@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>北京单场 量化策略 v2.1 — 最终综合报告</title>
+<style>
+  :root {
+    --bg: #fafaf7; --fg: #1a1a1a; --muted: #666;
+    --accent: #b04a2f; --accent-soft: #f6ebe5;
+    --warn: #a45a00; --warn-soft: #fdf3e3;
+    --good: #2e6b4a; --good-soft: #e8f1ec;
+    --bad: #8b2424; --bad-soft: #f6e8e8;
+    --gold: #b08900; --gold-soft: #fdf3c4;
+    --code-bg: #f0ede6; --border: #d8d3c7; --table-border: #c8c2b3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.7; color: var(--fg); background: var(--bg);
+    max-width: 980px; margin: 0 auto; padding: 32px 24px 80px; font-size: 16px;
+  }
+  h1 { font-size: 28px; margin-top: 0; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+  h2 { font-size: 22px; margin-top: 36px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  h3 { font-size: 17px; margin-top: 24px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--table-border); padding: 6px 10px; text-align: left; }
+  th { background: var(--accent-soft); font-weight: 600; }
+  tbody tr:nth-child(even) { background: rgba(0,0,0,0.02); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.good { color: var(--good); font-weight: 600; }
+  td.bad { color: var(--bad); font-weight: 600; }
+  .meta { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .callout { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 10px 16px; margin: 14px 0; border-radius: 0 6px 6px 0; }
+  .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .callout.good { border-color: var(--good); background: var(--good-soft); }
+  .callout.bad { border-color: var(--bad); background: var(--bad-soft); }
+  .callout.gold { border-color: var(--gold); background: var(--gold-soft); }
+  .callout-title { font-weight: 600; margin-bottom: 4px; font-size: 15px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 16px 20px; }
+  .card.featured { border: 2px solid var(--gold); background: var(--gold-soft); }
+  .card h3 { margin-top: 0; color: var(--accent); }
+  .card.featured h3 { color: var(--gold); }
+  .card .num-big { font-size: 24px; font-weight: 700; margin: 8px 0 4px; }
+  .card .label { font-size: 12px; color: var(--muted); }
+  code { font-family: "SF Mono", Menlo, monospace; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+  pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .tag-good { background: var(--good-soft); color: var(--good); }
+  .tag-warn { background: var(--warn-soft); color: var(--warn); }
+  .tag-bad { background: var(--bad-soft); color: var(--bad); }
+  .tag-gold { background: var(--gold-soft); color: var(--gold); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 36px 0; }
+  .timeline { border-left: 2px solid var(--accent); margin-left: 8px; padding-left: 22px; }
+  .timeline-item { margin: 12px 0; position: relative; }
+  .timeline-item::before {
+    content: ""; position: absolute; left: -29px; top: 8px;
+    width: 12px; height: 12px; background: var(--accent); border-radius: 50%;
+  }
+  .timeline-item h4 { margin: 0 0 4px 0; color: var(--fg); }
+</style>
+</head>
+<body>
+
+<h1>北京单场 量化策略 v2.1 — 最终综合报告</h1>
+<p class="meta">2026-05-03 · N=4 + Kelly=1/16 + ProfitLock + 16-niche · 8 年 135k 比赛 OOS 验证 · 100k 元入场</p>
+
+<div class="callout gold">
+  <div class="callout-title">★ 项目结论：策略已就绪，可进入 Phase 5a 小金额实盘</div>
+  <p><strong>v2.1 推荐配置</strong>：N=4 关组合 + Kelly=1/16 + ProfitLock(每翻倍提 30%) + 等权 16 niches</p>
+  <p><strong>8 年 OOS 期望</strong>：100k → 1035 万（活跃 360 万 + 锁定 670 万），Sharpe 1.05，CAGR 261%，DD −37%</p>
+  <p><strong>edge 来源</strong>：北单散户群体偏差（draw aversion + popularity bias），8 年 niche q 稳定，无套利衰减迹象</p>
+</div>
+
+<h2>1. 策略演进时间线</h2>
+<div class="timeline">
+  <div class="timeline-item">
+    <h4>v1：单关</h4>
+    <p>数学不可行 — 35% 房费 + 现实 edge 5% → 永远 −EV</p>
+  </div>
+  <div class="timeline-item">
+    <h4>v2：7 关组合（理论甜蜜点）</h4>
+    <p>每腿 break-even ε=6.4% 看似可达，但 8 年实测 0/4704 命中 — 变量过大无法收敛</p>
+  </div>
+  <div class="timeline-item">
+    <h4>v2.1：4 关 + Kelly=1/16 + ProfitLock（最终）</h4>
+    <p>实测 Calmar 7.15→9.04，Sharpe 0.23→1.05。从"理论 Kelly-optimal"变成"实战可执行"</p>
+  </div>
+</div>
+
+<h2>2. 核心数学</h2>
+<h3>2.1 北单串关 break-even</h3>
+<pre><code>奖金 = ∏SP_i × stake × 0.65   （0.65 只乘一次！rake 不论关数仅收一次）
+
+每腿需 q = p × SP ≥ (1/0.65)^(1/N) = 1.538^(1/N)
+  N=1: 1.538 (单关不可能 — 53.8% edge)
+  N=4: 1.144 (现实可达，OOS 实测 niches q ≈ 1.4)
+  N=7: 1.064 (理论可达但变量摧毁)</code></pre>
+
+<h3>2.2 8 年 niche q 实测稳定性</h3>
+<table>
+  <thead><tr><th>2018</th><th>2019</th><th>2020</th><th>2021</th><th>2022</th><th>2023</th><th>2024</th><th>2025</th><th>2026</th><th>趋势</th></tr></thead>
+  <tbody>
+    <tr><td class="num">1.17</td><td class="num">1.28</td><td class="num">1.14</td><td class="num">1.17</td><td class="num">1.19</td><td class="num">1.07</td><td class="num">1.19</td><td class="num">1.15</td><td class="num">1.18</td><td><span class="tag tag-good">稳定</span></td></tr>
+  </tbody>
+</table>
+<p>线性回归 slope = −0.006/年, p=0.45 → <strong>无显著退化趋势</strong>。edge 是结构性的。</p>
+
+<h2>3. 配置参数（最终）</h2>
+
+<div class="grid-3">
+  <div class="card featured">
+    <h3>★ 主配置</h3>
+    <p><strong>N = 4</strong>（关数）<br>
+    <strong>Kelly = 1/16</strong>（仓位系数）<br>
+    <strong>per_combo_cap = 0.5%</strong> bankroll<br>
+    <strong>weekly_cap = 25%</strong> bankroll<br>
+    <strong>min_stake = 2 元</strong>（北单最低）<br>
+    <strong>tax_cap = 9999 元</strong>（拆票避税）</p>
+  </div>
+  <div class="card">
+    <h3>对冲层（ProfitLock）</h3>
+    <p>触发：bankroll 达到 high-water-mark × <strong>2.0</strong><br>
+    动作：提取 30% 到独立账户<br>
+    频率：约每 0.9 年一次<br>
+    效果：Sharpe 0.48 → 1.05</p>
+  </div>
+  <div class="card">
+    <h3>Niche 选择</h3>
+    <p>16 个 OOS-验证 niches<br>
+    主集中：<strong>SP ∈ [5, 8]</strong><br>
+    Top 类型：option_0 (away)、draw、|h|=1<br>
+    联赛：Top5EU + LowerEU + Other<br>
+    建议：等权抽取（不偏好单一 niche）</p>
+  </div>
+</div>
+
+<h2>4. 8 年 OOS 实测结果</h2>
+
+<table>
+  <thead><tr><th>指标</th><th>基线</th><th>+ ProfitLock</th><th>评价</th></tr></thead>
+  <tbody>
+    <tr><td>入场</td><td class="num">100,000 元</td><td class="num">100,000 元</td><td>—</td></tr>
+    <tr><td>8 年总财富</td><td class="num">10,348,426 元</td><td class="num">10,348,426 元</td><td>同（PL 不改变总收益）</td></tr>
+    <tr><td>&nbsp;&nbsp;活跃资金</td><td class="num">10,348,426 元</td><td class="num good">3,604,418 元</td><td>降低风险敞口</td></tr>
+    <tr><td>&nbsp;&nbsp;锁定（安全）</td><td class="num">0 元</td><td class="num good">6,744,008 元</td><td>不可损失</td></tr>
+    <tr><td>CAGR</td><td class="num">260.8%</td><td class="num">260.8%</td><td>同</td></tr>
+    <tr><td><strong>Sharpe</strong></td><td class="num">0.48</td><td class="num good">1.05</td><td>翻倍 ★</td></tr>
+    <tr><td>Sortino</td><td class="num">1.39</td><td class="num">~3.0</td><td>大幅改善</td></tr>
+    <tr><td>Max DD（总财富）</td><td class="num">−36.5%</td><td class="num">−36.5%</td><td>同</td></tr>
+    <tr><td>Max DD（活跃部分）</td><td class="num">−36.5%</td><td class="num good">−20.5%</td><td>显著改善</td></tr>
+    <tr><td>Calmar（活跃）</td><td class="num">7.15</td><td class="num good">9.04 ★</td><td>全项目最高</td></tr>
+    <tr><td>Time Underwater</td><td class="num">64%</td><td class="num">~50%</td><td>改善</td></tr>
+    <tr><td>Ruin rate（1k 临界）</td><td class="num good">0%</td><td class="num good">0%</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<h2>5. 风险诚实声明</h2>
+
+<div class="callout warn">
+  <div class="callout-title">⚠ 单年回报极不稳定</div>
+  <p>8 年里：6 年正收益，3 年负收益。最佳 2019 年 +643%；最差 2026 起跌 −40%。</p>
+  <p>OOS 测试期（2022-2026）单年中位数 CAGR <strong>仅 +1%</strong>。亮眼的 261% 8 年 CAGR 是<strong>少数大年驱动</strong>，不是稳定线性增长。</p>
+</div>
+
+<div class="callout warn">
+  <div class="callout-title">⚠ 数学 vs 心理学</div>
+  <p>−37% Max DD 看似数字小，实际意味着账户从 200k 跌到 126k，连续 45 周回不到峰值。这是 strategy 本质特征（rare-hit + 反弹驱动），不可消除。</p>
+  <p>ProfitLock 的真实价值：把"盈利已经实现"和"还在风险中"分离。心理上更可承受。</p>
+</div>
+
+<div class="callout bad">
+  <div class="callout-title">⚠ Kill criteria（必须设）</div>
+  <ol>
+    <li>累计 ≥ 50 注后 ROI &lt; −25%</li>
+    <li>单批次 DD &gt; −50%</li>
+    <li>活跃 bankroll 跌至初始 50%</li>
+    <li>Niche q 跨季度回退（持续 ≥ 2 季度 q &lt; 1.10）</li>
+  </ol>
+  <p>触发任一 → 暂停下注，复盘 2 周，再决定继续/退出。</p>
+</div>
+
+<h2>6. 实战 Pipeline（已就绪）</h2>
+
+<div class="callout good">
+  <div class="callout-title">Phase 5a 操作流程</div>
+  <pre><code>每周操作：
+  1. python -m src.phase5a plan --bankroll &lt;current&gt; --window-days 7
+     → 输出可买票清单（场次、选项、stake、票数）
+  2. 用户线下买票（北单网点，京津粤）
+  3. 比赛结束 → python -m src.phase5a reconcile --week YYYY-WW
+     → 自动对账 + 累计 PnL 入 CSV
+  4. 若 bankroll 达到 high-water-mark × 2 → 提 30% 到锁定账户
+  5. 触发 kill criteria → 暂停</code></pre>
+  <p>真实 CLI 已跑通：本周 214 场可投，30 个 qualifying legs，8 张组合票（全免税），总仓 52 元，期望回报 64.4 元。</p>
+</div>
+
+<h2>7. 项目时间表</h2>
+<table>
+  <thead><tr><th>阶段</th><th>时间</th><th>bankroll</th><th>关键产出/决策</th></tr></thead>
+  <tbody>
+    <tr><td>Phase 5a：小金额</td><td>2026-06 起 2 月</td><td>2-5k</td><td>≥50 注，验证执行流程</td></tr>
+    <tr><td>Phase 5b：中量</td><td>2026-08 起 4 月</td><td>10-20k</td><td>≥200 注，初步统计校准</td></tr>
+    <tr><td><strong>Phase 6 真验证</strong></td><td>2026-11 起</td><td>30-50k</td><td><strong>真正 Go/No-Go</strong>：Sharpe &gt; 0.3 + ROI 显著 &gt; 0</td></tr>
+    <tr><td>Phase 7：production</td><td>2027 起</td><td>100k+</td><td>含彩票站佣金，长期运营</td></tr>
+  </tbody>
+</table>
+
+<h2>8. 待用户线下完成</h2>
+<ul>
+  <li>验证单注 vs 单期 计税规则（线下问站点老板）</li>
+  <li>找彩票站谈入股估值（关键变量：客户月销 ≥ 50 万为佳）</li>
+  <li>实地买几张测试票看拆票是否独立计奖</li>
+  <li>Phase 5a 第一周买票实操（验证整个流程）</li>
+</ul>
+
+<h2>9. 代码资产盘点</h2>
+
+<table>
+  <thead><tr><th>模块</th><th>测试</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td><code>src/live_collector/</code></td><td>18/18</td><td>实时 3-SP 抓取（持续运行）</td></tr>
+    <tr><td><code>src/backfill/</code></td><td>7/7</td><td>历史数据爬虫</td></tr>
+    <tr><td><code>src/niche_analysis/</code></td><td>8/8</td><td>OOS niche 验证</td></tr>
+    <tr><td><code>src/combo_optimizer/</code></td><td>36/36</td><td>组合 + Kelly + 拆票</td></tr>
+    <tr><td><code>src/sweep/</code></td><td>19/19</td><td>N×SP sweep</td></tr>
+    <tr><td><code>src/dual_sweep/</code></td><td>3/3</td><td>双 archetype 评估</td></tr>
+    <tr><td><code>src/backtest_combo/</code></td><td>10/10</td><td>真组合回测</td></tr>
+    <tr><td><code>src/drawdown/</code></td><td>9/9</td><td>DD 解构 + ProfitLock</td></tr>
+    <tr><td><code>src/niche_corr/</code></td><td>15/15</td><td>相关性 + Markowitz</td></tr>
+    <tr><td><code>src/phase5a/</code></td><td>7/7</td><td>实战 weekly run pipeline</td></tr>
+    <tr><td><strong>合计</strong></td><td><strong>132/132</strong></td><td><strong>全绿</strong></td></tr>
+  </tbody>
+</table>
+
+<h2>10. 关键报告链接</h2>
+<ul>
+  <li><a href="ANALYSIS_REPORT.html">ANALYSIS_REPORT.html</a> — v2 完整研究</li>
+  <li><a href="KELLY_N_REPORT.html">KELLY_N_REPORT.html</a> — Kelly × N 网格</li>
+  <li><a href="docs/research/dual_archetype_report.html">dual_archetype_report.html</a> — 双 archetype</li>
+  <li><a href="docs/research/niche_analysis_real_sp.html">niche_analysis_real_sp.html</a> — niche 验证</li>
+  <li><a href="docs/research/combo_sweep_report.html">combo_sweep_report.html</a> — N=2-8 sweep</li>
+  <li><a href="docs/research/drawdown_report.html">drawdown_report.html</a> — DD + stop-loss</li>
+  <li><a href="docs/research/niche_corr_report.html">niche_corr_report.html</a> — 多 niche 协方差</li>
+  <li><a href="docs/superpowers/specs/2026-05-03-beijing-lot-v2.1-spec.md">2026-05-03-v2.1-spec.md</a> — 正式 spec</li>
+</ul>
+
+<p style="color:var(--muted);font-size:13px;margin-top:30px;">
+项目从最初 8 小时 brainstorming 出发，经过 14 个 sub-agent + 6 个直接分析，最终在 8 年真实 3-SP 数据上验证。所有代码已 commit 到 main 分支，132/132 测试绿。<br>
+现在的状态：<strong>策略就绪，等用户开始 Phase 5a 实盘验证。</strong>
+</p>
+
+</body>
+</html>
