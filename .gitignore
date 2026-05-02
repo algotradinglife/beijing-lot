@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.DS_Store
+
+# parallel-agent live-collector data (out of this workstream's scope)
+data/beidan_live.db*
