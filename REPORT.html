@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>北京单场 让球胜平负 (3/1/0) 量化策略 — 研究报告</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --fg: #1a1a1a;
+    --muted: #666;
+    --accent: #b04a2f;
+    --accent-soft: #f6ebe5;
+    --warn: #a45a00;
+    --warn-soft: #fdf3e3;
+    --good: #2e6b4a;
+    --good-soft: #e8f1ec;
+    --code-bg: #f0ede6;
+    --border: #d8d3c7;
+    --table-border: #c8c2b3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+                 "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.7;
+    color: var(--fg);
+    background: var(--bg);
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+    font-size: 16px;
+  }
+  h1 { font-size: 26px; margin-top: 0; border-bottom: 2px solid var(--accent); padding-bottom: 8px; }
+  h2 { font-size: 20px; margin-top: 36px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  h3 { font-size: 17px; margin-top: 24px; }
+  h4 { font-size: 15px; margin-top: 18px; color: var(--muted); }
+  p { margin: 10px 0; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 4px 0; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 12px 14px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 13px;
+    border: 1px solid var(--border);
+  }
+  pre code { background: none; padding: 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--table-border);
+    padding: 6px 10px;
+    text-align: left;
+  }
+  th {
+    background: var(--accent-soft);
+    font-weight: 600;
+  }
+  tbody tr:nth-child(even) { background: rgba(0,0,0,0.02); }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 10px 16px;
+    margin: 14px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .callout.good { border-color: var(--good); background: var(--good-soft); }
+  .callout-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  .toc {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 20px;
+    margin-bottom: 28px;
+  }
+  .toc ol { margin: 6px 0 0 0; padding-left: 22px; }
+  .toc a { color: var(--fg); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  .formula {
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--code-bg);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 8px 0;
+    overflow-x: auto;
+    font-size: 13px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+  }
+  .card h4 { margin-top: 0; color: var(--accent); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 36px 0; }
+  small { color: var(--muted); }
+  kbd {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 12px;
+    font-family: monospace;
+  }
+  .num-tag {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    line-height: 22px;
+    text-align: center;
+    font-size: 12px;
+    margin-right: 6px;
+    font-weight: 600;
+  }
+  .footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<h1>北京单场 让球胜平负 (3/1/0) 量化策略</h1>
+<p class="meta">研究报告 · 2026-05-02 · 工作目录 <code>/Volumes/Data Drive/workspace/trading/beijing-lot/</code></p>
+
+<div class="toc">
+  <strong>目录</strong>
+  <ol>
+    <li><a href="#tldr">核心结论 (TL;DR)</a></li>
+    <li><a href="#thesis">投注论 (Bet Thesis)</a></li>
+    <li><a href="#findings">关键实证发现</a></li>
+    <li><a href="#decisions">系统设计决策</a></li>
+    <li><a href="#data-risk">数据风险与应对</a></li>
+    <li><a href="#phases">开发阶段计划</a></li>
+    <li><a href="#open">需要你确认的事</a></li>
+    <li><a href="#warnings">重要警告</a></li>
+    <li><a href="#deliverables">交付物清单</a></li>
+  </ol>
+</div>
+
+<h2 id="tldr">1. 核心结论</h2>
+
+<div class="callout">
+  <div class="callout-title">一句话总结</div>
+  方法学可行（Pinnacle 反推真实概率经实证校准良好），但<strong>北单历史数据有结构性缺失</strong>（销量比 + 输方 SP 不存档），导致核心 edge 假设（散户群体偏差）只能靠未来 6+ 个月的 live 数据验证。设计稿与 5 项实证分析已完成；任何投入应区分"探索期"与"已验证期"。
+</div>
+
+<ul>
+  <li><span class="num-tag">1</span><strong>方法学可行</strong>：Pinnacle 1X2 校准误差 &lt; 2pp、AH 校准 &lt; 1.5pp、Skellam AH→1X2 重建偏差 ~1.1pp（与原书价 Brier 无统计差异）。</li>
+  <li><span class="num-tag">2</span><strong>发现一个必修偏差</strong>：Skellam 在整数线上系统性低估让球后平局 (p1) 约 2.8pp（实际 27.5% vs 预测 24.8%）。每注 "1" 选项被低估 EV ~6.2%。</li>
+  <li><span class="num-tag">3</span><strong>批次必须 N ≥ 50</strong>：Monte Carlo 显示 5% 真实 edge 下，N=50 → P5 ROI = −18%；N=10 → P5 ROI = −45%。北单一期只有 5–10 场 → 批次必须按周聚合。</li>
+  <li><span class="num-tag">4</span><strong>EV 阈值 T = 0.05 默认</strong>（最小化最坏损失）；T = 0.10–0.15 适合长期增长。T ≥ 0.18 在高噪声下让 log-growth 转负。</li>
+  <li><span class="num-tag">5</span><strong>仓位规则定型</strong>：1/4 Kelly + 三层上限（per-match 5% 资金 / pool 0.5% / batch 25%）。文献支撑（MacLean–Thorp–Ziemba 2010, Whelan 2025）。</li>
+  <li><span class="num-tag">6</span><strong>Edge 仅一种站得住脚</strong>：散户群体 SP 偏好（draw aversion + popularity bias）vs 国际市场。<strong>v1 必须实证验证</strong> — 否则项目无 edge 应停止。</li>
+</ul>
+
+<h2 id="thesis">2. 投注论 (Bet Thesis)</h2>
+
+<h3>2.1 北单 SP 机制</h3>
+<ul>
+  <li>彩池模型（parimutuel）：奖金 = SP × 2 × 0.65</li>
+  <li>返奖率 65%，房费 35%（远高于 Pinnacle 的 ~3%）</li>
+  <li><strong>不是和庄家对赌，而是和其他购彩者对赌</strong></li>
+</ul>
+
+<h3>2.2 Edge 来源</h3>
+<p>结构性 +EV 假设：北单购彩者群体（中国散户）的投注分布偏离国际博彩市场（Pinnacle 等）的真实概率估计。</p>
+
+<table>
+  <thead>
+    <tr><th>偏差假设</th><th>方向</th><th>信心</th><th>来源</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>平局选项 SP 系统性偏高（散户回避平局）</td><td>"1" +EV</td><td><strong>高</strong></td><td>Forrest &amp; Simmons; Deschamps &amp; Gergaud</td></tr>
+    <tr><td>主队/热门球队赢球 SP 偏低</td><td>"3" 热门 −EV</td><td>中</td><td>Fischer 2022 (COVID 自然实验)</td></tr>
+    <tr><td>极端冷门 SP 偏低（FLB 残留）</td><td>极冷门 −EV</td><td>中</td><td>Snyder 1978; Hausch–Ziemba–Rubinstein 1981</td></tr>
+    <tr><td>小盘比赛 SP 噪声大</td><td>±10% 双向</td><td>高</td><td>直觉 + 中文行业分析</td></tr>
+  </tbody>
+</table>
+
+<div class="callout warn">
+  <div class="callout-title">⚠ 关键论断</div>
+  上述假设若不成立或不足以覆盖 35% 房费，<strong>策略无 edge</strong>。第一阶段必须用真实北单 SP 历史数据验证。
+</div>
+
+<h3>2.3 P_real（真实概率）来源 — Approach A 已验证</h3>
+<p>从国际博彩市场（Pinnacle）反推：</p>
+<div class="formula">Pinnacle AH（让球数 + 赔率）+ Pinnacle O/U 2.5 → Skellam(λ_h, λ_a) 拟合 → 北单整数让球数下读取 p3/p1/p0</div>
+
+<h2 id="findings">3. 关键实证发现</h2>
+
+<h3>3.1 Pinnacle 1X2 校准（8993 场五大联赛 5 季）</h3>
+<table>
+  <thead><tr><th>指标</th><th>数值</th><th>解读</th></tr></thead>
+  <tbody>
+    <tr><td>Margin (overround)</td><td>2.95%</td><td>极低，盘口锐利</td></tr>
+    <tr><td>校准误差（max bucket）</td><td>&lt; 2pp</td><td>预测值与实现频率对齐</td></tr>
+    <tr><td>Favourite ROI</td><td>−1.40%</td><td>市场近似有效</td></tr>
+    <tr><td>Brier score</td><td>0.5772</td><td>明显优于 uniform 基线 0.667</td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 Pinnacle AH 校准</h3>
+<ul>
+  <li>Margin: <strong>2.34%</strong></li>
+  <li>Always-back-away ROI: <strong>−0.006%</strong>（基本完美有效）</li>
+  <li>仅 <strong>23.75%</strong> 比赛是整数让球线 → <strong>76% 需要 AH→1X2 转换</strong></li>
+</ul>
+
+<h3>3.3 Skellam AH→1X2 转换（EPL 2024-25 校准）</h3>
+<ul>
+  <li>Mean abs prob error: <strong>1.12%</strong></li>
+  <li>Brier vs outcome: 0.583（与 Pinnacle 自家 1X2 统计无差）</li>
+  <li>6/6 单元测试通过；conversion 在 8903 场上零失败</li>
+</ul>
+
+<h3>3.4 ⚠ 关键偏差：整数线平局低估（必修）</h3>
+
+<div class="callout warn">
+  <div class="callout-title">Dixon-Coles τ 效应在 8903 场实测中显现</div>
+  Skellam 模型<strong>系统性低估让球后平局 (p1) 约 2.8pp</strong>。在 SP_draw ≈ 3.4 时，每注 "1" 选项 EV 被低估 6.2% — 系统会拒绝大量本应盈利的平局下注。
+</div>
+
+<table>
+  <thead><tr><th>整数线 h</th><th>样本数</th><th>p1 残差</th><th>p3 残差</th></tr></thead>
+  <tbody>
+    <tr><td>−2</td><td>795</td><td>−0.5pp</td><td>−3.7pp</td></tr>
+    <tr><td>−1</td><td>1932</td><td>+2.6pp</td><td>−0.5pp</td></tr>
+    <tr><td><strong>0</strong></td><td><strong>5016</strong></td><td><strong>+3.5pp</strong></td><td>−3.0pp</td></tr>
+    <tr><td>+1</td><td>933</td><td>+2.1pp</td><td>−2.0pp</td></tr>
+    <tr><td>+2</td><td>211</td><td>−0.4pp</td><td>+2.9pp</td></tr>
+  </tbody>
+</table>
+
+<p><strong>v1 双轨方案</strong>：</p>
+<ol>
+  <li><strong>h = 0 场次（56% 比赛）</strong>：直接用 Pinnacle 1X2（去 vig 后）。无校正需要。</li>
+  <li><strong>|h| = 1 场次（32% 比赛）</strong>：Skellam + 经验校正 <code>p1 += 0.020; p3 -= 0.010; p0 -= 0.010</code></li>
+  <li><strong>|h| ≥ 2 场次（12% 比赛）</strong>：Skellam 原值（残差 &lt; 0.5pp，无需校正）</li>
+</ol>
+
+<h3>3.5 Portfolio Monte Carlo — 决定批次大小 N</h3>
+<p>20k 批次每点，等额下注。目标：5% 分位 ROI ≥ −20%。</p>
+<table>
+  <thead><tr><th>N (per batch)</th><th>edge=3% P5 ROI</th><th>edge=5% P5 ROI</th><th>edge=10% P5 ROI</th></tr></thead>
+  <tbody>
+    <tr><td>5</td><td>−69%</td><td>−68%</td><td>−63%</td></tr>
+    <tr><td>10</td><td>−47%</td><td>−45%</td><td>−41%</td></tr>
+    <tr><td>20</td><td>−33%</td><td>−31%</td><td>−26%</td></tr>
+    <tr style="background: var(--good-soft);"><td><strong>50</strong></td><td><strong>−20%</strong></td><td><strong>−18%</strong></td><td><strong>−13%</strong></td></tr>
+    <tr><td>100</td><td>−13%</td><td>−11%</td><td>−7%</td></tr>
+  </tbody>
+</table>
+<p>→ <strong>N ≥ 50 才能控制最坏损失</strong>。北单一期 5–10 场 → <strong>批次按周聚合</strong>，不是单期。</p>
+
+<h3>3.6 Winner's Curse — EV 阈值 T 的设定</h3>
+<p>实际操作点 σ_p ≈ 0.03（含 Pinnacle 自身噪声 0.025 + 我们重建误差 0.011），edge_mean = +1%：</p>
+<table>
+  <thead><tr><th>T</th><th>接受率</th><th>realized true edge</th><th>mean Kelly stake</th><th>每注 log-growth</th></tr></thead>
+  <tbody>
+    <tr><td>0.00</td><td>53%</td><td>+2.6%</td><td>1.9%</td><td>5.1e-4</td></tr>
+    <tr><td><strong>0.05</strong></td><td>27%</td><td>+3.7%</td><td>2.7%</td><td>8.4e-4</td></tr>
+    <tr><td>0.10</td><td>10%</td><td>+4.6%</td><td>3.2%</td><td>11.3e-4</td></tr>
+    <tr><td>0.15</td><td>3%</td><td>+5.2%</td><td>3.3%</td><td><strong>11.9e-4 (峰值)</strong></td></tr>
+    <tr><td>0.20</td><td>&lt;1%</td><td>+5.4%</td><td>3.4%</td><td>11.0e-4 (回落)</td></tr>
+  </tbody>
+</table>
+
+<div class="grid-2">
+  <div class="card">
+    <h4>目标 A — 最小化批次最坏损失</h4>
+    <p>T = 0.05，每周 N ≈ 50 候选。批次 P5 ROI ~ −18%。<br><strong>v1 默认采用此目标</strong>（用户原诉求）。</p>
+  </div>
+  <div class="card">
+    <h4>目标 B — 最大化长期 log-growth</h4>
+    <p>T = 0.10–0.15，每周 N ≈ 25 候选。批次 P5 ROI ~ −25%（更糟）但平均增长更高。</p>
+  </div>
+</div>
+
+<h2 id="decisions">4. 系统设计决策</h2>
+
+<table>
+  <thead><tr><th>决策项</th><th>选择</th><th>依据</th></tr></thead>
+  <tbody>
+    <tr><td>玩法</td><td>仅让球胜平负 (3/1/0)</td><td>v1 范围；其它玩法 v2 议</td></tr>
+    <tr><td>下注结构</td><td><strong>仅单关</strong>，禁串关</td><td>串关 all-or-nothing 与最坏损失目标冲突</td></tr>
+    <tr><td>选项选择</td><td>EV 驱动（自下而上）</td><td>用户首选 A（顶层配额），同意先 B 跑通</td></tr>
+    <tr><td>真实概率源</td><td>Pinnacle 反推（Approach A）</td><td>Pinnacle 1X2/AH 校准良好；自建模型 v2 议</td></tr>
+    <tr><td>EV 阈值</td><td>T = 0.05</td><td>winner's curse 分析</td></tr>
+    <tr><td>仓位规则</td><td>1/4 Kelly + 三层上限</td><td>MacLean-Thorp-Ziemba 2010</td></tr>
+    <tr><td>批次大小</td><td>N ≥ 50（周聚合）</td><td>Monte Carlo P5 目标</td></tr>
+    <tr><td>批次总仓位上限</td><td>≤ 25% bankroll</td><td>系统性模型错误防护</td></tr>
+    <tr><td>联赛范围</td><td>五大起步 → 欧洲全部</td><td>样本不足时扩展</td></tr>
+  </tbody>
+</table>
+
+<h3>4.1 仓位计算公式</h3>
+<pre><code>edge_i      = p_i × SP_i × 0.65 − 1
+f_kelly_i   = edge_i / (SP_i × 0.65 − 1)
+f_actual_i  = 0.25 × f_kelly_i
+stake_i     = min(
+                f_actual_i × bankroll,
+                0.05 × bankroll,         # per-match 上限
+                0.005 × pool_i           # pool 自影响上限
+              )
+</code></pre>
+
+<h2 id="data-risk">5. 数据风险与应对（实测后已确定）</h2>
+
+<div class="callout good">
+  <div class="callout-title">✓ 好消息：500.com 全量可爬</div>
+  ~2,115 期（自 2007-05），共 ~170k 场。单脚本 ~80 LOC，~70 分钟跑完。备份源 cp.zgzcw.com。无 JS、无验证码、无观察到的限流。
+</div>
+
+<div class="callout warn">
+  <div class="callout-title">⚠ 坏消息（影响回测设计）</div>
+  <ol>
+    <li><strong>历史只保留中奖选项 SP</strong>。输的两个选项 SP 已被擦除。</li>
+    <li><strong>销量分布（每选项投注百分比）历史不留档</strong>。这是验证群体偏差最关键的信号。</li>
+    <li>平均欧赔（1X2 主流博彩平均赔率）历史完整保留 — 关键回退方案。</li>
+    <li>赛前实时 3-SP + 销量比是有的，但需 Live Collector 持续抓取。</li>
+  </ol>
+</div>
+
+<h3>5.1 应对方案：双轨数据策略</h3>
+
+<div class="grid-2">
+  <div class="card">
+    <h4>轨道 1：Live Collector（立即开始）</h4>
+    <p>常驻爬虫 poll 北单投注页，5–15 分钟一次，捕获完整 3-SP + 销量比 + 让球数。</p>
+    <p>6–12 个月后才有真正可用于策略验证的数据集。<br>工作量：~2 人天。</p>
+  </div>
+  <div class="card">
+    <h4>轨道 2：Limited Backtest with Proxies</h4>
+    <p>用 170k 历史 + 平均欧赔代理 SP，构建近似回测。验证模型对平均欧赔的预测准确性。</p>
+    <p><strong>不能</strong>验证群体偏差量级。<br>工作量：1 人周。</p>
+  </div>
+</div>
+
+<h2 id="phases">6. 开发阶段计划（修订）</h2>
+
+<table>
+  <thead><tr><th>阶段</th><th>周期</th><th>关键产出</th></tr></thead>
+  <tbody>
+    <tr><td>Phase 1 — 数据基础设施</td><td>2–3 周</td><td>Live Collector + 历史回填爬虫 + Pinnacle 抓取 + DB schema</td></tr>
+    <tr><td>Phase 2 — 模型核心</td><td>2 周</td><td>双轨概率管道（Pinnacle 1X2 直用 + Skellam 校正）</td></tr>
+    <tr><td>Phase 3 — 决策与初步回测</td><td>2 周</td><td>EV 过滤 + Kelly + 限制版回测引擎</td></tr>
+    <tr><td>Phase 4a — Limited Backtest 报告</td><td>1–2 周</td><td><strong>决策点 1</strong>：模型对平均欧赔有 +EV 趋势 → 进入 Phase 5</td></tr>
+    <tr><td>Phase 5 — Forward Live Collection</td><td>3–6 月</td><td>真实 3-SP + 销量数据；小金额 forward test</td></tr>
+    <tr><td>Phase 6 — Real Backtest 验证</td><td>足量数据后</td><td><strong>决策点 2 (真正 Go/No-Go)</strong>：累计 ROI 显著 &gt; 0 → production</td></tr>
+    <tr><td>Phase 7 — Production Scale</td><td>持续</td><td>上调 bankroll / 滚动 retraining / PnL 监控</td></tr>
+  </tbody>
+</table>
+
+<p><small>原估 8–12 周到 v1 上线 → 改为 8–12 周到 Limited Backtest；6–12 月到 Forward Test 验证；12–18 月到 production scale。</small></p>
+
+<h2 id="open">7. 需要你确认的事</h2>
+
+<ol>
+  <li><strong>T 阈值与目标函数</strong> — T=0.05（最小化最坏损失）vs T=0.10–0.15（最大化长期增长）。默认前者；接受？</li>
+  <li><strong>延长时间表</strong> — 真正 Go/No-Go 推迟约 6 个月。接受这个时间表，还是希望换一种 edge 来源？</li>
+  <li><strong>初始 bankroll</strong> — 影响 5% 上限的绝对额。规模设想？</li>
+  <li><strong>执行地</strong> — 北单仅在京津粤三地销售。你在三地之内吗？</li>
+  <li><strong>开发时间预算</strong> — 你能投入多少周/月开发时间？</li>
+</ol>
+
+<h2 id="warnings">8. 重要警告</h2>
+
+<div class="callout warn">
+  <div class="callout-title">警告 1：北单不是和庄对赌，是和散户对赌</div>
+  <ul>
+    <li>返奖率 65%，房费 35%（高于普通博彩）</li>
+    <li>任何"知识缺乏的盲注策略"长期 ROI ≈ −35%。<strong>不可能靠运气或感觉盈利</strong></li>
+    <li>唯一可行 edge：散户群体定价错误 vs 国际市场。文献显示 5–10pp 量级，需用 35% 房费 cover 后才有正期望</li>
+  </ul>
+</div>
+
+<div class="callout warn">
+  <div class="callout-title">警告 2：真正 Go/No-Go 决策推迟 ~6 个月</div>
+  <ul>
+    <li>历史回测最多告诉我们"模型预测多准 vs 平均欧赔"</li>
+    <li>历史回测<strong>不能</strong>告诉我们"北单散户偏差是否真存在 + 大到能 cover 35% 房费"</li>
+    <li>必须 Live Collector 跑 3+ 月 + 200+ 注 forward test 才有统计意义</li>
+    <li>在此之前任何投入都是<strong>探索性投入，不能靠它盈利</strong></li>
+  </ul>
+</div>
+
+<div class="callout warn">
+  <div class="callout-title">警告 3：合规</div>
+  中国大陆体育彩票为国家专营。本系统仅用于<strong>个人决策辅助</strong>，不做代购、不托管、不收费咨询。生成的投注清单只在本地保留。
+</div>
+
+<h2 id="deliverables">9. 交付物清单</h2>
+
+<h3>设计稿（核心交付物）</h3>
+<ul>
+  <li><code>docs/superpowers/specs/2026-05-02-beijing-lot-310-design.md</code> — 完整设计文档（351 行）</li>
+</ul>
+
+<h3>研究报告</h3>
+<ul>
+  <li><code>docs/research/sp-bias-and-kelly.md</code> — 25+ 篇文献综述 + 仓位规则推导（312 行）</li>
+  <li><code>docs/research/ah-to-1x2-methodology.md</code> — Skellam 方法学详细推导（241 行）</li>
+  <li><code>docs/research/data-sources-beidan.md</code> — 北单数据源实测报告（294 行）</li>
+</ul>
+
+<h3>实证分析（Python，全部跑通）</h3>
+<ul>
+  <li><code>notebooks/portfolio_sim.py</code> — 批次方差网格扫描</li>
+  <li><code>notebooks/winners_curse.py</code> + <code>winners_curse_v2.py</code> — EV 阈值 + 噪声敏感性分析</li>
+  <li><code>notebooks/pinnacle_calibration.py</code> — Pinnacle 1X2 校准</li>
+  <li><code>notebooks/ah_calibration.py</code> — Pinnacle AH 校准</li>
+  <li><code>notebooks/ah_to_1x2.py</code> — Skellam 转换器（6/6 单元测试通过）</li>
+  <li><code>notebooks/integer_line_test.py</code> — 整数线实测（发现 +2.8pp 平局校正需求）</li>
+  <li><code>notebooks/draw_correction_test.py</code> — 校正方案对比</li>
+</ul>
+
+<h3>数据集</h3>
+<ul>
+  <li><code>data/raw/football-data/</code> — 5 联赛 × 5 季原始 CSV（9498 场 × 100+ 字段）</li>
+  <li><code>data/raw/big5_int_line_predictions.csv</code> — 整数线预测 + 实际结果（8903 场）</li>
+  <li><code>data/raw/portfolio_sweep.csv</code> — Monte Carlo 全网格结果</li>
+</ul>
+
+<h3>持久化记忆（自动 memory，跨 session 持久化）</h3>
+<ul>
+  <li><code>~/.claude/.../memory/project_beijing_lot_strategy.md</code> — 项目目标、关键决策、开放问题</li>
+  <li><code>~/.claude/.../memory/project_empirical_findings.md</code> — 实证数据基线</li>
+  <li><code>~/.claude/.../memory/feedback_design_collaboration.md</code> — 协作风格</li>
+</ul>
+
+<div class="footer">
+  本报告由 8 小时自主探索生成（2026-05-02 00:30 — 写完时刻）。<br>
+  含 3 个并行 sub-agent 调研、5 项 Python 实证分析、1 份完整设计稿。<br>
+  按 brainstorming skill 硬约束，<strong>未进入实施阶段</strong>，等待用户审阅设计稿后通过 superpowers:writing-plans 推进。
+</div>
+
+</body>
+</html>
