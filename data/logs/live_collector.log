@@ -1,0 +1,29 @@
+2026-05-02 08:56:52,178 INFO live_collector | starting; db=/Volumes/Data Drive/workspace/trading/beijing-lot/data/beidan_live.db log=/Volumes/Data Drive/workspace/trading/beijing-lot/data/logs/live_collector.log
+2026-05-02 08:56:52,530 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-02T00:56:52Z
+2026-05-02 08:56:53,967 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-02 08:56:56,303 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-02 08:56:56,304 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-02 08:56:56,439 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-02 08:56:57,116 INFO live_collector.scheduler | settle issue=26051 wrote 14 settlement rows
+2026-05-02 08:56:57,117 INFO live_collector | shutdown complete; total polls=1
+2026-05-02 08:57:40,828 INFO live_collector | starting; db=/Volumes/Data Drive/workspace/trading/beijing-lot/data/beidan_live.db log=/Volumes/Data Drive/workspace/trading/beijing-lot/data/logs/live_collector.log
+2026-05-02 08:57:41,040 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-02T00:57:41Z
+2026-05-02 08:57:42,283 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-02 08:57:44,566 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-02 08:57:44,566 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-02 08:57:44,699 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-02 08:57:45,597 INFO live_collector.scheduler | settle issue=26051 wrote 14 settlement rows
+2026-05-02 08:57:45,598 INFO live_collector | sleeping 159s
+2026-05-02 09:00:25,492 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-02T01:00:25Z
+2026-05-02 09:00:27,087 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-02 09:00:29,195 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-02 09:00:29,196 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-02 09:00:29,273 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-02 09:00:29,274 INFO live_collector | sleeping 136s
+2026-05-02 09:02:41,033 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-02T01:02:41Z
+2026-05-02 09:02:42,575 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-02 09:02:44,460 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-02 09:02:44,460 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-02 09:02:45,492 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-02 09:02:45,492 INFO live_collector | duration reached, exiting
+2026-05-02 09:02:45,494 INFO live_collector | shutdown complete; total polls=3

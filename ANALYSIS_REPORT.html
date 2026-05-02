@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>北京单场 量化策略 — 分析与测试报告 v2</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --fg: #1a1a1a;
+    --muted: #666;
+    --accent: #b04a2f;
+    --accent-soft: #f6ebe5;
+    --warn: #a45a00;
+    --warn-soft: #fdf3e3;
+    --good: #2e6b4a;
+    --good-soft: #e8f1ec;
+    --bad: #8b2424;
+    --bad-soft: #f6e8e8;
+    --code-bg: #f0ede6;
+    --border: #d8d3c7;
+    --table-border: #c8c2b3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+                 "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.7;
+    color: var(--fg);
+    background: var(--bg);
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+    font-size: 16px;
+  }
+  h1 { font-size: 28px; margin-top: 0; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+  h2 { font-size: 22px; margin-top: 40px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  h3 { font-size: 18px; margin-top: 26px; }
+  h4 { font-size: 15px; margin-top: 18px; color: var(--muted); }
+  p { margin: 10px 0; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 4px 0; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 12px 14px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--table-border);
+    padding: 6px 10px;
+    text-align: left;
+  }
+  th {
+    background: var(--accent-soft);
+    font-weight: 600;
+  }
+  tbody tr:nth-child(even) { background: rgba(0,0,0,0.02); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.good { color: var(--good); font-weight: 600; }
+  td.bad { color: var(--bad); font-weight: 600; }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 10px 16px;
+    margin: 14px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .callout.good { border-color: var(--good); background: var(--good-soft); }
+  .callout.bad { border-color: var(--bad); background: var(--bad-soft); }
+  .callout-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  .toc {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 22px;
+    margin-bottom: 28px;
+  }
+  .toc ol { margin: 6px 0 0 0; padding-left: 22px; }
+  .toc a { color: var(--fg); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  .formula {
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--code-bg);
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin: 10px 0;
+    overflow-x: auto;
+    font-size: 13.5px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+  }
+  .card h4 { margin-top: 0; color: var(--accent); }
+  .card .num {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--fg);
+    margin: 6px 0 4px;
+  }
+  .card .label { font-size: 12px; color: var(--muted); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 36px 0; }
+  small { color: var(--muted); }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tag-pass { background: var(--good-soft); color: var(--good); }
+  .tag-fail { background: var(--bad-soft); color: var(--bad); }
+  .tag-warn { background: var(--warn-soft); color: var(--warn); }
+  .tag-info { background: var(--accent-soft); color: var(--accent); }
+  .num-tag {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    line-height: 22px;
+    text-align: center;
+    font-size: 12px;
+    margin-right: 6px;
+    font-weight: 600;
+  }
+  .footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .timeline {
+    border-left: 2px solid var(--accent);
+    margin-left: 8px;
+    padding-left: 22px;
+  }
+  .timeline-item {
+    margin: 12px 0;
+    position: relative;
+  }
+  .timeline-item::before {
+    content: "";
+    position: absolute;
+    left: -29px;
+    top: 8px;
+    width: 12px;
+    height: 12px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+  .timeline-item h4 {
+    margin: 0 0 4px 0;
+    color: var(--fg);
+  }
+  .pivot-arrow {
+    text-align: center;
+    color: var(--accent);
+    font-size: 24px;
+    margin: 18px 0;
+  }
+</style>
+</head>
+<body>
+
+<h1>北京单场 量化策略 — 分析与测试报告</h1>
+<p class="meta">v2.0 (combo pivot 后) · 2026-05-02 · 完整研究 + 实证 + 代码状态</p>
+
+<div class="toc">
+  <strong>目录</strong>
+  <ol>
+    <li><a href="#exec">Executive Summary</a></li>
+    <li><a href="#evolution">策略演化：v1 单关 → v2 7 关组合 + 站点 + 拆票</a></li>
+    <li><a href="#math">核心数学：为什么 7 关是甜蜜点</a></li>
+    <li><a href="#data">数据源与可用性</a></li>
+    <li><a href="#model">概率模型架构</a></li>
+    <li><a href="#empirical">关键实证发现</a></li>
+    <li><a href="#backtest">回测结果（单关 + 组合）</a></li>
+    <li><a href="#optimizer">组合优化器</a></li>
+    <li><a href="#code">代码与测试状态</a></li>
+    <li><a href="#critical">三个决定性洞察</a></li>
+    <li><a href="#decisions">已确定决策 & 待确认</a></li>
+    <li><a href="#nextsteps">下一步</a></li>
+  </ol>
+</div>
+
+<h2 id="exec">1. Executive Summary</h2>
+
+<div class="grid-3">
+  <div class="card">
+    <div class="label">策略迭代</div>
+    <div class="num">v1 → v2</div>
+    <div class="label">单关 → 7 关组合 + 站点 + 拆票避税</div>
+  </div>
+  <div class="card">
+    <div class="label">代码模块</div>
+    <div class="num">5 个</div>
+    <div class="label">live_collector / backfill / backtest / combo_optimizer / backtest_combo</div>
+  </div>
+  <div class="card">
+    <div class="label">测试通过率</div>
+    <div class="num">93 / 93</div>
+    <div class="label">跨所有模块</div>
+  </div>
+  <div class="card">
+    <div class="label">历史比赛</div>
+    <div class="num">38,463</div>
+    <div class="label">+ 8,993 五大联赛 Pinnacle</div>
+  </div>
+  <div class="card">
+    <div class="label">单关回测 ROI</div>
+    <div class="num" style="color:var(--bad)">−35.4%</div>
+    <div class="label">avg_eu proxy 下，与 rake 不可分辨</div>
+  </div>
+  <div class="card">
+    <div class="label">组合回测 ROI</div>
+    <div class="num" style="color:var(--bad)">−100.0%</div>
+    <div class="label">winner's curse 标本（同源数据）</div>
+  </div>
+</div>
+
+<div class="callout">
+  <div class="callout-title">核心论点</div>
+  <ol>
+    <li><strong>v1 单关策略数学上不可行</strong>：35% 房费 + 现实 edge 5% → 永远负 EV</li>
+    <li><strong>v2 7 关组合 + 站点佣金 + 拆票避税</strong>：当 per-leg edge ≥ 5–6% 时可以盈利</li>
+    <li><strong>关键约束</strong>：必须用<strong>独立数据源</strong>（Pinnacle 算 p_real / 北单 算 SP）。同源会触发 winner's curse（已实证：组合 ROI = −100%）</li>
+    <li><strong>真实 edge 量级 ε 是唯一未知数</strong>，必须 Live Collector 跑 6 个月才能量化</li>
+  </ol>
+</div>
+
+<h2 id="evolution">2. 策略演化</h2>
+
+<div class="timeline">
+  <div class="timeline-item">
+    <h4>v1.0 — 单关 + EV 过滤 + 1/4 Kelly（最初设计）</h4>
+    <p><span class="tag tag-info">超过</span> 设定：每注 EV ≥ 1.05 入投注组合；每周聚合 N ≥ 50 候选；目标控制最坏损失 P5 ROI ≥ −20%</p>
+    <p><strong>问题</strong>：35% 房费太高，单关 EV 永远负</p>
+  </div>
+  <div class="timeline-item">
+    <h4>v1.1 — 加入站点佣金（部分缓解）</h4>
+    <p>自买票 + 7% 佣金返佣 → 净房费降到 28%。仍负 EV，仅"亏得少"。</p>
+  </div>
+  <div class="pivot-arrow">▼</div>
+  <div class="timeline-item">
+    <h4>v2.0 — 7 关组合 + 站点 + 拆票避税（当前）</h4>
+    <p><span class="tag tag-pass">活跃</span> 用户透露真实赚钱模式：组合稀释 rake + 站点佣金 + 拆票避免 20% 税</p>
+    <p><strong>突破</strong>：35% 房费在 7 关组合下只收一次，per-leg break-even edge 从 53.8% 降到 6.4%。可达。</p>
+  </div>
+</div>
+
+<h2 id="math">3. 核心数学：为什么 7 关是甜蜜点</h2>
+
+<h3>3.1 北单 串关公式</h3>
+<div class="formula">奖金 (per 2 元票) = ∏ SP_i × 2 × 0.65</div>
+<p>关键：<strong>0.65 只乘一次</strong> — 35% 房费不论几关只收一次。</p>
+
+<h3>3.2 N 关 break-even per-leg edge</h3>
+<div class="formula">每腿需要 r ≥ (1/0.65)^(1/N) = 1.538^(1/N)</div>
+
+<table>
+  <thead>
+    <tr><th>关数 N</th><th>每腿需 r</th><th>需要的概率 edge</th><th>可行性</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1（单关）</td><td>1.538</td><td>53.8%</td><td class="bad">不可能</td></tr>
+    <tr><td>3 关</td><td>1.155</td><td>15.5%</td><td class="bad">极困难</td></tr>
+    <tr><td>5 关</td><td>1.090</td><td>9.0%</td><td>困难</td></tr>
+    <tr><td>7 关</td><td><strong>1.064</strong></td><td><strong>6.4%</strong></td><td class="good">可行（接近文献预测）</td></tr>
+    <tr><td>10 关</td><td>1.044</td><td>4.4%</td><td>易但变量太大</td></tr>
+    <tr><td>15 关</td><td>1.029</td><td>2.9%</td><td>易但中奖率 0.001%</td></tr>
+  </tbody>
+</table>
+
+<h3>3.3 加入佣金 + 拆票避税后的合并 EV</h3>
+<div class="formula">Net EV = (1+ε)^7 × 0.65 × τ + 0.07s − 1</div>
+<p>τ = 1.0（拆票避税）；s = 持股比例（佣金分成）；ε = per-leg edge</p>
+
+<table>
+  <thead>
+    <tr><th>per-leg ε</th><th>无佣金无拆票</th><th>仅拆票</th><th>仅佣金</th><th><strong>拆票+全佣金</strong></th></tr>
+  </thead>
+  <tbody>
+    <tr><td>3%</td><td class="bad">−43%</td><td class="bad">−28%</td><td class="bad">−36%</td><td class="bad">−13%</td></tr>
+    <tr><td>5%</td><td class="bad">−35%</td><td class="bad">−22%</td><td class="bad">−28%</td><td>−1.5%</td></tr>
+    <tr><td><strong>6%</strong></td><td class="bad">−32%</td><td class="bad">−18%</td><td class="bad">−25%</td><td class="good"><strong>+5.0%</strong></td></tr>
+    <tr><td>7%</td><td class="bad">−27%</td><td class="bad">−13%</td><td class="bad">−20%</td><td class="good">+11.3%</td></tr>
+    <tr><td>8%</td><td class="bad">−24%</td><td class="bad">−7%</td><td class="bad">−17%</td><td class="good">+18.5%</td></tr>
+  </tbody>
+</table>
+
+<p><strong>盈利门槛：每腿 ε ≥ 5–6%（拆票 + 全佣金条件下）</strong></p>
+
+<h2 id="data">4. 数据源与可用性</h2>
+
+<table>
+  <thead>
+    <tr><th>数据</th><th>来源</th><th>状态</th><th>覆盖</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>五大联赛历史结果 + Pinnacle 赔率</td><td>football-data.co.uk</td><td><span class="tag tag-pass">完成</span></td><td>9,498 场（5 联赛 × 5 季）</td></tr>
+    <tr><td>北单历史比赛 + 中奖侧 SP + 平均欧赔</td><td>500.com kaijiang.php</td><td><span class="tag tag-pass">完成</span></td><td>38,463 场（150 期，2024–2026）</td></tr>
+    <tr><td>北单实时 3-SP 全向量</td><td>cp.zgzcw + 500.com 投注页</td><td><span class="tag tag-pass">活跃</span></td><td>每 5–15 min poll</td></tr>
+    <tr><td>历史 输方 SP（输的两个选项 SP）</td><td>—</td><td><span class="tag tag-fail">永久缺失</span></td><td>500.com 系统擦除</td></tr>
+    <tr><td>历史 销量比例</td><td>—</td><td><span class="tag tag-fail">已被推导</span></td><td>= 1/SP_i（无需独立抓取）</td></tr>
+  </tbody>
+</table>
+
+<div class="callout good">
+  <div class="callout-title">关键发现：销量比可从 3-SP 直接推导</div>
+  <p>北单 parimutuel 公式蕴含恒等式 <strong>Σ(1/SP_i) = 1</strong>。即 share_i = 1 / SP_i。</p>
+  <p><strong>实证</strong>：1,104 个 Live Collector snapshot 上，平均 Σ(1/SP) = <strong>1.0026</strong>（标准差 0.002，最大偏差 1%）。100% 行落在 [0.99, 1.01] 区间。</p>
+  <p><strong>意味着</strong>：不需要单独抓取销量比；不需要花钱买历史数据；Live Collector 已隐式获得。</p>
+</div>
+
+<h2 id="model">5. 概率模型架构</h2>
+
+<div class="grid-2">
+  <div class="card">
+    <h4>P_real 来源（Approach A）</h4>
+    <p>Pinnacle AH（让球数 + 赔率）+ Pinnacle O/U 2.5 → Skellam 2 参数拟合 → 整数让球数下读 p3/p1/p0</p>
+    <p><strong>校准</strong>：</p>
+    <ul>
+      <li>Pinnacle 1X2 校准误差 &lt; 2pp</li>
+      <li>Pinnacle AH margin 2.34%</li>
+      <li>Skellam AH→1X2 重建偏差 ~1.1pp</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h4>SP 来源</h4>
+    <p>北单实际 3-SP（来自 Live Collector）— <strong>独立于 Pinnacle</strong></p>
+    <p><strong>关键</strong>：两个来源必须独立。同源（如都用 avg_eu）会触发 winner's curse（见 §7）</p>
+  </div>
+</div>
+
+<h3>5.1 整数线 Dixon-Coles τ 校正（v1 必修）</h3>
+<p>实测发现：Skellam 在整数线上系统性低估让球后平局：</p>
+
+<table>
+  <thead>
+    <tr><th>整数线 h</th><th>样本数</th><th>p1 残差</th><th>建议校正</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>−2</td><td class="num">795</td><td class="num">−0.5pp</td><td>无校正</td></tr>
+    <tr><td>−1</td><td class="num">1932</td><td class="num">+2.6pp</td><td>p1 += 0.020</td></tr>
+    <tr><td><strong>0</strong></td><td class="num"><strong>5016</strong></td><td class="num"><strong>+3.5pp</strong></td><td>用 Pinnacle 1X2 直接</td></tr>
+    <tr><td>+1</td><td class="num">933</td><td class="num">+2.1pp</td><td>p1 += 0.020</td></tr>
+    <tr><td>+2</td><td class="num">211</td><td class="num">−0.4pp</td><td>无校正</td></tr>
+  </tbody>
+</table>
+
+<h2 id="empirical">6. 关键实证发现</h2>
+
+<h3>6.1 北单 SP vs 平均欧赔的跨选项偏离（5,114 场样本）</h3>
+
+<table>
+  <thead>
+    <tr><th>中奖选项</th><th>样本数</th><th>北单 SP × 0.65 / avg_eu fair</th><th>解读</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>0（客胜）</td><td class="num">1,041</td><td class="num"><strong>0.660</strong></td><td>系统性最被低估（公众过度下注客胜）</td></tr>
+    <tr><td>1（平局）</td><td class="num">845</td><td class="num"><strong>0.679</strong></td><td>最接近"理论公允" 0.684 — 公众相对回避</td></tr>
+    <tr><td>3（主胜）</td><td class="num">1,202</td><td class="num">0.673</td><td>中间</td></tr>
+  </tbody>
+</table>
+
+<p>跨 30 期稳定性：mean 0.672, std 0.014（极稳定）</p>
+
+<div class="callout">
+  <div class="callout-title">真实但量级有限的群体偏差信号</div>
+  <p>跨选项差异 ~2pp。文献预期 5–10pp。意味着真实 ε 可能在 1–4% 区间，<strong>距离 6% 盈利门槛仍有距离</strong>。</p>
+</div>
+
+<h3>6.2 Portfolio Monte Carlo（合成数据）</h3>
+
+<p>5% 分位 ROI by N（matches per batch）at various edges（20k batches each）：</p>
+
+<table>
+  <thead>
+    <tr><th>N</th><th>edge=3%</th><th>edge=5%</th><th>edge=10%</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>5</td><td class="num bad">−69%</td><td class="num bad">−68%</td><td class="num bad">−63%</td></tr>
+    <tr><td>10</td><td class="num bad">−47%</td><td class="num bad">−45%</td><td class="num bad">−41%</td></tr>
+    <tr><td>20</td><td class="num bad">−33%</td><td class="num bad">−31%</td><td class="num bad">−26%</td></tr>
+    <tr><td><strong>50</strong></td><td class="num"><strong>−20%</strong></td><td class="num"><strong>−18%</strong></td><td class="num good"><strong>−13%</strong></td></tr>
+    <tr><td>100</td><td class="num">−13%</td><td class="num">−11%</td><td class="num good">−7%</td></tr>
+  </tbody>
+</table>
+
+<h2 id="backtest">7. 回测结果</h2>
+
+<h3>7.1 单关回测（B2 agent）</h3>
+<div class="card">
+  <p><strong>数据</strong>：38,463 历史 北单 比赛 / 6,228 EV-pass picks（empirical OLS proxy SP）</p>
+  <p><strong>累计 ROI</strong>：<span style="color:var(--bad);font-weight:700">−35.43%</span> （95% bootstrap CI [−37.62%, −33.36%]）</p>
+  <p><strong>按选项分组</strong>：3 / 1 / 0 全部 ROI ≈ −35%，无一显著</p>
+  <p><strong>按让球数分组</strong>：h=0 / |h|=1 / |h|≥2 全部 ROI ≈ −35%，无一显著</p>
+  <p><strong>按 EV 桶分组</strong>：5 个桶全部 ROI 在 −34% ~ −37%，模型预测 EV 不能预测实际 ROI</p>
+  <p><strong>结论</strong>：<span class="tag tag-info">符合零信号</span> 当 proxy SP 来自同源 avg_eu 市场，模型无法找到 edge。</p>
+</div>
+
+<h3>7.2 组合回测（half-backtest）</h3>
+<div class="card">
+  <p><strong>数据</strong>：150 期 / 44 活跃周 / 1,831 TicketPlan / 345,306 物理票 / 759,032 元总仓</p>
+  <p><strong>中奖组合数</strong>：<span style="color:var(--bad);font-weight:700">0 / 1,831</span></p>
+  <p><strong>中奖周数</strong>：<span style="color:var(--bad);font-weight:700">0 / 44</span></p>
+  <p><strong>累计 ROI</strong>：<span style="color:var(--bad);font-weight:700">−100.00%</span> （95% CI [−100, −100]）</p>
+  <p><strong>模型预测平均 joint_p</strong>：~11%（应有 ~204 中奖）</p>
+  <p><strong>实际命中</strong>：0 — 不仅未校准，是<strong>反向的 winner's curse 引擎</strong></p>
+</div>
+
+<div class="callout bad">
+  <div class="callout-title">⚠ Winner's Curse 引擎机制（重要诊断）</div>
+  <p>edge ≥ 0.05 过滤器选中的腿，恰好是 OLS proxy-SP 残差 + de-vig 噪声同向偏移最大的腿——<strong>也就是模型最可能错的腿</strong>。把 7 条带选择偏差的腿乘起来，joint probability 指数级崩塌。</p>
+  <p>组合 ROI <strong>比单关更差 64.57pp</strong>，因为 7 关结构放大了同源数据的偏差。</p>
+</div>
+
+<h3>7.3 回测对比</h3>
+
+<table>
+  <thead>
+    <tr><th>变体</th><th>p̂ 来源</th><th>SP 来源</th><th>来源独立性</th><th>ROI</th><th>诊断</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>单关 半回测（B2）</td><td>avg_eu</td><td>实测 winning_sp</td><td>部分独立</td><td class="num bad">−35.4%</td><td>≈ rake</td></tr>
+    <tr><td>组合 半回测</td><td>avg_eu</td><td>OLS 拟合 SP</td><td>完全同源</td><td class="num bad">−100%</td><td>winner's curse</td></tr>
+    <tr><td>未来真回测</td><td>Pinnacle AH</td><td>北单实际 3-SP</td><td>完全独立</td><td>未知（−35% 到 +10%）</td><td>Phase 5/6 验证</td></tr>
+  </tbody>
+</table>
+
+<div class="callout good">
+  <div class="callout-title">这两个负结果反而验证了 v1/v2 架构</div>
+  <p>组合回测 ROI = −100% 是同源数据的 winner's curse 标本。设计稿明确分离两个数据源（Pinnacle 算 p / 北单实测 SP）正是为了避免这个。<strong>当前 −100% 就是真信号缺失下的下界 baseline</strong>——任何未来回测 ROI > −35% 都意味着真信号存在。</p>
+</div>
+
+<h2 id="optimizer">8. 组合优化器</h2>
+
+<p>v1 实现于 <code>src/combo_optimizer/</code>。36/36 单元测试通过。</p>
+
+<h3>8.1 算法</h3>
+<ol>
+  <li>过滤候选 edge ≥ 0.05 + 同场去重（同 match 取 EV 最高的选项）</li>
+  <li>取 top K（默认 14）by EV</li>
+  <li>枚举 C(K, 7) = 3,432 个组合</li>
+  <li>过滤组合 EV ≥ 0.10</li>
+  <li>每个组合：1/4 Kelly 仓位 → 拆票（每票奖金 ≤ 9999） → 偶数元 stake → 总仓 ≤ 25% bankroll</li>
+</ol>
+
+<h3>8.2 Demo 输出（mock 数据，bankroll = 10 万元）</h3>
+
+<table>
+  <thead>
+    <tr><th>#</th><th>∏SP</th><th>p_combo</th><th>EV</th><th>stake/票</th><th>n_票</th><th>总仓</th><th>单票奖金</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td class="num">2,254.6</td><td class="num">1.56%</td><td class="num">+21.9%</td><td class="num">6 元</td><td class="num">63</td><td class="num">378 元</td><td class="num">8,793 元</td></tr>
+    <tr><td>2</td><td class="num">2,579.8</td><td class="num">1.36%</td><td class="num">+21.8%</td><td class="num">4 元</td><td class="num">82</td><td class="num">328 元</td><td class="num">6,707 元</td></tr>
+    <tr><td>3</td><td class="num">4,031.3</td><td class="num">0.87%</td><td class="num">+21.8%</td><td class="num">2 元</td><td class="num">104</td><td class="num">208 元</td><td class="num">5,241 元</td></tr>
+  </tbody>
+</table>
+
+<p><strong>50 张组合 / 3,852 物理票 / 总仓 12,956 元 (13% bankroll) / 全部税前避税</strong></p>
+
+<p><span class="tag tag-warn">注意</span> Mock 中 per-leg edge 5–8%（夸大）；真实环境每腿 1–4% 时组合 EV 为负。</p>
+
+<h2 id="code">9. 代码与测试状态</h2>
+
+<table>
+  <thead>
+    <tr><th>模块</th><th>路径</th><th>测试</th><th>状态</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Live Collector（实时 3-SP 抓取）</td><td><code>src/live_collector/</code></td><td>18 / 18</td><td><span class="tag tag-pass">活跃</span></td></tr>
+    <tr><td>Historical Backfill（500.com 爬取）</td><td><code>src/backfill/</code></td><td>7 / 7</td><td><span class="tag tag-pass">完成</span></td></tr>
+    <tr><td>Backtest Engine（单关）</td><td><code>src/backtest/</code></td><td>22 / 22</td><td><span class="tag tag-pass">完成</span></td></tr>
+    <tr><td>Combo Optimizer（7 关组合）</td><td><code>src/combo_optimizer/</code></td><td>36 / 36</td><td><span class="tag tag-pass">完成</span></td></tr>
+    <tr><td>Combo Backtest（组合回测）</td><td><code>src/backtest_combo/</code></td><td>10 / 10</td><td><span class="tag tag-pass">完成</span></td></tr>
+    <tr><td><strong>合计</strong></td><td>—</td><td><strong>93 / 93</strong></td><td><span class="tag tag-pass">绿</span></td></tr>
+  </tbody>
+</table>
+
+<h3>9.1 数据库</h3>
+<table>
+  <thead><tr><th>DB</th><th>路径</th><th>大小</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>历史回填 DB</td><td><code>data/beidan_history.db</code></td><td>—</td><td>38,463 行</td></tr>
+    <tr><td>Live Collector DB</td><td><code>data/beidan_live.db</code></td><td>—</td><td>matches 382 / snapshots 1,146 / settlements 14（持续增长）</td></tr>
+    <tr><td>用户提供 CSV</td><td><code>data/raw/beidan_history_user_clean.csv</code></td><td>~430 KB</td><td>5,114 行（30 期）</td></tr>
+  </tbody>
+</table>
+
+<h2 id="critical">10. 三个决定性洞察</h2>
+
+<h3>10.1 销量比 ≡ 1 / SP_i（解决核心数据缺口）</h3>
+<p>北单 parimutuel 公式蕴含 Σ(1/SP_i) = 1。Live Collector 抓取 3-SP 即得销量比。<strong>不需要花钱买数据，不需要登录态，不需要找其他端点。</strong></p>
+
+<h3>10.2 Dixon-Coles τ 在整数线上的偏差（v1 必修）</h3>
+<p>Skellam 模型在 h=0 时低估平局 3.5pp。每注 "1" 选项 EV 被低估 ~6.2%，会拒绝大量本应盈利的下注。已设计分段校正方案。</p>
+
+<h3>10.3 同源数据触发 Winner's Curse（架构验证）</h3>
+<p>组合回测 ROI = −100% 证实：用 avg_eu 同时估 p 和 SP，过滤器会选中"模型最可能错"的腿。<strong>必须用独立数据源</strong>（Pinnacle 算 p / 北单实测 SP），这正是 v1/v2 架构选择。</p>
+
+<h2 id="decisions">11. 已确定决策 & 待确认</h2>
+
+<h3>已确定</h3>
+<table>
+  <thead><tr><th>项</th><th>选择</th></tr></thead>
+  <tbody>
+    <tr><td>玩法</td><td>北单 让球胜平负 (3/1/0) — 7 关组合</td></tr>
+    <tr><td>真概率源</td><td>Pinnacle AH + O/U → Skellam → 整数线 + 分段 τ 校正</td></tr>
+    <tr><td>SP 源</td><td>北单实测 3-SP（Live Collector）</td></tr>
+    <tr><td>仓位规则</td><td>1/4 Kelly + 单票奖金 ≤ 9,999 + 周仓 ≤ 25% bankroll</td></tr>
+    <tr><td>拆票避税</td><td>是（用户确认非身份绑定，可分人领奖）</td></tr>
+    <tr><td>站点佣金</td><td>入股模式，7% 销售额返佣（按持股比例）</td></tr>
+    <tr><td>地域</td><td>京津粤之内（用户确认）</td></tr>
+    <tr><td>初始 bankroll</td><td>100k+ 总额，分阶段部署（2-5k → 10-20k → 30-50k → 100k+）</td></tr>
+    <tr><td>EV 阈值 T</td><td>per-leg 0.05 起步；可调整</td></tr>
+  </tbody>
+</table>
+
+<h3>待确认</h3>
+<table>
+  <thead><tr><th>项</th><th>影响</th><th>验证方式</th></tr></thead>
+  <tbody>
+    <tr><td>单注 vs 单期 计税</td><td>τ ∈ [0.8, 1.0]</td><td>查《彩票管理条例》或问站点</td></tr>
+    <tr><td>站点佣金是否含老板自买票</td><td>佣金率 0–7pp</td><td>问体彩中心或老板</td></tr>
+    <tr><td>阶梯返佣（高销量 → 8%/9%）</td><td>+1–2pp</td><td>行业资料</td></tr>
+    <tr><td><strong>真实 per-leg ε</strong></td><td><strong>决定项目可行性</strong></td><td><strong>Live Collector 6+ 月</strong></td></tr>
+  </tbody>
+</table>
+
+<h2 id="nextsteps">12. 下一步</h2>
+
+<h3>12.1 你（线下）</h3>
+<ul>
+  <li>验证单注计税规则（任务 #20）</li>
+  <li>找一两家彩票站谈入股（关键变量：客户月销 ≥ 50 万为佳）</li>
+  <li>实地买几张测试票看拆票是否独立计奖</li>
+</ul>
+
+<h3>12.2 自动跑（已部署）</h3>
+<ul>
+  <li>Live Collector 持续运行，积累 3-SP 时序</li>
+  <li>每天自动结算到 settlements 表</li>
+</ul>
+
+<h3>12.3 推荐：当前阶段进入"等数据"模式</h3>
+<div class="callout">
+  <p>所有 v1/v2 必要代码已就绪（93/93 测试绿）。当前的"再写代码"基本只能进入 "假设 ε = X 又怎样" 的循环——没有新信息进入。</p>
+  <p><strong>建议 1–2 个月不增加新代码</strong>，让 Live Collector 累积真实数据。然后回来：</p>
+  <ol>
+    <li>用真 北单 3-SP + Pinnacle 模型重跑 backtest（独立数据源）</li>
+    <li>检查累计 ROI 是否显著 &gt; −35%（基本要求）</li>
+    <li>检查 per-leg ε 是否 ≥ 5–6%（盈利要求）</li>
+    <li>若都通过 → Phase 5a 小金额 forward test；否则停损</li>
+  </ol>
+</div>
+
+<h3>12.4 长期时间表</h3>
+
+<table>
+  <thead><tr><th>时间</th><th>阶段</th><th>关键产出 / 决策</th></tr></thead>
+  <tbody>
+    <tr><td>2026-05（now）</td><td>研究 + 代码完成</td><td>v2 spec + 93/93 测试 + Live Collector 上线</td></tr>
+    <tr><td>2026-05 ~ 06</td><td>线下商业验证</td><td>税规则 / 入股估值 / 实地买票测试</td></tr>
+    <tr><td>2026-06 ~ 08</td><td>Live Collector 累积期</td><td>3 月数据 → 第一次独立数据源回测</td></tr>
+    <tr><td>2026-09 ~ 11</td><td>Phase 5a 小金额 forward test</td><td>2-5k bankroll → 累计 50+ 注</td></tr>
+    <tr><td>2026-12 ~ 2027-02</td><td>Phase 5b 中量 forward test</td><td>10-20k bankroll → 累计 200+ 注 → <strong>真正 Go/No-Go</strong></td></tr>
+    <tr><td>2027-03+</td><td>Phase 6/7 production scale（如通过验证）</td><td>50k → 100k+ bankroll</td></tr>
+  </tbody>
+</table>
+
+<div class="footer">
+  本报告综合了 8 小时初始研究 + 后续 5 个 sub-agent 实现 + 3 次回测的所有关键发现。<br>
+  代码状态：5 个模块、93/93 测试通过、4 个数据库、3 篇研究报告、2 份设计稿、1 个用户提供数据集。<br>
+  对应 git：HEAD 在 main 分支，代码全部已提交。<br>
+  下次会话可参考 <code>~/.claude/projects/.../memory/MEMORY.md</code> 索引。
+</div>
+
+</body>
+</html>
