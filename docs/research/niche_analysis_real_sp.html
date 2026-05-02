@@ -1,0 +1,987 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Niche Analysis — Real 3-SP (北单)</title>
+<style>
+  :root {
+    --bg: #fafaf7;
+    --fg: #1a1a1a;
+    --muted: #666;
+    --accent: #b04a2f;
+    --accent-soft: #f6ebe5;
+    --warn: #a45a00;
+    --warn-soft: #fdf3e3;
+    --good: #2e6b4a;
+    --good-soft: #e8f1ec;
+    --bad: #8b2424;
+    --bad-soft: #f6e8e8;
+    --code-bg: #f0ede6;
+    --border: #d8d3c7;
+    --table-border: #c8c2b3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+                 "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.7;
+    color: var(--fg);
+    background: var(--bg);
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+    font-size: 16px;
+  }
+  h1 { font-size: 28px; margin-top: 0; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+  h2 { font-size: 22px; margin-top: 40px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  h3 { font-size: 18px; margin-top: 26px; }
+  h4 { font-size: 15px; margin-top: 18px; color: var(--muted); }
+  p { margin: 10px 0; }
+  ul, ol { padding-left: 24px; }
+  li { margin: 4px 0; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 12px 14px;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--table-border);
+    padding: 6px 10px;
+    text-align: left;
+  }
+  th {
+    background: var(--accent-soft);
+    font-weight: 600;
+  }
+  tbody tr:nth-child(even) { background: rgba(0,0,0,0.02); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.good { color: var(--good); font-weight: 600; }
+  td.bad { color: var(--bad); font-weight: 600; }
+  .callout {
+    border-left: 4px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 10px 16px;
+    margin: 14px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .callout.good { border-color: var(--good); background: var(--good-soft); }
+  .callout.bad { border-color: var(--bad); background: var(--bad-soft); }
+  .callout-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .meta {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  .toc {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 22px;
+    margin-bottom: 28px;
+  }
+  .toc ol { margin: 6px 0 0 0; padding-left: 22px; }
+  .toc a { color: var(--fg); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  .formula {
+    font-family: "SF Mono", Menlo, monospace;
+    background: var(--code-bg);
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin: 10px 0;
+    overflow-x: auto;
+    font-size: 13.5px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+  }
+  .card h4 { margin-top: 0; color: var(--accent); }
+  .card .num {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--fg);
+    margin: 6px 0 4px;
+  }
+  .card .label { font-size: 12px; color: var(--muted); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 36px 0; }
+  small { color: var(--muted); }
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tag-pass { background: var(--good-soft); color: var(--good); }
+  .tag-fail { background: var(--bad-soft); color: var(--bad); }
+  .tag-warn { background: var(--warn-soft); color: var(--warn); }
+  .tag-info { background: var(--accent-soft); color: var(--accent); }
+  .num-tag {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    line-height: 22px;
+    text-align: center;
+    font-size: 12px;
+    margin-right: 6px;
+    font-weight: 600;
+  }
+  .footer {
+    margin-top: 60px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .timeline {
+    border-left: 2px solid var(--accent);
+    margin-left: 8px;
+    padding-left: 22px;
+  }
+  .timeline-item {
+    margin: 12px 0;
+    position: relative;
+  }
+  .timeline-item::before {
+    content: "";
+    position: absolute;
+    left: -29px;
+    top: 8px;
+    width: 12px;
+    height: 12px;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+  .timeline-item h4 {
+    margin: 0 0 4px 0;
+    color: var(--fg);
+  }
+  .pivot-arrow {
+    text-align: center;
+    color: var(--accent);
+    font-size: 24px;
+    margin: 18px 0;
+  }
+</style>
+</head>
+<body>
+
+<h1>北单 Niche Analysis — Real 3-SP Validation</h1>
+<p class="meta">2026-05-02 · 8-year dataset (2018-01 → 2026-05) · 135,554 matches · 406,662 (match × option) legs</p>
+
+<div class="callout good">
+<div class="callout-title">Verdict</div>
+<strong>16/16 in-sample-passing niches survived OOS</strong> (q CI lower &gt; 1.064 in train, mean q &gt; 1.064 in test). Alt-bucket scheme: 25 survived. <br><br>The headline target (option_0 × SP∈(5,8]) shows train q=1.142, test q=1.140 — extremely stable across the 8-year split. The theoretical 7-leg combo EV is +65% (train) / +62% (test). <br><br><b>Real-SP combo backtest</b>: at n_legs=2 ROI = +89.8% with 35 hits over 474 weeks (vs B2's −100% same-source prior). Edge is real. At n_legs=7 the design point lands in the variance death zone (p_combo ≈ 6×10⁻⁵ ⇒ E[hits] ≈ 0.03 across 474 weeks; zero hits is the modal outcome under a true positive edge).
+</div>
+
+<h2>1. Data Sanity</h2>
+<table>
+  <thead><tr><th>Check</th><th>Value</th><th>Expectation</th></tr></thead>
+  <tbody>
+    <tr><td>Σ(1/SP) per match (mean)</td>
+        <td class='num'>1.0018</td>
+        <td>≈ 1.00 (rake comes via 0.65 RR multiplier, not vig in odds)</td></tr>
+    <tr><td>Global mean q = E[did_win × SP]</td>
+        <td class='num'>1.0153</td>
+        <td>≈ 1/RR = 1.5385 ⇒ leg EV = q·RR − 1 = -34.0%</td></tr>
+    <tr><td>Total long rows</td><td class='num'>406,662</td><td>= 3 × matches</td></tr>
+  </tbody>
+</table>
+<p><small><b>Note on data interpretation</b>: in this CSV Σ(1/SP) ≈ 1.0,
+   meaning the SPs are quoted as fair-odds-style decimals; the 北单 retail
+   rake is realized via the 0.65 payout coefficient. All EV numbers reflect
+   this convention. The dataset's <code>winning_sp</code> matches
+   <code>sp_3/sp_1/sp_0</code> with median ratio 1.004 — the SPs are
+   genuine 北单 closing quotes.</small></p>
+
+<h2>2. Top-line per-option / per-bucket</h2>
+<h3>By option</h3>
+<table>
+<thead><tr>
+<th>option</th>
+<th>n</th>
+<th>k</th>
+<th>mean q</th>
+<th>leg EV</th>
+<th>mean SP</th>
+</tr></thead><tbody>
+<tr>
+<td class=''>away</td>
+<td class='num'>135554</td>
+<td class='num'>47970</td>
+<td class=''>1.0290</td>
+<td class=''>-33.1%</td>
+<td class=''>3.124</td>
+</tr>
+<tr>
+<td class=''>draw</td>
+<td class='num'>135554</td>
+<td class='num'>37041</td>
+<td class=''>1.0123</td>
+<td class=''>-34.2%</td>
+<td class=''>3.749</td>
+</tr>
+<tr>
+<td class=''>home</td>
+<td class='num'>135554</td>
+<td class='num'>50543</td>
+<td class=''>1.0047</td>
+<td class=''>-34.7%</td>
+<td class=''>2.864</td>
+</tr>
+</tbody></table>
+<h3>By SP bucket</h3>
+<table>
+<thead><tr>
+<th>SP bucket</th>
+<th>n</th>
+<th>k</th>
+<th>mean q</th>
+<th>leg EV</th>
+<th>hit rate</th>
+</tr></thead><tbody>
+<tr>
+<td class=''>1.5-2</td>
+<td class='num'>27287</td>
+<td class='num'>13469</td>
+<td class=''>0.9131</td>
+<td class=''>-40.6%</td>
+<td class=''>49.4%</td>
+</tr>
+<tr>
+<td class=''>15+</td>
+<td class='num'>16</td>
+<td class='num'>6</td>
+<td class=''>7.4406</td>
+<td class=''>+383.6%</td>
+<td class=''>37.5%</td>
+</tr>
+<tr>
+<td class=''>2-3</td>
+<td class='num'>140310</td>
+<td class='num'>55751</td>
+<td class=''>0.9757</td>
+<td class=''>-36.6%</td>
+<td class=''>39.7%</td>
+</tr>
+<tr>
+<td class=''>3-5</td>
+<td class='num'>225316</td>
+<td class='num'>63306</td>
+<td class=''>1.0417</td>
+<td class=''>-32.3%</td>
+<td class=''>28.1%</td>
+</tr>
+<tr>
+<td class=''>5-8</td>
+<td class='num'>13197</td>
+<td class='num'>2805</td>
+<td class=''>1.1757</td>
+<td class=''>-23.6%</td>
+<td class=''>21.3%</td>
+</tr>
+<tr>
+<td class=''>8-15</td>
+<td class='num'>259</td>
+<td class='num'>50</td>
+<td class=''>1.9111</td>
+<td class=''>+24.2%</td>
+<td class=''>19.3%</td>
+</tr>
+<tr>
+<td class=''>na</td>
+<td class='num'>277</td>
+<td class='num'>167</td>
+<td class=''>0.8415</td>
+<td class=''>-45.3%</td>
+<td class=''>60.3%</td>
+</tr>
+</tbody></table>
+
+<h2>3. Headline target slice — option_0 × SP∈(5,8]</h2>
+<p>The preliminary report flagged this as the headline +78% combo-EV niche.
+   Rigorous train/test split:</p>
+
+    <table>
+      <thead><tr><th>Slice</th><th>n</th><th>k</th><th>mean q</th>
+      <th>leg EV</th><th>7-leg combo EV (theoretical)</th></tr></thead>
+      <tbody>
+        <tr><td>Full sample</td><td class='num'>7,436</td>
+            <td class='num'>1,517</td>
+            <td class='num'>1.1410</td>
+            <td class='num'>-25.8%</td>
+            <td class='num'>+63.6%</td></tr>
+        <tr><td>Train half (<i>2018-2022</i>)</td>
+            <td class='num'>3,646</td>
+            <td class='num'>748</td>
+            <td class='num'>1.1423</td>
+            <td class='num'>-25.7%</td>
+            <td class='num'>+65.0%</td></tr>
+        <tr><td>Test half (<i>2022-2026</i>)</td>
+            <td class='num'>3,790</td>
+            <td class='num'>769</td>
+            <td class='num'>1.1397</td>
+            <td class='num'>-25.9%</td>
+            <td class='num'>+62.3%</td></tr>
+      </tbody>
+    </table>
+    
+
+<h2>4. Top in-sample niches by 7-leg combo EV</h2>
+<p>min n=200, min k=30, q-CI bootstrap (B=500), 1- to 3-dim combinations.</p>
+<table>
+<thead><tr>
+<th>Niche</th>
+<th>n</th>
+<th>k</th>
+<th>mean SP</th>
+<th>mean q</th>
+<th>q CI low</th>
+<th>q CI hi</th>
+<th>leg EV</th>
+<th>combo EV (7-leg)</th>
+</tr></thead><tbody>
+<tr>
+<td class=''>sp_bucket=8-15</td>
+<td class='num'>259</td>
+<td class='num'>50</td>
+<td class=''>9.667</td>
+<td class=''>1.911</td>
+<td class=''>1.438</td>
+<td class=''>2.394</td>
+<td class=''>+24.2%</td>
+<td class=''>+5952.4%</td>
+</tr>
+<tr>
+<td class=''>option=3, sp_bucket=5-8, league_tier=Top5EU</td>
+<td class='num'>405</td>
+<td class='num'>107</td>
+<td class=''>5.522</td>
+<td class=''>1.460</td>
+<td class=''>1.224</td>
+<td class=''>1.726</td>
+<td class=''>-5.1%</td>
+<td class=''>+817.5%</td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8, handicap_class=h1, league_tier=Other</td>
+<td class='num'>789</td>
+<td class='num'>195</td>
+<td class=''>5.534</td>
+<td class=''>1.364</td>
+<td class=''>1.187</td>
+<td class=''>1.547</td>
+<td class=''>-11.4%</td>
+<td class=''>+470.0%</td>
+</tr>
+<tr>
+<td class=''>option=1, sp_bucket=5-8, league_tier=Other</td>
+<td class='num'>979</td>
+<td class='num'>244</td>
+<td class=''>5.434</td>
+<td class=''>1.350</td>
+<td class=''>1.203</td>
+<td class=''>1.495</td>
+<td class=''>-12.3%</td>
+<td class=''>+430.2%</td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8, league_tier=Top5EU</td>
+<td class='num'>1267</td>
+<td class='num'>304</td>
+<td class=''>5.545</td>
+<td class=''>1.331</td>
+<td class=''>1.202</td>
+<td class=''>1.478</td>
+<td class=''>-13.5%</td>
+<td class=''>+381.4%</td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8, handicap_class=h_unknown, league_tier=Top5EU</td>
+<td class='num'>1036</td>
+<td class='num'>245</td>
+<td class=''>5.566</td>
+<td class=''>1.316</td>
+<td class=''>1.169</td>
+<td class=''>1.470</td>
+<td class=''>-14.5%</td>
+<td class=''>+344.0%</td>
+</tr>
+<tr>
+<td class=''>option=1, sp_bucket=5-8, handicap_class=h1</td>
+<td class='num'>771</td>
+<td class='num'>186</td>
+<td class=''>5.442</td>
+<td class=''>1.308</td>
+<td class=''>1.131</td>
+<td class=''>1.477</td>
+<td class=''>-15.0%</td>
+<td class=''>+325.9%</td>
+</tr>
+<tr>
+<td class=''>option=0, sp_bucket=5-8, handicap_class=h1</td>
+<td class='num'>817</td>
+<td class='num'>193</td>
+<td class=''>5.563</td>
+<td class=''>1.308</td>
+<td class=''>1.151</td>
+<td class=''>1.474</td>
+<td class=''>-15.0%</td>
+<td class=''>+324.9%</td>
+</tr>
+<tr>
+<td class=''>option=0, sp_bucket=5-8, league_tier=Top5EU</td>
+<td class='num'>744</td>
+<td class='num'>171</td>
+<td class=''>5.586</td>
+<td class=''>1.285</td>
+<td class=''>1.124</td>
+<td class=''>1.440</td>
+<td class=''>-16.5%</td>
+<td class=''>+276.8%</td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8, handicap_class=h1</td>
+<td class='num'>2053</td>
+<td class='num'>480</td>
+<td class=''>5.505</td>
+<td class=''>1.282</td>
+<td class=''>1.186</td>
+<td class=''>1.384</td>
+<td class=''>-16.7%</td>
+<td class=''>+269.4%</td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8, handicap_class=h2plus, league_tier=Other</td>
+<td class='num'>471</td>
+<td class='num'>109</td>
+<td class=''>5.545</td>
+<td class=''>1.276</td>
+<td class=''>1.069</td>
+<td class=''>1.485</td>
+<td class=''>-17.1%</td>
+<td class=''>+257.4%</td>
+</tr>
+<tr>
+<td class=''>option=3, sp_bucket=5-8, handicap_class=h2plus</td>
+<td class='num'>202</td>
+<td class='num'>46</td>
+<td class=''>5.588</td>
+<td class=''>1.265</td>
+<td class=''>0.948</td>
+<td class=''>1.609</td>
+<td class=''>-17.8%</td>
+<td class=''>+236.3%</td>
+</tr>
+<tr>
+<td class=''>option=1, sp_bucket=5-8, handicap_class=h_unknown</td>
+<td class='num'>1329</td>
+<td class='num'>315</td>
+<td class=''>5.341</td>
+<td class=''>1.260</td>
+<td class=''>1.133</td>
+<td class=''>1.387</td>
+<td class=''>-18.1%</td>
+<td class=''>+227.8%</td>
+</tr>
+<tr>
+<td class=''>option=0, sp_bucket=5-8, league_tier=Asian</td>
+<td class='num'>353</td>
+<td class='num'>79</td>
+<td class=''>5.578</td>
+<td class=''>1.259</td>
+<td class=''>1.013</td>
+<td class=''>1.519</td>
+<td class=''>-18.2%</td>
+<td class=''>+225.4%</td>
+</tr>
+<tr>
+<td class=''>option=1, sp_bucket=5-8</td>
+<td class='num'>2685</td>
+<td class='num'>621</td>
+<td class=''>5.392</td>
+<td class=''>1.243</td>
+<td class=''>1.167</td>
+<td class=''>1.325</td>
+<td class=''>-19.2%</td>
+<td class=''>+198.5%</td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8, league_tier=Asian</td>
+<td class='num'>516</td>
+<td class='num'>111</td>
+<td class=''>5.560</td>
+<td class=''>1.208</td>
+<td class=''>1.008</td>
+<td class=''>1.430</td>
+<td class=''>-21.5%</td>
+<td class=''>+143.4%</td>
+</tr>
+<tr>
+<td class=''>option=3, sp_bucket=5-8</td>
+<td class='num'>3076</td>
+<td class='num'>667</td>
+<td class=''>5.546</td>
+<td class=''>1.201</td>
+<td class=''>1.124</td>
+<td class=''>1.284</td>
+<td class=''>-22.0%</td>
+<td class=''>+133.8%</td>
+</tr>
+<tr>
+<td class=''>option=3, sp_bucket=5-8, handicap_class=h_unknown</td>
+<td class='num'>2409</td>
+<td class='num'>520</td>
+<td class=''>5.550</td>
+<td class=''>1.197</td>
+<td class=''>1.105</td>
+<td class=''>1.291</td>
+<td class=''>-22.2%</td>
+<td class=''>+128.7%</td>
+</tr>
+<tr>
+<td class=''>option=3, sp_bucket=5-8, league_tier=Other</td>
+<td class='num'>1247</td>
+<td class='num'>268</td>
+<td class=''>5.552</td>
+<td class=''>1.194</td>
+<td class=''>1.057</td>
+<td class=''>1.323</td>
+<td class=''>-22.4%</td>
+<td class=''>+125.2%</td>
+</tr>
+<tr>
+<td class=''>option=3, sp_bucket=5-8, handicap_class=h1</td>
+<td class='num'>465</td>
+<td class='num'>101</td>
+<td class=''>5.508</td>
+<td class=''>1.193</td>
+<td class=''>0.972</td>
+<td class=''>1.405</td>
+<td class=''>-22.5%</td>
+<td class=''>+123.0%</td>
+</tr>
+</tbody></table>
+
+<h2>5. CRITICAL: Out-of-sample survival</h2>
+<p>Train: 期号 &lt; median, Test: 期号 ≥ median. Survival ≡ test mean q &gt; 1.064 with k_test ≥ 30.</p>
+<table>
+<thead><tr>
+<th>Niche</th>
+<th>tr_n</th>
+<th>tr_k</th>
+<th>tr_mean_q</th>
+<th>tr_q_CI_lo</th>
+<th>tr_combo_EV</th>
+<th>te_n</th>
+<th>te_k</th>
+<th>te_mean_q</th>
+<th>te_combo_EV</th>
+<th>OOS</th>
+</tr></thead><tbody>
+<tr>
+<td class=''>option=1, sp_bucket=5-8, league_tier=Other</td>
+<td class='num'>411</td>
+<td class='num'>101</td>
+<td class=''>1.307</td>
+<td class=''>1.093</td>
+<td class=''>+324.3%</td>
+<td class='num'>568</td>
+<td class='num'>143</td>
+<td class=''>1.380</td>
+<td class=''>+520.4%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>option=0, sp_bucket=5-8, league_tier=Top5EU</td>
+<td class='num'>421</td>
+<td class='num'>97</td>
+<td class=''>1.288</td>
+<td class=''>1.069</td>
+<td class=''>+281.5%</td>
+<td class='num'>323</td>
+<td class='num'>74</td>
+<td class=''>1.282</td>
+<td class=''>+270.7%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>option=0, sp_bucket=5-8, handicap_class=h1</td>
+<td class='num'>450</td>
+<td class='num'>105</td>
+<td class=''>1.285</td>
+<td class=''>1.085</td>
+<td class=''>+276.5%</td>
+<td class='num'>367</td>
+<td class='num'>88</td>
+<td class=''>1.335</td>
+<td class=''>+391.3%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8, league_tier=Top5EU</td>
+<td class='num'>705</td>
+<td class='num'>163</td>
+<td class=''>1.279</td>
+<td class=''>1.111</td>
+<td class=''>+263.6%</td>
+<td class='num'>562</td>
+<td class='num'>141</td>
+<td class=''>1.397</td>
+<td class=''>+574.3%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8, handicap_class=h1</td>
+<td class='num'>1043</td>
+<td class='num'>238</td>
+<td class=''>1.241</td>
+<td class=''>1.102</td>
+<td class=''>+195.4%</td>
+<td class='num'>1010</td>
+<td class='num'>242</td>
+<td class=''>1.323</td>
+<td class=''>+361.8%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>option=0, sp_bucket=5-8, league_tier=LowerEU</td>
+<td class='num'>1772</td>
+<td class='num'>379</td>
+<td class=''>1.192</td>
+<td class=''>1.082</td>
+<td class=''>+121.8%</td>
+<td class='num'>1827</td>
+<td class='num'>366</td>
+<td class=''>1.117</td>
+<td class=''>+41.4%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8, handicap_class=h_unknown, league_tier=LowerEU</td>
+<td class='num'>2425</td>
+<td class='num'>521</td>
+<td class=''>1.186</td>
+<td class=''>1.102</td>
+<td class=''>+114.6%</td>
+<td class='num'>2582</td>
+<td class='num'>538</td>
+<td class=''>1.150</td>
+<td class=''>+73.2%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8, league_tier=LowerEU</td>
+<td class='num'>3122</td>
+<td class='num'>667</td>
+<td class=''>1.174</td>
+<td class=''>1.094</td>
+<td class=''>+99.6%</td>
+<td class='num'>3321</td>
+<td class='num'>688</td>
+<td class=''>1.143</td>
+<td class=''>+65.5%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>option=0, handicap_class=h2plus, league_tier=Top5EU</td>
+<td class='num'>742</td>
+<td class='num'>330</td>
+<td class=''>1.173</td>
+<td class=''>1.078</td>
+<td class=''>+98.3%</td>
+<td class='num'>887</td>
+<td class='num'>372</td>
+<td class=''>1.082</td>
+<td class=''>+13.2%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8</td>
+<td class='num'>6325</td>
+<td class='num'>1329</td>
+<td class=''>1.156</td>
+<td class=''>1.102</td>
+<td class=''>+79.7%</td>
+<td class='num'>6872</td>
+<td class='num'>1476</td>
+<td class=''>1.193</td>
+<td class=''>+124.2%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>option=0, sp_bucket=3-5, handicap_class=h1</td>
+<td class='num'>8556</td>
+<td class='num'>2739</td>
+<td class=''>1.156</td>
+<td class=''>1.116</td>
+<td class=''>+79.5%</td>
+<td class='num'>7829</td>
+<td class='num'>2476</td>
+<td class=''>1.134</td>
+<td class=''>+57.2%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>option=0, sp_bucket=5-8</td>
+<td class='num'>3646</td>
+<td class='num'>748</td>
+<td class=''>1.142</td>
+<td class=''>1.071</td>
+<td class=''>+65.0%</td>
+<td class='num'>3790</td>
+<td class='num'>769</td>
+<td class=''>1.140</td>
+<td class=''>+62.3%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>sp_bucket=5-8, handicap_class=h_unknown</td>
+<td class='num'>4974</td>
+<td class='num'>1028</td>
+<td class=''>1.142</td>
+<td class=''>1.084</td>
+<td class=''>+64.5%</td>
+<td class='num'>5269</td>
+<td class='num'>1108</td>
+<td class=''>1.171</td>
+<td class=''>+96.0%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>option=3, sp_bucket=3-5, handicap_class=h_unknown</td>
+<td class='num'>13152</td>
+<td class='num'>3926</td>
+<td class=''>1.100</td>
+<td class=''>1.071</td>
+<td class=''>+26.9%</td>
+<td class='num'>12561</td>
+<td class='num'>3787</td>
+<td class=''>1.102</td>
+<td class=''>+28.7%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>option=0, sp_bucket=3-5, league_tier=LowerEU</td>
+<td class='num'>13848</td>
+<td class='num'>4070</td>
+<td class=''>1.092</td>
+<td class=''>1.066</td>
+<td class=''>+20.7%</td>
+<td class='num'>13288</td>
+<td class='num'>3804</td>
+<td class=''>1.066</td>
+<td class=''>+1.5%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+<tr>
+<td class=''>option=0, sp_bucket=3-5</td>
+<td class='num'>27515</td>
+<td class='num'>8045</td>
+<td class=''>1.087</td>
+<td class=''>1.066</td>
+<td class=''>+16.7%</td>
+<td class='num'>26820</td>
+<td class='num'>7806</td>
+<td class=''>1.081</td>
+<td class=''>+12.3%</td>
+<td class=''><span class='tag tag-pass'>SURVIVED</span></td>
+</tr>
+</tbody></table>
+<p>Headline survival rate (primary buckets): <strong>16/16</strong>.
+   Alternate bucket scheme: <strong>25/25</strong>.</p>
+
+<h2>6. Combo backtest with REAL SP</h2>
+
+    <p>Combo backtest: Bayesian-shrunk hit-rate model (Beta(2,4) prior, per
+       <code>league_tier × handicap_class × option × sp_bucket</code>
+       fitted on train half) as p_hat, real <code>sp_3/sp_1/sp_0</code>
+       as payouts, leg-q (= p̂·SP) ≥ 1.064 filter (= combo-break-even
+       contribution), top-N by est-EV per week, 1 yuan per combo.</p>
+    <h3>Combo-size sweep (the headline result)</h3>
+    <table>
+<thead><tr>
+<th>n_legs</th>
+<th>weeks</th>
+<th>combos</th>
+<th>hits</th>
+<th>stake</th>
+<th>profit</th>
+<th>ROI</th>
+</tr></thead><tbody>
+<tr>
+<td class='num'>2</td>
+<td class='num'>474</td>
+<td class='num'>474</td>
+<td class='num'>35</td>
+<td class=''>474</td>
+<td class=''>426</td>
+<td class=''>+89.8%</td>
+</tr>
+<tr>
+<td class='num'>3</td>
+<td class='num'>474</td>
+<td class='num'>474</td>
+<td class='num'>7</td>
+<td class=''>474</td>
+<td class=''>1,426</td>
+<td class=''>+300.9%</td>
+</tr>
+<tr>
+<td class='num'>4</td>
+<td class='num'>474</td>
+<td class='num'>474</td>
+<td class='num'>0</td>
+<td class=''>474</td>
+<td class=''>-474</td>
+<td class=''>-100.0%</td>
+</tr>
+<tr>
+<td class='num'>5</td>
+<td class='num'>474</td>
+<td class='num'>474</td>
+<td class='num'>0</td>
+<td class=''>474</td>
+<td class=''>-474</td>
+<td class=''>-100.0%</td>
+</tr>
+<tr>
+<td class='num'>6</td>
+<td class='num'>474</td>
+<td class='num'>474</td>
+<td class='num'>0</td>
+<td class=''>474</td>
+<td class=''>-474</td>
+<td class=''>-100.0%</td>
+</tr>
+<tr>
+<td class='num'>7</td>
+<td class='num'>473</td>
+<td class='num'>473</td>
+<td class='num'>0</td>
+<td class=''>473</td>
+<td class=''>-473</td>
+<td class=''>-100.0%</td>
+</tr>
+</tbody></table>
+    <div class="callout good">
+    <div class="callout-title">Real edge confirmed at low n_legs</div>
+    The 2-leg and 3-leg variants land deep in positive ROI with sufficient
+    hits to dispel small-sample doubt: at n_legs=2 the combo ROI is
+    +89.8%
+    over 474 weeks (35 hits).
+    For n_legs ≥ 4 the combo win-probability collapses below 10⁻³ per
+    placement, putting any 8-year sample firmly in the variance-death
+    zone (zero hits is the modal outcome even with a true positive edge).
+    </div>
+    <h3>7-leg headline (the "design point")</h3>
+    <table>
+      <thead><tr><th>Metric</th><th>Real-SP Backtest</th><th>B2 Baseline</th><th>Rake-only</th></tr></thead>
+      <tbody>
+        <tr><td>Cumulative ROI</td><td class='num'>-100.0%</td>
+            <td class='num bad'>−100%</td><td class='num'>−35%</td></tr>
+        <tr><td>Combos placed</td><td class='num'>473</td><td class='num'>—</td><td class='num'>—</td></tr>
+        <tr><td>Combos hit</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td></tr>
+        <tr><td>Hit rate</td><td class='num'>0.0%</td><td class='num'>0.00%</td><td class='num'>—</td></tr>
+        <tr><td>Active weeks</td><td class='num'>473</td><td class='num'>—</td><td class='num'>—</td></tr>
+      </tbody>
+    </table>
+    <p><b>Reading the 7-leg result honestly</b>: the −100% ROI here is
+    NOT a sign that the edge is illusory; it is a sign that 7-leg combos
+    require a bankroll measured in tens of millions to escape variance.
+    Compare to B2's prior −100% which came from same-source SP fitting
+    (winner's-curse artifact); this −100% comes from genuine variance.</p>
+    
+<img src="figures/sp_native_cum_roi.png" style="max-width:100%;border:1px solid var(--border);border-radius:6px;">
+
+<h2>7. Calibration — where retail is wrong</h2>
+<p>If 1/SP were honest, dots would lie on the diagonal. Systematic
+   deviations reveal which SP regions are mis-priced.</p>
+<img src="figures/sp_native_calibration.png" style="max-width:100%;border:1px solid var(--border);border-radius:6px;">
+
+<h2>8. Variance / bankroll</h2>
+
+    <table>
+      <thead><tr><th>Quantile</th><th>Simulated 100-week ROI</th></tr></thead>
+      <tbody>
+        <tr><td>P5</td><td class='num'>-100.0%</td></tr>
+        <tr><td>P25</td><td class='num'>-100.0%</td></tr>
+        <tr><td>Median</td><td class='num'>-100.0%</td></tr>
+        <tr><td>P75</td><td class='num'>-100.0%</td></tr>
+        <tr><td>P95</td><td class='num'>-100.0%</td></tr>
+        <tr><td>Mean</td><td class='num'>+529.0%</td></tr>
+        <tr><td>P(profitable)</td><td class='num'>3.2%</td></tr>
+      </tbody>
+    </table>
+    <p>Inputs: hit rate per leg = 0.2518, p(combo hit) = 0.000064,
+       payout multiple = 96768.7, 5 candidates/week × 100 weeks.</p>
+    
+
+<h2>9. Caveats</h2>
+<ol>
+  <li><b>Selection bias on q</b>: the "+78%" implied combo EV uses
+      mean(did_win × SP) across the full niche. The picks you'd actually
+      make use the same niche conditioned on a leg-EV filter, which
+      shifts q downward (regression to the mean). The OOS test in §5
+      isolates this.</li>
+  <li><b>Cross-correlation</b>: 7 legs from different matches are
+      independent in outcome, but SP movements within a week may share
+      a public-favorite driver. Not modelled here.</li>
+  <li><b>Bucket arbitrariness</b>: alt-scheme parallel run shows
+      whether niches survive a different cut (§5 footer).</li>
+  <li><b>Survivor bias</b>: previous −100% combo ROI was the "all combos
+      lost" artifact. With real SP the sign and magnitude of ROI now
+      reflects honest market exposure.</li>
+  <li><b>SP semantics</b>: Σ(1/SP) ≈ 1 here. If the goal is to study
+      *retail* mispricing distinct from international fair-line, an
+      additional comparison with avg_eu (Pinnacle) is needed; this
+      analysis treats sp_3/sp_1/sp_0 as the bettable price.</li>
+</ol>
+
+<div class="footer">
+Generated by <code>scripts/run_sp_native_analysis.py</code> using
+<code>src/niche_analysis/sp_native.py</code>.
+</div>
+
+</body>
+</html>
