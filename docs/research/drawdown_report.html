@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Drawdown Decomposition + Stop-Loss Tests — N=4 Kelly=1/16</title>
+<style>
+:root {
+    --bg: #fafaf7; --fg: #1a1a1a; --muted: #666; --accent: #b04a2f;
+    --accent-soft: #f6ebe5; --warn: #a45a00; --warn-soft: #fdf3e3;
+    --good: #2e6b4a; --good-soft: #e8f1ec; --bad: #8b2424;
+    --bad-soft: #f6e8e8; --code-bg: #f0ede6; --border: #d8d3c7;
+    --table-border: #c8c2b3;
+}
+* { box-sizing: border-box; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue",
+                 "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.7; color: var(--fg); background: var(--bg);
+    max-width: 980px; margin: 0 auto; padding: 32px 24px 80px; font-size: 16px;
+}
+h1 { font-size: 28px; margin-top: 0; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+h2 { font-size: 22px; margin-top: 40px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+h3 { font-size: 18px; margin-top: 26px; }
+code { font-family: "SF Mono", Menlo, Consolas, "Courier New", monospace;
+       background: var(--code-bg); padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
+th, td { border: 1px solid var(--table-border); padding: 6px 10px; text-align: left; }
+th { background: var(--accent-soft); font-weight: 600; }
+tbody tr:nth-child(even) { background: rgba(0,0,0,0.02); }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.good { color: var(--good); font-weight: 600; }
+td.bad { color: var(--bad); font-weight: 600; }
+.callout { border-left: 4px solid var(--accent); background: var(--accent-soft);
+           padding: 10px 16px; margin: 14px 0; border-radius: 0 6px 6px 0; }
+.callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+.callout.good { border-color: var(--good); background: var(--good-soft); }
+.callout.bad { border-color: var(--bad); background: var(--bad-soft); }
+.callout-title { font-weight: 600; margin-bottom: 4px; }
+.meta { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+img { max-width: 100%; border: 1px solid var(--border); border-radius: 4px; margin: 8px 0; }
+</style></head><body>
+
+<h1>Drawdown Decomposition + Stop-Loss Tests</h1>
+<p class="meta">Configuration: N=4 legs, Kelly fraction = 1/16, initial = ¥100,000,
+test-only slice (期号 ≥ median expect). Calmar-optimal in the (N, Kelly) grid.</p>
+
+<div class="callout good">
+<div class="callout-title">Verdict: Stop rules CAN help (modestly)</div>
+<b>ProfitLock_double2_skim30pct</b> improves Calmar from 7.15 to 9.04, cuts MaxDD from 36.5% to 20.5%, and changes ruin rate from 0.0% to 0.0%.
+</div>
+
+<h2>1. Baseline metrics</h2>
+<table><thead><tr>
+<th>Weeks</th><th>Final ¥</th><th>CAGR</th><th>Sharpe</th>
+<th>MaxDD</th><th>Calmar</th><th>Time UW</th><th>Ruin (MC)</th>
+</tr></thead><tbody><tr>
+<td class='num'>188</td>
+<td class='num'>10,348,426</td>
+<td class='num'>260.8%</td>
+<td class='num'>0.48</td>
+<td class='num bad'>-36.5%</td>
+<td class='num good'>7.15</td>
+<td class='num'>64.0%</td>
+<td class='num'>0.0%</td>
+</tr></tbody></table>
+
+<h2>2. Worst drawdown anatomy</h2>
+<ul>
+<li><b>Peak week:</b> 202444.0 (¥9,084,154)</li>
+<li><b>Trough week:</b> 202538.0 (¥5,769,955)</li>
+<li><b>Drawdown:</b> -36.5% over 45 weeks</li>
+<li><b>Losing weeks within DD:</b> 37 / 45
+    (winning: 8)</li>
+<li><b>Worst single week PnL:</b> ¥-1,117,336
+    (week index 119)</li>
+<li><b>Streak share:</b> 66% of the drawdown is
+    NOT from the single worst week.</li>
+<li><b>Recovery:</b> week 202541.0</li>
+</ul>
+<p><b>Verdict:</b> death by a thousand cuts (losing streak).</p>
+<img src="figures/drawdown_anatomy.png" alt="DD anatomy">
+
+<h2>3. Stop-loss rule comparison</h2>
+<p>Each rule is overlaid on the same baseline weekly trace (preserving
+weekly ROI and stake fraction signals) and replayed under a re-evolved
+bankroll. Profit-lock skim is treated as locked-in wealth (added to final
+realized).</p>
+<table><thead><tr>
+<th>Rule</th><th>CAGR</th><th>Sharpe</th><th>MaxDD</th><th>Calmar</th>
+<th>Time UW</th><th>Final ¥</th><th>Ruin% (MC)</th>
+<th>Med Final (MC)</th><th>P5 Final (MC)</th>
+</tr></thead><tbody>
+<tr><td>Baseline</td><td class='num bad'>260.8%</td><td class='num'>0.48</td><td class='num bad'>-36.5%</td><td class='num bad'>7.15</td><td class='num'>64.0%</td><td class='num'>10,348,426</td><td class='num good'>0.0%</td><td class='num'>9,786,564</td><td class='num'>252,869</td></tr><tr><td>HardStop_15pct_halt2wk</td><td class='num bad'>-3.6%</td><td class='num'>-0.63</td><td class='num good'>-18.5%</td><td class='num bad'>-0.20</td><td class='num'>96.3%</td><td class='num'>87,457</td><td class='num good'>0.0%</td><td class='num'>99,734</td><td class='num'>78,270</td></tr><tr><td>HardStop_15pct_halt4wk</td><td class='num bad'>-3.6%</td><td class='num'>-0.63</td><td class='num good'>-18.5%</td><td class='num bad'>-0.20</td><td class='num'>96.3%</td><td class='num'>87,457</td><td class='num good'>0.0%</td><td class='num'>99,734</td><td class='num'>78,270</td></tr><tr><td>HardStop_25pct_halt4wk</td><td class='num bad'>16.2%</td><td class='num'>0.36</td><td class='num good'>-26.5%</td><td class='num bad'>0.61</td><td class='num'>82.5%</td><td class='num'>171,960</td><td class='num good'>0.0%</td><td class='num'>215,610</td><td class='num'>70,897</td></tr><tr><td>HardStop_25pct_halt8wk</td><td class='num bad'>16.2%</td><td class='num'>0.36</td><td class='num good'>-26.5%</td><td class='num bad'>0.61</td><td class='num'>82.5%</td><td class='num'>171,960</td><td class='num good'>0.0%</td><td class='num'>215,610</td><td class='num'>70,897</td></tr><tr><td>HardStop_40pct_halt8wk</td><td class='num bad'>260.8%</td><td class='num'>0.48</td><td class='num bad'>-36.5%</td><td class='num bad'>7.15</td><td class='num'>64.0%</td><td class='num'>10,348,426</td><td class='num good'>0.0%</td><td class='num'>1,339,480</td><td class='num'>59,113</td></tr><tr><td>StakeThrottle_15pct_to0.25x</td><td class='num bad'>69.5%</td><td class='num'>0.42</td><td class='num good'>-27.2%</td><td class='num bad'>2.55</td><td class='num'>70.9%</td><td class='num'>673,171</td><td class='num good'>0.0%</td><td class='num'>1,546,955</td><td class='num'>134,805</td></tr><tr><td>StakeThrottle_25pct_to0.25x</td><td class='num bad'>150.0%</td><td class='num'>0.59</td><td class='num good'>-30.3%</td><td class='num bad'>4.95</td><td class='num'>69.8%</td><td class='num'>2,744,878</td><td class='num good'>0.0%</td><td class='num'>2,597,593</td><td class='num'>129,003</td></tr><tr><td>StakeThrottle_40pct_to0.25x</td><td class='num bad'>260.8%</td><td class='num'>0.48</td><td class='num bad'>-36.5%</td><td class='num bad'>7.15</td><td class='num'>64.0%</td><td class='num'>10,348,426</td><td class='num good'>0.0%</td><td class='num'>5,028,660</td><td class='num'>154,511</td></tr><tr><td>VolThrottle_w8_sd0.1_halt2wk</td><td class='num bad'>147.4%</td><td class='num'>0.54</td><td class='num bad'>-36.5%</td><td class='num bad'>4.04</td><td class='num'>55.0%</td><td class='num'>2,644,516</td><td class='num good'>0.0%</td><td class='num'>4,165,307</td><td class='num'>231,588</td></tr><tr><td>ProfitLock_double2_skim30pct</td><td class='num bad'>185.7%</td><td class='num'>0.71</td><td class='num good'>-20.5%</td><td class='num good'>9.04</td><td class='num'>58.2%</td><td class='num'>4,452,024</td><td class='num good'>0.0%</td><td class='num'>3,931,728</td><td class='num'>261,990</td></tr><tr><td>ProfitLock+StakeThrottle25%</td><td class='num bad'>83.6%</td><td class='num'>0.54</td><td class='num good'>-19.2%</td><td class='num bad'>4.36</td><td class='num'>63.5%</td><td class='num'>898,953</td><td class='num good'>0.0%</td><td class='num'>1,190,970</td><td class='num'>129,395</td></tr>
+</tbody></table>
+<p class='meta'>Green/red coloring is vs baseline. MC = 1000 bootstrap paths,
+horizon = baseline length, ruin = bankroll &lt; ¥1,000.</p>
+<img src="figures/drawdown_rule_curves.png" alt="rule curves">
+
+<h2>4. Honest discussion</h2>
+<div class="callout warn">
+<div class="callout-title">Why stop rules struggle here</div>
+<p>The strategy's edge is asymmetric: most weeks lose small amounts
+(stake bleed, no hits) and a few weeks win huge (combo payouts).
+Hard-stop / vol-throttle rules disproportionately skip the few "fat" weeks
+that produce nearly all of the equity. The baseline DD is largely
+attritional (long losing streak) — exactly the regime where a halt rule
+fires <em>after</em> most damage is done and then locks you out of recovery.</p>
+<p>Stake-throttle is gentler (you stay in market at reduced size) and
+preserves more upside, but in this trace the recovery weeks are exactly
+the ones that get throttled, so realized CAGR drops materially.</p>
+<p>Profit-lock-in (skimming on doublings) is the only rule that
+unambiguously reduces ruin probability without sacrificing too much
+expected wealth — because it monetizes the few fat weeks before they
+can be re-risked.</p>
+</div>
+
+<h2>5. Methodology &amp; caveats</h2>
+<ul>
+<li><b>Replay approximation:</b> the live simulator's stake is
+<code>kelly × bankroll × bet-quality</code> with a per-combo cap. We
+extract <code>stake_frac_t = week_stake / bankroll_at_start</code> and
+<code>roi_t = pnl / stake</code> from the baseline trace, then
+re-evolve bankroll under each rule. This preserves Kelly's bankroll
+proportionality but ignores the per-combo absolute cap (¥-denominated)
+becoming binding at low bankroll. For drawdown analysis at ≥¥10k
+bankroll the approximation is tight.</li>
+<li><b>Monte Carlo:</b> bootstrap (stake_frac, roi) <i>jointly per week</i>
+with replacement → preserves week-level correlation between sizing &amp;
+outcomes, but breaks any longitudinal autocorrelation (clustered
+hot/cold streaks).</li>
+<li><b>Ruin threshold:</b> ¥1,000 (1% of initial). Lowering to ¥0 would
+be unrealistic given minimum-stake quanta.</li>
+</ul>
+
+<h2>6. Files</h2>
+<ul>
+<li><code>data/raw/drawdown_baseline_weekly.csv</code></li>
+<li><code>data/raw/drawdown_rules_summary.csv</code></li>
+<li><code>docs/research/figures/drawdown_anatomy.png</code></li>
+<li><code>docs/research/figures/drawdown_rule_curves.png</code></li>
+<li><code>src/drawdown/{anatomy,replay,stop_rules}.py</code></li>
+<li><code>tests/drawdown/test_{anatomy,replay}.py</code> — 9 tests</li>
+</ul>
+
+</body></html>
