@@ -107,11 +107,17 @@ def build_weekly_plan(
 
     tickets: List[TicketPlan] = []
     if qualified:
+        # Single-leg edge floor is intentionally relaxed: niche legs run at
+        # p×SP ≈ 1.07-1.20 (per-leg q), which is < 1/0.65 = 1.538 (single-leg
+        # break-even), so single-leg edge is always negative. The +EV emerges
+        # at the combo level where (mean_q)^N × 0.65 > 1 for N=4 and q ≥ 1.07.
+        # We rely on ``combo_ev_threshold`` to filter at the combo stage.
         tickets = build_plan(
             [q.candidate for q in qualified],
             bankroll=bankroll,
             n_legs=n_legs,
             top_k=top_k,
+            single_leg_edge_floor=-1.0,
             combo_ev_threshold=combo_ev_threshold,
             kelly_fraction=kelly_fraction,
             weekly_stake_cap_frac=weekly_stake_cap_frac,
