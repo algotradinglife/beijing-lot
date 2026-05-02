@@ -1,0 +1,80 @@
+{
+  "_doc": "Surviving niches from data/raw/archetype_B_niches.csv (Phase 4). Each rule lists the dimensions a (match, option) pair must match to qualify, and a p_hat estimate (the train mean_q / sp). Override via --niches CLI arg.",
+  "return_rate": 0.65,
+  "rules": [
+    {
+      "name": "away_sp_3.5-4.5_Asian",
+      "option": "0",
+      "sp_lo": 3.5, "sp_hi": 4.5,
+      "league_tier": "Asian",
+      "p_hat_train": 0.305
+    },
+    {
+      "name": "away_sp_3.5-4.5_h1",
+      "option": "0",
+      "sp_lo": 3.5, "sp_hi": 4.5,
+      "handicap_class": "h1",
+      "p_hat_train": 0.298
+    },
+    {
+      "name": "away_h2plus_Top5EU",
+      "option": "0",
+      "handicap_class": "h2plus",
+      "league_tier": "Top5EU",
+      "p_hat_train": 0.293
+    },
+    {
+      "name": "home_sp_3.5-4.5_h_unknown",
+      "option": "3",
+      "sp_lo": 3.5, "sp_hi": 4.5,
+      "handicap_class": "h_unknown",
+      "p_hat_train": 0.283
+    },
+    {
+      "name": "home_sp_3.5-4.5_Other",
+      "option": "3",
+      "sp_lo": 3.5, "sp_hi": 4.5,
+      "league_tier": "Other",
+      "p_hat_train": 0.281
+    },
+    {
+      "name": "away_sp_3.5-4.5_LowerEU",
+      "option": "0",
+      "sp_lo": 3.5, "sp_hi": 4.5,
+      "league_tier": "LowerEU",
+      "p_hat_train": 0.278
+    },
+    {
+      "name": "away_sp_3.5-4.5",
+      "option": "0",
+      "sp_lo": 3.5, "sp_hi": 4.5,
+      "p_hat_train": 0.278
+    },
+    {
+      "name": "away_sp_3.0-3.5_h1",
+      "option": "0",
+      "sp_lo": 3.0, "sp_hi": 3.5,
+      "handicap_class": "h1",
+      "p_hat_train": 0.342
+    },
+    {
+      "name": "home_sp_3.5-4.5",
+      "option": "3",
+      "sp_lo": 3.5, "sp_hi": 4.5,
+      "p_hat_train": 0.277
+    },
+    {
+      "name": "sp_3.5-4.5_h_unknown_LowerEU",
+      "sp_lo": 3.5, "sp_hi": 4.5,
+      "handicap_class": "h_unknown",
+      "league_tier": "LowerEU",
+      "p_hat_train": 0.275
+    },
+    {
+      "name": "sp_3.5-4.5_h_unknown",
+      "sp_lo": 3.5, "sp_hi": 4.5,
+      "handicap_class": "h_unknown",
+      "p_hat_train": 0.272
+    }
+  ]
+}

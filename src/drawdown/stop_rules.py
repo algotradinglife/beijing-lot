@@ -24,6 +24,10 @@ class Rule:
     name: str
     fn: RuleFn
     note: str = ""
+    # Optional post-pnl hooks (e.g. profit-lock skim trigger). Each hook
+    # receives the state dict (with updated bankroll) and may set
+    # state["skim_request"].
+    _post_hooks: list[Callable[[RuleState], None]] | None = None
 
 
 def hard_stop(drop_pct: float, halt_weeks: int) -> Rule:
@@ -84,21 +88,24 @@ def vol_throttle(window: int = 8, std_threshold: float = 0.10, halt_weeks: int =
 
 def profit_lock(double_at: float = 2.0, skim_frac: float = 0.30) -> Rule:
     """Each time bankroll/initial crosses next doubling level, skim skim_frac
-    *out of play* (subtract from bankroll permanently). mult is always 1, but we
-    use a side-effect on bankroll via the 'skim' field set on state."""
+    *out of play* (subtract from bankroll permanently). Stake mult is always 1;
+    actual skim is decided in the POST-pnl hook below."""
     def fn(s: RuleState) -> float:
+        return 1.0
+
+    def post(s: RuleState) -> None:
         ratio = s["bankroll"] / s["initial"]
         last_level = s.get("doubling_level", 1.0)
         next_level = last_level * double_at
         if ratio >= next_level:
-            # request skim of skim_frac of CURRENT bankroll
             s["skim_request"] = skim_frac * s["bankroll"]
             s["doubling_level"] = next_level
-        return 1.0
+
     return Rule(
         name=f"ProfitLock_double{double_at:g}_skim{int(skim_frac*100)}pct",
         fn=fn,
         note=f"skim {int(skim_frac*100)}% of bankroll each time it doubles",
+        _post_hooks=[post],
     )
 
 

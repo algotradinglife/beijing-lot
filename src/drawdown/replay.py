@@ -50,7 +50,11 @@ def replay(signals: pd.DataFrame, rule: Rule, initial: float,
         stake = bankroll * sf * mult
         pnl = stake * roi
         bankroll += pnl
-        # apply skim if requested (profit lock-in)
+        # Profit-lock check uses POST-pnl bankroll. Run a lightweight side-only
+        # pass that calls each registered post_hook on the state.
+        state.update({"bankroll": bankroll})
+        for hook in getattr(rule, "_post_hooks", []) or []:
+            hook(state)
         skim = state.pop("skim_request", 0.0)
         if skim and bankroll > skim:
             bankroll -= skim
