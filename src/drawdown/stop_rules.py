@@ -110,15 +110,17 @@ def profit_lock(double_at: float = 2.0, skim_frac: float = 0.30) -> Rule:
 
 
 def combined(rule_a: Rule, rule_b: Rule, name: str | None = None) -> Rule:
-    """Apply two rules; mult is product, both side-effects executed."""
+    """Apply two rules; mult is product, both side-effects + post hooks executed."""
     def fn(s: RuleState) -> float:
         m1 = rule_a.fn(s)
         m2 = rule_b.fn(s)
         return m1 * m2
+    posts = (rule_a._post_hooks or []) + (rule_b._post_hooks or [])
     return Rule(
         name=name or f"Combo({rule_a.name}+{rule_b.name})",
         fn=fn,
         note=f"{rule_a.note} AND {rule_b.note}",
+        _post_hooks=posts or None,
     )
 
 
