@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Kelly × N 网格分析 — 找绝对最优 (Kelly, N) 组合</title>
+<style>
+  :root {
+    --bg: #fafaf7; --fg: #1a1a1a; --muted: #666;
+    --accent: #b04a2f; --accent-soft: #f6ebe5;
+    --warn: #a45a00; --warn-soft: #fdf3e3;
+    --good: #2e6b4a; --good-soft: #e8f1ec;
+    --bad: #8b2424; --bad-soft: #f6e8e8;
+    --code-bg: #f0ede6; --border: #d8d3c7; --table-border: #c8c2b3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.7; color: var(--fg); background: var(--bg);
+    max-width: 980px; margin: 0 auto; padding: 32px 24px 80px; font-size: 16px;
+  }
+  h1 { font-size: 28px; margin-top: 0; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+  h2 { font-size: 22px; margin-top: 36px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  h3 { font-size: 17px; margin-top: 24px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--table-border); padding: 6px 10px; text-align: left; }
+  th { background: var(--accent-soft); font-weight: 600; }
+  tbody tr:nth-child(even) { background: rgba(0,0,0,0.02); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .heatmap-cell { text-align: right; font-variant-numeric: tabular-nums; padding: 8px 10px; font-weight: 600; }
+  .meta { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .callout { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 10px 16px; margin: 14px 0; border-radius: 0 6px 6px 0; }
+  .callout.warn { border-color: var(--warn); background: var(--warn-soft); }
+  .callout.good { border-color: var(--good); background: var(--good-soft); }
+  .callout.bad { border-color: var(--bad); background: var(--bad-soft); }
+  .callout-title { font-weight: 600; margin-bottom: 4px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 16px 20px; }
+  .card.featured { border: 2px solid var(--good); background: var(--good-soft); }
+  .card h3 { margin-top: 0; color: var(--accent); }
+  .card.featured h3 { color: var(--good); }
+  .card .num-big { font-size: 26px; font-weight: 700; margin: 8px 0 4px; }
+  .card .label { font-size: 12px; color: var(--muted); }
+  code { font-family: "SF Mono", Menlo, monospace; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+  pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .tag-good { background: var(--good-soft); color: var(--good); }
+  .tag-bad { background: var(--bad-soft); color: var(--bad); }
+  .tag-warn { background: var(--warn-soft); color: var(--warn); }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 36px 0; }
+</style>
+</head>
+<body>
+
+<h1>Kelly × N 全网格分析</h1>
+<p class="meta">5 Kelly 系数 × 4 N 值 = 20 单元格 · 在 Archetype A niches × 8 年实测数据 · 100k 入场 · 2026-05-03</p>
+
+<div class="callout good">
+  <div class="callout-title">Headline: N=4 + Kelly=1/16 是绝对最优（Calmar 7.15）</div>
+  <p>之前默认 Kelly=1/4 + N=4：CAGR 469% / Max DD <strong>−81%</strong>。</p>
+  <p>改用 Kelly=1/16 + N=4：CAGR 261% / Max DD <strong>−37%</strong>（DD 砍半，CAGR 仍 100k → 1035 万）。</p>
+  <p>Calmar 7.15 全网格最高 — risk-adjusted 收益最优。</p>
+</div>
+
+<h2>三个操作点（按风险偏好挑）</h2>
+<div class="grid-3">
+  <div class="card">
+    <h3>保守型</h3>
+    <div class="label">N=4 + Kelly=1/32</div>
+    <div class="num-big">CAGR 74%</div>
+    <table>
+      <tr><td>Max DD</td><td class="num"><span class="tag tag-good">−21%</span></td></tr>
+      <tr><td>Sharpe</td><td class="num">0.64</td></tr>
+      <tr><td>Calmar</td><td class="num">3.48</td></tr>
+      <tr><td>8 年终值</td><td class="num">73 万</td></tr>
+      <tr><td>周均 stake</td><td class="num">~2%</td></tr>
+    </table>
+    <p style="font-size:13px;color:var(--muted);">几乎不痛的 DD；100k → 73 万合理增长。</p>
+  </div>
+  <div class="card featured">
+    <h3>★ 推荐：均衡型</h3>
+    <div class="label">N=4 + Kelly=1/16</div>
+    <div class="num-big">CAGR 261%</div>
+    <table>
+      <tr><td>Max DD</td><td class="num"><span class="tag tag-warn">−37%</span></td></tr>
+      <tr><td>Sharpe</td><td class="num">0.48</td></tr>
+      <tr><td><strong>Calmar</strong></td><td class="num"><strong>7.15 ★</strong></td></tr>
+      <tr><td>8 年终值</td><td class="num">1,035 万</td></tr>
+      <tr><td>周均 stake</td><td class="num">~5%</td></tr>
+    </table>
+    <p style="font-size:13px;color:var(--good);"><strong>Calmar 全网格最优 + DD 心理可承受 + 100x 终值</strong></p>
+  </div>
+  <div class="card">
+    <h3>激进型</h3>
+    <div class="label">N=4 + Kelly=1/4（原默认）</div>
+    <div class="num-big">CAGR 469%</div>
+    <table>
+      <tr><td>Max DD</td><td class="num"><span class="tag tag-bad">−81%</span></td></tr>
+      <tr><td>Sharpe</td><td class="num">0.23</td></tr>
+      <tr><td>Calmar</td><td class="num">5.81</td></tr>
+      <tr><td>8 年终值</td><td class="num">5,358 万</td></tr>
+      <tr><td>周均 stake</td><td class="num">~25%（满仓）</td></tr>
+    </table>
+    <p style="font-size:13px;color:var(--bad);">Kelly-optimal 但实操中 −81% DD 大概率触发停损跑路。</p>
+  </div>
+</div>
+
+<h2>完整网格</h2>
+
+<h3>Calmar (Risk-adjusted growth)</h3>
+<table>
+  <thead><tr><th>N \\ Kelly</th><th>1/32</th><th>1/16</th><th>1/8</th><th>1/4</th><th>1/2</th></tr></thead>
+  <tbody>
+    <tr><td>2</td><td class="heatmap-cell">1.69</td><td class="heatmap-cell">1.67</td><td class="heatmap-cell">1.66</td><td class="heatmap-cell">1.26</td><td class="heatmap-cell">1.27</td></tr>
+    <tr><td>3</td><td class="heatmap-cell">0.83</td><td class="heatmap-cell">1.50</td><td class="heatmap-cell">3.44</td><td class="heatmap-cell" style="background:#dcecdc">4.68</td><td class="heatmap-cell">3.79</td></tr>
+    <tr><td>4</td><td class="heatmap-cell">3.48</td><td class="heatmap-cell" style="background:#9ec99e;font-weight:bold">7.15 ★</td><td class="heatmap-cell" style="background:#bcdcbc">6.16</td><td class="heatmap-cell" style="background:#cae5ca">5.81</td><td class="heatmap-cell">4.15</td></tr>
+    <tr><td>5</td><td class="heatmap-cell">0.00</td><td class="heatmap-cell" style="color:var(--bad)">−0.32</td><td class="heatmap-cell">3.04</td><td class="heatmap-cell">2.48</td><td class="heatmap-cell">0.89</td></tr>
+  </tbody>
+</table>
+
+<h3>Sharpe (Risk-adjusted return)</h3>
+<table>
+  <thead><tr><th>N \\ Kelly</th><th>1/32</th><th>1/16</th><th>1/8</th><th>1/4</th><th>1/2</th></tr></thead>
+  <tbody>
+    <tr><td>2</td><td class="heatmap-cell" style="background:#9ec99e">0.96 ★</td><td class="heatmap-cell" style="background:#b6d6b6">0.92</td><td class="heatmap-cell" style="background:#c6dec6">0.83</td><td class="heatmap-cell">0.53</td><td class="heatmap-cell">0.38</td></tr>
+    <tr><td>3</td><td class="heatmap-cell">0.30</td><td class="heatmap-cell">0.17</td><td class="heatmap-cell">0.14</td><td class="heatmap-cell">0.11</td><td class="heatmap-cell">0.05</td></tr>
+    <tr><td>4</td><td class="heatmap-cell" style="background:#cae5ca">0.64</td><td class="heatmap-cell" style="background:#d4ead4">0.48</td><td class="heatmap-cell">0.31</td><td class="heatmap-cell">0.23</td><td class="heatmap-cell">0.09</td></tr>
+    <tr><td>5</td><td class="heatmap-cell">0.00</td><td class="heatmap-cell" style="color:var(--bad)">−0.77</td><td class="heatmap-cell">0.35</td><td class="heatmap-cell">0.20</td><td class="heatmap-cell">0.14</td></tr>
+  </tbody>
+</table>
+
+<h3>Max Drawdown (%)</h3>
+<table>
+  <thead><tr><th>N \\ Kelly</th><th>1/32</th><th>1/16</th><th>1/8</th><th>1/4</th><th>1/2</th></tr></thead>
+  <tbody>
+    <tr><td>2</td><td class="heatmap-cell" style="background:#dcecdc">−4.7</td><td class="heatmap-cell" style="background:#dcecdc">−10.0</td><td class="heatmap-cell" style="background:#e8f1e8">−19.7</td><td class="heatmap-cell">−37.4</td><td class="heatmap-cell" style="color:var(--bad)">−61.7</td></tr>
+    <tr><td>3</td><td class="heatmap-cell" style="color:var(--bad)">−58.9</td><td class="heatmap-cell" style="color:var(--bad)">−74.9</td><td class="heatmap-cell" style="color:var(--bad)">−77.8</td><td class="heatmap-cell" style="color:var(--bad)">−77.1</td><td class="heatmap-cell" style="color:var(--bad)">−90.1</td></tr>
+    <tr><td>4</td><td class="heatmap-cell" style="background:#e8f1e8">−21.2</td><td class="heatmap-cell">−36.5</td><td class="heatmap-cell" style="color:var(--bad)">−60.3</td><td class="heatmap-cell" style="color:var(--bad)">−80.7</td><td class="heatmap-cell" style="color:var(--bad)">−93.6</td></tr>
+    <tr><td>5</td><td class="heatmap-cell">0.0</td><td class="heatmap-cell">−6.9</td><td class="heatmap-cell">−44.4</td><td class="heatmap-cell" style="color:var(--bad)">−71.0</td><td class="heatmap-cell" style="color:var(--bad)">−80.9</td></tr>
+  </tbody>
+</table>
+
+<h3>CAGR (%)</h3>
+<table>
+  <thead><tr><th>N \\ Kelly</th><th>1/32</th><th>1/16</th><th>1/8</th><th>1/4</th><th>1/2</th></tr></thead>
+  <tbody>
+    <tr><td>2</td><td class="heatmap-cell">8</td><td class="heatmap-cell">17</td><td class="heatmap-cell">33</td><td class="heatmap-cell">47</td><td class="heatmap-cell">78</td></tr>
+    <tr><td>3</td><td class="heatmap-cell">49</td><td class="heatmap-cell">113</td><td class="heatmap-cell">267</td><td class="heatmap-cell" style="background:#dcecdc">361</td><td class="heatmap-cell">342</td></tr>
+    <tr><td>4</td><td class="heatmap-cell">74</td><td class="heatmap-cell" style="background:#bcdcbc">261</td><td class="heatmap-cell" style="background:#cae5ca">372</td><td class="heatmap-cell" style="background:#9ec99e">469 ★</td><td class="heatmap-cell">388</td></tr>
+    <tr><td>5</td><td class="heatmap-cell">0</td><td class="heatmap-cell" style="color:var(--bad)">−2</td><td class="heatmap-cell">135</td><td class="heatmap-cell">176</td><td class="heatmap-cell">72</td></tr>
+  </tbody>
+</table>
+
+<h3>8 年终值（M 元）</h3>
+<table>
+  <thead><tr><th>N \\ Kelly</th><th>1/32</th><th>1/16</th><th>1/8</th><th>1/4</th><th>1/2</th></tr></thead>
+  <tbody>
+    <tr><td>2</td><td class="heatmap-cell">0.13</td><td class="heatmap-cell">0.17</td><td class="heatmap-cell">0.26</td><td class="heatmap-cell">0.38</td><td class="heatmap-cell">0.73</td></tr>
+    <tr><td>3</td><td class="heatmap-cell">0.42</td><td class="heatmap-cell">1.53</td><td class="heatmap-cell">11.0</td><td class="heatmap-cell" style="background:#dcecdc">25.1</td><td class="heatmap-cell">21.5</td></tr>
+    <tr><td>4</td><td class="heatmap-cell">0.73</td><td class="heatmap-cell" style="background:#bcdcbc">10.3</td><td class="heatmap-cell" style="background:#cae5ca">27.3</td><td class="heatmap-cell" style="background:#9ec99e">53.6 ★</td><td class="heatmap-cell">30.9</td></tr>
+    <tr><td>5</td><td class="heatmap-cell">0.10</td><td class="heatmap-cell">0.09</td><td class="heatmap-cell">2.19</td><td class="heatmap-cell">3.93</td><td class="heatmap-cell">0.71</td></tr>
+  </tbody>
+</table>
+
+<h2>关键洞察</h2>
+
+<div class="callout">
+  <div class="callout-title">1. N=4 跨多个 Kelly 系数都是最优族</div>
+  <p>除了 Sharpe 单一指标（N=2 在低 Kelly 下胜出），N=4 主导 CAGR、Calmar、终值。说明 4 关组合是 niche q ≈ 1.4 数据下的"最优分散数"。</p>
+</div>
+
+<div class="callout">
+  <div class="callout-title">2. Kelly 系数比 N 选择更敏感</div>
+  <p>对 N=4：Kelly 从 1/4 → 1/16 → DD 从 −81% → −37%（砍半），但 Calmar 从 5.81 → 7.15（升）。<strong>"少下注但更聪明"完胜 Kelly-optimal</strong>。</p>
+</div>
+
+<div class="callout warn">
+  <div class="callout-title">3. N=3 在所有 Kelly 上 Sharpe 都低</div>
+  <p>N=3 CAGR 高（最优 361%）但 Sharpe 在 0.05–0.30 之间。说明 3 关在 niche q ≈ 1.4 下变量太大，回报靠少数巨爆驱动。</p>
+</div>
+
+<div class="callout bad">
+  <div class="callout-title">4. N=5 在低 Kelly 下崩溃</div>
+  <p>N=5 Kelly=1/16 实际亏损（CAGR −2%）。原因：低 Kelly 下 stake 太小，过不了 2 元最低门槛 → 太多 combo 被剔除 → 命中数据不足。<strong>N≥5 不可行</strong>。</p>
+</div>
+
+<h2>Pareto 前沿</h2>
+<p>(Sharpe, |Max DD|) 平面上，Pareto-dominant 配置：</p>
+<table>
+  <thead><tr><th>N</th><th>Kelly</th><th>CAGR</th><th>Sharpe</th><th>Max DD</th><th>Calmar</th><th>终值</th><th>定位</th></tr></thead>
+  <tbody>
+    <tr><td>2</td><td>1/32</td><td class="num">8%</td><td class="num">0.96</td><td class="num">−4.7%</td><td class="num">1.69</td><td class="num">13万</td><td>极端保守</td></tr>
+    <tr><td>2</td><td>1/16</td><td class="num">17%</td><td class="num">0.92</td><td class="num">−10%</td><td class="num">1.67</td><td class="num">17万</td><td>保守</td></tr>
+    <tr><td>4</td><td>1/32</td><td class="num">74%</td><td class="num">0.64</td><td class="num">−21%</td><td class="num">3.48</td><td class="num">73万</td><td>稳健成长</td></tr>
+    <tr style="background:var(--good-soft)"><td><strong>4</strong></td><td><strong>1/16</strong></td><td class="num"><strong>261%</strong></td><td class="num"><strong>0.48</strong></td><td class="num"><strong>−37%</strong></td><td class="num"><strong>7.15</strong></td><td class="num"><strong>1035万</strong></td><td><strong>★ 推荐均衡</strong></td></tr>
+    <tr><td>4</td><td>1/8</td><td class="num">372%</td><td class="num">0.31</td><td class="num">−60%</td><td class="num">6.16</td><td class="num">2728万</td><td>较激进</td></tr>
+    <tr><td>4</td><td>1/4</td><td class="num">469%</td><td class="num">0.23</td><td class="num">−81%</td><td class="num">5.81</td><td class="num">5358万</td><td>极激进</td></tr>
+  </tbody>
+</table>
+
+<h2>对你的具体建议</h2>
+
+<div class="callout good">
+  <div class="callout-title">Phase 5a 实盘起步配置</div>
+  <pre><code>策略 = N=4 + Kelly=1/16 + per_combo_cap=0.5% + weekly_cap=25%
+入场资金 = 100,000 元
+预期周均 stake ≈ 5,000 元（远低于 25% 上限）
+预期周均 PnL = 平本附近 ± 大波动
+预期 Phase 5a 末（200+ 注后）累计 ROI = +20% ~ +60%（80% 置信）
+Kill criteria: 累计 200 注 ROI &lt; -25% 或 DD &gt; -50% → 暂停
+</code></pre>
+</div>
+
+<p style="color:var(--muted);font-size:13px;margin-top:30px;">
+完整 grid CSV: <code>data/raw/kelly_n_grid.csv</code><br>
+源代码: <code>notebooks/kelly_n_grid.py</code><br>
+配套 dual_archetype 完整报告: <code>docs/research/dual_archetype_report.html</code><br>
+后续等回的 agent: drawdown 深度分析、niche 相关性、Phase 5a pipeline
+</p>
+
+</body>
+</html>
