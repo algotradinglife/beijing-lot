@@ -79,6 +79,55 @@
 <button id="clear_compare" class="btn btn-sm btn-outline-secondary mb-2">清空对比</button>
 <div id="compare_chart" style="height: 400px;"></div>
 
+<hr class="my-4">
+<h4>Mix 比例对比 — 同参数不同 (N₁/N₂) 比例</h4>
+<p class="text-muted">固定 Kelly/λ/max/佣金，看 N₁ 和 N₂ 不同混合权重下的权益曲线如何变化。</p>
+<div class="row mb-3">
+  <div class="col-md-2">
+    <label class="form-label small">主 N</label>
+    <select id="mr_primary" class="form-select form-select-sm">
+      <option value="4" selected>4</option><option value="3">3</option><option value="2">2</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small">次 N</label>
+    <select id="mr_secondary" class="form-select form-select-sm">
+      <option value="2" selected>2</option><option value="3">3</option><option value="4">4</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small">Kelly</label>
+    <select id="mr_kelly" class="form-select form-select-sm">
+      <option value="0.0313">1/32</option>
+      <option value="0.0625" selected>1/16</option>
+      <option value="0.1250">1/8</option>
+      <option value="0.2500">1/4</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small">λ (diversity)</label>
+    <select id="mr_lambda" class="form-select form-select-sm">
+      <option value="0">0</option><option value="0.5" selected>0.5</option>
+      <option value="1">1</option><option value="2">2</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small">max</label>
+    <select id="mr_max" class="form-select form-select-sm">
+      <option value="25">25</option><option value="50" selected>50</option>
+      <option value="100">100</option><option value="200">200</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small">佣金</label>
+    <select id="mr_comm" class="form-select form-select-sm">
+      <option value="0" selected>无</option><option value="0.07">7%</option>
+    </select>
+  </div>
+</div>
+<div id="mix_ratio_chart" style="height: 400px;"></div>
+<div id="mix_ratio_table" class="mt-2"></div>
+
 {% endif %}
 
 {% block scripts %}
@@ -257,14 +306,128 @@ function renderCompare() {
   }, { displayModeBar: false, responsive: true });
 }
 
+function findCellByParams({n_legs, kelly, lambda, max_combos, commission, is_mix=false, n_secondary=null, weight_primary=null}) {
+  return allRows.find(r => {
+    if (r.is_mix !== is_mix) return false;
+    if (r.n_legs !== n_legs) return false;
+    if (Math.abs(r.kelly - kelly) > 0.0005) return false;
+    if (Math.abs(r.lambda - lambda) > 0.01) return false;
+    if (r.max_combos !== max_combos) return false;
+    if (Math.abs(r.commission - commission) > 0.001) return false;
+    if (is_mix) {
+      if (r.n_secondary !== n_secondary) return false;
+      if (Math.abs(r.weight_primary - weight_primary) > 0.01) return false;
+    }
+    return true;
+  });
+}
+
+function renderMixRatio() {
+  const np = +document.getElementById('mr_primary').value;
+  const ns = +document.getElementById('mr_secondary').value;
+  const kelly = +document.getElementById('mr_kelly').value;
+  const lambda = +document.getElementById('mr_lambda').value;
+  const max_combos = +document.getElementById('mr_max').value;
+  const commission = +document.getElementById('mr_comm').value;
+
+  const targetEl = document.getElementById('mix_ratio_chart');
+  const tableEl = document.getElementById('mix_ratio_table');
+  if (np === ns) {
+    targetEl.innerHTML = '<div class="text-center text-warning py-5">主 N 和次 N 不能相同</div>';
+    tableEl.innerHTML = '';
+    return;
+  }
+
+  // Build configs: pure P, pure S, plus 3 mix weights
+  const candidates = [
+    {label: `纯 N=${np} (100/0)`, params: {n_legs: np, kelly, lambda, max_combos, commission}},
+    {label: `Mix ${np}/${ns} (70/30)`, params: {n_legs: np, kelly, lambda, max_combos, commission,
+      is_mix: true, n_secondary: ns, weight_primary: 0.7}},
+    {label: `Mix ${np}/${ns} (50/50)`, params: {n_legs: np, kelly, lambda, max_combos, commission,
+      is_mix: true, n_secondary: ns, weight_primary: 0.5}},
+    {label: `Mix ${np}/${ns} (30/70)`, params: {n_legs: np, kelly, lambda, max_combos, commission,
+      is_mix: true, n_secondary: ns, weight_primary: 0.3}},
+    {label: `纯 N=${ns} (0/100)`, params: {n_legs: ns, kelly, lambda, max_combos, commission}},
+  ];
+
+  const colors = ['#b04a2f', '#a45a00', '#2e6b4a', '#3a5a8c', '#6b2e6b'];
+  const traces = [];
+  const tableRows = [];
+
+  candidates.forEach((c, i) => {
+    const cell = findCellByParams(c.params);
+    if (!cell) {
+      tableRows.push({label: c.label, missing: true});
+      return;
+    }
+    traces.push({
+      x: cell.equity_curve.map((_, j) => j),
+      y: cell.equity_curve,
+      mode: 'lines', type: 'scatter',
+      line: {color: colors[i], width: 2},
+      name: c.label,
+    });
+    tableRows.push({
+      label: c.label,
+      cagr: cell.cagr_pct,
+      sharpe: cell.sharpe,
+      max_dd: cell.max_dd_pct,
+      calmar: cell.calmar,
+      util: cell.utilization_pct,
+      final: cell.final_w,
+    });
+  });
+
+  if (!traces.length) {
+    targetEl.innerHTML = '<div class="text-center text-muted py-5">网格中无对应 cell（请确认参数）</div>';
+    tableEl.innerHTML = '';
+    return;
+  }
+
+  Plotly.newPlot('mix_ratio_chart', traces, {
+    margin: {l: 60, r: 20, t: 10, b: 50},
+    xaxis: {title: '周（OOS 测试期，~50 点降采样）'},
+    yaxis: {title: 'Bankroll (元)', type: 'log'},
+    legend: {orientation: 'h', y: -0.2},
+    shapes: [{
+      type: 'line', x0: 0, x1: 50, y0: 100000, y1: 100000,
+      line: {color: 'gray', dash: 'dash', width: 1},
+    }],
+  }, {displayModeBar: false, responsive: true});
+
+  // Render comparison table
+  let html = '<table class="table table-sm"><thead><tr><th>配置</th><th class="text-end">CAGR</th><th class="text-end">Sharpe</th><th class="text-end">MaxDD</th><th class="text-end">Calmar</th><th class="text-end">利用率</th><th class="text-end">8 年终值</th></tr></thead><tbody>';
+  tableRows.forEach(r => {
+    if (r.missing) {
+      html += `<tr><td>${r.label}</td><td colspan="6" class="text-muted">— 未在网格中 —</td></tr>`;
+    } else {
+      html += `<tr>
+        <td>${r.label}</td>
+        <td class="text-end">${r.cagr.toFixed(1)}%</td>
+        <td class="text-end">${r.sharpe.toFixed(2)}</td>
+        <td class="text-end">${r.max_dd.toFixed(1)}%</td>
+        <td class="text-end">${r.calmar.toFixed(2)}</td>
+        <td class="text-end">${r.util.toFixed(1)}%</td>
+        <td class="text-end">${r.final.toFixed(1)}万</td>
+      </tr>`;
+    }
+  });
+  html += '</tbody></table>';
+  tableEl.innerHTML = html;
+}
+
 function refreshAll() {
   renderTable();
   renderPareto();
   renderCompare();
+  renderMixRatio();
 }
 
 ['filter_n', 'filter_lambda', 'filter_comm', 'sort_by'].forEach(id => {
   document.getElementById(id).addEventListener('change', refreshAll);
+});
+['mr_primary', 'mr_secondary', 'mr_kelly', 'mr_lambda', 'mr_max', 'mr_comm'].forEach(id => {
+  document.getElementById(id).addEventListener('change', renderMixRatio);
 });
 document.getElementById('clear_compare').addEventListener('click', () => {
   compareKeys.clear();
