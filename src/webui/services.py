@@ -137,7 +137,7 @@ def generate_plan(
     n_legs_secondary = int(db.get_config("n_legs_secondary") or 2)
     weight_primary_legacy = float(db.get_config("weight_primary") or 0.7)
     if mix_enabled and (w2 + w3 + w4) > 0:
-        # 3-way mix path with per-N Kelly + lambda overrides
+        # 3-way mix path with per-N Kelly + lambda overrides + max_combos auto-allocation
         wsum = w2 + w3 + w4
         w2, w3, w4 = w2/wsum, w3/wsum, w4/wsum
         # Per-N overrides (fall back to global if not set)
@@ -160,13 +160,14 @@ def generate_plan(
             if weight <= 0:
                 continue
             sub_bankroll = state.active * weight
+            sub_max_combos = max(1, int(round(max_combos * weight)))
             if sub_bankroll < 100:
                 continue
             plan_n = build_weekly_plan(
                 snapshots, bankroll=sub_bankroll, niche_config=cfg,
                 n_legs=n_val, kelly_fraction=k_n,
                 weekly_stake_cap_frac=WEEKLY_STAKE_CAP_FRAC,
-                diversity_lambda=lam_n, max_combos=max_combos, now=now,
+                diversity_lambda=lam_n, max_combos=sub_max_combos, now=now,
             )
             pn = plan_n.to_dict()
             for t in pn.get("tickets", []):
