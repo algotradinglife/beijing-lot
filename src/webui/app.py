@@ -101,6 +101,43 @@ def create_app(
             return redirect(url_for("dashboard"))
         return render_template("setup.html")
 
+    @app.route("/edit_bankroll", methods=["GET", "POST"])
+    def edit_bankroll():
+        """Manually edit bankroll values without resetting history."""
+        db = get_db()
+        if not db.is_initialized():
+            return redirect(url_for("setup"))
+        if request.method == "POST":
+            try:
+                new_initial = float(request.form.get("initial_bankroll", "0"))
+                new_active = float(request.form.get("current_active", "0"))
+                new_locked = float(request.form.get("locked_pile", "0"))
+            except ValueError:
+                flash("数值必须是数字", "error")
+                return redirect(url_for("edit_bankroll"))
+            if new_initial <= 0 or new_active < 0 or new_locked < 0:
+                flash("初始资金必须 > 0；活跃 / 锁定不能为负", "error")
+                return redirect(url_for("edit_bankroll"))
+            reset_peak = bool(request.form.get("reset_peak"))
+            db.set_config("initial_bankroll", new_initial)
+            db.set_config("current_active", new_active)
+            db.set_config("locked_pile", new_locked)
+            if reset_peak:
+                db.set_config("peak_high_water", new_active)
+            flash(
+                f"已更新：初始 {new_initial:,.0f} / 活跃 {new_active:,.0f} / 锁定 {new_locked:,.0f}"
+                + (" · 峰值已重置" if reset_peak else ""),
+                "success",
+            )
+            return redirect(url_for("dashboard"))
+        return render_template(
+            "edit_bankroll.html",
+            initial=float(db.get_config("initial_bankroll") or 0),
+            active=float(db.get_config("current_active") or 0),
+            locked=float(db.get_config("locked_pile") or 0),
+            peak=float(db.get_config("peak_high_water") or 0),
+        )
+
     @app.route("/dashboard")
     def dashboard():
         db = get_db()

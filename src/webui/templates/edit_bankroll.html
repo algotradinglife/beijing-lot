@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}修改资金 · 北单追踪{% endblock %}
+{% block content %}
+
+<h2 class="mb-3">手动修改资金</h2>
+
+<div class="alert alert-info">
+  这里可以直接编辑账面数字，不会清空历史记录。<br>
+  适用场景：纠正录入错误、调整测试基准、或将活跃/锁定金额对齐到实际账户余额。
+</div>
+
+<form method="post" class="card card-body" style="max-width: 600px;">
+  <div class="mb-3">
+    <label class="form-label">初始资金（元）</label>
+    <input type="number" step="any" min="1" name="initial_bankroll"
+           class="form-control" value="{{ "%.0f"|format(initial) }}" required>
+    <small class="text-muted">作为 ROI / CAGR 计算的基准点。</small>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">当前活跃本金（元）</label>
+    <input type="number" step="any" min="0" name="current_active"
+           class="form-control" value="{{ "%.0f"|format(active) }}" required>
+    <small class="text-muted">在 北单 中下注的可用资金。</small>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">已锁定（ProfitLock）（元）</label>
+    <input type="number" step="any" min="0" name="locked_pile"
+           class="form-control" value="{{ "%.0f"|format(locked) }}" required>
+    <small class="text-muted">已转出的"安全"资金（独立账户）。</small>
+  </div>
+
+  <div class="mb-3 form-check">
+    <input type="checkbox" name="reset_peak" id="reset_peak" class="form-check-input">
+    <label for="reset_peak" class="form-check-label">同时重置 high-water-mark 到当前活跃</label>
+    <div><small class="text-muted">勾选后，下一次 ProfitLock 触发将以新活跃为基准（活跃 × 2）。当前峰值 {{ "%.0f"|format(peak) }}。</small></div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">保存修改</button>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">取消</a>
+  </div>
+</form>
+
+{% endblock %}
