@@ -104,6 +104,21 @@ def create_app(
             return redirect(url_for("dashboard"))
         return render_template("setup.html")
 
+    @app.route("/strategy_explorer")
+    def strategy_explorer():
+        """Compare-and-choose page: master table + Pareto + heatmaps."""
+        db = get_db()
+        if not db.is_initialized():
+            return redirect(url_for("setup"))
+        grid_path = Path(__file__).resolve().parents[2] / "data" / "raw" / "backtest_grid.json"
+        if not grid_path.exists():
+            return render_template("strategy_explorer.html",
+                                   grid_json="{}", grid_ready=False)
+        # Stream-pass JSON to template (already small ~220 KB)
+        return render_template("strategy_explorer.html",
+                               grid_json=grid_path.read_text(),
+                               grid_ready=True)
+
     @app.route("/api/backtest_preview")
     def backtest_preview():
         """Return cached backtest metrics + equity curve for given config."""

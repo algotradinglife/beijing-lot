@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}策略对比 · 北单追踪{% endblock %}
+{% block content %}
+
+<h2 class="mb-3">策略对比 / 参数选择助手</h2>
+
+{% if not grid_ready %}
+<div class="alert alert-warning">
+  回测网格未生成。请先跑 <code>python notebooks/precompute_backtest_grid.py</code>，约 20 分钟。
+</div>
+{% else %}
+
+<div class="alert alert-info">
+  <strong>使用提示</strong>：从下方表格 + 散点图选合适配置 → 点击行的 "应用" 按钮一键写入策略参数 → 去当期计划页重新生成。
+  数据源：256 个回测 cell（N ∈ {3,4} × Kelly ∈ {1/32,1/16,1/8,1/4} × λ ∈ {0,0.5,1,2} × max ∈ {25,50,100,200} × 佣金 ∈ {0,7%}）
+</div>
+
+<div class="row mb-3">
+  <div class="col-md-3">
+    <label class="form-label small">筛选 N</label>
+    <select id="filter_n" class="form-select form-select-sm">
+      <option value="">全部</option><option value="3">3</option><option value="4">4</option>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small">筛选 λ</label>
+    <select id="filter_lambda" class="form-select form-select-sm">
+      <option value="">全部</option>
+      <option value="0">0</option><option value="0.5">0.5</option>
+      <option value="1">1</option><option value="2">2</option>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small">筛选佣金</label>
+    <select id="filter_comm" class="form-select form-select-sm">
+      <option value="">全部</option><option value="0">无</option><option value="0.07">7%</option>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small">排序依据</label>
+    <select id="sort_by" class="form-select form-select-sm">
+      <option value="calmar">Calmar（推荐）</option>
+      <option value="sharpe">Sharpe</option>
+      <option value="cagr">CAGR</option>
+      <option value="max_dd_neg">|MaxDD| 升序</option>
+      <option value="final">8 年终值</option>
+    </select>
+  </div>
+</div>
+
+<h4>Pareto 散点图（CAGR vs Max DD）</h4>
+<div id="pareto_chart" style="height: 420px;"></div>
+<small class="text-muted">点击点 → 高亮，并加入下方"对比曲线"。鼠标悬停查看配置详情。理想配置在右上角（高 CAGR, 低 |DD|）。</small>
+
+<h4 class="mt-4">配置排行表</h4>
+<div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+  <table class="table table-sm table-hover" id="config_table">
+    <thead class="sticky-top bg-light">
+      <tr>
+        <th>N</th><th>Kelly</th><th>λ</th><th>max</th><th>佣金</th>
+        <th class="text-end">CAGR</th>
+        <th class="text-end">Sharpe</th>
+        <th class="text-end">MaxDD</th>
+        <th class="text-end">Calmar</th>
+        <th class="text-end">利用%</th>
+        <th class="text-end">8年终值</th>
+        <th class="text-end">应用</th>
+      </tr>
+    </thead>
+    <tbody id="config_tbody"></tbody>
+  </table>
+</div>
+
+<h4 class="mt-4">对比权益曲线（点 Pareto 散点选中加入）</h4>
+<button id="clear_compare" class="btn btn-sm btn-outline-secondary mb-2">清空对比</button>
+<div id="compare_chart" style="height: 400px;"></div>
+
+{% endif %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.0/plotly.min.js"></script>
+<script>
+const grid = {{ grid_json|safe }};
+
+// Parse cell key: "N3_K0.0625_L0.50_M50_C0.000"
+function parseKey(k) {
+  const m = k.match(/^N(\d+)_K([\d.]+)_L([\d.]+)_M(\d+)_C([\d.]+)$/);
+  return m ? {
+    n_legs: +m[1], kelly: +m[2], lambda: +m[3],
+    max_combos: +m[4], commission: +m[5],
+  } : null;
+}
+
+const allRows = Object.entries(grid).map(([k, v]) => {
+  const p = parseKey(k);
+  return p ? {
+    key: k, ...p, ...v,
+    cagr_pct: v.cagr * 100,
+    max_dd_pct: v.max_dd * 100,
+    max_dd_neg: -v.max_dd,
+    final_w: v.final / 1e4,  // 万元
+  } : null;
+}).filter(Boolean);
+
+const compareKeys = new Set();
+
+function applyFilters() {
+  const fN = document.getElementById('filter_n').value;
+  const fL = document.getElementById('filter_lambda').value;
+  const fC = document.getElementById('filter_comm').value;
+  return allRows.filter(r =>
+    (!fN || r.n_legs === +fN) &&
+    (!fL || Math.abs(r.lambda - +fL) < 0.01) &&
+    (!fC || Math.abs(r.commission - +fC) < 0.001)
+  );
+}
+
+function sortRows(rows) {
+  const by = document.getElementById('sort_by').value;
+  return [...rows].sort((a, b) => {
+    if (by === 'max_dd_neg') return a.max_dd_neg - b.max_dd_neg;
+    return (b[by] || 0) - (a[by] || 0);
+  });
+}
+
+function fmtCfg(r) {
+  return `N=${r.n_legs}, K=${r.kelly.toFixed(4)}, λ=${r.lambda}, max=${r.max_combos}, 佣金=${(r.commission*100).toFixed(0)}%`;
+}
+
+function colorize(val, good_above, td) {
+  td.classList.remove('text-success','text-warning','text-danger');
+  if (val >= good_above) td.classList.add('text-success');
+  else if (val >= good_above * 0.5) td.classList.add('text-warning');
+  else td.classList.add('text-danger');
+}
+
+function renderTable() {
+  const rows = sortRows(applyFilters()).slice(0, 80);
+  const tbody = document.getElementById('config_tbody');
+  tbody.innerHTML = rows.map(r => `
+    <tr data-key="${r.key}">
+      <td>${r.n_legs}</td>
+      <td>${r.kelly.toFixed(4)}</td>
+      <td>${r.lambda}</td>
+      <td>${r.max_combos}</td>
+      <td>${(r.commission*100).toFixed(0)}%</td>
+      <td class="text-end ${r.cagr >= 0.30 ? 'text-success' : r.cagr >= 0.10 ? 'text-warning' : ''}">${(r.cagr_pct).toFixed(1)}%</td>
+      <td class="text-end ${r.sharpe >= 0.6 ? 'text-success' : r.sharpe >= 0.3 ? 'text-warning' : ''}">${r.sharpe.toFixed(2)}</td>
+      <td class="text-end ${r.max_dd > -0.15 ? 'text-success' : r.max_dd > -0.40 ? 'text-warning' : 'text-danger'}">${r.max_dd_pct.toFixed(1)}%</td>
+      <td class="text-end ${r.calmar >= 2 ? 'text-success' : r.calmar >= 1 ? 'text-warning' : ''}">${r.calmar.toFixed(2)}</td>
+      <td class="text-end">${r.utilization_pct.toFixed(1)}%</td>
+      <td class="text-end">${r.final_w.toFixed(1)}万</td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-outline-primary apply-btn" data-key="${r.key}">应用</button>
+      </td>
+    </tr>
+  `).join('');
+  document.querySelectorAll('.apply-btn').forEach(btn => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const r = allRows.find(x => x.key === btn.dataset.key);
+      const params = new URLSearchParams({
+        apply: 'true',
+        n_legs: r.n_legs, kelly_fraction: r.kelly,
+        diversity_lambda: r.lambda, max_combos: r.max_combos,
+        commission_rate: r.commission,
+      });
+      window.location = '/strategy_params?' + params.toString();
+    };
+  });
+}
+
+function renderPareto() {
+  const rows = applyFilters();
+  const data = [{
+    x: rows.map(r => r.max_dd_pct),
+    y: rows.map(r => r.cagr_pct),
+    mode: 'markers',
+    type: 'scatter',
+    marker: {
+      size: rows.map(r => 8 + Math.log10(Math.max(r.utilization_pct, 0.1)) * 4),
+      color: rows.map(r => r.sharpe),
+      colorscale: 'RdYlGn',
+      cmin: 0, cmax: 1,
+      colorbar: { title: 'Sharpe', thickness: 14 },
+      line: { width: rows.map(r => compareKeys.has(r.key) ? 3 : 0.5),
+              color: rows.map(r => compareKeys.has(r.key) ? '#000' : '#ccc') },
+    },
+    text: rows.map(r => fmtCfg(r) + `<br>final=${r.final_w.toFixed(1)}万 · util=${r.utilization_pct.toFixed(1)}%`),
+    hovertemplate: '%{text}<br>CAGR %{y:.1f}% · MaxDD %{x:.1f}%<extra></extra>',
+    customdata: rows.map(r => r.key),
+  }];
+  const layout = {
+    margin: { l: 60, r: 30, t: 10, b: 50 },
+    xaxis: { title: 'Max DD (%)', range: [Math.min(-100, Math.min(...rows.map(r=>r.max_dd_pct))-5), 5] },
+    yaxis: { title: 'CAGR (%)', range: [Math.min(-30, Math.min(...rows.map(r=>r.cagr_pct))-5),
+                                          Math.max(...rows.map(r=>r.cagr_pct))*1.1] },
+    showlegend: false,
+  };
+  Plotly.newPlot('pareto_chart', data, layout, { displayModeBar: false, responsive: true });
+  document.getElementById('pareto_chart').on('plotly_click', (ev) => {
+    const k = ev.points[0].customdata;
+    if (compareKeys.has(k)) compareKeys.delete(k);
+    else compareKeys.add(k);
+    renderPareto();
+    renderCompare();
+  });
+}
+
+function renderCompare() {
+  if (compareKeys.size === 0) {
+    document.getElementById('compare_chart').innerHTML =
+      '<div class="text-center text-muted py-5">点 Pareto 散点选中配置加入对比（最多 5 个）</div>';
+    return;
+  }
+  const colors = ['#b04a2f','#2e6b4a','#a45a00','#3a5a8c','#6b2e6b'];
+  const traces = [...compareKeys].slice(0, 5).map((k, i) => {
+    const r = allRows.find(x => x.key === k);
+    if (!r || !r.equity_curve) return null;
+    return {
+      x: r.equity_curve.map((_, j) => j),
+      y: r.equity_curve,
+      mode: 'lines', type: 'scatter',
+      line: { color: colors[i], width: 2 },
+      name: fmtCfg(r),
+    };
+  }).filter(Boolean);
+  Plotly.newPlot('compare_chart', traces, {
+    margin: { l: 60, r: 20, t: 10, b: 50 },
+    xaxis: { title: '周（OOS 测试期，~50 点降采样）' },
+    yaxis: { title: 'Bankroll (元)', type: 'log' },
+    legend: { orientation: 'h', y: -0.2 },
+    shapes: [{
+      type: 'line', x0: 0, x1: 50, y0: 100000, y1: 100000,
+      line: { color: 'gray', dash: 'dash', width: 1 },
+    }],
+  }, { displayModeBar: false, responsive: true });
+}
+
+function refreshAll() {
+  renderTable();
+  renderPareto();
+  renderCompare();
+}
+
+['filter_n', 'filter_lambda', 'filter_comm', 'sort_by'].forEach(id => {
+  document.getElementById(id).addEventListener('change', refreshAll);
+});
+document.getElementById('clear_compare').addEventListener('click', () => {
+  compareKeys.clear();
+  renderPareto();
+  renderCompare();
+});
+window.addEventListener('DOMContentLoaded', refreshAll);
+</script>
+{% endblock %}
+
+{% endblock %}
