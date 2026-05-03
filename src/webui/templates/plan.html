@@ -64,9 +64,9 @@
         <div class="col-md-4 text-center">
           <div class="text-muted small">最大集中度</div>
           <h3 class="mb-0
-            {% if plan.concentration_max_pct > 80 %}text-danger
-            {% elif plan.concentration_max_pct > 50 %}text-warning
-            {% else %}text-success{% endif %}">{{ plan.concentration_max_pct|default(0) }}%</h3>
+            {% if (plan.concentration_max_pct|default(0)) > 80 %}text-danger
+            {% elif (plan.concentration_max_pct|default(0)) > 50 %}text-warning
+            {% else %}text-success{% endif %}">{{ (plan.concentration_max_pct|default(0))|default(0) }}%</h3>
           <small class="text-muted">最强 leg 出现在多少%的票里</small>
         </div>
         <div class="col-md-4 text-center">
@@ -154,7 +154,7 @@
 
 {% endif %}
 
-{% if plan and plan.tickets and plan.leg_appearance %}
+{% if plan and plan.tickets and (plan.leg_appearance|default([])) %}
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.0/plotly.min.js"></script>
 <script>

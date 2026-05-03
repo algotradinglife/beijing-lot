@@ -1,30 +1,41 @@
 {
   "plan_id": "2026-W18",
-  "generated_at": "2026-05-03T05:58:37Z",
+  "generated_at": "2026-05-03T06:06:28Z",
   "bankroll": 100000.0,
   "n_legs": 4,
   "kelly_fraction": 0.0625,
   "n_open_matches": 154,
-  "n_qualified_legs": 34,
-  "total_stake": 294,
-  "expected_total_return": 362.60653165200983,
+  "n_qualified_legs": 32,
+  "total_stake": 282,
+  "expected_total_return": 349.0387931576625,
   "tickets": [
     {
       "ticket_no": 1,
       "stake_per_ticket": 10,
       "n_tickets": 1,
       "total_stake": 10,
-      "joint_sp": 334.75149120000003,
-      "joint_p": 0.006356537276000001,
-      "payout_per_yuan": 217.58846928000003,
-      "prize_per_ticket": 2175.8846928000003,
+      "joint_sp": 371.31404492999997,
+      "joint_p": 0.005993916022000003,
+      "payout_per_yuan": 241.3541292045,
+      "prize_per_ticket": 2413.541292045,
       "is_tax_free": true,
-      "ev": 0.38310921580610136,
+      "ev": 0.44665638201471136,
       "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
+        },
         {
           "match_id": "26051_267",
           "selection": 3,
-          "sp": 4.44,
+          "sp": 4.39,
           "p_hat": 0.277,
           "rule": "home_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T20:00:00",
@@ -35,7 +46,7 @@
         {
           "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.34,
+          "sp": 4.37,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5_LowerEU",
           "kickoff_ts": "2026-05-03T20:00:00",
@@ -44,16 +55,30 @@
           "league": "瑞典超"
         },
         {
-          "match_id": "26051_276",
-          "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
-        },
+          "match_id": "26051_310",
+          "selection": 3,
+          "sp": 4.33,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
+        }
+      ]
+    },
+    {
+      "ticket_no": 2,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 287.5432446,
+      "joint_p": 0.006448328428000002,
+      "payout_per_yuan": 186.90310899,
+      "prize_per_ticket": 1121.41865394,
+      "is_tax_free": true,
+      "ev": 0.20521263098179965,
+      "legs": [
         {
           "match_id": "26051_375",
           "selection": 3,
@@ -64,101 +89,54 @@
           "home": "LASK林茨",
           "away": "维也纳快速",
           "league": "奥甲"
-        }
-      ]
-    },
-    {
-      "ticket_no": 2,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 309.63999332,
-      "joint_p": 0.005993916022000003,
-      "payout_per_yuan": 201.26599565799998,
-      "prize_per_ticket": 1207.595973948,
-      "is_tax_free": true,
-      "ev": 0.2063714760582691,
-      "legs": [
+        },
+        {
+          "match_id": "26051_276",
+          "selection": 0,
+          "sp": 3.93,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
+        },
+        {
+          "match_id": "26051_340",
+          "selection": 3,
+          "sp": 4.11,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
+        },
         {
           "match_id": "26051_246",
           "selection": 0,
-          "sp": 4.22,
+          "sp": 4.14,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T15:30:00",
           "home": "坡州前沿",
           "away": "忠北清州FC",
           "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_310",
-          "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
-        },
-        {
-          "match_id": "26051_259",
-          "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        },
-        {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
         }
       ]
     },
     {
       "ticket_no": 3,
-      "stake_per_ticket": 4,
+      "stake_per_ticket": 2,
       "n_tickets": 1,
-      "total_stake": 4,
-      "joint_sp": 278.39903784,
-      "joint_p": 0.0062348395210000025,
-      "payout_per_yuan": 180.959374596,
-      "prize_per_ticket": 723.837498384,
+      "total_stake": 2,
+      "joint_sp": 254.21820732,
+      "joint_p": 0.006612036218000002,
+      "payout_per_yuan": 165.241834758,
+      "prize_per_ticket": 330.483669516,
       "is_tax_free": true,
-      "ev": 0.12825266042658479,
+      "ev": 0.09258499614866755,
       "legs": [
-        {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
-          "league": "K2联赛"
-        },
         {
           "match_id": "26051_229",
           "selection": 3,
@@ -171,51 +149,26 @@
           "league": "美职"
         },
         {
-          "match_id": "26051_340",
+          "match_id": "26051_248",
           "selection": 3,
-          "sp": 4.02,
+          "sp": 4.07,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
-        }
-      ]
-    },
-    {
-      "ticket_no": 4,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 287.71439760000004,
-      "joint_p": 0.0064483284280000015,
-      "payout_per_yuan": 187.01435844000002,
-      "prize_per_ticket": 1122.0861506400001,
-      "is_tax_free": true,
-      "ev": 0.20593000397283423,
-      "legs": [
-        {
-          "match_id": "26051_267",
-          "selection": 3,
-          "sp": 4.44,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "龙仁FC",
+          "away": "城南FC",
+          "league": "K2联赛"
         },
         {
-          "match_id": "26051_272",
-          "selection": 0,
-          "sp": 4.34,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5_LowerEU",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "马尔默",
-          "away": "米亚尔比",
-          "league": "瑞典超"
+          "match_id": "26051_245",
+          "selection": 3,
+          "sp": 4.06,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
         },
         {
           "match_id": "26051_257",
@@ -227,11 +180,58 @@
           "home": "希伯尼安",
           "away": "凯尔特人",
           "league": "苏超"
+        }
+      ]
+    },
+    {
+      "ticket_no": 4,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 310.79186307,
+      "joint_p": 0.006058598569000003,
+      "payout_per_yuan": 202.0147109955,
+      "prize_per_ticket": 1212.088265973,
+      "is_tax_free": true,
+      "ev": 0.22392603895428542,
+      "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_267",
+          "selection": 3,
+          "sp": 4.39,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
+        },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
         },
         {
           "match_id": "26051_240",
           "selection": 3,
-          "sp": 3.95,
+          "sp": 3.93,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T13:00:00",
@@ -246,23 +246,34 @@
       "stake_per_ticket": 8,
       "n_tickets": 1,
       "total_stake": 8,
-      "joint_sp": 309.36752479999996,
-      "joint_p": 0.006356537276000001,
-      "payout_per_yuan": 201.08889111999997,
-      "prize_per_ticket": 1608.7111289599998,
+      "joint_sp": 319.76456790000003,
+      "joint_p": 0.006356537276000002,
+      "payout_per_yuan": 207.84696913500002,
+      "prize_per_ticket": 1662.7757530800002,
       "is_tax_free": true,
-      "ev": 0.2782290321937855,
+      "ev": 0.3211870070102496,
       "legs": [
         {
-          "match_id": "26051_276",
+          "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
+          "sp": 4.37,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5_LowerEU",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "马尔默",
+          "away": "米亚尔比",
+          "league": "瑞典超"
+        },
+        {
+          "match_id": "26051_310",
+          "selection": 3,
+          "sp": 4.33,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
         },
         {
           "match_id": "26051_375",
@@ -276,26 +287,15 @@
           "league": "奥甲"
         },
         {
-          "match_id": "26051_246",
+          "match_id": "26051_276",
           "selection": 0,
-          "sp": 4.22,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "坡州前沿",
-          "away": "忠北清州FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_310",
-          "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
+          "sp": 3.93,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
         }
       ]
     },
@@ -304,81 +304,34 @@
       "stake_per_ticket": 4,
       "n_tickets": 1,
       "total_stake": 4,
-      "joint_sp": 295.85534188,
-      "joint_p": 0.006146087357000002,
-      "payout_per_yuan": 192.30597222200004,
-      "prize_per_ticket": 769.2238888880001,
+      "joint_sp": 281.85839946000004,
+      "joint_p": 0.006168275398000003,
+      "payout_per_yuan": 183.20795964900003,
+      "prize_per_ticket": 732.8318385960001,
       "is_tax_free": true,
-      "ev": 0.18192930454922807,
+      "ev": 0.1300771502207041,
       "legs": [
         {
-          "match_id": "26051_259",
+          "match_id": "26051_340",
           "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        },
-        {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
+          "sp": 4.11,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
         },
         {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
+          "match_id": "26051_246",
+          "selection": 0,
+          "sp": 4.14,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
+          "home": "坡州前沿",
+          "away": "忠北清州FC",
           "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
-          "league": "K2联赛"
-        }
-      ]
-    },
-    {
-      "ticket_no": 7,
-      "stake_per_ticket": 4,
-      "n_tickets": 1,
-      "total_stake": 4,
-      "joint_sp": 274.59664848,
-      "joint_p": 0.006517914706000002,
-      "payout_per_yuan": 178.487821512,
-      "prize_per_ticket": 713.951286048,
-      "is_tax_free": true,
-      "ev": 0.16336839667496839,
-      "legs": [
-        {
-          "match_id": "26051_267",
-          "selection": 3,
-          "sp": 4.44,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
         },
         {
           "match_id": "26051_229",
@@ -392,15 +345,51 @@
           "league": "美职"
         },
         {
-          "match_id": "26051_340",
+          "match_id": "26051_248",
           "selection": 3,
-          "sp": 4.02,
+          "sp": 4.07,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "龙仁FC",
+          "away": "城南FC",
+          "league": "K2联赛"
+        }
+      ]
+    },
+    {
+      "ticket_no": 7,
+      "stake_per_ticket": 4,
+      "n_tickets": 1,
+      "total_stake": 4,
+      "joint_sp": 276.4587898799999,
+      "joint_p": 0.006517914706000002,
+      "payout_per_yuan": 179.69821342199995,
+      "prize_per_ticket": 718.7928536879998,
+      "is_tax_free": true,
+      "ev": 0.1712576279051805,
+      "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_245",
+          "selection": 3,
+          "sp": 4.06,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
         },
         {
           "match_id": "26051_257",
@@ -412,6 +401,17 @@
           "home": "希伯尼安",
           "away": "凯尔特人",
           "league": "苏超"
+        },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
         }
       ]
     },
@@ -420,17 +420,28 @@
       "stake_per_ticket": 8,
       "n_tickets": 1,
       "total_stake": 8,
-      "joint_sp": 297.808196,
-      "joint_p": 0.0064483284280000015,
-      "payout_per_yuan": 193.57532740000002,
-      "prize_per_ticket": 1548.6026192000002,
+      "joint_sp": 326.45731467,
+      "joint_p": 0.005993916022000003,
+      "payout_per_yuan": 212.1972545355,
+      "prize_per_ticket": 1697.578036284,
       "is_tax_free": true,
-      "ev": 0.24823728663282774,
+      "ev": 0.27189252378474627,
       "legs": [
+        {
+          "match_id": "26051_267",
+          "selection": 3,
+          "sp": 4.39,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
+        },
         {
           "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.34,
+          "sp": 4.37,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5_LowerEU",
           "kickoff_ts": "2026-05-03T20:00:00",
@@ -439,31 +450,20 @@
           "league": "瑞典超"
         },
         {
-          "match_id": "26051_276",
-          "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
-        },
-        {
-          "match_id": "26051_375",
+          "match_id": "26051_310",
           "selection": 3,
-          "sp": 4.3,
+          "sp": 4.33,
           "p_hat": 0.277,
           "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-05T02:30:00",
-          "home": "LASK林茨",
-          "away": "维也纳快速",
-          "league": "奥甲"
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
         },
         {
           "match_id": "26051_240",
           "selection": 3,
-          "sp": 3.95,
+          "sp": 3.93,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T13:00:00",
@@ -478,92 +478,45 @@
       "stake_per_ticket": 6,
       "n_tickets": 1,
       "total_stake": 6,
-      "joint_sp": 309.63999332,
-      "joint_p": 0.005993916022000003,
-      "payout_per_yuan": 201.26599565799998,
-      "prize_per_ticket": 1207.595973948,
+      "joint_sp": 282.68140230000006,
+      "joint_p": 0.006517914706000002,
+      "payout_per_yuan": 183.74291149500004,
+      "prize_per_ticket": 1102.4574689700003,
       "is_tax_free": true,
-      "ev": 0.2063714760582691,
+      "ev": 0.19762062495651755,
       "legs": [
         {
-          "match_id": "26051_246",
+          "match_id": "26051_375",
+          "selection": 3,
+          "sp": 4.3,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-05T02:30:00",
+          "home": "LASK林茨",
+          "away": "维也纳快速",
+          "league": "奥甲"
+        },
+        {
+          "match_id": "26051_276",
           "selection": 0,
-          "sp": 4.22,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "坡州前沿",
-          "away": "忠北清州FC",
-          "league": "K2联赛"
+          "sp": 3.93,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
         },
         {
-          "match_id": "26051_310",
+          "match_id": "26051_340",
           "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
-        },
-        {
-          "match_id": "26051_259",
-          "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        },
-        {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
+          "sp": 4.11,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
-          "league": "K2联赛"
-        }
-      ]
-    },
-    {
-      "ticket_no": 10,
-      "stake_per_ticket": 4,
-      "n_tickets": 1,
-      "total_stake": 4,
-      "joint_sp": 278.39903784,
-      "joint_p": 0.0062348395210000025,
-      "payout_per_yuan": 180.959374596,
-      "prize_per_ticket": 723.837498384,
-      "is_tax_free": true,
-      "ev": 0.12825266042658479,
-      "legs": [
-        {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
-          "league": "K2联赛"
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
         },
         {
           "match_id": "26051_229",
@@ -575,53 +528,53 @@
           "home": "纽约红牛",
           "away": "FC达拉斯",
           "league": "美职"
-        },
-        {
-          "match_id": "26051_340",
-          "selection": 3,
-          "sp": 4.02,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
         }
       ]
     },
     {
-      "ticket_no": 11,
-      "stake_per_ticket": 6,
+      "ticket_no": 10,
+      "stake_per_ticket": 2,
       "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 267.8263056,
-      "joint_p": 0.006912236948000001,
-      "payout_per_yuan": 174.08709864000002,
-      "prize_per_ticket": 1044.5225918400001,
+      "total_stake": 2,
+      "joint_sp": 258.59051063999993,
+      "joint_p": 0.006541445084000002,
+      "payout_per_yuan": 168.08383191599995,
+      "prize_per_ticket": 336.1676638319999,
       "is_tax_free": true,
-      "ev": 0.2033312753895289,
+      "ev": 0.09951115598680049,
       "legs": [
         {
-          "match_id": "26051_267",
-          "selection": 3,
-          "sp": 4.44,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
+          "match_id": "26051_246",
+          "selection": 0,
+          "sp": 4.14,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "坡州前沿",
+          "away": "忠北清州FC",
+          "league": "K2联赛"
         },
         {
-          "match_id": "26051_276",
-          "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
+          "match_id": "26051_248",
+          "selection": 3,
+          "sp": 4.07,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "龙仁FC",
+          "away": "城南FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_245",
+          "selection": 3,
+          "sp": 4.06,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
         },
         {
           "match_id": "26051_257",
@@ -633,11 +586,58 @@
           "home": "希伯尼安",
           "away": "凯尔特人",
           "league": "苏超"
+        }
+      ]
+    },
+    {
+      "ticket_no": 11,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 309.37595481,
+      "joint_p": 0.006080470766000003,
+      "payout_per_yuan": 201.0943706265,
+      "prize_per_ticket": 1206.566223759,
+      "is_tax_free": true,
+      "ev": 0.22274844180160303,
+      "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_272",
+          "selection": 0,
+          "sp": 4.37,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5_LowerEU",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "马尔默",
+          "away": "米亚尔比",
+          "league": "瑞典超"
+        },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
         },
         {
           "match_id": "26051_240",
           "selection": 3,
-          "sp": 3.95,
+          "sp": 3.93,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T13:00:00",
@@ -652,17 +652,202 @@
       "stake_per_ticket": 8,
       "n_tickets": 1,
       "total_stake": 8,
-      "joint_sp": 332.3403607999999,
-      "joint_p": 0.005929924036000003,
-      "payout_per_yuan": 216.02123451999995,
-      "prize_per_ticket": 1728.1698761599996,
+      "joint_sp": 321.22802129999997,
+      "joint_p": 0.006333672034000002,
+      "payout_per_yuan": 208.798213845,
+      "prize_per_ticket": 1670.38571076,
       "is_tax_free": true,
-      "ev": 0.2809895108665412,
+      "ev": 0.32245940777922844,
       "legs": [
+        {
+          "match_id": "26051_267",
+          "selection": 3,
+          "sp": 4.39,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
+        },
+        {
+          "match_id": "26051_310",
+          "selection": 3,
+          "sp": 4.33,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
+        },
+        {
+          "match_id": "26051_375",
+          "selection": 3,
+          "sp": 4.3,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-05T02:30:00",
+          "home": "LASK林茨",
+          "away": "维也纳快速",
+          "league": "奥甲"
+        },
+        {
+          "match_id": "26051_276",
+          "selection": 0,
+          "sp": 3.93,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
+        }
+      ]
+    },
+    {
+      "ticket_no": 13,
+      "stake_per_ticket": 4,
+      "n_tickets": 1,
+      "total_stake": 4,
+      "joint_sp": 281.16587268,
+      "joint_p": 0.006168275398000003,
+      "payout_per_yuan": 182.75781724200002,
+      "prize_per_ticket": 731.0312689680001,
+      "is_tax_free": true,
+      "ev": 0.12730054788600942,
+      "legs": [
+        {
+          "match_id": "26051_340",
+          "selection": 3,
+          "sp": 4.11,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
+        },
+        {
+          "match_id": "26051_246",
+          "selection": 0,
+          "sp": 4.14,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "坡州前沿",
+          "away": "忠北清州FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_229",
+          "selection": 3,
+          "sp": 4.07,
+          "p_hat": 0.281,
+          "rule": "away_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T07:40:00",
+          "home": "纽约红牛",
+          "away": "FC达拉斯",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_245",
+          "selection": 3,
+          "sp": 4.06,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
+        }
+      ]
+    },
+    {
+      "ticket_no": 14,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 277.13972286000006,
+      "joint_p": 0.006517914706000002,
+      "payout_per_yuan": 180.14081985900006,
+      "prize_per_ticket": 1080.8449191540003,
+      "is_tax_free": true,
+      "ev": 0.17414249890987366,
+      "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_248",
+          "selection": 3,
+          "sp": 4.07,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "龙仁FC",
+          "away": "城南FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_257",
+          "selection": 0,
+          "sp": 3.78,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "希伯尼安",
+          "away": "凯尔特人",
+          "league": "苏超"
+        },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
+        }
+      ]
+    },
+    {
+      "ticket_no": 15,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 324.1954857,
+      "joint_p": 0.005993916022000003,
+      "payout_per_yuan": 210.727065705,
+      "prize_per_ticket": 1264.36239423,
+      "is_tax_free": true,
+      "ev": 0.2630803353982467,
+      "legs": [
+        {
+          "match_id": "26051_267",
+          "selection": 3,
+          "sp": 4.39,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
+        },
         {
           "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.34,
+          "sp": 4.37,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5_LowerEU",
           "kickoff_ts": "2026-05-03T20:00:00",
@@ -682,136 +867,9 @@
           "league": "奥甲"
         },
         {
-          "match_id": "26051_246",
-          "selection": 0,
-          "sp": 4.22,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "坡州前沿",
-          "away": "忠北清州FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_310",
-          "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
-        }
-      ]
-    },
-    {
-      "ticket_no": 13,
-      "stake_per_ticket": 4,
-      "n_tickets": 1,
-      "total_stake": 4,
-      "joint_sp": 292.26486443000005,
-      "joint_p": 0.006146087357000002,
-      "payout_per_yuan": 189.97216187950005,
-      "prize_per_ticket": 759.8886475180002,
-      "is_tax_free": true,
-      "ev": 0.16758550230955294,
-      "legs": [
-        {
-          "match_id": "26051_259",
-          "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        },
-        {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
-        },
-        {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_229",
-          "selection": 3,
-          "sp": 4.07,
-          "p_hat": 0.281,
-          "rule": "away_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T07:40:00",
-          "home": "纽约红牛",
-          "away": "FC达拉斯",
-          "league": "美职"
-        }
-      ]
-    },
-    {
-      "ticket_no": 14,
-      "stake_per_ticket": 2,
-      "n_tickets": 1,
-      "total_stake": 2,
-      "joint_sp": 247.2931944,
-      "joint_p": 0.006612036218000002,
-      "payout_per_yuan": 160.74057636,
-      "prize_per_ticket": 321.48115272,
-      "is_tax_free": true,
-      "ev": 0.06282251259451499,
-      "legs": [
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_340",
-          "selection": 3,
-          "sp": 4.02,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
-        },
-        {
-          "match_id": "26051_257",
-          "selection": 0,
-          "sp": 3.78,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "希伯尼安",
-          "away": "凯尔特人",
-          "league": "苏超"
-        },
-        {
           "match_id": "26051_240",
           "selection": 3,
-          "sp": 3.95,
+          "sp": 3.93,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T13:00:00",
@@ -822,43 +880,32 @@
       ]
     },
     {
-      "ticket_no": 15,
-      "stake_per_ticket": 10,
+      "ticket_no": 16,
+      "stake_per_ticket": 6,
       "n_tickets": 1,
-      "total_stake": 10,
-      "joint_sp": 328.52355648,
-      "joint_p": 0.006379485064000001,
-      "payout_per_yuan": 213.54031171200003,
-      "prize_per_ticket": 2135.4031171200004,
+      "total_stake": 6,
+      "joint_sp": 289.54936025999996,
+      "joint_p": 0.006448328428000002,
+      "payout_per_yuan": 188.20708416899998,
+      "prize_per_ticket": 1129.242505014,
       "is_tax_free": true,
-      "ev": 0.3622772291286087,
+      "ev": 0.2136210911979517,
       "legs": [
         {
-          "match_id": "26051_267",
+          "match_id": "26051_310",
           "selection": 3,
-          "sp": 4.44,
+          "sp": 4.33,
           "p_hat": 0.277,
           "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
-        },
-        {
-          "match_id": "26051_272",
-          "selection": 0,
-          "sp": 4.34,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5_LowerEU",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "马尔默",
-          "away": "米亚尔比",
-          "league": "瑞典超"
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
         },
         {
           "match_id": "26051_276",
           "selection": 0,
-          "sp": 4.04,
+          "sp": 3.93,
           "p_hat": 0.298,
           "rule": "away_sp_3.5-4.5_h1",
           "kickoff_ts": "2026-05-03T20:30:00",
@@ -867,9 +914,20 @@
           "league": "荷甲"
         },
         {
+          "match_id": "26051_340",
+          "selection": 3,
+          "sp": 4.11,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
+        },
+        {
           "match_id": "26051_246",
           "selection": 0,
-          "sp": 4.22,
+          "sp": 4.14,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T15:30:00",
@@ -880,97 +938,17 @@
       ]
     },
     {
-      "ticket_no": 16,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 315.50994579999997,
-      "joint_p": 0.005972355173000003,
-      "payout_per_yuan": 205.08146477,
-      "prize_per_ticket": 1230.48878862,
-      "is_tax_free": true,
-      "ev": 0.2248193470055273,
-      "legs": [
-        {
-          "match_id": "26051_375",
-          "selection": 3,
-          "sp": 4.3,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-05T02:30:00",
-          "home": "LASK林茨",
-          "away": "维也纳快速",
-          "league": "奥甲"
-        },
-        {
-          "match_id": "26051_310",
-          "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
-        },
-        {
-          "match_id": "26051_259",
-          "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        },
-        {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
-        }
-      ]
-    },
-    {
       "ticket_no": 17,
-      "stake_per_ticket": 4,
+      "stake_per_ticket": 2,
       "n_tickets": 1,
-      "total_stake": 4,
-      "joint_sp": 261.77819976,
-      "joint_p": 0.006612036218000002,
-      "payout_per_yuan": 170.155829844,
-      "prize_per_ticket": 680.623319376,
+      "total_stake": 2,
+      "joint_sp": 271.03158082000004,
+      "joint_p": 0.006146087357000002,
+      "payout_per_yuan": 176.17052753300004,
+      "prize_per_ticket": 352.3410550660001,
       "is_tax_free": true,
-      "ev": 0.1250765096323736,
+      "ev": 0.0827594519465924,
       "legs": [
-        {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
-          "league": "K2联赛"
-        },
         {
           "match_id": "26051_229",
           "selection": 3,
@@ -983,6 +961,75 @@
           "league": "美职"
         },
         {
+          "match_id": "26051_248",
+          "selection": 3,
+          "sp": 4.07,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "龙仁FC",
+          "away": "城南FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_245",
+          "selection": 3,
+          "sp": 4.06,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
+        }
+      ]
+    },
+    {
+      "ticket_no": 18,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 291.51197081999993,
+      "joint_p": 0.006517914706000002,
+      "payout_per_yuan": 189.48278103299995,
+      "prize_per_ticket": 1136.8966861979998,
+      "is_tax_free": true,
+      "ev": 0.23503260502876855,
+      "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_267",
+          "selection": 3,
+          "sp": 4.39,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
+        },
+        {
           "match_id": "26051_257",
           "selection": 0,
           "sp": 3.78,
@@ -992,58 +1039,11 @@
           "home": "希伯尼安",
           "away": "凯尔特人",
           "league": "苏超"
-        }
-      ]
-    },
-    {
-      "ticket_no": 18,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 305.9819784,
-      "joint_p": 0.006080470766000003,
-      "payout_per_yuan": 198.88828596000002,
-      "prize_per_ticket": 1193.32971576,
-      "is_tax_free": true,
-      "ev": 0.20933440847962892,
-      "legs": [
-        {
-          "match_id": "26051_267",
-          "selection": 3,
-          "sp": 4.44,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
-        },
-        {
-          "match_id": "26051_272",
-          "selection": 0,
-          "sp": 4.34,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5_LowerEU",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "马尔默",
-          "away": "米亚尔比",
-          "league": "瑞典超"
-        },
-        {
-          "match_id": "26051_340",
-          "selection": 3,
-          "sp": 4.02,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
         },
         {
           "match_id": "26051_240",
           "selection": 3,
-          "sp": 3.95,
+          "sp": 3.93,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T13:00:00",
@@ -1058,23 +1058,34 @@
       "stake_per_ticket": 8,
       "n_tickets": 1,
       "total_stake": 8,
-      "joint_sp": 308.6344264,
-      "joint_p": 0.006356537276000001,
-      "payout_per_yuan": 200.61237716,
-      "prize_per_ticket": 1604.89901728,
+      "joint_sp": 334.41027330000003,
+      "joint_p": 0.005993916022000003,
+      "payout_per_yuan": 217.36667764500004,
+      "prize_per_ticket": 1738.9334211600003,
       "is_tax_free": true,
-      "ev": 0.27520005344451115,
+      "ev": 0.3028776117852756,
       "legs": [
         {
-          "match_id": "26051_276",
+          "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
+          "sp": 4.37,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5_LowerEU",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "马尔默",
+          "away": "米亚尔比",
+          "league": "瑞典超"
+        },
+        {
+          "match_id": "26051_310",
+          "selection": 3,
+          "sp": 4.33,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
         },
         {
           "match_id": "26051_375",
@@ -1088,109 +1099,51 @@
           "league": "奥甲"
         },
         {
+          "match_id": "26051_340",
+          "selection": 3,
+          "sp": 4.11,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
+        }
+      ]
+    },
+    {
+      "ticket_no": 20,
+      "stake_per_ticket": 4,
+      "n_tickets": 1,
+      "total_stake": 4,
+      "joint_sp": 269.51423598,
+      "joint_p": 0.006541445084000001,
+      "payout_per_yuan": 175.184253387,
+      "prize_per_ticket": 700.737013548,
+      "is_tax_free": true,
+      "ev": 0.14595817311260184,
+      "legs": [
+        {
+          "match_id": "26051_276",
+          "selection": 0,
+          "sp": 3.93,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
+        },
+        {
           "match_id": "26051_246",
           "selection": 0,
-          "sp": 4.22,
+          "sp": 4.14,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T15:30:00",
           "home": "坡州前沿",
           "away": "忠北清州FC",
           "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_259",
-          "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        }
-      ]
-    },
-    {
-      "ticket_no": 20,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 296.55808615999996,
-      "joint_p": 0.006146087357000002,
-      "payout_per_yuan": 192.76275600399998,
-      "prize_per_ticket": 1156.5765360239998,
-      "is_tax_free": true,
-      "ev": 0.18473673757666065,
-      "legs": [
-        {
-          "match_id": "26051_310",
-          "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
-        },
-        {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
-        },
-        {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
-          "league": "K2联赛"
-        }
-      ]
-    },
-    {
-      "ticket_no": 21,
-      "stake_per_ticket": 4,
-      "n_tickets": 1,
-      "total_stake": 4,
-      "joint_sp": 286.9462332,
-      "joint_p": 0.006146087357000002,
-      "payout_per_yuan": 186.51505158,
-      "prize_per_ticket": 746.06020632,
-      "is_tax_free": true,
-      "ev": 0.14633780040604139,
-      "legs": [
-        {
-          "match_id": "26051_267",
-          "selection": 3,
-          "sp": 4.44,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
         },
         {
           "match_id": "26051_229",
@@ -1204,20 +1157,67 @@
           "league": "美职"
         },
         {
-          "match_id": "26051_340",
+          "match_id": "26051_248",
           "selection": 3,
-          "sp": 4.02,
+          "sp": 4.07,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "龙仁FC",
+          "away": "城南FC",
+          "league": "K2联赛"
+        }
+      ]
+    },
+    {
+      "ticket_no": 21,
+      "stake_per_ticket": 4,
+      "n_tickets": 1,
+      "total_stake": 4,
+      "joint_sp": 269.59877027999994,
+      "joint_p": 0.006612036218000002,
+      "payout_per_yuan": 175.23920068199996,
+      "prize_per_ticket": 700.9568027279998,
+      "is_tax_free": true,
+      "ev": 0.15868794172275424,
+      "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_245",
+          "selection": 3,
+          "sp": 4.06,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_257",
+          "selection": 0,
+          "sp": 3.78,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "希伯尼安",
+          "away": "凯尔特人",
+          "league": "苏超"
         },
         {
           "match_id": "26051_240",
           "selection": 3,
-          "sp": 3.95,
+          "sp": 3.93,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T13:00:00",
@@ -1232,17 +1232,28 @@
       "stake_per_ticket": 8,
       "n_tickets": 1,
       "total_stake": 8,
-      "joint_sp": 284.99113439999996,
-      "joint_p": 0.0068384408240000005,
-      "payout_per_yuan": 185.24423735999997,
-      "prize_per_ticket": 1481.9538988799998,
+      "joint_sp": 334.76411657000006,
+      "joint_p": 0.005908593374000002,
+      "payout_per_yuan": 217.59667577050004,
+      "prize_per_ticket": 1740.7734061640003,
       "is_tax_free": true,
-      "ev": 0.2667817551733698,
+      "ev": 0.2856902766620033,
       "legs": [
+        {
+          "match_id": "26051_267",
+          "selection": 3,
+          "sp": 4.39,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
+        },
         {
           "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.34,
+          "sp": 4.37,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5_LowerEU",
           "kickoff_ts": "2026-05-03T20:00:00",
@@ -1251,16 +1262,41 @@
           "league": "瑞典超"
         },
         {
-          "match_id": "26051_276",
-          "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
+          "match_id": "26051_310",
+          "selection": 3,
+          "sp": 4.33,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
         },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
+        }
+      ]
+    },
+    {
+      "ticket_no": 23,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 282.68140230000006,
+      "joint_p": 0.006517914706000002,
+      "payout_per_yuan": 183.74291149500004,
+      "prize_per_ticket": 1102.4574689700003,
+      "is_tax_free": true,
+      "ev": 0.19762062495651755,
+      "legs": [
         {
           "match_id": "26051_375",
           "selection": 3,
@@ -1273,108 +1309,61 @@
           "league": "奥甲"
         },
         {
-          "match_id": "26051_257",
+          "match_id": "26051_276",
           "selection": 0,
-          "sp": 3.78,
+          "sp": 3.93,
           "p_hat": 0.298,
           "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "希伯尼安",
-          "away": "凯尔特人",
-          "league": "苏超"
-        }
-      ]
-    },
-    {
-      "ticket_no": 23,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 308.89025968,
-      "joint_p": 0.005993916022000003,
-      "payout_per_yuan": 200.778668792,
-      "prize_per_ticket": 1204.672012752,
-      "is_tax_free": true,
-      "ev": 0.20345047974820063,
-      "legs": [
-        {
-          "match_id": "26051_246",
-          "selection": 0,
-          "sp": 4.22,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "坡州前沿",
-          "away": "忠北清州FC",
-          "league": "K2联赛"
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
         },
         {
-          "match_id": "26051_310",
+          "match_id": "26051_340",
           "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
+          "sp": 4.11,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
         },
         {
-          "match_id": "26051_259",
+          "match_id": "26051_248",
           "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
+          "sp": 4.07,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
+          "home": "龙仁FC",
+          "away": "城南FC",
           "league": "K2联赛"
         }
       ]
     },
     {
       "ticket_no": 24,
-      "stake_per_ticket": 4,
+      "stake_per_ticket": 2,
       "n_tickets": 1,
-      "total_stake": 4,
-      "joint_sp": 279.07476366,
-      "joint_p": 0.0062348395210000025,
-      "payout_per_yuan": 181.398596379,
-      "prize_per_ticket": 725.594385516,
+      "total_stake": 2,
+      "joint_sp": 258.59051063999993,
+      "joint_p": 0.006541445084000002,
+      "payout_per_yuan": 168.08383191599995,
+      "prize_per_ticket": 336.1676638319999,
       "is_tax_free": true,
-      "ev": 0.1309911377577171,
+      "ev": 0.09951115598680049,
       "legs": [
         {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
-        },
-        {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
+          "match_id": "26051_246",
+          "selection": 0,
+          "sp": 4.14,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
+          "home": "坡州前沿",
+          "away": "忠北清州FC",
           "league": "K2联赛"
         },
         {
@@ -1389,51 +1378,15 @@
           "league": "美职"
         },
         {
-          "match_id": "26051_340",
+          "match_id": "26051_245",
           "selection": 3,
-          "sp": 4.02,
+          "sp": 4.06,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
-        }
-      ]
-    },
-    {
-      "ticket_no": 25,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 285.062652,
-      "joint_p": 0.006425133002000002,
-      "payout_per_yuan": 185.29072380000002,
-      "prize_per_ticket": 1111.7443428000001,
-      "is_tax_free": true,
-      "ev": 0.19051754445184743,
-      "legs": [
-        {
-          "match_id": "26051_267",
-          "selection": 3,
-          "sp": 4.44,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
-        },
-        {
-          "match_id": "26051_375",
-          "selection": 3,
-          "sp": 4.3,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-05T02:30:00",
-          "home": "LASK林茨",
-          "away": "维也纳快速",
-          "league": "奥甲"
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
         },
         {
           "match_id": "26051_257",
@@ -1445,11 +1398,58 @@
           "home": "希伯尼安",
           "away": "凯尔特人",
           "league": "苏超"
+        }
+      ]
+    },
+    {
+      "ticket_no": 25,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 306.54413829000003,
+      "joint_p": 0.006058598569000003,
+      "payout_per_yuan": 199.25368988850002,
+      "prize_per_ticket": 1195.522139331,
+      "is_tax_free": true,
+      "ev": 0.2071981204264366,
+      "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_310",
+          "selection": 3,
+          "sp": 4.33,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
+        },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
         },
         {
           "match_id": "26051_240",
           "selection": 3,
-          "sp": 3.95,
+          "sp": 3.93,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T13:00:00",
@@ -1461,20 +1461,31 @@
     },
     {
       "ticket_no": 26,
-      "stake_per_ticket": 8,
+      "stake_per_ticket": 10,
       "n_tickets": 1,
-      "total_stake": 8,
-      "joint_sp": 312.24536223999996,
-      "joint_p": 0.006379485064000001,
-      "payout_per_yuan": 202.95948545599998,
-      "prize_per_ticket": 1623.6758836479999,
+      "total_stake": 10,
+      "joint_sp": 324.1954857,
+      "joint_p": 0.006356537276000002,
+      "payout_per_yuan": 210.727065705,
+      "prize_per_ticket": 2107.27065705,
       "is_tax_free": true,
-      "ev": 0.2947770060636774,
+      "ev": 0.3394944482159341,
       "legs": [
+        {
+          "match_id": "26051_267",
+          "selection": 3,
+          "sp": 4.39,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
+        },
         {
           "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.34,
+          "sp": 4.37,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5_LowerEU",
           "kickoff_ts": "2026-05-03T20:00:00",
@@ -1483,37 +1494,26 @@
           "league": "瑞典超"
         },
         {
+          "match_id": "26051_375",
+          "selection": 3,
+          "sp": 4.3,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-05T02:30:00",
+          "home": "LASK林茨",
+          "away": "维也纳快速",
+          "league": "奥甲"
+        },
+        {
           "match_id": "26051_276",
           "selection": 0,
-          "sp": 4.04,
+          "sp": 3.93,
           "p_hat": 0.298,
           "rule": "away_sp_3.5-4.5_h1",
           "kickoff_ts": "2026-05-03T20:30:00",
           "home": "锡塔德福图纳",
           "away": "费耶诺德",
           "league": "荷甲"
-        },
-        {
-          "match_id": "26051_246",
-          "selection": 0,
-          "sp": 4.22,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "坡州前沿",
-          "away": "忠北清州FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_310",
-          "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
         }
       ]
     },
@@ -1522,45 +1522,81 @@
       "stake_per_ticket": 4,
       "n_tickets": 1,
       "total_stake": 4,
-      "joint_sp": 291.55720132000005,
-      "joint_p": 0.006146087357000002,
-      "payout_per_yuan": 189.51218085800005,
-      "prize_per_ticket": 758.0487234320002,
+      "joint_sp": 281.16587268,
+      "joint_p": 0.006168275398000003,
+      "payout_per_yuan": 182.75781724200002,
+      "prize_per_ticket": 731.0312689680001,
       "is_tax_free": true,
-      "ev": 0.164758418768852,
+      "ev": 0.12730054788600942,
       "legs": [
         {
-          "match_id": "26051_259",
+          "match_id": "26051_340",
           "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        },
-        {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
+          "sp": 4.11,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
+        },
+        {
+          "match_id": "26051_246",
+          "selection": 0,
+          "sp": 4.14,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "坡州前沿",
+          "away": "忠北清州FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_248",
+          "selection": 3,
+          "sp": 4.07,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "龙仁FC",
+          "away": "城南FC",
+          "league": "K2联赛"
         },
         {
           "match_id": "26051_245",
           "selection": 3,
-          "sp": 4.12,
+          "sp": 4.06,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T15:30:00",
           "home": "天安城",
           "away": "忠南牙山FC",
           "league": "K2联赛"
+        }
+      ]
+    },
+    {
+      "ticket_no": 28,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 277.13972286000006,
+      "joint_p": 0.006517914706000002,
+      "payout_per_yuan": 180.14081985900006,
+      "prize_per_ticket": 1080.8449191540003,
+      "is_tax_free": true,
+      "ev": 0.17414249890987366,
+      "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
         },
         {
           "match_id": "26051_229",
@@ -1572,42 +1608,6 @@
           "home": "纽约红牛",
           "away": "FC达拉斯",
           "league": "美职"
-        }
-      ]
-    },
-    {
-      "ticket_no": 28,
-      "stake_per_ticket": 2,
-      "n_tickets": 1,
-      "total_stake": 2,
-      "joint_sp": 247.89342059999996,
-      "joint_p": 0.006612036218000002,
-      "payout_per_yuan": 161.13072338999999,
-      "prize_per_ticket": 322.26144677999997,
-      "is_tax_free": true,
-      "ev": 0.06540217888721989,
-      "legs": [
-        {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_340",
-          "selection": 3,
-          "sp": 4.02,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
         },
         {
           "match_id": "26051_257",
@@ -1621,34 +1621,34 @@
           "league": "苏超"
         },
         {
-          "match_id": "26051_240",
+          "match_id": "26051_259",
           "selection": 3,
-          "sp": 3.95,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T13:00:00",
-          "home": "大邱FC",
-          "away": "庆南FC",
-          "league": "K2联赛"
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
         }
       ]
     },
     {
       "ticket_no": 29,
-      "stake_per_ticket": 10,
+      "stake_per_ticket": 6,
       "n_tickets": 1,
-      "total_stake": 10,
-      "joint_sp": 328.52355648,
-      "joint_p": 0.006356537276000001,
-      "payout_per_yuan": 213.54031171200003,
-      "prize_per_ticket": 2135.4031171200004,
+      "total_stake": 6,
+      "joint_sp": 321.22802129999997,
+      "joint_p": 0.005972355173000003,
+      "payout_per_yuan": 208.798213845,
+      "prize_per_ticket": 1252.78928307,
       "is_tax_free": true,
-      "ev": 0.3573769513259879,
+      "ev": 0.24701709257034654,
       "legs": [
         {
           "match_id": "26051_267",
           "selection": 3,
-          "sp": 4.44,
+          "sp": 4.39,
           "p_hat": 0.277,
           "rule": "home_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T20:00:00",
@@ -1657,37 +1657,37 @@
           "league": "西乙"
         },
         {
-          "match_id": "26051_272",
-          "selection": 0,
-          "sp": 4.34,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5_LowerEU",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "马尔默",
-          "away": "米亚尔比",
-          "league": "瑞典超"
-        },
-        {
-          "match_id": "26051_276",
-          "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
-        },
-        {
           "match_id": "26051_310",
           "selection": 3,
-          "sp": 4.22,
+          "sp": 4.33,
           "p_hat": 0.277,
           "rule": "home_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T23:15:00",
           "home": "斯特拉斯堡",
           "away": "图卢兹",
           "league": "法甲"
+        },
+        {
+          "match_id": "26051_375",
+          "selection": 3,
+          "sp": 4.3,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-05T02:30:00",
+          "home": "LASK林茨",
+          "away": "维也纳快速",
+          "league": "奥甲"
+        },
+        {
+          "match_id": "26051_240",
+          "selection": 3,
+          "sp": 3.93,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T13:00:00",
+          "home": "大邱FC",
+          "away": "庆南FC",
+          "league": "K2联赛"
         }
       ]
     },
@@ -1696,13 +1696,209 @@
       "stake_per_ticket": 6,
       "n_tickets": 1,
       "total_stake": 6,
-      "joint_sp": 315.50994579999997,
-      "joint_p": 0.005993916022000003,
-      "payout_per_yuan": 205.08146477,
-      "prize_per_ticket": 1230.48878862,
+      "joint_sp": 292.2241811400001,
+      "joint_p": 0.006471607592000001,
+      "payout_per_yuan": 189.94571774100007,
+      "prize_per_ticket": 1139.6743064460004,
       "is_tax_free": true,
-      "ev": 0.22924107750013212,
+      "ev": 0.2292541490005453,
       "legs": [
+        {
+          "match_id": "26051_272",
+          "selection": 0,
+          "sp": 4.37,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5_LowerEU",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "马尔默",
+          "away": "米亚尔比",
+          "league": "瑞典超"
+        },
+        {
+          "match_id": "26051_276",
+          "selection": 0,
+          "sp": 3.93,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
+        },
+        {
+          "match_id": "26051_340",
+          "selection": 3,
+          "sp": 4.11,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
+        },
+        {
+          "match_id": "26051_246",
+          "selection": 0,
+          "sp": 4.14,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "坡州前沿",
+          "away": "忠北清州FC",
+          "league": "K2联赛"
+        }
+      ]
+    },
+    {
+      "ticket_no": 31,
+      "stake_per_ticket": 2,
+      "n_tickets": 1,
+      "total_stake": 2,
+      "joint_sp": 264.30623142,
+      "joint_p": 0.0062348395210000025,
+      "payout_per_yuan": 171.799050423,
+      "prize_per_ticket": 343.598100846,
+      "is_tax_free": true,
+      "ev": 0.0711395092475926,
+      "legs": [
+        {
+          "match_id": "26051_229",
+          "selection": 3,
+          "sp": 4.07,
+          "p_hat": 0.281,
+          "rule": "away_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T07:40:00",
+          "home": "纽约红牛",
+          "away": "FC达拉斯",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_248",
+          "selection": 3,
+          "sp": 4.07,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "龙仁FC",
+          "away": "城南FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_245",
+          "selection": 3,
+          "sp": 4.06,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_240",
+          "selection": 3,
+          "sp": 3.93,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T13:00:00",
+          "home": "大邱FC",
+          "away": "庆南FC",
+          "league": "K2联赛"
+        }
+      ]
+    },
+    {
+      "ticket_no": 32,
+      "stake_per_ticket": 8,
+      "n_tickets": 1,
+      "total_stake": 8,
+      "joint_sp": 298.92957821999994,
+      "joint_p": 0.006425133002000002,
+      "payout_per_yuan": 194.30422584299995,
+      "prize_per_ticket": 1554.4338067439996,
+      "is_tax_free": true,
+      "ev": 0.24843049389192062,
+      "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_267",
+          "selection": 3,
+          "sp": 4.39,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
+        },
+        {
+          "match_id": "26051_257",
+          "selection": 0,
+          "sp": 3.78,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "希伯尼安",
+          "away": "凯尔特人",
+          "league": "苏超"
+        },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
+        }
+      ]
+    },
+    {
+      "ticket_no": 33,
+      "stake_per_ticket": 8,
+      "n_tickets": 1,
+      "total_stake": 8,
+      "joint_sp": 336.8512242,
+      "joint_p": 0.005929924036000003,
+      "payout_per_yuan": 218.95329573,
+      "prize_per_ticket": 1751.62636584,
+      "is_tax_free": true,
+      "ev": 0.29837641111074387,
+      "legs": [
+        {
+          "match_id": "26051_272",
+          "selection": 0,
+          "sp": 4.37,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5_LowerEU",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "马尔默",
+          "away": "米亚尔比",
+          "league": "瑞典超"
+        },
+        {
+          "match_id": "26051_310",
+          "selection": 3,
+          "sp": 4.33,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
+        },
         {
           "match_id": "26051_375",
           "selection": 3,
@@ -1717,129 +1913,49 @@
         {
           "match_id": "26051_246",
           "selection": 0,
-          "sp": 4.22,
+          "sp": 4.14,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T15:30:00",
           "home": "坡州前沿",
           "away": "忠北清州FC",
           "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_259",
-          "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        },
-        {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
         }
       ]
     },
     {
-      "ticket_no": 31,
+      "ticket_no": 34,
       "stake_per_ticket": 4,
       "n_tickets": 1,
       "total_stake": 4,
-      "joint_sp": 258.56225135999995,
+      "joint_sp": 267.56123427000006,
       "joint_p": 0.006612036218000002,
-      "payout_per_yuan": 168.06546338399997,
-      "prize_per_ticket": 672.2618535359999,
+      "payout_per_yuan": 173.91480227550005,
+      "prize_per_ticket": 695.6592091020002,
       "is_tax_free": true,
-      "ev": 0.11125493088996086,
+      "ev": 0.14993097149191548,
       "legs": [
         {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
-          "league": "K2联赛"
+          "match_id": "26051_276",
+          "selection": 0,
+          "sp": 3.93,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
         },
         {
           "match_id": "26051_340",
           "selection": 3,
-          "sp": 4.02,
+          "sp": 4.11,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-04T03:00:00",
           "home": "罗萨里奥中央",
           "away": "蒂格雷",
           "league": "阿职联"
-        },
-        {
-          "match_id": "26051_257",
-          "selection": 0,
-          "sp": 3.78,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "希伯尼安",
-          "away": "凯尔特人",
-          "league": "苏超"
-        }
-      ]
-    },
-    {
-      "ticket_no": 32,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 309.7877244,
-      "joint_p": 0.006080470766000003,
-      "payout_per_yuan": 201.36202086,
-      "prize_per_ticket": 1208.17212516,
-      "is_tax_free": true,
-      "ev": 0.22437588122191277,
-      "legs": [
-        {
-          "match_id": "26051_267",
-          "selection": 3,
-          "sp": 4.44,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
-        },
-        {
-          "match_id": "26051_272",
-          "selection": 0,
-          "sp": 4.34,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5_LowerEU",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "马尔默",
-          "away": "米亚尔比",
-          "league": "瑞典超"
         },
         {
           "match_id": "26051_229",
@@ -1853,130 +1969,14 @@
           "league": "美职"
         },
         {
-          "match_id": "26051_240",
-          "selection": 3,
-          "sp": 3.95,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T13:00:00",
-          "home": "大邱FC",
-          "away": "庆南FC",
-          "league": "K2联赛"
-        }
-      ]
-    },
-    {
-      "ticket_no": 33,
-      "stake_per_ticket": 8,
-      "n_tickets": 1,
-      "total_stake": 8,
-      "joint_sp": 308.6344264,
-      "joint_p": 0.006333672034000002,
-      "payout_per_yuan": 200.61237716,
-      "prize_per_ticket": 1604.89901728,
-      "is_tax_free": true,
-      "ev": 0.27061300289255263,
-      "legs": [
-        {
-          "match_id": "26051_276",
-          "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
-        },
-        {
-          "match_id": "26051_375",
-          "selection": 3,
-          "sp": 4.3,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-05T02:30:00",
-          "home": "LASK林茨",
-          "away": "维也纳快速",
-          "league": "奥甲"
-        },
-        {
-          "match_id": "26051_310",
-          "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
-        },
-        {
-          "match_id": "26051_259",
-          "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        }
-      ]
-    },
-    {
-      "ticket_no": 34,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 296.55808615999996,
-      "joint_p": 0.006168275398000003,
-      "payout_per_yuan": 192.76275600399998,
-      "prize_per_ticket": 1156.5765360239998,
-      "is_tax_free": true,
-      "ev": 0.18901376551015048,
-      "legs": [
-        {
-          "match_id": "26051_246",
-          "selection": 0,
-          "sp": 4.22,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "坡州前沿",
-          "away": "忠北清州FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
-        },
-        {
           "match_id": "26051_248",
           "selection": 3,
-          "sp": 4.13,
+          "sp": 4.07,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T15:30:00",
           "home": "龙仁FC",
           "away": "城南FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
           "league": "K2联赛"
         }
       ]
@@ -1986,50 +1986,50 @@
       "stake_per_ticket": 4,
       "n_tickets": 1,
       "total_stake": 4,
-      "joint_sp": 269.8151148,
-      "joint_p": 0.006517914706000002,
-      "payout_per_yuan": 175.37982462000002,
-      "prize_per_ticket": 701.5192984800001,
+      "joint_sp": 287.42937678,
+      "joint_p": 0.006146087357000002,
+      "payout_per_yuan": 186.82909490699998,
+      "prize_per_ticket": 747.3163796279999,
       "is_tax_free": true,
-      "ev": 0.1431107380263994,
+      "ev": 0.14826793812766614,
       "legs": [
         {
-          "match_id": "26051_267",
+          "match_id": "26051_236",
           "selection": 3,
-          "sp": 4.44,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
-        },
-        {
-          "match_id": "26051_229",
-          "selection": 3,
-          "sp": 4.07,
+          "sp": 4.47,
           "p_hat": 0.281,
-          "rule": "away_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T07:40:00",
-          "home": "纽约红牛",
-          "away": "FC达拉斯",
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
           "league": "美职"
         },
         {
-          "match_id": "26051_257",
-          "selection": 0,
-          "sp": 3.78,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
+          "match_id": "26051_245",
+          "selection": 3,
+          "sp": 4.06,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "希伯尼安",
-          "away": "凯尔特人",
-          "league": "苏超"
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
         },
         {
           "match_id": "26051_240",
           "selection": 3,
-          "sp": 3.95,
+          "sp": 3.93,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T13:00:00",
@@ -2044,17 +2044,28 @@
       "stake_per_ticket": 8,
       "n_tickets": 1,
       "total_stake": 8,
-      "joint_sp": 303.08580959999995,
-      "joint_p": 0.0064483284280000015,
-      "payout_per_yuan": 197.00577623999996,
-      "prize_per_ticket": 1576.0462099199997,
+      "joint_sp": 313.99711182,
+      "joint_p": 0.006356537276000002,
+      "payout_per_yuan": 204.09812268299999,
+      "prize_per_ticket": 1632.7849814639999,
       "is_tax_free": true,
-      "ev": 0.2703579474085991,
+      "ev": 0.297357324796111,
       "legs": [
+        {
+          "match_id": "26051_267",
+          "selection": 3,
+          "sp": 4.39,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
+        },
         {
           "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.34,
+          "sp": 4.37,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5_LowerEU",
           "kickoff_ts": "2026-05-03T20:00:00",
@@ -2063,16 +2074,41 @@
           "league": "瑞典超"
         },
         {
-          "match_id": "26051_276",
+          "match_id": "26051_310",
+          "selection": 3,
+          "sp": 4.33,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
+        },
+        {
+          "match_id": "26051_257",
           "selection": 0,
-          "sp": 4.04,
+          "sp": 3.78,
           "p_hat": 0.298,
           "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
-        },
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "希伯尼安",
+          "away": "凯尔特人",
+          "league": "苏超"
+        }
+      ]
+    },
+    {
+      "ticket_no": 37,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 281.9868534,
+      "joint_p": 0.006517914706000002,
+      "payout_per_yuan": 183.29145470999998,
+      "prize_per_ticket": 1099.74872826,
+      "is_tax_free": true,
+      "ev": 0.19467806813844213,
+      "legs": [
         {
           "match_id": "26051_375",
           "selection": 3,
@@ -2085,108 +2121,61 @@
           "league": "奥甲"
         },
         {
+          "match_id": "26051_276",
+          "selection": 0,
+          "sp": 3.93,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
+        },
+        {
           "match_id": "26051_340",
           "selection": 3,
-          "sp": 4.02,
+          "sp": 4.11,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-04T03:00:00",
           "home": "罗萨里奥中央",
           "away": "蒂格雷",
           "league": "阿职联"
-        }
-      ]
-    },
-    {
-      "ticket_no": 37,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 303.7560979599999,
-      "joint_p": 0.006080470766000003,
-      "payout_per_yuan": 197.44146367399995,
-      "prize_per_ticket": 1184.6487820439997,
-      "is_tax_free": true,
-      "ev": 0.20053704786600823,
-      "legs": [
-        {
-          "match_id": "26051_246",
-          "selection": 0,
-          "sp": 4.22,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "坡州前沿",
-          "away": "忠北清州FC",
-          "league": "K2联赛"
         },
         {
-          "match_id": "26051_310",
+          "match_id": "26051_245",
           "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
-        },
-        {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
-        },
-        {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
+          "sp": 4.06,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
+          "home": "天安城",
+          "away": "忠南牙山FC",
           "league": "K2联赛"
         }
       ]
     },
     {
       "ticket_no": 38,
-      "stake_per_ticket": 4,
+      "stake_per_ticket": 2,
       "n_tickets": 1,
-      "total_stake": 4,
-      "joint_sp": 283.79175528,
-      "joint_p": 0.006146087357000002,
-      "payout_per_yuan": 184.464640932,
-      "prize_per_ticket": 737.858563728,
+      "total_stake": 2,
+      "joint_sp": 259.22743308,
+      "joint_p": 0.006541445084000002,
+      "payout_per_yuan": 168.49783150200003,
+      "prize_per_ticket": 336.99566300400005,
       "is_tax_free": true,
-      "ev": 0.1337357974457103,
+      "ev": 0.10221931154341868,
       "legs": [
         {
-          "match_id": "26051_259",
-          "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
+          "match_id": "26051_246",
+          "selection": 0,
+          "sp": 4.14,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
+          "home": "坡州前沿",
+          "away": "忠北清州FC",
           "league": "K2联赛"
         },
         {
@@ -2201,51 +2190,15 @@
           "league": "美职"
         },
         {
-          "match_id": "26051_340",
+          "match_id": "26051_248",
           "selection": 3,
-          "sp": 4.02,
+          "sp": 4.07,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
-        }
-      ]
-    },
-    {
-      "ticket_no": 39,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 261.7941816,
-      "joint_p": 0.006937190872,
-      "payout_per_yuan": 170.16621804000002,
-      "prize_per_ticket": 1020.9973082400002,
-      "is_tax_free": true,
-      "ev": 0.18047553450984988,
-      "legs": [
-        {
-          "match_id": "26051_272",
-          "selection": 0,
-          "sp": 4.34,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5_LowerEU",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "马尔默",
-          "away": "米亚尔比",
-          "league": "瑞典超"
-        },
-        {
-          "match_id": "26051_276",
-          "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "龙仁FC",
+          "away": "城南FC",
+          "league": "K2联赛"
         },
         {
           "match_id": "26051_257",
@@ -2257,11 +2210,58 @@
           "home": "希伯尼安",
           "away": "凯尔特人",
           "league": "苏超"
+        }
+      ]
+    },
+    {
+      "ticket_no": 39,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 304.4202759,
+      "joint_p": 0.006058598569000003,
+      "payout_per_yuan": 197.873179335,
+      "prize_per_ticket": 1187.23907601,
+      "is_tax_free": true,
+      "ev": 0.19883416116251196,
+      "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_375",
+          "selection": 3,
+          "sp": 4.3,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-05T02:30:00",
+          "home": "LASK林茨",
+          "away": "维也纳快速",
+          "league": "奥甲"
+        },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
         },
         {
           "match_id": "26051_240",
           "selection": 3,
-          "sp": 3.95,
+          "sp": 3.93,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T13:00:00",
@@ -2273,20 +2273,20 @@
     },
     {
       "ticket_no": 40,
-      "stake_per_ticket": 8,
+      "stake_per_ticket": 10,
       "n_tickets": 1,
-      "total_stake": 8,
-      "joint_sp": 339.9979728,
-      "joint_p": 0.005908593374000002,
-      "payout_per_yuan": 220.99868232000003,
-      "prize_per_ticket": 1767.9894585600002,
+      "total_stake": 10,
+      "joint_sp": 326.45731467,
+      "joint_p": 0.006356537276000002,
+      "payout_per_yuan": 212.1972545355,
+      "prize_per_ticket": 2121.972545355,
       "is_tax_free": true,
-      "ev": 0.3057913500186835,
+      "ev": 0.3488397583197662,
       "legs": [
         {
           "match_id": "26051_267",
           "selection": 3,
-          "sp": 4.44,
+          "sp": 4.39,
           "p_hat": 0.277,
           "rule": "home_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T20:00:00",
@@ -2295,37 +2295,37 @@
           "league": "西乙"
         },
         {
-          "match_id": "26051_375",
-          "selection": 3,
-          "sp": 4.3,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-05T02:30:00",
-          "home": "LASK林茨",
-          "away": "维也纳快速",
-          "league": "奥甲"
-        },
-        {
-          "match_id": "26051_246",
+          "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.22,
+          "sp": 4.37,
           "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "坡州前沿",
-          "away": "忠北清州FC",
-          "league": "K2联赛"
+          "rule": "away_sp_3.5-4.5_LowerEU",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "马尔默",
+          "away": "米亚尔比",
+          "league": "瑞典超"
         },
         {
           "match_id": "26051_310",
           "selection": 3,
-          "sp": 4.22,
+          "sp": 4.33,
           "p_hat": 0.277,
           "rule": "home_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T23:15:00",
           "home": "斯特拉斯堡",
           "away": "图卢兹",
           "league": "法甲"
+        },
+        {
+          "match_id": "26051_276",
+          "selection": 0,
+          "sp": 3.93,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
         }
       ]
     },
@@ -2334,45 +2334,23 @@
       "stake_per_ticket": 4,
       "n_tickets": 1,
       "total_stake": 4,
-      "joint_sp": 291.55720132000005,
-      "joint_p": 0.006146087357000002,
-      "payout_per_yuan": 189.51218085800005,
-      "prize_per_ticket": 758.0487234320002,
+      "joint_sp": 276.41186034000003,
+      "joint_p": 0.0062348395210000025,
+      "payout_per_yuan": 179.66770922100002,
+      "prize_per_ticket": 718.6708368840001,
       "is_tax_free": true,
-      "ev": 0.164758418768852,
+      "ev": 0.1201993340986276,
       "legs": [
         {
-          "match_id": "26051_259",
+          "match_id": "26051_340",
           "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        },
-        {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
+          "sp": 4.11,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
-          "league": "K2联赛"
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
         },
         {
           "match_id": "26051_229",
@@ -2384,42 +2362,64 @@
           "home": "纽约红牛",
           "away": "FC达拉斯",
           "league": "美职"
+        },
+        {
+          "match_id": "26051_248",
+          "selection": 3,
+          "sp": 4.07,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "龙仁FC",
+          "away": "城南FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_245",
+          "selection": 3,
+          "sp": 4.06,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
         }
       ]
     },
     {
       "ticket_no": 42,
-      "stake_per_ticket": 2,
+      "stake_per_ticket": 6,
       "n_tickets": 1,
-      "total_stake": 2,
-      "joint_sp": 247.89342059999996,
-      "joint_p": 0.006612036218000002,
-      "payout_per_yuan": 161.13072338999999,
-      "prize_per_ticket": 322.26144677999997,
+      "total_stake": 6,
+      "joint_sp": 281.90625372,
+      "joint_p": 0.006448328428000002,
+      "payout_per_yuan": 183.239064918,
+      "prize_per_ticket": 1099.434389508,
       "is_tax_free": true,
-      "ev": 0.06540217888721989,
+      "ev": 0.18158567143087723,
       "legs": [
         {
-          "match_id": "26051_238",
+          "match_id": "26051_236",
           "selection": 3,
-          "sp": 4.13,
+          "sp": 4.47,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
         },
         {
-          "match_id": "26051_340",
-          "selection": 3,
-          "sp": 4.02,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
+          "match_id": "26051_246",
+          "selection": 0,
+          "sp": 4.14,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "坡州前沿",
+          "away": "忠北清州FC",
+          "league": "K2联赛"
         },
         {
           "match_id": "26051_257",
@@ -2433,45 +2433,34 @@
           "league": "苏超"
         },
         {
-          "match_id": "26051_240",
+          "match_id": "26051_259",
           "selection": 3,
-          "sp": 3.95,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T13:00:00",
-          "home": "大邱FC",
-          "away": "庆南FC",
-          "league": "K2联赛"
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
         }
       ]
     },
     {
       "ticket_no": 43,
-      "stake_per_ticket": 10,
+      "stake_per_ticket": 6,
       "n_tickets": 1,
-      "total_stake": 10,
-      "joint_sp": 327.74506464,
-      "joint_p": 0.006356537276000001,
-      "payout_per_yuan": 213.03429201600002,
-      "prize_per_ticket": 2130.34292016,
+      "total_stake": 6,
+      "joint_sp": 319.76456790000003,
+      "joint_p": 0.005993916022000003,
+      "payout_per_yuan": 207.84696913500002,
+      "prize_per_ticket": 1247.0818148100002,
       "is_tax_free": true,
-      "ev": 0.35416041826597366,
+      "ev": 0.24581727842241663,
       "legs": [
-        {
-          "match_id": "26051_267",
-          "selection": 3,
-          "sp": 4.44,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
-        },
         {
           "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.34,
+          "sp": 4.37,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5_LowerEU",
           "kickoff_ts": "2026-05-03T20:00:00",
@@ -2480,26 +2469,37 @@
           "league": "瑞典超"
         },
         {
-          "match_id": "26051_276",
-          "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
-        },
-        {
-          "match_id": "26051_259",
+          "match_id": "26051_310",
           "selection": 3,
-          "sp": 4.21,
+          "sp": 4.33,
           "p_hat": 0.277,
           "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
+        },
+        {
+          "match_id": "26051_375",
+          "selection": 3,
+          "sp": 4.3,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-05T02:30:00",
+          "home": "LASK林茨",
+          "away": "维也纳快速",
+          "league": "奥甲"
+        },
+        {
+          "match_id": "26051_240",
+          "selection": 3,
+          "sp": 3.93,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T13:00:00",
+          "home": "大邱FC",
+          "away": "庆南FC",
+          "league": "K2联赛"
         }
       ]
     },
@@ -2508,56 +2508,56 @@
       "stake_per_ticket": 6,
       "n_tickets": 1,
       "total_stake": 6,
-      "joint_sp": 316.25937559999994,
-      "joint_p": 0.005993916022000003,
-      "payout_per_yuan": 205.56859413999996,
-      "prize_per_ticket": 1233.4115648399998,
+      "joint_sp": 293.56159158,
+      "joint_p": 0.006448328428000002,
+      "payout_per_yuan": 190.81503452700002,
+      "prize_per_ticket": 1144.890207162,
       "is_tax_free": true,
-      "ev": 0.23216089003576168,
+      "ev": 0.23043801163025623,
       "legs": [
         {
-          "match_id": "26051_375",
+          "match_id": "26051_267",
           "selection": 3,
-          "sp": 4.3,
+          "sp": 4.39,
           "p_hat": 0.277,
           "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-05T02:30:00",
-          "home": "LASK林茨",
-          "away": "维也纳快速",
-          "league": "奥甲"
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
+        },
+        {
+          "match_id": "26051_276",
+          "selection": 0,
+          "sp": 3.93,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
+        },
+        {
+          "match_id": "26051_340",
+          "selection": 3,
+          "sp": 4.11,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
         },
         {
           "match_id": "26051_246",
           "selection": 0,
-          "sp": 4.22,
+          "sp": 4.14,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T15:30:00",
           "home": "坡州前沿",
           "away": "忠北清州FC",
           "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_310",
-          "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
-        },
-        {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
         }
       ]
     },
@@ -2566,35 +2566,13 @@
       "stake_per_ticket": 2,
       "n_tickets": 1,
       "total_stake": 2,
-      "joint_sp": 273.5512934,
-      "joint_p": 0.0062348395210000025,
-      "payout_per_yuan": 177.80834071,
-      "prize_per_ticket": 355.61668142,
+      "joint_sp": 252.33974766,
+      "joint_p": 0.006517914706000002,
+      "payout_per_yuan": 164.020835979,
+      "prize_per_ticket": 328.041671958,
       "is_tax_free": true,
-      "ev": 0.10860646982214162,
+      "ev": 0.06907381891793829,
       "legs": [
-        {
-          "match_id": "26051_248",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "龙仁FC",
-          "away": "城南FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
-          "league": "K2联赛"
-        },
         {
           "match_id": "26051_229",
           "selection": 3,
@@ -2607,62 +2585,15 @@
           "league": "美职"
         },
         {
-          "match_id": "26051_240",
+          "match_id": "26051_248",
           "selection": 3,
-          "sp": 3.95,
+          "sp": 4.07,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T13:00:00",
-          "home": "大邱FC",
-          "away": "庆南FC",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "龙仁FC",
+          "away": "城南FC",
           "league": "K2联赛"
-        }
-      ]
-    },
-    {
-      "ticket_no": 46,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 292.81313375999997,
-      "joint_p": 0.006448328428000002,
-      "payout_per_yuan": 190.32853694399998,
-      "prize_per_ticket": 1141.9712216639998,
-      "is_tax_free": true,
-      "ev": 0.2273009154356438,
-      "legs": [
-        {
-          "match_id": "26051_267",
-          "selection": 3,
-          "sp": 4.44,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
-        },
-        {
-          "match_id": "26051_272",
-          "selection": 0,
-          "sp": 4.34,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5_LowerEU",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "马尔默",
-          "away": "米亚尔比",
-          "league": "瑞典超"
-        },
-        {
-          "match_id": "26051_340",
-          "selection": 3,
-          "sp": 4.02,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
         },
         {
           "match_id": "26051_257",
@@ -2674,6 +2605,75 @@
           "home": "希伯尼安",
           "away": "凯尔特人",
           "league": "苏超"
+        },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
+        }
+      ]
+    },
+    {
+      "ticket_no": 46,
+      "stake_per_ticket": 6,
+      "n_tickets": 1,
+      "total_stake": 6,
+      "joint_sp": 313.10545013999996,
+      "joint_p": 0.006146087357000002,
+      "payout_per_yuan": 203.51854259099997,
+      "prize_per_ticket": 1221.111255546,
+      "is_tax_free": true,
+      "ev": 0.2508427415336114,
+      "legs": [
+        {
+          "match_id": "26051_236",
+          "selection": 3,
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
+        },
+        {
+          "match_id": "26051_267",
+          "selection": 3,
+          "sp": 4.39,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
+        },
+        {
+          "match_id": "26051_245",
+          "selection": 3,
+          "sp": 4.06,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
+        },
+        {
+          "match_id": "26051_240",
+          "selection": 3,
+          "sp": 3.93,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T13:00:00",
+          "home": "大邱FC",
+          "away": "庆南FC",
+          "league": "K2联赛"
         }
       ]
     },
@@ -2682,23 +2682,34 @@
       "stake_per_ticket": 8,
       "n_tickets": 1,
       "total_stake": 8,
-      "joint_sp": 302.7696392,
-      "joint_p": 0.0064483284280000015,
-      "payout_per_yuan": 196.80026547999998,
-      "prize_per_ticket": 1574.4021238399998,
+      "joint_sp": 331.15567210000006,
+      "joint_p": 0.005993916022000003,
+      "payout_per_yuan": 215.25118686500005,
+      "prize_per_ticket": 1722.0094949200004,
       "is_tax_free": true,
-      "ev": 0.2690327465326312,
+      "ev": 0.2901975377046404,
       "legs": [
         {
-          "match_id": "26051_276",
+          "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
+          "sp": 4.37,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5_LowerEU",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "马尔默",
+          "away": "米亚尔比",
+          "league": "瑞典超"
+        },
+        {
+          "match_id": "26051_310",
+          "selection": 3,
+          "sp": 4.33,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
         },
         {
           "match_id": "26051_375",
@@ -2712,9 +2723,56 @@
           "league": "奥甲"
         },
         {
+          "match_id": "26051_229",
+          "selection": 3,
+          "sp": 4.07,
+          "p_hat": 0.281,
+          "rule": "away_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T07:40:00",
+          "home": "纽约红牛",
+          "away": "FC达拉斯",
+          "league": "美职"
+        }
+      ]
+    },
+    {
+      "ticket_no": 48,
+      "stake_per_ticket": 4,
+      "n_tickets": 1,
+      "total_stake": 4,
+      "joint_sp": 272.16302454,
+      "joint_p": 0.006541445084000002,
+      "payout_per_yuan": 176.90596595099998,
+      "prize_per_ticket": 707.6238638039999,
+      "is_tax_free": true,
+      "ev": 0.15722066130044055,
+      "legs": [
+        {
+          "match_id": "26051_276",
+          "selection": 0,
+          "sp": 3.93,
+          "p_hat": 0.298,
+          "rule": "away_sp_3.5-4.5_h1",
+          "kickoff_ts": "2026-05-03T20:30:00",
+          "home": "锡塔德福图纳",
+          "away": "费耶诺德",
+          "league": "荷甲"
+        },
+        {
+          "match_id": "26051_340",
+          "selection": 3,
+          "sp": 4.11,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-04T03:00:00",
+          "home": "罗萨里奥中央",
+          "away": "蒂格雷",
+          "league": "阿职联"
+        },
+        {
           "match_id": "26051_246",
           "selection": 0,
-          "sp": 4.22,
+          "sp": 4.14,
           "p_hat": 0.278,
           "rule": "away_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T15:30:00",
@@ -2723,72 +2781,14 @@
           "league": "K2联赛"
         },
         {
-          "match_id": "26051_238",
-          "selection": 3,
-          "sp": 4.13,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T11:15:00",
-          "home": "阿特拉斯",
-          "away": "蓝十字",
-          "league": "墨超"
-        }
-      ]
-    },
-    {
-      "ticket_no": 48,
-      "stake_per_ticket": 6,
-      "n_tickets": 1,
-      "total_stake": 6,
-      "joint_sp": 302.30255272,
-      "joint_p": 0.006058598569000003,
-      "payout_per_yuan": 196.496659268,
-      "prize_per_ticket": 1178.979955608,
-      "is_tax_free": true,
-      "ev": 0.190494378654386,
-      "legs": [
-        {
-          "match_id": "26051_310",
-          "selection": 3,
-          "sp": 4.22,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T23:15:00",
-          "home": "斯特拉斯堡",
-          "away": "图卢兹",
-          "league": "法甲"
-        },
-        {
-          "match_id": "26051_259",
-          "selection": 3,
-          "sp": 4.21,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T19:00:00",
-          "home": "科灵",
-          "away": "哈维德夫",
-          "league": "丹甲"
-        },
-        {
           "match_id": "26051_248",
           "selection": 3,
-          "sp": 4.13,
+          "sp": 4.07,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T15:30:00",
           "home": "龙仁FC",
           "away": "城南FC",
-          "league": "K2联赛"
-        },
-        {
-          "match_id": "26051_245",
-          "selection": 3,
-          "sp": 4.12,
-          "p_hat": 0.281,
-          "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-03T15:30:00",
-          "home": "天安城",
-          "away": "忠南牙山FC",
           "league": "K2联赛"
         }
       ]
@@ -2798,45 +2798,34 @@
       "stake_per_ticket": 4,
       "n_tickets": 1,
       "total_stake": 4,
-      "joint_sp": 268.41203928,
-      "joint_p": 0.006541445084000002,
-      "payout_per_yuan": 174.467825532,
-      "prize_per_ticket": 697.871302128,
+      "joint_sp": 271.51098155999995,
+      "joint_p": 0.006425133002000002,
+      "payout_per_yuan": 176.482138014,
+      "prize_per_ticket": 705.928552056,
       "is_tax_free": true,
-      "ev": 0.14127169964247144,
+      "ev": 0.13392120921727035,
       "legs": [
         {
-          "match_id": "26051_272",
-          "selection": 0,
-          "sp": 4.34,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5_LowerEU",
+          "match_id": "26051_267",
+          "selection": 3,
+          "sp": 4.39,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
           "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "马尔默",
-          "away": "米亚尔比",
-          "league": "瑞典超"
+          "home": "桑坦德竞技",
+          "away": "韦斯卡",
+          "league": "西乙"
         },
         {
-          "match_id": "26051_229",
+          "match_id": "26051_245",
           "selection": 3,
-          "sp": 4.07,
-          "p_hat": 0.281,
-          "rule": "away_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T07:40:00",
-          "home": "纽约红牛",
-          "away": "FC达拉斯",
-          "league": "美职"
-        },
-        {
-          "match_id": "26051_340",
-          "selection": 3,
-          "sp": 4.02,
+          "sp": 4.06,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "罗萨里奥中央",
-          "away": "蒂格雷",
-          "league": "阿职联"
+          "kickoff_ts": "2026-05-03T15:30:00",
+          "home": "天安城",
+          "away": "忠南牙山FC",
+          "league": "K2联赛"
         },
         {
           "match_id": "26051_257",
@@ -2848,6 +2837,17 @@
           "home": "希伯尼安",
           "away": "凯尔特人",
           "league": "苏超"
+        },
+        {
+          "match_id": "26051_259",
+          "selection": 3,
+          "sp": 4.03,
+          "p_hat": 0.277,
+          "rule": "home_sp_3.5-4.5",
+          "kickoff_ts": "2026-05-03T19:00:00",
+          "home": "科灵",
+          "away": "哈维德夫",
+          "league": "丹甲"
         }
       ]
     },
@@ -2856,50 +2856,50 @@
       "stake_per_ticket": 8,
       "n_tickets": 1,
       "total_stake": 8,
-      "joint_sp": 304.67013600000007,
-      "joint_p": 0.006425133002000002,
-      "payout_per_yuan": 198.03558840000005,
-      "prize_per_ticket": 1584.2847072000004,
+      "joint_sp": 332.40642291,
+      "joint_p": 0.006080470766000003,
+      "payout_per_yuan": 216.06417489150002,
+      "prize_per_ticket": 1728.5133991320001,
       "is_tax_free": true,
-      "ev": 0.2724049945993292,
+      "ev": 0.31377189900767766,
       "legs": [
         {
-          "match_id": "26051_267",
+          "match_id": "26051_236",
           "selection": 3,
-          "sp": 4.44,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T20:00:00",
-          "home": "桑坦德竞技",
-          "away": "韦斯卡",
-          "league": "西乙"
+          "sp": 4.47,
+          "p_hat": 0.281,
+          "rule": "home_sp_3.5-4.5_Other",
+          "kickoff_ts": "2026-05-03T09:40:00",
+          "home": "圣迭戈FC",
+          "away": "洛杉矶FC",
+          "league": "美职"
         },
         {
-          "match_id": "26051_276",
+          "match_id": "26051_272",
           "selection": 0,
-          "sp": 4.04,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-03T20:30:00",
-          "home": "锡塔德福图纳",
-          "away": "费耶诺德",
-          "league": "荷甲"
+          "sp": 4.37,
+          "p_hat": 0.278,
+          "rule": "away_sp_3.5-4.5_LowerEU",
+          "kickoff_ts": "2026-05-03T20:00:00",
+          "home": "马尔默",
+          "away": "米亚尔比",
+          "league": "瑞典超"
         },
         {
-          "match_id": "26051_375",
+          "match_id": "26051_310",
           "selection": 3,
-          "sp": 4.3,
+          "sp": 4.33,
           "p_hat": 0.277,
           "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-05T02:30:00",
-          "home": "LASK林茨",
-          "away": "维也纳快速",
-          "league": "奥甲"
+          "kickoff_ts": "2026-05-03T23:15:00",
+          "home": "斯特拉斯堡",
+          "away": "图卢兹",
+          "league": "法甲"
         },
         {
           "match_id": "26051_240",
           "selection": 3,
-          "sp": 3.95,
+          "sp": 3.93,
           "p_hat": 0.281,
           "rule": "home_sp_3.5-4.5_Other",
           "kickoff_ts": "2026-05-03T13:00:00",
