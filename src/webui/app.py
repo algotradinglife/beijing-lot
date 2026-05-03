@@ -119,6 +119,100 @@ def create_app(
                                grid_json=grid_path.read_text(),
                                grid_ready=True)
 
+    @app.route("/api/mix3_preview")
+    def mix3_preview():
+        """Compute 3-way mix (N=2 + N=3 + N=4) on-the-fly from base PnL series."""
+        try:
+            w2 = float(request.args.get("w2", "0"))
+            w3 = float(request.args.get("w3", "0"))
+            w4 = float(request.args.get("w4", "1"))
+            kelly = float(request.args.get("kelly", str(1/16)))
+            lam = float(request.args.get("lambda", "0.5"))
+            max_combos = int(request.args.get("max_combos", "50"))
+            commission = float(request.args.get("commission", "0"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid params"}), 400
+
+        s = w2 + w3 + w4
+        if s <= 0:
+            return jsonify({"error": "weights must sum > 0"}), 400
+        w2, w3, w4 = w2/s, w3/s, w4/s
+
+        grid_path = Path(__file__).resolve().parents[2] / "data" / "raw" / "backtest_grid.json"
+        if not grid_path.exists():
+            return jsonify({"error": "grid_not_ready"}), 200
+        import json as _json
+        grid = _json.loads(grid_path.read_text())
+
+        def snap(val, choices):
+            return min(choices, key=lambda c: abs(c - val))
+
+        kelly = snap(kelly, [1/32, 1/16, 1/8, 1/4])
+        lam = snap(lam, [0.0, 0.5, 1.0, 2.0])
+        max_combos = snap(max_combos, [25, 50, 100, 200])
+        commission = snap(commission, [0.0, 0.07])
+
+        def get_pnl(n):
+            key = f"N{n}_K{kelly:.4f}_L{lam:.2f}_M{max_combos}_C{commission:.3f}"
+            cell = grid.get(key)
+            if cell and "weekly_pnl" in cell:
+                return cell.get("week_keys", []), cell["weekly_pnl"], cell.get("weekly_stake", [])
+            return None, None, None
+
+        # Get all 3 base series, align by week_key
+        import pandas as pd
+        import numpy as np
+        rows = []
+        for n, w in [(2, w2), (3, w3), (4, w4)]:
+            wk, pnl, stake = get_pnl(n)
+            if wk is None:
+                return jsonify({"error": f"missing PnL for N={n}; re-run precompute"}), 200
+            rows.append((n, w, wk, pnl, stake))
+
+        # Outer-merge on week_key
+        df_merge = None
+        for n, w, wk, pnl, stake in rows:
+            d = pd.DataFrame({"k": wk, f"p{n}": pnl, f"s{n}": stake})
+            df_merge = d if df_merge is None else df_merge.merge(d, on="k", how="outer")
+        df_merge = df_merge.fillna(0).sort_values("k").reset_index(drop=True)
+
+        pnl_mix = w2*df_merge["p2"].values + w3*df_merge["p3"].values + w4*df_merge["p4"].values
+        stake_mix = w2*df_merge["s2"].values + w3*df_merge["s3"].values + w4*df_merge["s4"].values
+
+        INITIAL = 100_000.0
+        bankroll = INITIAL + np.cumsum(pnl_mix)
+        bankroll = np.maximum(bankroll, 0.01)
+        n_weeks = len(pnl_mix)
+        cagr = (bankroll[-1] / INITIAL) ** (52/max(n_weeks,1)) - 1
+        pct = pnl_mix / INITIAL
+        sharpe = (np.mean(pct)*52)/(np.std(pct, ddof=1)*np.sqrt(52)) if np.std(pct, ddof=1) > 0 else 0
+        seq = np.concatenate([[INITIAL], bankroll])
+        rm = np.maximum.accumulate(seq)
+        dd = (seq - rm) / rm
+        max_dd = float(np.min(dd))
+        avg_stake = float(stake_mix[stake_mix > 0].mean()) if (stake_mix > 0).any() else 0
+        # Downsample equity curve to 50 points
+        if len(bankroll) > 50:
+            idx = np.linspace(0, len(bankroll)-1, 50).astype(int)
+            equity = [round(float(x), 0) for x in bankroll[idx]]
+        else:
+            equity = [round(float(x), 0) for x in bankroll]
+
+        return jsonify({
+            "weights": {"w2": w2, "w3": w3, "w4": w4},
+            "snapped_to": {"kelly": kelly, "lambda": lam, "max_combos": max_combos, "commission": commission},
+            "n_weeks": n_weeks,
+            "cagr": float(cagr),
+            "sharpe": float(sharpe),
+            "max_dd": max_dd,
+            "calmar": float(cagr/abs(max_dd)) if max_dd < 0 else 0,
+            "final": float(bankroll[-1]),
+            "avg_weekly_stake": avg_stake,
+            "utilization_pct": avg_stake / INITIAL * 100,
+            "hit_rate": float((pnl_mix > 0).mean()),
+            "equity_curve": equity,
+        })
+
     @app.route("/api/backtest_preview")
     def backtest_preview():
         """Return cached backtest metrics + equity curve for given config."""
@@ -286,10 +380,12 @@ def create_app(
         equity = services.equity_series(db)
         recent = services.recent_settlements(db, n=5)
         live_db_exists = Path(app.config["LIVE_DB"]).exists()
+        match_status = services.match_status_for_plan(db, app.config["LIVE_DB"])
         return render_template(
             "dashboard.html",
             state=state, stats=stats, equity=equity, recent=recent,
             live_db_exists=live_db_exists,
+            match_status=match_status,
         )
 
     # -- plans ---------------------------------------------------------

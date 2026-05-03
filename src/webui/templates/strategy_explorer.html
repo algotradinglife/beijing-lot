@@ -80,7 +80,75 @@
 <div id="compare_chart" style="height: 400px;"></div>
 
 <hr class="my-4">
-<h4>Mix 比例对比 — 同参数不同 (N₁/N₂) 比例</h4>
+<h4>3 路 Mix 实时调节 — N=2/3/4 自由配比</h4>
+<p class="text-muted">三个滑块实时联动（自动归一化到和=100%）。改完立即看曲线 + 指标。</p>
+
+<div class="row mb-3">
+  <div class="col-md-2"><div class="card"><div class="card-body p-2">
+    <label class="form-label small">N=2 权重 <span id="m3_w2_lbl" class="badge bg-primary">30%</span></label>
+    <input type="range" id="m3_w2" min="0" max="100" value="30" class="form-range">
+  </div></div></div>
+  <div class="col-md-2"><div class="card"><div class="card-body p-2">
+    <label class="form-label small">N=3 权重 <span id="m3_w3_lbl" class="badge bg-primary">40%</span></label>
+    <input type="range" id="m3_w3" min="0" max="100" value="40" class="form-range">
+  </div></div></div>
+  <div class="col-md-2"><div class="card"><div class="card-body p-2">
+    <label class="form-label small">N=4 权重 <span id="m3_w4_lbl" class="badge bg-primary">30%</span></label>
+    <input type="range" id="m3_w4" min="0" max="100" value="30" class="form-range">
+  </div></div></div>
+  <div class="col-md-1">
+    <label class="form-label small">Kelly</label>
+    <select id="m3_kelly" class="form-select form-select-sm">
+      <option value="0.0312">1/32</option><option value="0.0625" selected>1/16</option>
+      <option value="0.1250">1/8</option><option value="0.2500">1/4</option>
+    </select>
+  </div>
+  <div class="col-md-1">
+    <label class="form-label small">λ</label>
+    <select id="m3_lambda" class="form-select form-select-sm">
+      <option value="0">0</option><option value="0.5" selected>0.5</option>
+      <option value="1">1</option><option value="2">2</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small">max</label>
+    <select id="m3_max" class="form-select form-select-sm">
+      <option value="25">25</option><option value="50" selected>50</option>
+      <option value="100">100</option><option value="200">200</option>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small">佣金</label>
+    <select id="m3_comm" class="form-select form-select-sm">
+      <option value="0" selected>无</option><option value="0.07">7%</option>
+    </select>
+  </div>
+</div>
+
+<div class="row mb-3">
+  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
+    <small class="text-muted">CAGR</small><h5 id="m3_cagr">--</h5>
+  </div></div></div>
+  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
+    <small class="text-muted">Sharpe</small><h5 id="m3_sharpe">--</h5>
+  </div></div></div>
+  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
+    <small class="text-muted">MaxDD</small><h5 id="m3_dd">--</h5>
+  </div></div></div>
+  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
+    <small class="text-muted">Calmar</small><h5 id="m3_calmar">--</h5>
+  </div></div></div>
+  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
+    <small class="text-muted">利用率</small><h5 id="m3_util">--</h5>
+  </div></div></div>
+  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
+    <small class="text-muted">8 年终值</small><h5 id="m3_final">--</h5>
+  </div></div></div>
+</div>
+<div id="mix3_chart" style="height: 320px;"></div>
+
+<hr class="my-4">
+<h4>2 路 Mix 比例对比（旧）— 固定参数看权重曲线</h4>
 <p class="text-muted">固定 Kelly/λ/max/佣金，看 N₁ 和 N₂ 不同混合权重下的权益曲线如何变化。</p>
 <div class="row mb-3">
   <div class="col-md-2">
@@ -416,11 +484,63 @@ function renderMixRatio() {
   tableEl.innerHTML = html;
 }
 
+async function renderMix3() {
+  const w2_raw = +document.getElementById('m3_w2').value;
+  const w3_raw = +document.getElementById('m3_w3').value;
+  const w4_raw = +document.getElementById('m3_w4').value;
+  const sum = w2_raw + w3_raw + w4_raw;
+  if (sum === 0) {
+    document.getElementById('mix3_chart').innerHTML = '<div class="text-warning text-center py-5">至少一个权重 > 0</div>';
+    return;
+  }
+  const w2 = w2_raw/sum, w3 = w3_raw/sum, w4 = w4_raw/sum;
+  document.getElementById('m3_w2_lbl').textContent = (w2*100).toFixed(0)+'%';
+  document.getElementById('m3_w3_lbl').textContent = (w3*100).toFixed(0)+'%';
+  document.getElementById('m3_w4_lbl').textContent = (w4*100).toFixed(0)+'%';
+
+  const params = new URLSearchParams({
+    w2, w3, w4,
+    kelly: document.getElementById('m3_kelly').value,
+    lambda: document.getElementById('m3_lambda').value,
+    max_combos: document.getElementById('m3_max').value,
+    commission: document.getElementById('m3_comm').value,
+  });
+  const r = await fetch('/api/mix3_preview?' + params.toString());
+  const j = await r.json();
+  if (j.error) {
+    document.getElementById('mix3_chart').innerHTML =
+      '<div class="text-warning text-center py-5">'+ (j.error || j.msg) +'</div>';
+    return;
+  }
+  const fmt = (x, dp=1, suffix='') => (x*100).toFixed(dp)+suffix;
+  document.getElementById('m3_cagr').textContent = fmt(j.cagr, 1) + '%';
+  document.getElementById('m3_sharpe').textContent = j.sharpe.toFixed(2);
+  document.getElementById('m3_dd').textContent = fmt(j.max_dd, 1) + '%';
+  document.getElementById('m3_calmar').textContent = j.calmar.toFixed(2);
+  document.getElementById('m3_util').textContent = j.utilization_pct.toFixed(1) + '%';
+  document.getElementById('m3_final').textContent = (j.final/1e4).toFixed(1) + '万';
+
+  const xs = j.equity_curve.map((_, i) => i);
+  Plotly.newPlot('mix3_chart', [{
+    x: xs, y: j.equity_curve, mode: 'lines',
+    line: {color: '#b04a2f', width: 2.5},
+    hovertemplate: 'Week ~%{x}: %{y:,.0f} 元<extra></extra>',
+  }], {
+    margin: {l: 60, r: 20, t: 10, b: 40},
+    xaxis: {title: '周（OOS 测试期）'},
+    yaxis: {title: 'Bankroll (元)', type: 'log'},
+    showlegend: false,
+    shapes: [{type: 'line', x0: 0, x1: xs[xs.length-1], y0: 100000, y1: 100000,
+              line: {color: 'gray', dash: 'dash', width: 1}}],
+  }, {displayModeBar: false, responsive: true});
+}
+
 function refreshAll() {
   renderTable();
   renderPareto();
   renderCompare();
   renderMixRatio();
+  renderMix3();
 }
 
 ['filter_n', 'filter_lambda', 'filter_comm', 'sort_by'].forEach(id => {
@@ -428,6 +548,9 @@ function refreshAll() {
 });
 ['mr_primary', 'mr_secondary', 'mr_kelly', 'mr_lambda', 'mr_max', 'mr_comm'].forEach(id => {
   document.getElementById(id).addEventListener('change', renderMixRatio);
+});
+['m3_w2', 'm3_w3', 'm3_w4', 'm3_kelly', 'm3_lambda', 'm3_max', 'm3_comm'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderMix3);
 });
 document.getElementById('clear_compare').addEventListener('click', () => {
   compareKeys.clear();

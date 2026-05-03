@@ -1,121 +1,12 @@
 {
   "plan_id": "2026-W18",
-  "generated_at": "2026-05-03T11:32:07Z",
+  "generated_at": "2026-05-03T12:55:40Z",
   "bankroll": 100000.0,
   "n_legs": 2,
   "kelly_fraction": 0.25,
   "n_open_matches": 139,
-  "n_qualified_legs": 44,
-  "total_stake": 382,
-  "expected_total_return": 405.3593663847,
-  "tickets": [
-    {
-      "ticket_no": 1,
-      "stake_per_ticket": 144,
-      "n_tickets": 1,
-      "total_stake": 144,
-      "joint_sp": 19.847,
-      "joint_p": 0.082844,
-      "payout_per_yuan": 12.90055,
-      "prize_per_ticket": 1857.6792,
-      "is_tax_free": true,
-      "ev": 0.06873316419999997,
-      "legs": [
-        {
-          "match_id": "26051_337",
-          "selection": 0,
-          "sp": 4.45,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "弗拉门戈",
-          "away": "瓦斯科达伽马",
-          "league": "巴西甲"
-        },
-        {
-          "match_id": "26051_283",
-          "selection": 0,
-          "sp": 4.46,
-          "p_hat": 0.278,
-          "rule": "away_sp_3.5-4.5_LowerEU",
-          "kickoff_ts": "2026-05-03T21:00:00",
-          "home": "帕索斯费雷拉",
-          "away": "CD费伦斯",
-          "league": "葡甲"
-        }
-      ]
-    },
-    {
-      "ticket_no": 2,
-      "stake_per_ticket": 122,
-      "n_tickets": 1,
-      "total_stake": 122,
-      "joint_sp": 19.7135,
-      "joint_p": 0.08254600000000001,
-      "payout_per_yuan": 12.813775,
-      "prize_per_ticket": 1563.28055,
-      "is_tax_free": true,
-      "ev": 0.05772587115000016,
-      "legs": [
-        {
-          "match_id": "26051_337",
-          "selection": 0,
-          "sp": 4.45,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "弗拉门戈",
-          "away": "瓦斯科达伽马",
-          "league": "巴西甲"
-        },
-        {
-          "match_id": "26051_320",
-          "selection": 3,
-          "sp": 4.43,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-04T00:30:00",
-          "home": "布拉格斯巴达",
-          "away": "亚布洛内茨",
-          "league": "捷克甲"
-        }
-      ]
-    },
-    {
-      "ticket_no": 3,
-      "stake_per_ticket": 116,
-      "n_tickets": 1,
-      "total_stake": 116,
-      "joint_sp": 19.669,
-      "joint_p": 0.08254600000000001,
-      "payout_per_yuan": 12.78485,
-      "prize_per_ticket": 1483.0426,
-      "is_tax_free": true,
-      "ev": 0.05533822810000011,
-      "legs": [
-        {
-          "match_id": "26051_337",
-          "selection": 0,
-          "sp": 4.45,
-          "p_hat": 0.298,
-          "rule": "away_sp_3.5-4.5_h1",
-          "kickoff_ts": "2026-05-04T03:00:00",
-          "home": "弗拉门戈",
-          "away": "瓦斯科达伽马",
-          "league": "巴西甲"
-        },
-        {
-          "match_id": "26051_299",
-          "selection": 3,
-          "sp": 4.42,
-          "p_hat": 0.277,
-          "rule": "home_sp_3.5-4.5",
-          "kickoff_ts": "2026-05-03T22:30:00",
-          "home": "加尔斯",
-          "away": "厄尔格里特",
-          "league": "瑞典超"
-        }
-      ]
-    }
-  ]
+  "n_qualified_legs": 34,
+  "total_stake": 0,
+  "expected_total_return": 0,
+  "tickets": []
 }

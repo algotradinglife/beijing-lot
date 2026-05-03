@@ -383,6 +383,127 @@ def recent_settlements(db: WebuiDB, n: int = 5) -> List[Dict[str, Any]]:
     return list(reversed(rows))[:n]
 
 
+def match_status_for_plan(
+    db: WebuiDB,
+    live_db_path: str | Path,
+    *,
+    now: Optional[datetime] = None,
+) -> Dict[str, List[Dict[str, Any]]]:
+    """For the most recent placed/unsettled plan, return per-match status grouped
+    into ``completed`` / ``live`` / ``upcoming`` lists.
+
+    Each match dict includes:
+      match_id, kickoff_ts, league, home, away, handicap, our_pick (selection),
+      our_pick_label (胜/平/负), status, score (if completed), result_code,
+      hit (bool, if completed), winning_sp.
+    """
+    now = now or datetime.now(timezone.utc)
+    out = {"completed": [], "live": [], "upcoming": []}
+
+    # Find latest plan that has tickets
+    plan_meta = None
+    for p in db.list_plans():
+        meta = db.get_plan(p["plan_id"])
+        if meta and meta.get("plan", {}).get("tickets"):
+            plan_meta = meta
+            break
+    if not plan_meta:
+        return out
+    plan = plan_meta["plan"]
+
+    # Gather (match_id, our_pick) for this plan
+    picks_by_match: Dict[str, set] = {}
+    leg_meta_by_match: Dict[str, Dict[str, Any]] = {}
+    for ticket in plan.get("tickets", []):
+        for leg in ticket.get("legs", []):
+            mid = leg.get("match_id")
+            if not mid:
+                continue
+            picks_by_match.setdefault(mid, set()).add(int(leg.get("selection", -1)))
+            leg_meta_by_match.setdefault(mid, dict(
+                match_id=mid, kickoff_ts=leg.get("kickoff_ts"),
+                league=leg.get("league"), home=leg.get("home"),
+                away=leg.get("away"), handicap=leg.get("handicap"),
+                sp=leg.get("sp"),
+            ))
+
+    if not picks_by_match:
+        return out
+
+    # Query Live Collector for match status + settlement
+    live_path = Path(live_db_path)
+    if not live_path.exists():
+        # No live data — everything is "unknown" upcoming
+        for mid, meta in leg_meta_by_match.items():
+            meta["our_picks"] = sorted(picks_by_match[mid])
+            meta["status"] = "upcoming"
+            out["upcoming"].append(meta)
+        out["upcoming"].sort(key=lambda x: x.get("kickoff_ts") or "")
+        return out
+
+    sel_label = {3: "胜", 1: "平", 0: "负"}
+    conn = sqlite3.connect(str(live_path))
+    try:
+        for mid, meta in leg_meta_by_match.items():
+            picks = sorted(picks_by_match[mid])
+            meta["our_picks"] = picks
+            meta["our_picks_label"] = "/".join(sel_label.get(p, str(p)) for p in picks)
+            # Try settlement first
+            row = conn.execute(
+                "SELECT fthg, ftag, result_code, winning_sp FROM settlements WHERE match_id=?",
+                (mid,)
+            ).fetchone()
+            if row and row[0] is not None:
+                fthg, ftag, result_code, winning_sp = row
+                meta["score"] = f"{int(fthg)}-{int(ftag)}"
+                try:
+                    rcode = int(result_code) if result_code is not None else None
+                except (TypeError, ValueError):
+                    rcode = None
+                meta["result_code"] = rcode
+                meta["result_label"] = sel_label.get(rcode, str(result_code))
+                meta["winning_sp"] = winning_sp
+                meta["hit"] = rcode in picks if rcode is not None else None
+                meta["status"] = "completed"
+                out["completed"].append(meta)
+                continue
+            # Otherwise classify by kickoff time
+            kt_str = meta.get("kickoff_ts")
+            if kt_str:
+                try:
+                    kt = datetime.fromisoformat(kt_str.replace("Z", "+00:00"))
+                    if kt.tzinfo is None:
+                        kt = kt.replace(tzinfo=timezone.utc)
+                except ValueError:
+                    kt = None
+                if kt:
+                    delta_min = (now - kt).total_seconds() / 60
+                    if delta_min < 0:
+                        meta["status"] = "upcoming"
+                        meta["minutes_to_start"] = -int(delta_min)
+                        out["upcoming"].append(meta)
+                    elif delta_min < 130:  # 90 min + ~40 min buffer for settlement
+                        meta["status"] = "live"
+                        meta["minutes_in"] = int(delta_min)
+                        out["live"].append(meta)
+                    else:
+                        meta["status"] = "pending_settlement"
+                        meta["minutes_since_kickoff"] = int(delta_min)
+                        out["live"].append(meta)
+                    continue
+            # No kickoff info
+            meta["status"] = "unknown"
+            out["upcoming"].append(meta)
+    finally:
+        conn.close()
+
+    # Sort each group
+    out["completed"].sort(key=lambda x: x.get("kickoff_ts") or "", reverse=True)
+    out["live"].sort(key=lambda x: x.get("kickoff_ts") or "")
+    out["upcoming"].sort(key=lambda x: x.get("kickoff_ts") or "")
+    return out
+
+
 # ----------------------------------------------------------------------
 # XLSX export of recommended plan
 # ----------------------------------------------------------------------

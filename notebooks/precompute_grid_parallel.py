@@ -57,9 +57,13 @@ def metrics_full(weekly_pnl, weekly_stake, initial=INITIAL):
 
 
 def run_one_cell(args):
-    """Worker fn: returns (config_tuple, week_keys, weekly_pnl, weekly_stake, metrics_dict)."""
+    """Worker fn: returns (config_tuple, week_keys, weekly_pnl, weekly_stake, metrics_dict).
+
+    Also embeds the full ``weekly_pnl`` list inside the metrics dict so the
+    grid JSON can be used downstream for arbitrary post-hoc mix combinations
+    (3-way, custom weights, etc.).
+    """
     n, kf, lam, mc, comm = args
-    # Imports inside worker (each process needs them)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     sys.path.insert(0, str(Path(__file__).parent))
     from src.dual_sweep.variants import build_archetype_a_qual
@@ -74,6 +78,10 @@ def run_one_cell(args):
     stake = df["week_stake"].values
     week_keys = df["week_key"].values
     m = metrics_full(pnl, stake)
+    if m is not None:
+        m["weekly_pnl"] = [round(float(x), 2) for x in pnl]
+        m["weekly_stake"] = [round(float(x), 2) for x in stake]
+        m["week_keys"] = [str(k) for k in week_keys]
     return ((n, kf, lam, mc, comm), week_keys.tolist(), pnl.tolist(),
             stake.tolist(), m)
 

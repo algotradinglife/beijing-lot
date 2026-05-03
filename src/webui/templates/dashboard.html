@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Dashboard · 北单追踪{% endblock %}
+{% block head_extra %}<meta http-equiv="refresh" content="60">{% endblock %}
 {% block content %}
+<small class="text-muted">页面每 60 秒自动刷新 · 最后更新: <span id="last_refresh"></span></small>
+<script>document.getElementById('last_refresh').textContent = new Date().toLocaleTimeString();</script>
 
 {% if not live_db_exists %}
 <div class="alert alert-warning">
@@ -73,6 +76,91 @@
   <div class="card-header">权益曲线 (活跃 / 锁定 / 总额)</div>
   <div class="card-body">
     <div id="equity-chart" style="height:400px"></div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between">
+    <span>当期场次状态</span>
+    <small class="text-muted">已完结 {{ match_status.completed|length }} · 进行中 {{ match_status.live|length }} · 即将开始 {{ match_status.upcoming|length }}</small>
+  </div>
+  <div class="card-body">
+    {% if match_status.completed or match_status.live or match_status.upcoming %}
+
+    {% if match_status.live %}
+    <h6 class="text-warning">⚡ 进行中 / 等待结算</h6>
+    <table class="table table-sm">
+      <thead><tr><th>开赛时间</th><th>联赛</th><th>主队 vs 客队</th><th>让球</th><th>我们押</th><th>状态</th></tr></thead>
+      <tbody>
+        {% for m in match_status.live %}
+        <tr>
+          <td><small>{{ m.kickoff_ts }}</small></td>
+          <td><small>{{ m.league or '-' }}</small></td>
+          <td>{{ m.home }} vs {{ m.away }}</td>
+          <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
+          <td><span class="badge bg-info">{{ m.our_picks_label }}</span></td>
+          <td>
+            {% if m.status == 'live' %}
+              <small class="text-warning">进行中 ({{ m.minutes_in }} min)</small>
+            {% else %}
+              <small class="text-muted">等结算 ({{ m.minutes_since_kickoff }} min)</small>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if match_status.completed %}
+    <h6 class="text-success mt-3">✓ 已完结（含命中状态）</h6>
+    <table class="table table-sm">
+      <thead><tr><th>开赛时间</th><th>联赛</th><th>主队 vs 客队</th><th>让球</th><th>我们押</th><th>实际结果</th><th>比分</th><th>命中?</th></tr></thead>
+      <tbody>
+        {% for m in match_status.completed %}
+        <tr class="{{ 'table-success' if m.hit else 'table-danger' if m.hit is false else '' }}">
+          <td><small>{{ m.kickoff_ts }}</small></td>
+          <td><small>{{ m.league or '-' }}</small></td>
+          <td>{{ m.home }} vs {{ m.away }}</td>
+          <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
+          <td><span class="badge bg-info">{{ m.our_picks_label }}</span></td>
+          <td><span class="badge bg-secondary">{{ m.result_label }}</span></td>
+          <td><strong>{{ m.score }}</strong></td>
+          <td>
+            {% if m.hit %}
+              <span class="badge bg-success">✓ HIT (SP {{ "%.2f"|format(m.winning_sp or 0) }})</span>
+            {% else %}
+              <span class="badge bg-danger">✗ MISS</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% if match_status.upcoming %}
+    <h6 class="text-primary mt-3">⏰ 即将开始</h6>
+    <table class="table table-sm">
+      <thead><tr><th>开赛时间</th><th>联赛</th><th>主队 vs 客队</th><th>让球</th><th>我们押</th><th>距开赛</th></tr></thead>
+      <tbody>
+        {% for m in match_status.upcoming %}
+        <tr>
+          <td><small>{{ m.kickoff_ts }}</small></td>
+          <td><small>{{ m.league or '-' }}</small></td>
+          <td>{{ m.home }} vs {{ m.away }}</td>
+          <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
+          <td><span class="badge bg-info">{{ m.our_picks_label }}</span></td>
+          <td><small>{% if m.minutes_to_start is not none %}{{ m.minutes_to_start }} min 后{% else %}-{% endif %}</small></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+
+    {% else %}
+    <p class="text-muted mb-0">没有当期 plan 数据。生成计划后此处会显示场次状态。</p>
+    {% endif %}
   </div>
 </div>
 
