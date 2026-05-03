@@ -23,6 +23,7 @@ def build_plan(
     combo_ev_threshold: float = 0.10,
     kelly_fraction: float = 0.25,
     max_combos: int = 50,
+    diversity_lambda: float = 0.5,
 ) -> List[TicketPlan]:
     """Build a weekly portfolio of 7-leg combo tickets.
 
@@ -54,6 +55,7 @@ def build_plan(
         n_legs=n_legs,
         min_ev=combo_ev_threshold,
         max_combos=max_combos,
+        diversity_lambda=diversity_lambda,
     )
     if not combos:
         log.warning("No combo passed EV threshold %.3f.", combo_ev_threshold)
