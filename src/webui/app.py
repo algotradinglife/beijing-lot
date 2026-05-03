@@ -104,6 +104,55 @@ def create_app(
             return redirect(url_for("dashboard"))
         return render_template("setup.html")
 
+    @app.route("/api/backtest_preview")
+    def backtest_preview():
+        """Return cached backtest metrics + equity curve for given config."""
+        try:
+            n_legs = int(request.args.get("n_legs", "4"))
+            kelly_fraction = float(request.args.get("kelly_fraction", str(1/16)))
+            diversity_lambda = float(request.args.get("diversity_lambda", "0.5"))
+            max_combos = int(request.args.get("max_combos", "50"))
+            commission_rate = float(request.args.get("commission_rate", "0"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid params"}), 400
+
+        grid_path = Path(__file__).resolve().parents[2] / "data" / "raw" / "backtest_grid.json"
+        if not grid_path.exists():
+            return jsonify({"error": "backtest_grid_not_ready",
+                            "msg": "回测网格未生成。请先跑 notebooks/precompute_backtest_grid.py"}), 200
+        import json as _json
+        try:
+            grid = _json.loads(grid_path.read_text())
+        except Exception as e:
+            return jsonify({"error": "grid_load_failed", "msg": str(e)}), 500
+
+        # Find nearest cell (snap each axis to grid value)
+        kelly_choices = [1/32, 1/16, 1/8, 1/4]
+        lambda_choices = [0.0, 0.5, 1.0, 2.0]
+        max_combos_choices = [25, 50, 100, 200]
+        commission_choices = [0.0, 0.07]
+        n_choices = [3, 4]
+
+        def _snap(val, choices):
+            return min(choices, key=lambda c: abs(c - val))
+
+        n_snap = _snap(n_legs, n_choices)
+        k_snap = _snap(kelly_fraction, kelly_choices)
+        l_snap = _snap(diversity_lambda, lambda_choices)
+        m_snap = _snap(max_combos, max_combos_choices)
+        c_snap = _snap(commission_rate, commission_choices)
+        key = f"N{n_snap}_K{k_snap:.4f}_L{l_snap:.2f}_M{m_snap}_C{c_snap:.3f}"
+        cell = grid.get(key)
+        if not cell:
+            return jsonify({"error": "no_cell", "key": key}), 200
+        cell = dict(cell)
+        cell["snapped_to"] = {
+            "n_legs": n_snap, "kelly_fraction": k_snap,
+            "diversity_lambda": l_snap, "max_combos": m_snap,
+            "commission_rate": c_snap,
+        }
+        return jsonify(cell)
+
     @app.route("/strategy_params", methods=["GET", "POST"])
     def strategy_params():
         """Edit策略参数: N, Kelly fraction, diversity_lambda."""

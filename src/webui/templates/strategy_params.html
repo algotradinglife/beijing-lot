@@ -92,4 +92,122 @@
   </div>
 </form>
 
+<hr class="my-4">
+<h3>回测预览（10 万入场，约 4 年 OOS 测试期）</h3>
+<p class="text-muted">改任何参数后实时显示对应的历史回测结果（snap 到最近网格点）</p>
+
+<div class="row mb-3">
+  <div class="col-md-2"><div class="card"><div class="card-body p-2 text-center">
+    <small class="text-muted">CAGR</small>
+    <h4 id="bt_cagr" class="mb-0">--</h4>
+  </div></div></div>
+  <div class="col-md-2"><div class="card"><div class="card-body p-2 text-center">
+    <small class="text-muted">Sharpe</small>
+    <h4 id="bt_sharpe" class="mb-0">--</h4>
+  </div></div></div>
+  <div class="col-md-2"><div class="card"><div class="card-body p-2 text-center">
+    <small class="text-muted">Max DD</small>
+    <h4 id="bt_max_dd" class="mb-0">--</h4>
+  </div></div></div>
+  <div class="col-md-2"><div class="card"><div class="card-body p-2 text-center">
+    <small class="text-muted">Calmar</small>
+    <h4 id="bt_calmar" class="mb-0">--</h4>
+  </div></div></div>
+  <div class="col-md-2"><div class="card"><div class="card-body p-2 text-center">
+    <small class="text-muted">周胜率</small>
+    <h4 id="bt_hit_rate" class="mb-0">--</h4>
+  </div></div></div>
+  <div class="col-md-2"><div class="card"><div class="card-body p-2 text-center">
+    <small class="text-muted">利用率</small>
+    <h4 id="bt_util" class="mb-0">--</h4>
+  </div></div></div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <small class="text-muted">权益曲线（10 万入场，~50 点降采样）<span id="bt_snap" class="text-info"></span></small>
+    <div id="bt_chart" style="height: 320px;"></div>
+    <small class="text-muted">注：参数被 snap 到最近的回测网格点（K∈{1/32,1/16,1/8,1/4}, λ∈{0,0.5,1,2}, max_combos∈{25,50,100,200}）</small>
+  </div>
+</div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.0/plotly.min.js"></script>
+<script>
+function fmtPct(x, dp=1) { return (x>=0?'+':'') + (x*100).toFixed(dp) + '%'; }
+function setColor(el, val, good_above) {
+  el.classList.remove('text-success', 'text-warning', 'text-danger');
+  if (val >= good_above) el.classList.add('text-success');
+  else if (val >= good_above * 0.5) el.classList.add('text-warning');
+  else el.classList.add('text-danger');
+}
+
+async function refreshBacktest() {
+  const params = new URLSearchParams({
+    n_legs: document.querySelector('select[name=n_legs]').value,
+    kelly_fraction: document.querySelector('select[name=kelly_fraction]').value,
+    diversity_lambda: document.querySelector('input[name=diversity_lambda]').value,
+    max_combos: document.querySelector('input[name=max_combos]').value,
+    commission_rate: document.querySelector('input[name=commission_rate]').value,
+  });
+  const r = await fetch('/api/backtest_preview?' + params.toString());
+  const j = await r.json();
+  if (j.error) {
+    document.getElementById('bt_chart').innerHTML =
+      '<div class="text-center text-muted py-5">' + (j.msg || j.error) + '</div>';
+    return;
+  }
+  document.getElementById('bt_cagr').textContent = fmtPct(j.cagr);
+  setColor(document.getElementById('bt_cagr'), j.cagr, 0.10);
+  document.getElementById('bt_sharpe').textContent = j.sharpe.toFixed(2);
+  setColor(document.getElementById('bt_sharpe'), j.sharpe, 0.5);
+  document.getElementById('bt_max_dd').textContent = fmtPct(j.max_dd);
+  document.getElementById('bt_max_dd').classList.remove('text-success','text-warning','text-danger');
+  if (j.max_dd > -0.10) document.getElementById('bt_max_dd').classList.add('text-success');
+  else if (j.max_dd > -0.30) document.getElementById('bt_max_dd').classList.add('text-warning');
+  else document.getElementById('bt_max_dd').classList.add('text-danger');
+  document.getElementById('bt_calmar').textContent = j.calmar.toFixed(2);
+  setColor(document.getElementById('bt_calmar'), j.calmar, 1.0);
+  document.getElementById('bt_hit_rate').textContent = (j.hit_rate*100).toFixed(1) + '%';
+  document.getElementById('bt_util').textContent = j.utilization_pct.toFixed(1) + '%';
+
+  const snap = j.snapped_to;
+  document.getElementById('bt_snap').textContent =
+    ` · snap 到 N=${snap.n_legs}, Kelly=${snap.kelly_fraction.toFixed(4)}, λ=${snap.diversity_lambda}, max=${snap.max_combos}, 佣金=${(snap.commission_rate*100).toFixed(1)}%`;
+
+  // Equity curve
+  const xs = j.equity_curve.map((_, i) => i);
+  const data = [{
+    x: xs, y: j.equity_curve, type: 'scatter', mode: 'lines',
+    line: { color: '#b04a2f', width: 2 },
+    name: 'Bankroll',
+    hovertemplate: 'Week ~%{x}: %{y:,.0f} 元<extra></extra>',
+  }];
+  const layout = {
+    margin: { l: 60, r: 20, t: 10, b: 40 },
+    yaxis: { title: 'Bankroll (元)', type: 'log' },
+    xaxis: { title: '周（OOS 测试期）' },
+    showlegend: false,
+    shapes: [{
+      type: 'line', x0: 0, x1: xs[xs.length-1], y0: 100000, y1: 100000,
+      line: { color: 'gray', dash: 'dash', width: 1 },
+    }],
+    annotations: [{
+      x: 0, y: 100000, xref: 'x', yref: 'y',
+      text: '初始 10 万', showarrow: false, xanchor: 'left', yanchor: 'bottom',
+      font: { size: 10, color: 'gray' },
+    }],
+  };
+  Plotly.newPlot('bt_chart', data, layout, { displayModeBar: false, responsive: true });
+}
+
+// Refresh on form changes
+document.querySelectorAll('select, input').forEach(el => {
+  el.addEventListener('change', refreshBacktest);
+  el.addEventListener('input', refreshBacktest);
+});
+window.addEventListener('DOMContentLoaded', refreshBacktest);
+</script>
+{% endblock %}
+
 {% endblock %}
