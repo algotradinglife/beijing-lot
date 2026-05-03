@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 {% block title %}历史 · 北单追踪{% endblock %}
+{% block head_extra %}<meta http-equiv="refresh" content="60">{% endblock %}
 {% block content %}
 
+<small class="text-muted">页面每 60 秒自动刷新（已自动 reconcile）</small>
 <h3 class="mb-3">历史计划与结算</h3>
 
 <div class="card mb-4">
@@ -24,7 +26,15 @@
             <td><small>{{ p.placed_ts or '—' }}</small></td>
             <td>
               {% if s %}<span class="badge bg-success">已结算</span>
-              {% elif p.placed_ts %}<span class="badge bg-warning">待结算</span>
+              {% elif p.placed_ts %}
+                {% set prog = progress.get(p.plan_id) %}
+                {% if prog %}
+                  <span class="badge bg-warning" title="{{ prog.settled }}/{{ prog.total }} 场已结算">
+                    待结算 {{ prog.settled }}/{{ prog.total }} ({{ prog.pct|int }}%)
+                  </span>
+                {% else %}
+                  <span class="badge bg-warning">待结算</span>
+                {% endif %}
               {% else %}<span class="badge bg-secondary">未下注</span>{% endif %}
             </td>
             <td class="text-end {{ 'text-success' if s and s.week_pnl >= 0 else 'text-danger' if s }}">
