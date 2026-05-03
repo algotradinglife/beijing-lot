@@ -43,13 +43,48 @@
       <small class="text-muted">推荐票数</small><h4>{{ plan.tickets|length }}</h4>
     </div></div></div>
     <div class="col-md-3"><div class="card"><div class="card-body">
-      <small class="text-muted">总下注 / 期望回收</small>
-      <h5>{{ plan.total_stake }} → {{ "%.0f"|format(plan.expected_total_return) }} 元</h5>
-      {% if plan.commission_rate and plan.commission_rate > 0 %}
-        <small class="text-success">+ 佣金 {{ "%.0f"|format(plan.expected_commission) }} 元
-          ({{ "%.1f"|format(plan.commission_rate*100) }}%)</small>
-      {% endif %}
+      <small class="text-muted">本周现金投入</small>
+      <h4 class="mb-0">{{ plan.total_stake }} 元</h4>
+      <small class="text-muted">占活跃 {{ "%.2f"|format(plan.total_stake / plan.bankroll * 100) }}%</small>
     </div></div></div>
+  </div>
+
+  {# 期望盈亏汇总卡片 #}
+  {% set net_profit = plan.expected_total_return - plan.total_stake %}
+  {% set ev_pct = (plan.expected_total_return / plan.total_stake - 1) * 100 if plan.total_stake else 0 %}
+  {% set net_with_comm = net_profit + (plan.expected_commission|default(0)) %}
+  <div class="row mb-3">
+    <div class="col-md-4">
+      <div class="card text-bg-light">
+        <div class="card-body">
+          <small class="text-muted">期望毛回收（中奖侧）</small>
+          <h4 class="mb-0">{{ "%.0f"|format(plan.expected_total_return) }} 元</h4>
+          <small class="text-muted">所有票 ⟨概率×奖金⟩ 之和</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card {% if net_profit >= 0 %}text-bg-success{% else %}text-bg-danger{% endif %}">
+        <div class="card-body">
+          <small>{% if net_profit >= 0 %}期望净利{% else %}期望净亏{% endif %}</small>
+          <h4 class="mb-0">{{ "%+.0f"|format(net_profit) }} 元</h4>
+          {% if plan.commission_rate and plan.commission_rate > 0 %}
+            <small>+ 佣金 {{ "%.0f"|format(plan.expected_commission) }} 元 → 合计 <strong>{{ "%+.0f"|format(net_with_comm) }} 元</strong></small>
+          {% else %}
+            <small>= 期望回收 − 总下注</small>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card {% if ev_pct >= 0 %}text-bg-primary{% else %}text-bg-warning{% endif %}">
+        <div class="card-body">
+          <small>每元下注的 EV</small>
+          <h4 class="mb-0">{{ "%+.1f"|format(ev_pct) }}%</h4>
+          <small>需大量周次后才向此值收敛（单周方差极大）</small>
+        </div>
+      </div>
+    </div>
   </div>
 
   {% if plan.tickets %}
