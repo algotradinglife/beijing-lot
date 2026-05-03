@@ -19,6 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from io import BytesIO
+
 from flask import (
     Flask,
     flash,
@@ -27,6 +29,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     url_for,
 )
 
@@ -200,6 +203,26 @@ def create_app(
         else:
             flash(f"未找到计划 {wk}", "error")
         return redirect(url_for("plan_view"))
+
+    # -- export to xlsx -----------------------------------------------
+    @app.route("/plan/export")
+    def plan_export():
+        """Download current plan as xlsx for printing/handoff at the彩票站."""
+        db = get_db()
+        if not db.is_initialized():
+            return redirect(url_for("setup"))
+        wk = request.args.get("week") or _current_week_id()
+        plan_meta = db.get_plan(wk)
+        if not plan_meta or not plan_meta.get("plan"):
+            flash(f"未找到计划 {wk}", "error")
+            return redirect(url_for("plan_view"))
+        xlsx_bytes = services.plan_to_xlsx(plan_meta["plan"], wk)
+        return send_file(
+            BytesIO(xlsx_bytes),
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name=f"beidan_plan_{wk}.xlsx",
+        )
 
     # -- history -------------------------------------------------------
     @app.route("/history")

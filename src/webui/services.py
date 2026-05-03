@@ -18,6 +18,7 @@ import math
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -273,3 +274,154 @@ def compute_stats(db: WebuiDB) -> Dict[str, Any]:
 def recent_settlements(db: WebuiDB, n: int = 5) -> List[Dict[str, Any]]:
     rows = db.list_settlements()
     return list(reversed(rows))[:n]
+
+
+# ----------------------------------------------------------------------
+# XLSX export of recommended plan
+# ----------------------------------------------------------------------
+
+def plan_to_xlsx(plan: Dict[str, Any], week_id: str) -> bytes:
+    """Render a recommended plan to xlsx bytes for printing or sharing.
+
+    Layout:
+      Sheet 1 "汇总" — meta + stats per ticket (one row per ticket)
+      Sheet 2 "下注单" — one row per leg, grouped by ticket (for filling
+                       投注单 at彩票站)
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
+
+    SEL_LABEL = {"3": "胜", "1": "平", "0": "负", 3: "胜", 1: "平", 0: "负"}
+    HEADER_FILL = PatternFill("solid", fgColor="B04A2F")
+    HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
+    THIN = Side(border_style="thin", color="C8C2B3")
+    BORDER = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
+    CENTER = Alignment(horizontal="center", vertical="center")
+    LEFT = Alignment(horizontal="left", vertical="center")
+
+    def _style_header_row(ws, row_idx: int, n_cols: int):
+        for c in range(1, n_cols + 1):
+            cell = ws.cell(row=row_idx, column=c)
+            cell.fill = HEADER_FILL
+            cell.font = HEADER_FONT
+            cell.alignment = CENTER
+            cell.border = BORDER
+
+    def _border_range(ws, r1, c1, r2, c2):
+        for r in range(r1, r2 + 1):
+            for c in range(c1, c2 + 1):
+                ws.cell(row=r, column=c).border = BORDER
+
+    wb = Workbook()
+
+    # --- Sheet 1: 汇总 ---
+    ws1 = wb.active
+    ws1.title = "汇总"
+    ws1["A1"] = f"北单组合票推荐 · {week_id}"
+    ws1["A1"].font = Font(bold=True, size=14, color="B04A2F")
+    ws1.merge_cells("A1:H1")
+
+    meta_rows = [
+        ("候选场次", plan.get("n_open_matches", 0)),
+        ("合格腿数", plan.get("n_qualified_legs", 0)),
+        ("推荐组合票数", len(plan.get("tickets", []))),
+        ("总下注", f"{plan.get('total_stake', 0)} 元"),
+        ("期望回收", f"{plan.get('expected_total_return', 0):,.0f} 元"),
+        ("生成时间", plan.get("generated_ts", "")),
+    ]
+    for i, (k, v) in enumerate(meta_rows, start=3):
+        ws1.cell(row=i, column=1, value=k).font = Font(bold=True)
+        ws1.cell(row=i, column=2, value=v)
+
+    headers = ["#", "组合腿（场次:选项@SP）", "联合 SP",
+               "单注", "倍数 (n_tickets)", "总下注", "单票奖金", "免税?", "EV"]
+    start_row = len(meta_rows) + 5
+    for c, h in enumerate(headers, start=1):
+        ws1.cell(row=start_row, column=c, value=h)
+    _style_header_row(ws1, start_row, len(headers))
+
+    for i, t in enumerate(plan.get("tickets", []), start=1):
+        row = start_row + i
+        legs_str = " + ".join(
+            f"{leg.get('match_id')}:{SEL_LABEL.get(leg.get('selection'), leg.get('selection'))}@{leg.get('sp'):.2f}"
+            for leg in t.get("legs", [])
+        )
+        ws1.cell(row=row, column=1, value=i).alignment = CENTER
+        ws1.cell(row=row, column=2, value=legs_str).alignment = LEFT
+        ws1.cell(row=row, column=3, value=round(t.get("joint_sp", 0), 2)).alignment = CENTER
+        ws1.cell(row=row, column=4, value=t.get("stake_per_ticket", 0)).alignment = CENTER
+        ws1.cell(row=row, column=5, value=t.get("n_tickets", 0)).alignment = CENTER
+        ws1.cell(row=row, column=6, value=t.get("total_stake", 0)).alignment = CENTER
+        ws1.cell(row=row, column=7, value=round(t.get("prize_per_ticket", 0), 0)).alignment = CENTER
+        ws1.cell(row=row, column=8, value="✓" if t.get("is_tax_free") else "✗ 税").alignment = CENTER
+        ws1.cell(row=row, column=9, value=round(t.get("ev", 0), 3)).alignment = CENTER
+
+    n_tickets = len(plan.get("tickets", []))
+    if n_tickets:
+        _border_range(ws1, start_row + 1, 1, start_row + n_tickets, len(headers))
+
+    # Set column widths
+    widths = [5, 60, 10, 8, 18, 10, 12, 9, 8]
+    for c, w in enumerate(widths, start=1):
+        ws1.column_dimensions[get_column_letter(c)].width = w
+
+    # --- Sheet 2: 下注单（leg-level for filling 投注单） ---
+    ws2 = wb.create_sheet("下注单")
+    ws2["A1"] = f"实际下注操作清单 · {week_id} · 按此填投注单"
+    ws2["A1"].font = Font(bold=True, size=14, color="B04A2F")
+    ws2.merge_cells("A1:I1")
+
+    headers2 = ["票#", "期号", "场次序号", "联赛", "主队", "客队",
+                "开赛时间", "选项", "SP"]
+    start2 = 3
+    for c, h in enumerate(headers2, start=1):
+        ws2.cell(row=start2, column=c, value=h)
+    _style_header_row(ws2, start2, len(headers2))
+
+    cur_row = start2 + 1
+    for ticket_no, t in enumerate(plan.get("tickets", []), start=1):
+        for leg in t.get("legs", []):
+            mid = str(leg.get("match_id", ""))
+            # match_id is typically "期号_序号"
+            if "_" in mid:
+                expect, match_no = mid.split("_", 1)
+            else:
+                expect, match_no = "", mid
+            ws2.cell(row=cur_row, column=1, value=ticket_no).alignment = CENTER
+            ws2.cell(row=cur_row, column=2, value=expect).alignment = CENTER
+            ws2.cell(row=cur_row, column=3, value=match_no).alignment = CENTER
+            ws2.cell(row=cur_row, column=4, value=leg.get("league", "")).alignment = LEFT
+            ws2.cell(row=cur_row, column=5, value=leg.get("home", "")).alignment = LEFT
+            ws2.cell(row=cur_row, column=6, value=leg.get("away", "")).alignment = LEFT
+            ws2.cell(row=cur_row, column=7, value=leg.get("kickoff_ts", "")).alignment = CENTER
+            sel_cell = ws2.cell(row=cur_row, column=8,
+                                value=SEL_LABEL.get(leg.get("selection"), leg.get("selection")))
+            sel_cell.alignment = CENTER
+            sel_cell.font = Font(bold=True, size=12, color="B04A2F")
+            ws2.cell(row=cur_row, column=9, value=round(leg.get("sp", 0), 2)).alignment = CENTER
+            cur_row += 1
+        # blank separator row between tickets
+        cur_row += 1
+
+    if cur_row > start2 + 1:
+        _border_range(ws2, start2 + 1, 1, cur_row - 1, len(headers2))
+
+    widths2 = [6, 8, 8, 16, 22, 22, 22, 8, 8]
+    for c, w in enumerate(widths2, start=1):
+        ws2.column_dimensions[get_column_letter(c)].width = w
+
+    # Footer note on sheet 2
+    note_row = cur_row + 2
+    note_text = (
+        f"说明：每个 票# 内多行 = 该票的 4 关组合。"
+        f"在彩票站填投注单时按 过关方式 选 4 串 1，"
+        f"每行勾选对应的选项（胜/平/负）。倍数 = 单票 倍数 列。"
+        f"共 {n_tickets} 张票需购买。"
+    )
+    ws2.cell(row=note_row, column=1, value=note_text).font = Font(italic=True, color="666666")
+    ws2.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=9)
+
+    out = BytesIO()
+    wb.save(out)
+    return out.getvalue()
