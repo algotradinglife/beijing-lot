@@ -375,6 +375,16 @@ def create_app(
         db = get_db()
         if not db.is_initialized():
             return redirect(url_for("setup"))
+        # Auto-reconcile (idempotent) so dashboard reflects latest settlements
+        try:
+            services.reconcile_pending(
+                db,
+                live_db_path=app.config["LIVE_DB"],
+                plans_dir=app.config["PLANS_DIR"],
+                pnl_log=app.config["PNL_LOG"],
+            )
+        except Exception:
+            pass
         state = services.get_state(db)
         stats = services.compute_stats(db)
         equity = services.equity_series(db)
@@ -461,14 +471,25 @@ def create_app(
         db = get_db()
         if not db.is_initialized():
             return redirect(url_for("setup"))
+        # Auto-trigger reconcile (idempotent) so history reflects latest settlements
+        try:
+            services.reconcile_pending(
+                db,
+                live_db_path=app.config["LIVE_DB"],
+                plans_dir=app.config["PLANS_DIR"],
+                pnl_log=app.config["PNL_LOG"],
+            )
+        except Exception:
+            pass  # silent fail; show stale data rather than crash
         plans = db.list_plans()
         settlements = list(reversed(db.list_settlements()))
-        # Index settlements by week for easy template lookup
         settle_by_week = {s["week_id"]: s for s in settlements}
+        progress = services.settlement_progress(db, app.config["LIVE_DB"])
         return render_template(
             "history.html",
             plans=plans, settlements=settlements,
             settle_by_week=settle_by_week,
+            progress=progress,
         )
 
     # -- reconcile -----------------------------------------------------

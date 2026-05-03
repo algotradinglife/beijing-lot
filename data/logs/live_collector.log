@@ -516,3 +516,15 @@
 2026-05-03 20:54:41,424 INFO live_collector.scheduler |   merged: 382 unique matches
 2026-05-03 20:54:45,809 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
 2026-05-03 20:54:45,811 INFO live_collector | sleeping 584s
+2026-05-03 21:04:30,971 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-03T13:04:30Z
+2026-05-03 21:04:32,335 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-03 21:04:35,112 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-03 21:04:35,113 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-03 21:04:35,348 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-03 21:04:35,350 INFO live_collector | sleeping 811s
+2026-05-03 21:18:07,474 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-03T13:18:07Z
+2026-05-03 21:18:09,160 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-03 21:18:12,073 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-03 21:18:12,074 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-03 21:18:12,330 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-03 21:18:12,331 INFO live_collector | sleeping 415s

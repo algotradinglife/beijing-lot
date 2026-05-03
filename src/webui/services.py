@@ -383,6 +383,46 @@ def recent_settlements(db: WebuiDB, n: int = 5) -> List[Dict[str, Any]]:
     return list(reversed(rows))[:n]
 
 
+def settlement_progress(
+    db: WebuiDB,
+    live_db_path: str | Path,
+) -> Dict[str, Dict[str, int]]:
+    """For each plan that's been placed but not booked, count how many of its
+    matches are settled. Returns ``{plan_id: {settled, total, pct}}``."""
+    out: Dict[str, Dict[str, int]] = {}
+    live_path = Path(live_db_path)
+    if not live_path.exists():
+        return out
+    conn = sqlite3.connect(str(live_path))
+    try:
+        for plan_meta in db.list_plans():
+            week_id = plan_meta["plan_id"]
+            if db.has_settlement(week_id):
+                continue
+            full = db.get_plan(week_id)
+            if not full or not full.get("plan", {}).get("tickets"):
+                continue
+            mids = set()
+            for t in full["plan"]["tickets"]:
+                for leg in t.get("legs", []):
+                    if leg.get("match_id"):
+                        mids.add(leg["match_id"])
+            if not mids:
+                continue
+            placeholders = ",".join("?" * len(mids))
+            row = conn.execute(
+                f"SELECT COUNT(*) FROM settlements WHERE match_id IN ({placeholders})",
+                tuple(mids),
+            ).fetchone()
+            settled = int(row[0]) if row else 0
+            total = len(mids)
+            out[week_id] = dict(settled=settled, total=total,
+                                 pct=round(100 * settled / total, 0) if total else 0)
+    finally:
+        conn.close()
+    return out
+
+
 def match_status_for_plan(
     db: WebuiDB,
     live_db_path: str | Path,
