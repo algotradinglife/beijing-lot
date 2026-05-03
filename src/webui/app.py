@@ -104,6 +104,44 @@ def create_app(
             return redirect(url_for("dashboard"))
         return render_template("setup.html")
 
+    @app.route("/strategy_params", methods=["GET", "POST"])
+    def strategy_params():
+        """Edit策略参数: N, Kelly fraction, diversity_lambda."""
+        db = get_db()
+        if not db.is_initialized():
+            return redirect(url_for("setup"))
+        if request.method == "POST":
+            try:
+                n_legs = int(request.form.get("n_legs", "4"))
+                kelly_fraction = float(request.form.get("kelly_fraction", str(1/16)))
+                diversity_lambda = float(request.form.get("diversity_lambda", "0.5"))
+            except ValueError:
+                flash("数值无效", "error")
+                return redirect(url_for("strategy_params"))
+            if n_legs < 2 or n_legs > 8:
+                flash("N 必须在 2..8", "error")
+                return redirect(url_for("strategy_params"))
+            if not (0 < kelly_fraction <= 1):
+                flash("Kelly 系数必须在 (0, 1]", "error")
+                return redirect(url_for("strategy_params"))
+            if diversity_lambda < 0:
+                flash("Diversity λ 必须 ≥ 0", "error")
+                return redirect(url_for("strategy_params"))
+            db.set_config("n_legs", n_legs)
+            db.set_config("kelly_fraction", kelly_fraction)
+            db.set_config("diversity_lambda", diversity_lambda)
+            flash(
+                f"策略已更新：N={n_legs} · Kelly={kelly_fraction:g} · λ={diversity_lambda:g}",
+                "success",
+            )
+            return redirect(url_for("plan_view"))
+        return render_template(
+            "strategy_params.html",
+            n_legs=int(db.get_config("n_legs") or 4),
+            kelly_fraction=float(db.get_config("kelly_fraction") or 1/16),
+            diversity_lambda=float(db.get_config("diversity_lambda") or 0.5),
+        )
+
     @app.route("/edit_bankroll", methods=["GET", "POST"])
     def edit_bankroll():
         """Manually edit bankroll values without resetting history."""

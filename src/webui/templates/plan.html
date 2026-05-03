@@ -51,6 +51,41 @@
   {% if plan.tickets %}
   <div class="card mb-3">
     <div class="card-header d-flex justify-content-between align-items-center">
+      <span>组合多样性诊断</span>
+      <small class="text-muted">
+        N={{ plan.n_legs_config|default(plan.n_legs|default(4)) }} ·
+        Kelly={{ "%.4f"|format(plan.kelly_fraction|default(0.0625)) }} ·
+        λ={{ plan.diversity_lambda|default(0.5) }} ·
+        <a href="{{ url_for('strategy_params') }}">改参数</a>
+      </small>
+    </div>
+    <div class="card-body">
+      <div class="row mb-3">
+        <div class="col-md-4 text-center">
+          <div class="text-muted small">最大集中度</div>
+          <h3 class="mb-0
+            {% if plan.concentration_max_pct > 80 %}text-danger
+            {% elif plan.concentration_max_pct > 50 %}text-warning
+            {% else %}text-success{% endif %}">{{ plan.concentration_max_pct|default(0) }}%</h3>
+          <small class="text-muted">最强 leg 出现在多少%的票里</small>
+        </div>
+        <div class="col-md-4 text-center">
+          <div class="text-muted small">HHI 集中度指数</div>
+          <h3 class="mb-0">{{ "%.4f"|format(plan.hhi|default(0)) }}</h3>
+          <small class="text-muted">越低越分散（理论最低 = 1/n_legs）</small>
+        </div>
+        <div class="col-md-4 text-center">
+          <div class="text-muted small">有效独立 leg 数</div>
+          <h3 class="mb-0">{{ plan.effective_n_legs|default(0) }}</h3>
+          <small class="text-muted">portfolio 实际"独立程度"</small>
+        </div>
+      </div>
+      <div id="legChart" style="height: 280px;"></div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
       <span>推荐组合票（{{ plan.tickets|length }} 张）</span>
       <div class="d-flex align-items-center gap-2">
         <a href="{{ url_for('plan_export', week=week_id) }}"
@@ -117,6 +152,47 @@
   </div>
   {% endif %}
 
+{% endif %}
+
+{% if plan and plan.tickets and plan.leg_appearance %}
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.0/plotly.min.js"></script>
+<script>
+  const legData = {{ plan.leg_appearance|tojson }};
+  const totalTickets = {{ plan.tickets|length }};
+  const labels = legData.map(l => `${l.match_id}:${ {3:'胜',1:'平',0:'负'}[l.selection] || l.selection }@${l.sp.toFixed(2)}`);
+  const counts = legData.map(l => l.count);
+  const pcts = counts.map(c => (100*c/totalTickets).toFixed(1));
+  const colors = pcts.map(p => p > 80 ? '#8b2424' : p > 50 ? '#a45a00' : '#2e6b4a');
+
+  const data = [{
+    x: labels,
+    y: counts,
+    type: 'bar',
+    marker: { color: colors },
+    text: pcts.map(p => `${p}%`),
+    textposition: 'outside',
+    hovertemplate: '%{x}<br>出现 %{y} 次 (%{text})<extra></extra>',
+  }];
+
+  const layout = {
+    margin: { l: 50, r: 20, t: 20, b: 100 },
+    yaxis: { title: '出现次数', rangemode: 'tozero' },
+    xaxis: { tickangle: -30, automargin: true },
+    showlegend: false,
+    annotations: [{
+      xref: 'paper', yref: 'paper', x: 0, y: 1.05,
+      text: `共 ${totalTickets} 张票，${legData.length} 条不同腿。`
+            + ` 绿 = 集中度健康 (≤50%)，黄 = 较高 (50-80%)，红 = 过度集中 (>80%)`,
+      showarrow: false,
+      font: { size: 11, color: '#666' },
+      align: 'left',
+    }],
+  };
+
+  Plotly.newPlot('legChart', data, layout, { displayModeBar: false, responsive: true });
+</script>
+{% endblock %}
 {% endif %}
 
 {% endblock %}

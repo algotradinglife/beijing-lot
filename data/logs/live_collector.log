@@ -235,3 +235,9 @@
 2026-05-03 13:49:42,600 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
 2026-05-03 13:49:44,174 INFO live_collector.scheduler | settle issue=26051 wrote 235 settlement rows
 2026-05-03 13:49:44,175 INFO live_collector | sleeping 650s
+2026-05-03 14:00:35,048 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-03T06:00:35Z
+2026-05-03 14:00:36,653 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-03 14:00:39,434 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-03 14:00:39,437 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-03 14:00:39,707 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-03 14:00:39,709 INFO live_collector | sleeping 392s

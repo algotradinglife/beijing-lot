@@ -122,17 +122,55 @@ def generate_plan(
 
     cfg = niche_config or NicheConfig.load()
     snapshots = load_open_matches(live_db_path, now=now)
+    # Read user-tunable strategy params from config (defaults locked from analysis)
+    n_legs = int(db.get_config("n_legs") or N_LEGS)
+    kelly_fraction = float(db.get_config("kelly_fraction") or KELLY_FRACTION)
+    diversity_lambda = float(db.get_config("diversity_lambda") or 0.5)
     plan = build_weekly_plan(
         snapshots,
         bankroll=state.active,
         niche_config=cfg,
-        n_legs=N_LEGS,
-        kelly_fraction=KELLY_FRACTION,
+        n_legs=n_legs,
+        kelly_fraction=kelly_fraction,
         weekly_stake_cap_frac=WEEKLY_STAKE_CAP_FRAC,
+        diversity_lambda=diversity_lambda,
         now=now,
     )
     plan_dict = plan.to_dict()
     plan_dict["live_db_empty"] = len(snapshots) == 0
+    # Diagnostic: per-leg appearance counts for diversity visualization
+    leg_counts: Dict[str, Dict[str, Any]] = {}
+    for ticket in plan_dict.get("tickets", []):
+        for leg in ticket.get("legs", []):
+            key = f"{leg.get('match_id')}:{leg.get('selection')}"
+            entry = leg_counts.setdefault(key, dict(
+                key=key,
+                match_id=leg.get("match_id"),
+                selection=leg.get("selection"),
+                home=leg.get("home"),
+                away=leg.get("away"),
+                sp=leg.get("sp"),
+                count=0,
+            ))
+            entry["count"] += 1
+    plan_dict["leg_appearance"] = sorted(
+        leg_counts.values(), key=lambda x: x["count"], reverse=True
+    )
+    n_tickets = len(plan_dict.get("tickets", []))
+    if leg_counts and n_tickets:
+        max_count = max(e["count"] for e in leg_counts.values())
+        plan_dict["concentration_max_pct"] = round(100 * max_count / n_tickets, 1)
+        # Herfindahl–Hirschman Index on shares
+        shares = [e["count"] / n_tickets for e in leg_counts.values()]
+        plan_dict["hhi"] = round(sum(s * s for s in shares), 4)
+        plan_dict["effective_n_legs"] = round(1.0 / plan_dict["hhi"], 2) if plan_dict["hhi"] > 0 else 0
+    else:
+        plan_dict["concentration_max_pct"] = 0
+        plan_dict["hhi"] = 0
+        plan_dict["effective_n_legs"] = 0
+    plan_dict["diversity_lambda"] = diversity_lambda
+    plan_dict["n_legs_config"] = n_legs
+    plan_dict["kelly_fraction"] = kelly_fraction
 
     # Persist to disk (so reconcile can read it later) AND to webui DB.
     save_plan_json(plan, plans_dir)

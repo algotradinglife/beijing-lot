@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}策略参数 · 北单追踪{% endblock %}
+{% block content %}
+
+<h2 class="mb-3">策略参数</h2>
+
+<div class="alert alert-info">
+  改完后下次"生成计划"会按新参数重算。已生成的计划不会自动重算（如需重新生成请去当期计划页点"使用最新行情重新生成"）。
+</div>
+
+<form method="post" class="card card-body" style="max-width: 720px;">
+
+  <div class="mb-4">
+    <label class="form-label">关数 N</label>
+    <select name="n_legs" class="form-select">
+      {% for n in [2, 3, 4, 5, 6, 7, 8] %}
+        <option value="{{ n }}" {% if n == n_legs %}selected{% endif %}>{{ n }}</option>
+      {% endfor %}
+    </select>
+    <small class="text-muted">
+      8 年回测 N=4 是 Calmar 最优。N=2 Sharpe 高但绝对收益弱；N≥6 在低 Kelly 下崩溃。
+    </small>
+  </div>
+
+  <div class="mb-4">
+    <label class="form-label">Kelly 系数</label>
+    <select name="kelly_fraction" class="form-select">
+      {% for label, val in [('1/32 = 0.0313', 0.03125),
+                            ('1/16 = 0.0625 (推荐)', 0.0625),
+                            ('1/8 = 0.125', 0.125),
+                            ('1/4 = 0.25', 0.25),
+                            ('1/2 = 0.5', 0.5)] %}
+        <option value="{{ val }}" {% if (val - kelly_fraction)|abs < 0.001 %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <small class="text-muted">
+      Kelly 越大 → 收益越高 + 回撤越深。1/16 在 8 年回测下 DD = -37%（可承受）；1/4 = -81%（实操难以承受）。
+    </small>
+  </div>
+
+  <div class="mb-4">
+    <label class="form-label">Diversity λ（多样性强度）</label>
+    <input type="range" name="diversity_lambda" min="0" max="2" step="0.1"
+           value="{{ diversity_lambda }}" class="form-range"
+           oninput="document.getElementById('lam').textContent = this.value">
+    <div class="d-flex justify-content-between">
+      <small>0 = 纯 EV（最强 leg 占满）</small>
+      <small id="lam" class="badge bg-primary">{{ diversity_lambda }}</small>
+      <small>2 = 强分散（牺牲 EV）</small>
+    </div>
+    <small class="text-muted">
+      推荐 0.5（中度分散，最强 leg 不超过 80% 票）。0.3 轻度分散；1.0 强分散。
+    </small>
+  </div>
+
+  <div class="alert alert-warning">
+    <strong>低本金提示</strong>：当资金 &lt; 30,000 元时，N=4 + Kelly=1/16 大概率推不出推荐
+    （Kelly stake 落在 2 元最小注以下被丢弃）。建议改用 N=2 或 N=3 + Kelly=1/4。
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn btn-primary">保存策略参数</button>
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">取消</a>
+  </div>
+</form>
+
+{% endblock %}
