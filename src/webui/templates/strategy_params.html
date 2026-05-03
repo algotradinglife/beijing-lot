@@ -66,6 +66,42 @@
   <hr>
 
   <div class="mb-4">
+    <h5>Mix 模式（双 N 混合策略）</h5>
+    <div class="form-check mb-2">
+      <input type="checkbox" id="mix_enabled" name="mix_enabled" class="form-check-input"
+             {% if mix_enabled %}checked{% endif %}>
+      <label for="mix_enabled" class="form-check-label">启用 mix（同时跑两个 N，按权重分配 bankroll）</label>
+    </div>
+    <div class="row">
+      <div class="col-md-4">
+        <label class="form-label">次级 N（与主 N 不同）</label>
+        <select name="n_legs_secondary" class="form-select">
+          {% for n in [2, 3, 4, 5] %}
+            <option value="{{ n }}" {% if n == n_legs_secondary %}selected{% endif %}>{{ n }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">主 N 权重（次级 = 1 − 主）</label>
+        <input type="range" name="weight_primary" min="0" max="1" step="0.05"
+               value="{{ weight_primary }}" class="form-range"
+               oninput="document.getElementById('wp').textContent = (this.value*100).toFixed(0) + '%'">
+        <div class="d-flex justify-content-between">
+          <small>0% 主 / 100% 次级</small>
+          <small id="wp" class="badge bg-primary">{{ (weight_primary*100)|round|int }}%</small>
+          <small>100% 主 / 0% 次级</small>
+        </div>
+      </div>
+    </div>
+    <small class="text-muted">
+      回测建议：N=4 为主 + N=2 为次，权重 70% 主（即 30% N=2 + 70% N=4）<br>
+      → 同等利用率下 DD 从 −47% 降到 −30%（CAGR 仅损 10%）
+    </small>
+  </div>
+
+  <hr>
+
+  <div class="mb-4">
     <label class="form-label">
       彩票站佣金率（默认 0 = 无佣金）
     </label>

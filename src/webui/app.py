@@ -166,6 +166,9 @@ def create_app(
                 diversity_lambda = float(request.form.get("diversity_lambda", "0.5"))
                 max_combos = int(request.form.get("max_combos", "50"))
                 commission_rate = float(request.form.get("commission_rate", "0"))
+                mix_enabled = 1 if request.form.get("mix_enabled") else 0
+                n_legs_secondary = int(request.form.get("n_legs_secondary", "2"))
+                weight_primary = float(request.form.get("weight_primary", "0.7"))
             except ValueError:
                 flash("数值无效", "error")
                 return redirect(url_for("strategy_params"))
@@ -184,14 +187,28 @@ def create_app(
             if commission_rate < 0 or commission_rate > 0.20:
                 flash("彩票站佣金率必须在 [0, 0.20]", "error")
                 return redirect(url_for("strategy_params"))
+            if not (0.0 <= weight_primary <= 1.0):
+                flash("Mix 权重必须在 [0, 1]", "error")
+                return redirect(url_for("strategy_params"))
+            if mix_enabled and n_legs_secondary == n_legs:
+                flash("Mix 时主/次 N 必须不同", "error")
+                return redirect(url_for("strategy_params"))
             db.set_config("n_legs", n_legs)
             db.set_config("kelly_fraction", kelly_fraction)
             db.set_config("diversity_lambda", diversity_lambda)
             db.set_config("max_combos", max_combos)
             db.set_config("commission_rate", commission_rate)
+            db.set_config("mix_enabled", mix_enabled)
+            db.set_config("n_legs_secondary", n_legs_secondary)
+            db.set_config("weight_primary", weight_primary)
+            mix_msg = (
+                f" · MIX：{int(weight_primary*100)}% N={n_legs} + "
+                f"{int((1-weight_primary)*100)}% N={n_legs_secondary}"
+                if mix_enabled else ""
+            )
             flash(
                 f"策略已更新：N={n_legs} · Kelly={kelly_fraction:g} · λ={diversity_lambda:g} · "
-                f"max={max_combos} · 佣金={commission_rate*100:.1f}%",
+                f"max={max_combos} · 佣金={commission_rate*100:.1f}%{mix_msg}",
                 "success",
             )
             return redirect(url_for("plan_view"))
@@ -202,6 +219,9 @@ def create_app(
             diversity_lambda=float(db.get_config("diversity_lambda") or 0.5),
             max_combos=int(db.get_config("max_combos") or 50),
             commission_rate=float(db.get_config("commission_rate") or 0.0),
+            mix_enabled=bool(int(db.get_config("mix_enabled") or 0)),
+            n_legs_secondary=int(db.get_config("n_legs_secondary") or 2),
+            weight_primary=float(db.get_config("weight_primary") or 0.7),
         )
 
     @app.route("/edit_bankroll", methods=["GET", "POST"])

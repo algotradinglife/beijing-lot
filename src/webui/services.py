@@ -128,19 +128,78 @@ def generate_plan(
     diversity_lambda = float(db.get_config("diversity_lambda") or 0.5)
     max_combos = int(db.get_config("max_combos") or 50)
     commission_rate = float(db.get_config("commission_rate") or 0.0)
-    plan = build_weekly_plan(
-        snapshots,
-        bankroll=state.active,
-        niche_config=cfg,
-        n_legs=n_legs,
-        kelly_fraction=kelly_fraction,
-        weekly_stake_cap_frac=WEEKLY_STAKE_CAP_FRAC,
-        diversity_lambda=diversity_lambda,
-        max_combos=max_combos,
-        now=now,
-    )
-    plan_dict = plan.to_dict()
-    plan_dict["live_db_empty"] = len(snapshots) == 0
+    # Mix mode: split bankroll across two N values
+    mix_enabled = bool(int(db.get_config("mix_enabled") or 0))
+    n_legs_secondary = int(db.get_config("n_legs_secondary") or 2)
+    weight_primary = float(db.get_config("weight_primary") or 0.7)
+    if mix_enabled and abs(weight_primary - 1.0) > 1e-6:
+        # Run primary leg with bankroll * weight, secondary with bankroll * (1-weight)
+        bankroll_p = state.active * weight_primary
+        bankroll_s = state.active * (1.0 - weight_primary)
+        plan_p = build_weekly_plan(
+            snapshots, bankroll=bankroll_p, niche_config=cfg,
+            n_legs=n_legs, kelly_fraction=kelly_fraction,
+            weekly_stake_cap_frac=WEEKLY_STAKE_CAP_FRAC,
+            diversity_lambda=diversity_lambda, max_combos=max_combos, now=now,
+        )
+        plan_s = build_weekly_plan(
+            snapshots, bankroll=bankroll_s, niche_config=cfg,
+            n_legs=n_legs_secondary, kelly_fraction=kelly_fraction,
+            weekly_stake_cap_frac=WEEKLY_STAKE_CAP_FRAC,
+            diversity_lambda=diversity_lambda, max_combos=max_combos, now=now,
+        )
+        # Merge: tag tickets with their N, combine
+        plan_p_dict = plan_p.to_dict()
+        plan_s_dict = plan_s.to_dict()
+        for t in plan_p_dict.get("tickets", []):
+            t["leg_source"] = f"N={n_legs}"
+        for t in plan_s_dict.get("tickets", []):
+            t["leg_source"] = f"N={n_legs_secondary}"
+        plan_dict = dict(plan_p_dict)
+        plan_dict["tickets"] = plan_p_dict.get("tickets", []) + plan_s_dict.get("tickets", [])
+        plan_dict["total_stake"] = (
+            int(plan_p_dict.get("total_stake", 0)) + int(plan_s_dict.get("total_stake", 0))
+        )
+        plan_dict["expected_total_return"] = (
+            float(plan_p_dict.get("expected_total_return", 0))
+            + float(plan_s_dict.get("expected_total_return", 0))
+        )
+        plan_dict["n_qualified_legs"] = max(
+            plan_p_dict.get("n_qualified_legs", 0),
+            plan_s_dict.get("n_qualified_legs", 0),
+        )
+        plan_dict["mix_enabled"] = True
+        plan_dict["weight_primary"] = weight_primary
+        plan_dict["n_legs_primary"] = n_legs
+        plan_dict["n_legs_secondary"] = n_legs_secondary
+        plan_dict["primary_stake"] = int(plan_p_dict.get("total_stake", 0))
+        plan_dict["secondary_stake"] = int(plan_s_dict.get("total_stake", 0))
+        # Persist primary plan json (reconcile uses it as base)
+        save_plan_json(plan_p, plans_dir)
+        # Save secondary alongside with suffix for traceability
+        from src.phase5a.planner import PlanResult  # noqa
+        # Save secondary plan separately
+        sec_path = Path(plans_dir) / f"{plan_s.plan_id}_secondary.json"
+        sec_path.parent.mkdir(parents=True, exist_ok=True)
+        import json as _json
+        sec_path.write_text(_json.dumps(plan_s_dict, ensure_ascii=False))
+        db.upsert_plan(plan_p.plan_id, plan_p.generated_at, plan_dict)
+        plan_dict["live_db_empty"] = len(snapshots) == 0
+    else:
+        plan = build_weekly_plan(
+            snapshots,
+            bankroll=state.active,
+            niche_config=cfg,
+            n_legs=n_legs,
+            kelly_fraction=kelly_fraction,
+            weekly_stake_cap_frac=WEEKLY_STAKE_CAP_FRAC,
+            diversity_lambda=diversity_lambda,
+            max_combos=max_combos,
+            now=now,
+        )
+        plan_dict = plan.to_dict()
+        plan_dict["live_db_empty"] = len(snapshots) == 0
+        plan_dict["mix_enabled"] = False
     # Diagnostic: per-leg appearance counts for diversity visualization
     leg_counts: Dict[str, Dict[str, Any]] = {}
     for ticket in plan_dict.get("tickets", []):
@@ -179,8 +238,9 @@ def generate_plan(
     plan_dict["expected_commission"] = float(plan_dict.get("total_stake", 0)) * commission_rate
 
     # Persist to disk (so reconcile can read it later) AND to webui DB.
-    save_plan_json(plan, plans_dir)
-    db.upsert_plan(plan.plan_id, plan.generated_at, plan_dict)
+    if not mix_enabled:
+        save_plan_json(plan, plans_dir)
+        db.upsert_plan(plan.plan_id, plan.generated_at, plan_dict)
     return plan_dict
 
 
