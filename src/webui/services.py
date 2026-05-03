@@ -137,29 +137,43 @@ def generate_plan(
     n_legs_secondary = int(db.get_config("n_legs_secondary") or 2)
     weight_primary_legacy = float(db.get_config("weight_primary") or 0.7)
     if mix_enabled and (w2 + w3 + w4) > 0:
-        # 3-way mix path
+        # 3-way mix path with per-N Kelly + lambda overrides
         wsum = w2 + w3 + w4
         w2, w3, w4 = w2/wsum, w3/wsum, w4/wsum
+        # Per-N overrides (fall back to global if not set)
+        kelly_n2 = float(db.get_config("kelly_n2") or kelly_fraction)
+        kelly_n3 = float(db.get_config("kelly_n3") or kelly_fraction)
+        kelly_n4 = float(db.get_config("kelly_n4") or kelly_fraction)
+        lambda_n2 = float(db.get_config("lambda_n2") if db.get_config("lambda_n2") is not None else diversity_lambda)
+        lambda_n3 = float(db.get_config("lambda_n3") if db.get_config("lambda_n3") is not None else diversity_lambda)
+        lambda_n4 = float(db.get_config("lambda_n4") if db.get_config("lambda_n4") is not None else diversity_lambda)
+        per_n_params = {
+            2: (w2, kelly_n2, lambda_n2),
+            3: (w3, kelly_n3, lambda_n3),
+            4: (w4, kelly_n4, lambda_n4),
+        }
         merged_tickets = []
         total_stake = 0
         expected_return = 0.0
         n_qual_legs = 0
-        for n_val, weight in [(2, w2), (3, w3), (4, w4)]:
+        for n_val, (weight, k_n, lam_n) in per_n_params.items():
             if weight <= 0:
                 continue
             sub_bankroll = state.active * weight
-            if sub_bankroll < 100:  # too small to bet
+            if sub_bankroll < 100:
                 continue
             plan_n = build_weekly_plan(
                 snapshots, bankroll=sub_bankroll, niche_config=cfg,
-                n_legs=n_val, kelly_fraction=kelly_fraction,
+                n_legs=n_val, kelly_fraction=k_n,
                 weekly_stake_cap_frac=WEEKLY_STAKE_CAP_FRAC,
-                diversity_lambda=diversity_lambda, max_combos=max_combos, now=now,
+                diversity_lambda=lam_n, max_combos=max_combos, now=now,
             )
             pn = plan_n.to_dict()
             for t in pn.get("tickets", []):
                 t["leg_source"] = f"N={n_val}"
                 t["mix_weight"] = round(weight, 2)
+                t["leg_kelly"] = k_n
+                t["leg_lambda"] = lam_n
                 merged_tickets.append(t)
             total_stake += int(pn.get("total_stake", 0))
             expected_return += float(pn.get("expected_total_return", 0))
@@ -180,6 +194,8 @@ def generate_plan(
             tickets=merged_tickets,
             mix_enabled=True,
             mix_weights=dict(n2=round(w2, 3), n3=round(w3, 3), n4=round(w4, 3)),
+            mix_kelly=dict(n2=kelly_n2, n3=kelly_n3, n4=kelly_n4),
+            mix_lambda=dict(n2=lambda_n2, n3=lambda_n3, n4=lambda_n4),
         )
         # Persist merged plan to disk for reconcile
         plans_dir = Path(plans_dir)

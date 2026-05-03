@@ -276,10 +276,17 @@ def create_app(
                 max_combos = int(request.form.get("max_combos", "50"))
                 commission_rate = float(request.form.get("commission_rate", "0"))
                 mix_enabled = 1 if request.form.get("mix_enabled") else 0
-                # 3-way mix weights (raw, will be normalized at use time)
+                # 3-way mix weights
                 mix_w2 = float(request.form.get("mix_weight_n2", "0"))
                 mix_w3 = float(request.form.get("mix_weight_n3", "0"))
                 mix_w4 = float(request.form.get("mix_weight_n4", "1"))
+                # Per-N Kelly + lambda overrides (only used when mix enabled)
+                kelly_n2 = float(request.form.get("kelly_n2") or kelly_fraction)
+                kelly_n3 = float(request.form.get("kelly_n3") or kelly_fraction)
+                kelly_n4 = float(request.form.get("kelly_n4") or kelly_fraction)
+                lambda_n2 = float(request.form.get("lambda_n2") if request.form.get("lambda_n2") is not None else diversity_lambda)
+                lambda_n3 = float(request.form.get("lambda_n3") if request.form.get("lambda_n3") is not None else diversity_lambda)
+                lambda_n4 = float(request.form.get("lambda_n4") if request.form.get("lambda_n4") is not None else diversity_lambda)
                 # Legacy fields kept for backward compat
                 n_legs_secondary = int(request.form.get("n_legs_secondary", "2"))
                 weight_primary = float(request.form.get("weight_primary", "0.7"))
@@ -315,6 +322,12 @@ def create_app(
             db.set_config("mix_weight_n2", mix_w2)
             db.set_config("mix_weight_n3", mix_w3)
             db.set_config("mix_weight_n4", mix_w4)
+            db.set_config("kelly_n2", kelly_n2)
+            db.set_config("kelly_n3", kelly_n3)
+            db.set_config("kelly_n4", kelly_n4)
+            db.set_config("lambda_n2", lambda_n2)
+            db.set_config("lambda_n3", lambda_n3)
+            db.set_config("lambda_n4", lambda_n4)
             mix_msg = ""
             if mix_enabled:
                 ws = mix_w2 + mix_w3 + mix_w4
@@ -340,6 +353,12 @@ def create_app(
             mix_w2=float(db.get_config("mix_weight_n2") or 0.0),
             mix_w3=float(db.get_config("mix_weight_n3") or 0.0),
             mix_w4=float(db.get_config("mix_weight_n4") or 1.0),
+            kelly_n2=float(db.get_config("kelly_n2") or 0.0625),
+            kelly_n3=float(db.get_config("kelly_n3") or 0.0625),
+            kelly_n4=float(db.get_config("kelly_n4") or 0.0625),
+            lambda_n2=float(db.get_config("lambda_n2") if db.get_config("lambda_n2") is not None else 0.5),
+            lambda_n3=float(db.get_config("lambda_n3") if db.get_config("lambda_n3") is not None else 0.5),
+            lambda_n4=float(db.get_config("lambda_n4") if db.get_config("lambda_n4") is not None else 0.5),
         )
 
     @app.route("/edit_bankroll", methods=["GET", "POST"])

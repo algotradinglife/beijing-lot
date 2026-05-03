@@ -72,26 +72,38 @@
              {% if mix_enabled %}checked{% endif %}>
       <label for="mix_enabled" class="form-check-label">启用 mix（按权重分配 bankroll 到 N=2/3/4）</label>
     </div>
-    <div class="row">
-      <div class="col-md-4">
-        <label class="form-label">N=2 权重 <span id="lbl_w2" class="badge bg-primary">{{ "%.2f"|format(mix_w2) }}</span></label>
-        <input type="range" name="mix_weight_n2" min="0" max="1" step="0.05"
-               value="{{ mix_w2 }}" class="form-range"
-               oninput="updateMixLabels()">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">N=3 权重 <span id="lbl_w3" class="badge bg-primary">{{ "%.2f"|format(mix_w3) }}</span></label>
-        <input type="range" name="mix_weight_n3" min="0" max="1" step="0.05"
-               value="{{ mix_w3 }}" class="form-range"
-               oninput="updateMixLabels()">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">N=4 权重 <span id="lbl_w4" class="badge bg-primary">{{ "%.2f"|format(mix_w4) }}</span></label>
-        <input type="range" name="mix_weight_n4" min="0" max="1" step="0.05"
-               value="{{ mix_w4 }}" class="form-range"
-               oninput="updateMixLabels()">
-      </div>
-    </div>
+    <table class="table table-sm" style="background:#fafaf7;">
+      <thead><tr>
+        <th>N</th><th>权重</th><th>Kelly</th><th>λ (diversity)</th>
+      </tr></thead>
+      <tbody>
+        {% for n, w_val, k_val, l_val in [(2, mix_w2, kelly_n2, lambda_n2), (3, mix_w3, kelly_n3, lambda_n3), (4, mix_w4, kelly_n4, lambda_n4)] %}
+        <tr>
+          <td><strong>N={{ n }}</strong></td>
+          <td style="width:30%">
+            <input type="range" name="mix_weight_n{{ n }}" min="0" max="1" step="0.05"
+                   value="{{ w_val }}" class="form-range" style="width:100%"
+                   oninput="updateMixLabels()">
+            <small id="lbl_w{{ n }}" class="badge bg-primary">{{ "%.2f"|format(w_val) }}</small>
+          </td>
+          <td>
+            <select name="kelly_n{{ n }}" class="form-select form-select-sm">
+              {% for kl, kv in [('1/32', 0.03125), ('1/16', 0.0625), ('1/8', 0.125), ('1/4', 0.25), ('1/2', 0.5)] %}
+                <option value="{{ kv }}" {% if (kv - k_val)|abs < 0.001 %}selected{% endif %}>{{ kl }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>
+            <select name="lambda_n{{ n }}" class="form-select form-select-sm">
+              {% for lv in [0.0, 0.3, 0.5, 1.0, 2.0] %}
+                <option value="{{ lv }}" {% if (lv - l_val)|abs < 0.01 %}selected{% endif %}>{{ lv }}</option>
+              {% endfor %}
+            </select>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     <div class="mt-2"><small id="mix_summary" class="text-muted"></small></div>
     <script>
       function updateMixLabels() {
@@ -112,9 +124,10 @@
       }
       window.addEventListener('DOMContentLoaded', updateMixLabels);
     </script>
-    <small class="text-muted mt-2">
-      回测建议：30% N=2 + 40% N=3 + 30% N=4，K=1/16，max=200，+7% 佣金 → Sharpe 1.52，DD -8%（全网格最优）<br>
-      mix 关闭时使用上方"关数 N"作为单一 N。
+    <small class="text-muted mt-2 d-block">
+      <strong>回测建议（Sharpe 1.52, DD -8%）</strong>：N=2 (0.30, K=1/32, λ=0) + N=3 (0.40, K=1/32, λ=0) + N=4 (0.30, K=1/32, λ=0)，max=200, +7% 佣金<br>
+      <strong>每 N 单独 Kelly/λ 的好处</strong>：N=2 方差小可用 K=1/8；N=4 方差大用 K=1/32 控制 DD；λ 一般低 N 用 0（候选多不需分散），高 N 用 0.5（候选少需分散）<br>
+      mix 关闭时使用上方"关数 N" + 全局 Kelly/λ 作为单一 N。
     </small>
   </div>
 
