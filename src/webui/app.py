@@ -276,6 +276,11 @@ def create_app(
                 max_combos = int(request.form.get("max_combos", "50"))
                 commission_rate = float(request.form.get("commission_rate", "0"))
                 mix_enabled = 1 if request.form.get("mix_enabled") else 0
+                # 3-way mix weights (raw, will be normalized at use time)
+                mix_w2 = float(request.form.get("mix_weight_n2", "0"))
+                mix_w3 = float(request.form.get("mix_weight_n3", "0"))
+                mix_w4 = float(request.form.get("mix_weight_n4", "1"))
+                # Legacy fields kept for backward compat
                 n_legs_secondary = int(request.form.get("n_legs_secondary", "2"))
                 weight_primary = float(request.form.get("weight_primary", "0.7"))
             except ValueError:
@@ -296,11 +301,8 @@ def create_app(
             if commission_rate < 0 or commission_rate > 0.20:
                 flash("彩票站佣金率必须在 [0, 0.20]", "error")
                 return redirect(url_for("strategy_params"))
-            if not (0.0 <= weight_primary <= 1.0):
-                flash("Mix 权重必须在 [0, 1]", "error")
-                return redirect(url_for("strategy_params"))
-            if mix_enabled and n_legs_secondary == n_legs:
-                flash("Mix 时主/次 N 必须不同", "error")
+            if mix_enabled and (mix_w2 + mix_w3 + mix_w4) <= 0:
+                flash("Mix 模式下至少一个 N 权重 > 0", "error")
                 return redirect(url_for("strategy_params"))
             db.set_config("n_legs", n_legs)
             db.set_config("kelly_fraction", kelly_fraction)
@@ -310,11 +312,15 @@ def create_app(
             db.set_config("mix_enabled", mix_enabled)
             db.set_config("n_legs_secondary", n_legs_secondary)
             db.set_config("weight_primary", weight_primary)
-            mix_msg = (
-                f" · MIX：{int(weight_primary*100)}% N={n_legs} + "
-                f"{int((1-weight_primary)*100)}% N={n_legs_secondary}"
-                if mix_enabled else ""
-            )
+            db.set_config("mix_weight_n2", mix_w2)
+            db.set_config("mix_weight_n3", mix_w3)
+            db.set_config("mix_weight_n4", mix_w4)
+            mix_msg = ""
+            if mix_enabled:
+                ws = mix_w2 + mix_w3 + mix_w4
+                if ws > 0:
+                    p2, p3, p4 = mix_w2/ws*100, mix_w3/ws*100, mix_w4/ws*100
+                    mix_msg = f" · MIX: N=2 {p2:.0f}% / N=3 {p3:.0f}% / N=4 {p4:.0f}%"
             flash(
                 f"策略已更新：N={n_legs} · Kelly={kelly_fraction:g} · λ={diversity_lambda:g} · "
                 f"max={max_combos} · 佣金={commission_rate*100:.1f}%{mix_msg}",
@@ -331,6 +337,9 @@ def create_app(
             mix_enabled=bool(int(db.get_config("mix_enabled") or 0)),
             n_legs_secondary=int(db.get_config("n_legs_secondary") or 2),
             weight_primary=float(db.get_config("weight_primary") or 0.7),
+            mix_w2=float(db.get_config("mix_weight_n2") or 0.0),
+            mix_w3=float(db.get_config("mix_weight_n3") or 0.0),
+            mix_w4=float(db.get_config("mix_weight_n4") or 1.0),
         )
 
     @app.route("/edit_bankroll", methods=["GET", "POST"])

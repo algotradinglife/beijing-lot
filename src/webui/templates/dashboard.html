@@ -62,14 +62,9 @@
   </div></div></div>
 </div>
 
-<div class="d-flex gap-2 mb-3">
-  <form method="post" action="{{ url_for('plan_generate') }}">
-    <button class="btn btn-primary">刷新行情 + 生成计划</button>
-  </form>
-  <form method="post" action="{{ url_for('reconcile') }}">
-    <button class="btn btn-success">刷新结算 (Reconcile)</button>
-  </form>
+<div class="d-flex gap-2 mb-3 align-items-center">
   <a href="{{ url_for('plan_view') }}" class="btn btn-outline-primary">查看当期计划</a>
+  <small class="text-muted">行情每 5-15 min 自动 poll · 结算每页面访问自动 reconcile · Dashboard 60 秒刷新</small>
 </div>
 
 <div class="card mb-4">

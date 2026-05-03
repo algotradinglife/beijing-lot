@@ -66,36 +66,55 @@
   <hr>
 
   <div class="mb-4">
-    <h5>Mix 模式（双 N 混合策略）</h5>
-    <div class="form-check mb-2">
+    <h5>Mix 模式（3 路 N=2/3/4 自由配比）</h5>
+    <div class="form-check mb-3">
       <input type="checkbox" id="mix_enabled" name="mix_enabled" class="form-check-input"
              {% if mix_enabled %}checked{% endif %}>
-      <label for="mix_enabled" class="form-check-label">启用 mix（同时跑两个 N，按权重分配 bankroll）</label>
+      <label for="mix_enabled" class="form-check-label">启用 mix（按权重分配 bankroll 到 N=2/3/4）</label>
     </div>
     <div class="row">
       <div class="col-md-4">
-        <label class="form-label">次级 N（与主 N 不同）</label>
-        <select name="n_legs_secondary" class="form-select">
-          {% for n in [2, 3, 4, 5] %}
-            <option value="{{ n }}" {% if n == n_legs_secondary %}selected{% endif %}>{{ n }}</option>
-          {% endfor %}
-        </select>
+        <label class="form-label">N=2 权重 <span id="lbl_w2" class="badge bg-primary">{{ "%.2f"|format(mix_w2) }}</span></label>
+        <input type="range" name="mix_weight_n2" min="0" max="1" step="0.05"
+               value="{{ mix_w2 }}" class="form-range"
+               oninput="updateMixLabels()">
       </div>
-      <div class="col-md-8">
-        <label class="form-label">主 N 权重（次级 = 1 − 主）</label>
-        <input type="range" name="weight_primary" min="0" max="1" step="0.05"
-               value="{{ weight_primary }}" class="form-range"
-               oninput="document.getElementById('wp').textContent = (this.value*100).toFixed(0) + '%'">
-        <div class="d-flex justify-content-between">
-          <small>0% 主 / 100% 次级</small>
-          <small id="wp" class="badge bg-primary">{{ (weight_primary*100)|round|int }}%</small>
-          <small>100% 主 / 0% 次级</small>
-        </div>
+      <div class="col-md-4">
+        <label class="form-label">N=3 权重 <span id="lbl_w3" class="badge bg-primary">{{ "%.2f"|format(mix_w3) }}</span></label>
+        <input type="range" name="mix_weight_n3" min="0" max="1" step="0.05"
+               value="{{ mix_w3 }}" class="form-range"
+               oninput="updateMixLabels()">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">N=4 权重 <span id="lbl_w4" class="badge bg-primary">{{ "%.2f"|format(mix_w4) }}</span></label>
+        <input type="range" name="mix_weight_n4" min="0" max="1" step="0.05"
+               value="{{ mix_w4 }}" class="form-range"
+               oninput="updateMixLabels()">
       </div>
     </div>
-    <small class="text-muted">
-      回测建议：N=4 为主 + N=2 为次，权重 70% 主（即 30% N=2 + 70% N=4）<br>
-      → 同等利用率下 DD 从 −47% 降到 −30%（CAGR 仅损 10%）
+    <div class="mt-2"><small id="mix_summary" class="text-muted"></small></div>
+    <script>
+      function updateMixLabels() {
+        const w2 = parseFloat(document.getElementsByName('mix_weight_n2')[0].value);
+        const w3 = parseFloat(document.getElementsByName('mix_weight_n3')[0].value);
+        const w4 = parseFloat(document.getElementsByName('mix_weight_n4')[0].value);
+        document.getElementById('lbl_w2').textContent = w2.toFixed(2);
+        document.getElementById('lbl_w3').textContent = w3.toFixed(2);
+        document.getElementById('lbl_w4').textContent = w4.toFixed(2);
+        const s = w2 + w3 + w4;
+        if (s > 0) {
+          const p2 = (w2/s*100).toFixed(0), p3 = (w3/s*100).toFixed(0), p4 = (w4/s*100).toFixed(0);
+          document.getElementById('mix_summary').textContent =
+            `归一化：N=2 ${p2}% / N=3 ${p3}% / N=4 ${p4}%`;
+        } else {
+          document.getElementById('mix_summary').textContent = '（请至少一个权重 > 0）';
+        }
+      }
+      window.addEventListener('DOMContentLoaded', updateMixLabels);
+    </script>
+    <small class="text-muted mt-2">
+      回测建议：30% N=2 + 40% N=3 + 30% N=4，K=1/16，max=200，+7% 佣金 → Sharpe 1.52，DD -8%（全网格最优）<br>
+      mix 关闭时使用上方"关数 N"作为单一 N。
     </small>
   </div>
 

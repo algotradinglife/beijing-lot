@@ -128,11 +128,68 @@ def generate_plan(
     diversity_lambda = float(db.get_config("diversity_lambda") or 0.5)
     max_combos = int(db.get_config("max_combos") or 50)
     commission_rate = float(db.get_config("commission_rate") or 0.0)
-    # Mix mode: split bankroll across two N values
+    # Mix mode: split bankroll across N=2 / N=3 / N=4 by 3 weights (sum auto-norm)
     mix_enabled = bool(int(db.get_config("mix_enabled") or 0))
+    w2 = float(db.get_config("mix_weight_n2") or 0.0)
+    w3 = float(db.get_config("mix_weight_n3") or 0.0)
+    w4 = float(db.get_config("mix_weight_n4") or 1.0)
+    # Legacy 2-way fallback
     n_legs_secondary = int(db.get_config("n_legs_secondary") or 2)
-    weight_primary = float(db.get_config("weight_primary") or 0.7)
-    if mix_enabled and abs(weight_primary - 1.0) > 1e-6:
+    weight_primary_legacy = float(db.get_config("weight_primary") or 0.7)
+    if mix_enabled and (w2 + w3 + w4) > 0:
+        # 3-way mix path
+        wsum = w2 + w3 + w4
+        w2, w3, w4 = w2/wsum, w3/wsum, w4/wsum
+        merged_tickets = []
+        total_stake = 0
+        expected_return = 0.0
+        n_qual_legs = 0
+        for n_val, weight in [(2, w2), (3, w3), (4, w4)]:
+            if weight <= 0:
+                continue
+            sub_bankroll = state.active * weight
+            if sub_bankroll < 100:  # too small to bet
+                continue
+            plan_n = build_weekly_plan(
+                snapshots, bankroll=sub_bankroll, niche_config=cfg,
+                n_legs=n_val, kelly_fraction=kelly_fraction,
+                weekly_stake_cap_frac=WEEKLY_STAKE_CAP_FRAC,
+                diversity_lambda=diversity_lambda, max_combos=max_combos, now=now,
+            )
+            pn = plan_n.to_dict()
+            for t in pn.get("tickets", []):
+                t["leg_source"] = f"N={n_val}"
+                t["mix_weight"] = round(weight, 2)
+                merged_tickets.append(t)
+            total_stake += int(pn.get("total_stake", 0))
+            expected_return += float(pn.get("expected_total_return", 0))
+            n_qual_legs = max(n_qual_legs, pn.get("n_qualified_legs", 0))
+        # Build merged plan dict (use N=4 plan_id as canonical week id)
+        from src.phase5a.planner import iso_week_id
+        wk = iso_week_id(now or datetime.now(timezone.utc))
+        plan_dict = dict(
+            plan_id=wk,
+            generated_at=(now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            bankroll=float(state.active),
+            n_legs=n_legs,  # primary for legacy compat
+            kelly_fraction=kelly_fraction,
+            n_open_matches=len(snapshots),
+            n_qualified_legs=n_qual_legs,
+            total_stake=total_stake,
+            expected_total_return=expected_return,
+            tickets=merged_tickets,
+            mix_enabled=True,
+            mix_weights=dict(n2=round(w2, 3), n3=round(w3, 3), n4=round(w4, 3)),
+        )
+        # Persist merged plan to disk for reconcile
+        plans_dir = Path(plans_dir)
+        plans_dir.mkdir(parents=True, exist_ok=True)
+        import json as _json
+        (plans_dir / f"{wk}.json").write_text(_json.dumps(plan_dict, ensure_ascii=False))
+        db.upsert_plan(wk, plan_dict["generated_at"], plan_dict)
+        plan_dict["live_db_empty"] = len(snapshots) == 0
+    elif mix_enabled and abs(weight_primary_legacy - 1.0) > 1e-6:
+        weight_primary = weight_primary_legacy
         # Run primary leg with bankroll * weight, secondary with bankroll * (1-weight)
         bankroll_p = state.active * weight_primary
         bankroll_s = state.active * (1.0 - weight_primary)
