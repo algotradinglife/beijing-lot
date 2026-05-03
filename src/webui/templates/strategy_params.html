@@ -53,6 +53,34 @@
     </small>
   </div>
 
+  <div class="mb-4">
+    <label class="form-label">每周组合票上限 (max_combos)</label>
+    <input type="number" name="max_combos" min="1" max="5000" step="1"
+           value="{{ max_combos }}" class="form-control">
+    <small class="text-muted">
+      实操上每周最多买多少张组合票。回测显示：25 张 + λ=2 → Sharpe 0.87（最高）；
+      100 张 + λ=0.3 → CAGR 16% / Sharpe 0.79；500+ 张 → CAGR 100%+ 但 DD 也大。
+    </small>
+  </div>
+
+  <hr>
+
+  <div class="mb-4">
+    <label class="form-label">
+      彩票站佣金率（默认 0 = 无佣金）
+    </label>
+    <div class="input-group">
+      <input type="number" name="commission_rate" min="0" max="0.20" step="0.01"
+             value="{{ commission_rate }}" class="form-control">
+      <span class="input-group-text">×总下注 = 每周返点</span>
+    </div>
+    <small class="text-muted">
+      若你或亲友运营/入股彩票站，每周下注的总额会按此比例返佣（叠加到 PnL）。<br>
+      典型值：0 = 无佣金（默认）；0.07 = 标准 7% 佣金；0.035 = 50% 入股 = 3.5% 佣金。<br>
+      <strong>注意</strong>：仅作账面计算。线下你需要实际收到佣金后才有现金价值。
+    </small>
+  </div>
+
   <div class="alert alert-warning">
     <strong>低本金提示</strong>：当资金 &lt; 30,000 元时，N=4 + Kelly=1/16 大概率推不出推荐
     （Kelly stake 落在 2 元最小注以下被丢弃）。建议改用 N=2 或 N=3 + Kelly=1/4。

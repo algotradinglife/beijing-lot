@@ -45,6 +45,10 @@
     <div class="col-md-3"><div class="card"><div class="card-body">
       <small class="text-muted">总下注 / 期望回收</small>
       <h5>{{ plan.total_stake }} → {{ "%.0f"|format(plan.expected_total_return) }} 元</h5>
+      {% if plan.commission_rate and plan.commission_rate > 0 %}
+        <small class="text-success">+ 佣金 {{ "%.0f"|format(plan.expected_commission) }} 元
+          ({{ "%.1f"|format(plan.commission_rate*100) }}%)</small>
+      {% endif %}
     </div></div></div>
   </div>
 

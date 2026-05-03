@@ -241,3 +241,40 @@
 2026-05-03 14:00:39,437 INFO live_collector.scheduler |   merged: 382 unique matches
 2026-05-03 14:00:39,707 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
 2026-05-03 14:00:39,709 INFO live_collector | sleeping 392s
+2026-05-03 14:07:12,220 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-03T06:07:12Z
+2026-05-03 14:07:13,468 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-03 14:07:16,065 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-03 14:07:16,067 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-03 14:07:16,310 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-03 14:07:16,311 INFO live_collector | sleeping 467s
+2026-05-03 14:15:05,936 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-03T06:15:05Z
+2026-05-03 14:15:06,609 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-03 14:15:09,314 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-03 14:15:09,317 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-03 14:15:09,764 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-03 14:15:09,765 INFO live_collector | sleeping 450s
+2026-05-03 14:22:39,908 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-03T06:22:39Z
+2026-05-03 14:22:41,698 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-03 14:22:44,341 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-03 14:22:44,343 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-03 14:22:44,672 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-03 14:22:45,867 INFO live_collector.scheduler | settle issue=26051 wrote 238 settlement rows
+2026-05-03 14:22:45,868 INFO live_collector | sleeping 618s
+2026-05-03 14:33:04,629 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-03T06:33:04Z
+2026-05-03 14:33:06,047 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-03 14:33:08,901 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-03 14:33:08,902 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-03 14:33:09,137 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-03 14:33:09,139 INFO live_collector | sleeping 371s
+2026-05-03 14:39:20,270 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-03T06:39:20Z
+2026-05-03 14:39:21,845 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-03 14:39:24,712 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-03 14:39:24,715 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-03 14:39:24,977 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-03 14:39:24,979 INFO live_collector | sleeping 848s
+2026-05-03 14:53:33,488 INFO live_collector.scheduler | poll start issue=26051 ts=2026-05-03T06:53:33Z
+2026-05-03 14:53:34,616 INFO live_collector.scheduler |   500.com bjdc: 382 rows
+2026-05-03 14:53:37,583 INFO live_collector.scheduler |   zgzcw bdplay: 382 rows
+2026-05-03 14:53:37,585 INFO live_collector.scheduler |   merged: 382 unique matches
+2026-05-03 14:53:37,814 INFO live_collector.scheduler | poll done: inserted 382 snapshot rows
+2026-05-03 14:53:37,815 INFO live_collector | sleeping 843s

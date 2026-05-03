@@ -126,6 +126,8 @@ def generate_plan(
     n_legs = int(db.get_config("n_legs") or N_LEGS)
     kelly_fraction = float(db.get_config("kelly_fraction") or KELLY_FRACTION)
     diversity_lambda = float(db.get_config("diversity_lambda") or 0.5)
+    max_combos = int(db.get_config("max_combos") or 50)
+    commission_rate = float(db.get_config("commission_rate") or 0.0)
     plan = build_weekly_plan(
         snapshots,
         bankroll=state.active,
@@ -134,6 +136,7 @@ def generate_plan(
         kelly_fraction=kelly_fraction,
         weekly_stake_cap_frac=WEEKLY_STAKE_CAP_FRAC,
         diversity_lambda=diversity_lambda,
+        max_combos=max_combos,
         now=now,
     )
     plan_dict = plan.to_dict()
@@ -171,6 +174,9 @@ def generate_plan(
     plan_dict["diversity_lambda"] = diversity_lambda
     plan_dict["n_legs_config"] = n_legs
     plan_dict["kelly_fraction"] = kelly_fraction
+    plan_dict["max_combos"] = max_combos
+    plan_dict["commission_rate"] = commission_rate
+    plan_dict["expected_commission"] = float(plan_dict.get("total_stake", 0)) * commission_rate
 
     # Persist to disk (so reconcile can read it later) AND to webui DB.
     save_plan_json(plan, plans_dir)
@@ -214,7 +220,10 @@ def reconcile_pending(
             continue
 
         state = get_state(db)
-        new_active = state.active + res.net_pnl
+        # Apply optional commission rebate (彩票站佣金) on top of net PnL.
+        commission_rate = float(db.get_config("commission_rate") or 0.0)
+        commission = float(res.total_stake) * commission_rate
+        new_active = state.active + res.net_pnl + commission
         new_state = BankrollState(
             initial=state.initial, active=new_active,
             locked=state.locked, peak=state.peak,
@@ -229,7 +238,7 @@ def reconcile_pending(
             n_hits=res.n_winning_tickets,
             week_stake=float(res.total_stake),
             week_payout=float(res.gross_payout),
-            week_pnl=float(res.net_pnl),
+            week_pnl=float(res.net_pnl) + commission,
             bankroll_after=new_state.active,
             locked_after=new_state.locked,
             skimmed=skimmed,

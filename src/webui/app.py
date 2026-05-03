@@ -115,6 +115,8 @@ def create_app(
                 n_legs = int(request.form.get("n_legs", "4"))
                 kelly_fraction = float(request.form.get("kelly_fraction", str(1/16)))
                 diversity_lambda = float(request.form.get("diversity_lambda", "0.5"))
+                max_combos = int(request.form.get("max_combos", "50"))
+                commission_rate = float(request.form.get("commission_rate", "0"))
             except ValueError:
                 flash("数值无效", "error")
                 return redirect(url_for("strategy_params"))
@@ -127,11 +129,20 @@ def create_app(
             if diversity_lambda < 0:
                 flash("Diversity λ 必须 ≥ 0", "error")
                 return redirect(url_for("strategy_params"))
+            if max_combos < 1 or max_combos > 5000:
+                flash("max_combos 必须在 1..5000", "error")
+                return redirect(url_for("strategy_params"))
+            if commission_rate < 0 or commission_rate > 0.20:
+                flash("彩票站佣金率必须在 [0, 0.20]", "error")
+                return redirect(url_for("strategy_params"))
             db.set_config("n_legs", n_legs)
             db.set_config("kelly_fraction", kelly_fraction)
             db.set_config("diversity_lambda", diversity_lambda)
+            db.set_config("max_combos", max_combos)
+            db.set_config("commission_rate", commission_rate)
             flash(
-                f"策略已更新：N={n_legs} · Kelly={kelly_fraction:g} · λ={diversity_lambda:g}",
+                f"策略已更新：N={n_legs} · Kelly={kelly_fraction:g} · λ={diversity_lambda:g} · "
+                f"max={max_combos} · 佣金={commission_rate*100:.1f}%",
                 "success",
             )
             return redirect(url_for("plan_view"))
@@ -140,6 +151,8 @@ def create_app(
             n_legs=int(db.get_config("n_legs") or 4),
             kelly_fraction=float(db.get_config("kelly_fraction") or 1/16),
             diversity_lambda=float(db.get_config("diversity_lambda") or 0.5),
+            max_combos=int(db.get_config("max_combos") or 50),
+            commission_rate=float(db.get_config("commission_rate") or 0.0),
         )
 
     @app.route("/edit_bankroll", methods=["GET", "POST"])
