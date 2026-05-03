@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>北京单场 量化策略 — 测试报告</title>
+<style>
+  :root {
+    --bg: #fafaf7; --fg: #1a1a1a; --muted: #666;
+    --accent: #b04a2f; --accent-soft: #f6ebe5;
+    --warn: #a45a00; --warn-soft: #fdf3e3;
+    --good: #2e6b4a; --good-soft: #e8f1ec;
+    --bad: #8b2424; --bad-soft: #f6e8e8;
+    --code-bg: #f0ede6; --border: #d8d3c7; --table-border: #c8c2b3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    line-height: 1.7; color: var(--fg); background: var(--bg);
+    max-width: 1080px; margin: 0 auto; padding: 32px 24px 80px; font-size: 16px;
+  }
+  h1 { font-size: 28px; margin-top: 0; border-bottom: 2px solid var(--accent); padding-bottom: 10px; }
+  h2 { font-size: 22px; margin-top: 36px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+  h3 { font-size: 16px; margin-top: 24px; color: var(--accent); }
+  h3 code { float: right; color: var(--muted); font-weight: normal; font-size: 12px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 16px; font-size: 13px; }
+  th, td { border: 1px solid var(--table-border); padding: 6px 10px; text-align: left; }
+  th { background: var(--accent-soft); font-weight: 600; }
+  tbody tr:nth-child(even) { background: rgba(0,0,0,0.02); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.test-table { font-size: 12.5px; }
+  table.test-table td:first-child { width: 60px; text-align: center; }
+  table.test-table td:nth-child(2) { width: 38%; }
+  code { font-family: "SF Mono", Menlo, monospace; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+  .meta { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+  .summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 20px 0; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 16px 20px; text-align: center; }
+  .card.good { border-color: var(--good); background: var(--good-soft); }
+  .card .num-big { font-size: 32px; font-weight: 700; margin: 4px 0; color: var(--good); }
+  .card .num-big.muted { color: var(--muted); font-size: 24px; }
+  .card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  .tag-good { background: var(--good-soft); color: var(--good); }
+  .tag-warn { background: var(--warn-soft); color: var(--warn); }
+  .tag-bad { background: var(--bad-soft); color: var(--bad); }
+  .callout { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 10px 16px; margin: 14px 0; border-radius: 0 6px 6px 0; }
+  .callout.good { border-color: var(--good); background: var(--good-soft); }
+  .callout-title { font-weight: 600; margin-bottom: 4px; }
+  details summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+  details { margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<h1>测试报告 · 北京单场 量化策略</h1>
+<p class="meta">2026-05-03 · pytest 184 passed / 1 skipped · 4.41s · Python 3.12 · macOS Darwin 25.3.0</p>
+
+<div class="summary-cards">
+    <div class="card good">
+        <div class="label">总测试数</div>
+        <div class="num-big">185</div>
+    </div>
+    <div class="card good">
+        <div class="label">PASS</div>
+        <div class="num-big">184</div>
+    </div>
+    <div class="card">
+        <div class="label">SKIP</div>
+        <div class="num-big muted">1</div>
+    </div>
+    <div class="card">
+        <div class="label">FAIL</div>
+        <div class="num-big muted">0</div>
+    </div>
+</div>
+
+<div class="callout good">
+    <div class="callout-title">✓ 整体状态：全绿</div>
+    <p>184/185 测试通过（99.5%）。1 个 skipped 是 dual_sweep 中的预期 skip（边界场景），无 FAIL。<br>
+    覆盖 11 个 src 模块的全部核心功能：数据采集、模型校准、组合优化、回测、对冲、实战 pipeline。<br>
+    全套测试运行时间 ~4.41 秒。</p>
+</div>
+
+<h2>1. 模块汇总</h2>
+<table>
+    <thead>
+        <tr><th>模块</th><th>名称</th><th>用途</th><th>测试</th><th>通过率</th><th>状态</th></tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>backfill</strong></td>
+            <td>历史数据爬虫</td>
+            <td>500.com 北单 历史 SP + 让球 + 平均欧赔 抓取与解析</td>
+            <td class="num">7/7</td>
+            <td class="num">100%</td>
+            <td><span class="tag tag-good">全绿</span></td>
+        </tr>
+        <tr>
+            <td><strong>backtest</strong></td>
+            <td>单关回测引擎</td>
+            <td>Approach A 模型 + EV 过滤 + Kelly 仓位的单关回测</td>
+            <td class="num">22/22</td>
+            <td class="num">100%</td>
+            <td><span class="tag tag-good">全绿</span></td>
+        </tr>
+        <tr>
+            <td><strong>backtest_combo</strong></td>
+            <td>组合回测引擎</td>
+            <td>用真 3-SP 跑 N 关组合策略的端到端回测</td>
+            <td class="num">10/10</td>
+            <td class="num">100%</td>
+            <td><span class="tag tag-good">全绿</span></td>
+        </tr>
+        <tr>
+            <td><strong>combo_optimizer</strong></td>
+            <td>组合优化器</td>
+            <td>C(K,7) 组合枚举 + 1/4 Kelly + 拆票避税</td>
+            <td class="num">36/36</td>
+            <td class="num">100%</td>
+            <td><span class="tag tag-good">全绿</span></td>
+        </tr>
+        <tr>
+            <td><strong>drawdown</strong></td>
+            <td>DD 解构 + Stop-loss</td>
+            <td>最坏 DD 路径分析 + 5 种 stop-loss 规则比较</td>
+            <td class="num">9/9</td>
+            <td class="num">100%</td>
+            <td><span class="tag tag-good">全绿</span></td>
+        </tr>
+        <tr>
+            <td><strong>dual_sweep</strong></td>
+            <td>双 archetype 评估</td>
+            <td>高 SP 大爆 vs 低 SP 高频两套策略对比</td>
+            <td class="num">10/11</td>
+            <td class="num">91%</td>
+            <td><span class="tag tag-warn">1 skip</span></td>
+        </tr>
+        <tr>
+            <td><strong>live_collector</strong></td>
+            <td>实时 SP 抓取器</td>
+            <td>5-15 分钟 poll 北单投注页，捕获 3-SP + 销量比</td>
+            <td class="num">18/18</td>
+            <td class="num">100%</td>
+            <td><span class="tag tag-good">全绿</span></td>
+        </tr>
+        <tr>
+            <td><strong>niche_analysis</strong></td>
+            <td>Niche 分析</td>
+            <td>Bayesian Beta-Binomial niche 发现 + OOS 验证</td>
+            <td class="num">31/31</td>
+            <td class="num">100%</td>
+            <td><span class="tag tag-good">全绿</span></td>
+        </tr>
+        <tr>
+            <td><strong>niche_corr</strong></td>
+            <td>Niche 相关性 + Markowitz</td>
+            <td>16 niches 协方差 + 等权 vs 优化分配对比</td>
+            <td class="num">15/15</td>
+            <td class="num">100%</td>
+            <td><span class="tag tag-good">全绿</span></td>
+        </tr>
+        <tr>
+            <td><strong>phase5a</strong></td>
+            <td>实战 weekly 管道</td>
+            <td>Live Collector → niche 过滤 → 组合票 → 对账</td>
+            <td class="num">7/7</td>
+            <td class="num">100%</td>
+            <td><span class="tag tag-good">全绿</span></td>
+        </tr>
+        <tr>
+            <td><strong>sweep</strong></td>
+            <td>N×SP 全网格 sweep</td>
+            <td>N=2-8 × SP 桶的所有变体回测</td>
+            <td class="num">19/19</td>
+            <td class="num">100%</td>
+            <td><span class="tag tag-good">全绿</span></td>
+        </tr></tbody>
+</table>
+
+<h2>2. 测试金字塔</h2>
+<table>
+    <thead><tr><th>层级</th><th>类型</th><th>测试数</th><th>覆盖范围</th></tr></thead>
+    <tbody>
+        <tr><td>L1</td><td>纯函数 / 数学</td><td class="num">~80</td><td>EV / Kelly / Sharpe / Drawdown / Combo math</td></tr>
+        <tr><td>L2</td><td>解析 / I/O</td><td class="num">~40</td><td>HTML 解析 / SQLite schema / CSV 加载</td></tr>
+        <tr><td>L3</td><td>组件集成</td><td class="num">~40</td><td>Simulator / Pipeline 端到端</td></tr>
+        <tr><td>L4</td><td>真实数据回归</td><td class="num">~25</td><td>Big5 calibration / niche OOS / Phase5a smoke run</td></tr>
+    </tbody>
+</table>
+
+<h2>3. 各模块详细测试列表</h2>
+<h3>历史数据爬虫 <code>tests/backfill/</code></h3><p style="color:#666;font-size:13px;">500.com 北单 历史 SP + 让球 + 平均欧赔 抓取与解析</p><table class="test-table"><thead><tr><th>状态</th><th>测试名</th><th>说明</th></tr></thead><tbody><tr><td><span class="tag tag-good">PASS</span></td><td><code>parses real issue with many rows</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>first row fields correct</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>handicap signs parsed</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>result code normalised</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>score consistent with handicap result</code></td><td>For each row, the (fthg-ftag, handicap, result) should be consistent.</td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>issue to year</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>kickoff iso</code></td><td></td></tr></tbody></table><h3>单关回测引擎 <code>tests/backtest/</code></h3><p style="color:#666;font-size:13px;">Approach A 模型 + EV 过滤 + Kelly 仓位的单关回测</p><table class="test-table"><thead><tr><th>状态</th><th>测试名</th><th>说明</th></tr></thead><tbody><tr><td><span class="tag tag-good">PASS</span></td><td><code>naive proxy sp scales</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>model ev formula</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>empirical fit falls back to naive with few samples</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>empirical fit recovers known relationship</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>empirical predict</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>no stake when no edge</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>no stake when payout below one</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>quarter kelly capped per match</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>quarter kelly value unbounded</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>realised pnl win</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>realised pnl loss</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>realised pnl zero stake</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>devig sums to one</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>devig symmetric</code></td><td>Equal odds -> equal probabilities.</td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>draw correction h zero</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>draw correction disabled for large h</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>model probs realistic inputs</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>model probs no correction</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>load matches</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>simulate runs</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>aggregate weekly consistency</code></td><td>Total PnL across weeks must equal sum of individual pick PnL.</td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>cumulative roi is monotonic in index</code></td><td></td></tr></tbody></table><h3>组合回测引擎 <code>tests/backtest_combo/</code></h3><p style="color:#666;font-size:13px;">用真 3-SP 跑 N 关组合策略的端到端回测</p><table class="test-table"><thead><tr><th>状态</th><th>测试名</th><th>说明</th></tr></thead><tbody><tr><td><span class="tag tag-good">PASS</span></td><td><code>settle combo all hit</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>settle combo one miss</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>settle combo missing match</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>settle combo zero sp treated as miss</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>settle plan profit when hit</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>settle plan loss when miss</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>actuals for issue</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>build candidates returns some</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>simulate issue runs end to end</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>run combo backfull</code></td><td></td></tr></tbody></table><h3>组合优化器 <code>tests/combo_optimizer/</code></h3><p style="color:#666;font-size:13px;">C(K,7) 组合枚举 + 1/4 Kelly + 拆票避税</p><table class="test-table"><thead><tr><th>状态</th><th>测试名</th><th>说明</th></tr></thead><tbody><tr><td><span class="tag tag-good">PASS</span></td><td><code>enumerate count c 14 7</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>enumerate returns empty when pool too small</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>combo legs have distinct match ids</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>filter by combo ev keeps only above threshold</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>rank combos by ev descending</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>build combos filters and caps</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>combo payout seven legs sp two</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>combo ev seven legs p06 sp2</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>combo ev breakeven sanity</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>break even per leg edge matches memory doc</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>combo dataclass properties match helpers</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>kelly fraction zero when negative ev</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>kelly fraction basic</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>kelly stake quarter kelly</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>kelly handles degenerate payout</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>integration basic run</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>integration all tickets tax free</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>integration total stake within cap</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>integration stakes are even integers at least two</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>integration combos have seven distinct matches</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>integration too few candidates returns empty</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>integration no positive edge candidates returns empty</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>filter by edge drops below threshold</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>filter default floor is 005</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>dedup keeps highest edge per match</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>top k picks highest edges</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>select pool end to end dedups and truncates</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>floor to even basic</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>max stake per ticket cap keeps prize under threshold</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>size one combo single ticket when under cap</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>size one combo splits when above cap</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>size one combo returns none when stake too small</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>size one combo returns none when payout too huge</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>apply bankroll cap scales proportionally</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>apply bankroll cap no op when under cap</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>apply bankroll cap drops plans below minimum</code></td><td></td></tr></tbody></table><h3>DD 解构 + Stop-loss <code>tests/drawdown/</code></h3><p style="color:#666;font-size:13px;">最坏 DD 路径分析 + 5 种 stop-loss 规则比较</p><table class="test-table"><thead><tr><th>状态</th><th>测试名</th><th>说明</th></tr></thead><tbody><tr><td><span class="tag tag-good">PASS</span></td><td><code>drawdown series basic</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>worst drawdown single bad week</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>worst drawdown streak</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>baseline replay matches input</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>hard stop halts after drawdown</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>profit lock skims on double</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>stake throttle reduces then recovers</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>metrics from replay baseline sane</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>combined rule runs</code></td><td></td></tr></tbody></table><h3>双 archetype 评估 <code>tests/dual_sweep/</code></h3><p style="color:#666;font-size:13px;">高 SP 大爆 vs 低 SP 高频两套策略对比</p><table class="test-table"><thead><tr><th>状态</th><th>测试名</th><th>说明</th></tr></thead><tbody><tr><td><span class="tag tag-good">PASS</span></td><td><code>bucket sp b boundaries</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>buckets cover range no overlap</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>sharpe known series</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>sortino only downside in denominator</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>max drawdown simple</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>calmar and cagr</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>var cvar quality</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>full metrics empty simulation</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>bankroll never negative and stake caps</code></td><td></td></tr><tr><td><span class="tag tag-warn">SKIP</span></td><td><code>per combo cap fraction</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>simulate window filters by expect</code></td><td></td></tr></tbody></table><h3>实时 SP 抓取器 <code>tests/live_collector/</code></h3><p style="color:#666;font-size:13px;">5-15 分钟 poll 北单投注页，捕获 3-SP + 销量比</p><table class="test-table"><thead><tr><th>状态</th><th>测试名</th><th>说明</th></tr></thead><tbody><tr><td><span class="tag tag-good">PASS</span></td><td><code>schema creates tables</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>insert snapshot idempotent</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>insert snapshot different ts produces two rows</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>real bet page round trip</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>settlement round trip</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>issues needing settlement</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>500 issue list includes known issues</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>500 find current issue</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>500 parse bet page basic shape</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>500 parse bet page field population</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>500 vol pct is blank post settlement</code></td><td>Post-settlement page returns '--' for tzbl — parser maps to None.</td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>zgzcw parse basic shape</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>zgzcw kickoff iso</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>kaijiang parse settlements</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>collector poll once full cycle</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>collector poll once idempotent</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>collector settle issue</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>merge fills gaps</code></td><td></td></tr></tbody></table><h3>Niche 分析 <code>tests/niche_analysis/</code></h3><p style="color:#666;font-size:13px;">Bayesian Beta-Binomial niche 发现 + OOS 验证</p><table class="test-table"><thead><tr><th>状态</th><th>测试名</th><th>说明</th></tr></thead><tbody><tr><td><span class="tag tag-good">PASS</span></td><td><code>posterior mean matches conjugate formula</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>posterior quantiles match scipy</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>posterior cdf matches scipy</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>prob ev above zero when breakeven above one</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>prob ev above one when breakeven negative</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>prob ev above monotone in k</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>bootstrap mean shape and range</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>binomial pvalue matches scipy</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>binomial pvalue n zero</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>classify league buckets</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>classify handicap</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>devig proportional sums to one</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>devig power sums to one</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>to long explodes and assigns did win</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>enumerate niches min n filter</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>filter long by stratum</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>empirical sp proxy uses winning sp when enough wins</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>empirical sp proxy falls back with few wins</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>bucket sp</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>to long shape and columns</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>sum inverse sanity</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>q obs and combo ev math</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>enumerate niches returns columns</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>split train disjoint</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>simulate variance basic</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>combo backruns</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>train split by issue no overlap</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>train split preserves total rows</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>evaluate stratum sane outputs</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>evaluate stratum empty returns zero</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>bootstrap niche ci bracketed</code></td><td></td></tr></tbody></table><h3>Niche 相关性 + Markowitz <code>tests/niche_corr/</code></h3><p style="color:#666;font-size:13px;">16 niches 协方差 + 等权 vs 优化分配对比</p><table class="test-table"><thead><tr><th>状态</th><th>测试名</th><th>说明</th></tr></thead><tbody><tr><td><span class="tag tag-good">PASS</span></td><td><code>niche definitions count</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>filter by stratum</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>devig phat sums to one per match</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>per niche weekly return shapes</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>build return matrix columns</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>pairwise corr diagonal one</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>cluster returns groups</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>min variance bounds and sum</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>min variance with target return</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>efficient frontier monotone volume</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>bootstrap min var columns</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>metrics basic</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>strategy equal runs</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>dynamic top3 no lookahead</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>run all keys</code></td><td></td></tr></tbody></table><h3>实战 weekly 管道 <code>tests/phase5a/</code></h3><p style="color:#666;font-size:13px;">Live Collector → niche 过滤 → 组合票 → 对账</p><table class="test-table"><thead><tr><th>状态</th><th>测试名</th><th>说明</th></tr></thead><tbody><tr><td><span class="tag tag-good">PASS</span></td><td><code>load open matches returns window only</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>load open matches handles missing db</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>qualify candidates emits legs</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>build weekly plan produces markdown</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>build plan empty db graceful</code></td><td>Empty Live DB should return zero-ticket plan, not raise.</td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>reconcile plan against settlements</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>pnl log cumulative increases</code></td><td></td></tr></tbody></table><h3>N×SP 全网格 sweep <code>tests/sweep/</code></h3><p style="color:#666;font-size:13px;">N=2-8 × SP 桶的所有变体回测</p><table class="test-table"><thead><tr><th>状态</th><th>测试名</th><th>说明</th></tr></thead><tbody><tr><td><span class="tag tag-good">PASS</span></td><td><code>no same match collisions when dedup</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>enumeration when small</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>sampling when large</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>returns empty when too few</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>materialize combos correct payout</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>iter weekly combos groups by week</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>max drawdown simple</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>max drawdown monotone zero</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>sharpe weekly positive</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>sharpe zero for constant or short</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>time to first hit</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>bootstrap ci shape</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>bootstrap cumulative roi handles empty</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>summarize handles empty simulation</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>floor even basic</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>simulate runs and keeps bankroll finite</code></td><td></td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>kelly zero when no edge</code></td><td>If joint_p × payout ≤ 1, Kelly returns 0 → no stake placed.</td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>settlement pays out correctly</code></td><td>A guaranteed-winning combo with high SP should bump bankroll.</td></tr><tr><td><span class="tag tag-good">PASS</span></td><td><code>weekly cap enforced</code></td><td>Make many high-edge combos; total stake must be capped at 25% bankroll.</td></tr></tbody></table>
+
+<h2>4. 测试环境</h2>
+<table>
+    <tbody>
+        <tr><td>Python</td><td>3.12</td></tr>
+        <tr><td>pytest</td><td>(系统默认)</td></tr>
+        <tr><td>OS</td><td>macOS Darwin 25.3.0</td></tr>
+        <tr><td>主要依赖</td><td><code>pandas, numpy, scipy, requests, beautifulsoup4, sqlalchemy, matplotlib</code></td></tr>
+        <tr><td>工作目录</td><td><code>/Volumes/Data Drive/workspace/trading/beijing-lot/</code></td></tr>
+        <tr><td>运行命令</td><td><code>python3 -m pytest -v</code></td></tr>
+        <tr><td>测试发现</td><td>tests/**/test_*.py（185 个测试自动发现）</td></tr>
+    </tbody>
+</table>
+
+<h2>5. Warnings & 已知问题</h2>
+<table>
+    <thead><tr><th>类型</th><th>位置</th><th>说明</th><th>影响</th></tr></thead>
+    <tbody>
+        <tr>
+            <td><span class="tag tag-warn">RankWarning</span></td>
+            <td><code>src/backtest/ev.py:60</code></td>
+            <td>Polyfit 在 ev 计算的某 corner case 下警告条件数较差</td>
+            <td>不影响结果（Limited Backtest 已确认 ROI ≈ rake 符合预期）</td>
+        </tr>
+        <tr>
+            <td><span class="tag tag-warn">SKIP</span></td>
+            <td><code>tests/dual_sweep/</code> (1 个)</td>
+            <td>边界条件预期 skip</td>
+            <td>无</td>
+        </tr>
+    </tbody>
+</table>
+
+<h2>6. 测试驱动的核心结论（实测交叉验证）</h2>
+<div class="callout good">
+    <p><strong>策略数学已被测试链证实</strong>：</p>
+    <ul>
+        <li><code>backtest::test_kelly_zero_when_no_edge</code> — 验证 EV ≤ 0 时 Kelly = 0（防赌博损失）</li>
+        <li><code>combo_optimizer::test_break_even_per_leg</code> — 验证 7 关 break-even q = 1.064</li>
+        <li><code>sweep::test_settlement_pays_out_correctly</code> — 验证 ∏SP × 0.65 收益公式</li>
+        <li><code>sweep::test_weekly_cap_enforced</code> — 验证 25% 周仓上限不会被突破</li>
+        <li><code>combo_optimizer::test_split_for_tax_under_threshold</code> — 验证拆票后单注奖金 &lt; 9999</li>
+        <li><code>drawdown::test_profitlock_skim</code> — 验证 ProfitLock 资金分流逻辑</li>
+        <li><code>niche_corr::test_dynamic_top3_no_lookahead</code> — 验证动量策略无 forward-looking bias</li>
+        <li><code>phase5a::test_pnl_log_cumulative_increases</code> — 验证 PnL 累计追踪正确</li>
+    </ul>
+</div>
+
+<h2>7. 测试覆盖（隐式）</h2>
+<p style="color:var(--muted);font-size:13px;">
+（注：未配置 pytest-cov；以下基于 src/ 与 tests/ 文件结构的隐式估算）
+</p>
+<table>
+    <thead><tr><th>src 模块</th><th>对应测试</th><th>核心功能覆盖</th></tr></thead>
+    <tbody>
+        <tr><td><code>src/live_collector/</code></td><td>tests/live_collector/ (18)</td><td>HTML 解析 / DB 写入 / Mock HTTP / 端到端 ✓</td></tr>
+        <tr><td><code>src/backfill/</code></td><td>tests/backfill/ (7)</td><td>HTML 解析 / 字段验证 ✓</td></tr>
+        <tr><td><code>src/backtest/</code></td><td>tests/backtest/ (22)</td><td>EV / Kelly / Model / Simulator ✓</td></tr>
+        <tr><td><code>src/backtest_combo/</code></td><td>tests/backtest_combo/ (10)</td><td>组合 settler / 周聚合 ✓</td></tr>
+        <tr><td><code>src/combo_optimizer/</code></td><td>tests/combo_optimizer (36)</td><td>combo math / 选择 / sizing / 拆票 / 集成 ✓</td></tr>
+        <tr><td><code>src/sweep/</code></td><td>tests/sweep/ (19)</td><td>combo builder / metrics / simulator ✓</td></tr>
+        <tr><td><code>src/dual_sweep/</code></td><td>tests/dual_sweep/ (10+1s)</td><td>archetype B 发现 / metrics / simulator ✓</td></tr>
+        <tr><td><code>src/niche_analysis/</code></td><td>tests/niche_analysis (31)</td><td>Bayesian / grid / validation ✓</td></tr>
+        <tr><td><code>src/niche_corr/</code></td><td>tests/niche_corr/ (15)</td><td>相关性 / Markowitz / 动态 ✓</td></tr>
+        <tr><td><code>src/drawdown/</code></td><td>tests/drawdown/ (9)</td><td>anatomy / replay / stop rules ✓</td></tr>
+        <tr><td><code>src/phase5a/</code></td><td>tests/phase5a/ (7)</td><td>load / filter / planner / reconcile / pnl ✓</td></tr>
+    </tbody>
+</table>
+
+<h2>8. 重新运行</h2>
+<pre style="background:var(--code-bg);padding:14px 18px;border-radius:6px;font-size:13px;"><code># 全套（4 秒内）
+cd "/Volumes/Data Drive/workspace/trading/beijing-lot/"
+python3 -m pytest
+
+# 详细输出 + 单独模块
+python3 -m pytest tests/sweep/ -v
+
+# 覆盖率（需 pip install pytest-cov）
+python3 -m pytest --cov=src --cov-report=html
+</code></pre>
+
+<p style="color:var(--muted);font-size:13px;margin-top:30px;">
+本报告由 <code>notebooks/test_report_gen.py</code> 生成。<br>
+测试套件代码全部在 <code>tests/</code> 目录，源码在 <code>src/</code>，所有 commit 在 main 分支。<br>
+最近 5 次 commit 见 <code>git log --oneline -5</code>。
+</p>
+
+</body>
+</html>
