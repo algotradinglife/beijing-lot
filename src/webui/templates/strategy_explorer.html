@@ -19,7 +19,11 @@
   <div class="col-md-3">
     <label class="form-label small">筛选 N</label>
     <select id="filter_n" class="form-select form-select-sm">
-      <option value="">全部</option><option value="3">3</option><option value="4">4</option>
+      <option value="">全部</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4">4</option>
+      <option value="mix">仅 mix 配置</option>
     </select>
   </div>
   <div class="col-md-3">
@@ -82,13 +86,22 @@
 <script>
 const grid = {{ grid_json|safe }};
 
-// Parse cell key: "N3_K0.0625_L0.50_M50_C0.000"
+// Parse cell key: "N3_K0.0625_L0.50_M50_C0.000" or
+// "MIX_P4_S2_W0.70_K0.0625_L0.50_M50_C0.000"
 function parseKey(k) {
-  const m = k.match(/^N(\d+)_K([\d.]+)_L([\d.]+)_M(\d+)_C([\d.]+)$/);
-  return m ? {
+  let m = k.match(/^N(\d+)_K([\d.]+)_L([\d.]+)_M(\d+)_C([\d.]+)$/);
+  if (m) return {
     n_legs: +m[1], kelly: +m[2], lambda: +m[3],
-    max_combos: +m[4], commission: +m[5],
-  } : null;
+    max_combos: +m[4], commission: +m[5], is_mix: false,
+  };
+  m = k.match(/^MIX_P(\d+)_S(\d+)_W([\d.]+)_K([\d.]+)_L([\d.]+)_M(\d+)_C([\d.]+)$/);
+  if (m) return {
+    n_legs: +m[1],  // primary N for filtering
+    n_secondary: +m[2], weight_primary: +m[3],
+    kelly: +m[4], lambda: +m[5],
+    max_combos: +m[6], commission: +m[7], is_mix: true,
+  };
+  return null;
 }
 
 const allRows = Object.entries(grid).map(([k, v]) => {
@@ -108,11 +121,15 @@ function applyFilters() {
   const fN = document.getElementById('filter_n').value;
   const fL = document.getElementById('filter_lambda').value;
   const fC = document.getElementById('filter_comm').value;
-  return allRows.filter(r =>
-    (!fN || r.n_legs === +fN) &&
-    (!fL || Math.abs(r.lambda - +fL) < 0.01) &&
-    (!fC || Math.abs(r.commission - +fC) < 0.001)
-  );
+  return allRows.filter(r => {
+    let nOK;
+    if (!fN) nOK = true;
+    else if (fN === 'mix') nOK = r.is_mix;
+    else nOK = !r.is_mix && r.n_legs === +fN;
+    return nOK
+      && (!fL || Math.abs(r.lambda - +fL) < 0.01)
+      && (!fC || Math.abs(r.commission - +fC) < 0.001);
+  });
 }
 
 function sortRows(rows) {
@@ -124,6 +141,9 @@ function sortRows(rows) {
 }
 
 function fmtCfg(r) {
+  if (r.is_mix) {
+    return `MIX ${(r.weight_primary*100).toFixed(0)}% N=${r.n_legs} + ${((1-r.weight_primary)*100).toFixed(0)}% N=${r.n_secondary}, K=${r.kelly.toFixed(4)}, λ=${r.lambda}, max=${r.max_combos}, 佣金=${(r.commission*100).toFixed(0)}%`;
+  }
   return `N=${r.n_legs}, K=${r.kelly.toFixed(4)}, λ=${r.lambda}, max=${r.max_combos}, 佣金=${(r.commission*100).toFixed(0)}%`;
 }
 
@@ -138,8 +158,8 @@ function renderTable() {
   const rows = sortRows(applyFilters()).slice(0, 80);
   const tbody = document.getElementById('config_tbody');
   tbody.innerHTML = rows.map(r => `
-    <tr data-key="${r.key}">
-      <td>${r.n_legs}</td>
+    <tr data-key="${r.key}" ${r.is_mix ? 'style="background:#fdf3c4"' : ''}>
+      <td>${r.is_mix ? `MIX ${(r.weight_primary*100).toFixed(0)}/${((1-r.weight_primary)*100).toFixed(0)}<br><small>P=${r.n_legs} S=${r.n_secondary}</small>` : r.n_legs}</td>
       <td>${r.kelly.toFixed(4)}</td>
       <td>${r.lambda}</td>
       <td>${r.max_combos}</td>
