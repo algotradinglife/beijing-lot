@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}当期计划 {{ week_id }} · 北单追踪{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-0">当期计划 · {{ week_id }}</h3>
+    <small class="text-muted">
+      活跃本金 {{ "%.0f"|format(state.active) }} 元 ·
+      周下注上限 25% = {{ "%.0f"|format(state.active * 0.25) }} 元
+    </small>
+  </div>
+  <form method="post" action="{{ url_for('plan_generate') }}">
+    <button class="btn btn-primary">使用最新行情重新生成</button>
+  </form>
+</div>
+
+{% if not live_db_exists %}
+<div class="alert alert-warning">
+  Live Collector 未启动 / 数据库不存在。请先采集行情。
+</div>
+{% endif %}
+
+{% if not plan %}
+<div class="card">
+  <div class="card-body text-center">
+    <p class="lead">本周尚未生成计划。</p>
+    <form method="post" action="{{ url_for('plan_generate') }}">
+      <button class="btn btn-lg btn-primary">生成计划</button>
+    </form>
+  </div>
+</div>
+{% else %}
+
+  <div class="row mb-3">
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <small class="text-muted">候选场次</small><h4>{{ plan.n_open_matches }}</h4>
+    </div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <small class="text-muted">合格腿</small><h4>{{ plan.n_qualified_legs }}</h4>
+    </div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <small class="text-muted">推荐票数</small><h4>{{ plan.tickets|length }}</h4>
+    </div></div></div>
+    <div class="col-md-3"><div class="card"><div class="card-body">
+      <small class="text-muted">总下注 / 期望回收</small>
+      <h5>{{ plan.total_stake }} → {{ "%.0f"|format(plan.expected_total_return) }} 元</h5>
+    </div></div></div>
+  </div>
+
+  {% if plan.tickets %}
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>推荐组合票（{{ plan.tickets|length }} 张）</span>
+      {% if plan_meta and plan_meta.placed_ts %}
+        <span class="badge bg-success">已下注 · {{ plan_meta.placed_ts }}</span>
+      {% else %}
+        <form method="post" action="{{ url_for('plan_place') }}" class="d-inline">
+          <input type="hidden" name="plan_id" value="{{ week_id }}">
+          <button class="btn btn-sm btn-success">标记已下注</button>
+        </form>
+      {% endif %}
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0">
+        <thead><tr>
+          <th>#</th><th>组合腿 (match:选项@SP)</th>
+          <th class="text-end">联合 SP</th>
+          <th class="text-end">单注 / 张数</th>
+          <th class="text-end">总下注</th>
+          <th class="text-end">单票奖金</th>
+          <th>免税?</th>
+          <th class="text-end">EV</th>
+        </tr></thead>
+        <tbody>
+        {% for t in plan.tickets %}
+          <tr>
+            <td>{{ t.ticket_no }}</td>
+            <td><small>
+              {% for leg in t.legs %}
+                {{ leg.match_id }}:{{ {'3':'胜','1':'平','0':'负'}.get(leg.selection|string, leg.selection) }}@{{ "%.2f"|format(leg.sp) }}
+                {% if not loop.last %} + {% endif %}
+              {% endfor %}
+            </small></td>
+            <td class="text-end">{{ "%.2f"|format(t.joint_sp) }}</td>
+            <td class="text-end">{{ t.stake_per_ticket }} × {{ t.n_tickets }}</td>
+            <td class="text-end">{{ t.total_stake }}</td>
+            <td class="text-end">{{ "%.0f"|format(t.prize_per_ticket) }}</td>
+            <td>
+              {% if t.is_tax_free %}<span class="badge bg-success">Y</span>
+              {% else %}<span class="badge bg-warning">N</span>{% endif %}
+            </td>
+            <td class="text-end">{{ "%.3f"|format(t.ev) }}</td>
+          </tr>
+          <tr class="table-light">
+            <td></td>
+            <td colspan="7"><small class="text-muted">
+              {% for leg in t.legs %}
+                {% if leg.home %}{{ leg.home }} vs {{ leg.away }}{% if leg.kickoff_ts %} · {{ leg.kickoff_ts }}{% endif %} ({{ leg.rule }}){% if not loop.last %} | {% endif %}{% endif %}
+              {% endfor %}
+            </small></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-info">
+    没有合格的组合票（候选场次 / SP 不在 niche 区间，或子两元下注）。
+  </div>
+  {% endif %}
+
+{% endif %}
+
+{% endblock %}

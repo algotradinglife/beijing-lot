@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}重置 · 北单追踪{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card border-danger">
+      <div class="card-body">
+        <h4 class="card-title text-danger">重置所有数据</h4>
+        <p>这将清空 webui 数据库中的：</p>
+        <ul>
+          <li>初始资金 / 活跃 / 锁定</li>
+          <li>所有已生成计划</li>
+          <li>所有结算记录</li>
+        </ul>
+        <p class="text-muted">
+          <strong>不会</strong>影响 Live Collector 数据库或 Phase 5a 计划 JSON 文件。
+        </p>
+        <form method="post" action="{{ url_for('reset') }}">
+          <button class="btn btn-danger" onclick="return confirm('确认清空所有 webui 数据？')">
+            确认重置
+          </button>
+          <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">取消</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

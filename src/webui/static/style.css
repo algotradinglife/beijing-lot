@@ -1,0 +1,6 @@
+/* Minimal custom tweaks on top of Bootstrap 5. */
+body { background: #f5f7fa; }
+.navbar-brand { font-weight: 600; }
+.card { border: 0; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.card-header { background: #fafbfc; font-weight: 600; }
+table small { color: #6c757d; }

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · 北单追踪{% endblock %}
+{% block content %}
+
+{% if not live_db_exists %}
+<div class="alert alert-warning">
+  <strong>Live Collector 未启动 / 无数据。</strong>
+  请先运行 <code>python -m src.live_collector</code> 采集行情，再生成计划。
+</div>
+{% endif %}
+
+<div class="row mb-4">
+  <div class="col-md-4">
+    <div class="card text-bg-primary">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-1">总财富</h6>
+        <h2 class="card-title mb-0">{{ "%.0f"|format(state.total) }} 元</h2>
+        <small>初始 {{ "%.0f"|format(state.initial) }} · 累计 PnL {{ "%+.0f"|format(state.cumulative_pnl) }} ({{ "%.2f"|format(state.cumulative_roi * 100) }}%)</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-1 text-muted">活跃本金</h6>
+        <h3 class="card-title mb-0">{{ "%.0f"|format(state.active) }} 元</h3>
+        <small>峰值 {{ "%.0f"|format(state.peak) }}</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-1 text-muted">已锁定（ProfitLock）</h6>
+        <h3 class="card-title mb-0">{{ "%.0f"|format(state.locked) }} 元</h3>
+        <small>触发: 活跃 ≥ 峰值×2 时锁 30%</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-md-3"><div class="card"><div class="card-body">
+    <small class="text-muted">已活跃周数</small>
+    <h4>{{ stats.n_weeks }}</h4>
+  </div></div></div>
+  <div class="col-md-3"><div class="card"><div class="card-body">
+    <small class="text-muted">命中率</small>
+    <h4>{{ "%.1f"|format(stats.hit_rate * 100) }}%</h4>
+    <small>{{ stats.n_hits }}/{{ stats.n_combos }}</small>
+  </div></div></div>
+  <div class="col-md-3"><div class="card"><div class="card-body">
+    <small class="text-muted">Sharpe (年化)</small>
+    <h4>{{ "%.2f"|format(stats.sharpe) }}</h4>
+  </div></div></div>
+  <div class="col-md-3"><div class="card"><div class="card-body">
+    <small class="text-muted">最大回撤</small>
+    <h4>{{ "%.1f"|format(stats.max_drawdown * 100) }}%</h4>
+  </div></div></div>
+</div>
+
+<div class="d-flex gap-2 mb-3">
+  <form method="post" action="{{ url_for('plan_generate') }}">
+    <button class="btn btn-primary">刷新行情 + 生成计划</button>
+  </form>
+  <form method="post" action="{{ url_for('reconcile') }}">
+    <button class="btn btn-success">刷新结算 (Reconcile)</button>
+  </form>
+  <a href="{{ url_for('plan_view') }}" class="btn btn-outline-primary">查看当期计划</a>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">权益曲线 (活跃 / 锁定 / 总额)</div>
+  <div class="card-body">
+    <div id="equity-chart" style="height:400px"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">最近 5 期结算</div>
+  <div class="card-body">
+    {% if recent %}
+    <table class="table table-sm">
+      <thead><tr>
+        <th>期号</th><th>时间</th><th>票数</th><th>命中</th>
+        <th class="text-end">下注</th><th class="text-end">回收</th>
+        <th class="text-end">PnL</th><th class="text-end">活跃后</th><th class="text-end">锁定后</th>
+      </tr></thead>
+      <tbody>
+        {% for s in recent %}
+        <tr>
+          <td>{{ s.week_id }}</td>
+          <td><small>{{ s.settled_ts }}</small></td>
+          <td>{{ s.n_combos }}</td>
+          <td>{{ s.n_hits }}</td>
+          <td class="text-end">{{ "%.0f"|format(s.week_stake) }}</td>
+          <td class="text-end">{{ "%.0f"|format(s.week_payout) }}</td>
+          <td class="text-end {{ 'text-success' if s.week_pnl >= 0 else 'text-danger' }}">
+            {{ "%+.0f"|format(s.week_pnl) }}
+          </td>
+          <td class="text-end">{{ "%.0f"|format(s.bankroll_after) }}</td>
+          <td class="text-end">{{ "%.0f"|format(s.locked_after) }}{% if s.skimmed %} <small class="text-success">+{{ "%.0f"|format(s.skimmed) }}</small>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted mb-0">暂无结算记录。下注后回到此页点击"刷新结算"。</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+<script>
+  const equity = {{ equity|tojson }};
+  if (equity.length > 0) {
+    const x = equity.map(p => p.week_id);
+    const data = [
+      { x, y: equity.map(p => p.active), name: '活跃', mode: 'lines+markers', line: { color: '#0d6efd' } },
+      { x, y: equity.map(p => p.locked), name: '锁定', mode: 'lines+markers', line: { color: '#198754' } },
+      { x, y: equity.map(p => p.total),  name: '总额', mode: 'lines+markers', line: { color: '#212529', width: 3 } },
+    ];
+    Plotly.newPlot('equity-chart', data, {
+      margin: { t: 10, l: 60, r: 20, b: 50 },
+      xaxis: { title: '期号' }, yaxis: { title: '元' },
+      legend: { orientation: 'h' },
+    }, { responsive: true });
+  } else {
+    document.getElementById('equity-chart').innerHTML =
+      '<p class="text-muted text-center mt-5">暂无数据，结算后将出现曲线。</p>';
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}初始化 · 北单追踪{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card">
+      <div class="card-body">
+        <h3 class="card-title">首次启动 · 设置初始资金</h3>
+        <p class="text-muted">
+          这是一个本地单用户工具。请输入起始本金（元）。
+          策略默认 N=4 腿，Kelly 分数 1/16，周下注上限 25% 本金。
+        </p>
+        <form method="post" action="{{ url_for('setup') }}">
+          <div class="mb-3">
+            <label class="form-label">初始资金 (元)</label>
+            <input type="number" step="1" min="1" name="initial_bankroll"
+                   class="form-control" placeholder="例如 100000" required autofocus>
+          </div>
+          <button type="submit" class="btn btn-primary">开始追踪</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

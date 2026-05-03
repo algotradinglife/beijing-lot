@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}历史 · 北单追踪{% endblock %}
+{% block content %}
+
+<h3 class="mb-3">历史计划与结算</h3>
+
+<div class="card mb-4">
+  <div class="card-header">所有计划</div>
+  <div class="card-body p-0">
+    {% if plans %}
+    <table class="table table-sm mb-0">
+      <thead><tr>
+        <th>期号</th><th>生成时间</th><th>下注时间</th><th>结算</th>
+        <th class="text-end">PnL</th>
+        <th class="text-end">活跃后</th>
+        <th class="text-end">锁定后</th>
+      </tr></thead>
+      <tbody>
+        {% for p in plans %}
+          {% set s = settle_by_week.get(p.plan_id) %}
+          <tr>
+            <td><strong>{{ p.plan_id }}</strong></td>
+            <td><small>{{ p.created_ts }}</small></td>
+            <td><small>{{ p.placed_ts or '—' }}</small></td>
+            <td>
+              {% if s %}<span class="badge bg-success">已结算</span>
+              {% elif p.placed_ts %}<span class="badge bg-warning">待结算</span>
+              {% else %}<span class="badge bg-secondary">未下注</span>{% endif %}
+            </td>
+            <td class="text-end {{ 'text-success' if s and s.week_pnl >= 0 else 'text-danger' if s }}">
+              {% if s %}{{ "%+.0f"|format(s.week_pnl) }}{% else %}—{% endif %}
+            </td>
+            <td class="text-end">{% if s %}{{ "%.0f"|format(s.bankroll_after) }}{% else %}—{% endif %}</td>
+            <td class="text-end">{% if s %}{{ "%.0f"|format(s.locked_after) }}{% if s.skimmed %} <small class="text-success">+{{ "%.0f"|format(s.skimmed) }}</small>{% endif %}{% else %}—{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted m-3">暂无计划。</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">所有结算 (按期号倒序)</div>
+  <div class="card-body p-0">
+    {% if settlements %}
+    <table class="table table-sm mb-0">
+      <thead><tr>
+        <th>期号</th><th>结算时间</th><th>票/中</th>
+        <th class="text-end">下注</th><th class="text-end">回收</th>
+        <th class="text-end">PnL</th>
+        <th class="text-end">活跃后</th><th class="text-end">锁定后</th>
+        <th class="text-end">本期锁定</th>
+      </tr></thead>
+      <tbody>
+        {% for s in settlements %}
+        <tr>
+          <td>{{ s.week_id }}</td>
+          <td><small>{{ s.settled_ts }}</small></td>
+          <td>{{ s.n_hits }}/{{ s.n_combos }}</td>
+          <td class="text-end">{{ "%.0f"|format(s.week_stake) }}</td>
+          <td class="text-end">{{ "%.0f"|format(s.week_payout) }}</td>
+          <td class="text-end {{ 'text-success' if s.week_pnl >= 0 else 'text-danger' }}">
+            {{ "%+.0f"|format(s.week_pnl) }}
+          </td>
+          <td class="text-end">{{ "%.0f"|format(s.bankroll_after) }}</td>
+          <td class="text-end">{{ "%.0f"|format(s.locked_after) }}</td>
+          <td class="text-end">{{ "%.0f"|format(s.skimmed or 0) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-muted m-3">暂无结算记录。</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
