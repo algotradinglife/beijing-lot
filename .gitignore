@@ -1,8 +1,22 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
 .pytest_cache/
+
+# OS
 .DS_Store
 
-# parallel-agent live-collector data (out of this workstream's scope)
-data/beidan_live.db*
+# Editor / agent caches
+.claude/
+.idea/
+.vscode/
+
+# Runtime data — never commit (DBs, logs, generated plans/reports/PnL,
+# precomputed grids, scraped caches). ~64MB total, mostly machine-specific.
+data/
+
+# Local generated artifacts at repo root
+*.html
+*.zip

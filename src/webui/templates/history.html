@@ -33,7 +33,7 @@
                     待结算 {{ prog.settled }}/{{ prog.total }} ({{ prog.pct|int }}%)
                   </span>
                 {% else %}
-                  <span class="badge bg-warning">待结算</span>
+                  <span class="badge bg-secondary" title="plan 中无票数据">已下注（无票）</span>
                 {% endif %}
               {% else %}<span class="badge bg-secondary">未下注</span>{% endif %}
             </td>

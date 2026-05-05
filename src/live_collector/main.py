@@ -97,8 +97,15 @@ def main():
             poll_n += 1
             try:
                 coll.poll_once()
-                if not args.no_settle and poll_n % 4 == 1:
+                if not args.no_settle:
+                    # Issue-level kaijiang every cycle — one HTTP request,
+                    # cheap; previously gated to %4 caused 20–60min stalls
+                    # when kaijiang was published between cycles.
                     coll.settle_pending()
+                    # Per-match livescore fallback every 4th cycle (heavier:
+                    # multiple HTTP fetches across fids on live.500.com)
+                    if poll_n % 4 == 1:
+                        coll.settle_per_match()
             except Exception as e:
                 log.exception("poll failed: %s", e)
 

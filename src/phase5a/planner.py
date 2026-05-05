@@ -75,6 +75,7 @@ class PlanResult:
                             home=getattr(self.snap_by_match.get(leg.match_id), "home", None),
                             away=getattr(self.snap_by_match.get(leg.match_id), "away", None),
                             league=getattr(self.snap_by_match.get(leg.match_id), "league", None),
+                            handicap=getattr(self.snap_by_match.get(leg.match_id), "handicap_line", None),
                         )
                         for leg in t.combo.legs
                     ],

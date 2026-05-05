@@ -37,13 +37,28 @@ class NicheRule:
     handicap_class: Optional[str] = None
 
 
+_LEAGUE_Q_PATH = Path(__file__).parent / "league_quality.json"
+
+
+def _load_league_q() -> dict:
+    if _LEAGUE_Q_PATH.exists():
+        try:
+            return json.loads(_LEAGUE_Q_PATH.read_text())
+        except Exception:
+            return {}
+    return {}
+
+
 @dataclass(frozen=True)
 class NicheConfig:
     return_rate: float
     rules: tuple[NicheRule, ...] = field(default_factory=tuple)
+    league_q_min: float = 0.0  # if > 0, only legs from leagues with historical q ≥ this pass
+    league_q_table: tuple = field(default_factory=tuple)  # (league, q) pairs
 
     @classmethod
-    def load(cls, path: str | Path | None = None) -> "NicheConfig":
+    def load(cls, path: str | Path | None = None,
+             league_q_min: float = 0.0) -> "NicheConfig":
         p = Path(path) if path else DEFAULT_NICHES_PATH
         data = json.loads(p.read_text())
         rules = tuple(
@@ -58,7 +73,24 @@ class NicheConfig:
             )
             for r in data.get("rules", [])
         )
-        return cls(return_rate=float(data.get("return_rate", 0.65)), rules=rules)
+        lq = _load_league_q()
+        lq_table = tuple((k, float(v["q"])) for k, v in lq.items())
+        return cls(return_rate=float(data.get("return_rate", 0.65)),
+                   rules=rules,
+                   league_q_min=float(league_q_min),
+                   league_q_table=lq_table)
+
+    def league_passes(self, league: str | None) -> bool:
+        """Return True if `league` is allowed under the q_min filter.
+        Unknown leagues default to allowed (avoid hiding new ones)."""
+        if self.league_q_min <= 0:
+            return True
+        if not league:
+            return True
+        for name, q in self.league_q_table:
+            if name == league:
+                return q >= self.league_q_min
+        return True  # unknown — be permissive
 
 
 def _matches(
@@ -108,6 +140,8 @@ def qualify_candidates(
     """
     out: List[QualifiedCandidate] = []
     for snap in snapshots:
+        if not config.league_passes(snap.league):
+            continue
         league_tier = classify_league(snap.league)
         handicap_class = classify_handicap(snap.handicap_line)
         for option_code, sp in _option_iter(snap):

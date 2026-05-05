@@ -14,7 +14,7 @@ from __future__ import annotations
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable, List, Optional
 
@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS matches (
     away            TEXT,
     handicap_line   REAL,
     status          TEXT DEFAULT 'open',
+    fid             TEXT,
     created_ts      TEXT DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(issue, match_idx)
 );
@@ -68,9 +69,17 @@ CREATE TABLE IF NOT EXISTS settlements (
     avg_eu_d        REAL,
     avg_eu_a        REAL,
     settled_ts      TEXT DEFAULT CURRENT_TIMESTAMP,
+    source          TEXT,
     FOREIGN KEY(match_id) REFERENCES matches(match_id)
 );
 """
+
+
+def _migrate(conn) -> None:
+    """Idempotent schema migrations on existing DBs."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(settlements)").fetchall()}
+    if "source" not in cols:
+        conn.execute("ALTER TABLE settlements ADD COLUMN source TEXT")
 
 
 def _utcnow_iso() -> str:
@@ -85,6 +94,18 @@ class Database:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(SCHEMA)
+        # Idempotent migration: add fid column if existing table predates it
+        try:
+            cols = [r[1] for r in self._conn.execute(
+                "PRAGMA table_info(matches)").fetchall()]
+            if "fid" not in cols:
+                self._conn.execute("ALTER TABLE matches ADD COLUMN fid TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            _migrate(self._conn)
+        except sqlite3.OperationalError:
+            pass
 
     def close(self):
         self._conn.close()
@@ -107,17 +128,19 @@ class Database:
         with self.tx() as cur:
             cur.execute(
                 "INSERT OR IGNORE INTO matches(match_id, issue, match_idx, league, "
-                "kickoff_ts, home, away, handicap_line) VALUES (?,?,?,?,?,?,?,?)",
+                "kickoff_ts, home, away, handicap_line, fid) "
+                "VALUES (?,?,?,?,?,?,?,?,?)",
                 (mid, snap.issue, snap.match_idx, snap.league, snap.kickoff_ts,
-                 snap.home, snap.away, snap.handicap_line),
+                 snap.home, snap.away, snap.handicap_line, snap.fid),
             )
             cur.execute(
                 "UPDATE matches SET league=COALESCE(?, league), "
                 "kickoff_ts=COALESCE(?, kickoff_ts), home=COALESCE(?, home), "
-                "away=COALESCE(?, away), handicap_line=COALESCE(?, handicap_line) "
+                "away=COALESCE(?, away), handicap_line=COALESCE(?, handicap_line), "
+                "fid=COALESCE(?, fid) "
                 "WHERE match_id=?",
                 (snap.league, snap.kickoff_ts, snap.home, snap.away,
-                 snap.handicap_line, mid),
+                 snap.handicap_line, snap.fid, mid),
             )
         return mid
 
@@ -140,14 +163,14 @@ class Database:
             )
             return cur.rowcount > 0
 
-    def insert_settlement(self, s: Settlement) -> bool:
+    def insert_settlement(self, s: Settlement, *, source: str = "500") -> bool:
         with self.tx() as cur:
             cur.execute(
                 "INSERT OR REPLACE INTO settlements(match_id, issue, match_idx, "
-                "fthg, ftag, result_code, winning_sp, avg_eu_h, avg_eu_d, avg_eu_a) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                "fthg, ftag, result_code, winning_sp, avg_eu_h, avg_eu_d, "
+                "avg_eu_a, source) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (s.match_id, s.issue, s.match_idx, s.fthg, s.ftag, s.result_code,
-                 s.winning_sp, s.avg_eu_h, s.avg_eu_d, s.avg_eu_a),
+                 s.winning_sp, s.avg_eu_h, s.avg_eu_d, s.avg_eu_a, source),
             )
             return cur.rowcount > 0
 
@@ -185,3 +208,29 @@ class Database:
             "SELECT DISTINCT m.issue FROM matches m LEFT JOIN settlements s "
             "ON s.match_id=m.match_id WHERE s.match_id IS NULL")
         return [r[0] for r in cur.fetchall()]
+
+    def matches_needing_per_match_settle(self, *, min_minutes_after_kickoff: int = 120):
+        """Return ``[(match_id, issue, match_idx, fid, kickoff_ts, home, away)]``
+        for matches that kicked off long enough ago but still have no row in
+        ``settlements``. Used by the per-match livescore fallback scraper.
+
+        Filtering is done in Python (kickoff_ts is naive ISO Beijing-ish).
+        """
+        cur = self._conn.cursor()
+        cur.execute(
+            "SELECT m.match_id, m.issue, m.match_idx, m.fid, m.kickoff_ts, "
+            "m.home, m.away FROM matches m LEFT JOIN settlements s "
+            "ON s.match_id=m.match_id WHERE s.match_id IS NULL "
+            "AND m.kickoff_ts IS NOT NULL ORDER BY m.kickoff_ts ASC")
+        rows = cur.fetchall()
+        # Use UTC-naive ISO of (now - min_minutes) as cutoff string compare;
+        # kickoff_ts is naive Beijing-ish so this is a rough but stable filter.
+        cutoff = (datetime.now() - timedelta(minutes=min_minutes_after_kickoff)
+                  ).strftime("%Y-%m-%dT%H:%M:%S")
+        out = []
+        for r in rows:
+            if r[4] and r[4] <= cutoff:
+                out.append(dict(match_id=r[0], issue=r[1], match_idx=r[2],
+                                fid=r[3], kickoff_ts=r[4],
+                                home=r[5], away=r[6]))
+        return out

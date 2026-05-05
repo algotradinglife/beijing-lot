@@ -24,7 +24,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from bs4 import BeautifulSoup
 
@@ -53,6 +53,7 @@ class MatchSnapshot:
     eu_h: Optional[float] = None
     eu_d: Optional[float] = None
     eu_a: Optional[float] = None
+    fid: Optional[str] = None  # 500.com per-match id (used by livescore scraper)
 
     @property
     def match_id(self) -> str:
@@ -105,9 +106,10 @@ def find_current_issue(html: str) -> Optional[str]:
 # 500.com bjdc bet page
 # ---------------------------------------------------------------------------
 _VS_LINE_RE = re.compile(
-    r'<tr[^>]*class="vs_lines[^"]*"[^>]*value="(?P<meta>\{[^}]*\})"[^>]*>(?P<body>.*?)</tr>',
+    r'<tr[^>]*class="vs_lines[^"]*"[^>]*value="(?P<meta>\{[^}]*\})"(?P<rest>[^>]*)>(?P<body>.*?)</tr>',
     re.S,
 )
+_FID_RE = re.compile(r'fid="(\d+)"')
 # meta is single-quoted JS-object-literal-ish: index:'1',leagueName:'挪超',...
 _META_KV_RE = re.compile(r"(\w+):\s*'([^']*)'")
 
@@ -160,6 +162,8 @@ def parse_bet_page_500(html: str, issue: Optional[str] = None) -> List[MatchSnap
                 continue
 
             snap = MatchSnapshot(issue=issue, match_idx=idx)
+            fid_m = _FID_RE.search(m.group("rest") or "")
+            snap.fid = fid_m.group(1) if fid_m else None
             snap.league = meta.get("leagueName") or None
             snap.home = meta.get("homeTeam") or None
             snap.away = meta.get("guestTeam") or None
@@ -378,3 +382,149 @@ def parse_kaijiang(html: str, issue: str) -> List[Settlement]:
             log.warning("kaijiang: failed to parse row idx=%s: %s", first, e)
             continue
     return out
+
+
+# ---------------------------------------------------------------------------
+# Per-match livescore: live.500.com/?gameid=<fid>
+# ---------------------------------------------------------------------------
+_LIVE500_ROW_RE = re.compile(
+    r'<tr[^>]*\bid="a(?P<fid>\d+)"[^>]*>(?P<body>.*?)</tr>',
+    re.S,
+)
+# Status cell uses <span class="red">完</span> for finished matches
+_LIVE500_FINISHED_RE = re.compile(r'class="red"\s*>\s*完\s*<')
+# Final score cell: <td align="center" class="red">2 - 0</td>
+_LIVE500_SCORE_RE = re.compile(
+    r'<td[^>]*class="red"[^>]*>\s*(\d+)\s*-\s*(\d+)\s*</td>'
+)
+# Handicap cell on this page: <span class="sp_rq">(-1)</span> — sign matches
+# the home team. We use the parent matches table's handicap_line instead.
+
+
+def parse_livescore_500_all(html: str) -> dict[str, tuple[int, int]]:
+    """Return ``{fid: (home_goals, away_goals)}`` for every finished match
+    on the page. Lets one HTTP fetch cover ~30 nearby matches.
+    """
+    out: dict[str, tuple[int, int]] = {}
+    for m in _LIVE500_ROW_RE.finditer(html):
+        body = m.group("body")
+        if not _LIVE500_FINISHED_RE.search(body):
+            continue
+        sm = _LIVE500_SCORE_RE.search(body)
+        if not sm:
+            continue
+        out[m.group("fid")] = (int(sm.group(1)), int(sm.group(2)))
+    return out
+
+
+def parse_livescore_500_for_fid(html: str, fid: str) -> Optional[tuple[int, int]]:
+    """Return ``(home_goals, away_goals)`` if the row for ``fid`` is finished.
+    Thin wrapper around ``parse_livescore_500_all`` for backward compat.
+    """
+    return parse_livescore_500_all(html).get(str(fid))
+
+
+def compute_result_code(
+    fthg: int, ftag: int, handicap_line: Optional[float]
+) -> str:
+    """Beijing Lot rule: result_code = '3' (主胜) / '1' (平) / '0' (客胜)
+    after applying the handicap to the home team's goals.
+
+    handicap_line follows 500.com convention: a value of ``-1`` means
+    "home owes 1 goal" — subtract from home before comparing.
+    """
+    h = int(handicap_line) if handicap_line is not None else 0
+    home_eff = fthg + h
+    if home_eff > ftag:
+        return "3"
+    if home_eff < ftag:
+        return "0"
+    return "1"
+
+
+# ---------------------------------------------------------------------------
+# Removed 2026-05-05: dongqiudi fallback parser.
+# Site migrated from Next.js (server-rendered __NEXT_DATA__) to Nuxt.js
+# (IIFE shell + lazy fetch via token-protected APIs). No static-HTML scraping
+# is feasible; would require Playwright or reverse-engineered mobile API.
+# 500.com remains the sole settlement source.
+# ---------------------------------------------------------------------------
+# (parse_dongqiudi_day and is_dongqiudi_finished removed; see banner above.)
+
+
+# ---------------------------------------------------------------------------
+# 500.com zqdc.php fallback (per-fid scoreboard, faster than kaijiang)
+# ---------------------------------------------------------------------------
+# Kaijiang can lag hours on certain leagues. live.500.com/zqdc.php?id={fid}
+# returns a scoreboard whose row for that fid has status="4" (finished)
+# and inline home/away goal spans even when kaijiang still shows '-'.
+
+_ZQDC_ROW_RE_TPL = (
+    r'<tr id="a{fid}"[^>]*\bstatus="(?P<status>\d+)"[^>]*>'
+    r'(?P<body>.*?)</tr>'
+)
+
+# Inside the row body: home team has yellowcard span BEFORE its team link,
+# away team has yellowcard span AFTER its team link.
+_ZQDC_HOME_GOALS_RE = re.compile(
+    r'<span class="yellowcard">(\d+)</span>\s*<a[^>]*team/\d+/[^>]*>',
+    re.S,
+)
+_ZQDC_AWAY_GOALS_RE = re.compile(
+    r'<a[^>]*team/\d+/[^>]*>[^<]+</a>\s*<span class="yellowcard">(\d+)</span>',
+    re.S,
+)
+
+
+# Issue id markers on zqdc.php pages. Multiple signals exist; we try them
+# in order of reliability:
+#   1. ``window.live_cur_expect = "26052";`` — JS var, single source of truth
+#   2. ``<select id="sel_expect"><option value="26052">`` — visible UI dropdown
+#   3. ``window.live_json_path = 'zqdc/26052';`` — last-resort path hint
+_ZQDC_CUR_EXPECT_RE = re.compile(
+    r'live_cur_expect\s*=\s*["\'](\d{5,6})["\']'
+)
+_ZQDC_SEL_EXPECT_RE = re.compile(
+    r'id="sel_expect"[^>]*>\s*<option[^>]*value="(\d{5,6})"', re.S
+)
+_ZQDC_JSON_PATH_RE = re.compile(
+    r"live_json_path\s*=\s*['\"]zqdc/(\d{5,6})['\"]"
+)
+
+
+def parse_500_zqdc_issue(html: str) -> Optional[str]:
+    """Extract the current 北单 issue id from a live.500.com/zqdc.php page.
+
+    Used as the fallback when ``trade.500.com`` issue discovery is down.
+    Returns None if no issue marker is found.
+    """
+    if not html:
+        return None
+    for rx in (_ZQDC_CUR_EXPECT_RE, _ZQDC_SEL_EXPECT_RE, _ZQDC_JSON_PATH_RE):
+        m = rx.search(html)
+        if m:
+            return m.group(1)
+    return None
+
+
+def parse_500_zqdc_score(html: str, fid: str
+                         ) -> Optional[Tuple[int, int, str]]:
+    """Locate the row for the given ``fid`` in a zqdc.php response and
+    return ``(home_goals, away_goals, status)``. Returns None if the row
+    isn't found or scores can't be extracted. Caller should treat status
+    == "4" as finished.
+    """
+    row_re = re.compile(_ZQDC_ROW_RE_TPL.format(fid=re.escape(str(fid))), re.S)
+    m = row_re.search(html)
+    if not m:
+        return None
+    status = m.group("status")
+    body = m.group("body")
+    mh = _ZQDC_HOME_GOALS_RE.search(body)
+    ma = _ZQDC_AWAY_GOALS_RE.search(body)
+    if not mh or not ma:
+        return None
+    try:
+        return int(mh.group(1)), int(ma.group(1)), status
+    except ValueError:
+        return None

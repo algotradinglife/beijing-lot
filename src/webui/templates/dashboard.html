@@ -74,13 +74,198 @@
   </div>
 </div>
 
+{% if stats.current_dd is defined and stats.current_dd >= 0.15 %}
+<div class="alert alert-{% if stats.current_dd >= 0.30 %}danger{% else %}warning{% endif %} mb-3">
+  <strong>⚠ 回撤警报</strong>：当前 bankroll vs 历史峰值回撤
+  <strong>{{ "%.1f"|format(stats.current_dd * 100) }}%</strong>
+  （峰值 {{ "%.0f"|format(stats.peak_bankroll) }} 元 → 当前 {{ "%.0f"|format(state.active + state.locked) }} 元）。
+  {% if stats.current_dd >= 0.30 %}
+    <strong>已过 30% 阈值</strong>，建议暂停新计划生成 / 切换稳健策略 / 等回撤 → 评估是否策略失效。
+  {% else %}
+    建议关注；继续恶化到 -30% 应考虑暂停。
+  {% endif %}
+</div>
+{% endif %}
+
+{% if loop_health %}
+{% set lh = loop_health %}
+<div class="card mb-3 border-info">
+  <div class="card-header bg-info bg-opacity-10 py-2">
+    <strong>🔁 闭环健康看板</strong>
+  </div>
+  <div class="card-body py-2">
+    <div class="row g-2 small">
+      <div class="col-md-3">
+        <strong>策略</strong>:
+        {% if lh.strategy_active %}
+          <span class="text-success">✓ 已配置</span>
+          <a href="{{ url_for('plan_view') }}">详情</a>
+        {% else %}
+          <span class="text-danger">✗ 未配置</span>
+          <a href="{{ url_for('strategy_explorer') }}">去选 →</a>
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        <strong>Live Collector</strong>:
+        {% if lh.lc_alive %}
+          <span class="text-success">✓ 活跃</span>
+          <small class="text-muted">{{ lh.lc_age_min }} min 前</small>
+        {% else %}
+          <span class="text-danger">✗ 停止</span>
+          <small class="text-muted">{{ lh.lc_last }}</small>
+        {% endif %}
+      </div>
+      <div class="col-md-3">
+        <strong>最新 plan</strong>:
+        {% if lh.latest_plan_id %}
+          {{ lh.latest_plan_id }}（{{ lh.latest_plan_tickets }} 张
+          {% if lh.latest_plan_placed %}· <span class="badge bg-success">已下注</span>
+          {% else %}· <span class="badge bg-secondary">未下注</span>{% endif %})
+        {% else %}<span class="text-muted">无</span>{% endif %}
+      </div>
+      <div class="col-md-3">
+        <strong>最近结算</strong>:
+        {% if lh.last_settle %}
+          {{ lh.last_settle.week_id }} ·
+          <span class="{% if lh.last_settle.week_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {{ "%+.0f"|format(lh.last_settle.week_pnl) }} 元
+          </span>
+        {% else %}<span class="text-muted">无</span>{% endif %}
+      </div>
+      {% if q_drift and q_drift.q is not none %}
+      <div class="col-md-12 mt-1 pt-1 border-top">
+        <strong>q drift</strong>（近 {{ q_drift.days }} 天 leg 命中率 vs 历史基准）：
+        实测 q =
+        <span class="{% if q_drift.q < 0.6 %}text-danger{% elif q_drift.q < 0.7 %}text-warning{% else %}text-success{% endif %}">
+          <strong>{{ "%.2f"|format(q_drift.q) }}</strong>
+        </span>
+        （基准 {{ "%.2f"|format(q_drift.baseline_q) }} ·
+        漂移 {{ "%+.2f"|format(q_drift.drift) }}） ·
+        样本 {{ q_drift.n_legs }} 个 leg ({{ q_drift.n_hits }} 中)
+        {% if q_drift.q < 0.6 %}
+          <span class="badge bg-danger">⚠ q 跌破 0.60，单 leg 接近 -EV，建议降仓或暂停</span>
+        {% elif q_drift.q < 0.65 %}
+          <span class="badge bg-warning">q 已 < 0.65，关注</span>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if auto_state %}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong>🤖 自动模式</strong>
+    {% if auto_state.paused %}
+      <span class="badge bg-danger">已暂停</span>
+    {% elif auto_state.enabled %}
+      <span class="badge bg-success">运行中</span>
+    {% else %}
+      <span class="badge bg-secondary">未启用</span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <div class="row mb-3">
+      <div class="col-md-6">
+        <p class="mb-1"><strong>下次自动选注</strong>（周五 21:00）：
+          <code>{{ auto_state.next_autoplan }}</code></p>
+        <p class="mb-1"><strong>下次自动复盘</strong>（周一 10:00）：
+          <code>{{ auto_state.next_autocheck }}</code></p>
+        <p class="mb-1"><strong>iMessage 接收</strong>：
+          <code>{{ auto_state.imessage_phone }}</code></p>
+      </div>
+      <div class="col-md-6">
+        <p class="mb-1"><strong>最近 autoplan</strong>：
+          {% if auto_state.last_autoplan_at %}
+            {{ auto_state.last_autoplan_at }}
+            <span class="badge bg-{% if auto_state.last_autoplan_status == 'ok' %}success{% elif auto_state.last_autoplan_status == 'error' %}danger{% else %}secondary{% endif %}">{{ auto_state.last_autoplan_status }}</span>
+          {% else %}<em class="text-muted">未运行</em>{% endif %}
+        </p>
+        <p class="mb-1"><strong>最近 autocheck</strong>：
+          {% if auto_state.last_autocheck_at %}
+            {{ auto_state.last_autocheck_at }}
+            <span class="badge bg-{% if auto_state.last_autocheck_status == 'ok' %}success{% elif auto_state.last_autocheck_status == 'error' or auto_state.last_autocheck_status == 'paused' %}danger{% else %}warning{% endif %}">{{ auto_state.last_autocheck_status }}</span>
+          {% else %}<em class="text-muted">未运行</em>{% endif %}
+        </p>
+      </div>
+    </div>
+
+    {% if auto_state.paused %}
+    <div class="alert alert-danger">
+      <strong>已自动暂停</strong>：{{ auto_state.paused_reason }}
+      <br><small class="text-muted">{{ auto_state.paused_at }}</small>
+      <form method="post" action="{{ url_for('auto_resume') }}" class="d-inline ms-2">
+        <button type="submit" class="btn btn-sm btn-warning">手动恢复</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <div class="d-flex gap-2 mb-3 flex-wrap">
+      <form method="post" action="{{ url_for('auto_toggle') }}">
+        <button type="submit" class="btn btn-sm {% if auto_state.enabled %}btn-outline-secondary{% else %}btn-success{% endif %}">
+          {% if auto_state.enabled %}关闭自动模式{% else %}启用自动模式{% endif %}
+        </button>
+      </form>
+      <form method="post" action="{{ url_for('auto_run_now') }}"
+            onsubmit="return confirm('立即运行 autoplan？将生成本期 plan 并标记已下注。');">
+        <input type="hidden" name="kind" value="autoplan">
+        <button type="submit" class="btn btn-sm btn-outline-success">▶ 立即生成 plan</button>
+      </form>
+      <form method="post" action="{{ url_for('auto_run_now') }}">
+        <input type="hidden" name="kind" value="autocheck">
+        <button type="submit" class="btn btn-sm btn-outline-info">▶ 立即复盘</button>
+      </form>
+      <form method="post" action="{{ url_for('auto_phone') }}" class="d-flex gap-1">
+        <input type="text" class="form-control form-control-sm" name="phone"
+               placeholder="iMessage 手机号 (e.g. +8613xxx)"
+               value="{{ auto_state.imessage_phone }}" style="width:220px">
+        <button type="submit" class="btn btn-sm btn-outline-primary">更新号码</button>
+      </form>
+    </div>
+
+    {% if auto_logs %}
+    <details>
+      <summary>最近执行日志（{{ auto_logs|length }}）</summary>
+      <table class="table table-sm mt-2 mb-0">
+        <thead><tr><th>时间</th><th>类型</th><th>级别</th><th>消息</th></tr></thead>
+        <tbody>
+          {% for log in auto_logs %}
+          <tr>
+            <td><small><code>{{ log.ts }}</code></small></td>
+            <td><small>{{ log.kind }}</small></td>
+            <td><span class="badge bg-{% if log.level == 'error' %}danger{% elif log.level == 'warn' %}warning{% else %}secondary{% endif %}">{{ log.level }}</span></td>
+            <td><small>{{ log.message }}</small></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between">
-    <span>当期场次状态</span>
+    <span>当期场次状态
+      {% if match_status.plan_id %}
+        — <small class="text-muted">{{ match_status.plan_id }}
+        {% if match_status.placed_ts %}<span class="badge bg-success">已下注</span>{% endif %}
+        · {{ match_status.n_tickets }} 张票</small>
+      {% endif %}
+    </span>
     <small class="text-muted">已完结 {{ match_status.completed|length }} · 进行中 {{ match_status.live|length }} · 即将开始 {{ match_status.upcoming|length }}</small>
   </div>
   <div class="card-body">
-    {% if match_status.completed or match_status.live or match_status.upcoming %}
+    {% if match_status.empty_placed %}
+    <div class="alert alert-warning mb-0">
+      计划 <strong>{{ match_status.plan_id }}</strong> 已标记下注，但保存的 plan 中无票数据
+      （可能是结算后被清空或生成时为空）。请到
+      <a href="{{ url_for('plan_view') }}">当期计划</a> 重新生成并下注。
+    </div>
+    {% elif match_status.completed or match_status.live or match_status.upcoming %}
 
     {% if match_status.live %}
     <h6 class="text-warning">⚡ 进行中 / 等待结算</h6>
@@ -89,7 +274,7 @@
       <tbody>
         {% for m in match_status.live %}
         <tr>
-          <td><small>{{ m.kickoff_ts }}</small></td>
+          <td><small>{{ m.kickoff_ts|hk }}</small></td>
           <td><small>{{ m.league or '-' }}</small></td>
           <td>{{ m.home }} vs {{ m.away }}</td>
           <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
@@ -114,7 +299,7 @@
       <tbody>
         {% for m in match_status.completed %}
         <tr class="{{ 'table-success' if m.hit else 'table-danger' if m.hit is false else '' }}">
-          <td><small>{{ m.kickoff_ts }}</small></td>
+          <td><small>{{ m.kickoff_ts|hk }}</small></td>
           <td><small>{{ m.league or '-' }}</small></td>
           <td>{{ m.home }} vs {{ m.away }}</td>
           <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
@@ -141,7 +326,7 @@
       <tbody>
         {% for m in match_status.upcoming %}
         <tr>
-          <td><small>{{ m.kickoff_ts }}</small></td>
+          <td><small>{{ m.kickoff_ts|hk }}</small></td>
           <td><small>{{ m.league or '-' }}</small></td>
           <td>{{ m.home }} vs {{ m.away }}</td>
           <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
@@ -199,15 +384,24 @@
 <script>
   const equity = {{ equity|tojson }};
   if (equity.length > 0) {
-    const x = equity.map(p => p.week_id);
+    const x = equity.map(p => p.ts);
+    const labels = equity.map(p => p.week_id);
+    const mkText = vals => vals.map((v, i) =>
+      `${labels[i]}<br>${v.toLocaleString()} 元`);
     const data = [
-      { x, y: equity.map(p => p.active), name: '活跃', mode: 'lines+markers', line: { color: '#0d6efd' } },
-      { x, y: equity.map(p => p.locked), name: '锁定', mode: 'lines+markers', line: { color: '#198754' } },
-      { x, y: equity.map(p => p.total),  name: '总额', mode: 'lines+markers', line: { color: '#212529', width: 3 } },
+      { x, y: equity.map(p => p.active), name: '活跃', mode: 'lines+markers',
+        line: { color: '#0d6efd' }, text: mkText(equity.map(p => p.active)),
+        hovertemplate: '%{x}<br>%{text}<extra>活跃</extra>' },
+      { x, y: equity.map(p => p.locked), name: '锁定', mode: 'lines+markers',
+        line: { color: '#198754' }, text: mkText(equity.map(p => p.locked)),
+        hovertemplate: '%{x}<br>%{text}<extra>锁定</extra>' },
+      { x, y: equity.map(p => p.total),  name: '总额', mode: 'lines+markers',
+        line: { color: '#212529', width: 3 }, text: mkText(equity.map(p => p.total)),
+        hovertemplate: '%{x}<br>%{text}<extra>总额</extra>' },
     ];
     Plotly.newPlot('equity-chart', data, {
       margin: { t: 10, l: 60, r: 20, b: 50 },
-      xaxis: { title: '期号' }, yaxis: { title: '元' },
+      xaxis: { title: '结算时间', type: 'date' }, yaxis: { title: '元' },
       legend: { orientation: 'h' },
     }, { responsive: true });
   } else {

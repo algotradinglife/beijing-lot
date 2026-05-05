@@ -41,10 +41,69 @@ def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _current_week_id(now: Optional[datetime] = None) -> str:
-    now = now or datetime.now(timezone.utc)
-    iso = now.isocalendar()
-    return f"{iso.year:04d}-W{iso.week:02d}"
+def _current_week_id(now: Optional[datetime] = None, db=None,
+                     live_db: Optional[str] = None) -> str:
+    """Return a plan ID for the current 北单 issue.
+
+    Format: ``<issue>`` (e.g. ``26052``) on first plan in an issue;
+    ``<issue>-2`` / ``-3`` for collisions when multiple plans are
+    generated for the same issue. Falls back to ``YYYY-MM-DD`` only when
+    the live DB is unreachable (no scrape yet).
+    """
+    base = None
+    if live_db:
+        try:
+            import sqlite3 as _sql
+            with _sql.connect(live_db) as c:
+                row = c.execute(
+                    "SELECT issue FROM matches ORDER BY created_ts DESC LIMIT 1"
+                ).fetchone()
+                if row:
+                    base = str(row[0])
+        except Exception:
+            base = None
+    if base is None:
+        base = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+    if db is None:
+        return base
+    existing = {p["plan_id"] for p in db.list_plans()}
+    if base not in existing:
+        return base
+    n = 2
+    while f"{base}-{n}" in existing:
+        n += 1
+    return f"{base}-{n}"
+
+
+def _next_weekday_at(*, weekday: int, hour: int, minute: int) -> str:
+    """Return next occurrence of (weekday, time) as `YYYY-MM-DD HH:MM`.
+
+    weekday: 0=Mon ... 6=Sun.
+    """
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    days_ahead = (weekday - now.weekday()) % 7
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0) \
+                + timedelta(days=days_ahead)
+    if target <= now:
+        target += timedelta(days=7)
+    return target.strftime("%Y-%m-%d %H:%M")
+
+
+def _latest_plan_id(db) -> Optional[str]:
+    """Plan ID for the "current" period in read-only views.
+
+    Prefers the latest-created **unsettled** plan (sorted by ``created_ts``
+    desc, since ``plan_id`` like ``2026-W18`` and ``2026-05-03`` don't sort
+    lexicographically). Falls back to today's date if no plans exist.
+    """
+    plans = db.list_plans()
+    plans = sorted(plans, key=lambda p: (p.get("created_ts") or "", p["plan_id"]),
+                   reverse=True)
+    for p in plans:
+        if not db.has_settlement(p["plan_id"]):
+            return p["plan_id"]
+    return plans[0]["plan_id"] if plans else _current_week_id(db=db)
 
 
 def create_app(
@@ -62,6 +121,7 @@ def create_app(
         PLANS_DIR=str(plans_dir),
         PNL_LOG=str(pnl_log),
     )
+    app.jinja_env.filters["hk"] = services.fmt_hk
 
     def get_db() -> WebuiDB:
         if "webui_db" not in g:
@@ -115,8 +175,11 @@ def create_app(
             return render_template("strategy_explorer.html",
                                    grid_json="{}", grid_ready=False)
         # Stream-pass JSON to template (already small ~220 KB)
+        eq_path = Path(__file__).resolve().parents[2] / "data" / "raw" / "strategy_equity_curves.json"
+        equity_curves = eq_path.read_text() if eq_path.exists() else "{}"
         return render_template("strategy_explorer.html",
                                grid_json=grid_path.read_text(),
+                               equity_curves=equity_curves,
                                grid_ready=True)
 
     @app.route("/api/mix3_preview")
@@ -130,6 +193,9 @@ def create_app(
             lam = float(request.args.get("lambda", "0.5"))
             max_combos = int(request.args.get("max_combos", "50"))
             commission = float(request.args.get("commission", "0"))
+            # Per-N overrides (optional; fall back to global kelly/lam)
+            k_per = {n: float(request.args.get(f"k{n}", kelly)) for n in (2, 3, 4)}
+            l_per = {n: float(request.args.get(f"l{n}", lam)) for n in (2, 3, 4)}
         except (TypeError, ValueError):
             return jsonify({"error": "invalid params"}), 400
 
@@ -147,13 +213,13 @@ def create_app(
         def snap(val, choices):
             return min(choices, key=lambda c: abs(c - val))
 
-        kelly = snap(kelly, [1/32, 1/16, 1/8, 1/4])
-        lam = snap(lam, [0.0, 0.5, 1.0, 2.0])
-        max_combos = snap(max_combos, [25, 50, 100, 200])
+        max_combos = snap(max_combos, [25, 50, 100, 150, 200, 400])
         commission = snap(commission, [0.0, 0.07])
+        k_per = {n: snap(k_per[n], [1/32, 1/16, 1/8, 1/4]) for n in (2, 3, 4)}
+        l_per = {n: snap(l_per[n], [0.0, 0.5, 1.0, 2.0]) for n in (2, 3, 4)}
 
         def get_pnl(n):
-            key = f"N{n}_K{kelly:.4f}_L{lam:.2f}_M{max_combos}_C{commission:.3f}"
+            key = f"N{n}_K{k_per[n]:.4f}_L{l_per[n]:.2f}_M{max_combos}_C{commission:.3f}"
             cell = grid.get(key)
             if cell and "weekly_pnl" in cell:
                 return cell.get("week_keys", []), cell["weekly_pnl"], cell.get("weekly_stake", [])
@@ -191,6 +257,10 @@ def create_app(
         dd = (seq - rm) / rm
         max_dd = float(np.min(dd))
         avg_stake = float(stake_mix[stake_mix > 0].mean()) if (stake_mix > 0).any() else 0
+        # Utilization vs running bankroll (more meaningful than vs INITIAL once
+        # 8 years of compounding inflate the bankroll 10-100×).
+        avg_bankroll = float(np.mean(bankroll))
+        util_curr = (avg_stake / avg_bankroll * 100) if avg_bankroll > 0 else 0
         # Downsample equity curve to 50 points
         if len(bankroll) > 50:
             idx = np.linspace(0, len(bankroll)-1, 50).astype(int)
@@ -200,7 +270,8 @@ def create_app(
 
         return jsonify({
             "weights": {"w2": w2, "w3": w3, "w4": w4},
-            "snapped_to": {"kelly": kelly, "lambda": lam, "max_combos": max_combos, "commission": commission},
+            "snapped_to": {"kelly": kelly, "lambda": lam, "max_combos": max_combos, "commission": commission,
+                           "k_per": k_per, "l_per": l_per},
             "n_weeks": n_weeks,
             "cagr": float(cagr),
             "sharpe": float(sharpe),
@@ -209,6 +280,8 @@ def create_app(
             "final": float(bankroll[-1]),
             "avg_weekly_stake": avg_stake,
             "utilization_pct": avg_stake / INITIAL * 100,
+            "utilization_curr_pct": util_curr,
+            "avg_running_bankroll": avg_bankroll,
             "hit_rate": float((pnl_mix > 0).mean()),
             "equity_curve": equity,
         })
@@ -238,7 +311,7 @@ def create_app(
         # Find nearest cell (snap each axis to grid value)
         kelly_choices = [1/32, 1/16, 1/8, 1/4]
         lambda_choices = [0.0, 0.5, 1.0, 2.0]
-        max_combos_choices = [25, 50, 100, 200]
+        max_combos_choices = [25, 50, 100, 150, 200, 400]
         commission_choices = [0.0, 0.07]
         n_choices = [3, 4]
 
@@ -274,19 +347,22 @@ def create_app(
                 kelly_fraction = float(request.form.get("kelly_fraction", str(1/16)))
                 diversity_lambda = float(request.form.get("diversity_lambda", "0.5"))
                 max_combos = int(request.form.get("max_combos", "50"))
-                commission_rate = float(request.form.get("commission_rate", "0"))
                 mix_enabled = 1 if request.form.get("mix_enabled") else 0
                 # 3-way mix weights
                 mix_w2 = float(request.form.get("mix_weight_n2", "0"))
                 mix_w3 = float(request.form.get("mix_weight_n3", "0"))
                 mix_w4 = float(request.form.get("mix_weight_n4", "1"))
+                mix_w5 = float(request.form.get("mix_weight_n5", "0"))
                 # Per-N Kelly + lambda overrides (only used when mix enabled)
                 kelly_n2 = float(request.form.get("kelly_n2") or kelly_fraction)
                 kelly_n3 = float(request.form.get("kelly_n3") or kelly_fraction)
                 kelly_n4 = float(request.form.get("kelly_n4") or kelly_fraction)
+                kelly_n5 = float(request.form.get("kelly_n5") or 0.125)
                 lambda_n2 = float(request.form.get("lambda_n2") if request.form.get("lambda_n2") is not None else diversity_lambda)
                 lambda_n3 = float(request.form.get("lambda_n3") if request.form.get("lambda_n3") is not None else diversity_lambda)
                 lambda_n4 = float(request.form.get("lambda_n4") if request.form.get("lambda_n4") is not None else diversity_lambda)
+                lambda_n5 = float(request.form.get("lambda_n5") if request.form.get("lambda_n5") is not None else 0.0)
+                league_q_min = float(request.form.get("league_q_min") or 0.0)
                 # Legacy fields kept for backward compat
                 n_legs_secondary = int(request.form.get("n_legs_secondary", "2"))
                 weight_primary = float(request.form.get("weight_primary", "0.7"))
@@ -305,29 +381,29 @@ def create_app(
             if max_combos < 1 or max_combos > 5000:
                 flash("max_combos 必须在 1..5000", "error")
                 return redirect(url_for("strategy_params"))
-            if commission_rate < 0 or commission_rate > 0.20:
-                flash("彩票站佣金率必须在 [0, 0.20]", "error")
-                return redirect(url_for("strategy_params"))
-            if mix_enabled and (mix_w2 + mix_w3 + mix_w4) <= 0:
+            if mix_enabled and (mix_w2 + mix_w3 + mix_w4 + mix_w5) <= 0:
                 flash("Mix 模式下至少一个 N 权重 > 0", "error")
                 return redirect(url_for("strategy_params"))
             db.set_config("n_legs", n_legs)
             db.set_config("kelly_fraction", kelly_fraction)
             db.set_config("diversity_lambda", diversity_lambda)
             db.set_config("max_combos", max_combos)
-            db.set_config("commission_rate", commission_rate)
             db.set_config("mix_enabled", mix_enabled)
             db.set_config("n_legs_secondary", n_legs_secondary)
             db.set_config("weight_primary", weight_primary)
             db.set_config("mix_weight_n2", mix_w2)
             db.set_config("mix_weight_n3", mix_w3)
             db.set_config("mix_weight_n4", mix_w4)
+            db.set_config("mix_weight_n5", mix_w5)
             db.set_config("kelly_n2", kelly_n2)
             db.set_config("kelly_n3", kelly_n3)
             db.set_config("kelly_n4", kelly_n4)
+            db.set_config("kelly_n5", kelly_n5)
             db.set_config("lambda_n2", lambda_n2)
             db.set_config("lambda_n3", lambda_n3)
             db.set_config("lambda_n4", lambda_n4)
+            db.set_config("lambda_n5", lambda_n5)
+            db.set_config("league_q_min", league_q_min)
             mix_msg = ""
             if mix_enabled:
                 ws = mix_w2 + mix_w3 + mix_w4
@@ -336,7 +412,7 @@ def create_app(
                     mix_msg = f" · MIX: N=2 {p2:.0f}% / N=3 {p3:.0f}% / N=4 {p4:.0f}%"
             flash(
                 f"策略已更新：N={n_legs} · Kelly={kelly_fraction:g} · λ={diversity_lambda:g} · "
-                f"max={max_combos} · 佣金={commission_rate*100:.1f}%{mix_msg}",
+                f"max={max_combos}{mix_msg}",
                 "success",
             )
             return redirect(url_for("plan_view"))
@@ -346,19 +422,21 @@ def create_app(
             kelly_fraction=float(db.get_config("kelly_fraction") or 1/16),
             diversity_lambda=float(db.get_config("diversity_lambda") or 0.5),
             max_combos=int(db.get_config("max_combos") or 50),
-            commission_rate=float(db.get_config("commission_rate") or 0.0),
             mix_enabled=bool(int(db.get_config("mix_enabled") or 0)),
             n_legs_secondary=int(db.get_config("n_legs_secondary") or 2),
             weight_primary=float(db.get_config("weight_primary") or 0.7),
             mix_w2=float(db.get_config("mix_weight_n2") or 0.0),
             mix_w3=float(db.get_config("mix_weight_n3") or 0.0),
             mix_w4=float(db.get_config("mix_weight_n4") or 1.0),
+            mix_w5=float(db.get_config("mix_weight_n5") or 0.0),
             kelly_n2=float(db.get_config("kelly_n2") or 0.0625),
             kelly_n3=float(db.get_config("kelly_n3") or 0.0625),
             kelly_n4=float(db.get_config("kelly_n4") or 0.0625),
+            kelly_n5=float(db.get_config("kelly_n5") or 0.125),
             lambda_n2=float(db.get_config("lambda_n2") if db.get_config("lambda_n2") is not None else 0.5),
             lambda_n3=float(db.get_config("lambda_n3") if db.get_config("lambda_n3") is not None else 0.5),
             lambda_n4=float(db.get_config("lambda_n4") if db.get_config("lambda_n4") is not None else 0.5),
+            lambda_n5=float(db.get_config("lambda_n5") if db.get_config("lambda_n5") is not None else 0.0),
         )
 
     @app.route("/edit_bankroll", methods=["GET", "POST"])
@@ -419,12 +497,120 @@ def create_app(
         recent = services.recent_settlements(db, n=5)
         live_db_exists = Path(app.config["LIVE_DB"]).exists()
         match_status = services.match_status_for_plan(db, app.config["LIVE_DB"])
+        # === 闭环健康看板 ===
+        from datetime import datetime as _dt
+        # 1. 当前策略
+        ws = (float(db.get_config("mix_weight_n2") or 0)
+              + float(db.get_config("mix_weight_n3") or 0)
+              + float(db.get_config("mix_weight_n4") or 0)
+              + float(db.get_config("mix_weight_n5") or 0))
+        strategy_active = bool(int(db.get_config("mix_enabled") or 0)) and ws > 0
+        # 2. 最近 plan
+        latest_plan_id_str = _latest_plan_id(db)
+        latest_plan_meta = db.get_plan(latest_plan_id_str) if latest_plan_id_str else None
+        latest_plan_tickets = (len(latest_plan_meta.get("plan", {}).get("tickets", []))
+                               if latest_plan_meta else 0)
+        latest_plan_placed = bool(latest_plan_meta.get("placed_ts")) if latest_plan_meta else False
+        # 3. Live Collector 状态：检查 stdout log 最后 mtime
+        lc_log = Path("data/logs/live_collector.stdout.log")
+        if lc_log.exists():
+            lc_mtime = _dt.fromtimestamp(lc_log.stat().st_mtime)
+            lc_age_sec = (_dt.now() - lc_mtime).total_seconds()
+            lc_alive = lc_age_sec < 1800  # 30 min
+            lc_last = lc_mtime.strftime("%Y-%m-%d %H:%M")
+        else:
+            lc_alive = False; lc_last = "未启动"; lc_age_sec = 1e9
+        # 4. 最近 reconcile (settlements_log 最新条目)
+        last_settle = (db.list_settlements()[-1] if db.list_settlements() else None)
+        q_drift = services.compute_q_drift(db, live_db_path=app.config["LIVE_DB"], days=90)
+        loop_health = dict(
+            strategy_active=strategy_active,
+            latest_plan_id=latest_plan_id_str,
+            latest_plan_tickets=latest_plan_tickets,
+            latest_plan_placed=latest_plan_placed,
+            lc_alive=lc_alive,
+            lc_last=lc_last,
+            lc_age_min=int(lc_age_sec/60),
+            last_settle=last_settle,
+        )
+        # ---- auto mode panel context ----
+        auto_state = db.auto_get()
+        auto_logs = db.auto_recent_logs(limit=8)
+        auto_state["next_autoplan"] = _next_weekday_at(weekday=4, hour=21, minute=0)  # Fri = 4 (Mon=0)
+        auto_state["next_autocheck"] = _next_weekday_at(weekday=0, hour=10, minute=0)  # Mon
         return render_template(
             "dashboard.html",
             state=state, stats=stats, equity=equity, recent=recent,
             live_db_exists=live_db_exists,
             match_status=match_status,
+            loop_health=loop_health,
+            q_drift=q_drift,
+            auto_state=auto_state,
+            auto_logs=auto_logs,
         )
+
+    @app.route("/auto/toggle", methods=["POST"])
+    def auto_toggle():
+        db = get_db()
+        cur = db.auto_get()
+        if cur["enabled"]:
+            db.auto_set_enabled(False)
+            flash("自动模式已关闭", "info")
+        else:
+            if cur["paused"]:
+                flash("当前为暂停状态，请先点恢复再启用", "error")
+                return redirect(url_for("dashboard"))
+            db.auto_set_enabled(True)
+            flash("自动模式已启用 — 周五 21:00 自动选注，周一 10:00 自动复盘", "success")
+        return redirect(url_for("dashboard"))
+
+    @app.route("/auto/resume", methods=["POST"])
+    def auto_resume():
+        db = get_db()
+        db.auto_resume()
+        flash("已手动恢复自动模式", "success")
+        return redirect(url_for("dashboard"))
+
+    @app.route("/auto/run_now", methods=["POST"])
+    def auto_run_now():
+        """Manually trigger autoplan (or autocheck) right now, off-schedule."""
+        kind = request.form.get("kind", "autoplan")
+        try:
+            from auto import autoplan as _ap, autocheck as _ac
+        except ModuleNotFoundError:
+            from src.auto import autoplan as _ap, autocheck as _ac
+        from pathlib import Path as _P
+        try:
+            if kind == "autocheck":
+                _ac.run(
+                    live_db=_P(app.config["LIVE_DB"]),
+                    webui_db=_P(app.config["WEBUI_DB"]),
+                    plans_dir=_P(app.config["PLANS_DIR"]),
+                    pnl_log=_P(app.config["PNL_LOG"]),
+                )
+                flash("autocheck 已运行 — 查看周报和 dashboard", "success")
+            else:
+                # Manual triggers from dashboard bypass the weekday/thin-issue
+                # guardrails — user explicitly opted in.
+                _ap.run(
+                    live_db=_P(app.config["LIVE_DB"]),
+                    webui_db=_P(app.config["WEBUI_DB"]),
+                    plans_dir=_P(app.config["PLANS_DIR"]),
+                    force=True,
+                )
+                flash("autoplan 已运行 — 检查 iMessage 和当期计划", "success")
+        except Exception as e:
+            flash(f"运行失败: {e}", "error")
+        return redirect(url_for("dashboard"))
+
+    @app.route("/auto/phone", methods=["POST"])
+    def auto_phone():
+        db = get_db()
+        phone = (request.form.get("phone") or "").strip()
+        if phone:
+            db.set_config("imessage_phone", phone)
+            flash(f"iMessage 接收号码已更新: {phone}", "success")
+        return redirect(url_for("dashboard"))
 
     # -- plans ---------------------------------------------------------
     @app.route("/plan")
@@ -433,15 +619,35 @@ def create_app(
         if not db.is_initialized():
             return redirect(url_for("setup"))
 
-        wk = _current_week_id()
+        # Show the most recently generated plan (or today's slot if none yet)
+        wk = request.args.get("plan_id") or _latest_plan_id(db)
         plan_meta = db.get_plan(wk)
         plan = plan_meta["plan"] if plan_meta else None
         live_db_exists = Path(app.config["LIVE_DB"]).exists()
+        # 当前已保存的策略参数（用户上次"应用"的配置）
+        strategy_summary = dict(
+            mix_enabled=bool(int(db.get_config("mix_enabled") or 0)),
+            max_combos=int(db.get_config("max_combos") or 50),
+            mix_w2=float(db.get_config("mix_weight_n2") or 0.0),
+            mix_w3=float(db.get_config("mix_weight_n3") or 0.0),
+            mix_w4=float(db.get_config("mix_weight_n4") or 1.0),
+            mix_w5=float(db.get_config("mix_weight_n5") or 0.0),
+            kelly_n2=float(db.get_config("kelly_n2") or 0.0625),
+            kelly_n3=float(db.get_config("kelly_n3") or 0.0625),
+            kelly_n4=float(db.get_config("kelly_n4") or 0.0625),
+            kelly_n5=float(db.get_config("kelly_n5") or 0.125),
+            lambda_n2=float(db.get_config("lambda_n2") or 0.0),
+            lambda_n3=float(db.get_config("lambda_n3") or 0.0),
+            lambda_n4=float(db.get_config("lambda_n4") or 0.5),
+            lambda_n5=float(db.get_config("lambda_n5") or 0.0),
+            league_q_min=float(db.get_config("league_q_min") or 0.0),
+        )
         return render_template(
             "plan.html",
             week_id=wk, plan=plan, plan_meta=plan_meta,
             state=services.get_state(db),
             live_db_exists=live_db_exists,
+            strategy_summary=strategy_summary,
         )
 
     @app.route("/plan/generate", methods=["POST"])
@@ -466,7 +672,7 @@ def create_app(
     @app.route("/plan/place", methods=["POST"])
     def plan_place():
         db = get_db()
-        wk = request.form.get("plan_id") or _current_week_id()
+        wk = request.form.get("plan_id") or _latest_plan_id(db)
         if db.mark_placed(wk, _utcnow_iso()):
             flash(f"已标记 {wk} 为已下注", "success")
         else:
@@ -480,7 +686,7 @@ def create_app(
         db = get_db()
         if not db.is_initialized():
             return redirect(url_for("setup"))
-        wk = request.args.get("week") or _current_week_id()
+        wk = request.args.get("week") or _latest_plan_id(db)
         plan_meta = db.get_plan(wk)
         if not plan_meta or not plan_meta.get("plan"):
             flash(f"未找到计划 {wk}", "error")

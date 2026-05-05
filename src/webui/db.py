@@ -28,6 +28,15 @@ CREATE TABLE IF NOT EXISTS plans (
     placed_actual  TEXT
 );
 
+CREATE TABLE IF NOT EXISTS auto_mode_log (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts          TEXT NOT NULL,
+    kind        TEXT NOT NULL,
+    level       TEXT NOT NULL,
+    message     TEXT NOT NULL,
+    details     TEXT
+);
+
 CREATE TABLE IF NOT EXISTS settlements_log (
     week_id         TEXT PRIMARY KEY,
     settled_ts      TEXT NOT NULL,
@@ -182,6 +191,55 @@ class WebuiDB:
                 "week_payout", "week_pnl", "bankroll_after", "locked_after",
                 "skimmed"]
         return [dict(zip(cols, r)) for r in rows]
+
+    # ---- auto mode -------------------------------------------------------
+    def auto_get(self) -> Dict[str, Any]:
+        """Return current auto-mode state."""
+        return dict(
+            enabled=(self.get_config("auto_enabled", "0") == "1"),
+            paused=(self.get_config("auto_paused", "0") == "1"),
+            paused_reason=self.get_config("auto_paused_reason"),
+            paused_at=self.get_config("auto_paused_at"),
+            last_autoplan_at=self.get_config("auto_last_plan_at"),
+            last_autoplan_status=self.get_config("auto_last_plan_status"),
+            last_autocheck_at=self.get_config("auto_last_check_at"),
+            last_autocheck_status=self.get_config("auto_last_check_status"),
+            imessage_phone=self.get_config("imessage_phone", "+861234567890"),
+        )
+
+    def auto_set_enabled(self, enabled: bool) -> None:
+        self.set_config("auto_enabled", "1" if enabled else "0")
+
+    def auto_pause(self, reason: str, ts: str) -> None:
+        self.set_config("auto_paused", "1")
+        self.set_config("auto_paused_reason", reason)
+        self.set_config("auto_paused_at", ts)
+
+    def auto_resume(self) -> None:
+        self.set_config("auto_paused", "0")
+        self.set_config("auto_paused_reason", "")
+        self.set_config("auto_paused_at", "")
+
+    def auto_log(self, kind: str, level: str, message: str,
+                 ts: str, details: Optional[Dict[str, Any]] = None) -> None:
+        with self.tx() as cur:
+            cur.execute(
+                "INSERT INTO auto_mode_log(ts,kind,level,message,details) "
+                "VALUES(?,?,?,?,?)",
+                (ts, kind, level, message,
+                 json.dumps(details, ensure_ascii=False) if details else None),
+            )
+
+    def auto_recent_logs(self, limit: int = 20) -> List[Dict[str, Any]]:
+        rows = self._conn.execute(
+            "SELECT id, ts, kind, level, message, details FROM auto_mode_log "
+            "ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [
+            dict(id=r[0], ts=r[1], kind=r[2], level=r[3], message=r[4],
+                 details=json.loads(r[5]) if r[5] else None)
+            for r in rows
+        ]
 
     def has_settlement(self, week_id: str) -> bool:
         return self._conn.execute(

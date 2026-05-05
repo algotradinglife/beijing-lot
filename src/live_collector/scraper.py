@@ -36,6 +36,12 @@ URL_PROJECT_LIST = (
 )
 URL_BET_ZGZCW = "https://cp.zgzcw.com/lottery/bdplayvsforJsp.action?lotteryId=200"
 URL_KAIJIANG_500 = "https://zx.500.com/zqdc/kaijiang.php?playid=1&expect={issue}"
+# Per-match livescore page: returns the day's match list including final score
+# for the match that fid refers to. Used as a fast-path when the issue-level
+# kaijiang page hasn't published a late match yet.
+URL_LIVESCORE_500 = "https://live.500.com/?gameid={fid}"
+# Removed 2026-05-05: dongqiudi day-livescore URL. Site migrated to a
+# Nuxt JS shell with token-protected APIs; no static-HTML scraping path.
 
 
 class Scraper:
@@ -109,3 +115,25 @@ class Scraper:
 
     def fetch_kaijiang_500(self, issue: str) -> str:
         return self.get(URL_KAIJIANG_500.format(issue=issue), encoding="gb18030")
+
+    def fetch_livescore_500(self, fid: str) -> str:
+        """Per-match livescore page (faster-publishing than issue kaijiang)."""
+        return self.get(URL_LIVESCORE_500.format(fid=fid), encoding="gb18030")
+
+    def fetch_500_zqdc_index(self) -> str:
+        """live.500.com/zqdc.php (no id) — scoreboard for the current 北单
+        issue. Used as the fallback path for issue discovery when
+        ``trade.500.com`` is down. Page exposes the current issue via
+        ``window.live_cur_expect`` and a ``<select id="sel_expect">`` widget.
+        """
+        return self.get("https://live.500.com/zqdc.php", encoding="gb18030")
+
+    def fetch_500_zqdc(self, fid: str) -> str:
+        """live.500.com/zqdc.php?id={fid} — per-fid scoreboard page that
+        publishes finals faster than the issue kaijiang. Each match row has
+        ``status="4"`` (finished) plus inline home/away goal spans.
+        """
+        return self.get(f"https://live.500.com/zqdc.php?id={fid}",
+                        encoding="gb18030")
+
+    # fetch_dongqiudi_day removed 2026-05-05; see comment near URL constants.

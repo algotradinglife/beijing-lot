@@ -17,7 +17,23 @@ import json
 import math
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+HK_TZ = timezone(timedelta(hours=8))
+
+
+def fmt_hk(ts) -> str:
+    """Format an ISO kickoff_ts (assumed HK if naive) as `MM-DD HH:MM HKT`."""
+    if not ts:
+        return ""
+    try:
+        dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+    except ValueError:
+        return str(ts)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=HK_TZ)
+    dt = dt.astimezone(HK_TZ)
+    return dt.strftime("%m-%d %H:%M +08:00")
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -120,37 +136,42 @@ def generate_plan(
     if state.active <= 0:
         return dict(error="bankroll_not_initialized")
 
-    cfg = niche_config or NicheConfig.load()
+    # League q-filter persisted in DB (per-preset; 高 Sharpe N=5 用 0.65, 其他默认 0)
+    league_q_min = float(db.get_config("league_q_min") or 0.0)
+    cfg = niche_config or NicheConfig.load(league_q_min=league_q_min)
     snapshots = load_open_matches(live_db_path, now=now)
     # Read user-tunable strategy params from config (defaults locked from analysis)
     n_legs = int(db.get_config("n_legs") or N_LEGS)
     kelly_fraction = float(db.get_config("kelly_fraction") or KELLY_FRACTION)
     diversity_lambda = float(db.get_config("diversity_lambda") or 0.5)
     max_combos = int(db.get_config("max_combos") or 50)
-    commission_rate = float(db.get_config("commission_rate") or 0.0)
-    # Mix mode: split bankroll across N=2 / N=3 / N=4 by 3 weights (sum auto-norm)
+    # Mix mode: split bankroll across N=2 / N=3 / N=4 / N=5 by 4 weights (sum auto-norm)
     mix_enabled = bool(int(db.get_config("mix_enabled") or 0))
     w2 = float(db.get_config("mix_weight_n2") or 0.0)
     w3 = float(db.get_config("mix_weight_n3") or 0.0)
     w4 = float(db.get_config("mix_weight_n4") or 1.0)
+    w5 = float(db.get_config("mix_weight_n5") or 0.0)
     # Legacy 2-way fallback
     n_legs_secondary = int(db.get_config("n_legs_secondary") or 2)
     weight_primary_legacy = float(db.get_config("weight_primary") or 0.7)
-    if mix_enabled and (w2 + w3 + w4) > 0:
-        # 3-way mix path with per-N Kelly + lambda overrides + max_combos auto-allocation
-        wsum = w2 + w3 + w4
-        w2, w3, w4 = w2/wsum, w3/wsum, w4/wsum
+    if mix_enabled and (w2 + w3 + w4 + w5) > 0:
+        # 4-way mix path with per-N Kelly + lambda overrides + max_combos auto-allocation
+        wsum = w2 + w3 + w4 + w5
+        w2, w3, w4, w5 = w2/wsum, w3/wsum, w4/wsum, w5/wsum
         # Per-N overrides (fall back to global if not set)
         kelly_n2 = float(db.get_config("kelly_n2") or kelly_fraction)
         kelly_n3 = float(db.get_config("kelly_n3") or kelly_fraction)
         kelly_n4 = float(db.get_config("kelly_n4") or kelly_fraction)
+        kelly_n5 = float(db.get_config("kelly_n5") or 0.125)
         lambda_n2 = float(db.get_config("lambda_n2") if db.get_config("lambda_n2") is not None else diversity_lambda)
         lambda_n3 = float(db.get_config("lambda_n3") if db.get_config("lambda_n3") is not None else diversity_lambda)
         lambda_n4 = float(db.get_config("lambda_n4") if db.get_config("lambda_n4") is not None else diversity_lambda)
+        lambda_n5 = float(db.get_config("lambda_n5") if db.get_config("lambda_n5") is not None else 0.0)
         per_n_params = {
             2: (w2, kelly_n2, lambda_n2),
             3: (w3, kelly_n3, lambda_n3),
             4: (w4, kelly_n4, lambda_n4),
+            5: (w5, kelly_n5, lambda_n5),
         }
         merged_tickets = []
         total_stake = 0
@@ -179,9 +200,23 @@ def generate_plan(
             total_stake += int(pn.get("total_stake", 0))
             expected_return += float(pn.get("expected_total_return", 0))
             n_qual_legs = max(n_qual_legs, pn.get("n_qualified_legs", 0))
-        # Build merged plan dict (use N=4 plan_id as canonical week id)
-        from src.phase5a.planner import iso_week_id
-        wk = iso_week_id(now or datetime.now(timezone.utc))
+        # Build merged plan dict — id = 北单 issue (e.g. "26052") with
+        # collision suffix `-2` / `-3` for re-generations of the same issue.
+        # Falls back to YYYY-MM-DD if no snapshot is available.
+        base = None
+        for snap in snapshots:
+            iss = getattr(snap, "issue", None)
+            if iss:
+                base = str(iss)
+                break
+        if not base:
+            base = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+        existing = {p["plan_id"] for p in db.list_plans()}
+        wk = base
+        i = 2
+        while wk in existing:
+            wk = f"{base}-{i}"
+            i += 1
         plan_dict = dict(
             plan_id=wk,
             generated_at=(now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -194,9 +229,10 @@ def generate_plan(
             expected_total_return=expected_return,
             tickets=merged_tickets,
             mix_enabled=True,
-            mix_weights=dict(n2=round(w2, 3), n3=round(w3, 3), n4=round(w4, 3)),
-            mix_kelly=dict(n2=kelly_n2, n3=kelly_n3, n4=kelly_n4),
-            mix_lambda=dict(n2=lambda_n2, n3=lambda_n3, n4=lambda_n4),
+            mix_weights=dict(n2=round(w2, 3), n3=round(w3, 3), n4=round(w4, 3), n5=round(w5, 3)),
+            mix_kelly=dict(n2=kelly_n2, n3=kelly_n3, n4=kelly_n4, n5=kelly_n5),
+            mix_lambda=dict(n2=lambda_n2, n3=lambda_n3, n4=lambda_n4, n5=lambda_n5),
+            league_q_min=league_q_min,
         )
         # Persist merged plan to disk for reconcile
         plans_dir = Path(plans_dir)
@@ -308,13 +344,23 @@ def generate_plan(
     plan_dict["n_legs_config"] = n_legs
     plan_dict["kelly_fraction"] = kelly_fraction
     plan_dict["max_combos"] = max_combos
-    plan_dict["commission_rate"] = commission_rate
-    plan_dict["expected_commission"] = float(plan_dict.get("total_stake", 0)) * commission_rate
 
     # Persist to disk (so reconcile can read it later) AND to webui DB.
     if not mix_enabled:
         save_plan_json(plan, plans_dir)
-        db.upsert_plan(plan.plan_id, plan.generated_at, plan_dict)
+    # Re-upsert with augmented fields (leg_appearance, hhi, …). Mix path
+    # already wrote a slim version earlier; this overwrite keeps the DB in
+    # sync with the dict the templates expect.
+    pid = plan_dict.get("plan_id")
+    gen = plan_dict.get("generated_at")
+    if pid and gen:
+        db.upsert_plan(pid, gen, plan_dict)
+        # Also rewrite the JSON file in mix mode so reconcile sees the same dict
+        if mix_enabled:
+            import json as _json
+            (Path(plans_dir) / f"{pid}.json").write_text(
+                _json.dumps(plan_dict, ensure_ascii=False)
+            )
     return plan_dict
 
 
@@ -341,6 +387,10 @@ def reconcile_pending(
     for plan_meta in db.list_plans():
         week_id = plan_meta["plan_id"]
         if db.has_settlement(week_id):
+            continue
+        if not plan_meta.get("placed_ts"):
+            # Skip plans that were never marked placed — settling them
+            # would pollute equity curve with hypothetical PnL.
             continue
         plan_path = plans_dir / f"{week_id}.json"
         if not plan_path.exists():
@@ -389,16 +439,26 @@ def reconcile_pending(
 # Statistics for dashboard
 
 def equity_series(db: WebuiDB) -> List[Dict[str, Any]]:
-    """Return list of {week_id, active, locked, total} sorted by week."""
-    rows = db.list_settlements()
+    """Return list of {ts, week_id, active, locked, total} sorted by
+    settled_ts (true chronology). Each entry carries:
+      - ts:       ISO date string used as x-axis (calendar time)
+      - week_id:  the 北单 issue (used as point label / hover only)
+    """
+    # Sort by settled_ts so non-monotonic plan_id alphabets don't reorder
+    rows = sorted(db.list_settlements(),
+                  key=lambda r: r.get("settled_ts") or "")
     state = get_state(db)
     series: List[Dict[str, Any]] = []
     if state.initial > 0:
-        # Prepend the starting point (no week_id).
-        series.append(dict(week_id="START", active=state.initial,
+        first_ts = rows[0]["settled_ts"][:10] if rows and rows[0].get("settled_ts") \
+                   else None
+        series.append(dict(ts=first_ts or "START",
+                           week_id="START", active=state.initial,
                            locked=0.0, total=state.initial))
     for r in rows:
+        ts_full = r.get("settled_ts") or ""
         series.append(dict(
+            ts=ts_full[:16].replace("T", " ") if ts_full else r["week_id"],
             week_id=r["week_id"],
             active=float(r["bankroll_after"] or 0.0),
             locked=float(r["locked_after"] or 0.0),
@@ -406,6 +466,61 @@ def equity_series(db: WebuiDB) -> List[Dict[str, Any]]:
                   + float(r["locked_after"] or 0.0),
         ))
     return series
+
+
+def compute_q_drift(
+    db: WebuiDB, *, live_db_path: str | Path, days: int = 90,
+) -> Dict[str, Any]:
+    """Compute leg-level q on actually-placed legs over the last N days,
+    using live_db settlements to determine hit. Returns
+    ``dict(n_legs, hit_rate, implied_p, q, baseline_q, drift)``.
+
+    baseline_q = 0.71 (overall STRAT measure on historical data).
+    """
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    live_path = Path(live_db_path)
+    if not live_path.exists():
+        return dict(n_legs=0, q=None, drift=None, days=days)
+    conn = sqlite3.connect(str(live_path))
+    legs_total = 0; legs_hit = 0; sum_implied_p = 0.0
+    try:
+        for plan_meta in db.list_plans():
+            wk = plan_meta["plan_id"]
+            full = db.get_plan(wk)
+            if not full or not full.get("plan", {}).get("tickets"):
+                continue
+            placed_ts = plan_meta.get("placed_ts") or full.get("created_ts") or ""
+            if placed_ts and placed_ts < cutoff:
+                continue
+            seen = set()  # uniq legs per plan
+            for ticket in full["plan"]["tickets"]:
+                for leg in ticket.get("legs", []):
+                    key = (leg.get("match_id"), leg.get("selection"))
+                    if not key[0] or key in seen: continue
+                    seen.add(key)
+                    sp = float(leg.get("sp") or 0)
+                    if sp < 1.01: continue
+                    row = conn.execute(
+                        "SELECT result_code FROM settlements WHERE match_id=?",
+                        (key[0],)).fetchone()
+                    if not row or row[0] is None: continue
+                    legs_total += 1
+                    sum_implied_p += 1 / (sp * 0.65)
+                    if str(row[0]) == str(key[1]):
+                        legs_hit += 1
+    finally:
+        conn.close()
+    if legs_total == 0:
+        return dict(n_legs=0, q=None, drift=None, days=days,
+                    baseline_q=0.71)
+    hit_rate = legs_hit / legs_total
+    avg_implied = sum_implied_p / legs_total
+    q = hit_rate / avg_implied if avg_implied > 0 else 0
+    baseline = 0.71
+    return dict(n_legs=legs_total, n_hits=legs_hit, hit_rate=hit_rate,
+                implied_p=avg_implied, q=q, baseline_q=baseline,
+                drift=q - baseline, days=days)
 
 
 def compute_stats(db: WebuiDB) -> Dict[str, Any]:
@@ -440,9 +555,16 @@ def compute_stats(db: WebuiDB) -> Dict[str, Any]:
             dd = (peak - s["total"]) / peak
             max_dd = max(max_dd, dd)
 
+    # 当前 drawdown（实时 — 用于警报）
+    current_total = state.active + state.locked
+    all_time_peak = max((s["total"] for s in series), default=current_total)
+    current_dd = (all_time_peak - current_total) / all_time_peak if all_time_peak > 0 else 0.0
+
     return dict(
         n_weeks=n_weeks,
         n_hits=n_hits,
+        current_dd=current_dd,
+        peak_bankroll=all_time_peak,
         n_combos=n_combos,
         hit_rate=hit_rate,
         cumulative_pnl=state.cumulative_pnl,
@@ -512,18 +634,35 @@ def match_status_for_plan(
       hit (bool, if completed), winning_sp.
     """
     now = now or datetime.now(timezone.utc)
-    out = {"completed": [], "live": [], "upcoming": []}
+    out: Dict[str, Any] = {"completed": [], "live": [], "upcoming": [],
+                            "plan_id": None, "placed_ts": None,
+                            "n_tickets": 0, "empty_placed": False}
 
-    # Find latest plan that has tickets
+    # Prefer the latest placed-but-unsettled plan (so dashboard matches history).
+    # Fall back to latest *unsettled* plan with tickets. Already-settled plans
+    # belong to history, not current status.
     plan_meta = None
     for p in db.list_plans():
-        meta = db.get_plan(p["plan_id"])
-        if meta and meta.get("plan", {}).get("tickets"):
-            plan_meta = meta
+        if p.get("placed_ts") and not db.has_settlement(p["plan_id"]):
+            plan_meta = db.get_plan(p["plan_id"])
             break
+    if plan_meta is None:
+        for p in db.list_plans():
+            if db.has_settlement(p["plan_id"]):
+                continue
+            meta = db.get_plan(p["plan_id"])
+            if meta and meta.get("plan", {}).get("tickets"):
+                plan_meta = meta
+                break
     if not plan_meta:
         return out
+
     plan = plan_meta["plan"]
+    tickets = plan.get("tickets", []) or []
+    out["plan_id"] = plan_meta.get("plan_id")
+    out["placed_ts"] = plan_meta.get("placed_ts")
+    out["n_tickets"] = len(tickets)
+    out["empty_placed"] = bool(plan_meta.get("placed_ts")) and len(tickets) == 0
 
     # Gather (match_id, our_pick) for this plan
     picks_by_match: Dict[str, set] = {}
@@ -587,7 +726,8 @@ def match_status_for_plan(
                 try:
                     kt = datetime.fromisoformat(kt_str.replace("Z", "+00:00"))
                     if kt.tzinfo is None:
-                        kt = kt.replace(tzinfo=timezone.utc)
+                        # Scraper stores naive kickoff in HK time (UTC+8).
+                        kt = kt.replace(tzinfo=timezone(timedelta(hours=8)))
                 except ValueError:
                     kt = None
                 if kt:
@@ -736,7 +876,7 @@ def plan_to_xlsx(plan: Dict[str, Any], week_id: str) -> bytes:
             ws2.cell(row=cur_row, column=4, value=leg.get("league", "")).alignment = LEFT
             ws2.cell(row=cur_row, column=5, value=leg.get("home", "")).alignment = LEFT
             ws2.cell(row=cur_row, column=6, value=leg.get("away", "")).alignment = LEFT
-            ws2.cell(row=cur_row, column=7, value=leg.get("kickoff_ts", "")).alignment = CENTER
+            ws2.cell(row=cur_row, column=7, value=fmt_hk(leg.get("kickoff_ts"))).alignment = CENTER
             sel_cell = ws2.cell(row=cur_row, column=8,
                                 value=SEL_LABEL.get(leg.get("selection"), leg.get("selection")))
             sel_cell.alignment = CENTER
@@ -763,6 +903,59 @@ def plan_to_xlsx(plan: Dict[str, Any], week_id: str) -> bytes:
     )
     ws2.cell(row=note_row, column=1, value=note_text).font = Font(italic=True, color="666666")
     ws2.merge_cells(start_row=note_row, start_column=1, end_row=note_row, end_column=9)
+
+    # --- Sheet 3: 按比赛分组（打票顺序优化） ---
+    ws3 = wb.create_sheet("按比赛分组")
+    ws3["A1"] = f"打票顺序参考（同场比赛连续填）· {week_id}"
+    ws3["A1"].font = Font(bold=True, size=14, color="B04A2F")
+    ws3.merge_cells("A1:G1")
+
+    headers3 = ["序号", "场次", "联赛", "主队 vs 客队", "开赛", "出现票#", "勾"]
+    start3 = 3
+    for c, h in enumerate(headers3, start=1):
+        ws3.cell(row=start3, column=c, value=h)
+    _style_header_row(ws3, start3, len(headers3))
+
+    # collect: match_id → list of (ticket_no, selection)
+    match_to_tickets: dict = {}
+    match_meta: dict = {}
+    for ticket_no, t in enumerate(plan.get("tickets", []), start=1):
+        for leg in t.get("legs", []):
+            mid = str(leg.get("match_id") or "")
+            if not mid: continue
+            match_to_tickets.setdefault(mid, []).append(
+                (ticket_no, SEL_LABEL.get(leg.get("selection"), str(leg.get("selection")))))
+            match_meta.setdefault(mid, dict(
+                league=leg.get("league") or "", home=leg.get("home") or "",
+                away=leg.get("away") or "", kickoff=leg.get("kickoff_ts") or "",
+                handicap=leg.get("handicap")))
+    # sort by kickoff
+    sorted_mids = sorted(match_to_tickets.keys(),
+                         key=lambda m: match_meta[m].get("kickoff", "") or "")
+    cur_row = start3 + 1
+    for i, mid in enumerate(sorted_mids, start=1):
+        m = match_meta[mid]
+        tickets_str = ", ".join(f"#{tn}({sel})" for tn, sel in match_to_tickets[mid])
+        ws3.cell(row=cur_row, column=1, value=i).alignment = CENTER
+        ws3.cell(row=cur_row, column=2, value=mid).alignment = CENTER
+        ws3.cell(row=cur_row, column=3, value=m["league"]).alignment = LEFT
+        match_str = f"{m['home']} vs {m['away']}"
+        if m.get("handicap") is not None:
+            match_str += f" ({m['handicap']:+g})"
+        ws3.cell(row=cur_row, column=4, value=match_str).alignment = LEFT
+        ws3.cell(row=cur_row, column=5, value=fmt_hk(m["kickoff"])).alignment = CENTER
+        ws3.cell(row=cur_row, column=6, value=tickets_str).alignment = LEFT
+        ws3.cell(row=cur_row, column=7, value="☐").alignment = CENTER  # 已打勾位
+        cur_row += 1
+    if cur_row > start3 + 1:
+        _border_range(ws3, start3 + 1, 1, cur_row - 1, len(headers3))
+    widths3 = [6, 14, 14, 36, 18, 30, 6]
+    for c, w in enumerate(widths3, start=1):
+        ws3.column_dimensions[get_column_letter(c)].width = w
+    ws3.cell(row=cur_row + 1, column=1,
+             value=f"共 {len(sorted_mids)} 场比赛 → 同场所有票连续填写，操作员可逐场打勾。"
+                   ).font = Font(italic=True, color="666666")
+    ws3.merge_cells(start_row=cur_row+1, start_column=1, end_row=cur_row+1, end_column=7)
 
     out = BytesIO()
     wb.save(out)

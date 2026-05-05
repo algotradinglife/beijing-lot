@@ -66,9 +66,16 @@ def run_one_cell(args):
     n, kf, lam, mc, comm = args
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     sys.path.insert(0, str(Path(__file__).parent))
+    import json as _json
     from src.dual_sweep.variants import build_archetype_a_qual
     from equity_curve_default import simulate_with_stake
     qual_a, _ = build_archetype_a_qual()
+    # League q≥0.65 filter (drops historically -EV leagues)
+    lq_path = Path(__file__).resolve().parents[1] / "src" / "phase5a" / "league_quality.json"
+    if lq_path.exists():
+        lq = _json.loads(lq_path.read_text())
+        allowed = {k for k, v in lq.items() if v.get("q", 0) >= 0.65}
+        qual_a = qual_a[qual_a["league"].isin(allowed)].reset_index(drop=True)
     df = simulate_with_stake(
         qual_a, n_legs=n, kelly_fraction=kf,
         diversity_lambda=lam, max_combos_per_week=mc,

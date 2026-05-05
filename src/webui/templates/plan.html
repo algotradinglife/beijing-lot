@@ -15,6 +15,41 @@
   </form>
 </div>
 
+{% if strategy_summary %}
+{% set ss = strategy_summary %}
+{% set wsum = ss.mix_w2 + ss.mix_w3 + ss.mix_w4 + ss.mix_w5 %}
+<div class="alert alert-info py-2 mb-3 small">
+  <strong>📋 当前策略</strong>：
+  {% if ss.mix_enabled and wsum > 0 %}
+    {# 推断策略名 #}
+    {% set is_n5 = (ss.mix_w5 > 0.99 and ss.mix_w2 + ss.mix_w3 + ss.mix_w4 < 0.01) %}
+    {% set is_n3 = (ss.mix_w3 > 0.99 and ss.mix_w2 + ss.mix_w4 + ss.mix_w5 < 0.01) %}
+    {% set name = (is_n5 and ss.league_q_min >= 0.65) and "高 Sharpe N=5"
+                 or (is_n3) and "纯 N=3 高 Calmar"
+                 or "Mix 策略" %}
+    <strong class="text-primary">{{ name }}</strong> ·
+    max_combos={{ ss.max_combos }} ·
+    权重 N=2/3/4/5:
+    {{ "%.0f"|format(ss.mix_w2/wsum*100) }}/{{ "%.0f"|format(ss.mix_w3/wsum*100) }}/{{ "%.0f"|format(ss.mix_w4/wsum*100) }}/{{ "%.0f"|format(ss.mix_w5/wsum*100) }}%
+    · Kelly:
+    {% if ss.mix_w2 > 0 %} N2={{ ss.kelly_n2 }}{% endif %}
+    {% if ss.mix_w3 > 0 %} N3={{ ss.kelly_n3 }}{% endif %}
+    {% if ss.mix_w4 > 0 %} N4={{ ss.kelly_n4 }}{% endif %}
+    {% if ss.mix_w5 > 0 %} N5={{ ss.kelly_n5 }}{% endif %}
+    · λ:
+    {% if ss.mix_w2 > 0 %} N2={{ ss.lambda_n2 }}{% endif %}
+    {% if ss.mix_w3 > 0 %} N3={{ ss.lambda_n3 }}{% endif %}
+    {% if ss.mix_w4 > 0 %} N4={{ ss.lambda_n4 }}{% endif %}
+    {% if ss.mix_w5 > 0 %} N5={{ ss.lambda_n5 }}{% endif %}
+    {% if ss.league_q_min > 0 %} · <span class="badge bg-success">联赛过滤 q≥{{ ss.league_q_min }}</span>{% endif %}
+    <a href="{{ url_for('strategy_explorer') }}" class="ms-2">切换策略 →</a>
+  {% else %}
+    <span class="text-muted">未启用 mix 模式</span>
+    <a href="{{ url_for('strategy_explorer') }}" class="ms-2">去选择策略 →</a>
+  {% endif %}
+</div>
+{% endif %}
+
 {% if not live_db_exists %}
 <div class="alert alert-warning">
   Live Collector 未启动 / 数据库不存在。请先采集行情。
@@ -52,7 +87,6 @@
   {# 期望盈亏汇总卡片 #}
   {% set net_profit = plan.expected_total_return - plan.total_stake %}
   {% set ev_pct = (plan.expected_total_return / plan.total_stake - 1) * 100 if plan.total_stake else 0 %}
-  {% set net_with_comm = net_profit + (plan.expected_commission|default(0)) %}
   <div class="row mb-3">
     <div class="col-md-4">
       <div class="card text-bg-light">
@@ -68,11 +102,7 @@
         <div class="card-body">
           <small>{% if net_profit >= 0 %}期望净利{% else %}期望净亏{% endif %}</small>
           <h4 class="mb-0">{{ "%+.0f"|format(net_profit) }} 元</h4>
-          {% if plan.commission_rate and plan.commission_rate > 0 %}
-            <small>+ 佣金 {{ "%.0f"|format(plan.expected_commission) }} 元 → 合计 <strong>{{ "%+.0f"|format(net_with_comm) }} 元</strong></small>
-          {% else %}
-            <small>= 期望回收 − 总下注</small>
-          {% endif %}
+          <small>= 期望回收 − 总下注</small>
         </div>
       </div>
     </div>
@@ -176,7 +206,7 @@
             <td></td>
             <td colspan="7"><small class="text-muted">
               {% for leg in t.legs %}
-                {% if leg.home %}{{ leg.home }} vs {{ leg.away }}{% if leg.kickoff_ts %} · {{ leg.kickoff_ts }}{% endif %} ({{ leg.rule }}){% if not loop.last %} | {% endif %}{% endif %}
+                {% if leg.home %}{{ leg.home }} vs {{ leg.away }}{% if leg.kickoff_ts %} · {{ leg.kickoff_ts|hk }}{% endif %} ({{ leg.rule }}){% if not loop.last %} | {% endif %}{% endif %}
               {% endfor %}
             </small></td>
           </tr>

@@ -10,554 +10,430 @@
 </div>
 {% else %}
 
-<div class="alert alert-info">
-  <strong>使用提示</strong>：从下方表格 + 散点图选合适配置 → 点击行的 "应用" 按钮一键写入策略参数 → 去当期计划页重新生成。
-  数据源：256 个回测 cell（N ∈ {3,4} × Kelly ∈ {1/32,1/16,1/8,1/4} × λ ∈ {0,0.5,1,2} × max ∈ {25,50,100,200} × 佣金 ∈ {0,7%}）
-</div>
-
-<div class="row mb-3">
-  <div class="col-md-3">
-    <label class="form-label small">筛选 N</label>
-    <select id="filter_n" class="form-select form-select-sm">
-      <option value="">全部</option>
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4">4</option>
-      <option value="mix">仅 mix 配置</option>
-    </select>
+<div class="card mb-4 border-success">
+  <div class="card-header bg-success text-white">
+    💰 按本金推荐配置
   </div>
-  <div class="col-md-3">
-    <label class="form-label small">筛选 λ</label>
-    <select id="filter_lambda" class="form-select form-select-sm">
-      <option value="">全部</option>
-      <option value="0">0</option><option value="0.5">0.5</option>
-      <option value="1">1</option><option value="2">2</option>
-    </select>
-  </div>
-  <div class="col-md-3">
-    <label class="form-label small">筛选佣金</label>
-    <select id="filter_comm" class="form-select form-select-sm">
-      <option value="">全部</option><option value="0">无</option><option value="0.07">7%</option>
-    </select>
-  </div>
-  <div class="col-md-3">
-    <label class="form-label small">排序依据</label>
-    <select id="sort_by" class="form-select form-select-sm">
-      <option value="calmar">Calmar（推荐）</option>
-      <option value="sharpe">Sharpe</option>
-      <option value="cagr">CAGR</option>
-      <option value="max_dd_neg">|MaxDD| 升序</option>
-      <option value="final">8 年终值</option>
-    </select>
+  <div class="card-body">
+    <div class="row g-2 align-items-end mb-3">
+      <div class="col-md-3">
+        <label class="form-label small">你的起始本金（元）</label>
+        <input type="number" id="cap_input" class="form-control" value="100000" min="50000" step="10000"
+               oninput="recommendConfig()">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label small">最大 util%</label>
+        <select id="cap_util" class="form-select" onchange="recommendConfig()">
+          <option value="0.01">1%</option>
+          <option value="0.025">2.5%</option>
+          <option value="0.04">4%</option>
+          <option value="0.06" selected>6%</option>
+          <option value="0.10">10%</option>
+          <option value="0.20">20%</option>
+          <option value="0.50">50%</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">族过滤</label>
+        <select id="cap_fam" class="form-select" onchange="recommendConfig(); renderParetoStrategies();">
+          <option value="all" selected>全部（mix + 包场）</option>
+          <option value="mix">仅 mix 族</option>
+          <option value="cover">仅 包场族</option>
+          <option value="executable">仅可执行（绿色行）</option>
+        </select>
+      </div>
+    </div>
+    <div id="cap_result"></div>
   </div>
 </div>
 
-<h4>Pareto 散点图（CAGR vs Max DD）</h4>
-<div id="pareto_chart" style="height: 420px;"></div>
-<small class="text-muted">点击点 → 高亮，并加入下方"对比曲线"。鼠标悬停查看配置详情。理想配置在右上角（高 CAGR, 低 |DD|）。</small>
+<h4 class="mt-4">Pareto 散点图（CAGR vs Max DD）</h4>
+<div id="pareto_chart" style="height: 480px;"></div>
+<small class="text-muted">鼠标悬停查看详情，<strong>点击点查看资金增长曲线</strong>。理想配置在右上角（高 CAGR + 低 |DD|）。</small>
 
-<h4 class="mt-4">配置排行表</h4>
-<div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-  <table class="table table-sm table-hover" id="config_table">
-    <thead class="sticky-top bg-light">
-      <tr>
-        <th>N</th><th>Kelly</th><th>λ</th><th>max</th><th>佣金</th>
-        <th class="text-end">CAGR</th>
-        <th class="text-end">Sharpe</th>
-        <th class="text-end">MaxDD</th>
-        <th class="text-end">Calmar</th>
-        <th class="text-end">利用%</th>
-        <th class="text-end">8年终值</th>
-        <th class="text-end">应用</th>
-      </tr>
-    </thead>
-    <tbody id="config_tbody"></tbody>
-  </table>
+<div id="equity_panel" class="mt-3" style="display:none">
+  <h5 id="equity_title"></h5>
+  <div id="equity_chart" style="height: 360px;"></div>
 </div>
-
-<h4 class="mt-4">对比权益曲线（点 Pareto 散点选中加入）</h4>
-<button id="clear_compare" class="btn btn-sm btn-outline-secondary mb-2">清空对比</button>
-<div id="compare_chart" style="height: 400px;"></div>
-
-<hr class="my-4">
-<h4>3 路 Mix 实时调节 — N=2/3/4 自由配比</h4>
-<p class="text-muted">三个滑块实时联动（自动归一化到和=100%）。改完立即看曲线 + 指标。</p>
-
-<div class="row mb-3">
-  <div class="col-md-2"><div class="card"><div class="card-body p-2">
-    <label class="form-label small">N=2 权重 <span id="m3_w2_lbl" class="badge bg-primary">30%</span></label>
-    <input type="range" id="m3_w2" min="0" max="100" value="30" class="form-range">
-  </div></div></div>
-  <div class="col-md-2"><div class="card"><div class="card-body p-2">
-    <label class="form-label small">N=3 权重 <span id="m3_w3_lbl" class="badge bg-primary">40%</span></label>
-    <input type="range" id="m3_w3" min="0" max="100" value="40" class="form-range">
-  </div></div></div>
-  <div class="col-md-2"><div class="card"><div class="card-body p-2">
-    <label class="form-label small">N=4 权重 <span id="m3_w4_lbl" class="badge bg-primary">30%</span></label>
-    <input type="range" id="m3_w4" min="0" max="100" value="30" class="form-range">
-  </div></div></div>
-  <div class="col-md-1">
-    <label class="form-label small">Kelly</label>
-    <select id="m3_kelly" class="form-select form-select-sm">
-      <option value="0.0312">1/32</option><option value="0.0625" selected>1/16</option>
-      <option value="0.1250">1/8</option><option value="0.2500">1/4</option>
-    </select>
-  </div>
-  <div class="col-md-1">
-    <label class="form-label small">λ</label>
-    <select id="m3_lambda" class="form-select form-select-sm">
-      <option value="0">0</option><option value="0.5" selected>0.5</option>
-      <option value="1">1</option><option value="2">2</option>
-    </select>
-  </div>
-  <div class="col-md-2">
-    <label class="form-label small">max</label>
-    <select id="m3_max" class="form-select form-select-sm">
-      <option value="25">25</option><option value="50" selected>50</option>
-      <option value="100">100</option><option value="200">200</option>
-    </select>
-  </div>
-  <div class="col-md-2">
-    <label class="form-label small">佣金</label>
-    <select id="m3_comm" class="form-select form-select-sm">
-      <option value="0" selected>无</option><option value="0.07">7%</option>
-    </select>
-  </div>
-</div>
-
-<div class="row mb-3">
-  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
-    <small class="text-muted">CAGR</small><h5 id="m3_cagr">--</h5>
-  </div></div></div>
-  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
-    <small class="text-muted">Sharpe</small><h5 id="m3_sharpe">--</h5>
-  </div></div></div>
-  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
-    <small class="text-muted">MaxDD</small><h5 id="m3_dd">--</h5>
-  </div></div></div>
-  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
-    <small class="text-muted">Calmar</small><h5 id="m3_calmar">--</h5>
-  </div></div></div>
-  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
-    <small class="text-muted">利用率</small><h5 id="m3_util">--</h5>
-  </div></div></div>
-  <div class="col-md-2"><div class="card text-center"><div class="card-body p-2">
-    <small class="text-muted">8 年终值</small><h5 id="m3_final">--</h5>
-  </div></div></div>
-</div>
-<div id="mix3_chart" style="height: 320px;"></div>
-
-<hr class="my-4">
-<h4>2 路 Mix 比例对比（旧）— 固定参数看权重曲线</h4>
-<p class="text-muted">固定 Kelly/λ/max/佣金，看 N₁ 和 N₂ 不同混合权重下的权益曲线如何变化。</p>
-<div class="row mb-3">
-  <div class="col-md-2">
-    <label class="form-label small">主 N</label>
-    <select id="mr_primary" class="form-select form-select-sm">
-      <option value="4" selected>4</option><option value="3">3</option><option value="2">2</option>
-    </select>
-  </div>
-  <div class="col-md-2">
-    <label class="form-label small">次 N</label>
-    <select id="mr_secondary" class="form-select form-select-sm">
-      <option value="2" selected>2</option><option value="3">3</option><option value="4">4</option>
-    </select>
-  </div>
-  <div class="col-md-2">
-    <label class="form-label small">Kelly</label>
-    <select id="mr_kelly" class="form-select form-select-sm">
-      <option value="0.0313">1/32</option>
-      <option value="0.0625" selected>1/16</option>
-      <option value="0.1250">1/8</option>
-      <option value="0.2500">1/4</option>
-    </select>
-  </div>
-  <div class="col-md-2">
-    <label class="form-label small">λ (diversity)</label>
-    <select id="mr_lambda" class="form-select form-select-sm">
-      <option value="0">0</option><option value="0.5" selected>0.5</option>
-      <option value="1">1</option><option value="2">2</option>
-    </select>
-  </div>
-  <div class="col-md-2">
-    <label class="form-label small">max</label>
-    <select id="mr_max" class="form-select form-select-sm">
-      <option value="25">25</option><option value="50" selected>50</option>
-      <option value="100">100</option><option value="200">200</option>
-    </select>
-  </div>
-  <div class="col-md-2">
-    <label class="form-label small">佣金</label>
-    <select id="mr_comm" class="form-select form-select-sm">
-      <option value="0" selected>无</option><option value="0.07">7%</option>
-    </select>
-  </div>
-</div>
-<div id="mix_ratio_chart" style="height: 400px;"></div>
-<div id="mix_ratio_table" class="mt-2"></div>
 
 {% endif %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.0/plotly.min.js"></script>
 <script>
-const grid = {{ grid_json|safe }};
+// ===== 推荐策略列表（Mix 族 + 包场族）=====
+// 数据来源：8 年回测，本金 10 万基线
+// hit_rate（周胜率）= 实际有正 PnL 的周次占比
+const STRATEGIES = [
+  // ===== Niche-mix family =====
+  // 注：cfg.w / k / l 为 [N=2, N=3, N=4, N=5] 数组（4 个 N）
+  {fam:'mix', name:'稳健（K=1/32 全部, max=200）',          cagr:0.221, dd:-0.10,  sharpe:1.22, hit:0.305, ws_at_100k:1211,
+    cfg:{max_combos:200, w:[0.30,0.40,0.30,0],   k:[0.03125,0.03125,0.03125,0.125], l:[0,0,0,0]}},
+  {fam:'mix', name:'高 Sharpe N=5（K=⅛ λ=0 max=100, q≥0.65）', cagr:0.620, dd:-0.093, sharpe:1.18, hit:0.180, ws_at_100k:1134,
+    cfg:{max_combos:100, w:[0,0,0,1],            k:[0.0625,0.125,0.0625,0.125],     l:[0,0,0.5,0], league_q_min:0.65}},
+  {fam:'mix', name:'Sharpe 优先（20/20/60, max=100）',       cagr:0.642, dd:-0.20,  sharpe:0.77, hit:0.255, ws_at_100k:7669,
+    cfg:{max_combos:100, w:[0.20,0.20,0.60,0],   k:[0.25,0.125,0.125,0.125],        l:[0,0,0.5,0]}},
+  {fam:'mix', name:'平衡（0/50/50 N=3/N=4, max=100）',       cagr:0.935, dd:-0.30,  sharpe:0.70, hit:0.220, ws_at_100k:13649,
+    cfg:{max_combos:100, w:[0,0.50,0.50,0],      k:[0.0625,0.125,0.25,0.125],       l:[0,0,0.5,0]}},
+  {fam:'mix', name:'Calmar 王（20/20/60, max=150）',        cagr:0.949, dd:-0.297, sharpe:0.65, hit:0.280, ws_at_100k:19746,
+    cfg:{max_combos:150, w:[0.20,0.20,0.60,0],   k:[0.25,0.125,0.125,0.125],        l:[0,0,0.5,0]}},
+  {fam:'mix', name:'激进（20/20/60, max=200）',             cagr:1.305, dd:-0.454, sharpe:0.62, hit:0.300, ws_at_100k:43884,
+    cfg:{max_combos:200, w:[0.20,0.20,0.60,0],   k:[0.25,0.125,0.125,0.125],        l:[0,0,0.5,0]}},
+  {fam:'mix', name:'纯 N=3 高 Calmar（K=⅛, max=150）',       cagr:1.677, dd:-0.368, sharpe:0.58, hit:0.285, ws_at_100k:68200,
+    cfg:{max_combos:150, w:[0,1,0,0],            k:[0.0625,0.125,0.0625,0.125],     l:[0,0,0.5,0]}},
+  {fam:'mix', name:'满杠杆（0/50/50, max=200）',            cagr:1.849, dd:-0.497, sharpe:0.59, hit:0.255, ws_at_100k:98267,
+    cfg:{max_combos:200, w:[0,0.50,0.50,0],      k:[0.0625,0.125,0.25,0.125],       l:[0,0,0.5,0]}},
+  // ===== Cover family (固定 stake；含 20% 税；无佣金) =====
+  // min_bk: 把 MaxDD 控制在 50% 内所需的最低本金；cagr_real: 在 min_bk 基础上的真实 CAGR
+  {fam:'cover', name:'包场 N=7/3（≥2 SP≥4 过滤）',  min_bk:88624,    cagr_real:0.051, dd:-0.50, ws:864,    pnl_8y:43136,    hit:0.204, n:7,  nf:3, raw_after:0.130, p99:-0.074},
+  {fam:'cover', name:'包场 N=8/4',                min_bk:311394,   cagr_real:0.047, dd:-0.50, ws:2592,   pnl_8y:136767,   hit:0.170, n:8,  nf:4, raw_after:0.143, p99:-0.141},
+  {fam:'cover', name:'包场 N=9/5',                min_bk:989065,   cagr_real:0.045, dd:-0.50, ws:7776,   pnl_8y:413886,   hit:0.183, n:9,  nf:5, raw_after:0.150, p99:0.062},
+  {fam:'cover', name:'包场 N=10/6',               min_bk:1800768,  cagr_real:0.119, dd:-0.50, ws:23328,  pnl_8y:2619872,  hit:0.159, n:10, nf:6, raw_after:0.325, p99:0.206},
+  {fam:'cover', name:'包场 N=11/6 ⭐',             min_bk:3764453,  cagr_real:0.199, dd:-0.50, ws:46656,  pnl_8y:12342415, hit:0.163, n:11, nf:6, raw_after:0.799, p99:0.515},
+  {fam:'cover', name:'包场 N=11/7',               min_bk:5820960,  cagr_real:0.158, dd:-0.50, ws:69984,  pnl_8y:12994477, hit:0.172, n:11, nf:7, raw_after:0.561, p99:0.373},
+  {fam:'cover', name:'包场 N=12/7',               min_bk:11467596, cagr_real:0.193, dd:-0.50, ws:139968, pnl_8y:35452991, hit:0.158, n:12, nf:7, raw_after:0.799, p99:0.353},
+];
 
-// Parse cell key: "N3_K0.0625_L0.50_M50_C0.000" or
-// "MIX_P4_S2_W0.70_K0.0625_L0.50_M50_C0.000"
-function parseKey(k) {
-  let m = k.match(/^N(\d+)_K([\d.]+)_L([\d.]+)_M(\d+)_C([\d.]+)$/);
-  if (m) return {
-    n_legs: +m[1], kelly: +m[2], lambda: +m[3],
-    max_combos: +m[4], commission: +m[5], is_mix: false,
-  };
-  m = k.match(/^MIX_P(\d+)_S(\d+)_W([\d.]+)_K([\d.]+)_L([\d.]+)_M(\d+)_C([\d.]+)$/);
-  if (m) return {
-    n_legs: +m[1],  // primary N for filtering
-    n_secondary: +m[2], weight_primary: +m[3],
-    kelly: +m[4], lambda: +m[5],
-    max_combos: +m[6], commission: +m[7], is_mix: true,
-  };
-  return null;
+const COL_MIX = '#1f77b4';
+const COL_COVER = '#ff7f0e';
+
+function fmt(n) { return Math.round(n).toLocaleString('zh-CN'); }
+function fmtW(n) { return (n/10000).toFixed(1) + '万'; }
+
+// ===== Top recommendation table (按本金推荐) =====
+// 排序状态：默认按 8 年终值降序
+let sortKey = 'final8y';
+let sortDir = 'desc';
+
+// 预计算的 50 点 equity curve（key = 策略名匹配）
+const EQUITY_CURVES = {{ equity_curves|safe }};
+function shortKeyOf(name) {
+  return name.replace(/[（(].*$/, '').trim();
 }
-
-const allRows = Object.entries(grid).map(([k, v]) => {
-  const p = parseKey(k);
-  return p ? {
-    key: k, ...p, ...v,
-    cagr_pct: v.cagr * 100,
-    max_dd_pct: v.max_dd * 100,
-    max_dd_neg: -v.max_dd,
-    final_w: v.final / 1e4,  // 万元
-  } : null;
-}).filter(Boolean);
-
-const compareKeys = new Set();
-
-function applyFilters() {
-  const fN = document.getElementById('filter_n').value;
-  const fL = document.getElementById('filter_lambda').value;
-  const fC = document.getElementById('filter_comm').value;
-  return allRows.filter(r => {
-    let nOK;
-    if (!fN) nOK = true;
-    else if (fN === 'mix') nOK = r.is_mix;
-    else nOK = !r.is_mix && r.n_legs === +fN;
-    return nOK
-      && (!fL || Math.abs(r.lambda - +fL) < 0.01)
-      && (!fC || Math.abs(r.commission - +fC) < 0.001);
-  });
-}
-
-function sortRows(rows) {
-  const by = document.getElementById('sort_by').value;
-  return [...rows].sort((a, b) => {
-    if (by === 'max_dd_neg') return a.max_dd_neg - b.max_dd_neg;
-    return (b[by] || 0) - (a[by] || 0);
-  });
-}
-
-function fmtCfg(r) {
-  if (r.is_mix) {
-    return `MIX ${(r.weight_primary*100).toFixed(0)}% N=${r.n_legs} + ${((1-r.weight_primary)*100).toFixed(0)}% N=${r.n_secondary}, K=${r.kelly.toFixed(4)}, λ=${r.lambda}, max=${r.max_combos}, 佣金=${(r.commission*100).toFixed(0)}%`;
-  }
-  return `N=${r.n_legs}, K=${r.kelly.toFixed(4)}, λ=${r.lambda}, max=${r.max_combos}, 佣金=${(r.commission*100).toFixed(0)}%`;
-}
-
-function colorize(val, good_above, td) {
-  td.classList.remove('text-success','text-warning','text-danger');
-  if (val >= good_above) td.classList.add('text-success');
-  else if (val >= good_above * 0.5) td.classList.add('text-warning');
-  else td.classList.add('text-danger');
-}
-
-function renderTable() {
-  const rows = sortRows(applyFilters()).slice(0, 80);
-  const tbody = document.getElementById('config_tbody');
-  tbody.innerHTML = rows.map(r => `
-    <tr data-key="${r.key}" ${r.is_mix ? 'style="background:#fdf3c4"' : ''}>
-      <td>${r.is_mix ? `MIX ${(r.weight_primary*100).toFixed(0)}/${((1-r.weight_primary)*100).toFixed(0)}<br><small>P=${r.n_legs} S=${r.n_secondary}</small>` : r.n_legs}</td>
-      <td>${r.kelly.toFixed(4)}</td>
-      <td>${r.lambda}</td>
-      <td>${r.max_combos}</td>
-      <td>${(r.commission*100).toFixed(0)}%</td>
-      <td class="text-end ${r.cagr >= 0.30 ? 'text-success' : r.cagr >= 0.10 ? 'text-warning' : ''}">${(r.cagr_pct).toFixed(1)}%</td>
-      <td class="text-end ${r.sharpe >= 0.6 ? 'text-success' : r.sharpe >= 0.3 ? 'text-warning' : ''}">${r.sharpe.toFixed(2)}</td>
-      <td class="text-end ${r.max_dd > -0.15 ? 'text-success' : r.max_dd > -0.40 ? 'text-warning' : 'text-danger'}">${r.max_dd_pct.toFixed(1)}%</td>
-      <td class="text-end ${r.calmar >= 2 ? 'text-success' : r.calmar >= 1 ? 'text-warning' : ''}">${r.calmar.toFixed(2)}</td>
-      <td class="text-end">${r.utilization_pct.toFixed(1)}%</td>
-      <td class="text-end">${r.final_w.toFixed(1)}万</td>
-      <td class="text-end">
-        <button class="btn btn-sm btn-outline-primary apply-btn" data-key="${r.key}">应用</button>
-      </td>
-    </tr>
-  `).join('');
-  document.querySelectorAll('.apply-btn').forEach(btn => {
-    btn.onclick = (e) => {
-      e.stopPropagation();
-      const r = allRows.find(x => x.key === btn.dataset.key);
-      const params = new URLSearchParams({
-        apply: 'true',
-        n_legs: r.n_legs, kelly_fraction: r.kelly,
-        diversity_lambda: r.lambda, max_combos: r.max_combos,
-        commission_rate: r.commission,
-      });
-      window.location = '/strategy_params?' + params.toString();
-    };
-  });
-}
-
-function renderPareto() {
-  const rows = applyFilters();
-  const data = [{
-    x: rows.map(r => r.max_dd_pct),
-    y: rows.map(r => r.cagr_pct),
-    mode: 'markers',
-    type: 'scatter',
-    marker: {
-      size: rows.map(r => 8 + Math.log10(Math.max(r.utilization_pct, 0.1)) * 4),
-      color: rows.map(r => r.sharpe),
-      colorscale: 'RdYlGn',
-      cmin: 0, cmax: 1,
-      colorbar: { title: 'Sharpe', thickness: 14 },
-      line: { width: rows.map(r => compareKeys.has(r.key) ? 3 : 0.5),
-              color: rows.map(r => compareKeys.has(r.key) ? '#000' : '#ccc') },
-    },
-    text: rows.map(r => fmtCfg(r) + `<br>final=${r.final_w.toFixed(1)}万 · util=${r.utilization_pct.toFixed(1)}%`),
-    hovertemplate: '%{text}<br>CAGR %{y:.1f}% · MaxDD %{x:.1f}%<extra></extra>',
-    customdata: rows.map(r => r.key),
-  }];
-  const layout = {
-    margin: { l: 60, r: 30, t: 10, b: 50 },
-    xaxis: { title: 'Max DD (%)', range: [Math.min(-100, Math.min(...rows.map(r=>r.max_dd_pct))-5), 5] },
-    yaxis: { title: 'CAGR (%)', range: [Math.min(-30, Math.min(...rows.map(r=>r.cagr_pct))-5),
-                                          Math.max(...rows.map(r=>r.cagr_pct))*1.1] },
-    showlegend: false,
-  };
-  Plotly.newPlot('pareto_chart', data, layout, { displayModeBar: false, responsive: true });
-  document.getElementById('pareto_chart').on('plotly_click', (ev) => {
-    const k = ev.points[0].customdata;
-    if (compareKeys.has(k)) compareKeys.delete(k);
-    else compareKeys.add(k);
-    renderPareto();
-    renderCompare();
-  });
-}
-
-function renderCompare() {
-  if (compareKeys.size === 0) {
-    document.getElementById('compare_chart').innerHTML =
-      '<div class="text-center text-muted py-5">点 Pareto 散点选中配置加入对比（最多 5 个）</div>';
+function showEquityCurve(strategyIdx) {
+  const s = STRATEGIES[strategyIdx];
+  const key = shortKeyOf(s.name);
+  const curve = EQUITY_CURVES[key];
+  const panel = document.getElementById('equity_panel');
+  const title = document.getElementById('equity_title');
+  if (!curve || !curve.length) {
+    panel.style.display = 'none';
     return;
   }
-  const colors = ['#b04a2f','#2e6b4a','#a45a00','#3a5a8c','#6b2e6b'];
-  const traces = [...compareKeys].slice(0, 5).map((k, i) => {
-    const r = allRows.find(x => x.key === k);
-    if (!r || !r.equity_curve) return null;
-    return {
-      x: r.equity_curve.map((_, j) => j),
-      y: r.equity_curve,
-      mode: 'lines', type: 'scatter',
-      line: { color: colors[i], width: 2 },
-      name: fmtCfg(r),
-    };
-  }).filter(Boolean);
-  Plotly.newPlot('compare_chart', traces, {
-    margin: { l: 60, r: 20, t: 10, b: 50 },
-    xaxis: { title: '周（OOS 测试期，~50 点降采样）' },
-    yaxis: { title: 'Bankroll (元)', type: 'log' },
-    legend: { orientation: 'h', y: -0.2 },
-    shapes: [{
-      type: 'line', x0: 0, x1: 50, y0: 100000, y1: 100000,
-      line: { color: 'gray', dash: 'dash', width: 1 },
-    }],
-  }, { displayModeBar: false, responsive: true });
-}
-
-function findCellByParams({n_legs, kelly, lambda, max_combos, commission, is_mix=false, n_secondary=null, weight_primary=null}) {
-  return allRows.find(r => {
-    if (r.is_mix !== is_mix) return false;
-    if (r.n_legs !== n_legs) return false;
-    if (Math.abs(r.kelly - kelly) > 0.0005) return false;
-    if (Math.abs(r.lambda - lambda) > 0.01) return false;
-    if (r.max_combos !== max_combos) return false;
-    if (Math.abs(r.commission - commission) > 0.001) return false;
-    if (is_mix) {
-      if (r.n_secondary !== n_secondary) return false;
-      if (Math.abs(r.weight_primary - weight_primary) > 0.01) return false;
-    }
-    return true;
-  });
-}
-
-function renderMixRatio() {
-  const np = +document.getElementById('mr_primary').value;
-  const ns = +document.getElementById('mr_secondary').value;
-  const kelly = +document.getElementById('mr_kelly').value;
-  const lambda = +document.getElementById('mr_lambda').value;
-  const max_combos = +document.getElementById('mr_max').value;
-  const commission = +document.getElementById('mr_comm').value;
-
-  const targetEl = document.getElementById('mix_ratio_chart');
-  const tableEl = document.getElementById('mix_ratio_table');
-  if (np === ns) {
-    targetEl.innerHTML = '<div class="text-center text-warning py-5">主 N 和次 N 不能相同</div>';
-    tableEl.innerHTML = '';
-    return;
-  }
-
-  // Build configs: pure P, pure S, plus 3 mix weights
-  const candidates = [
-    {label: `纯 N=${np} (100/0)`, params: {n_legs: np, kelly, lambda, max_combos, commission}},
-    {label: `Mix ${np}/${ns} (70/30)`, params: {n_legs: np, kelly, lambda, max_combos, commission,
-      is_mix: true, n_secondary: ns, weight_primary: 0.7}},
-    {label: `Mix ${np}/${ns} (50/50)`, params: {n_legs: np, kelly, lambda, max_combos, commission,
-      is_mix: true, n_secondary: ns, weight_primary: 0.5}},
-    {label: `Mix ${np}/${ns} (30/70)`, params: {n_legs: np, kelly, lambda, max_combos, commission,
-      is_mix: true, n_secondary: ns, weight_primary: 0.3}},
-    {label: `纯 N=${ns} (0/100)`, params: {n_legs: ns, kelly, lambda, max_combos, commission}},
-  ];
-
-  const colors = ['#b04a2f', '#a45a00', '#2e6b4a', '#3a5a8c', '#6b2e6b'];
-  const traces = [];
-  const tableRows = [];
-
-  candidates.forEach((c, i) => {
-    const cell = findCellByParams(c.params);
-    if (!cell) {
-      tableRows.push({label: c.label, missing: true});
-      return;
-    }
-    traces.push({
-      x: cell.equity_curve.map((_, j) => j),
-      y: cell.equity_curve,
-      mode: 'lines', type: 'scatter',
-      line: {color: colors[i], width: 2},
-      name: c.label,
-    });
-    tableRows.push({
-      label: c.label,
-      cagr: cell.cagr_pct,
-      sharpe: cell.sharpe,
-      max_dd: cell.max_dd_pct,
-      calmar: cell.calmar,
-      util: cell.utilization_pct,
-      final: cell.final_w,
-    });
-  });
-
-  if (!traces.length) {
-    targetEl.innerHTML = '<div class="text-center text-muted py-5">网格中无对应 cell（请确认参数）</div>';
-    tableEl.innerHTML = '';
-    return;
-  }
-
-  Plotly.newPlot('mix_ratio_chart', traces, {
-    margin: {l: 60, r: 20, t: 10, b: 50},
-    xaxis: {title: '周（OOS 测试期，~50 点降采样）'},
-    yaxis: {title: 'Bankroll (元)', type: 'log'},
-    legend: {orientation: 'h', y: -0.2},
-    shapes: [{
-      type: 'line', x0: 0, x1: 50, y0: 100000, y1: 100000,
-      line: {color: 'gray', dash: 'dash', width: 1},
-    }],
-  }, {displayModeBar: false, responsive: true});
-
-  // Render comparison table
-  let html = '<table class="table table-sm"><thead><tr><th>配置</th><th class="text-end">CAGR</th><th class="text-end">Sharpe</th><th class="text-end">MaxDD</th><th class="text-end">Calmar</th><th class="text-end">利用率</th><th class="text-end">8 年终值</th></tr></thead><tbody>';
-  tableRows.forEach(r => {
-    if (r.missing) {
-      html += `<tr><td>${r.label}</td><td colspan="6" class="text-muted">— 未在网格中 —</td></tr>`;
-    } else {
-      html += `<tr>
-        <td>${r.label}</td>
-        <td class="text-end">${r.cagr.toFixed(1)}%</td>
-        <td class="text-end">${r.sharpe.toFixed(2)}</td>
-        <td class="text-end">${r.max_dd.toFixed(1)}%</td>
-        <td class="text-end">${r.calmar.toFixed(2)}</td>
-        <td class="text-end">${r.util.toFixed(1)}%</td>
-        <td class="text-end">${r.final.toFixed(1)}万</td>
-      </tr>`;
-    }
-  });
-  html += '</tbody></table>';
-  tableEl.innerHTML = html;
-}
-
-async function renderMix3() {
-  const w2_raw = +document.getElementById('m3_w2').value;
-  const w3_raw = +document.getElementById('m3_w3').value;
-  const w4_raw = +document.getElementById('m3_w4').value;
-  const sum = w2_raw + w3_raw + w4_raw;
-  if (sum === 0) {
-    document.getElementById('mix3_chart').innerHTML = '<div class="text-warning text-center py-5">至少一个权重 > 0</div>';
-    return;
-  }
-  const w2 = w2_raw/sum, w3 = w3_raw/sum, w4 = w4_raw/sum;
-  document.getElementById('m3_w2_lbl').textContent = (w2*100).toFixed(0)+'%';
-  document.getElementById('m3_w3_lbl').textContent = (w3*100).toFixed(0)+'%';
-  document.getElementById('m3_w4_lbl').textContent = (w4*100).toFixed(0)+'%';
-
-  const params = new URLSearchParams({
-    w2, w3, w4,
-    kelly: document.getElementById('m3_kelly').value,
-    lambda: document.getElementById('m3_lambda').value,
-    max_combos: document.getElementById('m3_max').value,
-    commission: document.getElementById('m3_comm').value,
-  });
-  const r = await fetch('/api/mix3_preview?' + params.toString());
-  const j = await r.json();
-  if (j.error) {
-    document.getElementById('mix3_chart').innerHTML =
-      '<div class="text-warning text-center py-5">'+ (j.error || j.msg) +'</div>';
-    return;
-  }
-  const fmt = (x, dp=1, suffix='') => (x*100).toFixed(dp)+suffix;
-  document.getElementById('m3_cagr').textContent = fmt(j.cagr, 1) + '%';
-  document.getElementById('m3_sharpe').textContent = j.sharpe.toFixed(2);
-  document.getElementById('m3_dd').textContent = fmt(j.max_dd, 1) + '%';
-  document.getElementById('m3_calmar').textContent = j.calmar.toFixed(2);
-  document.getElementById('m3_util').textContent = j.utilization_pct.toFixed(1) + '%';
-  document.getElementById('m3_final').textContent = (j.final/1e4).toFixed(1) + '万';
-
-  const xs = j.equity_curve.map((_, i) => i);
-  Plotly.newPlot('mix3_chart', [{
-    x: xs, y: j.equity_curve, mode: 'lines',
-    line: {color: '#b04a2f', width: 2.5},
+  panel.style.display = '';
+  const startBk = s.fam === 'mix' ? 100000 : (s.min_bk || 100000);
+  title.innerHTML = `${s.name} — 资金曲线（起始 ${(startBk/10000).toFixed(0)} 万 / 50 点采样 / 8 年期）`;
+  const xs = curve.map((_, i) => i);
+  Plotly.newPlot('equity_chart', [{
+    x: xs, y: curve, mode: 'lines+markers', type: 'scatter',
+    line: {color: s.fam === 'mix' ? '#1f77b4' : '#ff7f0e', width: 2.5},
+    marker: {size: 5},
     hovertemplate: 'Week ~%{x}: %{y:,.0f} 元<extra></extra>',
   }], {
-    margin: {l: 60, r: 20, t: 10, b: 40},
-    xaxis: {title: '周（OOS 测试期）'},
+    margin: {l: 70, r: 20, t: 10, b: 50},
+    xaxis: {title: '采样点（覆盖 8 年回测）'},
     yaxis: {title: 'Bankroll (元)', type: 'log'},
     showlegend: false,
-    shapes: [{type: 'line', x0: 0, x1: xs[xs.length-1], y0: 100000, y1: 100000,
-              line: {color: 'gray', dash: 'dash', width: 1}}],
+    shapes: [{type:'line', x0:0, x1:xs.at(-1), y0:startBk, y1:startBk,
+              line:{color:'gray', dash:'dash', width:1}}],
+    annotations: [{xref:'paper', yref:'y', x:0, y:startBk, xanchor:'left', yanchor:'bottom',
+                   text:'起始本金', showarrow:false, font:{color:'gray', size:10}}],
   }, {displayModeBar: false, responsive: true});
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
-function refreshAll() {
-  renderTable();
-  renderPareto();
-  renderCompare();
-  renderMixRatio();
-  renderMix3();
+function recommendConfig() {
+  const bk = +document.getElementById('cap_input').value || 100000;
+  const utilCap = +document.getElementById('cap_util').value;
+  const famFilter = document.getElementById('cap_fam').value;
+  const out = document.getElementById('cap_result');
+  let rows = STRATEGIES.map((s, origIdx) => {
+    let weeklyStake, final8y, util, effectiveBk, scaledUp;
+    if (s.fam === 'mix') {
+      // Mix 族：stake 随 bankroll 等比缩放，DD 比率不变；用户本金直接生效
+      effectiveBk = bk;
+      weeklyStake = s.ws_at_100k * (bk / 100000);
+      final8y = bk * Math.pow(1 + s.cagr, 8);
+      util = weeklyStake / bk;
+      scaledUp = false;
+    } else {
+      // 包场族：stake 固定；本金 < min_bk 时 DD 会爆。effectiveBk 仅用于显示理论 CAGR
+      effectiveBk = Math.max(bk, s.min_bk);
+      weeklyStake = s.ws;
+      // util 用 USER 真实本金算（不是放大后的）—— 反映真实可执行性
+      util = weeklyStake / bk;
+      final8y = effectiveBk * Math.pow(1 + s.cagr_real, 8);
+      scaledUp = bk < s.min_bk;
+    }
+    // 可执行 = util ≤ cap AND（包场族）bankroll ≥ min_bk
+    const ok = util <= utilCap && (s.fam === 'mix' || bk >= s.min_bk);
+    return {...s, weeklyStake, final8y, util, ok, effectiveBk, scaledUp, origIdx};
+  });
+  // Apply family filter
+  if (famFilter === 'mix') rows = rows.filter(r => r.fam === 'mix');
+  else if (famFilter === 'cover') rows = rows.filter(r => r.fam === 'cover');
+  else if (famFilter === 'executable') rows = rows.filter(r => r.ok);
+  // 多列排序
+  rows.sort((a, b) => {
+    let va, vb;
+    if (sortKey === 'weeklyStake') { va = a.weeklyStake; vb = b.weeklyStake; }
+    else if (sortKey === 'util') { va = a.util; vb = b.util; }
+    else if (sortKey === 'dd') { va = a.dd; vb = b.dd; }  // dd 是负数，desc=DD 最浅
+    else if (sortKey === 'hit') { va = a.hit; vb = b.hit; }
+    else if (sortKey === 'cagr') { va = a.fam === 'mix' ? a.cagr : a.cagr_real; vb = b.fam === 'mix' ? b.cagr : b.cagr_real; }
+    else { va = a.final8y; vb = b.final8y; }  // final8y 默认
+    return sortDir === 'desc' ? vb - va : va - vb;
+  });
+  function arrow(k) {
+    if (sortKey !== k) return '<span class="text-muted small">⇅</span>';
+    return sortDir === 'desc' ? ' ▼' : ' ▲';
+  }
+  const filterLabel = {all:'全部', mix:'仅 mix 族', cover:'仅 包场族', executable:'仅可执行'}[famFilter];
+  const html = `
+    <h6 class="mb-2">所有策略表现（${filterLabel} · 按 8 年终值排序，点击行展开详情 → 应用）</h6>
+    <p class="text-muted small mb-2">
+      <span class="badge bg-success">绿色行</span> = 当前本金可执行（util ≤ ${(utilCap*100).toFixed(0)}%）；
+      <span class="text-warning">↑ 自动放大</span> = 包场族本金不足时按 min_bk 缩放；
+      Mix 族 niche 串关 / 包场族 复式（含 20% 税）。
+    </p>
+    <table class="table table-sm table-hover" id="strategy_table">
+      <thead><tr>
+        <th>族</th><th>策略</th>
+        <th class="text-end">实际本金</th>
+        <th class="text-end sortable" data-sort="weeklyStake" style="cursor:pointer">周 stake${arrow('weeklyStake')}</th>
+        <th class="text-end sortable" data-sort="util" style="cursor:pointer">util%${arrow('util')}</th>
+        <th class="text-end sortable" data-sort="dd" style="cursor:pointer">MaxDD${arrow('dd')}</th>
+        <th class="text-end sortable" data-sort="hit" style="cursor:pointer" title="实际盈利的周次占比">周胜率${arrow('hit')}</th>
+        <th class="text-end sortable" data-sort="final8y" style="cursor:pointer">8 年终值${arrow('final8y')}</th>
+        <th class="text-end sortable" data-sort="cagr" style="cursor:pointer">CAGR${arrow('cagr')}</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map((r, idx) => {
+          const cagrYr = (r.fam === 'mix' ? r.cagr : r.cagr_real) * 100;
+          const famBadge = r.fam === 'mix' ? '<span class="badge bg-primary">mix</span>' : '<span class="badge bg-secondary">包场</span>';
+          // 行配色：可执行 → 绿；自动放大本金 → 仅在小字提示，不再黄
+          const rowClass = r.ok ? 'table-success' : '';
+          const ddPct = (r.dd * 100).toFixed(0) + '%';
+          const ddCls = r.dd < -0.5 ? 'text-warning' : r.dd < -0.2 ? '' : 'text-success';
+          const sharpeCell = r.fam === 'mix' ? r.sharpe.toFixed(2) : '—';
+          const hitCell = (r.hit*100).toFixed(1) + '%';
+          let bkLabel = fmtW(r.effectiveBk);
+          if (r.scaledUp) bkLabel += ` <small class="text-warning" title="你输入 ${fmtW(bk)}，但本策略需 ${fmtW(r.min_bk)} 才能控 DD≤50%">↑ 自动放大</small>`;
+          const expFirstWin = r.hit > 0 ? (1/r.hit).toFixed(1) + ' 期' : '∞';
+          const noWinIn10 = r.hit > 0 ? (Math.pow(1-r.hit, 10) * 100).toFixed(1) + '%' : '100%';
+          const isCover = r.fam === 'cover';
+          // 详细 cfg 字符串
+          let cfgDetail;
+          if (r.fam === 'mix') {
+            const cfg = r.cfg;
+            cfgDetail = `max_combos=${cfg.max_combos}, λ=${cfg.l[2]}, q≥${cfg.league_q_min || 0}<br>` +
+                        `权重 N=2/3/4/5: ${(cfg.w[0]*100).toFixed(0)}/${(cfg.w[1]*100).toFixed(0)}/${(cfg.w[2]*100).toFixed(0)}/${(cfg.w[3]*100).toFixed(0)}%<br>` +
+                        `Kelly N=2/3/4/5: ${cfg.k[0]}/${cfg.k[1]}/${cfg.k[2]}/${cfg.k[3]}`;
+          } else {
+            cfgDetail = `复式 ${3**r.nf * 2**(r.n-r.nf)} 张票/周, filter ≥2 SP≥4<br>` +
+                        `每场 stake=2 元（最低注），每周 ${r.ws} 元`;
+          }
+          const applyBtn = isCover
+            ? `<button class="btn btn-sm btn-outline-warning apply-strategy-btn" data-idx="${r.origIdx}" data-cover="1">应用此策略 →</button>`
+            : `<button class="btn btn-sm btn-success apply-strategy-btn" data-idx="${r.origIdx}">应用此策略 →</button>`;
+          return `<tr class="${rowClass} strategy-row" data-row-idx="${idx}" style="cursor:pointer">
+              <td>${famBadge}</td><td><strong>${r.name}</strong></td>
+              <td class="text-end">${bkLabel}</td>
+              <td class="text-end">${fmt(r.weeklyStake)} 元</td>
+              <td class="text-end ${r.ok?'':'text-danger'}">${(r.util*100).toFixed(1)}%</td>
+              <td class="text-end ${ddCls}">${ddPct}</td>
+              <td class="text-end">${hitCell}</td>
+              <td class="text-end ${r.ok?'text-success':''}"><strong>${fmtW(r.final8y)}</strong></td>
+              <td class="text-end">${cagrYr.toFixed(0)}%</td>
+            </tr>
+            <tr class="strategy-detail" id="strategy-detail-${idx}" style="display:none">
+              <td colspan="9" class="bg-light small">
+                <div class="row">
+                  <div class="col-md-3"><strong>详细参数</strong><br>${cfgDetail}</div>
+                  <div class="col-md-2"><strong>Sharpe</strong><br>${sharpeCell}${r.fam==='cover'?'<br><small class="text-muted">包场族 Sharpe 不可比</small>':''}</div>
+                  <div class="col-md-2"><strong>期望首次盈利期</strong><br>${expFirstWin}</div>
+                  <div class="col-md-2"><strong>10 期连续 0 盈利</strong><br>${noWinIn10}</div>
+                  <div class="col-md-3 text-end">${applyBtn}</div>
+                </div>
+              </td>
+            </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div class="alert alert-warning small mb-0">
+      <strong>⚠ 关键 — 包场族 "8 年终值" 是有水分的 (复利陷阱)</strong>：
+      <ul class="mb-2">
+        <li><span class="badge bg-primary">mix 族</span>：Kelly stake = K × bankroll × edge → bankroll 涨 stake 自动跟涨 →
+          <strong>真复利</strong>，CAGR 数字真实可达。8 年 (1+CAGR)<sup>8</sup> 准确反映几何增长。</li>
+        <li><span class="badge bg-warning text-dark">包场族</span>：stake = 2 元/票 × n_combos
+          <strong>固定不缩放</strong> → bankroll 涨之后 util 跌 →
+          <strong class="text-danger">本质上是线性累加 PnL，不是复利</strong>。
+          表中 CAGR 是从"linear PnL / min_bk"反算出的数字，**仅当你一开始就有 ≥ min_bk 本金 + 全程一档不变才能达到**。</li>
+        <li><strong>真复利路径</strong>需要"discrete N-upgrade"（如 N=7/3 → N=8/4 → N=11/6），但升级门槛跳跃大（9 万 → 31 万 → 376 万 → 1146 万）。
+          实测从 88 万起 + 自动升级，8 年实际 CAGR <strong>仅 +1.2%</strong>（vs 376 万一档 N=11/6 的 +19.9%）。</li>
+        <li><strong>规模优势其实只在大资金一次性满配的情形下成立</strong>。日常累积本金成长路径下，<span class="badge bg-primary">mix 族</span> 长跑必胜（真复利碾压线性）。</li>
+      </ul>
+    </div>
+  `;
+  out.innerHTML = html;
+
+  // 绑定：列头点击排序
+  document.querySelectorAll('.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const k = th.dataset.sort;
+      if (sortKey === k) sortDir = (sortDir === 'desc') ? 'asc' : 'desc';
+      else { sortKey = k; sortDir = 'desc'; }
+      recommendConfig();  // 重新渲染
+    });
+  });
+
+  // 绑定：点击主行 → 展开/折叠详情行
+  document.querySelectorAll('.strategy-row').forEach(tr => {
+    tr.addEventListener('click', (e) => {
+      // 点击 apply 按钮时不触发 toggle
+      if (e.target.closest('button')) return;
+      const idx = tr.dataset.rowIdx;
+      const detail = document.getElementById('strategy-detail-' + idx);
+      if (detail) detail.style.display = (detail.style.display === 'none') ? '' : 'none';
+    });
+  });
+
+  // 绑定：apply 按钮直接 POST /strategy_params
+  document.querySelectorAll('.apply-strategy-btn').forEach(btn => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();  // 不触发 row toggle
+      const s = STRATEGIES[+btn.dataset.idx];
+      if (btn.dataset.cover === '1') {
+        const ok = confirm(
+          `应用包场族「${s.name}」\n\n` +
+          `⚠ 注意：webui 当前的 plan 生成器基于 niche 规则（不支持包场过滤）。\n` +
+          `保存配置不会自动生成包场票，需要手动按以下规则在彩票站打票：\n\n` +
+          `1. 每周筛选 ≥2 SP≥4 的比赛\n` +
+          `2. 取 ${s.n} 场（按 avg_sp 升序）\n` +
+          `3. 最热门 ${s.nf} 场全包，剩余 ${s.n - s.nf} 场押 favorite + 极端 underdog（去 middle）\n` +
+          `4. 复式打票，共 ${3**s.nf * 2**(s.n - s.nf)} 张组合，每张 2 元 = 总 ${s.ws} 元/周\n` +
+          `5. 至少需要 ${(s.min_bk/10000).toFixed(0)} 万本金作 50% DD 缓冲\n\n` +
+          `点确定将参数记录到 dashboard 备忘（暂不影响 plan 自动生成）。`);
+        if (ok) {
+          btn.textContent = '✓ 已记录（手动执行）';
+          btn.classList.remove('btn-outline-warning');
+          btn.classList.add('btn-warning');
+          setTimeout(() => {
+            btn.textContent = '应用此策略 →';
+            btn.classList.add('btn-outline-warning');
+            btn.classList.remove('btn-warning');
+          }, 2500);
+        }
+        return;
+      }
+      if (!s.cfg) { alert('该策略缺少配置数据'); return; }
+      const cfg = s.cfg;
+      const fd = new FormData();
+      fd.append('mix_enabled', '1');
+      fd.append('n_legs', '4');
+      fd.append('kelly_fraction', String(cfg.k[2] || 0.0625));
+      fd.append('diversity_lambda', String(cfg.l[2] || 0.5));
+      fd.append('max_combos', String(cfg.max_combos));
+      [2,3,4,5].forEach((n, i) => {
+        fd.append(`mix_weight_n${n}`, String(cfg.w[i]));
+        fd.append(`kelly_n${n}`, String(cfg.k[i]));
+        fd.append(`lambda_n${n}`, String(cfg.l[i]));
+      });
+      fd.append('league_q_min', String(cfg.league_q_min || 0));
+      btn.disabled = true; btn.textContent = '保存中...';
+      try {
+        const r = await fetch('/strategy_params', {method:'POST', body:fd, redirect:'manual'});
+        if (!(r.type === 'opaqueredirect' || r.ok)) throw new Error('HTTP ' + r.status);
+        btn.textContent = '生成 plan 中...';
+        const r2 = await fetch('/plan/generate', {method:'POST', redirect:'manual'});
+        if (!(r2.type === 'opaqueredirect' || r2.ok)) throw new Error('plan/generate HTTP ' + r2.status);
+        btn.textContent = '✓ 已应用 + 已生成 plan';
+        btn.classList.remove('btn-success'); btn.classList.add('btn-primary');
+        if (confirm('已保存策略并生成本期 plan。是否跳到 plan 页查看？')) {
+          window.location.href = '/plan';
+          return;
+        }
+        setTimeout(() => {
+          btn.disabled = false; btn.textContent = '应用此策略 →';
+          btn.classList.add('btn-success'); btn.classList.remove('btn-primary');
+        }, 2500);
+      } catch (e) {
+        btn.textContent = '✗ 失败'; alert('操作失败: ' + e.message);
+        setTimeout(() => { btn.disabled = false; btn.textContent = '应用此策略 →'; }, 2000);
+      }
+    };
+  });
 }
 
-['filter_n', 'filter_lambda', 'filter_comm', 'sort_by'].forEach(id => {
-  document.getElementById(id).addEventListener('change', refreshAll);
+// ===== Pareto chart (only recommended strategies, colored by family) =====
+function renderParetoStrategies() {
+  const fam = document.getElementById('cap_fam')?.value || 'all';
+  const showMix = (fam === 'all' || fam === 'mix' || fam === 'executable');
+  const showCov = (fam === 'all' || fam === 'cover' || fam === 'executable');
+  const mix = showMix ? STRATEGIES.filter(s => s.fam === 'mix') : [];
+  const cov = showCov ? STRATEGIES.filter(s => s.fam === 'cover') : [];
+
+  // 包场族 DD 在 min_bk 基础上等于 -50% (设计约束)；CAGR 也是基于 min_bk 算的真实值
+  function coverDD(s) { return s.dd; }
+  function coverCAGR(s) { return s.cagr_real; }
+
+  // 短名称用于标记（避免遮挡）
+  function shortName(n) {
+    return n.replace(/(（.*$|\(.*$)/, '').trim();
+  }
+  const mixData = {
+    x: mix.map(s => s.dd * 100),
+    y: mix.map(s => s.cagr * 100),
+    mode: 'markers+text',
+    type: 'scatter',
+    name: 'Mix 族',
+    marker: {symbol:'circle', size: 14, color: COL_MIX,
+             line: {width: 1, color: '#fff'}},
+    text: mix.map(s => shortName(s.name)),
+    textposition: 'top center',
+    textfont: {size: 10, color: COL_MIX},
+    hovertext: mix.map(s => s.name + `<br>Sharpe ${s.sharpe.toFixed(2)} · 周胜率 ${(s.hit*100).toFixed(0)}%`),
+    hovertemplate: '%{hovertext}<br>CAGR %{y:.1f}% · MaxDD %{x:.1f}%<extra></extra>',
+    customdata: mix.map((_,i) => i),
+  };
+  const covData = {
+    x: cov.map(s => coverDD(s) * 100),
+    y: cov.map(s => coverCAGR(s) * 100),
+    mode: 'markers+text',
+    type: 'scatter',
+    name: '包场族',
+    marker: {symbol:'diamond', size: 14, color: COL_COVER,
+             line: {width: 1, color: '#fff'}},
+    text: cov.map(s => shortName(s.name)),
+    textposition: 'bottom center',
+    textfont: {size: 10, color: COL_COVER},
+    hovertext: cov.map(s => s.name + `<br>周胜率 ${(s.hit*100).toFixed(0)}% · 去 P99 ${s.p99>=0?'+':''}${(s.p99*100).toFixed(0)}%`),
+    hovertemplate: '%{hovertext}<br>CAGR %{y:.0f}% · MaxDD %{x:.0f}%（10 万起）<extra></extra>',
+    customdata: cov.map((_,i) => mix.length + i),
+  };
+  const layout = {
+    margin: {l: 60, r: 30, t: 30, b: 50},
+    xaxis: {title: 'Max DD (%)'},
+    yaxis: {title: 'CAGR (%)'},
+    legend: {orientation:'h', y: -0.15},
+  };
+  const traces = [];
+  if (mix.length) traces.push(mixData);
+  if (cov.length) traces.push(covData);
+  Plotly.newPlot('pareto_chart', traces, layout, {displayModeBar: false, responsive: true});
+
+  // 点击点 → 显示资金增长曲线
+  document.getElementById('pareto_chart').on('plotly_click', (ev) => {
+    if (!ev.points || !ev.points.length) return;
+    const idx = ev.points[0].customdata;
+    showEquityCurve(idx);
+  });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  recommendConfig();
+  renderParetoStrategies();
 });
-['mr_primary', 'mr_secondary', 'mr_kelly', 'mr_lambda', 'mr_max', 'mr_comm'].forEach(id => {
-  document.getElementById(id).addEventListener('change', renderMixRatio);
-});
-['m3_w2', 'm3_w3', 'm3_w4', 'm3_kelly', 'm3_lambda', 'm3_max', 'm3_comm'].forEach(id => {
-  document.getElementById(id).addEventListener('input', renderMix3);
-});
-document.getElementById('clear_compare').addEventListener('click', () => {
-  compareKeys.clear();
-  renderPareto();
-  renderCompare();
-});
-window.addEventListener('DOMContentLoaded', refreshAll);
 </script>
 {% endblock %}
 

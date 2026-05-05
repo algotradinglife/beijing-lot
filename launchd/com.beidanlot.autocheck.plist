@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.beidanlot.autocheck</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/huhan/miniforge3/bin/python3</string>
+        <string>-m</string>
+        <string>auto.autocheck</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Volumes/Data Drive/workspace/trading/beijing-lot</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHONPATH</key>
+        <string>/Volumes/Data Drive/workspace/trading/beijing-lot/src</string>
+        <key>PATH</key>
+        <string>/Users/huhan/miniforge3/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>10</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/Volumes/Data Drive/workspace/trading/beijing-lot/data/logs/autocheck.stdout.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Volumes/Data Drive/workspace/trading/beijing-lot/data/logs/autocheck.stderr.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
