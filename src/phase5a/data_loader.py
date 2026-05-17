@@ -82,8 +82,12 @@ def load_open_matches(
     # naive ISO from `now`/`end` — this is a stable string compare for the
     # same timezone convention. Use UTC-naive ISO; matches are within hours,
     # so window edge fuzziness ≤ 8h is acceptable for a 7-day plan.
-    lo = now.replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M:%S")
-    hi = end.replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M:%S")
+    # kickoff_ts is stored as naive Beijing (UTC+8) ISO. Convert now/end to
+    # Beijing-equivalent naive strings so the string comparison is apples-to-apples.
+    # Without this offset, UTC now < Beijing kickoff_ts for up to 8h after a
+    # match starts, letting already-kicked-off matches into the candidate pool.
+    lo = (now + timedelta(hours=8)).replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M:%S")
+    hi = (end + timedelta(hours=8)).replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M:%S")
 
     conn = sqlite3.connect(str(p))
     try:

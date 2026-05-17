@@ -21,6 +21,7 @@ from .parser import (
     parse_issue_list,
     parse_kaijiang,
     parse_livescore_500_all,
+    parse_500_detail_score,
     parse_500_zqdc_issue,
     parse_500_zqdc_score,
 )
@@ -133,21 +134,60 @@ class Collector:
         return inserted
 
     def settle_issue(self, issue: str) -> int:
-        """Fetch kaijiang for an issue and insert settlement rows."""
+        """Fetch kaijiang for an issue and insert settlement rows.
+
+        Each kaijiang row is cross-checked against ``detail.php?fid=`` (a
+        per-match page with explicit ``<span class="score">`` full-time
+        score). On disagreement, detail.php wins — kaijiang has a known
+        home/away inversion bug for some leagues that flips ``result_code``.
+        See ``scripts/audit_kaijiang.py`` for the bulk audit tool.
+        """
+        from .parser import parse_500_detail_score, compute_result_code
         html = self.scraper.fetch_kaijiang_500(issue)
         if not html:
             return 0
         rows = parse_kaijiang(html, issue)
+        # Build fid + handicap map once
+        cur = self.db._conn.cursor()
+        cur.execute("SELECT match_id, fid, handicap_line FROM matches "
+                    "WHERE issue=?", (issue,))
+        meta = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
+
         n = 0
+        n_corrected = 0
         for s in rows:
             if s.result_code is None and s.fthg is None:
                 continue  # row not yet settled
+            fid, hcap = meta.get(s.match_id, (None, None))
+            source = "500_kaijiang"
+            # Cross-check via detail.php; only when we have an fid.
+            if fid:
+                try:
+                    dhtml = self.scraper.fetch_500_detail(fid)
+                    det = parse_500_detail_score(dhtml)
+                except Exception as e:
+                    log.warning("detail fetch failed for %s: %s", s.match_id, e)
+                    det = None
+                if det and (s.fthg, s.ftag) != det:
+                    dhg, dag = det
+                    new_rc = compute_result_code(dhg, dag, hcap) if hcap is not None else s.result_code
+                    log.warning(
+                        "kaijiang/detail disagree %s: kaijiang=%d-%d rc=%s "
+                        "detail=%d-%d rc=%s — using detail",
+                        s.match_id, s.fthg or 0, s.ftag or 0, s.result_code,
+                        dhg, dag, new_rc,
+                    )
+                    import dataclasses as _dc
+                    s = _dc.replace(s, fthg=dhg, ftag=dag, result_code=new_rc)
+                    source = "kaijiang+detail"
+                    n_corrected += 1
             try:
-                if self.db.insert_settlement(s, source="500_kaijiang"):
+                if self.db.insert_settlement(s, source=source):
                     n += 1
             except Exception as e:  # pragma: no cover
                 log.warning("insert_settlement failed for %s: %s", s.match_id, e)
-        log.info("settle issue=%s wrote %d settlement rows", issue, n)
+        log.info("settle issue=%s wrote %d settlement rows (corrected=%d)",
+                 issue, n, n_corrected)
         return n
 
     def settle_pending(self) -> int:
@@ -225,12 +265,70 @@ class Collector:
                         hg, ag = zhg, zag
                         source = "zqdc"
 
+            # Path C: detail.php direct fallback — used when live500 and zqdc
+            # both come up empty (typically >24h after kickoff when rolling
+            # scoreboards no longer list the match) but detail.php still has
+            # the dedicated per-match full-time score.
+            if hg is None and fid:
+                try:
+                    dhtml = self.scraper.fetch_500_detail(fid)
+                    det = parse_500_detail_score(dhtml)
+                except Exception as e:
+                    log.warning("detail fallback fetch failed for %s: %s", mid, e)
+                    det = None
+                if det is not None:
+                    hg, ag = det
+                    source = "detail"
+                    log.info("per-match settle %s: used detail.php fallback %d-%d",
+                             mid, hg, ag)
+
             if hg is None:
                 continue
+            # Cross-check zqdc / live500 score against detail.php's
+            # explicit `<span class="score">N - M</span>` (full-time only).
+            # Without this, zqdc sometimes returns an intermediate score for
+            # a still-live match marked status=4 — that wrong score gets
+            # written to settlements, gets booked into PnL, and is only
+            # later silently overwritten by kaijiang (whose later correction
+            # is NOT propagated to settlements_log → bankroll drifts).
+            if source in ("zqdc", "live500") and fid:
+                try:
+                    dhtml = self.scraper.fetch_500_detail(fid)
+                    det = parse_500_detail_score(dhtml)
+                except Exception as e:
+                    log.warning("detail cross-check fetch failed for %s: %s", mid, e)
+                    det = None
+                if det is None:
+                    log.info("detail.php has no full-time score for %s yet — "
+                             "skip insert, retry next poll", mid)
+                    continue
+                if det != (hg, ag):
+                    log.warning(
+                        "per-match/detail disagree %s: per-match(%s)=%d-%d "
+                        "detail=%d-%d — using detail.php",
+                        mid, source, hg, ag, det[0], det[1],
+                    )
+                    hg, ag = det
+                    source = f"{source}+detail"
             rc = compute_result_code(hg, ag, handicap.get(mid))
+            # Populate winning_sp from the latest snapshot's SP for the
+            # winning side. The kaijiang parser sets this from the official
+            # 500 settlement page; per-match path doesn't see that page, so
+            # we use our most recent pre-kickoff SP as the proxy. Without
+            # this, ticket views show "SP 0.00" for hits settled per-match.
+            wsp = None
+            if rc in ("3", "1", "0"):
+                col = {"3": "sp_3", "1": "sp_1", "0": "sp_0"}[rc]
+                row = self.db._conn.execute(
+                    f"SELECT {col} FROM snapshots WHERE match_id=? "
+                    f"AND {col} IS NOT NULL ORDER BY snapshot_ts DESC LIMIT 1",
+                    (mid,),
+                ).fetchone()
+                if row and row[0] is not None:
+                    wsp = float(row[0])
             s = Settlement(
                 match_id=mid, issue=m["issue"], match_idx=m["match_idx"],
-                fthg=hg, ftag=ag, result_code=rc,
+                fthg=hg, ftag=ag, result_code=rc, winning_sp=wsp,
             )
             try:
                 if self.db.insert_settlement(s, source=source):

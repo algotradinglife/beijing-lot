@@ -250,130 +250,122 @@
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between">
     <span>当期场次状态
-      {% if match_status.plan_id %}
-        — <small class="text-muted">{{ match_status.plan_id }}
-        {% if match_status.placed_ts %}<span class="badge bg-success">已下注</span>{% endif %}
-        · {{ match_status.n_tickets }} 张票</small>
+      {% if match_status.total.n_plans %}
+        — <small class="text-muted">{{ match_status.total.n_periods }} 期 ·
+          {{ match_status.total.n_plans }} 计划 ·
+          {{ match_status.total.n_matches }} 场</small>
       {% endif %}
     </span>
-    <small class="text-muted">已完结 {{ match_status.completed|length }} · 进行中 {{ match_status.live|length }} · 即将开始 {{ match_status.upcoming|length }}</small>
+    <small class="text-muted">已完结 {{ match_status.total.completed }} · 进行中 {{ match_status.total.live }} · 即将开始 {{ match_status.total.upcoming }}</small>
   </div>
   <div class="card-body">
-    {% if match_status.empty_placed %}
-    <div class="alert alert-warning mb-0">
-      计划 <strong>{{ match_status.plan_id }}</strong> 已标记下注，但保存的 plan 中无票数据
-      （可能是结算后被清空或生成时为空）。请到
-      <a href="{{ url_for('plan_view') }}">当期计划</a> 重新生成并下注。
+    {% if match_status.plans %}
+    <div class="accordion" id="planAccordion">
+      {% for pl in match_status.plans %}
+      {% set pid_safe = pl.plan_id|replace('-', '_') %}
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="planHead{{ pid_safe }}">
+          <button class="accordion-button {{ '' if loop.first else 'collapsed' }}" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#planBody{{ pid_safe }}"
+                  aria-expanded="{{ 'true' if loop.first else 'false' }}"
+                  aria-controls="planBody{{ pid_safe }}">
+            <span class="me-2"><strong>{{ pl.plan_id }}</strong></span>
+            {% if pl.placed_ts %}<span class="badge bg-success me-2">已下注</span>{% endif %}
+            <small class="text-muted me-3">{{ pl.n_tickets }} 票 · {{ pl.n_matches }} 场</small>
+            {% if pl.completed %}<span class="badge bg-success me-1">完结 {{ pl.completed|length }}</span>{% endif %}
+            {% if pl.live %}<span class="badge bg-warning text-dark me-1">进行 {{ pl.live|length }}</span>{% endif %}
+            {% if pl.upcoming %}<span class="badge bg-primary me-1">即将 {{ pl.upcoming|length }}</span>{% endif %}
+            {% if pl.empty_placed %}<span class="badge bg-danger ms-1">空票</span>{% endif %}
+          </button>
+        </h2>
+        <div id="planBody{{ pid_safe }}" class="accordion-collapse collapse {{ 'show' if loop.first else '' }}"
+             aria-labelledby="planHead{{ pid_safe }}" data-bs-parent="#planAccordion">
+          <div class="accordion-body">
+            {% if pl.empty_placed %}
+            <div class="alert alert-warning mb-0">
+              计划 <strong>{{ pl.plan_id }}</strong> 已标记下注，但保存的 plan 中无票数据
+              （可能是结算后被清空或生成时为空）。请到
+              <a href="{{ url_for('plan_view') }}">当期计划</a> 重新生成并下注。
+            </div>
+            {% else %}
+            {% if pl.live %}
+            <h6 class="text-warning">⚡ 进行中 / 等待结算</h6>
+            <table class="table table-sm">
+              <thead><tr><th>开赛时间</th><th>联赛</th><th>主队 vs 客队</th><th>让球</th><th>我们押</th><th>状态</th></tr></thead>
+              <tbody>
+                {% for m in pl.live %}
+                <tr>
+                  <td><small>{{ m.kickoff_ts|hk }}</small></td>
+                  <td><small>{{ m.league or '-' }}</small></td>
+                  <td>{{ m.home }} vs {{ m.away }}</td>
+                  <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
+                  <td><span class="badge bg-info">{{ m.our_picks_label }}</span></td>
+                  <td>
+                    {% if m.status == 'live' %}
+                      <small class="text-warning">进行中 ({{ m.minutes_in|humanmin }})</small>
+                    {% else %}
+                      <small class="text-muted">等结算 ({{ m.minutes_since_kickoff|humanmin }})</small>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% endif %}
+
+            {% if pl.completed %}
+            <h6 class="text-success mt-3">✓ 已完结（含命中状态）</h6>
+            <table class="table table-sm">
+              <thead><tr><th>开赛时间</th><th>联赛</th><th>主队 vs 客队</th><th>让球</th><th>我们押</th><th>实际结果</th><th>比分</th><th>命中?</th></tr></thead>
+              <tbody>
+                {% for m in pl.completed %}
+                <tr class="{{ 'table-success' if m.hit else 'table-danger' if m.hit is false else '' }}">
+                  <td><small>{{ m.kickoff_ts|hk }}</small></td>
+                  <td><small>{{ m.league or '-' }}</small></td>
+                  <td>{{ m.home }} vs {{ m.away }}</td>
+                  <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
+                  <td><span class="badge bg-info">{{ m.our_picks_label }}</span></td>
+                  <td><span class="badge bg-secondary">{{ m.result_label }}</span></td>
+                  <td><strong>{{ m.score }}</strong></td>
+                  <td>
+                    {% if m.hit %}
+                      <span class="badge bg-success">✓ HIT (SP {{ "%.2f"|format(m.winning_sp or 0) }})</span>
+                    {% else %}
+                      <span class="badge bg-danger">✗ MISS</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% endif %}
+
+            {% if pl.upcoming %}
+            <h6 class="text-primary mt-3">⏰ 即将开始</h6>
+            <table class="table table-sm">
+              <thead><tr><th>开赛时间</th><th>联赛</th><th>主队 vs 客队</th><th>让球</th><th>我们押</th><th>距开赛</th></tr></thead>
+              <tbody>
+                {% for m in pl.upcoming %}
+                <tr>
+                  <td><small>{{ m.kickoff_ts|hk }}</small></td>
+                  <td><small>{{ m.league or '-' }}</small></td>
+                  <td>{{ m.home }} vs {{ m.away }}</td>
+                  <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
+                  <td><span class="badge bg-info">{{ m.our_picks_label }}</span></td>
+                  <td><small>{% if m.minutes_to_start is not none %}{{ m.minutes_to_start|humanmin }} 后{% else %}-{% endif %}</small></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% endif %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
     </div>
-    {% elif match_status.completed or match_status.live or match_status.upcoming %}
-
-    {% if match_status.live %}
-    <h6 class="text-warning">⚡ 进行中 / 等待结算</h6>
-    <table class="table table-sm">
-      <thead><tr><th>开赛时间</th><th>联赛</th><th>主队 vs 客队</th><th>让球</th><th>我们押</th><th>状态</th></tr></thead>
-      <tbody>
-        {% for m in match_status.live %}
-        <tr>
-          <td><small>{{ m.kickoff_ts|hk }}</small></td>
-          <td><small>{{ m.league or '-' }}</small></td>
-          <td>{{ m.home }} vs {{ m.away }}</td>
-          <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
-          <td><span class="badge bg-info">{{ m.our_picks_label }}</span></td>
-          <td>
-            {% if m.status == 'live' %}
-              <small class="text-warning">进行中 ({{ m.minutes_in }} min)</small>
-            {% else %}
-              <small class="text-muted">等结算 ({{ m.minutes_since_kickoff }} min)</small>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% endif %}
-
-    {% if match_status.completed %}
-    <h6 class="text-success mt-3">✓ 已完结（含命中状态）</h6>
-    <table class="table table-sm">
-      <thead><tr><th>开赛时间</th><th>联赛</th><th>主队 vs 客队</th><th>让球</th><th>我们押</th><th>实际结果</th><th>比分</th><th>命中?</th></tr></thead>
-      <tbody>
-        {% for m in match_status.completed %}
-        <tr class="{{ 'table-success' if m.hit else 'table-danger' if m.hit is false else '' }}">
-          <td><small>{{ m.kickoff_ts|hk }}</small></td>
-          <td><small>{{ m.league or '-' }}</small></td>
-          <td>{{ m.home }} vs {{ m.away }}</td>
-          <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
-          <td><span class="badge bg-info">{{ m.our_picks_label }}</span></td>
-          <td><span class="badge bg-secondary">{{ m.result_label }}</span></td>
-          <td><strong>{{ m.score }}</strong></td>
-          <td>
-            {% if m.hit %}
-              <span class="badge bg-success">✓ HIT (SP {{ "%.2f"|format(m.winning_sp or 0) }})</span>
-            {% else %}
-              <span class="badge bg-danger">✗ MISS</span>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% endif %}
-
-    {% if match_status.upcoming %}
-    <h6 class="text-primary mt-3">⏰ 即将开始</h6>
-    <table class="table table-sm">
-      <thead><tr><th>开赛时间</th><th>联赛</th><th>主队 vs 客队</th><th>让球</th><th>我们押</th><th>距开赛</th></tr></thead>
-      <tbody>
-        {% for m in match_status.upcoming %}
-        <tr>
-          <td><small>{{ m.kickoff_ts|hk }}</small></td>
-          <td><small>{{ m.league or '-' }}</small></td>
-          <td>{{ m.home }} vs {{ m.away }}</td>
-          <td>{{ m.handicap if m.handicap is not none else '-' }}</td>
-          <td><span class="badge bg-info">{{ m.our_picks_label }}</span></td>
-          <td><small>{% if m.minutes_to_start is not none %}{{ m.minutes_to_start }} min 后{% else %}-{% endif %}</small></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% endif %}
-
     {% else %}
     <p class="text-muted mb-0">没有当期 plan 数据。生成计划后此处会显示场次状态。</p>
-    {% endif %}
-  </div>
-</div>
-
-<div class="card">
-  <div class="card-header">最近 5 期结算</div>
-  <div class="card-body">
-    {% if recent %}
-    <table class="table table-sm">
-      <thead><tr>
-        <th>期号</th><th>时间</th><th>票数</th><th>命中</th>
-        <th class="text-end">下注</th><th class="text-end">回收</th>
-        <th class="text-end">PnL</th><th class="text-end">活跃后</th><th class="text-end">锁定后</th>
-      </tr></thead>
-      <tbody>
-        {% for s in recent %}
-        <tr>
-          <td>{{ s.week_id }}</td>
-          <td><small>{{ s.settled_ts }}</small></td>
-          <td>{{ s.n_combos }}</td>
-          <td>{{ s.n_hits }}</td>
-          <td class="text-end">{{ "%.0f"|format(s.week_stake) }}</td>
-          <td class="text-end">{{ "%.0f"|format(s.week_payout) }}</td>
-          <td class="text-end {{ 'text-success' if s.week_pnl >= 0 else 'text-danger' }}">
-            {{ "%+.0f"|format(s.week_pnl) }}
-          </td>
-          <td class="text-end">{{ "%.0f"|format(s.bankroll_after) }}</td>
-          <td class="text-end">{{ "%.0f"|format(s.locked_after) }}{% if s.skimmed %} <small class="text-success">+{{ "%.0f"|format(s.skimmed) }}</small>{% endif %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="text-muted mb-0">暂无结算记录。下注后回到此页点击"刷新结算"。</p>
     {% endif %}
   </div>
 </div>

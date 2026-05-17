@@ -72,6 +72,31 @@ def classify_league(league: Optional[str]) -> str:
     return "Other"
 
 
+# Competition-type buckets — orthogonal to league_tier. "杯" matches cup
+# competitions (Champions League, FA Cup etc.); intl-keywords match
+# inter-national qualifications and friendlies which behave differently
+# (rotated squads, lower predictability). See `scripts/niche_split_analysis.py`.
+_INTL_KEYWORDS = ("友谊", "预选", "锦标")
+
+
+def classify_comp_type(league) -> str:
+    """Return one of {'cup', 'league', 'intl'} for a 北单 league name."""
+    if league is None:
+        return "league"
+    try:
+        if isinstance(league, float) and not np.isfinite(league):
+            return "league"
+    except TypeError:
+        pass
+    s = str(league)
+    if "杯" in s:
+        return "cup"
+    for kw in _INTL_KEYWORDS:
+        if kw in s:
+            return "intl"
+    return "league"
+
+
 def classify_handicap(h) -> str:
     """Bucket handicap into {h=0, |h|=1, |h|>=2}."""
     if h is None:

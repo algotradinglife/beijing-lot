@@ -19,7 +19,9 @@ from pathlib import Path
 from typing import Iterable, List, Optional
 
 from src.combo_optimizer import Candidate
-from src.niche_analysis.data_loader import classify_handicap, classify_league
+from src.niche_analysis.data_loader import (
+    classify_comp_type, classify_handicap, classify_league,
+)
 
 from .data_loader import LiveSnapshot
 
@@ -35,6 +37,12 @@ class NicheRule:
     sp_hi: Optional[float] = None
     league_tier: Optional[str] = None
     handicap_class: Optional[str] = None
+    # comp_type ∈ {"cup", "league", "intl"} — added 2026-05-09 after the
+    # cup-subset analysis showed +0.07 q boost for option=0/sp 3.5-4.5/h1
+    # in cup matches and +0.04 boost for option=3/sp 3.5-4.5/h_unknown
+    # cup. More-specific comp_type rules go BEFORE the general ones in
+    # JSON so the first-match-wins loop picks them up.
+    comp_type: Optional[str] = None
 
 
 _LEAGUE_Q_PATH = Path(__file__).parent / "league_quality.json"
@@ -70,6 +78,7 @@ class NicheConfig:
                 sp_hi=r.get("sp_hi"),
                 league_tier=r.get("league_tier"),
                 handicap_class=r.get("handicap_class"),
+                comp_type=r.get("comp_type"),
             )
             for r in data.get("rules", [])
         )
@@ -96,6 +105,7 @@ class NicheConfig:
 def _matches(
     rule: NicheRule, *,
     option: str, sp: float, league_tier: str, handicap_class: str,
+    comp_type: str = "league",
 ) -> bool:
     if rule.option is not None and rule.option != option:
         return False
@@ -106,6 +116,8 @@ def _matches(
     if rule.league_tier is not None and rule.league_tier != league_tier:
         return False
     if rule.handicap_class is not None and rule.handicap_class != handicap_class:
+        return False
+    if rule.comp_type is not None and rule.comp_type != comp_type:
         return False
     return True
 
@@ -144,11 +156,13 @@ def qualify_candidates(
             continue
         league_tier = classify_league(snap.league)
         handicap_class = classify_handicap(snap.handicap_line)
+        comp_type = classify_comp_type(snap.league)
         for option_code, sp in _option_iter(snap):
             for rule in config.rules:
                 if _matches(rule, option=option_code, sp=sp,
                             league_tier=league_tier,
-                            handicap_class=handicap_class):
+                            handicap_class=handicap_class,
+                            comp_type=comp_type):
                     cand = Candidate(
                         match_id=snap.match_id,
                         selection=int(option_code),

@@ -464,14 +464,13 @@ _ZQDC_ROW_RE_TPL = (
     r'(?P<body>.*?)</tr>'
 )
 
-# Inside the row body: home team has yellowcard span BEFORE its team link,
-# away team has yellowcard span AFTER its team link.
-_ZQDC_HOME_GOALS_RE = re.compile(
-    r'<span class="yellowcard">(\d+)</span>\s*<a[^>]*team/\d+/[^>]*>',
-    re.S,
-)
-_ZQDC_AWAY_GOALS_RE = re.compile(
-    r'<a[^>]*team/\d+/[^>]*>[^<]+</a>\s*<span class="yellowcard">(\d+)</span>',
+# Final score td: format `<td align="center" class="red">2 - 0</td>` placed
+# after the away-team td. WARNING: do NOT use the per-team `<span class="yellowcard">N</span>`
+# spans — those are *yellow card* counts (next to team name), not goals.
+# Earlier versions of this parser used yellowcard spans and silently
+# wrote yellow-card counts as scores (corrupting result_code).
+_ZQDC_SCORE_RE = re.compile(
+    r'<td[^>]*class="red"[^>]*>\s*(\d+)\s*-\s*(\d+)\s*</td>',
     re.S,
 )
 
@@ -507,6 +506,30 @@ def parse_500_zqdc_issue(html: str) -> Optional[str]:
     return None
 
 
+# 500.com per-match detail page — gives full-time + half-time score
+# in a `<span class="score">N - M</span>` block. Most reliable single
+# source we have access to (more authoritative than zqdc/wanchang).
+_DETAIL_SCORE_RE = re.compile(
+    r'<[^>]*class="score[^"]*"[^>]*>\s*(\d+)\s*-\s*(\d+)\s*</'
+)
+
+
+def parse_500_detail_score(html: str) -> Optional[Tuple[int, int]]:
+    """Return ``(home_goals, away_goals)`` from a 500 detail.php response.
+    The score span is ``<span class="score">N - M</span>`` with the home
+    team's goals first. Returns None if not found (match not finished or
+    page layout drifted)."""
+    if not html:
+        return None
+    m = _DETAIL_SCORE_RE.search(html)
+    if not m:
+        return None
+    try:
+        return int(m.group(1)), int(m.group(2))
+    except ValueError:
+        return None
+
+
 def parse_500_zqdc_score(html: str, fid: str
                          ) -> Optional[Tuple[int, int, str]]:
     """Locate the row for the given ``fid`` in a zqdc.php response and
@@ -520,11 +543,10 @@ def parse_500_zqdc_score(html: str, fid: str
         return None
     status = m.group("status")
     body = m.group("body")
-    mh = _ZQDC_HOME_GOALS_RE.search(body)
-    ma = _ZQDC_AWAY_GOALS_RE.search(body)
-    if not mh or not ma:
+    sm = _ZQDC_SCORE_RE.search(body)
+    if not sm:
         return None
     try:
-        return int(mh.group(1)), int(ma.group(1)), status
+        return int(sm.group(1)), int(sm.group(2)), status
     except ValueError:
         return None

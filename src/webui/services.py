@@ -14,12 +14,32 @@ Constants (locked from prior analysis):
 from __future__ import annotations
 
 import json
+import logging
 import math
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 HK_TZ = timezone(timedelta(hours=8))
+
+
+def fmt_humanmin(mins) -> str:
+    """Format a minute count as `Xd Yh` / `Yh Zm` / `Zm` for readability.
+    2021 → `1d 9h`, 130 → `2h 10m`, 45 → `45m`."""
+    try:
+        m = int(mins)
+    except (TypeError, ValueError):
+        return str(mins)
+    if m < 0:
+        return f"-{fmt_humanmin(-m)}"
+    if m < 60:
+        return f"{m}m"
+    if m < 24 * 60:
+        h, mm = divmod(m, 60)
+        return f"{h}h {mm}m" if mm else f"{h}h"
+    d, rem = divmod(m, 24 * 60)
+    h = rem // 60
+    return f"{d}d {h}h" if h else f"{d}d"
 
 
 def fmt_hk(ts) -> str:
@@ -60,6 +80,92 @@ PROFIT_LOCK_SKIM_FRAC = 0.30
 
 def _utcnow_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+SEL_LABEL = {"3": "胜", "1": "平", "0": "负"}
+
+
+def diagnostic_legs(db: "WebuiDB", live_db_path: str) -> Dict[str, Any]:
+    """Per-current-issue leg-qualification diagnostic.
+
+    For each (match × selection) explains whether the option became a
+    qualified leg, and if not why. Also breaks down the niche-rule table
+    by target selection so the structural "no draw rules" answer is visible.
+    """
+    from src.niche_analysis.data_loader import (
+        classify_comp_type, classify_handicap, classify_league,
+    )
+    from src.phase5a.filter import _matches as _rule_matches  # noqa: PLC2701
+
+    league_q_min = float(db.get_config("league_q_min") or 0.0)
+    cfg = NicheConfig.load(league_q_min=league_q_min)
+    snaps = load_open_matches(live_db_path)
+
+    # Rule-table breakdown by target selection
+    rule_buckets: Dict[str, list] = {"3": [], "1": [], "0": [], "any": []}
+    for r in cfg.rules:
+        rule_buckets[r.option or "any"].append(r.name)
+
+    per_match = []
+    qual_count = {"3": 0, "1": 0, "0": 0}
+    market_count = {"3": 0, "1": 0, "0": 0}
+
+    for snap in snaps:
+        league_pass = cfg.league_passes(snap.league)
+        league_tier = classify_league(snap.league)
+        handicap_class = classify_handicap(snap.handicap_line)
+        comp_type = classify_comp_type(snap.league)
+        opts = []
+        for code, sp in (("3", snap.sp_3), ("1", snap.sp_1), ("0", snap.sp_0)):
+            row = dict(code=code, label=SEL_LABEL[code], sp=sp,
+                       qualified=False, rule=None, reason=None)
+            if sp is None or sp <= 1.0:
+                row["reason"] = "无报价"
+            else:
+                market_count[code] += 1
+                if not league_pass:
+                    row["reason"] = f"联赛 {snap.league} q<门槛"
+                else:
+                    matched = None
+                    for rule in cfg.rules:
+                        if _rule_matches(rule, option=code, sp=float(sp),
+                                         league_tier=league_tier,
+                                         handicap_class=handicap_class,
+                                         comp_type=comp_type):
+                            matched = rule.name
+                            break
+                    if matched:
+                        row["qualified"] = True
+                        row["rule"] = matched
+                        qual_count[code] += 1
+                    else:
+                        row["reason"] = (f"无 niche 规则匹配 "
+                                         f"(SP={sp:.2f}, tier={league_tier}, "
+                                         f"hcap={handicap_class}, comp={comp_type})")
+            opts.append(row)
+        per_match.append(dict(
+            match_id=snap.match_id,
+            kickoff=snap.kickoff_ts,
+            league=snap.league,
+            home=snap.home, away=snap.away,
+            handicap=snap.handicap_line,
+            league_tier=league_tier,
+            handicap_class=handicap_class,
+            options=opts,
+        ))
+
+    issue = snaps[0].issue if snaps else ""
+    return dict(
+        issue=issue,
+        n_matches=len(snaps),
+        league_q_min=league_q_min,
+        rule_total=len(cfg.rules),
+        rule_buckets={k: len(v) for k, v in rule_buckets.items()},
+        rule_buckets_names=rule_buckets,
+        qual_count=qual_count,
+        market_count=market_count,
+        per_match=per_match,
+    )
 
 
 @dataclass
@@ -140,6 +246,33 @@ def generate_plan(
     league_q_min = float(db.get_config("league_q_min") or 0.0)
     cfg = niche_config or NicheConfig.load(league_q_min=league_q_min)
     snapshots = load_open_matches(live_db_path, now=now)
+
+    # Anti-double-bet: collect match_ids from any placed-but-not-fully-settled
+    # plan and remove them from the snapshot pool. Without this, hourly autoplan
+    # would re-bet the same upcoming match twice when triggered before any of
+    # the prior plan's matches kick off. (The kickoff_ts > now filter inside
+    # load_open_matches doesn't catch this — those matches are still future.)
+    placed_match_ids: set = set()
+    for p in db.list_plans():
+        if not p.get("placed_ts"):
+            continue
+        if db.has_settlement(p["plan_id"]):
+            continue  # plan fully booked → its matches are fully settled
+        full = db.get_plan(p["plan_id"])
+        if not full:
+            continue
+        for t in full.get("plan", {}).get("tickets", []):
+            for leg in t.get("legs", []):
+                if leg.get("match_id"):
+                    placed_match_ids.add(leg["match_id"])
+    if placed_match_ids:
+        before = len(snapshots)
+        snapshots = [s for s in snapshots if s.match_id not in placed_match_ids]
+        if before != len(snapshots):
+            logging.getLogger(__name__).info(
+                "generate_plan: filtered %d already-bet matches from snapshot pool",
+                before - len(snapshots),
+            )
     # Read user-tunable strategy params from config (defaults locked from analysis)
     n_legs = int(db.get_config("n_legs") or N_LEGS)
     kelly_fraction = float(db.get_config("kelly_fraction") or KELLY_FRACTION)
@@ -213,10 +346,13 @@ def generate_plan(
             base = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
         existing = {p["plan_id"] for p in db.list_plans()}
         wk = base
-        i = 2
-        while wk in existing:
-            wk = f"{base}-{i}"
-            i += 1
+        if wk in existing:
+            hk_date = (now or datetime.now(timezone.utc)).astimezone(HK_TZ).strftime("%m%d")
+            wk = f"{base}-{hk_date}"
+            i = 2
+            while wk in existing:
+                wk = f"{base}-{hk_date}-{i}"
+                i += 1
         plan_dict = dict(
             plan_id=wk,
             generated_at=(now or datetime.now(timezone.utc)).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -234,6 +370,16 @@ def generate_plan(
             mix_lambda=dict(n2=lambda_n2, n3=lambda_n3, n4=lambda_n4, n5=lambda_n5),
             league_q_min=league_q_min,
         )
+        from .strategies import match_strategy as _ms
+        _sid, _sname = _ms(
+            weights=(w2, w3, w4, w5),
+            kelly=(kelly_n2, kelly_n3, kelly_n4, kelly_n5),
+            lambdas=(lambda_n2, lambda_n3, lambda_n4, lambda_n5),
+            max_combos=int(max_combos),
+            league_q_min=league_q_min,
+        )
+        plan_dict["strategy_id"] = _sid
+        plan_dict["strategy_name"] = _sname
         # Persist merged plan to disk for reconcile
         plans_dir = Path(plans_dir)
         plans_dir.mkdir(parents=True, exist_ok=True)
@@ -579,6 +725,74 @@ def recent_settlements(db: WebuiDB, n: int = 5) -> List[Dict[str, Any]]:
     return list(reversed(rows))[:n]
 
 
+def winning_tickets_for_plan(
+    db: WebuiDB, *, plan_id: str, live_db_path: str | Path,
+) -> List[Dict[str, Any]]:
+    """Return list of winning tickets in a settled plan, with per-leg
+    detail (home/away/selection/sp/result). Empty list if no hits or
+    plan not found. Each ticket: {idx, stake, product_sp, payout,
+    legs: [{home, away, selection_label, sp, result_label}, ...]}.
+    """
+    plan_meta = db.get_plan(plan_id)
+    if not plan_meta or not plan_meta.get("plan", {}).get("tickets"):
+        return []
+    tickets = plan_meta["plan"]["tickets"]
+
+    # Pull match results from live DB
+    sel_label = {"3": "胜", "1": "平", "0": "负"}
+    results: Dict[str, str] = {}
+    try:
+        with sqlite3.connect(str(live_db_path)) as c:
+            for row in c.execute(
+                "SELECT match_id, result_code FROM settlements WHERE result_code IS NOT NULL"
+            ).fetchall():
+                results[row[0]] = str(row[1])
+    except sqlite3.OperationalError:
+        return []
+
+    out: List[Dict[str, Any]] = []
+    for i, t in enumerate(tickets, start=1):
+        legs = t.get("legs", [])
+        if not legs:
+            continue
+        all_hit = True
+        leg_details: List[Dict[str, Any]] = []
+        product_sp = 1.0
+        for leg in legs:
+            mid = str(leg.get("match_id") or "")
+            raw_sel = leg.get("selection")
+            sel = "" if raw_sel is None else str(raw_sel)
+            actual = results.get(mid)
+            hit = (actual is not None and actual == sel)
+            if not hit:
+                all_hit = False
+            sp = float(leg.get("sp") or 0.0)
+            product_sp *= sp if sp else 1.0
+            leg_details.append(dict(
+                home=leg.get("home", "?"),
+                away=leg.get("away", "?"),
+                league=leg.get("league", ""),
+                selection=sel,
+                selection_label=sel_label.get(sel, sel),
+                sp=sp,
+                actual=actual,
+                actual_label=sel_label.get(actual, "—") if actual else "—",
+                hit=hit,
+            ))
+        if all_hit:
+            stake = int(t.get("total_stake")
+                        or t.get("stake")
+                        or t.get("stake_per_ticket", 0))
+            out.append(dict(
+                idx=i,
+                stake=stake,
+                product_sp=round(product_sp, 3),
+                payout=round(stake * product_sp, 2),
+                legs=leg_details,
+            ))
+    return out
+
+
 def settlement_progress(
     db: WebuiDB,
     live_db_path: str | Path,
@@ -619,92 +833,73 @@ def settlement_progress(
     return out
 
 
+def _period_of(plan_id: str) -> str:
+    """Period identifier (e.g. ``26054``) is the prefix before the first dash."""
+    return (plan_id or "").split("-", 1)[0]
+
+
 def match_status_for_plan(
     db: WebuiDB,
     live_db_path: str | Path,
     *,
     now: Optional[datetime] = None,
-) -> Dict[str, List[Dict[str, Any]]]:
-    """For the most recent placed/unsettled plan, return per-match status grouped
-    into ``completed`` / ``live`` / ``upcoming`` lists.
+) -> Dict[str, Any]:
+    """Per-match status for every placed-but-unsettled plan, one entry per plan.
 
-    Each match dict includes:
-      match_id, kickoff_ts, league, home, away, handicap, our_pick (selection),
-      our_pick_label (胜/平/负), status, score (if completed), result_code,
-      hit (bool, if completed), winning_sp.
+    Returns:
+        {
+          "plans": [
+              {"plan_id": "26054-0512-3", "period": "26054",
+               "placed_ts": ..., "n_tickets": K, "n_matches": M,
+               "completed": [...], "live": [...], "upcoming": [...],
+               "empty_placed": bool},
+              ...newest plan first (by created_ts DESC)
+          ],
+          "total": {"completed": int, "live": int, "upcoming": int,
+                     "n_plans": int, "n_matches": int, "n_periods": int},
+        }
     """
     now = now or datetime.now(timezone.utc)
-    out: Dict[str, Any] = {"completed": [], "live": [], "upcoming": [],
-                            "plan_id": None, "placed_ts": None,
-                            "n_tickets": 0, "empty_placed": False}
+    out: Dict[str, Any] = {"plans": [],
+                            "total": {"completed": 0, "live": 0, "upcoming": 0,
+                                       "n_plans": 0, "n_matches": 0,
+                                       "n_periods": 0}}
 
-    # Prefer the latest placed-but-unsettled plan (so dashboard matches history).
-    # Fall back to latest *unsettled* plan with tickets. Already-settled plans
-    # belong to history, not current status.
-    plan_meta = None
+    # Collect every placed-but-unsettled plan; fall back to latest unsettled
+    # (not yet placed) plan when no placed-unsettled exists. list_plans() is
+    # DESC by created_ts.
+    plan_metas: List[Dict[str, Any]] = []
     for p in db.list_plans():
-        if p.get("placed_ts") and not db.has_settlement(p["plan_id"]):
-            plan_meta = db.get_plan(p["plan_id"])
-            break
-    if plan_meta is None:
+        if db.has_settlement(p["plan_id"]):
+            continue
+        if p.get("placed_ts"):
+            meta = db.get_plan(p["plan_id"])
+            if meta:
+                plan_metas.append(meta)
+    if not plan_metas:
         for p in db.list_plans():
             if db.has_settlement(p["plan_id"]):
                 continue
             meta = db.get_plan(p["plan_id"])
             if meta and meta.get("plan", {}).get("tickets"):
-                plan_meta = meta
+                plan_metas.append(meta)
                 break
-    if not plan_meta:
-        return out
 
-    plan = plan_meta["plan"]
-    tickets = plan.get("tickets", []) or []
-    out["plan_id"] = plan_meta.get("plan_id")
-    out["placed_ts"] = plan_meta.get("placed_ts")
-    out["n_tickets"] = len(tickets)
-    out["empty_placed"] = bool(plan_meta.get("placed_ts")) and len(tickets) == 0
-
-    # Gather (match_id, our_pick) for this plan
-    picks_by_match: Dict[str, set] = {}
-    leg_meta_by_match: Dict[str, Dict[str, Any]] = {}
-    for ticket in plan.get("tickets", []):
-        for leg in ticket.get("legs", []):
-            mid = leg.get("match_id")
-            if not mid:
-                continue
-            picks_by_match.setdefault(mid, set()).add(int(leg.get("selection", -1)))
-            leg_meta_by_match.setdefault(mid, dict(
-                match_id=mid, kickoff_ts=leg.get("kickoff_ts"),
-                league=leg.get("league"), home=leg.get("home"),
-                away=leg.get("away"), handicap=leg.get("handicap"),
-                sp=leg.get("sp"),
-            ))
-
-    if not picks_by_match:
-        return out
-
-    # Query Live Collector for match status + settlement
-    live_path = Path(live_db_path)
-    if not live_path.exists():
-        # No live data — everything is "unknown" upcoming
-        for mid, meta in leg_meta_by_match.items():
-            meta["our_picks"] = sorted(picks_by_match[mid])
-            meta["status"] = "upcoming"
-            out["upcoming"].append(meta)
-        out["upcoming"].sort(key=lambda x: x.get("kickoff_ts") or "")
+    if not plan_metas:
         return out
 
     sel_label = {3: "胜", 1: "平", 0: "负"}
-    conn = sqlite3.connect(str(live_path))
-    try:
-        for mid, meta in leg_meta_by_match.items():
-            picks = sorted(picks_by_match[mid])
-            meta["our_picks"] = picks
-            meta["our_picks_label"] = "/".join(sel_label.get(p, str(p)) for p in picks)
-            # Try settlement first
+    live_path = Path(live_db_path)
+    conn = sqlite3.connect(str(live_path)) if live_path.exists() else None
+
+    def _classify(meta: Dict[str, Any], picks: List[int]) -> str:
+        meta["our_picks"] = picks
+        meta["our_picks_label"] = "/".join(sel_label.get(p, str(p)) for p in picks)
+        mid = meta["match_id"]
+        if conn is not None:
             row = conn.execute(
-                "SELECT fthg, ftag, result_code, winning_sp FROM settlements WHERE match_id=?",
-                (mid,)
+                "SELECT fthg, ftag, result_code, winning_sp FROM settlements "
+                "WHERE match_id=?", (mid,)
             ).fetchone()
             if row and row[0] is not None:
                 fthg, ftag, result_code, winning_sp = row
@@ -718,43 +913,88 @@ def match_status_for_plan(
                 meta["winning_sp"] = winning_sp
                 meta["hit"] = rcode in picks if rcode is not None else None
                 meta["status"] = "completed"
-                out["completed"].append(meta)
-                continue
-            # Otherwise classify by kickoff time
-            kt_str = meta.get("kickoff_ts")
-            if kt_str:
-                try:
-                    kt = datetime.fromisoformat(kt_str.replace("Z", "+00:00"))
-                    if kt.tzinfo is None:
-                        # Scraper stores naive kickoff in HK time (UTC+8).
-                        kt = kt.replace(tzinfo=timezone(timedelta(hours=8)))
-                except ValueError:
-                    kt = None
-                if kt:
-                    delta_min = (now - kt).total_seconds() / 60
-                    if delta_min < 0:
-                        meta["status"] = "upcoming"
-                        meta["minutes_to_start"] = -int(delta_min)
-                        out["upcoming"].append(meta)
-                    elif delta_min < 130:  # 90 min + ~40 min buffer for settlement
-                        meta["status"] = "live"
-                        meta["minutes_in"] = int(delta_min)
-                        out["live"].append(meta)
-                    else:
-                        meta["status"] = "pending_settlement"
-                        meta["minutes_since_kickoff"] = int(delta_min)
-                        out["live"].append(meta)
-                    continue
-            # No kickoff info
-            meta["status"] = "unknown"
-            out["upcoming"].append(meta)
-    finally:
-        conn.close()
+                return "completed"
+        kt_str = meta.get("kickoff_ts")
+        if kt_str:
+            try:
+                kt = datetime.fromisoformat(kt_str.replace("Z", "+00:00"))
+                if kt.tzinfo is None:
+                    kt = kt.replace(tzinfo=timezone(timedelta(hours=8)))
+            except ValueError:
+                kt = None
+            if kt:
+                delta_min = (now - kt).total_seconds() / 60
+                if delta_min < 0:
+                    meta["status"] = "upcoming"
+                    meta["minutes_to_start"] = -int(delta_min)
+                    return "upcoming"
+                if delta_min < 130:
+                    meta["status"] = "live"
+                    meta["minutes_in"] = int(delta_min)
+                    return "live"
+                meta["status"] = "pending_settlement"
+                meta["minutes_since_kickoff"] = int(delta_min)
+                return "live"
+        meta["status"] = "unknown"
+        return "upcoming"
 
-    # Sort each group
-    out["completed"].sort(key=lambda x: x.get("kickoff_ts") or "", reverse=True)
-    out["live"].sort(key=lambda x: x.get("kickoff_ts") or "")
-    out["upcoming"].sort(key=lambda x: x.get("kickoff_ts") or "")
+    seen_periods: set = set()
+    try:
+        for plan_meta in plan_metas:
+            plan_id = plan_meta.get("plan_id") or ""
+            period = _period_of(plan_id)
+            tickets = plan_meta.get("plan", {}).get("tickets", []) or []
+
+            picks_by_match: Dict[str, set] = {}
+            meta_by_match: Dict[str, Dict[str, Any]] = {}
+            for ticket in tickets:
+                for leg in ticket.get("legs", []):
+                    mid = leg.get("match_id")
+                    if not mid:
+                        continue
+                    picks_by_match.setdefault(mid, set()).add(
+                        int(leg.get("selection", -1)))
+                    meta_by_match.setdefault(mid, dict(
+                        match_id=mid, kickoff_ts=leg.get("kickoff_ts"),
+                        league=leg.get("league"), home=leg.get("home"),
+                        away=leg.get("away"), handicap=leg.get("handicap"),
+                        sp=leg.get("sp"),
+                    ))
+
+            buckets = {"completed": [], "live": [], "upcoming": []}
+            for mid, meta in meta_by_match.items():
+                picks = sorted(picks_by_match[mid])
+                bucket = _classify(meta, picks)
+                buckets[bucket].append(meta)
+            buckets["completed"].sort(key=lambda x: x.get("kickoff_ts") or "",
+                                       reverse=True)
+            buckets["live"].sort(key=lambda x: x.get("kickoff_ts") or "")
+            buckets["upcoming"].sort(key=lambda x: x.get("kickoff_ts") or "")
+
+            empty_placed = bool(plan_meta.get("placed_ts")) and not tickets
+            n_matches = len(meta_by_match)
+            out["plans"].append(dict(
+                plan_id=plan_id,
+                period=period,
+                placed_ts=plan_meta.get("placed_ts"),
+                n_tickets=len(tickets),
+                n_matches=n_matches,
+                completed=buckets["completed"],
+                live=buckets["live"],
+                upcoming=buckets["upcoming"],
+                empty_placed=empty_placed,
+            ))
+            out["total"]["completed"] += len(buckets["completed"])
+            out["total"]["live"] += len(buckets["live"])
+            out["total"]["upcoming"] += len(buckets["upcoming"])
+            out["total"]["n_plans"] += 1
+            out["total"]["n_matches"] += n_matches
+            seen_periods.add(period)
+    finally:
+        if conn is not None:
+            conn.close()
+
+    out["total"]["n_periods"] = len(seen_periods)
     return out
 
 

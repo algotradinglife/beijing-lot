@@ -216,12 +216,19 @@ class Database:
 
         Filtering is done in Python (kickoff_ts is naive ISO Beijing-ish).
         """
+        # Per-match settlement requires a 500.com fid; fidless rows must
+        # wait for the issue-level kaijiang. Without this filter, hundreds
+        # of stale fidless matches at the head of the kickoff-sorted queue
+        # crowd out the recent fid-having matches that we *can* settle.
+        # Newest-first so today's finished matches settle before chasing
+        # week-old ones.
         cur = self._conn.cursor()
         cur.execute(
             "SELECT m.match_id, m.issue, m.match_idx, m.fid, m.kickoff_ts, "
             "m.home, m.away FROM matches m LEFT JOIN settlements s "
             "ON s.match_id=m.match_id WHERE s.match_id IS NULL "
-            "AND m.kickoff_ts IS NOT NULL ORDER BY m.kickoff_ts ASC")
+            "AND m.kickoff_ts IS NOT NULL AND m.fid IS NOT NULL "
+            "ORDER BY m.kickoff_ts DESC")
         rows = cur.fetchall()
         # Use UTC-naive ISO of (now - min_minutes) as cutoff string compare;
         # kickoff_ts is naive Beijing-ish so this is a rough but stable filter.

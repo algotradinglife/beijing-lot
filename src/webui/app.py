@@ -75,6 +75,16 @@ def _current_week_id(now: Optional[datetime] = None, db=None,
     return f"{base}-{n}"
 
 
+def _next_daily_at(*, hour: int, minute: int) -> str:
+    """Return next occurrence of (hour:minute) today or tomorrow."""
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if target <= now:
+        target += timedelta(days=1)
+    return target.strftime("%Y-%m-%d %H:%M")
+
+
 def _next_weekday_at(*, weekday: int, hour: int, minute: int) -> str:
     """Return next occurrence of (weekday, time) as `YYYY-MM-DD HH:MM`.
 
@@ -103,7 +113,12 @@ def _latest_plan_id(db) -> Optional[str]:
     for p in plans:
         if not db.has_settlement(p["plan_id"]):
             return p["plan_id"]
-    return plans[0]["plan_id"] if plans else _current_week_id(db=db)
+    # All existing plans are settled — return the current (upcoming) issue
+    # so the view shows "no plan yet for this issue" instead of resurrecting
+    # a stale settled one.
+    from flask import current_app
+    return _current_week_id(db=db,
+                            live_db=current_app.config.get("LIVE_DB"))
 
 
 def create_app(
@@ -122,6 +137,7 @@ def create_app(
         PNL_LOG=str(pnl_log),
     )
     app.jinja_env.filters["hk"] = services.fmt_hk
+    app.jinja_env.filters["humanmin"] = services.fmt_humanmin
 
     def get_db() -> WebuiDB:
         if "webui_db" not in g:
@@ -536,8 +552,8 @@ def create_app(
         # ---- auto mode panel context ----
         auto_state = db.auto_get()
         auto_logs = db.auto_recent_logs(limit=8)
-        auto_state["next_autoplan"] = _next_weekday_at(weekday=4, hour=21, minute=0)  # Fri = 4 (Mon=0)
-        auto_state["next_autocheck"] = _next_weekday_at(weekday=0, hour=10, minute=0)  # Mon
+        auto_state["next_autoplan"] = _next_daily_at(hour=21, minute=0)
+        auto_state["next_autocheck"] = _next_daily_at(hour=10, minute=0)
         return render_template(
             "dashboard.html",
             state=state, stats=stats, equity=equity, recent=recent,
@@ -561,7 +577,7 @@ def create_app(
                 flash("当前为暂停状态，请先点恢复再启用", "error")
                 return redirect(url_for("dashboard"))
             db.auto_set_enabled(True)
-            flash("自动模式已启用 — 周五 21:00 自动选注，周一 10:00 自动复盘", "success")
+            flash("自动模式已启用 — 每天 21:00 评估生成 plan，每天 10:00 复盘", "success")
         return redirect(url_for("dashboard"))
 
     @app.route("/auto/resume", methods=["POST"])
@@ -642,12 +658,26 @@ def create_app(
             lambda_n5=float(db.get_config("lambda_n5") or 0.0),
             league_q_min=float(db.get_config("league_q_min") or 0.0),
         )
+        waiting = None
+        if plan is None:
+            # Sole gating reason now: current issue is too thin (< 30 open
+            # matches). Prior-plan-settlement no longer blocks new plans
+            # (changed 2026-05-09 — multi-day issues can drag tail
+            # settlements for days).
+            next_at = _next_daily_at(hour=21, minute=0)
+            waiting = dict(
+                headline=f"{wk} 期尚未生成计划",
+                detail=("autoplan 每天 21:00 评估当期场次。当前期场次数 < "
+                        "30 时跳过，等待后续场次更密集的期次。"),
+                next_at=next_at, allow_force=True,
+            )
         return render_template(
             "plan.html",
             week_id=wk, plan=plan, plan_meta=plan_meta,
             state=services.get_state(db),
             live_db_exists=live_db_exists,
             strategy_summary=strategy_summary,
+            waiting=waiting,
         )
 
     @app.route("/plan/generate", methods=["POST"])
@@ -719,12 +749,82 @@ def create_app(
         settlements = list(reversed(db.list_settlements()))
         settle_by_week = {s["week_id"]: s for s in settlements}
         progress = services.settlement_progress(db, app.config["LIVE_DB"])
+        # Winning tickets per settled week (only for weeks with n_hits > 0
+        # to keep page light)
+        winners_by_week: Dict[str, list] = {}
+        for s in settlements:
+            if (s.get("n_hits") or 0) > 0:
+                winners_by_week[s["week_id"]] = services.winning_tickets_for_plan(
+                    db, plan_id=s["week_id"], live_db_path=app.config["LIVE_DB"]
+                )
+        # Recent autoplan skip events — show as ghost rows in history so
+        # client can see "we deliberately did not bet that period and why"
+        REASON_LABEL = {
+            "thin_issue": ("场次不足", "warning"),
+            "pending_settle": ("等待上单结算", "secondary"),  # legacy; rule removed 2026-05-09
+            "same_issue_already_planned": ("本期已有计划", "info"),  # legacy; refined 2026-05-10
+            "prior_plan_no_progress": ("上单未开赛", "info"),
+            "low_stake": ("下注额不足¥1000", "secondary"),
+            "low_candidates": ("候选票数不足", "secondary"),
+        }
+        # Issues that already have a real plan — skip-event ghost rows for
+        # those would just duplicate the "26052" issue label, so suppress.
+        plan_issues = {str(p["plan_id"]).split("-")[0] for p in plans}
+        seen_skip_issues: set = set()
+        skip_events = []
+        for e in db.auto_recent_logs(limit=80):
+            if e.get("kind") != "autoplan": continue
+            d = e.get("details") or {}
+            reason = d.get("reason")
+            if reason not in REASON_LABEL: continue
+            issue = d.get("issue") or "?"
+            if issue in plan_issues or issue in seen_skip_issues: continue
+            seen_skip_issues.add(issue)
+            label, color = REASON_LABEL[reason]
+            skip_events.append(dict(
+                ts=e["ts"],
+                issue=issue,
+                reason_label=label,
+                reason_color=color,
+                detail=e["message"],
+            ))
+        # Strategy tag per plan (read from plan_json; backfilled rows have it)
+        strategy_by_plan: Dict[str, dict] = {}
+        for p in plans:
+            full = db.get_plan(p["plan_id"])
+            if not full: continue
+            pj = full.get("plan", {})
+            sid = pj.get("strategy_id")
+            if sid:
+                strategy_by_plan[p["plan_id"]] = dict(
+                    sid=sid, name=pj.get("strategy_name") or sid)
+        # Merge plans + skip events into one timeline, newest first, so the
+        # most recent autoplan action (including skips) appears at the top.
+        rows = []
+        for p in plans:
+            rows.append(dict(kind="plan", ts=p.get("created_ts") or "", plan=p))
+        for ev in skip_events:
+            rows.append(dict(kind="skip", ts=ev.get("ts") or "", ev=ev))
+        rows.sort(key=lambda r: r["ts"], reverse=True)
         return render_template(
             "history.html",
+            rows=rows,
             plans=plans, settlements=settlements,
             settle_by_week=settle_by_week,
             progress=progress,
+            winners_by_week=winners_by_week,
+            strategy_by_plan=strategy_by_plan,
+            skip_events=skip_events,
         )
+
+    # -- diagnostic ----------------------------------------------------
+    @app.route("/diagnostic")
+    def diagnostic():
+        db = get_db()
+        if not db.is_initialized():
+            return redirect(url_for("setup"))
+        diag = services.diagnostic_legs(db, app.config["LIVE_DB"])
+        return render_template("diagnostic.html", diag=diag)
 
     # -- reconcile -----------------------------------------------------
     @app.route("/reconcile", methods=["POST"])

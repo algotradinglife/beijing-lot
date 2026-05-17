@@ -7,42 +7,110 @@
 <h3 class="mb-3">历史计划与结算</h3>
 
 <div class="card mb-4">
-  <div class="card-header">所有计划</div>
+  <div class="card-header">所有计划与结算</div>
   <div class="card-body p-0">
-    {% if plans %}
+    {% if rows %}
     <table class="table table-sm mb-0">
       <thead><tr>
-        <th>期号</th><th>生成时间</th><th>下注时间</th><th>结算</th>
+        <th>期号</th>
+        <th>策略</th>
+        <th>生成时间</th>
+        <th>下注时间</th>
+        <th>结算状态</th>
+        <th>中/票</th>
+        <th class="text-end">下注</th>
+        <th class="text-end">回收</th>
         <th class="text-end">PnL</th>
         <th class="text-end">活跃后</th>
-        <th class="text-end">锁定后</th>
       </tr></thead>
       <tbody>
-        {% for p in plans %}
+        {% for r in rows %}
+        {% if r.kind == 'skip' %}
+        {% set ev = r.ev %}
+        <tr class="text-muted" style="background-color:#fafafa;">
+          <td><em>{{ ev.issue }}</em></td>
+          <td><span class="badge bg-{{ ev.reason_color }}">跳过 · {{ ev.reason_label }}</span></td>
+          <td><small>{{ ev.ts|hk }}</small></td>
+          <td colspan="7"><small>{{ ev.detail }}</small></td>
+        </tr>
+        {% else %}
+          {% set p = r.plan %}
           {% set s = settle_by_week.get(p.plan_id) %}
-          <tr>
-            <td><strong>{{ p.plan_id }}</strong></td>
-            <td><small>{{ p.created_ts }}</small></td>
-            <td><small>{{ p.placed_ts or '—' }}</small></td>
+          {% set strat = strategy_by_plan.get(p.plan_id) %}
+          {% set winners = winners_by_week.get(p.plan_id, []) %}
+          {% set has_hit = winners|length > 0 %}
+          <tr {% if has_hit %}class="settle-row" style="cursor:pointer"
+              data-target="winners-{{ loop.index }}"{% endif %}>
+            <td>
+              {% if has_hit %}<span class="text-muted">▸</span> {% endif %}
+              <strong>{{ p.plan_id }}</strong>
+            </td>
+            <td>
+              {% if strat %}
+                <span class="badge bg-{{ 'primary' if strat.sid != 'custom' else 'secondary' }}"
+                      title="{{ strat.name }}">{{ strat.sid }}</span>
+                <small class="text-muted">{{ strat.name }}</small>
+              {% else %}<small class="text-muted">—</small>{% endif %}
+            </td>
+            <td><small>{{ p.created_ts|hk }}</small></td>
+            <td><small>{% if p.placed_ts %}{{ p.placed_ts|hk }}{% else %}—{% endif %}</small></td>
             <td>
               {% if s %}<span class="badge bg-success">已结算</span>
               {% elif p.placed_ts %}
                 {% set prog = progress.get(p.plan_id) %}
                 {% if prog %}
                   <span class="badge bg-warning" title="{{ prog.settled }}/{{ prog.total }} 场已结算">
-                    待结算 {{ prog.settled }}/{{ prog.total }} ({{ prog.pct|int }}%)
+                    待结算 {{ prog.settled }}/{{ prog.total }}
                   </span>
                 {% else %}
                   <span class="badge bg-secondary" title="plan 中无票数据">已下注（无票）</span>
                 {% endif %}
               {% else %}<span class="badge bg-secondary">未下注</span>{% endif %}
             </td>
+            <td>{% if s %}{{ s.n_hits }}/{{ s.n_combos }}{% else %}—{% endif %}</td>
+            <td class="text-end">{% if s %}{{ "%.0f"|format(s.week_stake) }}{% else %}—{% endif %}</td>
+            <td class="text-end">{% if s %}{{ "%.0f"|format(s.week_payout) }}{% else %}—{% endif %}</td>
             <td class="text-end {{ 'text-success' if s and s.week_pnl >= 0 else 'text-danger' if s }}">
               {% if s %}{{ "%+.0f"|format(s.week_pnl) }}{% else %}—{% endif %}
             </td>
             <td class="text-end">{% if s %}{{ "%.0f"|format(s.bankroll_after) }}{% else %}—{% endif %}</td>
-            <td class="text-end">{% if s %}{{ "%.0f"|format(s.locked_after) }}{% if s.skimmed %} <small class="text-success">+{{ "%.0f"|format(s.skimmed) }}</small>{% endif %}{% else %}—{% endif %}</td>
           </tr>
+          {% if has_hit %}
+          <tr id="winners-{{ loop.index }}" style="display:none" class="bg-light">
+            <td colspan="10">
+              <div class="px-2 py-2">
+                <strong>{{ winners|length }} 张中票详情</strong>
+                <table class="table table-sm mt-2 mb-0">
+                  <thead class="table-light"><tr>
+                    <th>票#</th><th class="text-end">stake</th>
+                    <th class="text-end">实际 SP</th><th class="text-end">派彩</th>
+                    <th>各腿（赛事 / 选 / SP / 实际结果）</th>
+                  </tr></thead>
+                  <tbody>
+                  {% for w in winners %}
+                  <tr>
+                    <td>#{{ w.idx }}</td>
+                    <td class="text-end">{{ w.stake }}</td>
+                    <td class="text-end">{{ "%.2f"|format(w.product_sp) }}</td>
+                    <td class="text-end text-success"><strong>{{ "%.0f"|format(w.payout) }}</strong></td>
+                    <td>
+                      {% for leg in w.legs %}
+                        <small>{{ leg.home }} vs {{ leg.away }}
+                          <span class="badge bg-primary">{{ leg.selection_label }}</span>
+                          @{{ "%.2f"|format(leg.sp) }}
+                          → <span class="text-success">{{ leg.actual_label }} ✓</span>
+                        </small>{% if not loop.last %}<br>{% endif %}
+                      {% endfor %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </td>
+          </tr>
+          {% endif %}
+        {% endif %}
         {% endfor %}
       </tbody>
     </table>
@@ -52,40 +120,13 @@
   </div>
 </div>
 
-<div class="card">
-  <div class="card-header">所有结算 (按期号倒序)</div>
-  <div class="card-body p-0">
-    {% if settlements %}
-    <table class="table table-sm mb-0">
-      <thead><tr>
-        <th>期号</th><th>结算时间</th><th>票/中</th>
-        <th class="text-end">下注</th><th class="text-end">回收</th>
-        <th class="text-end">PnL</th>
-        <th class="text-end">活跃后</th><th class="text-end">锁定后</th>
-        <th class="text-end">本期锁定</th>
-      </tr></thead>
-      <tbody>
-        {% for s in settlements %}
-        <tr>
-          <td>{{ s.week_id }}</td>
-          <td><small>{{ s.settled_ts }}</small></td>
-          <td>{{ s.n_hits }}/{{ s.n_combos }}</td>
-          <td class="text-end">{{ "%.0f"|format(s.week_stake) }}</td>
-          <td class="text-end">{{ "%.0f"|format(s.week_payout) }}</td>
-          <td class="text-end {{ 'text-success' if s.week_pnl >= 0 else 'text-danger' }}">
-            {{ "%+.0f"|format(s.week_pnl) }}
-          </td>
-          <td class="text-end">{{ "%.0f"|format(s.bankroll_after) }}</td>
-          <td class="text-end">{{ "%.0f"|format(s.locked_after) }}</td>
-          <td class="text-end">{{ "%.0f"|format(s.skimmed or 0) }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="text-muted m-3">暂无结算记录。</p>
-    {% endif %}
-  </div>
-</div>
+<script>
+  document.querySelectorAll('.settle-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const t = document.getElementById(row.dataset.target);
+      if (t) t.style.display = (t.style.display === 'none') ? '' : 'none';
+    });
+  });
+</script>
 
 {% endblock %}

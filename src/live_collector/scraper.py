@@ -128,6 +128,15 @@ class Scraper:
         """
         return self.get("https://live.500.com/zqdc.php", encoding="gb18030")
 
+    def fetch_500_detail(self, fid: str) -> str:
+        """live.500.com/detail.php?fid={fid} — per-match detail page with
+        explicit ``<span class="score">N - M</span>`` (full-time) and a
+        sibling half-time score span. More authoritative than kaijiang
+        (which has occasional home/away inversions) and the wanchang index.
+        """
+        return self.get(f"https://live.500.com/detail.php?fid={fid}",
+                        encoding="gb18030")
+
     def fetch_500_zqdc(self, fid: str) -> str:
         """live.500.com/zqdc.php?id={fid} — per-fid scoreboard page that
         publishes finals faster than the issue kaijiang. Each match row has

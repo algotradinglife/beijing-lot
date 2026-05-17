@@ -1,7 +1,24 @@
 {
-  "_doc": "Surviving niches from data/raw/archetype_B_niches.csv (Phase 4). Each rule lists the dimensions a (match, option) pair must match to qualify, and a p_hat estimate (the train mean_q / sp). Override via --niches CLI arg.",
+  "_doc": "Surviving niches from data/raw/archetype_B_niches.csv (Phase 4). Each rule lists the dimensions a (match, option) pair must match to qualify, and a p_hat estimate (the train mean_q / sp). Override via --niches CLI arg. Rules are evaluated top-to-bottom; FIRST MATCH WINS — keep more-specific (e.g. comp_type-restricted) rules ABOVE their general counterparts.",
+  "_doc_comp_type_overrides": "2026-05-09 — Step 1 split analysis (scripts/niche_split_analysis.py) found two cup-subset boosts that survive OOS: option=0/sp 3.5-4.5/h1/cup test_q=1.245 (n=531) vs niche-avg 1.175; option=3/sp 3.5-4.5/h_unknown/cup test_q=1.184 (n=583) vs 1.140. Encoded as cup-priority rules below. Step 2 (mining option=1 draws with comp_type) found NO surviving niches strong enough (mean_q >= 1.113 break-even for N=4) — draws remain excluded.",
   "return_rate": 0.65,
   "rules": [
+    {
+      "name": "away_sp_3.5-4.5_h1_CUP",
+      "option": "0",
+      "sp_lo": 3.5, "sp_hi": 4.5,
+      "handicap_class": "h1",
+      "comp_type": "cup",
+      "p_hat_train": 0.311
+    },
+    {
+      "name": "home_sp_3.5-4.5_h_unknown_CUP",
+      "option": "3",
+      "sp_lo": 3.5, "sp_hi": 4.5,
+      "handicap_class": "h_unknown",
+      "comp_type": "cup",
+      "p_hat_train": 0.296
+    },
     {
       "name": "away_sp_3.5-4.5_Asian",
       "option": "0",

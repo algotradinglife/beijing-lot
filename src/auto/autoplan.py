@@ -36,12 +36,13 @@ DEFAULT_WEBUI_DB = ROOT / "data" / "webui.db"
 DEFAULT_PLANS_DIR = ROOT / "data" / "phase5a_plans"
 DEFAULT_REPORTS_DIR = ROOT / "data" / "auto_reports"
 MIN_CANDIDATES = 5
-# 北单 weekend issues typically have 60–100+ matches across Sat/Sun. Mid-week
-# "凑数" issues (Tue/Wed) have <20 matches and aren't betable for our strategy.
+# 北单 issues vary: weekend issues have 60–100+ matches, mid-week "凑数"
+# issues have <20 matches and aren't betable for our strategy. autoplan
+# runs daily; this threshold gates whether we actually generate a plan.
 MIN_OPEN_MATCHES = 30
-# Allowed weekdays for autoplan (0=Mon ... 6=Sun). Friday + Saturday only —
-# we generate Fri night for the weekend, occasionally Sat for a Sun-only batch.
-ALLOWED_WEEKDAYS = {4, 5}
+# Plans with total_stake below this threshold are discarded — too small to
+# justify the operational overhead of a separate betting slip.
+MIN_STAKE = 1000
 
 
 def _now_iso() -> str:
@@ -86,15 +87,37 @@ def _human_summary(plan: dict) -> str:
     return head
 
 
-def _count_open_matches(live_db: Path) -> int:
-    """Count matches in the current issue (used as a sanity check that
-    today is a real betting day, not a sparse mid-week issue)."""
+def _current_issue(live_db: Path) -> str:
     import sqlite3
     try:
         with sqlite3.connect(str(live_db)) as c:
+            r = c.execute(
+                "SELECT issue FROM matches ORDER BY created_ts DESC LIMIT 1"
+            ).fetchone()
+            return str(r[0]) if r else ""
+    except Exception:
+        return ""
+
+
+def _count_open_matches(live_db: Path) -> int:
+    """Count *betable* matches in the current issue: future kickoff AND
+    not yet settled. Past/settled matches don't count toward our 'is this
+    a fat-enough issue to bet' threshold.
+    """
+    import sqlite3
+    from datetime import datetime, timedelta, timezone
+    HK = timezone(timedelta(hours=8))
+    now_hk = datetime.now(timezone.utc).astimezone(HK).strftime("%Y-%m-%dT%H:%M:%S")
+    try:
+        with sqlite3.connect(str(live_db)) as c:
             row = c.execute(
-                "SELECT COUNT(*) FROM matches WHERE issue=("
-                "  SELECT issue FROM matches ORDER BY created_ts DESC LIMIT 1)"
+                "SELECT COUNT(*) FROM matches m "
+                "LEFT JOIN settlements s ON s.match_id = m.match_id "
+                "WHERE m.issue = ("
+                "  SELECT issue FROM matches ORDER BY created_ts DESC LIMIT 1) "
+                "AND s.match_id IS NULL "
+                "AND m.kickoff_ts > ?",
+                (now_hk,),
             ).fetchone()
             return int(row[0]) if row else 0
     except Exception:
@@ -125,28 +148,25 @@ def run(
         db.auto_log("autoplan", "warn", msg, _now_iso())
         return 0
 
-    # Guardrail 1: weekday — refuse on mid-week unless force=True
-    if not force:
-        wd = datetime.now().weekday()  # local time
-        if wd not in ALLOWED_WEEKDAYS:
-            wd_name = "一二三四五六日"[wd]
-            msg = (f"今天是周{wd_name}，非北单主投注日（周五/六）— autoplan 跳过。"
-                   f"如确需生成，从 dashboard 立即触发会传 force=True。")
-            log.info(msg)
-            db.auto_log("autoplan", "info", msg, _now_iso())
-            db.set_config("auto_last_plan_status", "skipped_weekday")
-            db.set_config("auto_last_plan_at", _now_iso())
-            return 0
+    # Best-effort: get current issue id for richer skip logging
+    cur_issue = _current_issue(live_db)
 
-    # Guardrail 2: open-match count — mid-week 凑数 issues have <20 matches
+    # NOTE: 2026-05-10 — autoplan now runs HOURLY (not daily 21:00). No
+    # cooldown. Anti-double-bet is enforced inside services.generate_plan,
+    # which excludes match_ids from any placed-but-unsettled prior plan.
+    # If after that exclusion there aren't enough qualifying legs we fall
+    # through to the MIN_CANDIDATES skip below — same as a thin issue.
+
+    # Guardrail: open-match count — thin issues (mid-week 凑数) skipped
     n_open = _count_open_matches(live_db)
     if n_open < MIN_OPEN_MATCHES and not force:
-        msg = (f"当前期只有 {n_open} 场（< {MIN_OPEN_MATCHES}），疑似中段凑数期，"
-               f"autoplan 跳过")
-        log.warning(msg)
-        notify(phone, "北单自动模式", msg)
-        db.auto_log("autoplan", "warn", msg, _now_iso(),
-                    details=dict(n_open=n_open))
+        msg = (f"当前期 {cur_issue or '?'} 只有 {n_open} 场（< {MIN_OPEN_MATCHES}），"
+               f"疑似中段凑数期，autoplan 跳过")
+        log.info(msg)
+        db.auto_log("autoplan", "info", msg, _now_iso(),
+                    details=dict(reason="thin_issue",
+                                 issue=cur_issue, n_open=n_open,
+                                 threshold=MIN_OPEN_MATCHES))
         db.set_config("auto_last_plan_status", "skipped_thin_issue")
         db.set_config("auto_last_plan_at", _now_iso())
         return 0
@@ -205,12 +225,48 @@ def run(
 
     n_tickets = len(plan.get("tickets", []))
     if n_tickets < MIN_CANDIDATES:
+        # services.generate_plan already upserted this plan into the DB +
+        # wrote a JSON file. Since we're not placing it, clean both up
+        # to avoid orphan rows littering /history.
+        orphan_id = plan.get("plan_id")
+        if orphan_id:
+            try:
+                db.delete_plan(orphan_id)
+                orphan_json = plans_dir / f"{orphan_id}.json"
+                if orphan_json.exists():
+                    orphan_json.unlink()
+            except Exception as e:  # pragma: no cover
+                log.warning("orphan cleanup failed for %s: %s", orphan_id, e)
         msg = (f"候选过少 ({n_tickets} 张) — 跳过本期。"
-               f"行情可能不够丰富或 q 阈值过严。")
-        notify(phone, "北单自动模式", msg)
-        db.auto_log("autoplan", "warn", msg, _now_iso(),
-                    details=dict(n_tickets=n_tickets))
+               f"可能 dedupe 后剩余腿不足 / 行情还没刷新 / q 阈值过严。")
+        # No iMessage on this skip — hourly polling makes it routine when
+        # we're between plans. Only DB-log so /history still shows it.
+        log.info(msg)
+        db.auto_log("autoplan", "info", msg, _now_iso(),
+                    details=dict(reason="low_candidates", n_tickets=n_tickets,
+                                 orphan_cleaned=orphan_id))
         db.set_config("auto_last_plan_status", "skipped_low_candidates")
+        db.set_config("auto_last_plan_at", _now_iso())
+        return 0
+
+    total_stake = plan.get("total_stake", 0)
+    if total_stake < MIN_STAKE:
+        orphan_id = plan.get("plan_id")
+        if orphan_id:
+            try:
+                db.delete_plan(orphan_id)
+                orphan_json = plans_dir / f"{orphan_id}.json"
+                if orphan_json.exists():
+                    orphan_json.unlink()
+            except Exception as e:  # pragma: no cover
+                log.warning("orphan cleanup failed for %s: %s", orphan_id, e)
+        msg = (f"下注额过低 (¥{int(total_stake)} < ¥{MIN_STAKE}) — 跳过。"
+               f"新增场次太少 / 行情未刷新，等下次轮询。")
+        log.info(msg)
+        db.auto_log("autoplan", "info", msg, _now_iso(),
+                    details=dict(reason="low_stake", total_stake=total_stake,
+                                 threshold=MIN_STAKE, orphan_cleaned=orphan_id))
+        db.set_config("auto_last_plan_status", "skipped_low_stake")
         db.set_config("auto_last_plan_at", _now_iso())
         return 0
 

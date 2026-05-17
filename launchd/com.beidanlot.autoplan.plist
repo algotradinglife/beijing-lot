@@ -23,15 +23,12 @@
         <string>/Users/huhan/miniforge3/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>
 
-    <key>StartCalendarInterval</key>
-    <dict>
-        <key>Weekday</key>
-        <integer>5</integer>
-        <key>Hour</key>
-        <integer>21</integer>
-        <key>Minute</key>
-        <integer>0</integer>
-    </dict>
+    <!-- Hourly polling (changed 2026-05-10 from daily 21:00). -->
+    <!-- Anti-double-bet enforced inside services.generate_plan, so cron      -->
+    <!-- triggers liberally and the planner skips when no new matches qualify -->
+    <!-- after deduping placed-but-unsettled prior plans.                    -->
+    <key>StartInterval</key>
+    <integer>3600</integer>
 
     <key>RunAtLoad</key>
     <false/>

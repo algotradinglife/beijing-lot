@@ -127,6 +127,12 @@ class WebuiDB:
                  json.dumps(plan_dict, ensure_ascii=False)),
             )
 
+    def delete_plan(self, plan_id: str) -> None:
+        """Remove a plan row. Used by autoplan to clean up plans it generated
+        but decided not to place (e.g., too few qualifying candidates)."""
+        with self.tx() as cur:
+            cur.execute("DELETE FROM plans WHERE plan_id=?", (plan_id,))
+
     def mark_placed(self, plan_id: str, placed_ts: str,
                     actual: Optional[Dict[str, Any]] = None) -> bool:
         with self.tx() as cur:
@@ -155,7 +161,7 @@ class WebuiDB:
     def list_plans(self) -> List[Dict[str, Any]]:
         rows = self._conn.execute(
             "SELECT plan_id, created_ts, placed_ts FROM plans "
-            "ORDER BY plan_id DESC"
+            "ORDER BY created_ts DESC, plan_id DESC"
         ).fetchall()
         return [dict(plan_id=r[0], created_ts=r[1], placed_ts=r[2])
                 for r in rows]

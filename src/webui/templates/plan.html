@@ -59,10 +59,23 @@
 {% if not plan %}
 <div class="card">
   <div class="card-body text-center">
-    <p class="lead">本周尚未生成计划。</p>
-    <form method="post" action="{{ url_for('plan_generate') }}">
-      <button class="btn btn-lg btn-primary">生成计划</button>
-    </form>
+    {% if waiting %}
+      <p class="lead mb-2">{{ waiting.headline }}</p>
+      <p class="text-muted mb-3">{{ waiting.detail }}</p>
+      {% if waiting.next_at %}
+        <p class="small text-muted">下次自动生成时间：<code>{{ waiting.next_at }}</code></p>
+      {% endif %}
+      {% if waiting.allow_force %}
+        <form method="post" action="{{ url_for('plan_generate') }}">
+          <button class="btn btn-outline-primary">仍要立即生成（覆盖等待）</button>
+        </form>
+      {% endif %}
+    {% else %}
+      <p class="lead">{{ week_id }} 尚未生成计划。</p>
+      <form method="post" action="{{ url_for('plan_generate') }}">
+        <button class="btn btn-lg btn-primary">生成计划</button>
+      </form>
+    {% endif %}
   </div>
 </div>
 {% else %}
@@ -223,8 +236,8 @@
 
 {% endif %}
 
-{% if plan and plan.tickets and (plan.leg_appearance|default([])) %}
 {% block scripts %}
+{% if plan and plan.tickets and (plan.leg_appearance|default([])) %}
 <script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.0/plotly.min.js"></script>
 <script>
   const legData = {{ plan.leg_appearance|tojson }};
@@ -261,7 +274,7 @@
 
   Plotly.newPlot('legChart', data, layout, { displayModeBar: false, responsive: true });
 </script>
-{% endblock %}
 {% endif %}
+{% endblock %}
 
 {% endblock %}
