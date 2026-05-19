@@ -35,6 +35,7 @@ from flask import (
 
 from . import services
 from .db import WebuiDB
+from .strategies import match_strategy
 
 
 def _utcnow_iso() -> str:
@@ -658,18 +659,24 @@ def create_app(
             lambda_n5=float(db.get_config("lambda_n5") or 0.0),
             league_q_min=float(db.get_config("league_q_min") or 0.0),
         )
+        # Resolve canonical strategy name from current params
+        ss = strategy_summary
+        sid, sname = match_strategy(
+            weights=(ss["mix_w2"], ss["mix_w3"], ss["mix_w4"], ss["mix_w5"]),
+            kelly=(ss["kelly_n2"], ss["kelly_n3"], ss["kelly_n4"], ss["kelly_n5"]),
+            lambdas=(ss["lambda_n2"], ss["lambda_n3"], ss["lambda_n4"], ss["lambda_n5"]),
+            max_combos=ss["max_combos"],
+            league_q_min=ss["league_q_min"],
+        )
+        strategy_summary["strategy_id"] = sid
+        strategy_summary["strategy_name"] = sname
         waiting = None
         if plan is None:
-            # Sole gating reason now: current issue is too thin (< 30 open
-            # matches). Prior-plan-settlement no longer blocks new plans
-            # (changed 2026-05-09 — multi-day issues can drag tail
-            # settlements for days).
-            next_at = _next_daily_at(hour=21, minute=0)
             waiting = dict(
                 headline=f"{wk} 期尚未生成计划",
-                detail=("autoplan 每天 21:00 评估当期场次。当前期场次数 < "
+                detail=("autoplan 每小时评估当期场次。当前期场次数 < "
                         "30 时跳过，等待后续场次更密集的期次。"),
-                next_at=next_at, allow_force=True,
+                next_at=None, allow_force=True,
             )
         return render_template(
             "plan.html",
@@ -764,7 +771,7 @@ def create_app(
             "pending_settle": ("等待上单结算", "secondary"),  # legacy; rule removed 2026-05-09
             "same_issue_already_planned": ("本期已有计划", "info"),  # legacy; refined 2026-05-10
             "prior_plan_no_progress": ("上单未开赛", "info"),
-            "low_stake": ("下注额不足¥1000", "secondary"),
+            "low_stake": ("下注额不足¥500", "secondary"),
             "low_candidates": ("候选票数不足", "secondary"),
         }
         # Issues that already have a real plan — skip-event ghost rows for
@@ -777,7 +784,13 @@ def create_app(
             d = e.get("details") or {}
             reason = d.get("reason")
             if reason not in REASON_LABEL: continue
-            issue = d.get("issue") or "?"
+            # Recover issue from orphan plan_id when direct field is missing
+            issue = d.get("issue") or ""
+            if not issue:
+                orphan = d.get("orphan_cleaned") or ""
+                if orphan:
+                    issue = str(orphan).split("-")[0]
+            issue = issue or "?"
             if issue in plan_issues or issue in seen_skip_issues: continue
             seen_skip_issues.add(issue)
             label, color = REASON_LABEL[reason]
