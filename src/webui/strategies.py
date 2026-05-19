@@ -38,7 +38,7 @@ REGISTRY: Dict[str, Strategy] = {
                  lambdas=(0, 0, 0.5, 0), max_combos=100, league_q_min=0.65),
         Strategy("S3", "Sharpe 优先",
                  weights=(0.20, 0.20, 0.60, 0),
-                 kelly=(0.25, 0.125, 0.125, 0.125),
+                 kelly=(0.25, 0.25, 0.25, 0.125),
                  lambdas=(0, 0, 0.5, 0), max_combos=100),
         Strategy("S4", "平衡",
                  weights=(0, 0.50, 0.50, 0),

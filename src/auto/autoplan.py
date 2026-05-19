@@ -42,7 +42,7 @@ MIN_CANDIDATES = 5
 MIN_OPEN_MATCHES = 30
 # Plans with total_stake below this threshold are discarded — too small to
 # justify the operational overhead of a separate betting slip.
-MIN_STAKE = 1000
+MIN_STAKE = 500
 
 
 def _now_iso() -> str:
