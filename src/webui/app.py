@@ -555,6 +555,9 @@ def create_app(
         auto_logs = db.auto_recent_logs(limit=8)
         auto_state["next_autoplan"] = _next_daily_at(hour=21, minute=0)
         auto_state["next_autocheck"] = _next_daily_at(hour=10, minute=0)
+        pending_preview = services.confirmed_payout_across_unsettled(
+            db, app.config["LIVE_DB"]
+        )
         return render_template(
             "dashboard.html",
             state=state, stats=stats, equity=equity, recent=recent,
@@ -564,6 +567,7 @@ def create_app(
             q_drift=q_drift,
             auto_state=auto_state,
             auto_logs=auto_logs,
+            pending_preview=pending_preview,
         )
 
     @app.route("/auto/toggle", methods=["POST"])
@@ -678,6 +682,12 @@ def create_app(
                         "30 时跳过，等待后续场次更密集的期次。"),
                 next_at=None, allow_force=True,
             )
+        # Partial-settle preview: confirmed + pending payout for this plan
+        partial_preview = None
+        if plan and plan_meta and plan_meta.get("placed_ts") and not db.has_settlement(wk):
+            partial_preview = services.partial_settle_preview(
+                db, app.config["LIVE_DB"], wk
+            )
         return render_template(
             "plan.html",
             week_id=wk, plan=plan, plan_meta=plan_meta,
@@ -685,6 +695,7 @@ def create_app(
             live_db_exists=live_db_exists,
             strategy_summary=strategy_summary,
             waiting=waiting,
+            partial_preview=partial_preview,
         )
 
     @app.route("/plan/generate", methods=["POST"])

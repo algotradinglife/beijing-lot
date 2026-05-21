@@ -94,6 +94,35 @@
     </div></div></div>
   </div>
 
+  {% if partial_preview and (partial_preview.confirmed_payout > 0 or partial_preview.pending_max_payout > 0) %}
+  <div class="row mb-3">
+    {% if partial_preview.confirmed_payout > 0 %}
+    <div class="col-md-6">
+      <div class="card border-success">
+        <div class="card-body py-2 d-flex align-items-center gap-3">
+          <div>
+            <small class="text-success fw-semibold">✓ 已确定兑现（暂不计入总额）</small>
+            <div class="fs-4 fw-bold text-success">{{ "%.0f"|format(partial_preview.confirmed_payout) }} 元</div>
+            <small class="text-muted">{{ partial_preview.confirmed_count }} 张全中票 · 结算后自动入账</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% if partial_preview.pending_max_payout > 0 %}
+    <div class="col-md-6">
+      <div class="card border-warning">
+        <div class="card-body py-2">
+          <small class="text-warning fw-semibold">⏳ 待定中奖上限（暂不计入）</small>
+          <div class="fs-4 fw-bold">{{ "%.0f"|format(partial_preview.pending_max_payout) }} 元</div>
+          <small class="text-muted">{{ partial_preview.pending_count }} 张存活票 · 剩余腿若全中可兑现</small>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {# 期望盈亏汇总卡片 #}
   {% set net_profit = plan.expected_total_return - plan.total_stake %}
   {% set ev_pct = (plan.expected_total_return / plan.total_stake - 1) * 100 if plan.total_stake else 0 %}

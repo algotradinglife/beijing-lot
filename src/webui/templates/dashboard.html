@@ -42,6 +42,33 @@
   </div>
 </div>
 
+{% if pending_preview and (pending_preview.confirmed_payout > 0 or pending_preview.pending_max_payout > 0) %}
+<div class="row mb-4">
+  {% if pending_preview.confirmed_payout > 0 %}
+  <div class="col-md-6">
+    <div class="card border-success">
+      <div class="card-body py-2">
+        <h6 class="card-subtitle mb-1 text-success">✓ 已确定兑现（暂不计入总额）</h6>
+        <h3 class="card-title mb-0 text-success">{{ "%.0f"|format(pending_preview.confirmed_payout) }} 元</h3>
+        <small class="text-muted">全腿命中的待结算票 · 结算后将自动入账</small>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% if pending_preview.pending_max_payout > 0 %}
+  <div class="col-md-6">
+    <div class="card border-warning">
+      <div class="card-body py-2">
+        <h6 class="card-subtitle mb-1 text-warning">⏳ 待定中奖上限（暂不计入）</h6>
+        <h3 class="card-title mb-0">{{ "%.0f"|format(pending_preview.pending_max_payout) }} 元</h3>
+        <small class="text-muted">已中间腿、待定结果的票 · 若剩余腿全中则可兑现</small>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="row mb-4">
   <div class="col-md-3"><div class="card"><div class="card-body">
     <small class="text-muted">已活跃周数</small>

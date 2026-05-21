@@ -1200,3 +1200,144 @@ def plan_to_xlsx(plan: Dict[str, Any], week_id: str) -> bytes:
     out = BytesIO()
     wb.save(out)
     return out.getvalue()
+
+
+def partial_settle_preview(
+    db: "WebuiDB",
+    live_db_path: str | Path,
+    plan_id: str,
+) -> Optional[Dict[str, Any]]:
+    """For a partially settled plan, compute confirmed and tentatively
+    pending payouts WITHOUT touching bankroll.
+
+    A ticket is **confirmed** when every leg is settled and all hit.
+    A ticket is **pending** when every settled leg hit but ≥1 leg is
+    still unsettled (could still win).
+    Dead tickets (any settled leg missed) are ignored.
+
+    Returns:
+        {confirmed_count, confirmed_payout,
+         pending_count, pending_max_payout}
+    or None when plan not found / already fully settled in webui.
+    """
+    plan_meta = db.get_plan(plan_id)
+    if not plan_meta or not plan_meta.get("plan", {}).get("tickets"):
+        return None
+
+    tickets = plan_meta["plan"]["tickets"]
+    live_path = Path(live_db_path)
+    if not live_path.exists():
+        return None
+
+    # Collect all match_ids in this plan
+    all_mids: set = set()
+    for t in tickets:
+        for leg in t.get("legs", []):
+            if leg.get("match_id"):
+                all_mids.add(str(leg["match_id"]))
+
+    if not all_mids:
+        return None
+
+    # Load settlements: {match_id: (result_code, winning_sp)}
+    settlements: Dict[str, tuple] = {}
+    with sqlite3.connect(str(live_path)) as conn:
+        ph = ",".join("?" * len(all_mids))
+        for r in conn.execute(
+            f"SELECT match_id, result_code, winning_sp FROM settlements "
+            f"WHERE match_id IN ({ph})",
+            tuple(all_mids),
+        ).fetchall():
+            settlements[str(r[0])] = (
+                str(r[1]) if r[1] is not None else None,
+                float(r[2]) if r[2] is not None else None,
+            )
+
+    confirmed_count = 0
+    confirmed_payout = 0.0
+    pending_count = 0
+    pending_max_payout = 0.0
+
+    for t in tickets:
+        legs = t.get("legs", [])
+        if not legs:
+            continue
+        stake = int(
+            t.get("total_stake") or t.get("stake") or t.get("stake_per_ticket", 0)
+        )
+
+        dead = False
+        settled_sp_product = 1.0
+        pending_plan_sp_product = 1.0  # product of plan SP for unsettled legs
+        n_pending = 0
+
+        for leg in legs:
+            mid = str(leg.get("match_id") or "")
+            sel = str(leg.get("selection") or "")
+            plan_sp = float(leg.get("sp") or 1.0)
+
+            if mid in settlements:
+                rc, wsp = settlements[mid]
+                if rc == sel:  # hit — use actual winning_sp, fallback to plan SP
+                    settled_sp_product *= wsp if wsp else plan_sp
+                else:
+                    dead = True
+                    break
+            else:
+                # Unsettled leg
+                n_pending += 1
+                pending_plan_sp_product *= plan_sp
+
+        if dead:
+            continue
+
+        if n_pending == 0:
+            # All legs settled and all hit → confirmed
+            confirmed_count += 1
+            confirmed_payout += stake * settled_sp_product
+        else:
+            # Surviving so far, still waiting on n_pending legs
+            pending_count += 1
+            # Optimistic upper bound: pending legs all hit at plan SP
+            pending_max_payout += stake * settled_sp_product * pending_plan_sp_product
+
+    return dict(
+        confirmed_count=confirmed_count,
+        confirmed_payout=round(confirmed_payout),
+        pending_count=pending_count,
+        pending_max_payout=round(pending_max_payout),
+    )
+
+
+def confirmed_payout_across_unsettled(
+    db: "WebuiDB",
+    live_db_path: str | Path,
+) -> Dict[str, Any]:
+    """Aggregate partial_settle_preview across all placed-but-not-booked plans.
+
+    Returns:
+        {confirmed_payout, pending_max_payout,
+         plan_previews: {plan_id: preview_dict}}
+    """
+    total_confirmed = 0.0
+    total_pending_max = 0.0
+    plan_previews: Dict[str, Dict] = {}
+
+    for plan_meta in db.list_plans():
+        week_id = plan_meta["plan_id"]
+        if not plan_meta.get("placed_ts"):
+            continue
+        if db.has_settlement(week_id):
+            continue
+        preview = partial_settle_preview(db, live_db_path, week_id)
+        if preview is None:
+            continue
+        plan_previews[week_id] = preview
+        total_confirmed += preview["confirmed_payout"]
+        total_pending_max += preview["pending_max_payout"]
+
+    return dict(
+        confirmed_payout=round(total_confirmed),
+        pending_max_payout=round(total_pending_max),
+        plan_previews=plan_previews,
+    )
