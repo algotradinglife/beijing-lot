@@ -274,6 +274,95 @@
 </div>
 {% endif %}
 
+{% if sp_drift and sp_drift.n_legs > 0 %}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong>📊 SP 漂移统计（获奖腿）</strong>
+    <small class="text-muted">{{ sp_drift.n_legs }} 条获奖腿（跨 {{ sp_drift.by_plan|length }} 期）</small>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-md-3 text-center">
+        <div class="text-muted small">样本腿数</div>
+        <h4 class="mb-0">{{ sp_drift.n_legs }}</h4>
+        <small class="text-muted">升 {{ sp_drift.n_positive }} · 降 {{ sp_drift.n_negative }}</small>
+      </div>
+      <div class="col-md-3 text-center">
+        <div class="text-muted small">平均漂移</div>
+        <h4 class="mb-0 {{ 'text-success' if sp_drift.mean_drift_pct >= 0 else 'text-danger' }}">
+          {{ "%+.1f"|format(sp_drift.mean_drift_pct) }}%
+        </h4>
+        <small class="text-muted">结算 SP 相对下注 SP</small>
+      </div>
+      <div class="col-md-3 text-center">
+        <div class="text-muted small">中位漂移</div>
+        <h4 class="mb-0 {{ 'text-success' if sp_drift.median_drift_pct >= 0 else 'text-danger' }}">
+          {{ "%+.1f"|format(sp_drift.median_drift_pct) }}%
+        </h4>
+        <small class="text-muted">中位数（抗极值）</small>
+      </div>
+      <div class="col-md-3 text-center">
+        <div class="text-muted small">漂移方向</div>
+        <h4 class="mb-0">
+          {% set pct_pos = (sp_drift.n_positive / sp_drift.n_legs * 100) if sp_drift.n_legs else 0 %}
+          <span class="text-success">↑{{ "%.0f"|format(pct_pos) }}%</span>
+          <span class="text-muted"> / </span>
+          <span class="text-danger">↓{{ "%.0f"|format(100 - pct_pos) }}%</span>
+        </h4>
+        <small class="text-muted">上涨 / 下跌腿比例</small>
+      </div>
+    </div>
+    {% if sp_drift.mean_drift_pct < -10 %}
+    <div class="alert alert-warning py-1 mb-3 small">
+      ⚠ 结算 SP 平均偏低 {{ "%.1f"|format(sp_drift.mean_drift_pct|abs) }}%，EV 计算是以下注时 SP 为准——实际回收将系统性低于计划值。
+    </div>
+    {% endif %}
+    <details>
+      <summary class="text-muted small" style="cursor:pointer">按期展开明细 ▸</summary>
+      <div class="mt-2">
+        {% for bp in sp_drift.by_plan %}
+        <details class="mb-2">
+          <summary style="cursor:pointer">
+            <strong>{{ bp.plan_id }}</strong>
+            <span class="text-muted small ms-2">{{ bp.n_legs }} 条腿 ·
+              平均漂移
+              <span class="{{ 'text-success' if bp.mean_drift_pct >= 0 else 'text-danger' }}">
+                {{ "%+.1f"|format(bp.mean_drift_pct) }}%
+              </span>
+            </span>
+          </summary>
+          <table class="table table-sm mt-2 mb-0">
+            <thead><tr>
+              <th>场次</th><th>联赛</th><th>主 vs 客</th><th>押</th>
+              <th class="text-end">下注 SP</th><th class="text-end">结算 SP</th>
+              <th class="text-end">漂移</th>
+            </tr></thead>
+            <tbody>
+              {% for leg in bp.legs %}
+              <tr>
+                <td><small>{{ leg.match_id }}</small></td>
+                <td><small>{{ leg.league or '-' }}</small></td>
+                <td><small>{{ leg.home }} vs {{ leg.away }}</small></td>
+                <td><span class="badge bg-info">{{ leg.selection_label }}</span></td>
+                <td class="text-end">{{ "%.3f"|format(leg.plan_sp) }}</td>
+                <td class="text-end">{{ "%.3f"|format(leg.winning_sp) }}</td>
+                <td class="text-end">
+                  <span class="{{ 'text-success' if leg.drift_pct >= 0 else 'text-danger' }}">
+                    {{ "%+.1f"|format(leg.drift_pct) }}%
+                  </span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </details>
+        {% endfor %}
+      </div>
+    </details>
+  </div>
+</div>
+{% endif %}
+
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between">
     <span>当期场次状态

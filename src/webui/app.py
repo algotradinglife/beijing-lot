@@ -558,6 +558,7 @@ def create_app(
         pending_preview = services.confirmed_payout_across_unsettled(
             db, app.config["LIVE_DB"]
         )
+        sp_drift = services.sp_drift_stats(db, app.config["LIVE_DB"])
         return render_template(
             "dashboard.html",
             state=state, stats=stats, equity=equity, recent=recent,
@@ -568,6 +569,7 @@ def create_app(
             auto_state=auto_state,
             auto_logs=auto_logs,
             pending_preview=pending_preview,
+            sp_drift=sp_drift,
         )
 
     @app.route("/auto/toggle", methods=["POST"])
