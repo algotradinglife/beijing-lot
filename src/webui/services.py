@@ -58,6 +58,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.combo_optimizer import RETURN_RATE
 from src.phase5a import (
     NicheConfig,
     build_weekly_plan,
@@ -1295,12 +1296,12 @@ def partial_settle_preview(
         if n_pending == 0:
             # All legs settled and all hit → confirmed
             confirmed_count += 1
-            confirmed_payout += stake * settled_sp_product
+            confirmed_payout += stake * settled_sp_product * RETURN_RATE
         else:
             # Surviving so far, still waiting on n_pending legs
             pending_count += 1
             # Optimistic upper bound: pending legs all hit at plan SP
-            pending_max_payout += stake * settled_sp_product * pending_plan_sp_product
+            pending_max_payout += stake * settled_sp_product * pending_plan_sp_product * RETURN_RATE
 
     return dict(
         confirmed_count=confirmed_count,

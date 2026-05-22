@@ -91,9 +91,12 @@ def reconcile_plan(
         joint_sp = 1.0
         for leg in legs:
             s = settlements[leg["match_id"]]
-            # Use winning_sp if present (leg matched winning option), else
-            # the recorded leg.sp (more reliable for losing legs).
-            joint_sp *= float(leg["sp"])
+            # Winning tickets use the final parimutuel settlement SP
+            # (winning_sp), which is what the lottery actually pays out.
+            # plan-time leg["sp"] is only an estimate; fall back to it
+            # only if winning_sp was not scraped yet.
+            sp = s.get("winning_sp") if all_hit else None
+            joint_sp *= float(sp or leg["sp"])
         payout = (
             int(tk["stake_per_ticket"]) * joint_sp * RETURN_RATE
             * int(tk["n_tickets"])
