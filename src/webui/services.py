@@ -1352,22 +1352,31 @@ def sp_drift_stats(
 ) -> Dict[str, Any]:
     """Compare plan-time SP vs final settlement SP for every hit leg.
 
-    Only settled plans are included; only legs where result_code ==
+    Only settled plans are included.  Only legs where result_code ==
     selection (hit) and winning_sp IS NOT NULL are counted.  Each
     (plan_id, match_id) pair is deduplicated — a match appearing in
-    many tickets of the same plan is counted once.
+    many tickets counts once per plan.
+
+    NOTE: selection may be 0 (int or str "0" = 负); never test with
+    `or` — use explicit `is None` guard.
 
     Returns:
         {
-          n_legs: int,                # unique (plan, match) hit pairs
-          mean_drift_pct: float,      # avg (winning_sp/plan_sp - 1)*100
-          median_drift_pct: float,
-          n_positive: int,            # winning_sp > plan_sp
-          n_negative: int,            # winning_sp < plan_sp
-          by_plan: [
-            { plan_id, n_legs, mean_drift_pct,
+          n_winning_legs: int,
+          avg_plan_sp: float,
+          avg_settlement_sp: float,
+          avg_drift_ratio: float,       # avg(winning_sp / plan_sp)
+          avg_drift_pct: float,         # avg((ratio - 1) * 100)
+          min_drift_ratio: float,
+          max_drift_ratio: float,
+          favorable: int,               # ratio > 1.02
+          unfavorable: int,             # ratio < 0.98
+          stable: int,                  # 0.98 ≤ ratio ≤ 1.02
+          per_plan: [
+            { plan_id, n_legs, avg_drift_pct, avg_drift_ratio,
               legs: [{match_id, home, away, league, selection,
-                      plan_sp, winning_sp, drift_pct, drift_ratio}] }
+                      selection_label, plan_sp, winning_sp,
+                      drift_pct, drift_ratio}] }
           ]
         }
     """
@@ -1386,9 +1395,10 @@ def sp_drift_stats(
 
     sel_label = {"3": "胜", "1": "平", "0": "负"}
 
-    # Collect per-plan leg data
-    by_plan: List[Dict] = []
-    all_drift_pcts: List[float] = []
+    per_plan: List[Dict] = []
+    all_plan_sps: List[float] = []
+    all_settle_sps: List[float] = []
+    all_ratios: List[float] = []
 
     plans_to_scan = (
         [db.get_plan(plan_id)] if plan_id else
@@ -1402,81 +1412,102 @@ def sp_drift_stats(
             plan_meta.get("plan", {}).get("plan_id", ""))
         if not pid:
             continue
-        # Only settled plans
         if not db.has_settlement(pid):
             continue
         tickets = plan_meta.get("plan", {}).get("tickets", [])
         if not tickets:
             continue
 
-        # Deduplicate by match_id within this plan
         seen: Dict[str, Dict] = {}  # match_id → leg record
         for t in tickets:
             for leg in t.get("legs", []):
-                mid = str(leg.get("match_id") or "")
+                mid = leg.get("match_id")
+                if mid is None:
+                    continue
+                mid = str(mid)
                 if not mid or mid in seen:
                     continue
-                sel = str(leg.get("selection") or "")
-                plan_sp = float(leg.get("sp") or 0.0)
-                if plan_sp <= 0:
+                # selection=0 is valid (负) — never use `or` here
+                raw_sel = leg.get("selection")
+                if raw_sel is None:
                     continue
+                sel = str(raw_sel)
+                plan_sp = leg.get("sp")
+                if plan_sp is None or float(plan_sp) <= 0:
+                    continue
+                plan_sp = float(plan_sp)
                 if mid not in settle:
                     continue
                 rc, wsp = settle[mid]
                 if rc != sel:
                     continue  # not a hit
-                drift_pct = (wsp / plan_sp - 1.0) * 100.0
+                ratio = wsp / plan_sp
+                drift_pct = (ratio - 1.0) * 100.0
                 seen[mid] = dict(
                     match_id=mid,
-                    home=leg.get("home", "?"),
-                    away=leg.get("away", "?"),
+                    home=leg.get("home") or "?",
+                    away=leg.get("away") or "?",
                     league=leg.get("league") or "",
                     selection=sel,
                     selection_label=sel_label.get(sel, sel),
                     plan_sp=round(plan_sp, 3),
                     winning_sp=round(wsp, 3),
                     drift_pct=round(drift_pct, 2),
-                    drift_ratio=round(wsp / plan_sp, 4),
+                    drift_ratio=round(ratio, 4),
                 )
 
         legs = list(seen.values())
         if not legs:
             continue
 
-        # Sort legs by |drift_pct| desc for display
         legs.sort(key=lambda x: abs(x["drift_pct"]), reverse=True)
-        plan_drifts = [lg["drift_pct"] for lg in legs]
-        plan_mean = sum(plan_drifts) / len(plan_drifts)
-        all_drift_pcts.extend(plan_drifts)
 
-        by_plan.append(dict(
+        plan_ratios = [lg["drift_ratio"] for lg in legs]
+        plan_sps = [lg["plan_sp"] for lg in legs]
+        settle_sps = [lg["winning_sp"] for lg in legs]
+        plan_avg_ratio = sum(plan_ratios) / len(plan_ratios)
+        plan_avg_pct = (plan_avg_ratio - 1.0) * 100.0
+
+        all_plan_sps.extend(plan_sps)
+        all_settle_sps.extend(settle_sps)
+        all_ratios.extend(plan_ratios)
+
+        per_plan.append(dict(
             plan_id=pid,
             n_legs=len(legs),
-            mean_drift_pct=round(plan_mean, 2),
+            avg_drift_pct=round(plan_avg_pct, 2),
+            avg_drift_ratio=round(plan_avg_ratio, 4),
             legs=legs,
         ))
 
-    # Sort plans newest-first (plan_id lexicographic desc)
-    by_plan.sort(key=lambda x: x["plan_id"], reverse=True)
+    per_plan.sort(key=lambda x: x["plan_id"], reverse=True)
 
-    if not all_drift_pcts:
+    if not all_ratios:
         return _empty_drift()
 
-    sorted_drifts = sorted(all_drift_pcts)
-    n = len(sorted_drifts)
-    median = (sorted_drifts[n // 2] if n % 2 else
-              (sorted_drifts[n // 2 - 1] + sorted_drifts[n // 2]) / 2)
-
+    n = len(all_ratios)
+    avg_ratio = sum(all_ratios) / n
     return dict(
-        n_legs=n,
-        mean_drift_pct=round(sum(all_drift_pcts) / n, 2),
-        median_drift_pct=round(median, 2),
-        n_positive=sum(1 for d in all_drift_pcts if d > 0),
-        n_negative=sum(1 for d in all_drift_pcts if d < 0),
-        by_plan=by_plan,
+        n_winning_legs=n,
+        avg_plan_sp=round(sum(all_plan_sps) / n, 3),
+        avg_settlement_sp=round(sum(all_settle_sps) / n, 3),
+        avg_drift_ratio=round(avg_ratio, 4),
+        avg_drift_pct=round((avg_ratio - 1.0) * 100.0, 2),
+        min_drift_ratio=round(min(all_ratios), 4),
+        max_drift_ratio=round(max(all_ratios), 4),
+        favorable=sum(1 for r in all_ratios if r > 1.02),
+        unfavorable=sum(1 for r in all_ratios if r < 0.98),
+        stable=sum(1 for r in all_ratios if 0.98 <= r <= 1.02),
+        per_plan=per_plan,
     )
 
 
 def _empty_drift() -> Dict[str, Any]:
-    return dict(n_legs=0, mean_drift_pct=0.0, median_drift_pct=0.0,
-                n_positive=0, n_negative=0, by_plan=[])
+    return dict(
+        n_winning_legs=0,
+        avg_plan_sp=0.0, avg_settlement_sp=0.0,
+        avg_drift_ratio=1.0, avg_drift_pct=0.0,
+        min_drift_ratio=1.0, max_drift_ratio=1.0,
+        favorable=0, unfavorable=0, stable=0,
+        per_plan=[],
+    )
