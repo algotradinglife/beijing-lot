@@ -1280,7 +1280,10 @@ def partial_settle_preview(
 
             if mid in settlements:
                 rc, wsp = settlements[mid]
-                if rc == sel:  # hit — use actual winning_sp, fallback to plan SP
+                if not rc:  # row exists but result_code not yet populated → pending
+                    n_pending += 1
+                    pending_plan_sp_product *= plan_sp
+                elif rc == sel:  # hit — use actual winning_sp, fallback to plan SP
                     settled_sp_product *= wsp if wsp else plan_sp
                 else:
                     dead = True
@@ -1390,9 +1393,13 @@ def sp_drift_stats(
     with sqlite3.connect(str(live_path)) as lc:
         for r in lc.execute(
             "SELECT match_id, result_code, winning_sp FROM settlements "
-            "WHERE winning_sp IS NOT NULL AND result_code IS NOT NULL"
+            "WHERE winning_sp IS NOT NULL AND winning_sp > 0 "
+            "AND result_code IS NOT NULL"
         ).fetchall():
-            settle[str(r[0])] = (str(r[1]), float(r[2]))
+            try:
+                settle[str(r[0])] = (str(r[1]), float(r[2]))
+            except (TypeError, ValueError):
+                continue
 
     sel_label = {"3": "胜", "1": "平", "0": "负"}
 

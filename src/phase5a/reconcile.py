@@ -89,14 +89,26 @@ def reconcile_plan(
             res.pending += 1
             continue
         joint_sp = 1.0
+        missing_wsp = False
         for leg in legs:
             s = settlements[leg["match_id"]]
-            # Winning tickets use the final parimutuel settlement SP
-            # (winning_sp), which is what the lottery actually pays out.
-            # plan-time leg["sp"] is only an estimate; fall back to it
-            # only if winning_sp was not scraped yet.
-            sp = s.get("winning_sp") if all_hit else None
-            joint_sp *= float(sp or leg["sp"])
+            if all_hit:
+                wsp = s.get("winning_sp")
+                if not wsp:  # None or 0 — settlement SP not scraped yet
+                    missing_wsp = True
+                    break
+                joint_sp *= float(wsp)
+            else:
+                joint_sp *= float(leg["sp"])
+
+        if all_hit and missing_wsp:
+            res.ticket_outcomes.append(
+                TicketOutcome(ticket_no=tk["ticket_no"], status="pending",
+                              stake=stake, payout=0.0, pnl=0.0)
+            )
+            res.pending += 1
+            continue
+
         payout = (
             int(tk["stake_per_ticket"]) * joint_sp * RETURN_RATE
             * int(tk["n_tickets"])
