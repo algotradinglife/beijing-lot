@@ -22,6 +22,7 @@
         <th class="text-end">回收</th>
         <th class="text-end">PnL</th>
         <th class="text-end">活跃后</th>
+        <th></th>
       </tr></thead>
       <tbody>
         {% for r in rows %}
@@ -31,7 +32,7 @@
           <td><em>{{ ev.issue }}</em></td>
           <td><span class="badge bg-{{ ev.reason_color }}">跳过 · {{ ev.reason_label }}</span></td>
           <td><small>{{ ev.ts|hk }}</small></td>
-          <td colspan="7"><small>{{ ev.detail }}</small></td>
+          <td colspan="8"><small>{{ ev.detail }}</small></td>
         </tr>
         {% else %}
           {% set p = r.plan %}
@@ -74,10 +75,15 @@
               {% if s %}{{ "%+.0f"|format(s.week_pnl) }}{% else %}—{% endif %}
             </td>
             <td class="text-end">{% if s %}{{ "%.0f"|format(s.bankroll_after) }}{% else %}—{% endif %}</td>
+            <td>
+              <a href="{{ url_for('plan_export', week=p.plan_id) }}"
+                 class="btn btn-sm btn-outline-secondary py-0 px-1"
+                 title="下载 {{ p.plan_id }} 的 xlsx">⬇</a>
+            </td>
           </tr>
           {% if has_hit %}
           <tr id="winners-{{ loop.index }}" style="display:none" class="bg-light">
-            <td colspan="10">
+            <td colspan="11">
               <div class="px-2 py-2">
                 <strong>{{ winners|length }} 张中票详情</strong>
                 <table class="table table-sm mt-2 mb-0">
