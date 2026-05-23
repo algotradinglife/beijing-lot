@@ -42,9 +42,8 @@
   </div>
 </div>
 
-{% if pending_preview and (pending_preview.confirmed_payout > 0 or pending_preview.pending_max_payout > 0) %}
+{% if pending_preview and pending_preview.confirmed_payout > 0 %}
 <div class="row mb-4">
-  {% if pending_preview.confirmed_payout > 0 %}
   <div class="col-md-6">
     <div class="card border-success">
       <div class="card-body py-2">
@@ -54,18 +53,6 @@
       </div>
     </div>
   </div>
-  {% endif %}
-  {% if pending_preview.pending_max_payout > 0 %}
-  <div class="col-md-6">
-    <div class="card border-warning">
-      <div class="card-body py-2">
-        <h6 class="card-subtitle mb-1 text-warning">⏳ 待定中奖上限（暂不计入）</h6>
-        <h3 class="card-title mb-0">{{ "%.0f"|format(pending_preview.pending_max_payout) }} 元</h3>
-        <small class="text-muted">已中间腿、待定结果的票 · 若剩余腿全中则可兑现</small>
-      </div>
-    </div>
-  </div>
-  {% endif %}
 </div>
 {% endif %}
 
@@ -398,6 +385,7 @@
     <div class="accordion" id="planAccordion">
       {% for pl in match_status.plans %}
       {% set pid_safe = pl.plan_id|replace('-', '_') %}
+      {% set pp = pending_preview.plan_previews.get(pl.plan_id) if pending_preview and pending_preview.plan_previews else None %}
       <div class="accordion-item">
         <h2 class="accordion-header" id="planHead{{ pid_safe }}">
           <button class="accordion-button {{ '' if loop.first else 'collapsed' }}" type="button"
@@ -411,6 +399,9 @@
             {% if pl.live %}<span class="badge bg-warning text-dark me-1">进行 {{ pl.live|length }}</span>{% endif %}
             {% if pl.upcoming %}<span class="badge bg-primary me-1">即将 {{ pl.upcoming|length }}</span>{% endif %}
             {% if pl.empty_placed %}<span class="badge bg-danger ms-1">空票</span>{% endif %}
+            {% if pp and pp.confirmed_payout > 0 %}
+              <span class="badge bg-success ms-2">✓ 兑现 {{ "%.0f"|format(pp.confirmed_payout) }} 元</span>
+            {% endif %}
           </button>
         </h2>
         <div id="planBody{{ pid_safe }}" class="accordion-collapse collapse {{ 'show' if loop.first else '' }}"
