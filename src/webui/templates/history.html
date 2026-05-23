@@ -14,8 +14,8 @@
       <thead><tr>
         <th>期号</th>
         <th>策略</th>
-        <th>生成时间</th>
         <th>下注时间</th>
+        <th>结算时间</th>
         <th>结算状态</th>
         <th>中/票</th>
         <th class="text-end">下注</th>
@@ -53,8 +53,8 @@
                 <small class="text-muted">{{ strat.name }}</small>
               {% else %}<small class="text-muted">—</small>{% endif %}
             </td>
-            <td><small>{{ p.created_ts|hk }}</small></td>
             <td><small>{% if p.placed_ts %}{{ p.placed_ts|hk }}{% else %}—{% endif %}</small></td>
+            <td><small>{% if s and s.settled_ts %}{{ s.settled_ts|hk }}{% else %}—{% endif %}</small></td>
             <td>
               {% if s %}<span class="badge bg-success">已结算</span>
               {% elif p.placed_ts %}

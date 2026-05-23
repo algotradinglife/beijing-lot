@@ -828,7 +828,14 @@ def create_app(
         # most recent autoplan action (including skips) appears at the top.
         rows = []
         for p in plans:
-            rows.append(dict(kind="plan", ts=p.get("created_ts") or "", plan=p))
+            s = settle_by_week.get(p["plan_id"])
+            sort_ts = (
+                (s.get("settled_ts") if s else None)
+                or p.get("placed_ts")
+                or p.get("created_ts")
+                or ""
+            )
+            rows.append(dict(kind="plan", ts=sort_ts, plan=p))
         for ev in skip_events:
             rows.append(dict(kind="skip", ts=ev.get("ts") or "", ev=ev))
         rows.sort(key=lambda r: r["ts"], reverse=True)
