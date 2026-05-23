@@ -53,7 +53,7 @@ def fmt_hk(ts) -> str:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=HK_TZ)
     dt = dt.astimezone(HK_TZ)
-    return dt.strftime("%m-%d %H:%M +08:00")
+    return dt.strftime("%m-%d %H:%M")
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
