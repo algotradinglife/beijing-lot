@@ -829,16 +829,15 @@ def create_app(
         rows = []
         for p in plans:
             s = settle_by_week.get(p["plan_id"])
+            settled = s is not None
             sort_ts = (
-                (s.get("settled_ts") if s else None)
-                or p.get("placed_ts")
-                or p.get("created_ts")
-                or ""
-            )
-            rows.append(dict(kind="plan", ts=sort_ts, plan=p))
+                s.get("settled_ts") if settled else None
+            ) or p.get("placed_ts") or p.get("created_ts") or ""
+            # tier 0 = settled, tier 1 = unsettled → with reverse=True unsettled floats up
+            rows.append(dict(kind="plan", ts=sort_ts, tier=0 if settled else 1, plan=p))
         for ev in skip_events:
-            rows.append(dict(kind="skip", ts=ev.get("ts") or "", ev=ev))
-        rows.sort(key=lambda r: r["ts"], reverse=True)
+            rows.append(dict(kind="skip", ts=ev.get("ts") or "", tier=1, ev=ev))
+        rows.sort(key=lambda r: (r["tier"], r["ts"]), reverse=True)
         return render_template(
             "history.html",
             rows=rows,
