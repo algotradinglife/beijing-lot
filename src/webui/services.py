@@ -1440,10 +1440,12 @@ def sp_drift_stats(
                 if raw_sel is None:
                     continue
                 sel = str(raw_sel)
-                plan_sp = leg.get("sp")
-                if plan_sp is None or float(plan_sp) <= 0:
+                try:
+                    plan_sp = float(leg.get("sp") or 0)
+                except (TypeError, ValueError):
                     continue
-                plan_sp = float(plan_sp)
+                if plan_sp <= 0:
+                    continue
                 if mid not in settle:
                     continue
                 rc, wsp = settle[mid]
