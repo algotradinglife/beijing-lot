@@ -175,6 +175,9 @@ def create_app(
     def get_db() -> WebuiDB:
         if "webui_db" not in g:
             pid = _active_profile_id()
+            if pid != "default" and not get_registry_db().get_profile(pid):
+                pid = "default"
+                session["active_profile"] = "default"
             if pid == "default":
                 g.webui_db = get_registry_db()
             else:
@@ -968,7 +971,7 @@ def create_app(
         reg = get_registry_db()
         if profile_id == "default" or reg.get_profile(profile_id):
             session["active_profile"] = profile_id
-        return redirect(request.referrer or url_for("dashboard"))
+        return redirect(url_for("dashboard"))
 
     @app.route("/profiles")
     def profiles_page():
