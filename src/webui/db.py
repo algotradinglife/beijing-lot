@@ -49,6 +49,12 @@ CREATE TABLE IF NOT EXISTS settlements_log (
     locked_after    REAL,
     skimmed         REAL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS profiles (
+    profile_id  TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    created_ts  TEXT NOT NULL
+);
 """
 
 
@@ -251,3 +257,31 @@ class WebuiDB:
         return self._conn.execute(
             "SELECT 1 FROM settlements_log WHERE week_id=?", (week_id,)
         ).fetchone() is not None
+
+    # ---- profiles registry -----------------------------------------------
+    def list_profiles(self) -> List[Dict[str, Any]]:
+        rows = self._conn.execute(
+            "SELECT profile_id, name, created_ts FROM profiles ORDER BY created_ts ASC"
+        ).fetchall()
+        return [dict(profile_id=r[0], name=r[1], created_ts=r[2]) for r in rows]
+
+    def get_profile(self, profile_id: str) -> Optional[Dict[str, Any]]:
+        row = self._conn.execute(
+            "SELECT profile_id, name, created_ts FROM profiles WHERE profile_id=?",
+            (profile_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return dict(profile_id=row[0], name=row[1], created_ts=row[2])
+
+    def upsert_profile(self, profile_id: str, name: str, created_ts: str) -> None:
+        with self.tx() as cur:
+            cur.execute(
+                "INSERT INTO profiles(profile_id, name, created_ts) VALUES(?,?,?) "
+                "ON CONFLICT(profile_id) DO UPDATE SET name=excluded.name",
+                (profile_id, name, created_ts),
+            )
+
+    def delete_profile(self, profile_id: str) -> None:
+        with self.tx() as cur:
+            cur.execute("DELETE FROM profiles WHERE profile_id=?", (profile_id,))

@@ -30,6 +30,7 @@ from flask import (
     render_template,
     request,
     send_file,
+    session,
     url_for,
 )
 
@@ -140,16 +141,77 @@ def create_app(
     app.jinja_env.filters["hk"] = services.fmt_hk
     app.jinja_env.filters["humanmin"] = services.fmt_humanmin
 
+    # ---- profile helpers -------------------------------------------------
+    def _ensure_default_profile(registry: WebuiDB) -> None:
+        if not registry.get_profile("default"):
+            registry.upsert_profile("default", "默认", _utcnow_iso())
+
+    def get_registry_db() -> WebuiDB:
+        if "registry_db" not in g:
+            g.registry_db = WebuiDB(app.config["WEBUI_DB"])
+            _ensure_default_profile(g.registry_db)
+        return g.registry_db
+
+    def _active_profile_id() -> str:
+        return session.get("active_profile", "default")
+
+    def _profile_paths(profile_id: str) -> dict:
+        if profile_id == "default":
+            return dict(
+                webui_db=app.config["WEBUI_DB"],
+                plans_dir=app.config["PLANS_DIR"],
+                pnl_log=app.config["PNL_LOG"],
+            )
+        base = Path(app.config["WEBUI_DB"]).parent / "profiles" / profile_id
+        return dict(
+            webui_db=str(base / "webui.db"),
+            plans_dir=str(base / "plans"),
+            pnl_log=str(base / "pnl_log.csv"),
+        )
+
+    def _active_paths() -> dict:
+        return _profile_paths(_active_profile_id())
+
     def get_db() -> WebuiDB:
         if "webui_db" not in g:
-            g.webui_db = WebuiDB(app.config["WEBUI_DB"])
+            pid = _active_profile_id()
+            if pid == "default":
+                g.webui_db = get_registry_db()
+            else:
+                g.webui_db = WebuiDB(_profile_paths(pid)["webui_db"])
         return g.webui_db
 
     @app.teardown_appcontext
     def _close_db(_exc):
-        d = g.pop("webui_db", None)
-        if d is not None:
-            d.close()
+        reg = g.pop("registry_db", None)
+        db = g.pop("webui_db", None)
+        if db is not None and db is not reg:
+            db.close()
+        if reg is not None:
+            reg.close()
+
+    @app.context_processor
+    def inject_profiles():
+        try:
+            reg = get_registry_db()
+            profiles = reg.list_profiles()
+            active_id = _active_profile_id()
+            valid_ids = {p["profile_id"] for p in profiles}
+            if active_id not in valid_ids:
+                active_id = "default"
+                session["active_profile"] = "default"
+            active_name = next(
+                (p["name"] for p in profiles if p["profile_id"] == active_id), "默认"
+            )
+        except Exception:
+            profiles = []
+            active_id = "default"
+            active_name = "默认"
+        return dict(
+            all_profiles=profiles,
+            active_profile_id=active_id,
+            active_profile_name=active_name,
+        )
 
     # ------------------------------------------------------------------
     @app.route("/")
@@ -499,12 +561,13 @@ def create_app(
         if not db.is_initialized():
             return redirect(url_for("setup"))
         # Auto-reconcile (idempotent) so dashboard reflects latest settlements
+        _paths = _active_paths()
         try:
             services.reconcile_pending(
                 db,
                 live_db_path=app.config["LIVE_DB"],
-                plans_dir=app.config["PLANS_DIR"],
-                pnl_log=app.config["PNL_LOG"],
+                plans_dir=_paths["plans_dir"],
+                pnl_log=_paths["pnl_log"],
             )
         except Exception:
             pass
@@ -603,13 +666,14 @@ def create_app(
         except ModuleNotFoundError:
             from src.auto import autoplan as _ap, autocheck as _ac
         from pathlib import Path as _P
+        _paths = _active_paths()
         try:
             if kind == "autocheck":
                 _ac.run(
                     live_db=_P(app.config["LIVE_DB"]),
-                    webui_db=_P(app.config["WEBUI_DB"]),
-                    plans_dir=_P(app.config["PLANS_DIR"]),
-                    pnl_log=_P(app.config["PNL_LOG"]),
+                    webui_db=_P(_paths["webui_db"]),
+                    plans_dir=_P(_paths["plans_dir"]),
+                    pnl_log=_P(_paths["pnl_log"]),
                 )
                 flash("autocheck 已运行 — 查看周报和 dashboard", "success")
             else:
@@ -617,8 +681,8 @@ def create_app(
                 # guardrails — user explicitly opted in.
                 _ap.run(
                     live_db=_P(app.config["LIVE_DB"]),
-                    webui_db=_P(app.config["WEBUI_DB"]),
-                    plans_dir=_P(app.config["PLANS_DIR"]),
+                    webui_db=_P(_paths["webui_db"]),
+                    plans_dir=_P(_paths["plans_dir"]),
                     force=True,
                 )
                 flash("autoplan 已运行 — 检查 iMessage 和当期计划", "success")
@@ -708,7 +772,7 @@ def create_app(
         result = services.generate_plan(
             db,
             live_db_path=app.config["LIVE_DB"],
-            plans_dir=app.config["PLANS_DIR"],
+            plans_dir=_active_paths()["plans_dir"],
         )
         if "error" in result:
             flash(f"生成计划失败: {result['error']}", "error")
@@ -756,12 +820,13 @@ def create_app(
         if not db.is_initialized():
             return redirect(url_for("setup"))
         # Auto-trigger reconcile (idempotent) so history reflects latest settlements
+        _paths = _active_paths()
         try:
             services.reconcile_pending(
                 db,
                 live_db_path=app.config["LIVE_DB"],
-                plans_dir=app.config["PLANS_DIR"],
-                pnl_log=app.config["PNL_LOG"],
+                plans_dir=_paths["plans_dir"],
+                pnl_log=_paths["pnl_log"],
             )
         except Exception:
             pass  # silent fail; show stale data rather than crash
@@ -864,11 +929,12 @@ def create_app(
         db = get_db()
         if not db.is_initialized():
             return redirect(url_for("setup"))
+        _paths = _active_paths()
         results = services.reconcile_pending(
             db,
             live_db_path=app.config["LIVE_DB"],
-            plans_dir=app.config["PLANS_DIR"],
-            pnl_log=app.config["PNL_LOG"],
+            plans_dir=_paths["plans_dir"],
+            pnl_log=_paths["pnl_log"],
         )
         if not results:
             flash("没有可结算的计划（数据未到 / 已结算）。", "info")
@@ -894,5 +960,64 @@ def create_app(
     @app.route("/healthz")
     def healthz():
         return jsonify(ok=True)
+
+    # ---- profiles management -----------------------------------------
+    @app.route("/profiles/switch", methods=["POST"])
+    def profiles_switch():
+        profile_id = request.form.get("profile_id", "default")
+        reg = get_registry_db()
+        if profile_id == "default" or reg.get_profile(profile_id):
+            session["active_profile"] = profile_id
+        return redirect(request.referrer or url_for("dashboard"))
+
+    @app.route("/profiles")
+    def profiles_page():
+        reg = get_registry_db()
+        return render_template("profiles.html", profiles=reg.list_profiles())
+
+    @app.route("/profiles/create", methods=["POST"])
+    def profiles_create():
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            flash("Profile 名称不能为空", "error")
+            return redirect(url_for("profiles_page"))
+        import uuid as _uuid
+        profile_id = "p_" + _uuid.uuid4().hex[:8]
+        reg = get_registry_db()
+        reg.upsert_profile(profile_id, name, _utcnow_iso())
+        paths = _profile_paths(profile_id)
+        Path(paths["plans_dir"]).mkdir(parents=True, exist_ok=True)
+        Path(paths["pnl_log"]).parent.mkdir(parents=True, exist_ok=True)
+        flash(f"已创建 Profile「{name}」，请切换后完成初始化（设定起始资金）", "success")
+        return redirect(url_for("profiles_page"))
+
+    @app.route("/profiles/<profile_id>/rename", methods=["POST"])
+    def profiles_rename(profile_id):
+        name = (request.form.get("name") or "").strip()
+        if not name:
+            flash("名称不能为空", "error")
+            return redirect(url_for("profiles_page"))
+        reg = get_registry_db()
+        if not reg.get_profile(profile_id):
+            flash("Profile 不存在", "error")
+            return redirect(url_for("profiles_page"))
+        reg.upsert_profile(profile_id, name, _utcnow_iso())
+        flash(f"已重命名为「{name}」", "success")
+        return redirect(url_for("profiles_page"))
+
+    @app.route("/profiles/<profile_id>/delete", methods=["POST"])
+    def profiles_delete(profile_id):
+        if profile_id == "default":
+            flash("不能删除默认 Profile", "error")
+            return redirect(url_for("profiles_page"))
+        reg = get_registry_db()
+        if not reg.get_profile(profile_id):
+            flash("Profile 不存在", "error")
+            return redirect(url_for("profiles_page"))
+        reg.delete_profile(profile_id)
+        if _active_profile_id() == profile_id:
+            session["active_profile"] = "default"
+        flash("已删除 Profile（数据文件未自动删除）", "success")
+        return redirect(url_for("profiles_page"))
 
     return app

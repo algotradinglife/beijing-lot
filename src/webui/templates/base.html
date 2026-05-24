@@ -23,6 +23,28 @@
         <li class="nav-item"><a class="nav-link" href="{{ url_for('edit_bankroll') }}">修改资金</a></li>
         <li class="nav-item"><a class="nav-link text-warning" href="{{ url_for('reset') }}">Reset</a></li>
       </ul>
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+            {{ active_profile_name }}
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% for p in all_profiles %}
+            <li>
+              <form method="post" action="{{ url_for('profiles_switch') }}" class="m-0">
+                <input type="hidden" name="profile_id" value="{{ p.profile_id }}">
+                <button type="submit"
+                        class="dropdown-item{{ ' active' if p.profile_id == active_profile_id }}">
+                  {{ p.name }}
+                </button>
+              </form>
+            </li>
+            {% endfor %}
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item" href="{{ url_for('profiles_page') }}">管理 Profiles…</a></li>
+          </ul>
+        </li>
+      </ul>
     </div>
   </div>
 </nav>

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Profiles · 北单追踪{% endblock %}
+{% block content %}
+<h3 class="mb-3">管理 Profiles</h3>
+
+<div class="card mb-4">
+  <div class="card-header">所有 Profiles</div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead><tr>
+        <th>名称</th>
+        <th>ID</th>
+        <th>创建时间</th>
+        <th class="text-end">操作</th>
+      </tr></thead>
+      <tbody>
+        {% for p in profiles %}
+        <tr {% if p.profile_id == active_profile_id %}class="table-primary"{% endif %}>
+          <td>
+            <strong>{{ p.name }}</strong>
+            {% if p.profile_id == active_profile_id %}
+              <span class="badge bg-primary ms-1">当前</span>
+            {% endif %}
+            {% if p.profile_id == "default" %}
+              <span class="badge bg-secondary ms-1">默认</span>
+            {% endif %}
+          </td>
+          <td><small class="text-muted font-monospace">{{ p.profile_id }}</small></td>
+          <td><small>{{ p.created_ts|hk }}</small></td>
+          <td class="text-end">
+            <button class="btn btn-sm btn-outline-secondary py-0"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#rename-{{ loop.index }}">重命名</button>
+            {% if p.profile_id != active_profile_id %}
+            <form method="post" action="{{ url_for('profiles_switch') }}" class="d-inline">
+              <input type="hidden" name="profile_id" value="{{ p.profile_id }}">
+              <button type="submit" class="btn btn-sm btn-outline-primary py-0">切换</button>
+            </form>
+            {% endif %}
+            {% if p.profile_id != "default" %}
+            <form method="post"
+                  action="{{ url_for('profiles_delete', profile_id=p.profile_id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('确认删除 Profile「{{ p.name }}」？\n注意：数据文件不会自动删除。')">
+              <button type="submit" class="btn btn-sm btn-outline-danger py-0">删除</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        <tr id="rename-{{ loop.index }}" class="collapse">
+          <td colspan="4">
+            <form method="post"
+                  action="{{ url_for('profiles_rename', profile_id=p.profile_id) }}"
+                  class="d-flex gap-2 p-2">
+              <input type="text" name="name" class="form-control form-control-sm"
+                     value="{{ p.name }}" placeholder="新名称" required>
+              <button type="submit" class="btn btn-sm btn-primary px-3">保存</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header">创建新 Profile</div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('profiles_create') }}" class="row g-2 align-items-end">
+      <div class="col-auto">
+        <label class="form-label mb-1">Profile 名称</label>
+        <input type="text" name="name" class="form-control" placeholder="例：保守策略 / 激进测试" required>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-success">创建</button>
+      </div>
+    </form>
+    <p class="text-muted mt-2 mb-0 small">
+      创建后点击「切换」，然后前往
+      <a href="{{ url_for('setup') }}">Setup</a>
+      设定该 Profile 的起始资金。各 Profile 拥有独立的资金账本、计划历史和自动下注调度。
+    </p>
+  </div>
+</div>
+{% endblock %}
