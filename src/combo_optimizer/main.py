@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import FrozenSet, List, Optional
 
 from .builder import build_combos
 from .selector import DEFAULT_SINGLE_LEG_EDGE_FLOOR, select_pool
@@ -24,6 +24,8 @@ def build_plan(
     kelly_fraction: float = 0.25,
     max_combos: int = 50,
     diversity_lambda: float = 0.5,
+    cross_n_used: Optional[FrozenSet[str]] = None,
+    cross_n_lambda: float = 0.0,
 ) -> List[TicketPlan]:
     """Build a weekly portfolio of 7-leg combo tickets.
 
@@ -56,6 +58,8 @@ def build_plan(
         min_ev=combo_ev_threshold,
         max_combos=max_combos,
         diversity_lambda=diversity_lambda,
+        cross_n_used=cross_n_used,
+        cross_n_lambda=cross_n_lambda,
     )
     if not combos:
         log.warning("No combo passed EV threshold %.3f.", combo_ev_threshold)

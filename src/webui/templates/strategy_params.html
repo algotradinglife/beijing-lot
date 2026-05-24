@@ -41,6 +41,10 @@
       data-preset='{"max_combos":200,"w":[0,0.50,0.50],"k":[0.0625,0.125,0.25],"l":[0,0,0.5]}'>
       满杠杆（50/50 N=3/N=4，max=200）<br><small>CAGR 185% · DD −50% · 8 年 441万 · 周胜率 36%（约 2.8 期一盈利）</small>
     </button>
+    <button type="button" class="btn btn-sm btn-outline-info preset-btn"
+      data-preset='{"max_combos":200,"w":[0.30,0.40,0.30],"k":[0.03125,0.03125,0.03125],"l":[0,0,0],"cln":0.5}'>
+      S9 跨N多样化（稳健 + cross_n_λ=0.5）<br><small>降低 N 层间场次重叠，减少尾部集中风险（待回测）</small>
+    </button>
     <p class="text-muted small mt-2 mb-0">
       <strong>周胜率说明</strong>：本期总盈利（净 PnL > 0）的概率。多数期是亏的，靠少数大赢期补回。
       <em>10 期内连 0 盈利</em> ≈ (1 − 周胜率)¹⁰，约 1-2%（即 95%+ 概率 10 期内会出现至少一期盈利）。
@@ -151,13 +155,16 @@
       function applyPreset(p) {
         document.getElementById('mc_input').value = p.max_combos;
         for (const [i, n] of [[0,2],[1,3],[2,4]]) {
-          const w = p.w[i] * 100;  // slider is 0-100? Actually 0-1
-          // slider step=0.05 in 0..1 — store the raw weight (matches form expectations)
           const wslider = document.getElementById('w' + n);
           wslider.value = p.w[i];
           document.getElementById('enable_n' + n).checked = p.w[i] > 0;
           snapSelect(document.querySelector('select[name=kelly_n' + n + ']'), p.k[i]);
           snapSelect(document.querySelector('select[name=lambda_n' + n + ']'), p.l[i]);
+        }
+        if (p.cln !== undefined) {
+          const s = document.getElementById('cln_slider');
+          s.value = p.cln;
+          document.getElementById('cln_val').textContent = parseFloat(p.cln).toFixed(1);
         }
         updateMixLabels();
       }
@@ -173,6 +180,32 @@
       N=2 (0.30, K=1/32, λ=0) + N=3 (0.40, K=1/32, λ=0) + N=4 (0.30, K=1/32, λ=0)，max=200<br>
       <strong>每 N 单独 Kelly/λ 的好处</strong>：
       N=2 方差小可加 K=1/8；N=4 方差大用 K=1/32 控 DD；λ 一般低 N 用 0（候选多不需分散），高 N 用 0.5。
+    </small>
+  </div>
+
+  <hr>
+
+  <div class="mb-4">
+    <h5>跨 N 多样化惩罚（cross_n_lambda）</h5>
+    <p class="text-muted small mb-2">
+      控制 N=3、N=4 在选票时对"已被低 N 层选过的场次"的惩罚力度。
+      <br>
+      <strong>0</strong>（默认）= 各层独立选择，最高 EV 场次会同时出现在所有 N 层（历史重叠率 ~100%）。
+      <br>
+      <strong>0.5</strong> = 适中惩罚，N=3/4 会偏向选择 N=2 未用过的场次，降低跨层相关性。
+      <br>
+      <strong>1.0+</strong> = 强力分散，各 N 层尽量选不同场次，牺牲 EV 换取独立性。
+    </p>
+    <div class="d-flex align-items-center gap-3">
+      <input type="range" name="cross_n_lambda" id="cln_slider"
+             min="0" max="2" step="0.1"
+             value="{{ cross_n_lambda }}" class="form-range" style="max-width:300px"
+             oninput="document.getElementById('cln_val').textContent = parseFloat(this.value).toFixed(1)">
+      <span class="badge bg-secondary fs-6" id="cln_val">{{ '%.1f'|format(cross_n_lambda) }}</span>
+    </div>
+    <small class="text-muted">
+      对应策略 <strong>S9（跨N多样化）</strong>：与 S1 相同权重/Kelly，仅加 cross_n_lambda=0.5。
+      设为 0 完全等价于不启用（向后兼容）。
     </small>
   </div>
 

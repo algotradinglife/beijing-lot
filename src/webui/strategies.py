@@ -24,6 +24,7 @@ class Strategy:
     lambdas: Tuple[float, float, float, float]
     max_combos: int
     league_q_min: float = 0.0
+    cross_n_lambda: float = 0.0  # cross-tier diversity penalty (0 = disabled)
 
 
 REGISTRY: Dict[str, Strategy] = {
@@ -60,6 +61,11 @@ REGISTRY: Dict[str, Strategy] = {
                  weights=(0, 0.50, 0.50, 0),
                  kelly=(0.0625, 0.125, 0.25, 0.125),
                  lambdas=(0, 0, 0.5, 0), max_combos=200),
+        Strategy("S9", "跨N多样化",
+                 weights=(0.30, 0.40, 0.30, 0),
+                 kelly=(0.03125, 0.03125, 0.03125, 0.125),
+                 lambdas=(0, 0, 0, 0), max_combos=200,
+                 cross_n_lambda=0.5),
     ]
 }
 
@@ -72,7 +78,8 @@ def _approx_eq(a, b, tol: float = 1e-3) -> bool:
 
 
 def match_strategy(*, weights, kelly, lambdas, max_combos: int,
-                   league_q_min: float = 0.0) -> Tuple[str, str]:
+                   league_q_min: float = 0.0,
+                   cross_n_lambda: float = 0.0) -> Tuple[str, str]:
     """Return (sid, name) of the matching preset, or a synthetic
     descriptive label when params don't match any preset.
 
@@ -82,21 +89,22 @@ def match_strategy(*, weights, kelly, lambdas, max_combos: int,
     for s in REGISTRY.values():
         if not all(_approx_eq(weights[i], s.weights[i]) for i in range(4)):
             continue
-        # Only compare kelly/lambda for active N's (weight > 0)
         active = [i for i in range(4) if s.weights[i] > 0]
         if (all(_approx_eq(kelly[i], s.kelly[i]) for i in active)
             and all(_approx_eq(lambdas[i], s.lambdas[i]) for i in active)
             and int(max_combos) == s.max_combos
-            and _approx_eq(league_q_min, s.league_q_min)):
+            and _approx_eq(league_q_min, s.league_q_min)
+            and _approx_eq(cross_n_lambda, s.cross_n_lambda)):
             return s.sid, s.name
-    return "custom", _describe(weights, kelly, lambdas, max_combos, league_q_min)
+    return "custom", _describe(weights, kelly, lambdas, max_combos, league_q_min,
+                               cross_n_lambda)
 
 
-def _describe(weights, kelly, lambdas, max_combos, league_q_min) -> str:
+def _describe(weights, kelly, lambdas, max_combos, league_q_min,
+              cross_n_lambda: float = 0.0) -> str:
     """One-line summary for non-preset params, e.g.
     `Mix 30/40/30/0 K=1/32 max=200`. Used when no preset matches."""
     w = "/".join(f"{int(round(weights[i]*100))}" for i in range(4))
-    # Show Kelly only for active N's; collapse if all equal
     active_k = [kelly[i] for i in range(4) if weights[i] > 0]
     if active_k and all(_approx_eq(k, active_k[0]) for k in active_k):
         k_str = f"K={_kelly_to_frac(active_k[0])}"
@@ -106,6 +114,8 @@ def _describe(weights, kelly, lambdas, max_combos, league_q_min) -> str:
     parts = [f"Mix {w}", k_str, f"max={int(max_combos)}"]
     if league_q_min and league_q_min > 0:
         parts.append(f"q≥{league_q_min:g}")
+    if cross_n_lambda and cross_n_lambda > 0:
+        parts.append(f"CλN={cross_n_lambda:g}")
     return " ".join(parts)
 
 

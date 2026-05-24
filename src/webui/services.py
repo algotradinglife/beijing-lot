@@ -301,6 +301,7 @@ def generate_plan(
         lambda_n3 = float(db.get_config("lambda_n3") if db.get_config("lambda_n3") is not None else diversity_lambda)
         lambda_n4 = float(db.get_config("lambda_n4") if db.get_config("lambda_n4") is not None else diversity_lambda)
         lambda_n5 = float(db.get_config("lambda_n5") if db.get_config("lambda_n5") is not None else 0.0)
+        cross_n_lambda = float(db.get_config("cross_n_lambda") or 0.0)
         per_n_params = {
             2: (w2, kelly_n2, lambda_n2),
             3: (w3, kelly_n3, lambda_n3),
@@ -311,6 +312,7 @@ def generate_plan(
         total_stake = 0
         expected_return = 0.0
         n_qual_legs = 0
+        cross_n_used: set = set()  # legs selected by lower-N tiers (for cross_n_lambda)
         for n_val, (weight, k_n, lam_n) in per_n_params.items():
             if weight <= 0:
                 continue
@@ -323,6 +325,8 @@ def generate_plan(
                 n_legs=n_val, kelly_fraction=k_n,
                 weekly_stake_cap_frac=WEEKLY_STAKE_CAP_FRAC,
                 diversity_lambda=lam_n, max_combos=sub_max_combos, now=now,
+                cross_n_used=frozenset(cross_n_used) if cross_n_used else None,
+                cross_n_lambda=cross_n_lambda,
             )
             pn = plan_n.to_dict()
             for t in pn.get("tickets", []):
@@ -331,6 +335,11 @@ def generate_plan(
                 t["leg_kelly"] = k_n
                 t["leg_lambda"] = lam_n
                 merged_tickets.append(t)
+            # Accumulate legs used by this tier for subsequent tiers
+            if cross_n_lambda > 0:
+                for t in pn.get("tickets", []):
+                    for leg in t.get("legs", []):
+                        cross_n_used.add(f"{leg['match_id']}:{leg['selection']}")
             total_stake += int(pn.get("total_stake", 0))
             expected_return += float(pn.get("expected_total_return", 0))
             n_qual_legs = max(n_qual_legs, pn.get("n_qualified_legs", 0))
@@ -370,6 +379,7 @@ def generate_plan(
             mix_kelly=dict(n2=kelly_n2, n3=kelly_n3, n4=kelly_n4, n5=kelly_n5),
             mix_lambda=dict(n2=lambda_n2, n3=lambda_n3, n4=lambda_n4, n5=lambda_n5),
             league_q_min=league_q_min,
+            cross_n_lambda=cross_n_lambda,
         )
         from .strategies import match_strategy as _ms
         _sid, _sname = _ms(
@@ -378,6 +388,7 @@ def generate_plan(
             lambdas=(lambda_n2, lambda_n3, lambda_n4, lambda_n5),
             max_combos=int(max_combos),
             league_q_min=league_q_min,
+            cross_n_lambda=cross_n_lambda,
         )
         plan_dict["strategy_id"] = _sid
         plan_dict["strategy_name"] = _sname

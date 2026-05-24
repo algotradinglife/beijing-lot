@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from collections import Counter
 from itertools import combinations
-from typing import Iterable, List
+from typing import FrozenSet, Iterable, List, Optional
 
 from .types import Candidate, Combo
 
@@ -50,21 +50,19 @@ def select_diverse_combos(
     max_combos: int,
     *,
     diversity_lambda: float = 0.5,
+    cross_n_used: Optional[FrozenSet[str]] = None,
+    cross_n_lambda: float = 0.0,
 ) -> List[Combo]:
     """Greedy diversity-aware selection.
 
     At each step pick the combo maximizing
-        score = combo.ev - diversity_lambda × Σ (1 + leg_count[l])
-    where leg_count is the number of times each leg already appears in
-    selected combos. The "1 +" softens the early-stage penalty so the
-    first combo is still picked for raw EV.
+        score = combo.ev
+              - diversity_lambda × Σ leg_count[l]       (within-tier penalty)
+              - cross_n_lambda  × Σ (l in cross_n_used) (cross-tier penalty)
 
-    diversity_lambda interpretation:
-      - 0.0 → identical to pure EV ranking
-      - 0.3 → light diversity bias (typical)
-      - 0.5 → moderate (default)
-      - 1.0 → strong diversity, may sacrifice EV
-      - >2  → diversity dominates, near-uniform leg distribution
+    cross_n_used: frozenset of leg IDs (match_id:selection) already selected
+        by lower-N tiers in the same mix plan. When provided, cross_n_lambda
+        penalises reuse of those matches, pushing each tier to pick unique legs.
     """
     pool = list(combos)
     if not pool or max_combos <= 0:
@@ -73,18 +71,20 @@ def select_diverse_combos(
     leg_count: Counter = Counter()
     selected: List[Combo] = []
     remaining = list(pool)
+    _cross = cross_n_used or frozenset()
 
     while remaining and len(selected) < max_combos:
-        # Score each remaining combo
         best_idx = -1
         best_score = float("-inf")
         for i, c in enumerate(remaining):
             penalty = sum(leg_count[_leg_id(l)] for l in c.legs)
             score = c.ev - diversity_lambda * penalty
+            if cross_n_lambda > 0 and _cross:
+                cross_pen = sum(1 for l in c.legs if _leg_id(l) in _cross)
+                score -= cross_n_lambda * cross_pen
             if score > best_score:
                 best_score = score
                 best_idx = i
-        # Pick the best
         chosen = remaining.pop(best_idx)
         selected.append(chosen)
         for l in chosen.legs:
@@ -100,18 +100,22 @@ def build_combos(
     min_ev: float = 0.10,
     max_combos: int = 50,
     diversity_lambda: float = 0.5,
+    cross_n_used: Optional[FrozenSet[str]] = None,
+    cross_n_lambda: float = 0.0,
 ) -> List[Combo]:
     """Enumerate, filter, and rank combos.
 
-    If ``diversity_lambda > 0`` (default 0.5), uses greedy diversity-aware
-    selection so the same leg won't dominate the portfolio. Set to 0.0
-    to recover legacy EV-only ranking.
+    If ``diversity_lambda > 0`` or ``cross_n_lambda > 0``, uses greedy
+    diversity-aware selection. Set both to 0 to recover legacy EV-only ranking.
     """
     eligible = filter_by_combo_ev(
         enumerate_combos(candidates, n_legs=n_legs), min_ev
     )
-    if diversity_lambda <= 0:
+    if diversity_lambda <= 0 and cross_n_lambda <= 0:
         return rank_combos(eligible, max_combos)
     return select_diverse_combos(
-        eligible, max_combos, diversity_lambda=diversity_lambda
+        eligible, max_combos,
+        diversity_lambda=diversity_lambda,
+        cross_n_used=cross_n_used,
+        cross_n_lambda=cross_n_lambda,
     )

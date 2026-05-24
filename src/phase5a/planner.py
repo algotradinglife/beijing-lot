@@ -102,6 +102,8 @@ def build_weekly_plan(
     top_k: int = 14,
     max_combos: int = 50,
     diversity_lambda: float = 0.5,
+    cross_n_used: Optional[frozenset] = None,
+    cross_n_lambda: float = 0.0,
     now: Optional[datetime] = None,
 ) -> PlanResult:
     snapshots = list(snapshots)
@@ -125,6 +127,8 @@ def build_weekly_plan(
             weekly_stake_cap_frac=weekly_stake_cap_frac,
             max_combos=max_combos,
             diversity_lambda=diversity_lambda,
+            cross_n_used=cross_n_used,
+            cross_n_lambda=cross_n_lambda,
         )
 
     rule_by_match = {q.candidate.match_id: q.rule_name for q in qualified}
