@@ -17,6 +17,7 @@ import json
 import logging
 import math
 import sqlite3
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -77,6 +78,18 @@ PER_COMBO_STAKE_CAP_FRAC = 0.005
 WEEKLY_STAKE_CAP_FRAC = 0.25
 PROFIT_LOCK_TRIGGER = 2.0
 PROFIT_LOCK_SKIM_FRAC = 0.30
+
+_CROSS_N_TOP_LEGS = 5  # top leg IDs to carry forward as cross-tier penalty seeds
+
+
+def _top_freq_leg_ids_dict(tickets: list, top_k: int) -> set:
+    """Return top_k most-frequent 'match_id:selection' strings from plan ticket dicts."""
+    freq: Counter = Counter(
+        f"{leg['match_id']}:{leg['selection']}"
+        for t in tickets
+        for leg in t.get("legs", [])
+    )
+    return {lid for lid, _ in freq.most_common(top_k)}
 
 
 def _utcnow_iso() -> str:
@@ -335,11 +348,11 @@ def generate_plan(
                 t["leg_kelly"] = k_n
                 t["leg_lambda"] = lam_n
                 merged_tickets.append(t)
-            # Accumulate legs used by this tier for subsequent tiers
+            # Accumulate top-frequency legs from this tier for subsequent tiers
             if cross_n_lambda > 0:
-                for t in pn.get("tickets", []):
-                    for leg in t.get("legs", []):
-                        cross_n_used.add(f"{leg['match_id']}:{leg['selection']}")
+                cross_n_used.update(
+                    _top_freq_leg_ids_dict(pn.get("tickets", []), _CROSS_N_TOP_LEGS)
+                )
             total_stake += int(pn.get("total_stake", 0))
             expected_return += float(pn.get("expected_total_return", 0))
             n_qual_legs = max(n_qual_legs, pn.get("n_qualified_legs", 0))

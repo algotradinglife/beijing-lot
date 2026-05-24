@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from collections import Counter
 from typing import List, Optional
 
 import numpy as np
@@ -30,6 +31,21 @@ from src.combo_optimizer.types import RETURN_RATE, Candidate, TicketPlan
 from .settler import ComboSettlement, settle_plan
 
 log = logging.getLogger(__name__)
+
+# How many of the most-frequent leg IDs from tier N to propagate as
+# cross-tier penalty seeds for tier N+1. Prevents full-pool saturation
+# (previously all top_k=14 legs were added, making the penalty uniform).
+_CROSS_N_TOP_LEGS = 5
+
+
+def _top_freq_leg_ids(sub_plans: List[TicketPlan], top_k: int) -> set:
+    """Return the top_k most-frequent 'match_id:selection' strings across sub_plans."""
+    freq: Counter = Counter(
+        f"{leg.match_id}:{leg.selection}"
+        for plan in sub_plans
+        for leg in plan.combo.legs
+    )
+    return {lid for lid, _ in freq.most_common(top_k)}
 
 
 # ---------------------------------------------------------------------------
@@ -175,10 +191,8 @@ def simulate_issue(
                 cross_n_lambda=cross_n_lambda,
             )
             plans.extend(sub_plans)
-            if cross_n_lambda > 0:
-                for plan in sub_plans:
-                    for leg in plan.combo.legs:
-                        cross_n_used.add(f"{leg.match_id}:{leg.selection}")
+            if cross_n_lambda > 0 and sub_plans:
+                cross_n_used.update(_top_freq_leg_ids(sub_plans, _CROSS_N_TOP_LEGS))
     elif len(cands) >= n_legs:
         plans = build_plan(
             cands,
