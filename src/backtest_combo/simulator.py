@@ -131,8 +131,18 @@ def simulate_issue(
     kelly_fraction: float = 0.25,
     max_combos: int = 50,
     weekly_stake_cap_frac: float = 0.25,
+    # Multi-N mix + cross-tier diversity
+    mix_n_legs: Optional[tuple] = None,    # e.g. (2, 3, 4); None → single-N
+    mix_weights: Optional[tuple] = None,   # normalised bankroll split per N
+    mix_kelly: Optional[tuple] = None,     # per-N Kelly; falls back to kelly_fraction
+    cross_n_lambda: float = 0.0,           # cross-tier overlap penalty
 ) -> tuple[dict, List[ComboSettlement]]:
     """Run optimizer + settle for a single issue.
+
+    When ``mix_n_legs`` is provided the issue is run in multi-N mix mode:
+    N tiers are built in ascending order, each receiving the leg IDs
+    selected by lower tiers via ``cross_n_used`` so that ``cross_n_lambda``
+    can penalise match reuse across tiers.
 
     Returns (issue_summary_dict, list_of_ComboSettlement).
     """
@@ -140,7 +150,36 @@ def simulate_issue(
         issue_df, sp_model, edge_floor=edge_floor
     )
     plans: List[TicketPlan] = []
-    if len(cands) >= n_legs:
+
+    if mix_n_legs and mix_weights and len(cands) > 0:
+        wsum = sum(mix_weights)
+        cross_n_used: set = set()
+        for i, (n, w) in enumerate(zip(mix_n_legs, mix_weights)):
+            if w <= 0 or len(cands) < n:
+                continue
+            w_norm = w / wsum
+            k = mix_kelly[i] if mix_kelly else kelly_fraction
+            sub_bankroll = bankroll * w_norm
+            sub_max = max(1, round(max_combos * w_norm))
+            sub_plans = build_plan(
+                cands,
+                bankroll=sub_bankroll,
+                weekly_stake_cap_frac=weekly_stake_cap_frac,
+                n_legs=n,
+                top_k=top_k,
+                single_leg_edge_floor=edge_floor,
+                combo_ev_threshold=combo_ev_threshold,
+                kelly_fraction=k,
+                max_combos=sub_max,
+                cross_n_used=frozenset(cross_n_used) if cross_n_used else None,
+                cross_n_lambda=cross_n_lambda,
+            )
+            plans.extend(sub_plans)
+            if cross_n_lambda > 0:
+                for plan in sub_plans:
+                    for leg in plan.combo.legs:
+                        cross_n_used.add(f"{leg.match_id}:{leg.selection}")
+    elif len(cands) >= n_legs:
         plans = build_plan(
             cands,
             bankroll=bankroll,
@@ -151,6 +190,7 @@ def simulate_issue(
             combo_ev_threshold=combo_ev_threshold,
             kelly_fraction=kelly_fraction,
             max_combos=max_combos,
+            cross_n_lambda=cross_n_lambda,
         )
 
     actuals = actuals_for_issue(issue_df)
@@ -194,6 +234,10 @@ def run_combo_backtest(
     kelly_fraction: float = 0.25,
     max_combos: int = 50,
     weekly_stake_cap_frac: float = 0.25,
+    mix_n_legs: Optional[tuple] = None,
+    mix_weights: Optional[tuple] = None,
+    mix_kelly: Optional[tuple] = None,
+    cross_n_lambda: float = 0.0,
     df: Optional[pd.DataFrame] = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, EmpiricalSPModel]:
     """Run the backtest across every issue in the DB.
@@ -218,6 +262,10 @@ def run_combo_backtest(
             kelly_fraction=kelly_fraction,
             max_combos=max_combos,
             weekly_stake_cap_frac=weekly_stake_cap_frac,
+            mix_n_legs=mix_n_legs,
+            mix_weights=mix_weights,
+            mix_kelly=mix_kelly,
+            cross_n_lambda=cross_n_lambda,
         )
         kickoff_min = idf["kickoff_ts"].min()
         summary["kickoff_min"] = kickoff_min
