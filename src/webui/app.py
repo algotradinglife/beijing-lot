@@ -446,6 +446,7 @@ def create_app(
                 lambda_n5 = float(request.form.get("lambda_n5") if request.form.get("lambda_n5") is not None else 0.0)
                 league_q_min = float(request.form.get("league_q_min") or 0.0)
                 cross_n_lambda = float(request.form.get("cross_n_lambda") or 0.0)
+                kickoff_window_hours = float(request.form.get("kickoff_window_hours") or 0.0)
                 # Legacy fields kept for backward compat
                 n_legs_secondary = int(request.form.get("n_legs_secondary", "2"))
                 weight_primary = float(request.form.get("weight_primary", "0.7"))
@@ -488,6 +489,7 @@ def create_app(
             db.set_config("lambda_n5", lambda_n5)
             db.set_config("league_q_min", league_q_min)
             db.set_config("cross_n_lambda", cross_n_lambda)
+            db.set_config("kickoff_window_hours", kickoff_window_hours)
             mix_msg = ""
             if mix_enabled:
                 ws = mix_w2 + mix_w3 + mix_w4
@@ -522,6 +524,7 @@ def create_app(
             lambda_n4=float(db.get_config("lambda_n4") if db.get_config("lambda_n4") is not None else 0.5),
             lambda_n5=float(db.get_config("lambda_n5") if db.get_config("lambda_n5") is not None else 0.0),
             cross_n_lambda=float(db.get_config("cross_n_lambda") or 0.0),
+            kickoff_window_hours=float(db.get_config("kickoff_window_hours") or 0.0),
         )
 
     @app.route("/edit_bankroll", methods=["GET", "POST"])

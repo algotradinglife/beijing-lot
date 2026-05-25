@@ -211,6 +211,31 @@
     </small>
   </div>
 
+  <hr>
+
+  <div class="mb-4">
+    <h5>开球时间窗口（kickoff_window_hours）</h5>
+    <p class="text-muted small mb-2">
+      生成计划时只纳入未来 X 小时内开球的场次，避免远期场次的竞池 SP 在下注后大幅漂移。
+      <br>
+      <strong>0</strong>（默认）= 不限制，纳入本期所有开放场次（最多 7 天内）。
+      <br>
+      <strong>2–4</strong> = 推荐：只选当日接下来 2–4 小时内的场次批量下注，SP 漂移风险最低。
+      <br>
+      <strong>注意</strong>：窗口太小可能导致合格场次不足、无法生成计划；建议配合"诊断"页面观察当前合格腿数。
+    </p>
+    <div class="d-flex align-items-center gap-3">
+      <input type="range" name="kickoff_window_hours" id="kwh_slider"
+             min="0" max="24" step="0.5"
+             value="{{ kickoff_window_hours }}" class="form-range" style="max-width:300px"
+             oninput="document.getElementById('kwh_val').textContent = parseFloat(this.value) === 0 ? '不限' : parseFloat(this.value).toFixed(1) + 'h'">
+      <span class="badge bg-secondary fs-6" id="kwh_val">
+        {{ '不限' if kickoff_window_hours == 0 else '%.1f'|format(kickoff_window_hours) + 'h' }}
+      </span>
+    </div>
+    <small class="text-muted">设为 0 等价于不启用（向后兼容）。建议平时保持 0，批量下注前临时调为 2–4。</small>
+  </div>
+
   <div class="alert alert-warning">
     <strong>低本金提示</strong>：当资金 &lt; 30,000 元时，建议主用 N=2 + Kelly=1/4
     （高 N + 低 Kelly 算出的 stake 会落到 2 元最小注以下被丢弃）。

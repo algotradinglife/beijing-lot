@@ -261,6 +261,16 @@ def generate_plan(
     cfg = niche_config or NicheConfig.load(league_q_min=league_q_min)
     snapshots = load_open_matches(live_db_path, now=now)
 
+    # Kickoff window filter: only include matches starting within X hours from now.
+    # 0 (default) = no filter (all open matches in the 7-day window are included).
+    kickoff_window_hours = float(db.get_config("kickoff_window_hours") or 0.0)
+    if kickoff_window_hours > 0:
+        now_eff = now or datetime.now(timezone.utc)
+        # kickoff_ts is stored as naive Beijing (UTC+8) ISO strings
+        cutoff = (now_eff + timedelta(hours=8) + timedelta(hours=kickoff_window_hours)
+                  ).replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M:%S")
+        snapshots = [s for s in snapshots if s.kickoff_ts and s.kickoff_ts <= cutoff]
+
     # Anti-double-bet: collect match_ids from any placed-but-not-fully-settled
     # plan and remove them from the snapshot pool. Without this, hourly autoplan
     # would re-bet the same upcoming match twice when triggered before any of

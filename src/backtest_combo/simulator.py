@@ -151,7 +151,9 @@ def simulate_issue(
     mix_n_legs: Optional[tuple] = None,    # e.g. (2, 3, 4); None → single-N
     mix_weights: Optional[tuple] = None,   # normalised bankroll split per N
     mix_kelly: Optional[tuple] = None,     # per-N Kelly; falls back to kelly_fraction
+    mix_lambdas: Optional[tuple] = None,   # per-N within-tier diversity lambda
     cross_n_lambda: float = 0.0,           # cross-tier overlap penalty
+    diversity_lambda: float = 0.0,         # single-N mode within-tier lambda
 ) -> tuple[dict, List[ComboSettlement]]:
     """Run optimizer + settle for a single issue.
 
@@ -175,6 +177,7 @@ def simulate_issue(
                 continue
             w_norm = w / wsum
             k = mix_kelly[i] if mix_kelly else kelly_fraction
+            lam = mix_lambdas[i] if mix_lambdas else 0.0
             sub_bankroll = bankroll * w_norm
             sub_max = max(1, round(max_combos * w_norm))
             sub_plans = build_plan(
@@ -187,6 +190,7 @@ def simulate_issue(
                 combo_ev_threshold=combo_ev_threshold,
                 kelly_fraction=k,
                 max_combos=sub_max,
+                diversity_lambda=lam,
                 cross_n_used=frozenset(cross_n_used) if cross_n_used else None,
                 cross_n_lambda=cross_n_lambda,
             )
@@ -204,6 +208,7 @@ def simulate_issue(
             combo_ev_threshold=combo_ev_threshold,
             kelly_fraction=kelly_fraction,
             max_combos=max_combos,
+            diversity_lambda=diversity_lambda,
             cross_n_lambda=cross_n_lambda,
         )
 
@@ -251,6 +256,7 @@ def run_combo_backtest(
     mix_n_legs: Optional[tuple] = None,
     mix_weights: Optional[tuple] = None,
     mix_kelly: Optional[tuple] = None,
+    mix_lambdas: Optional[tuple] = None,
     cross_n_lambda: float = 0.0,
     df: Optional[pd.DataFrame] = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, EmpiricalSPModel]:
@@ -279,6 +285,7 @@ def run_combo_backtest(
             mix_n_legs=mix_n_legs,
             mix_weights=mix_weights,
             mix_kelly=mix_kelly,
+            mix_lambdas=mix_lambdas,
             cross_n_lambda=cross_n_lambda,
         )
         kickoff_min = idf["kickoff_ts"].min()
