@@ -14,36 +14,36 @@
   <p class="text-muted small mb-2">点击应用预设到下方表单（仍需点"保存"提交）。每个数字基于 8 年历史回测。</p>
   <div class="d-flex flex-wrap gap-2">
     <button type="button" class="btn btn-sm btn-outline-primary preset-btn"
-      data-preset='{"max_combos":200,"w":[0.30,0.40,0.30],"k":[0.03125,0.03125,0.03125],"l":[0,0,0]}'>
+      data-preset='{"max_combos":200,"w":[0.30,0.40,0.30],"k":[0.03125,0.03125,0.03125],"l":[0,1,0.5]}'>
       稳健（max=200，K=1/32 全部）<br><small>CAGR 22% · DD −10% · Sharpe 1.22 · 周胜率 38%（约 2.6 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-primary preset-btn"
-      data-preset='{"max_combos":100,"w":[0,0.50,0.50],"k":[0.0625,0.125,0.25],"l":[0,0,0.5]}'>
+      data-preset='{"max_combos":100,"w":[0,0.50,0.50],"k":[0.0625,0.125,0.25],"l":[0,1,0.5]}'>
       平衡（50/50 N=3/N=4，max=100）<br><small>CAGR 94% · DD −30% · Calmar 3.09 · 周胜率 30%（约 3.4 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-primary preset-btn"
-      data-preset='{"max_combos":100,"w":[0.20,0.20,0.60],"k":[0.25,0.125,0.125],"l":[0,0,0.5]}'>
+      data-preset='{"max_combos":100,"w":[0.20,0.20,0.60],"k":[0.25,0.125,0.125],"l":[0,1,0.5]}'>
       Sharpe 优先（20/20/60，max=100）<br><small>CAGR 64% · DD −20% · Sharpe 0.77 · 周胜率 34%（约 2.9 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-success preset-btn"
-      data-preset='{"max_combos":150,"w":[0.20,0.20,0.60],"k":[0.25,0.125,0.125],"l":[0,0,0.5]}'>
+      data-preset='{"max_combos":150,"w":[0.20,0.20,0.60],"k":[0.25,0.125,0.125],"l":[0,1,0.5]}'>
       <strong>Calmar 王（20/20/60，max=150）</strong><br><small>CAGR 95% · DD −30% · Calmar 3.20 · 周胜率 35%（约 2.9 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-success preset-btn"
-      data-preset='{"max_combos":150,"w":[0,1,0],"k":[0.0625,0.125,0.0625],"l":[0,0,0.5]}'>
-      <strong>纯 N=3 高 Calmar（K=⅛，λ=0，max=150）</strong><br><small>CAGR 168% · DD −37% · Calmar 4.56 · 8 年 352万 · 周胜率 36%（约 2.8 期一盈利）</small>
+      data-preset='{"max_combos":150,"w":[0,1,0],"k":[0.0625,0.125,0.0625],"l":[0,1,0.5]}'>
+      <strong>纯 N=3 高 Calmar（K=⅛，λ=1，max=150）</strong><br><small>CAGR 168% · DD −37% · Calmar 4.56 · 8 年 352万 · 周胜率 36%（约 2.8 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-warning preset-btn"
-      data-preset='{"max_combos":200,"w":[0.20,0.20,0.60],"k":[0.25,0.125,0.125],"l":[0,0,0.5]}'>
+      data-preset='{"max_combos":200,"w":[0.20,0.20,0.60],"k":[0.25,0.125,0.125],"l":[0,1,0.5]}'>
       激进（20/20/60，max=200）<br><small>CAGR 131% · DD −45% · 8 年 205万 · 周胜率 39%（约 2.6 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-danger preset-btn"
-      data-preset='{"max_combos":200,"w":[0,0.50,0.50],"k":[0.0625,0.125,0.25],"l":[0,0,0.5]}'>
+      data-preset='{"max_combos":200,"w":[0,0.50,0.50],"k":[0.0625,0.125,0.25],"l":[0,1,0.5]}'>
       满杠杆（50/50 N=3/N=4，max=200）<br><small>CAGR 185% · DD −50% · 8 年 441万 · 周胜率 36%（约 2.8 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-info preset-btn"
-      data-preset='{"max_combos":200,"w":[0.30,0.40,0.30],"k":[0.03125,0.03125,0.03125],"l":[0,0,0],"cln":0.5}'>
-      S9 跨N多样化（稳健 + cross_n_λ=0.5）<br><small>降低 N 层间场次重叠，减少尾部集中风险（待回测）</small>
+      data-preset='{"max_combos":200,"w":[0.30,0.40,0.30],"k":[0.03125,0.03125,0.03125],"l":[0,1,0.5],"cln":0.5}'>
+      S9 跨N多样化（稳健 + cross_n_λ=0.5）<br><small>降低 N 层间场次重叠，减少尾部集中风险</small>
     </button>
     <p class="text-muted small mt-2 mb-0">
       <strong>周胜率说明</strong>：本期总盈利（净 PnL > 0）的概率。多数期是亏的，靠少数大赢期补回。
@@ -176,10 +176,12 @@
       });
     </script>
     <small class="text-muted mt-2 d-block">
-      <strong>回测最优（Sharpe 1.52, DD -8%）</strong>：
-      N=2 (0.30, K=1/32, λ=0) + N=3 (0.40, K=1/32, λ=0) + N=4 (0.30, K=1/32, λ=0)，max=200<br>
-      <strong>每 N 单独 Kelly/λ 的好处</strong>：
-      N=2 方差小可加 K=1/8；N=4 方差大用 K=1/32 控 DD；λ 一般低 N 用 0（候选多不需分散），高 N 用 0.5。
+      <strong>回测最优（λ 更新后）</strong>：
+      N=2 (λ=0) + N=3 (λ=1.0) + N=4 (λ=0.5)，周胜率 +2%，ROI +2%（相比 N=3 λ=0）<br>
+      <strong>为什么 N=3 要 λ=1.0</strong>：
+      λ=0 时热门场次出现在 90%+ 的票里，一旦该场输则几乎全灭（即使正确预测 4-5 场也可能 0 中奖）。
+      λ=1.0 把单场出现率压到 ~40%，大幅降低"正确但不中奖"概率。
+      N=2 因腿数少方差本身可控，λ=0 即可；N=4 λ=0.5 已足够分散。
     </small>
   </div>
 
