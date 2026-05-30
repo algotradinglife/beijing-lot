@@ -218,11 +218,22 @@
     <p class="text-muted small mb-2">
       生成计划时只纳入未来 X 小时内开球的场次，避免远期场次的竞池 SP 在下注后大幅漂移。
       <br>
-      <strong>0</strong>（默认）= 不限制，纳入本期所有开放场次（最多 7 天内）。
-      <br>
-      <strong>2–4</strong> = 推荐：只选当日接下来 2–4 小时内的场次批量下注，SP 漂移风险最低。
-      <br>
-      <strong>注意</strong>：窗口太小可能导致合格场次不足、无法生成计划；建议配合"诊断"页面观察当前合格腿数。
+      <strong>实测数据（1,473 场 / 28 万快照）：</strong>
+    </p>
+    <table class="table table-sm table-bordered mb-2" style="max-width:520px;font-size:0.82em">
+      <thead class="table-light"><tr><th>距开场时间</th><th>单腿中位漂移</th><th>P90 漂移</th><th>4腿联合 SP 误差</th></tr></thead>
+      <tbody>
+        <tr class="table-success"><td>&lt; 30 分钟</td><td>≈ 0%</td><td>2%</td><td><strong>~0%</strong> ✓ 最优</td></tr>
+        <tr class="table-success"><td>30 分–1 小时</td><td>1%</td><td>6%</td><td><strong>~4%</strong> ✓ 推荐</td></tr>
+        <tr class="table-warning"><td>1–2 小时</td><td>2%</td><td>12%</td><td><strong>~8%</strong> 勉强可接受</td></tr>
+        <tr class="table-danger"><td>2–4 小时</td><td>4%</td><td>26%</td><td><strong>~17%</strong> ✗ 吃掉 niche edge</td></tr>
+        <tr class="table-danger"><td>4–8 小时</td><td>9%</td><td>60%</td><td><strong>~42%</strong> ✗ 不建议</td></tr>
+      </tbody>
+    </table>
+    <p class="text-muted small mb-2">
+      <strong>0</strong>（默认）= 不限制，纳入本期所有开放场次（最多 7 天内）。<br>
+      <strong>1</strong> = 推荐：只选 1 小时内开球的场次，4 腿联合 SP 误差约 4%，在 niche edge 安全边际内。<br>
+      <strong>注意</strong>：窗口设为 1h 后，<em>生成计划后应尽快下注</em>，否则下注时刻距开场可能已超过 1h。
     </p>
     <div class="d-flex align-items-center gap-3">
       <input type="range" name="kickoff_window_hours" id="kwh_slider"
@@ -233,7 +244,7 @@
         {{ '不限' if kickoff_window_hours == 0 else '%.1f'|format(kickoff_window_hours) + 'h' }}
       </span>
     </div>
-    <small class="text-muted">设为 0 等价于不启用（向后兼容）。建议平时保持 0，批量下注前临时调为 2–4。</small>
+    <small class="text-muted">设为 0 等价于不启用（向后兼容）。下注前临时调为 1，下注完毕后可改回 0。</small>
   </div>
 
   <div class="alert alert-warning">
