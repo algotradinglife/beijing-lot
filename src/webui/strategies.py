@@ -66,6 +66,14 @@ REGISTRY: Dict[str, Strategy] = {
                  kelly=(0.03125, 0.03125, 0.03125, 0.125),
                  lambdas=(0, 1.0, 0.5, 0), max_combos=200,
                  cross_n_lambda=0.5),
+        Strategy("S10", "纯 N=5 高 CAGR",
+                 weights=(0, 0, 0, 1),
+                 kelly=(0.0625, 0.125, 0.0625, 0.125),
+                 lambdas=(0, 1.0, 0.5, 0.5), max_combos=150),
+        Strategy("S11", "N=4+5 均衡",
+                 weights=(0, 0.20, 0.40, 0.40),
+                 kelly=(0.0625, 0.125, 0.125, 0.125),
+                 lambdas=(0, 1.0, 0.5, 0.5), max_combos=150),
     ]
 }
 

@@ -14,36 +14,44 @@
   <p class="text-muted small mb-2">点击应用预设到下方表单（仍需点"保存"提交）。每个数字基于 8 年历史回测。</p>
   <div class="d-flex flex-wrap gap-2">
     <button type="button" class="btn btn-sm btn-outline-primary preset-btn"
-      data-preset='{"max_combos":200,"w":[0.30,0.40,0.30],"k":[0.03125,0.03125,0.03125],"l":[0,1,0.5]}'>
+      data-preset='{"max_combos":200,"w":[0.30,0.40,0.30,0],"k":[0.03125,0.03125,0.03125,0.125],"l":[0,1,0.5,0.5]}'>
       稳健（max=200，K=1/32 全部）<br><small>CAGR 22% · DD −10% · Sharpe 1.22 · 周胜率 38%（约 2.6 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-primary preset-btn"
-      data-preset='{"max_combos":100,"w":[0,0.50,0.50],"k":[0.0625,0.125,0.25],"l":[0,1,0.5]}'>
+      data-preset='{"max_combos":100,"w":[0,0.50,0.50,0],"k":[0.0625,0.125,0.25,0.125],"l":[0,1,0.5,0.5]}'>
       平衡（50/50 N=3/N=4，max=100）<br><small>CAGR 94% · DD −30% · Calmar 3.09 · 周胜率 30%（约 3.4 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-primary preset-btn"
-      data-preset='{"max_combos":100,"w":[0.20,0.20,0.60],"k":[0.25,0.125,0.125],"l":[0,1,0.5]}'>
+      data-preset='{"max_combos":100,"w":[0.20,0.20,0.60,0],"k":[0.25,0.125,0.125,0.125],"l":[0,1,0.5,0.5]}'>
       Sharpe 优先（20/20/60，max=100）<br><small>CAGR 64% · DD −20% · Sharpe 0.77 · 周胜率 34%（约 2.9 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-success preset-btn"
-      data-preset='{"max_combos":150,"w":[0.20,0.20,0.60],"k":[0.25,0.125,0.125],"l":[0,1,0.5]}'>
+      data-preset='{"max_combos":150,"w":[0.20,0.20,0.60,0],"k":[0.25,0.125,0.125,0.125],"l":[0,1,0.5,0.5]}'>
       <strong>Calmar 王（20/20/60，max=150）</strong><br><small>CAGR 95% · DD −30% · Calmar 3.20 · 周胜率 35%（约 2.9 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-success preset-btn"
-      data-preset='{"max_combos":150,"w":[0,1,0],"k":[0.0625,0.125,0.0625],"l":[0,1,0.5]}'>
+      data-preset='{"max_combos":150,"w":[0,1,0,0],"k":[0.0625,0.125,0.0625,0.125],"l":[0,1,0.5,0.5]}'>
       <strong>纯 N=3 高 Calmar（K=⅛，λ=1，max=150）</strong><br><small>CAGR 168% · DD −37% · Calmar 4.56 · 8 年 352万 · 周胜率 36%（约 2.8 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-warning preset-btn"
-      data-preset='{"max_combos":200,"w":[0.20,0.20,0.60],"k":[0.25,0.125,0.125],"l":[0,1,0.5]}'>
+      data-preset='{"max_combos":200,"w":[0.20,0.20,0.60,0],"k":[0.25,0.125,0.125,0.125],"l":[0,1,0.5,0.5]}'>
       激进（20/20/60，max=200）<br><small>CAGR 131% · DD −45% · 8 年 205万 · 周胜率 39%（约 2.6 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-danger preset-btn"
-      data-preset='{"max_combos":200,"w":[0,0.50,0.50],"k":[0.0625,0.125,0.25],"l":[0,1,0.5]}'>
+      data-preset='{"max_combos":200,"w":[0,0.50,0.50,0],"k":[0.0625,0.125,0.25,0.125],"l":[0,1,0.5,0.5]}'>
       满杠杆（50/50 N=3/N=4，max=200）<br><small>CAGR 185% · DD −50% · 8 年 441万 · 周胜率 36%（约 2.8 期一盈利）</small>
     </button>
     <button type="button" class="btn btn-sm btn-outline-info preset-btn"
-      data-preset='{"max_combos":200,"w":[0.30,0.40,0.30],"k":[0.03125,0.03125,0.03125],"l":[0,1,0.5],"cln":0.5}'>
+      data-preset='{"max_combos":200,"w":[0.30,0.40,0.30,0],"k":[0.03125,0.03125,0.03125,0.125],"l":[0,1,0.5,0.5],"cln":0.5}'>
       S9 跨N多样化（稳健 + cross_n_λ=0.5）<br><small>降低 N 层间场次重叠，减少尾部集中风险</small>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-success preset-btn"
+      data-preset='{"max_combos":150,"w":[0,0,0,1],"k":[0.0625,0.125,0.0625,0.125],"l":[0,1,0.5,0.5]}'>
+      <strong>S10 纯 N=5（高 CAGR）</strong><br><small>CAGR 40% · DD −106% · Calmar 0.38 · 周胜率 11%（约 9 期一盈利）</small>
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-primary preset-btn"
+      data-preset='{"max_combos":150,"w":[0,0.20,0.40,0.40],"k":[0.0625,0.125,0.125,0.125],"l":[0,1,0.5,0.5]}'>
+      S11 N=4+5 均衡（20/40/40）<br><small>结合 N=4 稳定性与 N=5 高 CAGR，周胜率约 12–16%</small>
     </button>
     <p class="text-muted small mt-2 mb-0">
       <strong>周胜率说明</strong>：本期总盈利（净 PnL > 0）的概率。多数期是亏的，靠少数大赢期补回。
@@ -154,7 +162,7 @@
       }
       function applyPreset(p) {
         document.getElementById('mc_input').value = p.max_combos;
-        for (const [i, n] of [[0,2],[1,3],[2,4]]) {
+        for (const [i, n] of [[0,2],[1,3],[2,4],[3,5]]) {
           const wslider = document.getElementById('w' + n);
           wslider.value = p.w[i];
           document.getElementById('enable_n' + n).checked = p.w[i] > 0;
