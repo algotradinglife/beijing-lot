@@ -5,12 +5,21 @@ No JS rendering required — all targets are static HTML. Encoding handling:
 - ``trade.500.com`` and ``zx.500.com`` declare gb2312, but in practice we
   decode with gb18030 (a superset) for safety.
 - ``cp.zgzcw.com`` is UTF-8.
+
+Authentication:
+- vol_pct (投注比例) on trade.500.com is only served to logged-in users.
+- Run ``scripts/refresh_500_cookies.py`` to extract Chrome session cookies
+  and save them to ``data/500com_cookies.json``.
+- The Scraper loads that file at init and injects cookies for *.500.com
+  requests.  If the file is absent the scraper works but vol_pct = None.
 """
 from __future__ import annotations
 
+import json
 import logging
 import random
 import time
+from pathlib import Path
 from typing import Optional
 
 import requests
@@ -44,16 +53,34 @@ URL_LIVESCORE_500 = "https://live.500.com/?gameid={fid}"
 # Nuxt JS shell with token-protected APIs; no static-HTML scraping path.
 
 
+_DEFAULT_COOKIES_PATH = Path(__file__).resolve().parents[3] / "data" / "500com_cookies.json"
+
+
 class Scraper:
     """Thin requests wrapper with throttle, UA rotation, and 429/5xx backoff."""
 
     def __init__(self, *, min_interval: float = 1.0, max_retries: int = 3,
-                 timeout: int = 20, session: Optional[requests.Session] = None):
+                 timeout: int = 20, session: Optional[requests.Session] = None,
+                 cookies_path: Optional[Path] = None):
         self.min_interval = min_interval
         self.max_retries = max_retries
         self.timeout = timeout
         self._last_req_at = 0.0
         self.session = session or requests.Session()
+        self._load_500_cookies(cookies_path or _DEFAULT_COOKIES_PATH)
+
+    def _load_500_cookies(self, path: Path) -> None:
+        """Load saved 500.com auth cookies and inject into the session."""
+        if not path.exists():
+            log.debug("No 500.com cookie file at %s — vol_pct will be blank", path)
+            return
+        try:
+            cookies = json.loads(path.read_text())
+            for name, value in cookies.items():
+                self.session.cookies.set(name, value, domain=".500.com")
+            log.info("Loaded %d 500.com auth cookies from %s", len(cookies), path)
+        except Exception as e:
+            log.warning("Failed to load 500.com cookies from %s: %s", path, e)
 
     # ---- low-level -------------------------------------------------------
     def _throttle(self):
