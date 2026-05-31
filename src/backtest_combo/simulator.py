@@ -158,9 +158,9 @@ def simulate_issue(
     """Run optimizer + settle for a single issue.
 
     When ``mix_n_legs`` is provided the issue is run in multi-N mix mode:
-    N tiers are built in ascending order, each receiving the leg IDs
-    selected by lower tiers via ``cross_n_used`` so that ``cross_n_lambda``
-    can penalise match reuse across tiers.
+    N tiers are built in descending weight order (highest-weight tier first),
+    each passing its top-frequency leg IDs via ``cross_n_used`` so that
+    ``cross_n_lambda`` penalises match reuse in lower-weight tiers.
 
     Returns (issue_summary_dict, list_of_ComboSettlement).
     """
@@ -172,7 +172,8 @@ def simulate_issue(
     if mix_n_legs and mix_weights and len(cands) > 0:
         wsum = sum(mix_weights)
         cross_n_used: set = set()
-        for i, (n, w) in enumerate(zip(mix_n_legs, mix_weights)):
+        _mix_sorted = sorted(enumerate(zip(mix_n_legs, mix_weights)), key=lambda x: x[1][1], reverse=True)
+        for i, (n, w) in _mix_sorted:
             if w <= 0 or len(cands) < n:
                 continue
             w_norm = w / wsum

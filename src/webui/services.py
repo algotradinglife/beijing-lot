@@ -335,8 +335,8 @@ def generate_plan(
         total_stake = 0
         expected_return = 0.0
         n_qual_legs = 0
-        cross_n_used: set = set()  # legs selected by lower-N tiers (for cross_n_lambda)
-        for n_val, (weight, k_n, lam_n) in per_n_params.items():
+        cross_n_used: set = set()  # legs selected by higher-weight tiers (for cross_n_lambda)
+        for n_val, (weight, k_n, lam_n) in sorted(per_n_params.items(), key=lambda x: x[1][0], reverse=True):
             if weight <= 0:
                 continue
             sub_bankroll = state.active * weight
