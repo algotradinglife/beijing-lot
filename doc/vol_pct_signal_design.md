@@ -1,6 +1,6 @@
 # Pool-Volume Confidence Signal Design
 
-**Status**: Design review — no backtest yet  
+**Status**: Track A backtested (redundant with niche rules). Track B closed — see §11.  
 **Date**: 2026-05-31  
 **Data window**: 2026-05-02 to 2026-05-30 (1,579 settled matches, 698,838 snapshots)
 
@@ -24,14 +24,14 @@ In a thin pool, late money can swing SP by ±20%; in a deep pool the same amount
 |---|---|---|
 | `eu_h / eu_d / eu_a` | 99% of snapshots | European pre-match odds from scraper |
 | `sp_3 / sp_1 / sp_0` | 68–98% of snapshots | Parimutuel SP (best at close) |
-| `vol_pct_3/1/0` | **0%** — always NULL | Schema exists; scraper never populates |
-| `pool_total` | **0%** — always NULL | Same |
+| `vol_pct_3/1/0` | **0%** — always NULL | Schema exists; scraper cannot populate (see §11) |
+| `pool_total` | **0%** — always NULL | No accessible free source (see §11) |
 
 This means:
-- **Track A (EU-vs-SP divergence)**: implementable immediately
-- **Track B (raw vol_pct)**: requires scraper fix first
+- **Track A (EU-vs-SP divergence)**: implementable immediately — backtested 2026-05-31, found redundant
+- **Track B (raw vol_pct / pool_total)**: **closed** — see §11 for root-cause analysis
 
-Both tracks are designed below. Track A is the actionable path for the next backtest cycle.
+Both tracks are designed below. See §11 for the definitive conclusion.
 
 ---
 
@@ -234,3 +234,45 @@ From 692k snapshots with EU odds populated:
 | Raw corr w/ outcome | −0.039 | — | — |
 
 Note: raw correlation is expected to be weak because it pools all matches, not just niche-qualified legs. The signal's predictive power must be evaluated *conditional on a leg being in a niche rule's SP range*, which is the Phase 1 backtest's job.
+
+---
+
+## 11. Post-Investigation Conclusions (2026-05-31)
+
+### Track A: EU-vs-SP divergence — CLOSED (redundant)
+
+Phase 1 backtest run on 9 issues (2026-05). Key finding:
+
+- 69% of niche-qualified candidates already have `div_raw > 0.10` — niche rules implicitly select high-divergence legs (p_hat > 0.65/SP is a div threshold by another name)
+- Adding a hard filter at any threshold showed inconsistent per-issue effects (some issues improve, others degrade)
+- With only 9 data points, no statistically meaningful conclusion possible
+- **Decision**: Do not ship the div_raw hard filter. Signal is circular given niche rule construction.
+
+### Track B: vol_pct / pool_total — CLOSED (data not obtainable)
+
+Root cause investigation of the NULL fields:
+
+**vol_pct_3/1/0 is mathematically redundant with SP:**
+
+The parimutuel formula is exact: `SP = RETURN_RATE / vol_pct`, therefore `vol_pct = 0.65 / SP`. These fields would contain no independent information beyond what `sp_3/sp_1/sp_0` already holds. Populating them would just store derived values.
+
+**The scraper is correct — 500.com requires authentication:**
+
+The `trade.500.com/bjdc/` page serves `--` for all `<span class="tzbl">` fields to unauthenticated users, even during the active betting window. The JS handler for the "投注比例" dropdown only toggles CSS visibility (no AJAX call) — but the server-side HTML itself is "--" without a session cookie. Confirmed by fetching the live page (issue 26061, 132 active rows, all tzbl = "--").
+
+**pool_total has no accessible free source:**
+
+| Source tried | Result |
+|---|---|
+| `trade.500.com/bjdc/` | vol_pct "--" without auth; no pool_total field |
+| `www.500.com/static/public/bjdc/xml/sp/just_{issue}_{play_id}.xml` | 404 |
+| `zx.500.com/zqdc/kaijiang.php` (already scraped) | No pool total |
+| `cp.zgzcw.com/lottery/bdplayvsforJsp.action` | No pool data |
+| `lottery.gov.cn` | 403 |
+| `jss.lottery.gov.cn` | DNS resolution failure |
+
+**To obtain pool_total in future:** Would require either (a) authenticated 500.com session scraped at betting time, or (b) reverse-engineering the mobile app API. Neither is attempted here.
+
+### What This Means for Strategy
+
+The pool depth signal as originally conceived is not buildable without authentication or a new data source. The current niche+EU pipeline uses all available free data efficiently. No further action on this track unless a new data source is identified.
