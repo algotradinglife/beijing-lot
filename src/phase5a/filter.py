@@ -145,6 +145,13 @@ class NicheConfig:
         lq = _load_league_q()
         lq_table = tuple((k, float(v["q"])) for k, v in lq.items())
         bl = frozenset(league_blacklist) if league_blacklist is not None else frozenset()
+        # Leagues already covered by a drift_block_rules entry (with a non-None leagues
+        # set) are managed at sub-category level — remove them from the coarse blacklist
+        # so that safe sub-categories (e.g. 德甲 hcp≠0) are not wrongly excluded.
+        drift_managed = frozenset(
+            lg for dr in drift_rules if dr.leagues is not None for lg in dr.leagues
+        )
+        bl = bl - drift_managed
         return cls(return_rate=float(data.get("return_rate", 0.65)),
                    rules=rules,
                    league_q_min=float(league_q_min),
