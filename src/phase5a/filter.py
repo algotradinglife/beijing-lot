@@ -58,6 +58,49 @@ def _load_league_q() -> dict:
 
 
 @dataclass(frozen=True)
+class DriftBlockRule:
+    """Block a (match, option) leg if ALL specified conditions match.
+
+    Fields mirror NicheRule dimensions but serve as a reject-list: any leg
+    that satisfies every non-None field is dropped before entering the pool.
+    None means "any value" — always specify at least one constraint.
+
+    hcp_class values: "h0" (平受), "h1" (±1 goal), "h2plus" (±2+), "h_unknown".
+    option values: "3" (主胜), "1" (平局), "0" (客胜).
+    leagues: frozenset of league names; None = apply to all leagues.
+    """
+    option: Optional[str] = None
+    hcp_class: Optional[str] = None
+    sp_lo: Optional[float] = None   # sp >= sp_lo
+    sp_hi: Optional[float] = None   # sp < sp_hi
+    leagues: Optional[frozenset] = None  # None → all leagues
+
+
+def _drift_blocked(
+    rules: tuple,
+    *,
+    option: str,
+    hcp_class: str,
+    sp: float,
+    league: Optional[str],
+) -> bool:
+    """Return True if the leg matches any DriftBlockRule (i.e., should be rejected)."""
+    for r in rules:
+        if r.option is not None and r.option != option:
+            continue
+        if r.hcp_class is not None and r.hcp_class != hcp_class:
+            continue
+        if r.sp_lo is not None and sp < r.sp_lo:
+            continue
+        if r.sp_hi is not None and sp >= r.sp_hi:
+            continue
+        if r.leagues is not None and league not in r.leagues:
+            continue
+        return True
+    return False
+
+
+@dataclass(frozen=True)
 class NicheConfig:
     return_rate: float
     rules: tuple[NicheRule, ...] = field(default_factory=tuple)
@@ -66,6 +109,9 @@ class NicheConfig:
     # SP-drift blacklist: leagues with empirically high big-drop rates (>33% from 2026-05 analysis).
     # Default is the 档一 set; override via DB config key "league_blacklist" (comma-separated).
     league_blacklist: frozenset = field(default_factory=frozenset)
+    # Fine-grained SP-drift block rules: condition-based filter more precise than league-level.
+    # Populated from "drift_block_rules" key in the niches JSON file.
+    drift_block_rules: tuple = field(default_factory=tuple)
 
     @classmethod
     def load(cls, path: str | Path | None = None,
@@ -86,6 +132,16 @@ class NicheConfig:
             )
             for r in data.get("rules", [])
         )
+        drift_rules = tuple(
+            DriftBlockRule(
+                option=d.get("option"),
+                hcp_class=d.get("hcp_class"),
+                sp_lo=d.get("sp_lo"),
+                sp_hi=d.get("sp_hi"),
+                leagues=frozenset(d["leagues"]) if d.get("leagues") else None,
+            )
+            for d in data.get("drift_block_rules", [])
+        )
         lq = _load_league_q()
         lq_table = tuple((k, float(v["q"])) for k, v in lq.items())
         bl = frozenset(league_blacklist) if league_blacklist is not None else frozenset()
@@ -93,7 +149,8 @@ class NicheConfig:
                    rules=rules,
                    league_q_min=float(league_q_min),
                    league_q_table=lq_table,
-                   league_blacklist=bl)
+                   league_blacklist=bl,
+                   drift_block_rules=drift_rules)
 
     def league_passes(self, league: str | None) -> bool:
         """Return True if `league` is allowed (not blacklisted, and passes q_min).
@@ -166,6 +223,14 @@ def qualify_candidates(
         handicap_class = classify_handicap(snap.handicap_line)
         comp_type = classify_comp_type(snap.league)
         for option_code, sp in _option_iter(snap):
+            if config.drift_block_rules and _drift_blocked(
+                config.drift_block_rules,
+                option=option_code,
+                hcp_class=handicap_class,
+                sp=sp,
+                league=snap.league,
+            ):
+                continue
             for rule in config.rules:
                 if _matches(rule, option=option_code, sp=sp,
                             league_tier=league_tier,

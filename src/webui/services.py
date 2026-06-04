@@ -116,7 +116,10 @@ def diagnostic_legs(db: "WebuiDB", live_db_path: str) -> Dict[str, Any]:
     from src.niche_analysis.data_loader import (
         classify_comp_type, classify_handicap, classify_league,
     )
-    from src.phase5a.filter import _matches as _rule_matches  # noqa: PLC2701
+    from src.phase5a.filter import (
+        _drift_blocked as _check_drift,  # noqa: PLC2701
+        _matches as _rule_matches,       # noqa: PLC2701
+    )
 
     league_q_min = float(db.get_config("league_q_min") or 0.0)
     league_blacklist = _parse_blacklist(db.get_config("league_blacklist"))
@@ -146,7 +149,19 @@ def diagnostic_legs(db: "WebuiDB", live_db_path: str) -> Dict[str, Any]:
             else:
                 market_count[code] += 1
                 if not league_pass:
-                    row["reason"] = f"联赛 {snap.league} q<门槛"
+                    row["reason"] = (
+                        f"联赛黑名单: {snap.league}" if snap.league in cfg.league_blacklist
+                        else f"联赛 {snap.league} q<门槛({league_q_min})"
+                    )
+                elif cfg.drift_block_rules and _check_drift(
+                    cfg.drift_block_rules,
+                    option=code,
+                    hcp_class=handicap_class,
+                    sp=float(sp),
+                    league=snap.league,
+                ):
+                    row["reason"] = (f"SP漂移风险拦截 "
+                                     f"(SP={sp:.2f}, hcap={handicap_class})")
                 else:
                     matched = None
                     for rule in cfg.rules:
@@ -182,6 +197,7 @@ def diagnostic_legs(db: "WebuiDB", live_db_path: str) -> Dict[str, Any]:
         n_matches=len(snaps),
         league_q_min=league_q_min,
         rule_total=len(cfg.rules),
+        drift_block_rule_count=len(cfg.drift_block_rules),
         rule_buckets={k: len(v) for k, v in rule_buckets.items()},
         rule_buckets_names=rule_buckets,
         qual_count=qual_count,

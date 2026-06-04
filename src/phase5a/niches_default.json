@@ -2,6 +2,25 @@
   "_doc": "Surviving niches from data/raw/archetype_B_niches.csv (Phase 4). Each rule lists the dimensions a (match, option) pair must match to qualify, and a p_hat estimate (the train mean_q / sp). Override via --niches CLI arg. Rules are evaluated top-to-bottom; FIRST MATCH WINS — keep more-specific (e.g. comp_type-restricted) rules ABOVE their general counterparts.",
   "_doc_comp_type_overrides": "2026-05-09 — Step 1 split analysis (scripts/niche_split_analysis.py) found two cup-subset boosts that survive OOS: option=0/sp 3.5-4.5/h1/cup test_q=1.245 (n=531) vs niche-avg 1.175; option=3/sp 3.5-4.5/h_unknown/cup test_q=1.184 (n=583) vs 1.140. Encoded as cup-priority rules below. Step 2 (mining option=1 draws with comp_type) found NO surviving niches strong enough (mean_q >= 1.113 break-even for N=4) — draws remain excluded.",
   "return_rate": 0.65,
+  "_doc_drift_block_rules": "Condition-based SP-drift reject-list (2026-06-04 analysis of 459 selection-level drift records). Each rule drops a leg if ALL non-null fields match. Replaces coarse league_blacklist with sub-league precision. hcp_class: h0=平受 |hcp|<0.5, h1=±1goal, h2plus=±2+. option: 3=主胜, 0=客胜, 1=平. leagues: null=all leagues.",
+  "drift_block_rules": [
+    {
+      "_comment": "主胜+平受+SP[3.8,4.6): 67-100% big-drop in HIGH leagues; cross-league risk cell",
+      "option": "3", "hcp_class": "h0", "sp_lo": 3.8, "sp_hi": 4.6
+    },
+    {
+      "_comment": "主胜+h1+SP[3.8,4.2): 50% big-drop across ALL leagues (n=8)",
+      "option": "3", "hcp_class": "h1", "sp_lo": 3.8, "sp_hi": 4.2
+    },
+    {
+      "_comment": "主胜+平受+SP>=4.6: 44% big-drop across OTHER leagues (n=9)",
+      "option": "3", "hcp_class": "h0", "sp_lo": 4.6
+    },
+    {
+      "_comment": "德甲+平受: 83-100% big-drop (replaces full 德甲 league blacklist — hcp!=0 德甲 is safe)",
+      "hcp_class": "h0", "leagues": ["德甲"]
+    }
+  ],
   "rules": [
     {
       "name": "away_sp_3.5-4.5_h1_CUP",
