@@ -222,6 +222,42 @@
   <hr>
 
   <div class="mb-4">
+    <h5>联赛漂移黑名单（league_blacklist）</h5>
+    <p class="text-muted small mb-2">
+      从下注腿中排除 SP 终盘漂移风险高的联赛，减少"计划时 SP 4.3，实际结算 SP 2.1"的情况。<br>
+      逗号分隔，留空则不过滤。
+    </p>
+    <table class="table table-sm table-bordered mb-2" style="max-width:600px;font-size:0.82em">
+      <thead class="table-light"><tr><th>风险等级</th><th>联赛</th><th>大幅下跌率(>10%)</th></tr></thead>
+      <tbody>
+        <tr class="table-danger"><td>高（档一，推荐排除）</td><td>德甲 芬甲 爱甲 英超 爱超 罗甲 智利甲 冰岛超</td><td>33–56%</td></tr>
+        <tr class="table-warning"><td>中（档二，可选排除）</td><td>挪超 芬超 葡超 意乙</td><td>25–29%</td></tr>
+        <tr class="table-success"><td>低（安全）</td><td>K2联赛 意甲 K1联赛 捷克甲 奥甲 丹甲</td><td>0%</td></tr>
+      </tbody>
+    </table>
+    <textarea name="league_blacklist" class="form-control font-monospace" rows="2"
+              style="max-width:600px;font-size:0.85em"
+              placeholder="德甲,芬甲,爱甲,英超,爱超,罗甲,智利甲,冰岛超">{{ league_blacklist }}</textarea>
+    <div class="mt-1 d-flex gap-2">
+      <button type="button" class="btn btn-sm btn-outline-danger"
+        onclick="document.querySelector('[name=league_blacklist]').value='德甲,芬甲,爱甲,英超,爱超,罗甲,智利甲,冰岛超'">
+        档一（推荐）
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-warning"
+        onclick="document.querySelector('[name=league_blacklist]').value='德甲,芬甲,爱甲,英超,爱超,罗甲,智利甲,冰岛超,挪超,芬超,葡超,意乙'">
+        档一＋档二
+      </button>
+      <button type="button" class="btn btn-sm btn-outline-secondary"
+        onclick="document.querySelector('[name=league_blacklist]').value=''">
+        清空
+      </button>
+    </div>
+    <small class="text-muted">档一黑名单保留约 86% 的场次，大幅下跌率从 18.5% 降至 14.7%。</small>
+  </div>
+
+  <hr>
+
+  <div class="mb-4">
     <h5>开球时间窗口（kickoff_window_hours）</h5>
     <p class="text-muted small mb-2">
       生成计划时只纳入未来 X 小时内开球的场次，避免远期场次的竞池 SP 在下注后大幅漂移。

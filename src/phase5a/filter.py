@@ -63,10 +63,14 @@ class NicheConfig:
     rules: tuple[NicheRule, ...] = field(default_factory=tuple)
     league_q_min: float = 0.0  # if > 0, only legs from leagues with historical q ≥ this pass
     league_q_table: tuple = field(default_factory=tuple)  # (league, q) pairs
+    # SP-drift blacklist: leagues with empirically high big-drop rates (>33% from 2026-05 analysis).
+    # Default is the 档一 set; override via DB config key "league_blacklist" (comma-separated).
+    league_blacklist: frozenset = field(default_factory=frozenset)
 
     @classmethod
     def load(cls, path: str | Path | None = None,
-             league_q_min: float = 0.0) -> "NicheConfig":
+             league_q_min: float = 0.0,
+             league_blacklist: frozenset | set | None = None) -> "NicheConfig":
         p = Path(path) if path else DEFAULT_NICHES_PATH
         data = json.loads(p.read_text())
         rules = tuple(
@@ -84,17 +88,21 @@ class NicheConfig:
         )
         lq = _load_league_q()
         lq_table = tuple((k, float(v["q"])) for k, v in lq.items())
+        bl = frozenset(league_blacklist) if league_blacklist is not None else frozenset()
         return cls(return_rate=float(data.get("return_rate", 0.65)),
                    rules=rules,
                    league_q_min=float(league_q_min),
-                   league_q_table=lq_table)
+                   league_q_table=lq_table,
+                   league_blacklist=bl)
 
     def league_passes(self, league: str | None) -> bool:
-        """Return True if `league` is allowed under the q_min filter.
+        """Return True if `league` is allowed (not blacklisted, and passes q_min).
         Unknown leagues default to allowed (avoid hiding new ones)."""
-        if self.league_q_min <= 0:
-            return True
         if not league:
+            return True
+        if league in self.league_blacklist:
+            return False
+        if self.league_q_min <= 0:
             return True
         for name, q in self.league_q_table:
             if name == league:

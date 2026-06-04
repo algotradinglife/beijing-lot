@@ -67,6 +67,13 @@ from src.phase5a import (
     read_pnl_log,
     reconcile_plan,
 )
+
+
+def _parse_blacklist(raw: str | None) -> frozenset:
+    """Parse a comma-separated league blacklist string from the DB config."""
+    if not raw:
+        return frozenset()
+    return frozenset(s.strip() for s in raw.split(",") if s.strip())
 from src.phase5a.planner import save_plan_json
 
 from .db import WebuiDB
@@ -112,7 +119,8 @@ def diagnostic_legs(db: "WebuiDB", live_db_path: str) -> Dict[str, Any]:
     from src.phase5a.filter import _matches as _rule_matches  # noqa: PLC2701
 
     league_q_min = float(db.get_config("league_q_min") or 0.0)
-    cfg = NicheConfig.load(league_q_min=league_q_min)
+    league_blacklist = _parse_blacklist(db.get_config("league_blacklist"))
+    cfg = NicheConfig.load(league_q_min=league_q_min, league_blacklist=league_blacklist)
     snaps = load_open_matches(live_db_path)
 
     # Rule-table breakdown by target selection
@@ -256,9 +264,10 @@ def generate_plan(
     if state.active <= 0:
         return dict(error="bankroll_not_initialized")
 
-    # League q-filter persisted in DB (per-preset; 高 Sharpe N=5 用 0.65, 其他默认 0)
+    # League q-filter and SP-drift blacklist persisted in DB
     league_q_min = float(db.get_config("league_q_min") or 0.0)
-    cfg = niche_config or NicheConfig.load(league_q_min=league_q_min)
+    league_blacklist = _parse_blacklist(db.get_config("league_blacklist"))
+    cfg = niche_config or NicheConfig.load(league_q_min=league_q_min, league_blacklist=league_blacklist)
     snapshots = load_open_matches(live_db_path, now=now)
 
     # Kickoff window filter: only include matches starting within X hours from now.
