@@ -1,22 +1,84 @@
-# Python
+# === 数据：必须出仓到外置盘 ===
+data/
+datasets/
+derived/
+knowledge-base/
+wiki/
+samples/
+demos/
+models/
+checkpoints/
+training-data/
+source-materials/
+
+# === 运行时产物 ===
+logs/
+log/
+output/
+outputs/
+results/
+runs/
+.cache/
+tmp/
+temp/
+# === 数据文件类型 ===
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.npy
+*.npz
+*.arrow
+*.db
+*.sqlite
+*.sqlite3
+*.duckdb
+# === 媒体/正式文档（PNG/JPG 等小图不在禁列，由 2MB 单文件限制管）===
+*.pdf
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.mp3
+*.wav
+*.m4a
+*.psd
+*.ai
+*.sketch
+# === 包管理/构建 ===
+node_modules/
+.venv/
+venv/
+env/
 __pycache__/
 *.pyc
-*.pyo
-*.egg-info/
 .pytest_cache/
-
-# OS
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+target/
+*.egg-info/
+.next/
+.nuxt/
+# === IDE/系统 ===
 .DS_Store
-
-# Editor / agent caches
-.claude/
 .idea/
 .vscode/
-
+*.swp
+# === AI/VCS 元数据（每机器各自维护）===
+.jj/
+.claude/
+# Python
+*.pyo
+# OS
+# Editor / agent caches
 # Runtime data — never commit (DBs, logs, generated plans/reports/PnL,
 # precomputed grids, scraped caches). ~64MB total, mostly machine-specific.
-data/
-
 # Local generated artifacts at repo root
 *.html
 *.zip
