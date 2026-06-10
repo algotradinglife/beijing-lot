@@ -56,6 +56,10 @@ def send_imessage(phone: str, body: str) -> Tuple[bool, str]:
         )
     except subprocess.TimeoutExpired as e:
         return False, f"timeout: {e}"
+    except (FileNotFoundError, OSError) as e:
+        # Non-macOS host (e.g. WSL/Linux): osascript absent. Degrade to no-op.
+        log.warning("iMessage unavailable on this platform: %s", e)
+        return False, f"osascript unavailable: {e}"
     if out.returncode != 0:
         err = out.stderr.strip()
         log.error("iMessage send failed: %s", err)
