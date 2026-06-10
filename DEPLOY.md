@@ -1,16 +1,46 @@
 # Beijing-Lot 服务器迁移/部署指南
 
-> 更新于 2026-06-10。适用于将整套服务从旧 macOS 主机迁移到新主机。
+> 更新于 2026-06-10。
+> **新主机环境：Windows + WSL2（Ubuntu）**
+> 旧主机：macOS（launchd）→ 新主机：WSL2（systemd）
 
 ---
 
 ## 一、前提条件
 
-- 新主机为 macOS（launchd 服务依赖 macOS）
-- 已安装 [miniforge3](https://github.com/conda-forge/miniforge)（Python 3.11+）
-- 已安装 cloudflared（`brew install cloudflare/cloudflare/cloudflared`）
-- SSH 公钥已加入 GitHub（用于 clone）
-- 可从旧机器通过 SSH 拉取文件
+在 WSL2（Ubuntu）内确认以下工具已就绪：
+
+```bash
+# 检查 WSL 版本（需要 WSL2，否则 systemd 不可用）
+wsl.exe --list --verbose          # 在 Windows PowerShell 里运行
+
+# WSL 内检查 systemd 是否启用
+systemctl --version               # 能输出版本号说明 systemd 已启用
+```
+
+若 systemd 未启用，在 WSL 的 `/etc/wsl.conf` 中添加：
+
+```ini
+[boot]
+systemd=true
+```
+
+然后在 PowerShell 里重启 WSL：`wsl.exe --shutdown`，再重新进入。
+
+其他依赖：
+
+```bash
+sudo apt update && sudo apt install -y git rsync sqlite3 curl
+```
+
+Python（miniforge3，安装到 WSL 内）：
+
+```bash
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
+bash Miniforge3-Linux-x86_64.sh -b -p ~/miniforge3
+echo 'export PATH="$HOME/miniforge3/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
 
 ---
 
@@ -30,9 +60,17 @@ pip install -r ~/code/trading/beijing-lot/requirements.txt
 
 ## 三、数据同步
 
-数据文件不在 git 里，需从旧机器手动拉取（约 195 MB）。
+数据文件不在 git 里，需从旧 macOS 主机拉取（约 195 MB）。
 
-**在新机器上执行**（替换 `OLD_HOST` 为旧机器地址）：
+迁移前先在**旧机器**上做 WAL checkpoint，确保数据完整：
+
+```bash
+# 旧机器（macOS）上执行
+sqlite3 "/Volumes/Data Drive/data/derived/beijing-lot/beidan_live.db" \
+  "PRAGMA wal_checkpoint(TRUNCATE);"
+```
+
+然后在**新机器（WSL）**上执行（替换 `OLD_HOST` 为旧机器地址或 IP）：
 
 ```bash
 mkdir -p ~/data/beijing-lot
@@ -42,13 +80,11 @@ rsync -avz --progress \
   ~/data/beijing-lot/
 ```
 
-迁移前在旧机器上先做 WAL checkpoint，确保数据完整：
-
-```bash
-# 旧机器上执行
-sqlite3 "/Volumes/Data Drive/data/derived/beijing-lot/beidan_live.db" \
-  "PRAGMA wal_checkpoint(TRUNCATE);"
-```
+> 如果旧机器没有开 SSH，也可以在 Windows 文件管理器里把数据目录复制到某个路径，
+> 然后在 WSL 内通过 `/mnt/c/...` 访问。例如：
+> ```bash
+> rsync -avz /mnt/d/beijing-lot-data/ ~/data/beijing-lot/
+> ```
 
 需要同步的关键文件：
 
@@ -62,64 +98,152 @@ sqlite3 "/Volumes/Data Drive/data/derived/beijing-lot/beidan_live.db" \
 
 ---
 
-## 四、目录结构配置
+## 四、目录结构与环境变量
 
-旧机器的路径约定是 `/Volumes/Data Drive/...`，新机器改为 `~/data/beijing-lot`。
-
-需要在 shell 环境（`~/.zshrc` 或 `~/.bashrc`）里设置：
+在 `~/.bashrc` 里追加：
 
 ```bash
 export BEIDAN_DATA_DIR="$HOME/data/beijing-lot"
 export BEIDAN_REPO_DIR="$HOME/code/trading/beijing-lot"
 ```
 
-> 注意：当前代码中部分路径仍为硬编码，见 `MIGRATION.md` 中的 `hardcoded_path_hits`。
-> 如遇路径问题请手动核查 `src/` 下引用 `data/` 的位置。
-
-创建日志目录：
-
 ```bash
+source ~/.bashrc
 mkdir -p ~/data/beijing-lot/logs
 ```
 
+> 注意：代码中部分路径仍为硬编码（指向旧 macOS 的 `/Volumes/Data Drive/...`），
+> 见 `MIGRATION.md` 中的 `hardcoded_path_hits`。
+> 如遇路径问题，检查 `src/` 下引用 `data/` 的位置并手动修正。
+
 ---
 
-## 五、launchd 服务配置
+## 五、systemd 服务配置（替代 macOS launchd）
 
-仓库 `launchd/` 目录下有三个服务的 plist 模板，**安装前需批量替换路径**：
+WSL2 使用 systemd 管理后台服务。为三个服务分别创建 unit 文件：
 
 ```bash
 REPO="$HOME/code/trading/beijing-lot"
 DATA="$HOME/data/beijing-lot"
 PYTHON="$HOME/miniforge3/bin/python3"
 USER=$(whoami)
+UNIT_DIR="$HOME/.config/systemd/user"
 
-for f in "$REPO/launchd/"*.plist; do
-  sed \
-    -e "s|/Volumes/Data Drive/workspace/trading/beijing-lot|$REPO|g" \
-    -e "s|/Volumes/Data Drive/workspace/trading/beijing-lot/data|$DATA|g" \
-    -e "s|/Users/huhan/miniforge3|$HOME/miniforge3|g" \
-    -e "s|/Users/huhan|$HOME|g" \
-    "$f" > ~/Library/LaunchAgents/$(basename "$f")
-done
+mkdir -p "$UNIT_DIR"
 ```
 
-加载服务：
+**webui.service**
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.beidanlot.webui.plist
-launchctl load ~/Library/LaunchAgents/com.beidanlot.autoplan.plist
-launchctl load ~/Library/LaunchAgents/com.beidanlot.autocheck.plist
+cat > "$UNIT_DIR/beidanlot-webui.service" <<EOF
+[Unit]
+Description=Beijing-Lot WebUI
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$REPO
+Environment=PYTHONPATH=$REPO/src
+ExecStart=$PYTHON -m src.webui --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=10
+StandardOutput=append:$DATA/logs/webui.stdout.log
+StandardError=append:$DATA/logs/webui.stderr.log
+
+[Install]
+WantedBy=default.target
+EOF
 ```
 
-验证：
+**autoplan.service**
 
 ```bash
-launchctl list | grep beidanlot
-# 每个服务应显示 PID（非 -），exit code 为 0
+cat > "$UNIT_DIR/beidanlot-autoplan.service" <<EOF
+[Unit]
+Description=Beijing-Lot Auto Planner
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$REPO
+Environment=PYTHONPATH=$REPO/src
+ExecStart=$PYTHON -m auto.autoplan
+Restart=always
+RestartSec=10
+StandardOutput=append:$DATA/logs/autoplan.stdout.log
+StandardError=append:$DATA/logs/autoplan.stderr.log
+
+[Install]
+WantedBy=default.target
+EOF
 ```
 
-检查 WebUI 是否正常：
+**autocheck.service**
+
+```bash
+cat > "$UNIT_DIR/beidanlot-autocheck.service" <<EOF
+[Unit]
+Description=Beijing-Lot Auto Checker
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$REPO
+Environment=PYTHONPATH=$REPO/src
+ExecStart=$PYTHON -m auto.autocheck
+Restart=always
+RestartSec=10
+StandardOutput=append:$DATA/logs/autocheck.stdout.log
+StandardError=append:$DATA/logs/autocheck.stderr.log
+
+[Install]
+WantedBy=default.target
+EOF
+```
+
+**live_collector.service**
+
+```bash
+cat > "$UNIT_DIR/beidanlot-live-collector.service" <<EOF
+[Unit]
+Description=Beijing-Lot Live Collector
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$REPO
+Environment=PYTHONPATH=$REPO/src
+ExecStart=$PYTHON -m live_collector --interval-min 300 --interval-max 900
+Restart=always
+RestartSec=10
+StandardOutput=append:$DATA/logs/live_collector.stdout.log
+StandardError=append:$DATA/logs/live_collector.stderr.log
+
+[Install]
+WantedBy=default.target
+EOF
+```
+
+加载并启动：
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now beidanlot-webui
+systemctl --user enable --now beidanlot-autoplan
+systemctl --user enable --now beidanlot-autocheck
+systemctl --user enable --now beidanlot-live-collector
+
+# 允许用户服务在登出后继续运行
+sudo loginctl enable-linger $USER
+```
+
+验证状态：
+
+```bash
+systemctl --user status beidanlot-webui beidanlot-autoplan beidanlot-autocheck beidanlot-live-collector
+```
+
+检查 WebUI：
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/
@@ -130,20 +254,28 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/
 
 ## 六、Cloudflare Tunnel 配置
 
-Tunnel 绑定在 Cloudflare 账号上，不需要重新创建，只需把凭证文件复制过来。
+Tunnel 绑定在 Cloudflare 账号上，凭证文件从旧机器复制过来即可，不需要重新创建。
 
-**从旧机器拉取：**
+**安装 cloudflared（WSL 内）：**
+
+```bash
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb \
+  -o /tmp/cloudflared.deb
+sudo dpkg -i /tmp/cloudflared.deb
+```
+
+**从旧机器拉取凭证：**
 
 ```bash
 mkdir -p ~/.cloudflared
 rsync -avz OLD_HOST:"~/.cloudflared/" ~/.cloudflared/
 ```
 
-拉取后检查 `~/.cloudflared/config.yml`，确认 `service` 地址与新机器端口一致：
+检查 `~/.cloudflared/config.yml`，确认内容如下（端口与 webui 一致）：
 
 ```yaml
 tunnel: 6f11c8e0-219a-4a6b-8f24-624368b33b22
-credentials-file: ~/.cloudflared/6f11c8e0-219a-4a6b-8f24-624368b33b22.json
+credentials-file: /home/<你的用户名>/.cloudflared/6f11c8e0-219a-4a6b-8f24-624368b33b22.json
 protocol: http2   # WARP 环境必须保留，否则报 1033
 
 ingress:
@@ -152,11 +284,27 @@ ingress:
   - service: http_status:404
 ```
 
-安装并启动 tunnel 服务：
+> 注意：`credentials-file` 路径需改为 WSL 内的绝对路径（`/home/...`），不能用 `~`。
+
+用 systemd 管理 tunnel：
 
 ```bash
-sudo cloudflared service install
-sudo launchctl load /Library/LaunchDaemons/com.cloudflare.cloudflared.plist
+cat > "$HOME/.config/systemd/user/cloudflared-trading.service" <<EOF
+[Unit]
+Description=Cloudflare Tunnel (trading)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/cloudflared tunnel --config $HOME/.cloudflared/config.yml run
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+
+systemctl --user enable --now cloudflared-trading
 ```
 
 验证公网可访问：
@@ -170,24 +318,25 @@ curl -s -o /dev/null -w "%{http_code}" https://trading.drwhospaper.site/
 
 ## 七、迁移后验收清单
 
-- [ ] `launchctl list | grep beidanlot` 三个服务均有 PID
+- [ ] `systemctl --user status beidanlot-webui` 显示 `active (running)`
+- [ ] `systemctl --user status beidanlot-live-collector` 显示 `active (running)`
 - [ ] `curl http://localhost:8000/` 返回 302
-- [ ] `https://trading.drwhospaper.site/` 可访问
+- [ ] `https://trading.drwhospaper.site/` 公网可访问
 - [ ] WebUI 策略页面加载正常，历史期次数据可查
-- [ ] Live collector 正常采集（检查 `~/data/beijing-lot/logs/live_collector.stdout.log`）
 - [ ] `sqlite3 ~/data/beijing-lot/beidan_live.db "SELECT count(*) FROM snapshots;"` 返回正确行数
+- [ ] 查看 live collector 日志无报错：`tail -f ~/data/beijing-lot/logs/live_collector.stdout.log`
 
 ---
 
 ## 八、旧机器善后
 
-确认新机器运转正常后：
+确认新机器运转正常后，停止旧机器上的所有服务，**避免两台机器同时写数据库**：
 
-1. 停止旧机器上的服务，避免双写数据库：
-   ```bash
-   launchctl unload ~/Library/LaunchAgents/com.beidanlot.webui.plist
-   launchctl unload ~/Library/LaunchAgents/com.beidanlot.autoplan.plist
-   launchctl unload ~/Library/LaunchAgents/com.beidanlot.autocheck.plist
-   launchctl unload ~/Library/LaunchAgents/com.beidanlot.live_collector.plist
-   ```
-2. 停止旧机器上的 cloudflared tunnel（否则两端都在监听同一 hostname）。
+```bash
+# 旧机器（macOS）上执行
+launchctl unload ~/Library/LaunchAgents/com.beidanlot.webui.plist
+launchctl unload ~/Library/LaunchAgents/com.beidanlot.autoplan.plist
+launchctl unload ~/Library/LaunchAgents/com.beidanlot.autocheck.plist
+launchctl unload ~/Library/LaunchAgents/com.beidanlot.live_collector.plist
+launchctl unload ~/Library/LaunchAgents/com.cloudflare.cloudflared.trading-tunnel.plist
+```
