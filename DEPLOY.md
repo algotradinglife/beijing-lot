@@ -6,6 +6,76 @@
 
 ---
 
+## 〇、实际部署现状（2026-06-11，权威记录）
+
+> **本节记录已完成的真实落地配置；与下方第一～八节的规划稿如有出入，以本节为准。**
+> 下方规划稿保留作背景参考，但其中若干命令与实际不符（见各处「⚠️ 实际」标注）。
+
+**主机 / 路径**
+
+| 项 | 实际值 |
+|----|--------|
+| 用户 / 主机 | `drwho1985` @ `DrWhoTrade1985`（WSL2，systemd PID1） |
+| 仓库 | `/home/drwho1985/workspace/soccer/beijing-lot` |
+| 数据目录 | **仓库内 `data/`**（代码用相对路径，**不要**用 `~/data/beijing-lot`） |
+| 旧机数据源 | `huhan@dr:/Volumes/Data Drive/data/derived/beijing-lot/`（约 195 MB） |
+| Python | 系统 `python3.14` + 仓库内 venv `.venv`（`ensurepip` 缺失，用 `get-pip.py` 引导 pip） |
+| 依赖 | 仓库 `requirements.txt`（已精简为真实 import；旧的 398 包全局 freeze 已弃用） |
+| `PYTHONPATH` | `$REPO:$REPO/src`（代码混用 `from src.x` 与 `from x` 两种风格，需同时在路径上） |
+
+**数据迁移用 `sqlite3 .backup` 取一致性快照**（折叠 WAL，避免拷到撕裂副本）：
+
+```bash
+# 旧机生成快照
+ssh huhan@dr 'cd "/Volumes/Data Drive/data/derived/beijing-lot"; \
+  for db in beidan_live webui beidan_history; do sqlite3 "$db.db" ".backup /tmp/$db.db"; done'
+# 新机：支撑文件 + 3 个快照库 → 仓库内 data/
+rsync -az --exclude="*.db" --exclude="*.db-wal" --exclude="*.db-shm" \
+  huhan@dr:"/Volumes/Data Drive/data/derived/beijing-lot/" data/
+for db in beidan_live webui beidan_history; do rsync -az huhan@dr:/tmp/$db.db data/$db.db; done
+```
+
+**环境搭建**
+
+```bash
+cd /home/drwho1985/workspace/soccer/beijing-lot
+python3 -m venv .venv
+curl -sS https://bootstrap.pypa.io/get-pip.py | .venv/bin/python   # 系统缺 ensurepip
+.venv/bin/python -m pip install -r requirements.txt
+```
+
+**已运行的 5 个 systemd --user 单元**（`linger=yes`，开机/登出自启）
+
+| 单元 | 类型 | 调度 / 说明 |
+|------|------|-------------|
+| `beidanlot-webui.service` | 常驻 | `-m src.webui --host 127.0.0.1 --port 8000` |
+| `beidanlot-live-collector.service` | 常驻 | `-m live_collector --interval-min 300 --interval-max 900` |
+| `beidanlot-autoplan.service` + `.timer` | **oneshot + timer** | 每小时（`OnCalendar=hourly`） |
+| `beidanlot-autocheck.service` + `.timer` | **oneshot + timer** | 每天 10:00 |
+| `cloudflared-trading.service` | 常驻 | `~/.local/bin/cloudflared`（免 sudo 二进制，非 dpkg） |
+
+> **⚠️ 关键纠正**：autoplan / autocheck 是**跑完即退的 one-shot 脚本**，绝不能配成 `Restart=always`
+> 常驻服务（会被 systemd 疯狂重启）。正确做法是 `Type=oneshot` service + `.timer` 定时触发，
+> 周期对应旧机 launchd 的 `StartInterval=3600`（每小时）与 `StartCalendarInterval Hour=10`（每天 10:00）。
+
+**跨平台修复（已提交 `bc4a2f8`）**：`src/webui/notify.py` 的 iMessage 走 macOS `osascript`，
+非 mac 主机会抛未捕获的 `FileNotFoundError` 拖垮 autoplan/autocheck → 已改为捕获并降级为日志。
+WSL 上桌面/iMessage 通知不可用（仅记日志）；如需通知可后续接飞书。
+
+**Cloudflare Tunnel**：tunnel `6f11c8e0-...` 仅本机运行（旧机已停，无 replica 冲突）。
+`config.yml` 保留全部 4 条 ingress，但只有 `trading.drwhospaper.site → :8000` 在本机；
+其余 3 个（option-timing / wx / wxmonitor）本机无对应服务会 502（其中 `wx` 仍在旧机 :3000）。
+`trading` 前有 **Cloudflare Access 鉴权**，登录后方可进 dashboard。
+
+**已验证**：`snapshots=742067`、`integrity=ok`、`http://localhost:8000/ → 302`、
+`https://trading.drwhospaper.site/ → 302`（跳 Access 登录页）、collector 启动即写入新快照。
+
+**遗留 / 可选**：`sqlite3` CLI 未装（需 sudo；校验可用 `.venv/bin/python` 的 sqlite3 模块）；
+`camoufox`/`pycryptodome` 未装（惰性 import，仅 soccerway 爬取 / 刷 cookie 需要）；
+旧 mac 脚本 `scripts/live_collector_daemon.sh`（launchctl）在 WSL 下废弃，改用 systemd。
+
+---
+
 ## 一、前提条件
 
 在 WSL2（Ubuntu）内确认以下工具已就绪：
@@ -155,49 +225,56 @@ WantedBy=default.target
 EOF
 ```
 
-**autoplan.service**
+**autoplan / autocheck（⚠️ 实际：oneshot + timer，不是常驻服务）**
+
+> 下面这两个 `Restart=always` 写法是**错的**——autoplan/autocheck 跑完即退，会被疯狂重启。
+> 实际部署用 `Type=oneshot` service + `.timer`（见第〇节）。正确写法：
 
 ```bash
+# autoplan：oneshot service + 每小时 timer
 cat > "$UNIT_DIR/beidanlot-autoplan.service" <<EOF
 [Unit]
-Description=Beijing-Lot Auto Planner
+Description=Beijing-Lot Auto Planner (oneshot)
 After=network.target
-
 [Service]
-Type=simple
+Type=oneshot
 WorkingDirectory=$REPO
-Environment=PYTHONPATH=$REPO/src
+Environment=PYTHONPATH=$REPO:$REPO/src
 ExecStart=$PYTHON -m auto.autoplan
-Restart=always
-RestartSec=10
 StandardOutput=append:$DATA/logs/autoplan.stdout.log
 StandardError=append:$DATA/logs/autoplan.stderr.log
-
-[Install]
-WantedBy=default.target
 EOF
-```
+cat > "$UNIT_DIR/beidanlot-autoplan.timer" <<EOF
+[Unit]
+Description=Run autoplan hourly
+[Timer]
+OnCalendar=hourly
+Persistent=true
+[Install]
+WantedBy=timers.target
+EOF
 
-**autocheck.service**
-
-```bash
+# autocheck：oneshot service + 每天 10:00 timer
 cat > "$UNIT_DIR/beidanlot-autocheck.service" <<EOF
 [Unit]
-Description=Beijing-Lot Auto Checker
+Description=Beijing-Lot Auto Checker (oneshot)
 After=network.target
-
 [Service]
-Type=simple
+Type=oneshot
 WorkingDirectory=$REPO
-Environment=PYTHONPATH=$REPO/src
+Environment=PYTHONPATH=$REPO:$REPO/src
 ExecStart=$PYTHON -m auto.autocheck
-Restart=always
-RestartSec=10
 StandardOutput=append:$DATA/logs/autocheck.stdout.log
 StandardError=append:$DATA/logs/autocheck.stderr.log
-
+EOF
+cat > "$UNIT_DIR/beidanlot-autocheck.timer" <<EOF
+[Unit]
+Description=Run autocheck daily at 10:00
+[Timer]
+OnCalendar=*-*-* 10:00:00
+Persistent=true
 [Install]
-WantedBy=default.target
+WantedBy=timers.target
 EOF
 ```
 
@@ -229,13 +306,15 @@ EOF
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now beidanlot-webui
-systemctl --user enable --now beidanlot-autoplan
-systemctl --user enable --now beidanlot-autocheck
 systemctl --user enable --now beidanlot-live-collector
+systemctl --user enable --now beidanlot-autoplan.timer    # timer，不是 .service
+systemctl --user enable --now beidanlot-autocheck.timer   # timer，不是 .service
 
 # 允许用户服务在登出后继续运行
 sudo loginctl enable-linger $USER
 ```
+
+> 查看 timer 排程：`systemctl --user list-timers 'beidanlot-*'`
 
 验证状态：
 
