@@ -44,15 +44,16 @@ curl -sS https://bootstrap.pypa.io/get-pip.py | .venv/bin/python   # 系统缺 e
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-**已运行的 5 个 systemd --user 单元**（`linger=yes`，开机/登出自启）
+**已运行的 systemd --user 单元**（`linger=yes`，开机/登出自启）
 
 | 单元 | 类型 | 调度 / 说明 |
 |------|------|-------------|
-| `beidanlot-webui.service` | 常驻 | `-m src.webui --host 127.0.0.1 --port 8000` |
+| `beidanlot-webui.service` | 常驻 | `-m src.webui --host 127.0.0.1 --port 8000`；`EnvironmentFile=~/.config/beidanlot/webui.env` |
 | `beidanlot-live-collector.service` | 常驻 | `-m live_collector --interval-min 300 --interval-max 900` |
 | `beidanlot-autoplan.service` + `.timer` | **oneshot + timer** | 每小时（`OnCalendar=hourly`） |
 | `beidanlot-autocheck.service` + `.timer` | **oneshot + timer** | 每天 10:00 |
-| `cloudflared-trading.service` | 常驻 | `~/.local/bin/cloudflared`（免 sudo 二进制，非 dpkg） |
+| `cloudflared-trading.service` | 常驻 | `cloudflared tunnel --config <cfg> --metrics 127.0.0.1:20241 run` |
+| `cloudflared-watchdog.service` + `.timer` | **oneshot + timer** | 每 2 分钟，边缘连接为 0 就重启 tunnel |
 
 > **⚠️ 关键纠正**：autoplan / autocheck 是**跑完即退的 one-shot 脚本**，绝不能配成 `Restart=always`
 > 常驻服务（会被 systemd 疯狂重启）。正确做法是 `Type=oneshot` service + `.timer` 定时触发，
@@ -65,10 +66,27 @@ WSL 上桌面/iMessage 通知不可用（仅记日志）；如需通知可后续
 **Cloudflare Tunnel**：tunnel `6f11c8e0-...` 仅本机运行（旧机已停，无 replica 冲突）。
 `config.yml` 保留全部 4 条 ingress，但只有 `trading.drwhospaper.site → :8000` 在本机；
 其余 3 个（option-timing / wx / wxmonitor）本机无对应服务会 502（其中 `wx` 仍在旧机 :3000）。
-`trading` 前有 **Cloudflare Access 鉴权**，登录后方可进 dashboard。
+
+**登录方式（已从 Cloudflare Access 改为 app 级算术门）**：
+- 原 trading 域名的 **Cloudflare Access 应用已删除**（不再要邮箱 OTP）。
+- webui 内置**算术门 + 固定口令**（`src/webui/app.py` 的 `/gate` + `before_request` 守卫）：
+  答对算术题并输入口令后置 30 天 session。提交 `70af408` / 修复竞态 `83bbaca`。
+- 口令与强 `BEIDAN_SECRET` 存于 `~/.config/beidanlot/webui.env`（600，**不入 git**）：
+  ```
+  BEIDAN_GATE_PASS=<口令>
+  BEIDAN_SECRET=<openssl/secrets 生成的强随机串>
+  ```
+  未设 `BEIDAN_GATE_PASS` → 门自动关闭（本地/测试无门）。
+- ⚠️ 安全级别低（算术题只挡机器人，口令是唯一关卡，页面展示真实 bankroll），仅供少数信任的人。
+
+**⚠️ WARP 拦截 + watchdog**：本机/网络上的 WARP 会间歇劫持 cloudflared 到边缘的 TLS
+（edge IP 落在 `198.18.x`，报 `TLS handshake EOF` / `no free edge addresses`），导致公网 530。
+此时 cloudflared **进程仍活着**，`Restart=always` 不触发 → 必须靠 `cloudflared-watchdog.timer`：
+每 2 分钟读 `--metrics 127.0.0.1:20241` 的 `cloudflared_tunnel_ha_connections`，为 0 则 `restart`。
+（注意 `--metrics` 必须放在 `run` **之前**，放在 `run` 后会被拒绝并打印 usage。）
 
 **已验证**：`snapshots=742067`、`integrity=ok`、`http://localhost:8000/ → 302`、
-`https://trading.drwhospaper.site/ → 302`（跳 Access 登录页）、collector 启动即写入新快照。
+`https://trading.drwhospaper.site/` 公网经算术门 + 口令登录后 dashboard 200、watchdog 报 healthy、collector 启动即写入新快照。
 
 **遗留 / 可选**：`sqlite3` CLI 未装（需 sudo；校验可用 `.venv/bin/python` 的 sqlite3 模块）；
 `camoufox`/`pycryptodome` 未装（惰性 import，仅 soccerway 爬取 / 刷 cookie 需要）；
