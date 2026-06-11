@@ -85,3 +85,16 @@ def slice_consistency(legs: pd.DataFrame, slice_col: str, min_n: int = 30) -> di
         n_positive=n_pos,
         consistent=bool(max(n_neg, n_pos) >= 3 and min(n_neg, n_pos) == 0),
     )
+
+
+def winners_vs_all_bias(legs: pd.DataFrame) -> dict:
+    """Compare drift_bias on winning legs only vs all legs, to expose the
+    selection bias in the live -16.5% figure (which used winners only).
+    `legs` needs is_winner, decision_sp, final_sp."""
+    all_m = drift_metrics(legs)
+    win_m = drift_metrics(legs[legs["is_winner"]])
+    return dict(
+        all_bias=all_m["drift_bias"], all_n=all_m["n"],
+        winners_bias=win_m["drift_bias"], winners_n=win_m["n"],
+        bias_gap=win_m["drift_bias"] - all_m["drift_bias"],
+    )

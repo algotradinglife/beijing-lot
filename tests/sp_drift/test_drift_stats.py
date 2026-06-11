@@ -87,3 +87,18 @@ def test_slice_consistency_counts_same_sign_slices():
     assert res["n_slices"] == 3
     assert res["n_negative"] == 3          # all 3 leagues negative bias
     assert res["consistent"]               # >=3 same-direction → consistent
+
+
+from src.sp_drift.drift_stats import winners_vs_all_bias
+
+
+def test_winners_vs_all_exposes_selection_bias():
+    # winners drifted down hard; the full leg set (incl losers) drifts less
+    legs = pd.DataFrame({
+        "is_winner": [True, True, False, False],
+        "decision_sp": [4.0, 4.0, 4.0, 4.0],
+        "final_sp": [3.0, 3.0, 4.4, 4.4],   # winners -25%, losers +10%
+    })
+    res = winners_vs_all_bias(legs)
+    assert res["winners_bias"] < res["all_bias"]   # winners-only overstates adverse drift
+    assert abs(res["winners_bias"] - (-0.25)) < 1e-9
