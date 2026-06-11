@@ -44,3 +44,44 @@ def drift_by_mtk_bucket(legs: pd.DataFrame, edges: list[float]) -> pd.DataFrame:
         m["mtk_lo"] = float(bucket.left)   # numeric sort key
         rows.append(m)
     return pd.DataFrame(rows)
+
+
+_SP_EDGES = [(3.5, "<3.5"), (4.5, "3.5-4.5"), (5.0, "4.5-5"), (8.0, "5-8")]
+
+
+def sp_band(sp: float) -> str:
+    """Bucket an SP into the strategy-relevant bands."""
+    for hi, label in _SP_EDGES:
+        if sp < hi:
+            return label
+    return ">8"
+
+
+def drift_by_cell(legs: pd.DataFrame, by: list[str], min_n: int = 1) -> pd.DataFrame:
+    """Drift metrics per cell (group key `by`); cells with < min_n legs dropped.
+    Sorted by drift_bias ascending (most adverse first)."""
+    rows = []
+    for key, grp in legs.groupby(by, observed=True):
+        m = drift_metrics(grp)
+        if m["n"] < min_n:
+            continue
+        for col, val in zip(by, key if isinstance(key, tuple) else (key,)):
+            m[col] = val
+        rows.append(m)
+    out = pd.DataFrame(rows)
+    return out.sort_values("drift_bias").reset_index(drop=True) if len(out) else out
+
+
+def slice_consistency(legs: pd.DataFrame, slice_col: str, min_n: int = 30) -> dict:
+    """Check whether drift_bias has the same sign across >=3 slices of slice_col.
+    Implements the spec's multi-slice consistency standard."""
+    cells = drift_by_cell(legs, by=[slice_col], min_n=min_n)
+    biases = cells["drift_bias"].dropna()
+    n_neg = int((biases < 0).sum())
+    n_pos = int((biases > 0).sum())
+    return dict(
+        n_slices=int(len(biases)),
+        n_negative=n_neg,
+        n_positive=n_pos,
+        consistent=bool(max(n_neg, n_pos) >= 3 and min(n_neg, n_pos) == 0),
+    )

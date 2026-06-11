@@ -45,3 +45,45 @@ def test_drift_by_mtk_bucket_returns_one_row_per_bucket():
     near, far = out.iloc[0], out.iloc[1]   # sorted by left edge ascending
     # far-from-kickoff bucket has bigger residual drift than near
     assert far["residual_drift"] > near["residual_drift"]
+
+
+from src.sp_drift.drift_stats import drift_by_cell, sp_band
+
+
+def test_sp_band_buckets():
+    assert sp_band(2.0) == "<3.5"
+    assert sp_band(4.0) == "3.5-4.5"
+    assert sp_band(6.0) == "5-8"
+    assert sp_band(9.0) == ">8"
+
+
+def test_drift_by_cell_groups_and_counts():
+    legs = pd.DataFrame({
+        "selection": ["0", "0", "3"],
+        "hcp_class": ["h1", "h1", "h0"],
+        "sp_band": ["3.5-4.5", "3.5-4.5", "5-8"],
+        "league_bucket": ["Top5EU", "Top5EU", "Other"],
+        "comp_type": ["league", "league", "league"],
+        "decision_sp": [4.0, 4.0, 6.0],
+        "final_sp": [3.0, 3.2, 5.0],
+    })
+    out = drift_by_cell(legs, by=["selection", "hcp_class", "sp_band", "league_bucket", "comp_type"])
+    assert len(out) == 2          # two distinct cells
+    cell = out[out["selection"] == "0"].iloc[0]
+    assert cell["n"] == 2
+    assert cell["drift_bias"] < 0  # away SP drifted down
+
+
+from src.sp_drift.drift_stats import slice_consistency
+
+
+def test_slice_consistency_counts_same_sign_slices():
+    legs = pd.DataFrame({
+        "league_bucket": ["Top5EU", "Top5EU", "Asian", "Asian", "Other", "Other"],
+        "decision_sp": [4.0] * 6,
+        "final_sp": [3.0, 3.2, 3.1, 3.3, 3.0, 3.4],   # all drift down across 3 leagues
+    })
+    res = slice_consistency(legs, slice_col="league_bucket", min_n=1)
+    assert res["n_slices"] == 3
+    assert res["n_negative"] == 3          # all 3 leagues negative bias
+    assert res["consistent"]               # >=3 same-direction → consistent
