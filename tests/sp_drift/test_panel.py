@@ -42,3 +42,25 @@ def test_snapshot_panel_attaches_labels(live_db):
     assert a["league_bucket"] == "Top5EU"   # 英超
     assert a["hcp_class"] == "h1"            # |-1.0|
     assert a["comp_type"] == "league"
+
+
+from src.sp_drift.panel import attach_final_and_settlement
+
+
+def test_final_sp_is_last_pre_kickoff_snapshot(live_db):
+    panel = build_snapshot_panel(live_db)
+    dec = attach_final_and_settlement(panel, live_db)
+    # one row per (match, selection)
+    a0 = dec[(dec["match_id"] == "A") & (dec["selection"] == "0")].iloc[0]
+    assert a0["final_sp"] == 3.0      # closing snapshot (MTK 10), not the dropped post-kickoff one
+    assert a0["is_winner"]            # away won
+    assert a0["winning_sp"] == 3.0
+
+
+def test_final_sp_matches_winning_sp_for_winners(live_db):
+    """Anchor: closing pre-kickoff SP should equal settlement winning_sp for winners."""
+    panel = build_snapshot_panel(live_db)
+    dec = attach_final_and_settlement(panel, live_db)
+    win = dec[dec["is_winner"]]
+    rel = (win["final_sp"] - win["winning_sp"]).abs() / win["winning_sp"]
+    assert (rel < 0.05).all()

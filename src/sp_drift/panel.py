@@ -68,3 +68,24 @@ def build_snapshot_panel(live_db_path: str | Path) -> pd.DataFrame:
     panel["hcp_class"] = panel["handicap_line"].map(classify_handicap)
     panel["comp_type"] = panel["league"].map(classify_comp_type)
     return panel.reset_index(drop=True)
+
+
+def attach_final_and_settlement(panel: pd.DataFrame, live_db_path: str | Path) -> pd.DataFrame:
+    """Collapse to one row per (match, selection) at its closing pre-kickoff
+    snapshot, joined with settlement outcome.
+
+    Adds: final_sp (SP at smallest positive MTK), result_code, winning_sp,
+    is_winner (result_code == selection).
+    """
+    closing_idx = panel.groupby(["match_id", "selection"])["mtk"].idxmin()
+    closing = panel.loc[closing_idx].rename(columns={"sp": "final_sp"}).copy()
+
+    con = sqlite3.connect(str(live_db_path))
+    settle = pd.read_sql_query(
+        "SELECT match_id, result_code, winning_sp FROM settlements", con)
+    con.close()
+    settle["result_code"] = settle["result_code"].astype(str)
+
+    out = closing.merge(settle, on="match_id", how="left")
+    out["is_winner"] = out["result_code"] == out["selection"]
+    return out.reset_index(drop=True)
