@@ -6,9 +6,12 @@ so the panel keeps only pre-kickoff snapshots (MTK > 0).
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import numpy as np
 
 import pandas as pd
 
@@ -89,3 +92,36 @@ def attach_final_and_settlement(panel: pd.DataFrame, live_db_path: str | Path) -
     out = closing.merge(settle, on="match_id", how="left")
     out["is_winner"] = out["result_code"] == out["selection"]
     return out.reset_index(drop=True)
+
+
+def decision_view(panel: pd.DataFrame, mtk_target: float) -> pd.DataFrame:
+    """One row per (match, selection): the latest snapshot at least `mtk_target`
+    minutes before kickoff (i.e. the SP a decider at MTK=target would observe).
+    `sp` is the decision_SP. Matches with no snapshot that early are dropped.
+    """
+    elig = panel[panel["mtk"] >= mtk_target]
+    if elig.empty:
+        return elig.copy()
+    idx = elig.groupby(["match_id", "selection"])["mtk"].idxmin()
+    return panel.loc[idx].reset_index(drop=True)
+
+
+def baseline_decision_mtk(webui_db_path: str | Path) -> float:
+    """Median MTK at which live plans were actually generated, used as the
+    no-window baseline decision point. Returns nan if no plan legs found.
+    """
+    con = sqlite3.connect(str(webui_db_path))
+    rows = con.execute("SELECT created_ts, plan_json FROM plans").fetchall()
+    con.close()
+    mtks = []
+    for created_ts, pj in rows:
+        try:
+            plan = json.loads(pj)
+        except (TypeError, ValueError):
+            continue
+        for ticket in plan.get("tickets", []):
+            for leg in ticket.get("legs", []):
+                ko = leg.get("kickoff_ts")
+                if ko and created_ts:
+                    mtks.append(minutes_to_kickoff(created_ts, ko))
+    return float(np.median(mtks)) if mtks else float("nan")

@@ -64,3 +64,41 @@ def test_final_sp_matches_winning_sp_for_winners(live_db):
     win = dec[dec["is_winner"]]
     rel = (win["final_sp"] - win["winning_sp"]).abs() / win["winning_sp"]
     assert (rel < 0.05).all()
+
+
+from src.sp_drift.panel import decision_view
+
+
+def test_decision_view_picks_latest_snapshot_at_least_T_before_kickoff(live_db):
+    panel = build_snapshot_panel(live_db)
+    # T = 30 min: match A eligible snapshots are MTK {180, 60} (10 < 30 excluded);
+    # latest = smallest MTK among those = 60 → away sp 3.5
+    dec = decision_view(panel, mtk_target=30)
+    a0 = dec[(dec["match_id"] == "A") & (dec["selection"] == "0")].iloc[0]
+    assert a0["mtk"] == 60.0
+    assert a0["sp"] == 3.5
+
+
+def test_decision_view_excludes_matches_with_no_snapshot_before_T(live_db):
+    panel = build_snapshot_panel(live_db)
+    dec = decision_view(panel, mtk_target=130)   # only A's MTK-180 qualifies; B's max is 120
+    assert set(dec["match_id"].unique()) == {"A"}
+
+
+import json
+import sqlite3 as _sql
+
+from src.sp_drift.panel import baseline_decision_mtk
+
+
+def test_baseline_decision_mtk_from_plan_creation(tmp_path):
+    """Median MTK between plan created_ts and leg kickoff across plan legs."""
+    wdb = tmp_path / "webui.db"
+    con = _sql.connect(wdb)
+    con.execute("CREATE TABLE plans (plan_id TEXT, created_ts TEXT, plan_json TEXT)")
+    # created 10:35Z, leg kickoff 19:35 Beijing(=11:35Z) → MTK 60
+    plan = {"tickets": [{"legs": [{"kickoff_ts": "2026-06-09T19:35:00"}]}]}
+    con.execute("INSERT INTO plans VALUES ('p1','2026-06-09T10:35:00Z',?)", (json.dumps(plan),))
+    con.commit()
+    con.close()
+    assert baseline_decision_mtk(wdb) == 60.0
