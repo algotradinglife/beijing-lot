@@ -78,6 +78,7 @@
 构建可复用面板：对每个 `(match, selection)`，以 MTK 为索引的 SP 轨迹、vol% 轨迹、pool_total、欧赔、最终结算 SP、赛果，以及 niche/联赛/SP档/让球类/赛事类型标签。
 
 - 产出：`src/sp_drift/panel.py` + 缓存 parquet（写到 `data/derived/sp_drift/`）。
+- **决策快照选择器（必须先定义，否则下游不可复现）**：给定决策 MTK `T`，`decision_snapshot(match, T)` = 该场距开赛 ≥ `T` 分钟中**最晚**的快照（即「在 T 时刻能看到的最新 SP」）；`decision_SP` 取自它。基线（无窗）的 `T_base` 锚定到**实盘计划实际生成时刻的 MTK**——从 live plans 的 `created_ts` 与 `kickoff_ts` 经验推出（典型值在 Phase 0 算出并记录），使「基线」真实对应当前实盘行为，而非任意取点。
 - 机制 sanity：池子随时间增长？vol% 三项和≈100%？SP 与隐含概率自洽（1/SP 归一后 ≈ 1/return_rate）？
 - 完成判据：面板能复算出诊断里的 −16.5% 命中腿漂移（与 `sp_drift_stats` 对齐，作为正确性锚点）。
 
@@ -128,8 +129,11 @@
 
 ## 7. 指标字典
 
+- `decision_SP`：在决策 MTK `T` 由 `decision_snapshot`（见 Phase 0）取得的 SP。
 - `drift_ratio = final_SP / decision_SP`：下注腿上 <1 即不利。
-- `residual_drift(T) = E[|1 − drift_ratio|]`，限定 MTK=T 做决策。
+- `drift_bias(T) = E[drift_ratio − 1]`（**有符号**均值）：系统性方向性偏差，−16.5% 即此量；**P2 haircut 治的是它**。
+- `residual_drift(T) = E[|drift_ratio − 1|]`（**幅度**，无符号）：决策时刻仍未走完的不确定性；**P1 开窗 / P4 时机治的是它**。
+  > 二者要分开报：`drift_bias` 可预判 → 能 haircut/过滤；`residual_drift` 只能靠「下单更晚」压。GATE 1 的「方向随机 vs 系统」之分即 `|drift_bias|` 相对 `residual_drift` 的大小。
 - `qualify_count`：给定策略下通过 niche 的腿/组合数。
 - `drift_adjusted_EV`：用 final_SP（或预测 final_SP）替代 decision_SP 算的 EV。
 - 重放指标：realized ROI、周 ROI 分布、MaxDD、Calmar。
@@ -153,6 +157,8 @@ Phase 0 ──> Phase 1 ──[GATE 1]──> Phase 2 ──[GATE 2]──> Phas
 ```
 
 每个 GATE 都是潜在早停点：GATE 1 可在最便宜阶段否决整个课题（若漂移不可战胜）；GATE 2 可省掉建模；GATE 3 给最终 go/no-go。
+
+**分批实施（重要）**：不要一次把 5 阶段代码全建出来——那违背早停逻辑且浪费工。**实施计划先只覆盖 Phase 0 + Phase 1（到 GATE 1）**；GATE 1 结论出来后再据其分支（继续 Phase 2 还是跳到 Phase 3）写下一段计划。`policies.py` / `sp_model.py` / `replay.py` 在对应 GATE 之前不动。
 
 ## 10. 交付物清单
 
