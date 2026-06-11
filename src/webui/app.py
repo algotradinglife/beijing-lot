@@ -15,7 +15,9 @@ Routes:
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+import hmac
+import random
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -129,15 +131,22 @@ def create_app(
     webui_db: str = "data/webui.db",
     plans_dir: str = "data/phase5a_plans",
     pnl_log: str = "data/phase5a_pnl/pnl.csv",
+    gate_pass: Optional[str] = None,
 ) -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.secret_key = os.environ.get("BEIDAN_SECRET", "beidan-local-dev-key")
+    # Lightweight access gate: when a passphrase is configured (arg or
+    # BEIDAN_GATE_PASS), every page requires a correct arithmetic answer +
+    # the passphrase before the session is granted. Unset → gate disabled.
+    gate_pass = gate_pass if gate_pass is not None else os.environ.get("BEIDAN_GATE_PASS")
     app.config.update(
         LIVE_DB=str(live_db),
         WEBUI_DB=str(webui_db),
         PLANS_DIR=str(plans_dir),
         PNL_LOG=str(pnl_log),
+        GATE_PASS=gate_pass or None,
     )
+    app.permanent_session_lifetime = timedelta(days=30)
     app.jinja_env.filters["hk"] = services.fmt_hk
     app.jinja_env.filters["humanmin"] = services.fmt_humanmin
 
@@ -215,6 +224,43 @@ def create_app(
             active_profile_id=active_id,
             active_profile_name=active_name,
         )
+
+    # ---- access gate -------------------------------------------------
+    def _new_question() -> int:
+        a, b = random.randint(1, 9), random.randint(1, 9)
+        session["gate_ans"] = a + b
+        session["gate_q"] = f"{a} + {b}"
+        return session["gate_ans"]
+
+    @app.before_request
+    def _require_gate():
+        if not app.config.get("GATE_PASS"):
+            return None  # gate disabled
+        if session.get("gate_ok"):
+            return None
+        if request.endpoint in ("gate", "static"):
+            return None
+        return redirect(url_for("gate"))
+
+    @app.route("/gate", methods=["GET", "POST"])
+    def gate():
+        if not app.config.get("GATE_PASS"):
+            return redirect(url_for("index"))
+        if session.get("gate_ok"):
+            return redirect(url_for("index"))
+        if request.method == "POST":
+            expected = str(session.get("gate_ans", ""))
+            answer = (request.form.get("answer") or "").strip()
+            passphrase = request.form.get("passphrase") or ""
+            answer_ok = answer == expected and expected != ""
+            pass_ok = hmac.compare_digest(passphrase, app.config["GATE_PASS"])
+            if answer_ok and pass_ok:
+                session["gate_ok"] = True
+                session.permanent = True
+                return redirect(url_for("index"))
+            flash("答错了，再试一次", "error")
+        _new_question()
+        return render_template("gate.html", question=session.get("gate_q", ""))
 
     # ------------------------------------------------------------------
     @app.route("/")

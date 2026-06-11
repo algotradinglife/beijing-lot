@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>验证 · 北单追踪</title>
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; background:#0f1115;
+           color:#e6e6e6; display:flex; min-height:100vh; align-items:center;
+           justify-content:center; margin:0; }
+    .card { background:#1a1d24; padding:32px 36px; border-radius:12px;
+            box-shadow:0 8px 30px rgba(0,0,0,.4); width:300px; }
+    h1 { font-size:18px; margin:0 0 20px; font-weight:600; }
+    label { display:block; font-size:13px; color:#9aa0a6; margin:14px 0 6px; }
+    .q { font-size:22px; font-weight:700; color:#fff; letter-spacing:1px; }
+    input { width:100%; box-sizing:border-box; padding:10px 12px; border-radius:8px;
+            border:1px solid #2c313a; background:#0f1115; color:#fff; font-size:15px; }
+    button { width:100%; margin-top:20px; padding:11px; border:0; border-radius:8px;
+             background:#3b82f6; color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+    button:hover { background:#2f6fe0; }
+    .err { color:#f87171; font-size:13px; margin-top:14px; }
+  </style>
+</head>
+<body>
+  <form class="card" method="post" action="{{ url_for('gate') }}">
+    <h1>请先验证</h1>
+    <label>计算题</label>
+    <div class="q">{{ question }} = ?</div>
+    <label for="answer">答案</label>
+    <input id="answer" name="answer" inputmode="numeric" autocomplete="off" autofocus>
+    <label for="passphrase">口令</label>
+    <input id="passphrase" name="passphrase" type="password" autocomplete="off">
+    <button type="submit">进入</button>
+    {% with msgs = get_flashed_messages(category_filter=['error']) %}
+      {% if msgs %}<div class="err">{{ msgs[0] }}</div>{% endif %}
+    {% endwith %}
+  </form>
+</body>
+</html>

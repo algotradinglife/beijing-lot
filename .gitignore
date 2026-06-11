@@ -81,4 +81,5 @@ target/
 # precomputed grids, scraped caches). ~64MB total, mostly machine-specific.
 # Local generated artifacts at repo root
 *.html
+!src/webui/templates/*.html
 *.zip
