@@ -226,12 +226,11 @@ def create_app(
         )
 
     # ---- access gate -------------------------------------------------
-    def _new_question() -> int:
-        a, b = random.randint(1, 9), random.randint(1, 9)
-        session["gate_ans"] = a + b
-        session["gate_q"] = f"{a} + {b}"
-        return session["gate_ans"]
-
+    # The arithmetic question is stateless: operands ride in hidden form
+    # fields and are re-validated at POST time. This avoids a race where a
+    # second GET /gate (e.g. the browser fetching /favicon.ico, which the
+    # guard redirects here) would otherwise regenerate a session-stored
+    # answer and invalidate the question the user is filling in.
     @app.before_request
     def _require_gate():
         if not app.config.get("GATE_PASS"):
@@ -249,18 +248,22 @@ def create_app(
         if session.get("gate_ok"):
             return redirect(url_for("index"))
         if request.method == "POST":
-            expected = str(session.get("gate_ans", ""))
+            try:
+                a = int(request.form.get("a", ""))
+                b = int(request.form.get("b", ""))
+            except ValueError:
+                a = b = None
             answer = (request.form.get("answer") or "").strip()
             passphrase = request.form.get("passphrase") or ""
-            answer_ok = answer == expected and expected != ""
+            answer_ok = a is not None and b is not None and answer == str(a + b)
             pass_ok = hmac.compare_digest(passphrase, app.config["GATE_PASS"])
             if answer_ok and pass_ok:
                 session["gate_ok"] = True
                 session.permanent = True
                 return redirect(url_for("index"))
             flash("答错了，再试一次", "error")
-        _new_question()
-        return render_template("gate.html", question=session.get("gate_q", ""))
+        a, b = random.randint(1, 9), random.randint(1, 9)
+        return render_template("gate.html", a=a, b=b)
 
     # ------------------------------------------------------------------
     @app.route("/")

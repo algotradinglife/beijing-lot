@@ -26,7 +26,9 @@
   <form class="card" method="post" action="{{ url_for('gate') }}">
     <h1>请先验证</h1>
     <label>计算题</label>
-    <div class="q">{{ question }} = ?</div>
+    <div class="q">{{ a }} + {{ b }} = ?</div>
+    <input type="hidden" name="a" value="{{ a }}">
+    <input type="hidden" name="b" value="{{ b }}">
     <label for="answer">答案</label>
     <input id="answer" name="answer" inputmode="numeric" autocomplete="off" autofocus>
     <label for="passphrase">口令</label>
