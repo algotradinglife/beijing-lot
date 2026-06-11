@@ -125,3 +125,15 @@ def baseline_decision_mtk(webui_db_path: str | Path) -> float:
                 if ko and created_ts:
                     mtks.append(minutes_to_kickoff(created_ts, ko))
     return float(np.median(mtks)) if mtks else float("nan")
+
+
+def build(live_db_path: str | Path, cache_path: str | Path,
+          rebuild: bool = False) -> pd.DataFrame:
+    """Build (or load cached) snapshot panel, parquet-cached at cache_path."""
+    cache_path = Path(cache_path)
+    if cache_path.exists() and not rebuild:
+        return pd.read_parquet(cache_path)
+    panel = build_snapshot_panel(live_db_path)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    panel.to_parquet(cache_path, index=False)
+    return panel

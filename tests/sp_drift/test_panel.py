@@ -102,3 +102,17 @@ def test_baseline_decision_mtk_from_plan_creation(tmp_path):
     con.commit()
     con.close()
     assert baseline_decision_mtk(wdb) == 60.0
+
+
+from src.sp_drift.panel import build
+
+
+def test_build_caches_parquet_and_reloads(live_db, tmp_path):
+    cache = tmp_path / "panel.parquet"
+    p1 = build(live_db, cache_path=cache)
+    assert cache.exists()
+    assert len(p1) == 15
+    # second call reads cache (delete source to prove it doesn't re-query)
+    live_db.unlink()
+    p2 = build(live_db, cache_path=cache)
+    assert len(p2) == 15
