@@ -98,3 +98,18 @@ def winners_vs_all_bias(legs: pd.DataFrame) -> dict:
         winners_bias=win_m["drift_bias"], winners_n=win_m["n"],
         bias_gap=win_m["drift_bias"] - all_m["drift_bias"],
     )
+
+
+def vol_imbalance_predictivity(legs: pd.DataFrame, vol_split: float = 40.0) -> dict:
+    """Does a selection's own vol% share at decision time predict drift direction?
+    Splits legs by decision_vol_pct >= vol_split and reports drift_bias of each
+    group. Mechanism: high public share → SP keeps being bet down (negative bias).
+    `legs` needs decision_vol_pct, decision_sp, final_sp."""
+    hi = legs[legs["decision_vol_pct"] >= vol_split]
+    lo = legs[legs["decision_vol_pct"] < vol_split]
+    hm, lm = drift_metrics(hi), drift_metrics(lo)
+    return dict(
+        high_vol_bias=hm["drift_bias"], high_vol_n=hm["n"],
+        low_vol_bias=lm["drift_bias"], low_vol_n=lm["n"],
+        spread=hm["drift_bias"] - lm["drift_bias"],
+    )

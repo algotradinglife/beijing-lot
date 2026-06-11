@@ -102,3 +102,19 @@ def test_winners_vs_all_exposes_selection_bias():
     res = winners_vs_all_bias(legs)
     assert res["winners_bias"] < res["all_bias"]   # winners-only overstates adverse drift
     assert abs(res["winners_bias"] - (-0.25)) < 1e-9
+
+
+from src.sp_drift.drift_stats import vol_imbalance_predictivity
+
+
+def test_high_vol_share_predicts_downward_drift():
+    # legs where the selection already has a high vol_pct at decision time
+    # should drift DOWN more (public piling in keeps lowering its SP).
+    legs = pd.DataFrame({
+        "decision_vol_pct": [10, 15, 55, 60],    # low-share vs high-share
+        "decision_sp": [4.0, 4.0, 4.0, 4.0],
+        "final_sp": [4.2, 4.1, 3.2, 3.0],        # high-share legs drift down
+    })
+    res = vol_imbalance_predictivity(legs, vol_split=40)
+    assert res["high_vol_bias"] < res["low_vol_bias"]
+    assert res["high_vol_bias"] < 0
