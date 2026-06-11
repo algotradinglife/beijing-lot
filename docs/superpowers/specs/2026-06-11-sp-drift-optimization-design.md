@@ -147,6 +147,7 @@
 | 中奖腿选择偏差（−16.5% 偏高估计） | Phase 1 Q1.4 用全 qualify 腿重算 |
 | Parimutuel 反身性（自身下注移动 SP） | 当前注额下可忽略，注明；未来注额放大需复核 |
 | GATE 2 过拟合（薄数据 + 灵活模型） | 机制优先 + 时间外样本 + 多切片一致 |
+| **final_sp 代理噪声**（Phase 0 实测）：收盘前快照 SP 与结算 winning_sp **无系统性偏差**（中位比 1.003、Spearman 0.841），但逐场噪声大（<5% 仅 ~34%）——因末段 parimutuel 移动 + winning_sp 是结算后值 | `drift_bias`（有符号）可靠；`residual_drift`（幅度）含此噪声、视为上界。结论以 drift_bias 为主 |
 
 ## 9. 阶段依赖与早停
 
