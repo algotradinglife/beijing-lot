@@ -382,7 +382,7 @@ def replay_policy(panel: pd.DataFrame, live_db_path: str | Path,
             combo_ev_threshold=policy.combo_ev_threshold,
             weekly_stake_cap_frac=policy.weekly_stake_cap_frac)
         stake = float(sum(t.total_stake for t in pr.tickets))
-        pnl = float(sum(s.profit for s in settle_plans(pr.tickets, actuals)))
+        pnl = float(sum(s.total_profit for s in settle_plans(pr.tickets, actuals)))
         n_tickets += len(pr.tickets)
         weeks.append((issue, stake, pnl))
         bankroll += pnl
