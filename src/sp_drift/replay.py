@@ -71,3 +71,81 @@ def actuals_from_db(live_db_path: str | Path) -> dict:
     con.close()
     return {str(m): {"result_code": str(rc), "winning_sp": float(ws)}
             for m, rc, ws in rows}
+
+
+from dataclasses import dataclass
+
+from src.backtest_combo.settler import settle_plans
+from src.phase5a.filter import NicheConfig
+from src.phase5a.planner import build_weekly_plan
+
+
+@dataclass(frozen=True)
+class Policy:
+    mtk_target: float                 # decision minutes-to-kickoff
+    haircut: Optional[dict] = None    # band_bias map, or None
+    n_legs: int = 4
+    kelly_fraction: float = 0.0625    # 1/16 per v2.1
+    combo_ev_threshold: float = 0.05
+    weekly_stake_cap_frac: float = 0.25
+    start_bankroll: float = 100000.0
+
+
+def replay_policy(panel: pd.DataFrame, live_db_path: str | Path,
+                  niche_config: NicheConfig, policy: Policy) -> dict:
+    """Replay one policy issue-by-issue. Qualify/size on decision-time
+    (optionally haircut) SP; settle on real winning_sp; roll bankroll."""
+    actuals = actuals_from_db(live_db_path)
+    snaps = decision_snapshots(panel, mtk_target=policy.mtk_target)
+    if policy.haircut:
+        snaps = apply_band_haircut(snaps, policy.haircut)
+
+    by_issue: dict = {}
+    for s in snaps:
+        by_issue.setdefault(s.issue, []).append(s)
+
+    bankroll = policy.start_bankroll
+    weeks = []
+    n_tickets = 0
+    for issue in sorted(by_issue):
+        pr = build_weekly_plan(
+            by_issue[issue], bankroll=bankroll, niche_config=niche_config,
+            n_legs=policy.n_legs, kelly_fraction=policy.kelly_fraction,
+            combo_ev_threshold=policy.combo_ev_threshold,
+            weekly_stake_cap_frac=policy.weekly_stake_cap_frac)
+        stake = float(sum(t.total_stake for t in pr.tickets))
+        pnl = float(sum(s.profit for s in settle_plans(pr.tickets, actuals)))
+        n_tickets += len(pr.tickets)
+        weeks.append((issue, stake, pnl))
+        bankroll += pnl
+
+    res = aggregate_equity(weeks, start_bankroll=policy.start_bankroll)
+    res["n_tickets"] = n_tickets
+    return res
+
+
+def aggregate_equity(weeks: list, start_bankroll: float) -> dict:
+    """weeks: list of (issue, stake, pnl) in chronological order. Rolls a
+    bankroll, returns roi/total_pnl/max_dd/final_bankroll/equity."""
+    bankroll = start_bankroll
+    peak = start_bankroll
+    max_dd = 0.0
+    equity = [start_bankroll]
+    total_stake = total_pnl = 0.0
+    for _issue, stake, pnl in weeks:
+        bankroll += pnl
+        total_stake += stake
+        total_pnl += pnl
+        equity.append(bankroll)
+        peak = max(peak, bankroll)
+        if peak > 0:
+            max_dd = max(max_dd, (peak - bankroll) / peak)
+    return dict(
+        final_bankroll=bankroll,
+        total_pnl=total_pnl,
+        total_stake=total_stake,
+        roi=(total_pnl / total_stake if total_stake else float("nan")),
+        max_dd=max_dd,
+        equity=equity,
+        n_weeks=len(weeks),
+    )

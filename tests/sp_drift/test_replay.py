@@ -59,3 +59,56 @@ def test_actuals_from_db(tmp_path):
     assert a["A"] == {"result_code": "0", "winning_sp": 3.0}
     assert a["B"]["winning_sp"] == 4.5
     assert "C" not in a
+
+
+from src.sp_drift.replay import aggregate_equity
+
+
+def test_aggregate_equity_rolls_bankroll_and_computes_maxdd():
+    # weekly (issue, stake, pnl) in chronological order
+    weeks = [("26051", 100.0, 50.0), ("26052", 100.0, -80.0), ("26053", 100.0, 60.0)]
+    res = aggregate_equity(weeks, start_bankroll=1000.0)
+    # equity: 1000 → 1050 → 970 → 1030
+    assert res["final_bankroll"] == 1030.0
+    assert abs(res["total_pnl"] - 30.0) < 1e-9
+    assert abs(res["total_stake"] - 300.0) < 1e-9
+    assert abs(res["roi"] - 30.0 / 300.0) < 1e-9
+    # peak 1050, trough after 970 → MaxDD = (1050-970)/1050
+    assert abs(res["max_dd"] - (1050.0 - 970.0) / 1050.0) < 1e-9
+
+
+import sqlite3
+
+from src.sp_drift import panel as P
+from src.sp_drift.replay import Policy, replay_policy
+from src.phase5a.filter import NicheConfig
+
+
+def test_replay_policy_runs_pipeline_and_returns_metrics(tmp_path):
+    # Build a tiny live db with 6 matches in one issue so build_weekly_plan can
+    # form at least one N=2 combo; we only assert the result shape + that it
+    # settled against winning_sp, not exact pnl.
+    db = tmp_path / "live.db"
+    con = sqlite3.connect(db)
+    con.executescript(
+        "CREATE TABLE matches (match_id TEXT PRIMARY KEY, issue TEXT, match_idx INTEGER,"
+        " league TEXT, kickoff_ts TEXT, home TEXT, away TEXT, handicap_line REAL);"
+        "CREATE TABLE snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, match_id TEXT,"
+        " snapshot_ts TEXT, sp_3 REAL, sp_1 REAL, sp_0 REAL, vol_pct_3 REAL,"
+        " vol_pct_1 REAL, vol_pct_0 REAL, pool_total REAL);"
+        "CREATE TABLE settlements (match_id TEXT, result_code TEXT, winning_sp REAL);")
+    for i in range(1, 7):
+        con.execute("INSERT INTO matches VALUES (?,?,?,?,?,?,?,?)",
+                    (f"M{i}", "26099", i, "挪超", "2026-06-09T19:35:00", "H", "A", 1.0))
+        con.execute("INSERT INTO snapshots (match_id,snapshot_ts,sp_3,sp_1,sp_0,"
+                    "vol_pct_3,vol_pct_1,vol_pct_0,pool_total) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (f"M{i}", "2026-06-09T10:35:00Z", 6.0, 3.4, 1.6, 0, 0, 0, 1000))
+        con.execute("INSERT INTO settlements VALUES (?,?,?)", (f"M{i}", "3", 6.0))
+    con.commit(); con.close()
+
+    pan = P.build(db, cache_path=tmp_path / "p.parquet", rebuild=True)
+    pol = Policy(mtk_target=30, haircut=None, n_legs=2, kelly_fraction=0.0625,
+                 combo_ev_threshold=0.0, start_bankroll=100000.0)
+    res = replay_policy(pan, db, NicheConfig.load(), pol)
+    assert {"roi", "max_dd", "final_bankroll", "n_weeks", "n_tickets"} <= set(res)
+    assert res["n_weeks"] == 1
