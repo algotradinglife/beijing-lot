@@ -58,3 +58,16 @@ def apply_band_haircut(snaps: List[LiveSnapshot], band_bias: dict) -> List[LiveS
 
     return [_dc_replace(s, sp_3=adj(s.sp_3), sp_1=adj(s.sp_1), sp_0=adj(s.sp_0))
             for s in snaps]
+
+
+def actuals_from_db(live_db_path: str | Path) -> dict:
+    """Real settlement truth: {match_id: {result_code, winning_sp}}. This is
+    the SP you are actually paid at — replay settles against THIS, not the
+    decision SP. Rows with null result_code or non-positive winning_sp dropped."""
+    con = sqlite3.connect(str(live_db_path))
+    rows = con.execute(
+        "SELECT match_id, result_code, winning_sp FROM settlements "
+        "WHERE result_code IS NOT NULL AND winning_sp > 0").fetchall()
+    con.close()
+    return {str(m): {"result_code": str(rc), "winning_sp": float(ws)}
+            for m, rc, ws in rows}

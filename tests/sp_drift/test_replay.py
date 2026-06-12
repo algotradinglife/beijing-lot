@@ -40,3 +40,22 @@ def test_band_haircut_lowers_sp_by_band_bias():
     # sp_3=2.5 (<3.5) unchanged; sp_1=3.4 (3.5-4.5? no, <3.5) ; sp_0=4.0 (3.5-4.5) ×0.75
     assert s.sp_3 == 2.5
     assert abs(s.sp_0 - 4.0 * 0.75) < 1e-9
+
+
+import sqlite3 as _sql
+
+from src.sp_drift.replay import actuals_from_db
+
+
+def test_actuals_from_db(tmp_path):
+    db = tmp_path / "live.db"
+    con = _sql.connect(db)
+    con.execute("CREATE TABLE settlements (match_id TEXT, result_code TEXT, winning_sp REAL)")
+    con.execute("INSERT INTO settlements VALUES ('A','0',3.0)")
+    con.execute("INSERT INTO settlements VALUES ('B','3',4.5)")
+    con.execute("INSERT INTO settlements VALUES ('C',NULL,0)")  # unsettled → skipped
+    con.commit(); con.close()
+    a = actuals_from_db(db)
+    assert a["A"] == {"result_code": "0", "winning_sp": 3.0}
+    assert a["B"]["winning_sp"] == 4.5
+    assert "C" not in a
