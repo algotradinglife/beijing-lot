@@ -26,3 +26,17 @@ def test_decision_snapshots_pivots_to_livesnapshot(tmp_path):
     assert s.sp_3 == 2.5 and s.sp_1 == 3.4 and s.sp_0 == 4.0
     assert s.league == "英超" and s.handicap_line == -1.0
     assert s.issue == "26099"
+
+
+from src.sp_drift.replay import apply_band_haircut
+
+
+def test_band_haircut_lowers_sp_by_band_bias():
+    snaps = decision_snapshots(_panel(), mtk_target=30)
+    # band map keyed by sp_band label; -0.10 means "expect final SP 10% lower"
+    hc = {"<3.5": 0.0, "3.5-4.5": -0.25, "5-8": -0.50}
+    out = apply_band_haircut(snaps, hc)
+    s = out[0]
+    # sp_3=2.5 (<3.5) unchanged; sp_1=3.4 (3.5-4.5? no, <3.5) ; sp_0=4.0 (3.5-4.5) ×0.75
+    assert s.sp_3 == 2.5
+    assert abs(s.sp_0 - 4.0 * 0.75) < 1e-9

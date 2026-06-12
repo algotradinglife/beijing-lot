@@ -39,3 +39,22 @@ def decision_snapshots(panel: pd.DataFrame, mtk_target: float) -> List[LiveSnaps
             snapshot_ts=None,
         ))
     return out
+
+
+from dataclasses import replace as _dc_replace
+
+from src.sp_drift.drift_stats import sp_band
+
+
+def apply_band_haircut(snaps: List[LiveSnapshot], band_bias: dict) -> List[LiveSnapshot]:
+    """Return new LiveSnapshots whose each-selection SP is adjusted toward its
+    expected final value: adjusted = sp × (1 + band_bias[band(sp)]). Missing
+    bands default to 0 (no change). band_bias values are signed (negative =
+    expected to drift down)."""
+    def adj(sp: Optional[float]) -> Optional[float]:
+        if sp is None or sp <= 0:
+            return sp
+        return sp * (1.0 + band_bias.get(sp_band(sp), 0.0))
+
+    return [_dc_replace(s, sp_3=adj(s.sp_3), sp_1=adj(s.sp_1), sp_0=adj(s.sp_0))
+            for s in snaps]
