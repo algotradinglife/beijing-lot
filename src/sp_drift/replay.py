@@ -107,20 +107,24 @@ def replay_policy(panel: pd.DataFrame, live_db_path: str | Path,
     bankroll = policy.start_bankroll
     weeks = []
     n_tickets = 0
+    n_hits = 0
     for issue in sorted(by_issue):
         pr = build_weekly_plan(
             by_issue[issue], bankroll=bankroll, niche_config=niche_config,
             n_legs=policy.n_legs, kelly_fraction=policy.kelly_fraction,
             combo_ev_threshold=policy.combo_ev_threshold,
             weekly_stake_cap_frac=policy.weekly_stake_cap_frac)
+        setts = settle_plans(pr.tickets, actuals)
         stake = float(sum(t.total_stake for t in pr.tickets))
-        pnl = float(sum(s.total_profit for s in settle_plans(pr.tickets, actuals)))
+        pnl = float(sum(s.total_profit for s in setts))
         n_tickets += len(pr.tickets)
+        n_hits += sum(1 for s in setts if s.all_hit)
         weeks.append((issue, stake, pnl))
         bankroll += pnl
 
     res = aggregate_equity(weeks, start_bankroll=policy.start_bankroll)
     res["n_tickets"] = n_tickets
+    res["n_hits"] = n_hits
     return res
 
 
