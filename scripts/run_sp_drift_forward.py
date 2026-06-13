@@ -1,0 +1,77 @@
+"""SP-drift forward-test runner → ledger + docs/research/sp_drift_forward.md.
+
+Run weekly (systemd timer) or manually:
+  PYTHONPATH=".:src" .venv/bin/python scripts/run_sp_drift_forward.py
+"""
+from datetime import date
+from pathlib import Path
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
+from src.phase5a.filter import NicheConfig
+from src.sp_drift import forward as F
+from src.sp_drift import panel as P
+
+LIVE, WEBUI = "data/beidan_live.db", "data/webui.db"
+CACHE = "data/derived/sp_drift/panel.parquet"
+LEDGER = "data/derived/sp_drift/forward_ledger.csv"
+OUT = Path("docs/research/sp_drift_forward.md")
+FIGDIR = Path("docs/research/figures")
+
+
+def main() -> None:
+    today = date.today().isoformat()
+    pan = P.build(LIVE, cache_path=CACHE, rebuild=True)
+    cfg = NicheConfig.load()
+    baseline = P.baseline_decision_mtk(WEBUI)
+    arms = F.build_arms(baseline_mtk=baseline, haircut_map=F.HAIRCUT_MAP)
+    rows = F.run_forward(pan, LIVE, cfg, arms, run_date=today, forward_start=F.FORWARD_START)
+    ledger = F.append_ledger(rows, LEDGER)
+    status = F.check_stopping_rule(ledger, F.FORWARD_START, today)
+
+    # cumulative ROI-by-arm over run_dates
+    FIGDIR.mkdir(parents=True, exist_ok=True)
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    for arm in ("C0", "C1", "C2"):
+        sub = ledger[ledger["arm"] == arm].sort_values("run_date")
+        ax.plot(sub["run_date"], sub["roi"] * 100, "o-", label=arm)
+    ax.axhline(0, color="k", lw=0.8)
+    ax.set_ylabel("cumulative ROI %")
+    ax.set_title("Forward-test ROI by arm (OOS, paper)")
+    ax.legend(); ax.grid(alpha=0.3)
+    plt.xticks(rotation=45, ha="right", fontsize=7)
+    fig.tight_layout()
+    fig.savefig(FIGDIR / "sp_drift_forward_roi.png", dpi=110)
+
+    latest = {r["arm"]: r for r in rows}
+    lines = [
+        "# SP 漂移 Forward-Test（纸面 · OOS）\n",
+        f"run_date={today}; FORWARD_START={F.FORWARD_START}; "
+        f"weeks_elapsed={status['weeks_elapsed']:.1f}\n",
+        "## 各 arm 累计（FORWARD_START 至今的样本外切片）\n",
+        "| arm | 组合 | 命中 | 总投注 | ROI | MaxDD |",
+        "|-----|------|------|--------|-----|-------|",
+        *[f"| {a} | {latest[a]['n_combos']} | {latest[a]['n_hits']} | "
+          f"{latest[a]['total_stake']:,.0f} | **{latest[a]['roi']*100:+.1f}%** | "
+          f"{latest[a]['max_dd']*100:.0f}% |" for a in ("C0", "C1", "C2")],
+        "",
+        "## 停止规则 / GATE-FT 状态\n",
+        f"- stop={status['stop']}  reason={status['reason']}  **verdict={status['verdict']}**",
+        f"- C2 组合数 {status['c2_n_combos']}/200 · 周数 {status['weeks_elapsed']:.1f}/12 · "
+        f"C2 MaxDD {status['c2_max_dd']*100:.0f}%/50%",
+        f"- ROI: C0 {status['c0_roi']*100:+.1f}% / C1 {status['c1_roi']*100:+.1f}% / "
+        f"C2 {status['c2_roi']*100:+.1f}%（go 需 C2>0 且 C2−C0≥5pp 且 C1−C0≥5pp）",
+        "",
+        "> 纸面、样本外、haircut 冻结在 GATE 1 值。样本初期很小，勿据早期数据下结论。",
+        "\n![forward roi](figures/sp_drift_forward_roi.png)\n",
+    ]
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text("\n".join(lines), encoding="utf-8")
+    print("\n".join(lines))
+    print(f"\nwrote {OUT} and appended {LEDGER}")
+
+
+if __name__ == "__main__":
+    main()
