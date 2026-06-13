@@ -54,6 +54,7 @@ curl -sS https://bootstrap.pypa.io/get-pip.py | .venv/bin/python   # 系统缺 e
 | `beidanlot-autocheck.service` + `.timer` | **oneshot + timer** | 每天 10:00 |
 | `cloudflared-trading.service` | 常驻 | `cloudflared tunnel --config <cfg> --metrics 127.0.0.1:20241 run` |
 | `cloudflared-watchdog.service` + `.timer` | **oneshot + timer** | 每 2 分钟，边缘连接为 0 就重启 tunnel |
+| `beidanlot-sp-forward.service` + `.timer` | **oneshot + timer** | 每周一 09:00，纸面 forward-test 评估，写 ledger + 报告 |
 
 > **⚠️ 关键纠正**：autoplan / autocheck 是**跑完即退的 one-shot 脚本**，绝不能配成 `Restart=always`
 > 常驻服务（会被 systemd 疯狂重启）。正确做法是 `Type=oneshot` service + `.timer` 定时触发，
