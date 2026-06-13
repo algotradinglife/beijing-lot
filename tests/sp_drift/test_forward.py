@@ -25,3 +25,29 @@ def test_build_arms_three_arms_with_expected_policies():
 
 def test_haircut_map_is_frozen_gate1_values():
     assert HAIRCUT_MAP["5-8"] == -0.36 and HAIRCUT_MAP["<3.5"] == 0.33
+
+
+from src.sp_drift.forward import LEDGER_COLS, append_ledger
+
+
+def _row(run_date, arm, roi):
+    return {"run_date": run_date, "arm": arm, "forward_start": "2026-06-13",
+            "n_combos": 10, "n_hits": 1, "total_stake": 100.0, "total_pnl": roi * 100.0,
+            "roi": roi, "max_dd": 0.1, "final_bankroll": 100000.0 + roi * 100.0}
+
+
+def test_append_ledger_creates_then_appends(tmp_path):
+    led = tmp_path / "ledger.csv"
+    append_ledger([_row("2026-06-20", "C0", 0.1)], led)
+    out = append_ledger([_row("2026-06-27", "C0", 0.2)], led)
+    assert list(out.columns) == LEDGER_COLS
+    assert set(out["run_date"]) == {"2026-06-20", "2026-06-27"}
+
+
+def test_append_ledger_is_idempotent_per_run_date(tmp_path):
+    led = tmp_path / "ledger.csv"
+    append_ledger([_row("2026-06-20", "C0", 0.1)], led)
+    # re-run same run_date with a corrected value → replaces, not duplicates
+    out = append_ledger([_row("2026-06-20", "C0", 0.5)], led)
+    sub = out[(out["run_date"] == "2026-06-20") & (out["arm"] == "C0")]
+    assert len(sub) == 1 and abs(float(sub.iloc[0]["roi"]) - 0.5) < 1e-9

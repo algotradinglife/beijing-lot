@@ -35,3 +35,23 @@ def build_arms(baseline_mtk: float, haircut_map: dict) -> List[Tuple[str, Policy
         ("C1", Policy(mtk_target=WINDOW_MTK)),
         ("C2", Policy(mtk_target=WINDOW_MTK, haircut=haircut_map)),
     ]
+
+
+LEDGER_COLS = ["run_date", "arm", "forward_start", "n_combos", "n_hits",
+               "total_stake", "total_pnl", "roi", "max_dd", "final_bankroll"]
+
+
+def append_ledger(rows: List[dict], ledger_path: str | Path) -> pd.DataFrame:
+    """Append rows to the append-only ledger CSV. Idempotent per run_date:
+    re-writing an existing run_date replaces those rows (so re-runs don't dup)."""
+    ledger_path = Path(ledger_path)
+    new = pd.DataFrame(rows, columns=LEDGER_COLS)
+    if ledger_path.exists():
+        old = pd.read_csv(ledger_path)
+        old = old[~old["run_date"].isin(set(new["run_date"]))]
+        out = pd.concat([old, new], ignore_index=True)
+    else:
+        ledger_path.parent.mkdir(parents=True, exist_ok=True)
+        out = new
+    out.to_csv(ledger_path, index=False)
+    return out
