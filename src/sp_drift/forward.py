@@ -6,6 +6,7 @@ Pre-registered (do not change mid-test):
 """
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -55,3 +56,46 @@ def append_ledger(rows: List[dict], ledger_path: str | Path) -> pd.DataFrame:
         out = new
     out.to_csv(ledger_path, index=False)
     return out
+
+
+# GATE-FT thresholds (pre-registered, frozen).
+MIN_COMBOS = 200
+MAX_WEEKS = 12.0
+MAXDD_STOP = 0.50
+MARGIN = 0.05  # C2-C0 and C1-C0 ROI margin required for a "go"
+
+
+def check_stopping_rule(ledger_df: pd.DataFrame, forward_start: str, today: str) -> dict:
+    """Evaluate the pre-registered stopping rule and GATE-FT verdict on the
+    latest run_date's arm rows. See spec §3/§7."""
+    latest = ledger_df[ledger_df["run_date"] == ledger_df["run_date"].max()]
+    by_arm = {r["arm"]: r for _, r in latest.iterrows()}
+
+    def roi(arm: str) -> float:
+        r = by_arm.get(arm)
+        return float(r["roi"]) if r is not None else float("nan")
+
+    c2 = by_arm.get("C2")
+    c2_n = int(c2["n_combos"]) if c2 is not None else 0
+    c2_dd = float(c2["max_dd"]) if c2 is not None else 0.0
+    weeks = (date.fromisoformat(today) - date.fromisoformat(forward_start)).days / 7.0
+
+    stop, reason, verdict = False, "running", "pending"
+    if c2_dd > MAXDD_STOP:
+        stop, reason, verdict = True, "maxdd_stop", "no_go"
+    elif c2_n >= MIN_COMBOS:
+        stop, reason = True, "n_combos>=200"
+    elif weeks >= MAX_WEEKS:
+        stop, reason = True, "weeks>=12"
+
+    if stop and verdict == "pending":
+        if roi("C2") > 0 and (roi("C2") - roi("C0")) >= MARGIN and (roi("C1") - roi("C0")) >= MARGIN:
+            verdict = "go"
+        elif roi("C2") <= 0:
+            verdict = "no_go"
+        else:
+            verdict = "uncertain"
+
+    return dict(stop=stop, reason=reason, verdict=verdict,
+                c0_roi=roi("C0"), c1_roi=roi("C1"), c2_roi=roi("C2"),
+                c2_n_combos=c2_n, weeks_elapsed=weeks, c2_max_dd=c2_dd)

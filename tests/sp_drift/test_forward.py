@@ -51,3 +51,37 @@ def test_append_ledger_is_idempotent_per_run_date(tmp_path):
     out = append_ledger([_row("2026-06-20", "C0", 0.5)], led)
     sub = out[(out["run_date"] == "2026-06-20") & (out["arm"] == "C0")]
     assert len(sub) == 1 and abs(float(sub.iloc[0]["roi"]) - 0.5) < 1e-9
+
+
+from src.sp_drift.forward import check_stopping_rule
+
+
+def _ledger(c0_roi, c1_roi, c2_roi, c2_n=10, c2_dd=0.1, run_date="2026-06-20"):
+    rows = []
+    for arm, roi, n, dd in [("C0", c0_roi, 10, 0.1), ("C1", c1_roi, 10, 0.1),
+                            ("C2", c2_roi, c2_n, c2_dd)]:
+        rows.append({"run_date": run_date, "arm": arm, "forward_start": "2026-06-13",
+                     "n_combos": n, "n_hits": 1, "total_stake": 1.0, "total_pnl": 0.0,
+                     "roi": roi, "max_dd": dd, "final_bankroll": 1.0})
+    return pd.DataFrame(rows)
+
+
+def test_stopping_maxdd_triggers_no_go():
+    res = check_stopping_rule(_ledger(0.0, 0.1, 0.1, c2_dd=0.6), "2026-06-13", "2026-06-20")
+    assert res["stop"] and res["reason"] == "maxdd_stop" and res["verdict"] == "no_go"
+
+
+def test_stopping_n_combos_go_when_margins_met():
+    res = check_stopping_rule(_ledger(0.0, 0.10, 0.12, c2_n=220), "2026-06-13", "2026-07-01")
+    assert res["stop"] and res["reason"] == "n_combos>=200" and res["verdict"] == "go"
+
+
+def test_stopping_n_combos_no_go_when_c2_negative():
+    res = check_stopping_rule(_ledger(0.0, 0.10, -0.05, c2_n=220), "2026-06-13", "2026-07-01")
+    assert res["stop"] and res["verdict"] == "no_go"
+
+
+def test_stopping_running_pending_before_thresholds():
+    res = check_stopping_rule(_ledger(0.0, 0.1, 0.1, c2_n=10), "2026-06-13", "2026-06-20")
+    assert not res["stop"] and res["verdict"] == "pending"
+    assert abs(res["weeks_elapsed"] - 1.0) < 1e-9
