@@ -12,7 +12,7 @@ from typing import List, Optional, Tuple
 
 import pandas as pd
 
-from src.sp_drift.replay import Policy
+from src.sp_drift.replay import Policy, replay_policy
 
 FORWARD_START = "2026-06-13"  # naive Beijing date; kickoffs after this are OOS
 
@@ -99,3 +99,22 @@ def check_stopping_rule(ledger_df: pd.DataFrame, forward_start: str, today: str)
     return dict(stop=stop, reason=reason, verdict=verdict,
                 c0_roi=roi("C0"), c1_roi=roi("C1"), c2_roi=roi("C2"),
                 c2_n_combos=c2_n, weeks_elapsed=weeks, c2_max_dd=c2_dd)
+
+
+def run_forward(panel: pd.DataFrame, live_db_path, niche_config,
+                arms: List[Tuple[str, Policy]], run_date: str,
+                forward_start: str = FORWARD_START) -> List[dict]:
+    """Replay each arm on the OOS (forward) slice and return one ledger row per
+    arm. Reuses replay_policy (qualify on decision SP, settle on real SP)."""
+    fp = forward_panel(panel, forward_start)
+    rows: List[dict] = []
+    for name, pol in arms:
+        res = replay_policy(fp, live_db_path, niche_config, pol)
+        rows.append({
+            "run_date": run_date, "arm": name, "forward_start": forward_start,
+            "n_combos": res["n_tickets"], "n_hits": res["n_hits"],
+            "total_stake": res["total_stake"], "total_pnl": res["total_pnl"],
+            "roi": res["roi"], "max_dd": res["max_dd"],
+            "final_bankroll": res["final_bankroll"],
+        })
+    return rows

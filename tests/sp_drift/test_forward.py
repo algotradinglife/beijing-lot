@@ -85,3 +85,45 @@ def test_stopping_running_pending_before_thresholds():
     res = check_stopping_rule(_ledger(0.0, 0.1, 0.1, c2_n=10), "2026-06-13", "2026-06-20")
     assert not res["stop"] and res["verdict"] == "pending"
     assert abs(res["weeks_elapsed"] - 1.0) < 1e-9
+
+
+import sqlite3
+
+from src.sp_drift import panel as P
+from src.sp_drift.forward import run_forward
+from src.phase5a.filter import NicheConfig
+
+
+def _forward_db(tmp_path):
+    db = tmp_path / "live.db"
+    con = sqlite3.connect(db)
+    con.executescript(
+        "CREATE TABLE matches (match_id TEXT PRIMARY KEY, issue TEXT, match_idx INTEGER,"
+        " league TEXT, kickoff_ts TEXT, home TEXT, away TEXT, handicap_line REAL);"
+        "CREATE TABLE snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, match_id TEXT,"
+        " snapshot_ts TEXT, sp_3 REAL, sp_1 REAL, sp_0 REAL, vol_pct_3 REAL,"
+        " vol_pct_1 REAL, vol_pct_0 REAL, pool_total REAL);"
+        "CREATE TABLE settlements (match_id TEXT, result_code TEXT, winning_sp REAL);")
+    # 6 forward-dated matches (kickoff after FORWARD_START), snapshot ~1h before
+    for i in range(1, 7):
+        con.execute("INSERT INTO matches VALUES (?,?,?,?,?,?,?,?)",
+                    (f"M{i}", "26099", i, "挪超", "2026-06-20T19:35:00", "H", "A", 1.0))
+        con.execute("INSERT INTO snapshots (match_id,snapshot_ts,sp_3,sp_1,sp_0,"
+                    "vol_pct_3,vol_pct_1,vol_pct_0,pool_total) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (f"M{i}", "2026-06-20T10:35:00Z", 6.0, 3.4, 1.6, 0, 0, 0, 1000))
+        con.execute("INSERT INTO settlements VALUES (?,?,?)", (f"M{i}", "3", 6.0))
+    con.commit(); con.close()
+    return db
+
+
+def test_run_forward_returns_one_row_per_arm(tmp_path):
+    db = _forward_db(tmp_path)
+    pan = P.build(db, cache_path=tmp_path / "p.parquet", rebuild=True)
+    arms = build_arms(baseline_mtk=600.0, haircut_map=HAIRCUT_MAP)
+    rows = run_forward(pan, db, NicheConfig.load(), arms,
+                       run_date="2026-06-21", forward_start="2026-06-13")
+    assert len(rows) == 3
+    assert {r["arm"] for r in rows} == {"C0", "C1", "C2"}
+    r0 = rows[0]
+    assert set(LEDGER_COLS) <= set(r0)               # every ledger column present
+    assert r0["forward_start"] == "2026-06-13" and r0["run_date"] == "2026-06-21"
