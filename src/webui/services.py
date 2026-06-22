@@ -83,6 +83,47 @@ N_LEGS = 4
 KELLY_FRACTION = 1 / 16
 
 
+# Concentration guardrail defaults. A plan built from very few qualified legs,
+# or one whose single most-frequent leg sits in too large a share of tickets,
+# is really a concentrated bet on a handful of legs dressed up as many tickets.
+# History: max-concentration >= 60% plans ran ~-40% ROI.
+MIN_QUALIFIED_LEGS = 13
+MAX_CONCENTRATION_PCT = 60.0
+
+
+def leg_concentration_pct(tickets) -> float:
+    """Largest share (%) of tickets that any single leg (match_id+selection)
+    appears in. 0 for an empty plan. 100 means one leg is in every ticket."""
+    tickets = list(tickets)
+    n = len(tickets)
+    if n == 0:
+        return 0.0
+    counts: Counter = Counter()
+    for t in tickets:
+        for leg in t.get("legs", []):
+            counts[(leg.get("match_id"), str(leg.get("selection")))] += 1
+    if not counts:
+        return 0.0
+    return 100.0 * max(counts.values()) / n
+
+
+def passes_concentration_guard(
+    *, n_qualified_legs: int, concentration_max_pct: float,
+    min_legs: int = MIN_QUALIFIED_LEGS,
+    max_concentration_pct: float = MAX_CONCENTRATION_PCT,
+) -> Tuple[bool, str]:
+    """Whether a plan is diversified enough to auto-place. Returns (ok, reason);
+    reason is '' when ok."""
+    if n_qualified_legs < min_legs:
+        return False, (f"too few qualified legs ({n_qualified_legs} < "
+                       f"{min_legs})")
+    if concentration_max_pct > max_concentration_pct:
+        return False, (f"leg concentration too high "
+                       f"({concentration_max_pct:.0f}% > "
+                       f"{max_concentration_pct:.0f}%)")
+    return True, ""
+
+
 def select_current_issue(snapshots) -> Optional[str]:
     """Pick the single issue a plan should be built from.
 
@@ -447,6 +488,11 @@ def generate_plan(
             kelly_fraction=kelly_fraction,
             n_open_matches=len(snapshots),
             n_qualified_legs=n_qual_legs,
+            concentration_max_pct=round(leg_concentration_pct(merged_tickets), 1),
+            effective_n_legs=len({
+                (lg.get("match_id"), str(lg.get("selection")))
+                for t in merged_tickets for lg in t.get("legs", [])
+            }),
             total_stake=total_stake,
             expected_total_return=expected_return,
             tickets=merged_tickets,
