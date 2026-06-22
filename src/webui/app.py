@@ -492,6 +492,40 @@ def create_app(
             return jsonify(ok=False, error=f"unknown strategy {sid!r}"), 400
         return jsonify(ok=True, sid=s.sid, name=s.name)
 
+    @app.route("/api/q_monitor")
+    def api_q_monitor():
+        """Rolling live quality by league + option from settled placed legs,
+        with the leagues whose live q is low enough (and sample big enough) to
+        auto-downweight."""
+        db = get_db()
+        legs = services.collect_settled_legs(db, app.config["LIVE_DB"])
+        buckets = services.q_buckets(legs)
+        buckets["overall"] = services._q_stat(legs)
+        buckets["downweight_candidates"] = [
+            dict(league=lg, reason=r)
+            for lg, r in services.select_downweight_leagues(buckets["by_league"])
+        ]
+        return jsonify(buckets)
+
+    @app.route("/q_monitor/apply_downweight", methods=["POST"])
+    def q_monitor_apply_downweight():
+        """Add the low-q leagues to the temporary blacklist, recording why."""
+        db = get_db()
+        legs = services.collect_settled_legs(db, app.config["LIVE_DB"])
+        buckets = services.q_buckets(legs)
+        picked = services.select_downweight_leagues(buckets["by_league"])
+        current = set(services._parse_blacklist(db.get_config("league_blacklist")))
+        added = []
+        for league, reason in picked:
+            if league not in current:
+                current.add(league)
+                added.append(league)
+                db.auto_log("q_monitor", "info",
+                            f"自动降权(拉黑) {league}: {reason}", _utcnow_iso())
+        db.set_config("league_blacklist", ",".join(sorted(current)))
+        return jsonify(ok=True, added=added,
+                       blacklist=sorted(current))
+
     @app.route("/strategy_params", methods=["GET", "POST"])
     def strategy_params():
         """Edit策略参数: N, Kelly fraction, diversity_lambda."""

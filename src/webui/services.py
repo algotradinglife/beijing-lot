@@ -124,6 +124,97 @@ def passes_concentration_guard(
     return True, ""
 
 
+def _q_stat(legs: list) -> dict:
+    """Aggregate one bucket of settled legs into n/hits/hit_rate/avg_sp/q.
+    q = realized per-leg return multiple = RETURN_RATE × (Σ winning-leg SP)/n."""
+    n = len(legs)
+    if n == 0:
+        return dict(n=0, hits=0, hit_rate=0.0, avg_sp=0.0, q=0.0)
+    hits = sum(1 for lg in legs if lg.get("hit"))
+    sum_sp = sum(float(lg.get("sp") or 0) for lg in legs)
+    sum_hit_sp = sum(float(lg.get("sp") or 0) for lg in legs if lg.get("hit"))
+    return dict(
+        n=n, hits=hits,
+        hit_rate=round(hits / n, 4),
+        avg_sp=round(sum_sp / n, 4),
+        q=round(RETURN_RATE * sum_hit_sp / n, 4),
+    )
+
+
+def q_buckets(legs: list) -> dict:
+    """Group settled legs by league and by option (selection), each summarised
+    by _q_stat. Each leg: {league, selection, sp, hit:bool}."""
+    by_league: dict = {}
+    by_option: dict = {}
+    for lg in legs:
+        by_league.setdefault(lg.get("league") or "", []).append(lg)
+        by_option.setdefault(str(lg.get("selection")), []).append(lg)
+    return dict(
+        by_league={k: _q_stat(v) for k, v in by_league.items()},
+        by_option={k: _q_stat(v) for k, v in by_option.items()},
+    )
+
+
+def select_downweight_leagues(by_league: dict, *, min_n: int = 8,
+                              q_threshold: float = 0.7) -> list:
+    """Pick leagues to temporarily blacklist: enough live sample AND low q.
+    Returns [(league, reason)]. Thin-sample leagues are left alone (warn-only)."""
+    out = []
+    for league, st in by_league.items():
+        if not league:
+            continue
+        if st["n"] >= min_n and st["q"] < q_threshold:
+            out.append((league, f"live q={st['q']:.2f} < {q_threshold:.2f} "
+                                 f"over n={st['n']} legs (hit_rate "
+                                 f"{st['hit_rate']:.0%}, avg_sp {st['avg_sp']:.2f})"))
+    return out
+
+
+def collect_settled_legs(db: "WebuiDB", live_db_path: str | Path) -> list:
+    """Every distinct (plan, match) leg from settled plans, tagged with its
+    settlement hit/miss. Used by the live q monitor."""
+    live_path = Path(live_db_path)
+    if not live_path.exists():
+        return []
+    settle: dict = {}
+    with sqlite3.connect(str(live_path)) as lc:
+        for mid, rc in lc.execute(
+            "SELECT match_id, result_code FROM settlements "
+            "WHERE result_code IS NOT NULL"
+        ).fetchall():
+            settle[str(mid)] = str(rc)
+    out = []
+    for p in db.list_plans():
+        pid = p["plan_id"]
+        if not db.has_settlement(pid):
+            continue
+        meta = db.get_plan(pid)
+        if not meta:
+            continue
+        seen = set()
+        for t in meta.get("plan", {}).get("tickets", []):
+            for leg in t.get("legs", []):
+                mid = leg.get("match_id")
+                raw_sel = leg.get("selection")
+                if mid is None or raw_sel is None:
+                    continue
+                mid = str(mid)
+                key = (pid, mid)
+                if key in seen or mid not in settle:
+                    continue
+                try:
+                    sp = float(leg.get("sp") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if sp <= 0:
+                    continue
+                seen.add(key)
+                sel = str(raw_sel)
+                out.append(dict(league=leg.get("league") or "", selection=sel,
+                                sp=sp, hit=(settle[mid] == sel)))
+    return out
+
+
 def select_current_issue(snapshots) -> Optional[str]:
     """Pick the single issue a plan should be built from.
 
