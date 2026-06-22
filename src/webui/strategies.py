@@ -145,3 +145,24 @@ def _kelly_to_frac(k) -> str:
 
 def lookup(sid: str) -> Optional[Strategy]:
     return REGISTRY.get(sid)
+
+
+def apply_strategy(db, sid: str) -> Strategy:
+    """Write a registry preset into ``db`` config as the single source of truth.
+
+    Sets exactly the keys ``generate_plan`` reads on the mix path, so the
+    running params round-trip back to this same preset via ``match_strategy``.
+    Raises KeyError for an unknown sid.
+    """
+    s = REGISTRY.get(sid)
+    if s is None:
+        raise KeyError(f"unknown strategy {sid!r}")
+    db.set_config("mix_enabled", 1)
+    for i, n in enumerate((2, 3, 4, 5)):
+        db.set_config(f"mix_weight_n{n}", s.weights[i])
+        db.set_config(f"kelly_n{n}", s.kelly[i])
+        db.set_config(f"lambda_n{n}", s.lambdas[i])
+    db.set_config("max_combos", s.max_combos)
+    db.set_config("league_q_min", s.league_q_min)
+    db.set_config("cross_n_lambda", s.cross_n_lambda)
+    return s
