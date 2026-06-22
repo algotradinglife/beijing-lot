@@ -124,6 +124,19 @@ def passes_concentration_guard(
     return True, ""
 
 
+def maybe_haircut_snapshots(snaps, enabled: bool):
+    """When enabled, shift each leg's SP toward its expected settlement value
+    using the frozen GATE-1 band map, so EV/Kelly sizing prices in SP drift
+    (longshot bands shrink → smaller/zero stake). Identity when disabled.
+    Default OFF — pending forward-test (GATE-FT) validation. See
+    docs/research/sp_drift_phase4.md and src/sp_drift/forward.py (C2 arm)."""
+    if not enabled:
+        return snaps
+    from src.sp_drift.forward import HAIRCUT_MAP
+    from src.sp_drift.replay import apply_band_haircut
+    return apply_band_haircut(list(snaps), HAIRCUT_MAP)
+
+
 def _q_stat(legs: list) -> dict:
     """Aggregate one bucket of settled legs into n/hits/hit_rate/avg_sp/q.
     q = realized per-leg return multiple = RETURN_RATE × (Σ winning-leg SP)/n."""
@@ -486,6 +499,12 @@ def generate_plan(
                 "generate_plan: filtered %d already-bet matches from snapshot pool",
                 before - len(snapshots),
             )
+    # Optional SP-drift haircut: price each leg's expected settlement SP into
+    # EV/sizing so longshot bands (which drift down) get a smaller stake.
+    # Default OFF — pending forward-test (GATE-FT) validation.
+    haircut_enabled = bool(int(db.get_config("haircut_enabled") or 0))
+    snapshots = maybe_haircut_snapshots(snapshots, haircut_enabled)
+
     # Read user-tunable strategy params from config (defaults locked from analysis)
     n_legs = int(db.get_config("n_legs") or N_LEGS)
     kelly_fraction = float(db.get_config("kelly_fraction") or KELLY_FRACTION)
