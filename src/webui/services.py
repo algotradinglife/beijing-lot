@@ -81,6 +81,65 @@ from .db import WebuiDB
 # Strategy constants
 N_LEGS = 4
 KELLY_FRACTION = 1 / 16
+
+
+# Concentration guardrail defaults. A plan built from very few qualified legs,
+# or one whose single most-frequent leg sits in too large a share of tickets,
+# is really a concentrated bet on a handful of legs dressed up as many tickets.
+# History: max-concentration >= 60% plans ran ~-40% ROI.
+MIN_QUALIFIED_LEGS = 13
+MAX_CONCENTRATION_PCT = 60.0
+
+
+def leg_concentration_pct(tickets) -> float:
+    """Largest share (%) of tickets that any single leg (match_id+selection)
+    appears in. 0 for an empty plan. 100 means one leg is in every ticket."""
+    tickets = list(tickets)
+    n = len(tickets)
+    if n == 0:
+        return 0.0
+    counts: Counter = Counter()
+    for t in tickets:
+        for leg in t.get("legs", []):
+            counts[(leg.get("match_id"), str(leg.get("selection")))] += 1
+    if not counts:
+        return 0.0
+    return 100.0 * max(counts.values()) / n
+
+
+def passes_concentration_guard(
+    *, n_qualified_legs: int, concentration_max_pct: float,
+    min_legs: int = MIN_QUALIFIED_LEGS,
+    max_concentration_pct: float = MAX_CONCENTRATION_PCT,
+) -> Tuple[bool, str]:
+    """Whether a plan is diversified enough to auto-place. Returns (ok, reason);
+    reason is '' when ok."""
+    if n_qualified_legs < min_legs:
+        return False, (f"too few qualified legs ({n_qualified_legs} < "
+                       f"{min_legs})")
+    if concentration_max_pct > max_concentration_pct:
+        return False, (f"leg concentration too high "
+                       f"({concentration_max_pct:.0f}% > "
+                       f"{max_concentration_pct:.0f}%)")
+    return True, ""
+
+
+def select_current_issue(snapshots) -> Optional[str]:
+    """Pick the single issue a plan should be built from.
+
+    A combo must never mix legs across 北单 issues (a parlay spanning two draws
+    is not a real bet). We choose the issue with the most open matches — the
+    slate we actually have — tie-broken toward the larger/newer issue string so
+    leftover stragglers from a previous issue never dominate. Blank issues are
+    ignored. Returns None when there is nothing to bet.
+    """
+    counts = Counter(
+        s.issue for s in snapshots if getattr(s, "issue", None)
+    )
+    if not counts:
+        return None
+    # Most matches wins; ties resolve toward the newer (larger) issue string.
+    return max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
 PER_COMBO_STAKE_CAP_FRAC = 0.005
 WEEKLY_STAKE_CAP_FRAC = 0.25
 PROFIT_LOCK_TRIGGER = 2.0
@@ -286,6 +345,20 @@ def generate_plan(
     cfg = niche_config or NicheConfig.load(league_q_min=league_q_min, league_blacklist=league_blacklist)
     snapshots = load_open_matches(live_db_path, now=now)
 
+    # Single-issue guard: the open-match window can span two 北单 issues (a
+    # straggler from the previous draw plus the current one). A combo must never
+    # mix issues, so restrict the pool to the current issue before anything else.
+    current_issue = select_current_issue(snapshots)
+    if current_issue is not None:
+        before = len(snapshots)
+        snapshots = [s for s in snapshots if s.issue == current_issue]
+        if before != len(snapshots):
+            logging.getLogger(__name__).warning(
+                "generate_plan: dropped %d leg(s) from other issues; "
+                "pinned plan to issue %s",
+                before - len(snapshots), current_issue,
+            )
+
     # Kickoff window filter: only include matches starting within X hours from now.
     # 0 (default) = no filter (all open matches in the 7-day window are included).
     kickoff_window_hours = float(db.get_config("kickoff_window_hours") or 0.0)
@@ -393,15 +466,11 @@ def generate_plan(
             n_qual_legs = max(n_qual_legs, pn.get("n_qualified_legs", 0))
         # Build merged plan dict — id = 北单 issue (e.g. "26052") with
         # collision suffix `-2` / `-3` for re-generations of the same issue.
-        # Falls back to YYYY-MM-DD if no snapshot is available.
-        base = None
-        for snap in snapshots:
-            iss = getattr(snap, "issue", None)
-            if iss:
-                base = str(iss)
-                break
-        if not base:
-            base = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+        # Uses the same pinned current_issue the pool was filtered to, so the
+        # plan_id and every leg's match_id prefix always agree. Falls back to
+        # YYYY-MM-DD if no snapshot is available.
+        base = current_issue or (
+            now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
         existing = {p["plan_id"] for p in db.list_plans()}
         wk = base
         if wk in existing:
@@ -419,6 +488,11 @@ def generate_plan(
             kelly_fraction=kelly_fraction,
             n_open_matches=len(snapshots),
             n_qualified_legs=n_qual_legs,
+            concentration_max_pct=round(leg_concentration_pct(merged_tickets), 1),
+            effective_n_legs=len({
+                (lg.get("match_id"), str(lg.get("selection")))
+                for t in merged_tickets for lg in t.get("legs", [])
+            }),
             total_stake=total_stake,
             expected_total_return=expected_return,
             tickets=merged_tickets,

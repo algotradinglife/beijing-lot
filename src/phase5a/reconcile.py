@@ -49,17 +49,29 @@ class ReconcileResult:
 
 
 def _ticket_settles(legs: list[dict], settlements: dict[str, dict]) -> tuple[Optional[bool], int]:
-    """Return (all_hit | None if pending, n_settled_legs)."""
+    """Return (all_hit | None if pending, n_settled_legs).
+
+    A combo ticket loses the moment ANY leg is settled-and-lost — even if other
+    legs are still unsettled (a parlay with a dead leg can no longer pay). So we
+    scan every leg: if any settled leg missed, the ticket is already lost. Only
+    a ticket with no lost leg and at least one unsettled leg is truly pending.
+    """
     n_settled = 0
-    all_hit = True
+    any_lost = False
+    any_unsettled = False
     for leg in legs:
         s = settlements.get(leg["match_id"])
         if s is None or s.get("result_code") in (None, "", "None"):
-            return None, n_settled
+            any_unsettled = True
+            continue
         n_settled += 1
         if str(s["result_code"]) != str(leg["selection"]):
-            all_hit = False
-    return all_hit, n_settled
+            any_lost = True
+    if any_lost:
+        return False, n_settled
+    if any_unsettled:
+        return None, n_settled
+    return True, n_settled
 
 
 def reconcile_plan(
@@ -88,18 +100,19 @@ def reconcile_plan(
             )
             res.pending += 1
             continue
+        # joint_sp only matters for a winning ticket; a lost ticket pays 0 and
+        # may legitimately contain an unsettled leg (absent from settlements),
+        # so only walk the legs when all_hit.
         joint_sp = 1.0
         missing_wsp = False
-        for leg in legs:
-            s = settlements[leg["match_id"]]
-            if all_hit:
+        if all_hit:
+            for leg in legs:
+                s = settlements[leg["match_id"]]
                 wsp = s.get("winning_sp")
                 if not wsp:  # None or 0 — settlement SP not scraped yet
                     missing_wsp = True
                     break
                 joint_sp *= float(wsp)
-            else:
-                joint_sp *= float(leg["sp"])
 
         if all_hit and missing_wsp:
             res.ticket_outcomes.append(

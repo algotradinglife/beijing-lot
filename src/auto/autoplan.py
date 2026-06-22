@@ -270,6 +270,37 @@ def run(
         db.set_config("auto_last_plan_at", _now_iso())
         return 0
 
+    # Concentration guardrail: a plan built from too few qualified legs, or one
+    # whose single most-frequent leg sits in too large a share of tickets, is a
+    # concentrated bet dressed up as many tickets (history: >=60% conc ran
+    # ~-40% ROI). Don't auto-place it.
+    n_qual = int(plan.get("n_qualified_legs", 0))
+    conc = float(plan.get("concentration_max_pct", 0.0))
+    ok, guard_reason = services.passes_concentration_guard(
+        n_qualified_legs=n_qual, concentration_max_pct=conc)
+    if not ok and not force:
+        orphan_id = plan.get("plan_id")
+        if orphan_id:
+            try:
+                db.delete_plan(orphan_id)
+                orphan_json = plans_dir / f"{orphan_id}.json"
+                if orphan_json.exists():
+                    orphan_json.unlink()
+            except Exception as e:  # pragma: no cover
+                log.warning("orphan cleanup failed for %s: %s", orphan_id, e)
+        msg = (f"集中度风控跳过: {guard_reason}（合格腿 {n_qual}, "
+               f"单腿最高占比 {conc:.0f}%）")
+        log.info(msg)
+        db.auto_log("autoplan", "info", msg, _now_iso(),
+                    details=dict(reason="concentration_guard",
+                                 n_qualified_legs=n_qual,
+                                 concentration_max_pct=conc,
+                                 guard_reason=guard_reason,
+                                 orphan_cleaned=orphan_id))
+        db.set_config("auto_last_plan_status", "skipped_concentration")
+        db.set_config("auto_last_plan_at", _now_iso())
+        return 0
+
     # Mark as placed (assumed-placed mode).
     plan_id = plan["plan_id"]
     db.mark_placed(plan_id, _now_iso(), actual=None)
