@@ -81,6 +81,24 @@ from .db import WebuiDB
 # Strategy constants
 N_LEGS = 4
 KELLY_FRACTION = 1 / 16
+
+
+def select_current_issue(snapshots) -> Optional[str]:
+    """Pick the single issue a plan should be built from.
+
+    A combo must never mix legs across 北单 issues (a parlay spanning two draws
+    is not a real bet). We choose the issue with the most open matches — the
+    slate we actually have — tie-broken toward the larger/newer issue string so
+    leftover stragglers from a previous issue never dominate. Blank issues are
+    ignored. Returns None when there is nothing to bet.
+    """
+    counts = Counter(
+        s.issue for s in snapshots if getattr(s, "issue", None)
+    )
+    if not counts:
+        return None
+    # Most matches wins; ties resolve toward the newer (larger) issue string.
+    return max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
 PER_COMBO_STAKE_CAP_FRAC = 0.005
 WEEKLY_STAKE_CAP_FRAC = 0.25
 PROFIT_LOCK_TRIGGER = 2.0
@@ -286,6 +304,20 @@ def generate_plan(
     cfg = niche_config or NicheConfig.load(league_q_min=league_q_min, league_blacklist=league_blacklist)
     snapshots = load_open_matches(live_db_path, now=now)
 
+    # Single-issue guard: the open-match window can span two 北单 issues (a
+    # straggler from the previous draw plus the current one). A combo must never
+    # mix issues, so restrict the pool to the current issue before anything else.
+    current_issue = select_current_issue(snapshots)
+    if current_issue is not None:
+        before = len(snapshots)
+        snapshots = [s for s in snapshots if s.issue == current_issue]
+        if before != len(snapshots):
+            logging.getLogger(__name__).warning(
+                "generate_plan: dropped %d leg(s) from other issues; "
+                "pinned plan to issue %s",
+                before - len(snapshots), current_issue,
+            )
+
     # Kickoff window filter: only include matches starting within X hours from now.
     # 0 (default) = no filter (all open matches in the 7-day window are included).
     kickoff_window_hours = float(db.get_config("kickoff_window_hours") or 0.0)
@@ -393,15 +425,11 @@ def generate_plan(
             n_qual_legs = max(n_qual_legs, pn.get("n_qualified_legs", 0))
         # Build merged plan dict — id = 北单 issue (e.g. "26052") with
         # collision suffix `-2` / `-3` for re-generations of the same issue.
-        # Falls back to YYYY-MM-DD if no snapshot is available.
-        base = None
-        for snap in snapshots:
-            iss = getattr(snap, "issue", None)
-            if iss:
-                base = str(iss)
-                break
-        if not base:
-            base = (now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+        # Uses the same pinned current_issue the pool was filtered to, so the
+        # plan_id and every leg's match_id prefix always agree. Falls back to
+        # YYYY-MM-DD if no snapshot is available.
+        base = current_issue or (
+            now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
         existing = {p["plan_id"] for p in db.list_plans()}
         wk = base
         if wk in existing:
