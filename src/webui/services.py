@@ -124,6 +124,57 @@ def passes_concentration_guard(
     return True, ""
 
 
+def kickoff_bucket_label(kickoff_ts: str, bucket_hours: float) -> Optional[str]:
+    """Map a kickoff timestamp (naive Beijing ISO) to a sortable bucket label
+    'MMDD-HHh' where HH is the start of its bucket_hours block. None if blank."""
+    if not kickoff_ts:
+        return None
+    try:
+        dt = datetime.strptime(kickoff_ts[:19], "%Y-%m-%dT%H:%M:%S")
+    except (ValueError, TypeError):
+        return None
+    block = int(dt.hour // bucket_hours * bucket_hours)
+    return f"{dt.month:02d}{dt.day:02d}-{block:02d}h"
+
+
+def assign_kickoff_buckets(snapshots, bucket_hours: float) -> dict:
+    """Group snapshots by kickoff bucket label, ordered by label. Snapshots with
+    a blank/invalid kickoff are dropped (can't be timed into a batch)."""
+    buckets: dict = {}
+    for s in snapshots:
+        label = kickoff_bucket_label(getattr(s, "kickoff_ts", None), bucket_hours)
+        if label is None:
+            continue
+        buckets.setdefault(label, []).append(s)
+    return {k: buckets[k] for k in sorted(buckets)}
+
+
+def generate_bucketed_plans(
+    db, *, live_db_path: str | Path, plans_dir: str | Path,
+    bucket_hours: float, niche_config: Optional[NicheConfig] = None,
+    now: Optional[datetime] = None,
+) -> List[Dict[str, Any]]:
+    """Generate one independent plan per kickoff bucket of the current issue.
+
+    Each bucket reuses generate_plan (so it inherits the single-issue pin,
+    anti-double-bet, concentration guard and stake logic) restricted to that
+    bucket's matches and tagged with an issue+bucket plan id. Returns the per
+    bucket plan dicts in kickoff order."""
+    snaps = load_open_matches(live_db_path, now=now)
+    issue = select_current_issue(snaps)
+    if issue is None:
+        return []
+    snaps = [s for s in snaps if s.issue == issue]
+    out: List[Dict[str, Any]] = []
+    for label, bsnaps in assign_kickoff_buckets(snaps, bucket_hours).items():
+        ids = {s.match_id for s in bsnaps}
+        out.append(generate_plan(
+            db, live_db_path=live_db_path, plans_dir=plans_dir,
+            niche_config=niche_config, now=now,
+            restrict_match_ids=ids, plan_id_suffix=label))
+    return out
+
+
 def maybe_haircut_snapshots(snaps, enabled: bool):
     """When enabled, shift each leg's SP toward its expected settlement value
     using the frozen GATE-1 band map, so EV/Kelly sizing prices in SP drift
@@ -433,11 +484,17 @@ def generate_plan(
     plans_dir: str | Path,
     niche_config: Optional[NicheConfig] = None,
     now: Optional[datetime] = None,
+    restrict_match_ids: Optional[set] = None,
+    plan_id_suffix: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run the planner against current Live Collector data and persist.
 
     Returns the plan dict (same shape as ``PlanResult.to_dict()``) plus
     a ``live_db_empty`` flag the UI uses for the empty-state banner.
+
+    ``restrict_match_ids`` limits the pool to one kickoff bucket; the resulting
+    plan id is tagged with ``plan_id_suffix`` so an issue can hold several
+    independent bucket plans (see generate_bucketed_plans).
     """
     state = get_state(db)
     if state.active <= 0:
@@ -462,6 +519,10 @@ def generate_plan(
                 "pinned plan to issue %s",
                 before - len(snapshots), current_issue,
             )
+
+    # Kickoff-bucket restriction: limit the pool to one batch of matches.
+    if restrict_match_ids is not None:
+        snapshots = [s for s in snapshots if s.match_id in restrict_match_ids]
 
     # Kickoff window filter: only include matches starting within X hours from now.
     # 0 (default) = no filter (all open matches in the 7-day window are included).
@@ -581,6 +642,8 @@ def generate_plan(
         # YYYY-MM-DD if no snapshot is available.
         base = current_issue or (
             now or datetime.now(timezone.utc)).strftime("%Y-%m-%d")
+        if plan_id_suffix:
+            base = f"{base}-{plan_id_suffix}"
         existing = {p["plan_id"] for p in db.list_plans()}
         wk = base
         if wk in existing:
