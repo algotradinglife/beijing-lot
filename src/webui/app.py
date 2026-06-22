@@ -38,7 +38,7 @@ from flask import (
 
 from . import services
 from .db import WebuiDB
-from .strategies import match_strategy
+from .strategies import REGISTRY, apply_strategy, match_strategy
 
 
 def _utcnow_iso() -> str:
@@ -465,6 +465,32 @@ def create_app(
             "commission_rate": c_snap,
         }
         return jsonify(cell)
+
+    @app.route("/api/strategies")
+    def api_strategies():
+        """Expose the strategy registry as JSON — the single source of truth the
+        frontend reads instead of hardcoding preset params."""
+        return jsonify({
+            sid: dict(sid=s.sid, name=s.name, weights=list(s.weights),
+                      kelly=list(s.kelly), lambdas=list(s.lambdas),
+                      max_combos=s.max_combos, league_q_min=s.league_q_min,
+                      cross_n_lambda=s.cross_n_lambda)
+            for sid, s in REGISTRY.items()
+        })
+
+    @app.route("/strategy/apply", methods=["POST"])
+    def strategy_apply():
+        """Apply a registry preset by sid — no hidden-param copying from the
+        page. Keeps UI, DB and plan_json in lock-step with the registry."""
+        db = get_db()
+        if not db.is_initialized():
+            return jsonify(ok=False, error="not_initialized"), 400
+        sid = (request.form.get("sid") or "").strip()
+        try:
+            s = apply_strategy(db, sid)
+        except KeyError:
+            return jsonify(ok=False, error=f"unknown strategy {sid!r}"), 400
+        return jsonify(ok=True, sid=s.sid, name=s.name)
 
     @app.route("/strategy_params", methods=["GET", "POST"])
     def strategy_params():
