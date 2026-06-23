@@ -29,12 +29,20 @@ def forward_panel(panel: pd.DataFrame, min_kickoff: str) -> pd.DataFrame:
 
 
 def build_arms(baseline_mtk: float, haircut_map: dict) -> List[Tuple[str, Policy]]:
-    """Three arms: C0 control (decide ~18h-out, no haircut), C1 window-only,
-    C2 window + frozen haircut."""
+    """Arms:
+    - SP-drift arms (drive GATE-FT): C0 control (decide ~18h-out, no haircut),
+      C1 window-only, C2 window + frozen haircut. C0 is the N=4 reference.
+    - N-sweep arms (descriptive, do not affect GATE-FT): N3 / N5 differ from C0
+      only in n_legs, isolating the leg-count effect on ROI / drift-compounding
+      (PnL attribution showed drift compounds with N). Same decision timing and
+      kelly as C0, no haircut.
+    """
     return [
         ("C0", Policy(mtk_target=baseline_mtk)),
         ("C1", Policy(mtk_target=WINDOW_MTK)),
         ("C2", Policy(mtk_target=WINDOW_MTK, haircut=haircut_map)),
+        ("N3", Policy(mtk_target=baseline_mtk, n_legs=3)),
+        ("N5", Policy(mtk_target=baseline_mtk, n_legs=5)),
     ]
 
 

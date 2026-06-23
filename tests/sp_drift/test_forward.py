@@ -13,14 +13,24 @@ def test_forward_panel_keeps_only_kickoffs_after_start():
     assert list(out["match_id"]) == ["B"]
 
 
-def test_build_arms_three_arms_with_expected_policies():
+def test_build_arms_drift_arms_with_expected_policies():
     arms = build_arms(baseline_mtk=1080.0, haircut_map=HAIRCUT_MAP)
-    names = [n for n, _ in arms]
-    assert names == ["C0", "C1", "C2"]
     by = dict(arms)
+    # SP-drift arms (unchanged): control + window + window/haircut
     assert by["C0"].mtk_target == 1080.0 and by["C0"].haircut is None
     assert by["C1"].mtk_target == 180.0 and by["C1"].haircut is None
     assert by["C2"].mtk_target == 180.0 and by["C2"].haircut == HAIRCUT_MAP
+
+
+def test_build_arms_includes_n_sweep_arms():
+    # N3/N5 isolate leg count: same decision timing as C0 (baseline, no
+    # haircut), only n_legs differs. C0 is the N=4 reference (Policy default).
+    arms = build_arms(baseline_mtk=1080.0, haircut_map=HAIRCUT_MAP)
+    by = dict(arms)
+    assert "N3" in by and "N5" in by
+    assert by["C0"].n_legs == 4
+    assert by["N3"].n_legs == 3 and by["N3"].mtk_target == 1080.0 and by["N3"].haircut is None
+    assert by["N5"].n_legs == 5 and by["N5"].mtk_target == 1080.0 and by["N5"].haircut is None
 
 
 def test_haircut_map_is_frozen_gate1_values():
@@ -122,8 +132,10 @@ def test_run_forward_returns_one_row_per_arm(tmp_path):
     arms = build_arms(baseline_mtk=600.0, haircut_map=HAIRCUT_MAP)
     rows = run_forward(pan, db, NicheConfig.load(), arms,
                        run_date="2026-06-21", forward_start="2026-06-13")
-    assert len(rows) == 3
-    assert {r["arm"] for r in rows} == {"C0", "C1", "C2"}
+    # one row per arm, whatever the arm set is
+    assert len(rows) == len(arms)
+    assert {r["arm"] for r in rows} == {n for n, _ in arms}
+    assert {"C0", "C1", "C2", "N3", "N5"} <= {r["arm"] for r in rows}
     r0 = rows[0]
     assert set(LEDGER_COLS) <= set(r0)               # every ledger column present
     assert r0["forward_start"] == "2026-06-13" and r0["run_date"] == "2026-06-21"

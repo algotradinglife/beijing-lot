@@ -31,10 +31,13 @@ def main() -> None:
     ledger = F.append_ledger(rows, LEDGER)
     status = F.check_stopping_rule(ledger, F.FORWARD_START, today)
 
+    # arms present in this run, in build order (C0/C1/C2 then N-sweep N3/N5)
+    arm_names = [r["arm"] for r in rows]
+
     # cumulative ROI-by-arm over run_dates
     FIGDIR.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(8, 4.5))
-    for arm in ("C0", "C1", "C2"):
+    for arm in arm_names:
         sub = ledger[ledger["arm"] == arm].sort_values("run_date")
         ax.plot(sub["run_date"], sub["roi"] * 100, "o-", label=arm)
     ax.axhline(0, color="k", lw=0.8)
@@ -55,7 +58,7 @@ def main() -> None:
         "|-----|------|------|--------|-----|-------|",
         *[f"| {a} | {latest[a]['n_combos']} | {latest[a]['n_hits']} | "
           f"{latest[a]['total_stake']:,.0f} | **{latest[a]['roi']*100:+.1f}%** | "
-          f"{latest[a]['max_dd']*100:.0f}% |" for a in ("C0", "C1", "C2")],
+          f"{latest[a]['max_dd']*100:.0f}% |" for a in arm_names],
         "",
         "## 停止规则 / GATE-FT 状态\n",
         f"- stop={status['stop']}  reason={status['reason']}  **verdict={status['verdict']}**",
@@ -65,6 +68,9 @@ def main() -> None:
         f"C2 {status['c2_roi']*100:+.1f}%（go 需 C2>0 且 C2−C0≥5pp 且 C1−C0≥5pp）",
         "",
         "> 纸面、样本外、haircut 冻结在 GATE 1 值。样本初期很小，勿据早期数据下结论。",
+        "> **N3 / N5 是描述性 N-sweep arm**（与 C0 同决策时机、仅 n_legs 不同），"
+        "用于观察腿数对 ROI/漂移的影响（盈亏归因显示漂移随 N 乘法放大）；"
+        "**不参与 GATE-FT 判定**（judging 仍只看 C0/C1/C2）。",
         "> ⚠️ **运营口径差**：C1/C2 的 window 是按期次池化、每场各取其「距开赛 180min」的 SP；"
         "实盘 `kickoff_window_hours` 是「距现在 N 小时内开赛」的同时性过滤，二者不等价。"
         "经 P1 权衡分析（2026-06-14）：受 N=4 需 ≥30 场同时在池约束，任何窗口值都无法两全"
