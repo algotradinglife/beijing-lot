@@ -245,3 +245,36 @@ def test_run_forward_includes_qhc_arm(tmp_path):
     assert "QHC" in by
     qhc = [r for r in rows if r["arm"] == "QHC"][0]
     assert set(LEDGER_COLS) <= set(qhc)
+
+
+# ---- P3 fix: QHC model must train only on pre-forward data (no leakage) ----
+def test_training_panel_is_preforward_complement():
+    from src.sp_drift.forward import training_panel
+    panel = pd.DataFrame({"match_id": ["A", "B"],
+                          "kickoff_ts": ["2026-06-10T19:00:00", "2026-06-20T19:00:00"],
+                          "sp": [4.0, 4.0]})
+    tr = training_panel(panel, "2026-06-13")
+    fw = forward_panel(panel, "2026-06-13")
+    assert list(tr["match_id"]) == ["A"]            # only kickoff <= cutoff
+    assert list(fw["match_id"]) == ["B"]
+    assert set(tr["match_id"]) & set(fw["match_id"]) == set()
+
+
+def test_qhc_model_trained_only_on_pre_forward_data():
+    from src.sp_drift.forward import build_qhc_arm_from_panel
+    fs = "2026-06-13"
+    rows = []
+    # pre-forward (kickoff <= cutoff): ratio 0.9 (decision 4.0@800min, close 3.6@10)
+    for i in range(40):
+        rows.append((f"P{i}", "3", 4.0, 800.0, "2026-06-10T19:00:00"))
+        rows.append((f"P{i}", "3", 3.6, 10.0, "2026-06-10T19:00:00"))
+    # post-forward (kickoff > cutoff): ratio 0.3 — MUST NOT leak into the model
+    for i in range(40):
+        rows.append((f"Q{i}", "3", 4.0, 800.0, "2026-06-20T19:00:00"))
+        rows.append((f"Q{i}", "3", 1.2, 10.0, "2026-06-20T19:00:00"))
+    panel = pd.DataFrame(rows, columns=["match_id", "selection", "sp", "mtk", "kickoff_ts"])
+    name, pol = build_qhc_arm_from_panel(panel, fs, decision_mtk=800.0, q=0.5)
+    assert name == "QHC"
+    adj = pol.sp_adjust(4.0)          # q=0.5 → sp × mean ratio at (3.5-4.5, 720-1440)
+    assert abs(adj - 3.6) < 0.15      # pre-forward mean 0.9 → 3.6
+    assert adj > 3.0                  # NOT the leaked blend (~2.4) or post (~1.2)

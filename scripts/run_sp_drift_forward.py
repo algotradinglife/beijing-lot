@@ -27,9 +27,9 @@ def main() -> None:
     cfg = NicheConfig.load()
     baseline = P.baseline_decision_mtk(WEBUI)
     arms = F.build_arms(baseline_mtk=baseline, haircut_map=F.HAIRCUT_MAP)
-    # QHC: model-based conservative-quantile haircut arm (descriptive, not GATE-FT)
-    from src.sp_drift.drift_model import fit_drift_model
-    arms.append(F.build_qhc_arm(fit_drift_model(pan), q=0.25))
+    # QHC: model-based conservative-quantile haircut arm (descriptive, not GATE-FT).
+    # build_qhc_arm_from_panel fits the DriftModel on the PRE-forward slice only (no leakage).
+    arms.append(F.build_qhc_arm_from_panel(pan, F.FORWARD_START, q=0.25))
     rows = F.run_forward(pan, LIVE, cfg, arms, run_date=today, forward_start=F.FORWARD_START)
     # FAV5: descriptive 'bet the favorite, N=5' arm (flat-staked, not GATE-FT).
     rows.append(F.favorite_arm_row(pan, LIVE, today, forward_start=F.FORWARD_START,
@@ -75,6 +75,7 @@ def main() -> None:
         "**不参与 GATE-FT 判定**（judging 仍只看 C0/C1/C2）。",
         "> **QHC 是「模型保守分位 haircut」arm**（与 C1/C2 同决策时机=180min 窗口，但 sizing "
         "用 (SP档×MTK桶) 漂移模型的 q=0.25 保守分位预测结算 SP，而非 C2 的冻结档位点估计）；"
+        "**模型仅在 FORWARD_START 之前的数据上拟合（无前瞻泄露）**；"
         "检验模型+分位能否捞回 C2 漏掉的价值；不进 GATE-FT。\n"
         "> **FAV5 是「押每场最热门(最低SP)、N=5」arm**（平注，非 Kelly）：检验"
         "「抽水每票一次×热门 realized p×SP>1×中等N」的假说（见 high_n_favorite_parlay 研究）；"

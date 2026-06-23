@@ -46,6 +46,24 @@ def build_arms(baseline_mtk: float, haircut_map: dict) -> List[Tuple[str, Policy
     ]
 
 
+def training_panel(panel: pd.DataFrame, forward_start: str) -> pd.DataFrame:
+    """Pre-forward (in-sample) slice: kickoffs ON or BEFORE forward_start. The
+    complement of forward_panel — used to train models WITHOUT leaking the OOS
+    forward period. kickoff_ts is naive Beijing ISO, so lexicographic compare."""
+    return panel[panel["kickoff_ts"] <= forward_start].copy()
+
+
+def build_qhc_arm_from_panel(panel: pd.DataFrame, forward_start: str = FORWARD_START,
+                             decision_mtk: float = WINDOW_MTK,
+                             q: float = 0.25) -> Tuple[str, Policy]:
+    """Safe QHC entry point: fit the DriftModel on the PRE-forward slice only
+    (no lookahead), then build the arm. Always use this from the runner rather
+    than fit_drift_model(full_panel) to avoid leaking the OOS period into sizing."""
+    from src.sp_drift.drift_model import fit_drift_model
+    model = fit_drift_model(training_panel(panel, forward_start))
+    return build_qhc_arm(model, decision_mtk=decision_mtk, q=q)
+
+
 def build_qhc_arm(model, decision_mtk: float = WINDOW_MTK,
                   q: float = 0.25) -> Tuple[str, Policy]:
     """QHC arm: like C2 (decide at the 180min window) but size on the model's
