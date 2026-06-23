@@ -27,6 +27,9 @@ def main() -> None:
     cfg = NicheConfig.load()
     baseline = P.baseline_decision_mtk(WEBUI)
     arms = F.build_arms(baseline_mtk=baseline, haircut_map=F.HAIRCUT_MAP)
+    # QHC: model-based conservative-quantile haircut arm (descriptive, not GATE-FT)
+    from src.sp_drift.drift_model import fit_drift_model
+    arms.append(F.build_qhc_arm(fit_drift_model(pan), q=0.25))
     rows = F.run_forward(pan, LIVE, cfg, arms, run_date=today, forward_start=F.FORWARD_START)
     # FAV5: descriptive 'bet the favorite, N=5' arm (flat-staked, not GATE-FT).
     rows.append(F.favorite_arm_row(pan, LIVE, today, forward_start=F.FORWARD_START,
@@ -70,6 +73,9 @@ def main() -> None:
         "> **N3 / N5 是描述性 N-sweep arm**（与 C0 同决策时机、仅 n_legs 不同），"
         "用于观察腿数对 ROI/漂移的影响（盈亏归因显示漂移随 N 乘法放大）；"
         "**不参与 GATE-FT 判定**（judging 仍只看 C0/C1/C2）。",
+        "> **QHC 是「模型保守分位 haircut」arm**（与 C1/C2 同决策时机=180min 窗口，但 sizing "
+        "用 (SP档×MTK桶) 漂移模型的 q=0.25 保守分位预测结算 SP，而非 C2 的冻结档位点估计）；"
+        "检验模型+分位能否捞回 C2 漏掉的价值；不进 GATE-FT。\n"
         "> **FAV5 是「押每场最热门(最低SP)、N=5」arm**（平注，非 Kelly）：检验"
         "「抽水每票一次×热门 realized p×SP>1×中等N」的假说（见 high_n_favorite_parlay 研究）；"
         "roi/命中率/周σ 为有效指标，其 MaxDD 与 Kelly-sized 的 C/N arm 不可直接比；不进 GATE-FT。",

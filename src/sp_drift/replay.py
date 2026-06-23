@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import pandas as pd
 
@@ -60,6 +60,20 @@ def apply_band_haircut(snaps: List[LiveSnapshot], band_bias: dict) -> List[LiveS
             for s in snaps]
 
 
+def apply_sp_adjust(snaps: List[LiveSnapshot],
+                    fn: Callable[[float], float]) -> List[LiveSnapshot]:
+    """Return new LiveSnapshots with each selection SP mapped by ``fn`` (e.g. a
+    DriftModel conservative-quantile adjustment ``sp -> adjusted_sp``). None or
+    non-positive SPs are left unchanged."""
+    def adj(sp: Optional[float]) -> Optional[float]:
+        if sp is None or sp <= 0:
+            return sp
+        return fn(sp)
+
+    return [_dc_replace(s, sp_3=adj(s.sp_3), sp_1=adj(s.sp_1), sp_0=adj(s.sp_0))
+            for s in snaps]
+
+
 def actuals_from_db(live_db_path: str | Path) -> dict:
     """Real settlement truth: {match_id: {result_code, winning_sp}}. This is
     the SP you are actually paid at — replay settles against THIS, not the
@@ -84,6 +98,7 @@ from src.phase5a.planner import build_weekly_plan
 class Policy:
     mtk_target: float                 # decision minutes-to-kickoff
     haircut: Optional[dict] = None    # band_bias map, or None
+    sp_adjust: Optional[Callable[[float], float]] = None  # per-leg SP map, or None
     n_legs: int = 4
     kelly_fraction: float = 0.0625    # 1/16 per v2.1
     combo_ev_threshold: float = 0.05
@@ -99,6 +114,8 @@ def replay_policy(panel: pd.DataFrame, live_db_path: str | Path,
     snaps = decision_snapshots(panel, mtk_target=policy.mtk_target)
     if policy.haircut:
         snaps = apply_band_haircut(snaps, policy.haircut)
+    if policy.sp_adjust:
+        snaps = apply_sp_adjust(snaps, policy.sp_adjust)
 
     by_issue: dict = {}
     for s in snaps:

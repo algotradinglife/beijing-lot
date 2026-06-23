@@ -46,6 +46,16 @@ def build_arms(baseline_mtk: float, haircut_map: dict) -> List[Tuple[str, Policy
     ]
 
 
+def build_qhc_arm(model, decision_mtk: float = WINDOW_MTK,
+                  q: float = 0.25) -> Tuple[str, Policy]:
+    """QHC arm: like C2 (decide at the 180min window) but size on the model's
+    CONSERVATIVE-QUANTILE predicted settlement SP instead of the frozen band map.
+    Tests whether the (SP-band × MTK) drift model + conservative quantile
+    recovers value the frozen-band C2 haircut misses. Descriptive, not GATE-FT."""
+    return ("QHC", Policy(mtk_target=decision_mtk,
+                          sp_adjust=lambda sp: model.adjusted_sp(sp, decision_mtk, q)))
+
+
 LEDGER_COLS = ["run_date", "arm", "forward_start", "n_combos", "n_hits",
                "total_stake", "total_pnl", "roi", "max_dd", "final_bankroll",
                "weekly_sigma"]
@@ -155,9 +165,11 @@ def render_arm_table(latest: dict, arm_names: list) -> list:
         r = latest[a]
         nc = r["n_combos"]
         hit_rate = (100.0 * r["n_hits"] / nc) if nc else 0.0
+        roi = r["roi"]
+        roi_s = "—" if (roi != roi) else f"**{roi * 100:+.1f}%**"   # nan (0-stake) → —
         lines.append(
             f"| {a} | {nc} | {r['n_hits']} | {hit_rate:.1f}% | "
-            f"{r['total_stake']:,.0f} | **{r['roi'] * 100:+.1f}%** | "
+            f"{r['total_stake']:,.0f} | {roi_s} | "
             f"{r['max_dd'] * 100:.0f}% | {r.get('weekly_sigma', 0.0):,.1f} |"
         )
     return lines

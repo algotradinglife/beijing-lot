@@ -205,3 +205,43 @@ def test_run_forward_returns_one_row_per_arm(tmp_path):
     r0 = rows[0]
     assert set(LEDGER_COLS) <= set(r0)               # every ledger column present
     assert r0["forward_start"] == "2026-06-13" and r0["run_date"] == "2026-06-21"
+
+
+# ---- P3: QHC (model conservative-quantile haircut) forward arm ----
+def test_apply_sp_adjust_maps_each_sp():
+    from src.phase5a.data_loader import LiveSnapshot
+    from src.sp_drift.replay import apply_sp_adjust
+    s = LiveSnapshot(match_id="m", issue="1", match_idx=1, league="x",
+                     kickoff_ts="t", home=None, away=None, handicap_line=None,
+                     sp_3=4.0, sp_1=None, sp_0=2.0, snapshot_ts=None)
+    out = apply_sp_adjust([s], lambda sp: sp * 0.5)[0]
+    assert out.sp_3 == 2.0 and out.sp_0 == 1.0 and out.sp_1 is None
+
+
+def test_build_qhc_arm_uses_model_quantile():
+    from src.sp_drift.drift_model import DriftModel
+    from src.sp_drift.forward import build_qhc_arm
+    # empty cells → everything falls back to global prior (mean 0.8). q=0.5 → mean.
+    model = DriftModel(cells={}, band_prior={}, global_prior=(0.8, 0.2))
+    name, pol = build_qhc_arm(model, decision_mtk=600.0, q=0.5)
+    assert name == "QHC"
+    assert pol.mtk_target == 600.0
+    assert pol.sp_adjust is not None and pol.haircut is None
+    assert abs(pol.sp_adjust(4.0) - 3.2) < 1e-6      # 4.0 × 0.8
+
+
+def test_run_forward_includes_qhc_arm(tmp_path):
+    from src.sp_drift import panel as P
+    from src.sp_drift.drift_model import fit_drift_model
+    from src.sp_drift.forward import build_qhc_arm
+    db = _forward_db(tmp_path)
+    pan = P.build(db, cache_path=tmp_path / "p.parquet", rebuild=True)
+    model = fit_drift_model(pan)
+    arms = build_arms(baseline_mtk=600.0, haircut_map=HAIRCUT_MAP)
+    arms.append(build_qhc_arm(model, decision_mtk=30.0, q=0.25))
+    rows = run_forward(pan, db, NicheConfig.load(), arms,
+                       run_date="2026-06-21", forward_start="2026-06-13")
+    by = {r["arm"] for r in rows}
+    assert "QHC" in by
+    qhc = [r for r in rows if r["arm"] == "QHC"][0]
+    assert set(LEDGER_COLS) <= set(qhc)
