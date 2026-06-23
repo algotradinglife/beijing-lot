@@ -54,11 +54,7 @@ def main() -> None:
         f"run_date={today}; FORWARD_START={F.FORWARD_START}; "
         f"weeks_elapsed={status['weeks_elapsed']:.1f}\n",
         "## 各 arm 累计（FORWARD_START 至今的样本外切片）\n",
-        "| arm | 组合 | 命中 | 总投注 | ROI | MaxDD |",
-        "|-----|------|------|--------|-----|-------|",
-        *[f"| {a} | {latest[a]['n_combos']} | {latest[a]['n_hits']} | "
-          f"{latest[a]['total_stake']:,.0f} | **{latest[a]['roi']*100:+.1f}%** | "
-          f"{latest[a]['max_dd']*100:.0f}% |" for a in arm_names],
+        *F.render_arm_table(latest, arm_names),
         "",
         "## 停止规则 / GATE-FT 状态\n",
         f"- stop={status['stop']}  reason={status['reason']}  **verdict={status['verdict']}**",

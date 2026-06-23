@@ -47,7 +47,39 @@ def build_arms(baseline_mtk: float, haircut_map: dict) -> List[Tuple[str, Policy
 
 
 LEDGER_COLS = ["run_date", "arm", "forward_start", "n_combos", "n_hits",
-               "total_stake", "total_pnl", "roi", "max_dd", "final_bankroll"]
+               "total_stake", "total_pnl", "roi", "max_dd", "final_bankroll",
+               "weekly_sigma"]
+
+
+def _weekly_sigma(equity: list) -> float:
+    """Population std of weekly PnL from the equity path (consecutive diffs).
+    Deterministic 0.0 when there are fewer than 2 weeks of observations."""
+    import statistics
+    if not equity or len(equity) < 2:
+        return 0.0
+    weekly_pnl = [equity[i + 1] - equity[i] for i in range(len(equity) - 1)]
+    if len(weekly_pnl) < 2:
+        return 0.0
+    return float(statistics.pstdev(weekly_pnl))
+
+
+def render_arm_table(latest: dict, arm_names: list) -> list:
+    """Markdown table lines for the per-arm summary. Columns include 命中率
+    (n_hits/n_combos, guarded for zero combos) and 周σ (weekly PnL std)."""
+    lines = [
+        "| arm | 组合 | 命中 | 命中率 | 总投注 | ROI | MaxDD | 周σ |",
+        "|-----|------|------|--------|--------|-----|-------|-----|",
+    ]
+    for a in arm_names:
+        r = latest[a]
+        nc = r["n_combos"]
+        hit_rate = (100.0 * r["n_hits"] / nc) if nc else 0.0
+        lines.append(
+            f"| {a} | {nc} | {r['n_hits']} | {hit_rate:.1f}% | "
+            f"{r['total_stake']:,.0f} | **{r['roi'] * 100:+.1f}%** | "
+            f"{r['max_dd'] * 100:.0f}% | {r.get('weekly_sigma', 0.0):,.1f} |"
+        )
+    return lines
 
 
 def append_ledger(rows: List[dict], ledger_path: str | Path) -> pd.DataFrame:
@@ -124,5 +156,6 @@ def run_forward(panel: pd.DataFrame, live_db_path, niche_config,
             "total_stake": res["total_stake"], "total_pnl": res["total_pnl"],
             "roi": res["roi"], "max_dd": res["max_dd"],
             "final_bankroll": res["final_bankroll"],
+            "weekly_sigma": _weekly_sigma(res.get("equity", [])),
         })
     return rows

@@ -1,6 +1,35 @@
 import pandas as pd
 
-from src.sp_drift.forward import FORWARD_START, HAIRCUT_MAP, build_arms, forward_panel
+from src.sp_drift.forward import (
+    FORWARD_START,
+    HAIRCUT_MAP,
+    LEDGER_COLS,
+    build_arms,
+    forward_panel,
+    render_arm_table,
+)
+
+
+def test_ledger_cols_include_weekly_sigma():
+    assert "weekly_sigma" in LEDGER_COLS
+
+
+def test_render_arm_table_shows_hit_rate_and_weekly_sigma():
+    latest = {
+        "C0": {"n_combos": 10, "n_hits": 2, "total_stake": 100.0,
+               "roi": 0.5, "max_dd": 0.1, "weekly_sigma": 12.34},
+        "N3": {"n_combos": 0, "n_hits": 0, "total_stake": 0.0,
+               "roi": 0.0, "max_dd": 0.0, "weekly_sigma": 0.0},
+    }
+    lines = render_arm_table(latest, ["C0", "N3"])
+    header = lines[0]
+    assert "命中率" in header and "周σ" in header
+    body = "\n".join(lines)
+    assert "20.0%" in body          # C0 hit rate = 2/10
+    assert "12.3" in body           # C0 weekly sigma rendered
+    # zero-combo arm must not divide-by-zero; deterministic 0
+    n3_row = [ln for ln in lines if ln.startswith("| N3 ")][0]
+    assert "0.0%" in n3_row
 
 
 def test_forward_panel_keeps_only_kickoffs_after_start():
