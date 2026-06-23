@@ -57,6 +57,21 @@ class DriftModel:
         m, s = self.global_prior
         return (m, s, 0)
 
+    def adjusted_sp(self, sp: float, mtk: float, q: float = 0.25,
+                    floor: float = 0.05) -> float:
+        """Conservative-quantile predicted settlement SP for sizing EV.
+
+        Uses a normal approximation of the ratio's distribution in the cell:
+        ``ratio_q = mean + z_q·sd`` (floored positive), and returns
+        ``sp · ratio_q``. q=0.5 recovers the mean (point-estimate haircut);
+        q<0.5 is conservative (lower SP → smaller stake). Wider sd or a more
+        adverse/earlier-MTK cell ⇒ bigger haircut."""
+        import statistics
+        mean, sd, _n = self.lookup(sp, mtk)
+        z = statistics.NormalDist(0.0, 1.0).inv_cdf(q)
+        ratio_q = max(mean + z * sd, floor)
+        return sp * ratio_q
+
     def table(self) -> pd.DataFrame:
         """Tidy (band, bucket, mean, sd, n) table, sorted deterministically."""
         rows = [

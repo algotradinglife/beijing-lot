@@ -66,3 +66,41 @@ def test_deterministic():
     m1 = fit_drift_model(_panel(rows)).table().to_csv(index=False)
     m2 = fit_drift_model(_panel(rows)).table().to_csv(index=False)
     assert m1 == m2
+
+
+# ---- P2: conservative-quantile SP adjustment ----
+from src.sp_drift.drift_model import DriftModel
+
+
+def _model(cells):
+    # cells: {(band,bucket):(mean,sd,n)}; priors = first cell's (mean,sd)
+    any_ms = next(iter(cells.values()))[:2]
+    bands = {b: (m, s) for (b, _k), (m, s, _n) in cells.items()}
+    return DriftModel(cells=cells, band_prior=bands, global_prior=any_ms)
+
+
+def test_adjusted_sp_q50_recovers_mean_point_estimate():
+    m = _model({("3.5-4.5", "720-1440"): (0.9, 0.3, 100)})
+    # q=0.5 → ratio = mean → adjusted_sp = sp*mean
+    assert abs(m.adjusted_sp(4.0, 1000.0, q=0.5) - 4.0 * 0.9) < 1e-6
+
+
+def test_lower_quantile_is_more_conservative():
+    m = _model({("3.5-4.5", "720-1440"): (0.9, 0.3, 100)})
+    q50 = m.adjusted_sp(4.0, 1000.0, q=0.5)
+    q25 = m.adjusted_sp(4.0, 1000.0, q=0.25)
+    assert q25 < q50                      # conservative = lower SP
+
+
+def test_wider_sd_gives_bigger_haircut():
+    tight = _model({("3.5-4.5", "720-1440"): (0.9, 0.1, 100)})
+    wide = _model({("3.5-4.5", "720-1440"): (0.9, 0.5, 100)})
+    # same mean, same q<0.5 → wider sd → lower (more haircut)
+    assert wide.adjusted_sp(4.0, 1000.0, q=0.25) < tight.adjusted_sp(4.0, 1000.0, q=0.25)
+
+
+def test_adjusted_sp_floored_positive():
+    # extreme: mean 0.17, big sd → q=0.05 must stay positive, not negative
+    m = _model({(">8", "1440-inf"): (0.17, 0.21, 100)})
+    v = m.adjusted_sp(10.0, 2000.0, q=0.05)
+    assert v > 0
