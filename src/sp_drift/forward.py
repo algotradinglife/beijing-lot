@@ -51,6 +51,87 @@ LEDGER_COLS = ["run_date", "arm", "forward_start", "n_combos", "n_hits",
                "weekly_sigma"]
 
 
+def favorite_arm_row(panel, live_db_path, run_date: str, *,
+                     forward_start: str = FORWARD_START, n_legs: int = 5,
+                     mtk_target: float, max_combos: int = 200, seed: int = 0,
+                     start_bankroll: float = 100000.0) -> dict:
+    """A descriptive 'bet the market favorite' arm: per match pick the lowest-SP
+    selection (favorite), form N-leg parlays per issue (flat 1-unit stake),
+    settle on real winning_sp. Tests the high-N favorite hypothesis (rake is
+    per-ticket, favorites have realized p×SP>1) against true leg correlation.
+
+    NOT a Policy arm (favorite selection ≠ niche qualify) and NOT part of
+    GATE-FT. Flat-staked, so `roi`/命中率/`weekly_sigma` are the meaningful
+    metrics; `max_dd` is not comparable to the Kelly-sized C/N arms."""
+    import math
+    import random as _random
+    from collections import defaultdict
+    from itertools import combinations
+
+    from src.combo_optimizer import RETURN_RATE
+    from src.sp_drift import panel as P
+    from src.sp_drift.replay import actuals_from_db, aggregate_equity
+
+    dec = P.decision_view(forward_panel(panel, forward_start), mtk_target)
+    actuals = actuals_from_db(live_db_path)
+
+    by_issue: dict = defaultdict(list)   # issue -> list of (hit: bool, win_sp)
+    for mid, grp in dec.groupby("match_id"):
+        sps = {str(r["selection"]): float(r["sp"]) for _, r in grp.iterrows()
+               if r["sp"] and float(r["sp"]) > 0}
+        if not sps:
+            continue
+        fav = min(sps, key=sps.get)
+        a = actuals.get(str(mid))
+        if not a:
+            continue
+        hit = (a["result_code"] == fav)
+        win_sp = a["winning_sp"] if hit else None
+        if hit and (win_sp is None or win_sp <= 0):
+            continue  # winning favorite without a settlement SP — drop
+        by_issue[str(grp.iloc[0]["issue"])].append((hit, win_sp))
+
+    rng = _random.Random(seed)
+    weeks, n_comb, n_hits, total_stake, total_pnl = [], 0, 0, 0.0, 0.0
+    for issue in sorted(by_issue):
+        legs = by_issue[issue]
+        m = len(legs)
+        if m < n_legs:
+            continue
+        if math.comb(m, n_legs) <= max_combos:
+            combos = list(combinations(range(m), n_legs))
+        else:
+            seen = set()
+            while len(seen) < max_combos:
+                seen.add(tuple(sorted(rng.sample(range(m), n_legs))))
+            combos = list(seen)
+        stake = pnl = 0.0
+        for comb in combos:
+            stake += 1.0
+            n_comb += 1
+            if all(legs[i][0] for i in comb):
+                prod = 1.0
+                for i in comb:
+                    prod *= legs[i][1]
+                pnl += RETURN_RATE * prod - 1.0
+                n_hits += 1
+            else:
+                pnl += -1.0
+        weeks.append((issue, stake, pnl))
+        total_stake += stake
+        total_pnl += pnl
+
+    res = aggregate_equity(weeks, start_bankroll=start_bankroll)
+    return {
+        "run_date": run_date, "arm": f"FAV{n_legs}", "forward_start": forward_start,
+        "n_combos": n_comb, "n_hits": n_hits,
+        "total_stake": total_stake, "total_pnl": total_pnl,
+        "roi": res["roi"], "max_dd": res["max_dd"],
+        "final_bankroll": res["final_bankroll"],
+        "weekly_sigma": _weekly_sigma(res["equity"]),
+    }
+
+
 def _weekly_sigma(equity: list) -> float:
     """Population std of weekly PnL from the equity path (consecutive diffs).
     Deterministic 0.0 when there are fewer than 2 weeks of observations."""

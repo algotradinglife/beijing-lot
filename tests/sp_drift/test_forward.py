@@ -14,6 +14,43 @@ def test_ledger_cols_include_weekly_sigma():
     assert "weekly_sigma" in LEDGER_COLS
 
 
+def test_favorite_arm_row_picks_favorites_and_settles():
+    import sqlite3
+    import tempfile
+    from pathlib import Path as _Path
+    from src.sp_drift import panel as P
+    from src.sp_drift.forward import favorite_arm_row
+
+    d = _Path(tempfile.mkdtemp())
+    db = d / "fav.db"
+    con = sqlite3.connect(db)
+    con.executescript(
+        "CREATE TABLE matches (match_id TEXT, issue TEXT, match_idx INT, league TEXT,"
+        " kickoff_ts TEXT, home TEXT, away TEXT, handicap_line REAL);"
+        "CREATE TABLE snapshots (match_id TEXT, snapshot_ts TEXT, sp_3 REAL, sp_1 REAL,"
+        " sp_0 REAL, vol_pct_3 REAL, vol_pct_1 REAL, vol_pct_0 REAL, pool_total REAL);"
+        "CREATE TABLE settlements (match_id TEXT, result_code TEXT, winning_sp REAL);")
+    # 6 forward-dated matches, favorite is always home (sp_3=2.0 lowest).
+    # 4 favorite-hits (result 3), 2 favorite-misses (result 0).
+    for i in range(1, 7):
+        con.execute("INSERT INTO matches VALUES (?,?,?,?,?,?,?,?)",
+                    (f"M{i}", "26099", i, "挪超", "2026-06-20T19:35:00", "H", "A", 1.0))
+        con.execute("INSERT INTO snapshots (match_id,snapshot_ts,sp_3,sp_1,sp_0,"
+                    "vol_pct_3,vol_pct_1,vol_pct_0,pool_total) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (f"M{i}", "2026-06-20T10:35:00Z", 2.0, 4.0, 5.0, 0, 0, 0, 1000))
+        rc, wsp = ("3", 2.0) if i <= 4 else ("0", 5.0)
+        con.execute("INSERT INTO settlements VALUES (?,?,?)", (f"M{i}", rc, wsp))
+    con.commit(); con.close()
+
+    pan = P.build(db, cache_path=d / "p.parquet", rebuild=True)
+    row = favorite_arm_row(pan, db, run_date="2026-06-21", forward_start="2026-06-13",
+                           n_legs=2, mtk_target=30.0, max_combos=999)
+    assert row["arm"] == "FAV2"
+    assert row["n_combos"] == 15          # C(6,2)
+    assert row["n_hits"] == 6             # C(4,2): both legs must be hitting favorites
+    assert "weekly_sigma" in row and "roi" in row
+
+
 def test_render_arm_table_shows_hit_rate_and_weekly_sigma():
     latest = {
         "C0": {"n_combos": 10, "n_hits": 2, "total_stake": 100.0,

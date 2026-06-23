@@ -28,6 +28,9 @@ def main() -> None:
     baseline = P.baseline_decision_mtk(WEBUI)
     arms = F.build_arms(baseline_mtk=baseline, haircut_map=F.HAIRCUT_MAP)
     rows = F.run_forward(pan, LIVE, cfg, arms, run_date=today, forward_start=F.FORWARD_START)
+    # FAV5: descriptive 'bet the favorite, N=5' arm (flat-staked, not GATE-FT).
+    rows.append(F.favorite_arm_row(pan, LIVE, today, forward_start=F.FORWARD_START,
+                                   n_legs=5, mtk_target=baseline))
     ledger = F.append_ledger(rows, LEDGER)
     status = F.check_stopping_rule(ledger, F.FORWARD_START, today)
 
@@ -67,6 +70,9 @@ def main() -> None:
         "> **N3 / N5 是描述性 N-sweep arm**（与 C0 同决策时机、仅 n_legs 不同），"
         "用于观察腿数对 ROI/漂移的影响（盈亏归因显示漂移随 N 乘法放大）；"
         "**不参与 GATE-FT 判定**（judging 仍只看 C0/C1/C2）。",
+        "> **FAV5 是「押每场最热门(最低SP)、N=5」arm**（平注，非 Kelly）：检验"
+        "「抽水每票一次×热门 realized p×SP>1×中等N」的假说（见 high_n_favorite_parlay 研究）；"
+        "roi/命中率/周σ 为有效指标，其 MaxDD 与 Kelly-sized 的 C/N arm 不可直接比；不进 GATE-FT。",
         "> ⚠️ **运营口径差**：C1/C2 的 window 是按期次池化、每场各取其「距开赛 180min」的 SP；"
         "实盘 `kickoff_window_hours` 是「距现在 N 小时内开赛」的同时性过滤，二者不等价。"
         "经 P1 权衡分析（2026-06-14）：受 N=4 需 ≥30 场同时在池约束，任何窗口值都无法两全"
