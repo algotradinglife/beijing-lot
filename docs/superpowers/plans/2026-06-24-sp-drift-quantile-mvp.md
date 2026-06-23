@@ -2,10 +2,22 @@
 
 **日期**: 2026-06-24
 **作者**: Claude（承接对话：盈亏归因 + SP 漂移建模直觉）
-**状态**: 执行中
-**关联**: `docs/research/pnl_attribution.md`、`docs/strategy/final_sp_process_model.md`、[[sp-drift-study]]、`src/sp_drift/{panel,drift_stats,replay,forward}.py`
+**状态**: **第一轮（P1–P4）完成（2026-06-24）**。复盘：`docs/research/sp_drift_quantile_mvp_retro.md`
+**关联**: `docs/research/pnl_attribution.md`、`docs/strategy/final_sp_process_model.md`、`docs/research/sp_drift_quantile_mvp_retro.md`、[[sp-drift-study]]、`src/sp_drift/{panel,drift_stats,replay,drift_model,forward}.py`
 
 ---
+
+## 第一轮结果与决定（P4，2026-06-24）
+
+四张卡均经独立审核 + push：P1 `drift_model`(7420d98) → P2 `adjusted_sp`(696b295) → P3 QHC arm + 前瞻泄露修复(43daa19+8bcc993) → P4 复盘(a1b5550)。
+
+- **真正交付的价值**：P1 的 (SP档×MTK) 漂移模型表——稳健量化「haircut×决策时机」统一结构（近开赛 SP 稳、远期/高 SP 漂移极端）。
+- **OOS（~1.6 周）全是噪声**，不可判任何 arm 有效性（C0 +910% / QHC −100% / N3 +1007% 皆薄样本）。
+- **本轮教训**：P3 初版前瞻泄露（完整 panel 训练）被 reviewer 逮住并修复 → 纪律：**所有 forward arm 的模型/参数只用 pre-forward 数据训练/冻结**。
+- **决定 = 继续累积（选项 b）**：不加特征、不碰实盘；drift_model/QHC/FAV5/N arm 已接入每周一 forward timer 自动累积。
+- **预注册下一轮触发**：当 QHC 累积 ≥ 数十次命中（或 ≥8–12 周）→ 再开一轮复盘正式比较 QHC vs C2 vs C0，届时才考虑 (a) 加特征 或 落地保守分位 haircut（仍需先过 GATE）。
+
+详见复盘文档 `docs/research/sp_drift_quantile_mvp_retro.md`。
 
 ## 1. 目标
 
