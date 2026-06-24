@@ -68,6 +68,32 @@ def test_simulate_matches_analytic_ev_and_deterministic():
     assert abs(a["hit_rate"] - analytic["hit_prob"]) < 0.03
 
 
+def test_config_metrics_rejects_bad_covered():
+    legs = [fair_leg((0.5, 0.3, 0.2)), fair_leg((0.5, 0.3, 0.2))]
+    import pytest
+    with pytest.raises(ValueError):       # wrong length (zip would silently truncate)
+        config_metrics(legs, [(0,)])
+    with pytest.raises(ValueError):       # empty covered set
+        config_metrics(legs, [(0,), ()])
+    with pytest.raises(ValueError):       # bad outcome index
+        config_metrics(legs, [(0,), (3,)])
+    with pytest.raises(ValueError):       # duplicate outcome
+        config_metrics(legs, [(0,), (1, 1)])
+
+
+def test_cover2_between_single_and_cover3():
+    # cover-2 (drop least likely) sits between single and cover-3 on P(hit)/tickets
+    legs = [fair_leg((0.6, 0.25, 0.15)) for _ in range(4)]
+    single = config_metrics(legs, [(0,)] * 4)
+    cover2 = config_metrics(legs, [(0, 1)] * 4)       # top-2 each
+    cover3 = config_metrics(legs, [(0, 1, 2)] * 4)
+    assert single["hit_prob"] < cover2["hit_prob"] < cover3["hit_prob"]
+    assert single["tickets"] < cover2["tickets"] < cover3["tickets"]
+    assert cover2["tickets"] == 2 ** 4
+    # EV stays at the fair floor regardless
+    assert abs(cover2["ev_per_budget"] - RR) < 1e-9
+
+
 def test_simulate_strategy_deterministic_and_fair_floor():
     # fair pool -> EV/budget = RR for every coverage level (no edge, no drift)
     pool = [fair_leg((0.55, 0.25, 0.20)), fair_leg((0.6, 0.22, 0.18)),
@@ -83,3 +109,15 @@ def test_simulate_strategy_deterministic_and_fair_floor():
     assert cov["hit_rate"] > a["hit_rate"]
     assert cov["tickets"] == 81 and a["tickets"] == 1
     assert abs(cov["mean_roi"] + 1.0 - RR) < 0.06
+    # cover-2 ladder: tickets = 2^n_cover2, hit between single and cover-3
+    c2 = simulate_strategy(pool, n_legs=7, n_cover2=4, n_sims=30000, seed=5)
+    assert c2["tickets"] == 16
+    assert a["hit_rate"] < c2["hit_rate"] < cov["hit_rate"]
+    assert abs(c2["mean_roi"] + 1.0 - RR) < 0.06
+
+
+def test_simulate_strategy_rejects_overcover():
+    import pytest
+    pool = [fair_leg((0.5, 0.3, 0.2)) for _ in range(6)]
+    with pytest.raises(ValueError):
+        simulate_strategy(pool, n_legs=5, n_cover2=3, n_cover3=3, n_sims=10)

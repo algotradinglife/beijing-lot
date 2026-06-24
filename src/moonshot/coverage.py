@@ -46,12 +46,26 @@ def parlay_ev_single(legs: Sequence[Leg], selections: Sequence[int]) -> float:
     return RR * prod
 
 
+def _validate_covered(legs: Sequence[Leg], covered: Sequence[Sequence[int]]) -> None:
+    """Guard against the silent zip-truncation / bad-index footguns."""
+    if len(covered) != len(legs):
+        raise ValueError(f"covered has {len(covered)} sets for {len(legs)} legs")
+    for i, C in enumerate(covered):
+        if len(C) == 0:
+            raise ValueError(f"leg {i}: covered set is empty")
+        if any(o not in (0, 1, 2) for o in C):
+            raise ValueError(f"leg {i}: outcome index out of range in {C}")
+        if len(set(C)) != len(C):
+            raise ValueError(f"leg {i}: duplicate outcome in {C}")
+
+
 def config_metrics(legs: Sequence[Leg], covered: Sequence[Sequence[int]]) -> dict:
     """Analytic metrics for one coverage configuration.
 
     covered[i] = outcome indices bought on leg i (1..3 of them).
     Returns ticket count, P(parlay yields a winning ticket), and EV/budget.
     """
+    _validate_covered(legs, covered)
     tickets = 1
     hit_prob = 1.0
     ev_num = 1.0   # ∏_i (Σ_{o∈C_i} p_o·sp_o)
@@ -119,18 +133,30 @@ def simulate_config(legs: Sequence[Leg], covered: Sequence[Sequence[int]],
     )
 
 
-def simulate_strategy(pool: Sequence[Leg], n_legs: int, n_cover3: int,
-                      budget: float = 1000.0, n_sims: int = 200000,
-                      seed: int = 0, thresholds: Sequence[float] = ()) -> dict:
-    """Marginalise the moonshot over real leg draws: each sim draws n_legs legs
-    from `pool`, SINGLE-selects the most-confident (n_legs − n_cover3) at their
-    favourite outcome and COVER-3s the least-confident n_cover3 legs. The whole
-    budget is spread over the 3^n_cover3 cartesian tickets. Deterministic.
+def _top_k_outcomes(probs: Tuple[float, float, float], k: int) -> frozenset:
+    """The k highest-probability outcome indices (the ones you'd cover)."""
+    return frozenset(sorted(range(3), key=lambda o: probs[o], reverse=True)[:k])
+
+
+def simulate_strategy(pool: Sequence[Leg], n_legs: int, n_cover2: int = 0,
+                      n_cover3: int = 0, budget: float = 1000.0,
+                      n_sims: int = 200000, seed: int = 0,
+                      thresholds: Sequence[float] = ()) -> dict:
+    """Marginalise the moonshot over real leg draws. Each sim draws n_legs legs
+    from `pool`, sorts by confidence (max prob), then by position:
+      - most-confident (n_legs − n_cover2 − n_cover3): SINGLE the favourite,
+      - next n_cover2: COVER the top-2 outcomes (drop the least likely),
+      - least-confident n_cover3: COVER all 3.
+    Budget is spread over the 2^n_cover2 · 3^n_cover3 cartesian tickets. The
+    parlay wins iff every leg's realised outcome is in its covered set.
+    Deterministic per seed.
     """
+    if n_cover2 + n_cover3 > n_legs:
+        raise ValueError("n_cover2 + n_cover3 exceeds n_legs")
     rng = random.Random(seed)
-    tickets = 3 ** n_cover3
+    tickets = (2 ** n_cover2) * (3 ** n_cover3)
     spt = budget / tickets
-    n_single = n_legs - n_cover3
+    n_single = n_legs - n_cover2 - n_cover3
     npool = len(pool)
     hits = 0
     total_return = 0.0
@@ -145,7 +171,13 @@ def simulate_strategy(pool: Sequence[Leg], n_legs: int, n_cover3: int,
             r = rng.random()
             p0, p1 = L.probs[0], L.probs[1]
             o = 0 if r < p0 else (1 if r < p0 + p1 else 2)
-            if j < n_single and o != L.probs.index(max(L.probs)):
+            if j < n_single:                       # single: must hit favourite
+                covered = {L.probs.index(max(L.probs))}
+            elif j < n_single + n_cover2:          # cover top-2
+                covered = _top_k_outcomes(L.probs, 2)
+            else:                                  # cover all 3
+                covered = {0, 1, 2}
+            if o not in covered:
                 win = False
                 break
             mult *= L.sps[o]
@@ -159,6 +191,7 @@ def simulate_strategy(pool: Sequence[Leg], n_legs: int, n_cover3: int,
                     thr_counts[i] += 1
     payoffs.sort()
     return dict(
+        n_cover2=n_cover2,
         n_cover3=n_cover3,
         tickets=tickets,
         stake_per_ticket=spt,
