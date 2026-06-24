@@ -2,7 +2,7 @@
 
 **日期**: 2026-06-24
 **作者**: Claude
-**性质**: 状态综述 + 路线图（综合本阶段所有研究；引用的结论均已独立审核 + 落库）
+**性质**: 状态综述 + 路线图（综合本阶段研究；引用的结论**除明确标注「未落库」者（如 O3）外**均已独立审核 + 落库为 repo 文档/脚本）
 **关联研究**: `docs/research/{pnl_attribution,q_persistence_analysis,high_n_favorite_parlay,beidan_vs_euro_divergence,sp_drift_quantile_mvp_retro}.md`、`docs/research/sp_drift_phase{0,1,4}.md`、`docs/strategy/*.md`、`docs/superpowers/plans/2026-06-24-sp-drift-quantile-mvp.md`
 
 ---
