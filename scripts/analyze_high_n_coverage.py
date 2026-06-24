@@ -30,6 +30,7 @@ CACHE = "data/derived/sp_drift/panel.parquet"
 BUDGET = 1000.0
 THR = [100_000.0, 1_000_000.0]
 SEED, N_SIMS = 0, 300_000
+N_ENUM = 100_000   # per-config sims for the full (n_single,c2,c3) enumeration
 FIG = Path("docs/research/figures/high_n_coverage.png")
 CODES = ["3", "1", "0"]  # outcome index 0/1/2
 
@@ -126,63 +127,85 @@ def main():
     print("  → 抽水每票一次→高 N 把它摊薄，高 N 需要的『每腿 edge 更小』；近开赛 N=7 只需 sel≈1.11"
           "(每腿+11%)。**高N+近开赛 是对每腿 edge 要求最低的角落**(若 Track B 找得到 edge)。\n")
 
-    # ---- coverage frontier: cover-2 ladder AND cover-3 ladder, N=7 then N=6 ----
-    def run_ladder(N, mode):
-        """mode='cover3' or 'cover2': cover n least-confident legs at all-3 / top-2."""
-        rows = []
-        for nc in range(0, N + 1):
-            kw = {"n_cover3": nc} if mode == "cover3" else {"n_cover2": nc}
-            s = simulate_strategy(pool, n_legs=N, budget=BUDGET, n_sims=N_SIMS,
-                                  seed=SEED, thresholds=THR, **kw)
-            rows.append((nc, s))
-        return rows
+    # ---- FULL coverage config space: enumerate every (n_single,n_cover2,n_cover3) ----
+    def enumerate_configs(N):
+        pts = []
+        for c2 in range(N + 1):
+            for c3 in range(N + 1 - c2):
+                s = simulate_strategy(pool, n_legs=N, n_cover2=c2, n_cover3=c3,
+                                      budget=BUDGET, n_sims=N_ENUM, seed=SEED,
+                                      thresholds=THR)
+                pts.append(((N - c2 - c3, c2, c3), s))
+        return pts
 
-    def print_ladder(title, rows):
-        print(title)
-        print(f"  {'盖几条':>6} {'票数':>6} {'每票':>7} {'P(命中)':>9} {'EV/预算':>8} "
-              f"{'中位奖':>10} {'P95奖':>11} {'最大奖':>12} {'P(≥10万)':>9} {'P(≥100万)':>10}")
-        for nc, s in rows:
-            print(f"  {nc:>6} {s['tickets']:>6} {s['stake_per_ticket']:>7.1f} "
-                  f"{s['hit_rate']:>8.4f} {100*(s['mean_roi']+1):>7.1f}% "
-                  f"{s['median_jackpot']:>10.0f} {s['p95_jackpot']:>11.0f} "
-                  f"{s['max_jackpot']:>12.0f} {s['p_threshold'][THR[0]]:>9.5f} "
-                  f"{s['p_threshold'][THR[1]]:>10.6f}")
+    def pareto_frontier(pts):
+        """Non-dominated on (hit_rate↑, median_jackpot↑) — EV is flat, so the only
+        real trade is P(hit) vs jackpot."""
+        front = []
+        for cfg, s in pts:
+            if not any(
+                o["hit_rate"] >= s["hit_rate"] and o["median_jackpot"] >= s["median_jackpot"]
+                and (o["hit_rate"] > s["hit_rate"] or o["median_jackpot"] > s["median_jackpot"])
+                for _, o in pts):
+                front.append((cfg, s))
+        return sorted(front, key=lambda x: x[1]["hit_rate"])
 
-    rows7_c3 = run_ladder(7, "cover3")
-    rows7_c2 = run_ladder(7, "cover2")
-    print_ladder(f"== N=7 覆盖前沿 · cover-3 梯度（全包不确定的 n 条；预算 {BUDGET:.0f}）==", rows7_c3)
-    print_ladder("== N=7 覆盖前沿 · cover-2 梯度（只包不确定腿的 top-2，丢最不可能结果）==", rows7_c2)
-    print_ladder(f"== N=6 覆盖前沿 · cover-3 梯度（预算 {BUDGET:.0f}）==", run_ladder(6, "cover3"))
+    for N in [7, 6]:
+        pts = enumerate_configs(N)
+        front = pareto_frontier(pts)
+        front_cfgs = {c for c, _ in front}
+        print(f"== N={N} 完整配置空间枚举（所有 n_single+n_cover2+n_cover3={N}，"
+              f"共 {len(pts)} 点；预算 {BUDGET:.0f}）==")
+        print(f"  EV/预算 全恒 ≈{100*(pts[0][1]['mean_roi']+1):.1f}%（覆盖不改 EV）。下表 ★=Pareto 前沿"
+              f"（P命中↔奖金非占优），含混合 cover-2/cover-3 配置：")
+        print(f"  {'(单,c2,c3)':>12} {'票数':>6} {'P(命中)':>9} {'中位奖':>9} "
+              f"{'P95奖':>9} {'P(≥10万)':>9}")
+        for cfg, s in front:
+            print(f"  ★{str(cfg):>11} {s['tickets']:>6} {s['hit_rate']:>8.4f} "
+                  f"{s['median_jackpot']:>9.0f} {s['p95_jackpot']:>9.0f} "
+                  f"{s['p_threshold'][THR[0]]:>9.5f}")
+        # a few dominated points for contrast (same P(hit) reachable with more jackpot)
+        dom = [(c, s) for c, s in pts if c not in front_cfgs][:3]
+        if dom:
+            print("  被占优点示例（同 P命中 下票更多/奖金更碎，故不在前沿）：")
+            for cfg, s in dom:
+                print(f"   {str(cfg):>12} {s['tickets']:>6} {s['hit_rate']:>8.4f} "
+                      f"{s['median_jackpot']:>9.0f}")
+        print(f"  前沿点 {len(front)}/{len(pts)}。")
+        if N == 7:
+            pts7, front7 = pts, front
 
-    print("\n注：EV/预算 在各覆盖档基本恒为 RR×drift^N（覆盖只换命中率↔奖金形状，不改 EV）。")
-    print("cover-2 vs cover-3：同样盖 n 条，cover-2 票更少(2^n vs 3^n)、每票更大、命中率增益较小但"
-          "**奖金保留更多**——丢掉的是各腿最不可能的结果，是更 EV/奖金高效的覆盖。")
+    print(f"\n关键发现：**Pareto 前沿密集(N=7: {len(front7)}/{len(pts7)} 点非占优)、连续，由混合 (单,c2,c3) 配置铺成**，"
+          "从 (7,0,0)[低命中高奖金] 一路到 (0,0,7)[全包必中低奖金]。选哪点取决于**目标 P(命中)**："
+          "低命中端 cover-2 更高效（同命中率票更少、奖金更高，如 (5,2,0) 优于 (4,2,1)）；要冲高命中端"
+          "必须用 cover-3。**没有单一『只用 cover-2』法则**；EV/预算 全程恒定（覆盖不改 EV）。")
     print("税务：单票奖金>1万触发 20% 税，需拆票；高 N 单压的稀有大奖必然破万→必须拆。")
 
-    make_figure(rows7_c3, rows7_c2, drift_gm)
+    make_figure(pts7, front7, drift_gm)
 
 
-def make_figure(rows_c3, rows_c2, drift_gm):
+def make_figure(pts, front, drift_gm):
+    """Scatter the full N=7 (n_single,c2,c3) config space (P(hit) vs median
+    jackpot); the Pareto frontier (non-dominated) is highlighted. EV is flat
+    across every point — the only trade is P(hit) ↔ jackpot."""
     FIG.parent.mkdir(parents=True, exist_ok=True)
-    ncs = [r[0] for r in rows_c3]
-    fig, (axl, axr) = plt.subplots(1, 2, figsize=(11, 4.4))
-    axl.plot(ncs, [r[1]["hit_rate"] for r in rows_c3], "o-", color="#4f81bd",
-             label="cover-3 P(hit)")
-    axl.plot(ncs, [r[1]["hit_rate"] for r in rows_c2], "o--", color="#9bbb59",
-             label="cover-2 P(hit)")
-    axl.plot(ncs, [r[1]["p_threshold"][THR[0]] for r in rows_c3], "s:", color="#c0504d",
-             label="cover-3 P(jackpot ≥ 100k)")
-    axl.set_xlabel("# uncertain legs covered"); axl.set_ylabel("probability")
-    axl.set_yscale("log"); axl.set_title("N=7: covering raises P(hit), shrinks jackpot")
-    axl.legend(fontsize=8); axl.grid(alpha=0.3)
-    axr.plot(ncs, [r[1]["median_jackpot"] for r in rows_c3], "o-", color="#4f81bd",
-             label="cover-3 median jackpot")
-    axr.plot(ncs, [r[1]["median_jackpot"] for r in rows_c2], "o--", color="#9bbb59",
-             label="cover-2 median jackpot (more retained)")
-    axr.set_xlabel("# uncertain legs covered"); axr.set_ylabel("yuan (budget=1000)")
-    axr.set_yscale("log")
-    axr.set_title(f"N=7 jackpot vs coverage (EV flat ≈ {100*RR*drift_gm**7:.1f}%)")
-    axr.legend(fontsize=8); axr.grid(alpha=0.3)
+    front_cfgs = {c for c, _ in front}
+    dom = [(c, s) for c, s in pts if c not in front_cfgs]
+    fig, ax = plt.subplots(figsize=(8.2, 5.0))
+    ax.scatter([s["hit_rate"] for _, s in dom], [s["median_jackpot"] for _, s in dom],
+               s=26, c="#bbbbbb", alpha=0.7, label="dominated config")
+    fx = [s["hit_rate"] for c, s in front]
+    fy = [s["median_jackpot"] for c, s in front]
+    ax.plot(fx, fy, "k-o", ms=6, lw=1.5, label="Pareto frontier (mixed configs)")
+    for (c, s) in front:
+        if c[2] == 0 or c == front[-1][0] or c == front[0][0]:   # label cover-2/end points
+            ax.annotate(str(c), (s["hit_rate"], s["median_jackpot"]), fontsize=6,
+                        xytext=(3, 3), textcoords="offset points")
+    ax.set_xscale("log"); ax.set_yscale("log")
+    ax.set_xlabel("P(hit any prize)"); ax.set_ylabel("median jackpot | hit (yuan, budget=1000)")
+    ax.set_title(f"N=7 full coverage config space (36 pts) — frontier spans the "
+                 f"P(hit)↔jackpot trade (EV flat ≈ {100*RR*drift_gm**7:.1f}%)")
+    ax.legend(fontsize=8); ax.grid(alpha=0.3, which="both")
     fig.tight_layout(); fig.savefig(FIG, dpi=110)
     print(f"\nwrote {FIG}")
 

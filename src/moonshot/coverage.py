@@ -92,6 +92,7 @@ def simulate_config(legs: Sequence[Leg], covered: Sequence[Sequence[int]],
     paying stake_per_ticket · ∏ sp_realised · RR on the single matching ticket.
     Deterministic per seed.
     """
+    _validate_covered(legs, covered)
     tickets = 1
     for C in covered:
         tickets *= len(C)

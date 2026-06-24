@@ -81,6 +81,20 @@ def test_config_metrics_rejects_bad_covered():
         config_metrics(legs, [(0,), (1, 1)])
 
 
+def test_simulate_config_validates_covered():
+    # same contract as config_metrics — no silent zip-truncation / ZeroDivision
+    import pytest
+    legs = [fair_leg((0.5, 0.3, 0.2)), fair_leg((0.5, 0.3, 0.2))]
+    with pytest.raises(ValueError):
+        simulate_config(legs, [(0,)], n_sims=10)            # wrong length
+    with pytest.raises(ValueError):
+        simulate_config(legs, [(0,), ()], n_sims=10)        # empty set
+    with pytest.raises(ValueError):
+        simulate_config(legs, [(0,), (3,)], n_sims=10)      # bad index
+    with pytest.raises(ValueError):
+        simulate_config(legs, [(0,), (1, 1)], n_sims=10)    # duplicate
+
+
 def test_cover2_between_single_and_cover3():
     # cover-2 (drop least likely) sits between single and cover-3 on P(hit)/tickets
     legs = [fair_leg((0.6, 0.25, 0.15)) for _ in range(4)]
