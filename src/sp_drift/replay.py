@@ -142,6 +142,7 @@ def replay_policy(panel: pd.DataFrame, live_db_path: str | Path,
     res = aggregate_equity(weeks, start_bankroll=policy.start_bankroll)
     res["n_tickets"] = n_tickets
     res["n_hits"] = n_hits
+    res["weeks"] = weeks  # [(issue, stake, pnl)] for bootstrap / jackknife (A1)
     return res
 
 
