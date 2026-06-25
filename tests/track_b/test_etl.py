@@ -17,14 +17,31 @@ def good_r0():
     return r0
 
 
+def good_r1():
+    r1 = [None] * 853
+    for c in book_starts(etl.EURO_START, etl.EURO_END):
+        r1[c] = "欧赔-初"; r1[c + 9] = "欧赔-终"
+    for c in book_starts(etl.ASIAN_START, etl.ASIAN_END):
+        r1[c] = "亚盘-初"; r1[c + 9] = "亚盘-终"
+    return r1
+
+
 def test_validate_layout_ok():
-    validate_layout(good_r0())  # no raise
+    validate_layout(good_r0(), good_r1())  # no raise
 
 
-def test_validate_layout_detects_drift():
+def test_validate_layout_detects_header_drift():
     r0 = good_r0(); r0[etl.ASIAN_HEADER] = "something else"
     with pytest.raises(ValueError):
-        validate_layout(r0)
+        validate_layout(r0, good_r1())
+
+
+def test_validate_layout_detects_per_block_drift():
+    # a single shifted per-book sub-header must be caught
+    r0, r1 = good_r0(), good_r1()
+    r1[30] = "something"          # 澳门 euro block start label corrupted
+    with pytest.raises(ValueError):
+        validate_layout(r0, r1)
 
 
 def test_book_starts():

@@ -34,14 +34,17 @@ TP_OPEN, TP_CLOSE = 0, 3            # 初 / 终
 CROWN_EU, PINNACLE_EU = 18, 174     # 皇冠 / Pinna* euro block starts
 
 
-def validate_layout(r0: List) -> None:
-    """Fail loudly if the collector's column template drifted."""
-    def s(i):
-        return str(r0[i]) if i < len(r0) and r0[i] is not None else ""
+def validate_layout(r0: List, r1: Optional[List] = None) -> None:
+    """Fail loudly if the collector's column template drifted. Checks section
+    sentinels (row0) AND the per-block open/close timepoint sub-headers (row1)
+    across EVERY euro/asian book — so a per-book column shift can't silently
+    corrupt the parsed odds while the sentinels stay put."""
+    def s(r, i):
+        return str(r[i]) if r is not None and i < len(r) and r[i] is not None else ""
     checks = {ISSUE: "期号", HCAP: "让球", WL: "胜负", MATCHID: "编号",
               CROWN_EU: "皇冠", KELLY_HEADER: "凯利", ASIAN_HEADER: "亚盘",
               OU_HEADER: "大小球", SCLASSID: "sclassid", PINNACLE_EU: "Pinna*"}
-    bad = {i: (exp, s(i)) for i, exp in checks.items() if s(i) != exp}
+    bad = {i: (exp, s(r0, i)) for i, exp in checks.items() if s(r0, i) != exp}
     if bad:
         raise ValueError(f"unexpected xlsm layout (col->[expected,got]): {bad}")
     for name, (lo, hi) in {"euro": (EURO_START, EURO_END),
@@ -49,6 +52,18 @@ def validate_layout(r0: List) -> None:
                            "ou": (OU_START, OU_END)}.items():
         if (hi - lo) % BOOK_W:
             raise ValueError(f"{name} span {hi-lo} not a multiple of {BOOK_W}")
+    if r1 is None:
+        return
+    # per-block sub-header structure (row1): open at block start, close at +9
+    for tag, lo, hi, open_lbl, close_lbl in [
+            ("euro", EURO_START, EURO_END, "欧赔-初", "欧赔-终"),
+            ("asian", ASIAN_START, ASIAN_END, "亚盘-初", "亚盘-终")]:
+        for c in book_starts(lo, hi):
+            if s(r1, c) != open_lbl or s(r1, c + 3 * TP_CLOSE) != close_lbl:
+                raise ValueError(
+                    f"{tag} block at col {c}: row1 sub-headers "
+                    f"[{s(r1, c)!r},{s(r1, c + 3*TP_CLOSE)!r}] != "
+                    f"[{open_lbl!r},{close_lbl!r}] — per-book layout drift")
 
 
 def book_starts(lo: int, hi: int) -> List[int]:
@@ -132,9 +147,10 @@ def parse_match(row, eu_starts, as_starts) -> Optional[Dict]:
         # 让球 blank in the collector == no handicap == line 0 (straight 1X2,
         # O5-comparable). Verified by the line=0 calibration in P1.
         "beidan_hcap": (0.0 if _f(row[HCAP]) is None else _f(row[HCAP])),
+        # result_code is the LABEL. Post-kickoff outcomes (score/ht_score/
+        # total_goals) are deliberately NOT stored — they must never leak into
+        # features. Re-derive from source if a future market needs them.
         "result_code": rc,
-        "score": _s(row[SCORE]), "ht_score": _s(row[HT_SCORE]),
-        "total_goals": _f(row[TOTGOALS]),
         "rank_home": parse_rank(row[RANK_H]), "rank_away": parse_rank(row[RANK_A]),
         # consensus de-vigged probs (3/1/0), close + open (for movement)
         "p_close_3": _g(eu_close, 0), "p_close_1": _g(eu_close, 1), "p_close_0": _g(eu_close, 2),
@@ -169,8 +185,8 @@ def iter_matches(xlsm_path: str) -> Iterator[Dict]:
     ws = wb["数据"]
     it = ws.iter_rows(values_only=True)
     r0 = list(next(it))
-    next(it)  # row1 sub-labels (unused; layout validated by r0)
-    validate_layout(r0)
+    r1 = list(next(it))   # row1 sub-labels — used to validate per-block structure
+    validate_layout(r0, r1)
     eu_starts = book_starts(EURO_START, EURO_END)
     as_starts = book_starts(ASIAN_START, ASIAN_END)
     for row in it:
@@ -183,12 +199,23 @@ def iter_matches(xlsm_path: str) -> Iterator[Dict]:
 
 
 COLUMNS = ["match_id", "issue", "season", "kickoff", "league", "home", "away",
-           "home_id", "away_id", "beidan_hcap", "result_code", "score", "ht_score",
-           "total_goals", "rank_home", "rank_away",
+           "home_id", "away_id", "beidan_hcap", "result_code",
+           "rank_home", "rank_away",
            "p_close_3", "p_close_1", "p_close_0", "p_open_3", "p_open_1", "p_open_0",
            "crown_close_3", "crown_close_1", "crown_close_0",
            "pinn_close_3", "pinn_close_1", "pinn_close_0",
            "asian_p_home_close", "asian_p_home_open", "asian_line"]
+
+# Explicit contract for P2: the ONLY columns a model may use as inputs (all
+# strictly pre-kickoff). result_code is the label; identity cols are keys, not
+# features. Post-kickoff outcomes are not in the table at all.
+LABEL_COLUMN = "result_code"
+FEATURE_COLUMNS = ["beidan_hcap", "rank_home", "rank_away",
+                   "p_close_3", "p_close_1", "p_close_0",
+                   "p_open_3", "p_open_1", "p_open_0",
+                   "crown_close_3", "crown_close_1", "crown_close_0",
+                   "pinn_close_3", "pinn_close_1", "pinn_close_0",
+                   "asian_p_home_close", "asian_p_home_open", "asian_line"]
 
 
 def build_sqlite(xlsm_path: str, db_path: str) -> int:
