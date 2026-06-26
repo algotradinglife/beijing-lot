@@ -315,6 +315,14 @@ def test_stable_sp_arm_row_returns_s7_ledger_row(tmp_path):
     assert row["arm"] == "S7"
     assert set(LEDGER_COLS) <= set(row)
     assert row["n_combos"] > 0
+    loose = stable_sp_arm_row(
+        pan, db, NicheConfig.load(), run_date="2026-06-21",
+        forward_start="2026-06-13", n_legs=7, arm_name="S7L",
+        start_bankroll=1_000_000.0, kelly_fraction=0.25,
+        max_odds=5.0, min_multiplier=0.75, max_abs_log_move=0.20,
+        min_stability_score=0.55,
+    )
+    assert loose["arm"] == "S7L" and loose["n_combos"] > 0
 
 
 # ---- P3 fix: QHC model must train only on pre-forward data (no leakage) ----

@@ -39,6 +39,11 @@ def main() -> None:
     # the C0/C1/C2 GATE-FT verdict.
     rows.append(F.stable_sp_arm_row(pan, LIVE, cfg, today, forward_start=F.FORWARD_START,
                                     n_legs=7))
+    # S7L: looser stable-SP contrast arm using the historical moderate gate.
+    rows.append(F.stable_sp_arm_row(
+        pan, LIVE, cfg, today, forward_start=F.FORWARD_START,
+        n_legs=7, arm_name="S7L", **F.STABLE_LOOSE,
+    ))
     ledger = F.append_ledger(rows, LEDGER)
     status = F.check_stopping_rule(ledger, F.FORWARD_START, today)
 
@@ -88,6 +93,9 @@ def main() -> None:
         "> **S7 是「1h strict stable-SP, N=7」arm**：在 1h 决策面板上只保留温和 SP、"
         "预测结算倍率不差、10h→1h 变化不剧烈的腿，然后走现有 phase5a planner 并用真实 winning_sp 结算。"
         "该 arm 是 `n7_sp_stability_gate_2026-06-26.md` 的 live OOS 纸面跟踪，不进 GATE-FT。",
+        "> **S7L 是 S7 的宽松对照 arm**：使用历史 moderate gate "
+        "`max_odds=5.0 / min_multiplier=0.75 / max_abs_log_move=0.20 / min_stability_score=0.55`，"
+        "用于观察 strict gate 是否过度饿死候选池；同样只纸面跟踪、不进 GATE-FT。",
         "> ⚠️ **运营口径差**：C1/C2 的 window 是按期次池化、每场各取其「距开赛 180min」的 SP；"
         "实盘 `kickoff_window_hours` 是「距现在 N 小时内开赛」的同时性过滤，二者不等价。"
         "经 P1 权衡分析（2026-06-14）：受 N=4 需 ≥30 场同时在池约束，任何窗口值都无法两全"

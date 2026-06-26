@@ -30,6 +30,13 @@ STABLE_STRICT = {
     "min_stability_score": 0.80,
 }
 
+STABLE_LOOSE = {
+    "max_odds": 5.0,
+    "min_multiplier": 0.75,
+    "max_abs_log_move": 0.20,
+    "min_stability_score": 0.55,
+}
+
 
 def forward_panel(panel: pd.DataFrame, min_kickoff: str) -> pd.DataFrame:
     """Keep only rows whose kickoff_ts is after min_kickoff (out-of-sample slice).
@@ -179,6 +186,7 @@ def stable_sp_decision_snapshots(
 
 
 def stable_sp_arm_row(panel, live_db_path, niche_config, run_date: str, *,
+                      arm_name: str | None = None,
                       forward_start: str = FORWARD_START, n_legs: int = 7,
                       decision_mtk: float = STABLE_MTK,
                       base_mtk: float = STABLE_BASE_MTK,
@@ -243,7 +251,7 @@ def stable_sp_arm_row(panel, live_db_path, niche_config, run_date: str, *,
 
     res = aggregate_equity(weeks, start_bankroll=start_bankroll)
     return {
-        "run_date": run_date, "arm": f"S{n_legs}", "forward_start": forward_start,
+        "run_date": run_date, "arm": arm_name or f"S{n_legs}", "forward_start": forward_start,
         "n_combos": n_tickets, "n_hits": n_hits,
         "total_stake": res["total_stake"], "total_pnl": res["total_pnl"],
         "roi": res["roi"], "max_dd": res["max_dd"],
