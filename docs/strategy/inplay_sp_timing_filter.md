@@ -88,6 +88,47 @@
 
 > **与既有 haircut 的关系**：haircut（`maybe_haircut_snapshots`）是**连续的价格修正**（按 band 把 SP 向期望结算值缩，进 EV/Kelly），本节 gate 是**离散的时点决策**（买/等/弃）。二者叠加：先 haircut 修价、再 gate 决定是否纳入及何时纳入。haircut 仍受 `haircut_enabled` 门控、由 GATE-FT 裁决；本设计不改其门控逻辑。
 
+### 5.1 主策略的 SP 稳定性优先原则
+
+新增一条资金分层原则：**主策略不追最高名义 SP，而优先选择温和、可解释、预期不剧烈漂移的 SP；高 SP / 高漂移腿只进入小资金尾仓或观察池。**
+
+理由：
+
+- 串关收益按腿相乘，单腿 SP 下修会被 N 放大；主仓承受高漂移腿，相当于在出票前就放大负滑点。
+- Phase 1 已显示 SP 档位漂移强烈分层：`<3.5` 平均上漂，`3.5-4.5` 小幅下修，`4.5-5` 下修明显，`5-8` 与 `>8` 是主漂移雷区。
+- 主策略的目标应是降低死票与极端回撤，冷门右尾收益交给尾仓；二者不要混在同一个 eligibility 规则里。
+
+落地上给每条候选腿增加一个 `sp_stability_score`，只用于决定这条腿是否能进入**主策略池**，不替代 `p/confidence/q`：
+
+```text
+sp_stability_score =
+  f(
+    sp_band,
+    predicted_final_sp_ratio,      # E(final_SP/current_SP) 或 Q0.25(final_SP/current_SP)
+    residual_drift_bucket,
+    recent_slope_1h_3h,
+    eu_deviation,
+    tail_downshift_risk
+  )
+```
+
+建议分层：
+
+| 层级 | 条件口径 | 用途 |
+|------|----------|------|
+| **主仓 core** | 温和 SP；预测 final_SP ratio 接近 1 或上漂；近 1h/3h 斜率收敛；欧赔偏离不大；tail 下修风险低 | 允许进入主策略组合，confidence 决定覆盖深度 |
+| **主仓 watch** | q/confidence 好，但 SP 稳定性一般；预测轻微下修或尚未收敛 | WAIT 或降 stake，临近重评 |
+| **尾仓 only** | 高 SP / 高 residual drift / 高 tail 下修风险，但赛果模型有冷门信号 | 只允许小资金冷门尾仓，且避免与主策略同腿重叠 |
+| **skip** | 保守 final_SP 后 edge≤0，或欧赔偏离/下修概率过大 | 不买 |
+
+这会把原先一个混合问题拆开：
+
+- `confidence`：决定多注下注时的覆盖深度；
+- `q` / `edge_after_final_sp`：决定是否值得下注；
+- `sp_stability_score`：决定进入主仓、等待、尾仓，还是跳过。
+
+后续评估口径：在 `replay_policy` / bucket 回测里新增一个 arm，比较「原主策略」vs「主策略只收 stable SP 腿」vs「stable 主策略 + cold tail」的 ROI、profit、MaxDD、死票率；结算仍必须用真实 `winning_sp`，不能用 `final` 快照代替。
+
 ## 6. 分批执行（bucket 调度方案）
 
 直接在 `generate_bucketed_plans` 之上设计调度，**不重写它**。
