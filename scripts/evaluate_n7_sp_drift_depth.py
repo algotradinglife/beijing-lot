@@ -201,6 +201,108 @@ def sp_adjusted_leg(
     )
 
 
+def odds_move_log(row: ActionRow, snapshot: str) -> float | None:
+    if snapshot == "10h":
+        return None
+    current, _ = snapshot_odds_p(row, snapshot)
+    base = row.euro_10h_odds
+    if base is None or current is None or base <= 1.0 or current <= 1.0:
+        return None
+    return math.log(current / base)
+
+
+def odds_stability_component(odds: float) -> float:
+    if odds < 3.5:
+        return 1.10
+    if odds < 4.5:
+        return 1.00
+    if odds < 5.0:
+        return 0.75
+    if odds < 8.0:
+        return 0.45
+    return 0.20
+
+
+def move_stability_component(move_log: float | None) -> float:
+    if move_log is None:
+        return 1.0
+    return max(0.25, min(1.15, math.exp(-abs(move_log) / 0.16)))
+
+
+def sp_stability_metrics(leg: Leg, sp_model: SpDriftModel) -> dict[str, float | str]:
+    odds, _ = snapshot_odds_p(leg.row, sp_model.snapshot)
+    if odds is None or odds <= 1.0:
+        return {
+            "odds": float("nan"),
+            "move_log": float("nan"),
+            "pred_multiplier": float("nan"),
+            "stability_score": float("nan"),
+            "reason": "missing_odds",
+        }
+    move_log = odds_move_log(leg.row, sp_model.snapshot)
+    multiplier = predict_sp_multiplier(sp_model, leg.row)
+    stability_score = multiplier * odds_stability_component(odds) * move_stability_component(move_log)
+    return {
+        "odds": odds,
+        "move_log": move_log if move_log is not None else float("nan"),
+        "pred_multiplier": multiplier,
+        "stability_score": stability_score,
+        "reason": "pass",
+    }
+
+
+def stable_sp_leg(
+    leg: Leg,
+    *,
+    sp_model: SpDriftModel,
+    min_score_factor: float,
+    max_odds: float,
+    min_multiplier: float,
+    max_abs_move_log: float,
+    min_stability_score: float,
+    filter_on_score: bool,
+) -> Leg | None:
+    metrics = sp_stability_metrics(leg, sp_model)
+    odds = float(metrics["odds"])
+    multiplier = float(metrics["pred_multiplier"])
+    stability_score = float(metrics["stability_score"])
+    move_log = float(metrics["move_log"])
+    if not math.isfinite(odds) or odds > max_odds:
+        return None
+    if not math.isfinite(multiplier) or multiplier < min_multiplier:
+        return None
+    if math.isfinite(move_log) and abs(move_log) > max_abs_move_log:
+        return None
+    if not math.isfinite(stability_score) or stability_score < min_stability_score:
+        return None
+    score = leg.score_factor * multiplier
+    if filter_on_score and score < min_score_factor:
+        return None
+    return replace(
+        leg,
+        strategy=f"{leg.strategy}_sp_stable",
+        score_factor=score,
+        source_rule=(
+            f"{leg.source_rule};sp_stable_mult={multiplier:.4f};"
+            f"sp_stable_score={stability_score:.4f};sp_stable_odds={odds:.3f};"
+            f"sp_stable_move_log={move_log:.4f}"
+        ),
+    )
+
+
+def stable_depth_weight(
+    base_weight: float,
+    *,
+    stability_score: float,
+    alpha: float,
+    min_weight: float,
+    max_weight: float,
+) -> float:
+    if not math.isfinite(stability_score) or stability_score <= 0:
+        return base_weight * min_weight
+    return base_weight * max(min_weight, min(max_weight, stability_score**alpha))
+
+
 def adjust_depth_weights(
     legs: list[Leg],
     depth_weights: dict[str, float],
@@ -439,6 +541,39 @@ def run(args: argparse.Namespace) -> None:
         ticket_rows.extend(settle_ticket(ticket) for ticket in sp_entry_tickets)
         coverage_rows.append(coverage_snapshot("baseline_q_sp_entry", test_issue, sp_entry_legs, sp_entry_tickets))
 
+        stable_entry_legs = [
+            converted
+            for leg in q_legs
+            if (
+                converted := stable_sp_leg(
+                    leg,
+                    sp_model=sp_model,
+                    min_score_factor=threshold,
+                    max_odds=args.stable_sp_max_odds,
+                    min_multiplier=args.stable_sp_min_multiplier,
+                    max_abs_move_log=args.stable_sp_max_abs_log_move,
+                    min_stability_score=args.stable_sp_min_score,
+                    filter_on_score=args.stable_sp_filter_on_score,
+                )
+            )
+            is not None
+        ]
+        stable_entry_tickets = make_tickets(
+            stable_entry_legs,
+            strategy="baseline_q_sp_stable",
+            issue=test_issue,
+            n_legs=args.n_legs,
+            max_tickets=args.max_tickets_per_issue,
+            overlap_penalty=args.overlap_penalty,
+            train_start_issue=train_issues[0],
+            train_end_issue=train_issues[-1],
+            full_rows=full_cover_lookup(test_action_rows),
+            action_model={},
+            protect_full_count=0,
+        )
+        ticket_rows.extend(settle_ticket(ticket) for ticket in stable_entry_tickets)
+        coverage_rows.append(coverage_snapshot("baseline_q_sp_stable", test_issue, stable_entry_legs, stable_entry_tickets))
+
         depth_counts = {}
         for policy in depth_policies:
             depth_legs, depth_weights = transform_legs_for_depth(
@@ -527,6 +662,51 @@ def run(args: argparse.Namespace) -> None:
             coverage_rows.append(coverage_snapshot(sp_entry_depth_strategy, test_issue, sp_entry_depth_legs, sp_entry_depth_tickets))
             depth_counts[sp_entry_depth_strategy] = len(sp_entry_depth_tickets)
 
+            stable_entry_depth_legs = [
+                converted
+                for leg in depth_legs
+                if (
+                    converted := stable_sp_leg(
+                        leg,
+                        sp_model=sp_model,
+                        min_score_factor=threshold,
+                        max_odds=args.stable_sp_max_odds,
+                        min_multiplier=args.stable_sp_min_multiplier,
+                        max_abs_move_log=args.stable_sp_max_abs_log_move,
+                        min_stability_score=args.stable_sp_min_score,
+                        filter_on_score=args.stable_sp_filter_on_score,
+                    )
+                )
+                is not None
+            ]
+            stable_entry_depth_weights = {}
+            for leg in stable_entry_depth_legs:
+                metrics = sp_stability_metrics(leg, sp_model)
+                stable_entry_depth_weights[leg.leg_id] = stable_depth_weight(
+                    depth_weights.get(leg.leg_id, 1.0),
+                    stability_score=float(metrics["stability_score"]),
+                    alpha=args.stable_sp_depth_alpha,
+                    min_weight=args.stable_sp_min_depth_weight,
+                    max_weight=args.stable_sp_max_depth_weight,
+                )
+            stable_entry_depth_strategy = f"{depth_strategy}_sp_stable"
+            stable_entry_depth_tickets = make_depth_weighted_tickets(
+                stable_entry_depth_legs,
+                depth_weights=stable_entry_depth_weights,
+                strategy=stable_entry_depth_strategy,
+                issue=test_issue,
+                n_legs=args.n_legs,
+                max_tickets=args.max_tickets_per_issue,
+                overlap_penalty=args.overlap_penalty,
+                train_start_issue=train_issues[0],
+                train_end_issue=train_issues[-1],
+                max_leg_uses=args.max_depth_leg_uses if policy.startswith("depth_constrained") else 0,
+                max_ticket_overlap=args.max_depth_ticket_overlap if policy.startswith("depth_constrained") else 0,
+            )
+            ticket_rows.extend(settle_ticket(ticket) for ticket in stable_entry_depth_tickets)
+            coverage_rows.append(coverage_snapshot(stable_entry_depth_strategy, test_issue, stable_entry_depth_legs, stable_entry_depth_tickets))
+            depth_counts[stable_entry_depth_strategy] = len(stable_entry_depth_tickets)
+
         row = {
             "test_issue": test_issue,
             "train_start_issue": train_issues[0],
@@ -539,6 +719,8 @@ def run(args: argparse.Namespace) -> None:
             "n_base_tickets": len(base_tickets),
             "n_sp_entry_legs": len(sp_entry_legs),
             "n_sp_entry_tickets": len(sp_entry_tickets),
+            "n_sp_stable_legs": len(stable_entry_legs),
+            "n_sp_stable_tickets": len(stable_entry_tickets),
         }
         for strategy, count in depth_counts.items():
             row[f"n_{strategy}_tickets"] = count
@@ -568,6 +750,10 @@ def run(args: argparse.Namespace) -> None:
         f"- SP feature set: `{args.sp_feature_set}`",
         f"- SP prior N: `{args.sp_prior_n}`",
         f"- SP depth alpha: `{args.sp_depth_alpha}`",
+        f"- Stable SP max odds: `{args.stable_sp_max_odds}`",
+        f"- Stable SP min multiplier: `{args.stable_sp_min_multiplier}`",
+        f"- Stable SP max abs log move: `{args.stable_sp_max_abs_log_move}`",
+        f"- Stable SP min score: `{args.stable_sp_min_score}`",
         f"- Depth policies: `{args.depth_policies}`",
         "",
         "## Strategy Summary",
@@ -620,6 +806,14 @@ def main() -> None:
     parser.add_argument("--sp-depth-alpha", type=float, default=0.50)
     parser.add_argument("--min-sp-depth-weight", type=float, default=0.60)
     parser.add_argument("--max-sp-depth-weight", type=float, default=1.60)
+    parser.add_argument("--stable-sp-max-odds", type=float, default=5.0)
+    parser.add_argument("--stable-sp-min-multiplier", type=float, default=0.75)
+    parser.add_argument("--stable-sp-max-abs-log-move", type=float, default=0.20)
+    parser.add_argument("--stable-sp-min-score", type=float, default=0.55)
+    parser.add_argument("--stable-sp-filter-on-score", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--stable-sp-depth-alpha", type=float, default=0.50)
+    parser.add_argument("--stable-sp-min-depth-weight", type=float, default=0.65)
+    parser.add_argument("--stable-sp-max-depth-weight", type=float, default=1.35)
     args = parser.parse_args()
     if not args.db.exists():
         raise SystemExit(f"DB not found: {args.db}")
