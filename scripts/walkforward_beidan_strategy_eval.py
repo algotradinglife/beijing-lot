@@ -150,11 +150,16 @@ def as_float(value: object) -> float | None:
     return out
 
 
-def load_action_rows(db_path: Path, min_year: int) -> list[ActionRow]:
+def load_action_rows(db_path: Path, min_year: int, settlement_quality: str | None = None) -> list[ActionRow]:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    quality_clause = ""
+    quality_params: list[object] = []
+    if settlement_quality:
+        quality_clause = "AND settlement_quality = ?"
+        quality_params.append(settlement_quality)
 
-    outcome_sql = """
+    outcome_sql = f"""
         SELECT
             match_id,
             outcome_code,
@@ -173,14 +178,15 @@ def load_action_rows(db_path: Path, min_year: int) -> list[ActionRow]:
         FROM outcome_features
         WHERE has_winning_sp = 1
           AND season_year >= ?
+          {quality_clause}
           AND outcome_code IN ('3','1','0')
     """
     outcome_map: dict[tuple[int, str], sqlite3.Row] = {
         (int(r["match_id"]), str(r["outcome_code"])): r
-        for r in conn.execute(outcome_sql, (min_year,))
+        for r in conn.execute(outcome_sql, [min_year, *quality_params])
     }
 
-    sql = """
+    sql = f"""
         SELECT
             ac.match_id,
             ac.issue,
@@ -200,6 +206,7 @@ def load_action_rows(db_path: Path, min_year: int) -> list[ActionRow]:
         FROM action_candidates ac
         WHERE ac.has_winning_sp = 1
           AND ac.season_year >= ?
+          {quality_clause}
           AND ac.handicap_line_norm IS NOT NULL
           AND ac.winning_sp IS NOT NULL
           AND ac.winning_sp > 0
@@ -207,7 +214,7 @@ def load_action_rows(db_path: Path, min_year: int) -> list[ActionRow]:
         ORDER BY ac.issue, ac.match_idx, ac.action_code
     """
     out: list[ActionRow] = []
-    for r in conn.execute(sql, (min_year,)):
+    for r in conn.execute(sql, [min_year, *quality_params]):
         of = outcome_map.get((int(r["match_id"]), str(r["action_code"])))
         out.append(
             ActionRow(

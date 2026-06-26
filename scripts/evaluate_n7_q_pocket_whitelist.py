@@ -567,8 +567,12 @@ def leg_detail_rows(legs: list[Leg], metas: dict[str, LegMeta], strategy: str, i
 
 
 def run(args: argparse.Namespace) -> None:
-    action_rows = load_action_rows(args.db, args.min_year)
-    samples = build_samples(action_rows, load_match_extras(args.db, args.min_year))
+    settlement_quality = None if args.settlement_quality == "any" else args.settlement_quality
+    action_rows = load_action_rows(args.db, args.min_year, settlement_quality=settlement_quality)
+    samples = build_samples(
+        action_rows,
+        load_match_extras(args.db, args.min_year, settlement_quality=settlement_quality),
+    )
     action_by_issue = group_action_rows_by_issue(action_rows)
     samples_by_issue = group_samples_by_issue(samples)
     issues = sorted(samples_by_issue)
@@ -737,6 +741,7 @@ def run(args: argparse.Namespace) -> None:
         f"- DB: `{args.db}`",
         f"- Snapshot: `{args.snapshot}`",
         f"- Train issues: `{args.train_issues}`",
+        f"- Settlement quality: `{args.settlement_quality}`",
         f"- Depth policy: `{args.depth_policy}`",
         f"- Same-budget issue stake: `{args.issue_budget_units}`",
         f"- Gate specs: `{args.gate_specs}`",
@@ -784,6 +789,7 @@ def main() -> None:
     parser.add_argument("--min-factor-margin", type=float, default=0.0)
     parser.add_argument("--depth-policy", default="depth_constrained_hybrid")
     parser.add_argument("--gate-specs", default="all")
+    parser.add_argument("--settlement-quality", choices=("any", "trusted", "mismatch", "missing_sp"), default="any")
     args = parser.parse_args()
     if not args.db.exists():
         raise SystemExit(f"DB not found: {args.db}")

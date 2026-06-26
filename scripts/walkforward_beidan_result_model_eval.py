@@ -146,18 +146,30 @@ def rel_range(avg: float | None, lo: float | None, hi: float | None) -> float:
     return (float(hi) - float(lo)) / abs(float(avg))
 
 
-def load_match_extras(db_path: Path, min_year: int) -> dict[int, dict[str, float]]:
+def load_match_extras(
+    db_path: Path,
+    min_year: int,
+    settlement_quality: str | None = None,
+) -> dict[int, dict[str, float]]:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     extras: dict[int, dict[str, float]] = defaultdict(dict)
+    quality_clause = ""
+    quality_clause_with_alias = ""
+    quality_params: list[object] = []
+    if settlement_quality:
+        quality_clause = "AND settlement_quality = ?"
+        quality_clause_with_alias = "AND mf.settlement_quality = ?"
+        quality_params.append(settlement_quality)
     for r in conn.execute(
-        """
+        f"""
         SELECT match_id, home_rank, away_rank,
                history_avg_eu_home, history_avg_eu_draw, history_avg_eu_away
         FROM match_features
         WHERE has_winning_sp=1 AND season_year>=?
+          {quality_clause}
         """,
-        (min_year,),
+        [min_year, *quality_params],
     ):
         mid = int(r["match_id"])
         hr, hr_missing = parse_rank(r["home_rank"])
@@ -183,16 +195,17 @@ def load_match_extras(db_path: Path, min_year: int) -> dict[int, dict[str, float
             e["hist_eu_home_p"] = e["hist_eu_draw_p"] = e["hist_eu_away_p"] = 0.0
 
     market_rows = conn.execute(
-        """
+        f"""
         SELECT mc.*
         FROM market_consensus mc
         JOIN match_features mf ON mf.match_id = mc.match_id
         WHERE mf.has_winning_sp=1
           AND mf.season_year>=?
+          {quality_clause_with_alias}
           AND mc.market IN ('euro_1x2','asian_handicap','over_under')
           AND mc.snapshot IN ('final','10h')
         """,
-        (min_year,),
+        [min_year, *quality_params],
     )
     for r in market_rows:
         mid = int(r["match_id"])
