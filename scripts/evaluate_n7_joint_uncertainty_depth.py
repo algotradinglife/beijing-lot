@@ -43,6 +43,7 @@ from scripts.evaluate_n7_sp_drift_depth import (
     predict_sp_multiplier,
     train_sp_drift_model,
 )
+from scripts.snapshot_pure_result_model import fit_predict_snapshot_pure
 from scripts.walkforward_beidan_result_model_eval import OUTCOMES, build_samples, load_match_extras
 from scripts.walkforward_beidan_strategy_eval import (
     ActionRow,
@@ -141,6 +142,16 @@ def snapshot_market_probabilities(samples, snapshot: str) -> np.ndarray:
 def decision_probabilities(args, train_samples, test_samples) -> np.ndarray:
     if args.model_source == "snapshot_market":
         return snapshot_market_probabilities(test_samples, args.snapshot)
+    if args.model_source == "snapshot_pure":
+        probs, _ = fit_predict_snapshot_pure(
+            train_samples,
+            test_samples,
+            snapshot=args.snapshot,
+            feature_set=args.feature_set,
+            l2=args.l2,
+            maxiter=args.maxiter,
+        )
+        return probs
     return trained_model_probabilities(args, train_samples, test_samples)
 
 
@@ -805,8 +816,24 @@ def main() -> None:
     parser.add_argument("--snapshot", choices=("final", "1h", "10h"), default="1h")
     parser.add_argument("--q-prior-n", type=int, default=80)
     parser.add_argument("--min-factor-margin", type=float, default=0.0)
-    parser.add_argument("--model-source", choices=("snapshot_market", "multiclass", "ovr_shared", "ovr_separate"), default="snapshot_market")
-    parser.add_argument("--feature-set", choices=("base", "kelly", "priors", "extras", "rich", "team", "team_rich"), default="base")
+    parser.add_argument("--model-source", choices=("snapshot_market", "snapshot_pure", "multiclass", "ovr_shared", "ovr_separate"), default="snapshot_market")
+    parser.add_argument(
+        "--feature-set",
+        choices=(
+            "snapshot",
+            "snapshot_priors",
+            "snapshot_kelly",
+            "snapshot_full",
+            "base",
+            "kelly",
+            "priors",
+            "extras",
+            "rich",
+            "team",
+            "team_rich",
+        ),
+        default="snapshot_priors",
+    )
     parser.add_argument("--l2", type=float, default=0.01)
     parser.add_argument("--class-weight", choices=("none", "balanced"), default="none")
     parser.add_argument("--maxiter", type=int, default=120)
