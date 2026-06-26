@@ -20,6 +20,15 @@ FORWARD_START = "2026-06-13"  # naive Beijing date; kickoffs after this are OOS
 HAIRCUT_MAP = {"<3.5": 0.33, "3.5-4.5": -0.09, "4.5-5": -0.21, "5-8": -0.36, ">8": -0.81}
 
 WINDOW_MTK = 180.0  # 3h, mirrors the live kickoff_window_hours=3 (MTK proxy)
+STABLE_MTK = 60.0   # 1h, descriptive stable-SP main-strategy arm.
+STABLE_BASE_MTK = 600.0
+
+STABLE_STRICT = {
+    "max_odds": 4.5,
+    "min_multiplier": 0.85,
+    "max_abs_log_move": 0.12,
+    "min_stability_score": 0.80,
+}
 
 
 def forward_panel(panel: pd.DataFrame, min_kickoff: str) -> pd.DataFrame:
@@ -72,6 +81,175 @@ def build_qhc_arm(model, decision_mtk: float = WINDOW_MTK,
     recovers value the frozen-band C2 haircut misses. Descriptive, not GATE-FT."""
     return ("QHC", Policy(mtk_target=decision_mtk,
                           sp_adjust=lambda sp: model.adjusted_sp(sp, decision_mtk, q)))
+
+
+def _odds_stability_component(odds: float) -> float:
+    if odds < 3.5:
+        return 1.10
+    if odds < 4.5:
+        return 1.00
+    if odds < 5.0:
+        return 0.75
+    if odds < 8.0:
+        return 0.45
+    return 0.20
+
+
+def _move_stability_component(move_log: float | None) -> float:
+    import math
+    if move_log is None:
+        return 1.0
+    return max(0.25, min(1.15, math.exp(-abs(move_log) / 0.16)))
+
+
+def stable_sp_decision_snapshots(
+    panel: pd.DataFrame,
+    model,
+    *,
+    forward_start: str = FORWARD_START,
+    decision_mtk: float = STABLE_MTK,
+    base_mtk: float = STABLE_BASE_MTK,
+    max_odds: float = STABLE_STRICT["max_odds"],
+    min_multiplier: float = STABLE_STRICT["min_multiplier"],
+    max_abs_log_move: float = STABLE_STRICT["max_abs_log_move"],
+    min_stability_score: float = STABLE_STRICT["min_stability_score"],
+):
+    """Return 1h decision LiveSnapshots with unstable selections nulled out.
+
+    This is the live-forward analogue of the XLSM `baseline_q_sp_stable` gate:
+    moderate SP, predicted settlement ratio not too adverse, and small recent
+    move from 10h to 1h. It is descriptive and does not alter C0/C1/C2.
+    """
+    import math
+
+    from src.phase5a.data_loader import LiveSnapshot
+    from src.sp_drift import panel as P
+
+    fp = forward_panel(panel, forward_start)
+    dec = P.decision_view(fp, mtk_target=decision_mtk)
+    base = P.decision_view(fp, mtk_target=base_mtk)
+    base_sp = {
+        (str(r["match_id"]), str(r["selection"])): float(r["sp"])
+        for _, r in base.iterrows()
+        if r["sp"] and float(r["sp"]) > 1.0
+    }
+
+    out = []
+    for mid, grp in dec.groupby("match_id"):
+        any_row = grp.iloc[0]
+        kept: dict[str, float] = {}
+        for _, row in grp.iterrows():
+            sel = str(row["selection"])
+            sp = float(row["sp"])
+            if sp <= 1.0 or sp > max_odds:
+                continue
+            multiplier, _sd, _n = model.lookup(sp, float(row["mtk"]))
+            if multiplier < min_multiplier:
+                continue
+            b = base_sp.get((str(mid), sel))
+            move_log = None
+            if b is not None and b > 1.0:
+                move_log = math.log(sp / b)
+                if abs(move_log) > max_abs_log_move:
+                    continue
+            stability_score = multiplier * _odds_stability_component(sp) * _move_stability_component(move_log)
+            if stability_score < min_stability_score:
+                continue
+            kept[sel] = sp
+
+        if not kept:
+            continue
+        out.append(
+            LiveSnapshot(
+                match_id=str(mid),
+                issue=str(any_row["issue"]),
+                match_idx=int(any_row["match_idx"]),
+                league=any_row["league"],
+                kickoff_ts=str(any_row["kickoff_ts"]),
+                home=None,
+                away=None,
+                handicap_line=(None if pd.isna(any_row["handicap_line"]) else float(any_row["handicap_line"])),
+                sp_3=kept.get("3"),
+                sp_1=kept.get("1"),
+                sp_0=kept.get("0"),
+                snapshot_ts=None,
+            )
+        )
+    return out
+
+
+def stable_sp_arm_row(panel, live_db_path, niche_config, run_date: str, *,
+                      forward_start: str = FORWARD_START, n_legs: int = 7,
+                      decision_mtk: float = STABLE_MTK,
+                      base_mtk: float = STABLE_BASE_MTK,
+                      start_bankroll: float = 100000.0,
+                      kelly_fraction: float = 0.0625,
+                      combo_ev_threshold: float = 0.05,
+                      weekly_stake_cap_frac: float = 0.25,
+                      max_odds: float = STABLE_STRICT["max_odds"],
+                      min_multiplier: float = STABLE_STRICT["min_multiplier"],
+                      max_abs_log_move: float = STABLE_STRICT["max_abs_log_move"],
+                      min_stability_score: float = STABLE_STRICT["min_stability_score"]) -> dict:
+    """Descriptive stable-SP N=7 paper arm.
+
+    Trains the drift model on pre-forward data only, filters the 1h live panel
+    with the strict stable-SP gate, then uses the existing planner and settles
+    against true `winning_sp`. Not part of the C0/C1/C2 GATE-FT verdict.
+    """
+    from src.backtest_combo.settler import settle_plans
+    from src.phase5a.planner import build_weekly_plan
+    from src.sp_drift.drift_model import fit_drift_model
+    from src.sp_drift.replay import actuals_from_db, aggregate_equity
+
+    model = fit_drift_model(training_panel(panel, forward_start))
+    snaps = stable_sp_decision_snapshots(
+        panel,
+        model,
+        forward_start=forward_start,
+        decision_mtk=decision_mtk,
+        base_mtk=base_mtk,
+        max_odds=max_odds,
+        min_multiplier=min_multiplier,
+        max_abs_log_move=max_abs_log_move,
+        min_stability_score=min_stability_score,
+    )
+    actuals = actuals_from_db(live_db_path)
+
+    by_issue: dict = {}
+    for snap in snaps:
+        by_issue.setdefault(snap.issue, []).append(snap)
+
+    bankroll = start_bankroll
+    weeks = []
+    n_tickets = 0
+    n_hits = 0
+    for issue in sorted(by_issue):
+        pr = build_weekly_plan(
+            by_issue[issue],
+            bankroll=bankroll,
+            niche_config=niche_config,
+            n_legs=n_legs,
+            kelly_fraction=kelly_fraction,
+            combo_ev_threshold=combo_ev_threshold,
+            weekly_stake_cap_frac=weekly_stake_cap_frac,
+        )
+        setts = settle_plans(pr.tickets, actuals)
+        stake = float(sum(t.total_stake for t in pr.tickets))
+        pnl = float(sum(s.total_profit for s in setts))
+        n_tickets += len(pr.tickets)
+        n_hits += sum(1 for s in setts if s.all_hit)
+        weeks.append((issue, stake, pnl))
+        bankroll += pnl
+
+    res = aggregate_equity(weeks, start_bankroll=start_bankroll)
+    return {
+        "run_date": run_date, "arm": f"S{n_legs}", "forward_start": forward_start,
+        "n_combos": n_tickets, "n_hits": n_hits,
+        "total_stake": res["total_stake"], "total_pnl": res["total_pnl"],
+        "roi": res["roi"], "max_dd": res["max_dd"],
+        "final_bankroll": res["final_bankroll"],
+        "weekly_sigma": _weekly_sigma(res.get("equity", [])),
+    }
 
 
 LEDGER_COLS = ["run_date", "arm", "forward_start", "n_combos", "n_hits",

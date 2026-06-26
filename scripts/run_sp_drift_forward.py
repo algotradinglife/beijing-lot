@@ -34,6 +34,11 @@ def main() -> None:
     # FAV5: descriptive 'bet the favorite, N=5' arm (flat-staked, not GATE-FT).
     rows.append(F.favorite_arm_row(pan, LIVE, today, forward_start=F.FORWARD_START,
                                    n_legs=5, mtk_target=baseline))
+    # S7: descriptive 1h strict stable-SP N=7 arm. It is a paper-only follow-up
+    # to docs/research/n7_sp_stability_gate_2026-06-26.md and is not part of
+    # the C0/C1/C2 GATE-FT verdict.
+    rows.append(F.stable_sp_arm_row(pan, LIVE, cfg, today, forward_start=F.FORWARD_START,
+                                    n_legs=7))
     ledger = F.append_ledger(rows, LEDGER)
     status = F.check_stopping_rule(ledger, F.FORWARD_START, today)
 
@@ -80,6 +85,9 @@ def main() -> None:
         "> **FAV5 是「押每场最热门(最低SP)、N=5」arm**（平注，非 Kelly）：检验"
         "「抽水每票一次×热门 realized p×SP>1×中等N」的假说（见 high_n_favorite_parlay 研究）；"
         "roi/命中率/周σ 为有效指标，其 MaxDD 与 Kelly-sized 的 C/N arm 不可直接比；不进 GATE-FT。",
+        "> **S7 是「1h strict stable-SP, N=7」arm**：在 1h 决策面板上只保留温和 SP、"
+        "预测结算倍率不差、10h→1h 变化不剧烈的腿，然后走现有 phase5a planner 并用真实 winning_sp 结算。"
+        "该 arm 是 `n7_sp_stability_gate_2026-06-26.md` 的 live OOS 纸面跟踪，不进 GATE-FT。",
         "> ⚠️ **运营口径差**：C1/C2 的 window 是按期次池化、每场各取其「距开赛 180min」的 SP；"
         "实盘 `kickoff_window_hours` 是「距现在 N 小时内开赛」的同时性过滤，二者不等价。"
         "经 P1 权衡分析（2026-06-14）：受 N=4 需 ≥30 场同时在池约束，任何窗口值都无法两全"

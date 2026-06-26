@@ -247,6 +247,76 @@ def test_run_forward_includes_qhc_arm(tmp_path):
     assert set(LEDGER_COLS) <= set(qhc)
 
 
+def test_stable_sp_decision_snapshots_filters_unstable_legs():
+    from src.sp_drift.forward import stable_sp_decision_snapshots
+
+    class NeutralModel:
+        def lookup(self, sp, mtk):
+            return (1.0, 0.0, 10)
+
+    panel = pd.DataFrame([
+        # M1 passes: odds <= 4.5 and small 10h->1h move.
+        {"match_id": "M1", "selection": "3", "sp": 4.0, "mtk": 600.0, "kickoff_ts": "2026-06-20T19:00:00",
+         "issue": "26099", "match_idx": 1, "league": "英超", "handicap_line": 2.0},
+        {"match_id": "M1", "selection": "3", "sp": 4.05, "mtk": 60.0, "kickoff_ts": "2026-06-20T19:00:00",
+         "issue": "26099", "match_idx": 1, "league": "英超", "handicap_line": 2.0},
+        # M2 fails max_odds.
+        {"match_id": "M2", "selection": "3", "sp": 5.2, "mtk": 600.0, "kickoff_ts": "2026-06-20T19:00:00",
+         "issue": "26099", "match_idx": 2, "league": "英超", "handicap_line": 2.0},
+        {"match_id": "M2", "selection": "3", "sp": 5.2, "mtk": 60.0, "kickoff_ts": "2026-06-20T19:00:00",
+         "issue": "26099", "match_idx": 2, "league": "英超", "handicap_line": 2.0},
+        # M3 fails recent move.
+        {"match_id": "M3", "selection": "3", "sp": 3.0, "mtk": 600.0, "kickoff_ts": "2026-06-20T19:00:00",
+         "issue": "26099", "match_idx": 3, "league": "英超", "handicap_line": 2.0},
+        {"match_id": "M3", "selection": "3", "sp": 4.4, "mtk": 60.0, "kickoff_ts": "2026-06-20T19:00:00",
+         "issue": "26099", "match_idx": 3, "league": "英超", "handicap_line": 2.0},
+    ])
+    snaps = stable_sp_decision_snapshots(panel, NeutralModel(), forward_start="2026-06-13")
+    assert [s.match_id for s in snaps] == ["M1"]
+    assert snaps[0].sp_3 == 4.05 and snaps[0].sp_1 is None and snaps[0].sp_0 is None
+
+
+def test_stable_sp_arm_row_returns_s7_ledger_row(tmp_path):
+    from src.sp_drift.forward import stable_sp_arm_row
+
+    db = tmp_path / "stable.db"
+    con = sqlite3.connect(db)
+    con.executescript(
+        "CREATE TABLE matches (match_id TEXT PRIMARY KEY, issue TEXT, match_idx INTEGER,"
+        " league TEXT, kickoff_ts TEXT, home TEXT, away TEXT, handicap_line REAL);"
+        "CREATE TABLE snapshots (id INTEGER PRIMARY KEY AUTOINCREMENT, match_id TEXT,"
+        " snapshot_ts TEXT, sp_3 REAL, sp_1 REAL, sp_0 REAL, vol_pct_3 REAL,"
+        " vol_pct_1 REAL, vol_pct_0 REAL, pool_total REAL);"
+        "CREATE TABLE settlements (match_id TEXT, result_code TEXT, winning_sp REAL);")
+    for phase, issue, kickoff in [
+        ("train", "26040", "2026-06-10T19:35:00"),
+        ("forward", "26099", "2026-06-20T19:35:00"),
+    ]:
+        day = "2026-06-10" if phase == "train" else "2026-06-20"
+        for i in range(1, 9):
+            mid = f"{phase}_{i}"
+            con.execute("INSERT INTO matches VALUES (?,?,?,?,?,?,?,?)",
+                        (mid, issue, i, "英超", kickoff, "H", "A", 1.0))
+            # 10h and 1h snapshots. Stable away SP fits the phase5a
+            # away_sp_3.0-3.5_h1 rule and remains below the N=7 tax-cap cliff.
+            con.execute("INSERT INTO snapshots (match_id,snapshot_ts,sp_3,sp_1,sp_0,"
+                        "vol_pct_3,vol_pct_1,vol_pct_0,pool_total) VALUES (?,?,?,?,?,?,?,?,?)",
+                        (mid, f"{day}T01:35:00Z", 2.5, 2.4, 3.4, 0, 0, 0, 1000))
+            con.execute("INSERT INTO snapshots (match_id,snapshot_ts,sp_3,sp_1,sp_0,"
+                        "vol_pct_3,vol_pct_1,vol_pct_0,pool_total) VALUES (?,?,?,?,?,?,?,?,?)",
+                        (mid, f"{day}T10:35:00Z", 2.5, 2.4, 3.4, 0, 0, 0, 1000))
+            con.execute("INSERT INTO settlements VALUES (?,?,?)", (mid, "0", 3.4))
+    con.commit(); con.close()
+
+    pan = P.build(db, cache_path=tmp_path / "stable.parquet", rebuild=True)
+    row = stable_sp_arm_row(pan, db, NicheConfig.load(), run_date="2026-06-21",
+                            forward_start="2026-06-13", n_legs=7,
+                            start_bankroll=1_000_000.0, kelly_fraction=0.25)
+    assert row["arm"] == "S7"
+    assert set(LEDGER_COLS) <= set(row)
+    assert row["n_combos"] > 0
+
+
 # ---- P3 fix: QHC model must train only on pre-forward data (no leakage) ----
 def test_training_panel_is_preforward_complement():
     from src.sp_drift.forward import training_panel
