@@ -15,6 +15,16 @@ def column_exists(conn: sqlite3.Connection, table: str, column: str) -> bool:
     return any(row[1] == column for row in conn.execute(f"PRAGMA table_info({table})"))
 
 
+def table_exists(conn: sqlite3.Connection, table: str, schema: str = "main") -> bool:
+    return (
+        conn.execute(
+            f"SELECT 1 FROM {schema}.sqlite_master WHERE type='table' AND name=?",
+            (table,),
+        ).fetchone()
+        is not None
+    )
+
+
 def exec_step(conn: sqlite3.Connection, label: str, sql: str) -> None:
     started = time.time()
     print(f"[build] {label}...", flush=True)
@@ -23,7 +33,67 @@ def exec_step(conn: sqlite3.Connection, label: str, sql: str) -> None:
     print(f"[build] {label} done in {elapsed:.1f}s", flush=True)
 
 
-def build(sqlite_path: Path, history_db: Path) -> None:
+def ensure_optional_sources(conn: sqlite3.Connection, history_db: Path | None) -> None:
+    if history_db is not None:
+        conn.execute(f"ATTACH DATABASE '{history_db}' AS hist")
+    else:
+        conn.execute("ATTACH DATABASE ':memory:' AS hist")
+        conn.execute(
+            """
+            CREATE TABLE hist.historical_matches (
+                id INTEGER,
+                issue TEXT,
+                match_idx INTEGER,
+                result_code TEXT,
+                winning_sp REAL,
+                fthg INTEGER,
+                ftag INTEGER,
+                handicap_line REAL,
+                avg_eu_home REAL,
+                avg_eu_draw REAL,
+                avg_eu_away REAL
+            )
+            """
+        )
+
+    if not table_exists(conn, "official_3sp_settlements"):
+        conn.execute(
+            """
+            CREATE TEMP TABLE official_3sp_settlements (
+                issue TEXT,
+                match_idx INTEGER,
+                handicap_line REAL,
+                fthg INTEGER,
+                ftag INTEGER,
+                result_code TEXT,
+                winning_sp REAL,
+                sp_3 REAL,
+                sp_1 REAL,
+                sp_0 REAL
+            )
+            """
+        )
+
+    if not table_exists(conn, "official_500_settlements"):
+        conn.execute(
+            """
+            CREATE TEMP TABLE official_500_settlements (
+                issue TEXT,
+                match_idx INTEGER,
+                handicap_line REAL,
+                fthg INTEGER,
+                ftag INTEGER,
+                result_code TEXT,
+                winning_sp REAL,
+                avg_odds_home REAL,
+                avg_odds_draw REAL,
+                avg_odds_away REAL
+            )
+            """
+        )
+
+
+def build(sqlite_path: Path, history_db: Path | None) -> None:
     conn = sqlite3.connect(sqlite_path)
     conn.execute("PRAGMA temp_store=MEMORY")
     conn.execute("PRAGMA cache_size=-1000000")
@@ -33,7 +103,7 @@ def build(sqlite_path: Path, history_db: Path) -> None:
             "matches.handicap_line_norm is missing. Run "
             "scripts/normalize_beidan_xlsm_handicap.py first."
         )
-    conn.execute(f"ATTACH DATABASE '{history_db}' AS hist")
+    ensure_optional_sources(conn, history_db)
 
     exec_step(
         conn,
@@ -86,54 +156,108 @@ def build(sqlite_path: Path, history_db: Path) -> None:
         "match_features",
         """
         CREATE TABLE match_features AS
+        WITH raw AS (
+            SELECT
+                m.match_id,
+                m.issue,
+                m.match_idx,
+                m.kickoff_ts,
+                CAST(substr(m.kickoff_ts, 1, 4) AS INTEGER) AS season_year,
+                m.league,
+                m.home,
+                m.away,
+                m.score,
+                m.home_rank,
+                m.away_rank,
+                m.handicap_line AS handicap_line_raw,
+                m.handicap_line_norm,
+                m.handicap_norm_source,
+                m.result_label,
+                CASE m.result_label
+                    WHEN '胜' THEN '3'
+                    WHEN '平' THEN '1'
+                    WHEN '负' THEN '0'
+                    ELSE NULL
+                END AS result_code_from_label,
+                s.result_code AS result_code_3sp,
+                f.result_code AS result_code_500,
+                h.result_code AS result_code_history,
+                COALESCE(s.result_code, f.result_code, h.result_code, CASE m.result_label
+                    WHEN '胜' THEN '3'
+                    WHEN '平' THEN '1'
+                    WHEN '负' THEN '0'
+                    ELSE NULL
+                END) AS result_code,
+                COALESCE(s.winning_sp, f.winning_sp, h.winning_sp) AS winning_sp,
+                COALESCE(s.fthg, f.fthg, h.fthg) AS fthg,
+                COALESCE(s.ftag, f.ftag, h.ftag) AS ftag,
+                COALESCE(s.handicap_line, f.handicap_line, h.handicap_line) AS handicap_line_history,
+                COALESCE(f.avg_odds_home, h.avg_eu_home) AS history_avg_eu_home,
+                COALESCE(f.avg_odds_draw, h.avg_eu_draw) AS history_avg_eu_draw,
+                COALESCE(f.avg_odds_away, h.avg_eu_away) AS history_avg_eu_away,
+                f.avg_odds_home AS official_500_avg_eu_home,
+                f.avg_odds_draw AS official_500_avg_eu_draw,
+                f.avg_odds_away AS official_500_avg_eu_away,
+                s.sp_3 AS official_sp_3,
+                s.sp_1 AS official_sp_1,
+                s.sp_0 AS official_sp_0,
+                CASE WHEN s.issue IS NOT NULL THEN 1 ELSE 0 END AS has_3sp_join,
+                CASE WHEN f.issue IS NOT NULL THEN 1 ELSE 0 END AS has_500_join,
+                CASE WHEN h.id IS NOT NULL THEN 1 ELSE 0 END AS has_history_join,
+                CASE
+                    WHEN s.winning_sp IS NOT NULL AND s.winning_sp > 0 THEN 1
+                    WHEN f.winning_sp IS NOT NULL AND f.winning_sp > 0 THEN 1
+                    WHEN h.winning_sp IS NOT NULL AND h.winning_sp > 0 THEN 1
+                    ELSE 0
+                END AS has_winning_sp,
+                CASE
+                    WHEN s.winning_sp IS NOT NULL AND s.winning_sp > 0 THEN 'official_3sp_csv'
+                    WHEN f.winning_sp IS NOT NULL AND f.winning_sp > 0 THEN 'official_500_history'
+                    WHEN h.winning_sp IS NOT NULL AND h.winning_sp > 0 THEN 'history_db'
+                    ELSE NULL
+                END AS winning_sp_source
+            FROM matches m
+            LEFT JOIN official_3sp_settlements s
+              ON s.issue = m.issue
+             AND s.match_idx = m.match_idx
+            LEFT JOIN official_500_settlements f
+              ON f.issue = m.issue
+             AND f.match_idx = m.match_idx
+            LEFT JOIN hist.historical_matches h
+              ON h.issue = m.issue
+             AND h.match_idx = m.match_idx
+        ),
+        scored AS (
+            SELECT
+                raw.*,
+                CASE
+                    WHEN fthg IS NULL OR ftag IS NULL OR handicap_line_history IS NULL THEN NULL
+                    WHEN fthg + handicap_line_history > ftag THEN '3'
+                    WHEN fthg + handicap_line_history < ftag THEN '0'
+                    ELSE '1'
+                END AS result_code_from_score_hcp
+            FROM raw
+        )
         SELECT
-            m.match_id,
-            m.issue,
-            m.match_idx,
-            m.kickoff_ts,
-            CAST(substr(m.kickoff_ts, 1, 4) AS INTEGER) AS season_year,
-            m.league,
-            m.home,
-            m.away,
-            m.score,
-            m.home_rank,
-            m.away_rank,
-            m.handicap_line AS handicap_line_raw,
-            m.handicap_line_norm,
-            m.handicap_norm_source,
-            m.result_label,
-            CASE m.result_label
-                WHEN '胜' THEN '3'
-                WHEN '平' THEN '1'
-                WHEN '负' THEN '0'
-                ELSE NULL
-            END AS result_code_from_label,
-            h.result_code AS result_code_history,
-            COALESCE(h.result_code, CASE m.result_label
-                WHEN '胜' THEN '3'
-                WHEN '平' THEN '1'
-                WHEN '负' THEN '0'
-                ELSE NULL
-            END) AS result_code,
-            h.winning_sp,
-            h.fthg,
-            h.ftag,
-            h.handicap_line AS handicap_line_history,
-            h.avg_eu_home AS history_avg_eu_home,
-            h.avg_eu_draw AS history_avg_eu_draw,
-            h.avg_eu_away AS history_avg_eu_away,
-            CASE WHEN h.id IS NOT NULL THEN 1 ELSE 0 END AS has_history_join,
-            CASE WHEN h.winning_sp IS NOT NULL AND h.winning_sp > 0 THEN 1 ELSE 0 END AS has_winning_sp
-        FROM matches m
-        LEFT JOIN hist.historical_matches h
-          ON h.issue = m.issue
-         AND h.match_idx = m.match_idx;
+            scored.*,
+            CASE
+                WHEN winning_sp IS NULL OR winning_sp <= 0 OR result_code IS NULL THEN 'missing_sp'
+                WHEN result_code_from_score_hcp IS NOT NULL AND result_code <> result_code_from_score_hcp THEN 'mismatch'
+                ELSE 'trusted'
+            END AS settlement_quality,
+            CASE
+                WHEN winning_sp IS NULL OR winning_sp <= 0 OR result_code IS NULL THEN 0
+                WHEN result_code_from_score_hcp IS NOT NULL AND result_code <> result_code_from_score_hcp THEN 0
+                ELSE 1
+            END AS has_trusted_settlement
+        FROM scored;
 
         CREATE INDEX idx_match_features_match ON match_features(match_id);
         CREATE INDEX idx_match_features_issue_idx ON match_features(issue, match_idx);
         CREATE INDEX idx_match_features_league ON match_features(league);
         CREATE INDEX idx_match_features_hcp ON match_features(handicap_line_norm);
         CREATE INDEX idx_match_features_has_sp ON match_features(has_winning_sp);
+        CREATE INDEX idx_match_features_quality ON match_features(settlement_quality);
         """,
     )
 
@@ -184,6 +308,7 @@ def build(sqlite_path: Path, history_db: Path) -> None:
         SELECT
             match_id, issue, match_idx, kickoff_ts, season_year, league,
             handicap_line_norm, result_code, winning_sp, has_winning_sp,
+            settlement_quality, has_trusted_settlement,
             '3' AS outcome_code,
             CASE WHEN result_code = '3' THEN 1 WHEN result_code IS NULL THEN NULL ELSE 0 END AS hit,
             ef_h AS euro_final_odds,
@@ -208,6 +333,7 @@ def build(sqlite_path: Path, history_db: Path) -> None:
         SELECT
             match_id, issue, match_idx, kickoff_ts, season_year, league,
             handicap_line_norm, result_code, winning_sp, has_winning_sp,
+            settlement_quality, has_trusted_settlement,
             '1' AS outcome_code,
             CASE WHEN result_code = '1' THEN 1 WHEN result_code IS NULL THEN NULL ELSE 0 END AS hit,
             ef_d AS euro_final_odds,
@@ -232,6 +358,7 @@ def build(sqlite_path: Path, history_db: Path) -> None:
         SELECT
             match_id, issue, match_idx, kickoff_ts, season_year, league,
             handicap_line_norm, result_code, winning_sp, has_winning_sp,
+            settlement_quality, has_trusted_settlement,
             '0' AS outcome_code,
             CASE WHEN result_code = '0' THEN 1 WHEN result_code IS NULL THEN NULL ELSE 0 END AS hit,
             ef_a AS euro_final_odds,
@@ -256,6 +383,7 @@ def build(sqlite_path: Path, history_db: Path) -> None:
         CREATE INDEX idx_outcome_features_match ON outcome_features(match_id);
         CREATE INDEX idx_outcome_features_code ON outcome_features(outcome_code);
         CREATE INDEX idx_outcome_features_hit ON outcome_features(has_winning_sp, hit);
+        CREATE INDEX idx_outcome_features_quality ON outcome_features(settlement_quality);
         CREATE INDEX idx_outcome_features_rank ON outcome_features(euro_final_rank);
         CREATE INDEX idx_outcome_features_league ON outcome_features(league);
         """,
@@ -294,6 +422,8 @@ def build(sqlite_path: Path, history_db: Path) -> None:
             mf.result_code,
             mf.winning_sp,
             mf.has_winning_sp,
+            mf.settlement_quality,
+            mf.has_trusted_settlement,
             ad.action_code,
             ad.action_label,
             ad.selection_set,
@@ -322,6 +452,7 @@ def build(sqlite_path: Path, history_db: Path) -> None:
         CREATE INDEX idx_action_candidates_match ON action_candidates(match_id);
         CREATE INDEX idx_action_candidates_action ON action_candidates(action_code);
         CREATE INDEX idx_action_candidates_sp ON action_candidates(has_winning_sp);
+        CREATE INDEX idx_action_candidates_quality ON action_candidates(settlement_quality);
         CREATE INDEX idx_action_candidates_league ON action_candidates(league);
         CREATE INDEX idx_action_candidates_hcp ON action_candidates(handicap_line_norm);
         """,
@@ -333,7 +464,7 @@ def build(sqlite_path: Path, history_db: Path) -> None:
         """
         INSERT OR REPLACE INTO source_meta(key, value) VALUES
             ('modeling_tables_built', datetime('now')),
-            ('modeling_tables_version', 'v1');
+            ('modeling_tables_version', 'v4_settlement_quality');
         """,
     )
 
@@ -344,7 +475,7 @@ def build(sqlite_path: Path, history_db: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sqlite", required=True, type=Path)
-    parser.add_argument("--history-db", required=True, type=Path)
+    parser.add_argument("--history-db", type=Path)
     args = parser.parse_args()
     build(args.sqlite, args.history_db)
     return 0
