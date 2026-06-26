@@ -117,3 +117,15 @@ python3 scripts/export_combo_live_candidates.py --output-dir results/combo_live_
 1. 用保守触发器做前向纸面跟踪，冻结参数，不再在同一批历史数据上调参。
 2. 复跑 `main_snapshot=1h` 和 `main_snapshot=10h`，比较收益是否仍来自可实盘获得的信息。
 3. 将 `export_combo_live_candidates.py` 接入真实未结算数据源，确保候选导出完全不依赖 `winning_sp/result_code/hit`。
+
+## 8. 投后验证更新
+
+2026-06-26 复跑 `docs/research/n7_combo_cold_tail_validation_2026-06-26.md` §3 的单窗口口径：`train_issues=12`、62 期、`cold_snapshot=1h`、`cold_overlap_filter=match`、保守触发器 `n_cold_candidate_matches>=15` 且 `n_q_legs>=180`。`main_only` 结果为：
+
+| main_snapshot | ROI | stake units | profit units |
+| --- | ---: | ---: | ---: |
+| `final` | 43.9% | 4870.0 | 2138.1 |
+| `1h` | 10.9% | 4874.0 | 533.6 |
+| `10h` | 9.0% | 4883.0 | 438.8 |
+
+留一期检验确认 1h 口径的脆弱性：去掉最佳单期 `24041` 后，其余 61 期净额为 `-467.6` units，ROI 为 `-9.8%`，且只有 9/62 期盈利。上述结果与验证文档一致，说明原报告基于 `main_snapshot=final` 的 64-84% ROI 不应视为可实盘落地 edge；该候选不通过 1h/10h 入场检验，不应冻结或作为 edge 进入纸面跟踪。后续以验证文档 `docs/research/n7_combo_cold_tail_validation_2026-06-26.md` 的结论为准。
