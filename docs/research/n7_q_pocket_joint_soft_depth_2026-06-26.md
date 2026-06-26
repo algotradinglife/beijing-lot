@@ -184,4 +184,3 @@ Next useful work:
    reduce or skip the whole issue only when many selected q-pocket legs show adverse drift.
 3. Test a separate 1h paper arm for direction-aware drift, but require positive ex-top2 ROI before considering production.
 4. Keep result prediction as a monitoring layer for "dead-ticket risk", not as a q-pocket ranking replacement.
-

@@ -159,4 +159,3 @@ Next useful work:
 1. Build a live/paper dashboard that records issue risk metrics without changing stake.
 2. Validate `1h up_move` on longer 2014+ data before considering it as a small tail sleeve.
 3. Revisit issue-level risk only after long-history data is available; current sample is too small to fit skip thresholds safely.
-

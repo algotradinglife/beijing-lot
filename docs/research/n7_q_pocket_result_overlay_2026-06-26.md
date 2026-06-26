@@ -134,4 +134,3 @@ Next useful experiment:
   `final_depth = q_depth * drift_component * weak_model_component`
 - Cap the model component tightly, for example `0.85x` to `1.10x`, so it can adjust depth but cannot rewrite the q-pocket ranking.
 - Evaluate this only after the SP drift component is in the same loop.
-

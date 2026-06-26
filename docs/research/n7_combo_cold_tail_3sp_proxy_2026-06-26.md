@@ -84,4 +84,3 @@ Keep it only as a paper/control arm. For N=7 optimization, prioritize:
 2. A no-draw q/confidence-depth arm as a diagnostic, because it may contain useful selection information but is still top-two dependent.
 3. A separate draw-cover model before paying for dynamic draw coverage again.
 4. Cold tail only as a tiny moonshot sleeve, and only after we can define a real 10h/1h analogue that does not overlap heavily with the main tickets.
-
