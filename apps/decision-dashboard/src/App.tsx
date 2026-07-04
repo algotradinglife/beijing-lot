@@ -1623,7 +1623,8 @@ export default function App() {
 	  useEffect(() => {
 	    if (!data || availableDecisionVariants.length === 0) return;
 	    if (!availableDecisionVariants.some((option) => option.variantId === selectedDecisionVariant)) {
-	      setSelectedDecisionVariant(availableDecisionVariants[0].variantId);
+	      const defaultVariant = availableDecisionVariants.find((option) => option.isDefault) ?? availableDecisionVariants[0];
+	      setSelectedDecisionVariant(defaultVariant.variantId);
 	    }
 	  }, [data, availableDecisionVariantKey, availableDecisionVariants, selectedDecisionVariant]);
 

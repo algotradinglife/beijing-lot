@@ -140,7 +140,7 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
                     "kind": ACTIVE_DECISION_VARIANT_KIND,
                     "label": ACTIVE_DECISION_VARIANT_LABEL,
                     "source": "active_snapshot",
-                    "is_default": True,
+                    "is_default": False,
                     "selectable": True,
                 },
                 {
@@ -150,7 +150,7 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
                     "label": SHADOW_DECISION_LABEL,
                     "source": "structured_shadow_csv",
                     "artifact_key": "structured_shadow_dir",
-                    "is_default": False,
+                    "is_default": True,
                     "selectable": True,
                 },
             ],
@@ -3014,6 +3014,7 @@ def _active_decision_variant(summary: dict[str, Any]) -> dict[str, Any]:
     primary = codes[0] if codes else ""
     result_code = str(summary.get("result_code") or "")
     prediction_hit = result_code in codes if result_code and codes else None
+    manifest = _manifest_variant_by_id().get(ACTIVE_DECISION_VARIANT_ID, {})
     version = summary.get("decision_chain_version") or _active_version_bundle()["decision_chain_version"]
     return {
         "variant_id": ACTIVE_DECISION_VARIANT_ID,
@@ -3023,7 +3024,7 @@ def _active_decision_variant(summary: dict[str, Any]) -> dict[str, Any]:
         "display_label": ACTIVE_DECISION_VARIANT_DISPLAY_LABEL,
         "version": version,
         "source": "active_snapshot",
-        "is_default": True,
+        "is_default": bool(manifest.get("is_default", False)),
         "recommendation": summary.get("llm_judgment") or ("停" if not codes else "+".join(OUTCOME_LABEL[code] for code in codes)),
         "primary_pick": primary,
         "protect_picks": codes[1:],
@@ -3041,6 +3042,8 @@ def _active_decision_variant(summary: dict[str, Any]) -> dict[str, Any]:
 
 def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_code: str = "") -> dict[str, Any]:
     codes = _selection_codes_from_value(row.get("shadow_selection_codes"))
+    variant_id = str(row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID)
+    manifest = _manifest_variant_by_id().get(variant_id, {})
     primary = str(row.get("shadow_primary") or (codes[0] if codes else ""))
     if primary not in OUTCOME_ORDER:
         primary = codes[0] if codes else ""
@@ -3050,15 +3053,15 @@ def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_co
         primary_hit = result_code == primary if primary else None
         coverage_hit = result_code in codes
     return {
-        "variant_id": row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID,
+        "variant_id": variant_id,
         "kind": SHADOW_DECISION_VARIANT_KIND,
         "family": SHADOW_DECISION_FAMILY,
-        "label": _shadow_variant_display_label(row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID),
-        "display_label": _shadow_variant_display_label(row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID),
+        "label": manifest.get("label") or _shadow_variant_display_label(variant_id),
+        "display_label": _shadow_variant_display_label(variant_id),
         "version": row.get("shadow_version") or SHADOW_DECISION_VERSION,
         "source": "structured_shadow_csv",
         "source_path": source_path,
-        "is_default": False,
+        "is_default": bool(manifest.get("is_default", False)),
         "recommendation": row.get("shadow_judgment") or ("停" if not codes else "+".join(OUTCOME_LABEL[code] for code in codes)),
         "primary_pick": primary,
         "protect_picks": codes[1:],
@@ -3138,7 +3141,7 @@ def _shadow_decision_option(
         "source": "structured_shadow_csv",
         "source_path": source_path,
         "artifact_key": manifest.get("artifact_key", "structured_shadow_dir"),
-        "is_default": False,
+        "is_default": bool(manifest.get("is_default", False)),
         "selectable": bool(manifest.get("selectable", True)),
         "available": True,
     }
@@ -3161,7 +3164,7 @@ def _decision_variant_options(
             "version": active_manifest.get("version_id") or _active_version_bundle()["decision_chain_version"],
             "version_id": active_manifest.get("version_id") or "",
             "source": "active_snapshot",
-            "is_default": True,
+            "is_default": bool(active_manifest.get("is_default", False)),
             "selectable": bool(active_manifest.get("selectable", True)),
             "available": True,
         }

@@ -39,11 +39,6 @@ describe('北单实盘决策台 v1', () => {
         matches: mockDashboardData.issue.matches.map((match, index) => ({
           ...match,
           kickoffDate: index === 2 ? yesterday : index >= 3 ? tomorrow : today,
-          decisionVariants: index === 0
-            ? match.decisionVariants?.map((variant) => variant.variantId === 'shadow_v3.3.1'
-              ? { ...variant, predictionHit: undefined, primaryHit: undefined, coverageHit: undefined }
-              : variant)
-            : match.decisionVariants,
         })),
       },
     };
@@ -69,7 +64,8 @@ describe('北单实盘决策台 v1', () => {
     expect(within(firstMatchRow!).getByText(/^押$/)).toBeInTheDocument();
     expect(within(firstMatchRow!).getByText(/^保$/)).toBeInTheDocument();
     expect(within(firstMatchRow!).queryByText(/^停$/)).not.toBeInTheDocument();
-    expect(within(firstMatchRow!).getByText('押中')).toBeInTheDocument();
+    expect(within(firstMatchRow!).getByText('未中')).toBeInTheDocument();
+    expect(within(firstMatchRow!).queryByText('押中')).not.toBeInTheDocument();
     expect(screen.getByText('bjdc_26052_009')).toBeInTheDocument();
     expect(screen.queryByText('bjdc_26052_006')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: new RegExp(yesterday) }));
@@ -111,9 +107,14 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.queryByText('押+保+停')).not.toBeInTheDocument();
 
     const versionSelect = screen.getByLabelText('选择决策版本') as HTMLSelectElement;
+    expect(versionSelect.value).toBe('shadow_v3.3.3');
+    await userEvent.selectOptions(versionSelect, 'active_v3');
     expect(versionSelect.value).toBe('active_v3');
-    await userEvent.selectOptions(versionSelect, 'shadow_v3.3.1');
-    expect(versionSelect.value).toBe('shadow_v3.3.1');
+    const firstMatchActiveRow = screen.getByText('bjdc_26052_001').closest('tr');
+    expect(firstMatchActiveRow).not.toBeNull();
+    expect(within(firstMatchActiveRow!).getByText('押中')).toBeInTheDocument();
+    await userEvent.selectOptions(versionSelect, 'shadow_v3.3.3');
+    expect(versionSelect.value).toBe('shadow_v3.3.3');
     const firstMatchShadowRow = screen.getByText('bjdc_26052_001').closest('tr');
     expect(firstMatchShadowRow).not.toBeNull();
     expect(within(firstMatchShadowRow!).getByText(/^押$/)).toBeInTheDocument();
@@ -130,7 +131,7 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getAllByText(/盘口与关注要点/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/情报摘要/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/结构化决策链/).length).toBeGreaterThan(0);
-    expect((screen.getByLabelText('选择详情决策版本') as HTMLSelectElement).value).toBe('shadow_v3.3.1');
+    expect((screen.getByLabelText('选择详情决策版本') as HTMLSelectElement).value).toBe('shadow_v3.3.3');
     expect(screen.getAllByText(/让球后概率/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/q \/ EV/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/脚本汇总/).length).toBeGreaterThan(0);
@@ -393,6 +394,7 @@ describe('北单实盘决策台 v1', () => {
     await userEvent.click(screen.getByRole('button', { name: /2026-06-30/ }));
     expect(screen.getByText('待确认新建议')).toBeInTheDocument();
     expect(screen.queryByText(/Active \/ Draft 对比/)).not.toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('选择决策版本'), 'active_v3');
 
     await userEvent.click(screen.getByText('bjdc_26052_001'));
     expect(screen.getByText(/Active \/ Draft 对比/)).toBeInTheDocument();
@@ -413,7 +415,7 @@ describe('北单实盘决策台 v1', () => {
     await userEvent.click(confirmButton);
     await waitFor(() => expect(confirmSpy).toHaveBeenCalledWith('bjdc_26052_001'));
     expect(await screen.findByText(/确认完成，active=draft_26052_001/)).toBeInTheDocument();
-    await waitFor(() => expect(getDashboardSpy).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(getDashboardSpy).toHaveBeenCalledTimes(4));
   });
 
   it('keeps the last successful dashboard visible when a real refresh fails', async () => {
@@ -489,7 +491,7 @@ describe('北单实盘决策台 v1', () => {
   it('fetches only the issue list and issue dashboard for the initial shell', async () => {
     const payloads: Record<string, unknown> = {
       '/api/issues?limit=120&include_replay=0': { issues: [{ issue: '26052', label: '26052 当前期', status: 'current', source: 'sqlite', is_current: true, last_seen_at: '2026-07-04' }] },
-      '/api/issues/26052/dashboard?view=summary&decision_variant=active_v3': {
+      '/api/issues/26052/dashboard?view=summary&decision_variant=shadow_v3.3.3': {
         issue: '26052',
         issue_date: '2026-07-04',
         status: 'open',
@@ -506,11 +508,11 @@ describe('北单实盘决策台 v1', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
-    await expect(adapter.getDashboardShell('26052', 'active_v3')).resolves.toMatchObject({ issue: { issueId: '26052' } });
+    await expect(adapter.getDashboardShell('26052', 'shadow_v3.3.3')).resolves.toMatchObject({ issue: { issueId: '26052' } });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://api.test/api/issues?limit=120&include_replay=0');
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'http://api.test/api/issues/26052/dashboard?view=summary&decision_variant=active_v3');
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'http://api.test/api/issues/26052/dashboard?view=summary&decision_variant=shadow_v3.3.3');
   });
 
   it('fetch mode calls canonical API paths and transforms minimal snake_case payloads', async () => {
@@ -521,8 +523,8 @@ describe('北单实盘决策台 v1', () => {
 	        capture_status: 'partial',
 	        stats: { n_matches: 14, qualified_legs: 17, qualified_matches: 10, q_avg: 1.2, pool_quality_flag: 'green' },
 	        decision_variant_options: [
-	          { variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: true },
-	          { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', source_path: 'shadow.csv' },
+	          { variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: false },
+	          { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', source_path: 'shadow.csv', is_default: true },
 	        ],
 	        matches: [{
 	          match_id: 'bjdc_26052_001', league: '日乙', kickoff_ts: '2026-06-30 19:00', home: '札幌', away: '横滨FC', handicap_line: -1,
@@ -533,15 +535,15 @@ describe('北单实盘决策台 v1', () => {
 	          model_selection: '3', model_selection_codes: ['3'], model_selection_type: 'single',
 	          llm_selection: '1', llm_selection_codes: ['1', '0'], llm_selection_type: 'double', llm_q_score: 1.08, llm_probability: 0.31, llm_confidence_label: '中', llm_source: 'gpt_fixed_decision_chain_v1',
 	          decision_variants: [
-	            { variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: true, recommendation: '押平，保负', primary_pick: '1', protect_picks: ['0'], selection_codes: ['1', '0'], selection_type: 'double', stop_flag: false, q_score: 1.08, probability: 0.31, coverage_hit: true },
-	            { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', recommendation: '押胜', primary_pick: '3', protect_picks: [], selection_codes: ['3'], selection_type: 'single', stop_flag: false, q_score: 1.2, probability: 0.46, coverage_hit: false },
+	            { variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: false, recommendation: '押平，保负', primary_pick: '1', protect_picks: ['0'], selection_codes: ['1', '0'], selection_type: 'double', stop_flag: false, q_score: 1.08, probability: 0.31, coverage_hit: true },
+	            { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', is_default: true, recommendation: '押胜', primary_pick: '3', protect_picks: [], selection_codes: ['3'], selection_type: 'single', stop_flag: false, q_score: 1.2, probability: 0.46, coverage_hit: false },
 	          ],
 	        }],
 	      },
 	      '/api/matches/bjdc_26052_001': {
 	        match: { match_id: 'bjdc_26052_001', issue: '26052', league: '日乙', kickoff_ts: '2026-06-30T19:00:00+08:00', home: '札幌', away: '横滨FC', handicap_line: -1, status: 'open', score: '2-1', halftime_score: '1-0', live_score_status: 'finished', live_score_status_text: '完场', sp_3: 2.1, sp_1: 3.55, sp_0: 3.2, sp_snapshot_ts: '2026-06-30T18:20:00+08:00', sp_drift_band: '胜-4.2% 平-1.5% 负+9.1%', eu_home: 1.86, eu_draw: 3.4, eu_away: 4.1, ah_line: -0.75, ah_home: 1.91, ah_away: 1.97, line_gap: 0.25, odds_consensus: { n_companies: 42, open_avg: { home: 1.92, draw: 3.36, away: 4.05 }, current_avg: { home: 1.84, draw: 3.31, away: 4.42 }, drift: { home: -0.042, draw: -0.015, away: 0.091 }, providers: [{ company: 'Bet 365', open: { home: 1.91, draw: 3.4, away: 4.1 }, current: { home: 1.83, draw: 3.3, away: 4.5 } }] }, market_highlights: ['欧赔均值 主胜-4.2% 平-1.5% 客胜+9.1%'] },
-	        decision_variant_options: [{ variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: true }, { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', source_path: 'shadow.csv' }],
-	        decision_variants: [{ variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: true, recommendation: '押平，保负', primary_pick: '1', protect_picks: ['0'], selection_codes: ['1', '0'], selection_type: 'double', stop_flag: false }, { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', recommendation: '押胜', primary_pick: '3', protect_picks: [], selection_codes: ['3'], selection_type: 'single', stop_flag: false }],
+	        decision_variant_options: [{ variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: false }, { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', source_path: 'shadow.csv', is_default: true }],
+	        decision_variants: [{ variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: false, recommendation: '押平，保负', primary_pick: '1', protect_picks: ['0'], selection_codes: ['1', '0'], selection_type: 'double', stop_flag: false }, { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', is_default: true, recommendation: '押胜', primary_pick: '3', protect_picks: [], selection_codes: ['3'], selection_type: 'single', stop_flag: false }],
         analysis_500: { status: 'ok', fetched_at: '2026-06-30 15:40:00', title: '札幌VS横滨FC-数据分析-500彩票网', description: '500 detail', urls: { data: 'https://odds.500.com/fenxi/shuju-1.shtml' }, home_recent: { team: '札幌', summary: '近10场 5胜3平2负', rows: [] }, away_recent: { team: '横滨FC', summary: '近10场 4胜2平4负', rows: [] }, h2h: { summary: '交锋缺', rows: [] }, league_table: '积分摘要', source: 'odds.500.com/fenxi/shuju', highlights: ['主队主场胜率 50%'], market_summary: '欧赔均值 主胜-4.2% 平-1.5% 客胜+9.1%', odds_consensus: { n_companies: 42, open_avg: { home: 1.92, draw: 3.36, away: 4.05 }, current_avg: { home: 1.84, draw: 3.31, away: 4.42 }, drift: { home: -0.042, draw: -0.015, away: 0.091 }, providers: [] } },
         intelligence: { status: 'ok', fetched_at: '2026-06-30 15:41:00', headline: '26日乙第21轮', points: ['赛事阶段：联赛 第21轮', '资料观点：主队主场效率较高。'], tags: ['league_round', '500资料观点'], stage: { competition_label: '26日乙第21轮', stage_name: '联赛', stage_type: 'league_round', round: '21', home_standing: '4', away_standing: '12' }, sources: [{ source: '500_pc_shuju_macau', tier: 'editorial', status: 'ok', title: '26日乙第21轮', url: 'https://odds.500.com/fenxi/shuju-1.shtml' }], source_count: 1 },
         decision_snapshot: { snapshot_id: 'active_26052_001', status: 'active', generated_at: '2026-06-30T14:20:00+08:00', checked_at: '2026-06-30T14:21:00+08:00', input_hash: 'activehash', recommendation: '押平，保负', primary_pick: '1', protect_picks: ['0'], stop_flag: false, selection_codes: ['1', '0'], confidence: 0.64, confidence_label: '中', q_score: 1.2, probability: 0.29, prompt_version: 'prompt-v1', model_version: 'gpt-fixed-chain-v1', prob_model_version: 'prob-v1', q_model_version: 'q-v1', decision_chain_version: 'chain-v1', decision_config_hash: 'abcdef123456', review_tag_version: 'review-v1' },
@@ -699,8 +701,8 @@ describe('北单实盘决策台 v1', () => {
           selection_status: 'ok',
           available_variant_ids: ['active_v3', 'shadow_v3.3.3'],
           options: [
-            { variant_id: 'active_v3', kind: 'active', label: 'v3', version: 'llm_chain_bet_protect_stop_v3', source: 'active_snapshot', is_default: true },
-            { variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv', artifact_key: 'shadow_v3_3_3' },
+            { variant_id: 'active_v3', kind: 'active', label: 'v3', version: 'llm_chain_bet_protect_stop_v3', source: 'active_snapshot', is_default: false },
+            { variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv', artifact_key: 'shadow_v3_3_3', is_default: true },
           ],
         },
       },
