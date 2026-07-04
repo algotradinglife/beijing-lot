@@ -86,6 +86,32 @@ nav {
   margin-top: 18px;
 }
 
+.sync-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 14px 0;
+  padding: 10px 12px;
+  color: #0f172a;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+}
+
+.sync-banner.bad {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.sync-banner span {
+  color: #475569;
+}
+
+.sync-banner small {
+  color: #64748b;
+}
+
 button {
   margin: 4px 6px 4px 0;
   padding: 9px 13px;

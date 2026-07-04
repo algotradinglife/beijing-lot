@@ -408,6 +408,55 @@ describe('北单实盘决策台 v1', () => {
     await waitFor(() => expect(getDashboardSpy).toHaveBeenCalledTimes(3));
   });
 
+  it('keeps the last successful dashboard visible when a real refresh fails', async () => {
+    const getDashboardSpy = vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData')
+      .mockResolvedValueOnce(mockDashboardData)
+      .mockRejectedValueOnce(new Error('API 503'));
+
+    render(<App />);
+    await screen.findByText('第 26052 期');
+
+    await userEvent.selectOptions(screen.getByLabelText('选择期号'), '26051');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('数据刷新失败');
+    expect(screen.getByText(/API 503/)).toBeInTheDocument();
+    expect(screen.getByText(/继续显示上一次成功数据/)).toBeInTheDocument();
+    expect(screen.getByText('第 26052 期')).toBeInTheDocument();
+    expect((screen.getByLabelText('选择期号') as HTMLSelectElement).value).toBe('26051');
+    expect(getDashboardSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores slower stale dashboard requests after a newer selection resolves', async () => {
+    let resolveSlowIssue!: (value: DashboardData) => void;
+    const slowIssueData: DashboardData = {
+      ...mockDashboardData,
+      issue: { ...mockDashboardData.issue, issueId: '26051' },
+    };
+    const latestIssueData: DashboardData = {
+      ...mockDashboardData,
+      issue: { ...mockDashboardData.issue, issueId: '26052' },
+    };
+    const getDashboardSpy = vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData')
+      .mockResolvedValueOnce(mockDashboardData)
+      .mockImplementationOnce(() => new Promise<DashboardData>((resolve) => {
+        resolveSlowIssue = resolve;
+      }))
+      .mockResolvedValueOnce(latestIssueData);
+
+    render(<App />);
+    await screen.findByText('第 26052 期');
+    const issueSelect = screen.getByLabelText('选择期号') as HTMLSelectElement;
+
+    await userEvent.selectOptions(issueSelect, '26051');
+    await waitFor(() => expect(getDashboardSpy).toHaveBeenCalledTimes(2));
+    await userEvent.selectOptions(issueSelect, '26052');
+    await waitFor(() => expect(getDashboardSpy).toHaveBeenCalledTimes(3));
+    expect(screen.getByText('第 26052 期')).toBeInTheDocument();
+
+    resolveSlowIssue(slowIssueData);
+    await waitFor(() => expect(screen.queryByText('第 26051 期')).not.toBeInTheDocument());
+  });
+
   it('mock data covers ok, missing, failed, stale, and settled review states', () => {
     const statuses = new Set(mockDashboardData.issue.matches.map((m) => m.scrapeStatus));
     expect(statuses).toEqual(new Set(['ok', 'partial', 'missing', 'failed', 'stale']));

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, Gauge, LineChart, Server, ShieldAlert, Ticket, WalletCards } from 'lucide-react';
 import { ApiDashboardAdapter } from './data/apiAdapter';
 import { DEFAULT_DECISION_VARIANT_ID, decisionVersionLabel, isActiveDecisionVariant, isShadowDecisionVariant } from './decisionVariants';
@@ -1433,12 +1433,14 @@ export default function App() {
 	  const [page, setPage] = useState<Page>('Issue Dashboard');
 	  const [selectedIssue, setSelectedIssue] = useState('current');
 	  const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>();
-	  const [selectedDecisionVariant, setSelectedDecisionVariant] = useState(DEFAULT_DECISION_VARIANT_ID);
-	  const [data, setData] = useState<DashboardData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshTick, setRefreshTick] = useState(0);
-  const [confirmDraftState, setConfirmDraftState] = useState<ConfirmDraftState | undefined>();
-  const [reviewTaskState, setReviewTaskState] = useState<ReviewTaskState | undefined>();
+		  const [selectedDecisionVariant, setSelectedDecisionVariant] = useState(DEFAULT_DECISION_VARIANT_ID);
+		  const [data, setData] = useState<DashboardData | null>(null);
+	  const [error, setError] = useState<string | null>(null);
+	  const [loadState, setLoadState] = useState<'idle' | 'loading' | 'refreshing'>('idle');
+	  const [refreshTick, setRefreshTick] = useState(0);
+	  const [confirmDraftState, setConfirmDraftState] = useState<ConfirmDraftState | undefined>();
+	  const [reviewTaskState, setReviewTaskState] = useState<ReviewTaskState | undefined>();
+	  const requestSeq = useRef(0);
   const dataMode = import.meta.env.VITE_DATA_MODE as string | undefined;
   const baseUrl = dashboardApiBaseUrl(import.meta.env.VITE_API_BASE_URL as string | undefined);
   const adapter = useMemo(() => new ApiDashboardAdapter({ mode: dataMode === 'mock' ? 'mock' : 'fetch', baseUrl }), [dataMode, baseUrl]);
@@ -1451,10 +1453,23 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [dataMode]);
 
-	  useEffect(() => {
-	    setError(null);
-	    adapter.getDashboardData(selectedIssue, selectedMatchId).then(setData).catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
-	  }, [adapter, selectedIssue, selectedMatchId, refreshTick]);
+		  useEffect(() => {
+		    const requestId = requestSeq.current + 1;
+		    requestSeq.current = requestId;
+		    setLoadState(data ? 'refreshing' : 'loading');
+		    adapter.getDashboardData(selectedIssue, selectedMatchId)
+		      .then((nextData) => {
+		        if (requestSeq.current !== requestId) return;
+		        setData(nextData);
+		        setError(null);
+		        setLoadState('idle');
+		      })
+		      .catch((err: unknown) => {
+		        if (requestSeq.current !== requestId) return;
+		        setError(err instanceof Error ? err.message : String(err));
+		        setLoadState('idle');
+		      });
+		  }, [adapter, selectedIssue, selectedMatchId, refreshTick]);
 
 	  const availableDecisionVariants = data?.issue.decisionVariantOptions?.length
 	    ? data.issue.decisionVariantOptions
@@ -1491,23 +1506,25 @@ export default function App() {
     }
   };
 
-  if (error) return <main><h1>北单实盘决策台</h1><p role="alert">数据加载失败：{error}</p></main>;
-  if (!data) return <main><h1>北单实盘决策台</h1><p>Loading dashboard data...</p></main>;
+	  if (!data) return <main><h1>北单实盘决策台</h1><p role={error ? 'alert' : undefined}>{error ? `数据加载失败：${error}` : 'Loading dashboard data...'}</p></main>;
 
-  const settlementReviewIssues = data.availableIssues.filter(isSettlementReviewIssue);
-  const selectedSettlementIssue = settlementReviewIssues.some((issue) => issue.issueId === selectedIssue)
-    ? selectedIssue
-    : data.settlement.issueId;
+	  const settlementReviewIssues = data.availableIssues.filter(isSettlementReviewIssue);
+	  const selectedSettlementIssue = settlementReviewIssues.some((issue) => issue.issueId === selectedIssue)
+	    ? selectedIssue
+	    : data.settlement.issueId;
+	  const selectedIssueOption = selectedIssue === 'current' ? data.issue.issueId : selectedIssue;
 
-	  return <main>
-	    <header>
-	      <div className="header-title"><h1>北单实盘决策台</h1><span className="ui-build-badge">{UI_BUILD_LABEL}</span></div>
-	      <nav>{pages.map((p) => <button key={p} className={page === p ? 'active' : ''} onClick={() => setPage(p)}>{PAGE_LABELS[p]}</button>)}</nav>
-	    </header>
-	    {page === 'Issue Dashboard' && <IssueDashboard
-	      data={data.issue}
-	      availableIssues={data.availableIssues}
-	      selectedIssue={data.issue.issueId}
+		  return <main>
+		    <header>
+		      <div className="header-title"><h1>北单实盘决策台</h1><span className="ui-build-badge">{UI_BUILD_LABEL}</span></div>
+		      <nav>{pages.map((p) => <button key={p} className={page === p ? 'active' : ''} onClick={() => setPage(p)}>{PAGE_LABELS[p]}</button>)}</nav>
+		    </header>
+		    {error ? <div className="sync-banner bad" role="alert"><b>数据刷新失败</b><span>{error}</span><small>继续显示上一次成功数据；真实模式不会回退到 mock。</small></div> : null}
+		    {loadState === 'refreshing' ? <div className="sync-banner"><b>正在刷新数据</b><span>页面暂时保留当前快照。</span></div> : null}
+		    {page === 'Issue Dashboard' && <IssueDashboard
+		      data={data.issue}
+		      availableIssues={data.availableIssues}
+		      selectedIssue={selectedIssueOption}
 	      selectedDecisionVariant={selectedDecisionVariant}
 	      onIssueChange={(issueId) => {
 	        setSelectedIssue(issueId);

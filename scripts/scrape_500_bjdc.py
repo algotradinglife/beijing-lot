@@ -30,6 +30,11 @@ from typing import Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.sqlite_runtime import connect_sqlite  # noqa: E402
+
 DEFAULT_DB = ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 TRADE_URL = "https://trade.500.com/bjdc/index.php"
 LIVE_SP_URL = "https://www.500.com/static/public/bjdc/xml/sp/just_{issue}_{playid}.xml"
@@ -370,7 +375,43 @@ def upsert_matches(conn: sqlite3.Connection, rows: list[dict[str, object]]) -> N
         return
     cols = list(rows[0])
     placeholders = ",".join(":" + c for c in cols)
-    updates = ",".join(f"{c}=excluded.{c}" for c in cols if c not in {"issue", "match_idx"})
+    preserve_text = {
+        "league",
+        "home",
+        "away",
+        "end_time",
+        "schedule_date",
+        "disabled",
+        "bg_color",
+        "score",
+        "result_label",
+        "result_code",
+        "asian_handicap",
+    }
+    preserve_numeric = {
+        "fid",
+        "handicap_line",
+        "home_rank",
+        "away_rank",
+        "winning_sp",
+        "sp_home",
+        "sp_draw",
+        "sp_away",
+        "avg_odds_home",
+        "avg_odds_draw",
+        "avg_odds_away",
+    }
+    update_exprs: list[str] = []
+    for col in cols:
+        if col in {"issue", "match_idx"}:
+            continue
+        if col in preserve_text:
+            update_exprs.append(f"{col}=COALESCE(NULLIF(excluded.{col}, ''), {col})")
+        elif col in preserve_numeric:
+            update_exprs.append(f"{col}=COALESCE(excluded.{col}, {col})")
+        else:
+            update_exprs.append(f"{col}=excluded.{col}")
+    updates = ",".join(update_exprs)
     conn.executemany(
         f"""
         INSERT INTO matches({",".join(cols)})
@@ -639,8 +680,7 @@ def main() -> None:
     args = parser.parse_args()
 
     args.db.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(args.db)
-    conn.execute("PRAGMA foreign_keys=ON")
+    conn = connect_sqlite(args.db)
     create_schema(conn)
     issues = fetch_issue_list(conn, args)
     print(f"[issue_list] {len(issues)} issues; latest={issues[0]['issue'] if issues else ''}", flush=True)

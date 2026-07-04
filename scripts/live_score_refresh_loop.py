@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import sqlite3
 import subprocess
 import sys
 import time
@@ -11,6 +10,11 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.sqlite_runtime import connect_sqlite  # noqa: E402
+
 DEFAULT_DB = ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 
 
@@ -23,7 +27,7 @@ def resolve_issues(db_path: Path, requested: list[str]) -> list[str]:
     explicit = [issue for issue in requested if issue != "current"]
     issues.extend(explicit)
     if "current" in requested:
-        with sqlite3.connect(db_path) as conn:
+        with connect_sqlite(db_path) as conn:
             rows = conn.execute(
                 """
                 SELECT issue

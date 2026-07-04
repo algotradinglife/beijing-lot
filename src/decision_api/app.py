@@ -17,6 +17,8 @@ from typing import Any
 
 from flask import Flask, jsonify, request
 
+from src.sqlite_runtime import connect_sqlite
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_500_DB = PROJECT_ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
@@ -516,9 +518,7 @@ def _csv_bool(row: dict[str, Any], key: str) -> bool | None:
 
 
 def _connect(path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return connect_sqlite(path, row_factory=True)
 
 
 def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
@@ -1516,16 +1516,23 @@ def _latest_live_sp_subquery(issue: str) -> tuple[str, tuple[Any, ...]]:
     return (
         """
         SELECT *
-        FROM live_sp_snapshots
-        WHERE issue=?
-          AND playid=34
-          AND fetched_at=(
-              SELECT MAX(fetched_at)
-              FROM live_sp_snapshots
-              WHERE issue=? AND playid=34
-          )
+        FROM (
+            SELECT
+              l.*,
+              ROW_NUMBER() OVER (
+                PARTITION BY l.issue, l.row_idx
+                ORDER BY COALESCE(l.source_updatetime, '') DESC, l.fetched_at DESC
+              ) AS rn
+            FROM live_sp_snapshots l
+            WHERE l.issue=?
+              AND l.playid=34
+              AND l.sp_home IS NOT NULL
+              AND l.sp_draw IS NOT NULL
+              AND l.sp_away IS NOT NULL
+        )
+        WHERE rn=1
         """,
-        (issue, issue),
+        (issue,),
     )
 
 
@@ -4211,6 +4218,72 @@ def _main_strategy_payload(conn: sqlite3.Connection, issue: str, *, only_date: s
     }
 
 
+def _source_statuses(conn: sqlite3.Connection, issue: str) -> list[dict[str, Any]]:
+    if not _table_exists(conn, "fetch_log"):
+        return []
+    rows = conn.execute(
+        """
+        SELECT
+          kind,
+          MAX(fetched_at) AS last_attempt_at,
+          MAX(CASE WHEN ok=1 THEN fetched_at ELSE '' END) AS last_success_at,
+          SUM(CASE WHEN ok=1 THEN 1 ELSE 0 END) AS ok_count,
+          SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END) AS fail_count,
+          COUNT(*) AS total_attempts,
+          SUM(COALESCE(rows_parsed, 0)) AS rows_parsed,
+          MAX(error) AS error
+        FROM fetch_log
+        WHERE issue=? OR issue IS NULL
+        GROUP BY kind
+        ORDER BY kind
+        """,
+        (issue,),
+    )
+    source_statuses: list[dict[str, Any]] = []
+    for row in rows:
+        ok_count = int(row["ok_count"] or 0)
+        fail_count = int(row["fail_count"] or 0)
+        last_success_at = str(row["last_success_at"] or "")
+        age_minutes = _minutes_since_hk(last_success_at)
+        if ok_count == 0:
+            status = "failed"
+        elif age_minutes is not None and age_minutes > 360:
+            status = "stale"
+        elif fail_count > 0:
+            status = "partial"
+        else:
+            status = "ok"
+        source_statuses.append(
+            {
+                "source_name": row["kind"],
+                "status": status,
+                "last_attempt_at": row["last_attempt_at"] or "",
+                "last_success_at": last_success_at,
+                "age_minutes": age_minutes,
+                "ok_count": ok_count,
+                "fail_count": fail_count,
+                "total_attempts": int(row["total_attempts"] or 0),
+                "rows_parsed": int(row["rows_parsed"] or 0),
+                "error": row["error"] or "",
+            }
+        )
+    return source_statuses
+
+
+def _latest_issue_specific_success(source_statuses: list[dict[str, Any]]) -> str:
+    source_names = {"issue_html", "live_sp_xml", "nowscore_bjdc"}
+    parsed_candidates = [
+        (parsed, str(value))
+        for source in source_statuses
+        if source.get("source_name") in source_names
+        for value in [source.get("last_success_at")]
+        if value
+        for parsed in [_parse_timestamp_to_hk(str(value))]
+        if parsed is not None
+    ]
+    return max(parsed_candidates, default=(None, ""))[1] if parsed_candidates else ""
+
+
 def _dashboard(conn: sqlite3.Connection, issue: str, *, only_date: str | None) -> dict[str, Any]:
     _ensure_decision_snapshot_schema(conn)
     release = _active_strategy_release()
@@ -4225,17 +4298,16 @@ def _dashboard(conn: sqlite3.Connection, issue: str, *, only_date: str | None) -
     partial = sum(1 for m in matches if m["capture_status"] == "partial")
     q_values = [m["q_max"] for m in matches if m["q_max"] is not None]
     issue_meta = conn.execute("SELECT * FROM issues WHERE issue=?", (resolved,)).fetchone()
-    last_fetch = conn.execute(
-        "SELECT MAX(fetched_at) AS fetched_at FROM fetch_log WHERE issue=? OR issue IS NULL",
-        (resolved,),
-    ).fetchone()
+    source_statuses = _source_statuses(conn, resolved)
+    last_snapshot_ts = _latest_issue_specific_success(source_statuses)
     status = "complete" if rows and complete == len(rows) else "partial" if rows else "missing"
     return {
         "issue": resolved,
         "issue_date": only_date or (matches[0]["kickoff_ts"][:10] if matches and matches[0]["kickoff_ts"] else ""),
         "status": "open" if any(m["status"] == "open" for m in matches) else "settled",
         "capture_status": status,
-        "last_snapshot_ts": (last_fetch["fetched_at"] if last_fetch else "") or "",
+        "last_snapshot_ts": last_snapshot_ts,
+        "source_freshness": source_statuses,
         "sales_deadline": max((m["kickoff_ts"] for m in matches if m["kickoff_ts"]), default=""),
         "stats": {
             "n_matches": len(matches),
@@ -4268,52 +4340,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
     settled_rows = [row for row in rows if row["result_code"] is not None or row["winning_sp"] is not None]
     winning_sp_rows = [row for row in rows if row["winning_sp"] is not None]
 
-    source_statuses: list[dict[str, Any]] = []
-    for row in conn.execute(
-        """
-        SELECT
-          kind,
-          MAX(fetched_at) AS last_attempt_at,
-          MAX(CASE WHEN ok=1 THEN fetched_at ELSE '' END) AS last_success_at,
-          SUM(CASE WHEN ok=1 THEN 1 ELSE 0 END) AS ok_count,
-          SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END) AS fail_count,
-          COUNT(*) AS total_attempts,
-          SUM(COALESCE(rows_parsed, 0)) AS rows_parsed,
-          MAX(error) AS error
-        FROM fetch_log
-        WHERE issue=? OR issue IS NULL
-        GROUP BY kind
-        ORDER BY kind
-        """,
-        (resolved,),
-    ):
-        ok_count = int(row["ok_count"] or 0)
-        fail_count = int(row["fail_count"] or 0)
-        total_attempts = int(row["total_attempts"] or 0)
-        last_success_at = str(row["last_success_at"] or "")
-        age_minutes = _minutes_since_hk(last_success_at)
-        if ok_count == 0:
-            status = "failed"
-        elif age_minutes is not None and age_minutes > 360:
-            status = "stale"
-        elif fail_count > 0:
-            status = "partial"
-        else:
-            status = "ok"
-        source_statuses.append(
-            {
-                "source_name": row["kind"],
-                "status": status,
-                "last_attempt_at": row["last_attempt_at"] or "",
-                "last_success_at": last_success_at,
-                "age_minutes": age_minutes,
-                "ok_count": ok_count,
-                "fail_count": fail_count,
-                "total_attempts": total_attempts,
-                "rows_parsed": int(row["rows_parsed"] or 0),
-                "error": row["error"] or "",
-            }
-        )
+    source_statuses = _source_statuses(conn, resolved)
 
     snapshot_counts = {row["status"]: int(row["n"]) for row in conn.execute(
         "SELECT status, COUNT(*) AS n FROM llm_decision_snapshots WHERE issue=? GROUP BY status",
