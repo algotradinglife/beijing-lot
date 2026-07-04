@@ -1,7 +1,7 @@
 import type { DecisionVariantOption } from './data/types';
 
 export const ACTIVE_DECISION_VARIANT_ID = 'active_v3';
-export const DEFAULT_DECISION_VARIANT_ID = 'shadow_v3.3.3';
+export const DEFAULT_DECISION_VARIANT_ID = '';
 
 export const DECISION_VARIANT_KIND = {
   ACTIVE: 'active',

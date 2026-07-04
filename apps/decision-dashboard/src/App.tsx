@@ -1612,21 +1612,28 @@ export default function App() {
       });
   }, [adapter, data, dataMode, page, selectedDecisionVariant, selectedIssue, selectedMatchId]);
 
-	  const availableDecisionVariants = data?.issue.strategyVersionContext?.options?.length
-	    ? data.issue.strategyVersionContext.options
-	    : data?.issue.decisionVariantOptions?.length
-	      ? data.issue.decisionVariantOptions
-	      : data?.matchDetail?.strategyVersionContext?.options?.length
-	        ? data.matchDetail.strategyVersionContext.options
-	        : data?.matchDetail?.decisionVariantOptions ?? [];
-	  const availableDecisionVariantKey = availableDecisionVariants.map((option) => option.variantId).join('|');
-	  useEffect(() => {
-	    if (!data || availableDecisionVariants.length === 0) return;
-	    if (!availableDecisionVariants.some((option) => option.variantId === selectedDecisionVariant)) {
-	      const defaultVariant = availableDecisionVariants.find((option) => option.isDefault) ?? availableDecisionVariants[0];
-	      setSelectedDecisionVariant(defaultVariant.variantId);
-	    }
-	  }, [data, availableDecisionVariantKey, availableDecisionVariants, selectedDecisionVariant]);
+  const availableDecisionVariants = data?.issue.strategyVersionContext?.options?.length
+    ? data.issue.strategyVersionContext.options
+    : data?.issue.decisionVariantOptions?.length
+      ? data.issue.decisionVariantOptions
+      : data?.matchDetail?.strategyVersionContext?.options?.length
+        ? data.matchDetail.strategyVersionContext.options
+        : data?.matchDetail?.decisionVariantOptions ?? [];
+  const contextSelectedDecisionVariant = data?.issue.strategyVersionContext?.selectedVariantId
+    || data?.matchDetail?.strategyVersionContext?.selectedVariantId
+    || '';
+  const defaultAvailableDecisionVariant = contextSelectedDecisionVariant
+    || availableDecisionVariants.find((option) => option.isDefault)?.variantId
+    || availableDecisionVariants[0]?.variantId
+    || '';
+  const effectiveSelectedDecisionVariant = selectedDecisionVariant || defaultAvailableDecisionVariant;
+  const availableDecisionVariantKey = availableDecisionVariants.map((option) => option.variantId).join('|');
+  useEffect(() => {
+    if (!data || availableDecisionVariants.length === 0) return;
+    if (selectedDecisionVariant && !availableDecisionVariants.some((option) => option.variantId === selectedDecisionVariant)) {
+      setSelectedDecisionVariant('');
+    }
+  }, [data, availableDecisionVariantKey, availableDecisionVariants, selectedDecisionVariant]);
 
   const handleConfirmDraft = async (matchId: string) => {
     setConfirmDraftState({ matchId, status: 'submitting', message: '正在确认 draft 覆盖...' });
@@ -1675,7 +1682,7 @@ export default function App() {
 		      data={data.issue}
 		      availableIssues={data.availableIssues}
 		      selectedIssue={selectedIssueOption}
-	      selectedDecisionVariant={selectedDecisionVariant}
+		      selectedDecisionVariant={effectiveSelectedDecisionVariant}
 	      onIssueChange={(issueId) => {
 	        setSelectedIssue(issueId);
 	        setSelectedMatchId(undefined);
@@ -1692,7 +1699,7 @@ export default function App() {
 	      : <DeferredPage title="主策略" loading={activePageLoad} error={activePageError} />)}
 	    {page === 'Match Detail' && (data.matchDetail ? <MatchDetail
 	      data={data.matchDetail}
-	      selectedDecisionVariant={selectedDecisionVariant}
+	      selectedDecisionVariant={effectiveSelectedDecisionVariant}
 	      onDecisionVariantChange={setSelectedDecisionVariant}
 	      confirmDraftState={confirmDraftState}
 	      onConfirmDraft={handleConfirmDraft}

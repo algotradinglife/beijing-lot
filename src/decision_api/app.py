@@ -2966,6 +2966,15 @@ def _shadow_variant_display_label(variant_id: str) -> str:
     return str(variant_id or SHADOW_DECISION_VARIANT_ID).replace("_", " ")
 
 
+def _decision_variant_version_key(variant_id: Any) -> tuple[int, int, int, str]:
+    text = str(variant_id or "")
+    match = re.search(r"v(\d+)\.(\d+)\.(\d+)", text)
+    if not match:
+        return (-1, -1, -1, text)
+    major, minor, patch = (int(part) for part in match.groups())
+    return (major, minor, patch, text)
+
+
 def _structured_shadow_variant_scan(
     issue: str,
     release: dict[str, Any] | None = None,
@@ -2987,11 +2996,7 @@ def _structured_shadow_variant_scan(
             variants[variant_id] = (rows, source, mtime)
 
     def sort_key(item: tuple[str, tuple[dict[int, dict[str, Any]], str, float]]) -> tuple[int, str]:
-        variant_id = item[0]
-        match = re.search(r"v(\d+)\.(\d+)\.(\d+)", variant_id)
-        if not match:
-            return (999, variant_id)
-        major, minor, patch = (int(part) for part in match.groups())
+        major, minor, patch, variant_id = _decision_variant_version_key(item[0])
         return (major * 10000 + minor * 100 + patch, variant_id)
 
     return (
@@ -3147,6 +3152,26 @@ def _shadow_decision_option(
     }
 
 
+def _normalize_decision_variant_defaults(options: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not options:
+        return options
+    shadow_options = [
+        item for item in options
+        if item.get("kind") == SHADOW_DECISION_VARIANT_KIND and item.get("variant_id")
+    ]
+    if shadow_options:
+        default_variant_id = str(max(
+            shadow_options,
+            key=lambda item: _decision_variant_version_key(item.get("variant_id") or item.get("version_id")),
+        ).get("variant_id") or "")
+    else:
+        default_option = next((item for item in options if item.get("is_default")), options[0])
+        default_variant_id = str(default_option.get("variant_id") or "")
+    for item in options:
+        item["is_default"] = bool(default_variant_id and str(item.get("variant_id") or "") == default_variant_id)
+    return options
+
+
 def _decision_variant_options(
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] | None = None,
     *,
@@ -3172,7 +3197,7 @@ def _decision_variant_options(
     for rows, source_path in shadow_variants or []:
         if rows and source_path:
             options.append(_shadow_decision_option(rows, source_path, release=release))
-    return options
+    return _normalize_decision_variant_defaults(options)
 
 
 def _strategy_version_context(
@@ -4755,7 +4780,7 @@ def _dashboard(
         decision_variant_id,
         suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
     )
-    matches = _attach_selected_decision_variant(matches, decision_variant_id)
+    matches = _attach_selected_decision_variant(matches, version_context.get("selected_variant_id") or decision_variant_id)
     if summary_view:
         matches = [_dashboard_summary_match(match) for match in matches]
     complete = sum(1 for m in matches if m["capture_status"] == "ok")
@@ -5078,7 +5103,7 @@ def _match_detail(
         decision_variant_id,
         suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
     )
-    _attach_selected_decision_variant([summary], decision_variant_id)
+    _attach_selected_decision_variant([summary], version_context.get("selected_variant_id") or decision_variant_id)
     versions = _active_version_bundle()
     return {
         "match": summary,

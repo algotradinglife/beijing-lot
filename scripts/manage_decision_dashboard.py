@@ -536,7 +536,7 @@ def _warm_api_cache(args: argparse.Namespace) -> list[dict[str, Any]]:
     base = f"http://127.0.0.1:{args.api_port}"
     probes = [
         ("issues_light", f"{base}/api/issues?limit=120&include_replay=0"),
-        ("dashboard_summary", f"{base}/api/issues/current/dashboard?view=summary&decision_variant=shadow_v3.3.3"),
+        ("dashboard_summary", f"{base}/api/issues/current/dashboard?view=summary"),
     ]
     warmed: list[dict[str, Any]] = []
     for name, url in probes:

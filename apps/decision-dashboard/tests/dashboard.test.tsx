@@ -491,7 +491,7 @@ describe('北单实盘决策台 v1', () => {
   it('fetches only the issue list and issue dashboard for the initial shell', async () => {
     const payloads: Record<string, unknown> = {
       '/api/issues?limit=120&include_replay=0': { issues: [{ issue: '26052', label: '26052 当前期', status: 'current', source: 'sqlite', is_current: true, last_seen_at: '2026-07-04' }] },
-      '/api/issues/26052/dashboard?view=summary&decision_variant=shadow_v3.3.3': {
+      '/api/issues/26052/dashboard?view=summary': {
         issue: '26052',
         issue_date: '2026-07-04',
         status: 'open',
@@ -508,11 +508,11 @@ describe('北单实盘决策台 v1', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
-    await expect(adapter.getDashboardShell('26052', 'shadow_v3.3.3')).resolves.toMatchObject({ issue: { issueId: '26052' } });
+    await expect(adapter.getDashboardShell('26052')).resolves.toMatchObject({ issue: { issueId: '26052' } });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://api.test/api/issues?limit=120&include_replay=0');
-    expect(fetchMock).toHaveBeenNthCalledWith(2, 'http://api.test/api/issues/26052/dashboard?view=summary&decision_variant=shadow_v3.3.3');
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'http://api.test/api/issues/26052/dashboard?view=summary');
   });
 
   it('fetch mode calls canonical API paths and transforms minimal snake_case payloads', async () => {
