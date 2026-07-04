@@ -16,7 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 
 from src.sqlite_runtime import connect_sqlite
 
@@ -33,6 +33,7 @@ STRUCTURED_DECISION_SHADOW_DIR = PROJECT_ROOT / "results/structured_decision_cha
 DECISION_VERSIONS_CONFIG = PROJECT_ROOT / "config/decision_versions.json"
 STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
 DEFAULT_DASHBOARD_RUNTIME_STATUS = PROJECT_ROOT / "tmp/decision_dashboard/runtime_status.json"
+DEFAULT_DASHBOARD_STATIC_DIR = PROJECT_ROOT / "apps/decision-dashboard/dist"
 DEFAULT_DECISION_API_HOST = "127.0.0.1"
 OPERATOR_TOKEN_ENV = "BEIDAN_DECISION_API_OPERATOR_TOKEN"
 OPERATOR_TOKEN_HEADER = "X-Beidan-Operator-Token"
@@ -5423,9 +5424,30 @@ def create_app(
     sqlite_db: str | os.PathLike[str] = DEFAULT_500_DB,
     results_dir: str | os.PathLike[str] = DEFAULT_RESULTS_DIR,
 ) -> Flask:
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder=None)
     db_path = Path(sqlite_db)
     result_path = Path(results_dir)
+    static_dir = Path(os.environ.get("BEIDAN_DASHBOARD_STATIC_DIR", DEFAULT_DASHBOARD_STATIC_DIR))
+
+    def _serve_index():
+        index_path = static_dir / "index.html"
+        if not index_path.exists():
+            return jsonify({
+                "error": "decision dashboard frontend build is missing",
+                "expected": str(index_path),
+                "hint": "run npm --prefix apps/decision-dashboard run build",
+            }), 503
+        response = send_from_directory(static_dir, "index.html")
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+    def _serve_asset(path: str):
+        asset_path = static_dir / path
+        if not asset_path.is_file():
+            return jsonify({"error": f"frontend asset not found: {path}"}), 404
+        response = send_from_directory(static_dir, path, max_age=31536000)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
 
     @app.before_request
     def _operator_token_gate():
@@ -5443,6 +5465,23 @@ def create_app(
             resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
             resp.headers.add("Vary", "Origin")
         return resp
+
+    @app.get("/")
+    def frontend_index():
+        return _serve_index()
+
+    @app.get("/assets/<path:path>")
+    def frontend_assets(path: str):
+        return _serve_asset(f"assets/{path}")
+
+    @app.get("/<path:path>")
+    def frontend_spa(path: str):
+        if path == "api" or path.startswith("api/"):
+            return jsonify({"error": f"API route not found: /{path}"}), 404
+        candidate = static_dir / path
+        if candidate.is_file():
+            return _serve_asset(path)
+        return _serve_index()
 
     @app.get("/healthz")
     def healthz():

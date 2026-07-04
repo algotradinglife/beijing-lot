@@ -283,8 +283,8 @@ function Badge({ children, tone = 'neutral' }: { children: React.ReactNode; tone
 }
 
 function statusTone(status?: string): 'good' | 'warn' | 'bad' | 'neutral' {
-  if (status === 'ok' || status === 'active') return 'good';
-  if (status === 'failed' || status === 'missing' || status === 'bad') return 'bad';
+  if (status === 'ok' || status === 'active' || status === 'served_by_api') return 'good';
+  if (status === 'failed' || status === 'missing' || status === 'bad' || status === 'missing_build' || status === 'api_missing') return 'bad';
   if (status === 'partial' || status === 'stale' || status === 'warn' || status === 'draft_replacement') return 'warn';
   return 'neutral';
 }
@@ -312,6 +312,9 @@ function processLabel(status?: string) {
   if (!status) return '未记录';
   if (status === 'running') return '运行中';
   if (status === 'missing') return '未运行';
+  if (status === 'served_by_api') return '由 API 托管';
+  if (status === 'missing_build') return '缺少构建';
+  if (status === 'api_missing') return 'API 未运行';
   return status;
 }
 

@@ -1,6 +1,6 @@
 # 北单实盘决策台 frontend v1
 
-可运行的 React/Vite dashboard。浏览器入口是 Vite 前端，真实场次数据通过本地只读 API 从 500.com SQLite 读取。
+可运行的 React dashboard。默认生产入口由 Flask API 同源托管 `dist/`，真实场次数据通过本地只读 API 从 500.com SQLite 读取；Vite 只作为显式开发调试模式使用。
 
 - Issue Dashboard
 - Main Strategy
@@ -21,11 +21,15 @@ python3 scripts/manage_decision_dashboard.py start
 python3 scripts/manage_decision_dashboard.py health
 ```
 
-如果要通过 Tailscale Serve 的 MagicDNS 域名访问，启动时显式加入允许的 Host：
+默认 `start/restart` 会先执行前端 production build，再由 `src.decision_api` 同源服务 `/` 和 `/api`。
+
+如果要通过 Tailscale Serve 的 MagicDNS 域名访问：
 
 ```bash
 BEIDAN_DECISION_API_OPERATOR_TOKEN='replace-with-local-secret' \
-python3 scripts/manage_decision_dashboard.py restart --magic-dns YOUR_MAGICDNS_HOST.ts.net
+python3 scripts/manage_decision_dashboard.py restart \
+  --magic-dns YOUR_MAGICDNS_HOST.ts.net \
+  --configure-tailscale-serve
 ```
 
 完整运维手册见 [docs/ops/decision_dashboard_runbook.md](../../docs/ops/decision_dashboard_runbook.md)。
@@ -51,29 +55,29 @@ python3 -m src.decision_api
 API 默认监听 `127.0.0.1:8790`，可用 `BEIDAN_DECISION_API_HOST` /
 `BEIDAN_DECISION_API_PORT` 覆盖。除本机排障外，不建议直接把 API 端口暴露到局域网或公网。
 
-然后启动前端：
+开发调试时可以显式启动 Vite 热更新模式：
 
 ```bash
 npm install
-npm run dev
+BEIDAN_DASHBOARD_FRONTEND_MODE=vite-dev python3 scripts/manage_decision_dashboard.py restart
 ```
 
-浏览器只打开：
+生产默认本机入口：
 
 ```text
-http://127.0.0.1:4173/
+http://127.0.0.1:8790/
 ```
 
-远程访问优先使用 Tailscale Serve，把 Tailnet HTTPS 入口代理到本机前端：
+远程访问优先使用 Tailscale Serve，把 Tailnet HTTPS 入口代理到本机 API/static 入口：
 
 ```bash
-tailscale serve --bg http://127.0.0.1:4173
+tailscale serve --bg http://127.0.0.1:8790
 ```
 
-前端默认使用同源 `/api`，由 Vite proxy 转发到本机 API；不会让远程浏览器去请求它自己的
-`127.0.0.1:8790`，也不需要直接开放 API 端口。只有明确要做 Tailnet 直连调试时，才使用
-`npm run dev:tailscale` 或 `--frontend-host 0.0.0.0`。Vite 默认不再放开所有 Host；
-MagicDNS 访问需要 `--magic-dns YOUR_MAGICDNS_HOST.ts.net` 或 `VITE_ALLOWED_HOSTS=YOUR_MAGICDNS_HOST.ts.net`。
+前端默认使用同源 `/api`，生产模式不需要 Vite proxy，也不会让远程浏览器去请求它自己的
+`127.0.0.1:8790`。只有明确要做 Tailnet 直连调试时，才使用
+`--frontend-mode vite-dev`、`npm run dev:tailscale` 或 `--frontend-host 0.0.0.0`。Vite 默认不再放开所有 Host；
+MagicDNS 直连 Vite 调试才需要 `VITE_ALLOWED_HOSTS=YOUR_MAGICDNS_HOST.ts.net`。
 
 写操作默认需要 operator token。API 侧设置 `BEIDAN_DECISION_API_OPERATOR_TOKEN`；浏览器侧只在需要执行
 确认 draft、实盘 workflow、复盘写入等 POST 操作时设置：
