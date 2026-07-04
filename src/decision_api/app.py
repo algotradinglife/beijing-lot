@@ -612,6 +612,12 @@ def _safe_int(value: Any) -> int | None:
         return None
 
 
+def _query_bool(value: Any, default: bool = False) -> bool:
+    if value is None or value == "":
+        return default
+    return str(value).strip().lower() not in {"0", "false", "no", "off"}
+
+
 def _read_csv(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
@@ -3230,6 +3236,121 @@ def _attach_selected_decision_variant(
     return matches
 
 
+def _compact_decision_variant(variant: dict[str, Any]) -> dict[str, Any]:
+    keep = {
+        "variant_id",
+        "kind",
+        "family",
+        "label",
+        "display_label",
+        "version",
+        "version_id",
+        "source",
+        "is_default",
+        "recommendation",
+        "primary_pick",
+        "protect_picks",
+        "selection_codes",
+        "selection_type",
+        "stop_flag",
+        "q_score",
+        "probability",
+        "confidence_label",
+        "prediction_hit",
+        "primary_hit",
+        "coverage_hit",
+    }
+    return {key: value for key, value in variant.items() if key in keep}
+
+
+def _dashboard_summary_match(match: dict[str, Any]) -> dict[str, Any]:
+    keep = {
+        "match_id",
+        "issue",
+        "match_idx",
+        "league",
+        "kickoff_ts",
+        "kickoff_date",
+        "home",
+        "away",
+        "handicap_line",
+        "score",
+        "halftime_score",
+        "live_score_status",
+        "live_score_status_text",
+        "sp_3",
+        "sp_1",
+        "sp_0",
+        "eu_home",
+        "eu_draw",
+        "eu_away",
+        "ah_line",
+        "line_gap",
+        "sp_drift_3",
+        "sp_drift_1",
+        "sp_drift_0",
+        "sp_drift_band",
+        "q_max",
+        "q_score",
+        "confidence_weight",
+        "model_p_3",
+        "model_p_1",
+        "model_p_0",
+        "market_p_3",
+        "market_p_1",
+        "market_p_0",
+        "model_selection",
+        "model_selection_codes",
+        "model_selection_type",
+        "model_selection_source",
+        "model_prediction_hit",
+        "llm_judgment",
+        "llm_selection",
+        "llm_selection_codes",
+        "llm_selection_type",
+        "llm_confidence",
+        "llm_confidence_label",
+        "llm_source",
+        "llm_q_score",
+        "llm_probability",
+        "llm_prediction_hit",
+        "llm_stop_flag",
+        "selection",
+        "selection_codes",
+        "selection_source",
+        "selection_type",
+        "status",
+        "capture_status",
+        "result_code",
+        "result_label",
+        "prediction_hit",
+        "winning_sp",
+        "generated_ts",
+        "q_input_sp_snapshot_ts",
+        "q_input_probability_snapshot_ts",
+        "q_calculated_ts",
+        "decision_snapshot_id",
+        "decision_snapshot_status",
+        "decision_snapshot_generated_at",
+        "decision_snapshot_checked_at",
+        "draft_decision_snapshot_id",
+        "draft_decision_snapshot_status",
+        "postmatch_review_outcome",
+        "postmatch_review_summary",
+        "postmatch_review_tags",
+        "postmatch_review_action",
+        "postmatch_review_profit",
+        "postmatch_review_reviewed_at",
+        "selected_decision_variant_id",
+        "selected_decision_variant_status",
+    }
+    out = {key: match.get(key) for key in keep if key in match}
+    selected = match.get("selected_decision_variant")
+    if isinstance(selected, dict):
+        out["selected_decision_variant"] = _compact_decision_variant(selected)
+    return out
+
+
 def _attach_decision_variants(
     matches: list[dict[str, Any]],
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]],
@@ -3965,7 +4086,7 @@ def _issue_year(issue: str) -> int | None:
     return year if 2000 <= year <= 2099 else None
 
 
-def _available_issues(conn: sqlite3.Connection, *, limit: int = 80) -> list[dict[str, Any]]:
+def _available_issues(conn: sqlite3.Connection, *, limit: int = 80, include_replay: bool = True) -> list[dict[str, Any]]:
     by_issue: dict[str, dict[str, Any]] = {}
     for row in conn.execute(
         """
@@ -4007,34 +4128,35 @@ def _available_issues(conn: sqlite3.Connection, *, limit: int = 80) -> list[dict
             "issue_close_ts": "",
         }
 
-    historical: dict[str, dict[str, Any]] = {}
-    for row in _main_strategy_issue_rows():
-        issue = str(row.get("issue", ""))
-        if not issue:
-            continue
-        item = historical.setdefault(issue, {
-            "issue": issue,
-            "label": f"{issue} 历史回放",
-            "status": "historical_replay",
-            "source": "main_strategy_replay",
-            "is_current": False,
-            "year": _csv_int(row, "calendar_year") or _issue_year(issue),
-            "match_count": 0,
-            "settled_match_count": 0,
-            "open_match_count": 0,
-            "is_fully_settled": False,
-            "has_settlement": False,
-            "last_seen_at": row.get("issue_close_ts", ""),
-            "issue_order": _csv_int(row, "issue_order"),
-            "issue_close_ts": row.get("issue_close_ts", ""),
-        })
-        item["issue_order"] = max(_safe_int(item.get("issue_order")) or 0, _csv_int(row, "issue_order"))
-        if row.get("issue_close_ts"):
-            item["last_seen_at"] = row.get("issue_close_ts", "")
-            item["issue_close_ts"] = row.get("issue_close_ts", "")
-    for issue, item in historical.items():
-        if issue not in by_issue:
-            by_issue[issue] = item
+    if include_replay:
+        historical: dict[str, dict[str, Any]] = {}
+        for row in _main_strategy_issue_rows():
+            issue = str(row.get("issue", ""))
+            if not issue:
+                continue
+            item = historical.setdefault(issue, {
+                "issue": issue,
+                "label": f"{issue} 历史回放",
+                "status": "historical_replay",
+                "source": "main_strategy_replay",
+                "is_current": False,
+                "year": _csv_int(row, "calendar_year") or _issue_year(issue),
+                "match_count": 0,
+                "settled_match_count": 0,
+                "open_match_count": 0,
+                "is_fully_settled": False,
+                "has_settlement": False,
+                "last_seen_at": row.get("issue_close_ts", ""),
+                "issue_order": _csv_int(row, "issue_order"),
+                "issue_close_ts": row.get("issue_close_ts", ""),
+            })
+            item["issue_order"] = max(_safe_int(item.get("issue_order")) or 0, _csv_int(row, "issue_order"))
+            if row.get("issue_close_ts"):
+                item["last_seen_at"] = row.get("issue_close_ts", "")
+                item["issue_close_ts"] = row.get("issue_close_ts", "")
+        for issue, item in historical.items():
+            if issue not in by_issue:
+                by_issue[issue] = item
 
     rows = list(by_issue.values())
     rows.sort(
@@ -4608,6 +4730,7 @@ def _dashboard(
     *,
     only_date: str | None,
     decision_variant_id: str | None = None,
+    summary_view: bool = False,
 ) -> dict[str, Any]:
     _ensure_decision_snapshot_schema(conn)
     release = _active_strategy_release()
@@ -4627,6 +4750,8 @@ def _dashboard(
         suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
     )
     matches = _attach_selected_decision_variant(matches, decision_variant_id)
+    if summary_view:
+        matches = [_dashboard_summary_match(match) for match in matches]
     complete = sum(1 for m in matches if m["capture_status"] == "ok")
     partial = sum(1 for m in matches if m["capture_status"] == "partial")
     q_values = [m["q_max"] for m in matches if m["q_max"] is not None]
@@ -5353,16 +5478,18 @@ def create_app(
     @app.get("/api/issues")
     def issues():
         limit = _safe_int(request.args.get("limit")) or 80
+        include_replay = _query_bool(request.args.get("include_replay"), True)
         with _connect(db_path) as conn:
-            return jsonify({"issues": _available_issues(conn, limit=limit)})
+            return jsonify({"issues": _available_issues(conn, limit=limit, include_replay=include_replay)})
 
     @app.get("/api/issues/<issue>/dashboard")
     def issue_dashboard(issue: str):
         only_date = request.args.get("date")
         decision_variant_id = _requested_decision_variant_id()
+        summary_view = str(request.args.get("view") or "").strip().lower() == "summary" or _query_bool(request.args.get("summary"), False)
         with _connect(db_path) as conn:
             try:
-                return jsonify(_dashboard(conn, issue, only_date=only_date, decision_variant_id=decision_variant_id))
+                return jsonify(_dashboard(conn, issue, only_date=only_date, decision_variant_id=decision_variant_id, summary_view=summary_view))
             except LookupError as exc:
                 if _main_strategy_issue_exists(issue):
                     return jsonify(_historical_dashboard(issue))

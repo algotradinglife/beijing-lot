@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, Gauge, LineChart, Server, ShieldAlert, Ticket, WalletCards } from 'lucide-react';
 import { ApiDashboardAdapter } from './data/apiAdapter';
 import { DEFAULT_DECISION_VARIANT_ID, decisionVersionLabel, isActiveDecisionVariant, isShadowDecisionVariant } from './decisionVariants';
-import type { DashboardData, IssueMatchRow } from './data/types';
+import type { DashboardData, IssueDashboardData, IssueMatchRow, IssueOption } from './data/types';
 
 type Page = 'Issue Dashboard' | 'Match Detail' | 'Operations' | 'Main Strategy' | 'Ticket Builder' | 'Selector Shadow' | 'Live Signals' | 'Settlement Review' | 'Strategy Lab';
 const pages: Page[] = ['Issue Dashboard', 'Settlement Review', 'Operations', 'Main Strategy', 'Ticket Builder', 'Selector Shadow', 'Live Signals', 'Strategy Lab'];
@@ -22,6 +22,11 @@ const N_SETTLEMENT_BUDGET = 1000;
 const BASE_TICKET_STAKE = 2;
 type ConfirmDraftState = { matchId: string; status: 'submitting' | 'succeeded' | 'failed'; message: string };
 type ReviewTaskState = { issueId: string; status: 'submitting' | 'succeeded' | 'failed'; message: string };
+type DashboardShellData = {
+  availableIssues: IssueOption[];
+  issue: IssueDashboardData;
+} & Partial<Omit<DashboardData, 'availableIssues' | 'issue'>>;
+type DeferredPageState = { page: Page; status: 'loading' | 'refreshing'; message: string };
 
 const statusLabel: Record<string, string> = { ok: '', partial: '部分数据', missing: '缺数据', failed: '抓取失败', stale: '过期' };
 const coverageLabel: Record<string, string> = { single: '单选', double: '双选', full: '全包', 'no-buy': '不买' };
@@ -319,6 +324,17 @@ function accessModeLabel(mode?: string, configured?: boolean) {
   return configured ? '已记录外部访问元数据' : '未记录外部访问';
 }
 
+function DeferredPage({ title, loading, error }: { title: string; loading?: DeferredPageState; error?: string }) {
+  return <div className="grid page-grid">
+    <Card title={title}>
+      <div className="empty-state">
+        <b>{error ? '加载失败' : loading ? '正在加载' : '尚未加载'}</b>
+        <span>{error || loading?.message || '进入页面后按需读取真实数据。'}</span>
+      </div>
+    </Card>
+  </div>;
+}
+
 function spChangeLabel(value?: string) {
   const text = value?.trim();
   if (!text || text === '缺' || text === 'api' || text === 'open') return '样本不足';
@@ -459,8 +475,11 @@ function pickListLabel(values?: string[]) {
 
 function decisionVariantForMatch(match: IssueMatchRow, selectedVariantId: string) {
   const variants = match.decisionVariants ?? [];
+  const selectedVariant = match.selectedDecisionVariant;
   return variants.find((variant) => variant.variantId === selectedVariantId)
+    ?? (selectedVariant?.variantId === selectedVariantId ? selectedVariant : undefined)
     ?? variants.find((variant) => variant.isDefault)
+    ?? selectedVariant
     ?? variants[0];
 }
 
@@ -1462,16 +1481,21 @@ export default function App() {
 	  const [selectedIssue, setSelectedIssue] = useState('current');
 	  const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>();
 		  const [selectedDecisionVariant, setSelectedDecisionVariant] = useState(DEFAULT_DECISION_VARIANT_ID);
-		  const [data, setData] = useState<DashboardData | null>(null);
+		  const [data, setData] = useState<DashboardShellData | null>(null);
 	  const [error, setError] = useState<string | null>(null);
 	  const [loadState, setLoadState] = useState<'idle' | 'loading' | 'refreshing'>('idle');
+	  const [pageLoadState, setPageLoadState] = useState<DeferredPageState | undefined>();
+	  const [pageErrors, setPageErrors] = useState<Partial<Record<Page, string>>>({});
 	  const [refreshTick, setRefreshTick] = useState(0);
 	  const [confirmDraftState, setConfirmDraftState] = useState<ConfirmDraftState | undefined>();
 	  const [reviewTaskState, setReviewTaskState] = useState<ReviewTaskState | undefined>();
 	  const requestSeq = useRef(0);
+	  const pageRequestSeq = useRef(0);
+	  const shellVariantRef = useRef(selectedDecisionVariant);
   const dataMode = import.meta.env.VITE_DATA_MODE as string | undefined;
   const baseUrl = dashboardApiBaseUrl(import.meta.env.VITE_API_BASE_URL as string | undefined);
   const adapter = useMemo(() => new ApiDashboardAdapter({ mode: dataMode === 'mock' ? 'mock' : 'fetch', baseUrl }), [dataMode, baseUrl]);
+  const shellMatchId = dataMode === 'mock' ? selectedMatchId : undefined;
 
   useEffect(() => {
     if (dataMode === 'mock') return;
@@ -1485,10 +1509,21 @@ export default function App() {
 		    const requestId = requestSeq.current + 1;
 		    requestSeq.current = requestId;
 		    setLoadState(data ? 'refreshing' : 'loading');
-		    adapter.getDashboardData(selectedIssue, selectedMatchId, selectedDecisionVariant)
+		    const previousVariant = shellVariantRef.current;
+		    const request = dataMode === 'mock'
+		      ? adapter.getDashboardData(selectedIssue, shellMatchId, selectedDecisionVariant)
+		      : adapter.getDashboardShell(selectedIssue, selectedDecisionVariant);
+		    request
 		      .then((nextData) => {
 		        if (requestSeq.current !== requestId) return;
-		        setData(nextData);
+		        setData((prev) => {
+		          if (dataMode === 'mock') return nextData as DashboardData;
+		          const shell = nextData as Pick<DashboardData, 'availableIssues' | 'issue'>;
+		          const sameIssue = prev?.issue.issueId === shell.issue.issueId;
+		          const sameVariant = previousVariant === selectedDecisionVariant;
+		          return sameIssue && sameVariant ? { ...prev, ...shell } : shell;
+		        });
+		        shellVariantRef.current = selectedDecisionVariant;
 		        setError(null);
 		        setLoadState('idle');
 		      })
@@ -1497,15 +1532,90 @@ export default function App() {
 		        setError(err instanceof Error ? err.message : String(err));
 		        setLoadState('idle');
 		      });
-		  }, [adapter, selectedIssue, selectedMatchId, selectedDecisionVariant, refreshTick]);
+		  }, [adapter, selectedIssue, shellMatchId, selectedDecisionVariant, refreshTick, dataMode]);
+
+  useEffect(() => {
+    if (!data || dataMode === 'mock') return;
+    const issueId = data.issue.issueId || selectedIssue;
+    const firstMatchId = data.issue.matches[0]?.matchId;
+    const matchId = selectedMatchId ?? firstMatchId;
+    const settlementReviewIssues = data.availableIssues.filter(isSettlementReviewIssue);
+    const settlementIssueId = settlementReviewIssues.some((issue) => issue.issueId === selectedIssue)
+      ? selectedIssue
+      : data.settlement?.issueId ?? settlementReviewIssues[0]?.issueId ?? issueId;
+    let promise: Promise<unknown> | undefined;
+    let apply: ((prev: DashboardShellData, payload: unknown) => DashboardShellData) | undefined;
+    let loaded = false;
+    let message = '正在读取真实数据...';
+
+    if (page === 'Match Detail') {
+      if (!matchId) return;
+      loaded = data.matchDetail?.matchId === matchId;
+      promise = loaded ? undefined : adapter.getMatchDetail(issueId, matchId, selectedDecisionVariant);
+      apply = (prev, payload) => ({ ...prev, matchDetail: payload as DashboardData['matchDetail'] });
+      message = '正在加载单场详情...';
+    } else if (page === 'Settlement Review') {
+      loaded = data.settlement?.issueId === settlementIssueId;
+      promise = loaded ? undefined : adapter.getSettlementReview(settlementIssueId, selectedDecisionVariant);
+      apply = (prev, payload) => ({ ...prev, settlement: payload as DashboardData['settlement'] });
+      message = '正在加载最近完结期复盘...';
+    } else if (page === 'Operations') {
+      loaded = data.operations?.issueId === issueId;
+      promise = loaded ? undefined : adapter.getOperationsStatus(issueId);
+      apply = (prev, payload) => ({ ...prev, operations: payload as DashboardData['operations'] });
+      message = '正在加载运行状态...';
+    } else if (page === 'Main Strategy') {
+      loaded = data.mainStrategy?.issueId === issueId;
+      promise = loaded ? undefined : adapter.getMainStrategy(issueId, selectedDecisionVariant);
+      apply = (prev, payload) => ({ ...prev, mainStrategy: payload as DashboardData['mainStrategy'] });
+      message = '正在加载主策略...';
+    } else if (page === 'Ticket Builder') {
+      loaded = data.ticket?.issueId === issueId;
+      promise = loaded ? undefined : adapter.getTicketDraft(issueId);
+      apply = (prev, payload) => ({ ...prev, ticket: payload as DashboardData['ticket'] });
+      message = '正在加载票池草稿...';
+    } else if (page === 'Selector Shadow') {
+      loaded = data.selectorShadow?.issueId === issueId;
+      promise = loaded ? undefined : adapter.getSelectorShadow(issueId);
+      apply = (prev, payload) => ({ ...prev, selectorShadow: payload as DashboardData['selectorShadow'] });
+      message = '正在加载影子策略...';
+    } else if (page === 'Live Signals') {
+      loaded = data.liveSignals?.issueId === issueId;
+      promise = loaded ? undefined : adapter.getLiveSignals(issueId);
+      apply = (prev, payload) => ({ ...prev, liveSignals: payload as DashboardData['liveSignals'] });
+      message = '正在加载实时信号...';
+    } else if (page === 'Strategy Lab') {
+      loaded = Boolean(data.strategyLab);
+      promise = loaded ? undefined : adapter.getStrategyLab();
+      apply = (prev, payload) => ({ ...prev, strategyLab: payload as DashboardData['strategyLab'] });
+      message = '正在加载策略实验...';
+    }
+
+    if (!promise || !apply) return;
+    const requestId = pageRequestSeq.current + 1;
+    pageRequestSeq.current = requestId;
+    setPageLoadState({ page, status: loaded ? 'refreshing' : 'loading', message });
+    setPageErrors((prev) => ({ ...prev, [page]: undefined }));
+    promise
+      .then((payload) => {
+        if (pageRequestSeq.current !== requestId) return;
+        setData((prev) => (prev ? apply(prev, payload) : prev));
+        setPageLoadState(undefined);
+      })
+      .catch((err: unknown) => {
+        if (pageRequestSeq.current !== requestId) return;
+        setPageErrors((prev) => ({ ...prev, [page]: err instanceof Error ? err.message : String(err) }));
+        setPageLoadState(undefined);
+      });
+  }, [adapter, data, dataMode, page, selectedDecisionVariant, selectedIssue, selectedMatchId]);
 
 	  const availableDecisionVariants = data?.issue.strategyVersionContext?.options?.length
 	    ? data.issue.strategyVersionContext.options
 	    : data?.issue.decisionVariantOptions?.length
 	      ? data.issue.decisionVariantOptions
-	      : data?.matchDetail.strategyVersionContext?.options?.length
+	      : data?.matchDetail?.strategyVersionContext?.options?.length
 	        ? data.matchDetail.strategyVersionContext.options
-	        : data?.matchDetail.decisionVariantOptions ?? [];
+	        : data?.matchDetail?.decisionVariantOptions ?? [];
 	  const availableDecisionVariantKey = availableDecisionVariants.map((option) => option.variantId).join('|');
 	  useEffect(() => {
 	    if (!data || availableDecisionVariants.length === 0) return;
@@ -1520,6 +1630,7 @@ export default function App() {
       const result = await adapter.confirmDecisionSnapshot(matchId);
       const activeId = result.active?.snapshotId ? `active=${result.active.snapshotId}` : result.action;
       setConfirmDraftState({ matchId, status: 'succeeded', message: `确认完成，${activeId}，正在刷新 Issue/Operations 状态。` });
+      setData((prev) => prev ? { ...prev, matchDetail: undefined, operations: undefined } : prev);
       setRefreshTick((value) => value + 1);
     } catch (err: unknown) {
       setConfirmDraftState({ matchId, status: 'failed', message: err instanceof Error ? err.message : String(err) });
@@ -1532,6 +1643,7 @@ export default function App() {
       const result = await adapter.runPostmatchReview(issueId, dryRun);
       const count = dryRun ? result.result.wouldInsert ?? 0 : result.result.inserted ?? 0;
       setReviewTaskState({ issueId, status: 'succeeded', message: dryRun ? `dry-run 完成，预计写入 ${count} 场。` : `复盘写入完成，新增 ${count} 场，正在刷新。` });
+      setData((prev) => prev ? { ...prev, operations: undefined, settlement: undefined } : prev);
       setRefreshTick((value) => value + 1);
     } catch (err: unknown) {
       setReviewTaskState({ issueId, status: 'failed', message: err instanceof Error ? err.message : String(err) });
@@ -1543,8 +1655,10 @@ export default function App() {
 	  const settlementReviewIssues = data.availableIssues.filter(isSettlementReviewIssue);
 	  const selectedSettlementIssue = settlementReviewIssues.some((issue) => issue.issueId === selectedIssue)
 	    ? selectedIssue
-	    : data.settlement.issueId;
+	    : data.settlement?.issueId ?? settlementReviewIssues[0]?.issueId ?? data.issue.issueId;
 	  const selectedIssueOption = selectedIssue === 'current' ? data.issue.issueId : selectedIssue;
+	  const activePageLoad = pageLoadState?.page === page ? pageLoadState : undefined;
+	  const activePageError = pageErrors[page];
 
 		  return <main>
 		    <header>
@@ -1569,19 +1683,29 @@ export default function App() {
 	      }}
 	      onOpenTicket={() => setPage('Ticket Builder')}
 	    />}
-	    {page === 'Main Strategy' && <MainStrategy data={data.mainStrategy} />}
-	    {page === 'Match Detail' && <MatchDetail
+	    {page === 'Main Strategy' && (data.mainStrategy
+	      ? <MainStrategy data={data.mainStrategy} />
+	      : <DeferredPage title="主策略" loading={activePageLoad} error={activePageError} />)}
+	    {page === 'Match Detail' && (data.matchDetail ? <MatchDetail
 	      data={data.matchDetail}
 	      selectedDecisionVariant={selectedDecisionVariant}
 	      onDecisionVariantChange={setSelectedDecisionVariant}
 	      confirmDraftState={confirmDraftState}
 	      onConfirmDraft={handleConfirmDraft}
-	    />}
-	    {page === 'Operations' && <OperationsStatus data={data.operations} reviewTaskState={reviewTaskState} onRunPostmatchReview={handleRunPostmatchReview} />}
-	    {page === 'Ticket Builder' && <TicketBuilder data={data.ticket} />}
-	    {page === 'Selector Shadow' && <SelectorShadow data={data.selectorShadow} />}
-	    {page === 'Live Signals' && <LiveSignals data={data.liveSignals} />}
-	    {page === 'Settlement Review' && <SettlementReview
+	    /> : <DeferredPage title="比赛详情" loading={activePageLoad} error={activePageError} />)}
+	    {page === 'Operations' && (data.operations
+	      ? <OperationsStatus data={data.operations} reviewTaskState={reviewTaskState} onRunPostmatchReview={handleRunPostmatchReview} />
+	      : <DeferredPage title="运行状态" loading={activePageLoad} error={activePageError} />)}
+	    {page === 'Ticket Builder' && (data.ticket
+	      ? <TicketBuilder data={data.ticket} />
+	      : <DeferredPage title="投注构建" loading={activePageLoad} error={activePageError} />)}
+	    {page === 'Selector Shadow' && (data.selectorShadow
+	      ? <SelectorShadow data={data.selectorShadow} />
+	      : <DeferredPage title="影子策略" loading={activePageLoad} error={activePageError} />)}
+	    {page === 'Live Signals' && (data.liveSignals
+	      ? <LiveSignals data={data.liveSignals} />
+	      : <DeferredPage title="实时信号" loading={activePageLoad} error={activePageError} />)}
+	    {page === 'Settlement Review' && (data.settlement ? <SettlementReview
 	      data={data.settlement}
 	      availableIssues={data.availableIssues}
 	      selectedIssue={selectedSettlementIssue}
@@ -1592,7 +1716,9 @@ export default function App() {
 	      onOpenMatch={(matchId) => {
 	        setSelectedMatchId(matchId);
 	        setPage('Match Detail');
-	      }} />}
-	    {page === 'Strategy Lab' && <StrategyLab data={data.strategyLab} />}
+	      }} /> : <DeferredPage title="赛后复盘" loading={activePageLoad} error={activePageError} />)}
+	    {page === 'Strategy Lab' && (data.strategyLab
+	      ? <StrategyLab data={data.strategyLab} />
+	      : <DeferredPage title="策略实验" loading={activePageLoad} error={activePageError} />)}
 	  </main>;
 	}

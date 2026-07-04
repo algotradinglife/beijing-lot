@@ -1,10 +1,14 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
 import { mockDashboardData } from '../src/data/mockData';
 import { ApiDashboardAdapter } from '../src/data/apiAdapter';
 import type { DashboardData } from '../src/data/types';
+
+beforeEach(() => {
+  vi.stubEnv('VITE_DATA_MODE', 'mock');
+});
 
 afterEach(() => {
   window.localStorage.clear();
@@ -480,6 +484,33 @@ describe('北单实盘决策台 v1', () => {
   it('uses an adapter layer that can switch from mock to fetch API', async () => {
     const adapter = new ApiDashboardAdapter({ mode: 'mock' });
     await expect(adapter.getIssueDashboard('26052')).resolves.toMatchObject({ issueId: '26052' });
+  });
+
+  it('fetches only the issue list and issue dashboard for the initial shell', async () => {
+    const payloads: Record<string, unknown> = {
+      '/api/issues?limit=120&include_replay=0': { issues: [{ issue: '26052', label: '26052 当前期', status: 'current', source: 'sqlite', is_current: true, last_seen_at: '2026-07-04' }] },
+      '/api/issues/26052/dashboard?view=summary&decision_variant=active_v3': {
+        issue: '26052',
+        issue_date: '2026-07-04',
+        status: 'open',
+        capture_status: 'ok',
+        stats: { n_matches: 0, qualified_legs: 0, qualified_matches: 0, q_avg: 0, pool_quality_flag: 'green' },
+        matches: [],
+        source: { kind: 'sqlite', provider: '500.com', tables: ['matches'] },
+      },
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input).replace('http://api.test', '');
+      return { ok: true, json: async () => payloads[url] } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
+    await expect(adapter.getDashboardShell('26052', 'active_v3')).resolves.toMatchObject({ issue: { issueId: '26052' } });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://api.test/api/issues?limit=120&include_replay=0');
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'http://api.test/api/issues/26052/dashboard?view=summary&decision_variant=active_v3');
   });
 
   it('fetch mode calls canonical API paths and transforms minimal snake_case payloads', async () => {

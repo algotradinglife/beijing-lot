@@ -1530,12 +1530,16 @@ export class ApiDashboardAdapter {
     return transform(payload);
   }
 
-  getIssueDashboard(issueId: string, decisionVariantId?: string): Promise<IssueDashboardData> {
-    return this.getJson(withDecisionVariant(`/api/issues/${issueId}/dashboard`, decisionVariantId), mockDashboardData.issue, transformIssueDashboard);
+  getIssueDashboard(issueId: string, decisionVariantId?: string, options: { summary?: boolean } = {}): Promise<IssueDashboardData> {
+    const path = options.summary ? `/api/issues/${issueId}/dashboard?view=summary` : `/api/issues/${issueId}/dashboard`;
+    return this.getJson(withDecisionVariant(path, decisionVariantId), mockDashboardData.issue, transformIssueDashboard);
   }
 
-  getAvailableIssues(): Promise<IssueOption[]> {
-    return this.getJson('/api/issues?limit=120', mockDashboardData.availableIssues, (payload) => asArray(asObject(payload).issues).map(transformIssueOption));
+  getAvailableIssues(options: { limit?: number; includeReplay?: boolean } = {}): Promise<IssueOption[]> {
+    const limit = options.limit ?? 120;
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (options.includeReplay === false) params.set('include_replay', '0');
+    return this.getJson(`/api/issues?${params.toString()}`, mockDashboardData.availableIssues, (payload) => asArray(asObject(payload).issues).map(transformIssueOption));
   }
 
   getMatchDetail(_issueId: string, matchId: string, decisionVariantId?: string): Promise<MatchDetailData> {
@@ -1581,6 +1585,15 @@ export class ApiDashboardAdapter {
 
   getOperationsStatus(issueId: string): Promise<OperationsStatusData> {
     return this.getJson(`/api/issues/${issueId}/operations`, mockDashboardData.operations, transformOperationsStatus);
+  }
+
+  async getDashboardShell(issueId: string, decisionVariantId?: string): Promise<Pick<DashboardData, 'availableIssues' | 'issue'>> {
+    if (this.mode === 'mock') return { availableIssues: mockDashboardData.availableIssues, issue: mockDashboardData.issue };
+    const [availableIssues, issue] = await Promise.all([
+      this.getAvailableIssues({ includeReplay: false }),
+      this.getIssueDashboard(issueId, decisionVariantId, { summary: true }),
+    ]);
+    return { availableIssues, issue };
   }
 
   runPostmatchReview(issueId: string, dryRun: boolean): Promise<OperationsStatusData['review']['task']> {
