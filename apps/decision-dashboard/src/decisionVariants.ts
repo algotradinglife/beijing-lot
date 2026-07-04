@@ -1,6 +1,7 @@
 import type { DecisionVariantOption } from './data/types';
 
-export const DEFAULT_DECISION_VARIANT_ID = 'active_v3';
+export const ACTIVE_DECISION_VARIANT_ID = 'active_v3';
+export const DEFAULT_DECISION_VARIANT_ID = '';
 
 export const DECISION_VARIANT_KIND = {
   ACTIVE: 'active',
@@ -15,11 +16,11 @@ type VariantLike = Pick<DecisionVariantOption, 'variantId' | 'kind' | 'source' |
 export function decisionVariantKind(variant: VariantLike): DecisionVariantKind {
   if (!variant) return DECISION_VARIANT_KIND.OTHER;
   if (variant.kind === DECISION_VARIANT_KIND.ACTIVE || variant.kind === DECISION_VARIANT_KIND.SHADOW) return variant.kind;
-  if (variant.isDefault || variant.source === 'active_snapshot' || variant.variantId === DEFAULT_DECISION_VARIANT_ID) {
-    return DECISION_VARIANT_KIND.ACTIVE;
-  }
   if (variant.source === 'structured_shadow_csv' || variant.variantId.startsWith('shadow_')) {
     return DECISION_VARIANT_KIND.SHADOW;
+  }
+  if (variant.isDefault || variant.source === 'active_snapshot' || variant.variantId === ACTIVE_DECISION_VARIANT_ID) {
+    return DECISION_VARIANT_KIND.ACTIVE;
   }
   return DECISION_VARIANT_KIND.OTHER;
 }

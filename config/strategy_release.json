@@ -35,7 +35,7 @@
           "kind": "active",
           "label": "v3",
           "source": "active_snapshot",
-          "is_default": true,
+          "is_default": false,
           "selectable": true
         },
         {
@@ -45,7 +45,7 @@
           "label": "shadow v3.3.3",
           "source": "structured_shadow_csv",
           "artifact_key": "structured_shadow_dir",
-          "is_default": false,
+          "is_default": true,
           "selectable": true
         }
       ],

@@ -12,6 +12,33 @@ if str(ROOT) not in sys.path:
 from src.decision_api import app as appmod
 
 
+OPERATOR_TOKEN = "pytest-operator-token"
+OPERATOR_HEADERS = {"X-Beidan-Operator-Token": OPERATOR_TOKEN}
+
+
+def test_decision_api_main_defaults_to_loopback(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+
+    class DummyApp:
+        def run(self, *, host: str, port: int, debug: bool) -> None:
+            seen.update({"host": host, "port": port, "debug": debug})
+
+    monkeypatch.delenv("BEIDAN_DECISION_API_HOST", raising=False)
+    monkeypatch.setenv("BEIDAN_DECISION_API_PORT", "8791")
+    monkeypatch.setattr(appmod, "create_app", lambda **kwargs: DummyApp())
+
+    appmod.main()
+
+    assert appmod.DEFAULT_DECISION_API_HOST == "127.0.0.1"
+    assert seen == {"host": "127.0.0.1", "port": 8791, "debug": False}
+
+
+def test_vite_config_defaults_are_not_public() -> None:
+    config_text = (ROOT / "apps/decision-dashboard/vite.config.ts").read_text(encoding="utf-8")
+    assert "host: process.env.VITE_DEV_HOST ?? '127.0.0.1'" in config_text
+    assert "allowedHosts: true" not in config_text
+
+
 def _build_minimal_500_db(path: Path) -> None:
     conn = sqlite3.connect(path)
     try:
@@ -276,6 +303,7 @@ def test_operations_reads_dashboard_runtime_status(tmp_path: Path, monkeypatch) 
     db_path = tmp_path / "500_bjdc.sqlite"
     runtime_status = tmp_path / "runtime_status.json"
     _build_minimal_500_db(db_path)
+    monkeypatch.delenv("BEIDAN_DECISION_API_PUBLIC_DIAGNOSTICS", raising=False)
     runtime_status.write_text(
         json.dumps(
             {
@@ -326,12 +354,101 @@ def test_operations_reads_dashboard_runtime_status(tmp_path: Path, monkeypatch) 
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["runtime"]["checked_at"] == "2026-07-03T02:30:00+08:00"
-    assert payload["runtime"]["api_pid"] == 123
-    assert payload["runtime"]["frontend_pid"] == 456
-    assert payload["runtime"]["api_bind_host"] == "0.0.0.0"
-    assert payload["runtime"]["frontend_bind_host"] == "0.0.0.0"
-    assert payload["runtime"]["frontend_remote_url"] == "http://100.104.142.57:4173/"
-    assert payload["runtime"]["health"]["host_smokes"][0]["host_header"] == "trade-server.tail0aa0e9.ts.net"
+    assert payload["runtime"]["public_diagnostics"] is False
+    assert payload["runtime"]["access_mode"] == "tailnet_metadata_recorded"
+    assert payload["runtime"]["api_process_status"] == "running"
+    assert payload["runtime"]["frontend_process_status"] == "running"
+    assert payload["runtime"]["frontend_remote_url"] == ""
+    assert payload["runtime"]["health"]["host_smoke_count"] == 1
+    assert payload["runtime"]["health"]["host_smoke_ok_count"] == 1
+    assert "api_pid" not in payload["runtime"]
+    assert "frontend_pid" not in payload["runtime"]
+    assert "api_bind_host" not in payload["runtime"]
+    assert "frontend_bind_host" not in payload["runtime"]
+    assert "diagnostics" not in payload["runtime"]
+    assert payload["source"]["sqlite_db"] == "redacted"
+
+
+def test_healthz_and_cors_hide_local_details_by_default(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "500_bjdc.sqlite"
+    _build_minimal_500_db(db_path)
+    monkeypatch.delenv("BEIDAN_DECISION_API_CORS_ORIGINS", raising=False)
+    monkeypatch.delenv("BEIDAN_DECISION_API_PUBLIC_DIAGNOSTICS", raising=False)
+
+    app = appmod.create_app(sqlite_db=db_path)
+    with app.test_client() as client:
+        response = client.get("/healthz", headers={"Origin": "http://example.test"})
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+    assert payload["public_diagnostics"] is False
+    assert "sqlite_db" not in payload
+    assert "results_dir" not in payload
+    assert "model_db" not in payload
+    assert "Access-Control-Allow-Origin" not in response.headers
+
+    monkeypatch.setenv("BEIDAN_DECISION_API_CORS_ORIGINS", "http://allowed.test")
+    app = appmod.create_app(sqlite_db=db_path)
+    with app.test_client() as client:
+        allowed = client.get("/healthz", headers={"Origin": "http://allowed.test"})
+        denied = client.get("/healthz", headers={"Origin": "http://blocked.test"})
+
+    assert allowed.headers["Access-Control-Allow-Origin"] == "http://allowed.test"
+    assert "Access-Control-Allow-Origin" not in denied.headers
+
+
+def test_public_payloads_redact_local_paths_by_default(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "500_bjdc.sqlite"
+    _build_minimal_500_db(db_path)
+    monkeypatch.delenv("BEIDAN_DECISION_API_PUBLIC_DIAGNOSTICS", raising=False)
+
+    app = appmod.create_app(sqlite_db=db_path)
+    with app.test_client() as client:
+        dashboard = client.get("/api/issues/review_tie_case/dashboard").get_json()
+        main_strategy = client.get("/api/issues/review_tie_case/main-strategy").get_json()
+
+    dashboard_text = json.dumps(dashboard, ensure_ascii=False)
+    strategy_text = json.dumps(main_strategy, ensure_ascii=False)
+    assert dashboard["source"]["path"] == "redacted"
+    assert main_strategy["source"]["model_db"] == "redacted"
+    assert main_strategy["source"]["live_db"] == "redacted"
+    assert str(db_path) not in dashboard_text
+    assert str(db_path) not in strategy_text
+    assert str(appmod.DEFAULT_MODEL_DB) not in dashboard_text
+    assert str(appmod.DEFAULT_MODEL_DB) not in strategy_text
+    assert appmod._public_diagnostics_path(appmod.DEFAULT_MODEL_DB) == "redacted"
+
+    monkeypatch.setenv("BEIDAN_DECISION_API_PUBLIC_DIAGNOSTICS", "1")
+    assert appmod._public_diagnostics_path(appmod.DEFAULT_MODEL_DB) == str(appmod.DEFAULT_MODEL_DB)
+
+
+def test_mutating_api_requires_operator_token(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "500_bjdc.sqlite"
+    _build_minimal_500_db(db_path)
+
+    app = appmod.create_app(sqlite_db=db_path)
+    with app.test_client() as client:
+        unconfigured = client.post("/api/matches/does-not-exist/decision-snapshot/confirm")
+
+    assert unconfigured.status_code == 403
+    assert unconfigured.get_json()["code"] == "operator_token_unconfigured"
+
+    monkeypatch.setenv("BEIDAN_DECISION_API_OPERATOR_TOKEN", OPERATOR_TOKEN)
+    app = appmod.create_app(sqlite_db=db_path)
+    with app.test_client() as client:
+        missing = client.post("/api/matches/does-not-exist/decision-snapshot/confirm")
+        wrong = client.post(
+            "/api/matches/does-not-exist/decision-snapshot/confirm",
+            headers={"X-Beidan-Operator-Token": "wrong"},
+        )
+        authorized = client.post("/api/matches/999999/decision-snapshot/confirm", headers=OPERATOR_HEADERS)
+
+    assert missing.status_code == 403
+    assert missing.get_json()["code"] == "operator_token_required"
+    assert wrong.status_code == 403
+    assert wrong.get_json()["code"] == "operator_token_required"
+    assert authorized.status_code == 404
 
 
 def _snapshot_record(status: str, *, snapshot_id: str, primary_pick: str, generated_at: str, supersedes: str | None = None) -> dict[str, object]:
@@ -383,9 +500,10 @@ def _snapshot_record(status: str, *, snapshot_id: str, primary_pick: str, genera
     }
 
 
-def test_confirm_decision_snapshot_promotes_draft_and_audits_previous_active(tmp_path: Path) -> None:
+def test_confirm_decision_snapshot_promotes_draft_and_audits_previous_active(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "500_bjdc.sqlite"
     _build_minimal_500_db(db_path)
+    monkeypatch.setenv("BEIDAN_DECISION_API_OPERATOR_TOKEN", OPERATOR_TOKEN)
 
     conn = appmod._connect(db_path)
     try:
@@ -415,7 +533,7 @@ def test_confirm_decision_snapshot_promotes_draft_and_audits_previous_active(tmp
 
     app = appmod.create_app(sqlite_db=db_path)
     with app.test_client() as client:
-        response = client.post("/api/matches/1001/decision-snapshot/confirm")
+        response = client.post("/api/matches/1001/decision-snapshot/confirm", headers=OPERATOR_HEADERS)
         operations = client.get("/api/issues/review_tie_case/operations").get_json()
 
     assert response.status_code == 200
@@ -434,9 +552,10 @@ def test_confirm_decision_snapshot_promotes_draft_and_audits_previous_active(tmp
     assert operations["snapshots"]["superseded_count"] == 1
 
 
-def test_postmatch_review_api_dry_run_and_real_write_review_rows(tmp_path: Path) -> None:
+def test_postmatch_review_api_dry_run_and_real_write_review_rows(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "500_bjdc.sqlite"
     _build_minimal_500_db(db_path)
+    monkeypatch.setenv("BEIDAN_DECISION_API_OPERATOR_TOKEN", OPERATOR_TOKEN)
 
     conn = appmod._connect(db_path)
     try:
@@ -466,9 +585,15 @@ def test_postmatch_review_api_dry_run_and_real_write_review_rows(tmp_path: Path)
 
     app = appmod.create_app(sqlite_db=db_path)
     with app.test_client() as client:
-        dry = client.post("/api/issues/review_tie_case/postmatch-review?dry_run=1", headers={"X-Requested-By": "pytest-dry"})
+        dry = client.post(
+            "/api/issues/review_tie_case/postmatch-review?dry_run=1",
+            headers={**OPERATOR_HEADERS, "X-Requested-By": "pytest-dry"},
+        )
         after_dry = client.get("/api/issues/review_tie_case/operations").get_json()
-        real = client.post("/api/issues/review_tie_case/postmatch-review", headers={"X-Requested-By": "pytest-real"})
+        real = client.post(
+            "/api/issues/review_tie_case/postmatch-review",
+            headers={**OPERATOR_HEADERS, "X-Requested-By": "pytest-real"},
+        )
         after_real = client.get("/api/issues/review_tie_case/operations").get_json()
         settlement = client.get("/api/issues/review_tie_case/settlement?decision_variant=missing_v9").get_json()
 

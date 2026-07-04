@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import hmac
 import json
 import math
 import os
@@ -9,13 +10,14 @@ import re
 import sqlite3
 import subprocess
 import sys
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 
 from src.sqlite_runtime import connect_sqlite
 
@@ -32,6 +34,11 @@ STRUCTURED_DECISION_SHADOW_DIR = PROJECT_ROOT / "results/structured_decision_cha
 DECISION_VERSIONS_CONFIG = PROJECT_ROOT / "config/decision_versions.json"
 STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
 DEFAULT_DASHBOARD_RUNTIME_STATUS = PROJECT_ROOT / "tmp/decision_dashboard/runtime_status.json"
+DEFAULT_DASHBOARD_STATIC_DIR = PROJECT_ROOT / "apps/decision-dashboard/dist"
+DEFAULT_DECISION_API_HOST = "127.0.0.1"
+DEFAULT_CACHE_TTL_SEC = 30.0
+OPERATOR_TOKEN_ENV = "BEIDAN_DECISION_API_OPERATOR_TOKEN"
+OPERATOR_TOKEN_HEADER = "X-Beidan-Operator-Token"
 HK_TZ = timezone(timedelta(hours=8))
 OUTCOME_LABEL = {"3": "胜", "1": "平", "0": "负"}
 OUTCOME_ORDER = ("3", "1", "0")
@@ -133,7 +140,7 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
                     "kind": ACTIVE_DECISION_VARIANT_KIND,
                     "label": ACTIVE_DECISION_VARIANT_LABEL,
                     "source": "active_snapshot",
-                    "is_default": True,
+                    "is_default": False,
                     "selectable": True,
                 },
                 {
@@ -143,7 +150,7 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
                     "label": SHADOW_DECISION_LABEL,
                     "source": "structured_shadow_csv",
                     "artifact_key": "structured_shadow_dir",
-                    "is_default": False,
+                    "is_default": True,
                     "selectable": True,
                 },
             ],
@@ -442,45 +449,131 @@ def _read_dashboard_runtime_status() -> dict[str, Any]:
     return loaded if isinstance(loaded, dict) else {}
 
 
-def _compact_runtime_health(value: Any) -> Any:
-    if isinstance(value, list):
-        return [_compact_runtime_health(item) for item in value]
-    if isinstance(value, dict):
-        return {
-            key: _compact_runtime_health(item)
-            for key, item in value.items()
-            if key not in {"json", "sample"}
-        }
-    return value
+def _truthy_env(name: str) -> bool:
+    return str(os.environ.get(name, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _public_diagnostics_enabled() -> bool:
+    return _truthy_env("BEIDAN_DECISION_API_PUBLIC_DIAGNOSTICS")
+
+
+def _public_diagnostics_path(path: Any) -> str:
+    return str(path) if _public_diagnostics_enabled() else "redacted"
+
+
+def _allowed_cors_origins() -> set[str]:
+    raw = os.environ.get("BEIDAN_DECISION_API_CORS_ORIGINS", "")
+    return {item.strip() for item in raw.split(",") if item.strip()}
+
+
+def _operator_token() -> str:
+    return str(os.environ.get(OPERATOR_TOKEN_ENV, "")).strip()
+
+
+def _operator_token_error(code: str, message: str) -> tuple[Any, int]:
+    return jsonify({"error": message, "code": code}), 403
+
+
+def _require_operator_token() -> tuple[Any, int] | None:
+    expected = _operator_token()
+    if not expected:
+        return _operator_token_error(
+            "operator_token_unconfigured",
+            f"{OPERATOR_TOKEN_ENV} is required for mutating API requests.",
+        )
+    provided = request.headers.get(OPERATOR_TOKEN_HEADER, "")
+    if not provided or not hmac.compare_digest(provided, expected):
+        return _operator_token_error(
+            "operator_token_required",
+            f"{OPERATOR_TOKEN_HEADER} is required for mutating API requests.",
+        )
+    return None
+
+
+def _health_probe_summary(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    payload = {
+        "ok": bool(value.get("ok")),
+        "status": int(value.get("status") or 0),
+    }
+    if value.get("latency_ms") is not None:
+        payload["latency_ms"] = value.get("latency_ms")
+    for key in ("issue", "workflow_status", "review_task_status"):
+        if value.get(key) not in {None, ""}:
+            payload[key] = value.get(key)
+    return payload
+
+
+def _runtime_health_summary(health: Any) -> dict[str, Any]:
+    if not isinstance(health, dict):
+        return {}
+    host_smokes = health.get("host_smokes")
+    host_smokes = host_smokes if isinstance(host_smokes, list) else []
+    return {
+        "api": _health_probe_summary(health.get("api")),
+        "frontend_local": _health_probe_summary(health.get("frontend_local")),
+        "operations": _health_probe_summary(health.get("operations")),
+        "host_smoke_count": len(host_smokes),
+        "host_smoke_ok_count": sum(1 for item in host_smokes if isinstance(item, dict) and item.get("ok")),
+    }
+
+
+def _runtime_access_mode(api: dict[str, Any], frontend: dict[str, Any], urls: dict[str, Any]) -> str:
+    if urls.get("funnel"):
+        return "public_funnel_configured"
+    if urls.get("magic_dns") or urls.get("frontend_remote"):
+        return "tailnet_metadata_recorded"
+    exposed_hosts = {"0.0.0.0", "::", ""}
+    if str(api.get("bind_host") or "") in exposed_hosts or str(frontend.get("bind_host") or "") in exposed_hosts:
+        return "direct_bind_non_loopback"
+    return "local_only"
 
 
 def _dashboard_runtime_summary() -> dict[str, Any]:
     status = _read_dashboard_runtime_status()
+    public_diagnostics = _public_diagnostics_enabled()
     if not status:
-        return {"status_path": str(_dashboard_runtime_status_path())}
+        return {
+            "checked_at": "",
+            "public_diagnostics": public_diagnostics,
+            "access_mode": "runtime_status_missing",
+            "external_access_configured": False,
+            "api_process_status": "unknown",
+            "frontend_process_status": "unknown",
+            "health": {},
+        }
     api = status.get("api") if isinstance(status.get("api"), dict) else {}
     frontend = status.get("frontend") if isinstance(status.get("frontend"), dict) else {}
     health = status.get("health") if isinstance(status.get("health"), dict) else {}
     urls = status.get("urls") if isinstance(status.get("urls"), dict) else {}
     logs = status.get("logs") if isinstance(status.get("logs"), dict) else {}
-    return {
+    external_access_configured = bool(urls.get("frontend_remote") or urls.get("magic_dns") or urls.get("funnel"))
+    payload: dict[str, Any] = {
         "schema": status.get("schema", ""),
         "checked_at": status.get("checked_at", ""),
-        "status_path": status.get("status_path") or str(_dashboard_runtime_status_path()),
-        "runtime_dir": status.get("runtime_dir", ""),
-        "urls": urls,
-        "api_pid": api.get("pid"),
+        "public_diagnostics": public_diagnostics,
+        "access_mode": _runtime_access_mode(api, frontend, urls),
+        "external_access_configured": external_access_configured,
         "api_process_status": api.get("status", ""),
-        "api_bind_host": api.get("bind_host", ""),
-        "api_command": api.get("command", []),
-        "api_log": api.get("log") or logs.get("api", ""),
-        "frontend_pid": frontend.get("pid"),
         "frontend_process_status": frontend.get("status", ""),
-        "frontend_bind_host": frontend.get("bind_host", ""),
-        "frontend_command": frontend.get("command", []),
-        "frontend_log": frontend.get("log") or logs.get("frontend", ""),
-        "health": _compact_runtime_health(health),
+        "health": _runtime_health_summary(health),
     }
+    if public_diagnostics:
+        payload["diagnostics"] = {
+            "status_path": status.get("status_path") or str(_dashboard_runtime_status_path()),
+            "runtime_dir": status.get("runtime_dir", ""),
+            "urls": urls,
+            "api_pid": api.get("pid"),
+            "api_bind_host": api.get("bind_host", ""),
+            "api_command": api.get("command", []),
+            "api_log": api.get("log") or logs.get("api", ""),
+            "frontend_pid": frontend.get("pid"),
+            "frontend_bind_host": frontend.get("bind_host", ""),
+            "frontend_command": frontend.get("command", []),
+            "frontend_log": frontend.get("log") or logs.get("frontend", ""),
+        }
+    return payload
 
 
 def _active_version_bundle() -> dict[str, Any]:
@@ -520,6 +613,12 @@ def _safe_int(value: Any) -> int | None:
         return int(float(value))
     except (TypeError, ValueError):
         return None
+
+
+def _query_bool(value: Any, default: bool = False) -> bool:
+    if value is None or value == "":
+        return default
+    return str(value).strip().lower() not in {"0", "false", "no", "off"}
 
 
 def _read_csv(path: Path) -> list[dict[str, Any]]:
@@ -2867,6 +2966,15 @@ def _shadow_variant_display_label(variant_id: str) -> str:
     return str(variant_id or SHADOW_DECISION_VARIANT_ID).replace("_", " ")
 
 
+def _decision_variant_version_key(variant_id: Any) -> tuple[int, int, int, str]:
+    text = str(variant_id or "")
+    match = re.search(r"v(\d+)\.(\d+)\.(\d+)", text)
+    if not match:
+        return (-1, -1, -1, text)
+    major, minor, patch = (int(part) for part in match.groups())
+    return (major, minor, patch, text)
+
+
 def _structured_shadow_variant_scan(
     issue: str,
     release: dict[str, Any] | None = None,
@@ -2888,11 +2996,7 @@ def _structured_shadow_variant_scan(
             variants[variant_id] = (rows, source, mtime)
 
     def sort_key(item: tuple[str, tuple[dict[int, dict[str, Any]], str, float]]) -> tuple[int, str]:
-        variant_id = item[0]
-        match = re.search(r"v(\d+)\.(\d+)\.(\d+)", variant_id)
-        if not match:
-            return (999, variant_id)
-        major, minor, patch = (int(part) for part in match.groups())
+        major, minor, patch, variant_id = _decision_variant_version_key(item[0])
         return (major * 10000 + minor * 100 + patch, variant_id)
 
     return (
@@ -2915,6 +3019,7 @@ def _active_decision_variant(summary: dict[str, Any]) -> dict[str, Any]:
     primary = codes[0] if codes else ""
     result_code = str(summary.get("result_code") or "")
     prediction_hit = result_code in codes if result_code and codes else None
+    manifest = _manifest_variant_by_id().get(ACTIVE_DECISION_VARIANT_ID, {})
     version = summary.get("decision_chain_version") or _active_version_bundle()["decision_chain_version"]
     return {
         "variant_id": ACTIVE_DECISION_VARIANT_ID,
@@ -2924,7 +3029,7 @@ def _active_decision_variant(summary: dict[str, Any]) -> dict[str, Any]:
         "display_label": ACTIVE_DECISION_VARIANT_DISPLAY_LABEL,
         "version": version,
         "source": "active_snapshot",
-        "is_default": True,
+        "is_default": bool(manifest.get("is_default", False)),
         "recommendation": summary.get("llm_judgment") or ("停" if not codes else "+".join(OUTCOME_LABEL[code] for code in codes)),
         "primary_pick": primary,
         "protect_picks": codes[1:],
@@ -2942,6 +3047,8 @@ def _active_decision_variant(summary: dict[str, Any]) -> dict[str, Any]:
 
 def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_code: str = "") -> dict[str, Any]:
     codes = _selection_codes_from_value(row.get("shadow_selection_codes"))
+    variant_id = str(row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID)
+    manifest = _manifest_variant_by_id().get(variant_id, {})
     primary = str(row.get("shadow_primary") or (codes[0] if codes else ""))
     if primary not in OUTCOME_ORDER:
         primary = codes[0] if codes else ""
@@ -2951,15 +3058,15 @@ def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_co
         primary_hit = result_code == primary if primary else None
         coverage_hit = result_code in codes
     return {
-        "variant_id": row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID,
+        "variant_id": variant_id,
         "kind": SHADOW_DECISION_VARIANT_KIND,
         "family": SHADOW_DECISION_FAMILY,
-        "label": _shadow_variant_display_label(row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID),
-        "display_label": _shadow_variant_display_label(row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID),
+        "label": manifest.get("label") or _shadow_variant_display_label(variant_id),
+        "display_label": _shadow_variant_display_label(variant_id),
         "version": row.get("shadow_version") or SHADOW_DECISION_VERSION,
         "source": "structured_shadow_csv",
         "source_path": source_path,
-        "is_default": False,
+        "is_default": bool(manifest.get("is_default", False)),
         "recommendation": row.get("shadow_judgment") or ("停" if not codes else "+".join(OUTCOME_LABEL[code] for code in codes)),
         "primary_pick": primary,
         "protect_picks": codes[1:],
@@ -3039,10 +3146,30 @@ def _shadow_decision_option(
         "source": "structured_shadow_csv",
         "source_path": source_path,
         "artifact_key": manifest.get("artifact_key", "structured_shadow_dir"),
-        "is_default": False,
+        "is_default": bool(manifest.get("is_default", False)),
         "selectable": bool(manifest.get("selectable", True)),
         "available": True,
     }
+
+
+def _normalize_decision_variant_defaults(options: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not options:
+        return options
+    shadow_options = [
+        item for item in options
+        if item.get("kind") == SHADOW_DECISION_VARIANT_KIND and item.get("variant_id")
+    ]
+    if shadow_options:
+        default_variant_id = str(max(
+            shadow_options,
+            key=lambda item: _decision_variant_version_key(item.get("variant_id") or item.get("version_id")),
+        ).get("variant_id") or "")
+    else:
+        default_option = next((item for item in options if item.get("is_default")), options[0])
+        default_variant_id = str(default_option.get("variant_id") or "")
+    for item in options:
+        item["is_default"] = bool(default_variant_id and str(item.get("variant_id") or "") == default_variant_id)
+    return options
 
 
 def _decision_variant_options(
@@ -3062,7 +3189,7 @@ def _decision_variant_options(
             "version": active_manifest.get("version_id") or _active_version_bundle()["decision_chain_version"],
             "version_id": active_manifest.get("version_id") or "",
             "source": "active_snapshot",
-            "is_default": True,
+            "is_default": bool(active_manifest.get("is_default", False)),
             "selectable": bool(active_manifest.get("selectable", True)),
             "available": True,
         }
@@ -3070,7 +3197,7 @@ def _decision_variant_options(
     for rows, source_path in shadow_variants or []:
         if rows and source_path:
             options.append(_shadow_decision_option(rows, source_path, release=release))
-    return options
+    return _normalize_decision_variant_defaults(options)
 
 
 def _strategy_version_context(
@@ -3138,6 +3265,121 @@ def _attach_selected_decision_variant(
         match["selected_decision_variant"] = selected or {}
         match["selected_decision_variant_status"] = status
     return matches
+
+
+def _compact_decision_variant(variant: dict[str, Any]) -> dict[str, Any]:
+    keep = {
+        "variant_id",
+        "kind",
+        "family",
+        "label",
+        "display_label",
+        "version",
+        "version_id",
+        "source",
+        "is_default",
+        "recommendation",
+        "primary_pick",
+        "protect_picks",
+        "selection_codes",
+        "selection_type",
+        "stop_flag",
+        "q_score",
+        "probability",
+        "confidence_label",
+        "prediction_hit",
+        "primary_hit",
+        "coverage_hit",
+    }
+    return {key: value for key, value in variant.items() if key in keep}
+
+
+def _dashboard_summary_match(match: dict[str, Any]) -> dict[str, Any]:
+    keep = {
+        "match_id",
+        "issue",
+        "match_idx",
+        "league",
+        "kickoff_ts",
+        "kickoff_date",
+        "home",
+        "away",
+        "handicap_line",
+        "score",
+        "halftime_score",
+        "live_score_status",
+        "live_score_status_text",
+        "sp_3",
+        "sp_1",
+        "sp_0",
+        "eu_home",
+        "eu_draw",
+        "eu_away",
+        "ah_line",
+        "line_gap",
+        "sp_drift_3",
+        "sp_drift_1",
+        "sp_drift_0",
+        "sp_drift_band",
+        "q_max",
+        "q_score",
+        "confidence_weight",
+        "model_p_3",
+        "model_p_1",
+        "model_p_0",
+        "market_p_3",
+        "market_p_1",
+        "market_p_0",
+        "model_selection",
+        "model_selection_codes",
+        "model_selection_type",
+        "model_selection_source",
+        "model_prediction_hit",
+        "llm_judgment",
+        "llm_selection",
+        "llm_selection_codes",
+        "llm_selection_type",
+        "llm_confidence",
+        "llm_confidence_label",
+        "llm_source",
+        "llm_q_score",
+        "llm_probability",
+        "llm_prediction_hit",
+        "llm_stop_flag",
+        "selection",
+        "selection_codes",
+        "selection_source",
+        "selection_type",
+        "status",
+        "capture_status",
+        "result_code",
+        "result_label",
+        "prediction_hit",
+        "winning_sp",
+        "generated_ts",
+        "q_input_sp_snapshot_ts",
+        "q_input_probability_snapshot_ts",
+        "q_calculated_ts",
+        "decision_snapshot_id",
+        "decision_snapshot_status",
+        "decision_snapshot_generated_at",
+        "decision_snapshot_checked_at",
+        "draft_decision_snapshot_id",
+        "draft_decision_snapshot_status",
+        "postmatch_review_outcome",
+        "postmatch_review_summary",
+        "postmatch_review_tags",
+        "postmatch_review_action",
+        "postmatch_review_profit",
+        "postmatch_review_reviewed_at",
+        "selected_decision_variant_id",
+        "selected_decision_variant_status",
+    }
+    out = {key: match.get(key) for key in keep if key in match}
+    selected = match.get("selected_decision_variant")
+    if isinstance(selected, dict):
+        out["selected_decision_variant"] = _compact_decision_variant(selected)
+    return out
 
 
 def _attach_decision_variants(
@@ -3875,7 +4117,7 @@ def _issue_year(issue: str) -> int | None:
     return year if 2000 <= year <= 2099 else None
 
 
-def _available_issues(conn: sqlite3.Connection, *, limit: int = 80) -> list[dict[str, Any]]:
+def _available_issues(conn: sqlite3.Connection, *, limit: int = 80, include_replay: bool = True) -> list[dict[str, Any]]:
     by_issue: dict[str, dict[str, Any]] = {}
     for row in conn.execute(
         """
@@ -3917,34 +4159,35 @@ def _available_issues(conn: sqlite3.Connection, *, limit: int = 80) -> list[dict
             "issue_close_ts": "",
         }
 
-    historical: dict[str, dict[str, Any]] = {}
-    for row in _main_strategy_issue_rows():
-        issue = str(row.get("issue", ""))
-        if not issue:
-            continue
-        item = historical.setdefault(issue, {
-            "issue": issue,
-            "label": f"{issue} 历史回放",
-            "status": "historical_replay",
-            "source": "main_strategy_replay",
-            "is_current": False,
-            "year": _csv_int(row, "calendar_year") or _issue_year(issue),
-            "match_count": 0,
-            "settled_match_count": 0,
-            "open_match_count": 0,
-            "is_fully_settled": False,
-            "has_settlement": False,
-            "last_seen_at": row.get("issue_close_ts", ""),
-            "issue_order": _csv_int(row, "issue_order"),
-            "issue_close_ts": row.get("issue_close_ts", ""),
-        })
-        item["issue_order"] = max(_safe_int(item.get("issue_order")) or 0, _csv_int(row, "issue_order"))
-        if row.get("issue_close_ts"):
-            item["last_seen_at"] = row.get("issue_close_ts", "")
-            item["issue_close_ts"] = row.get("issue_close_ts", "")
-    for issue, item in historical.items():
-        if issue not in by_issue:
-            by_issue[issue] = item
+    if include_replay:
+        historical: dict[str, dict[str, Any]] = {}
+        for row in _main_strategy_issue_rows():
+            issue = str(row.get("issue", ""))
+            if not issue:
+                continue
+            item = historical.setdefault(issue, {
+                "issue": issue,
+                "label": f"{issue} 历史回放",
+                "status": "historical_replay",
+                "source": "main_strategy_replay",
+                "is_current": False,
+                "year": _csv_int(row, "calendar_year") or _issue_year(issue),
+                "match_count": 0,
+                "settled_match_count": 0,
+                "open_match_count": 0,
+                "is_fully_settled": False,
+                "has_settlement": False,
+                "last_seen_at": row.get("issue_close_ts", ""),
+                "issue_order": _csv_int(row, "issue_order"),
+                "issue_close_ts": row.get("issue_close_ts", ""),
+            })
+            item["issue_order"] = max(_safe_int(item.get("issue_order")) or 0, _csv_int(row, "issue_order"))
+            if row.get("issue_close_ts"):
+                item["last_seen_at"] = row.get("issue_close_ts", "")
+                item["issue_close_ts"] = row.get("issue_close_ts", "")
+        for issue, item in historical.items():
+            if issue not in by_issue:
+                by_issue[issue] = item
 
     rows = list(by_issue.values())
     rows.sort(
@@ -4096,7 +4339,7 @@ def _historical_dashboard(issue: str, release: dict[str, Any] | None = None) -> 
             "provider": "beidan_modeling_plus_2026",
             "issue_label": f"{resolved} 历史回放",
             "scope_date": None,
-            "path": str(DEFAULT_MODEL_DB),
+            "path": _public_diagnostics_path(DEFAULT_MODEL_DB),
             "tables": ["match_features", "market_consensus", "joint_leg_rows.csv"],
         },
     }
@@ -4438,8 +4681,8 @@ def _main_strategy_payload(
             "ticket_pool_csv": _relative_display_path(_strategy_ticket_pool_csv(release)),
             "joint_leg_rows_csv": _relative_display_path(_strategy_joint_leg_rows_csv(release)),
             "structured_shadow_dir": _relative_display_path(_strategy_shadow_dir(release)),
-            "model_db": str(DEFAULT_MODEL_DB),
-            "live_db": str(conn.execute("PRAGMA database_list").fetchone()["file"]),
+            "model_db": _public_diagnostics_path(DEFAULT_MODEL_DB),
+            "live_db": _public_diagnostics_path(conn.execute("PRAGMA database_list").fetchone()["file"]),
             "strategy_release_config": _relative_display_path(STRATEGY_RELEASE_CONFIG),
             "no_future_leakage": "当前期只读 live/html odds；历史 replay 才显示 hit/payout/profit。",
         },
@@ -4518,6 +4761,7 @@ def _dashboard(
     *,
     only_date: str | None,
     decision_variant_id: str | None = None,
+    summary_view: bool = False,
 ) -> dict[str, Any]:
     _ensure_decision_snapshot_schema(conn)
     release = _active_strategy_release()
@@ -4536,7 +4780,9 @@ def _dashboard(
         decision_variant_id,
         suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
     )
-    matches = _attach_selected_decision_variant(matches, decision_variant_id)
+    matches = _attach_selected_decision_variant(matches, version_context.get("selected_variant_id") or decision_variant_id)
+    if summary_view:
+        matches = [_dashboard_summary_match(match) for match in matches]
     complete = sum(1 for m in matches if m["capture_status"] == "ok")
     partial = sum(1 for m in matches if m["capture_status"] == "partial")
     q_values = [m["q_max"] for m in matches if m["q_max"] is not None]
@@ -4567,7 +4813,7 @@ def _dashboard(
             "provider": "500.com",
             "issue_label": issue_meta["label"] if issue_meta else resolved,
             "scope_date": only_date,
-            "path": str(conn.execute("PRAGMA database_list").fetchone()["file"]),
+            "path": _public_diagnostics_path(conn.execute("PRAGMA database_list").fetchone()["file"]),
             "tables": ["issues", "matches", "live_sp_snapshots", "fetch_log", "llm_decision_snapshots"],
         },
     }
@@ -4652,17 +4898,9 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
     latest_snapshot_at = max(parsed_candidates, default=(None, ""))[1] if parsed_candidates else ""
 
     runtime_status = _dashboard_runtime_summary()
-    runtime_urls = runtime_status.get("urls") if isinstance(runtime_status.get("urls"), dict) else {}
-    api_host = request.host.split(":")[0] if request.host else "127.0.0.1"
-    api_url = request.host_url.rstrip("/")
-    remote_frontend_url = (
-        os.environ.get("BEIDAN_DASHBOARD_REMOTE_URL")
-        or runtime_urls.get("frontend_remote")
-        or runtime_urls.get("magic_dns")
-        or f"http://{api_host}:4173/"
-    )
-    frontend_local_url = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_URL", "http://127.0.0.1:4173/")
-    api_port = request.host.split(":")[1] if ":" in request.host else os.environ.get("BEIDAN_DECISION_API_PORT", "8790")
+    runtime_health = runtime_status.get("health") if isinstance(runtime_status.get("health"), dict) else {}
+    api_probe = runtime_health.get("api") if isinstance(runtime_health.get("api"), dict) else {}
+    frontend_probe = runtime_health.get("frontend_local") if isinstance(runtime_health.get("frontend_local"), dict) else {}
 
     warnings: list[dict[str, Any]] = []
     if not rows:
@@ -4743,13 +4981,14 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
             "latest_snapshot_age_minutes": _minutes_since_hk(latest_snapshot_at),
         },
         "runtime": {
-            "api_health": "ok",
-            "api_url": api_url,
-            "api_health_url": f"{api_url}/healthz",
-            "api_port": api_port,
-            "frontend_local_url": frontend_local_url,
-            "frontend_remote_url": remote_frontend_url,
-            "frontend_port": "4173",
+            "api_health": "ok" if api_probe.get("ok") else "warn",
+            "api_url": "",
+            "api_health_url": "",
+            "api_port": "",
+            "frontend_local_url": "",
+            "frontend_remote_url": "",
+            "frontend_port": "",
+            "frontend_health": "ok" if frontend_probe.get("ok") else "warn",
             **runtime_status,
         },
         "sources": source_statuses,
@@ -4801,7 +5040,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
         "versions": versions,
         "warnings": warnings,
         "source": {
-            "sqlite_db": str(conn.execute("PRAGMA database_list").fetchone()["file"]),
+            "sqlite_db": _public_diagnostics_path(conn.execute("PRAGMA database_list").fetchone()["file"]),
             "tables": ["matches", "fetch_log", "llm_decision_snapshots", "postmatch_reviews", "postmatch_review_issue_summary"],
         },
     }
@@ -4864,7 +5103,7 @@ def _match_detail(
         decision_variant_id,
         suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
     )
-    _attach_selected_decision_variant([summary], decision_variant_id)
+    _attach_selected_decision_variant([summary], version_context.get("selected_variant_id") or decision_variant_id)
     versions = _active_version_bundle()
     return {
         "match": summary,
@@ -5206,7 +5445,7 @@ def _selector_shadow(results_dir: Path, issue: str) -> dict[str, Any]:
             "pre_drawdown_units": _csv_float(row, "pre_drawdown_units"),
             "outcome": "helped" if _csv_int(row, "switch_helped") else "hurt" if _csv_int(row, "switch_hurt") else "flat",
         } for row in decisions[-8:]][::-1],
-        "guardrail": f"source={results_dir}; no mock fallback. Current issue selector run must be generated separately before real staking.",
+        "guardrail": f"source={_relative_display_path(results_dir)}; no mock fallback. Current issue selector run must be generated separately before real staking.",
     }
 
 
@@ -5215,15 +5454,89 @@ def create_app(
     sqlite_db: str | os.PathLike[str] = DEFAULT_500_DB,
     results_dir: str | os.PathLike[str] = DEFAULT_RESULTS_DIR,
 ) -> Flask:
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder=None)
     db_path = Path(sqlite_db)
     result_path = Path(results_dir)
+    static_dir = Path(os.environ.get("BEIDAN_DASHBOARD_STATIC_DIR", DEFAULT_DASHBOARD_STATIC_DIR))
+    configured_cache_ttl = _safe_float(os.environ.get("BEIDAN_DECISION_API_CACHE_TTL_SEC"))
+    cache_ttl_sec = max(0.0, DEFAULT_CACHE_TTL_SEC if configured_cache_ttl is None else configured_cache_ttl)
+    response_cache: dict[tuple[Any, ...], tuple[float, Any]] = {}
+
+    def _cache_get(key: tuple[Any, ...]) -> Any | None:
+        if cache_ttl_sec <= 0:
+            return None
+        cached = response_cache.get(key)
+        if not cached:
+            return None
+        expires_at, payload = cached
+        if expires_at <= time.monotonic():
+            response_cache.pop(key, None)
+            return None
+        return payload
+
+    def _cache_set(key: tuple[Any, ...], payload: Any) -> None:
+        if cache_ttl_sec <= 0:
+            return
+        if len(response_cache) > 64:
+            response_cache.clear()
+        response_cache[key] = (time.monotonic() + cache_ttl_sec, payload)
+
+    def _cache_clear() -> None:
+        response_cache.clear()
+
+    def _serve_index():
+        index_path = static_dir / "index.html"
+        if not index_path.exists():
+            return jsonify({
+                "error": "decision dashboard frontend build is missing",
+                "expected": str(index_path),
+                "hint": "run npm --prefix apps/decision-dashboard run build",
+            }), 503
+        response = send_from_directory(static_dir, "index.html")
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+    def _serve_asset(path: str):
+        asset_path = static_dir / path
+        if not asset_path.is_file():
+            return jsonify({"error": f"frontend asset not found: {path}"}), 404
+        response = send_from_directory(static_dir, path, max_age=31536000)
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+    @app.before_request
+    def _operator_token_gate():
+        if request.method == "POST" and request.path.startswith("/api/"):
+            return _require_operator_token()
+        return None
 
     @app.after_request
     def _cors(resp):
-        resp.headers["Access-Control-Allow-Origin"] = "*"
-        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        origin = request.headers.get("Origin", "")
+        allowed = _allowed_cors_origins()
+        if origin and origin in allowed:
+            resp.headers["Access-Control-Allow-Origin"] = origin
+            resp.headers["Access-Control-Allow-Headers"] = f"Content-Type,{OPERATOR_TOKEN_HEADER}"
+            resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+            resp.headers.add("Vary", "Origin")
         return resp
+
+    @app.get("/")
+    def frontend_index():
+        return _serve_index()
+
+    @app.get("/assets/<path:path>")
+    def frontend_assets(path: str):
+        return _serve_asset(f"assets/{path}")
+
+    @app.get("/<path:path>")
+    def frontend_spa(path: str):
+        if path == "api" or path.startswith("api/"):
+            return jsonify({"error": f"API route not found: /{path}"}), 404
+        candidate = static_dir / path
+        if candidate.is_file():
+            return _serve_asset(path)
+        return _serve_index()
 
     @app.get("/healthz")
     def healthz():
@@ -5231,20 +5544,26 @@ def create_app(
             current = _resolve_issue(conn, "current")
         release = _active_strategy_release()
         release_payload = _strategy_release_public_payload(release)
-        return jsonify({
+        payload = {
             "ok": db_path.exists(),
             "provider": "500.com",
             "current_issue": current,
             "scope_date": _today_hk(),
-            "sqlite_db": str(db_path),
-            "results_dir": str(result_path),
             "strategy_release_id": release.get("release_id"),
-            "strategy_release_config": release.get("config_path"),
-            "strategy_release_missing_required": release_payload["artifact_health"]["missing_required"],
-            "main_strategy_dir": _relative_display_path(_strategy_main_dir(release)),
-            "high_n_selector_dir": _relative_display_path(_strategy_artifact_path("ticket_pool_dir", HIGH_N_SELECTOR_RESULTS_DIR, release)),
-            "model_db": str(DEFAULT_MODEL_DB),
-        })
+            "strategy_release_missing_required_count": len(release_payload["artifact_health"]["missing_required"]),
+            "public_diagnostics": _public_diagnostics_enabled(),
+        }
+        if _public_diagnostics_enabled():
+            payload.update({
+                "sqlite_db": str(db_path),
+                "results_dir": str(result_path),
+                "strategy_release_config": release.get("config_path"),
+                "strategy_release_missing_required": release_payload["artifact_health"]["missing_required"],
+                "main_strategy_dir": _relative_display_path(_strategy_main_dir(release)),
+                "high_n_selector_dir": _relative_display_path(_strategy_artifact_path("ticket_pool_dir", HIGH_N_SELECTOR_RESULTS_DIR, release)),
+                "model_db": str(DEFAULT_MODEL_DB),
+            })
+        return jsonify(payload)
 
     @app.get("/api/strategy-release")
     def strategy_release():
@@ -5253,16 +5572,49 @@ def create_app(
     @app.get("/api/issues")
     def issues():
         limit = _safe_int(request.args.get("limit")) or 80
+        include_replay = _query_bool(request.args.get("include_replay"), True)
+        cacheable = not include_replay
+        cache_key = ("issues", limit, include_replay)
+        if cacheable:
+            cached = _cache_get(cache_key)
+            if cached is not None:
+                response = jsonify(cached)
+                response.headers["X-Beidan-Cache"] = "hit"
+                response.headers["Cache-Control"] = "private, max-age=5"
+                return response
         with _connect(db_path) as conn:
-            return jsonify({"issues": _available_issues(conn, limit=limit)})
+            payload = {"issues": _available_issues(conn, limit=limit, include_replay=include_replay)}
+            if cacheable:
+                _cache_set(cache_key, payload)
+                response = jsonify(payload)
+                response.headers["X-Beidan-Cache"] = "miss"
+                response.headers["Cache-Control"] = "private, max-age=5"
+                return response
+            return jsonify(payload)
 
     @app.get("/api/issues/<issue>/dashboard")
     def issue_dashboard(issue: str):
         only_date = request.args.get("date")
         decision_variant_id = _requested_decision_variant_id()
+        summary_view = str(request.args.get("view") or "").strip().lower() == "summary" or _query_bool(request.args.get("summary"), False)
+        cache_key = ("dashboard_summary", issue, only_date, decision_variant_id)
+        if summary_view:
+            cached = _cache_get(cache_key)
+            if cached is not None:
+                response = jsonify(cached)
+                response.headers["X-Beidan-Cache"] = "hit"
+                response.headers["Cache-Control"] = "private, max-age=5"
+                return response
         with _connect(db_path) as conn:
             try:
-                return jsonify(_dashboard(conn, issue, only_date=only_date, decision_variant_id=decision_variant_id))
+                payload = _dashboard(conn, issue, only_date=only_date, decision_variant_id=decision_variant_id, summary_view=summary_view)
+                if summary_view:
+                    _cache_set(cache_key, payload)
+                    response = jsonify(payload)
+                    response.headers["X-Beidan-Cache"] = "miss"
+                    response.headers["Cache-Control"] = "private, max-age=5"
+                    return response
+                return jsonify(payload)
             except LookupError as exc:
                 if _main_strategy_issue_exists(issue):
                     return jsonify(_historical_dashboard(issue))
@@ -5288,6 +5640,7 @@ def create_app(
             try:
                 payload = _materialize_issue_decision_snapshots(conn, issue, only_date=only_date)
                 conn.commit()
+                _cache_clear()
                 return jsonify(payload)
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404
@@ -5303,6 +5656,7 @@ def create_app(
                     raise LookupError(f"500.com match not found: {match_id}")
                 payload = _materialize_decision_snapshot_for_row(conn, row)
                 conn.commit()
+                _cache_clear()
                 return jsonify(payload)
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404
@@ -5314,6 +5668,7 @@ def create_app(
                 issue, idx = _find_match(conn, match_id)
                 payload = _confirm_decision_snapshot_override(conn, issue, idx)
                 conn.commit()
+                _cache_clear()
                 return jsonify(payload)
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404
@@ -5371,6 +5726,7 @@ def create_app(
         with _connect(db_path) as conn:
             try:
                 payload = _run_live_workflow(conn, db_path, issue, dry_run=dry_run, requested_by=requested_by)
+                _cache_clear()
                 return jsonify(payload), 200 if payload.get("status") != "failed" else 500
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404
@@ -5386,6 +5742,7 @@ def create_app(
         with _connect(db_path) as conn:
             try:
                 payload = _run_postmatch_review_task(conn, db_path, issue, dry_run=dry_run, requested_by=requested_by)
+                _cache_clear()
                 return jsonify(payload), 200 if payload.get("status") != "failed" else 500
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404
@@ -5421,7 +5778,7 @@ def main() -> None:
         sqlite_db=os.environ.get("BEIDAN_500_DB", DEFAULT_500_DB),
         results_dir=os.environ.get("BEIDAN_SELECTOR_RESULTS_DIR", DEFAULT_RESULTS_DIR),
     )
-    host = os.environ.get("BEIDAN_DECISION_API_HOST", "0.0.0.0")
+    host = os.environ.get("BEIDAN_DECISION_API_HOST", DEFAULT_DECISION_API_HOST)
     port = int(os.environ.get("BEIDAN_DECISION_API_PORT", "8790"))
     app.run(host=host, port=port, debug=False)
 

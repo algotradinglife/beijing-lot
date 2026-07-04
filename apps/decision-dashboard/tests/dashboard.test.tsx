@@ -1,12 +1,17 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
 import { mockDashboardData } from '../src/data/mockData';
 import { ApiDashboardAdapter } from '../src/data/apiAdapter';
 import type { DashboardData } from '../src/data/types';
 
+beforeEach(() => {
+  vi.stubEnv('VITE_DATA_MODE', 'mock');
+});
+
 afterEach(() => {
+  window.localStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -34,11 +39,6 @@ describe('北单实盘决策台 v1', () => {
         matches: mockDashboardData.issue.matches.map((match, index) => ({
           ...match,
           kickoffDate: index === 2 ? yesterday : index >= 3 ? tomorrow : today,
-          decisionVariants: index === 0
-            ? match.decisionVariants?.map((variant) => variant.variantId === 'shadow_v3.3.1'
-              ? { ...variant, predictionHit: undefined, primaryHit: undefined, coverageHit: undefined }
-              : variant)
-            : match.decisionVariants,
         })),
       },
     };
@@ -64,7 +64,8 @@ describe('北单实盘决策台 v1', () => {
     expect(within(firstMatchRow!).getByText(/^押$/)).toBeInTheDocument();
     expect(within(firstMatchRow!).getByText(/^保$/)).toBeInTheDocument();
     expect(within(firstMatchRow!).queryByText(/^停$/)).not.toBeInTheDocument();
-    expect(within(firstMatchRow!).getByText('押中')).toBeInTheDocument();
+    expect(within(firstMatchRow!).getByText('未中')).toBeInTheDocument();
+    expect(within(firstMatchRow!).queryByText('押中')).not.toBeInTheDocument();
     expect(screen.getByText('bjdc_26052_009')).toBeInTheDocument();
     expect(screen.queryByText('bjdc_26052_006')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: new RegExp(yesterday) }));
@@ -106,9 +107,14 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.queryByText('押+保+停')).not.toBeInTheDocument();
 
     const versionSelect = screen.getByLabelText('选择决策版本') as HTMLSelectElement;
+    expect(versionSelect.value).toBe('shadow_v3.3.3');
+    await userEvent.selectOptions(versionSelect, 'active_v3');
     expect(versionSelect.value).toBe('active_v3');
-    await userEvent.selectOptions(versionSelect, 'shadow_v3.3.1');
-    expect(versionSelect.value).toBe('shadow_v3.3.1');
+    const firstMatchActiveRow = screen.getByText('bjdc_26052_001').closest('tr');
+    expect(firstMatchActiveRow).not.toBeNull();
+    expect(within(firstMatchActiveRow!).getByText('押中')).toBeInTheDocument();
+    await userEvent.selectOptions(versionSelect, 'shadow_v3.3.3');
+    expect(versionSelect.value).toBe('shadow_v3.3.3');
     const firstMatchShadowRow = screen.getByText('bjdc_26052_001').closest('tr');
     expect(firstMatchShadowRow).not.toBeNull();
     expect(within(firstMatchShadowRow!).getByText(/^押$/)).toBeInTheDocument();
@@ -125,7 +131,7 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getAllByText(/盘口与关注要点/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/情报摘要/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/结构化决策链/).length).toBeGreaterThan(0);
-    expect((screen.getByLabelText('选择详情决策版本') as HTMLSelectElement).value).toBe('shadow_v3.3.1');
+    expect((screen.getByLabelText('选择详情决策版本') as HTMLSelectElement).value).toBe('shadow_v3.3.3');
     expect(screen.getAllByText(/让球后概率/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/q \/ EV/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/脚本汇总/).length).toBeGreaterThan(0);
@@ -156,11 +162,14 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getByText('版本锁定')).toBeInTheDocument();
     expect(screen.getByText('数据源新鲜度')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '复盘 dry-run' })).toBeInTheDocument();
-    expect(screen.getByText('http://127.0.0.1:4173/')).toBeInTheDocument();
-    expect(screen.getByText('http://127.0.0.1:8790/healthz')).toBeInTheDocument();
-    expect(screen.getByText(/running · pid 1001/)).toBeInTheDocument();
-    expect(screen.getByText(/running · pid 1002/)).toBeInTheDocument();
-    expect(screen.getByText('trade-server.tail0aa0e9.ts.net')).toBeInTheDocument();
+    expect(screen.getByText('API 健康')).toBeInTheDocument();
+    expect(screen.getByText(/页面不显示 API 地址/)).toBeInTheDocument();
+    expect(screen.getByText(/Host smoke 1\/1/)).toBeInTheDocument();
+    expect(screen.queryByText('http://127.0.0.1:4173/')).not.toBeInTheDocument();
+    expect(screen.queryByText('http://127.0.0.1:8790/healthz')).not.toBeInTheDocument();
+    expect(screen.queryByText(/pid 1001/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/pid 1002/)).not.toBeInTheDocument();
+    expect(screen.queryByText('trade-server.tail0aa0e9.ts.net')).not.toBeInTheDocument();
     expect(screen.getByText('f2ad3ef6')).toBeInTheDocument();
     expect(screen.getByText('26071_014')).toBeInTheDocument();
     expect(screen.getByText('1 条 draft 待确认')).toBeInTheDocument();
@@ -385,6 +394,7 @@ describe('北单实盘决策台 v1', () => {
     await userEvent.click(screen.getByRole('button', { name: /2026-06-30/ }));
     expect(screen.getByText('待确认新建议')).toBeInTheDocument();
     expect(screen.queryByText(/Active \/ Draft 对比/)).not.toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('选择决策版本'), 'active_v3');
 
     await userEvent.click(screen.getByText('bjdc_26052_001'));
     expect(screen.getByText(/Active \/ Draft 对比/)).toBeInTheDocument();
@@ -405,7 +415,7 @@ describe('北单实盘决策台 v1', () => {
     await userEvent.click(confirmButton);
     await waitFor(() => expect(confirmSpy).toHaveBeenCalledWith('bjdc_26052_001'));
     expect(await screen.findByText(/确认完成，active=draft_26052_001/)).toBeInTheDocument();
-    await waitFor(() => expect(getDashboardSpy).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(getDashboardSpy).toHaveBeenCalledTimes(4));
   });
 
   it('keeps the last successful dashboard visible when a real refresh fails', async () => {
@@ -467,7 +477,7 @@ describe('北单实盘决策台 v1', () => {
     expect(mockDashboardData.mainStrategy.candidates.map((arm) => arm.armId)).toContain('b384_dd32_smooth100');
     expect(mockDashboardData.mainStrategy.evPool.available).toBe(true);
     expect(mockDashboardData.availableIssues.map((issue) => issue.issueId)).toContain('26051');
-    expect(mockDashboardData.operations.runtime.frontendLocalUrl).toContain('4173');
+    expect(mockDashboardData.operations.runtime.publicDiagnostics).toBe(false);
     expect(mockDashboardData.operations.snapshots.draftReplacementCount).toBe(1);
     expect(mockDashboardData.operations.workflow.steps).toHaveLength(3);
     expect(mockDashboardData.operations.review.task.status).toBe('dry_run');
@@ -478,6 +488,33 @@ describe('北单实盘决策台 v1', () => {
     await expect(adapter.getIssueDashboard('26052')).resolves.toMatchObject({ issueId: '26052' });
   });
 
+  it('fetches only the issue list and issue dashboard for the initial shell', async () => {
+    const payloads: Record<string, unknown> = {
+      '/api/issues?limit=120&include_replay=0': { issues: [{ issue: '26052', label: '26052 当前期', status: 'current', source: 'sqlite', is_current: true, last_seen_at: '2026-07-04' }] },
+      '/api/issues/26052/dashboard?view=summary': {
+        issue: '26052',
+        issue_date: '2026-07-04',
+        status: 'open',
+        capture_status: 'ok',
+        stats: { n_matches: 0, qualified_legs: 0, qualified_matches: 0, q_avg: 0, pool_quality_flag: 'green' },
+        matches: [],
+        source: { kind: 'sqlite', provider: '500.com', tables: ['matches'] },
+      },
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input).replace('http://api.test', '');
+      return { ok: true, json: async () => payloads[url] } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
+    await expect(adapter.getDashboardShell('26052')).resolves.toMatchObject({ issue: { issueId: '26052' } });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://api.test/api/issues?limit=120&include_replay=0');
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'http://api.test/api/issues/26052/dashboard?view=summary');
+  });
+
   it('fetch mode calls canonical API paths and transforms minimal snake_case payloads', async () => {
     const payloads: Record<string, unknown> = {
       '/api/issues/26052/dashboard': {
@@ -486,8 +523,8 @@ describe('北单实盘决策台 v1', () => {
 	        capture_status: 'partial',
 	        stats: { n_matches: 14, qualified_legs: 17, qualified_matches: 10, q_avg: 1.2, pool_quality_flag: 'green' },
 	        decision_variant_options: [
-	          { variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: true },
-	          { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', source_path: 'shadow.csv' },
+	          { variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: false },
+	          { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', source_path: 'shadow.csv', is_default: true },
 	        ],
 	        matches: [{
 	          match_id: 'bjdc_26052_001', league: '日乙', kickoff_ts: '2026-06-30 19:00', home: '札幌', away: '横滨FC', handicap_line: -1,
@@ -498,15 +535,15 @@ describe('北单实盘决策台 v1', () => {
 	          model_selection: '3', model_selection_codes: ['3'], model_selection_type: 'single',
 	          llm_selection: '1', llm_selection_codes: ['1', '0'], llm_selection_type: 'double', llm_q_score: 1.08, llm_probability: 0.31, llm_confidence_label: '中', llm_source: 'gpt_fixed_decision_chain_v1',
 	          decision_variants: [
-	            { variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: true, recommendation: '押平，保负', primary_pick: '1', protect_picks: ['0'], selection_codes: ['1', '0'], selection_type: 'double', stop_flag: false, q_score: 1.08, probability: 0.31, coverage_hit: true },
-	            { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', recommendation: '押胜', primary_pick: '3', protect_picks: [], selection_codes: ['3'], selection_type: 'single', stop_flag: false, q_score: 1.2, probability: 0.46, coverage_hit: false },
+	            { variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: false, recommendation: '押平，保负', primary_pick: '1', protect_picks: ['0'], selection_codes: ['1', '0'], selection_type: 'double', stop_flag: false, q_score: 1.08, probability: 0.31, coverage_hit: true },
+	            { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', is_default: true, recommendation: '押胜', primary_pick: '3', protect_picks: [], selection_codes: ['3'], selection_type: 'single', stop_flag: false, q_score: 1.2, probability: 0.46, coverage_hit: false },
 	          ],
 	        }],
 	      },
 	      '/api/matches/bjdc_26052_001': {
 	        match: { match_id: 'bjdc_26052_001', issue: '26052', league: '日乙', kickoff_ts: '2026-06-30T19:00:00+08:00', home: '札幌', away: '横滨FC', handicap_line: -1, status: 'open', score: '2-1', halftime_score: '1-0', live_score_status: 'finished', live_score_status_text: '完场', sp_3: 2.1, sp_1: 3.55, sp_0: 3.2, sp_snapshot_ts: '2026-06-30T18:20:00+08:00', sp_drift_band: '胜-4.2% 平-1.5% 负+9.1%', eu_home: 1.86, eu_draw: 3.4, eu_away: 4.1, ah_line: -0.75, ah_home: 1.91, ah_away: 1.97, line_gap: 0.25, odds_consensus: { n_companies: 42, open_avg: { home: 1.92, draw: 3.36, away: 4.05 }, current_avg: { home: 1.84, draw: 3.31, away: 4.42 }, drift: { home: -0.042, draw: -0.015, away: 0.091 }, providers: [{ company: 'Bet 365', open: { home: 1.91, draw: 3.4, away: 4.1 }, current: { home: 1.83, draw: 3.3, away: 4.5 } }] }, market_highlights: ['欧赔均值 主胜-4.2% 平-1.5% 客胜+9.1%'] },
-	        decision_variant_options: [{ variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: true }, { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', source_path: 'shadow.csv' }],
-	        decision_variants: [{ variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: true, recommendation: '押平，保负', primary_pick: '1', protect_picks: ['0'], selection_codes: ['1', '0'], selection_type: 'double', stop_flag: false }, { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', recommendation: '押胜', primary_pick: '3', protect_picks: [], selection_codes: ['3'], selection_type: 'single', stop_flag: false }],
+	        decision_variant_options: [{ variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: false }, { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', source_path: 'shadow.csv', is_default: true }],
+	        decision_variants: [{ variant_id: 'active_v3', label: 'v3', version: 'chain-v1', source: 'active_snapshot', is_default: false, recommendation: '押平，保负', primary_pick: '1', protect_picks: ['0'], selection_codes: ['1', '0'], selection_type: 'double', stop_flag: false }, { variant_id: 'shadow_v3.3.1', label: 'shadow v3.3.1', version: 'chain-v3.3.1-shadow', source: 'structured_shadow_csv', is_default: true, recommendation: '押胜', primary_pick: '3', protect_picks: [], selection_codes: ['3'], selection_type: 'single', stop_flag: false }],
         analysis_500: { status: 'ok', fetched_at: '2026-06-30 15:40:00', title: '札幌VS横滨FC-数据分析-500彩票网', description: '500 detail', urls: { data: 'https://odds.500.com/fenxi/shuju-1.shtml' }, home_recent: { team: '札幌', summary: '近10场 5胜3平2负', rows: [] }, away_recent: { team: '横滨FC', summary: '近10场 4胜2平4负', rows: [] }, h2h: { summary: '交锋缺', rows: [] }, league_table: '积分摘要', source: 'odds.500.com/fenxi/shuju', highlights: ['主队主场胜率 50%'], market_summary: '欧赔均值 主胜-4.2% 平-1.5% 客胜+9.1%', odds_consensus: { n_companies: 42, open_avg: { home: 1.92, draw: 3.36, away: 4.05 }, current_avg: { home: 1.84, draw: 3.31, away: 4.42 }, drift: { home: -0.042, draw: -0.015, away: 0.091 }, providers: [] } },
         intelligence: { status: 'ok', fetched_at: '2026-06-30 15:41:00', headline: '26日乙第21轮', points: ['赛事阶段：联赛 第21轮', '资料观点：主队主场效率较高。'], tags: ['league_round', '500资料观点'], stage: { competition_label: '26日乙第21轮', stage_name: '联赛', stage_type: 'league_round', round: '21', home_standing: '4', away_standing: '12' }, sources: [{ source: '500_pc_shuju_macau', tier: 'editorial', status: 'ok', title: '26日乙第21轮', url: 'https://odds.500.com/fenxi/shuju-1.shtml' }], source_count: 1 },
         decision_snapshot: { snapshot_id: 'active_26052_001', status: 'active', generated_at: '2026-06-30T14:20:00+08:00', checked_at: '2026-06-30T14:21:00+08:00', input_hash: 'activehash', recommendation: '押平，保负', primary_pick: '1', protect_picks: ['0'], stop_flag: false, selection_codes: ['1', '0'], confidence: 0.64, confidence_label: '中', q_score: 1.2, probability: 0.29, prompt_version: 'prompt-v1', model_version: 'gpt-fixed-chain-v1', prob_model_version: 'prob-v1', q_model_version: 'q-v1', decision_chain_version: 'chain-v1', decision_config_hash: 'abcdef123456', review_tag_version: 'review-v1' },
@@ -569,24 +606,25 @@ describe('北单实盘决策台 v1', () => {
         issue_status: { current_issue: '26052', match_count: 14, finished_count: 9, settled_sp_count: 9, open_count: 5, capture_status: 'ok', latest_snapshot_at: '2026-07-02T16:44:28Z', latest_snapshot_age_minutes: 8 },
         runtime: {
           api_health: 'ok',
-          api_url: 'http://api.test',
-          api_health_url: 'http://api.test/healthz',
-          api_port: '8790',
-          frontend_local_url: 'http://127.0.0.1:4173/',
-          frontend_remote_url: 'http://100.104.142.57:4173/',
-          frontend_port: '4173',
+          api_url: '',
+          api_health_url: '',
+          api_port: '',
+          frontend_health: 'ok',
+          frontend_local_url: '',
+          frontend_remote_url: '',
+          frontend_port: '',
           checked_at: '2026-07-03T00:50:02+08:00',
-          api_pid: 123,
+          public_diagnostics: false,
+          access_mode: 'local_only',
+          external_access_configured: false,
           api_process_status: 'running',
-          api_bind_host: '0.0.0.0',
-          frontend_pid: 456,
           frontend_process_status: 'running',
-          frontend_bind_host: '0.0.0.0',
           health: {
-            api: { ok: true, status: 200, url: 'http://127.0.0.1:8790/healthz', latency_ms: 1.2 },
-            frontend_local: { ok: true, status: 200, url: 'http://127.0.0.1:4173/', latency_ms: 2.3 },
-            operations: { ok: true, status: 200, url: 'http://127.0.0.1:8790/api/issues/current/operations', latency_ms: 10.1, issue: '26052', workflow_status: 'dry_run', review_task_status: 'dry_run' },
-            host_smokes: [{ ok: true, status: 200, url: 'http://127.0.0.1:4173/', host_header: 'trade-server.tail0aa0e9.ts.net', latency_ms: 2.4 }],
+            api: { ok: true, status: 200, latency_ms: 1.2 },
+            frontend_local: { ok: true, status: 200, latency_ms: 2.3 },
+            operations: { ok: true, status: 200, latency_ms: 10.1, issue: '26052', workflow_status: 'dry_run', review_task_status: 'dry_run' },
+            host_smoke_count: 1,
+            host_smoke_ok_count: 1,
           },
         },
         sources: [{ source_name: 'issue_html', status: 'ok', last_attempt_at: '2026-07-02 16:44:27', last_success_at: '2026-07-02 16:44:27', age_minutes: 8, ok_count: 10, fail_count: 0, total_attempts: 10, rows_parsed: 140 }],
@@ -595,7 +633,7 @@ describe('北单实盘决策台 v1', () => {
         workflow: { run_id: 'wf_26052_test', issue: '26052', mode: 'live_day_refresh_v1', status: 'dry_run', dry_run: true, requested_by: 'test', started_at: '2026-07-03 00:50:00', finished_at: '2026-07-03 00:50:01', elapsed_sec: 1.2, trigger_endpoint: 'POST /api/issues/26052/live-workflow?dry_run=1', steps: [{ step_idx: 1, step_key: 'monitor_500_nowscore', label: '刷新 500/捷报/赛果/SP', status: 'planned', command: ['python3'], elapsed_sec: 0.1 }] },
         versions: { schema_version: 'decision_versions_v1', prob_model_version: 'prob-v1', q_model_version: 'q-v1', decision_chain_version: 'chain-v1', decision_prompt_version: 'prompt-v1', decision_model_version: 'model-v1', review_tag_version: 'review-v1', review_version: 'v2_active_llm_snapshot_tags', decision_config_hash: 'abcdef123456', config_path: 'config/decision_versions.json' },
         warnings: [{ code: 'draft_replacement_pending', severity: 'warn', label: '1 条 draft 待确认', detail: 'manual confirm required' }],
-        source: { sqlite_db: 'live.sqlite', tables: ['matches', 'fetch_log'] },
+        source: { sqlite_db: 'redacted', tables: ['matches', 'fetch_log'] },
       },
       '/api/issues/26052/postmatch-review?dry_run=1': {
         run_id: 'pmr_26052_dry',
@@ -617,6 +655,7 @@ describe('北单实盘决策台 v1', () => {
       return { ok: true, json: async () => payloads[url] } as Response;
     });
     vi.stubGlobal('fetch', fetchMock);
+    window.localStorage.setItem('BEIDAN_OPERATOR_TOKEN', 'test-token');
 
     const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
 
@@ -628,7 +667,7 @@ describe('北单实盘决策台 v1', () => {
     await expect(adapter.getStrategyLab()).resolves.toMatchObject({ arms: [{ armId: 'current', maxDrawdown: -0.16 }, { armId: 'challenger', maxDrawdown: -0.08 }], annualPerformance: [{ armId: 's1', year: 2024, totalStake: 100 }, { armId: 's2', year: 2024, totalStake: 110 }] });
     await expect(adapter.getSelectorShadow('26052')).resolves.toMatchObject({ issueId: '26052', ruleName: 'rule_x', currentDecision: { chosenArm: 'selector' }, recentDecisions: [{ outcome: 'helped' }] });
     await expect(adapter.getMainStrategy('26052')).resolves.toMatchObject({ issueId: '26052', candidates: [{ armId: 'b384_dd32_smooth100' }], evPool: { tickets: [{ ticketId: 't1', legs: [{ selectionLabel: '负', hit: false }] }] }, riskState: { recommendedArm: 'b384_dd32_smooth100' } });
-    await expect(adapter.getOperationsStatus('26052')).resolves.toMatchObject({ issueId: '26052', runtime: { apiPort: '8790', frontendPort: '4173', apiPid: 123, frontendPid: 456, health: { hostSmokes: [{ hostHeader: 'trade-server.tail0aa0e9.ts.net', ok: true }], operations: { workflowStatus: 'dry_run', reviewTaskStatus: 'dry_run' } } }, snapshots: { draftReplacementCount: 1, pendingDrafts: [{ matchId: '26052_008' }] }, review: { unreviewedSettledCount: 1, task: { runId: 'pmr_26052_test', status: 'dry_run', result: { wouldInsert: 1, profit: 10.64 } } }, workflow: { runId: 'wf_26052_test', status: 'dry_run', dryRun: true, steps: [{ stepKey: 'monitor_500_nowscore' }] }, versions: { decisionConfigHash: 'abcdef123456' } });
+    await expect(adapter.getOperationsStatus('26052')).resolves.toMatchObject({ issueId: '26052', runtime: { apiPort: '', frontendPort: '', publicDiagnostics: false, accessMode: 'local_only', health: { hostSmokeCount: 1, hostSmokeOkCount: 1, operations: { workflowStatus: 'dry_run', reviewTaskStatus: 'dry_run' } } }, snapshots: { draftReplacementCount: 1, pendingDrafts: [{ matchId: '26052_008' }] }, review: { unreviewedSettledCount: 1, task: { runId: 'pmr_26052_test', status: 'dry_run', result: { wouldInsert: 1, profit: 10.64 } } }, workflow: { runId: 'wf_26052_test', status: 'dry_run', dryRun: true, steps: [{ stepKey: 'monitor_500_nowscore' }] }, versions: { decisionConfigHash: 'abcdef123456' } });
     await expect(adapter.confirmDecisionSnapshot('bjdc_26052_001')).resolves.toMatchObject({ action: 'confirmed_override', confirmedAt: '2026-06-30 14:42', active: { snapshotId: 'draft_26052_001', status: 'active', confirmedAt: '2026-06-30 14:42', supersedesSnapshotId: 'active_26052_001' }, previousActive: { snapshotId: 'active_26052_001', supersededAt: '2026-06-30 14:42' } });
     await expect(adapter.runPostmatchReview('26052', true)).resolves.toMatchObject({ runId: 'pmr_26052_dry', status: 'dry_run', result: { wouldInsert: 1, profit: 10.64 } });
 
@@ -641,8 +680,8 @@ describe('北单实盘决策台 v1', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(7, 'http://api.test/api/issues/26052/selector-shadow');
     expect(fetchMock).toHaveBeenNthCalledWith(8, 'http://api.test/api/issues/26052/main-strategy');
     expect(fetchMock).toHaveBeenNthCalledWith(9, 'http://api.test/api/issues/26052/operations');
-    expect(fetchMock).toHaveBeenNthCalledWith(10, 'http://api.test/api/matches/bjdc_26052_001/decision-snapshot/confirm', { method: 'POST' });
-    expect(fetchMock).toHaveBeenNthCalledWith(11, 'http://api.test/api/issues/26052/postmatch-review?dry_run=1', { method: 'POST' });
+    expect(fetchMock).toHaveBeenNthCalledWith(10, 'http://api.test/api/matches/bjdc_26052_001/decision-snapshot/confirm', { method: 'POST', headers: { 'X-Beidan-Operator-Token': 'test-token' } });
+    expect(fetchMock).toHaveBeenNthCalledWith(11, 'http://api.test/api/issues/26052/postmatch-review?dry_run=1', { method: 'POST', headers: { 'X-Beidan-Operator-Token': 'test-token' } });
   });
 
   it('dashboard aggregate passes the selected decision variant to versioned API endpoints', async () => {
@@ -662,8 +701,8 @@ describe('北单实盘决策台 v1', () => {
           selection_status: 'ok',
           available_variant_ids: ['active_v3', 'shadow_v3.3.3'],
           options: [
-            { variant_id: 'active_v3', kind: 'active', label: 'v3', version: 'llm_chain_bet_protect_stop_v3', source: 'active_snapshot', is_default: true },
-            { variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv', artifact_key: 'shadow_v3_3_3' },
+            { variant_id: 'active_v3', kind: 'active', label: 'v3', version: 'llm_chain_bet_protect_stop_v3', source: 'active_snapshot', is_default: false },
+            { variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv', artifact_key: 'shadow_v3_3_3', is_default: true },
           ],
         },
       },

@@ -596,9 +596,13 @@ export interface OperationsStatusData {
     apiUrl: string;
     apiHealthUrl: string;
     apiPort: string;
+    frontendHealth?: string;
     frontendLocalUrl: string;
     frontendRemoteUrl: string;
     frontendPort: string;
+    publicDiagnostics?: boolean;
+    accessMode?: string;
+    externalAccessConfigured?: boolean;
     checkedAt?: string;
     statusPath?: string;
     runtimeDir?: string;
@@ -617,6 +621,8 @@ export interface OperationsStatusData {
       api?: RuntimeHealthProbe;
       frontendLocal?: RuntimeHealthProbe;
       operations?: RuntimeHealthProbe & { issue?: string; workflowStatus?: string; reviewTaskStatus?: string };
+      hostSmokeCount?: number;
+      hostSmokeOkCount?: number;
       hostSmokes?: RuntimeHealthProbe[];
     };
   };
@@ -712,7 +718,7 @@ export interface OperationsStatusData {
 export interface RuntimeHealthProbe {
   ok: boolean;
   status: number;
-  url: string;
+  url?: string;
   hostHeader?: string;
   latencyMs?: number;
   error?: string;
