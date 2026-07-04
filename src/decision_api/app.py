@@ -28,6 +28,7 @@ LINEGAP_DRIFT_RESULTS_DIR = PROJECT_ROOT / "results/main_strategy_linegap_drift_
 JOINT_LEG_RESULTS_DIR = PROJECT_ROOT / "results/n7_q_conf_drift_joint_2014_10h_trusted_plus2026_linefill_20260630"
 STRUCTURED_DECISION_SHADOW_DIR = PROJECT_ROOT / "results/structured_decision_chain_shadow"
 DECISION_VERSIONS_CONFIG = PROJECT_ROOT / "config/decision_versions.json"
+STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
 DEFAULT_DASHBOARD_RUNTIME_STATUS = PROJECT_ROOT / "tmp/decision_dashboard/runtime_status.json"
 HK_TZ = timezone(timedelta(hours=8))
 OUTCOME_LABEL = {"3": "胜", "1": "平", "0": "负"}
@@ -92,9 +93,86 @@ DEFAULT_DECISION_VERSION_REGISTRY: dict[str, Any] = {
     },
 }
 
+DEFAULT_STRATEGY_RELEASE_ID = "main_n7_384_2026_07_04"
+DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
+    "schema_version": "strategy_release_registry_v1",
+    "active_release_id": DEFAULT_STRATEGY_RELEASE_ID,
+    "releases": {
+        DEFAULT_STRATEGY_RELEASE_ID: {
+            "release_id": DEFAULT_STRATEGY_RELEASE_ID,
+            "status": "active",
+            "owner": "codex",
+            "strategy_family": "N=7 fixed-384 main strategy",
+            "model_versions": {
+                "probability_model": "bd_prob_handicap_calibrated_v1",
+                "q_model": "q_ev_sp_v1",
+                "decision_chain": "llm_chain_bet_protect_stop_v3",
+                "shadow_decision_chain": SHADOW_DECISION_VERSION,
+            },
+            "decision_variants": [
+                {
+                    "variant_id": ACTIVE_DECISION_VARIANT_ID,
+                    "kind": ACTIVE_DECISION_VARIANT_KIND,
+                    "label": ACTIVE_DECISION_VARIANT_LABEL,
+                    "source": "active_snapshot",
+                    "is_default": True,
+                    "selectable": True,
+                },
+                {
+                    "variant_id": SHADOW_DECISION_VARIANT_ID,
+                    "kind": SHADOW_DECISION_VARIANT_KIND,
+                    "label": SHADOW_DECISION_LABEL,
+                    "source": "structured_shadow_csv",
+                    "artifact_key": "structured_shadow_dir",
+                    "is_default": False,
+                    "selectable": True,
+                },
+            ],
+            "main_strategy_arms": list(MAIN_STRATEGY_ARMS),
+            "artifacts": {
+                "main_strategy_dir": str(MAIN_STRATEGY_RESULTS_DIR.relative_to(PROJECT_ROOT)),
+                "ticket_pool_dir": str(HIGH_N_SELECTOR_RESULTS_DIR.relative_to(PROJECT_ROOT)),
+                "ticket_pool_csv": str((HIGH_N_SELECTOR_RESULTS_DIR / "high_n_selector_selected_tickets.csv").relative_to(PROJECT_ROOT)),
+                "linegap_drift_dir": str(LINEGAP_DRIFT_RESULTS_DIR.relative_to(PROJECT_ROOT)),
+                "joint_leg_rows_csv": str((JOINT_LEG_RESULTS_DIR / "joint_leg_rows.csv").relative_to(PROJECT_ROOT)),
+                "structured_shadow_dir": str(STRUCTURED_DECISION_SHADOW_DIR.relative_to(PROJECT_ROOT)),
+            },
+            "required_artifacts": [
+                "main_strategy_dir/sleeve_mix_summary.csv",
+                "main_strategy_dir/sleeve_mix_annual.csv",
+                "main_strategy_dir/sleeve_mix_issue_profit.csv",
+                "ticket_pool_csv",
+                "joint_leg_rows_csv",
+            ],
+            "promotion": {
+                "mode": "shadow_first_or_validated_default",
+                "validated": True,
+                "promoted_at": "2026-07-04",
+                "promoted_by": "codex",
+                "rollback_release_id": "",
+            },
+            "validation": {
+                "report": "docs/strategy/strategy_worktree_model_ev_handoff_2026-07-02.md",
+                "no_future_leakage": True,
+                "notes": "line-gap and SP drift remain diagnostics unless a strategy release explicitly validates them.",
+            },
+        }
+    },
+}
+
 
 def _canonical_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _deep_merge_dict(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = json.loads(_canonical_json(base))
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge_dict(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
 
 
 @lru_cache(maxsize=1)
@@ -103,16 +181,170 @@ def _decision_version_registry() -> dict[str, Any]:
         try:
             loaded = json.loads(DECISION_VERSIONS_CONFIG.read_text(encoding="utf-8"))
             if isinstance(loaded, dict):
-                merged = json.loads(_canonical_json(DEFAULT_DECISION_VERSION_REGISTRY))
-                for key, value in loaded.items():
-                    if isinstance(value, dict) and isinstance(merged.get(key), dict):
-                        merged[key].update(value)
-                    else:
-                        merged[key] = value
-                return merged
+                return _deep_merge_dict(DEFAULT_DECISION_VERSION_REGISTRY, loaded)
         except (OSError, json.JSONDecodeError):
             pass
     return json.loads(_canonical_json(DEFAULT_DECISION_VERSION_REGISTRY))
+
+
+@lru_cache(maxsize=1)
+def _strategy_release_registry() -> dict[str, Any]:
+    if STRATEGY_RELEASE_CONFIG.exists():
+        try:
+            loaded = json.loads(STRATEGY_RELEASE_CONFIG.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                return _deep_merge_dict(DEFAULT_STRATEGY_RELEASE_REGISTRY, loaded)
+        except (OSError, json.JSONDecodeError):
+            pass
+    return json.loads(_canonical_json(DEFAULT_STRATEGY_RELEASE_REGISTRY))
+
+
+def _relative_display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _project_path(value: Any) -> Path:
+    path = Path(str(value or ""))
+    return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+def _active_strategy_release() -> dict[str, Any]:
+    registry = _strategy_release_registry()
+    active_id = str(registry.get("active_release_id") or DEFAULT_STRATEGY_RELEASE_ID)
+    releases = registry.get("releases", {})
+    if not isinstance(releases, dict):
+        releases = {}
+    release = releases.get(active_id)
+    if not isinstance(release, dict):
+        release = DEFAULT_STRATEGY_RELEASE_REGISTRY["releases"][DEFAULT_STRATEGY_RELEASE_ID]
+        active_id = DEFAULT_STRATEGY_RELEASE_ID
+    out = json.loads(_canonical_json(release))
+    out.setdefault("release_id", active_id)
+    out["release_id"] = str(out["release_id"] or active_id)
+    out["schema_version"] = registry.get("schema_version", "strategy_release_registry_v1")
+    out["active_release_id"] = active_id
+    out["config_path"] = _relative_display_path(STRATEGY_RELEASE_CONFIG)
+    return out
+
+
+def _strategy_release_artifacts(release: dict[str, Any] | None = None) -> dict[str, Any]:
+    release = release or _active_strategy_release()
+    artifacts = release.get("artifacts", {})
+    return artifacts if isinstance(artifacts, dict) else {}
+
+
+def _strategy_artifact_path(
+    artifact_key: str,
+    fallback: Path,
+    release: dict[str, Any] | None = None,
+) -> Path:
+    artifacts = _strategy_release_artifacts(release)
+    value = artifacts.get(artifact_key)
+    if value in {None, ""}:
+        return fallback
+    return _project_path(value)
+
+
+def _strategy_ticket_pool_csv(release: dict[str, Any] | None = None) -> Path:
+    pool_dir = _strategy_artifact_path("ticket_pool_dir", HIGH_N_SELECTOR_RESULTS_DIR, release)
+    return _strategy_artifact_path("ticket_pool_csv", pool_dir / "high_n_selector_selected_tickets.csv", release)
+
+
+def _strategy_joint_leg_rows_csv(release: dict[str, Any] | None = None) -> Path:
+    return _strategy_artifact_path("joint_leg_rows_csv", JOINT_LEG_RESULTS_DIR / "joint_leg_rows.csv", release)
+
+
+def _strategy_main_dir(release: dict[str, Any] | None = None) -> Path:
+    return _strategy_artifact_path("main_strategy_dir", MAIN_STRATEGY_RESULTS_DIR, release)
+
+
+def _strategy_linegap_drift_dir(release: dict[str, Any] | None = None) -> Path:
+    return _strategy_artifact_path("linegap_drift_dir", LINEGAP_DRIFT_RESULTS_DIR, release)
+
+
+def _strategy_shadow_dir(release: dict[str, Any] | None = None) -> Path:
+    return _strategy_artifact_path("structured_shadow_dir", STRUCTURED_DECISION_SHADOW_DIR, release)
+
+
+def _main_strategy_arms(release: dict[str, Any] | None = None) -> tuple[dict[str, Any], ...]:
+    release = release or _active_strategy_release()
+    arms = release.get("main_strategy_arms")
+    if not isinstance(arms, list):
+        return MAIN_STRATEGY_ARMS
+    cleaned = [arm for arm in arms if isinstance(arm, dict) and arm.get("arm_id")]
+    return tuple(cleaned) if cleaned else MAIN_STRATEGY_ARMS
+
+
+def _main_strategy_arm_ids(release: dict[str, Any] | None = None) -> tuple[str, ...]:
+    return tuple(str(arm["arm_id"]) for arm in _main_strategy_arms(release))
+
+
+def _resolve_strategy_required_artifact(spec: Any, release: dict[str, Any] | None = None) -> Path:
+    release = release or _active_strategy_release()
+    text = str(spec or "")
+    artifacts = _strategy_release_artifacts(release)
+    if text in artifacts:
+        return _project_path(artifacts[text])
+    if "/" in text:
+        key, suffix = text.split("/", 1)
+        if key in artifacts:
+            return _project_path(artifacts[key]) / suffix
+    return _project_path(text)
+
+
+def _strategy_release_artifact_health(release: dict[str, Any] | None = None) -> dict[str, Any]:
+    release = release or _active_strategy_release()
+    artifacts = {
+        key: {
+            "path": _relative_display_path(_project_path(value)),
+            "exists": _project_path(value).exists(),
+        }
+        for key, value in _strategy_release_artifacts(release).items()
+        if value not in {None, ""}
+    }
+    required = []
+    for spec in release.get("required_artifacts", []) if isinstance(release.get("required_artifacts"), list) else []:
+        path = _resolve_strategy_required_artifact(spec, release)
+        required.append({
+            "spec": str(spec),
+            "path": _relative_display_path(path),
+            "exists": path.exists(),
+        })
+    return {
+        "artifacts": artifacts,
+        "required": required,
+        "missing_required": [item for item in required if not item["exists"]],
+    }
+
+
+def _strategy_release_public_payload(release: dict[str, Any] | None = None) -> dict[str, Any]:
+    release = release or _active_strategy_release()
+    resolved_artifacts = {
+        key: _relative_display_path(_project_path(value))
+        for key, value in _strategy_release_artifacts(release).items()
+        if value not in {None, ""}
+    }
+    health = _strategy_release_artifact_health(release)
+    return {
+        "schema_version": release.get("schema_version", "strategy_release_registry_v1"),
+        "active_release_id": release.get("active_release_id") or release.get("release_id"),
+        "release_id": release.get("release_id"),
+        "status": release.get("status", ""),
+        "owner": release.get("owner", ""),
+        "strategy_family": release.get("strategy_family", ""),
+        "model_versions": release.get("model_versions", {}),
+        "decision_variants": release.get("decision_variants", []),
+        "main_strategy_arms": list(_main_strategy_arms(release)),
+        "artifacts": resolved_artifacts,
+        "required_artifacts": release.get("required_artifacts", []),
+        "artifact_health": health,
+        "promotion": release.get("promotion", {}),
+        "validation": release.get("validation", {}),
+        "config_path": release.get("config_path", _relative_display_path(STRATEGY_RELEASE_CONFIG)),
+    }
 
 
 def _decision_config_hash() -> str:
@@ -1265,7 +1497,7 @@ def _live_issue_exists(conn: sqlite3.Connection, issue: str) -> bool:
 def _main_strategy_issue_exists(issue: str) -> bool:
     if any(str(row.get("issue", "")) == str(issue) for row in _main_strategy_issue_rows()):
         return True
-    if _selected_ticket_rows_for_issue(str(HIGH_N_SELECTOR_RESULTS_DIR / "high_n_selector_selected_tickets.csv"), issue):
+    if _selected_ticket_rows_for_issue(str(_strategy_ticket_pool_csv()), issue):
         return True
     return bool(_match_context_for_issue(str(DEFAULT_MODEL_DB), issue))
 
@@ -2521,10 +2753,11 @@ def _selection_codes_from_value(value: Any) -> list[str]:
     return [str(code).strip() for code in raw if str(code).strip() in OUTCOME_ORDER]
 
 
-def _structured_shadow_csv_candidates(issue: str) -> list[Path]:
+def _structured_shadow_csv_candidates(issue: str, release: dict[str, Any] | None = None) -> list[Path]:
+    shadow_dir = _strategy_shadow_dir(release)
     candidates = [
         path
-        for path in STRUCTURED_DECISION_SHADOW_DIR.glob(f"{issue}_*/structured_shadow_{issue}.csv")
+        for path in shadow_dir.glob(f"{issue}_*/structured_shadow_{issue}.csv")
         if path.is_file()
     ]
     return sorted(candidates, key=lambda path: (path.parent.name, path.stat().st_mtime))
@@ -2554,9 +2787,9 @@ def _shadow_variant_display_label(variant_id: str) -> str:
     return str(variant_id or SHADOW_DECISION_VARIANT_ID).replace("_", " ")
 
 
-def _structured_shadow_variants(issue: str) -> list[tuple[dict[int, dict[str, Any]], str]]:
+def _structured_shadow_variants(issue: str, release: dict[str, Any] | None = None) -> list[tuple[dict[int, dict[str, Any]], str]]:
     variants: dict[str, tuple[dict[int, dict[str, Any]], str, float]] = {}
-    for path in _structured_shadow_csv_candidates(issue):
+    for path in _structured_shadow_csv_candidates(issue, release):
         rows, source = _structured_shadow_rows_from_csv(path)
         if not rows:
             continue
@@ -3135,9 +3368,10 @@ def _confirm_decision_snapshot_override(conn: sqlite3.Connection, issue: str, ma
     }
 
 
-def _main_strategy_summary_rows() -> list[dict[str, Any]]:
-    rows = _read_csv_cached(str(MAIN_STRATEGY_RESULTS_DIR / "sleeve_mix_summary.csv"))
-    meta_by_arm = {arm["arm_id"]: arm for arm in MAIN_STRATEGY_ARMS}
+def _main_strategy_summary_rows(release: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    release = release or _active_strategy_release()
+    rows = _read_csv_cached(str(_strategy_main_dir(release) / "sleeve_mix_summary.csv"))
+    meta_by_arm = {str(arm["arm_id"]): arm for arm in _main_strategy_arms(release)}
     out: list[dict[str, Any]] = []
     for row in rows:
         arm_id = str(row.get("portfolio", ""))
@@ -3180,12 +3414,14 @@ def _main_strategy_summary_rows() -> list[dict[str, Any]]:
     return sorted(out, key=lambda item: role_order.get(str(item["role"]), 99))
 
 
-def _main_strategy_annual_rows() -> list[dict[str, Any]]:
-    annual = _read_csv_cached(str(MAIN_STRATEGY_RESULTS_DIR / "sleeve_mix_annual.csv"))
+def _main_strategy_annual_rows(release: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    release = release or _active_strategy_release()
+    annual = _read_csv_cached(str(_strategy_main_dir(release) / "sleeve_mix_annual.csv"))
+    arm_ids = _main_strategy_arm_ids(release)
     rows = []
     for row in annual:
         arm_id = str(row.get("portfolio", ""))
-        if arm_id not in MAIN_STRATEGY_ARM_IDS:
+        if arm_id not in arm_ids:
             continue
         rows.append({
             "arm_id": arm_id,
@@ -3201,18 +3437,21 @@ def _main_strategy_annual_rows() -> list[dict[str, Any]]:
     return rows
 
 
-def _main_strategy_issue_rows() -> list[dict[str, Any]]:
-    path = MAIN_STRATEGY_RESULTS_DIR / "sleeve_mix_issue_profit.csv"
-    return list(_main_issue_rows_cached(str(path), MAIN_STRATEGY_ARM_IDS))
+def _main_strategy_issue_rows(release: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    release = release or _active_strategy_release()
+    path = _strategy_main_dir(release) / "sleeve_mix_issue_profit.csv"
+    return list(_main_issue_rows_cached(str(path), _main_strategy_arm_ids(release)))
 
 
-def _issue_review_rows(issue: str, *, limit: int = 14) -> list[dict[str, Any]]:
-    raw_rows = _main_strategy_issue_rows()
+def _issue_review_rows(issue: str, *, limit: int = 14, release: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    release = release or _active_strategy_release()
+    raw_rows = _main_strategy_issue_rows(release)
+    arm_ids = _main_strategy_arm_ids(release)
     by_issue: dict[str, dict[str, Any]] = {}
     for row in raw_rows:
         issue_id = str(row.get("issue", ""))
         arm_id = str(row.get("portfolio", ""))
-        if arm_id not in MAIN_STRATEGY_ARM_IDS:
+        if arm_id not in arm_ids:
             continue
         item = by_issue.setdefault(issue_id, {
             "issue": issue_id,
@@ -3239,9 +3478,9 @@ def _issue_review_rows(issue: str, *, limit: int = 14) -> list[dict[str, Any]]:
     return sorted(latest, key=lambda row: _safe_int(row.get("issue_order")) or 0, reverse=True)
 
 
-def _risk_state() -> dict[str, Any]:
+def _risk_state(release: dict[str, Any] | None = None) -> dict[str, Any]:
     rows = [
-        row for row in _main_strategy_issue_rows()
+        row for row in _main_strategy_issue_rows(release)
         if str(row.get("portfolio", "")) == "b384_dd32_smooth80_convex19"
     ]
     rows.sort(key=lambda row: _csv_int(row, "issue_order"))
@@ -3589,7 +3828,10 @@ def _historical_match_summary(
     }
 
 
-def _historical_match_by_display_id(match_id: str) -> tuple[str, dict[str, Any], dict[tuple[int, str], dict[str, Any]]]:
+def _historical_match_by_display_id(
+    match_id: str,
+    release: dict[str, Any] | None = None,
+) -> tuple[str, dict[str, Any], dict[tuple[int, str], dict[str, Any]]]:
     if "_" not in match_id and "-" not in match_id:
         raise LookupError(f"historical match id must include issue prefix: {match_id}")
     issue, idx_text = match_id.split("_", 1) if "_" in match_id else match_id.split("-", 1)
@@ -3600,21 +3842,22 @@ def _historical_match_by_display_id(match_id: str) -> tuple[str, dict[str, Any],
     context = next((row for row in match_context.values() if _safe_int(row.get("match_idx")) == idx), None)
     if not context:
         raise LookupError(f"historical match not found: {match_id}")
-    joint_meta = _joint_leg_meta_for_issue(str(JOINT_LEG_RESULTS_DIR / "joint_leg_rows.csv"), issue)
+    joint_meta = _joint_leg_meta_for_issue(str(_strategy_joint_leg_rows_csv(release)), issue)
     return issue, context, joint_meta
 
 
-def _historical_dashboard(issue: str) -> dict[str, Any]:
+def _historical_dashboard(issue: str, release: dict[str, Any] | None = None) -> dict[str, Any]:
+    release = release or _active_strategy_release()
     resolved = str(issue)
     match_context = _match_context_for_issue(str(DEFAULT_MODEL_DB), resolved)
     if not match_context:
         raise LookupError(f"historical issue not found: {issue}")
-    joint_meta = _joint_leg_meta_for_issue(str(JOINT_LEG_RESULTS_DIR / "joint_leg_rows.csv"), resolved)
+    joint_meta = _joint_leg_meta_for_issue(str(_strategy_joint_leg_rows_csv(release)), resolved)
     contexts = sorted(match_context.values(), key=lambda row: _safe_int(row.get("match_idx")) or 0)
     matches = [_historical_match_summary(resolved, context, joint_meta) for context in contexts]
     q_values = [m["q_max"] for m in matches if m["q_max"] is not None]
     hits = [m["prediction_hit"] for m in matches if m["prediction_hit"] is not None]
-    review = next((row for row in _issue_review_rows(resolved, limit=120) if row["issue"] == resolved), None)
+    review = next((row for row in _issue_review_rows(resolved, limit=120, release=release) if row["issue"] == resolved), None)
     return {
         "issue": resolved,
         "issue_date": matches[0]["kickoff_date"] if matches else "",
@@ -3645,7 +3888,8 @@ def _historical_dashboard(issue: str) -> dict[str, Any]:
 
 
 def _historical_match_detail(match_id: str) -> dict[str, Any]:
-    issue, context, joint_meta = _historical_match_by_display_id(match_id)
+    release = _active_strategy_release()
+    issue, context, joint_meta = _historical_match_by_display_id(match_id, release)
     summary = _historical_match_summary(issue, context, joint_meta)
     return {
         "match": summary,
@@ -3830,12 +4074,15 @@ def _ticket_leg_details(row: dict[str, Any], match_context: dict[int, dict[str, 
     return details
 
 
-def _historical_ev_pool(issue: str) -> dict[str, Any]:
-    rows = _selected_ticket_rows_for_issue(str(HIGH_N_SELECTOR_RESULTS_DIR / "high_n_selector_selected_tickets.csv"), issue)
+def _historical_ev_pool(issue: str, release: dict[str, Any] | None = None) -> dict[str, Any]:
+    release = release or _active_strategy_release()
+    ticket_pool_csv = _strategy_ticket_pool_csv(release)
+    joint_leg_rows_csv = _strategy_joint_leg_rows_csv(release)
+    rows = _selected_ticket_rows_for_issue(str(ticket_pool_csv), issue)
     core_rows = tuple(row for row in rows if str(row.get("selector", "")) == "all") or rows
     aggregated = _aggregate_ticket_rows(core_rows)
     match_context = _match_context_for_issue(str(DEFAULT_MODEL_DB), issue)
-    joint_meta = _joint_leg_meta_for_issue(str(JOINT_LEG_RESULTS_DIR / "joint_leg_rows.csv"), issue)
+    joint_meta = _joint_leg_meta_for_issue(str(joint_leg_rows_csv), issue)
     aggregated.sort(
         key=lambda row: (
             _csv_float(row, "selected_stake_units"),
@@ -3878,7 +4125,7 @@ def _historical_ev_pool(issue: str) -> dict[str, Any]:
     return {
         "available": bool(tickets),
         "status": "historical_core_ev_pool" if tickets else "no_replay_pool_for_issue",
-        "source": str(HIGH_N_SELECTOR_RESULTS_DIR / "high_n_selector_selected_tickets.csv"),
+        "source": _relative_display_path(ticket_pool_csv),
         "pool_filter": "selector=all; extra sleeves are shown in A/B allocation/review, not duplicated as separate ticket rows.",
         "ticket_count": len(tickets),
         "tickets": tickets,
@@ -3896,8 +4143,8 @@ def _live_proxy_pool(conn: sqlite3.Connection, issue: str, *, only_date: str | N
     }
 
 
-def _paper_diagnostics() -> list[dict[str, Any]]:
-    rows = _read_csv_cached(str(LINEGAP_DRIFT_RESULTS_DIR / "paper_arm_summary.csv"))
+def _paper_diagnostics(release: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    rows = _read_csv_cached(str(_strategy_linegap_drift_dir(release) / "paper_arm_summary.csv"))
     wanted = {"paper_drift_top8_256", "paper_linegap_drift_hybrid_top8_256", "baseline_384_convex", "baseline_384_smooth"}
     out = []
     for row in rows:
@@ -3922,8 +4169,9 @@ def _paper_diagnostics() -> list[dict[str, Any]]:
 
 
 def _main_strategy_payload(conn: sqlite3.Connection, issue: str, *, only_date: str | None) -> dict[str, Any]:
+    release = _active_strategy_release()
     resolved = _resolve_main_strategy_issue(conn, issue)
-    historical_pool = _historical_ev_pool(resolved)
+    historical_pool = _historical_ev_pool(resolved, release)
     live_proxy = (
         None
         if historical_pool["available"] or not _live_issue_exists(conn, resolved)
@@ -3933,26 +4181,31 @@ def _main_strategy_payload(conn: sqlite3.Connection, issue: str, *, only_date: s
         "issue": resolved,
         "generated_ts": datetime.now(timezone.utc).isoformat(),
         "mode": "historical_replay" if historical_pool["available"] else "live_monitoring",
-        "strategy_family": "N=7 fixed-384 main strategy",
-        "candidates": _main_strategy_summary_rows(),
-        "annual_performance": _main_strategy_annual_rows(),
+        "strategy_family": release.get("strategy_family", "N=7 fixed-384 main strategy"),
+        "strategy_release": _strategy_release_public_payload(release),
+        "candidates": _main_strategy_summary_rows(release),
+        "annual_performance": _main_strategy_annual_rows(release),
         "ev_pool": historical_pool,
         "live_proxy": live_proxy,
-        "risk_state": _risk_state(),
+        "risk_state": _risk_state(release),
         "diagnostics": {
             "line_gap_policy": "diagnostic_only_not_hard_gate",
             "sp_drift_policy": "diagnostic_only_or_tiny_paper_convex_sleeve_not_main_depth_gate",
-            "paper_arms": _paper_diagnostics(),
+            "paper_arms": _paper_diagnostics(release),
         },
         "review": {
-            "issues": _issue_review_rows(resolved),
-            "source": str(MAIN_STRATEGY_RESULTS_DIR / "sleeve_mix_issue_profit.csv"),
+            "issues": _issue_review_rows(resolved, release=release),
+            "source": _relative_display_path(_strategy_main_dir(release) / "sleeve_mix_issue_profit.csv"),
         },
         "source": {
-            "main_strategy_dir": str(MAIN_STRATEGY_RESULTS_DIR),
-            "ticket_pool_dir": str(HIGH_N_SELECTOR_RESULTS_DIR),
+            "main_strategy_dir": _relative_display_path(_strategy_main_dir(release)),
+            "ticket_pool_dir": _relative_display_path(_strategy_artifact_path("ticket_pool_dir", HIGH_N_SELECTOR_RESULTS_DIR, release)),
+            "ticket_pool_csv": _relative_display_path(_strategy_ticket_pool_csv(release)),
+            "joint_leg_rows_csv": _relative_display_path(_strategy_joint_leg_rows_csv(release)),
+            "structured_shadow_dir": _relative_display_path(_strategy_shadow_dir(release)),
             "model_db": str(DEFAULT_MODEL_DB),
             "live_db": str(conn.execute("PRAGMA database_list").fetchone()["file"]),
+            "strategy_release_config": _relative_display_path(STRATEGY_RELEASE_CONFIG),
             "no_future_leakage": "当前期只读 live/html odds；历史 replay 才显示 hit/payout/profit。",
         },
     }
@@ -3960,12 +4213,13 @@ def _main_strategy_payload(conn: sqlite3.Connection, issue: str, *, only_date: s
 
 def _dashboard(conn: sqlite3.Connection, issue: str, *, only_date: str | None) -> dict[str, Any]:
     _ensure_decision_snapshot_schema(conn)
+    release = _active_strategy_release()
     resolved = _resolve_issue(conn, issue)
     rows = _issue_rows(conn, resolved, only_date=only_date)
     matches = [_apply_llm_issue_decision(conn, row, _match_summary(row)) for row in rows]
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     if not _issue_all_has_result(rows):
-        shadow_variants = _structured_shadow_variants(resolved)
+        shadow_variants = _structured_shadow_variants(resolved, release)
     matches = _attach_decision_variants(matches, shadow_variants)
     complete = sum(1 for m in matches if m["capture_status"] == "ok")
     partial = sum(1 for m in matches if m["capture_status"] == "partial")
@@ -4323,7 +4577,7 @@ def _match_detail(conn: sqlite3.Connection, match_id: str) -> dict[str, Any]:
         )
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     if not _issue_all_has_result(rows):
-        shadow_variants = _structured_shadow_variants(str(row["issue"]))
+        shadow_variants = _structured_shadow_variants(str(row["issue"]), _active_strategy_release())
     _attach_decision_variants([summary], shadow_variants)
     versions = _active_version_bundle()
     return {
@@ -4525,9 +4779,10 @@ def _sample_equity(rows: list[dict[str, Any]], portfolio: str) -> list[float]:
 
 def _strategy_lab(results_dir: Path) -> dict[str, Any]:
     _ = results_dir
-    summary = _main_strategy_summary_rows()
-    annual = _main_strategy_annual_rows()
-    issue_profit = _main_strategy_issue_rows()
+    release = _active_strategy_release()
+    summary = _main_strategy_summary_rows(release)
+    annual = _main_strategy_annual_rows(release)
+    issue_profit = _main_strategy_issue_rows(release)
     arms = []
     for row in summary:
         portfolio = row.get("arm_id", "")
@@ -4560,7 +4815,8 @@ def _strategy_lab(results_dir: Path) -> dict[str, Any]:
                 "arm_id": row.get("arm_id", ""),
             } for row in annual],
         }],
-        "source": str(MAIN_STRATEGY_RESULTS_DIR),
+        "strategy_release": _strategy_release_public_payload(release),
+        "source": _relative_display_path(_strategy_main_dir(release)),
     }
 
 
@@ -4677,6 +4933,8 @@ def create_app(
     def healthz():
         with _connect(db_path) as conn:
             current = _resolve_issue(conn, "current")
+        release = _active_strategy_release()
+        release_payload = _strategy_release_public_payload(release)
         return jsonify({
             "ok": db_path.exists(),
             "provider": "500.com",
@@ -4684,10 +4942,17 @@ def create_app(
             "scope_date": _today_hk(),
             "sqlite_db": str(db_path),
             "results_dir": str(result_path),
-            "main_strategy_dir": str(MAIN_STRATEGY_RESULTS_DIR),
-            "high_n_selector_dir": str(HIGH_N_SELECTOR_RESULTS_DIR),
+            "strategy_release_id": release.get("release_id"),
+            "strategy_release_config": release.get("config_path"),
+            "strategy_release_missing_required": release_payload["artifact_health"]["missing_required"],
+            "main_strategy_dir": _relative_display_path(_strategy_main_dir(release)),
+            "high_n_selector_dir": _relative_display_path(_strategy_artifact_path("ticket_pool_dir", HIGH_N_SELECTOR_RESULTS_DIR, release)),
             "model_db": str(DEFAULT_MODEL_DB),
         })
+
+    @app.get("/api/strategy-release")
+    def strategy_release():
+        return jsonify(_strategy_release_public_payload())
 
     @app.get("/api/issues")
     def issues():

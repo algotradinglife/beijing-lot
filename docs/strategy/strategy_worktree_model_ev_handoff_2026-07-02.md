@@ -15,6 +15,26 @@ Current ownership split after the 2026-07-04 main integration:
 - Strategy changes should not be promoted into the live decision dashboard until they produce reproducible artifacts and a concise handoff describing data boundaries, leakage controls, and expected live behavior.
 - The dashboard may display shadow/paper variants for audit, but production-facing defaults should remain stable unless the strategy worktree has validated the change.
 
+## Promotion Interface
+
+Dashboard promotion is now manifest-driven:
+
+```text
+config/strategy_release.json
+GET /api/strategy-release
+scripts/validate_strategy_release.py
+```
+
+The detailed contract is in:
+
+```text
+docs/strategy/strategy_dashboard_artifact_contract.md
+```
+
+Strategy should add a new release entry, point artifact keys at its generated outputs, validate the release, then switch `active_release_id`. The dashboard reads main strategy metrics, ticket pools, joint leg metadata, and structured shadow decision variants from that active release.
+
+Shadow decision-chain versions are also strategy-owned going forward. The dashboard still lets users switch between active and shadow views, but it no longer treats shadow CSVs as a local dashboard experiment.
+
 ## Current Website Model EV Version
 
 The live website uses the decision API in `src/decision_api/app.py`.
