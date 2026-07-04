@@ -22,6 +22,11 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.sqlite_runtime import connect_sqlite  # noqa: E402
+
 DEFAULT_DB = ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 NOWSCORE_URL = "https://cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID=5&issueNum={issue}"
 DEFAULT_UA = (
@@ -265,6 +270,61 @@ def insert_fetch_log(
     )
 
 
+def upsert_match_rows(conn: sqlite3.Connection, rows: list[dict[str, object]]) -> None:
+    if not rows:
+        return
+    conn.executemany(
+        """
+        INSERT INTO nowscore_bjdc_matches(
+            issue, match_idx, provider_match_id, fetched_at, schedule_date, league,
+            kickoff_time, status_text, status, can_sale, home, away,
+            handicap_text, handicap_line, score, halftime_score, result_code,
+            panlu_url, asian_url, europe_url, analysis_url, recommendation_url,
+            sp_url, raw_row_hash, raw_row
+        ) VALUES(
+            :issue, :match_idx, :provider_match_id, :fetched_at, :schedule_date, :league,
+            :kickoff_time, :status_text, :status, :can_sale, :home, :away,
+            :handicap_text, :handicap_line, :score, :halftime_score, :result_code,
+            :panlu_url, :asian_url, :europe_url, :analysis_url, :recommendation_url,
+            :sp_url, :raw_row_hash, :raw_row
+        )
+        ON CONFLICT(issue, match_idx) DO UPDATE SET
+            provider_match_id=COALESCE(NULLIF(excluded.provider_match_id, ''), provider_match_id),
+            fetched_at=excluded.fetched_at,
+            schedule_date=COALESCE(NULLIF(excluded.schedule_date, ''), schedule_date),
+            league=COALESCE(NULLIF(excluded.league, ''), league),
+            kickoff_time=COALESCE(NULLIF(excluded.kickoff_time, ''), kickoff_time),
+            status_text=CASE
+                WHEN status='finished' AND COALESCE(NULLIF(excluded.status_text, ''), '') NOT LIKE '%完%'
+                    THEN status_text
+                ELSE COALESCE(NULLIF(excluded.status_text, ''), status_text)
+            END,
+            status=CASE
+                WHEN status='finished' AND COALESCE(NULLIF(excluded.status, ''), '') != 'finished'
+                    THEN status
+                ELSE COALESCE(NULLIF(excluded.status, ''), status)
+            END,
+            can_sale=excluded.can_sale,
+            home=COALESCE(NULLIF(excluded.home, ''), home),
+            away=COALESCE(NULLIF(excluded.away, ''), away),
+            handicap_text=COALESCE(NULLIF(excluded.handicap_text, ''), handicap_text),
+            handicap_line=COALESCE(excluded.handicap_line, handicap_line),
+            score=COALESCE(NULLIF(excluded.score, ''), score),
+            halftime_score=COALESCE(NULLIF(excluded.halftime_score, ''), halftime_score),
+            result_code=COALESCE(NULLIF(excluded.result_code, ''), result_code),
+            panlu_url=COALESCE(NULLIF(excluded.panlu_url, ''), panlu_url),
+            asian_url=COALESCE(NULLIF(excluded.asian_url, ''), asian_url),
+            europe_url=COALESCE(NULLIF(excluded.europe_url, ''), europe_url),
+            analysis_url=COALESCE(NULLIF(excluded.analysis_url, ''), analysis_url),
+            recommendation_url=COALESCE(NULLIF(excluded.recommendation_url, ''), recommendation_url),
+            sp_url=COALESCE(NULLIF(excluded.sp_url, ''), sp_url),
+            raw_row_hash=excluded.raw_row_hash,
+            raw_row=excluded.raw_row
+        """,
+        rows,
+    )
+
+
 def scrape_issue(conn: sqlite3.Connection, issue: str, args: argparse.Namespace) -> int:
     fetched_at = now_utc()
     url = NOWSCORE_URL.format(issue=issue)
@@ -272,48 +332,7 @@ def scrape_issue(conn: sqlite3.Connection, issue: str, args: argparse.Namespace)
         status, payload, elapsed = fetch_url(url, args.timeout, args.user_agent)
         text = payload.decode("utf-8", errors="replace")
         rows = parse_rows(issue, text, fetched_at)
-        conn.executemany(
-            """
-            INSERT INTO nowscore_bjdc_matches(
-                issue, match_idx, provider_match_id, fetched_at, schedule_date, league,
-                kickoff_time, status_text, status, can_sale, home, away,
-                handicap_text, handicap_line, score, halftime_score, result_code,
-                panlu_url, asian_url, europe_url, analysis_url, recommendation_url,
-                sp_url, raw_row_hash, raw_row
-            ) VALUES(
-                :issue, :match_idx, :provider_match_id, :fetched_at, :schedule_date, :league,
-                :kickoff_time, :status_text, :status, :can_sale, :home, :away,
-                :handicap_text, :handicap_line, :score, :halftime_score, :result_code,
-                :panlu_url, :asian_url, :europe_url, :analysis_url, :recommendation_url,
-                :sp_url, :raw_row_hash, :raw_row
-            )
-            ON CONFLICT(issue, match_idx) DO UPDATE SET
-                provider_match_id=excluded.provider_match_id,
-                fetched_at=excluded.fetched_at,
-                schedule_date=excluded.schedule_date,
-                league=excluded.league,
-                kickoff_time=excluded.kickoff_time,
-                status_text=excluded.status_text,
-                status=excluded.status,
-                can_sale=excluded.can_sale,
-                home=excluded.home,
-                away=excluded.away,
-                handicap_text=excluded.handicap_text,
-                handicap_line=excluded.handicap_line,
-                score=excluded.score,
-                halftime_score=excluded.halftime_score,
-                result_code=excluded.result_code,
-                panlu_url=excluded.panlu_url,
-                asian_url=excluded.asian_url,
-                europe_url=excluded.europe_url,
-                analysis_url=excluded.analysis_url,
-                recommendation_url=excluded.recommendation_url,
-                sp_url=excluded.sp_url,
-                raw_row_hash=excluded.raw_row_hash,
-                raw_row=excluded.raw_row
-            """,
-            rows,
-        )
+        upsert_match_rows(conn, rows)
         insert_fetch_log(
             conn,
             fetched_at=fetched_at,
@@ -360,7 +379,7 @@ def main() -> None:
     args = parser.parse_args()
 
     issues = [part.strip() for raw in args.issue for part in raw.split(",") if part.strip()]
-    conn = sqlite3.connect(args.db)
+    conn = connect_sqlite(args.db)
     try:
         create_schema(conn)
         total = 0

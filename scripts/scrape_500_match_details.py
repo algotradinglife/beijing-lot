@@ -31,6 +31,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.live_collector.scraper import Scraper  # noqa: E402
+from src.sqlite_runtime import connect_sqlite  # noqa: E402
 
 
 DEFAULT_DB = ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
@@ -340,8 +341,7 @@ def main() -> None:
     parser.add_argument("--timeout", type=int, default=20)
     args = parser.parse_args()
 
-    conn = sqlite3.connect(args.db)
-    conn.row_factory = sqlite3.Row
+    conn = connect_sqlite(args.db, row_factory=True)
     create_schema(conn)
     scraper = Scraper(min_interval=max(args.sleep, 0.0), max_retries=2, timeout=args.timeout)
     rows = select_matches(conn, args)

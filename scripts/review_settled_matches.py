@@ -18,6 +18,11 @@ from zoneinfo import ZoneInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.sqlite_runtime import connect_sqlite  # noqa: E402
+
 DEFAULT_DB = ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 REVIEW_VERSION = "v2_active_llm_snapshot_tags"
 REVIEW_TAG_VERSION = "postmatch_tags_v2"
@@ -444,14 +449,14 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    with sqlite3.connect(args.db) as conn:
+    with connect_sqlite(args.db) as conn:
         ensure_schema(conn)
 
     dashboard = load_dashboard(args.issue, args.db)
     issue = str(dashboard.get("issue") or args.issue)
     reviewed_at = now_hk()
 
-    with sqlite3.connect(args.db) as conn:
+    with connect_sqlite(args.db) as conn:
         ensure_schema(conn)
         existing = reviewed_keys(conn, issue)
         rows = [

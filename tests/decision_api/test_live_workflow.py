@@ -175,6 +175,103 @@ def test_operations_uses_last_inserted_workflow_run_for_same_second_tie(tmp_path
     assert any(warning["code"] == "workflow_failed" for warning in payload["warnings"])
 
 
+def test_dashboard_uses_latest_complete_live_sp_per_match(tmp_path: Path) -> None:
+    db_path = tmp_path / "500_bjdc.sqlite"
+    _build_minimal_500_db(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE matches SET end_time='2026-07-03 00:30:00' WHERE issue='review_tie_case'")
+        conn.execute(
+            """
+            INSERT INTO live_sp_snapshots(
+                issue, playid, fetched_at, source_updatetime, row_idx,
+                home, away, league, handicap_line, sp_home, sp_draw, sp_away, raw_node
+            )
+            VALUES (
+                'review_tie_case', 34, '2026-07-03 01:00:00', '2026-07-03 01:00:00', 1,
+                '主队', '客队', '测试联赛', 0, 2.22, 3.33, 4.44, 'complete'
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO live_sp_snapshots(
+                issue, playid, fetched_at, source_updatetime, row_idx,
+                home, away, league, handicap_line, sp_home, sp_draw, sp_away, raw_node
+            )
+            VALUES (
+                'review_tie_case', 34, '2026-07-03 02:00:00', '2026-07-03 02:00:00', 1,
+                '主队', '客队', '测试联赛', 0, 9.99, NULL, 8.88, 'partial-latest'
+            )
+            """
+        )
+        conn.commit()
+
+    app = appmod.create_app(sqlite_db=db_path)
+    with app.test_client() as client:
+        response = client.get("/api/issues/review_tie_case/dashboard?decision_variant=missing_v9")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["strategy_version_context"]["requested_variant_id"] == "missing_v9"
+    assert payload["strategy_version_context"]["selection_status"] == "unavailable"
+    assert payload["strategy_version_context"]["selected_variant_id"] == "active_v3"
+    match = payload["matches"][0]
+    assert match["selected_decision_variant_id"] == "active_v3"
+    assert match["selected_decision_variant_status"] == "unavailable"
+    assert match["sp_3"] == 2.22
+    assert match["sp_1"] == 3.33
+    assert match["sp_0"] == 4.44
+    assert match["display_sp_source"] == "live_complete_sp"
+    assert match["sp_snapshot_ts"] == "2026-07-03 01:00:00"
+
+
+def test_dashboard_source_freshness_keeps_issue_list_from_masking_issue_sources(tmp_path: Path) -> None:
+    db_path = tmp_path / "500_bjdc.sqlite"
+    _build_minimal_500_db(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.executemany(
+            """
+            INSERT INTO fetch_log(fetched_at, kind, issue, url, status, ok, elapsed_sec, bytes, rows_parsed, error)
+            VALUES(?, ?, ?, ?, 200, 1, 0.1, 100, 1, '')
+            """,
+            [
+                ("2026-07-04 12:00:00", "issue_list", None, "https://trade.500.com/bjdc/index.php"),
+                ("2026-07-04 08:00:00", "issue_html", "review_tie_case", "https://trade.500.com/bjdc/?expect=review_tie_case"),
+                ("2026-07-04 09:00:00", "live_sp_xml", "review_tie_case", "https://www.500.com/static/public/bjdc/xml/sp.xml"),
+                ("2026-07-04T10:00:00Z", "nowscore_bjdc", "review_tie_case", "https://cp.nowscore.com/buy/DanChang.aspx"),
+            ],
+        )
+        conn.commit()
+
+    app = appmod.create_app(sqlite_db=db_path)
+    with app.test_client() as client:
+        response = client.get("/api/issues/review_tie_case/dashboard")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["last_snapshot_ts"] == "2026-07-04T10:00:00Z"
+    freshness = {row["source_name"]: row for row in payload["source_freshness"]}
+    assert set(freshness) == {"issue_html", "issue_list", "live_sp_xml", "nowscore_bjdc"}
+    assert freshness["issue_list"]["last_success_at"] == "2026-07-04 12:00:00"
+    assert freshness["nowscore_bjdc"]["last_success_at"] == "2026-07-04T10:00:00Z"
+
+
+def test_match_detail_exposes_strategy_version_context(tmp_path: Path) -> None:
+    db_path = tmp_path / "500_bjdc.sqlite"
+    _build_minimal_500_db(db_path)
+
+    app = appmod.create_app(sqlite_db=db_path)
+    with app.test_client() as client:
+        response = client.get("/api/matches/1001?decision_variant=missing_v9")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["strategy_version_context"]["requested_variant_id"] == "missing_v9"
+    assert payload["strategy_version_context"]["selection_status"] == "unavailable"
+    assert payload["match"]["selected_decision_variant_id"] == "active_v3"
+    assert payload["match"]["selected_decision_variant_status"] == "unavailable"
+
+
 def test_operations_reads_dashboard_runtime_status(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "500_bjdc.sqlite"
     runtime_status = tmp_path / "runtime_status.json"
@@ -373,7 +470,7 @@ def test_postmatch_review_api_dry_run_and_real_write_review_rows(tmp_path: Path)
         after_dry = client.get("/api/issues/review_tie_case/operations").get_json()
         real = client.post("/api/issues/review_tie_case/postmatch-review", headers={"X-Requested-By": "pytest-real"})
         after_real = client.get("/api/issues/review_tie_case/operations").get_json()
-        settlement = client.get("/api/issues/review_tie_case/settlement").get_json()
+        settlement = client.get("/api/issues/review_tie_case/settlement?decision_variant=missing_v9").get_json()
 
     assert dry.status_code == 200
     dry_payload = dry.get_json()
@@ -390,3 +487,5 @@ def test_postmatch_review_api_dry_run_and_real_write_review_rows(tmp_path: Path)
     assert after_real["review"]["task"]["status"] == "succeeded"
     assert settlement["postmatch_review_issue_summary"]["n_reviews"] == 1
     assert settlement["postmatch_reviews"][0]["outcome_label"] == "押中"
+    assert settlement["strategy_version_context"]["requested_variant_id"] == "missing_v9"
+    assert settlement["strategy_version_context"]["selection_status"] == "unavailable"

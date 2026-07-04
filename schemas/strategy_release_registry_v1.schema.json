@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beijing-lot.local/schemas/strategy_release_registry_v1.schema.json",
+  "title": "Beijing Lot strategy release registry v1",
+  "type": "object",
+  "required": ["schema_version", "active_release_id", "releases"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {
+      "const": "strategy_release_registry_v1"
+    },
+    "active_release_id": {
+      "$ref": "#/$defs/releaseId"
+    },
+    "releases": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "$ref": "#/$defs/releaseId"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/release"
+      }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "releaseId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*_[0-9]{4}_[0-9]{2}_[0-9]{2}$"
+    },
+    "isoDateTime": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "release": {
+      "type": "object",
+      "required": [
+        "release_id",
+        "version_id",
+        "status",
+        "owner",
+        "strategy_family",
+        "generated_at",
+        "effective_from_issue",
+        "artifact_scope",
+        "snapshot_timestamps",
+        "model_versions",
+        "decision_variants",
+        "main_strategy_arms",
+        "artifacts",
+        "required_artifacts",
+        "promotion",
+        "validation"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "release_id": {
+          "$ref": "#/$defs/releaseId"
+        },
+        "version_id": {
+          "$ref": "#/$defs/semver"
+        },
+        "status": {
+          "enum": ["active", "shadow", "draft", "superseded", "archived"]
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "strategy_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generated_at": {
+          "$ref": "#/$defs/isoDateTime"
+        },
+        "effective_from_issue": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_scope": {
+          "type": "object",
+          "required": ["historical_data_start", "backtest_through_issue", "live_issue_policy", "freeze_policy"],
+          "additionalProperties": true
+        },
+        "snapshot_timestamps": {
+          "type": "object",
+          "required": ["probability_model", "q_model", "confidence_model", "decision_chain"],
+          "additionalProperties": true
+        },
+        "model_versions": {
+          "type": "object",
+          "required": ["probability_model", "q_model", "decision_chain", "shadow_decision_chain"],
+          "additionalProperties": true
+        },
+        "decision_variants": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/decisionVariant"
+          }
+        },
+        "main_strategy_arms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mainStrategyArm"
+          }
+        },
+        "artifacts": {
+          "type": "object",
+          "required": ["main_strategy_dir", "ticket_pool_csv", "joint_leg_rows_csv"],
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "required_artifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "promotion": {
+          "type": "object",
+          "required": ["validated"],
+          "additionalProperties": true
+        },
+        "validation": {
+          "type": "object",
+          "required": ["no_future_leakage"],
+          "additionalProperties": true
+        }
+      }
+    },
+    "decisionVariant": {
+      "type": "object",
+      "required": ["variant_id", "version_id", "kind", "label", "source", "is_default", "selectable"],
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "shadow"
+              }
+            },
+            "required": ["kind"]
+          },
+          "then": {
+            "required": ["artifact_key"]
+          }
+        }
+      ],
+      "properties": {
+        "variant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version_id": {
+          "$ref": "#/$defs/semver"
+        },
+        "kind": {
+          "enum": ["active", "shadow", "draft"]
+        },
+        "source": {
+          "enum": ["active_snapshot", "structured_shadow_csv", "strategy_artifact"]
+        },
+        "artifact_key": {
+          "type": "string"
+        },
+        "is_default": {
+          "type": "boolean"
+        },
+        "selectable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "mainStrategyArm": {
+      "type": "object",
+      "required": ["arm_id", "label", "role"],
+      "additionalProperties": true,
+      "properties": {
+        "arm_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

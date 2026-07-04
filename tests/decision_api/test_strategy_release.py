@@ -229,6 +229,61 @@ def test_strategy_release_endpoint_exposes_manifest(monkeypatch, tmp_path: Path)
         _clear_strategy_caches()
 
 
+def test_shadow_variant_options_are_manifest_allowlisted(tmp_path: Path) -> None:
+    issue = "99123"
+    shadow_dir = tmp_path / "results/shadow_custom"
+    header = [
+        "match_idx",
+        "shadow_arm",
+        "shadow_version",
+        "shadow_selection_codes",
+        "shadow_primary",
+        "shadow_judgment",
+        "shadow_stop_flag",
+    ]
+    _write_csv(
+        shadow_dir / f"{issue}_old" / f"structured_shadow_{issue}.csv",
+        header,
+        [[1, "shadow_v3.3.1", "llm_chain_bet_protect_stop_v3.3.1_shadow", "3", "3", "胜", "0"]],
+    )
+    _write_csv(
+        shadow_dir / f"{issue}_current" / f"structured_shadow_{issue}.csv",
+        header,
+        [[1, "shadow_v3.3.3", "llm_chain_bet_protect_stop_v3.3.3_shadow", "1", "1", "平", "0"]],
+    )
+    release = {
+        "schema_version": "strategy_release_registry_v1",
+        "active_release_id": "main_n7_384_2026_07_04",
+        "release_id": "main_n7_384_2026_07_04",
+        "decision_variants": [
+            {"variant_id": "active_v3", "version_id": "3.0.0", "kind": "active", "label": "v3", "source": "active_snapshot", "is_default": True, "selectable": True},
+            {"variant_id": "shadow_v3.3.3", "version_id": "3.3.3", "kind": "shadow", "label": "shadow v3.3.3", "source": "structured_shadow_csv", "artifact_key": "structured_shadow_dir", "is_default": False, "selectable": True},
+        ],
+        "artifacts": {"structured_shadow_dir": str(shadow_dir)},
+        "required_artifacts": [],
+        "promotion": {"validated": True},
+        "validation": {"no_future_leakage": True},
+    }
+
+    variants, suppressed = appmod._structured_shadow_variant_scan(issue, release)
+    options = appmod._decision_variant_options(variants, release=release)
+    unavailable = appmod._strategy_version_context(
+        release,
+        options,
+        "shadow_v3.3.1",
+        suppressed_shadow_variant_ids=suppressed,
+    )
+    available = appmod._strategy_version_context(release, options, "shadow_v3.3.3")
+
+    assert [item["variant_id"] for item in options] == ["active_v3", "shadow_v3.3.3"]
+    assert suppressed == ["shadow_v3.3.1"]
+    assert unavailable["selection_status"] == "unavailable"
+    assert unavailable["selected_variant_id"] == "active_v3"
+    assert unavailable["contract_warnings"][0]["variant_ids"] == ["shadow_v3.3.1"]
+    assert available["selection_status"] == "ok"
+    assert available["selected_variant_id"] == "shadow_v3.3.3"
+
+
 def test_main_strategy_reads_release_artifacts(monkeypatch, tmp_path: Path) -> None:
     config_path, db_path = _build_release_fixture(tmp_path)
     _minimal_db(db_path)

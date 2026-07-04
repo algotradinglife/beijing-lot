@@ -17,6 +17,8 @@ from typing import Any
 
 from flask import Flask, jsonify, request
 
+from src.sqlite_runtime import connect_sqlite
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_500_DB = PROJECT_ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
@@ -100,9 +102,24 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
     "releases": {
         DEFAULT_STRATEGY_RELEASE_ID: {
             "release_id": DEFAULT_STRATEGY_RELEASE_ID,
+            "version_id": "1.0.0",
             "status": "active",
             "owner": "codex",
             "strategy_family": "N=7 fixed-384 main strategy",
+            "generated_at": "2026-07-04T14:30:00+08:00",
+            "effective_from_issue": "26072",
+            "artifact_scope": {
+                "historical_data_start": "2014",
+                "backtest_through_issue": "26071",
+                "live_issue_policy": "resolve_current_from_500_sqlite",
+                "freeze_policy": "strategy artifacts must be generated before the issue is traded; post-settlement artifacts are review-only",
+            },
+            "snapshot_timestamps": {
+                "probability_model": "2026-07-04T14:30:00+08:00",
+                "q_model": "2026-07-04T14:30:00+08:00",
+                "confidence_model": "2026-07-04T14:30:00+08:00",
+                "decision_chain": "2026-07-04T14:30:00+08:00",
+            },
             "model_versions": {
                 "probability_model": "bd_prob_handicap_calibrated_v1",
                 "q_model": "q_ev_sp_v1",
@@ -112,6 +129,7 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
             "decision_variants": [
                 {
                     "variant_id": ACTIVE_DECISION_VARIANT_ID,
+                    "version_id": "3.0.0",
                     "kind": ACTIVE_DECISION_VARIANT_KIND,
                     "label": ACTIVE_DECISION_VARIANT_LABEL,
                     "source": "active_snapshot",
@@ -120,6 +138,7 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
                 },
                 {
                     "variant_id": SHADOW_DECISION_VARIANT_ID,
+                    "version_id": "3.3.3",
                     "kind": SHADOW_DECISION_VARIANT_KIND,
                     "label": SHADOW_DECISION_LABEL,
                     "source": "structured_shadow_csv",
@@ -189,14 +208,34 @@ def _decision_version_registry() -> dict[str, Any]:
 
 @lru_cache(maxsize=1)
 def _strategy_release_registry() -> dict[str, Any]:
+    fallback = json.loads(_canonical_json(DEFAULT_STRATEGY_RELEASE_REGISTRY))
     if STRATEGY_RELEASE_CONFIG.exists():
         try:
             loaded = json.loads(STRATEGY_RELEASE_CONFIG.read_text(encoding="utf-8"))
             if isinstance(loaded, dict):
-                return _deep_merge_dict(DEFAULT_STRATEGY_RELEASE_REGISTRY, loaded)
-        except (OSError, json.JSONDecodeError):
-            pass
-    return json.loads(_canonical_json(DEFAULT_STRATEGY_RELEASE_REGISTRY))
+                merged = _deep_merge_dict(DEFAULT_STRATEGY_RELEASE_REGISTRY, loaded)
+                merged["_load_status"] = {
+                    "status": "ok",
+                    "source": _relative_display_path(STRATEGY_RELEASE_CONFIG),
+                    "error": "",
+                    "fallback_release_id": "",
+                }
+                return merged
+        except (OSError, json.JSONDecodeError) as exc:
+            fallback["_load_status"] = {
+                "status": "degraded",
+                "source": _relative_display_path(STRATEGY_RELEASE_CONFIG),
+                "error": f"failed to load strategy release config: {exc}",
+                "fallback_release_id": DEFAULT_STRATEGY_RELEASE_ID,
+            }
+            return fallback
+    fallback["_load_status"] = {
+        "status": "default",
+        "source": _relative_display_path(STRATEGY_RELEASE_CONFIG),
+        "error": "",
+        "fallback_release_id": "",
+    }
+    return fallback
 
 
 def _relative_display_path(path: Path) -> str:
@@ -214,18 +253,35 @@ def _project_path(value: Any) -> Path:
 def _active_strategy_release() -> dict[str, Any]:
     registry = _strategy_release_registry()
     active_id = str(registry.get("active_release_id") or DEFAULT_STRATEGY_RELEASE_ID)
+    configured_active_id = active_id
+    load_status = registry.get("_load_status", {})
+    if not isinstance(load_status, dict):
+        load_status = {"status": "ok", "error": "", "fallback_release_id": ""}
     releases = registry.get("releases", {})
     if not isinstance(releases, dict):
         releases = {}
     release = releases.get(active_id)
+    fallback_used = False
     if not isinstance(release, dict):
         release = DEFAULT_STRATEGY_RELEASE_REGISTRY["releases"][DEFAULT_STRATEGY_RELEASE_ID]
-        active_id = DEFAULT_STRATEGY_RELEASE_ID
+        fallback_used = True
+        load_status = {
+            "status": "degraded",
+            "source": load_status.get("source", _relative_display_path(STRATEGY_RELEASE_CONFIG)),
+            "error": f"active strategy release not found: {configured_active_id}",
+            "configured_active_release_id": configured_active_id,
+            "fallback_release_id": DEFAULT_STRATEGY_RELEASE_ID,
+        }
     out = json.loads(_canonical_json(release))
     out.setdefault("release_id", active_id)
-    out["release_id"] = str(out["release_id"] or active_id)
+    out["release_id"] = str(out["release_id"] or (DEFAULT_STRATEGY_RELEASE_ID if fallback_used else active_id))
     out["schema_version"] = registry.get("schema_version", "strategy_release_registry_v1")
-    out["active_release_id"] = active_id
+    out["active_release_id"] = configured_active_id
+    out["configured_active_release_id"] = configured_active_id
+    out["fallback_release_id"] = str(load_status.get("fallback_release_id") or "")
+    out["fallback_used"] = fallback_used or bool(load_status.get("fallback_release_id"))
+    out["release_load_status"] = str(load_status.get("status") or "ok")
+    out["release_load_error"] = str(load_status.get("error") or "")
     out["config_path"] = _relative_display_path(STRATEGY_RELEASE_CONFIG)
     return out
 
@@ -331,10 +387,20 @@ def _strategy_release_public_payload(release: dict[str, Any] | None = None) -> d
     return {
         "schema_version": release.get("schema_version", "strategy_release_registry_v1"),
         "active_release_id": release.get("active_release_id") or release.get("release_id"),
+        "configured_active_release_id": release.get("configured_active_release_id", release.get("active_release_id", "")),
         "release_id": release.get("release_id"),
+        "fallback_release_id": release.get("fallback_release_id", ""),
+        "fallback_used": bool(release.get("fallback_used")),
+        "release_load_status": release.get("release_load_status", "ok"),
+        "release_load_error": release.get("release_load_error", ""),
+        "version_id": release.get("version_id", ""),
         "status": release.get("status", ""),
         "owner": release.get("owner", ""),
         "strategy_family": release.get("strategy_family", ""),
+        "generated_at": release.get("generated_at", ""),
+        "effective_from_issue": release.get("effective_from_issue", ""),
+        "artifact_scope": release.get("artifact_scope", {}),
+        "snapshot_timestamps": release.get("snapshot_timestamps", {}),
         "model_versions": release.get("model_versions", {}),
         "decision_variants": release.get("decision_variants", []),
         "main_strategy_arms": list(_main_strategy_arms(release)),
@@ -516,9 +582,7 @@ def _csv_bool(row: dict[str, Any], key: str) -> bool | None:
 
 
 def _connect(path: Path) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return connect_sqlite(path, row_factory=True)
 
 
 def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
@@ -973,6 +1037,15 @@ def _postmatch_review_rows_payload(conn: sqlite3.Connection, issue: str) -> list
 
 def _today_hk() -> str:
     return os.environ.get("BEIDAN_DASHBOARD_DATE") or datetime.now(HK_TZ).strftime("%Y-%m-%d")
+
+
+def _requested_decision_variant_id() -> str:
+    return str(
+        request.args.get("decision_variant")
+        or request.args.get("variant")
+        or request.args.get("version")
+        or ""
+    ).strip()
 
 
 def _now_hk_iso() -> str:
@@ -1516,16 +1589,23 @@ def _latest_live_sp_subquery(issue: str) -> tuple[str, tuple[Any, ...]]:
     return (
         """
         SELECT *
-        FROM live_sp_snapshots
-        WHERE issue=?
-          AND playid=34
-          AND fetched_at=(
-              SELECT MAX(fetched_at)
-              FROM live_sp_snapshots
-              WHERE issue=? AND playid=34
-          )
+        FROM (
+            SELECT
+              l.*,
+              ROW_NUMBER() OVER (
+                PARTITION BY l.issue, l.row_idx
+                ORDER BY COALESCE(l.source_updatetime, '') DESC, l.fetched_at DESC
+              ) AS rn
+            FROM live_sp_snapshots l
+            WHERE l.issue=?
+              AND l.playid=34
+              AND l.sp_home IS NOT NULL
+              AND l.sp_draw IS NOT NULL
+              AND l.sp_away IS NOT NULL
+        )
+        WHERE rn=1
         """,
-        (issue, issue),
+        (issue,),
     )
 
 
@@ -2787,13 +2867,21 @@ def _shadow_variant_display_label(variant_id: str) -> str:
     return str(variant_id or SHADOW_DECISION_VARIANT_ID).replace("_", " ")
 
 
-def _structured_shadow_variants(issue: str, release: dict[str, Any] | None = None) -> list[tuple[dict[int, dict[str, Any]], str]]:
+def _structured_shadow_variant_scan(
+    issue: str,
+    release: dict[str, Any] | None = None,
+) -> tuple[list[tuple[dict[int, dict[str, Any]], str]], list[str]]:
+    allowed_shadow_ids = _manifest_variant_ids(release, kind=SHADOW_DECISION_VARIANT_KIND)
     variants: dict[str, tuple[dict[int, dict[str, Any]], str, float]] = {}
+    suppressed: set[str] = set()
     for path in _structured_shadow_csv_candidates(issue, release):
         rows, source = _structured_shadow_rows_from_csv(path)
         if not rows:
             continue
         variant_id = _shadow_variant_id(rows)
+        if variant_id not in allowed_shadow_ids:
+            suppressed.add(variant_id)
+            continue
         mtime = path.stat().st_mtime
         existing = variants.get(variant_id)
         if existing is None or mtime >= existing[2]:
@@ -2807,7 +2895,15 @@ def _structured_shadow_variants(issue: str, release: dict[str, Any] | None = Non
         major, minor, patch = (int(part) for part in match.groups())
         return (major * 10000 + minor * 100 + patch, variant_id)
 
-    return [(rows, source) for _variant_id, (rows, source, _mtime) in sorted(variants.items(), key=sort_key)]
+    return (
+        [(rows, source) for _variant_id, (rows, source, _mtime) in sorted(variants.items(), key=sort_key)],
+        sorted(suppressed),
+    )
+
+
+def _structured_shadow_variants(issue: str, release: dict[str, Any] | None = None) -> list[tuple[dict[int, dict[str, Any]], str]]:
+    variants, _suppressed = _structured_shadow_variant_scan(issue, release)
+    return variants
 
 
 def _issue_all_has_result(rows: list[sqlite3.Row]) -> bool:
@@ -2890,39 +2986,158 @@ def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_co
     }
 
 
-def _shadow_decision_option(rows: dict[int, dict[str, Any]], source_path: str) -> dict[str, Any]:
+def _manifest_decision_variants(release: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    release = release or _active_strategy_release()
+    variants = release.get("decision_variants", [])
+    return [item for item in variants if isinstance(item, dict)]
+
+
+def _manifest_variant_by_id(release: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
+    return {
+        str(item.get("variant_id") or ""): item
+        for item in _manifest_decision_variants(release)
+        if item.get("variant_id")
+    }
+
+
+def _manifest_variant_ids(release: dict[str, Any] | None = None, *, kind: str | None = None) -> set[str]:
+    return {
+        str(item.get("variant_id") or "")
+        for item in _manifest_decision_variants(release)
+        if item.get("variant_id") and (kind is None or item.get("kind") == kind)
+    }
+
+
+def _manifest_default_active_variant(release: dict[str, Any] | None = None) -> dict[str, Any]:
+    variants = _manifest_decision_variants(release)
+    for item in variants:
+        if item.get("kind") == ACTIVE_DECISION_VARIANT_KIND and item.get("is_default"):
+            return item
+    for item in variants:
+        if item.get("kind") == ACTIVE_DECISION_VARIANT_KIND:
+            return item
+    return {}
+
+
+def _shadow_decision_option(
+    rows: dict[int, dict[str, Any]],
+    source_path: str,
+    *,
+    release: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     first = next(iter(rows.values()), {})
     variant_id = first.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID
+    manifest = _manifest_variant_by_id(release).get(str(variant_id), {})
     return {
         "variant_id": variant_id,
         "kind": SHADOW_DECISION_VARIANT_KIND,
         "family": SHADOW_DECISION_FAMILY,
-        "label": _shadow_variant_display_label(variant_id),
+        "label": manifest.get("label") or _shadow_variant_display_label(variant_id),
         "display_label": _shadow_variant_display_label(variant_id),
-        "version": first.get("shadow_version") or SHADOW_DECISION_VERSION,
+        "version": first.get("shadow_version") or manifest.get("version_id") or SHADOW_DECISION_VERSION,
+        "version_id": manifest.get("version_id") or first.get("shadow_version") or SHADOW_DECISION_VERSION,
         "source": "structured_shadow_csv",
         "source_path": source_path,
+        "artifact_key": manifest.get("artifact_key", "structured_shadow_dir"),
         "is_default": False,
+        "selectable": bool(manifest.get("selectable", True)),
+        "available": True,
     }
 
 
-def _decision_variant_options(shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] | None = None) -> list[dict[str, Any]]:
+def _decision_variant_options(
+    shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] | None = None,
+    *,
+    release: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    active_manifest = _manifest_default_active_variant(release)
+    active_variant_id = str(active_manifest.get("variant_id") or ACTIVE_DECISION_VARIANT_ID)
     options = [
         {
-            "variant_id": ACTIVE_DECISION_VARIANT_ID,
+            "variant_id": active_variant_id,
             "kind": ACTIVE_DECISION_VARIANT_KIND,
             "family": "active_snapshot",
-            "label": ACTIVE_DECISION_VARIANT_LABEL,
+            "label": active_manifest.get("label") or ACTIVE_DECISION_VARIANT_LABEL,
             "display_label": ACTIVE_DECISION_VARIANT_DISPLAY_LABEL,
-            "version": _active_version_bundle()["decision_chain_version"],
+            "version": active_manifest.get("version_id") or _active_version_bundle()["decision_chain_version"],
+            "version_id": active_manifest.get("version_id") or "",
             "source": "active_snapshot",
             "is_default": True,
+            "selectable": bool(active_manifest.get("selectable", True)),
+            "available": True,
         }
     ]
     for rows, source_path in shadow_variants or []:
         if rows and source_path:
-            options.append(_shadow_decision_option(rows, source_path))
+            options.append(_shadow_decision_option(rows, source_path, release=release))
     return options
+
+
+def _strategy_version_context(
+    release: dict[str, Any],
+    options: list[dict[str, Any]],
+    requested_variant_id: str | None = None,
+    *,
+    suppressed_shadow_variant_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    requested = str(requested_variant_id or "").strip()
+    default_option = next((item for item in options if item.get("is_default")), options[0] if options else {})
+    selected_option = next((item for item in options if str(item.get("variant_id") or "") == requested), None) if requested else None
+    selection_status = "ok"
+    selection_error = ""
+    if requested and selected_option is None:
+        selected_option = default_option
+        selection_status = "unavailable"
+        selection_error = f"decision variant not available for this issue: {requested}"
+    elif selected_option is None:
+        selected_option = default_option
+
+    release_payload = _strategy_release_public_payload(release)
+    if release_payload.get("release_load_status") == "degraded" and selection_status == "ok":
+        selection_status = "degraded"
+    if release_payload.get("artifact_health", {}).get("missing_required") and selection_status == "ok":
+        selection_status = "degraded"
+        selection_error = "strategy release has missing required artifacts"
+    contract_warnings = []
+    if suppressed_shadow_variant_ids:
+        contract_warnings.append({
+            "type": "undeclared_shadow_artifacts_suppressed",
+            "variant_ids": suppressed_shadow_variant_ids,
+            "message": "shadow artifacts not declared in strategy release manifest were suppressed",
+        })
+
+    return {
+        "schema_version": "strategy_version_context_v1",
+        "requested_variant_id": requested,
+        "selected_variant_id": str(selected_option.get("variant_id") or "") if selected_option else "",
+        "selection_status": selection_status,
+        "selection_error": selection_error,
+        "available_variant_ids": [str(item.get("variant_id") or "") for item in options if item.get("variant_id")],
+        "contract_warnings": contract_warnings,
+        "options": options,
+        "strategy_release": release_payload,
+    }
+
+
+def _attach_selected_decision_variant(
+    matches: list[dict[str, Any]],
+    selected_variant_id: str | None,
+) -> list[dict[str, Any]]:
+    requested = str(selected_variant_id or "").strip()
+    for match in matches:
+        variants = [item for item in match.get("decision_variants", []) if isinstance(item, dict)]
+        default_variant = next((item for item in variants if item.get("is_default")), variants[0] if variants else {})
+        selected = next((item for item in variants if str(item.get("variant_id") or "") == requested), None) if requested else None
+        status = "ok"
+        if requested and selected is None:
+            selected = default_variant
+            status = "unavailable"
+        elif selected is None:
+            selected = default_variant
+        match["selected_decision_variant_id"] = str(selected.get("variant_id") or "") if selected else ""
+        match["selected_decision_variant"] = selected or {}
+        match["selected_decision_variant_status"] = status
+    return matches
 
 
 def _attach_decision_variants(
@@ -4168,9 +4383,22 @@ def _paper_diagnostics(release: dict[str, Any] | None = None) -> list[dict[str, 
     return out
 
 
-def _main_strategy_payload(conn: sqlite3.Connection, issue: str, *, only_date: str | None) -> dict[str, Any]:
+def _main_strategy_payload(
+    conn: sqlite3.Connection,
+    issue: str,
+    *,
+    only_date: str | None,
+    decision_variant_id: str | None = None,
+) -> dict[str, Any]:
     release = _active_strategy_release()
     resolved = _resolve_main_strategy_issue(conn, issue)
+    shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
+    suppressed_shadow_variant_ids: list[str] = []
+    if _live_issue_exists(conn, resolved):
+        rows = _issue_rows(conn, resolved, only_date=None)
+        if not _issue_all_has_result(rows):
+            shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
+    variant_options = _decision_variant_options(shadow_variants, release=release)
     historical_pool = _historical_ev_pool(resolved, release)
     live_proxy = (
         None
@@ -4183,6 +4411,13 @@ def _main_strategy_payload(conn: sqlite3.Connection, issue: str, *, only_date: s
         "mode": "historical_replay" if historical_pool["available"] else "live_monitoring",
         "strategy_family": release.get("strategy_family", "N=7 fixed-384 main strategy"),
         "strategy_release": _strategy_release_public_payload(release),
+        "strategy_version_context": _strategy_version_context(
+            release,
+            variant_options,
+            decision_variant_id,
+            suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
+        ),
+        "decision_variant_options": variant_options,
         "candidates": _main_strategy_summary_rows(release),
         "annual_performance": _main_strategy_annual_rows(release),
         "ev_pool": historical_pool,
@@ -4211,31 +4446,111 @@ def _main_strategy_payload(conn: sqlite3.Connection, issue: str, *, only_date: s
     }
 
 
-def _dashboard(conn: sqlite3.Connection, issue: str, *, only_date: str | None) -> dict[str, Any]:
+def _source_statuses(conn: sqlite3.Connection, issue: str) -> list[dict[str, Any]]:
+    if not _table_exists(conn, "fetch_log"):
+        return []
+    rows = conn.execute(
+        """
+        SELECT
+          kind,
+          MAX(fetched_at) AS last_attempt_at,
+          MAX(CASE WHEN ok=1 THEN fetched_at ELSE '' END) AS last_success_at,
+          SUM(CASE WHEN ok=1 THEN 1 ELSE 0 END) AS ok_count,
+          SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END) AS fail_count,
+          COUNT(*) AS total_attempts,
+          SUM(COALESCE(rows_parsed, 0)) AS rows_parsed,
+          MAX(error) AS error
+        FROM fetch_log
+        WHERE issue=? OR issue IS NULL
+        GROUP BY kind
+        ORDER BY kind
+        """,
+        (issue,),
+    )
+    source_statuses: list[dict[str, Any]] = []
+    for row in rows:
+        ok_count = int(row["ok_count"] or 0)
+        fail_count = int(row["fail_count"] or 0)
+        last_success_at = str(row["last_success_at"] or "")
+        age_minutes = _minutes_since_hk(last_success_at)
+        if ok_count == 0:
+            status = "failed"
+        elif age_minutes is not None and age_minutes > 360:
+            status = "stale"
+        elif fail_count > 0:
+            status = "partial"
+        else:
+            status = "ok"
+        source_statuses.append(
+            {
+                "source_name": row["kind"],
+                "status": status,
+                "last_attempt_at": row["last_attempt_at"] or "",
+                "last_success_at": last_success_at,
+                "age_minutes": age_minutes,
+                "ok_count": ok_count,
+                "fail_count": fail_count,
+                "total_attempts": int(row["total_attempts"] or 0),
+                "rows_parsed": int(row["rows_parsed"] or 0),
+                "error": row["error"] or "",
+            }
+        )
+    return source_statuses
+
+
+def _latest_issue_specific_success(source_statuses: list[dict[str, Any]]) -> str:
+    source_names = {"issue_html", "live_sp_xml", "nowscore_bjdc"}
+    parsed_candidates = [
+        (parsed, str(value))
+        for source in source_statuses
+        if source.get("source_name") in source_names
+        for value in [source.get("last_success_at")]
+        if value
+        for parsed in [_parse_timestamp_to_hk(str(value))]
+        if parsed is not None
+    ]
+    return max(parsed_candidates, default=(None, ""))[1] if parsed_candidates else ""
+
+
+def _dashboard(
+    conn: sqlite3.Connection,
+    issue: str,
+    *,
+    only_date: str | None,
+    decision_variant_id: str | None = None,
+) -> dict[str, Any]:
     _ensure_decision_snapshot_schema(conn)
     release = _active_strategy_release()
     resolved = _resolve_issue(conn, issue)
     rows = _issue_rows(conn, resolved, only_date=only_date)
     matches = [_apply_llm_issue_decision(conn, row, _match_summary(row)) for row in rows]
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
+    suppressed_shadow_variant_ids: list[str] = []
     if not _issue_all_has_result(rows):
-        shadow_variants = _structured_shadow_variants(resolved, release)
+        shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
     matches = _attach_decision_variants(matches, shadow_variants)
+    variant_options = _decision_variant_options(shadow_variants, release=release)
+    version_context = _strategy_version_context(
+        release,
+        variant_options,
+        decision_variant_id,
+        suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
+    )
+    matches = _attach_selected_decision_variant(matches, decision_variant_id)
     complete = sum(1 for m in matches if m["capture_status"] == "ok")
     partial = sum(1 for m in matches if m["capture_status"] == "partial")
     q_values = [m["q_max"] for m in matches if m["q_max"] is not None]
     issue_meta = conn.execute("SELECT * FROM issues WHERE issue=?", (resolved,)).fetchone()
-    last_fetch = conn.execute(
-        "SELECT MAX(fetched_at) AS fetched_at FROM fetch_log WHERE issue=? OR issue IS NULL",
-        (resolved,),
-    ).fetchone()
+    source_statuses = _source_statuses(conn, resolved)
+    last_snapshot_ts = _latest_issue_specific_success(source_statuses)
     status = "complete" if rows and complete == len(rows) else "partial" if rows else "missing"
     return {
         "issue": resolved,
         "issue_date": only_date or (matches[0]["kickoff_ts"][:10] if matches and matches[0]["kickoff_ts"] else ""),
         "status": "open" if any(m["status"] == "open" for m in matches) else "settled",
         "capture_status": status,
-        "last_snapshot_ts": (last_fetch["fetched_at"] if last_fetch else "") or "",
+        "last_snapshot_ts": last_snapshot_ts,
+        "source_freshness": source_statuses,
         "sales_deadline": max((m["kickoff_ts"] for m in matches if m["kickoff_ts"]), default=""),
         "stats": {
             "n_matches": len(matches),
@@ -4244,7 +4559,8 @@ def _dashboard(conn: sqlite3.Connection, issue: str, *, only_date: str | None) -
             "q_avg": sum(q_values) / len(q_values) if q_values else 0,
             "pool_quality_flag": "green" if matches and complete == len(matches) else "yellow" if complete + partial else "red",
         },
-        "decision_variant_options": _decision_variant_options(shadow_variants),
+        "decision_variant_options": variant_options,
+        "strategy_version_context": version_context,
         "matches": matches,
         "source": {
             "kind": "sqlite",
@@ -4268,52 +4584,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
     settled_rows = [row for row in rows if row["result_code"] is not None or row["winning_sp"] is not None]
     winning_sp_rows = [row for row in rows if row["winning_sp"] is not None]
 
-    source_statuses: list[dict[str, Any]] = []
-    for row in conn.execute(
-        """
-        SELECT
-          kind,
-          MAX(fetched_at) AS last_attempt_at,
-          MAX(CASE WHEN ok=1 THEN fetched_at ELSE '' END) AS last_success_at,
-          SUM(CASE WHEN ok=1 THEN 1 ELSE 0 END) AS ok_count,
-          SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END) AS fail_count,
-          COUNT(*) AS total_attempts,
-          SUM(COALESCE(rows_parsed, 0)) AS rows_parsed,
-          MAX(error) AS error
-        FROM fetch_log
-        WHERE issue=? OR issue IS NULL
-        GROUP BY kind
-        ORDER BY kind
-        """,
-        (resolved,),
-    ):
-        ok_count = int(row["ok_count"] or 0)
-        fail_count = int(row["fail_count"] or 0)
-        total_attempts = int(row["total_attempts"] or 0)
-        last_success_at = str(row["last_success_at"] or "")
-        age_minutes = _minutes_since_hk(last_success_at)
-        if ok_count == 0:
-            status = "failed"
-        elif age_minutes is not None and age_minutes > 360:
-            status = "stale"
-        elif fail_count > 0:
-            status = "partial"
-        else:
-            status = "ok"
-        source_statuses.append(
-            {
-                "source_name": row["kind"],
-                "status": status,
-                "last_attempt_at": row["last_attempt_at"] or "",
-                "last_success_at": last_success_at,
-                "age_minutes": age_minutes,
-                "ok_count": ok_count,
-                "fail_count": fail_count,
-                "total_attempts": total_attempts,
-                "rows_parsed": int(row["rows_parsed"] or 0),
-                "error": row["error"] or "",
-            }
-        )
+    source_statuses = _source_statuses(conn, resolved)
 
     snapshot_counts = {row["status"]: int(row["n"]) for row in conn.execute(
         "SELECT status, COUNT(*) AS n FROM llm_decision_snapshots WHERE issue=? GROUP BY status",
@@ -4536,13 +4807,19 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
     }
 
 
-def _match_detail(conn: sqlite3.Connection, match_id: str) -> dict[str, Any]:
+def _match_detail(
+    conn: sqlite3.Connection,
+    match_id: str,
+    *,
+    decision_variant_id: str | None = None,
+) -> dict[str, Any]:
     _ensure_decision_snapshot_schema(conn)
     issue, idx = _find_match(conn, match_id)
     rows = _issue_rows(conn, issue, only_date=None)
     row = next((r for r in rows if int(r["match_idx"]) == idx), None)
     if row is None:
         raise LookupError(f"500.com match not found: {match_id}")
+    release = _active_strategy_release()
     summary = _match_summary(row)
     detail_payload = _nowscore_detail_payload(conn, row)
     if detail_payload:
@@ -4576,13 +4853,23 @@ def _match_detail(conn: sqlite3.Connection, match_id: str) -> dict[str, Any]:
             }
         )
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
+    suppressed_shadow_variant_ids: list[str] = []
     if not _issue_all_has_result(rows):
-        shadow_variants = _structured_shadow_variants(str(row["issue"]), _active_strategy_release())
+        shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(str(row["issue"]), release)
     _attach_decision_variants([summary], shadow_variants)
+    variant_options = _decision_variant_options(shadow_variants, release=release)
+    version_context = _strategy_version_context(
+        release,
+        variant_options,
+        decision_variant_id,
+        suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
+    )
+    _attach_selected_decision_variant([summary], decision_variant_id)
     versions = _active_version_bundle()
     return {
         "match": summary,
-        "decision_variant_options": _decision_variant_options(shadow_variants),
+        "decision_variant_options": variant_options,
+        "strategy_version_context": version_context,
         "decision_variants": summary.get("decision_variants", []),
         "analysis_500": analysis,
         "intelligence": intelligence,
@@ -4726,8 +5013,15 @@ def _signals(conn: sqlite3.Connection, issue: str, *, only_date: str | None) -> 
     }
 
 
-def _settlement(conn: sqlite3.Connection, issue: str) -> tuple[dict[str, Any], int]:
+def _settlement(
+    conn: sqlite3.Connection,
+    issue: str,
+    *,
+    decision_variant_id: str | None = None,
+) -> tuple[dict[str, Any], int]:
     resolved = _resolve_issue(conn, issue)
+    release = _active_strategy_release()
+    variant_options = _decision_variant_options([], release=release)
     rows = _issue_rows(conn, resolved, only_date=None)
     settled = [row for row in rows if row["winning_sp"] is not None]
     if not settled:
@@ -4738,6 +5032,8 @@ def _settlement(conn: sqlite3.Connection, issue: str) -> tuple[dict[str, Any], i
     payload = {
         "issue": resolved,
         "settled_ts": datetime.now(timezone.utc).isoformat(),
+        "strategy_version_context": _strategy_version_context(release, variant_options, decision_variant_id),
+        "decision_variant_options": variant_options,
         "n_tickets": 0,
         "n_hits": 0,
         "n_legs_total": len(rows),
@@ -4963,9 +5259,10 @@ def create_app(
     @app.get("/api/issues/<issue>/dashboard")
     def issue_dashboard(issue: str):
         only_date = request.args.get("date")
+        decision_variant_id = _requested_decision_variant_id()
         with _connect(db_path) as conn:
             try:
-                return jsonify(_dashboard(conn, issue, only_date=only_date))
+                return jsonify(_dashboard(conn, issue, only_date=only_date, decision_variant_id=decision_variant_id))
             except LookupError as exc:
                 if _main_strategy_issue_exists(issue):
                     return jsonify(_historical_dashboard(issue))
@@ -4973,9 +5270,10 @@ def create_app(
 
     @app.get("/api/matches/<match_id>")
     def match_detail(match_id: str):
+        decision_variant_id = _requested_decision_variant_id()
         with _connect(db_path) as conn:
             try:
-                return jsonify(_match_detail(conn, match_id))
+                return jsonify(_match_detail(conn, match_id, decision_variant_id=decision_variant_id))
             except LookupError as exc:
                 try:
                     return jsonify(_historical_match_detail(match_id))
@@ -5037,10 +5335,11 @@ def create_app(
     @app.get("/api/issues/<issue>/main-strategy")
     def main_strategy(issue: str):
         only_date = request.args.get("date")
+        decision_variant_id = _requested_decision_variant_id()
         if issue in {"current", "latest"} and only_date is None:
             only_date = _today_hk()
         with _connect(db_path) as conn:
-            return jsonify(_main_strategy_payload(conn, issue, only_date=only_date))
+            return jsonify(_main_strategy_payload(conn, issue, only_date=only_date, decision_variant_id=decision_variant_id))
 
     @app.get("/api/issues/<issue>/signals")
     def signals(issue: str):
@@ -5095,9 +5394,10 @@ def create_app(
 
     @app.get("/api/issues/<issue>/settlement")
     def settlement(issue: str):
+        decision_variant_id = _requested_decision_variant_id()
         with _connect(db_path) as conn:
             try:
-                payload, status = _settlement(conn, issue)
+                payload, status = _settlement(conn, issue, decision_variant_id=decision_variant_id)
             except LookupError as exc:
                 if _main_strategy_issue_exists(issue):
                     payload, status = _historical_settlement(issue)

@@ -408,6 +408,55 @@ describe('北单实盘决策台 v1', () => {
     await waitFor(() => expect(getDashboardSpy).toHaveBeenCalledTimes(3));
   });
 
+  it('keeps the last successful dashboard visible when a real refresh fails', async () => {
+    const getDashboardSpy = vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData')
+      .mockResolvedValueOnce(mockDashboardData)
+      .mockRejectedValueOnce(new Error('API 503'));
+
+    render(<App />);
+    await screen.findByText('第 26052 期');
+
+    await userEvent.selectOptions(screen.getByLabelText('选择期号'), '26051');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('数据刷新失败');
+    expect(screen.getByText(/API 503/)).toBeInTheDocument();
+    expect(screen.getByText(/继续显示上一次成功数据/)).toBeInTheDocument();
+    expect(screen.getByText('第 26052 期')).toBeInTheDocument();
+    expect((screen.getByLabelText('选择期号') as HTMLSelectElement).value).toBe('26051');
+    expect(getDashboardSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('ignores slower stale dashboard requests after a newer selection resolves', async () => {
+    let resolveSlowIssue!: (value: DashboardData) => void;
+    const slowIssueData: DashboardData = {
+      ...mockDashboardData,
+      issue: { ...mockDashboardData.issue, issueId: '26051' },
+    };
+    const latestIssueData: DashboardData = {
+      ...mockDashboardData,
+      issue: { ...mockDashboardData.issue, issueId: '26052' },
+    };
+    const getDashboardSpy = vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData')
+      .mockResolvedValueOnce(mockDashboardData)
+      .mockImplementationOnce(() => new Promise<DashboardData>((resolve) => {
+        resolveSlowIssue = resolve;
+      }))
+      .mockResolvedValueOnce(latestIssueData);
+
+    render(<App />);
+    await screen.findByText('第 26052 期');
+    const issueSelect = screen.getByLabelText('选择期号') as HTMLSelectElement;
+
+    await userEvent.selectOptions(issueSelect, '26051');
+    await waitFor(() => expect(getDashboardSpy).toHaveBeenCalledTimes(2));
+    await userEvent.selectOptions(issueSelect, '26052');
+    await waitFor(() => expect(getDashboardSpy).toHaveBeenCalledTimes(3));
+    expect(screen.getByText('第 26052 期')).toBeInTheDocument();
+
+    resolveSlowIssue(slowIssueData);
+    await waitFor(() => expect(screen.queryByText('第 26051 期')).not.toBeInTheDocument());
+  });
+
   it('mock data covers ok, missing, failed, stale, and settled review states', () => {
     const statuses = new Set(mockDashboardData.issue.matches.map((m) => m.scrapeStatus));
     expect(statuses).toEqual(new Set(['ok', 'partial', 'missing', 'failed', 'stale']));
@@ -594,6 +643,86 @@ describe('北单实盘决策台 v1', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(9, 'http://api.test/api/issues/26052/operations');
     expect(fetchMock).toHaveBeenNthCalledWith(10, 'http://api.test/api/matches/bjdc_26052_001/decision-snapshot/confirm', { method: 'POST' });
     expect(fetchMock).toHaveBeenNthCalledWith(11, 'http://api.test/api/issues/26052/postmatch-review?dry_run=1', { method: 'POST' });
+  });
+
+  it('dashboard aggregate passes the selected decision variant to versioned API endpoints', async () => {
+    const payloads: Record<string, unknown> = {
+      '/api/issues?limit=120': {
+        issues: [{ issue: '26052', label: '26052', status: 'current', is_current: true, has_settlement: false, is_fully_settled: false, match_count: 1 }],
+      },
+      '/api/issues/26052/dashboard?decision_variant=shadow_v3.3.3': {
+        issue: '26052',
+        status: 'open',
+        stats: { n_matches: 1 },
+        matches: [{ match_id: 'bjdc_26052_001', issue: '26052', selected_decision_variant_id: 'shadow_v3.3.3' }],
+        strategy_version_context: {
+          schema_version: 'strategy_version_context_v1',
+          requested_variant_id: 'shadow_v3.3.3',
+          selected_variant_id: 'shadow_v3.3.3',
+          selection_status: 'ok',
+          available_variant_ids: ['active_v3', 'shadow_v3.3.3'],
+          options: [
+            { variant_id: 'active_v3', kind: 'active', label: 'v3', version: 'llm_chain_bet_protect_stop_v3', source: 'active_snapshot', is_default: true },
+            { variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv', artifact_key: 'shadow_v3_3_3' },
+          ],
+        },
+      },
+      '/api/matches/bjdc_26052_001?decision_variant=shadow_v3.3.3': {
+        match: { match_id: 'bjdc_26052_001', issue: '26052', selected_decision_variant_id: 'shadow_v3.3.3' },
+        prediction: {},
+        strategy_version_context: {
+          schema_version: 'strategy_version_context_v1',
+          requested_variant_id: 'shadow_v3.3.3',
+          selected_variant_id: 'shadow_v3.3.3',
+          selection_status: 'ok',
+          available_variant_ids: ['active_v3', 'shadow_v3.3.3'],
+          options: [{ variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv' }],
+        },
+      },
+      '/api/issues/26052/tickets?status=candidate': { issue: '26052', tickets: [] },
+      '/api/issues/26052/signals': { issue: '26052', signals: [] },
+      '/api/issues/26052/settlement?decision_variant=shadow_v3.3.3': { issue: '26052', settled_ts: '', postmatch_reviews: [] },
+      '/api/strategies/lab': { strategies: [] },
+      '/api/issues/26052/selector-shadow': { issue: '26052', rule_name: 'rule_x', current_decision: {}, arms: [], switch_attribution: [], rolling_stability: [], recent_decisions: [] },
+      '/api/issues/26052/main-strategy?decision_variant=shadow_v3.3.3': {
+        issue: '26052',
+        candidates: [],
+        annual_performance: [],
+        ev_pool: { tickets: [] },
+        risk_state: { cooldown: {}, budget: {} },
+        diagnostics: {},
+        review: { issues: [] },
+        source: {},
+        strategy_version_context: {
+          schema_version: 'strategy_version_context_v1',
+          requested_variant_id: 'shadow_v3.3.3',
+          selected_variant_id: 'shadow_v3.3.3',
+          selection_status: 'ok',
+          available_variant_ids: ['active_v3', 'shadow_v3.3.3'],
+          options: [{ variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv' }],
+        },
+      },
+      '/api/issues/26052/operations': { issue: '26052', issue_status: {}, runtime: {}, sources: [], snapshots: {}, review: {}, versions: {}, warnings: [], source: {} },
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input).replace('http://api.test', '');
+      if (!(url in payloads)) throw new Error(`unexpected URL ${url}`);
+      return { ok: true, json: async () => payloads[url] } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
+    await expect(adapter.getDashboardData('26052', undefined, 'shadow_v3.3.3')).resolves.toMatchObject({
+      issue: { strategyVersionContext: { selectedVariantId: 'shadow_v3.3.3' } },
+      matchDetail: { strategyVersionContext: { selectedVariantId: 'shadow_v3.3.3' } },
+      mainStrategy: { strategyVersionContext: { selectedVariantId: 'shadow_v3.3.3' } },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/dashboard?decision_variant=shadow_v3.3.3');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/matches/bjdc_26052_001?decision_variant=shadow_v3.3.3');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/settlement?decision_variant=shadow_v3.3.3');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/main-strategy?decision_variant=shadow_v3.3.3');
+    expect(fetchMock).not.toHaveBeenCalledWith('http://api.test/api/issues/26052/dashboard');
   });
 
   it('dashboard aggregate tolerates canonical settlement 404 for open issues', async () => {

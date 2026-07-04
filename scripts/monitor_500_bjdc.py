@@ -9,9 +9,14 @@ from __future__ import annotations
 
 import argparse
 import sqlite3
+import sys
 import time
 from pathlib import Path
 from types import SimpleNamespace
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from scrape_500_bjdc import (
     DEFAULT_DB,
@@ -30,6 +35,7 @@ from scrape_nowscore_match_details import (
     create_schema as create_nowscore_detail_schema,
     scrape_issue as scrape_nowscore_detail_issue,
 )
+from src.sqlite_runtime import connect_sqlite
 
 
 def _now_text() -> str:
@@ -162,9 +168,7 @@ def main() -> None:
     args = parser.parse_args()
 
     args.db.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(args.db)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys=ON")
+    conn = connect_sqlite(args.db, row_factory=True)
     create_schema(conn)
     create_nowscore_schema(conn)
     create_nowscore_detail_schema(conn)

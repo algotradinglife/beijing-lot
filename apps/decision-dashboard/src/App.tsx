@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, Gauge, LineChart, Server, ShieldAlert, Ticket, WalletCards } from 'lucide-react';
 import { ApiDashboardAdapter } from './data/apiAdapter';
 import { DEFAULT_DECISION_VARIANT_ID, decisionVersionLabel, isActiveDecisionVariant, isShadowDecisionVariant } from './decisionVariants';
@@ -526,6 +526,18 @@ function applyDecisionVariant(match: IssueMatchRow, selectedVariantId: string): 
   };
 }
 
+function StrategyVersionStatus({ context }: { context?: DashboardData['issue']['strategyVersionContext'] }) {
+  if (!context) return null;
+  const warningCount = context.contractWarnings?.length ?? 0;
+  if (context.selectionStatus === 'ok' && warningCount === 0) return null;
+  const label = context.selectionStatus === 'unavailable'
+    ? '版本不可用'
+    : context.selectionStatus === 'degraded'
+      ? '版本降级'
+      : '版本提示';
+  return <small className="version-status">{label}{context.selectionError ? `：${context.selectionError}` : warningCount ? `：${warningCount} 条契约提示` : ''}</small>;
+}
+
 function shortHash(value?: string) {
   return value ? value.slice(0, 8) : '-';
 }
@@ -565,6 +577,7 @@ function IssueDashboard({
   onOpenMatch: (matchId: string) => void;
   onOpenTicket: () => void;
 }) {
+  const decisionOptions = data.strategyVersionContext?.options?.length ? data.strategyVersionContext.options : data.decisionVariantOptions ?? [];
   const displayedMatches = useMemo(
     () => data.matches.map((match) => applyDecisionVariant(match, selectedDecisionVariant)),
     [data.matches, selectedDecisionVariant],
@@ -608,12 +621,13 @@ function IssueDashboard({
 	            {availableIssues.map((issue) => <option key={issue.issueId} value={issue.issueId}>{issue.label}</option>)}
 	          </select>
 	        </label>
-	        {(data.decisionVariantOptions ?? []).length > 1 && <label>
-	          <span>决策版本</span>
-	          <select value={selectedDecisionVariant} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择决策版本">
-	            {(data.decisionVariantOptions ?? []).map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
-	          </select>
-	        </label>}
+        {decisionOptions.length > 1 && <label>
+          <span>决策版本</span>
+          <select value={selectedDecisionVariant} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择决策版本">
+            {decisionOptions.map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
+          </select>
+          <StrategyVersionStatus context={data.strategyVersionContext} />
+        </label>}
 	        <div className="issue-source"><Badge tone={data.settlementStatus === 'settled' ? 'good' : 'warn'}>{data.settlementStatus}</Badge><span>{data.lastScrapedAt || data.issueDate}</span></div>
       </div>
       <div className="hero-stats">
@@ -682,6 +696,7 @@ function MatchDetail({
   confirmDraftState?: ConfirmDraftState;
   onConfirmDraft: (matchId: string) => Promise<void>;
 }) {
+  const decisionOptions = data.strategyVersionContext?.options?.length ? data.strategyVersionContext.options : data.decisionVariantOptions ?? [];
   const selectedVariant = (data.decisionVariants ?? []).find((variant) => variant.variantId === selectedDecisionVariant)
     ?? (data.decisionVariants ?? []).find((variant) => variant.isDefault)
     ?? (data.decisionVariants ?? [])[0];
@@ -846,12 +861,13 @@ function MatchDetail({
 	          {data.score ? <span>比分 {data.score}</span> : null}
 	          {data.halftimeScore ? <span>半场 {data.halftimeScore}</span> : null}
 	        </div>
-	        {(data.decisionVariantOptions ?? []).length > 1 && <label className="decision-version-control match-detail-version">
-	          <span>决策版本</span>
-	          <select value={selectedDecisionVariant} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择详情决策版本">
-	            {(data.decisionVariantOptions ?? []).map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
-	          </select>
-	        </label>}
+        {decisionOptions.length > 1 && <label className="decision-version-control match-detail-version">
+          <span>决策版本</span>
+          <select value={selectedDecisionVariant} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择详情决策版本">
+            {decisionOptions.map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
+          </select>
+          <StrategyVersionStatus context={data.strategyVersionContext} />
+        </label>}
 	        <div className={llmStopped ? 'decision-bet-panel has-stop' : 'decision-bet-panel'}>
 	          <div className="decision-bet-row primary"><span>押</span><b>{primaryOutcome}</b></div>
           <div className={protectionOutcomes.length ? 'decision-bet-row protect' : 'decision-bet-row muted'}><span>保</span><b>{protectionOutcomes.length ? protectionOutcomes.join('+') : '-'}</b></div>
@@ -1433,12 +1449,14 @@ export default function App() {
 	  const [page, setPage] = useState<Page>('Issue Dashboard');
 	  const [selectedIssue, setSelectedIssue] = useState('current');
 	  const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>();
-	  const [selectedDecisionVariant, setSelectedDecisionVariant] = useState(DEFAULT_DECISION_VARIANT_ID);
-	  const [data, setData] = useState<DashboardData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshTick, setRefreshTick] = useState(0);
-  const [confirmDraftState, setConfirmDraftState] = useState<ConfirmDraftState | undefined>();
-  const [reviewTaskState, setReviewTaskState] = useState<ReviewTaskState | undefined>();
+		  const [selectedDecisionVariant, setSelectedDecisionVariant] = useState(DEFAULT_DECISION_VARIANT_ID);
+		  const [data, setData] = useState<DashboardData | null>(null);
+	  const [error, setError] = useState<string | null>(null);
+	  const [loadState, setLoadState] = useState<'idle' | 'loading' | 'refreshing'>('idle');
+	  const [refreshTick, setRefreshTick] = useState(0);
+	  const [confirmDraftState, setConfirmDraftState] = useState<ConfirmDraftState | undefined>();
+	  const [reviewTaskState, setReviewTaskState] = useState<ReviewTaskState | undefined>();
+	  const requestSeq = useRef(0);
   const dataMode = import.meta.env.VITE_DATA_MODE as string | undefined;
   const baseUrl = dashboardApiBaseUrl(import.meta.env.VITE_API_BASE_URL as string | undefined);
   const adapter = useMemo(() => new ApiDashboardAdapter({ mode: dataMode === 'mock' ? 'mock' : 'fetch', baseUrl }), [dataMode, baseUrl]);
@@ -1451,14 +1469,31 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [dataMode]);
 
-	  useEffect(() => {
-	    setError(null);
-	    adapter.getDashboardData(selectedIssue, selectedMatchId).then(setData).catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
-	  }, [adapter, selectedIssue, selectedMatchId, refreshTick]);
+		  useEffect(() => {
+		    const requestId = requestSeq.current + 1;
+		    requestSeq.current = requestId;
+		    setLoadState(data ? 'refreshing' : 'loading');
+		    adapter.getDashboardData(selectedIssue, selectedMatchId, selectedDecisionVariant)
+		      .then((nextData) => {
+		        if (requestSeq.current !== requestId) return;
+		        setData(nextData);
+		        setError(null);
+		        setLoadState('idle');
+		      })
+		      .catch((err: unknown) => {
+		        if (requestSeq.current !== requestId) return;
+		        setError(err instanceof Error ? err.message : String(err));
+		        setLoadState('idle');
+		      });
+		  }, [adapter, selectedIssue, selectedMatchId, selectedDecisionVariant, refreshTick]);
 
-	  const availableDecisionVariants = data?.issue.decisionVariantOptions?.length
-	    ? data.issue.decisionVariantOptions
-	    : data?.matchDetail.decisionVariantOptions ?? [];
+	  const availableDecisionVariants = data?.issue.strategyVersionContext?.options?.length
+	    ? data.issue.strategyVersionContext.options
+	    : data?.issue.decisionVariantOptions?.length
+	      ? data.issue.decisionVariantOptions
+	      : data?.matchDetail.strategyVersionContext?.options?.length
+	        ? data.matchDetail.strategyVersionContext.options
+	        : data?.matchDetail.decisionVariantOptions ?? [];
 	  const availableDecisionVariantKey = availableDecisionVariants.map((option) => option.variantId).join('|');
 	  useEffect(() => {
 	    if (!data || availableDecisionVariants.length === 0) return;
@@ -1491,23 +1526,25 @@ export default function App() {
     }
   };
 
-  if (error) return <main><h1>北单实盘决策台</h1><p role="alert">数据加载失败：{error}</p></main>;
-  if (!data) return <main><h1>北单实盘决策台</h1><p>Loading dashboard data...</p></main>;
+	  if (!data) return <main><h1>北单实盘决策台</h1><p role={error ? 'alert' : undefined}>{error ? `数据加载失败：${error}` : 'Loading dashboard data...'}</p></main>;
 
-  const settlementReviewIssues = data.availableIssues.filter(isSettlementReviewIssue);
-  const selectedSettlementIssue = settlementReviewIssues.some((issue) => issue.issueId === selectedIssue)
-    ? selectedIssue
-    : data.settlement.issueId;
+	  const settlementReviewIssues = data.availableIssues.filter(isSettlementReviewIssue);
+	  const selectedSettlementIssue = settlementReviewIssues.some((issue) => issue.issueId === selectedIssue)
+	    ? selectedIssue
+	    : data.settlement.issueId;
+	  const selectedIssueOption = selectedIssue === 'current' ? data.issue.issueId : selectedIssue;
 
-	  return <main>
-	    <header>
-	      <div className="header-title"><h1>北单实盘决策台</h1><span className="ui-build-badge">{UI_BUILD_LABEL}</span></div>
-	      <nav>{pages.map((p) => <button key={p} className={page === p ? 'active' : ''} onClick={() => setPage(p)}>{PAGE_LABELS[p]}</button>)}</nav>
-	    </header>
-	    {page === 'Issue Dashboard' && <IssueDashboard
-	      data={data.issue}
-	      availableIssues={data.availableIssues}
-	      selectedIssue={data.issue.issueId}
+		  return <main>
+		    <header>
+		      <div className="header-title"><h1>北单实盘决策台</h1><span className="ui-build-badge">{UI_BUILD_LABEL}</span></div>
+		      <nav>{pages.map((p) => <button key={p} className={page === p ? 'active' : ''} onClick={() => setPage(p)}>{PAGE_LABELS[p]}</button>)}</nav>
+		    </header>
+		    {error ? <div className="sync-banner bad" role="alert"><b>数据刷新失败</b><span>{error}</span><small>继续显示上一次成功数据；真实模式不会回退到 mock。</small></div> : null}
+		    {loadState === 'refreshing' ? <div className="sync-banner"><b>正在刷新数据</b><span>页面暂时保留当前快照。</span></div> : null}
+		    {page === 'Issue Dashboard' && <IssueDashboard
+		      data={data.issue}
+		      availableIssues={data.availableIssues}
+		      selectedIssue={selectedIssueOption}
 	      selectedDecisionVariant={selectedDecisionVariant}
 	      onIssueChange={(issueId) => {
 	        setSelectedIssue(issueId);

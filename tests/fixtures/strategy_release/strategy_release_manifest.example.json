@@ -1,0 +1,95 @@
+{
+  "schema_version": "strategy_release_registry_v1",
+  "active_release_id": "main_n7_384_2026_07_04",
+  "releases": {
+    "main_n7_384_2026_07_04": {
+      "release_id": "main_n7_384_2026_07_04",
+      "version_id": "1.0.0",
+      "status": "active",
+      "owner": "strategy",
+      "strategy_family": "N=7 fixed-384 main strategy",
+      "generated_at": "2026-07-04T14:30:00+08:00",
+      "effective_from_issue": "26072",
+      "artifact_scope": {
+        "historical_data_start": "2014",
+        "backtest_through_issue": "26071",
+        "live_issue_policy": "resolve_current_from_500_sqlite",
+        "freeze_policy": "strategy artifacts must be generated before the issue is traded; post-settlement artifacts are review-only"
+      },
+      "snapshot_timestamps": {
+        "probability_model": "2026-07-04T14:30:00+08:00",
+        "q_model": "2026-07-04T14:30:00+08:00",
+        "confidence_model": "2026-07-04T14:30:00+08:00",
+        "decision_chain": "2026-07-04T14:30:00+08:00"
+      },
+      "model_versions": {
+        "probability_model": "bd_prob_handicap_calibrated_v1",
+        "q_model": "q_ev_sp_v1",
+        "decision_chain": "llm_chain_bet_protect_stop_v3",
+        "shadow_decision_chain": "llm_chain_bet_protect_stop_v3.3.3_shadow"
+      },
+      "decision_variants": [
+        {
+          "variant_id": "active_v3",
+          "version_id": "3.0.0",
+          "kind": "active",
+          "label": "v3",
+          "source": "active_snapshot",
+          "is_default": true,
+          "selectable": true
+        },
+        {
+          "variant_id": "shadow_v3.3.3",
+          "version_id": "3.3.3",
+          "kind": "shadow",
+          "label": "shadow v3.3.3",
+          "source": "structured_shadow_csv",
+          "artifact_key": "structured_shadow_dir",
+          "is_default": false,
+          "selectable": true
+        }
+      ],
+      "main_strategy_arms": [
+        {
+          "arm_id": "b384_dd32_smooth100",
+          "label": "A steady drawdown control",
+          "role": "stable",
+          "recommended_for": "lower drawdown live default"
+        },
+        {
+          "arm_id": "b384_dd32_smooth80_convex19",
+          "label": "B convex upside",
+          "role": "convex",
+          "recommended_for": "higher convexity with deeper drawdown tolerance"
+        }
+      ],
+      "artifacts": {
+        "main_strategy_dir": "results/n7_sleeve_mix_capital_plus2026_linefill_20260630",
+        "ticket_pool_dir": "results/high_n_selector_plus2026_linefill_20260630",
+        "ticket_pool_csv": "results/high_n_selector_plus2026_linefill_20260630/high_n_selector_selected_tickets.csv",
+        "linegap_drift_dir": "results/main_strategy_linegap_drift_depth_20260630",
+        "joint_leg_rows_csv": "results/n7_q_conf_drift_joint_2014_10h_trusted_plus2026_linefill_20260630/joint_leg_rows.csv",
+        "structured_shadow_dir": "results/structured_decision_chain_shadow"
+      },
+      "required_artifacts": [
+        "main_strategy_dir/sleeve_mix_summary.csv",
+        "main_strategy_dir/sleeve_mix_annual.csv",
+        "main_strategy_dir/sleeve_mix_issue_profit.csv",
+        "ticket_pool_csv",
+        "joint_leg_rows_csv"
+      ],
+      "promotion": {
+        "mode": "shadow_first_or_validated_default",
+        "validated": true,
+        "promoted_at": "2026-07-04",
+        "promoted_by": "strategy",
+        "rollback_release_id": ""
+      },
+      "validation": {
+        "report": "docs/strategy/strategy_worktree_model_ev_handoff_2026-07-02.md",
+        "no_future_leakage": true,
+        "notes": "line-gap is diagnostic unless a release explicitly validates it; SP drift is diagnostic or paper sleeve unless promoted."
+      }
+    }
+  }
+}

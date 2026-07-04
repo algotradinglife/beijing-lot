@@ -27,6 +27,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.scrape_nowscore_bjdc import DEFAULT_DB, DEFAULT_UA  # noqa: E402
 from src.live_collector.scraper import Scraper  # noqa: E402
+from src.sqlite_runtime import connect_sqlite  # noqa: E402
 
 
 ANALYSIS_URL = "https://live.nowscore.com/analysis/{provider_id}cn.html"
@@ -572,8 +573,7 @@ def main() -> None:
     parser.add_argument("--user-agent", default=DEFAULT_UA)
     args = parser.parse_args()
 
-    conn = sqlite3.connect(args.db)
-    conn.row_factory = sqlite3.Row
+    conn = connect_sqlite(args.db, row_factory=True)
     try:
         create_schema(conn)
         rows = select_matches(conn, args)
