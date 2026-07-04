@@ -34,6 +34,25 @@ def _assert_response(checks: list[dict[str, Any]], name: str, response: Any, exp
     return payload
 
 
+def _check_strategy_version_context(checks: list[dict[str, Any]], name: str, payload: dict[str, Any]) -> None:
+    context = payload.get("strategy_version_context")
+    ok = (
+        isinstance(context, dict)
+        and context.get("schema_version") == "strategy_version_context_v1"
+        and bool(context.get("selected_variant_id"))
+        and context.get("selection_status") in {"ok", "degraded"}
+    )
+    _record(
+        checks,
+        name,
+        ok,
+        selected_variant_id=context.get("selected_variant_id") if isinstance(context, dict) else "",
+        selection_status=context.get("selection_status") if isinstance(context, dict) else "",
+    )
+    if not ok:
+        raise RuntimeError(f"{name} missing usable strategy_version_context")
+
+
 def _latest_settled_issue(db_path: Path) -> str:
     with connect_sqlite(db_path, row_factory=True, readonly=True) as conn:
         row = conn.execute(
@@ -79,11 +98,14 @@ def run_smoke(db_path: Path, issue: str, settlement_issue: str) -> dict[str, Any
         _assert_response(checks, "healthz", client.get("/healthz"))
 
         dashboard = _assert_response(checks, "dashboard", client.get(f"/api/issues/{issue}/dashboard"))
+        _check_strategy_version_context(checks, "dashboard_strategy_version_context", dashboard)
         resolved_issue = str(dashboard.get("issue") or issue)
         matches = dashboard.get("matches") if isinstance(dashboard.get("matches"), list) else []
         if not matches:
             raise RuntimeError(f"dashboard returned no matches for {issue}")
         first_match = matches[0]
+        if not first_match.get("selected_decision_variant_id"):
+            raise RuntimeError("first dashboard match has no selected_decision_variant_id")
         match_id = str(first_match.get("match_id") or "")
         if not match_id:
             raise RuntimeError("first dashboard match has no match_id")
@@ -97,15 +119,18 @@ def run_smoke(db_path: Path, issue: str, settlement_issue: str) -> dict[str, Any
             last_snapshot_ts=dashboard.get("last_snapshot_ts") or "",
         )
 
-        _assert_response(checks, "match_detail", client.get(f"/api/matches/{match_id}"))
+        match_detail = _assert_response(checks, "match_detail", client.get(f"/api/matches/{match_id}"))
+        _check_strategy_version_context(checks, "match_detail_strategy_version_context", match_detail)
         _assert_response(checks, "operations", client.get(f"/api/issues/{resolved_issue}/operations"))
         _assert_response(checks, "signals", client.get(f"/api/issues/{resolved_issue}/signals"))
-        _assert_response(checks, "main_strategy", client.get(f"/api/issues/{resolved_issue}/main-strategy"))
+        main_strategy = _assert_response(checks, "main_strategy", client.get(f"/api/issues/{resolved_issue}/main-strategy"))
+        _check_strategy_version_context(checks, "main_strategy_version_context", main_strategy)
 
         settled_issue = _latest_settled_issue(db_path) if settlement_issue == "auto" else settlement_issue
         if not settled_issue:
             raise RuntimeError("no fully settled issue found for settlement smoke")
         settlement = _assert_response(checks, "settlement", client.get(f"/api/issues/{settled_issue}/settlement"))
+        _check_strategy_version_context(checks, "settlement_strategy_version_context", settlement)
         _record(
             checks,
             "settlement_payload",

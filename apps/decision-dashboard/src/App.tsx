@@ -526,6 +526,18 @@ function applyDecisionVariant(match: IssueMatchRow, selectedVariantId: string): 
   };
 }
 
+function StrategyVersionStatus({ context }: { context?: DashboardData['issue']['strategyVersionContext'] }) {
+  if (!context) return null;
+  const warningCount = context.contractWarnings?.length ?? 0;
+  if (context.selectionStatus === 'ok' && warningCount === 0) return null;
+  const label = context.selectionStatus === 'unavailable'
+    ? '版本不可用'
+    : context.selectionStatus === 'degraded'
+      ? '版本降级'
+      : '版本提示';
+  return <small className="version-status">{label}{context.selectionError ? `：${context.selectionError}` : warningCount ? `：${warningCount} 条契约提示` : ''}</small>;
+}
+
 function shortHash(value?: string) {
   return value ? value.slice(0, 8) : '-';
 }
@@ -565,6 +577,7 @@ function IssueDashboard({
   onOpenMatch: (matchId: string) => void;
   onOpenTicket: () => void;
 }) {
+  const decisionOptions = data.strategyVersionContext?.options?.length ? data.strategyVersionContext.options : data.decisionVariantOptions ?? [];
   const displayedMatches = useMemo(
     () => data.matches.map((match) => applyDecisionVariant(match, selectedDecisionVariant)),
     [data.matches, selectedDecisionVariant],
@@ -608,12 +621,13 @@ function IssueDashboard({
 	            {availableIssues.map((issue) => <option key={issue.issueId} value={issue.issueId}>{issue.label}</option>)}
 	          </select>
 	        </label>
-	        {(data.decisionVariantOptions ?? []).length > 1 && <label>
-	          <span>决策版本</span>
-	          <select value={selectedDecisionVariant} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择决策版本">
-	            {(data.decisionVariantOptions ?? []).map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
-	          </select>
-	        </label>}
+        {decisionOptions.length > 1 && <label>
+          <span>决策版本</span>
+          <select value={selectedDecisionVariant} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择决策版本">
+            {decisionOptions.map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
+          </select>
+          <StrategyVersionStatus context={data.strategyVersionContext} />
+        </label>}
 	        <div className="issue-source"><Badge tone={data.settlementStatus === 'settled' ? 'good' : 'warn'}>{data.settlementStatus}</Badge><span>{data.lastScrapedAt || data.issueDate}</span></div>
       </div>
       <div className="hero-stats">
@@ -682,6 +696,7 @@ function MatchDetail({
   confirmDraftState?: ConfirmDraftState;
   onConfirmDraft: (matchId: string) => Promise<void>;
 }) {
+  const decisionOptions = data.strategyVersionContext?.options?.length ? data.strategyVersionContext.options : data.decisionVariantOptions ?? [];
   const selectedVariant = (data.decisionVariants ?? []).find((variant) => variant.variantId === selectedDecisionVariant)
     ?? (data.decisionVariants ?? []).find((variant) => variant.isDefault)
     ?? (data.decisionVariants ?? [])[0];
@@ -846,12 +861,13 @@ function MatchDetail({
 	          {data.score ? <span>比分 {data.score}</span> : null}
 	          {data.halftimeScore ? <span>半场 {data.halftimeScore}</span> : null}
 	        </div>
-	        {(data.decisionVariantOptions ?? []).length > 1 && <label className="decision-version-control match-detail-version">
-	          <span>决策版本</span>
-	          <select value={selectedDecisionVariant} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择详情决策版本">
-	            {(data.decisionVariantOptions ?? []).map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
-	          </select>
-	        </label>}
+        {decisionOptions.length > 1 && <label className="decision-version-control match-detail-version">
+          <span>决策版本</span>
+          <select value={selectedDecisionVariant} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择详情决策版本">
+            {decisionOptions.map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
+          </select>
+          <StrategyVersionStatus context={data.strategyVersionContext} />
+        </label>}
 	        <div className={llmStopped ? 'decision-bet-panel has-stop' : 'decision-bet-panel'}>
 	          <div className="decision-bet-row primary"><span>押</span><b>{primaryOutcome}</b></div>
           <div className={protectionOutcomes.length ? 'decision-bet-row protect' : 'decision-bet-row muted'}><span>保</span><b>{protectionOutcomes.length ? protectionOutcomes.join('+') : '-'}</b></div>
@@ -1457,7 +1473,7 @@ export default function App() {
 		    const requestId = requestSeq.current + 1;
 		    requestSeq.current = requestId;
 		    setLoadState(data ? 'refreshing' : 'loading');
-		    adapter.getDashboardData(selectedIssue, selectedMatchId)
+		    adapter.getDashboardData(selectedIssue, selectedMatchId, selectedDecisionVariant)
 		      .then((nextData) => {
 		        if (requestSeq.current !== requestId) return;
 		        setData(nextData);
@@ -1469,11 +1485,15 @@ export default function App() {
 		        setError(err instanceof Error ? err.message : String(err));
 		        setLoadState('idle');
 		      });
-		  }, [adapter, selectedIssue, selectedMatchId, refreshTick]);
+		  }, [adapter, selectedIssue, selectedMatchId, selectedDecisionVariant, refreshTick]);
 
-	  const availableDecisionVariants = data?.issue.decisionVariantOptions?.length
-	    ? data.issue.decisionVariantOptions
-	    : data?.matchDetail.decisionVariantOptions ?? [];
+	  const availableDecisionVariants = data?.issue.strategyVersionContext?.options?.length
+	    ? data.issue.strategyVersionContext.options
+	    : data?.issue.decisionVariantOptions?.length
+	      ? data.issue.decisionVariantOptions
+	      : data?.matchDetail.strategyVersionContext?.options?.length
+	        ? data.matchDetail.strategyVersionContext.options
+	        : data?.matchDetail.decisionVariantOptions ?? [];
 	  const availableDecisionVariantKey = availableDecisionVariants.map((option) => option.variantId).join('|');
 	  useEffect(() => {
 	    if (!data || availableDecisionVariants.length === 0) return;

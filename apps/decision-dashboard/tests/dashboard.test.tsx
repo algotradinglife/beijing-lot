@@ -645,6 +645,86 @@ describe('北单实盘决策台 v1', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(11, 'http://api.test/api/issues/26052/postmatch-review?dry_run=1', { method: 'POST' });
   });
 
+  it('dashboard aggregate passes the selected decision variant to versioned API endpoints', async () => {
+    const payloads: Record<string, unknown> = {
+      '/api/issues?limit=120': {
+        issues: [{ issue: '26052', label: '26052', status: 'current', is_current: true, has_settlement: false, is_fully_settled: false, match_count: 1 }],
+      },
+      '/api/issues/26052/dashboard?decision_variant=shadow_v3.3.3': {
+        issue: '26052',
+        status: 'open',
+        stats: { n_matches: 1 },
+        matches: [{ match_id: 'bjdc_26052_001', issue: '26052', selected_decision_variant_id: 'shadow_v3.3.3' }],
+        strategy_version_context: {
+          schema_version: 'strategy_version_context_v1',
+          requested_variant_id: 'shadow_v3.3.3',
+          selected_variant_id: 'shadow_v3.3.3',
+          selection_status: 'ok',
+          available_variant_ids: ['active_v3', 'shadow_v3.3.3'],
+          options: [
+            { variant_id: 'active_v3', kind: 'active', label: 'v3', version: 'llm_chain_bet_protect_stop_v3', source: 'active_snapshot', is_default: true },
+            { variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv', artifact_key: 'shadow_v3_3_3' },
+          ],
+        },
+      },
+      '/api/matches/bjdc_26052_001?decision_variant=shadow_v3.3.3': {
+        match: { match_id: 'bjdc_26052_001', issue: '26052', selected_decision_variant_id: 'shadow_v3.3.3' },
+        prediction: {},
+        strategy_version_context: {
+          schema_version: 'strategy_version_context_v1',
+          requested_variant_id: 'shadow_v3.3.3',
+          selected_variant_id: 'shadow_v3.3.3',
+          selection_status: 'ok',
+          available_variant_ids: ['active_v3', 'shadow_v3.3.3'],
+          options: [{ variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv' }],
+        },
+      },
+      '/api/issues/26052/tickets?status=candidate': { issue: '26052', tickets: [] },
+      '/api/issues/26052/signals': { issue: '26052', signals: [] },
+      '/api/issues/26052/settlement?decision_variant=shadow_v3.3.3': { issue: '26052', settled_ts: '', postmatch_reviews: [] },
+      '/api/strategies/lab': { strategies: [] },
+      '/api/issues/26052/selector-shadow': { issue: '26052', rule_name: 'rule_x', current_decision: {}, arms: [], switch_attribution: [], rolling_stability: [], recent_decisions: [] },
+      '/api/issues/26052/main-strategy?decision_variant=shadow_v3.3.3': {
+        issue: '26052',
+        candidates: [],
+        annual_performance: [],
+        ev_pool: { tickets: [] },
+        risk_state: { cooldown: {}, budget: {} },
+        diagnostics: {},
+        review: { issues: [] },
+        source: {},
+        strategy_version_context: {
+          schema_version: 'strategy_version_context_v1',
+          requested_variant_id: 'shadow_v3.3.3',
+          selected_variant_id: 'shadow_v3.3.3',
+          selection_status: 'ok',
+          available_variant_ids: ['active_v3', 'shadow_v3.3.3'],
+          options: [{ variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv' }],
+        },
+      },
+      '/api/issues/26052/operations': { issue: '26052', issue_status: {}, runtime: {}, sources: [], snapshots: {}, review: {}, versions: {}, warnings: [], source: {} },
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input).replace('http://api.test', '');
+      if (!(url in payloads)) throw new Error(`unexpected URL ${url}`);
+      return { ok: true, json: async () => payloads[url] } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
+    await expect(adapter.getDashboardData('26052', undefined, 'shadow_v3.3.3')).resolves.toMatchObject({
+      issue: { strategyVersionContext: { selectedVariantId: 'shadow_v3.3.3' } },
+      matchDetail: { strategyVersionContext: { selectedVariantId: 'shadow_v3.3.3' } },
+      mainStrategy: { strategyVersionContext: { selectedVariantId: 'shadow_v3.3.3' } },
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/dashboard?decision_variant=shadow_v3.3.3');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/matches/bjdc_26052_001?decision_variant=shadow_v3.3.3');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/settlement?decision_variant=shadow_v3.3.3');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/main-strategy?decision_variant=shadow_v3.3.3');
+    expect(fetchMock).not.toHaveBeenCalledWith('http://api.test/api/issues/26052/dashboard');
+  });
+
   it('dashboard aggregate tolerates canonical settlement 404 for open issues', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input).replace('http://api.test', '');

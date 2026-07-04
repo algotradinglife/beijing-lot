@@ -4,13 +4,18 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
+SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+RELEASE_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*_[0-9]{4}_[0-9]{2}_[0-9]{2}$")
+ISO_DATETIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 
 
 def _project_path(value: Any) -> Path:
@@ -78,6 +83,87 @@ def _read_csv_rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(f))
 
 
+def _is_iso_datetime(value: Any) -> bool:
+    text = str(value or "")
+    if not ISO_DATETIME_RE.fullmatch(text):
+        return False
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).tzinfo is not None
+    except ValueError:
+        return False
+
+
+def _validate_release_contract(release_key: str, release: dict[str, Any], errors: list[str]) -> None:
+    if not RELEASE_ID_RE.fullmatch(release_key):
+        errors.append(f"release key must be lowercase snake-case with YYYY_MM_DD suffix: {release_key}")
+    if str(release.get("release_id") or "") != release_key:
+        errors.append(f"release_id must match release key: {release_key}")
+    if not RELEASE_ID_RE.fullmatch(str(release.get("release_id") or "")):
+        errors.append(f"{release_key} release_id must be lowercase snake-case with YYYY_MM_DD suffix")
+    if not SEMVER_RE.fullmatch(str(release.get("version_id") or "")):
+        errors.append(f"{release_key} version_id must use x.y.z")
+    if not _is_iso_datetime(release.get("generated_at")):
+        errors.append(f"{release_key} generated_at must be ISO datetime with timezone")
+    if not str(release.get("effective_from_issue") or ""):
+        errors.append(f"{release_key} must set effective_from_issue")
+
+    artifact_scope = release.get("artifact_scope", {})
+    if not isinstance(artifact_scope, dict):
+        errors.append(f"{release_key} artifact_scope must be an object")
+        artifact_scope = {}
+    for key in ("historical_data_start", "backtest_through_issue", "live_issue_policy", "freeze_policy"):
+        if not str(artifact_scope.get(key) or ""):
+            errors.append(f"{release_key} artifact_scope.{key} is required")
+
+    snapshots = release.get("snapshot_timestamps", {})
+    if not isinstance(snapshots, dict):
+        errors.append(f"{release_key} snapshot_timestamps must be an object")
+        snapshots = {}
+    for key in ("probability_model", "q_model", "confidence_model", "decision_chain"):
+        if not _is_iso_datetime(snapshots.get(key)):
+            errors.append(f"{release_key} snapshot_timestamps.{key} must be ISO datetime with timezone")
+
+    model_versions = release.get("model_versions", {})
+    if not isinstance(model_versions, dict):
+        errors.append(f"{release_key} model_versions must be an object")
+        model_versions = {}
+    for key in ("probability_model", "q_model", "decision_chain", "shadow_decision_chain"):
+        if not str(model_versions.get(key) or ""):
+            errors.append(f"{release_key} model_versions.{key} is required")
+
+    artifacts = release.get("artifacts", {})
+    if not isinstance(artifacts, dict):
+        errors.append(f"{release_key} artifacts must be an object")
+        artifacts = {}
+    for key in ("main_strategy_dir", "ticket_pool_csv", "joint_leg_rows_csv"):
+        if not str(artifacts.get(key) or ""):
+            errors.append(f"{release_key} artifacts.{key} is required")
+
+    variants = release.get("decision_variants", [])
+    if not isinstance(variants, list) or not variants:
+        errors.append(f"{release_key} must declare decision_variants")
+        return
+    if not any(isinstance(item, dict) and item.get("kind") == "active" and item.get("is_default") for item in variants):
+        errors.append(f"{release_key} must declare one default active decision variant")
+    for idx, variant in enumerate(variants):
+        if not isinstance(variant, dict):
+            errors.append(f"{release_key} decision_variants[{idx}] must be an object")
+            continue
+        if not str(variant.get("variant_id") or ""):
+            errors.append(f"{release_key} decision_variants[{idx}].variant_id is required")
+        if not SEMVER_RE.fullmatch(str(variant.get("version_id") or "")):
+            errors.append(f"{release_key} decision_variants[{idx}].version_id must use x.y.z")
+        kind = str(variant.get("kind") or "")
+        if kind not in {"active", "shadow", "draft"}:
+            errors.append(f"{release_key} decision_variants[{idx}].kind is invalid")
+        if kind == "shadow":
+            artifact_key = str(variant.get("artifact_key") or "")
+            if not artifact_key:
+                errors.append(f"{release_key} shadow decision variant {variant.get('variant_id', idx)} must set artifact_key")
+            elif artifact_key not in artifacts:
+                errors.append(f"{release_key} shadow decision variant {variant.get('variant_id', idx)} artifact_key not in artifacts: {artifact_key}")
+
+
 def validate_strategy_release(
     config_path: Path = DEFAULT_CONFIG,
     *,
@@ -85,13 +171,32 @@ def validate_strategy_release(
     allow_missing: bool = False,
 ) -> dict[str, Any]:
     config = _load_json(config_path)
-    active_id, release = _active_release(config, release_id)
-    artifacts = _artifact_paths(release)
     errors: list[str] = []
     warnings: list[str] = []
+    try:
+        active_id, release = _active_release(config, release_id)
+    except ValueError as exc:
+        active_id = release_id or str(config.get("active_release_id") or "")
+        release = {}
+        errors.append(str(exc))
+    artifacts = _artifact_paths(release)
 
     if str(config.get("schema_version") or "") != "strategy_release_registry_v1":
         errors.append("schema_version must be strategy_release_registry_v1")
+    releases = config.get("releases")
+    if not isinstance(releases, dict) or not releases:
+        errors.append("strategy release config must contain non-empty releases object")
+        releases = {}
+    active_release_id = str(config.get("active_release_id") or "")
+    if active_release_id and not RELEASE_ID_RE.fullmatch(active_release_id):
+        errors.append(f"active_release_id must be lowercase snake-case with YYYY_MM_DD suffix: {active_release_id}")
+    if active_release_id and active_release_id not in releases:
+        errors.append(f"active_release_id not found in releases: {active_release_id}")
+    for release_key, release_value in releases.items():
+        if isinstance(release_value, dict):
+            _validate_release_contract(str(release_key), release_value, errors)
+        else:
+            errors.append(f"release must be an object: {release_key}")
     if str(release.get("release_id") or active_id) != active_id:
         errors.append("release_id must match active release key")
 
