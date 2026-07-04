@@ -1,5 +1,7 @@
 # === 数据：必须出仓到外置盘 ===
 data/
+!apps/decision-dashboard/src/data/
+!apps/decision-dashboard/src/data/**
 datasets/
 derived/
 knowledge-base/
@@ -82,5 +84,6 @@ target/
 # precomputed grids, scraped caches). ~64MB total, mostly machine-specific.
 # Local generated artifacts at repo root
 *.html
+!apps/decision-dashboard/index.html
 !src/webui/templates/*.html
 *.zip
