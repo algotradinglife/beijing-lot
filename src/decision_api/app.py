@@ -10,6 +10,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
@@ -35,6 +36,7 @@ STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
 DEFAULT_DASHBOARD_RUNTIME_STATUS = PROJECT_ROOT / "tmp/decision_dashboard/runtime_status.json"
 DEFAULT_DASHBOARD_STATIC_DIR = PROJECT_ROOT / "apps/decision-dashboard/dist"
 DEFAULT_DECISION_API_HOST = "127.0.0.1"
+DEFAULT_CACHE_TTL_SEC = 30.0
 OPERATOR_TOKEN_ENV = "BEIDAN_DECISION_API_OPERATOR_TOKEN"
 OPERATOR_TOKEN_HEADER = "X-Beidan-Operator-Token"
 HK_TZ = timezone(timedelta(hours=8))
@@ -5428,6 +5430,31 @@ def create_app(
     db_path = Path(sqlite_db)
     result_path = Path(results_dir)
     static_dir = Path(os.environ.get("BEIDAN_DASHBOARD_STATIC_DIR", DEFAULT_DASHBOARD_STATIC_DIR))
+    configured_cache_ttl = _safe_float(os.environ.get("BEIDAN_DECISION_API_CACHE_TTL_SEC"))
+    cache_ttl_sec = max(0.0, DEFAULT_CACHE_TTL_SEC if configured_cache_ttl is None else configured_cache_ttl)
+    response_cache: dict[tuple[Any, ...], tuple[float, Any]] = {}
+
+    def _cache_get(key: tuple[Any, ...]) -> Any | None:
+        if cache_ttl_sec <= 0:
+            return None
+        cached = response_cache.get(key)
+        if not cached:
+            return None
+        expires_at, payload = cached
+        if expires_at <= time.monotonic():
+            response_cache.pop(key, None)
+            return None
+        return payload
+
+    def _cache_set(key: tuple[Any, ...], payload: Any) -> None:
+        if cache_ttl_sec <= 0:
+            return
+        if len(response_cache) > 64:
+            response_cache.clear()
+        response_cache[key] = (time.monotonic() + cache_ttl_sec, payload)
+
+    def _cache_clear() -> None:
+        response_cache.clear()
 
     def _serve_index():
         index_path = static_dir / "index.html"
@@ -5518,17 +5545,48 @@ def create_app(
     def issues():
         limit = _safe_int(request.args.get("limit")) or 80
         include_replay = _query_bool(request.args.get("include_replay"), True)
+        cacheable = not include_replay
+        cache_key = ("issues", limit, include_replay)
+        if cacheable:
+            cached = _cache_get(cache_key)
+            if cached is not None:
+                response = jsonify(cached)
+                response.headers["X-Beidan-Cache"] = "hit"
+                response.headers["Cache-Control"] = "private, max-age=5"
+                return response
         with _connect(db_path) as conn:
-            return jsonify({"issues": _available_issues(conn, limit=limit, include_replay=include_replay)})
+            payload = {"issues": _available_issues(conn, limit=limit, include_replay=include_replay)}
+            if cacheable:
+                _cache_set(cache_key, payload)
+                response = jsonify(payload)
+                response.headers["X-Beidan-Cache"] = "miss"
+                response.headers["Cache-Control"] = "private, max-age=5"
+                return response
+            return jsonify(payload)
 
     @app.get("/api/issues/<issue>/dashboard")
     def issue_dashboard(issue: str):
         only_date = request.args.get("date")
         decision_variant_id = _requested_decision_variant_id()
         summary_view = str(request.args.get("view") or "").strip().lower() == "summary" or _query_bool(request.args.get("summary"), False)
+        cache_key = ("dashboard_summary", issue, only_date, decision_variant_id)
+        if summary_view:
+            cached = _cache_get(cache_key)
+            if cached is not None:
+                response = jsonify(cached)
+                response.headers["X-Beidan-Cache"] = "hit"
+                response.headers["Cache-Control"] = "private, max-age=5"
+                return response
         with _connect(db_path) as conn:
             try:
-                return jsonify(_dashboard(conn, issue, only_date=only_date, decision_variant_id=decision_variant_id, summary_view=summary_view))
+                payload = _dashboard(conn, issue, only_date=only_date, decision_variant_id=decision_variant_id, summary_view=summary_view)
+                if summary_view:
+                    _cache_set(cache_key, payload)
+                    response = jsonify(payload)
+                    response.headers["X-Beidan-Cache"] = "miss"
+                    response.headers["Cache-Control"] = "private, max-age=5"
+                    return response
+                return jsonify(payload)
             except LookupError as exc:
                 if _main_strategy_issue_exists(issue):
                     return jsonify(_historical_dashboard(issue))
@@ -5554,6 +5612,7 @@ def create_app(
             try:
                 payload = _materialize_issue_decision_snapshots(conn, issue, only_date=only_date)
                 conn.commit()
+                _cache_clear()
                 return jsonify(payload)
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404
@@ -5569,6 +5628,7 @@ def create_app(
                     raise LookupError(f"500.com match not found: {match_id}")
                 payload = _materialize_decision_snapshot_for_row(conn, row)
                 conn.commit()
+                _cache_clear()
                 return jsonify(payload)
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404
@@ -5580,6 +5640,7 @@ def create_app(
                 issue, idx = _find_match(conn, match_id)
                 payload = _confirm_decision_snapshot_override(conn, issue, idx)
                 conn.commit()
+                _cache_clear()
                 return jsonify(payload)
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404
@@ -5637,6 +5698,7 @@ def create_app(
         with _connect(db_path) as conn:
             try:
                 payload = _run_live_workflow(conn, db_path, issue, dry_run=dry_run, requested_by=requested_by)
+                _cache_clear()
                 return jsonify(payload), 200 if payload.get("status") != "failed" else 500
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404
@@ -5652,6 +5714,7 @@ def create_app(
         with _connect(db_path) as conn:
             try:
                 payload = _run_postmatch_review_task(conn, db_path, issue, dry_run=dry_run, requested_by=requested_by)
+                _cache_clear()
                 return jsonify(payload), 200 if payload.get("status") != "failed" else 500
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404

@@ -27,6 +27,7 @@ python3 scripts/manage_decision_dashboard.py restart \
 - 先执行 `npm run build` 生成 `apps/decision-dashboard/dist`。
 - 启动 API：`python3 -m src.decision_api`，默认监听本机回环地址。
 - API 同源服务 `/`、`/assets/*` 和 `/api/*`；不再启动 Vite dev server。
+- 启动后预热首屏接口：轻量期号列表和当前期 summary dashboard。
 
 需要热更新调试时才显式使用：
 
@@ -41,6 +42,21 @@ tmp/decision_dashboard/runtime_status.json
 ```
 
 Operations 页面只展示安全摘要：服务健康、进程状态、最近检查、workflow/复盘状态。PID、绑定地址、日志路径、SQLite 路径、Tailscale IP、MagicDNS 域名不会默认返回给浏览器。临时本机排障可设置 `BEIDAN_DECISION_API_PUBLIC_DIAGNOSTICS=1`，对外访问时不要常开。
+
+## 首屏缓存
+
+API 对首屏读路径做短 TTL 缓存：
+
+- `GET /api/issues?include_replay=0`
+- `GET /api/issues/:issue/dashboard?view=summary`
+
+默认 TTL 为 30 秒，可用环境变量调整：
+
+```bash
+BEIDAN_DECISION_API_CACHE_TTL_SEC=30
+```
+
+设置为 `0` 可关闭缓存。确认决策快照、运行 live workflow、写入赛后复盘等 POST 会清空缓存；后台比分刷新依赖短 TTL 自然更新。
 
 ## 访问方式
 

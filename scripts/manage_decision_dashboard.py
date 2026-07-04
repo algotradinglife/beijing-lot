@@ -530,6 +530,21 @@ def _configure_tailscale_serve(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def _warm_api_cache(args: argparse.Namespace) -> list[dict[str, Any]]:
+    if args.skip_cache_warmup:
+        return []
+    base = f"http://127.0.0.1:{args.api_port}"
+    probes = [
+        ("issues_light", f"{base}/api/issues?limit=120&include_replay=0"),
+        ("dashboard_summary", f"{base}/api/issues/current/dashboard?view=summary&decision_variant=active_v3"),
+    ]
+    warmed: list[dict[str, Any]] = []
+    for name, url in probes:
+        result = _http_probe(url, timeout_sec=args.timeout)
+        warmed.append({key: value for key, value in {"name": name, **result}.items() if key != "sample"})
+    return warmed
+
+
 def _wait_for_start(args: argparse.Namespace) -> None:
     deadline = time.monotonic() + args.wait
     while time.monotonic() < deadline:
@@ -546,8 +561,10 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
     _start_frontend(args)
     _start_score_refresh(args)
     _wait_for_start(args)
+    cache_warmup = _warm_api_cache(args)
     tailscale_serve = _configure_tailscale_serve(args)
     payload = _health_payload(args)
+    payload["cache_warmup"] = cache_warmup
     payload["tailscale_serve"] = tailscale_serve
     _write_status(payload)
     return payload
@@ -592,6 +609,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--magic-dns", default=os.environ.get("BEIDAN_DASHBOARD_MAGICDNS_HOST", ""))
     parser.add_argument("--funnel-url", default=os.environ.get("BEIDAN_DASHBOARD_FUNNEL_URL", ""))
     parser.add_argument("--configure-tailscale-serve", action="store_true", help="Run tailscale serve --bg for the selected frontend target.")
+    parser.add_argument("--skip-cache-warmup", action="store_true")
     parser.add_argument("--timeout", type=float, default=5.0)
     parser.add_argument("--wait", type=float, default=20.0)
     parser.add_argument("--score-refresh-interval", type=float, default=DEFAULT_SCORE_REFRESH_INTERVAL)
