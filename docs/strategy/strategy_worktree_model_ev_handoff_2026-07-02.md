@@ -6,6 +6,15 @@ Date: 2026-07-02
 
 This note separates the current website's live model-EV display from the strategy backtest work. The frontend should remain a decision console. Strategy research, replay, and parameter changes should move to the strategy worktree and only flow back after out-of-sample validation.
 
+## Worktree Boundary
+
+Current ownership split after the 2026-07-04 main integration:
+
+- `feature/beijing-lot-codex` should focus on database maintenance, data ingestion, dashboard/API reliability, frontend usability, settlement review, and integration of validated strategy outputs.
+- `feature/beijing-lot-strategy` should own model optimization, decision-chain optimization, draw-protection research, N-string portfolio selection, and historical/out-of-sample replay.
+- Strategy changes should not be promoted into the live decision dashboard until they produce reproducible artifacts and a concise handoff describing data boundaries, leakage controls, and expected live behavior.
+- The dashboard may display shadow/paper variants for audit, but production-facing defaults should remain stable unless the strategy worktree has validated the change.
+
 ## Current Website Model EV Version
 
 The live website uses the decision API in `src/decision_api/app.py`.
@@ -210,4 +219,3 @@ python3 scripts/build_main_strategy_leg_ev_features.py
 - Should Issue Board show both model-q recommendation and fixed-chain `押/保/停`, or only the final fixed-chain decision?
 - Should active snapshots freeze the q/probability version bundle per match before ticket construction?
 - Should current issue production EV pool be generated explicitly before the UI allows ticket export?
-
