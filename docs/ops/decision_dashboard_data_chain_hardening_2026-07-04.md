@@ -45,8 +45,13 @@ This handoff covers the live decision dashboard data chain after the SQLite/upda
 Repeatable local smoke:
 
 ```bash
+export BEIDAN_LIVE_SQLITE=/path/to/populated/500_bjdc.sqlite
 python3.14 scripts/smoke_decision_dashboard_data_chain.py --issue current
 ```
+
+The smoke script validates that the SQLite file contains the required live
+tables before creating the Flask app. This prevents an empty default SQLite
+file from being silently created when the local data artifact is missing.
 
 Full validation used in this pass:
 
