@@ -25,8 +25,8 @@ FRONTEND_LOG = RUNTIME_DIR / "decision_dashboard_vite.log"
 SCORE_REFRESH_LOG = RUNTIME_DIR / "live_score_refresh.log"
 DEFAULT_API_PORT = int(os.environ.get("BEIDAN_DECISION_API_PORT", "8790"))
 DEFAULT_FRONTEND_PORT = int(os.environ.get("BEIDAN_DASHBOARD_FRONTEND_PORT", "4173"))
-DEFAULT_API_HOST = os.environ.get("BEIDAN_DECISION_API_HOST", "0.0.0.0")
-DEFAULT_FRONTEND_HOST = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_HOST", "0.0.0.0")
+DEFAULT_API_HOST = os.environ.get("BEIDAN_DECISION_API_HOST", "127.0.0.1")
+DEFAULT_FRONTEND_HOST = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_HOST", "127.0.0.1")
 DEFAULT_SCORE_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_SCORE_REFRESH_INTERVAL", "120"))
 
 
@@ -234,13 +234,24 @@ def _tailscale_ip() -> str:
     return next((line.strip() for line in proc.stdout.splitlines() if line.strip()), "")
 
 
-def _urls(api_port: int, frontend_port: int, magic_dns: str = "", funnel_url: str = "") -> dict[str, str]:
-    tailscale_ip = _tailscale_ip()
+def _is_loopback_host(host: str) -> bool:
+    return host in {"127.0.0.1", "localhost", "::1"}
+
+
+def _urls(
+    api_port: int,
+    frontend_port: int,
+    magic_dns: str = "",
+    funnel_url: str = "",
+    frontend_host: str = "127.0.0.1",
+) -> dict[str, str]:
+    direct_remote_enabled = not _is_loopback_host(frontend_host)
+    tailscale_ip = _tailscale_ip() if direct_remote_enabled else ""
     urls = {
         "api_local": f"http://127.0.0.1:{api_port}",
         "api_health": f"http://127.0.0.1:{api_port}/healthz",
         "frontend_local": f"http://127.0.0.1:{frontend_port}/",
-        "frontend_remote": f"http://{tailscale_ip}:{frontend_port}/" if tailscale_ip else "",
+        "frontend_remote": f"http://{tailscale_ip}:{frontend_port}/" if direct_remote_enabled and tailscale_ip else "",
         "tailscale_ip": tailscale_ip,
         "magic_dns": f"http://{magic_dns}:{frontend_port}/" if magic_dns else "",
         "funnel": funnel_url,
@@ -277,9 +288,19 @@ def _process_snapshot(service: str, command: list[str], log_path: Path, extra: d
 
 
 def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
-    urls = _urls(args.api_port, args.frontend_port, args.magic_dns, args.funnel_url)
+    urls = _urls(args.api_port, args.frontend_port, args.magic_dns, args.funnel_url, args.frontend_host)
     api_command = [sys.executable, "-m", "src.decision_api"]
-    frontend_command = ["npm", "run", "dev:tailscale"]
+    frontend_command = [
+        "npm",
+        "run",
+        "dev",
+        "--",
+        "--host",
+        str(args.frontend_host),
+        "--port",
+        str(args.frontend_port),
+        "--strictPort",
+    ]
     score_refresh_command = [
         sys.executable,
         str(ROOT / "scripts/live_score_refresh_loop.py"),
@@ -370,9 +391,11 @@ def _start_frontend(args: argparse.Namespace) -> None:
     env.setdefault("VITE_API_BASE_URL", "")
     env.setdefault("VITE_API_PROXY_TARGET", f"http://127.0.0.1:{args.api_port}")
     env.setdefault("VITE_REFRESH_MS", "60000")
+    if args.magic_dns:
+        env.setdefault("VITE_ALLOWED_HOSTS", args.magic_dns)
     with FRONTEND_LOG.open("ab") as log:
         subprocess.Popen(
-            ["npm", "run", "dev:tailscale"],
+            ["npm", "run", "dev", "--", "--host", str(args.frontend_host), "--port", str(args.frontend_port), "--strictPort"],
             cwd=DASHBOARD_DIR,
             env=env,
             stdin=subprocess.DEVNULL,

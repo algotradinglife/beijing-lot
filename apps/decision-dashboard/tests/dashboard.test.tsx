@@ -7,6 +7,7 @@ import { ApiDashboardAdapter } from '../src/data/apiAdapter';
 import type { DashboardData } from '../src/data/types';
 
 afterEach(() => {
+  window.localStorage.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -156,11 +157,14 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getByText('版本锁定')).toBeInTheDocument();
     expect(screen.getByText('数据源新鲜度')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '复盘 dry-run' })).toBeInTheDocument();
-    expect(screen.getByText('http://127.0.0.1:4173/')).toBeInTheDocument();
-    expect(screen.getByText('http://127.0.0.1:8790/healthz')).toBeInTheDocument();
-    expect(screen.getByText(/running · pid 1001/)).toBeInTheDocument();
-    expect(screen.getByText(/running · pid 1002/)).toBeInTheDocument();
-    expect(screen.getByText('trade-server.tail0aa0e9.ts.net')).toBeInTheDocument();
+    expect(screen.getByText('API 健康')).toBeInTheDocument();
+    expect(screen.getByText(/页面不显示 API 地址/)).toBeInTheDocument();
+    expect(screen.getByText(/Host smoke 1\/1/)).toBeInTheDocument();
+    expect(screen.queryByText('http://127.0.0.1:4173/')).not.toBeInTheDocument();
+    expect(screen.queryByText('http://127.0.0.1:8790/healthz')).not.toBeInTheDocument();
+    expect(screen.queryByText(/pid 1001/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/pid 1002/)).not.toBeInTheDocument();
+    expect(screen.queryByText('trade-server.tail0aa0e9.ts.net')).not.toBeInTheDocument();
     expect(screen.getByText('f2ad3ef6')).toBeInTheDocument();
     expect(screen.getByText('26071_014')).toBeInTheDocument();
     expect(screen.getByText('1 条 draft 待确认')).toBeInTheDocument();
@@ -467,7 +471,7 @@ describe('北单实盘决策台 v1', () => {
     expect(mockDashboardData.mainStrategy.candidates.map((arm) => arm.armId)).toContain('b384_dd32_smooth100');
     expect(mockDashboardData.mainStrategy.evPool.available).toBe(true);
     expect(mockDashboardData.availableIssues.map((issue) => issue.issueId)).toContain('26051');
-    expect(mockDashboardData.operations.runtime.frontendLocalUrl).toContain('4173');
+    expect(mockDashboardData.operations.runtime.publicDiagnostics).toBe(false);
     expect(mockDashboardData.operations.snapshots.draftReplacementCount).toBe(1);
     expect(mockDashboardData.operations.workflow.steps).toHaveLength(3);
     expect(mockDashboardData.operations.review.task.status).toBe('dry_run');
@@ -569,24 +573,25 @@ describe('北单实盘决策台 v1', () => {
         issue_status: { current_issue: '26052', match_count: 14, finished_count: 9, settled_sp_count: 9, open_count: 5, capture_status: 'ok', latest_snapshot_at: '2026-07-02T16:44:28Z', latest_snapshot_age_minutes: 8 },
         runtime: {
           api_health: 'ok',
-          api_url: 'http://api.test',
-          api_health_url: 'http://api.test/healthz',
-          api_port: '8790',
-          frontend_local_url: 'http://127.0.0.1:4173/',
-          frontend_remote_url: 'http://100.104.142.57:4173/',
-          frontend_port: '4173',
+          api_url: '',
+          api_health_url: '',
+          api_port: '',
+          frontend_health: 'ok',
+          frontend_local_url: '',
+          frontend_remote_url: '',
+          frontend_port: '',
           checked_at: '2026-07-03T00:50:02+08:00',
-          api_pid: 123,
+          public_diagnostics: false,
+          access_mode: 'local_only',
+          external_access_configured: false,
           api_process_status: 'running',
-          api_bind_host: '0.0.0.0',
-          frontend_pid: 456,
           frontend_process_status: 'running',
-          frontend_bind_host: '0.0.0.0',
           health: {
-            api: { ok: true, status: 200, url: 'http://127.0.0.1:8790/healthz', latency_ms: 1.2 },
-            frontend_local: { ok: true, status: 200, url: 'http://127.0.0.1:4173/', latency_ms: 2.3 },
-            operations: { ok: true, status: 200, url: 'http://127.0.0.1:8790/api/issues/current/operations', latency_ms: 10.1, issue: '26052', workflow_status: 'dry_run', review_task_status: 'dry_run' },
-            host_smokes: [{ ok: true, status: 200, url: 'http://127.0.0.1:4173/', host_header: 'trade-server.tail0aa0e9.ts.net', latency_ms: 2.4 }],
+            api: { ok: true, status: 200, latency_ms: 1.2 },
+            frontend_local: { ok: true, status: 200, latency_ms: 2.3 },
+            operations: { ok: true, status: 200, latency_ms: 10.1, issue: '26052', workflow_status: 'dry_run', review_task_status: 'dry_run' },
+            host_smoke_count: 1,
+            host_smoke_ok_count: 1,
           },
         },
         sources: [{ source_name: 'issue_html', status: 'ok', last_attempt_at: '2026-07-02 16:44:27', last_success_at: '2026-07-02 16:44:27', age_minutes: 8, ok_count: 10, fail_count: 0, total_attempts: 10, rows_parsed: 140 }],
@@ -595,7 +600,7 @@ describe('北单实盘决策台 v1', () => {
         workflow: { run_id: 'wf_26052_test', issue: '26052', mode: 'live_day_refresh_v1', status: 'dry_run', dry_run: true, requested_by: 'test', started_at: '2026-07-03 00:50:00', finished_at: '2026-07-03 00:50:01', elapsed_sec: 1.2, trigger_endpoint: 'POST /api/issues/26052/live-workflow?dry_run=1', steps: [{ step_idx: 1, step_key: 'monitor_500_nowscore', label: '刷新 500/捷报/赛果/SP', status: 'planned', command: ['python3'], elapsed_sec: 0.1 }] },
         versions: { schema_version: 'decision_versions_v1', prob_model_version: 'prob-v1', q_model_version: 'q-v1', decision_chain_version: 'chain-v1', decision_prompt_version: 'prompt-v1', decision_model_version: 'model-v1', review_tag_version: 'review-v1', review_version: 'v2_active_llm_snapshot_tags', decision_config_hash: 'abcdef123456', config_path: 'config/decision_versions.json' },
         warnings: [{ code: 'draft_replacement_pending', severity: 'warn', label: '1 条 draft 待确认', detail: 'manual confirm required' }],
-        source: { sqlite_db: 'live.sqlite', tables: ['matches', 'fetch_log'] },
+        source: { sqlite_db: 'redacted', tables: ['matches', 'fetch_log'] },
       },
       '/api/issues/26052/postmatch-review?dry_run=1': {
         run_id: 'pmr_26052_dry',
@@ -617,6 +622,7 @@ describe('北单实盘决策台 v1', () => {
       return { ok: true, json: async () => payloads[url] } as Response;
     });
     vi.stubGlobal('fetch', fetchMock);
+    window.localStorage.setItem('BEIDAN_OPERATOR_TOKEN', 'test-token');
 
     const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
 
@@ -628,7 +634,7 @@ describe('北单实盘决策台 v1', () => {
     await expect(adapter.getStrategyLab()).resolves.toMatchObject({ arms: [{ armId: 'current', maxDrawdown: -0.16 }, { armId: 'challenger', maxDrawdown: -0.08 }], annualPerformance: [{ armId: 's1', year: 2024, totalStake: 100 }, { armId: 's2', year: 2024, totalStake: 110 }] });
     await expect(adapter.getSelectorShadow('26052')).resolves.toMatchObject({ issueId: '26052', ruleName: 'rule_x', currentDecision: { chosenArm: 'selector' }, recentDecisions: [{ outcome: 'helped' }] });
     await expect(adapter.getMainStrategy('26052')).resolves.toMatchObject({ issueId: '26052', candidates: [{ armId: 'b384_dd32_smooth100' }], evPool: { tickets: [{ ticketId: 't1', legs: [{ selectionLabel: '负', hit: false }] }] }, riskState: { recommendedArm: 'b384_dd32_smooth100' } });
-    await expect(adapter.getOperationsStatus('26052')).resolves.toMatchObject({ issueId: '26052', runtime: { apiPort: '8790', frontendPort: '4173', apiPid: 123, frontendPid: 456, health: { hostSmokes: [{ hostHeader: 'trade-server.tail0aa0e9.ts.net', ok: true }], operations: { workflowStatus: 'dry_run', reviewTaskStatus: 'dry_run' } } }, snapshots: { draftReplacementCount: 1, pendingDrafts: [{ matchId: '26052_008' }] }, review: { unreviewedSettledCount: 1, task: { runId: 'pmr_26052_test', status: 'dry_run', result: { wouldInsert: 1, profit: 10.64 } } }, workflow: { runId: 'wf_26052_test', status: 'dry_run', dryRun: true, steps: [{ stepKey: 'monitor_500_nowscore' }] }, versions: { decisionConfigHash: 'abcdef123456' } });
+    await expect(adapter.getOperationsStatus('26052')).resolves.toMatchObject({ issueId: '26052', runtime: { apiPort: '', frontendPort: '', publicDiagnostics: false, accessMode: 'local_only', health: { hostSmokeCount: 1, hostSmokeOkCount: 1, operations: { workflowStatus: 'dry_run', reviewTaskStatus: 'dry_run' } } }, snapshots: { draftReplacementCount: 1, pendingDrafts: [{ matchId: '26052_008' }] }, review: { unreviewedSettledCount: 1, task: { runId: 'pmr_26052_test', status: 'dry_run', result: { wouldInsert: 1, profit: 10.64 } } }, workflow: { runId: 'wf_26052_test', status: 'dry_run', dryRun: true, steps: [{ stepKey: 'monitor_500_nowscore' }] }, versions: { decisionConfigHash: 'abcdef123456' } });
     await expect(adapter.confirmDecisionSnapshot('bjdc_26052_001')).resolves.toMatchObject({ action: 'confirmed_override', confirmedAt: '2026-06-30 14:42', active: { snapshotId: 'draft_26052_001', status: 'active', confirmedAt: '2026-06-30 14:42', supersedesSnapshotId: 'active_26052_001' }, previousActive: { snapshotId: 'active_26052_001', supersededAt: '2026-06-30 14:42' } });
     await expect(adapter.runPostmatchReview('26052', true)).resolves.toMatchObject({ runId: 'pmr_26052_dry', status: 'dry_run', result: { wouldInsert: 1, profit: 10.64 } });
 
@@ -641,8 +647,8 @@ describe('北单实盘决策台 v1', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(7, 'http://api.test/api/issues/26052/selector-shadow');
     expect(fetchMock).toHaveBeenNthCalledWith(8, 'http://api.test/api/issues/26052/main-strategy');
     expect(fetchMock).toHaveBeenNthCalledWith(9, 'http://api.test/api/issues/26052/operations');
-    expect(fetchMock).toHaveBeenNthCalledWith(10, 'http://api.test/api/matches/bjdc_26052_001/decision-snapshot/confirm', { method: 'POST' });
-    expect(fetchMock).toHaveBeenNthCalledWith(11, 'http://api.test/api/issues/26052/postmatch-review?dry_run=1', { method: 'POST' });
+    expect(fetchMock).toHaveBeenNthCalledWith(10, 'http://api.test/api/matches/bjdc_26052_001/decision-snapshot/confirm', { method: 'POST', headers: { 'X-Beidan-Operator-Token': 'test-token' } });
+    expect(fetchMock).toHaveBeenNthCalledWith(11, 'http://api.test/api/issues/26052/postmatch-review?dry_run=1', { method: 'POST', headers: { 'X-Beidan-Operator-Token': 'test-token' } });
   });
 
   it('dashboard aggregate passes the selected decision variant to versioned API endpoints', async () => {

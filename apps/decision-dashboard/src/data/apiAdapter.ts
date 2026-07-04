@@ -489,6 +489,12 @@ function transformRuntimeHealthProbe(raw: unknown) {
   };
 }
 
+function operatorTokenHeaders(): HeadersInit {
+  if (typeof window === 'undefined') return {};
+  const token = window.localStorage?.getItem('BEIDAN_OPERATOR_TOKEN')?.trim();
+  return token ? { 'X-Beidan-Operator-Token': token } : {};
+}
+
 function toCandidateRole(value: unknown, qScore?: number): CandidateRole {
   if (value === 'core' || value === 'protect' || value === 'watch' || value === 'avoid') return value;
   if (qScore === undefined) return 'watch';
@@ -1323,6 +1329,8 @@ function transformOperationsStatus(raw: unknown): OperationsStatusData {
   const versions = asObject(obj.versions);
   const source = asObject(obj.source);
   const runtimeHealth = asObject(runtime.health);
+  const runtimeDiagnostics = asObject(runtime.diagnostics);
+  const runtimeUrls = asObject(runtime.urls ?? runtimeDiagnostics.urls);
   return {
     issueId: asString(obj.issue, asString(obj.issueId)),
     generatedAt: asString(obj.generated_at, asString(obj.generatedAt)),
@@ -1341,27 +1349,33 @@ function transformOperationsStatus(raw: unknown): OperationsStatusData {
       apiUrl: asString(runtime.api_url, asString(runtime.apiUrl)),
       apiHealthUrl: asString(runtime.api_health_url, asString(runtime.apiHealthUrl)),
       apiPort: asString(runtime.api_port, asString(runtime.apiPort)),
+      frontendHealth: asString(runtime.frontend_health, asString(runtime.frontendHealth)) || undefined,
       frontendLocalUrl: asString(runtime.frontend_local_url, asString(runtime.frontendLocalUrl)),
       frontendRemoteUrl: asString(runtime.frontend_remote_url, asString(runtime.frontendRemoteUrl)),
       frontendPort: asString(runtime.frontend_port, asString(runtime.frontendPort)),
+      publicDiagnostics: asBoolean(runtime.public_diagnostics, asBoolean(runtime.publicDiagnostics)),
+      accessMode: asString(runtime.access_mode, asString(runtime.accessMode)) || undefined,
+      externalAccessConfigured: asBoolean(runtime.external_access_configured, asBoolean(runtime.externalAccessConfigured)),
       checkedAt: asString(runtime.checked_at, asString(runtime.checkedAt)) || undefined,
-      statusPath: asString(runtime.status_path, asString(runtime.statusPath)) || undefined,
-      runtimeDir: asString(runtime.runtime_dir, asString(runtime.runtimeDir)) || undefined,
-      urls: Object.fromEntries(Object.entries(asObject(runtime.urls)).map(([key, value]) => [key, asString(value)])),
-      apiPid: asMaybeNumber(runtime.api_pid ?? runtime.apiPid),
+      statusPath: asString(runtime.status_path, asString(runtime.statusPath, asString(runtimeDiagnostics.status_path, asString(runtimeDiagnostics.statusPath)))) || undefined,
+      runtimeDir: asString(runtime.runtime_dir, asString(runtime.runtimeDir, asString(runtimeDiagnostics.runtime_dir, asString(runtimeDiagnostics.runtimeDir)))) || undefined,
+      urls: Object.fromEntries(Object.entries(runtimeUrls).map(([key, value]) => [key, asString(value)])),
+      apiPid: asMaybeNumber(runtime.api_pid ?? runtime.apiPid ?? runtimeDiagnostics.api_pid ?? runtimeDiagnostics.apiPid),
       apiProcessStatus: asString(runtime.api_process_status, asString(runtime.apiProcessStatus)) || undefined,
-      apiBindHost: asString(runtime.api_bind_host, asString(runtime.apiBindHost)) || undefined,
-      apiCommand: asArray(runtime.api_command ?? runtime.apiCommand).map((value) => asString(value)).filter(Boolean),
-      apiLog: asString(runtime.api_log, asString(runtime.apiLog)) || undefined,
-      frontendPid: asMaybeNumber(runtime.frontend_pid ?? runtime.frontendPid),
+      apiBindHost: asString(runtime.api_bind_host, asString(runtime.apiBindHost, asString(runtimeDiagnostics.api_bind_host, asString(runtimeDiagnostics.apiBindHost)))) || undefined,
+      apiCommand: asArray(runtime.api_command ?? runtime.apiCommand ?? runtimeDiagnostics.api_command ?? runtimeDiagnostics.apiCommand).map((value) => asString(value)).filter(Boolean),
+      apiLog: asString(runtime.api_log, asString(runtime.apiLog, asString(runtimeDiagnostics.api_log, asString(runtimeDiagnostics.apiLog)))) || undefined,
+      frontendPid: asMaybeNumber(runtime.frontend_pid ?? runtime.frontendPid ?? runtimeDiagnostics.frontend_pid ?? runtimeDiagnostics.frontendPid),
       frontendProcessStatus: asString(runtime.frontend_process_status, asString(runtime.frontendProcessStatus)) || undefined,
-      frontendBindHost: asString(runtime.frontend_bind_host, asString(runtime.frontendBindHost)) || undefined,
-      frontendCommand: asArray(runtime.frontend_command ?? runtime.frontendCommand).map((value) => asString(value)).filter(Boolean),
-      frontendLog: asString(runtime.frontend_log, asString(runtime.frontendLog)) || undefined,
+      frontendBindHost: asString(runtime.frontend_bind_host, asString(runtime.frontendBindHost, asString(runtimeDiagnostics.frontend_bind_host, asString(runtimeDiagnostics.frontendBindHost)))) || undefined,
+      frontendCommand: asArray(runtime.frontend_command ?? runtime.frontendCommand ?? runtimeDiagnostics.frontend_command ?? runtimeDiagnostics.frontendCommand).map((value) => asString(value)).filter(Boolean),
+      frontendLog: asString(runtime.frontend_log, asString(runtime.frontendLog, asString(runtimeDiagnostics.frontend_log, asString(runtimeDiagnostics.frontendLog)))) || undefined,
       health: {
         api: transformRuntimeHealthProbe(runtimeHealth.api),
         frontendLocal: transformRuntimeHealthProbe(runtimeHealth.frontend_local ?? runtimeHealth.frontendLocal),
         operations: transformRuntimeHealthProbe(runtimeHealth.operations),
+        hostSmokeCount: asMaybeNumber(runtimeHealth.host_smoke_count ?? runtimeHealth.hostSmokeCount),
+        hostSmokeOkCount: asMaybeNumber(runtimeHealth.host_smoke_ok_count ?? runtimeHealth.hostSmokeOkCount),
         hostSmokes: asArray(runtimeHealth.host_smokes ?? runtimeHealth.hostSmokes).map(transformRuntimeHealthProbe),
       },
     },
@@ -1507,7 +1521,7 @@ export class ApiDashboardAdapter {
 
   private async postJson<T>(path: string, fallback: T, transform: (payload: unknown) => T = (payload) => payload as T): Promise<T> {
     if (this.mode === 'mock') return fallback;
-    const response = await fetch(`${this.baseUrl}${path}`, { method: 'POST' });
+    const response = await fetch(`${this.baseUrl}${path}`, { method: 'POST', headers: operatorTokenHeaders() });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const message = asString(asObject(payload).error, `API ${path} failed: ${response.status}`);

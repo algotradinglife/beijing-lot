@@ -298,14 +298,25 @@ function secondsLabel(value?: number) {
 }
 
 function healthProbeLabel(probe?: { ok: boolean; status: number; url?: string; latencyMs?: number; error?: string }) {
-  if (!probe || !probe.url) return '未检查';
-  if (!probe.ok) return probe.error || `HTTP ${probe.status || 0}`;
-  return `HTTP ${probe.status} · ${probe.latencyMs ?? '-'}ms`;
+  if (!probe) return '未检查';
+  if (!probe.ok) return probe.status ? `异常 · HTTP ${probe.status}` : '异常';
+  return `正常 · ${probe.latencyMs ?? '-'}ms`;
 }
 
-function processLabel(status?: string, pid?: number) {
+function processLabel(status?: string) {
   if (!status) return '未记录';
-  return pid ? `${status} · pid ${pid}` : status;
+  if (status === 'running') return '运行中';
+  if (status === 'missing') return '未运行';
+  return status;
+}
+
+function accessModeLabel(mode?: string, configured?: boolean) {
+  if (mode === 'local_only') return '仅本机监听';
+  if (mode === 'runtime_status_missing') return '未生成运行快照';
+  if (mode === 'direct_bind_non_loopback') return '存在非本机监听';
+  if (mode === 'tailnet_metadata_recorded') return '记录了 Tailnet 访问元数据';
+  if (mode === 'public_funnel_configured') return '记录了 Funnel 访问元数据';
+  return configured ? '已记录外部访问元数据' : '未记录外部访问';
 }
 
 function spChangeLabel(value?: string) {
@@ -1151,7 +1162,9 @@ function OperationsStatus({
   const runtimeHealth = data.runtime.health;
   const apiProcessTone = statusTone(data.runtime.apiProcessStatus);
   const frontendProcessTone = statusTone(data.runtime.frontendProcessStatus);
-  const hostSmokes = runtimeHealth?.hostSmokes?.filter((probe) => probe.hostHeader || probe.url) ?? [];
+  const externalAccessTone = data.runtime.accessMode === 'direct_bind_non_loopback' || data.runtime.accessMode === 'public_funnel_configured' ? 'warn' : 'good';
+  const hostSmokeCount = runtimeHealth?.hostSmokeCount ?? runtimeHealth?.hostSmokes?.length ?? 0;
+  const hostSmokeOkCount = runtimeHealth?.hostSmokeOkCount ?? runtimeHealth?.hostSmokes?.filter((probe) => probe.ok).length ?? 0;
   return <div className="grid page-grid operations-page">
     <Card title={`实盘运行状态 / Issue ${data.issueId}`} icon={<Activity />}>
       <div className="hero-stats">
@@ -1176,15 +1189,14 @@ function OperationsStatus({
     <div className="grid two-col">
       <Card title="访问与服务" icon={<Server />}>
         <div className="runtime-grid">
-          <div><span>API</span><b><Badge tone={statusTone(data.runtime.apiHealth)}>:{data.runtime.apiPort || '8790'}</Badge>{data.runtime.apiUrl || '-'}</b><small>{data.runtime.apiHealthUrl || '/healthz'}</small></div>
-          <div><span>API 进程</span><b><Badge tone={apiProcessTone}>{processLabel(data.runtime.apiProcessStatus, data.runtime.apiPid)}</Badge></b><small>{data.runtime.apiBindHost || '0.0.0.0'}:{data.runtime.apiPort || '8790'} · {data.runtime.apiLog || '-'}</small></div>
-          <div><span>前端本机</span><b><Badge tone={statusTone(runtimeHealth?.frontendLocal?.ok ? 'ok' : 'warn')}>:{data.runtime.frontendPort || '4173'}</Badge>{data.runtime.frontendLocalUrl}</b><small>{healthProbeLabel(runtimeHealth?.frontendLocal)}</small></div>
-          <div><span>前端进程</span><b><Badge tone={frontendProcessTone}>{processLabel(data.runtime.frontendProcessStatus, data.runtime.frontendPid)}</Badge></b><small>{data.runtime.frontendBindHost || '0.0.0.0'}:{data.runtime.frontendPort || '4173'} · {data.runtime.frontendLog || '-'}</small></div>
-          <div><span>前端远程</span><b>{data.runtime.frontendRemoteUrl || data.runtime.urls?.frontend_remote || '-'}</b><small>同网段/Tailscale 优先使用这个地址</small></div>
-          <div><span>最近检查</span><b>{data.runtime.checkedAt || '未运行 health'}</b><small>{data.runtime.statusPath || '-'}</small></div>
+          <div><span>API 健康</span><b><Badge tone={statusTone(data.runtime.apiHealth)}>{healthProbeLabel(runtimeHealth?.api)}</Badge></b><small>经同源 /api 代理访问，页面不显示 API 地址。</small></div>
+          <div><span>API 进程</span><b><Badge tone={apiProcessTone}>{processLabel(data.runtime.apiProcessStatus)}</Badge></b><small>端口、PID、命令和日志路径已隐藏。</small></div>
+          <div><span>前端健康</span><b><Badge tone={statusTone(data.runtime.frontendHealth || (runtimeHealth?.frontendLocal?.ok ? 'ok' : 'warn'))}>{healthProbeLabel(runtimeHealth?.frontendLocal)}</Badge></b><small>浏览器入口由本机或 Tailscale Serve 管理。</small></div>
+          <div><span>前端进程</span><b><Badge tone={frontendProcessTone}>{processLabel(data.runtime.frontendProcessStatus)}</Badge></b><small>不在页面公开监听地址。</small></div>
+          <div><span>外部访问</span><b><Badge tone={externalAccessTone}>{accessModeLabel(data.runtime.accessMode, data.runtime.externalAccessConfigured)}</Badge></b><small>{data.runtime.publicDiagnostics ? 'diagnostics 已开启' : 'diagnostics 默认关闭'}</small></div>
+          <div><span>最近检查</span><b>{data.runtime.checkedAt || '未运行 health'}</b><small>详细快照仅保留在服务器本机。</small></div>
         </div>
-        {hostSmokes.length ? <div className="host-smoke-list">{hostSmokes.map((probe) => <div key={`${probe.hostHeader}-${probe.url}`}><span>{probe.hostHeader || probe.url}</span><b><Badge tone={probe.ok ? 'good' : 'bad'}>{healthProbeLabel(probe)}</Badge></b></div>)}</div> : null}
-        <p>Operations API：{healthProbeLabel(runtimeHealth?.operations)} · workflow {runtimeHealth?.operations?.workflowStatus || '-'} · review {runtimeHealth?.operations?.reviewTaskStatus || '-'}</p>
+        <p>Operations API：{healthProbeLabel(runtimeHealth?.operations)} · workflow {runtimeHealth?.operations?.workflowStatus || '-'} · review {runtimeHealth?.operations?.reviewTaskStatus || '-'} · Host smoke {hostSmokeOkCount}/{hostSmokeCount}</p>
       </Card>
 
       <Card title="版本锁定">
@@ -1193,7 +1205,7 @@ function OperationsStatus({
           <div><span>q</span><b>{data.versions.qModelVersion || '-'}</b></div>
           <div><span>chain</span><b>{data.versions.decisionChainVersion || '-'}</b></div>
           <div><span>review</span><b>{data.versions.reviewTagVersion || '-'}</b></div>
-          <div><span>config</span><b>{hashShort}</b><small>{data.versions.configPath}</small></div>
+          <div><span>config</span><b>{hashShort}</b><small>仅显示 hash</small></div>
           <div><span>review_version</span><b>{data.versions.reviewVersion || data.review.reviewVersion || '-'}</b></div>
         </div>
       </Card>
@@ -1255,7 +1267,7 @@ function OperationsStatus({
         <b>{warning.label}</b>
         <span>{warning.detail}</span>
       </div>)}</div> : <div className="empty-state"><b>没有阻断项</b><span>API、数据源、snapshot 和复盘状态当前可用。</span></div>}
-      <small>{data.source.sqliteDb} · {data.source.tables.join(', ')}</small>
+      <small>本地 SQLite 与表结构细节已隐藏。</small>
     </Card>
   </div>;
 }

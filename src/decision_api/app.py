@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import hmac
 import json
 import math
 import os
@@ -32,6 +33,9 @@ STRUCTURED_DECISION_SHADOW_DIR = PROJECT_ROOT / "results/structured_decision_cha
 DECISION_VERSIONS_CONFIG = PROJECT_ROOT / "config/decision_versions.json"
 STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
 DEFAULT_DASHBOARD_RUNTIME_STATUS = PROJECT_ROOT / "tmp/decision_dashboard/runtime_status.json"
+DEFAULT_DECISION_API_HOST = "127.0.0.1"
+OPERATOR_TOKEN_ENV = "BEIDAN_DECISION_API_OPERATOR_TOKEN"
+OPERATOR_TOKEN_HEADER = "X-Beidan-Operator-Token"
 HK_TZ = timezone(timedelta(hours=8))
 OUTCOME_LABEL = {"3": "胜", "1": "平", "0": "负"}
 OUTCOME_ORDER = ("3", "1", "0")
@@ -442,45 +446,131 @@ def _read_dashboard_runtime_status() -> dict[str, Any]:
     return loaded if isinstance(loaded, dict) else {}
 
 
-def _compact_runtime_health(value: Any) -> Any:
-    if isinstance(value, list):
-        return [_compact_runtime_health(item) for item in value]
-    if isinstance(value, dict):
-        return {
-            key: _compact_runtime_health(item)
-            for key, item in value.items()
-            if key not in {"json", "sample"}
-        }
-    return value
+def _truthy_env(name: str) -> bool:
+    return str(os.environ.get(name, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _public_diagnostics_enabled() -> bool:
+    return _truthy_env("BEIDAN_DECISION_API_PUBLIC_DIAGNOSTICS")
+
+
+def _public_diagnostics_path(path: Any) -> str:
+    return str(path) if _public_diagnostics_enabled() else "redacted"
+
+
+def _allowed_cors_origins() -> set[str]:
+    raw = os.environ.get("BEIDAN_DECISION_API_CORS_ORIGINS", "")
+    return {item.strip() for item in raw.split(",") if item.strip()}
+
+
+def _operator_token() -> str:
+    return str(os.environ.get(OPERATOR_TOKEN_ENV, "")).strip()
+
+
+def _operator_token_error(code: str, message: str) -> tuple[Any, int]:
+    return jsonify({"error": message, "code": code}), 403
+
+
+def _require_operator_token() -> tuple[Any, int] | None:
+    expected = _operator_token()
+    if not expected:
+        return _operator_token_error(
+            "operator_token_unconfigured",
+            f"{OPERATOR_TOKEN_ENV} is required for mutating API requests.",
+        )
+    provided = request.headers.get(OPERATOR_TOKEN_HEADER, "")
+    if not provided or not hmac.compare_digest(provided, expected):
+        return _operator_token_error(
+            "operator_token_required",
+            f"{OPERATOR_TOKEN_HEADER} is required for mutating API requests.",
+        )
+    return None
+
+
+def _health_probe_summary(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    payload = {
+        "ok": bool(value.get("ok")),
+        "status": int(value.get("status") or 0),
+    }
+    if value.get("latency_ms") is not None:
+        payload["latency_ms"] = value.get("latency_ms")
+    for key in ("issue", "workflow_status", "review_task_status"):
+        if value.get(key) not in {None, ""}:
+            payload[key] = value.get(key)
+    return payload
+
+
+def _runtime_health_summary(health: Any) -> dict[str, Any]:
+    if not isinstance(health, dict):
+        return {}
+    host_smokes = health.get("host_smokes")
+    host_smokes = host_smokes if isinstance(host_smokes, list) else []
+    return {
+        "api": _health_probe_summary(health.get("api")),
+        "frontend_local": _health_probe_summary(health.get("frontend_local")),
+        "operations": _health_probe_summary(health.get("operations")),
+        "host_smoke_count": len(host_smokes),
+        "host_smoke_ok_count": sum(1 for item in host_smokes if isinstance(item, dict) and item.get("ok")),
+    }
+
+
+def _runtime_access_mode(api: dict[str, Any], frontend: dict[str, Any], urls: dict[str, Any]) -> str:
+    if urls.get("funnel"):
+        return "public_funnel_configured"
+    if urls.get("magic_dns") or urls.get("frontend_remote"):
+        return "tailnet_metadata_recorded"
+    exposed_hosts = {"0.0.0.0", "::", ""}
+    if str(api.get("bind_host") or "") in exposed_hosts or str(frontend.get("bind_host") or "") in exposed_hosts:
+        return "direct_bind_non_loopback"
+    return "local_only"
 
 
 def _dashboard_runtime_summary() -> dict[str, Any]:
     status = _read_dashboard_runtime_status()
+    public_diagnostics = _public_diagnostics_enabled()
     if not status:
-        return {"status_path": str(_dashboard_runtime_status_path())}
+        return {
+            "checked_at": "",
+            "public_diagnostics": public_diagnostics,
+            "access_mode": "runtime_status_missing",
+            "external_access_configured": False,
+            "api_process_status": "unknown",
+            "frontend_process_status": "unknown",
+            "health": {},
+        }
     api = status.get("api") if isinstance(status.get("api"), dict) else {}
     frontend = status.get("frontend") if isinstance(status.get("frontend"), dict) else {}
     health = status.get("health") if isinstance(status.get("health"), dict) else {}
     urls = status.get("urls") if isinstance(status.get("urls"), dict) else {}
     logs = status.get("logs") if isinstance(status.get("logs"), dict) else {}
-    return {
+    external_access_configured = bool(urls.get("frontend_remote") or urls.get("magic_dns") or urls.get("funnel"))
+    payload: dict[str, Any] = {
         "schema": status.get("schema", ""),
         "checked_at": status.get("checked_at", ""),
-        "status_path": status.get("status_path") or str(_dashboard_runtime_status_path()),
-        "runtime_dir": status.get("runtime_dir", ""),
-        "urls": urls,
-        "api_pid": api.get("pid"),
+        "public_diagnostics": public_diagnostics,
+        "access_mode": _runtime_access_mode(api, frontend, urls),
+        "external_access_configured": external_access_configured,
         "api_process_status": api.get("status", ""),
-        "api_bind_host": api.get("bind_host", ""),
-        "api_command": api.get("command", []),
-        "api_log": api.get("log") or logs.get("api", ""),
-        "frontend_pid": frontend.get("pid"),
         "frontend_process_status": frontend.get("status", ""),
-        "frontend_bind_host": frontend.get("bind_host", ""),
-        "frontend_command": frontend.get("command", []),
-        "frontend_log": frontend.get("log") or logs.get("frontend", ""),
-        "health": _compact_runtime_health(health),
+        "health": _runtime_health_summary(health),
     }
+    if public_diagnostics:
+        payload["diagnostics"] = {
+            "status_path": status.get("status_path") or str(_dashboard_runtime_status_path()),
+            "runtime_dir": status.get("runtime_dir", ""),
+            "urls": urls,
+            "api_pid": api.get("pid"),
+            "api_bind_host": api.get("bind_host", ""),
+            "api_command": api.get("command", []),
+            "api_log": api.get("log") or logs.get("api", ""),
+            "frontend_pid": frontend.get("pid"),
+            "frontend_bind_host": frontend.get("bind_host", ""),
+            "frontend_command": frontend.get("command", []),
+            "frontend_log": frontend.get("log") or logs.get("frontend", ""),
+        }
+    return payload
 
 
 def _active_version_bundle() -> dict[str, Any]:
@@ -4096,7 +4186,7 @@ def _historical_dashboard(issue: str, release: dict[str, Any] | None = None) -> 
             "provider": "beidan_modeling_plus_2026",
             "issue_label": f"{resolved} 历史回放",
             "scope_date": None,
-            "path": str(DEFAULT_MODEL_DB),
+            "path": _public_diagnostics_path(DEFAULT_MODEL_DB),
             "tables": ["match_features", "market_consensus", "joint_leg_rows.csv"],
         },
     }
@@ -4438,8 +4528,8 @@ def _main_strategy_payload(
             "ticket_pool_csv": _relative_display_path(_strategy_ticket_pool_csv(release)),
             "joint_leg_rows_csv": _relative_display_path(_strategy_joint_leg_rows_csv(release)),
             "structured_shadow_dir": _relative_display_path(_strategy_shadow_dir(release)),
-            "model_db": str(DEFAULT_MODEL_DB),
-            "live_db": str(conn.execute("PRAGMA database_list").fetchone()["file"]),
+            "model_db": _public_diagnostics_path(DEFAULT_MODEL_DB),
+            "live_db": _public_diagnostics_path(conn.execute("PRAGMA database_list").fetchone()["file"]),
             "strategy_release_config": _relative_display_path(STRATEGY_RELEASE_CONFIG),
             "no_future_leakage": "当前期只读 live/html odds；历史 replay 才显示 hit/payout/profit。",
         },
@@ -4567,7 +4657,7 @@ def _dashboard(
             "provider": "500.com",
             "issue_label": issue_meta["label"] if issue_meta else resolved,
             "scope_date": only_date,
-            "path": str(conn.execute("PRAGMA database_list").fetchone()["file"]),
+            "path": _public_diagnostics_path(conn.execute("PRAGMA database_list").fetchone()["file"]),
             "tables": ["issues", "matches", "live_sp_snapshots", "fetch_log", "llm_decision_snapshots"],
         },
     }
@@ -4652,17 +4742,9 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
     latest_snapshot_at = max(parsed_candidates, default=(None, ""))[1] if parsed_candidates else ""
 
     runtime_status = _dashboard_runtime_summary()
-    runtime_urls = runtime_status.get("urls") if isinstance(runtime_status.get("urls"), dict) else {}
-    api_host = request.host.split(":")[0] if request.host else "127.0.0.1"
-    api_url = request.host_url.rstrip("/")
-    remote_frontend_url = (
-        os.environ.get("BEIDAN_DASHBOARD_REMOTE_URL")
-        or runtime_urls.get("frontend_remote")
-        or runtime_urls.get("magic_dns")
-        or f"http://{api_host}:4173/"
-    )
-    frontend_local_url = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_URL", "http://127.0.0.1:4173/")
-    api_port = request.host.split(":")[1] if ":" in request.host else os.environ.get("BEIDAN_DECISION_API_PORT", "8790")
+    runtime_health = runtime_status.get("health") if isinstance(runtime_status.get("health"), dict) else {}
+    api_probe = runtime_health.get("api") if isinstance(runtime_health.get("api"), dict) else {}
+    frontend_probe = runtime_health.get("frontend_local") if isinstance(runtime_health.get("frontend_local"), dict) else {}
 
     warnings: list[dict[str, Any]] = []
     if not rows:
@@ -4743,13 +4825,14 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
             "latest_snapshot_age_minutes": _minutes_since_hk(latest_snapshot_at),
         },
         "runtime": {
-            "api_health": "ok",
-            "api_url": api_url,
-            "api_health_url": f"{api_url}/healthz",
-            "api_port": api_port,
-            "frontend_local_url": frontend_local_url,
-            "frontend_remote_url": remote_frontend_url,
-            "frontend_port": "4173",
+            "api_health": "ok" if api_probe.get("ok") else "warn",
+            "api_url": "",
+            "api_health_url": "",
+            "api_port": "",
+            "frontend_local_url": "",
+            "frontend_remote_url": "",
+            "frontend_port": "",
+            "frontend_health": "ok" if frontend_probe.get("ok") else "warn",
             **runtime_status,
         },
         "sources": source_statuses,
@@ -4801,7 +4884,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
         "versions": versions,
         "warnings": warnings,
         "source": {
-            "sqlite_db": str(conn.execute("PRAGMA database_list").fetchone()["file"]),
+            "sqlite_db": _public_diagnostics_path(conn.execute("PRAGMA database_list").fetchone()["file"]),
             "tables": ["matches", "fetch_log", "llm_decision_snapshots", "postmatch_reviews", "postmatch_review_issue_summary"],
         },
     }
@@ -5206,7 +5289,7 @@ def _selector_shadow(results_dir: Path, issue: str) -> dict[str, Any]:
             "pre_drawdown_units": _csv_float(row, "pre_drawdown_units"),
             "outcome": "helped" if _csv_int(row, "switch_helped") else "hurt" if _csv_int(row, "switch_hurt") else "flat",
         } for row in decisions[-8:]][::-1],
-        "guardrail": f"source={results_dir}; no mock fallback. Current issue selector run must be generated separately before real staking.",
+        "guardrail": f"source={_relative_display_path(results_dir)}; no mock fallback. Current issue selector run must be generated separately before real staking.",
     }
 
 
@@ -5219,10 +5302,21 @@ def create_app(
     db_path = Path(sqlite_db)
     result_path = Path(results_dir)
 
+    @app.before_request
+    def _operator_token_gate():
+        if request.method == "POST" and request.path.startswith("/api/"):
+            return _require_operator_token()
+        return None
+
     @app.after_request
     def _cors(resp):
-        resp.headers["Access-Control-Allow-Origin"] = "*"
-        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        origin = request.headers.get("Origin", "")
+        allowed = _allowed_cors_origins()
+        if origin and origin in allowed:
+            resp.headers["Access-Control-Allow-Origin"] = origin
+            resp.headers["Access-Control-Allow-Headers"] = f"Content-Type,{OPERATOR_TOKEN_HEADER}"
+            resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+            resp.headers.add("Vary", "Origin")
         return resp
 
     @app.get("/healthz")
@@ -5231,20 +5325,26 @@ def create_app(
             current = _resolve_issue(conn, "current")
         release = _active_strategy_release()
         release_payload = _strategy_release_public_payload(release)
-        return jsonify({
+        payload = {
             "ok": db_path.exists(),
             "provider": "500.com",
             "current_issue": current,
             "scope_date": _today_hk(),
-            "sqlite_db": str(db_path),
-            "results_dir": str(result_path),
             "strategy_release_id": release.get("release_id"),
-            "strategy_release_config": release.get("config_path"),
-            "strategy_release_missing_required": release_payload["artifact_health"]["missing_required"],
-            "main_strategy_dir": _relative_display_path(_strategy_main_dir(release)),
-            "high_n_selector_dir": _relative_display_path(_strategy_artifact_path("ticket_pool_dir", HIGH_N_SELECTOR_RESULTS_DIR, release)),
-            "model_db": str(DEFAULT_MODEL_DB),
-        })
+            "strategy_release_missing_required_count": len(release_payload["artifact_health"]["missing_required"]),
+            "public_diagnostics": _public_diagnostics_enabled(),
+        }
+        if _public_diagnostics_enabled():
+            payload.update({
+                "sqlite_db": str(db_path),
+                "results_dir": str(result_path),
+                "strategy_release_config": release.get("config_path"),
+                "strategy_release_missing_required": release_payload["artifact_health"]["missing_required"],
+                "main_strategy_dir": _relative_display_path(_strategy_main_dir(release)),
+                "high_n_selector_dir": _relative_display_path(_strategy_artifact_path("ticket_pool_dir", HIGH_N_SELECTOR_RESULTS_DIR, release)),
+                "model_db": str(DEFAULT_MODEL_DB),
+            })
+        return jsonify(payload)
 
     @app.get("/api/strategy-release")
     def strategy_release():
@@ -5421,7 +5521,7 @@ def main() -> None:
         sqlite_db=os.environ.get("BEIDAN_500_DB", DEFAULT_500_DB),
         results_dir=os.environ.get("BEIDAN_SELECTOR_RESULTS_DIR", DEFAULT_RESULTS_DIR),
     )
-    host = os.environ.get("BEIDAN_DECISION_API_HOST", "0.0.0.0")
+    host = os.environ.get("BEIDAN_DECISION_API_HOST", DEFAULT_DECISION_API_HOST)
     port = int(os.environ.get("BEIDAN_DECISION_API_PORT", "8790"))
     app.run(host=host, port=port, debug=False)
 
