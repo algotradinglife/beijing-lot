@@ -61,6 +61,7 @@ __pycache__/
 .mypy_cache/
 dist/
 build/
+*.tsbuildinfo
 target/
 *.egg-info/
 .next/

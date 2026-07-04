@@ -321,6 +321,29 @@ def create_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_matches_issue ON matches(issue);
         CREATE INDEX IF NOT EXISTS idx_matches_has_sp ON matches(issue, winning_sp);
         CREATE INDEX IF NOT EXISTS idx_live_sp_issue ON live_sp_snapshots(issue, playid, fetched_at);
+
+        CREATE TABLE IF NOT EXISTS match_details_500 (
+            issue TEXT NOT NULL,
+            match_idx INTEGER NOT NULL,
+            fid INTEGER NOT NULL,
+            fetched_at TEXT NOT NULL,
+            status TEXT NOT NULL,
+            title TEXT,
+            description TEXT,
+            data_url TEXT,
+            recommendation_url TEXT,
+            asian_url TEXT,
+            europe_url TEXT,
+            home_recent_summary TEXT,
+            away_recent_summary TEXT,
+            h2h_summary TEXT,
+            league_table_summary TEXT,
+            payload_json TEXT,
+            raw_sha1 TEXT,
+            error TEXT,
+            PRIMARY KEY(issue, match_idx)
+        );
+        CREATE INDEX IF NOT EXISTS idx_match_details_500_fid ON match_details_500(fid);
         """
     )
 

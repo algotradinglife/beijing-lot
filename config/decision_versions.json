@@ -1,0 +1,36 @@
+{
+  "schema_version": "decision_versions_v1",
+  "probability_model": {
+    "version": "bd_prob_handicap_calibrated_v1",
+    "description": "Handicap-adjusted 3-result probability from 500.com live market proxy.",
+    "parameters": {
+      "uses_beidan_integer_handicap": true,
+      "uses_market_implied_probability": true,
+      "line_gap_policy": "diagnostic_only"
+    }
+  },
+  "q_model": {
+    "version": "q_ev_sp_v1",
+    "description": "Expected value proxy from calibrated probability and pre-result SP snapshot.",
+    "parameters": {
+      "stop_threshold": 1.0,
+      "sp_policy": "preclose_sp_if_available_else_live_sp_only_before_result"
+    }
+  },
+  "decision_chain": {
+    "version": "llm_chain_bet_protect_stop_v3",
+    "prompt_version": "fixed_decision_chain_v3_bet_protect_stop",
+    "model_version": "gpt_fixed_decision_chain_v3",
+    "description": "LLM-style fixed decision chain for primary bet, protection, and stop decisions.",
+    "parameters": {
+      "line_gap_policy": "diagnostic_or_protection_note",
+      "q_stop_threshold": 1.0,
+      "manual_override_required_for_snapshot_replacement": true
+    }
+  },
+  "review_tags": {
+    "version": "postmatch_tags_v2",
+    "review_version": "v2_active_llm_snapshot_tags",
+    "description": "Post-match attribution tags bound to active LLM decision snapshots."
+  }
+}
