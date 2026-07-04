@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -18,8 +19,9 @@ from src.decision_api.app import create_app  # noqa: E402
 from src.sqlite_runtime import connect_sqlite  # noqa: E402
 
 
-DEFAULT_DB = ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
+DEFAULT_DB = Path(os.environ.get("BEIDAN_LIVE_SQLITE", ROOT / "data/derived/500_bjdc/500_bjdc.sqlite")).expanduser()
 FORBIDDEN_TRACKED_SUFFIXES = {".sqlite", ".db", ".xlsm", ".xlsx"}
+REQUIRED_DB_TABLES = {"issues", "matches"}
 
 
 def _record(checks: list[dict[str, Any]], name: str, ok: bool, **details: Any) -> None:
@@ -69,6 +71,23 @@ def _latest_settled_issue(db_path: Path) -> str:
     return str(row["issue"]) if row else ""
 
 
+def _validate_smoke_db(db_path: Path) -> None:
+    if not db_path.exists():
+        raise FileNotFoundError(
+            f"SQLite DB not found: {db_path}. "
+            "Pass --db or set BEIDAN_LIVE_SQLITE to the live 500_bjdc.sqlite path."
+        )
+    with connect_sqlite(db_path, row_factory=True, readonly=True) as conn:
+        rows = conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    tables = {str(row["name"]) for row in rows}
+    missing = sorted(REQUIRED_DB_TABLES - tables)
+    if missing:
+        raise RuntimeError(
+            f"SQLite DB {db_path} is not a usable live Beidan DB; missing tables: {missing}. "
+            "Pass --db or set BEIDAN_LIVE_SQLITE to the populated 500_bjdc.sqlite."
+        )
+
+
 def _tracked_data_file_violations() -> list[str]:
     proc = subprocess.run(
         ["git", "ls-files"],
@@ -90,8 +109,7 @@ def _tracked_data_file_violations() -> list[str]:
 
 def run_smoke(db_path: Path, issue: str, settlement_issue: str) -> dict[str, Any]:
     checks: list[dict[str, Any]] = []
-    if not db_path.exists():
-        raise FileNotFoundError(f"SQLite DB not found: {db_path}")
+    _validate_smoke_db(db_path)
 
     app = create_app(sqlite_db=db_path)
     with app.test_client() as client:
@@ -159,7 +177,7 @@ def run_smoke(db_path: Path, issue: str, settlement_issue: str) -> dict[str, Any
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Smoke test the Beidan decision dashboard data chain.")
-    parser.add_argument("--db", type=Path, default=DEFAULT_DB)
+    parser.add_argument("--db", type=Path, default=DEFAULT_DB, help="Live 500_bjdc.sqlite path. Defaults to BEIDAN_LIVE_SQLITE or data/derived/500_bjdc/500_bjdc.sqlite.")
     parser.add_argument("--issue", default="current")
     parser.add_argument("--settlement-issue", default="auto")
     parser.add_argument("--json", action="store_true")
