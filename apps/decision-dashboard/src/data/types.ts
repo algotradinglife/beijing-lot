@@ -9,9 +9,13 @@ export interface DecisionVariantOption {
   label: string;
   displayLabel?: string;
   version: string;
+  versionId?: string;
   source: string;
   sourcePath?: string;
+  artifactKey?: string;
   isDefault?: boolean;
+  selectable?: boolean;
+  available?: boolean;
 }
 
 export interface DecisionVariantData extends DecisionVariantOption {
@@ -37,6 +41,28 @@ export interface DecisionVariantData extends DecisionVariantOption {
     verdict?: string;
     evidence?: string[];
   }>;
+}
+
+export interface StrategyVersionContext {
+  schemaVersion: string;
+  requestedVariantId: string;
+  selectedVariantId: string;
+  selectionStatus: 'ok' | 'degraded' | 'unavailable' | string;
+  selectionError?: string;
+  availableVariantIds: string[];
+  options: DecisionVariantOption[];
+  contractWarnings: Array<{ type: string; variantIds: string[]; message: string }>;
+  strategyRelease?: {
+    releaseId: string;
+    activeReleaseId: string;
+    versionId: string;
+    generatedAt: string;
+    effectiveFromIssue: string;
+    loadStatus: string;
+    loadError?: string;
+    fallbackUsed: boolean;
+    missingRequiredCount: number;
+  };
 }
 
 export interface IssueOption {
@@ -83,10 +109,13 @@ export interface IssueMatchRow {
   protectionOutcomes?: string[];
   recommendedCoverage: CoverageType;
   stopFlag?: boolean;
-	  recommendationSource?: string;
-	  recommendationConfidenceLabel?: string;
-	  decisionVariants?: DecisionVariantData[];
-	  candidateRole: CandidateRole;
+		  recommendationSource?: string;
+		  recommendationConfidenceLabel?: string;
+		  decisionVariants?: DecisionVariantData[];
+  selectedDecisionVariantId?: string;
+  selectedDecisionVariantStatus?: string;
+  selectedDecisionVariant?: DecisionVariantData;
+		  candidateRole: CandidateRole;
 	  resultCode?: string;
   resultLabel?: string;
   predictionHit?: boolean | null;
@@ -182,10 +211,11 @@ export interface IssueDashboardData {
   recommendedAction: 'build-ticket' | 'watch' | 'no-bet';
   funnel: Array<{ label: string; count: number }>;
   quality: { grade: string; risks: string[]; score: number; poolQualityFlag: 'green' | 'yellow' | 'red' };
-	  matches: IssueMatchRow[];
-	  decisionVariantOptions?: DecisionVariantOption[];
-	  llmAssistSummary: string;
-	}
+		  matches: IssueMatchRow[];
+		  decisionVariantOptions?: DecisionVariantOption[];
+  strategyVersionContext?: StrategyVersionContext;
+		  llmAssistSummary: string;
+		}
 
 export interface OddsConsensus {
   nCompanies: number;
@@ -230,10 +260,11 @@ export interface MatchDetailData {
 	  qInputPolicy?: string;
 	  decisionSnapshot?: DecisionSnapshotData;
 	  draftDecisionSnapshot?: DecisionSnapshotData;
-		  postmatchReview?: PostmatchReviewData;
-		  decisionVariants?: DecisionVariantData[];
-		  decisionVariantOptions?: DecisionVariantOption[];
-		  selectedOutcomes: string[];
+			  postmatchReview?: PostmatchReviewData;
+			  decisionVariants?: DecisionVariantData[];
+			  decisionVariantOptions?: DecisionVariantOption[];
+  strategyVersionContext?: StrategyVersionContext;
+			  selectedOutcomes: string[];
   recommendedAction: 'buy' | 'protect' | 'no-buy' | 'watch';
   recommendedCoverage: CoverageType;
   noBuyReason?: string;
@@ -337,6 +368,8 @@ export interface LiveSignalsData {
 export interface SettlementData {
   issueId: string;
   settledAt: string;
+  decisionVariantOptions?: DecisionVariantOption[];
+  strategyVersionContext?: StrategyVersionContext;
   ticketCount: number;
   totalStake: number;
   grossReturn: number;
@@ -445,6 +478,8 @@ export interface MainStrategyData {
   generatedAt: string;
   mode: 'historical_replay' | 'live_monitoring';
   strategyFamily: string;
+  decisionVariantOptions?: DecisionVariantOption[];
+  strategyVersionContext?: StrategyVersionContext;
   candidates: Array<{
     armId: string;
     label: string;

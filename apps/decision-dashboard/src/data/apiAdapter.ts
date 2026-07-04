@@ -1,6 +1,6 @@
 import { mockDashboardData } from './mockData';
 import { DEFAULT_DECISION_VARIANT_ID } from '../decisionVariants';
-import type { CandidateRole, CoverageType, DashboardData, DecisionSnapshotConfirmResult, DecisionSnapshotData, DecisionVariantData, DecisionVariantOption, IssueDashboardData, IssueMatchRow, IssueOption, LiveSignalsData, MainStrategyData, MatchDetailData, OddsConsensus, OperationsStatusData, PostmatchReviewData, ScrapeStatus, SelectorShadowData, SettlementData, StrategyLabData, TicketData } from './types';
+import type { CandidateRole, CoverageType, DashboardData, DecisionSnapshotConfirmResult, DecisionSnapshotData, DecisionVariantData, DecisionVariantOption, IssueDashboardData, IssueMatchRow, IssueOption, LiveSignalsData, MainStrategyData, MatchDetailData, OddsConsensus, OperationsStatusData, PostmatchReviewData, ScrapeStatus, SelectorShadowData, SettlementData, StrategyLabData, StrategyVersionContext, TicketData } from './types';
 
 export type AdapterMode = 'mock' | 'fetch';
 
@@ -367,9 +367,13 @@ function transformDecisionVariantOption(raw: unknown): DecisionVariantOption {
     label: asString(obj.label, asString(obj.variant_id, asString(obj.variantId, 'v3'))),
     displayLabel: asString(obj.display_label, asString(obj.displayLabel)) || undefined,
     version: asString(obj.version),
+    versionId: asString(obj.version_id, asString(obj.versionId)) || undefined,
     source: asString(obj.source),
     sourcePath: asString(obj.source_path, asString(obj.sourcePath)) || undefined,
+    artifactKey: asString(obj.artifact_key, asString(obj.artifactKey)) || undefined,
     isDefault: asBoolean(obj.is_default, asBoolean(obj.isDefault)),
+    selectable: asBoolean(obj.selectable, asBoolean(obj.selectable, true)),
+    available: asBoolean(obj.available, asBoolean(obj.available, true)),
   };
 }
 
@@ -405,6 +409,41 @@ function transformDecisionVariant(raw: unknown): DecisionVariantData {
     notes: asArray(obj.notes).map((value) => asString(value)).filter(Boolean),
     decisionChain: asArray(obj.decision_chain ?? obj.decisionChain).map((value) => asString(value)).filter(Boolean),
     decisionCategories: asArray(obj.decision_categories ?? obj.decisionCategories).map(transformDecisionCategory),
+  };
+}
+
+function transformStrategyVersionContext(raw: unknown): StrategyVersionContext | undefined {
+  const obj = asObject(raw);
+  if (!Object.keys(obj).length) return undefined;
+  const release = asObject(obj.strategy_release ?? obj.strategyRelease);
+  const health = asObject(release.artifact_health ?? release.artifactHealth);
+  return {
+    schemaVersion: asString(obj.schema_version, asString(obj.schemaVersion)),
+    requestedVariantId: asString(obj.requested_variant_id, asString(obj.requestedVariantId)),
+    selectedVariantId: asString(obj.selected_variant_id, asString(obj.selectedVariantId)),
+    selectionStatus: asString(obj.selection_status, asString(obj.selectionStatus, 'ok')),
+    selectionError: asString(obj.selection_error, asString(obj.selectionError)) || undefined,
+    availableVariantIds: asArray(obj.available_variant_ids ?? obj.availableVariantIds).map((value) => asString(value)).filter(Boolean),
+    options: asArray(obj.options).map(transformDecisionVariantOption),
+    contractWarnings: asArray(obj.contract_warnings ?? obj.contractWarnings).map((warningRaw) => {
+      const warning = asObject(warningRaw);
+      return {
+        type: asString(warning.type),
+        variantIds: asArray(warning.variant_ids ?? warning.variantIds).map((value) => asString(value)).filter(Boolean),
+        message: asString(warning.message),
+      };
+    }),
+    strategyRelease: Object.keys(release).length ? {
+      releaseId: asString(release.release_id, asString(release.releaseId)),
+      activeReleaseId: asString(release.active_release_id, asString(release.activeReleaseId)),
+      versionId: asString(release.version_id, asString(release.versionId)),
+      generatedAt: asString(release.generated_at, asString(release.generatedAt)),
+      effectiveFromIssue: asString(release.effective_from_issue, asString(release.effectiveFromIssue)),
+      loadStatus: asString(release.release_load_status, asString(release.releaseLoadStatus, 'ok')),
+      loadError: asString(release.release_load_error, asString(release.releaseLoadError)) || undefined,
+      fallbackUsed: asBoolean(release.fallback_used, asBoolean(release.fallbackUsed)),
+      missingRequiredCount: asArray(health.missing_required ?? health.missingRequired).length,
+    } : undefined,
   };
 }
 
@@ -487,6 +526,12 @@ function chooseSettlementIssueId(issues: IssueOption[], preferredIssueId: string
   return reviewable[0]?.issueId ?? preferredIssueId;
 }
 
+function withDecisionVariant(path: string, decisionVariantId?: string): string {
+  if (!decisionVariantId) return path;
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}decision_variant=${encodeURIComponent(decisionVariantId)}`;
+}
+
 function transformMatchRow(raw: unknown): IssueMatchRow {
   const row = asObject(raw) as ApiMatchSummary;
   const matchId = asString(row.match_id);
@@ -517,6 +562,8 @@ function transformMatchRow(raw: unknown): IssueMatchRow {
 	  const postmatchReviewOutcome = asString(row.postmatch_review_outcome);
 	  const postmatchReviewSummary = asString(row.postmatch_review_summary);
 	  const decisionVariants = asArray(row.decision_variants).map(transformDecisionVariant);
+	  const selectedDecisionVariantRaw = asObject(row.selected_decision_variant ?? row.selectedDecisionVariant);
+	  const selectedDecisionVariant = Object.keys(selectedDecisionVariantRaw).length ? transformDecisionVariant(selectedDecisionVariantRaw) : undefined;
 	  const drift = {
     win: typeof row.sp_drift_3 === 'number' ? row.sp_drift_3 : undefined,
     draw: typeof row.sp_drift_1 === 'number' ? row.sp_drift_1 : undefined,
@@ -554,6 +601,9 @@ function transformMatchRow(raw: unknown): IssueMatchRow {
 	    recommendationSource: llmAvailable ? 'LLM' : '模型',
 	    recommendationConfidenceLabel: llmAvailable ? asString(row.llm_confidence_label, typeof row.llm_confidence === 'number' ? row.llm_confidence.toFixed(2) : '') : undefined,
 	    decisionVariants,
+    selectedDecisionVariantId: asString(row.selected_decision_variant_id, asString(row.selectedDecisionVariantId)) || undefined,
+    selectedDecisionVariantStatus: asString(row.selected_decision_variant_status, asString(row.selectedDecisionVariantStatus)) || undefined,
+    selectedDecisionVariant,
 	    candidateRole: toCandidateRole(row.candidate_role, qScore),
     resultCode,
     resultLabel,
@@ -585,6 +635,7 @@ function transformIssueDashboard(raw: unknown): IssueDashboardData {
   const stats = asObject(obj.stats);
   const matches = asArray(obj.matches).map(transformMatchRow);
   const decisionVariantOptions = asArray(obj.decision_variant_options ?? obj.decisionVariantOptions).map(transformDecisionVariantOption);
+  const strategyVersionContext = transformStrategyVersionContext(obj.strategy_version_context ?? obj.strategyVersionContext);
   const qualityFlag = asString(stats.pool_quality_flag, 'yellow') as 'green' | 'yellow' | 'red';
   return {
     issueId: asString(obj.issue),
@@ -604,6 +655,7 @@ function transformIssueDashboard(raw: unknown): IssueDashboardData {
 	    quality: { grade: qualityFlag === 'green' ? 'A' : qualityFlag === 'red' ? 'C' : 'B', risks: [], score: Math.round(asNumber(stats.q_avg, 0) * 100), poolQualityFlag: qualityFlag },
 	    matches,
 	    decisionVariantOptions,
+    strategyVersionContext,
 	    llmAssistSummary: 'Canonical /api/issues/:issue/dashboard payload transformed from snake_case by ApiDashboardAdapter.',
 	  };
 	}
@@ -619,6 +671,7 @@ function transformMatchDetail(raw: unknown): MatchDetailData {
 	  const postmatchReview = transformPostmatchReview(obj.postmatch_review);
 	  const decisionVariants = asArray(obj.decision_variants ?? match.decision_variants).map(transformDecisionVariant);
 	  const decisionVariantOptions = asArray(obj.decision_variant_options ?? obj.decisionVariantOptions).map(transformDecisionVariantOption);
+	  const strategyVersionContext = transformStrategyVersionContext(obj.strategy_version_context ?? obj.strategyVersionContext);
 	  const strategyArms = asArray(prediction.strategy_arms);
   const activeArm = asObject(strategyArms.find((arm) => asBoolean(asObject(arm).active)) ?? strategyArms[0]);
   const modelSelectedOutcome = activeArm.selection ?? prediction.selection ?? 'pass';
@@ -682,6 +735,7 @@ function transformMatchDetail(raw: unknown): MatchDetailData {
 	    postmatchReview,
 	    decisionVariants,
 	    decisionVariantOptions,
+    strategyVersionContext,
 	    selectedOutcomes: modelSelectedOutcome === 'pass' ? [] : selectedCodes.length ? selectedCodes.map(selectionLabel) : [selectionLabel(modelSelectedOutcome)],
     recommendedAction: modelSelectedOutcome === 'pass' ? 'no-buy' : 'buy',
     recommendedCoverage: toCoverage(selectionType),
@@ -831,6 +885,8 @@ function emptySettlement(issueId: string): SettlementData {
 function transformSettlement(raw: unknown): SettlementData {
   const obj = asObject(raw);
   const summaryObj = asObject(obj.postmatch_review_issue_summary ?? obj.postmatchSummary);
+  const decisionVariantOptions = asArray(obj.decision_variant_options ?? obj.decisionVariantOptions).map(transformDecisionVariantOption);
+  const strategyVersionContext = transformStrategyVersionContext(obj.strategy_version_context ?? obj.strategyVersionContext);
   const hasSummary = Object.keys(summaryObj).length > 0;
   const postmatchSummary = hasSummary ? {
     reviewVersion: asString(summaryObj.review_version, asString(summaryObj.reviewVersion)),
@@ -886,6 +942,8 @@ function transformSettlement(raw: unknown): SettlementData {
   return {
     issueId: asString(obj.issue),
     settledAt: asString(obj.settled_ts),
+    decisionVariantOptions,
+    strategyVersionContext,
     ticketCount: postmatchSummary?.reviewCount ?? asNumber(obj.n_tickets),
     totalStake,
     grossReturn,
@@ -1068,11 +1126,15 @@ function transformMainStrategy(raw: unknown): MainStrategyData {
   const diagnostics = asObject(obj.diagnostics);
   const review = asObject(obj.review);
   const source = asObject(obj.source);
+  const decisionVariantOptions = asArray(obj.decision_variant_options ?? obj.decisionVariantOptions).map(transformDecisionVariantOption);
+  const strategyVersionContext = transformStrategyVersionContext(obj.strategy_version_context ?? obj.strategyVersionContext);
   return {
     issueId: asString(obj.issue, asString(obj.issueId)),
     generatedAt: asString(obj.generated_ts, asString(obj.generatedAt)),
     mode: asString(obj.mode, 'live_monitoring') as MainStrategyData['mode'],
     strategyFamily: asString(obj.strategy_family, asString(obj.strategyFamily)),
+    decisionVariantOptions,
+    strategyVersionContext,
     candidates: asArray(obj.candidates).map((candidateRaw) => {
       const candidate = asObject(candidateRaw);
       return {
@@ -1454,16 +1516,16 @@ export class ApiDashboardAdapter {
     return transform(payload);
   }
 
-  getIssueDashboard(issueId: string): Promise<IssueDashboardData> {
-    return this.getJson(`/api/issues/${issueId}/dashboard`, mockDashboardData.issue, transformIssueDashboard);
+  getIssueDashboard(issueId: string, decisionVariantId?: string): Promise<IssueDashboardData> {
+    return this.getJson(withDecisionVariant(`/api/issues/${issueId}/dashboard`, decisionVariantId), mockDashboardData.issue, transformIssueDashboard);
   }
 
   getAvailableIssues(): Promise<IssueOption[]> {
     return this.getJson('/api/issues?limit=120', mockDashboardData.availableIssues, (payload) => asArray(asObject(payload).issues).map(transformIssueOption));
   }
 
-  getMatchDetail(_issueId: string, matchId: string): Promise<MatchDetailData> {
-    return this.getJson(`/api/matches/${matchId}`, mockDashboardData.matchDetail, transformMatchDetail);
+  getMatchDetail(_issueId: string, matchId: string, decisionVariantId?: string): Promise<MatchDetailData> {
+    return this.getJson(withDecisionVariant(`/api/matches/${matchId}`, decisionVariantId), mockDashboardData.matchDetail, transformMatchDetail);
   }
 
   confirmDecisionSnapshot(matchId: string): Promise<DecisionSnapshotConfirmResult> {
@@ -1487,8 +1549,8 @@ export class ApiDashboardAdapter {
     return this.getJson(`/api/issues/${issueId}/signals`, mockDashboardData.liveSignals, transformLiveSignals);
   }
 
-  getSettlementReview(issueId: string): Promise<SettlementData> {
-    return this.getJson(`/api/issues/${issueId}/settlement`, mockDashboardData.settlement, transformSettlement);
+  getSettlementReview(issueId: string, decisionVariantId?: string): Promise<SettlementData> {
+    return this.getJson(withDecisionVariant(`/api/issues/${issueId}/settlement`, decisionVariantId), mockDashboardData.settlement, transformSettlement);
   }
 
   getStrategyLab(): Promise<StrategyLabData> {
@@ -1499,8 +1561,8 @@ export class ApiDashboardAdapter {
     return this.getJson(`/api/issues/${issueId}/selector-shadow`, mockDashboardData.selectorShadow, transformSelectorShadow);
   }
 
-  getMainStrategy(issueId: string): Promise<MainStrategyData> {
-    return this.getJson(`/api/issues/${issueId}/main-strategy`, mockDashboardData.mainStrategy, transformMainStrategy);
+  getMainStrategy(issueId: string, decisionVariantId?: string): Promise<MainStrategyData> {
+    return this.getJson(withDecisionVariant(`/api/issues/${issueId}/main-strategy`, decisionVariantId), mockDashboardData.mainStrategy, transformMainStrategy);
   }
 
   getOperationsStatus(issueId: string): Promise<OperationsStatusData> {
@@ -1515,27 +1577,27 @@ export class ApiDashboardAdapter {
     );
   }
 
-  async getDashboardData(issueId: string, matchId?: string): Promise<DashboardData> {
+  async getDashboardData(issueId: string, matchId?: string, decisionVariantId?: string): Promise<DashboardData> {
     if (this.mode === 'mock') return mockDashboardData;
     const [availableIssues, issue] = await Promise.all([
       this.getAvailableIssues(),
-      this.getIssueDashboard(issueId),
+      this.getIssueDashboard(issueId, decisionVariantId),
     ]);
     const resolvedIssueId = issue.issueId || issueId;
     const settlementIssueId = chooseSettlementIssueId(availableIssues, resolvedIssueId);
     const resolvedMatchId = matchId ?? issue.matches[0]?.matchId;
     if (!resolvedMatchId) throw new Error(`No matches available for issue ${issue.issueId}`);
     const [matchDetail, ticket, liveSignals, settlement, strategyLab, selectorShadow, mainStrategy, operations] = await Promise.all([
-      this.getMatchDetail(resolvedIssueId, resolvedMatchId),
+      this.getMatchDetail(resolvedIssueId, resolvedMatchId, decisionVariantId),
       this.getTicketDraft(resolvedIssueId),
       this.getLiveSignals(resolvedIssueId),
-      this.getSettlementReview(settlementIssueId).catch((error: unknown) => {
+      this.getSettlementReview(settlementIssueId, decisionVariantId).catch((error: unknown) => {
         if (error instanceof Error && error.message.includes('404')) return emptySettlement(settlementIssueId);
         throw error;
       }),
       this.getStrategyLab(),
       this.getSelectorShadow(resolvedIssueId),
-      this.getMainStrategy(resolvedIssueId),
+      this.getMainStrategy(resolvedIssueId, decisionVariantId),
       this.getOperationsStatus(resolvedIssueId),
     ]);
     return { availableIssues, issue, matchDetail, ticket, liveSignals, settlement, strategyLab, selectorShadow, mainStrategy, operations };
