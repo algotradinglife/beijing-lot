@@ -145,6 +145,12 @@ For v4.2.0000 execution artifacts:
   `execution_reasons`.
 - Full-cover display should use `execution_full_score`,
   `execution_full_candidate`, and `execution_full_kept`.
+- `skip_*` actions should be rendered as stop/no-buy states. In particular,
+  `skip_wait_late_refresh` is a temporary warning to not bet the match until a
+  valid late SP refresh artifact exists.
+- If live data auto-refresh changes the selected/default execution variant,
+  the UI must keep the selected policy visible instead of silently turning a
+  stop/wait row into an actionable pick.
 - Rolling/N views and any stake preview must use `shadow_selection_codes`.
 - Dashboard/API must treat `execution_*` as read-only artifact data.
 

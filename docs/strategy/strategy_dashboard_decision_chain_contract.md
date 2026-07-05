@@ -99,7 +99,7 @@ them populated for compatibility.
 | `shadow_judgment` | string | yes | Human-readable final summary. |
 | `shadow_primary` | enum | yes if buy/display codes exist | One of `3`, `1`, `0`; first display pick. |
 | `shadow_selection_codes` | string | yes | `+`-joined codes from `3`, `1`, `0`; empty means no buy/display pick. |
-| `shadow_stop_flag` | boolean/int | yes | `1/true` means stop/wait/risk state is active. |
+| `shadow_stop_flag` | boolean/int | yes | `1/true` means no executable pick now; render as stop/wait/risk, not as a buy signal. |
 | `selection_type` | enum | yes | `single`, `double`, `full`, or `no-buy`. |
 | `prob_top` | enum/string | recommended | Highest probability code if known. |
 | `q_top` | enum/string | recommended | Highest q/EV code if known. |
@@ -157,6 +157,9 @@ Mapping rule:
 - For `wait_late_refresh`, `stop`, and `review_only`, `buy_codes` must be
   empty. If display codes are retained for explanation, `shadow_stop_flag` must
   be true and `decision_action` must disambiguate that they are not buy orders.
+- `stop` is a user-facing blocking signal. In live use, it means "do not place
+  this bet now" even if the row still carries audit/recommended codes for
+  explanation.
 
 ## v4.2.0000 Execution Artifact Fields
 
@@ -177,6 +180,12 @@ no-buy. `late_proxy_fullcap2` represents the executable state after a valid
 late SP refresh has occurred. The live workflow should publish/choose
 `strict_fullcap2` before the refresh window and `late_proxy_fullcap2` after the
 refresh artifact exists.
+
+Because live strategy artifacts may refresh automatically, dashboard must make
+the selected execution policy and blocking state visible. A row that is
+`skip_wait_late_refresh` should be shown as a temporary stop/wait state such as
+"stop - waiting late refresh"; it is a warning not to bet that match yet, not a
+final statement that the match will never be buyable.
 
 Required execution extension fields:
 
@@ -216,6 +225,11 @@ Execution mapping rules:
 - `execution_recommended_codes` is the audit recommendation. It can be wider
   than `shadow_selection_codes`.
 - `shadow_stop_flag=1` means no executable selection exists for this row.
+- `skip_*` execution actions must be rendered as stop/no-buy states even when
+  `execution_recommended_codes` is populated.
+- `skip_wait_late_refresh` is a temporary stop. It may become executable after
+  a later valid refresh, so the UI should show the policy/refresh state instead
+  of silently treating the audit recommendation as actionable.
 - N-ticket replay and live staking must consume `shadow_selection_codes`, not
   `execution_recommended_codes`.
 - Match detail should show both columns when they differ.

@@ -58,6 +58,11 @@ Issue Board / Match Detail:
   `execution_full_candidate`, `execution_full_kept`, and
   `execution_segment_idx`;
 - show `shadow_stop_flag=1` rows as no-buy/wait/skip, not as executable picks.
+- render `skip_wait_late_refresh` as a temporary stop/wait warning. The user
+  should understand that this match is not safe to bet before a valid late SP
+  refresh, even if audit recommendation codes are present.
+- keep the selected execution policy visible when data auto-refreshes, so a
+  change from strict/wait to late-proxy/executable is not silent.
 
 Rolling/N views:
 
