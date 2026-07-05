@@ -17,7 +17,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, redirect, render_template_string, request, send_from_directory, session
 
 from src.sqlite_runtime import connect_sqlite
 
@@ -39,6 +39,8 @@ DEFAULT_DECISION_API_HOST = "127.0.0.1"
 DEFAULT_CACHE_TTL_SEC = 30.0
 OPERATOR_TOKEN_ENV = "BEIDAN_DECISION_API_OPERATOR_TOKEN"
 OPERATOR_TOKEN_HEADER = "X-Beidan-Operator-Token"
+DASHBOARD_GATE_PASSWORD_ENVS = ("BEIDAN_DASHBOARD_GATE_PASS", "BEIDAN_GATE_PASS")
+DASHBOARD_GATE_SECRET_ENVS = ("BEIDAN_DASHBOARD_GATE_SECRET", "BEIDAN_SECRET")
 HK_TZ = timezone(timedelta(hours=8))
 OUTCOME_LABEL = {"3": "胜", "1": "平", "0": "负"}
 OUTCOME_ORDER = ("3", "1", "0")
@@ -5457,6 +5459,11 @@ def create_app(
     db_path = Path(sqlite_db)
     result_path = Path(results_dir)
     static_dir = Path(os.environ.get("BEIDAN_DASHBOARD_STATIC_DIR", DEFAULT_DASHBOARD_STATIC_DIR))
+    gate_password = next((os.environ.get(name) for name in DASHBOARD_GATE_PASSWORD_ENVS if os.environ.get(name)), "")
+    gate_secret = next((os.environ.get(name) for name in DASHBOARD_GATE_SECRET_ENVS if os.environ.get(name)), gate_password)
+    if gate_password:
+        app.secret_key = gate_secret or gate_password
+        app.permanent_session_lifetime = timedelta(days=30)
     configured_cache_ttl = _safe_float(os.environ.get("BEIDAN_DECISION_API_CACHE_TTL_SEC"))
     cache_ttl_sec = max(0.0, DEFAULT_CACHE_TTL_SEC if configured_cache_ttl is None else configured_cache_ttl)
     response_cache: dict[tuple[Any, ...], tuple[float, Any]] = {}
@@ -5504,7 +5511,16 @@ def create_app(
         return response
 
     @app.before_request
-    def _operator_token_gate():
+    def _request_gates():
+        if gate_password:
+            if request.endpoint in {"dashboard_gate", "dashboard_gate_logout"}:
+                return None
+            if request.path == "/favicon.ico":
+                return None
+            if not session.get("dashboard_gate_ok"):
+                if request.path.startswith("/api/"):
+                    return jsonify({"error": "dashboard gate required", "login": "/gate"}), 401
+                return redirect("/gate")
         if request.method == "POST" and request.path.startswith("/api/"):
             return _require_operator_token()
         return None
@@ -5519,6 +5535,57 @@ def create_app(
             resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
             resp.headers.add("Vary", "Origin")
         return resp
+
+    @app.route("/gate", methods=["GET", "POST"])
+    def dashboard_gate():
+        if not gate_password:
+            return redirect("/")
+        error = ""
+        if request.method == "POST":
+            passphrase = request.form.get("passphrase") or ""
+            if hmac.compare_digest(passphrase, gate_password):
+                session["dashboard_gate_ok"] = True
+                session.permanent = True
+                return redirect("/")
+            error = "口令不正确"
+        return render_template_string(
+            """
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>验证 · 北单决策台</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin:0; min-height:100vh; display:grid; place-items:center; background:#f5f7fb; color:#111827; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    form { width:min(340px, calc(100vw - 36px)); background:#fff; border:1px solid #e5e7eb; border-radius:10px; box-shadow:0 18px 50px rgba(15,23,42,.12); padding:26px; }
+    h1 { margin:0 0 18px; font-size:20px; font-weight:650; }
+    label { display:block; margin:0 0 8px; font-size:14px; color:#4b5563; }
+    input { width:100%; box-sizing:border-box; border:1px solid #cbd5e1; border-radius:8px; padding:11px 12px; font-size:16px; }
+    button { width:100%; margin-top:16px; border:0; border-radius:8px; background:#2563eb; color:white; padding:11px 12px; font-size:15px; font-weight:650; cursor:pointer; }
+    .err { margin-top:12px; color:#dc2626; font-size:13px; }
+  </style>
+</head>
+<body>
+  <form method="post" action="/gate">
+    <h1>北单决策台</h1>
+    <label for="passphrase">访问口令</label>
+    <input id="passphrase" name="passphrase" type="password" autocomplete="current-password" autofocus>
+    <button type="submit">进入</button>
+    {% if error %}<div class="err">{{ error }}</div>{% endif %}
+  </form>
+</body>
+</html>
+            """,
+            error=error,
+        ), 401 if error else 200
+
+    @app.get("/gate/logout")
+    def dashboard_gate_logout():
+        session.pop("dashboard_gate_ok", None)
+        return redirect("/gate")
 
     @app.get("/")
     def frontend_index():

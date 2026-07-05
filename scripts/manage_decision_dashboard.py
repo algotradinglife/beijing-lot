@@ -30,6 +30,10 @@ DEFAULT_API_HOST = os.environ.get("BEIDAN_DECISION_API_HOST", "127.0.0.1")
 DEFAULT_FRONTEND_HOST = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_HOST", "127.0.0.1")
 DEFAULT_FRONTEND_MODE = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_MODE", "api-static")
 DEFAULT_SCORE_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_SCORE_REFRESH_INTERVAL", "120"))
+ENV_FILES = (
+    Path.home() / ".config/beidanlot/webui.env",
+    Path.home() / ".config/beidanlot/decision_dashboard.env",
+)
 
 
 def _now_iso() -> str:
@@ -101,6 +105,31 @@ def _load_previous_status() -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         return {}
     return loaded if isinstance(loaded, dict) else {}
+
+
+def _read_env_file(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return values
+    for line in lines:
+        text = line.strip()
+        if not text or text.startswith("#") or "=" not in text:
+            continue
+        key, value = text.split("=", 1)
+        key = key.strip()
+        if not key:
+            continue
+        values[key] = value.strip().strip('"').strip("'")
+    return values
+
+
+def _service_env() -> dict[str, str]:
+    env = os.environ.copy()
+    for path in ENV_FILES:
+        env.update(_read_env_file(path))
+    return env
 
 
 def _previous_pid(service: str) -> int | None:
@@ -408,7 +437,7 @@ def _start_api(args: argparse.Namespace) -> None:
     if _known_service_pids("api", args.api_port):
         return
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
-    env = os.environ.copy()
+    env = _service_env()
     env["BEIDAN_DECISION_API_HOST"] = args.api_host
     env["BEIDAN_DECISION_API_PORT"] = str(args.api_port)
     env["BEIDAN_DASHBOARD_RUNTIME_STATUS"] = str(STATUS_PATH)
