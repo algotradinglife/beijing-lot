@@ -3279,8 +3279,12 @@ def _manifest_shadow_placeholder_decision_variant(manifest: dict[str, Any]) -> d
 def _normalize_decision_variant_defaults(options: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not options:
         return options
-    shadow_options = [
+    defaultable_options = [
         item for item in options
+        if item.get("available") is not False and item.get("selectable") is not False
+    ]
+    shadow_options = [
+        item for item in defaultable_options
         if item.get("kind") == SHADOW_DECISION_VARIANT_KIND and item.get("variant_id")
     ]
     if shadow_options:
@@ -3289,7 +3293,8 @@ def _normalize_decision_variant_defaults(options: list[dict[str, Any]]) -> list[
             key=_decision_variant_default_key,
         ).get("variant_id") or "")
     else:
-        default_option = next((item for item in options if item.get("is_default")), options[0])
+        default_pool = defaultable_options or options
+        default_option = next((item for item in default_pool if item.get("is_default")), default_pool[0])
         default_variant_id = str(default_option.get("variant_id") or "")
     for item in options:
         item["is_default"] = bool(default_variant_id and str(item.get("variant_id") or "") == default_variant_id)
