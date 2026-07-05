@@ -291,6 +291,44 @@ def test_shadow_variant_version_key_supports_four_digit_fix_numbers() -> None:
     assert appmod._decision_variant_version_key("shadow_v3.3.3")[:3] == appmod._decision_variant_version_key("shadow_v3.3.0003")[:3]
 
 
+def test_shadow_execution_variant_exposes_sp_repricing_fields() -> None:
+    variant = appmod._shadow_decision_variant(
+        {
+            "shadow_arm": "shadow_v4.2.0000_execution_late_proxy_fullcap2",
+            "shadow_version": "fixture",
+            "shadow_selection_codes": "1+0",
+            "shadow_primary": "1",
+            "shadow_stop_flag": "0",
+            "source_sp_3": "14.84",
+            "source_sp_1": "1.08",
+            "source_sp_0": "70.94",
+            "source_q_3": "5.936",
+            "source_q_1": "0.3024",
+            "source_q_0": "23.09",
+            "execution_sp_3": "2.37",
+            "execution_sp_1": "3.26",
+            "execution_sp_0": "3.65",
+            "execution_q_3": "0.948",
+            "execution_q_1": "0.9128",
+            "execution_q_0": "1.1881",
+            "execution_sp_source": "live_sp_snapshots",
+            "execution_sp_snapshot_ts": "2026-07-05T12:00:00+00:00",
+            "execution_sp_repriced": "1",
+            "execution_sp_reprice_ratio_max": "19.4356",
+            "execution_sp_missing": "0",
+        },
+        "fixture.csv",
+    )
+    compact = appmod._compact_decision_variant(variant)
+
+    assert compact["source_sp"]["0"] == 70.94
+    assert compact["execution_sp"]["0"] == 3.65
+    assert compact["execution_q"]["0"] == 1.1881
+    assert compact["execution_sp_source"] == "live_sp_snapshots"
+    assert compact["execution_sp_repriced"] is True
+    assert compact["execution_sp_missing"] is False
+
+
 def test_late_proxy_execution_variant_defaults_over_strict_when_available() -> None:
     options = [
         {"variant_id": "active_v3", "kind": "active", "is_default": True},

@@ -25,6 +25,11 @@ import replay_rolling_segment_n_tickets as rolling  # noqa: E402
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = PROJECT_ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 OUTCOME_CODES = ("3", "1", "0")
+SP_COLUMN_BY_CODE = {"3": "sp_3", "1": "sp_1", "0": "sp_0"}
+Q_COLUMN_BY_CODE = {"3": "q_3", "1": "q_1", "0": "q_0"}
+LIVE_SP_COLUMN_BY_CODE = {"3": "sp_home", "1": "sp_draw", "0": "sp_away"}
+MATERIAL_SP_RATIO = 1.45
+SEVERE_SP_RATIO = 2.0
 POLICY_VERSION = "v4.2.0000_execution_policy_2026-07-05"
 SHADOW_ARM = "shadow_v4.2.0000_execution"
 SHADOW_VERSION = "llm_chain_structured_v4.2.0000_layered_merge_execution_policy"
@@ -40,6 +45,20 @@ class RowExecution:
     full_candidate: bool
     full_kept: bool
     segment_idx: int | None = None
+
+
+@dataclass(frozen=True)
+class ExecutionSpSnapshot:
+    sp: dict[str, float]
+    snapshot_ts: str
+    source: str
+
+
+@dataclass(frozen=True)
+class PreparedExecutionRow:
+    row: dict[str, Any]
+    repricing_reasons: tuple[str, ...]
+    missing_execution_sp: bool
 
 
 def execution_unlock_state(source_action: str, execution: RowExecution) -> str:
@@ -60,6 +79,12 @@ def safe_float(value: Any, default: float = 0.0) -> float:
     except (TypeError, ValueError):
         return default
     return number if math.isfinite(number) else default
+
+
+def fmt_float(value: float | None, *, digits: int = 4) -> str:
+    if value is None or not math.isfinite(value):
+        return ""
+    return f"{value:.{digits}f}"
 
 
 def safe_json(value: Any, fallback: Any) -> Any:
@@ -89,6 +114,16 @@ def unique_codes(codes: list[str]) -> list[str]:
     return out
 
 
+def selection_type_from_codes(codes: list[str]) -> str:
+    if not codes:
+        return "no-buy"
+    if len(codes) == 1:
+        return "single"
+    if len(codes) == 2:
+        return "double"
+    return "full"
+
+
 def load_csv(path: Path) -> tuple[list[dict[str, str]], list[str]]:
     with path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -101,6 +136,168 @@ def write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) -> 
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def table_exists(conn: sqlite3.Connection, name: str) -> bool:
+    row = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone()
+    return row is not None
+
+
+def table_columns(conn: sqlite3.Connection, name: str) -> set[str]:
+    if not table_exists(conn, name):
+        return set()
+    return {str(row["name"]) for row in conn.execute(f"PRAGMA table_info({name})").fetchall()}
+
+
+def complete_sp(sp: dict[str, float]) -> bool:
+    return all(sp.get(code, 0.0) > 0 for code in OUTCOME_CODES)
+
+
+def load_execution_sp_snapshots(db_path: Path, issue: str) -> dict[int, ExecutionSpSnapshot]:
+    if not db_path.exists():
+        return {}
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        out: dict[int, ExecutionSpSnapshot] = {}
+        if table_exists(conn, "live_sp_snapshots"):
+            rows = conn.execute(
+                """
+                SELECT *
+                FROM (
+                    SELECT
+                      l.row_idx AS match_idx,
+                      l.sp_home,
+                      l.sp_draw,
+                      l.sp_away,
+                      l.source_updatetime,
+                      l.fetched_at,
+                      ROW_NUMBER() OVER (
+                        PARTITION BY l.issue, l.row_idx
+                        ORDER BY COALESCE(l.source_updatetime, '') DESC, l.fetched_at DESC
+                      ) AS rn
+                    FROM live_sp_snapshots l
+                    WHERE l.issue=?
+                      AND l.playid=34
+                      AND l.sp_home IS NOT NULL
+                      AND l.sp_draw IS NOT NULL
+                      AND l.sp_away IS NOT NULL
+                )
+                WHERE rn=1
+                """,
+                (issue,),
+            ).fetchall()
+            for row in rows:
+                sp = {code: safe_float(row[LIVE_SP_COLUMN_BY_CODE[code]]) for code in OUTCOME_CODES}
+                if complete_sp(sp):
+                    out[int(row["match_idx"])] = ExecutionSpSnapshot(
+                        sp=sp,
+                        snapshot_ts=str(row["source_updatetime"] or row["fetched_at"] or ""),
+                        source="live_sp_snapshots",
+                    )
+        match_columns = table_columns(conn, "matches")
+        if {"match_idx", "sp_home", "sp_draw", "sp_away"}.issubset(match_columns):
+            fetched_expr = "fetched_at" if "fetched_at" in match_columns else "'' AS fetched_at"
+            rows = conn.execute(
+                f"""
+                SELECT match_idx, sp_home, sp_draw, sp_away, {fetched_expr}
+                FROM matches
+                WHERE issue=?
+                  AND sp_home IS NOT NULL
+                  AND sp_draw IS NOT NULL
+                  AND sp_away IS NOT NULL
+                """,
+                (issue,),
+            ).fetchall()
+            for row in rows:
+                match_idx = int(row["match_idx"])
+                if match_idx in out:
+                    continue
+                sp = {code: safe_float(row[LIVE_SP_COLUMN_BY_CODE[code]]) for code in OUTCOME_CODES}
+                if complete_sp(sp):
+                    out[match_idx] = ExecutionSpSnapshot(
+                        sp=sp,
+                        snapshot_ts=str(row["fetched_at"] or ""),
+                        source="matches_current_sp",
+                    )
+        return out
+    finally:
+        conn.close()
+
+
+def with_source_execution_sp_fields(
+    source_row: dict[str, Any],
+    snapshot: ExecutionSpSnapshot | None,
+    *,
+    require_execution_sp: bool,
+) -> PreparedExecutionRow:
+    row = dict(source_row)
+    reasons: list[str] = []
+    missing_execution_sp = bool(require_execution_sp and snapshot is None)
+    max_ratio = 1.0
+    repriced = False
+    execution_q: dict[str, float] = {}
+
+    for code in OUTCOME_CODES:
+        source_sp = safe_float(source_row.get(SP_COLUMN_BY_CODE[code]))
+        source_q = safe_float(source_row.get(Q_COLUMN_BY_CODE[code]))
+        execution_sp = snapshot.sp[code] if snapshot else source_sp
+        probability = safe_float(source_row.get(f"p_{code}"))
+        q_value = probability * execution_sp if probability > 0 and execution_sp > 0 else 0.0
+        execution_q[code] = q_value
+
+        if snapshot and source_sp > 0 and execution_sp > 0:
+            ratio = max(source_sp / execution_sp, execution_sp / source_sp)
+            max_ratio = max(max_ratio, ratio)
+            if ratio >= MATERIAL_SP_RATIO:
+                repriced = True
+
+        row[f"source_sp_{code}"] = fmt_float(source_sp)
+        row[f"source_q_{code}"] = fmt_float(source_q)
+        row[f"execution_sp_{code}"] = fmt_float(execution_sp) if snapshot or not require_execution_sp else ""
+        row[f"execution_q_{code}"] = fmt_float(q_value) if snapshot or not require_execution_sp else ""
+        if snapshot:
+            row[SP_COLUMN_BY_CODE[code]] = fmt_float(execution_sp)
+            row[Q_COLUMN_BY_CODE[code]] = fmt_float(q_value)
+
+    if snapshot:
+        q_top = max(execution_q.items(), key=lambda item: item[1])[0]
+        row["q_top"] = q_top
+        row["max_q"] = fmt_float(execution_q[q_top])
+    row["execution_sp_source"] = snapshot.source if snapshot else ("missing_trusted_sp" if require_execution_sp else "source_artifact")
+    row["execution_sp_snapshot_ts"] = snapshot.snapshot_ts if snapshot else ""
+    row["execution_sp_repriced"] = int(repriced)
+    row["execution_sp_reprice_ratio_max"] = fmt_float(max_ratio)
+    row["execution_sp_missing"] = int(missing_execution_sp)
+    if repriced:
+        reasons.append("sp_repriced_after_late_refresh")
+    if max_ratio >= SEVERE_SP_RATIO:
+        reasons.append("severe_sp_repriced_after_late_refresh")
+    if missing_execution_sp:
+        reasons.append("missing_execution_sp_after_late_refresh")
+    return PreparedExecutionRow(row=row, repricing_reasons=tuple(reasons), missing_execution_sp=missing_execution_sp)
+
+
+def prepare_execution_rows(
+    source_rows: list[dict[str, str]],
+    *,
+    db_path: Path,
+    issue: str,
+    execution_sp_mode: str,
+) -> dict[int, PreparedExecutionRow]:
+    require_execution_sp = execution_sp_mode == "latest_trusted"
+    snapshots = load_execution_sp_snapshots(db_path, issue) if require_execution_sp else {}
+    out: dict[int, PreparedExecutionRow] = {}
+    for source_row in source_rows:
+        if str(source_row.get("issue") or issue) != issue:
+            continue
+        match_idx = int(safe_float(source_row.get("match_idx")))
+        out[match_idx] = with_source_execution_sp_fields(
+            source_row,
+            snapshots.get(match_idx),
+            require_execution_sp=require_execution_sp,
+        )
+    return out
 
 
 def code_metrics(source_row: dict[str, Any]) -> dict[str, dict[str, float]]:
@@ -365,9 +562,16 @@ def apply_policy(
     min_matches: int,
     max_matches: int,
     policy_name: str,
+    execution_sp_mode: str = "source",
 ) -> tuple[Path, Path, dict[str, Any]]:
     source_rows, source_fieldnames = load_csv(source_csv)
     decisions = load_decisions(decision_csv)
+    prepared_rows = prepare_execution_rows(
+        source_rows,
+        db_path=db_path,
+        issue=issue,
+        execution_sp_mode=execution_sp_mode,
+    )
     segment_lookup = segments_by_match_idx(
         source_csv,
         db_path,
@@ -383,19 +587,59 @@ def apply_policy(
         if str(source_row.get("issue") or issue) != issue:
             continue
         match_idx = int(safe_float(source_row.get("match_idx")))
+        prepared = prepared_rows.get(match_idx)
+        execution_source_row = prepared.row if prepared else source_row
         decision_row = decisions.get(match_idx)
         if not decision_row:
             executions[match_idx] = RowExecution([], "skip_missing_decision", ["missing_v4_2_decision"], [], 0.0, False, False)
             continue
+        if late_refresh_mode == "proxy" and prepared and prepared.missing_execution_sp:
+            executions[match_idx] = RowExecution(
+                [],
+                "skip_missing_execution_sp",
+                ["missing_execution_sp_after_late_refresh"],
+                [],
+                0.0,
+                False,
+                False,
+            )
+            continue
         executions[match_idx] = evaluate_row_policy(
-            source_row,
+            execution_source_row,
             decision_row,
             late_refresh_mode=late_refresh_mode,
             full_score_threshold=full_score_threshold,
         )
+        if prepared and prepared.repricing_reasons:
+            executions[match_idx].reasons = list(prepared.repricing_reasons) + executions[match_idx].reasons
     apply_segment_full_cap(executions, segment_lookup, max_full_per_segment=max_full_per_segment)
 
     extra_fields = [
+        "q_top",
+        "max_q",
+        "shadow_selection_codes",
+        "shadow_primary",
+        "shadow_arm",
+        "shadow_version",
+        "shadow_stop_flag",
+        "selection_type",
+        "source_sp_3",
+        "source_sp_1",
+        "source_sp_0",
+        "source_q_3",
+        "source_q_1",
+        "source_q_0",
+        "execution_sp_3",
+        "execution_sp_1",
+        "execution_sp_0",
+        "execution_q_3",
+        "execution_q_1",
+        "execution_q_0",
+        "execution_sp_source",
+        "execution_sp_snapshot_ts",
+        "execution_sp_repriced",
+        "execution_sp_reprice_ratio_max",
+        "execution_sp_missing",
         "execution_policy_version",
         "execution_policy_name",
         "execution_action",
@@ -420,8 +664,8 @@ def apply_policy(
     hit_count = 0
     settled_count = 0
     for source_row in source_rows:
-        row = dict(source_row)
-        match_idx = int(safe_float(row.get("match_idx")))
+        match_idx = int(safe_float(source_row.get("match_idx")))
+        row = dict(prepared_rows.get(match_idx).row if match_idx in prepared_rows else source_row)
         execution = executions.get(match_idx, RowExecution([], "skip_missing_decision", ["missing_v4_2_decision"], [], 0.0, False, False))
         decision_row = decisions.get(match_idx, {})
         selection_text = "+".join(execution.selection_codes)
@@ -430,6 +674,7 @@ def apply_policy(
         row["shadow_arm"] = f"{SHADOW_ARM}_{policy_name}"
         row["shadow_version"] = SHADOW_VERSION
         row["shadow_stop_flag"] = "0" if execution.selection_codes else "1"
+        row["selection_type"] = selection_type_from_codes(execution.selection_codes)
         row["execution_policy_version"] = POLICY_VERSION
         row["execution_policy_name"] = policy_name
         row["execution_action"] = execution.action
@@ -456,6 +701,7 @@ def apply_policy(
         "policy_version": POLICY_VERSION,
         "policy_name": policy_name,
         "late_refresh_mode": late_refresh_mode,
+        "execution_sp_mode": execution_sp_mode,
         "full_score_threshold": full_score_threshold,
         "max_full_per_segment": max_full_per_segment,
         "rows": len(output_rows),
@@ -505,6 +751,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-csv", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
     parser.add_argument("--late-refresh-mode", choices=("skip", "proxy"), default="skip")
+    parser.add_argument("--execution-sp-mode", choices=("source", "latest_trusted"), default="")
     parser.add_argument("--full-score-threshold", type=float, default=1.40)
     parser.add_argument("--max-full-per-segment", type=int, default=1)
     parser.add_argument("--window-hours", type=float, default=12.0)
@@ -519,6 +766,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     policy_name = args.policy_name or f"late_{args.late_refresh_mode}_fullcap{args.max_full_per_segment}"
+    execution_sp_mode = args.execution_sp_mode or ("latest_trusted" if args.late_refresh_mode == "proxy" else "source")
     output_csv, report_path, summary = apply_policy(
         issue=args.issue,
         source_csv=args.source_structured_csv,
@@ -534,6 +782,7 @@ def main() -> None:
         min_matches=args.min_matches,
         max_matches=args.max_matches,
         policy_name=policy_name,
+        execution_sp_mode=execution_sp_mode,
     )
     if args.json:
         print(json.dumps(summary, ensure_ascii=False, indent=2))

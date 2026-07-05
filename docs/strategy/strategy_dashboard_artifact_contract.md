@@ -108,6 +108,11 @@ v4.2.0000 execution artifacts are published through the same
 their `shadow_selection_codes` represents the executable selection after the
 execution policy, while `execution_recommended_codes` preserves the wider
 decision-chain audit recommendation.
+For `late_proxy_fullcap2`, execution scoring must use refreshed per-match SP,
+not the stale source artifact SP. The artifact should retain
+`source_sp_*`/`source_q_*` for audit and publish `execution_sp_*`,
+`execution_q_*`, `execution_sp_snapshot_ts`, `execution_sp_repriced`, and
+`execution_sp_missing` for dashboard explanation.
 
 Current strategy-owned execution variants:
 

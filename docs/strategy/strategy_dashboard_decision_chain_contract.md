@@ -177,9 +177,10 @@ shadow_v4.2.0000_execution_late_proxy_fullcap2
 
 `strict_fullcap2` is the pre-refresh state: `wait_late_refresh` rows remain
 no-buy. `late_proxy_fullcap2` represents the executable state after a valid
-late SP refresh has occurred. The live workflow should publish/choose
-`strict_fullcap2` before the refresh window and `late_proxy_fullcap2` after the
-refresh artifact exists.
+late SP refresh has occurred and the refreshed SP has been applied to execution
+scoring. The live workflow should publish/choose `strict_fullcap2` before the
+refresh window and `late_proxy_fullcap2` only after the refresh artifact exists
+and per-match execution SP is available.
 
 Because live strategy artifacts may refresh automatically, dashboard must make
 the selected execution policy and blocking state visible. A row that is
@@ -240,6 +241,15 @@ Required execution extension fields:
 | `execution_full_kept` | boolean/int | `1` if the row kept full cover after per-segment cap. |
 | `execution_segment_idx` | integer/string | Rolling segment id used by the execution cap. |
 | `execution_unlock_state` | enum/string | Late-refresh stop state for UI color and automation. |
+| `source_sp_3`, `source_sp_1`, `source_sp_0` | number/string | SP values from the source structured shadow CSV before execution repricing. |
+| `source_q_3`, `source_q_1`, `source_q_0` | number/string | q values from the source structured shadow CSV before execution repricing. |
+| `execution_sp_3`, `execution_sp_1`, `execution_sp_0` | number/string | SP values actually used by the execution layer. |
+| `execution_q_3`, `execution_q_1`, `execution_q_0` | number/string | Probability times execution SP, used for full-score and compression decisions. |
+| `execution_sp_source` | string | `live_sp_snapshots`, `matches_current_sp`, `source_artifact`, or `missing_trusted_sp`. |
+| `execution_sp_snapshot_ts` | string | Timestamp of the SP snapshot used by execution. |
+| `execution_sp_repriced` | boolean/int | `1` when source SP and execution SP differ materially. |
+| `execution_sp_reprice_ratio_max` | number/string | Largest ratio between source SP and execution SP across the three outcomes. |
+| `execution_sp_missing` | boolean/int | `1` when late-proxy execution could not find trusted per-match SP and must not unlock. |
 
 Stable `execution_action` values:
 
@@ -256,6 +266,7 @@ Stable `execution_action` values:
 | `skip_full_over_cap` | Full cover exceeded segment cap and no safe double was available. |
 | `skip_no_recommendation` | No v4.2 recommended codes. |
 | `skip_missing_decision` | Execution artifact could not find a v4.2 decision row. |
+| `skip_missing_execution_sp` | Late-proxy mode could not find trusted per-match execution SP; row remains no-buy. |
 
 Execution mapping rules:
 
@@ -271,14 +282,19 @@ Execution mapping rules:
 - `execution_unlock_state=waiting_late_refresh` should be rendered as a red
   stop/wait state.
 - `execution_unlock_state=unlocked_after_late_refresh` should be rendered as a
-  green unlocked state, because this row was previously held for late refresh
-  and is now executable.
+  green unlocked state, because this row was previously held for late refresh,
+  has been repriced with execution SP, and is now executable.
 - `execution_unlock_state=not_applicable` means the row was not held by the
   late-refresh gate.
 - `execution_unlock_state=blocked_after_late_refresh` means the row was still
   not executable after refresh and should remain a stop/no-buy state.
 - N-ticket replay and live staking must consume `shadow_selection_codes`, not
   `execution_recommended_codes`.
+- `late_proxy_fullcap2` must not score full covers from stale source `sp_*` or
+  `q_*`. When `execution_sp_repriced=1`, dashboard should show that the row was
+  repriced and use `execution_sp_*`/`execution_q_*` for explanation.
+- If `execution_sp_missing=1`, the row is not unlocked even if a global live SP
+  refresh happened.
 - Match detail should show both columns when they differ.
 - Dashboard must not infer that a downgraded full-cover row is a strategy miss;
   it is an execution-layer cost decision.

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import csv
 import importlib.util
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -58,6 +60,20 @@ def _decision(**overrides):
     }
     row.update(overrides)
     return row
+
+
+def _write_rows(path: Path, rows: list[dict[str, str]], fieldnames: list[str]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+    return path
+
+
+def _read_first_row(path: Path) -> dict[str, str]:
+    with path.open(newline="", encoding="utf-8") as f:
+        return next(csv.DictReader(f))
 
 
 def test_wait_late_refresh_is_no_buy_until_proxy_mode() -> None:
@@ -139,3 +155,280 @@ def test_segment_full_cap_keeps_top_candidate_and_downgrades_overflow() -> None:
     assert first.full_kept is True
     assert second.action == "downgrade_full_to_double_over_cap"
     assert second.selection_codes == ["0", "1"]
+
+
+def test_late_proxy_reprices_stale_source_sp_before_full_cover_scoring(tmp_path: Path) -> None:
+    mod = _load_module()
+    issue = "26072"
+    db_path = tmp_path / "500.sqlite"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE matches (
+                issue TEXT NOT NULL,
+                match_idx INTEGER NOT NULL,
+                end_time TEXT,
+                league TEXT,
+                home TEXT,
+                away TEXT,
+                result_code TEXT,
+                winning_sp REAL,
+                PRIMARY KEY (issue, match_idx)
+            );
+            CREATE TABLE live_sp_snapshots (
+                issue TEXT NOT NULL,
+                playid INTEGER NOT NULL,
+                fetched_at TEXT NOT NULL,
+                source_updatetime TEXT,
+                row_idx INTEGER NOT NULL,
+                home TEXT,
+                away TEXT,
+                league TEXT,
+                handicap_line REAL,
+                sp_home REAL,
+                sp_draw REAL,
+                sp_away REAL,
+                raw_node TEXT,
+                PRIMARY KEY (issue, playid, fetched_at, row_idx)
+            );
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO matches(issue, match_idx, end_time, league, home, away, result_code, winning_sp)
+            VALUES('26072', 51, '2026-07-05 20:00:00', 'K2联赛', '庆南FC', '天安城', NULL, NULL)
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO live_sp_snapshots(
+                issue, playid, fetched_at, source_updatetime, row_idx,
+                home, away, league, handicap_line, sp_home, sp_draw, sp_away, raw_node
+            )
+            VALUES('26072', 34, '2026-07-05T12:00:00+00:00', '2026-07-05T12:00:00+00:00', 51,
+                   '庆南FC', '天安城', 'K2联赛', 0, 2.37, 3.26, 3.65, 'fresh')
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    source_csv = _write_rows(
+        tmp_path / "source.csv",
+        [
+            {
+                "issue": issue,
+                "match_idx": "51",
+                "match_id": "26072_051",
+                "active_selection_codes": "3",
+                "shadow_selection_codes": "1+0+3",
+                "p_3": "0.40",
+                "p_1": "0.28",
+                "p_0": "0.3255",
+                "sp_3": "14.84",
+                "sp_1": "1.08",
+                "sp_0": "70.94",
+                "q_3": "5.9360",
+                "q_1": "0.3024",
+                "q_0": "23.0900",
+                "prob_top": "3",
+                "q_top": "0",
+                "max_q": "23.0900",
+                "shadow_arm": "shadow_v3.3.3",
+                "shadow_version": "fixture",
+                "shadow_primary": "1",
+                "shadow_judgment": "",
+                "shadow_stop_flag": "0",
+                "selection_type": "full",
+            }
+        ],
+        [
+            "issue",
+            "match_idx",
+            "match_id",
+            "active_selection_codes",
+            "shadow_selection_codes",
+            "p_3",
+            "p_1",
+            "p_0",
+            "sp_3",
+            "sp_1",
+            "sp_0",
+            "q_3",
+            "q_1",
+            "q_0",
+            "prob_top",
+            "q_top",
+            "max_q",
+            "shadow_arm",
+            "shadow_version",
+            "shadow_primary",
+            "shadow_judgment",
+            "shadow_stop_flag",
+            "selection_type",
+        ],
+    )
+    decision_csv = _write_rows(
+        tmp_path / "decision.csv",
+        [
+            {
+                "match_idx": "51",
+                "v4_action": "wait_late_refresh",
+                "v4_recommended_codes": "1+0+3",
+                "v4_selection_codes": "",
+                "v4_semantic_draw": "balanced",
+                "v4_team_strength_side": "mixed",
+                "v4_team_strength_confidence": "0.55",
+                "v4_team_strength_codes": "",
+                "v4_mandatory_codes": "",
+                "v4_protected_codes": "",
+                "v4_full_cover_reasons": "layer_conflict_requires_full_cover_or_skip;candidate_score_dense;extreme_sp_or_source_conflict_full",
+                "v4_merge_flags": "layer_conflict_requires_full_cover_or_skip",
+                "v4_candidate_pool_json": '[{"code":"1","score":1.2},{"code":"0","score":1.1},{"code":"3","score":1.0}]',
+            }
+        ],
+        [
+            "match_idx",
+            "v4_action",
+            "v4_recommended_codes",
+            "v4_selection_codes",
+            "v4_semantic_draw",
+            "v4_team_strength_side",
+            "v4_team_strength_confidence",
+            "v4_team_strength_codes",
+            "v4_mandatory_codes",
+            "v4_protected_codes",
+            "v4_full_cover_reasons",
+            "v4_merge_flags",
+            "v4_candidate_pool_json",
+        ],
+    )
+    output_csv = tmp_path / "out.csv"
+    mod.apply_policy(
+        issue=issue,
+        source_csv=source_csv,
+        decision_csv=decision_csv,
+        db_path=db_path,
+        output_csv=output_csv,
+        report_path=tmp_path / "report.md",
+        late_refresh_mode="proxy",
+        full_score_threshold=1.40,
+        max_full_per_segment=2,
+        window_hours=12.0,
+        extend_hours="18,24,36",
+        min_matches=1,
+        max_matches=24,
+        policy_name="late_proxy_fullcap2",
+        execution_sp_mode="latest_trusted",
+    )
+
+    row = _read_first_row(output_csv)
+    assert row["source_sp_0"] == "70.9400"
+    assert row["execution_sp_0"] == "3.6500"
+    assert row["sp_0"] == "3.6500"
+    assert row["execution_q_0"] == "1.1881"
+    assert row["execution_sp_source"] == "live_sp_snapshots"
+    assert row["execution_sp_repriced"] == "1"
+    assert "sp_repriced_after_late_refresh" in row["execution_reasons"]
+    assert row["execution_action"] != "execute_full_cover"
+    assert row["execution_full_kept"] == "0"
+    assert row["shadow_selection_codes"] != "1+0+3"
+
+
+def test_late_proxy_blocks_unlock_when_execution_sp_is_missing(tmp_path: Path) -> None:
+    mod = _load_module()
+    issue = "26072"
+    db_path = tmp_path / "500.sqlite"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE matches (
+                issue TEXT NOT NULL,
+                match_idx INTEGER NOT NULL,
+                end_time TEXT,
+                league TEXT,
+                home TEXT,
+                away TEXT,
+                result_code TEXT,
+                winning_sp REAL,
+                PRIMARY KEY (issue, match_idx)
+            );
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO matches(issue, match_idx, end_time, league, home, away, result_code, winning_sp)
+            VALUES('26072', 51, '2026-07-05 20:00:00', 'K2联赛', '庆南FC', '天安城', NULL, NULL)
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    source_csv = _write_rows(
+        tmp_path / "source.csv",
+        [_source(issue=issue, match_idx="51", match_id="26072_051", active_selection_codes="3", shadow_selection_codes="3+1")],
+        [
+            "issue",
+            "match_idx",
+            "match_id",
+            "active_selection_codes",
+            "shadow_selection_codes",
+            "prob_top",
+            "q_top",
+            "p_3",
+            "p_1",
+            "p_0",
+            "sp_3",
+            "sp_1",
+            "sp_0",
+            "q_3",
+            "q_1",
+            "q_0",
+        ],
+    )
+    decision_csv = _write_rows(
+        tmp_path / "decision.csv",
+        [_decision(match_idx="51", v4_action="wait_late_refresh", v4_recommended_codes="3+1", v4_selection_codes="")],
+        [
+            "match_idx",
+            "v4_action",
+            "v4_recommended_codes",
+            "v4_selection_codes",
+            "v4_semantic_draw",
+            "v4_team_strength_side",
+            "v4_team_strength_confidence",
+            "v4_team_strength_codes",
+            "v4_mandatory_codes",
+            "v4_protected_codes",
+            "v4_full_cover_reasons",
+            "v4_merge_flags",
+            "v4_candidate_pool_json",
+        ],
+    )
+    output_csv = tmp_path / "out.csv"
+    mod.apply_policy(
+        issue=issue,
+        source_csv=source_csv,
+        decision_csv=decision_csv,
+        db_path=db_path,
+        output_csv=output_csv,
+        report_path=tmp_path / "report.md",
+        late_refresh_mode="proxy",
+        full_score_threshold=1.40,
+        max_full_per_segment=2,
+        window_hours=12.0,
+        extend_hours="18,24,36",
+        min_matches=1,
+        max_matches=24,
+        policy_name="late_proxy_fullcap2",
+        execution_sp_mode="latest_trusted",
+    )
+
+    row = _read_first_row(output_csv)
+    assert row["execution_action"] == "skip_missing_execution_sp"
+    assert row["execution_unlock_state"] == "blocked_after_late_refresh"
+    assert row["execution_sp_missing"] == "1"
+    assert row["shadow_selection_codes"] == ""

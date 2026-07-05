@@ -49,7 +49,26 @@ def _build_db(path: Path, *, with_live_refresh: bool) -> None:
                 away TEXT,
                 result_code TEXT,
                 winning_sp REAL,
+                sp_home REAL,
+                sp_draw REAL,
+                sp_away REAL,
                 PRIMARY KEY (issue, match_idx)
+            );
+            CREATE TABLE live_sp_snapshots (
+                issue TEXT NOT NULL,
+                playid INTEGER NOT NULL,
+                fetched_at TEXT NOT NULL,
+                source_updatetime TEXT,
+                row_idx INTEGER NOT NULL,
+                home TEXT,
+                away TEXT,
+                league TEXT,
+                handicap_line REAL,
+                sp_home REAL,
+                sp_draw REAL,
+                sp_away REAL,
+                raw_node TEXT,
+                PRIMARY KEY (issue, playid, fetched_at, row_idx)
             );
             CREATE TABLE fetch_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,17 +87,28 @@ def _build_db(path: Path, *, with_live_refresh: bool) -> None:
         )
         conn.execute(
             """
-            INSERT INTO matches(issue, match_idx, end_time, league, home, away, result_code, winning_sp)
-            VALUES('1001', 1, '2026-07-05 20:00:00', '测试联赛', '主队', '客队', NULL, NULL)
+            INSERT INTO matches(issue, match_idx, end_time, league, home, away, result_code, winning_sp, sp_home, sp_draw, sp_away)
+            VALUES('1001', 1, '2026-07-05 20:00:00', '测试联赛', '主队', '客队', NULL, NULL, 2.20, 3.80, 4.20)
             """
         )
         if with_live_refresh:
+            fetched_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
             conn.execute(
                 """
                 INSERT INTO fetch_log(fetched_at, kind, issue, url, status, ok, elapsed_sec, bytes, rows_parsed, error)
                 VALUES(?, 'live_sp_xml', '1001', 'https://example.test/sp.xml', 200, 1, 0.1, 100, 1, '')
                 """,
-                (datetime.now(timezone.utc).isoformat(timespec="seconds"),),
+                (fetched_at,),
+            )
+            conn.execute(
+                """
+                INSERT INTO live_sp_snapshots(
+                    issue, playid, fetched_at, source_updatetime, row_idx, home, away, league,
+                    handicap_line, sp_home, sp_draw, sp_away, raw_node
+                )
+                VALUES('1001', 34, ?, ?, 1, '主队', '客队', '测试联赛', 0, 2.25, 3.70, 4.10, 'fixture')
+                """,
+                (fetched_at, fetched_at),
             )
         conn.commit()
     finally:
@@ -224,6 +254,10 @@ def test_valid_live_sp_refresh_publishes_late_proxy_unlock(tmp_path: Path) -> No
     assert late_row["execution_unlock_state"] == "unlocked_after_late_refresh"
     assert late_row["shadow_stop_flag"] == "0"
     assert late_row["shadow_selection_codes"] == "3+1"
+    assert late_row["source_sp_3"] == "2.2000"
+    assert late_row["execution_sp_3"] == "2.2500"
+    assert late_row["sp_3"] == "2.2500"
+    assert late_row["execution_sp_source"] == "live_sp_snapshots"
 
 
 def test_missing_live_sp_refresh_keeps_late_proxy_unpublished(tmp_path: Path) -> None:

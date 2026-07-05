@@ -3127,6 +3127,15 @@ def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_co
         "execution_full_kept": _csv_bool(row, "execution_full_kept"),
         "execution_segment_idx": _safe_int(row.get("execution_segment_idx")),
         "execution_unlock_state": row.get("execution_unlock_state") or "",
+        "source_sp": {code: _safe_float(row.get(f"source_sp_{code}")) for code in OUTCOME_ORDER},
+        "source_q": {code: _safe_float(row.get(f"source_q_{code}")) for code in OUTCOME_ORDER},
+        "execution_sp": {code: _safe_float(row.get(f"execution_sp_{code}")) for code in OUTCOME_ORDER},
+        "execution_q": {code: _safe_float(row.get(f"execution_q_{code}")) for code in OUTCOME_ORDER},
+        "execution_sp_source": row.get("execution_sp_source") or "",
+        "execution_sp_snapshot_ts": row.get("execution_sp_snapshot_ts") or "",
+        "execution_sp_repriced": _csv_bool(row, "execution_sp_repriced"),
+        "execution_sp_reprice_ratio_max": _safe_float(row.get("execution_sp_reprice_ratio_max")),
+        "execution_sp_missing": _csv_bool(row, "execution_sp_missing"),
         "notes": [
             note
             for note in [
@@ -3504,6 +3513,15 @@ def _compact_decision_variant(variant: dict[str, Any]) -> dict[str, Any]:
         "execution_full_kept",
         "execution_segment_idx",
         "execution_unlock_state",
+        "source_sp",
+        "source_q",
+        "execution_sp",
+        "execution_q",
+        "execution_sp_source",
+        "execution_sp_snapshot_ts",
+        "execution_sp_repriced",
+        "execution_sp_reprice_ratio_max",
+        "execution_sp_missing",
     }
     return {key: value for key, value in variant.items() if key in keep}
 

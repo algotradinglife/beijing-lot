@@ -47,6 +47,15 @@ export interface DecisionVariantData extends DecisionVariantOption {
   executionFullKept?: boolean | null;
   executionSegmentIdx?: number;
   executionUnlockState?: string;
+  sourceSp?: Record<string, number>;
+  sourceQ?: Record<string, number>;
+  executionSp?: Record<string, number>;
+  executionQ?: Record<string, number>;
+  executionSpSource?: string;
+  executionSpSnapshotTs?: string;
+  executionSpRepriced?: boolean | null;
+  executionSpRepriceRatioMax?: number;
+  executionSpMissing?: boolean | null;
   decisionChain?: string[];
   decisionCategories?: Array<{
     key: string;

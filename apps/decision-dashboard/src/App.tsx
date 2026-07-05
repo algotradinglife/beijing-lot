@@ -564,8 +564,22 @@ function executionActionLabel(action?: string) {
     skip_full_over_cap: '全包超额停',
     skip_no_recommendation: '无建议停',
     skip_missing_decision: '缺决策停',
+    skip_missing_execution_sp: '缺执行SP',
   };
   return action ? labels[action] || action : '未记录';
+}
+
+function codeNumberTripletLabel(values?: Record<string, number>) {
+  if (!values) return '-';
+  const win = values['3'];
+  const draw = values['1'];
+  const loss = values['0'];
+  const fmt = (value?: number) => value !== undefined && Number.isFinite(value) ? value.toFixed(2) : '缺';
+  return `${fmt(win)} / ${fmt(draw)} / ${fmt(loss)}`;
+}
+
+function hasCodeNumbers(values?: Record<string, number>) {
+  return Boolean(values && ['3', '1', '0'].some((code) => values[code] !== undefined && Number.isFinite(values[code])));
 }
 
 function executionUnlockLabel(state?: string) {
@@ -1085,6 +1099,9 @@ function MatchDetail({
         <div><span>全包状态</span><b>{executionBoolLabel(selectedVariant.executionFullCandidate)} / {executionBoolLabel(selectedVariant.executionFullKept)}</b></div>
         <div><span>分段</span><b>{selectedVariant.executionSegmentIdx ?? '-'}</b></div>
         <div><span>策略</span><b>{selectedVariant.executionPolicyName || selectedVariant.executionPolicyVersion || '-'}</b></div>
+        {hasCodeNumbers(selectedVariant.executionSp) ? <div><span>执行SP</span><b>{codeNumberTripletLabel(selectedVariant.executionSp)}</b></div> : null}
+        {selectedVariant.executionSpSnapshotTs ? <div><span>SP快照</span><b>{selectedVariant.executionSpSnapshotTs}</b></div> : null}
+        {selectedVariant.executionSpRepriced || selectedVariant.executionSpMissing ? <div><span>SP变动</span><b>{selectedVariant.executionSpMissing ? '缺执行SP' : `重定价 x${selectedVariant.executionSpRepriceRatioMax?.toFixed(2) ?? '-'}`}</b></div> : null}
       </div>
       {selectedVariantExecutionDiffers ? <div className="execution-policy-diff">审计建议与可执行下注不同，出票按“可执行”列。</div> : null}
       {selectedVariant.executionReasons?.length ? <div className="compact-list execution-reasons">

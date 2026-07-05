@@ -175,6 +175,7 @@ def apply_execution(
     report: Path,
     late_refresh_mode: str,
     policy_name: str,
+    execution_sp_mode: str,
 ) -> dict[str, Any]:
     _csv_path, _report_path, summary = execution_policy.apply_policy(
         issue=issue,
@@ -191,6 +192,7 @@ def apply_execution(
         min_matches=6,
         max_matches=24,
         policy_name=policy_name,
+        execution_sp_mode=execution_sp_mode,
     )
     return summary
 
@@ -244,6 +246,7 @@ def run(
         report=report_path(work_dir, issue, STRICT_POLICY_NAME, date),
         late_refresh_mode="skip",
         policy_name=STRICT_POLICY_NAME,
+        execution_sp_mode="source",
     )
     if refresh_ok:
         late_csv = published_csv_path(shadow_dir, issue, LATE_PROXY_ARM, date)
@@ -256,6 +259,7 @@ def run(
             report=report_path(work_dir, issue, LATE_PROXY_POLICY_NAME, date),
             late_refresh_mode="proxy",
             policy_name=LATE_PROXY_POLICY_NAME,
+            execution_sp_mode="latest_trusted",
         )
 
     return {

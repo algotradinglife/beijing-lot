@@ -19,7 +19,8 @@ shadow_v4.2.0000_execution_late_proxy_fullcap2
 ```
 
 - `strict_fullcap2`: pre-refresh state. Rows requiring late refresh are no-buy.
-- `late_proxy_fullcap2`: executable state after a valid late SP refresh.
+- `late_proxy_fullcap2`: executable state after a valid late SP refresh, with
+  refreshed per-match SP applied to q/full-score/compression.
 
 ## Artifact Contract
 
@@ -80,6 +81,11 @@ API / manifest:
 - when both strict and late-proxy artifacts are available for the same version,
   API should select the late-proxy artifact by default. This is the automated
   stop-unlock signal.
+- treat `late_proxy_fullcap2` as valid only when `execution_sp_missing=0`.
+  `unlocked_after_late_refresh` means refreshed SP was used for execution
+  scoring, not merely that a refresh happened somewhere in the issue.
+- show `execution_sp_*`, `execution_q_*`, `execution_sp_snapshot_ts`, and
+  `execution_sp_repriced` when available so stale-SP repricing is auditable.
 - consume API option fields `available`, `defaultable`, `readiness_status`,
   `degraded_reason`, and `readiness` directly; do not infer readiness from the
   variant id alone.
@@ -95,15 +101,22 @@ Stop unlock is automated at the artifact/API layer:
 1. Before a valid late SP refresh, strategy publishes/selects
    `strict_fullcap2`; late-refresh rows have
    `execution_unlock_state=waiting_late_refresh` and should render red.
-2. After a valid late SP refresh, strategy publishes
-   `late_proxy_fullcap2`; rows previously held by the late-refresh gate have
-   `execution_unlock_state=unlocked_after_late_refresh` and should render
-   green.
+2. After a valid late SP refresh, strategy publishes `late_proxy_fullcap2` only
+   after overlaying the latest trusted per-match SP into execution scoring.
+   Rows previously held by the late-refresh gate have
+   `execution_unlock_state=unlocked_after_late_refresh` and should render green
+   only when `execution_sp_missing=0`.
 3. API defaults to `late_proxy_fullcap2` once that artifact is available, while
    keeping `strict_fullcap2` selectable for audit.
 4. This unlocks the row as an executable recommendation, but it must not
    silently submit a ticket. Ticket build/submit remains an explicit user
    action.
+
+If the source artifact carried stale extreme SP, the execution artifact keeps
+`source_sp_*`/`source_q_*` for audit, writes refreshed `execution_sp_*` and
+`execution_q_*`, and adds `sp_repriced_after_late_refresh` to
+`execution_reasons`. If trusted per-match execution SP is missing,
+`execution_action=skip_missing_execution_sp` and the row remains no-buy.
 
 ## Manifest Draft
 
