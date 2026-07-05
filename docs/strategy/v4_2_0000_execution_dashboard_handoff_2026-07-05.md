@@ -181,5 +181,10 @@ Current provisional 26072 result through #54, using official 500 settlement for
 - `v4.2.0002` late-proxy publishes 7/65 per-row full-cover candidates. These
   are not final funded full covers; budget and ticket selection are delegated
   to the downstream optimizer.
+- `v4.2.0003` changes direct-buy q-top drift to blend model probability with
+  refreshed market-implied probability. #48 is no longer a stop because the
+  uncovered `3` q-top came from higher payout while market-implied probability
+  weakened; it remains executable `0+1` with `value_only_sp_drift`. Provisional
+  #1-54 remains 49/54 coverage; bought rows become 54 with 49 hits.
 
 This remains shadow/research until official 500 settlement is complete.

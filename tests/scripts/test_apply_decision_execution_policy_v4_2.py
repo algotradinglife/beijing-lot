@@ -197,6 +197,47 @@ def test_late_q_top_drift_blocks_direct_buy_without_swapping_codes() -> None:
     assert "late_q_top_drift_uncovered" in execution.reasons
 
 
+def test_late_q_top_drift_does_not_block_value_only_sp_drift() -> None:
+    mod = _load_module()
+    source = _source(
+        p_3="0.3457146088540445",
+        p_1="0.2513695493862822",
+        p_0="0.40291584175967327",
+        sp_3="3.6000",
+        sp_1="3.4100",
+        sp_0="2.3200",
+        q_3="1.2446",
+        q_1="0.8572",
+        q_0="0.9348",
+        source_sp_3="2.7100",
+        source_sp_1="3.2700",
+        source_sp_0="3.0600",
+        source_q_3="0.9369",
+        source_q_1="0.8220",
+        source_q_0="1.2329",
+        execution_sp_3="3.6000",
+        execution_sp_1="3.4100",
+        execution_sp_0="2.3200",
+        execution_q_3="1.2446",
+        execution_q_1="0.8572",
+        execution_q_0="0.9348",
+        execution_sp_reprice_ratio_max="1.3284",
+    )
+    decision = _decision(
+        v4_action="buy",
+        v4_recommended_codes="0+1",
+        v4_selection_codes="0+1",
+    )
+
+    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.4)
+
+    assert execution.action == "execute_double"
+    assert execution.selection_codes == ["0", "1"]
+    assert execution.double_codes == ["0", "1"]
+    assert "value_only_sp_drift" in execution.reasons
+    assert "market_implied_p_weakened_3" in execution.reasons
+
+
 def test_probability_anchor_keeps_cover_win_when_q_top_is_weak() -> None:
     mod = _load_module()
     source = _source(

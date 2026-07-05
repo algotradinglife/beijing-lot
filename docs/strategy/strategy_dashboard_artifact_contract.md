@@ -167,6 +167,9 @@ For v4.2.0000 execution artifacts:
   (`shadow_selection_codes`).
 - Execution badges should come from `execution_action` and
   `execution_reasons`.
+- `value_only_sp_drift` inside `execution_reasons` is an audit/risk marker for
+  payout-driven q movement; it is not a no-buy state unless `execution_action`
+  itself is `skip_*`.
 - Full-cover display should use `execution_full_score`,
   `execution_full_candidate`, and `execution_full_kept`.
   `execution_full_kept=1` means the row remains full cover in this per-row

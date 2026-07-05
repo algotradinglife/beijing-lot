@@ -33,7 +33,11 @@ SEVERE_SP_RATIO = 2.0
 TOPLINE_DRIFT_SP_RATIO = 1.30
 TOPLINE_DRIFT_Q_MIN = 1.20
 TOPLINE_DRIFT_P_MIN = 0.30
-POLICY_VERSION = "v4.2.0002_execution_policy_2026-07-05_probability_anchor"
+TOPLINE_DRIFT_BLEND_GAP_MAX = 0.03
+TOPLINE_DRIFT_MARKET_WEAKEN_EPS = 0.01
+MARKET_BLEND_BASE_WEIGHT = 0.30
+MARKET_BLEND_SEVERE_WEIGHT = 0.45
+POLICY_VERSION = "v4.2.0003_execution_policy_2026-07-05_market_blend"
 SHADOW_ARM = "shadow_v4.2.0000_execution"
 SHADOW_VERSION = "llm_chain_structured_v4.2.0000_layered_merge_execution_policy"
 
@@ -349,6 +353,45 @@ def source_q_top_from_row(row: dict[str, Any]) -> tuple[str | None, dict[str, fl
     return top_row_code(row, "", "q")
 
 
+def sp_values_from_row(row: dict[str, Any], prefix: str) -> dict[str, float]:
+    values = {code: safe_float(row.get(f"{prefix}sp_{code}")) for code in OUTCOME_CODES}
+    if any(value > 0 for value in values.values()):
+        return values
+    return {code: safe_float(row.get(f"sp_{code}")) for code in OUTCOME_CODES}
+
+
+def normalized_market_probabilities(sp_values: dict[str, float]) -> dict[str, float]:
+    inverse = {code: (1.0 / sp if sp > 0 else 0.0) for code, sp in sp_values.items()}
+    total = sum(inverse.values())
+    if total <= 0:
+        return {code: 0.0 for code in OUTCOME_CODES}
+    return {code: value / total for code, value in inverse.items()}
+
+
+def market_probabilities_from_row(row: dict[str, Any], prefix: str) -> dict[str, float]:
+    return normalized_market_probabilities(sp_values_from_row(row, prefix))
+
+
+def late_market_blend_weight(row: dict[str, Any]) -> float:
+    if safe_float(row.get("execution_sp_reprice_ratio_max"), default=1.0) >= SEVERE_SP_RATIO:
+        return MARKET_BLEND_SEVERE_WEIGHT
+    return MARKET_BLEND_BASE_WEIGHT
+
+
+def late_blended_probabilities(row: dict[str, Any]) -> dict[str, float]:
+    market_p = market_probabilities_from_row(row, "execution_")
+    weight = late_market_blend_weight(row)
+    out: dict[str, float] = {}
+    for code in OUTCOME_CODES:
+        model_p = safe_float(row.get(f"p_{code}"))
+        implied_p = market_p.get(code, 0.0)
+        if implied_p <= 0:
+            out[code] = model_p
+        else:
+            out[code] = (1.0 - weight) * model_p + weight * implied_p
+    return out
+
+
 def should_probability_anchor_compression(source_row: dict[str, Any], decision_row: dict[str, Any]) -> bool:
     source_action = str(decision_row.get("v4_action") or "")
     if source_action not in {"wait_late_refresh", "full_cover_or_skip"}:
@@ -415,10 +458,54 @@ def late_q_top_drift_skip_reasons(source_row: dict[str, Any], selection_codes: l
     if not q_top or q_top in selection_codes or q_top == source_q_top:
         return []
     q_value = q_values.get(q_top, 0.0)
-    probability = safe_float(source_row.get(f"p_{q_top}"))
-    if q_value >= TOPLINE_DRIFT_Q_MIN and probability >= TOPLINE_DRIFT_P_MIN:
-        return ["late_q_top_drift_uncovered", f"late_q_top_drift_{source_q_top or 'none'}_to_{q_top}"]
+    blended_p = late_blended_probabilities(source_row)
+    probability = blended_p.get(q_top, safe_float(source_row.get(f"p_{q_top}")))
+    selected_probability = max((blended_p.get(code, 0.0) for code in selection_codes), default=0.0)
+    source_market_p = market_probabilities_from_row(source_row, "source_")
+    execution_market_p = market_probabilities_from_row(source_row, "execution_")
+    market_delta = execution_market_p.get(q_top, 0.0) - source_market_p.get(q_top, 0.0)
+    market_weakened = market_delta < -TOPLINE_DRIFT_MARKET_WEAKEN_EPS
+    probability_supported = probability + TOPLINE_DRIFT_BLEND_GAP_MAX >= selected_probability
+    if (
+        q_value >= TOPLINE_DRIFT_Q_MIN
+        and probability >= TOPLINE_DRIFT_P_MIN
+        and probability_supported
+        and not market_weakened
+    ):
+        return [
+            "late_q_top_drift_uncovered",
+            f"late_q_top_drift_{source_q_top or 'none'}_to_{q_top}",
+            f"late_blended_p_{q_top}_{probability:.4f}",
+        ]
     return []
+
+
+def late_q_top_drift_watch_reasons(source_row: dict[str, Any], selection_codes: list[str]) -> list[str]:
+    if safe_float(source_row.get("execution_sp_reprice_ratio_max"), default=1.0) < TOPLINE_DRIFT_SP_RATIO:
+        return []
+    q_top, q_values = execution_q_top_from_row(source_row)
+    source_q_top, _source_q_values = source_q_top_from_row(source_row)
+    if not q_top or q_top in selection_codes or q_top == source_q_top:
+        return []
+    q_value = q_values.get(q_top, 0.0)
+    if q_value < TOPLINE_DRIFT_Q_MIN:
+        return []
+    blended_p = late_blended_probabilities(source_row)
+    probability = blended_p.get(q_top, safe_float(source_row.get(f"p_{q_top}")))
+    selected_probability = max((blended_p.get(code, 0.0) for code in selection_codes), default=0.0)
+    source_market_p = market_probabilities_from_row(source_row, "source_")
+    execution_market_p = market_probabilities_from_row(source_row, "execution_")
+    market_delta = execution_market_p.get(q_top, 0.0) - source_market_p.get(q_top, 0.0)
+    reasons = [
+        "value_only_sp_drift",
+        f"late_q_top_drift_watch_{source_q_top or 'none'}_to_{q_top}",
+        f"late_blended_p_{q_top}_{probability:.4f}",
+    ]
+    if market_delta < -TOPLINE_DRIFT_MARKET_WEAKEN_EPS:
+        reasons.append(f"market_implied_p_weakened_{q_top}")
+    if probability + TOPLINE_DRIFT_BLEND_GAP_MAX < selected_probability:
+        reasons.append(f"late_blended_p_below_selected_{q_top}")
+    return reasons
 
 
 def unbacked_draw(decision_row: dict[str, Any]) -> bool:
@@ -577,7 +664,10 @@ def evaluate_row_policy(
         if source_action != "wait_late_refresh" and drift_reasons:
             return RowExecution([], "skip_late_q_top_drift", drift_reasons, double_codes, full_score, False, False)
         reason = "late_refresh_proxy" if source_action == "wait_late_refresh" else "direct_buy"
-        return RowExecution(recommended, "execute_double" if len(recommended) == 2 else "execute_single", [reason], double_codes, full_score, False, False)
+        reasons = [reason]
+        if source_action != "wait_late_refresh":
+            reasons.extend(late_q_top_drift_watch_reasons(source_row, recommended))
+        return RowExecution(recommended, "execute_double" if len(recommended) == 2 else "execute_single", reasons, double_codes, full_score, False, False)
     if full_candidate:
         return RowExecution(recommended, "execute_full_cover", ["full_score_above_threshold"], double_codes, full_score, True, True)
     if conflict_full:
@@ -850,7 +940,9 @@ Generated: {generated}
 - Severely repriced full-cover rows compress by anchoring probability top first;
   the remaining two outcomes compete for the second slot.
 - Direct-buy rows stop when refreshed q-top drifts to a material uncovered
-  outcome; execution does not swap codes automatically.
+  outcome only if market-blended probability also supports that uncovered
+  outcome. Payout-only SP drift is marked as `value_only_sp_drift` and remains
+  executable.
 """
 
 

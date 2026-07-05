@@ -231,7 +231,7 @@ Required execution extension fields:
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `execution_policy_version` | string | Example: `v4.2.0002_execution_policy_2026-07-05_probability_anchor`. |
+| `execution_policy_version` | string | Example: `v4.2.0003_execution_policy_2026-07-05_market_blend`. |
 | `execution_policy_name` | enum/string | Example: `strict_fullcap2` or `late_proxy_fullcap2`. |
 | `execution_action` | enum | Stable action from the execution layer. |
 | `execution_reasons` | string | `;`-joined machine-readable reasons. |
@@ -270,7 +270,7 @@ Stable `execution_action` values:
 | `skip_missing_decision` | Execution artifact could not find a v4.2 decision row. |
 | `skip_missing_execution_sp` | Late-proxy mode could not find trusted per-match execution SP; row remains no-buy. |
 | `skip_late_repriced_conflict_missing_prob_top` | Late-proxy row had severe SP repricing; compressed double lost the probability top, so the row remains no-buy. |
-| `skip_late_q_top_drift` | Late execution q-top drifted to an uncovered outcome; row remains no-buy instead of swapping codes automatically. |
+| `skip_late_q_top_drift` | Late execution q-top drifted to an uncovered outcome and market-blended probability also supports that uncovered outcome; row remains no-buy instead of swapping codes automatically. |
 
 Execution mapping rules:
 
@@ -284,6 +284,11 @@ Execution mapping rules:
   anchoring the probability top first and letting the remaining outcomes compete
   for the second slot. Dashboard should display `shadow_selection_codes` and
   `execution_double_codes` from the artifact, not re-run this compression.
+- In `v4.2.0003`, direct-buy q-top drift uses refreshed market-implied
+  probability blended with model probability. If an uncovered q-top is only a
+  higher-payout SP move while market-implied probability weakened, the artifact
+  keeps the executable selection and adds `value_only_sp_drift` instead of
+  `skip_late_q_top_drift`.
 - `v4.2.0002+` does not apply per-segment full-cover caps or budget decisions.
   Later ticket/stake optimization owns final match selection, N choice, and
   whether a per-row full-cover candidate is actually funded.
