@@ -30,7 +30,10 @@ Q_COLUMN_BY_CODE = {"3": "q_3", "1": "q_1", "0": "q_0"}
 LIVE_SP_COLUMN_BY_CODE = {"3": "sp_home", "1": "sp_draw", "0": "sp_away"}
 MATERIAL_SP_RATIO = 1.45
 SEVERE_SP_RATIO = 2.0
-POLICY_VERSION = "v4.2.0000_execution_policy_2026-07-05"
+TOPLINE_DRIFT_SP_RATIO = 1.30
+TOPLINE_DRIFT_Q_MIN = 1.20
+TOPLINE_DRIFT_P_MIN = 0.30
+POLICY_VERSION = "v4.2.0000_execution_policy_2026-07-05_topline_guard"
 SHADOW_ARM = "shadow_v4.2.0000_execution"
 SHADOW_VERSION = "llm_chain_structured_v4.2.0000_layered_merge_execution_policy"
 
@@ -318,6 +321,63 @@ def top_code(metrics: dict[str, dict[str, float]], key: str) -> str | None:
     return max(usable, key=lambda item: item[1])[0] if usable else None
 
 
+def top_row_code(row: dict[str, Any], prefix: str, field: str) -> tuple[str | None, dict[str, float]]:
+    values = {code: safe_float(row.get(f"{prefix}{field}_{code}")) for code in OUTCOME_CODES}
+    usable = [(code, value) for code, value in values.items() if value > 0]
+    return (max(usable, key=lambda item: item[1])[0] if usable else None, values)
+
+
+def probability_top_from_row(row: dict[str, Any]) -> str | None:
+    code, _values = top_row_code(row, "", "p")
+    if code:
+        return code
+    fallback = str(row.get("prob_top") or "")
+    return fallback if fallback in OUTCOME_CODES else None
+
+
+def execution_q_top_from_row(row: dict[str, Any]) -> tuple[str | None, dict[str, float]]:
+    code, values = top_row_code(row, "execution_", "q")
+    if code:
+        return code, values
+    return top_row_code(row, "", "q")
+
+
+def source_q_top_from_row(row: dict[str, Any]) -> tuple[str | None, dict[str, float]]:
+    code, values = top_row_code(row, "source_", "q")
+    if code:
+        return code, values
+    return top_row_code(row, "", "q")
+
+
+def late_repriced_conflict_skip_reasons(
+    source_row: dict[str, Any],
+    source_action: str,
+    selection_codes: list[str],
+) -> list[str]:
+    if source_action != "wait_late_refresh":
+        return []
+    if safe_float(source_row.get("execution_sp_reprice_ratio_max"), default=1.0) < SEVERE_SP_RATIO:
+        return []
+    prob_top = probability_top_from_row(source_row)
+    if prob_top and prob_top not in selection_codes:
+        return ["late_repriced_conflict_missing_prob_top", f"missing_prob_top_{prob_top}"]
+    return []
+
+
+def late_q_top_drift_skip_reasons(source_row: dict[str, Any], selection_codes: list[str]) -> list[str]:
+    if safe_float(source_row.get("execution_sp_reprice_ratio_max"), default=1.0) < TOPLINE_DRIFT_SP_RATIO:
+        return []
+    q_top, q_values = execution_q_top_from_row(source_row)
+    source_q_top, _source_q_values = source_q_top_from_row(source_row)
+    if not q_top or q_top in selection_codes or q_top == source_q_top:
+        return []
+    q_value = q_values.get(q_top, 0.0)
+    probability = safe_float(source_row.get(f"p_{q_top}"))
+    if q_value >= TOPLINE_DRIFT_Q_MIN and probability >= TOPLINE_DRIFT_P_MIN:
+        return ["late_q_top_drift_uncovered", f"late_q_top_drift_{source_q_top or 'none'}_to_{q_top}"]
+    return []
+
+
 def unbacked_draw(decision_row: dict[str, Any]) -> bool:
     return (
         str(decision_row.get("v4_semantic_draw") or "none") == "none"
@@ -460,12 +520,26 @@ def evaluate_row_policy(
     if not recommended:
         return RowExecution([], "skip_no_recommendation", ["empty_recommended_codes"], double_codes, full_score, False, False)
     if len(recommended) <= 2:
+        drift_reasons = late_q_top_drift_skip_reasons(source_row, recommended)
+        if source_action != "wait_late_refresh" and drift_reasons:
+            return RowExecution([], "skip_late_q_top_drift", drift_reasons, double_codes, full_score, False, False)
         reason = "late_refresh_proxy" if source_action == "wait_late_refresh" else "direct_buy"
         return RowExecution(recommended, "execute_double" if len(recommended) == 2 else "execute_single", [reason], double_codes, full_score, False, False)
     if full_candidate:
         return RowExecution(recommended, "candidate_full_cover", ["full_score_above_threshold"], double_codes, full_score, True, False)
     if conflict_full:
         if double_codes:
+            skip_reasons = late_repriced_conflict_skip_reasons(source_row, source_action, double_codes)
+            if skip_reasons:
+                return RowExecution(
+                    [],
+                    "skip_late_repriced_conflict_missing_prob_top",
+                    skip_reasons,
+                    double_codes,
+                    full_score,
+                    False,
+                    False,
+                )
             return RowExecution(
                 double_codes,
                 "downgrade_full_to_double_layer_conflict",
@@ -738,7 +812,10 @@ Generated: {generated}
   value of the third code after double compression.
 - Full cover is capped per rolling segment. Over-cap full candidates are
   downgraded to the best double when possible.
-- Low-value layer conflicts are skipped instead of forcing a tight double.
+- Late-proxy rows stop instead of forcing a tight double when severe SP
+  repricing makes the compressed double lose the probability top.
+- Direct-buy rows stop when refreshed q-top drifts to a material uncovered
+  outcome; execution does not swap codes automatically.
 """
 
 

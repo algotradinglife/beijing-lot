@@ -141,6 +141,61 @@ def test_layer_conflict_full_can_be_candidate_when_third_code_has_value() -> Non
     assert execution.selection_codes == ["1", "3", "0"]
 
 
+def test_late_repriced_layer_conflict_is_blocked_when_double_misses_probability_top() -> None:
+    mod = _load_module()
+    source = _source(
+        p_3="0.42",
+        p_1="0.29",
+        p_0="0.29",
+        q_3="0.92",
+        q_1="1.62",
+        q_0="0.93",
+        execution_sp_reprice_ratio_max="2.80",
+    )
+    decision = _decision(
+        v4_action="wait_late_refresh",
+        v4_recommended_codes="1+0+3",
+        v4_full_cover_reasons="layer_conflict_requires_full_cover_or_skip",
+        v4_merge_flags="layer_conflict_requires_full_cover_or_skip",
+        v4_candidate_pool_json='[{"code":"1","score":2.0},{"code":"0","score":1.8},{"code":"3","score":0.1}]',
+    )
+
+    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.4)
+
+    assert execution.action == "skip_late_repriced_conflict_missing_prob_top"
+    assert execution.selection_codes == []
+    assert execution.double_codes == ["1", "0"]
+    assert "late_repriced_conflict_missing_prob_top" in execution.reasons
+
+
+def test_late_q_top_drift_blocks_direct_buy_without_swapping_codes() -> None:
+    mod = _load_module()
+    source = _source(
+        p_3="0.345",
+        p_1="0.251",
+        p_0="0.403",
+        q_3="1.262",
+        q_1="0.857",
+        q_0="0.927",
+        source_q_3="0.937",
+        source_q_1="0.822",
+        source_q_0="1.233",
+        execution_sp_reprice_ratio_max="1.35",
+    )
+    decision = _decision(
+        v4_action="buy",
+        v4_recommended_codes="0+1",
+        v4_selection_codes="0+1",
+    )
+
+    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.4)
+
+    assert execution.action == "skip_late_q_top_drift"
+    assert execution.selection_codes == []
+    assert execution.double_codes == ["0", "1"]
+    assert "late_q_top_drift_uncovered" in execution.reasons
+
+
 def test_segment_full_cap_keeps_top_candidate_and_downgrades_overflow() -> None:
     mod = _load_module()
     first = mod.RowExecution(["3", "1", "0"], "candidate_full_cover", [], ["3", "1"], 2.0, True, False)

@@ -229,7 +229,7 @@ Required execution extension fields:
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `execution_policy_version` | string | Example: `v4.2.0000_execution_policy_2026-07-05`. |
+| `execution_policy_version` | string | Example: `v4.2.0000_execution_policy_2026-07-05_topline_guard`. |
 | `execution_policy_name` | enum/string | Example: `strict_fullcap2` or `late_proxy_fullcap2`. |
 | `execution_action` | enum | Stable action from the execution layer. |
 | `execution_reasons` | string | `;`-joined machine-readable reasons. |
@@ -267,6 +267,8 @@ Stable `execution_action` values:
 | `skip_no_recommendation` | No v4.2 recommended codes. |
 | `skip_missing_decision` | Execution artifact could not find a v4.2 decision row. |
 | `skip_missing_execution_sp` | Late-proxy mode could not find trusted per-match execution SP; row remains no-buy. |
+| `skip_late_repriced_conflict_missing_prob_top` | Late-proxy row had severe SP repricing; compressed double lost the probability top, so the row remains no-buy. |
+| `skip_late_q_top_drift` | Late execution q-top drifted to an uncovered outcome; row remains no-buy instead of swapping codes automatically. |
 
 Execution mapping rules:
 
