@@ -33,7 +33,7 @@ SEVERE_SP_RATIO = 2.0
 TOPLINE_DRIFT_SP_RATIO = 1.30
 TOPLINE_DRIFT_Q_MIN = 1.20
 TOPLINE_DRIFT_P_MIN = 0.30
-POLICY_VERSION = "v4.2.0000_execution_policy_2026-07-05_topline_guard"
+POLICY_VERSION = "v4.2.0001_execution_policy_2026-07-05_topline_guard"
 SHADOW_ARM = "shadow_v4.2.0000_execution"
 SHADOW_VERSION = "llm_chain_structured_v4.2.0000_layered_merge_execution_policy"
 
@@ -349,6 +349,25 @@ def source_q_top_from_row(row: dict[str, Any]) -> tuple[str | None, dict[str, fl
     return top_row_code(row, "", "q")
 
 
+def probability_team_top_guard_code(source_row: dict[str, Any], decision_row: dict[str, Any]) -> str | None:
+    if str(decision_row.get("v4_action") or "") != "full_cover_or_skip":
+        return None
+    if safe_float(source_row.get("execution_sp_reprice_ratio_max"), default=1.0) < SEVERE_SP_RATIO:
+        return None
+    prob_top = probability_top_from_row(source_row)
+    if not prob_top:
+        return None
+    team_codes = set(parse_codes(decision_row.get("v4_team_strength_codes")))
+    if safe_float(decision_row.get("v4_team_strength_confidence")) < 0.85:
+        return None
+    if prob_top not in team_codes:
+        return None
+    q_top, q_values = execution_q_top_from_row(source_row)
+    if q_top == prob_top or q_values.get(q_top or "", 0.0) >= TOPLINE_DRIFT_Q_MIN:
+        return None
+    return prob_top
+
+
 def late_repriced_conflict_skip_reasons(
     source_row: dict[str, Any],
     source_action: str,
@@ -451,6 +470,9 @@ def compressed_double_codes(source_row: dict[str, Any], decision_row: dict[str, 
     selected = unique_codes(mandatory)
     if len(selected) > 2:
         return []
+    guard_code = probability_team_top_guard_code(source_row, decision_row)
+    if guard_code and guard_code not in selected and guard_code in recommended and len(selected) < 2:
+        selected.append(guard_code)
     for code in ranked:
         if code not in selected:
             selected.append(code)
@@ -814,6 +836,8 @@ Generated: {generated}
   downgraded to the best double when possible.
 - Late-proxy rows stop instead of forcing a tight double when severe SP
   repricing makes the compressed double lose the probability top.
+- Full-cover-or-skip rows keep the probability/team-strength top in the
+  compressed double when refreshed q-top is not material enough to override it.
 - Direct-buy rows stop when refreshed q-top drifts to a material uncovered
   outcome; execution does not swap codes automatically.
 """

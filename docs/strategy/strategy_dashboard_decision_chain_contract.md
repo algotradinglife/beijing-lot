@@ -229,7 +229,7 @@ Required execution extension fields:
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `execution_policy_version` | string | Example: `v4.2.0000_execution_policy_2026-07-05_topline_guard`. |
+| `execution_policy_version` | string | Example: `v4.2.0001_execution_policy_2026-07-05_topline_guard`. |
 | `execution_policy_name` | enum/string | Example: `strict_fullcap2` or `late_proxy_fullcap2`. |
 | `execution_action` | enum | Stable action from the execution layer. |
 | `execution_reasons` | string | `;`-joined machine-readable reasons. |

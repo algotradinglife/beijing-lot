@@ -160,7 +160,7 @@ def test_late_repriced_layer_conflict_is_blocked_when_double_misses_probability_
         v4_candidate_pool_json='[{"code":"1","score":2.0},{"code":"0","score":1.8},{"code":"3","score":0.1}]',
     )
 
-    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.4)
+    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=9.0)
 
     assert execution.action == "skip_late_repriced_conflict_missing_prob_top"
     assert execution.selection_codes == []
@@ -194,6 +194,74 @@ def test_late_q_top_drift_blocks_direct_buy_without_swapping_codes() -> None:
     assert execution.selection_codes == []
     assert execution.double_codes == ["0", "1"]
     assert "late_q_top_drift_uncovered" in execution.reasons
+
+
+def test_probability_team_top_guard_keeps_cover_win_when_q_top_is_weak() -> None:
+    mod = _load_module()
+    source = _source(
+        p_3="0.426",
+        p_1="0.258",
+        p_0="0.317",
+        sp_3="2.05",
+        sp_1="4.30",
+        sp_0="3.55",
+        q_3="0.873",
+        q_1="1.108",
+        q_0="1.124",
+        execution_sp_reprice_ratio_max="2.15",
+    )
+    decision = _decision(
+        v4_action="full_cover_or_skip",
+        v4_recommended_codes="0+1+3",
+        v4_mandatory_codes="1",
+        v4_protected_codes="1",
+        v4_semantic_draw="explicit_draw",
+        v4_team_strength_side="home",
+        v4_team_strength_confidence="0.90",
+        v4_team_strength_codes="3",
+        v4_full_cover_reasons="candidate_score_dense;layer_conflict_requires_full_cover_or_skip",
+        v4_merge_flags="layer_conflict_requires_full_cover_or_skip",
+        v4_candidate_pool_json='[{"code":"0","score":2.0713},{"code":"1","score":1.9761},{"code":"3","score":1.5492}]',
+    )
+
+    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.4)
+
+    assert execution.action == "downgrade_full_to_double_layer_conflict"
+    assert execution.selection_codes == ["1", "3"]
+    assert execution.double_codes == ["1", "3"]
+
+
+def test_probability_team_top_guard_does_not_override_strong_q_double() -> None:
+    mod = _load_module()
+    source = _source(
+        p_3="0.449",
+        p_1="0.243",
+        p_0="0.308",
+        sp_3="1.30",
+        sp_1="10.03",
+        sp_0="7.40",
+        q_3="0.583",
+        q_1="2.437",
+        q_0="2.283",
+        execution_sp_reprice_ratio_max="2.75",
+    )
+    decision = _decision(
+        v4_action="full_cover_or_skip",
+        v4_recommended_codes="3+1+0",
+        v4_mandatory_codes="1+0",
+        v4_semantic_draw="balanced",
+        v4_team_strength_side="away",
+        v4_team_strength_confidence="0.90",
+        v4_team_strength_codes="0",
+        v4_full_cover_reasons="candidate_score_dense;layer_conflict_requires_full_cover_or_skip",
+        v4_merge_flags="layer_conflict_requires_full_cover_or_skip",
+        v4_candidate_pool_json='[{"code":"3","score":1.5414},{"code":"1","score":1.4005},{"code":"0","score":1.3449}]',
+    )
+
+    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=9.0)
+
+    assert execution.selection_codes == ["1", "0"]
+    assert execution.double_codes == ["1", "0"]
 
 
 def test_segment_full_cap_keeps_top_candidate_and_downgrades_overflow() -> None:
