@@ -123,8 +123,10 @@ shadow_v4.2.0000_execution_late_proxy_fullcap2
 
 Dashboard should only display these variants when the active release manifest
 declares matching `decision_variants[]` and the CSV rows contain matching
-`shadow_arm` values. It must not recompute full-cover caps, late-refresh state,
-or N selection from these rows.
+`shadow_arm` values. The `fullcap2` suffix is retained for compatibility, but
+strategy execution policy `v4.2.0002+` does not apply final per-segment/budget
+caps in this artifact. Dashboard must not recompute late-refresh state or N
+selection from these rows; final ticket/stake optimization is a separate layer.
 
 Readiness/defaulting contract:
 
@@ -167,6 +169,8 @@ For v4.2.0000 execution artifacts:
   `execution_reasons`.
 - Full-cover display should use `execution_full_score`,
   `execution_full_candidate`, and `execution_full_kept`.
+  `execution_full_kept=1` means the row remains full cover in this per-row
+  artifact, not that budget optimization has funded it.
 - Late-refresh stop color should come from `execution_unlock_state`:
   `waiting_late_refresh` renders red and `unlocked_after_late_refresh` renders
   green.

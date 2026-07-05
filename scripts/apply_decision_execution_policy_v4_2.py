@@ -33,7 +33,7 @@ SEVERE_SP_RATIO = 2.0
 TOPLINE_DRIFT_SP_RATIO = 1.30
 TOPLINE_DRIFT_Q_MIN = 1.20
 TOPLINE_DRIFT_P_MIN = 0.30
-POLICY_VERSION = "v4.2.0001_execution_policy_2026-07-05_topline_guard"
+POLICY_VERSION = "v4.2.0002_execution_policy_2026-07-05_probability_anchor"
 SHADOW_ARM = "shadow_v4.2.0000_execution"
 SHADOW_VERSION = "llm_chain_structured_v4.2.0000_layered_merge_execution_policy"
 
@@ -349,23 +349,47 @@ def source_q_top_from_row(row: dict[str, Any]) -> tuple[str | None, dict[str, fl
     return top_row_code(row, "", "q")
 
 
-def probability_team_top_guard_code(source_row: dict[str, Any], decision_row: dict[str, Any]) -> str | None:
-    if str(decision_row.get("v4_action") or "") != "full_cover_or_skip":
-        return None
-    if safe_float(source_row.get("execution_sp_reprice_ratio_max"), default=1.0) < SEVERE_SP_RATIO:
-        return None
-    prob_top = probability_top_from_row(source_row)
-    if not prob_top:
-        return None
+def should_probability_anchor_compression(source_row: dict[str, Any], decision_row: dict[str, Any]) -> bool:
+    source_action = str(decision_row.get("v4_action") or "")
+    if source_action not in {"wait_late_refresh", "full_cover_or_skip"}:
+        return False
+    return safe_float(source_row.get("execution_sp_reprice_ratio_max"), default=1.0) >= SEVERE_SP_RATIO
+
+
+def second_leg_score(source_row: dict[str, Any], decision_row: dict[str, Any], code: str) -> float:
+    metrics = code_metrics(source_row)
+    values = metrics[code]
+    mandatory = set(parse_codes(decision_row.get("v4_mandatory_codes")))
+    protected = set(parse_codes(decision_row.get("v4_protected_codes")))
     team_codes = set(parse_codes(decision_row.get("v4_team_strength_codes")))
-    if safe_float(decision_row.get("v4_team_strength_confidence")) < 0.85:
-        return None
-    if prob_top not in team_codes:
-        return None
-    q_top, q_values = execution_q_top_from_row(source_row)
-    if q_top == prob_top or q_values.get(q_top or "", 0.0) >= TOPLINE_DRIFT_Q_MIN:
-        return None
-    return prob_top
+    semantic_draw = str(decision_row.get("v4_semantic_draw") or "none")
+    score = 0.60 * values["q"] + 0.20 * values["p"]
+    if code in team_codes and safe_float(decision_row.get("v4_team_strength_confidence")) >= 0.85:
+        score += 0.80
+    if code in mandatory:
+        score += 0.30
+    if code in protected:
+        score += 0.30
+    if code == "1":
+        if semantic_draw == "explicit_draw":
+            score += 0.35
+        elif semantic_draw == "balanced":
+            score += 0.20
+    return score
+
+
+def probability_anchor_double_codes(source_row: dict[str, Any], decision_row: dict[str, Any]) -> list[str]:
+    recommended = parse_codes(decision_row.get("v4_recommended_codes"))
+    if len(recommended) < 3 or not should_probability_anchor_compression(source_row, decision_row):
+        return []
+    anchor = probability_top_from_row(source_row)
+    if anchor not in recommended:
+        return []
+    remaining = [code for code in recommended if code != anchor]
+    if not remaining:
+        return [anchor]
+    second = max(remaining, key=lambda code: second_leg_score(source_row, decision_row, code))
+    return [anchor, second]
 
 
 def late_repriced_conflict_skip_reasons(
@@ -461,18 +485,24 @@ def rank_codes_for_execution(source_row: dict[str, Any], decision_row: dict[str,
     return sorted(recommended, key=lambda code: scores.get(code, 0.0), reverse=True)
 
 
-def compressed_double_codes(source_row: dict[str, Any], decision_row: dict[str, Any]) -> list[str]:
+def compressed_double_codes(
+    source_row: dict[str, Any],
+    decision_row: dict[str, Any],
+    *,
+    probability_anchor: bool = True,
+) -> list[str]:
     recommended = parse_codes(decision_row.get("v4_recommended_codes"))
     if len(recommended) <= 2:
         return recommended
+    if probability_anchor:
+        anchored = probability_anchor_double_codes(source_row, decision_row)
+        if anchored:
+            return anchored
     mandatory = parse_codes(decision_row.get("v4_mandatory_codes"))
     ranked = rank_codes_for_execution(source_row, decision_row)
     selected = unique_codes(mandatory)
     if len(selected) > 2:
         return []
-    guard_code = probability_team_top_guard_code(source_row, decision_row)
-    if guard_code and guard_code not in selected and guard_code in recommended and len(selected) < 2:
-        selected.append(guard_code)
     for code in ranked:
         if code not in selected:
             selected.append(code)
@@ -529,7 +559,8 @@ def evaluate_row_policy(
     source_action = str(decision_row.get("v4_action") or "")
     recommended = parse_codes(decision_row.get("v4_recommended_codes"))
     double_codes = compressed_double_codes(source_row, decision_row)
-    full_score = full_cover_score(source_row, decision_row, double_codes)
+    scoring_double_codes = compressed_double_codes(source_row, decision_row, probability_anchor=False)
+    full_score = full_cover_score(source_row, decision_row, scoring_double_codes)
     full_candidate = len(recommended) >= 3 and full_score >= full_score_threshold
     merge_flags = set(str(decision_row.get("v4_merge_flags") or "").split(";"))
     full_reasons = set(str(decision_row.get("v4_full_cover_reasons") or "").split(";"))
@@ -548,7 +579,7 @@ def evaluate_row_policy(
         reason = "late_refresh_proxy" if source_action == "wait_late_refresh" else "direct_buy"
         return RowExecution(recommended, "execute_double" if len(recommended) == 2 else "execute_single", [reason], double_codes, full_score, False, False)
     if full_candidate:
-        return RowExecution(recommended, "candidate_full_cover", ["full_score_above_threshold"], double_codes, full_score, True, False)
+        return RowExecution(recommended, "execute_full_cover", ["full_score_above_threshold"], double_codes, full_score, True, True)
     if conflict_full:
         if double_codes:
             skip_reasons = late_repriced_conflict_skip_reasons(source_row, source_action, double_codes)
@@ -612,34 +643,12 @@ def segments_by_match_idx(
     return out
 
 
-def apply_segment_full_cap(
+def annotate_execution_segments(
     executions: dict[int, RowExecution],
     segment_lookup: dict[int, int],
-    *,
-    max_full_per_segment: int,
 ) -> None:
-    grouped: dict[int, list[tuple[int, RowExecution]]] = {}
     for match_idx, execution in executions.items():
         execution.segment_idx = segment_lookup.get(match_idx)
-        if execution.full_candidate:
-            grouped.setdefault(execution.segment_idx or 0, []).append((match_idx, execution))
-    for rows in grouped.values():
-        rows.sort(key=lambda item: item[1].full_score, reverse=True)
-        keep = {match_idx for match_idx, _execution in rows[:max(0, max_full_per_segment)]}
-        for match_idx, execution in rows:
-            if match_idx in keep:
-                execution.full_kept = True
-                execution.action = "execute_full_cover"
-                execution.reasons = ["segment_full_cap_kept"] + execution.reasons
-                continue
-            if execution.double_codes:
-                execution.selection_codes = execution.double_codes
-                execution.action = "downgrade_full_to_double_over_cap"
-                execution.reasons = ["segment_full_cap_overflow"] + execution.reasons
-            else:
-                execution.selection_codes = []
-                execution.action = "skip_full_over_cap"
-                execution.reasons = ["segment_full_cap_overflow_no_double"] + execution.reasons
 
 
 def apply_policy(
@@ -708,7 +717,7 @@ def apply_policy(
         )
         if prepared and prepared.repricing_reasons:
             executions[match_idx].reasons = list(prepared.repricing_reasons) + executions[match_idx].reasons
-    apply_segment_full_cap(executions, segment_lookup, max_full_per_segment=max_full_per_segment)
+    annotate_execution_segments(executions, segment_lookup)
 
     extra_fields = [
         "q_top",
@@ -800,6 +809,7 @@ def apply_policy(
         "execution_sp_mode": execution_sp_mode,
         "full_score_threshold": full_score_threshold,
         "max_full_per_segment": max_full_per_segment,
+        "segment_full_cap_applied": False,
         "rows": len(output_rows),
         "settled_rows": settled_count,
         "settled_hit_rows": hit_count,
@@ -831,13 +841,14 @@ Generated: {generated}
 - `wait_late_refresh` rows execute only when `late_refresh_mode=proxy`; in
   strict mode they remain no-buy until a real late refresh artifact exists.
 - Full-cover rows are scored by layer-conflict value, q/SP attraction, and the
-  value of the third code after double compression.
-- Full cover is capped per rolling segment. Over-cap full candidates are
-  downgraded to the best double when possible.
+  value of the third code after baseline double compression, so late probability
+  anchoring does not change per-row full-cover candidacy.
+- Rolling segment ids are attached for downstream stake optimization, but this
+  layer does not cap, skip, or downgrade full-cover candidates by segment.
 - Late-proxy rows stop instead of forcing a tight double when severe SP
-  repricing makes the compressed double lose the probability top.
-- Full-cover-or-skip rows keep the probability/team-strength top in the
-  compressed double when refreshed q-top is not material enough to override it.
+  repricing cannot be compressed while keeping the probability top.
+- Severely repriced full-cover rows compress by anchoring probability top first;
+  the remaining two outcomes compete for the second slot.
 - Direct-buy rows stop when refreshed q-top drifts to a material uncovered
   outcome; execution does not swap codes automatically.
 """

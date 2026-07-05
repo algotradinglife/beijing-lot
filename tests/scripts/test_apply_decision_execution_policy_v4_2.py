@@ -137,11 +137,12 @@ def test_layer_conflict_full_can_be_candidate_when_third_code_has_value() -> Non
     execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.4)
 
     assert execution.full_candidate is True
-    assert execution.action == "candidate_full_cover"
+    assert execution.full_kept is True
+    assert execution.action == "execute_full_cover"
     assert execution.selection_codes == ["1", "3", "0"]
 
 
-def test_late_repriced_layer_conflict_is_blocked_when_double_misses_probability_top() -> None:
+def test_late_repriced_layer_conflict_anchors_probability_top_before_compressing() -> None:
     mod = _load_module()
     source = _source(
         p_3="0.42",
@@ -162,10 +163,10 @@ def test_late_repriced_layer_conflict_is_blocked_when_double_misses_probability_
 
     execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=9.0)
 
-    assert execution.action == "skip_late_repriced_conflict_missing_prob_top"
-    assert execution.selection_codes == []
-    assert execution.double_codes == ["1", "0"]
-    assert "late_repriced_conflict_missing_prob_top" in execution.reasons
+    assert execution.action == "downgrade_full_to_double_layer_conflict"
+    assert execution.selection_codes == ["3", "1"]
+    assert execution.double_codes == ["3", "1"]
+    assert "full_required_but_value_below_threshold" in execution.reasons
 
 
 def test_late_q_top_drift_blocks_direct_buy_without_swapping_codes() -> None:
@@ -196,7 +197,7 @@ def test_late_q_top_drift_blocks_direct_buy_without_swapping_codes() -> None:
     assert "late_q_top_drift_uncovered" in execution.reasons
 
 
-def test_probability_team_top_guard_keeps_cover_win_when_q_top_is_weak() -> None:
+def test_probability_anchor_keeps_cover_win_when_q_top_is_weak() -> None:
     mod = _load_module()
     source = _source(
         p_3="0.426",
@@ -227,11 +228,11 @@ def test_probability_team_top_guard_keeps_cover_win_when_q_top_is_weak() -> None
     execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.4)
 
     assert execution.action == "downgrade_full_to_double_layer_conflict"
-    assert execution.selection_codes == ["1", "3"]
-    assert execution.double_codes == ["1", "3"]
+    assert execution.selection_codes == ["3", "1"]
+    assert execution.double_codes == ["3", "1"]
 
 
-def test_probability_team_top_guard_does_not_override_strong_q_double() -> None:
+def test_probability_anchor_lets_remaining_outcomes_compete_without_promoting_full_cover() -> None:
     mod = _load_module()
     source = _source(
         p_3="0.449",
@@ -258,26 +259,65 @@ def test_probability_team_top_guard_does_not_override_strong_q_double() -> None:
         v4_candidate_pool_json='[{"code":"3","score":1.5414},{"code":"1","score":1.4005},{"code":"0","score":1.3449}]',
     )
 
+    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.6)
+
+    assert execution.action == "downgrade_full_to_double_layer_conflict"
+    assert execution.full_candidate is False
+    assert execution.selection_codes == ["3", "0"]
+    assert execution.double_codes == ["3", "0"]
+
+
+def test_probability_anchor_can_compress_mandatory_overflow() -> None:
+    mod = _load_module()
+    source = _source(
+        p_3="0.449",
+        p_1="0.243",
+        p_0="0.308",
+        sp_3="1.30",
+        sp_1="10.03",
+        sp_0="7.40",
+        q_3="0.583",
+        q_1="2.437",
+        q_0="2.283",
+        execution_sp_reprice_ratio_max="2.75",
+    )
+    decision = _decision(
+        v4_action="wait_late_refresh",
+        v4_recommended_codes="1+3+0",
+        v4_mandatory_codes="1+3+0",
+        v4_semantic_draw="balanced",
+        v4_team_strength_side="away",
+        v4_team_strength_confidence="0.90",
+        v4_team_strength_codes="0",
+        v4_full_cover_reasons="candidate_score_dense;layer_conflict_requires_full_cover_or_skip",
+        v4_merge_flags="layer_conflict_requires_full_cover_or_skip",
+        v4_candidate_pool_json='[{"code":"1","score":1.5414},{"code":"3","score":1.4005},{"code":"0","score":1.3449}]',
+    )
+
     execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=9.0)
 
-    assert execution.selection_codes == ["1", "0"]
-    assert execution.double_codes == ["1", "0"]
+    assert execution.action == "downgrade_full_to_double_layer_conflict"
+    assert execution.selection_codes == ["3", "0"]
+    assert execution.double_codes == ["3", "0"]
 
 
-def test_segment_full_cap_keeps_top_candidate_and_downgrades_overflow() -> None:
+def test_segment_annotation_does_not_cap_or_downgrade_full_candidates() -> None:
     mod = _load_module()
-    first = mod.RowExecution(["3", "1", "0"], "candidate_full_cover", [], ["3", "1"], 2.0, True, False)
-    second = mod.RowExecution(["3", "1", "0"], "candidate_full_cover", [], ["0", "1"], 1.5, True, False)
+    first = mod.RowExecution(["3", "1", "0"], "execute_full_cover", [], ["3", "1"], 2.0, True, True)
+    second = mod.RowExecution(["3", "1", "0"], "execute_full_cover", [], ["0", "1"], 1.5, True, True)
     executions = {1: first, 2: second}
     segment_lookup = {1: 1, 2: 1}
 
-    mod.apply_segment_full_cap(executions, segment_lookup, max_full_per_segment=1)
+    mod.annotate_execution_segments(executions, segment_lookup)
 
     assert first.action == "execute_full_cover"
     assert first.selection_codes == ["3", "1", "0"]
     assert first.full_kept is True
-    assert second.action == "downgrade_full_to_double_over_cap"
-    assert second.selection_codes == ["0", "1"]
+    assert first.segment_idx == 1
+    assert second.action == "execute_full_cover"
+    assert second.selection_codes == ["3", "1", "0"]
+    assert second.full_kept is True
+    assert second.segment_idx == 1
 
 
 def test_late_proxy_reprices_stale_source_sp_before_full_cover_scoring(tmp_path: Path) -> None:

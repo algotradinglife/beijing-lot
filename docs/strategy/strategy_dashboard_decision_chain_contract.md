@@ -180,7 +180,9 @@ no-buy. `late_proxy_fullcap2` represents the executable state after a valid
 late SP refresh has occurred and the refreshed SP has been applied to execution
 scoring. The live workflow should publish/choose `strict_fullcap2` before the
 refresh window and `late_proxy_fullcap2` only after the refresh artifact exists
-and per-match execution SP is available.
+and per-match execution SP is available. The `fullcap2` suffix is a legacy
+variant id retained for dashboard compatibility; starting with execution policy
+`v4.2.0002`, this layer does not apply the final per-segment/budget cap.
 
 Because live strategy artifacts may refresh automatically, dashboard must make
 the selected execution policy and blocking state visible. A row that is
@@ -229,17 +231,17 @@ Required execution extension fields:
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `execution_policy_version` | string | Example: `v4.2.0001_execution_policy_2026-07-05_topline_guard`. |
+| `execution_policy_version` | string | Example: `v4.2.0002_execution_policy_2026-07-05_probability_anchor`. |
 | `execution_policy_name` | enum/string | Example: `strict_fullcap2` or `late_proxy_fullcap2`. |
 | `execution_action` | enum | Stable action from the execution layer. |
 | `execution_reasons` | string | `;`-joined machine-readable reasons. |
 | `execution_source_action` | enum/string | Original v4.2 decision action, e.g. `buy`, `wait_late_refresh`, `full_cover_or_skip`. |
 | `execution_recommended_codes` | string | Audit recommendation from v4.2.0000, before execution compression. |
 | `execution_double_codes` | string | Best compressed double if a full-cover row must be reduced. |
-| `execution_full_score` | number/string | Full-cover value score used for cap/keep decisions. |
-| `execution_full_candidate` | boolean/int | `1` if the row qualified as a full-cover candidate before segment cap. |
-| `execution_full_kept` | boolean/int | `1` if the row kept full cover after per-segment cap. |
-| `execution_segment_idx` | integer/string | Rolling segment id used by the execution cap. |
+| `execution_full_score` | number/string | Per-row full-cover value score for downstream stake optimization. |
+| `execution_full_candidate` | boolean/int | `1` if the row qualified as a per-row full-cover candidate. |
+| `execution_full_kept` | boolean/int | `1` if this artifact leaves the row as full cover; not a final budget/cap approval in `v4.2.0002+`. |
+| `execution_segment_idx` | integer/string | Rolling segment id for downstream stake optimization. |
 | `execution_unlock_state` | enum/string | Late-refresh stop state for UI color and automation. |
 | `source_sp_3`, `source_sp_1`, `source_sp_0` | number/string | SP values from the source structured shadow CSV before execution repricing. |
 | `source_q_3`, `source_q_1`, `source_q_0` | number/string | q values from the source structured shadow CSV before execution repricing. |
@@ -257,13 +259,13 @@ Stable `execution_action` values:
 | --- | --- |
 | `execute_single` | One executable code. |
 | `execute_double` | Two executable codes. |
-| `execute_full_cover` | Full cover kept by execution policy. |
+| `execute_full_cover` | Per-row full cover selected by execution policy; downstream stake optimization may still skip or compress it. |
 | `downgrade_full_to_double` | Low-value full cover reduced to best double. |
 | `downgrade_full_to_double_layer_conflict` | Layer-conflict full cover reduced to best double because full value is below threshold. |
-| `downgrade_full_to_double_over_cap` | Full cover qualified but exceeded per-segment full cap, then reduced to best double. |
+| `downgrade_full_to_double_over_cap` | Deprecated after `v4.2.0002`; final cap is not applied in this layer. |
 | `skip_wait_late_refresh` | Strict mode: row is waiting for late refresh and is not buyable. |
 | `skip_stop` | Source chain stopped the row. |
-| `skip_full_over_cap` | Full cover exceeded segment cap and no safe double was available. |
+| `skip_full_over_cap` | Deprecated after `v4.2.0002`; final cap is not applied in this layer. |
 | `skip_no_recommendation` | No v4.2 recommended codes. |
 | `skip_missing_decision` | Execution artifact could not find a v4.2 decision row. |
 | `skip_missing_execution_sp` | Late-proxy mode could not find trusted per-match execution SP; row remains no-buy. |
@@ -278,6 +280,13 @@ Execution mapping rules:
 - `shadow_stop_flag=1` means no executable selection exists for this row.
 - `skip_*` execution actions must be rendered as stop/no-buy states even when
   `execution_recommended_codes` is populated.
+- In `v4.2.0002`, severely repriced late/full-cover rows are compressed by
+  anchoring the probability top first and letting the remaining outcomes compete
+  for the second slot. Dashboard should display `shadow_selection_codes` and
+  `execution_double_codes` from the artifact, not re-run this compression.
+- `v4.2.0002+` does not apply per-segment full-cover caps or budget decisions.
+  Later ticket/stake optimization owns final match selection, N choice, and
+  whether a per-row full-cover candidate is actually funded.
 - `skip_wait_late_refresh` is a temporary stop. It may become executable after
   a later valid refresh, so the UI should show the policy/refresh state instead
   of silently treating the audit recommendation as actionable.

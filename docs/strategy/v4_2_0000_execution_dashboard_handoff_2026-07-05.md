@@ -6,8 +6,9 @@ Date: 2026-07-05
 
 Strategy publishes v4.2.0000 execution artifacts as structured shadow CSVs.
 Dashboard consumes the declared artifact and renders the fields. Dashboard does
-not recompute recommendations, execution codes, full-cover caps, late-refresh
-state, or N.
+not recompute recommendations, execution codes, late-refresh state, or N. The
+execution artifact also does not make the final budget/full-cover cap decision;
+that belongs to a later ticket/stake optimization layer.
 
 ## Variants
 
@@ -21,6 +22,10 @@ shadow_v4.2.0000_execution_late_proxy_fullcap2
 - `strict_fullcap2`: pre-refresh state. Rows requiring late refresh are no-buy.
 - `late_proxy_fullcap2`: executable state after a valid late SP refresh, with
   refreshed per-match SP applied to q/full-score/compression.
+
+The `fullcap2` suffix is retained as a compatibility id. Starting with execution
+policy `v4.2.0002`, this artifact marks per-row full-cover candidates but does
+not cap or downgrade them by segment.
 
 ## Artifact Contract
 
@@ -58,6 +63,8 @@ Issue Board / Match Detail:
 - show `execution_action`, `execution_reasons`, `execution_full_score`,
   `execution_full_candidate`, `execution_full_kept`, and
   `execution_segment_idx`;
+- treat full-cover fields as per-row diagnostics for the downstream optimizer,
+  not as proof that a full cover has been funded under the final budget;
 - use `execution_unlock_state` for late-refresh stop color:
   `waiting_late_refresh` is red, `unlocked_after_late_refresh` is green;
 - show `shadow_stop_flag=1` rows as no-buy/wait/skip, not as executable picks.
@@ -164,10 +171,15 @@ official 26072 settlement replay.
 
 ## Current Strategy Evidence
 
-Current provisional 26072 augmented #1-45 result:
+Current provisional 26072 result through #54, using official 500 settlement for
+#1-52 plus NowScore provisional finished results for #53-54:
 
-- v4.2.0000 recommended: 45/45 coverage, 32/65 full rows.
-- `late_proxy_fullcap2`: 40/45 coverage, 8/65 full rows.
-- 100 seed rolling replay: median ROI 143.07%, p10 112.34%.
+- prior `v4.2.0001` late-proxy artifact: 44/54 coverage; bought 49 rows and
+  hit 44/49; no-buy rows were #28, #48, #50, #51, #52.
+- `v4.2.0002` late-proxy per-row artifact: 49/54 coverage; bought 53 rows and
+  hit 49/53; only no-buy row is #48.
+- `v4.2.0002` late-proxy publishes 7/65 per-row full-cover candidates. These
+  are not final funded full covers; budget and ticket selection are delegated
+  to the downstream optimizer.
 
 This remains shadow/research until official 500 settlement is complete.
