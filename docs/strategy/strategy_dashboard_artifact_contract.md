@@ -64,7 +64,12 @@ decision_chain
 shadow_decision_chain
 ```
 
-`decision_variants` should include the user-selectable active and shadow views. Active is the production snapshot view. Shadow variants are strategy-provided artifacts and remain selectable in the UI when a current/open issue has matching shadow CSV rows.
+`decision_variants` should include the user-selectable active and shadow views.
+Active is the production snapshot view. Shadow variants are strategy-provided
+artifacts and remain selectable in the UI when a current/open issue has
+matching shadow CSV rows. Variants can include a `readiness` object so the API
+and dashboard know whether a missing artifact should fall back, render as a
+diagnostic placeholder, or stay hidden until produced.
 
 ## Artifact Keys
 
@@ -115,6 +120,18 @@ Dashboard should only display these variants when the active release manifest
 declares matching `decision_variants[]` and the CSV rows contain matching
 `shadow_arm` values. It must not recompute full-cover caps, late-refresh state,
 or N selection from these rows.
+
+Readiness/defaulting contract:
+
+- `defaultable_when=available`: the variant can be default only after real
+  per-issue rows exist.
+- `missing_behavior=diagnostic_placeholder`: API may expose a degraded,
+  non-defaultable placeholder for diagnosis. This is used for missing
+  `strict_fullcap2`.
+- `missing_behavior=hidden_until_artifact`: API hides the option until the
+  artifact exists. This is used for missing `late_proxy_fullcap2`.
+- Runtime API options expose `available`, `defaultable`, `readiness_status`,
+  and `degraded_reason`; dashboard should display these directly.
 
 Reference sample CSV:
 

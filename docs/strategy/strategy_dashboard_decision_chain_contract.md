@@ -192,6 +192,38 @@ version, API should default to `late_proxy_fullcap2`. This is the automated
 unlock mechanism. The strict artifact remains selectable for audit, and ticket
 submission remains an explicit user action.
 
+Manifest readiness fields make this defaulting rule explicit. Each
+`decision_variants[]` entry may include:
+
+| Field | Values | Meaning |
+| --- | --- | --- |
+| `readiness.artifact_required` | boolean | Whether a per-issue artifact row must exist before the variant is real. |
+| `readiness.defaultable_when` | `always`, `available`, `never` | Whether the API may choose this variant as the default. Execution variants use `available`. |
+| `readiness.missing_behavior` | `builtin_active`, `fallback_to_active`, `diagnostic_placeholder`, `hidden_until_artifact`, `artifact_missing` | How API/frontend should treat a missing per-issue artifact. |
+| `readiness.late_refresh` | `not_applicable`, `strict_wait_before_valid_live_sp_refresh`, `unlock_after_valid_live_sp_refresh` | Late-refresh timing semantics. |
+| `readiness.missing_reason` | string | Stable warning code for missing artifacts. |
+
+Runtime option fields exposed by the API:
+
+- `available=true` means the option has real rows for the issue or is built in.
+- `defaultable=true` means the option can participate in default selection.
+- `readiness_status=available` means no readiness warning.
+- `readiness_status=degraded` means the option is selectable only as a
+  diagnostic placeholder, currently used for missing strict execution artifacts.
+- `readiness_status=unavailable` means the option must not be shown as a live
+  executable choice. Missing late-proxy artifacts are hidden until published.
+- `degraded_reason` is a concise machine-readable reason for warnings.
+
+For v4.2.0000 execution variants:
+
+- missing `strict_fullcap2`: API may expose a degraded diagnostic placeholder,
+  but `available=false`, `defaultable=false`, and rows are no-buy/wait.
+- real `strict_fullcap2`: `available=true`, `defaultable=true`; rows held by
+  late refresh stay red with `waiting_late_refresh`.
+- missing `late_proxy_fullcap2`: hidden from options, not defaultable.
+- real `late_proxy_fullcap2`: `available=true`, `defaultable=true`, and it
+  outranks strict as the default for that issue.
+
 Required execution extension fields:
 
 | Field | Type | Rule |

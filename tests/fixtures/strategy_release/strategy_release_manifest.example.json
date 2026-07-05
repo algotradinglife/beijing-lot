@@ -36,7 +36,13 @@
           "label": "v3",
           "source": "active_snapshot",
           "is_default": true,
-          "selectable": true
+          "selectable": true,
+          "readiness": {
+            "artifact_required": false,
+            "defaultable_when": "always",
+            "missing_behavior": "builtin_active",
+            "late_refresh": "not_applicable"
+          }
         },
         {
           "variant_id": "shadow_v3.3.3",
@@ -46,7 +52,14 @@
           "source": "structured_shadow_csv",
           "artifact_key": "structured_shadow_dir",
           "is_default": false,
-          "selectable": true
+          "selectable": true,
+          "readiness": {
+            "artifact_required": true,
+            "defaultable_when": "available",
+            "missing_behavior": "fallback_to_active",
+            "late_refresh": "not_applicable",
+            "missing_reason": "structured_shadow_artifact_missing_for_issue"
+          }
         }
       ],
       "main_strategy_arms": [

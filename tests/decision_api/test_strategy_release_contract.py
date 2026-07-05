@@ -14,6 +14,9 @@ ROOT = Path(__file__).resolve().parents[2]
 RELEASE_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 DECISION_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.(?:[0-9]{4}|[0-9]+)$")
 RELEASE_ID = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*_[0-9]{4}_[0-9]{2}_[0-9]{2}$")
+DEFAULTABLE_WHEN = {"always", "available", "never"}
+MISSING_BEHAVIOR = {"builtin_active", "fallback_to_active", "diagnostic_placeholder", "hidden_until_artifact", "artifact_missing"}
+LATE_REFRESH_POLICY = {"not_applicable", "strict_wait_before_valid_live_sp_refresh", "unlock_after_valid_live_sp_refresh"}
 sys.path.insert(0, str(ROOT))
 
 from scripts.validate_strategy_release import validate_strategy_release  # noqa: E402
@@ -73,6 +76,13 @@ def _assert_release_contract(registry: dict[str, Any]) -> None:
             assert variant["kind"] in {"active", "shadow", "draft"}
             assert isinstance(variant["selectable"], bool)
             assert isinstance(variant["is_default"], bool)
+            readiness = variant.get("readiness", {})
+            assert isinstance(readiness, dict)
+            if readiness:
+                assert isinstance(readiness.get("artifact_required"), bool)
+                assert readiness.get("defaultable_when") in DEFAULTABLE_WHEN
+                assert readiness.get("missing_behavior") in MISSING_BEHAVIOR
+                assert readiness.get("late_refresh") in LATE_REFRESH_POLICY
             if variant["kind"] == "shadow":
                 assert variant["artifact_key"] in artifacts
 

@@ -80,6 +80,13 @@ API / manifest:
 - when both strict and late-proxy artifacts are available for the same version,
   API should select the late-proxy artifact by default. This is the automated
   stop-unlock signal.
+- consume API option fields `available`, `defaultable`, `readiness_status`,
+  `degraded_reason`, and `readiness` directly; do not infer readiness from the
+  variant id alone.
+- a missing strict artifact may appear as a degraded diagnostic placeholder, but
+  it must not be defaultable or treated as executable.
+- a missing late-proxy artifact is hidden until the live workflow publishes real
+  rows after valid live SP refresh.
 
 ## Automated Stop Unlock
 
@@ -113,7 +120,14 @@ Example release fragment:
       "source": "structured_shadow_csv",
       "artifact_key": "structured_shadow_dir",
       "is_default": false,
-      "selectable": true
+      "selectable": true,
+      "readiness": {
+        "artifact_required": true,
+        "defaultable_when": "available",
+        "missing_behavior": "hidden_until_artifact",
+        "late_refresh": "unlock_after_valid_live_sp_refresh",
+        "missing_reason": "late_proxy_execution_artifact_missing_or_not_refreshed"
+      }
     }
   ],
   "artifacts": {

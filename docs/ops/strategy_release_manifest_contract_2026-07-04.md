@@ -44,6 +44,21 @@ snapshots or other active artifacts declared by the release.
 reinterpret, or hard-code shadow logic. It should only consume the artifact
 declared by `decision_variants[].artifact_key`.
 
+Each `decision_variants[]` entry may include `readiness`:
+
+- `artifact_required`: whether issue-level artifact rows must exist.
+- `defaultable_when`: `always`, `available`, or `never`.
+- `missing_behavior`: `builtin_active`, `fallback_to_active`,
+  `diagnostic_placeholder`, `hidden_until_artifact`, or `artifact_missing`.
+- `late_refresh`: `not_applicable`,
+  `strict_wait_before_valid_live_sp_refresh`, or
+  `unlock_after_valid_live_sp_refresh`.
+- `missing_reason`: stable warning code for dashboard/API diagnostics.
+
+The API exposes runtime option fields derived from this metadata:
+`available`, `defaultable`, `readiness_status`, and `degraded_reason`.
+Unavailable execution placeholders must not participate in default selection.
+
 Historical issues must only show variants that were available under the release
 effective for that issue. Post-settlement artifacts are review-only unless a new
 release explicitly promotes them.

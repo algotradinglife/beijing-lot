@@ -3174,6 +3174,33 @@ def _manifest_default_active_variant(release: dict[str, Any] | None = None) -> d
     return {}
 
 
+def _decision_variant_readiness(
+    manifest: dict[str, Any],
+    *,
+    available: bool,
+    missing_behavior: str = "artifact_missing",
+) -> dict[str, Any]:
+    readiness = manifest.get("readiness")
+    readiness_payload = dict(readiness) if isinstance(readiness, dict) else {}
+    defaultable_when = str(readiness_payload.get("defaultable_when") or "available")
+    selectable = manifest.get("selectable") is not False
+    defaultable = bool(available and selectable and defaultable_when != "never")
+    if available:
+        return {
+            "readiness": readiness_payload,
+            "readiness_status": "available",
+            "defaultable": defaultable,
+            "degraded_reason": "",
+        }
+    missing = str(readiness_payload.get("missing_behavior") or missing_behavior)
+    return {
+        "readiness": readiness_payload,
+        "readiness_status": "degraded" if missing == "diagnostic_placeholder" else "unavailable",
+        "defaultable": False,
+        "degraded_reason": str(readiness_payload.get("missing_reason") or "artifact_missing_for_issue"),
+    }
+
+
 def _shadow_decision_option(
     rows: dict[int, dict[str, Any]],
     source_path: str,
@@ -3183,6 +3210,7 @@ def _shadow_decision_option(
     first = next(iter(rows.values()), {})
     variant_id = first.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID
     manifest = _manifest_variant_by_id(release).get(str(variant_id), {})
+    readiness = _decision_variant_readiness(manifest, available=True)
     return {
         "variant_id": variant_id,
         "kind": SHADOW_DECISION_VARIANT_KIND,
@@ -3197,6 +3225,7 @@ def _shadow_decision_option(
         "is_default": bool(manifest.get("is_default", False)),
         "selectable": bool(manifest.get("selectable", True)),
         "available": True,
+        **readiness,
     }
 
 
@@ -3210,6 +3239,8 @@ def _is_execution_late_proxy_variant_id(variant_id: str) -> bool:
 
 def _manifest_shadow_option(manifest: dict[str, Any], *, available: bool) -> dict[str, Any]:
     variant_id = str(manifest.get("variant_id") or "")
+    missing_behavior = "diagnostic_placeholder" if _is_execution_strict_variant_id(variant_id) else "artifact_missing"
+    readiness = _decision_variant_readiness(manifest, available=available, missing_behavior=missing_behavior)
     return {
         "variant_id": variant_id,
         "kind": SHADOW_DECISION_VARIANT_KIND,
@@ -3224,6 +3255,7 @@ def _manifest_shadow_option(manifest: dict[str, Any], *, available: bool) -> dic
         "is_default": bool(manifest.get("is_default", False)),
         "selectable": bool(manifest.get("selectable", True)),
         "available": available,
+        **readiness,
     }
 
 
@@ -3250,6 +3282,7 @@ def _manifest_shadow_placeholder_decision_variant(manifest: dict[str, Any]) -> d
     variant_id = str(manifest.get("variant_id") or "")
     if not _is_execution_strict_variant_id(variant_id):
         return {}
+    readiness = _decision_variant_readiness(manifest, available=False, missing_behavior="diagnostic_placeholder")
     return {
         "variant_id": variant_id,
         "kind": SHADOW_DECISION_VARIANT_KIND,
@@ -3262,6 +3295,8 @@ def _manifest_shadow_placeholder_decision_variant(manifest: dict[str, Any]) -> d
         "source_path": "",
         "is_default": bool(manifest.get("is_default", False)),
         "available": False,
+        "selectable": bool(manifest.get("selectable", True)),
+        **readiness,
         "recommendation": "等待晚盘",
         "primary_pick": "",
         "protect_picks": [],
@@ -3297,7 +3332,9 @@ def _normalize_decision_variant_defaults(options: list[dict[str, Any]]) -> list[
         return options
     defaultable_options = [
         item for item in options
-        if item.get("available") is not False and item.get("selectable") is not False
+        if item.get("available") is not False
+        and item.get("selectable") is not False
+        and item.get("defaultable") is not False
     ]
     shadow_options = [
         item for item in defaultable_options
@@ -3324,6 +3361,7 @@ def _decision_variant_options(
 ) -> list[dict[str, Any]]:
     active_manifest = _manifest_default_active_variant(release)
     active_variant_id = str(active_manifest.get("variant_id") or ACTIVE_DECISION_VARIANT_ID)
+    active_readiness = _decision_variant_readiness(active_manifest, available=True)
     options = [
         {
             "variant_id": active_variant_id,
@@ -3337,6 +3375,7 @@ def _decision_variant_options(
             "is_default": bool(active_manifest.get("is_default", False)),
             "selectable": bool(active_manifest.get("selectable", True)),
             "available": True,
+            **active_readiness,
         }
     ]
     for rows, source_path in shadow_variants or []:
@@ -3416,6 +3455,8 @@ def _attach_selected_decision_variant(
             status = "unavailable"
         elif selected is None:
             selected = default_variant
+        if selected and selected.get("available") is False and status == "ok":
+            status = "degraded"
         match["selected_decision_variant_id"] = str(selected.get("variant_id") or "") if selected else ""
         match["selected_decision_variant"] = selected or {}
         match["selected_decision_variant_status"] = status
@@ -3433,7 +3474,12 @@ def _compact_decision_variant(variant: dict[str, Any]) -> dict[str, Any]:
         "version_id",
         "source",
         "is_default",
+        "selectable",
         "available",
+        "defaultable",
+        "readiness",
+        "readiness_status",
+        "degraded_reason",
         "recommendation",
         "primary_pick",
         "protect_picks",

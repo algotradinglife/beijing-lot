@@ -304,6 +304,135 @@ def test_late_proxy_execution_variant_defaults_over_strict_when_available() -> N
     assert defaults == ["shadow_v4.2.0000_execution_late_proxy_fullcap2"]
 
 
+def _execution_release(shadow_dir: Path) -> dict[str, object]:
+    return {
+        "release_id": "fixture_execution_release",
+        "decision_variants": [
+            {
+                "variant_id": "active_v3",
+                "version_id": "3.0.0",
+                "kind": "active",
+                "source": "active_snapshot",
+                "is_default": False,
+                "selectable": True,
+                "readiness": {
+                    "artifact_required": False,
+                    "defaultable_when": "always",
+                    "missing_behavior": "builtin_active",
+                    "late_refresh": "not_applicable",
+                },
+            },
+            {
+                "variant_id": "shadow_v3.3.3",
+                "version_id": "3.3.3",
+                "kind": "shadow",
+                "source": "structured_shadow_csv",
+                "artifact_key": "structured_shadow_dir",
+                "is_default": True,
+                "selectable": True,
+                "readiness": {
+                    "artifact_required": True,
+                    "defaultable_when": "available",
+                    "missing_behavior": "fallback_to_active",
+                    "late_refresh": "not_applicable",
+                },
+            },
+            {
+                "variant_id": "shadow_v4.2.0000_execution_strict_fullcap2",
+                "version_id": "4.2.0000",
+                "kind": "shadow",
+                "source": "structured_shadow_csv",
+                "artifact_key": "structured_shadow_dir",
+                "is_default": False,
+                "selectable": True,
+                "readiness": {
+                    "artifact_required": True,
+                    "defaultable_when": "available",
+                    "missing_behavior": "diagnostic_placeholder",
+                    "late_refresh": "strict_wait_before_valid_live_sp_refresh",
+                    "missing_reason": "strict_execution_artifact_missing_for_issue",
+                },
+            },
+            {
+                "variant_id": "shadow_v4.2.0000_execution_late_proxy_fullcap2",
+                "version_id": "4.2.0000",
+                "kind": "shadow",
+                "source": "structured_shadow_csv",
+                "artifact_key": "structured_shadow_dir",
+                "is_default": False,
+                "selectable": True,
+                "readiness": {
+                    "artifact_required": True,
+                    "defaultable_when": "available",
+                    "missing_behavior": "hidden_until_artifact",
+                    "late_refresh": "unlock_after_valid_live_sp_refresh",
+                    "missing_reason": "late_proxy_execution_artifact_missing_or_not_refreshed",
+                },
+            },
+        ],
+        "required_artifacts": [],
+        "artifacts": {"structured_shadow_dir": str(shadow_dir)},
+    }
+
+
+def test_execution_variant_readiness_defaults_only_real_artifacts(tmp_path: Path) -> None:
+    issue = "99125"
+    shadow_dir = tmp_path / "shadow"
+    release = _execution_release(shadow_dir)
+    header = [
+        "match_idx",
+        "shadow_arm",
+        "shadow_version",
+        "shadow_selection_codes",
+        "shadow_primary",
+        "shadow_judgment",
+        "shadow_stop_flag",
+        "execution_unlock_state",
+    ]
+    _write_csv(
+        shadow_dir / f"{issue}_v3" / f"structured_shadow_{issue}.csv",
+        header,
+        [[1, "shadow_v3.3.3", "llm_chain_bet_protect_stop_v3.3.3_shadow", "3+1", "3", "胜保平", "0", "not_applicable"]],
+    )
+
+    variants, suppressed = appmod._structured_shadow_variant_scan(issue, release)
+    options = appmod._decision_variant_options(variants, release=release)
+    strict_option = next(item for item in options if item["variant_id"] == "shadow_v4.2.0000_execution_strict_fullcap2")
+    assert suppressed == []
+    assert next(item["variant_id"] for item in options if item["is_default"]) == "shadow_v3.3.3"
+    assert strict_option["available"] is False
+    assert strict_option["defaultable"] is False
+    assert strict_option["readiness_status"] == "degraded"
+    assert strict_option["degraded_reason"] == "strict_execution_artifact_missing_for_issue"
+    assert not any(item["variant_id"] == "shadow_v4.2.0000_execution_late_proxy_fullcap2" for item in options)
+
+    _write_csv(
+        shadow_dir / f"{issue}_strict" / f"structured_shadow_{issue}.csv",
+        header,
+        [[1, "shadow_v4.2.0000_execution_strict_fullcap2", "v4.2.0000", "", "", "等待晚盘", "1", "waiting_late_refresh"]],
+    )
+    variants, _suppressed = appmod._structured_shadow_variant_scan(issue, release)
+    options = appmod._decision_variant_options(variants, release=release)
+    strict_option = next(item for item in options if item["variant_id"] == "shadow_v4.2.0000_execution_strict_fullcap2")
+    assert strict_option["available"] is True
+    assert strict_option["defaultable"] is True
+    assert strict_option["readiness_status"] == "available"
+    assert next(item["variant_id"] for item in options if item["is_default"]) == "shadow_v4.2.0000_execution_strict_fullcap2"
+
+    _write_csv(
+        shadow_dir / f"{issue}_late" / f"structured_shadow_{issue}.csv",
+        header,
+        [[1, "shadow_v4.2.0000_execution_late_proxy_fullcap2", "v4.2.0000", "3+1", "3", "胜保平", "0", "unlocked_after_late_refresh"]],
+    )
+    variants, _suppressed = appmod._structured_shadow_variant_scan(issue, release)
+    options = appmod._decision_variant_options(variants, release=release)
+    late_option = next(item for item in options if item["variant_id"] == "shadow_v4.2.0000_execution_late_proxy_fullcap2")
+    assert late_option["available"] is True
+    assert late_option["defaultable"] is True
+    assert late_option["readiness_status"] == "available"
+    assert next(item["variant_id"] for item in options if item["is_default"]) == "shadow_v4.2.0000_execution_late_proxy_fullcap2"
+
+
 def test_unavailable_execution_variant_does_not_become_default(tmp_path: Path) -> None:
     issue = "99124"
     shadow_dir = tmp_path / "shadow"
@@ -320,17 +449,7 @@ def test_unavailable_execution_variant_does_not_become_default(tmp_path: Path) -
         ],
         [[1, "shadow_v3.3.3", "llm_chain_bet_protect_stop_v3.3.3_shadow", "3+1", "3", "胜为押，保平", "0"]],
     )
-    release = {
-        "release_id": "fixture_execution_release",
-        "decision_variants": [
-            {"variant_id": "active_v3", "kind": "active", "source": "active_snapshot", "is_default": False, "selectable": True},
-            {"variant_id": "shadow_v3.3.3", "kind": "shadow", "source": "structured_shadow_csv", "artifact_key": "structured_shadow_dir", "is_default": True, "selectable": True},
-            {"variant_id": "shadow_v4.2.0000_execution_strict_fullcap2", "version_id": "4.2.0000", "kind": "shadow", "source": "structured_shadow_csv", "artifact_key": "structured_shadow_dir", "is_default": False, "selectable": True},
-            {"variant_id": "shadow_v4.2.0000_execution_late_proxy_fullcap2", "version_id": "4.2.0000", "kind": "shadow", "source": "structured_shadow_csv", "artifact_key": "structured_shadow_dir", "is_default": False, "selectable": True},
-        ],
-        "required_artifacts": [],
-        "artifacts": {"structured_shadow_dir": str(shadow_dir)},
-    }
+    release = _execution_release(shadow_dir)
 
     variants, suppressed = appmod._structured_shadow_variant_scan(issue, release)
     options = appmod._decision_variant_options(variants, release=release)
@@ -359,6 +478,8 @@ def test_unavailable_execution_variant_does_not_become_default(tmp_path: Path) -
     assert option_ids == ["active_v3", "shadow_v3.3.3", "shadow_v4.2.0000_execution_strict_fullcap2"]
     assert "shadow_v4.2.0000_execution_late_proxy_fullcap2" not in option_ids
     assert options[2]["available"] is False
+    assert options[2]["defaultable"] is False
+    assert options[2]["readiness_status"] == "degraded"
     assert context["selection_status"] == "ok"
     assert context["selected_variant_id"] == "shadow_v3.3.3"
     assert selected["variant_id"] == "shadow_v3.3.3"
@@ -371,6 +492,7 @@ def test_unavailable_execution_variant_does_not_become_default(tmp_path: Path) -
     assert strict_selected["selection_codes"] == []
     assert strict_selected["selection_type"] == "no-buy"
     assert strict_selected["stop_flag"] is True
+    assert matches[0]["selected_decision_variant_status"] == "degraded"
     assert strict_selected["execution_action"] == "skip_wait_late_refresh"
     assert strict_selected["execution_unlock_state"] == "waiting_late_refresh"
 

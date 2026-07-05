@@ -17,6 +17,9 @@ SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 DECISION_VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.(?:[0-9]{4}|[0-9]+)$")
 RELEASE_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*_[0-9]{4}_[0-9]{2}_[0-9]{2}$")
 ISO_DATETIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
+DEFAULTABLE_WHEN = {"always", "available", "never"}
+MISSING_BEHAVIOR = {"builtin_active", "fallback_to_active", "diagnostic_placeholder", "hidden_until_artifact", "artifact_missing"}
+LATE_REFRESH_POLICY = {"not_applicable", "strict_wait_before_valid_live_sp_refresh", "unlock_after_valid_live_sp_refresh"}
 
 
 def _project_path(value: Any) -> Path:
@@ -172,6 +175,19 @@ def _validate_release_contract(release_key: str, release: dict[str, Any], errors
                 errors.append(f"{release_key} shadow decision variant {variant.get('variant_id', idx)} must set artifact_key")
             elif artifact_key not in artifacts:
                 errors.append(f"{release_key} shadow decision variant {variant.get('variant_id', idx)} artifact_key not in artifacts: {artifact_key}")
+        readiness = variant.get("readiness", {})
+        if readiness:
+            if not isinstance(readiness, dict):
+                errors.append(f"{release_key} decision variant {variant.get('variant_id', idx)} readiness must be an object")
+                continue
+            if "artifact_required" in readiness and not isinstance(readiness.get("artifact_required"), bool):
+                errors.append(f"{release_key} decision variant {variant.get('variant_id', idx)} readiness.artifact_required must be boolean")
+            if readiness.get("defaultable_when") not in {None, "", *DEFAULTABLE_WHEN}:
+                errors.append(f"{release_key} decision variant {variant.get('variant_id', idx)} readiness.defaultable_when is invalid")
+            if readiness.get("missing_behavior") not in {None, "", *MISSING_BEHAVIOR}:
+                errors.append(f"{release_key} decision variant {variant.get('variant_id', idx)} readiness.missing_behavior is invalid")
+            if readiness.get("late_refresh") not in {None, "", *LATE_REFRESH_POLICY}:
+                errors.append(f"{release_key} decision variant {variant.get('variant_id', idx)} readiness.late_refresh is invalid")
 
 
 def validate_strategy_release(
@@ -272,6 +288,7 @@ def validate_strategy_release(
                 "kind": item.get("kind"),
                 "source": item.get("source"),
                 "is_default": item.get("is_default"),
+                "readiness": item.get("readiness", {}),
             }
             for item in variants
             if isinstance(item, dict)

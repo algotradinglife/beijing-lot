@@ -36,7 +36,13 @@
           "label": "v3",
           "source": "active_snapshot",
           "is_default": false,
-          "selectable": true
+          "selectable": true,
+          "readiness": {
+            "artifact_required": false,
+            "defaultable_when": "always",
+            "missing_behavior": "builtin_active",
+            "late_refresh": "not_applicable"
+          }
         },
         {
           "variant_id": "shadow_v3.3.3",
@@ -46,7 +52,14 @@
           "source": "structured_shadow_csv",
           "artifact_key": "structured_shadow_dir",
           "is_default": true,
-          "selectable": true
+          "selectable": true,
+          "readiness": {
+            "artifact_required": true,
+            "defaultable_when": "available",
+            "missing_behavior": "fallback_to_active",
+            "late_refresh": "not_applicable",
+            "missing_reason": "structured_shadow_artifact_missing_for_issue"
+          }
         },
         {
           "variant_id": "shadow_v4.2.0000_execution_strict_fullcap2",
@@ -56,7 +69,14 @@
           "source": "structured_shadow_csv",
           "artifact_key": "structured_shadow_dir",
           "is_default": false,
-          "selectable": true
+          "selectable": true,
+          "readiness": {
+            "artifact_required": true,
+            "defaultable_when": "available",
+            "missing_behavior": "diagnostic_placeholder",
+            "late_refresh": "strict_wait_before_valid_live_sp_refresh",
+            "missing_reason": "strict_execution_artifact_missing_for_issue"
+          }
         },
         {
           "variant_id": "shadow_v4.2.0000_execution_late_proxy_fullcap2",
@@ -66,7 +86,14 @@
           "source": "structured_shadow_csv",
           "artifact_key": "structured_shadow_dir",
           "is_default": false,
-          "selectable": true
+          "selectable": true,
+          "readiness": {
+            "artifact_required": true,
+            "defaultable_when": "available",
+            "missing_behavior": "hidden_until_artifact",
+            "late_refresh": "unlock_after_valid_live_sp_refresh",
+            "missing_reason": "late_proxy_execution_artifact_missing_or_not_refreshed"
+          }
         }
       ],
       "main_strategy_arms": [

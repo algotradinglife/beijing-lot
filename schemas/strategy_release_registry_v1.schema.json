@@ -183,6 +183,34 @@
         },
         "selectable": {
           "type": "boolean"
+        },
+        "readiness": {
+          "$ref": "#/$defs/decisionVariantReadiness"
+        }
+      }
+    },
+    "decisionVariantReadiness": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "artifact_required": {
+          "type": "boolean"
+        },
+        "defaultable_when": {
+          "enum": ["always", "available", "never"]
+        },
+        "missing_behavior": {
+          "enum": ["builtin_active", "fallback_to_active", "diagnostic_placeholder", "hidden_until_artifact", "artifact_missing"]
+        },
+        "late_refresh": {
+          "enum": [
+            "not_applicable",
+            "strict_wait_before_valid_live_sp_refresh",
+            "unlock_after_valid_live_sp_refresh"
+          ]
+        },
+        "missing_reason": {
+          "type": "string"
         }
       }
     },
