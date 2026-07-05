@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, Gauge, LineChart, Server, ShieldAlert, Ticket, WalletCards } from 'lucide-react';
 import { ApiDashboardAdapter } from './data/apiAdapter';
-import { DEFAULT_DECISION_VARIANT_ID, decisionVersionLabel, isActiveDecisionVariant, isShadowDecisionVariant } from './decisionVariants';
+import { DEFAULT_DECISION_VARIANT_ID, decisionVersionDescription, decisionVersionLabel, isActiveDecisionVariant, isShadowDecisionVariant } from './decisionVariants';
 import type { DashboardData, DecisionVariantData, IssueDashboardData, IssueMatchRow, IssueOption } from './data/types';
 
 type Page = 'Issue Dashboard' | 'Match Detail' | 'Operations' | 'Main Strategy' | 'Ticket Builder' | 'Selector Shadow' | 'Live Signals' | 'Settlement Review' | 'Strategy Lab';
@@ -660,7 +660,7 @@ function applyDecisionVariant(match: IssueMatchRow, selectedVariantId: string): 
     protectionOutcomes: protectLabels,
     recommendedCoverage: stopped ? 'no-buy' : variant.selectionType,
     stopFlag: stopped,
-    recommendationSource: variant.label || match.recommendationSource,
+    recommendationSource: decisionVersionLabel(variant) || match.recommendationSource,
     recommendationConfidenceLabel: variant.confidenceLabel || match.recommendationConfidenceLabel,
     predictionHit,
     postmatchReviewOutcome,
@@ -719,6 +719,9 @@ function IssueDashboard({
   onOpenTicket: () => void;
 }) {
   const decisionOptions = data.strategyVersionContext?.options?.length ? data.strategyVersionContext.options : data.decisionVariantOptions ?? [];
+  const selectedDecisionOption = decisionOptions.find((option) => option.variantId === selectedDecisionVariant)
+    ?? decisionOptions.find((option) => option.isDefault)
+    ?? decisionOptions[0];
   const displayedMatches = useMemo(
     () => data.matches.map((match) => applyDecisionVariant(match, selectedDecisionVariant)),
     [data.matches, selectedDecisionVariant],
@@ -768,6 +771,7 @@ function IssueDashboard({
             {decisionOptions.map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
           </select>
           <StrategyVersionStatus context={data.strategyVersionContext} />
+          {selectedDecisionOption ? <small className="version-help">{decisionVersionDescription(selectedDecisionOption)}</small> : null}
         </label>}
 	        <div className="issue-source"><Badge tone={data.settlementStatus === 'settled' ? 'good' : 'warn'}>{data.settlementStatus}</Badge><span>{data.lastScrapedAt || data.issueDate}</span></div>
       </div>
@@ -848,6 +852,10 @@ function MatchDetail({
   const selectedVariant = (data.decisionVariants ?? []).find((variant) => variant.variantId === selectedDecisionVariant)
     ?? (data.decisionVariants ?? []).find((variant) => variant.isDefault)
     ?? (data.decisionVariants ?? [])[0];
+  const selectedDecisionOption = selectedVariant
+    ?? decisionOptions.find((option) => option.variantId === selectedDecisionVariant)
+    ?? decisionOptions.find((option) => option.isDefault)
+    ?? decisionOptions[0];
   const selectedVariantStopped = isExecutionStopped(selectedVariant);
   const selectedVariantExecutableCodes = executableSelectionCodes(selectedVariant);
   const selectedVariantAuditCodes = executionRecommendedCodes(selectedVariant);
@@ -1023,6 +1031,7 @@ function MatchDetail({
             {decisionOptions.map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
           </select>
           <StrategyVersionStatus context={data.strategyVersionContext} />
+          {selectedDecisionOption ? <small className="version-help">{decisionVersionDescription(selectedDecisionOption)}</small> : null}
         </label>}
 	        <div className={llmStopped ? 'decision-bet-panel has-stop' : 'decision-bet-panel'}>
 	          <div className="decision-bet-row primary"><span>押</span><b>{primaryOutcome}</b></div>
@@ -1142,8 +1151,8 @@ function MatchDetail({
 	        <div><span>置信</span><b>{selectedVariant?.confidenceLabel || (selectedVariant?.probability !== undefined ? pct(selectedVariant.probability) : llmReady ? data.llm.confidenceLabel : '待接入')}</b></div>
 	        <div><span>决策时间</span><b>{decisionSnapshot?.generatedAt || data.llm.generatedAt || '缺'}</b></div>
 	        <div><span>检查时间</span><b>{decisionSnapshot?.checkedAt || '-'}</b></div>
-	        <div><span>版本</span><b>{selectedVariant?.version || decisionSnapshot?.decisionChainVersion || data.llm.source}</b></div>
-	        <div><span>来源</span><b>{selectedVariant?.sourcePath?.split('/').slice(-2).join('/') || selectedVariant?.source || (decisionSnapshot?.decisionConfigHash ? decisionSnapshot.decisionConfigHash.slice(0, 8) : '-')}</b></div>
+	        <div><span>版本</span><b>{selectedDecisionOption ? decisionVersionLabel(selectedDecisionOption) : decisionSnapshot?.decisionChainVersion || data.llm.source}</b></div>
+	        <div><span>说明</span><b>{selectedDecisionOption ? decisionVersionDescription(selectedDecisionOption) : decisionSnapshot?.decisionConfigHash ? shortHash(decisionSnapshot.decisionConfigHash) : '-'}</b></div>
 	      </div>
 	      {shadowDecisionVersionSelected && shadowDecisionCategories.length > 0 && <div className="decision-category-grid">
 	        {shadowDecisionCategories.map((item) => <div key={item.key || item.label} className="decision-category-card">

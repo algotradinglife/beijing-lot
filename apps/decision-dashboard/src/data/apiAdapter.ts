@@ -380,6 +380,9 @@ function transformDecisionVariantOption(raw: unknown): DecisionVariantOption {
     isDefault: asBoolean(obj.is_default, asBoolean(obj.isDefault)),
     selectable: asBoolean(obj.selectable, asBoolean(obj.selectable, true)),
     available: asBoolean(obj.available, asBoolean(obj.available, true)),
+    defaultable: asBoolean(obj.defaultable, asBoolean(obj.defaultable, true)),
+    readinessStatus: asString(obj.readiness_status, asString(obj.readinessStatus)) || undefined,
+    degradedReason: asString(obj.degraded_reason, asString(obj.degradedReason)) || undefined,
   };
 }
 

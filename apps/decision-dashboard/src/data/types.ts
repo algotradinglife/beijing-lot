@@ -16,6 +16,9 @@ export interface DecisionVariantOption {
   isDefault?: boolean;
   selectable?: boolean;
   available?: boolean;
+  defaultable?: boolean;
+  readinessStatus?: string;
+  degradedReason?: string;
 }
 
 export interface DecisionVariantData extends DecisionVariantOption {

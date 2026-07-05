@@ -365,7 +365,14 @@ describe('北单实盘决策台 v1', () => {
     await screen.findByRole('button', { name: '期次看板' });
     const versionSelect = screen.getByLabelText('选择决策版本') as HTMLSelectElement;
     expect([...versionSelect.options].map((option) => option.value)).toContain(lateProxyId);
+    expect([...versionSelect.options].map((option) => option.textContent)).toEqual(expect.arrayContaining([
+      'v3.0 旧版',
+      'v4.2.0 严格等待',
+      'v4.2.0 晚盘执行',
+    ]));
     expect(versionSelect.value).toBe(lateProxyId);
+    expect(screen.getByText('晚盘 SP 刷新后可出票，当前 v4.2 默认执行版。')).toBeInTheDocument();
+    expect(screen.queryByText(/shadow_v4\.2\.0000/)).not.toBeInTheDocument();
     const row = screen.getByText('bjdc_26052_001').closest('tr');
     expect(row).not.toBeNull();
     const betCell = row!.querySelector('.bet-cell') as HTMLElement;
@@ -386,6 +393,8 @@ describe('北单实盘决策台 v1', () => {
 
     await userEvent.selectOptions(versionSelect, lateProxyId);
     await userEvent.click(screen.getByText('bjdc_26052_001'));
+    expect((screen.getByLabelText('选择详情决策版本') as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('v4.2.0 晚盘执行');
+    expect(screen.getAllByText('v4.2.0 晚盘执行').length).toBeGreaterThan(0);
     expect(screen.getByText('执行层')).toBeInTheDocument();
     expect(screen.getByText('可出票')).toBeInTheDocument();
     expect(screen.getByText('晚盘解锁')).toBeInTheDocument();
