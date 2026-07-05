@@ -6,6 +6,13 @@ Date: 2026-07-04
 
 This contract defines how `feature/beijing-lot-strategy` promotes validated model, decision-chain, and shadow-chain outputs into the decision dashboard without dashboard code changes.
 
+Structured decision-chain CSV fields and active/shadow semantics are specified
+in:
+
+```text
+docs/strategy/strategy_dashboard_decision_chain_contract.md
+```
+
 The dashboard consumes one active strategy release from:
 
 ```text
@@ -91,6 +98,30 @@ linegap_drift_dir/paper_arm_summary.csv
 structured_shadow_dir/<issue>_*/structured_shadow_<issue>.csv
 ```
 
+v4.2.0000 execution artifacts are published through the same
+`structured_shadow_dir` mechanism. They are still structured shadow CSVs, but
+their `shadow_selection_codes` represents the executable selection after the
+execution policy, while `execution_recommended_codes` preserves the wider
+decision-chain audit recommendation.
+
+Current strategy-owned execution variants:
+
+```text
+shadow_v4.2.0000_execution_strict_fullcap2
+shadow_v4.2.0000_execution_late_proxy_fullcap2
+```
+
+Dashboard should only display these variants when the active release manifest
+declares matching `decision_variants[]` and the CSV rows contain matching
+`shadow_arm` values. It must not recompute full-cover caps, late-refresh state,
+or N selection from these rows.
+
+Reference sample CSV:
+
+```text
+docs/strategy/examples/v4_2_0000_execution_artifact_example.csv
+```
+
 ## Dashboard Consumption
 
 The decision API uses the active release for:
@@ -104,6 +135,18 @@ The decision API uses the active release for:
 - Health checks and artifact diagnostics
 
 The frontend still lets users choose active or shadow versions. The dashboard only changes where those variants come from: strategy release metadata and strategy-provided CSV artifacts.
+
+For v4.2.0000 execution artifacts:
+
+- Issue Board and Match Detail should show both the audit recommendation
+  (`execution_recommended_codes`) and executable selection
+  (`shadow_selection_codes`).
+- Execution badges should come from `execution_action` and
+  `execution_reasons`.
+- Full-cover display should use `execution_full_score`,
+  `execution_full_candidate`, and `execution_full_kept`.
+- Rolling/N views and any stake preview must use `shadow_selection_codes`.
+- Dashboard/API must treat `execution_*` as read-only artifact data.
 
 ## Validation
 
