@@ -40,11 +40,10 @@ python3 scripts/manage_decision_dashboard.py restart \
 python3 scripts/scrape_500_bjdc.py --live-sp --force --sleep 0
 ```
 
-实盘时建议启动 500.com 期号/赛果 monitor；默认 5 分钟一轮，会监控 `https://trade.500.com/bjdc/index.php` 的当前期变化，并持续刷新近期期号和仍未结算的比赛：
+实盘时一键管理脚本会托管两个后台刷新进程：
 
-```bash
-python3 scripts/monitor_500_bjdc.py --interval 300 --recent-count 6 --open-limit 20
-```
+- `scripts/live_score_refresh_loop.py`：低延迟刷新捷报比分、半场和赛果。
+- `scripts/live_sp_refresh_loop.py`：低频刷新 500 当前/近期/未结算期的结算 SP 和 live SP XML。
 
 启动真实数据 API：
 

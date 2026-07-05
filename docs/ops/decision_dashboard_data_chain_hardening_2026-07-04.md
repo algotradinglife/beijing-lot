@@ -28,8 +28,9 @@ This handoff covers the live decision dashboard data chain after the SQLite/upda
   - `scripts/scrape_nowscore_match_details.py`
   - `scripts/collect_match_intel.py`
 - Runtime orchestration:
-  - `scripts/monitor_500_bjdc.py`
   - `scripts/live_score_refresh_loop.py`
+  - `scripts/live_sp_refresh_loop.py`
+  - `scripts/monitor_500_bjdc.py` remains available for full manual refreshes, but dashboard runtime uses the lighter split loops.
   - `scripts/manage_decision_dashboard.py`
 
 ## API Smoke Paths
@@ -56,7 +57,7 @@ file from being silently created when the local data artifact is missing.
 Full validation used in this pass:
 
 ```bash
-python3.14 -m py_compile src/sqlite_runtime.py src/decision_api/app.py scripts/scrape_500_bjdc.py scripts/scrape_nowscore_bjdc.py scripts/monitor_500_bjdc.py scripts/live_score_refresh_loop.py scripts/scrape_500_match_details.py scripts/scrape_nowscore_match_details.py scripts/review_settled_matches.py scripts/smoke_decision_dashboard_data_chain.py tests/scripts/test_live_upsert_regression.py tests/decision_api/test_sqlite_runtime.py tests/decision_api/test_live_workflow.py
+python3.14 -m py_compile src/sqlite_runtime.py src/decision_api/app.py scripts/scrape_500_bjdc.py scripts/scrape_nowscore_bjdc.py scripts/monitor_500_bjdc.py scripts/live_score_refresh_loop.py scripts/live_sp_refresh_loop.py scripts/scrape_500_match_details.py scripts/scrape_nowscore_match_details.py scripts/review_settled_matches.py scripts/smoke_decision_dashboard_data_chain.py tests/scripts/test_live_upsert_regression.py tests/decision_api/test_sqlite_runtime.py tests/decision_api/test_live_workflow.py
 pytest -q tests/decision_api tests/scripts/test_live_upsert_regression.py
 npm --prefix apps/decision-dashboard test -- --run
 npm --prefix apps/decision-dashboard run build

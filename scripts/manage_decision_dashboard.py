@@ -24,12 +24,14 @@ API_LOG = RUNTIME_DIR / "decision_api.log"
 FRONTEND_LOG = RUNTIME_DIR / "decision_dashboard_vite.log"
 FRONTEND_BUILD_LOG = RUNTIME_DIR / "decision_dashboard_build.log"
 SCORE_REFRESH_LOG = RUNTIME_DIR / "live_score_refresh.log"
+SP_REFRESH_LOG = RUNTIME_DIR / "live_sp_refresh.log"
 DEFAULT_API_PORT = int(os.environ.get("BEIDAN_DECISION_API_PORT", "8790"))
 DEFAULT_FRONTEND_PORT = int(os.environ.get("BEIDAN_DASHBOARD_FRONTEND_PORT", "4173"))
 DEFAULT_API_HOST = os.environ.get("BEIDAN_DECISION_API_HOST", "127.0.0.1")
 DEFAULT_FRONTEND_HOST = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_HOST", "127.0.0.1")
 DEFAULT_FRONTEND_MODE = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_MODE", "api-static")
 DEFAULT_SCORE_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_SCORE_REFRESH_INTERVAL", "120"))
+DEFAULT_SP_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_SP_REFRESH_INTERVAL", "900"))
 ENV_FILES = (
     Path.home() / ".config/beidanlot/webui.env",
     Path.home() / ".config/beidanlot/decision_dashboard.env",
@@ -96,6 +98,8 @@ def _service_name_for_pid(pid: int) -> str:
         return "frontend"
     if "scripts/live_score_refresh_loop.py" in cmdline and cwd == ROOT.resolve():
         return "score_refresh"
+    if "scripts/live_sp_refresh_loop.py" in cmdline and cwd == ROOT.resolve():
+        return "sp_refresh"
     return ""
 
 
@@ -384,6 +388,22 @@ def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
         "--timeout",
         str(int(args.timeout * 4)),
     ]
+    sp_refresh_command = [
+        sys.executable,
+        str(ROOT / "scripts/live_sp_refresh_loop.py"),
+        "--db",
+        str(ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"),
+        "--issue",
+        "current",
+        "--interval",
+        str(args.sp_refresh_interval),
+        "--recent-count",
+        str(args.sp_refresh_recent_count),
+        "--open-limit",
+        str(args.sp_refresh_open_limit),
+        "--timeout",
+        str(max(25, int(args.timeout * 6))),
+    ]
     operations_probe = _json_probe(f"{urls['api_local']}/api/issues/current/operations", timeout_sec=args.timeout)
     operations_json = operations_probe.get("json") if isinstance(operations_probe.get("json"), dict) else {}
     workflow = operations_json.get("workflow") if isinstance(operations_json, dict) else {}
@@ -409,6 +429,17 @@ def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
             SCORE_REFRESH_LOG,
             {"interval_sec": args.score_refresh_interval, "enabled": not args.no_score_refresh},
         ),
+        "sp_refresh": _process_snapshot(
+            "sp_refresh",
+            sp_refresh_command,
+            SP_REFRESH_LOG,
+            {
+                "interval_sec": args.sp_refresh_interval,
+                "enabled": not args.no_sp_refresh,
+                "recent_count": args.sp_refresh_recent_count,
+                "open_limit": args.sp_refresh_open_limit,
+            },
+        ),
         "health": {
             "api": _http_probe(urls["api_health"], timeout_sec=args.timeout),
             "frontend_local": _http_probe(urls["frontend_local"], timeout_sec=args.timeout),
@@ -421,7 +452,13 @@ def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "review_task_status": review_task.get("status", "") if isinstance(review_task, dict) else "",
             },
         },
-        "logs": {"api": str(API_LOG), "frontend": str(FRONTEND_LOG), "frontend_build": str(FRONTEND_BUILD_LOG)},
+        "logs": {
+            "api": str(API_LOG),
+            "frontend": str(FRONTEND_LOG),
+            "frontend_build": str(FRONTEND_BUILD_LOG),
+            "score_refresh": str(SCORE_REFRESH_LOG),
+            "sp_refresh": str(SP_REFRESH_LOG),
+        },
     }
     return payload
 
@@ -531,6 +568,39 @@ def _start_score_refresh(args: argparse.Namespace) -> None:
         )
 
 
+def _start_sp_refresh(args: argparse.Namespace) -> None:
+    if args.no_sp_refresh or _known_process_pids("sp_refresh"):
+        return
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    command = [
+        sys.executable,
+        str(ROOT / "scripts/live_sp_refresh_loop.py"),
+        "--db",
+        str(ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"),
+        "--issue",
+        "current",
+        "--interval",
+        str(args.sp_refresh_interval),
+        "--recent-count",
+        str(args.sp_refresh_recent_count),
+        "--open-limit",
+        str(args.sp_refresh_open_limit),
+        "--timeout",
+        str(max(25, int(args.timeout * 6))),
+    ]
+    with SP_REFRESH_LOG.open("ab") as log:
+        subprocess.Popen(
+            command,
+            cwd=ROOT,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+
+
 def _tailscale_serve_target(args: argparse.Namespace) -> str:
     port = args.api_port if args.frontend_mode == "api-static" else args.frontend_port
     return f"http://127.0.0.1:{port}"
@@ -589,6 +659,7 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
     _start_api(args)
     _start_frontend(args)
     _start_score_refresh(args)
+    _start_sp_refresh(args)
     _wait_for_start(args)
     cache_warmup = _warm_api_cache(args)
     tailscale_serve = _configure_tailscale_serve(args)
@@ -601,9 +672,10 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
 
 def command_stop(args: argparse.Namespace) -> dict[str, Any]:
     stopped: list[dict[str, Any]] = []
-    for pid in _known_process_pids("score_refresh"):
-        stopped.append({"service": "score_refresh", "pid": pid})
-        _terminate_pid(pid)
+    for service in ("sp_refresh", "score_refresh"):
+        for pid in _known_process_pids(service):
+            stopped.append({"service": service, "pid": pid})
+            _terminate_pid(pid)
     for service, port in (("frontend", args.frontend_port), ("api", args.api_port)):
         for pid in _known_service_pids(service, port):
             stopped.append({"service": service, "pid": pid})
@@ -643,6 +715,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--wait", type=float, default=20.0)
     parser.add_argument("--score-refresh-interval", type=float, default=DEFAULT_SCORE_REFRESH_INTERVAL)
     parser.add_argument("--no-score-refresh", action="store_true")
+    parser.add_argument("--sp-refresh-interval", type=float, default=DEFAULT_SP_REFRESH_INTERVAL)
+    parser.add_argument("--sp-refresh-recent-count", type=int, default=4)
+    parser.add_argument("--sp-refresh-open-limit", type=int, default=12)
+    parser.add_argument("--no-sp-refresh", action="store_true")
     return parser
 
 

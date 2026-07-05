@@ -27,6 +27,7 @@ python3 scripts/manage_decision_dashboard.py restart \
 - 先执行 `npm run build` 生成 `apps/decision-dashboard/dist`。
 - 启动 API：`python3 -m src.decision_api`，默认监听本机回环地址。
 - API 同源服务 `/`、`/assets/*` 和 `/api/*`；不再启动 Vite dev server。
+- 启动两个后台刷新 loop：捷报比分默认 2 分钟一次，500 结算 SP/live SP 默认 15 分钟一次。
 - 启动后预热首屏接口：轻量期号列表和当前期 summary dashboard。
 
 需要热更新调试时才显式使用：
@@ -132,6 +133,8 @@ ss -ltnp '( sport = :4173 or sport = :8790 )'
 tmp/decision_dashboard/decision_api.log
 tmp/decision_dashboard/decision_dashboard_vite.log
 tmp/decision_dashboard/decision_dashboard_build.log
+tmp/decision_dashboard/live_score_refresh.log
+tmp/decision_dashboard/live_sp_refresh.log
 ```
 
 5. 如果本机能访问但 Tailnet 入口不能访问，优先检查系统或浏览器代理。Tailscale 地址建议加入 bypass：
