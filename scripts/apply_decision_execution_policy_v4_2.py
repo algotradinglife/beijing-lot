@@ -42,6 +42,16 @@ class RowExecution:
     segment_idx: int | None = None
 
 
+def execution_unlock_state(source_action: str, execution: RowExecution) -> str:
+    if source_action != "wait_late_refresh":
+        return "not_applicable"
+    if execution.action == "skip_wait_late_refresh":
+        return "waiting_late_refresh"
+    if execution.selection_codes:
+        return "unlocked_after_late_refresh"
+    return "blocked_after_late_refresh"
+
+
 def safe_float(value: Any, default: float = 0.0) -> float:
     if value is None or value == "":
         return default
@@ -397,6 +407,7 @@ def apply_policy(
         "execution_full_candidate",
         "execution_full_kept",
         "execution_segment_idx",
+        "execution_unlock_state",
     ]
     fieldnames = list(source_fieldnames)
     for field in extra_fields:
@@ -430,6 +441,7 @@ def apply_policy(
         row["execution_full_candidate"] = int(execution.full_candidate)
         row["execution_full_kept"] = int(execution.full_kept)
         row["execution_segment_idx"] = execution.segment_idx or ""
+        row["execution_unlock_state"] = execution_unlock_state(str(decision_row.get("v4_action") or ""), execution)
         actual = str(row.get("actual_code") or "")
         if actual in OUTCOME_CODES:
             settled_count += 1

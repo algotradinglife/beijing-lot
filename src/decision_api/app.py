@@ -682,6 +682,13 @@ def _csv_bool(row: dict[str, Any], key: str) -> bool | None:
     return None if parsed is None else bool(parsed)
 
 
+def _csv_semicolon_list(row: dict[str, Any], key: str) -> list[str]:
+    value = row.get(key)
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [part.strip() for part in str(value or "").split(";") if part.strip()]
+
+
 def _connect(path: Path) -> sqlite3.Connection:
     return connect_sqlite(path, row_factory=True)
 
@@ -2977,6 +2984,18 @@ def _decision_variant_version_key(variant_id: Any) -> tuple[int, int, int, str]:
     return (major, minor, revision, text)
 
 
+def _decision_variant_default_key(item: dict[str, Any]) -> tuple[int, int, int, int, str]:
+    variant_id = str(item.get("variant_id") or item.get("version_id") or "")
+    major, minor, revision, text = _decision_variant_version_key(variant_id)
+    if "_execution_late_proxy_" in variant_id:
+        execution_rank = 2
+    elif "_execution_strict_" in variant_id:
+        execution_rank = 1
+    else:
+        execution_rank = 0
+    return (major, minor, revision, execution_rank, text)
+
+
 def _structured_shadow_variant_scan(
     issue: str,
     release: dict[str, Any] | None = None,
@@ -3080,6 +3099,18 @@ def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_co
         "prediction_hit": coverage_hit,
         "primary_hit": primary_hit,
         "coverage_hit": coverage_hit,
+        "execution_policy_version": row.get("execution_policy_version") or "",
+        "execution_policy_name": row.get("execution_policy_name") or "",
+        "execution_action": row.get("execution_action") or "",
+        "execution_reasons": _csv_semicolon_list(row, "execution_reasons"),
+        "execution_source_action": row.get("execution_source_action") or "",
+        "execution_recommended_codes": row.get("execution_recommended_codes") or "",
+        "execution_double_codes": row.get("execution_double_codes") or "",
+        "execution_full_score": _safe_float(row.get("execution_full_score")),
+        "execution_full_candidate": _csv_bool(row, "execution_full_candidate"),
+        "execution_full_kept": _csv_bool(row, "execution_full_kept"),
+        "execution_segment_idx": _safe_int(row.get("execution_segment_idx")),
+        "execution_unlock_state": row.get("execution_unlock_state") or "",
         "notes": [
             note
             for note in [
@@ -3163,7 +3194,7 @@ def _normalize_decision_variant_defaults(options: list[dict[str, Any]]) -> list[
     if shadow_options:
         default_variant_id = str(max(
             shadow_options,
-            key=lambda item: _decision_variant_version_key(item.get("variant_id") or item.get("version_id")),
+            key=_decision_variant_default_key,
         ).get("variant_id") or "")
     else:
         default_option = next((item for item in options if item.get("is_default")), options[0])
@@ -3291,6 +3322,18 @@ def _compact_decision_variant(variant: dict[str, Any]) -> dict[str, Any]:
         "prediction_hit",
         "primary_hit",
         "coverage_hit",
+        "execution_policy_version",
+        "execution_policy_name",
+        "execution_action",
+        "execution_reasons",
+        "execution_source_action",
+        "execution_recommended_codes",
+        "execution_double_codes",
+        "execution_full_score",
+        "execution_full_candidate",
+        "execution_full_kept",
+        "execution_segment_idx",
+        "execution_unlock_state",
     }
     return {key: value for key, value in variant.items() if key in keep}
 
@@ -4781,7 +4824,7 @@ def _dashboard(
         decision_variant_id,
         suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
     )
-    matches = _attach_selected_decision_variant(matches, version_context.get("selected_variant_id") or decision_variant_id)
+    matches = _attach_selected_decision_variant(matches, decision_variant_id)
     if summary_view:
         matches = [_dashboard_summary_match(match) for match in matches]
     complete = sum(1 for m in matches if m["capture_status"] == "ok")
@@ -5104,7 +5147,7 @@ def _match_detail(
         decision_variant_id,
         suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
     )
-    _attach_selected_decision_variant([summary], version_context.get("selected_variant_id") or decision_variant_id)
+    _attach_selected_decision_variant([summary], decision_variant_id)
     versions = _active_version_bundle()
     return {
         "match": summary,

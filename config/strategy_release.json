@@ -47,6 +47,26 @@
           "artifact_key": "structured_shadow_dir",
           "is_default": true,
           "selectable": true
+        },
+        {
+          "variant_id": "shadow_v4.2.0000_execution_strict_fullcap2",
+          "version_id": "4.2.0000",
+          "kind": "shadow",
+          "label": "v4.2.0000 strict fullcap2",
+          "source": "structured_shadow_csv",
+          "artifact_key": "structured_shadow_dir",
+          "is_default": false,
+          "selectable": true
+        },
+        {
+          "variant_id": "shadow_v4.2.0000_execution_late_proxy_fullcap2",
+          "version_id": "4.2.0000",
+          "kind": "shadow",
+          "label": "v4.2.0000 late proxy fullcap2",
+          "source": "structured_shadow_csv",
+          "artifact_key": "structured_shadow_dir",
+          "is_default": false,
+          "selectable": true
         }
       ],
       "main_strategy_arms": [

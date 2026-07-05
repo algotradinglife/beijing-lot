@@ -57,6 +57,8 @@ Issue Board / Match Detail:
 - show `execution_action`, `execution_reasons`, `execution_full_score`,
   `execution_full_candidate`, `execution_full_kept`, and
   `execution_segment_idx`;
+- use `execution_unlock_state` for late-refresh stop color:
+  `waiting_late_refresh` is red, `unlocked_after_late_refresh` is green;
 - show `shadow_stop_flag=1` rows as no-buy/wait/skip, not as executable picks.
 - render `skip_wait_late_refresh` as a temporary stop/wait warning. The user
   should understand that this match is not safe to bet before a valid late SP
@@ -75,6 +77,26 @@ API / manifest:
 - expose the variants only when declared by active release manifest;
 - suppress undeclared `shadow_arm` artifacts;
 - treat `execution_*` fields as read-only artifact columns.
+- when both strict and late-proxy artifacts are available for the same version,
+  API should select the late-proxy artifact by default. This is the automated
+  stop-unlock signal.
+
+## Automated Stop Unlock
+
+Stop unlock is automated at the artifact/API layer:
+
+1. Before a valid late SP refresh, strategy publishes/selects
+   `strict_fullcap2`; late-refresh rows have
+   `execution_unlock_state=waiting_late_refresh` and should render red.
+2. After a valid late SP refresh, strategy publishes
+   `late_proxy_fullcap2`; rows previously held by the late-refresh gate have
+   `execution_unlock_state=unlocked_after_late_refresh` and should render
+   green.
+3. API defaults to `late_proxy_fullcap2` once that artifact is available, while
+   keeping `strict_fullcap2` selectable for audit.
+4. This unlocks the row as an executable recommendation, but it must not
+   silently submit a ticket. Ticket build/submit remains an explicit user
+   action.
 
 ## Manifest Draft
 

@@ -32,6 +32,18 @@ export interface DecisionVariantData extends DecisionVariantOption {
   primaryHit?: boolean | null;
   coverageHit?: boolean | null;
   notes?: string[];
+  executionPolicyVersion?: string;
+  executionPolicyName?: string;
+  executionAction?: string;
+  executionReasons?: string[];
+  executionSourceAction?: string;
+  executionRecommendedCodes?: string;
+  executionDoubleCodes?: string;
+  executionFullScore?: number;
+  executionFullCandidate?: boolean | null;
+  executionFullKept?: boolean | null;
+  executionSegmentIdx?: number;
+  executionUnlockState?: string;
   decisionChain?: string[];
   decisionCategories?: Array<{
     key: string;

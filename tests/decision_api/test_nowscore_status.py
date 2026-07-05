@@ -33,6 +33,17 @@ def test_shadow_variant_hit_is_recomputed_from_current_result() -> None:
         "shadow_stop_flag": "0",
         "shadow_primary_hit": "",
         "shadow_coverage_hit": "",
+        "execution_policy_name": "late_proxy_fullcap2",
+        "execution_action": "execute_double",
+        "execution_reasons": "late_refresh_proxy;direct_buy",
+        "execution_source_action": "wait_late_refresh",
+        "execution_recommended_codes": "0+1",
+        "execution_double_codes": "0+1",
+        "execution_full_score": "0.0",
+        "execution_full_candidate": "0",
+        "execution_full_kept": "0",
+        "execution_segment_idx": "2",
+        "execution_unlock_state": "unlocked_after_late_refresh",
     }
 
     variant = appmod._shadow_decision_variant(row, "shadow.csv", result_code="1")
@@ -40,3 +51,9 @@ def test_shadow_variant_hit_is_recomputed_from_current_result() -> None:
     assert variant["primary_hit"] is False
     assert variant["coverage_hit"] is True
     assert variant["prediction_hit"] is True
+    assert variant["execution_action"] == "execute_double"
+    assert variant["execution_reasons"] == ["late_refresh_proxy", "direct_buy"]
+    assert variant["execution_source_action"] == "wait_late_refresh"
+    assert variant["execution_unlock_state"] == "unlocked_after_late_refresh"
+    assert variant["execution_full_candidate"] is False
+    assert variant["execution_segment_idx"] == 2

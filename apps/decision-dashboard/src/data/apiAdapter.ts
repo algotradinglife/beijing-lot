@@ -143,6 +143,12 @@ function asArray<T = unknown>(value: unknown): T[] {
   return Array.isArray(value) ? value as T[] : [];
 }
 
+function asStringList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => asString(item)).filter(Boolean);
+  if (typeof value === 'string') return value.split(';').map((item) => item.trim()).filter(Boolean);
+  return [];
+}
+
 function asNumber(value: unknown, fallback = 0): number {
   return typeof value === 'number' ? value : fallback;
 }
@@ -407,6 +413,18 @@ function transformDecisionVariant(raw: unknown): DecisionVariantData {
     primaryHit: asNullableBoolean(obj.primary_hit ?? obj.primaryHit),
     coverageHit: asNullableBoolean(obj.coverage_hit ?? obj.coverageHit),
     notes: asArray(obj.notes).map((value) => asString(value)).filter(Boolean),
+    executionPolicyVersion: asString(obj.execution_policy_version, asString(obj.executionPolicyVersion)) || undefined,
+    executionPolicyName: asString(obj.execution_policy_name, asString(obj.executionPolicyName)) || undefined,
+    executionAction: asString(obj.execution_action, asString(obj.executionAction)) || undefined,
+    executionReasons: asStringList(obj.execution_reasons ?? obj.executionReasons),
+    executionSourceAction: asString(obj.execution_source_action, asString(obj.executionSourceAction)) || undefined,
+    executionRecommendedCodes: asString(obj.execution_recommended_codes, asString(obj.executionRecommendedCodes)) || undefined,
+    executionDoubleCodes: asString(obj.execution_double_codes, asString(obj.executionDoubleCodes)) || undefined,
+    executionFullScore: asMaybeNumber(obj.execution_full_score ?? obj.executionFullScore),
+    executionFullCandidate: asNullableBoolean(obj.execution_full_candidate ?? obj.executionFullCandidate),
+    executionFullKept: asNullableBoolean(obj.execution_full_kept ?? obj.executionFullKept),
+    executionSegmentIdx: asMaybeNumber(obj.execution_segment_idx ?? obj.executionSegmentIdx),
+    executionUnlockState: asString(obj.execution_unlock_state, asString(obj.executionUnlockState)) || undefined,
     decisionChain: asArray(obj.decision_chain ?? obj.decisionChain).map((value) => asString(value)).filter(Boolean),
     decisionCategories: asArray(obj.decision_categories ?? obj.decisionCategories).map(transformDecisionCategory),
   };

@@ -70,8 +70,11 @@ def test_wait_late_refresh_is_no_buy_until_proxy_mode() -> None:
 
     assert strict.selection_codes == []
     assert strict.action == "skip_wait_late_refresh"
+    assert mod.execution_unlock_state("wait_late_refresh", strict) == "waiting_late_refresh"
     assert proxy.selection_codes == ["3", "1"]
     assert proxy.action == "execute_double"
+    assert mod.execution_unlock_state("wait_late_refresh", proxy) == "unlocked_after_late_refresh"
+    assert mod.execution_unlock_state("buy", proxy) == "not_applicable"
 
 
 def test_low_value_full_cover_is_downgraded_to_best_double() -> None:

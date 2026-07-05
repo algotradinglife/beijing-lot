@@ -187,6 +187,11 @@ the selected execution policy and blocking state visible. A row that is
 "stop - waiting late refresh"; it is a warning not to bet that match yet, not a
 final statement that the match will never be buyable.
 
+When both strict and late-proxy artifacts are available for the same execution
+version, API should default to `late_proxy_fullcap2`. This is the automated
+unlock mechanism. The strict artifact remains selectable for audit, and ticket
+submission remains an explicit user action.
+
 Required execution extension fields:
 
 | Field | Type | Rule |
@@ -202,6 +207,7 @@ Required execution extension fields:
 | `execution_full_candidate` | boolean/int | `1` if the row qualified as a full-cover candidate before segment cap. |
 | `execution_full_kept` | boolean/int | `1` if the row kept full cover after per-segment cap. |
 | `execution_segment_idx` | integer/string | Rolling segment id used by the execution cap. |
+| `execution_unlock_state` | enum/string | Late-refresh stop state for UI color and automation. |
 
 Stable `execution_action` values:
 
@@ -230,6 +236,15 @@ Execution mapping rules:
 - `skip_wait_late_refresh` is a temporary stop. It may become executable after
   a later valid refresh, so the UI should show the policy/refresh state instead
   of silently treating the audit recommendation as actionable.
+- `execution_unlock_state=waiting_late_refresh` should be rendered as a red
+  stop/wait state.
+- `execution_unlock_state=unlocked_after_late_refresh` should be rendered as a
+  green unlocked state, because this row was previously held for late refresh
+  and is now executable.
+- `execution_unlock_state=not_applicable` means the row was not held by the
+  late-refresh gate.
+- `execution_unlock_state=blocked_after_late_refresh` means the row was still
+  not executable after refresh and should remain a stop/no-buy state.
 - N-ticket replay and live staking must consume `shadow_selection_codes`, not
   `execution_recommended_codes`.
 - Match detail should show both columns when they differ.

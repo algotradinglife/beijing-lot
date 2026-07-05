@@ -291,6 +291,19 @@ def test_shadow_variant_version_key_supports_four_digit_fix_numbers() -> None:
     assert appmod._decision_variant_version_key("shadow_v3.3.3")[:3] == appmod._decision_variant_version_key("shadow_v3.3.0003")[:3]
 
 
+def test_late_proxy_execution_variant_defaults_over_strict_when_available() -> None:
+    options = [
+        {"variant_id": "active_v3", "kind": "active", "is_default": True},
+        {"variant_id": "shadow_v4.2.0000_execution_strict_fullcap2", "kind": "shadow", "is_default": False},
+        {"variant_id": "shadow_v4.2.0000_execution_late_proxy_fullcap2", "kind": "shadow", "is_default": False},
+    ]
+
+    normalized = appmod._normalize_decision_variant_defaults(options)
+
+    defaults = [item["variant_id"] for item in normalized if item["is_default"]]
+    assert defaults == ["shadow_v4.2.0000_execution_late_proxy_fullcap2"]
+
+
 def test_main_strategy_reads_release_artifacts(monkeypatch, tmp_path: Path) -> None:
     config_path, db_path = _build_release_fixture(tmp_path)
     _minimal_db(db_path)

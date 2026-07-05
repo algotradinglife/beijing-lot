@@ -145,6 +145,9 @@ For v4.2.0000 execution artifacts:
   `execution_reasons`.
 - Full-cover display should use `execution_full_score`,
   `execution_full_candidate`, and `execution_full_kept`.
+- Late-refresh stop color should come from `execution_unlock_state`:
+  `waiting_late_refresh` renders red and `unlocked_after_late_refresh` renders
+  green.
 - `skip_*` actions should be rendered as stop/no-buy states. In particular,
   `skip_wait_late_refresh` is a temporary warning to not bet the match until a
   valid late SP refresh artifact exists.
