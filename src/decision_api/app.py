@@ -1253,6 +1253,22 @@ def _live_workflow_step_defs(issue: str, db_path: Path) -> list[dict[str, Any]]:
             "timeout_sec": 180,
             "command": ["internal", "materialize_issue_decision_snapshots", issue],
         },
+        {
+            "step_key": "publish_v4_2_execution_artifacts",
+            "label": "发布 v4.2 自动解停执行影子单",
+            "kind": "subprocess",
+            "timeout_sec": 300,
+            "command": [
+                py,
+                str(PROJECT_ROOT / "scripts/publish_v4_2_execution_artifacts.py"),
+                "--db",
+                db_arg,
+                "--issue",
+                issue,
+                "--max-refresh-age-minutes",
+                "180",
+            ],
+        },
     ]
 
 

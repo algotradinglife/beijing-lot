@@ -33,6 +33,18 @@ def test_decision_api_main_defaults_to_loopback(monkeypatch) -> None:
     assert seen == {"host": "127.0.0.1", "port": 8791, "debug": False}
 
 
+def test_live_workflow_publishes_v4_2_execution_artifacts_after_snapshot_materialization(tmp_path: Path) -> None:
+    plan = appmod._live_workflow_step_defs("review_tie_case", tmp_path / "500.sqlite")
+    step_keys = [step["step_key"] for step in plan]
+
+    assert step_keys.index("publish_v4_2_execution_artifacts") > step_keys.index("materialize_decision_snapshots")
+    publish_step = next(step for step in plan if step["step_key"] == "publish_v4_2_execution_artifacts")
+    assert publish_step["kind"] == "subprocess"
+    command_text = " ".join(str(item) for item in publish_step["command"])
+    assert "scripts/publish_v4_2_execution_artifacts.py" in command_text
+    assert "--max-refresh-age-minutes 180" in command_text
+
+
 def test_vite_config_defaults_are_not_public() -> None:
     config_text = (ROOT / "apps/decision-dashboard/vite.config.ts").read_text(encoding="utf-8")
     assert "host: process.env.VITE_DEV_HOST ?? '127.0.0.1'" in config_text
@@ -244,7 +256,7 @@ def test_dashboard_uses_latest_complete_live_sp_per_match(tmp_path: Path) -> Non
     assert payload["strategy_version_context"]["selected_variant_id"] == "active_v3"
     match = payload["matches"][0]
     assert match["selected_decision_variant_id"] == "active_v3"
-    assert match["selected_decision_variant_status"] == "unavailable"
+    assert match["selected_decision_variant_status"] == "ok"
     assert match["sp_3"] == 2.22
     assert match["sp_1"] == 3.33
     assert match["sp_0"] == 4.44
@@ -296,7 +308,7 @@ def test_match_detail_exposes_strategy_version_context(tmp_path: Path) -> None:
     assert payload["strategy_version_context"]["requested_variant_id"] == "missing_v9"
     assert payload["strategy_version_context"]["selection_status"] == "unavailable"
     assert payload["match"]["selected_decision_variant_id"] == "active_v3"
-    assert payload["match"]["selected_decision_variant_status"] == "unavailable"
+    assert payload["match"]["selected_decision_variant_status"] == "ok"
 
 
 def test_operations_reads_dashboard_runtime_status(tmp_path: Path, monkeypatch) -> None:
