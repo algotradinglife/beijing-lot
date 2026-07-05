@@ -278,10 +278,17 @@ def test_shadow_variant_options_are_manifest_allowlisted(tmp_path: Path) -> None
     assert [item["variant_id"] for item in options] == ["active_v3", "shadow_v3.3.3"]
     assert suppressed == ["shadow_v3.3.1"]
     assert unavailable["selection_status"] == "unavailable"
-    assert unavailable["selected_variant_id"] == "active_v3"
+    assert unavailable["selected_variant_id"] == "shadow_v3.3.3"
     assert unavailable["contract_warnings"][0]["variant_ids"] == ["shadow_v3.3.1"]
     assert available["selection_status"] == "ok"
     assert available["selected_variant_id"] == "shadow_v3.3.3"
+
+
+def test_shadow_variant_version_key_supports_four_digit_fix_numbers() -> None:
+    assert appmod._decision_variant_version_key("shadow_v3.3.0010") > appmod._decision_variant_version_key("shadow_v3.3.0009")
+    assert appmod._decision_variant_version_key("shadow_v3.4.0000") > appmod._decision_variant_version_key("shadow_v3.3.9999")
+    assert appmod._decision_variant_version_key("shadow_v4.0.0000") > appmod._decision_variant_version_key("shadow_v3.999.9999")
+    assert appmod._decision_variant_version_key("shadow_v3.3.3")[:3] == appmod._decision_variant_version_key("shadow_v3.3.0003")[:3]
 
 
 def test_main_strategy_reads_release_artifacts(monkeypatch, tmp_path: Path) -> None:

@@ -28,6 +28,11 @@
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
+    "decisionVersion": {
+      "type": "string",
+      "description": "Decision-chain version. New versions use x.y.abcd: x for formal/rewrite lines, y for major logic changes, abcd for small fixes. Legacy x.y.z values remain readable.",
+      "pattern": "^[0-9]+\\.[0-9]+\\.(?:[0-9]{4}|[0-9]+)$"
+    },
     "releaseId": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*_[0-9]{4}_[0-9]{2}_[0-9]{2}$"
@@ -162,7 +167,7 @@
           "minLength": 1
         },
         "version_id": {
-          "$ref": "#/$defs/semver"
+          "$ref": "#/$defs/decisionVersion"
         },
         "kind": {
           "enum": ["active", "shadow", "draft"]

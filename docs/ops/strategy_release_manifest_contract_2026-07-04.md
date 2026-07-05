@@ -20,7 +20,7 @@ Each release must include:
 
 - `release_id`: lowercase snake-case deployment id ending in `YYYY_MM_DD`,
   for example `main_n7_384_2026_07_04`.
-- `version_id`: semantic version in `x.y.z` form for the release contract.
+- `version_id`: release bundle version in `x.y.z` form.
 - `status`: `active`, `shadow`, `draft`, `superseded`, or `archived`.
 - `generated_at`: ISO timestamp for the artifact bundle.
 - `effective_from_issue`: first issue where this release may be shown live.
@@ -47,6 +47,23 @@ declared by `decision_variants[].artifact_key`.
 Historical issues must only show variants that were available under the release
 effective for that issue. Post-settlement artifacts are review-only unless a new
 release explicitly promotes them.
+
+## Decision-Chain Version Numbers
+
+Decision variant ids and `decision_variants[].version_id` use `x.y.abcd` going
+forward:
+
+- `x`: formal line or structural rewrite.
+- `y`: major strategy/decision-chain logic change.
+- `abcd`: small fix counter within the same `x.y` line, zero-padded to four
+  digits.
+
+Example: `shadow_v3.4.0000` starts a new major logic branch after
+`shadow_v3.3.0012`; `shadow_v4.0.0000` is a structural/formal version line.
+
+Existing three-part values such as `shadow_v3.3.3` remain readable as legacy
+artifacts and sort equivalently to `shadow_v3.3.0003`. New strategy artifacts
+should use the four-digit fix segment.
 
 ## Required Artifacts
 
@@ -76,7 +93,8 @@ shared by Issue Board, Match Detail, and Settlement Review.
 Before strategy asks the dashboard to adopt a new version:
 
 1. Write a new release entry in `config/strategy_release.json`.
-2. Use semantic `version_id` values for release and decision variants.
+2. Use `x.y.z` for release bundle `version_id`, and `x.y.abcd` for decision
+   variant `version_id` / `shadow_vx.y.abcd`.
 3. Fill `generated_at`, `effective_from_issue`, `artifact_scope`, and
    `snapshot_timestamps`.
 4. Point artifacts to committed or locally generated result files, without

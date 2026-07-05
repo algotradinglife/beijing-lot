@@ -2968,11 +2968,11 @@ def _shadow_variant_display_label(variant_id: str) -> str:
 
 def _decision_variant_version_key(variant_id: Any) -> tuple[int, int, int, str]:
     text = str(variant_id or "")
-    match = re.search(r"v(\d+)\.(\d+)\.(\d+)", text)
+    match = re.search(r"(?:^|v)(\d+)\.(\d+)\.(\d+)", text)
     if not match:
         return (-1, -1, -1, text)
-    major, minor, patch = (int(part) for part in match.groups())
-    return (major, minor, patch, text)
+    major, minor, revision = (int(part) for part in match.groups())
+    return (major, minor, revision, text)
 
 
 def _structured_shadow_variant_scan(
@@ -2995,9 +2995,8 @@ def _structured_shadow_variant_scan(
         if existing is None or mtime >= existing[2]:
             variants[variant_id] = (rows, source, mtime)
 
-    def sort_key(item: tuple[str, tuple[dict[int, dict[str, Any]], str, float]]) -> tuple[int, str]:
-        major, minor, patch, variant_id = _decision_variant_version_key(item[0])
-        return (major * 10000 + minor * 100 + patch, variant_id)
+    def sort_key(item: tuple[str, tuple[dict[int, dict[str, Any]], str, float]]) -> tuple[int, int, int, str]:
+        return _decision_variant_version_key(item[0])
 
     return (
         [(rows, source) for _variant_id, (rows, source, _mtime) in sorted(variants.items(), key=sort_key)],

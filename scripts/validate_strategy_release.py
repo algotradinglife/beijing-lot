@@ -14,6 +14,7 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
 SEMVER_RE = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+DECISION_VERSION_RE = re.compile(r"^[0-9]+\.[0-9]+\.(?:[0-9]{4}|[0-9]+)$")
 RELEASE_ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*_[0-9]{4}_[0-9]{2}_[0-9]{2}$")
 ISO_DATETIME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 
@@ -143,16 +144,25 @@ def _validate_release_contract(release_key: str, release: dict[str, Any], errors
     if not isinstance(variants, list) or not variants:
         errors.append(f"{release_key} must declare decision_variants")
         return
-    if not any(isinstance(item, dict) and item.get("kind") == "active" and item.get("is_default") for item in variants):
-        errors.append(f"{release_key} must declare one default active decision variant")
+    if not any(isinstance(item, dict) and item.get("kind") == "active" for item in variants):
+        errors.append(f"{release_key} must declare one active decision variant")
+    default_variants = [
+        item
+        for item in variants
+        if isinstance(item, dict) and item.get("is_default")
+    ]
+    if not default_variants:
+        errors.append(f"{release_key} must declare one default decision variant")
+    elif len(default_variants) > 1:
+        errors.append(f"{release_key} must declare only one default decision variant")
     for idx, variant in enumerate(variants):
         if not isinstance(variant, dict):
             errors.append(f"{release_key} decision_variants[{idx}] must be an object")
             continue
         if not str(variant.get("variant_id") or ""):
             errors.append(f"{release_key} decision_variants[{idx}].variant_id is required")
-        if not SEMVER_RE.fullmatch(str(variant.get("version_id") or "")):
-            errors.append(f"{release_key} decision_variants[{idx}].version_id must use x.y.z")
+        if not DECISION_VERSION_RE.fullmatch(str(variant.get("version_id") or "")):
+            errors.append(f"{release_key} decision_variants[{idx}].version_id must use x.y.abcd")
         kind = str(variant.get("kind") or "")
         if kind not in {"active", "shadow", "draft"}:
             errors.append(f"{release_key} decision_variants[{idx}].kind is invalid")

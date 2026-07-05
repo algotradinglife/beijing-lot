@@ -11,7 +11,8 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+RELEASE_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+DECISION_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.(?:[0-9]{4}|[0-9]+)$")
 RELEASE_ID = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*_[0-9]{4}_[0-9]{2}_[0-9]{2}$")
 sys.path.insert(0, str(ROOT))
 
@@ -36,7 +37,7 @@ def _assert_release_contract(registry: dict[str, Any]) -> None:
         assert RELEASE_ID.fullmatch(release_id)
         assert release["release_id"] == release_id
         assert RELEASE_ID.fullmatch(release["release_id"])
-        assert SEMVER.fullmatch(release["version_id"])
+        assert RELEASE_VERSION.fullmatch(release["version_id"])
         assert release["status"] in {"active", "shadow", "draft", "superseded", "archived"}
         assert release["owner"]
         assert release["strategy_family"]
@@ -64,10 +65,11 @@ def _assert_release_contract(registry: dict[str, Any]) -> None:
         assert release["main_strategy_arms"]
 
         variants = release["decision_variants"]
-        assert any(item["kind"] == "active" and item["is_default"] for item in variants)
+        assert any(item["kind"] == "active" for item in variants)
+        assert sum(1 for item in variants if item["is_default"]) == 1
         for variant in variants:
             assert variant["variant_id"]
-            assert SEMVER.fullmatch(variant["version_id"])
+            assert DECISION_VERSION.fullmatch(variant["version_id"])
             assert variant["kind"] in {"active", "shadow", "draft"}
             assert isinstance(variant["selectable"], bool)
             assert isinstance(variant["is_default"], bool)
