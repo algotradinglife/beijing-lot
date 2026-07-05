@@ -3184,6 +3184,98 @@ def _shadow_decision_option(
     }
 
 
+def _is_execution_strict_variant_id(variant_id: str) -> bool:
+    return "_execution_strict_" in variant_id
+
+
+def _is_execution_late_proxy_variant_id(variant_id: str) -> bool:
+    return "_execution_late_proxy_" in variant_id
+
+
+def _manifest_shadow_option(manifest: dict[str, Any], *, available: bool) -> dict[str, Any]:
+    variant_id = str(manifest.get("variant_id") or "")
+    return {
+        "variant_id": variant_id,
+        "kind": SHADOW_DECISION_VARIANT_KIND,
+        "family": SHADOW_DECISION_FAMILY,
+        "label": manifest.get("label") or _shadow_variant_display_label(variant_id),
+        "display_label": _shadow_variant_display_label(variant_id),
+        "version": manifest.get("version_id") or "",
+        "version_id": manifest.get("version_id") or "",
+        "source": "structured_shadow_csv",
+        "source_path": "",
+        "artifact_key": manifest.get("artifact_key", "structured_shadow_dir"),
+        "is_default": bool(manifest.get("is_default", False)),
+        "selectable": bool(manifest.get("selectable", True)),
+        "available": available,
+    }
+
+
+def _missing_manifest_shadow_options(
+    present_variant_ids: set[str],
+    release: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    options: list[dict[str, Any]] = []
+    for manifest in _manifest_decision_variants(release):
+        variant_id = str(manifest.get("variant_id") or "")
+        if manifest.get("kind") != SHADOW_DECISION_VARIANT_KIND or not variant_id:
+            continue
+        if variant_id in present_variant_ids:
+            continue
+        # late_proxy is only actionable after the late-refresh artifact exists.
+        if _is_execution_late_proxy_variant_id(variant_id):
+            continue
+        if _is_execution_strict_variant_id(variant_id):
+            options.append(_manifest_shadow_option(manifest, available=False))
+    return options
+
+
+def _manifest_shadow_placeholder_decision_variant(manifest: dict[str, Any]) -> dict[str, Any]:
+    variant_id = str(manifest.get("variant_id") or "")
+    if not _is_execution_strict_variant_id(variant_id):
+        return {}
+    return {
+        "variant_id": variant_id,
+        "kind": SHADOW_DECISION_VARIANT_KIND,
+        "family": SHADOW_DECISION_FAMILY,
+        "label": manifest.get("label") or _shadow_variant_display_label(variant_id),
+        "display_label": _shadow_variant_display_label(variant_id),
+        "version": manifest.get("version_id") or "",
+        "version_id": manifest.get("version_id") or "",
+        "source": "structured_shadow_csv",
+        "source_path": "",
+        "is_default": bool(manifest.get("is_default", False)),
+        "available": False,
+        "recommendation": "等待晚盘",
+        "primary_pick": "",
+        "protect_picks": [],
+        "selection_codes": [],
+        "selection_type": "no-buy",
+        "stop_flag": True,
+        "q_score": None,
+        "probability": None,
+        "confidence_label": "",
+        "prediction_hit": None,
+        "primary_hit": None,
+        "coverage_hit": None,
+        "execution_policy_version": manifest.get("version_id") or "",
+        "execution_policy_name": "strict_fullcap2",
+        "execution_action": "skip_wait_late_refresh",
+        "execution_reasons": ["execution_artifact_missing_for_issue"],
+        "execution_source_action": "wait_late_refresh",
+        "execution_recommended_codes": "",
+        "execution_double_codes": "",
+        "execution_full_score": None,
+        "execution_full_candidate": False,
+        "execution_full_kept": False,
+        "execution_segment_idx": None,
+        "execution_unlock_state": "waiting_late_refresh",
+        "notes": ["strict execution artifact missing; no executable pick"],
+        "decision_chain": [],
+        "decision_categories": [],
+    }
+
+
 def _normalize_decision_variant_defaults(options: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not options:
         return options
@@ -3228,7 +3320,14 @@ def _decision_variant_options(
     ]
     for rows, source_path in shadow_variants or []:
         if rows and source_path:
-            options.append(_shadow_decision_option(rows, source_path, release=release))
+            option = _shadow_decision_option(rows, source_path, release=release)
+            options.append(option)
+    present_shadow_ids = {
+        str(item.get("variant_id") or "")
+        for item in options
+        if item.get("kind") == SHADOW_DECISION_VARIANT_KIND
+    }
+    options.extend(_missing_manifest_shadow_options(present_shadow_ids, release))
     return _normalize_decision_variant_defaults(options)
 
 
@@ -3250,6 +3349,9 @@ def _strategy_version_context(
         selection_error = f"decision variant not available for this issue: {requested}"
     elif selected_option is None:
         selected_option = default_option
+    if selected_option and selected_option.get("available") is False and selection_status == "ok":
+        selection_status = "degraded"
+        selection_error = f"decision variant artifact unavailable for this issue: {selected_option.get('variant_id')}"
 
     release_payload = _strategy_release_public_payload(release)
     if release_payload.get("release_load_status") == "degraded" and selection_status == "ok":
@@ -3310,6 +3412,7 @@ def _compact_decision_variant(variant: dict[str, Any]) -> dict[str, Any]:
         "version_id",
         "source",
         "is_default",
+        "available",
         "recommendation",
         "primary_pick",
         "protect_picks",
@@ -3429,7 +3532,22 @@ def _dashboard_summary_match(match: dict[str, Any]) -> dict[str, Any]:
 def _attach_decision_variants(
     matches: list[dict[str, Any]],
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]],
+    *,
+    release: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    present_shadow_ids = {
+        _shadow_variant_id(rows)
+        for rows, _source_path in shadow_variants
+        if rows
+    }
+    placeholder_manifests = [
+        manifest
+        for manifest in _manifest_decision_variants(release)
+        if str(manifest.get("variant_id") or "") in {
+            str(item.get("variant_id") or "")
+            for item in _missing_manifest_shadow_options(present_shadow_ids, release)
+        }
+    ]
     for match in matches:
         idx = _safe_int(match.get("match_idx"))
         variants = [_active_decision_variant(match)]
@@ -3437,6 +3555,10 @@ def _attach_decision_variants(
         for shadow_rows, shadow_source_path in shadow_variants:
             if idx is not None and idx in shadow_rows and shadow_source_path:
                 variants.append(_shadow_decision_variant(shadow_rows[idx], shadow_source_path, result_code=result_code))
+        for manifest in placeholder_manifests:
+            placeholder = _manifest_shadow_placeholder_decision_variant(manifest)
+            if placeholder:
+                variants.append(placeholder)
         match["decision_variants"] = variants
     return matches
 
@@ -4816,7 +4938,7 @@ def _dashboard(
     suppressed_shadow_variant_ids: list[str] = []
     if not _issue_all_has_result(rows):
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
-    matches = _attach_decision_variants(matches, shadow_variants)
+    matches = _attach_decision_variants(matches, shadow_variants, release=release)
     variant_options = _decision_variant_options(shadow_variants, release=release)
     version_context = _strategy_version_context(
         release,
@@ -4824,7 +4946,7 @@ def _dashboard(
         decision_variant_id,
         suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
     )
-    matches = _attach_selected_decision_variant(matches, decision_variant_id)
+    matches = _attach_selected_decision_variant(matches, version_context.get("selected_variant_id") or decision_variant_id)
     if summary_view:
         matches = [_dashboard_summary_match(match) for match in matches]
     complete = sum(1 for m in matches if m["capture_status"] == "ok")
@@ -5139,7 +5261,7 @@ def _match_detail(
     suppressed_shadow_variant_ids: list[str] = []
     if not _issue_all_has_result(rows):
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(str(row["issue"]), release)
-    _attach_decision_variants([summary], shadow_variants)
+    _attach_decision_variants([summary], shadow_variants, release=release)
     variant_options = _decision_variant_options(shadow_variants, release=release)
     version_context = _strategy_version_context(
         release,
@@ -5147,7 +5269,7 @@ def _match_detail(
         decision_variant_id,
         suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
     )
-    _attach_selected_decision_variant([summary], decision_variant_id)
+    _attach_selected_decision_variant([summary], version_context.get("selected_variant_id") or decision_variant_id)
     versions = _active_version_bundle()
     return {
         "match": summary,

@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, Gauge, LineChart, Server, ShieldAlert, Ticket, WalletCards } from 'lucide-react';
 import { ApiDashboardAdapter } from './data/apiAdapter';
 import { DEFAULT_DECISION_VARIANT_ID, decisionVersionLabel, isActiveDecisionVariant, isShadowDecisionVariant } from './decisionVariants';
-import type { DashboardData, IssueDashboardData, IssueMatchRow, IssueOption } from './data/types';
+import type { DashboardData, DecisionVariantData, IssueDashboardData, IssueMatchRow, IssueOption } from './data/types';
 
 type Page = 'Issue Dashboard' | 'Match Detail' | 'Operations' | 'Main Strategy' | 'Ticket Builder' | 'Selector Shadow' | 'Live Signals' | 'Settlement Review' | 'Strategy Lab';
 const pages: Page[] = ['Issue Dashboard', 'Settlement Review', 'Operations', 'Main Strategy', 'Ticket Builder', 'Selector Shadow', 'Live Signals', 'Strategy Lab'];
-const UI_BUILD_LABEL = 'UI settlement-clean-2348';
+const UI_BUILD_LABEL = 'UI execution-v4200-1355';
 const PAGE_LABELS: Record<Page, string> = {
   'Issue Dashboard': '期次看板',
   'Settlement Review': '赛后复盘',
@@ -77,6 +77,7 @@ function isCurrentOrFutureDate(value: string, today = localIsoDate()) {
 
 const Q_FOCUS_THRESHOLD = 1.5;
 const CONFIDENCE_FOCUS_THRESHOLD = 0.45;
+type PickCode = '3' | '1' | '0';
 const REVIEW_TAG_LABELS: Record<string, string> = {
   had_pre_match_risks: '赛前风险',
   intel_misread: '情报误读',
@@ -425,7 +426,7 @@ function betParts(match: IssueMatchRow): { primary: string; protection: string[]
   const fallbackOutcomes = splitOutcomeLabel(match.recommendedOutcome);
   const primary = match.primaryBetOutcome || fallbackOutcomes[0] || match.recommendedOutcome || '待预测';
   const protection = match.protectionOutcomes?.length ? match.protectionOutcomes : fallbackOutcomes.slice(1);
-  if (match.recommendedCoverage === 'no-buy' || primary === '不买' || primary === '待预测' || primary === '观察') {
+  if (match.stopFlag || match.recommendedCoverage === 'no-buy' || primary === '不买' || primary === '待预测' || primary === '观察' || primary === '停') {
     return { primary: '-', protection: [], stopped: true };
   }
   return { primary, protection, stopped: Boolean(match.stopFlag) };
@@ -490,6 +491,110 @@ function labelsFromCodes(values?: string[]) {
   return (values ?? []).map(pickLabel).filter((value) => value && value !== '-');
 }
 
+function isPickCode(value?: string): value is PickCode {
+  return value === '3' || value === '1' || value === '0';
+}
+
+function normalisedPickCodes(values?: string[]): PickCode[] {
+  return (values ?? [])
+    .map((value) => value.trim())
+    .filter(isPickCode);
+}
+
+function codesFromJoined(value?: string) {
+  return normalisedPickCodes(value?.split(/[+/,，\s]+/));
+}
+
+function isExecutionSkip(variant?: DecisionVariantData) {
+  return Boolean(variant?.executionAction?.startsWith('skip_'));
+}
+
+function isExecutionStopped(variant?: DecisionVariantData) {
+  if (!variant) return false;
+  return Boolean(
+    variant.stopFlag
+      || variant.selectionType === 'no-buy'
+      || isExecutionSkip(variant)
+      || normalisedPickCodes(variant.selectionCodes).length === 0,
+  );
+}
+
+function executableSelectionCodes(variant?: DecisionVariantData) {
+  if (!variant || isExecutionStopped(variant)) return [];
+  return normalisedPickCodes(variant.selectionCodes);
+}
+
+function executablePrimaryCode(variant?: DecisionVariantData) {
+  const codes = executableSelectionCodes(variant);
+  if (!codes.length) return undefined;
+  const primary = variant?.primaryPick?.trim();
+  return isPickCode(primary) && codes.includes(primary) ? primary : codes[0];
+}
+
+function executableProtectCodes(variant?: DecisionVariantData) {
+  const codes = executableSelectionCodes(variant);
+  const primary = executablePrimaryCode(variant);
+  const explicitProtect = normalisedPickCodes(variant?.protectPicks).filter((code) => code !== primary && codes.includes(code));
+  if (explicitProtect.length) return explicitProtect;
+  return codes.filter((code) => code !== primary);
+}
+
+function executionRecommendedCodes(variant?: DecisionVariantData) {
+  return codesFromJoined(variant?.executionRecommendedCodes);
+}
+
+function executionAuditDiffers(variant?: DecisionVariantData) {
+  if (!variant) return false;
+  const recommended = executionRecommendedCodes(variant);
+  if (!recommended.length) return false;
+  const executable = executableSelectionCodes(variant);
+  return recommended.join('+') !== executable.join('+');
+}
+
+function executionActionLabel(action?: string) {
+  const labels: Record<string, string> = {
+    execute_single: '单选执行',
+    execute_double: '双选执行',
+    execute_full_cover: '全包执行',
+    downgrade_full_to_double: '降全为双',
+    downgrade_full_to_double_layer_conflict: '冲突降双',
+    downgrade_full_to_double_over_cap: '超额降双',
+    skip_wait_late_refresh: '等待晚盘',
+    skip_stop: '停',
+    skip_full_over_cap: '全包超额停',
+    skip_no_recommendation: '无建议停',
+    skip_missing_decision: '缺决策停',
+  };
+  return action ? labels[action] || action : '未记录';
+}
+
+function executionUnlockLabel(state?: string) {
+  const labels: Record<string, string> = {
+    waiting_late_refresh: '等待晚盘',
+    unlocked_after_late_refresh: '晚盘解锁',
+    blocked_after_late_refresh: '晚盘仍停',
+    not_applicable: '常规',
+  };
+  return state ? labels[state] || state : '常规';
+}
+
+function executionUnlockTone(state?: string): 'good' | 'warn' | 'bad' | 'neutral' {
+  if (state === 'unlocked_after_late_refresh') return 'good';
+  if (state === 'waiting_late_refresh' || state === 'blocked_after_late_refresh') return 'bad';
+  return 'neutral';
+}
+
+function executionBoolLabel(value?: boolean | null) {
+  if (value === true) return '是';
+  if (value === false) return '否';
+  return '-';
+}
+
+function executionCodesLabel(codes: string[]) {
+  const labels = labelsFromCodes(codes);
+  return labels.length ? labels.join('+') : '停';
+}
+
 function hasDecisionHitValue(value?: boolean | null) {
   return value === true || value === false;
 }
@@ -498,11 +603,11 @@ function computedVariantHits(match: { resultCode?: string; status?: string; scor
   if (!variant || !isMatchCompleted(match) || !match.resultCode) {
     return { primaryHit: undefined, coverageHit: undefined, predictionHit: undefined };
   }
-  const selectedCodes = variant.selectionCodes ?? [];
-  if (!selectedCodes.length) {
+  const selectedCodes = executableSelectionCodes(variant);
+  if (!selectedCodes.length || !isPickCode(match.resultCode)) {
     return { primaryHit: undefined, coverageHit: undefined, predictionHit: undefined };
   }
-  const primaryCode = variant.primaryPick || selectedCodes[0];
+  const primaryCode = executablePrimaryCode(variant) || selectedCodes[0];
   const coverageHit = selectedCodes.includes(match.resultCode);
   return {
     primaryHit: primaryCode ? primaryCode === match.resultCode : undefined,
@@ -515,7 +620,7 @@ function variantOutcomeLabel(match: IssueMatchRow, variant: ReturnType<typeof de
   if (!variant) return undefined;
   const completed = isMatchCompleted(match);
   if (!completed) return undefined;
-  if (variant.stopFlag || variant.selectionType === 'no-buy' || selectedLabels.length === 0) return '停';
+  if (isExecutionStopped(variant) || selectedLabels.length === 0) return '停';
   const computedHits = computedVariantHits(match, variant);
   const primaryHit = variant.primaryHit ?? computedHits.primaryHit;
   const coverageHit = variant.coverageHit ?? variant.predictionHit ?? computedHits.coverageHit;
@@ -536,9 +641,12 @@ function variantOutcomeLabel(match: IssueMatchRow, variant: ReturnType<typeof de
 function applyDecisionVariant(match: IssueMatchRow, selectedVariantId: string): IssueMatchRow {
   const variant = decisionVariantForMatch(match, selectedVariantId);
   if (!variant) return match;
-  const selectedLabels = labelsFromCodes(variant.selectionCodes);
-  const protectLabels = labelsFromCodes(variant.protectPicks);
-  const primaryLabel = pickLabel(variant.primaryPick) !== '-' ? pickLabel(variant.primaryPick) : selectedLabels[0];
+  const stopped = isExecutionStopped(variant);
+  const executableCodes = executableSelectionCodes(variant);
+  const selectedLabels = labelsFromCodes(executableCodes);
+  const protectLabels = labelsFromCodes(executableProtectCodes(variant));
+  const primaryCode = executablePrimaryCode(variant);
+  const primaryLabel = primaryCode ? pickLabel(primaryCode) : undefined;
   const isActiveVariant = isActiveDecisionVariant(variant);
   const computedHits = computedVariantHits(match, variant);
   const predictionHit = variant.coverageHit ?? variant.predictionHit ?? computedHits.predictionHit ?? (isActiveVariant ? match.predictionHit : undefined);
@@ -547,11 +655,11 @@ function applyDecisionVariant(match: IssueMatchRow, selectedVariantId: string): 
     ...match,
     qScore: variant.qScore ?? match.qScore,
     confidence: variant.probability ?? match.confidence,
-    recommendedOutcome: selectedLabels.length ? selectedLabels.join('+') : variant.recommendation || match.recommendedOutcome,
-    primaryBetOutcome: primaryLabel,
+    recommendedOutcome: stopped ? '不买' : selectedLabels.length ? selectedLabels.join('+') : variant.recommendation || match.recommendedOutcome,
+    primaryBetOutcome: stopped ? undefined : primaryLabel,
     protectionOutcomes: protectLabels,
-    recommendedCoverage: variant.selectionType,
-    stopFlag: variant.stopFlag,
+    recommendedCoverage: stopped ? 'no-buy' : variant.selectionType,
+    stopFlag: stopped,
     recommendationSource: variant.label || match.recommendationSource,
     recommendationConfidenceLabel: variant.confidenceLabel || match.recommendationConfidenceLabel,
     predictionHit,
@@ -685,6 +793,11 @@ function IssueDashboard({
           {isExpanded && <div className="table-wrap"><table className="issue-matches-table"><colgroup><col className="issue-col-id" /><col className="issue-col-time" /><col className="issue-col-match" /><col className="issue-col-handicap" /><col className="issue-col-sp" /><col className="issue-col-probability" /><col className="issue-col-pick" /><col className="issue-col-result" /><col className="issue-col-status" /><col className="issue-col-settlement-sp" /></colgroup><thead><tr><th>#</th><th>时间</th><th>比赛</th><th>让球</th><th>SP</th><th>概率</th><th>注<br/><small>押/保</small></th><th>赛果</th><th>预测</th><th>结算SP</th></tr></thead><tbody>
             {group.matches.map((m: IssueMatchRow) => {
               const bet = betParts(m);
+              const variant = decisionVariantForMatch(m, selectedDecisionVariant);
+              const auditCodes = executionRecommendedCodes(variant);
+              const executableCodes = executableSelectionCodes(variant);
+              const hasExecutionMeta = Boolean(variant?.executionAction || variant?.executionUnlockState);
+              const hasExecutionDiff = executionAuditDiffers(variant);
               const probabilities = probabilityTriplet(m);
               const maxProbability = Math.max(...probabilities.map((item) => item.value ?? -1));
               const scoreParts = scoreCellParts(m);
@@ -701,6 +814,8 @@ function IssueDashboard({
                   {bet.protection.length ? <span className="bet-outcome-list">{bet.protection.map((outcome, index) => <span key={outcome} className="bet-outcome-item">{index > 0 ? <span className="bet-separator">+</span> : null}<span className={betOutcomeClass(m, outcome)}>{outcome}</span></span>)}</span> : <span className="bet-outcome muted">-</span>}
                 </span>
                 {bet.stopped ? <span className="bet-row stop active"><span className="bet-label">停</span><span className="bet-outcome stop-active">停</span></span> : null}
+                {hasExecutionMeta ? <small className={`execution-chip ${executionUnlockTone(variant?.executionUnlockState)}`.trim()}>{executionActionLabel(variant?.executionAction)} · {executionUnlockLabel(variant?.executionUnlockState)}</small> : null}
+                {hasExecutionDiff ? <small className="execution-audit-diff">审 {executionCodesLabel(auditCodes)} → 执 {executionCodesLabel(executableCodes)}</small> : null}
                 {m.draftDecisionSnapshotId ? <small className="decision-snapshot-note warn">待确认新建议</small> : null}
               </td>
               <td className="score-cell"><span>(半) {scoreParts.half}</span><span>(全) {scoreParts.full}</span><small>{matchStatusLabel(m)}</small></td>
@@ -733,11 +848,17 @@ function MatchDetail({
   const selectedVariant = (data.decisionVariants ?? []).find((variant) => variant.variantId === selectedDecisionVariant)
     ?? (data.decisionVariants ?? []).find((variant) => variant.isDefault)
     ?? (data.decisionVariants ?? [])[0];
-  const selectedVariantLabels = selectedVariant ? labelsFromCodes(selectedVariant.selectionCodes) : [];
-  const selectedVariantProtectLabels = selectedVariant ? labelsFromCodes(selectedVariant.protectPicks) : [];
+  const selectedVariantStopped = isExecutionStopped(selectedVariant);
+  const selectedVariantExecutableCodes = executableSelectionCodes(selectedVariant);
+  const selectedVariantAuditCodes = executionRecommendedCodes(selectedVariant);
+  const selectedVariantLabels = selectedVariant ? labelsFromCodes(selectedVariantExecutableCodes) : [];
+  const selectedVariantProtectLabels = selectedVariant ? labelsFromCodes(executableProtectCodes(selectedVariant)) : [];
+  const selectedVariantAuditLabels = labelsFromCodes(selectedVariantAuditCodes);
+  const selectedVariantExecutionDiffers = executionAuditDiffers(selectedVariant);
+  const selectedVariantPrimaryCode = executablePrimaryCode(selectedVariant);
   const llmReady = Boolean(selectedVariant) || (data.llm.source !== 'none' && data.llm.source !== 'api' && data.llm.direction !== '待决策');
   const modelPick = data.selectedOutcomes.length ? data.selectedOutcomes.join('+') : '不买';
-  const llmDecision = selectedVariant ? (selectedVariant.recommendation || (selectedVariant.stopFlag ? '停' : selectedVariantLabels.join('+'))) : llmReady ? data.llm.direction : '待决策';
+  const llmDecision = selectedVariant ? (selectedVariantStopped ? '停' : selectedVariantLabels.join('+') || selectedVariant.recommendation) : llmReady ? data.llm.direction : '待决策';
   const latestOdds = data.oddsTimeline[data.oddsTimeline.length - 1];
   const modelRole = data.recommendedCoverage === 'no-buy' ? '不买' : data.qScore >= 2 ? '核心' : data.qScore >= 1.2 ? '保护' : '观察';
   const analysis500 = data.analysis500;
@@ -757,7 +878,7 @@ function MatchDetail({
 	  const postmatchReview = data.postmatchReview;
 	  const matchCompleted = isMatchCompleted(data);
 	  const selectedVariantHits = computedVariantHits(data, selectedVariant);
-	  const selectedDecisionHit = matchCompleted ? selectedVariant?.coverageHit ?? selectedVariant?.predictionHit ?? selectedVariantHits.predictionHit ?? data.predictionHit : undefined;
+	  const selectedDecisionHit = matchCompleted && !selectedVariantStopped ? selectedVariant?.coverageHit ?? selectedVariant?.predictionHit ?? selectedVariantHits.predictionHit ?? data.predictionHit : undefined;
   const lineGapValue = data.lineGap;
   const lineGapLabel = lineGapValue === undefined ? '缺' : `${lineGapValue > 0 ? '+' : ''}${lineGapValue}`;
   const lineGapValueClass = lineGapValue !== undefined && Math.abs(lineGapValue) >= 0.75 ? 'bad-value' : lineGapValue !== undefined && Math.abs(lineGapValue) >= 0.5 ? 'warn-value' : undefined;
@@ -778,12 +899,12 @@ function MatchDetail({
   const topProbabilityOutcome = [...outcomeRows].sort((a, b) => (b.probability ?? -1) - (a.probability ?? -1))[0];
   const topQOutcome = [...outcomeRows].sort((a, b) => (b.q ?? -1) - (a.q ?? -1))[0];
   const llmProtectionFromData = data.llmProtectionOutcomes ?? [];
-  const llmStopped = selectedVariant ? selectedVariant.stopFlag : Boolean(data.llmStopped) || data.recommendedCoverage === 'no-buy' || llmDecision.includes('停');
+  const llmStopped = selectedVariant ? selectedVariantStopped : Boolean(data.llmStopped) || data.recommendedCoverage === 'no-buy' || llmDecision.includes('停');
   const primaryOutcome = selectedVariant
-    ? (pickLabel(selectedVariant.primaryPick) !== '-' ? pickLabel(selectedVariant.primaryPick) : selectedVariantLabels[0] || modelPick)
+    ? (selectedVariantStopped ? '-' : selectedVariantPrimaryCode ? pickLabel(selectedVariantPrimaryCode) : selectedVariantLabels[0] || modelPick)
     : data.llmPrimaryOutcome || (['胜', '平', '负'].includes(llmDecision) ? llmDecision : modelPick);
   const protectionOutcomes = selectedVariant
-    ? selectedVariantProtectLabels
+    ? selectedVariantStopped ? [] : selectedVariantProtectLabels
     : llmProtectionFromData.length
         ? llmProtectionFromData
         : topQOutcome?.label && topQOutcome.label !== primaryOutcome
@@ -831,10 +952,12 @@ function MatchDetail({
   const probabilityLine = `胜 ${pct(data.probability.win)} · 平 ${pct(data.probability.draw)} · 负 ${pct(data.probability.loss)}`;
   const evLine = topQOutcome ? `${topQOutcome.label} q ${topQOutcome.q?.toFixed(2) ?? '缺'}，模型EV ${modelPick}` : `模型EV ${modelPick}`;
   const protectionReason = protectionOutcomes.length
-    ? `q/EV 倾向与主押存在差异，保护 ${protectionOutcomes.join('+')}`
+    ? selectedVariantExecutionDiffers
+      ? `审计建议 ${selectedVariantAuditLabels.join('+')}，执行层按 ${selectedVariantLabels.join('+')} 出票`
+      : `q/EV 倾向与主押存在差异，保护 ${protectionOutcomes.join('+')}`
     : '未触发额外保护';
 	  const stopReason = llmStopped
-	    ? visibleLlmRisks[0] || '最大 q 偏低或综合反证过多，停牌'
+	    ? selectedVariant?.executionReasons?.[0] || (selectedVariant?.executionAction ? executionActionLabel(selectedVariant.executionAction) : visibleLlmRisks[0]) || '最大 q 偏低或综合反证过多，停牌'
 	    : data.qScore < 1.1
       ? '接近停牌线，降低优先级'
       : '未触发停牌';
@@ -939,6 +1062,26 @@ function MatchDetail({
         <div><span>停牌原因</span><b>{llmStopped ? '停' : '未停'}</b><p>{stopReason}</p></div>
       </div>
     </Card>
+
+    {selectedVariant?.executionAction && <Card title="执行层" className="execution-policy-panel">
+      <div className="execution-policy-head">
+        <Badge tone={isExecutionStopped(selectedVariant) ? 'bad' : 'good'}>{isExecutionStopped(selectedVariant) ? '不可出票' : '可出票'}</Badge>
+        <Badge tone={executionUnlockTone(selectedVariant.executionUnlockState)}>{executionUnlockLabel(selectedVariant.executionUnlockState)}</Badge>
+        <span>{executionActionLabel(selectedVariant.executionAction)}</span>
+      </div>
+      <div className="execution-policy-grid">
+        <div><span>可执行</span><b>{executionCodesLabel(selectedVariantExecutableCodes)}</b></div>
+        <div><span>审计建议</span><b>{selectedVariantAuditLabels.length ? selectedVariantAuditLabels.join('+') : '-'}</b></div>
+        <div><span>全包评分</span><b>{selectedVariant.executionFullScore?.toFixed(2) ?? '-'}</b></div>
+        <div><span>全包状态</span><b>{executionBoolLabel(selectedVariant.executionFullCandidate)} / {executionBoolLabel(selectedVariant.executionFullKept)}</b></div>
+        <div><span>分段</span><b>{selectedVariant.executionSegmentIdx ?? '-'}</b></div>
+        <div><span>策略</span><b>{selectedVariant.executionPolicyName || selectedVariant.executionPolicyVersion || '-'}</b></div>
+      </div>
+      {selectedVariantExecutionDiffers ? <div className="execution-policy-diff">审计建议与可执行下注不同，出票按“可执行”列。</div> : null}
+      {selectedVariant.executionReasons?.length ? <div className="compact-list execution-reasons">
+        {selectedVariant.executionReasons.slice(0, 3).map((reason) => <p key={reason}>{reason}</p>)}
+      </div> : null}
+    </Card>}
 
 	    {activeDecisionVersionSelected && activeSnapshot && draftSnapshot && <Card title="Active / Draft 对比" className="decision-snapshot-compare-card">
       <div className="decision-version-banner">

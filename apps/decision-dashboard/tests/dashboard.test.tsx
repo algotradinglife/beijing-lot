@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -26,6 +27,38 @@ function relativeIsoDate(offsetDays: number) {
   return `${year}-${month}-${day}`;
 }
 
+function parseCsvLine(line: string) {
+  const fields: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+    if (char === '"' && inQuotes && next === '"') {
+      current += '"';
+      i += 1;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      fields.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  fields.push(current);
+  return fields;
+}
+
+function parseCsvRows(text: string) {
+  const [headerLine, ...lines] = text.trim().split(/\r?\n/);
+  const headers = parseCsvLine(headerLine);
+  return lines.map((line) => {
+    const values = parseCsvLine(line);
+    return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? '']));
+  });
+}
+
 describe('北单实盘决策台 v1', () => {
   it('renders navigable pages with focused issue dashboard fields', async () => {
     const yesterday = relativeIsoDate(-1);
@@ -45,7 +78,7 @@ describe('北单实盘决策台 v1', () => {
     vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(dashboardData);
     render(<App />);
     await screen.findByRole('button', { name: '期次看板' });
-    expect(screen.getByText('UI settlement-clean-2348')).toBeInTheDocument();
+    expect(screen.getByText('UI execution-v4200-1355')).toBeInTheDocument();
     for (const page of ['期次看板', '运行状态', '主策略', '投注构建', '影子策略', '实时信号', '赛后复盘', '策略实验']) {
       expect(screen.getByRole('button', { name: page })).toBeInTheDocument();
     }
@@ -220,6 +253,173 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getAllByText(/baseline_384_hybrid/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/selector_v2_frozen/).length).toBeGreaterThan(0);
     expect(screen.getByText(/年度表现/)).toBeInTheDocument();
+  });
+
+  it('renders v4.2 execution variants from executable picks and keeps audit recommendations separate', async () => {
+    const today = relativeIsoDate(0);
+    const lateProxyId = 'shadow_v4.2.0000_execution_late_proxy_fullcap2';
+    const strictId = 'shadow_v4.2.0000_execution_strict_fullcap2';
+    const decisionVariantOptions = [
+      { variantId: 'active_v3', kind: 'active', label: 'v3', version: 'llm_chain_bet_protect_stop_v3', source: 'active_snapshot', isDefault: false },
+      { variantId: strictId, kind: 'shadow', label: 'v4.2 strict', version: 'llm_chain_structured_v4.2.0000_layered_merge_execution_policy', source: 'structured_shadow_csv', artifactKey: 'v4_2_strict', isDefault: false },
+      { variantId: lateProxyId, kind: 'shadow', label: 'v4.2 late proxy', version: 'llm_chain_structured_v4.2.0000_layered_merge_execution_policy', source: 'structured_shadow_csv', artifactKey: 'v4_2_late_proxy', isDefault: true },
+    ];
+    const strategyVersionContext = {
+      schemaVersion: 'strategy_version_context_v1',
+      requestedVariantId: lateProxyId,
+      selectedVariantId: lateProxyId,
+      selectionStatus: 'ok',
+      availableVariantIds: ['active_v3', strictId, lateProxyId],
+      options: decisionVariantOptions,
+      contractWarnings: [],
+    };
+    const strictVariant = {
+      ...decisionVariantOptions[1],
+      recommendation: '等待晚盘',
+      primaryPick: undefined,
+      protectPicks: [],
+      selectionCodes: [],
+      selectionType: 'no-buy' as const,
+      stopFlag: true,
+      qScore: 3.74,
+      probability: 0.45,
+      executionPolicyVersion: 'v4.2.0000_execution_policy_2026-07-05',
+      executionPolicyName: 'strict_fullcap2',
+      executionAction: 'skip_wait_late_refresh',
+      executionReasons: ['requires_late_refresh_before_bet'],
+      executionSourceAction: 'wait_late_refresh',
+      executionRecommendedCodes: '1+0',
+      executionDoubleCodes: '1+0',
+      executionFullScore: 0,
+      executionFullCandidate: false,
+      executionFullKept: false,
+      executionSegmentIdx: 2,
+      executionUnlockState: 'waiting_late_refresh',
+    };
+    const lateProxyVariant = {
+      ...decisionVariantOptions[2],
+      recommendation: 'full downgraded to double',
+      primaryPick: '1',
+      protectPicks: ['3'],
+      selectionCodes: ['1', '3'],
+      selectionType: 'double' as const,
+      stopFlag: false,
+      qScore: 1.11,
+      probability: 0.46,
+      executionPolicyVersion: 'v4.2.0000_execution_policy_2026-07-05',
+      executionPolicyName: 'late_proxy_fullcap2',
+      executionAction: 'downgrade_full_to_double_layer_conflict',
+      executionReasons: ['full_required_but_value_below_threshold'],
+      executionSourceAction: 'full_cover_or_skip',
+      executionRecommendedCodes: '3+1+0',
+      executionDoubleCodes: '1+3',
+      executionFullScore: 0.85,
+      executionFullCandidate: false,
+      executionFullKept: false,
+      executionSegmentIdx: 1,
+      executionUnlockState: 'unlocked_after_late_refresh',
+    };
+    const match = {
+      ...mockDashboardData.issue.matches[0],
+      kickoffDate: today,
+      status: 'open' as const,
+      score: undefined,
+      halftimeScore: undefined,
+      scoreStatus: 'scheduled',
+      scoreStatusText: '未开',
+      resultCode: undefined,
+      resultLabel: undefined,
+      predictionHit: null,
+      settlementSp: undefined,
+      selectedDecisionVariantId: lateProxyId,
+      selectedDecisionVariant: lateProxyVariant,
+      decisionVariants: [strictVariant, lateProxyVariant],
+    };
+    const dashboardData: DashboardData = {
+      ...mockDashboardData,
+      issue: {
+        ...mockDashboardData.issue,
+        issueDate: today,
+        decisionVariantOptions,
+        strategyVersionContext,
+        matches: [match],
+      },
+      matchDetail: {
+        ...mockDashboardData.matchDetail,
+        status: 'open',
+        score: undefined,
+        halftimeScore: undefined,
+        scoreStatus: 'scheduled',
+        scoreStatusText: '未开',
+        resultLabel: undefined,
+        predictionHit: null,
+        settlementSp: undefined,
+        decisionVariantOptions,
+        strategyVersionContext,
+        decisionVariants: [strictVariant, lateProxyVariant],
+      },
+    };
+    vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(dashboardData);
+
+    render(<App />);
+    await screen.findByRole('button', { name: '期次看板' });
+    const versionSelect = screen.getByLabelText('选择决策版本') as HTMLSelectElement;
+    expect([...versionSelect.options].map((option) => option.value)).toContain(lateProxyId);
+    expect(versionSelect.value).toBe(lateProxyId);
+    const row = screen.getByText('bjdc_26052_001').closest('tr');
+    expect(row).not.toBeNull();
+    const betCell = row!.querySelector('.bet-cell') as HTMLElement;
+    expect(within(betCell).getByText('押')).toBeInTheDocument();
+    expect(within(betCell).getByText('平')).toBeInTheDocument();
+    expect(within(betCell).getByText('保')).toBeInTheDocument();
+    expect(within(betCell).getByText('胜')).toBeInTheDocument();
+    expect(within(betCell).getByText('冲突降双 · 晚盘解锁')).toBeInTheDocument();
+    expect(within(betCell).getByText('审 胜+平+负 → 执 平+胜')).toBeInTheDocument();
+
+    await userEvent.selectOptions(versionSelect, strictId);
+    expect(versionSelect.value).toBe(strictId);
+    const strictRow = screen.getByText('bjdc_26052_001').closest('tr');
+    const strictBetCell = strictRow!.querySelector('.bet-cell') as HTMLElement;
+    expect(within(strictBetCell).getByText('等待晚盘 · 等待晚盘')).toBeInTheDocument();
+    expect(within(strictBetCell).getByText('审 平+负 → 执 停')).toBeInTheDocument();
+    expect(within(strictBetCell).getAllByText('停').length).toBeGreaterThan(0);
+
+    await userEvent.selectOptions(versionSelect, lateProxyId);
+    await userEvent.click(screen.getByText('bjdc_26052_001'));
+    expect(screen.getByText('执行层')).toBeInTheDocument();
+    expect(screen.getByText('可出票')).toBeInTheDocument();
+    expect(screen.getByText('晚盘解锁')).toBeInTheDocument();
+    expect(screen.getByText('可执行')).toBeInTheDocument();
+    expect(screen.getAllByText('平+胜').length).toBeGreaterThan(0);
+    expect(screen.getByText('审计建议')).toBeInTheDocument();
+    expect(screen.getByText('胜+平+负')).toBeInTheDocument();
+    expect(screen.getByText('审计建议与可执行下注不同，出票按“可执行”列。')).toBeInTheDocument();
+    expect(screen.getByText('0.85')).toBeInTheDocument();
+  });
+
+  it('parses the v4.2 execution artifact fixture fields used by the dashboard contract', () => {
+    const csv = readFileSync('../../docs/strategy/examples/v4_2_0000_execution_artifact_example.csv', 'utf8');
+    const rows = parseCsvRows(csv);
+    expect(rows.length).toBeGreaterThanOrEqual(6);
+    const lateProxyRow = rows.find((row) => row.match_id === '26072_005');
+    expect(lateProxyRow).toMatchObject({
+      shadow_arm: 'shadow_v4.2.0000_execution_late_proxy_fullcap2',
+      shadow_selection_codes: '1+3',
+      execution_recommended_codes: '3+1+0',
+      execution_action: 'downgrade_full_to_double_layer_conflict',
+      execution_full_score: '0.8500',
+      execution_unlock_state: 'not_applicable',
+    });
+    const strictWaitRow = rows.find((row) => row.match_id === '26072_020');
+    expect(strictWaitRow).toMatchObject({
+      shadow_arm: 'shadow_v4.2.0000_execution_strict_fullcap2',
+      shadow_selection_codes: '',
+      shadow_stop_flag: '1',
+      selection_type: 'no-buy',
+      execution_action: 'skip_wait_late_refresh',
+      execution_recommended_codes: '1+0',
+      execution_unlock_state: 'waiting_late_refresh',
+    });
   });
 
   it('does not score halftime matches as missed even when upstream status says finished', async () => {

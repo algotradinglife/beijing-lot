@@ -304,6 +304,46 @@ def test_late_proxy_execution_variant_defaults_over_strict_when_available() -> N
     assert defaults == ["shadow_v4.2.0000_execution_late_proxy_fullcap2"]
 
 
+def test_strict_execution_variant_surfaces_as_wait_when_late_artifact_missing() -> None:
+    release = {
+        "release_id": "fixture_execution_release",
+        "decision_variants": [
+            {"variant_id": "active_v3", "kind": "active", "source": "active_snapshot", "is_default": False, "selectable": True},
+            {"variant_id": "shadow_v3.3.3", "kind": "shadow", "source": "structured_shadow_csv", "artifact_key": "structured_shadow_dir", "is_default": True, "selectable": True},
+            {"variant_id": "shadow_v4.2.0000_execution_strict_fullcap2", "version_id": "4.2.0000", "kind": "shadow", "source": "structured_shadow_csv", "artifact_key": "structured_shadow_dir", "is_default": False, "selectable": True},
+            {"variant_id": "shadow_v4.2.0000_execution_late_proxy_fullcap2", "version_id": "4.2.0000", "kind": "shadow", "source": "structured_shadow_csv", "artifact_key": "structured_shadow_dir", "is_default": False, "selectable": True},
+        ],
+        "required_artifacts": [],
+        "artifacts": {},
+    }
+
+    options = appmod._decision_variant_options([], release=release)
+    option_ids = [item["variant_id"] for item in options]
+    context = appmod._strategy_version_context(release, options, None)
+    matches = [{
+        "match_idx": 1,
+        "llm_selection_codes": ["3"],
+        "llm_judgment": "胜",
+        "llm_stop_flag": False,
+        "result_code": "",
+    }]
+    appmod._attach_decision_variants(matches, [], release=release)
+    appmod._attach_selected_decision_variant(matches, context["selected_variant_id"])
+    selected = matches[0]["selected_decision_variant"]
+
+    assert option_ids == ["active_v3", "shadow_v4.2.0000_execution_strict_fullcap2"]
+    assert "shadow_v4.2.0000_execution_late_proxy_fullcap2" not in option_ids
+    assert options[1]["available"] is False
+    assert context["selection_status"] == "degraded"
+    assert context["selected_variant_id"] == "shadow_v4.2.0000_execution_strict_fullcap2"
+    assert selected["variant_id"] == "shadow_v4.2.0000_execution_strict_fullcap2"
+    assert selected["selection_codes"] == []
+    assert selected["selection_type"] == "no-buy"
+    assert selected["stop_flag"] is True
+    assert selected["execution_action"] == "skip_wait_late_refresh"
+    assert selected["execution_unlock_state"] == "waiting_late_refresh"
+
+
 def test_main_strategy_reads_release_artifacts(monkeypatch, tmp_path: Path) -> None:
     config_path, db_path = _build_release_fixture(tmp_path)
     _minimal_db(db_path)

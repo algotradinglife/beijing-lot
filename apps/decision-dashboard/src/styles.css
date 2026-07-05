@@ -736,6 +736,42 @@ tr.clickable:hover {
   font-weight: 700;
 }
 
+.execution-chip {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.25;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+}
+
+.execution-chip.good {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.execution-chip.bad {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.execution-chip.warn {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fde68a;
+}
+
+.execution-audit-diff {
+  color: #92400e;
+  font-weight: 800;
+}
+
 .settlement-sp {
   display: inline;
   color: #dc2626;
@@ -1016,6 +1052,68 @@ tr.clickable:hover {
 
 .decision-brief-card {
   grid-column: 1 / -1;
+}
+
+.execution-policy-panel {
+  grid-column: 1 / -1;
+}
+
+.execution-policy-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.execution-policy-head span {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.execution-policy-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.execution-policy-grid div {
+  min-width: 0;
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.execution-policy-grid span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.execution-policy-grid b {
+  display: block;
+  margin-top: 4px;
+  color: #0f172a;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+
+.execution-policy-diff {
+  margin-top: 10px;
+  padding: 9px 10px;
+  color: #92400e;
+  font-size: 13px;
+  font-weight: 800;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+}
+
+.execution-reasons {
+  margin-top: 10px;
 }
 
 .decision-reason-grid {
@@ -2095,6 +2193,7 @@ tr.clickable:hover {
   .year-strip,
   .match-decision-hero,
   .decision-reason-grid,
+  .execution-policy-grid,
   .decision-category-grid,
   .focus-card-grid,
   .version-grid,
@@ -2128,6 +2227,7 @@ tr.clickable:hover {
   .review-kpi-grid,
   .outcome-card-grid,
   .decision-bet-panel,
+  .execution-policy-grid,
   .decision-category-grid,
   .version-grid,
   .ops-kpi-grid,
@@ -2159,6 +2259,7 @@ tr.clickable:hover {
   .outcome-card-grid,
   .decision-bet-panel,
   .decision-reason-grid,
+  .execution-policy-grid,
   .decision-category-grid,
   .focus-card-grid,
   .llm-evidence-grid,
