@@ -72,7 +72,7 @@
           "selectable": true,
           "readiness": {
             "artifact_required": true,
-            "defaultable_when": "available",
+            "defaultable_when": "never",
             "missing_behavior": "diagnostic_placeholder",
             "late_refresh": "strict_wait_before_valid_live_sp_refresh",
             "missing_reason": "strict_execution_artifact_missing_for_issue"
@@ -89,7 +89,7 @@
           "selectable": true,
           "readiness": {
             "artifact_required": true,
-            "defaultable_when": "available",
+            "defaultable_when": "never",
             "missing_behavior": "hidden_until_artifact",
             "late_refresh": "unlock_after_valid_live_sp_refresh",
             "missing_reason": "late_proxy_execution_artifact_missing_or_not_refreshed"
@@ -135,7 +135,7 @@
       "validation": {
         "report": "docs/strategy/strategy_worktree_model_ev_handoff_2026-07-02.md",
         "no_future_leakage": true,
-        "notes": "line-gap 只作为诊断标签；SP drift 只作为诊断/极小 paper convex sleeve；shadow 版本后续由 strategy worktree 提供。"
+        "notes": "shadow_v3.3.3 保持默认决策链；v4.2 execution artifacts 仅作为手动诊断/实验视图，待压缩合约和更长 forward validation 稳定后再评估是否可默认。line-gap 只作为诊断标签；SP drift 只作为诊断/极小 paper convex sleeve。"
       }
     }
   }

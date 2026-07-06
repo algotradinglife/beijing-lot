@@ -85,9 +85,9 @@ API / manifest:
 - expose the variants only when declared by active release manifest;
 - suppress undeclared `shadow_arm` artifacts;
 - treat `execution_*` fields as read-only artifact columns.
-- when both strict and late-proxy artifacts are available for the same version,
-  API should select the late-proxy artifact by default. This is the automated
-  stop-unlock signal.
+- v4.2 execution variants are currently selectable manual diagnostic views, not
+  API defaults. `shadow_v3.3.3` remains the stable default while v4.2 is under
+  further validation.
 - treat `late_proxy_fullcap2` as valid only when `execution_sp_missing=0`.
   `unlocked_after_late_refresh` means refreshed SP was used for execution
   scoring, not merely that a refresh happened somewhere in the issue.
@@ -113,9 +113,11 @@ Stop unlock is automated at the artifact/API layer:
    Rows previously held by the late-refresh gate have
    `execution_unlock_state=unlocked_after_late_refresh` and should render green
    only when `execution_sp_missing=0`.
-3. API defaults to `late_proxy_fullcap2` once that artifact is available, while
-   keeping `strict_fullcap2` selectable for audit.
-4. This unlocks the row as an executable recommendation, but it must not
+3. The API exposes `late_proxy_fullcap2` once that artifact is available, while
+   keeping `strict_fullcap2` selectable for audit. In the current release,
+   v4.2 remains manual because `shadow_v3.3.3` is the default.
+4. Selecting the late-proxy variant unlocks the row as an executable
+   recommendation, but it must not
    silently submit a ticket. Ticket build/submit remains an explicit user
    action.
 
@@ -143,7 +145,7 @@ Example release fragment:
       "selectable": true,
       "readiness": {
         "artifact_required": true,
-        "defaultable_when": "available",
+        "defaultable_when": "never",
         "missing_behavior": "hidden_until_artifact",
         "late_refresh": "unlock_after_valid_live_sp_refresh",
         "missing_reason": "late_proxy_execution_artifact_missing_or_not_refreshed"

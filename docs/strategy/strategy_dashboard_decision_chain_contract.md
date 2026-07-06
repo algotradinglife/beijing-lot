@@ -42,10 +42,11 @@ Rules:
   `llm_chain_structured_v4.2.0000_layered_merge_execution_policy`.
 - The API only exposes shadow artifacts whose `shadow_arm` is declared in the
   active release manifest. Undeclared shadow CSVs are suppressed.
-- When at least one declared shadow artifact is available for an issue, the API
-  marks the highest declared shadow version as the default option. If no shadow
-  artifact is available, active fallback remains available and the response may
-  be degraded.
+- Default selection follows the active release manifest. The API first uses the
+  declared `is_default` option when it is available and defaultable; it only
+  falls back to highest-version shadow ordering when no explicit default is
+  available. If no shadow artifact is available, active fallback remains
+  available and the response may be degraded.
 
 Promotion from shadow to active requires a new release entry or an explicit
 manifest update. Do not silently reinterpret a shadow CSV as active.
@@ -190,10 +191,11 @@ the selected execution policy and blocking state visible. A row that is
 "stop - waiting late refresh"; it is a warning not to bet that match yet, not a
 final statement that the match will never be buyable.
 
-When both strict and late-proxy artifacts are available for the same execution
-version, API should default to `late_proxy_fullcap2`. This is the automated
-unlock mechanism. The strict artifact remains selectable for audit, and ticket
-submission remains an explicit user action.
+In the current active release, `shadow_v3.3.3` is the runtime default. v4.2
+execution variants remain selectable manual diagnostic views and must not become
+the API default automatically. The late-proxy artifact is still the automated
+unlock signal inside v4.2: rows with `execution_unlock_state=unlocked_after_late_refresh`
+should render as unlocked when the user selects that variant.
 
 Manifest readiness fields make this defaulting rule explicit. Each
 `decision_variants[]` entry may include:
@@ -201,7 +203,7 @@ Manifest readiness fields make this defaulting rule explicit. Each
 | Field | Values | Meaning |
 | --- | --- | --- |
 | `readiness.artifact_required` | boolean | Whether a per-issue artifact row must exist before the variant is real. |
-| `readiness.defaultable_when` | `always`, `available`, `never` | Whether the API may choose this variant as the default. Execution variants use `available`. |
+| `readiness.defaultable_when` | `always`, `available`, `never` | Whether the API may choose this variant as the default. Current v4.2 execution variants use `never`; future validated execution releases may use `available`. |
 | `readiness.missing_behavior` | `builtin_active`, `fallback_to_active`, `diagnostic_placeholder`, `hidden_until_artifact`, `artifact_missing` | How API/frontend should treat a missing per-issue artifact. |
 | `readiness.late_refresh` | `not_applicable`, `strict_wait_before_valid_live_sp_refresh`, `unlock_after_valid_live_sp_refresh` | Late-refresh timing semantics. |
 | `readiness.missing_reason` | string | Stable warning code for missing artifacts. |
@@ -221,11 +223,11 @@ For v4.2.0000 execution variants:
 
 - missing `strict_fullcap2`: API may expose a degraded diagnostic placeholder,
   but `available=false`, `defaultable=false`, and rows are no-buy/wait.
-- real `strict_fullcap2`: `available=true`, `defaultable=true`; rows held by
+- real `strict_fullcap2`: `available=true`, `defaultable=false`; rows held by
   late refresh stay red with `waiting_late_refresh`.
 - missing `late_proxy_fullcap2`: hidden from options, not defaultable.
-- real `late_proxy_fullcap2`: `available=true`, `defaultable=true`, and it
-  outranks strict as the default for that issue.
+- real `late_proxy_fullcap2`: `available=true`, `defaultable=false`; it is
+  manually selectable and exposes unlocked green rows after valid late refresh.
 
 Required execution extension fields:
 

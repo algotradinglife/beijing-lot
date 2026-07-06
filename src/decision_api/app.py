@@ -3345,11 +3345,17 @@ def _normalize_decision_variant_defaults(options: list[dict[str, Any]]) -> list[
         and item.get("selectable") is not False
         and item.get("defaultable") is not False
     ]
+    explicit_defaults = [
+        item for item in defaultable_options
+        if item.get("is_default")
+    ]
     shadow_options = [
         item for item in defaultable_options
         if item.get("kind") == SHADOW_DECISION_VARIANT_KIND and item.get("variant_id")
     ]
-    if shadow_options:
+    if explicit_defaults:
+        default_variant_id = str(explicit_defaults[0].get("variant_id") or "")
+    elif shadow_options:
         default_variant_id = str(max(
             shadow_options,
             key=_decision_variant_default_key,

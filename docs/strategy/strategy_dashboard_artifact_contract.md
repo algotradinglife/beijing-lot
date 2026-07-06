@@ -132,6 +132,9 @@ Readiness/defaulting contract:
 
 - `defaultable_when=available`: the variant can be default only after real
   per-issue rows exist.
+- `defaultable_when=never`: the variant is selectable for manual audit, but
+  must not become the API default automatically. The current active release
+  uses this for v4.2 execution variants while v3.3.3 remains the stable default.
 - `missing_behavior=diagnostic_placeholder`: API may expose a degraded,
   non-defaultable placeholder for diagnosis. This is used for missing
   `strict_fullcap2`.
@@ -183,9 +186,10 @@ For v4.2.0000 execution artifacts:
 - `skip_*` actions should be rendered as stop/no-buy states. In particular,
   `skip_wait_late_refresh` is a temporary warning to not bet the match until a
   valid late SP refresh artifact exists.
-- If live data auto-refresh changes the selected/default execution variant,
-  the UI must keep the selected policy visible instead of silently turning a
-  stop/wait row into an actionable pick.
+- v4.2 execution variants are manual diagnostic/experimental views in the
+  current release. If a future release makes them defaultable, live data
+  auto-refresh must keep the selected policy visible instead of silently turning
+  a stop/wait row into an actionable pick.
 - Rolling/N views and any stake preview must use `shadow_selection_codes`.
 - Dashboard/API must treat `execution_*` as read-only artifact data.
 

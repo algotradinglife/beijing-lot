@@ -104,6 +104,22 @@ def test_current_strategy_release_config_follows_contract() -> None:
     _assert_release_contract(registry)
 
 
+def test_current_strategy_release_keeps_v3_3_3_as_runtime_default() -> None:
+    registry = _load_json(ROOT / "config/strategy_release.json")
+    release = registry["releases"][registry["active_release_id"]]
+    variants = {item["variant_id"]: item for item in release["decision_variants"]}
+
+    assert variants["shadow_v3.3.3"]["is_default"] is True
+    for variant_id in (
+        "shadow_v4.2.0000_execution_strict_fullcap2",
+        "shadow_v4.2.0000_execution_late_proxy_fullcap2",
+    ):
+        variant = variants[variant_id]
+        assert variant["is_default"] is False
+        assert variant["selectable"] is True
+        assert variant["readiness"]["defaultable_when"] == "never"
+
+
 def _write_registry(tmp_path: Path, registry: dict[str, Any]) -> Path:
     path = tmp_path / "strategy_release.json"
     path.write_text(json.dumps(registry, ensure_ascii=False), encoding="utf-8")

@@ -256,8 +256,8 @@ def test_shadow_variant_options_are_manifest_allowlisted(tmp_path: Path) -> None
         "active_release_id": "main_n7_384_2026_07_04",
         "release_id": "main_n7_384_2026_07_04",
         "decision_variants": [
-            {"variant_id": "active_v3", "version_id": "3.0.0", "kind": "active", "label": "v3", "source": "active_snapshot", "is_default": True, "selectable": True},
-            {"variant_id": "shadow_v3.3.3", "version_id": "3.3.3", "kind": "shadow", "label": "shadow v3.3.3", "source": "structured_shadow_csv", "artifact_key": "structured_shadow_dir", "is_default": False, "selectable": True},
+            {"variant_id": "active_v3", "version_id": "3.0.0", "kind": "active", "label": "v3", "source": "active_snapshot", "is_default": False, "selectable": True},
+            {"variant_id": "shadow_v3.3.3", "version_id": "3.3.3", "kind": "shadow", "label": "shadow v3.3.3", "source": "structured_shadow_csv", "artifact_key": "structured_shadow_dir", "is_default": True, "selectable": True},
         ],
         "artifacts": {"structured_shadow_dir": str(shadow_dir)},
         "required_artifacts": [],
@@ -329,17 +329,18 @@ def test_shadow_execution_variant_exposes_sp_repricing_fields() -> None:
     assert compact["execution_sp_missing"] is False
 
 
-def test_late_proxy_execution_variant_defaults_over_strict_when_available() -> None:
+def test_manifest_default_stays_default_over_higher_shadow_versions() -> None:
     options = [
-        {"variant_id": "active_v3", "kind": "active", "is_default": True},
-        {"variant_id": "shadow_v4.2.0000_execution_strict_fullcap2", "kind": "shadow", "is_default": False},
-        {"variant_id": "shadow_v4.2.0000_execution_late_proxy_fullcap2", "kind": "shadow", "is_default": False},
+        {"variant_id": "active_v3", "kind": "active", "is_default": False, "defaultable": True, "available": True, "selectable": True},
+        {"variant_id": "shadow_v3.3.3", "kind": "shadow", "is_default": True, "defaultable": True, "available": True, "selectable": True},
+        {"variant_id": "shadow_v4.2.0000_execution_strict_fullcap2", "kind": "shadow", "is_default": False, "defaultable": True, "available": True, "selectable": True},
+        {"variant_id": "shadow_v4.2.0000_execution_late_proxy_fullcap2", "kind": "shadow", "is_default": False, "defaultable": True, "available": True, "selectable": True},
     ]
 
     normalized = appmod._normalize_decision_variant_defaults(options)
 
     defaults = [item["variant_id"] for item in normalized if item["is_default"]]
-    assert defaults == ["shadow_v4.2.0000_execution_late_proxy_fullcap2"]
+    assert defaults == ["shadow_v3.3.3"]
 
 
 def _execution_release(shadow_dir: Path) -> dict[str, object]:
@@ -385,7 +386,7 @@ def _execution_release(shadow_dir: Path) -> dict[str, object]:
                 "selectable": True,
                 "readiness": {
                     "artifact_required": True,
-                    "defaultable_when": "available",
+                    "defaultable_when": "never",
                     "missing_behavior": "diagnostic_placeholder",
                     "late_refresh": "strict_wait_before_valid_live_sp_refresh",
                     "missing_reason": "strict_execution_artifact_missing_for_issue",
@@ -401,7 +402,7 @@ def _execution_release(shadow_dir: Path) -> dict[str, object]:
                 "selectable": True,
                 "readiness": {
                     "artifact_required": True,
-                    "defaultable_when": "available",
+                    "defaultable_when": "never",
                     "missing_behavior": "hidden_until_artifact",
                     "late_refresh": "unlock_after_valid_live_sp_refresh",
                     "missing_reason": "late_proxy_execution_artifact_missing_or_not_refreshed",
@@ -453,9 +454,9 @@ def test_execution_variant_readiness_defaults_only_real_artifacts(tmp_path: Path
     options = appmod._decision_variant_options(variants, release=release)
     strict_option = next(item for item in options if item["variant_id"] == "shadow_v4.2.0000_execution_strict_fullcap2")
     assert strict_option["available"] is True
-    assert strict_option["defaultable"] is True
+    assert strict_option["defaultable"] is False
     assert strict_option["readiness_status"] == "available"
-    assert next(item["variant_id"] for item in options if item["is_default"]) == "shadow_v4.2.0000_execution_strict_fullcap2"
+    assert next(item["variant_id"] for item in options if item["is_default"]) == "shadow_v3.3.3"
 
     _write_csv(
         shadow_dir / f"{issue}_late" / f"structured_shadow_{issue}.csv",
@@ -466,9 +467,9 @@ def test_execution_variant_readiness_defaults_only_real_artifacts(tmp_path: Path
     options = appmod._decision_variant_options(variants, release=release)
     late_option = next(item for item in options if item["variant_id"] == "shadow_v4.2.0000_execution_late_proxy_fullcap2")
     assert late_option["available"] is True
-    assert late_option["defaultable"] is True
+    assert late_option["defaultable"] is False
     assert late_option["readiness_status"] == "available"
-    assert next(item["variant_id"] for item in options if item["is_default"]) == "shadow_v4.2.0000_execution_late_proxy_fullcap2"
+    assert next(item["variant_id"] for item in options if item["is_default"]) == "shadow_v3.3.3"
 
 
 def test_unavailable_execution_variant_does_not_become_default(tmp_path: Path) -> None:
