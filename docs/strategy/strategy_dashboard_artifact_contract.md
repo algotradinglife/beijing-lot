@@ -170,6 +170,9 @@ For v4.2.0000 execution artifacts:
 - `value_only_sp_drift` inside `execution_reasons` is an audit/risk marker for
   payout-driven q movement; it is not a no-buy state unless `execution_action`
   itself is `skip_*`.
+- `late_refresh_pending_draw_rescue` inside `execution_reasons` means a
+  previously skipped pending draw was restored after severe late SP refresh.
+  It is executable when `execution_action=execute_double`.
 - Full-cover display should use `execution_full_score`,
   `execution_full_candidate`, and `execution_full_kept`.
   `execution_full_kept=1` means the row remains full cover in this per-row

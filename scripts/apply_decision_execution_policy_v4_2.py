@@ -37,7 +37,13 @@ TOPLINE_DRIFT_BLEND_GAP_MAX = 0.03
 TOPLINE_DRIFT_MARKET_WEAKEN_EPS = 0.01
 MARKET_BLEND_BASE_WEIGHT = 0.30
 MARKET_BLEND_SEVERE_WEIGHT = 0.45
-POLICY_VERSION = "v4.2.0003_execution_policy_2026-07-05_market_blend"
+TIGHT_DENSE_ANCHOR_SP_RATIO = 1.40
+TIGHT_DENSE_ANCHOR_MARKET_GAIN = 0.025
+TIGHT_DENSE_ANCHOR_P_GAP = 0.06
+PENDING_DRAW_RESCUE_P_MIN = 0.28
+PENDING_DRAW_RESCUE_SP_MIN = 2.60
+PENDING_DRAW_RESCUE_SP_MAX = 5.00
+POLICY_VERSION = "v4.2.0004_execution_policy_2026-07-06_dense_draw_rescue"
 SHADOW_ARM = "shadow_v4.2.0000_execution"
 SHADOW_VERSION = "llm_chain_structured_v4.2.0000_layered_merge_execution_policy"
 
@@ -399,6 +405,30 @@ def should_probability_anchor_compression(source_row: dict[str, Any], decision_r
     return safe_float(source_row.get("execution_sp_reprice_ratio_max"), default=1.0) >= SEVERE_SP_RATIO
 
 
+def should_tight_dense_probability_anchor(source_row: dict[str, Any], decision_row: dict[str, Any]) -> bool:
+    if str(decision_row.get("v4_action") or "") != "full_cover_or_skip":
+        return False
+    full_reasons = set(str(decision_row.get("v4_full_cover_reasons") or "").split(";"))
+    if "tight_dense_requires_full_or_skip" not in full_reasons:
+        return False
+    if safe_float(source_row.get("execution_sp_reprice_ratio_max"), default=1.0) < TIGHT_DENSE_ANCHOR_SP_RATIO:
+        return False
+    anchor = probability_top_from_row(source_row)
+    if not anchor:
+        return False
+    q_top, _q_values = execution_q_top_from_row(source_row)
+    if anchor == q_top:
+        return True
+    source_market_p = market_probabilities_from_row(source_row, "source_")
+    execution_market_p = market_probabilities_from_row(source_row, "execution_")
+    if execution_market_p.get(anchor, 0.0) >= source_market_p.get(anchor, 0.0) + TIGHT_DENSE_ANCHOR_MARKET_GAIN:
+        return True
+    recommended = parse_codes(decision_row.get("v4_recommended_codes"))
+    anchor_p = safe_float(source_row.get(f"p_{anchor}"))
+    other_p = max((safe_float(source_row.get(f"p_{code}")) for code in recommended if code != anchor), default=0.0)
+    return anchor_p - other_p >= TIGHT_DENSE_ANCHOR_P_GAP
+
+
 def second_leg_score(source_row: dict[str, Any], decision_row: dict[str, Any], code: str) -> float:
     metrics = code_metrics(source_row)
     values = metrics[code]
@@ -423,7 +453,11 @@ def second_leg_score(source_row: dict[str, Any], decision_row: dict[str, Any], c
 
 def probability_anchor_double_codes(source_row: dict[str, Any], decision_row: dict[str, Any]) -> list[str]:
     recommended = parse_codes(decision_row.get("v4_recommended_codes"))
-    if len(recommended) < 3 or not should_probability_anchor_compression(source_row, decision_row):
+    should_anchor = should_probability_anchor_compression(source_row, decision_row) or should_tight_dense_probability_anchor(
+        source_row,
+        decision_row,
+    )
+    if len(recommended) < 3 or not should_anchor:
         return []
     anchor = probability_top_from_row(source_row)
     if anchor not in recommended:
@@ -433,6 +467,43 @@ def probability_anchor_double_codes(source_row: dict[str, Any], decision_row: di
         return [anchor]
     second = max(remaining, key=lambda code: second_leg_score(source_row, decision_row, code))
     return [anchor, second]
+
+
+def candidate_pool_has_pending_draw(decision_row: dict[str, Any]) -> bool:
+    candidates = safe_json(decision_row.get("v4_candidate_pool_json"), [])
+    if not isinstance(candidates, list):
+        return False
+    for item in candidates:
+        if not isinstance(item, dict) or str(item.get("code") or "") != "1":
+            continue
+        signals = set(str(signal) for signal in item.get("signals") or [])
+        pending_signals = set(str(signal) for signal in item.get("pending_signals") or [])
+        if "late_refresh_neighbor_draw" in signals or "late_refresh_neighbor_draw" in pending_signals:
+            return True
+    return False
+
+
+def late_refresh_pending_draw_double_codes(source_row: dict[str, Any], decision_row: dict[str, Any]) -> list[str]:
+    recommended = parse_codes(decision_row.get("v4_recommended_codes"))
+    if str(decision_row.get("v4_action") or "") != "wait_late_refresh":
+        return []
+    if len(recommended) != 2 or "1" in recommended:
+        return []
+    if safe_float(source_row.get("execution_sp_reprice_ratio_max"), default=1.0) < SEVERE_SP_RATIO:
+        return []
+    merge_flags = set(str(decision_row.get("v4_merge_flags") or "").split(";"))
+    if "skip_unbacked_high_q_draw" not in merge_flags:
+        return []
+    if not candidate_pool_has_pending_draw(decision_row):
+        return []
+    if safe_float(source_row.get("p_1")) < PENDING_DRAW_RESCUE_P_MIN:
+        return []
+    draw_sp = safe_float(source_row.get("execution_sp_1") or source_row.get("sp_1"))
+    if not (PENDING_DRAW_RESCUE_SP_MIN <= draw_sp <= PENDING_DRAW_RESCUE_SP_MAX):
+        return []
+    anchor = probability_top_from_row(source_row)
+    keep = anchor if anchor in recommended else max(recommended, key=lambda code: safe_float(source_row.get(f"p_{code}")))
+    return [keep, "1"]
 
 
 def late_repriced_conflict_skip_reasons(
@@ -580,6 +651,9 @@ def compressed_double_codes(
 ) -> list[str]:
     recommended = parse_codes(decision_row.get("v4_recommended_codes"))
     if len(recommended) <= 2:
+        pending_draw = late_refresh_pending_draw_double_codes(source_row, decision_row)
+        if pending_draw:
+            return pending_draw
         return recommended
     if probability_anchor:
         anchored = probability_anchor_double_codes(source_row, decision_row)
@@ -665,9 +739,12 @@ def evaluate_row_policy(
             return RowExecution([], "skip_late_q_top_drift", drift_reasons, double_codes, full_score, False, False)
         reason = "late_refresh_proxy" if source_action == "wait_late_refresh" else "direct_buy"
         reasons = [reason]
+        if source_action == "wait_late_refresh" and double_codes != recommended:
+            reasons.append("late_refresh_pending_draw_rescue")
         if source_action != "wait_late_refresh":
             reasons.extend(late_q_top_drift_watch_reasons(source_row, recommended))
-        return RowExecution(recommended, "execute_double" if len(recommended) == 2 else "execute_single", reasons, double_codes, full_score, False, False)
+        selection_codes = double_codes or recommended
+        return RowExecution(selection_codes, "execute_double" if len(selection_codes) == 2 else "execute_single", reasons, double_codes, full_score, False, False)
     if full_candidate:
         return RowExecution(recommended, "execute_full_cover", ["full_score_above_threshold"], double_codes, full_score, True, True)
     if conflict_full:
@@ -939,6 +1016,10 @@ Generated: {generated}
   repricing cannot be compressed while keeping the probability top.
 - Severely repriced full-cover rows compress by anchoring probability top first;
   the remaining two outcomes compete for the second slot.
+- Tight-dense full-cover rows with material SP refresh keep a model probability
+  top when refreshed q, market-implied probability, or model gap supports it.
+- Severe late-refresh rows can restore a pending draw when the source chain had
+  skipped an unbacked high-q draw and refreshed draw SP becomes sane.
 - Direct-buy rows stop when refreshed q-top drifts to a material uncovered
   outcome only if market-blended probability also supports that uncovered
   outcome. Payout-only SP drift is marked as `value_only_sp_drift` and remains

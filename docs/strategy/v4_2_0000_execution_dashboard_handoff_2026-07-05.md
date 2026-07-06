@@ -171,8 +171,8 @@ official 26072 settlement replay.
 
 ## Current Strategy Evidence
 
-Current provisional 26072 result through #54, using official 500 settlement for
-#1-52 plus NowScore provisional finished results for #53-54:
+Current provisional 26072 result, using official 500 settlement where present
+plus NowScore provisional finished results for not-yet-official rows:
 
 - prior `v4.2.0001` late-proxy artifact: 44/54 coverage; bought 49 rows and
   hit 44/49; no-buy rows were #28, #48, #50, #51, #52.
@@ -186,5 +186,9 @@ Current provisional 26072 result through #54, using official 500 settlement for
   uncovered `3` q-top came from higher payout while market-implied probability
   weakened; it remains executable `0+1` with `value_only_sp_drift`. Provisional
   #1-54 remains 49/54 coverage; bought rows become 54 with 49 hits.
+- `v4.2.0004` fixes the 2026-07-06 #58-60 regression: #58 and #60 keep the
+  model/market-supported probability top during tight-dense full compression,
+  and #59 restores the pending draw after severe late refresh. Provisional
+  #58-60 is 3/3; #1-60 is 54/60 with NowScore #60 included.
 
 This remains shadow/research until official 500 settlement is complete.

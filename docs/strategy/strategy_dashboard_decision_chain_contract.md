@@ -231,7 +231,7 @@ Required execution extension fields:
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `execution_policy_version` | string | Example: `v4.2.0003_execution_policy_2026-07-05_market_blend`. |
+| `execution_policy_version` | string | Example: `v4.2.0004_execution_policy_2026-07-06_dense_draw_rescue`. |
 | `execution_policy_name` | enum/string | Example: `strict_fullcap2` or `late_proxy_fullcap2`. |
 | `execution_action` | enum | Stable action from the execution layer. |
 | `execution_reasons` | string | `;`-joined machine-readable reasons. |
@@ -289,6 +289,10 @@ Execution mapping rules:
   higher-payout SP move while market-implied probability weakened, the artifact
   keeps the executable selection and adds `value_only_sp_drift` instead of
   `skip_late_q_top_drift`.
+- In `v4.2.0004`, tight-dense full-cover compression keeps a model probability
+  top that is also supported by refreshed q or market-implied probability.
+- In `v4.2.0004`, severe late-refresh rows with `skip_unbacked_high_q_draw`
+  may restore the pending draw as `late_refresh_pending_draw_rescue`.
 - `v4.2.0002+` does not apply per-segment full-cover caps or budget decisions.
   Later ticket/stake optimization owns final match selection, N choice, and
   whether a per-row full-cover candidate is actually funded.

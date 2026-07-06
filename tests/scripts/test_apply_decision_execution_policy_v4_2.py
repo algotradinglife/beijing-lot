@@ -342,6 +342,127 @@ def test_probability_anchor_can_compress_mandatory_overflow() -> None:
     assert execution.double_codes == ["3", "0"]
 
 
+def test_tight_dense_compression_keeps_market_supported_probability_top() -> None:
+    mod = _load_module()
+    source = _source(
+        p_3="0.3166063325742699",
+        p_1="0.3006215407033773",
+        p_0="0.38277212672235283",
+        sp_3="4.7000",
+        sp_1="2.8400",
+        sp_0="2.2900",
+        q_3="1.4880",
+        q_1="0.8538",
+        q_0="0.8765",
+        source_sp_3="3.1400",
+        source_sp_1="2.1700",
+        source_sp_0="4.5200",
+        source_q_3="0.9941",
+        source_q_1="0.6523",
+        source_q_0="1.7301",
+        execution_sp_3="4.7000",
+        execution_sp_1="2.8400",
+        execution_sp_0="2.2900",
+        execution_q_3="1.4880",
+        execution_q_1="0.8538",
+        execution_q_0="0.8765",
+        execution_sp_reprice_ratio_max="1.9738",
+    )
+    decision = _decision(
+        v4_action="full_cover_or_skip",
+        v4_recommended_codes="3+1+0",
+        v4_mandatory_codes="3+1",
+        v4_semantic_draw="explicit_draw",
+        v4_full_cover_reasons="candidate_score_dense;layer_conflict_requires_full_cover_or_skip;tight_dense_requires_full_or_skip",
+        v4_merge_flags="layer_conflict_requires_full_cover_or_skip",
+        v4_candidate_pool_json='[{"code":"3","score":1.6784},{"code":"1","score":1.4550},{"code":"0","score":1.1420}]',
+    )
+
+    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.4)
+
+    assert execution.action == "downgrade_full_to_double_layer_conflict"
+    assert execution.selection_codes == ["0", "3"]
+    assert execution.double_codes == ["0", "3"]
+
+
+def test_late_refresh_pending_draw_rescue_for_skipped_unbacked_high_q_draw() -> None:
+    mod = _load_module()
+    source = _source(
+        p_3="0.44497214737447593",
+        p_1="0.297789526187624",
+        p_0="0.25723832643790007",
+        sp_3="2.8000",
+        sp_1="3.0700",
+        sp_0="3.1400",
+        q_3="1.2459",
+        q_1="0.9142",
+        q_0="0.8077",
+        execution_sp_3="2.8000",
+        execution_sp_1="3.0700",
+        execution_sp_0="3.1400",
+        execution_sp_reprice_ratio_max="3.2052",
+    )
+    decision = _decision(
+        v4_action="wait_late_refresh",
+        v4_recommended_codes="3+0",
+        v4_selection_codes="",
+        v4_team_strength_confidence="0.748",
+        v4_merge_flags="skip_unbacked_high_q_draw",
+        v4_full_cover_reasons="extreme_sp_or_source_conflict_full",
+        v4_candidate_pool_json=(
+            '[{"code":"3","score":1.2025},{"code":"0","score":0.9859},'
+            '{"code":"1","score":0.7714,"pending_score":0.45,'
+            '"signals":["late_refresh_neighbor_draw","model_probability"],"pending_signals":["market_q_ev"]}]'
+        ),
+    )
+
+    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.4)
+
+    assert execution.action == "execute_double"
+    assert execution.selection_codes == ["3", "1"]
+    assert execution.double_codes == ["3", "1"]
+    assert "late_refresh_pending_draw_rescue" in execution.reasons
+
+
+def test_late_refresh_pending_draw_rescue_does_not_override_high_q_make_room() -> None:
+    mod = _load_module()
+    source = _source(
+        p_3="0.44984094521808515",
+        p_1="0.2994669214860346",
+        p_0="0.25069213329588025",
+        sp_3="2.0800",
+        sp_1="3.8300",
+        sp_0="3.8400",
+        q_3="0.9357",
+        q_1="1.1470",
+        q_0="0.9627",
+        execution_sp_3="2.0800",
+        execution_sp_1="3.8300",
+        execution_sp_0="3.8400",
+        execution_sp_reprice_ratio_max="9.2891",
+    )
+    decision = _decision(
+        v4_action="wait_late_refresh",
+        v4_recommended_codes="3+0",
+        v4_selection_codes="",
+        v4_team_strength_confidence="0.547",
+        v4_merge_flags="high_q_attraction;make_room_for_high_q_attraction",
+        v4_full_cover_reasons="extreme_sp_or_source_conflict_full",
+        v4_candidate_pool_json=(
+            '[{"code":"3","score":2.0056},{"code":"1","score":1.2681,'
+            '"signals":["handicap_translation:ordinary_draw_translation","late_refresh_neighbor_draw","model_probability"]},'
+            '{"code":"0","score":0.4136,"pending_score":0.45,"pending_signals":["market_q_ev"]}]'
+        ),
+    )
+
+    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.4)
+
+    assert execution.action == "execute_double"
+    assert execution.selection_codes == ["3", "0"]
+    assert execution.double_codes == ["3", "0"]
+    assert "late_refresh_pending_draw_rescue" not in execution.reasons
+
+
 def test_segment_annotation_does_not_cap_or_downgrade_full_candidates() -> None:
     mod = _load_module()
     first = mod.RowExecution(["3", "1", "0"], "execute_full_cover", [], ["3", "1"], 2.0, True, True)
