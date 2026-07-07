@@ -41,8 +41,29 @@ def test_live_workflow_publishes_v4_2_execution_artifacts_after_snapshot_materia
     publish_step = next(step for step in plan if step["step_key"] == "publish_v4_2_execution_artifacts")
     assert publish_step["kind"] == "subprocess"
     command_text = " ".join(str(item) for item in publish_step["command"])
+    assert "collect_match_intel.py" in " ".join(str(item) for step in plan for item in step["command"])
+    assert "--limit 96" in " ".join(str(item) for step in plan for item in step["command"])
     assert "scripts/publish_v4_2_execution_artifacts.py" in command_text
     assert "--max-refresh-age-minutes 180" in command_text
+
+
+def test_live_workflow_blocks_when_materialized_snapshots_remain_incomplete() -> None:
+    result = {
+        "completeness": {
+            "complete": False,
+            "expected_count": 67,
+            "actual_count": 65,
+            "missing_match_idx": [66, 67],
+        }
+    }
+
+    try:
+        appmod._assert_materialize_workflow_complete(result)
+    except RuntimeError as exc:
+        assert "active_snapshot_missing after materialize" in str(exc)
+        assert "missing=[66, 67]" in str(exc)
+    else:
+        raise AssertionError("incomplete materialize result should fail workflow")
 
 
 def test_vite_config_defaults_are_not_public() -> None:

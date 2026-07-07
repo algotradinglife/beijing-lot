@@ -291,6 +291,48 @@ def test_shadow_variant_version_key_supports_four_digit_fix_numbers() -> None:
     assert appmod._decision_variant_version_key("shadow_v3.3.3")[:3] == appmod._decision_variant_version_key("shadow_v3.3.0003")[:3]
 
 
+def test_incomplete_shadow_variant_is_suppressed_from_options() -> None:
+    release = {
+        "decision_variants": [
+            {"variant_id": "active_v3", "kind": "active", "source": "active_snapshot", "is_default": False, "selectable": True},
+            {"variant_id": "shadow_v3.3.3", "kind": "shadow", "source": "structured_shadow_csv", "is_default": True, "selectable": True},
+        ]
+    }
+    shadow_variants = [
+        (
+            {
+                1: {
+                    "match_idx": "1",
+                    "shadow_arm": "shadow_v3.3.3",
+                    "shadow_version": "fixture",
+                    "shadow_selection_codes": "3+1",
+                    "shadow_primary": "3",
+                    "shadow_stop_flag": "0",
+                }
+            },
+            "results/structured_decision_chain_shadow/26072_fixture/structured_shadow_26072.csv",
+        )
+    ]
+
+    complete, incomplete = appmod._complete_shadow_variants("26072", shadow_variants, {1, 2})
+    options = appmod._decision_variant_options(complete, release=release)
+    context = appmod._strategy_version_context(
+        release,
+        options,
+        "shadow_v3.3.3",
+        incomplete_shadow_variants=incomplete,
+    )
+
+    assert complete == []
+    assert incomplete[0]["variant_id"] == "shadow_v3.3.3"
+    assert incomplete[0]["missing_match_idx"] == [2]
+    assert [item["variant_id"] for item in options] == ["active_v3"]
+    assert context["selection_status"] == "unavailable"
+    assert context["selected_variant_id"] == "active_v3"
+    assert context["contract_warnings"][0]["type"] == "structured_shadow_artifacts_incomplete"
+    assert context["contract_warnings"][0]["artifacts"][0]["missing_match_idx"] == [2]
+
+
 def test_shadow_execution_variant_exposes_sp_repricing_fields() -> None:
     variant = appmod._shadow_decision_variant(
         {

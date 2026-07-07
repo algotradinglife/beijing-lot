@@ -19,6 +19,7 @@ from typing import Any
 
 from flask import Flask, jsonify, redirect, render_template_string, request, send_from_directory, session
 
+from src.decision_artifact_completeness import active_snapshot_completeness, completeness_for_indices
 from src.sqlite_runtime import connect_sqlite
 
 
@@ -1239,7 +1240,7 @@ def _live_workflow_step_defs(issue: str, db_path: Path) -> list[dict[str, Any]]:
                 "--issue",
                 issue,
                 "--limit",
-                "64",
+                "96",
                 "--sleep",
                 "0",
                 "--timeout",
@@ -1452,6 +1453,18 @@ def _latest_workflow_payload(conn: sqlite3.Connection, issue: str) -> dict[str, 
     return _workflow_run_payload(conn, row["run_id"])
 
 
+def _assert_materialize_workflow_complete(result: dict[str, Any]) -> None:
+    completeness = result.get("completeness") if isinstance(result, dict) else None
+    if not isinstance(completeness, dict) or completeness.get("complete") is not False:
+        return
+    raise RuntimeError(
+        "active_snapshot_missing after materialize: "
+        f"expected={completeness.get('expected_count')} "
+        f"actual={completeness.get('actual_count')} "
+        f"missing={completeness.get('missing_match_idx')}"
+    )
+
+
 def _run_live_workflow(conn: sqlite3.Connection, db_path: Path, issue: str, *, dry_run: bool, requested_by: str) -> dict[str, Any]:
     _ensure_decision_snapshot_schema(conn)
     _ensure_live_workflow_schema(conn)
@@ -1499,6 +1512,7 @@ def _run_live_workflow(conn: sqlite3.Connection, db_path: Path, issue: str, *, d
             elif step["kind"] == "internal_decision_snapshots":
                 result = _materialize_issue_decision_snapshots(conn, resolved, only_date=None)
                 conn.commit()
+                _assert_materialize_workflow_complete(result)
             else:
                 raise RuntimeError(f"unknown workflow step kind: {step['kind']}")
             elapsed = max(0.0, (datetime.now(HK_TZ) - step_started).total_seconds())
@@ -3046,6 +3060,37 @@ def _structured_shadow_variants(issue: str, release: dict[str, Any] | None = Non
     return variants
 
 
+def _complete_shadow_variants(
+    issue: str,
+    shadow_variants: list[tuple[dict[int, dict[str, Any]], str]],
+    expected_match_indices: set[int],
+    *,
+    ignore_extra: bool = False,
+) -> tuple[list[tuple[dict[int, dict[str, Any]], str]], list[dict[str, Any]]]:
+    if not expected_match_indices:
+        return shadow_variants, []
+    complete: list[tuple[dict[int, dict[str, Any]], str]] = []
+    incomplete: list[dict[str, Any]] = []
+    for rows, source_path in shadow_variants:
+        variant_id = _shadow_variant_id(rows)
+        status = completeness_for_indices(
+            issue=issue,
+            scope="structured_shadow_csv",
+            expected_indices=expected_match_indices,
+            actual_indices=rows.keys(),
+            ignore_extra=ignore_extra,
+        )
+        if status.complete:
+            complete.append((rows, source_path))
+            continue
+        incomplete.append({
+            "variant_id": variant_id,
+            "source_path": source_path,
+            **status.to_dict(),
+        })
+    return complete, incomplete
+
+
 def _issue_all_has_result(rows: list[sqlite3.Row]) -> bool:
     return bool(rows) and all(_row_has_result(row) for row in rows)
 
@@ -3430,6 +3475,7 @@ def _strategy_version_context(
     requested_variant_id: str | None = None,
     *,
     suppressed_shadow_variant_ids: list[str] | None = None,
+    incomplete_shadow_variants: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     requested = str(requested_variant_id or "").strip()
     default_option = next((item for item in options if item.get("is_default")), options[0] if options else {})
@@ -3458,6 +3504,13 @@ def _strategy_version_context(
             "type": "undeclared_shadow_artifacts_suppressed",
             "variant_ids": suppressed_shadow_variant_ids,
             "message": "shadow artifacts not declared in strategy release manifest were suppressed",
+        })
+    if incomplete_shadow_variants:
+        contract_warnings.append({
+            "type": "structured_shadow_artifacts_incomplete",
+            "variant_ids": [str(item.get("variant_id") or "") for item in incomplete_shadow_variants],
+            "artifacts": incomplete_shadow_variants,
+            "message": "structured shadow artifacts missing match rows were suppressed",
         })
 
     return {
@@ -3661,8 +3714,7 @@ def _attach_decision_variants(
     for match in matches:
         idx = _safe_int(match.get("match_idx"))
         variants = []
-        if manifests.get(ACTIVE_DECISION_VARIANT_ID, {}).get("selectable") is not False:
-            variants.append(_active_decision_variant(match))
+        variants.append(_active_decision_variant(match))
         result_code = str(match.get("result_code") or "")
         for shadow_rows, shadow_source_path in shadow_variants:
             if idx is not None and idx in shadow_rows and shadow_source_path:
@@ -4062,11 +4114,13 @@ def _materialize_issue_decision_snapshots(conn: sqlite3.Connection, issue: str, 
             "action": action,
             "snapshot_id": (result.get("snapshot") or result.get("draft") or {}).get("snapshot_id") if isinstance(result.get("snapshot") or result.get("draft"), dict) else "",
         })
+    completeness = active_snapshot_completeness(conn, resolved, only_date=only_date).to_dict()
     return {
         "issue": resolved,
         "count": len(items),
         "actions": dict(actions),
         "items": items,
+        "completeness": completeness,
     }
 
 
@@ -4920,10 +4974,13 @@ def _main_strategy_payload(
     resolved = _resolve_main_strategy_issue(conn, issue)
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     suppressed_shadow_variant_ids: list[str] = []
+    incomplete_shadow_variants: list[dict[str, Any]] = []
     if _live_issue_exists(conn, resolved):
         rows = _issue_rows(conn, resolved, only_date=None)
         if _should_scan_release_shadow_variants(resolved, rows, release):
             shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
+            expected_indices = {int(row["match_idx"]) for row in rows}
+            shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(resolved, shadow_variants, expected_indices)
     variant_options = _decision_variant_options(shadow_variants, release=release)
     historical_pool = _historical_ev_pool(resolved, release)
     live_proxy = (
@@ -4942,6 +4999,7 @@ def _main_strategy_payload(
             variant_options,
             decision_variant_id,
             suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
+            incomplete_shadow_variants=incomplete_shadow_variants,
         ),
         "decision_variant_options": variant_options,
         "candidates": _main_strategy_summary_rows(release),
@@ -5053,8 +5111,16 @@ def _dashboard(
     matches = [_apply_llm_issue_decision(conn, row, _match_summary(row)) for row in rows]
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     suppressed_shadow_variant_ids: list[str] = []
+    incomplete_shadow_variants: list[dict[str, Any]] = []
     if _should_scan_release_shadow_variants(resolved, rows, release):
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
+        expected_indices = {int(row["match_idx"]) for row in rows}
+        shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(
+            resolved,
+            shadow_variants,
+            expected_indices,
+            ignore_extra=bool(only_date),
+        )
     matches = _attach_decision_variants(matches, shadow_variants, release=release)
     variant_options = _decision_variant_options(shadow_variants, release=release)
     version_context = _strategy_version_context(
@@ -5062,6 +5128,7 @@ def _dashboard(
         variant_options,
         decision_variant_id,
         suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
+        incomplete_shadow_variants=incomplete_shadow_variants,
     )
     matches = _attach_selected_decision_variant(matches, version_context.get("selected_variant_id") or decision_variant_id)
     if summary_view:
@@ -5071,6 +5138,7 @@ def _dashboard(
     q_values = [m["q_max"] for m in matches if m["q_max"] is not None]
     issue_meta = conn.execute("SELECT * FROM issues WHERE issue=?", (resolved,)).fetchone()
     source_statuses = _source_statuses(conn, resolved)
+    snapshot_completeness = active_snapshot_completeness(conn, resolved, only_date=only_date).to_dict()
     last_snapshot_ts = _latest_issue_specific_success(source_statuses)
     status = "complete" if rows and complete == len(rows) else "partial" if rows else "missing"
     return {
@@ -5090,6 +5158,10 @@ def _dashboard(
         },
         "decision_variant_options": variant_options,
         "strategy_version_context": version_context,
+        "completeness": {
+            "active_snapshots": snapshot_completeness,
+            "incomplete_shadow_variants": incomplete_shadow_variants,
+        },
         "matches": matches,
         "source": {
             "kind": "sqlite",
@@ -5119,6 +5191,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
         "SELECT status, COUNT(*) AS n FROM llm_decision_snapshots WHERE issue=? GROUP BY status",
         (resolved,),
     )}
+    snapshot_completeness = active_snapshot_completeness(conn, resolved).to_dict()
     pending_drafts = [
         {
             "match_idx": int(row["match_idx"]),
@@ -5211,12 +5284,13 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
             "label": f"{len(unreviewed_matches)} 场已结算未复盘",
             "detail": f"review_version={preferred_review}",
         })
-    if snapshot_counts.get("active", 0) < len(rows):
+    if not snapshot_completeness.get("complete"):
+        missing = snapshot_completeness.get("missing_match_idx") or []
         warnings.append({
             "code": "active_snapshot_missing",
             "severity": "warn",
             "label": "active 决策快照未覆盖全部比赛",
-            "detail": f"active={snapshot_counts.get('active', 0)} / matches={len(rows)}",
+            "detail": f"active={snapshot_completeness.get('actual_count')} / matches={snapshot_completeness.get('expected_count')}; missing={missing}",
         })
     latest_workflow = _latest_workflow_payload(conn, resolved)
     workflow_trigger_endpoint = f"POST /api/issues/{resolved}/live-workflow?dry_run=1"
@@ -5279,6 +5353,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
             "active_count": snapshot_counts.get("active", 0),
             "draft_replacement_count": snapshot_counts.get("draft_replacement", 0),
             "superseded_count": snapshot_counts.get("superseded", 0),
+            "completeness": snapshot_completeness,
             "pending_drafts": pending_drafts,
         },
         "review": {
@@ -5376,8 +5451,11 @@ def _match_detail(
         )
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     suppressed_shadow_variant_ids: list[str] = []
+    incomplete_shadow_variants: list[dict[str, Any]] = []
     if _should_scan_release_shadow_variants(str(row["issue"]), rows, release):
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(str(row["issue"]), release)
+        expected_indices = {int(item["match_idx"]) for item in rows}
+        shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(str(row["issue"]), shadow_variants, expected_indices)
     _attach_decision_variants([summary], shadow_variants, release=release)
     variant_options = _decision_variant_options(shadow_variants, release=release)
     version_context = _strategy_version_context(
@@ -5385,6 +5463,7 @@ def _match_detail(
         variant_options,
         decision_variant_id,
         suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
+        incomplete_shadow_variants=incomplete_shadow_variants,
     )
     _attach_selected_decision_variant([summary], version_context.get("selected_variant_id") or decision_variant_id)
     versions = _active_version_bundle()
@@ -5546,8 +5625,11 @@ def _settlement(
     rows = _issue_rows(conn, resolved, only_date=None)
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     suppressed_shadow_variant_ids: list[str] = []
+    incomplete_shadow_variants: list[dict[str, Any]] = []
     if _should_scan_release_shadow_variants(resolved, rows, release):
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
+        expected_indices = {int(row["match_idx"]) for row in rows}
+        shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(resolved, shadow_variants, expected_indices)
     variant_options = _decision_variant_options(shadow_variants, release=release)
     settled = [row for row in rows if row["winning_sp"] is not None]
     if not settled:
@@ -5563,6 +5645,7 @@ def _settlement(
             variant_options,
             decision_variant_id,
             suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
+            incomplete_shadow_variants=incomplete_shadow_variants,
         ),
         "decision_variant_options": variant_options,
         "n_tickets": 0,

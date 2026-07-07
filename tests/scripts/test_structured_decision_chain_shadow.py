@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+import sqlite3
 import sys
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -424,3 +427,28 @@ def test_report_path_display_handles_default_internal_and_external_paths(tmp_pat
     assert mod.path_for_report(default_like) == "results/structured_decision_chain_shadow/26071_20260703/structured_shadow_26071.csv"
     assert mod.path_for_report(internal_absolute) == "results/reviewer_probe_structured_shadow/26071_20260703/structured_shadow_26071.csv"
     assert mod.path_for_report(external) == str(external.resolve())
+
+
+def test_active_snapshot_completeness_guard_blocks_missing_rows() -> None:
+    mod = _load_module()
+    conn = sqlite3.connect(":memory:")
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE matches(issue TEXT, match_idx INTEGER);
+            CREATE TABLE llm_decision_snapshots(issue TEXT, match_idx INTEGER, status TEXT);
+            INSERT INTO matches VALUES('26072', 1);
+            INSERT INTO matches VALUES('26072', 2);
+            INSERT INTO llm_decision_snapshots VALUES('26072', 1, 'active');
+            """
+        )
+
+        with pytest.raises(SystemExit) as exc:
+            mod.assert_active_snapshots_complete(conn, "26072")
+
+        assert "active_decision_snapshots incomplete" in str(exc.value)
+        assert "missing=2" in str(exc.value)
+        allowed = mod.assert_active_snapshots_complete(conn, "26072", allow_incomplete=True)
+        assert allowed["missing_match_idx"] == [2]
+    finally:
+        conn.close()

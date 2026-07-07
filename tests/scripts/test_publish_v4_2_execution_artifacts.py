@@ -289,3 +289,37 @@ def test_missing_live_sp_refresh_keeps_late_proxy_unpublished(tmp_path: Path) ->
     late_csv = shadow_dir / "1001_20260705_shadow_v4.2.0005_execution_late_proxy_fullcap2/structured_shadow_1001.csv"
     assert strict_csv.exists()
     assert not late_csv.exists()
+
+
+def test_incomplete_source_csv_is_not_published(tmp_path: Path) -> None:
+    mod = _load_module()
+    db_path = tmp_path / "500.sqlite"
+    shadow_dir = tmp_path / "shadow"
+    work_dir = tmp_path / "work"
+    _build_db(db_path, with_live_refresh=True)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO matches(issue, match_idx, end_time, league, home, away, result_code, winning_sp, sp_home, sp_draw, sp_away)
+            VALUES('1001', 2, '2026-07-05 21:00:00', '测试联赛', '主队2', '客队2', NULL, NULL, 2.30, 3.60, 4.00)
+            """
+        )
+        conn.commit()
+
+    summary = mod.run(
+        issue="1001",
+        db_path=db_path,
+        shadow_dir=shadow_dir,
+        work_dir=work_dir,
+        source_csv=_source_csv(tmp_path / "source.csv"),
+        decision_csv=_decision_csv(tmp_path / "decision.csv"),
+        max_refresh_age_minutes=90.0,
+        date_slug="20260705",
+    )
+
+    assert summary["status"] == "skipped"
+    assert summary["reason"] == "source_structured_csv_incomplete"
+    assert summary["completeness"]["expected_count"] == 2
+    assert summary["completeness"]["actual_count"] == 1
+    assert summary["completeness"]["missing_match_idx"] == [2]
+    assert not list(shadow_dir.glob("**/structured_shadow_1001.csv"))

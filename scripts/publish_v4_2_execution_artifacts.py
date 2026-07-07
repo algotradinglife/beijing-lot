@@ -17,9 +17,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parents[0]
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import apply_decision_execution_policy_v4_2 as execution_policy  # noqa: E402
 import evaluate_structured_decision_chain_v4_2 as decision_chain  # noqa: E402
+from src.decision_artifact_completeness import format_completeness_error, structured_csv_completeness  # noqa: E402
 
 
 DEFAULT_DB = PROJECT_ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
@@ -230,6 +233,16 @@ def run(
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
+        source_completeness = structured_csv_completeness(conn, issue, source)
+        if not source_completeness.complete:
+            return {
+                "status": "skipped",
+                "reason": "source_structured_csv_incomplete",
+                "issue": issue,
+                "source_csv": str(source),
+                "completeness": source_completeness.to_dict(),
+                "message": format_completeness_error(source_completeness),
+            }
         refresh_ok, refresh = (True, {"policy": "forced_late_proxy"}) if force_late_proxy else has_valid_late_refresh(
             conn,
             issue,
@@ -281,6 +294,7 @@ def run(
         "artifact_version_id": artifact_version_id,
         "source_csv": str(source),
         "decision_csv": str(decision),
+        "source_completeness": source_completeness.to_dict(),
         "late_proxy_published": bool(refresh_ok),
         "late_refresh": refresh,
         "outputs": outputs,

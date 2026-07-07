@@ -218,6 +218,13 @@ Runtime option fields exposed by the API:
 - `readiness_status=unavailable` means the option must not be shown as a live
   executable choice. Missing late-proxy artifacts are hidden until published.
 - `degraded_reason` is a concise machine-readable reason for warnings.
+- `strategy_version_context.contract_warnings[]` may include
+  `type=structured_shadow_artifacts_incomplete`. Those artifacts were present on
+  disk but suppressed because their `match_idx` rows did not cover the current
+  `matches` table. Dashboard should show the warning and must not offer the
+  suppressed variant as a betting choice.
+- `dashboard.completeness.active_snapshots` reports the active snapshot coverage:
+  `expected_count`, `actual_count`, `missing_match_idx`, and `complete`.
 
 For v4.2.0000 execution variants:
 
@@ -364,6 +371,8 @@ Dashboard/API behavior:
 - Load variants only from the active release manifest.
 - Read shadow CSV rows only through `structured_shadow_dir`.
 - Suppress undeclared `shadow_arm` artifacts and report a contract warning.
+- Suppress incomplete structured shadow artifacts and report
+  `structured_shadow_artifacts_incomplete` with missing `match_idx` values.
 - Use one selected `decision_variant` across Issue Board, Match Detail, Main
   Strategy, and Settlement Review.
 - If a requested variant is unavailable, fall back to the default variant and

@@ -6,6 +6,7 @@ import json
 import math
 import re
 import sqlite3
+import sys
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -14,6 +15,11 @@ from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.decision_artifact_completeness import active_snapshot_completeness, format_completeness_error  # noqa: E402
+
 DEFAULT_DB = PROJECT_ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "results/structured_decision_chain_shadow"
 DEFAULT_REPORT_DIR = PROJECT_ROOT / "docs/research"
@@ -1077,6 +1083,13 @@ def load_issue_rows(conn: sqlite3.Connection, issue: str) -> list[ReplayRow]:
     return replay_rows
 
 
+def assert_active_snapshots_complete(conn: sqlite3.Connection, issue: str, *, allow_incomplete: bool = False) -> dict[str, Any]:
+    status = active_snapshot_completeness(conn, issue)
+    if not status.complete and not allow_incomplete:
+        raise SystemExit(format_completeness_error(status))
+    return status.to_dict()
+
+
 def leg_profit(codes: list[str], result_code: str | None, winning_sp: float | None) -> float:
     if not codes:
         return 0.0
@@ -1382,6 +1395,7 @@ def render_report(rows: list[ReplayRow], summary: dict[str, Any], csv_path: Path
 ## 数据边界
 
 - 输入只读取 `llm_decision_snapshots.status='active'` 的 `input_payload_json`，即赛前决策输入；赛果只用于事后评估。
+- 快照完整性：`{summary.get("snapshot_completeness", {}).get("actual_count", "缺")}/{summary.get("snapshot_completeness", {}).get("expected_count", "缺")}`；缺失场次 `{summary.get("snapshot_completeness", {}).get("missing_match_idx", [])}`。
 - 未结算比赛只生成 shadow 决策，不计入命中率和 profit proxy。
 - 本报告不写回 `llm_decision_snapshots`，不生成 active/draft replacement，不改变主策略票池。
 - profit proxy 是单腿层面的简化评估：每选一个结果记 1 单位成本，命中返还该场 `winning_sp`；不是 N 串 ticket-level 回放。
@@ -1477,9 +1491,10 @@ CSV 明细：`{path_for_report(csv_path)}`
 """
 
 
-def run(issue: str, db_path: Path, output_root: Path, report_dir: Path) -> tuple[Path, Path, dict[str, Any]]:
+def run(issue: str, db_path: Path, output_root: Path, report_dir: Path, *, allow_incomplete: bool = False) -> tuple[Path, Path, dict[str, Any]]:
     conn = sqlite3.connect(db_path)
     try:
+        completeness = assert_active_snapshots_complete(conn, issue, allow_incomplete=allow_incomplete)
         rows = load_issue_rows(conn, issue)
     finally:
         conn.close()
@@ -1491,6 +1506,7 @@ def run(issue: str, db_path: Path, output_root: Path, report_dir: Path) -> tuple
     csv_path = out_dir / f"structured_shadow_{issue}.csv"
     report_path = report_dir / f"structured_decision_chain_{issue}_{SHADOW_ARM}_{report_date}.md"
     summary = summarize(rows)
+    summary["snapshot_completeness"] = completeness
     write_csv(rows, csv_path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(render_report(rows, summary, csv_path, issue=issue), encoding="utf-8")
@@ -1503,12 +1519,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
+    parser.add_argument("--allow-incomplete", action="store_true", help="Generate a review-only artifact even when active snapshots miss match rows.")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    csv_path, report_path, summary = run(args.issue, args.db, args.output_root, args.report_dir)
+    csv_path, report_path, summary = run(args.issue, args.db, args.output_root, args.report_dir, allow_incomplete=args.allow_incomplete)
     print(json.dumps({"csv": str(csv_path), "report": str(report_path), "summary": summary}, ensure_ascii=False, indent=2))
 
 

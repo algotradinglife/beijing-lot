@@ -142,6 +142,10 @@ Readiness/defaulting contract:
   artifact exists. This is used for missing `late_proxy_fullcap2`.
 - Runtime API options expose `available`, `defaultable`, `readiness_status`,
   and `degraded_reason`; dashboard should display these directly.
+- Structured shadow artifacts are complete only when their CSV `match_idx` set
+  matches the issue `matches` table. Strategy publish scripts must skip
+  incomplete artifacts; API exposes any legacy suppressed artifacts through
+  `strategy_version_context.contract_warnings[].type=structured_shadow_artifacts_incomplete`.
 
 Reference sample CSV:
 
