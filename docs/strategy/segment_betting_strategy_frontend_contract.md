@@ -170,3 +170,22 @@ changed between strategy versions:
 Different decision-chain versions can therefore produce different N for the same
 time segment because they expose different executable legs, widths, and coverage
 probabilities.
+
+## User-Facing Backtest Explanation
+
+The betting strategy page should include a compact explanatory table using the
+checked-in replay examples:
+
+| file | frontend use |
+| --- | --- |
+| `docs/strategy/segment_betting_strategy_user_explainer_2026-07-07.md` | Human-readable wording, summary table, and default `scale_to_budget` per-segment explanation table for the tab. |
+
+Display constraints:
+
+- Treat these rows as settled replay examples, not live return promises.
+- Label 26072 as a 65-row artifact sample unless a full-row artifact replaces it.
+- Show `scale_to_budget` as the default stake mode and `unit_once` as audit mode.
+- Keep `base_cost_yuan` and `selected_cost_yuan` visible together so users can
+  understand budget scaling.
+- Show p10/mean/p90 or p10-p90 ranges when `seed_count > 1`; do not display a
+  single seed result as deterministic strategy quality.
