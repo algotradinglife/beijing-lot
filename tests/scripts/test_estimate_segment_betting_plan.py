@@ -181,8 +181,12 @@ def test_run_writes_outputs(tmp_path: Path) -> None:
     assert Path(payload["report_path"]).exists()
 
     summary_payload = json.loads(Path(payload["summary_json"]).read_text(encoding="utf-8"))
+    assert summary_payload["strategy_family"] == "segment_betting_plan"
+    assert summary_payload["betting_strategy_version"] == "segment_betting_v0.1.0000"
+    assert summary_payload["artifact_schema_version"] == "segment_betting_artifact_v1"
     assert summary_payload["seed_aggregate"]["summary_mode"] == "single_seed"
     assert any(item["key"] == "segment_budget_yuan" for item in summary_payload["parameter_schema"])
+    assert "segment_betting_v0.1.0000" in payload["summary_json"]
 
 
 def test_run_multi_seed_writes_stability_outputs(tmp_path: Path) -> None:
@@ -243,6 +247,8 @@ def test_run_multi_seed_writes_stability_outputs(tmp_path: Path) -> None:
         "1001",
         "--structured-csv",
         str(structured),
+        "--betting-strategy-version",
+        "segment_betting_v0.1.0001",
         "--db",
         str(db),
         "--output-dir",
@@ -260,6 +266,8 @@ def test_run_multi_seed_writes_stability_outputs(tmp_path: Path) -> None:
     ])
     payload = mod.run(args)
 
+    assert payload["betting_strategy_version"] == "segment_betting_v0.1.0001"
+    assert "segment_betting_v0.1.0001" in payload["summary_json"]
     assert payload["seed_aggregate"]["seed_count"] == 3
     assert payload["seed_aggregate"]["seeds"] == [10, 11, 12]
     assert payload["seed_aggregate"]["summary_mode"] == "multi_seed_mean"

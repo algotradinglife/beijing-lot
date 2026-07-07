@@ -29,6 +29,9 @@ DEFAULT_DB = PROJECT_ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "results/segment_betting_plan"
 DEFAULT_REPORT_DIR = PROJECT_ROOT / "docs/research"
 OUTCOME_CODES = ("3", "1", "0")
+BETTING_STRATEGY_FAMILY = "segment_betting_plan"
+BETTING_STRATEGY_VERSION = "segment_betting_v0.1.0000"
+ARTIFACT_SCHEMA_VERSION = "segment_betting_artifact_v1"
 
 
 @dataclass(frozen=True)
@@ -72,6 +75,10 @@ def product(values: Iterable[float]) -> float:
 def stable_seed(*parts: object) -> int:
     text = "|".join(str(part) for part in parts)
     return int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:16], 16)
+
+
+def slugify(value: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in {"-", "_", "."} else "_" for ch in value)
 
 
 def sample_seeds_from_args(args: argparse.Namespace) -> list[int]:
@@ -697,6 +704,7 @@ def render_report(
     *,
     issue: str,
     label: str,
+    betting_strategy_version: str,
     summary: dict[str, Any],
     seed_aggregate: dict[str, Any],
     seed_summary_rows: list[dict[str, Any]],
@@ -723,11 +731,11 @@ def render_report(
         for key, values in seed_aggregate.get("metrics", {}).items()
         if key in {"selected_cost_yuan", "payout_yuan", "profit_yuan", "roi", "dead_segments"}
     ]
-    return f"""# Segment Betting Plan {issue} {label}
+    return f"""# Segment Betting Plan {issue} {label} {betting_strategy_version}
 
 Generated: {generated}
 
-## Strategy v0.1
+## Strategy {betting_strategy_version}
 
 - Use rolling kickoff segments, not natural days: start with `{args.window_hours}`h, extend through `{args.extend_hours}`h until at least `{args.min_matches}` eligible matches, cap a segment at `{args.max_matches}` matches.
 - Eligible matches are rows with executable selected codes for `--arm {args.arm}`. Rows with no-buy/stop are excluded from bundle selection.
@@ -838,6 +846,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--issue", required=True)
     parser.add_argument("--structured-csv", type=Path, required=True)
     parser.add_argument("--label", default="")
+    parser.add_argument("--betting-strategy-version", default=BETTING_STRATEGY_VERSION)
     parser.add_argument("--arm", choices=("active", "shadow"), default="shadow")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -909,12 +918,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     seed_aggregate = aggregate_seed_summaries(seed_summary_rows)
     segment_seed_summary_rows = aggregate_segment_seed_rows(segment_rows)
     summary = seed_aggregate["mean_summary"]
-    slug_label = "".join(ch if ch.isalnum() or ch in {"-", "_", "."} else "_" for ch in label)
+    version = args.betting_strategy_version
+    slug_label = slugify(label)
+    version_slug = slugify(version)
     if len(seeds) == 1:
         seed_slug = f"seed{seeds[0]}"
     else:
         seed_slug = f"seeds{len(seeds)}_{seeds[0]}-{seeds[-1]}"
-    slug = f"{args.issue}_{slug_label}_b{int(args.segment_budget_yuan)}_{seed_slug}"
+    slug = f"{args.issue}_{slug_label}_{version_slug}_b{int(args.segment_budget_yuan)}_{seed_slug}"
     out_dir = args.output_dir / slug
     segment_csv = out_dir / "segment_betting_plan_segments.csv"
     bundle_csv = out_dir / "segment_betting_plan_bundles.csv"
@@ -928,6 +939,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     payload = {
         "issue": args.issue,
         "label": label,
+        "strategy_family": BETTING_STRATEGY_FAMILY,
+        "betting_strategy_version": version,
+        "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
         "arm": args.arm,
         "structured_csv": str(args.structured_csv),
         "source_rows": len(legs),
@@ -943,6 +957,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "max_matches": args.max_matches,
             "segment_budget_yuan": args.segment_budget_yuan,
             "stake_yuan_per_ticket": args.stake_yuan_per_ticket,
+            "betting_strategy_version": version,
             "sample_attempts": args.sample_attempts,
             "sample_seed": args.sample_seed,
             "seed_count": args.seed_count,
@@ -965,6 +980,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         render_report(
             issue=args.issue,
             label=label,
+            betting_strategy_version=version,
             summary=summary,
             seed_aggregate=seed_aggregate,
             seed_summary_rows=seed_summary_rows,

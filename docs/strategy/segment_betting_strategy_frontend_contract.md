@@ -10,6 +10,32 @@ per-match 3/1/0 selections. It groups executable selections into kickoff-time
 segments, chooses N from segment size and expected coverage, samples affordable
 small-combo bundles, and settles or estimates return.
 
+## Versioning
+
+The betting strategy has its own version independent from the decision-chain
+version.
+
+Current default:
+
+| field | value |
+| --- | --- |
+| `strategy_family` | `segment_betting_plan` |
+| `betting_strategy_version` | `segment_betting_v0.1.0000` |
+| `artifact_schema_version` | `segment_betting_artifact_v1` |
+
+Version semantics:
+
+| part | when to change |
+| --- | --- |
+| family | A different betting planner family, not just a parameter change. |
+| major | Incompatible payout/cost semantics or artifact contract changes. |
+| minor | Material strategy logic changes: segmentation, N selection, bundle scoring, budget allocation, or stability method. |
+| four-digit patch | Bug fixes, diagnostics, report fields, or conservative tuning that preserves the strategy contract. |
+
+The frontend should display the decision-chain version and betting strategy
+version separately. Two artifacts can share the same decision-chain version but
+use different betting strategy versions, and vice versa.
+
 ## Output Files
 
 Each run writes:
@@ -29,6 +55,9 @@ The summary JSON includes:
 | key | meaning |
 | --- | --- |
 | `summary` | Main displayed estimate. For multi-seed runs this is the mean summary. |
+| `strategy_family` | Betting planner family id. |
+| `betting_strategy_version` | Version of segmentation/N/bundle/budget logic. |
+| `artifact_schema_version` | JSON/CSV schema version for frontend compatibility. |
 | `seed_aggregate.summary_mode` | `single_seed` or `multi_seed_mean`. |
 | `seed_aggregate.metrics.*` | `min`, `p10`, `mean`, `median`, `p90`, `max` for cost, payout, profit, ROI, bundles, selected segments, and dead segments. |
 | `settings` | Concrete values used for the run. |
