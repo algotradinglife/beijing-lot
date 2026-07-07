@@ -174,6 +174,9 @@ For v4.2.0000 execution artifacts:
   (`shadow_selection_codes`).
 - Execution badges should come from `execution_action` and
   `execution_reasons`.
+- If `execution_dropped_codes` is non-empty, show it with
+  `execution_drop_reasons` so users can audit why a recommended outcome was not
+  executable.
 - `value_only_sp_drift` inside `execution_reasons` is an audit/risk marker for
   payout-driven q movement; it is not a no-buy state unless `execution_action`
   itself is `skip_*`.
