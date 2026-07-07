@@ -1491,21 +1491,51 @@ CSV 明细：`{path_for_report(csv_path)}`
 """
 
 
-def run(issue: str, db_path: Path, output_root: Path, report_dir: Path, *, allow_incomplete: bool = False) -> tuple[Path, Path, dict[str, Any]]:
+def skipped_summary(issue: str, reason: str, completeness: dict[str, Any], message: str) -> dict[str, Any]:
+    return {
+        "status": "skipped",
+        "reason": reason,
+        "issue": issue,
+        "snapshot_completeness": completeness,
+        "message": message,
+    }
+
+
+def run(
+    issue: str,
+    db_path: Path,
+    output_root: Path,
+    report_dir: Path,
+    *,
+    allow_incomplete: bool = False,
+    strict_completeness: bool = False,
+) -> tuple[Path | None, Path | None, dict[str, Any]]:
     conn = sqlite3.connect(db_path)
     try:
-        completeness = assert_active_snapshots_complete(conn, issue, allow_incomplete=allow_incomplete)
+        status = active_snapshot_completeness(conn, issue)
+        completeness = status.to_dict()
+        if not status.complete and not allow_incomplete:
+            message = format_completeness_error(status)
+            if strict_completeness:
+                raise SystemExit(message)
+            return None, None, skipped_summary(issue, "active_decision_snapshots_incomplete", completeness, message)
         rows = load_issue_rows(conn, issue)
     finally:
         conn.close()
     if not rows:
-        raise SystemExit(f"No active snapshots found for issue {issue} in {db_path}")
+        return None, None, skipped_summary(
+            issue,
+            "active_decision_snapshots_missing",
+            completeness,
+            f"No active snapshots found for issue {issue} in {db_path}",
+        )
     date_slug = datetime.now(timezone.utc).strftime("%Y%m%d")
     report_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     out_dir = output_root / f"{issue}_{date_slug}_{SHADOW_ARM}"
     csv_path = out_dir / f"structured_shadow_{issue}.csv"
     report_path = report_dir / f"structured_decision_chain_{issue}_{SHADOW_ARM}_{report_date}.md"
     summary = summarize(rows)
+    summary["status"] = "generated"
     summary["snapshot_completeness"] = completeness
     write_csv(rows, csv_path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1520,13 +1550,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
     parser.add_argument("--allow-incomplete", action="store_true", help="Generate a review-only artifact even when active snapshots miss match rows.")
+    parser.add_argument("--strict-completeness", action="store_true", help="Exit non-zero instead of returning a skipped payload when active snapshots are incomplete.")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    csv_path, report_path, summary = run(args.issue, args.db, args.output_root, args.report_dir, allow_incomplete=args.allow_incomplete)
-    print(json.dumps({"csv": str(csv_path), "report": str(report_path), "summary": summary}, ensure_ascii=False, indent=2))
+    csv_path, report_path, summary = run(
+        args.issue,
+        args.db,
+        args.output_root,
+        args.report_dir,
+        allow_incomplete=args.allow_incomplete,
+        strict_completeness=args.strict_completeness,
+    )
+    print(
+        json.dumps(
+            {
+                "status": summary.get("status", "generated"),
+                "csv": str(csv_path) if csv_path else "",
+                "report": str(report_path) if report_path else "",
+                "summary": summary,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

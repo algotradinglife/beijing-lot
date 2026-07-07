@@ -452,3 +452,39 @@ def test_active_snapshot_completeness_guard_blocks_missing_rows() -> None:
         assert allowed["missing_match_idx"] == [2]
     finally:
         conn.close()
+
+
+def test_run_skips_incomplete_snapshots_without_writing_artifacts(tmp_path: Path) -> None:
+    mod = _load_module()
+    db_path = tmp_path / "500.sqlite"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE matches(issue TEXT, match_idx INTEGER);
+            CREATE TABLE llm_decision_snapshots(issue TEXT, match_idx INTEGER, status TEXT);
+            INSERT INTO matches VALUES('26072', 1);
+            INSERT INTO matches VALUES('26072', 2);
+            INSERT INTO llm_decision_snapshots VALUES('26072', 1, 'active');
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    csv_path, report_path, summary = mod.run(
+        "26072",
+        db_path,
+        tmp_path / "shadow",
+        tmp_path / "docs",
+    )
+
+    assert csv_path is None
+    assert report_path is None
+    assert summary["status"] == "skipped"
+    assert summary["reason"] == "active_decision_snapshots_incomplete"
+    assert summary["snapshot_completeness"]["missing_match_idx"] == [2]
+    assert not list((tmp_path / "shadow").glob("**/*.csv"))
+
+    with pytest.raises(SystemExit):
+        mod.run("26072", db_path, tmp_path / "shadow", tmp_path / "docs", strict_completeness=True)
