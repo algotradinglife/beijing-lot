@@ -273,11 +273,14 @@ def test_dashboard_uses_latest_complete_live_sp_per_match(tmp_path: Path) -> Non
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["strategy_version_context"]["requested_variant_id"] == "missing_v9"
+    assert payload["strategy_version_context"]["requested_canonical_variant_id"] == ""
     assert payload["strategy_version_context"]["selection_status"] == "unavailable"
-    assert payload["strategy_version_context"]["selected_variant_id"] == "active_v3"
+    assert payload["strategy_version_context"]["selected_variant_id"] == "active_v3.3.3"
     match = payload["matches"][0]
-    assert match["selected_decision_variant_id"] == "active_v3"
-    assert match["selected_decision_variant_status"] == "ok"
+    assert match["selected_decision_variant_id"] == "active_v3.3.3"
+    assert match["selected_decision_variant_status"] == "degraded"
+    assert match["selected_decision_variant"]["selection_type"] == "no-buy"
+    assert match["selected_decision_variant"]["execution_action"] == "skip_artifact_missing"
     assert match["sp_3"] == 2.22
     assert match["sp_1"] == 3.33
     assert match["sp_0"] == 4.44
@@ -327,9 +330,12 @@ def test_match_detail_exposes_strategy_version_context(tmp_path: Path) -> None:
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["strategy_version_context"]["requested_variant_id"] == "missing_v9"
+    assert payload["strategy_version_context"]["requested_canonical_variant_id"] == ""
     assert payload["strategy_version_context"]["selection_status"] == "unavailable"
-    assert payload["match"]["selected_decision_variant_id"] == "active_v3"
-    assert payload["match"]["selected_decision_variant_status"] == "ok"
+    assert payload["strategy_version_context"]["selected_variant_id"] == "active_v3.3.3"
+    assert payload["match"]["selected_decision_variant_id"] == "active_v3.3.3"
+    assert payload["match"]["selected_decision_variant_status"] == "degraded"
+    assert payload["match"]["selected_decision_variant"]["execution_action"] == "skip_artifact_missing"
 
 
 def test_operations_reads_dashboard_runtime_status(tmp_path: Path, monkeypatch) -> None:

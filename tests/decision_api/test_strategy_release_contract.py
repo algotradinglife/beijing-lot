@@ -111,8 +111,12 @@ def test_current_strategy_release_keeps_v3_3_3_as_runtime_default() -> None:
 
     assert variants["active_v3"]["is_default"] is False
     assert variants["active_v3"]["selectable"] is False
-    assert variants["shadow_v3.3.3"]["is_default"] is True
-    assert variants["shadow_v3.3.3"]["selectable"] is True
+    assert variants["active_v3"]["production_status"] == "retired"
+    assert variants["active_v3"]["readiness"]["defaultable_when"] == "never"
+    assert variants["active_v3.3.3"]["is_default"] is True
+    assert variants["active_v3.3.3"]["selectable"] is True
+    assert "shadow_v3.3.3" in variants["active_v3.3.3"]["legacy_aliases"]
+    assert variants["active_v3.3.3"]["readiness"]["missing_behavior"] == "artifact_missing"
     for variant_id, version_id in (
         ("shadow_v4.2.0000_execution_strict_fullcap2", "4.2.0004"),
         ("shadow_v4.2.0005_execution_strict_fullcap2", "4.2.0005"),

@@ -84,7 +84,15 @@ def find_source_structured_csv(issue: str, shadow_dir: Path) -> Path | None:
     ]
     if not candidates:
         return None
-    candidates.sort(key=lambda path: (0 if "shadow_v3.3.3" in path.parent.name else 1, -path.stat().st_mtime))
+    def source_rank(path: Path) -> int:
+        parent = path.parent.name
+        if "active_v3.3.3" in parent:
+            return 0
+        if "shadow_v3.3.3" in parent:
+            return 1
+        return 2
+
+    candidates.sort(key=lambda path: (source_rank(path), -path.stat().st_mtime))
     return candidates[0]
 
 

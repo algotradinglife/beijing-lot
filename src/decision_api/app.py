@@ -48,11 +48,13 @@ OUTCOME_ORDER = ("3", "1", "0")
 Q_STOP_THRESHOLD = 1.00
 ACTIVE_DECISION_VARIANT_ID = "active_v3"
 ACTIVE_DECISION_VARIANT_KIND = "active"
-ACTIVE_DECISION_VARIANT_LABEL = "v3"
-ACTIVE_DECISION_VARIANT_DISPLAY_LABEL = "v3"
-SHADOW_DECISION_VARIANT_ID = "shadow_v3.3.3"
-SHADOW_DECISION_VERSION = "llm_chain_bet_protect_stop_v3.3.3_shadow"
-SHADOW_DECISION_LABEL = "shadow v3.3.3"
+ACTIVE_DECISION_VARIANT_LABEL = "v3 retired"
+ACTIVE_DECISION_VARIANT_DISPLAY_LABEL = "v3 retired"
+FORMAL_DECISION_VARIANT_ID = "active_v3.3.3"
+LEGACY_SHADOW_DECISION_VARIANT_ID = "shadow_v3.3.3"
+SHADOW_DECISION_VARIANT_ID = FORMAL_DECISION_VARIANT_ID
+SHADOW_DECISION_VERSION = "llm_chain_bet_protect_stop_v3.3.3"
+SHADOW_DECISION_LABEL = "active v3.3.3"
 SHADOW_DECISION_VARIANT_KIND = "shadow"
 SHADOW_DECISION_FAMILY = "structured_shadow"
 MAIN_STRATEGY_ARMS = (
@@ -90,13 +92,14 @@ DEFAULT_DECISION_VERSION_REGISTRY: dict[str, Any] = {
         },
     },
     "decision_chain": {
-        "version": "llm_chain_bet_protect_stop_v3",
-        "prompt_version": "fixed_decision_chain_v3_bet_protect_stop",
-        "model_version": "gpt_fixed_decision_chain_v3",
+        "version": SHADOW_DECISION_VERSION,
+        "prompt_version": "fixed_decision_chain_v3_3_3_bet_protect_stop",
+        "model_version": "gpt_fixed_decision_chain_v3_3_3",
         "parameters": {
             "line_gap_policy": "diagnostic_or_protection_note",
             "q_stop_threshold": Q_STOP_THRESHOLD,
             "manual_override_required_for_snapshot_replacement": True,
+            "legacy_active_decision_chain": "llm_chain_bet_protect_stop_v3",
         },
     },
     "review_tags": {
@@ -133,8 +136,9 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
             "model_versions": {
                 "probability_model": "bd_prob_handicap_calibrated_v1",
                 "q_model": "q_ev_sp_v1",
-                "decision_chain": "llm_chain_bet_protect_stop_v3",
+                "decision_chain": SHADOW_DECISION_VERSION,
                 "shadow_decision_chain": SHADOW_DECISION_VERSION,
+                "legacy_active_decision_chain": "llm_chain_bet_protect_stop_v3",
             },
             "decision_variants": [
                 {
@@ -144,7 +148,16 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
                     "label": ACTIVE_DECISION_VARIANT_LABEL,
                     "source": "active_snapshot",
                     "is_default": False,
-                    "selectable": True,
+                    "selectable": False,
+                    "production_status": "retired",
+                    "retired_reason": "active_v3 is historical baseline only; do not use as live default, fallback, or selectable betting version.",
+                    "readiness": {
+                        "artifact_required": False,
+                        "defaultable_when": "never",
+                        "missing_behavior": "builtin_active",
+                        "late_refresh": "not_applicable",
+                        "missing_reason": "active_v3_retired_not_live_selectable",
+                    },
                 },
                 {
                     "variant_id": SHADOW_DECISION_VARIANT_ID,
@@ -155,6 +168,15 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
                     "artifact_key": "structured_shadow_dir",
                     "is_default": True,
                     "selectable": True,
+                    "legacy_aliases": [LEGACY_SHADOW_DECISION_VARIANT_ID],
+                    "planned_direct_shadow_arm": SHADOW_DECISION_VARIANT_ID,
+                    "readiness": {
+                        "artifact_required": True,
+                        "defaultable_when": "available",
+                        "missing_behavior": "artifact_missing",
+                        "late_refresh": "not_applicable",
+                        "missing_reason": "active_v3_3_3_artifact_missing_for_issue",
+                    },
                 },
             ],
             "main_strategy_arms": list(MAIN_STRATEGY_ARMS),
@@ -589,9 +611,9 @@ def _active_version_bundle() -> dict[str, Any]:
         "schema_version": registry.get("schema_version", "decision_versions_v1"),
         "prob_model_version": probability.get("version", "bd_prob_handicap_calibrated_v1"),
         "q_model_version": q_model.get("version", "q_ev_sp_v1"),
-        "decision_chain_version": chain.get("version", "llm_chain_bet_protect_stop_v3"),
-        "decision_prompt_version": chain.get("prompt_version", "fixed_decision_chain_v3_bet_protect_stop"),
-        "decision_model_version": chain.get("model_version", "gpt_fixed_decision_chain_v3"),
+        "decision_chain_version": chain.get("version", SHADOW_DECISION_VERSION),
+        "decision_prompt_version": chain.get("prompt_version", "fixed_decision_chain_v3_3_3_bet_protect_stop"),
+        "decision_model_version": chain.get("model_version", "gpt_fixed_decision_chain_v3_3_3"),
         "review_tag_version": review.get("version", "postmatch_tags_v2"),
         "review_version": review.get("review_version", "v2_active_llm_snapshot_tags"),
         "decision_config_hash": _decision_config_hash(),
@@ -2949,7 +2971,7 @@ def _gpt_fixed_chain_decision(
         "risks": risks[:5],
         "chain": chain,
         "explanation": explanation,
-        "source": "gpt_fixed_decision_chain_v3_bet_protect_stop",
+        "source": "gpt_fixed_decision_chain_v3_3_3_bet_protect_stop",
     }
 
 
@@ -2998,11 +3020,72 @@ def _structured_shadow_rows_from_csv(path: Path) -> tuple[dict[int, dict[str, An
 
 def _shadow_variant_id(rows: dict[int, dict[str, Any]]) -> str:
     first = next(iter(rows.values()), {})
-    return str(first.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID)
+    return str(first.get("_manifest_variant_id") or first.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID)
+
+
+def _shadow_source_variant_id(rows: dict[int, dict[str, Any]]) -> str:
+    first = next(iter(rows.values()), {})
+    return str(first.get("_source_shadow_arm") or first.get("shadow_arm") or _shadow_variant_id(rows))
 
 
 def _shadow_variant_display_label(variant_id: str) -> str:
     return str(variant_id or SHADOW_DECISION_VARIANT_ID).replace("_", " ")
+
+
+def _variant_legacy_aliases(manifest: dict[str, Any]) -> list[str]:
+    aliases = manifest.get("legacy_aliases")
+    if isinstance(aliases, list):
+        return [str(alias).strip() for alias in aliases if str(alias).strip()]
+    if isinstance(aliases, str):
+        return [part.strip() for part in re.split(r"[;,]", aliases) if part.strip()]
+    return []
+
+
+def _manifest_variant_alias_map(release: dict[str, Any] | None = None, *, kind: str | None = None) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for manifest in _manifest_decision_variants(release):
+        variant_id = str(manifest.get("variant_id") or "")
+        if not variant_id or (kind is not None and manifest.get("kind") != kind):
+            continue
+        for alias in _variant_legacy_aliases(manifest):
+            out[alias] = variant_id
+    return out
+
+
+def _annotate_shadow_variant_rows(
+    rows: dict[int, dict[str, Any]],
+    *,
+    manifest_variant_id: str,
+    source_variant_id: str,
+) -> dict[int, dict[str, Any]]:
+    if manifest_variant_id == source_variant_id:
+        return rows
+    return {
+        idx: {
+            **row,
+            "_manifest_variant_id": manifest_variant_id,
+            "_source_shadow_arm": source_variant_id,
+        }
+        for idx, row in rows.items()
+    }
+
+
+def _variant_option_aliases(option: dict[str, Any]) -> set[str]:
+    aliases = set(_variant_legacy_aliases(option))
+    for key in ("legacy_variant_id", "source_variant_id"):
+        value = str(option.get(key) or "").strip()
+        if value:
+            aliases.add(value)
+    return aliases
+
+
+def _option_matches_variant_id(option: dict[str, Any], requested_variant_id: str) -> bool:
+    requested = str(requested_variant_id or "").strip()
+    if not requested:
+        return False
+    if str(option.get("variant_id") or "") == requested:
+        return True
+    return requested in _variant_option_aliases(option)
 
 
 def _decision_variant_version_key(variant_id: Any) -> tuple[int, int, int, str]:
@@ -3031,16 +3114,23 @@ def _structured_shadow_variant_scan(
     release: dict[str, Any] | None = None,
 ) -> tuple[list[tuple[dict[int, dict[str, Any]], str]], list[str]]:
     allowed_shadow_ids = _manifest_variant_ids(release, kind=SHADOW_DECISION_VARIANT_KIND)
+    shadow_aliases = _manifest_variant_alias_map(release, kind=SHADOW_DECISION_VARIANT_KIND)
     variants: dict[str, tuple[dict[int, dict[str, Any]], str, float]] = {}
     suppressed: set[str] = set()
     for path in _structured_shadow_csv_candidates(issue, release):
         rows, source = _structured_shadow_rows_from_csv(path)
         if not rows:
             continue
-        variant_id = _shadow_variant_id(rows)
+        source_variant_id = _shadow_source_variant_id(rows)
+        variant_id = shadow_aliases.get(source_variant_id, source_variant_id)
         if variant_id not in allowed_shadow_ids:
-            suppressed.add(variant_id)
+            suppressed.add(source_variant_id)
             continue
+        rows = _annotate_shadow_variant_rows(
+            rows,
+            manifest_variant_id=variant_id,
+            source_variant_id=source_variant_id,
+        )
         mtime = path.stat().st_mtime
         existing = variants.get(variant_id)
         if existing is None or mtime >= existing[2]:
@@ -3111,19 +3201,20 @@ def _should_scan_release_shadow_variants(issue: str, rows: list[sqlite3.Row], re
     return _issue_is_at_or_after_release_effective(issue, release) or not _issue_all_has_result(rows)
 
 
-def _active_decision_variant(summary: dict[str, Any]) -> dict[str, Any]:
+def _active_decision_variant(summary: dict[str, Any], *, release: dict[str, Any] | None = None) -> dict[str, Any]:
     codes = _selection_codes_from_value(summary.get("llm_selection_codes") or summary.get("selection_codes"))
     primary = codes[0] if codes else ""
     result_code = str(summary.get("result_code") or "")
     prediction_hit = result_code in codes if result_code and codes else None
-    manifest = _manifest_variant_by_id().get(ACTIVE_DECISION_VARIANT_ID, {})
+    manifest = _manifest_default_active_variant(release)
+    variant_id = str(manifest.get("variant_id") or ACTIVE_DECISION_VARIANT_ID)
     version = summary.get("decision_chain_version") or _active_version_bundle()["decision_chain_version"]
     return {
-        "variant_id": ACTIVE_DECISION_VARIANT_ID,
+        "variant_id": variant_id,
         "kind": ACTIVE_DECISION_VARIANT_KIND,
         "family": "active_snapshot",
-        "label": ACTIVE_DECISION_VARIANT_LABEL,
-        "display_label": ACTIVE_DECISION_VARIANT_DISPLAY_LABEL,
+        "label": manifest.get("label") or ACTIVE_DECISION_VARIANT_LABEL,
+        "display_label": manifest.get("label") or ACTIVE_DECISION_VARIANT_DISPLAY_LABEL,
         "version": version,
         "source": "active_snapshot",
         "is_default": bool(manifest.get("is_default", False)),
@@ -3142,10 +3233,17 @@ def _active_decision_variant(summary: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_code: str = "") -> dict[str, Any]:
+def _shadow_decision_variant(
+    row: dict[str, Any],
+    source_path: str,
+    *,
+    result_code: str = "",
+    release: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     codes = _selection_codes_from_value(row.get("shadow_selection_codes"))
-    variant_id = str(row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID)
-    manifest = _manifest_variant_by_id().get(variant_id, {})
+    variant_id = str(row.get("_manifest_variant_id") or row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID)
+    source_variant_id = str(row.get("_source_shadow_arm") or row.get("shadow_arm") or variant_id)
+    manifest = _manifest_variant_by_id(release).get(variant_id, {})
     primary = str(row.get("shadow_primary") or (codes[0] if codes else ""))
     if primary not in OUTCOME_ORDER:
         primary = codes[0] if codes else ""
@@ -3156,6 +3254,9 @@ def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_co
         coverage_hit = result_code in codes
     return {
         "variant_id": variant_id,
+        "source_variant_id": source_variant_id,
+        "legacy_variant_id": source_variant_id if source_variant_id != variant_id else "",
+        "legacy_aliases": _variant_legacy_aliases(manifest),
         "kind": SHADOW_DECISION_VARIANT_KIND,
         "family": SHADOW_DECISION_FAMILY,
         "label": manifest.get("label") or _shadow_variant_display_label(variant_id),
@@ -3183,7 +3284,7 @@ def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_co
         "execution_source_action": row.get("execution_source_action") or "",
         "execution_recommended_codes": row.get("execution_recommended_codes") or "",
         "execution_double_codes": row.get("execution_double_codes") or "",
-        "execution_dropped_codes": _codes_from_text(row.get("execution_dropped_codes") or ""),
+        "execution_dropped_codes": _selection_codes_from_value(row.get("execution_dropped_codes") or ""),
         "execution_drop_reasons": _csv_semicolon_list(row, "execution_drop_reasons"),
         "execution_full_score": _safe_float(row.get("execution_full_score")),
         "execution_full_candidate": _csv_bool(row, "execution_full_candidate"),
@@ -3280,11 +3381,15 @@ def _shadow_decision_option(
     release: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     first = next(iter(rows.values()), {})
-    variant_id = first.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID
+    variant_id = _shadow_variant_id(rows)
+    source_variant_id = _shadow_source_variant_id(rows)
     manifest = _manifest_variant_by_id(release).get(str(variant_id), {})
     readiness = _decision_variant_readiness(manifest, available=True)
     return {
         "variant_id": variant_id,
+        "source_variant_id": source_variant_id,
+        "legacy_variant_id": source_variant_id if source_variant_id != variant_id else "",
+        "legacy_aliases": _variant_legacy_aliases(manifest),
         "kind": SHADOW_DECISION_VARIANT_KIND,
         "family": SHADOW_DECISION_FAMILY,
         "label": manifest.get("label") or _shadow_variant_display_label(variant_id),
@@ -3315,6 +3420,9 @@ def _manifest_shadow_option(manifest: dict[str, Any], *, available: bool) -> dic
     readiness = _decision_variant_readiness(manifest, available=available, missing_behavior=missing_behavior)
     return {
         "variant_id": variant_id,
+        "source_variant_id": "",
+        "legacy_variant_id": "",
+        "legacy_aliases": _variant_legacy_aliases(manifest),
         "kind": SHADOW_DECISION_VARIANT_KIND,
         "family": SHADOW_DECISION_FAMILY,
         "label": manifest.get("label") or _shadow_variant_display_label(variant_id),
@@ -3347,16 +3455,43 @@ def _missing_manifest_shadow_options(
             continue
         if _is_execution_strict_variant_id(variant_id):
             options.append(_manifest_shadow_option(manifest, available=False))
+            continue
+        readiness = manifest.get("readiness") if isinstance(manifest.get("readiness"), dict) else {}
+        missing_behavior = str(readiness.get("missing_behavior") or "")
+        if manifest.get("is_default") or missing_behavior == "artifact_missing":
+            options.append(_manifest_shadow_option(manifest, available=False))
     return options
 
 
 def _manifest_shadow_placeholder_decision_variant(manifest: dict[str, Any]) -> dict[str, Any]:
     variant_id = str(manifest.get("variant_id") or "")
-    if not _is_execution_strict_variant_id(variant_id):
+    readiness_payload = manifest.get("readiness") if isinstance(manifest.get("readiness"), dict) else {}
+    missing_behavior = str(readiness_payload.get("missing_behavior") or "")
+    is_strict = _is_execution_strict_variant_id(variant_id)
+    is_artifact_missing = manifest.get("is_default") or missing_behavior == "artifact_missing"
+    if not is_strict and not is_artifact_missing:
         return {}
-    readiness = _decision_variant_readiness(manifest, available=False, missing_behavior="diagnostic_placeholder")
+    readiness = _decision_variant_readiness(
+        manifest,
+        available=False,
+        missing_behavior="diagnostic_placeholder" if is_strict else "artifact_missing",
+    )
+    recommendation = "等待晚盘" if is_strict else "正式版产物缺失"
+    execution_policy_name = "strict_fullcap2" if is_strict else ""
+    execution_action = "skip_wait_late_refresh" if is_strict else "skip_artifact_missing"
+    execution_reasons = ["execution_artifact_missing_for_issue"] if is_strict else ["formal_decision_artifact_missing_for_issue"]
+    execution_source_action = "wait_late_refresh" if is_strict else "artifact_missing"
+    execution_unlock_state = "waiting_late_refresh" if is_strict else "artifact_missing"
+    notes = (
+        ["strict execution artifact missing; no executable pick"]
+        if is_strict
+        else [f"{variant_id} structured artifact missing; no fallback to retired active_v3"]
+    )
     return {
         "variant_id": variant_id,
+        "source_variant_id": "",
+        "legacy_variant_id": "",
+        "legacy_aliases": _variant_legacy_aliases(manifest),
         "kind": SHADOW_DECISION_VARIANT_KIND,
         "family": SHADOW_DECISION_FAMILY,
         "label": manifest.get("label") or _shadow_variant_display_label(variant_id),
@@ -3369,7 +3504,7 @@ def _manifest_shadow_placeholder_decision_variant(manifest: dict[str, Any]) -> d
         "available": False,
         "selectable": bool(manifest.get("selectable", True)),
         **readiness,
-        "recommendation": "等待晚盘",
+        "recommendation": recommendation,
         "primary_pick": "",
         "protect_picks": [],
         "selection_codes": [],
@@ -3382,10 +3517,10 @@ def _manifest_shadow_placeholder_decision_variant(manifest: dict[str, Any]) -> d
         "primary_hit": None,
         "coverage_hit": None,
         "execution_policy_version": manifest.get("version_id") or "",
-        "execution_policy_name": "strict_fullcap2",
-        "execution_action": "skip_wait_late_refresh",
-        "execution_reasons": ["execution_artifact_missing_for_issue"],
-        "execution_source_action": "wait_late_refresh",
+        "execution_policy_name": execution_policy_name,
+        "execution_action": execution_action,
+        "execution_reasons": execution_reasons,
+        "execution_source_action": execution_source_action,
         "execution_recommended_codes": "",
         "execution_double_codes": "",
         "execution_dropped_codes": [],
@@ -3394,8 +3529,8 @@ def _manifest_shadow_placeholder_decision_variant(manifest: dict[str, Any]) -> d
         "execution_full_candidate": False,
         "execution_full_kept": False,
         "execution_segment_idx": None,
-        "execution_unlock_state": "waiting_late_refresh",
-        "notes": ["strict execution artifact missing; no executable pick"],
+        "execution_unlock_state": execution_unlock_state,
+        "notes": notes,
         "decision_chain": [],
         "decision_categories": [],
     }
@@ -3483,7 +3618,8 @@ def _strategy_version_context(
 ) -> dict[str, Any]:
     requested = str(requested_variant_id or "").strip()
     default_option = next((item for item in options if item.get("is_default")), options[0] if options else {})
-    selected_option = next((item for item in options if str(item.get("variant_id") or "") == requested), None) if requested else None
+    requested_option = next((item for item in options if _option_matches_variant_id(item, requested)), None) if requested else None
+    selected_option = requested_option
     selection_status = "ok"
     selection_error = ""
     if requested and selected_option is None:
@@ -3520,6 +3656,7 @@ def _strategy_version_context(
     return {
         "schema_version": "strategy_version_context_v1",
         "requested_variant_id": requested,
+        "requested_canonical_variant_id": str(requested_option.get("variant_id") or "") if requested and requested_option else "",
         "selected_variant_id": str(selected_option.get("variant_id") or "") if selected_option else "",
         "selection_status": selection_status,
         "selection_error": selection_error,
@@ -3538,7 +3675,7 @@ def _attach_selected_decision_variant(
     for match in matches:
         variants = [item for item in match.get("decision_variants", []) if isinstance(item, dict)]
         default_variant = next((item for item in variants if item.get("is_default")), variants[0] if variants else {})
-        selected = next((item for item in variants if str(item.get("variant_id") or "") == requested), None) if requested else None
+        selected = next((item for item in variants if _option_matches_variant_id(item, requested)), None) if requested else None
         status = "ok"
         if requested and selected is None:
             selected = default_variant
@@ -3562,6 +3699,9 @@ def _compact_decision_variant(variant: dict[str, Any]) -> dict[str, Any]:
         "display_label",
         "version",
         "version_id",
+        "source_variant_id",
+        "legacy_variant_id",
+        "legacy_aliases",
         "source",
         "is_default",
         "selectable",
@@ -3720,14 +3860,16 @@ def _attach_decision_variants(
     for match in matches:
         idx = _safe_int(match.get("match_idx"))
         variants = []
-        variants.append(_active_decision_variant(match))
+        active_manifest = _manifest_default_active_variant(release)
+        if active_manifest.get("selectable") is not False:
+            variants.append(_active_decision_variant(match, release=release))
         result_code = str(match.get("result_code") or "")
         for shadow_rows, shadow_source_path in shadow_variants:
             if idx is not None and idx in shadow_rows and shadow_source_path:
                 variant_id = _shadow_variant_id(shadow_rows)
                 if manifests.get(variant_id, {}).get("selectable") is False:
                     continue
-                variants.append(_shadow_decision_variant(shadow_rows[idx], shadow_source_path, result_code=result_code))
+                variants.append(_shadow_decision_variant(shadow_rows[idx], shadow_source_path, result_code=result_code, release=release))
         for manifest in placeholder_manifests:
             if manifest.get("selectable") is False:
                 continue

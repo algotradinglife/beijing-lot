@@ -28,8 +28,8 @@ OUTCOME_LABEL = {"3": "胜", "1": "平", "0": "负"}
 CODE_TO_SIDE = {"3": "home", "1": "draw", "0": "away"}
 SIDE_TO_CODE = {"home": "3", "draw": "1", "away": "0"}
 Q_STOP_THRESHOLD = 1.0
-SHADOW_VERSION = "llm_chain_bet_protect_stop_v3.3.3_shadow"
-SHADOW_ARM = "shadow_v3.3.3"
+SHADOW_VERSION = "llm_chain_bet_protect_stop_v3.3.3"
+SHADOW_ARM = "active_v3.3.3"
 LLM_INTEL_PROTECTION_SCHEMA = "llm_intel_protection_v2"
 
 

@@ -897,7 +897,7 @@ python3 scripts/evaluate_probability_first_decision_chain_v4_3.py --issue 26071 
 
 上线判断：
 
-- 不建议上线为 active/default；`shadow_v3.3.3` 继续保持默认。
+- 不建议上线为 active/default；`active_v3.3.3` 继续保持默认（历史 `shadow_v3.3.3` 仅作为 artifact alias）。
 - 可以继续观察 v4.2 execution late_proxy 作为备选；极值 source q guard 应保留在 v4.2 执行层。
 - 可以进入下一步 execution/diagnostic 的逻辑：概率 top 主押硬约束、源 SP sanity 异常标签、q top 稳定化前后切换标签、源 q 不得成为 mandatory single。
 - 暂不进入默认执行的逻辑：直接用欧赔均值替代北单 SP、把 stable q top 强制作为保护、扩大到默认全包。

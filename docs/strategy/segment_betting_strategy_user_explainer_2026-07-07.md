@@ -9,7 +9,7 @@ betting strategy tab. It is explanatory copy, not a production promotion gate.
 
 | field | value |
 | --- | --- |
-| decision chain | `shadow_v3.3.3` |
+| decision chain | `active_v3.3.3` (`shadow_v3.3.3` legacy alias for these replay artifacts) |
 | betting strategy | `segment_betting_v0.3.0000` |
 | schema | `segment_betting_artifact_v1` |
 | planning scope | `remaining_issue` |

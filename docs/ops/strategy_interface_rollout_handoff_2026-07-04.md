@@ -15,8 +15,12 @@ by publishing a release manifest and artifacts, not by editing frontend logic.
   - `b384_dd32_smooth100`: steadier drawdown-control arm
   - `b384_dd32_smooth80_convex19`: higher convexity arm
 - Decision variants exposed to the UI:
-  - `active_v3`
-  - `shadow_v3.3.3`
+  - `active_v3.3.3` formal/default decision chain
+  - `shadow_v4.2.*` manual diagnostic/experimental views when artifacts exist
+
+`active_v3` is retired and must not be presented as a live selectable betting
+version. Existing `shadow_v3.3.3` artifacts remain readable only as
+`active_v3.3.3` legacy aliases.
 
 The API is responsible for resolving which variants are available. The frontend
 does not invent shadow versions and does not read shadow CSVs directly.
@@ -49,9 +53,11 @@ must not be committed.
 - `GET /api/issues/:issue/settlement?decision_variant=<id>` returns settlement
   review under the same variant context.
 
-If the requested variant is unavailable, the API falls back to the default
-active variant and marks `selection_status: unavailable`. Missing artifacts are
-reported as degraded state rather than silently falling back to mock data.
+If the requested variant is unavailable, the API selects the manifest default
+context and marks `selection_status: unavailable`. If the formal
+`active_v3.3.3` artifact is missing or incomplete, the API exposes an
+artifact-missing/no-buy placeholder; frontend must not substitute retired
+`active_v3` or mock data.
 
 ## Frontend Boundary
 

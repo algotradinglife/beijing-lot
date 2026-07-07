@@ -18,14 +18,15 @@
     }
   },
   "decision_chain": {
-    "version": "llm_chain_bet_protect_stop_v3",
-    "prompt_version": "fixed_decision_chain_v3_bet_protect_stop",
-    "model_version": "gpt_fixed_decision_chain_v3",
-    "description": "LLM-style fixed decision chain for primary bet, protection, and stop decisions.",
+    "version": "llm_chain_bet_protect_stop_v3.3.3",
+    "prompt_version": "fixed_decision_chain_v3_3_3_bet_protect_stop",
+    "model_version": "gpt_fixed_decision_chain_v3_3_3",
+    "description": "Formal v3.3.3 decision chain for primary bet, protection, and stop decisions. Legacy active_v3 is retained only as a historical baseline.",
     "parameters": {
       "line_gap_policy": "diagnostic_or_protection_note",
       "q_stop_threshold": 1.0,
-      "manual_override_required_for_snapshot_replacement": true
+      "manual_override_required_for_snapshot_replacement": true,
+      "legacy_active_decision_chain": "llm_chain_bet_protect_stop_v3"
     }
   },
   "review_tags": {
