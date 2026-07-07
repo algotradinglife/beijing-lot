@@ -1158,6 +1158,20 @@ def build_entire_issue_segment(legs: list[rolling.LegRow]) -> rolling.Segment:
     )
 
 
+def selection_binding(planning_scope: str) -> dict[str, Any]:
+    if planning_scope == "by_segment":
+        return {
+            "match_selection_source": "issue_board_same_decision_variant",
+            "frontend_display_source": "issue_board",
+            "refresh_policy": "future by_segment match selections follow the issue board decision variant refresh; the plan artifact must not be treated as an independent per-match recommendation source",
+        }
+    return {
+        "match_selection_source": "issue_board_same_decision_variant",
+        "frontend_display_source": "issue_board",
+        "refresh_policy": "entire_issue is an issue-wide planning view using the same decision variant selections as the issue board",
+    }
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
     planning_scope = normalize_planning_scope(args.planning_scope)
     args.planning_scope = planning_scope
@@ -1261,6 +1275,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "dynamic_segments_available": dynamic_segments_available,
         "segments": len(segments),
         "planning_scope": planning_scope,
+        "selection_binding": selection_binding(planning_scope),
         "decision_time": format_optional_dt(decision_time),
         "sp_drift_risk": {
             "accepted": bool(planning_scope_risk(planning_scope)[0]),

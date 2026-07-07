@@ -229,6 +229,7 @@ def test_run_writes_outputs(tmp_path: Path) -> None:
     assert summary_payload["betting_strategy_version"] == "segment_betting_v0.4.0000"
     assert summary_payload["artifact_schema_version"] == "segment_betting_artifact_v1"
     assert summary_payload["planning_scope"] == "by_segment"
+    assert summary_payload["selection_binding"]["match_selection_source"] == "issue_board_same_decision_variant"
     assert summary_payload["sp_drift_risk"]["accepted"] is False
     assert summary_payload["settings"]["stake_mode"] == "scale_to_budget"
     assert summary_payload["seed_aggregate"]["summary_mode"] == "single_seed"

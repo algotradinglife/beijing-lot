@@ -76,6 +76,7 @@ The summary JSON includes:
 | `betting_strategy_version` | Version of segmentation/N/bundle/budget logic. |
 | `artifact_schema_version` | JSON/CSV schema version for frontend compatibility. |
 | `planning_scope` | `by_segment` or `entire_issue`. Legacy query values `next_segment` and `remaining_issue` are normalized to `by_segment` and `entire_issue`. |
+| `selection_binding` | Declares that per-match selections must be displayed from the issue board's same decision variant, not as an independent betting-plan recommendation. |
 | `settings.stake_mode` | `scale_to_budget` or `unit_once`. |
 | `decision_time` | Optional planning timestamp used to annotate segment timing/refresh context; issue-wide scopes still include ended matches. |
 | `available_segments` | Number of concrete plan segments in the selected scope. |
@@ -159,6 +160,13 @@ frontend distinguish settled/past rows from future rows that may be regenerated.
 The frontend should show `available_segments`, `segments`, and
 `dynamic_segments_available` together so the user can see whether the artifact
 is a by-segment issue view or one all-issue segment.
+
+For `by_segment`, match-level direction choices are not independently owned by
+the betting planner. The frontend should display the current issue-board
+selection for the same `decision_variant`; future segment choices can refresh
+when that decision-chain variant refreshes. Bundle CSV `leg_codes` are an audit
+snapshot of the selected bundle shape and expansion cost, not a separate
+per-match recommendation source.
 
 ## Stake Mode
 
