@@ -30,7 +30,7 @@ DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "results/segment_betting_plan"
 DEFAULT_REPORT_DIR = PROJECT_ROOT / "docs/research"
 OUTCOME_CODES = ("3", "1", "0")
 BETTING_STRATEGY_FAMILY = "segment_betting_plan"
-BETTING_STRATEGY_VERSION = "segment_betting_v0.3.0000"
+BETTING_STRATEGY_VERSION = "segment_betting_v0.4.0000"
 ARTIFACT_SCHEMA_VERSION = "segment_betting_artifact_v1"
 
 
@@ -103,13 +103,24 @@ def hours_between(start: datetime | None, end: datetime) -> float | str:
 
 
 def planning_scope_risk(planning_scope: str) -> tuple[int, str, str]:
-    if planning_scope == "remaining_issue":
+    if planning_scope == "entire_issue":
         return (
             1,
             "elevated",
-            "remaining_issue_selected_user_accepts_far_kickoff_sp_drift",
+            "entire_issue_selected_user_accepts_far_kickoff_sp_drift",
         )
-    return 0, "bounded", "next_segment_only_limits_far_kickoff_sp_drift"
+    return 0, "bounded", "by_segment_limits_far_kickoff_sp_drift"
+
+
+def normalize_planning_scope(value: str) -> str:
+    token = str(value or "").strip()
+    if token == "next_segment":
+        return "by_segment"
+    if token == "remaining_issue":
+        return "entire_issue"
+    if token in {"by_segment", "entire_issue"}:
+        return token
+    raise ValueError(f"unsupported planning_scope: {value!r}")
 
 
 def staked_bundle_cost_units(item: StakedBundle) -> float:
@@ -243,6 +254,8 @@ def aggregate_segment_seed_rows(segment_rows: list[dict[str, Any]]) -> list[dict
                 "base_cost_yuan_mean": metric_stats(rows, "base_cost_yuan")["mean"],
                 "cost_yuan_mean": metric_stats(rows, "selected_cost_yuan")["mean"],
                 "stake_multiplier_units_mean": metric_stats(rows, "stake_multiplier_units")["mean"],
+                "expected_profit_yuan_mean": metric_stats(rows, "expected_profit_yuan")["mean"],
+                "expected_roi_mean": metric_stats(rows, "expected_roi")["mean"],
                 "payout_yuan_mean": metric_stats(rows, "payout_yuan")["mean"],
                 "profit_yuan_min": metric_stats(rows, "profit_yuan")["min"],
                 "profit_yuan_p10": metric_stats(rows, "profit_yuan")["p10"],
@@ -280,9 +293,9 @@ def betting_strategy_parameter_schema() -> list[dict[str, Any]]:
             "label": "planning scope",
             "ui_level": "basic",
             "type": "enum",
-            "default": "next_segment",
-            "options": ["next_segment", "remaining_issue"],
-            "effect": "Choose only the next dynamic segment, or buy every remaining issue segment while accepting SP drift risk.",
+            "default": "by_segment",
+            "options": ["by_segment", "entire_issue"],
+            "effect": "Choose rolling segments as separate plan rows, or one all-issue segment while accepting SP drift risk.",
         },
         {
             "key": "decision_time",
@@ -290,7 +303,7 @@ def betting_strategy_parameter_schema() -> list[dict[str, Any]]:
             "ui_level": "basic",
             "type": "datetime",
             "default": "",
-            "effect": "Filters out matches that have already kicked off at planning time.",
+            "effect": "Annotates segment timing relative to the planning snapshot; issue-wide scopes still include ended matches.",
         },
         {
             "key": "segment_budget_yuan",
@@ -302,6 +315,18 @@ def betting_strategy_parameter_schema() -> list[dict[str, Any]]:
             "min": 100.0,
             "step": 50.0,
             "effect": "Caps total cost per rolling kickoff segment.",
+        },
+        {
+            "key": "max_bundle_spend_pct",
+            "label": "max bundle spend",
+            "ui_level": "basic",
+            "type": "number",
+            "unit": "budget_pct",
+            "default": 0.4,
+            "min": 0.05,
+            "max": 1.0,
+            "step": 0.05,
+            "effect": "Caps one selected N-string bundle's scaled spend as a share of the segment budget.",
         },
         {
             "key": "window_hours",
@@ -585,6 +610,7 @@ def select_bundles(
     budget_units: float,
     max_overlap: int,
     positive_ev_only: bool,
+    max_bundle_cost_units: float | None = None,
 ) -> list[BundleCandidate]:
     ordered = sorted(
         candidates,
@@ -604,6 +630,8 @@ def select_bundles(
             continue
         if candidate.cost_units <= 0 or spent + candidate.cost_units > budget_units:
             continue
+        if max_bundle_cost_units is not None and candidate.cost_units > max_bundle_cost_units:
+            continue
         current = set(candidate.match_indices)
         if max_overlap >= 0 and any(len(current & prev) > max_overlap for prev in selected_sets):
             continue
@@ -618,6 +646,7 @@ def apply_stake_mode(
     *,
     budget_units: float,
     stake_mode: str,
+    max_bundle_cost_units: float | None = None,
 ) -> tuple[list[StakedBundle], float, str]:
     if not selected:
         return [], 0.0, "no_selected_bundle"
@@ -631,6 +660,7 @@ def apply_stake_mode(
     if base_cost <= 0 or base_cost >= budget_units:
         return staked, base_cost, "scale_to_budget_no_room"
 
+    cap_units = max_bundle_cost_units if max_bundle_cost_units is not None and max_bundle_cost_units > 0 else budget_units
     spent = base_cost
     multipliers = [1 for _item in selected]
     scores = [
@@ -642,6 +672,7 @@ def apply_stake_mode(
             idx
             for idx, item in enumerate(selected)
             if item.cost_units > 0 and spent + item.cost_units <= budget_units
+            and (multipliers[idx] + 1) * item.cost_units <= cap_units
         ]
         if not affordable:
             break
@@ -656,10 +687,17 @@ def apply_stake_mode(
         multipliers[idx] += 1
         spent += selected[idx].cost_units
 
+    cap_limited = any(
+        item.cost_units > 0
+        and spent + item.cost_units <= budget_units
+        and (multipliers[idx] + 1) * item.cost_units > cap_units
+        for idx, item in enumerate(selected)
+    )
+    reason = "scale_to_budget_bundle_cap" if cap_limited else "scale_to_budget"
     return (
         [StakedBundle(candidate=item, stake_multiplier=multipliers[idx]) for idx, item in enumerate(selected)],
         spent,
-        "scale_to_budget",
+        reason,
     )
 
 
@@ -686,14 +724,17 @@ def settle_segment(
     max_n: int,
     max_overlap: int | None,
     positive_ev_only: bool,
+    max_bundle_spend_pct: float = 0.4,
     stake_mode: str = "scale_to_budget",
-    planning_scope: str = "next_segment",
+    planning_scope: str = "by_segment",
     decision_time: datetime | None = None,
 ) -> tuple[dict[str, Any], list[StakedBundle]]:
     metrics = [item for leg in segment.legs if (item := leg_metrics(leg, arm)) is not None]
     budget_units = segment_budget_yuan / stake_yuan_per_ticket if stake_yuan_per_ticket > 0 else 0.0
+    capped_pct = min(max(float(max_bundle_spend_pct), 0.0), 1.0)
+    max_bundle_cost_units = budget_units * capped_pct if capped_pct > 0 else None
     n_value, n_info = recommend_n_for_segment(metrics, min_n=min_n, max_n=max_n)
-    reasons = [n_info["n_reasons"]]
+    reasons = [n_info["n_reasons"], f"max_bundle_spend_pct_{capped_pct:g}" if max_bundle_cost_units else ""]
     candidates: list[BundleCandidate] = []
     selected: list[BundleCandidate] = []
     dropped_for_budget = 0
@@ -720,6 +761,7 @@ def settle_segment(
                 candidates,
                 budget_units=budget_units,
                 max_overlap=overlap_limit,
+                max_bundle_cost_units=max_bundle_cost_units,
                 positive_ev_only=positive_ev_only,
             )
         else:
@@ -732,6 +774,7 @@ def settle_segment(
         selected,
         budget_units=budget_units,
         stake_mode=stake_mode,
+        max_bundle_cost_units=max_bundle_cost_units,
     )
     reasons.append(stake_mode_reason)
 
@@ -784,6 +827,8 @@ def settle_segment(
         "selected_cost_units": round(selected_cost_units, 6),
         "selected_cost_yuan": round(selected_cost_units * stake_yuan_per_ticket, 6),
         "segment_budget_yuan": round(segment_budget_yuan, 6),
+        "max_bundle_spend_pct": round(capped_pct, 6),
+        "max_bundle_spend_yuan": round((max_bundle_cost_units or budget_units) * stake_yuan_per_ticket, 6),
         "expected_profit_units": round(expected_profit_units, 6),
         "expected_profit_yuan": round(expected_profit_units * stake_yuan_per_ticket, 6),
         "expected_roi": round(expected_roi, 6) if expected_roi != "" else "",
@@ -938,12 +983,12 @@ Generated: {generated}
 ## Strategy {betting_strategy_version}
 
 - Use rolling kickoff segments, not natural days: start with `{args.window_hours}`h, extend through `{args.extend_hours}`h until at least `{args.min_matches}` eligible matches, cap a segment at `{args.max_matches}` matches.
-- Planning scope is `{args.planning_scope}`. `next_segment` buys only the next dynamic segment; `remaining_issue` buys all remaining issue segments and marks SP drift risk as accepted.
-- Stake mode is `{args.stake_mode}`. `scale_to_budget` repeats selected bundles by score until the segment budget is nearly exhausted; `unit_once` buys each selected bundle once.
+- Planning scope is `{args.planning_scope}`. `by_segment` outputs each rolling dynamic segment as its own plan row; `entire_issue` builds one all-issue segment and marks SP drift risk as accepted.
+- Stake mode is `{args.stake_mode}`. `scale_to_budget` repeats selected bundles by score until the segment budget is nearly exhausted, while respecting `max_bundle_spend_pct={args.max_bundle_spend_pct}`; `unit_once` buys each selected bundle once.
 - Eligible matches are rows with executable selected codes for `--arm {args.arm}`. Rows with no-buy/stop are excluded from bundle selection.
 - N starts from half of eligible match count, capped at `{args.max_n}`, then drops by expected coverage hit rate using `select_rolling_segment_n.py`.
 - Each selected bundle is one small-combo N串1 ticket group: cost units are `product(width_i)`, yuan cost is `{args.stake_yuan_per_ticket}` times that. A hit pays one expanded ticket: `product(winning_sp_i)`.
-- Candidate bundles are sampled by leg hit probability and unit value `sum(p*sp)/width`; the selector buys positive-EV bundles under `{args.segment_budget_yuan}` yuan per segment with overlap guard `{args.max_overlap if args.max_overlap is not None else 'N-2'}`.
+- Candidate bundles are sampled by leg hit probability and unit value `sum(p*sp)/width`; the selector buys positive-EV bundles under `{args.segment_budget_yuan}` yuan per segment with overlap guard `{args.max_overlap if args.max_overlap is not None else 'N-2'}` and per-bundle spend cap.
 - Sampling stability is measured with `{seed_label}`. Multi-seed reports use the mean as the main estimate and min/p10/median/p90/max as the variation interval.
 - `settlement_status={summary.get("settlement_status", "")}` and `primary_metric_mode={summary.get("primary_metric_mode", "")}`. Open/live issues should use expected profit/ROI; realized payout/profit/ROI are only populated after the segment is fully settled.
 
@@ -1001,6 +1046,8 @@ Generated: {generated}
         ("bundles mean", "selected_bundles_mean"),
         ("base cost", "base_cost_yuan_mean"),
         ("cost mean", "cost_yuan_mean"),
+        ("exp profit mean", "expected_profit_yuan_mean"),
+        ("exp ROI mean", "expected_roi_mean"),
         ("profit mean", "profit_yuan_mean"),
         ("profit min", "profit_yuan_min"),
         ("profit max", "profit_yuan_max"),
@@ -1071,9 +1118,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--label", default="")
     parser.add_argument("--betting-strategy-version", default=BETTING_STRATEGY_VERSION)
     parser.add_argument("--arm", choices=("active", "shadow"), default="shadow")
-    parser.add_argument("--planning-scope", choices=("next_segment", "remaining_issue"), default="next_segment")
+    parser.add_argument("--planning-scope", choices=("by_segment", "entire_issue", "remaining_issue", "next_segment"), default="by_segment")
     parser.add_argument("--stake-mode", choices=("scale_to_budget", "unit_once"), default="scale_to_budget")
-    parser.add_argument("--decision-time", default="", help="Local issue datetime; filters out matches with kickoff <= decision time.")
+    parser.add_argument("--decision-time", default="", help="Local issue datetime used for segment timing diagnostics; issue-wide scopes still include ended matches.")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
@@ -1090,25 +1137,42 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--min-n", type=int, default=3)
     parser.add_argument("--max-n", type=int, default=8)
     parser.add_argument("--max-overlap", type=int, default=None)
+    parser.add_argument("--max-bundle-spend-pct", type=float, default=0.4)
     parser.add_argument("--allow-negative-ev", action="store_true")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args(argv)
 
 
+def build_entire_issue_segment(legs: list[rolling.LegRow]) -> rolling.Segment:
+    if not legs:
+        raise ValueError("entire_issue segment requires at least one leg")
+    start = legs[0].kickoff
+    end = legs[-1].kickoff
+    window_hours = max(0.0, (end - start).total_seconds() / 3600.0)
+    return rolling.Segment(
+        segment_idx=1,
+        start=start,
+        end=end,
+        window_hours=window_hours,
+        legs=tuple(legs),
+    )
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
+    planning_scope = normalize_planning_scope(args.planning_scope)
+    args.planning_scope = planning_scope
     label = args.label or Path(args.structured_csv).parent.name
     legs = rolling.load_legs(args.structured_csv, args.db, issue=args.issue)
     decision_time = parse_optional_decision_time(args.decision_time)
     eligible_before_decision_filter = [leg for leg in legs if selected_codes_for(leg, args.arm)]
-    eligible_legs = [
+    eligible_legs = list(eligible_before_decision_filter)
+    future_eligible_legs = [
         leg
-        for leg in eligible_before_decision_filter
+        for leg in eligible_legs
         if decision_time is None or leg.kickoff > decision_time
     ]
     if not eligible_before_decision_filter:
         raise SystemExit(f"No eligible legs loaded for issue {args.issue}")
-    if not eligible_legs:
-        raise SystemExit(f"No future eligible legs loaded for issue {args.issue}")
     all_segments = rolling.build_segments(
         eligible_legs,
         base_window_hours=args.window_hours,
@@ -1116,7 +1180,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         min_matches=args.min_matches,
         max_matches=args.max_matches,
     )
-    segments = all_segments[:1] if args.planning_scope == "next_segment" else all_segments
+    dynamic_segments_available = len(all_segments)
+    if planning_scope == "entire_issue":
+        segments = [build_entire_issue_segment(eligible_legs)]
+    else:
+        segments = all_segments
 
     seeds = sample_seeds_from_args(args)
     segment_rows: list[dict[str, Any]] = []
@@ -1137,8 +1205,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 max_n=args.max_n,
                 max_overlap=args.max_overlap,
                 positive_ev_only=not args.allow_negative_ev,
+                max_bundle_spend_pct=args.max_bundle_spend_pct,
                 stake_mode=args.stake_mode,
-                planning_scope=args.planning_scope,
+                planning_scope=planning_scope,
                 decision_time=decision_time,
             )
             row = {"sample_seed": sample_seed, **row}
@@ -1163,7 +1232,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         seed_slug = f"seed{seeds[0]}"
     else:
         seed_slug = f"seeds{len(seeds)}_{seeds[0]}-{seeds[-1]}"
-    scope_slug = slugify(args.planning_scope)
+    scope_slug = slugify(planning_scope)
     stake_slug = slugify(args.stake_mode)
     slug = f"{args.issue}_{slug_label}_{version_slug}_{scope_slug}_{stake_slug}_b{int(args.segment_budget_yuan)}_{seed_slug}"
     out_dir = args.output_dir / slug
@@ -1187,14 +1256,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "source_rows": len(legs),
         "eligible_rows_before_decision_filter": len(eligible_before_decision_filter),
         "eligible_rows": len(eligible_legs),
-        "available_segments": len(all_segments),
+        "future_eligible_rows": len(future_eligible_legs),
+        "available_segments": len(segments),
+        "dynamic_segments_available": dynamic_segments_available,
         "segments": len(segments),
-        "planning_scope": args.planning_scope,
+        "planning_scope": planning_scope,
         "decision_time": format_optional_dt(decision_time),
         "sp_drift_risk": {
-            "accepted": bool(planning_scope_risk(args.planning_scope)[0]),
-            "level": planning_scope_risk(args.planning_scope)[1],
-            "reason": planning_scope_risk(args.planning_scope)[2],
+            "accepted": bool(planning_scope_risk(planning_scope)[0]),
+            "level": planning_scope_risk(planning_scope)[1],
+            "reason": planning_scope_risk(planning_scope)[2],
         },
         "summary": summary,
         "seed_aggregate": seed_aggregate,
@@ -1202,12 +1273,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "settings": {
             "window_hours": args.window_hours,
             "extend_hours": args.extend_hours,
-            "planning_scope": args.planning_scope,
+            "planning_scope": planning_scope,
             "stake_mode": args.stake_mode,
             "decision_time": format_optional_dt(decision_time),
             "min_matches": args.min_matches,
             "max_matches": args.max_matches,
             "segment_budget_yuan": args.segment_budget_yuan,
+            "max_bundle_spend_pct": args.max_bundle_spend_pct,
             "stake_yuan_per_ticket": args.stake_yuan_per_ticket,
             "betting_strategy_version": version,
             "sample_attempts": args.sample_attempts,

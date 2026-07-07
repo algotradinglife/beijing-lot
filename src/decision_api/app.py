@@ -1229,6 +1229,17 @@ def _default_decision_variant_id(release: dict[str, Any] | None = None) -> str:
     return ""
 
 
+def _normalize_segment_planning_scope(value: str) -> str:
+    token = str(value or "").strip()
+    if token == "next_segment":
+        return "by_segment"
+    if token == "remaining_issue":
+        return "entire_issue"
+    if token in {"by_segment", "entire_issue"}:
+        return token
+    return token
+
+
 def _segment_betting_plan_matches(
     payload: dict[str, Any],
     *,
@@ -6376,7 +6387,9 @@ def create_app(
         release = _active_strategy_release()
         requested_variant_id = _requested_decision_variant_id()
         decision_variant_id = requested_variant_id or _default_decision_variant_id(release)
-        planning_scope = str(request.args.get("planning_scope") or request.args.get("scope") or "next_segment").strip()
+        planning_scope = _normalize_segment_planning_scope(
+            str(request.args.get("planning_scope") or request.args.get("scope") or "by_segment")
+        )
         stake_mode = str(request.args.get("stake_mode") or "scale_to_budget").strip()
         betting_strategy_version = str(request.args.get("betting_strategy_version") or "").strip()
         label = str(request.args.get("label") or "").strip()

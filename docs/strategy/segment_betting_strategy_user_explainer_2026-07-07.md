@@ -10,17 +10,18 @@ betting strategy tab. It is explanatory copy, not a production promotion gate.
 | field | value |
 | --- | --- |
 | decision chain | `shadow_v3.3.3` |
-| betting strategy | `segment_betting_v0.3.0000` |
+| betting strategy | `segment_betting_v0.3.0000` historical replay example |
 | schema | `segment_betting_artifact_v1` |
-| planning scope | `remaining_issue` |
+| planning scope | `remaining_issue` legacy name |
 | segment budget | 1000 yuan |
 | ticket stake | 2 yuan per expanded ticket |
 | seed sample | 20 seeds, `20260707` to `20260726` |
 | issues | 26071 has 16 source rows; 26072 has 65 source rows in this artifact |
 
-`remaining_issue` means the replay buys every remaining dynamic segment in the
-issue. In live use, the default is still `next_segment`; buying the whole
-remaining issue means the user accepts far-kickoff SP drift risk.
+This table is a historical `segment_betting_v0.3.0000` replay. The current
+default scope is `by_segment`, and the all-issue scope is now named
+`entire_issue`; legacy `remaining_issue` inputs are normalized to
+`entire_issue`. Current scopes are issue-wide and include ended matches.
 
 ## How To Read
 
@@ -69,5 +70,5 @@ Frontend source: this Markdown table.
   a guaranteed or promised return.
 - Mark 26072 as a 65-row artifact sample. Do not present it as a full official
   67-row issue replay unless the artifact is regenerated with all rows.
-- If the user selects `remaining_issue` in live planning, show the SP drift risk
+- If the user selects `entire_issue` in live planning, show the SP drift risk
   warning because later kickoff segments may move materially before bet time.

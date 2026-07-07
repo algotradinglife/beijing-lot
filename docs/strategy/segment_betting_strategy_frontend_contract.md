@@ -31,7 +31,7 @@ Current default:
 | field | value |
 | --- | --- |
 | `strategy_family` | `segment_betting_plan` |
-| `betting_strategy_version` | `segment_betting_v0.3.0000` |
+| `betting_strategy_version` | `segment_betting_v0.4.0000` |
 | `artifact_schema_version` | `segment_betting_artifact_v1` |
 
 Version semantics:
@@ -75,12 +75,13 @@ The summary JSON includes:
 | `strategy_family` | Betting planner family id. |
 | `betting_strategy_version` | Version of segmentation/N/bundle/budget logic. |
 | `artifact_schema_version` | JSON/CSV schema version for frontend compatibility. |
-| `planning_scope` | `next_segment` or `remaining_issue`. |
+| `planning_scope` | `by_segment` or `entire_issue`. Legacy query values `next_segment` and `remaining_issue` are normalized to `by_segment` and `entire_issue`. |
 | `settings.stake_mode` | `scale_to_budget` or `unit_once`. |
-| `decision_time` | Optional planning timestamp used to filter already-started matches. |
-| `available_segments` | Number of dynamic segments available after decision-time filtering. |
+| `decision_time` | Optional planning timestamp used to annotate segment timing/refresh context; issue-wide scopes still include ended matches. |
+| `available_segments` | Number of concrete plan segments in the selected scope. |
 | `segments` | Number of segments actually included in this plan. |
-| `sp_drift_risk` | Risk marker. `accepted=true` means the user chose to buy remaining future segments now. |
+| `dynamic_segments_available` | Number of rolling time segments in the full issue. For `entire_issue`, this can be greater than `segments`. |
+| `sp_drift_risk` | Risk marker. `accepted=true` means the user chose the all-issue view despite far-kickoff SP drift risk. |
 | `summary.expected_profit_yuan` / `summary.expected_roi` | Live/open-issue display metrics. |
 | `summary.settlement_status` | `unsettled`, `partially_settled`, or `settled`. |
 | `summary.primary_metric_mode` | `expected` before settlement, `realized` after all included rows settle. |
@@ -113,7 +114,7 @@ Default filters:
 | filter | default |
 | --- | --- |
 | `decision_variant` / `variant` / `version` | Active release default decision variant. |
-| `planning_scope` | `next_segment` |
+| `planning_scope` | `by_segment` |
 | `stake_mode` | `scale_to_budget` |
 | `betting_strategy_version` | empty, meaning latest matching artifact by mtime. |
 | `label` | empty. |
@@ -149,13 +150,15 @@ to buy now.
 
 | `planning_scope` | meaning | SP drift posture |
 | --- | --- | --- |
-| `next_segment` | Build and buy only the next dynamic segment after `decision_time`. | Default. Limits far-kickoff SP drift. |
-| `remaining_issue` | Build and buy every remaining dynamic segment in the issue. | User explicitly accepts SP drift risk for later segments. |
+| `by_segment` | Build every rolling time segment for the whole issue; ended matches remain included. Future segment rows can be regenerated as selections/SP refresh. | Default. Shows operational segment boundaries. |
+| `entire_issue` | Build one all-issue segment containing every eligible match in the issue; ended matches remain included. | User explicitly accepts SP drift risk for later kickoffs. |
 
-When `decision_time` is present, matches with `kickoff <= decision_time` are
-excluded before segment construction. The frontend should show `available_segments`
-and `segments` together so the user can see whether they are buying one segment
-or the whole remaining issue.
+When `decision_time` is present, it does not exclude already-started matches.
+It only annotates segment timing (`hours_from_decision_start/end`) and helps the
+frontend distinguish settled/past rows from future rows that may be regenerated.
+The frontend should show `available_segments`, `segments`, and
+`dynamic_segments_available` together so the user can see whether the artifact
+is a by-segment issue view or one all-issue segment.
 
 ## Stake Mode
 
@@ -163,7 +166,7 @@ The segment budget is now a target by default, not only a hard cap.
 
 | `stake_mode` | meaning |
 | --- | --- |
-| `scale_to_budget` | Default. Select bundles, then repeat selected bundles by score until the segment budget is nearly exhausted. |
+| `scale_to_budget` | Default. Select bundles, then repeat selected bundles by score until the segment budget is nearly exhausted, subject to `max_bundle_spend_pct`. |
 | `unit_once` | Audit mode. Buy each selected bundle once; this reproduces the old conservative under-spend behavior. |
 
 Segment CSV fields:
@@ -190,9 +193,10 @@ Basic controls:
 | key | default | effect |
 | --- | --- | --- |
 | `stake_mode` | `scale_to_budget` | Scale selected bundles toward segment budget, or use `unit_once` for audit. |
-| `planning_scope` | `next_segment` | Choose next dynamic segment or all remaining issue segments. |
-| `decision_time` | empty | Filters out matches already started at planning time. |
+| `planning_scope` | `by_segment` | Choose rolling issue segments or one all-issue segment. |
+| `decision_time` | empty | Annotates segment timing relative to the planning snapshot; does not filter rows. |
 | `segment_budget_yuan` | `1000` | Caps total cost per rolling segment. |
+| `max_bundle_spend_pct` | `0.4` | Caps one selected N-string bundle's scaled spend as a share of the segment budget. |
 | `window_hours` | `12` | Base kickoff window. Smaller is closer to kickoff but can starve segments. |
 | `extend_hours` | `18,24,36` | Fallback windows when the base segment is too small. |
 | `min_matches` | `6` | Minimum segment size before extension. |
@@ -232,7 +236,7 @@ changed between strategy versions:
 | `width_counts` | Different single/double/full-cover shapes change cost and coverage. |
 | `recommended_n` / `initial_recommended_n` | Shows final N after budget fallback versus initial recommendation. |
 | `reasons` | Includes N downgrade and no-bundle explanations. |
-| `planning_scope` / `sp_drift_risk_level` | Explains whether the segment is part of a bounded next-segment buy or remaining-issue buy. |
+| `planning_scope` / `sp_drift_risk_level` | Explains whether the artifact is by-segment or one all-issue segment. |
 | `stake_mode` / `base_cost_yuan` / `selected_cost_yuan` | Explains whether cost was scaled toward budget or kept as one unit per bundle. |
 
 Different decision-chain versions can therefore produce different N for the same

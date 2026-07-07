@@ -312,19 +312,26 @@ Supported query filters:
 
 ```text
 decision_variant | variant | version
-planning_scope=next_segment|remaining_issue
+planning_scope=by_segment|entire_issue
 stake_mode=scale_to_budget|unit_once
 betting_strategy_version=<segment_betting_v...>
 label=<artifact label>
 ```
 
-Defaults are `planning_scope=next_segment`, `stake_mode=scale_to_budget`, and
+Defaults are `planning_scope=by_segment`, `stake_mode=scale_to_budget`, and
 the active release's default decision variant. If no matching artifact exists,
 the API returns `artifact_status.status=missing` with the resolved
 `artifact_dir` and filters; frontend should render this as a strategy artifact
 gap, not silently recompute a plan. The operational fix for a missing current
 issue artifact is to run the approved generation job; strategy changes are
 needed only when the method or contract changes.
+
+`planning_scope=entire_issue` means one all-issue segment; frontend should not
+expect or render multiple rolling sub-segments for that scope. Both
+`by_segment` and `entire_issue` are issue-wide views and include ended matches.
+`decision_time` is timing/refresh context, not a row filter. `scale_to_budget` respects
+`settings.max_bundle_spend_pct`, so a plan can intentionally leave budget
+unused when all selected bundles hit their per-bundle cap.
 
 ## Validation
 
