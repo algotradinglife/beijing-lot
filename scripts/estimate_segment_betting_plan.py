@@ -30,7 +30,7 @@ DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "results/segment_betting_plan"
 DEFAULT_REPORT_DIR = PROJECT_ROOT / "docs/research"
 OUTCOME_CODES = ("3", "1", "0")
 BETTING_STRATEGY_FAMILY = "segment_betting_plan"
-BETTING_STRATEGY_VERSION = "segment_betting_v0.2.0000"
+BETTING_STRATEGY_VERSION = "segment_betting_v0.3.0000"
 ARTIFACT_SCHEMA_VERSION = "segment_betting_artifact_v1"
 
 
@@ -63,6 +63,12 @@ class BundleCandidate:
     profit_units: float
     realized_hit: bool
     score: float
+
+
+@dataclass(frozen=True)
+class StakedBundle:
+    candidate: BundleCandidate
+    stake_multiplier: int
 
 
 def product(values: Iterable[float]) -> float:
@@ -104,6 +110,18 @@ def planning_scope_risk(planning_scope: str) -> tuple[int, str, str]:
             "remaining_issue_selected_user_accepts_far_kickoff_sp_drift",
         )
     return 0, "bounded", "next_segment_only_limits_far_kickoff_sp_drift"
+
+
+def staked_bundle_cost_units(item: StakedBundle) -> float:
+    return item.candidate.cost_units * item.stake_multiplier
+
+
+def staked_bundle_payout_units(item: StakedBundle) -> float:
+    return item.candidate.payout_units * item.stake_multiplier
+
+
+def staked_bundle_expected_profit_units(item: StakedBundle) -> float:
+    return item.candidate.expected_profit_units * item.stake_multiplier
 
 
 def sample_seeds_from_args(args: argparse.Namespace) -> list[int]:
@@ -169,11 +187,13 @@ def mean_summary(seed_summary_rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def aggregate_seed_summaries(seed_summary_rows: list[dict[str, Any]]) -> dict[str, Any]:
     metrics = [
+        "base_cost_yuan",
         "selected_cost_yuan",
         "payout_yuan",
         "profit_yuan",
         "roi",
         "selected_bundles",
+        "stake_multiplier_units",
         "selected_segments",
         "dead_segments",
     ]
@@ -211,7 +231,9 @@ def aggregate_segment_seed_rows(segment_rows: list[dict[str, Any]]) -> list[dict
                 "selected_bundles_mean": metric_stats(rows, "selected_bundles")["mean"],
                 "selected_bundles_min": metric_stats(rows, "selected_bundles")["min"],
                 "selected_bundles_max": metric_stats(rows, "selected_bundles")["max"],
+                "base_cost_yuan_mean": metric_stats(rows, "base_cost_yuan")["mean"],
                 "cost_yuan_mean": metric_stats(rows, "selected_cost_yuan")["mean"],
+                "stake_multiplier_units_mean": metric_stats(rows, "stake_multiplier_units")["mean"],
                 "payout_yuan_mean": metric_stats(rows, "payout_yuan")["mean"],
                 "profit_yuan_min": metric_stats(rows, "profit_yuan")["min"],
                 "profit_yuan_p10": metric_stats(rows, "profit_yuan")["p10"],
@@ -235,6 +257,15 @@ def aggregate_segment_seed_rows(segment_rows: list[dict[str, Any]]) -> list[dict
 
 def betting_strategy_parameter_schema() -> list[dict[str, Any]]:
     return [
+        {
+            "key": "stake_mode",
+            "label": "stake mode",
+            "ui_level": "basic",
+            "type": "enum",
+            "default": "scale_to_budget",
+            "options": ["scale_to_budget", "unit_once"],
+            "effect": "Scale selected bundles toward the segment budget, or buy each selected bundle once for audit.",
+        },
         {
             "key": "planning_scope",
             "label": "planning scope",
@@ -573,6 +604,56 @@ def select_bundles(
     return selected
 
 
+def apply_stake_mode(
+    selected: list[BundleCandidate],
+    *,
+    budget_units: float,
+    stake_mode: str,
+) -> tuple[list[StakedBundle], float, str]:
+    if not selected:
+        return [], 0.0, "no_selected_bundle"
+
+    staked = [StakedBundle(candidate=item, stake_multiplier=1) for item in selected]
+    base_cost = sum(staked_bundle_cost_units(item) for item in staked)
+    if stake_mode == "unit_once":
+        return staked, base_cost, "unit_once"
+    if stake_mode != "scale_to_budget":
+        raise ValueError("stake_mode must be scale_to_budget or unit_once")
+    if base_cost <= 0 or base_cost >= budget_units:
+        return staked, base_cost, "scale_to_budget_no_room"
+
+    spent = base_cost
+    multipliers = [1 for _item in selected]
+    scores = [
+        max(item.score, item.expected_profit_units, item.expected_roi * item.cost_units, 0.000001)
+        for item in selected
+    ]
+    while True:
+        affordable = [
+            idx
+            for idx, item in enumerate(selected)
+            if item.cost_units > 0 and spent + item.cost_units <= budget_units
+        ]
+        if not affordable:
+            break
+        idx = max(
+            affordable,
+            key=lambda pos: (
+                scores[pos] / multipliers[pos],
+                selected[pos].expected_roi,
+                -selected[pos].cost_units,
+            ),
+        )
+        multipliers[idx] += 1
+        spent += selected[idx].cost_units
+
+    return (
+        [StakedBundle(candidate=item, stake_multiplier=multipliers[idx]) for idx, item in enumerate(selected)],
+        spent,
+        "scale_to_budget",
+    )
+
+
 def recommend_n_for_segment(metrics: list[LegMetrics], *, min_n: int, max_n: int) -> tuple[int | None, dict[str, Any]]:
     expected_rate = sum(item.hit_prob for item in metrics) / len(metrics) if metrics else 0.0
     recommendation = recommend_segment_n(len(metrics), expected_rate, budget_coverage="ok", min_n=min_n, max_n=max_n)
@@ -596,9 +677,10 @@ def settle_segment(
     max_n: int,
     max_overlap: int | None,
     positive_ev_only: bool,
+    stake_mode: str = "scale_to_budget",
     planning_scope: str = "next_segment",
     decision_time: datetime | None = None,
-) -> tuple[dict[str, Any], list[BundleCandidate]]:
+) -> tuple[dict[str, Any], list[StakedBundle]]:
     metrics = [item for leg in segment.legs if (item := leg_metrics(leg, arm)) is not None]
     budget_units = segment_budget_yuan / stake_yuan_per_ticket if stake_yuan_per_ticket > 0 else 0.0
     n_value, n_info = recommend_n_for_segment(metrics, min_n=min_n, max_n=max_n)
@@ -637,13 +719,19 @@ def settle_segment(
         reasons.append(f"bundle_cost_budget_drop_{dropped_for_budget}")
     if not selected:
         reasons.append("no_positive_ev_bundle_selected" if positive_ev_only else "no_bundle_selected")
+    staked_selected, selected_cost_units, stake_mode_reason = apply_stake_mode(
+        selected,
+        budget_units=budget_units,
+        stake_mode=stake_mode,
+    )
+    reasons.append(stake_mode_reason)
 
     width_counts = Counter(item.width for item in metrics)
     actual_hits = sum(1 for item in metrics if item.leg.actual_code in item.codes)
-    selected_cost_units = sum(item.cost_units for item in selected)
-    payout_units = sum(item.payout_units for item in selected)
+    base_cost_units = sum(item.cost_units for item in selected)
+    payout_units = sum(staked_bundle_payout_units(item) for item in staked_selected)
     profit_units = payout_units - selected_cost_units
-    expected_profit_units = sum(item.expected_profit_units for item in selected)
+    expected_profit_units = sum(staked_bundle_expected_profit_units(item) for item in staked_selected)
     drift_accepted, drift_level, drift_reason = planning_scope_risk(planning_scope)
     row = {
         "segment_idx": segment.segment_idx,
@@ -664,8 +752,12 @@ def settle_segment(
         "actual_coverage_hit_rate": round(actual_hits / len(metrics), 6) if metrics else "",
         "recommended_n": n_value or "",
         "initial_recommended_n": n_info["initial_recommended_n"],
+        "stake_mode": stake_mode,
         "selected_bundles": len(selected),
         "candidate_bundles": len(candidates),
+        "base_cost_units": round(base_cost_units, 6),
+        "base_cost_yuan": round(base_cost_units * stake_yuan_per_ticket, 6),
+        "stake_multiplier_units": sum(item.stake_multiplier for item in staked_selected),
         "selected_cost_units": round(selected_cost_units, 6),
         "selected_cost_yuan": round(selected_cost_units * stake_yuan_per_ticket, 6),
         "segment_budget_yuan": round(segment_budget_yuan, 6),
@@ -681,13 +773,15 @@ def settle_segment(
         "reasons": ";".join(reason for reason in reasons if reason),
         "match_indices": ",".join(str(item.leg.match_idx) for item in metrics),
     }
-    return row, selected
+    return row, staked_selected
 
 
 def summarize(segment_rows: list[dict[str, Any]], bundle_rows: list[dict[str, Any]]) -> dict[str, Any]:
+    base_cost_units = sum(rolling.fnum(row.get("base_cost_units")) for row in segment_rows)
     selected_cost_units = sum(rolling.fnum(row.get("selected_cost_units")) for row in segment_rows)
     payout_units = sum(rolling.fnum(row.get("payout_units")) for row in segment_rows)
     profit_units = payout_units - selected_cost_units
+    stake_multiplier_units = sum(rolling.fnum(row.get("stake_multiplier_units")) for row in segment_rows)
     stake = rolling.fnum(segment_rows[0].get("selected_cost_yuan")) / max(
         rolling.fnum(segment_rows[0].get("selected_cost_units")),
         1.0,
@@ -697,6 +791,9 @@ def summarize(segment_rows: list[dict[str, Any]], bundle_rows: list[dict[str, An
         "selected_segments": sum(1 for row in segment_rows if rolling.fnum(row.get("selected_bundles")) > 0),
         "dead_segments": sum(1 for row in segment_rows if rolling.fnum(row.get("dead_segment")) > 0),
         "selected_bundles": len(bundle_rows),
+        "stake_multiplier_units": round(stake_multiplier_units, 6),
+        "base_cost_units": round(base_cost_units, 6),
+        "base_cost_yuan": round(base_cost_units * stake, 6),
         "selected_cost_units": round(selected_cost_units, 6),
         "selected_cost_yuan": round(selected_cost_units * stake, 6),
         "payout_units": round(payout_units, 6),
@@ -707,7 +804,8 @@ def summarize(segment_rows: list[dict[str, Any]], bundle_rows: list[dict[str, An
     }
 
 
-def candidate_to_row(candidate: BundleCandidate, *, stake_yuan_per_ticket: float, sample_seed: int | None = None) -> dict[str, Any]:
+def candidate_to_row(staked: StakedBundle, *, stake_yuan_per_ticket: float, sample_seed: int | None = None) -> dict[str, Any]:
+    candidate = staked.candidate
     prefix = {"sample_seed": sample_seed} if sample_seed is not None else {}
     return {
         **prefix,
@@ -718,17 +816,25 @@ def candidate_to_row(candidate: BundleCandidate, *, stake_yuan_per_ticket: float
         "match_indices": ",".join(str(value) for value in candidate.match_indices),
         "leg_codes": "|".join(candidate.leg_codes),
         "widths": ",".join(str(value) for value in candidate.widths),
+        "stake_multiplier": staked.stake_multiplier,
         "cost_units": round(candidate.cost_units, 6),
         "cost_yuan": round(candidate.cost_units * stake_yuan_per_ticket, 6),
+        "scaled_cost_units": round(candidate.cost_units * staked.stake_multiplier, 6),
+        "scaled_cost_yuan": round(candidate.cost_units * staked.stake_multiplier * stake_yuan_per_ticket, 6),
         "expected_payout_units": round(candidate.expected_payout_units, 6),
         "expected_profit_units": round(candidate.expected_profit_units, 6),
+        "scaled_expected_profit_units": round(candidate.expected_profit_units * staked.stake_multiplier, 6),
         "expected_roi": round(candidate.expected_roi, 6),
         "hit_prob": round(candidate.hit_prob, 6),
         "realized_hit": int(candidate.realized_hit),
         "payout_units": round(candidate.payout_units, 6),
         "payout_yuan": round(candidate.payout_units * stake_yuan_per_ticket, 6),
+        "scaled_payout_units": round(candidate.payout_units * staked.stake_multiplier, 6),
+        "scaled_payout_yuan": round(candidate.payout_units * staked.stake_multiplier * stake_yuan_per_ticket, 6),
         "profit_units": round(candidate.profit_units, 6),
         "profit_yuan": round(candidate.profit_units * stake_yuan_per_ticket, 6),
+        "scaled_profit_units": round(candidate.profit_units * staked.stake_multiplier, 6),
+        "scaled_profit_yuan": round(candidate.profit_units * staked.stake_multiplier * stake_yuan_per_ticket, 6),
     }
 
 
@@ -771,7 +877,7 @@ def render_report(
     args: argparse.Namespace,
 ) -> str:
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
-    top_bundles = sorted(bundle_rows, key=lambda row: rolling.fnum(row.get("profit_units")), reverse=True)[:12]
+    top_bundles = sorted(bundle_rows, key=lambda row: rolling.fnum(row.get("scaled_profit_units")), reverse=True)[:12]
     seed_count = len(seed_summary_rows)
     seed_label = (
         f"{seed_count} seeds ({seed_summary_rows[0]['sample_seed']}..{seed_summary_rows[-1]['sample_seed']})"
@@ -791,6 +897,7 @@ Generated: {generated}
 
 - Use rolling kickoff segments, not natural days: start with `{args.window_hours}`h, extend through `{args.extend_hours}`h until at least `{args.min_matches}` eligible matches, cap a segment at `{args.max_matches}` matches.
 - Planning scope is `{args.planning_scope}`. `next_segment` buys only the next dynamic segment; `remaining_issue` buys all remaining issue segments and marks SP drift risk as accepted.
+- Stake mode is `{args.stake_mode}`. `scale_to_budget` repeats selected bundles by score until the segment budget is nearly exhausted; `unit_once` buys each selected bundle once.
 - Eligible matches are rows with executable selected codes for `--arm {args.arm}`. Rows with no-buy/stop are excluded from bundle selection.
 - N starts from half of eligible match count, capped at `{args.max_n}`, then drops by expected coverage hit rate using `select_rolling_segment_n.py`.
 - Each selected bundle is one small-combo N串1 ticket group: cost units are `product(width_i)`, yuan cost is `{args.stake_yuan_per_ticket}` times that. A hit pays one expanded ticket: `product(winning_sp_i)`.
@@ -805,6 +912,8 @@ Generated: {generated}
 | segments | {summary["segments"]} |
 | selected segments | {summary["selected_segments"]} |
 | selected bundles | {summary["selected_bundles"]} |
+| stake multiplier units | {summary["stake_multiplier_units"]} |
+| base cost yuan | {summary["base_cost_yuan"]} |
 | cost yuan | {summary["selected_cost_yuan"]} |
 | payout yuan | {summary["payout_yuan"]} |
 | profit yuan | {summary["profit_yuan"]} |
@@ -842,6 +951,8 @@ Generated: {generated}
         ("N values", "recommended_n_values"),
         ("N stable", "recommended_n_stable"),
         ("bundles mean", "selected_bundles_mean"),
+        ("base cost", "base_cost_yuan_mean"),
+        ("cost mean", "cost_yuan_mean"),
         ("profit mean", "profit_yuan_mean"),
         ("profit min", "profit_yuan_min"),
         ("profit max", "profit_yuan_max"),
@@ -862,7 +973,9 @@ Generated: {generated}
         ("hits", "actual_coverage_hits"),
         ("hit%", "actual_coverage_hit_rate"),
         ("N", "recommended_n"),
+        ("stake", "stake_mode"),
         ("bundles", "selected_bundles"),
+        ("base", "base_cost_yuan"),
         ("cost", "selected_cost_yuan"),
         ("payout", "payout_yuan"),
         ("profit", "profit_yuan"),
@@ -878,12 +991,14 @@ Generated: {generated}
         ("N", "n_value"),
         ("matches", "match_indices"),
         ("codes", "leg_codes"),
+        ("x", "stake_multiplier"),
         ("cost", "cost_yuan"),
+        ("scaled cost", "scaled_cost_yuan"),
         ("EV roi", "expected_roi"),
         ("hit p", "hit_prob"),
         ("hit", "realized_hit"),
-        ("payout", "payout_yuan"),
-        ("profit", "profit_yuan"),
+        ("payout", "scaled_payout_yuan"),
+        ("profit", "scaled_profit_yuan"),
     ])}
 
 Artifacts:
@@ -904,6 +1019,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--betting-strategy-version", default=BETTING_STRATEGY_VERSION)
     parser.add_argument("--arm", choices=("active", "shadow"), default="shadow")
     parser.add_argument("--planning-scope", choices=("next_segment", "remaining_issue"), default="next_segment")
+    parser.add_argument("--stake-mode", choices=("scale_to_budget", "unit_once"), default="scale_to_budget")
     parser.add_argument("--decision-time", default="", help="Local issue datetime; filters out matches with kickoff <= decision time.")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -955,7 +1071,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     seed_summary_rows: list[dict[str, Any]] = []
     for sample_seed in seeds:
         seed_segment_rows: list[dict[str, Any]] = []
-        selected_candidates: list[BundleCandidate] = []
+        selected_candidates: list[StakedBundle] = []
         for segment in segments:
             row, selected = settle_segment(
                 segment,
@@ -968,6 +1084,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 max_n=args.max_n,
                 max_overlap=args.max_overlap,
                 positive_ev_only=not args.allow_negative_ev,
+                stake_mode=args.stake_mode,
                 planning_scope=args.planning_scope,
                 decision_time=decision_time,
             )
@@ -994,7 +1111,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     else:
         seed_slug = f"seeds{len(seeds)}_{seeds[0]}-{seeds[-1]}"
     scope_slug = slugify(args.planning_scope)
-    slug = f"{args.issue}_{slug_label}_{version_slug}_{scope_slug}_b{int(args.segment_budget_yuan)}_{seed_slug}"
+    stake_slug = slugify(args.stake_mode)
+    slug = f"{args.issue}_{slug_label}_{version_slug}_{scope_slug}_{stake_slug}_b{int(args.segment_budget_yuan)}_{seed_slug}"
     out_dir = args.output_dir / slug
     segment_csv = out_dir / "segment_betting_plan_segments.csv"
     bundle_csv = out_dir / "segment_betting_plan_bundles.csv"
@@ -1032,6 +1150,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "window_hours": args.window_hours,
             "extend_hours": args.extend_hours,
             "planning_scope": args.planning_scope,
+            "stake_mode": args.stake_mode,
             "decision_time": format_optional_dt(decision_time),
             "min_matches": args.min_matches,
             "max_matches": args.max_matches,

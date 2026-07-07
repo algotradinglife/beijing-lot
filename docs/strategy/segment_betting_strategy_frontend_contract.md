@@ -20,7 +20,7 @@ Current default:
 | field | value |
 | --- | --- |
 | `strategy_family` | `segment_betting_plan` |
-| `betting_strategy_version` | `segment_betting_v0.2.0000` |
+| `betting_strategy_version` | `segment_betting_v0.3.0000` |
 | `artifact_schema_version` | `segment_betting_artifact_v1` |
 
 Version semantics:
@@ -59,6 +59,7 @@ The summary JSON includes:
 | `betting_strategy_version` | Version of segmentation/N/bundle/budget logic. |
 | `artifact_schema_version` | JSON/CSV schema version for frontend compatibility. |
 | `planning_scope` | `next_segment` or `remaining_issue`. |
+| `settings.stake_mode` | `scale_to_budget` or `unit_once`. |
 | `decision_time` | Optional planning timestamp used to filter already-started matches. |
 | `available_segments` | Number of dynamic segments available after decision-time filtering. |
 | `segments` | Number of segments actually included in this plan. |
@@ -90,12 +91,39 @@ excluded before segment construction. The frontend should show `available_segmen
 and `segments` together so the user can see whether they are buying one segment
 or the whole remaining issue.
 
+## Stake Mode
+
+The segment budget is now a target by default, not only a hard cap.
+
+| `stake_mode` | meaning |
+| --- | --- |
+| `scale_to_budget` | Default. Select bundles, then repeat selected bundles by score until the segment budget is nearly exhausted. |
+| `unit_once` | Audit mode. Buy each selected bundle once; this reproduces the old conservative under-spend behavior. |
+
+Segment CSV fields:
+
+| field | meaning |
+| --- | --- |
+| `base_cost_yuan` | Cost before stake scaling. |
+| `selected_cost_yuan` | Final cost after stake scaling. |
+| `stake_multiplier_units` | Sum of bundle repeat multipliers in the segment. |
+
+Bundle CSV fields:
+
+| field | meaning |
+| --- | --- |
+| `stake_multiplier` | Number of times this bundle is bought. |
+| `scaled_cost_yuan` | Bundle cost after multiplier. |
+| `scaled_payout_yuan` | Settled bundle payout after multiplier. |
+| `scaled_profit_yuan` | Settled bundle profit after multiplier. |
+
 ## Recommended Controls
 
 Basic controls:
 
 | key | default | effect |
 | --- | --- | --- |
+| `stake_mode` | `scale_to_budget` | Scale selected bundles toward segment budget, or use `unit_once` for audit. |
 | `planning_scope` | `next_segment` | Choose next dynamic segment or all remaining issue segments. |
 | `decision_time` | empty | Filters out matches already started at planning time. |
 | `segment_budget_yuan` | `1000` | Caps total cost per rolling segment. |
@@ -137,6 +165,7 @@ changed between strategy versions:
 | `recommended_n` / `initial_recommended_n` | Shows final N after budget fallback versus initial recommendation. |
 | `reasons` | Includes N downgrade and no-bundle explanations. |
 | `planning_scope` / `sp_drift_risk_level` | Explains whether the segment is part of a bounded next-segment buy or remaining-issue buy. |
+| `stake_mode` / `base_cost_yuan` / `selected_cost_yuan` | Explains whether cost was scaled toward budget or kept as one unit per bundle. |
 
 Different decision-chain versions can therefore produce different N for the same
 time segment because they expose different executable legs, widths, and coverage
