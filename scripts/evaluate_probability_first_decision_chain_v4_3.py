@@ -581,11 +581,13 @@ def load_v4_2_execution_records(rows_by_key: dict[tuple[str, int], SnapshotRow],
                 q_stable = {code: safe_float(artifact_row.get(f"execution_q_{code}") or artifact_row.get(f"q_{code}")) for code in OUTCOME_ORDER}
                 sp_source = {code: safe_float(artifact_row.get(f"source_sp_{code}") or artifact_row.get(f"sp_{code}")) for code in OUTCOME_ORDER}
                 sp_stable = {code: safe_float(artifact_row.get(f"execution_sp_{code}") or artifact_row.get(f"sp_{code}")) for code in OUTCOME_ORDER}
+                version = str(artifact_row.get("execution_policy_version") or artifact_row.get("shadow_version") or "")
+                version_prefix = next((part for part in version.split("_") if part.startswith("v4.2.")), "v4.2")
                 records.append(
                     record_from_codes(
                         row,
-                        arm="v4.2.0004_execution_late_proxy",
-                        version=str(artifact_row.get("execution_policy_version") or artifact_row.get("shadow_version") or ""),
+                        arm=f"{version_prefix}_execution_late_proxy",
+                        version=version,
                         codes=codes,
                         primary=primary,
                         reasons=[str(artifact_row.get("execution_action") or ""), str(artifact_row.get("execution_reasons") or "")],
@@ -891,14 +893,15 @@ python3 scripts/evaluate_probability_first_decision_chain_v4_3.py --issue 26071 
 
 ## 结论
 
-当前小样本结论偏向：v4.3 的 probability-first 框架是正确方向，尤其能直接修复 #61 这类“源北单 SP 极端导致 q 爆表、主押偏离概率 top”的问题；#51 也不再让源 q 方向主导主押。但 v4.3 双选默认覆盖率仍低于 v3.3.3，说明保护位还不够稳，不能替换默认。
+当前小样本结论偏向：v4.2 execution 在加入极值 source q guard 后，已经能修复 #61 这类“源北单 SP 极端导致 q 爆表、主押偏离概率 top”的问题，同时保留 v4.2 的高覆盖优势。v4.3 的 probability-first 框架仍能作为诊断参考，但双选默认覆盖率低于 v3.3.3 和 v4.2，说明保护位还不够稳，不能替换默认。
 
 上线判断：
 
 - 不建议上线为 active/default；`shadow_v3.3.3` 继续保持默认。
+- 可以继续观察 v4.2 execution late_proxy 作为备选；极值 source q guard 应保留在 v4.2 执行层。
 - 可以进入下一步 execution/diagnostic 的逻辑：概率 top 主押硬约束、源 SP sanity 异常标签、q top 稳定化前后切换标签、源 q 不得成为 mandatory single。
 - 暂不进入默认执行的逻辑：直接用欧赔均值替代北单 SP、把 stable q top 强制作为保护、扩大到默认全包。
-- 下一步应把这些约束接入 v4.2 execution compression contract，并用 26073+ forward settlement 继续观察错删/新增保护。
+- 下一步应用 26073+ forward settlement 继续观察极值 guard 是否只修复尾部风险，而不会引入新的错删/错增保护。
 """
 
 
@@ -938,7 +941,7 @@ def write_records(csv_path: Path, records: list[dict[str, Any]]) -> None:
         fieldnames.extend([f"p_{code}", f"source_sp_{code}", f"stable_sp_{code}", f"source_q_{code}", f"stable_q_{code}"])
     csv_path.parent.mkdir(parents=True, exist_ok=True)
     with csv_path.open("w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for record in records:
             writer.writerow({key: record.get(key, "") for key in fieldnames})

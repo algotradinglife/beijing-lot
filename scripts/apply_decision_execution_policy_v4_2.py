@@ -43,7 +43,11 @@ TIGHT_DENSE_ANCHOR_P_GAP = 0.06
 PENDING_DRAW_RESCUE_P_MIN = 0.28
 PENDING_DRAW_RESCUE_SP_MIN = 2.60
 PENDING_DRAW_RESCUE_SP_MAX = 5.00
-POLICY_VERSION = "v4.2.0004_execution_policy_2026-07-06_dense_draw_rescue"
+EXTREME_SOURCE_Q_MIN = 2.50
+EXTREME_SOURCE_Q_COLLAPSE_MAX = 1.05
+EXTREME_SOURCE_Q_REPRICE_RATIO = 2.00
+EXTREME_SOURCE_Q_SECOND_P_MIN = 0.25
+POLICY_VERSION = "v4.2.0005_execution_policy_2026-07-07_extreme_source_q_guard"
 SHADOW_ARM = "shadow_v4.2.0000_execution"
 SHADOW_VERSION = "llm_chain_structured_v4.2.0000_layered_merge_execution_policy"
 
@@ -378,6 +382,14 @@ def market_probabilities_from_row(row: dict[str, Any], prefix: str) -> dict[str,
     return normalized_market_probabilities(sp_values_from_row(row, prefix))
 
 
+def ratio(a: float, b: float) -> float:
+    if a <= 0 or b <= 0:
+        return 1.0
+    high = max(a, b)
+    low = min(a, b)
+    return high / low if low > 0 else 1.0
+
+
 def late_market_blend_weight(row: dict[str, Any]) -> float:
     if safe_float(row.get("execution_sp_reprice_ratio_max"), default=1.0) >= SEVERE_SP_RATIO:
         return MARKET_BLEND_SEVERE_WEIGHT
@@ -504,6 +516,61 @@ def late_refresh_pending_draw_double_codes(source_row: dict[str, Any], decision_
     anchor = probability_top_from_row(source_row)
     keep = anchor if anchor in recommended else max(recommended, key=lambda code: safe_float(source_row.get(f"p_{code}")))
     return [keep, "1"]
+
+
+def extreme_source_q_guard_double_codes(source_row: dict[str, Any], decision_row: dict[str, Any]) -> list[str]:
+    recommended = parse_codes(decision_row.get("v4_recommended_codes"))
+    if not recommended or len(recommended) > 2:
+        return []
+    if str(decision_row.get("v4_action") or "") != "wait_late_refresh":
+        return []
+    if safe_float(source_row.get("execution_sp_reprice_ratio_max"), default=1.0) < SEVERE_SP_RATIO:
+        return []
+    prob_top = probability_top_from_row(source_row)
+    if not prob_top or prob_top in recommended:
+        return []
+    source_q_top, source_q_values = source_q_top_from_row(source_row)
+    execution_q_top, execution_q_values = execution_q_top_from_row(source_row)
+    if not source_q_top or source_q_top not in recommended:
+        return []
+    if not execution_q_top or execution_q_top == source_q_top:
+        return []
+
+    source_q = source_q_values.get(source_q_top, 0.0)
+    execution_q_for_source_top = execution_q_values.get(source_q_top, 0.0)
+    source_sp = sp_values_from_row(source_row, "source_").get(source_q_top, 0.0)
+    execution_sp = sp_values_from_row(source_row, "execution_").get(source_q_top, 0.0)
+    source_reprice_ratio = ratio(source_sp, execution_sp)
+    if source_q < EXTREME_SOURCE_Q_MIN and source_reprice_ratio < EXTREME_SOURCE_Q_REPRICE_RATIO:
+        return []
+    if execution_q_for_source_top > EXTREME_SOURCE_Q_COLLAPSE_MAX:
+        return []
+
+    prob_top_p = safe_float(source_row.get(f"p_{prob_top}"))
+    source_q_top_p = safe_float(source_row.get(f"p_{source_q_top}"))
+    if source_q_top_p >= prob_top_p:
+        return []
+
+    second_scores: dict[str, float] = {}
+    for code in unique_codes([execution_q_top, *recommended]):
+        if code == prob_top:
+            continue
+        probability = safe_float(source_row.get(f"p_{code}"))
+        if probability < EXTREME_SOURCE_Q_SECOND_P_MIN:
+            continue
+        execution_q = execution_q_values.get(code, 0.0)
+        score = 2.0 * probability + 0.35 * execution_q
+        if code == execution_q_top:
+            score += 0.45
+        if code in recommended and code != source_q_top:
+            score += 0.10
+        if code == source_q_top:
+            score -= 0.30
+        second_scores[code] = score
+    if not second_scores:
+        return [prob_top]
+    second = max(second_scores.items(), key=lambda item: item[1])[0]
+    return unique_codes([prob_top, second])
 
 
 def late_repriced_conflict_skip_reasons(
@@ -734,6 +801,21 @@ def evaluate_row_policy(
     if not recommended:
         return RowExecution([], "skip_no_recommendation", ["empty_recommended_codes"], double_codes, full_score, False, False)
     if len(recommended) <= 2:
+        extreme_guard = extreme_source_q_guard_double_codes(source_row, decision_row)
+        if extreme_guard:
+            return RowExecution(
+                extreme_guard,
+                "execute_double" if len(extreme_guard) == 2 else "execute_single",
+                [
+                    "late_refresh_proxy",
+                    "extreme_source_q_repriced_probability_guard",
+                    f"restored_probability_top_{extreme_guard[0]}",
+                ],
+                extreme_guard,
+                full_score,
+                False,
+                False,
+            )
         drift_reasons = late_q_top_drift_skip_reasons(source_row, recommended)
         if source_action != "wait_late_refresh" and drift_reasons:
             return RowExecution([], "skip_late_q_top_drift", drift_reasons, double_codes, full_score, False, False)

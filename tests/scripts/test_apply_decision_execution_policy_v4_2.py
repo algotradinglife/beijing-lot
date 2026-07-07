@@ -238,6 +238,56 @@ def test_late_q_top_drift_does_not_block_value_only_sp_drift() -> None:
     assert "market_implied_p_weakened_3" in execution.reasons
 
 
+def test_extreme_source_q_single_restores_probability_top_after_late_reprice() -> None:
+    mod = _load_module()
+    source = _source(
+        prob_top="0",
+        q_top="1",
+        p_3="0.2953664966833232",
+        p_1="0.32685944517886906",
+        p_0="0.37777405813780773",
+        sp_3="2.6500",
+        sp_1="4.0600",
+        sp_0="2.6400",
+        q_3="0.7827",
+        q_1="1.3270",
+        q_0="0.9973",
+        source_sp_3="33.5100",
+        source_sp_1="2.0800",
+        source_sp_0="2.0300",
+        source_q_3="9.8977",
+        source_q_1="0.6799",
+        source_q_0="0.7669",
+        execution_sp_3="2.6500",
+        execution_sp_1="4.0600",
+        execution_sp_0="2.6400",
+        execution_q_3="0.7827",
+        execution_q_1="1.3270",
+        execution_q_0="0.9973",
+        execution_sp_reprice_ratio_max="12.6453",
+    )
+    decision = _decision(
+        v4_action="wait_late_refresh",
+        v4_recommended_codes="3",
+        v4_selection_codes="",
+        v4_mandatory_codes="3",
+        v4_full_cover_reasons="extreme_sp_or_source_conflict_full",
+        v4_merge_flags="suppress_unbacked_late_refresh_draw",
+        v4_candidate_pool_json=(
+            '[{"code":"3","score":1.3234,"mandatory":true},'
+            '{"code":"1","score":1.1393,"signals":["late_refresh_neighbor_draw"]},'
+            '{"code":"0","score":0.8733,"signals":["model_top"]}]'
+        ),
+    )
+
+    execution = mod.evaluate_row_policy(source, decision, late_refresh_mode="proxy", full_score_threshold=1.4)
+
+    assert execution.action == "execute_double"
+    assert execution.selection_codes == ["0", "1"]
+    assert execution.double_codes == ["0", "1"]
+    assert "extreme_source_q_repriced_probability_guard" in execution.reasons
+
+
 def test_probability_anchor_keeps_cover_win_when_q_top_is_weak() -> None:
     mod = _load_module()
     source = _source(

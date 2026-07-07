@@ -1,6 +1,6 @@
 # Probability-first 决策链 v4.3.0000 回测
 
-生成时间：2026-07-07 01:50:45Z
+生成时间：2026-07-07 02:35:11Z
 
 ## 边界
 
@@ -9,7 +9,7 @@
 - 赛果：优先 `matches.result_code`，主表未结算但 NowScore 完场时只用于命中评估。
 - profit proxy：只对已有真实北单 `winning_sp` 的行计算，成本按每覆盖一个结果 1 单位。
 - v4.3 不修改 release/default，不写 `llm_decision_snapshots`。
-- v4.2 execution artifact 缺失期号：26071。
+- v4.2 execution artifact 缺失期号：无。
 
 复现命令：
 
@@ -29,7 +29,7 @@ python3 scripts/evaluate_probability_first_decision_chain_v4_3.py --issue 26071 
 | arm | rows | 有赛果 | 有SP | 覆盖命中 | 主押命中 | 成本 | 均深 | profit proxy | ROI proxy | 票型 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | v3.3.3_recomputed | 81 | 81 | 81 | 79.0% | 42.0% | 169 | 2.086 | 15.3200 | 9.1% | {'double': 56, 'single': 9, 'full': 16} |
-| v4.2.0004_execution_late_proxy | 65 | 65 | 65 | 89.2% | 46.2% | 135 | 2.077 | 39.4900 | 29.3% | {'double': 56, 'full': 7, 'single': 2} |
+| v4.2.0005_execution_late_proxy | 81 | 81 | 81 | 91.4% | 45.7% | 169 | 2.086 | 50.2800 | 29.8% | {'double': 72, 'full': 8, 'single': 1} |
 | v4.3_probability_first | 81 | 81 | 81 | 71.6% | 49.4% | 145 | 1.790 | 22.0500 | 15.2% | {'double': 64, 'single': 17} |
 
 ## 分期结果
@@ -38,7 +38,8 @@ python3 scripts/evaluate_probability_first_decision_chain_v4_3.py --issue 26071 
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | v3.3.3_recomputed | 26071 | 16 | 87.5% | 56.2% | 8.7900 | 29.3% | 1.875 |
 | v3.3.3_recomputed | 26072 | 65 | 76.9% | 38.5% | 6.5300 | 4.7% | 2.138 |
-| v4.2.0004_execution_late_proxy | 26072 | 65 | 89.2% | 46.2% | 39.4900 | 29.3% | 2.077 |
+| v4.2.0005_execution_late_proxy | 26071 | 16 | 93.8% | 37.5% | 8.7400 | 26.5% | 2.062 |
+| v4.2.0005_execution_late_proxy | 26072 | 65 | 90.8% | 47.7% | 41.5400 | 30.5% | 2.092 |
 | v4.3_probability_first | 26071 | 16 | 75.0% | 50.0% | 5.3900 | 20.7% | 1.625 |
 | v4.3_probability_first | 26072 | 65 | 70.8% | 49.2% | 16.6600 | 14.0% | 1.831 |
 
@@ -50,8 +51,8 @@ python3 scripts/evaluate_probability_first_decision_chain_v4_3.py --issue 26071 
 | v4.3_probability_first | 26072 | 51 | 庆南FC vs 天安城 | 2:1 | 胜 | 胜+平 | 1 | 胜 | 胜 | 负 | 负 | 14.84/1.08/70.94 | 2.41/3.32/3.52 | drop_source_q_top_after_sp_sanity;source_sp_anomaly_0;source_sp_anomaly_1;source_sp_anomaly_3;source_sp_sanity_anomaly |
 | v3.3.3_recomputed | 26072 | 61 | 赫根 vs 佐加顿斯 | 2:4 | 负 | 胜+负 | 1 | 胜 | 负 | 胜 | 胜 | 33.51/2.08/2.03 | 33.51/2.08/2.03 | probability_runner_up_protection;q_high_but_probability_low;q_probability_disagree |
 | v4.3_probability_first | 26072 | 61 | 赫根 vs 佐加顿斯 | 2:4 | 负 | 负+平 | 1 | 负 | 负 | 胜 | 平 | 33.51/2.08/2.03 | 2.41/3.86/3.05 | drop_source_q_top_after_sp_sanity;q_top_stabilized_3_to_1;source_sp_anomaly_3;source_sp_sanity_anomaly |
-| v4.2.0004_execution_late_proxy | 26072 | 51 | 庆南FC vs 天安城 | 2:1 | 胜 | 胜+平 | 1 | 胜 | 胜 | 负 | 负 | 14.84/1.08/70.94 | 2.40/3.32/3.52 | probability_runner_up_protection;q_probability_disagree;raw_strength_missing |
-| v4.2.0004_execution_late_proxy | 26072 | 61 | 赫根 vs 佐加顿斯 | 2:4 | 负 | 胜 | 0 | 胜 | 负 | 胜 | 平 | 33.51/2.08/2.03 | 2.65/4.06/2.64 | probability_runner_up_protection;q_high_but_probability_low;q_probability_disagree |
+| v4.2.0005_execution_late_proxy | 26072 | 51 | 庆南FC vs 天安城 | 2:1 | 胜 | 胜+平 | 1 | 胜 | 胜 | 负 | 负 | 14.84/1.08/70.94 | 2.40/3.32/3.52 | probability_runner_up_protection;q_probability_disagree;raw_strength_missing |
+| v4.2.0005_execution_late_proxy | 26072 | 61 | 赫根 vs 佐加顿斯 | 2:4 | 负 | 负+平 | 1 | 负 | 负 | 胜 | 平 | 33.51/2.08/2.03 | 2.41/3.86/3.05 | probability_runner_up_protection;q_high_but_probability_low;q_probability_disagree |
 
 ## v3.3.3 -> v4.3 切换
 
@@ -166,11 +167,12 @@ python3 scripts/evaluate_probability_first_decision_chain_v4_3.py --issue 26071 
 
 ## 结论
 
-当前小样本结论偏向：v4.3 的 probability-first 框架是正确方向，尤其能直接修复 #61 这类“源北单 SP 极端导致 q 爆表、主押偏离概率 top”的问题；#51 也不再让源 q 方向主导主押。但 v4.3 双选默认覆盖率仍低于 v3.3.3，说明保护位还不够稳，不能替换默认。
+当前小样本结论偏向：v4.2 execution 在加入极值 source q guard 后，已经能修复 #61 这类“源北单 SP 极端导致 q 爆表、主押偏离概率 top”的问题，同时保留 v4.2 的高覆盖优势。v4.3 的 probability-first 框架仍能作为诊断参考，但双选默认覆盖率低于 v3.3.3 和 v4.2，说明保护位还不够稳，不能替换默认。
 
 上线判断：
 
 - 不建议上线为 active/default；`shadow_v3.3.3` 继续保持默认。
+- 可以继续观察 v4.2 execution late_proxy 作为备选；极值 source q guard 应保留在 v4.2 执行层。
 - 可以进入下一步 execution/diagnostic 的逻辑：概率 top 主押硬约束、源 SP sanity 异常标签、q top 稳定化前后切换标签、源 q 不得成为 mandatory single。
 - 暂不进入默认执行的逻辑：直接用欧赔均值替代北单 SP、把 stable q top 强制作为保护、扩大到默认全包。
-- 下一步应把这些约束接入 v4.2 execution compression contract，并用 26073+ forward settlement 继续观察错删/新增保护。
+- 下一步应用 26073+ forward settlement 继续观察极值 guard 是否只修复尾部风险，而不会引入新的错删/错增保护。
