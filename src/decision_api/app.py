@@ -1257,8 +1257,13 @@ def _segment_betting_plan_matches(
         return False
     if str(payload.get("issue") or "") != issue:
         return False
-    if planning_scope and str(payload.get("planning_scope") or "") != planning_scope:
-        return False
+    if planning_scope:
+        payload_planning_scope = str(payload.get("planning_scope") or "")
+        artifact_planning_scope = str(payload.get("artifact_planning_scope") or "")
+        if payload_planning_scope != planning_scope:
+            return False
+        if planning_scope == "entire_issue" and artifact_planning_scope != "entire_issue":
+            return False
     settings = payload.get("settings", {})
     if not isinstance(settings, dict):
         settings = {}
@@ -1372,6 +1377,7 @@ def _segment_betting_plan_payload(
         "betting_strategy_version": str(payload.get("betting_strategy_version") or ""),
         "artifact_schema_version": str(payload.get("artifact_schema_version") or ""),
         "planning_scope": str(payload.get("planning_scope") or ""),
+        "artifact_planning_scope": str(payload.get("artifact_planning_scope") or ""),
         "stake_mode": str(settings.get("stake_mode") or ""),
         "label": str(payload.get("label") or ""),
     }

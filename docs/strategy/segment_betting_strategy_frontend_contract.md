@@ -76,6 +76,7 @@ The summary JSON includes:
 | `betting_strategy_version` | Version of segmentation/N/bundle/budget logic. |
 | `artifact_schema_version` | JSON/CSV schema version for frontend compatibility. |
 | `planning_scope` | `by_segment` or `entire_issue`. Legacy query values `next_segment` and `remaining_issue` are normalized to `by_segment` and `entire_issue`. |
+| `artifact_planning_scope` | Canonical scope written by the artifact generator. A true all-issue plan must have both `planning_scope=entire_issue` and `artifact_planning_scope=entire_issue`; legacy `remaining_issue` artifacts are historical audit data only. |
 | `selection_binding` | Declares that per-match selections must be displayed from the issue board's same decision variant, not as an independent betting-plan recommendation. |
 | `settings.stake_mode` | `scale_to_budget` or `unit_once`. |
 | `decision_time` | Optional planning timestamp used to annotate segment timing/refresh context; issue-wide scopes still include ended matches. |
@@ -153,6 +154,12 @@ to buy now.
 | --- | --- | --- |
 | `by_segment` | Build every rolling time segment for the whole issue; ended matches remain included. Future segment rows can be regenerated as selections/SP refresh. | Default. Shows operational segment boundaries. |
 | `entire_issue` | Build one all-issue segment containing every eligible match in the issue; ended matches remain included. | User explicitly accepts SP drift risk for later kickoffs. |
+
+The formal `segment_betting_v0.4` all-issue contract is
+`planning_scope=entire_issue` plus `artifact_planning_scope=entire_issue`.
+Older `segment_betting_v0.3` `remaining_issue` artifacts can be displayed for
+compatibility or historical audit, but they must not be selected as future
+all-issue betting artifacts.
 
 When `decision_time` is present, it does not exclude already-started matches.
 It only annotates segment timing (`hours_from_decision_start/end`) and helps the

@@ -333,6 +333,12 @@ expect or render multiple rolling sub-segments for that scope. Both
 `settings.max_bundle_spend_pct`, so a plan can intentionally leave budget
 unused when all selected bundles hit their per-bundle cap.
 
+A true `segment_betting_v0.4` all-issue artifact must set both
+`planning_scope=entire_issue` and
+`artifact_planning_scope=entire_issue`. Legacy
+`segment_betting_v0.3` `remaining_issue` artifacts are compatibility/history
+records only and must not be used as future all-issue betting plans.
+
 For `planning_scope=by_segment`, per-match direction choices remain bound to
 the issue board's same decision-chain variant. Dashboard should render current
 match choices from the issue board data and use the betting-plan artifact for
