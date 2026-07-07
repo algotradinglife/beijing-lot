@@ -50,6 +50,28 @@ EXTREME_SOURCE_Q_SECOND_P_MIN = 0.25
 POLICY_VERSION = "v4.2.0005_execution_policy_2026-07-07_extreme_source_q_guard"
 SHADOW_ARM = "shadow_v4.2.0000_execution"
 SHADOW_VERSION = "llm_chain_structured_v4.2.0000_layered_merge_execution_policy"
+EXECUTION_COMPRESSION_INVARIANTS = [
+    {
+        "id": "late_refresh_gated",
+        "rule": "wait_late_refresh rows are either still waiting, blocked for missing trusted SP, or explicitly unlocked after trusted execution SP.",
+    },
+    {
+        "id": "probability_top_anchor",
+        "rule": "materially repriced full-cover compression preserves the model probability top when refreshed q, market-implied probability, or model gap supports it.",
+    },
+    {
+        "id": "pending_draw_resolution",
+        "rule": "a pending draw can be restored after severe late refresh only when draw probability and refreshed draw SP are sane.",
+    },
+    {
+        "id": "drop_audit",
+        "rule": "every recommended outcome omitted from the executable selection is recorded with a machine-readable drop reason.",
+    },
+    {
+        "id": "budget_boundary",
+        "rule": "execution attaches segment ids and full-cover diagnostics, but final budget caps and N-ticket funding are owned downstream.",
+    },
+]
 
 
 @dataclass
@@ -128,6 +150,15 @@ def unique_codes(codes: list[str]) -> list[str]:
     for code in codes:
         if code in OUTCOME_CODES and code not in out:
             out.append(code)
+    return out
+
+
+def unique_reasons(reasons: list[str]) -> list[str]:
+    out: list[str] = []
+    for reason in reasons:
+        text = str(reason or "").strip()
+        if text and text not in out:
+            out.append(text)
     return out
 
 
@@ -646,6 +677,53 @@ def late_q_top_drift_watch_reasons(source_row: dict[str, Any], selection_codes: 
     return reasons
 
 
+def dropped_code_audit(
+    source_row: dict[str, Any],
+    decision_row: dict[str, Any],
+    execution: RowExecution,
+) -> tuple[list[str], list[str]]:
+    recommended = parse_codes(decision_row.get("v4_recommended_codes"))
+    selected = set(execution.selection_codes)
+    dropped = [code for code in recommended if code not in selected]
+    if not dropped:
+        return [], []
+
+    prob_top = probability_top_from_row(source_row)
+    source_q_top, _source_q_values = source_q_top_from_row(source_row)
+    execution_q_top, _execution_q_values = execution_q_top_from_row(source_row)
+    severe_reprice = safe_float(source_row.get("execution_sp_reprice_ratio_max"), default=1.0) >= SEVERE_SP_RATIO
+    probability_anchor_used = (
+        severe_reprice
+        and len(recommended) >= 3
+        and prob_top in execution.selection_codes
+    )
+    drop_entries: list[str] = []
+    for code in dropped:
+        reasons: list[str] = []
+        if not execution.selection_codes:
+            reasons.append(execution.action)
+        if code == prob_top:
+            reasons.append("dropped_probability_top")
+        if probability_anchor_used and code != prob_top:
+            reasons.append("probability_top_anchor_compression")
+        if "full_required_but_value_below_threshold" in execution.reasons:
+            reasons.append("full_required_but_value_below_threshold")
+        if "full_value_below_threshold" in execution.reasons:
+            reasons.append("full_value_below_threshold")
+        if "late_refresh_pending_draw_rescue" in execution.reasons:
+            reasons.append("late_refresh_pending_draw_rescue")
+        if "extreme_source_q_repriced_probability_guard" in execution.reasons:
+            reasons.append("extreme_source_q_repriced_probability_guard")
+        if severe_reprice and code == source_q_top and source_q_top != execution_q_top:
+            reasons.append("stale_source_q_not_supported_after_refresh")
+        if code == "1" and unbacked_draw(decision_row):
+            reasons.append("unbacked_draw")
+        if not reasons:
+            reasons.extend(execution.reasons or [execution.action, "lower_rank_after_compression"])
+        drop_entries.append(f"{code}:{'|'.join(unique_reasons(reasons))}")
+    return dropped, drop_entries
+
+
 def unbacked_draw(decision_row: dict[str, Any]) -> bool:
     return (
         str(decision_row.get("v4_semantic_draw") or "none") == "none"
@@ -1002,6 +1080,8 @@ def apply_policy(
         "execution_source_action",
         "execution_recommended_codes",
         "execution_double_codes",
+        "execution_dropped_codes",
+        "execution_drop_reasons",
         "execution_full_score",
         "execution_full_candidate",
         "execution_full_kept",
@@ -1037,6 +1117,9 @@ def apply_policy(
         row["execution_source_action"] = decision_row.get("v4_action", "")
         row["execution_recommended_codes"] = decision_row.get("v4_recommended_codes", "")
         row["execution_double_codes"] = "+".join(execution.double_codes)
+        dropped_codes, drop_reasons = dropped_code_audit(row, decision_row, execution)
+        row["execution_dropped_codes"] = "+".join(dropped_codes)
+        row["execution_drop_reasons"] = ";".join(drop_reasons)
         row["execution_full_score"] = f"{execution.full_score:.4f}"
         row["execution_full_candidate"] = int(execution.full_candidate)
         row["execution_full_kept"] = int(execution.full_kept)
@@ -1061,6 +1144,7 @@ def apply_policy(
         "full_score_threshold": full_score_threshold,
         "max_full_per_segment": max_full_per_segment,
         "segment_full_cap_applied": False,
+        "compression_invariants": EXECUTION_COMPRESSION_INVARIANTS,
         "rows": len(output_rows),
         "settled_rows": settled_count,
         "settled_hit_rows": hit_count,
@@ -1085,6 +1169,10 @@ Generated: {generated}
 ```json
 {json.dumps(summary, ensure_ascii=False, indent=2)}
 ```
+
+## Compression Invariants
+
+{chr(10).join(f"- `{item['id']}`: {item['rule']}" for item in EXECUTION_COMPRESSION_INVARIANTS)}
 
 ## Policy
 

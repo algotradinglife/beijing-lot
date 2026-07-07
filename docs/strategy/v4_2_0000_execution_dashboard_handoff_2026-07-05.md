@@ -63,6 +63,8 @@ Issue Board / Match Detail:
 - show `execution_action`, `execution_reasons`, `execution_full_score`,
   `execution_full_candidate`, `execution_full_kept`, and
   `execution_segment_idx`;
+- show `execution_dropped_codes` and `execution_drop_reasons` when an execution
+  row omits a code from `execution_recommended_codes`;
 - treat full-cover fields as per-row diagnostics for the downstream optimizer,
   not as proof that a full cover has been funded under the final budget;
 - use `execution_unlock_state` for late-refresh stop color:

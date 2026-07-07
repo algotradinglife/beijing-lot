@@ -247,6 +247,8 @@ Required execution extension fields:
 | `execution_source_action` | enum/string | Original v4.2 decision action, e.g. `buy`, `wait_late_refresh`, `full_cover_or_skip`. |
 | `execution_recommended_codes` | string | Audit recommendation from v4.2.0000, before execution compression. |
 | `execution_double_codes` | string | Best compressed double if a full-cover row must be reduced. |
+| `execution_dropped_codes` | string | Recommended outcomes omitted from the executable selection, e.g. `0` or `3+1`. |
+| `execution_drop_reasons` | string | `;`-joined entries in `code:reason|reason` format explaining why each omitted outcome was dropped. |
 | `execution_full_score` | number/string | Per-row full-cover value score for downstream stake optimization. |
 | `execution_full_candidate` | boolean/int | `1` if the row qualified as a per-row full-cover candidate. |
 | `execution_full_kept` | boolean/int | `1` if this artifact leaves the row as full cover; not a final budget/cap approval in `v4.2.0002+`. |
@@ -286,6 +288,10 @@ Execution mapping rules:
 - `shadow_selection_codes` is the actual executable selection. It may be empty.
 - `execution_recommended_codes` is the audit recommendation. It can be wider
   than `shadow_selection_codes`.
+- When `execution_recommended_codes` is wider or different from
+  `shadow_selection_codes`, `execution_dropped_codes` and
+  `execution_drop_reasons` explain what was omitted. Dashboard should render
+  these as audit diagnostics, not recompute the compression.
 - `shadow_stop_flag=1` means no executable selection exists for this row.
 - `skip_*` execution actions must be rendered as stop/no-buy states even when
   `execution_recommended_codes` is populated.

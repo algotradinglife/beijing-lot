@@ -322,6 +322,10 @@ def test_probability_anchor_keeps_cover_win_when_q_top_is_weak() -> None:
     assert execution.selection_codes == ["3", "1"]
     assert execution.double_codes == ["3", "1"]
 
+    dropped_codes, drop_reasons = mod.dropped_code_audit(source, decision, execution)
+    assert dropped_codes == ["0"]
+    assert drop_reasons == ["0:probability_top_anchor_compression|full_required_but_value_below_threshold"]
+
 
 def test_probability_anchor_lets_remaining_outcomes_compete_without_promoting_full_cover() -> None:
     mod = _load_module()
@@ -472,6 +476,10 @@ def test_late_refresh_pending_draw_rescue_for_skipped_unbacked_high_q_draw() -> 
     assert execution.selection_codes == ["3", "1"]
     assert execution.double_codes == ["3", "1"]
     assert "late_refresh_pending_draw_rescue" in execution.reasons
+
+    dropped_codes, drop_reasons = mod.dropped_code_audit(source, decision, execution)
+    assert dropped_codes == ["0"]
+    assert drop_reasons == ["0:late_refresh_pending_draw_rescue"]
 
 
 def test_late_refresh_pending_draw_rescue_does_not_override_high_q_make_room() -> None:
@@ -709,6 +717,12 @@ def test_late_proxy_reprices_stale_source_sp_before_full_cover_scoring(tmp_path:
     assert row["execution_action"] != "execute_full_cover"
     assert row["execution_full_kept"] == "0"
     assert row["shadow_selection_codes"] != "1+0+3"
+    assert row["execution_dropped_codes"]
+    assert row["execution_drop_reasons"]
+
+    report_text = (tmp_path / "report.md").read_text(encoding="utf-8")
+    assert "`drop_audit`" in report_text
+    assert "`budget_boundary`" in report_text
 
 
 def test_late_proxy_blocks_unlock_when_execution_sp_is_missing(tmp_path: Path) -> None:
@@ -807,3 +821,6 @@ def test_late_proxy_blocks_unlock_when_execution_sp_is_missing(tmp_path: Path) -
     assert row["execution_unlock_state"] == "blocked_after_late_refresh"
     assert row["execution_sp_missing"] == "1"
     assert row["shadow_selection_codes"] == ""
+    assert row["execution_dropped_codes"] == "3+1"
+    assert "3:skip_missing_execution_sp" in row["execution_drop_reasons"]
+    assert "1:skip_missing_execution_sp" in row["execution_drop_reasons"]
