@@ -32,6 +32,8 @@ HIGH_N_SELECTOR_RESULTS_DIR = PROJECT_ROOT / "results/high_n_selector_plus2026_l
 LINEGAP_DRIFT_RESULTS_DIR = PROJECT_ROOT / "results/main_strategy_linegap_drift_depth_20260630"
 JOINT_LEG_RESULTS_DIR = PROJECT_ROOT / "results/n7_q_conf_drift_joint_2014_10h_trusted_plus2026_linefill_20260630"
 STRUCTURED_DECISION_SHADOW_DIR = PROJECT_ROOT / "results/structured_decision_chain_shadow"
+POSTMATCH_TICKET_POOL_DIR = PROJECT_ROOT / "results/postmatch_ticket_pool_artifacts"
+SEGMENT_BETTING_PLAN_DIR = PROJECT_ROOT / "results/segment_betting_plan"
 DECISION_VERSIONS_CONFIG = PROJECT_ROOT / "config/decision_versions.json"
 STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
 DEFAULT_DASHBOARD_RUNTIME_STATUS = PROJECT_ROOT / "tmp/decision_dashboard/runtime_status.json"
@@ -46,6 +48,8 @@ HK_TZ = timezone(timedelta(hours=8))
 OUTCOME_LABEL = {"3": "胜", "1": "平", "0": "负"}
 OUTCOME_ORDER = ("3", "1", "0")
 Q_STOP_THRESHOLD = 1.00
+SEGMENT_BETTING_STRATEGY_FAMILY = "segment_betting_plan"
+SEGMENT_BETTING_ARTIFACT_SCHEMA_VERSION = "segment_betting_artifact_v1"
 ACTIVE_DECISION_VARIANT_ID = "active_v3"
 ACTIVE_DECISION_VARIANT_KIND = "active"
 ACTIVE_DECISION_VARIANT_LABEL = "v3"
@@ -165,6 +169,8 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
                 "linegap_drift_dir": str(LINEGAP_DRIFT_RESULTS_DIR.relative_to(PROJECT_ROOT)),
                 "joint_leg_rows_csv": str((JOINT_LEG_RESULTS_DIR / "joint_leg_rows.csv").relative_to(PROJECT_ROOT)),
                 "structured_shadow_dir": str(STRUCTURED_DECISION_SHADOW_DIR.relative_to(PROJECT_ROOT)),
+                "postmatch_ticket_pool_dir": str(POSTMATCH_TICKET_POOL_DIR.relative_to(PROJECT_ROOT)),
+                "segment_betting_plan_dir": str(SEGMENT_BETTING_PLAN_DIR.relative_to(PROJECT_ROOT)),
             },
             "required_artifacts": [
                 "main_strategy_dir/sleeve_mix_summary.csv",
@@ -333,6 +339,14 @@ def _strategy_linegap_drift_dir(release: dict[str, Any] | None = None) -> Path:
 
 def _strategy_shadow_dir(release: dict[str, Any] | None = None) -> Path:
     return _strategy_artifact_path("structured_shadow_dir", STRUCTURED_DECISION_SHADOW_DIR, release)
+
+
+def _strategy_postmatch_ticket_pool_dir(release: dict[str, Any] | None = None) -> Path:
+    return _strategy_artifact_path("postmatch_ticket_pool_dir", POSTMATCH_TICKET_POOL_DIR, release)
+
+
+def _strategy_segment_betting_plan_dir(release: dict[str, Any] | None = None) -> Path:
+    return _strategy_artifact_path("segment_betting_plan_dir", SEGMENT_BETTING_PLAN_DIR, release)
 
 
 def _main_strategy_arms(release: dict[str, Any] | None = None) -> tuple[dict[str, Any], ...]:
@@ -1142,6 +1156,215 @@ def _postmatch_review_rows_payload(conn: sqlite3.Connection, issue: str) -> list
             "action_suggestion": row["action_suggestion"] if "action_suggestion" in keys else "",
         })
     return out
+
+
+def _postmatch_ticket_pool_candidates(
+    issue: str,
+    variant_id: str,
+    release: dict[str, Any] | None = None,
+) -> list[Path]:
+    root = _strategy_postmatch_ticket_pool_dir(release)
+    if not root.exists():
+        return []
+    candidates: list[Path] = []
+    for path in root.glob(f"{issue}_*/postmatch_ticket_pool_{issue}_*.json"):
+        if not path.is_file():
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if payload.get("schema_version") != "postmatch_ticket_pool_artifact_v1":
+            continue
+        if str(payload.get("issue") or "") != issue:
+            continue
+        if variant_id and str(payload.get("variant_id") or "") != variant_id:
+            continue
+        candidates.append(path)
+    return sorted(candidates, key=lambda item: item.stat().st_mtime, reverse=True)
+
+
+def _postmatch_ticket_pool_payload(
+    issue: str,
+    variant_id: str,
+    release: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    root = _strategy_postmatch_ticket_pool_dir(release)
+    candidates = _postmatch_ticket_pool_candidates(issue, variant_id, release)
+    if not candidates:
+        return None, {
+            "status": "missing",
+            "reason": "postmatch_ticket_pool_artifact_missing",
+            "issue": issue,
+            "variant_id": variant_id,
+            "artifact_dir": _relative_display_path(root),
+        }
+    path = candidates[0]
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, {
+            "status": "invalid",
+            "reason": f"postmatch_ticket_pool_artifact_unreadable: {exc}",
+            "issue": issue,
+            "variant_id": variant_id,
+            "artifact_path": _relative_display_path(path),
+        }
+    payload["_artifact_path"] = _relative_display_path(path)
+    return payload, {
+        "status": "available",
+        "reason": "",
+        "issue": issue,
+        "variant_id": str(payload.get("variant_id") or variant_id),
+        "artifact_path": _relative_display_path(path),
+        "generated_at": str(payload.get("generated_at") or ""),
+        "review_version": str(payload.get("review_version") or ""),
+    }
+
+
+def _default_decision_variant_id(release: dict[str, Any] | None = None) -> str:
+    for item in _manifest_decision_variants(release):
+        if item.get("is_default"):
+            return str(item.get("variant_id") or "")
+    return ""
+
+
+def _segment_betting_plan_matches(
+    payload: dict[str, Any],
+    *,
+    issue: str,
+    decision_variant_id: str,
+    planning_scope: str,
+    stake_mode: str,
+    betting_strategy_version: str,
+    label: str,
+    path: Path,
+) -> bool:
+    if str(payload.get("strategy_family") or "") != SEGMENT_BETTING_STRATEGY_FAMILY:
+        return False
+    if str(payload.get("artifact_schema_version") or "") != SEGMENT_BETTING_ARTIFACT_SCHEMA_VERSION:
+        return False
+    if str(payload.get("issue") or "") != issue:
+        return False
+    if planning_scope and str(payload.get("planning_scope") or "") != planning_scope:
+        return False
+    settings = payload.get("settings", {})
+    if not isinstance(settings, dict):
+        settings = {}
+    if stake_mode and str(settings.get("stake_mode") or "") != stake_mode:
+        return False
+    if betting_strategy_version and str(payload.get("betting_strategy_version") or "") != betting_strategy_version:
+        return False
+    if label and str(payload.get("label") or "") != label:
+        return False
+    if decision_variant_id:
+        haystack = " ".join(
+            str(value or "")
+            for value in (
+                payload.get("label"),
+                payload.get("arm"),
+                payload.get("structured_csv"),
+                path.parent.name,
+                path.name,
+            )
+        )
+        if decision_variant_id not in haystack:
+            return False
+    return True
+
+
+def _segment_betting_plan_candidates(
+    issue: str,
+    *,
+    decision_variant_id: str = "",
+    planning_scope: str = "",
+    stake_mode: str = "",
+    betting_strategy_version: str = "",
+    label: str = "",
+    release: dict[str, Any] | None = None,
+) -> list[tuple[Path, dict[str, Any]]]:
+    root = _strategy_segment_betting_plan_dir(release)
+    if not root.exists():
+        return []
+    candidates: list[tuple[Path, dict[str, Any]]] = []
+    for path in root.glob(f"{issue}_*/segment_betting_plan_summary.json"):
+        if not path.is_file():
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, dict):
+            continue
+        if not _segment_betting_plan_matches(
+            payload,
+            issue=issue,
+            decision_variant_id=decision_variant_id,
+            planning_scope=planning_scope,
+            stake_mode=stake_mode,
+            betting_strategy_version=betting_strategy_version,
+            label=label,
+            path=path,
+        ):
+            continue
+        candidates.append((path, payload))
+    return sorted(candidates, key=lambda item: item[0].stat().st_mtime, reverse=True)
+
+
+def _segment_betting_plan_payload(
+    issue: str,
+    *,
+    decision_variant_id: str = "",
+    planning_scope: str = "",
+    stake_mode: str = "",
+    betting_strategy_version: str = "",
+    label: str = "",
+    release: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    root = _strategy_segment_betting_plan_dir(release)
+    filters = {
+        "decision_variant_id": decision_variant_id,
+        "planning_scope": planning_scope,
+        "stake_mode": stake_mode,
+        "betting_strategy_version": betting_strategy_version,
+        "label": label,
+    }
+    candidates = _segment_betting_plan_candidates(
+        issue,
+        decision_variant_id=decision_variant_id,
+        planning_scope=planning_scope,
+        stake_mode=stake_mode,
+        betting_strategy_version=betting_strategy_version,
+        label=label,
+        release=release,
+    )
+    if not candidates:
+        return None, {
+            "status": "missing",
+            "reason": "segment_betting_plan_artifact_missing",
+            "issue": issue,
+            "artifact_dir": _relative_display_path(root),
+            "filters": filters,
+        }
+    path, payload = candidates[0]
+    payload = dict(payload)
+    settings = payload.get("settings")
+    if not isinstance(settings, dict):
+        settings = {}
+    payload["_artifact_path"] = _relative_display_path(path)
+    payload["artifact_status"] = {
+        "status": "available",
+        "reason": "",
+        "issue": issue,
+        "artifact_path": _relative_display_path(path),
+        "filters": filters,
+        "betting_strategy_version": str(payload.get("betting_strategy_version") or ""),
+        "artifact_schema_version": str(payload.get("artifact_schema_version") or ""),
+        "planning_scope": str(payload.get("planning_scope") or ""),
+        "stake_mode": str(settings.get("stake_mode") or ""),
+        "label": str(payload.get("label") or ""),
+    }
+    return payload, payload["artifact_status"]
 
 
 def _today_hk() -> str:
@@ -5022,6 +5245,7 @@ def _main_strategy_payload(
             "ticket_pool_csv": _relative_display_path(_strategy_ticket_pool_csv(release)),
             "joint_leg_rows_csv": _relative_display_path(_strategy_joint_leg_rows_csv(release)),
             "structured_shadow_dir": _relative_display_path(_strategy_shadow_dir(release)),
+            "segment_betting_plan_dir": _relative_display_path(_strategy_segment_betting_plan_dir(release)),
             "model_db": _public_diagnostics_path(DEFAULT_MODEL_DB),
             "live_db": _public_diagnostics_path(conn.execute("PRAGMA database_list").fetchone()["file"]),
             "strategy_release_config": _relative_display_path(STRATEGY_RELEASE_CONFIG),
@@ -5631,6 +5855,20 @@ def _settlement(
         expected_indices = {int(row["match_idx"]) for row in rows}
         shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(resolved, shadow_variants, expected_indices)
     variant_options = _decision_variant_options(shadow_variants, release=release)
+    version_context = _strategy_version_context(
+        release,
+        variant_options,
+        decision_variant_id,
+        suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
+        incomplete_shadow_variants=incomplete_shadow_variants,
+    )
+    selected_variant_id = str(
+        version_context.get("selected_variant_id")
+        or version_context.get("requested_variant_id")
+        or ""
+    )
+    ticket_pool_variant_id = str(decision_variant_id or "").strip() or selected_variant_id
+    ticket_pool_artifact, ticket_pool_status = _postmatch_ticket_pool_payload(resolved, ticket_pool_variant_id, release)
     settled = [row for row in rows if row["winning_sp"] is not None]
     if not settled:
         return {"error": "not settled", "issue": resolved}, 404
@@ -5640,14 +5878,9 @@ def _settlement(
     payload = {
         "issue": resolved,
         "settled_ts": datetime.now(timezone.utc).isoformat(),
-        "strategy_version_context": _strategy_version_context(
-            release,
-            variant_options,
-            decision_variant_id,
-            suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
-            incomplete_shadow_variants=incomplete_shadow_variants,
-        ),
+        "strategy_version_context": version_context,
         "decision_variant_options": variant_options,
+        "postmatch_ticket_pool_status": ticket_pool_status,
         "n_tickets": 0,
         "n_hits": 0,
         "n_legs_total": len(rows),
@@ -5671,6 +5904,8 @@ def _settlement(
         payload["postmatch_review_issue_summary"] = postmatch_summary
     if postmatch_reviews:
         payload["postmatch_reviews"] = postmatch_reviews
+    if ticket_pool_artifact:
+        payload["postmatch_ticket_pool"] = ticket_pool_artifact
     return payload, 200
 
 
@@ -6135,6 +6370,44 @@ def create_app(
             only_date = _today_hk()
         with _connect(db_path) as conn:
             return jsonify(_main_strategy_payload(conn, issue, only_date=only_date, decision_variant_id=decision_variant_id))
+
+    @app.get("/api/issues/<issue>/segment-betting-plan")
+    def segment_betting_plan(issue: str):
+        release = _active_strategy_release()
+        requested_variant_id = _requested_decision_variant_id()
+        decision_variant_id = requested_variant_id or _default_decision_variant_id(release)
+        planning_scope = str(request.args.get("planning_scope") or request.args.get("scope") or "next_segment").strip()
+        stake_mode = str(request.args.get("stake_mode") or "scale_to_budget").strip()
+        betting_strategy_version = str(request.args.get("betting_strategy_version") or "").strip()
+        label = str(request.args.get("label") or "").strip()
+        with _connect(db_path) as conn:
+            try:
+                resolved = _resolve_issue(conn, issue)
+            except LookupError as exc:
+                if issue in {"current", "latest"}:
+                    return jsonify({"error": str(exc)}), 404
+                resolved = issue
+        plan, artifact_status = _segment_betting_plan_payload(
+            resolved,
+            decision_variant_id=decision_variant_id,
+            planning_scope=planning_scope,
+            stake_mode=stake_mode,
+            betting_strategy_version=betting_strategy_version,
+            label=label,
+            release=release,
+        )
+        if plan:
+            plan["strategy_release"] = _strategy_release_public_payload(release)
+            return jsonify(plan)
+        return jsonify({
+            "status": "missing",
+            "issue": resolved,
+            "strategy_family": SEGMENT_BETTING_STRATEGY_FAMILY,
+            "artifact_schema_version": SEGMENT_BETTING_ARTIFACT_SCHEMA_VERSION,
+            "artifact_status": artifact_status,
+            "strategy_release": _strategy_release_public_payload(release),
+            "plan": None,
+        })
 
     @app.get("/api/issues/<issue>/signals")
     def signals(issue: str):

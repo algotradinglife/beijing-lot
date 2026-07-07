@@ -10,6 +10,17 @@ per-match 3/1/0 selections. It groups executable selections into kickoff-time
 segments, chooses N from segment size and expected coverage, samples affordable
 small-combo bundles, and settles or estimates return.
 
+Ownership boundary:
+
+- Strategy owns the generation method: script logic, parameter semantics,
+  versioning, and this frontend/API contract.
+- Backend/frontend ops owns running the generator for live issues and placing
+  the resulting artifacts under the active strategy release's
+  `artifacts.segment_betting_plan_dir`.
+- API and frontend only read those generated artifacts.
+- Missing live artifacts should be displayed as an explicit strategy gap; the
+  dashboard must not synthesize or recompute a fallback plan.
+
 ## Versioning
 
 The betting strategy has its own version independent from the decision-chain
@@ -48,6 +59,12 @@ Each run writes:
 | `segment_betting_plan_seed_summary.csv` | One summary row per sampled seed. |
 | `segment_betting_plan_segment_seed_summary.csv` | Per-segment stability summary across seeds. |
 
+The directory is selected by `config/strategy_release.json`:
+
+```text
+artifacts.segment_betting_plan_dir
+```
+
 ## JSON Contract
 
 The summary JSON includes:
@@ -64,6 +81,10 @@ The summary JSON includes:
 | `available_segments` | Number of dynamic segments available after decision-time filtering. |
 | `segments` | Number of segments actually included in this plan. |
 | `sp_drift_risk` | Risk marker. `accepted=true` means the user chose to buy remaining future segments now. |
+| `summary.expected_profit_yuan` / `summary.expected_roi` | Live/open-issue display metrics. |
+| `summary.settlement_status` | `unsettled`, `partially_settled`, or `settled`. |
+| `summary.primary_metric_mode` | `expected` before settlement, `realized` after all included rows settle. |
+| `summary.payout_yuan` / `summary.profit_yuan` / `summary.roi` | Realized replay metrics; blank until all included segments are settled. |
 | `seed_aggregate.summary_mode` | `single_seed` or `multi_seed_mean`. |
 | `seed_aggregate.metrics.*` | `min`, `p10`, `mean`, `median`, `p90`, `max` for cost, payout, profit, ROI, bundles, selected segments, and dead segments. |
 | `settings` | Concrete values used for the run. |
@@ -74,6 +95,51 @@ The summary JSON includes:
 For live planning, the frontend should treat one deterministic primary seed as
 the executable plan and show multi-seed output as stability/risk context. A
 multi-seed run is not an instruction to buy every sampled plan.
+
+For open issues, display expected profit/ROI as the estimate and label realized
+profit/ROI as pending. Realized fields are populated only after all included
+matches are settled.
+
+## API Contract
+
+The decision API exposes the plan through a read-only endpoint:
+
+```text
+GET /api/issues/<issue>/segment-betting-plan
+```
+
+Default filters:
+
+| filter | default |
+| --- | --- |
+| `decision_variant` / `variant` / `version` | Active release default decision variant. |
+| `planning_scope` | `next_segment` |
+| `stake_mode` | `scale_to_budget` |
+| `betting_strategy_version` | empty, meaning latest matching artifact by mtime. |
+| `label` | empty. |
+
+When an artifact is found, the response is the summary JSON plus:
+
+| key | meaning |
+| --- | --- |
+| `_artifact_path` | Resolved summary JSON path. |
+| `artifact_status.status` | `available`. |
+| `strategy_release` | Active release metadata and artifact health. |
+
+When no artifact is found, the API returns HTTP 200 with:
+
+```text
+status=missing
+artifact_status.status=missing
+artifact_status.artifact_dir=<resolved segment_betting_plan_dir>
+artifact_status.filters=<effective filters>
+plan=null
+```
+
+Frontend should render the missing state directly and route it to the live
+artifact generation job/operator; it should not call the generator itself from
+the browser. Strategy action is only needed when the method, parameters, or
+contract need to change.
 
 ## Planning Scope
 
@@ -160,6 +226,8 @@ changed between strategy versions:
 | --- | --- |
 | `eligible_matches` | N starts from segment size, roughly half the available matches. |
 | `expected_coverage_hit_rate` | Lower expected coverage can downgrade N. |
+| `settlement_status` / `settled_matches` | Separates live planning from settled replay. |
+| `expected_profit_yuan` / `expected_roi` | Primary live estimate. |
 | `actual_coverage_hit_rate` | Settled replay diagnostic only. |
 | `width_counts` | Different single/double/full-cover shapes change cost and coverage. |
 | `recommended_n` / `initial_recommended_n` | Shows final N after budget fallback versus initial recommendation. |

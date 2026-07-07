@@ -23,7 +23,7 @@ def _load_module():
     return module
 
 
-def _leg(mod, idx: int, codes: tuple[str, ...], actual: str, winning_sp: float):
+def _leg(mod, idx: int, codes: tuple[str, ...], actual: str, winning_sp: float | None):
     return mod.rolling.LegRow(
         issue="1001",
         match_idx=idx,
@@ -102,6 +102,50 @@ def test_settle_segment_selects_bundles_under_budget() -> None:
     assert len(selected) <= 1
     if selected:
         assert selected[0].candidate.cost_units <= 2
+
+
+def test_settle_segment_keeps_unsettled_live_metrics_pending() -> None:
+    mod = _load_module()
+    legs = [
+        _leg(mod, 1, ("3", "1"), "", None),
+        _leg(mod, 2, ("0",), "", None),
+        _leg(mod, 3, ("1",), "", None),
+        _leg(mod, 4, ("3",), "", None),
+        _leg(mod, 5, ("3",), "", None),
+        _leg(mod, 6, ("3",), "", None),
+    ]
+    segment = mod.rolling.Segment(
+        segment_idx=1,
+        start=legs[0].kickoff,
+        end=legs[-1].kickoff,
+        window_hours=12,
+        legs=tuple(legs),
+    )
+
+    row, selected = mod.settle_segment(
+        segment,
+        arm="shadow",
+        segment_budget_yuan=20,
+        stake_yuan_per_ticket=2,
+        sample_attempts=100,
+        sample_seed=7,
+        min_n=3,
+        max_n=8,
+        max_overlap=None,
+        positive_ev_only=False,
+    )
+    summary = mod.summarize([row], [mod.candidate_to_row(item, stake_yuan_per_ticket=2) for item in selected])
+
+    assert row["settlement_status"] == "unsettled"
+    assert row["actual_coverage_hit_rate"] == ""
+    assert row["profit_yuan"] == ""
+    assert row["roi"] == ""
+    assert row["dead_segment"] == 0
+    assert row["expected_profit_yuan"] != ""
+    assert summary["settlement_status"] == "unsettled"
+    assert summary["primary_metric_mode"] == "expected"
+    assert summary["profit_yuan"] == ""
+    assert summary["expected_profit_yuan"] != ""
 
 
 def test_run_writes_outputs(tmp_path: Path) -> None:

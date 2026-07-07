@@ -647,3 +647,107 @@ def test_postmatch_review_api_dry_run_and_real_write_review_rows(tmp_path: Path,
     assert settlement["postmatch_reviews"][0]["outcome_label"] == "押中"
     assert settlement["strategy_version_context"]["requested_variant_id"] == "missing_v9"
     assert settlement["strategy_version_context"]["selection_status"] == "unavailable"
+
+
+def test_settlement_attaches_postmatch_ticket_pool_artifact(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "500_bjdc.sqlite"
+    _build_minimal_500_db(db_path)
+    conn = appmod._connect(db_path)
+    try:
+        conn.execute(
+            """
+            UPDATE matches
+            SET score='2:1',
+                result_code='3',
+                result_label='胜',
+                winning_sp=2.10
+            WHERE issue='review_tie_case' AND match_idx=1
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    artifact_dir = tmp_path / "postmatch"
+    artifact_path = artifact_dir / "review_tie_case_20260707_active_v3" / "postmatch_ticket_pool_review_tie_case_active_v3.json"
+    artifact_path.parent.mkdir(parents=True)
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "postmatch_ticket_pool_artifact_v1",
+                "artifact_version": "1.0.0",
+                "issue": "review_tie_case",
+                "variant_id": "active_v3",
+                "variant_version": "3.0.0",
+                "decision_time": {"scope": "pytest"},
+                "review_version": "pytest_postmatch_ticket_pool",
+                "generated_at": "2026-07-07T00:00:00+00:00",
+                "no_future_policy": "pytest",
+                "settings": {},
+                "summary": {"ticket_count": 1, "profit_yuan": 2.2},
+                "n_replay": [],
+                "match_attribution": [],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    requested_artifact_path = artifact_dir / "review_tie_case_20260707_shadow_test" / "postmatch_ticket_pool_review_tie_case_shadow_test.json"
+    requested_artifact_path.parent.mkdir(parents=True)
+    requested_artifact_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "postmatch_ticket_pool_artifact_v1",
+                "artifact_version": "1.0.0",
+                "issue": "review_tie_case",
+                "variant_id": "shadow_test",
+                "variant_version": "3.3.3",
+                "decision_time": {"scope": "pytest"},
+                "review_version": "pytest_requested_variant",
+                "generated_at": "2026-07-07T00:00:00+00:00",
+                "no_future_policy": "pytest",
+                "settings": {},
+                "summary": {"ticket_count": 2, "profit_yuan": 4.4},
+                "n_replay": [],
+                "match_attribution": [],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    registry_path = tmp_path / "strategy_release.json"
+    registry_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "strategy_release_registry_v1",
+                "active_release_id": appmod.DEFAULT_STRATEGY_RELEASE_ID,
+                "releases": {
+                    appmod.DEFAULT_STRATEGY_RELEASE_ID: {
+                        "artifacts": {
+                            "postmatch_ticket_pool_dir": str(artifact_dir),
+                        }
+                    }
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(appmod, "STRATEGY_RELEASE_CONFIG", registry_path)
+    appmod._strategy_release_registry.cache_clear()
+    try:
+        app = appmod.create_app(sqlite_db=db_path)
+        with app.test_client() as client:
+            settlement = client.get("/api/issues/review_tie_case/settlement").get_json()
+            requested = client.get("/api/issues/review_tie_case/settlement?decision_variant=shadow_test").get_json()
+    finally:
+        appmod._strategy_release_registry.cache_clear()
+
+    assert settlement["postmatch_ticket_pool_status"]["status"] == "available"
+    assert settlement["postmatch_ticket_pool_status"]["variant_id"] == "active_v3"
+    assert settlement["postmatch_ticket_pool"]["summary"]["ticket_count"] == 1
+    assert settlement["postmatch_ticket_pool"]["_artifact_path"].endswith("postmatch_ticket_pool_review_tie_case_active_v3.json")
+    assert requested["strategy_version_context"]["selection_status"] == "unavailable"
+    assert requested["postmatch_ticket_pool_status"]["status"] == "available"
+    assert requested["postmatch_ticket_pool_status"]["variant_id"] == "shadow_test"
+    assert requested["postmatch_ticket_pool"]["summary"]["ticket_count"] == 2

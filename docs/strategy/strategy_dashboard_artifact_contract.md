@@ -82,6 +82,8 @@ ticket_pool_csv
 linegap_drift_dir
 joint_leg_rows_csv
 structured_shadow_dir
+postmatch_ticket_pool_dir
+segment_betting_plan_dir
 ```
 
 Paths may be absolute or relative to the repo root.
@@ -101,6 +103,8 @@ Optional but supported:
 ```text
 linegap_drift_dir/paper_arm_summary.csv
 structured_shadow_dir/<issue>_*/structured_shadow_<issue>.csv
+postmatch_ticket_pool_dir/<issue>_*/postmatch_ticket_pool_<issue>_<variant>.json
+segment_betting_plan_dir/<issue>_*/segment_betting_plan_summary.json
 ```
 
 v4.2.0000 execution artifacts are published through the same
@@ -196,6 +200,131 @@ For v4.2.0000 execution artifacts:
   a stop/wait row into an actionable pick.
 - Rolling/N views and any stake preview must use `shadow_selection_codes`.
 - Dashboard/API must treat `execution_*` as read-only artifact data.
+
+## Postmatch Ticket-Pool Artifacts
+
+Strategy owns formal post-settlement ticket-pool replay artifacts under:
+
+```text
+postmatch_ticket_pool_dir/<issue>_<YYYYMMDD>_<variant_id>/postmatch_ticket_pool_<issue>_<variant_id>.json
+```
+
+The schema version is:
+
+```text
+postmatch_ticket_pool_artifact_v1
+```
+
+Minimum top-level fields:
+
+```text
+schema_version
+artifact_version
+issue
+variant_id
+variant_version
+decision_time
+review_version
+generated_at
+no_future_policy
+settings
+summary
+n_replay
+match_attribution
+```
+
+`summary` is the strategy-level issue replay summary for the dynamic rolling
+segment policy. It includes budget, ticket count, hit tickets, stake, payout,
+profit, ROI, max segment loss, coverage, primary/protection hits, stop checks,
+and failure-tag counts.
+
+`n_replay` contains the fixed N=3/4/5/6/7 formal replay at the configured
+segment budget, including ticket count, stake, payout, profit, ROI,
+hit-ticket rate, miss-by-1/miss-by-2 counts, segment rows, and main drag legs.
+
+`match_attribution` is leg-level attribution for the dynamic policy: selection
+role, actual result, winning SP, ticket appearances, hit/miss appearances,
+profit contribution, tags, and next-rule suggestion.
+
+The existing settlement endpoint attaches the artifact when available:
+
+```text
+GET /api/issues/<issue>/settlement?decision_variant=<variant_id>
+```
+
+Response fields:
+
+```text
+postmatch_ticket_pool_status
+postmatch_ticket_pool
+```
+
+If the artifact is missing, the API returns
+`postmatch_ticket_pool_status.status=missing` and does not synthesize a
+fallback from per-match review rows. Dashboard should render this as an
+explicit strategy artifact gap.
+
+Historical artifacts must not be silently overwritten. A rerun with changed
+logic must publish a different `variant_id`/version or an explicitly separate
+artifact directory; post-settlement artifacts are review-only and must not be
+used to improve a pre-settlement recommendation retroactively.
+
+## Segment Betting Plan Artifacts
+
+Strategy owns the rolling segment N-string betting plan method through:
+
+```text
+scripts/estimate_segment_betting_plan.py
+```
+
+This means strategy maintains the script logic, parameter semantics, versioning,
+and artifact schema. Backend/frontend ops is responsible for running the method
+for concrete live issues and placing the generated files where the active
+release points frontend/API reads:
+
+```text
+segment_betting_plan_dir
+```
+
+Each generated plan lives under:
+
+```text
+segment_betting_plan_dir/<issue>_<label>_<betting_strategy_version>_<planning_scope>_<stake_mode>_b<budget>_<seed_slug>/
+```
+
+Minimum files:
+
+```text
+segment_betting_plan_summary.json
+segment_betting_plan_segments.csv
+segment_betting_plan_bundles.csv
+segment_betting_plan_seed_summary.csv
+segment_betting_plan_segment_seed_summary.csv
+```
+
+The API endpoint is read-only and never generates a plan on demand:
+
+```text
+GET /api/issues/<issue>/segment-betting-plan
+```
+
+Supported query filters:
+
+```text
+decision_variant | variant | version
+planning_scope=next_segment|remaining_issue
+stake_mode=scale_to_budget|unit_once
+betting_strategy_version=<segment_betting_v...>
+label=<artifact label>
+```
+
+Defaults are `planning_scope=next_segment`, `stake_mode=scale_to_budget`, and
+the active release's default decision variant. If no matching artifact exists,
+the API returns `artifact_status.status=missing` with the resolved
+`artifact_dir` and filters; frontend should render this as a strategy artifact
+gap, not silently recompute a plan. The operational fix for a missing current
+issue artifact is to run the approved generation job; strategy changes are
+needed only when the method or contract changes.
 
 ## Validation
 

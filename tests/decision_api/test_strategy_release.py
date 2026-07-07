@@ -598,3 +598,65 @@ def test_main_strategy_reads_release_artifacts(monkeypatch, tmp_path: Path) -> N
         assert payload["source"]["main_strategy_dir"].endswith("results/main_strategy_custom")
     finally:
         _clear_strategy_caches()
+
+
+def test_segment_betting_plan_endpoint_reads_release_artifact(monkeypatch, tmp_path: Path) -> None:
+    config_path, db_path = _build_release_fixture(tmp_path)
+    _minimal_db(db_path)
+    segment_dir = tmp_path / "results/segment_betting_plan"
+    plan_dir = segment_dir / "99123_active_v3_segment_betting_v0.3.0000_next_segment_scale_to_budget_b1000_seed1"
+    plan_dir.mkdir(parents=True)
+    (plan_dir / "segment_betting_plan_summary.json").write_text(
+        json.dumps(
+            {
+                "issue": "99123",
+                "label": "active_v3",
+                "strategy_family": "segment_betting_plan",
+                "betting_strategy_version": "segment_betting_v0.3.0000",
+                "artifact_schema_version": "segment_betting_artifact_v1",
+                "arm": "active",
+                "structured_csv": "results/structured_decision_chain_shadow/99123_active_v3/structured_shadow_99123.csv",
+                "planning_scope": "next_segment",
+                "decision_time": "2026-07-07 12:00",
+                "summary": {"selected_cost_yuan": 998.0, "profit_yuan": 120.0},
+                "seed_aggregate": {"summary_mode": "single_seed"},
+                "parameter_schema": [],
+                "settings": {"stake_mode": "scale_to_budget", "planning_scope": "next_segment"},
+                "segment_csv": str(plan_dir / "segment_betting_plan_segments.csv"),
+                "bundle_csv": str(plan_dir / "segment_betting_plan_bundles.csv"),
+                "seed_summary_csv": str(plan_dir / "segment_betting_plan_seed_summary.csv"),
+                "segment_seed_summary_csv": str(plan_dir / "segment_betting_plan_segment_seed_summary.csv"),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    registry = json.loads(config_path.read_text(encoding="utf-8"))
+    registry["releases"]["fixture_release"]["artifacts"]["segment_betting_plan_dir"] = str(segment_dir)
+    config_path.write_text(json.dumps(registry, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(appmod, "STRATEGY_RELEASE_CONFIG", config_path)
+    _clear_strategy_caches()
+
+    try:
+        app = appmod.create_app(sqlite_db=db_path)
+        with app.test_client() as client:
+            response = client.get("/api/issues/99123/segment-betting-plan")
+            missing = client.get("/api/issues/99123/segment-betting-plan?planning_scope=remaining_issue")
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload["artifact_status"]["status"] == "available"
+        assert payload["artifact_status"]["stake_mode"] == "scale_to_budget"
+        assert payload["artifact_status"]["planning_scope"] == "next_segment"
+        assert payload["summary"]["selected_cost_yuan"] == 998.0
+        assert payload["_artifact_path"].endswith("segment_betting_plan_summary.json")
+        assert payload["strategy_release"]["artifacts"]["segment_betting_plan_dir"] == str(segment_dir)
+
+        assert missing.status_code == 200
+        missing_payload = missing.get_json()
+        assert missing_payload["status"] == "missing"
+        assert missing_payload["artifact_status"]["status"] == "missing"
+        assert missing_payload["artifact_status"]["filters"]["planning_scope"] == "remaining_issue"
+        assert missing_payload["plan"] is None
+    finally:
+        _clear_strategy_caches()

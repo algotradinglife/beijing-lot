@@ -175,6 +175,11 @@ def mean_summary(seed_summary_rows: list[dict[str, Any]]) -> dict[str, Any]:
     for key, value in seed_summary_rows[0].items():
         if key == "sample_seed":
             continue
+        if key in {"settlement_status", "primary_metric_mode"}:
+            values = [str(row.get(key) or "") for row in seed_summary_rows if row.get(key) != ""]
+            unique = sorted(set(values))
+            out[key] = unique[0] if len(unique) == 1 else ",".join(unique)
+            continue
         values = [rolling.fnum(row.get(key)) for row in seed_summary_rows if row.get(key) != ""]
         if not values:
             out[key] = ""
@@ -192,6 +197,8 @@ def aggregate_seed_summaries(seed_summary_rows: list[dict[str, Any]]) -> dict[st
         "payout_yuan",
         "profit_yuan",
         "roi",
+        "expected_profit_yuan",
+        "expected_roi",
         "selected_bundles",
         "stake_multiplier_units",
         "selected_segments",
@@ -224,6 +231,8 @@ def aggregate_segment_seed_rows(segment_rows: list[dict[str, Any]]) -> list[dict
                 "segment_end": row0.get("segment_end", ""),
                 "eligible_matches": row0.get("eligible_matches", ""),
                 "expected_coverage_hit_rate": row0.get("expected_coverage_hit_rate", ""),
+                "settled_matches": row0.get("settled_matches", ""),
+                "settlement_status": row0.get("settlement_status", ""),
                 "actual_coverage_hits": row0.get("actual_coverage_hits", ""),
                 "actual_coverage_hit_rate": row0.get("actual_coverage_hit_rate", ""),
                 "recommended_n_values": ",".join(n_values),
@@ -727,11 +736,23 @@ def settle_segment(
     reasons.append(stake_mode_reason)
 
     width_counts = Counter(item.width for item in metrics)
-    actual_hits = sum(1 for item in metrics if item.leg.actual_code in item.codes)
+    settled_matches = sum(1 for item in metrics if item.leg.actual_code and item.leg.winning_sp is not None)
+    if metrics and settled_matches == len(metrics):
+        settlement_status = "settled"
+    elif settled_matches:
+        settlement_status = "partially_settled"
+    else:
+        settlement_status = "unsettled"
+    actual_hits = sum(
+        1
+        for item in metrics
+        if item.leg.actual_code and item.leg.winning_sp is not None and item.leg.actual_code in item.codes
+    )
     base_cost_units = sum(item.cost_units for item in selected)
     payout_units = sum(staked_bundle_payout_units(item) for item in staked_selected)
-    profit_units = payout_units - selected_cost_units
+    profit_units = payout_units - selected_cost_units if settlement_status == "settled" else None
     expected_profit_units = sum(staked_bundle_expected_profit_units(item) for item in staked_selected)
+    expected_roi = expected_profit_units / selected_cost_units if selected_cost_units else ""
     drift_accepted, drift_level, drift_reason = planning_scope_risk(planning_scope)
     row = {
         "segment_idx": segment.segment_idx,
@@ -748,8 +769,10 @@ def settle_segment(
         "window_hours": round(segment.window_hours, 2),
         "eligible_matches": len(metrics),
         "expected_coverage_hit_rate": round(n_info["expected_coverage_hit_rate"], 6),
+        "settled_matches": settled_matches,
+        "settlement_status": settlement_status,
         "actual_coverage_hits": actual_hits,
-        "actual_coverage_hit_rate": round(actual_hits / len(metrics), 6) if metrics else "",
+        "actual_coverage_hit_rate": round(actual_hits / settled_matches, 6) if settled_matches else "",
         "recommended_n": n_value or "",
         "initial_recommended_n": n_info["initial_recommended_n"],
         "stake_mode": stake_mode,
@@ -763,12 +786,13 @@ def settle_segment(
         "segment_budget_yuan": round(segment_budget_yuan, 6),
         "expected_profit_units": round(expected_profit_units, 6),
         "expected_profit_yuan": round(expected_profit_units * stake_yuan_per_ticket, 6),
-        "payout_units": round(payout_units, 6),
-        "payout_yuan": round(payout_units * stake_yuan_per_ticket, 6),
-        "profit_units": round(profit_units, 6),
-        "profit_yuan": round(profit_units * stake_yuan_per_ticket, 6),
-        "roi": round(profit_units / selected_cost_units, 6) if selected_cost_units else "",
-        "dead_segment": int(bool(selected) and payout_units <= 0),
+        "expected_roi": round(expected_roi, 6) if expected_roi != "" else "",
+        "payout_units": round(payout_units, 6) if settlement_status == "settled" else "",
+        "payout_yuan": round(payout_units * stake_yuan_per_ticket, 6) if settlement_status == "settled" else "",
+        "profit_units": round(profit_units, 6) if profit_units is not None else "",
+        "profit_yuan": round(profit_units * stake_yuan_per_ticket, 6) if profit_units is not None else "",
+        "roi": round(profit_units / selected_cost_units, 6) if profit_units is not None and selected_cost_units else "",
+        "dead_segment": int(bool(selected) and settlement_status == "settled" and payout_units <= 0),
         "width_counts": dict(sorted(width_counts.items())),
         "reasons": ";".join(reason for reason in reasons if reason),
         "match_indices": ",".join(str(item.leg.match_idx) for item in metrics),
@@ -779,8 +803,19 @@ def settle_segment(
 def summarize(segment_rows: list[dict[str, Any]], bundle_rows: list[dict[str, Any]]) -> dict[str, Any]:
     base_cost_units = sum(rolling.fnum(row.get("base_cost_units")) for row in segment_rows)
     selected_cost_units = sum(rolling.fnum(row.get("selected_cost_units")) for row in segment_rows)
-    payout_units = sum(rolling.fnum(row.get("payout_units")) for row in segment_rows)
-    profit_units = payout_units - selected_cost_units
+    statuses = {str(row.get("settlement_status") or "") for row in segment_rows if row.get("settlement_status") != ""}
+    if not segment_rows:
+        settlement_status = ""
+    elif statuses == {"settled"}:
+        settlement_status = "settled"
+    elif statuses == {"unsettled"}:
+        settlement_status = "unsettled"
+    else:
+        settlement_status = "partially_settled"
+    realized_complete = settlement_status == "settled"
+    payout_units = sum(rolling.fnum(row.get("payout_units")) for row in segment_rows) if realized_complete else None
+    profit_units = (payout_units or 0.0) - selected_cost_units if realized_complete else None
+    expected_profit_units = sum(rolling.fnum(row.get("expected_profit_units")) for row in segment_rows)
     stake_multiplier_units = sum(rolling.fnum(row.get("stake_multiplier_units")) for row in segment_rows)
     stake = rolling.fnum(segment_rows[0].get("selected_cost_yuan")) / max(
         rolling.fnum(segment_rows[0].get("selected_cost_units")),
@@ -796,11 +831,16 @@ def summarize(segment_rows: list[dict[str, Any]], bundle_rows: list[dict[str, An
         "base_cost_yuan": round(base_cost_units * stake, 6),
         "selected_cost_units": round(selected_cost_units, 6),
         "selected_cost_yuan": round(selected_cost_units * stake, 6),
-        "payout_units": round(payout_units, 6),
-        "payout_yuan": round(payout_units * stake, 6),
-        "profit_units": round(profit_units, 6),
-        "profit_yuan": round(profit_units * stake, 6),
-        "roi": round(profit_units / selected_cost_units, 6) if selected_cost_units else "",
+        "expected_profit_units": round(expected_profit_units, 6),
+        "expected_profit_yuan": round(expected_profit_units * stake, 6),
+        "expected_roi": round(expected_profit_units / selected_cost_units, 6) if selected_cost_units else "",
+        "settlement_status": settlement_status,
+        "primary_metric_mode": "realized" if realized_complete else "expected",
+        "payout_units": round(payout_units, 6) if payout_units is not None else "",
+        "payout_yuan": round(payout_units * stake, 6) if payout_units is not None else "",
+        "profit_units": round(profit_units, 6) if profit_units is not None else "",
+        "profit_yuan": round(profit_units * stake, 6) if profit_units is not None else "",
+        "roi": round(profit_units / selected_cost_units, 6) if profit_units is not None and selected_cost_units else "",
     }
 
 
@@ -877,7 +917,9 @@ def render_report(
     args: argparse.Namespace,
 ) -> str:
     generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
-    top_bundles = sorted(bundle_rows, key=lambda row: rolling.fnum(row.get("scaled_profit_units")), reverse=True)[:12]
+    primary_metric_mode = str(summary.get("primary_metric_mode") or "realized")
+    top_bundle_key = "scaled_profit_units" if primary_metric_mode == "realized" else "scaled_expected_profit_units"
+    top_bundles = sorted(bundle_rows, key=lambda row: rolling.fnum(row.get(top_bundle_key)), reverse=True)[:12]
     seed_count = len(seed_summary_rows)
     seed_label = (
         f"{seed_count} seeds ({seed_summary_rows[0]['sample_seed']}..{seed_summary_rows[-1]['sample_seed']})"
@@ -887,7 +929,7 @@ def render_report(
     stability_rows = [
         {"metric": key, **values}
         for key, values in seed_aggregate.get("metrics", {}).items()
-        if key in {"selected_cost_yuan", "payout_yuan", "profit_yuan", "roi", "dead_segments"}
+        if key in {"selected_cost_yuan", "expected_profit_yuan", "expected_roi", "payout_yuan", "profit_yuan", "roi", "dead_segments"}
     ]
     return f"""# Segment Betting Plan {issue} {label} {betting_strategy_version}
 
@@ -903,7 +945,7 @@ Generated: {generated}
 - Each selected bundle is one small-combo N串1 ticket group: cost units are `product(width_i)`, yuan cost is `{args.stake_yuan_per_ticket}` times that. A hit pays one expanded ticket: `product(winning_sp_i)`.
 - Candidate bundles are sampled by leg hit probability and unit value `sum(p*sp)/width`; the selector buys positive-EV bundles under `{args.segment_budget_yuan}` yuan per segment with overlap guard `{args.max_overlap if args.max_overlap is not None else 'N-2'}`.
 - Sampling stability is measured with `{seed_label}`. Multi-seed reports use the mean as the main estimate and min/p10/median/p90/max as the variation interval.
-- This is a settled replay for estimating behavior, not a promotion gate. If the structured artifact has fewer rows than the settled issue, missing rows are not backfilled after the fact.
+- `settlement_status={summary.get("settlement_status", "")}` and `primary_metric_mode={summary.get("primary_metric_mode", "")}`. Open/live issues should use expected profit/ROI; realized payout/profit/ROI are only populated after the segment is fully settled.
 
 ## Summary
 
@@ -915,6 +957,10 @@ Generated: {generated}
 | stake multiplier units | {summary["stake_multiplier_units"]} |
 | base cost yuan | {summary["base_cost_yuan"]} |
 | cost yuan | {summary["selected_cost_yuan"]} |
+| expected profit yuan | {summary["expected_profit_yuan"]} |
+| expected ROI | {summary["expected_roi"]} |
+| settlement status | {summary.get("settlement_status", "")} |
+| primary metric mode | {summary.get("primary_metric_mode", "")} |
 | payout yuan | {summary["payout_yuan"]} |
 | profit yuan | {summary["profit_yuan"]} |
 | ROI | {summary["roi"]} |
@@ -947,6 +993,8 @@ Generated: {generated}
         ("seg", "segment_idx"),
         ("L", "eligible_matches"),
         ("p_exp", "expected_coverage_hit_rate"),
+        ("settled", "settled_matches"),
+        ("status", "settlement_status"),
         ("hits", "actual_coverage_hits"),
         ("N values", "recommended_n_values"),
         ("N stable", "recommended_n_stable"),
@@ -970,6 +1018,8 @@ Generated: {generated}
         ("drift", "sp_drift_risk_level"),
         ("L", "eligible_matches"),
         ("p_exp", "expected_coverage_hit_rate"),
+        ("settled", "settled_matches"),
+        ("status", "settlement_status"),
         ("hits", "actual_coverage_hits"),
         ("hit%", "actual_coverage_hit_rate"),
         ("N", "recommended_n"),
@@ -977,6 +1027,8 @@ Generated: {generated}
         ("bundles", "selected_bundles"),
         ("base", "base_cost_yuan"),
         ("cost", "selected_cost_yuan"),
+        ("exp profit", "expected_profit_yuan"),
+        ("exp ROI", "expected_roi"),
         ("payout", "payout_yuan"),
         ("profit", "profit_yuan"),
         ("ROI", "roi"),
@@ -994,6 +1046,7 @@ Generated: {generated}
         ("x", "stake_multiplier"),
         ("cost", "cost_yuan"),
         ("scaled cost", "scaled_cost_yuan"),
+        ("scaled EV", "scaled_expected_profit_units"),
         ("EV roi", "expected_roi"),
         ("hit p", "hit_prob"),
         ("hit", "realized_hit"),
