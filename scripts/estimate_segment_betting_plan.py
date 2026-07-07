@@ -30,7 +30,7 @@ DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "results/segment_betting_plan"
 DEFAULT_REPORT_DIR = PROJECT_ROOT / "docs/research"
 OUTCOME_CODES = ("3", "1", "0")
 BETTING_STRATEGY_FAMILY = "segment_betting_plan"
-BETTING_STRATEGY_VERSION = "segment_betting_v0.1.0000"
+BETTING_STRATEGY_VERSION = "segment_betting_v0.2.0000"
 ARTIFACT_SCHEMA_VERSION = "segment_betting_artifact_v1"
 
 
@@ -79,6 +79,31 @@ def stable_seed(*parts: object) -> int:
 
 def slugify(value: str) -> str:
     return "".join(ch if ch.isalnum() or ch in {"-", "_", "."} else "_" for ch in value)
+
+
+def parse_optional_decision_time(value: str) -> datetime | None:
+    token = str(value or "").strip()
+    return rolling.parse_dt(token) if token else None
+
+
+def format_optional_dt(value: datetime | None) -> str:
+    return value.strftime("%Y-%m-%d %H:%M") if value else ""
+
+
+def hours_between(start: datetime | None, end: datetime) -> float | str:
+    if start is None:
+        return ""
+    return round((end - start).total_seconds() / 3600.0, 6)
+
+
+def planning_scope_risk(planning_scope: str) -> tuple[int, str, str]:
+    if planning_scope == "remaining_issue":
+        return (
+            1,
+            "elevated",
+            "remaining_issue_selected_user_accepts_far_kickoff_sp_drift",
+        )
+    return 0, "bounded", "next_segment_only_limits_far_kickoff_sp_drift"
 
 
 def sample_seeds_from_args(args: argparse.Namespace) -> list[int]:
@@ -210,6 +235,23 @@ def aggregate_segment_seed_rows(segment_rows: list[dict[str, Any]]) -> list[dict
 
 def betting_strategy_parameter_schema() -> list[dict[str, Any]]:
     return [
+        {
+            "key": "planning_scope",
+            "label": "planning scope",
+            "ui_level": "basic",
+            "type": "enum",
+            "default": "next_segment",
+            "options": ["next_segment", "remaining_issue"],
+            "effect": "Choose only the next dynamic segment, or buy every remaining issue segment while accepting SP drift risk.",
+        },
+        {
+            "key": "decision_time",
+            "label": "decision time",
+            "ui_level": "basic",
+            "type": "datetime",
+            "default": "",
+            "effect": "Filters out matches that have already kicked off at planning time.",
+        },
         {
             "key": "segment_budget_yuan",
             "label": "segment budget",
@@ -554,6 +596,8 @@ def settle_segment(
     max_n: int,
     max_overlap: int | None,
     positive_ev_only: bool,
+    planning_scope: str = "next_segment",
+    decision_time: datetime | None = None,
 ) -> tuple[dict[str, Any], list[BundleCandidate]]:
     metrics = [item for leg in segment.legs if (item := leg_metrics(leg, arm)) is not None]
     budget_units = segment_budget_yuan / stake_yuan_per_ticket if stake_yuan_per_ticket > 0 else 0.0
@@ -600,11 +644,19 @@ def settle_segment(
     payout_units = sum(item.payout_units for item in selected)
     profit_units = payout_units - selected_cost_units
     expected_profit_units = sum(item.expected_profit_units for item in selected)
+    drift_accepted, drift_level, drift_reason = planning_scope_risk(planning_scope)
     row = {
         "segment_idx": segment.segment_idx,
         "arm": arm,
+        "planning_scope": planning_scope,
+        "decision_time": format_optional_dt(decision_time),
         "segment_start": segment.start.strftime("%Y-%m-%d %H:%M"),
         "segment_end": segment.end.strftime("%Y-%m-%d %H:%M"),
+        "hours_from_decision_start": hours_between(decision_time, segment.start),
+        "hours_from_decision_end": hours_between(decision_time, segment.end),
+        "sp_drift_risk_accepted": drift_accepted,
+        "sp_drift_risk_level": drift_level,
+        "sp_drift_risk_reason": drift_reason,
         "window_hours": round(segment.window_hours, 2),
         "eligible_matches": len(metrics),
         "expected_coverage_hit_rate": round(n_info["expected_coverage_hit_rate"], 6),
@@ -738,6 +790,7 @@ Generated: {generated}
 ## Strategy {betting_strategy_version}
 
 - Use rolling kickoff segments, not natural days: start with `{args.window_hours}`h, extend through `{args.extend_hours}`h until at least `{args.min_matches}` eligible matches, cap a segment at `{args.max_matches}` matches.
+- Planning scope is `{args.planning_scope}`. `next_segment` buys only the next dynamic segment; `remaining_issue` buys all remaining issue segments and marks SP drift risk as accepted.
 - Eligible matches are rows with executable selected codes for `--arm {args.arm}`. Rows with no-buy/stop are excluded from bundle selection.
 - N starts from half of eligible match count, capped at `{args.max_n}`, then drops by expected coverage hit rate using `select_rolling_segment_n.py`.
 - Each selected bundle is one small-combo N串1 ticket group: cost units are `product(width_i)`, yuan cost is `{args.stake_yuan_per_ticket}` times that. A hit pays one expanded ticket: `product(winning_sp_i)`.
@@ -800,8 +853,10 @@ Generated: {generated}
 {md_table(segment_rows, [
         ("seed", "sample_seed"),
         ("seg", "segment_idx"),
+        ("scope", "planning_scope"),
         ("start", "segment_start"),
         ("end", "segment_end"),
+        ("drift", "sp_drift_risk_level"),
         ("L", "eligible_matches"),
         ("p_exp", "expected_coverage_hit_rate"),
         ("hits", "actual_coverage_hits"),
@@ -848,6 +903,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--label", default="")
     parser.add_argument("--betting-strategy-version", default=BETTING_STRATEGY_VERSION)
     parser.add_argument("--arm", choices=("active", "shadow"), default="shadow")
+    parser.add_argument("--planning-scope", choices=("next_segment", "remaining_issue"), default="next_segment")
+    parser.add_argument("--decision-time", default="", help="Local issue datetime; filters out matches with kickoff <= decision time.")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--report-dir", type=Path, default=DEFAULT_REPORT_DIR)
@@ -872,16 +929,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def run(args: argparse.Namespace) -> dict[str, Any]:
     label = args.label or Path(args.structured_csv).parent.name
     legs = rolling.load_legs(args.structured_csv, args.db, issue=args.issue)
-    eligible_legs = [leg for leg in legs if selected_codes_for(leg, args.arm)]
-    if not eligible_legs:
+    decision_time = parse_optional_decision_time(args.decision_time)
+    eligible_before_decision_filter = [leg for leg in legs if selected_codes_for(leg, args.arm)]
+    eligible_legs = [
+        leg
+        for leg in eligible_before_decision_filter
+        if decision_time is None or leg.kickoff > decision_time
+    ]
+    if not eligible_before_decision_filter:
         raise SystemExit(f"No eligible legs loaded for issue {args.issue}")
-    segments = rolling.build_segments(
+    if not eligible_legs:
+        raise SystemExit(f"No future eligible legs loaded for issue {args.issue}")
+    all_segments = rolling.build_segments(
         eligible_legs,
         base_window_hours=args.window_hours,
         extend_hours=rolling.parse_extend_hours(args.extend_hours),
         min_matches=args.min_matches,
         max_matches=args.max_matches,
     )
+    segments = all_segments[:1] if args.planning_scope == "next_segment" else all_segments
 
     seeds = sample_seeds_from_args(args)
     segment_rows: list[dict[str, Any]] = []
@@ -902,6 +968,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 max_n=args.max_n,
                 max_overlap=args.max_overlap,
                 positive_ev_only=not args.allow_negative_ev,
+                planning_scope=args.planning_scope,
+                decision_time=decision_time,
             )
             row = {"sample_seed": sample_seed, **row}
             seed_segment_rows.append(row)
@@ -925,7 +993,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         seed_slug = f"seed{seeds[0]}"
     else:
         seed_slug = f"seeds{len(seeds)}_{seeds[0]}-{seeds[-1]}"
-    slug = f"{args.issue}_{slug_label}_{version_slug}_b{int(args.segment_budget_yuan)}_{seed_slug}"
+    scope_slug = slugify(args.planning_scope)
+    slug = f"{args.issue}_{slug_label}_{version_slug}_{scope_slug}_b{int(args.segment_budget_yuan)}_{seed_slug}"
     out_dir = args.output_dir / slug
     segment_csv = out_dir / "segment_betting_plan_segments.csv"
     bundle_csv = out_dir / "segment_betting_plan_bundles.csv"
@@ -945,14 +1014,25 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "arm": args.arm,
         "structured_csv": str(args.structured_csv),
         "source_rows": len(legs),
+        "eligible_rows_before_decision_filter": len(eligible_before_decision_filter),
         "eligible_rows": len(eligible_legs),
+        "available_segments": len(all_segments),
         "segments": len(segments),
+        "planning_scope": args.planning_scope,
+        "decision_time": format_optional_dt(decision_time),
+        "sp_drift_risk": {
+            "accepted": bool(planning_scope_risk(args.planning_scope)[0]),
+            "level": planning_scope_risk(args.planning_scope)[1],
+            "reason": planning_scope_risk(args.planning_scope)[2],
+        },
         "summary": summary,
         "seed_aggregate": seed_aggregate,
         "parameter_schema": betting_strategy_parameter_schema(),
         "settings": {
             "window_hours": args.window_hours,
             "extend_hours": args.extend_hours,
+            "planning_scope": args.planning_scope,
+            "decision_time": format_optional_dt(decision_time),
             "min_matches": args.min_matches,
             "max_matches": args.max_matches,
             "segment_budget_yuan": args.segment_budget_yuan,

@@ -5,7 +5,7 @@ import importlib.util
 import json
 import sqlite3
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 
@@ -182,11 +182,13 @@ def test_run_writes_outputs(tmp_path: Path) -> None:
 
     summary_payload = json.loads(Path(payload["summary_json"]).read_text(encoding="utf-8"))
     assert summary_payload["strategy_family"] == "segment_betting_plan"
-    assert summary_payload["betting_strategy_version"] == "segment_betting_v0.1.0000"
+    assert summary_payload["betting_strategy_version"] == "segment_betting_v0.2.0000"
     assert summary_payload["artifact_schema_version"] == "segment_betting_artifact_v1"
+    assert summary_payload["planning_scope"] == "next_segment"
+    assert summary_payload["sp_drift_risk"]["accepted"] is False
     assert summary_payload["seed_aggregate"]["summary_mode"] == "single_seed"
     assert any(item["key"] == "segment_budget_yuan" for item in summary_payload["parameter_schema"])
-    assert "segment_betting_v0.1.0000" in payload["summary_json"]
+    assert "segment_betting_v0.2.0000" in payload["summary_json"]
 
 
 def test_run_multi_seed_writes_stability_outputs(tmp_path: Path) -> None:
@@ -281,3 +283,95 @@ def test_run_multi_seed_writes_stability_outputs(tmp_path: Path) -> None:
         segment_seed_rows = list(csv.DictReader(f))
     assert segment_seed_rows
     assert "recommended_n_values" in segment_seed_rows[0]
+
+
+def test_planning_scope_can_limit_to_next_segment_or_remaining_issue(tmp_path: Path) -> None:
+    mod = _load_module()
+    db = tmp_path / "test.sqlite"
+    start = datetime(2026, 7, 1, 0, 0)
+    conn = sqlite3.connect(db)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE matches (
+                issue TEXT NOT NULL,
+                match_idx INTEGER NOT NULL,
+                end_time TEXT,
+                league TEXT,
+                home TEXT,
+                away TEXT,
+                result_code TEXT,
+                winning_sp REAL,
+                PRIMARY KEY(issue, match_idx)
+            )
+            """
+        )
+        for idx in range(1, 13):
+            kickoff = start + timedelta(hours=idx * 4)
+            conn.execute(
+                "INSERT INTO matches VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                ("1001", idx, kickoff.strftime("%Y-%m-%d %H:%M"), "T", f"H{idx}", f"A{idx}", "3", 2.0),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+    structured = tmp_path / "structured.csv"
+    rows = [
+        {
+            "issue": "1001",
+            "match_idx": str(idx),
+            "match_id": f"1001_{idx:03d}",
+            "active_selection_codes": "3",
+            "shadow_selection_codes": "3",
+            "p_3": "0.70",
+            "p_1": "0.20",
+            "p_0": "0.10",
+            "sp_3": "2.0",
+            "sp_1": "3.5",
+            "sp_0": "4.0",
+        }
+        for idx in range(1, 13)
+    ]
+    with structured.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+
+    base_args = [
+        "--issue",
+        "1001",
+        "--structured-csv",
+        str(structured),
+        "--db",
+        str(db),
+        "--output-dir",
+        str(tmp_path / "out"),
+        "--report-dir",
+        str(tmp_path / "reports"),
+        "--segment-budget-yuan",
+        "100",
+        "--sample-attempts",
+        "200",
+        "--min-matches",
+        "3",
+        "--decision-time",
+        "2026-07-01 10:00",
+    ]
+
+    next_payload = mod.run(mod.parse_args([*base_args, "--planning-scope", "next_segment"]))
+    assert next_payload["planning_scope"] == "next_segment"
+    assert next_payload["available_segments"] > 1
+    assert next_payload["segments"] == 1
+    assert next_payload["eligible_rows_before_decision_filter"] == 12
+    assert next_payload["eligible_rows"] == 10
+    assert next_payload["sp_drift_risk"]["accepted"] is False
+
+    remaining_payload = mod.run(mod.parse_args([*base_args, "--planning-scope", "remaining_issue"]))
+    assert remaining_payload["planning_scope"] == "remaining_issue"
+    assert remaining_payload["segments"] == remaining_payload["available_segments"]
+    assert remaining_payload["segments"] > 1
+    assert remaining_payload["sp_drift_risk"]["accepted"] is True
+    with Path(remaining_payload["segment_csv"]).open(encoding="utf-8", newline="") as f:
+        segment_rows = list(csv.DictReader(f))
+    assert all(row["planning_scope"] == "remaining_issue" for row in segment_rows)
+    assert all(row["sp_drift_risk_accepted"] == "1" for row in segment_rows)

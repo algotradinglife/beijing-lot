@@ -20,7 +20,7 @@ Current default:
 | field | value |
 | --- | --- |
 | `strategy_family` | `segment_betting_plan` |
-| `betting_strategy_version` | `segment_betting_v0.1.0000` |
+| `betting_strategy_version` | `segment_betting_v0.2.0000` |
 | `artifact_schema_version` | `segment_betting_artifact_v1` |
 
 Version semantics:
@@ -58,6 +58,11 @@ The summary JSON includes:
 | `strategy_family` | Betting planner family id. |
 | `betting_strategy_version` | Version of segmentation/N/bundle/budget logic. |
 | `artifact_schema_version` | JSON/CSV schema version for frontend compatibility. |
+| `planning_scope` | `next_segment` or `remaining_issue`. |
+| `decision_time` | Optional planning timestamp used to filter already-started matches. |
+| `available_segments` | Number of dynamic segments available after decision-time filtering. |
+| `segments` | Number of segments actually included in this plan. |
+| `sp_drift_risk` | Risk marker. `accepted=true` means the user chose to buy remaining future segments now. |
 | `seed_aggregate.summary_mode` | `single_seed` or `multi_seed_mean`. |
 | `seed_aggregate.metrics.*` | `min`, `p10`, `mean`, `median`, `p90`, `max` for cost, payout, profit, ROI, bundles, selected segments, and dead segments. |
 | `settings` | Concrete values used for the run. |
@@ -69,12 +74,30 @@ For live planning, the frontend should treat one deterministic primary seed as
 the executable plan and show multi-seed output as stability/risk context. A
 multi-seed run is not an instruction to buy every sampled plan.
 
+## Planning Scope
+
+The live betting workflow is dynamic. One issue can be split into several
+rolling kickoff segments, but the user chooses how much of the remaining issue
+to buy now.
+
+| `planning_scope` | meaning | SP drift posture |
+| --- | --- | --- |
+| `next_segment` | Build and buy only the next dynamic segment after `decision_time`. | Default. Limits far-kickoff SP drift. |
+| `remaining_issue` | Build and buy every remaining dynamic segment in the issue. | User explicitly accepts SP drift risk for later segments. |
+
+When `decision_time` is present, matches with `kickoff <= decision_time` are
+excluded before segment construction. The frontend should show `available_segments`
+and `segments` together so the user can see whether they are buying one segment
+or the whole remaining issue.
+
 ## Recommended Controls
 
 Basic controls:
 
 | key | default | effect |
 | --- | --- | --- |
+| `planning_scope` | `next_segment` | Choose next dynamic segment or all remaining issue segments. |
+| `decision_time` | empty | Filters out matches already started at planning time. |
 | `segment_budget_yuan` | `1000` | Caps total cost per rolling segment. |
 | `window_hours` | `12` | Base kickoff window. Smaller is closer to kickoff but can starve segments. |
 | `extend_hours` | `18,24,36` | Fallback windows when the base segment is too small. |
@@ -113,6 +136,7 @@ changed between strategy versions:
 | `width_counts` | Different single/double/full-cover shapes change cost and coverage. |
 | `recommended_n` / `initial_recommended_n` | Shows final N after budget fallback versus initial recommendation. |
 | `reasons` | Includes N downgrade and no-bundle explanations. |
+| `planning_scope` / `sp_drift_risk_level` | Explains whether the segment is part of a bounded next-segment buy or remaining-issue buy. |
 
 Different decision-chain versions can therefore produce different N for the same
 time segment because they expose different executable legs, widths, and coverage
