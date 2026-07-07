@@ -25,10 +25,17 @@ import evaluate_structured_decision_chain_v4_2 as decision_chain  # noqa: E402
 DEFAULT_DB = PROJECT_ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 DEFAULT_SHADOW_DIR = PROJECT_ROOT / "results/structured_decision_chain_shadow"
 DEFAULT_WORK_DIR = PROJECT_ROOT / "results/v4_2_execution_publish_work"
+DEFAULT_ARTIFACT_VERSION_ID = "v4.2.0005"
 STRICT_POLICY_NAME = "strict_fullcap2"
 LATE_PROXY_POLICY_NAME = "late_proxy_fullcap2"
-STRICT_ARM = "shadow_v4.2.0000_execution_strict_fullcap2"
-LATE_PROXY_ARM = "shadow_v4.2.0000_execution_late_proxy_fullcap2"
+
+
+def execution_shadow_arm_prefix(artifact_version_id: str) -> str:
+    return f"shadow_{artifact_version_id}_execution"
+
+
+def execution_variant_id(artifact_version_id: str, policy_name: str) -> str:
+    return f"{execution_shadow_arm_prefix(artifact_version_id)}_{policy_name}"
 
 
 def utc_slug() -> str:
@@ -176,6 +183,7 @@ def apply_execution(
     late_refresh_mode: str,
     policy_name: str,
     execution_sp_mode: str,
+    shadow_arm_prefix: str,
 ) -> dict[str, Any]:
     _csv_path, _report_path, summary = execution_policy.apply_policy(
         issue=issue,
@@ -193,6 +201,7 @@ def apply_execution(
         max_matches=24,
         policy_name=policy_name,
         execution_sp_mode=execution_sp_mode,
+        shadow_arm_prefix=shadow_arm_prefix,
     )
     return summary
 
@@ -208,8 +217,10 @@ def run(
     max_refresh_age_minutes: float = 90.0,
     force_late_proxy: bool = False,
     date_slug: str | None = None,
+    artifact_version_id: str = DEFAULT_ARTIFACT_VERSION_ID,
 ) -> dict[str, Any]:
     date = date_slug or utc_slug()
+    shadow_arm_prefix = execution_shadow_arm_prefix(artifact_version_id)
     source = source_csv or find_source_structured_csv(issue, shadow_dir)
     if source is None:
         return {"status": "skipped", "reason": "source_structured_csv_missing", "issue": issue}
@@ -236,7 +247,7 @@ def run(
         date_slug=date,
     )
     outputs: dict[str, Any] = {}
-    strict_csv = published_csv_path(shadow_dir, issue, STRICT_ARM, date)
+    strict_csv = published_csv_path(shadow_dir, issue, execution_variant_id(artifact_version_id, STRICT_POLICY_NAME), date)
     outputs[STRICT_POLICY_NAME] = apply_execution(
         issue=issue,
         source_csv=source,
@@ -247,9 +258,10 @@ def run(
         late_refresh_mode="skip",
         policy_name=STRICT_POLICY_NAME,
         execution_sp_mode="source",
+        shadow_arm_prefix=shadow_arm_prefix,
     )
     if refresh_ok:
-        late_csv = published_csv_path(shadow_dir, issue, LATE_PROXY_ARM, date)
+        late_csv = published_csv_path(shadow_dir, issue, execution_variant_id(artifact_version_id, LATE_PROXY_POLICY_NAME), date)
         outputs[LATE_PROXY_POLICY_NAME] = apply_execution(
             issue=issue,
             source_csv=source,
@@ -260,11 +272,13 @@ def run(
             late_refresh_mode="proxy",
             policy_name=LATE_PROXY_POLICY_NAME,
             execution_sp_mode="latest_trusted",
+            shadow_arm_prefix=shadow_arm_prefix,
         )
 
     return {
         "status": "published",
         "issue": issue,
+        "artifact_version_id": artifact_version_id,
         "source_csv": str(source),
         "decision_csv": str(decision),
         "late_proxy_published": bool(refresh_ok),
@@ -284,6 +298,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-refresh-age-minutes", type=float, default=90.0)
     parser.add_argument("--force-late-proxy", action="store_true")
     parser.add_argument("--date-slug", default="")
+    parser.add_argument("--artifact-version-id", default=DEFAULT_ARTIFACT_VERSION_ID)
     return parser.parse_args()
 
 
@@ -299,6 +314,7 @@ def main() -> None:
         max_refresh_age_minutes=args.max_refresh_age_minutes,
         force_late_proxy=args.force_late_proxy,
         date_slug=args.date_slug or None,
+        artifact_version_id=args.artifact_version_id,
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
 

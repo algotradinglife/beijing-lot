@@ -109,15 +109,28 @@ def test_current_strategy_release_keeps_v3_3_3_as_runtime_default() -> None:
     release = registry["releases"][registry["active_release_id"]]
     variants = {item["variant_id"]: item for item in release["decision_variants"]}
 
+    assert variants["active_v3"]["is_default"] is False
+    assert variants["active_v3"]["selectable"] is False
     assert variants["shadow_v3.3.3"]["is_default"] is True
-    for variant_id in (
-        "shadow_v4.2.0000_execution_strict_fullcap2",
-        "shadow_v4.2.0000_execution_late_proxy_fullcap2",
+    assert variants["shadow_v3.3.3"]["selectable"] is True
+    for variant_id, version_id in (
+        ("shadow_v4.2.0000_execution_strict_fullcap2", "4.2.0004"),
+        ("shadow_v4.2.0005_execution_strict_fullcap2", "4.2.0005"),
     ):
-        variant = variants[variant_id]
-        assert variant["is_default"] is False
-        assert variant["selectable"] is True
-        assert variant["readiness"]["defaultable_when"] == "never"
+        strict = variants[variant_id]
+        assert strict["version_id"] == version_id
+        assert strict["is_default"] is False
+        assert strict["selectable"] is False
+        assert strict["readiness"]["defaultable_when"] == "never"
+    for variant_id, version_id in (
+        ("shadow_v4.2.0000_execution_late_proxy_fullcap2", "4.2.0004"),
+        ("shadow_v4.2.0005_execution_late_proxy_fullcap2", "4.2.0005"),
+    ):
+        late = variants[variant_id]
+        assert late["version_id"] == version_id
+        assert late["is_default"] is False
+        assert late["selectable"] is True
+        assert late["readiness"]["defaultable_when"] == "never"
 
 
 def _write_registry(tmp_path: Path, registry: dict[str, Any]) -> Path:

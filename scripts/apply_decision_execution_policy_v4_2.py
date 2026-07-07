@@ -917,6 +917,7 @@ def apply_policy(
     max_matches: int,
     policy_name: str,
     execution_sp_mode: str = "source",
+    shadow_arm_prefix: str = SHADOW_ARM,
 ) -> tuple[Path, Path, dict[str, Any]]:
     source_rows, source_fieldnames = load_csv(source_csv)
     decisions = load_decisions(decision_csv)
@@ -1025,7 +1026,7 @@ def apply_policy(
         selection_text = "+".join(execution.selection_codes)
         row["shadow_selection_codes"] = selection_text
         row["shadow_primary"] = execution.selection_codes[0] if execution.selection_codes else ""
-        row["shadow_arm"] = f"{SHADOW_ARM}_{policy_name}"
+        row["shadow_arm"] = f"{shadow_arm_prefix}_{policy_name}"
         row["shadow_version"] = SHADOW_VERSION
         row["shadow_stop_flag"] = "0" if execution.selection_codes else "1"
         row["selection_type"] = selection_type_from_codes(execution.selection_codes)
@@ -1054,6 +1055,7 @@ def apply_policy(
         "issue": issue,
         "policy_version": POLICY_VERSION,
         "policy_name": policy_name,
+        "shadow_arm": f"{shadow_arm_prefix}_{policy_name}",
         "late_refresh_mode": late_refresh_mode,
         "execution_sp_mode": execution_sp_mode,
         "full_score_threshold": full_score_threshold,
@@ -1126,6 +1128,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-matches", type=int, default=6)
     parser.add_argument("--max-matches", type=int, default=24)
     parser.add_argument("--policy-name", default="")
+    parser.add_argument("--shadow-arm-prefix", default=SHADOW_ARM)
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 
@@ -1150,6 +1153,7 @@ def main() -> None:
         max_matches=args.max_matches,
         policy_name=policy_name,
         execution_sp_mode=execution_sp_mode,
+        shadow_arm_prefix=args.shadow_arm_prefix,
     )
     if args.json:
         print(json.dumps(summary, ensure_ascii=False, indent=2))

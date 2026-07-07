@@ -39,7 +39,7 @@ export function isShadowDecisionVariant(variant: VariantLike) {
 export function decisionVersionLabel(variant: VariantLike) {
   if (!variant) return '';
   const id = variant.variantId || '';
-  const base = shortVersion(id, variant.versionId, variant.version, variant.displayLabel, variant.label);
+  const base = shortVersion(variant.versionId, variant.version, id, variant.displayLabel, variant.label);
   const role = decisionVersionRole(variant);
   return [base, role].filter(Boolean).join(' ');
 }
@@ -47,13 +47,17 @@ export function decisionVersionLabel(variant: VariantLike) {
 export function decisionVersionDescription(variant: VariantLike) {
   if (!variant) return '';
   const id = variant.variantId.toLowerCase();
+  const version = shortVersion(variant.versionId, variant.version, variant.variantId, variant.displayLabel, variant.label);
   if (variant.available === false || variant.readinessStatus === 'degraded') {
     if (id.includes('execution_strict')) return '执行产物未就绪，仅作诊断；生成后才可投注参考。';
     return variant.degradedReason ? '当前版本未就绪，仅作诊断。' : '当前版本未就绪。';
   }
-  if (id.includes('execution_late_proxy')) return '晚盘 SP 刷新后可出票，当前 v4.2 默认执行版。';
-  if (id.includes('execution_strict')) return '晚盘前严格等待版，适合审计刷新前的停牌逻辑。';
-  if (id.includes('shadow_v3.3.3')) return '稳定影子决策链，作为 v4.2 不可用时的基线。';
+  if (id.includes('execution_late_proxy')) {
+    if (version === 'v4.2.0005') return 'v4.2.0005 备选观察版：继承 v4.2 coverage/ROI，新增极值 SP/source q guard；不作为默认。';
+    return `${version || 'v4.2.0004'} 备选观察版：coverage/ROI 有潜力，但需防范异常 SP/q 带偏；不作为默认。`;
+  }
+  if (id.includes('execution_strict')) return `${version || 'v4.2.0004'} 严格等待观察版，用于审计晚盘刷新前的停牌逻辑；不作为默认。`;
+  if (id.includes('shadow_v3.3.3')) return '默认稳定决策链：先解决胜率，q 主要用于保护和增厚。';
   if (id === ACTIVE_DECISION_VARIANT_ID) return '旧版快照，用于对照。';
   if (decisionVariantKind(variant) === DECISION_VARIANT_KIND.SHADOW) return '影子决策链版本。';
   return variant.source ? '当前可选决策版本。' : '';
@@ -61,9 +65,9 @@ export function decisionVersionDescription(variant: VariantLike) {
 
 function decisionVersionRole(variant: NonNullable<VariantLike>) {
   const id = variant.variantId.toLowerCase();
-  if (id.includes('execution_late_proxy')) return '晚盘执行';
-  if (id.includes('execution_strict')) return '严格等待';
-  if (id.includes('shadow_v3.3.3')) return '稳定版';
+  if (id.includes('execution_late_proxy')) return '备选观察';
+  if (id.includes('execution_strict')) return '严格观察';
+  if (id.includes('shadow_v3.3.3')) return '默认稳定';
   if (id === ACTIVE_DECISION_VARIANT_ID) return '旧版';
   if (decisionVariantKind(variant) === DECISION_VARIANT_KIND.SHADOW) return '影子版';
   return variant.label && !looksInternal(variant.label) ? variant.label : '';
@@ -76,7 +80,8 @@ function shortVersion(...values: Array<string | undefined>) {
     const semantic = text.match(/(?:^|[_\-\s])v?(\d+)\.(\d+)\.(\d{1,4})/i) ?? text.match(/^v?(\d+)\.(\d+)\.(\d{1,4})/i);
     if (semantic) {
       const [, major, minor, patch] = semantic;
-      return `v${Number(major)}.${Number(minor)}.${Number(patch)}`;
+      const patchText = patch.length >= 4 ? patch : String(Number(patch));
+      return `v${Number(major)}.${Number(minor)}.${patchText}`;
     }
     const active = text.match(/^active_v(\d+)$/i);
     if (active) return `v${Number(active[1])}.0`;

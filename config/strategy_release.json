@@ -36,7 +36,7 @@
           "label": "v3",
           "source": "active_snapshot",
           "is_default": false,
-          "selectable": true,
+          "selectable": false,
           "readiness": {
             "artifact_required": false,
             "defaultable_when": "always",
@@ -63,13 +63,13 @@
         },
         {
           "variant_id": "shadow_v4.2.0000_execution_strict_fullcap2",
-          "version_id": "4.2.0000",
+          "version_id": "4.2.0004",
           "kind": "shadow",
-          "label": "v4.2.0000 strict fullcap2",
+          "label": "v4.2.0004 strict 观察",
           "source": "structured_shadow_csv",
           "artifact_key": "structured_shadow_dir",
           "is_default": false,
-          "selectable": true,
+          "selectable": false,
           "readiness": {
             "artifact_required": true,
             "defaultable_when": "never",
@@ -80,9 +80,43 @@
         },
         {
           "variant_id": "shadow_v4.2.0000_execution_late_proxy_fullcap2",
-          "version_id": "4.2.0000",
+          "version_id": "4.2.0004",
           "kind": "shadow",
-          "label": "v4.2.0000 late proxy fullcap2",
+          "label": "v4.2.0004 备选观察",
+          "source": "structured_shadow_csv",
+          "artifact_key": "structured_shadow_dir",
+          "is_default": false,
+          "selectable": true,
+          "readiness": {
+            "artifact_required": true,
+            "defaultable_when": "never",
+            "missing_behavior": "hidden_until_artifact",
+            "late_refresh": "unlock_after_valid_live_sp_refresh",
+            "missing_reason": "late_proxy_execution_artifact_missing_or_not_refreshed"
+          }
+        },
+        {
+          "variant_id": "shadow_v4.2.0005_execution_strict_fullcap2",
+          "version_id": "4.2.0005",
+          "kind": "shadow",
+          "label": "v4.2.0005 strict 观察",
+          "source": "structured_shadow_csv",
+          "artifact_key": "structured_shadow_dir",
+          "is_default": false,
+          "selectable": false,
+          "readiness": {
+            "artifact_required": true,
+            "defaultable_when": "never",
+            "missing_behavior": "diagnostic_placeholder",
+            "late_refresh": "strict_wait_before_valid_live_sp_refresh",
+            "missing_reason": "strict_execution_artifact_missing_for_issue"
+          }
+        },
+        {
+          "variant_id": "shadow_v4.2.0005_execution_late_proxy_fullcap2",
+          "version_id": "4.2.0005",
+          "kind": "shadow",
+          "label": "v4.2.0005 备选观察",
           "source": "structured_shadow_csv",
           "artifact_key": "structured_shadow_dir",
           "is_default": false,

@@ -240,14 +240,17 @@ def test_valid_live_sp_refresh_publishes_late_proxy_unlock(tmp_path: Path) -> No
     )
 
     assert summary["status"] == "published"
+    assert summary["artifact_version_id"] == "v4.2.0005"
     assert summary["late_proxy_published"] is True
-    strict_csv = shadow_dir / "1001_20260705_shadow_v4.2.0000_execution_strict_fullcap2/structured_shadow_1001.csv"
-    late_csv = shadow_dir / "1001_20260705_shadow_v4.2.0000_execution_late_proxy_fullcap2/structured_shadow_1001.csv"
+    strict_csv = shadow_dir / "1001_20260705_shadow_v4.2.0005_execution_strict_fullcap2/structured_shadow_1001.csv"
+    late_csv = shadow_dir / "1001_20260705_shadow_v4.2.0005_execution_late_proxy_fullcap2/structured_shadow_1001.csv"
     assert strict_csv.exists()
     assert late_csv.exists()
 
     strict_row = _read_first_row(strict_csv)
     late_row = _read_first_row(late_csv)
+    assert strict_row["shadow_arm"] == "shadow_v4.2.0005_execution_strict_fullcap2"
+    assert late_row["shadow_arm"] == "shadow_v4.2.0005_execution_late_proxy_fullcap2"
     assert strict_row["execution_unlock_state"] == "waiting_late_refresh"
     assert strict_row["shadow_stop_flag"] == "1"
     assert strict_row["shadow_selection_codes"] == ""
@@ -279,9 +282,10 @@ def test_missing_live_sp_refresh_keeps_late_proxy_unpublished(tmp_path: Path) ->
     )
 
     assert summary["status"] == "published"
+    assert summary["artifact_version_id"] == "v4.2.0005"
     assert summary["late_proxy_published"] is False
     assert summary["late_refresh"]["reason"] == "no_successful_live_sp_xml"
-    strict_csv = shadow_dir / "1001_20260705_shadow_v4.2.0000_execution_strict_fullcap2/structured_shadow_1001.csv"
-    late_csv = shadow_dir / "1001_20260705_shadow_v4.2.0000_execution_late_proxy_fullcap2/structured_shadow_1001.csv"
+    strict_csv = shadow_dir / "1001_20260705_shadow_v4.2.0005_execution_strict_fullcap2/structured_shadow_1001.csv"
+    late_csv = shadow_dir / "1001_20260705_shadow_v4.2.0005_execution_late_proxy_fullcap2/structured_shadow_1001.csv"
     assert strict_csv.exists()
     assert not late_csv.exists()

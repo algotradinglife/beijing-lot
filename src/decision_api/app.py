@@ -3050,6 +3050,22 @@ def _issue_all_has_result(rows: list[sqlite3.Row]) -> bool:
     return bool(rows) and all(_row_has_result(row) for row in rows)
 
 
+def _issue_is_at_or_after_release_effective(issue: str, release: dict[str, Any] | None = None) -> bool:
+    release = release or _active_strategy_release()
+    effective = str(release.get("effective_from_issue") or "").strip()
+    current = str(issue or "").strip()
+    if not effective or not current:
+        return False
+    try:
+        return int(current) >= int(effective)
+    except ValueError:
+        return current >= effective
+
+
+def _should_scan_release_shadow_variants(issue: str, rows: list[sqlite3.Row], release: dict[str, Any] | None = None) -> bool:
+    return _issue_is_at_or_after_release_effective(issue, release) or not _issue_all_has_result(rows)
+
+
 def _active_decision_variant(summary: dict[str, Any]) -> dict[str, Any]:
     codes = _selection_codes_from_value(summary.get("llm_selection_codes") or summary.get("selection_codes"))
     primary = codes[0] if codes else ""
@@ -3403,7 +3419,9 @@ def _decision_variant_options(
         if item.get("kind") == SHADOW_DECISION_VARIANT_KIND
     }
     options.extend(_missing_manifest_shadow_options(present_shadow_ids, release))
-    return _normalize_decision_variant_defaults(options)
+    normalized = _normalize_decision_variant_defaults(options)
+    selectable = [item for item in normalized if item.get("selectable") is not False]
+    return selectable or normalized
 
 
 def _strategy_version_context(
@@ -3626,6 +3644,7 @@ def _attach_decision_variants(
     *,
     release: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
+    manifests = _manifest_variant_by_id(release)
     present_shadow_ids = {
         _shadow_variant_id(rows)
         for rows, _source_path in shadow_variants
@@ -3641,12 +3660,19 @@ def _attach_decision_variants(
     ]
     for match in matches:
         idx = _safe_int(match.get("match_idx"))
-        variants = [_active_decision_variant(match)]
+        variants = []
+        if manifests.get(ACTIVE_DECISION_VARIANT_ID, {}).get("selectable") is not False:
+            variants.append(_active_decision_variant(match))
         result_code = str(match.get("result_code") or "")
         for shadow_rows, shadow_source_path in shadow_variants:
             if idx is not None and idx in shadow_rows and shadow_source_path:
+                variant_id = _shadow_variant_id(shadow_rows)
+                if manifests.get(variant_id, {}).get("selectable") is False:
+                    continue
                 variants.append(_shadow_decision_variant(shadow_rows[idx], shadow_source_path, result_code=result_code))
         for manifest in placeholder_manifests:
+            if manifest.get("selectable") is False:
+                continue
             placeholder = _manifest_shadow_placeholder_decision_variant(manifest)
             if placeholder:
                 variants.append(placeholder)
@@ -4896,7 +4922,7 @@ def _main_strategy_payload(
     suppressed_shadow_variant_ids: list[str] = []
     if _live_issue_exists(conn, resolved):
         rows = _issue_rows(conn, resolved, only_date=None)
-        if not _issue_all_has_result(rows):
+        if _should_scan_release_shadow_variants(resolved, rows, release):
             shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
     variant_options = _decision_variant_options(shadow_variants, release=release)
     historical_pool = _historical_ev_pool(resolved, release)
@@ -5027,7 +5053,7 @@ def _dashboard(
     matches = [_apply_llm_issue_decision(conn, row, _match_summary(row)) for row in rows]
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     suppressed_shadow_variant_ids: list[str] = []
-    if not _issue_all_has_result(rows):
+    if _should_scan_release_shadow_variants(resolved, rows, release):
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
     matches = _attach_decision_variants(matches, shadow_variants, release=release)
     variant_options = _decision_variant_options(shadow_variants, release=release)
@@ -5350,7 +5376,7 @@ def _match_detail(
         )
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     suppressed_shadow_variant_ids: list[str] = []
-    if not _issue_all_has_result(rows):
+    if _should_scan_release_shadow_variants(str(row["issue"]), rows, release):
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(str(row["issue"]), release)
     _attach_decision_variants([summary], shadow_variants, release=release)
     variant_options = _decision_variant_options(shadow_variants, release=release)
@@ -5517,8 +5543,12 @@ def _settlement(
 ) -> tuple[dict[str, Any], int]:
     resolved = _resolve_issue(conn, issue)
     release = _active_strategy_release()
-    variant_options = _decision_variant_options([], release=release)
     rows = _issue_rows(conn, resolved, only_date=None)
+    shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
+    suppressed_shadow_variant_ids: list[str] = []
+    if _should_scan_release_shadow_variants(resolved, rows, release):
+        shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
+    variant_options = _decision_variant_options(shadow_variants, release=release)
     settled = [row for row in rows if row["winning_sp"] is not None]
     if not settled:
         return {"error": "not settled", "issue": resolved}, 404
@@ -5528,7 +5558,12 @@ def _settlement(
     payload = {
         "issue": resolved,
         "settled_ts": datetime.now(timezone.utc).isoformat(),
-        "strategy_version_context": _strategy_version_context(release, variant_options, decision_variant_id),
+        "strategy_version_context": _strategy_version_context(
+            release,
+            variant_options,
+            decision_variant_id,
+            suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
+        ),
         "decision_variant_options": variant_options,
         "n_tickets": 0,
         "n_hits": 0,

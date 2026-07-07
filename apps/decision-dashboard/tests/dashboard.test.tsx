@@ -257,24 +257,28 @@ describe('北单实盘决策台 v1', () => {
 
   it('renders v4.2 execution variants from executable picks and keeps audit recommendations separate', async () => {
     const today = relativeIsoDate(0);
-    const lateProxyId = 'shadow_v4.2.0000_execution_late_proxy_fullcap2';
-    const strictId = 'shadow_v4.2.0000_execution_strict_fullcap2';
+    const lateProxy0004Id = 'shadow_v4.2.0000_execution_late_proxy_fullcap2';
+    const strict0004Id = 'shadow_v4.2.0000_execution_strict_fullcap2';
+    const lateProxyId = 'shadow_v4.2.0005_execution_late_proxy_fullcap2';
+    const strictId = 'shadow_v4.2.0005_execution_strict_fullcap2';
     const decisionVariantOptions = [
       { variantId: 'active_v3', kind: 'active', label: 'v3', version: 'llm_chain_bet_protect_stop_v3', source: 'active_snapshot', isDefault: false },
-      { variantId: strictId, kind: 'shadow', label: 'v4.2 strict', version: 'llm_chain_structured_v4.2.0000_layered_merge_execution_policy', source: 'structured_shadow_csv', artifactKey: 'v4_2_strict', isDefault: false },
-      { variantId: lateProxyId, kind: 'shadow', label: 'v4.2 late proxy', version: 'llm_chain_structured_v4.2.0000_layered_merge_execution_policy', source: 'structured_shadow_csv', artifactKey: 'v4_2_late_proxy', isDefault: true },
+      { variantId: strict0004Id, kind: 'shadow', label: 'v4.2 strict', version: 'llm_chain_structured_v4.2.0000_layered_merge_execution_policy', versionId: '4.2.0004', source: 'structured_shadow_csv', artifactKey: 'v4_2_0004_strict', isDefault: false },
+      { variantId: lateProxy0004Id, kind: 'shadow', label: 'v4.2 late proxy', version: 'llm_chain_structured_v4.2.0000_layered_merge_execution_policy', versionId: '4.2.0004', source: 'structured_shadow_csv', artifactKey: 'v4_2_0004_late_proxy', isDefault: false },
+      { variantId: strictId, kind: 'shadow', label: 'v4.2 strict', version: 'llm_chain_structured_v4.2.0000_layered_merge_execution_policy', versionId: '4.2.0005', source: 'structured_shadow_csv', artifactKey: 'v4_2_0005_strict', isDefault: false },
+      { variantId: lateProxyId, kind: 'shadow', label: 'v4.2 late proxy', version: 'llm_chain_structured_v4.2.0000_layered_merge_execution_policy', versionId: '4.2.0005', source: 'structured_shadow_csv', artifactKey: 'v4_2_0005_late_proxy', isDefault: true },
     ];
     const strategyVersionContext = {
       schemaVersion: 'strategy_version_context_v1',
       requestedVariantId: lateProxyId,
       selectedVariantId: lateProxyId,
       selectionStatus: 'ok',
-      availableVariantIds: ['active_v3', strictId, lateProxyId],
+      availableVariantIds: ['active_v3', strict0004Id, lateProxy0004Id, strictId, lateProxyId],
       options: decisionVariantOptions,
       contractWarnings: [],
     };
     const strictVariant = {
-      ...decisionVariantOptions[1],
+      ...decisionVariantOptions[3],
       recommendation: '等待晚盘',
       primaryPick: undefined,
       protectPicks: [],
@@ -283,7 +287,7 @@ describe('北单实盘决策台 v1', () => {
       stopFlag: true,
       qScore: 3.74,
       probability: 0.45,
-      executionPolicyVersion: 'v4.2.0000_execution_policy_2026-07-05',
+      executionPolicyVersion: 'v4.2.0005_execution_policy_2026-07-07_extreme_source_q_guard',
       executionPolicyName: 'strict_fullcap2',
       executionAction: 'skip_wait_late_refresh',
       executionReasons: ['requires_late_refresh_before_bet'],
@@ -297,7 +301,7 @@ describe('北单实盘决策台 v1', () => {
       executionUnlockState: 'waiting_late_refresh',
     };
     const lateProxyVariant = {
-      ...decisionVariantOptions[2],
+      ...decisionVariantOptions[4],
       recommendation: 'full downgraded to double',
       primaryPick: '1',
       protectPicks: ['3'],
@@ -306,7 +310,7 @@ describe('北单实盘决策台 v1', () => {
       stopFlag: false,
       qScore: 1.11,
       probability: 0.46,
-      executionPolicyVersion: 'v4.2.0000_execution_policy_2026-07-05',
+      executionPolicyVersion: 'v4.2.0005_execution_policy_2026-07-07_extreme_source_q_guard',
       executionPolicyName: 'late_proxy_fullcap2',
       executionAction: 'downgrade_full_to_double_layer_conflict',
       executionReasons: ['full_required_but_value_below_threshold'],
@@ -367,12 +371,15 @@ describe('北单实盘决策台 v1', () => {
     expect([...versionSelect.options].map((option) => option.value)).toContain(lateProxyId);
     expect([...versionSelect.options].map((option) => option.textContent)).toEqual(expect.arrayContaining([
       'v3.0 旧版',
-      'v4.2.0 严格等待',
-      'v4.2.0 晚盘执行',
+      'v4.2.0004 严格观察',
+      'v4.2.0004 备选观察',
+      'v4.2.0005 严格观察',
+      'v4.2.0005 备选观察',
     ]));
     expect(versionSelect.value).toBe(lateProxyId);
-    expect(screen.getByText('晚盘 SP 刷新后可出票，当前 v4.2 默认执行版。')).toBeInTheDocument();
+    expect(screen.getByText('v4.2.0005 备选观察版：继承 v4.2 coverage/ROI，新增极值 SP/source q guard；不作为默认。')).toBeInTheDocument();
     expect(screen.queryByText(/shadow_v4\.2\.0000/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/shadow_v4\.2\.0005/)).not.toBeInTheDocument();
     const row = screen.getByText('bjdc_26052_001').closest('tr');
     expect(row).not.toBeNull();
     const betCell = row!.querySelector('.bet-cell') as HTMLElement;
@@ -393,8 +400,8 @@ describe('北单实盘决策台 v1', () => {
 
     await userEvent.selectOptions(versionSelect, lateProxyId);
     await userEvent.click(screen.getByText('bjdc_26052_001'));
-    expect((screen.getByLabelText('选择详情决策版本') as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('v4.2.0 晚盘执行');
-    expect(screen.getAllByText('v4.2.0 晚盘执行').length).toBeGreaterThan(0);
+    expect((screen.getByLabelText('选择详情决策版本') as HTMLSelectElement).selectedOptions[0]?.textContent).toBe('v4.2.0005 备选观察');
+    expect(screen.getAllByText('v4.2.0005 备选观察').length).toBeGreaterThan(0);
     expect(screen.getByText('执行层')).toBeInTheDocument();
     expect(screen.getByText('可出票')).toBeInTheDocument();
     expect(screen.getByText('晚盘解锁')).toBeInTheDocument();
