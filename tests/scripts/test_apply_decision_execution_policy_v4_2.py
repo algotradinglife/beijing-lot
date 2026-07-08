@@ -532,6 +532,164 @@ def test_segment_annotation_does_not_cap_or_downgrade_full_candidates() -> None:
     assert second.segment_idx == 1
 
 
+def test_execution_artifact_primary_and_judgment_follow_execution_q_top(tmp_path: Path) -> None:
+    mod = _load_module()
+    issue = "26073"
+    db_path = tmp_path / "500.sqlite"
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.executescript(
+            """
+            CREATE TABLE matches (
+                issue TEXT NOT NULL,
+                match_idx INTEGER NOT NULL,
+                end_time TEXT,
+                league TEXT,
+                home TEXT,
+                away TEXT,
+                result_code TEXT,
+                winning_sp REAL,
+                PRIMARY KEY (issue, match_idx)
+            );
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO matches(issue, match_idx, end_time, league, home, away, result_code, winning_sp)
+            VALUES('26073', 1, '2026-07-08 03:00:00', '奥男足', '阿根廷', '埃及', NULL, NULL)
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    source_csv = _write_rows(
+        tmp_path / "source.csv",
+        [
+            {
+                "issue": issue,
+                "match_idx": "1",
+                "match_id": "26073_001",
+                "league": "奥男足",
+                "home": "阿根廷",
+                "away": "埃及",
+                "active_selection_codes": "0",
+                "shadow_selection_codes": "0+3+1",
+                "p_3": "0.3657420453718926",
+                "p_1": "0.25523242855914996",
+                "p_0": "0.3790255260689575",
+                "sp_3": "1.9500",
+                "sp_1": "3.6800",
+                "sp_0": "4.5900",
+                "q_3": "0.7132",
+                "q_1": "0.9393",
+                "q_0": "1.7397",
+                "prob_top": "0",
+                "q_top": "0",
+                "max_q": "1.7397",
+                "shadow_arm": "shadow_v3.3.3",
+                "shadow_version": "fixture",
+                "shadow_primary": "0",
+                "shadow_judgment": "负(埃及)为押，保胜(阿根廷)+平",
+                "shadow_stop_flag": "0",
+                "selection_type": "full",
+            }
+        ],
+        [
+            "issue",
+            "match_idx",
+            "match_id",
+            "league",
+            "home",
+            "away",
+            "active_selection_codes",
+            "shadow_selection_codes",
+            "p_3",
+            "p_1",
+            "p_0",
+            "sp_3",
+            "sp_1",
+            "sp_0",
+            "q_3",
+            "q_1",
+            "q_0",
+            "prob_top",
+            "q_top",
+            "max_q",
+            "shadow_arm",
+            "shadow_version",
+            "shadow_primary",
+            "shadow_judgment",
+            "shadow_stop_flag",
+            "selection_type",
+        ],
+    )
+    decision_csv = _write_rows(
+        tmp_path / "decision.csv",
+        [
+            {
+                "match_idx": "1",
+                "v4_action": "full_cover_or_skip",
+                "v4_recommended_codes": "1+3+0",
+                "v4_selection_codes": "",
+                "v4_semantic_draw": "none",
+                "v4_team_strength_side": "home",
+                "v4_team_strength_confidence": "0.90",
+                "v4_team_strength_codes": "3",
+                "v4_mandatory_codes": "1",
+                "v4_protected_codes": "1",
+                "v4_full_cover_reasons": "candidate_score_dense;layer_conflict_requires_full_cover_or_skip;tight_dense_requires_full_or_skip",
+                "v4_merge_flags": "layer_conflict_requires_full_cover_or_skip",
+                "v4_candidate_pool_json": '[{"code":"1","score":1.945},{"code":"3","score":1.6311},{"code":"0","score":1.1799}]',
+            }
+        ],
+        [
+            "match_idx",
+            "v4_action",
+            "v4_recommended_codes",
+            "v4_selection_codes",
+            "v4_semantic_draw",
+            "v4_team_strength_side",
+            "v4_team_strength_confidence",
+            "v4_team_strength_codes",
+            "v4_mandatory_codes",
+            "v4_protected_codes",
+            "v4_full_cover_reasons",
+            "v4_merge_flags",
+            "v4_candidate_pool_json",
+        ],
+    )
+    output_csv = tmp_path / "out.csv"
+    mod.apply_policy(
+        issue=issue,
+        source_csv=source_csv,
+        decision_csv=decision_csv,
+        db_path=db_path,
+        output_csv=output_csv,
+        report_path=tmp_path / "report.md",
+        late_refresh_mode="proxy",
+        full_score_threshold=1.40,
+        max_full_per_segment=2,
+        window_hours=12.0,
+        extend_hours="18,24,36",
+        min_matches=1,
+        max_matches=24,
+        policy_name="late_proxy_fullcap2",
+        execution_sp_mode="source",
+    )
+
+    row = _read_first_row(output_csv)
+    assert row["execution_action"] == "execute_full_cover"
+    assert row["execution_recommended_codes"] == "1+3+0"
+    assert row["execution_double_codes"] == "1+3"
+    assert row["execution_primary_code"] == "0"
+    assert row["execution_primary_source"] == "execution_q_top"
+    assert row["execution_support_codes"] == "1+3"
+    assert row["shadow_primary"] == "0"
+    assert row["shadow_selection_codes"] == "0+1+3"
+    assert row["shadow_judgment"] == "负(埃及)为押，保平+胜(阿根廷)"
+
+
 def test_late_proxy_reprices_stale_source_sp_before_full_cover_scoring(tmp_path: Path) -> None:
     mod = _load_module()
     issue = "26072"

@@ -111,7 +111,16 @@ v4.2.0000 execution artifacts are published through the same
 `structured_shadow_dir` mechanism. They are still structured shadow CSVs, but
 their `shadow_selection_codes` represents the executable selection after the
 execution policy, while `execution_recommended_codes` preserves the wider
-decision-chain audit recommendation.
+decision-chain audit recommendation. `shadow_primary` is the executable display
+primary, not necessarily the first code from `execution_recommended_codes`.
+For execution artifacts, the generator writes `shadow_selection_codes` in
+display order: primary first, then support codes. It also publishes
+`execution_primary_code`, `execution_primary_source`, and
+`execution_support_codes` so the dashboard can explain whether the primary came
+from refreshed q-top, probability top, a single selection, or fallback
+selection order. `shadow_judgment` is regenerated from these execution fields;
+older source-artifact judgment text must be treated as historical explanation
+only.
 For `late_proxy_fullcap2`, execution scoring must use refreshed per-match SP,
 not the stale source artifact SP. The artifact should retain
 `source_sp_*`/`source_q_*` for audit and publish `execution_sp_*`,
@@ -176,6 +185,10 @@ For v4.2.0000 execution artifacts:
 - Issue Board and Match Detail should show both the audit recommendation
   (`execution_recommended_codes`) and executable selection
   (`shadow_selection_codes`).
+- The display contract is: "押" = `shadow_primary`; "保" =
+  `shadow_selection_codes` minus `shadow_primary`. `execution_primary_source`
+  explains the source of the primary. `execution_double_codes` is compression
+  audit/fallback and should not override the executable display fields.
 - Execution badges should come from `execution_action` and
   `execution_reasons`.
 - `value_only_sp_drift` inside `execution_reasons` is an audit/risk marker for
