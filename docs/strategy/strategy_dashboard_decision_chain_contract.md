@@ -22,12 +22,21 @@ evidence, and the meaning of each decision field.
 Decision variants use manifest ids:
 
 ```text
-active_v3
+active_v3.3.3
 shadow_vX.Y.abcd
 ```
 
 Rules:
 
+- `active_v3.3.3` is the formal default decision-chain variant. It is backed
+  by structured CSV artifacts, not by the old built-in active snapshot.
+- `shadow_v3.3.3` is a legacy alias only. Existing artifacts that still carry
+  `shadow_arm=shadow_v3.3.3` are readable through
+  `decision_variants[].legacy_aliases`, but API/frontend should display
+  `active_v3.3.3`.
+- `active_v3` is retired. It may appear only as a historical baseline and must
+  not be defaultable, selectable, or used as a fallback for missing formal
+  artifacts.
 - New decision-chain artifacts use `shadow_vX.Y.abcd`: `X` is the formal or
   structural line, `Y` is the major logic branch, and `abcd` is the zero-padded
   four-digit fix counter.
@@ -36,7 +45,9 @@ Rules:
 - `decision_variants[].version_id` in `config/strategy_release.json` should
   use the same `X.Y.abcd` decision-chain version (`4.2.0000`, etc.). Release
   bundle `version_id` remains `x.y.z`.
-- CSV `shadow_arm` must equal the manifest `variant_id`.
+- CSV `shadow_arm` must equal the manifest `variant_id`. The only current
+  compatibility exception is legacy `shadow_v3.3.3`, which maps to
+  `active_v3.3.3` through `legacy_aliases`.
 - CSV `shadow_version` is the implementation/version string for audit. It may
   be more descriptive than semver, for example
   `llm_chain_structured_v4.2.0000_layered_merge_execution_policy`.
@@ -45,11 +56,14 @@ Rules:
 - Default selection follows the active release manifest. The API first uses the
   declared `is_default` option when it is available and defaultable; it only
   falls back to highest-version shadow ordering when no explicit default is
-  available. If no shadow artifact is available, active fallback remains
-  available and the response may be degraded.
+  available. If the formal `active_v3.3.3` artifact is missing or incomplete,
+  the API must return an unavailable/degraded strategy-version context and a
+  `structured_shadow_artifacts_incomplete` or artifact-missing warning. It must
+  not fall back to retired `active_v3`.
 
 Promotion from shadow to active requires a new release entry or an explicit
-manifest update. Do not silently reinterpret a shadow CSV as active.
+manifest update. The v3.3.3 promotion is now explicit as `active_v3.3.3`;
+legacy `shadow_v3.3.3` rows are interpreted through the release alias map.
 
 ## Artifact Location
 
@@ -95,7 +109,7 @@ them populated for compatibility.
 | `home` | string | recommended | Display/audit only. |
 | `away` | string | recommended | Display/audit only. |
 | `handicap_line` | number/string | recommended | Beidan handicap line used by the decision chain. |
-| `shadow_arm` | string | yes | Must match a manifest `decision_variants[].variant_id`, e.g. `shadow_v4.1.0`. |
+| `shadow_arm` | string | yes | Must match a manifest `decision_variants[].variant_id`, e.g. `active_v3.3.3` or `shadow_v4.1.0`; legacy `shadow_v3.3.3` is accepted only as an alias for `active_v3.3.3`. |
 | `shadow_version` | string | yes | Implementation version string for audit. |
 | `shadow_judgment` | string | yes | Human-readable final summary. |
 | `shadow_primary` | enum | yes if buy/display codes exist | One of `3`, `1`, `0`; first display pick. |

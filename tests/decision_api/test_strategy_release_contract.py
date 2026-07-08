@@ -108,11 +108,16 @@ def test_current_strategy_release_keeps_v3_3_3_as_runtime_default() -> None:
     release = registry["releases"][registry["active_release_id"]]
     variants = {item["variant_id"]: item for item in release["decision_variants"]}
 
-    assert "active_v3" not in variants
     assert "shadow_v3.3.3" not in variants
+    assert variants["active_v3"]["is_default"] is False
+    assert variants["active_v3"]["selectable"] is False
+    assert variants["active_v3"]["production_status"] == "retired"
+    assert variants["active_v3"]["readiness"]["defaultable_when"] == "never"
     assert variants["active_v3.3.3"]["is_default"] is True
     assert variants["active_v3.3.3"]["selectable"] is True
+    assert "shadow_v3.3.3" in variants["active_v3.3.3"]["legacy_aliases"]
     assert "shadow_v3.3.3" in variants["active_v3.3.3"].get("legacy_variant_ids", [])
+    assert variants["active_v3.3.3"]["readiness"]["missing_behavior"] == "artifact_missing"
     assert not any("execution_strict" in variant_id for variant_id in variants)
     for variant_id, version_id in (
         ("shadow_v4.2.0000_execution_late_proxy_fullcap2", "4.2.0004"),

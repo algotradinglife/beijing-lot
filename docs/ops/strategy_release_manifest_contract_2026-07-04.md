@@ -76,9 +76,18 @@ forward:
 Example: `shadow_v3.4.0000` starts a new major logic branch after
 `shadow_v3.3.0012`; `shadow_v4.0.0000` is a structural/formal version line.
 
-Existing three-part values such as `shadow_v3.3.3` remain readable as legacy
-artifacts and sort equivalently to `shadow_v3.3.0003`. New strategy artifacts
-should use the four-digit fix segment.
+Current formal default:
+
+- `active_v3.3.3` is the live/default decision-chain id exposed to API and UI.
+- `shadow_v3.3.3` is a legacy artifact alias only, declared through
+  `decision_variants[].legacy_aliases`.
+- `active_v3` is retired and must not be selectable, defaultable, or used as a
+  fallback when the formal artifact is missing.
+
+Existing three-part values such as `shadow_v3.3.3` remain readable only when a
+manifest declares them as `legacy_aliases`. New strategy artifacts should emit
+the manifest `variant_id` directly and should use the four-digit fix segment
+for new shadow lines.
 
 ## Required Artifacts
 
@@ -101,7 +110,10 @@ required artifacts in `artifact_health.missing_required`, and return explicit
 degraded/error state. Real mode must not silently fall back to mock data.
 
 The frontend should treat the selected strategy version as one state variable
-shared by Issue Board, Match Detail, and Settlement Review.
+shared by Issue Board, Match Detail, and Settlement Review. If the formal
+`active_v3.3.3` artifact is missing/incomplete, the API should return an
+explicit artifact-missing/degraded state; frontend should not substitute
+retired `active_v3`.
 
 ## Strategy Handoff Checklist
 

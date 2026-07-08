@@ -174,7 +174,7 @@ def test_26071_016_shape_primary_probability_with_q_protection() -> None:
 
     decision = mod.structured_decision_for_payload(payload)
 
-    assert decision["decision_version"] == "llm_chain_bet_protect_stop_v3.3.3_shadow"
+    assert decision["decision_version"] == "llm_chain_bet_protect_stop_v3.3.3"
     assert decision["primary_pick"] == "3"
     assert decision["protect_picks"] == ["0"]
     assert decision["selection_codes"] == ["3", "0"]

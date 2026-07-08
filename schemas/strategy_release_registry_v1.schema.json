@@ -178,6 +178,25 @@
         "artifact_key": {
           "type": "string"
         },
+        "legacy_aliases": {
+          "type": "array",
+          "description": "Legacy artifact/variant ids accepted as aliases for this manifest variant. Used for short-term shadow_v3.3.3 -> active_v3.3.3 compatibility.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "planned_direct_shadow_arm": {
+          "type": "string",
+          "description": "The shadow_arm value future generated CSV artifacts should emit directly."
+        },
+        "production_status": {
+          "enum": ["live", "diagnostic", "retired", "historical"]
+        },
+        "retired_reason": {
+          "type": "string"
+        },
         "is_default": {
           "type": "boolean"
         },

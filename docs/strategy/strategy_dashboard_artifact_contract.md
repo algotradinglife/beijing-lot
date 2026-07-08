@@ -64,12 +64,18 @@ decision_chain
 shadow_decision_chain
 ```
 
-`decision_variants` should include the user-selectable active and shadow views.
-Active is the production snapshot view. Shadow variants are strategy-provided
-artifacts and remain selectable in the UI when a current/open issue has
-matching shadow CSV rows. Variants can include a `readiness` object so the API
-and dashboard know whether a missing artifact should fall back, render as a
-diagnostic placeholder, or stay hidden until produced.
+`decision_variants` should include the user-selectable formal and diagnostic
+decision views. `active_v3.3.3` is the formal default and is backed by
+structured CSV artifacts. The old `active_v3` active-snapshot view is retired:
+it may remain as a historical baseline in manifests, but must not be selectable,
+defaultable, or used as fallback. Variants can include a `readiness` object so
+the API and dashboard know whether a missing artifact should render as missing,
+render as a diagnostic placeholder, or stay hidden until produced.
+
+For short-term compatibility, existing `shadow_v3.3.3` CSV rows are read through
+`decision_variants[].legacy_aliases=["shadow_v3.3.3"]` and exposed as
+`active_v3.3.3` in the API. New strategy artifacts should emit
+`shadow_arm=active_v3.3.3` directly.
 
 ## Artifact Keys
 
@@ -102,6 +108,10 @@ Optional but supported:
 linegap_drift_dir/paper_arm_summary.csv
 structured_shadow_dir/<issue>_*/structured_shadow_<issue>.csv
 ```
+
+For the formal default, a missing or incomplete `active_v3.3.3` structured CSV
+is a missing-artifact state. Dashboard should show "正式版产物缺失" and must not
+silently fall back to retired `active_v3`.
 
 v4.2.0000 execution artifacts are published through the same
 `structured_shadow_dir` mechanism. They are still structured shadow CSVs, but

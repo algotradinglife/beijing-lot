@@ -89,7 +89,8 @@ API / manifest:
 - treat `execution_*` fields as read-only artifact columns.
 - v4.2 execution variants are currently selectable manual diagnostic views, not
   API defaults. `active_v3.3.3` remains the stable default while v4.2 is under
-  further validation.
+  further validation; legacy `shadow_v3.3.3` is only an alias for existing
+  artifacts.
 - treat `late_proxy_fullcap2` as valid only when `execution_sp_missing=0`.
   `unlocked_after_late_refresh` means refreshed SP was used for execution
   scoring, not merely that a refresh happened somewhere in the issue.

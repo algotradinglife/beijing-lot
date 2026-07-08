@@ -25,40 +25,46 @@
       "model_versions": {
         "probability_model": "bd_prob_handicap_calibrated_v1",
         "q_model": "q_ev_sp_v1",
-        "decision_chain": "llm_chain_bet_protect_stop_v3",
-        "shadow_decision_chain": "llm_chain_bet_protect_stop_v3.3.3_shadow"
+        "decision_chain": "llm_chain_bet_protect_stop_v3.3.3",
+        "shadow_decision_chain": "llm_chain_bet_protect_stop_v3.3.3",
+        "legacy_active_decision_chain": "llm_chain_bet_protect_stop_v3"
       },
       "decision_variants": [
         {
           "variant_id": "active_v3",
           "version_id": "3.0.0",
           "kind": "active",
-          "label": "v3",
+          "label": "v3 retired baseline",
           "source": "active_snapshot",
-          "is_default": true,
-          "selectable": true,
+          "is_default": false,
+          "selectable": false,
+          "production_status": "retired",
+          "retired_reason": "active_v3 is historical baseline only; do not use as live default, fallback, or selectable betting version.",
           "readiness": {
             "artifact_required": false,
-            "defaultable_when": "always",
+            "defaultable_when": "never",
             "missing_behavior": "builtin_active",
-            "late_refresh": "not_applicable"
+            "late_refresh": "not_applicable",
+            "missing_reason": "active_v3_retired_not_live_selectable"
           }
         },
         {
-          "variant_id": "shadow_v3.3.3",
+          "variant_id": "active_v3.3.3",
           "version_id": "3.3.3",
           "kind": "shadow",
-          "label": "shadow v3.3.3",
+          "label": "active v3.3.3",
           "source": "structured_shadow_csv",
           "artifact_key": "structured_shadow_dir",
-          "is_default": false,
+          "is_default": true,
           "selectable": true,
+          "legacy_aliases": ["shadow_v3.3.3"],
+          "planned_direct_shadow_arm": "active_v3.3.3",
           "readiness": {
             "artifact_required": true,
             "defaultable_when": "available",
-            "missing_behavior": "fallback_to_active",
+            "missing_behavior": "artifact_missing",
             "late_refresh": "not_applicable",
-            "missing_reason": "structured_shadow_artifact_missing_for_issue"
+            "missing_reason": "active_v3_3_3_artifact_missing_for_issue"
           }
         }
       ],
@@ -101,7 +107,7 @@
       "validation": {
         "report": "docs/strategy/strategy_worktree_model_ev_handoff_2026-07-02.md",
         "no_future_leakage": true,
-        "notes": "line-gap is diagnostic unless a release explicitly validates it; SP drift is diagnostic or paper sleeve unless promoted."
+        "notes": "active_v3.3.3 is the formal default decision chain. Existing shadow_v3.3.3 artifacts remain readable only through legacy_aliases; active_v3 is retired and must not be used as live default, fallback, or selectable betting version."
       }
     }
   }

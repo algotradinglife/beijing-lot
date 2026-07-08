@@ -25,10 +25,29 @@
       "model_versions": {
         "probability_model": "bd_prob_handicap_calibrated_v1",
         "q_model": "q_ev_sp_v1",
-        "decision_chain": "llm_chain_bet_protect_stop_v3",
-        "shadow_decision_chain": "llm_chain_bet_protect_stop_v3.3.3_shadow"
+        "decision_chain": "llm_chain_bet_protect_stop_v3.3.3",
+        "shadow_decision_chain": "llm_chain_bet_protect_stop_v3.3.3",
+        "legacy_active_decision_chain": "llm_chain_bet_protect_stop_v3"
       },
       "decision_variants": [
+        {
+          "variant_id": "active_v3",
+          "version_id": "3.0.0",
+          "kind": "active",
+          "label": "v3 retired baseline",
+          "source": "active_snapshot",
+          "is_default": false,
+          "selectable": false,
+          "production_status": "retired",
+          "retired_reason": "active_v3 is historical baseline only; do not use as live default, fallback, or selectable betting version.",
+          "readiness": {
+            "artifact_required": false,
+            "defaultable_when": "never",
+            "missing_behavior": "builtin_active",
+            "late_refresh": "not_applicable",
+            "missing_reason": "active_v3_retired_not_live_selectable"
+          }
+        },
         {
           "variant_id": "active_v3.3.3",
           "version_id": "3.3.3",
@@ -44,12 +63,14 @@
           ],
           "is_default": true,
           "selectable": true,
+          "legacy_aliases": ["shadow_v3.3.3"],
+          "planned_direct_shadow_arm": "active_v3.3.3",
           "readiness": {
             "artifact_required": true,
             "defaultable_when": "available",
-            "missing_behavior": "unavailable",
+            "missing_behavior": "artifact_missing",
             "late_refresh": "not_applicable",
-            "missing_reason": "structured_shadow_artifact_missing_for_issue"
+            "missing_reason": "active_v3_3_3_artifact_missing_for_issue"
           }
         },
         {
@@ -127,7 +148,7 @@
       "validation": {
         "report": "docs/strategy/strategy_worktree_model_ev_handoff_2026-07-02.md",
         "no_future_leakage": true,
-        "notes": "active_v3.3.3 是正式默认决策链；旧 artifact ID shadow_v3.3.3 仅作为兼容 alias。active_v3 已退役，不再作为前端可选项或缺失兜底。v4.2 execution artifacts 仅作为手动诊断/实验视图，待压缩合约和更长 forward validation 稳定后再评估是否可默认。line-gap 只作为诊断标签；SP drift 只作为诊断/极小 paper convex sleeve。"
+        "notes": "active_v3.3.3 是正式默认决策链；旧 artifact ID shadow_v3.3.3 仅通过 legacy_aliases 兼容读取。active_v3 已退役，不能作为实盘默认、兜底或可选下注版本。v4.2 execution artifacts 仅作为手动诊断/实验视图，待单独 promotion card 验证后再评估是否默认。line-gap 只作为诊断标签；SP drift 只作为诊断/极小 paper sleeve，除非单独 promoted。"
       }
     }
   }

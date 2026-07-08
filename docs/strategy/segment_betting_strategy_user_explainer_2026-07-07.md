@@ -10,6 +10,17 @@ The 26072 rows below are based on the `active_v3.3.3` structured artifact with
 
 ## Summary Examples
 
+| field | value |
+| --- | --- |
+| decision chain | `active_v3.3.3` (`shadow_v3.3.3` legacy alias for these replay artifacts) |
+| betting strategy | `segment_betting_v0.3.0000` |
+| schema | `segment_betting_artifact_v1` |
+| planning scope | `remaining_issue` |
+| segment budget | 1000 yuan |
+| ticket stake | 2 yuan per expanded ticket |
+| seed sample | 20 seeds, `20260707` to `20260726` |
+| issues | 26071 has 16 source rows; 26072 has 65 source rows in this artifact |
+
 | issue | decision_chain | betting_strategy | planning_scope | stake_mode | sample_rows | seed_count | selected_segments | base_cost_yuan | actual_stake_yuan | profit_yuan_mean | profit_yuan_p10 | profit_yuan_p90 | roi_mean | note |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 26072 | active_v3.3.3 | segment_betting_v0.3.0000 | next_segment | scale_to_budget | 65 | 10 | 1 | 972 | 972 | 12120.38 | 10853.47 | 12966.20 | 12.4695 | Default stake mode; no extra budget room in this segment. |

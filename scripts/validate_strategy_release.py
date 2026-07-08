@@ -147,6 +147,10 @@ def _validate_release_contract(release_key: str, release: dict[str, Any], errors
     if not isinstance(variants, list) or not variants:
         errors.append(f"{release_key} must declare decision_variants")
         return
+    variant_ids: set[str] = set()
+    legacy_aliases: dict[str, str] = {}
+    if not any(isinstance(item, dict) and item.get("kind") == "active" for item in variants):
+        errors.append(f"{release_key} must declare one active decision variant")
     default_variants = [
         item
         for item in variants
@@ -160,8 +164,13 @@ def _validate_release_contract(release_key: str, release: dict[str, Any], errors
         if not isinstance(variant, dict):
             errors.append(f"{release_key} decision_variants[{idx}] must be an object")
             continue
-        if not str(variant.get("variant_id") or ""):
+        variant_id = str(variant.get("variant_id") or "")
+        if not variant_id:
             errors.append(f"{release_key} decision_variants[{idx}].variant_id is required")
+        elif variant_id in variant_ids:
+            errors.append(f"{release_key} decision variant duplicated: {variant_id}")
+        else:
+            variant_ids.add(variant_id)
         if not DECISION_VERSION_RE.fullmatch(str(variant.get("version_id") or "")):
             errors.append(f"{release_key} decision_variants[{idx}].version_id must use x.y.abcd")
         kind = str(variant.get("kind") or "")
@@ -186,6 +195,41 @@ def _validate_release_contract(release_key: str, release: dict[str, Any], errors
                 errors.append(f"{release_key} decision variant {variant.get('variant_id', idx)} readiness.missing_behavior is invalid")
             if readiness.get("late_refresh") not in {None, "", *LATE_REFRESH_POLICY}:
                 errors.append(f"{release_key} decision variant {variant.get('variant_id', idx)} readiness.late_refresh is invalid")
+        aliases = variant.get("legacy_aliases", [])
+        if aliases:
+            if not isinstance(aliases, list):
+                errors.append(f"{release_key} decision variant {variant.get('variant_id', idx)} legacy_aliases must be a list")
+            else:
+                for alias in aliases:
+                    alias_text = str(alias or "")
+                    if not alias_text:
+                        errors.append(f"{release_key} decision variant {variant.get('variant_id', idx)} legacy_aliases cannot contain empty values")
+                    elif alias_text == variant_id:
+                        errors.append(f"{release_key} decision variant {variant_id} legacy_aliases cannot contain itself")
+                    elif alias_text in legacy_aliases:
+                        errors.append(f"{release_key} legacy alias duplicated: {alias_text}")
+                    else:
+                        legacy_aliases[alias_text] = variant_id
+        if variant_id == "active_v3":
+            readiness_payload = variant.get("readiness") if isinstance(variant.get("readiness"), dict) else {}
+            if variant.get("is_default"):
+                errors.append(f"{release_key} active_v3 is retired and cannot be default")
+            if variant.get("selectable") is not False:
+                errors.append(f"{release_key} active_v3 is retired and cannot be selectable")
+            if readiness_payload.get("defaultable_when") != "never":
+                errors.append(f"{release_key} active_v3 readiness.defaultable_when must be never")
+
+    active_v333 = next(
+        (item for item in variants if isinstance(item, dict) and item.get("variant_id") == "active_v3.3.3"),
+        None,
+    )
+    if active_v333:
+        readiness_payload = active_v333.get("readiness") if isinstance(active_v333.get("readiness"), dict) else {}
+        aliases = {str(alias) for alias in active_v333.get("legacy_aliases", [])}
+        if "shadow_v3.3.3" not in aliases:
+            errors.append(f"{release_key} active_v3.3.3 must declare shadow_v3.3.3 as a legacy alias")
+        if readiness_payload.get("missing_behavior") != "artifact_missing":
+            errors.append(f"{release_key} active_v3.3.3 missing_behavior must be artifact_missing")
 
 
 def validate_strategy_release(
