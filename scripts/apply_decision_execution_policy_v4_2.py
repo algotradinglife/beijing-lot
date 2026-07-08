@@ -25,6 +25,7 @@ import replay_rolling_segment_n_tickets as rolling  # noqa: E402
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DB = PROJECT_ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 OUTCOME_CODES = ("3", "1", "0")
+OUTCOME_LABELS = {"3": "胜", "1": "平", "0": "负"}
 SP_COLUMN_BY_CODE = {"3": "sp_3", "1": "sp_1", "0": "sp_0"}
 Q_COLUMN_BY_CODE = {"3": "q_3", "1": "q_1", "0": "q_0"}
 LIVE_SP_COLUMN_BY_CODE = {"3": "sp_home", "1": "sp_draw", "0": "sp_away"}
@@ -160,6 +161,12 @@ def unique_reasons(reasons: list[str]) -> list[str]:
         if text and text not in out:
             out.append(text)
     return out
+
+
+def order_codes_with_primary(codes: list[str], primary: str) -> list[str]:
+    if primary not in OUTCOME_CODES:
+        return unique_codes(codes)
+    return unique_codes([primary, *codes])
 
 
 def selection_type_from_codes(codes: list[str]) -> str:
@@ -392,6 +399,40 @@ def source_q_top_from_row(row: dict[str, Any]) -> tuple[str | None, dict[str, fl
     if code:
         return code, values
     return top_row_code(row, "", "q")
+
+
+def execution_primary_code(source_row: dict[str, Any], execution: RowExecution) -> tuple[str, str]:
+    selected = unique_codes(execution.selection_codes)
+    if not selected:
+        return "", "no_selection"
+    if len(selected) == 1:
+        return selected[0], "single_selection"
+    q_top, _q_values = execution_q_top_from_row(source_row)
+    if q_top in selected:
+        return q_top, "execution_q_top"
+    prob_top = probability_top_from_row(source_row)
+    if prob_top in selected:
+        return prob_top, "probability_top"
+    return selected[0], "execution_selection_order"
+
+
+def outcome_text(code: str, row: dict[str, Any]) -> str:
+    label = OUTCOME_LABELS.get(code, code)
+    if code == "3" and row.get("home"):
+        return f"{label}({row['home']})"
+    if code == "0" and row.get("away"):
+        return f"{label}({row['away']})"
+    return label
+
+
+def execution_judgment(row: dict[str, Any], primary: str, support_codes: list[str]) -> str:
+    if primary not in OUTCOME_CODES:
+        return "停"
+    primary_text = outcome_text(primary, row)
+    if not support_codes:
+        return primary_text
+    support_text = "+".join(outcome_text(code, row) for code in support_codes)
+    return f"{primary_text}为押，保{support_text}"
 
 
 def sp_values_from_row(row: dict[str, Any], prefix: str) -> dict[str, float]:
@@ -1052,6 +1093,9 @@ def apply_policy(
         "max_q",
         "shadow_selection_codes",
         "shadow_primary",
+        "shadow_judgment",
+        "shadow_primary_hit",
+        "shadow_coverage_hit",
         "shadow_arm",
         "shadow_version",
         "shadow_stop_flag",
@@ -1082,6 +1126,9 @@ def apply_policy(
         "execution_double_codes",
         "execution_dropped_codes",
         "execution_drop_reasons",
+        "execution_primary_code",
+        "execution_primary_source",
+        "execution_support_codes",
         "execution_full_score",
         "execution_full_candidate",
         "execution_full_kept",
@@ -1103,13 +1150,17 @@ def apply_policy(
         row = dict(prepared_rows.get(match_idx).row if match_idx in prepared_rows else source_row)
         execution = executions.get(match_idx, RowExecution([], "skip_missing_decision", ["missing_v4_2_decision"], [], 0.0, False, False))
         decision_row = decisions.get(match_idx, {})
-        selection_text = "+".join(execution.selection_codes)
+        primary, primary_source = execution_primary_code(row, execution)
+        display_codes = order_codes_with_primary(execution.selection_codes, primary)
+        support_codes = [code for code in display_codes if code != primary]
+        selection_text = "+".join(display_codes)
         row["shadow_selection_codes"] = selection_text
-        row["shadow_primary"] = execution.selection_codes[0] if execution.selection_codes else ""
+        row["shadow_primary"] = primary
+        row["shadow_judgment"] = execution_judgment(row, primary, support_codes)
         row["shadow_arm"] = f"{shadow_arm_prefix}_{policy_name}"
         row["shadow_version"] = SHADOW_VERSION
         row["shadow_stop_flag"] = "0" if execution.selection_codes else "1"
-        row["selection_type"] = selection_type_from_codes(execution.selection_codes)
+        row["selection_type"] = selection_type_from_codes(display_codes)
         row["execution_policy_version"] = POLICY_VERSION
         row["execution_policy_name"] = policy_name
         row["execution_action"] = execution.action
@@ -1120,6 +1171,9 @@ def apply_policy(
         dropped_codes, drop_reasons = dropped_code_audit(row, decision_row, execution)
         row["execution_dropped_codes"] = "+".join(dropped_codes)
         row["execution_drop_reasons"] = ";".join(drop_reasons)
+        row["execution_primary_code"] = primary
+        row["execution_primary_source"] = primary_source
+        row["execution_support_codes"] = "+".join(support_codes)
         row["execution_full_score"] = f"{execution.full_score:.4f}"
         row["execution_full_candidate"] = int(execution.full_candidate)
         row["execution_full_kept"] = int(execution.full_kept)
@@ -1127,8 +1181,10 @@ def apply_policy(
         row["execution_unlock_state"] = execution_unlock_state(str(decision_row.get("v4_action") or ""), execution)
         actual = str(row.get("actual_code") or "")
         if actual in OUTCOME_CODES:
+            row["shadow_primary_hit"] = int(actual == primary) if primary else ""
+            row["shadow_coverage_hit"] = int(actual in display_codes)
             settled_count += 1
-            hit_count += int(actual in execution.selection_codes)
+            hit_count += int(actual in display_codes)
         action_counts[execution.action] += 1
         width_counts[len(execution.selection_codes)] += 1
         output_rows.append(row)

@@ -1277,6 +1277,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "dynamic_segments_available": dynamic_segments_available,
         "segments": len(segments),
         "planning_scope": planning_scope,
+        "artifact_planning_scope": planning_scope,
         "selection_binding": selection_binding(planning_scope),
         "decision_time": format_optional_dt(decision_time),
         "sp_drift_risk": {

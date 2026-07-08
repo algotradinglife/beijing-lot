@@ -88,7 +88,9 @@
         "ticket_pool_csv": "results/high_n_selector_plus2026_linefill_20260630/high_n_selector_selected_tickets.csv",
         "linegap_drift_dir": "results/main_strategy_linegap_drift_depth_20260630",
         "joint_leg_rows_csv": "results/n7_q_conf_drift_joint_2014_10h_trusted_plus2026_linefill_20260630/joint_leg_rows.csv",
-        "structured_shadow_dir": "results/structured_decision_chain_shadow"
+        "structured_shadow_dir": "results/structured_decision_chain_shadow",
+        "postmatch_ticket_pool_dir": "results/postmatch_ticket_pool_artifacts",
+        "segment_betting_plan_dir": "results/segment_betting_plan"
       },
       "required_artifacts": [
         "main_strategy_dir/sleeve_mix_summary.csv",

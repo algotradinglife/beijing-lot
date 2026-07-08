@@ -111,9 +111,9 @@ them populated for compatibility.
 | `handicap_line` | number/string | recommended | Beidan handicap line used by the decision chain. |
 | `shadow_arm` | string | yes | Must match a manifest `decision_variants[].variant_id`, e.g. `active_v3.3.3` or `shadow_v4.1.0`; legacy `shadow_v3.3.3` is accepted only as an alias for `active_v3.3.3`. |
 | `shadow_version` | string | yes | Implementation version string for audit. |
-| `shadow_judgment` | string | yes | Human-readable final summary. |
-| `shadow_primary` | enum | yes if buy/display codes exist | One of `3`, `1`, `0`; first display pick. |
-| `shadow_selection_codes` | string | yes | `+`-joined codes from `3`, `1`, `0`; empty means no buy/display pick. |
+| `shadow_judgment` | string | yes | Human-readable final execution summary. For execution artifacts this must be regenerated from execution fields, not copied from the source artifact. |
+| `shadow_primary` | enum | yes if buy/display codes exist | One of `3`, `1`, `0`; executable display primary. |
+| `shadow_selection_codes` | string | yes | `+`-joined codes from `3`, `1`, `0`; empty means no buy/display pick. For execution artifacts this is display ordered: primary first, then supports. |
 | `shadow_stop_flag` | boolean/int | yes | `1/true` means no executable pick now; render as stop/wait/risk, not as a buy signal. |
 | `selection_type` | enum | yes | `single`, `double`, `full`, or `no-buy`. |
 | `prob_top` | enum/string | recommended | Highest probability code if known. |
@@ -263,6 +263,9 @@ Required execution extension fields:
 | `execution_double_codes` | string | Best compressed double if a full-cover row must be reduced. |
 | `execution_dropped_codes` | string | Recommended outcomes omitted from the executable selection, e.g. `0` or `3+1`. |
 | `execution_drop_reasons` | string | `;`-joined entries in `code:reason|reason` format explaining why each omitted outcome was dropped. |
+| `execution_primary_code` | enum/string | Executable display primary mirrored into `shadow_primary`. |
+| `execution_primary_source` | string | Why the execution primary was chosen: `execution_q_top`, `probability_top`, `single_selection`, `execution_selection_order`, or `no_selection`. |
+| `execution_support_codes` | string | Display support codes, equal to `shadow_selection_codes` minus `shadow_primary`. |
 | `execution_full_score` | number/string | Per-row full-cover value score for downstream stake optimization. |
 | `execution_full_candidate` | boolean/int | `1` if the row qualified as a per-row full-cover candidate. |
 | `execution_full_kept` | boolean/int | `1` if this artifact leaves the row as full cover; not a final budget/cap approval in `v4.2.0002+`. |
@@ -300,12 +303,16 @@ Stable `execution_action` values:
 Execution mapping rules:
 
 - `shadow_selection_codes` is the actual executable selection. It may be empty.
+- For execution artifacts, display "押" from `shadow_primary` and display
+  "保" from `shadow_selection_codes` minus `shadow_primary`.
 - `execution_recommended_codes` is the audit recommendation. It can be wider
   than `shadow_selection_codes`.
 - When `execution_recommended_codes` is wider or different from
   `shadow_selection_codes`, `execution_dropped_codes` and
   `execution_drop_reasons` explain what was omitted. Dashboard should render
   these as audit diagnostics, not recompute the compression.
+- `execution_double_codes` is compression audit/fallback, not the primary
+  display source.
 - `shadow_stop_flag=1` means no executable selection exists for this row.
 - `skip_*` execution actions must be rendered as stop/no-buy states even when
   `execution_recommended_codes` is populated.

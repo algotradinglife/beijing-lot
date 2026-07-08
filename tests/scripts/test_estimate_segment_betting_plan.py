@@ -229,6 +229,7 @@ def test_run_writes_outputs(tmp_path: Path) -> None:
     assert summary_payload["betting_strategy_version"] == "segment_betting_v0.4.0000"
     assert summary_payload["artifact_schema_version"] == "segment_betting_artifact_v1"
     assert summary_payload["planning_scope"] == "by_segment"
+    assert summary_payload["artifact_planning_scope"] == "by_segment"
     assert summary_payload["selection_binding"]["match_selection_source"] == "issue_board_same_decision_variant"
     assert summary_payload["sp_drift_risk"]["accepted"] is False
     assert summary_payload["settings"]["stake_mode"] == "scale_to_budget"
@@ -415,6 +416,7 @@ def test_planning_scope_can_output_by_segment_or_one_entire_issue_segment(tmp_pa
 
     entire_payload = mod.run(mod.parse_args([*base_args, "--planning-scope", "entire_issue"]))
     assert entire_payload["planning_scope"] == "entire_issue"
+    assert entire_payload["artifact_planning_scope"] == "entire_issue"
     assert entire_payload["segments"] == 1
     assert entire_payload["available_segments"] == 1
     assert entire_payload["dynamic_segments_available"] == by_segment_payload["segments"]
@@ -425,6 +427,12 @@ def test_planning_scope_can_output_by_segment_or_one_entire_issue_segment(tmp_pa
     assert all(row["planning_scope"] == "entire_issue" for row in segment_rows)
     assert all(row["sp_drift_risk_accepted"] == "1" for row in segment_rows)
     assert segment_rows[0]["match_indices"] == "3,4,5,6,7,8,9,10,11,12"
+    assert segment_rows[0]["recommended_n"]
+    assert int(segment_rows[0]["eligible_matches"]) == 10
+    assert int(segment_rows[0]["selected_bundles"]) > 0
+    assert float(segment_rows[0]["selected_cost_yuan"]) <= 100.0
+    assert entire_payload["summary"]["selected_cost_yuan"] <= 100.0
+    assert entire_payload["selection_binding"]["match_selection_source"] == "issue_board_same_decision_variant"
 
 
 def test_stake_mode_defaults_to_scale_budget_and_can_use_unit_once(tmp_path: Path) -> None:

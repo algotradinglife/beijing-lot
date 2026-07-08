@@ -32,6 +32,7 @@ HIGH_N_SELECTOR_RESULTS_DIR = PROJECT_ROOT / "results/high_n_selector_plus2026_l
 LINEGAP_DRIFT_RESULTS_DIR = PROJECT_ROOT / "results/main_strategy_linegap_drift_depth_20260630"
 JOINT_LEG_RESULTS_DIR = PROJECT_ROOT / "results/n7_q_conf_drift_joint_2014_10h_trusted_plus2026_linefill_20260630"
 STRUCTURED_DECISION_SHADOW_DIR = PROJECT_ROOT / "results/structured_decision_chain_shadow"
+POSTMATCH_TICKET_POOL_DIR = PROJECT_ROOT / "results/postmatch_ticket_pool_artifacts"
 SEGMENT_BETTING_PLAN_DIR = PROJECT_ROOT / "results/segment_betting_plan"
 DECISION_VERSIONS_CONFIG = PROJECT_ROOT / "config/decision_versions.json"
 STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
@@ -48,6 +49,8 @@ OUTCOME_LABEL = {"3": "胜", "1": "平", "0": "负"}
 OUTCOME_ORDER = ("3", "1", "0")
 Q_STOP_THRESHOLD = 1.00
 SEGMENT_PLAN_FREEZE_MINUTES_BEFORE_FIRST_KICKOFF = 60
+SEGMENT_BETTING_STRATEGY_FAMILY = "segment_betting_plan"
+SEGMENT_BETTING_ARTIFACT_SCHEMA_VERSION = "segment_betting_artifact_v1"
 ACTIVE_DECISION_VARIANT_ID = "active_v3"
 ACTIVE_DECISION_VARIANT_KIND = "active"
 ACTIVE_DECISION_VARIANT_LABEL = "v3 retired"
@@ -226,6 +229,8 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
                 "linegap_drift_dir": str(LINEGAP_DRIFT_RESULTS_DIR.relative_to(PROJECT_ROOT)),
                 "joint_leg_rows_csv": str((JOINT_LEG_RESULTS_DIR / "joint_leg_rows.csv").relative_to(PROJECT_ROOT)),
                 "structured_shadow_dir": str(STRUCTURED_DECISION_SHADOW_DIR.relative_to(PROJECT_ROOT)),
+                "postmatch_ticket_pool_dir": str(POSTMATCH_TICKET_POOL_DIR.relative_to(PROJECT_ROOT)),
+                "segment_betting_plan_dir": str(SEGMENT_BETTING_PLAN_DIR.relative_to(PROJECT_ROOT)),
             },
             "required_artifacts": [
                 "main_strategy_dir/sleeve_mix_summary.csv",
@@ -394,6 +399,10 @@ def _strategy_linegap_drift_dir(release: dict[str, Any] | None = None) -> Path:
 
 def _strategy_shadow_dir(release: dict[str, Any] | None = None) -> Path:
     return _strategy_artifact_path("structured_shadow_dir", STRUCTURED_DECISION_SHADOW_DIR, release)
+
+
+def _strategy_postmatch_ticket_pool_dir(release: dict[str, Any] | None = None) -> Path:
+    return _strategy_artifact_path("postmatch_ticket_pool_dir", POSTMATCH_TICKET_POOL_DIR, release)
 
 
 def _strategy_segment_betting_plan_dir(release: dict[str, Any] | None = None) -> Path:
@@ -1258,6 +1267,87 @@ def _postmatch_review_rows_payload(conn: sqlite3.Connection, issue: str, review_
             "action_suggestion": row["action_suggestion"] if "action_suggestion" in keys else "",
         })
     return out
+
+
+def _postmatch_ticket_pool_candidates(
+    issue: str,
+    variant_id: str,
+    release: dict[str, Any] | None = None,
+) -> list[Path]:
+    root = _strategy_postmatch_ticket_pool_dir(release)
+    if not root.exists():
+        return []
+    variant_ids = _postmatch_ticket_pool_variant_ids(variant_id, release)
+    candidates: list[Path] = []
+    for path in root.glob(f"{issue}_*/postmatch_ticket_pool_{issue}_*.json"):
+        if not path.is_file():
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if payload.get("schema_version") != "postmatch_ticket_pool_artifact_v1":
+            continue
+        if str(payload.get("issue") or "") != issue:
+            continue
+        if variant_ids and str(payload.get("variant_id") or "") not in variant_ids:
+            continue
+        candidates.append(path)
+    return sorted(candidates, key=lambda item: item.stat().st_mtime, reverse=True)
+
+
+def _postmatch_ticket_pool_variant_ids(variant_id: str, release: dict[str, Any] | None = None) -> set[str]:
+    requested = str(variant_id or "").strip()
+    if not requested:
+        return set()
+    ids = {requested}
+    manifest = _manifest_variant_for_id(requested, release)
+    if manifest:
+        public_id = str(manifest.get("variant_id") or "").strip()
+        if public_id:
+            ids.add(public_id)
+        ids.update(_manifest_variant_alias_ids(manifest))
+    return {item for item in ids if item}
+
+
+def _postmatch_ticket_pool_payload(
+    issue: str,
+    variant_id: str,
+    release: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    root = _strategy_postmatch_ticket_pool_dir(release)
+    candidates = _postmatch_ticket_pool_candidates(issue, variant_id, release)
+    if not candidates:
+        return None, {
+            "status": "missing",
+            "reason": "postmatch_ticket_pool_artifact_missing",
+            "issue": issue,
+            "variant_id": variant_id,
+            "artifact_dir": _relative_display_path(root),
+        }
+    path = candidates[0]
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, {
+            "status": "invalid",
+            "reason": f"postmatch_ticket_pool_artifact_unreadable: {exc}",
+            "issue": issue,
+            "variant_id": variant_id,
+            "artifact_path": _relative_display_path(path),
+        }
+    payload["_artifact_path"] = _relative_display_path(path)
+    return payload, {
+        "status": "available",
+        "reason": "",
+        "issue": issue,
+        "requested_variant_id": variant_id,
+        "variant_id": str(payload.get("variant_id") or variant_id),
+        "source_variant_id": str(payload.get("source_variant_id") or ""),
+        "artifact_path": _relative_display_path(path),
+        "generated_at": str(payload.get("generated_at") or ""),
+        "review_version": str(payload.get("review_version") or ""),
+    }
 
 
 def _today_hk() -> str:
@@ -3638,6 +3728,9 @@ def _shadow_decision_variant(
         "execution_double_codes": row.get("execution_double_codes") or "",
         "execution_dropped_codes": _selection_codes_from_value(row.get("execution_dropped_codes") or ""),
         "execution_drop_reasons": _csv_semicolon_list(row, "execution_drop_reasons"),
+        "execution_primary_code": row.get("execution_primary_code") or "",
+        "execution_primary_source": row.get("execution_primary_source") or "",
+        "execution_support_codes": row.get("execution_support_codes") or "",
         "execution_full_score": _safe_float(row.get("execution_full_score")),
         "execution_full_candidate": _csv_bool(row, "execution_full_candidate"),
         "execution_full_kept": _csv_bool(row, "execution_full_kept"),
@@ -4314,7 +4407,11 @@ def _segment_plan_option_from_summary(summary_path: Path) -> dict[str, Any] | No
     plan_id = summary_path.parent.name
     variant_id = _segment_plan_variant_id(label)
     sample_seeds = settings.get("sample_seeds") if isinstance(settings.get("sample_seeds"), list) else []
-    artifact_planning_scope = str(payload.get("planning_scope") or settings.get("planning_scope") or "")
+    artifact_planning_scope = str(payload.get("artifact_planning_scope") or settings.get("artifact_planning_scope") or "")
+    if not artifact_planning_scope:
+        legacy_scope = str(payload.get("planning_scope") or settings.get("planning_scope") or "")
+        if legacy_scope in {"next_segment", "remaining_issue"}:
+            artifact_planning_scope = legacy_scope
     planning_scope = _normalize_segment_planning_scope(artifact_planning_scope)
     decision_time = str(payload.get("decision_time") or settings.get("decision_time") or "")
     return {
@@ -4392,7 +4489,7 @@ def _select_segment_plan(
     if requested_scope:
         scoped = []
         for item in candidates:
-            raw_scope = str(item.get("artifact_planning_scope") or item.get("planning_scope") or "")
+            raw_scope = str(item.get("artifact_planning_scope") or "")
             rank = _segment_plan_scope_rank(raw_scope, requested_scope)
             if rank > 0:
                 scoped.append((rank, item))
@@ -4400,6 +4497,17 @@ def _select_segment_plan(
             return None
         best_scope_rank = max(rank for rank, _ in scoped)
         candidates = [item for rank, item in scoped if rank == best_scope_rank]
+    else:
+        scoped_by_segment = [
+            item for item in candidates
+            if _segment_plan_scope_matches(str(item.get("artifact_planning_scope") or ""), "by_segment")
+        ]
+        if scoped_by_segment:
+            candidates = scoped_by_segment
+        else:
+            explicit_scope_items = [item for item in candidates if str(item.get("artifact_planning_scope") or "")]
+            if explicit_scope_items:
+                candidates = explicit_scope_items
     requested_decision_time = str(decision_time or "").strip()
     if requested_decision_time:
         timed = [
@@ -5003,6 +5111,7 @@ def _segment_betting_plan_payload(
         "requested_betting_strategy_version": str(betting_strategy_version or ""),
         "requested_label": str(label or ""),
         "selected_plan_id": str(selected.get("plan_id") or "") if selected else "",
+        "status": "available" if selected else "missing",
         "availability_status": "available" if selected else "missing",
         "unavailable_reason": "" if selected else missing_reason,
         "notice": "settled replay / shadow planning only; not the default live betting recommendation",
@@ -5021,11 +5130,23 @@ def _segment_betting_plan_payload(
             "updated_at": _segment_plan_updated_at(selected["_summary_path"]) if selected else "",
             "reason": "" if selected else missing_reason,
             "freeze_info": selected_freeze_info,
+            "filters": {
+                "decision_variant_id": str(decision_variant_id or ""),
+                "plan_id": str(plan_id or ""),
+                "label": str(label or ""),
+                "betting_strategy_version": str(betting_strategy_version or ""),
+                "segment_budget_yuan": segment_budget_yuan,
+                "seed": seed,
+                "planning_scope": _normalize_segment_planning_scope(planning_scope),
+                "decision_time": str(decision_time or ""),
+                "stake_mode": str(stake_mode or ""),
+            },
         },
         "strategy_release": _strategy_release_public_payload(release),
         "available_plans": [_segment_plan_public_option(item) for item in options],
         "rejected_frozen_plans": [_segment_plan_public_option(item) for item in rejected_frozen_options],
         "selected_plan": _segment_plan_public_option(selected) if selected else None,
+        "plan": _segment_plan_public_option(selected) if selected else None,
         "strategy_family": "",
         "betting_strategy_version": "",
         "artifact_schema_version": "",
@@ -5057,7 +5178,11 @@ def _segment_betting_plan_payload(
     settings = raw_payload.get("settings") if isinstance(raw_payload.get("settings"), dict) else {}
     summary = raw_payload.get("summary") if isinstance(raw_payload.get("summary"), dict) else {}
     requested_scope = _normalize_segment_planning_scope(planning_scope)
-    artifact_scope = str(raw_payload.get("planning_scope") or settings.get("planning_scope") or "")
+    artifact_scope = str(raw_payload.get("artifact_planning_scope") or settings.get("artifact_planning_scope") or "")
+    if not artifact_scope:
+        legacy_scope = str(raw_payload.get("planning_scope") or settings.get("planning_scope") or "")
+        if legacy_scope in {"next_segment", "remaining_issue"}:
+            artifact_scope = legacy_scope
     effective_scope = requested_scope if requested_scope in {"by_segment", "entire_issue"} else _normalize_segment_planning_scope(artifact_scope)
     segment_rows = _segment_plan_csv_rows(summary_path.parent / "segment_betting_plan_segments.csv")
     bundle_rows = _segment_plan_csv_rows(summary_path.parent / "segment_betting_plan_bundles.csv")
@@ -5105,11 +5230,20 @@ def _segment_betting_plan_payload(
             _segment_plan_segment_seed_summary_payload(row)
             for row in segment_seed_summary_rows
 	        ],
-	    })
+    })
+    base_payload["artifact_status"].update({
+        "betting_strategy_version": base_payload["betting_strategy_version"],
+        "artifact_schema_version": base_payload["artifact_schema_version"],
+        "planning_scope": base_payload["planning_scope"],
+        "artifact_planning_scope": base_payload["artifact_planning_scope"],
+        "stake_mode": str(settings.get("stake_mode") or ""),
+        "label": str(raw_payload.get("label") or ""),
+    })
     _apply_requested_segment_scope_label(base_payload, effective_scope)
     _collapse_legacy_remaining_issue_to_entire_issue(base_payload)
     _scale_segment_betting_plan_to_budget(base_payload, segment_budget_yuan)
     if not segment_rows or not bundle_rows:
+        base_payload["status"] = "degraded"
         base_payload["availability_status"] = "degraded"
         base_payload["unavailable_reason"] = "segment_or_bundle_csv_missing"
         base_payload["artifact_status"]["status"] = "degraded"
@@ -6621,6 +6755,7 @@ def _main_strategy_payload(
             "ticket_pool_csv": _relative_display_path(_strategy_ticket_pool_csv(release)),
             "joint_leg_rows_csv": _relative_display_path(_strategy_joint_leg_rows_csv(release)),
             "structured_shadow_dir": _relative_display_path(_strategy_shadow_dir(release)),
+            "segment_betting_plan_dir": _relative_display_path(_strategy_segment_betting_plan_dir(release)),
             "model_db": _public_diagnostics_path(DEFAULT_MODEL_DB),
             "live_db": _public_diagnostics_path(conn.execute("PRAGMA database_list").fetchone()["file"]),
             "strategy_release_config": _relative_display_path(STRATEGY_RELEASE_CONFIG),
@@ -7240,6 +7375,20 @@ def _settlement(
         expected_indices = {int(row["match_idx"]) for row in rows}
         shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(resolved, shadow_variants, expected_indices, release=release)
     variant_options = _decision_variant_options(shadow_variants, release=release)
+    version_context = _strategy_version_context(
+        release,
+        variant_options,
+        decision_variant_id,
+        suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
+        incomplete_shadow_variants=incomplete_shadow_variants,
+    )
+    selected_variant_id = str(
+        version_context.get("selected_variant_id")
+        or version_context.get("requested_variant_id")
+        or ""
+    )
+    ticket_pool_variant_id = str(decision_variant_id or "").strip() or selected_variant_id
+    ticket_pool_artifact, ticket_pool_status = _postmatch_ticket_pool_payload(resolved, ticket_pool_variant_id, release)
     settled = [row for row in rows if row["winning_sp"] is not None]
     if not settled:
         return {"error": "not settled", "issue": resolved}, 404
@@ -7277,6 +7426,7 @@ def _settlement(
         "strategy_version_context": strategy_version_context,
         "decision_variant_options": variant_options,
         "selected_postmatch_review_version": selected_review_version,
+        "postmatch_ticket_pool_status": ticket_pool_status,
         "n_tickets": 0,
         "n_hits": 0,
         "n_legs_total": len(rows),
@@ -7300,6 +7450,8 @@ def _settlement(
         payload["postmatch_review_issue_summary"] = postmatch_summary
     if postmatch_reviews:
         payload["postmatch_reviews"] = postmatch_reviews
+    if ticket_pool_artifact:
+        payload["postmatch_ticket_pool"] = ticket_pool_artifact
     return payload, 200
 
 

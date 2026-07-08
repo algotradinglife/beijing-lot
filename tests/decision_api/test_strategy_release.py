@@ -604,3 +604,161 @@ def test_main_strategy_reads_release_artifacts(monkeypatch, tmp_path: Path) -> N
         assert payload["source"]["main_strategy_dir"].endswith("results/main_strategy_custom")
     finally:
         _clear_strategy_caches()
+
+
+def test_segment_betting_plan_endpoint_reads_release_artifact(monkeypatch, tmp_path: Path) -> None:
+    config_path, db_path = _build_release_fixture(tmp_path)
+    _minimal_db(db_path)
+    segment_dir = tmp_path / "results/segment_betting_plan"
+    plan_dir = segment_dir / "99123_active_v3_3_3_segment_betting_v0.4.0000_by_segment_scale_to_budget_b1000_seed1"
+    plan_dir.mkdir(parents=True)
+    (plan_dir / "segment_betting_plan_summary.json").write_text(
+        json.dumps(
+            {
+                "issue": "99123",
+                "label": "active_v3.3.3",
+                "strategy_family": "segment_betting_plan",
+                "betting_strategy_version": "segment_betting_v0.4.0000",
+                "artifact_schema_version": "segment_betting_artifact_v1",
+                "arm": "active",
+                "structured_csv": "results/structured_decision_chain_shadow/99123_active_v3_3_3/structured_shadow_99123.csv",
+                "planning_scope": "by_segment",
+                "artifact_planning_scope": "by_segment",
+                "decision_time": "2026-07-07 12:00",
+                "summary": {"selected_cost_yuan": 998.0, "profit_yuan": 120.0},
+                "seed_aggregate": {"summary_mode": "single_seed"},
+                "parameter_schema": [],
+                "settings": {"stake_mode": "scale_to_budget", "planning_scope": "by_segment"},
+                "segment_csv": str(plan_dir / "segment_betting_plan_segments.csv"),
+                "bundle_csv": str(plan_dir / "segment_betting_plan_bundles.csv"),
+                "seed_summary_csv": str(plan_dir / "segment_betting_plan_seed_summary.csv"),
+                "segment_seed_summary_csv": str(plan_dir / "segment_betting_plan_segment_seed_summary.csv"),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    _write_csv(
+        plan_dir / "segment_betting_plan_segments.csv",
+        [
+            "sample_seed", "segment_idx", "arm", "planning_scope", "stake_mode",
+            "eligible_matches", "recommended_n", "selected_bundles", "base_cost_yuan",
+            "selected_cost_yuan", "segment_budget_yuan", "match_indices",
+        ],
+        [[1, 1, "active", "by_segment", "scale_to_budget", 3, 3, 1, 998, 998, 1000, "1;2;3"]],
+    )
+    _write_csv(
+        plan_dir / "segment_betting_plan_bundles.csv",
+        [
+            "sample_seed", "segment_idx", "bundle_idx", "arm", "n_value",
+            "match_indices", "leg_codes", "widths", "stake_multiplier", "cost_yuan",
+            "scaled_cost_yuan", "profit_yuan", "scaled_profit_yuan",
+        ],
+        [[1, 1, 1, "active", 3, "1;2;3", "3|1|0", "1;1;1", 1, 998, 998, 120, 120]],
+    )
+    incomplete_entire_dir = (
+        segment_dir / "99123_active_v3_3_3_segment_betting_v0.4.0000_entire_issue_scale_to_budget_b1000_seed1_incomplete"
+    )
+    incomplete_entire_dir.mkdir(parents=True)
+    (incomplete_entire_dir / "segment_betting_plan_summary.json").write_text(
+        json.dumps(
+            {
+                "issue": "99123",
+                "label": "active_v3.3.3",
+                "strategy_family": "segment_betting_plan",
+                "betting_strategy_version": "segment_betting_v0.4.0000",
+                "artifact_schema_version": "segment_betting_artifact_v1",
+                "arm": "active",
+                "structured_csv": "results/structured_decision_chain_shadow/99123_active_v3_3_3/structured_shadow_99123.csv",
+                "planning_scope": "entire_issue",
+                "summary": {"selected_cost_yuan": 500.0},
+                "seed_aggregate": {"summary_mode": "single_seed"},
+                "parameter_schema": [],
+                "settings": {"stake_mode": "scale_to_budget", "planning_scope": "entire_issue"},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    registry = json.loads(config_path.read_text(encoding="utf-8"))
+    registry["releases"]["fixture_release"]["artifacts"]["segment_betting_plan_dir"] = str(segment_dir)
+    config_path.write_text(json.dumps(registry, ensure_ascii=False), encoding="utf-8")
+    monkeypatch.setattr(appmod, "STRATEGY_RELEASE_CONFIG", config_path)
+    _clear_strategy_caches()
+
+    try:
+        app = appmod.create_app(sqlite_db=db_path)
+        with app.test_client() as client:
+            response = client.get("/api/issues/99123/segment-betting-plan")
+            missing = client.get("/api/issues/99123/segment-betting-plan?planning_scope=entire_issue")
+            true_entire_dir = (
+                segment_dir / "99123_active_v3_3_3_segment_betting_v0.4.0000_entire_issue_scale_to_budget_b1000_seed2"
+            )
+            true_entire_dir.mkdir(parents=True)
+            (true_entire_dir / "segment_betting_plan_summary.json").write_text(
+                json.dumps(
+                    {
+                        "issue": "99123",
+                        "label": "active_v3.3.3",
+                        "strategy_family": "segment_betting_plan",
+                        "betting_strategy_version": "segment_betting_v0.4.0000",
+                        "artifact_schema_version": "segment_betting_artifact_v1",
+                        "arm": "active",
+                        "structured_csv": "results/structured_decision_chain_shadow/99123_active_v3_3_3/structured_shadow_99123.csv",
+                        "planning_scope": "entire_issue",
+                        "artifact_planning_scope": "entire_issue",
+                        "summary": {"selected_cost_yuan": 500.0},
+                        "seed_aggregate": {"summary_mode": "single_seed"},
+                        "parameter_schema": [],
+                        "settings": {"stake_mode": "scale_to_budget", "planning_scope": "entire_issue"},
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            _write_csv(
+                true_entire_dir / "segment_betting_plan_segments.csv",
+                [
+                    "sample_seed", "segment_idx", "arm", "planning_scope", "stake_mode",
+                    "eligible_matches", "recommended_n", "selected_bundles", "base_cost_yuan",
+                    "selected_cost_yuan", "segment_budget_yuan", "match_indices",
+                ],
+                [[2, 1, "active", "entire_issue", "scale_to_budget", 4, 4, 1, 500, 500, 1000, "1;2;3;4"]],
+            )
+            _write_csv(
+                true_entire_dir / "segment_betting_plan_bundles.csv",
+                [
+                    "sample_seed", "segment_idx", "bundle_idx", "arm", "n_value",
+                    "match_indices", "leg_codes", "widths", "stake_multiplier", "cost_yuan",
+                    "scaled_cost_yuan", "profit_yuan", "scaled_profit_yuan",
+                ],
+                [[2, 1, 1, "active", 4, "1;2;3;4", "3|1|0|3", "1;1;1;1", 1, 500, 500, 50, 50]],
+            )
+            true_entire = client.get("/api/issues/99123/segment-betting-plan?planning_scope=entire_issue")
+
+        assert response.status_code == 200
+        payload = response.get_json()
+        assert payload["artifact_status"]["status"] == "available"
+        assert payload["artifact_status"]["stake_mode"] == "scale_to_budget"
+        assert payload["artifact_status"]["planning_scope"] == "by_segment"
+        assert payload["artifact_status"]["artifact_planning_scope"] == "by_segment"
+        assert payload["summary"]["selected_cost_yuan"] == 998.0
+        assert payload["_artifact_path"].endswith("99123_active_v3_3_3_segment_betting_v0.4.0000_by_segment_scale_to_budget_b1000_seed1")
+        assert payload["artifact_status"]["source_path"].endswith("segment_betting_plan_summary.json")
+        assert payload["strategy_release"]["artifacts"]["segment_betting_plan_dir"] == str(segment_dir)
+
+        assert missing.status_code == 200
+        missing_payload = missing.get_json()
+        assert missing_payload["status"] == "missing"
+        assert missing_payload["artifact_status"]["status"] == "missing"
+        assert missing_payload["artifact_status"]["filters"]["planning_scope"] == "entire_issue"
+        assert missing_payload["plan"] is None
+
+        assert true_entire.status_code == 200
+        true_payload = true_entire.get_json()
+        assert true_payload["artifact_status"]["status"] == "available"
+        assert true_payload["artifact_status"]["planning_scope"] == "entire_issue"
+        assert true_payload["artifact_status"]["artifact_planning_scope"] == "entire_issue"
+        assert true_payload["summary"]["selected_cost_yuan"] == 500.0
+    finally:
+        _clear_strategy_caches()
