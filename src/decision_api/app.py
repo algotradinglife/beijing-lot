@@ -32,6 +32,7 @@ HIGH_N_SELECTOR_RESULTS_DIR = PROJECT_ROOT / "results/high_n_selector_plus2026_l
 LINEGAP_DRIFT_RESULTS_DIR = PROJECT_ROOT / "results/main_strategy_linegap_drift_depth_20260630"
 JOINT_LEG_RESULTS_DIR = PROJECT_ROOT / "results/n7_q_conf_drift_joint_2014_10h_trusted_plus2026_linefill_20260630"
 STRUCTURED_DECISION_SHADOW_DIR = PROJECT_ROOT / "results/structured_decision_chain_shadow"
+SEGMENT_BETTING_PLAN_DIR = PROJECT_ROOT / "results/segment_betting_plan"
 DECISION_VERSIONS_CONFIG = PROJECT_ROOT / "config/decision_versions.json"
 STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
 DEFAULT_DASHBOARD_RUNTIME_STATUS = PROJECT_ROOT / "tmp/decision_dashboard/runtime_status.json"
@@ -46,13 +47,16 @@ HK_TZ = timezone(timedelta(hours=8))
 OUTCOME_LABEL = {"3": "胜", "1": "平", "0": "负"}
 OUTCOME_ORDER = ("3", "1", "0")
 Q_STOP_THRESHOLD = 1.00
+SEGMENT_PLAN_FREEZE_MINUTES_BEFORE_FIRST_KICKOFF = 60
 ACTIVE_DECISION_VARIANT_ID = "active_v3"
 ACTIVE_DECISION_VARIANT_KIND = "active"
 ACTIVE_DECISION_VARIANT_LABEL = "v3"
 ACTIVE_DECISION_VARIANT_DISPLAY_LABEL = "v3"
-SHADOW_DECISION_VARIANT_ID = "shadow_v3.3.3"
-SHADOW_DECISION_VERSION = "llm_chain_bet_protect_stop_v3.3.3_shadow"
-SHADOW_DECISION_LABEL = "shadow v3.3.3"
+STABLE_DECISION_VARIANT_ID = "active_v3.3.3"
+LEGACY_SHADOW_DECISION_VARIANT_ID = "shadow_v3.3.3"
+SHADOW_DECISION_VARIANT_ID = LEGACY_SHADOW_DECISION_VARIANT_ID
+SHADOW_DECISION_VERSION = "llm_chain_bet_protect_stop_v3.3.3"
+SHADOW_DECISION_LABEL = "active v3.3.3"
 SHADOW_DECISION_VARIANT_KIND = "shadow"
 SHADOW_DECISION_FAMILY = "structured_shadow"
 MAIN_STRATEGY_ARMS = (
@@ -101,7 +105,7 @@ DEFAULT_DECISION_VERSION_REGISTRY: dict[str, Any] = {
     },
     "review_tags": {
         "version": "postmatch_tags_v2",
-        "review_version": "v2_active_llm_snapshot_tags",
+        "review_version": "v3_decision_variant_active_v3_3_3_tags",
     },
 }
 
@@ -138,23 +142,57 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
             },
             "decision_variants": [
                 {
-                    "variant_id": ACTIVE_DECISION_VARIANT_ID,
-                    "version_id": "3.0.0",
-                    "kind": ACTIVE_DECISION_VARIANT_KIND,
-                    "label": ACTIVE_DECISION_VARIANT_LABEL,
-                    "source": "active_snapshot",
-                    "is_default": False,
-                    "selectable": True,
-                },
-                {
-                    "variant_id": SHADOW_DECISION_VARIANT_ID,
+                    "variant_id": STABLE_DECISION_VARIANT_ID,
                     "version_id": "3.3.3",
                     "kind": SHADOW_DECISION_VARIANT_KIND,
-                    "label": SHADOW_DECISION_LABEL,
+                    "label": "正式版 v3.3.3",
                     "source": "structured_shadow_csv",
                     "artifact_key": "structured_shadow_dir",
+                    "artifact_variant_ids": [LEGACY_SHADOW_DECISION_VARIANT_ID],
+                    "legacy_variant_ids": [LEGACY_SHADOW_DECISION_VARIANT_ID],
                     "is_default": True,
                     "selectable": True,
+                    "readiness": {
+                        "artifact_required": True,
+                        "defaultable_when": "available",
+                        "missing_behavior": "unavailable",
+                        "late_refresh": "not_applicable",
+                        "missing_reason": "structured_shadow_artifact_missing_for_issue",
+                    },
+                },
+                {
+                    "variant_id": "shadow_v4.2.0000_execution_late_proxy_fullcap2",
+                    "version_id": "4.2.0004",
+                    "kind": SHADOW_DECISION_VARIANT_KIND,
+                    "label": "v4.2.0004 备选观察",
+                    "source": "structured_shadow_csv",
+                    "artifact_key": "structured_shadow_dir",
+                    "is_default": False,
+                    "selectable": True,
+                    "readiness": {
+                        "artifact_required": True,
+                        "defaultable_when": "never",
+                        "missing_behavior": "hidden_until_artifact",
+                        "late_refresh": "unlock_after_valid_live_sp_refresh",
+                        "missing_reason": "late_proxy_execution_artifact_missing_or_not_refreshed",
+                    },
+                },
+                {
+                    "variant_id": "shadow_v4.2.0005_execution_late_proxy_fullcap2",
+                    "version_id": "4.2.0005",
+                    "kind": SHADOW_DECISION_VARIANT_KIND,
+                    "label": "v4.2.0005 备选观察",
+                    "source": "structured_shadow_csv",
+                    "artifact_key": "structured_shadow_dir",
+                    "is_default": False,
+                    "selectable": True,
+                    "readiness": {
+                        "artifact_required": True,
+                        "defaultable_when": "never",
+                        "missing_behavior": "hidden_until_artifact",
+                        "late_refresh": "unlock_after_valid_live_sp_refresh",
+                        "missing_reason": "late_proxy_execution_artifact_missing_or_not_refreshed",
+                    },
                 },
             ],
             "main_strategy_arms": list(MAIN_STRATEGY_ARMS),
@@ -333,6 +371,10 @@ def _strategy_linegap_drift_dir(release: dict[str, Any] | None = None) -> Path:
 
 def _strategy_shadow_dir(release: dict[str, Any] | None = None) -> Path:
     return _strategy_artifact_path("structured_shadow_dir", STRUCTURED_DECISION_SHADOW_DIR, release)
+
+
+def _strategy_segment_betting_plan_dir(release: dict[str, Any] | None = None) -> Path:
+    return _strategy_artifact_path("segment_betting_plan_dir", SEGMENT_BETTING_PLAN_DIR, release)
 
 
 def _main_strategy_arms(release: dict[str, Any] | None = None) -> tuple[dict[str, Any], ...]:
@@ -593,7 +635,7 @@ def _active_version_bundle() -> dict[str, Any]:
         "decision_prompt_version": chain.get("prompt_version", "fixed_decision_chain_v3_bet_protect_stop"),
         "decision_model_version": chain.get("model_version", "gpt_fixed_decision_chain_v3"),
         "review_tag_version": review.get("version", "postmatch_tags_v2"),
-        "review_version": review.get("review_version", "v2_active_llm_snapshot_tags"),
+        "review_version": review.get("review_version", "v3_decision_variant_active_v3_3_3_tags"),
         "decision_config_hash": _decision_config_hash(),
         "config_path": str(DECISION_VERSIONS_CONFIG.relative_to(PROJECT_ROOT)),
     }
@@ -700,6 +742,18 @@ def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
         (name,),
     ).fetchone()
     return bool(row)
+
+
+def _table_columns(conn: sqlite3.Connection, name: str) -> set[str]:
+    if not _table_exists(conn, name):
+        return set()
+    columns: set[str] = set()
+    for row in conn.execute(f"PRAGMA table_info({name})"):
+        try:
+            columns.add(str(row["name"]))
+        except (KeyError, TypeError, IndexError):
+            columns.add(str(row[1]))
+    return columns
 
 
 def _ensure_decision_snapshot_schema(conn: sqlite3.Connection) -> None:
@@ -1002,20 +1056,25 @@ def _snapshot_row_to_summary_fields(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
-def _postmatch_review_payload(conn: sqlite3.Connection, issue: str, match_idx: int) -> dict[str, Any] | None:
+def _postmatch_review_payload(
+    conn: sqlite3.Connection,
+    issue: str,
+    match_idx: int,
+    review_version: str | None = None,
+) -> dict[str, Any] | None:
     if not _table_exists(conn, "postmatch_reviews"):
+        return None
+    if not review_version:
         return None
     row = conn.execute(
         """
         SELECT *
         FROM postmatch_reviews
-        WHERE issue=? AND match_idx=?
-        ORDER BY
-          CASE WHEN review_version='v2_active_llm_snapshot_tags' THEN 0 ELSE 1 END,
-          reviewed_at DESC
+        WHERE issue=? AND match_idx=? AND review_version=?
+        ORDER BY reviewed_at DESC
         LIMIT 1
         """,
-        (issue, match_idx),
+        (issue, match_idx, review_version),
     ).fetchone()
     if not row:
         return None
@@ -1046,27 +1105,60 @@ def _postmatch_review_payload(conn: sqlite3.Connection, issue: str, match_idx: i
     return payload
 
 
-def _postmatch_issue_summary_payload(conn: sqlite3.Connection, issue: str) -> dict[str, Any] | None:
+def _postmatch_review_slug(value: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in str(value or "").strip().lower()).strip("_")
+
+
+def _postmatch_review_version_for_decision_variant(decision_variant_id: str | None) -> str:
+    variant = str(decision_variant_id or "").strip()
+    return f"v3_decision_variant_{_postmatch_review_slug(variant)}_tags" if variant else ""
+
+
+def _select_postmatch_review_version(conn: sqlite3.Connection, issue: str, decision_variant_id: str | None = None) -> str:
+    variant_review = _postmatch_review_version_for_decision_variant(decision_variant_id)
+    if not variant_review:
+        return ""
+    if _table_exists(conn, "postmatch_review_issue_summary"):
+        row = conn.execute(
+            "SELECT 1 FROM postmatch_review_issue_summary WHERE issue=? AND review_version=? LIMIT 1",
+            (issue, variant_review),
+        ).fetchone()
+        if row:
+            return variant_review
+    if _table_exists(conn, "postmatch_reviews"):
+        row = conn.execute(
+            "SELECT 1 FROM postmatch_reviews WHERE issue=? AND review_version=? LIMIT 1",
+            (issue, variant_review),
+        ).fetchone()
+        if row:
+            return variant_review
+    return ""
+
+
+def _postmatch_issue_summary_payload(conn: sqlite3.Connection, issue: str, review_version: str | None = None) -> dict[str, Any] | None:
     if not _table_exists(conn, "postmatch_review_issue_summary"):
         return None
-    row = conn.execute(
-        """
-        SELECT *
-        FROM postmatch_review_issue_summary
-        WHERE issue=?
-        ORDER BY
-          CASE WHEN review_version='v2_active_llm_snapshot_tags' THEN 0 ELSE 1 END,
-          reviewed_at DESC
-        LIMIT 1
-        """,
-        (issue,),
-    ).fetchone()
+    if review_version:
+        row = conn.execute(
+            """
+            SELECT *
+            FROM postmatch_review_issue_summary
+            WHERE issue=? AND review_version=?
+            ORDER BY reviewed_at DESC
+            LIMIT 1
+            """,
+            (issue, review_version),
+        ).fetchone()
+    else:
+        return None
     if not row:
         return None
+    keys = set(row.keys())
     tag_counts = _json_loads(row["tag_counts_json"], {})
     return {
         "issue": row["issue"],
         "review_version": row["review_version"],
+        "decision_variant_id": row["decision_variant_id"] if "decision_variant_id" in keys else "",
         "reviewed_at": row["reviewed_at"],
         "n_reviews": row["n_reviews"],
         "stake": row["stake"],
@@ -1082,21 +1174,21 @@ def _postmatch_issue_summary_payload(conn: sqlite3.Connection, issue: str) -> di
     }
 
 
-def _postmatch_review_rows_payload(conn: sqlite3.Connection, issue: str) -> list[dict[str, Any]]:
+def _postmatch_review_rows_payload(conn: sqlite3.Connection, issue: str, review_version: str | None = None) -> list[dict[str, Any]]:
     if not _table_exists(conn, "postmatch_reviews"):
         return []
-    rows = conn.execute(
-        """
-        SELECT *
-        FROM postmatch_reviews
-        WHERE issue=?
-        ORDER BY
-          match_idx ASC,
-          CASE WHEN review_version='v2_active_llm_snapshot_tags' THEN 0 ELSE 1 END,
-          reviewed_at DESC
-        """,
-        (issue,),
-    ).fetchall()
+    if review_version:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM postmatch_reviews
+            WHERE issue=? AND review_version=?
+            ORDER BY match_idx ASC, reviewed_at DESC
+            """,
+            (issue, review_version),
+        ).fetchall()
+    else:
+        rows = []
     out: list[dict[str, Any]] = []
     seen: set[int] = set()
     for row in rows:
@@ -1112,6 +1204,7 @@ def _postmatch_review_rows_payload(conn: sqlite3.Connection, issue: str) -> list
             "match_idx": match_idx,
             "match_id": row["match_id"],
             "review_version": row["review_version"],
+            "decision_variant_id": row["decision_variant_id"] if "decision_variant_id" in keys else "",
             "reviewed_at": row["reviewed_at"],
             "decision_snapshot_id": row["decision_snapshot_id"] if "decision_snapshot_id" in keys else "",
             "decision_snapshot_generated_at": row["decision_snapshot_generated_at"] if "decision_snapshot_generated_at" in keys else "",
@@ -1161,7 +1254,7 @@ def _now_hk_iso() -> str:
     return datetime.now(HK_TZ).strftime("%Y-%m-%d %H:%M:%S")
 
 
-def _parse_timestamp_to_hk(value: str | None) -> datetime | None:
+def _parse_timestamp_to_hk(value: str | None, *, naive_tz: timezone = HK_TZ) -> datetime | None:
     if not value:
         return None
     text = str(value).strip()
@@ -1173,16 +1266,24 @@ def _parse_timestamp_to_hk(value: str | None) -> datetime | None:
         elif "T" in text:
             parsed = datetime.fromisoformat(text)
         else:
-            parsed = datetime.strptime(text, "%Y-%m-%d %H:%M:%S").replace(tzinfo=HK_TZ)
+            parsed = None
+            for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+                try:
+                    parsed = datetime.strptime(text, fmt).replace(tzinfo=naive_tz)
+                    break
+                except ValueError:
+                    continue
+            if parsed is None:
+                raise ValueError(text)
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=HK_TZ)
+        parsed = parsed.replace(tzinfo=naive_tz)
     return parsed.astimezone(HK_TZ)
 
 
-def _minutes_since_hk(value: str | None) -> float | None:
-    parsed = _parse_timestamp_to_hk(value)
+def _minutes_since_hk(value: str | None, *, naive_tz: timezone = HK_TZ) -> float | None:
+    parsed = _parse_timestamp_to_hk(value, naive_tz=naive_tz)
     if parsed is None:
         return None
     return max(0.0, (datetime.now(HK_TZ) - parsed).total_seconds() / 60)
@@ -1253,6 +1354,21 @@ def _live_workflow_step_defs(issue: str, db_path: Path) -> list[dict[str, Any]]:
             "kind": "internal_decision_snapshots",
             "timeout_sec": 180,
             "command": ["internal", "materialize_issue_decision_snapshots", issue],
+        },
+        {
+            "step_key": "generate_active_v3_3_3_artifact",
+            "label": "生成 active_v3.3.3 正式决策 artifact",
+            "kind": "subprocess",
+            "timeout_sec": 300,
+            "command": [
+                py,
+                str(PROJECT_ROOT / "scripts/evaluate_structured_decision_chain_shadow.py"),
+                "--db",
+                db_arg,
+                "--issue",
+                issue,
+                "--strict-completeness",
+            ],
         },
         {
             "step_key": "publish_v4_2_execution_artifacts",
@@ -1465,6 +1581,236 @@ def _assert_materialize_workflow_complete(result: dict[str, Any]) -> None:
     )
 
 
+def _decision_artifact_default_variant(release: dict[str, Any] | None = None) -> str:
+    manifest = _manifest_default_active_variant(release)
+    if manifest:
+        return str(manifest.get("variant_id") or STABLE_DECISION_VARIANT_ID)
+    return STABLE_DECISION_VARIANT_ID
+
+
+def _decision_artifact_manifest(variant_id: str | None, release: dict[str, Any] | None = None) -> dict[str, Any]:
+    release = release or _active_strategy_release()
+    requested = str(variant_id or "").strip() or _decision_artifact_default_variant(release)
+    manifest = _manifest_variant_for_id(requested, release)
+    if manifest:
+        return manifest
+    return {}
+
+
+def _decision_artifact_public_variant_id(variant_id: str | None, release: dict[str, Any] | None = None) -> str:
+    manifest = _decision_artifact_manifest(variant_id, release)
+    if manifest:
+        return str(manifest.get("variant_id") or "")
+    return str(variant_id or "").strip() or _decision_artifact_default_variant(release)
+
+
+def _decision_artifact_generator_artifact_id(manifest: dict[str, Any]) -> str:
+    values = manifest.get("artifact_variant_ids")
+    if isinstance(values, list):
+        for value in values:
+            text = str(value or "").strip()
+            if text:
+                return text
+    for key in ("legacy_variant_ids", "alias_variant_ids"):
+        values = manifest.get(key)
+        if isinstance(values, list):
+            for value in values:
+                text = str(value or "").strip()
+                if text:
+                    return text
+    return str(manifest.get("variant_id") or "").strip()
+
+
+def _decision_artifact_generation_supported(manifest: dict[str, Any]) -> bool:
+    if not manifest:
+        return False
+    if manifest.get("source") != "structured_shadow_csv":
+        return False
+    artifact_id = _decision_artifact_generator_artifact_id(manifest)
+    # The current strategy generator writes shadow_v3.3.3, exposed publicly as active_v3.3.3.
+    return artifact_id == LEGACY_SHADOW_DECISION_VARIANT_ID
+
+
+def _decision_artifact_latest_complete_variant(
+    issue: str,
+    expected_indices: set[int],
+    manifest: dict[str, Any],
+    *,
+    release: dict[str, Any] | None = None,
+) -> tuple[dict[int, dict[str, Any]] | None, str, dict[str, Any] | None]:
+    public_id = str(manifest.get("variant_id") or "")
+    artifact_id = _decision_artifact_generator_artifact_id(manifest)
+    candidates: list[tuple[Path, dict[int, dict[str, Any]], str]] = []
+    for path in _structured_shadow_csv_candidates(issue, release):
+        rows, source = _structured_shadow_rows_from_csv(path)
+        if not rows:
+            continue
+        row_artifact_id = _shadow_variant_id(rows)
+        row_public_id = _public_decision_variant_id(row_artifact_id, release)
+        if row_artifact_id != artifact_id and row_public_id != public_id:
+            continue
+        candidates.append((path, rows, source))
+    if not candidates:
+        completeness = completeness_for_indices(
+            issue=issue,
+            scope="structured_shadow_csv",
+            expected_indices=expected_indices,
+            actual_indices=[],
+        ).to_dict()
+        return None, "", completeness
+    candidates.sort(key=lambda item: item[0].stat().st_mtime, reverse=True)
+    best_incomplete: tuple[dict[int, dict[str, Any]], str, dict[str, Any]] | None = None
+    for _path, rows, source in candidates:
+        status = completeness_for_indices(
+            issue=issue,
+            scope="structured_shadow_csv",
+            expected_indices=expected_indices,
+            actual_indices=rows.keys(),
+        )
+        status_payload = status.to_dict()
+        if status.complete:
+            return rows, source, status_payload
+        if best_incomplete is None:
+            best_incomplete = (rows, source, status_payload)
+    if best_incomplete is None:
+        return None, "", None
+    return best_incomplete
+
+
+def _decision_artifact_status_payload(
+    conn: sqlite3.Connection,
+    issue: str,
+    *,
+    variant_id: str | None,
+) -> dict[str, Any]:
+    release = _active_strategy_release()
+    resolved = _resolve_issue(conn, issue)
+    rows = _issue_rows(conn, resolved, only_date=None)
+    expected_indices = {int(row["match_idx"]) for row in rows}
+    requested_variant_id = str(variant_id or "").strip() or _decision_artifact_default_variant(release)
+    manifest = _decision_artifact_manifest(requested_variant_id, release)
+    public_variant_id = _decision_artifact_public_variant_id(requested_variant_id, release)
+    artifact_variant_id = _decision_artifact_generator_artifact_id(manifest) if manifest else ""
+    supported = _decision_artifact_generation_supported(manifest)
+    artifact_rows, source_path, completeness = _decision_artifact_latest_complete_variant(
+        resolved,
+        expected_indices,
+        manifest,
+        release=release,
+    ) if manifest else (None, "", None)
+    snapshot_completeness = active_snapshot_completeness(conn, resolved).to_dict()
+    if not manifest:
+        status = "unsupported"
+        message = f"unknown decision artifact variant: {requested_variant_id}"
+    elif completeness and completeness.get("complete"):
+        status = "available"
+        message = "artifact available"
+    elif source_path:
+        status = "incomplete"
+        message = "artifact incomplete"
+    else:
+        status = "missing"
+        message = "artifact missing"
+    latest_workflow = _latest_workflow_payload(conn, resolved)
+    latest_generation_step = {}
+    if latest_workflow:
+        for step in latest_workflow.get("steps", []):
+            if step.get("step_key") == "generate_active_v3_3_3_artifact":
+                latest_generation_step = step
+    return {
+        "issue": resolved,
+        "requested_variant_id": requested_variant_id,
+        "variant_id": public_variant_id,
+        "artifact_variant_id": artifact_variant_id,
+        "status": status,
+        "message": message,
+        "generation_supported": supported,
+        "source_path": source_path,
+        "row_count": len(artifact_rows or {}),
+        "expected_match_count": len(expected_indices),
+        "completeness": completeness or completeness_for_indices(
+            issue=resolved,
+            scope="structured_shadow_csv",
+            expected_indices=expected_indices,
+            actual_indices=[],
+        ).to_dict(),
+        "snapshot_completeness": snapshot_completeness,
+        "latest_workflow": {
+            "run_id": latest_workflow.get("run_id", "") if latest_workflow else "",
+            "status": latest_workflow.get("status", "") if latest_workflow else "",
+            "started_at": latest_workflow.get("started_at", "") if latest_workflow else "",
+            "finished_at": latest_workflow.get("finished_at", "") if latest_workflow else "",
+        },
+        "latest_generation_step": latest_generation_step,
+    }
+
+
+def _run_decision_artifact_generator(
+    conn: sqlite3.Connection,
+    db_path: Path,
+    issue: str,
+    *,
+    variant_id: str | None,
+    materialize_snapshots: bool,
+    strict_completeness: bool,
+    timeout_sec: int = 300,
+) -> dict[str, Any]:
+    release = _active_strategy_release()
+    resolved = _resolve_issue(conn, issue)
+    manifest = _decision_artifact_manifest(variant_id, release)
+    requested_variant_id = str(variant_id or "").strip() or _decision_artifact_default_variant(release)
+    if not manifest:
+        raise ValueError(f"unknown decision artifact variant: {requested_variant_id}")
+    if not _decision_artifact_generation_supported(manifest):
+        raise ValueError(f"decision artifact generation is not supported for variant: {requested_variant_id}")
+
+    materialize_result: dict[str, Any] | None = None
+    if materialize_snapshots:
+        materialize_result = _materialize_issue_decision_snapshots(conn, resolved, only_date=None)
+        conn.commit()
+        _assert_materialize_workflow_complete(materialize_result)
+
+    py = os.environ.get("PYTHON") or sys.executable
+    command = [
+        py,
+        str(PROJECT_ROOT / "scripts/evaluate_structured_decision_chain_shadow.py"),
+        "--db",
+        str(db_path),
+        "--issue",
+        resolved,
+    ]
+    if strict_completeness:
+        command.append("--strict-completeness")
+    completed = subprocess.run(
+        command,
+        cwd=PROJECT_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=timeout_sec,
+        check=False,
+    )
+    stdout_tail = (completed.stdout or "")[-4000:]
+    stderr_tail = (completed.stderr or "")[-4000:]
+    if completed.returncode != 0:
+        raise RuntimeError(f"exit={completed.returncode}; stderr={stderr_tail or stdout_tail}")
+    generated_payload = _json_loads(completed.stdout, {}) if completed.stdout else {}
+    status_payload = _decision_artifact_status_payload(conn, resolved, variant_id=requested_variant_id)
+    return {
+        "issue": resolved,
+        "variant_id": status_payload.get("variant_id") or requested_variant_id,
+        "artifact_variant_id": status_payload.get("artifact_variant_id") or "",
+        "status": "succeeded",
+        "materialize_snapshots": materialize_snapshots,
+        "materialize_result": materialize_result or {},
+        "command": command,
+        "returncode": completed.returncode,
+        "stdout_tail": stdout_tail,
+        "stderr_tail": stderr_tail,
+        "generator_payload": generated_payload,
+        "artifact_status": status_payload,
+    }
+
+
 def _run_live_workflow(conn: sqlite3.Connection, db_path: Path, issue: str, *, dry_run: bool, requested_by: str) -> dict[str, Any]:
     _ensure_decision_snapshot_schema(conn)
     _ensure_live_workflow_schema(conn)
@@ -1613,6 +1959,8 @@ def _run_postmatch_review_task(
         str(db_path),
         "--issue",
         resolved,
+        "--decision-variant",
+        STABLE_DECISION_VARIANT_ID,
     ]
     if dry_run:
         command.append("--dry-run")
@@ -3038,6 +3386,11 @@ def _structured_shadow_variant_scan(
         if not rows:
             continue
         variant_id = _shadow_variant_id(rows)
+        if _is_execution_strict_variant_id(variant_id):
+            continue
+        manifest = _manifest_variant_for_id(variant_id, release)
+        if manifest and manifest.get("selectable") is False:
+            continue
         if variant_id not in allowed_shadow_ids:
             suppressed.add(variant_id)
             continue
@@ -3065,6 +3418,7 @@ def _complete_shadow_variants(
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]],
     expected_match_indices: set[int],
     *,
+    release: dict[str, Any] | None = None,
     ignore_extra: bool = False,
 ) -> tuple[list[tuple[dict[int, dict[str, Any]], str]], list[dict[str, Any]]]:
     if not expected_match_indices:
@@ -3072,7 +3426,8 @@ def _complete_shadow_variants(
     complete: list[tuple[dict[int, dict[str, Any]], str]] = []
     incomplete: list[dict[str, Any]] = []
     for rows, source_path in shadow_variants:
-        variant_id = _shadow_variant_id(rows)
+        artifact_variant_id = _shadow_variant_id(rows)
+        variant_id = _public_decision_variant_id(artifact_variant_id, release)
         status = completeness_for_indices(
             issue=issue,
             scope="structured_shadow_csv",
@@ -3085,6 +3440,7 @@ def _complete_shadow_variants(
             continue
         incomplete.append({
             "variant_id": variant_id,
+            "artifact_variant_id": artifact_variant_id,
             "source_path": source_path,
             **status.to_dict(),
         })
@@ -3142,10 +3498,17 @@ def _active_decision_variant(summary: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_code: str = "") -> dict[str, Any]:
+def _shadow_decision_variant(
+    row: dict[str, Any],
+    source_path: str,
+    *,
+    result_code: str = "",
+    release: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     codes = _selection_codes_from_value(row.get("shadow_selection_codes"))
-    variant_id = str(row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID)
-    manifest = _manifest_variant_by_id().get(variant_id, {})
+    artifact_variant_id = str(row.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID)
+    manifest = _manifest_variant_for_id(artifact_variant_id, release)
+    variant_id = str(manifest.get("variant_id") or artifact_variant_id)
     primary = str(row.get("shadow_primary") or (codes[0] if codes else ""))
     if primary not in OUTCOME_ORDER:
         primary = codes[0] if codes else ""
@@ -3156,6 +3519,7 @@ def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_co
         coverage_hit = result_code in codes
     return {
         "variant_id": variant_id,
+        "artifact_variant_id": artifact_variant_id,
         "kind": SHADOW_DECISION_VARIANT_KIND,
         "family": SHADOW_DECISION_FAMILY,
         "label": manifest.get("label") or _shadow_variant_display_label(variant_id),
@@ -3183,7 +3547,7 @@ def _shadow_decision_variant(row: dict[str, Any], source_path: str, *, result_co
         "execution_source_action": row.get("execution_source_action") or "",
         "execution_recommended_codes": row.get("execution_recommended_codes") or "",
         "execution_double_codes": row.get("execution_double_codes") or "",
-        "execution_dropped_codes": _codes_from_text(row.get("execution_dropped_codes") or ""),
+        "execution_dropped_codes": _selection_codes_from_value(row.get("execution_dropped_codes") or ""),
         "execution_drop_reasons": _csv_semicolon_list(row, "execution_drop_reasons"),
         "execution_full_score": _safe_float(row.get("execution_full_score")),
         "execution_full_candidate": _csv_bool(row, "execution_full_candidate"),
@@ -3227,12 +3591,53 @@ def _manifest_variant_by_id(release: dict[str, Any] | None = None) -> dict[str, 
     }
 
 
+def _manifest_variant_alias_ids(item: dict[str, Any]) -> set[str]:
+    aliases: set[str] = set()
+    for key in ("artifact_variant_ids", "alias_variant_ids", "legacy_variant_ids"):
+        value = item.get(key)
+        if isinstance(value, list):
+            aliases.update(str(part) for part in value if str(part or "").strip())
+        elif value:
+            aliases.add(str(value))
+    return aliases
+
+
+def _manifest_variant_by_public_or_alias(release: dict[str, Any] | None = None) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
+    for item in _manifest_decision_variants(release):
+        variant_id = str(item.get("variant_id") or "")
+        if variant_id:
+            out[variant_id] = item
+        for alias in _manifest_variant_alias_ids(item):
+            out[alias] = item
+    return out
+
+
+def _manifest_variant_for_id(variant_id: Any, release: dict[str, Any] | None = None) -> dict[str, Any]:
+    return _manifest_variant_by_public_or_alias(release).get(str(variant_id or ""), {})
+
+
+def _public_decision_variant_id(variant_id: Any, release: dict[str, Any] | None = None) -> str:
+    raw = str(variant_id or "")
+    manifest = _manifest_variant_for_id(raw, release)
+    return str(manifest.get("variant_id") or raw)
+
+
+def _resolve_requested_decision_variant_id(variant_id: str | None, release: dict[str, Any] | None = None) -> str:
+    requested = str(variant_id or "").strip()
+    return _public_decision_variant_id(requested, release) if requested else ""
+
+
 def _manifest_variant_ids(release: dict[str, Any] | None = None, *, kind: str | None = None) -> set[str]:
-    return {
-        str(item.get("variant_id") or "")
-        for item in _manifest_decision_variants(release)
-        if item.get("variant_id") and (kind is None or item.get("kind") == kind)
-    }
+    ids: set[str] = set()
+    for item in _manifest_decision_variants(release):
+        if kind is not None and item.get("kind") != kind:
+            continue
+        variant_id = str(item.get("variant_id") or "")
+        if variant_id:
+            ids.add(variant_id)
+        ids.update(_manifest_variant_alias_ids(item))
+    return ids
 
 
 def _manifest_default_active_variant(release: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -3280,11 +3685,13 @@ def _shadow_decision_option(
     release: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     first = next(iter(rows.values()), {})
-    variant_id = first.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID
-    manifest = _manifest_variant_by_id(release).get(str(variant_id), {})
+    artifact_variant_id = str(first.get("shadow_arm") or SHADOW_DECISION_VARIANT_ID)
+    manifest = _manifest_variant_for_id(artifact_variant_id, release)
+    variant_id = str(manifest.get("variant_id") or artifact_variant_id)
     readiness = _decision_variant_readiness(manifest, available=True)
     return {
         "variant_id": variant_id,
+        "artifact_variant_id": artifact_variant_id,
         "kind": SHADOW_DECISION_VARIANT_KIND,
         "family": SHADOW_DECISION_FAMILY,
         "label": manifest.get("label") or _shadow_variant_display_label(variant_id),
@@ -3345,8 +3752,7 @@ def _missing_manifest_shadow_options(
         # late_proxy is only actionable after the late-refresh artifact exists.
         if _is_execution_late_proxy_variant_id(variant_id):
             continue
-        if _is_execution_strict_variant_id(variant_id):
-            options.append(_manifest_shadow_option(manifest, available=False))
+        options.append(_manifest_shadow_option(manifest, available=False))
     return options
 
 
@@ -3440,10 +3846,11 @@ def _decision_variant_options(
     release: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     active_manifest = _manifest_default_active_variant(release)
-    active_variant_id = str(active_manifest.get("variant_id") or ACTIVE_DECISION_VARIANT_ID)
-    active_readiness = _decision_variant_readiness(active_manifest, available=True)
-    options = [
-        {
+    options: list[dict[str, Any]] = []
+    if active_manifest and active_manifest.get("selectable") is not False:
+        active_variant_id = str(active_manifest.get("variant_id") or ACTIVE_DECISION_VARIANT_ID)
+        active_readiness = _decision_variant_readiness(active_manifest, available=True)
+        options.append({
             "variant_id": active_variant_id,
             "kind": ACTIVE_DECISION_VARIANT_KIND,
             "family": "active_snapshot",
@@ -3456,8 +3863,7 @@ def _decision_variant_options(
             "selectable": bool(active_manifest.get("selectable", True)),
             "available": True,
             **active_readiness,
-        }
-    ]
+        })
     for rows, source_path in shadow_variants or []:
         if rows and source_path:
             option = _shadow_decision_option(rows, source_path, release=release)
@@ -3470,7 +3876,7 @@ def _decision_variant_options(
     options.extend(_missing_manifest_shadow_options(present_shadow_ids, release))
     normalized = _normalize_decision_variant_defaults(options)
     selectable = [item for item in normalized if item.get("selectable") is not False]
-    return selectable or normalized
+    return selectable
 
 
 def _strategy_version_context(
@@ -3482,10 +3888,15 @@ def _strategy_version_context(
     incomplete_shadow_variants: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     requested = str(requested_variant_id or "").strip()
+    resolved_requested = _resolve_requested_decision_variant_id(requested, release)
     default_option = next((item for item in options if item.get("is_default")), options[0] if options else {})
-    selected_option = next((item for item in options if str(item.get("variant_id") or "") == requested), None) if requested else None
+    selected_option = next((item for item in options if str(item.get("variant_id") or "") == resolved_requested), None) if resolved_requested else None
     selection_status = "ok"
     selection_error = ""
+    if not options:
+        selected_option = {}
+        selection_status = "unavailable"
+        selection_error = "no decision variant available for this issue"
     if requested and selected_option is None:
         selected_option = default_option
         selection_status = "unavailable"
@@ -3520,6 +3931,7 @@ def _strategy_version_context(
     return {
         "schema_version": "strategy_version_context_v1",
         "requested_variant_id": requested,
+        "resolved_requested_variant_id": resolved_requested,
         "selected_variant_id": str(selected_option.get("variant_id") or "") if selected_option else "",
         "selection_status": selection_status,
         "selection_error": selection_error,
@@ -3528,6 +3940,1057 @@ def _strategy_version_context(
         "options": options,
         "strategy_release": release_payload,
     }
+
+
+def _segment_plan_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    text = str(value or "").strip()
+    if not text:
+        return []
+    return [part.strip() for part in re.split(r"[;,]", text) if part.strip()]
+
+
+def _segment_plan_int_list(value: Any) -> list[int]:
+    out: list[int] = []
+    for part in _segment_plan_list(value):
+        parsed = _safe_int(part)
+        if parsed is not None:
+            out.append(parsed)
+    return out
+
+
+def _segment_plan_variant_id(label: str) -> str:
+    normalized = str(label or "").lower()
+    if "v4.2.0005" in normalized:
+        return "shadow_v4.2.0005_execution_late_proxy_fullcap2"
+    if "v4.2.0004" in normalized:
+        return "shadow_v4.2.0000_execution_late_proxy_fullcap2"
+    if "v3.3.3" in normalized:
+        return STABLE_DECISION_VARIANT_ID
+    return ""
+
+
+def _segment_plan_requested_variant_keys(decision_variant_id: str | None) -> set[str]:
+    requested = str(decision_variant_id or "").strip().lower()
+    keys = {requested} if requested else set()
+    if "v4.2.0005" in requested:
+        keys.update({"v4.2.0005", "v4.2.0005_late_proxy"})
+    elif "v4.2.0000" in requested or "v4.2.0004" in requested:
+        keys.update({"v4.2.0004", "v4.2.0004_late_proxy"})
+    elif "v3.3.3" in requested:
+        keys.update({"v3.3.3", STABLE_DECISION_VARIANT_ID, LEGACY_SHADOW_DECISION_VARIANT_ID})
+    return {key for key in keys if key}
+
+
+def _segment_plan_option_matches_requested_variant(item: dict[str, Any], requested_keys: set[str]) -> bool:
+    if not requested_keys:
+        return False
+    label = str(item.get("label") or "").lower()
+    variant_id = str(item.get("decision_variant_id") or "").lower()
+    plan_name = str(item.get("plan_id") or "").lower()
+    return bool(requested_keys & {label, variant_id}) or any(key in plan_name for key in requested_keys)
+
+
+def _segment_plan_float(row: dict[str, Any], key: str) -> float | None:
+    return _safe_float(row.get(key))
+
+
+def _segment_plan_int(row: dict[str, Any], key: str) -> int | None:
+    return _safe_int(row.get(key))
+
+
+def _segment_plan_bool(row: dict[str, Any], key: str) -> bool | None:
+    value = row.get(key)
+    if value in {True, False}:
+        return bool(value)
+    parsed = _safe_int(value)
+    return None if parsed is None else bool(parsed)
+
+
+def _segment_plan_csv_rows(path: Path) -> list[dict[str, Any]]:
+    if not path.is_file():
+        return []
+    with path.open(newline="", encoding="utf-8") as f:
+        return [dict(row) for row in csv.DictReader(f)]
+
+
+def _segment_plan_display_path(path: Path) -> str:
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return path.name
+
+
+def _segment_plan_updated_at(path: Path) -> str:
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).astimezone().isoformat(timespec="seconds")
+    except OSError:
+        return ""
+
+
+def _segment_plan_path_mtime_hk(path: Path | None) -> datetime | None:
+    if path is None:
+        return None
+    try:
+        return datetime.fromtimestamp(path.stat().st_mtime, HK_TZ)
+    except OSError:
+        return None
+
+
+def _segment_plan_path_from_payload(value: Any) -> Path | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    path = Path(text)
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    return path
+
+
+def _segment_plan_freeze_state(conn: sqlite3.Connection, issue: str) -> dict[str, Any]:
+    state: dict[str, Any] = {
+        "policy": "first_kickoff_minus_1h_issue_wide_lock",
+        "leg_filter_policy": "no_started_match_filter_after_lock",
+        "issue": str(issue),
+        "freeze_minutes_before_first_kickoff": SEGMENT_PLAN_FREEZE_MINUTES_BEFORE_FIRST_KICKOFF,
+        "first_kickoff": "",
+        "freeze_at": "",
+        "now": _now_hk_iso(),
+        "locked": False,
+        "reason": "kickoff_unavailable",
+    }
+    columns = _table_columns(conn, "matches")
+    if "end_time" not in columns:
+        state["reason"] = "matches_end_time_column_missing"
+        return state
+    row = conn.execute(
+        """
+        SELECT MIN(end_time) AS first_kickoff
+        FROM matches
+        WHERE issue=?
+          AND end_time IS NOT NULL
+          AND TRIM(end_time) <> ''
+        """,
+        (issue,),
+    ).fetchone()
+    first_kickoff = _parse_timestamp_to_hk(row["first_kickoff"] if row else "")
+    if first_kickoff is None:
+        return state
+    freeze_at = first_kickoff - timedelta(minutes=SEGMENT_PLAN_FREEZE_MINUTES_BEFORE_FIRST_KICKOFF)
+    now = datetime.now(HK_TZ)
+    locked = now >= freeze_at
+    state.update({
+        "first_kickoff": first_kickoff.strftime("%Y-%m-%d %H:%M:%S"),
+        "freeze_at": freeze_at.strftime("%Y-%m-%d %H:%M:%S"),
+        "now": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "locked": locked,
+        "reason": "locked_after_freeze_at" if locked else "before_freeze_at",
+    })
+    return state
+
+
+def _segment_plan_option_freeze_info(option: dict[str, Any], freeze_state: dict[str, Any] | None) -> dict[str, Any]:
+    info: dict[str, Any] = {
+        "allowed": True,
+        "reason": "freeze_not_active",
+        "summary_updated_at": "",
+        "structured_source_updated_at": "",
+        "structured_source_path": "",
+    }
+    if not freeze_state or not freeze_state.get("locked"):
+        return info
+    freeze_at = _parse_timestamp_to_hk(str(freeze_state.get("freeze_at") or ""))
+    summary_path = option.get("_summary_path") if isinstance(option.get("_summary_path"), Path) else None
+    summary_mtime = _segment_plan_path_mtime_hk(summary_path)
+    if summary_mtime is not None:
+        info["summary_updated_at"] = summary_mtime.strftime("%Y-%m-%d %H:%M:%S")
+    payload = option.get("_payload") if isinstance(option.get("_payload"), dict) else {}
+    structured_path = _segment_plan_path_from_payload(payload.get("structured_csv"))
+    structured_mtime = _segment_plan_path_mtime_hk(structured_path)
+    if structured_path is not None:
+        info["structured_source_path"] = _segment_plan_display_path(structured_path)
+    if structured_mtime is not None:
+        info["structured_source_updated_at"] = structured_mtime.strftime("%Y-%m-%d %H:%M:%S")
+    if freeze_at is None:
+        info.update({"allowed": False, "reason": "freeze_at_unparseable"})
+        return info
+    if summary_mtime is not None and summary_mtime <= freeze_at:
+        info["reason"] = "summary_prelock"
+        return info
+    if structured_mtime is not None and structured_mtime <= freeze_at:
+        info["reason"] = "structured_source_prelock"
+        return info
+    info.update({"allowed": False, "reason": "post_freeze_artifact_rejected"})
+    return info
+
+
+def _filter_segment_plan_options_for_freeze(
+    options: list[dict[str, Any]],
+    freeze_state: dict[str, Any] | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    filtered: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
+    for option in options:
+        annotated = dict(option)
+        annotated["_freeze_info"] = _segment_plan_option_freeze_info(annotated, freeze_state)
+        if annotated["_freeze_info"].get("allowed"):
+            filtered.append(annotated)
+        else:
+            rejected.append(annotated)
+    return filtered, rejected
+
+
+def _normalize_segment_planning_scope(value: str | None) -> str:
+    token = str(value or "").strip()
+    if token == "next_segment":
+        return "by_segment"
+    if token == "remaining_issue":
+        return "entire_issue"
+    return token
+
+
+def _segment_plan_scope_matches(value: str | None, requested_scope: str) -> bool:
+    return _normalize_segment_planning_scope(value) == requested_scope
+
+
+def _segment_plan_scope_rank(value: str | None, requested_scope: str) -> int:
+    token = str(value or "").strip()
+    normalized = _normalize_segment_planning_scope(token)
+    if normalized != requested_scope:
+        return 0
+    if token == requested_scope:
+        return 3
+    if requested_scope == "by_segment" and token == "next_segment":
+        return 2
+    if requested_scope == "entire_issue" and token == "remaining_issue":
+        return 2
+    return 1
+
+
+def _segment_plan_selection_binding(planning_scope: str) -> dict[str, str]:
+    return {
+        "match_selection_source": "issue_board_same_decision_variant",
+        "frontend_display_source": "issue_board",
+        "refresh_policy": "match directions follow issue board artifact refresh; betting plan only provides segment/bundle/estimate metrics",
+        "planning_scope": planning_scope,
+    }
+
+
+def _segment_plan_option_from_summary(summary_path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    settings = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
+    summary = payload.get("summary") if isinstance(payload.get("summary"), dict) else {}
+    seed_aggregate = payload.get("seed_aggregate") if isinstance(payload.get("seed_aggregate"), dict) else {}
+    sp_drift_risk = payload.get("sp_drift_risk") if isinstance(payload.get("sp_drift_risk"), dict) else {}
+    label = str(payload.get("label") or "")
+    plan_id = summary_path.parent.name
+    variant_id = _segment_plan_variant_id(label)
+    sample_seeds = settings.get("sample_seeds") if isinstance(settings.get("sample_seeds"), list) else []
+    artifact_planning_scope = str(payload.get("planning_scope") or settings.get("planning_scope") or "")
+    planning_scope = _normalize_segment_planning_scope(artifact_planning_scope)
+    decision_time = str(payload.get("decision_time") or settings.get("decision_time") or "")
+    return {
+        "plan_id": plan_id,
+        "label": label or plan_id,
+        "decision_variant_id": variant_id,
+        "strategy_family": str(payload.get("strategy_family") or ""),
+        "betting_strategy_version": str(payload.get("betting_strategy_version") or settings.get("betting_strategy_version") or ""),
+        "artifact_schema_version": str(payload.get("artifact_schema_version") or ""),
+        "planning_scope": planning_scope,
+        "artifact_planning_scope": artifact_planning_scope,
+        "decision_time": decision_time,
+        "stake_mode": str(settings.get("stake_mode") or ""),
+        "available_segments": _safe_int(payload.get("available_segments")),
+        "sp_drift_risk_accepted": bool(sp_drift_risk.get("accepted")) if sp_drift_risk else False,
+        "sp_drift_risk_level": str(sp_drift_risk.get("level") or ""),
+        "arm": str(payload.get("arm") or ""),
+        "segment_budget_yuan": _safe_float(settings.get("segment_budget_yuan")),
+        "sample_seed": _safe_int(settings.get("sample_seed")),
+        "seed_count": _safe_int(seed_aggregate.get("seed_count") or settings.get("seed_count")) or len(sample_seeds) or 1,
+        "summary_mode": str(seed_aggregate.get("summary_mode") or "single_seed"),
+        "source_rows": _safe_int(payload.get("source_rows")),
+        "eligible_rows": _safe_int(payload.get("eligible_rows")),
+        "segments": _safe_int(payload.get("segments") or summary.get("segments")),
+        "selected_bundles": _safe_int(summary.get("selected_bundles")),
+        "base_cost_yuan": _safe_float(summary.get("base_cost_yuan")),
+        "stake_multiplier_units": _safe_float(summary.get("stake_multiplier_units")),
+        "selected_cost_yuan": _safe_float(summary.get("selected_cost_yuan")),
+        "profit_yuan": _safe_float(summary.get("profit_yuan")),
+        "roi": _safe_float(summary.get("roi")),
+        "updated_at": _segment_plan_updated_at(summary_path),
+        "artifact_path": _segment_plan_display_path(summary_path.parent),
+        "_summary_path": summary_path,
+        "_payload": payload,
+    }
+
+
+def _segment_plan_options(issue: str, release: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    if not re.fullmatch(r"\d{1,12}", str(issue or "")):
+        return []
+    plan_dir = _strategy_segment_betting_plan_dir(release)
+    options: list[dict[str, Any]] = []
+    for summary_path in sorted(plan_dir.glob(f"{issue}_*/segment_betting_plan_summary.json")):
+        if not summary_path.is_file():
+            continue
+        option = _segment_plan_option_from_summary(summary_path)
+        if option:
+            options.append(option)
+    return sorted(
+        options,
+        key=lambda item: (
+            str(item.get("label") or ""),
+            float(item.get("segment_budget_yuan") or 0),
+            int(item.get("sample_seed") or 0),
+            str(item.get("plan_id") or ""),
+        ),
+    )
+
+
+def _select_segment_plan(
+    options: list[dict[str, Any]],
+    *,
+    decision_variant_id: str | None = None,
+    plan_id: str | None = None,
+    label: str | None = None,
+    betting_strategy_version: str | None = None,
+    segment_budget_yuan: float | None = None,
+    seed: int | None = None,
+    planning_scope: str | None = None,
+    decision_time: str | None = None,
+    stake_mode: str | None = None,
+) -> dict[str, Any] | None:
+    candidates = list(options)
+    requested_scope = _normalize_segment_planning_scope(planning_scope)
+    if requested_scope:
+        scoped = []
+        for item in candidates:
+            raw_scope = str(item.get("artifact_planning_scope") or item.get("planning_scope") or "")
+            rank = _segment_plan_scope_rank(raw_scope, requested_scope)
+            if rank > 0:
+                scoped.append((rank, item))
+        if not scoped:
+            return None
+        best_scope_rank = max(rank for rank, _ in scoped)
+        candidates = [item for rank, item in scoped if rank == best_scope_rank]
+    requested_decision_time = str(decision_time or "").strip()
+    if requested_decision_time:
+        timed = [
+            item for item in candidates
+            if str(item.get("decision_time") or "") == requested_decision_time
+        ]
+        if not timed:
+            return None
+        candidates = timed
+    requested_budget_yuan = segment_budget_yuan
+    if segment_budget_yuan is not None:
+        budgeted = [
+            item for item in candidates
+            if _safe_float(item.get("segment_budget_yuan")) == segment_budget_yuan
+        ]
+        if budgeted:
+            candidates = budgeted
+    requested_stake_mode = str(stake_mode or "").strip()
+    if requested_stake_mode:
+        stake_mode_items = [
+            item for item in candidates
+            if str(item.get("stake_mode") or "") == requested_stake_mode
+        ]
+        if not stake_mode_items:
+            return None
+        candidates = stake_mode_items
+    requested_betting_strategy_version = str(betting_strategy_version or "").strip()
+    if requested_betting_strategy_version:
+        version_items = [
+            item for item in candidates
+            if str(item.get("betting_strategy_version") or "") == requested_betting_strategy_version
+        ]
+        if not version_items:
+            return None
+        candidates = version_items
+    requested_label = str(label or "").strip().lower()
+    if requested_label:
+        label_items = [
+            item for item in candidates
+            if str(item.get("label") or "").lower() == requested_label
+        ]
+        if not label_items:
+            return None
+        candidates = label_items
+    if seed is not None:
+        candidates = [
+            item for item in candidates
+            if _safe_int(item.get("sample_seed")) == seed
+        ] or candidates
+    requested_plan = str(plan_id or "").strip().lower()
+    def best(items: list[dict[str, Any]]) -> dict[str, Any] | None:
+        return max(
+            items,
+            key=lambda item: (
+                1 if str(item.get("stake_mode") or "") == "scale_to_budget" else 0,
+                -abs(float(item.get("segment_budget_yuan") or 0) - requested_budget_yuan) if requested_budget_yuan is not None else 0,
+                int(item.get("seed_count") or 1),
+                float(item.get("segment_budget_yuan") or 0),
+                str(item.get("plan_id") or ""),
+            ),
+            default=None,
+        )
+    if requested_plan:
+        for item in candidates:
+            if requested_plan in {
+                str(item.get("plan_id") or "").lower(),
+                str(item.get("label") or "").lower(),
+            }:
+                return item
+    requested_keys = _segment_plan_requested_variant_keys(decision_variant_id)
+    if requested_keys:
+        matched = [
+            item for item in candidates
+            if _segment_plan_option_matches_requested_variant(item, requested_keys)
+        ]
+        selected = best(matched)
+        if selected:
+            return selected
+        return None
+    default_items = [item for item in candidates if str(item.get("decision_variant_id") or "") == STABLE_DECISION_VARIANT_ID]
+    return best(default_items) or best(candidates)
+
+
+def _segment_plan_public_option(option: dict[str, Any]) -> dict[str, Any]:
+    public = {
+        key: value
+        for key, value in option.items()
+        if not key.startswith("_")
+    }
+    freeze_info = option.get("_freeze_info")
+    if isinstance(freeze_info, dict):
+        public["freeze_info"] = freeze_info
+    return public
+
+
+def _segment_plan_segment_payload(row: dict[str, Any]) -> dict[str, Any]:
+    artifact_planning_scope = row.get("planning_scope") or ""
+    return {
+        "sample_seed": _segment_plan_int(row, "sample_seed"),
+        "segment_idx": _segment_plan_int(row, "segment_idx"),
+        "arm": row.get("arm") or "",
+        "planning_scope": _normalize_segment_planning_scope(str(artifact_planning_scope)),
+        "artifact_planning_scope": artifact_planning_scope,
+        "hours_from_decision_start": _safe_float(row.get("hours_from_decision_start")),
+        "hours_from_decision_end": _safe_float(row.get("hours_from_decision_end")),
+        "sp_drift_risk_accepted": bool(_segment_plan_bool(row, "sp_drift_risk_accepted")),
+        "sp_drift_risk_level": row.get("sp_drift_risk_level") or "",
+        "sp_drift_risk_reason": row.get("sp_drift_risk_reason") or "",
+        "stake_mode": row.get("stake_mode") or "",
+        "segment_start": row.get("segment_start") or "",
+        "segment_end": row.get("segment_end") or "",
+        "window_hours": _segment_plan_float(row, "window_hours"),
+        "eligible_matches": _segment_plan_int(row, "eligible_matches"),
+        "expected_coverage_hit_rate": _segment_plan_float(row, "expected_coverage_hit_rate"),
+        "actual_coverage_hits": _segment_plan_int(row, "actual_coverage_hits"),
+        "actual_coverage_hit_rate": _segment_plan_float(row, "actual_coverage_hit_rate"),
+        "recommended_n": _segment_plan_int(row, "recommended_n"),
+        "initial_recommended_n": _segment_plan_int(row, "initial_recommended_n"),
+        "selected_bundles": _segment_plan_int(row, "selected_bundles"),
+        "candidate_bundles": _segment_plan_int(row, "candidate_bundles"),
+        "base_cost_yuan": _segment_plan_float(row, "base_cost_yuan"),
+        "stake_multiplier_units": _segment_plan_float(row, "stake_multiplier_units"),
+        "selected_cost_yuan": _segment_plan_float(row, "selected_cost_yuan"),
+        "segment_budget_yuan": _segment_plan_float(row, "segment_budget_yuan"),
+        "expected_profit_yuan": _segment_plan_float(row, "expected_profit_yuan"),
+        "payout_yuan": _segment_plan_float(row, "payout_yuan"),
+        "profit_yuan": _segment_plan_float(row, "profit_yuan"),
+        "roi": _segment_plan_float(row, "roi"),
+        "dead_segment": bool(_segment_plan_bool(row, "dead_segment")),
+        "width_counts": row.get("width_counts") or "",
+        "reasons": _csv_semicolon_list(row, "reasons"),
+        "match_indices": _segment_plan_int_list(row.get("match_indices")),
+    }
+
+
+def _segment_plan_bundle_payload(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "sample_seed": _segment_plan_int(row, "sample_seed"),
+        "segment_idx": _segment_plan_int(row, "segment_idx"),
+        "bundle_idx": _segment_plan_int(row, "bundle_idx"),
+        "arm": row.get("arm") or "",
+        "n_value": _segment_plan_int(row, "n_value"),
+        "match_indices": _segment_plan_int_list(row.get("match_indices")),
+        "leg_codes": [part.strip() for part in str(row.get("leg_codes") or "").split("|") if part.strip()],
+        "widths": _segment_plan_int_list(row.get("widths")),
+        "stake_multiplier": _segment_plan_int(row, "stake_multiplier"),
+        "cost_yuan": _segment_plan_float(row, "cost_yuan"),
+        "scaled_cost_yuan": _segment_plan_float(row, "scaled_cost_yuan"),
+        "expected_payout_yuan": _safe_float(row.get("expected_payout_yuan")),
+        "expected_profit_yuan": _safe_float(row.get("expected_profit_yuan")),
+        "scaled_expected_profit_yuan": _safe_float(row.get("scaled_expected_profit_yuan")),
+        "expected_roi": _segment_plan_float(row, "expected_roi"),
+        "hit_prob": _segment_plan_float(row, "hit_prob"),
+        "realized_hit": bool(_segment_plan_bool(row, "realized_hit")),
+        "payout_yuan": _segment_plan_float(row, "payout_yuan"),
+        "scaled_payout_yuan": _segment_plan_float(row, "scaled_payout_yuan"),
+        "profit_yuan": _segment_plan_float(row, "profit_yuan"),
+        "scaled_profit_yuan": _segment_plan_float(row, "scaled_profit_yuan"),
+    }
+
+
+def _segment_plan_seed_summary_payload(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "sample_seed": _segment_plan_int(row, "sample_seed"),
+        "selected_segments": _segment_plan_int(row, "selected_segments"),
+        "dead_segments": _segment_plan_int(row, "dead_segments"),
+        "selected_bundles": _segment_plan_int(row, "selected_bundles"),
+        "selected_cost_yuan": _segment_plan_float(row, "selected_cost_yuan"),
+        "payout_yuan": _segment_plan_float(row, "payout_yuan"),
+        "profit_yuan": _segment_plan_float(row, "profit_yuan"),
+        "roi": _segment_plan_float(row, "roi"),
+    }
+
+
+def _segment_plan_segment_seed_summary_payload(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "segment_idx": _segment_plan_int(row, "segment_idx"),
+        "arm": row.get("arm") or "",
+        "sample_count": _segment_plan_int(row, "sample_count"),
+        "segment_start": row.get("segment_start") or "",
+        "segment_end": row.get("segment_end") or "",
+        "eligible_matches": _segment_plan_int(row, "eligible_matches"),
+        "expected_coverage_hit_rate": _segment_plan_float(row, "expected_coverage_hit_rate"),
+        "actual_coverage_hits": _segment_plan_int(row, "actual_coverage_hits"),
+        "actual_coverage_hit_rate": _segment_plan_float(row, "actual_coverage_hit_rate"),
+        "recommended_n_values": _segment_plan_int_list(row.get("recommended_n_values")),
+        "recommended_n_stable": bool(_segment_plan_bool(row, "recommended_n_stable")),
+        "selected_bundles_mean": _segment_plan_float(row, "selected_bundles_mean"),
+        "selected_bundles_min": _segment_plan_float(row, "selected_bundles_min"),
+        "selected_bundles_max": _segment_plan_float(row, "selected_bundles_max"),
+        "base_cost_yuan_mean": _segment_plan_float(row, "base_cost_yuan_mean"),
+        "stake_multiplier_units_mean": _segment_plan_float(row, "stake_multiplier_units_mean"),
+        "cost_yuan_mean": _segment_plan_float(row, "cost_yuan_mean"),
+        "payout_yuan_mean": _segment_plan_float(row, "payout_yuan_mean"),
+        "profit_yuan_min": _segment_plan_float(row, "profit_yuan_min"),
+        "profit_yuan_p10": _segment_plan_float(row, "profit_yuan_p10"),
+        "profit_yuan_mean": _segment_plan_float(row, "profit_yuan_mean"),
+        "profit_yuan_median": _segment_plan_float(row, "profit_yuan_median"),
+        "profit_yuan_p90": _segment_plan_float(row, "profit_yuan_p90"),
+        "profit_yuan_max": _segment_plan_float(row, "profit_yuan_max"),
+        "roi_min": _segment_plan_float(row, "roi_min"),
+        "roi_mean": _segment_plan_float(row, "roi_mean"),
+        "roi_max": _segment_plan_float(row, "roi_max"),
+        "dead_segment_rate": _segment_plan_float(row, "dead_segment_rate"),
+        "width_counts": row.get("width_counts") or "",
+        "match_indices": _segment_plan_int_list(row.get("match_indices")),
+    }
+
+
+def _segment_plan_scaled_number(value: Any, scale: float) -> float | None:
+    parsed = _safe_float(value)
+    if parsed is None:
+        return None
+    return round(parsed * scale, 6)
+
+
+def _segment_plan_money(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return round(float(value), 6)
+
+
+def _segment_plan_bundle_base_cost(bundle: dict[str, Any]) -> float:
+    cost = _safe_float(bundle.get("cost_yuan"))
+    if cost is not None and cost > 0:
+        return cost
+    scaled = _safe_float(bundle.get("scaled_cost_yuan"))
+    multiplier = _safe_float(bundle.get("stake_multiplier"))
+    if scaled is not None and scaled > 0 and multiplier is not None and multiplier > 0:
+        return scaled / multiplier
+    return 0.0
+
+
+def _segment_plan_bundle_priority(bundle: dict[str, Any], source_scale: float) -> tuple[float, float, float, float, float]:
+    original_multiplier = max(_safe_float(bundle.get("stake_multiplier")) or 1.0, 1.0)
+    target_multiplier = max(original_multiplier * source_scale, 1.0)
+    expected_roi = _safe_float(bundle.get("expected_roi")) or 0.0
+    hit_prob = _safe_float(bundle.get("hit_prob")) or 0.0
+    base_cost = _segment_plan_bundle_base_cost(bundle)
+    return (target_multiplier, original_multiplier, expected_roi, hit_prob, -base_cost)
+
+
+def _segment_plan_apply_bundle_multiplier(bundle: dict[str, Any], multiplier: int) -> None:
+    multiplier = max(int(multiplier), 0)
+    bundle["stake_multiplier"] = multiplier
+    base_cost = _segment_plan_bundle_base_cost(bundle)
+    bundle["scaled_cost_yuan"] = _segment_plan_money(base_cost * multiplier)
+    for base_key, scaled_key in (
+        ("expected_payout_yuan", "scaled_expected_payout_yuan"),
+        ("expected_profit_yuan", "scaled_expected_profit_yuan"),
+        ("payout_yuan", "scaled_payout_yuan"),
+        ("profit_yuan", "scaled_profit_yuan"),
+    ):
+        value = _safe_float(bundle.get(base_key))
+        if value is not None:
+            bundle[scaled_key] = _segment_plan_money(value * multiplier)
+
+
+def _segment_plan_allocate_integer_multipliers(
+    bundles: list[dict[str, Any]],
+    *,
+    requested_budget: float,
+    source_budget: float,
+    max_bundle_spend_pct: float | None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if requested_budget <= 0 or not bundles:
+        return [], {
+            "selected_cost_yuan": 0.0,
+            "stake_multiplier_units": 0,
+            "dropped_bundles": len(bundles),
+            "integer_projection_limited": bool(bundles),
+        }
+
+    source_scale = requested_budget / source_budget if source_budget > 0 else 1.0
+    cap_yuan = requested_budget * max_bundle_spend_pct if max_bundle_spend_pct and max_bundle_spend_pct > 0 else None
+    sorted_bundles = sorted(
+        bundles,
+        key=lambda bundle: _segment_plan_bundle_priority(bundle, source_scale),
+        reverse=True,
+    )
+    multipliers: dict[int, int] = {}
+    spent = 0.0
+
+    for bundle in sorted_bundles:
+        base_cost = _segment_plan_bundle_base_cost(bundle)
+        if base_cost <= 0:
+            continue
+        if spent + base_cost <= requested_budget + 1e-9:
+            multipliers[id(bundle)] = 1
+            spent += base_cost
+
+    target_multiplier_by_id: dict[int, float] = {}
+    for bundle in sorted_bundles:
+        if id(bundle) not in multipliers:
+            continue
+        original_multiplier = max(_safe_float(bundle.get("stake_multiplier")) or 1.0, 1.0)
+        target_multiplier_by_id[id(bundle)] = max(original_multiplier * source_scale, 1.0)
+
+    while True:
+        affordable: list[dict[str, Any]] = []
+        for bundle in sorted_bundles:
+            current = multipliers.get(id(bundle))
+            if current is None:
+                continue
+            base_cost = _segment_plan_bundle_base_cost(bundle)
+            if base_cost <= 0 or spent + base_cost > requested_budget + 1e-9:
+                continue
+            if cap_yuan is not None and (current + 1) * base_cost > cap_yuan + 1e-9:
+                continue
+            affordable.append(bundle)
+        if not affordable:
+            break
+
+        def add_priority(bundle: dict[str, Any]) -> tuple[float, float, float, float, float]:
+            current = multipliers.get(id(bundle), 0)
+            target = target_multiplier_by_id.get(id(bundle), 1.0)
+            expected_roi = _safe_float(bundle.get("expected_roi")) or 0.0
+            hit_prob = _safe_float(bundle.get("hit_prob")) or 0.0
+            original_multiplier = max(_safe_float(bundle.get("stake_multiplier")) or 1.0, 1.0)
+            base_cost = _segment_plan_bundle_base_cost(bundle)
+            return (target - current, expected_roi, hit_prob, original_multiplier, -base_cost)
+
+        chosen = max(affordable, key=add_priority)
+        multipliers[id(chosen)] = multipliers.get(id(chosen), 0) + 1
+        spent += _segment_plan_bundle_base_cost(chosen)
+
+    kept: list[dict[str, Any]] = []
+    for bundle in bundles:
+        multiplier = multipliers.get(id(bundle), 0)
+        if multiplier <= 0:
+            continue
+        _segment_plan_apply_bundle_multiplier(bundle, multiplier)
+        kept.append(bundle)
+
+    selected_cost = sum(_safe_float(bundle.get("scaled_cost_yuan")) or 0.0 for bundle in kept)
+    return kept, {
+        "selected_cost_yuan": _segment_plan_money(selected_cost) or 0.0,
+        "stake_multiplier_units": sum(int(bundle.get("stake_multiplier") or 0) for bundle in kept),
+        "dropped_bundles": max(0, len(bundles) - len(kept)),
+        "integer_projection_limited": len(kept) < len(bundles) or selected_cost + 1e-9 < min(requested_budget, sum((_segment_plan_bundle_base_cost(bundle) * max(_safe_float(bundle.get("stake_multiplier")) or 1.0, 1.0)) for bundle in bundles) * (requested_budget / source_budget if source_budget > 0 else 1.0)),
+    }
+
+
+def _segment_plan_sum_scaled_bundle_field(bundles: list[dict[str, Any]], key: str) -> float | None:
+    values = [_safe_float(bundle.get(key)) for bundle in bundles]
+    present = [value for value in values if value is not None]
+    if not present:
+        return None
+    return _segment_plan_money(sum(present))
+
+
+def _segment_plan_update_money_field(row: dict[str, Any], key: str, value: float | None) -> None:
+    if value is not None:
+        row[key] = value
+
+
+def _segment_plan_recompute_totals_from_integer_bundles(
+    payload: dict[str, Any],
+    *,
+    requested_budget: float,
+    source_budget: float,
+) -> dict[str, Any]:
+    settings = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
+    max_bundle_spend_pct = _safe_float(settings.get("max_bundle_spend_pct"))
+    original_bundles = [bundle for bundle in payload.get("bundles", []) if isinstance(bundle, dict)]
+    bundles_by_segment: dict[int, list[dict[str, Any]]] = defaultdict(list)
+    for bundle in original_bundles:
+        segment_idx = _safe_int(bundle.get("segment_idx")) or 0
+        bundles_by_segment[segment_idx].append(bundle)
+
+    kept_all: list[dict[str, Any]] = []
+    dropped_bundles = 0
+    limited = False
+    for segment in payload.get("segments", []):
+        if not isinstance(segment, dict):
+            continue
+        segment_idx = _safe_int(segment.get("segment_idx")) or 0
+        segment_bundles = bundles_by_segment.get(segment_idx, [])
+        kept, stats = _segment_plan_allocate_integer_multipliers(
+            segment_bundles,
+            requested_budget=requested_budget,
+            source_budget=source_budget,
+            max_bundle_spend_pct=max_bundle_spend_pct,
+        )
+        kept_all.extend(kept)
+        dropped_bundles += int(stats.get("dropped_bundles") or 0)
+        limited = limited or bool(stats.get("integer_projection_limited"))
+        segment["segment_budget_yuan"] = requested_budget
+        segment["selected_bundles"] = len(kept)
+        segment["stake_multiplier_units"] = int(stats.get("stake_multiplier_units") or 0)
+        segment["selected_cost_yuan"] = stats.get("selected_cost_yuan")
+        segment["base_cost_yuan"] = _segment_plan_sum_scaled_bundle_field(kept, "cost_yuan") or 0.0
+        _segment_plan_update_money_field(segment, "expected_profit_yuan", _segment_plan_sum_scaled_bundle_field(kept, "scaled_expected_profit_yuan"))
+        _segment_plan_update_money_field(segment, "payout_yuan", _segment_plan_sum_scaled_bundle_field(kept, "scaled_payout_yuan"))
+        _segment_plan_update_money_field(segment, "profit_yuan", _segment_plan_sum_scaled_bundle_field(kept, "scaled_profit_yuan"))
+        selected_cost = _safe_float(segment.get("selected_cost_yuan"))
+        profit = _safe_float(segment.get("profit_yuan"))
+        expected_profit = _safe_float(segment.get("expected_profit_yuan"))
+        if profit is not None and selected_cost:
+            segment["roi"] = round(profit / selected_cost, 6)
+        if expected_profit is not None and selected_cost:
+            segment["expected_roi"] = round(expected_profit / selected_cost, 6)
+
+    payload["bundles"] = kept_all
+    summary = payload.get("summary")
+    if not isinstance(summary, dict):
+        summary = {}
+        payload["summary"] = summary
+    summary["selected_bundles"] = len(kept_all)
+    summary["base_cost_yuan"] = _segment_plan_sum_scaled_bundle_field(kept_all, "cost_yuan") or 0.0
+    summary["stake_multiplier_units"] = sum(int(bundle.get("stake_multiplier") or 0) for bundle in kept_all)
+    summary["selected_cost_yuan"] = _segment_plan_sum_scaled_bundle_field(kept_all, "scaled_cost_yuan") or 0.0
+    _segment_plan_update_money_field(summary, "expected_payout_yuan", _segment_plan_sum_scaled_bundle_field(kept_all, "scaled_expected_payout_yuan"))
+    _segment_plan_update_money_field(summary, "expected_profit_yuan", _segment_plan_sum_scaled_bundle_field(kept_all, "scaled_expected_profit_yuan"))
+    _segment_plan_update_money_field(summary, "payout_yuan", _segment_plan_sum_scaled_bundle_field(kept_all, "scaled_payout_yuan"))
+    _segment_plan_update_money_field(summary, "profit_yuan", _segment_plan_sum_scaled_bundle_field(kept_all, "scaled_profit_yuan"))
+    selected_cost = _safe_float(summary.get("selected_cost_yuan"))
+    profit = _safe_float(summary.get("profit_yuan"))
+    expected_profit = _safe_float(summary.get("expected_profit_yuan"))
+    if profit is not None and selected_cost:
+        summary["roi"] = round(profit / selected_cost, 6)
+    if expected_profit is not None and selected_cost:
+        summary["expected_roi"] = round(expected_profit / selected_cost, 6)
+
+    selected_plan = payload.get("selected_plan")
+    if isinstance(selected_plan, dict):
+        selected_plan["segment_budget_yuan"] = requested_budget
+        selected_plan["selected_bundles"] = summary["selected_bundles"]
+        selected_plan["base_cost_yuan"] = summary["base_cost_yuan"]
+        selected_plan["stake_multiplier_units"] = summary["stake_multiplier_units"]
+        selected_plan["selected_cost_yuan"] = summary["selected_cost_yuan"]
+        _segment_plan_update_money_field(selected_plan, "profit_yuan", summary.get("profit_yuan"))
+        selected_plan["roi"] = summary.get("roi")
+
+    return {
+        "method": "integer_budget_projection_from_selected_artifact",
+        "source_segment_budget_yuan": source_budget,
+        "requested_segment_budget_yuan": requested_budget,
+        "scale_factor": round(requested_budget / source_budget, 6) if source_budget else 1.0,
+        "dropped_bundles": dropped_bundles,
+        "integer_projection_limited": limited,
+    }
+
+
+def _scale_segment_betting_plan_to_budget(payload: dict[str, Any], requested_budget: float | None) -> None:
+    if requested_budget is None or requested_budget <= 0:
+        return
+    settings = payload.get("settings")
+    if not isinstance(settings, dict):
+        return
+    source_budget = _safe_float(settings.get("segment_budget_yuan"))
+    if source_budget is None or source_budget <= 0 or source_budget == requested_budget:
+        return
+    settings["segment_budget_yuan"] = requested_budget
+    if str(settings.get("stake_mode") or "") != "scale_to_budget":
+        payload["budget_rescale"] = {
+            "applied": False,
+            "source_segment_budget_yuan": source_budget,
+            "requested_segment_budget_yuan": requested_budget,
+            "scale_factor": round(requested_budget / source_budget, 6),
+            "method": "unit_once_budget_reference_only",
+        }
+        return
+    projection = _segment_plan_recompute_totals_from_integer_bundles(
+        payload,
+        requested_budget=requested_budget,
+        source_budget=source_budget,
+    )
+    payload["budget_rescale"] = {"applied": True, **projection}
+
+
+def _collapse_legacy_remaining_issue_to_entire_issue(payload: dict[str, Any]) -> None:
+    if payload.get("requested_planning_scope") != "entire_issue":
+        return
+    if payload.get("artifact_planning_scope") != "remaining_issue":
+        return
+    segments = [row for row in payload.get("segments", []) if isinstance(row, dict)]
+    if len(segments) <= 1:
+        return
+    match_indices = sorted({
+        idx
+        for segment in segments
+        for idx in segment.get("match_indices", [])
+        if isinstance(idx, int)
+    })
+
+    def sum_key(key: str) -> float | None:
+        values = [_safe_float(segment.get(key)) for segment in segments]
+        present = [value for value in values if value is not None]
+        return round(sum(present), 6) if present else None
+
+    def max_key(key: str) -> float | None:
+        values = [_safe_float(segment.get(key)) for segment in segments]
+        present = [value for value in values if value is not None]
+        return max(present) if present else None
+
+    def min_key(key: str) -> float | None:
+        values = [_safe_float(segment.get(key)) for segment in segments]
+        present = [value for value in values if value is not None]
+        return min(present) if present else None
+
+    starts = [str(segment.get("segment_start") or "") for segment in segments if str(segment.get("segment_start") or "")]
+    ends = [str(segment.get("segment_end") or "") for segment in segments if str(segment.get("segment_end") or "")]
+    first = dict(segments[0])
+    first.update({
+        "segment_idx": 1,
+        "planning_scope": "entire_issue",
+        "segment_start": min(starts) if starts else first.get("segment_start", ""),
+        "segment_end": max(ends) if ends else first.get("segment_end", ""),
+        "hours_from_decision_start": min_key("hours_from_decision_start"),
+        "hours_from_decision_end": max_key("hours_from_decision_end"),
+        "eligible_matches": len(match_indices) or sum_key("eligible_matches"),
+        "selected_bundles": sum_key("selected_bundles"),
+        "candidate_bundles": sum_key("candidate_bundles"),
+        "base_cost_yuan": sum_key("base_cost_yuan"),
+        "stake_multiplier_units": sum_key("stake_multiplier_units"),
+        "selected_cost_yuan": sum_key("selected_cost_yuan"),
+        "segment_budget_yuan": _safe_float(payload.get("settings", {}).get("segment_budget_yuan")) if isinstance(payload.get("settings"), dict) else first.get("segment_budget_yuan"),
+        "expected_profit_yuan": sum_key("expected_profit_yuan"),
+        "payout_yuan": sum_key("payout_yuan"),
+        "profit_yuan": sum_key("profit_yuan"),
+        "dead_segment": all(bool(segment.get("dead_segment")) for segment in segments),
+        "match_indices": match_indices,
+        "reasons": ["legacy_remaining_issue_collapsed_to_entire_issue"],
+    })
+    first["recommended_n"] = None
+    first["initial_recommended_n"] = None
+    payload["segments"] = [first]
+
+
+def _apply_requested_segment_scope_label(payload: dict[str, Any], requested_scope: str | None) -> None:
+    scope = _normalize_segment_planning_scope(requested_scope)
+    if scope not in {"by_segment", "entire_issue"}:
+        return
+    payload["planning_scope"] = scope
+    binding = payload.get("selection_binding")
+    if isinstance(binding, dict):
+        binding["planning_scope"] = scope
+    for segment in payload.get("segments", []):
+        if isinstance(segment, dict):
+            segment["planning_scope"] = scope
+
+
+def _segment_betting_plan_payload(
+    issue: str,
+    *,
+    decision_variant_id: str | None = None,
+    plan_id: str | None = None,
+    label: str | None = None,
+    betting_strategy_version: str | None = None,
+    segment_budget_yuan: float | None = None,
+    seed: int | None = None,
+    planning_scope: str | None = None,
+    decision_time: str | None = None,
+    stake_mode: str | None = None,
+    release: dict[str, Any] | None = None,
+    freeze_state: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], int]:
+    release = release or _active_strategy_release()
+    all_options = _segment_plan_options(issue, release)
+    options, rejected_frozen_options = _filter_segment_plan_options_for_freeze(all_options, freeze_state)
+    selected = _select_segment_plan(
+        options,
+        decision_variant_id=decision_variant_id,
+        plan_id=plan_id,
+        label=label,
+        betting_strategy_version=betting_strategy_version,
+        segment_budget_yuan=segment_budget_yuan,
+        seed=seed,
+        planning_scope=planning_scope,
+        decision_time=decision_time,
+        stake_mode=stake_mode,
+    )
+    plan_dir = _strategy_segment_betting_plan_dir(release)
+    freeze_payload = dict(freeze_state or {})
+    freeze_payload.update({
+        "all_plan_count": len(all_options),
+        "available_plan_count": len(options),
+        "rejected_plan_count": len(rejected_frozen_options),
+    })
+    missing_reason = "segment_betting_plan_artifact_missing"
+    requested_keys = _segment_plan_requested_variant_keys(decision_variant_id)
+    if freeze_payload.get("locked") and all_options and not options:
+        missing_reason = "segment_betting_plan_frozen_no_prelock_artifact"
+    elif (
+        freeze_payload.get("locked")
+        and requested_keys
+        and any(_segment_plan_option_matches_requested_variant(item, requested_keys) for item in rejected_frozen_options)
+    ):
+        missing_reason = "segment_betting_plan_frozen_requested_variant_rejected"
+    selected_freeze_info = selected.get("_freeze_info") if selected and isinstance(selected.get("_freeze_info"), dict) else {}
+    base_payload = {
+        "schema_version": "segment_betting_plan_v1",
+        "issue": issue,
+        "mode": "settled_replay_shadow_planning",
+        "requested_decision_variant_id": str(decision_variant_id or ""),
+        "requested_planning_scope": _normalize_segment_planning_scope(planning_scope),
+        "requested_decision_time": str(decision_time or ""),
+        "requested_segment_budget_yuan": segment_budget_yuan,
+        "requested_stake_mode": str(stake_mode or ""),
+        "requested_betting_strategy_version": str(betting_strategy_version or ""),
+        "requested_label": str(label or ""),
+        "selected_plan_id": str(selected.get("plan_id") or "") if selected else "",
+        "availability_status": "available" if selected else "missing",
+        "unavailable_reason": "" if selected else missing_reason,
+        "notice": "settled replay / shadow planning only; not the default live betting recommendation",
+        "freeze_state": freeze_payload,
+        "source": {
+            "artifact_key": "segment_betting_plan_dir",
+            "artifact_dir": _segment_plan_display_path(plan_dir),
+        },
+        "_artifact_path": _segment_plan_display_path(selected["_summary_path"].parent) if selected else "",
+        "artifact_status": {
+            "status": "available" if selected else "missing",
+            "artifact_key": "segment_betting_plan_dir",
+            "artifact_dir": _segment_plan_display_path(plan_dir),
+            "artifact_path": _segment_plan_display_path(selected["_summary_path"].parent) if selected else "",
+            "source_path": _segment_plan_display_path(selected["_summary_path"]) if selected else "",
+            "updated_at": _segment_plan_updated_at(selected["_summary_path"]) if selected else "",
+            "reason": "" if selected else missing_reason,
+            "freeze_info": selected_freeze_info,
+        },
+        "strategy_release": _strategy_release_public_payload(release),
+        "available_plans": [_segment_plan_public_option(item) for item in options],
+        "rejected_frozen_plans": [_segment_plan_public_option(item) for item in rejected_frozen_options],
+        "selected_plan": _segment_plan_public_option(selected) if selected else None,
+        "strategy_family": "",
+        "betting_strategy_version": "",
+        "artifact_schema_version": "",
+        "planning_scope": _normalize_segment_planning_scope(planning_scope),
+        "artifact_planning_scope": "",
+        "decision_time": str(decision_time or ""),
+        "available_segments": None,
+        "dynamic_segments_available": None,
+        "sp_drift_risk": {},
+        "selection_binding": _segment_plan_selection_binding(_normalize_segment_planning_scope(planning_scope)),
+        "settings": {},
+        "summary": {},
+        "seed_aggregate": {},
+        "parameter_schema": [],
+        "segment_csv": "",
+        "bundle_csv": "",
+        "seed_summary_csv": "",
+        "segment_seed_summary_csv": "",
+        "segments": [],
+        "bundles": [],
+        "seed_summaries": [],
+        "segment_seed_summary": [],
+    }
+    if selected is None:
+        return base_payload, 200
+
+    summary_path = selected["_summary_path"]
+    raw_payload = selected["_payload"]
+    settings = raw_payload.get("settings") if isinstance(raw_payload.get("settings"), dict) else {}
+    summary = raw_payload.get("summary") if isinstance(raw_payload.get("summary"), dict) else {}
+    requested_scope = _normalize_segment_planning_scope(planning_scope)
+    artifact_scope = str(raw_payload.get("planning_scope") or settings.get("planning_scope") or "")
+    effective_scope = requested_scope if requested_scope in {"by_segment", "entire_issue"} else _normalize_segment_planning_scope(artifact_scope)
+    segment_rows = _segment_plan_csv_rows(summary_path.parent / "segment_betting_plan_segments.csv")
+    bundle_rows = _segment_plan_csv_rows(summary_path.parent / "segment_betting_plan_bundles.csv")
+    seed_summary_rows = _segment_plan_csv_rows(summary_path.parent / "segment_betting_plan_seed_summary.csv")
+    segment_seed_summary_rows = _segment_plan_csv_rows(summary_path.parent / "segment_betting_plan_segment_seed_summary.csv")
+    segment_csv_path = summary_path.parent / "segment_betting_plan_segments.csv"
+    bundle_csv_path = summary_path.parent / "segment_betting_plan_bundles.csv"
+    seed_summary_csv_path = summary_path.parent / "segment_betting_plan_seed_summary.csv"
+    segment_seed_summary_csv_path = summary_path.parent / "segment_betting_plan_segment_seed_summary.csv"
+    primary_seed = _safe_int(settings.get("sample_seed"))
+    if primary_seed is not None:
+        primary_segment_rows = [
+            row for row in segment_rows
+            if _safe_int(row.get("sample_seed")) == primary_seed
+        ]
+        primary_bundle_rows = [
+            row for row in bundle_rows
+            if _safe_int(row.get("sample_seed")) == primary_seed
+        ]
+        segment_rows = primary_segment_rows or segment_rows
+        bundle_rows = primary_bundle_rows or bundle_rows
+    base_payload.update({
+        "strategy_family": str(raw_payload.get("strategy_family") or ""),
+        "betting_strategy_version": str(raw_payload.get("betting_strategy_version") or settings.get("betting_strategy_version") or ""),
+        "artifact_schema_version": str(raw_payload.get("artifact_schema_version") or ""),
+        "planning_scope": effective_scope,
+        "artifact_planning_scope": artifact_scope,
+        "decision_time": str(raw_payload.get("decision_time") or settings.get("decision_time") or ""),
+        "available_segments": _safe_int(raw_payload.get("available_segments")),
+        "dynamic_segments_available": _safe_int(raw_payload.get("dynamic_segments_available")),
+        "sp_drift_risk": raw_payload.get("sp_drift_risk") if isinstance(raw_payload.get("sp_drift_risk"), dict) else {},
+        "selection_binding": raw_payload.get("selection_binding") if isinstance(raw_payload.get("selection_binding"), dict) else _segment_plan_selection_binding(effective_scope),
+        "settings": settings,
+        "summary": summary,
+        "seed_aggregate": raw_payload.get("seed_aggregate") if isinstance(raw_payload.get("seed_aggregate"), dict) else {},
+        "parameter_schema": raw_payload.get("parameter_schema") if isinstance(raw_payload.get("parameter_schema"), list) else [],
+        "segment_csv": _segment_plan_display_path(segment_csv_path),
+        "bundle_csv": _segment_plan_display_path(bundle_csv_path),
+        "seed_summary_csv": _segment_plan_display_path(seed_summary_csv_path),
+        "segment_seed_summary_csv": _segment_plan_display_path(segment_seed_summary_csv_path),
+        "segments": [_segment_plan_segment_payload(row) for row in segment_rows],
+        "bundles": [_segment_plan_bundle_payload(row) for row in bundle_rows],
+        "seed_summaries": [_segment_plan_seed_summary_payload(row) for row in seed_summary_rows],
+        "segment_seed_summary": [
+            _segment_plan_segment_seed_summary_payload(row)
+            for row in segment_seed_summary_rows
+	        ],
+	    })
+    _apply_requested_segment_scope_label(base_payload, effective_scope)
+    _collapse_legacy_remaining_issue_to_entire_issue(base_payload)
+    _scale_segment_betting_plan_to_budget(base_payload, segment_budget_yuan)
+    if not segment_rows or not bundle_rows:
+        base_payload["availability_status"] = "degraded"
+        base_payload["unavailable_reason"] = "segment_or_bundle_csv_missing"
+        base_payload["artifact_status"]["status"] = "degraded"
+        base_payload["artifact_status"]["reason"] = "segment_or_bundle_csv_missing"
+    return base_payload, 200
 
 
 def _attach_selected_decision_variant(
@@ -3556,6 +5019,7 @@ def _attach_selected_decision_variant(
 def _compact_decision_variant(variant: dict[str, Any]) -> dict[str, Any]:
     keep = {
         "variant_id",
+        "artifact_variant_id",
         "kind",
         "family",
         "label",
@@ -3704,8 +5168,9 @@ def _attach_decision_variants(
     release: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     manifests = _manifest_variant_by_id(release)
+    active_manifest = _manifest_default_active_variant(release)
     present_shadow_ids = {
-        _shadow_variant_id(rows)
+        _public_decision_variant_id(_shadow_variant_id(rows), release)
         for rows, _source_path in shadow_variants
         if rows
     }
@@ -3720,14 +5185,15 @@ def _attach_decision_variants(
     for match in matches:
         idx = _safe_int(match.get("match_idx"))
         variants = []
-        variants.append(_active_decision_variant(match))
+        if active_manifest and active_manifest.get("selectable") is not False:
+            variants.append(_active_decision_variant(match))
         result_code = str(match.get("result_code") or "")
         for shadow_rows, shadow_source_path in shadow_variants:
             if idx is not None and idx in shadow_rows and shadow_source_path:
-                variant_id = _shadow_variant_id(shadow_rows)
+                variant_id = _public_decision_variant_id(_shadow_variant_id(shadow_rows), release)
                 if manifests.get(variant_id, {}).get("selectable") is False:
                     continue
-                variants.append(_shadow_decision_variant(shadow_rows[idx], shadow_source_path, result_code=result_code))
+                variants.append(_shadow_decision_variant(shadow_rows[idx], shadow_source_path, result_code=result_code, release=release))
         for manifest in placeholder_manifests:
             if manifest.get("selectable") is False:
                 continue
@@ -4986,7 +6452,7 @@ def _main_strategy_payload(
         if _should_scan_release_shadow_variants(resolved, rows, release):
             shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
             expected_indices = {int(row["match_idx"]) for row in rows}
-            shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(resolved, shadow_variants, expected_indices)
+            shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(resolved, shadow_variants, expected_indices, release=release)
     variant_options = _decision_variant_options(shadow_variants, release=release)
     historical_pool = _historical_ev_pool(resolved, release)
     live_proxy = (
@@ -5045,6 +6511,7 @@ def _source_statuses(conn: sqlite3.Connection, issue: str) -> list[dict[str, Any
           kind,
           MAX(fetched_at) AS last_attempt_at,
           MAX(CASE WHEN ok=1 THEN fetched_at ELSE '' END) AS last_success_at,
+          MAX(CASE WHEN ok=0 THEN fetched_at ELSE '' END) AS last_error_at,
           SUM(CASE WHEN ok=1 THEN 1 ELSE 0 END) AS ok_count,
           SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END) AS fail_count,
           COUNT(*) AS total_attempts,
@@ -5061,13 +6528,16 @@ def _source_statuses(conn: sqlite3.Connection, issue: str) -> list[dict[str, Any
     for row in rows:
         ok_count = int(row["ok_count"] or 0)
         fail_count = int(row["fail_count"] or 0)
+        last_attempt_at = str(row["last_attempt_at"] or "")
         last_success_at = str(row["last_success_at"] or "")
-        age_minutes = _minutes_since_hk(last_success_at)
+        last_error_at = str(row["last_error_at"] or "")
+        age_minutes = _minutes_since_hk(last_success_at, naive_tz=timezone.utc)
+        latest_attempt_failed = bool(last_error_at and last_error_at == last_attempt_at)
         if ok_count == 0:
             status = "failed"
         elif age_minutes is not None and age_minutes > 360:
             status = "stale"
-        elif fail_count > 0:
+        elif latest_attempt_failed:
             status = "partial"
         else:
             status = "ok"
@@ -5075,14 +6545,14 @@ def _source_statuses(conn: sqlite3.Connection, issue: str) -> list[dict[str, Any
             {
                 "source_name": row["kind"],
                 "status": status,
-                "last_attempt_at": row["last_attempt_at"] or "",
+                "last_attempt_at": last_attempt_at,
                 "last_success_at": last_success_at,
                 "age_minutes": age_minutes,
                 "ok_count": ok_count,
                 "fail_count": fail_count,
                 "total_attempts": int(row["total_attempts"] or 0),
                 "rows_parsed": int(row["rows_parsed"] or 0),
-                "error": row["error"] or "",
+                "error": row["error"] if latest_attempt_failed else "",
             }
         )
     return source_statuses
@@ -5096,7 +6566,7 @@ def _latest_issue_specific_success(source_statuses: list[dict[str, Any]]) -> str
         if source.get("source_name") in source_names
         for value in [source.get("last_success_at")]
         if value
-        for parsed in [_parse_timestamp_to_hk(str(value))]
+        for parsed in [_parse_timestamp_to_hk(str(value), naive_tz=timezone.utc)]
         if parsed is not None
     ]
     return max(parsed_candidates, default=(None, ""))[1] if parsed_candidates else ""
@@ -5125,6 +6595,7 @@ def _dashboard(
             resolved,
             shadow_variants,
             expected_indices,
+            release=release,
             ignore_extra=bool(only_date),
         )
     matches = _attach_decision_variants(matches, shadow_variants, release=release)
@@ -5187,7 +6658,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
     resolved = _resolve_issue(conn, issue)
     rows = _issue_rows(conn, resolved, only_date=None)
     versions = _active_version_bundle()
-    preferred_review = str(versions.get("review_version") or "v2_active_llm_snapshot_tags")
+    preferred_review = str(versions.get("review_version") or "v3_decision_variant_active_v3_3_3_tags")
     settled_rows = [row for row in rows if row["result_code"] is not None or row["winning_sp"] is not None]
     winning_sp_rows = [row for row in rows if row["winning_sp"] is not None]
 
@@ -5254,7 +6725,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
         (parsed, str(value))
         for value in latest_candidates
         if value
-        for parsed in [_parse_timestamp_to_hk(str(value))]
+        for parsed in [_parse_timestamp_to_hk(str(value), naive_tz=timezone.utc)]
         if parsed is not None
     ]
     latest_snapshot_at = max(parsed_candidates, default=(None, ""))[1] if parsed_candidates else ""
@@ -5341,7 +6812,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
             "open_count": max(0, len(rows) - len(settled_rows)),
             "capture_status": capture_status,
             "latest_snapshot_at": latest_snapshot_at,
-            "latest_snapshot_age_minutes": _minutes_since_hk(latest_snapshot_at),
+                "latest_snapshot_age_minutes": _minutes_since_hk(latest_snapshot_at, naive_tz=timezone.utc),
         },
         "runtime": {
             "api_health": "ok" if api_probe.get("ok") else "warn",
@@ -5435,7 +6906,6 @@ def _match_detail(
     gpt_decision = _gpt_fixed_chain_decision(summary, analysis, intelligence)
     active_snapshot = _latest_decision_snapshot(conn, str(row["issue"]), int(row["match_idx"]), "active")
     draft_snapshot = _latest_decision_snapshot(conn, str(row["issue"]), int(row["match_idx"]), "draft_replacement")
-    postmatch_review = _postmatch_review_payload(conn, str(row["issue"]), int(row["match_idx"]))
     if active_snapshot:
         summary.update(_snapshot_row_to_summary_fields(active_snapshot))
         active_codes = [str(code) for code in summary.get("llm_selection_codes", []) if str(code) in OUTCOME_ORDER]
@@ -5461,7 +6931,7 @@ def _match_detail(
     if _should_scan_release_shadow_variants(str(row["issue"]), rows, release):
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(str(row["issue"]), release)
         expected_indices = {int(item["match_idx"]) for item in rows}
-        shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(str(row["issue"]), shadow_variants, expected_indices)
+        shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(str(row["issue"]), shadow_variants, expected_indices, release=release)
     _attach_decision_variants([summary], shadow_variants, release=release)
     variant_options = _decision_variant_options(shadow_variants, release=release)
     version_context = _strategy_version_context(
@@ -5472,6 +6942,12 @@ def _match_detail(
         incomplete_shadow_variants=incomplete_shadow_variants,
     )
     _attach_selected_decision_variant([summary], version_context.get("selected_variant_id") or decision_variant_id)
+    selected_review_version = _select_postmatch_review_version(
+        conn,
+        str(row["issue"]),
+        str(version_context.get("selected_variant_id") or decision_variant_id or ""),
+    )
+    postmatch_review = _postmatch_review_payload(conn, str(row["issue"]), int(row["match_idx"]), selected_review_version)
     versions = _active_version_bundle()
     return {
         "match": summary,
@@ -5635,25 +7111,45 @@ def _settlement(
     if _should_scan_release_shadow_variants(resolved, rows, release):
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
         expected_indices = {int(row["match_idx"]) for row in rows}
-        shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(resolved, shadow_variants, expected_indices)
+        shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(resolved, shadow_variants, expected_indices, release=release)
     variant_options = _decision_variant_options(shadow_variants, release=release)
     settled = [row for row in rows if row["winning_sp"] is not None]
     if not settled:
         return {"error": "not settled", "issue": resolved}, 404
     total_payout = sum(float(row["winning_sp"] or 0) for row in settled)
-    postmatch_summary = _postmatch_issue_summary_payload(conn, resolved)
-    postmatch_reviews = _postmatch_review_rows_payload(conn, resolved)
+    strategy_version_context = _strategy_version_context(
+        release,
+        variant_options,
+        decision_variant_id,
+        suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
+        incomplete_shadow_variants=incomplete_shadow_variants,
+    )
+    selected_decision_variant_id = str(strategy_version_context.get("selected_variant_id") or decision_variant_id or "")
+    requested_review_variant_id = str(
+        strategy_version_context.get("resolved_requested_variant_id") or decision_variant_id or ""
+    ).strip()
+    review_decision_variant_id = requested_review_variant_id or selected_decision_variant_id
+    expected_review_version = _postmatch_review_version_for_decision_variant(review_decision_variant_id)
+    selected_review_version = _select_postmatch_review_version(conn, resolved, review_decision_variant_id)
+    postmatch_summary = _postmatch_issue_summary_payload(conn, resolved, selected_review_version)
+    postmatch_reviews = _postmatch_review_rows_payload(conn, resolved, selected_review_version)
+    if not selected_review_version or (not postmatch_summary and not postmatch_reviews):
+        return {
+            "error": "postmatch review artifact unavailable",
+            "issue": resolved,
+            "decision_variant_id": review_decision_variant_id,
+            "selected_decision_variant_id": selected_decision_variant_id,
+            "expected_review_version": expected_review_version,
+            "strategy_version_context": strategy_version_context,
+            "decision_variant_options": variant_options,
+            "message": "requested decision-chain postmatch review has not been generated; legacy v2 fallback is disabled",
+        }, 409
     payload = {
         "issue": resolved,
         "settled_ts": datetime.now(timezone.utc).isoformat(),
-        "strategy_version_context": _strategy_version_context(
-            release,
-            variant_options,
-            decision_variant_id,
-            suppressed_shadow_variant_ids=suppressed_shadow_variant_ids,
-            incomplete_shadow_variants=incomplete_shadow_variants,
-        ),
+        "strategy_version_context": strategy_version_context,
         "decision_variant_options": variant_options,
+        "selected_postmatch_review_version": selected_review_version,
         "n_tickets": 0,
         "n_hits": 0,
         "n_legs_total": len(rows),
@@ -6091,6 +7587,51 @@ def create_app(
             except LookupError as exc:
                 return jsonify({"error": str(exc)}), 404
 
+    @app.get("/api/issues/<issue>/decision-artifacts/status")
+    def decision_artifact_status(issue: str):
+        variant_id = request.args.get("variant") or request.args.get("decision_variant")
+        with _connect(db_path) as conn:
+            try:
+                return jsonify(_decision_artifact_status_payload(conn, issue, variant_id=variant_id))
+            except LookupError as exc:
+                return jsonify({"error": str(exc)}), 404
+
+    @app.post("/api/issues/<issue>/decision-artifacts/generate")
+    def generate_decision_artifact(issue: str):
+        variant_id = request.args.get("variant") or request.args.get("decision_variant")
+        body = request.get_json(silent=True) or {}
+        materialize = _query_bool(
+            request.args.get("materialize") if request.args.get("materialize") is not None else body.get("materialize"),
+            True,
+        )
+        strict = _query_bool(
+            request.args.get("strict_completeness")
+            if request.args.get("strict_completeness") is not None
+            else body.get("strict_completeness", body.get("strictCompleteness")),
+            True,
+        )
+        timeout_sec = _safe_int(request.args.get("timeout_sec") or body.get("timeout_sec") or body.get("timeoutSec")) or 300
+        with _connect(db_path) as conn:
+            try:
+                payload = _run_decision_artifact_generator(
+                    conn,
+                    db_path,
+                    issue,
+                    variant_id=variant_id,
+                    materialize_snapshots=materialize,
+                    strict_completeness=strict,
+                    timeout_sec=timeout_sec,
+                )
+                conn.commit()
+                _cache_clear()
+                return jsonify(payload)
+            except LookupError as exc:
+                return jsonify({"error": str(exc)}), 404
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except Exception as exc:
+                return jsonify({"error": str(exc)}), 500
+
     @app.post("/api/matches/<match_id>/decision-snapshot")
     def materialize_match_decision_snapshot(match_id: str):
         with _connect(db_path) as conn:
@@ -6141,6 +7682,47 @@ def create_app(
             only_date = _today_hk()
         with _connect(db_path) as conn:
             return jsonify(_main_strategy_payload(conn, issue, only_date=only_date, decision_variant_id=decision_variant_id))
+
+    @app.get("/api/issues/<issue>/segment-betting-plan")
+    def segment_betting_plan(issue: str):
+        decision_variant_id = _requested_decision_variant_id()
+        plan_id = request.args.get("plan_id") or request.args.get("plan")
+        label = request.args.get("label")
+        betting_strategy_version = request.args.get("betting_strategy_version") or request.args.get("bettingStrategyVersion")
+        segment_budget_yuan = _safe_float(request.args.get("segment_budget_yuan") or request.args.get("budget"))
+        seed = _safe_int(request.args.get("seed") or request.args.get("sample_seed"))
+        requested_planning_scope = str(request.args.get("planning_scope") or request.args.get("scope") or "by_segment").strip()
+        planning_scope = _normalize_segment_planning_scope(requested_planning_scope)
+        if planning_scope not in {"by_segment", "entire_issue"}:
+            return jsonify({"error": f"Unsupported planning_scope: {requested_planning_scope}"}), 400
+        decision_time = str(request.args.get("decision_time") or request.args.get("decisionTime") or "").strip()
+        stake_mode = str(request.args.get("stake_mode") or request.args.get("stakeMode") or "").strip()
+        if stake_mode not in {"", "scale_to_budget", "unit_once"}:
+            return jsonify({"error": f"Unsupported stake_mode: {stake_mode}"}), 400
+        freeze_state: dict[str, Any] | None = None
+        with _connect(db_path) as conn:
+            try:
+                resolved = _resolve_issue(conn, issue)
+            except LookupError:
+                raw_issue = str(issue or "").strip()
+                if not re.fullmatch(r"\d{1,12}", raw_issue):
+                    return jsonify({"error": f"Unknown issue: {issue}"}), 404
+                resolved = raw_issue
+            freeze_state = _segment_plan_freeze_state(conn, resolved)
+        payload, status = _segment_betting_plan_payload(
+            resolved,
+            decision_variant_id=decision_variant_id,
+            plan_id=plan_id,
+            label=label,
+            betting_strategy_version=betting_strategy_version,
+            segment_budget_yuan=segment_budget_yuan,
+            seed=seed,
+            planning_scope=planning_scope,
+            decision_time=decision_time or None,
+            stake_mode=stake_mode or None,
+            freeze_state=freeze_state,
+        )
+        return jsonify(payload), status
 
     @app.get("/api/issues/<issue>/signals")
     def signals(issue: str):

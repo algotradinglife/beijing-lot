@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 import sys
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -10,6 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.decision_api import app as appmod
+from scripts import review_settled_matches as review_script
 
 
 OPERATOR_TOKEN = "pytest-operator-token"
@@ -37,7 +39,14 @@ def test_live_workflow_publishes_v4_2_execution_artifacts_after_snapshot_materia
     plan = appmod._live_workflow_step_defs("review_tie_case", tmp_path / "500.sqlite")
     step_keys = [step["step_key"] for step in plan]
 
+    assert step_keys.index("generate_active_v3_3_3_artifact") > step_keys.index("materialize_decision_snapshots")
     assert step_keys.index("publish_v4_2_execution_artifacts") > step_keys.index("materialize_decision_snapshots")
+    assert step_keys.index("publish_v4_2_execution_artifacts") > step_keys.index("generate_active_v3_3_3_artifact")
+    artifact_step = next(step for step in plan if step["step_key"] == "generate_active_v3_3_3_artifact")
+    artifact_command = " ".join(str(item) for item in artifact_step["command"])
+    assert artifact_step["kind"] == "subprocess"
+    assert "scripts/evaluate_structured_decision_chain_shadow.py" in artifact_command
+    assert "--strict-completeness" in artifact_command
     publish_step = next(step for step in plan if step["step_key"] == "publish_v4_2_execution_artifacts")
     assert publish_step["kind"] == "subprocess"
     command_text = " ".join(str(item) for item in publish_step["command"])
@@ -174,6 +183,135 @@ def _build_minimal_500_db(path: Path) -> None:
         conn.close()
 
 
+def _release_with_shadow_dir(shadow_dir: Path) -> dict[str, object]:
+    return {
+        "release_id": "test_release",
+        "effective_from_issue": "review_tie_case",
+        "decision_variants": [
+            {
+                "variant_id": "active_v3.3.3",
+                "version_id": "3.3.3",
+                "kind": "shadow",
+                "label": "正式版 v3.3.3",
+                "source": "structured_shadow_csv",
+                "artifact_key": "structured_shadow_dir",
+                "artifact_variant_ids": ["shadow_v3.3.3"],
+                "legacy_variant_ids": ["shadow_v3.3.3"],
+                "is_default": True,
+                "selectable": True,
+                "readiness": {
+                    "artifact_required": True,
+                    "defaultable_when": "available",
+                    "missing_behavior": "unavailable",
+                    "missing_reason": "structured_shadow_artifact_missing_for_issue",
+                },
+            },
+            {
+                "variant_id": "shadow_v4.2.0005_execution_late_proxy_fullcap2",
+                "version_id": "4.2.0005",
+                "kind": "shadow",
+                "label": "v4.2 观察",
+                "source": "structured_shadow_csv",
+                "artifact_key": "structured_shadow_dir",
+                "is_default": False,
+                "selectable": True,
+            },
+        ],
+        "artifacts": {"structured_shadow_dir": str(shadow_dir)},
+    }
+
+
+def test_decision_artifact_status_reports_missing_formal_artifact(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "500_bjdc.sqlite"
+    shadow_dir = tmp_path / "structured_shadow"
+    _build_minimal_500_db(db_path)
+    monkeypatch.setattr(appmod, "_active_strategy_release", lambda: _release_with_shadow_dir(shadow_dir))
+    app = appmod.create_app(sqlite_db=db_path)
+    client = app.test_client()
+
+    response = client.get("/api/issues/review_tie_case/decision-artifacts/status?variant=active_v3.3.3")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "missing"
+    assert payload["variant_id"] == "active_v3.3.3"
+    assert payload["artifact_variant_id"] == "shadow_v3.3.3"
+    assert payload["generation_supported"] is True
+    assert payload["completeness"]["missing_match_idx"] == [1]
+
+
+def test_generate_decision_artifact_runs_strategy_generator_and_reports_status(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "500_bjdc.sqlite"
+    shadow_dir = tmp_path / "structured_shadow"
+    _build_minimal_500_db(db_path)
+    monkeypatch.setenv("BEIDAN_DECISION_API_OPERATOR_TOKEN", OPERATOR_TOKEN)
+    monkeypatch.setattr(appmod, "_active_strategy_release", lambda: _release_with_shadow_dir(shadow_dir))
+    seen: dict[str, object] = {}
+
+    def fake_run(command, *, cwd, capture_output, text, timeout, check):
+        seen.update({
+            "command": command,
+            "cwd": cwd,
+            "capture_output": capture_output,
+            "text": text,
+            "timeout": timeout,
+            "check": check,
+        })
+        out_dir = shadow_dir / "review_tie_case_20260707_shadow_v3.3.3"
+        out_dir.mkdir(parents=True)
+        (out_dir / "structured_shadow_review_tie_case.csv").write_text(
+            "issue,match_idx,match_id,shadow_arm,shadow_version,shadow_primary,shadow_selection_codes,selection_type\n"
+            "review_tie_case,1,review_tie_case_001,shadow_v3.3.3,llm_chain_bet_protect_stop_v3.3.3_shadow,3,3,single\n",
+            encoding="utf-8",
+        )
+        return type("Completed", (), {
+            "returncode": 0,
+            "stdout": json.dumps({"status": "generated", "csv": "fixture.csv"}),
+            "stderr": "",
+        })()
+
+    monkeypatch.setattr(appmod.subprocess, "run", fake_run)
+    app = appmod.create_app(sqlite_db=db_path)
+    client = app.test_client()
+
+    response = client.post(
+        "/api/issues/review_tie_case/decision-artifacts/generate"
+        "?variant=active_v3.3.3&materialize=false&strict_completeness=true&timeout_sec=12",
+        headers=OPERATOR_HEADERS,
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    command_text = " ".join(str(item) for item in seen["command"])
+    assert payload["status"] == "succeeded"
+    assert payload["variant_id"] == "active_v3.3.3"
+    assert payload["artifact_status"]["status"] == "available"
+    assert payload["artifact_status"]["source_path"].endswith("structured_shadow_review_tie_case.csv")
+    assert "scripts/evaluate_structured_decision_chain_shadow.py" in command_text
+    assert "--issue review_tie_case" in command_text
+    assert "--strict-completeness" in command_text
+    assert seen["timeout"] == 12
+
+
+def test_generate_decision_artifact_rejects_late_proxy_variant(tmp_path: Path, monkeypatch) -> None:
+    db_path = tmp_path / "500_bjdc.sqlite"
+    shadow_dir = tmp_path / "structured_shadow"
+    _build_minimal_500_db(db_path)
+    monkeypatch.setenv("BEIDAN_DECISION_API_OPERATOR_TOKEN", OPERATOR_TOKEN)
+    monkeypatch.setattr(appmod, "_active_strategy_release", lambda: _release_with_shadow_dir(shadow_dir))
+    app = appmod.create_app(sqlite_db=db_path)
+    client = app.test_client()
+
+    response = client.post(
+        "/api/issues/review_tie_case/decision-artifacts/generate"
+        "?variant=shadow_v4.2.0005_execution_late_proxy_fullcap2&materialize=false",
+        headers=OPERATOR_HEADERS,
+    )
+
+    assert response.status_code == 400
+    assert "not supported" in response.get_json()["error"]
+
+
 def test_operations_uses_last_inserted_workflow_run_for_same_second_tie(tmp_path: Path) -> None:
     db_path = tmp_path / "500_bjdc.sqlite"
     _build_minimal_500_db(db_path)
@@ -274,10 +412,10 @@ def test_dashboard_uses_latest_complete_live_sp_per_match(tmp_path: Path) -> Non
     payload = response.get_json()
     assert payload["strategy_version_context"]["requested_variant_id"] == "missing_v9"
     assert payload["strategy_version_context"]["selection_status"] == "unavailable"
-    assert payload["strategy_version_context"]["selected_variant_id"] == "active_v3"
+    assert payload["strategy_version_context"]["selected_variant_id"] == "active_v3.3.3"
     match = payload["matches"][0]
-    assert match["selected_decision_variant_id"] == "active_v3"
-    assert match["selected_decision_variant_status"] == "ok"
+    assert match["selected_decision_variant_id"] == ""
+    assert match["selected_decision_variant_status"] == "unavailable"
     assert match["sp_3"] == 2.22
     assert match["sp_1"] == 3.33
     assert match["sp_0"] == 4.44
@@ -289,6 +427,7 @@ def test_dashboard_source_freshness_keeps_issue_list_from_masking_issue_sources(
     db_path = tmp_path / "500_bjdc.sqlite"
     _build_minimal_500_db(db_path)
     with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
         conn.executemany(
             """
             INSERT INTO fetch_log(fetched_at, kind, issue, url, status, ok, elapsed_sec, bytes, rows_parsed, error)
@@ -316,6 +455,40 @@ def test_dashboard_source_freshness_keeps_issue_list_from_masking_issue_sources(
     assert freshness["nowscore_bjdc"]["last_success_at"] == "2026-07-04T10:00:00Z"
 
 
+def test_source_freshness_treats_naive_fetch_log_timestamps_as_utc(tmp_path: Path, monkeypatch) -> None:
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            current = datetime(2026, 7, 4, 12, 5, tzinfo=timezone.utc)
+            return current.astimezone(tz) if tz else current.replace(tzinfo=None)
+
+    monkeypatch.setattr(appmod, "datetime", FixedDateTime)
+    db_path = tmp_path / "500_bjdc.sqlite"
+    _build_minimal_500_db(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        conn.executemany(
+            """
+            INSERT INTO fetch_log(fetched_at, kind, issue, url, status, ok, elapsed_sec, bytes, rows_parsed, error)
+            VALUES(?, ?, ?, ?, 200, ?, 0.1, 100, 1, ?)
+            """,
+            [
+                ("2026-07-04 12:00:00", "issue_html", "review_tie_case", "https://trade.500.com/bjdc/?expect=review_tie_case", 1, ""),
+                ("2026-07-04T11:55:00Z", "nowscore_bjdc", "review_tie_case", "https://cp.nowscore.com/buy/DanChang.aspx", 0, "old broken pipe"),
+                ("2026-07-04T12:01:00Z", "nowscore_bjdc", "review_tie_case", "https://cp.nowscore.com/buy/DanChang.aspx", 1, ""),
+            ],
+        )
+        conn.commit()
+        freshness = {row["source_name"]: row for row in appmod._source_statuses(conn, "review_tie_case")}
+
+    assert freshness["issue_html"]["status"] == "ok"
+    assert freshness["issue_html"]["age_minutes"] == 5
+    assert freshness["nowscore_bjdc"]["status"] == "ok"
+    assert freshness["nowscore_bjdc"]["age_minutes"] == 4
+    assert freshness["nowscore_bjdc"]["fail_count"] == 1
+    assert freshness["nowscore_bjdc"]["error"] == ""
+
+
 def test_match_detail_exposes_strategy_version_context(tmp_path: Path) -> None:
     db_path = tmp_path / "500_bjdc.sqlite"
     _build_minimal_500_db(db_path)
@@ -328,8 +501,8 @@ def test_match_detail_exposes_strategy_version_context(tmp_path: Path) -> None:
     payload = response.get_json()
     assert payload["strategy_version_context"]["requested_variant_id"] == "missing_v9"
     assert payload["strategy_version_context"]["selection_status"] == "unavailable"
-    assert payload["match"]["selected_decision_variant_id"] == "active_v3"
-    assert payload["match"]["selected_decision_variant_status"] == "ok"
+    assert payload["match"]["selected_decision_variant_id"] == ""
+    assert payload["match"]["selected_decision_variant_status"] == "unavailable"
 
 
 def test_operations_reads_dashboard_runtime_status(tmp_path: Path, monkeypatch) -> None:
@@ -590,6 +763,71 @@ def test_postmatch_review_api_dry_run_and_real_write_review_rows(tmp_path: Path,
     _build_minimal_500_db(db_path)
     monkeypatch.setenv("BEIDAN_DECISION_API_OPERATOR_TOKEN", OPERATOR_TOKEN)
 
+    def fake_review_run(command, *, cwd, capture_output, text, timeout, check):
+        assert "--decision-variant" in command
+        assert "active_v3.3.3" in command
+        dry_run = "--dry-run" in command
+        result = {
+            "issue": "review_tie_case",
+            "decision_variant_id": "active_v3.3.3",
+            "review_version": "v3_decision_variant_active_v3_3_3_tags",
+            "inserted": 0 if dry_run else 1,
+            "would_insert": 1,
+            "coverage_hits": 1,
+            "profit": 2.2,
+        }
+        if not dry_run:
+            with appmod._connect(db_path) as write_conn:
+                review_script.ensure_schema(write_conn)
+                write_conn.execute(
+                    """
+                    INSERT INTO postmatch_reviews (
+                        issue, match_idx, match_id, review_version, decision_variant_id, reviewed_at,
+                        decision_generated_ts, decision_source, decision_snapshot_id,
+                        decision_snapshot_generated_at, decision_snapshot_status, decision_fingerprint,
+                        tag_version, outcome_label, action_suggestion, issue_day_key,
+                        league, home, away, kickoff_ts, score, halftime_score, result_code,
+                        result_label, winning_sp, llm_selection, llm_selection_codes_json,
+                        llm_judgment, primary_hit, protect_hit, coverage_hit, stopped,
+                        stake, gross_return, profit, roi, failure_tags_json, review_summary,
+                        review_payload_json
+                    )
+                    VALUES (
+                        'review_tie_case', 1, 'review_tie_case_001',
+                        'v3_decision_variant_active_v3_3_3_tags', 'active_v3.3.3',
+                        '2026-07-03 10:15:00', '2026-07-03 10:00:00', 'pytest',
+                        'active_review_tie_case_001', '2026-07-03 10:00:00', 'active',
+                        'fingerprint', 'postmatch_tags_v2', '押中', '复盘无新增动作。',
+                        'review_tie_case:2026-07-03', '测试联赛', '主队', '客队',
+                        '2026-07-03 20:00:00', '2:1', '', '3', '胜', 2.10,
+                        '3', '["3"]', '押胜', 1, 0, 1, 0, 2.0, 4.2, 2.2, 1.1,
+                        '["primary_hit"]', '主押命中：押胜，实际胜，结算SP 2.10。', '{}'
+                    )
+                    """
+                )
+                write_conn.execute(
+                    """
+                    INSERT INTO postmatch_review_issue_summary (
+                        issue, review_version, decision_variant_id, reviewed_at, n_reviews,
+                        stake, gross_return, profit, roi, primary_hits, protect_hits,
+                        coverage_hits, stopped_correct, stopped_wrong, tag_counts_json
+                    )
+                    VALUES (
+                        'review_tie_case', 'v3_decision_variant_active_v3_3_3_tags',
+                        'active_v3.3.3', '2026-07-03 10:15:00', 1,
+                        2.0, 4.2, 2.2, 1.1, 1, 0, 1, 0, 0, '{"primary_hit":1}'
+                    )
+                    """
+                )
+                write_conn.commit()
+        return type("Completed", (), {
+            "returncode": 0,
+            "stdout": json.dumps(result),
+            "stderr": "",
+        })()
+
+    monkeypatch.setattr(appmod.subprocess, "run", fake_review_run)
+
     conn = appmod._connect(db_path)
     try:
         appmod._ensure_decision_snapshot_schema(conn)
@@ -628,7 +866,10 @@ def test_postmatch_review_api_dry_run_and_real_write_review_rows(tmp_path: Path,
             headers={**OPERATOR_HEADERS, "X-Requested-By": "pytest-real"},
         )
         after_real = client.get("/api/issues/review_tie_case/operations").get_json()
-        settlement = client.get("/api/issues/review_tie_case/settlement?decision_variant=missing_v9").get_json()
+        settlement_response = client.get("/api/issues/review_tie_case/settlement?decision_variant=active_v3.3.3")
+        missing_response = client.get("/api/issues/review_tie_case/settlement?decision_variant=missing_v9")
+        settlement = settlement_response.get_json()
+        missing = missing_response.get_json()
 
     assert dry.status_code == 200
     dry_payload = dry.get_json()
@@ -643,7 +884,11 @@ def test_postmatch_review_api_dry_run_and_real_write_review_rows(tmp_path: Path,
     assert after_real["review"]["reviewed_match_count"] == 1
     assert after_real["review"]["unreviewed_settled_count"] == 0
     assert after_real["review"]["task"]["status"] == "succeeded"
+    assert settlement_response.status_code == 200
     assert settlement["postmatch_review_issue_summary"]["n_reviews"] == 1
+    assert settlement["postmatch_review_issue_summary"]["review_version"] == "v3_decision_variant_active_v3_3_3_tags"
     assert settlement["postmatch_reviews"][0]["outcome_label"] == "押中"
-    assert settlement["strategy_version_context"]["requested_variant_id"] == "missing_v9"
-    assert settlement["strategy_version_context"]["selection_status"] == "unavailable"
+    assert settlement["strategy_version_context"]["requested_variant_id"] == "active_v3.3.3"
+    assert missing_response.status_code == 409
+    assert missing["error"] == "postmatch review artifact unavailable"
+    assert missing["expected_review_version"] == "v3_decision_variant_missing_v9_tags"

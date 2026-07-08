@@ -191,7 +191,7 @@ the selected execution policy and blocking state visible. A row that is
 "stop - waiting late refresh"; it is a warning not to bet that match yet, not a
 final statement that the match will never be buyable.
 
-In the current active release, `shadow_v3.3.3` is the runtime default. v4.2
+In the current active release, `active_v3.3.3` is the runtime default. v4.2
 execution variants remain selectable manual diagnostic views and must not become
 the API default automatically. The late-proxy artifact is still the automated
 unlock signal inside v4.2: rows with `execution_unlock_state=unlocked_after_late_refresh`

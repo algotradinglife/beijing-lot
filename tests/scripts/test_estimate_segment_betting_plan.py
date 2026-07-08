@@ -23,7 +23,7 @@ def _load_module():
     return module
 
 
-def _leg(mod, idx: int, codes: tuple[str, ...], actual: str, winning_sp: float):
+def _leg(mod, idx: int, codes: tuple[str, ...], actual: str, winning_sp: float | None):
     return mod.rolling.LegRow(
         issue="1001",
         match_idx=idx,
@@ -104,6 +104,50 @@ def test_settle_segment_selects_bundles_under_budget() -> None:
         assert selected[0].candidate.cost_units <= 2
 
 
+def test_settle_segment_keeps_unsettled_live_metrics_pending() -> None:
+    mod = _load_module()
+    legs = [
+        _leg(mod, 1, ("3", "1"), "", None),
+        _leg(mod, 2, ("0",), "", None),
+        _leg(mod, 3, ("1",), "", None),
+        _leg(mod, 4, ("3",), "", None),
+        _leg(mod, 5, ("3",), "", None),
+        _leg(mod, 6, ("3",), "", None),
+    ]
+    segment = mod.rolling.Segment(
+        segment_idx=1,
+        start=legs[0].kickoff,
+        end=legs[-1].kickoff,
+        window_hours=12,
+        legs=tuple(legs),
+    )
+
+    row, selected = mod.settle_segment(
+        segment,
+        arm="shadow",
+        segment_budget_yuan=20,
+        stake_yuan_per_ticket=2,
+        sample_attempts=100,
+        sample_seed=7,
+        min_n=3,
+        max_n=8,
+        max_overlap=None,
+        positive_ev_only=False,
+    )
+    summary = mod.summarize([row], [mod.candidate_to_row(item, stake_yuan_per_ticket=2) for item in selected])
+
+    assert row["settlement_status"] == "unsettled"
+    assert row["actual_coverage_hit_rate"] == ""
+    assert row["profit_yuan"] == ""
+    assert row["roi"] == ""
+    assert row["dead_segment"] == 0
+    assert row["expected_profit_yuan"] != ""
+    assert summary["settlement_status"] == "unsettled"
+    assert summary["primary_metric_mode"] == "expected"
+    assert summary["profit_yuan"] == ""
+    assert summary["expected_profit_yuan"] != ""
+
+
 def test_run_writes_outputs(tmp_path: Path) -> None:
     mod = _load_module()
     db = tmp_path / "test.sqlite"
@@ -182,14 +226,15 @@ def test_run_writes_outputs(tmp_path: Path) -> None:
 
     summary_payload = json.loads(Path(payload["summary_json"]).read_text(encoding="utf-8"))
     assert summary_payload["strategy_family"] == "segment_betting_plan"
-    assert summary_payload["betting_strategy_version"] == "segment_betting_v0.3.0000"
+    assert summary_payload["betting_strategy_version"] == "segment_betting_v0.4.0000"
     assert summary_payload["artifact_schema_version"] == "segment_betting_artifact_v1"
-    assert summary_payload["planning_scope"] == "next_segment"
+    assert summary_payload["planning_scope"] == "by_segment"
+    assert summary_payload["selection_binding"]["match_selection_source"] == "issue_board_same_decision_variant"
     assert summary_payload["sp_drift_risk"]["accepted"] is False
     assert summary_payload["settings"]["stake_mode"] == "scale_to_budget"
     assert summary_payload["seed_aggregate"]["summary_mode"] == "single_seed"
     assert any(item["key"] == "segment_budget_yuan" for item in summary_payload["parameter_schema"])
-    assert "segment_betting_v0.3.0000" in payload["summary_json"]
+    assert "segment_betting_v0.4.0000" in payload["summary_json"]
 
 
 def test_run_multi_seed_writes_stability_outputs(tmp_path: Path) -> None:
@@ -286,7 +331,7 @@ def test_run_multi_seed_writes_stability_outputs(tmp_path: Path) -> None:
     assert "recommended_n_values" in segment_seed_rows[0]
 
 
-def test_planning_scope_can_limit_to_next_segment_or_remaining_issue(tmp_path: Path) -> None:
+def test_planning_scope_can_output_by_segment_or_one_entire_issue_segment(tmp_path: Path) -> None:
     mod = _load_module()
     db = tmp_path / "test.sqlite"
     start = datetime(2026, 7, 1, 0, 0)
@@ -359,23 +404,27 @@ def test_planning_scope_can_limit_to_next_segment_or_remaining_issue(tmp_path: P
         "2026-07-01 10:00",
     ]
 
-    next_payload = mod.run(mod.parse_args([*base_args, "--planning-scope", "next_segment"]))
-    assert next_payload["planning_scope"] == "next_segment"
-    assert next_payload["available_segments"] > 1
-    assert next_payload["segments"] == 1
-    assert next_payload["eligible_rows_before_decision_filter"] == 12
-    assert next_payload["eligible_rows"] == 10
-    assert next_payload["sp_drift_risk"]["accepted"] is False
+    by_segment_payload = mod.run(mod.parse_args([*base_args, "--planning-scope", "by_segment"]))
+    assert by_segment_payload["planning_scope"] == "by_segment"
+    assert by_segment_payload["available_segments"] > 1
+    assert by_segment_payload["segments"] == by_segment_payload["available_segments"]
+    assert by_segment_payload["eligible_rows_before_decision_filter"] == 12
+    assert by_segment_payload["eligible_rows"] == 10
+    assert by_segment_payload["future_eligible_rows"] == 10
+    assert by_segment_payload["sp_drift_risk"]["accepted"] is False
 
-    remaining_payload = mod.run(mod.parse_args([*base_args, "--planning-scope", "remaining_issue"]))
-    assert remaining_payload["planning_scope"] == "remaining_issue"
-    assert remaining_payload["segments"] == remaining_payload["available_segments"]
-    assert remaining_payload["segments"] > 1
-    assert remaining_payload["sp_drift_risk"]["accepted"] is True
-    with Path(remaining_payload["segment_csv"]).open(encoding="utf-8", newline="") as f:
+    entire_payload = mod.run(mod.parse_args([*base_args, "--planning-scope", "entire_issue"]))
+    assert entire_payload["planning_scope"] == "entire_issue"
+    assert entire_payload["segments"] == 1
+    assert entire_payload["available_segments"] == 1
+    assert entire_payload["dynamic_segments_available"] == by_segment_payload["segments"]
+    assert entire_payload["sp_drift_risk"]["accepted"] is True
+    with Path(entire_payload["segment_csv"]).open(encoding="utf-8", newline="") as f:
         segment_rows = list(csv.DictReader(f))
-    assert all(row["planning_scope"] == "remaining_issue" for row in segment_rows)
+    assert len(segment_rows) == 1
+    assert all(row["planning_scope"] == "entire_issue" for row in segment_rows)
     assert all(row["sp_drift_risk_accepted"] == "1" for row in segment_rows)
+    assert segment_rows[0]["match_indices"] == "3,4,5,6,7,8,9,10,11,12"
 
 
 def test_stake_mode_defaults_to_scale_budget_and_can_use_unit_once(tmp_path: Path) -> None:
@@ -453,6 +502,8 @@ def test_stake_mode_defaults_to_scale_budget_and_can_use_unit_once(tmp_path: Pat
     assert scaled["summary"]["base_cost_yuan"] == unit_once["summary"]["selected_cost_yuan"]
     assert scaled["summary"]["selected_cost_yuan"] > scaled["summary"]["base_cost_yuan"]
     assert scaled["summary"]["selected_cost_yuan"] <= 100
+    assert scaled["settings"]["max_bundle_spend_pct"] == 0.4
     with Path(scaled["bundle_csv"]).open(encoding="utf-8", newline="") as f:
         bundle_rows = list(csv.DictReader(f))
     assert any(int(row["stake_multiplier"]) > 1 for row in bundle_rows)
+    assert all(float(row["scaled_cost_yuan"]) <= 40 for row in bundle_rows)

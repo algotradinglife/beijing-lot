@@ -200,7 +200,7 @@
           "enum": ["always", "available", "never"]
         },
         "missing_behavior": {
-          "enum": ["builtin_active", "fallback_to_active", "diagnostic_placeholder", "hidden_until_artifact", "artifact_missing"]
+          "enum": ["builtin_active", "fallback_to_active", "diagnostic_placeholder", "hidden_until_artifact", "artifact_missing", "unavailable"]
         },
         "late_refresh": {
           "enum": [

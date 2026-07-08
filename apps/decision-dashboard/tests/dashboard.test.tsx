@@ -78,10 +78,13 @@ describe('北单实盘决策台 v1', () => {
     vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(dashboardData);
     render(<App />);
     await screen.findByRole('button', { name: '期次看板' });
-    expect(screen.getByText('UI execution-v4200-1355')).toBeInTheDocument();
-    for (const page of ['期次看板', '运行状态', '主策略', '投注构建', '影子策略', '实时信号', '赛后复盘', '策略实验']) {
+     expect(screen.getByText('UI betting-scope-v0400-0140')).toBeInTheDocument();
+    for (const page of ['期次看板', '赛后复盘', '下注设计', '运行状态', '实时信号', '策略实验']) {
       expect(screen.getByRole('button', { name: page })).toBeInTheDocument();
     }
+    expect(screen.queryByRole('button', { name: '投注构建' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '主策略' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '影子策略' })).not.toBeInTheDocument();
     const navButtons = screen.getAllByRole('button').map((button) => button.textContent);
     expect(navButtons.slice(0, 2)).toEqual(['期次看板', '赛后复盘']);
     expect(screen.queryByRole('button', { name: '比赛详情' })).not.toBeInTheDocument();
@@ -140,14 +143,11 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.queryByText('押+保+停')).not.toBeInTheDocument();
 
     const versionSelect = screen.getByLabelText('选择决策版本') as HTMLSelectElement;
-    expect(versionSelect.value).toBe('shadow_v3.3.3');
-    await userEvent.selectOptions(versionSelect, 'active_v3');
-    expect(versionSelect.value).toBe('active_v3');
-    const firstMatchActiveRow = screen.getByText('bjdc_26052_001').closest('tr');
-    expect(firstMatchActiveRow).not.toBeNull();
-    expect(within(firstMatchActiveRow!).getByText('押中')).toBeInTheDocument();
-    await userEvent.selectOptions(versionSelect, 'shadow_v3.3.3');
-    expect(versionSelect.value).toBe('shadow_v3.3.3');
+    expect(versionSelect.value).toBe('active_v3.3.3');
+    expect([...versionSelect.options].map((option) => option.value)).not.toContain('active_v3');
+    expect([...versionSelect.options].map((option) => option.value)).not.toContain('shadow_v4.2.0000_execution_strict_fullcap2');
+    await userEvent.selectOptions(versionSelect, 'active_v3.3.3');
+    expect(versionSelect.value).toBe('active_v3.3.3');
     const firstMatchShadowRow = screen.getByText('bjdc_26052_001').closest('tr');
     expect(firstMatchShadowRow).not.toBeNull();
     expect(within(firstMatchShadowRow!).getByText(/^押$/)).toBeInTheDocument();
@@ -164,7 +164,7 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getAllByText(/盘口与关注要点/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/情报摘要/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/结构化决策链/).length).toBeGreaterThan(0);
-    expect((screen.getByLabelText('选择详情决策版本') as HTMLSelectElement).value).toBe('shadow_v3.3.3');
+    expect((screen.getByLabelText('选择详情决策版本') as HTMLSelectElement).value).toBe('active_v3.3.3');
     expect(screen.getAllByText(/让球后概率/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/q \/ EV/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/脚本汇总/).length).toBeGreaterThan(0);
@@ -178,45 +178,98 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.queryByText(/待确认覆盖/)).not.toBeInTheDocument();
     expect(screen.getAllByText(/赛后复盘/).length).toBeGreaterThan(0);
 
-    await userEvent.click(screen.getByRole('button', { name: '主策略' }));
-    expect(screen.getAllByText(/A 稳健\/回撤控制/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/B 收益\/凸性/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/line_gap_diagnostic_only/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Replay Review/)).toBeInTheDocument();
+	    await userEvent.click(screen.getByRole('button', { name: '下注设计' }));
+	    expect(screen.getByText('下注方案')).toBeInTheDocument();
+	    expect(screen.getByText('已生成')).toBeInTheDocument();
+		    const bettingVersionSelect = screen.getByLabelText('选择下注决策链版本') as HTMLSelectElement;
+		    expect([...bettingVersionSelect.options].map((option) => option.value)).toContain('shadow_v4.2.0000_execution_late_proxy_fullcap2');
+		    const bettingScopeSelect = screen.getByLabelText('选择下注范围') as HTMLSelectElement;
+		    expect(bettingScopeSelect.value).toBe('by_segment');
+		    expect([...bettingScopeSelect.options].map((option) => option.textContent)).toEqual(['分段下注', '整期下注']);
+		    expect(screen.getByLabelText('下注预算')).toBeInTheDocument();
+		    expect(screen.getByLabelText('选择投入方式')).toBeInTheDocument();
+		    expect(screen.queryByLabelText('计划')).not.toBeInTheDocument();
+	    expect(screen.queryByText('决策时间')).not.toBeInTheDocument();
+	    expect(screen.getAllByText('预算放大').length).toBeGreaterThan(0);
+	    expect(screen.getByText('分段计划')).toBeInTheDocument();
+		    expect(screen.getByText('票组明细')).toBeInTheDocument();
+		    expect(screen.getByText('计划更新')).toBeInTheDocument();
+		    expect(screen.getByText('2026-06-30 21:58')).toBeInTheDocument();
+		    expect(screen.getByText('方向来源')).toBeInTheDocument();
+		    expect(screen.getByText('期次看板同版本')).toBeInTheDocument();
+		    expect(screen.getByText(/#1 负\+平/)).toBeInTheDocument();
+	    expect(screen.queryByText('死段')).not.toBeInTheDocument();
+	    expect(screen.queryByText('有效')).not.toBeInTheDocument();
+	    expect(screen.queryByRole('columnheader', { name: '场次/N' })).not.toBeInTheDocument();
+	    expect(screen.getAllByRole('columnheader', { name: '场次' }).length).toBeGreaterThan(0);
+	    expect(screen.getAllByRole('columnheader', { name: 'N' }).length).toBeGreaterThan(0);
+	    expect(screen.getByText('从 2026-06-30 18:00')).toBeInTheDocument();
+	    expect(screen.getByText('到 2026-07-01 06:00')).toBeInTheDocument();
+	    expect(screen.getByText('从 2026-07-01 18:00')).toBeInTheDocument();
+	    expect(screen.getByText('到 2026-07-02 06:00')).toBeInTheDocument();
+	    expect(screen.queryByText(/^动态段$/)).not.toBeInTheDocument();
+	    expect(screen.queryByText(/^收益$/)).not.toBeInTheDocument();
+	    expect(screen.queryByText(/^ROI$/)).not.toBeInTheDocument();
+	    expect(screen.queryByText(/只覆盖下一开赛时段/)).not.toBeInTheDocument();
+	    expect(screen.queryByText(/覆盖本期剩余比赛/)).not.toBeInTheDocument();
+	    expect(screen.queryByText('计划成本')).not.toBeInTheDocument();
+	    expect(screen.queryByText('实结收益')).not.toBeInTheDocument();
+	    expect(screen.queryByText('实结 ROI')).not.toBeInTheDocument();
+	    expect(screen.queryByText('结算状态')).not.toBeInTheDocument();
+	    expect(screen.queryByText('历史表现参考')).not.toBeInTheDocument();
+	    expect(screen.queryByText(/用于观察方案稳定性/)).not.toBeInTheDocument();
+	    expect(screen.queryByText('方案稳定性')).not.toBeInTheDocument();
+	    expect(screen.queryByText('分段表现区间')).not.toBeInTheDocument();
+	    expect(screen.queryByRole('columnheader', { name: '收益区间' })).not.toBeInTheDocument();
+	    expect(screen.queryByRole('columnheader', { name: '结果校验' })).not.toBeInTheDocument();
+    expect(screen.queryByText('赛后回放方案')).not.toBeInTheDocument();
+    expect(screen.queryByText('回放样本')).not.toBeInTheDocument();
+    expect(screen.queryByText('回放结果')).not.toBeInTheDocument();
+    expect(screen.queryByText(/回放/)).not.toBeInTheDocument();
+    expect(screen.queryByText('波动参考')).not.toBeInTheDocument();
+    expect(screen.queryByText('样本数')).not.toBeInTheDocument();
+    expect(screen.queryByText('成本 低/均/高')).not.toBeInTheDocument();
+    expect(screen.queryByText('收益 低/均/高')).not.toBeInTheDocument();
+    expect(screen.queryByText('ROI 低/均/高')).not.toBeInTheDocument();
+    expect(screen.queryByText('只读产物')).not.toBeInTheDocument();
+    expect(screen.queryByText('参数契约')).not.toBeInTheDocument();
+    expect(screen.queryByText('采样CSV')).not.toBeInTheDocument();
+    expect(screen.queryByText('segment_betting_plan_segments.csv')).not.toBeInTheDocument();
+    expect(screen.queryByText(/segment_betting_strategy_user_explainer_2026-07-07/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/默认高亮/)).not.toBeInTheDocument();
+    expect(screen.queryByText('单次审计')).not.toBeInTheDocument();
+    expect(screen.queryByText('不可用')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: '运行状态' }));
-    expect(screen.getByText(/实盘运行状态 \/ Issue 26071/)).toBeInTheDocument();
-    expect(screen.getByText('实盘日流程')).toBeInTheDocument();
-    expect(screen.getByText('wf_26071_mock')).toBeInTheDocument();
-    expect(screen.getByText('刷新 500/捷报/赛果/SP')).toBeInTheDocument();
-    expect(screen.getByText('采集当前期情报摘要')).toBeInTheDocument();
-    expect(screen.getByText('生成/检查 LLM 决策快照')).toBeInTheDocument();
-    expect(screen.getByText('访问与服务')).toBeInTheDocument();
-    expect(screen.getByText('版本锁定')).toBeInTheDocument();
-    expect(screen.getByText('数据源新鲜度')).toBeInTheDocument();
+    expect(screen.getByText(/实盘健康检查 \/ Issue 26071/)).toBeInTheDocument();
+    expect(screen.getByText('待处理事项')).toBeInTheDocument();
+    expect(screen.getByText('数据源健康')).toBeInTheDocument();
+    expect(screen.getByText('决策快照')).toBeInTheDocument();
+    expect(screen.getByText('复盘进度')).toBeInTheDocument();
+    expect(screen.getByText('操作区')).toBeInTheDocument();
+    expect(screen.getByText('待确认决策草稿')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '复盘 dry-run' })).toBeInTheDocument();
-    expect(screen.getByText('API 健康')).toBeInTheDocument();
-    expect(screen.getByText(/页面不显示 API 地址/)).toBeInTheDocument();
-    expect(screen.getByText(/Host smoke 1\/1/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '执行复盘写入' })).toBeInTheDocument();
+    expect(screen.queryByText('实盘日流程')).not.toBeInTheDocument();
+    expect(screen.queryByText('访问与服务')).not.toBeInTheDocument();
+    expect(screen.queryByText('版本锁定')).not.toBeInTheDocument();
+    expect(screen.queryByText('数据源新鲜度')).not.toBeInTheDocument();
+    expect(screen.queryByText('wf_26071_mock')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Host smoke/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/triggerEndpoint/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/draft_replacement_pending/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/draft replacement/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/would_insert/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/dry_run/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/预计写入/).length).toBeGreaterThan(0);
     expect(screen.queryByText('http://127.0.0.1:4173/')).not.toBeInTheDocument();
     expect(screen.queryByText('http://127.0.0.1:8790/healthz')).not.toBeInTheDocument();
     expect(screen.queryByText(/pid 1001/)).not.toBeInTheDocument();
     expect(screen.queryByText(/pid 1002/)).not.toBeInTheDocument();
     expect(screen.queryByText('trade-server.tail0aa0e9.ts.net')).not.toBeInTheDocument();
-    expect(screen.getByText('f2ad3ef6')).toBeInTheDocument();
+    expect(screen.queryByText('f2ad3ef6')).not.toBeInTheDocument();
     expect(screen.getByText('26071_014')).toBeInTheDocument();
-    expect(screen.getByText('1 条 draft 待确认')).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: '投注构建' }));
-    expect(screen.getByText(/单选腿/)).toBeInTheDocument();
-    expect(screen.getByText(/双选腿/)).toBeInTheDocument();
-    expect(screen.getByText(/全包腿/)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: '影子策略' }));
-    expect(screen.getAllByText(/Selector Shadow/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/state_L6_DD9000_OR_weakcount_ge4_q0p1_h120/)).toBeInTheDocument();
-    expect(screen.getAllByText(/selector_v2_frozen/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/weak count/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/1 条决策草稿/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: '实时信号' }));
     expect(screen.getAllByText(/source_failed/).length).toBeGreaterThan(0);
@@ -227,7 +280,19 @@ describe('北单实盘决策台 v1', () => {
     const settlementIssueSelect = screen.getByLabelText('选择复盘期号') as HTMLSelectElement;
     expect(settlementIssueSelect.value).toBe('26051');
     expect([...settlementIssueSelect.options].map((option) => option.value)).toEqual(['26051']);
+    const settlementVersionSelect = screen.getByLabelText('选择复盘决策链版本') as HTMLSelectElement;
+    expect([...settlementVersionSelect.options].map((option) => option.value)).toEqual(['active_v3.3.3', 'shadow_v4.2.0000_execution_late_proxy_fullcap2']);
+    expect(settlementVersionSelect.value).toBe('active_v3.3.3');
+    await userEvent.selectOptions(settlementVersionSelect, 'shadow_v4.2.0000_execution_late_proxy_fullcap2');
+    expect(settlementVersionSelect.value).toBe('shadow_v4.2.0000_execution_late_proxy_fullcap2');
     expect(screen.getByText('错因标签')).toBeInTheDocument();
+    expect(screen.queryByText('本期摘要')).not.toBeInTheDocument();
+    expect(screen.queryByText('v3_decision_variant_active_v3_3_3_tags')).not.toBeInTheDocument();
+    expect(screen.getAllByText('v4.2.0004 备选观察').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/主押 1 中，保护救回 0 场/)).not.toBeInTheDocument();
+    expect(screen.getByText('复盘焦点')).toBeInTheDocument();
+    expect(screen.getAllByText('未覆盖').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('保护救回').length).toBeGreaterThan(0);
     expect(screen.getByText('标签对应比赛')).toBeInTheDocument();
     expect(screen.getAllByText('漏平').length).toBeGreaterThan(0);
     expect(screen.getAllByText('未覆盖赛果').length).toBeGreaterThan(0);
@@ -238,22 +303,66 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getByText('保护腿有实际价值')).toBeInTheDocument();
     expect(screen.getByText('最大漏点是平局保护不足')).toBeInTheDocument();
     expect(screen.getByText(/押胜率，q 方向做保/)).toBeInTheDocument();
-    expect(screen.getByText('N串1结算')).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: '组合空间' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: '500注覆盖' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: '押+保全中' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: '1000回报' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: '1000收益' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: '下注含义' })).toBeInTheDocument();
-    expect(screen.getByText('3串1')).toBeInTheDocument();
-    expect(screen.getByText('4串1')).toBeInTheDocument();
-    expect(screen.getByText('6串1')).toBeInTheDocument();
+    expect(screen.queryByText('N串1结算')).not.toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '组合空间' })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: '策略实验' }));
     expect(screen.getAllByText(/baseline_384_hybrid/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/selector_v2_frozen/).length).toBeGreaterThan(0);
     expect(screen.getByText(/年度表现/)).toBeInTheDocument();
   });
+
+  it('keeps betting plan decision version selectable before plan artifacts are generated', async () => {
+    const lateProxyId = 'shadow_v4.2.0000_execution_late_proxy_fullcap2';
+    const decisionOptions = [
+      { variantId: 'active_v3.3.3', kind: 'shadow', label: '正式版 v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv', isDefault: true },
+      { variantId: lateProxyId, kind: 'shadow', label: 'v4.2 late proxy', version: 'llm_chain_structured_v4.2.0000_layered_merge_execution_policy', versionId: '4.2.0004', source: 'structured_shadow_csv', isDefault: false },
+    ];
+    const dashboardData: DashboardData = {
+      ...mockDashboardData,
+      issue: {
+        ...mockDashboardData.issue,
+        decisionVariantOptions: decisionOptions,
+        strategyVersionContext: {
+          schemaVersion: 'strategy_version_context_v1',
+          requestedVariantId: '',
+          selectedVariantId: 'active_v3.3.3',
+          selectionStatus: 'ok',
+          availableVariantIds: decisionOptions.map((option) => option.variantId),
+          options: decisionOptions,
+          contractWarnings: [],
+        },
+      },
+      segmentBettingPlan: {
+        ...mockDashboardData.segmentBettingPlan,
+        availabilityStatus: 'missing',
+        unavailableReason: 'segment_betting_plan_artifact_missing',
+        availablePlans: [],
+        selectedPlan: undefined,
+        selectedPlanId: '',
+        summary: {},
+        segments: [],
+        bundles: [],
+      },
+    };
+    vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(dashboardData);
+
+    render(<App />);
+    await screen.findByRole('button', { name: '下注设计' });
+    await userEvent.click(screen.getByRole('button', { name: '下注设计' }));
+
+    expect(screen.getByText('待生成')).toBeInTheDocument();
+    expect(screen.getByText('暂无下注计划')).toBeInTheDocument();
+    expect(screen.queryByText('不可用')).not.toBeInTheDocument();
+	    const versionSelect = screen.getByLabelText('选择下注决策链版本') as HTMLSelectElement;
+	    expect(versionSelect.disabled).toBe(false);
+	    expect([...versionSelect.options].map((option) => option.value)).toEqual(['active_v3.3.3', lateProxyId]);
+	    await userEvent.selectOptions(versionSelect, lateProxyId);
+	    expect(versionSelect.value).toBe(lateProxyId);
+	    expect(screen.queryByLabelText('计划')).not.toBeInTheDocument();
+	    expect((screen.getByLabelText('下注预算') as HTMLInputElement).value).toBe('1000');
+	    expect((screen.getByLabelText('选择投入方式') as HTMLSelectElement).value).toBe('scale_to_budget');
+	  });
 
   it('renders v4.2 execution variants from executable picks and keeps audit recommendations separate', async () => {
     const today = relativeIsoDate(0);
@@ -370,14 +479,14 @@ describe('北单实盘决策台 v1', () => {
     const versionSelect = screen.getByLabelText('选择决策版本') as HTMLSelectElement;
     expect([...versionSelect.options].map((option) => option.value)).toContain(lateProxyId);
     expect([...versionSelect.options].map((option) => option.textContent)).toEqual(expect.arrayContaining([
-      'v3.0 旧版',
-      'v4.2.0004 严格观察',
       'v4.2.0004 备选观察',
-      'v4.2.0005 严格观察',
       'v4.2.0005 备选观察',
     ]));
+    expect([...versionSelect.options].map((option) => option.value)).not.toContain('active_v3');
+    expect([...versionSelect.options].map((option) => option.value)).not.toContain(strict0004Id);
+    expect([...versionSelect.options].map((option) => option.value)).not.toContain(strictId);
     expect(versionSelect.value).toBe(lateProxyId);
-    expect(screen.getByText('v4.2.0005 备选观察版：继承 v4.2 coverage/ROI，新增极值 SP/source q guard；不作为默认。')).toBeInTheDocument();
+    expect(screen.queryByText(/备选观察版/)).not.toBeInTheDocument();
     expect(screen.queryByText(/shadow_v4\.2\.0000/)).not.toBeInTheDocument();
     expect(screen.queryByText(/shadow_v4\.2\.0005/)).not.toBeInTheDocument();
     const row = screen.getByText('bjdc_26052_001').closest('tr');
@@ -389,14 +498,6 @@ describe('北单实盘决策台 v1', () => {
     expect(within(betCell).getByText('胜')).toBeInTheDocument();
     expect(within(betCell).getByText('冲突降双 · 晚盘解锁')).toBeInTheDocument();
     expect(within(betCell).getByText('审 胜+平+负 → 执 平+胜')).toBeInTheDocument();
-
-    await userEvent.selectOptions(versionSelect, strictId);
-    expect(versionSelect.value).toBe(strictId);
-    const strictRow = screen.getByText('bjdc_26052_001').closest('tr');
-    const strictBetCell = strictRow!.querySelector('.bet-cell') as HTMLElement;
-    expect(within(strictBetCell).getByText('等待晚盘 · 等待晚盘')).toBeInTheDocument();
-    expect(within(strictBetCell).getByText('审 平+负 → 执 停')).toBeInTheDocument();
-    expect(within(strictBetCell).getAllByText('停').length).toBeGreaterThan(0);
 
     await userEvent.selectOptions(versionSelect, lateProxyId);
     await userEvent.click(screen.getByText('bjdc_26052_001'));
@@ -537,7 +638,7 @@ describe('北单实盘决策台 v1', () => {
     expect(within(row!).getByText('进行中')).toBeInTheDocument();
   });
 
-  it('shows active/draft decision snapshot differences and keeps no-draft rows quiet', async () => {
+  it('hides retired active snapshot draft controls from the public decision version picker', async () => {
     const dashboardData: DashboardData = {
       ...mockDashboardData,
       issue: {
@@ -597,8 +698,8 @@ describe('北单实盘决策台 v1', () => {
         },
       },
     };
-    const getDashboardSpy = vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(dashboardData);
-    const confirmSpy = vi.spyOn(ApiDashboardAdapter.prototype, 'confirmDecisionSnapshot').mockResolvedValue({
+    vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(dashboardData);
+    vi.spyOn(ApiDashboardAdapter.prototype, 'confirmDecisionSnapshot').mockResolvedValue({
       action: 'confirmed_override',
       confirmedAt: '2026-07-03 10:40',
       previousActive: dashboardData.matchDetail.decisionSnapshot,
@@ -610,28 +711,11 @@ describe('北单实盘决策台 v1', () => {
     await userEvent.click(screen.getByRole('button', { name: /2026-06-30/ }));
     expect(screen.getByText('待确认新建议')).toBeInTheDocument();
     expect(screen.queryByText(/Active \/ Draft 对比/)).not.toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText('选择决策版本'), 'active_v3');
+    expect([...((screen.getByLabelText('选择决策版本') as HTMLSelectElement).options)].map((option) => option.value)).not.toContain('active_v3');
 
     await userEvent.click(screen.getByText('bjdc_26052_001'));
-    expect(screen.getByText(/Active \/ Draft 对比/)).toBeInTheDocument();
-    expect(screen.getByText('发现 draft_replacement，待确认覆盖')).toBeInTheDocument();
-    expect(screen.getByText('Draft 不会自动覆盖 Active，需要用户手动确认。')).toBeInTheDocument();
-    expect(screen.getByText('主押变化')).toBeInTheDocument();
-    expect(screen.getByText('保护变化')).toBeInTheDocument();
-    expect(screen.getByText('版本变化')).toBeInTheDocument();
-    expect(screen.getByText('押胜，保平')).toBeInTheDocument();
-    expect(screen.getByText('押负，保胜')).toBeInTheDocument();
-    expect(screen.getAllByText('chain-v1').length).toBeGreaterThan(0);
-    expect(screen.getByText('chain-v2')).toBeInTheDocument();
-    expect(screen.getAllByText('abcdef12').length).toBeGreaterThan(0);
-    expect(screen.getByText('fedcba98')).toBeInTheDocument();
-    const confirmButton = screen.getByRole('button', { name: '确认覆盖' });
-    expect(confirmButton).toBeEnabled();
-    expect(screen.getByText(/previous_active=active_26052_001/)).toBeInTheDocument();
-    await userEvent.click(confirmButton);
-    await waitFor(() => expect(confirmSpy).toHaveBeenCalledWith('bjdc_26052_001'));
-    expect(await screen.findByText(/确认完成，active=draft_26052_001/)).toBeInTheDocument();
-    await waitFor(() => expect(getDashboardSpy).toHaveBeenCalledTimes(4));
+    expect(screen.queryByText(/Active \/ Draft 对比/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '确认覆盖' })).not.toBeInTheDocument();
   });
 
   it('keeps the last successful dashboard visible when a real refresh fails', async () => {
@@ -716,6 +800,14 @@ describe('北单实盘决策台 v1', () => {
         matches: [],
         source: { kind: 'sqlite', provider: '500.com', tables: ['matches'] },
       },
+      '/api/issues/26052/decision-artifacts/status': {
+        issue: '26052',
+        variant_id: 'active_v3.3.3',
+        status: 'missing',
+        expected_count: 0,
+        row_count: 0,
+        missing_match_idxs: [],
+      },
     };
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input).replace('http://api.test', '');
@@ -726,9 +818,10 @@ describe('北单实盘决策台 v1', () => {
     const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
     await expect(adapter.getDashboardShell('26052')).resolves.toMatchObject({ issue: { issueId: '26052' } });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(fetchMock).toHaveBeenNthCalledWith(1, 'http://api.test/api/issues?limit=120&include_replay=0');
     expect(fetchMock).toHaveBeenNthCalledWith(2, 'http://api.test/api/issues/26052/dashboard?view=summary');
+    expect(fetchMock).toHaveBeenNthCalledWith(3, 'http://api.test/api/issues/26052/decision-artifacts/status');
   });
 
   it('fetch mode calls canonical API paths and transforms minimal snake_case payloads', async () => {
@@ -780,7 +873,7 @@ describe('北单实盘决策台 v1', () => {
       },
       '/api/issues/26052/settlement': {
         issue: '26052', settled_ts: '2026-06-30T10:15:00+08:00', n_tickets: 1, n_hits: 0, n_legs_total: 1, n_legs_hit: 0, n_legs_missed_by_1: 1, total_stake: 20, total_payout: 45, pnl: 25, roi: 1.25, quality_review: 'ok', per_match_settlements: [{ match_id: 'bjdc_26052_001', result_code: '0', winning_sp: 3.55, selected_by_arms: ['current'], arm_hits: { current: false }, sp_drift: -0.05 }],
-        postmatch_review_issue_summary: { issue: '26052', review_version: 'v2_active_llm_snapshot_tags', reviewed_at: '2026-06-30 10:15:00', n_reviews: 9, stake: 32, gross_return: 42.64, profit: 10.64, roi: 0.3325, primary_hits: 5, protect_hits: 3, coverage_hits: 8, stopped_correct: 0, stopped_wrong: 0, tag_counts: { missed_draw: 2, uncovered_result: 1, uncovered_high_prob_alt: 1 } },
+        postmatch_review_issue_summary: { issue: '26052', review_version: 'v3_decision_variant_active_v3_3_3_tags', decision_variant_id: 'active_v3.3.3', reviewed_at: '2026-06-30 10:15:00', n_reviews: 9, stake: 32, gross_return: 42.64, profit: 10.64, roi: 0.3325, primary_hits: 5, protect_hits: 3, coverage_hits: 8, stopped_correct: 0, stopped_wrong: 0, tag_counts: { missed_draw: 2, uncovered_result: 1, uncovered_high_prob_alt: 1 } },
         postmatch_reviews: [{ issue: '26052', match_idx: 8, match_id: '26052_008', league: '女欧', home: '比利时', away: '塞内加尔', kickoff_ts: '2026-06-30T23:30:00+08:00', score: '1:1', halftime_score: '0:0', result_code: '1', result_label: '平', winning_sp: 2.95, llm_selection_codes: ['3'], llm_judgment: '押胜', outcome_label: '未中', primary_hit: false, protect_hit: false, coverage_hit: false, stopped: false, stake: 2, gross_return: 0, profit: -2, roi: -1, tags: ['missed_draw', 'uncovered_result', 'uncovered_high_prob_alt'], review_summary: '未命中：胜未覆盖实际平。', action_suggestion: '复查平局保护阈值。', reviewed_at: '2026-06-30 10:15:00' }],
       },
       '/api/strategies/lab': {
@@ -816,6 +909,33 @@ describe('北单实盘决策台 v1', () => {
         review: { source: 'sleeve_mix_issue_profit.csv', issues: [{ issue: '26051', issue_order: 1, calendar_year: 2026, issue_close_ts: '2026-05-02', arms: [{ arm_id: 'b384_dd32_smooth100', stake_units: 384, profit_units: -10, roi: -0.1, tickets: 1, hits: 0, parts: 'current:256', state: 'static', allocation: 'same_ticket4_full_risk=96' }] }] },
         source: { main_strategy_dir: 'main', ticket_pool_dir: 'pool', model_db: 'model.sqlite', live_db: 'live.sqlite', no_future_leakage: 'historical only' },
       },
+      '/api/issues/26052/segment-betting-plan': {
+        schema_version: 'segment_betting_plan_v1',
+        issue: '26052',
+        mode: 'settled_replay_shadow_planning',
+        requested_decision_variant_id: '',
+        requested_planning_scope: 'by_segment',
+        requested_decision_time: '',
+        selected_plan_id: '26052_v3.3.3_b1000_seed20260707',
+        availability_status: 'available',
+        notice: 'settled replay only',
+        source: { artifact_key: 'segment_betting_plan_dir', artifact_dir: 'results/segment_betting_plan' },
+        strategy_family: 'segment_betting_plan',
+        betting_strategy_version: 'segment_betting_v0.4.0000',
+        artifact_schema_version: 'segment_betting_artifact_v1',
+        planning_scope: 'by_segment',
+        artifact_planning_scope: 'next_segment',
+        decision_time: '',
+        available_segments: 2,
+        sp_drift_risk: { accepted: false, level: 'low', reason: 'next segment only' },
+        selection_binding: { match_selection_source: 'issue_board_same_decision_variant', frontend_display_source: 'issue_board', refresh_policy: 'match directions follow issue board artifact refresh' },
+        available_plans: [{ plan_id: '26052_v3.3.3_b1000_seed20260707', label: 'v3.3.3', decision_variant_id: 'active_v3.3.3', strategy_family: 'segment_betting_plan', betting_strategy_version: 'segment_betting_v0.4.0000', artifact_schema_version: 'segment_betting_artifact_v1', planning_scope: 'by_segment', artifact_planning_scope: 'next_segment', decision_time: '', stake_mode: 'scale_to_budget', available_segments: 2, sp_drift_risk_accepted: false, sp_drift_risk_level: 'low', arm: 'shadow', segment_budget_yuan: 1000, sample_seed: 20260707, selected_bundles: 1, base_cost_yuan: 32, stake_multiplier_units: 2, selected_cost_yuan: 64, profit_yuan: 128, roi: 2 }],
+        selected_plan: { plan_id: '26052_v3.3.3_b1000_seed20260707', label: 'v3.3.3', decision_variant_id: 'active_v3.3.3', strategy_family: 'segment_betting_plan', betting_strategy_version: 'segment_betting_v0.4.0000', artifact_schema_version: 'segment_betting_artifact_v1', planning_scope: 'by_segment', artifact_planning_scope: 'next_segment', decision_time: '', stake_mode: 'scale_to_budget', available_segments: 2, sp_drift_risk_accepted: false, sp_drift_risk_level: 'low', arm: 'shadow', segment_budget_yuan: 1000, sample_seed: 20260707, selected_bundles: 1, base_cost_yuan: 32, stake_multiplier_units: 2, selected_cost_yuan: 64, profit_yuan: 128, roi: 2 },
+        settings: { planning_scope: 'by_segment', decision_time: '', stake_mode: 'scale_to_budget', window_hours: 12, segment_budget_yuan: 1000, sample_seed: 20260707, min_n: 3, max_n: 8, max_bundle_spend_pct: 0.4, positive_ev_only: true, betting_strategy_version: 'segment_betting_v0.4.0000' },
+        summary: { segments: 1, selected_segments: 1, dead_segments: 0, selected_bundles: 1, base_cost_yuan: 32, stake_multiplier_units: 2, selected_cost_yuan: 64, payout_yuan: 192, profit_yuan: 128, roi: 2 },
+        segments: [{ segment_idx: 1, arm: 'shadow', planning_scope: 'by_segment', artifact_planning_scope: 'next_segment', hours_from_decision_start: 2, hours_from_decision_end: 14, sp_drift_risk_accepted: false, sp_drift_risk_level: 'low', sp_drift_risk_reason: 'next segment only', stake_mode: 'scale_to_budget', segment_start: '2026-06-30 18:00', segment_end: '2026-07-01 06:00', window_hours: 12, eligible_matches: 8, expected_coverage_hit_rate: 0.7, actual_coverage_hits: 7, actual_coverage_hit_rate: 0.875, recommended_n: 5, selected_bundles: 1, candidate_bundles: 12, base_cost_yuan: 32, stake_multiplier_units: 2, selected_cost_yuan: 64, segment_budget_yuan: 1000, profit_yuan: 128, roi: 2, dead_segment: false, reasons: ['budget_coverage_ok'], match_indices: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        bundles: [{ segment_idx: 1, bundle_idx: 7, arm: 'shadow', n_value: 5, match_indices: [1, 2, 3, 4, 5], leg_codes: ['3+1', '0', '3', '1+0', '3+0'], widths: [2, 1, 1, 2, 2], stake_multiplier: 2, cost_yuan: 16, scaled_cost_yuan: 32, expected_profit_yuan: 64, scaled_expected_profit_yuan: 128, expected_roi: 4, hit_prob: 0.12, realized_hit: true, payout_yuan: 80, scaled_payout_yuan: 160, profit_yuan: 64, scaled_profit_yuan: 128 }],
+      },
       '/api/issues/26052/operations': {
         issue: '26052',
         generated_at: '2026-07-03 00:50:00',
@@ -845,9 +965,9 @@ describe('北单实盘决策台 v1', () => {
         },
         sources: [{ source_name: 'issue_html', status: 'ok', last_attempt_at: '2026-07-02 16:44:27', last_success_at: '2026-07-02 16:44:27', age_minutes: 8, ok_count: 10, fail_count: 0, total_attempts: 10, rows_parsed: 140 }],
         snapshots: { active_count: 14, draft_replacement_count: 1, superseded_count: 0, pending_drafts: [{ match_idx: 8, match_id: '26052_008', generated_at: '2026-07-02 22:47:13', checked_at: '2026-07-02 22:47:13' }] },
-        review: { review_version: 'v2_active_llm_snapshot_tags', settled_match_count: 9, reviewed_match_count: 8, unreviewed_settled_count: 1, latest_review_at: '2026-07-03 00:45:00', unreviewed_matches: [{ match_idx: 4, match_id: '26052_004', label: '水原 vs 浦项', result_label: '平', winning_sp: 3.05 }], task: { run_id: 'pmr_26052_test', issue: '26052', mode: 'postmatch_review_v1', status: 'dry_run', dry_run: true, requested_by: 'test', started_at: '2026-07-03 00:49:00', finished_at: '2026-07-03 00:49:01', elapsed_sec: 0.9, trigger_endpoint: 'POST /api/issues/26052/postmatch-review?dry_run=1', command: ['python3'], result: { would_insert: 1, inserted: 0, coverage_hits: 8, profit: 10.64 } } },
+        review: { review_version: 'v3_decision_variant_active_v3_3_3_tags', settled_match_count: 9, reviewed_match_count: 8, unreviewed_settled_count: 1, latest_review_at: '2026-07-03 00:45:00', unreviewed_matches: [{ match_idx: 4, match_id: '26052_004', label: '水原 vs 浦项', result_label: '平', winning_sp: 3.05 }], task: { run_id: 'pmr_26052_test', issue: '26052', mode: 'postmatch_review_v1', status: 'dry_run', dry_run: true, requested_by: 'test', started_at: '2026-07-03 00:49:00', finished_at: '2026-07-03 00:49:01', elapsed_sec: 0.9, trigger_endpoint: 'POST /api/issues/26052/postmatch-review?dry_run=1', command: ['python3'], result: { would_insert: 1, inserted: 0, coverage_hits: 8, profit: 10.64 } } },
         workflow: { run_id: 'wf_26052_test', issue: '26052', mode: 'live_day_refresh_v1', status: 'dry_run', dry_run: true, requested_by: 'test', started_at: '2026-07-03 00:50:00', finished_at: '2026-07-03 00:50:01', elapsed_sec: 1.2, trigger_endpoint: 'POST /api/issues/26052/live-workflow?dry_run=1', steps: [{ step_idx: 1, step_key: 'monitor_500_nowscore', label: '刷新 500/捷报/赛果/SP', status: 'planned', command: ['python3'], elapsed_sec: 0.1 }] },
-        versions: { schema_version: 'decision_versions_v1', prob_model_version: 'prob-v1', q_model_version: 'q-v1', decision_chain_version: 'chain-v1', decision_prompt_version: 'prompt-v1', decision_model_version: 'model-v1', review_tag_version: 'review-v1', review_version: 'v2_active_llm_snapshot_tags', decision_config_hash: 'abcdef123456', config_path: 'config/decision_versions.json' },
+        versions: { schema_version: 'decision_versions_v1', prob_model_version: 'prob-v1', q_model_version: 'q-v1', decision_chain_version: 'chain-v1', decision_prompt_version: 'prompt-v1', decision_model_version: 'model-v1', review_tag_version: 'review-v1', review_version: 'v3_decision_variant_active_v3_3_3_tags', decision_config_hash: 'abcdef123456', config_path: 'config/decision_versions.json' },
         warnings: [{ code: 'draft_replacement_pending', severity: 'warn', label: '1 条 draft 待确认', detail: 'manual confirm required' }],
         source: { sqlite_db: 'redacted', tables: ['matches', 'fetch_log'] },
       },
@@ -883,6 +1003,7 @@ describe('北单实盘决策台 v1', () => {
     await expect(adapter.getStrategyLab()).resolves.toMatchObject({ arms: [{ armId: 'current', maxDrawdown: -0.16 }, { armId: 'challenger', maxDrawdown: -0.08 }], annualPerformance: [{ armId: 's1', year: 2024, totalStake: 100 }, { armId: 's2', year: 2024, totalStake: 110 }] });
     await expect(adapter.getSelectorShadow('26052')).resolves.toMatchObject({ issueId: '26052', ruleName: 'rule_x', currentDecision: { chosenArm: 'selector' }, recentDecisions: [{ outcome: 'helped' }] });
     await expect(adapter.getMainStrategy('26052')).resolves.toMatchObject({ issueId: '26052', candidates: [{ armId: 'b384_dd32_smooth100' }], evPool: { tickets: [{ ticketId: 't1', legs: [{ selectionLabel: '负', hit: false }] }] }, riskState: { recommendedArm: 'b384_dd32_smooth100' } });
+    await expect(adapter.getSegmentBettingPlan('26052')).resolves.toMatchObject({ issueId: '26052', bettingStrategyVersion: 'segment_betting_v0.4.0000', planningScope: 'by_segment', artifactPlanningScope: 'next_segment', spDriftRisk: { accepted: false, level: 'low' }, selectedPlanId: '26052_v3.3.3_b1000_seed20260707', selectedPlan: { stakeMode: 'scale_to_budget', baseCostYuan: 32, stakeMultiplierUnits: 2, artifactPlanningScope: 'next_segment' }, settings: { stakeMode: 'scale_to_budget', maxBundleSpendPct: 0.4 }, selectionBinding: { frontendDisplaySource: 'issue_board' }, summary: { baseCostYuan: 32, stakeMultiplierUnits: 2, selectedCostYuan: 64, profitYuan: 128 }, segments: [{ recommendedN: 5, planningScope: 'by_segment', spDriftRiskAccepted: false, stakeMode: 'scale_to_budget', baseCostYuan: 32, stakeMultiplierUnits: 2 }], bundles: [{ realizedHit: true, legCodes: ['3+1', '0', '3', '1+0', '3+0'], stakeMultiplier: 2, scaledCostYuan: 32, scaledProfitYuan: 128 }] });
     await expect(adapter.getOperationsStatus('26052')).resolves.toMatchObject({ issueId: '26052', runtime: { apiPort: '', frontendPort: '', publicDiagnostics: false, accessMode: 'local_only', health: { hostSmokeCount: 1, hostSmokeOkCount: 1, operations: { workflowStatus: 'dry_run', reviewTaskStatus: 'dry_run' } } }, snapshots: { draftReplacementCount: 1, pendingDrafts: [{ matchId: '26052_008' }] }, review: { unreviewedSettledCount: 1, task: { runId: 'pmr_26052_test', status: 'dry_run', result: { wouldInsert: 1, profit: 10.64 } } }, workflow: { runId: 'wf_26052_test', status: 'dry_run', dryRun: true, steps: [{ stepKey: 'monitor_500_nowscore' }] }, versions: { decisionConfigHash: 'abcdef123456' } });
     await expect(adapter.confirmDecisionSnapshot('bjdc_26052_001')).resolves.toMatchObject({ action: 'confirmed_override', confirmedAt: '2026-06-30 14:42', active: { snapshotId: 'draft_26052_001', status: 'active', confirmedAt: '2026-06-30 14:42', supersedesSnapshotId: 'active_26052_001' }, previousActive: { snapshotId: 'active_26052_001', supersededAt: '2026-06-30 14:42' } });
     await expect(adapter.runPostmatchReview('26052', true)).resolves.toMatchObject({ runId: 'pmr_26052_dry', status: 'dry_run', result: { wouldInsert: 1, profit: 10.64 } });
@@ -895,9 +1016,52 @@ describe('北单实盘决策台 v1', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(6, 'http://api.test/api/strategies/lab');
     expect(fetchMock).toHaveBeenNthCalledWith(7, 'http://api.test/api/issues/26052/selector-shadow');
     expect(fetchMock).toHaveBeenNthCalledWith(8, 'http://api.test/api/issues/26052/main-strategy');
-    expect(fetchMock).toHaveBeenNthCalledWith(9, 'http://api.test/api/issues/26052/operations');
-    expect(fetchMock).toHaveBeenNthCalledWith(10, 'http://api.test/api/matches/bjdc_26052_001/decision-snapshot/confirm', { method: 'POST', headers: { 'X-Beidan-Operator-Token': 'test-token' } });
-    expect(fetchMock).toHaveBeenNthCalledWith(11, 'http://api.test/api/issues/26052/postmatch-review?dry_run=1', { method: 'POST', headers: { 'X-Beidan-Operator-Token': 'test-token' } });
+    expect(fetchMock).toHaveBeenNthCalledWith(9, 'http://api.test/api/issues/26052/segment-betting-plan');
+    expect(fetchMock).toHaveBeenNthCalledWith(10, 'http://api.test/api/issues/26052/operations');
+    expect(fetchMock).toHaveBeenNthCalledWith(11, 'http://api.test/api/matches/bjdc_26052_001/decision-snapshot/confirm', { method: 'POST', headers: { 'X-Beidan-Operator-Token': 'test-token' } });
+    expect(fetchMock).toHaveBeenNthCalledWith(12, 'http://api.test/api/issues/26052/postmatch-review?dry_run=1', { method: 'POST', headers: { 'X-Beidan-Operator-Token': 'test-token' } });
+  });
+
+	  it('passes segment betting scope controls to the API', async () => {
+	    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+	      const url = String(input).replace('http://api.test', '');
+	      expect(url).toBe('/api/issues/26052/segment-betting-plan?decision_variant=active_v3.3.3&planning_scope=entire_issue&segment_budget_yuan=1000&stake_mode=scale_to_budget');
+	      return {
+	        ok: true,
+	        json: async () => ({
+	          issue: '26052',
+	          requested_decision_variant_id: 'active_v3.3.3',
+	          requested_planning_scope: 'entire_issue',
+	          requested_segment_budget_yuan: 1000,
+	          requested_stake_mode: 'scale_to_budget',
+	          selected_plan_id: 'planA',
+	          availability_status: 'available',
+	          planning_scope: 'entire_issue',
+	          sp_drift_risk: { accepted: true, level: 'elevated', reason: 'remaining issue selected' },
+	          source: {},
+          available_plans: [],
+          settings: {},
+          summary: {},
+          segments: [],
+          bundles: [],
+        }),
+      } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+	    const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
+	    await expect(adapter.getSegmentBettingPlan('26052', 'active_v3.3.3', undefined, {
+	      planningScope: 'entire_issue',
+	      segmentBudgetYuan: 1000,
+	      stakeMode: 'scale_to_budget',
+	    })).resolves.toMatchObject({
+	      issueId: '26052',
+	      requestedPlanningScope: 'entire_issue',
+	      requestedSegmentBudgetYuan: 1000,
+	      requestedStakeMode: 'scale_to_budget',
+	      planningScope: 'entire_issue',
+	      spDriftRisk: { accepted: true, level: 'elevated' },
+	    });
   });
 
   it('dashboard aggregate passes the selected decision variant to versioned API endpoints', async () => {
@@ -905,41 +1069,41 @@ describe('北单实盘决策台 v1', () => {
       '/api/issues?limit=120': {
         issues: [{ issue: '26052', label: '26052', status: 'current', is_current: true, has_settlement: false, is_fully_settled: false, match_count: 1 }],
       },
-      '/api/issues/26052/dashboard?decision_variant=shadow_v3.3.3': {
+      '/api/issues/26052/dashboard?decision_variant=active_v3.3.3': {
         issue: '26052',
         status: 'open',
         stats: { n_matches: 1 },
-        matches: [{ match_id: 'bjdc_26052_001', issue: '26052', selected_decision_variant_id: 'shadow_v3.3.3' }],
+        matches: [{ match_id: 'bjdc_26052_001', issue: '26052', selected_decision_variant_id: 'active_v3.3.3' }],
         strategy_version_context: {
           schema_version: 'strategy_version_context_v1',
-          requested_variant_id: 'shadow_v3.3.3',
-          selected_variant_id: 'shadow_v3.3.3',
+          requested_variant_id: 'active_v3.3.3',
+          selected_variant_id: 'active_v3.3.3',
           selection_status: 'ok',
-          available_variant_ids: ['active_v3', 'shadow_v3.3.3'],
+          available_variant_ids: ['active_v3', 'active_v3.3.3'],
           options: [
             { variant_id: 'active_v3', kind: 'active', label: 'v3', version: 'llm_chain_bet_protect_stop_v3', source: 'active_snapshot', is_default: false },
-            { variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv', artifact_key: 'shadow_v3_3_3', is_default: true },
+            { variant_id: 'active_v3.3.3', kind: 'shadow', label: '正式版 v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv', artifact_key: 'shadow_v3_3_3', is_default: true },
           ],
         },
       },
-      '/api/matches/bjdc_26052_001?decision_variant=shadow_v3.3.3': {
-        match: { match_id: 'bjdc_26052_001', issue: '26052', selected_decision_variant_id: 'shadow_v3.3.3' },
+      '/api/matches/bjdc_26052_001?decision_variant=active_v3.3.3': {
+        match: { match_id: 'bjdc_26052_001', issue: '26052', selected_decision_variant_id: 'active_v3.3.3' },
         prediction: {},
         strategy_version_context: {
           schema_version: 'strategy_version_context_v1',
-          requested_variant_id: 'shadow_v3.3.3',
-          selected_variant_id: 'shadow_v3.3.3',
+          requested_variant_id: 'active_v3.3.3',
+          selected_variant_id: 'active_v3.3.3',
           selection_status: 'ok',
-          available_variant_ids: ['active_v3', 'shadow_v3.3.3'],
-          options: [{ variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv' }],
+          available_variant_ids: ['active_v3', 'active_v3.3.3'],
+          options: [{ variant_id: 'active_v3.3.3', kind: 'shadow', label: '正式版 v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv' }],
         },
       },
       '/api/issues/26052/tickets?status=candidate': { issue: '26052', tickets: [] },
       '/api/issues/26052/signals': { issue: '26052', signals: [] },
-      '/api/issues/26052/settlement?decision_variant=shadow_v3.3.3': { issue: '26052', settled_ts: '', postmatch_reviews: [] },
+      '/api/issues/26052/settlement?decision_variant=active_v3.3.3': { issue: '26052', settled_ts: '', postmatch_reviews: [] },
       '/api/strategies/lab': { strategies: [] },
       '/api/issues/26052/selector-shadow': { issue: '26052', rule_name: 'rule_x', current_decision: {}, arms: [], switch_attribution: [], rolling_stability: [], recent_decisions: [] },
-      '/api/issues/26052/main-strategy?decision_variant=shadow_v3.3.3': {
+      '/api/issues/26052/main-strategy?decision_variant=active_v3.3.3': {
         issue: '26052',
         candidates: [],
         annual_performance: [],
@@ -950,12 +1114,28 @@ describe('北单实盘决策台 v1', () => {
         source: {},
         strategy_version_context: {
           schema_version: 'strategy_version_context_v1',
-          requested_variant_id: 'shadow_v3.3.3',
-          selected_variant_id: 'shadow_v3.3.3',
+          requested_variant_id: 'active_v3.3.3',
+          selected_variant_id: 'active_v3.3.3',
           selection_status: 'ok',
-          available_variant_ids: ['active_v3', 'shadow_v3.3.3'],
-          options: [{ variant_id: 'shadow_v3.3.3', kind: 'shadow', label: 'shadow v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv' }],
+          available_variant_ids: ['active_v3', 'active_v3.3.3'],
+          options: [{ variant_id: 'active_v3.3.3', kind: 'shadow', label: '正式版 v3.3.3', version: 'llm_chain_bet_protect_stop_v3.3.3_shadow', source: 'structured_shadow_csv' }],
         },
+      },
+      '/api/issues/26052/segment-betting-plan?decision_variant=active_v3.3.3': {
+        schema_version: 'segment_betting_plan_v1',
+        issue: '26052',
+        mode: 'settled_replay_shadow_planning',
+        requested_decision_variant_id: 'active_v3.3.3',
+        selected_plan_id: '26052_v3.3.3_b1000_seed20260707',
+        availability_status: 'available',
+        notice: 'settled replay only',
+        source: { artifact_key: 'segment_betting_plan_dir', artifact_dir: 'results/segment_betting_plan' },
+        available_plans: [{ plan_id: '26052_v3.3.3_b1000_seed20260707', label: 'v3.3.3', decision_variant_id: 'active_v3.3.3', arm: 'shadow', segment_budget_yuan: 1000, sample_seed: 20260707 }],
+        selected_plan: { plan_id: '26052_v3.3.3_b1000_seed20260707', label: 'v3.3.3', decision_variant_id: 'active_v3.3.3', arm: 'shadow', segment_budget_yuan: 1000, sample_seed: 20260707 },
+        settings: { segment_budget_yuan: 1000, sample_seed: 20260707 },
+        summary: { selected_bundles: 0, selected_cost_yuan: 0, profit_yuan: 0, roi: 0 },
+        segments: [],
+        bundles: [],
       },
       '/api/issues/26052/operations': { issue: '26052', issue_status: {}, runtime: {}, sources: [], snapshots: {}, review: {}, versions: {}, warnings: [], source: {} },
     };
@@ -967,16 +1147,18 @@ describe('北单实盘决策台 v1', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
-    await expect(adapter.getDashboardData('26052', undefined, 'shadow_v3.3.3')).resolves.toMatchObject({
-      issue: { strategyVersionContext: { selectedVariantId: 'shadow_v3.3.3' } },
-      matchDetail: { strategyVersionContext: { selectedVariantId: 'shadow_v3.3.3' } },
-      mainStrategy: { strategyVersionContext: { selectedVariantId: 'shadow_v3.3.3' } },
+    await expect(adapter.getDashboardData('26052', undefined, 'active_v3.3.3')).resolves.toMatchObject({
+      issue: { strategyVersionContext: { selectedVariantId: 'active_v3.3.3' } },
+      matchDetail: { strategyVersionContext: { selectedVariantId: 'active_v3.3.3' } },
+      mainStrategy: { strategyVersionContext: { selectedVariantId: 'active_v3.3.3' } },
+      segmentBettingPlan: { requestedDecisionVariantId: 'active_v3.3.3' },
     });
 
-    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/dashboard?decision_variant=shadow_v3.3.3');
-    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/matches/bjdc_26052_001?decision_variant=shadow_v3.3.3');
-    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/settlement?decision_variant=shadow_v3.3.3');
-    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/main-strategy?decision_variant=shadow_v3.3.3');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/dashboard?decision_variant=active_v3.3.3');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/matches/bjdc_26052_001?decision_variant=active_v3.3.3');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/settlement?decision_variant=active_v3.3.3');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/main-strategy?decision_variant=active_v3.3.3');
+    expect(fetchMock).toHaveBeenCalledWith('http://api.test/api/issues/26052/segment-betting-plan?decision_variant=active_v3.3.3');
     expect(fetchMock).not.toHaveBeenCalledWith('http://api.test/api/issues/26052/dashboard');
   });
 
@@ -991,6 +1173,7 @@ describe('北单实盘决策台 v1', () => {
         '/api/issues/26052/signals': { issue: '26052', signals: [] },
         '/api/issues/26052/selector-shadow': { issue: '26052', rule_name: 'rule_x', current_decision: {}, arms: [], switch_attribution: [], rolling_stability: [], recent_decisions: [] },
         '/api/issues/26052/main-strategy': { issue: '26052', candidates: [], annual_performance: [], ev_pool: { tickets: [] }, risk_state: { cooldown: {}, budget: {} }, diagnostics: {}, review: { issues: [] }, source: {} },
+        '/api/issues/26052/segment-betting-plan': { issue: '26052', availability_status: 'missing', source: {}, available_plans: [], settings: {}, summary: {}, segments: [], bundles: [] },
         '/api/issues/26052/operations': { issue: '26052', issue_status: {}, runtime: {}, sources: [], snapshots: {}, review: {}, versions: {}, warnings: [], source: {} },
         '/api/strategies/lab': { strategies: [] },
       };
@@ -1017,6 +1200,7 @@ describe('北单实盘决策台 v1', () => {
         '/api/issues/26099/settlement': { issue: '26099', settled_ts: '2026-06-30T10:15:00+08:00' },
         '/api/issues/26099/selector-shadow': { issue: '26099', rule_name: 'rule_x', current_decision: {}, arms: [], switch_attribution: [], rolling_stability: [], recent_decisions: [] },
         '/api/issues/26099/main-strategy': { issue: '26099', candidates: [], annual_performance: [], ev_pool: { tickets: [] }, risk_state: { cooldown: {}, budget: {} }, diagnostics: {}, review: { issues: [] }, source: {} },
+        '/api/issues/26099/segment-betting-plan': { issue: '26099', availability_status: 'missing', source: {}, available_plans: [], settings: {}, summary: {}, segments: [], bundles: [] },
         '/api/issues/26099/operations': { issue: '26099', issue_status: {}, runtime: {}, sources: [], snapshots: {}, review: {}, versions: {}, warnings: [], source: {} },
         '/api/strategies/lab': { strategies: [] },
       };

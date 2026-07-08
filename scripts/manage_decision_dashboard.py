@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import http.cookiejar
 import json
 import os
 import re
@@ -10,6 +11,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,6 +27,7 @@ FRONTEND_LOG = RUNTIME_DIR / "decision_dashboard_vite.log"
 FRONTEND_BUILD_LOG = RUNTIME_DIR / "decision_dashboard_build.log"
 SCORE_REFRESH_LOG = RUNTIME_DIR / "live_score_refresh.log"
 SP_REFRESH_LOG = RUNTIME_DIR / "live_sp_refresh.log"
+ARTIFACT_REFRESH_LOG = RUNTIME_DIR / "live_artifact_refresh.log"
 DEFAULT_API_PORT = int(os.environ.get("BEIDAN_DECISION_API_PORT", "8790"))
 DEFAULT_FRONTEND_PORT = int(os.environ.get("BEIDAN_DASHBOARD_FRONTEND_PORT", "4173"))
 DEFAULT_API_HOST = os.environ.get("BEIDAN_DECISION_API_HOST", "127.0.0.1")
@@ -32,6 +35,7 @@ DEFAULT_FRONTEND_HOST = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_HOST", "127.0.
 DEFAULT_FRONTEND_MODE = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_MODE", "api-static")
 DEFAULT_SCORE_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_SCORE_REFRESH_INTERVAL", "120"))
 DEFAULT_SP_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_SP_REFRESH_INTERVAL", "900"))
+DEFAULT_ARTIFACT_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_ARTIFACT_REFRESH_INTERVAL", "300"))
 ENV_FILES = (
     Path.home() / ".config/beidanlot/webui.env",
     Path.home() / ".config/beidanlot/decision_dashboard.env",
@@ -100,6 +104,8 @@ def _service_name_for_pid(pid: int) -> str:
         return "score_refresh"
     if "scripts/live_sp_refresh_loop.py" in cmdline and cwd == ROOT.resolve():
         return "sp_refresh"
+    if "scripts/live_artifact_refresh_loop.py" in cmdline and cwd == ROOT.resolve():
+        return "artifact_refresh"
     return ""
 
 
@@ -226,10 +232,15 @@ def _http_probe(url: str, *, host_header: str | None = None, timeout_sec: float 
         }
 
 
-def _json_probe(url: str, *, timeout_sec: float = 5.0) -> dict[str, Any]:
+def _json_probe(
+    url: str,
+    *,
+    timeout_sec: float = 5.0,
+    opener: urllib.request.OpenerDirector | None = None,
+) -> dict[str, Any]:
     started = time.monotonic()
     request = urllib.request.Request(url, headers={"User-Agent": "beidan-decision-dashboard-health/1.0"})
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    opener = opener or urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
         with opener.open(request, timeout=timeout_sec) as response:
             raw = response.read()
@@ -259,6 +270,32 @@ def _json_probe(url: str, *, timeout_sec: float = 5.0) -> dict[str, Any]:
             "error": f"{type(exc).__name__}: {exc}",
             "json": {},
         }
+
+
+def _dashboard_gate_pass() -> str:
+    env = _service_env()
+    return (env.get("BEIDAN_DASHBOARD_GATE_PASS") or env.get("BEIDAN_GATE_PASS") or "").strip()
+
+
+def _gate_authenticated_opener(api_local_url: str, *, timeout_sec: float = 5.0) -> urllib.request.OpenerDirector | None:
+    gate_pass = _dashboard_gate_pass()
+    if not gate_pass:
+        return None
+    cookie_jar = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), urllib.request.HTTPCookieProcessor(cookie_jar))
+    body = urllib.parse.urlencode({"passphrase": gate_pass}).encode("utf-8")
+    request = urllib.request.Request(
+        f"{api_local_url}/gate",
+        data=body,
+        headers={"User-Agent": "beidan-decision-dashboard-health/1.0"},
+        method="POST",
+    )
+    try:
+        with opener.open(request, timeout=timeout_sec) as response:
+            response.read(128)
+    except Exception:
+        return None
+    return opener
 
 
 def _tailscale_ip() -> str:
@@ -404,7 +441,26 @@ def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
         "--timeout",
         str(max(25, int(args.timeout * 6))),
     ]
-    operations_probe = _json_probe(f"{urls['api_local']}/api/issues/current/operations", timeout_sec=args.timeout)
+    artifact_refresh_command = [
+        sys.executable,
+        str(ROOT / "scripts/live_artifact_refresh_loop.py"),
+        "--db",
+        str(ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"),
+        "--issue",
+        "current",
+        "--interval",
+        str(args.artifact_refresh_interval),
+        "--timeout",
+        "300",
+        "--max-refresh-age-minutes",
+        str(args.artifact_refresh_max_sp_age_minutes),
+    ]
+    gate_opener = _gate_authenticated_opener(urls["api_local"], timeout_sec=args.timeout)
+    operations_probe = _json_probe(
+        f"{urls['api_local']}/api/issues/current/operations",
+        timeout_sec=args.timeout,
+        opener=gate_opener,
+    )
     operations_json = operations_probe.get("json") if isinstance(operations_probe.get("json"), dict) else {}
     workflow = operations_json.get("workflow") if isinstance(operations_json, dict) else {}
     review = operations_json.get("review") if isinstance(operations_json, dict) else {}
@@ -440,6 +496,16 @@ def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "open_limit": args.sp_refresh_open_limit,
             },
         ),
+        "artifact_refresh": _process_snapshot(
+            "artifact_refresh",
+            artifact_refresh_command,
+            ARTIFACT_REFRESH_LOG,
+            {
+                "interval_sec": args.artifact_refresh_interval,
+                "enabled": not args.no_artifact_refresh,
+                "max_sp_age_minutes": args.artifact_refresh_max_sp_age_minutes,
+            },
+        ),
         "health": {
             "api": _http_probe(urls["api_health"], timeout_sec=args.timeout),
             "frontend_local": _http_probe(urls["frontend_local"], timeout_sec=args.timeout),
@@ -458,6 +524,7 @@ def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
             "frontend_build": str(FRONTEND_BUILD_LOG),
             "score_refresh": str(SCORE_REFRESH_LOG),
             "sp_refresh": str(SP_REFRESH_LOG),
+            "artifact_refresh": str(ARTIFACT_REFRESH_LOG),
         },
     }
     return payload
@@ -601,6 +668,37 @@ def _start_sp_refresh(args: argparse.Namespace) -> None:
         )
 
 
+def _start_artifact_refresh(args: argparse.Namespace) -> None:
+    if args.no_artifact_refresh or _known_process_pids("artifact_refresh"):
+        return
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    command = [
+        sys.executable,
+        str(ROOT / "scripts/live_artifact_refresh_loop.py"),
+        "--db",
+        str(ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"),
+        "--issue",
+        "current",
+        "--interval",
+        str(args.artifact_refresh_interval),
+        "--timeout",
+        "300",
+        "--max-refresh-age-minutes",
+        str(args.artifact_refresh_max_sp_age_minutes),
+    ]
+    with ARTIFACT_REFRESH_LOG.open("ab") as log:
+        subprocess.Popen(
+            command,
+            cwd=ROOT,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+
+
 def _tailscale_serve_target(args: argparse.Namespace) -> str:
     port = args.api_port if args.frontend_mode == "api-static" else args.frontend_port
     return f"http://127.0.0.1:{port}"
@@ -660,6 +758,7 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
     _start_frontend(args)
     _start_score_refresh(args)
     _start_sp_refresh(args)
+    _start_artifact_refresh(args)
     _wait_for_start(args)
     cache_warmup = _warm_api_cache(args)
     tailscale_serve = _configure_tailscale_serve(args)
@@ -672,7 +771,7 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
 
 def command_stop(args: argparse.Namespace) -> dict[str, Any]:
     stopped: list[dict[str, Any]] = []
-    for service in ("sp_refresh", "score_refresh"):
+    for service in ("artifact_refresh", "sp_refresh", "score_refresh"):
         for pid in _known_process_pids(service):
             stopped.append({"service": service, "pid": pid})
             _terminate_pid(pid)
@@ -719,6 +818,9 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sp-refresh-recent-count", type=int, default=4)
     parser.add_argument("--sp-refresh-open-limit", type=int, default=12)
     parser.add_argument("--no-sp-refresh", action="store_true")
+    parser.add_argument("--artifact-refresh-interval", type=float, default=DEFAULT_ARTIFACT_REFRESH_INTERVAL)
+    parser.add_argument("--artifact-refresh-max-sp-age-minutes", type=float, default=90.0)
+    parser.add_argument("--no-artifact-refresh", action="store_true")
     return parser
 
 

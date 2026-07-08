@@ -30,7 +30,7 @@
   },
   "review_tags": {
     "version": "postmatch_tags_v2",
-    "review_version": "v2_active_llm_snapshot_tags",
-    "description": "Post-match attribution tags bound to active LLM decision snapshots."
+    "review_version": "v3_decision_variant_active_v3_3_3_tags",
+    "description": "Post-match attribution tags bound to the selected decision-chain variant."
   }
 }

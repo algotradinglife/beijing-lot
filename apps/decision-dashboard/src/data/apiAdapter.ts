@@ -1,6 +1,6 @@
 import { mockDashboardData } from './mockData';
 import { DEFAULT_DECISION_VARIANT_ID } from '../decisionVariants';
-import type { CandidateRole, CoverageType, DashboardData, DecisionSnapshotConfirmResult, DecisionSnapshotData, DecisionVariantData, DecisionVariantOption, IssueDashboardData, IssueMatchRow, IssueOption, LiveSignalsData, MainStrategyData, MatchDetailData, OddsConsensus, OperationsStatusData, PostmatchReviewData, ScrapeStatus, SelectorShadowData, SettlementData, StrategyLabData, StrategyVersionContext, TicketData } from './types';
+import type { CandidateRole, CoverageType, DashboardData, DecisionArtifactCompleteness, DecisionArtifactGenerateResult, DecisionArtifactStatusData, DecisionSnapshotConfirmResult, DecisionSnapshotData, DecisionVariantData, DecisionVariantOption, IssueDashboardData, IssueMatchRow, IssueOption, LiveSignalsData, MainStrategyData, MatchDetailData, OddsConsensus, OperationsStatusData, PostmatchReviewData, ScrapeStatus, SegmentBettingPlanData, SelectorShadowData, SettlementData, StrategyLabData, StrategyVersionContext, TicketData } from './types';
 
 export type AdapterMode = 'mock' | 'fetch';
 
@@ -8,6 +8,7 @@ type ApiObject = Record<string, unknown>;
 
 type ApiMatchSummary = ApiObject & {
   match_id?: string;
+  match_idx?: number;
   issue?: string;
   league?: string;
   kickoff_ts?: string;
@@ -364,6 +365,68 @@ function transformDecisionSnapshotConfirm(raw: unknown): DecisionSnapshotConfirm
   };
 }
 
+function transformDecisionArtifactCompleteness(raw: unknown): DecisionArtifactCompleteness {
+  const obj = asObject(raw);
+  return {
+    issue: asString(obj.issue),
+    scope: asString(obj.scope),
+    complete: asBoolean(obj.complete),
+    expectedCount: asNumber(obj.expected_count, asNumber(obj.expectedCount)),
+    actualCount: asNumber(obj.actual_count, asNumber(obj.actualCount)),
+    expectedMatchIdx: asArray(obj.expected_match_idx ?? obj.expectedMatchIdx).map((value) => asNumber(value)).filter((value) => Number.isFinite(value)),
+    actualMatchIdx: asArray(obj.actual_match_idx ?? obj.actualMatchIdx).map((value) => asNumber(value)).filter((value) => Number.isFinite(value)),
+    missingMatchIdx: asArray(obj.missing_match_idx ?? obj.missingMatchIdx).map((value) => asNumber(value)).filter((value) => Number.isFinite(value)),
+    extraMatchIdx: asArray(obj.extra_match_idx ?? obj.extraMatchIdx).map((value) => asNumber(value)).filter((value) => Number.isFinite(value)),
+  };
+}
+
+function transformDecisionArtifactStatus(raw: unknown): DecisionArtifactStatusData {
+  const obj = asObject(raw);
+  const latestWorkflow = asObject(obj.latest_workflow ?? obj.latestWorkflow);
+  const latestGenerationStep = asObject(obj.latest_generation_step ?? obj.latestGenerationStep);
+  return {
+    issueId: asString(obj.issue, asString(obj.issueId)),
+    requestedVariantId: asString(obj.requested_variant_id, asString(obj.requestedVariantId)),
+    variantId: asString(obj.variant_id, asString(obj.variantId)),
+    artifactVariantId: asString(obj.artifact_variant_id, asString(obj.artifactVariantId)),
+    status: asString(obj.status),
+    message: asString(obj.message),
+    generationSupported: asBoolean(obj.generation_supported, asBoolean(obj.generationSupported)),
+    sourcePath: asString(obj.source_path, asString(obj.sourcePath)),
+    rowCount: asNumber(obj.row_count, asNumber(obj.rowCount)),
+    expectedMatchCount: asNumber(obj.expected_match_count, asNumber(obj.expectedMatchCount)),
+    completeness: transformDecisionArtifactCompleteness(obj.completeness),
+    snapshotCompleteness: transformDecisionArtifactCompleteness(obj.snapshot_completeness ?? obj.snapshotCompleteness),
+    latestWorkflow: Object.keys(latestWorkflow).length ? {
+      runId: asString(latestWorkflow.run_id, asString(latestWorkflow.runId)),
+      status: asString(latestWorkflow.status),
+      startedAt: asString(latestWorkflow.started_at, asString(latestWorkflow.startedAt)),
+      finishedAt: asString(latestWorkflow.finished_at, asString(latestWorkflow.finishedAt)),
+    } : undefined,
+    latestGenerationStep: Object.keys(latestGenerationStep).length ? {
+      stepIdx: asMaybeNumber(latestGenerationStep.step_idx ?? latestGenerationStep.stepIdx),
+      stepKey: asString(latestGenerationStep.step_key, asString(latestGenerationStep.stepKey)) || undefined,
+      label: asString(latestGenerationStep.label) || undefined,
+      status: asString(latestGenerationStep.status) || undefined,
+      startedAt: asString(latestGenerationStep.started_at, asString(latestGenerationStep.startedAt)) || undefined,
+      finishedAt: asString(latestGenerationStep.finished_at, asString(latestGenerationStep.finishedAt)) || undefined,
+      error: asString(latestGenerationStep.error) || undefined,
+    } : undefined,
+  };
+}
+
+function transformDecisionArtifactGenerate(raw: unknown): DecisionArtifactGenerateResult {
+  const obj = asObject(raw);
+  return {
+    issueId: asString(obj.issue, asString(obj.issueId)),
+    variantId: asString(obj.variant_id, asString(obj.variantId)),
+    artifactVariantId: asString(obj.artifact_variant_id, asString(obj.artifactVariantId)),
+    status: asString(obj.status),
+    materializeSnapshots: asBoolean(obj.materialize_snapshots, asBoolean(obj.materializeSnapshots)),
+    artifactStatus: transformDecisionArtifactStatus(obj.artifact_status ?? obj.artifactStatus),
+  };
+}
+
 function transformDecisionVariantOption(raw: unknown): DecisionVariantOption {
   const obj = asObject(raw);
   return {
@@ -568,6 +631,12 @@ function withDecisionVariant(path: string, decisionVariantId?: string): string {
   return `${path}${separator}decision_variant=${encodeURIComponent(decisionVariantId)}`;
 }
 
+function withArtifactVariant(path: string, decisionVariantId?: string): string {
+  if (!decisionVariantId) return path;
+  const separator = path.includes('?') ? '&' : '?';
+  return `${path}${separator}variant=${encodeURIComponent(decisionVariantId)}`;
+}
+
 function transformMatchRow(raw: unknown): IssueMatchRow {
   const row = asObject(raw) as ApiMatchSummary;
   const matchId = asString(row.match_id);
@@ -608,6 +677,7 @@ function transformMatchRow(raw: unknown): IssueMatchRow {
   };
   return {
     matchId,
+    matchIdx: asMaybeNumber(row.match_idx ?? row.matchIdx),
     league: asString(row.league, ''),
     kickoffDate: asString(row.kickoff_date, formatDate(row.kickoff_ts)),
     kickoffTime: formatClock(row.kickoff_ts),
@@ -672,6 +742,9 @@ function transformIssueDashboard(raw: unknown): IssueDashboardData {
   const matches = asArray(obj.matches).map(transformMatchRow);
   const decisionVariantOptions = asArray(obj.decision_variant_options ?? obj.decisionVariantOptions).map(transformDecisionVariantOption);
   const strategyVersionContext = transformStrategyVersionContext(obj.strategy_version_context ?? obj.strategyVersionContext);
+  const decisionArtifactStatus = Object.keys(asObject(obj.decision_artifact_status ?? obj.decisionArtifactStatus)).length
+    ? transformDecisionArtifactStatus(obj.decision_artifact_status ?? obj.decisionArtifactStatus)
+    : undefined;
   const qualityFlag = asString(stats.pool_quality_flag, 'yellow') as 'green' | 'yellow' | 'red';
   return {
     issueId: asString(obj.issue),
@@ -692,6 +765,7 @@ function transformIssueDashboard(raw: unknown): IssueDashboardData {
 	    matches,
 	    decisionVariantOptions,
     strategyVersionContext,
+    decisionArtifactStatus,
 	    llmAssistSummary: 'Canonical /api/issues/:issue/dashboard payload transformed from snake_case by ApiDashboardAdapter.',
 	  };
 	}
@@ -1533,6 +1607,298 @@ function transformOperationsStatus(raw: unknown): OperationsStatusData {
   };
 }
 
+function transformSegmentBettingPlan(raw: unknown): SegmentBettingPlanData {
+  const obj = asObject(raw);
+  const source = asObject(obj.source);
+  const artifactStatus = asObject(obj.artifact_status ?? obj.artifactStatus);
+  const strategyRelease = asObject(obj.strategy_release ?? obj.strategyRelease);
+  const settings = asObject(obj.settings);
+  const summary = asObject(obj.summary);
+  const spDriftRisk = asObject(obj.sp_drift_risk ?? obj.spDriftRisk);
+  const selectionBinding = asObject(obj.selection_binding ?? obj.selectionBinding);
+  const seedAggregate = asObject(obj.seed_aggregate ?? obj.seedAggregate);
+  const seedMetrics = asObject(seedAggregate.metrics);
+  const transformSeedMetric = (rawMetric: unknown) => {
+    const metric = asObject(rawMetric);
+    return {
+      min: asMaybeNumber(metric.min),
+      p10: asMaybeNumber(metric.p10),
+      mean: asMaybeNumber(metric.mean),
+      median: asMaybeNumber(metric.median),
+      p90: asMaybeNumber(metric.p90),
+      max: asMaybeNumber(metric.max),
+    };
+  };
+  const transformPlanOption = (rawPlan: unknown): SegmentBettingPlanData['availablePlans'][number] => {
+    const plan = asObject(rawPlan);
+    return {
+      planId: asString(plan.plan_id, asString(plan.planId)),
+      label: asString(plan.label),
+      decisionVariantId: asString(plan.decision_variant_id, asString(plan.decisionVariantId)),
+      strategyFamily: asString(plan.strategy_family, asString(plan.strategyFamily)),
+      bettingStrategyVersion: asString(plan.betting_strategy_version, asString(plan.bettingStrategyVersion)),
+	      artifactSchemaVersion: asString(plan.artifact_schema_version, asString(plan.artifactSchemaVersion)),
+	      planningScope: asString(plan.planning_scope, asString(plan.planningScope)),
+	      artifactPlanningScope: asString(plan.artifact_planning_scope, asString(plan.artifactPlanningScope)) || undefined,
+	      decisionTime: asString(plan.decision_time, asString(plan.decisionTime)),
+      stakeMode: asString(plan.stake_mode, asString(plan.stakeMode)),
+      availableSegments: asMaybeNumber(plan.available_segments ?? plan.availableSegments),
+      spDriftRiskAccepted: asBoolean(plan.sp_drift_risk_accepted, asBoolean(plan.spDriftRiskAccepted)),
+      spDriftRiskLevel: asString(plan.sp_drift_risk_level, asString(plan.spDriftRiskLevel)),
+      arm: asString(plan.arm),
+      segmentBudgetYuan: asMaybeNumber(plan.segment_budget_yuan ?? plan.segmentBudgetYuan),
+      sampleSeed: asMaybeNumber(plan.sample_seed ?? plan.sampleSeed),
+      seedCount: asMaybeNumber(plan.seed_count ?? plan.seedCount),
+      summaryMode: asString(plan.summary_mode, asString(plan.summaryMode)),
+      sourceRows: asMaybeNumber(plan.source_rows ?? plan.sourceRows),
+      eligibleRows: asMaybeNumber(plan.eligible_rows ?? plan.eligibleRows),
+      segments: asMaybeNumber(plan.segments),
+      selectedBundles: asMaybeNumber(plan.selected_bundles ?? plan.selectedBundles),
+      baseCostYuan: asMaybeNumber(plan.base_cost_yuan ?? plan.baseCostYuan),
+      stakeMultiplierUnits: asMaybeNumber(plan.stake_multiplier_units ?? plan.stakeMultiplierUnits),
+      selectedCostYuan: asMaybeNumber(plan.selected_cost_yuan ?? plan.selectedCostYuan),
+      profitYuan: asMaybeNumber(plan.profit_yuan ?? plan.profitYuan),
+      roi: asMaybeNumber(plan.roi),
+      updatedAt: formatDateTimeShort(plan.updated_at ?? plan.updatedAt),
+      artifactPath: asString(plan.artifact_path, asString(plan.artifactPath)),
+    };
+  };
+  return {
+	    schemaVersion: asString(obj.schema_version, asString(obj.schemaVersion)),
+	    issueId: asString(obj.issue, asString(obj.issueId)),
+	    mode: asString(obj.mode),
+	    requestedDecisionVariantId: asString(obj.requested_decision_variant_id, asString(obj.requestedDecisionVariantId)),
+	    requestedPlanningScope: asString(obj.requested_planning_scope, asString(obj.requestedPlanningScope)),
+	    requestedDecisionTime: asString(obj.requested_decision_time, asString(obj.requestedDecisionTime)),
+	    requestedSegmentBudgetYuan: asMaybeNumber(obj.requested_segment_budget_yuan ?? obj.requestedSegmentBudgetYuan),
+	    requestedStakeMode: asString(obj.requested_stake_mode, asString(obj.requestedStakeMode)) || undefined,
+	    requestedBettingStrategyVersion: asString(obj.requested_betting_strategy_version, asString(obj.requestedBettingStrategyVersion)),
+	    requestedLabel: asString(obj.requested_label, asString(obj.requestedLabel)),
+	    selectedPlanId: asString(obj.selected_plan_id, asString(obj.selectedPlanId)),
+    availabilityStatus: asString(obj.availability_status, asString(obj.availabilityStatus, 'missing')),
+    unavailableReason: asString(obj.unavailable_reason, asString(obj.unavailableReason)) || undefined,
+    notice: asString(obj.notice),
+    source: {
+      artifactKey: asString(source.artifact_key, asString(source.artifactKey)),
+      artifactDir: asString(source.artifact_dir, asString(source.artifactDir)),
+    },
+    artifactPath: asString(obj._artifact_path, asString(obj.artifactPath)),
+    artifactStatus: {
+      status: asString(artifactStatus.status, asString(obj.availability_status, asString(obj.availabilityStatus, 'missing'))),
+      artifactKey: asString(artifactStatus.artifact_key, asString(artifactStatus.artifactKey)),
+      artifactDir: asString(artifactStatus.artifact_dir, asString(artifactStatus.artifactDir)),
+      artifactPath: asString(artifactStatus.artifact_path, asString(artifactStatus.artifactPath)),
+      sourcePath: asString(artifactStatus.source_path, asString(artifactStatus.sourcePath)),
+      updatedAt: formatDateTimeShort(artifactStatus.updated_at ?? artifactStatus.updatedAt),
+      reason: asString(artifactStatus.reason),
+    },
+    strategyRelease: {
+      activeReleaseId: asString(strategyRelease.active_release_id, asString(strategyRelease.activeReleaseId)),
+      releaseId: asString(strategyRelease.release_id, asString(strategyRelease.releaseId)),
+      versionId: asString(strategyRelease.version_id, asString(strategyRelease.versionId)),
+      status: asString(strategyRelease.status),
+    },
+    availablePlans: asArray(obj.available_plans ?? obj.availablePlans).map(transformPlanOption),
+    selectedPlan: Object.keys(asObject(obj.selected_plan ?? obj.selectedPlan)).length
+      ? transformPlanOption(obj.selected_plan ?? obj.selectedPlan)
+      : undefined,
+    strategyFamily: asString(obj.strategy_family, asString(obj.strategyFamily)),
+	    bettingStrategyVersion: asString(obj.betting_strategy_version, asString(obj.bettingStrategyVersion)),
+	    artifactSchemaVersion: asString(obj.artifact_schema_version, asString(obj.artifactSchemaVersion)),
+	    planningScope: asString(obj.planning_scope, asString(obj.planningScope)),
+	    artifactPlanningScope: asString(obj.artifact_planning_scope, asString(obj.artifactPlanningScope)) || undefined,
+	    decisionTime: asString(obj.decision_time, asString(obj.decisionTime)),
+	    availableSegments: asMaybeNumber(obj.available_segments ?? obj.availableSegments),
+	    dynamicSegmentsAvailable: asMaybeNumber(obj.dynamic_segments_available ?? obj.dynamicSegmentsAvailable),
+	    selectionBinding: Object.keys(selectionBinding).length ? {
+	      matchSelectionSource: asString(selectionBinding.match_selection_source, asString(selectionBinding.matchSelectionSource)),
+	      frontendDisplaySource: asString(selectionBinding.frontend_display_source, asString(selectionBinding.frontendDisplaySource)),
+	      refreshPolicy: asString(selectionBinding.refresh_policy, asString(selectionBinding.refreshPolicy)),
+	      planningScope: asString(selectionBinding.planning_scope, asString(selectionBinding.planningScope)) || undefined,
+	    } : undefined,
+    spDriftRisk: {
+      accepted: asBoolean(spDriftRisk.accepted),
+      level: asString(spDriftRisk.level),
+      reason: asString(spDriftRisk.reason),
+    },
+    settings: {
+      planningScope: asString(settings.planning_scope, asString(settings.planningScope)) || undefined,
+      decisionTime: asString(settings.decision_time, asString(settings.decisionTime)) || undefined,
+      stakeMode: asString(settings.stake_mode, asString(settings.stakeMode)) || undefined,
+      windowHours: asMaybeNumber(settings.window_hours ?? settings.windowHours),
+      extendHours: asString(settings.extend_hours, asString(settings.extendHours)),
+      minMatches: asMaybeNumber(settings.min_matches ?? settings.minMatches),
+      maxMatches: asMaybeNumber(settings.max_matches ?? settings.maxMatches),
+      segmentBudgetYuan: asMaybeNumber(settings.segment_budget_yuan ?? settings.segmentBudgetYuan),
+      stakeYuanPerTicket: asMaybeNumber(settings.stake_yuan_per_ticket ?? settings.stakeYuanPerTicket),
+      sampleAttempts: asMaybeNumber(settings.sample_attempts ?? settings.sampleAttempts),
+      sampleSeed: asMaybeNumber(settings.sample_seed ?? settings.sampleSeed),
+      seedCount: asMaybeNumber(settings.seed_count ?? settings.seedCount),
+      sampleSeeds: asArray(settings.sample_seeds ?? settings.sampleSeeds).filter((value): value is number => typeof value === 'number'),
+      minN: asMaybeNumber(settings.min_n ?? settings.minN),
+      maxN: asMaybeNumber(settings.max_n ?? settings.maxN),
+	      maxOverlap: asMaybeNumber(settings.max_overlap ?? settings.maxOverlap),
+	      maxBundleSpendPct: asMaybeNumber(settings.max_bundle_spend_pct ?? settings.maxBundleSpendPct),
+	      positiveEvOnly: asBoolean(settings.positive_ev_only, asBoolean(settings.positiveEvOnly)),
+      bettingStrategyVersion: asString(settings.betting_strategy_version, asString(settings.bettingStrategyVersion)) || undefined,
+    },
+    seedAggregate: {
+      seedCount: asMaybeNumber(seedAggregate.seed_count ?? seedAggregate.seedCount),
+      seeds: asArray(seedAggregate.seeds).filter((value): value is number => typeof value === 'number'),
+      summaryMode: asString(seedAggregate.summary_mode, asString(seedAggregate.summaryMode, 'single_seed')),
+      metrics: Object.fromEntries(Object.entries(seedMetrics).map(([key, value]) => [key, transformSeedMetric(value)])),
+    },
+    parameterSchema: asArray(obj.parameter_schema ?? obj.parameterSchema).map((rawParam) => {
+      const param = asObject(rawParam);
+      return {
+        key: asString(param.key),
+        label: asString(param.label),
+        uiLevel: asString(param.ui_level, asString(param.uiLevel, 'basic')),
+        type: asString(param.type),
+        unit: asString(param.unit) || undefined,
+        defaultValue: (param.default ?? param.defaultValue) as string | number | boolean | null | undefined,
+        options: asArray(param.options).map((value) => asString(value)).filter(Boolean),
+        min: asMaybeNumber(param.min),
+        step: asMaybeNumber(param.step),
+        effect: asString(param.effect),
+      };
+    }).filter((param) => param.key),
+    segmentCsv: asString(obj.segment_csv, asString(obj.segmentCsv)),
+    bundleCsv: asString(obj.bundle_csv, asString(obj.bundleCsv)),
+    seedSummaryCsv: asString(obj.seed_summary_csv, asString(obj.seedSummaryCsv)),
+    segmentSeedSummaryCsv: asString(obj.segment_seed_summary_csv, asString(obj.segmentSeedSummaryCsv)),
+    summary: {
+      settlementStatus: asString(summary.settlement_status, asString(summary.settlementStatus)) || undefined,
+      primaryMetricMode: asString(summary.primary_metric_mode, asString(summary.primaryMetricMode)) || undefined,
+      segments: asMaybeNumber(summary.segments),
+      selectedSegments: asMaybeNumber(summary.selected_segments ?? summary.selectedSegments),
+      deadSegments: asMaybeNumber(summary.dead_segments ?? summary.deadSegments),
+      selectedBundles: asMaybeNumber(summary.selected_bundles ?? summary.selectedBundles),
+      baseCostYuan: asMaybeNumber(summary.base_cost_yuan ?? summary.baseCostYuan),
+      stakeMultiplierUnits: asMaybeNumber(summary.stake_multiplier_units ?? summary.stakeMultiplierUnits),
+      selectedCostYuan: asMaybeNumber(summary.selected_cost_yuan ?? summary.selectedCostYuan),
+      expectedPayoutYuan: asMaybeNumber(summary.expected_payout_yuan ?? summary.expectedPayoutYuan),
+      expectedProfitYuan: asMaybeNumber(summary.expected_profit_yuan ?? summary.expectedProfitYuan),
+      expectedRoi: asMaybeNumber(summary.expected_roi ?? summary.expectedRoi),
+      payoutYuan: asMaybeNumber(summary.payout_yuan ?? summary.payoutYuan),
+      profitYuan: asMaybeNumber(summary.profit_yuan ?? summary.profitYuan),
+      roi: asMaybeNumber(summary.roi),
+    },
+    segments: asArray(obj.segments).map((rawSegment) => {
+      const segment = asObject(rawSegment);
+      return {
+        sampleSeed: asMaybeNumber(segment.sample_seed ?? segment.sampleSeed),
+        segmentIdx: asMaybeNumber(segment.segment_idx ?? segment.segmentIdx),
+        arm: asString(segment.arm),
+        planningScope: asString(segment.planning_scope, asString(segment.planningScope)),
+        hoursFromDecisionStart: asMaybeNumber(segment.hours_from_decision_start ?? segment.hoursFromDecisionStart),
+        hoursFromDecisionEnd: asMaybeNumber(segment.hours_from_decision_end ?? segment.hoursFromDecisionEnd),
+        spDriftRiskAccepted: asBoolean(segment.sp_drift_risk_accepted, asBoolean(segment.spDriftRiskAccepted)),
+        spDriftRiskLevel: asString(segment.sp_drift_risk_level, asString(segment.spDriftRiskLevel)),
+        spDriftRiskReason: asString(segment.sp_drift_risk_reason, asString(segment.spDriftRiskReason)),
+        stakeMode: asString(segment.stake_mode, asString(segment.stakeMode)),
+        segmentStart: asString(segment.segment_start, asString(segment.segmentStart)),
+        segmentEnd: asString(segment.segment_end, asString(segment.segmentEnd)),
+        windowHours: asMaybeNumber(segment.window_hours ?? segment.windowHours),
+        eligibleMatches: asMaybeNumber(segment.eligible_matches ?? segment.eligibleMatches),
+        expectedCoverageHitRate: asMaybeNumber(segment.expected_coverage_hit_rate ?? segment.expectedCoverageHitRate),
+        actualCoverageHits: asMaybeNumber(segment.actual_coverage_hits ?? segment.actualCoverageHits),
+        actualCoverageHitRate: asMaybeNumber(segment.actual_coverage_hit_rate ?? segment.actualCoverageHitRate),
+        recommendedN: asMaybeNumber(segment.recommended_n ?? segment.recommendedN),
+        initialRecommendedN: asMaybeNumber(segment.initial_recommended_n ?? segment.initialRecommendedN),
+        selectedBundles: asMaybeNumber(segment.selected_bundles ?? segment.selectedBundles),
+        candidateBundles: asMaybeNumber(segment.candidate_bundles ?? segment.candidateBundles),
+        baseCostYuan: asMaybeNumber(segment.base_cost_yuan ?? segment.baseCostYuan),
+        stakeMultiplierUnits: asMaybeNumber(segment.stake_multiplier_units ?? segment.stakeMultiplierUnits),
+        selectedCostYuan: asMaybeNumber(segment.selected_cost_yuan ?? segment.selectedCostYuan),
+        segmentBudgetYuan: asMaybeNumber(segment.segment_budget_yuan ?? segment.segmentBudgetYuan),
+        expectedProfitYuan: asMaybeNumber(segment.expected_profit_yuan ?? segment.expectedProfitYuan),
+        payoutYuan: asMaybeNumber(segment.payout_yuan ?? segment.payoutYuan),
+        profitYuan: asMaybeNumber(segment.profit_yuan ?? segment.profitYuan),
+        roi: asMaybeNumber(segment.roi),
+        deadSegment: asBoolean(segment.dead_segment, asBoolean(segment.deadSegment)),
+        widthCounts: asString(segment.width_counts, asString(segment.widthCounts)),
+        reasons: asStringList(segment.reasons),
+        matchIndices: asArray(segment.match_indices ?? segment.matchIndices).filter((value): value is number => typeof value === 'number'),
+      };
+    }),
+    bundles: asArray(obj.bundles).map((rawBundle) => {
+      const bundle = asObject(rawBundle);
+      return {
+        sampleSeed: asMaybeNumber(bundle.sample_seed ?? bundle.sampleSeed),
+        segmentIdx: asMaybeNumber(bundle.segment_idx ?? bundle.segmentIdx),
+        bundleIdx: asMaybeNumber(bundle.bundle_idx ?? bundle.bundleIdx),
+        arm: asString(bundle.arm),
+        nValue: asMaybeNumber(bundle.n_value ?? bundle.nValue),
+        matchIndices: asArray(bundle.match_indices ?? bundle.matchIndices).filter((value): value is number => typeof value === 'number'),
+        legCodes: asArray(bundle.leg_codes ?? bundle.legCodes).map((value) => asString(value)).filter(Boolean),
+        widths: asArray(bundle.widths).filter((value): value is number => typeof value === 'number'),
+        stakeMultiplier: asMaybeNumber(bundle.stake_multiplier ?? bundle.stakeMultiplier),
+        costYuan: asMaybeNumber(bundle.cost_yuan ?? bundle.costYuan),
+        scaledCostYuan: asMaybeNumber(bundle.scaled_cost_yuan ?? bundle.scaledCostYuan),
+        expectedPayoutYuan: asMaybeNumber(bundle.expected_payout_yuan ?? bundle.expectedPayoutYuan),
+        expectedProfitYuan: asMaybeNumber(bundle.expected_profit_yuan ?? bundle.expectedProfitYuan),
+        scaledExpectedProfitYuan: asMaybeNumber(bundle.scaled_expected_profit_yuan ?? bundle.scaledExpectedProfitYuan),
+        expectedRoi: asMaybeNumber(bundle.expected_roi ?? bundle.expectedRoi),
+        hitProb: asMaybeNumber(bundle.hit_prob ?? bundle.hitProb),
+        realizedHit: asBoolean(bundle.realized_hit, asBoolean(bundle.realizedHit)),
+        payoutYuan: asMaybeNumber(bundle.payout_yuan ?? bundle.payoutYuan),
+        scaledPayoutYuan: asMaybeNumber(bundle.scaled_payout_yuan ?? bundle.scaledPayoutYuan),
+        profitYuan: asMaybeNumber(bundle.profit_yuan ?? bundle.profitYuan),
+        scaledProfitYuan: asMaybeNumber(bundle.scaled_profit_yuan ?? bundle.scaledProfitYuan),
+      };
+    }),
+    seedSummaries: asArray(obj.seed_summaries ?? obj.seedSummaries).map((rawSeed) => {
+      const seed = asObject(rawSeed);
+      return {
+        sampleSeed: asMaybeNumber(seed.sample_seed ?? seed.sampleSeed),
+        selectedSegments: asMaybeNumber(seed.selected_segments ?? seed.selectedSegments),
+        deadSegments: asMaybeNumber(seed.dead_segments ?? seed.deadSegments),
+        selectedBundles: asMaybeNumber(seed.selected_bundles ?? seed.selectedBundles),
+        selectedCostYuan: asMaybeNumber(seed.selected_cost_yuan ?? seed.selectedCostYuan),
+        payoutYuan: asMaybeNumber(seed.payout_yuan ?? seed.payoutYuan),
+        profitYuan: asMaybeNumber(seed.profit_yuan ?? seed.profitYuan),
+        roi: asMaybeNumber(seed.roi),
+      };
+    }),
+    segmentSeedSummary: asArray(obj.segment_seed_summary ?? obj.segmentSeedSummary).map((rawSegment) => {
+      const segment = asObject(rawSegment);
+      return {
+        segmentIdx: asMaybeNumber(segment.segment_idx ?? segment.segmentIdx),
+        arm: asString(segment.arm),
+        sampleCount: asMaybeNumber(segment.sample_count ?? segment.sampleCount),
+        segmentStart: asString(segment.segment_start, asString(segment.segmentStart)),
+        segmentEnd: asString(segment.segment_end, asString(segment.segmentEnd)),
+        eligibleMatches: asMaybeNumber(segment.eligible_matches ?? segment.eligibleMatches),
+        expectedCoverageHitRate: asMaybeNumber(segment.expected_coverage_hit_rate ?? segment.expectedCoverageHitRate),
+        actualCoverageHits: asMaybeNumber(segment.actual_coverage_hits ?? segment.actualCoverageHits),
+        actualCoverageHitRate: asMaybeNumber(segment.actual_coverage_hit_rate ?? segment.actualCoverageHitRate),
+        recommendedNValues: asArray(segment.recommended_n_values ?? segment.recommendedNValues).filter((value): value is number => typeof value === 'number'),
+        recommendedNStable: asBoolean(segment.recommended_n_stable, asBoolean(segment.recommendedNStable)),
+        selectedBundlesMean: asMaybeNumber(segment.selected_bundles_mean ?? segment.selectedBundlesMean),
+        selectedBundlesMin: asMaybeNumber(segment.selected_bundles_min ?? segment.selectedBundlesMin),
+        selectedBundlesMax: asMaybeNumber(segment.selected_bundles_max ?? segment.selectedBundlesMax),
+        baseCostYuanMean: asMaybeNumber(segment.base_cost_yuan_mean ?? segment.baseCostYuanMean),
+        stakeMultiplierUnitsMean: asMaybeNumber(segment.stake_multiplier_units_mean ?? segment.stakeMultiplierUnitsMean),
+        costYuanMean: asMaybeNumber(segment.cost_yuan_mean ?? segment.costYuanMean),
+        payoutYuanMean: asMaybeNumber(segment.payout_yuan_mean ?? segment.payoutYuanMean),
+        profitYuanMin: asMaybeNumber(segment.profit_yuan_min ?? segment.profitYuanMin),
+        profitYuanP10: asMaybeNumber(segment.profit_yuan_p10 ?? segment.profitYuanP10),
+        profitYuanMean: asMaybeNumber(segment.profit_yuan_mean ?? segment.profitYuanMean),
+        profitYuanMedian: asMaybeNumber(segment.profit_yuan_median ?? segment.profitYuanMedian),
+        profitYuanP90: asMaybeNumber(segment.profit_yuan_p90 ?? segment.profitYuanP90),
+        profitYuanMax: asMaybeNumber(segment.profit_yuan_max ?? segment.profitYuanMax),
+        roiMin: asMaybeNumber(segment.roi_min ?? segment.roiMin),
+        roiMean: asMaybeNumber(segment.roi_mean ?? segment.roiMean),
+        roiMax: asMaybeNumber(segment.roi_max ?? segment.roiMax),
+        deadSegmentRate: asMaybeNumber(segment.dead_segment_rate ?? segment.deadSegmentRate),
+        widthCounts: asString(segment.width_counts, asString(segment.widthCounts)),
+        matchIndices: asArray(segment.match_indices ?? segment.matchIndices).filter((value): value is number => typeof value === 'number'),
+      };
+    }),
+  };
+}
+
 export class ApiDashboardAdapter {
   private mode: AdapterMode;
   private baseUrl: string;
@@ -1589,6 +1955,29 @@ export class ApiDashboardAdapter {
     );
   }
 
+  getDecisionArtifactStatus(issueId: string, decisionVariantId?: string): Promise<DecisionArtifactStatusData> {
+    return this.getJson(
+      withArtifactVariant(`/api/issues/${issueId}/decision-artifacts/status`, decisionVariantId),
+      mockDashboardData.issue.decisionArtifactStatus!,
+      transformDecisionArtifactStatus,
+    );
+  }
+
+  generateDecisionArtifact(issueId: string, decisionVariantId?: string): Promise<DecisionArtifactGenerateResult> {
+    return this.postJson(
+      withArtifactVariant(`/api/issues/${issueId}/decision-artifacts/generate`, decisionVariantId),
+      {
+        issueId,
+        variantId: decisionVariantId ?? DEFAULT_DECISION_VARIANT_ID,
+        artifactVariantId: 'shadow_v3.3.3',
+        status: 'mock_generated',
+        materializeSnapshots: true,
+        artifactStatus: mockDashboardData.issue.decisionArtifactStatus!,
+      },
+      transformDecisionArtifactGenerate,
+    );
+  }
+
   getTicketDraft(issueId: string): Promise<TicketData> {
     return this.getJson(`/api/issues/${issueId}/tickets?status=candidate`, mockDashboardData.ticket, transformTicket);
   }
@@ -1613,6 +2002,31 @@ export class ApiDashboardAdapter {
     return this.getJson(withDecisionVariant(`/api/issues/${issueId}/main-strategy`, decisionVariantId), mockDashboardData.mainStrategy, transformMainStrategy);
   }
 
+	  getSegmentBettingPlan(
+	    issueId: string,
+	    decisionVariantId?: string,
+	    planId?: string,
+	    options?: {
+	      planningScope?: string;
+	      segmentBudgetYuan?: string | number;
+	      stakeMode?: string;
+	      bettingStrategyVersion?: string;
+	      label?: string;
+	    },
+	  ): Promise<SegmentBettingPlanData> {
+	    const basePath = withDecisionVariant(`/api/issues/${issueId}/segment-betting-plan`, decisionVariantId);
+	    const params = new URLSearchParams();
+	    if (planId) params.set('plan_id', planId);
+	    if (options?.planningScope) params.set('planning_scope', options.planningScope);
+	    if (options?.segmentBudgetYuan !== undefined && `${options.segmentBudgetYuan}`.trim()) params.set('segment_budget_yuan', `${options.segmentBudgetYuan}`.trim());
+	    if (options?.stakeMode) params.set('stake_mode', options.stakeMode);
+	    if (options?.bettingStrategyVersion) params.set('betting_strategy_version', options.bettingStrategyVersion);
+	    if (options?.label) params.set('label', options.label);
+    const suffix = params.toString();
+    const path = suffix ? `${basePath}${basePath.includes('?') ? '&' : '?'}${suffix}` : basePath;
+    return this.getJson(path, mockDashboardData.segmentBettingPlan, transformSegmentBettingPlan);
+  }
+
   getOperationsStatus(issueId: string): Promise<OperationsStatusData> {
     return this.getJson(`/api/issues/${issueId}/operations`, mockDashboardData.operations, transformOperationsStatus);
   }
@@ -1623,7 +2037,9 @@ export class ApiDashboardAdapter {
       this.getAvailableIssues({ includeReplay: false }),
       this.getIssueDashboard(issueId, decisionVariantId, { summary: true }),
     ]);
-    return { availableIssues, issue };
+    const resolvedIssueId = issue.issueId || issueId;
+    const decisionArtifactStatus = await this.getDecisionArtifactStatus(resolvedIssueId, decisionVariantId).catch(() => undefined);
+    return { availableIssues, issue: decisionArtifactStatus ? { ...issue, decisionArtifactStatus } : issue };
   }
 
   runPostmatchReview(issueId: string, dryRun: boolean): Promise<OperationsStatusData['review']['task']> {
@@ -1644,7 +2060,8 @@ export class ApiDashboardAdapter {
     const settlementIssueId = chooseSettlementIssueId(availableIssues, resolvedIssueId);
     const resolvedMatchId = matchId ?? issue.matches[0]?.matchId;
     if (!resolvedMatchId) throw new Error(`No matches available for issue ${issue.issueId}`);
-    const [matchDetail, ticket, liveSignals, settlement, strategyLab, selectorShadow, mainStrategy, operations] = await Promise.all([
+    const [decisionArtifactStatus, matchDetail, ticket, liveSignals, settlement, strategyLab, selectorShadow, mainStrategy, operations, segmentBettingPlan] = await Promise.all([
+      this.getDecisionArtifactStatus(resolvedIssueId, decisionVariantId).catch(() => undefined),
       this.getMatchDetail(resolvedIssueId, resolvedMatchId, decisionVariantId),
       this.getTicketDraft(resolvedIssueId),
       this.getLiveSignals(resolvedIssueId),
@@ -1656,7 +2073,20 @@ export class ApiDashboardAdapter {
       this.getSelectorShadow(resolvedIssueId),
       this.getMainStrategy(resolvedIssueId, decisionVariantId),
       this.getOperationsStatus(resolvedIssueId),
+      this.getSegmentBettingPlan(resolvedIssueId, decisionVariantId),
     ]);
-    return { availableIssues, issue, matchDetail, ticket, liveSignals, settlement, strategyLab, selectorShadow, mainStrategy, operations };
+    return {
+      availableIssues,
+      issue: decisionArtifactStatus ? { ...issue, decisionArtifactStatus } : issue,
+      matchDetail,
+      ticket,
+      liveSignals,
+      settlement,
+      strategyLab,
+      selectorShadow,
+      mainStrategy,
+      operations,
+      segmentBettingPlan,
+    };
   }
 }

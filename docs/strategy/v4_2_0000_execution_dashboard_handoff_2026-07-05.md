@@ -88,7 +88,7 @@ API / manifest:
 - suppress undeclared `shadow_arm` artifacts;
 - treat `execution_*` fields as read-only artifact columns.
 - v4.2 execution variants are currently selectable manual diagnostic views, not
-  API defaults. `shadow_v3.3.3` remains the stable default while v4.2 is under
+  API defaults. `active_v3.3.3` remains the stable default while v4.2 is under
   further validation.
 - treat `late_proxy_fullcap2` as valid only when `execution_sp_missing=0`.
   `unlocked_after_late_refresh` means refreshed SP was used for execution
@@ -117,7 +117,7 @@ Stop unlock is automated at the artifact/API layer:
    only when `execution_sp_missing=0`.
 3. The API exposes `late_proxy_fullcap2` once that artifact is available, while
    keeping `strict_fullcap2` selectable for audit. In the current release,
-   v4.2 remains manual because `shadow_v3.3.3` is the default.
+   v4.2 remains manual because `active_v3.3.3` is the default.
 4. Selecting the late-proxy variant unlocks the row as an executable
    recommendation, but it must not
    silently submit a ticket. Ticket build/submit remains an explicit user

@@ -15,7 +15,7 @@ RELEASE_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 DECISION_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.(?:[0-9]{4}|[0-9]+)$")
 RELEASE_ID = re.compile(r"^[a-z][a-z0-9]*(?:_[a-z0-9]+)*_[0-9]{4}_[0-9]{2}_[0-9]{2}$")
 DEFAULTABLE_WHEN = {"always", "available", "never"}
-MISSING_BEHAVIOR = {"builtin_active", "fallback_to_active", "diagnostic_placeholder", "hidden_until_artifact", "artifact_missing"}
+MISSING_BEHAVIOR = {"builtin_active", "fallback_to_active", "diagnostic_placeholder", "hidden_until_artifact", "artifact_missing", "unavailable"}
 LATE_REFRESH_POLICY = {"not_applicable", "strict_wait_before_valid_live_sp_refresh", "unlock_after_valid_live_sp_refresh"}
 sys.path.insert(0, str(ROOT))
 
@@ -68,7 +68,6 @@ def _assert_release_contract(registry: dict[str, Any]) -> None:
         assert release["main_strategy_arms"]
 
         variants = release["decision_variants"]
-        assert any(item["kind"] == "active" for item in variants)
         assert sum(1 for item in variants if item["is_default"]) == 1
         for variant in variants:
             assert variant["variant_id"]
@@ -109,19 +108,12 @@ def test_current_strategy_release_keeps_v3_3_3_as_runtime_default() -> None:
     release = registry["releases"][registry["active_release_id"]]
     variants = {item["variant_id"]: item for item in release["decision_variants"]}
 
-    assert variants["active_v3"]["is_default"] is False
-    assert variants["active_v3"]["selectable"] is False
-    assert variants["shadow_v3.3.3"]["is_default"] is True
-    assert variants["shadow_v3.3.3"]["selectable"] is True
-    for variant_id, version_id in (
-        ("shadow_v4.2.0000_execution_strict_fullcap2", "4.2.0004"),
-        ("shadow_v4.2.0005_execution_strict_fullcap2", "4.2.0005"),
-    ):
-        strict = variants[variant_id]
-        assert strict["version_id"] == version_id
-        assert strict["is_default"] is False
-        assert strict["selectable"] is False
-        assert strict["readiness"]["defaultable_when"] == "never"
+    assert "active_v3" not in variants
+    assert "shadow_v3.3.3" not in variants
+    assert variants["active_v3.3.3"]["is_default"] is True
+    assert variants["active_v3.3.3"]["selectable"] is True
+    assert "shadow_v3.3.3" in variants["active_v3.3.3"].get("legacy_variant_ids", [])
+    assert not any("execution_strict" in variant_id for variant_id in variants)
     for variant_id, version_id in (
         ("shadow_v4.2.0000_execution_late_proxy_fullcap2", "4.2.0004"),
         ("shadow_v4.2.0005_execution_late_proxy_fullcap2", "4.2.0005"),

@@ -107,6 +107,7 @@ export interface IssueOption {
 
 export interface IssueMatchRow {
   matchId: string;
+  matchIdx?: number;
   league: string;
   kickoffDate: string;
   kickoffTime: string;
@@ -199,6 +200,57 @@ export interface DecisionSnapshotConfirmResult {
   error?: string;
 }
 
+export interface DecisionArtifactCompleteness {
+  issue: string;
+  scope: string;
+  complete: boolean;
+  expectedCount: number;
+  actualCount: number;
+  expectedMatchIdx: number[];
+  actualMatchIdx: number[];
+  missingMatchIdx: number[];
+  extraMatchIdx: number[];
+}
+
+export interface DecisionArtifactStatusData {
+  issueId: string;
+  requestedVariantId: string;
+  variantId: string;
+  artifactVariantId: string;
+  status: 'available' | 'missing' | 'incomplete' | 'unsupported' | string;
+  message: string;
+  generationSupported: boolean;
+  sourcePath: string;
+  rowCount: number;
+  expectedMatchCount: number;
+  completeness: DecisionArtifactCompleteness;
+  snapshotCompleteness: DecisionArtifactCompleteness;
+  latestWorkflow?: {
+    runId: string;
+    status: string;
+    startedAt: string;
+    finishedAt: string;
+  };
+  latestGenerationStep?: {
+    stepIdx?: number;
+    stepKey?: string;
+    label?: string;
+    status?: string;
+    startedAt?: string;
+    finishedAt?: string;
+    error?: string;
+  };
+}
+
+export interface DecisionArtifactGenerateResult {
+  issueId: string;
+  variantId: string;
+  artifactVariantId: string;
+  status: string;
+  materializeSnapshots: boolean;
+  artifactStatus: DecisionArtifactStatusData;
+}
+
 	export interface PostmatchReviewData {
 	  issue: string;
 	  matchIdx: number;
@@ -238,6 +290,7 @@ export interface IssueDashboardData {
 		  matches: IssueMatchRow[];
 		  decisionVariantOptions?: DecisionVariantOption[];
   strategyVersionContext?: StrategyVersionContext;
+  decisionArtifactStatus?: DecisionArtifactStatusData;
 		  llmAssistSummary: string;
 		}
 
@@ -751,6 +804,258 @@ export interface RuntimeHealthProbe {
   reviewTaskStatus?: string;
 }
 
+export interface SegmentBettingPlanData {
+  schemaVersion: string;
+  issueId: string;
+  mode: string;
+  requestedDecisionVariantId: string;
+  requestedPlanningScope: string;
+  requestedDecisionTime: string;
+  requestedSegmentBudgetYuan?: number;
+  requestedStakeMode?: string;
+  requestedBettingStrategyVersion: string;
+  requestedLabel: string;
+  selectedPlanId: string;
+  availabilityStatus: 'available' | 'degraded' | 'missing' | string;
+  unavailableReason?: string;
+  notice: string;
+  source: { artifactKey: string; artifactDir: string };
+  artifactPath: string;
+  artifactStatus: {
+    status: string;
+    artifactKey: string;
+    artifactDir: string;
+    artifactPath: string;
+    sourcePath: string;
+    updatedAt: string;
+    reason: string;
+  };
+  strategyRelease: {
+    activeReleaseId: string;
+    releaseId: string;
+    versionId: string;
+    status: string;
+  };
+  availablePlans: Array<{
+    planId: string;
+    label: string;
+    decisionVariantId: string;
+    strategyFamily: string;
+    bettingStrategyVersion: string;
+	    artifactSchemaVersion: string;
+	    planningScope: string;
+	    artifactPlanningScope?: string;
+	    decisionTime: string;
+    stakeMode: string;
+    availableSegments?: number;
+    spDriftRiskAccepted: boolean;
+    spDriftRiskLevel: string;
+    arm: string;
+    segmentBudgetYuan?: number;
+    sampleSeed?: number;
+    seedCount?: number;
+    summaryMode?: string;
+    sourceRows?: number;
+    eligibleRows?: number;
+    segments?: number;
+    selectedBundles?: number;
+    baseCostYuan?: number;
+    stakeMultiplierUnits?: number;
+    selectedCostYuan?: number;
+    profitYuan?: number;
+    roi?: number;
+    updatedAt?: string;
+    artifactPath: string;
+  }>;
+  selectedPlan?: SegmentBettingPlanData['availablePlans'][number];
+  strategyFamily: string;
+  bettingStrategyVersion: string;
+  artifactSchemaVersion: string;
+	  planningScope: string;
+	  artifactPlanningScope?: string;
+	  decisionTime: string;
+	  availableSegments?: number;
+	  dynamicSegmentsAvailable?: number;
+	  selectionBinding?: {
+	    matchSelectionSource: string;
+	    frontendDisplaySource: string;
+	    refreshPolicy: string;
+	    planningScope?: string;
+	  };
+	  spDriftRisk: {
+    accepted: boolean;
+    level: string;
+    reason: string;
+  };
+  settings: {
+    planningScope?: string;
+    decisionTime?: string;
+    stakeMode?: string;
+    windowHours?: number;
+    extendHours?: string;
+    minMatches?: number;
+    maxMatches?: number;
+    segmentBudgetYuan?: number;
+    stakeYuanPerTicket?: number;
+    sampleAttempts?: number;
+    sampleSeed?: number;
+    minN?: number;
+    maxN?: number;
+    positiveEvOnly?: boolean;
+	    seedCount?: number;
+	    sampleSeeds?: number[];
+	    maxOverlap?: number;
+	    maxBundleSpendPct?: number;
+	    bettingStrategyVersion?: string;
+	  };
+  seedAggregate: {
+    seedCount?: number;
+    seeds: number[];
+    summaryMode: string;
+    metrics: Record<string, {
+      min?: number;
+      p10?: number;
+      mean?: number;
+      median?: number;
+      p90?: number;
+      max?: number;
+    }>;
+  };
+  parameterSchema: Array<{
+    key: string;
+    label: string;
+    uiLevel: 'basic' | 'advanced' | 'debug' | string;
+    type: string;
+    unit?: string;
+    defaultValue?: string | number | boolean | null;
+    options?: string[];
+    min?: number;
+    step?: number;
+    effect: string;
+  }>;
+  segmentCsv: string;
+  bundleCsv: string;
+  seedSummaryCsv: string;
+  segmentSeedSummaryCsv: string;
+  summary: {
+    settlementStatus?: string;
+    primaryMetricMode?: string;
+    segments?: number;
+    selectedSegments?: number;
+    deadSegments?: number;
+    selectedBundles?: number;
+    baseCostYuan?: number;
+    stakeMultiplierUnits?: number;
+    selectedCostYuan?: number;
+    expectedPayoutYuan?: number;
+    expectedProfitYuan?: number;
+    expectedRoi?: number;
+    payoutYuan?: number;
+    profitYuan?: number;
+    roi?: number;
+  };
+  segments: Array<{
+    sampleSeed?: number;
+    segmentIdx?: number;
+    arm: string;
+    planningScope: string;
+    hoursFromDecisionStart?: number;
+    hoursFromDecisionEnd?: number;
+    spDriftRiskAccepted: boolean;
+    spDriftRiskLevel: string;
+    spDriftRiskReason: string;
+    stakeMode: string;
+    segmentStart: string;
+    segmentEnd: string;
+    windowHours?: number;
+    eligibleMatches?: number;
+    expectedCoverageHitRate?: number;
+    actualCoverageHits?: number;
+    actualCoverageHitRate?: number;
+    recommendedN?: number;
+    initialRecommendedN?: number;
+    selectedBundles?: number;
+    candidateBundles?: number;
+    baseCostYuan?: number;
+    stakeMultiplierUnits?: number;
+    selectedCostYuan?: number;
+    segmentBudgetYuan?: number;
+    expectedProfitYuan?: number;
+    payoutYuan?: number;
+    profitYuan?: number;
+    roi?: number;
+    deadSegment: boolean;
+    widthCounts: string;
+    reasons: string[];
+    matchIndices: number[];
+  }>;
+  bundles: Array<{
+    sampleSeed?: number;
+    segmentIdx?: number;
+    bundleIdx?: number;
+    arm: string;
+    nValue?: number;
+    matchIndices: number[];
+    legCodes: string[];
+    widths: number[];
+    stakeMultiplier?: number;
+    costYuan?: number;
+    scaledCostYuan?: number;
+    expectedPayoutYuan?: number;
+    expectedProfitYuan?: number;
+    scaledExpectedProfitYuan?: number;
+    expectedRoi?: number;
+    hitProb?: number;
+    realizedHit: boolean;
+    payoutYuan?: number;
+    scaledPayoutYuan?: number;
+    profitYuan?: number;
+    scaledProfitYuan?: number;
+  }>;
+  seedSummaries: Array<{
+    sampleSeed?: number;
+    selectedSegments?: number;
+    deadSegments?: number;
+    selectedBundles?: number;
+    selectedCostYuan?: number;
+    payoutYuan?: number;
+    profitYuan?: number;
+    roi?: number;
+  }>;
+  segmentSeedSummary: Array<{
+    segmentIdx?: number;
+    arm: string;
+    sampleCount?: number;
+    segmentStart: string;
+    segmentEnd: string;
+    eligibleMatches?: number;
+    expectedCoverageHitRate?: number;
+    actualCoverageHits?: number;
+    actualCoverageHitRate?: number;
+    recommendedNValues: number[];
+    recommendedNStable: boolean;
+    selectedBundlesMean?: number;
+    selectedBundlesMin?: number;
+    selectedBundlesMax?: number;
+    baseCostYuanMean?: number;
+    stakeMultiplierUnitsMean?: number;
+    costYuanMean?: number;
+    payoutYuanMean?: number;
+    profitYuanMin?: number;
+    profitYuanP10?: number;
+    profitYuanMean?: number;
+    profitYuanMedian?: number;
+    profitYuanP90?: number;
+    profitYuanMax?: number;
+    roiMin?: number;
+    roiMean?: number;
+    roiMax?: number;
+    deadSegmentRate?: number;
+    widthCounts: string;
+    matchIndices: number[];
+  }>;
+}
+
 export interface DashboardData {
   availableIssues: IssueOption[];
   issue: IssueDashboardData;
@@ -762,4 +1067,5 @@ export interface DashboardData {
   selectorShadow: SelectorShadowData;
   mainStrategy: MainStrategyData;
   operations: OperationsStatusData;
+  segmentBettingPlan: SegmentBettingPlanData;
 }

@@ -1,0 +1,478 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts.publish_v4_2_execution_artifacts import (  # noqa: E402
+    DEFAULT_SHADOW_DIR,
+    DEFAULT_WORK_DIR,
+    run as publish_v4_2_execution_artifacts,
+)
+from scripts.estimate_segment_betting_plan import (  # noqa: E402
+    BETTING_STRATEGY_VERSION as SEGMENT_BETTING_STRATEGY_VERSION,
+    DEFAULT_OUTPUT_DIR as DEFAULT_SEGMENT_BETTING_PLAN_DIR,
+    parse_args as parse_segment_betting_plan_args,
+    run as estimate_segment_betting_plan,
+)
+from src.decision_api import app as decision_app  # noqa: E402
+
+
+DEFAULT_INTERVAL_SEC = 300.0
+DEFAULT_V4_2_ARTIFACT_VERSIONS = ("v4.2.0005", "v4.2.0000")
+DEFAULT_SEGMENT_PLAN_SCOPES = ("by_segment", "entire_issue")
+DEFAULT_SEGMENT_PLAN_STAKE_MODE = "scale_to_budget"
+DEFAULT_SEGMENT_PLAN_BUDGET_YUAN = 1000.0
+
+
+def now_iso() -> str:
+    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+def _status_complete(status: dict[str, Any]) -> bool:
+    completeness = status.get("completeness") if isinstance(status.get("completeness"), dict) else {}
+    snapshots = status.get("snapshot_completeness") if isinstance(status.get("snapshot_completeness"), dict) else {}
+    return (
+        status.get("status") == "available"
+        and bool(completeness.get("complete"))
+        and bool(snapshots.get("complete"))
+    )
+
+
+def _small_status(status: dict[str, Any]) -> dict[str, Any]:
+    completeness = status.get("completeness") if isinstance(status.get("completeness"), dict) else {}
+    snapshots = status.get("snapshot_completeness") if isinstance(status.get("snapshot_completeness"), dict) else {}
+    return {
+        "status": status.get("status", ""),
+        "message": status.get("message", ""),
+        "source_path": status.get("source_path", ""),
+        "row_count": status.get("row_count", 0),
+        "expected_match_count": status.get("expected_match_count", 0),
+        "missing_match_idx": completeness.get("missing_match_idx", []),
+        "snapshot_missing_match_idx": snapshots.get("missing_match_idx", []),
+    }
+
+
+def ensure_active_artifact(db_path: Path, issue: str, *, timeout_sec: int) -> dict[str, Any]:
+    with decision_app._connect(db_path) as conn:
+        resolved = decision_app._resolve_issue(conn, issue)
+        before = decision_app._decision_artifact_status_payload(
+            conn,
+            resolved,
+            variant_id=decision_app.STABLE_DECISION_VARIANT_ID,
+        )
+        if _status_complete(before):
+            return {
+                "issue": resolved,
+                "action": "active_artifact_already_available",
+                "artifact_status": _small_status(before),
+            }
+
+        materialize = decision_app._materialize_issue_decision_snapshots(conn, resolved, only_date=None)
+        conn.commit()
+        completeness = materialize.get("completeness") if isinstance(materialize.get("completeness"), dict) else {}
+        if not completeness.get("complete"):
+            return {
+                "issue": resolved,
+                "action": "skipped_active_snapshot_incomplete",
+                "materialize": {
+                    "count": materialize.get("count", 0),
+                    "actions": materialize.get("actions", {}),
+                    "completeness": completeness,
+                },
+                "artifact_status": _small_status(before),
+            }
+
+        generated = decision_app._run_decision_artifact_generator(
+            conn,
+            db_path,
+            resolved,
+            variant_id=decision_app.STABLE_DECISION_VARIANT_ID,
+            materialize_snapshots=False,
+            strict_completeness=True,
+            timeout_sec=timeout_sec,
+        )
+        conn.commit()
+        return {
+            "issue": resolved,
+            "action": "generated_active_artifact",
+            "materialize": {
+                "count": materialize.get("count", 0),
+                "actions": materialize.get("actions", {}),
+                "completeness": completeness,
+            },
+            "artifact_status": _small_status(generated.get("artifact_status", {})),
+        }
+
+
+def publish_v4_2_artifacts(
+    db_path: Path,
+    issue: str,
+    *,
+    max_refresh_age_minutes: float,
+    artifact_versions: list[str],
+) -> list[dict[str, Any]]:
+    outputs: list[dict[str, Any]] = []
+    for version in artifact_versions:
+        summary = publish_v4_2_execution_artifacts(
+            issue=issue,
+            db_path=db_path,
+            shadow_dir=DEFAULT_SHADOW_DIR,
+            work_dir=DEFAULT_WORK_DIR,
+            artifact_version_id=version,
+            max_refresh_age_minutes=max_refresh_age_minutes,
+        )
+        outputs.append({
+            "artifact_version_id": summary.get("artifact_version_id", version),
+            "status": summary.get("status", ""),
+            "late_proxy_published": summary.get("late_proxy_published", False),
+            "late_refresh": summary.get("late_refresh", {}),
+            "outputs": {
+                key: {
+                    "shadow_arm": value.get("shadow_arm", ""),
+                    "rows": value.get("rows", 0),
+                    "output_csv": value.get("output_csv", ""),
+                }
+                for key, value in (summary.get("outputs") or {}).items()
+                if isinstance(value, dict)
+            },
+        })
+    return outputs
+
+
+def segment_plan_freeze_state(db_path: Path, issue: str) -> dict[str, Any]:
+    try:
+        with decision_app._connect(db_path) as conn:
+            resolved = decision_app._resolve_issue(conn, issue)
+            return decision_app._segment_plan_freeze_state(conn, resolved)
+    except Exception as exc:
+        return {
+            "policy": "first_kickoff_minus_1h_issue_wide_lock",
+            "issue": str(issue),
+            "locked": False,
+            "reason": f"freeze_state_unavailable:{type(exc).__name__}",
+            "error": str(exc),
+        }
+
+
+def _read_json(path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _as_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _as_float(value: Any, default: float) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _resolve_project_path(value: Any) -> Path:
+    path = Path(str(value or ""))
+    if not path.is_absolute():
+        path = ROOT / path
+    return path.resolve()
+
+
+def _segment_plan_label_from_structured_csv(path: Path) -> str:
+    parent = path.parent.name
+    if "shadow_v3.3.3" in parent:
+        return "v3.3.3"
+    match = re.search(r"shadow_(v4\.2\.(?:0004|0005))_execution_late_proxy", parent)
+    return f"{match.group(1)}_late_proxy" if match else ""
+
+
+def _segment_plan_specs_from_existing(issue: str, *, plan_dir: Path, structured_dir: Path) -> list[dict[str, Any]]:
+    specs: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for summary_path in sorted(plan_dir.glob(f"{issue}_*/segment_betting_plan_summary.json")):
+        payload = _read_json(summary_path)
+        if not payload:
+            continue
+        settings = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
+        structured_csv = _resolve_project_path(payload.get("structured_csv"))
+        if not structured_csv.is_file():
+            continue
+        label = str(payload.get("label") or "")
+        if not label:
+            continue
+        stake_mode = str(settings.get("stake_mode") or DEFAULT_SEGMENT_PLAN_STAKE_MODE)
+        if stake_mode != DEFAULT_SEGMENT_PLAN_STAKE_MODE:
+            continue
+        version = SEGMENT_BETTING_STRATEGY_VERSION
+        key = (label, version, str(structured_csv))
+        specs[key] = {
+            "label": label,
+            "structured_csv": structured_csv,
+            "arm": str(payload.get("arm") or "shadow"),
+            "betting_strategy_version": version,
+            "stake_mode": stake_mode,
+            "segment_budget_yuan": _as_float(settings.get("segment_budget_yuan"), DEFAULT_SEGMENT_PLAN_BUDGET_YUAN),
+            "stake_yuan_per_ticket": _as_float(settings.get("stake_yuan_per_ticket"), 2.0),
+            "window_hours": _as_float(settings.get("window_hours"), 12.0),
+            "extend_hours": str(settings.get("extend_hours") or "18,24,36"),
+            "min_matches": _as_int(settings.get("min_matches"), 6),
+            "max_matches": _as_int(settings.get("max_matches"), 24),
+            "sample_attempts": _as_int(settings.get("sample_attempts"), 12000),
+            "sample_seed": _as_int(settings.get("sample_seed"), 20260707),
+            "seed_count": _as_int(settings.get("seed_count"), 10),
+            "sample_seeds": settings.get("sample_seeds") if isinstance(settings.get("sample_seeds"), list) else [],
+            "min_n": _as_int(settings.get("min_n"), 3),
+            "max_n": _as_int(settings.get("max_n"), 8),
+            "max_bundle_spend_pct": _as_float(settings.get("max_bundle_spend_pct"), 0.4),
+            "max_overlap": settings.get("max_overlap"),
+            "allow_negative_ev": not bool(settings.get("positive_ev_only", True)),
+            "decision_time": str(settings.get("decision_time") or payload.get("decision_time") or ""),
+        }
+
+    for structured_csv in sorted(structured_dir.glob(f"{issue}_*/structured_shadow_{issue}.csv")):
+        structured_csv = structured_csv.resolve()
+        label = _segment_plan_label_from_structured_csv(structured_csv)
+        if not label:
+            continue
+        key = (label, SEGMENT_BETTING_STRATEGY_VERSION, str(structured_csv))
+        specs.setdefault(key, {
+            "label": label,
+            "structured_csv": structured_csv,
+            "arm": "shadow",
+            "betting_strategy_version": SEGMENT_BETTING_STRATEGY_VERSION,
+            "stake_mode": DEFAULT_SEGMENT_PLAN_STAKE_MODE,
+            "segment_budget_yuan": DEFAULT_SEGMENT_PLAN_BUDGET_YUAN,
+            "stake_yuan_per_ticket": 2.0,
+            "window_hours": 12.0,
+            "extend_hours": "18,24,36",
+            "min_matches": 6,
+            "max_matches": 24,
+            "sample_attempts": 12000,
+            "sample_seed": 20260707,
+            "seed_count": 10,
+            "sample_seeds": [],
+            "min_n": 3,
+            "max_n": 8,
+            "max_bundle_spend_pct": 0.4,
+            "max_overlap": None,
+            "allow_negative_ev": False,
+            "decision_time": "",
+        })
+    return sorted(specs.values(), key=lambda item: (str(item.get("label") or ""), str(item.get("structured_csv") or "")))
+
+
+def _segment_plan_exists(issue: str, spec: dict[str, Any], *, scope: str, plan_dir: Path) -> bool:
+    for summary_path in sorted(plan_dir.glob(f"{issue}_*/segment_betting_plan_summary.json")):
+        payload = _read_json(summary_path)
+        if not payload:
+            continue
+        settings = payload.get("settings") if isinstance(payload.get("settings"), dict) else {}
+        if str(payload.get("label") or "") != str(spec.get("label") or ""):
+            continue
+        if str(payload.get("betting_strategy_version") or settings.get("betting_strategy_version") or "") != str(spec.get("betting_strategy_version") or ""):
+            continue
+        if _resolve_project_path(payload.get("structured_csv")) != _resolve_project_path(spec.get("structured_csv")):
+            continue
+        if str(payload.get("planning_scope") or settings.get("planning_scope") or "") != scope:
+            continue
+        if str(settings.get("stake_mode") or "") != str(spec.get("stake_mode") or ""):
+            continue
+        if _as_float(settings.get("segment_budget_yuan"), 0.0) != _as_float(spec.get("segment_budget_yuan"), 0.0):
+            continue
+        if not (summary_path.parent / "segment_betting_plan_segments.csv").is_file():
+            continue
+        if not (summary_path.parent / "segment_betting_plan_bundles.csv").is_file():
+            continue
+        if scope == "by_segment" and _as_int(payload.get("segments"), 0) < _as_int(payload.get("available_segments"), 0):
+            continue
+        return True
+    return False
+
+
+def _run_segment_plan(
+    db_path: Path,
+    issue: str,
+    spec: dict[str, Any],
+    *,
+    scope: str,
+    plan_dir: Path,
+) -> dict[str, Any]:
+    argv = [
+        "--issue", issue,
+        "--structured-csv", str(spec["structured_csv"]),
+        "--label", str(spec["label"]),
+        "--betting-strategy-version", str(spec["betting_strategy_version"]),
+        "--arm", str(spec.get("arm") or "shadow"),
+        "--planning-scope", scope,
+        "--stake-mode", str(spec.get("stake_mode") or DEFAULT_SEGMENT_PLAN_STAKE_MODE),
+        "--db", str(db_path),
+        "--output-dir", str(plan_dir),
+        "--window-hours", str(spec.get("window_hours") or 12.0),
+        "--extend-hours", str(spec.get("extend_hours") or "18,24,36"),
+        "--min-matches", str(spec.get("min_matches") or 6),
+        "--max-matches", str(spec.get("max_matches") or 24),
+        "--segment-budget-yuan", str(spec.get("segment_budget_yuan") or DEFAULT_SEGMENT_PLAN_BUDGET_YUAN),
+        "--stake-yuan-per-ticket", str(spec.get("stake_yuan_per_ticket") or 2.0),
+        "--sample-attempts", str(spec.get("sample_attempts") or 12000),
+        "--sample-seed", str(spec.get("sample_seed") or 20260707),
+        "--seed-count", str(spec.get("seed_count") or 10),
+        "--min-n", str(spec.get("min_n") or 3),
+        "--max-n", str(spec.get("max_n") or 8),
+        "--max-bundle-spend-pct", str(spec.get("max_bundle_spend_pct") or 0.4),
+    ]
+    if spec.get("decision_time"):
+        argv.extend(["--decision-time", str(spec["decision_time"])])
+    sample_seeds = spec.get("sample_seeds")
+    if isinstance(sample_seeds, list) and sample_seeds:
+        argv.extend(["--sample-seeds", ",".join(str(seed) for seed in sample_seeds)])
+    if spec.get("max_overlap") is not None:
+        argv.extend(["--max-overlap", str(spec["max_overlap"])])
+    if spec.get("allow_negative_ev"):
+        argv.append("--allow-negative-ev")
+    payload = estimate_segment_betting_plan(parse_segment_betting_plan_args(argv))
+    return {
+        "label": payload.get("label", spec.get("label", "")),
+        "planning_scope": payload.get("planning_scope", scope),
+        "segments": payload.get("segments", 0),
+        "available_segments": payload.get("available_segments", 0),
+        "selected_bundles": (payload.get("summary") or {}).get("selected_bundles", 0)
+        if isinstance(payload.get("summary"), dict) else 0,
+        "summary_json": payload.get("summary_json", ""),
+    }
+
+
+def ensure_segment_betting_plans(
+    db_path: Path,
+    issue: str,
+    *,
+    scopes: list[str],
+    plan_dir: Path = DEFAULT_SEGMENT_BETTING_PLAN_DIR,
+    structured_dir: Path = DEFAULT_SHADOW_DIR,
+) -> list[dict[str, Any]]:
+    outputs: list[dict[str, Any]] = []
+    specs = _segment_plan_specs_from_existing(issue, plan_dir=plan_dir, structured_dir=structured_dir)
+    for spec in specs:
+        for scope in scopes:
+            if _segment_plan_exists(issue, spec, scope=scope, plan_dir=plan_dir):
+                outputs.append({
+                    "label": spec.get("label", ""),
+                    "planning_scope": scope,
+                    "status": "already_available",
+                })
+                continue
+            try:
+                generated = _run_segment_plan(db_path, issue, spec, scope=scope, plan_dir=plan_dir)
+                outputs.append({"status": "generated", **generated})
+            except Exception as exc:
+                outputs.append({
+                    "label": spec.get("label", ""),
+                    "planning_scope": scope,
+                    "status": "failed",
+                    "error": f"{type(exc).__name__}: {exc}",
+                })
+    if not specs:
+        outputs.append({"status": "skipped_no_structured_artifacts", "planning_scope": ",".join(scopes)})
+    return outputs
+
+
+def run_once(args: argparse.Namespace) -> dict[str, Any]:
+    active = ensure_active_artifact(args.db, args.issue, timeout_sec=args.timeout)
+    issue = str(active.get("issue") or args.issue)
+    status = active.get("artifact_status") if isinstance(active.get("artifact_status"), dict) else {}
+    v4_2: list[dict[str, Any]] = []
+    if status.get("status") == "available" and args.publish_v4_2:
+        v4_2 = publish_v4_2_artifacts(
+            args.db,
+            issue,
+            max_refresh_age_minutes=args.max_refresh_age_minutes,
+            artifact_versions=args.v4_2_artifact_version,
+        )
+    segment_plan_freeze = segment_plan_freeze_state(args.db, issue)
+    segment_betting_plans: list[dict[str, Any]] = []
+    if status.get("status") == "available" and args.ensure_segment_betting_plans:
+        if segment_plan_freeze.get("locked"):
+            segment_betting_plans = [{
+                "status": "skipped_frozen",
+                "reason": "segment_betting_plan_locked_before_first_kickoff",
+                "freeze_at": segment_plan_freeze.get("freeze_at", ""),
+                "first_kickoff": segment_plan_freeze.get("first_kickoff", ""),
+            }]
+        else:
+            scopes = args.segment_plan_scope or list(DEFAULT_SEGMENT_PLAN_SCOPES)
+            segment_betting_plans = ensure_segment_betting_plans(
+                args.db,
+                issue,
+                scopes=scopes,
+                plan_dir=args.segment_plan_dir,
+                structured_dir=args.structured_shadow_dir,
+            )
+    return {
+        "checked_at": now_iso(),
+        "issue": issue,
+        "active": active,
+        "v4_2": v4_2,
+        "segment_betting_plan_freeze": segment_plan_freeze,
+        "segment_betting_plans": segment_betting_plans,
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Maintain active decision artifacts and v4.2 execution artifacts for the current BJDC issue."
+    )
+    parser.add_argument("--db", type=Path, default=decision_app.DEFAULT_500_DB)
+    parser.add_argument("--issue", default="current")
+    parser.add_argument("--interval", type=float, default=DEFAULT_INTERVAL_SEC)
+    parser.add_argument("--timeout", type=int, default=300)
+    parser.add_argument("--max-refresh-age-minutes", type=float, default=90.0)
+    parser.add_argument("--v4-2-artifact-version", action="append", default=list(DEFAULT_V4_2_ARTIFACT_VERSIONS))
+    parser.add_argument("--no-publish-v4-2", action="store_false", dest="publish_v4_2", default=True)
+    parser.add_argument("--no-segment-betting-plans", action="store_false", dest="ensure_segment_betting_plans", default=True)
+    parser.add_argument("--segment-plan-scope", action="append", choices=DEFAULT_SEGMENT_PLAN_SCOPES, default=[])
+    parser.add_argument("--segment-plan-dir", type=Path, default=DEFAULT_SEGMENT_BETTING_PLAN_DIR)
+    parser.add_argument("--structured-shadow-dir", type=Path, default=DEFAULT_SHADOW_DIR)
+    parser.add_argument("--once", action="store_true")
+    args = parser.parse_args()
+
+    while True:
+        started = time.monotonic()
+        try:
+            print(json.dumps(run_once(args), ensure_ascii=False, sort_keys=True), flush=True)
+        except Exception as exc:
+            print(
+                json.dumps(
+                    {
+                        "checked_at": now_iso(),
+                        "issue": args.issue,
+                        "error": f"{type(exc).__name__}: {exc}",
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
+                file=sys.stderr,
+                flush=True,
+            )
+        if args.once:
+            return
+        elapsed = time.monotonic() - started
+        time.sleep(max(30.0, args.interval - elapsed))
+
+
+if __name__ == "__main__":
+    main()

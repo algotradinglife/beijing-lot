@@ -426,22 +426,30 @@ small {
   border-radius: 8px;
 }
 
-.version-status {
-  display: block;
-  max-width: 260px;
-  color: #b45309;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.3;
+.control-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 14px 0;
 }
 
-.version-help {
-  display: block;
-  max-width: 280px;
+.control-row label {
+  display: grid;
+  gap: 6px;
   color: #64748b;
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.35;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.control-row select,
+.control-row input {
+  min-width: 0;
+  width: 100%;
+  padding: 9px 12px;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
 }
 
 .match-detail-version {
@@ -581,6 +589,15 @@ th {
   color: #1d4ed8;
   font-weight: 600;
   background: #f1f5f9;
+}
+
+.time-window-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+  color: #1e293b;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 tr.clickable:hover {
@@ -1568,27 +1585,6 @@ tr.clickable:hover {
   line-height: 1.5;
 }
 
-.n-settlement-note {
-  margin: 0 0 12px;
-  color: #334155;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.n-settlement-table {
-  min-width: 1120px;
-}
-
-.n-settlement-table th,
-.n-settlement-table td {
-  white-space: nowrap;
-}
-
-.n-settlement-table td:last-child {
-  min-width: 190px;
-  white-space: normal;
-}
-
 .outcome-table {
   min-width: 760px;
   table-layout: fixed;
@@ -1954,6 +1950,18 @@ tr.clickable:hover {
 
 .postmatch-review-table td {
   vertical-align: top;
+}
+
+.focus-review-table {
+  min-width: 980px;
+}
+
+.focus-review-table th:nth-child(5),
+.focus-review-table th:nth-child(6),
+.focus-review-table td:nth-child(5),
+.focus-review-table td:nth-child(6) {
+  min-width: 220px;
+  white-space: normal;
 }
 
 .empty-state {

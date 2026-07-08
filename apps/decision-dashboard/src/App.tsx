@@ -1,27 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, Gauge, LineChart, Server, ShieldAlert, Ticket, WalletCards } from 'lucide-react';
+import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, Gauge, LineChart, Server, ShieldAlert, WalletCards } from 'lucide-react';
 import { ApiDashboardAdapter } from './data/apiAdapter';
-import { DEFAULT_DECISION_VARIANT_ID, decisionVersionDescription, decisionVersionLabel, isActiveDecisionVariant, isShadowDecisionVariant } from './decisionVariants';
-import type { DashboardData, DecisionVariantData, IssueDashboardData, IssueMatchRow, IssueOption } from './data/types';
+import { ACTIVE_DECISION_VARIANT_ID, DEFAULT_DECISION_VARIANT_ID, decisionVersionLabel, displayableDecisionVariants, isActiveDecisionVariant, isShadowDecisionVariant } from './decisionVariants';
+import type { DashboardData, DecisionArtifactStatusData, DecisionVariantData, DecisionVariantOption, IssueDashboardData, IssueMatchRow, IssueOption } from './data/types';
 
-type Page = 'Issue Dashboard' | 'Match Detail' | 'Operations' | 'Main Strategy' | 'Ticket Builder' | 'Selector Shadow' | 'Live Signals' | 'Settlement Review' | 'Strategy Lab';
-const pages: Page[] = ['Issue Dashboard', 'Settlement Review', 'Operations', 'Main Strategy', 'Ticket Builder', 'Selector Shadow', 'Live Signals', 'Strategy Lab'];
-const UI_BUILD_LABEL = 'UI execution-v4200-1355';
+type Page = 'Issue Dashboard' | 'Match Detail' | 'Operations' | 'Betting Plan' | 'Live Signals' | 'Settlement Review' | 'Strategy Lab';
+const pages: Page[] = ['Issue Dashboard', 'Settlement Review', 'Betting Plan', 'Operations', 'Live Signals', 'Strategy Lab'];
+const UI_BUILD_LABEL = 'UI betting-scope-v0400-0140';
 const PAGE_LABELS: Record<Page, string> = {
   'Issue Dashboard': '期次看板',
   'Settlement Review': '赛后复盘',
+  'Betting Plan': '下注设计',
   Operations: '运行状态',
-  'Main Strategy': '主策略',
-  'Ticket Builder': '投注构建',
-  'Selector Shadow': '影子策略',
   'Live Signals': '实时信号',
   'Strategy Lab': '策略实验',
   'Match Detail': '比赛详情',
 };
-const N_SETTLEMENT_BUDGET = 1000;
-const BASE_TICKET_STAKE = 2;
+const DEFAULT_BETTING_PLAN_SCOPE = 'by_segment';
+const BETTING_PLAN_SCOPE_OPTIONS = [
+  { value: 'by_segment', label: '分段下注' },
+  { value: 'entire_issue', label: '整期下注' },
+] as const;
+type BettingPlanScope = typeof BETTING_PLAN_SCOPE_OPTIONS[number]['value'];
 type ConfirmDraftState = { matchId: string; status: 'submitting' | 'succeeded' | 'failed'; message: string };
 type ReviewTaskState = { issueId: string; status: 'submitting' | 'succeeded' | 'failed'; message: string };
+type ArtifactGenerateState = { issueId: string; variantId: string; status: 'submitting' | 'succeeded' | 'failed'; message: string };
 type DashboardShellData = {
   availableIssues: IssueOption[];
   issue: IssueDashboardData;
@@ -150,77 +153,6 @@ function profitSum(rows: SettlementReviewRow[]) {
   return rows.reduce((total, row) => total + row.profit, 0);
 }
 
-function combination(n: number, k: number) {
-  if (k < 0 || k > n) return 0;
-  const r = Math.min(k, n - k);
-  let value = 1;
-  for (let i = 1; i <= r; i += 1) value = (value * (n - r + i)) / i;
-  return Math.round(value);
-}
-
-function productSumForSize(values: number[], size: number) {
-  if (size < 0) return 0;
-  const dp = Array(size + 1).fill(0);
-  dp[0] = 1;
-  for (const value of values) {
-    for (let k = size; k >= 1; k -= 1) {
-      dp[k] += dp[k - 1] * value;
-    }
-  }
-  return dp[size];
-}
-
-function nSettlementRows(data: DashboardData['settlement']) {
-  const rows = data.postmatchReviews;
-  const totalLegs = data.postmatchSummary?.reviewCount ?? rows.length;
-  const primaryHits = data.postmatchSummary?.primaryHits ?? rows.filter((row) => row.primaryHit).length;
-  const coverageHits = data.postmatchSummary?.coverageHits ?? rows.filter((row) => row.coverageHit).length;
-  const deadLegs = Math.max(0, totalLegs - coverageHits);
-  const diverseTicketCount = Math.floor(N_SETTLEMENT_BUDGET / BASE_TICKET_STAKE);
-  const hitMultipliers = rows.map((row) => row.coverageHit && row.stake > 0 ? row.grossReturn / row.stake : 0);
-  return [3, 4, 5, 6, 7].map((n) => {
-    const totalCombos = combination(totalLegs, n);
-    const primaryExact = combination(primaryHits, n);
-    const coverageExact = combination(coverageHits, n);
-    const missBy1 = combination(coverageHits, n - 1) * combination(deadLegs, 1);
-    const missBy2 = combination(coverageHits, n - 2) * combination(deadLegs, 2);
-    const coverageExactRate = totalCombos ? coverageExact / totalCombos : undefined;
-    const primaryExactRate = totalCombos ? primaryExact / totalCombos : undefined;
-    const missBy1Rate = totalCombos ? missBy1 / totalCombos : undefined;
-    const missBy2Rate = totalCombos ? missBy2 / totalCombos : undefined;
-    const diversifiedComboShare = totalCombos ? Math.min(diverseTicketCount, totalCombos) / totalCombos : undefined;
-    const grossMultiplierSum = productSumForSize(hitMultipliers, n);
-    const diversifiedGrossReturn = totalCombos ? (N_SETTLEMENT_BUDGET / totalCombos) * grossMultiplierSum : undefined;
-    const diversifiedProfit = diversifiedGrossReturn === undefined ? undefined : diversifiedGrossReturn - N_SETTLEMENT_BUDGET;
-    const diversifiedRoi = diversifiedGrossReturn === undefined ? undefined : diversifiedGrossReturn / N_SETTLEMENT_BUDGET - 1;
-    let verdict = `样本腿不足：本期只有 ${totalLegs} 腿`;
-    if (totalCombos) {
-      if (n >= 7) verdict = deadLegs <= 2 ? 'N=7可继续做凸性主层' : 'N=7需要先降低死腿数';
-      else if (n >= 5) verdict = coverageExactRate && coverageExactRate >= 0.15 ? 'N=5适合作平滑层' : 'N=5仍受死腿拖累';
-      else verdict = 'N=3偏稳定，但收益依赖赔率结构';
-    }
-    return {
-      n,
-      totalLegs,
-      primaryHits,
-      coverageHits,
-      deadLegs,
-      diverseTicketCount,
-      totalCombos,
-      primaryExactRate,
-      coverageExactRate,
-      missBy1Rate,
-      missBy2Rate,
-      protectionLift: coverageExactRate !== undefined && primaryExactRate !== undefined ? coverageExactRate - primaryExactRate : undefined,
-      diversifiedComboShare,
-      diversifiedGrossReturn,
-      diversifiedProfit,
-      diversifiedRoi,
-      verdict,
-    };
-  });
-}
-
 function settlementTakeaways(data: DashboardData['settlement']) {
   const rows = data.postmatchReviews;
   if (!rows.length) return [{ tone: 'neutral' as const, title: '暂无可复盘比赛', body: '等待赛果后生成整期结论。' }];
@@ -275,6 +207,43 @@ function settlementTakeaways(data: DashboardData['settlement']) {
   return takeaways;
 }
 
+function settlementFocusRows(data: DashboardData['settlement']) {
+  const rows = data.postmatchReviews;
+  const focus: Array<{ key: string; label: string; tone: 'good' | 'warn' | 'bad' | 'neutral'; row: SettlementReviewRow; reason: string }> = [];
+  const pushRows = (label: string, tone: 'good' | 'warn' | 'bad' | 'neutral', selectedRows: SettlementReviewRow[], reason: (row: SettlementReviewRow) => string) => {
+    for (const row of selectedRows) {
+      const key = `${label}-${row.matchId}`;
+      if (focus.some((item) => item.key === key)) continue;
+      focus.push({ key, label, tone, row, reason: reason(row) });
+    }
+  };
+  pushRows(
+    '未覆盖',
+    'bad',
+    rows.filter((row) => !row.coverageHit && !row.stopped).sort((a, b) => a.profit - b.profit).slice(0, 5),
+    (row) => row.summary || `${row.llmJudgment || row.selectedOutcomes.join('+') || '未下注'} 未覆盖实际 ${row.resultLabel || '-'}。`,
+  );
+  pushRows(
+    '保护救回',
+    'good',
+    rows.filter((row) => row.protectHit).sort((a, b) => b.profit - a.profit).slice(0, 4),
+    (row) => row.summary || `保护命中 ${row.resultLabel || '-'}，说明该腿反向风险值得覆盖。`,
+  );
+  pushRows(
+    '正贡献',
+    'good',
+    rows.filter((row) => row.profit > 0 && !row.protectHit).sort((a, b) => b.profit - a.profit).slice(0, 4),
+    (row) => row.summary || `主押命中并贡献 ${money(row.profit)}。`,
+  );
+  pushRows(
+    '停牌校验',
+    'warn',
+    rows.filter((row) => row.stopped).slice(0, 3),
+    (row) => row.summary || `停牌场次实际为 ${row.resultLabel || '-'}，用于校验停牌阈值。`,
+  );
+  return focus.slice(0, 10);
+}
+
 function Card({ title, children, icon, className = '' }: { title: string; children: React.ReactNode; icon?: React.ReactNode; className?: string }) {
   return <section className={`card ${className}`.trim()}><h2>{icon}{title}</h2>{children}</section>;
 }
@@ -288,6 +257,20 @@ function statusTone(status?: string): 'good' | 'warn' | 'bad' | 'neutral' {
   if (status === 'failed' || status === 'missing' || status === 'bad' || status === 'missing_build' || status === 'api_missing') return 'bad';
   if (status === 'partial' || status === 'stale' || status === 'warn' || status === 'draft_replacement') return 'warn';
   return 'neutral';
+}
+
+function opsStatusLabel(status?: string) {
+  if (!status) return '未运行';
+  if (status === 'ok') return '正常';
+  if (status === 'active') return '生效';
+  if (status === 'dry_run') return '试运行完成';
+  if (status === 'running') return '运行中';
+  if (status === 'planned') return '计划中';
+  if (status === 'partial') return '部分数据';
+  if (status === 'stale') return '过期';
+  if (status === 'failed') return '失败';
+  if (status === 'missing') return '缺失';
+  return status;
 }
 
 function minutesLabel(value?: number) {
@@ -463,6 +446,36 @@ function probabilityTriplet(match: IssueMatchRow) {
 
 function probabilityTripletText(value?: number) {
   return value === undefined ? '缺' : `${Math.round(value * 100)}%`;
+}
+
+function artifactStatusTone(status?: string): 'good' | 'warn' | 'bad' | 'neutral' {
+  if (status === 'available') return 'good';
+  if (status === 'missing' || status === 'incomplete') return 'warn';
+  if (status === 'unsupported') return 'bad';
+  return 'neutral';
+}
+
+function artifactStatusLabel(status?: string) {
+  const labels: Record<string, string> = {
+    available: '已生成',
+    missing: '缺少',
+    incomplete: '不完整',
+    unsupported: '不支持',
+  };
+  return labels[String(status || '')] || (status || '未知');
+}
+
+function artifactMissingText(status?: DecisionArtifactStatusData) {
+  const missing = status?.completeness?.missingMatchIdx ?? [];
+  if (!missing.length) return '';
+  const shown = missing.slice(0, 12).map((idx) => `#${idx}`).join('、');
+  return missing.length > 12 ? `${shown} 等 ${missing.length} 场` : shown;
+}
+
+function isFormalArtifactBlocking(status: DecisionArtifactStatusData | undefined, selectedVariantId: string) {
+  if (!status) return false;
+  const selected = selectedVariantId || status.variantId;
+  return selected === ACTIVE_DECISION_VARIANT_ID && status.status !== 'available';
 }
 
 function pickLabel(value?: string) {
@@ -681,18 +694,6 @@ function applyDecisionVariant(match: IssueMatchRow, selectedVariantId: string): 
   };
 }
 
-function StrategyVersionStatus({ context }: { context?: DashboardData['issue']['strategyVersionContext'] }) {
-  if (!context) return null;
-  const warningCount = context.contractWarnings?.length ?? 0;
-  if (context.selectionStatus === 'ok' && warningCount === 0) return null;
-  const label = context.selectionStatus === 'unavailable'
-    ? '版本不可用'
-    : context.selectionStatus === 'degraded'
-      ? '版本降级'
-      : '版本提示';
-  return <small className="version-status">{label}{context.selectionError ? `：${context.selectionError}` : warningCount ? `：${warningCount} 条契约提示` : ''}</small>;
-}
-
 function shortHash(value?: string) {
   return value ? value.slice(0, 8) : '-';
 }
@@ -721,7 +722,6 @@ function IssueDashboard({
   onIssueChange,
   onDecisionVariantChange,
   onOpenMatch,
-  onOpenTicket,
 }: {
   data: DashboardData['issue'];
   availableIssues: DashboardData['availableIssues'];
@@ -730,9 +730,9 @@ function IssueDashboard({
   onIssueChange: (issueId: string) => void;
   onDecisionVariantChange: (variantId: string) => void;
   onOpenMatch: (matchId: string) => void;
-  onOpenTicket: () => void;
 }) {
-  const decisionOptions = data.strategyVersionContext?.options?.length ? data.strategyVersionContext.options : data.decisionVariantOptions ?? [];
+  const rawDecisionOptions = data.strategyVersionContext?.options?.length ? data.strategyVersionContext.options : data.decisionVariantOptions ?? [];
+  const decisionOptions = displayableDecisionVariants(rawDecisionOptions);
   const selectedDecisionOption = decisionOptions.find((option) => option.variantId === selectedDecisionVariant)
     ?? decisionOptions.find((option) => option.isDefault)
     ?? decisionOptions[0];
@@ -779,13 +779,11 @@ function IssueDashboard({
 	            {availableIssues.map((issue) => <option key={issue.issueId} value={issue.issueId}>{issue.label}</option>)}
 	          </select>
 	        </label>
-        {decisionOptions.length > 1 && <label>
+        {decisionOptions.length > 0 && <label>
           <span>决策版本</span>
-          <select value={selectedDecisionVariant} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择决策版本">
+          <select value={selectedDecisionVariant || selectedDecisionOption?.variantId || ''} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择决策版本" disabled={decisionOptions.length <= 1}>
             {decisionOptions.map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
           </select>
-          <StrategyVersionStatus context={data.strategyVersionContext} />
-          {selectedDecisionOption ? <small className="version-help">{decisionVersionDescription(selectedDecisionOption)}</small> : null}
         </label>}
 	        <div className="issue-source"><Badge tone={data.settlementStatus === 'settled' ? 'good' : 'warn'}>{data.settlementStatus}</Badge><span>{data.lastScrapedAt || data.issueDate}</span></div>
       </div>
@@ -795,7 +793,7 @@ function IssueDashboard({
         <div><span>候选</span><b>{data.qualifiedCandidateCount}/{data.matchCount}</b></div>
         <div><span>预测命中</span><b>{evaluatedMatches.length ? `${hitCount}/${evaluatedMatches.length}` : '待统计'}</b></div>
       </div>
-    </Card>
+		    </Card>
 
     <Card title="比赛列表">
       <div className="issue-board">
@@ -862,7 +860,8 @@ function MatchDetail({
   confirmDraftState?: ConfirmDraftState;
   onConfirmDraft: (matchId: string) => Promise<void>;
 }) {
-  const decisionOptions = data.strategyVersionContext?.options?.length ? data.strategyVersionContext.options : data.decisionVariantOptions ?? [];
+  const rawDecisionOptions = data.strategyVersionContext?.options?.length ? data.strategyVersionContext.options : data.decisionVariantOptions ?? [];
+  const decisionOptions = displayableDecisionVariants(rawDecisionOptions);
   const selectedVariant = (data.decisionVariants ?? []).find((variant) => variant.variantId === selectedDecisionVariant)
     ?? (data.decisionVariants ?? []).find((variant) => variant.isDefault)
     ?? (data.decisionVariants ?? [])[0];
@@ -1039,13 +1038,11 @@ function MatchDetail({
 	          {data.score ? <span>比分 {data.score}</span> : null}
 	          {data.halftimeScore ? <span>半场 {data.halftimeScore}</span> : null}
 	        </div>
-        {decisionOptions.length > 1 && <label className="decision-version-control match-detail-version">
+        {decisionOptions.length > 0 && <label className="decision-version-control match-detail-version">
           <span>决策版本</span>
-          <select value={selectedDecisionVariant} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择详情决策版本">
+          <select value={selectedDecisionVariant || selectedDecisionOption?.variantId || ''} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择详情决策版本" disabled={decisionOptions.length <= 1}>
             {decisionOptions.map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
           </select>
-          <StrategyVersionStatus context={data.strategyVersionContext} />
-          {selectedDecisionOption ? <small className="version-help">{decisionVersionDescription(selectedDecisionOption)}</small> : null}
         </label>}
 	        <div className={llmStopped ? 'decision-bet-panel has-stop' : 'decision-bet-panel'}>
 	          <div className="decision-bet-row primary"><span>押</span><b>{primaryOutcome}</b></div>
@@ -1084,7 +1081,7 @@ function MatchDetail({
         <div><span>保护原因</span><b>{protectionOutcomes.length ? protectionOutcomes.join('+') : '无'}</b><p>{protectionReason}</p></div>
         <div><span>停牌原因</span><b>{llmStopped ? '停' : '未停'}</b><p>{stopReason}</p></div>
       </div>
-    </Card>
+		    </Card>
 
     {selectedVariant?.executionAction && <Card title="执行层" className="execution-policy-panel">
       <div className="execution-policy-head">
@@ -1169,7 +1166,7 @@ function MatchDetail({
 	        <div><span>决策时间</span><b>{decisionSnapshot?.generatedAt || data.llm.generatedAt || '缺'}</b></div>
 	        <div><span>检查时间</span><b>{decisionSnapshot?.checkedAt || '-'}</b></div>
 	        <div><span>版本</span><b>{selectedDecisionOption ? decisionVersionLabel(selectedDecisionOption) : decisionSnapshot?.decisionChainVersion || data.llm.source}</b></div>
-	        <div><span>说明</span><b>{selectedDecisionOption ? decisionVersionDescription(selectedDecisionOption) : decisionSnapshot?.decisionConfigHash ? shortHash(decisionSnapshot.decisionConfigHash) : '-'}</b></div>
+	        <div><span>说明</span><b>{decisionSnapshot?.decisionConfigHash ? shortHash(decisionSnapshot.decisionConfigHash) : '-'}</b></div>
 	      </div>
 	      {shadowDecisionVersionSelected && shadowDecisionCategories.length > 0 && <div className="decision-category-grid">
 	        {shadowDecisionCategories.map((item) => <div key={item.key || item.label} className="decision-category-card">
@@ -1233,9 +1230,150 @@ function MatchDetail({
   </div>;
 }
 
-function TicketBuilder({ data }: { data: DashboardData['ticket'] }) {
-  const counts = data.legs.reduce((acc, leg) => ({ ...acc, [leg.coverageType]: (acc[leg.coverageType] ?? 0) + 1 }), {} as Record<string, number>);
-  return <div className="grid page-grid"><Card title={`Ticket Builder / Issue ${data.issueId}`} icon={<Ticket />}><div className="hero-stats"><div><span>预算</span><b>{money(data.totalBudget)}</b></div><div><span>已用</span><b>{money(data.usedBudget)}</b></div><div><span>allocator</span><b>{data.allocatorArm}</b></div><div><span>状态</span><b>{data.status}</b></div></div></Card><Card title="Leg Builder"><table><thead><tr><th>#</th><th>比赛</th><th>选择</th><th>SP</th><th>q/conf</th><th>风险</th></tr></thead><tbody>{data.legs.map((l) => <tr key={l.legId}><td>{l.legId}</td><td>{l.label} ({l.handicap})</td><td>{coverageLabel[l.coverageType]} [{l.selectedOutcomes.join('/')}]</td><td>{l.spSelected}</td><td>{l.qScore}/{l.confidence}</td><td>{l.riskTags.join(', ') || 'none'}</td></tr>)}</tbody></table></Card><Card title="Coverage Matrix"><p>单选腿: {counts.single ?? 0}　双选腿: {counts.double ?? 0}　全包腿: {counts.full ?? 0}</p><p>组合数: {data.totalCombinations} · 覆盖深度: {pct(data.protectionDepth)}</p></Card><Card title="资金分配 / 风险与期望收益"><p>基础注: {money(data.baseStake)} · 倍投: {data.multiplier} · 预算使用率: {pct(data.usedBudget / data.totalBudget)}</p><p>EV: {money(data.expectedReturn)} · Expected ROI: {pct(data.expectedRoi)} · Max Payout: {money(data.maxPayout)} · Worst Loss: {money(data.worstCaseLoss)}</p><p>风险评分: {data.riskScore} · 集中度: {data.concentrationScore} · SP drift sensitivity: {data.spDriftSensitivity}</p><button>保存草稿</button><button>导出投注单</button><button>生成复盘快照</button></Card></div>;
+function legCodeLabel(value: string) {
+  return pickListLabel(value.split('+'));
+}
+
+function bettingPlanScopeLabel(value?: string) {
+  return BETTING_PLAN_SCOPE_OPTIONS.find((option) => option.value === value)?.label ?? value ?? '分段下注';
+}
+
+function matchIndexFromRow(match: IssueMatchRow, fallbackIndex: number) {
+  if (typeof match.matchIdx === 'number' && Number.isFinite(match.matchIdx)) return match.matchIdx;
+  const matchIdIndex = match.matchId.match(/_(\d{1,3})$/);
+  if (matchIdIndex) return Number(matchIdIndex[1]);
+  return fallbackIndex + 1;
+}
+
+function issueBoardLegLabel(matchIdx: number, match?: IssueMatchRow) {
+  if (!match) return `#${matchIdx} 缺看板选择`;
+  const selection = match.stopFlag || match.recommendedCoverage === 'no-buy'
+    ? '不买'
+    : match.recommendedOutcome || '待定';
+  return `#${matchIdx} ${selection}`;
+}
+
+function multiplierLabel(value?: number, digits = 0) {
+  if (value === undefined || !Number.isFinite(value)) return '-';
+  return value.toLocaleString('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits });
+}
+
+function driftRiskLabel(value?: string) {
+  if (value === 'low') return '低';
+  if (value === 'medium') return '中';
+  if (value === 'high') return '高';
+  return value || '未知';
+}
+
+function bettingPlanStatusLabel(value?: string) {
+  if (value === 'available') return '已生成';
+  if (value === 'degraded') return '待确认';
+  if (value === 'missing') return '待生成';
+  return value || '待生成';
+}
+
+function bettingPlanStatusTone(value?: string): 'good' | 'warn' | 'bad' | 'neutral' {
+  if (value === 'available') return 'good';
+  if (value === 'degraded' || value === 'missing') return 'warn';
+  return 'neutral';
+}
+
+function BettingPlan({
+  data,
+  availableIssues,
+  decisionVariantOptions,
+	  issueMatches,
+	  selectedIssue,
+	  selectedDecisionVariant,
+	  onIssueChange,
+	  onDecisionVariantChange,
+	  selectedPlanningScope,
+	  onPlanningScopeChange,
+	  selectedSegmentBudgetYuan,
+	  onSegmentBudgetChange,
+	  selectedStakeMode,
+	  onStakeModeChange,
+	}: {
+	  data: DashboardData['segmentBettingPlan'];
+	  availableIssues: DashboardData['availableIssues'];
+	  decisionVariantOptions: DecisionVariantOption[];
+	  issueMatches: IssueMatchRow[];
+	  selectedIssue: string;
+	  selectedDecisionVariant: string;
+	  onIssueChange: (issueId: string) => void;
+	  onDecisionVariantChange: (variantId: string) => void;
+	  selectedPlanningScope: BettingPlanScope;
+	  onPlanningScopeChange: (value: BettingPlanScope) => void;
+	  selectedSegmentBudgetYuan: string;
+	  onSegmentBudgetChange: (value: string) => void;
+	  selectedStakeMode: string;
+	  onStakeModeChange: (value: string) => void;
+	}) {
+	  const plans = data.availablePlans;
+	  const fallbackVariantOptions: DecisionVariantOption[] = Array.from(new Map(plans.map((plan) => [plan.decisionVariantId, plan])).values())
+	    .filter((plan) => plan.decisionVariantId)
+	    .map((plan) => ({ variantId: plan.decisionVariantId, label: plan.label, version: '', source: '' }));
+	  const variantOptions = decisionVariantOptions.length ? decisionVariantOptions : fallbackVariantOptions;
+	  const selectedVariantValue = variantOptions.some((option) => option.variantId === selectedDecisionVariant)
+	    ? selectedDecisionVariant
+	    : variantOptions.find((option) => option.isDefault)?.variantId || variantOptions[0]?.variantId || '';
+	  const topBundles = data.bundles.slice(0, 12);
+	  const planUpdatedAt = data.artifactStatus.updatedAt || data.selectedPlan?.updatedAt || '';
+	  const displayedMatchByIdx = useMemo(() => {
+	    const entries = issueMatches.map((match, index) => {
+	      const displayed = applyDecisionVariant(match, selectedVariantValue);
+	      return [matchIndexFromRow(displayed, index), displayed] as const;
+	    });
+	    return new Map(entries);
+	  }, [issueMatches, selectedVariantValue]);
+	  const sourceLabel = data.selectionBinding?.frontendDisplaySource === 'issue_board' ? '期次看板同版本' : '期次看板';
+	  return <div className="grid page-grid">
+	    <Card title={`下注设计 / Issue ${data.issueId || selectedIssue}`} icon={<WalletCards />}>
+      <div className="status-row">
+        <span>下注方案</span>
+        <Badge tone={bettingPlanStatusTone(data.availabilityStatus)}>{bettingPlanStatusLabel(data.availabilityStatus)}</Badge>
+	      </div>
+	      <div className="control-row">
+	        <label>期号<select value={selectedIssue} onChange={(event) => onIssueChange(event.target.value)}>
+	          {availableIssues.map((issue) => <option key={issue.issueId} value={issue.issueId}>{issue.label.replace('历史回放', '历史参考')}</option>)}
+	        </select></label>
+	        <label>决策链版本<select aria-label="选择下注决策链版本" value={selectedVariantValue} disabled={!variantOptions.length} onChange={(event) => onDecisionVariantChange(event.target.value)}>
+	          {variantOptions.length ? variantOptions.map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>) : <option value="">暂无版本</option>}
+	        </select></label>
+	        <label>下注范围<select aria-label="选择下注范围" value={selectedPlanningScope} onChange={(event) => onPlanningScopeChange(event.target.value as BettingPlanScope)}>
+	          {BETTING_PLAN_SCOPE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+	        </select></label>
+	        <label>预算<input aria-label="下注预算" type="number" min="2" step="2" value={selectedSegmentBudgetYuan} onChange={(event) => onSegmentBudgetChange(event.target.value)} /></label>
+	        <label>投入方式<select aria-label="选择投入方式" value={selectedStakeMode} onChange={(event) => onStakeModeChange(event.target.value)}>
+	          <option value="scale_to_budget">预算放大</option>
+	          <option value="unit_once">基础投入</option>
+	        </select></label>
+	      </div>
+	      {data.availabilityStatus !== 'available' ? <div className="empty-state"><b>暂无下注计划</b><span>{data.unavailableReason === 'segment_betting_plan_artifact_missing' ? '当前期下注计划还未生成，请稍后刷新。' : data.unavailableReason || '当前期下注计划还未生成。'}</span></div> : null}
+		    </Card>
+		    <Card title={selectedPlanningScope === 'entire_issue' ? '整期计划' : '分段计划'}>
+	      {data.segments.length ? <div className="table-wrap"><table><thead><tr><th>段</th><th>时间窗</th><th>场次</th><th>N</th><th>票组</th><th>预算/成本</th><th>风险</th></tr></thead><tbody>{data.segments.map((segment) => <tr key={segment.segmentIdx ?? segment.segmentStart}>
+	        <td>#{segment.segmentIdx}</td>
+	        <td><div className="time-window-cell"><span>从 {segment.segmentStart}</span><span>到 {segment.segmentEnd}</span></div></td>
+	        <td>{segment.eligibleMatches ?? '-'} 场<br/><small>#{segment.matchIndices.join(',')}</small></td>
+	        <td>{segment.recommendedN ?? '-'}</td>
+	        <td>{segment.selectedBundles ?? 0}<br/><small>候选 {segment.candidateBundles ?? '-'}</small></td>
+	        <td>{moneyFixed(segment.selectedCostYuan)}<br/><small>基础 {moneyFixed(segment.baseCostYuan, 0)} · 倍数 {multiplierLabel(segment.stakeMultiplierUnits)}</small></td>
+	        <td><Badge tone={segment.spDriftRiskAccepted ? 'warn' : 'good'}>SP变化{driftRiskLabel(segment.spDriftRiskLevel || data.spDriftRisk.level)}</Badge></td>
+	      </tr>)}</tbody></table></div> : <div className="empty-state"><b>暂无分段计划</b></div>}
+			    </Card>
+		    <Card title="票组明细">
+	      {planUpdatedAt ? <div className="status-row"><span>计划更新</span><Badge tone="neutral">{planUpdatedAt}</Badge></div> : null}
+	      <div className="status-row"><span>方向来源</span><Badge tone="neutral">{sourceLabel}</Badge><span>{bettingPlanScopeLabel(data.requestedPlanningScope || selectedPlanningScope)}</span></div>
+	      {topBundles.length ? <div className="table-wrap"><table><thead><tr><th>段/票组</th><th>N</th><th>场次</th><th>腿覆盖</th><th>成本</th></tr></thead><tbody>{topBundles.map((bundle) => <tr key={`${bundle.segmentIdx}-${bundle.bundleIdx}`}>
+	        <td>#{bundle.segmentIdx} / {bundle.bundleIdx}</td>
+	        <td>{bundle.nValue ?? '-'}<br/><small>{bundle.widths.join('×')}</small></td>
+	        <td>{bundle.matchIndices.map((idx) => `#${idx}`).join(',')}</td>
+	        <td>{bundle.matchIndices.map((idx) => issueBoardLegLabel(idx, displayedMatchByIdx.get(idx))).join(' | ')}</td>
+	        <td>{moneyFixed(bundle.scaledCostYuan ?? bundle.costYuan)}<br/><small>基础 {moneyFixed(bundle.costYuan, 0)} · 倍数 {bundle.stakeMultiplier ?? 1}</small></td>
+	      </tr>)}</tbody></table></div> : <div className="empty-state"><b>暂无票组明细</b></div>}
+	    </Card>
+  </div>;
 }
 
 function MainStrategy({ data }: { data: DashboardData['mainStrategy'] }) {
@@ -1343,90 +1481,151 @@ function OperationsStatus({
 }) {
   const hasDraft = data.snapshots.draftReplacementCount > 0;
   const unreviewed = data.review.unreviewedSettledCount > 0;
-  const hashShort = shortHash(data.versions.decisionConfigHash);
-  const sourceHealthTone = data.sources.some((source) => source.status === 'failed') ? 'bad' : data.sources.some((source) => source.status === 'partial' || source.status === 'stale') ? 'warn' : 'good';
+  const failedSources = data.sources.filter((source) => source.status === 'failed');
+  const warningSources = data.sources.filter((source) => source.status === 'partial' || source.status === 'stale');
+  const sourceHealthTone = failedSources.length ? 'bad' : warningSources.length ? 'warn' : 'good';
   const workflowTone = statusTone(data.workflow.status);
   const reviewTask = data.review.task;
   const reviewTaskTone = statusTone(reviewTask.status);
   const currentReviewTaskState = reviewTaskState?.issueId === data.issueId ? reviewTaskState : undefined;
   const reviewTaskRunning = currentReviewTaskState?.status === 'submitting';
   const runtimeHealth = data.runtime.health;
-  const apiProcessTone = statusTone(data.runtime.apiProcessStatus);
-  const frontendProcessTone = statusTone(data.runtime.frontendProcessStatus);
-  const externalAccessTone = data.runtime.accessMode === 'direct_bind_non_loopback' || data.runtime.accessMode === 'public_funnel_configured' ? 'warn' : 'good';
-  const hostSmokeCount = runtimeHealth?.hostSmokeCount ?? runtimeHealth?.hostSmokes?.length ?? 0;
-  const hostSmokeOkCount = runtimeHealth?.hostSmokeOkCount ?? runtimeHealth?.hostSmokes?.filter((probe) => probe.ok).length ?? 0;
+  const runtimeProblems = [
+    runtimeHealth?.api?.ok === false ? 'API 健康检查异常' : '',
+    runtimeHealth?.frontendLocal?.ok === false ? '前端本地健康检查异常' : '',
+    runtimeHealth?.operations?.ok === false ? '运行状态 API 异常' : '',
+  ].filter(Boolean);
+  const staleSnapshot = (data.issueStatus.latestSnapshotAgeMinutes ?? 0) > 60;
+  const missingSettlementSp = Math.max(0, data.issueStatus.finishedCount - data.issueStatus.settledSpCount);
+  const completedWorkflowSteps = data.workflow.steps.filter((step) => statusTone(step.status) === 'good').length;
+  const workflowStepSummary = data.workflow.steps.length
+    ? `${completedWorkflowSteps}/${data.workflow.steps.length} 步完成`
+    : '尚未运行';
+  const todoItems: Array<{ key: string; tone: 'good' | 'warn' | 'bad' | 'neutral'; code: string; title: string; detail: string }> = [];
+  if (failedSources.length) {
+    todoItems.push({
+      key: 'source_failed',
+      tone: 'bad',
+      code: '数据源',
+      title: '数据源抓取失败',
+      detail: failedSources.map((source) => source.sourceName).join('、'),
+    });
+  }
+  if (warningSources.length) {
+    todoItems.push({
+      key: 'source_warning',
+      tone: 'warn',
+      code: '数据源',
+      title: '数据源过期或不完整',
+      detail: warningSources.map((source) => `${source.sourceName} ${minutesLabel(source.ageMinutes)}`).join('、'),
+    });
+  }
+  if (staleSnapshot) {
+    todoItems.push({
+      key: 'snapshot_stale',
+      tone: 'warn',
+      code: '快照',
+      title: '当前期快照偏旧',
+      detail: `最新快照 ${data.issueStatus.latestSnapshotAt || '缺失'}，距今 ${minutesLabel(data.issueStatus.latestSnapshotAgeMinutes)}`,
+    });
+  }
+  if (missingSettlementSp > 0) {
+    todoItems.push({
+      key: 'settlement_sp_gap',
+      tone: 'warn',
+      code: '结算SP',
+      title: '已完赛但结算SP未齐',
+      detail: `${missingSettlementSp} 场需要继续刷新结算SP`,
+    });
+  }
+  if (hasDraft) {
+    todoItems.push({
+      key: 'pending_draft',
+      tone: 'warn',
+      code: '决策',
+      title: '待确认决策草稿',
+      detail: `${data.snapshots.draftReplacementCount} 条决策草稿需要确认后才进入正式展示`,
+    });
+  }
+  if (unreviewed) {
+    todoItems.push({
+      key: 'postmatch_review',
+      tone: 'warn',
+      code: '复盘',
+      title: '未复盘赛果',
+      detail: `${data.review.unreviewedSettledCount} 场已结算未复盘，建议先 dry-run 再写入`,
+    });
+  }
+  if (data.workflow.error) {
+    todoItems.push({
+      key: 'workflow_failed',
+      tone: 'bad',
+      code: '刷新',
+      title: '刷新流程失败',
+      detail: data.workflow.error,
+    });
+  }
+  if (reviewTask.error) {
+    todoItems.push({
+      key: 'review_failed',
+      tone: 'bad',
+      code: '复盘',
+      title: '复盘任务失败',
+      detail: reviewTask.error,
+    });
+  }
+  if (runtimeProblems.length) {
+    todoItems.push({
+      key: 'runtime_health',
+      tone: 'bad',
+      code: '服务',
+      title: '服务健康检查异常',
+      detail: runtimeProblems.join('、'),
+    });
+  }
   return <div className="grid page-grid operations-page">
-    <Card title={`实盘运行状态 / Issue ${data.issueId}`} icon={<Activity />}>
+    <Card title={`实盘健康检查 / Issue ${data.issueId}`} icon={<Activity />}>
       <div className="hero-stats">
         <div><span>当前期</span><b>{data.issueStatus.currentIssue || data.issueId}</b><small>{data.generatedAt}</small></div>
         <div><span>比赛</span><b>{data.issueStatus.matchCount}</b><small>{data.issueStatus.finishedCount} 已完赛 / {data.issueStatus.openCount} 未完赛</small></div>
-        <div><span>数据源</span><b><Badge tone={sourceHealthTone}>{data.issueStatus.captureStatus}</Badge></b><small>最新 {data.issueStatus.latestSnapshotAt || '缺'} · {minutesLabel(data.issueStatus.latestSnapshotAgeMinutes)}</small></div>
-        <div><span>待处理</span><b>{data.snapshots.draftReplacementCount + data.review.unreviewedSettledCount}</b><small>{data.snapshots.draftReplacementCount} draft / {data.review.unreviewedSettledCount} 未复盘</small></div>
+        <div><span>数据源</span><b><Badge tone={sourceHealthTone}>{opsStatusLabel(data.issueStatus.captureStatus)}</Badge></b><small>最新 {data.issueStatus.latestSnapshotAt || '缺'} · {minutesLabel(data.issueStatus.latestSnapshotAgeMinutes)}</small></div>
+        <div><span>待处理</span><b>{data.snapshots.draftReplacementCount + data.review.unreviewedSettledCount}</b><small>{data.snapshots.draftReplacementCount} 草稿 / {data.review.unreviewedSettledCount} 未复盘</small></div>
       </div>
     </Card>
 
-    <Card title="实盘日流程" icon={<Activity />}>
-      <div className="workflow-head">
-        <div><span>状态</span><b><Badge tone={workflowTone}>{data.workflow.status || 'not_run'}</Badge></b><small>{data.workflow.runId || '尚未运行'}</small></div>
-        <div><span>触发</span><b>{data.workflow.requestedBy || '-'}</b><small>{data.workflow.dryRun ? 'dry-run' : 'real run'}</small></div>
-        <div><span>开始</span><b>{data.workflow.startedAt || '-'}</b><small>结束 {data.workflow.finishedAt || '-'}</small></div>
-        <div><span>耗时</span><b>{secondsLabel(data.workflow.elapsedSec)}</b><small>{data.workflow.triggerEndpoint}</small></div>
-      </div>
-      {data.workflow.error ? <div className="ops-warning bad"><Badge tone="bad">workflow_failed</Badge><b>流程失败</b><span>{data.workflow.error}</span></div> : null}
-      {data.workflow.steps.length ? <div className="table-wrap"><table><thead><tr><th>#</th><th>步骤</th><th>状态</th><th>耗时</th><th>开始/结束</th><th>错误</th></tr></thead><tbody>{data.workflow.steps.map((step) => <tr key={`${step.stepIdx}-${step.stepKey}`}><td>{step.stepIdx}</td><td>{step.label}<br/><small>{step.stepKey}</small></td><td><Badge tone={statusTone(step.status)}>{step.status}</Badge></td><td>{secondsLabel(step.elapsedSec)}</td><td>{step.startedAt || '-'}<br/><small>{step.finishedAt || '-'}</small></td><td>{step.error || '-'}</td></tr>)}</tbody></table></div> : <div className="empty-state"><b>尚未运行</b><span>可通过 {data.workflow.triggerEndpoint || 'live-workflow API'} 触发 dry-run 或真实刷新。</span></div>}
+    <Card title="待处理事项" icon={<AlertTriangle />}>
+      {todoItems.length ? <div className="ops-warning-list">{todoItems.map((item) => <div key={item.key} className={`ops-warning ${item.tone}`}>
+        <Badge tone={item.tone}>{item.code}</Badge>
+        <b>{item.title}</b>
+        <span>{item.detail}</span>
+      </div>)}</div> : <div className="empty-state"><b>没有阻断项</b><span>当前数据、决策快照和复盘状态可用于实盘检查。</span></div>}
     </Card>
 
-    <div className="grid two-col">
-      <Card title="访问与服务" icon={<Server />}>
-        <div className="runtime-grid">
-          <div><span>API 健康</span><b><Badge tone={statusTone(data.runtime.apiHealth)}>{healthProbeLabel(runtimeHealth?.api)}</Badge></b><small>经同源 /api 代理访问，页面不显示 API 地址。</small></div>
-          <div><span>API 进程</span><b><Badge tone={apiProcessTone}>{processLabel(data.runtime.apiProcessStatus)}</Badge></b><small>端口、PID、命令和日志路径已隐藏。</small></div>
-          <div><span>前端健康</span><b><Badge tone={statusTone(data.runtime.frontendHealth || (runtimeHealth?.frontendLocal?.ok ? 'ok' : 'warn'))}>{healthProbeLabel(runtimeHealth?.frontendLocal)}</Badge></b><small>浏览器入口由本机或 Tailscale Serve 管理。</small></div>
-          <div><span>前端进程</span><b><Badge tone={frontendProcessTone}>{processLabel(data.runtime.frontendProcessStatus)}</Badge></b><small>不在页面公开监听地址。</small></div>
-          <div><span>外部访问</span><b><Badge tone={externalAccessTone}>{accessModeLabel(data.runtime.accessMode, data.runtime.externalAccessConfigured)}</Badge></b><small>{data.runtime.publicDiagnostics ? 'diagnostics 已开启' : 'diagnostics 默认关闭'}</small></div>
-          <div><span>最近检查</span><b>{data.runtime.checkedAt || '未运行 health'}</b><small>详细快照仅保留在服务器本机。</small></div>
-        </div>
-        <p>Operations API：{healthProbeLabel(runtimeHealth?.operations)} · workflow {runtimeHealth?.operations?.workflowStatus || '-'} · review {runtimeHealth?.operations?.reviewTaskStatus || '-'} · Host smoke {hostSmokeOkCount}/{hostSmokeCount}</p>
-      </Card>
-
-      <Card title="版本锁定">
-        <div className="version-grid">
-          <div><span>prob</span><b>{data.versions.probModelVersion || '-'}</b></div>
-          <div><span>q</span><b>{data.versions.qModelVersion || '-'}</b></div>
-          <div><span>chain</span><b>{data.versions.decisionChainVersion || '-'}</b></div>
-          <div><span>review</span><b>{data.versions.reviewTagVersion || '-'}</b></div>
-          <div><span>config</span><b>{hashShort}</b><small>仅显示 hash</small></div>
-          <div><span>review_version</span><b>{data.versions.reviewVersion || data.review.reviewVersion || '-'}</b></div>
-        </div>
-      </Card>
-    </div>
-
-    <Card title="数据源新鲜度" icon={<Database />}>
-      <div className="table-wrap"><table><thead><tr><th>Source</th><th>Status</th><th>Last Success</th><th>Age</th><th>Attempts</th><th>Rows</th><th>Error</th></tr></thead><tbody>{data.sources.map((source) => <tr key={source.sourceName}><td>{source.sourceName}</td><td><Badge tone={statusTone(source.status)}>{source.status}</Badge></td><td>{source.lastSuccessAt || '-'}</td><td>{minutesLabel(source.ageMinutes)}</td><td>{source.okCount}/{source.totalAttempts}<br/><small>fail {source.failCount}</small></td><td>{source.rowsParsed.toLocaleString('zh-CN')}</td><td>{source.error || '-'}</td></tr>)}</tbody></table></div>
+    <Card title="数据源健康" icon={<Database />}>
+      <div className="table-wrap"><table><thead><tr><th>数据源</th><th>状态</th><th>最后成功</th><th>新鲜度</th><th>采集</th><th>错误摘要</th></tr></thead><tbody>{data.sources.map((source) => <tr key={source.sourceName}><td>{source.sourceName}</td><td><Badge tone={statusTone(source.status)}>{opsStatusLabel(source.status)}</Badge></td><td>{source.lastSuccessAt || '-'}</td><td>{minutesLabel(source.ageMinutes)}</td><td>{source.okCount}/{source.totalAttempts}<br/><small>失败 {source.failCount}</small></td><td>{source.error || '-'}</td></tr>)}</tbody></table></div>
     </Card>
 
     <div className="grid two-col">
       <Card title="决策快照">
         <div className="ops-kpi-grid">
-          <div><span>active</span><b>{data.snapshots.activeCount}</b></div>
-          <div><span>draft_replacement</span><b className={hasDraft ? 'warn-value' : undefined}>{data.snapshots.draftReplacementCount}</b></div>
-          <div><span>superseded</span><b>{data.snapshots.supersededCount}</b></div>
+          <div><span>正式</span><b>{data.snapshots.activeCount}</b></div>
+          <div><span>待确认</span><b className={hasDraft ? 'warn-value' : undefined}>{data.snapshots.draftReplacementCount}</b></div>
+          <div><span>历史</span><b>{data.snapshots.supersededCount}</b></div>
         </div>
-        {hasDraft ? <div className="table-wrap"><table><thead><tr><th>#</th><th>Match</th><th>Generated</th><th>Checked</th></tr></thead><tbody>{data.snapshots.pendingDrafts.map((draft) => <tr key={draft.matchId}><td>{draft.matchIdx}</td><td>{draft.matchId}</td><td>{draft.generatedAt}</td><td>{draft.checkedAt}</td></tr>)}</tbody></table></div> : <p>没有待确认 draft_replacement。</p>}
+        {hasDraft ? <div className="table-wrap"><table><thead><tr><th>#</th><th>比赛</th><th>生成</th><th>检查</th></tr></thead><tbody>{data.snapshots.pendingDrafts.map((draft) => <tr key={draft.matchId}><td>{draft.matchIdx}</td><td>{draft.matchId}</td><td>{draft.generatedAt}</td><td>{draft.checkedAt}</td></tr>)}</tbody></table></div> : <p>没有待确认决策草稿。</p>}
       </Card>
 
-      <Card title="赛后复盘状态">
+      <Card title="复盘进度">
         <div className="ops-kpi-grid">
           <div><span>已结算</span><b>{data.review.settledMatchCount}</b></div>
           <div><span>已复盘</span><b>{data.review.reviewedMatchCount}</b></div>
           <div><span>未复盘</span><b className={unreviewed ? 'warn-value' : undefined}>{data.review.unreviewedSettledCount}</b></div>
         </div>
-        <p>版本 {data.review.reviewVersion || '-'} · 最新 {data.review.latestReviewAt || '-'}</p>
+        <p>最新复盘 {data.review.latestReviewAt || '-'}</p>
         <div className="review-task-panel">
           <div className="review-task-head">
-            <div><span>任务</span><b><Badge tone={reviewTaskTone}>{reviewTask.status || 'not_run'}</Badge></b><small>{reviewTask.runId || '尚未运行'}</small></div>
-            <div><span>触发</span><b>{reviewTask.requestedBy || '-'}</b><small>{reviewTask.dryRun ? 'dry-run' : 'real run'}</small></div>
+            <div><span>任务</span><b><Badge tone={reviewTaskTone}>{opsStatusLabel(reviewTask.status)}</Badge></b><small>{reviewTask.dryRun ? '试运行' : '正式写入'}</small></div>
+            <div><span>检查</span><b>{reviewTask.result.wouldInsert ?? '-'}</b><small>预计写入</small></div>
             <div><span>耗时</span><b>{secondsLabel(reviewTask.elapsedSec)}</b><small>{reviewTask.finishedAt || reviewTask.startedAt || '-'}</small></div>
           </div>
           <div className="snapshot-action-row">
@@ -1437,28 +1636,28 @@ function OperationsStatus({
               执行复盘写入
             </button>
             <small className={currentReviewTaskState?.status === 'failed' ? 'bad-value' : currentReviewTaskState?.status === 'succeeded' ? 'good-text' : undefined}>
-              {currentReviewTaskState?.message || `入口 ${reviewTask.triggerEndpoint || `POST /api/issues/${data.issueId}/postmatch-review?dry_run=1`}`}
+              {currentReviewTaskState?.message || '试运行先检查，正式写入只处理未复盘赛果'}
             </small>
           </div>
-          {reviewTask.error ? <div className="ops-warning bad"><Badge tone="bad">postmatch_review_failed</Badge><b>复盘失败</b><span>{reviewTask.error}</span></div> : null}
+          {reviewTask.error ? <div className="ops-warning bad"><Badge tone="bad">复盘</Badge><b>复盘失败</b><span>{reviewTask.error}</span></div> : null}
           <div className="review-task-result">
-            <span>would_insert {reviewTask.result.wouldInsert ?? '-'}</span>
-            <span>inserted {reviewTask.result.inserted ?? '-'}</span>
-            <span>coverage {reviewTask.result.coverageHits ?? '-'}</span>
-            <span>profit {reviewTask.result.profit !== undefined ? money(reviewTask.result.profit) : '-'}</span>
+            <span>预计写入 {reviewTask.result.wouldInsert ?? '-'}</span>
+            <span>已写入 {reviewTask.result.inserted ?? '-'}</span>
+            <span>覆盖命中 {reviewTask.result.coverageHits ?? '-'}</span>
+            <span>收益 {reviewTask.result.profit !== undefined ? money(reviewTask.result.profit) : '-'}</span>
           </div>
         </div>
         {unreviewed && <div className="table-wrap"><table><thead><tr><th>#</th><th>比赛</th><th>赛果</th><th>SP</th></tr></thead><tbody>{data.review.unreviewedMatches.map((match) => <tr key={match.matchId}><td>{match.matchIdx}</td><td>{match.label}<br/><small>{match.matchId}</small></td><td>{match.resultLabel}</td><td>{match.winningSp ?? '-'}</td></tr>)}</tbody></table></div>}
       </Card>
     </div>
 
-    <Card title="告警">
-      {data.warnings.length ? <div className="ops-warning-list">{data.warnings.map((warning) => <div key={`${warning.code}-${warning.label}`} className={`ops-warning ${statusTone(warning.severity)}`}>
-        <Badge tone={statusTone(warning.severity)}>{warning.code}</Badge>
-        <b>{warning.label}</b>
-        <span>{warning.detail}</span>
-      </div>)}</div> : <div className="empty-state"><b>没有阻断项</b><span>API、数据源、snapshot 和复盘状态当前可用。</span></div>}
-      <small>本地 SQLite 与表结构细节已隐藏。</small>
+    <Card title="操作区" icon={<Server />}>
+      <div className="workflow-head">
+        <div><span>刷新流程</span><b><Badge tone={workflowTone}>{opsStatusLabel(data.workflow.status)}</Badge></b><small>{workflowStepSummary}</small></div>
+        <div><span>数据检查</span><b><Badge tone={statusTone(data.runtime.apiHealth)}>{healthProbeLabel(runtimeHealth?.api)}</Badge></b><small>{data.runtime.checkedAt || '未检查'}</small></div>
+        <div><span>页面访问</span><b>{accessModeLabel(data.runtime.accessMode, data.runtime.externalAccessConfigured)}</b><small>{data.runtime.publicDiagnostics ? '诊断开启' : '诊断关闭'}</small></div>
+        <div><span>最近耗时</span><b>{secondsLabel(data.workflow.elapsedSec)}</b><small>{data.workflow.finishedAt || data.workflow.startedAt || '-'}</small></div>
+      </div>
     </Card>
   </div>;
 }
@@ -1470,16 +1669,31 @@ function LiveSignals({ data }: { data: DashboardData['liveSignals'] }) {
 function SettlementReview({
   data,
   availableIssues,
+  decisionVariantOptions,
   selectedIssue,
+  selectedDecisionVariant,
   onIssueChange,
+  onDecisionVariantChange,
   onOpenMatch,
 }: {
   data: DashboardData['settlement'];
   availableIssues: DashboardData['availableIssues'];
+  decisionVariantOptions: DecisionVariantOption[];
   selectedIssue: string;
+  selectedDecisionVariant: string;
   onIssueChange: (issueId: string) => void;
+  onDecisionVariantChange: (variantId: string) => void;
   onOpenMatch: (matchId: string) => void;
 }) {
+  const rawDecisionOptions = data.strategyVersionContext?.options?.length
+    ? data.strategyVersionContext.options
+    : data.decisionVariantOptions?.length
+      ? data.decisionVariantOptions
+      : decisionVariantOptions;
+  const reviewDecisionOptions = displayableDecisionVariants(rawDecisionOptions);
+  const selectedDecisionOption = reviewDecisionOptions.find((option) => option.variantId === selectedDecisionVariant)
+    ?? reviewDecisionOptions.find((option) => option.isDefault)
+    ?? reviewDecisionOptions[0];
   const summary = data.postmatchSummary;
   const tagEntries = Object.entries(summary?.tagCounts ?? {}).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   const defaultTag = tagEntries[0]?.[0] ?? '';
@@ -1494,7 +1708,7 @@ function SettlementReview({
   const topTags = tagEntries.slice(0, 8);
   const reviewIssueOptions = availableIssues.filter(isSettlementReviewIssue);
   const takeaways = settlementTakeaways(data);
-  const nRows = nSettlementRows(data);
+  const focusRows = settlementFocusRows(data);
   return <div className="grid page-grid settlement-review-page">
     <Card title={`赛后复盘 / Issue ${data.issueId}`} icon={<AlertTriangle />}>
       <div className="issue-toolbar settlement-toolbar">
@@ -1504,6 +1718,12 @@ function SettlementReview({
             {reviewIssueOptions.map((issue) => <option key={issue.issueId} value={issue.issueId}>{issue.label}</option>)}
           </select>
         </label> : <div className="empty-state"><b>暂无已完结期</b><span>当前没有可复盘的完整结算期。</span></div>}
+        {reviewDecisionOptions.length ? <label>
+          <span>决策链版本</span>
+          <select value={selectedDecisionOption?.variantId || selectedDecisionVariant || ''} onChange={(event) => onDecisionVariantChange(event.target.value)} aria-label="选择复盘决策链版本" disabled={reviewDecisionOptions.length <= 1}>
+            {reviewDecisionOptions.map((option) => <option key={option.variantId} value={option.variantId}>{decisionVersionLabel(option)}</option>)}
+          </select>
+        </label> : null}
       </div>
       <div className="hero-stats">
         <div><span>投入</span><b>{money(data.totalStake)}</b></div>
@@ -1531,6 +1751,20 @@ function SettlementReview({
       </div> : <div className="empty-state"><b>暂无复盘标签</b></div>}
     </Card>
 
+    <Card title="复盘焦点">
+      {focusRows.length ? <div className="table-wrap"><table className="postmatch-review-table focus-review-table">
+        <thead><tr><th>类型</th><th>比赛</th><th>押 / 保 / 赛果</th><th>收益</th><th>判断</th><th>下一步</th></tr></thead>
+        <tbody>{focusRows.map((item) => <tr key={item.key}>
+          <td><Badge tone={item.tone}>{item.label}</Badge></td>
+          <td><b>#{item.row.matchIdx}</b> {item.row.home || item.row.matchId}{item.row.away ? ` vs ${item.row.away}` : ''}<br/><small>{item.row.league || '-'} · {item.row.kickoffTime || '-'}</small></td>
+          <td>{item.row.llmJudgment || item.row.selectedOutcomes.join('+') || '-'}<br/><small>{item.row.score || '-'} · {item.row.resultLabel || '-'} {item.row.winningSp ? `(${item.row.winningSp})` : ''}</small></td>
+          <td><b className={item.row.profit >= 0 ? 'profit-good' : 'profit-bad'}>{money(item.row.profit)}</b><br/><small>ROI {pct(item.row.roi)}</small></td>
+          <td>{item.reason}</td>
+          <td>{item.row.actionSuggestion || '保留到下一轮规则复核。'}</td>
+        </tr>)}</tbody>
+      </table></div> : <div className="empty-state"><b>暂无焦点场次</b><span>复盘脚本尚未写入逐场标签。</span></div>}
+    </Card>
+
     <Card title="标签对应比赛">
       {visibleReviews.length ? <div className="table-wrap"><table className="postmatch-review-table">
         <thead><tr><th>#</th><th>比赛</th><th>下注 / 赛果</th><th>命中</th><th>收益</th><th>标签</th><th>动作</th></tr></thead>
@@ -1553,26 +1787,6 @@ function SettlementReview({
           <b>{item.body}</b>
         </div>)}
       </div>
-    </Card>
-
-    <Card title="N串1结算">
-      <p className="n-settlement-note">
-        {money(N_SETTLEMENT_BUDGET)} / {nRows[0]?.diverseTicketCount ?? 0}注；主押 {nRows[0]?.primaryHits ?? 0}/{nRows[0]?.totalLegs ?? 0}，押+保 {nRows[0]?.coverageHits ?? 0}/{nRows[0]?.totalLegs ?? 0}，死腿 {nRows[0]?.deadLegs ?? 0}
-      </p>
-      <div className="table-wrap"><table className="n-settlement-table"><thead><tr><th>N</th><th>组合空间</th><th>500注覆盖</th><th>主押全中</th><th>押+保全中</th><th>保护抬升</th><th>1000回报</th><th>1000收益</th><th>ROI</th><th>差1空间</th><th>差2空间</th><th>下注含义</th></tr></thead><tbody>{nRows.map((row) => <tr key={row.n}>
-        <td><b>{row.n}串1</b></td>
-        <td>{row.totalCombos ? row.totalCombos.toLocaleString('zh-CN') : '-'}</td>
-        <td>{pct1(row.diversifiedComboShare)}</td>
-        <td>{pct1(row.primaryExactRate)}</td>
-        <td><b className={row.coverageExactRate && row.coverageExactRate >= 0.15 ? 'profit-good' : row.coverageExactRate && row.coverageExactRate < 0.08 ? 'profit-bad' : undefined}>{pct1(row.coverageExactRate)}</b></td>
-        <td>{pct1(row.protectionLift)}</td>
-        <td>{moneyFixed(row.diversifiedGrossReturn)}</td>
-        <td><b className={row.diversifiedProfit !== undefined && row.diversifiedProfit >= 0 ? 'profit-good' : 'profit-bad'}>{moneyFixed(row.diversifiedProfit)}</b></td>
-        <td>{pct1(row.diversifiedRoi)}</td>
-        <td>{pct1(row.missBy1Rate)}</td>
-        <td>{pct1(row.missBy2Rate)}</td>
-        <td>{row.verdict}</td>
-      </tr>)}</tbody></table></div>
     </Card>
   </div>;
 }
@@ -1650,10 +1864,13 @@ function StrategyLab({ data }: { data: DashboardData['strategyLab'] }) {
 
 export default function App() {
 	  const [page, setPage] = useState<Page>('Issue Dashboard');
-	  const [selectedIssue, setSelectedIssue] = useState('current');
-	  const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>();
-		  const [selectedDecisionVariant, setSelectedDecisionVariant] = useState(DEFAULT_DECISION_VARIANT_ID);
-		  const [data, setData] = useState<DashboardShellData | null>(null);
+		  const [selectedIssue, setSelectedIssue] = useState('current');
+			  const [selectedMatchId, setSelectedMatchId] = useState<string | undefined>();
+					  const [selectedDecisionVariant, setSelectedDecisionVariant] = useState(DEFAULT_DECISION_VARIANT_ID);
+					  const [selectedSegmentBudgetYuan, setSelectedSegmentBudgetYuan] = useState('1000');
+				  const [selectedSegmentStakeMode, setSelectedSegmentStakeMode] = useState('scale_to_budget');
+				  const [selectedBettingPlanScope, setSelectedBettingPlanScope] = useState<BettingPlanScope>(DEFAULT_BETTING_PLAN_SCOPE);
+			  const [data, setData] = useState<DashboardShellData | null>(null);
 	  const [error, setError] = useState<string | null>(null);
 	  const [loadState, setLoadState] = useState<'idle' | 'loading' | 'refreshing'>('idle');
 	  const [pageLoadState, setPageLoadState] = useState<DeferredPageState | undefined>();
@@ -1727,7 +1944,9 @@ export default function App() {
       apply = (prev, payload) => ({ ...prev, matchDetail: payload as DashboardData['matchDetail'] });
       message = '正在加载单场详情...';
     } else if (page === 'Settlement Review') {
-      loaded = data.settlement?.issueId === settlementIssueId;
+      const loadedSettlementVariant = data.settlement?.strategyVersionContext?.selectedVariantId || '';
+      loaded = data.settlement?.issueId === settlementIssueId
+        && (!loadedSettlementVariant || loadedSettlementVariant === selectedDecisionVariant);
       promise = loaded ? undefined : adapter.getSettlementReview(settlementIssueId, selectedDecisionVariant);
       apply = (prev, payload) => ({ ...prev, settlement: payload as DashboardData['settlement'] });
       message = '正在加载最近完结期复盘...';
@@ -1736,21 +1955,21 @@ export default function App() {
       promise = loaded ? undefined : adapter.getOperationsStatus(issueId);
       apply = (prev, payload) => ({ ...prev, operations: payload as DashboardData['operations'] });
       message = '正在加载运行状态...';
-    } else if (page === 'Main Strategy') {
-      loaded = data.mainStrategy?.issueId === issueId;
-      promise = loaded ? undefined : adapter.getMainStrategy(issueId, selectedDecisionVariant);
-      apply = (prev, payload) => ({ ...prev, mainStrategy: payload as DashboardData['mainStrategy'] });
-      message = '正在加载主策略...';
-    } else if (page === 'Ticket Builder') {
-      loaded = data.ticket?.issueId === issueId;
-      promise = loaded ? undefined : adapter.getTicketDraft(issueId);
-      apply = (prev, payload) => ({ ...prev, ticket: payload as DashboardData['ticket'] });
-      message = '正在加载票池草稿...';
-    } else if (page === 'Selector Shadow') {
-      loaded = data.selectorShadow?.issueId === issueId;
-      promise = loaded ? undefined : adapter.getSelectorShadow(issueId);
-      apply = (prev, payload) => ({ ...prev, selectorShadow: payload as DashboardData['selectorShadow'] });
-      message = '正在加载影子策略...';
+	    } else if (page === 'Betting Plan') {
+	      const requestedBudgetYuan = selectedSegmentBudgetYuan.trim() ? Number(selectedSegmentBudgetYuan) : undefined;
+	      const normalizedBudgetYuan = requestedBudgetYuan !== undefined && Number.isFinite(requestedBudgetYuan) ? requestedBudgetYuan : undefined;
+	      loaded = data.segmentBettingPlan?.issueId === issueId
+	        && data.segmentBettingPlan?.requestedDecisionVariantId === selectedDecisionVariant
+	        && data.segmentBettingPlan?.requestedPlanningScope === selectedBettingPlanScope
+	        && (normalizedBudgetYuan === undefined || data.segmentBettingPlan?.requestedSegmentBudgetYuan === normalizedBudgetYuan)
+	        && (!selectedSegmentStakeMode || data.segmentBettingPlan?.requestedStakeMode === selectedSegmentStakeMode);
+	      promise = loaded ? undefined : adapter.getSegmentBettingPlan(issueId, selectedDecisionVariant, undefined, {
+	        planningScope: selectedBettingPlanScope,
+	        segmentBudgetYuan: normalizedBudgetYuan,
+	        stakeMode: selectedSegmentStakeMode,
+	      });
+	      apply = (prev, payload) => ({ ...prev, segmentBettingPlan: payload as DashboardData['segmentBettingPlan'] });
+      message = '正在加载下注设计...';
     } else if (page === 'Live Signals') {
       loaded = data.liveSignals?.issueId === issueId;
       promise = loaded ? undefined : adapter.getLiveSignals(issueId);
@@ -1779,15 +1998,16 @@ export default function App() {
         setPageErrors((prev) => ({ ...prev, [page]: err instanceof Error ? err.message : String(err) }));
         setPageLoadState(undefined);
       });
-  }, [adapter, data, dataMode, page, selectedDecisionVariant, selectedIssue, selectedMatchId]);
+	  }, [adapter, data, dataMode, page, selectedBettingPlanScope, selectedDecisionVariant, selectedIssue, selectedMatchId, selectedSegmentBudgetYuan, selectedSegmentStakeMode]);
 
-  const availableDecisionVariants = data?.issue.strategyVersionContext?.options?.length
+  const rawAvailableDecisionVariants = data?.issue.strategyVersionContext?.options?.length
     ? data.issue.strategyVersionContext.options
     : data?.issue.decisionVariantOptions?.length
       ? data.issue.decisionVariantOptions
       : data?.matchDetail?.strategyVersionContext?.options?.length
         ? data.matchDetail.strategyVersionContext.options
         : data?.matchDetail?.decisionVariantOptions ?? [];
+  const availableDecisionVariants = displayableDecisionVariants(rawAvailableDecisionVariants);
   const contextSelectedDecisionVariant = data?.issue.strategyVersionContext?.selectedVariantId
     || data?.matchDetail?.strategyVersionContext?.selectedVariantId
     || '';
@@ -1830,6 +2050,10 @@ export default function App() {
     }
   };
 
+	  const handleDecisionVariantChange = (variantId: string) => {
+	    setSelectedDecisionVariant(variantId);
+	  };
+
 	  if (!data) return <main><h1>北单实盘决策台</h1><p role={error ? 'alert' : undefined}>{error ? `数据加载失败：${error}` : 'Loading dashboard data...'}</p></main>;
 
 	  const settlementReviewIssues = data.availableIssues.filter(isSettlementReviewIssue);
@@ -1852,47 +2076,59 @@ export default function App() {
 		      availableIssues={data.availableIssues}
 		      selectedIssue={selectedIssueOption}
 		      selectedDecisionVariant={effectiveSelectedDecisionVariant}
-	      onIssueChange={(issueId) => {
-	        setSelectedIssue(issueId);
-	        setSelectedMatchId(undefined);
-	      }}
-	      onDecisionVariantChange={setSelectedDecisionVariant}
+		      onIssueChange={(issueId) => {
+		        setSelectedIssue(issueId);
+		        setSelectedMatchId(undefined);
+		      }}
+	      onDecisionVariantChange={handleDecisionVariantChange}
 	      onOpenMatch={(matchId) => {
 	        setSelectedMatchId(matchId);
 	        setPage('Match Detail');
 	      }}
-	      onOpenTicket={() => setPage('Ticket Builder')}
 	    />}
-	    {page === 'Main Strategy' && (data.mainStrategy
-	      ? <MainStrategy data={data.mainStrategy} />
-	      : <DeferredPage title="主策略" loading={activePageLoad} error={activePageError} />)}
+	    {page === 'Betting Plan' && (data.segmentBettingPlan ? <BettingPlan
+	      data={data.segmentBettingPlan}
+	      availableIssues={data.availableIssues}
+	      decisionVariantOptions={availableDecisionVariants}
+	      issueMatches={data.issue.matches}
+	      selectedIssue={selectedIssueOption}
+	      selectedDecisionVariant={effectiveSelectedDecisionVariant}
+		      onIssueChange={(issueId) => {
+		        setSelectedIssue(issueId);
+		        setSelectedMatchId(undefined);
+		      }}
+		      onDecisionVariantChange={handleDecisionVariantChange}
+		      selectedPlanningScope={selectedBettingPlanScope}
+		      onPlanningScopeChange={setSelectedBettingPlanScope}
+		      selectedSegmentBudgetYuan={selectedSegmentBudgetYuan}
+		      onSegmentBudgetChange={setSelectedSegmentBudgetYuan}
+		      selectedStakeMode={selectedSegmentStakeMode}
+		      onStakeModeChange={setSelectedSegmentStakeMode}
+		    /> : <DeferredPage title="下注设计" loading={activePageLoad} error={activePageError} />)}
 	    {page === 'Match Detail' && (data.matchDetail ? <MatchDetail
 	      data={data.matchDetail}
 	      selectedDecisionVariant={effectiveSelectedDecisionVariant}
-	      onDecisionVariantChange={setSelectedDecisionVariant}
+	      onDecisionVariantChange={handleDecisionVariantChange}
 	      confirmDraftState={confirmDraftState}
 	      onConfirmDraft={handleConfirmDraft}
 	    /> : <DeferredPage title="比赛详情" loading={activePageLoad} error={activePageError} />)}
 	    {page === 'Operations' && (data.operations
 	      ? <OperationsStatus data={data.operations} reviewTaskState={reviewTaskState} onRunPostmatchReview={handleRunPostmatchReview} />
 	      : <DeferredPage title="运行状态" loading={activePageLoad} error={activePageError} />)}
-	    {page === 'Ticket Builder' && (data.ticket
-	      ? <TicketBuilder data={data.ticket} />
-	      : <DeferredPage title="投注构建" loading={activePageLoad} error={activePageError} />)}
-	    {page === 'Selector Shadow' && (data.selectorShadow
-	      ? <SelectorShadow data={data.selectorShadow} />
-	      : <DeferredPage title="影子策略" loading={activePageLoad} error={activePageError} />)}
 	    {page === 'Live Signals' && (data.liveSignals
 	      ? <LiveSignals data={data.liveSignals} />
 	      : <DeferredPage title="实时信号" loading={activePageLoad} error={activePageError} />)}
 	    {page === 'Settlement Review' && (data.settlement ? <SettlementReview
 	      data={data.settlement}
 	      availableIssues={data.availableIssues}
+	      decisionVariantOptions={availableDecisionVariants}
 	      selectedIssue={selectedSettlementIssue}
-	      onIssueChange={(issueId) => {
-	        setSelectedIssue(issueId);
-	        setSelectedMatchId(undefined);
-	      }}
+	      selectedDecisionVariant={effectiveSelectedDecisionVariant}
+		      onIssueChange={(issueId) => {
+		        setSelectedIssue(issueId);
+		        setSelectedMatchId(undefined);
+		      }}
+	      onDecisionVariantChange={handleDecisionVariantChange}
 	      onOpenMatch={(matchId) => {
 	        setSelectedMatchId(matchId);
 	        setPage('Match Detail');

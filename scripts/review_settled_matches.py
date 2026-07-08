@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Create post-match review rows for settled live matches.
 
-This script records an audit snapshot of the active LLM decision snapshot
+This script records an audit snapshot of a specific decision-chain variant
 against final settled results. It is intentionally append-only per review
 version: dynamic match details may keep changing, but a post-match review should
 not silently rewrite the prior betting decision basis.
@@ -24,10 +24,12 @@ if str(ROOT) not in sys.path:
 from src.sqlite_runtime import connect_sqlite  # noqa: E402
 
 DEFAULT_DB = ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
-REVIEW_VERSION = "v2_active_llm_snapshot_tags"
+DEFAULT_DECISION_VARIANT_ID = "active_v3.3.3"
+REVIEW_VERSION = "v3_decision_variant_active_v3_3_3_tags"
 REVIEW_TAG_VERSION = "postmatch_tags_v2"
 OUTCOME_LABEL = {"3": "胜", "1": "平", "0": "负"}
 REQUIRED_REVIEW_COLUMNS = {
+    "decision_variant_id": "TEXT",
     "decision_snapshot_id": "TEXT",
     "decision_snapshot_generated_at": "TEXT",
     "decision_snapshot_status": "TEXT",
@@ -36,6 +38,9 @@ REQUIRED_REVIEW_COLUMNS = {
     "outcome_label": "TEXT",
     "action_suggestion": "TEXT",
     "issue_day_key": "TEXT",
+}
+REQUIRED_SUMMARY_COLUMNS = {
+    "decision_variant_id": "TEXT",
 }
 
 
@@ -114,16 +119,29 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         )
         """
     )
+    existing_summary_cols = {row[1] for row in conn.execute("PRAGMA table_info(postmatch_review_issue_summary)")}
+    for col, col_type in REQUIRED_SUMMARY_COLUMNS.items():
+        if col not in existing_summary_cols:
+            conn.execute(f"ALTER TABLE postmatch_review_issue_summary ADD COLUMN {col} {col_type}")
 
 
-def reviewed_keys(conn: sqlite3.Connection, issue: str) -> set[tuple[str, int]]:
+def slugify(value: str) -> str:
+    return "".join(ch if ch.isalnum() else "_" for ch in value.strip().lower()).strip("_")
+
+
+def review_version_for_decision_variant(decision_variant_id: str) -> str:
+    variant = decision_variant_id.strip()
+    return f"v3_decision_variant_{slugify(variant)}_tags" if variant else REVIEW_VERSION
+
+
+def reviewed_keys(conn: sqlite3.Connection, issue: str, review_version: str) -> set[tuple[str, int]]:
     rows = conn.execute(
         """
         SELECT issue, match_idx
         FROM postmatch_reviews
         WHERE issue=? AND review_version=?
         """,
-        (issue, REVIEW_VERSION),
+        (issue, review_version),
     ).fetchall()
     return {(str(row[0]), int(row[1])) for row in rows}
 
@@ -140,6 +158,41 @@ def as_code_list(raw: object) -> list[str]:
     if not isinstance(raw, list):
         return []
     return [str(item) for item in raw if str(item) in OUTCOME_LABEL]
+
+
+def as_dict(raw: object) -> dict[str, object]:
+    return raw if isinstance(raw, dict) else {}
+
+
+def selected_decision(match: dict[str, object], decision_variant_id: str) -> dict[str, object]:
+    if not decision_variant_id:
+        selected = as_code_list(match.get("llm_selection_codes") or match.get("selection_codes"))
+        primary = str(match.get("llm_selection") or (selected[0] if selected else ""))
+        return {
+            "variant_id": "",
+            "selection_codes": selected,
+            "primary_pick": primary,
+            "recommendation": str(match.get("llm_judgment") or ""),
+            "selection_type": str(match.get("llm_selection_type") or ""),
+            "stop_flag": False,
+            "source": str(match.get("llm_source") or match.get("selection_source") or ""),
+            "version": str(match.get("model_version") or ""),
+            "decision_chain": match.get("llm_decision_chain") or [],
+        }
+    variant = as_dict(match.get("selected_decision_variant"))
+    selected = as_code_list(variant.get("selection_codes"))
+    primary = str(variant.get("primary_pick") or (selected[0] if selected else ""))
+    return {
+        "variant_id": str(variant.get("variant_id") or decision_variant_id),
+        "selection_codes": selected,
+        "primary_pick": primary,
+        "recommendation": str(variant.get("recommendation") or ""),
+        "selection_type": str(variant.get("selection_type") or ""),
+        "stop_flag": bool(variant.get("stop_flag")),
+        "source": str(variant.get("source") or ""),
+        "version": str(variant.get("version") or variant.get("version_id") or ""),
+        "decision_chain": variant.get("decision_chain") or [],
+    }
 
 
 def outcome_probability(match: dict[str, object], code: str) -> float:
@@ -232,15 +285,16 @@ def action_suggestion(tags: list[str], outcome_label: str) -> str:
     return "复盘无新增动作。"
 
 
-def build_review(match: dict[str, object], reviewed_at: str) -> dict[str, object]:
+def build_review(match: dict[str, object], reviewed_at: str, *, review_version: str, decision_variant_id: str) -> dict[str, object]:
     issue = str(match["issue"])
     match_idx = int(match["match_idx"])
     actual = str(match["result_code"])
     actual_label = str(match.get("result_label") or OUTCOME_LABEL.get(actual, actual))
     winning_sp = float(match.get("winning_sp") or 0.0)
-    selected = as_code_list(match.get("llm_selection_codes") or match.get("selection_codes"))
-    primary = str(match.get("llm_selection") or (selected[0] if selected else ""))
-    stopped = 1 if not selected or str(match.get("llm_selection_type") or "") == "stop" else 0
+    decision = selected_decision(match, decision_variant_id)
+    selected = as_code_list(decision.get("selection_codes"))
+    primary = str(decision.get("primary_pick") or (selected[0] if selected else ""))
+    stopped = 1 if not selected or bool(decision.get("stop_flag")) or str(decision.get("selection_type") or "") in {"stop", "no-buy"} else 0
     protect_codes = [code for code in selected if code != primary]
     primary_hit = 1 if primary == actual else 0
     protect_hit = 1 if actual in protect_codes else 0
@@ -279,8 +333,10 @@ def build_review(match: dict[str, object], reviewed_at: str) -> dict[str, object
         "issue": issue,
         "match_idx": match_idx,
         "match_id": match.get("match_id"),
+        "review_version": review_version,
+        "decision_variant_id": decision_variant_id,
         "reviewed_at": reviewed_at,
-        "decision_chain": match.get("llm_decision_chain") or [],
+        "decision_chain": decision.get("decision_chain") or match.get("llm_decision_chain") or [],
         "decision_snapshot_id": match.get("decision_snapshot_id"),
         "decision_snapshot_generated_at": match.get("decision_snapshot_generated_at"),
         "decision_snapshot_status": match.get("decision_snapshot_status"),
@@ -325,10 +381,11 @@ def build_review(match: dict[str, object], reviewed_at: str) -> dict[str, object
         "issue": issue,
         "match_idx": match_idx,
         "match_id": str(match.get("match_id") or f"{issue}_{match_idx:03d}"),
-        "review_version": REVIEW_VERSION,
+        "review_version": review_version,
+        "decision_variant_id": decision_variant_id,
         "reviewed_at": reviewed_at,
         "decision_generated_ts": str(match.get("decision_snapshot_generated_at") or match.get("generated_ts") or ""),
-        "decision_source": str(match.get("llm_source") or match.get("selection_source") or ""),
+        "decision_source": str(decision.get("source") or decision.get("version") or match.get("llm_source") or match.get("selection_source") or ""),
         "decision_snapshot_id": str(match.get("decision_snapshot_id") or ""),
         "decision_snapshot_generated_at": str(match.get("decision_snapshot_generated_at") or ""),
         "decision_snapshot_status": str(match.get("decision_snapshot_status") or ""),
@@ -348,7 +405,7 @@ def build_review(match: dict[str, object], reviewed_at: str) -> dict[str, object
         "winning_sp": winning_sp,
         "llm_selection": primary,
         "llm_selection_codes_json": json.dumps(selected, ensure_ascii=False),
-        "llm_judgment": str(match.get("llm_judgment") or ""),
+        "llm_judgment": str(decision.get("recommendation") or match.get("llm_judgment") or ""),
         "primary_hit": primary_hit,
         "protect_hit": protect_hit,
         "coverage_hit": coverage_hit,
@@ -378,7 +435,7 @@ def insert_reviews(conn: sqlite3.Connection, rows: list[dict[str, object]]) -> i
     return int(conn.total_changes)
 
 
-def write_issue_summary(conn: sqlite3.Connection, issue: str, rows: list[dict[str, object]], reviewed_at: str) -> dict[str, object]:
+def write_issue_summary(conn: sqlite3.Connection, issue: str, rows: list[dict[str, object]], reviewed_at: str, *, review_version: str, decision_variant_id: str) -> dict[str, object]:
     tag_counts: dict[str, int] = {}
     for row in rows:
         for tag in json.loads(str(row["failure_tags_json"] or "[]")):
@@ -388,7 +445,8 @@ def write_issue_summary(conn: sqlite3.Connection, issue: str, rows: list[dict[st
     profit = sum(float(row["profit"]) for row in rows)
     summary = {
         "issue": issue,
-        "review_version": REVIEW_VERSION,
+        "review_version": review_version,
+        "decision_variant_id": decision_variant_id,
         "reviewed_at": reviewed_at,
         "n_reviews": len(rows),
         "stake": stake,
@@ -416,7 +474,7 @@ def write_issue_summary(conn: sqlite3.Connection, issue: str, rows: list[dict[st
     return summary
 
 
-def load_review_rows(conn: sqlite3.Connection, issue: str) -> list[dict[str, object]]:
+def load_review_rows(conn: sqlite3.Connection, issue: str, review_version: str) -> list[dict[str, object]]:
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         """
@@ -425,58 +483,93 @@ def load_review_rows(conn: sqlite3.Connection, issue: str) -> list[dict[str, obj
         WHERE issue=? AND review_version=?
         ORDER BY match_idx
         """,
-        (issue, REVIEW_VERSION),
+        (issue, review_version),
     ).fetchall()
     return [dict(row) for row in rows]
 
 
-def load_dashboard(issue: str, db_path: Path) -> dict[str, object]:
+def load_dashboard(issue: str, db_path: Path, decision_variant_id: str) -> dict[str, object]:
     ensure_import_path()
     from src.decision_api.app import create_app
 
     app = create_app(sqlite_db=db_path)
     with app.test_client() as client:
-        response = client.get(f"/api/issues/{issue}/dashboard")
+        suffix = f"?decision_variant={decision_variant_id}" if decision_variant_id else ""
+        response = client.get(f"/api/issues/{issue}/dashboard{suffix}")
         if response.status_code != 200:
             raise RuntimeError(f"dashboard API failed for {issue}: {response.status_code} {response.get_data(as_text=True)}")
         return response.get_json()
+
+
+def validate_decision_variant_ready(dashboard: dict[str, object], decision_variant_id: str) -> None:
+    if not decision_variant_id:
+        return
+    context = as_dict(dashboard.get("strategy_version_context"))
+    status = str(context.get("selection_status") or "")
+    if status != "ok":
+        error = str(context.get("selection_error") or "decision variant unavailable")
+        raise RuntimeError(f"decision variant not reviewable: {decision_variant_id}; status={status}; {error}")
+    bad_indices = [
+        int(match.get("match_idx") or 0)
+        for match in dashboard.get("matches", [])
+        if isinstance(match, dict)
+        and is_settled(match)
+        and str(match.get("selected_decision_variant_status") or "") != "ok"
+    ]
+    if bad_indices:
+        shown = ",".join(str(idx) for idx in bad_indices[:12])
+        more = f",...(+{len(bad_indices) - 12})" if len(bad_indices) > 12 else ""
+        raise RuntimeError(
+            f"decision variant has unavailable settled rows: {decision_variant_id}; match_idx={shown}{more}"
+        )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--issue", default="current")
+    parser.add_argument("--decision-variant", default=DEFAULT_DECISION_VARIANT_ID, help="Decision-chain variant to review, e.g. active_v3.3.3")
+    parser.add_argument("--review-version", default="", help="Override persisted postmatch review_version")
+    parser.add_argument("--replace", action="store_true", help="Delete existing rows for this issue/review-version before writing")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+    decision_variant_id = str(args.decision_variant or "").strip()
+    review_version = str(args.review_version or "").strip() or review_version_for_decision_variant(decision_variant_id)
 
     with connect_sqlite(args.db) as conn:
         ensure_schema(conn)
 
-    dashboard = load_dashboard(args.issue, args.db)
+    dashboard = load_dashboard(args.issue, args.db, decision_variant_id)
+    validate_decision_variant_ready(dashboard, decision_variant_id)
     issue = str(dashboard.get("issue") or args.issue)
     reviewed_at = now_hk()
 
     with connect_sqlite(args.db) as conn:
         ensure_schema(conn)
-        existing = reviewed_keys(conn, issue)
+        if args.replace and not args.dry_run:
+            conn.execute("DELETE FROM postmatch_reviews WHERE issue=? AND review_version=?", (issue, review_version))
+            conn.execute("DELETE FROM postmatch_review_issue_summary WHERE issue=? AND review_version=?", (issue, review_version))
+        existing = reviewed_keys(conn, issue, review_version)
         rows = [
-            build_review(match, reviewed_at)
+            build_review(match, reviewed_at, review_version=review_version, decision_variant_id=decision_variant_id)
             for match in dashboard.get("matches", [])
             if is_settled(match)
             and has_active_decision_snapshot(match)
             and (str(match.get("issue")), int(match.get("match_idx") or 0)) not in existing
         ]
         if args.dry_run:
-            print(json.dumps({"issue": issue, "would_insert": len(rows), "rows": rows}, ensure_ascii=False, indent=2))
+            print(json.dumps({"issue": issue, "decision_variant_id": decision_variant_id, "review_version": review_version, "would_insert": len(rows), "rows": rows}, ensure_ascii=False, indent=2))
             return
         before_insert = conn.total_changes
         insert_reviews(conn, rows)
         inserted = conn.total_changes - before_insert
-        issue_summary = write_issue_summary(conn, issue, load_review_rows(conn, issue), reviewed_at)
+        issue_summary = write_issue_summary(conn, issue, load_review_rows(conn, issue, review_version), reviewed_at, review_version=review_version, decision_variant_id=decision_variant_id)
         conn.commit()
 
     summary = {
         "issue": issue,
+        "decision_variant_id": decision_variant_id,
+        "review_version": review_version,
         "inserted": inserted,
         "reviewed_at": reviewed_at,
         "stake": issue_summary["stake"],

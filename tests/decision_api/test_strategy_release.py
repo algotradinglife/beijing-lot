@@ -256,8 +256,18 @@ def test_shadow_variant_options_are_manifest_allowlisted(tmp_path: Path) -> None
         "active_release_id": "main_n7_384_2026_07_04",
         "release_id": "main_n7_384_2026_07_04",
         "decision_variants": [
-            {"variant_id": "active_v3", "version_id": "3.0.0", "kind": "active", "label": "v3", "source": "active_snapshot", "is_default": False, "selectable": True},
-            {"variant_id": "shadow_v3.3.3", "version_id": "3.3.3", "kind": "shadow", "label": "shadow v3.3.3", "source": "structured_shadow_csv", "artifact_key": "structured_shadow_dir", "is_default": True, "selectable": True},
+            {
+                "variant_id": "active_v3.3.3",
+                "version_id": "3.3.3",
+                "kind": "shadow",
+                "label": "正式版 v3.3.3",
+                "source": "structured_shadow_csv",
+                "artifact_key": "structured_shadow_dir",
+                "artifact_variant_ids": ["shadow_v3.3.3"],
+                "legacy_variant_ids": ["shadow_v3.3.3"],
+                "is_default": True,
+                "selectable": True,
+            },
         ],
         "artifacts": {"structured_shadow_dir": str(shadow_dir)},
         "required_artifacts": [],
@@ -275,13 +285,14 @@ def test_shadow_variant_options_are_manifest_allowlisted(tmp_path: Path) -> None
     )
     available = appmod._strategy_version_context(release, options, "shadow_v3.3.3")
 
-    assert [item["variant_id"] for item in options] == ["active_v3", "shadow_v3.3.3"]
+    assert [item["variant_id"] for item in options] == ["active_v3.3.3"]
     assert suppressed == ["shadow_v3.3.1"]
     assert unavailable["selection_status"] == "unavailable"
-    assert unavailable["selected_variant_id"] == "shadow_v3.3.3"
+    assert unavailable["selected_variant_id"] == "active_v3.3.3"
     assert unavailable["contract_warnings"][0]["variant_ids"] == ["shadow_v3.3.1"]
     assert available["selection_status"] == "ok"
-    assert available["selected_variant_id"] == "shadow_v3.3.3"
+    assert available["resolved_requested_variant_id"] == "active_v3.3.3"
+    assert available["selected_variant_id"] == "active_v3.3.3"
 
 
 def test_shadow_variant_version_key_supports_four_digit_fix_numbers() -> None:
@@ -294,8 +305,16 @@ def test_shadow_variant_version_key_supports_four_digit_fix_numbers() -> None:
 def test_incomplete_shadow_variant_is_suppressed_from_options() -> None:
     release = {
         "decision_variants": [
-            {"variant_id": "active_v3", "kind": "active", "source": "active_snapshot", "is_default": False, "selectable": True},
-            {"variant_id": "shadow_v3.3.3", "kind": "shadow", "source": "structured_shadow_csv", "is_default": True, "selectable": True},
+            {
+                "variant_id": "active_v3.3.3",
+                "kind": "shadow",
+                "source": "structured_shadow_csv",
+                "artifact_key": "structured_shadow_dir",
+                "artifact_variant_ids": ["shadow_v3.3.3"],
+                "legacy_variant_ids": ["shadow_v3.3.3"],
+                "is_default": True,
+                "selectable": True,
+            },
         ]
     }
     shadow_variants = [
@@ -314,7 +333,7 @@ def test_incomplete_shadow_variant_is_suppressed_from_options() -> None:
         )
     ]
 
-    complete, incomplete = appmod._complete_shadow_variants("26072", shadow_variants, {1, 2})
+    complete, incomplete = appmod._complete_shadow_variants("26072", shadow_variants, {1, 2}, release=release)
     options = appmod._decision_variant_options(complete, release=release)
     context = appmod._strategy_version_context(
         release,
@@ -324,11 +343,12 @@ def test_incomplete_shadow_variant_is_suppressed_from_options() -> None:
     )
 
     assert complete == []
-    assert incomplete[0]["variant_id"] == "shadow_v3.3.3"
+    assert incomplete[0]["variant_id"] == "active_v3.3.3"
+    assert incomplete[0]["artifact_variant_id"] == "shadow_v3.3.3"
     assert incomplete[0]["missing_match_idx"] == [2]
-    assert [item["variant_id"] for item in options] == ["active_v3"]
-    assert context["selection_status"] == "unavailable"
-    assert context["selected_variant_id"] == "active_v3"
+    assert [item["variant_id"] for item in options] == ["active_v3.3.3"]
+    assert context["selection_status"] == "degraded"
+    assert context["selected_variant_id"] == "active_v3.3.3"
     assert context["contract_warnings"][0]["type"] == "structured_shadow_artifacts_incomplete"
     assert context["contract_warnings"][0]["artifacts"][0]["missing_match_idx"] == [2]
 
@@ -373,16 +393,14 @@ def test_shadow_execution_variant_exposes_sp_repricing_fields() -> None:
 
 def test_manifest_default_stays_default_over_higher_shadow_versions() -> None:
     options = [
-        {"variant_id": "active_v3", "kind": "active", "is_default": False, "defaultable": True, "available": True, "selectable": True},
-        {"variant_id": "shadow_v3.3.3", "kind": "shadow", "is_default": True, "defaultable": True, "available": True, "selectable": True},
-        {"variant_id": "shadow_v4.2.0000_execution_strict_fullcap2", "kind": "shadow", "is_default": False, "defaultable": True, "available": True, "selectable": True},
+        {"variant_id": "active_v3.3.3", "kind": "shadow", "is_default": True, "defaultable": True, "available": True, "selectable": True},
         {"variant_id": "shadow_v4.2.0000_execution_late_proxy_fullcap2", "kind": "shadow", "is_default": False, "defaultable": True, "available": True, "selectable": True},
     ]
 
     normalized = appmod._normalize_decision_variant_defaults(options)
 
     defaults = [item["variant_id"] for item in normalized if item["is_default"]]
-    assert defaults == ["shadow_v3.3.3"]
+    assert defaults == ["active_v3.3.3"]
 
 
 def _execution_release(shadow_dir: Path) -> dict[str, object]:
@@ -390,48 +408,22 @@ def _execution_release(shadow_dir: Path) -> dict[str, object]:
         "release_id": "fixture_execution_release",
         "decision_variants": [
             {
-                "variant_id": "active_v3",
-                "version_id": "3.0.0",
-                "kind": "active",
-                "source": "active_snapshot",
-                "is_default": False,
-                "selectable": True,
-                "readiness": {
-                    "artifact_required": False,
-                    "defaultable_when": "always",
-                    "missing_behavior": "builtin_active",
-                    "late_refresh": "not_applicable",
-                },
-            },
-            {
-                "variant_id": "shadow_v3.3.3",
+                "variant_id": "active_v3.3.3",
                 "version_id": "3.3.3",
                 "kind": "shadow",
+                "label": "正式版 v3.3.3",
                 "source": "structured_shadow_csv",
                 "artifact_key": "structured_shadow_dir",
+                "artifact_variant_ids": ["shadow_v3.3.3"],
+                "legacy_variant_ids": ["shadow_v3.3.3"],
                 "is_default": True,
                 "selectable": True,
                 "readiness": {
                     "artifact_required": True,
                     "defaultable_when": "available",
-                    "missing_behavior": "fallback_to_active",
+                    "missing_behavior": "unavailable",
                     "late_refresh": "not_applicable",
-                },
-            },
-            {
-                "variant_id": "shadow_v4.2.0000_execution_strict_fullcap2",
-                "version_id": "4.2.0000",
-                "kind": "shadow",
-                "source": "structured_shadow_csv",
-                "artifact_key": "structured_shadow_dir",
-                "is_default": False,
-                "selectable": True,
-                "readiness": {
-                    "artifact_required": True,
-                    "defaultable_when": "never",
-                    "missing_behavior": "diagnostic_placeholder",
-                    "late_refresh": "strict_wait_before_valid_live_sp_refresh",
-                    "missing_reason": "strict_execution_artifact_missing_for_issue",
+                    "missing_reason": "structured_shadow_artifact_missing_for_issue",
                 },
             },
             {
@@ -478,13 +470,9 @@ def test_execution_variant_readiness_defaults_only_real_artifacts(tmp_path: Path
 
     variants, suppressed = appmod._structured_shadow_variant_scan(issue, release)
     options = appmod._decision_variant_options(variants, release=release)
-    strict_option = next(item for item in options if item["variant_id"] == "shadow_v4.2.0000_execution_strict_fullcap2")
     assert suppressed == []
-    assert next(item["variant_id"] for item in options if item["is_default"]) == "shadow_v3.3.3"
-    assert strict_option["available"] is False
-    assert strict_option["defaultable"] is False
-    assert strict_option["readiness_status"] == "degraded"
-    assert strict_option["degraded_reason"] == "strict_execution_artifact_missing_for_issue"
+    assert [item["variant_id"] for item in options] == ["active_v3.3.3"]
+    assert next(item["variant_id"] for item in options if item["is_default"]) == "active_v3.3.3"
     assert not any(item["variant_id"] == "shadow_v4.2.0000_execution_late_proxy_fullcap2" for item in options)
 
     _write_csv(
@@ -494,11 +482,8 @@ def test_execution_variant_readiness_defaults_only_real_artifacts(tmp_path: Path
     )
     variants, _suppressed = appmod._structured_shadow_variant_scan(issue, release)
     options = appmod._decision_variant_options(variants, release=release)
-    strict_option = next(item for item in options if item["variant_id"] == "shadow_v4.2.0000_execution_strict_fullcap2")
-    assert strict_option["available"] is True
-    assert strict_option["defaultable"] is False
-    assert strict_option["readiness_status"] == "available"
-    assert next(item["variant_id"] for item in options if item["is_default"]) == "shadow_v3.3.3"
+    assert [item["variant_id"] for item in options] == ["active_v3.3.3"]
+    assert next(item["variant_id"] for item in options if item["is_default"]) == "active_v3.3.3"
 
     _write_csv(
         shadow_dir / f"{issue}_late" / f"structured_shadow_{issue}.csv",
@@ -511,7 +496,7 @@ def test_execution_variant_readiness_defaults_only_real_artifacts(tmp_path: Path
     assert late_option["available"] is True
     assert late_option["defaultable"] is False
     assert late_option["readiness_status"] == "available"
-    assert next(item["variant_id"] for item in options if item["is_default"]) == "shadow_v3.3.3"
+    assert next(item["variant_id"] for item in options if item["is_default"]) == "active_v3.3.3"
 
 
 def test_unavailable_execution_variant_does_not_become_default(tmp_path: Path) -> None:
@@ -553,29 +538,19 @@ def test_unavailable_execution_variant_does_not_become_default(tmp_path: Path) -
     appmod._attach_selected_decision_variant(matches, context["selected_variant_id"])
     selected = matches[0]["selected_decision_variant"]
     appmod._attach_selected_decision_variant(matches, strict_context["selected_variant_id"])
-    strict_selected = matches[0]["selected_decision_variant"]
 
     assert suppressed == []
-    assert option_ids == ["active_v3", "shadow_v3.3.3", "shadow_v4.2.0000_execution_strict_fullcap2"]
+    assert option_ids == ["active_v3.3.3"]
     assert "shadow_v4.2.0000_execution_late_proxy_fullcap2" not in option_ids
-    assert options[2]["available"] is False
-    assert options[2]["defaultable"] is False
-    assert options[2]["readiness_status"] == "degraded"
     assert context["selection_status"] == "ok"
-    assert context["selected_variant_id"] == "shadow_v3.3.3"
-    assert selected["variant_id"] == "shadow_v3.3.3"
+    assert context["selected_variant_id"] == "active_v3.3.3"
+    assert selected["variant_id"] == "active_v3.3.3"
+    assert selected["artifact_variant_id"] == "shadow_v3.3.3"
     assert selected["selection_codes"] == ["3", "1"]
     assert selected["stop_flag"] is False
 
-    assert strict_context["selection_status"] == "degraded"
-    assert strict_context["selected_variant_id"] == "shadow_v4.2.0000_execution_strict_fullcap2"
-    assert strict_selected["variant_id"] == "shadow_v4.2.0000_execution_strict_fullcap2"
-    assert strict_selected["selection_codes"] == []
-    assert strict_selected["selection_type"] == "no-buy"
-    assert strict_selected["stop_flag"] is True
-    assert matches[0]["selected_decision_variant_status"] == "degraded"
-    assert strict_selected["execution_action"] == "skip_wait_late_refresh"
-    assert strict_selected["execution_unlock_state"] == "waiting_late_refresh"
+    assert strict_context["selection_status"] == "unavailable"
+    assert strict_context["selected_variant_id"] == "active_v3.3.3"
 
 
 def test_main_strategy_reads_release_artifacts(monkeypatch, tmp_path: Path) -> None:
