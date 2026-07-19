@@ -1,0 +1,29 @@
+{
+  "artifact_type": "research_only_nonselectable_roi_unauthorized",
+  "base_commit": "bb11c1a3110fb2b75851d05a85bf4d4eb566e951",
+  "input_panel": {
+    "historical_p1_p2_rows": 0,
+    "status": "blocked_fail_closed",
+    "reason": "no_historical_p1_p2_rows"
+  },
+  "loop_payload": {
+    "eligibility": {
+      "eligible": false,
+      "reasons": [
+        "no_historical_p1_p2_rows"
+      ]
+    },
+    "evidence_sha256": {
+      "ah_to_1x2_methodology": "762011201098e0fa45c7a2f09f80e7ea3b6d7a2cc88ba84ac0f71896ca6a4309",
+      "forward_contract": "322d278ac1976242a2955832fc1179ea2191c5c5ea20e19575a10743f7dff51e",
+      "g1_poisson_reference": "fc9a7ae08955e16a0ad8109f5659d31f66507e26718da476d1fe32864dd7ab63",
+      "loop_implementation": "4468f9698af982c8beb6b78f7737d3ac626bfc6da2524b7b85dfd58523222483"
+    },
+    "prediction_count": 0,
+    "selection_diagnostic": [],
+    "status": "research_only_nonselectable_roi_unauthorized",
+    "summaries": []
+  },
+  "loop_payload_sha256": "ed8cf1655c547ad41809f70292bd3faf9306198253adf374bd0946de46799413",
+  "persistence": "static research record only; no shared SQLite, production artifact, ticket, or release state"
+}
