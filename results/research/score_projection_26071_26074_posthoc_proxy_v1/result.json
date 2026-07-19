@@ -1,0 +1,80 @@
+{
+  "status": "research_only_post_hoc_proxy_non_executable_non_selectable_roi_unauthorized",
+  "evidence_classification": "small_sample_post_hoc_proxy_only_never_promotion_evidence",
+  "input": {
+    "path": "results/strategy_parallel/S13_0005_approximate_score_projection_draw_replay_v1/a5_diagnostic_predictions.csv",
+    "sha256": "86ab097fb4be06ed883811d3c015ceb5ef1241be1ea3a9284316572bb9367998",
+    "source_checksum_verified": true,
+    "allowlisted_source_candidates": ["baseline_handicap_probability", "g1_score_projection"],
+    "excluded_source_candidates": ["g1_logit_calibrated_draw", "baseline_g1_chronological_blend"]
+  },
+  "selection_lock": {
+    "path": "results/research/score_projection_26071_26074_posthoc_proxy_v1/selection_lock.json",
+    "sha256": "7b4f5bf5dc3d87afd6a893644bb80c51cb7f9ceaf82fdd82e1c7f17751559166",
+    "verified_before_holdout_label_parse": true,
+    "holdout_label_evaluations": 1
+  },
+  "partition": {"tuning_issues": ["26071", "26072", "26073"], "holdout_issue": "26074"},
+  "selected_candidate": {
+    "name": "G1_logit_L2_1",
+    "calibration_l2": 1.0,
+    "calibration_iterations": 4,
+    "intercept": 0.036788882627408294,
+    "slope": 0.9610905292904738,
+    "fitted_rows": 93
+  },
+  "metric_definition": "binary handicap-draw proper scores; lower Brier, log loss, and 10-bin draw ECE are better",
+  "per_issue": {
+    "26071": {
+      "n": 16, "draw_count": 4, "draw_rate": 0.25,
+      "G0_no_change": {"binary_draw_brier": 0.18605376462990136, "binary_draw_log_loss": 0.5590007986171276, "draw_ece_10bin": 0.045431176936541445},
+      "G1_no_change": {"binary_draw_brier": 0.18975935932647037, "binary_draw_log_loss": 0.5673719350810105, "draw_ece_10bin": 0.09855655819189561},
+      "G1_logit_L2_1": {"binary_draw_brier": 0.18959068243396043, "binary_draw_log_loss": 0.5667479534887564, "draw_ece_10bin": 0.06229374749555966}
+    },
+    "26072": {
+      "n": 67, "draw_count": 15, "draw_rate": 0.22388059701492538,
+      "G0_no_change": {"binary_draw_brier": 0.1743385864332591, "binary_draw_log_loss": 0.5316264667744197, "draw_ece_10bin": 0.06597489189543913},
+      "G1_no_change": {"binary_draw_brier": 0.17196917551442117, "binary_draw_log_loss": 0.526850267977944, "draw_ece_10bin": 0.040153850040287965},
+      "G1_logit_L2_1": {"binary_draw_brier": 0.17278183098176783, "binary_draw_log_loss": 0.529183605447037, "draw_ece_10bin": 0.03914262210741556}
+    },
+    "26073": {
+      "n": 10, "draw_count": 5, "draw_rate": 0.5,
+      "G0_no_change": {"binary_draw_brier": 0.3059790380283597, "binary_draw_log_loss": 0.8214932146931441, "draw_ece_10bin": 0.2190650361263026},
+      "G1_no_change": {"binary_draw_brier": 0.32000132975139073, "binary_draw_log_loss": 0.8603402042636615, "draw_ece_10bin": 0.3150077787060507},
+      "G1_logit_L2_1": {"binary_draw_brier": 0.3125853858618629, "binary_draw_log_loss": 0.8396670389653625, "draw_ece_10bin": 0.30291284578664246}
+    },
+    "26074": {
+      "n": 65, "draw_count": 21, "draw_rate": 0.3230769230769231,
+      "G0_no_change": {"binary_draw_brier": 0.21789594081298883, "binary_draw_log_loss": 0.627384226840661, "draw_ece_10bin": 0.04537161598374578},
+      "G1_no_change": {"binary_draw_brier": 0.22161798393940868, "binary_draw_log_loss": 0.6363788876610592, "draw_ece_10bin": 0.07851190269965112},
+      "G1_logit_L2_1": {"binary_draw_brier": 0.21946998179186883, "binary_draw_log_loss": 0.630927231558328, "draw_ece_10bin": 0.08217421096404998}
+    }
+  },
+  "aggregates": {
+    "tuning_26071_26073": {
+      "n": 93, "draw_count": 24, "draw_rate": 0.25806451612903225,
+      "G0_no_change": {"binary_draw_brier": 0.19050898823000412, "binary_draw_log_loss": 0.5675044967601246, "draw_ece_10bin": 0.03179103469587164},
+      "G1_no_change": {"binary_draw_brier": 0.19094728823874896, "binary_draw_log_loss": 0.569680870521022, "draw_ece_10bin": 0.015503587159097889},
+      "G1_logit_L2_1": {"binary_draw_brier": 0.19070631670258537, "binary_draw_log_loss": 0.5690316044131744, "draw_ece_10bin": 0.010807108629215306}
+    },
+    "holdout_26074": {
+      "n": 65, "draw_count": 21, "draw_rate": 0.3230769230769231,
+      "G0_no_change": {"binary_draw_brier": 0.21789594081298883, "binary_draw_log_loss": 0.627384226840661, "draw_ece_10bin": 0.04537161598374578},
+      "G1_no_change": {"binary_draw_brier": 0.22161798393940868, "binary_draw_log_loss": 0.6363788876610592, "draw_ece_10bin": 0.07851190269965112},
+      "G1_logit_L2_1": {"binary_draw_brier": 0.21946998179186883, "binary_draw_log_loss": 0.630927231558328, "draw_ece_10bin": 0.08217421096404998}
+    },
+    "descriptive_all_26071_26074": {
+      "n": 158, "draw_count": 45, "draw_rate": 0.2848101265822785,
+      "G0_no_change": {"binary_draw_brier": 0.20177577252047246, "binary_draw_log_loss": 0.5921385629324977, "draw_ece_10bin": 0.031115705544320475},
+      "G1_no_change": {"binary_draw_brier": 0.20356497950800764, "binary_draw_log_loss": 0.5971199282052145, "draw_ece_10bin": 0.04142472962831285},
+      "G1_logit_L2_1": {"binary_draw_brier": 0.2025394700621007, "binary_draw_log_loss": 0.5944949953273201, "draw_ece_10bin": 0.0401669925011409}
+    }
+  },
+  "holdout_deltas_vs_G0_no_change": {
+    "G1_logit_L2_1": {"binary_draw_brier": 0.0015740409788800036, "binary_draw_log_loss": 0.0035430047176669976, "draw_ece_10bin": 0.03680259498030419},
+    "G1_no_change": {"binary_draw_brier": 0.003722043126419855, "binary_draw_log_loss": 0.008994660820398237, "draw_ece_10bin": 0.03314028671590534}
+  },
+  "transfer_supported": false,
+  "transfer_reason": "The selected calibration improves 26074 Brier and log loss relative to raw G1, but worsens draw ECE versus raw G1 and is worse than G0 no-change on every reported binary-draw metric. It therefore does not support transfer as an improvement over the no-change reference.",
+  "prohibited": ["terminal_correct_score_odds", "roi", "ticket_data", "payout_data", "production_api", "frontend", "collector", "scheduler", "release_manifest", "formal_strategy", "shared_sqlite"]
+}
