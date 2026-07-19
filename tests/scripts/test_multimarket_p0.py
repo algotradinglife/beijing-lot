@@ -1,0 +1,204 @@
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import sqlite3
+import sys
+from pathlib import Path
+
+import pytest
+
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from scripts import scrape_500_bjdc as scraper  # noqa: E402
+from src import multimarket_p0 as p0  # noqa: E402
+
+
+def market_xml(playid: int, *, winner_only: str | None = None, winner_sp: float = 5.25) -> bytes:
+    _, outcomes = scraper.MARKET_OUTCOMES[playid]
+    attributes = []
+    for index, (code, _label, attribute) in enumerate(outcomes):
+        value = winner_sp if winner_only == code else "" if winner_only else 2.25 + index
+        attributes.append(f'{attribute}="{value}"')
+    return (
+        '<root updatetime="2026-07-16 20:00:00">'
+        f'<w1 {" ".join(attributes)} h="主队" a="客队" gn="测试联赛" r="0" st="" />'
+        "</root>"
+    ).encode("gb18030")
+
+
+def make_db(path: Path, *, cutoff: str = "2026-07-17 06:50", disabled: str = "no") -> sqlite3.Connection:
+    connection = sqlite3.connect(path)
+    connection.row_factory = sqlite3.Row
+    scraper.create_schema(connection)
+    connection.execute(
+        """
+        INSERT INTO matches(
+            issue,match_idx,home,away,end_time,schedule_date,disabled,score,fetched_at
+        ) VALUES('P0X',1,'主队','客队',?,'2026-07-17',?,'','2026-07-16 10:00:00')
+        """,
+        (cutoff, disabled),
+    )
+    connection.execute(
+        """
+        CREATE TABLE nowscore_bjdc_matches(
+            issue TEXT,match_idx INTEGER,kickoff_time TEXT,score TEXT,
+            status_text TEXT,status TEXT
+        )
+        """
+    )
+    connection.execute(
+        "INSERT INTO nowscore_bjdc_matches VALUES('P0X',1,'07:00','','','scheduled')"
+    )
+    connection.commit()
+    return connection
+
+
+def capture(
+    connection: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    playid: int,
+    payload: bytes,
+    *,
+    fetched_at: str = "2026-07-16 12:00:00",
+) -> int:
+    monkeypatch.setattr(
+        scraper,
+        "fetch_url",
+        lambda *args, **kwargs: scraper.FetchResult(
+            url=f"https://example.test/{playid}.xml",
+            status=200,
+            body=payload,
+            elapsed_sec=0.1,
+        ),
+    )
+    monkeypatch.setattr(scraper, "now_utc", lambda: fetched_at)
+    args = argparse.Namespace(
+        playid=playid,
+        timeout=10,
+        user_agent="test",
+        keep_going=False,
+        capture_root=tmp_path / "captures",
+    )
+    return scraper.scrape_live_sp(connection, "P0X", args)
+
+
+def test_append_only_capture_bundle_is_hashed_and_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    connection = make_db(tmp_path / "db.sqlite")
+    payload = market_xml(40)
+
+    assert capture(connection, monkeypatch, tmp_path, 40, payload) == 1
+    assert capture(connection, monkeypatch, tmp_path, 40, payload) == 1
+    batches = connection.execute("SELECT * FROM market_sp_capture_batches").fetchall()
+    assert len(batches) == 1
+    assert connection.execute("SELECT COUNT(*) FROM live_market_sp_snapshots").fetchone()[0] == 8
+    bundle = Path(batches[0]["bundle_path"])
+    assert p0.verify_bundle(bundle)["raw.xml"] == p0.sha256_bytes(payload)
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["complete_forward_open_rows"] == 1
+    assert manifest["classification_summary"] == {"forward_complete_open": 8}
+    row = connection.execute(
+        "SELECT match_id,sale_status,sale_cutoff_hkt,capture_classification,parlay_allowed "
+        "FROM live_market_sp_snapshots LIMIT 1"
+    ).fetchone()
+    assert tuple(row) == (
+        "P0X_001",
+        "open",
+        "2026-07-17T06:50:00+08:00",
+        "forward_complete_open",
+        "unknown",
+    )
+    connection.close()
+
+
+def test_10h_freeze_links_valid_dual_clock_batches_and_rejects_tamper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection = make_db(tmp_path / "db.sqlite")
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40))
+    capture(connection, monkeypatch, tmp_path, 42, market_xml(42))
+
+    result = p0.freeze_10h(connection, "P0X", tmp_path / "freeze")
+    assert result["frozen_match_markets"] == 2
+    assert result["frozen_outcome_rows"] == 33
+    with (tmp_path / "freeze/frozen_outcomes.csv").open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert {row["sale_status"] for row in rows} == {"open"}
+    assert len({row["batch_id"] for row in rows}) == 2
+    assert p0.verify_freeze(tmp_path / "freeze")["status"] == "valid"
+    with (tmp_path / "freeze/frozen_outcomes.csv").open("a", encoding="utf-8") as handle:
+        handle.write("tamper\n")
+    with pytest.raises(p0.MultimarketP0Error, match="checksum mismatch"):
+        p0.verify_freeze(tmp_path / "freeze")
+
+    tampered_connection = make_db(tmp_path / "tampered.sqlite")
+    capture(tampered_connection, monkeypatch, tmp_path / "tampered", 40, market_xml(40))
+    batch = tampered_connection.execute("SELECT bundle_path FROM market_sp_capture_batches").fetchone()
+    with (Path(batch[0]) / "raw.xml").open("ab") as handle:
+        handle.write(b"tamper")
+    with pytest.raises(p0.MultimarketP0Error, match="checksum mismatch"):
+        p0.freeze_10h(tampered_connection, "P0X", tmp_path / "bad-freeze", playids=(40,))
+    connection.close()
+    tampered_connection.close()
+
+
+def test_capture_database_rows_rollback_together(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    connection = make_db(tmp_path / "db.sqlite")
+    connection.execute(
+        """
+        CREATE TRIGGER reject_market_rows BEFORE INSERT ON live_market_sp_snapshots
+        BEGIN SELECT RAISE(ABORT, 'forced detail failure'); END
+        """
+    )
+    connection.commit()
+    with pytest.raises(sqlite3.IntegrityError, match="forced detail failure"):
+        capture(connection, monkeypatch, tmp_path, 40, market_xml(40))
+    assert connection.execute("SELECT COUNT(*) FROM market_sp_capture_batches").fetchone()[0] == 0
+    assert connection.execute("SELECT COUNT(*) FROM live_market_sp_snapshots").fetchone()[0] == 0
+    connection.close()
+
+
+def test_terminal_backfill_and_closed_capture_cannot_enter_10h(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    terminal = make_db(tmp_path / "terminal.sqlite", cutoff="2026-07-16 19:00", disabled="yes")
+    capture(terminal, monkeypatch, tmp_path / "terminal", 40, market_xml(40, winner_only="3"))
+    row = terminal.execute(
+        "SELECT capture_classification,sale_status FROM live_market_sp_snapshots LIMIT 1"
+    ).fetchone()
+    assert tuple(row) == ("terminal_backfill_exploratory_only", "closed")
+    with pytest.raises(p0.MultimarketP0Error, match="no valid 10h"):
+        p0.freeze_10h(terminal, "P0X", tmp_path / "terminal-freeze", playids=(40,))
+    terminal.close()
+
+
+def test_settlement_truth_maps_total_score_other_and_sp1(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    connection = make_db(tmp_path / "db.sqlite", cutoff="2026-07-16 19:00", disabled="yes")
+    connection.execute("UPDATE matches SET score='5:4' WHERE issue='P0X'")
+    connection.execute(
+        "UPDATE nowscore_bjdc_matches SET score='5-4',status_text='完场',status='finished' WHERE issue='P0X'"
+    )
+    connection.commit()
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40, winner_only="7+", winner_sp=1.0))
+    capture(connection, monkeypatch, tmp_path, 42, market_xml(42, winner_only="home_other", winner_sp=42.0))
+
+    result = p0.build_settlement_truth(connection, "P0X")
+    assert result["status_counts"] == {"void_sp1": 1, "settled": 1}
+    rows = {
+        row["market_key"]: row
+        for row in connection.execute("SELECT * FROM multimarket_settlement_truth")
+    }
+    assert (rows["total_goals"]["fthg"], rows["total_goals"]["ftag"]) == (5, 4)
+    assert rows["total_goals"]["outcome_code"] == "7+"
+    assert rows["total_goals"]["settlement_status"] == "void_sp1"
+    assert json.loads(rows["total_goals"]["special_flags_json"]) == ["sp1_void"]
+    assert rows["total_goals"]["winning_sp_source"] == "terminal_backfill_exploratory_only"
+    assert rows["correct_score"]["outcome_code"] == "home_other"
+    assert rows["correct_score"]["winning_sp"] == 42.0
+    assert rows["correct_score"]["source_batch_id"]
+    connection.close()
