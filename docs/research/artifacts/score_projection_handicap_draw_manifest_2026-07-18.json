@@ -1,0 +1,31 @@
+{
+  "artifact_type": "research_only_nonselectable_roi_unauthorized",
+  "integrity_algorithm": "sha256",
+  "records": {
+    "handoff": {
+      "path": "docs/research/score_projection_handicap_draw_handoff_2026-07-18.md",
+      "sha256": "9a7bc65fa17094d1d10320d2722a811749086cd5618250a132fc1ceaef20a835"
+    },
+    "implementation": {
+      "path": "research/handicap_draw_projection/loop.py",
+      "sha256": "4468f9698af982c8beb6b78f7737d3ac626bfc6da2524b7b85dfd58523222483"
+    },
+    "loop_result": {
+      "path": "docs/research/artifacts/score_projection_handicap_draw_2026-07-18.json",
+      "sha256": "fc86928da21ec2399f45254e180243cf33a65bd0fc158581119b6eae32c57c8f"
+    },
+    "plan": {
+      "path": "docs/research/score_projection_handicap_draw_plan_2026-07-18.md",
+      "sha256": "0add072811e29bf74c53a12ff04dfe49f41481592dda0d3346a3272ff97bea42"
+    },
+    "report": {
+      "path": "docs/research/score_projection_handicap_draw_report_2026-07-18.md",
+      "sha256": "fcad376e5cd90ebb56a3bcc9c4b75ea65621c9ee29c5add11f568d3c795ad146"
+    },
+    "tests": {
+      "path": "tests/research/test_handicap_draw_projection.py",
+      "sha256": "5f3dd19ee43980ecedcbb3b82d615156056f4d2d980aad5ef0aeeb40b6725546"
+    }
+  },
+  "scope": "static research records only; no production state or shared SQLite"
+}

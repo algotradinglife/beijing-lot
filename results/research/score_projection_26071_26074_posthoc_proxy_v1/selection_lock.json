@@ -1,0 +1,37 @@
+{
+  "status": "research_only_post_hoc_proxy_non_executable_non_selectable_roi_unauthorized",
+  "purpose": "fit-only lock; created before parsing or scoring 26074 labels",
+  "input": {
+    "path": "results/strategy_parallel/S13_0005_approximate_score_projection_draw_replay_v1/a5_diagnostic_predictions.csv",
+    "sha256": "86ab097fb4be06ed883811d3c015ceb5ef1241be1ea3a9284316572bb9367998",
+    "allowlisted_fields": ["issue", "match_id", "match_idx", "candidate", "p3", "p1_draw", "p0", "outcome"],
+    "accepted_source_candidates": ["baseline_handicap_probability", "g1_score_projection"],
+    "excluded_source_candidates": ["g1_logit_calibrated_draw", "baseline_g1_chronological_blend"]
+  },
+  "partition": {
+    "tuning_issues": ["26071", "26072", "26073"],
+    "holdout_issue": "26074",
+    "holdout_labels_parsed_at_lock": false
+  },
+  "grid_lock_document": {
+    "path": "docs/research/2026-07-18-26071-26073-score-projection-calibration-lock.md",
+    "sha256": "eda9d3173cec101caa2eabd893a0a969547f5571f738bcaaaa71ac2a9056187d"
+  },
+  "selection_rule": "lowest aggregate binary draw Brier; then lower binary draw log loss; then listed order",
+  "tuning_candidate_scores": [
+    {"candidate": "G1_no_change", "n": 93, "binary_draw_brier": 0.19094728823874896, "binary_draw_log_loss": 0.569680870521022, "draw_ece_10bin": 0.015503587159097889},
+    {"candidate": "G1_logit_L2_1", "n": 93, "binary_draw_brier": 0.19070631670258537, "binary_draw_log_loss": 0.5690316044131744, "draw_ece_10bin": 0.010807108629215306},
+    {"candidate": "G1_logit_L2_4", "n": 93, "binary_draw_brier": 0.19070826857208883, "binary_draw_log_loss": 0.5690365328993464, "draw_ece_10bin": 0.007526533696427659},
+    {"candidate": "G1_logit_L2_16", "n": 93, "binary_draw_brier": 0.19072632050588795, "binary_draw_log_loss": 0.5690838349961003, "draw_ece_10bin": 0.007748899424182413}
+  ],
+  "selected_candidate": {
+    "name": "G1_logit_L2_1",
+    "calibration_l2": 1.0,
+    "calibration_iterations": 4,
+    "intercept": 0.036788882627408294,
+    "slope": 0.9610905292904738,
+    "fitted_rows": 93,
+    "fitted_issues": ["26071", "26072", "26073"]
+  },
+  "prohibited": ["terminal_correct_score_odds", "roi", "ticket_data", "payout_data", "production_api", "frontend", "collector", "scheduler", "release_manifest", "formal_strategy", "shared_sqlite"]
+}
