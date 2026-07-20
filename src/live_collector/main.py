@@ -94,9 +94,12 @@ def main():
     poll_n = 0
     try:
         while not _stop:
+            cycle_started = time.monotonic()
             poll_n += 1
             try:
                 coll.poll_once()
+                if _stop:
+                    break
                 if not args.no_settle:
                     # Issue-level kaijiang every cycle — one HTTP request,
                     # cheap; previously gated to %4 caused 20–60min stalls
@@ -115,8 +118,15 @@ def main():
                 log.info("duration reached, exiting")
                 break
 
-            sleep = random.randint(args.interval_min, args.interval_max)
-            log.info("sleeping %ds", sleep)
+            target_interval = random.randint(args.interval_min, args.interval_max)
+            cycle_elapsed = time.monotonic() - cycle_started
+            sleep = max(0, target_interval - int(cycle_elapsed))
+            log.info(
+                "sleeping %ds (target_interval=%ds cycle_elapsed=%.1fs)",
+                sleep,
+                target_interval,
+                cycle_elapsed,
+            )
             t0 = time.time()
             while not _stop and (time.time() - t0) < sleep:
                 time.sleep(1)

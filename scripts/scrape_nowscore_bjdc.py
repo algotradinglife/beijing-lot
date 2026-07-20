@@ -40,6 +40,7 @@ ATTR_RE = re.compile(r"""(\w+)\s*=\s*["']([^"']*)["']""", re.S)
 PROVIDER_RE = re.compile(r"Panlu\.aspx\?id=(\d+)", re.I)
 HREF_RE = re.compile(r"""href=["']([^"']+)["']""", re.I)
 SCORE_RE = re.compile(r"^\s*(\d+)\s*[-:]\s*(\d+)\s*$")
+RESULT_LABEL_BY_CODE = {"3": "胜", "1": "平", "0": "负"}
 
 
 def now_utc() -> str:
@@ -325,6 +326,83 @@ def upsert_match_rows(conn: sqlite3.Connection, rows: list[dict[str, object]]) -
     )
 
 
+def reconcile_finished_settlements(conn: sqlite3.Connection, issue: str) -> int:
+    """Fill missing 500 settlements from a finished Nowscore row.
+
+    Nowscore is the score authority here; the payout remains the matching
+    500.com option SP already stored on the issue row.  Do not overwrite an
+    existing official settlement, and require the two sources to agree on the
+    Beidan handicap before writing a result.
+    """
+    has_matches = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='matches'"
+    ).fetchone()
+    if not has_matches:
+        return 0
+
+    rows = conn.execute(
+        """
+        SELECT
+          m.issue,
+          m.match_idx,
+          m.handicap_line AS official_handicap,
+          m.sp_home,
+          m.sp_draw,
+          m.sp_away,
+          n.fetched_at,
+          n.handicap_line AS nowscore_handicap,
+          n.score,
+          n.result_code
+        FROM matches AS m
+        JOIN nowscore_bjdc_matches AS n
+          ON n.issue=m.issue AND n.match_idx=m.match_idx
+        WHERE m.issue=?
+          AND m.winning_sp IS NULL
+          AND n.status='finished'
+          AND n.result_code IN ('3', '1', '0')
+          AND TRIM(COALESCE(n.score, ''))<>''
+          AND (
+            m.handicap_line IS NULL
+            OR n.handicap_line IS NULL
+            OR ABS(m.handicap_line - n.handicap_line) < 0.000001
+          )
+        """,
+        (issue,),
+    ).fetchall()
+    updates: list[tuple[object, ...]] = []
+    for row in rows:
+        result_code = str(row["result_code"])
+        winning_sp = {
+            "3": row["sp_home"],
+            "1": row["sp_draw"],
+            "0": row["sp_away"],
+        }[result_code]
+        if winning_sp is None or float(winning_sp) <= 0:
+            continue
+        updates.append(
+            (
+                str(row["score"]),
+                RESULT_LABEL_BY_CODE[result_code],
+                result_code,
+                float(winning_sp),
+                str(row["fetched_at"]),
+                str(row["issue"]),
+                int(row["match_idx"]),
+            )
+        )
+    if not updates:
+        return 0
+    conn.executemany(
+        """
+        UPDATE matches
+        SET score=?, result_label=?, result_code=?, winning_sp=?, fetched_at=?
+        WHERE issue=? AND match_idx=? AND winning_sp IS NULL
+        """,
+        updates,
+    )
+    return len(updates)
+
+
 def scrape_issue(conn: sqlite3.Connection, issue: str, args: argparse.Namespace) -> int:
     fetched_at = now_utc()
     url = NOWSCORE_URL.format(issue=issue)
@@ -333,6 +411,7 @@ def scrape_issue(conn: sqlite3.Connection, issue: str, args: argparse.Namespace)
         text = payload.decode("utf-8", errors="replace")
         rows = parse_rows(issue, text, fetched_at)
         upsert_match_rows(conn, rows)
+        reconciled = reconcile_finished_settlements(conn, issue)
         insert_fetch_log(
             conn,
             fetched_at=fetched_at,
@@ -346,7 +425,10 @@ def scrape_issue(conn: sqlite3.Connection, issue: str, args: argparse.Namespace)
         )
         conn.commit()
         finished = sum(1 for row in rows if row.get("status") == "finished")
-        print(f"[nowscore] {issue}: rows={len(rows)} finished={finished}", flush=True)
+        print(
+            f"[nowscore] {issue}: rows={len(rows)} finished={finished} reconciled={reconciled}",
+            flush=True,
+        )
         return len(rows)
     except Exception as exc:
         insert_fetch_log(
@@ -379,7 +461,7 @@ def main() -> None:
     args = parser.parse_args()
 
     issues = [part.strip() for raw in args.issue for part in raw.split(",") if part.strip()]
-    conn = connect_sqlite(args.db)
+    conn = connect_sqlite(args.db, row_factory=True)
     try:
         create_schema(conn)
         total = 0

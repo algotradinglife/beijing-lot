@@ -152,12 +152,29 @@ class Collector:
         cur.execute("SELECT match_id, fid, handicap_line FROM matches "
                     "WHERE issue=?", (issue,))
         meta = {r[0]: (r[1], r[2]) for r in cur.fetchall()}
+        cur.execute(
+            "SELECT match_id, fthg, ftag, result_code, winning_sp, avg_eu_h, avg_eu_d, avg_eu_a "
+            "FROM settlements WHERE issue=?",
+            (issue,),
+        )
+        existing = {row[0]: tuple(row[1:]) for row in cur.fetchall()}
 
         n = 0
         n_corrected = 0
         for s in rows:
             if s.result_code is None and s.fthg is None:
                 continue  # row not yet settled
+            candidate = (
+                s.fthg,
+                s.ftag,
+                s.result_code,
+                s.winning_sp,
+                s.avg_eu_h,
+                s.avg_eu_d,
+                s.avg_eu_a,
+            )
+            if existing.get(s.match_id) == candidate:
+                continue
             fid, hcap = meta.get(s.match_id, (None, None))
             source = "500_kaijiang"
             # Cross-check via detail.php; only when we have an fid.

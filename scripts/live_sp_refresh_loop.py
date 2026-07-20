@@ -19,10 +19,16 @@ from scrape_500_bjdc import (  # noqa: E402
     create_schema,
     fetch_issue_list,
     issue_year,
+    parse_playids,
     scrape_issue,
     scrape_live_sp,
 )
 from src.sqlite_runtime import connect_sqlite  # noqa: E402
+from src.multimarket_p0 import (  # noqa: E402
+    MultimarketP0Error,
+    TARGET_PLAYIDS as P0_TARGET_PLAYIDS,
+    build_settlement_truth,
+)
 
 
 DEFAULT_INTERVAL_SEC = 900.0
@@ -108,14 +114,14 @@ def resolve_sp_refresh_issues(
     return selected
 
 
-def _scrape_namespace(args: argparse.Namespace) -> SimpleNamespace:
+def _scrape_namespace(args: argparse.Namespace, playid: int) -> SimpleNamespace:
     return SimpleNamespace(
         timeout=args.timeout,
         user_agent=args.user_agent,
         force=args.force,
         keep_going=True,
         live_sp=True,
-        playid=args.playid,
+        playid=playid,
         sleep=0,
     )
 
@@ -140,14 +146,24 @@ def run_once(conn, args: argparse.Namespace) -> int:
     _record_source_meta(conn, "last_live_sp_refresh_selected_issues", ",".join(selected))
     conn.commit()
 
-    scrape_args = _scrape_namespace(args)
+    playids = parse_playids(args.playid)
+    issue_args = _scrape_namespace(args, playids[0])
     total_rows = 0
     total_live_rows = 0
     for index, issue in enumerate(selected, start=1):
         print(f"[{now_iso()}] live_sp_refresh issue={issue} {index}/{len(selected)}", flush=True)
-        total_rows += scrape_issue(conn, issue, scrape_args)
+        total_rows += scrape_issue(conn, issue, issue_args)
         if args.live_sp:
-            total_live_rows += scrape_live_sp(conn, issue, scrape_args)
+            for playid in playids:
+                if playid != 34 and issue != current:
+                    continue
+                scrape_args = _scrape_namespace(args, playid)
+                total_live_rows += scrape_live_sp(conn, issue, scrape_args)
+        if any(playid in P0_TARGET_PLAYIDS for playid in playids):
+            try:
+                build_settlement_truth(conn, issue)
+            except MultimarketP0Error as exc:
+                print(f"[{now_iso()}] multimarket_settlement skipped issue={issue}: {exc}", flush=True)
         if args.sleep and index < len(selected):
             time.sleep(args.sleep)
 
@@ -174,7 +190,11 @@ def main() -> None:
     parser.add_argument("--recent-count", type=int, default=4)
     parser.add_argument("--open-limit", type=int, default=12)
     parser.add_argument("--open-year-lookback", type=int, default=1)
-    parser.add_argument("--playid", type=int, default=34)
+    parser.add_argument(
+        "--playid",
+        action="append",
+        help="BJDC play id or comma-separated ids; repeatable. Default: 34,40,41,42,51.",
+    )
     parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--sleep", type=float, default=0.2)
     parser.add_argument("--user-agent", default=DEFAULT_UA)

@@ -254,6 +254,14 @@ def build_digest(row: sqlite3.Row, sources: dict[str, dict[str, Any]]) -> dict[s
     stage_text = " ".join(part for part in (stage_name, group_name, f"第{match_round}轮" if match_round and match_round != "0" else "") if part)
 
     points: list[str] = []
+    if stage_text or competition_label:
+        stage_label = stage_text or competition_label
+        stage_kind = {
+            "knockout": "淘汰赛",
+            "group": "小组赛",
+            "league_round": "联赛轮次",
+        }.get(stage_type, "赛事阶段")
+        points.append(f"赛制：{stage_kind} · {shorten(stage_label, 120)}")
     standings = []
     if base.get("homestanding"):
         standings.append(f"{row['home']}第{base.get('homestanding')}")
@@ -276,6 +284,8 @@ def build_digest(row: sqlite3.Row, sources: dict[str, dict[str, Any]]) -> dict[s
         tags.append("500资料观点")
     if expert_titles:
         tags.append("专家标题池")
+    if stage_text or competition_label:
+        tags.append("赛制上下文")
     if base.get("is_zhongli") == "1":
         tags.append("中立场")
     headline = compact_headline(competition_label, stage_text, f"{row['league']} {row['home']} vs {row['away']}")
@@ -366,6 +376,14 @@ def select_matches(conn: sqlite3.Connection, args: argparse.Namespace) -> list[s
         if has_nowscore
         else ""
     )
+    has_digest = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='match_intel_digest' LIMIT 1"
+    ).fetchone()
+    digest_join = (
+        "LEFT JOIN match_intel_digest d ON d.issue=m.issue AND d.match_idx=m.match_idx"
+        if has_digest
+        else ""
+    )
     where = ["m.fid IS NOT NULL"]
     params: list[Any] = []
     if issue:
@@ -374,11 +392,18 @@ def select_matches(conn: sqlite3.Connection, args: argparse.Namespace) -> list[s
     if args.fid:
         where.append("m.fid=?")
         params.append(args.fid)
+    stale_hours = max(0.0, float(getattr(args, "stale_hours", 0.0) or 0.0))
+    if has_digest and stale_hours > 0:
+        where.append(
+            "(d.fetched_at IS NULL OR d.status!='ok' OR datetime(d.fetched_at) < datetime('now', ?))"
+        )
+        params.append(f"-{stale_hours:g} hours")
     sql = f"""
         SELECT m.issue, m.match_idx, m.fid, m.league, m.home, m.away, m.end_time,
                {nowscore_cols}
         FROM matches m
         {nowscore_join}
+        {digest_join}
         WHERE {" AND ".join(where)}
         ORDER BY m.issue DESC, m.match_idx
         LIMIT ?
@@ -554,6 +579,7 @@ def main() -> None:
     parser.add_argument("--issue", default="current")
     parser.add_argument("--fid", type=int)
     parser.add_argument("--limit", type=int, default=64)
+    parser.add_argument("--stale-hours", type=float, default=2.0, help="Refresh missing/failed digests or successful digests older than this many hours; 0 refreshes all rows.")
     parser.add_argument("--sleep", type=float, default=0.35)
     parser.add_argument("--timeout", type=int, default=20)
     args = parser.parse_args()

@@ -26,6 +26,7 @@ API_LOG = RUNTIME_DIR / "decision_api.log"
 FRONTEND_LOG = RUNTIME_DIR / "decision_dashboard_vite.log"
 FRONTEND_BUILD_LOG = RUNTIME_DIR / "decision_dashboard_build.log"
 SCORE_REFRESH_LOG = RUNTIME_DIR / "live_score_refresh.log"
+SCORE_MODEL_ODDS_REFRESH_LOG = RUNTIME_DIR / "live_score_model_odds_refresh.log"
 SP_REFRESH_LOG = RUNTIME_DIR / "live_sp_refresh.log"
 ARTIFACT_REFRESH_LOG = RUNTIME_DIR / "live_artifact_refresh.log"
 DEFAULT_API_PORT = int(os.environ.get("BEIDAN_DECISION_API_PORT", "8790"))
@@ -34,6 +35,9 @@ DEFAULT_API_HOST = os.environ.get("BEIDAN_DECISION_API_HOST", "127.0.0.1")
 DEFAULT_FRONTEND_HOST = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_HOST", "127.0.0.1")
 DEFAULT_FRONTEND_MODE = os.environ.get("BEIDAN_DASHBOARD_FRONTEND_MODE", "api-static")
 DEFAULT_SCORE_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_SCORE_REFRESH_INTERVAL", "120"))
+DEFAULT_SCORE_MODEL_ODDS_REFRESH_INTERVAL = float(
+    os.environ.get("BEIDAN_SCORE_MODEL_ODDS_REFRESH_INTERVAL", "60")
+)
 DEFAULT_SP_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_SP_REFRESH_INTERVAL", "900"))
 DEFAULT_ARTIFACT_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_ARTIFACT_REFRESH_INTERVAL", "300"))
 ENV_FILES = (
@@ -102,6 +106,8 @@ def _service_name_for_pid(pid: int) -> str:
         return "frontend"
     if "scripts/live_score_refresh_loop.py" in cmdline and cwd == ROOT.resolve():
         return "score_refresh"
+    if "scripts/live_score_model_odds_refresh_loop.py" in cmdline and cwd == ROOT.resolve():
+        return "score_model_odds_refresh"
     if "scripts/live_sp_refresh_loop.py" in cmdline and cwd == ROOT.resolve():
         return "sp_refresh"
     if "scripts/live_artifact_refresh_loop.py" in cmdline and cwd == ROOT.resolve():
@@ -425,6 +431,16 @@ def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
         "--timeout",
         str(int(args.timeout * 4)),
     ]
+    score_model_odds_refresh_command = [
+        sys.executable,
+        str(ROOT / "scripts/live_score_model_odds_refresh_loop.py"),
+        "--db",
+        str(ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"),
+        "--issue",
+        "current",
+        "--interval",
+        str(args.score_model_odds_refresh_interval),
+    ]
     sp_refresh_command = [
         sys.executable,
         str(ROOT / "scripts/live_sp_refresh_loop.py"),
@@ -485,6 +501,15 @@ def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
             SCORE_REFRESH_LOG,
             {"interval_sec": args.score_refresh_interval, "enabled": not args.no_score_refresh},
         ),
+        "score_model_odds_refresh": _process_snapshot(
+            "score_model_odds_refresh",
+            score_model_odds_refresh_command,
+            SCORE_MODEL_ODDS_REFRESH_LOG,
+            {
+                "interval_sec": args.score_model_odds_refresh_interval,
+                "enabled": not args.no_score_model_odds_refresh,
+            },
+        ),
         "sp_refresh": _process_snapshot(
             "sp_refresh",
             sp_refresh_command,
@@ -523,6 +548,7 @@ def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
             "frontend": str(FRONTEND_LOG),
             "frontend_build": str(FRONTEND_BUILD_LOG),
             "score_refresh": str(SCORE_REFRESH_LOG),
+            "score_model_odds_refresh": str(SCORE_MODEL_ODDS_REFRESH_LOG),
             "sp_refresh": str(SP_REFRESH_LOG),
             "artifact_refresh": str(ARTIFACT_REFRESH_LOG),
         },
@@ -668,6 +694,32 @@ def _start_sp_refresh(args: argparse.Namespace) -> None:
         )
 
 
+def _start_score_model_odds_refresh(args: argparse.Namespace) -> None:
+    if args.no_score_model_odds_refresh or _known_process_pids("score_model_odds_refresh"):
+        return
+    RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
+    command = [
+        sys.executable,
+        str(ROOT / "scripts/live_score_model_odds_refresh_loop.py"),
+        "--db",
+        str(ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"),
+        "--issue",
+        "current",
+        "--interval",
+        str(args.score_model_odds_refresh_interval),
+    ]
+    with SCORE_MODEL_ODDS_REFRESH_LOG.open("ab") as log:
+        subprocess.Popen(
+            command,
+            cwd=ROOT,
+            env=os.environ.copy(),
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+
+
 def _start_artifact_refresh(args: argparse.Namespace) -> None:
     if args.no_artifact_refresh or _known_process_pids("artifact_refresh"):
         return
@@ -757,6 +809,7 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
     _start_api(args)
     _start_frontend(args)
     _start_score_refresh(args)
+    _start_score_model_odds_refresh(args)
     _start_sp_refresh(args)
     _start_artifact_refresh(args)
     _wait_for_start(args)
@@ -771,7 +824,7 @@ def command_start(args: argparse.Namespace) -> dict[str, Any]:
 
 def command_stop(args: argparse.Namespace) -> dict[str, Any]:
     stopped: list[dict[str, Any]] = []
-    for service in ("artifact_refresh", "sp_refresh", "score_refresh"):
+    for service in ("artifact_refresh", "sp_refresh", "score_model_odds_refresh", "score_refresh"):
         for pid in _known_process_pids(service):
             stopped.append({"service": service, "pid": pid})
             _terminate_pid(pid)
@@ -814,6 +867,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--wait", type=float, default=20.0)
     parser.add_argument("--score-refresh-interval", type=float, default=DEFAULT_SCORE_REFRESH_INTERVAL)
     parser.add_argument("--no-score-refresh", action="store_true")
+    parser.add_argument(
+        "--score-model-odds-refresh-interval",
+        type=float,
+        default=DEFAULT_SCORE_MODEL_ODDS_REFRESH_INTERVAL,
+    )
+    parser.add_argument("--no-score-model-odds-refresh", action="store_true")
     parser.add_argument("--sp-refresh-interval", type=float, default=DEFAULT_SP_REFRESH_INTERVAL)
     parser.add_argument("--sp-refresh-recent-count", type=int, default=4)
     parser.add_argument("--sp-refresh-open-limit", type=int, default=12)

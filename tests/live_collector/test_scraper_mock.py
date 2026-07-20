@@ -81,6 +81,7 @@ def test_collector_settle_issue(tmp_db):
     c = Collector(tmp_db, s)
     n = c.settle_issue("26051")
     assert n >= 1
+    assert c.settle_issue("26051") == 0
 
 
 def test_merge_fills_gaps():

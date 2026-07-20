@@ -24,7 +24,7 @@ import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -34,10 +34,91 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.sqlite_runtime import connect_sqlite  # noqa: E402
+from src.multimarket_p0 import (  # noqa: E402
+    DEFAULT_CAPTURE_ROOT,
+    TARGET_PLAYIDS as P0_TARGET_PLAYIDS,
+    ensure_schema as ensure_multimarket_p0_schema,
+    publish_capture_batch,
+)
 
 DEFAULT_DB = ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 TRADE_URL = "https://trade.500.com/bjdc/index.php"
 LIVE_SP_URL = "https://www.500.com/static/public/bjdc/xml/sp/just_{issue}_{playid}.xml"
+DEFAULT_LIVE_PLAYIDS = (34, 40, 41, 42, 51)
+MARKET_OUTCOMES: dict[int, tuple[str, tuple[tuple[str, str, str], ...]]] = {
+    34: (
+        "handicap_3way",
+        (("3", "胜", "c1"), ("1", "平", "c3"), ("0", "负", "c5")),
+    ),
+    40: (
+        "total_goals",
+        tuple((code, code, f"c{1 + 2 * index}") for index, code in enumerate(("0", "1", "2", "3", "4", "5", "6", "7+"))),
+    ),
+    41: (
+        "upper_lower_odd_even",
+        (
+            ("upper_odd", "上+单", "c1"),
+            ("upper_even", "上+双", "c3"),
+            ("lower_odd", "下+单", "c5"),
+            ("lower_even", "下+双", "c7"),
+        ),
+    ),
+    42: (
+        "correct_score",
+        tuple(
+            (code, label, f"c{index}")
+            for index, (code, label) in enumerate(
+                (
+                    ("home_other", "胜其他"),
+                    ("1:0", "1:0"),
+                    ("2:0", "2:0"),
+                    ("2:1", "2:1"),
+                    ("3:0", "3:0"),
+                    ("3:1", "3:1"),
+                    ("3:2", "3:2"),
+                    ("4:0", "4:0"),
+                    ("4:1", "4:1"),
+                    ("4:2", "4:2"),
+                    ("draw_other", "平其他"),
+                    ("0:0", "0:0"),
+                    ("1:1", "1:1"),
+                    ("2:2", "2:2"),
+                    ("3:3", "3:3"),
+                    ("away_other", "负其他"),
+                    ("0:1", "0:1"),
+                    ("0:2", "0:2"),
+                    ("1:2", "1:2"),
+                    ("0:3", "0:3"),
+                    ("1:3", "1:3"),
+                    ("2:3", "2:3"),
+                    ("0:4", "0:4"),
+                    ("1:4", "1:4"),
+                    ("2:4", "2:4"),
+                ),
+                start=1,
+            )
+        ),
+    ),
+    51: (
+        "half_full",
+        tuple(
+            (code, label, f"c{1 + 2 * index}")
+            for index, (code, label) in enumerate(
+                (
+                    ("3-3", "胜-胜"),
+                    ("3-1", "胜-平"),
+                    ("3-0", "胜-负"),
+                    ("1-3", "平-胜"),
+                    ("1-1", "平-平"),
+                    ("1-0", "平-负"),
+                    ("0-3", "负-胜"),
+                    ("0-1", "负-平"),
+                    ("0-0", "负-负"),
+                )
+            )
+        ),
+    ),
+}
 DEFAULT_UA = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"
@@ -327,6 +408,26 @@ def create_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_matches_has_sp ON matches(issue, winning_sp);
         CREATE INDEX IF NOT EXISTS idx_live_sp_issue ON live_sp_snapshots(issue, playid, fetched_at);
 
+        CREATE TABLE IF NOT EXISTS live_market_sp_snapshots (
+            issue TEXT NOT NULL,
+            playid INTEGER NOT NULL,
+            market_key TEXT NOT NULL,
+            fetched_at TEXT NOT NULL,
+            source_updatetime TEXT,
+            row_idx INTEGER NOT NULL,
+            home TEXT,
+            away TEXT,
+            league TEXT,
+            outcome_code TEXT NOT NULL,
+            outcome_label TEXT NOT NULL,
+            sp REAL,
+            source_attribute TEXT NOT NULL,
+            raw_node TEXT,
+            PRIMARY KEY (issue, playid, fetched_at, row_idx, outcome_code)
+        );
+        CREATE INDEX IF NOT EXISTS idx_live_market_sp_issue
+            ON live_market_sp_snapshots(issue, playid, fetched_at, row_idx);
+
         CREATE TABLE IF NOT EXISTS match_details_500 (
             issue TEXT NOT NULL,
             match_idx INTEGER NOT NULL,
@@ -351,6 +452,7 @@ def create_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_match_details_500_fid ON match_details_500(fid);
         """
     )
+    ensure_multimarket_p0_schema(conn)
 
 
 def upsert_issues(conn: sqlite3.Connection, rows: list[dict[str, object]], fetched_at: str) -> None:
@@ -594,27 +696,148 @@ def parse_live_sp(issue: str, playid: int, data: bytes, fetched_at: str) -> tupl
     return source_updatetime, rows
 
 
+def parse_live_market_sp(
+    issue: str,
+    playid: int,
+    data: bytes,
+    fetched_at: str,
+) -> tuple[str | None, list[dict[str, object]]]:
+    market = MARKET_OUTCOMES.get(playid)
+    if market is None:
+        raise ValueError(f"unsupported normalized BJDC playid: {playid}")
+    market_key, outcomes = market
+    root = ET.fromstring(decode_html(data))
+    source_updatetime = root.attrib.get("updatetime")
+    rows: list[dict[str, object]] = []
+    for child in list(root):
+        if not child.tag.startswith("w"):
+            continue
+        try:
+            row_idx = int(child.tag[1:])
+        except ValueError:
+            continue
+        raw_node = ET.tostring(child, encoding="unicode")
+        for outcome_code, outcome_label, attribute in outcomes:
+            rows.append(
+                {
+                    "issue": issue,
+                    "playid": playid,
+                    "market_key": market_key,
+                    "fetched_at": fetched_at,
+                    "source_updatetime": source_updatetime,
+                    "row_idx": row_idx,
+                    "home": child.attrib.get("h", ""),
+                    "away": child.attrib.get("a", ""),
+                    "league": child.attrib.get("gn", ""),
+                    "outcome_code": outcome_code,
+                    "outcome_label": outcome_label,
+                    "sp": as_float(child.attrib.get(attribute)),
+                    "source_attribute": attribute,
+                    "raw_node": raw_node,
+                }
+            )
+    return source_updatetime, rows
+
+
+def parse_playids(values: Iterable[object] | None) -> tuple[int, ...]:
+    if not values:
+        return DEFAULT_LIVE_PLAYIDS
+    playids: list[int] = []
+    for raw in values:
+        for part in str(raw).replace("，", ",").split(","):
+            if not part.strip():
+                continue
+            playid = int(part.strip())
+            if playid not in MARKET_OUTCOMES:
+                raise ValueError(f"unsupported BJDC playid: {playid}")
+            if playid not in playids:
+                playids.append(playid)
+    return tuple(playids)
+
+
 def scrape_live_sp(conn: sqlite3.Connection, issue: str, args: argparse.Namespace) -> int:
     url = LIVE_SP_URL.format(issue=issue, playid=args.playid)
+    fetch_kind = "live_sp_xml" if args.playid == 34 else f"live_market_sp_xml_{args.playid}"
+    savepoint_active = False
     try:
         fetched_at = now_utc()
         result = fetch_url(url, timeout=args.timeout, user_agent=args.user_agent, referer=f"{TRADE_URL}?expect={issue}")
         source_updatetime, rows = parse_live_sp(issue, args.playid, result.body, fetched_at)
+        normalized_updatetime, market_rows = parse_live_market_sp(issue, args.playid, result.body, fetched_at)
+        if source_updatetime != normalized_updatetime:
+            raise ValueError("normalized market timestamp disagrees with legacy parser")
+        conn.execute("SAVEPOINT scrape_live_sp")
+        savepoint_active = True
+        fetched_at_utc = datetime.fromisoformat(fetched_at).replace(tzinfo=timezone.utc).isoformat()
+        for row in market_rows:
+            row.update(
+                {
+                    "batch_id": None,
+                    "match_id": f"{issue}_{int(row['row_idx']):03d}",
+                    "source_url": url,
+                    "fetched_at_utc": fetched_at_utc,
+                    "source_updated_at_hkt": (
+                        datetime.fromisoformat(source_updatetime).replace(tzinfo=timezone(timedelta(hours=8))).isoformat()
+                        if source_updatetime
+                        else None
+                    ),
+                    "sale_status": "unknown",
+                    "sale_cutoff_hkt": None,
+                    "parlay_allowed": "unknown",
+                    "parlay_modes_json": "[]",
+                    "stake_limit_json": "{}",
+                    "capture_classification": "non_target_market_unclassified",
+                }
+            )
+        if args.playid in P0_TARGET_PLAYIDS:
+            if not source_updatetime:
+                raise ValueError("target-market source updatetime missing")
+            batch = publish_capture_batch(
+                conn,
+                issue=issue,
+                playid=args.playid,
+                source_url=url,
+                fetched_at_utc=fetched_at_utc,
+                source_updated_at_hkt=source_updatetime,
+                raw_payload=result.body,
+                rows=market_rows,
+                capture_root=Path(getattr(args, "capture_root", DEFAULT_CAPTURE_ROOT)),
+            )
+            market_rows = batch["rows"]
+        if args.playid == 34:
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO live_sp_snapshots(
+                    issue, playid, fetched_at, source_updatetime, row_idx,
+                    home, away, league, handicap_line, sp_home, sp_draw, sp_away, raw_node
+                ) VALUES(
+                    :issue, :playid, :fetched_at, :source_updatetime, :row_idx,
+                    :home, :away, :league, :handicap_line, :sp_home, :sp_draw, :sp_away, :raw_node
+                )
+                """,
+                rows,
+            )
         conn.executemany(
             """
-            INSERT OR REPLACE INTO live_sp_snapshots(
-                issue, playid, fetched_at, source_updatetime, row_idx,
-                home, away, league, handicap_line, sp_home, sp_draw, sp_away, raw_node
+            INSERT OR IGNORE INTO live_market_sp_snapshots(
+                issue, playid, market_key, fetched_at, source_updatetime, row_idx,
+                home, away, league, outcome_code, outcome_label, sp,
+                source_attribute, raw_node, match_id, batch_id, source_url, fetched_at_utc,
+                source_updated_at_hkt, sale_status, sale_cutoff_hkt, parlay_allowed, parlay_modes_json,
+                stake_limit_json, capture_classification
             ) VALUES(
-                :issue, :playid, :fetched_at, :source_updatetime, :row_idx,
-                :home, :away, :league, :handicap_line, :sp_home, :sp_draw, :sp_away, :raw_node
+                :issue, :playid, :market_key, :fetched_at, :source_updatetime, :row_idx,
+                :home, :away, :league, :outcome_code, :outcome_label, :sp,
+                :source_attribute, :raw_node, :match_id, :batch_id, :source_url, :fetched_at_utc,
+                :source_updated_at_hkt, :sale_status, :sale_cutoff_hkt, :parlay_allowed, :parlay_modes_json,
+                :stake_limit_json, :capture_classification
             )
             """,
-            rows,
+            market_rows,
         )
         insert_fetch_log(
             conn,
-            kind="live_sp_xml",
+            kind=fetch_kind,
             issue=issue,
             url=url,
             status=result.status,
@@ -623,13 +846,22 @@ def scrape_live_sp(conn: sqlite3.Connection, issue: str, args: argparse.Namespac
             bytes_len=len(result.body),
             rows_parsed=len(rows),
         )
+        conn.execute("RELEASE SAVEPOINT scrape_live_sp")
+        savepoint_active = False
         conn.commit()
-        print(f"[live_sp] {issue}: rows={len(rows)} updatetime={source_updatetime}", flush=True)
+        print(
+            f"[live_sp] {issue} playid={args.playid}: rows={len(rows)} "
+            f"outcomes={len(market_rows)} updatetime={source_updatetime}",
+            flush=True,
+        )
         return len(rows)
     except Exception as exc:
+        if savepoint_active:
+            conn.execute("ROLLBACK TO SAVEPOINT scrape_live_sp")
+            conn.execute("RELEASE SAVEPOINT scrape_live_sp")
         insert_fetch_log(
             conn,
-            kind="live_sp_xml",
+            kind=fetch_kind,
             issue=issue,
             url=url,
             status=getattr(exc, "code", None),
@@ -671,13 +903,19 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--list-only", action="store_true", help="Only refresh the issue list.")
     parser.add_argument("--live-sp", action="store_true", help="Also fetch current live SP XML for selected issues.")
-    parser.add_argument("--playid", type=int, default=34, help="500 play id; 34 is BJDC rqspf.")
+    parser.add_argument(
+        "--playid",
+        action="append",
+        help="BJDC play id or comma-separated ids; repeatable. Default: 34,40,41,42,51.",
+    )
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--keep-going", action="store_true")
     parser.add_argument("--sleep", type=float, default=0.35)
     parser.add_argument("--timeout", type=float, default=25.0)
+    parser.add_argument("--capture-root", type=Path, default=DEFAULT_CAPTURE_ROOT)
     parser.add_argument("--user-agent", default=DEFAULT_UA)
     args = parser.parse_args()
+    playids = parse_playids(args.playid)
 
     args.db.parent.mkdir(parents=True, exist_ok=True)
     conn = connect_sqlite(args.db)
@@ -696,7 +934,9 @@ def main() -> None:
         print(f"[progress] {i}/{len(selected)} issue={issue}", flush=True)
         scrape_issue(conn, issue, args)
         if args.live_sp:
-            scrape_live_sp(conn, issue, args)
+            for playid in playids:
+                args.playid = playid
+                scrape_live_sp(conn, issue, args)
         if args.sleep and i < len(selected):
             time.sleep(args.sleep)
     print_summary(conn)

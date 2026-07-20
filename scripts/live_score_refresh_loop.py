@@ -27,7 +27,8 @@ def resolve_issues(db_path: Path, requested: list[str]) -> list[str]:
     explicit = [issue for issue in requested if issue != "current"]
     issues.extend(explicit)
     if "current" in requested:
-        with connect_sqlite(db_path) as conn:
+        conn = connect_sqlite(db_path)
+        try:
             rows = conn.execute(
                 """
                 SELECT issue
@@ -37,6 +38,8 @@ def resolve_issues(db_path: Path, requested: list[str]) -> list[str]:
                 LIMIT 1
                 """
             ).fetchall()
+        finally:
+            conn.close()
         issues.extend(str(row[0]) for row in rows)
     seen: set[str] = set()
     out: list[str] = []

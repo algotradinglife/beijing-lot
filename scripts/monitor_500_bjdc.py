@@ -18,24 +18,25 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scrape_500_bjdc import (
+from scrape_500_bjdc import (  # noqa: E402
     DEFAULT_DB,
     DEFAULT_UA,
     create_schema,
     fetch_issue_list,
     issue_year,
+    parse_playids,
     scrape_issue,
     scrape_live_sp,
 )
-from scrape_nowscore_bjdc import (
+from scrape_nowscore_bjdc import (  # noqa: E402
     create_schema as create_nowscore_schema,
     scrape_issue as scrape_nowscore_issue,
 )
-from scrape_nowscore_match_details import (
+from scrape_nowscore_match_details import (  # noqa: E402
     create_schema as create_nowscore_detail_schema,
     scrape_issue as scrape_nowscore_detail_issue,
 )
-from src.sqlite_runtime import connect_sqlite
+from src.sqlite_runtime import connect_sqlite  # noqa: E402
 
 
 def _now_text() -> str:
@@ -87,14 +88,14 @@ def _selected_issues(conn: sqlite3.Connection, rows: list[dict[str, object]], ar
     return selected
 
 
-def _scrape_namespace(args: argparse.Namespace) -> SimpleNamespace:
+def _scrape_namespace(args: argparse.Namespace, playid: int) -> SimpleNamespace:
     return SimpleNamespace(
         timeout=args.timeout,
         user_agent=args.user_agent,
         force=True,
         keep_going=True,
         live_sp=args.live_sp,
-        playid=args.playid,
+        playid=playid,
         sleep=0,
     )
 
@@ -130,12 +131,16 @@ def run_once(conn: sqlite3.Connection, args: argparse.Namespace) -> int:
 
     selected = _selected_issues(conn, rows, args)
     print(f"[{_now_text()}] [monitor] current={current} selected={','.join(selected)}", flush=True)
-    scrape_args = _scrape_namespace(args)
+    playids = parse_playids(args.playid)
+    scrape_args = _scrape_namespace(args, playids[0])
     total_rows = 0
     for issue in selected:
         total_rows += scrape_issue(conn, issue, scrape_args)
         if args.live_sp:
-            scrape_live_sp(conn, issue, scrape_args)
+            for playid in playids:
+                if playid != 34 and issue != current:
+                    continue
+                scrape_live_sp(conn, issue, _scrape_namespace(args, playid))
         if args.nowscore:
             scrape_nowscore_issue(conn, issue, scrape_args)
         if args.sleep:
@@ -161,7 +166,11 @@ def main() -> None:
     parser.add_argument("--no-nowscore-details", action="store_false", dest="nowscore_details")
     parser.add_argument("--nowscore-detail-limit", type=int, default=24)
     parser.add_argument("--nowscore-detail-stale-hours", type=float, default=6.0)
-    parser.add_argument("--playid", type=int, default=34)
+    parser.add_argument(
+        "--playid",
+        action="append",
+        help="BJDC play id or comma-separated ids; repeatable. Default: 34,40,41,42,51.",
+    )
     parser.add_argument("--sleep", type=float, default=0.25)
     parser.add_argument("--timeout", type=float, default=25.0)
     parser.add_argument("--user-agent", default=DEFAULT_UA)

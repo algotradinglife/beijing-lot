@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
 from scripts.scrape_500_bjdc import create_schema as create_500_schema
 from scripts.scrape_500_bjdc import upsert_matches
 from scripts.scrape_nowscore_bjdc import create_schema as create_nowscore_schema
+from scripts.scrape_nowscore_bjdc import reconcile_finished_settlements
 from scripts.scrape_nowscore_bjdc import upsert_match_rows
 from src.sqlite_runtime import connect_sqlite
 
@@ -172,3 +173,49 @@ def test_nowscore_upsert_preserves_finished_result_against_empty_refresh(tmp_pat
             "result_code": "1",
             "raw_row_hash": "corrected",
         }
+
+
+def test_nowscore_finished_row_backfills_missing_500_settlement(tmp_path: Path) -> None:
+    db_path = tmp_path / "settlement.sqlite"
+    with connect_sqlite(db_path, row_factory=True) as conn:
+        create_500_schema(conn)
+        create_nowscore_schema(conn)
+        upsert_matches(
+            conn,
+            [
+                _match_row(
+                    score="",
+                    result_label=None,
+                    result_code=None,
+                    winning_sp=None,
+                    handicap_line=-1.0,
+                    sp_home=2.45,
+                    sp_draw=3.20,
+                    sp_away=2.80,
+                )
+            ],
+        )
+        upsert_match_rows(
+            conn,
+            [
+                _nowscore_row(
+                    handicap_line=-1.0,
+                    score="2-1",
+                    result_code="1",
+                )
+            ],
+        )
+
+        assert reconcile_finished_settlements(conn, "99123") == 1
+        settled = conn.execute(
+            "SELECT score, result_label, result_code, winning_sp FROM matches"
+        ).fetchone()
+        assert dict(settled) == {
+            "score": "2-1",
+            "result_label": "平",
+            "result_code": "1",
+            "winning_sp": 3.20,
+        }
+
+        # A later score refresh cannot overwrite the completed official row.
+        assert reconcile_finished_settlements(conn, "99123") == 0

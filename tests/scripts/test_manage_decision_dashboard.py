@@ -38,6 +38,9 @@ def test_service_name_detects_refresh_loops(monkeypatch) -> None:
     monkeypatch.setattr(mod, "_read_cmdline", lambda pid: "python3 scripts/live_sp_refresh_loop.py --issue current")
     assert mod._service_name_for_pid(1002) == "sp_refresh"
 
+    monkeypatch.setattr(mod, "_read_cmdline", lambda pid: "python3 scripts/live_score_model_odds_refresh_loop.py --issue current")
+    assert mod._service_name_for_pid(1003) == "score_model_odds_refresh"
+
 
 def test_previous_pid_must_still_listen_on_requested_port(monkeypatch) -> None:
     mod = _load_module()
@@ -70,3 +73,5 @@ def test_health_payload_includes_sp_refresh(monkeypatch) -> None:
     assert payload["sp_refresh"]["status"] == "running"
     assert "scripts/live_sp_refresh_loop.py" in " ".join(payload["sp_refresh"]["command"])
     assert payload["logs"]["sp_refresh"].endswith("live_sp_refresh.log")
+    assert payload["score_model_odds_refresh"]["status"] == "running"
+    assert "scripts/live_score_model_odds_refresh_loop.py" in " ".join(payload["score_model_odds_refresh"]["command"])
