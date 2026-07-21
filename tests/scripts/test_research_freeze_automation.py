@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src import research_freeze_protocol as protocol  # noqa: E402
+from src import research_freeze_automation as automation  # noqa: E402
 from src.research_freeze_automation import register_experiment, run_due_jobs  # noqa: E402
 from src.research_freeze_protocol import ResearchFreezeError, verify_freeze_package  # noqa: E402
 
@@ -200,12 +201,90 @@ def test_registry_duplicate_detection_compares_same_row_only(tmp_path: Path) -> 
         )
 
 
+def test_registry_conflict_blocks_freeze_publish_before_package_creation(tmp_path: Path) -> None:
+    config = scheduler_config(tmp_path)
+    registry = tmp_path / "experiment_registry.md"
+    registry.write_text(
+        "| Experiment ID | Research Question | Branch | Freeze ID | Status | Result | Evidence Level |\n"
+        "| --- | --- | --- | --- | --- | --- | --- |\n"
+        "| `AUTO-FREEZE-001` | Old | `branch` | `old-freeze` | `frozen` | `pending` | `A` |\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ResearchFreezeError, match="different freeze"):
+        run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+
+    assert not (tmp_path / "freeze/AUTO-FREEZE-001").exists()
+    assert "`old-freeze`" in registry.read_text(encoding="utf-8")
+
+
 def test_scheduler_skips_jobs_that_are_not_due(tmp_path: Path) -> None:
     config = scheduler_config(tmp_path)
     results = run_due_jobs(config, now_utc="2026-07-21T01:59:00+00:00")
 
     assert results == [{"status": "skipped", "reason": "not_due", "experiment_id": "AUTO-FREEZE-001"}]
     assert not (tmp_path / "freeze/AUTO-FREEZE-001").exists()
+
+
+def test_scheduler_skips_due_job_until_its_as_of_boundary(tmp_path: Path) -> None:
+    config = scheduler_config(tmp_path)
+    payload = json.loads(config.read_text(encoding="utf-8"))
+    payload["jobs"][0]["as_of_utc"] = "2026-07-21T02:10:00+00:00"
+    write(config, json.dumps(payload))
+
+    results = run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+
+    assert results == [{"status": "skipped", "reason": "not_ready", "experiment_id": "AUTO-FREEZE-001"}]
+    assert not (tmp_path / "freeze/AUTO-FREEZE-001").exists()
+
+
+def test_scheduler_rejects_input_file_drift_before_freeze_publish(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config = scheduler_config(tmp_path)
+    source = tmp_path / "inputs/matches.csv"
+    original_produce = automation.CopyResearchOutputAdapter.produce
+
+    def mutate_input_after_output(self: object, dataset: object) -> object:
+        output = original_produce(self, dataset)  # type: ignore[arg-type]
+        write(source, "match,kickoff_hkt,team_home,team_away\n1,2026-07-21T20:00:00+08:00,C,D\n")
+        return output
+
+    monkeypatch.setattr(automation.CopyResearchOutputAdapter, "produce", mutate_input_after_output)
+
+    with pytest.raises(ResearchFreezeError, match="changed since as-of snapshot"):
+        run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+
+    assert not (tmp_path / "freeze/AUTO-FREEZE-001").exists()
+
+
+def test_scheduler_recovers_registry_after_published_freeze_registration_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = scheduler_config(tmp_path)
+    original_register = automation.register_experiment
+    attempts = 0
+
+    def fail_once(registry_path: Path, entry: object) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("simulated registry write failure")
+        original_register(registry_path, entry)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(automation, "register_experiment", fail_once)
+
+    with pytest.raises(OSError, match="registry write failure"):
+        run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+
+    package = tmp_path / "freeze/AUTO-FREEZE-001"
+    assert verify_freeze_package(package)["status"] == "valid"
+    assert not (tmp_path / "experiment_registry.md").exists()
+
+    results = run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+
+    assert results[0]["status"] == "frozen"
+    assert results[0]["registry_recovered"] is True
+    assert attempts == 2
+    assert f"`{results[0]['freeze_id']}`" in (tmp_path / "experiment_registry.md").read_text(encoding="utf-8")
 
 
 def test_scheduler_cli_smoke_creates_reviewable_freeze(tmp_path: Path) -> None:

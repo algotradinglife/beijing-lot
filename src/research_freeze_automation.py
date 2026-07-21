@@ -22,8 +22,10 @@ from .research_freeze_protocol import (
     create_freeze_package,
     current_git_commit,
     explicit_utc,
+    freeze_identity_sha256,
     safe_protocol_id,
     sha256_file,
+    verify_freeze_package,
 )
 
 
@@ -151,6 +153,23 @@ def _copy_named(sources: tuple[Path, ...], output_dir: Path) -> list[Path]:
     return copied
 
 
+def _freeze_asset_records(sources: tuple[Path, ...], directory: str) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    used: set[str] = set()
+    for index, source in enumerate(sources, start=1):
+        resolved = _regular(source)
+        target_name = resolved.name if resolved.name not in used else f"{index:03d}_{resolved.name}"
+        used.add(target_name)
+        records.append(
+            {
+                "path": f"{directory}/{target_name}",
+                "bytes": resolved.stat().st_size,
+                "sha256": sha256_file(resolved),
+            }
+        )
+    return records
+
+
 def adapter_from_config(config: Mapping[str, Any], base_dir: Path) -> ResearchOutputAdapter:
     adapter = config.get("output_adapter")
     if not isinstance(adapter, dict):
@@ -208,9 +227,29 @@ def _materialize_snapshot_metadata(job: Mapping[str, Any], base_dir: Path, work_
     return tuple(files), metadata
 
 
+def _verify_snapshot_inputs(input_files: tuple[Path, ...], snapshot_metadata: Path) -> None:
+    try:
+        snapshot = json.loads(snapshot_metadata.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ResearchFreezeError("invalid as-of snapshot metadata") from exc
+    records = snapshot.get("snapshot_files") if isinstance(snapshot, dict) else None
+    if not isinstance(records, list) or len(records) != len(input_files):
+        raise ResearchFreezeError("as-of snapshot metadata does not match input files")
+
+    for path, record in zip(input_files, records, strict=True):
+        if not isinstance(record, dict):
+            raise ResearchFreezeError("invalid as-of snapshot metadata record")
+        resolved = _regular(path)
+        actual_bytes = resolved.stat().st_size
+        actual_sha256 = sha256_file(resolved)
+        if actual_bytes != record.get("bytes") or actual_sha256 != record.get("sha256"):
+            raise ResearchFreezeError(f"input file changed since as-of snapshot: {resolved}")
+
+
 def _job_due(job: Mapping[str, Any], now_utc: str) -> bool:
     scheduled_for = explicit_utc(str(job.get("scheduled_for_utc") or job.get("as_of_utc") or ""))
-    return scheduled_for <= now_utc
+    as_of_utc = explicit_utc(str(job.get("as_of_utc") or job.get("scheduled_for_utc") or ""))
+    return scheduled_for <= now_utc and as_of_utc <= now_utc
 
 
 def _job_config_file(job: Mapping[str, Any], work_dir: Path) -> Path:
@@ -271,6 +310,30 @@ def register_experiment(registry_path: Path, entry: Mapping[str, Any]) -> None:
     registry_path.write_text(text + row, encoding="utf-8")
 
 
+def _preflight_registry_conflict(registry_path: Path, experiment_id: str, freeze_id: str) -> None:
+    if not registry_path.exists():
+        return
+    for line in registry_path.read_text(encoding="utf-8").splitlines():
+        if line.startswith(f"| `{experiment_id}` |"):
+            if f"| `{freeze_id}` |" in line:
+                return
+            raise ResearchFreezeError(f"experiment already registered with a different freeze: {experiment_id}")
+
+
+def _registry_entry(
+    job: Mapping[str, Any], *, experiment_id: str, research_question: str, freeze_id: str
+) -> dict[str, Any]:
+    return {
+        "experiment_id": experiment_id,
+        "research_question": research_question.replace("|", "\\|"),
+        "branch": str(job.get("branch") or "research/freeze-automation-v1"),
+        "freeze_id": freeze_id,
+        "status": "frozen",
+        "result": "pending",
+        "evidence_level": str(job.get("evidence_level") or "A"),
+    }
+
+
 def run_freeze_job(
     job: Mapping[str, Any],
     *,
@@ -288,10 +351,25 @@ def run_freeze_job(
 
     now = explicit_utc(now_utc) if now_utc else _utc_now()
     if not _job_due(job, now):
-        return {"status": "skipped", "reason": "not_due", "experiment_id": experiment_id}
+        scheduled_for = explicit_utc(str(job.get("scheduled_for_utc") or job.get("as_of_utc") or ""))
+        as_of_utc = explicit_utc(str(job.get("as_of_utc") or job.get("scheduled_for_utc") or ""))
+        reason = "not_ready" if scheduled_for <= now < as_of_utc else "not_due"
+        return {"status": "skipped", "reason": reason, "experiment_id": experiment_id}
     output_dir = freeze_root / experiment_id
     if output_dir.exists():
-        return {"status": "skipped", "reason": "already_frozen", "experiment_id": experiment_id, "package_dir": str(output_dir)}
+        published = verify_freeze_package(output_dir)
+        if published["experiment_id"] != experiment_id:
+            raise ResearchFreezeError(f"published freeze experiment ID mismatch: {output_dir}")
+        register_experiment(
+            registry_path,
+            _registry_entry(
+                job,
+                experiment_id=experiment_id,
+                research_question=research_question,
+                freeze_id=published["freeze_id"],
+            ),
+        )
+        return {**published, "verification_status": published["status"], "status": "frozen", "registry_recovered": True}
     if dry_run:
         return {"status": "dry_run", "experiment_id": experiment_id, "package_dir": str(output_dir)}
 
@@ -321,6 +399,21 @@ def run_freeze_job(
     )
     config_file = _job_config_file(job, work_dir)
     metadata_files = (snapshot_metadata, scheduler_metadata, *output.metadata_files)
+    commit = str(job.get("git_commit") or current_git_commit())
+    candidate_freeze_id = freeze_identity_sha256(
+        experiment_id=experiment_id,
+        research_question=research_question,
+        model_version=model_version,
+        frozen_at_utc=now,
+        git_commit=commit,
+        inputs=_freeze_asset_records(input_files, "inputs"),
+        predictions=_freeze_asset_records(output.prediction_files, "predictions"),
+        decisions=_freeze_asset_records(output.decision_files, "decisions"),
+        config=_freeze_asset_records((config_file,), "metadata/config")[0],
+        metadata=_freeze_asset_records(tuple(metadata_files), "metadata/files"),
+    )
+    _preflight_registry_conflict(registry_path, experiment_id, candidate_freeze_id)
+    _verify_snapshot_inputs(input_files, snapshot_metadata)
     freeze = create_freeze_package(
         output_dir,
         experiment_id=experiment_id,
@@ -332,20 +425,17 @@ def run_freeze_job(
         decision_directory="decisions",
         config_file=config_file,
         metadata_files=metadata_files,
-        git_commit=str(job.get("git_commit") or current_git_commit()),
+        git_commit=commit,
         frozen_at_utc=now,
     )
     register_experiment(
         registry_path,
-        {
-            "experiment_id": experiment_id,
-            "research_question": research_question.replace("|", "\\|"),
-            "branch": str(job.get("branch") or "research/freeze-automation-v1"),
-            "freeze_id": freeze["freeze_id"],
-            "status": "frozen",
-            "result": "pending",
-            "evidence_level": str(job.get("evidence_level") or "A"),
-        },
+        _registry_entry(
+            job,
+            experiment_id=experiment_id,
+            research_question=research_question,
+            freeze_id=freeze["freeze_id"],
+        ),
     )
     return {**freeze, "verification_status": freeze["status"], "status": "frozen"}
 
