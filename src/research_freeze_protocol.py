@@ -443,7 +443,10 @@ def verify_freeze_package(path: Path) -> dict[str, Any]:
         raise ResearchFreezeError("SHA256SUMS contains files not declared by the freeze manifest")
     if snapshot.get("data_sha256") != asset_list_sha256(inputs):
         raise ResearchFreezeError("dataset snapshot digest mismatch")
-    if manifest.get("prediction_sha256") not in {None, asset_list_sha256(predictions)}:
+    prediction_sha256 = manifest.get("prediction_sha256")
+    if predictions and prediction_sha256 != asset_list_sha256(predictions):
+        raise ResearchFreezeError("prediction digest mismatch")
+    if not predictions and prediction_sha256 is not None:
         raise ResearchFreezeError("prediction digest mismatch")
     if manifest.get("decision_sha256") != asset_list_sha256(decisions):
         raise ResearchFreezeError("frozen decision digest mismatch")

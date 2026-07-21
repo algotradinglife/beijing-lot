@@ -96,6 +96,36 @@ def test_due_scheduler_creates_freeze_package_with_snapshot_metadata_and_registr
     assert f"| `{manifest['freeze_id']}` |" in registry
 
 
+def test_freeze_with_predictions_and_matching_digest_verifies(tmp_path: Path) -> None:
+    config = scheduler_config(tmp_path)
+    run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+    package = tmp_path / "freeze/AUTO-FREEZE-001"
+    manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
+
+    assert manifest["prediction_files"]
+    assert manifest["prediction_sha256"] == protocol.asset_list_sha256(manifest["prediction_files"])
+    assert verify_freeze_package(package)["status"] == "valid"
+
+
+@pytest.mark.parametrize("missing_mode", ["null", "missing"])
+def test_freeze_with_predictions_requires_prediction_digest(tmp_path: Path, missing_mode: str) -> None:
+    config = scheduler_config(tmp_path)
+    run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+    package = tmp_path / "freeze/AUTO-FREEZE-001"
+    manifest_path = package / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["prediction_files"]
+    if missing_mode == "null":
+        manifest["prediction_sha256"] = None
+    else:
+        manifest.pop("prediction_sha256")
+    protocol._write_json(manifest_path, manifest)
+    protocol._write_sums(package, {"inputs", "predictions", "decisions", "metadata"})
+
+    with pytest.raises(ResearchFreezeError, match="prediction digest mismatch"):
+        verify_freeze_package(package)
+
+
 def test_scheduler_rejects_inputs_available_after_as_of_boundary(tmp_path: Path) -> None:
     config = scheduler_config(tmp_path, available_at_utc="2026-07-21T02:01:00+00:00")
     with pytest.raises(ResearchFreezeError, match="after the as-of boundary"):
