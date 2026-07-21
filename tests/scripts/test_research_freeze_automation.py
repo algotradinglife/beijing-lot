@@ -57,8 +57,20 @@ def scheduler_config(tmp_path: Path, *, available_at_utc: str = "2026-07-21T01:3
                 ],
                 "output_adapter": {
                     "type": "copy",
-                    "prediction_files": ["outputs/predictions.json"],
-                    "decision_files": ["outputs/decisions.json"],
+                    "prediction_files": [
+                        {
+                            "path": "outputs/predictions.json",
+                            "source_timestamp_utc": "2026-07-21T01:20:00+00:00",
+                            "available_at_utc": "2026-07-21T01:30:00+00:00",
+                        }
+                    ],
+                    "decision_files": [
+                        {
+                            "path": "outputs/decisions.json",
+                            "source_timestamp_utc": "2026-07-21T01:20:00+00:00",
+                            "available_at_utc": "2026-07-21T01:30:00+00:00",
+                        }
+                    ],
                 },
             }
         ],
@@ -129,6 +141,27 @@ def test_freeze_with_predictions_requires_prediction_digest(tmp_path: Path, miss
 
 def test_scheduler_rejects_inputs_available_after_as_of_boundary(tmp_path: Path) -> None:
     config = scheduler_config(tmp_path, available_at_utc="2026-07-21T02:01:00+00:00")
+    with pytest.raises(ResearchFreezeError, match="after the as-of boundary"):
+        run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+
+
+@pytest.mark.parametrize(
+    ("output_kind", "timestamp_field"),
+    [
+        ("prediction_files", "source_timestamp_utc"),
+        ("prediction_files", "available_at_utc"),
+        ("decision_files", "source_timestamp_utc"),
+        ("decision_files", "available_at_utc"),
+    ],
+)
+def test_scheduler_rejects_outputs_after_as_of_boundary(
+    tmp_path: Path, output_kind: str, timestamp_field: str
+) -> None:
+    config = scheduler_config(tmp_path)
+    payload = json.loads(config.read_text(encoding="utf-8"))
+    payload["jobs"][0]["output_adapter"][output_kind][0][timestamp_field] = "2026-07-21T02:01:00+00:00"
+    write(config, json.dumps(payload))
+
     with pytest.raises(ResearchFreezeError, match="after the as-of boundary"):
         run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
 
@@ -299,13 +332,47 @@ def test_scheduler_recovers_registry_after_published_freeze_registration_failure
     package = tmp_path / "freeze/AUTO-FREEZE-001"
     assert verify_freeze_package(package)["status"] == "valid"
     assert not (tmp_path / "experiment_registry.md").exists()
+    payload = json.loads(config.read_text(encoding="utf-8"))
+    payload["jobs"][0]["research_question"] = "Mutable replacement question"
+    write(config, json.dumps(payload))
 
     results = run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
 
     assert results[0]["status"] == "frozen"
     assert results[0]["registry_recovered"] is True
     assert attempts == 2
-    assert f"`{results[0]['freeze_id']}`" in (tmp_path / "experiment_registry.md").read_text(encoding="utf-8")
+    registry = (tmp_path / "experiment_registry.md").read_text(encoding="utf-8")
+    assert f"`{results[0]['freeze_id']}`" in registry
+    assert "Can automated freeze capture as-of research output?" in registry
+    assert "Mutable replacement question" not in registry
+
+
+def test_scheduler_dry_run_does_not_register_unregistered_published_freeze(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = scheduler_config(tmp_path)
+
+    def fail_registry_write(registry_path: Path, entry: object) -> None:
+        raise OSError("simulated registry write failure")
+
+    monkeypatch.setattr(automation, "register_experiment", fail_registry_write)
+    with pytest.raises(OSError, match="registry write failure"):
+        run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+
+    def registry_write_is_unexpected(registry_path: Path, entry: object) -> None:
+        raise AssertionError("dry run must not register a published freeze")
+
+    monkeypatch.setattr(automation, "register_experiment", registry_write_is_unexpected)
+    results = run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00", dry_run=True)
+
+    assert results == [
+        {
+            "status": "dry_run",
+            "experiment_id": "AUTO-FREEZE-001",
+            "package_dir": str(tmp_path / "freeze/AUTO-FREEZE-001"),
+        }
+    ]
+    assert not (tmp_path / "experiment_registry.md").exists()
 
 
 def test_scheduler_cli_smoke_creates_reviewable_freeze(tmp_path: Path) -> None:

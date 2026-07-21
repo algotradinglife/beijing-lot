@@ -46,6 +46,15 @@ class FrozenDataset:
 
 
 @dataclass(frozen=True)
+class CopyOutputSource:
+    """Copied research output with its as-of provenance."""
+
+    path: Path
+    source_timestamp_utc: str
+    available_at_utc: str
+
+
+@dataclass(frozen=True)
 class ResearchOutput:
     """Adapter result consumed by freeze package generation."""
 
@@ -110,17 +119,21 @@ def _config_path(value: Any, default: Path, base_dir: Path) -> Path:
 class CopyResearchOutputAdapter:
     """Adapter that copies already-produced prediction and decision artifacts."""
 
-    def __init__(self, prediction_files: tuple[Path, ...], decision_files: tuple[Path, ...]) -> None:
-        if not prediction_files:
+    def __init__(self, prediction_sources: tuple[CopyOutputSource, ...], decision_sources: tuple[CopyOutputSource, ...]) -> None:
+        if not prediction_sources:
             raise ResearchFreezeError("copy adapter requires at least one prediction file")
-        if not decision_files:
+        if not decision_sources:
             raise ResearchFreezeError("copy adapter requires at least one decision file")
-        self.prediction_files = prediction_files
-        self.decision_files = decision_files
+        self.prediction_sources = prediction_sources
+        self.decision_sources = decision_sources
 
     def produce(self, dataset: FrozenDataset) -> ResearchOutput:
-        predictions = _copy_named(self.prediction_files, dataset.work_dir / "adapter_output/predictions")
-        decisions = _copy_named(self.decision_files, dataset.work_dir / "adapter_output/decisions")
+        predictions = _copy_named(
+            tuple(source.path for source in self.prediction_sources), dataset.work_dir / "adapter_output/predictions"
+        )
+        decisions = _copy_named(
+            tuple(source.path for source in self.decision_sources), dataset.work_dir / "adapter_output/decisions"
+        )
         metadata = _write_json(
             dataset.work_dir / "adapter_output/research_output_interface.json",
             {
@@ -134,6 +147,22 @@ class CopyResearchOutputAdapter:
                 "roi_authorized": False,
                 "prediction_files": [path.name for path in predictions],
                 "decision_files": [path.name for path in decisions],
+                "prediction_file_provenance": [
+                    {
+                        "path": path.name,
+                        "source_timestamp_utc": source.source_timestamp_utc,
+                        "available_at_utc": source.available_at_utc,
+                    }
+                    for path, source in zip(predictions, self.prediction_sources, strict=True)
+                ],
+                "decision_file_provenance": [
+                    {
+                        "path": path.name,
+                        "source_timestamp_utc": source.source_timestamp_utc,
+                        "available_at_utc": source.available_at_utc,
+                    }
+                    for path, source in zip(decisions, self.decision_sources, strict=True)
+                ],
             },
         )
         return ResearchOutput(tuple(predictions), tuple(decisions), (metadata,))
@@ -170,6 +199,26 @@ def _freeze_asset_records(sources: tuple[Path, ...], directory: str) -> list[dic
     return records
 
 
+def _copy_output_sources(
+    adapter: Mapping[str, Any], field: str, base_dir: Path, as_of_utc: str
+) -> tuple[CopyOutputSource, ...]:
+    items = adapter.get(field)
+    if not isinstance(items, list) or not items:
+        raise ResearchFreezeError(f"copy adapter requires at least one {field.removesuffix('_files')} entry")
+    sources: list[CopyOutputSource] = []
+    for index, item in enumerate(items, start=1):
+        if not isinstance(item, dict) or not item.get("path"):
+            raise ResearchFreezeError(f"output_adapter.{field}[{index}] must include path and as-of provenance")
+        sources.append(
+            CopyOutputSource(
+                path=base_dir / str(item["path"]),
+                source_timestamp_utc=_source_time(item, "source_timestamp_utc", as_of_utc, f"output_adapter.{field}[{index}]"),
+                available_at_utc=_source_time(item, "available_at_utc", as_of_utc, f"output_adapter.{field}[{index}]"),
+            )
+        )
+    return tuple(sources)
+
+
 def adapter_from_config(config: Mapping[str, Any], base_dir: Path) -> ResearchOutputAdapter:
     adapter = config.get("output_adapter")
     if not isinstance(adapter, dict):
@@ -177,9 +226,11 @@ def adapter_from_config(config: Mapping[str, Any], base_dir: Path) -> ResearchOu
     adapter_type = adapter.get("type")
     if adapter_type != "copy":
         raise ResearchFreezeError("only the generic 'copy' research-output adapter is available in v1")
-    predictions = tuple(base_dir / str(item) for item in adapter.get("prediction_files", []))
-    decisions = tuple(base_dir / str(item) for item in adapter.get("decision_files", []))
-    return CopyResearchOutputAdapter(predictions, decisions)
+    as_of_utc = explicit_utc(str(config.get("as_of_utc") or config.get("scheduled_for_utc") or ""))
+    return CopyResearchOutputAdapter(
+        _copy_output_sources(adapter, "prediction_files", base_dir, as_of_utc),
+        _copy_output_sources(adapter, "decision_files", base_dir, as_of_utc),
+    )
 
 
 def _materialize_snapshot_metadata(job: Mapping[str, Any], base_dir: Path, work_dir: Path) -> tuple[tuple[Path, ...], Path]:
@@ -343,6 +394,17 @@ def _registry_entry(
     }
 
 
+def _frozen_research_question(package_dir: Path) -> str:
+    try:
+        manifest = json.loads((package_dir / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ResearchFreezeError(f"invalid published freeze manifest: {package_dir}") from exc
+    research_question = manifest.get("research_question") if isinstance(manifest, dict) else None
+    if not isinstance(research_question, str) or not research_question.strip():
+        raise ResearchFreezeError(f"published freeze has no research question: {package_dir}")
+    return research_question
+
+
 def run_freeze_job(
     job: Mapping[str, Any],
     *,
@@ -355,8 +417,6 @@ def run_freeze_job(
     experiment_id = safe_protocol_id(str(job.get("experiment_id") or ""), "experiment ID")
     research_question = str(job.get("research_question") or "").strip()
     model_version = str(job.get("model_version") or "").strip()
-    if not research_question or not model_version:
-        raise ResearchFreezeError("job requires research_question and model_version")
 
     now = explicit_utc(now_utc) if now_utc else _utc_now()
     if not _job_due(job, now):
@@ -365,6 +425,8 @@ def run_freeze_job(
         reason = "not_ready" if scheduled_for <= now < as_of_utc else "not_due"
         return {"status": "skipped", "reason": reason, "experiment_id": experiment_id}
     output_dir = freeze_root / experiment_id
+    if dry_run:
+        return {"status": "dry_run", "experiment_id": experiment_id, "package_dir": str(output_dir)}
     if output_dir.exists():
         published = verify_freeze_package(output_dir)
         if published["experiment_id"] != experiment_id:
@@ -374,13 +436,13 @@ def run_freeze_job(
             _registry_entry(
                 job,
                 experiment_id=experiment_id,
-                research_question=research_question,
+                research_question=_frozen_research_question(output_dir),
                 freeze_id=published["freeze_id"],
             ),
         )
         return {**published, "verification_status": published["status"], "status": "frozen", "registry_recovered": True}
-    if dry_run:
-        return {"status": "dry_run", "experiment_id": experiment_id, "package_dir": str(output_dir)}
+    if not research_question or not model_version:
+        raise ResearchFreezeError("job requires research_question and model_version")
 
     work_dir = base_dir / "results/freeze_scheduler_work" / experiment_id
     if work_dir.exists():
