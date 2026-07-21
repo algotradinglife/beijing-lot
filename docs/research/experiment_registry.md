@@ -8,7 +8,7 @@
 
 | Experiment ID | Research Question | Branch | Freeze ID | Status | Result | Evidence Level |
 | --- | --- | --- | --- | --- | --- | --- |
-| _No protocol-v1 experiment registered at initialization._ |  |  |  |  |  |  |
+| `SP-EFF-001` | SP-EFF-001: Does Beijing Single Match SP contain calibrated predictive information about 90-minute handicap 3/1/0 outcomes? | `research/sp-eff-001` | `14993d22c46585a8ad7ce8067cd1a87758eb986ac0028256ef49b3415451658a` | `reviewed` | `directional_sp_information_no_holm_rejection` | `A` |
 
 ## 字段约定
 
