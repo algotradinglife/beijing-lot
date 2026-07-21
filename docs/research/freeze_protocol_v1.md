@@ -45,6 +45,8 @@ results/freeze/<experiment_id>/
   inputs/
   decision/
   metadata/
+    config/
+    files/
   SHA256SUMS
 ```
 
@@ -52,6 +54,9 @@ results/freeze/<experiment_id>/
 快照及其数据 hash、配置文件、冻结决策及其 hash。Freeze ID 是这些不可变身份字段和全部
 冻结文件 hash 的 SHA-256；它不包含工作站本地源路径。`SHA256SUMS` 覆盖 manifest 与三个
 内容目录的全部常规文件，校验时任何未登记文件、软链接、缺失文件或 hash 不符均拒绝。
+`metadata/config/` 只保存 `--config` 文件，任意 `--metadata` 文件保存到 `metadata/files/`，
+生成与校验均强制该分工，因此合法元数据文件名（例如 `config`）不会与配置目录冲突。为保持
+既有 v1 包可复验，校验器仍接受旧的 `metadata/<name>` 辅助元数据布局，但新的包不会再生成它。
 
 为保证冻结包自身不变，后续包使用相邻的独立根目录：
 
@@ -68,7 +73,8 @@ results/review/<freeze_id>/<review_id>/
 ```
 
 后续 manifest 固定引用上游 manifest 和 `SHA256SUMS` 的 hash。路径便于本地审计，hash
-才是跨机器的身份依据。
+才是跨机器的身份依据。默认路径中的 `experiment_id`、`settlement_id` 和 `review_id` 必须
+是单个安全路径组件；空值、`.`、`..`、斜杠、反斜杠和绝对路径均拒绝。
 
 ## 4. 赛前边界与防泄漏规则
 
@@ -117,6 +123,9 @@ results/review/<freeze_id>/<review_id>/
 
 - 相同输出目录第二次冻结必须失败，不能覆盖旧包。
 - 修改冻结中的任一文件后，校验必须失败。
+- 包内任何软链接（包括目录软链接）必须失败。
+- 默认输出路径使用的 ID 不得逃逸对应的 `results/freeze`、`results/settlement` 或
+  `results/review` 根目录。
 - 结算或复盘输出目录不得位于被冻结目录内。
 - 结算和复盘只能引用 hash 一致的上游包；错误的上游对应关系必须拒绝。
 - 本协议不替代玩法专属的可售性、赛前完整性、结算完整性和 ROI 授权审查。

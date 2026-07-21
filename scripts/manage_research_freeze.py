@@ -20,6 +20,7 @@ from src.research_freeze_protocol import (  # noqa: E402
     create_freeze_package,
     create_review_package,
     create_settlement_package,
+    safe_protocol_id,
     verify_freeze_package,
     verify_review_package,
     verify_settlement_package,
@@ -71,10 +72,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     arguments = parse_args()
     if arguments.command == "freeze":
-        output = arguments.output_dir or DEFAULT_FREEZE_ROOT / arguments.experiment_id
+        experiment_id = safe_protocol_id(arguments.experiment_id, "experiment ID")
+        output = arguments.output_dir or DEFAULT_FREEZE_ROOT / experiment_id
         result = create_freeze_package(
             output,
-            experiment_id=arguments.experiment_id,
+            experiment_id=experiment_id,
             research_question=arguments.research_question,
             model_version=arguments.model_version,
             input_files=arguments.input,
@@ -87,25 +89,27 @@ def main() -> int:
     elif arguments.command == "verify-freeze":
         result = verify_freeze_package(arguments.package_dir)
     elif arguments.command == "settle":
+        settlement_id = safe_protocol_id(arguments.settlement_id, "settlement ID")
         freeze = verify_freeze_package(arguments.freeze_dir)
-        output = arguments.output_dir or DEFAULT_SETTLEMENT_ROOT / freeze["freeze_id"] / arguments.settlement_id
+        output = arguments.output_dir or DEFAULT_SETTLEMENT_ROOT / freeze["freeze_id"] / settlement_id
         result = create_settlement_package(
             arguments.freeze_dir,
             output,
-            settlement_id=arguments.settlement_id,
+            settlement_id=settlement_id,
             result_files=arguments.result,
             settled_at_utc=arguments.settled_at_utc,
         )
     elif arguments.command == "verify-settlement":
         result = verify_settlement_package(arguments.package_dir)
     elif arguments.command == "review":
+        review_id = safe_protocol_id(arguments.review_id, "review ID")
         freeze = verify_freeze_package(arguments.freeze_dir)
-        output = arguments.output_dir or DEFAULT_REVIEW_ROOT / freeze["freeze_id"] / arguments.review_id
+        output = arguments.output_dir or DEFAULT_REVIEW_ROOT / freeze["freeze_id"] / review_id
         result = create_review_package(
             arguments.freeze_dir,
             arguments.settlement_dir,
             output,
-            review_id=arguments.review_id,
+            review_id=review_id,
             summary_file=arguments.summary,
             reviewed_at_utc=arguments.reviewed_at_utc,
         )

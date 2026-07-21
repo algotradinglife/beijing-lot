@@ -116,6 +116,35 @@ def _safe_relative_name(name: str) -> str:
     return candidate.as_posix()
 
 
+def _is_flat_metadata_path(path: str) -> bool:
+    return path.startswith("metadata/") and "/" not in path.removeprefix("metadata/")
+
+
+def _is_config_metadata_path(path: str) -> bool:
+    return path.startswith("metadata/config/") or _is_flat_metadata_path(path)
+
+
+def _is_auxiliary_metadata_path(path: str) -> bool:
+    return path.startswith("metadata/files/") or _is_flat_metadata_path(path)
+
+
+def safe_protocol_id(value: str, label: str) -> str:
+    """Return an ID that is safe to use as one default package path component."""
+
+    candidate = value.strip()
+    if (
+        not candidate
+        or candidate != value
+        or candidate in {".", ".."}
+        or "/" in candidate
+        or "\\" in candidate
+        or Path(candidate).is_absolute()
+        or len(Path(candidate).parts) != 1
+    ):
+        raise ResearchFreezeError(f"{label} must be a safe single path component")
+    return candidate
+
+
 def _require_regular_source(path: Path) -> Path:
     source = path.expanduser().resolve()
     if not source.is_file() or source.is_symlink():
@@ -154,9 +183,11 @@ def _write_json(path: Path, value: Mapping[str, Any]) -> None:
 def _package_files(package: Path, allowed_roots: set[str]) -> set[str]:
     files: set[str] = set()
     for candidate in package.rglob("*"):
+        if candidate.is_symlink():
+            raise ResearchFreezeError(f"package contains a non-regular file: {candidate}")
         if candidate.is_dir():
             continue
-        if candidate.is_symlink() or not candidate.is_file():
+        if not candidate.is_file():
             raise ResearchFreezeError(f"package contains a non-regular file: {candidate}")
         relative = candidate.relative_to(package).as_posix()
         top_level = relative.split("/", 1)[0]
@@ -272,8 +303,9 @@ def create_freeze_package(
 ) -> dict[str, Any]:
     """Atomically create an immutable freeze package from pre-selected files."""
 
-    if not experiment_id.strip() or not research_question.strip() or not model_version.strip():
-        raise ResearchFreezeError("experiment ID, research question, and model version are required")
+    experiment_id = safe_protocol_id(experiment_id, "experiment ID")
+    if not research_question.strip() or not model_version.strip():
+        raise ResearchFreezeError("research question and model version are required")
     commit = git_commit or current_git_commit()
     if not re.fullmatch(r"[0-9a-f]{7,64}", commit):
         raise ResearchFreezeError("git commit must be a hexadecimal commit identifier")
@@ -284,7 +316,7 @@ def create_freeze_package(
         inputs = _copy_assets(stage, "inputs", input_files)
         decisions = _copy_assets(stage, "decision", decision_files)
         config = _copy_assets(stage, "metadata/config", [config_file])[0]
-        metadata = _copy_assets(stage, "metadata", metadata_sources) if metadata_sources else []
+        metadata = _copy_assets(stage, "metadata/files", metadata_sources) if metadata_sources else []
         # The package identity covers every frozen byte, without storing local source paths.
         freeze_id = freeze_identity_sha256(
             experiment_id=experiment_id,
@@ -345,6 +377,10 @@ def verify_freeze_package(path: Path) -> dict[str, Any]:
     decisions = _verify_asset_list(package, manifest.get("frozen_decisions"), "decision")
     config = _verify_asset_list(package, [manifest.get("config")], "metadata")[0]
     metadata = _verify_asset_list(package, manifest.get("metadata_files", []), "metadata", required=False)
+    if not _is_config_metadata_path(config["path"]):
+        raise ResearchFreezeError("config file must be stored under metadata/config")
+    if any(not _is_auxiliary_metadata_path(asset["path"]) for asset in metadata):
+        raise ResearchFreezeError("metadata files must be stored under metadata/files")
     if config in metadata:
         raise ResearchFreezeError("config file must not be duplicated in metadata_files")
     if snapshot.get("data_sha256") != asset_list_sha256(inputs):
@@ -388,11 +424,10 @@ def create_settlement_package(
 ) -> dict[str, Any]:
     """Capture real result files in a separate package after verifying a freeze."""
 
+    settlement_id = safe_protocol_id(settlement_id, "settlement ID")
     freeze = freeze_dir.expanduser().resolve()
     freeze_check = verify_freeze_package(freeze)
     _ensure_outside(output_dir, freeze)
-    if not settlement_id.strip():
-        raise ResearchFreezeError("settlement ID is required")
     settled_at = explicit_utc(settled_at_utc) if settled_at_utc else utc_now()
     freeze_manifest = json.loads((freeze / "manifest.json").read_text(encoding="utf-8"))
 
@@ -462,6 +497,7 @@ def create_review_package(
 ) -> dict[str, Any]:
     """Create a separate review package referencing verified freeze and settlement bytes."""
 
+    review_id = safe_protocol_id(review_id, "review ID")
     freeze = freeze_dir.expanduser().resolve()
     settlement = settlement_dir.expanduser().resolve()
     freeze_check = verify_freeze_package(freeze)
@@ -477,8 +513,6 @@ def create_review_package(
         or settlement_reference["sha256s_sha256"] != freeze_check["sha256s_sha256"]
     ):
         raise ResearchFreezeError("settlement package freeze hashes do not match the supplied freeze")
-    if not review_id.strip():
-        raise ResearchFreezeError("review ID is required")
     reviewed_at = explicit_utc(reviewed_at_utc) if reviewed_at_utc else utc_now()
 
     def build(stage: Path) -> None:

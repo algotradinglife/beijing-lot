@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -37,6 +39,15 @@ def freeze(tmp_path: Path, name: str = "EXP-001") -> Path:
         frozen_at_utc="2026-07-21T00:00:00+00:00",
     )
     return output
+
+
+def run_cli(*arguments: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(ROOT / "scripts/manage_research_freeze.py"), *arguments],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+    )
 
 
 def test_freeze_layout_manifest_and_checksum_are_immutable(tmp_path: Path) -> None:
@@ -97,6 +108,149 @@ def test_freeze_identity_covers_config_and_model_metadata(tmp_path: Path) -> Non
         tmp_path / "freeze/third", config_file=first_config, model_version="model-v2", **common
     )
     assert len({first["freeze_id"], second["freeze_id"], third["freeze_id"]}) == 3
+
+
+def test_metadata_source_named_config_cannot_collide_with_config_directory(tmp_path: Path) -> None:
+    inputs = write(tmp_path / "sources/asof.csv", "match,probability\n1,0.61\n")
+    decisions = write(tmp_path / "sources/decision.csv", "match,choice\n1,3\n")
+    config = write(tmp_path / "sources/config.json", '{"seed": 17}\n')
+    metadata = write(tmp_path / "sources/metadata/config", "legal metadata named config\n")
+
+    output = tmp_path / "freeze" / "EXP-METADATA-CONFIG"
+    protocol.create_freeze_package(
+        output,
+        experiment_id="EXP-METADATA-CONFIG",
+        research_question="Can metadata use a reserved-looking basename?",
+        model_version="test-model-v1",
+        input_files=[inputs],
+        decision_files=[decisions],
+        config_file=config,
+        metadata_files=[metadata],
+        git_commit="a" * 40,
+        frozen_at_utc="2026-07-21T00:00:00+00:00",
+    )
+
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["config"]["path"].startswith("metadata/config/")
+    assert manifest["metadata_files"][0]["path"] == "metadata/files/config"
+    assert protocol.verify_freeze_package(output)["status"] == "valid"
+
+
+def test_verifier_enforces_metadata_subdirectory_roles(tmp_path: Path) -> None:
+    inputs = write(tmp_path / "sources/asof.csv", "match,probability\n1,0.61\n")
+    decisions = write(tmp_path / "sources/decision.csv", "match,choice\n1,3\n")
+    config = write(tmp_path / "sources/config.json", '{"seed": 17}\n')
+    metadata = write(tmp_path / "sources/metadata/info.txt", "metadata\n")
+    output = tmp_path / "freeze" / "EXP-METADATA-ROLES"
+    protocol.create_freeze_package(
+        output,
+        experiment_id="EXP-METADATA-ROLES",
+        research_question="Does verification enforce metadata roles?",
+        model_version="test-model-v1",
+        input_files=[inputs],
+        decision_files=[decisions],
+        config_file=config,
+        metadata_files=[metadata],
+        git_commit="a" * 40,
+        frozen_at_utc="2026-07-21T00:00:00+00:00",
+    )
+
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    config_bytes = (output / manifest["config"]["path"]).read_bytes()
+    metadata_bytes = (output / manifest["metadata_files"][0]["path"]).read_bytes()
+    shutil.rmtree(output / "metadata")
+    swapped_config = write(output / "metadata/files/config.json", config_bytes.decode("utf-8"))
+    swapped_metadata = write(output / "metadata/config/info.txt", metadata_bytes.decode("utf-8"))
+    manifest["config"].update(
+        {
+            "path": "metadata/files/config.json",
+            "bytes": swapped_config.stat().st_size,
+            "sha256": protocol.sha256_file(swapped_config),
+        }
+    )
+    manifest["metadata_files"][0].update(
+        {
+            "path": "metadata/config/info.txt",
+            "bytes": swapped_metadata.stat().st_size,
+            "sha256": protocol.sha256_file(swapped_metadata),
+        }
+    )
+    manifest["freeze_id"] = protocol.freeze_identity_sha256(
+        experiment_id=manifest["experiment_id"],
+        research_question=manifest["research_question"],
+        model_version=manifest["model_version"],
+        frozen_at_utc=manifest["frozen_at_utc"],
+        git_commit=manifest["git_commit"],
+        inputs=manifest["dataset_snapshot"]["files"],
+        decisions=manifest["frozen_decisions"],
+        config=manifest["config"],
+        metadata=manifest["metadata_files"],
+    )
+    protocol._write_json(output / "manifest.json", manifest)
+    protocol._write_sums(output, {"inputs", "decision", "metadata"})
+
+    with pytest.raises(protocol.ResearchFreezeError, match="config file must be stored under metadata/config"):
+        protocol.verify_freeze_package(output)
+
+
+def test_verifier_accepts_legacy_flat_auxiliary_metadata(tmp_path: Path) -> None:
+    inputs = write(tmp_path / "sources/asof.csv", "match,probability\n1,0.61\n")
+    decisions = write(tmp_path / "sources/decision.csv", "match,choice\n1,3\n")
+    config = write(tmp_path / "sources/config.json", '{"seed": 17}\n')
+    metadata = write(tmp_path / "sources/metadata/info.txt", "metadata\n")
+    output = tmp_path / "freeze" / "EXP-LEGACY-METADATA"
+    protocol.create_freeze_package(
+        output,
+        experiment_id="EXP-LEGACY-METADATA",
+        research_question="Can legacy flat metadata still verify?",
+        model_version="test-model-v1",
+        input_files=[inputs],
+        decision_files=[decisions],
+        config_file=config,
+        metadata_files=[metadata],
+        git_commit="a" * 40,
+        frozen_at_utc="2026-07-21T00:00:00+00:00",
+    )
+
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    metadata_bytes = (output / manifest["metadata_files"][0]["path"]).read_text(encoding="utf-8")
+    shutil.rmtree(output / "metadata/files")
+    legacy_metadata = write(output / "metadata/info.txt", metadata_bytes)
+    manifest["metadata_files"][0].update(
+        {
+            "path": "metadata/info.txt",
+            "bytes": legacy_metadata.stat().st_size,
+            "sha256": protocol.sha256_file(legacy_metadata),
+        }
+    )
+    manifest["freeze_id"] = protocol.freeze_identity_sha256(
+        experiment_id=manifest["experiment_id"],
+        research_question=manifest["research_question"],
+        model_version=manifest["model_version"],
+        frozen_at_utc=manifest["frozen_at_utc"],
+        git_commit=manifest["git_commit"],
+        inputs=manifest["dataset_snapshot"]["files"],
+        decisions=manifest["frozen_decisions"],
+        config=manifest["config"],
+        metadata=manifest["metadata_files"],
+    )
+    protocol._write_json(output / "manifest.json", manifest)
+    protocol._write_sums(output, {"inputs", "decision", "metadata"})
+
+    assert protocol.verify_freeze_package(output)["status"] == "valid"
+
+
+def test_directory_symlink_in_package_is_rejected(tmp_path: Path) -> None:
+    output = freeze(tmp_path)
+    target = tmp_path / "external-directory"
+    target.mkdir()
+    try:
+        (output / "inputs/linked-directory").symlink_to(target, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"directory symlinks are unavailable: {exc}")
+
+    with pytest.raises(protocol.ResearchFreezeError, match="non-regular file"):
+        protocol.verify_freeze_package(output)
 
 
 def test_tampered_freeze_is_rejected(tmp_path: Path) -> None:
@@ -166,3 +320,162 @@ def test_review_rejects_settlement_from_another_freeze(tmp_path: Path) -> None:
             review_id="REV-INVALID",
             summary_file=write(tmp_path / "review.md", "invalid link\n"),
         )
+
+
+def test_library_rejects_traversal_and_absolute_protocol_ids(tmp_path: Path) -> None:
+    frozen = freeze(tmp_path)
+    freeze_info = protocol.verify_freeze_package(frozen)
+    result = write(tmp_path / "official/results.csv", "match,score\n1,2:0\n")
+    settlement = tmp_path / "settlement" / freeze_info["freeze_id"] / "SET-001"
+    protocol.create_settlement_package(
+        frozen,
+        settlement,
+        settlement_id="SET-001",
+        result_files=[result],
+        settled_at_utc="2026-07-22T00:00:00+00:00",
+    )
+    summary = write(tmp_path / "review.md", "# Review\n")
+
+    with pytest.raises(protocol.ResearchFreezeError, match="experiment ID must be a safe single path component"):
+        protocol.create_freeze_package(
+            tmp_path / "freeze/invalid-traversal",
+            experiment_id="../escaped-freeze",
+            research_question="reject traversal",
+            model_version="test-model-v1",
+            input_files=[tmp_path / "sources/EXP-001/asof.csv"],
+            decision_files=[tmp_path / "sources/EXP-001/decision.csv"],
+            config_file=tmp_path / "sources/EXP-001/config.json",
+            git_commit="a" * 40,
+        )
+    with pytest.raises(protocol.ResearchFreezeError, match="experiment ID must be a safe single path component"):
+        protocol.create_freeze_package(
+            tmp_path / "freeze/invalid-absolute",
+            experiment_id=str(tmp_path / "absolute-freeze-id"),
+            research_question="reject absolute",
+            model_version="test-model-v1",
+            input_files=[tmp_path / "sources/EXP-001/asof.csv"],
+            decision_files=[tmp_path / "sources/EXP-001/decision.csv"],
+            config_file=tmp_path / "sources/EXP-001/config.json",
+            git_commit="a" * 40,
+        )
+    with pytest.raises(protocol.ResearchFreezeError, match="settlement ID must be a safe single path component"):
+        protocol.create_settlement_package(
+            frozen,
+            tmp_path / "settlement/invalid",
+            settlement_id="../escaped-settlement",
+            result_files=[result],
+        )
+    with pytest.raises(protocol.ResearchFreezeError, match="settlement ID must be a safe single path component"):
+        protocol.create_settlement_package(
+            frozen,
+            tmp_path / "settlement/invalid-absolute",
+            settlement_id=str(tmp_path / "absolute-settlement-id"),
+            result_files=[result],
+        )
+    with pytest.raises(protocol.ResearchFreezeError, match="review ID must be a safe single path component"):
+        protocol.create_review_package(
+            frozen,
+            settlement,
+            tmp_path / "review/invalid",
+            review_id="../escaped-review",
+            summary_file=summary,
+        )
+    with pytest.raises(protocol.ResearchFreezeError, match="review ID must be a safe single path component"):
+        protocol.create_review_package(
+            frozen,
+            settlement,
+            tmp_path / "review/invalid-absolute",
+            review_id=str(tmp_path / "absolute-review-id"),
+            summary_file=summary,
+        )
+
+
+def test_cli_default_paths_reject_traversal_and_absolute_protocol_ids(tmp_path: Path) -> None:
+    frozen = freeze(tmp_path)
+    freeze_info = protocol.verify_freeze_package(frozen)
+    result = write(tmp_path / "official/results.csv", "match,score\n1,2:0\n")
+    settlement = tmp_path / "settlement" / freeze_info["freeze_id"] / "SET-001"
+    protocol.create_settlement_package(
+        frozen,
+        settlement,
+        settlement_id="SET-001",
+        result_files=[result],
+        settled_at_utc="2026-07-22T00:00:00+00:00",
+    )
+    summary = write(tmp_path / "review.md", "# Review\n")
+
+    freeze_args = [
+        "--research-question",
+        "reject default path escape",
+        "--model-version",
+        "test-model-v1",
+        "--input",
+        str(tmp_path / "sources/EXP-001/asof.csv"),
+        "--decision",
+        str(tmp_path / "sources/EXP-001/decision.csv"),
+        "--config",
+        str(tmp_path / "sources/EXP-001/config.json"),
+        "--git-commit",
+        "a" * 40,
+    ]
+    freeze_traversal = run_cli("freeze", "--experiment-id", "../escaped-freeze", *freeze_args)
+    freeze_absolute = run_cli("freeze", "--experiment-id", str(tmp_path / "absolute-freeze-id"), *freeze_args)
+    settlement_traversal = run_cli(
+        "settle",
+        "--freeze-dir",
+        str(frozen),
+        "--settlement-id",
+        "../escaped-settlement",
+        "--result",
+        str(result),
+    )
+    settlement_absolute = run_cli(
+        "settle",
+        "--freeze-dir",
+        str(frozen),
+        "--settlement-id",
+        str(tmp_path / "absolute-settlement-id"),
+        "--result",
+        str(result),
+    )
+    review_traversal = run_cli(
+        "review",
+        "--freeze-dir",
+        str(frozen),
+        "--settlement-dir",
+        str(settlement),
+        "--review-id",
+        "../escaped-review",
+        "--summary",
+        str(summary),
+    )
+    review_absolute = run_cli(
+        "review",
+        "--freeze-dir",
+        str(frozen),
+        "--settlement-dir",
+        str(settlement),
+        "--review-id",
+        str(tmp_path / "absolute-review-id"),
+        "--summary",
+        str(summary),
+    )
+
+    results = [
+        freeze_traversal,
+        freeze_absolute,
+        settlement_traversal,
+        settlement_absolute,
+        review_traversal,
+        review_absolute,
+    ]
+    assert all(item.returncode != 0 for item in results)
+    assert "experiment ID must be a safe single path component" in freeze_traversal.stderr
+    assert "experiment ID must be a safe single path component" in freeze_absolute.stderr
+    assert "settlement ID must be a safe single path component" in settlement_traversal.stderr
+    assert "settlement ID must be a safe single path component" in settlement_absolute.stderr
+    assert "review ID must be a safe single path component" in review_traversal.stderr
+    assert "review ID must be a safe single path component" in review_absolute.stderr
+    assert not (tmp_path / "absolute-freeze-id").exists()
+    assert not (tmp_path / "absolute-settlement-id").exists()
+    assert not (tmp_path / "absolute-review-id").exists()
