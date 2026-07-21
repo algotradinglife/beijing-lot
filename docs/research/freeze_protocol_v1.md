@@ -50,6 +50,23 @@ results/freeze/<experiment_id>/
   SHA256SUMS
 ```
 
+Automated Freeze Scheduler v1 使用同一校验器的扩展布局：
+
+```text
+results/freeze/<experiment_id>/
+  manifest.json
+  inputs/
+  predictions/
+  decisions/
+  metadata/
+    config/
+    files/
+  SHA256SUMS
+```
+
+该扩展仅增加 generic research-output 文件夹，不改变冻结包的非执行属性。手动 v1 包继续使用
+`decision/`；自动化包使用 `predictions/` 与 `decisions/`，二者都必须由 `SHA256SUMS` 覆盖。
+
 `manifest.json` 至少保存实验 ID、研究问题、冻结 UTC 时间、git commit、模型版本、输入
 快照及其数据 hash、配置文件、冻结决策及其 hash。Freeze ID 是这些不可变身份字段和全部
 冻结文件 hash 的 SHA-256；它不包含工作站本地源路径。`SHA256SUMS` 覆盖 manifest 与三个

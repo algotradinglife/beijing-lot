@@ -60,6 +60,13 @@ def asset_list_sha256(assets: Iterable[Mapping[str, Any]]) -> str:
     )
 
 
+def _asset_digest_list(assets: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {"path": asset["path"], "bytes": asset["bytes"], "sha256": asset["sha256"]}
+        for asset in assets
+    ]
+
+
 def freeze_identity_sha256(
     *,
     experiment_id: str,
@@ -68,24 +75,29 @@ def freeze_identity_sha256(
     frozen_at_utc: str,
     git_commit: str,
     inputs: Iterable[Mapping[str, Any]],
+    predictions: Iterable[Mapping[str, Any]] = (),
     decisions: Iterable[Mapping[str, Any]],
     config: Mapping[str, Any],
     metadata: Iterable[Mapping[str, Any]],
 ) -> str:
     """Return the portable identity of every immutable freeze input."""
 
+    prediction_assets = _asset_digest_list(predictions)
+    identity = {
+        "experiment_id": experiment_id,
+        "research_question": research_question,
+        "model_version": model_version,
+        "frozen_at_utc": frozen_at_utc,
+        "git_commit": git_commit,
+        "inputs_sha256": asset_list_sha256(inputs),
+        "decisions_sha256": asset_list_sha256(decisions),
+        "config_sha256": asset_list_sha256([config]),
+        "metadata_sha256": asset_list_sha256(metadata),
+    }
+    if prediction_assets:
+        identity["predictions_sha256"] = asset_list_sha256(prediction_assets)
     return canonical_sha256(
-        {
-            "experiment_id": experiment_id,
-            "research_question": research_question,
-            "model_version": model_version,
-            "frozen_at_utc": frozen_at_utc,
-            "git_commit": git_commit,
-            "inputs_sha256": asset_list_sha256(inputs),
-            "decisions_sha256": asset_list_sha256(decisions),
-            "config_sha256": asset_list_sha256([config]),
-            "metadata_sha256": asset_list_sha256(metadata),
-        }
+        identity
     )
 
 
@@ -176,6 +188,13 @@ def _copy_assets(stage: Path, directory: str, sources: Iterable[Path]) -> list[d
     return assets
 
 
+def _copy_optional_assets(stage: Path, directory: str, sources: Iterable[Path]) -> list[dict[str, Any]]:
+    optional_sources = tuple(sources)
+    if not optional_sources:
+        return []
+    return _copy_assets(stage, directory, optional_sources)
+
+
 def _write_json(path: Path, value: Mapping[str, Any]) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -250,6 +269,13 @@ def _verify_asset_list(
     return verified
 
 
+def _manifest_asset_paths(*asset_groups: Iterable[Mapping[str, Any]], config: Mapping[str, Any]) -> set[str]:
+    paths = {"manifest.json", str(config["path"])}
+    for assets in asset_groups:
+        paths.update(str(asset["path"]) for asset in assets)
+    return paths
+
+
 def _fsync_tree(path: Path) -> None:
     for item in sorted(path.rglob("*")):
         if item.is_file():
@@ -297,6 +323,8 @@ def create_freeze_package(
     input_files: Iterable[Path],
     decision_files: Iterable[Path],
     config_file: Path,
+    prediction_files: Iterable[Path] = (),
+    decision_directory: str = "decision",
     metadata_files: Iterable[Path] = (),
     git_commit: str | None = None,
     frozen_at_utc: str | None = None,
@@ -306,6 +334,9 @@ def create_freeze_package(
     experiment_id = safe_protocol_id(experiment_id, "experiment ID")
     if not research_question.strip() or not model_version.strip():
         raise ResearchFreezeError("research question and model version are required")
+    decision_directory = _safe_relative_name(decision_directory)
+    if decision_directory not in {"decision", "decisions"}:
+        raise ResearchFreezeError("decision directory must be either 'decision' or 'decisions'")
     commit = git_commit or current_git_commit()
     if not re.fullmatch(r"[0-9a-f]{7,64}", commit):
         raise ResearchFreezeError("git commit must be a hexadecimal commit identifier")
@@ -314,7 +345,8 @@ def create_freeze_package(
 
     def build(stage: Path) -> None:
         inputs = _copy_assets(stage, "inputs", input_files)
-        decisions = _copy_assets(stage, "decision", decision_files)
+        predictions = _copy_optional_assets(stage, "predictions", prediction_files)
+        decisions = _copy_assets(stage, decision_directory, decision_files)
         config = _copy_assets(stage, "metadata/config", [config_file])[0]
         metadata = _copy_assets(stage, "metadata/files", metadata_sources) if metadata_sources else []
         # The package identity covers every frozen byte, without storing local source paths.
@@ -325,6 +357,7 @@ def create_freeze_package(
             frozen_at_utc=frozen_at,
             git_commit=commit,
             inputs=inputs,
+            predictions=predictions,
             decisions=decisions,
             config=config,
             metadata=metadata,
@@ -339,6 +372,8 @@ def create_freeze_package(
             "model_version": model_version,
             "research_question": research_question,
             "dataset_snapshot": {"files": inputs, "data_sha256": asset_list_sha256(inputs)},
+            "prediction_files": predictions,
+            "prediction_sha256": asset_list_sha256(predictions) if predictions else None,
             "config": config,
             "metadata_files": metadata,
             "frozen_decisions": decisions,
@@ -349,14 +384,16 @@ def create_freeze_package(
             "protocol_notice": "Frozen decisions are immutable. Settlement and review packages may reference this package but must not modify it.",
         }
         _write_json(stage / "manifest.json", manifest)
-        _write_sums(stage, {"inputs", "decision", "metadata"})
+        allowed_roots = {"inputs", decision_directory, "metadata"}
+        if predictions:
+            allowed_roots.add("predictions")
+        _write_sums(stage, allowed_roots)
 
     return _atomic_publish(output_dir, build, verify_freeze_package)
 
 
 def verify_freeze_package(path: Path) -> dict[str, Any]:
     package = path.expanduser().resolve()
-    entries = _verify_sums(package, {"inputs", "decision", "metadata"})
     try:
         manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -373,8 +410,26 @@ def verify_freeze_package(path: Path) -> dict[str, Any]:
     snapshot = manifest["dataset_snapshot"]
     if not isinstance(snapshot, dict):
         raise ResearchFreezeError("invalid dataset snapshot")
+    decisions_payload = manifest.get("frozen_decisions")
+    if not isinstance(decisions_payload, list) or not decisions_payload:
+        raise ResearchFreezeError("decision asset list is missing or empty")
+    decision_paths = [asset.get("path") if isinstance(asset, dict) else None for asset in decisions_payload]
+    if all(isinstance(path, str) and path.startswith("decision/") for path in decision_paths):
+        decision_directory = "decision"
+    elif all(isinstance(path, str) and path.startswith("decisions/") for path in decision_paths):
+        decision_directory = "decisions"
+    else:
+        raise ResearchFreezeError("frozen decision assets must stay under one decision directory")
+    prediction_payload = manifest.get("prediction_files", [])
+    if not isinstance(prediction_payload, list):
+        raise ResearchFreezeError("prediction asset list is invalid")
+    allowed_roots = {"inputs", decision_directory, "metadata"}
+    if prediction_payload:
+        allowed_roots.add("predictions")
+    entries = _verify_sums(package, allowed_roots)
     inputs = _verify_asset_list(package, snapshot.get("files"), "inputs")
-    decisions = _verify_asset_list(package, manifest.get("frozen_decisions"), "decision")
+    decisions = _verify_asset_list(package, decisions_payload, decision_directory)
+    predictions = _verify_asset_list(package, prediction_payload, "predictions", required=False)
     config = _verify_asset_list(package, [manifest.get("config")], "metadata")[0]
     metadata = _verify_asset_list(package, manifest.get("metadata_files", []), "metadata", required=False)
     if not _is_config_metadata_path(config["path"]):
@@ -383,8 +438,13 @@ def verify_freeze_package(path: Path) -> dict[str, Any]:
         raise ResearchFreezeError("metadata files must be stored under metadata/files")
     if config in metadata:
         raise ResearchFreezeError("config file must not be duplicated in metadata_files")
+    expected_manifest_files = _manifest_asset_paths(inputs, predictions, decisions, metadata, config=config)
+    if set(entries) != expected_manifest_files:
+        raise ResearchFreezeError("SHA256SUMS contains files not declared by the freeze manifest")
     if snapshot.get("data_sha256") != asset_list_sha256(inputs):
         raise ResearchFreezeError("dataset snapshot digest mismatch")
+    if manifest.get("prediction_sha256") not in {None, asset_list_sha256(predictions)}:
+        raise ResearchFreezeError("prediction digest mismatch")
     if manifest.get("decision_sha256") != asset_list_sha256(decisions):
         raise ResearchFreezeError("frozen decision digest mismatch")
     expected_freeze_id = freeze_identity_sha256(
@@ -394,6 +454,7 @@ def verify_freeze_package(path: Path) -> dict[str, Any]:
         frozen_at_utc=manifest["frozen_at_utc"],
         git_commit=manifest["git_commit"],
         inputs=inputs,
+        predictions=predictions,
         decisions=decisions,
         config=config,
         metadata=metadata,
@@ -408,6 +469,7 @@ def verify_freeze_package(path: Path) -> dict[str, Any]:
         "experiment_id": manifest["experiment_id"],
         "freeze_id": manifest["freeze_id"],
         "input_files": len(inputs),
+        "prediction_files": len(predictions),
         "decision_files": len(decisions),
         "sha256s_sha256": sha256_file(package / "SHA256SUMS"),
         "manifest_sha256": entries["manifest.json"],

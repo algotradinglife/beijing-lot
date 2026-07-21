@@ -307,6 +307,15 @@ def test_tampered_freeze_is_rejected(tmp_path: Path) -> None:
         protocol.verify_freeze_package(output)
 
 
+def test_verifier_rejects_manifest_unreferenced_prediction_directory(tmp_path: Path) -> None:
+    output = freeze(tmp_path)
+    write(output / "predictions/extra.json", '{"unexpected": true}\n')
+    protocol._write_sums(output, {"inputs", "decision", "predictions", "metadata"})
+
+    with pytest.raises(protocol.ResearchFreezeError, match="unexpected package file"):
+        protocol.verify_freeze_package(output)
+
+
 def test_settlement_and_review_are_separate_and_linked_to_the_same_freeze(tmp_path: Path) -> None:
     frozen = freeze(tmp_path)
     freeze_sum_before = protocol.sha256_file(frozen / "SHA256SUMS")
