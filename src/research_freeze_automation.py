@@ -370,14 +370,15 @@ def register_experiment(registry_path: Path, entry: Mapping[str, Any]) -> None:
     registry_path.write_text(text + row, encoding="utf-8")
 
 
-def _preflight_registry_conflict(registry_path: Path, experiment_id: str, freeze_id: str) -> None:
+def _preflight_registry_conflict(registry_path: Path, experiment_id: str, freeze_id: str) -> bool:
     if not registry_path.exists():
-        return
+        return False
     for line in registry_path.read_text(encoding="utf-8").splitlines():
         if line.startswith(f"| `{experiment_id}` |"):
             if f"| `{freeze_id}` |" in line:
-                return
+                return True
             raise ResearchFreezeError(f"experiment already registered with a different freeze: {experiment_id}")
+    return False
 
 
 def _registry_entry(
@@ -431,6 +432,8 @@ def run_freeze_job(
         published = verify_freeze_package(output_dir)
         if published["experiment_id"] != experiment_id:
             raise ResearchFreezeError(f"published freeze experiment ID mismatch: {output_dir}")
+        if _preflight_registry_conflict(registry_path, experiment_id, published["freeze_id"]):
+            return {**published, "status": "already_frozen"}
         register_experiment(
             registry_path,
             _registry_entry(

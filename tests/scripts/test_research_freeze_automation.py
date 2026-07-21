@@ -347,6 +347,18 @@ def test_scheduler_recovers_registry_after_published_freeze_registration_failure
     assert "Mutable replacement question" not in registry
 
 
+def test_scheduler_returns_already_frozen_when_published_freeze_is_registered(tmp_path: Path) -> None:
+    config = scheduler_config(tmp_path)
+    first = run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")[0]
+
+    second = run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")[0]
+
+    assert second["status"] == "already_frozen"
+    assert second["freeze_id"] == first["freeze_id"]
+    assert "registry_recovered" not in second
+    assert (tmp_path / "experiment_registry.md").read_text(encoding="utf-8").count("| `AUTO-FREEZE-001` |") == 1
+
+
 def test_scheduler_dry_run_does_not_register_unregistered_published_freeze(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
