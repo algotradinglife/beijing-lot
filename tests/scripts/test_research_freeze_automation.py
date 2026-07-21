@@ -238,22 +238,43 @@ def test_scheduler_skips_due_job_until_its_as_of_boundary(tmp_path: Path) -> Non
     assert not (tmp_path / "freeze/AUTO-FREEZE-001").exists()
 
 
-def test_scheduler_rejects_input_file_drift_before_freeze_publish(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_scheduler_freezes_verified_input_copies_when_source_changes_before_publish(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     config = scheduler_config(tmp_path)
     source = tmp_path / "inputs/matches.csv"
-    original_produce = automation.CopyResearchOutputAdapter.produce
+    expected = source.read_text(encoding="utf-8")
+    original_create = automation.create_freeze_package
 
-    def mutate_input_after_output(self: object, dataset: object) -> object:
-        output = original_produce(self, dataset)  # type: ignore[arg-type]
+    def mutate_source_before_publish(*args: object, **kwargs: object) -> object:
         write(source, "match,kickoff_hkt,team_home,team_away\n1,2026-07-21T20:00:00+08:00,C,D\n")
-        return output
+        return original_create(*args, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(automation.CopyResearchOutputAdapter, "produce", mutate_input_after_output)
+    monkeypatch.setattr(automation, "create_freeze_package", mutate_source_before_publish)
 
-    with pytest.raises(ResearchFreezeError, match="changed since as-of snapshot"):
-        run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+    run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
 
-    assert not (tmp_path / "freeze/AUTO-FREEZE-001").exists()
+    package = tmp_path / "freeze/AUTO-FREEZE-001"
+    frozen_input = package / "inputs/matches.csv"
+    snapshot = json.loads((package / "metadata/files/as_of_snapshot_metadata.json").read_text(encoding="utf-8"))
+    assert source.read_text(encoding="utf-8") != expected
+    assert frozen_input.read_text(encoding="utf-8") == expected
+    assert snapshot["snapshot_files"][0]["sha256"] == protocol.sha256_file(frozen_input)
+    assert verify_freeze_package(package)["status"] == "valid"
+
+
+def test_scheduler_freeze_id_is_portable_across_freeze_roots(tmp_path: Path) -> None:
+    config = scheduler_config(tmp_path)
+    first = run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")[0]
+    alternate = json.loads(config.read_text(encoding="utf-8"))
+    alternate["freeze_root"] = str(tmp_path / "alternate_freeze")
+    alternate["registry_path"] = str(tmp_path / "alternate_experiment_registry.md")
+    alternate_config = write(tmp_path / "alternate_scheduler.json", json.dumps(alternate))
+
+    second = run_due_jobs(alternate_config, now_utc="2026-07-21T02:05:00+00:00")[0]
+
+    assert first["freeze_id"] == second["freeze_id"]
+    assert verify_freeze_package(tmp_path / "alternate_freeze/AUTO-FREEZE-001")["status"] == "valid"
 
 
 def test_scheduler_recovers_registry_after_published_freeze_registration_failure(

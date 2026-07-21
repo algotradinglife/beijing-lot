@@ -246,6 +246,15 @@ def _verify_snapshot_inputs(input_files: tuple[Path, ...], snapshot_metadata: Pa
             raise ResearchFreezeError(f"input file changed since as-of snapshot: {resolved}")
 
 
+def _copy_verified_snapshot_inputs(
+    input_files: tuple[Path, ...], snapshot_metadata: Path, work_dir: Path
+) -> tuple[Path, ...]:
+    _verify_snapshot_inputs(input_files, snapshot_metadata)
+    copied = tuple(_copy_named(input_files, work_dir / "verified_inputs"))
+    _verify_snapshot_inputs(copied, snapshot_metadata)
+    return copied
+
+
 def _job_due(job: Mapping[str, Any], now_utc: str) -> bool:
     scheduled_for = explicit_utc(str(job.get("scheduled_for_utc") or job.get("as_of_utc") or ""))
     as_of_utc = explicit_utc(str(job.get("as_of_utc") or job.get("scheduled_for_utc") or ""))
@@ -377,7 +386,8 @@ def run_freeze_job(
     if work_dir.exists():
         shutil.rmtree(work_dir)
     work_dir.mkdir(parents=True)
-    input_files, snapshot_metadata = _materialize_snapshot_metadata(job, base_dir, work_dir)
+    snapshot_inputs, snapshot_metadata = _materialize_snapshot_metadata(job, base_dir, work_dir)
+    input_files = _copy_verified_snapshot_inputs(snapshot_inputs, snapshot_metadata, work_dir)
     dataset = FrozenDataset(
         experiment_id=experiment_id,
         as_of_utc=explicit_utc(str(job.get("as_of_utc") or job.get("scheduled_for_utc"))),
@@ -393,7 +403,6 @@ def run_freeze_job(
             "experiment_id": experiment_id,
             "scheduled_for_utc": explicit_utc(str(job.get("scheduled_for_utc") or job.get("as_of_utc"))),
             "ran_at_utc": now,
-            "freeze_package_target": str(output_dir),
             "scheduler": "simple_file_due_scheduler_v1",
         },
     )
@@ -413,7 +422,6 @@ def run_freeze_job(
         metadata=_freeze_asset_records(tuple(metadata_files), "metadata/files"),
     )
     _preflight_registry_conflict(registry_path, experiment_id, candidate_freeze_id)
-    _verify_snapshot_inputs(input_files, snapshot_metadata)
     freeze = create_freeze_package(
         output_dir,
         experiment_id=experiment_id,
