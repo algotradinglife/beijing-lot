@@ -28,7 +28,7 @@ def _make_live_db(path: Path) -> None:
             snapshot_ts TEXT, sp_3 REAL, sp_1 REAL, sp_0 REAL
         );
         CREATE TABLE settlements(
-            match_id TEXT PRIMARY KEY, result_code TEXT
+            match_id TEXT PRIMARY KEY, result_code TEXT, settled_ts TEXT
         );
         """
     )
@@ -40,7 +40,10 @@ def _make_live_db(path: Path) -> None:
             "INSERT INTO matches VALUES(?,?,?,?,?,?)",
             (match_id, issue, index, "test", f"2026-07-{index:02d}T12:00:00", 0.0),
         )
-        connection.execute("INSERT INTO settlements VALUES(?,?)", (match_id, result))
+        connection.execute(
+            "INSERT INTO settlements VALUES(?,?,?)",
+            (match_id, result, f"2026-07-{index:02d}T06:00:00Z"),
+        )
         # Kickoff is 04:00 UTC. Only 02:00 and 03:00 are eligible.
         connection.execute(
             "INSERT INTO snapshots(match_id,snapshot_ts,sp_3,sp_1,sp_0) VALUES(?,?,?,?,?)",
@@ -85,11 +88,51 @@ def test_load_uses_complete_vector_strictly_before_beijing_kickoff(tmp_path: Pat
     assert audit.postkickoff_rows_rejected == 8
     assert audit.extract_sha256 == experiment.load_experiment_frame(database)[1].extract_sha256
 
-    cutoff_frame, _ = experiment.load_experiment_frame(
-        database, as_of="2026-07-01T02:30:00Z"
+    cutoff_frame, cutoff_audit = experiment.load_experiment_frame(
+        database, as_of="2026-07-02T02:30:00Z"
     )
     assert len(cutoff_frame) == 1
-    assert cutoff_frame.iloc[0]["closing_snapshot_ts"] == "2026-07-01T02:00:00Z"
+    assert cutoff_frame.iloc[0]["closing_snapshot_ts"] == "2026-07-01T03:00:00Z"
+    assert cutoff_audit.settled_matches == 1
+
+
+def test_as_of_excludes_late_settlements_and_is_repeatable(tmp_path: Path) -> None:
+    database = tmp_path / "live.db"
+    _make_live_db(database)
+    cutoff = "2026-07-02T02:30:00Z"
+
+    first_frame, first_audit = experiment.load_experiment_frame(database, as_of=cutoff)
+
+    connection = sqlite3.connect(database)
+    connection.execute(
+        "INSERT INTO matches VALUES(?,?,?,?,?,?)",
+        ("late", "A", 99, "test", "2026-07-01T12:00:00", 0.0),
+    )
+    connection.execute(
+        "INSERT INTO snapshots(match_id,snapshot_ts,sp_3,sp_1,sp_0) VALUES(?,?,?,?,?)",
+        ("late", "2026-07-01T02:00:00Z", 2.5, 3.2, 3.0),
+    )
+    connection.execute(
+        "INSERT INTO settlements VALUES(?,?,?)",
+        ("late", "3", "2026-07-02T03:00:00Z"),
+    )
+    connection.commit()
+    connection.close()
+
+    second_frame, second_audit = experiment.load_experiment_frame(database, as_of=cutoff)
+
+    pd.testing.assert_frame_equal(first_frame, second_frame)
+    assert first_audit.settled_matches == second_audit.settled_matches == 1
+    assert first_audit.extract_sha256 == second_audit.extract_sha256
+
+
+def test_markdown_figure_path_is_relative_to_custom_report_directory(tmp_path: Path) -> None:
+    figure = tmp_path / "assets" / "calibration.png"
+    report = tmp_path / "reports" / "nested" / "SP-EFF-001.md"
+
+    link = experiment._markdown_relative_path(figure, report)
+
+    assert link == "../../assets/calibration.png"
 
 
 def test_market_probability_is_jointly_normalized_not_naive_inverse(tmp_path: Path) -> None:

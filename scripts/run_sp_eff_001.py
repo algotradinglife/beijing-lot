@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import math
+import os
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -102,12 +103,19 @@ def load_experiment_frame(
     as_of_ts = _utc_timestamp(as_of)
     if as_of and as_of_ts is None:
         raise ValueError(f"invalid --as-of timestamp: {as_of}")
+    settlement_cutoff = ""
+    query_params: dict[str, str] = {}
+    if as_of_ts is not None:
+        settlement_cutoff = " AND datetime(settled_ts) <= datetime(:as_of)"
+        query_params["as_of"] = as_of_ts.isoformat()
 
     connection = _readonly_connection(path)
     try:
         settled_matches = int(
             connection.execute(
-                "SELECT COUNT(*) FROM settlements WHERE result_code IN ('3','1','0')"
+                "SELECT COUNT(*) FROM settlements "
+                "WHERE result_code IN ('3','1','0')" + settlement_cutoff,
+                query_params,
             ).fetchone()[0]
         )
         raw = pd.read_sql_query(
@@ -121,8 +129,9 @@ def load_experiment_frame(
             JOIN settlements st ON st.match_id = s.match_id
             WHERE st.result_code IN ('3','1','0')
               AND s.sp_3 > 1.0 AND s.sp_1 > 1.0 AND s.sp_0 > 1.0
-            """,
+            """ + settlement_cutoff.replace("settled_ts", "st.settled_ts"),
             connection,
+            params=query_params,
         )
     finally:
         connection.rollback()
@@ -513,6 +522,13 @@ def _make_calibration_figure(
     plt.close(fig)
 
 
+def _markdown_relative_path(target_path: Path, document_path: Path) -> str:
+    """Return a portable Markdown path from a document to a target artifact."""
+    return Path(
+        os.path.relpath(target_path.resolve(), start=document_path.parent.resolve())
+    ).as_posix()
+
+
 def render_report(
     *,
     audit: DatasetAudit,
@@ -554,7 +570,7 @@ def render_report(
         "with both issue-block-bootstrap intervals below zero. This supports incremental "
         "predictive information in SP for this sample."
     )
-    relative_figure = Path("..") / "figures" / figure_path.name
+    relative_figure = _markdown_relative_path(figure_path, output_path)
     metric_display = metrics.rename(
         columns={"model": "Baseline", "log_loss": "Log Loss", "brier_score": "Brier Score", "ece": "ECE"}
     )
@@ -637,7 +653,7 @@ def render_report(
         "",
         _markdown_table(score_comparisons, {"Delta": "+.5f", "95% CI low": "+.5f", "95% CI high": "+.5f"}),
         "",
-        f"![Out-of-sample calibration]({relative_figure.as_posix()})",
+        f"![Out-of-sample calibration]({relative_figure})",
         "",
         "### Calibrated market probability bins (holdout)",
         "",
