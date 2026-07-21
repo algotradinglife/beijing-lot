@@ -359,6 +359,38 @@ def test_scheduler_returns_already_frozen_when_published_freeze_is_registered(tm
     assert (tmp_path / "experiment_registry.md").read_text(encoding="utf-8").count("| `AUTO-FREEZE-001` |") == 1
 
 
+def test_scheduler_recovery_uses_frozen_branch_and_evidence_level(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = scheduler_config(tmp_path)
+    original_register = automation.register_experiment
+    attempts = 0
+
+    def fail_once(registry_path: Path, entry: object) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise OSError("simulated registry write failure")
+        original_register(registry_path, entry)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(automation, "register_experiment", fail_once)
+    with pytest.raises(OSError, match="registry write failure"):
+        run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+
+    payload = json.loads(config.read_text(encoding="utf-8"))
+    payload["jobs"][0]["branch"] = "mutable/replacement-branch"
+    payload["jobs"][0]["evidence_level"] = "Z"
+    write(config, json.dumps(payload))
+
+    run_due_jobs(config, now_utc="2026-07-21T02:05:00+00:00")
+
+    registry = (tmp_path / "experiment_registry.md").read_text(encoding="utf-8")
+    assert "`research/freeze-automation-v1`" in registry
+    assert "`A`" in registry
+    assert "mutable/replacement-branch" not in registry
+    assert "`Z`" not in registry
+
+
 def test_scheduler_dry_run_does_not_register_unregistered_published_freeze(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

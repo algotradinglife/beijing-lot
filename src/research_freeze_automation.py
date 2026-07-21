@@ -319,6 +319,8 @@ def _job_config_file(job: Mapping[str, Any], work_dir: Path) -> Path:
             "schema_version": AUTOMATION_SCHEMA,
             "experiment_id": job["experiment_id"],
             "model_version": job["model_version"],
+            "branch": str(job.get("branch") or "research/freeze-automation-v1"),
+            "evidence_level": str(job.get("evidence_level") or "A"),
             "scheduled_for_utc": explicit_utc(str(job.get("scheduled_for_utc") or job.get("as_of_utc"))),
             "as_of_utc": explicit_utc(str(job.get("as_of_utc") or job.get("scheduled_for_utc"))),
             "research_output_adapter": job.get("output_adapter", {}).get("type"),
@@ -382,20 +384,26 @@ def _preflight_registry_conflict(registry_path: Path, experiment_id: str, freeze
 
 
 def _registry_entry(
-    job: Mapping[str, Any], *, experiment_id: str, research_question: str, freeze_id: str
+    job: Mapping[str, Any],
+    *,
+    experiment_id: str,
+    research_question: str,
+    freeze_id: str,
+    branch: str | None = None,
+    evidence_level: str | None = None,
 ) -> dict[str, Any]:
     return {
         "experiment_id": experiment_id,
         "research_question": research_question.replace("|", "\\|"),
-        "branch": str(job.get("branch") or "research/freeze-automation-v1"),
+        "branch": branch if branch is not None else str(job.get("branch") or "research/freeze-automation-v1"),
         "freeze_id": freeze_id,
         "status": "frozen",
         "result": "pending",
-        "evidence_level": str(job.get("evidence_level") or "A"),
+        "evidence_level": evidence_level if evidence_level is not None else str(job.get("evidence_level") or "A"),
     }
 
 
-def _frozen_research_question(package_dir: Path) -> str:
+def _frozen_registry_metadata(package_dir: Path) -> dict[str, str]:
     try:
         manifest = json.loads((package_dir / "manifest.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -403,7 +411,19 @@ def _frozen_research_question(package_dir: Path) -> str:
     research_question = manifest.get("research_question") if isinstance(manifest, dict) else None
     if not isinstance(research_question, str) or not research_question.strip():
         raise ResearchFreezeError(f"published freeze has no research question: {package_dir}")
-    return research_question
+    config = manifest.get("config") if isinstance(manifest, dict) else None
+    config_path = config.get("path") if isinstance(config, dict) else None
+    if not isinstance(config_path, str) or not config_path.startswith("metadata/config/"):
+        raise ResearchFreezeError(f"published freeze has no automation config: {package_dir}")
+    try:
+        frozen_config = json.loads((package_dir / config_path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ResearchFreezeError(f"invalid published freeze config: {package_dir}") from exc
+    branch = frozen_config.get("branch") if isinstance(frozen_config, dict) else None
+    evidence_level = frozen_config.get("evidence_level") if isinstance(frozen_config, dict) else None
+    if not isinstance(branch, str) or not branch.strip() or not isinstance(evidence_level, str) or not evidence_level.strip():
+        raise ResearchFreezeError(f"published freeze has incomplete registry metadata: {package_dir}")
+    return {"research_question": research_question, "branch": branch, "evidence_level": evidence_level}
 
 
 def run_freeze_job(
@@ -434,13 +454,16 @@ def run_freeze_job(
             raise ResearchFreezeError(f"published freeze experiment ID mismatch: {output_dir}")
         if _preflight_registry_conflict(registry_path, experiment_id, published["freeze_id"]):
             return {**published, "status": "already_frozen"}
+        frozen_registry = _frozen_registry_metadata(output_dir)
         register_experiment(
             registry_path,
             _registry_entry(
                 job,
                 experiment_id=experiment_id,
-                research_question=_frozen_research_question(output_dir),
+                research_question=frozen_registry["research_question"],
                 freeze_id=published["freeze_id"],
+                branch=frozen_registry["branch"],
+                evidence_level=frozen_registry["evidence_level"],
             ),
         )
         return {**published, "verification_status": published["status"], "status": "frozen", "registry_recovered": True}
