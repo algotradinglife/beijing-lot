@@ -193,6 +193,52 @@ def test_verifier_enforces_metadata_subdirectory_roles(tmp_path: Path) -> None:
         protocol.verify_freeze_package(output)
 
 
+def test_verifier_rejects_recomputed_flat_config_path(tmp_path: Path) -> None:
+    inputs = write(tmp_path / "sources/asof.csv", "match,probability\n1,0.61\n")
+    decisions = write(tmp_path / "sources/decision.csv", "match,choice\n1,3\n")
+    config = write(tmp_path / "sources/config.json", '{"seed": 17}\n')
+    output = tmp_path / "freeze" / "EXP-FLAT-CONFIG"
+    protocol.create_freeze_package(
+        output,
+        experiment_id="EXP-FLAT-CONFIG",
+        research_question="Does verification reject a flat config path?",
+        model_version="test-model-v1",
+        input_files=[inputs],
+        decision_files=[decisions],
+        config_file=config,
+        git_commit="a" * 40,
+        frozen_at_utc="2026-07-21T00:00:00+00:00",
+    )
+
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    config_bytes = (output / manifest["config"]["path"]).read_text(encoding="utf-8")
+    shutil.rmtree(output / "metadata/config")
+    flat_config = write(output / "metadata/config.json", config_bytes)
+    manifest["config"].update(
+        {
+            "path": "metadata/config.json",
+            "bytes": flat_config.stat().st_size,
+            "sha256": protocol.sha256_file(flat_config),
+        }
+    )
+    manifest["freeze_id"] = protocol.freeze_identity_sha256(
+        experiment_id=manifest["experiment_id"],
+        research_question=manifest["research_question"],
+        model_version=manifest["model_version"],
+        frozen_at_utc=manifest["frozen_at_utc"],
+        git_commit=manifest["git_commit"],
+        inputs=manifest["dataset_snapshot"]["files"],
+        decisions=manifest["frozen_decisions"],
+        config=manifest["config"],
+        metadata=manifest["metadata_files"],
+    )
+    protocol._write_json(output / "manifest.json", manifest)
+    protocol._write_sums(output, {"inputs", "decision", "metadata"})
+
+    with pytest.raises(protocol.ResearchFreezeError, match="config file must be stored under metadata/config"):
+        protocol.verify_freeze_package(output)
+
+
 def test_verifier_accepts_legacy_flat_auxiliary_metadata(tmp_path: Path) -> None:
     inputs = write(tmp_path / "sources/asof.csv", "match,probability\n1,0.61\n")
     decisions = write(tmp_path / "sources/decision.csv", "match,choice\n1,3\n")

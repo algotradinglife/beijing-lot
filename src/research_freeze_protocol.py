@@ -121,7 +121,7 @@ def _is_flat_metadata_path(path: str) -> bool:
 
 
 def _is_config_metadata_path(path: str) -> bool:
-    return path.startswith("metadata/config/") or _is_flat_metadata_path(path)
+    return path.startswith("metadata/config/")
 
 
 def _is_auxiliary_metadata_path(path: str) -> bool:
