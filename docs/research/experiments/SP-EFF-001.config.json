@@ -1,0 +1,38 @@
+{
+  "baselines": [
+    "B0_uniform",
+    "B1_normalized_inverse_sp",
+    "B1_T_temperature_calibrated",
+    "B2_historical_frequency"
+  ],
+  "bootstrap_samples": 5000,
+  "calibration_bins": "0.0..1.0 step 0.1",
+  "evidence_level": "A",
+  "experiment_id": "SP-EFF-001",
+  "figure": "docs/research/figures/sp_eff_001_calibration.png",
+  "input_database": "data/beidan_live.db",
+  "market_scope": "beijing_single_match_handicap_3_1_0",
+  "metrics": [
+    "log_loss",
+    "brier_score",
+    "ece",
+    "holm_corrected_calibration_cell_tests",
+    "issue_block_bootstrap_paired_score_differences"
+  ],
+  "model_version": "sp-eff-001-live-db-v1",
+  "no_roi_or_strategy_search": true,
+  "report": "docs/research/experiments/SP-EFF-001.md",
+  "sp_bands": [
+    "1-1.5",
+    "1.5-2",
+    "2-3",
+    "3-5",
+    "5-8",
+    "8+"
+  ],
+  "timezone_contract": {
+    "kickoff_ts": "Asia/Shanghai naive",
+    "snapshot_ts": "UTC"
+  },
+  "train_fraction_by_chronological_issue": 0.7
+}
