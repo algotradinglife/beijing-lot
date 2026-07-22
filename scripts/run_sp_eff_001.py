@@ -221,6 +221,11 @@ def chronological_issue_split(
     train_count = min(max(int(math.floor(len(issue_order) * train_fraction)), 1), len(issue_order) - 1)
     train_issues = tuple(issue_order[:train_count])
     test_issues = tuple(issue_order[train_count:])
+    if len(test_issues) < 2:
+        raise ValueError(
+            "holdout requires at least 2 issues; "
+            f"got {len(test_issues)} from {len(issue_order)} chronological issues"
+        )
     train = frame[frame["issue"].isin(train_issues)].copy()
     test = frame[frame["issue"].isin(test_issues)].copy()
     return train, test, train_issues, test_issues
@@ -529,6 +534,45 @@ def _markdown_relative_path(target_path: Path, document_path: Path) -> str:
     ).as_posix()
 
 
+def _predictive_conclusion(score_comparisons: pd.DataFrame) -> str:
+    """State the holdout result without conflating direction and uncertainty."""
+    comparisons = score_comparisons[
+        (score_comparisons["Model"] == "B1-T train-fitted temperature")
+        & (score_comparisons["Metric"] == "Log Loss")
+    ].copy()
+    decisive_wins = (
+        (comparisons["Delta"] < 0)
+        & (comparisons["95% CI high"] < 0)
+    )
+    worse = comparisons[comparisons["Delta"] > 0]
+    directional = comparisons[comparisons["Delta"] < 0]
+
+    if len(comparisons) == 2 and decisive_wins.all():
+        return (
+            "The calibrated SP model has lower holdout Log Loss than both non-market "
+            "baselines, with both issue-block-bootstrap intervals below zero. This "
+            "supports incremental predictive information in SP for this sample."
+        )
+    if not worse.empty:
+        worse_against = ", ".join(worse["Comparator"])
+        return (
+            "The calibrated SP model has higher (worse) holdout Log Loss than "
+            f"{worse_against}; it does not beat every non-market baseline and therefore "
+            "does not establish incremental predictive information across these comparisons."
+        )
+    if not directional.empty:
+        return (
+            "The calibrated SP model has lower holdout Log Loss than at least one "
+            "non-market baseline, but at least one issue-block-bootstrap interval crosses "
+            "zero. This is directional, not conclusive, evidence of incremental predictive "
+            "information."
+        )
+    return (
+        "The calibrated SP model does not have lower holdout Log Loss than the non-market "
+        "baselines, so this sample does not support incremental predictive information."
+    )
+
+
 def render_report(
     *,
     audit: DatasetAudit,
@@ -545,6 +589,7 @@ def render_report(
     drift_thresholds: np.ndarray,
     figure_path: Path,
     output_path: Path,
+    as_of_utc: str,
 ) -> None:
     calibrated = calibration[calibration["model"] == "B1-T train-fitted temperature"].copy()
     significant = calibrated[calibrated["significant_5pct"]]
@@ -557,19 +602,7 @@ def render_report(
         else "Fail to reject H0 on this holdout: no pre-specified probability/outcome cell "
         "retains a calibration deviation after Holm correction."
     )
-    calibrated_log_comparisons = score_comparisons[
-        (score_comparisons["Model"] == "B1-T train-fitted temperature")
-        & (score_comparisons["Metric"] == "Log Loss")
-    ]
-    predictive_conclusion = (
-        "The calibrated SP model beats both non-market baselines in holdout Log Loss, "
-        "but at least one issue-block-bootstrap interval crosses zero. This is directional, "
-        "not conclusive, evidence of incremental predictive information."
-        if (calibrated_log_comparisons["95% CI high"] >= 0).any()
-        else "The calibrated SP model beats both non-market baselines in holdout Log Loss, "
-        "with both issue-block-bootstrap intervals below zero. This supports incremental "
-        "predictive information in SP for this sample."
-    )
+    predictive_conclusion = _predictive_conclusion(score_comparisons)
     relative_figure = _markdown_relative_path(figure_path, output_path)
     metric_display = metrics.rename(
         columns={"model": "Baseline", "log_loss": "Log Loss", "brier_score": "Brier Score", "ece": "ECE"}
@@ -592,6 +625,7 @@ def render_report(
         "",
         f"- Source: `data/{Path(audit.database_path).name}` (`{audit.database_size_bytes:,}` bytes)",
         f"- Extracted: `{audit.extracted_at_utc}`",
+        f"- Reproduction cutoff (`--as-of` UTC): `{as_of_utc}`",
         f"- Canonical extract SHA-256: `{audit.extract_sha256}`",
         f"- Complete-snapshot rows examined: `{audit.complete_snapshot_rows:,}`; valid settled matches: `{audit.settled_matches:,}`",
         f"- Eligible matches after strict pre-kickoff filtering: `{audit.eligible_matches:,}`",
@@ -689,7 +723,7 @@ def render_report(
         "## Reproduction",
         "",
         "```bash",
-        "python scripts/run_sp_eff_001.py --db data/beidan_live.db",
+        f"python scripts/run_sp_eff_001.py --db data/beidan_live.db --as-of {as_of_utc}",
         "```",
         "",
     ]
@@ -698,7 +732,12 @@ def render_report(
 
 
 def run(args: argparse.Namespace) -> None:
-    frame, audit = load_experiment_frame(args.db, as_of=args.as_of)
+    requested_as_of = _utc_timestamp(args.as_of)
+    if args.as_of and requested_as_of is None:
+        raise ValueError(f"invalid --as-of timestamp: {args.as_of}")
+    as_of_timestamp = requested_as_of or pd.Timestamp.now(tz="UTC")
+    as_of_utc = as_of_timestamp.floor("s").isoformat().replace("+00:00", "Z")
+    frame, audit = load_experiment_frame(args.db, as_of=as_of_utc)
     train, test, train_issues, test_issues = chronological_issue_split(
         frame, train_fraction=args.train_fraction
     )
@@ -720,7 +759,7 @@ def run(args: argparse.Namespace) -> None:
         calibration=calibration, temperature=temperature,
         sp_bands=sp_bands, drift_bands=drift_bands,
         drift_thresholds=drift_thresholds, figure_path=figure_path,
-        output_path=report_path,
+        output_path=report_path, as_of_utc=as_of_utc,
     )
     print(f"SP-EFF-001 complete: {len(train):,} train / {len(test):,} holdout matches")
     print(metrics.to_string(index=False, float_format=lambda value: f"{value:.6f}"))

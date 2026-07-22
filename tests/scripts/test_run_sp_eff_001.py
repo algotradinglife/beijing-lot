@@ -33,7 +33,7 @@ def _make_live_db(path: Path) -> None:
         """
     )
     for index, (issue, result) in enumerate(
-        [("A", "3"), ("A", "1"), ("B", "0"), ("B", "3")], start=1
+        [("A", "3"), ("B", "1"), ("C", "0"), ("D", "3")], start=1
     ):
         match_id = f"m{index}"
         connection.execute(
@@ -135,6 +135,28 @@ def test_markdown_figure_path_is_relative_to_custom_report_directory(tmp_path: P
     assert link == "../../assets/calibration.png"
 
 
+def test_report_records_cutoff_and_reproduces_frame_hash(tmp_path: Path) -> None:
+    database = tmp_path / "live.db"
+    report = tmp_path / "reports" / "SP-EFF-001.md"
+    figure = tmp_path / "figures" / "calibration.png"
+    cutoff = "2026-07-05T00:00:00Z"
+    _make_live_db(database)
+    original_frame, original_audit = experiment.load_experiment_frame(database, as_of=cutoff)
+
+    experiment.run(
+        experiment.build_parser().parse_args(
+            ["--db", str(database), "--output", str(report), "--figure", str(figure), "--as-of", cutoff]
+        )
+    )
+    rerun_frame, rerun_audit = experiment.load_experiment_frame(database, as_of=cutoff)
+
+    contents = report.read_text(encoding="utf-8")
+    assert f"Reproduction cutoff (`--as-of` UTC): `{cutoff}`" in contents
+    assert f"--as-of {cutoff}" in contents
+    pd.testing.assert_frame_equal(original_frame, rerun_frame)
+    assert original_audit.extract_sha256 == rerun_audit.extract_sha256
+
+
 def test_market_probability_is_jointly_normalized_not_naive_inverse(tmp_path: Path) -> None:
     database = tmp_path / "live.db"
     _make_live_db(database)
@@ -150,20 +172,65 @@ def test_market_probability_is_jointly_normalized_not_naive_inverse(tmp_path: Pa
 def test_issue_split_is_chronological_and_disjoint() -> None:
     frame = pd.DataFrame(
         {
-            "issue": ["late", "early", "middle", "early"],
+            "issue": ["latest", "late", "early", "middle", "early"],
             "kickoff_at": pd.to_datetime(
-                ["2026-03-01", "2026-01-02", "2026-02-01", "2026-01-01"], utc=True
+                ["2026-04-01", "2026-03-01", "2026-01-02", "2026-02-01", "2026-01-01"], utc=True
             ),
         }
     )
 
     train, test, train_issues, test_issues = experiment.chronological_issue_split(
-        frame, train_fraction=2 / 3
+        frame, train_fraction=0.5
     )
 
     assert train_issues == ("early", "middle")
-    assert test_issues == ("late",)
+    assert test_issues == ("late", "latest")
     assert set(train["issue"]).isdisjoint(set(test["issue"]))
+
+
+def test_issue_split_requires_two_holdout_issues() -> None:
+    frame = pd.DataFrame(
+        {
+            "issue": ["early", "middle", "late"],
+            "kickoff_at": pd.to_datetime(
+                ["2026-01-01", "2026-02-01", "2026-03-01"], utc=True
+            ),
+        }
+    )
+
+    try:
+        experiment.chronological_issue_split(frame)
+    except ValueError as error:
+        assert "got 1 from 3 chronological issues" in str(error)
+    else:
+        raise AssertionError("expected a one-issue holdout to be rejected")
+
+
+def test_predictive_conclusion_does_not_claim_win_for_higher_log_loss() -> None:
+    comparisons = pd.DataFrame(
+        [
+            {
+                "Model": "B1-T train-fitted temperature",
+                "Comparator": "B0 uniform random",
+                "Metric": "Log Loss",
+                "Delta": 0.01,
+                "95% CI high": 0.04,
+            },
+            {
+                "Model": "B1-T train-fitted temperature",
+                "Comparator": "B2 historical outcome frequency",
+                "Metric": "Log Loss",
+                "Delta": -0.01,
+                "95% CI high": 0.02,
+            },
+        ]
+    )
+
+    conclusion = experiment._predictive_conclusion(comparisons)
+
+    assert "higher (worse) holdout Log Loss than B0 uniform random" in conclusion
+    assert "does not establish incremental predictive information" in conclusion
+    assert "beats" not in conclusion
 
 
 def test_metrics_and_temperature_are_valid() -> None:

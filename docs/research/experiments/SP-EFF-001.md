@@ -6,6 +6,7 @@
 
 - Source: `data/beidan_live.db` (`165,486,592` bytes)
 - Extracted: `2026-07-21T16:41:04+00:00`
+- Reproduction cutoff (`--as-of` UTC): `2026-07-21T16:41:04Z`
 - Canonical extract SHA-256: `d50cfba9d354a2dd0f1fa02d9edfb1adfe873bc099b1af0c2e58d19be56a2e66`
 - Complete-snapshot rows examined: `514,417`; valid settled matches: `2,260`
 - Eligible matches after strict pre-kickoff filtering: `2,137`
@@ -143,7 +144,7 @@ Training cutoffs for mean absolute log-SP change: `0.25576, 0.56732, 1.03787`.
 
 ## Conclusion
 
-The calibrated SP model beats both non-market baselines in holdout Log Loss, but at least one issue-block-bootstrap interval crosses zero. This is directional, not conclusive, evidence of incremental predictive information.
+The calibrated SP model has lower holdout Log Loss than at least one non-market baseline, but at least one issue-block-bootstrap interval crosses zero. This is directional, not conclusive, evidence of incremental predictive information.
 
 Fail to reject H0 on this holdout: no pre-specified probability/outcome cell retains a calibration deviation after Holm correction.
 
@@ -152,5 +153,5 @@ The market-information conclusion should also consider whether B1/B1-T improve p
 ## Reproduction
 
 ```bash
-python scripts/run_sp_eff_001.py --db data/beidan_live.db
+python scripts/run_sp_eff_001.py --db data/beidan_live.db --as-of 2026-07-21T16:41:04Z
 ```
