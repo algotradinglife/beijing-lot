@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import math
 import os
 import sqlite3
@@ -38,6 +39,9 @@ SP_COLUMNS = ("sp_3", "sp_1", "sp_0")
 PROBABILITY_BINS = np.linspace(0.0, 1.0, 11)
 SP_BINS = np.array([1.0, 1.5, 2.0, 3.0, 5.0, 8.0, np.inf])
 SP_LABELS = ("1-1.5", "1.5-2", "2-3", "3-5", "5-8", "8+")
+SETTLEMENT_STRUCTURE_COLUMNS = (
+    "fthg", "ftag", "winning_sp", "avg_eu_h", "avg_eu_d", "avg_eu_a",
+)
 
 
 @dataclass(frozen=True)
@@ -46,6 +50,7 @@ class DatasetAudit:
     database_size_bytes: int
     extracted_at_utc: str
     extract_sha256: str
+    settlement_version_sha256: str
     settled_matches: int
     complete_snapshot_rows: int
     invalid_timestamp_rows: int
@@ -79,11 +84,45 @@ def _extract_fingerprint(frame: pd.DataFrame) -> str:
     columns = [
         "match_id", "issue", "kickoff_ts", "opening_snapshot_ts",
         "closing_snapshot_ts", "opening_sp_3", "opening_sp_1", "opening_sp_0",
-        "sp_3", "sp_1", "sp_0", "result_code",
+        "sp_3", "sp_1", "sp_0", "result_code", *SETTLEMENT_STRUCTURE_COLUMNS,
     ]
     canonical = frame.sort_values("match_id")[columns].to_csv(
         index=False, lineterminator="\n", float_format="%.10g"
     )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _json_value(value: object) -> object:
+    if value is None or pd.isna(value):
+        return None
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.floating):
+        return float(value)
+    return value
+
+
+def _settlement_version_sha256(frame: pd.DataFrame) -> str:
+    """Hash stable settlement identities without the replaceable settled_ts value."""
+    versions = []
+    for row in frame.sort_values("match_id").itertuples(index=False):
+        structure = {
+            column: _json_value(getattr(row, column))
+            for column in SETTLEMENT_STRUCTURE_COLUMNS
+        }
+        structure_json = json.dumps(
+            structure, sort_keys=True, separators=(",", ":"), allow_nan=False
+        )
+        versions.append(
+            {
+                "match_id": str(row.match_id),
+                "result_code": str(row.result_code),
+                "result_structure_sha256": hashlib.sha256(
+                    structure_json.encode("utf-8")
+                ).hexdigest(),
+            }
+        )
+    canonical = json.dumps(versions, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -96,6 +135,8 @@ def load_experiment_frame(
 
     Collector timestamps are UTC.  Kickoffs are stored as naive Beijing time,
     so they are explicitly localized to Asia/Shanghai before comparison.
+    ``as_of`` limits snapshots only: settlement rows are replaceable, so their
+    stable content version—not ``settled_ts``—anchors the outcome labels.
     """
     path = Path(database_path)
     if not path.is_file():
@@ -103,19 +144,12 @@ def load_experiment_frame(
     as_of_ts = _utc_timestamp(as_of)
     if as_of and as_of_ts is None:
         raise ValueError(f"invalid --as-of timestamp: {as_of}")
-    settlement_cutoff = ""
-    query_params: dict[str, str] = {}
-    if as_of_ts is not None:
-        settlement_cutoff = " AND datetime(settled_ts) <= datetime(:as_of)"
-        query_params["as_of"] = as_of_ts.isoformat()
-
     connection = _readonly_connection(path)
     try:
         settled_matches = int(
             connection.execute(
                 "SELECT COUNT(*) FROM settlements "
-                "WHERE result_code IN ('3','1','0')" + settlement_cutoff,
-                query_params,
+                "WHERE result_code IN ('3','1','0')",
             ).fetchone()[0]
         )
         raw = pd.read_sql_query(
@@ -123,15 +157,16 @@ def load_experiment_frame(
             SELECT s.id, s.match_id, s.snapshot_ts,
                    s.sp_3, s.sp_1, s.sp_0,
                    m.issue, m.match_idx, m.league, m.kickoff_ts,
-                   m.handicap_line, st.result_code
+                   m.handicap_line, st.result_code,
+                   st.fthg, st.ftag, st.winning_sp,
+                   st.avg_eu_h, st.avg_eu_d, st.avg_eu_a
             FROM snapshots s
             JOIN matches m ON m.match_id = s.match_id
             JOIN settlements st ON st.match_id = s.match_id
             WHERE st.result_code IN ('3','1','0')
               AND s.sp_3 > 1.0 AND s.sp_1 > 1.0 AND s.sp_0 > 1.0
-            """ + settlement_cutoff.replace("settled_ts", "st.settled_ts"),
+            """,
             connection,
-            params=query_params,
         )
     finally:
         connection.rollback()
@@ -192,6 +227,7 @@ def load_experiment_frame(
         database_size_bytes=path.stat().st_size,
         extracted_at_utc=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         extract_sha256=_extract_fingerprint(frame),
+        settlement_version_sha256=_settlement_version_sha256(frame),
         settled_matches=settled_matches,
         complete_snapshot_rows=complete_snapshot_rows,
         invalid_timestamp_rows=invalid_timestamp_rows,
@@ -626,6 +662,7 @@ def render_report(
         f"- Source: `data/{Path(audit.database_path).name}` (`{audit.database_size_bytes:,}` bytes)",
         f"- Extracted: `{audit.extracted_at_utc}`",
         f"- Reproduction cutoff (`--as-of` UTC): `{as_of_utc}`",
+        f"- Stable settlement version SHA-256: `{audit.settlement_version_sha256}`",
         f"- Canonical extract SHA-256: `{audit.extract_sha256}`",
         f"- Complete-snapshot rows examined: `{audit.complete_snapshot_rows:,}`; valid settled matches: `{audit.settled_matches:,}`",
         f"- Eligible matches after strict pre-kickoff filtering: `{audit.eligible_matches:,}`",
@@ -634,7 +671,7 @@ def render_report(
         f"- Rejected invalid-timestamp rows: `{audit.invalid_timestamp_rows:,}`; rejected post-kickoff rows: `{audit.postkickoff_rows_rejected:,}`",
         f"- Closing snapshot lead time: minimum `{audit.minimum_closing_mtk:.2f}` min; median `{audit.median_closing_mtk:.2f}` min",
         "",
-        "Dataset version is the canonical extract hash, not merely the mutable SQLite filename. It hashes match identity, opening/closing snapshot timestamps and SP vectors, and settlement outcome.",
+        "Dataset version is the canonical extract hash, not merely the mutable SQLite filename. The cutoff applies to snapshots; outcome labels are bound by the stable settlement version (match ID, result code, and result-structure hash), never mutable `settled_ts`.",
         "",
         "## Research Question",
         "",

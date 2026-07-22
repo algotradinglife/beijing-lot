@@ -28,7 +28,9 @@ def _make_live_db(path: Path) -> None:
             snapshot_ts TEXT, sp_3 REAL, sp_1 REAL, sp_0 REAL
         );
         CREATE TABLE settlements(
-            match_id TEXT PRIMARY KEY, result_code TEXT, settled_ts TEXT
+            match_id TEXT PRIMARY KEY, result_code TEXT, settled_ts TEXT,
+            fthg INTEGER, ftag INTEGER, winning_sp REAL,
+            avg_eu_h REAL, avg_eu_d REAL, avg_eu_a REAL
         );
         """
     )
@@ -41,8 +43,11 @@ def _make_live_db(path: Path) -> None:
             (match_id, issue, index, "test", f"2026-07-{index:02d}T12:00:00", 0.0),
         )
         connection.execute(
-            "INSERT INTO settlements VALUES(?,?,?)",
-            (match_id, result, f"2026-07-{index:02d}T06:00:00Z"),
+            "INSERT INTO settlements VALUES(?,?,?,?,?,?,?,?,?)",
+            (
+                match_id, result, f"2026-07-{index:02d}T06:00:00Z",
+                index, index - 1, 2.4, 2.1, 3.2, 3.4,
+            ),
         )
         # Kickoff is 04:00 UTC. Only 02:00 and 03:00 are eligible.
         connection.execute(
@@ -89,14 +94,14 @@ def test_load_uses_complete_vector_strictly_before_beijing_kickoff(tmp_path: Pat
     assert audit.extract_sha256 == experiment.load_experiment_frame(database)[1].extract_sha256
 
     cutoff_frame, cutoff_audit = experiment.load_experiment_frame(
-        database, as_of="2026-07-02T02:30:00Z"
+        database, as_of="2026-07-01T02:30:00Z"
     )
     assert len(cutoff_frame) == 1
-    assert cutoff_frame.iloc[0]["closing_snapshot_ts"] == "2026-07-01T03:00:00Z"
-    assert cutoff_audit.settled_matches == 1
+    assert cutoff_frame.iloc[0]["closing_snapshot_ts"] == "2026-07-01T02:00:00Z"
+    assert cutoff_audit.settled_matches == 4
 
 
-def test_as_of_excludes_late_settlements_and_is_repeatable(tmp_path: Path) -> None:
+def test_as_of_is_stable_when_a_settlement_is_refreshed(tmp_path: Path) -> None:
     database = tmp_path / "live.db"
     _make_live_db(database)
     cutoff = "2026-07-02T02:30:00Z"
@@ -105,16 +110,8 @@ def test_as_of_excludes_late_settlements_and_is_repeatable(tmp_path: Path) -> No
 
     connection = sqlite3.connect(database)
     connection.execute(
-        "INSERT INTO matches VALUES(?,?,?,?,?,?)",
-        ("late", "A", 99, "test", "2026-07-01T12:00:00", 0.0),
-    )
-    connection.execute(
-        "INSERT INTO snapshots(match_id,snapshot_ts,sp_3,sp_1,sp_0) VALUES(?,?,?,?,?)",
-        ("late", "2026-07-01T02:00:00Z", 2.5, 3.2, 3.0),
-    )
-    connection.execute(
-        "INSERT INTO settlements VALUES(?,?,?)",
-        ("late", "3", "2026-07-02T03:00:00Z"),
+        "INSERT OR REPLACE INTO settlements VALUES(?,?,?,?,?,?,?,?,?)",
+        ("m1", "3", "2026-07-02T03:00:00Z", 1, 0, 2.4, 2.1, 3.2, 3.4),
     )
     connection.commit()
     connection.close()
@@ -122,8 +119,27 @@ def test_as_of_excludes_late_settlements_and_is_repeatable(tmp_path: Path) -> No
     second_frame, second_audit = experiment.load_experiment_frame(database, as_of=cutoff)
 
     pd.testing.assert_frame_equal(first_frame, second_frame)
-    assert first_audit.settled_matches == second_audit.settled_matches == 1
+    assert first_audit.settled_matches == second_audit.settled_matches == 4
     assert first_audit.extract_sha256 == second_audit.extract_sha256
+    assert first_audit.settlement_version_sha256 == second_audit.settlement_version_sha256
+
+
+def test_settlement_version_changes_with_result_structure(tmp_path: Path) -> None:
+    database = tmp_path / "live.db"
+    _make_live_db(database)
+    _, original_audit = experiment.load_experiment_frame(database)
+
+    connection = sqlite3.connect(database)
+    connection.execute(
+        "UPDATE settlements SET fthg = fthg + 1 WHERE match_id = 'm1'"
+    )
+    connection.commit()
+    connection.close()
+
+    _, changed_audit = experiment.load_experiment_frame(database)
+
+    assert original_audit.settlement_version_sha256 != changed_audit.settlement_version_sha256
+    assert original_audit.extract_sha256 != changed_audit.extract_sha256
 
 
 def test_markdown_figure_path_is_relative_to_custom_report_directory(tmp_path: Path) -> None:

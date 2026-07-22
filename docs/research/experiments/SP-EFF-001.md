@@ -7,7 +7,8 @@
 - Source: `data/beidan_live.db` (`165,486,592` bytes)
 - Extracted: `2026-07-21T16:41:04+00:00`
 - Reproduction cutoff (`--as-of` UTC): `2026-07-21T16:41:04Z`
-- Canonical extract SHA-256: `d50cfba9d354a2dd0f1fa02d9edfb1adfe873bc099b1af0c2e58d19be56a2e66`
+- Stable settlement version SHA-256: `d6348828ede66c26abb53d69f6a5073bc12d4588d5b62395c7bac94440743a9c`
+- Canonical extract SHA-256: `e0606fce3cb4e30dfcf80ba3e47787e6d750e24af3ed573336eb716c577f0b39`
 - Complete-snapshot rows examined: `514,417`; valid settled matches: `2,260`
 - Eligible matches after strict pre-kickoff filtering: `2,137`
 - Kickoff range (UTC): `2026-05-02T03:55:00+00:00` to `2026-07-21T10:30:00+00:00`
@@ -15,7 +16,7 @@
 - Rejected invalid-timestamp rows: `0`; rejected post-kickoff rows: `105,156`
 - Closing snapshot lead time: minimum `0.02` min; median `7.70` min
 
-Dataset version is the canonical extract hash, not merely the mutable SQLite filename. It hashes match identity, opening/closing snapshot timestamps and SP vectors, and settlement outcome.
+Dataset version is the canonical extract hash, not merely the mutable SQLite filename. The cutoff applies to snapshots; outcome labels are bound by the stable settlement version (match ID, result code, and result-structure hash), never mutable `settled_ts`.
 
 ## Research Question
 
