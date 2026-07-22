@@ -220,7 +220,7 @@ class MultiMarketAuditor:
         pre_kickoff = db.execute(
             """SELECT COUNT(*) FROM snapshots s
                JOIN matches m ON s.match_id = m.match_id
-               WHERE s.snapshot_ts < m.kickoff_ts
+               WHERE datetime(REPLACE(s.snapshot_ts, 'Z', '')) < datetime(m.kickoff_ts, '-8 hours')
                  AND m.kickoff_ts IS NOT NULL AND m.kickoff_ts != ''
                  AND s.snapshot_ts IS NOT NULL AND s.snapshot_ts != ''"""
         ).fetchone()[0]
