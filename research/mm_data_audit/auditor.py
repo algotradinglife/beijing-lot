@@ -176,12 +176,20 @@ def _table_exists(conn: sqlite3.Connection, name: str) -> bool:
     ).fetchone() is not None
 
 
+def _begin_read_snapshot(conn: sqlite3.Connection) -> None:
+    conn.execute("PRAGMA query_only = ON")
+    conn.execute("BEGIN")
+    conn.execute("SELECT COUNT(*) FROM sqlite_master").fetchone()
+
+
 class MultiMarketAuditor:
     """Audit four target markets across three dimensions."""
 
     def __init__(self) -> None:
         self.beidan = _connect("beidan_live")
         self.bjdc = _connect("500_bjdc")
+        _begin_read_snapshot(self.beidan)
+        _begin_read_snapshot(self.bjdc)
         self._audit_cutoff = datetime.now(UTC).isoformat(timespec="seconds")
 
     def audit_all(self) -> AuditResult:
@@ -314,26 +322,47 @@ class MultiMarketAuditor:
                  AND m.kickoff_ts IS NOT NULL AND m.kickoff_ts != ''
                  AND s.snapshot_ts IS NOT NULL AND s.snapshot_ts != ''"""
         ).fetchone()[0]
+        complete_pre_kickoff_matches = db.execute(
+            """SELECT COUNT(*) FROM (
+                   SELECT m.match_id
+                   FROM matches m
+                   JOIN snapshots s ON s.match_id = m.match_id
+                   WHERE datetime(REPLACE(s.snapshot_ts, 'Z', '')) < datetime(m.kickoff_ts, '-8 hours')
+                     AND m.kickoff_ts IS NOT NULL AND m.kickoff_ts != ''
+                     AND s.snapshot_ts IS NOT NULL AND s.snapshot_ts != ''
+                     AND s.sp_3 IS NOT NULL AND s.sp_1 IS NOT NULL AND s.sp_0 IS NOT NULL
+                   GROUP BY m.match_id
+               )"""
+        ).fetchone()[0]
+        complete_pre_kickoff_pct = (
+            complete_pre_kickoff_matches / total_db_matches * 100
+        ) if total_db_matches else 0
 
         metrics.update({
             "total_matches": total_db_matches,
             "matches_with_kickoff": matches_with_kickoff,
             "kickoff_coverage_pct": round(ko_pct, 2),
             "pre_kickoff_snapshots": pre_kickoff,
+            "complete_pre_kickoff_matches": complete_pre_kickoff_matches,
+            "complete_pre_kickoff_match_pct": round(complete_pre_kickoff_pct, 2),
         })
         gates.append(GateResult(
             gate_id=GateID.G3_PRE_CUTOFF_EVIDENCE,
-            passed=ko_pct >= 50 and pre_kickoff > 0,
-            score=min(1.0, ko_pct / 100) * 0.5 + (0.5 if pre_kickoff > 0 else 0),
+            passed=complete_pre_kickoff_pct >= 50,
+            score=min(1.0, complete_pre_kickoff_pct / 50),
             evidence=(
                 f"{matches_with_kickoff}/{total_db_matches} matches ({ko_pct:.1f}%) have kickoff_ts. "
                 f"{pre_kickoff:,} snapshots are pre-kickoff. "
+                f"{complete_pre_kickoff_matches:,}/{total_db_matches:,} matches "
+                f"({complete_pre_kickoff_pct:.1f}%) have a complete 3/1/0 vector before kickoff. "
                 f"Segment decision windows from 500_bjdc provide freeze_at timestamps for issues 26074-26077."
             ),
             metrics={
                 "matches_with_kickoff": matches_with_kickoff,
                 "kickoff_coverage_pct": round(ko_pct, 2),
                 "pre_kickoff_snapshots": pre_kickoff,
+                "complete_pre_kickoff_matches": complete_pre_kickoff_matches,
+                "complete_pre_kickoff_match_pct": round(complete_pre_kickoff_pct, 2),
             },
         ))
 
@@ -404,7 +433,8 @@ class MultiMarketAuditor:
 
         db = self.beidan
         total_settled = db.execute("SELECT COUNT(*) FROM settlements").fetchone()[0]
-        total_matches = db.execute("SELECT COUNT(DISTINCT match_id) FROM settlements").fetchone()[0]
+        settled_matches = db.execute("SELECT COUNT(DISTINCT match_id) FROM settlements").fetchone()[0]
+        total_matches = db.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
 
         # Settlement status distribution
         settled_with_score = db.execute(
@@ -419,7 +449,7 @@ class MultiMarketAuditor:
             "SELECT COUNT(*) FROM settlements WHERE winning_sp = 1 OR winning_sp = 1.0"
         ).fetchone()[0]
 
-        settlement_pct = (total_settled / total_matches * 100) if total_matches else 0
+        settlement_pct = (settled_matches / total_matches * 100) if total_matches else 0
 
         # Cross-check: handicap result mapping
         result_codes = dict(db.execute(
@@ -428,7 +458,9 @@ class MultiMarketAuditor:
 
         metrics.update({
             "total_settlements": total_settled,
-            "settled_matches": total_matches,
+            "total_settlement_rows": total_settled,
+            "settled_matches": settled_matches,
+            "total_match_rows": total_matches,
             "settled_with_score": settled_with_score,
             "cancelled_or_postponed": cancelled_or_special,
             "sp1_void": sp1_void,
@@ -444,7 +476,8 @@ class MultiMarketAuditor:
             passed=settlement_pct >= 50 and mapping_ok,
             score=min(1.0, settlement_pct / 100),
             evidence=(
-                f"{total_settled} settlements across {total_matches} matches ({settlement_pct:.1f}% of DB). "
+                f"{total_settled} settlement rows cover {settled_matches}/{total_matches} matches "
+                f"({settlement_pct:.1f}% of DB matches). "
                 f"{settled_with_score} have final scores. "
                 f"{cancelled_or_special} cancellations/postponements, {sp1_void} SP=1 voids. "
                 f"Result codes: {sorted(result_codes.keys())}. "
@@ -604,6 +637,16 @@ class MultiMarketAuditor:
         ))
 
         # G3: Pre-cutoff evidence
+        cutoff_clock_predicate = """
+                     sale_cutoff_hkt IS NOT NULL AND sale_cutoff_hkt != ''
+                     AND fetched_at_utc IS NOT NULL AND fetched_at_utc != ''
+                     AND source_updated_at_hkt IS NOT NULL AND source_updated_at_hkt != ''
+                     AND datetime(sale_cutoff_hkt) IS NOT NULL
+                     AND datetime(fetched_at_utc) IS NOT NULL
+                     AND datetime(source_updated_at_hkt) IS NOT NULL
+                     AND datetime(fetched_at_utc) < datetime(sale_cutoff_hkt)
+                     AND datetime(source_updated_at_hkt) < datetime(sale_cutoff_hkt)
+        """
         pre_cutoff = db.execute(
             """SELECT COUNT(*) FROM live_market_sp_snapshots
                WHERE playid=? AND capture_classification='forward_complete_open'""",
@@ -626,6 +669,7 @@ class MultiMarketAuditor:
                    FROM live_market_sp_snapshots
                    WHERE playid=? AND sale_status='open'
                      AND capture_classification='forward_complete_open'
+                     AND {cutoff_clock_predicate}
                    GROUP BY {capture_identity}
                    HAVING COUNT(DISTINCT CASE WHEN sp IS NOT NULL THEN outcome_code END)=?
                       AND COUNT(DISTINCT CASE
@@ -640,12 +684,71 @@ class MultiMarketAuditor:
         pre_pct = (pre_cutoff_capture_vectors / total_capture_vectors * 100) if total_capture_vectors else 0
         pre_match_pct = (pre_cutoff_match_markets / total_matches * 100) if total_matches else 0
 
+        pre_cutoff_rejections = {
+            "non_open_sale": 0,
+            "missing_cutoff_clock": 0,
+            "missing_dual_clock": 0,
+            "fetched_at_or_after_cutoff": 0,
+            "source_updated_at_or_after_cutoff": 0,
+        }
+        if has_table:
+            rejection_row = db.execute(
+                f"""WITH complete_vectors AS (
+                   SELECT issue, row_idx,
+                          MIN(CASE WHEN sale_status='open' THEN 1 ELSE 0 END) AS sale_open,
+                          MIN(CASE
+                              WHEN sale_cutoff_hkt IS NOT NULL AND sale_cutoff_hkt != ''
+                               AND datetime(sale_cutoff_hkt) IS NOT NULL
+                              THEN 1 ELSE 0
+                          END) AS has_cutoff,
+                          MIN(CASE
+                              WHEN fetched_at_utc IS NOT NULL AND fetched_at_utc != ''
+                               AND source_updated_at_hkt IS NOT NULL AND source_updated_at_hkt != ''
+                               AND datetime(fetched_at_utc) IS NOT NULL
+                               AND datetime(source_updated_at_hkt) IS NOT NULL
+                              THEN 1 ELSE 0
+                          END) AS has_dual_clock,
+                          MIN(CASE
+                              WHEN datetime(fetched_at_utc) < datetime(sale_cutoff_hkt)
+                              THEN 1 ELSE 0
+                          END) AS fetched_before_cutoff,
+                          MIN(CASE
+                              WHEN datetime(source_updated_at_hkt) < datetime(sale_cutoff_hkt)
+                              THEN 1 ELSE 0
+                          END) AS source_before_cutoff
+                   FROM live_market_sp_snapshots
+                   WHERE playid=? AND capture_classification='forward_complete_open'
+                   GROUP BY {capture_identity}
+                   HAVING COUNT(DISTINCT CASE WHEN sp IS NOT NULL THEN outcome_code END)=?
+                      AND COUNT(DISTINCT CASE
+                          WHEN sp IS NOT NULL AND outcome_code IN ({expected_placeholders})
+                          THEN outcome_code
+                      END)=?
+               )
+               SELECT
+                   COALESCE(SUM(CASE WHEN sale_open=0 THEN 1 ELSE 0 END), 0) AS non_open_sale,
+                   COALESCE(SUM(CASE WHEN has_cutoff=0 THEN 1 ELSE 0 END), 0) AS missing_cutoff_clock,
+                   COALESCE(SUM(CASE WHEN has_dual_clock=0 THEN 1 ELSE 0 END), 0) AS missing_dual_clock,
+                   COALESCE(SUM(CASE
+                       WHEN has_cutoff=1 AND has_dual_clock=1 AND fetched_before_cutoff=0
+                       THEN 1 ELSE 0
+                   END), 0) AS fetched_at_or_after_cutoff,
+                   COALESCE(SUM(CASE
+                       WHEN has_cutoff=1 AND has_dual_clock=1 AND source_before_cutoff=0
+                       THEN 1 ELSE 0
+                   END), 0) AS source_updated_at_or_after_cutoff
+               FROM complete_vectors""",
+                (market.playid, expected_per_match, *market.outcome_codes, expected_per_match),
+            ).fetchone()
+            pre_cutoff_rejections = {key: int(rejection_row[key]) for key in pre_cutoff_rejections}
+
         metrics.update({
             "pre_cutoff_eligible_capture_vectors": pre_cutoff_capture_vectors,
             "pre_cutoff_eligible_match_markets": pre_cutoff_match_markets,
             "pre_cutoff_eligible_match_vectors": pre_cutoff_match_markets,
             "pre_cutoff_eligible_pct": round(pre_pct, 2),
             "pre_cutoff_eligible_match_market_pct": round(pre_match_pct, 2),
+            "pre_cutoff_rejection_reasons": pre_cutoff_rejections,
         })
         gates.append(GateResult(
             gate_id=GateID.G3_PRE_CUTOFF_EVIDENCE,
@@ -656,13 +759,14 @@ class MultiMarketAuditor:
                 f"forward_complete_open classification ({pre_pct:.1f}%). "
                 f"{pre_cutoff_match_markets:,}/{total_matches:,} match-markets have eligible "
                 f"pre-cutoff capture-vectors ({pre_match_pct:.1f}%). "
-                f"Dual-clock confirms both fetched_at_utc and source_updated_at_hkt precede kickoff."
+                f"Dual-clock confirms both fetched_at_utc and source_updated_at_hkt precede sale_cutoff_hkt."
             ),
             metrics={
                 "pre_cutoff_capture_vectors": pre_cutoff_capture_vectors,
                 "pre_cutoff_pct": round(pre_pct, 2),
                 "pre_cutoff_match_markets": pre_cutoff_match_markets,
                 "pre_cutoff_match_market_pct": round(pre_match_pct, 2),
+                "rejection_reasons": pre_cutoff_rejections,
             },
         ))
 
@@ -672,17 +776,28 @@ class MultiMarketAuditor:
             (market.playid,),
         ).fetchone()[0] if has_table else 0
         terminal_rows = terminal // market.expected_outcome_count if terminal else 0
+        unproven_forward = db.execute(
+            f"""SELECT COUNT(*) FROM live_market_sp_snapshots
+               WHERE playid=? AND capture_classification='forward_complete_open'
+                 AND NOT ({cutoff_clock_predicate})""",
+            (market.playid,),
+        ).fetchone()[0] if has_table else 0
+        leakage_free = unproven_forward == 0
 
         gates.append(GateResult(
             gate_id=GateID.G7_NO_LEAKAGE,
-            passed=True,
-            score=1.0,
+            passed=leakage_free,
+            score=1.0 if leakage_free else 0.0,
             evidence=(
                 f"{terminal:,} terminal-backfill rows exist but are classified as "
                 f"terminal_backfill_exploratory_only and excluded from forward_complete_open. "
-                f"No leakage: terminal data is never used as pre-event input."
+                f"{unproven_forward:,} forward_complete_open rows lack independent cutoff-clock proof."
             ),
-            metrics={"terminal_rows": terminal, "terminal_excluded": True},
+            metrics={
+                "terminal_rows": terminal,
+                "terminal_excluded": True,
+                "unproven_forward_rows": unproven_forward,
+            },
         ))
 
         metrics["discovered_match_markets"] = total_matches
@@ -749,36 +864,48 @@ class MultiMarketAuditor:
         ))
 
         # G5: Freeze Protocol v1
-        from pathlib import Path as P
+        from src.multimarket_p0 import MultimarketP0Error, verify_freeze
         freeze_root = _repo_root() / "results/research/multimarket_10h_freeze_v1"
         freeze_dirs = list(freeze_root.glob("*")) if freeze_root.exists() else []
 
         has_freeze = False
         freeze_manifest = {}
+        verified_freeze = {}
+        freeze_failures: list[dict[str, str]] = []
         for fd in freeze_dirs:
             manifest_path = fd / "manifest.json"
-            if manifest_path.is_file():
+            if not manifest_path.is_file():
+                continue
+            try:
+                verification = verify_freeze(fd)
                 manifest = json.loads(manifest_path.read_text())
-                if market.playid in manifest.get("target_playids", []):
-                    has_freeze = True
-                    freeze_manifest = manifest
-                    break
+            except (MultimarketP0Error, OSError, ValueError, json.JSONDecodeError) as exc:
+                if len(freeze_failures) < 5:
+                    freeze_failures.append({"path": str(fd), "error": str(exc)})
+                continue
+            if market.playid in manifest.get("target_playids", []):
+                has_freeze = True
+                freeze_manifest = manifest
+                verified_freeze = verification
+                break
 
         metrics.update({
             "has_existing_freeze": has_freeze,
             "freeze_manifest": freeze_manifest.get("schema_version") if freeze_manifest else None,
+            "freeze_verification": verified_freeze,
+            "freeze_verification_failures": freeze_failures,
         })
         gates.append(GateResult(
             gate_id=GateID.G5_ASOF_FREEZE,
             passed=has_freeze,
             score=0.8 if has_freeze else 0.2,
             evidence=(
-                f"{'Existing 10h freeze package found:' if has_freeze else 'No existing freeze package.'} "
+                f"{'Verified 10h freeze package found:' if has_freeze else 'No verified freeze package.'} "
                 f"{freeze_manifest.get('schema_version', '')} with "
                 f"{freeze_manifest.get('frozen_outcome_rows', 0)} frozen rows "
                 f"{'for this market.' if has_freeze else ''}"
             ),
-            metrics={"has_freeze": has_freeze},
+            metrics={"has_freeze": has_freeze, "freeze_verification": verified_freeze},
         ))
 
         return gates, metrics
@@ -968,12 +1095,13 @@ class MultiMarketAuditor:
         # G7: Leakage
         gates.append(GateResult(
             gate_id=GateID.G7_NO_LEAKAGE,
-            passed=True,
+            passed=False,
             score=0.5,
             evidence=(
                 f"No terminal classification exists; all data is non_target_market_unclassified. "
                 f"Risk unknown — data may contain post-event captures but cannot be proven either way."
             ),
+            metrics={"leakage_risk": "unknown"},
         ))
 
         metrics["discovered_match_markets"] = total_matches
@@ -1046,23 +1174,71 @@ class MultiMarketAuditor:
             ))
             return gates, metrics
 
-        settled = db.execute(
-            "SELECT COUNT(*) FROM multimarket_settlement_truth WHERE market_key=? AND settlement_status='settled'",
+        expected_placeholders = ",".join("?" for _ in market.outcome_codes)
+        p51_source_predicate = """
+                  (
+                    lower(coalesce(score_source, '')) LIKE '%p51%'
+                    OR lower(coalesce(score_source, '')) LIKE '%half%'
+                  )
+        """
+        audited_rows = db.execute(
+            f"""SELECT COUNT(*) FROM multimarket_settlement_truth
+                WHERE market_key=?
+                  AND {p51_source_predicate}
+                  AND (
+                    (
+                      settlement_status='settled'
+                      AND outcome_code IN ({expected_placeholders})
+                    )
+                    OR (
+                      settlement_status IN ('cancelled', 'postponed', 'void_sp1')
+                      AND (outcome_code IN ({expected_placeholders}) OR coalesce(outcome_code, '') = '')
+                    )
+                  )""",
+            (market.market_key, *market.outcome_codes, *market.outcome_codes),
+        ).fetchone()[0]
+        explicit_source_rows = db.execute(
+            f"""SELECT COUNT(*) FROM multimarket_settlement_truth
+                WHERE market_key=? AND {p51_source_predicate}""",
             (market.market_key,),
         ).fetchone()[0]
+        final_score_only_rows = db.execute(
+            """SELECT COUNT(*) FROM multimarket_settlement_truth
+                WHERE market_key=?
+                  AND lower(coalesce(score_source, '')) IN (
+                    'matches.score',
+                    'nowscore_bjdc_matches.score'
+                  )""",
+            (market.market_key,),
+        ).fetchone()[0]
+        settlement_coverage = audited_rows / p51_rows if p51_rows else 0
 
         gates.append(GateResult(
             gate_id=GateID.G6_SETTLEMENT_MAPPING,
-            passed=settled > 0,
-            score=min(1.0, settled / max(p51_rows, 1)),
+            passed=p51_rows > 0 and audited_rows == p51_rows,
+            score=settlement_coverage,
             evidence=(
-                f"{p51_rows} settlement truth rows, {settled} settled. "
-                f"Half/full-time outcome mapping from final score is deterministic."
+                f"{p51_rows} p51 settlement truth rows, {audited_rows} have audited p51 "
+                f"outcome/special-status mapping from explicit half/full-time source metadata. "
+                f"Full-time-only sources such as matches.score are not accepted."
             ),
-            metrics={"settlement_rows": p51_rows, "settled": settled},
+            metrics={
+                "settlement_rows": p51_rows,
+                "audited_p51_settlement_rows": audited_rows,
+                "settlement_coverage_pct": round(settlement_coverage * 100, 2),
+                "explicit_p51_source_rows": explicit_source_rows,
+                "final_score_only_rows": final_score_only_rows,
+            },
         ))
 
-        metrics["settlement_sourced_separately"] = p51_rows > 0
+        metrics.update({
+            "total_settlement_rows": p51_rows,
+            "audited_p51_settlement_rows": audited_rows,
+            "settlement_coverage_pct": round(settlement_coverage * 100, 2),
+            "explicit_p51_source_rows": explicit_source_rows,
+            "final_score_only_rows": final_score_only_rows,
+            "settlement_sourced_separately": audited_rows == p51_rows,
+        })
         return gates, metrics
 
     # ── Classification ─────────────────────────────────────────────────────
@@ -1150,5 +1326,7 @@ class MultiMarketAuditor:
                     summary["complete_vectors_by_market"][mk] = dim.metrics["complete_match_vectors"]
                 if "total_settlement_rows" in dim.metrics:
                     summary["settlement_rows_by_market"][mk] = dim.metrics["total_settlement_rows"]
+                elif "total_settlements" in dim.metrics:
+                    summary["settlement_rows_by_market"][mk] = dim.metrics["total_settlements"]
 
         return dict(summary)

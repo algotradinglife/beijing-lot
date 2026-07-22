@@ -150,7 +150,7 @@ def generate_report(result: AuditResult) -> str:
         ".venv/bin/python scripts/run_mm_data_audit.py --output-dir results/research/mm_data_audit",
         "```",
         "",
-        f"The audit input snapshot is frozen under `results/freeze/MM-DATA-AUDIT-001/`.",
+        "The audit can be regenerated with the command above; local `results/` outputs are runtime artifacts.",
         f"Machine-readable results are at `results/research/mm_data_audit/audit_result.json`.",
         "",
         "## 8. Follow-Up Issues",
@@ -167,7 +167,7 @@ def generate_report(result: AuditResult) -> str:
         lines.append(f"{issue_count}. **Half/Full Time Pre-Event Classification**: Retroactively classify p51 rows in live_market_sp_snapshots with dual-clock validation.")
     if result.readiness_matrix.get("half_full_time", {}).get("settlement_support") == "UNAVAILABLE":
         issue_count += 1
-        lines.append(f"{issue_count}. **Half/Full Time Settlement Truth**: Build settlement mapping for p51 from matches.score → half/full-time outcome codes.")
+        lines.append(f"{issue_count}. **Half/Full Time Settlement Truth**: Build independently sourced half-time plus full-time truth for p51, including audited cancellation/postponement/SP=1 mapping.")
 
     lines += [
         "",
