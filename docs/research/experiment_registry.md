@@ -8,7 +8,7 @@
 
 | Experiment ID | Research Question | Branch | Freeze ID | Status | Result | Evidence Level |
 | --- | --- | --- | --- | --- | --- | --- |
-| _No protocol-v1 experiment registered at initialization._ |  |  |  |  |  |  |
+| MM-DATA-AUDIT-001 | For each target market (Handicap 3/1/0, Correct Score, Total Goals, Half/Full Time), does the current forward data chain provide sufficient evidence to support strict as-of research under Freeze Protocol v1? | research/mm-data-audit-001 | 8d56341e42f49313114316539798207abc2e3fb3a14e776f9b03183e35432197 | frozen | pending | B |
 
 ## 字段约定
 
