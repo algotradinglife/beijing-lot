@@ -1,6 +1,6 @@
 # Research Phase 1: Multi-Market Data Audit (MM-DATA-AUDIT-001)
 
-**Audit Cutoff (UTC):** 2026-07-22T15:13:50+00:00
+**Audit Cutoff (UTC):** 2026-07-22T17:30:58+00:00
 **Status:** `engineering_validation`
 
 ## 1. Research Question
@@ -23,8 +23,8 @@ to support strict as-of research under Freeze Protocol v1?
 | --- | --- | --- | --- |
 | Handicap 3/1/0 | `READY_STRICT` | `PARTIAL` | `READY_STRICT` |
 | Total Goals | `READY_STRICT` | `READY_STRICT` | `READY_STRICT` |
-| Correct Score | `READY_STRICT` | `READY_STRICT` | `READY_STRICT` |
-| Half/Full Time | `PARTIAL` | `UNAVAILABLE` | `SETTLEMENT_ONLY` |
+| Correct Score | `PARTIAL` | `READY_STRICT` | `READY_STRICT` |
+| Half/Full Time | `PARTIAL` | `UNAVAILABLE` | `UNAVAILABLE` |
 
 ### Readiness Legend
 
@@ -45,29 +45,29 @@ Handicap 3/1/0 pre_event_input: READY_STRICT. 4/4 relevant gates passed, avg sco
 
 | Gate | Passed | Score | Evidence |
 | --- | ---: | ---: | --- |
-| g1_outcome_vectors | ✓ | 0.58 | 554,607/960,078 snapshots (57.8%) have complete 3/1/0 SP vectors across 3,519 matches. Outcome mapping is hard-coded in ... |
-| g2_source_timestamps | ✓ | 1.00 | 960,078/960,078 snapshots (100.0%) have snapshot_ts. Sources: ['merged']. No dual-clock (fetched_at + source_updated_at)... |
-| g3_pre_cutoff_evidence | ✓ | 1.00 | 3519/3519 matches (100.0%) have kickoff_ts. 528,993 snapshots are pre-kickoff. Segment decision windows from 500_bjdc pr... |
+| g1_outcome_vectors | ✓ | 0.58 | 555,491/961,353 snapshots (57.8%) have complete 3/1/0 SP vectors across 3,519 matches. Outcome mapping is hard-coded in ... |
+| g2_source_timestamps | ✓ | 1.00 | 961,353/961,353 snapshots (100.0%) have snapshot_ts. Sources: ['merged']. No dual-clock (fetched_at + source_updated_at)... |
+| g3_pre_cutoff_evidence | ✓ | 1.00 | 3519/3519 matches (100.0%) have kickoff_ts. 450,273 snapshots are pre-kickoff. Segment decision windows from 500_bjdc pr... |
 | g7_no_leakage | ✓ | 1.00 | beidan_live.db snapshots are captured live (source='zqdc', 'live500'). No post-event terminal SP substitution detected —... |
 
 #### Key Metrics
 
 ```json
 {
-  "total_snapshots": 960078,
+  "total_snapshots": 961353,
   "total_matches": 3519,
-  "complete_vector_snapshots": 554607,
-  "complete_vector_pct": 57.77,
+  "complete_vector_snapshots": 555491,
+  "complete_vector_pct": 57.78,
   "has_source_column": true,
   "sources": [
     "merged"
   ],
   "has_snapshot_ts": true,
-  "timestamped_snapshots": 960078,
+  "timestamped_snapshots": 961353,
   "timestamped_pct": 100.0,
   "matches_with_kickoff": 3519,
   "kickoff_coverage_pct": 100.0,
-  "pre_kickoff_snapshots": 528993,
+  "pre_kickoff_snapshots": 450273,
   "discovered_match_markets": 3519
 }
 ```
@@ -139,31 +139,38 @@ Handicap 3/1/0 settlement_support: READY_STRICT. 1/1 relevant gates passed, avg 
 
 **Classification:** `READY_STRICT`
 
-Total Goals pre_event_input: READY_STRICT. 4/4 relevant gates passed, avg score=1.00
+Total Goals pre_event_input: READY_STRICT. 4/4 relevant gates passed, avg score=0.98
 
 #### Gates
 
 | Gate | Passed | Score | Evidence |
 | --- | ---: | ---: | --- |
-| g1_outcome_vectors | ✓ | 1.00 | 136,088 rows classified as forward_complete_open → ~17,011 complete match-vectors of 8 outcomes each (4874.2% of 349 tot... |
-| g2_source_timestamps | ✓ | 0.99 | Dual-clock (fetched_at_utc + source_updated_at_hkt): 287,400/290,600 rows (98.9%) have both timestamps. |
-| g3_pre_cutoff_evidence | ✓ | 1.00 | 17,011 match-vectors with both sale_status=open and forward_complete_open classification (4874.2%). Dual-clock confirms ... |
-| g7_no_leakage | ✓ | 1.00 | 101,064 terminal-backfill rows exist but are classified as terminal_backfill_exploratory_only and excluded from forward_... |
+| g1_outcome_vectors | ✓ | 0.94 | 139,296 rows classified as forward_complete_open. 17,412/36,925 capture-vectors have the exact 8-outcome set priced (47.... |
+| g2_source_timestamps | ✓ | 0.99 | Dual-clock (fetched_at_utc + source_updated_at_hkt): 292,200/295,400 rows (98.9%) have both timestamps. |
+| g3_pre_cutoff_evidence | ✓ | 1.00 | 17,412 capture-vectors with both sale_status=open and forward_complete_open classification (47.2%). 182/349 match-market... |
+| g7_no_leakage | ✓ | 1.00 | 102,536 terminal-backfill rows exist but are classified as terminal_backfill_exploratory_only and excluded from forward_... |
 
 #### Key Metrics
 
 ```json
 {
-  "total_rows": 290600,
+  "total_rows": 295400,
   "total_match_markets": 349,
-  "forward_complete_open_rows": 136088,
-  "complete_match_vectors": 17011,
-  "complete_vector_pct": 4874.21,
+  "forward_complete_open_rows": 139296,
+  "total_capture_vectors": 36925,
+  "complete_capture_vectors": 17412,
+  "complete_match_markets": 182,
+  "complete_match_vectors": 182,
+  "complete_vector_pct": 47.16,
+  "complete_match_market_pct": 52.15,
   "has_dual_clock": true,
-  "dual_clock_complete_rows": 287400,
-  "dual_clock_pct": 98.9,
-  "pre_cutoff_eligible_match_vectors": 17011,
-  "pre_cutoff_eligible_pct": 4874.21,
+  "dual_clock_complete_rows": 292200,
+  "dual_clock_pct": 98.92,
+  "pre_cutoff_eligible_capture_vectors": 17412,
+  "pre_cutoff_eligible_match_markets": 182,
+  "pre_cutoff_eligible_match_vectors": 182,
+  "pre_cutoff_eligible_pct": 47.16,
+  "pre_cutoff_eligible_match_market_pct": 52.15,
   "discovered_match_markets": 349
 }
 ```
@@ -178,15 +185,18 @@ Total Goals freeze_support: READY_STRICT. 2/2 relevant gates passed, avg score=0
 
 | Gate | Passed | Score | Evidence |
 | --- | ---: | ---: | --- |
-| g4_immutable_provenance | ✓ | 1.00 | 465 capture batches for Total Goals. 465 bundle directories on disk. All bundles have SHA256SUMS with verifiable checksu... |
+| g4_immutable_provenance | ✓ | 1.00 | 473 capture batches for Total Goals. 473 bundle directories on disk. 473 bundles verified by recomputing SHA256SUMS entr... |
 | g5_asof_freeze | ✓ | 0.80 | Existing 10h freeze package found: multimarket_asof_freeze_v1 with 231 frozen rows for this market. |
 
 #### Key Metrics
 
 ```json
 {
-  "capture_batches": 465,
-  "bundle_dirs": 465,
+  "capture_batches": 473,
+  "bundle_dirs": 473,
+  "sha256_verified_bundle_dirs": 473,
+  "sha256_failed_bundle_dirs": 0,
+  "sha256_failure_samples": [],
   "all_sha256_verifiable": true,
   "has_existing_freeze": true,
   "freeze_manifest": "multimarket_asof_freeze_v1"
@@ -203,18 +213,18 @@ Total Goals settlement_support: READY_STRICT. 1/1 relevant gates passed, avg sco
 
 | Gate | Passed | Score | Evidence |
 | --- | ---: | ---: | --- |
-| g6_settlement_mapping | ✓ | 1.00 | 348 match-markets in settlement truth: 295 settled (84.8%), 52 pending, 1 cancelled, 0 SP=1 voids. Score source is separ... |
+| g6_settlement_mapping | ✓ | 1.00 | 348 match-markets in settlement truth: 298 settled (85.6%), 49 pending, 1 cancelled, 0 SP=1 voids. Score source is separ... |
 
 #### Key Metrics
 
 ```json
 {
   "total_settlement_rows": 348,
-  "settled": 295,
-  "pending_or_unknown": 52,
+  "settled": 298,
+  "pending_or_unknown": 49,
   "cancelled": 1,
   "void_sp1": 0,
-  "settlement_coverage_pct": 84.77,
+  "settlement_coverage_pct": 85.63,
   "has_separate_score_source": true,
   "settlement_sourced_separately": true
 }
@@ -222,33 +232,40 @@ Total Goals settlement_support: READY_STRICT. 1/1 relevant gates passed, avg sco
 
 ### 4.42 Correct Score — Pre Event Input
 
-**Classification:** `READY_STRICT`
+**Classification:** `PARTIAL`
 
-Correct Score pre_event_input: READY_STRICT. 4/4 relevant gates passed, avg score=1.00
+Correct Score pre_event_input: PARTIAL. 3/4 relevant gates passed, avg score=0.81
 
 #### Gates
 
 | Gate | Passed | Score | Evidence |
 | --- | ---: | ---: | --- |
-| g1_outcome_vectors | ✓ | 1.00 | 228,600 rows classified as forward_complete_open → ~9,144 complete match-vectors of 25 outcomes each (2620.1% of 349 tot... |
-| g2_source_timestamps | ✓ | 0.99 | Dual-clock (fetched_at_utc + source_updated_at_hkt): 986,450/996,450 rows (99.0%) have both timestamps. |
-| g3_pre_cutoff_evidence | ✓ | 1.00 | 9,144 match-vectors with both sale_status=open and forward_complete_open classification (2620.1%). Dual-clock confirms b... |
-| g7_no_leakage | ✓ | 1.00 | 385,600 terminal-backfill rows exist but are classified as terminal_backfill_exploratory_only and excluded from forward_... |
+| g1_outcome_vectors | ✗ | 0.47 | 236,725 rows classified as forward_complete_open. 9,469/40,533 capture-vectors have the exact 25-outcome set priced (23.... |
+| g2_source_timestamps | ✓ | 0.99 | Dual-clock (fetched_at_utc + source_updated_at_hkt): 1,003,325/1,013,325 rows (99.0%) have both timestamps. |
+| g3_pre_cutoff_evidence | ✓ | 0.78 | 9,469 capture-vectors with both sale_status=open and forward_complete_open classification (23.4%). 168/349 match-markets... |
+| g7_no_leakage | ✓ | 1.00 | 390,775 terminal-backfill rows exist but are classified as terminal_backfill_exploratory_only and excluded from forward_... |
 
 #### Key Metrics
 
 ```json
 {
-  "total_rows": 996450,
+  "total_rows": 1013325,
   "total_match_markets": 349,
-  "forward_complete_open_rows": 228600,
-  "complete_match_vectors": 9144,
-  "complete_vector_pct": 2620.06,
+  "forward_complete_open_rows": 236725,
+  "total_capture_vectors": 40533,
+  "complete_capture_vectors": 9469,
+  "complete_match_markets": 168,
+  "complete_match_vectors": 168,
+  "complete_vector_pct": 23.36,
+  "complete_match_market_pct": 48.14,
   "has_dual_clock": true,
-  "dual_clock_complete_rows": 986450,
-  "dual_clock_pct": 99.0,
-  "pre_cutoff_eligible_match_vectors": 9144,
-  "pre_cutoff_eligible_pct": 2620.06,
+  "dual_clock_complete_rows": 1003325,
+  "dual_clock_pct": 99.01,
+  "pre_cutoff_eligible_capture_vectors": 9469,
+  "pre_cutoff_eligible_match_markets": 168,
+  "pre_cutoff_eligible_match_vectors": 168,
+  "pre_cutoff_eligible_pct": 23.36,
+  "pre_cutoff_eligible_match_market_pct": 48.14,
   "discovered_match_markets": 349
 }
 ```
@@ -263,15 +280,18 @@ Correct Score freeze_support: READY_STRICT. 2/2 relevant gates passed, avg score
 
 | Gate | Passed | Score | Evidence |
 | --- | ---: | ---: | --- |
-| g4_immutable_provenance | ✓ | 1.00 | 504 capture batches for Correct Score. 504 bundle directories on disk. All bundles have SHA256SUMS with verifiable check... |
+| g4_immutable_provenance | ✓ | 1.00 | 513 capture batches for Correct Score. 513 bundle directories on disk. 513 bundles verified by recomputing SHA256SUMS en... |
 | g5_asof_freeze | ✓ | 0.80 | Existing 10h freeze package found: multimarket_asof_freeze_v1 with 231 frozen rows for this market. |
 
 #### Key Metrics
 
 ```json
 {
-  "capture_batches": 504,
-  "bundle_dirs": 504,
+  "capture_batches": 513,
+  "bundle_dirs": 513,
+  "sha256_verified_bundle_dirs": 513,
+  "sha256_failed_bundle_dirs": 0,
+  "sha256_failure_samples": [],
   "all_sha256_verifiable": true,
   "has_existing_freeze": true,
   "freeze_manifest": "multimarket_asof_freeze_v1"
@@ -288,18 +308,18 @@ Correct Score settlement_support: READY_STRICT. 1/1 relevant gates passed, avg s
 
 | Gate | Passed | Score | Evidence |
 | --- | ---: | ---: | --- |
-| g6_settlement_mapping | ✓ | 1.00 | 348 match-markets in settlement truth: 295 settled (84.8%), 52 pending, 1 cancelled, 0 SP=1 voids. Score source is separ... |
+| g6_settlement_mapping | ✓ | 1.00 | 348 match-markets in settlement truth: 298 settled (85.6%), 49 pending, 1 cancelled, 0 SP=1 voids. Score source is separ... |
 
 #### Key Metrics
 
 ```json
 {
   "total_settlement_rows": 348,
-  "settled": 295,
-  "pending_or_unknown": 52,
+  "settled": 298,
+  "pending_or_unknown": 49,
   "cancelled": 1,
   "void_sp1": 0,
-  "settlement_coverage_pct": 84.77,
+  "settlement_coverage_pct": 85.63,
   "has_separate_score_source": true,
   "settlement_sourced_separately": true
 }
@@ -315,8 +335,8 @@ Half/Full Time pre_event_input: PARTIAL. 3/4 relevant gates passed, avg score=0.
 
 | Gate | Passed | Score | Evidence |
 | --- | ---: | ---: | --- |
-| g1_outcome_vectors | ✓ | 0.60 | 399,744 rows across 349 match-markets. Outcome codes: ['0-0', '0-1', '0-3', '1-0', '1-1', '1-3', '3-0', '3-1', '3-3']. A... |
-| g2_source_timestamps | ✓ | 0.80 | 399,744/399,744 rows (100.0%) have fetched_at. Dual-clock (fetched_at_utc + source_updated_at_hkt): present. No batch_id... |
+| g1_outcome_vectors | ✓ | 0.60 | 405,819 rows across 349 match-markets. Outcome codes: ['0-0', '0-1', '0-3', '1-0', '1-1', '1-3', '3-0', '3-1', '3-3']. A... |
+| g2_source_timestamps | ✓ | 0.80 | 405,819/405,819 rows (100.0%) have fetched_at. Dual-clock (fetched_at_utc + source_updated_at_hkt): present. No batch_id... |
 | g3_pre_cutoff_evidence | ✗ | 0.10 | All rows are non_target_market_unclassified — never validated for pre-cutoff eligibility. No sale_status, sale_cutoff, o... |
 | g7_no_leakage | ✓ | 0.50 | No terminal classification exists; all data is non_target_market_unclassified. Risk unknown — data may contain post-even... |
 
@@ -324,7 +344,7 @@ Half/Full Time pre_event_input: PARTIAL. 3/4 relevant gates passed, avg score=0.
 
 ```json
 {
-  "total_rows": 399744,
+  "total_rows": 405819,
   "total_match_markets": 349,
   "outcome_codes_found": [
     "0-0",
@@ -339,7 +359,7 @@ Half/Full Time pre_event_input: PARTIAL. 3/4 relevant gates passed, avg score=0.
   ],
   "expected_outcome_match": true,
   "has_timestamps": true,
-  "timestamped_rows": 399744,
+  "timestamped_rows": 405819,
   "timestamped_pct": 100.0,
   "has_dual_clock": true,
   "discovered_match_markets": 349
@@ -367,20 +387,23 @@ Half/Full Time freeze_support: UNAVAILABLE. 0/2 relevant gates passed, avg score
 
 ### 4.51 Half/Full Time — Settlement Support
 
-**Classification:** `SETTLEMENT_ONLY`
+**Classification:** `UNAVAILABLE`
 
-Half/Full Time settlement_support: SETTLEMENT_ONLY. 0/1 relevant gates passed, avg score=0.20
+Half/Full Time settlement_support: UNAVAILABLE. 0/1 relevant gates passed, avg score=0.00
 
 #### Gates
 
 | Gate | Passed | Score | Evidence |
 | --- | ---: | ---: | --- |
-| g6_settlement_mapping | ✗ | 0.20 | No settlement truth rows for Half/Full Time. However, matches table has scores (fthg/ftag) which can be mapped to half/f... |
+| g6_settlement_mapping | ✗ | 0.00 | No settlement truth rows for Half/Full Time. Half/full-time settlement mapping is not available until separately sourced... |
 
 #### Key Metrics
 
 ```json
-{}
+{
+  "settlement_sourced_separately": false,
+  "total_settlement_rows": 0
+}
 ```
 
 ## 5. Cross-Market Metrics
@@ -406,10 +429,11 @@ Half/Full Time settlement_support: SETTLEMENT_ONLY. 0/1 relevant gates passed, a
 ## 6. Gap Findings
 
 1. **Handicap 3/1/0 — g4_immutable_provenance** (score=0.30): beidan_live.db is append-only by convention but lacks per-snapshot SHA-256 hashes or file-level bundle verification. No SHA256SUMS exist for raw capture. The Freeze Protocol v1 would need to hash the 
-2. **Half/Full Time — g3_pre_cutoff_evidence** (score=0.10): All rows are non_target_market_unclassified — never validated for pre-cutoff eligibility. No sale_status, sale_cutoff, or capture_classification beyond raw source_attribute values. Cannot confirm pre-
-3. **Half/Full Time — g4_immutable_provenance** (score=0.10): No market_sp_capture_batches for playid=51. No SHA256SUMS, no immutable bundles, no batch provenance. Data exists as raw rows in live_market_sp_snapshots without hash verification.
-4. **Half/Full Time — g5_asof_freeze** (score=0.00): No freeze package exists for playid=51. Freeze Protocol v1 requires capture batches which don't exist. Data is available but not in a freezable form.
-5. **Half/Full Time — g6_settlement_mapping** (score=0.20): No settlement truth rows for Half/Full Time. However, matches table has scores (fthg/ftag) which can be mapped to half/full-time outcomes using a deterministic mapping function. This would need to be 
+2. **Correct Score — g1_outcome_vectors** (score=0.47): 236,725 rows classified as forward_complete_open. 9,469/40,533 capture-vectors have the exact 25-outcome set priced (23.4%). 168/349 match-markets have at least one complete capture-vector (48.1%).
+3. **Half/Full Time — g3_pre_cutoff_evidence** (score=0.10): All rows are non_target_market_unclassified — never validated for pre-cutoff eligibility. No sale_status, sale_cutoff, or capture_classification beyond raw source_attribute values. Cannot confirm pre-
+4. **Half/Full Time — g4_immutable_provenance** (score=0.10): No market_sp_capture_batches for playid=51. No SHA256SUMS, no immutable bundles, no batch provenance. Data exists as raw rows in live_market_sp_snapshots without hash verification.
+5. **Half/Full Time — g5_asof_freeze** (score=0.00): No freeze package exists for playid=51. Freeze Protocol v1 requires capture batches which don't exist. Data is available but not in a freezable form.
+6. **Half/Full Time — g6_settlement_mapping** (score=0.00): No settlement truth rows for Half/Full Time. Half/full-time settlement mapping is not available until separately sourced p51 settlement rows are built and audited.
 
 ## 7. Reproducibility
 
@@ -427,6 +451,7 @@ Machine-readable results are at `results/research/mm_data_audit/audit_result.jso
 Gap findings above must be addressed as separate issues before SP-CONSISTENCY-001:
 
 1. **Handicap 3/1/0 Freeze Protocol v1**: Create freeze package from beidan_live.db snapshots with SHA-256 verification.
+2. **Half/Full Time Settlement Truth**: Build settlement mapping for p51 from matches.score → half/full-time outcome codes.
 
 ## 9. Gates Definitions
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import sqlite3
 import statistics
 from collections import Counter, defaultdict
@@ -25,6 +26,95 @@ from research.mm_data_audit.contract import (
 HKT = timezone(timedelta(hours=8))
 UTC = timezone.utc
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def _is_sha256_hex(value: str) -> bool:
+    return len(value) == 64 and all(ch in "0123456789abcdef" for ch in value.lower())
+
+
+def _sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _verify_sha256sums(bundle_path: Path, expected_sha256s_sha256: str | None = None) -> tuple[bool, dict[str, Any]]:
+    """Verify a capture bundle against its SHA256SUMS manifest."""
+    bundle = bundle_path.expanduser()
+    sums = bundle / "SHA256SUMS"
+    detail: dict[str, Any] = {
+        "bundle_path": str(bundle),
+        "sha256sums_exists": sums.is_file(),
+        "sha256sums_digest_matches": False,
+        "files_checked": 0,
+        "errors": [],
+    }
+
+    if not sums.is_file():
+        detail["errors"].append("SHA256SUMS missing")
+        return False, detail
+
+    if expected_sha256s_sha256:
+        actual_sums_digest = _sha256_file(sums)
+        detail["sha256sums_sha256"] = actual_sums_digest
+        if not _is_sha256_hex(expected_sha256s_sha256):
+            detail["errors"].append("invalid recorded SHA256SUMS digest")
+            return False, detail
+        if actual_sums_digest != expected_sha256s_sha256.lower():
+            detail["errors"].append("SHA256SUMS digest mismatch")
+            return False, detail
+        detail["sha256sums_digest_matches"] = True
+
+    entries = sums.read_text(encoding="utf-8").splitlines()
+    seen: set[str] = set()
+    for line in entries:
+        if not line.strip():
+            continue
+        try:
+            digest, name = line.split("  ", 1)
+        except ValueError:
+            detail["errors"].append(f"invalid SHA256SUMS line: {line!r}")
+            return False, detail
+        digest = digest.lower()
+        if not _is_sha256_hex(digest):
+            detail["errors"].append(f"invalid checksum for {name}")
+            return False, detail
+        rel = Path(name)
+        if rel.is_absolute() or ".." in rel.parts or name in seen:
+            detail["errors"].append(f"unsafe or duplicate SHA256SUMS path: {name}")
+            return False, detail
+        target = bundle / rel
+        if not target.is_file() or target.is_symlink():
+            detail["errors"].append(f"listed file missing: {name}")
+            return False, detail
+        actual = _sha256_file(target)
+        if actual != digest:
+            detail["errors"].append(f"checksum mismatch: {name}")
+            return False, detail
+        seen.add(name)
+        detail["files_checked"] += 1
+
+    if detail["files_checked"] == 0:
+        detail["errors"].append("SHA256SUMS has no file entries")
+        return False, detail
+    actual_files: set[str] = set()
+    for candidate in bundle.rglob("*"):
+        if candidate.is_dir():
+            continue
+        if candidate.is_symlink() or not candidate.is_file():
+            detail["errors"].append(f"bundle contains non-regular file: {candidate}")
+            return False, detail
+        relative = candidate.relative_to(bundle).as_posix()
+        if relative != "SHA256SUMS":
+            actual_files.add(relative)
+    if seen != actual_files:
+        detail["errors"].append("SHA256SUMS does not cover exactly the bundle files")
+        return False, detail
+    if expected_sha256s_sha256 is None:
+        detail["sha256sums_digest_matches"] = True
+    return True, detail
 
 
 def _repo_root() -> Path:
@@ -216,7 +306,7 @@ class MultiMarketAuditor:
         ).fetchone()[0]
         total_db_matches = db.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
         ko_pct = (matches_with_kickoff / total_db_matches * 100) if total_db_matches else 0
-        # Check if snapshots exist before kickoff
+        # Check if snapshots exist before kickoff — UTC-aware comparison
         pre_kickoff = db.execute(
             """SELECT COUNT(*) FROM snapshots s
                JOIN matches m ON s.match_id = m.match_id
@@ -409,26 +499,74 @@ class MultiMarketAuditor:
             ).fetchone()[0]
 
         expected_per_match = market.expected_outcome_count
-        complete_match_vectors = forward_complete // expected_per_match if forward_complete else 0
-        complete_pct = (complete_match_vectors / total_matches * 100) if total_matches else 0
+        capture_identity = (
+            "issue, row_idx, playid, COALESCE(batch_id, ''), "
+            "COALESCE(fetched_at_utc, fetched_at, ''), COALESCE(source_updated_at_hkt, '')"
+        )
+        total_capture_vectors = 0
+        if has_table:
+            total_capture_vectors = db.execute(
+                f"""SELECT COUNT(*) FROM (
+                   SELECT 1
+                   FROM live_market_sp_snapshots
+                   WHERE playid=?
+                   GROUP BY {capture_identity}
+               )""",
+                (market.playid,),
+            ).fetchone()[0]
+
+        expected_placeholders = ",".join("?" for _ in market.outcome_codes)
+        complete_capture_vectors = 0
+        complete_match_markets = 0
+        if has_table:
+            complete_capture_vectors, complete_match_markets = db.execute(
+                f"""WITH capture_vectors AS (
+                   SELECT issue, row_idx
+                   FROM live_market_sp_snapshots
+                   WHERE playid=? AND capture_classification='forward_complete_open'
+                   GROUP BY {capture_identity}
+                   HAVING COUNT(DISTINCT CASE WHEN sp IS NOT NULL THEN outcome_code END)=?
+                      AND COUNT(DISTINCT CASE
+                          WHEN sp IS NOT NULL AND outcome_code IN ({expected_placeholders})
+                          THEN outcome_code
+                      END)=?
+               )
+               SELECT COUNT(*), COUNT(DISTINCT issue||'-'||row_idx)
+               FROM capture_vectors""",
+                (market.playid, expected_per_match, *market.outcome_codes, expected_per_match),
+            ).fetchone()
+        complete_pct = (complete_capture_vectors / total_capture_vectors * 100) if total_capture_vectors else 0
+        complete_match_pct = (complete_match_markets / total_matches * 100) if total_matches else 0
 
         metrics.update({
             "total_rows": total_rows,
             "total_match_markets": total_matches,
             "forward_complete_open_rows": forward_complete,
-            "complete_match_vectors": complete_match_vectors,
+            "total_capture_vectors": total_capture_vectors,
+            "complete_capture_vectors": complete_capture_vectors,
+            "complete_match_markets": complete_match_markets,
+            "complete_match_vectors": complete_match_markets,
             "complete_vector_pct": round(complete_pct, 2),
+            "complete_match_market_pct": round(complete_match_pct, 2),
         })
         gates.append(GateResult(
             gate_id=GateID.G1_OUTCOME_VECTORS,
-            passed=complete_pct >= 30,
-            score=min(1.0, complete_pct / 50),  # 50% is the bar for score=1.0
+            passed=complete_pct >= 30 and complete_match_pct >= 30,
+            score=min(1.0, min(complete_pct, complete_match_pct) / 50),  # 50% is the bar for score=1.0
             evidence=(
-                f"{forward_complete:,} rows classified as forward_complete_open → "
-                f"~{complete_match_vectors:,} complete match-vectors of {expected_per_match} outcomes each "
-                f"({complete_pct:.1f}% of {total_matches:,} total match-markets)."
+                f"{forward_complete:,} rows classified as forward_complete_open. "
+                f"{complete_capture_vectors:,}/{total_capture_vectors:,} capture-vectors "
+                f"have the exact {expected_per_match}-outcome set priced ({complete_pct:.1f}%). "
+                f"{complete_match_markets:,}/{total_matches:,} match-markets have at least one complete "
+                f"capture-vector ({complete_match_pct:.1f}%)."
             ),
-            metrics={"complete_match_vectors": complete_match_vectors, "complete_vector_pct": round(complete_pct, 2)},
+            metrics={
+                "complete_capture_vectors": complete_capture_vectors,
+                "total_capture_vectors": total_capture_vectors,
+                "complete_vector_pct": round(complete_pct, 2),
+                "complete_match_markets": complete_match_markets,
+                "complete_match_market_pct": round(complete_match_pct, 2),
+            },
         ))
 
         # G2: Source and capture timestamps
@@ -479,23 +617,53 @@ class MultiMarketAuditor:
             (market.playid,),
         ).fetchone()[0] if has_table else 0
 
-        pre_cutoff_match_vecs = open_sale // market.expected_outcome_count if open_sale else 0
-        pre_pct = (pre_cutoff_match_vecs / total_matches * 100) if total_matches else 0
+        pre_cutoff_capture_vectors = 0
+        pre_cutoff_match_markets = 0
+        if has_table:
+            pre_cutoff_capture_vectors, pre_cutoff_match_markets = db.execute(
+                f"""WITH capture_vectors AS (
+                   SELECT issue, row_idx
+                   FROM live_market_sp_snapshots
+                   WHERE playid=? AND sale_status='open'
+                     AND capture_classification='forward_complete_open'
+                   GROUP BY {capture_identity}
+                   HAVING COUNT(DISTINCT CASE WHEN sp IS NOT NULL THEN outcome_code END)=?
+                      AND COUNT(DISTINCT CASE
+                          WHEN sp IS NOT NULL AND outcome_code IN ({expected_placeholders})
+                          THEN outcome_code
+                      END)=?
+               )
+               SELECT COUNT(*), COUNT(DISTINCT issue||'-'||row_idx)
+               FROM capture_vectors""",
+                (market.playid, expected_per_match, *market.outcome_codes, expected_per_match),
+            ).fetchone()
+        pre_pct = (pre_cutoff_capture_vectors / total_capture_vectors * 100) if total_capture_vectors else 0
+        pre_match_pct = (pre_cutoff_match_markets / total_matches * 100) if total_matches else 0
 
         metrics.update({
-            "pre_cutoff_eligible_match_vectors": pre_cutoff_match_vecs,
+            "pre_cutoff_eligible_capture_vectors": pre_cutoff_capture_vectors,
+            "pre_cutoff_eligible_match_markets": pre_cutoff_match_markets,
+            "pre_cutoff_eligible_match_vectors": pre_cutoff_match_markets,
             "pre_cutoff_eligible_pct": round(pre_pct, 2),
+            "pre_cutoff_eligible_match_market_pct": round(pre_match_pct, 2),
         })
         gates.append(GateResult(
             gate_id=GateID.G3_PRE_CUTOFF_EVIDENCE,
-            passed=pre_pct >= 10,
-            score=min(1.0, pre_pct / 30),
+            passed=pre_pct >= 10 and pre_match_pct >= 30,
+            score=min(1.0, min(pre_pct, pre_match_pct) / 30),
             evidence=(
-                f"{pre_cutoff_match_vecs:,} match-vectors with both sale_status=open and "
+                f"{pre_cutoff_capture_vectors:,} capture-vectors with both sale_status=open and "
                 f"forward_complete_open classification ({pre_pct:.1f}%). "
+                f"{pre_cutoff_match_markets:,}/{total_matches:,} match-markets have eligible "
+                f"pre-cutoff capture-vectors ({pre_match_pct:.1f}%). "
                 f"Dual-clock confirms both fetched_at_utc and source_updated_at_hkt precede kickoff."
             ),
-            metrics={"pre_cutoff_match_vectors": pre_cutoff_match_vecs, "pre_cutoff_pct": round(pre_pct, 2)},
+            metrics={
+                "pre_cutoff_capture_vectors": pre_cutoff_capture_vectors,
+                "pre_cutoff_pct": round(pre_pct, 2),
+                "pre_cutoff_match_markets": pre_cutoff_match_markets,
+                "pre_cutoff_match_market_pct": round(pre_match_pct, 2),
+            },
         ))
 
         # G7: No leakage
@@ -532,25 +700,38 @@ class MultiMarketAuditor:
         ).fetchone()[0]
         has_bundles = bool(batches)
 
-        # Check if bundles have SHA256SUMS
         has_verifiable = False
         bundle_count = 0
+        verified = 0
+        failed = 0
+        failure_samples: list[dict[str, Any]] = []
         if has_bundles:
             bundle_dirs = db.execute(
-                "SELECT DISTINCT bundle_path FROM market_sp_capture_batches WHERE playid=? AND bundle_path IS NOT NULL",
+                """SELECT DISTINCT bundle_path, bundle_sha256s_sha256
+                   FROM market_sp_capture_batches
+                   WHERE playid=? AND bundle_path IS NOT NULL""",
                 (market.playid,),
             ).fetchall()
             bundle_count = len(bundle_dirs)
-            verified = 0
-            for (bpath,) in bundle_dirs:
-                sums = Path(bpath) / "SHA256SUMS"
-                if sums.is_file():
+            for row in bundle_dirs:
+                ok, detail = _verify_sha256sums(
+                    Path(row["bundle_path"]),
+                    row["bundle_sha256s_sha256"],
+                )
+                if ok:
                     verified += 1
+                else:
+                    failed += 1
+                    if len(failure_samples) < 5:
+                        failure_samples.append(detail)
             has_verifiable = (verified == bundle_count and bundle_count > 0)
 
         metrics.update({
             "capture_batches": batches,
             "bundle_dirs": bundle_count,
+            "sha256_verified_bundle_dirs": verified,
+            "sha256_failed_bundle_dirs": failed,
+            "sha256_failure_samples": failure_samples,
             "all_sha256_verifiable": has_verifiable,
         })
         gates.append(GateResult(
@@ -560,7 +741,9 @@ class MultiMarketAuditor:
             evidence=(
                 f"{batches} capture batches for {market.display_name}. "
                 f"{bundle_count} bundle directories on disk. "
-                f"{'All bundles have SHA256SUMS with verifiable checksums.' if has_verifiable else 'Bundle verification incomplete or missing.'}"
+                f"{verified} bundles verified by recomputing SHA256SUMS entries and matching "
+                f"the recorded SHA256SUMS digest. "
+                f"{'All bundle checks passed.' if has_verifiable else f'{failed} bundle checks failed.'}"
             ),
             metrics=dict(metrics),
         ))
@@ -848,17 +1031,18 @@ class MultiMarketAuditor:
         ).fetchone()[0]
 
         if p51_rows == 0:
+            metrics["settlement_sourced_separately"] = False
+            metrics["total_settlement_rows"] = 0
             gates.append(GateResult(
                 gate_id=GateID.G6_SETTLEMENT_MAPPING,
                 passed=False,
-                score=0.2,
+                score=0.0,
                 evidence=(
                     f"No settlement truth rows for {market.display_name}. "
-                    f"However, matches table has scores (fthg/ftag) which can be mapped to "
-                    f"half/full-time outcomes using a deterministic mapping function. "
-                    f"This would need to be built as a follow-up."
+                    f"Half/full-time settlement mapping is not available until separately "
+                    f"sourced p51 settlement rows are built and audited."
                 ),
-                metrics={"settlement_rows": 0, "mapping_possible": True},
+                metrics={"settlement_rows": 0, "mapping_available": False},
             ))
             return gates, metrics
 
@@ -892,7 +1076,10 @@ class MultiMarketAuditor:
     ) -> DimensionAudit:
         # Determine readiness from gate scores
         relevant_gates = self._gates_for_dimension(dimension)
-        scores = [g.score for g in gates if g.gate_id in relevant_gates]
+        relevant_gate_results = [g for g in gates if g.gate_id in relevant_gates]
+        scores = [g.score for g in relevant_gate_results]
+        has_all_required_gates = {g.gate_id for g in relevant_gate_results} == relevant_gates
+        passed_all = has_all_required_gates and all(g.passed for g in relevant_gate_results)
 
         if not scores:
             readiness = ReadinessLevel.UNAVAILABLE
@@ -901,7 +1088,7 @@ class MultiMarketAuditor:
             avg_score = sum(scores) / len(scores)
 
             if dimension == AuditDimension.SETTLEMENT_SUPPORT:
-                if avg_score >= 0.6:
+                if passed_all and avg_score >= 0.6:
                     readiness = ReadinessLevel.READY_STRICT
                 elif avg_score >= 0.3:
                     readiness = ReadinessLevel.PARTIAL
@@ -910,7 +1097,7 @@ class MultiMarketAuditor:
                 else:
                     readiness = ReadinessLevel.UNAVAILABLE
             else:
-                if avg_score >= 0.8:
+                if passed_all and avg_score >= 0.8:
                     readiness = ReadinessLevel.READY_STRICT
                 elif avg_score >= 0.4:
                     readiness = ReadinessLevel.PARTIAL

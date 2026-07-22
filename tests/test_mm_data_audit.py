@@ -10,8 +10,10 @@ Covers:
 
 from __future__ import annotations
 
+import hashlib
 import json
-import tempfile
+import hashlib
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -27,8 +29,152 @@ from research.mm_data_audit.contract import (
     MarketDefinition,
     ReadinessLevel,
 )
-from research.mm_data_audit.auditor import _repo_root, _connect, _table_exists
+import research.mm_data_audit.report as report_module
+from research.mm_data_audit.auditor import (
+    MultiMarketAuditor,
+    _repo_root,
+    _connect,
+    _table_exists,
+    _verify_sha256sums,
+)
 from research.mm_data_audit.report import generate_report, save_results
+
+
+def _make_live_market_sp_fixture() -> sqlite3.Connection:
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """CREATE TABLE live_market_sp_snapshots (
+            issue TEXT,
+            row_idx INTEGER,
+            playid INTEGER,
+            batch_id TEXT,
+            fetched_at TEXT,
+            fetched_at_utc TEXT,
+            source_updated_at_hkt TEXT,
+            capture_classification TEXT,
+            outcome_code TEXT,
+            sp REAL,
+            sale_status TEXT
+        )"""
+    )
+    return conn
+
+
+def _insert_capture_vector(
+    conn: sqlite3.Connection,
+    issue: str,
+    row_idx: int,
+    batch_id: str,
+    outcome_codes: list[str],
+    *,
+    playid: int = 40,
+    classification: str = "forward_complete_open",
+    sale_status: str = "open",
+) -> None:
+    for outcome_code in outcome_codes:
+        conn.execute(
+            """INSERT INTO live_market_sp_snapshots (
+                issue, row_idx, playid, batch_id, fetched_at, fetched_at_utc,
+                source_updated_at_hkt, capture_classification, outcome_code, sp, sale_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                issue,
+                row_idx,
+                playid,
+                batch_id,
+                "2026-07-22 10:00:00",
+                "2026-07-22T02:00:00+00:00",
+                "2026-07-22 10:00:00",
+                classification,
+                outcome_code,
+                2.0,
+                sale_status,
+            ),
+        )
+    conn.commit()
+
+
+def _auditor_for_bjdc(conn: sqlite3.Connection) -> MultiMarketAuditor:
+    auditor = object.__new__(MultiMarketAuditor)
+    auditor.bjdc = conn
+    return auditor
+
+
+def _gate_by_id(gates: list[GateResult], gate_id: GateID) -> GateResult:
+    return next(gate for gate in gates if gate.gate_id == gate_id)
+
+
+def _deterministic_audit_result() -> AuditResult:
+    result = AuditResult(audit_cutoff_utc="2026-07-22T00:00:00+00:00")
+    gate_by_dimension = {
+        AuditDimension.PRE_EVENT_INPUT: GateID.G1_OUTCOME_VECTORS,
+        AuditDimension.FREEZE_SUPPORT: GateID.G4_IMMUTABLE_PROVENANCE,
+        AuditDimension.SETTLEMENT_SUPPORT: GateID.G6_SETTLEMENT_MAPPING,
+    }
+    for playid in TARGET_PLAYIDS:
+        market = MARKETS[playid]
+        result.readiness_matrix[market.market_key] = {}
+        for dimension in AuditDimension:
+            result.readiness_matrix[market.market_key][dimension.value] = ReadinessLevel.PARTIAL.value
+            result.dimensions.append(
+                DimensionAudit(
+                    market=market,
+                    dimension=dimension,
+                    readiness=ReadinessLevel.PARTIAL,
+                    gates=[
+                        GateResult(
+                            gate_id=gate_by_dimension[dimension],
+                            passed=False,
+                            score=0.5,
+                            evidence="deterministic fixture",
+                        )
+                    ],
+                    summary=f"{market.display_name} {dimension.value}: deterministic fixture",
+                    metrics={"fixture": True},
+                )
+            )
+    return result
+
+
+def _write_deterministic_results(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Path]:
+    monkeypatch.setattr(report_module, "DOCS_DIR", tmp_path / "docs")
+    return save_results(_deterministic_audit_result(), tmp_path / "results")
+
+
+def _make_capture_batches_fixture(bundle_dir: Path, sums_digest: str, *, playid: int = 40) -> sqlite3.Connection:
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """CREATE TABLE market_sp_capture_batches (
+            playid INTEGER,
+            bundle_path TEXT,
+            bundle_sha256s_sha256 TEXT
+        )"""
+    )
+    conn.execute(
+        """INSERT INTO market_sp_capture_batches (
+            playid, bundle_path, bundle_sha256s_sha256
+        ) VALUES (?, ?, ?)""",
+        (playid, str(bundle_dir), sums_digest),
+    )
+    conn.commit()
+    return conn
+
+
+def _write_bundle(bundle_dir: Path, files: dict[str, str]) -> str:
+    bundle_dir.mkdir(parents=True, exist_ok=True)
+    for name, content in files.items():
+        path = bundle_dir / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    lines = []
+    for name in sorted(files):
+        digest = hashlib.sha256((bundle_dir / name).read_bytes()).hexdigest()
+        lines.append(f"{digest}  {name}\n")
+    sums = bundle_dir / "SHA256SUMS"
+    sums.write_text("".join(lines), encoding="utf-8")
+    return hashlib.sha256(sums.read_bytes()).hexdigest()
 
 
 # ── Contract Tests ─────────────────────────────────────────────────────────
@@ -213,6 +359,34 @@ class TestP0MarketGates:
         ).fetchone()[0]
         assert count > 0, f"No settlement rows for market_key={mk}"
 
+    def test_capture_vector_coverage_uses_distinct_capture_identity(self):
+        conn = _make_live_market_sp_fixture()
+        _insert_capture_vector(conn, "26080", 1, "batch-a", MARKETS[40].outcome_codes)
+        _insert_capture_vector(conn, "26080", 1, "batch-b", MARKETS[40].outcome_codes)
+        _insert_capture_vector(conn, "26080", 2, "batch-a", MARKETS[40].outcome_codes[:7])
+
+        gates, metrics = _auditor_for_bjdc(conn)._gates_p0_pre_event(MARKETS[40])
+
+        g1 = _gate_by_id(gates, GateID.G1_OUTCOME_VECTORS)
+        assert g1.passed is True
+        assert metrics["total_capture_vectors"] == 3
+        assert metrics["complete_capture_vectors"] == 2
+        assert metrics["complete_vector_pct"] == pytest.approx(66.67)
+        assert metrics["complete_match_markets"] == 1
+        assert metrics["complete_match_market_pct"] == pytest.approx(50.0)
+
+    def test_capture_vector_requires_exact_expected_outcome_set(self):
+        conn = _make_live_market_sp_fixture()
+        wrong_codes = MARKETS[40].outcome_codes[:7] + ["unexpected"]
+        _insert_capture_vector(conn, "26080", 1, "batch-a", wrong_codes)
+
+        gates, metrics = _auditor_for_bjdc(conn)._gates_p0_pre_event(MARKETS[40])
+
+        g1 = _gate_by_id(gates, GateID.G1_OUTCOME_VECTORS)
+        assert g1.passed is False
+        assert metrics["complete_capture_vectors"] == 0
+        assert metrics["complete_match_markets"] == 0
+
 
 class TestHalfFullTimeGates:
     """Verify Half/Full Time (p51) gate evaluation."""
@@ -271,24 +445,24 @@ class TestReportGeneration:
         assert "Correct Score" in report
         assert "Half/Full Time" in report
 
-    def test_save_results_creates_files(self):
+    def test_save_results_creates_files(self, tmp_path, monkeypatch):
         from research.mm_data_audit.auditor import MultiMarketAuditor
         auditor = MultiMarketAuditor()
         result = auditor.audit_all()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_dir = Path(tmpdir) / "test_audit"
-            paths = save_results(result, output_dir)
-            assert paths["audit_json"].exists()
-            assert paths["readiness_csv"].exists()
-            assert paths["report_md"].exists()
-            # Verify JSON is valid
-            data = json.loads(paths["audit_json"].read_text())
-            assert data["audit_id"] == "MM-DATA-AUDIT-001"
-            assert "readiness_matrix" in data
-            # Verify CSV has correct structure
-            csv_lines = paths["readiness_csv"].read_text().strip().split("\n")
-            assert csv_lines[0] == "market,pre_event_input,freeze_support,settlement_support"
-            assert len(csv_lines) == 5  # header + 4 markets
+        monkeypatch.setattr(report_module, "DOCS_DIR", tmp_path / "docs")
+        paths = save_results(result, tmp_path / "test_audit")
+        assert paths["audit_json"].exists()
+        assert paths["readiness_csv"].exists()
+        assert paths["report_md"].exists()
+        assert paths["report_md"].is_relative_to(tmp_path)
+        # Verify JSON is valid
+        data = json.loads(paths["audit_json"].read_text())
+        assert data["audit_id"] == "MM-DATA-AUDIT-001"
+        assert "readiness_matrix" in data
+        # Verify CSV has correct structure
+        csv_lines = paths["readiness_csv"].read_text().strip().split("\n")
+        assert csv_lines[0] == "market,pre_event_input,freeze_support,settlement_support"
+        assert len(csv_lines) == 5  # header + 4 markets
 
     def test_report_contains_all_markets(self):
         from research.mm_data_audit.auditor import MultiMarketAuditor
@@ -355,6 +529,34 @@ class TestFreezePackage:
             actual = hashlib.sha256(path.read_bytes()).hexdigest()
             assert actual == digest, f"Checksum mismatch for {name}: expected {digest}, got {actual}"
 
+    def test_p0_freeze_verifies_payload_hashes(self, tmp_path: Path):
+        bundle = tmp_path / "bundle"
+        sums_digest = _write_bundle(bundle, {"raw.xml": "<xml>original</xml>"})
+        (bundle / "raw.xml").write_text("<xml>tampered</xml>", encoding="utf-8")
+        conn = _make_capture_batches_fixture(bundle, sums_digest)
+
+        gates, metrics = _auditor_for_bjdc(conn)._gates_p0_freeze(MARKETS[40])
+
+        g4 = _gate_by_id(gates, GateID.G4_IMMUTABLE_PROVENANCE)
+        assert g4.passed is False
+        assert metrics["sha256_verified_bundle_dirs"] == 0
+        assert metrics["sha256_failed_bundle_dirs"] == 1
+        assert "checksum mismatch" in metrics["sha256_failure_samples"][0]["errors"][0]
+
+    def test_p0_freeze_requires_sha256sums_to_cover_bundle_inventory(self, tmp_path: Path):
+        bundle = tmp_path / "bundle"
+        sums_digest = _write_bundle(bundle, {"raw.xml": "<xml>original</xml>"})
+        (bundle / "extra.xml").write_text("<xml>extra</xml>", encoding="utf-8")
+        conn = _make_capture_batches_fixture(bundle, sums_digest)
+
+        gates, metrics = _auditor_for_bjdc(conn)._gates_p0_freeze(MARKETS[40])
+
+        g4 = _gate_by_id(gates, GateID.G4_IMMUTABLE_PROVENANCE)
+        assert g4.passed is False
+        assert metrics["sha256_verified_bundle_dirs"] == 0
+        assert metrics["sha256_failed_bundle_dirs"] == 1
+        assert "does not cover exactly" in metrics["sha256_failure_samples"][0]["errors"][0]
+
 
 # ── Classification Boundary Tests ──────────────────────────────────────────
 
@@ -407,13 +609,13 @@ class TestClassificationLogic:
 
 # ── Reproducibility Tests ──────────────────────────────────────────────────
 
+WORKTREE = Path(__file__).resolve().parents[1]
+
+
 class TestReproducibility:
     """Verify the audit is reproducible."""
-
     def test_audit_result_json_is_valid(self):
-        repo = _repo_root()
-        worktree = repo / ".worktrees/t_444c6ea1"
-        audit_json = worktree / "results/research/mm_data_audit/audit_result.json"
+        audit_json = WORKTREE / "results/research/mm_data_audit/audit_result.json"
         assert audit_json.exists(), f"Audit JSON not found: {audit_json}"
         data = json.loads(audit_json.read_text())
         assert data["audit_id"] == "MM-DATA-AUDIT-001"
@@ -422,9 +624,7 @@ class TestReproducibility:
         assert len(data["dimensions"]) == 12  # 4 markets × 3 dimensions
 
     def test_readiness_csv_is_valid(self):
-        repo = _repo_root()
-        worktree = repo / ".worktrees/t_444c6ea1"
-        csv_path = worktree / "results/research/mm_data_audit/readiness_matrix.csv"
+        csv_path = WORKTREE / "results/research/mm_data_audit/readiness_matrix.csv"
         lines = csv_path.read_text().strip().split("\n")
         assert len(lines) == 5  # header + 4 markets
         for line in lines[1:]:
@@ -433,9 +633,7 @@ class TestReproducibility:
             assert parts[1] in {"READY_STRICT", "PARTIAL", "SETTLEMENT_ONLY", "UNAVAILABLE"}
 
     def test_report_md_exists(self):
-        repo = _repo_root()
-        worktree = repo / ".worktrees/t_444c6ea1"
-        report = worktree / "docs/research/experiments/MM-DATA-AUDIT-001.md"
+        report = WORKTREE / "docs/research/experiments/MM-DATA-AUDIT-001.md"
         assert report.exists(), f"Report not found: {report}"
         content = report.read_text()
         assert "MM-DATA-AUDIT-001" in content
@@ -448,20 +646,17 @@ class TestExistingSystemsUnchanged:
 
     def test_strategy_release_registry_still_valid(self):
         repo = _repo_root()
-        worktree = repo / ".worktrees/t_444c6ea1"
-        schema_path = worktree / "schemas/strategy_release_registry_v1.schema.json"
+        schema_path = repo / "schemas/strategy_release_registry_v1.schema.json"
         assert schema_path.exists(), "Strategy release schema missing"
 
     def test_data_collection_plan_unchanged(self):
         repo = _repo_root()
-        worktree = repo / ".worktrees/t_444c6ea1"
-        config_path = worktree / "config/data_collection_plan.json"
+        config_path = repo / "config/data_collection_plan.json"
         assert config_path.exists(), "Data collection plan missing"
 
     def test_decision_versions_unchanged(self):
         repo = _repo_root()
-        worktree = repo / ".worktrees/t_444c6ea1"
-        config_path = worktree / "config/decision_versions.json"
+        config_path = repo / "config/decision_versions.json"
         assert config_path.exists(), "Decision versions config missing"
 
     def test_no_live_db_writes_from_audit(self):
