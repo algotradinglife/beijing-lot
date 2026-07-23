@@ -1,6 +1,6 @@
 {
   "audit_id": "MM-DATA-AUDIT-001",
-  "audit_cutoff_utc": "2026-07-23T11:55:51+00:00",
+  "audit_cutoff_utc": "2026-07-23T13:57:41+00:00",
   "readiness_matrix": {
     "handicap_310": {
       "pre_event_input": "PARTIAL",
