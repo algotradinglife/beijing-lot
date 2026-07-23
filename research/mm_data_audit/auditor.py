@@ -367,14 +367,19 @@ class MultiMarketAuditor:
         ))
 
         # G7: No leakage (terminal/final used as pre-event)
+        # beidan_live.db is append-only by convention but lacks per-snapshot SHA-256.
+        # Without per-file bundle hashes, post-capture modification cannot be ruled out.
+        # Score: 0.3 to reflect conventional append-only confidence but no cryptographic proof.
         gates.append(GateResult(
             gate_id=GateID.G7_NO_LEAKAGE,
-            passed=True,
-            score=1.0,
+            passed=False,
+            score=0.3,
             evidence=(
                 f"beidan_live.db snapshots are captured live (source='zqdc', 'live500'). "
-                f"No post-event terminal SP substitution detected — snapshot_ts always precedes or "
-                f"is near kickoff_ts for the captured data."
+                f"No post-event terminal SP substitution detected — snapshot_ts always precedes "
+                f"or is near kickoff_ts for the captured data. "
+                f"However, no per-snapshot SHA-256 hashes exist for raw capture rows; "
+                f"without bundle-level verification, post-capture leakage cannot be ruled out."
             ),
         ))
 

@@ -1,0 +1,23 @@
+{
+  "audit_id": "MM-DATA-AUDIT-001",
+  "readiness_matrix": {
+    "handicap_310": {"pre_event_input": "PARTIAL", "freeze_support": "PARTIAL", "settlement_support": "READY_STRICT"},
+    "total_goals": {"pre_event_input": "PARTIAL", "freeze_support": "READY_STRICT", "settlement_support": "READY_STRICT"},
+    "correct_score": {"pre_event_input": "PARTIAL", "freeze_support": "READY_STRICT", "settlement_support": "READY_STRICT"},
+    "half_full_time": {"pre_event_input": "PARTIAL", "freeze_support": "UNAVAILABLE", "settlement_support": "UNAVAILABLE"}
+  },
+  "dimensions": [
+    {"market": "handicap_310", "dimension": "pre_event_input", "readiness": "PARTIAL"},
+    {"market": "handicap_310", "dimension": "freeze_support", "readiness": "PARTIAL"},
+    {"market": "handicap_310", "dimension": "settlement_support", "readiness": "READY_STRICT"},
+    {"market": "total_goals", "dimension": "pre_event_input", "readiness": "PARTIAL"},
+    {"market": "total_goals", "dimension": "freeze_support", "readiness": "READY_STRICT"},
+    {"market": "total_goals", "dimension": "settlement_support", "readiness": "READY_STRICT"},
+    {"market": "correct_score", "dimension": "pre_event_input", "readiness": "PARTIAL"},
+    {"market": "correct_score", "dimension": "freeze_support", "readiness": "READY_STRICT"},
+    {"market": "correct_score", "dimension": "settlement_support", "readiness": "READY_STRICT"},
+    {"market": "half_full_time", "dimension": "pre_event_input", "readiness": "PARTIAL"},
+    {"market": "half_full_time", "dimension": "freeze_support", "readiness": "UNAVAILABLE"},
+    {"market": "half_full_time", "dimension": "settlement_support", "readiness": "UNAVAILABLE"}
+  ]
+}
