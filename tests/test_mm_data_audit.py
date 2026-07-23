@@ -729,6 +729,18 @@ class TestReportGeneration:
         assert "matches.score" not in report
         assert "independently sourced half-time plus full-time truth" in report
 
+    def test_report_truncates_gap_evidence_without_trailing_whitespace(self):
+        result = _deterministic_audit_result()
+        gate = result.dimensions[0].gates[0]
+        gate.score = 0.3
+        gate.evidence = "x" * 199 + " " + "continuation"
+
+        report = generate_report(result)
+        gap_line = next(line for line in report.splitlines() if line.startswith("1. **"))
+
+        assert gap_line.endswith("...")
+        assert all(not line.endswith(" ") for line in report.splitlines())
+
 
 # ── Freeze Package Verification Tests ──────────────────────────────────────
 

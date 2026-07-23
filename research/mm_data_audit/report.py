@@ -20,6 +20,13 @@ OUTPUT_DIR = ROOT / "results/research/mm_data_audit"
 DOCS_DIR = ROOT / "docs/research/experiments"
 
 
+def _truncate_evidence(evidence: str, limit: int) -> str:
+    """Shorten evidence without emitting trailing whitespace."""
+    if len(evidence) <= limit:
+        return evidence
+    return evidence[:limit].rstrip() + "..."
+
+
 def generate_report(result: AuditResult) -> str:
     """Generate the full markdown audit report."""
     lines = [
@@ -85,7 +92,7 @@ def generate_report(result: AuditResult) -> str:
             "| --- | ---: | ---: | --- |",
         ]
         for g in dim.gates:
-            evidence_short = g.evidence[:120] + "..." if len(g.evidence) > 120 else g.evidence
+            evidence_short = _truncate_evidence(g.evidence, 120)
             lines.append(
                 f"| {g.gate_id.value} | {'✓' if g.passed else '✗'} | {g.score:.2f} | {evidence_short} |"
             )
@@ -136,7 +143,10 @@ def generate_report(result: AuditResult) -> str:
         for g in dim.gates:
             if not g.passed and g.score < 0.5:
                 gap_count += 1
-                lines.append(f"{gap_count}. **{m.display_name} — {g.gate_id.value}** (score={g.score:.2f}): {g.evidence[:200]}")
+                lines.append(
+                    f"{gap_count}. **{m.display_name} — {g.gate_id.value}** "
+                    f"(score={g.score:.2f}): {_truncate_evidence(g.evidence, 200)}"
+                )
     if gap_count == 0:
         lines.append("No critical gaps identified.")
 
