@@ -39,7 +39,6 @@ def parse_args() -> argparse.Namespace:
     freeze.add_argument("--decision", type=Path, action="append", required=True)
     freeze.add_argument("--config", type=Path, required=True)
     freeze.add_argument("--metadata", type=Path, action="append", default=[])
-    freeze.add_argument("--input-dataset", type=Path, action="append", default=[])
     freeze.add_argument("--output-dir", type=Path)
     freeze.add_argument("--git-commit")
     freeze.add_argument("--frozen-at-utc")
@@ -84,7 +83,6 @@ def main() -> int:
             decision_files=arguments.decision,
             config_file=arguments.config,
             metadata_files=arguments.metadata,
-            input_datasets=arguments.input_dataset,
             git_commit=arguments.git_commit,
             frozen_at_utc=arguments.frozen_at_utc,
         )

@@ -79,7 +79,6 @@ def freeze_identity_sha256(
     decisions: Iterable[Mapping[str, Any]],
     config: Mapping[str, Any],
     metadata: Iterable[Mapping[str, Any]],
-    input_datasets: Iterable[Mapping[str, Any]] = (),
 ) -> str:
     """Return the portable identity of every immutable freeze input."""
 
@@ -97,9 +96,6 @@ def freeze_identity_sha256(
     }
     if prediction_assets:
         identity["predictions_sha256"] = asset_list_sha256(prediction_assets)
-    dataset_assets = _asset_digest_list(input_datasets)
-    if dataset_assets:
-        identity["input_datasets_sha256"] = asset_list_sha256(dataset_assets)
     return canonical_sha256(
         identity
     )
@@ -330,7 +326,6 @@ def create_freeze_package(
     prediction_files: Iterable[Path] = (),
     decision_directory: str = "decision",
     metadata_files: Iterable[Path] = (),
-    input_datasets: Iterable[Path] = (),
     git_commit: str | None = None,
     frozen_at_utc: str | None = None,
 ) -> dict[str, Any]:
@@ -347,11 +342,6 @@ def create_freeze_package(
         raise ResearchFreezeError("git commit must be a hexadecimal commit identifier")
     frozen_at = explicit_utc(frozen_at_utc) if frozen_at_utc else utc_now()
     metadata_sources = tuple(metadata_files)
-    dataset_sources = tuple(Path(path) for path in input_datasets)
-    datasets = [
-        {"path": str(path), "bytes": path.stat().st_size, "sha256": sha256_file(path)}
-        for path in dataset_sources
-    ]
 
     def build(stage: Path) -> None:
         inputs = _copy_assets(stage, "inputs", input_files)
@@ -371,7 +361,6 @@ def create_freeze_package(
             decisions=decisions,
             config=config,
             metadata=metadata,
-            input_datasets=datasets,
         )
         manifest = {
             "schema_version": FREEZE_SCHEMA,
@@ -383,7 +372,6 @@ def create_freeze_package(
             "model_version": model_version,
             "research_question": research_question,
             "dataset_snapshot": {"files": inputs, "data_sha256": asset_list_sha256(inputs)},
-            "input_dataset": datasets,
             "prediction_files": predictions,
             "prediction_sha256": asset_list_sha256(predictions) if predictions else None,
             "config": config,
@@ -444,18 +432,6 @@ def verify_freeze_package(path: Path) -> dict[str, Any]:
     predictions = _verify_asset_list(package, prediction_payload, "predictions", required=False)
     config = _verify_asset_list(package, [manifest.get("config")], "metadata")[0]
     metadata = _verify_asset_list(package, manifest.get("metadata_files", []), "metadata", required=False)
-    input_datasets = manifest.get("input_dataset", [])
-    if not isinstance(input_datasets, list) or any(
-        not isinstance(dataset, Mapping)
-        or set(dataset) != {"path", "bytes", "sha256"}
-        or not isinstance(dataset["path"], str)
-        or not isinstance(dataset["bytes"], int)
-        or dataset["bytes"] < 0
-        or not isinstance(dataset["sha256"], str)
-        or not SHA256_RE.fullmatch(dataset["sha256"])
-        for dataset in input_datasets
-    ):
-        raise ResearchFreezeError("invalid input dataset records")
     if not _is_config_metadata_path(config["path"]):
         raise ResearchFreezeError("config file must be stored under metadata/config")
     if any(not _is_auxiliary_metadata_path(asset["path"]) for asset in metadata):
@@ -485,7 +461,6 @@ def verify_freeze_package(path: Path) -> dict[str, Any]:
         decisions=decisions,
         config=config,
         metadata=metadata,
-        input_datasets=input_datasets,
     )
     if manifest.get("freeze_id") != expected_freeze_id:
         raise ResearchFreezeError("freeze identity mismatch")
