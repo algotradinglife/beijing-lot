@@ -69,10 +69,10 @@ status:
   current: CREATED
   attempts: 0
   routing:
-    executor_mode:
-    profile:
-    runtime:
-    reason:
+    executor_mode: controller_worker
+    profile: operator
+    runtime: hermes
+    reason: Bootstrap capability task — low risk, low uncertainty
   artifacts: []
   result: {}
   history: []
