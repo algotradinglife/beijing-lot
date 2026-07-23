@@ -1,6 +1,6 @@
 {
   "audit_id": "MM-DATA-AUDIT-001",
-  "audit_cutoff_utc": "2026-07-23T13:57:41+00:00",
+  "audit_cutoff_utc": "2026-07-23T16:03:12+00:00",
   "readiness_matrix": {
     "handicap_310": {
       "pre_event_input": "PARTIAL",
@@ -9,12 +9,12 @@
     },
     "total_goals": {
       "pre_event_input": "READY_STRICT",
-      "freeze_support": "PARTIAL",
+      "freeze_support": "SETTLEMENT_ONLY",
       "settlement_support": "READY_STRICT"
     },
     "correct_score": {
       "pre_event_input": "READY_STRICT",
-      "freeze_support": "PARTIAL",
+      "freeze_support": "SETTLEMENT_ONLY",
       "settlement_support": "READY_STRICT"
     },
     "half_full_time": {
@@ -282,8 +282,8 @@
       "market_display": "Total Goals",
       "playid": 40,
       "dimension": "freeze_support",
-      "readiness": "PARTIAL",
-      "summary": "Total Goals freeze_support: PARTIAL. 1/2 relevant gates passed, avg score=0.55",
+      "readiness": "SETTLEMENT_ONLY",
+      "summary": "Total Goals freeze_support: SETTLEMENT_ONLY. 0/2 relevant gates passed, avg score=0.25",
       "metrics": {
         "capture_batches": 0,
         "bundle_dirs": 0,
@@ -291,15 +291,9 @@
         "sha256_failed_bundle_dirs": 0,
         "sha256_failure_samples": [],
         "all_sha256_verifiable": false,
-        "has_existing_freeze": true,
-        "freeze_manifest": "multimarket_asof_freeze_v1",
-        "freeze_verification": {
-          "status": "valid",
-          "output_dir": "/home/drwho1985/workspace/soccer/beijing-lot/results/research/multimarket_10h_freeze_v1/26075_p0_20260716",
-          "frozen_outcome_rows": 231,
-          "rejected_match_markets": 36,
-          "sha256s_sha256": "4d2fee436ef450dfde6cdce8ba744eb0d0f949a732a3bc2c4e516beac83f91bf"
-        },
+        "has_existing_freeze": false,
+        "freeze_manifest": null,
+        "freeze_verification": {},
         "freeze_verification_failures": []
       },
       "gates": [
@@ -319,18 +313,12 @@
         },
         {
           "gate_id": "g5_asof_freeze",
-          "passed": true,
-          "score": 0.8,
-          "evidence": "Verified 10h freeze package found: multimarket_asof_freeze_v1 with 231 frozen rows for this market.",
+          "passed": false,
+          "score": 0.2,
+          "evidence": "No verified compatible 10h freeze package for this market.",
           "metrics": {
-            "has_freeze": true,
-            "freeze_verification": {
-              "status": "valid",
-              "output_dir": "/home/drwho1985/workspace/soccer/beijing-lot/results/research/multimarket_10h_freeze_v1/26075_p0_20260716",
-              "frozen_outcome_rows": 231,
-              "rejected_match_markets": 36,
-              "sha256s_sha256": "4d2fee436ef450dfde6cdce8ba744eb0d0f949a732a3bc2c4e516beac83f91bf"
-            }
+            "has_freeze": false,
+            "freeze_verification": {}
           }
         }
       ]
@@ -464,8 +452,8 @@
       "market_display": "Correct Score",
       "playid": 42,
       "dimension": "freeze_support",
-      "readiness": "PARTIAL",
-      "summary": "Correct Score freeze_support: PARTIAL. 1/2 relevant gates passed, avg score=0.55",
+      "readiness": "SETTLEMENT_ONLY",
+      "summary": "Correct Score freeze_support: SETTLEMENT_ONLY. 0/2 relevant gates passed, avg score=0.25",
       "metrics": {
         "capture_batches": 0,
         "bundle_dirs": 0,
@@ -473,15 +461,9 @@
         "sha256_failed_bundle_dirs": 0,
         "sha256_failure_samples": [],
         "all_sha256_verifiable": false,
-        "has_existing_freeze": true,
-        "freeze_manifest": "multimarket_asof_freeze_v1",
-        "freeze_verification": {
-          "status": "valid",
-          "output_dir": "/home/drwho1985/workspace/soccer/beijing-lot/results/research/multimarket_10h_freeze_v1/26075_p0_20260716",
-          "frozen_outcome_rows": 231,
-          "rejected_match_markets": 36,
-          "sha256s_sha256": "4d2fee436ef450dfde6cdce8ba744eb0d0f949a732a3bc2c4e516beac83f91bf"
-        },
+        "has_existing_freeze": false,
+        "freeze_manifest": null,
+        "freeze_verification": {},
         "freeze_verification_failures": []
       },
       "gates": [
@@ -501,18 +483,12 @@
         },
         {
           "gate_id": "g5_asof_freeze",
-          "passed": true,
-          "score": 0.8,
-          "evidence": "Verified 10h freeze package found: multimarket_asof_freeze_v1 with 231 frozen rows for this market.",
+          "passed": false,
+          "score": 0.2,
+          "evidence": "No verified compatible 10h freeze package for this market.",
           "metrics": {
-            "has_freeze": true,
-            "freeze_verification": {
-              "status": "valid",
-              "output_dir": "/home/drwho1985/workspace/soccer/beijing-lot/results/research/multimarket_10h_freeze_v1/26075_p0_20260716",
-              "frozen_outcome_rows": 231,
-              "rejected_match_markets": 36,
-              "sha256s_sha256": "4d2fee436ef450dfde6cdce8ba744eb0d0f949a732a3bc2c4e516beac83f91bf"
-            }
+            "has_freeze": false,
+            "freeze_verification": {}
           }
         }
       ]
@@ -710,12 +686,12 @@
       },
       "total_goals": {
         "pre_event_input": "READY_STRICT",
-        "freeze_support": "PARTIAL",
+        "freeze_support": "SETTLEMENT_ONLY",
         "settlement_support": "READY_STRICT"
       },
       "correct_score": {
         "pre_event_input": "READY_STRICT",
-        "freeze_support": "PARTIAL",
+        "freeze_support": "SETTLEMENT_ONLY",
         "settlement_support": "READY_STRICT"
       },
       "half_full_time": {

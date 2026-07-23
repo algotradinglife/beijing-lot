@@ -1,6 +1,6 @@
 # Research Phase 1: Multi-Market Data Audit (MM-DATA-AUDIT-001)
 
-**Audit Cutoff (UTC):** 2026-07-23T13:57:41+00:00
+**Audit Cutoff (UTC):** 2026-07-23T16:03:12+00:00
 **Status:** `engineering_validation`
 
 ## 1. Research Question
@@ -22,8 +22,8 @@ to support strict as-of research under Freeze Protocol v1?
 | Market | Pre-Event Input | Freeze Support | Settlement Support |
 | --- | --- | --- | --- |
 | Handicap 3/1/0 | `PARTIAL` | `PARTIAL` | `READY_STRICT` |
-| Total Goals | `READY_STRICT` | `PARTIAL` | `READY_STRICT` |
-| Correct Score | `READY_STRICT` | `PARTIAL` | `READY_STRICT` |
+| Total Goals | `READY_STRICT` | `SETTLEMENT_ONLY` | `READY_STRICT` |
+| Correct Score | `READY_STRICT` | `SETTLEMENT_ONLY` | `READY_STRICT` |
 | Half/Full Time | `PARTIAL` | `UNAVAILABLE` | `UNAVAILABLE` |
 
 ### Readiness Legend
@@ -188,16 +188,16 @@ Total Goals pre_event_input: READY_STRICT. 4/4 relevant gates passed, avg score=
 
 ### 4.40 Total Goals — Freeze Support
 
-**Classification:** `PARTIAL`
+**Classification:** `SETTLEMENT_ONLY`
 
-Total Goals freeze_support: PARTIAL. 1/2 relevant gates passed, avg score=0.55
+Total Goals freeze_support: SETTLEMENT_ONLY. 0/2 relevant gates passed, avg score=0.25
 
 #### Gates
 
 | Gate | Passed | Score | Evidence |
 | --- | ---: | ---: | --- |
 | g4_immutable_provenance | ✗ | 0.30 | 0 capture batches for Total Goals. 0 bundle directories on disk. 0 bundles verified by recomputing SHA256SUMS entries an... |
-| g5_asof_freeze | ✓ | 0.80 | Verified 10h freeze package found: multimarket_asof_freeze_v1 with 231 frozen rows for this market. |
+| g5_asof_freeze | ✗ | 0.20 | No verified compatible 10h freeze package for this market. |
 
 #### Key Metrics
 
@@ -209,15 +209,9 @@ Total Goals freeze_support: PARTIAL. 1/2 relevant gates passed, avg score=0.55
   "sha256_failed_bundle_dirs": 0,
   "sha256_failure_samples": [],
   "all_sha256_verifiable": false,
-  "has_existing_freeze": true,
-  "freeze_manifest": "multimarket_asof_freeze_v1",
-  "freeze_verification": {
-    "status": "valid",
-    "output_dir": "/home/drwho1985/workspace/soccer/beijing-lot/results/research/multimarket_10h_freeze_v1/26075_p0_20260716",
-    "frozen_outcome_rows": 231,
-    "rejected_match_markets": 36,
-    "sha256s_sha256": "4d2fee436ef450dfde6cdce8ba744eb0d0f949a732a3bc2c4e516beac83f91bf"
-  },
+  "has_existing_freeze": false,
+  "freeze_manifest": null,
+  "freeze_verification": {},
   "freeze_verification_failures": []
 }
 ```
@@ -298,16 +292,16 @@ Correct Score pre_event_input: READY_STRICT. 4/4 relevant gates passed, avg scor
 
 ### 4.42 Correct Score — Freeze Support
 
-**Classification:** `PARTIAL`
+**Classification:** `SETTLEMENT_ONLY`
 
-Correct Score freeze_support: PARTIAL. 1/2 relevant gates passed, avg score=0.55
+Correct Score freeze_support: SETTLEMENT_ONLY. 0/2 relevant gates passed, avg score=0.25
 
 #### Gates
 
 | Gate | Passed | Score | Evidence |
 | --- | ---: | ---: | --- |
 | g4_immutable_provenance | ✗ | 0.30 | 0 capture batches for Correct Score. 0 bundle directories on disk. 0 bundles verified by recomputing SHA256SUMS entries... |
-| g5_asof_freeze | ✓ | 0.80 | Verified 10h freeze package found: multimarket_asof_freeze_v1 with 231 frozen rows for this market. |
+| g5_asof_freeze | ✗ | 0.20 | No verified compatible 10h freeze package for this market. |
 
 #### Key Metrics
 
@@ -319,15 +313,9 @@ Correct Score freeze_support: PARTIAL. 1/2 relevant gates passed, avg score=0.55
   "sha256_failed_bundle_dirs": 0,
   "sha256_failure_samples": [],
   "all_sha256_verifiable": false,
-  "has_existing_freeze": true,
-  "freeze_manifest": "multimarket_asof_freeze_v1",
-  "freeze_verification": {
-    "status": "valid",
-    "output_dir": "/home/drwho1985/workspace/soccer/beijing-lot/results/research/multimarket_10h_freeze_v1/26075_p0_20260716",
-    "frozen_outcome_rows": 231,
-    "rejected_match_markets": 36,
-    "sha256s_sha256": "4d2fee436ef450dfde6cdce8ba744eb0d0f949a732a3bc2c4e516beac83f91bf"
-  },
+  "has_existing_freeze": false,
+  "freeze_manifest": null,
+  "freeze_verification": {},
   "freeze_verification_failures": []
 }
 ```
@@ -465,11 +453,13 @@ Half/Full Time settlement_support: UNAVAILABLE. 0/1 relevant gates passed, avg s
 1. **Handicap 3/1/0 — g7_no_leakage** (score=0.30): beidan_live.db snapshots are captured live (source='zqdc', 'live500'). No post-event terminal SP substitution detected — snapshot_ts always precedes or is near kickoff_ts for the captured data. Howeve...
 2. **Handicap 3/1/0 — g4_immutable_provenance** (score=0.30): beidan_live.db is append-only by convention but lacks per-snapshot SHA-256 hashes or file-level bundle verification. No SHA256SUMS exist for raw capture. The Freeze Protocol v1 would need to hash the...
 3. **Total Goals — g4_immutable_provenance** (score=0.30): 0 capture batches for Total Goals. 0 bundle directories on disk. 0 bundles verified by recomputing SHA256SUMS entries and matching the recorded SHA256SUMS digest. 0 bundle checks failed.
-4. **Correct Score — g4_immutable_provenance** (score=0.30): 0 capture batches for Correct Score. 0 bundle directories on disk. 0 bundles verified by recomputing SHA256SUMS entries and matching the recorded SHA256SUMS digest. 0 bundle checks failed.
-5. **Half/Full Time — g3_pre_cutoff_evidence** (score=0.10): All rows are non_target_market_unclassified — never validated for pre-cutoff eligibility. No sale_status, sale_cutoff, or capture_classification beyond raw source_attribute values. Cannot confirm pre-...
-6. **Half/Full Time — g4_immutable_provenance** (score=0.10): No market_sp_capture_batches for playid=51. No SHA256SUMS, no immutable bundles, no batch provenance. Data exists as raw rows in live_market_sp_snapshots without hash verification.
-7. **Half/Full Time — g5_asof_freeze** (score=0.00): No freeze package exists for playid=51. Freeze Protocol v1 requires capture batches which don't exist. Data is available but not in a freezable form.
-8. **Half/Full Time — g6_settlement_mapping** (score=0.00): No settlement truth rows for Half/Full Time. Half/full-time settlement mapping is not available until separately sourced p51 settlement rows are built and audited.
+4. **Total Goals — g5_asof_freeze** (score=0.20): No verified compatible 10h freeze package for this market.
+5. **Correct Score — g4_immutable_provenance** (score=0.30): 0 capture batches for Correct Score. 0 bundle directories on disk. 0 bundles verified by recomputing SHA256SUMS entries and matching the recorded SHA256SUMS digest. 0 bundle checks failed.
+6. **Correct Score — g5_asof_freeze** (score=0.20): No verified compatible 10h freeze package for this market.
+7. **Half/Full Time — g3_pre_cutoff_evidence** (score=0.10): All rows are non_target_market_unclassified — never validated for pre-cutoff eligibility. No sale_status, sale_cutoff, or capture_classification beyond raw source_attribute values. Cannot confirm pre-...
+8. **Half/Full Time — g4_immutable_provenance** (score=0.10): No market_sp_capture_batches for playid=51. No SHA256SUMS, no immutable bundles, no batch provenance. Data exists as raw rows in live_market_sp_snapshots without hash verification.
+9. **Half/Full Time — g5_asof_freeze** (score=0.00): No freeze package exists for playid=51. Freeze Protocol v1 requires capture batches which don't exist. Data is available but not in a freezable form.
+10. **Half/Full Time — g6_settlement_mapping** (score=0.00): No settlement truth rows for Half/Full Time. Half/full-time settlement mapping is not available until separately sourced p51 settlement rows are built and audited.
 
 ## 7. Reproducibility
 

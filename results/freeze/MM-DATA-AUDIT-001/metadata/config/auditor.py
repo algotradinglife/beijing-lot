@@ -885,8 +885,10 @@ class MultiMarketAuditor:
 
         # G5: Freeze Protocol v1
         from src.multimarket_p0 import MultimarketP0Error, verify_freeze
+        # verify_freeze() only accepts the multimarket as-of-freeze contract.
+        # The committed MM-DATA-AUDIT research freeze has a different schema.
         freeze_root = _repo_root() / "results/research/multimarket_10h_freeze_v1"
-        freeze_dirs = list(freeze_root.glob("*")) if freeze_root.exists() else []
+        freeze_dirs = [path for path in freeze_root.iterdir() if path.is_dir()] if freeze_root.is_dir() else []
 
         has_freeze = False
         freeze_manifest = {}
@@ -920,10 +922,10 @@ class MultiMarketAuditor:
             passed=has_freeze,
             score=0.8 if has_freeze else 0.2,
             evidence=(
-                f"{'Verified 10h freeze package found:' if has_freeze else 'No verified freeze package.'} "
-                f"{freeze_manifest.get('schema_version', '')} with "
-                f"{freeze_manifest.get('frozen_outcome_rows', 0)} frozen rows "
-                f"{'for this market.' if has_freeze else ''}"
+                f"Verified 10h freeze package found: {freeze_manifest.get('schema_version', '')} with "
+                f"{freeze_manifest.get('frozen_outcome_rows', 0)} frozen rows for this market."
+                if has_freeze
+                else "No verified compatible 10h freeze package for this market."
             ),
             metrics={"has_freeze": has_freeze, "freeze_verification": verified_freeze},
         ))
