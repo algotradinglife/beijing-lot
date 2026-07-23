@@ -1,0 +1,67 @@
+api_version: research-os/v0.1
+kind: Project
+
+research_os:
+  repository: https://github.com/algotradinglife/research-os-template
+  ref: c4f95f423dbb4acba8c3f7acb9ced2f766c2e34d
+  controller: kernel/controller.yaml
+
+metadata:
+  id: beijing-lot-research
+  name: Beijing Lot Strategy Research
+  version: "0.1.0"
+  owner: hh1985
+
+spec:
+  domain:
+    name: sports-probability
+    description: Calibration, pricing, and bankroll research for sports betting decisions.
+    entities:
+      - event
+      - market
+      - odds
+      - probability
+      - wager
+    metrics:
+      - calibration_error
+      - expected_value
+      - return_on_investment
+      - max_drawdown
+
+  objectives:
+    mission: Develop reproducible probability and risk-management methods for Beijing Single Match (北单) markets.
+    research_questions:
+      - Do defined market conditions contain stable out-of-sample pricing bias?
+
+  programs:
+    - probability-modeling
+    - market-calibration
+    - bankroll-management
+
+  capabilities:
+    required:
+      - probability_modeling
+      - simulation
+      - backtesting
+
+  knowledge:
+    sources:
+      - historical_odds
+      - event_results
+      - research_notes
+    memory_path: memory/
+
+  evaluation:
+    success_metrics:
+      - out_of_sample_calibration
+      - risk_adjusted_return
+    validation_rules:
+      - temporal_holdout
+      - closing_line_comparison
+      - bankroll_risk_simulation
+
+  policies:
+    routing: ../kernel/policies/routing-policy.yaml
+    validation: ../kernel/policies/validation-policy.yaml
+    memory_promotion: ../kernel/policies/memory-promotion.yaml
+    data_classification: internal
