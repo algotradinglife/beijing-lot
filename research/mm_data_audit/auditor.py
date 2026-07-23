@@ -157,28 +157,13 @@ def parse_utc(value: str) -> datetime | None:
 
 
 def _connect(db_name: str) -> sqlite3.Connection:
-    """Connect to a named database, preferring worktree fixtures over main data."""
+    """Connect to a named production database."""
     repo = _repo_root()
-    fixture_map = {
-        "beidan_live": (
-            ROOT / "tests/fixtures/mm_data_audit_live.db",
-            repo / "tests/fixtures/mm_data_audit_live.db",
-        ),
-        "500_bjdc": (
-            ROOT / "tests/fixtures/mm_data_audit_500_bjdc.db",
-            repo / "tests/fixtures/mm_data_audit_500_bjdc.db",
-        ),
-    }
     path_map = {
         "beidan_live": repo / "data/beidan_live.db",
         "500_bjdc": repo / "data/derived/500_bjdc/500_bjdc.sqlite",
     }
-    path = path_map[db_name]
-    for fixture_path in fixture_map.get(db_name, ()):
-        if fixture_path.is_file():
-            path = fixture_path
-            break
-    conn = sqlite3.connect(str(path))
+    conn = sqlite3.connect(str(path_map[db_name]))
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -663,7 +648,7 @@ class MultiMarketAuditor:
                      AND datetime(sale_cutoff_hkt) IS NOT NULL
                      AND datetime(fetched_at_utc) IS NOT NULL
                      AND datetime(source_updated_at_hkt) IS NOT NULL
-                     AND datetime(fetched_at_utc) < datetime(sale_cutoff_hkt)
+                     AND datetime(fetched_at_utc) < datetime(sale_cutoff_hkt, 'utc')
                      AND datetime(source_updated_at_hkt) < datetime(sale_cutoff_hkt)
         """
         pre_cutoff = db.execute(
@@ -728,7 +713,7 @@ class MultiMarketAuditor:
                               THEN 1 ELSE 0
                           END) AS has_dual_clock,
                           MIN(CASE
-                              WHEN datetime(fetched_at_utc) < datetime(sale_cutoff_hkt)
+                              WHEN datetime(fetched_at_utc) < datetime(sale_cutoff_hkt, 'utc')
                               THEN 1 ELSE 0
                           END) AS fetched_before_cutoff,
                           MIN(CASE
@@ -989,12 +974,12 @@ class MultiMarketAuditor:
 
         gates.append(GateResult(
             gate_id=GateID.G6_SETTLEMENT_MAPPING,
-            passed=settlement_coverage >= 30,
+            passed=settlement_coverage >= 30 and has_separate_score,
             score=min(1.0, settlement_coverage / 60),
             evidence=(
                 f"{total} match-markets in settlement truth: {settled} settled ({settlement_coverage:.1f}%), "
                 f"{pending} pending, {cancelled} cancelled, {void_sp1} SP=1 voids. "
-                f"Score source is separately sourced from matches/nowscore tables."
+                f"Score source is {'separately sourced from matches/nowscore tables' if has_separate_score else 'missing or not separately sourced'}."
             ),
             metrics=dict(metrics),
         ))

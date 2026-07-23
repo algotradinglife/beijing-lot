@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+import research.mm_data_audit.auditor as auditor_module
 from research.mm_data_audit.contract import (
     TARGET_PLAYIDS,
     MARKETS,
@@ -39,24 +40,38 @@ from research.mm_data_audit.auditor import (
 from research.mm_data_audit.report import generate_report, save_results
 
 
-FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
-
-
 def _data_db_path(db_name: str) -> Path:
-    """Return path to a test fixture DB, falling back to main repo data directory."""
-    fixture_map = {
-        "beidan_live": FIXTURES_DIR / "mm_data_audit_live.db",
-        "500_bjdc": FIXTURES_DIR / "mm_data_audit_500_bjdc.db",
-    }
-    fixture_path = fixture_map.get(db_name)
-    if fixture_path and fixture_path.is_file():
-        return fixture_path
+    """Return the production database path used by the auditor."""
     repo = _repo_root()
     path_map = {
         "beidan_live": repo / "data/beidan_live.db",
         "500_bjdc": repo / "data/derived/500_bjdc/500_bjdc.sqlite",
     }
     return path_map[db_name]
+
+
+@pytest.mark.parametrize(
+    ("db_name", "relative_path"),
+    [
+        ("beidan_live", "data/beidan_live.db"),
+        ("500_bjdc", "data/derived/500_bjdc/500_bjdc.sqlite"),
+    ],
+)
+def test_connect_uses_production_data_path(db_name, relative_path, monkeypatch, tmp_path):
+    connected_paths: list[str] = []
+    original_connect = sqlite3.connect
+
+    def record_connection(path: str) -> sqlite3.Connection:
+        connected_paths.append(path)
+        return original_connect(":memory:")
+
+    monkeypatch.setattr(auditor_module, "_repo_root", lambda: tmp_path)
+    monkeypatch.setattr(auditor_module.sqlite3, "connect", record_connection)
+
+    conn = auditor_module._connect(db_name)
+    conn.close()
+
+    assert connected_paths == [str(tmp_path / relative_path)]
 
 
 def _connect_required(db_name: str) -> sqlite3.Connection:
@@ -512,6 +527,48 @@ class TestP0MarketGates:
         assert g3.metrics["rejection_reasons"]["fetched_at_or_after_cutoff"] == 1
         assert g3.metrics["rejection_reasons"]["source_updated_at_or_after_cutoff"] == 1
         assert g3.metrics["rejection_reasons"]["missing_cutoff_clock"] == 1
+
+    def test_pre_cutoff_converts_hkt_cutoff_before_comparing_utc_fetch(self):
+        conn = _make_live_market_sp_fixture()
+        _insert_capture_vector(
+            conn,
+            "26080",
+            1,
+            "batch-post-cutoff-utc",
+            MARKETS[40].outcome_codes,
+            fetched_at_utc="2026-07-22T08:00:00",
+            source_updated_at_hkt="2026-07-22T14:00:00",
+            sale_cutoff_hkt="2026-07-22T15:00:00",
+        )
+
+        gates, metrics = _auditor_for_bjdc(conn)._gates_p0_pre_event(MARKETS[40])
+
+        g3 = _gate_by_id(gates, GateID.G3_PRE_CUTOFF_EVIDENCE)
+        assert g3.passed is False
+        assert metrics["pre_cutoff_eligible_capture_vectors"] == 0
+        assert g3.metrics["rejection_reasons"]["fetched_at_or_after_cutoff"] == 1
+        assert g3.metrics["rejection_reasons"]["source_updated_at_or_after_cutoff"] == 0
+
+    def test_p0_settlement_requires_separate_score_source(self):
+        rows = [
+            {
+                "market_key": MARKETS[40].market_key,
+                "settlement_status": "settled" if index < 3 else "pending_or_unknown",
+                "outcome_code": MARKETS[40].outcome_codes[0],
+                "score_source": "missing" if index % 2 else "",
+            }
+            for index in range(10)
+        ]
+        auditor = _auditor_for_bjdc(_make_settlement_truth_fixture(rows))
+
+        gates, metrics = auditor._gates_p0_settlement(MARKETS[40])
+        audit = auditor._classify(MARKETS[40], AuditDimension.SETTLEMENT_SUPPORT, gates, metrics)
+
+        g6 = _gate_by_id(gates, GateID.G6_SETTLEMENT_MAPPING)
+        assert metrics["settlement_coverage_pct"] == 30.0
+        assert metrics["has_separate_score_source"] is False
+        assert g6.passed is False
+        assert audit.readiness != ReadinessLevel.READY_STRICT
 
 
 class TestHalfFullTimeGates:
