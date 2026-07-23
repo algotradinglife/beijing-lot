@@ -1,0 +1,78 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: BJ-BOOT-001
+  title: Bootstrap Research OS control plane
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-BOOT
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/14"
+
+spec:
+  type: capability
+  intent:
+    objective: Integrate Research OS control plane into the beijing-lot repository.
+    question: null
+    hypothesis: null
+    expected_value: Enable structured, evidence-driven research workflows with explicit state tracking, routing policy, and audit history.
+    out_of_scope:
+      - src/ directory
+      - research/ directory (domain Python packages)
+      - tests/ directory
+      - config/ directory
+      - ops/ directory
+      - scripts/ directory
+      - Strategy, model, backtest, or betting logic
+      - Kanban configuration or CI/CD changes
+      - Database, data collection, or data pipeline changes
+      - Production deployment or Hermes configuration
+      - Codex session creation or agent configuration
+
+  context:
+    inputs:
+      - Research OS template at c4f95f423dbb4acba8c3f7acb9ced2f766c2e34d
+      - Issue #14: bootstrap contract
+    assumptions:
+      - Kernel and policies are loaded from the pinned template repository, not copied locally.
+      - Existing domain code in research/, src/, tests/ is not modified.
+
+  execution:
+    required_capabilities:
+      - configuration
+      - documentation
+    uncertainty: low
+    complexity: low
+
+  risk:
+    overall: low
+    scientific: low
+    engineering: low
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - HERMES.md at repository root
+      - .research/project.yaml pinned to c4f95f423dbb4acba8c3f7acb9ced2f766c2e34d
+      - .research/graph.yaml with GOAL-BOOT and BJ-BOOT-001 nodes
+      - .research/tasks/BJ-BOOT-001.yaml (type: capability)
+      - .research/memory/ directory
+      - .research/audit/ directory
+    checks:
+      - schema_validation (against kernel/schemas/*.schema.yaml)
+      - no_domain_code_modified (verify src/, research/, tests/, config/, ops/, scripts/ unchanged)
+    human_gates:
+      - merge_approval
+
+status:
+  current: CREATED
+  attempts: 0
+  routing:
+    executor_mode:
+    profile:
+    runtime:
+    reason:
+  artifacts: []
+  result: {}
+  history: []

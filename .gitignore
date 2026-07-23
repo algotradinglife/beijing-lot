@@ -1,3 +1,7 @@
+# === Research OS 运行时产物 ===
+.research/*.local
+.research/artifacts/
+
 # === 数据：必须出仓到外置盘 ===
 data/
 !apps/decision-dashboard/src/data/
