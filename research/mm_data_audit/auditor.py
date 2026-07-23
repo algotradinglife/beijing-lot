@@ -159,13 +159,17 @@ def parse_utc(value: str) -> datetime | None:
 def _connect(db_name: str) -> sqlite3.Connection:
     """Connect to a named database, preferring test fixture over main repo."""
     repo = _repo_root()
-    fixture_path = repo / "tests/fixtures/mm_data_audit_live.db"
+    fixture_map = {
+        "beidan_live": repo / "tests/fixtures/mm_data_audit_live.db",
+        "500_bjdc": repo / "tests/fixtures/mm_data_audit_500_bjdc.db",
+    }
+    fixture_path = fixture_map.get(db_name)
     path_map = {
         "beidan_live": repo / "data/beidan_live.db",
         "500_bjdc": repo / "data/derived/500_bjdc/500_bjdc.sqlite",
     }
     path = path_map[db_name]
-    if fixture_path.is_file() and db_name == "beidan_live":
+    if fixture_path and fixture_path.is_file():
         path = fixture_path
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row

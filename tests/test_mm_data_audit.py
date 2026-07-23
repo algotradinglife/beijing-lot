@@ -44,8 +44,12 @@ FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 
 def _data_db_path(db_name: str) -> Path:
     """Return path to a test fixture DB, falling back to main repo data directory."""
-    fixture_path = FIXTURES_DIR / "mm_data_audit_live.db"
-    if fixture_path.is_file():
+    fixture_map = {
+        "beidan_live": FIXTURES_DIR / "mm_data_audit_live.db",
+        "500_bjdc": FIXTURES_DIR / "mm_data_audit_500_bjdc.db",
+    }
+    fixture_path = fixture_map.get(db_name)
+    if fixture_path and fixture_path.is_file():
         return fixture_path
     repo = _repo_root()
     path_map = {
