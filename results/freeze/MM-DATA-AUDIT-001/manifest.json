@@ -1,0 +1,46 @@
+{
+  "config": {
+    "bytes": 5774,
+    "path": "metadata/config/contract.py",
+    "sha256": "49be11ddc0f0925db99cccc0affa1681c9966c4acc5b071e40bdfe4ce224196f"
+  },
+  "dataset_snapshot": {
+    "data_sha256": "f897505f5ec08fcabc8d4ce13a077a11e7a57129a8b1c43dedf578e397f35cb8",
+    "files": [
+      {
+        "bytes": 26894,
+        "path": "inputs/audit_result.json",
+        "sha256": "b0edd563fef3506ba313f1d644aba79f951be7e73bf07893d33a50224656313f"
+      }
+    ]
+  },
+  "decision_sha256": "19b4d203e1454a13a882a5a25abba7b2c6e6c16d8f825155741a0f3b6c488264",
+  "execution_enabled": false,
+  "experiment_id": "MM-DATA-AUDIT-001",
+  "freeze_id": "9ed9385ca961097a85667d2545e0d930807262053117032c484b16dfd602b5da",
+  "frontend_selectable": false,
+  "frozen_at_utc": "2026-07-23T11:54:01.946620+00:00",
+  "frozen_decisions": [
+    {
+      "bytes": 18164,
+      "path": "decision/MM-DATA-AUDIT-001.md",
+      "sha256": "4878a849a25cc3c6dddd6f805b224fb3a3f73c510ef1dadc9f8e7989043ee8c6"
+    }
+  ],
+  "git_commit": "d001817f6562df8c70c69cedbf46a406fb204de7",
+  "lifecycle_state": "FROZEN",
+  "metadata_files": [
+    {
+      "bytes": 240,
+      "path": "metadata/files/readiness_matrix.csv",
+      "sha256": "fa3f977dc9f7f8d04cd2b23a687db33f80f3c166ff792dd776564ea53c6df2e9"
+    }
+  ],
+  "model_version": "AUDIT-V1",
+  "prediction_files": [],
+  "prediction_sha256": null,
+  "protocol_notice": "Frozen decisions are immutable. Settlement and review packages may reference this package but must not modify it.",
+  "research_question": "For each target market, does the current forward data chain provide sufficient evidence to support strict as-of research under Freeze Protocol v1?",
+  "roi_authorized": false,
+  "schema_version": "beijing_lot_research_freeze_v1"
+}
