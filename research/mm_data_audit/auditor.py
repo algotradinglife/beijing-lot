@@ -922,10 +922,10 @@ class MultiMarketAuditor:
             passed=has_freeze,
             score=0.8 if has_freeze else 0.2,
             evidence=(
-                f"{'Verified 10h freeze package found:' if has_freeze else 'No verified freeze package.'} "
-                f"{freeze_manifest.get('schema_version', '')} with "
-                f"{freeze_manifest.get('frozen_outcome_rows', 0)} frozen rows "
-                f"{'for this market.' if has_freeze else ''}"
+                f"Verified 10h freeze package found: {freeze_manifest.get('schema_version', '')} with "
+                f"{freeze_manifest.get('frozen_outcome_rows', 0)} frozen rows for this market."
+                if has_freeze
+                else "No verified compatible 10h freeze package for this market."
             ),
             metrics={"has_freeze": has_freeze, "freeze_verification": verified_freeze},
         ))
