@@ -1,0 +1,14 @@
+[Unit]
+Description=Beijing-Lot Decision Dashboard services
+Wants=beidanlot-decision-api.service
+Wants=beidanlot-score-refresh.service
+Wants=beidanlot-score-model-odds-refresh.service
+Wants=beidanlot-correct-score-price-refresh.service
+Wants=beidanlot-sp-refresh.service
+Wants=beidanlot-artifact-refresh.service
+Wants=beidanlot-decision-dashboard-health.timer
+Wants=beidanlot-a9-coordinator.timer
+After=beidanlot-decision-dashboard-build.service
+
+[Install]
+WantedBy=default.target

@@ -76,6 +76,9 @@ target/
 # === AI/VCS 元数据（每机器各自维护）===
 .jj/
 .claude/
+.worktrees/
+.gstack/
+.hermes/
 # Python
 *.pyo
 # OS
@@ -87,3 +90,7 @@ target/
 !apps/decision-dashboard/index.html
 !src/webui/templates/*.html
 *.zip
+tests/fixtures/mm_data_audit_live.db
+
+# === Codex 自动产出的研究草稿（产物固化在 docs/research/experiments/ + results/freeze/）===
+docs/research/segment_betting_plan_*

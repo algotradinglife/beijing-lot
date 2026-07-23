@@ -1,0 +1,15 @@
+[Unit]
+Description=Beijing-Lot paper-only A9 forward coordinator scan
+After=network-online.target
+Wants=network-online.target
+PartOf=beidanlot-decision-dashboard.target
+ConditionPathExists=%h/workspace/soccer/beijing-lot/.worktrees/feature-strategy-beijing-lot-model-betting-20260712/scripts/monitor_strategy_parallel_simple_runner_forward.py
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/workspace/soccer/beijing-lot
+Environment=PYTHONPATH=%h/workspace/soccer/beijing-lot:%h/workspace/soccer/beijing-lot/src
+Environment=A9_RESEARCH_ROOT=%h/workspace/soccer/beijing-lot/.worktrees/feature-strategy-beijing-lot-model-betting-20260712
+EnvironmentFile=-%h/.config/beidanlot/a9_coordination.env
+ExecStart=%h/workspace/soccer/beijing-lot/.venv/bin/python scripts/a9_forward_coordinator.py scan --coordination-root %h/workspace/soccer/beijing-lot/results/coordination
+

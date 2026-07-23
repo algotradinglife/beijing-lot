@@ -1,0 +1,13 @@
+[Unit]
+Description=Beijing-Lot Decision Dashboard frontend build
+PartOf=beidanlot-decision-dashboard.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/workspace/soccer/beijing-lot/apps/decision-dashboard
+Environment=PATH=%h/.local/bin:/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin
+Environment=VITE_DATA_MODE=fetch
+Environment=VITE_API_BASE_URL=
+Environment=VITE_REFRESH_MS=60000
+ExecStart=%h/.local/bin/npm run build
+RemainAfterExit=yes
