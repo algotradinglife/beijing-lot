@@ -1,0 +1,21 @@
+[Unit]
+Description=Beijing-Lot Decision API and static dashboard
+Wants=network-online.target
+After=network-online.target beidanlot-decision-dashboard-build.service
+Requires=beidanlot-decision-dashboard-build.service
+PartOf=beidanlot-decision-dashboard.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/soccer/beijing-lot
+Environment=PYTHONPATH=%h/workspace/soccer/beijing-lot:%h/workspace/soccer/beijing-lot/src
+Environment=BEIDAN_DECISION_API_HOST=127.0.0.1
+Environment=BEIDAN_DECISION_API_PORT=8790
+Environment=BEIDAN_DASHBOARD_RUNTIME_STATUS=%h/workspace/soccer/beijing-lot/tmp/decision_dashboard/runtime_status.json
+Environment=BEIDAN_DASHBOARD_STATIC_DIR=%h/workspace/soccer/beijing-lot/apps/decision-dashboard/dist
+EnvironmentFile=-%h/.config/beidanlot/webui.env
+EnvironmentFile=-%h/.config/beidanlot/decision_dashboard.env
+ExecStart=%h/workspace/soccer/beijing-lot/.venv/bin/python -m src.decision_api
+Restart=always
+RestartSec=5
+
