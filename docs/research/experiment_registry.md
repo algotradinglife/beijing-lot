@@ -9,7 +9,7 @@
 | Experiment ID | Research Question | Branch | Freeze ID | Status | Result | Evidence Level |
 | --- | --- | --- | --- | --- | --- | --- |
 | `SP-EFF-001` | SP-EFF-001: Does Beijing Single Match SP contain calibrated predictive information about 90-minute handicap 3/1/0 outcomes? | `research/sp-eff-001` | `14993d22c46585a8ad7ce8067cd1a87758eb986ac0028256ef49b3415451658a` | `reviewed` | `directional_sp_information_no_holm_rejection` | `A` |
-| `MM-DATA-AUDIT-001` | For each target market (Handicap 3/1/0, Correct Score, Total Goals, Half/Full Time), does the current forward data chain provide sufficient evidence to support strict as-of research under Freeze Protocol v1? | `research/mm-data-audit-001` | `79fe22a3145f6b156a77afc4fa8fa16452dc778ad5adf74d76b93b934647e9f7` | `frozen` | `pending` | `B` |
+| `MM-DATA-AUDIT-001` | For each target market (Handicap 3/1/0, Correct Score, Total Goals, Half/Full Time), does the current forward data chain provide sufficient evidence to support strict as-of research under Freeze Protocol v1? | `research/mm-data-audit-001` | `b1d895631d22a1a145f1c33ce5c7a1358329cb49abb5cb288101bdd88e0c2e54` | `frozen` | `pending` | `B` |
 
 ## 字段约定
 

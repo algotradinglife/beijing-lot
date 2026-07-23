@@ -87,3 +87,4 @@ target/
 !apps/decision-dashboard/index.html
 !src/webui/templates/*.html
 *.zip
+tests/fixtures/mm_data_audit_live.db
