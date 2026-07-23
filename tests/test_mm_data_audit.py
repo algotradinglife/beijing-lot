@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import hashlib
 import sqlite3
+import time
 from pathlib import Path
 
 import pytest
@@ -39,13 +40,14 @@ from research.mm_data_audit.auditor import (
 )
 from research.mm_data_audit.report import generate_report, save_results
 
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
-def _data_db_path(db_name: str) -> Path:
-    """Return the production database path used by the auditor."""
-    repo = _repo_root()
+
+def _fixture_db_path(db_name: str) -> Path:
+    """Return a committed database fixture used by integration tests."""
     path_map = {
-        "beidan_live": repo / "data/beidan_live.db",
-        "500_bjdc": repo / "data/derived/500_bjdc/500_bjdc.sqlite",
+        "beidan_live": FIXTURES_DIR / "mm_data_audit_live.db",
+        "500_bjdc": FIXTURES_DIR / "mm_data_audit_500_bjdc.db",
     }
     return path_map[db_name]
 
@@ -74,19 +76,12 @@ def test_connect_uses_production_data_path(db_name, relative_path, monkeypatch, 
     assert connected_paths == [str(tmp_path / relative_path)]
 
 
-def _connect_required(db_name: str) -> sqlite3.Connection:
-    path = _data_db_path(db_name)
-    if not path.exists():
-        pytest.skip(f"{db_name} integration database not found: {path}")
-    return _connect(db_name)
+def _fixture_connect(db_name: str) -> sqlite3.Connection:
+    return _connect(db_name, fixtures_dir=FIXTURES_DIR)
 
 
-def _auditor_required() -> MultiMarketAuditor:
-    for db_name in ("beidan_live", "500_bjdc"):
-        path = _data_db_path(db_name)
-        if not path.exists():
-            pytest.skip(f"{db_name} integration database not found: {path}")
-    return MultiMarketAuditor()
+def _fixture_auditor() -> MultiMarketAuditor:
+    return MultiMarketAuditor(fixtures_dir=FIXTURES_DIR)
 
 
 def _make_live_market_sp_fixture() -> sqlite3.Connection:
@@ -358,23 +353,23 @@ class TestDatabaseConnectivity:
     """Verify databases are accessible."""
 
     def test_beidan_live_db_exists(self):
-        db_path = _data_db_path("beidan_live")
-        if not db_path.exists():
-            pytest.skip(f"beidan_live.db not found at {db_path}")
+        assert _fixture_db_path("beidan_live").is_file()
 
     def test_500_bjdc_db_exists(self):
-        db_path = _data_db_path("500_bjdc")
-        if not db_path.exists():
-            pytest.skip(f"500_bjdc.sqlite not found at {db_path}")
+        assert _fixture_db_path("500_bjdc").is_file()
+
+    def test_connect_fails_when_required_fixture_is_missing(self, tmp_path: Path):
+        with pytest.raises(FileNotFoundError, match="beidan_live fixture database"):
+            _connect("beidan_live", fixtures_dir=tmp_path)
 
     def test_beidan_live_has_required_tables(self):
-        conn = _connect_required("beidan_live")
+        conn = _fixture_connect("beidan_live")
         assert _table_exists(conn, "snapshots")
         assert _table_exists(conn, "matches")
         assert _table_exists(conn, "settlements")
 
     def test_500_bjdc_has_required_tables(self):
-        conn = _connect_required("500_bjdc")
+        conn = _fixture_connect("500_bjdc")
         assert _table_exists(conn, "live_market_sp_snapshots")
         assert _table_exists(conn, "market_sp_capture_batches")
         assert _table_exists(conn, "multimarket_settlement_truth")
@@ -385,12 +380,12 @@ class TestHandicapPreEventGates:
     """Verify Handicap 3/1/0 pre-event gate evaluation."""
 
     def test_outcome_vectors_nonzero(self):
-        conn = _connect_required("beidan_live")
+        conn = _fixture_connect("beidan_live")
         count = conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0]
         assert count > 0, "Zero handicap snapshots"
 
     def test_complete_vector_proportion(self):
-        conn = _connect_required("beidan_live")
+        conn = _fixture_connect("beidan_live")
         total = conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0]
         complete = conn.execute(
             "SELECT COUNT(*) FROM snapshots WHERE sp_3 IS NOT NULL AND sp_1 IS NOT NULL AND sp_0 IS NOT NULL"
@@ -399,7 +394,7 @@ class TestHandicapPreEventGates:
         assert pct > 30, f"Complete vector coverage too low: {pct:.1f}%"
 
     def test_kickoff_timestamps_present(self):
-        conn = _connect_required("beidan_live")
+        conn = _fixture_connect("beidan_live")
         total = conn.execute("SELECT COUNT(*) FROM matches").fetchone()[0]
         with_ko = conn.execute(
             "SELECT COUNT(*) FROM matches WHERE kickoff_ts IS NOT NULL AND kickoff_ts != ''"
@@ -408,7 +403,7 @@ class TestHandicapPreEventGates:
         assert (with_ko / total * 100) > 50 if total else True
 
     def test_pre_kickoff_snapshots_exist(self):
-        conn = _connect_required("beidan_live")
+        conn = _fixture_connect("beidan_live")
         pre_kickoff = conn.execute(
             """SELECT COUNT(*) FROM snapshots s
                JOIN matches m ON s.match_id = m.match_id
@@ -423,7 +418,7 @@ class TestP0MarketGates:
 
     @pytest.mark.parametrize("playid", [40, 42])
     def test_data_exists(self, playid):
-        conn = _connect_required("500_bjdc")
+        conn = _fixture_connect("500_bjdc")
         count = conn.execute(
             "SELECT COUNT(*) FROM live_market_sp_snapshots WHERE playid=?", (playid,)
         ).fetchone()[0]
@@ -431,7 +426,7 @@ class TestP0MarketGates:
 
     @pytest.mark.parametrize("playid", [40, 42])
     def test_forward_complete_exists(self, playid):
-        conn = _connect_required("500_bjdc")
+        conn = _fixture_connect("500_bjdc")
         fc = conn.execute(
             "SELECT COUNT(*) FROM live_market_sp_snapshots WHERE playid=? AND capture_classification='forward_complete_open'",
             (playid,),
@@ -440,7 +435,7 @@ class TestP0MarketGates:
 
     @pytest.mark.parametrize("playid", [40, 42])
     def test_terminal_excluded_from_forward(self, playid):
-        conn = _connect_required("500_bjdc")
+        conn = _fixture_connect("500_bjdc")
         terminal_forward = conn.execute(
             """SELECT COUNT(*) FROM live_market_sp_snapshots
                WHERE playid=? AND capture_classification='terminal_backfill_exploratory_only'
@@ -452,7 +447,7 @@ class TestP0MarketGates:
     @pytest.mark.parametrize("playid", [40, 42])
     def test_settlement_exists(self, playid):
         from research.mm_data_audit.contract import MARKET_KEY
-        conn = _connect_required("500_bjdc")
+        conn = _fixture_connect("500_bjdc")
         mk = MARKET_KEY[playid]
         count = conn.execute(
             "SELECT COUNT(*) FROM multimarket_settlement_truth WHERE market_key=?",
@@ -549,6 +544,29 @@ class TestP0MarketGates:
         assert g3.metrics["rejection_reasons"]["fetched_at_or_after_cutoff"] == 1
         assert g3.metrics["rejection_reasons"]["source_updated_at_or_after_cutoff"] == 0
 
+    def test_g3_pre_cutoff_is_identical_in_utc_and_hkt_host_timezones(self, monkeypatch):
+        def g3_metrics_for_timezone(host_timezone: str) -> dict[str, object]:
+            monkeypatch.setenv("TZ", host_timezone)
+            time.tzset()
+            conn = _make_live_market_sp_fixture()
+            _insert_capture_vector(conn, "26080", 1, "pre-cutoff", MARKETS[40].outcome_codes)
+            _insert_capture_vector(
+                conn,
+                "26080",
+                2,
+                "post-cutoff",
+                MARKETS[40].outcome_codes,
+                fetched_at_utc="2026-07-22T03:00:00+00:00",
+            )
+            gates, _metrics = _auditor_for_bjdc(conn)._gates_p0_pre_event(MARKETS[40])
+            return _gate_by_id(gates, GateID.G3_PRE_CUTOFF_EVIDENCE).metrics
+
+        try:
+            assert g3_metrics_for_timezone("UTC") == g3_metrics_for_timezone("Asia/Shanghai")
+        finally:
+            monkeypatch.delenv("TZ", raising=False)
+            time.tzset()
+
     def test_p0_settlement_requires_separate_score_source(self):
         rows = [
             {
@@ -575,14 +593,14 @@ class TestHalfFullTimeGates:
     """Verify Half/Full Time (p51) gate evaluation."""
 
     def test_data_exists(self):
-        conn = _connect_required("500_bjdc")
+        conn = _fixture_connect("500_bjdc")
         count = conn.execute(
             "SELECT COUNT(*) FROM live_market_sp_snapshots WHERE playid=51"
         ).fetchone()[0]
         assert count > 0, "Zero p51 snapshots"
 
     def test_outcome_codes_present(self):
-        conn = _connect_required("500_bjdc")
+        conn = _fixture_connect("500_bjdc")
         codes = {
             r[0] for r in conn.execute(
                 "SELECT DISTINCT outcome_code FROM live_market_sp_snapshots WHERE playid=51 AND outcome_code IS NOT NULL"
@@ -592,7 +610,7 @@ class TestHalfFullTimeGates:
         assert codes == expected, f"Unexpected outcome codes: {codes}"
 
     def test_all_unclassified(self):
-        conn = _connect_required("500_bjdc")
+        conn = _fixture_connect("500_bjdc")
         non_classified = conn.execute(
             """SELECT COUNT(*) FROM live_market_sp_snapshots
                WHERE playid=51 AND capture_classification NOT IN ('legacy_unclassified','non_target_market_unclassified')"""
@@ -601,7 +619,7 @@ class TestHalfFullTimeGates:
 
     def test_no_settlement(self):
         from research.mm_data_audit.contract import MARKET_KEY
-        conn = _connect_required("500_bjdc")
+        conn = _fixture_connect("500_bjdc")
         mk = MARKET_KEY[51]
         count = conn.execute(
             "SELECT COUNT(*) FROM multimarket_settlement_truth WHERE market_key=?",
@@ -716,7 +734,7 @@ class TestReportGeneration:
 
     def test_generate_report_nonempty(self):
         from research.mm_data_audit.auditor import MultiMarketAuditor
-        auditor = _auditor_required()
+        auditor = _fixture_auditor()
         result = auditor.audit_all()
         report = generate_report(result)
         assert len(report) > 1000
@@ -729,7 +747,7 @@ class TestReportGeneration:
 
     def test_save_results_creates_files(self, tmp_path, monkeypatch):
         from research.mm_data_audit.auditor import MultiMarketAuditor
-        auditor = _auditor_required()
+        auditor = _fixture_auditor()
         result = auditor.audit_all()
         monkeypatch.setattr(report_module, "DOCS_DIR", tmp_path / "docs")
         paths = save_results(result, tmp_path / "test_audit")
@@ -748,7 +766,7 @@ class TestReportGeneration:
 
     def test_report_contains_all_markets(self):
         from research.mm_data_audit.auditor import MultiMarketAuditor
-        auditor = _auditor_required()
+        auditor = _fixture_auditor()
         result = auditor.audit_all()
         report = generate_report(result)
         market_names = ["Handicap 3/1/0", "Total Goals", "Correct Score", "Half/Full Time"]
@@ -757,7 +775,7 @@ class TestReportGeneration:
 
     def test_report_contains_readiness_legend(self):
         from research.mm_data_audit.auditor import MultiMarketAuditor
-        auditor = _auditor_required()
+        auditor = _fixture_auditor()
         result = auditor.audit_all()
         report = generate_report(result)
         assert "READY_STRICT" in report
@@ -767,7 +785,7 @@ class TestReportGeneration:
 
     def test_readiness_matrix_is_complete(self):
         from research.mm_data_audit.auditor import MultiMarketAuditor
-        auditor = _auditor_required()
+        auditor = _fixture_auditor()
         result = auditor.audit_all()
         for playid in TARGET_PLAYIDS:
             m = MARKETS[playid]
@@ -885,7 +903,7 @@ class TestClassificationLogic:
 
     def test_handicap_settlement_is_ready(self):
         from research.mm_data_audit.auditor import MultiMarketAuditor
-        auditor = _auditor_required()
+        auditor = _fixture_auditor()
         result = auditor.audit_all()
         row = result.readiness_matrix.get("handicap_310", {})
         assert row.get("settlement_support") == "READY_STRICT", \
@@ -893,7 +911,7 @@ class TestClassificationLogic:
 
     def test_p51_freeze_is_unavailable(self):
         from research.mm_data_audit.auditor import MultiMarketAuditor
-        auditor = _auditor_required()
+        auditor = _fixture_auditor()
         result = auditor.audit_all()
         row = result.readiness_matrix.get("half_full_time", {})
         assert row.get("freeze_support") == "UNAVAILABLE", \
@@ -901,7 +919,7 @@ class TestClassificationLogic:
 
     def test_p51_settlement_not_ready_strict(self):
         from research.mm_data_audit.auditor import MultiMarketAuditor
-        auditor = _auditor_required()
+        auditor = _fixture_auditor()
         result = auditor.audit_all()
         row = result.readiness_matrix.get("half_full_time", {})
         assert row.get("settlement_support") == "UNAVAILABLE", \
@@ -929,7 +947,7 @@ class TestClassificationLogic:
 
     def test_no_market_unavailable_for_pre_event(self):
         from research.mm_data_audit.auditor import MultiMarketAuditor
-        auditor = _auditor_required()
+        auditor = _fixture_auditor()
         result = auditor.audit_all()
         for mk, row in result.readiness_matrix.items():
             assert row.get("pre_event_input") != "UNAVAILABLE", \
@@ -938,7 +956,7 @@ class TestClassificationLogic:
     def test_no_terminal_leakage_claimed(self):
         """Verify no market claims READY_STRICT while using terminal data."""
         from research.mm_data_audit.auditor import MultiMarketAuditor
-        auditor = _auditor_required()
+        auditor = _fixture_auditor()
         result = auditor.audit_all()
         for dim in result.dimensions:
             for gate in dim.gates:

@@ -156,14 +156,24 @@ def parse_utc(value: str) -> datetime | None:
         return None
 
 
-def _connect(db_name: str) -> sqlite3.Connection:
-    """Connect to a named production database."""
-    repo = _repo_root()
-    path_map = {
-        "beidan_live": repo / "data/beidan_live.db",
-        "500_bjdc": repo / "data/derived/500_bjdc/500_bjdc.sqlite",
-    }
-    conn = sqlite3.connect(str(path_map[db_name]))
+def _connect(db_name: str, fixtures_dir: Path | None = None) -> sqlite3.Connection:
+    """Connect to a production database or an explicitly supplied test fixture."""
+    if fixtures_dir is None:
+        repo = _repo_root()
+        path_map = {
+            "beidan_live": repo / "data/beidan_live.db",
+            "500_bjdc": repo / "data/derived/500_bjdc/500_bjdc.sqlite",
+        }
+    else:
+        fixtures = Path(fixtures_dir)
+        path_map = {
+            "beidan_live": fixtures / "mm_data_audit_live.db",
+            "500_bjdc": fixtures / "mm_data_audit_500_bjdc.db",
+        }
+    path = path_map[db_name]
+    if fixtures_dir is not None and not path.is_file():
+        raise FileNotFoundError(f"Required {db_name} fixture database not found: {path}")
+    conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -184,9 +194,9 @@ def _begin_read_snapshot(conn: sqlite3.Connection) -> None:
 class MultiMarketAuditor:
     """Audit four target markets across three dimensions."""
 
-    def __init__(self) -> None:
-        self.beidan = _connect("beidan_live")
-        self.bjdc = _connect("500_bjdc")
+    def __init__(self, fixtures_dir: Path | None = None) -> None:
+        self.beidan = _connect("beidan_live", fixtures_dir)
+        self.bjdc = _connect("500_bjdc", fixtures_dir)
         _begin_read_snapshot(self.beidan)
         _begin_read_snapshot(self.bjdc)
         self._audit_cutoff = datetime.now(UTC).isoformat(timespec="seconds")
@@ -317,7 +327,7 @@ class MultiMarketAuditor:
         pre_kickoff = db.execute(
             """SELECT COUNT(*) FROM snapshots s
                JOIN matches m ON s.match_id = m.match_id
-               WHERE datetime(REPLACE(s.snapshot_ts, 'Z', '')) < datetime(m.kickoff_ts, '-8 hours')
+               WHERE datetime(REPLACE(s.snapshot_ts, 'Z', '+00:00')) < datetime(m.kickoff_ts, '-8 hours')
                  AND m.kickoff_ts IS NOT NULL AND m.kickoff_ts != ''
                  AND s.snapshot_ts IS NOT NULL AND s.snapshot_ts != ''"""
         ).fetchone()[0]
@@ -326,7 +336,7 @@ class MultiMarketAuditor:
                    SELECT m.match_id
                    FROM matches m
                    JOIN snapshots s ON s.match_id = m.match_id
-                   WHERE datetime(REPLACE(s.snapshot_ts, 'Z', '')) < datetime(m.kickoff_ts, '-8 hours')
+                   WHERE datetime(REPLACE(s.snapshot_ts, 'Z', '+00:00')) < datetime(m.kickoff_ts, '-8 hours')
                      AND m.kickoff_ts IS NOT NULL AND m.kickoff_ts != ''
                      AND s.snapshot_ts IS NOT NULL AND s.snapshot_ts != ''
                      AND s.sp_3 IS NOT NULL AND s.sp_1 IS NOT NULL AND s.sp_0 IS NOT NULL
@@ -641,14 +651,20 @@ class MultiMarketAuditor:
         ))
 
         # G3: Pre-cutoff evidence
-        cutoff_clock_predicate = """
+        cutoff_utc = """CASE
+                     WHEN instr(substr(sale_cutoff_hkt, 11), '+') > 0
+                       OR instr(substr(sale_cutoff_hkt, 11), '-') > 0
+                     THEN datetime(sale_cutoff_hkt)
+                     ELSE datetime(sale_cutoff_hkt, '-8 hours')
+                 END"""
+        cutoff_clock_predicate = f"""
                      sale_cutoff_hkt IS NOT NULL AND sale_cutoff_hkt != ''
                      AND fetched_at_utc IS NOT NULL AND fetched_at_utc != ''
                      AND source_updated_at_hkt IS NOT NULL AND source_updated_at_hkt != ''
                      AND datetime(sale_cutoff_hkt) IS NOT NULL
                      AND datetime(fetched_at_utc) IS NOT NULL
                      AND datetime(source_updated_at_hkt) IS NOT NULL
-                     AND datetime(fetched_at_utc) < datetime(sale_cutoff_hkt, 'utc')
+                     AND datetime(fetched_at_utc) < {cutoff_utc}
                      AND datetime(source_updated_at_hkt) < datetime(sale_cutoff_hkt)
         """
         pre_cutoff = db.execute(
@@ -713,7 +729,7 @@ class MultiMarketAuditor:
                               THEN 1 ELSE 0
                           END) AS has_dual_clock,
                           MIN(CASE
-                              WHEN datetime(fetched_at_utc) < datetime(sale_cutoff_hkt, 'utc')
+                              WHEN datetime(fetched_at_utc) < {cutoff_utc}
                               THEN 1 ELSE 0
                           END) AS fetched_before_cutoff,
                           MIN(CASE

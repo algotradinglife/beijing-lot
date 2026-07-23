@@ -33,6 +33,11 @@ def main() -> None:
         help="Output directory for audit results (default: results/research/mm_data_audit)",
     )
     parser.add_argument(
+        "--fixtures-dir",
+        type=Path,
+        help="Directory containing mm_data_audit_live.db and mm_data_audit_500_bjdc.db",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Output JSON summary to stdout",
@@ -44,7 +49,7 @@ def main() -> None:
     print("=" * 60)
     print()
 
-    auditor = MultiMarketAuditor()
+    auditor = MultiMarketAuditor(fixtures_dir=args.fixtures_dir)
     result = auditor.audit_all()
 
     # Print summary
