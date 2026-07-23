@@ -1,0 +1,91 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: BJ-MM-FREEZE-001
+  title: p40/p42 strict segment freeze gate
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-PHASE1
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/17"
+    - "https://github.com/algotradinglife/beijing-lot/issues/11"
+    - "https://github.com/algotradinglife/beijing-lot/pull/13"
+
+spec:
+  type: capability
+  intent:
+    objective: Close G4 (immutable provenance) and G5 (as-of freeze) for Total Goals (p40) and Correct Score (p42) via deterministic segment-time selection and immutable freeze packages.
+    question: Can the current p40/p42 forward collection chain automatically publish deterministic, immutable, same-segment as-of freeze packages from genuine pre-cutoff observations, with zero terminal-data leakage?
+    hypothesis: After preregistered activation, the first two eligible segment freeze events can each produce at least one paired p40/p42 match using complete open-sale vectors observed before the same absolute freeze_at, and every published package can be independently hash-verified.
+    expected_value: Enable SP-CONSISTENCY-001 with a verified p40/p42 dataset that passes G4 and G5.
+    out_of_scope:
+      - SP-CONSISTENCY-001 probability transformation or statistical testing
+      - Any predictive model, calibration, q/EV filter or strategy optimization
+      - Handicap p34 or half/full-time p51 repairs
+      - Historical reconstruction presented as forward evidence
+      - ROI authorization or production execution
+      - Frontend/API/release-manifest exposure
+      - Portfolio construction, ticket generation or settlement truth logic
+
+  context:
+    inputs:
+      - Issue #17: full capability contract
+      - MM-DATA-AUDIT-001 readiness matrix (merged PR #13)
+      - src/multimarket_p0.py (existing capture + freeze-10h)
+      - scripts/manage_multimarket_p0.py (CLI)
+      - scripts/live_sp_refresh_loop.py (current-issue refresh)
+      - segment_decision_windows table
+      - docs/research/freeze_protocol_v1.md
+      - docs/research/multimarket_p0_capture_freeze_settlement_contract.md
+    assumptions:
+      - Two prospective segment events after activation are sufficient for G4/G5 evaluation
+      - Existing freeze-10h behavior remains backward-compatible
+      - MM-DATA-AUDIT-001 matrix is the immutable baseline
+
+  execution:
+    required_capabilities:
+      - python_development
+      - database_engineering
+      - testing
+      - documentation
+    uncertainty: medium
+    complexity: medium
+
+  risk:
+    overall: medium
+    scientific: medium
+    engineering: medium
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - .research/tasks/BJ-MM-FREEZE-001.yaml (schema-valid)
+      - .research/graph.yaml updated with Phase 1 goal
+      - freeze-segment CLI in scripts/manage_multimarket_p0.py
+      - Immutable package schema + verifier in src/multimarket_p0.py
+      - Research-only automatic coordinator
+      - docs/research/experiments/BJ-MM-FREEZE-001.md
+      - docs/research/experiments/MM-DATA-AUDIT-001.md reconciled
+      - docs/research/experiment_registry.md reconciled
+      - Two prospective event packages or honest PARTIAL record
+      - Focused tests with clean-checkout reproducibility
+    checks:
+      - schema_validation
+      - automated_tests
+      - clean_checkout_reproducibility
+      - no_strategy_model_ticket_changes
+    human_gates:
+      - research_pi_review
+
+status:
+  current: CREATED
+  attempts: 0
+  routing:
+    executor_mode: isolated_session
+    profile: engineer
+    runtime: codex
+    reason: Capability task, medium complexity, requires Python development across multiple subsystems
+  artifacts: []
+  result: {}
+  history: []

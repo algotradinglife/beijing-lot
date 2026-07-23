@@ -11,13 +11,27 @@ spec:
     - id: GOAL-BOOT
       node_type: goal
       ref: .research/project.yaml#spec.objectives
-      state: ACTIVE
+      state: COMPLETED
     - id: BJ-BOOT-001
       node_type: task
       ref: tasks/BJ-BOOT-001.yaml
+      state: COMPLETED
+    - id: GOAL-PHASE1
+      node_type: goal
+      ref: .research/project.yaml#spec.programs
+      state: ACTIVE
+    - id: BJ-MM-FREEZE-001
+      node_type: task
+      ref: tasks/BJ-MM-FREEZE-001.yaml
       state: CREATED
 
   edges:
     - from: GOAL-BOOT
       to: BJ-BOOT-001
       relation: decomposes_to
+    - from: GOAL-PHASE1
+      to: BJ-MM-FREEZE-001
+      relation: decomposes_to
+    - from: BJ-BOOT-001
+      to: BJ-MM-FREEZE-001
+      relation: informs

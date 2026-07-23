@@ -9,6 +9,8 @@ metadata:
   parent_id: GOAL-BOOT
   related_ids:
     - "https://github.com/algotradinglife/beijing-lot/issues/14"
+    - "https://github.com/algotradinglife/beijing-lot/pull/15"
+    - "https://github.com/algotradinglife/beijing-lot/pull/16"
 
 spec:
   type: capability
@@ -66,13 +68,41 @@ spec:
       - merge_approval
 
 status:
-  current: CREATED
-  attempts: 0
+  current: COMPLETED
+  attempts: 1
   routing:
     executor_mode: controller_worker
     profile: operator
     runtime: hermes
     reason: Bootstrap capability task — low risk, low uncertainty
-  artifacts: []
-  result: {}
-  history: []
+  artifacts:
+    - uri: "https://github.com/algotradinglife/beijing-lot/pull/15"
+      artifact_type: pull_request
+      description: Research OS control plane files
+    - uri: "https://github.com/algotradinglife/beijing-lot/pull/16"
+      artifact_type: pull_request
+      description: Schema validation fix
+  result:
+    outcome: supported
+    summary: Research OS control plane integrated. All 3 schema checks pass on main. No domain code modified.
+  history:
+    - transition: plan_task
+      from: CREATED
+      to: PLANNING
+      timestamp: "2026-07-24T00:00:00Z"
+    - transition: make_ready
+      from: PLANNING
+      to: READY
+      timestamp: "2026-07-24T00:00:00Z"
+    - transition: start_execution
+      from: READY
+      to: EXECUTING
+      timestamp: "2026-07-24T00:30:00Z"
+    - transition: submit_for_validation
+      from: EXECUTING
+      to: VALIDATING
+      timestamp: "2026-07-24T01:00:00Z"
+    - transition: operational_completion
+      from: VALIDATING
+      to: COMPLETED
+      timestamp: "2026-07-24T01:20:00Z"
