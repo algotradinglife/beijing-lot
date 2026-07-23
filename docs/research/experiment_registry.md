@@ -9,6 +9,19 @@
 | Experiment ID | Research Question | Branch | Freeze ID | Status | Result | Evidence Level |
 | --- | --- | --- | --- | --- | --- | --- |
 | `SP-EFF-001` | SP-EFF-001: Does Beijing Single Match SP contain calibrated predictive information about 90-minute handicap 3/1/0 outcomes? | `research/sp-eff-001` | `14993d22c46585a8ad7ce8067cd1a87758eb986ac0028256ef49b3415451658a` | `reviewed` | `directional_sp_information_no_holm_rejection` | `A` |
+| `MM-DATA-AUDIT-001` | For each target market (Handicap 3/1/0, Correct Score, Total Goals, Half/Full Time), does the current forward data chain provide sufficient evidence to support strict as-of research under Freeze Protocol v1? | `research/mm-data-audit-001` | `e3fee9f2241b258eb6fa406b50e80d403193448d73a9ea070c0a1e386ee8c976` | `frozen` | `pending` | `B` |
+
+### MM-DATA-AUDIT-001 verification snapshot
+
+- Freeze status: `frozen`; audit report status: `engineering_validation`; result remains `pending`.
+- Test command: `pytest -q tests/test_mm_data_audit.py` — 72 passed.
+
+| Market | Pre-Event Input | Freeze Support | Settlement Support |
+| --- | --- | --- | --- |
+| Handicap 3/1/0 | `PARTIAL` | `PARTIAL` | `READY_STRICT` |
+| Total Goals | `READY_STRICT` | `SETTLEMENT_ONLY` | `READY_STRICT` |
+| Correct Score | `READY_STRICT` | `SETTLEMENT_ONLY` | `READY_STRICT` |
+| Half/Full Time | `PARTIAL` | `UNAVAILABLE` | `UNAVAILABLE` |
 
 ## 字段约定
 

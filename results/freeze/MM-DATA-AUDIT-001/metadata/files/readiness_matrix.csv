@@ -1,0 +1,5 @@
+market,pre_event_input,freeze_support,settlement_support
+handicap_310,PARTIAL,PARTIAL,READY_STRICT
+total_goals,READY_STRICT,SETTLEMENT_ONLY,READY_STRICT
+correct_score,READY_STRICT,SETTLEMENT_ONLY,READY_STRICT
+half_full_time,PARTIAL,UNAVAILABLE,UNAVAILABLE

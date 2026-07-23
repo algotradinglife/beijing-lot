@@ -1,0 +1,704 @@
+{
+  "audit_id": "MM-DATA-AUDIT-001",
+  "audit_cutoff_utc": "2026-07-23T16:03:12+00:00",
+  "readiness_matrix": {
+    "handicap_310": {
+      "pre_event_input": "PARTIAL",
+      "freeze_support": "PARTIAL",
+      "settlement_support": "READY_STRICT"
+    },
+    "total_goals": {
+      "pre_event_input": "READY_STRICT",
+      "freeze_support": "SETTLEMENT_ONLY",
+      "settlement_support": "READY_STRICT"
+    },
+    "correct_score": {
+      "pre_event_input": "READY_STRICT",
+      "freeze_support": "SETTLEMENT_ONLY",
+      "settlement_support": "READY_STRICT"
+    },
+    "half_full_time": {
+      "pre_event_input": "PARTIAL",
+      "freeze_support": "UNAVAILABLE",
+      "settlement_support": "UNAVAILABLE"
+    }
+  },
+  "dimensions": [
+    {
+      "market_key": "handicap_310",
+      "market_display": "Handicap 3/1/0",
+      "playid": 34,
+      "dimension": "pre_event_input",
+      "readiness": "PARTIAL",
+      "summary": "Handicap 3/1/0 pre_event_input: PARTIAL. 3/4 relevant gates passed, avg score=0.78",
+      "metrics": {
+        "total_snapshots": 34649,
+        "total_matches": 100,
+        "complete_vector_snapshots": 28019,
+        "complete_vector_pct": 80.87,
+        "has_source_column": true,
+        "sources": [
+          "merged"
+        ],
+        "has_snapshot_ts": true,
+        "timestamped_snapshots": 34649,
+        "timestamped_pct": 100.0,
+        "matches_with_kickoff": 100,
+        "kickoff_coverage_pct": 100.0,
+        "pre_kickoff_snapshots": 25351,
+        "complete_pre_kickoff_matches": 86,
+        "complete_pre_kickoff_match_pct": 86.0,
+        "discovered_match_markets": 100
+      },
+      "gates": [
+        {
+          "gate_id": "g1_outcome_vectors",
+          "passed": true,
+          "score": 0.8086524863632428,
+          "evidence": "28,019/34,649 snapshots (80.9%) have complete 3/1/0 SP vectors across 100 matches. Outcome mapping is hard-coded in beidan_live.db schema (sp_3/sp_1/sp_0).",
+          "metrics": {
+            "total_snapshots": 34649,
+            "total_matches": 100,
+            "complete_vector_snapshots": 28019,
+            "complete_vector_pct": 80.87
+          }
+        },
+        {
+          "gate_id": "g2_source_timestamps",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "34,649/34,649 snapshots (100.0%) have snapshot_ts. Sources: ['merged']. No dual-clock (fetched_at + source_updated_at) — snapshot_ts is the single timestamp.",
+          "metrics": {
+            "timestamped_pct": 100.0,
+            "sources": [
+              "merged"
+            ]
+          }
+        },
+        {
+          "gate_id": "g3_pre_cutoff_evidence",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "100/100 matches (100.0%) have kickoff_ts. 25,351 snapshots are pre-kickoff. 86/100 matches (86.0%) have a complete 3/1/0 vector before kickoff. Segment decision windows from 500_bjdc provide freeze_at timestamps for issues 26074-26077.",
+          "metrics": {
+            "matches_with_kickoff": 100,
+            "kickoff_coverage_pct": 100.0,
+            "pre_kickoff_snapshots": 25351,
+            "complete_pre_kickoff_matches": 86,
+            "complete_pre_kickoff_match_pct": 86.0
+          }
+        },
+        {
+          "gate_id": "g7_no_leakage",
+          "passed": false,
+          "score": 0.3,
+          "evidence": "beidan_live.db snapshots are captured live (source='zqdc', 'live500'). No post-event terminal SP substitution detected — snapshot_ts always precedes or is near kickoff_ts for the captured data. However, no per-snapshot SHA-256 hashes exist for raw capture rows; without bundle-level verification, post-capture leakage cannot be ruled out.",
+          "metrics": {}
+        }
+      ]
+    },
+    {
+      "market_key": "handicap_310",
+      "market_display": "Handicap 3/1/0",
+      "playid": 34,
+      "dimension": "freeze_support",
+      "readiness": "PARTIAL",
+      "summary": "Handicap 3/1/0 freeze_support: PARTIAL. 1/2 relevant gates passed, avg score=0.50",
+      "metrics": {
+        "immutable_append_only": true,
+        "has_bundle_hashes": false,
+        "segment_decision_windows": 3,
+        "freeze_protocol_v1_capable": true
+      },
+      "gates": [
+        {
+          "gate_id": "g4_immutable_provenance",
+          "passed": false,
+          "score": 0.3,
+          "evidence": "beidan_live.db is append-only by convention but lacks per-snapshot SHA-256 hashes or file-level bundle verification. No SHA256SUMS exist for raw capture. The Freeze Protocol v1 would need to hash the entire snapshots export.",
+          "metrics": {
+            "has_bundle_hashes": false,
+            "append_only_claim": true
+          }
+        },
+        {
+          "gate_id": "g5_asof_freeze",
+          "passed": true,
+          "score": 0.7,
+          "evidence": "3 segment_decision_windows in 500_bjdc provide freeze_at timestamps. beidan_live.db snapshots have snapshot_ts which can be used for as-of selection. However, no existing freeze package exists under results/freeze/ for Handicap 3/1/0 — SP-EFF-001 predates Freeze Protocol v1 formalization.",
+          "metrics": {
+            "segment_windows": 3,
+            "existing_freeze_packages": 0
+          }
+        }
+      ]
+    },
+    {
+      "market_key": "handicap_310",
+      "market_display": "Handicap 3/1/0",
+      "playid": 34,
+      "dimension": "settlement_support",
+      "readiness": "READY_STRICT",
+      "summary": "Handicap 3/1/0 settlement_support: READY_STRICT. 1/1 relevant gates passed, avg score=0.65",
+      "metrics": {
+        "total_settlements": 65,
+        "total_settlement_rows": 65,
+        "settled_matches": 65,
+        "total_match_rows": 100,
+        "settled_with_score": 65,
+        "cancelled_or_postponed": 0,
+        "sp1_void": 0,
+        "settlement_coverage_pct": 65.0,
+        "result_codes": {
+          "0": 27,
+          "1": 15,
+          "3": 23
+        },
+        "settlement_sourced_separately": true,
+        "sources": [
+          "500_kaijiang",
+          "detail",
+          "live500",
+          "live500+detail",
+          "zqdc",
+          "zqdc+detail"
+        ]
+      },
+      "gates": [
+        {
+          "gate_id": "g6_settlement_mapping",
+          "passed": true,
+          "score": 0.65,
+          "evidence": "65 settlement rows cover 65/100 matches (65.0% of DB matches). 65 have final scores. 0 cancellations/postponements, 0 SP=1 voids. Result codes: ['0', '1', '3']. Settlement mapping is direct: fthg/ftag → handicap-adjusted result_code.",
+          "metrics": {
+            "total_settlements": 65,
+            "total_settlement_rows": 65,
+            "settled_matches": 65,
+            "total_match_rows": 100,
+            "settled_with_score": 65,
+            "cancelled_or_postponed": 0,
+            "sp1_void": 0,
+            "settlement_coverage_pct": 65.0,
+            "result_codes": {
+              "0": 27,
+              "1": 15,
+              "3": 23
+            }
+          }
+        }
+      ]
+    },
+    {
+      "market_key": "total_goals",
+      "market_display": "Total Goals",
+      "playid": 40,
+      "dimension": "pre_event_input",
+      "readiness": "READY_STRICT",
+      "summary": "Total Goals pre_event_input: READY_STRICT. 4/4 relevant gates passed, avg score=1.00",
+      "metrics": {
+        "total_rows": 16,
+        "total_match_markets": 2,
+        "forward_complete_open_rows": 16,
+        "total_capture_vectors": 2,
+        "complete_capture_vectors": 2,
+        "complete_match_markets": 2,
+        "complete_match_vectors": 2,
+        "complete_vector_pct": 100.0,
+        "complete_match_market_pct": 100.0,
+        "has_dual_clock": true,
+        "dual_clock_complete_rows": 16,
+        "dual_clock_pct": 100.0,
+        "pre_cutoff_eligible_capture_vectors": 2,
+        "pre_cutoff_eligible_match_markets": 2,
+        "pre_cutoff_eligible_match_vectors": 2,
+        "pre_cutoff_eligible_pct": 100.0,
+        "pre_cutoff_eligible_match_market_pct": 100.0,
+        "pre_cutoff_rejection_reasons": {
+          "non_open_sale": 0,
+          "missing_cutoff_clock": 0,
+          "missing_dual_clock": 0,
+          "fetched_at_or_after_cutoff": 0,
+          "source_updated_at_or_after_cutoff": 0
+        },
+        "discovered_match_markets": 2
+      },
+      "gates": [
+        {
+          "gate_id": "g1_outcome_vectors",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "16 rows classified as forward_complete_open. 2/2 capture-vectors have the exact 8-outcome set priced (100.0%). 2/2 match-markets have at least one complete capture-vector (100.0%).",
+          "metrics": {
+            "complete_capture_vectors": 2,
+            "total_capture_vectors": 2,
+            "complete_vector_pct": 100.0,
+            "complete_match_markets": 2,
+            "complete_match_market_pct": 100.0
+          }
+        },
+        {
+          "gate_id": "g2_source_timestamps",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "Dual-clock (fetched_at_utc + source_updated_at_hkt): 16/16 rows (100.0%) have both timestamps.",
+          "metrics": {
+            "dual_clock_pct": 100.0
+          }
+        },
+        {
+          "gate_id": "g3_pre_cutoff_evidence",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "2 capture-vectors with both sale_status=open and forward_complete_open classification (100.0%). 2/2 match-markets have eligible pre-cutoff capture-vectors (100.0%). Dual-clock confirms both fetched_at_utc and source_updated_at_hkt precede sale_cutoff_hkt.",
+          "metrics": {
+            "pre_cutoff_capture_vectors": 2,
+            "pre_cutoff_pct": 100.0,
+            "pre_cutoff_match_markets": 2,
+            "pre_cutoff_match_market_pct": 100.0,
+            "rejection_reasons": {
+              "non_open_sale": 0,
+              "missing_cutoff_clock": 0,
+              "missing_dual_clock": 0,
+              "fetched_at_or_after_cutoff": 0,
+              "source_updated_at_or_after_cutoff": 0
+            }
+          }
+        },
+        {
+          "gate_id": "g7_no_leakage",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "0 terminal-backfill rows exist but are classified as terminal_backfill_exploratory_only and excluded from forward_complete_open. 0 forward_complete_open rows lack independent cutoff-clock proof.",
+          "metrics": {
+            "terminal_rows": 0,
+            "terminal_excluded": true,
+            "unproven_forward_rows": 0
+          }
+        }
+      ]
+    },
+    {
+      "market_key": "total_goals",
+      "market_display": "Total Goals",
+      "playid": 40,
+      "dimension": "freeze_support",
+      "readiness": "SETTLEMENT_ONLY",
+      "summary": "Total Goals freeze_support: SETTLEMENT_ONLY. 0/2 relevant gates passed, avg score=0.25",
+      "metrics": {
+        "capture_batches": 0,
+        "bundle_dirs": 0,
+        "sha256_verified_bundle_dirs": 0,
+        "sha256_failed_bundle_dirs": 0,
+        "sha256_failure_samples": [],
+        "all_sha256_verifiable": false,
+        "has_existing_freeze": false,
+        "freeze_manifest": null,
+        "freeze_verification": {},
+        "freeze_verification_failures": []
+      },
+      "gates": [
+        {
+          "gate_id": "g4_immutable_provenance",
+          "passed": false,
+          "score": 0.3,
+          "evidence": "0 capture batches for Total Goals. 0 bundle directories on disk. 0 bundles verified by recomputing SHA256SUMS entries and matching the recorded SHA256SUMS digest. 0 bundle checks failed.",
+          "metrics": {
+            "capture_batches": 0,
+            "bundle_dirs": 0,
+            "sha256_verified_bundle_dirs": 0,
+            "sha256_failed_bundle_dirs": 0,
+            "sha256_failure_samples": [],
+            "all_sha256_verifiable": false
+          }
+        },
+        {
+          "gate_id": "g5_asof_freeze",
+          "passed": false,
+          "score": 0.2,
+          "evidence": "No verified compatible 10h freeze package for this market.",
+          "metrics": {
+            "has_freeze": false,
+            "freeze_verification": {}
+          }
+        }
+      ]
+    },
+    {
+      "market_key": "total_goals",
+      "market_display": "Total Goals",
+      "playid": 40,
+      "dimension": "settlement_support",
+      "readiness": "READY_STRICT",
+      "summary": "Total Goals settlement_support: READY_STRICT. 1/1 relevant gates passed, avg score=1.00",
+      "metrics": {
+        "total_settlement_rows": 2,
+        "settled": 2,
+        "pending_or_unknown": 0,
+        "cancelled": 0,
+        "void_sp1": 0,
+        "settlement_coverage_pct": 100.0,
+        "has_separate_score_source": true,
+        "settlement_sourced_separately": true
+      },
+      "gates": [
+        {
+          "gate_id": "g6_settlement_mapping",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "2 match-markets in settlement truth: 2 settled (100.0%), 0 pending, 0 cancelled, 0 SP=1 voids. Score source is separately sourced from matches/nowscore tables.",
+          "metrics": {
+            "total_settlement_rows": 2,
+            "settled": 2,
+            "pending_or_unknown": 0,
+            "cancelled": 0,
+            "void_sp1": 0,
+            "settlement_coverage_pct": 100.0,
+            "has_separate_score_source": true
+          }
+        }
+      ]
+    },
+    {
+      "market_key": "correct_score",
+      "market_display": "Correct Score",
+      "playid": 42,
+      "dimension": "pre_event_input",
+      "readiness": "READY_STRICT",
+      "summary": "Correct Score pre_event_input: READY_STRICT. 4/4 relevant gates passed, avg score=1.00",
+      "metrics": {
+        "total_rows": 50,
+        "total_match_markets": 2,
+        "forward_complete_open_rows": 50,
+        "total_capture_vectors": 2,
+        "complete_capture_vectors": 2,
+        "complete_match_markets": 2,
+        "complete_match_vectors": 2,
+        "complete_vector_pct": 100.0,
+        "complete_match_market_pct": 100.0,
+        "has_dual_clock": true,
+        "dual_clock_complete_rows": 50,
+        "dual_clock_pct": 100.0,
+        "pre_cutoff_eligible_capture_vectors": 2,
+        "pre_cutoff_eligible_match_markets": 2,
+        "pre_cutoff_eligible_match_vectors": 2,
+        "pre_cutoff_eligible_pct": 100.0,
+        "pre_cutoff_eligible_match_market_pct": 100.0,
+        "pre_cutoff_rejection_reasons": {
+          "non_open_sale": 0,
+          "missing_cutoff_clock": 0,
+          "missing_dual_clock": 0,
+          "fetched_at_or_after_cutoff": 0,
+          "source_updated_at_or_after_cutoff": 0
+        },
+        "discovered_match_markets": 2
+      },
+      "gates": [
+        {
+          "gate_id": "g1_outcome_vectors",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "50 rows classified as forward_complete_open. 2/2 capture-vectors have the exact 25-outcome set priced (100.0%). 2/2 match-markets have at least one complete capture-vector (100.0%).",
+          "metrics": {
+            "complete_capture_vectors": 2,
+            "total_capture_vectors": 2,
+            "complete_vector_pct": 100.0,
+            "complete_match_markets": 2,
+            "complete_match_market_pct": 100.0
+          }
+        },
+        {
+          "gate_id": "g2_source_timestamps",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "Dual-clock (fetched_at_utc + source_updated_at_hkt): 50/50 rows (100.0%) have both timestamps.",
+          "metrics": {
+            "dual_clock_pct": 100.0
+          }
+        },
+        {
+          "gate_id": "g3_pre_cutoff_evidence",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "2 capture-vectors with both sale_status=open and forward_complete_open classification (100.0%). 2/2 match-markets have eligible pre-cutoff capture-vectors (100.0%). Dual-clock confirms both fetched_at_utc and source_updated_at_hkt precede sale_cutoff_hkt.",
+          "metrics": {
+            "pre_cutoff_capture_vectors": 2,
+            "pre_cutoff_pct": 100.0,
+            "pre_cutoff_match_markets": 2,
+            "pre_cutoff_match_market_pct": 100.0,
+            "rejection_reasons": {
+              "non_open_sale": 0,
+              "missing_cutoff_clock": 0,
+              "missing_dual_clock": 0,
+              "fetched_at_or_after_cutoff": 0,
+              "source_updated_at_or_after_cutoff": 0
+            }
+          }
+        },
+        {
+          "gate_id": "g7_no_leakage",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "0 terminal-backfill rows exist but are classified as terminal_backfill_exploratory_only and excluded from forward_complete_open. 0 forward_complete_open rows lack independent cutoff-clock proof.",
+          "metrics": {
+            "terminal_rows": 0,
+            "terminal_excluded": true,
+            "unproven_forward_rows": 0
+          }
+        }
+      ]
+    },
+    {
+      "market_key": "correct_score",
+      "market_display": "Correct Score",
+      "playid": 42,
+      "dimension": "freeze_support",
+      "readiness": "SETTLEMENT_ONLY",
+      "summary": "Correct Score freeze_support: SETTLEMENT_ONLY. 0/2 relevant gates passed, avg score=0.25",
+      "metrics": {
+        "capture_batches": 0,
+        "bundle_dirs": 0,
+        "sha256_verified_bundle_dirs": 0,
+        "sha256_failed_bundle_dirs": 0,
+        "sha256_failure_samples": [],
+        "all_sha256_verifiable": false,
+        "has_existing_freeze": false,
+        "freeze_manifest": null,
+        "freeze_verification": {},
+        "freeze_verification_failures": []
+      },
+      "gates": [
+        {
+          "gate_id": "g4_immutable_provenance",
+          "passed": false,
+          "score": 0.3,
+          "evidence": "0 capture batches for Correct Score. 0 bundle directories on disk. 0 bundles verified by recomputing SHA256SUMS entries and matching the recorded SHA256SUMS digest. 0 bundle checks failed.",
+          "metrics": {
+            "capture_batches": 0,
+            "bundle_dirs": 0,
+            "sha256_verified_bundle_dirs": 0,
+            "sha256_failed_bundle_dirs": 0,
+            "sha256_failure_samples": [],
+            "all_sha256_verifiable": false
+          }
+        },
+        {
+          "gate_id": "g5_asof_freeze",
+          "passed": false,
+          "score": 0.2,
+          "evidence": "No verified compatible 10h freeze package for this market.",
+          "metrics": {
+            "has_freeze": false,
+            "freeze_verification": {}
+          }
+        }
+      ]
+    },
+    {
+      "market_key": "correct_score",
+      "market_display": "Correct Score",
+      "playid": 42,
+      "dimension": "settlement_support",
+      "readiness": "READY_STRICT",
+      "summary": "Correct Score settlement_support: READY_STRICT. 1/1 relevant gates passed, avg score=1.00",
+      "metrics": {
+        "total_settlement_rows": 2,
+        "settled": 2,
+        "pending_or_unknown": 0,
+        "cancelled": 0,
+        "void_sp1": 0,
+        "settlement_coverage_pct": 100.0,
+        "has_separate_score_source": true,
+        "settlement_sourced_separately": true
+      },
+      "gates": [
+        {
+          "gate_id": "g6_settlement_mapping",
+          "passed": true,
+          "score": 1.0,
+          "evidence": "2 match-markets in settlement truth: 2 settled (100.0%), 0 pending, 0 cancelled, 0 SP=1 voids. Score source is separately sourced from matches/nowscore tables.",
+          "metrics": {
+            "total_settlement_rows": 2,
+            "settled": 2,
+            "pending_or_unknown": 0,
+            "cancelled": 0,
+            "void_sp1": 0,
+            "settlement_coverage_pct": 100.0,
+            "has_separate_score_source": true
+          }
+        }
+      ]
+    },
+    {
+      "market_key": "half_full_time",
+      "market_display": "Half/Full Time",
+      "playid": 51,
+      "dimension": "pre_event_input",
+      "readiness": "PARTIAL",
+      "summary": "Half/Full Time pre_event_input: PARTIAL. 2/4 relevant gates passed, avg score=0.50",
+      "metrics": {
+        "total_rows": 18,
+        "total_match_markets": 2,
+        "outcome_codes_found": [
+          "0-0",
+          "0-1",
+          "0-3",
+          "1-0",
+          "1-1",
+          "1-3",
+          "3-0",
+          "3-1",
+          "3-3"
+        ],
+        "expected_outcome_match": true,
+        "has_timestamps": true,
+        "timestamped_rows": 18,
+        "timestamped_pct": 100.0,
+        "has_dual_clock": true,
+        "discovered_match_markets": 2
+      },
+      "gates": [
+        {
+          "gate_id": "g1_outcome_vectors",
+          "passed": true,
+          "score": 0.6,
+          "evidence": "18 rows across 2 match-markets. Outcome codes: ['0-0', '0-1', '0-3', '1-0', '1-1', '1-3', '3-0', '3-1', '3-3']. All 9 expected codes present. All rows are non_target_market_unclassified — never validated for completeness.",
+          "metrics": {
+            "outcome_codes_found": [
+              "0-0",
+              "0-1",
+              "0-3",
+              "1-0",
+              "1-1",
+              "1-3",
+              "3-0",
+              "3-1",
+              "3-3"
+            ],
+            "expected_match": true
+          }
+        },
+        {
+          "gate_id": "g2_source_timestamps",
+          "passed": true,
+          "score": 0.8,
+          "evidence": "18/18 rows (100.0%) have fetched_at. Dual-clock (fetched_at_utc + source_updated_at_hkt): present. No batch_id or source_url metadata.",
+          "metrics": {
+            "timestamped_pct": 100.0,
+            "dual_clock": true
+          }
+        },
+        {
+          "gate_id": "g3_pre_cutoff_evidence",
+          "passed": false,
+          "score": 0.1,
+          "evidence": "All rows are non_target_market_unclassified — never validated for pre-cutoff eligibility. No sale_status, sale_cutoff, or capture_classification beyond raw source_attribute values. Cannot confirm pre-cutoff capture without retroactive classification.",
+          "metrics": {
+            "classified": false
+          }
+        },
+        {
+          "gate_id": "g7_no_leakage",
+          "passed": false,
+          "score": 0.5,
+          "evidence": "No terminal classification exists; all data is non_target_market_unclassified. Risk unknown — data may contain post-event captures but cannot be proven either way.",
+          "metrics": {
+            "leakage_risk": "unknown"
+          }
+        }
+      ]
+    },
+    {
+      "market_key": "half_full_time",
+      "market_display": "Half/Full Time",
+      "playid": 51,
+      "dimension": "freeze_support",
+      "readiness": "UNAVAILABLE",
+      "summary": "Half/Full Time freeze_support: UNAVAILABLE. 0/2 relevant gates passed, avg score=0.05",
+      "metrics": {},
+      "gates": [
+        {
+          "gate_id": "g4_immutable_provenance",
+          "passed": false,
+          "score": 0.1,
+          "evidence": "No market_sp_capture_batches for playid=51. No SHA256SUMS, no immutable bundles, no batch provenance. Data exists as raw rows in live_market_sp_snapshots without hash verification.",
+          "metrics": {
+            "has_bundles": false
+          }
+        },
+        {
+          "gate_id": "g5_asof_freeze",
+          "passed": false,
+          "score": 0.0,
+          "evidence": "No freeze package exists for playid=51. Freeze Protocol v1 requires capture batches which don't exist. Data is available but not in a freezable form.",
+          "metrics": {
+            "has_freeze": false
+          }
+        }
+      ]
+    },
+    {
+      "market_key": "half_full_time",
+      "market_display": "Half/Full Time",
+      "playid": 51,
+      "dimension": "settlement_support",
+      "readiness": "UNAVAILABLE",
+      "summary": "Half/Full Time settlement_support: UNAVAILABLE. 0/1 relevant gates passed, avg score=0.00",
+      "metrics": {
+        "settlement_sourced_separately": false,
+        "total_settlement_rows": 0
+      },
+      "gates": [
+        {
+          "gate_id": "g6_settlement_mapping",
+          "passed": false,
+          "score": 0.0,
+          "evidence": "No settlement truth rows for Half/Full Time. Half/full-time settlement mapping is not available until separately sourced p51 settlement rows are built and audited.",
+          "metrics": {
+            "settlement_rows": 0,
+            "mapping_available": false
+          }
+        }
+      ]
+    }
+  ],
+  "metrics_summary": {
+    "total_match_markets_by_market": {
+      "handicap_310": 100,
+      "total_goals": 2,
+      "correct_score": 2,
+      "half_full_time": 2
+    },
+    "complete_vectors_by_market": {
+      "total_goals": 2,
+      "correct_score": 2
+    },
+    "settlement_rows_by_market": {
+      "handicap_310": 65,
+      "total_goals": 2,
+      "correct_score": 2,
+      "half_full_time": 0
+    },
+    "readiness_counts": {
+      "handicap_310": {
+        "pre_event_input": "PARTIAL",
+        "freeze_support": "PARTIAL",
+        "settlement_support": "READY_STRICT"
+      },
+      "total_goals": {
+        "pre_event_input": "READY_STRICT",
+        "freeze_support": "SETTLEMENT_ONLY",
+        "settlement_support": "READY_STRICT"
+      },
+      "correct_score": {
+        "pre_event_input": "READY_STRICT",
+        "freeze_support": "SETTLEMENT_ONLY",
+        "settlement_support": "READY_STRICT"
+      },
+      "half_full_time": {
+        "pre_event_input": "PARTIAL",
+        "freeze_support": "UNAVAILABLE",
+        "settlement_support": "UNAVAILABLE"
+      }
+    }
+  }
+}

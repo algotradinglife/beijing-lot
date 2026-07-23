@@ -1,0 +1,241 @@
+"""MM-DATA-AUDIT-001: Report generation — markdown, JSON, and readiness matrix."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+from research.mm_data_audit.contract import (
+    AuditDimension,
+    TARGET_PLAYIDS,
+    MARKETS,
+    AuditResult,
+    GateID,
+    ReadinessLevel,
+)
+
+ROOT = Path(__file__).resolve().parents[2]
+OUTPUT_DIR = ROOT / "results/research/mm_data_audit"
+DOCS_DIR = ROOT / "docs/research/experiments"
+
+
+def _truncate_evidence(evidence: str, limit: int) -> str:
+    """Shorten evidence without emitting trailing whitespace."""
+    if len(evidence) <= limit:
+        return evidence
+    return evidence[:limit].rstrip() + "..."
+
+
+def generate_report(result: AuditResult) -> str:
+    """Generate the full markdown audit report."""
+    lines = [
+        f"# Research Phase 1: Multi-Market Data Audit (MM-DATA-AUDIT-001)",
+        "",
+        f"**Audit Cutoff (UTC):** {result.audit_cutoff_utc}",
+        f"**Status:** `engineering_validation`",
+        "",
+        "## 1. Research Question",
+        "",
+        "For each target market, does the current forward data chain provide sufficient evidence",
+        "to support strict as-of research under Freeze Protocol v1?",
+        "",
+        "## 2. Markets Under Audit",
+        "",
+        "| Market | PlayID | Outcomes | Data Source |",
+        "| --- | ---: | ---: | --- |",
+    ]
+    for playid in TARGET_PLAYIDS:
+        m = MARKETS[playid]
+        lines.append(f"| {m.display_name} | {m.playid} | {m.expected_outcome_count} | {m.data_source} |")
+
+    lines += [
+        "",
+        "## 3. Readiness Matrix",
+        "",
+        "| Market | Pre-Event Input | Freeze Support | Settlement Support |",
+        "| --- | --- | --- | --- |",
+    ]
+    for playid in TARGET_PLAYIDS:
+        m = MARKETS[playid]
+        row = result.readiness_matrix.get(m.market_key, {})
+        pe = row.get("pre_event_input", "UNAVAILABLE")
+        fs = row.get("freeze_support", "UNAVAILABLE")
+        ss = row.get("settlement_support", "UNAVAILABLE")
+        lines.append(f"| {m.display_name} | `{pe}` | `{fs}` | `{ss}` |")
+
+    lines += [
+        "",
+        "### Readiness Legend",
+        "",
+        "- `READY_STRICT`: every gate passes for a clearly stated forward scope.",
+        "- `PARTIAL`: timestamped data exists, but one or more strict gates fail or coverage is insufficient.",
+        "- `SETTLEMENT_ONLY`: usable for outcome verification but prohibited as a pre-event input.",
+        "- `UNAVAILABLE`: no auditable asset for the required purpose.",
+        "",
+        "## 4. Per-Market Audit Details",
+        "",
+    ]
+
+    for dim in result.dimensions:
+        m = dim.market
+        lines += [
+            f"### 4.{dim.market.playid} {m.display_name} — {dim.dimension.value.replace('_', ' ').title()}",
+            "",
+            f"**Classification:** `{dim.readiness.value}`",
+            "",
+            f"{dim.summary}",
+            "",
+            "#### Gates",
+            "",
+            "| Gate | Passed | Score | Evidence |",
+            "| --- | ---: | ---: | --- |",
+        ]
+        for g in dim.gates:
+            evidence_short = _truncate_evidence(g.evidence, 120)
+            lines.append(
+                f"| {g.gate_id.value} | {'✓' if g.passed else '✗'} | {g.score:.2f} | {evidence_short} |"
+            )
+        lines += [
+            "",
+            "#### Key Metrics",
+            "",
+            "```json",
+            json.dumps(dim.metrics, indent=2, default=str),
+            "```",
+            "",
+        ]
+
+    # Full metric tables
+    lines += [
+        "## 5. Cross-Market Metrics",
+        "",
+        "### 5.1 Discovered Matches and Expected Match-Markets",
+        "",
+        "| Market | Discovered Match-Markets | Expected per Match |",
+        "| --- | ---: | ---: |",
+    ]
+    for playid in TARGET_PLAYIDS:
+        m = MARKETS[playid]
+        discovered = result.metrics_summary.get("total_match_markets_by_market", {}).get(m.market_key, 0)
+        lines.append(f"| {m.display_name} | {discovered:,} | {m.expected_outcome_count} |")
+
+    lines += [
+        "",
+        "### 5.2 Settlement Coverage",
+        "",
+        "| Market | Settlement Rows |",
+        "| --- | ---: |",
+    ]
+    for playid in TARGET_PLAYIDS:
+        m = MARKETS[playid]
+        settled = result.metrics_summary.get("settlement_rows_by_market", {}).get(m.market_key, 0)
+        lines.append(f"| {m.display_name} | {settled:,} |")
+
+    lines += [
+        "",
+        "## 6. Gap Findings",
+        "",
+    ]
+    gap_count = 0
+    for dim in result.dimensions:
+        m = dim.market
+        for g in dim.gates:
+            if not g.passed and g.score < 0.5:
+                gap_count += 1
+                lines.append(
+                    f"{gap_count}. **{m.display_name} — {g.gate_id.value}** "
+                    f"(score={g.score:.2f}): {_truncate_evidence(g.evidence, 200)}"
+                )
+    if gap_count == 0:
+        lines.append("No critical gaps identified.")
+
+    lines += [
+        "",
+        "## 7. Reproducibility",
+        "",
+        "This audit was generated by:",
+        "",
+        "```bash",
+        ".venv/bin/python scripts/run_mm_data_audit.py --fixtures-dir tests/fixtures --output-dir results/research/mm_data_audit",
+        "```",
+        "",
+        "The audit can be regenerated with the command above; local `results/` outputs are runtime artifacts.",
+        f"Machine-readable results are at `results/research/mm_data_audit/audit_result.json`.",
+        "",
+        "## 8. Follow-Up Issues",
+        "",
+        "Gap findings above must be addressed as separate issues before SP-CONSISTENCY-001:",
+        "",
+    ]
+    issue_count = 0
+    if result.readiness_matrix.get("handicap_310", {}).get("freeze_support") != "READY_STRICT":
+        issue_count += 1
+        lines.append(f"{issue_count}. **Handicap 3/1/0 Freeze Protocol v1**: Create freeze package from beidan_live.db snapshots with SHA-256 verification.")
+    if result.readiness_matrix.get("half_full_time", {}).get("pre_event_input") == "UNAVAILABLE":
+        issue_count += 1
+        lines.append(f"{issue_count}. **Half/Full Time Pre-Event Classification**: Retroactively classify p51 rows in live_market_sp_snapshots with dual-clock validation.")
+    if result.readiness_matrix.get("half_full_time", {}).get("settlement_support") == "UNAVAILABLE":
+        issue_count += 1
+        lines.append(f"{issue_count}. **Half/Full Time Settlement Truth**: Build independently sourced half-time plus full-time truth for p51, including audited cancellation/postponement/SP=1 mapping.")
+
+    lines += [
+        "",
+        "## 9. Gates Definitions",
+        "",
+        "| Gate | Description |",
+        "| --- | --- |",
+        "| G1 | Complete and correctly mapped outcome vectors |",
+        "| G2 | Explicit source and capture timestamps |",
+        "| G3 | Evidence that selected snapshot existed before declared decision cutoff |",
+        "| G4 | Immutable or append-only raw provenance with verifiable hashes |",
+        "| G5 | Deterministic as-of selection and Freeze Protocol v1 support |",
+        "| G6 | Complete, separately sourced settlement mapping including cancellation/postponement/SP=1 handling |",
+        "| G7 | No terminal/final SP or post-event page used as a pre-event feature |",
+        "",
+        "## 10. Engineering Validation Checklist",
+        "",
+        "- [ ] Clean-checkout command reproduces the audit from the frozen snapshot.",
+        "- [ ] Hash verification succeeds and tampering fails closed.",
+        "- [ ] Tests cover vector completeness, cutoff rejection, terminal-data rejection and settlement special states.",
+        "- [ ] Existing strategy, ticket, API, frontend and release-manifest behavior is unchanged.",
+        "- [ ] Outputs remain `execution_enabled=false`, `frontend_selectable=false`, `roi_authorized=false`.",
+        "",
+    ]
+
+    return "\n".join(lines)
+
+
+def save_results(result: AuditResult, output_dir: Path) -> dict[str, Path]:
+    """Save machine-readable audit results."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    audit_json = output_dir / "audit_result.json"
+    audit_json.write_text(
+        json.dumps(result.to_dict(), indent=2, ensure_ascii=False, default=str),
+        encoding="utf-8",
+    )
+
+    readiness_csv = output_dir / "readiness_matrix.csv"
+    lines = ["market,pre_event_input,freeze_support,settlement_support"]
+    for playid in TARGET_PLAYIDS:
+        m = MARKETS[playid]
+        row = result.readiness_matrix.get(m.market_key, {})
+        lines.append(
+            f"{m.market_key},"
+            f"{row.get('pre_event_input', 'UNAVAILABLE')},"
+            f"{row.get('freeze_support', 'UNAVAILABLE')},"
+            f"{row.get('settlement_support', 'UNAVAILABLE')}"
+        )
+    readiness_csv.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    report_md = DOCS_DIR / "MM-DATA-AUDIT-001.md"
+    report_md.parent.mkdir(parents=True, exist_ok=True)
+    report_content = generate_report(result)
+    report_md.write_text(report_content, encoding="utf-8")
+
+    return {
+        "audit_json": audit_json,
+        "readiness_csv": readiness_csv,
+        "report_md": report_md,
+    }

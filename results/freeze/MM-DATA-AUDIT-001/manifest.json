@@ -1,0 +1,58 @@
+{
+  "config": {
+    "bytes": 61024,
+    "path": "metadata/config/auditor.py",
+    "sha256": "c1dd93d77b893fe6b513c25b6a3112a1e5dd3eb149ad5bb08540ba888e8a94a8"
+  },
+  "dataset_snapshot": {
+    "data_sha256": "5ec8c5d5557a8cfb14725d1445a408a6e3ca6f69d51b8fa614e1ca886c1a60f1",
+    "files": [
+      {
+        "bytes": 25410,
+        "path": "inputs/audit_result.json",
+        "sha256": "09c580a7a46597d856457659d33e791ed95466f5fcc7489ae7ebde56744c3da3"
+      }
+    ]
+  },
+  "decision_sha256": "ca6ec6431c3420ffcfac1207b41d6051f0bd11d694e4d659cbdf5d53a6b608ed",
+  "execution_enabled": false,
+  "experiment_id": "MM-DATA-AUDIT-001",
+  "freeze_id": "e3fee9f2241b258eb6fa406b50e80d403193448d73a9ea070c0a1e386ee8c976",
+  "frontend_selectable": false,
+  "frozen_at_utc": "2026-07-23T16:03:32.712126+00:00",
+  "frozen_decisions": [
+    {
+      "bytes": 17729,
+      "path": "decision/MM-DATA-AUDIT-001.md",
+      "sha256": "d6765f8da8a64d7ab2096435fdec76eb1478c147907d05bb3f95d6689e197375"
+    }
+  ],
+  "git_commit": "269851a78dda538f64544a28c88ab8ca3e0a7eaf",
+  "input_dataset": [
+    {
+      "bytes": 5804032,
+      "path": "tests/fixtures/mm_data_audit_live.db",
+      "sha256": "1e7ab8079f667416f7d2ae9290c99f32a7abae087778ca061a718925e306a0bf"
+    },
+    {
+      "bytes": 364544,
+      "path": "tests/fixtures/mm_data_audit_500_bjdc.db",
+      "sha256": "71c12e78cee54d0ed20c0e6fc74f9c1189cee0f6e298fa005d57a77aba163ad8"
+    }
+  ],
+  "lifecycle_state": "FROZEN",
+  "metadata_files": [
+    {
+      "bytes": 256,
+      "path": "metadata/files/readiness_matrix.csv",
+      "sha256": "c14f083c28992df6f4122d7ebd771dcde7ea7ab3135d0d7a83e871d3f367fd53"
+    }
+  ],
+  "model_version": "AUDIT-V1",
+  "prediction_files": [],
+  "prediction_sha256": null,
+  "protocol_notice": "Frozen decisions are immutable. Settlement and review packages may reference this package but must not modify it.",
+  "research_question": "For each target market, does the current forward data chain provide sufficient evidence to support strict as-of research under Freeze Protocol v1?",
+  "roi_authorized": false,
+  "schema_version": "beijing_lot_research_freeze_v1"
+}

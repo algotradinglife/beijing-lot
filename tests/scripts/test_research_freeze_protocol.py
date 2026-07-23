@@ -110,6 +110,35 @@ def test_freeze_identity_covers_config_and_model_metadata(tmp_path: Path) -> Non
     assert len({first["freeze_id"], second["freeze_id"], third["freeze_id"]}) == 3
 
 
+def test_freeze_records_input_dataset_hashes_in_its_identity(tmp_path: Path) -> None:
+    inputs = write(tmp_path / "sources/asof.csv", "match,probability\n1,0.61\n")
+    decisions = write(tmp_path / "sources/decision.csv", "match,choice\n1,3\n")
+    config = write(tmp_path / "sources/config.json", '{"seed": 17}\n')
+    dataset = write(tmp_path / "fixtures/source.db", "fixture database bytes")
+    output = tmp_path / "freeze" / "EXP-DATASET"
+
+    protocol.create_freeze_package(
+        output,
+        experiment_id="EXP-DATASET",
+        research_question="Are source dataset hashes retained?",
+        model_version="test-model-v1",
+        input_files=[inputs],
+        input_datasets=[dataset],
+        decision_files=[decisions],
+        config_file=config,
+        git_commit="a" * 40,
+        frozen_at_utc="2026-07-21T00:00:00+00:00",
+    )
+
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["input_dataset"] == [{
+        "path": str(dataset),
+        "bytes": len("fixture database bytes"),
+        "sha256": protocol.sha256_file(dataset),
+    }]
+    assert protocol.verify_freeze_package(output)["status"] == "valid"
+
+
 def test_metadata_source_named_config_cannot_collide_with_config_directory(tmp_path: Path) -> None:
     inputs = write(tmp_path / "sources/asof.csv", "match,probability\n1,0.61\n")
     decisions = write(tmp_path / "sources/decision.csv", "match,choice\n1,3\n")
