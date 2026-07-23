@@ -885,15 +885,10 @@ class MultiMarketAuditor:
 
         # G5: Freeze Protocol v1
         from src.multimarket_p0 import MultimarketP0Error, verify_freeze
-        # Check committed freeze packages first; fall back to worktree external
-        candidate_roots = [
-            Path(_repo_root() / "results/freeze"),   # committed freeze packages
-            _repo_root() / "results/research/multimarket_10h_freeze_v1",  # external (may not exist in clone)
-        ]
-        freeze_dirs: list[Path] = []
-        for cr in candidate_roots:
-            if cr.exists():
-                freeze_dirs.extend(d for d in cr.iterdir() if d.is_dir())
+        # verify_freeze() only accepts the multimarket as-of-freeze contract.
+        # The committed MM-DATA-AUDIT research freeze has a different schema.
+        freeze_root = _repo_root() / "results/research/multimarket_10h_freeze_v1"
+        freeze_dirs = [path for path in freeze_root.iterdir() if path.is_dir()] if freeze_root.is_dir() else []
 
         has_freeze = False
         freeze_manifest = {}

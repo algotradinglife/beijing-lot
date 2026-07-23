@@ -848,6 +848,16 @@ class TestFreezePackage:
             actual = hashlib.sha256(path.read_bytes()).hexdigest()
             assert actual == digest, f"Checksum mismatch for {name}: expected {digest}, got {actual}"
 
+    def test_p0_freeze_ignores_incompatible_research_freeze_package(self, tmp_path, monkeypatch):
+        _write_mm_data_freeze_fixture(tmp_path / "results" / "freeze")
+        monkeypatch.setattr(auditor_module, "_repo_root", lambda: tmp_path)
+
+        gates, metrics = _fixture_auditor()._gates_p0_freeze(MARKETS[40])
+
+        g5 = _gate_by_id(gates, GateID.G5_ASOF_FREEZE)
+        assert g5.passed is False
+        assert metrics["freeze_verification_failures"] == []
+
     def test_sha256sums_verifier_rejects_tampering(self, tmp_path):
         bundle = tmp_path / "bundle"
         bundle.mkdir()
