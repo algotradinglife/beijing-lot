@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts import estimate_segment_betting_plan as plan  # noqa: E402
 from scripts import replay_rolling_segment_n_tickets as rolling  # noqa: E402
+from src.natural_day_manifest import NaturalDayManifestError, verify_manifest  # noqa: E402
 
 HKT = ZoneInfo("Asia/Hong_Kong")
 N_VALUES, BUDGETS = (3, 4, 5, 6, 7), (512, 768, 1024)
@@ -92,8 +93,12 @@ def main() -> None:
     p.add_argument("--decision-at-hkt", default="", help="manual freeze time; defaults to now")
     p.add_argument("--sample-attempts", type=int, default=12000); p.add_argument("--sample-seed", type=int, default=20260707)
     a = p.parse_args(); decision_at = hkt(a.decision_at_hkt)
-    manifest = json.loads(a.manifest.read_text()); claimed = manifest.pop("manifest_sha256", "")
-    if manifest.get("issue") != str(a.issue) or claimed != digest(manifest): raise SystemExit("fail closed: invalid natural-day manifest")
+    manifest = json.loads(a.manifest.read_text())
+    try:
+        claimed = verify_manifest(manifest)
+    except NaturalDayManifestError as exc:
+        raise SystemExit("fail closed: invalid natural-day manifest") from exc
+    if manifest.get("issue") != str(a.issue): raise SystemExit("fail closed: invalid natural-day manifest")
     seg = next((x for x in manifest["segments"] if int(x["segment_idx"]) == a.segment), None)
     if not seg: raise SystemExit("fail closed: segment absent from manifest")
     scheduled = hkt(seg["freeze_at"])

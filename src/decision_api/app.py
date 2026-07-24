@@ -20,6 +20,11 @@ from typing import Any
 from flask import Flask, jsonify, redirect, render_template_string, request, send_from_directory, session
 
 from src.decision_artifact_completeness import active_snapshot_completeness, completeness_for_indices
+from src.natural_day_manifest import (
+    NaturalDayManifestError,
+    load_published_manifest,
+    verify_operational_windows,
+)
 from src.sqlite_runtime import connect_sqlite
 
 
@@ -34,6 +39,8 @@ JOINT_LEG_RESULTS_DIR = PROJECT_ROOT / "results/n7_q_conf_drift_joint_2014_10h_t
 STRUCTURED_DECISION_SHADOW_DIR = PROJECT_ROOT / "results/structured_decision_chain_shadow"
 POSTMATCH_TICKET_POOL_DIR = PROJECT_ROOT / "results/postmatch_ticket_pool_artifacts"
 SEGMENT_BETTING_PLAN_DIR = PROJECT_ROOT / "results/segment_betting_plan"
+EXACT_N_SEGMENT_FREEZE_DIR = PROJECT_ROOT / "results/exact_n_segment_freeze"
+EXACT_N_SEGMENT_FREEZE_LEDGER_DIR = PROJECT_ROOT / "results/research/exact_n_segment_freeze_v1/ledger"
 DECISION_VERSIONS_CONFIG = PROJECT_ROOT / "config/decision_versions.json"
 STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
 DEFAULT_DASHBOARD_RUNTIME_STATUS = PROJECT_ROOT / "tmp/decision_dashboard/runtime_status.json"
@@ -4277,6 +4284,49 @@ def _segment_plan_freeze_state(conn: sqlite3.Connection, issue: str) -> dict[str
         "locked": False,
         "reason": "kickoff_unavailable",
     }
+    try:
+        segment_contract = load_published_manifest(conn, issue)
+        if segment_contract is not None:
+            verify_operational_windows(conn, segment_contract)
+            first_segment = segment_contract["segments"][0]
+            freeze_at = _parse_timestamp_to_hk(str(first_segment["freeze_at"]))
+            first_kickoff = _parse_timestamp_to_hk(str(first_segment["segment_start"]))
+            if freeze_at is None or first_kickoff is None:
+                state["reason"] = "published_segment_contract_time_unparseable"
+                return state
+            now = datetime.now(HK_TZ)
+            locked = now >= freeze_at
+            state.update({
+                "policy": str(segment_contract["policy"]),
+                "segment_manifest_sha256": str(segment_contract["manifest_sha256"]),
+                "segment_manifest_path": str(segment_contract["manifest_path"]),
+                "segment_counts": [
+                    int(segment["match_count"])
+                    for segment in segment_contract["segments"]
+                ],
+                "freeze_minutes_before_first_kickoff": round(
+                    (first_kickoff - freeze_at).total_seconds() / 60,
+                    6,
+                ),
+                "first_kickoff": first_kickoff.strftime("%Y-%m-%d %H:%M:%S"),
+                "freeze_at": freeze_at.strftime("%Y-%m-%d %H:%M:%S"),
+                "now": now.strftime("%Y-%m-%d %H:%M:%S"),
+                "locked": locked,
+                "reason": (
+                    "locked_after_published_segment_freeze"
+                    if locked
+                    else "before_published_segment_freeze"
+                ),
+            })
+            return state
+    except NaturalDayManifestError as exc:
+        state.update({
+            "policy": "published_natural_day_manifest_fail_closed",
+            "locked": True,
+            "reason": "published_segment_contract_invalid",
+            "error": str(exc),
+        })
+        return state
     columns = _table_columns(conn, "matches")
     if "end_time" not in columns:
         state["reason"] = "matches_end_time_column_missing"
@@ -4305,6 +4355,153 @@ def _segment_plan_freeze_state(conn: sqlite3.Connection, issue: str) -> dict[str
         "reason": "locked_after_freeze_at" if locked else "before_freeze_at",
     })
     return state
+
+
+def _exact_n_freeze_payload(
+    conn: sqlite3.Connection,
+    issue: str,
+    *,
+    output_root: Path = EXACT_N_SEGMENT_FREEZE_DIR,
+    ledger_root: Path = EXACT_N_SEGMENT_FREEZE_LEDGER_DIR,
+) -> dict[str, Any]:
+    try:
+        contract = load_published_manifest(conn, issue)
+        if contract is None:
+            return {
+                "issue": str(issue),
+                "status": "missing_segment_contract",
+                "segments": [],
+            }
+        verify_operational_windows(conn, contract)
+    except NaturalDayManifestError as exc:
+        return {
+            "issue": str(issue),
+            "status": "invalid_segment_contract",
+            "error": str(exc),
+            "segments": [],
+        }
+
+    segment_payloads: list[dict[str, Any]] = []
+    for segment in contract["segments"]:
+        segment_idx = int(segment["segment_idx"])
+        event_key = hashlib.sha256(
+            json.dumps(
+                {"issue": str(issue), "segment_idx": segment_idx},
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        base = {
+            "segment_idx": segment_idx,
+            "match_count": int(segment["match_count"]),
+            "freeze_at": str(segment["freeze_at"]),
+            "event_key": event_key,
+            "status": "pending",
+            "alternatives": [],
+        }
+        ledger_path = ledger_root / f"{event_key}.json"
+        if not ledger_path.is_file():
+            segment_payloads.append(base)
+            continue
+        try:
+            ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+            if (
+                ledger.get("state") != "PUBLISHED"
+                or str(ledger.get("segment_manifest_sha256") or "")
+                != str(contract["manifest_sha256"])
+            ):
+                raise ValueError("ledger is not a matching PUBLISHED event")
+            artifact_manifest_path = Path(str(ledger["artifact_manifest"]))
+            expected_root = (
+                output_root / str(issue) / f"segment_{segment_idx}" / event_key
+            ).resolve()
+            if artifact_manifest_path.resolve().parent != expected_root:
+                raise ValueError("artifact manifest path differs from event identity")
+            artifact_manifest = json.loads(
+                artifact_manifest_path.read_text(encoding="utf-8")
+            )
+            if (
+                str(artifact_manifest.get("event_key") or "") != event_key
+                or str(artifact_manifest.get("segment_manifest_sha256") or "")
+                != str(contract["manifest_sha256"])
+                or list(artifact_manifest.get("segment_match_indices") or [])
+                != list(segment["match_indices"])
+            ):
+                raise ValueError("artifact manifest differs from segment contract")
+            exact_entries = [
+                entry
+                for entry in artifact_manifest.get("artifacts", [])
+                if str(entry.get("file") or "").startswith("exact_n_")
+            ]
+            if len(exact_entries) != 15:
+                raise ValueError("published event does not contain 15 alternatives")
+            alternatives = []
+            for entry in exact_entries:
+                artifact_path = artifact_manifest_path.parent / str(entry["file"])
+                alternative = json.loads(artifact_path.read_text(encoding="utf-8"))
+                claimed = str(alternative.pop("sha256"))
+                actual = hashlib.sha256(
+                    json.dumps(
+                        alternative,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                ).hexdigest()
+                if claimed != actual or claimed != str(entry["sha256"]):
+                    raise ValueError("exact-N alternative hash mismatch")
+                alternatives.append({
+                    "plan_id": str(alternative.get("plan_id") or ""),
+                    "requested_n": _safe_int(alternative.get("requested_n")),
+                    "requested_budget_yuan": _safe_float(
+                        alternative.get("requested_budget_yuan")
+                    ),
+                    "actual_cost_yuan": _safe_float(
+                        alternative.get("actual_cost_yuan")
+                        if "actual_cost_yuan" in alternative
+                        else alternative.get("actual_budget_yuan")
+                    ),
+                    "unused_budget_yuan": _safe_float(
+                        alternative.get("unused_budget_yuan")
+                    ),
+                    "budget_utilization": _safe_float(
+                        alternative.get("budget_utilization")
+                    ),
+                    "status": str(alternative.get("status") or ""),
+                    "tickets": alternative.get("tickets")
+                    if isinstance(alternative.get("tickets"), list)
+                    else [],
+                    "sha256": claimed,
+                })
+            base.update({
+                "status": "published",
+                "effective_decision_at": str(
+                    artifact_manifest.get("effective_decision_at") or ""
+                ),
+                "alternatives": sorted(
+                    alternatives,
+                    key=lambda item: (
+                        int(item["requested_n"] or 0),
+                        float(item["requested_budget_yuan"] or 0),
+                    ),
+                ),
+            })
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            base.update({"status": "invalid_published_event", "error": str(exc)})
+        segment_payloads.append(base)
+    return {
+        "schema_version": "exact_n_segment_freeze_api_v1",
+        "issue": str(issue),
+        "status": "available",
+        "segment_manifest_sha256": str(contract["manifest_sha256"]),
+        "segment_counts": [
+            int(segment["match_count"]) for segment in contract["segments"]
+        ],
+        "segments": segment_payloads,
+        "execution_enabled": False,
+        "frontend_selectable": False,
+        "roi_authorized": False,
+    }
 
 
 def _segment_plan_option_freeze_info(option: dict[str, Any], freeze_state: dict[str, Any] | None) -> dict[str, Any]:
@@ -4423,6 +4620,7 @@ def _segment_plan_option_from_summary(summary_path: Path) -> dict[str, Any] | No
         "artifact_schema_version": str(payload.get("artifact_schema_version") or ""),
         "planning_scope": planning_scope,
         "artifact_planning_scope": artifact_planning_scope,
+        "segment_manifest_sha256": str(payload.get("segment_manifest_sha256") or ""),
         "decision_time": decision_time,
         "stake_mode": str(settings.get("stake_mode") or ""),
         "available_segments": _safe_int(payload.get("available_segments")),
@@ -5065,9 +5263,34 @@ def _segment_betting_plan_payload(
     stake_mode: str | None = None,
     release: dict[str, Any] | None = None,
     freeze_state: dict[str, Any] | None = None,
+    segment_contract: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], int]:
     release = release or _active_strategy_release()
     all_options = _segment_plan_options(issue, release)
+    expected_manifest_sha256 = str(
+        (segment_contract or {}).get("manifest_sha256") or ""
+    )
+    segment_contract_invalid = (
+        str((segment_contract or {}).get("status") or "") == "invalid"
+    )
+    stale_segment_options = [
+        option
+        for option in all_options
+        if str(option.get("artifact_planning_scope") or "") == "by_segment"
+        and (
+            segment_contract_invalid
+            or (
+                expected_manifest_sha256
+                and str(option.get("segment_manifest_sha256") or "")
+                != expected_manifest_sha256
+            )
+        )
+    ]
+    if stale_segment_options:
+        stale_ids = {id(option) for option in stale_segment_options}
+        all_options = [
+            option for option in all_options if id(option) not in stale_ids
+        ]
     options, rejected_frozen_options = _filter_segment_plan_options_for_freeze(all_options, freeze_state)
     selected = _select_segment_plan(
         options,
@@ -5087,6 +5310,7 @@ def _segment_betting_plan_payload(
         "all_plan_count": len(all_options),
         "available_plan_count": len(options),
         "rejected_plan_count": len(rejected_frozen_options),
+        "stale_segment_contract_plan_count": len(stale_segment_options),
     })
     missing_reason = "segment_betting_plan_artifact_missing"
     requested_keys = _segment_plan_requested_variant_keys(decision_variant_id)
@@ -5119,6 +5343,22 @@ def _segment_betting_plan_payload(
         "source": {
             "artifact_key": "segment_betting_plan_dir",
             "artifact_dir": _segment_plan_display_path(plan_dir),
+            "segment_contract": {
+                "status": (
+                    "invalid"
+                    if segment_contract_invalid
+                    else ("published" if expected_manifest_sha256 else "unpublished")
+                ),
+                "error": str((segment_contract or {}).get("error") or ""),
+                "policy": str((segment_contract or {}).get("policy") or ""),
+                "manifest_sha256": expected_manifest_sha256,
+                "manifest_path": str((segment_contract or {}).get("manifest_path") or ""),
+                "segment_counts": [
+                    _safe_int(segment.get("match_count"))
+                    for segment in (segment_contract or {}).get("segments", [])
+                    if isinstance(segment, dict)
+                ],
+            },
         },
         "_artifact_path": _segment_plan_display_path(selected["_summary_path"].parent) if selected else "",
         "artifact_status": {
@@ -7988,6 +8228,15 @@ def create_app(
                     return jsonify({"error": f"Unknown issue: {issue}"}), 404
                 resolved = raw_issue
             freeze_state = _segment_plan_freeze_state(conn, resolved)
+            try:
+                segment_contract = load_published_manifest(conn, resolved)
+                if segment_contract is not None:
+                    verify_operational_windows(conn, segment_contract)
+            except NaturalDayManifestError as exc:
+                segment_contract = {
+                    "status": "invalid",
+                    "error": str(exc),
+                }
         payload, status = _segment_betting_plan_payload(
             resolved,
             decision_variant_id=decision_variant_id,
@@ -8000,8 +8249,21 @@ def create_app(
             decision_time=decision_time or None,
             stake_mode=stake_mode or None,
             freeze_state=freeze_state,
+            segment_contract=segment_contract,
         )
         return jsonify(payload), status
+
+    @app.get("/api/issues/<issue>/exact-n-freezes")
+    def exact_n_freezes(issue: str):
+        with _connect(db_path) as conn:
+            try:
+                resolved = _resolve_issue(conn, issue)
+            except LookupError:
+                raw_issue = str(issue or "").strip()
+                if not re.fullmatch(r"\d{1,12}", raw_issue):
+                    return jsonify({"error": f"Unknown issue: {issue}"}), 404
+                resolved = raw_issue
+            return jsonify(_exact_n_freeze_payload(conn, resolved))
 
     @app.get("/api/issues/<issue>/signals")
     def signals(issue: str):

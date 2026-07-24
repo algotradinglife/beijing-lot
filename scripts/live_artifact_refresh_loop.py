@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
+import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,11 @@ from scripts.estimate_segment_betting_plan import (  # noqa: E402
     run as estimate_segment_betting_plan,
 )
 from src.decision_api import app as decision_app  # noqa: E402
+from src.natural_day_manifest import (  # noqa: E402
+    NaturalDayManifestError,
+    load_published_manifest,
+    verify_operational_windows,
+)
 
 
 DEFAULT_INTERVAL_SEC = 300.0
@@ -34,6 +41,10 @@ DEFAULT_V4_2_ARTIFACT_VERSIONS = ("v4.2.0005", "v4.2.0000")
 DEFAULT_SEGMENT_PLAN_SCOPES = ("by_segment", "entire_issue")
 DEFAULT_SEGMENT_PLAN_STAKE_MODE = "scale_to_budget"
 DEFAULT_SEGMENT_PLAN_BUDGET_YUAN = 1000.0
+DEFAULT_EXACT_N_OUTPUT_ROOT = ROOT / "results/exact_n_segment_freeze"
+DEFAULT_EXACT_N_LEDGER_ROOT = ROOT / "results/research/exact_n_segment_freeze_v1/ledger"
+DEFAULT_CORRECT_SCORE_ROOT = ROOT / "results/data_collection/correct_score_price_history_v1"
+DEFAULT_EXACT_N_TRIGGER_LEAD_MINUTES = 10.0
 
 
 def now_iso() -> str:
@@ -277,7 +288,14 @@ def _segment_plan_specs_from_existing(issue: str, *, plan_dir: Path, structured_
     return sorted(specs.values(), key=lambda item: (str(item.get("label") or ""), str(item.get("structured_csv") or "")))
 
 
-def _segment_plan_exists(issue: str, spec: dict[str, Any], *, scope: str, plan_dir: Path) -> bool:
+def _segment_plan_exists(
+    issue: str,
+    spec: dict[str, Any],
+    *,
+    scope: str,
+    plan_dir: Path,
+    segment_manifest_sha256: str = "",
+) -> bool:
     for summary_path in sorted(plan_dir.glob(f"{issue}_*/segment_betting_plan_summary.json")):
         payload = _read_json(summary_path)
         if not payload:
@@ -290,6 +308,13 @@ def _segment_plan_exists(issue: str, spec: dict[str, Any], *, scope: str, plan_d
         if _resolve_project_path(payload.get("structured_csv")) != _resolve_project_path(spec.get("structured_csv")):
             continue
         if str(payload.get("planning_scope") or settings.get("planning_scope") or "") != scope:
+            continue
+        if (
+            scope == "by_segment"
+            and segment_manifest_sha256
+            and str(payload.get("segment_manifest_sha256") or "")
+            != segment_manifest_sha256
+        ):
             continue
         if str(settings.get("stake_mode") or "") != str(spec.get("stake_mode") or ""):
             continue
@@ -366,19 +391,43 @@ def ensure_segment_betting_plans(
     structured_dir: Path = DEFAULT_SHADOW_DIR,
 ) -> list[dict[str, Any]]:
     outputs: list[dict[str, Any]] = []
+    segment_manifest_sha256 = ""
+    try:
+        with decision_app._connect(db_path) as conn:
+            manifest = load_published_manifest(conn, issue)
+            if manifest is not None:
+                verify_operational_windows(conn, manifest)
+                segment_manifest_sha256 = str(manifest["manifest_sha256"])
+    except NaturalDayManifestError as exc:
+        return [{
+            "status": "failed_closed_segment_contract",
+            "planning_scope": ",".join(scopes),
+            "error": str(exc),
+        }]
     specs = _segment_plan_specs_from_existing(issue, plan_dir=plan_dir, structured_dir=structured_dir)
     for spec in specs:
         for scope in scopes:
-            if _segment_plan_exists(issue, spec, scope=scope, plan_dir=plan_dir):
+            if _segment_plan_exists(
+                issue,
+                spec,
+                scope=scope,
+                plan_dir=plan_dir,
+                segment_manifest_sha256=segment_manifest_sha256,
+            ):
                 outputs.append({
                     "label": spec.get("label", ""),
                     "planning_scope": scope,
                     "status": "already_available",
+                    "segment_manifest_sha256": segment_manifest_sha256,
                 })
                 continue
             try:
                 generated = _run_segment_plan(db_path, issue, spec, scope=scope, plan_dir=plan_dir)
-                outputs.append({"status": "generated", **generated})
+                outputs.append({
+                    "status": "generated",
+                    "segment_manifest_sha256": segment_manifest_sha256,
+                    **generated,
+                })
             except Exception as exc:
                 outputs.append({
                     "label": spec.get("label", ""),
@@ -389,6 +438,140 @@ def ensure_segment_betting_plans(
     if not specs:
         outputs.append({"status": "skipped_no_structured_artifacts", "planning_scope": ",".join(scopes)})
     return outputs
+
+
+def coordinate_due_exact_n_freeze(
+    db_path: Path,
+    issue: str,
+    *,
+    structured_csv: Path,
+    now: datetime | None = None,
+    trigger_lead_minutes: float = DEFAULT_EXACT_N_TRIGGER_LEAD_MINUTES,
+    output_root: Path = DEFAULT_EXACT_N_OUTPUT_ROOT,
+    ledger_root: Path = DEFAULT_EXACT_N_LEDGER_ROOT,
+    correct_score_root: Path = DEFAULT_CORRECT_SCORE_ROOT,
+) -> dict[str, Any]:
+    """Publish one due segment through the same canonical manifest as all consumers."""
+    observed_at = (now or datetime.now(timezone.utc)).astimezone()
+    try:
+        with decision_app._connect(db_path) as conn:
+            manifest = load_published_manifest(conn, issue)
+            if manifest is None:
+                return {"status": "skipped_no_published_segment_contract"}
+            verify_operational_windows(conn, manifest)
+    except NaturalDayManifestError as exc:
+        return {"status": "failed_closed_segment_contract", "error": str(exc)}
+    if not structured_csv.is_file():
+        return {
+            "status": "failed_closed_structured_input_missing",
+            "structured_csv": str(structured_csv),
+        }
+
+    upcoming: list[tuple[datetime, dict[str, Any]]] = []
+    for segment in manifest["segments"]:
+        freeze_at = datetime.fromisoformat(str(segment["freeze_at"]))
+        if freeze_at.tzinfo is None:
+            freeze_at = freeze_at.astimezone()
+        if freeze_at - timedelta(minutes=trigger_lead_minutes) <= observed_at <= freeze_at:
+            upcoming.append((freeze_at, segment))
+    if not upcoming:
+        future = [
+            str(segment["freeze_at"])
+            for segment in manifest["segments"]
+            if datetime.fromisoformat(str(segment["freeze_at"])) > observed_at
+        ]
+        return {
+            "status": "pending",
+            "next_freeze_at": future[0] if future else "",
+            "segment_manifest_sha256": str(manifest["manifest_sha256"]),
+        }
+
+    _freeze_at, segment = min(upcoming, key=lambda item: item[0])
+    event_key = hashlib.sha256(
+        json.dumps(
+            {"issue": str(issue), "segment_idx": int(segment["segment_idx"])},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    ledger_path = ledger_root / f"{event_key}.json"
+    if ledger_path.is_file():
+        try:
+            ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            return {
+                "status": "failed_closed_invalid_ledger",
+                "segment_idx": int(segment["segment_idx"]),
+                "error": str(exc),
+            }
+        if (
+            ledger.get("state") == "PUBLISHED"
+            and str(ledger.get("segment_manifest_sha256") or "")
+            == str(manifest["manifest_sha256"])
+            and Path(str(ledger.get("artifact_manifest") or "")).is_file()
+        ):
+            return {
+                "status": "already_published",
+                "segment_idx": int(segment["segment_idx"]),
+                "event_key": event_key,
+                "segment_manifest_sha256": str(manifest["manifest_sha256"]),
+            }
+        return {
+            "status": "failed_closed_existing_event_reservation",
+            "segment_idx": int(segment["segment_idx"]),
+            "event_key": event_key,
+            "ledger_state": str(ledger.get("state") or ""),
+        }
+    command = [
+        sys.executable,
+        str(ROOT / "scripts/publish_exact_n_segment_freeze.py"),
+        "--issue",
+        str(issue),
+        "--segment",
+        str(segment["segment_idx"]),
+        "--manifest",
+        str(manifest["manifest_path"]),
+        "--structured-csv",
+        str(structured_csv),
+        "--db",
+        str(db_path),
+        "--output-root",
+        str(output_root),
+        "--ledger-root",
+        str(ledger_root),
+        "--correct-score-root",
+        str(correct_score_root),
+        "--decision-at-hkt",
+        observed_at.isoformat(timespec="seconds"),
+    ]
+    completed = subprocess.run(
+        command,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        return {
+            "status": "failed_closed_publish",
+            "segment_idx": int(segment["segment_idx"]),
+            "returncode": completed.returncode,
+            "error": (completed.stderr or completed.stdout).strip(),
+        }
+    try:
+        receipt = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return {
+            "status": "failed_closed_invalid_receipt",
+            "segment_idx": int(segment["segment_idx"]),
+            "stdout": completed.stdout.strip(),
+        }
+    return {
+        "status": "published",
+        "segment_idx": int(segment["segment_idx"]),
+        "segment_manifest_sha256": str(manifest["manifest_sha256"]),
+        "receipt": receipt,
+    }
 
 
 def run_once(args: argparse.Namespace) -> dict[str, Any]:
@@ -422,6 +605,33 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
                 plan_dir=args.segment_plan_dir,
                 structured_dir=args.structured_shadow_dir,
             )
+    exact_n_freeze: dict[str, Any] = {"status": "disabled"}
+    if status.get("status") == "available" and args.coordinate_exact_n_freeze:
+        specs = _segment_plan_specs_from_existing(
+            issue,
+            plan_dir=args.segment_plan_dir,
+            structured_dir=args.structured_shadow_dir,
+        )
+        preferred = next(
+            (
+                spec
+                for spec in specs
+                if str(spec.get("label") or "") == "v3.3.3"
+            ),
+            specs[0] if specs else None,
+        )
+        if preferred is None:
+            exact_n_freeze = {"status": "skipped_no_structured_artifacts"}
+        else:
+            exact_n_freeze = coordinate_due_exact_n_freeze(
+                args.db,
+                issue,
+                structured_csv=Path(preferred["structured_csv"]),
+                trigger_lead_minutes=args.exact_n_trigger_lead_minutes,
+                output_root=args.exact_n_output_root,
+                ledger_root=args.exact_n_ledger_root,
+                correct_score_root=args.correct_score_root,
+            )
     return {
         "checked_at": now_iso(),
         "issue": issue,
@@ -429,6 +639,7 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
         "v4_2": v4_2,
         "segment_betting_plan_freeze": segment_plan_freeze,
         "segment_betting_plans": segment_betting_plans,
+        "exact_n_freeze": exact_n_freeze,
     }
 
 
@@ -447,6 +658,11 @@ def main() -> None:
     parser.add_argument("--segment-plan-scope", action="append", choices=DEFAULT_SEGMENT_PLAN_SCOPES, default=[])
     parser.add_argument("--segment-plan-dir", type=Path, default=DEFAULT_SEGMENT_BETTING_PLAN_DIR)
     parser.add_argument("--structured-shadow-dir", type=Path, default=DEFAULT_SHADOW_DIR)
+    parser.add_argument("--no-coordinate-exact-n-freeze", action="store_false", dest="coordinate_exact_n_freeze", default=True)
+    parser.add_argument("--exact-n-trigger-lead-minutes", type=float, default=DEFAULT_EXACT_N_TRIGGER_LEAD_MINUTES)
+    parser.add_argument("--exact-n-output-root", type=Path, default=DEFAULT_EXACT_N_OUTPUT_ROOT)
+    parser.add_argument("--exact-n-ledger-root", type=Path, default=DEFAULT_EXACT_N_LEDGER_ROOT)
+    parser.add_argument("--correct-score-root", type=Path, default=DEFAULT_CORRECT_SCORE_ROOT)
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
 

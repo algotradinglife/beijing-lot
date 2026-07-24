@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import random
+import sqlite3
 import sys
 from collections import Counter
 from dataclasses import dataclass
@@ -1191,6 +1192,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise SystemExit(f"No eligible future legs loaded for issue {args.issue} at decision_time {format_optional_dt(decision_time)}")
     all_segments = rolling.build_segments(
         eligible_legs,
+        db_path=args.db,
         base_window_hours=args.window_hours,
         extend_hours=rolling.parse_extend_hours(args.extend_hours),
         min_matches=args.min_matches,
@@ -1261,6 +1263,21 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     write_csv(bundle_csv, bundle_rows)
     write_csv(seed_summary_csv, seed_summary_rows)
     write_csv(segment_seed_summary_csv, segment_seed_summary_rows)
+    segment_manifest_sha256 = ""
+    segment_manifest_path = ""
+    with sqlite3.connect(args.db) as manifest_conn:
+        from src.natural_day_manifest import load_published_manifest
+
+        published_segment_manifest = load_published_manifest(
+            manifest_conn, args.issue
+        )
+        if published_segment_manifest is not None:
+            segment_manifest_sha256 = str(
+                published_segment_manifest["manifest_sha256"]
+            )
+            segment_manifest_path = str(
+                published_segment_manifest["manifest_path"]
+            )
     payload = {
         "issue": args.issue,
         "label": label,
@@ -1278,6 +1295,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "segments": len(segments),
         "planning_scope": planning_scope,
         "artifact_planning_scope": planning_scope,
+        "segment_manifest_sha256": segment_manifest_sha256,
+        "segment_manifest_path": segment_manifest_path,
         "selection_binding": selection_binding(planning_scope),
         "decision_time": format_optional_dt(decision_time),
         "sp_drift_risk": {
