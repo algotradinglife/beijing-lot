@@ -11,19 +11,31 @@ entries:
     commits:
       - 4a2b47f183d4036e67e102cfbe46ec427fe45f25
       - 72a8a0618df8702fafef32fa6e121603b76abba4
-      - 36dee2075fcd24e6cf1b515784aa164c81f15c55
-      - c359c6011a20f10d2f79d8f7e352f84be9d4aa04
-      - 0bbf74827cb9e8480f8e98e1fc2dc97db237ce82
-    pr_number: 21
+      - 36dee20cd2cc08eb305dd4c02f2c697abe482f26
+      - c359c6016dbe25802411cdf840130270ef350b9e
+      - 0bbf748d1db98362d416720d525b50e7b87c3ca7
+      - 6fa84cdec42dd66d23019d537a1b06e6cc84df19
+      - 15203515b692702e152c9dace2d7e0084b84d8e0
+      - 6abab3762591de37df3edda9138e3664509b2616
+      - 39ab40c5b96122aa726f150929ef4c2ec7c8264e
+      - 3e9363bf2795a8d828a033033d64eb2748c0ad47
+      - 20192fb23525d79c9a8358509b488263fffec6aa
+      - d94974eaa0e714a89640e5a5678aacbfeb7d615d
+      - 3a8df35996a18a4b9d9363d6d1a23a71dc666a0c
+      - 42c02ac13b026c0a92ba6fa5c3d70c48e4b828d4
+      - d27212da9b4676eadbc0f83f6caa8ee20477e7d0
+      - cb40c57d10e479a818090944e4941f9bad9de899
+      - 63bbdb31f55e2cc11591e9c572ab6ff06fb54575
+      - 0a5199ded103af2aa102db2ed3fa7555a64bbb46
+    pr_number: 23
     started_at: "2026-07-24T09:07:37Z"
-    last_seen: "2026-07-24T09:27:58Z"
-    status: pr_open_has_conflicts
+    last_seen: "2026-07-25T00:23:23Z"
+    status: merged
     execution_phase: completed
     notes: >-
-      Code complete. No active session needed — awaiting conflict resolution
-      and PI review. PR #21 has add/add conflict in BET-FREEZE task yaml.
-      session_not_alive anomaly is expected (execution phase done).
-      Reconciler (2026-07-24T09:34Z): transitioned graph EXECUTING→REVIEW.
+      Combined PR #23 for SEG-DAY + BET-FREEZE. 5 PI review rounds.
+      PR merged by PI. Graph state updated to COMPLETED by reconciler
+      2026-07-25T00:36Z.
   BJ-BET-FREEZE-001:
     session_id: null
     executor: everything-bot-engineer
@@ -32,18 +44,33 @@ entries:
     branch: research/bj-bet-freeze-001
     worktree: null
     commits:
-      - 36dee2075fcd24e6cf1b515784aa164c81f15c55
-      - c359c6011a20f10d2f79d8f7e352f84be9d4aa04
-      - 0bbf74827cb9e8480f8e98e1fc2dc97db237ce82
-    pr_number: 21
+      - 4a2b47f183d4036e67e102cfbe46ec427fe45f25
+      - 72a8a0618df8702fafef32fa6e121603b76abba4
+      - 36dee20cd2cc08eb305dd4c02f2c697abe482f26
+      - c359c6016dbe25802411cdf840130270ef350b9e
+      - 0bbf748d1db98362d416720d525b50e7b87c3ca7
+      - 6fa84cdec42dd66d23019d537a1b06e6cc84df19
+      - 15203515b692702e152c9dace2d7e0084b84d8e0
+      - 6abab3762591de37df3edda9138e3664509b2616
+      - 39ab40c5b96122aa726f150929ef4c2ec7c8264e
+      - 3e9363bf2795a8d828a033033d64eb2748c0ad47
+      - 20192fb23525d79c9a8358509b488263fffec6aa
+      - d94974eaa0e714a89640e5a5678aacbfeb7d615d
+      - 3a8df35996a18a4b9d9363d6d1a23a71dc666a0c
+      - 42c02ac13b026c0a92ba6fa5c3d70c48e4b828d4
+      - d27212da9b4676eadbc0f83f6caa8ee20477e7d0
+      - cb40c57d10e479a818090944e4941f9bad9de899
+      - 63bbdb31f55e2cc11591e9c572ab6ff06fb54575
+      - 0a5199ded103af2aa102db2ed3fa7555a64bbb46
+    pr_number: 23
     started_at: "2026-07-24T09:07:37Z"
-    last_seen: "2026-07-24T09:27:58Z"
-    status: pr_open_has_conflicts
+    last_seen: "2026-07-25T00:23:23Z"
+    status: merged
     execution_phase: completed
     notes: >-
-      Code complete — Segment 1 exact-N artifacts frozen at 17:15 HKT.
-      No active session needed. PR #21 awaiting conflict resolution and PI review.
-      Reconciler (2026-07-24T09:34Z): transitioned graph CREATED→REVIEW (was stale).
+      Combined PR #23. 5 PI review rounds. PR merged by PI.
+      Graph state updated to COMPLETED by reconciler
+      2026-07-25T00:36Z.
 
 metadata:
   created_at: "2026-07-24T09:09:31Z"

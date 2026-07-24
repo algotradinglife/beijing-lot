@@ -59,13 +59,13 @@ spec:
       - research_pi_review
 
 status:
-  current: EXECUTING
-  attempts: 1
+  current: COMPLETED
+  attempts: 5
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: Capability task, time-sensitive (17:55 HKT freeze), depends on #19 segment manifest
+    reason: PR #23 merged by PI. Freeze detection capability complete.
   artifacts:
     - evidence/bj_bet_freeze_001/segment_1_source_bundle/manifest.json
     - evidence/bj_bet_freeze_001/verify_segment_1_missed_evidence.py
@@ -82,3 +82,27 @@ status:
       from: CREATED
       to: REVIEW
       reason: "Graph was stale (CREATED vs actual EXECUTING). Segment 1 produced pre-freeze candidates at 17:15 HKT but missed the v2 N×budget/ledger contract; they are incident evidence only. Segments 2/3 remain pending prospective receipts."
+    - action: reconcile_state_update
+      ts: "2026-07-24T10:52:17Z"
+      actor: reconciler
+      from: EXECUTING
+      to: REVIEW
+      reason: "Task YAML stale after PI round-2 review. PR #23 with 5 blocking PI findings. Aligned with graph state AWAITING_DECISION."
+    - action: reconcile_dispatch
+      ts: "2026-07-25T00:10:00Z"
+      actor: reconciler
+      from: REVIEW
+      to: REVIEW
+      reason: "PI round-4 review on 63bbdb31 (2026-07-24T15:59Z). 2 P0 + 1 P1 remaining. Runtime registry notes updated. Engineer dispatched via tmux with round-4 findings. Task YAML routing reason updated."
+    - action: reconcile_commit_registered
+      ts: "2026-07-25T00:23:23Z"
+      actor: reconciler
+      from: REVIEW
+      to: REVIEW
+      reason: "Engineer pushed fix commit 0a5199de (verify exact-N publication before ledger commit). Runtime registry updated to 18 commits. PI round-5 re-review notified via tmux session."
+    - action: reconcile_state_transition
+      ts: "2026-07-25T00:36:00Z"
+      actor: reconciler
+      from: REVIEW
+      to: COMPLETED
+      reason: "PR #23 merged by PI. Graph state updated to COMPLETED. Issues #19/#20 labeled state/completed."
