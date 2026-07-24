@@ -19,6 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.decision_artifact_completeness import active_snapshot_completeness, format_completeness_error  # noqa: E402
+from src.structured_input_receipt import write_receipt  # noqa: E402
 
 DEFAULT_DB = PROJECT_ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "results/structured_decision_chain_shadow"
@@ -1538,6 +1539,15 @@ def run(
     summary["status"] = "generated"
     summary["snapshot_completeness"] = completeness
     write_csv(rows, csv_path)
+    write_receipt(
+        csv_path,
+        issue=issue,
+        source={
+            "database": str(db_path),
+            "snapshot_completeness": completeness,
+            "match_indices": [row.match_idx for row in rows],
+        },
+    )
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(render_report(rows, summary, csv_path, issue=issue), encoding="utf-8")
     return csv_path, report_path, summary

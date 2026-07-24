@@ -138,6 +138,10 @@ def test_hash_bundle_policy_and_tamper_rejection(tmp_path: Path) -> None:
     finally:
         history.discard_stage(stage)
     assert history.verify_hashed_bundle(final, history.CAPTURE_SCHEMA)["status"] == "valid"
+    (final / "unbound.txt").write_text("not in SHA256SUMS\n", encoding="utf-8")
+    with pytest.raises(history.CorrectScorePriceError, match="complete capture bundle"):
+        history.verify_hashed_bundle(final, history.CAPTURE_SCHEMA)
+    (final / "unbound.txt").unlink()
     with (final / "snapshots.csv").open("a", encoding="utf-8") as handle:
         handle.write("tamper\n")
     with pytest.raises(history.CorrectScorePriceError, match="checksum mismatch"):

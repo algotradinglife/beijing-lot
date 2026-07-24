@@ -33,6 +33,10 @@ from src.correct_score_price_history import (  # noqa: E402
     select_latest_complete,
 )
 from src.natural_day_manifest import NaturalDayManifestError, verify_manifest  # noqa: E402
+from src.structured_input_receipt import (  # noqa: E402
+    receipt_path,
+    verify_receipt,
+)
 
 HKT = ZoneInfo("Asia/Hong_Kong")
 N_VALUES, BUDGETS = (3, 4, 5, 6, 7), (512, 768, 1024)
@@ -57,6 +61,26 @@ def file_hash(path: Path) -> str:
 def hkt(value: str) -> datetime:
     d = datetime.fromisoformat(value) if value else datetime.now(timezone.utc)
     return (d if d.tzinfo else d.replace(tzinfo=HKT)).astimezone(HKT)
+
+
+def require_pre_freeze_wall_clock(
+    scheduled: datetime, observed_at: datetime | None = None
+) -> datetime:
+    """Return the trusted invocation clock, refusing any post-deadline backfill."""
+    observed = (observed_at or datetime.now(timezone.utc)).astimezone(HKT)
+    if observed > scheduled:
+        raise ValueError("MISSED_FREEZE: publisher wall clock is after absolute freeze")
+    return observed
+
+
+def _predecision_fetch(row: dict[str, object], decision_at: datetime) -> bool:
+    try:
+        fetched = datetime.fromisoformat(str(row.get("fetched_at_utc") or ""))
+    except ValueError:
+        return False
+    if fetched.tzinfo is None:
+        return False
+    return fetched.astimezone(timezone.utc) <= decision_at.astimezone(timezone.utc)
 
 
 def score_audit(
@@ -105,7 +129,7 @@ def score_audit(
         bundles.append(batch)
         bundle_receipts.append(
             {
-                "path": str(batch),
+                "path": str(batch.expanduser().resolve()),
                 "capture_batch_id": str(manifest.get("capture_batch_id") or ""),
                 "manifest_sha256": file_hash(candidate),
                 "sha256s_sha256": str(verification["sha256s_sha256"]),
@@ -133,9 +157,16 @@ def score_audit(
     snapshots = [row for row in snapshots if row.get("issue") == issue]
     audits: list[dict[str, object]] = []
     for idx in indices:
-        candidates = [row for row in snapshots if int(row.get("match_idx") or 0) == idx]
+        all_candidates = [
+            row for row in snapshots if int(row.get("match_idx") or 0) == idx
+        ]
+        candidates = [
+            row for row in all_candidates if _predecision_fetch(row, decision_at)
+        ]
         selected, reason = select_latest_complete(candidates, decision_at)
         if selected is None:
+            if all_candidates and not candidates:
+                reason = "no_snapshot_with_predecision_fetch_clock"
             audits.append(
                 {
                     "match_idx": idx,
@@ -160,6 +191,11 @@ def score_audit(
         reasons: list[str] = []
         if len(vector) != int(selected.get("outcome_count") or 0):
             reasons.append("incomplete_price_vector")
+        sale_state = str(
+            selected.get("sale_state") or selected.get("market_sale_state") or ""
+        )
+        if not sale_state:
+            reasons.append("missing_source_sale_state")
         model_input = {
             "issue": issue,
             "match_idx": idx,
@@ -177,7 +213,7 @@ def score_audit(
                 "source_time_raw": selected["source_time_raw"],
                 "source_timestamp_scope": selected.get("source_timestamp_scope", ""),
                 "fetched_at_utc": selected["fetched_at_utc"],
-                "sale_state": "open_pregame_observation",
+                "sale_state": sale_state or "UNKNOWN_NOT_SOURCE_OBSERVED",
                 "phase": selected["phase"],
                 "raw_payload_sha256": selected["raw_payload_sha256"],
                 "raw_row_sha256": selected["raw_row_sha256"],
@@ -206,6 +242,11 @@ def main() -> None:
     p.add_argument("--manifest", type=Path, required=True)
     p.add_argument("--structured-csv", type=Path, required=True)
     p.add_argument(
+        "--input-receipt",
+        type=Path,
+        help="generator receipt; defaults beside --structured-csv",
+    )
+    p.add_argument(
         "--db", type=Path, default=ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
     )
     p.add_argument(
@@ -213,13 +254,9 @@ def main() -> None:
     )
     p.add_argument("--ledger-root", type=Path, default=DEFAULT_LEDGER)
     p.add_argument("--correct-score-root", type=Path, default=DEFAULT_SCORE_ROOT)
-    p.add_argument(
-        "--decision-at-hkt", default="", help="manual freeze time; defaults to now"
-    )
     p.add_argument("--sample-attempts", type=int, default=12000)
     p.add_argument("--sample-seed", type=int, default=20260707)
     a = p.parse_args()
-    decision_at = hkt(a.decision_at_hkt)
     manifest = json.loads(a.manifest.read_text())
     try:
         claimed = verify_manifest(manifest)
@@ -233,13 +270,20 @@ def main() -> None:
     if not seg:
         raise SystemExit("fail closed: segment absent from manifest")
     scheduled = hkt(seg["freeze_at"])
-    if decision_at > scheduled:
-        raise SystemExit("MISSED_FREEZE: decision is after absolute freeze")
+    try:
+        decision_at = require_pre_freeze_wall_clock(scheduled)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
     expected = tuple(int(x) for x in seg["match_indices"])
     source_sha = file_hash(a.structured_csv)
-    input_generated_at = datetime.fromtimestamp(
-        a.structured_csv.stat().st_mtime, scheduled.tzinfo
-    )
+    input_receipt_path = a.input_receipt or receipt_path(a.structured_csv)
+    try:
+        source_receipt = verify_receipt(
+            a.structured_csv, input_receipt_path, issue=str(a.issue)
+        )
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise SystemExit("fail closed: invalid structured input receipt") from exc
+    input_generated_at = source_receipt["generated_at"].astimezone(HKT)
     final_refresh_opens_at = scheduled - timedelta(minutes=30)
     if not (final_refresh_opens_at <= input_generated_at <= decision_at):
         raise SystemExit(
@@ -272,6 +316,8 @@ def main() -> None:
         "structured_csv": str(a.structured_csv),
         "structured_csv_sha256": source_sha,
         "structured_csv_size_bytes": a.structured_csv.stat().st_size,
+        "generator_receipt": str(input_receipt_path),
+        "generator_receipt_sha256": source_receipt["sha256"],
         "input_generated_at": input_generated_at.isoformat(timespec="seconds"),
         "input_observed_at": decision_at.isoformat(timespec="seconds"),
         "final_refresh_opens_at": final_refresh_opens_at.isoformat(timespec="seconds"),
@@ -297,6 +343,35 @@ def main() -> None:
     stage = Path(tempfile.mkdtemp(prefix="exact_n_", dir=a.output_root))
     payloads = []
     try:
+        (stage / "structured_input.csv").write_bytes(a.structured_csv.read_bytes())
+        (stage / "structured_input_receipt.json").write_bytes(
+            canonical(
+                {
+                    key: (
+                        value.isoformat(timespec="microseconds")
+                        if key == "generated_at"
+                        else value
+                    )
+                    for key, value in source_receipt.items()
+                    if key != "generated_at"
+                }
+            )
+            + b"\n"
+        )
+        payloads.extend(
+            [
+                {
+                    "file": "structured_input.csv",
+                    "sha256": source_sha,
+                    "artifact_type": "decision_input_bytes",
+                },
+                {
+                    "file": "structured_input_receipt.json",
+                    "sha256": source_receipt["sha256"],
+                    "artifact_type": "decision_input_generation_receipt",
+                },
+            ]
+        )
         (stage / "decision_input_manifest.json").write_bytes(
             canonical({**input_manifest, "sha256": input_manifest_sha256}) + b"\n"
         )
@@ -338,6 +413,7 @@ def main() -> None:
                         "leg_codes": list(x.candidate.leg_codes),
                         "actual_n": len(x.candidate.match_indices),
                         "stake_multiplier": x.stake_multiplier,
+                        "base_cost_yuan": x.candidate.cost_units * 2,
                         "cost_yuan": x.candidate.cost_units * x.stake_multiplier * 2,
                     }
                     for x in staked

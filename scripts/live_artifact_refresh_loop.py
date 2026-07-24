@@ -34,6 +34,7 @@ from src.natural_day_manifest import (  # noqa: E402
     load_published_manifest,
     verify_operational_windows,
 )
+from src.structured_input_receipt import receipt_path, verify_receipt  # noqa: E402
 
 
 DEFAULT_INTERVAL_SEC = 300.0
@@ -521,9 +522,22 @@ def coordinate_due_exact_n_freeze(
         }
 
     _freeze_at, segment = min(upcoming, key=lambda item: item[0])
-    input_generated_at = datetime.fromtimestamp(
-        structured_csv.stat().st_mtime, _freeze_at.tzinfo
-    )
+    source_receipt_path = receipt_path(structured_csv)
+    try:
+        source_receipt = verify_receipt(
+            structured_csv, source_receipt_path, issue=str(issue)
+        )
+        input_generated_at = source_receipt["generated_at"].astimezone(
+            _freeze_at.tzinfo
+        )
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return {
+            "status": "failed_closed_invalid_structured_input_receipt",
+            "segment_idx": int(segment["segment_idx"]),
+            "structured_csv": str(structured_csv),
+            "input_receipt": str(source_receipt_path),
+            "error": str(exc),
+        }
     final_refresh_opens_at = _freeze_at - timedelta(
         minutes=DEFAULT_FINAL_INPUT_REFRESH_LEAD_MINUTES
     )
@@ -583,6 +597,8 @@ def coordinate_due_exact_n_freeze(
         str(manifest["manifest_path"]),
         "--structured-csv",
         str(structured_csv),
+        "--input-receipt",
+        str(source_receipt_path),
         "--db",
         str(db_path),
         "--output-root",
@@ -591,8 +607,6 @@ def coordinate_due_exact_n_freeze(
         str(ledger_root),
         "--correct-score-root",
         str(correct_score_root),
-        "--decision-at-hkt",
-        observed_at.isoformat(timespec="seconds"),
     ]
     completed = subprocess.run(
         command,

@@ -25,6 +25,7 @@ from src.natural_day_manifest import (  # noqa: E402
     NaturalDayManifestError,
     load_published_manifest,
 )
+from src.structured_input_receipt import write_receipt  # noqa: E402
 
 
 def _database(path: Path) -> None:
@@ -383,6 +384,12 @@ def test_live_coordinator_publishes_due_segment_from_canonical_manifest(
     publication = _publish(db, output)
     refreshed_at = datetime.fromisoformat("2026-07-25T17:45:00+08:00")
     os.utime(structured, (refreshed_at.timestamp(), refreshed_at.timestamp()))
+    write_receipt(
+        structured,
+        issue="26078",
+        generated_at=refreshed_at,
+        source={"test": True},
+    )
     commands: list[list[str]] = []
 
     def run(command, **_kwargs):
@@ -467,6 +474,12 @@ def test_live_coordinator_rejects_stale_previous_segment_input(
     structured.write_text("fixture\n", encoding="utf-8")
     stale = datetime.fromisoformat("2026-07-24T17:45:00+08:00")
     os.utime(structured, (stale.timestamp(), stale.timestamp()))
+    write_receipt(
+        structured,
+        issue="26078",
+        generated_at=stale,
+        source={"test": True},
+    )
     _database(db)
     _publish(db, output)
     result = refresh_loop.coordinate_due_exact_n_freeze(
