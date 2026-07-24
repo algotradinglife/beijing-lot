@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import shutil
+import sqlite3
 import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -28,11 +29,20 @@ from scripts.manage_correct_score_price_history import (  # noqa: E402
     read_capture_bundles,
     verify_correct_score_bundle,
 )
+from scripts.verify_exact_n_freeze import (  # noqa: E402
+    verify_directory as verify_exact_n_directory,
+)
 from src.correct_score_price_history import (  # noqa: E402
     CorrectScorePriceError,
     select_latest_complete,
 )
-from src.natural_day_manifest import NaturalDayManifestError, verify_manifest  # noqa: E402
+from src.natural_day_manifest import (  # noqa: E402
+    NaturalDayManifestError,
+    load_published_manifest,
+    segment_membership,
+    verify_manifest,
+    verify_operational_windows,
+)
 from src.structured_input_receipt import (  # noqa: E402
     receipt_path,
     verify_receipt,
@@ -76,6 +86,115 @@ def require_pre_freeze_wall_clock(
     if observed > scheduled:
         raise ValueError("MISSED_FREEZE: publisher wall clock is after absolute freeze")
     return observed
+
+
+def require_canonical_segment_contract(
+    db_path: Path,
+    *,
+    issue: str,
+    supplied_manifest: dict[str, object],
+) -> dict[str, object]:
+    """Bind manual and automatic publication to the SQLite source of truth."""
+    supplied_sha = verify_manifest(supplied_manifest)
+    with sqlite3.connect(db_path) as connection:
+        published = load_published_manifest(connection, str(issue))
+        if published is None:
+            raise NaturalDayManifestError(
+                "canonical natural-day publication is missing"
+            )
+        verify_operational_windows(connection, published)
+    if (
+        str(supplied_manifest.get("issue")) != str(issue)
+        or supplied_sha != str(published["manifest_sha256"])
+        or segment_membership(supplied_manifest) != segment_membership(published)
+        or [
+            int(value)
+            for value in supplied_manifest.get("denominator_match_indices", [])
+        ]
+        != [int(value) for value in published["denominator_match_indices"]]
+    ):
+        raise NaturalDayManifestError(
+            "supplied manifest differs from canonical SQLite publication"
+        )
+    return published
+
+
+def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
+    fd, temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(canonical(payload) + b"\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        Path(temporary).unlink(missing_ok=True)
+        raise
+
+
+def promote_verified_package(
+    *,
+    stage: Path,
+    destination: Path,
+    ledger: Path,
+    ledger_payload: dict[str, object],
+) -> dict[str, object]:
+    """Verify before reservation and again before making the ledger authoritative."""
+    staged_verification = verify_exact_n_directory(stage)
+    if staged_verification.get("status") != "PASS":
+        raise RuntimeError("fail closed: staged exact-N package verification failed")
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        raise RuntimeError("fail closed: content-addressed output exists")
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    reserved = {
+        **ledger_payload,
+        "state": "RESERVED",
+        "staged_package_verification": staged_verification,
+    }
+    fd = os.open(ledger, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(canonical(reserved) + b"\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+
+    os.replace(stage, destination)
+    try:
+        visible_verification = verify_exact_n_directory(destination)
+        if (
+            visible_verification.get("status") != "PASS"
+            or visible_verification != staged_verification
+        ):
+            raise ValueError("visible verification differs from staged receipt")
+    except Exception as exc:
+        _atomic_write_json(
+            ledger,
+            {
+                **ledger_payload,
+                "state": "VERIFICATION_FAILED",
+                "verification_phase": "VISIBLE_PACKAGE",
+                "verification_error": f"{type(exc).__name__}: {exc}",
+                "staged_package_verification": staged_verification,
+            },
+        )
+        raise RuntimeError(
+            "fail closed: visible exact-N package verification failed"
+        ) from exc
+
+    _atomic_write_json(
+        ledger,
+        {
+            **ledger_payload,
+            "state": "PUBLISHED",
+            "artifact_manifest_sha256": file_hash(destination / "manifest.json"),
+            "package_sha256s_sha256": file_hash(destination / "SHA256SUMS"),
+            "package_verification": visible_verification,
+        },
+    )
+    return visible_verification
 
 
 def _predecision_fetch(row: dict[str, object], decision_at: datetime) -> bool:
@@ -272,11 +391,16 @@ def main() -> None:
     a = p.parse_args()
     manifest = json.loads(a.manifest.read_text())
     try:
+        manifest = require_canonical_segment_contract(
+            a.db,
+            issue=str(a.issue),
+            supplied_manifest=manifest,
+        )
         claimed = verify_manifest(manifest)
-    except NaturalDayManifestError as exc:
-        raise SystemExit("fail closed: invalid natural-day manifest") from exc
-    if manifest.get("issue") != str(a.issue):
-        raise SystemExit("fail closed: invalid natural-day manifest")
+    except (NaturalDayManifestError, sqlite3.Error) as exc:
+        raise SystemExit(
+            "fail closed: manifest is not the canonical DB publication"
+        ) from exc
     seg = next(
         (x for x in manifest["segments"] if int(x["segment_idx"]) == a.segment), None
     )
@@ -297,6 +421,7 @@ def main() -> None:
     except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
         raise SystemExit("fail closed: invalid structured input receipt") from exc
     input_generated_at = source_receipt["generated_at"].astimezone(HKT)
+    input_generated_at_text = input_generated_at.isoformat(timespec="microseconds")
     final_refresh_opens_at = scheduled - timedelta(minutes=30)
     if not (final_refresh_opens_at <= input_generated_at <= decision_at):
         raise SystemExit(
@@ -334,7 +459,7 @@ def main() -> None:
         ],
         "generator_receipt": str(input_receipt_path),
         "generator_receipt_sha256": source_receipt["sha256"],
-        "input_generated_at": input_generated_at.isoformat(timespec="seconds"),
+        "input_generated_at": input_generated_at_text,
         "input_observed_at": decision_at.isoformat(timespec="seconds"),
         "final_refresh_opens_at": final_refresh_opens_at.isoformat(timespec="seconds"),
         "effective_decision_at": decision_at.isoformat(timespec="seconds"),
@@ -348,7 +473,7 @@ def main() -> None:
         "segment_manifest_sha256": claimed,
         "decision_input_sha256": source_sha,
         "decision_input_manifest_sha256": input_manifest_sha256,
-        "decision_input_generated_at": input_generated_at.isoformat(timespec="seconds"),
+        "decision_input_generated_at": input_generated_at_text,
         "scheduled_freeze_at": scheduled.isoformat(timespec="seconds"),
         "manual_frozen_at": decision_at.isoformat(timespec="seconds"),
         "effective_decision_at": decision_at.isoformat(timespec="seconds"),
@@ -515,41 +640,18 @@ def main() -> None:
                 if path.is_file() and path.name != "SHA256SUMS"
             )
         )
-        destination = a.output_root / str(a.issue) / f"segment_{a.segment}" / event_key
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if destination.exists():
-            raise SystemExit("fail closed: content-addressed output exists")
-        # Reserve the immutable event before exposing the artifact.  A crash
-        # leaves an explicit incomplete ledger record rather than a second key.
-        a.ledger_root.mkdir(parents=True, exist_ok=True)
-        fd = os.open(ledger, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "wb") as f:
-            f.write(
-                canonical(
-                    {
-                        "schema_version": "exact_n_freeze_ledger_v1",
-                        **common,
-                        "state": "RESERVED",
-                        "artifact_manifest": str(destination / "manifest.json"),
-                    }
-                )
-                + b"\n"
-            )
-        os.replace(stage, destination)
-        ledger.write_bytes(
-            canonical(
-                {
-                    "schema_version": "exact_n_freeze_ledger_v1",
-                    **common,
-                    "state": "PUBLISHED",
-                    "artifact_manifest": str(destination / "manifest.json"),
-                    "artifact_manifest_sha256": file_hash(
-                        destination / "manifest.json"
-                    ),
-                    "package_sha256s_sha256": file_hash(destination / "SHA256SUMS"),
-                }
-            )
-            + b"\n"
+        destination = (
+            a.output_root / str(a.issue) / f"segment_{a.segment}" / event_key
+        )
+        verification = promote_verified_package(
+            stage=stage,
+            destination=destination,
+            ledger=ledger,
+            ledger_payload={
+                "schema_version": "exact_n_freeze_ledger_v1",
+                **common,
+                "artifact_manifest": str(destination / "manifest.json"),
+            },
         )
         print(
             json.dumps(
@@ -558,6 +660,7 @@ def main() -> None:
                     "destination": str(destination),
                     "variants": 15,
                     "ledger": str(ledger),
+                    "verification": verification,
                 }
             )
         )

@@ -8,7 +8,7 @@ import csv
 import hashlib
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -173,6 +173,8 @@ def verify_directory(root: Path) -> dict[str, Any]:
             payload["event_key"],
             str(payload["issue"]),
             int(payload["segment_idx"]),
+            payload["decision_input_generated_at"],
+            payload["manual_frozen_at"],
         )
         common = common or key
         if key != common:
@@ -195,6 +197,8 @@ def verify_directory(root: Path) -> dict[str, Any]:
         manifest.get("event_key"),
         str(manifest.get("issue")),
         int(manifest.get("segment_idx", -1)),
+        manifest.get("decision_input_generated_at"),
+        manifest.get("manual_frozen_at"),
     )
     if manifest_identity != common:
         raise ValueError("top-level manifest frozen identity mismatch")
@@ -249,17 +253,33 @@ def verify_directory(root: Path) -> dict[str, Any]:
     generated_at = datetime.fromisoformat(str(source_receipt["generated_at_utc"]))
     refresh_opens = datetime.fromisoformat(str(input_payload["final_refresh_opens_at"]))
     effective_at = datetime.fromisoformat(str(input_payload["effective_decision_at"]))
+    scheduled_at = datetime.fromisoformat(str(common[4]))
+    common_generated_at = datetime.fromisoformat(str(common[9]))
     if (
         generated_at.tzinfo is None
         or refresh_opens.tzinfo is None
         or effective_at.tzinfo is None
+        or scheduled_at.tzinfo is None
+        or common_generated_at.tzinfo is None
+        or input_payload.get("effective_decision_at") != common[5]
+        or input_payload.get("input_observed_at") != common[5]
+        or input_payload.get("input_generated_at") != common[9]
+        or common[10] != common[5]
+        or effective_at.astimezone(timezone.utc)
+        > scheduled_at.astimezone(timezone.utc)
+        or refresh_opens.astimezone(timezone.utc)
+        != (
+            scheduled_at.astimezone(timezone.utc) - timedelta(minutes=30)
+        )
+        or common_generated_at.astimezone(timezone.utc)
+        != generated_at.astimezone(timezone.utc)
         or not (
             refresh_opens.astimezone(timezone.utc)
             <= generated_at.astimezone(timezone.utc)
             <= effective_at.astimezone(timezone.utc)
         )
     ):
-        raise ValueError("decision input generation clock outside legal window")
+        raise ValueError("decision input clock linkage or legal window mismatch")
 
     score = json.loads((root / "correct_score_audit.json").read_text(encoding="utf-8"))
     score_hash = _payload_hash(score)
@@ -429,6 +449,10 @@ def verify_directory(root: Path) -> dict[str, Any]:
         "grid": sorted([list(item) for item in grid]),
         "shared_freeze_at": common[4],
         "effective_decision_at": common[5],
+        "input_observed_at": input_payload["input_observed_at"],
+        "decision_input_generated_at": common[9],
+        "final_refresh_opens_at": input_payload["final_refresh_opens_at"],
+        "clock_linkage": "PASS",
         "segment_manifest_sha256": common[1],
         "decision_input_sha256": common[2],
         "decision_input_manifest_sha256": common[3],

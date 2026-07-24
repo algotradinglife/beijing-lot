@@ -22,6 +22,9 @@ from scripts.publish_v4_2_execution_artifacts import (  # noqa: E402
     DEFAULT_WORK_DIR,
     run as publish_v4_2_execution_artifacts,
 )
+from scripts.verify_exact_n_freeze import (  # noqa: E402
+    verify_directory as verify_exact_n_directory,
+)
 from scripts.estimate_segment_betting_plan import (  # noqa: E402
     BETTING_STRATEGY_VERSION as SEGMENT_BETTING_STRATEGY_VERSION,
     DEFAULT_OUTPUT_DIR as DEFAULT_SEGMENT_BETTING_PLAN_DIR,
@@ -574,12 +577,38 @@ def coordinate_due_exact_n_freeze(
             == str(manifest["manifest_sha256"])
             and Path(str(ledger.get("artifact_manifest") or "")).is_file()
         ):
-            return {
-                "status": "already_published",
-                "segment_idx": int(segment["segment_idx"]),
-                "event_key": event_key,
-                "segment_manifest_sha256": str(manifest["manifest_sha256"]),
-            }
+            try:
+                artifact_manifest = Path(str(ledger["artifact_manifest"]))
+                verification = verify_exact_n_directory(artifact_manifest.parent)
+                if (
+                    verification.get("status") == "PASS"
+                    and ledger.get("package_verification") == verification
+                    and ledger.get("artifact_manifest_sha256")
+                    == verification.get("artifact_manifest_sha256")
+                    and ledger.get("package_sha256s_sha256")
+                    == verification.get("package_sha256s_sha256")
+                ):
+                    return {
+                        "status": "already_published",
+                        "segment_idx": int(segment["segment_idx"]),
+                        "event_key": event_key,
+                        "segment_manifest_sha256": str(
+                            manifest["manifest_sha256"]
+                        ),
+                        "verification": verification,
+                    }
+            except (
+                OSError,
+                KeyError,
+                TypeError,
+                ValueError,
+                json.JSONDecodeError,
+            ) as exc:
+                return {
+                    "status": "failed_closed_invalid_ledger",
+                    "segment_idx": int(segment["segment_idx"]),
+                    "error": f"published package verification failed: {exc}",
+                }
         return {
             "status": "failed_closed_existing_event_reservation",
             "segment_idx": int(segment["segment_idx"]),
@@ -629,6 +658,44 @@ def coordinate_due_exact_n_freeze(
             "status": "failed_closed_invalid_receipt",
             "segment_idx": int(segment["segment_idx"]),
             "stdout": completed.stdout.strip(),
+        }
+    verification = (
+        receipt.get("verification")
+        if isinstance(receipt.get("verification"), dict)
+        else {}
+    )
+    try:
+        published_ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {
+            "status": "failed_closed_invalid_receipt",
+            "segment_idx": int(segment["segment_idx"]),
+            "error": f"published ledger unavailable: {exc}",
+        }
+    try:
+        artifact_manifest = Path(
+            str(published_ledger.get("artifact_manifest") or "")
+        )
+        coordinator_verification = verify_exact_n_directory(
+            artifact_manifest.parent
+        )
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return {
+            "status": "failed_closed_invalid_receipt",
+            "segment_idx": int(segment["segment_idx"]),
+            "error": f"coordinator package verification failed: {exc}",
+        }
+    if (
+        receipt.get("event_key") != event_key
+        or verification.get("status") != "PASS"
+        or published_ledger.get("state") != "PUBLISHED"
+        or published_ledger.get("package_verification") != verification
+        or coordinator_verification != verification
+    ):
+        return {
+            "status": "failed_closed_invalid_receipt",
+            "segment_idx": int(segment["segment_idx"]),
+            "error": "publisher receipt is not bound to a verified PUBLISHED ledger",
         }
     return {
         "status": "published",

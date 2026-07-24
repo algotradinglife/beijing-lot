@@ -17,6 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts import publish_natural_day_segment_manifest as publisher  # noqa: E402
+from scripts import publish_exact_n_segment_freeze as exact_n_publisher  # noqa: E402
 from scripts import live_artifact_refresh_loop as refresh_loop  # noqa: E402
 from scripts import replay_rolling_segment_n_tickets as rolling  # noqa: E402
 from scripts.verify_natural_day_segment_consistency import verify  # noqa: E402
@@ -24,6 +25,7 @@ from src.decision_api import app as decision_app  # noqa: E402
 from src.natural_day_manifest import (  # noqa: E402
     NaturalDayManifestError,
     load_published_manifest,
+    manifest_sha256,
 )
 from src.structured_input_receipt import write_receipt  # noqa: E402
 
@@ -414,16 +416,45 @@ def test_live_coordinator_publishes_due_segment_from_canonical_manifest(
         source={"test": True},
     )
     commands: list[list[str]] = []
+    verification = {"status": "PASS", "cells": 15}
+    monkeypatch.setattr(
+        refresh_loop,
+        "verify_exact_n_directory",
+        lambda _path: dict(verification),
+    )
 
     def run(command, **_kwargs):
         commands.append(command)
+        event_key = hashlib.sha256(
+            json.dumps(
+                {"issue": "26078", "segment_idx": 1},
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
+        artifact_manifest = tmp_path / "freeze" / "manifest.json"
+        artifact_manifest.parent.mkdir(parents=True)
+        artifact_manifest.write_text("{}\n", encoding="utf-8")
+        ledger = tmp_path / "ledger" / f"{event_key}.json"
+        ledger.parent.mkdir(parents=True)
+        ledger.write_text(
+            json.dumps(
+                {
+                    "state": "PUBLISHED",
+                    "artifact_manifest": str(artifact_manifest),
+                    "package_verification": verification,
+                }
+            ),
+            encoding="utf-8",
+        )
         return subprocess.CompletedProcess(
             command,
             0,
             stdout=json.dumps({
-                "event_key": "fixture",
+                "event_key": event_key,
                 "destination": str(tmp_path / "freeze"),
                 "variants": 15,
+                "verification": verification,
             }),
             stderr="",
         )
@@ -485,6 +516,37 @@ def test_operational_by_segment_requires_published_manifest(tmp_path: Path) -> N
             legs,
             db_path=db,
             require_published_contract=True,
+        )
+
+
+def test_manual_freeze_rejects_noncanonical_self_consistent_manifest(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "test.sqlite"
+    output = tmp_path / "results"
+    _database(db)
+    publication = _publish(db, output)
+    canonical = json.loads(
+        Path(str(publication["manifest"])).read_text(encoding="utf-8")
+    )
+    bound = exact_n_publisher.require_canonical_segment_contract(
+        db,
+        issue="26078",
+        supplied_manifest=canonical,
+    )
+    assert bound["manifest_sha256"] == publication["sha256"]
+
+    decoy = json.loads(json.dumps(canonical))
+    moved = decoy["segments"][0]["match_indices"].pop()
+    decoy["segments"][0]["match_count"] -= 1
+    decoy["segments"][1]["match_indices"].insert(0, moved)
+    decoy["segments"][1]["match_count"] += 1
+    decoy["manifest_sha256"] = manifest_sha256(decoy)
+    with pytest.raises(NaturalDayManifestError, match="canonical SQLite"):
+        exact_n_publisher.require_canonical_segment_contract(
+            db,
+            issue="26078",
+            supplied_manifest=decoy,
         )
 
 

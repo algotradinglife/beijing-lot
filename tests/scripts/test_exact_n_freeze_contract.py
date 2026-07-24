@@ -36,6 +36,8 @@ def package(root: Path) -> Path:
         "decision_input_sha256": "b" * 64,
         "scheduled_freeze_at": "2026-07-26T00:55:00+08:00",
         "effective_decision_at": "2026-07-26T00:50:00+08:00",
+        "decision_input_generated_at": "2026-07-26T00:40:00+08:00",
+        "manual_frozen_at": "2026-07-26T00:50:00+08:00",
         "event_key": hashlib.sha256(
             canonical({"issue": "26078", "segment_idx": 2})
         ).hexdigest(),
@@ -179,9 +181,54 @@ def rehash_package(root: Path, changed_file: Path) -> None:
     )
 
 
+def rewrite_clock_package(
+    root: Path,
+    *,
+    input_updates: dict[str, object],
+    common_updates: dict[str, object] | None = None,
+) -> None:
+    """Fully rehash/relink a package after adversarial clock mutations."""
+    common_updates = common_updates or {}
+    input_path = root / "decision_input_manifest.json"
+    input_payload = json.loads(input_path.read_text(encoding="utf-8"))
+    input_payload.pop("sha256")
+    input_payload.update(input_updates)
+    input_sha = write_payload(input_path, input_payload)
+
+    changed_hashes = {"decision_input_manifest.json": input_sha}
+    for path in [
+        *sorted(root.glob("exact_n_*_budget_*.json")),
+        root / "correct_score_audit.json",
+    ]:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload.pop("sha256")
+        payload.update(common_updates)
+        payload["decision_input_manifest_sha256"] = input_sha
+        changed_hashes[path.name] = write_payload(path, payload)
+
+    manifest_path = root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest.pop("sha256")
+    manifest.update(common_updates)
+    manifest["decision_input_manifest_sha256"] = input_sha
+    for entry in manifest["artifacts"]:
+        if entry["file"] in changed_hashes:
+            entry["sha256"] = changed_hashes[entry["file"]]
+    write_payload(manifest_path, manifest)
+    (root / "SHA256SUMS").write_text(
+        "".join(
+            f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n"
+            for path in sorted(root.iterdir())
+            if path.is_file() and path.name != "SHA256SUMS"
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_verifier_proves_complete_exact_n_contract(tmp_path: Path) -> None:
     report = verify_directory(package(tmp_path / "package"))
     assert report["status"] == "PASS"
+    assert report["clock_linkage"] == "PASS"
     assert report["cells"] == 15
     assert len(report["grid"]) == 15
 
@@ -224,6 +271,125 @@ def test_publisher_rejects_backdated_post_deadline_invocation() -> None:
     observed = publisher.hkt("2026-07-26T00:55:01+08:00")
     with pytest.raises(ValueError, match="wall clock"):
         publisher.require_pre_freeze_wall_clock(scheduled, observed)
+
+
+@pytest.mark.parametrize(
+    ("input_updates", "common_updates"),
+    [
+        (
+            {
+                "effective_decision_at": "2026-07-26T00:49:00+08:00",
+                "input_observed_at": "2026-07-26T00:49:00+08:00",
+            },
+            {},
+        ),
+        ({"input_observed_at": "2026-07-26T00:49:00+08:00"}, {}),
+        (
+            {
+                "effective_decision_at": "2026-07-26T01:00:00+08:00",
+                "input_observed_at": "2026-07-26T01:00:00+08:00",
+            },
+            {
+                "effective_decision_at": "2026-07-26T01:00:00+08:00",
+                "manual_frozen_at": "2026-07-26T01:00:00+08:00",
+            },
+        ),
+        ({"final_refresh_opens_at": "2026-07-26T00:24:00+08:00"}, {}),
+        (
+            {"input_generated_at": "2026-07-26T00:41:00+08:00"},
+            {"decision_input_generated_at": "2026-07-26T00:41:00+08:00"},
+        ),
+    ],
+)
+def test_verifier_rejects_fully_rehashed_clock_linkage_attacks(
+    tmp_path: Path,
+    input_updates: dict[str, object],
+    common_updates: dict[str, object],
+) -> None:
+    root = package(tmp_path / "package")
+    rewrite_clock_package(
+        root,
+        input_updates=input_updates,
+        common_updates=common_updates,
+    )
+    with pytest.raises(ValueError, match="clock linkage"):
+        verify_directory(root)
+
+
+def test_staged_verification_failure_does_not_reserve_event(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    ledger = tmp_path / "ledger" / "event.json"
+    destination = tmp_path / "visible"
+    monkeypatch.setattr(
+        publisher,
+        "verify_exact_n_directory",
+        lambda _path: (_ for _ in ()).throw(ValueError("invalid staged package")),
+    )
+    with pytest.raises(ValueError, match="invalid staged package"):
+        publisher.promote_verified_package(
+            stage=stage,
+            destination=destination,
+            ledger=ledger,
+            ledger_payload={"artifact_manifest": str(destination / "manifest.json")},
+        )
+    assert not ledger.exists()
+    assert not destination.exists()
+
+
+def test_visible_verification_failure_never_marks_published(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    (stage / "manifest.json").write_text("manifest\n", encoding="utf-8")
+    (stage / "SHA256SUMS").write_text("sums\n", encoding="utf-8")
+    ledger = tmp_path / "ledger" / "event.json"
+    destination = tmp_path / "visible"
+    calls = 0
+
+    def verify(_path: Path) -> dict[str, object]:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise ValueError("invalid visible package")
+        return {"status": "PASS", "cells": 15}
+
+    monkeypatch.setattr(publisher, "verify_exact_n_directory", verify)
+    with pytest.raises(RuntimeError, match="visible exact-N"):
+        publisher.promote_verified_package(
+            stage=stage,
+            destination=destination,
+            ledger=ledger,
+            ledger_payload={"artifact_manifest": str(destination / "manifest.json")},
+        )
+    persisted = json.loads(ledger.read_text(encoding="utf-8"))
+    assert persisted["state"] == "VERIFICATION_FAILED"
+    assert persisted["state"] != "PUBLISHED"
+    assert persisted["staged_package_verification"]["status"] == "PASS"
+
+
+def test_published_ledger_contains_visible_verification_receipt(
+    tmp_path: Path,
+) -> None:
+    stage = package(tmp_path / "stage")
+    ledger = tmp_path / "ledger" / "event.json"
+    destination = tmp_path / "visible"
+    receipt = verify_directory(stage)
+    result = publisher.promote_verified_package(
+        stage=stage,
+        destination=destination,
+        ledger=ledger,
+        ledger_payload={"artifact_manifest": str(destination / "manifest.json")},
+    )
+    persisted = json.loads(ledger.read_text(encoding="utf-8"))
+    assert result == receipt
+    assert persisted["state"] == "PUBLISHED"
+    assert persisted["package_verification"] == receipt
 
 
 def test_verifier_rejects_rehashed_ticket_cost_forgery(tmp_path: Path) -> None:

@@ -4475,8 +4475,9 @@ def _exact_n_freeze_payload(
             if (
                 verification["package_sha256s_sha256"]
                 != str(ledger.get("package_sha256s_sha256") or "")
+                or ledger.get("package_verification") != verification
             ):
-                raise ValueError("ledger package SHA256SUMS mismatch")
+                raise ValueError("ledger package verification receipt mismatch")
             if (
                 str(artifact_manifest.get("event_key") or "") != event_key
                 or str(artifact_manifest.get("segment_manifest_sha256") or "")
