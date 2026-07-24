@@ -23,7 +23,7 @@ spec:
     - id: BJ-MM-FREEZE-001
       node_type: task
       ref: tasks/BJ-MM-FREEZE-001.yaml
-      state: CREATED
+      state: COMPLETED
 
   edges:
     - from: GOAL-BOOT

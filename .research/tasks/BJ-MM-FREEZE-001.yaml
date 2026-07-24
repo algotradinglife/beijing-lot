@@ -11,6 +11,7 @@ metadata:
     - "https://github.com/algotradinglife/beijing-lot/issues/17"
     - "https://github.com/algotradinglife/beijing-lot/issues/11"
     - "https://github.com/algotradinglife/beijing-lot/pull/13"
+    - "https://github.com/algotradinglife/beijing-lot/pull/18"
 
 spec:
   type: capability
@@ -89,13 +90,58 @@ spec:
       - research_pi_review
 
 status:
-  current: CREATED
-  attempts: 0
+  current: COMPLETED
+  attempts: 2
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
     reason: Capability task, medium complexity, requires Python development across multiple subsystems
-  artifacts: []
-  result: {}
-  history: []
+  artifacts:
+    - uri: "https://github.com/algotradinglife/beijing-lot/pull/18"
+      artifact_type: pull_request
+      description: p40/p42 strict segment freeze gate implementation (3 commits, 2 review cycles)
+  result:
+    outcome: supported
+    summary: Capability infrastructure implemented and merged. p40/p42 segment freeze CLI, immutable package schema/verifier, research coordinator, 89 tests. G4/G5 verdicts remain PARTIAL until two prospective events observed post-activation.
+  history:
+    - transition: plan_task
+      from: CREATED
+      to: PLANNING
+      timestamp: "2026-07-24T01:30:00Z"
+    - transition: make_ready
+      from: PLANNING
+      to: READY
+      timestamp: "2026-07-24T01:35:00Z"
+    - transition: start_execution
+      from: READY
+      to: EXECUTING
+      timestamp: "2026-07-24T01:40:00Z"
+    - transition: submit_for_validation
+      from: EXECUTING
+      to: VALIDATING
+      timestamp: "2026-07-24T02:00:00Z"
+    - transition: validation_retry
+      from: VALIDATING
+      to: EXECUTING
+      timestamp: "2026-07-24T02:20:00Z"
+    - transition: submit_for_validation
+      from: EXECUTING
+      to: VALIDATING
+      timestamp: "2026-07-24T03:00:00Z"
+    - transition: validation_retry
+      from: VALIDATING
+      to: EXECUTING
+      timestamp: "2026-07-24T03:30:00Z"
+    - transition: submit_for_validation
+      from: EXECUTING
+      to: VALIDATING
+      timestamp: "2026-07-24T04:30:00Z"
+    - transition: research_decision_gate
+      from: VALIDATING
+      to: AWAITING_DECISION
+      timestamp: "2026-07-24T05:05:00Z"
+    - transition: operational_completion
+      from: AWAITING_DECISION
+      to: COMPLETED
+      timestamp: "2026-07-24T05:10:00Z"
