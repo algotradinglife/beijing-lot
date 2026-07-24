@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import shutil
 import sqlite3
 import sys
 from pathlib import Path
@@ -287,6 +288,55 @@ def test_segment_freeze_verifier_rejects_unlisted_file(
     with pytest.raises(p0.MultimarketP0Error, match="cover exactly"):
         p0.verify_segment_freeze(package)
     connection.close()
+
+
+def test_segment_verifier_rejects_semantic_tampering_after_rehash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection = make_db(tmp_path / "semantic.sqlite")
+    connection.execute("INSERT INTO segment_decision_windows VALUES('P0X',1,'2026-07-16 21:00:00',NULL,'[1]')")
+    connection.commit()
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40))
+    capture(connection, monkeypatch, tmp_path, 42, market_xml(42))
+    package = Path(p0.freeze_segment(connection, "P0X", 1, tmp_path / "segment-freezes")["output_dir"])
+
+    wrong_codes = tmp_path / "wrong-codes" / package.name
+    shutil.copytree(package, wrong_codes)
+    rows = list(csv.DictReader((wrong_codes / "frozen_outcomes.csv").open(encoding="utf-8", newline="")))
+    next(row for row in rows if row["playid"] == "40")["outcome_code"] = "wrong-but-eight"
+    with (wrong_codes / "frozen_outcomes.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), lineterminator="\n")
+        writer.writeheader(); writer.writerows(rows)
+    p0._write_recursive_sums(wrong_codes)
+    with pytest.raises(p0.MultimarketP0Error, match="outcome-code set"):
+        p0.verify_segment_freeze(wrong_codes)
+
+    bad_manifest = tmp_path / "bad-manifest" / package.name
+    shutil.copytree(package, bad_manifest)
+    manifest = json.loads((bad_manifest / "manifest.json").read_text(encoding="utf-8"))
+    manifest["event_id"] = "0" * 64
+    (bad_manifest / "manifest.json").write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+    p0._write_recursive_sums(bad_manifest)
+    with pytest.raises(p0.MultimarketP0Error, match="event identity"):
+        p0.verify_segment_freeze(bad_manifest)
+
+    bad_overlap = tmp_path / "bad-overlap" / package.name
+    shutil.copytree(package, bad_overlap)
+    overlap = list(csv.DictReader((bad_overlap / "paired_overlap.csv").open(encoding="utf-8", newline="")))
+    overlap[0]["p40_batch_id"] = "0" * 64
+    with (bad_overlap / "paired_overlap.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=overlap[0].keys(), lineterminator="\n")
+        writer.writeheader(); writer.writerows(overlap)
+    p0._write_recursive_sums(bad_overlap)
+    with pytest.raises(p0.MultimarketP0Error, match="paired overlap"):
+        p0.verify_segment_freeze(bad_overlap)
+    connection.close()
+
+
+def test_prospective_g5_requires_both_preregistered_events() -> None:
+    assert not p0.prospective_segment_g5_ready(["event-1"], ["event-1"])
+    assert not p0.prospective_segment_g5_ready(["event-1", "event-2"], ["event-1"])
+    assert p0.prospective_segment_g5_ready(["event-1", "event-2"], ["event-2", "event-1"])
 
 
 def test_settlement_truth_maps_total_score_other_and_sp1(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

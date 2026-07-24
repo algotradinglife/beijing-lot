@@ -22,6 +22,14 @@ HKT = timezone(timedelta(hours=8))
 TARGET_PLAYIDS = (40, 42)
 MARKET_KEY = {40: "total_goals", 42: "correct_score"}
 EXPECTED_OUTCOMES = {40: 8, 42: 25}
+EXPECTED_OUTCOME_CODES = {
+    40: frozenset(("0", "1", "2", "3", "4", "5", "6", "7+")),
+    42: frozenset((
+        "home_other", "1:0", "2:0", "2:1", "3:0", "3:1", "3:2", "4:0", "4:1", "4:2",
+        "draw_other", "0:0", "1:1", "2:2", "3:3", "away_other", "0:1", "0:2", "1:2", "0:3",
+        "1:3", "2:3", "0:4", "1:4", "2:4",
+    )),
+}
 DEFAULT_CAPTURE_ROOT = ROOT / "results/data_collection/multimarket_sp_capture_v1"
 DEFAULT_FREEZE_ROOT = ROOT / "results/research/multimarket_10h_freeze_v1"
 DEFAULT_SEGMENT_FREEZE_ROOT = ROOT / "results/research/multimarket_segment_freeze_v1"
@@ -405,7 +413,7 @@ def _write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> Non
 
 
 SEGMENT_FREEZE_SCHEMA = "multimarket_segment_asof_freeze_v1"
-SEGMENT_FROZEN_FIELDS = ["issue", "segment_idx", "match_idx", "match_id", "playid", "market_key", "outcome_code", "outcome_label", "sp", "freeze_at_hkt", "freeze_source", "kickoff_hkt", "minutes_to_kickoff", "source_updated_at_hkt", "fetched_at_utc", "source_staleness_minutes", "capture_age_minutes", "sale_status", "sale_cutoff_hkt", "batch_id", "source_url", "payload_sha256", "bundle_sha256s_sha256"]
+SEGMENT_FROZEN_FIELDS = ["issue", "segment_idx", "match_idx", "match_id", "playid", "market_key", "outcome_code", "outcome_label", "sp", "freeze_at_hkt", "freeze_source", "kickoff_hkt", "minutes_to_kickoff", "source_updated_at_hkt", "fetched_at_utc", "source_staleness_minutes", "capture_age_minutes", "sale_status", "sale_cutoff_hkt", "capture_classification", "batch_id", "source_url", "payload_sha256", "bundle_sha256s_sha256"]
 SEGMENT_REJECTION_FIELDS = ["issue", "segment_idx", "match_idx", "playid", "market_key", "reason"]
 SEGMENT_SKIPPED_FIELDS = ["issue", "segment_idx", "match_idx", "playid", "batch_id", "reason"]
 
@@ -452,6 +460,18 @@ def _segment_event_id(issue: str, segment_idx: int, freeze_at: datetime, playids
     return sha256_bytes(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8"))
 
 
+def segment_event_id(issue: str, segment_idx: int, effective_freeze_at: str | datetime) -> str:
+    """Public canonical identity used by the prospective-event coordinator."""
+    freeze_at = parse_hkt(effective_freeze_at) if isinstance(effective_freeze_at, str) else effective_freeze_at
+    return _segment_event_id(issue, segment_idx, freeze_at, TARGET_PLAYIDS)
+
+
+def prospective_segment_g5_ready(expected_event_ids: Iterable[str], verified_event_ids: Iterable[str]) -> bool:
+    """G5 requires the complete preregistered two-event prospective set."""
+    expected = {str(value) for value in expected_event_ids}
+    return len(expected) == 2 and {str(value) for value in verified_event_ids} == expected
+
+
 def _segment_window(conn: sqlite3.Connection, issue: str, segment_idx: int) -> tuple[datetime, str, list[int]]:
     if not _table_exists(conn, "segment_decision_windows"):
         raise MultimarketP0Error("segment_decision_windows missing")
@@ -486,7 +506,7 @@ def _candidate_reason(batch: sqlite3.Row, rows: list[sqlite3.Row], *, issue: str
         return "invalid_dual_clock"
     if source_at > freeze_at or fetched_at > freeze_at:
         return "post_freeze_clock"
-    if len(rows) != EXPECTED_OUTCOMES[playid] or len({str(row["outcome_code"]) for row in rows}) != EXPECTED_OUTCOMES[playid]:
+    if {str(row["outcome_code"]) for row in rows} != EXPECTED_OUTCOME_CODES[playid]:
         return "incomplete_vector"
     if any(row["sp"] is None or not math.isfinite(float(row["sp"])) or float(row["sp"]) <= 1 for row in rows):
         return "invalid_sp"
@@ -525,17 +545,84 @@ def verify_segment_freeze(path: Path) -> dict[str, Any]:
     manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
     if manifest.get("schema_version") != SEGMENT_FREEZE_SCHEMA:
         raise MultimarketP0Error("unsupported segment freeze schema")
+    try:
+        freeze_at = parse_hkt(str(manifest["effective_freeze_at_hkt"]))
+        expected_event_id = _segment_event_id(
+            str(manifest["issue"]), int(manifest["segment_idx"]), freeze_at, manifest["target_playids"]
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise MultimarketP0Error("invalid segment freeze manifest identity") from exc
+    if manifest.get("event_id") != expected_event_id or output.name != expected_event_id:
+        raise MultimarketP0Error("segment freeze event identity mismatch")
+    if tuple(sorted(manifest.get("target_playids", []))) != TARGET_PLAYIDS:
+        raise MultimarketP0Error("segment freeze target playids mismatch")
     policy = manifest.get("policy", {})
     if policy.get("execution_enabled") is not False or policy.get("frontend_selectable") is not False or policy.get("roi_authorized") is not False:
         raise MultimarketP0Error("non-execution policy drift")
+    csv_rows: dict[str, list[dict[str, str]]] = {}
     counts: dict[str, int] = {}
     for name, key in (("frozen_outcomes.csv", "frozen_outcome_rows"), ("paired_overlap.csv", "paired_overlap_matches"), ("rejections.csv", "rejected_match_markets"), ("skipped_candidates.csv", "skipped_candidates")):
         with (output / name).open(encoding="utf-8", newline="") as handle:
-            counts[key] = len(list(csv.DictReader(handle)))
+            csv_rows[name] = list(csv.DictReader(handle))
+            counts[key] = len(csv_rows[name])
         if counts[key] != int(manifest.get(key, -1)):
             raise MultimarketP0Error("segment freeze count mismatch")
-    for batch_id in manifest.get("selected_batch_ids", []):
-        verify_bundle(output / "inputs/raw_batches" / str(batch_id))
+    frozen = csv_rows["frozen_outcomes.csv"]
+    selected_ids = {str(value) for value in manifest.get("selected_batch_ids", [])}
+    raw_dirs = output / "inputs/raw_batches"
+    actual_raw_ids = {path.name for path in raw_dirs.iterdir() if path.is_dir()} if raw_dirs.is_dir() else set()
+    if selected_ids != actual_raw_ids:
+        raise MultimarketP0Error("selected raw-batch set mismatch")
+    raw_manifests: dict[str, dict[str, Any]] = {}
+    for batch_id in selected_ids:
+        bundle = raw_dirs / batch_id
+        verify_bundle(bundle)
+        raw_manifests[batch_id] = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    vectors: dict[tuple[int, int], list[dict[str, str]]] = defaultdict(list)
+    for row in frozen:
+        try:
+            match_idx, playid = int(row["match_idx"]), int(row["playid"])
+            source_at = parse_hkt(row["source_updated_at_hkt"])
+            fetched_at = parse_utc(row["fetched_at_utc"]).astimezone(HKT)
+            cutoff = parse_hkt(row["sale_cutoff_hkt"])
+            sp = float(row["sp"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise MultimarketP0Error("invalid frozen row timing or numeric fields") from exc
+        if playid not in TARGET_PLAYIDS or row.get("issue") != manifest["issue"] or int(row.get("segment_idx", -1)) != int(manifest["segment_idx"]):
+            raise MultimarketP0Error("frozen row manifest mapping mismatch")
+        if row.get("match_id") != f"{manifest['issue']}_{match_idx:03d}" or row.get("market_key") != MARKET_KEY[playid]:
+            raise MultimarketP0Error("frozen row stable mapping mismatch")
+        if parse_hkt(row.get("freeze_at_hkt", "")) != freeze_at or row.get("freeze_source") != manifest.get("freeze_source"):
+            raise MultimarketP0Error("frozen row freeze identity mismatch")
+        if source_at > freeze_at or fetched_at > freeze_at or cutoff <= freeze_at or not math.isfinite(sp) or sp <= 1 or row.get("sale_status") != "open" or row.get("capture_classification") != "forward_complete_open":
+            raise MultimarketP0Error("frozen row strict timing or sale rule mismatch")
+        batch_id = row.get("batch_id", "")
+        raw = raw_manifests.get(batch_id)
+        if (raw is None or raw.get("issue") != manifest["issue"] or raw.get("playid") != playid
+                or raw.get("batch_id") != batch_id or raw.get("payload_sha256") != row.get("payload_sha256")
+                or raw.get("source_url") != row.get("source_url")
+                or sha256_file(raw_dirs / batch_id / "SHA256SUMS") != row.get("bundle_sha256s_sha256")):
+            raise MultimarketP0Error("frozen row raw batch mapping mismatch")
+        vectors[(match_idx, playid)].append(row)
+    if len(vectors) != int(manifest.get("frozen_match_markets", -1)):
+        raise MultimarketP0Error("frozen match-market count mismatch")
+    for (_match_idx, playid), vector in vectors.items():
+        if {row["outcome_code"] for row in vector} != EXPECTED_OUTCOME_CODES[playid]:
+            raise MultimarketP0Error("frozen vector outcome-code set mismatch")
+        if len({row["batch_id"] for row in vector}) != 1:
+            raise MultimarketP0Error("frozen vector batch mismatch")
+    expected_overlap = {
+        (match_idx, f"{manifest['issue']}_{match_idx:03d}", vectors[(match_idx, 40)][0]["batch_id"], vectors[(match_idx, 42)][0]["batch_id"])
+        for match_idx in manifest.get("segment_match_indices", []) if (match_idx, 40) in vectors and (match_idx, 42) in vectors
+    }
+    actual_overlap = {
+        (int(row["match_idx"]), row["match_id"], row["p40_batch_id"], row["p42_batch_id"])
+        for row in csv_rows["paired_overlap.csv"]
+        if row.get("issue") == manifest["issue"] and int(row.get("segment_idx", -1)) == int(manifest["segment_idx"])
+        and parse_hkt(row.get("freeze_at_hkt", "")) == freeze_at
+    }
+    if actual_overlap != expected_overlap:
+        raise MultimarketP0Error("paired overlap derivation mismatch")
     return {"status": "valid", "output_dir": str(output), "event_id": manifest.get("event_id"), "sha256s_sha256": sha256_file(output / "SHA256SUMS"), **counts}
 
 
@@ -596,7 +683,7 @@ def freeze_segment(
                     "kickoff_hkt": kickoff.isoformat(timespec="seconds") if kickoff else "", "minutes_to_kickoff": round((kickoff - freeze_at).total_seconds() / 60, 6) if kickoff else "",
                     "source_updated_at_hkt": source_at.isoformat(timespec="seconds"), "fetched_at_utc": parse_utc(str(batch["fetched_at_utc"])).isoformat(timespec="microseconds"),
                     "source_staleness_minutes": round((freeze_at - source_at).total_seconds() / 60, 6), "capture_age_minutes": round((freeze_at - fetched_at).total_seconds() / 60, 6),
-                    "sale_status": row["sale_status"], "sale_cutoff_hkt": cutoff.isoformat(timespec="seconds"), "batch_id": batch["batch_id"], "source_url": batch["source_url"],
+                    "sale_status": row["sale_status"], "sale_cutoff_hkt": cutoff.isoformat(timespec="seconds"), "capture_classification": row["capture_classification"], "batch_id": batch["batch_id"], "source_url": batch["source_url"],
                     "payload_sha256": batch["payload_sha256"], "bundle_sha256s_sha256": batch["bundle_sha256s_sha256"],
                 })
     overlap = [
