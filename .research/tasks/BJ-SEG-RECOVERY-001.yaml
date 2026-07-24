@@ -75,7 +75,7 @@ spec:
       - research_pi_review
 
 status:
-  current: EXECUTING
+  current: COMPLETED
   attempts: 3
   routing:
     executor_mode: isolated_session

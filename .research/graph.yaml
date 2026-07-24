@@ -35,7 +35,7 @@ spec:
     - id: BJ-SEG-RECOVERY-001
       node_type: task
       ref: tasks/BJ-SEG-RECOVERY-001.yaml
-      state: EXECUTING
+      state: COMPLETED
 
   edges:
     - from: GOAL-BOOT
