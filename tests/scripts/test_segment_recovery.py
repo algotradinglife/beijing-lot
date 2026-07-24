@@ -9,6 +9,7 @@ import sys
 import threading
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -810,6 +811,61 @@ def test_deadline_loss_aborts_published_then_terminal_owns_event(
     assert idempotent is False
     assert terminal["state"] == "MISSED_RECOVERY_FREEZE"
     assert terminal["prior_ledger_state"] == "PUBLICATION_ABORTED"
+
+
+def test_run_once_normalizes_naive_segment_freeze_display_clock(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "test.sqlite"
+    _database(db)
+    monkeypatch.setattr(
+        refresh_loop,
+        "coordinate_segment_recovery",
+        lambda *_args, **_kwargs: {
+            "status": "already_published",
+            "freeze_at": "2099-07-25T05:25:00+08:00",
+        },
+    )
+    monkeypatch.setattr(
+        refresh_loop,
+        "segment_plan_freeze_state",
+        lambda *_args, **_kwargs: {
+            "locked": False,
+            "freeze_at": "2099-07-26 00:55:00",
+        },
+    )
+    monkeypatch.setattr(
+        refresh_loop,
+        "ensure_active_artifact",
+        lambda *_args, **_kwargs: {
+            "issue": "26078",
+            "action": "active_artifact_already_available",
+            "artifact_status": {"status": "available"},
+        },
+    )
+    result = refresh_loop.run_once(
+        SimpleNamespace(
+            db=db,
+            issue="26078",
+            recovery_parent_segment=[1],
+            recovery_issue="26078",
+            recovery_output_root=tmp_path / "recovery",
+            exact_n_ledger_root=tmp_path / "exact-ledger",
+            recovery_hard_stop_hkt="2099-07-25T20:25:00+08:00",
+            timeout=1,
+            publish_v4_2=False,
+            max_refresh_age_minutes=90.0,
+            v4_2_artifact_version=[],
+            ensure_segment_betting_plans=False,
+            coordinate_exact_n_freeze=False,
+        )
+    )
+    assert (
+        result["segment_betting_plan_freeze"]["freeze_at"]
+        == "2099-07-26 00:55:00"
+    )
+    assert result["segment_recoveries"][0]["status"] == "already_published"
 
 
 def test_recovery_child_publishes_and_verifies_full_exact_n_package(
