@@ -15,7 +15,7 @@ if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
 
 from scripts import live_sp_refresh_loop as loop  # noqa: E402
-from src.multimarket_p0 import HKT  # noqa: E402
+from src import multimarket_p0 as p0  # noqa: E402
 
 
 def _db() -> sqlite3.Connection:
@@ -48,15 +48,34 @@ def test_prospective_selection_is_ordered_persisted_and_append_only(monkeypatch:
     now = datetime.fromisoformat("2026-07-24T10:00:00+08:00")
     first = loop.publish_due_segment_freezes(conn, [], output_root=tmp_path, now=now)
     assert [row["status"] for row in first] == ["retry", "retry"]
-    selected = conn.execute("SELECT issue,segment_idx,ordinal FROM multimarket_segment_freeze_events ORDER BY ordinal").fetchall()
-    assert [tuple(row) for row in selected] == [("a", 1, 1), ("b", 2, 2)]
-    assert "old" not in {row[0] for row in selected}
+    selected = p0.load_prospective_segment_bindings(
+        tmp_path / "ledger", activation_utc=activation.astimezone().isoformat(timespec="seconds"), required_events=2,
+    )
+    assert [(row["issue"], row["segment_idx"], row["ordinal"]) for row in selected] == [("a", 1, 1), ("b", 2, 2)]
+    assert "old" not in {row["issue"] for row in selected}
 
-    monkeypatch.setattr(loop, "freeze_segment", lambda _c, issue, index, _root: {"event_id": conn.execute("SELECT event_id FROM multimarket_segment_freeze_events WHERE issue=? AND segment_idx=?", (issue, index)).fetchone()[0]})
+    monkeypatch.setattr(loop, "freeze_segment", lambda _c, issue, index, _root: {"event_id": next(row["event_id"] for row in selected if row["issue"] == issue and row["segment_idx"] == index)})
     second = loop.publish_due_segment_freezes(conn, [], output_root=tmp_path, now=now)
     assert [row["status"] for row in second] == ["complete", "complete"]
-    attempts = conn.execute("SELECT status,reason FROM multimarket_segment_freeze_attempts ORDER BY attempt_id").fetchall()
-    assert [row["status"] for row in attempts] == ["retry", "retry", "complete", "complete"]
-    assert all(row["reason"] == "capture missing" for row in attempts[:2])
-    assert conn.execute("SELECT COUNT(*) FROM multimarket_segment_freeze_events").fetchone()[0] == 2
+    attempts = [p0.json.loads((path / "manifest.json").read_text()) for path in (tmp_path / "ledger/attempts").glob("*/*")]
+    assert sorted(row["status"] for row in attempts) == ["complete", "complete", "retry", "retry"]
+    assert sum(row["reason"] == "capture missing" for row in attempts) == 2
+    conn.close()
+
+
+def test_manual_freeze_drift_is_recorded_as_retry_not_completion(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    conn = _db()
+    activation = datetime.fromisoformat("2026-07-24T00:00:00+08:00")
+    monkeypatch.setattr(loop, "_prospective_config", lambda: (activation, 2))
+    monkeypatch.setattr(loop, "freeze_segment", lambda *_args: (_ for _ in ()).throw(loop.MultimarketP0Error("missing")))
+    now = datetime.fromisoformat("2026-07-24T10:00:00+08:00")
+    loop.publish_due_segment_freezes(conn, [], output_root=tmp_path, now=now)
+    conn.execute("UPDATE segment_decision_windows SET manual_frozen_at='2026-07-24T08:30:00+08:00' WHERE issue='a' AND segment_idx=1")
+    monkeypatch.setattr(loop, "freeze_segment", lambda _c, issue, idx, _root: {"event_id": p0.segment_event_id(issue, idx, "2026-07-24T08:30:00+08:00" if issue == "a" else "2026-07-24T09:00:00+08:00")})
+    result = loop.publish_due_segment_freezes(conn, [], output_root=tmp_path, now=now)
+    assert result[0]["status"] == "retry"
+    assert "differs from preregistered" in result[0]["reason"]
+    attempts = [p0.json.loads((path / "manifest.json").read_text()) for path in (tmp_path / "ledger/attempts").glob("*/*")]
+    assert [row["status"] for row in attempts].count("complete") == 1  # b remains unchanged
+    assert any("differs from preregistered" in row["reason"] for row in attempts)
     conn.close()

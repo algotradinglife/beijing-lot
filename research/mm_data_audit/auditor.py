@@ -7,6 +7,7 @@ import hashlib
 import csv
 import sqlite3
 import statistics
+import yaml
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -885,7 +886,7 @@ class MultiMarketAuditor:
         ))
 
         # G5: Freeze Protocol v1
-        from src.multimarket_p0 import MultimarketP0Error, prospective_segment_g5_ready, verify_freeze, verify_segment_freeze
+        from src.multimarket_p0 import MultimarketP0Error, load_prospective_segment_bindings, prospective_segment_event_ready, prospective_segment_g5_ready, verify_freeze, verify_segment_freeze
         # verify_freeze() only accepts the multimarket as-of-freeze contract.
         # The committed MM-DATA-AUDIT research freeze has a different schema.
         freeze_root = _repo_root() / "results/research/multimarket_10h_freeze_v1"
@@ -917,11 +918,16 @@ class MultiMarketAuditor:
         # valid package with no rows does not pass the gate.
         segment_root = _repo_root() / "results/research/multimarket_segment_freeze_v1"
         segment_dirs = list(segment_root.glob("*/segment_*/*")) if segment_root.is_dir() else []
-        prospective_events = []
-        if _table_exists(db, "multimarket_segment_freeze_events"):
-            prospective_events = db.execute(
-                "SELECT event_id FROM multimarket_segment_freeze_events ORDER BY ordinal"
-            ).fetchall()
+        task = yaml.safe_load((ROOT / ".research/tasks/BJ-MM-FREEZE-001.yaml").read_text(encoding="utf-8"))
+        registration = task["spec"]["context"]["preregistration"]
+        try:
+            prospective_events = load_prospective_segment_bindings(
+                segment_root / "ledger", activation_utc=str(registration["activation_utc"]),
+                required_events=int(registration["required_prospective_segment_events"]),
+            )
+        except (MultimarketP0Error, OSError, ValueError, json.JSONDecodeError) as exc:
+            prospective_events = []
+            freeze_failures.append({"path": str(segment_root / "ledger"), "error": str(exc)})
         prospective_ids = {str(row["event_id"]) for row in prospective_events}
         valid_prospective_ids: set[str] = set()
         for fd in segment_dirs:
@@ -935,8 +941,8 @@ class MultiMarketAuditor:
                 if len(freeze_failures) < 5:
                     freeze_failures.append({"path": str(fd), "error": str(exc)})
                 continue
-            if (manifest.get("event_id") in prospective_ids and market.playid in manifest.get("target_playids", [])
-                    and any(int(row["playid"]) == market.playid for row in frozen_rows)):
+            if (manifest.get("event_id") in prospective_ids and prospective_segment_event_ready(verification)
+                    and market.playid in manifest.get("target_playids", []) and any(int(row["playid"]) == market.playid for row in frozen_rows)):
                 valid_prospective_ids.add(str(manifest["event_id"]))
                 freeze_manifest = manifest
                 verified_freeze = verification

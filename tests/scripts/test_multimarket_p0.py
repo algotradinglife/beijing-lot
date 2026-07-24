@@ -330,6 +330,35 @@ def test_segment_verifier_rejects_semantic_tampering_after_rehash(
     p0._write_recursive_sums(bad_overlap)
     with pytest.raises(p0.MultimarketP0Error, match="paired overlap"):
         p0.verify_segment_freeze(bad_overlap)
+
+    malformed_overlap = tmp_path / "malformed-overlap" / package.name
+    shutil.copytree(package, malformed_overlap)
+    overlap = list(csv.DictReader((malformed_overlap / "paired_overlap.csv").open(encoding="utf-8", newline="")))
+    extra = dict(overlap[0]); extra["issue"] = "WRONG"
+    overlap.append(extra)
+    with (malformed_overlap / "paired_overlap.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=overlap[0].keys(), lineterminator="\n")
+        writer.writeheader(); writer.writerows(overlap)
+    manifest = json.loads((malformed_overlap / "manifest.json").read_text())
+    manifest["paired_overlap_matches"] = 2
+    (malformed_overlap / "manifest.json").write_text(json.dumps(manifest, sort_keys=True) + "\n")
+    p0._write_recursive_sums(malformed_overlap)
+    with pytest.raises(p0.MultimarketP0Error, match="row identity"):
+        p0.verify_segment_freeze(malformed_overlap)
+
+    duplicate_overlap = tmp_path / "duplicate-overlap" / package.name
+    shutil.copytree(package, duplicate_overlap)
+    overlap = list(csv.DictReader((duplicate_overlap / "paired_overlap.csv").open(encoding="utf-8", newline="")))
+    overlap.append(dict(overlap[0]))
+    with (duplicate_overlap / "paired_overlap.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=overlap[0].keys(), lineterminator="\n")
+        writer.writeheader(); writer.writerows(overlap)
+    manifest = json.loads((duplicate_overlap / "manifest.json").read_text())
+    manifest["paired_overlap_matches"] = 2
+    (duplicate_overlap / "manifest.json").write_text(json.dumps(manifest, sort_keys=True) + "\n")
+    p0._write_recursive_sums(duplicate_overlap)
+    with pytest.raises(p0.MultimarketP0Error, match="duplicate"):
+        p0.verify_segment_freeze(duplicate_overlap)
     connection.close()
 
 
@@ -337,6 +366,8 @@ def test_prospective_g5_requires_both_preregistered_events() -> None:
     assert not p0.prospective_segment_g5_ready(["event-1"], ["event-1"])
     assert not p0.prospective_segment_g5_ready(["event-1", "event-2"], ["event-1"])
     assert p0.prospective_segment_g5_ready(["event-1", "event-2"], ["event-2", "event-1"])
+    assert not p0.prospective_segment_event_ready({"status": "valid", "paired_overlap_matches": 0})
+    assert p0.prospective_segment_event_ready({"status": "valid", "paired_overlap_matches": 1})
 
 
 def test_settlement_truth_maps_total_score_other_and_sp1(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

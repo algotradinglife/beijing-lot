@@ -472,6 +472,77 @@ def prospective_segment_g5_ready(expected_event_ids: Iterable[str], verified_eve
     return len(expected) == 2 and {str(value) for value in verified_event_ids} == expected
 
 
+def prospective_segment_event_ready(verification: Mapping[str, Any]) -> bool:
+    return verification.get("status") == "valid" and int(verification.get("paired_overlap_matches", 0)) >= 1
+
+
+def _publish_ledger_record(path: Path, payload: Mapping[str, Any]) -> None:
+    """Publish one immutable, independently checksummed research-ledger record."""
+    if path.exists():
+        _verify_recursive_sums(path)
+        existing = json.loads((path / "manifest.json").read_text(encoding="utf-8"))
+        if existing != payload:
+            raise MultimarketP0Error(f"immutable ledger record conflicts: {path}")
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix=f".{path.name}.tmp-", dir=path.parent))
+    try:
+        (stage / "manifest.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _write_recursive_sums(stage)
+        stage.rename(path)
+    finally:
+        if stage.exists():
+            shutil.rmtree(stage)
+
+
+def bind_prospective_segment_event(ledger_root: Path, *, issue: str, segment_idx: int,
+                                   effective_freeze_at_hkt: str, activation_utc: str, ordinal: int) -> dict[str, Any]:
+    decision_at = parse_hkt(effective_freeze_at_hkt)
+    event_id = segment_event_id(issue, segment_idx, decision_at)
+    payload = {
+        "schema_version": "multimarket_segment_freeze_ledger_v1", "record_type": "binding",
+        "event_id": event_id, "issue": issue, "segment_idx": int(segment_idx),
+        "effective_freeze_at_hkt": decision_at.isoformat(timespec="seconds"),
+        "activation_utc": parse_utc(activation_utc).isoformat(timespec="seconds"), "ordinal": int(ordinal),
+    }
+    _publish_ledger_record(ledger_root / "bindings" / event_id, payload)
+    return payload
+
+
+def append_prospective_segment_attempt(ledger_root: Path, *, event_id: str, status: str, reason: str) -> dict[str, Any]:
+    attempted_at = datetime.now(timezone.utc).isoformat(timespec="microseconds")
+    payload = {"schema_version": "multimarket_segment_freeze_ledger_v1", "record_type": "attempt", "event_id": event_id,
+               "attempted_at_utc": attempted_at, "status": status, "reason": reason}
+    identity = sha256_bytes(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+    _publish_ledger_record(ledger_root / "attempts" / event_id / identity, payload)
+    return payload
+
+
+def load_prospective_segment_bindings(ledger_root: Path, *, activation_utc: str, required_events: int) -> list[dict[str, Any]]:
+    expected_activation = parse_utc(activation_utc).isoformat(timespec="seconds")
+    bindings: list[dict[str, Any]] = []
+    directory = ledger_root / "bindings"
+    for record in sorted(directory.iterdir()) if directory.is_dir() else []:
+        if not record.is_dir() or record.is_symlink():
+            raise MultimarketP0Error("unsafe prospective ledger binding entry")
+        _verify_recursive_sums(record)
+        payload = json.loads((record / "manifest.json").read_text(encoding="utf-8"))
+        try:
+            expected_id = segment_event_id(str(payload["issue"]), int(payload["segment_idx"]), str(payload["effective_freeze_at_hkt"]))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise MultimarketP0Error("invalid prospective ledger binding") from exc
+        if (payload.get("schema_version") != "multimarket_segment_freeze_ledger_v1" or payload.get("record_type") != "binding"
+                or payload.get("event_id") != expected_id or record.name != expected_id
+                or payload.get("activation_utc") != expected_activation
+                or parse_hkt(str(payload["effective_freeze_at_hkt"])) <= parse_utc(activation_utc).astimezone(HKT)):
+            raise MultimarketP0Error("prospective ledger binding identity mismatch")
+        bindings.append(payload)
+    bindings.sort(key=lambda item: int(item["ordinal"]))
+    if len(bindings) > required_events or [int(item["ordinal"]) for item in bindings] != list(range(1, len(bindings) + 1)):
+        raise MultimarketP0Error("prospective ledger ordinal mismatch")
+    return bindings
+
+
 def _segment_window(conn: sqlite3.Connection, issue: str, segment_idx: int) -> tuple[datetime, str, list[int]]:
     if not _table_exists(conn, "segment_decision_windows"):
         raise MultimarketP0Error("segment_decision_windows missing")
@@ -615,13 +686,20 @@ def verify_segment_freeze(path: Path) -> dict[str, Any]:
         (match_idx, f"{manifest['issue']}_{match_idx:03d}", vectors[(match_idx, 40)][0]["batch_id"], vectors[(match_idx, 42)][0]["batch_id"])
         for match_idx in manifest.get("segment_match_indices", []) if (match_idx, 40) in vectors and (match_idx, 42) in vectors
     }
-    actual_overlap = {
-        (int(row["match_idx"]), row["match_id"], row["p40_batch_id"], row["p42_batch_id"])
-        for row in csv_rows["paired_overlap.csv"]
-        if row.get("issue") == manifest["issue"] and int(row.get("segment_idx", -1)) == int(manifest["segment_idx"])
-        and parse_hkt(row.get("freeze_at_hkt", "")) == freeze_at
-    }
-    if actual_overlap != expected_overlap:
+    actual_overlap: set[tuple[int, str, str, str]] = set()
+    for row in csv_rows["paired_overlap.csv"]:
+        try:
+            item = (int(row["match_idx"]), row["match_id"], row["p40_batch_id"], row["p42_batch_id"])
+            valid_identity = (row["issue"] == manifest["issue"] and int(row["segment_idx"]) == int(manifest["segment_idx"])
+                              and parse_hkt(row["freeze_at_hkt"]) == freeze_at)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise MultimarketP0Error("invalid paired overlap row") from exc
+        if not valid_identity:
+            raise MultimarketP0Error("paired overlap row identity mismatch")
+        if item in actual_overlap:
+            raise MultimarketP0Error("duplicate paired overlap row")
+        actual_overlap.add(item)
+    if len(actual_overlap) != len(expected_overlap) or actual_overlap != expected_overlap:
         raise MultimarketP0Error("paired overlap derivation mismatch")
     return {"status": "valid", "output_dir": str(output), "event_id": manifest.get("event_id"), "sha256s_sha256": sha256_file(output / "SHA256SUMS"), **counts}
 
