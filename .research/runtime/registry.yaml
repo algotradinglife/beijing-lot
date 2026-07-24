@@ -56,18 +56,21 @@ entries:
     worktree: /tmp/wt-bj-seg-recovery-001
     commits:
       - 506e87af32cfa2333208c6d79e588a301617ef53
+      - 7cfacb03bdb066e2271b072a04078fe7331d4023
+      - 842d1c771d5b69e98317f353d4ce4122109e10b3
     pr_number: 24
     started_at: "2026-07-25T00:55:00Z"
-    last_seen: "2026-07-24T18:01:20Z"
+    last_seen: "2026-07-25T02:25:00Z"
     status: pr_review_changes_requested
     execution_phase: changes_requested
     priority_class: P0
     deadline_at_hkt: "2026-07-25T20:25:00+08:00"
-    last_review_at: "2026-07-24T18:00:51Z"
+    last_review_at: "2026-07-24T18:19:38Z"
     notes: >-
-      PR #24 (commit 506e87a) implements BJ-SEG-RECOVERY-001 capability.
-      PI review 2026-07-24T18:00:51Z: CHANGES_REQUESTED with P0 (missed freeze -> terminal missed evidence) and P1 (production refresh activation) findings.
-      Awaiting Engineer fixes.
+      PR #24 implements BJ-SEG-RECOVERY-001 capability.
+      Round 1 (506e87a, 2026-07-24T18:00:51Z): CHANGES_REQUESTED — P0 (missed freeze -> terminal missed evidence) + P1 (production activation).
+      Round 2 (7cfacb0, 2026-07-24T18:16:24Z): CHANGES_REQUESTED — P0 (atomic PUBLISHED-vs-MISSED terminal transition not implemented) persists. P1 resolved.
+      Round 3 (842d1c7, 2026-07-24T18:19:38Z): CHANGES_REQUESTED — P0 (atomic terminal ownership/transition still not implemented) persists, same finding across 3 rounds. Engineer fix required.
 
 metadata:
   created_at: "2026-07-24T09:09:31Z"
