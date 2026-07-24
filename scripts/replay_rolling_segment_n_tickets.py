@@ -22,6 +22,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from select_rolling_segment_n import recommend_segment_n  # noqa: E402
+from src.natural_day_segments import build_natural_day_segments  # noqa: E402
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -175,42 +176,16 @@ def build_segments(
     min_matches: int = 6,
     max_matches: int = 24,
 ) -> list[Segment]:
+    # Arguments remain for CLI compatibility.  Membership is exclusively owned
+    # by BJ-SEG-DAY-001; in particular max_matches must not split a busy day.
     if not legs:
         return []
-    windows = sorted({base_window_hours, *(extend_hours or [])})
-    segments: list[Segment] = []
-    cursor = 0
-    segment_idx = 1
-    while cursor < len(legs):
-        start = legs[cursor].kickoff
-        selected: list[LegRow] = []
-        selected_hours = windows[-1]
-        for hours in windows:
-            end = start + timedelta(hours=hours)
-            candidate = [leg for leg in legs[cursor:] if leg.kickoff <= end]
-            selected = candidate
-            selected_hours = hours
-            if len(candidate) >= min_matches:
-                break
-        if not selected:
-            selected = [legs[cursor]]
-            selected_hours = base_window_hours
-        if max_matches > 0 and len(selected) > max_matches:
-            selected = selected[:max_matches]
-            selected_hours = max(0.0, (selected[-1].kickoff - start).total_seconds() / 3600.0)
-        end = start + timedelta(hours=selected_hours)
-        segments.append(
-            Segment(
-                segment_idx=segment_idx,
-                start=start,
-                end=end,
-                window_hours=selected_hours,
-                legs=tuple(selected),
-            )
-        )
-        cursor += len(selected)
-        segment_idx += 1
-    return segments
+    result = build_natural_day_segments(legs[0].issue, legs)
+    by_idx = {leg.match_idx: leg for leg in legs}
+    return [Segment(segment_idx=item.segment_idx, start=item.first_kickoff.replace(tzinfo=None),
+                    end=item.last_kickoff.replace(tzinfo=None),
+                    window_hours=round((item.last_kickoff - item.first_kickoff).total_seconds() / 3600, 6),
+                    legs=tuple(by_idx[idx] for idx in item.match_indices)) for item in result.segments]
 
 
 def selection_probability(leg: LegRow, arm: str) -> float:
