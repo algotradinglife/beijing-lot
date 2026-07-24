@@ -11,6 +11,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -61,6 +62,7 @@ DEFAULT_CORRECT_SCORE_ROOT = ROOT / "results/data_collection/correct_score_price
 DEFAULT_EXACT_N_TRIGGER_LEAD_MINUTES = 10.0
 DEFAULT_FINAL_INPUT_REFRESH_LEAD_MINUTES = 30.0
 DEFAULT_RECOVERY_OUTPUT_ROOT = ROOT / "results/research/segment_recovery_v1"
+HK_TZ = ZoneInfo("Asia/Hong_Kong")
 
 
 def coordinate_segment_recovery(
@@ -114,12 +116,12 @@ def now_iso() -> str:
 
 
 def _align_clock(value: datetime, reference: datetime) -> datetime:
-    """Interpret display-only naive clocks in the coordinator's local zone."""
+    """Normalize contract clocks to HKT without depending on the host timezone."""
     if reference.tzinfo is None:
         raise ValueError("reference clock lacks timezone")
     if value.tzinfo is None:
-        return value.replace(tzinfo=reference.tzinfo)
-    return value.astimezone(reference.tzinfo)
+        value = value.replace(tzinfo=HK_TZ)
+    return value.astimezone(HK_TZ)
 
 
 def _status_complete(status: dict[str, Any]) -> bool:

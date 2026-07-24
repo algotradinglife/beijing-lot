@@ -7,7 +7,7 @@ import sqlite3
 import subprocess
 import sys
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -866,6 +866,22 @@ def test_run_once_normalizes_naive_segment_freeze_display_clock(
         == "2099-07-26 00:55:00"
     )
     assert result["segment_recoveries"][0]["status"] == "already_published"
+
+
+def test_align_clock_interprets_naive_contract_clock_as_hkt_on_non_hkt_host() -> None:
+    reference = datetime.fromisoformat("2099-07-25T16:55:00-04:00")
+    canonical_display = datetime.fromisoformat("2099-07-26 00:55:00")
+
+    aligned = refresh_loop._align_clock(canonical_display, reference)
+
+    assert aligned == datetime.fromisoformat("2099-07-26T00:55:00+08:00")
+    assert aligned.astimezone(timezone.utc) == datetime.fromisoformat(
+        "2099-07-25T16:55:00+00:00"
+    )
+    aware_recovery = datetime.fromisoformat("2099-07-25T21:25:00-04:00")
+    assert refresh_loop._align_clock(
+        aware_recovery, reference
+    ) == datetime.fromisoformat("2099-07-26T09:25:00+08:00")
 
 
 def test_recovery_child_publishes_and_verifies_full_exact_n_package(
