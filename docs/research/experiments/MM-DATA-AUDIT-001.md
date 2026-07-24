@@ -1,7 +1,10 @@
 # Research Phase 1: Multi-Market Data Audit (MM-DATA-AUDIT-001)
 
 **Audit Cutoff (UTC):** 2026-07-23T16:03:12+00:00
-**Status:** `engineering_validation`
+**Status:** `reviewed`
+
+**PI decision:** `no_market_end_to_end_ready` (PR #13). The readiness matrix
+below is the frozen audit baseline; this status correction adds no new evidence.
 
 ## 1. Research Question
 

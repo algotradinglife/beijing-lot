@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,9 +27,16 @@ from scrape_500_bjdc import (  # noqa: E402
 )
 from src.sqlite_runtime import connect_sqlite  # noqa: E402
 from src.multimarket_p0 import (  # noqa: E402
+    DEFAULT_SEGMENT_FREEZE_ROOT,
+    HKT,
     MultimarketP0Error,
     TARGET_PLAYIDS as P0_TARGET_PLAYIDS,
+    append_prospective_segment_attempt,
+    bind_prospective_segment_event,
     build_settlement_truth,
+    freeze_segment,
+    parse_hkt,
+    load_prospective_segment_bindings,
 )
 
 
@@ -130,6 +139,64 @@ def _record_source_meta(conn, key: str, value: str) -> None:
     conn.execute("INSERT OR REPLACE INTO source_meta(key, value) VALUES(?, ?)", (key, value))
 
 
+def _prospective_config() -> tuple[datetime, int]:
+    task = yaml.safe_load((ROOT / ".research/tasks/BJ-MM-FREEZE-001.yaml").read_text(encoding="utf-8"))
+    registration = task["spec"]["context"]["preregistration"]
+    return parse_hkt(str(registration["activation_utc"])), int(registration["required_prospective_segment_events"])
+
+
+def publish_due_segment_freezes(conn, issues: list[str], *, output_root: Path = DEFAULT_SEGMENT_FREEZE_ROOT,
+                                now: datetime | None = None) -> list[dict[str, object]]:
+    """Research-only, idempotent recovery for passed p40/p42 segment windows.
+
+    It only delegates to the strict as-of publisher; it never fetches later data
+    as a substitute and never invokes a strategy or execution path.
+    """
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='segment_decision_windows'").fetchone() is None:
+        return []
+    activation, required_events = _prospective_config()
+    ledger_root = output_root.expanduser().resolve() / "ledger"
+    columns = {str(row[1]) for row in conn.execute("PRAGMA table_info(segment_decision_windows)")}
+    manual = "manual_frozen_at" if "manual_frozen_at" in columns else "NULL"
+    rows = conn.execute(
+        f"SELECT issue,segment_idx,freeze_at,{manual} AS manual_frozen_at FROM segment_decision_windows "
+        "ORDER BY issue,segment_idx",
+    ).fetchall()
+    current = (now or datetime.now(timezone.utc)).astimezone(HKT)
+    existing = load_prospective_segment_bindings(
+        ledger_root, activation_utc=activation.astimezone(timezone.utc).isoformat(timespec="seconds"), required_events=required_events,
+    )
+    selected_keys = {(str(row["issue"]), int(row["segment_idx"])) for row in existing}
+    remaining = required_events - len(existing)
+    candidates: list[tuple[datetime, str, int, str]] = []
+    for row in rows:
+        effective = str(row["manual_frozen_at"] or row["freeze_at"] or "")
+        if not effective:
+            continue
+        decision_at = parse_hkt(effective)
+        issue, segment_idx = str(row["issue"]), int(row["segment_idx"])
+        if decision_at > activation and decision_at <= current and (issue, segment_idx) not in selected_keys:
+            candidates.append((decision_at, issue, segment_idx, effective))
+    for decision_at, issue, segment_idx, _effective in sorted(candidates)[:max(0, remaining)]:
+        existing.append(bind_prospective_segment_event(
+            ledger_root, issue=issue, segment_idx=segment_idx, effective_freeze_at_hkt=decision_at.isoformat(timespec="seconds"),
+            activation_utc=activation.astimezone(timezone.utc).isoformat(timespec="seconds"), ordinal=len(existing) + 1,
+        ))
+    results: list[dict[str, object]] = []
+    for row in existing:
+        issue, segment_idx, event_id = str(row["issue"]), int(row["segment_idx"]), str(row["event_id"])
+        try:
+            result = freeze_segment(conn, issue, segment_idx, output_root)
+            if result.get("event_id") != event_id:
+                raise MultimarketP0Error("freeze event identity differs from preregistered binding")
+            append_prospective_segment_attempt(ledger_root, event_id=event_id, status="complete", reason="")
+            results.append({"issue": issue, "segment_idx": segment_idx, "status": "complete", "event_id": result["event_id"]})
+        except (MultimarketP0Error, OSError, ValueError) as exc:
+            append_prospective_segment_attempt(ledger_root, event_id=event_id, status="retry", reason=str(exc))
+            results.append({"issue": issue, "segment_idx": segment_idx, "status": "retry", "reason": str(exc)})
+    return results
+
+
 def run_once(conn, args: argparse.Namespace) -> int:
     issue_rows = fetch_issue_list(conn, args)
     current = _current_issue(issue_rows)
@@ -166,6 +233,10 @@ def run_once(conn, args: argparse.Namespace) -> int:
                 print(f"[{now_iso()}] multimarket_settlement skipped issue={issue}: {exc}", flush=True)
         if args.sleep and index < len(selected):
             time.sleep(args.sleep)
+
+    if any(playid in P0_TARGET_PLAYIDS for playid in playids):
+        segment_results = publish_due_segment_freezes(conn, selected)
+        _record_source_meta(conn, "last_multimarket_segment_freeze_results", json.dumps(segment_results, sort_keys=True))
 
     _record_source_meta(conn, "last_live_sp_refresh_finished_at", now_iso())
     _record_source_meta(conn, "last_live_sp_refresh_issue_count", str(len(selected)))
@@ -221,3 +292,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    append_prospective_segment_attempt,
+    bind_prospective_segment_event,
