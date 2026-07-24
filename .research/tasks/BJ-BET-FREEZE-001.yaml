@@ -59,13 +59,17 @@ spec:
       - research_pi_review
 
 status:
-  current: CREATED
-  attempts: 0
+  current: EXECUTING
+  attempts: 1
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
     reason: Capability task, time-sensitive (17:55 HKT freeze), depends on #19 segment manifest
-  artifacts: []
-  result: {}
+  artifacts:
+    - results/exact_n_segment_freeze/26078/segment_1/20260724T171513+0800/manifest.json
+  result:
+    segment_1: FROZEN_EXACT_N_3_4_5_6_7
+    correct_score: UNAVAILABLE_CORRECT_SCORE_PLAN
+    artifact_sha256: fc07fba06a0315abbd21339db17affb37042185d9c5eb38cefd59d2bb6a41974
   history: []
