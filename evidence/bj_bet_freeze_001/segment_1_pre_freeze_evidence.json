@@ -1,0 +1,8 @@
+{
+  "status": "PRE_FREEZE_OUT_OF_CONTRACT_EVIDENCE",
+  "issue": "26078",
+  "segment_idx": 1,
+  "natural_day_manifest_sha256": "a95c3b057070b0a8c1861bee0e36b1733f271e4afded5b8b1115faf39668a463",
+  "segment_1_artifact_manifest_sha256": "fc07fba06a0315abbd21339db17affb37042185d9c5eb38cefd59d2bb6a41974",
+  "conclusion": "Five exact-N candidates were generated before the scheduled freeze, but no v2 ledger/effective decision binding or N×budget matrix existed. Do not treat as acceptance evidence."
+}
