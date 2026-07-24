@@ -72,4 +72,10 @@ status:
     segment_1: FROZEN_EXACT_N_3_4_5_6_7
     correct_score: UNAVAILABLE_CORRECT_SCORE_PLAN
     artifact_sha256: fc07fba06a0315abbd21339db17affb37042185d9c5eb38cefd59d2bb6a41974
-  history: []
+  history:
+    - action: reconcile_state_transition
+      ts: "2026-07-24T09:34:12Z"
+      actor: reconciler
+      from: CREATED
+      to: REVIEW
+      reason: "Graph was stale (CREATED vs actual EXECUTING). Code complete, Segment 1 exact-N artifacts frozen at 17:15 HKT. PR #21 open. Awaiting conflict resolution and PI review."
