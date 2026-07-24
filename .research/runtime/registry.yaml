@@ -59,6 +59,8 @@ entries:
       - 7cfacb03bdb066e2271b072a04078fe7331d4023
       - 842d1c771d5b69e98317f353d4ce4122109e10b3
       - 14e910531eee3a9d7e73eaa676f943fb5fdd9665
+      - 1c4773adc04078ae1f54a7083276afe6a97ad084
+      - 2b1774b7eb64391e633932f8a4f7ce7720656534
     pr_number: 24
     started_at: "2026-07-25T00:55:00Z"
     last_seen: "2026-07-25T02:37:27Z"
@@ -66,7 +68,7 @@ entries:
     execution_phase: pending_ev
     priority_class: P0
     deadline_at_hkt: "2026-07-25T20:25:00+08:00"
-    last_review_at: "2026-07-24T18:33:41Z"
+    last_review_at: "2026-07-24T18:53:34Z"
     notes: >-
       PR #24 implements BJ-SEG-RECOVERY-001 capability.
       Round 1 (506e87a, 18:00:51Z): CHANGES_REQUESTED — P0 (missed freeze terminal) + P1 (prod activation).
@@ -74,7 +76,10 @@ entries:
       Round 3 (842d1c7, 18:19:38Z): CHANGES_REQUESTED — P0 same finding, 3rd round.
       Round 4 (14e9105, 18:33:41Z): COMMENTED — PI confirms all findings resolved. Approval held for EV gate.
       EV (14e9105, 02:37+00:00): PASS — HermesPM Engineering Validation complete. All 16 recovery tests pass.
-      Next: PI final approval on HEAD 14e9105.
+      PI APPROVED (14e9105, 18:43:06Z): Final PI approval on HEAD 14e9105.
+      Round 5 (1c4773a, 18:47:26Z): CHANGES_REQUESTED — Registry prematurely carried prior-head approval onto unvalidated merge HEAD.
+      Round 6 (2b1774b, 18:53:34Z): COMMENTED — Merge-head registry findings resolved; approval held for exact-head EV.
+      Current HEAD: 2b1774b. Needs: HermesPM EV gate on exact HEAD 2b1774b → PI re-approval → merge.
 
 metadata:
   created_at: "2026-07-24T09:09:31Z"
