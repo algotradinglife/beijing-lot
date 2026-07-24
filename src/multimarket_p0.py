@@ -11,6 +11,7 @@ import re
 import shutil
 import sqlite3
 import tempfile
+import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -29,6 +30,10 @@ EXPECTED_OUTCOME_CODES = {
         "draw_other", "0:0", "1:1", "2:2", "3:3", "away_other", "0:1", "0:2", "1:2", "0:3",
         "1:3", "2:3", "0:4", "1:4", "2:4",
     )),
+}
+OUTCOME_ATTRIBUTE = {
+    40: {code: f"c{1 + 2 * index}" for index, code in enumerate(("0", "1", "2", "3", "4", "5", "6", "7+"))},
+    42: {code: f"c{index}" for index, code in enumerate(("home_other", "1:0", "2:0", "2:1", "3:0", "3:1", "3:2", "4:0", "4:1", "4:2", "draw_other", "0:0", "1:1", "2:2", "3:3", "away_other", "0:1", "0:2", "1:2", "0:3", "1:3", "2:3", "0:4", "1:4", "2:4"), start=1)},
 }
 DEFAULT_CAPTURE_ROOT = ROOT / "results/data_collection/multimarket_sp_capture_v1"
 DEFAULT_FREEZE_ROOT = ROOT / "results/research/multimarket_10h_freeze_v1"
@@ -645,10 +650,16 @@ def verify_segment_freeze(path: Path) -> dict[str, Any]:
     if selected_ids != actual_raw_ids:
         raise MultimarketP0Error("selected raw-batch set mismatch")
     raw_manifests: dict[str, dict[str, Any]] = {}
+    raw_nodes: dict[str, dict[int, ET.Element]] = {}
     for batch_id in selected_ids:
         bundle = raw_dirs / batch_id
         verify_bundle(bundle)
         raw_manifests[batch_id] = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+        try:
+            raw_xml = (bundle / "raw.xml").read_bytes().decode("gb18030")
+            raw_nodes[batch_id] = {int(node.tag[1:]): node for node in ET.fromstring(raw_xml) if node.tag.startswith("w")}
+        except (ET.ParseError, ValueError) as exc:
+            raise MultimarketP0Error("raw batch XML cannot be verified") from exc
     vectors: dict[tuple[int, int], list[dict[str, str]]] = defaultdict(list)
     for row in frozen:
         try:
@@ -659,7 +670,8 @@ def verify_segment_freeze(path: Path) -> dict[str, Any]:
             sp = float(row["sp"])
         except (KeyError, TypeError, ValueError) as exc:
             raise MultimarketP0Error("invalid frozen row timing or numeric fields") from exc
-        if playid not in TARGET_PLAYIDS or row.get("issue") != manifest["issue"] or int(row.get("segment_idx", -1)) != int(manifest["segment_idx"]):
+        if (playid not in TARGET_PLAYIDS or match_idx not in {int(value) for value in manifest.get("segment_match_indices", [])}
+                or row.get("issue") != manifest["issue"] or int(row.get("segment_idx", -1)) != int(manifest["segment_idx"])):
             raise MultimarketP0Error("frozen row manifest mapping mismatch")
         if row.get("match_id") != f"{manifest['issue']}_{match_idx:03d}" or row.get("market_key") != MARKET_KEY[playid]:
             raise MultimarketP0Error("frozen row stable mapping mismatch")
@@ -674,6 +686,16 @@ def verify_segment_freeze(path: Path) -> dict[str, Any]:
                 or raw.get("source_url") != row.get("source_url")
                 or sha256_file(raw_dirs / batch_id / "SHA256SUMS") != row.get("bundle_sha256s_sha256")):
             raise MultimarketP0Error("frozen row raw batch mapping mismatch")
+        if (raw.get("fetched_at_utc") != row.get("fetched_at_utc") or raw.get("source_updated_at_hkt") != row.get("source_updated_at_hkt")):
+            raise MultimarketP0Error("frozen row raw batch clock mismatch")
+        node = raw_nodes[batch_id].get(match_idx)
+        attribute = OUTCOME_ATTRIBUTE[playid].get(row.get("outcome_code", ""))
+        try:
+            raw_sp = float(node.attrib[attribute]) if node is not None and attribute else None
+        except (KeyError, TypeError, ValueError):
+            raw_sp = None
+        if raw_sp is None or raw_sp != sp:
+            raise MultimarketP0Error("frozen row raw batch SP mismatch")
         vectors[(match_idx, playid)].append(row)
     if len(vectors) != int(manifest.get("frozen_match_markets", -1)):
         raise MultimarketP0Error("frozen match-market count mismatch")

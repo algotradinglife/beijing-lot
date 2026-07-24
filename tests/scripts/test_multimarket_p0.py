@@ -308,7 +308,7 @@ def test_segment_verifier_rejects_semantic_tampering_after_rehash(
         writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), lineterminator="\n")
         writer.writeheader(); writer.writerows(rows)
     p0._write_recursive_sums(wrong_codes)
-    with pytest.raises(p0.MultimarketP0Error, match="outcome-code set"):
+    with pytest.raises(p0.MultimarketP0Error, match="raw batch SP mismatch"):
         p0.verify_segment_freeze(wrong_codes)
 
     bad_manifest = tmp_path / "bad-manifest" / package.name
@@ -359,6 +359,26 @@ def test_segment_verifier_rejects_semantic_tampering_after_rehash(
     p0._write_recursive_sums(duplicate_overlap)
     with pytest.raises(p0.MultimarketP0Error, match="duplicate"):
         p0.verify_segment_freeze(duplicate_overlap)
+
+    bad_sp = tmp_path / "bad-sp" / package.name
+    shutil.copytree(package, bad_sp)
+    rows = list(csv.DictReader((bad_sp / "frozen_outcomes.csv").open(encoding="utf-8", newline="")))
+    rows[0]["sp"] = "99.0"
+    with (bad_sp / "frozen_outcomes.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), lineterminator="\n"); writer.writeheader(); writer.writerows(rows)
+    p0._write_recursive_sums(bad_sp)
+    with pytest.raises(p0.MultimarketP0Error, match="SP mismatch"):
+        p0.verify_segment_freeze(bad_sp)
+
+    bad_match = tmp_path / "bad-match" / package.name
+    shutil.copytree(package, bad_match)
+    rows = list(csv.DictReader((bad_match / "frozen_outcomes.csv").open(encoding="utf-8", newline="")))
+    rows[0]["match_idx"] = "999"; rows[0]["match_id"] = "P0X_999"
+    with (bad_match / "frozen_outcomes.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), lineterminator="\n"); writer.writeheader(); writer.writerows(rows)
+    p0._write_recursive_sums(bad_match)
+    with pytest.raises(p0.MultimarketP0Error, match="manifest mapping"):
+        p0.verify_segment_freeze(bad_match)
     connection.close()
 
 
