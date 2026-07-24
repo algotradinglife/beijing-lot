@@ -76,7 +76,7 @@ spec:
 
 status:
   current: EXECUTING
-  attempts: 2
+  attempts: 3
   routing:
     executor_mode: isolated_session
     profile: engineer
@@ -109,3 +109,15 @@ status:
       from: EXECUTING
       to: EXECUTING
       reason: "Round 1 requested durable past-due exact-N terminal evidence and a production-managed recovery activation handoff."
+    - action: pi_review_round2_changes_requested
+      ts: "2026-07-24T18:16:24Z"
+      actor: research_pi
+      from: EXECUTING
+      to: EXECUTING
+      reason: "Round 2 found that the normal exact-N ledger and missed terminal receipt did not share one atomic event owner."
+    - action: pi_review_round3_state_correction
+      ts: "2026-07-24T18:19:38Z"
+      actor: research_pi
+      from: EXECUTING
+      to: EXECUTING
+      reason: "Merge-only HEAD retained the race and advanced the runtime registry prematurely; action returned to engineering rework."

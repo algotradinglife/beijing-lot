@@ -18,6 +18,7 @@ import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Callable
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +47,7 @@ from src.natural_day_manifest import (  # noqa: E402
 from src.segment_recovery import (  # noqa: E402
     SegmentRecoveryError,
     canonical as recovery_canonical,
+    exact_event_lock,
     load_published_recovery,
     recovery_exact_terminal_path,
     verify_manifest as verify_recovery_manifest,
@@ -188,11 +190,15 @@ def promote_verified_package(
     destination: Path,
     ledger: Path,
     ledger_payload: dict[str, object],
+    before_reservation: Callable[[], None] | None = None,
+    before_published: Callable[[], None] | None = None,
 ) -> dict[str, object]:
     """Verify before reservation and again before making the ledger authoritative."""
     staged_verification = verify_exact_n_directory(stage)
     if staged_verification.get("status") != "PASS":
         raise RuntimeError("fail closed: staged exact-N package verification failed")
+    if before_reservation is not None:
+        before_reservation()
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
@@ -231,6 +237,25 @@ def promote_verified_package(
         raise RuntimeError(
             "fail closed: visible exact-N package verification failed"
         ) from exc
+
+    if before_published is not None:
+        try:
+            before_published()
+        except BaseException as exc:
+            _atomic_write_json(
+                ledger,
+                {
+                    **ledger_payload,
+                    "state": "PUBLICATION_ABORTED",
+                    "verification_phase": "BEFORE_PUBLISHED",
+                    "publication_error": f"{type(exc).__name__}: {exc}",
+                    "staged_package_verification": staged_verification,
+                    "visible_package_verification": visible_verification,
+                },
+            )
+            raise RuntimeError(
+                "fail closed: exact-N publication lost terminal ownership"
+            ) from exc
 
     _atomic_write_json(
         ledger,
@@ -767,24 +792,40 @@ def main() -> None:
         destination = (
             a.output_root / str(a.issue) / segment_identity / event_key
         )
-        try:
+
+        def before_reservation() -> None:
             require_pre_freeze_wall_clock(scheduled)
-        except ValueError as exc:
-            raise SystemExit(str(exc)) from exc
-        if terminal_ledger is not None and terminal_ledger.exists():
-            raise SystemExit(
-                f"fail closed: recovery freeze became terminally missed: {event_key}"
+            if ledger.exists():
+                raise RuntimeError(
+                    f"freeze event already bound: {event_key}"
+                )
+            if terminal_ledger is not None and terminal_ledger.exists():
+                raise RuntimeError(
+                    f"recovery freeze is terminally missed: {event_key}"
+                )
+
+        def before_published() -> None:
+            require_pre_freeze_wall_clock(scheduled)
+            if terminal_ledger is not None and terminal_ledger.exists():
+                raise RuntimeError(
+                    f"recovery terminal owns event: {event_key}"
+                )
+
+        with exact_event_lock(a.ledger_root, event_key):
+            verification = promote_verified_package(
+                stage=stage,
+                destination=destination,
+                ledger=ledger,
+                ledger_payload={
+                    "schema_version": "exact_n_freeze_ledger_v1",
+                    **common,
+                    "artifact_manifest": str(
+                        destination / "manifest.json"
+                    ),
+                },
+                before_reservation=before_reservation,
+                before_published=before_published,
             )
-        verification = promote_verified_package(
-            stage=stage,
-            destination=destination,
-            ledger=ledger,
-            ledger_payload={
-                "schema_version": "exact_n_freeze_ledger_v1",
-                **common,
-                "artifact_manifest": str(destination / "manifest.json"),
-            },
-        )
         print(
             json.dumps(
                 {

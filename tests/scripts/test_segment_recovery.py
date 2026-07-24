@@ -6,6 +6,7 @@ import json
 import sqlite3
 import subprocess
 import sys
+import threading
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -22,7 +23,9 @@ from scripts.verify_segment_recovery import verify
 from src.decision_api import app as decision_app
 from src.segment_recovery import (
     SegmentRecoveryError,
+    exact_event_lock,
     load_published_recovery,
+    publish_exact_terminal_record,
     recovery_exact_terminal_path,
     verify_exact_terminal_record,
 )
@@ -651,6 +654,162 @@ def test_terminal_receipt_tamper_is_rejected_by_api(tmp_path: Path) -> None:
         if segment["segment_identity"] == "segment_1_recovery_1"
     )
     assert child["status"] == "invalid_terminal_event"
+
+
+def test_exact_published_and_missed_choice_is_atomic_under_interleaving(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "test.sqlite"
+    _database(db)
+    _publish_parent(db, tmp_path / "natural")
+    recovery_result = recovery_publisher.publish(
+        issue="26078",
+        parent_segment_idx=1,
+        db_path=db,
+        output_root=tmp_path / "recovery",
+        exact_ledger_root=tmp_path / "exact-ledger",
+        observed_at=datetime.fromisoformat("2026-07-25T00:55:15+08:00"),
+    )
+    recovery = json.loads(Path(str(recovery_result["manifest"])).read_text())
+    ledger_root = tmp_path / "exact-ledger"
+    event_key = exact_n_publisher.digest(
+        {
+            "issue": "26078",
+            "segment_identity": "segment_1_recovery_1",
+        }
+    )
+    ledger = ledger_root / f"{event_key}.json"
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    (stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+    (stage / "SHA256SUMS").write_text("fixture\n", encoding="utf-8")
+    destination = tmp_path / "visible"
+    verification = {"status": "PASS", "cells": 15}
+    monkeypatch.setattr(
+        exact_n_publisher,
+        "verify_exact_n_directory",
+        lambda _path: dict(verification),
+    )
+    publisher_at_terminal_gate = threading.Event()
+    release_publisher = threading.Event()
+    terminal_started = threading.Event()
+    publisher_errors: list[BaseException] = []
+    terminal_errors: list[BaseException] = []
+
+    def before_published() -> None:
+        publisher_at_terminal_gate.set()
+        assert release_publisher.wait(timeout=2)
+
+    def publish_exact() -> None:
+        try:
+            with exact_event_lock(ledger_root, event_key):
+                exact_n_publisher.promote_verified_package(
+                    stage=stage,
+                    destination=destination,
+                    ledger=ledger,
+                    ledger_payload={
+                        "event_key": event_key,
+                        "artifact_manifest": str(destination / "manifest.json"),
+                    },
+                    before_published=before_published,
+                )
+        except BaseException as exc:
+            publisher_errors.append(exc)
+
+    def publish_terminal() -> None:
+        terminal_started.set()
+        try:
+            publish_exact_terminal_record(
+                ledger_root,
+                recovery,
+                observed_at=datetime.fromisoformat("2026-07-25T01:40:01+08:00"),
+            )
+        except BaseException as exc:
+            terminal_errors.append(exc)
+
+    publisher_thread = threading.Thread(target=publish_exact)
+    publisher_thread.start()
+    assert publisher_at_terminal_gate.wait(timeout=2)
+    terminal_thread = threading.Thread(target=publish_terminal)
+    terminal_thread.start()
+    assert terminal_started.wait(timeout=2)
+    terminal_thread.join(timeout=0.05)
+    assert terminal_thread.is_alive(), "terminal writer bypassed the event lock"
+    assert terminal_errors == []
+    release_publisher.set()
+    publisher_thread.join(timeout=2)
+    terminal_thread.join(timeout=2)
+
+    assert not publisher_thread.is_alive()
+    assert not terminal_thread.is_alive()
+    assert publisher_errors == []
+    assert len(terminal_errors) == 1
+    assert isinstance(terminal_errors[0], SegmentRecoveryError)
+    assert json.loads(ledger.read_text())["state"] == "PUBLISHED"
+    assert not recovery_exact_terminal_path(
+        ledger_root, "26078", "segment_1_recovery_1"
+    ).exists()
+
+
+def test_deadline_loss_aborts_published_then_terminal_owns_event(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "test.sqlite"
+    _database(db)
+    _publish_parent(db, tmp_path / "natural")
+    recovery_result = recovery_publisher.publish(
+        issue="26078",
+        parent_segment_idx=1,
+        db_path=db,
+        output_root=tmp_path / "recovery",
+        exact_ledger_root=tmp_path / "exact-ledger",
+        observed_at=datetime.fromisoformat("2026-07-25T00:55:15+08:00"),
+    )
+    recovery = json.loads(Path(str(recovery_result["manifest"])).read_text())
+    ledger_root = tmp_path / "exact-ledger"
+    event_key = exact_n_publisher.digest(
+        {
+            "issue": "26078",
+            "segment_identity": "segment_1_recovery_1",
+        }
+    )
+    ledger = ledger_root / f"{event_key}.json"
+    stage = tmp_path / "stage"
+    stage.mkdir()
+    (stage / "manifest.json").write_text("{}\n", encoding="utf-8")
+    (stage / "SHA256SUMS").write_text("fixture\n", encoding="utf-8")
+    verification = {"status": "PASS", "cells": 15}
+    monkeypatch.setattr(
+        exact_n_publisher,
+        "verify_exact_n_directory",
+        lambda _path: dict(verification),
+    )
+
+    with pytest.raises(RuntimeError, match="lost terminal ownership"):
+        with exact_event_lock(ledger_root, event_key):
+            exact_n_publisher.promote_verified_package(
+                stage=stage,
+                destination=tmp_path / "visible",
+                ledger=ledger,
+                ledger_payload={
+                    "event_key": event_key,
+                    "artifact_manifest": str(tmp_path / "visible/manifest.json"),
+                },
+                before_published=lambda: (_ for _ in ()).throw(
+                    ValueError("freeze deadline elapsed")
+                ),
+            )
+    assert json.loads(ledger.read_text())["state"] == "PUBLICATION_ABORTED"
+    terminal, idempotent = publish_exact_terminal_record(
+        ledger_root,
+        recovery,
+        observed_at=datetime.fromisoformat("2026-07-25T01:40:01+08:00"),
+    )
+    assert idempotent is False
+    assert terminal["state"] == "MISSED_RECOVERY_FREEZE"
+    assert terminal["prior_ledger_state"] == "PUBLICATION_ABORTED"
 
 
 def test_recovery_child_publishes_and_verifies_full_exact_n_package(
