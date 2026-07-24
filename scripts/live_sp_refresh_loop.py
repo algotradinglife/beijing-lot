@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 from datetime import datetime, timezone
@@ -25,9 +26,13 @@ from scrape_500_bjdc import (  # noqa: E402
 )
 from src.sqlite_runtime import connect_sqlite  # noqa: E402
 from src.multimarket_p0 import (  # noqa: E402
+    DEFAULT_SEGMENT_FREEZE_ROOT,
+    HKT,
     MultimarketP0Error,
     TARGET_PLAYIDS as P0_TARGET_PLAYIDS,
     build_settlement_truth,
+    freeze_segment,
+    parse_hkt,
 )
 
 
@@ -130,6 +135,39 @@ def _record_source_meta(conn, key: str, value: str) -> None:
     conn.execute("INSERT OR REPLACE INTO source_meta(key, value) VALUES(?, ?)", (key, value))
 
 
+def publish_due_segment_freezes(conn, issues: list[str], *, output_root: Path = DEFAULT_SEGMENT_FREEZE_ROOT,
+                                now: datetime | None = None) -> list[dict[str, object]]:
+    """Research-only, idempotent recovery for passed p40/p42 segment windows.
+
+    It only delegates to the strict as-of publisher; it never fetches later data
+    as a substitute and never invokes a strategy or execution path.
+    """
+    if not issues or conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='segment_decision_windows'").fetchone() is None:
+        return []
+    columns = {str(row[1]) for row in conn.execute("PRAGMA table_info(segment_decision_windows)")}
+    manual = "manual_frozen_at" if "manual_frozen_at" in columns else "NULL"
+    placeholders = ",".join("?" for _ in issues)
+    rows = conn.execute(
+        f"SELECT issue,segment_idx,freeze_at,{manual} AS manual_frozen_at FROM segment_decision_windows "
+        f"WHERE issue IN ({placeholders}) ORDER BY issue,segment_idx", issues,
+    ).fetchall()
+    current = (now or datetime.now(timezone.utc)).astimezone(HKT)
+    results: list[dict[str, object]] = []
+    for row in rows:
+        effective = str(row["manual_frozen_at"] or row["freeze_at"] or "")
+        if not effective or parse_hkt(effective) > current:
+            continue
+        issue, segment_idx = str(row["issue"]), int(row["segment_idx"])
+        try:
+            result = freeze_segment(conn, issue, segment_idx, output_root)
+            results.append({"issue": issue, "segment_idx": segment_idx, "status": "complete", "event_id": result["event_id"]})
+        except (MultimarketP0Error, OSError, ValueError) as exc:
+            # Append-only source metadata provides retry evidence without
+            # rewriting a package or claiming completion.
+            results.append({"issue": issue, "segment_idx": segment_idx, "status": "retry", "reason": str(exc)})
+    return results
+
+
 def run_once(conn, args: argparse.Namespace) -> int:
     issue_rows = fetch_issue_list(conn, args)
     current = _current_issue(issue_rows)
@@ -166,6 +204,10 @@ def run_once(conn, args: argparse.Namespace) -> int:
                 print(f"[{now_iso()}] multimarket_settlement skipped issue={issue}: {exc}", flush=True)
         if args.sleep and index < len(selected):
             time.sleep(args.sleep)
+
+    if any(playid in P0_TARGET_PLAYIDS for playid in playids):
+        segment_results = publish_due_segment_freezes(conn, selected)
+        _record_source_meta(conn, "last_multimarket_segment_freeze_results", json.dumps(segment_results, sort_keys=True))
 
     _record_source_meta(conn, "last_live_sp_refresh_finished_at", now_iso())
     _record_source_meta(conn, "last_live_sp_refresh_issue_count", str(len(selected)))

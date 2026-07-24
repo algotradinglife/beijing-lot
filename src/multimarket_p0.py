@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -23,6 +24,7 @@ MARKET_KEY = {40: "total_goals", 42: "correct_score"}
 EXPECTED_OUTCOMES = {40: 8, 42: 25}
 DEFAULT_CAPTURE_ROOT = ROOT / "results/data_collection/multimarket_sp_capture_v1"
 DEFAULT_FREEZE_ROOT = ROOT / "results/research/multimarket_10h_freeze_v1"
+DEFAULT_SEGMENT_FREEZE_ROOT = ROOT / "results/research/multimarket_segment_freeze_v1"
 SCORE_RE = re.compile(r"^\s*(\d+)\s*[:-]\s*(\d+)\s*$")
 
 
@@ -400,6 +402,234 @@ def _write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> Non
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
+
+
+SEGMENT_FREEZE_SCHEMA = "multimarket_segment_asof_freeze_v1"
+SEGMENT_FROZEN_FIELDS = ["issue", "segment_idx", "match_idx", "match_id", "playid", "market_key", "outcome_code", "outcome_label", "sp", "freeze_at_hkt", "freeze_source", "kickoff_hkt", "minutes_to_kickoff", "source_updated_at_hkt", "fetched_at_utc", "source_staleness_minutes", "capture_age_minutes", "sale_status", "sale_cutoff_hkt", "batch_id", "source_url", "payload_sha256", "bundle_sha256s_sha256"]
+SEGMENT_REJECTION_FIELDS = ["issue", "segment_idx", "match_idx", "playid", "market_key", "reason"]
+SEGMENT_SKIPPED_FIELDS = ["issue", "segment_idx", "match_idx", "playid", "batch_id", "reason"]
+
+
+def _safe_relative_files(root: Path) -> set[str]:
+    files: set[str] = set()
+    for item in root.rglob("*"):
+        if item.is_symlink() or (not item.is_dir() and not item.is_file()):
+            raise MultimarketP0Error(f"bundle contains non-regular file: {item}")
+        if item.is_file():
+            files.add(item.relative_to(root).as_posix())
+    return files
+
+
+def _write_recursive_sums(root: Path) -> None:
+    names = sorted(_safe_relative_files(root) - {"SHA256SUMS"})
+    (root / "SHA256SUMS").write_text("".join(f"{sha256_file(root / name)}  {name}\n" for name in names), encoding="utf-8")
+
+
+def _verify_recursive_sums(root: Path) -> dict[str, str]:
+    sums = root / "SHA256SUMS"
+    if not sums.is_file() or sums.is_symlink():
+        raise MultimarketP0Error(f"SHA256SUMS missing: {root}")
+    entries: dict[str, str] = {}
+    for line in sums.read_text(encoding="utf-8").splitlines():
+        try:
+            digest, name = line.split("  ", 1)
+        except ValueError as exc:
+            raise MultimarketP0Error(f"invalid SHA256SUMS line: {line!r}") from exc
+        rel = Path(name)
+        if not re.fullmatch(r"[0-9a-f]{64}", digest) or rel.is_absolute() or ".." in rel.parts or name in entries or name == "SHA256SUMS":
+            raise MultimarketP0Error(f"invalid SHA256SUMS entry: {line!r}")
+        target = root / rel
+        if target.is_symlink() or not target.is_file() or sha256_file(target) != digest:
+            raise MultimarketP0Error(f"checksum mismatch: {target}")
+        entries[name] = digest
+    if set(entries) != _safe_relative_files(root) - {"SHA256SUMS"}:
+        raise MultimarketP0Error("SHA256SUMS does not cover exactly the package files")
+    return entries
+
+
+def _segment_event_id(issue: str, segment_idx: int, freeze_at: datetime, playids: Iterable[int]) -> str:
+    payload = {"schema_version": SEGMENT_FREEZE_SCHEMA, "issue": str(issue), "segment_idx": int(segment_idx), "effective_freeze_at_hkt": freeze_at.astimezone(HKT).isoformat(timespec="seconds"), "target_playids": sorted(int(p) for p in playids)}
+    return sha256_bytes(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+
+
+def _segment_window(conn: sqlite3.Connection, issue: str, segment_idx: int) -> tuple[datetime, str, list[int]]:
+    if not _table_exists(conn, "segment_decision_windows"):
+        raise MultimarketP0Error("segment_decision_windows missing")
+    columns = {str(row[1]) for row in conn.execute("PRAGMA table_info(segment_decision_windows)")}
+    manual = "manual_frozen_at" if "manual_frozen_at" in columns else "'' AS manual_frozen_at"
+    row = conn.execute(f"SELECT freeze_at,match_indices_json,{manual} FROM segment_decision_windows WHERE issue=? AND segment_idx=?", (issue, segment_idx)).fetchone()
+    if row is None:
+        raise MultimarketP0Error(f"segment window missing: {issue}/{segment_idx}")
+    try:
+        matches = sorted({int(v) for v in json.loads(row[1])})
+    except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise MultimarketP0Error("invalid segment match_indices_json") from exc
+    if not matches:
+        raise MultimarketP0Error("segment has no matches")
+    source = "manual_frozen_at" if str(row[2] or "").strip() else "freeze_at"
+    return parse_hkt(str(row[2] or row[0])), source, matches
+
+
+def _segment_kickoff(conn: sqlite3.Connection, issue: str, match_idx: int) -> datetime | None:
+    match = conn.execute("SELECT end_time FROM matches WHERE issue=? AND match_idx=?", (issue, match_idx)).fetchone()
+    if match is None or not _table_exists(conn, "nowscore_bjdc_matches"):
+        return None
+    nrow = conn.execute("SELECT kickoff_time FROM nowscore_bjdc_matches WHERE issue=? AND match_idx=?", (issue, match_idx)).fetchone()
+    return resolve_kickoff_hkt(str(match[0] or ""), str(nrow[0] or "") if nrow else "")
+
+
+def _candidate_reason(batch: sqlite3.Row, rows: list[sqlite3.Row], *, issue: str, match_idx: int, playid: int, freeze_at: datetime) -> str | None:
+    try:
+        source_at = parse_hkt(str(batch["source_updated_at_hkt"]))
+        fetched_at = parse_utc(str(batch["fetched_at_utc"])).astimezone(HKT)
+    except (ValueError, TypeError):
+        return "invalid_dual_clock"
+    if source_at > freeze_at or fetched_at > freeze_at:
+        return "post_freeze_clock"
+    if len(rows) != EXPECTED_OUTCOMES[playid] or len({str(row["outcome_code"]) for row in rows}) != EXPECTED_OUTCOMES[playid]:
+        return "incomplete_vector"
+    if any(row["sp"] is None or not math.isfinite(float(row["sp"])) or float(row["sp"]) <= 1 for row in rows):
+        return "invalid_sp"
+    if any(str(row["match_id"] or "") != f"{issue}_{match_idx:03d}" for row in rows):
+        return "match_mapping_mismatch"
+    if any(str(row["sale_status"] or "") != "open" for row in rows):
+        return "sale_not_open"
+    if any(str(row["capture_classification"] or "") != "forward_complete_open" for row in rows):
+        return "not_forward_complete_open"
+    try:
+        cutoffs = {parse_hkt(str(row["sale_cutoff_hkt"] or "")) for row in rows}
+    except (ValueError, TypeError):
+        return "invalid_sale_cutoff"
+    if len(cutoffs) != 1 or next(iter(cutoffs)) <= freeze_at:
+        return "sale_cutoff_at_or_before_freeze"
+    try:
+        bundle = Path(str(batch["bundle_path"])).resolve()
+        verify_bundle(bundle)
+        manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+        if sha256_file(bundle / "SHA256SUMS") != str(batch["bundle_sha256s_sha256"]) or manifest.get("batch_id") != batch["batch_id"] or manifest.get("issue") != issue or manifest.get("playid") != playid:
+            return "bundle_mapping_mismatch"
+    except (OSError, ValueError, MultimarketP0Error):
+        return "bundle_verification_failed"
+    return None
+
+
+def verify_segment_freeze(path: Path) -> dict[str, Any]:
+    supplied = path.expanduser()
+    if supplied.is_symlink():
+        raise MultimarketP0Error("segment freeze path must not be a symlink")
+    output = supplied.resolve()
+    entries = _verify_recursive_sums(output)
+    required = {"manifest.json", "frozen_outcomes.csv", "paired_overlap.csv", "rejections.csv", "skipped_candidates.csv"}
+    if not required.issubset(entries):
+        raise MultimarketP0Error("segment freeze required files missing")
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    if manifest.get("schema_version") != SEGMENT_FREEZE_SCHEMA:
+        raise MultimarketP0Error("unsupported segment freeze schema")
+    policy = manifest.get("policy", {})
+    if policy.get("execution_enabled") is not False or policy.get("frontend_selectable") is not False or policy.get("roi_authorized") is not False:
+        raise MultimarketP0Error("non-execution policy drift")
+    counts: dict[str, int] = {}
+    for name, key in (("frozen_outcomes.csv", "frozen_outcome_rows"), ("paired_overlap.csv", "paired_overlap_matches"), ("rejections.csv", "rejected_match_markets"), ("skipped_candidates.csv", "skipped_candidates")):
+        with (output / name).open(encoding="utf-8", newline="") as handle:
+            counts[key] = len(list(csv.DictReader(handle)))
+        if counts[key] != int(manifest.get(key, -1)):
+            raise MultimarketP0Error("segment freeze count mismatch")
+    for batch_id in manifest.get("selected_batch_ids", []):
+        verify_bundle(output / "inputs/raw_batches" / str(batch_id))
+    return {"status": "valid", "output_dir": str(output), "event_id": manifest.get("event_id"), "sha256s_sha256": sha256_file(output / "SHA256SUMS"), **counts}
+
+
+def freeze_segment(
+    conn: sqlite3.Connection, issue: str, segment_idx: int,
+    output_root: Path = DEFAULT_SEGMENT_FREEZE_ROOT, *, playids: Iterable[int] = TARGET_PLAYIDS,
+) -> dict[str, Any]:
+    """Publish one deterministic, non-executable p40/p42 segment as-of package."""
+    ensure_schema(conn)
+    target_playids = tuple(sorted(set(int(value) for value in playids)))
+    if target_playids != TARGET_PLAYIDS:
+        raise MultimarketP0Error("segment freeze is limited to p40/p42")
+    freeze_at, freeze_source, match_indices = _segment_window(conn, issue, segment_idx)
+    event_id = _segment_event_id(issue, segment_idx, freeze_at, target_playids)
+    segment_root = output_root.expanduser().resolve() / issue / f"segment_{segment_idx:02d}"
+    output = segment_root / event_id
+    if segment_root.exists():
+        prior = [entry for entry in segment_root.iterdir() if entry.is_dir()]
+        if output.exists():
+            return {**verify_segment_freeze(output), "idempotent": True}
+        if prior:
+            raise MultimarketP0Error("conflicting segment freeze identity; PI review required")
+
+    frozen: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
+    skipped: list[dict[str, Any]] = []
+    selected: dict[tuple[int, int], sqlite3.Row] = {}
+    for match_idx in match_indices:
+        kickoff = _segment_kickoff(conn, issue, match_idx)
+        for playid in target_playids:
+            market = MARKET_KEY[playid]
+            batches = conn.execute("SELECT * FROM market_sp_capture_batches WHERE issue=? AND playid=?", (issue, playid)).fetchall()
+            batches = sorted(batches, key=lambda row: (str(row["source_updated_at_hkt"]), str(row["fetched_at_utc"]), str(row["batch_id"])), reverse=True)
+            accepted: tuple[sqlite3.Row, list[sqlite3.Row]] | None = None
+            final_reason = "no_capture_batch"
+            for batch in batches:
+                vector = conn.execute("SELECT * FROM live_market_sp_snapshots WHERE batch_id=? AND row_idx=? ORDER BY outcome_code", (batch["batch_id"], match_idx)).fetchall()
+                reason = _candidate_reason(batch, vector, issue=issue, match_idx=match_idx, playid=playid, freeze_at=freeze_at)
+                if reason:
+                    skipped.append({"issue": issue, "segment_idx": segment_idx, "match_idx": match_idx, "playid": playid, "batch_id": batch["batch_id"], "reason": reason})
+                    final_reason = reason
+                    continue
+                accepted = (batch, vector)
+                break
+            if accepted is None:
+                rejected.append({"issue": issue, "segment_idx": segment_idx, "match_idx": match_idx, "playid": playid, "market_key": market, "reason": final_reason})
+                continue
+            batch, vector = accepted
+            selected[(match_idx, playid)] = batch
+            source_at = parse_hkt(str(batch["source_updated_at_hkt"]))
+            fetched_at = parse_utc(str(batch["fetched_at_utc"])).astimezone(HKT)
+            cutoff = parse_hkt(str(vector[0]["sale_cutoff_hkt"]))
+            for row in vector:
+                frozen.append({
+                    "issue": issue, "segment_idx": segment_idx, "match_idx": match_idx, "match_id": row["match_id"], "playid": playid, "market_key": market,
+                    "outcome_code": row["outcome_code"], "outcome_label": row["outcome_label"], "sp": row["sp"],
+                    "freeze_at_hkt": freeze_at.isoformat(timespec="seconds"), "freeze_source": freeze_source,
+                    "kickoff_hkt": kickoff.isoformat(timespec="seconds") if kickoff else "", "minutes_to_kickoff": round((kickoff - freeze_at).total_seconds() / 60, 6) if kickoff else "",
+                    "source_updated_at_hkt": source_at.isoformat(timespec="seconds"), "fetched_at_utc": parse_utc(str(batch["fetched_at_utc"])).isoformat(timespec="microseconds"),
+                    "source_staleness_minutes": round((freeze_at - source_at).total_seconds() / 60, 6), "capture_age_minutes": round((freeze_at - fetched_at).total_seconds() / 60, 6),
+                    "sale_status": row["sale_status"], "sale_cutoff_hkt": cutoff.isoformat(timespec="seconds"), "batch_id": batch["batch_id"], "source_url": batch["source_url"],
+                    "payload_sha256": batch["payload_sha256"], "bundle_sha256s_sha256": batch["bundle_sha256s_sha256"],
+                })
+    overlap = [
+        {"issue": issue, "segment_idx": segment_idx, "match_idx": idx, "match_id": f"{issue}_{idx:03d}", "freeze_at_hkt": freeze_at.isoformat(timespec="seconds"), "p40_batch_id": selected[(idx, 40)]["batch_id"], "p42_batch_id": selected[(idx, 42)]["batch_id"]}
+        for idx in match_indices if (idx, 40) in selected and (idx, 42) in selected
+    ]
+    output.parent.mkdir(parents=True, exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix=f".{event_id}.tmp-", dir=output.parent))
+    try:
+        _write_csv(stage / "frozen_outcomes.csv", frozen, SEGMENT_FROZEN_FIELDS)
+        _write_csv(stage / "paired_overlap.csv", overlap, ["issue", "segment_idx", "match_idx", "match_id", "freeze_at_hkt", "p40_batch_id", "p42_batch_id"])
+        _write_csv(stage / "rejections.csv", rejected, SEGMENT_REJECTION_FIELDS)
+        _write_csv(stage / "skipped_candidates.csv", skipped, SEGMENT_SKIPPED_FIELDS)
+        raw_root = stage / "inputs/raw_batches"
+        for batch in {str(row["batch_id"]): row for row in selected.values()}.values():
+            source = Path(str(batch["bundle_path"])).resolve()
+            verify_bundle(source)
+            shutil.copytree(source, raw_root / str(batch["batch_id"]))
+            verify_bundle(raw_root / str(batch["batch_id"]))
+        manifest = {
+            "schema_version": SEGMENT_FREEZE_SCHEMA, "event_id": event_id, "issue": issue, "segment_idx": segment_idx,
+            "effective_freeze_at_hkt": freeze_at.isoformat(timespec="seconds"), "freeze_source": freeze_source, "target_playids": list(target_playids), "segment_match_indices": match_indices,
+            "frozen_outcome_rows": len(frozen), "frozen_match_markets": len(selected), "rejected_match_markets": len(rejected), "skipped_candidates": len(skipped), "paired_overlap_matches": len(overlap),
+            "selected_batch_ids": sorted({str(row["batch_id"]) for row in selected.values()}), "non_execution_flags": {"execution_enabled": False, "frontend_selectable": False, "roi_authorized": False},
+            "policy": {"execution_enabled": False, "frontend_selectable": False, "roi_authorized": False, "complete_vector_required": True, "dual_clock_at_or_before_freeze": True, "sale_status_required": "open", "terminal_or_legacy_allowed": False},
+        }
+        (stage / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _write_recursive_sums(stage)
+        stage.rename(output)
+    finally:
+        if stage.exists():
+            shutil.rmtree(stage)
+    return {**manifest, **verify_segment_freeze(output), "idempotent": False}
 
 
 def verify_freeze(path: Path) -> dict[str, Any]:

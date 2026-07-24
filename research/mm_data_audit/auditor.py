@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import csv
 import sqlite3
 import statistics
 from collections import Counter, defaultdict
@@ -884,7 +885,7 @@ class MultiMarketAuditor:
         ))
 
         # G5: Freeze Protocol v1
-        from src.multimarket_p0 import MultimarketP0Error, verify_freeze
+        from src.multimarket_p0 import MultimarketP0Error, verify_freeze, verify_segment_freeze
         # verify_freeze() only accepts the multimarket as-of-freeze contract.
         # The committed MM-DATA-AUDIT research freeze has a different schema.
         freeze_root = _repo_root() / "results/research/multimarket_10h_freeze_v1"
@@ -911,6 +912,28 @@ class MultiMarketAuditor:
                 verified_freeze = verification
                 break
 
+        # Segment packages are the only compatible evidence for the p40/p42
+        # shared-decision-time G5 gate. They remain prospective evidence; a
+        # valid package with no rows does not pass the gate.
+        segment_root = _repo_root() / "results/research/multimarket_segment_freeze_v1"
+        segment_dirs = list(segment_root.glob("*/segment_*/*")) if segment_root.is_dir() else []
+        for fd in segment_dirs:
+            if has_freeze or not fd.is_dir() or not (fd / "manifest.json").is_file():
+                continue
+            try:
+                verification = verify_segment_freeze(fd)
+                manifest = json.loads((fd / "manifest.json").read_text())
+                frozen_rows = list(csv.DictReader((fd / "frozen_outcomes.csv").open(encoding="utf-8", newline="")))
+            except (MultimarketP0Error, OSError, ValueError, json.JSONDecodeError) as exc:
+                if len(freeze_failures) < 5:
+                    freeze_failures.append({"path": str(fd), "error": str(exc)})
+                continue
+            if market.playid in manifest.get("target_playids", []) and any(int(row["playid"]) == market.playid for row in frozen_rows):
+                has_freeze = True
+                freeze_manifest = manifest
+                verified_freeze = verification
+                break
+
         metrics.update({
             "has_existing_freeze": has_freeze,
             "freeze_manifest": freeze_manifest.get("schema_version") if freeze_manifest else None,
@@ -925,7 +948,7 @@ class MultiMarketAuditor:
                 f"Verified 10h freeze package found: {freeze_manifest.get('schema_version', '')} with "
                 f"{freeze_manifest.get('frozen_outcome_rows', 0)} frozen rows for this market."
                 if has_freeze
-                else "No verified compatible 10h freeze package for this market."
+                else "No verified compatible 10h or strict segment freeze package for this market."
             ),
             metrics={"has_freeze": has_freeze, "freeze_verification": verified_freeze},
         ))

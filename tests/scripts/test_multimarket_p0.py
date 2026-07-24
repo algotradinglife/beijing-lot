@@ -54,6 +54,9 @@ def make_db(path: Path, *, cutoff: str = "2026-07-17 06:50", disabled: str = "no
     connection.execute(
         "INSERT INTO nowscore_bjdc_matches VALUES('P0X',1,'07:00','','','scheduled')"
     )
+    connection.execute(
+        "CREATE TABLE segment_decision_windows(issue TEXT,segment_idx INTEGER,freeze_at TEXT,manual_frozen_at TEXT,match_indices_json TEXT)"
+    )
     connection.commit()
     return connection
 
@@ -175,6 +178,115 @@ def test_terminal_backfill_and_closed_capture_cannot_enter_10h(
     with pytest.raises(p0.MultimarketP0Error, match="no valid 10h"):
         p0.freeze_10h(terminal, "P0X", tmp_path / "terminal-freeze", playids=(40,))
     terminal.close()
+
+
+def test_segment_freeze_is_recursive_hashed_idempotent_and_rejects_tamper(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection = make_db(tmp_path / "db.sqlite")
+    connection.execute(
+        "INSERT INTO segment_decision_windows VALUES('P0X',1,'2026-07-16T21:00:00+08:00',NULL,'[1]')"
+    )
+    connection.commit()
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40))
+    capture(connection, monkeypatch, tmp_path, 42, market_xml(42))
+
+    result = p0.freeze_segment(connection, "P0X", 1, tmp_path / "segment")
+    package = Path(result["output_dir"])
+    assert result["status"] == "valid"
+    assert result["frozen_match_markets"] == 2
+    assert result["paired_overlap_matches"] == 1
+    repeated = p0.freeze_segment(connection, "P0X", 1, tmp_path / "segment")
+    assert repeated["event_id"] == result["event_id"]
+    assert repeated["idempotent"] is True
+    manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["non_execution_flags"] == {
+        "execution_enabled": False, "frontend_selectable": False, "roi_authorized": False,
+    }
+    raw = next((package / "inputs/raw_batches").glob("*/raw.xml"))
+    with raw.open("ab") as handle:
+        handle.write(b"tamper")
+    with pytest.raises(p0.MultimarketP0Error, match="checksum mismatch"):
+        p0.verify_segment_freeze(package)
+    connection.close()
+
+
+def test_segment_freeze_skips_late_candidate_and_rejects_closed_sale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection = make_db(tmp_path / "db.sqlite")
+    connection.execute(
+        "INSERT INTO segment_decision_windows VALUES('P0X',1,'2026-07-16T21:00:00+08:00',NULL,'[1]')"
+    )
+    connection.commit()
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40))
+    capture(connection, monkeypatch, tmp_path, 42, market_xml(42))
+    # A newer otherwise-valid batch is after the shared absolute decision time.
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40, winner_sp=3.5), fetched_at="2026-07-16 14:00:00")
+    result = p0.freeze_segment(connection, "P0X", 1, tmp_path / "segment")
+    package = Path(result["output_dir"])
+    skipped = list(csv.DictReader((package / "skipped_candidates.csv").open(encoding="utf-8", newline="")))
+    assert any(row["reason"] == "post_freeze_clock" for row in skipped)
+    frozen = list(csv.DictReader((package / "frozen_outcomes.csv").open(encoding="utf-8", newline="")))
+    assert {row["batch_id"] for row in frozen if row["playid"] == "40"} != {skipped[0]["batch_id"]}
+    connection.close()
+
+
+def test_segment_freeze_is_strict_recursive_and_idempotent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection = make_db(tmp_path / "segment.sqlite")
+    connection.execute("INSERT INTO segment_decision_windows VALUES('P0X',7,'2026-07-16 21:00:00',NULL,'[1]')")
+    connection.commit()
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40))
+    capture(connection, monkeypatch, tmp_path, 42, market_xml(42))
+
+    result = p0.freeze_segment(connection, "P0X", 7, tmp_path / "segment-freezes")
+    assert result["frozen_match_markets"] == 2
+    assert result["frozen_outcome_rows"] == 33
+    assert result["paired_overlap_matches"] == 1
+    package = Path(result["output_dir"])
+    assert p0.verify_segment_freeze(package)["status"] == "valid"
+    repeated = p0.freeze_segment(connection, "P0X", 7, tmp_path / "segment-freezes")
+    assert repeated["event_id"] == result["event_id"]
+    raw = next((package / "inputs/raw_batches").glob("*/raw.xml"))
+    with raw.open("ab") as handle:
+        handle.write(b"tamper")
+    with pytest.raises(p0.MultimarketP0Error, match="checksum mismatch"):
+        p0.verify_segment_freeze(package)
+    connection.close()
+
+
+def test_segment_freeze_skips_post_freeze_candidate_for_earlier_valid_batch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection = make_db(tmp_path / "segment-late.sqlite")
+    connection.execute("INSERT INTO segment_decision_windows VALUES('P0X',1,'2026-07-16 21:00:00',NULL,'[1]')")
+    connection.commit()
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40))
+    capture(connection, monkeypatch, tmp_path, 42, market_xml(42))
+    # A newer post-freeze p40 candidate is deliberately ineligible.
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40), fetched_at="2026-07-16 14:00:00")
+    result = p0.freeze_segment(connection, "P0X", 1, tmp_path / "segment-freezes")
+    assert result["frozen_match_markets"] == 2
+    skipped = list(csv.DictReader((Path(result["output_dir"]) / "skipped_candidates.csv").open(encoding="utf-8")))
+    assert any(row["reason"] == "post_freeze_clock" for row in skipped)
+    connection.close()
+
+
+def test_segment_freeze_verifier_rejects_unlisted_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    connection = make_db(tmp_path / "segment-verify.sqlite")
+    connection.execute("INSERT INTO segment_decision_windows VALUES('P0X',1,'2026-07-16 21:00:00',NULL,'[1]')")
+    connection.commit()
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40))
+    capture(connection, monkeypatch, tmp_path, 42, market_xml(42))
+    package = Path(p0.freeze_segment(connection, "P0X", 1, tmp_path / "segment-freezes")["output_dir"])
+    (package / "unexpected.txt").write_text("nope", encoding="utf-8")
+    with pytest.raises(p0.MultimarketP0Error, match="cover exactly"):
+        p0.verify_segment_freeze(package)
+    connection.close()
 
 
 def test_settlement_truth_maps_total_score_other_and_sp1(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

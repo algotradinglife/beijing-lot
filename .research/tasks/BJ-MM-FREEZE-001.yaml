@@ -42,6 +42,16 @@ spec:
       - Two prospective segment events after activation are sufficient for G4/G5 evaluation
       - Existing freeze-10h behavior remains backward-compatible
       - MM-DATA-AUDIT-001 matrix is the immutable baseline
+    preregistration:
+      target_playids: [40, 42]
+      selection_mode: segment_freeze
+      required_prospective_segment_events: 2
+      activation_git_sha: 63f09bef1c1a0399192444d79814a988bddede80
+      activation_utc: "2026-07-23T17:38:56Z"
+      event_rule: First two eligible segment events after activation, automatically and without manual cherry-picking.
+      execution_enabled: false
+      frontend_selectable: false
+      roi_authorized: false
 
   execution:
     required_capabilities:
