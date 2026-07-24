@@ -62,7 +62,7 @@ entries:
       - 1c4773adc04078ae1f54a7083276afe6a97ad084
       - 2b1774b7eb64391e633932f8a4f7ce7720656534
     pr_number: 24
-    started_at: "2026-07-25T00:55:00Z"
+    started_at: "2026-07-24T17:29:48Z"
     last_seen: "2026-07-25T02:37:27Z"
     status: pr_review_pending_validation
     execution_phase: pending_ev
@@ -75,7 +75,7 @@ entries:
       Round 2 (7cfacb0, 18:16:24Z): CHANGES_REQUESTED — P0 (atomic MISSED-vs-PUBLISHED) persists.
       Round 3 (842d1c7, 18:19:38Z): CHANGES_REQUESTED — P0 same finding, 3rd round.
       Round 4 (14e9105, 18:33:41Z): COMMENTED — PI confirms all findings resolved. Approval held for EV gate.
-      EV (14e9105, 02:37+00:00): PASS — HermesPM Engineering Validation complete. All 16 recovery tests pass.
+      EV (14e9105, receipt published 2026-07-24T18:42:18Z): PASS — HermesPM Engineering Validation complete. All 16 recovery tests pass.
       PI APPROVED (14e9105, 18:43:06Z): Final PI approval on HEAD 14e9105.
       Round 5 (1c4773a, 18:47:26Z): CHANGES_REQUESTED — Registry prematurely carried prior-head approval onto unvalidated merge HEAD.
       Round 6 (2b1774b, 18:53:34Z): COMMENTED — Merge-head registry findings resolved; approval held for exact-head EV.
