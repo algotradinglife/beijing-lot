@@ -61,7 +61,7 @@ def main() -> None:
         if now >= earliest:
             raise SystemExit(f"fail closed: first freeze {iso(earliest)} has passed")
         # A freeze ledger is irrevocable evidence, so correction is prohibited.
-        ledger = ROOT / "results/segment_freeze/ledger"
+        ledger = ROOT / "results/research/multimarket_segment_freeze_v1/ledger"
         if ledger.exists() and any(args.issue in path.read_text(encoding="utf-8", errors="ignore") for path in ledger.glob("*.json")):
             raise SystemExit("fail closed: existing research freeze ledger references issue")
         manifest = {
