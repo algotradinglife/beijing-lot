@@ -212,8 +212,9 @@ def test_run_writes_outputs(tmp_path: Path) -> None:
         str(tmp_path / "reports"),
         "--segment-budget-yuan",
         "20",
-        "--sample-attempts",
-        "200",
+            "--sample-attempts",
+            "200",
+            "--research-allow-unpublished-segment-contract",
     ])
     payload = mod.run(args)
 
@@ -310,8 +311,9 @@ def test_run_multi_seed_writes_stability_outputs(tmp_path: Path) -> None:
         "300",
         "--sample-seed",
         "10",
-        "--seed-count",
-        "3",
+            "--seed-count",
+            "3",
+            "--research-allow-unpublished-segment-contract",
     ])
     payload = mod.run(args)
 
@@ -401,8 +403,9 @@ def test_planning_scope_can_output_by_segment_or_one_entire_issue_segment(tmp_pa
         "200",
         "--min-matches",
         "3",
-        "--decision-time",
-        "2026-07-01 10:00",
+            "--decision-time",
+            "2026-07-01 10:00",
+            "--research-allow-unpublished-segment-contract",
     ]
 
     by_segment_payload = mod.run(mod.parse_args([*base_args, "--planning-scope", "by_segment"]))
@@ -500,7 +503,8 @@ def test_stake_mode_defaults_to_scale_budget_and_can_use_unit_once(tmp_path: Pat
         "100",
         "--sample-attempts",
         "300",
-        "--allow-negative-ev",
+            "--allow-negative-ev",
+            "--research-allow-unpublished-segment-contract",
     ]
     scaled = mod.run(mod.parse_args(base_args))
     unit_once = mod.run(mod.parse_args([*base_args, "--stake-mode", "unit_once"]))

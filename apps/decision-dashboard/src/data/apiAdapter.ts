@@ -1,6 +1,6 @@
 import { mockDashboardData } from './mockData';
 import { DEFAULT_DECISION_VARIANT_ID } from '../decisionVariants';
-import type { CandidateRole, CoverageType, DashboardData, DecisionArtifactCompleteness, DecisionArtifactGenerateResult, DecisionArtifactStatusData, DecisionSnapshotConfirmResult, DecisionSnapshotData, DecisionVariantData, DecisionVariantOption, IssueDashboardData, IssueMatchRow, IssueOption, LiveSignalsData, MainStrategyData, MatchDetailData, OddsConsensus, OperationsStatusData, PostmatchReviewData, ScrapeStatus, SegmentBettingPlanData, SelectorShadowData, SettlementData, StrategyLabData, StrategyVersionContext, TicketData } from './types';
+import type { CandidateRole, CoverageType, DashboardData, DecisionArtifactCompleteness, DecisionArtifactGenerateResult, DecisionArtifactStatusData, DecisionSnapshotConfirmResult, DecisionSnapshotData, DecisionVariantData, DecisionVariantOption, ExactNFreezeData, IssueDashboardData, IssueMatchRow, IssueOption, LiveSignalsData, MainStrategyData, MatchDetailData, OddsConsensus, OperationsStatusData, PostmatchReviewData, ScrapeStatus, SegmentBettingPlanData, SelectorShadowData, SettlementData, StrategyLabData, StrategyVersionContext, TicketData } from './types';
 
 export type AdapterMode = 'mock' | 'fetch';
 
@@ -1899,6 +1899,52 @@ function transformSegmentBettingPlan(raw: unknown): SegmentBettingPlanData {
   };
 }
 
+function transformExactNFreezes(raw: unknown): ExactNFreezeData {
+  const obj = asObject(raw);
+  return {
+    schemaVersion: asString(obj.schema_version),
+    issueId: asString(obj.issue),
+    status: asString(obj.status),
+    segmentManifestSha256: asString(obj.segment_manifest_sha256),
+    exactNFrontendSelectable: asBoolean(obj.exact_n_frontend_selectable),
+    segments: asArray(obj.segments).map((rawSegment) => {
+      const segment = asObject(rawSegment);
+      const correctScore = asObject(segment.correct_score);
+      return {
+        segmentIdx: asMaybeNumber(segment.segment_idx) ?? 0,
+        matchCount: asMaybeNumber(segment.match_count) ?? 0,
+        freezeAt: asString(segment.freeze_at),
+        effectiveDecisionAt: asString(segment.effective_decision_at),
+        status: asString(segment.status),
+        alternatives: asArray(segment.alternatives).map((rawAlternative) => {
+          const alternative = asObject(rawAlternative);
+          return {
+            planId: asString(alternative.plan_id),
+            exactN: asBoolean(alternative.exact_n),
+            requestedN: asMaybeNumber(alternative.requested_n) ?? 0,
+            artifactN: asMaybeNumber(alternative.artifact_n) ?? 0,
+            recommendedN: asMaybeNumber(alternative.recommended_n) ?? 0,
+            requestedBudgetYuan: asMaybeNumber(alternative.requested_budget_yuan) ?? 0,
+            baseCostYuan: asMaybeNumber(alternative.base_cost_yuan) ?? 0,
+            actualCostYuan: asMaybeNumber(alternative.actual_cost_yuan) ?? 0,
+            unusedBudgetYuan: asMaybeNumber(alternative.unused_budget_yuan) ?? 0,
+            budgetUtilization: asMaybeNumber(alternative.budget_utilization) ?? 0,
+            ticketCount: asMaybeNumber(alternative.ticket_count) ?? 0,
+            decisionInputSha256: asString(alternative.decision_input_sha256),
+            freezeAt: asString(alternative.freeze_at),
+            status: asString(alternative.status),
+            frontendSelectable: asBoolean(alternative.frontend_selectable),
+          };
+        }),
+        correctScore: Object.keys(correctScore).length ? {
+          status: asString(correctScore.status),
+          frontendSelectable: asBoolean(correctScore.frontend_selectable),
+        } : undefined,
+      };
+    }),
+  };
+}
+
 export class ApiDashboardAdapter {
   private mode: AdapterMode;
   private baseUrl: string;
@@ -2002,7 +2048,7 @@ export class ApiDashboardAdapter {
     return this.getJson(withDecisionVariant(`/api/issues/${issueId}/main-strategy`, decisionVariantId), mockDashboardData.mainStrategy, transformMainStrategy);
   }
 
-	  getSegmentBettingPlan(
+  getSegmentBettingPlan(
 	    issueId: string,
 	    decisionVariantId?: string,
 	    planId?: string,
@@ -2025,6 +2071,14 @@ export class ApiDashboardAdapter {
     const suffix = params.toString();
     const path = suffix ? `${basePath}${basePath.includes('?') ? '&' : '?'}${suffix}` : basePath;
     return this.getJson(path, mockDashboardData.segmentBettingPlan, transformSegmentBettingPlan);
+  }
+
+  getExactNFreezes(issueId: string): Promise<ExactNFreezeData> {
+    return this.getJson(
+      `/api/issues/${issueId}/exact-n-freezes`,
+      mockDashboardData.exactNFreezes,
+      transformExactNFreezes,
+    );
   }
 
   getOperationsStatus(issueId: string): Promise<OperationsStatusData> {
@@ -2060,7 +2114,7 @@ export class ApiDashboardAdapter {
     const settlementIssueId = chooseSettlementIssueId(availableIssues, resolvedIssueId);
     const resolvedMatchId = matchId ?? issue.matches[0]?.matchId;
     if (!resolvedMatchId) throw new Error(`No matches available for issue ${issue.issueId}`);
-    const [decisionArtifactStatus, matchDetail, ticket, liveSignals, settlement, strategyLab, selectorShadow, mainStrategy, operations, segmentBettingPlan] = await Promise.all([
+    const [decisionArtifactStatus, matchDetail, ticket, liveSignals, settlement, strategyLab, selectorShadow, mainStrategy, operations, segmentBettingPlan, exactNFreezes] = await Promise.all([
       this.getDecisionArtifactStatus(resolvedIssueId, decisionVariantId).catch(() => undefined),
       this.getMatchDetail(resolvedIssueId, resolvedMatchId, decisionVariantId),
       this.getTicketDraft(resolvedIssueId),
@@ -2074,6 +2128,7 @@ export class ApiDashboardAdapter {
       this.getMainStrategy(resolvedIssueId, decisionVariantId),
       this.getOperationsStatus(resolvedIssueId),
       this.getSegmentBettingPlan(resolvedIssueId, decisionVariantId),
+      this.getExactNFreezes(resolvedIssueId),
     ]);
     return {
       availableIssues,
@@ -2087,6 +2142,7 @@ export class ApiDashboardAdapter {
       mainStrategy,
       operations,
       segmentBettingPlan,
+      exactNFreezes,
     };
   }
 }

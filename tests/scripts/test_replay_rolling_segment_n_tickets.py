@@ -105,7 +105,7 @@ def _write_structured(path: Path) -> None:
         writer.writerows(rows)
 
 
-def test_build_segments_extends_when_initial_window_is_short(tmp_path: Path) -> None:
+def test_build_segments_skips_issue_below_natural_day_minimum(tmp_path: Path) -> None:
     mod = _load_module()
     db = tmp_path / "test.sqlite"
     structured = tmp_path / "structured.csv"
@@ -115,9 +115,7 @@ def test_build_segments_extends_when_initial_window_is_short(tmp_path: Path) -> 
     legs = mod.load_legs(structured, db, issue="1001")
     segments = mod.build_segments(legs, base_window_hours=12, extend_hours=[24], min_matches=3, max_matches=24)
 
-    assert len(segments) == 1
-    assert segments[0].window_hours == 24
-    assert [leg.match_idx for leg in segments[0].legs] == [1, 2, 3]
+    assert segments == []
 
 
 def test_replay_segment_uses_polynomial_cost_and_payout(tmp_path: Path) -> None:
@@ -128,7 +126,7 @@ def test_replay_segment_uses_polynomial_cost_and_payout(tmp_path: Path) -> None:
     _write_structured(structured)
 
     legs = mod.load_legs(structured, db, issue="1001")
-    segment = mod.build_segments(legs, base_window_hours=24, extend_hours=[24], min_matches=3, max_matches=24)[0]
+    segment = mod.Segment(1, legs[0].kickoff, legs[-1].kickoff, 24, tuple(legs))
     active = mod.replay_segment_arm(
         segment,
         "active",
@@ -173,7 +171,7 @@ def test_sample_budget_respects_cap_and_seed(tmp_path: Path) -> None:
     _write_structured(structured)
 
     legs = mod.load_legs(structured, db, issue="1001")
-    segment = mod.build_segments(legs, base_window_hours=24, extend_hours=[24], min_matches=3, max_matches=24)[0]
+    segment = mod.Segment(1, legs[0].kickoff, legs[-1].kickoff, 24, tuple(legs))
     first = mod.replay_segment_arm(
         segment,
         "shadow",

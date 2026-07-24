@@ -1,6 +1,41 @@
 import type { DashboardData } from './types';
 
 export const mockDashboardData: DashboardData = {
+  exactNFreezes: {
+    schemaVersion: 'exact_n_segment_freeze_api_v1',
+    issueId: '26052',
+    status: 'available',
+    segmentManifestSha256: 'mock-segment-manifest',
+    exactNFrontendSelectable: true,
+    segments: [{
+      segmentIdx: 1,
+      matchCount: 8,
+      freezeAt: '2026-06-30T17:35:00+08:00',
+      effectiveDecisionAt: '2026-06-30T17:30:00+08:00',
+      status: 'published',
+      alternatives: [{
+        planId: '26052_s1_n3_b512',
+        exactN: true,
+        requestedN: 3,
+        artifactN: 3,
+        recommendedN: 3,
+        requestedBudgetYuan: 512,
+        baseCostYuan: 16,
+        actualCostYuan: 500,
+        unusedBudgetYuan: 12,
+        budgetUtilization: 0.9765625,
+        ticketCount: 2,
+        decisionInputSha256: 'mock-input-sha256',
+        freezeAt: '2026-06-30T17:35:00+08:00',
+        status: 'FROZEN_EXACT_N_BUDGET',
+        frontendSelectable: true,
+      }],
+      correctScore: {
+        status: 'UNAVAILABLE_CORRECT_SCORE_PLAN',
+        frontendSelectable: false,
+      },
+    }],
+  },
   availableIssues: [
     { issueId: '26052', label: '26052 当前期', status: 'current', source: 'mock', isCurrent: true, year: 2026, matchCount: 31, settledMatchCount: 9, openMatchCount: 22, isFullySettled: false, hasSettlement: false, lastSeenAt: '2026-06-30T21:58:00+08:00', issueCloseTs: '' },
     { issueId: '26051', label: '26051 历史回放', status: 'historical_replay', source: 'mock', isCurrent: false, year: 2026, matchCount: 14, settledMatchCount: 14, openMatchCount: 0, isFullySettled: true, hasSettlement: true, lastSeenAt: '2026-05-02T20:00:00+08:00', issueCloseTs: '2026-05-02T20:00:00+08:00' },

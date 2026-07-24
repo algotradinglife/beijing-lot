@@ -999,6 +999,7 @@ def segments_by_match_idx(
     legs = rolling.load_legs(source_csv, db_path, issue=issue)
     segments = rolling.build_segments(
         legs,
+        db_path=db_path,
         base_window_hours=window_hours,
         extend_hours=rolling.parse_extend_hours(extend_hours),
         min_matches=min_matches,

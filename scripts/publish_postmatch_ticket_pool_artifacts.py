@@ -550,6 +550,7 @@ def build_artifact(args: argparse.Namespace) -> dict[str, Any]:
         raise SystemExit(f"No replay legs loaded for issue {args.issue}")
     segments = rolling.build_segments(
         legs,
+        db_path=args.db,
         base_window_hours=args.window_hours,
         extend_hours=rolling.parse_extend_hours(args.extend_hours),
         min_matches=args.min_matches,

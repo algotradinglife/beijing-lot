@@ -476,10 +476,21 @@ def verify_hashed_bundle(path: Path, expected_schema: str | None = None) -> dict
             raise CorrectScorePriceError(f"invalid SHA256SUMS line: {line!r}") from exc
         if not re.fullmatch(r"[0-9a-f]{64}", digest) or Path(name).is_absolute() or ".." in Path(name).parts:
             raise CorrectScorePriceError(f"invalid SHA256SUMS entry: {line!r}")
+        if name in entries:
+            raise CorrectScorePriceError(f"duplicate SHA256SUMS entry: {name}")
         target = root / name
         if not target.is_file() or sha256_file(target) != digest:
             raise CorrectScorePriceError(f"checksum mismatch: {target}")
         entries[name] = digest
+    actual_files = {
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and path.name != "SHA256SUMS"
+    }
+    if set(entries) != actual_files:
+        raise CorrectScorePriceError(
+            "SHA256SUMS does not bind the complete capture bundle file set"
+        )
     manifest_path = root / "manifest.json"
     if "manifest.json" not in entries:
         raise CorrectScorePriceError("manifest.json is not hash-bound")

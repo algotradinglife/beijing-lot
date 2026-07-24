@@ -12,7 +12,7 @@ import sqlite3
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -22,6 +22,13 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 from select_rolling_segment_n import recommend_segment_n  # noqa: E402
+from src.natural_day_manifest import (  # noqa: E402
+    NaturalDayManifestError,
+    load_published_manifest,
+    segment_membership,
+    verify_operational_windows,
+)
+from src.natural_day_segments import build_natural_day_segments  # noqa: E402
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -170,47 +177,73 @@ def parse_extend_hours(value: str) -> list[float]:
 def build_segments(
     legs: list[LegRow],
     *,
+    db_path: Path | None = None,
+    require_published_contract: bool = False,
     base_window_hours: float = 12.0,
     extend_hours: list[float] | None = None,
     min_matches: int = 6,
     max_matches: int = 24,
 ) -> list[Segment]:
+    # Arguments remain for CLI compatibility.  Membership is exclusively owned
+    # by BJ-SEG-DAY-001; in particular max_matches must not split a busy day.
     if not legs:
         return []
-    windows = sorted({base_window_hours, *(extend_hours or [])})
-    segments: list[Segment] = []
-    cursor = 0
-    segment_idx = 1
-    while cursor < len(legs):
-        start = legs[cursor].kickoff
-        selected: list[LegRow] = []
-        selected_hours = windows[-1]
-        for hours in windows:
-            end = start + timedelta(hours=hours)
-            candidate = [leg for leg in legs[cursor:] if leg.kickoff <= end]
-            selected = candidate
-            selected_hours = hours
-            if len(candidate) >= min_matches:
-                break
-        if not selected:
-            selected = [legs[cursor]]
-            selected_hours = base_window_hours
-        if max_matches > 0 and len(selected) > max_matches:
-            selected = selected[:max_matches]
-            selected_hours = max(0.0, (selected[-1].kickoff - start).total_seconds() / 3600.0)
-        end = start + timedelta(hours=selected_hours)
-        segments.append(
-            Segment(
-                segment_idx=segment_idx,
-                start=start,
-                end=end,
-                window_hours=selected_hours,
-                legs=tuple(selected),
-            )
+    by_idx = {leg.match_idx: leg for leg in legs}
+    if db_path is not None:
+        conn = sqlite3.connect(db_path)
+        try:
+            manifest = load_published_manifest(conn, legs[0].issue)
+            if manifest is not None:
+                verify_operational_windows(conn, manifest)
+                published: list[Segment] = []
+                for segment_idx, indices in segment_membership(manifest):
+                    segment_legs = tuple(by_idx[idx] for idx in indices if idx in by_idx)
+                    if not segment_legs:
+                        continue
+                    published.append(
+                        Segment(
+                            segment_idx=segment_idx,
+                            start=segment_legs[0].kickoff,
+                            end=segment_legs[-1].kickoff,
+                            window_hours=round(
+                                (
+                                    segment_legs[-1].kickoff - segment_legs[0].kickoff
+                                ).total_seconds()
+                                / 3600,
+                                6,
+                            ),
+                            legs=segment_legs,
+                        )
+                    )
+                return published
+            if require_published_contract:
+                raise ValueError(
+                    "published natural-day segment contract is required for operational by_segment generation"
+                )
+        except NaturalDayManifestError as exc:
+            raise ValueError(
+                f"published natural-day segment contract is invalid: {exc}"
+            ) from exc
+        finally:
+            conn.close()
+    if require_published_contract:
+        raise ValueError(
+            "published natural-day segment contract is required for operational by_segment generation"
         )
-        cursor += len(selected)
-        segment_idx += 1
-    return segments
+    result = build_natural_day_segments(legs[0].issue, legs)
+    return [
+        Segment(
+            segment_idx=item.segment_idx,
+            start=item.first_kickoff.replace(tzinfo=None),
+            end=item.last_kickoff.replace(tzinfo=None),
+            window_hours=round(
+                (item.last_kickoff - item.first_kickoff).total_seconds() / 3600,
+                6,
+            ),
+            legs=tuple(by_idx[idx] for idx in item.match_indices),
+        )
+        for item in result.segments
+    ]
 
 
 def selection_probability(leg: LegRow, arm: str) -> float:
@@ -644,6 +677,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise SystemExit(f"No legs loaded for issue {args.issue}")
     segments = build_segments(
         legs,
+        db_path=args.db,
         base_window_hours=args.window_hours,
         extend_hours=parse_extend_hours(args.extend_hours),
         min_matches=args.min_matches,

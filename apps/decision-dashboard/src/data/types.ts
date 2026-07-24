@@ -1068,4 +1068,41 @@ export interface DashboardData {
   mainStrategy: MainStrategyData;
   operations: OperationsStatusData;
   segmentBettingPlan: SegmentBettingPlanData;
+  exactNFreezes: ExactNFreezeData;
+}
+
+export interface ExactNFreezeData {
+  schemaVersion: string;
+  issueId: string;
+  status: string;
+  segmentManifestSha256: string;
+  exactNFrontendSelectable: boolean;
+  segments: Array<{
+    segmentIdx: number;
+    matchCount: number;
+    freezeAt: string;
+    effectiveDecisionAt: string;
+    status: string;
+    alternatives: Array<{
+      planId: string;
+      exactN: boolean;
+      requestedN: number;
+      artifactN: number;
+      recommendedN: number;
+      requestedBudgetYuan: number;
+      baseCostYuan: number;
+      actualCostYuan: number;
+      unusedBudgetYuan: number;
+      budgetUtilization: number;
+      ticketCount: number;
+      decisionInputSha256: string;
+      freezeAt: string;
+      status: string;
+      frontendSelectable: boolean;
+    }>;
+    correctScore?: {
+      status: string;
+      frontendSelectable: boolean;
+    };
+  }>;
 }

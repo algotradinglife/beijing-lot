@@ -1,0 +1,43 @@
+{
+  "ts": "2026-07-24T09:28:41.406599+00:00",
+  "reconciler_version": "0.1.0",
+  "project": "/home/drwho1985/workspace/soccer/beijing-lot",
+  "graph": "beijing-lot-pilot",
+  "runtime": {
+    "created_at": "2026-07-24T09:09:31Z",
+    "reconciler_version": "0.1.1"
+  },
+  "nodes_checked": 6,
+  "nodes_alive": 0,
+  "nodes_anomaly": 2,
+  "anomalies": [
+    {
+      "node": "BJ-SEG-DAY-001",
+      "state": "EXECUTING",
+      "issue": "session_not_alive",
+      "detail": {
+        "session_id": "",
+        "last_heartbeat": "unknown",
+        "stale_for": "",
+        "can_retry": true,
+        "attempts": 1,
+        "max_attempts": 2
+      }
+    },
+    {
+      "node": "BJ-BET-FREEZE-001",
+      "state": "EXECUTING",
+      "issue": "session_not_alive",
+      "detail": {
+        "session_id": "",
+        "last_heartbeat": "unknown",
+        "stale_for": "",
+        "can_retry": true,
+        "attempts": 1,
+        "max_attempts": 2
+      }
+    }
+  ],
+  "heartbeat_updates": [],
+  "warnings": []
+}

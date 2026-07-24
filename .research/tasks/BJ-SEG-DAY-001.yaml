@@ -75,4 +75,10 @@ status:
     reason: Capability task, medium complexity, time-sensitive (17:55 HKT freeze deadline)
   artifacts: []
   result: {}
-  history: []
+  history:
+    - action: reconcile_state_transition
+      ts: "2026-07-24T09:34:12Z"
+      actor: reconciler
+      from: EXECUTING
+      to: REVIEW
+      reason: "Code complete, PR #21 open. session_not_alive anomaly expected (execution phase done). Awaiting conflict resolution and PI review."
