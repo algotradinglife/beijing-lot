@@ -32,6 +32,10 @@ spec:
       node_type: task
       ref: tasks/BJ-BET-FREEZE-001.yaml
       state: COMPLETED
+    - id: BJ-SEG-RECOVERY-001
+      node_type: task
+      ref: tasks/BJ-SEG-RECOVERY-001.yaml
+      state: EXECUTING
 
   edges:
     - from: GOAL-BOOT
@@ -49,6 +53,15 @@ spec:
     - from: BJ-BOOT-001
       to: BJ-MM-FREEZE-001
       relation: informs
-    - from: BJ-SEG-DAY-001
+    - from: BJ-BET-FREEZE-001
+      to: BJ-SEG-DAY-001
+      relation: depends_on
+    - from: GOAL-PHASE1
+      to: BJ-SEG-RECOVERY-001
+      relation: decomposes_to
+    - from: BJ-SEG-RECOVERY-001
+      to: BJ-SEG-DAY-001
+      relation: depends_on
+    - from: BJ-SEG-RECOVERY-001
       to: BJ-BET-FREEZE-001
       relation: depends_on

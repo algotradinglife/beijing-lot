@@ -37,6 +37,16 @@ from src.natural_day_manifest import (  # noqa: E402
     load_published_manifest,
     verify_operational_windows,
 )
+from src.segment_recovery import (  # noqa: E402
+    PUBLICATION_TABLE as RECOVERY_PUBLICATION_TABLE,
+    SegmentRecoveryError,
+    load_exact_terminal_record,
+    load_published_recovery,
+    publish_exact_terminal_record,
+    recovery_exact_event_key,
+    recovery_exact_terminal_path,
+    verify_operational_window as verify_recovery_operational_window,
+)
 from src.structured_input_receipt import receipt_path, verify_receipt  # noqa: E402
 
 
@@ -50,6 +60,53 @@ DEFAULT_EXACT_N_LEDGER_ROOT = ROOT / "results/research/exact_n_segment_freeze_v1
 DEFAULT_CORRECT_SCORE_ROOT = ROOT / "results/data_collection/correct_score_price_history_v1"
 DEFAULT_EXACT_N_TRIGGER_LEAD_MINUTES = 10.0
 DEFAULT_FINAL_INPUT_REFRESH_LEAD_MINUTES = 30.0
+DEFAULT_RECOVERY_OUTPUT_ROOT = ROOT / "results/research/segment_recovery_v1"
+
+
+def coordinate_segment_recovery(
+    db_path: Path,
+    issue: str,
+    *,
+    parent_segment_idx: int,
+    output_root: Path = DEFAULT_RECOVERY_OUTPUT_ROOT,
+    exact_ledger_root: Path = DEFAULT_EXACT_N_LEDGER_ROOT,
+    hard_stop_hkt: str = "",
+) -> dict[str, Any]:
+    """Invoke the one-shot wall-clock publisher; it owns idempotency."""
+    command = [
+        sys.executable,
+        str(ROOT / "scripts/publish_segment_recovery.py"),
+        "--issue",
+        str(issue),
+        "--parent-segment",
+        str(parent_segment_idx),
+        "--db",
+        str(db_path),
+        "--output-root",
+        str(output_root),
+        "--exact-ledger-root",
+        str(exact_ledger_root),
+    ]
+    if hard_stop_hkt:
+        command.extend(["--hard-stop-hkt", hard_stop_hkt])
+    completed = subprocess.run(
+        command, cwd=ROOT, capture_output=True, text=True, check=False
+    )
+    if completed.returncode != 0:
+        return {
+            "status": "failed_closed_recovery_publish",
+            "parent_segment_idx": int(parent_segment_idx),
+            "error": (completed.stderr or completed.stdout).strip(),
+        }
+    try:
+        receipt = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        return {
+            "status": "failed_closed_invalid_recovery_receipt",
+            "parent_segment_idx": int(parent_segment_idx),
+            "stdout": completed.stdout.strip(),
+        }
+    return receipt
 
 
 def now_iso() -> str:
@@ -497,8 +554,184 @@ def coordinate_due_exact_n_freeze(
             if manifest is None:
                 return {"status": "skipped_no_published_segment_contract"}
             verify_operational_windows(conn, manifest)
+            recovery_segments: list[dict[str, Any]] = []
+            if conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                (RECOVERY_PUBLICATION_TABLE,),
+            ).fetchone() is not None:
+                parent_rows = conn.execute(
+                    f"""
+                    SELECT parent_segment_idx
+                    FROM {RECOVERY_PUBLICATION_TABLE}
+                    WHERE issue=?
+                    ORDER BY parent_segment_idx
+                    """,
+                    (str(issue),),
+                ).fetchall()
+                for row in parent_rows:
+                    recovery = load_published_recovery(
+                        conn, str(issue), int(row[0])
+                    )
+                    if recovery is None:
+                        continue
+                    verify_recovery_operational_window(conn, recovery)
+                    if recovery["status"] != "PUBLISHED_RECOVERY":
+                        continue
+                    recovery_segments.append(
+                        {
+                            "segment_idx": int(recovery["parent_segment_idx"]),
+                            "segment_identity": str(recovery["child_identity"]),
+                            "match_indices": [
+                                int(item["match_idx"])
+                                for item in recovery["included"]
+                            ],
+                            "match_count": int(recovery["included_match_count"]),
+                            "freeze_at": str(recovery["recovery_freeze_at"]),
+                            "_manifest_sha256": str(
+                                recovery["manifest_sha256"]
+                            ),
+                            "_manifest_path": str(recovery["manifest_path"]),
+                            "_is_recovery": True,
+                            "_recovery_contract": recovery,
+                        }
+                    )
     except NaturalDayManifestError as exc:
         return {"status": "failed_closed_segment_contract", "error": str(exc)}
+    except SegmentRecoveryError as exc:
+        return {"status": "failed_closed_recovery_contract", "error": str(exc)}
+    all_segments = [
+        {
+            **segment,
+            "segment_identity": f"segment_{int(segment['segment_idx'])}",
+            "_manifest_sha256": str(manifest["manifest_sha256"]),
+            "_manifest_path": str(manifest["manifest_path"]),
+            "_is_recovery": False,
+        }
+        for segment in manifest["segments"]
+    ] + recovery_segments
+    past_due_recoveries = sorted(
+        (
+            (
+                datetime.fromisoformat(str(segment["freeze_at"])),
+                segment,
+            )
+            for segment in recovery_segments
+            if datetime.fromisoformat(str(segment["freeze_at"])) < observed_at
+        ),
+        key=lambda item: item[0],
+    )
+    for _past_freeze, segment in past_due_recoveries:
+        event_key = recovery_exact_event_key(
+            str(issue), str(segment["segment_identity"])
+        )
+        ledger_path = ledger_root / f"{event_key}.json"
+        try:
+            existing_terminal = load_exact_terminal_record(
+                ledger_root, segment["_recovery_contract"]
+            )
+        except SegmentRecoveryError as exc:
+            return {
+                "status": "failed_closed_recovery_terminal",
+                "segment_idx": int(segment["segment_idx"]),
+                "segment_identity": str(segment["segment_identity"]),
+                "error": str(exc),
+            }
+        if ledger_path.is_file():
+            try:
+                ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                ledger = {}
+            if ledger.get("state") == "PUBLISHED":
+                if existing_terminal is not None:
+                    return {
+                        "status": "failed_closed_conflicting_terminal_event",
+                        "segment_idx": int(segment["segment_idx"]),
+                        "segment_identity": str(
+                            segment["segment_identity"]
+                        ),
+                        "event_key": event_key,
+                    }
+                try:
+                    artifact_manifest = Path(str(ledger["artifact_manifest"]))
+                    verification = verify_exact_n_directory(
+                        artifact_manifest.parent
+                    )
+                    if (
+                        verification.get("status") != "PASS"
+                        or ledger.get("package_verification") != verification
+                        or ledger.get("artifact_manifest_sha256")
+                        != verification.get("artifact_manifest_sha256")
+                        or ledger.get("package_sha256s_sha256")
+                        != verification.get("package_sha256s_sha256")
+                        or str(ledger.get("event_key") or "") != event_key
+                        or str(ledger.get("segment_manifest_sha256") or "")
+                        != str(segment["_manifest_sha256"])
+                    ):
+                        raise ValueError(
+                            "past-due PUBLISHED ledger verification mismatch"
+                        )
+                except (
+                    OSError,
+                    KeyError,
+                    TypeError,
+                    ValueError,
+                    json.JSONDecodeError,
+                ) as exc:
+                    return {
+                        "status": "failed_closed_invalid_ledger",
+                        "segment_idx": int(segment["segment_idx"]),
+                        "segment_identity": str(
+                            segment["segment_identity"]
+                        ),
+                        "error": (
+                            "past-due published package verification failed: "
+                            f"{exc}"
+                        ),
+                    }
+                return {
+                    "status": "already_published",
+                    "segment_idx": int(segment["segment_idx"]),
+                    "segment_identity": str(segment["segment_identity"]),
+                    "event_key": event_key,
+                    "segment_manifest_sha256": str(
+                        segment["_manifest_sha256"]
+                    ),
+                    "verification": verification,
+                }
+        try:
+            terminal, idempotent = publish_exact_terminal_record(
+                ledger_root,
+                segment["_recovery_contract"],
+                observed_at=observed_at,
+            )
+        except SegmentRecoveryError as exc:
+            return {
+                "status": "failed_closed_recovery_terminal",
+                "segment_idx": int(segment["segment_idx"]),
+                "segment_identity": str(segment["segment_identity"]),
+                "error": str(exc),
+            }
+        return {
+            "status": "MISSED_RECOVERY_FREEZE",
+            "segment_idx": int(segment["segment_idx"]),
+            "segment_identity": str(segment["segment_identity"]),
+            "event_key": event_key,
+            "terminal_receipt": str(
+                recovery_exact_terminal_path(
+                    ledger_root,
+                    str(issue),
+                    str(segment["segment_identity"]),
+                )
+            ),
+            "terminal_receipt_sha256": str(
+                terminal["terminal_receipt_sha256"]
+            ),
+            "idempotent": idempotent,
+            "exact_n_cells": terminal["exact_n_cells"],
+            "correct_score_budget_statuses": terminal[
+                "correct_score_budget_statuses"
+            ],
+        }
     if not structured_csv.is_file():
         return {
             "status": "failed_closed_structured_input_missing",
@@ -506,21 +739,23 @@ def coordinate_due_exact_n_freeze(
         }
 
     upcoming: list[tuple[datetime, dict[str, Any]]] = []
-    for segment in manifest["segments"]:
+    for segment in all_segments:
         freeze_at = datetime.fromisoformat(str(segment["freeze_at"]))
         if freeze_at.tzinfo is None:
             freeze_at = freeze_at.astimezone()
         if freeze_at - timedelta(minutes=trigger_lead_minutes) <= observed_at <= freeze_at:
             upcoming.append((freeze_at, segment))
     if not upcoming:
-        future = [
-            str(segment["freeze_at"])
-            for segment in manifest["segments"]
+        future = sorted(
+            datetime.fromisoformat(str(segment["freeze_at"]))
+            for segment in all_segments
             if datetime.fromisoformat(str(segment["freeze_at"])) > observed_at
-        ]
+        )
         return {
             "status": "pending",
-            "next_freeze_at": future[0] if future else "",
+            "next_freeze_at": (
+                future[0].isoformat(timespec="seconds") if future else ""
+            ),
             "segment_manifest_sha256": str(manifest["manifest_sha256"]),
         }
 
@@ -556,7 +791,14 @@ def coordinate_due_exact_n_freeze(
         }
     event_key = hashlib.sha256(
         json.dumps(
-            {"issue": str(issue), "segment_idx": int(segment["segment_idx"])},
+            (
+                {
+                    "issue": str(issue),
+                    "segment_identity": str(segment["segment_identity"]),
+                }
+                if segment["_is_recovery"]
+                else {"issue": str(issue), "segment_idx": int(segment["segment_idx"])}
+            ),
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
@@ -574,7 +816,7 @@ def coordinate_due_exact_n_freeze(
         if (
             ledger.get("state") == "PUBLISHED"
             and str(ledger.get("segment_manifest_sha256") or "")
-            == str(manifest["manifest_sha256"])
+            == str(segment["_manifest_sha256"])
             and Path(str(ledger.get("artifact_manifest") or "")).is_file()
         ):
             try:
@@ -592,8 +834,9 @@ def coordinate_due_exact_n_freeze(
                         "status": "already_published",
                         "segment_idx": int(segment["segment_idx"]),
                         "event_key": event_key,
+                        "segment_identity": str(segment["segment_identity"]),
                         "segment_manifest_sha256": str(
-                            manifest["manifest_sha256"]
+                            segment["_manifest_sha256"]
                         ),
                         "verification": verification,
                     }
@@ -622,8 +865,12 @@ def coordinate_due_exact_n_freeze(
         str(issue),
         "--segment",
         str(segment["segment_idx"]),
-        "--manifest",
-        str(manifest["manifest_path"]),
+        (
+            "--recovery-manifest"
+            if segment["_is_recovery"]
+            else "--manifest"
+        ),
+        str(segment["_manifest_path"]),
         "--structured-csv",
         str(structured_csv),
         "--input-receipt",
@@ -700,13 +947,56 @@ def coordinate_due_exact_n_freeze(
     return {
         "status": "published",
         "segment_idx": int(segment["segment_idx"]),
-        "segment_manifest_sha256": str(manifest["manifest_sha256"]),
+        "segment_identity": str(segment["segment_identity"]),
+        "segment_manifest_sha256": str(segment["_manifest_sha256"]),
         "receipt": receipt,
     }
 
 
 def run_once(args: argparse.Namespace) -> dict[str, Any]:
     observed_at = datetime.now(timezone.utc).astimezone()
+    with decision_app._connect(args.db) as recovery_connection:
+        recovery_issue = decision_app._resolve_issue(
+            recovery_connection, str(args.issue)
+        )
+    recovery_parents = list(
+        getattr(args, "recovery_parent_segment", [])
+    )
+    recovery_activation_issue = str(
+        getattr(args, "recovery_issue", "") or ""
+    )
+    if recovery_parents and recovery_activation_issue != recovery_issue:
+        segment_recoveries = [
+            {
+                "status": "skipped_recovery_activation_issue_mismatch",
+                "activation_issue": recovery_activation_issue,
+                "resolved_issue": recovery_issue,
+                "parent_segment_idx": int(parent_segment_idx),
+            }
+            for parent_segment_idx in recovery_parents
+        ]
+    else:
+        segment_recoveries = [
+            coordinate_segment_recovery(
+                args.db,
+                recovery_issue,
+                parent_segment_idx=int(parent_segment_idx),
+                output_root=getattr(
+                    args,
+                    "recovery_output_root",
+                    DEFAULT_RECOVERY_OUTPUT_ROOT,
+                ),
+                exact_ledger_root=getattr(
+                    args,
+                    "exact_n_ledger_root",
+                    DEFAULT_EXACT_N_LEDGER_ROOT,
+                ),
+                hard_stop_hkt=str(
+                    getattr(args, "recovery_hard_stop_hkt", "") or ""
+                ),
+            )
+            for parent_segment_idx in recovery_parents
+        ]
     segment_plan_freeze = segment_plan_freeze_state(
         args.db, args.issue, observed_at=observed_at
     )
@@ -719,6 +1009,19 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
         <= observed_at
         <= freeze_at
     )
+    for recovery in segment_recoveries:
+        recovery_freeze_text = str(recovery.get("freeze_at") or "")
+        if not recovery_freeze_text:
+            continue
+        recovery_freeze = datetime.fromisoformat(recovery_freeze_text)
+        if (
+            recovery_freeze - timedelta(
+                minutes=DEFAULT_FINAL_INPUT_REFRESH_LEAD_MINUTES
+            )
+            <= observed_at
+            <= recovery_freeze
+        ):
+            force_final_refresh = True
     active = ensure_active_artifact(
         args.db,
         args.issue,
@@ -794,6 +1097,7 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
         "active": active,
         "v4_2": v4_2,
         "segment_betting_plan_freeze": segment_plan_freeze,
+        "segment_recoveries": segment_recoveries,
         "segment_betting_plans": segment_betting_plans,
         "exact_n_freeze": exact_n_freeze,
     }
@@ -819,8 +1123,45 @@ def main() -> None:
     parser.add_argument("--exact-n-output-root", type=Path, default=DEFAULT_EXACT_N_OUTPUT_ROOT)
     parser.add_argument("--exact-n-ledger-root", type=Path, default=DEFAULT_EXACT_N_LEDGER_ROOT)
     parser.add_argument("--correct-score-root", type=Path, default=DEFAULT_CORRECT_SCORE_ROOT)
+    parser.add_argument(
+        "--recovery-issue",
+        default="",
+        help=(
+            "exact activated issue; prevents a persistent current-issue loop "
+            "from applying recovery to a later issue"
+        ),
+    )
+    parser.add_argument(
+        "--recovery-parent-segment",
+        type=int,
+        action="append",
+        default=[],
+        help="explicitly activated parent; at most one immutable recovery is published",
+    )
+    parser.add_argument(
+        "--recovery-output-root",
+        type=Path,
+        default=DEFAULT_RECOVERY_OUTPUT_ROOT,
+    )
+    parser.add_argument(
+        "--recovery-hard-stop-hkt",
+        default="",
+        help="activation-specific absolute cutoff for honest MISSED evidence",
+    )
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
+    recovery_activation_fields = (
+        bool(args.recovery_parent_segment),
+        bool(args.recovery_issue),
+        bool(args.recovery_hard_stop_hkt),
+    )
+    if any(recovery_activation_fields) and not all(
+        recovery_activation_fields
+    ):
+        parser.error(
+            "recovery activation requires --recovery-issue, "
+            "--recovery-parent-segment, and --recovery-hard-stop-hkt together"
+        )
 
     while True:
         started = time.monotonic()

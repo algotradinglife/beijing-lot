@@ -25,6 +25,13 @@ from src.natural_day_manifest import (
     load_published_manifest,
     verify_operational_windows,
 )
+from src.segment_recovery import (
+    PUBLICATION_TABLE as RECOVERY_PUBLICATION_TABLE,
+    SegmentRecoveryError,
+    load_exact_terminal_record,
+    load_published_recovery,
+    verify_operational_window as verify_recovery_operational_window,
+)
 from src.sqlite_runtime import connect_sqlite
 from scripts.verify_exact_n_freeze import verify_directory as verify_exact_n_directory
 
@@ -4425,25 +4432,187 @@ def _exact_n_freeze_payload(
             "segments": [],
         }
 
+    segment_contracts: list[dict[str, Any]] = [
+        {
+            **segment,
+            "segment_identity": f"segment_{int(segment['segment_idx'])}",
+            "segment_contract_sha256": str(contract["manifest_sha256"]),
+            "is_recovery": False,
+            "parent_segment_idx": None,
+            "parent_status": "",
+        }
+        for segment in contract["segments"]
+    ]
+    recovered_parent_indices: set[int] = set()
+    recovery_records: list[dict[str, Any]] = []
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (RECOVERY_PUBLICATION_TABLE,),
+    ).fetchone() is not None:
+        parent_rows = conn.execute(
+            f"""
+            SELECT parent_segment_idx
+            FROM {RECOVERY_PUBLICATION_TABLE}
+            WHERE issue=?
+            ORDER BY parent_segment_idx
+            """,
+            (str(issue),),
+        ).fetchall()
+        try:
+            for row in parent_rows:
+                recovery = load_published_recovery(
+                    conn, str(issue), int(row[0])
+                )
+                if recovery is None:
+                    continue
+                verify_recovery_operational_window(conn, recovery)
+                recovered_parent_indices.add(int(recovery["parent_segment_idx"]))
+                recovery_records.append(
+                    {
+                        "segment_identity": str(recovery["child_identity"]),
+                        "parent_segment_idx": int(
+                            recovery["parent_segment_idx"]
+                        ),
+                        "parent_status": str(recovery["parent_status"]),
+                        "status": str(recovery["status"]),
+                        "match_count": int(recovery["included_match_count"]),
+                        "freeze_at": str(recovery["recovery_freeze_at"]),
+                        "recovery_manifest_sha256": str(
+                            recovery["manifest_sha256"]
+                        ),
+                    }
+                )
+                if recovery["status"] != "PUBLISHED_RECOVERY":
+                    continue
+                segment_contracts.append(
+                    {
+                        "segment_idx": int(recovery["parent_segment_idx"]),
+                        "segment_identity": str(recovery["child_identity"]),
+                        "match_indices": [
+                            int(item["match_idx"])
+                            for item in recovery["included"]
+                        ],
+                        "match_count": int(recovery["included_match_count"]),
+                        "freeze_at": str(recovery["recovery_freeze_at"]),
+                        "segment_contract_sha256": str(
+                            recovery["manifest_sha256"]
+                        ),
+                        "is_recovery": True,
+                        "parent_segment_idx": int(
+                            recovery["parent_segment_idx"]
+                        ),
+                        "parent_status": str(recovery["parent_status"]),
+                        "recovery_manifest_sha256": str(
+                            recovery["manifest_sha256"]
+                        ),
+                        "_recovery_contract": recovery,
+                    }
+                )
+        except SegmentRecoveryError as exc:
+            return {
+                "issue": str(issue),
+                "status": "invalid_recovery_contract",
+                "error": str(exc),
+                "segments": [],
+            }
+
     segment_payloads: list[dict[str, Any]] = []
-    for segment in contract["segments"]:
+    for segment in segment_contracts:
         segment_idx = int(segment["segment_idx"])
+        segment_identity = str(segment["segment_identity"])
+        segment_contract_sha256 = str(segment["segment_contract_sha256"])
         event_key = hashlib.sha256(
             json.dumps(
-                {"issue": str(issue), "segment_idx": segment_idx},
+                (
+                    {"issue": str(issue), "segment_identity": segment_identity}
+                    if segment["is_recovery"]
+                    else {"issue": str(issue), "segment_idx": segment_idx}
+                ),
                 sort_keys=True,
                 separators=(",", ":"),
             ).encode("utf-8")
         ).hexdigest()
         base = {
             "segment_idx": segment_idx,
+            "segment_identity": segment_identity,
+            "is_recovery": bool(segment["is_recovery"]),
+            "parent_segment_idx": segment["parent_segment_idx"],
+            "parent_status": str(segment["parent_status"]),
+            "recovery_manifest_sha256": str(
+                segment.get("recovery_manifest_sha256") or ""
+            ),
             "match_count": int(segment["match_count"]),
             "freeze_at": str(segment["freeze_at"]),
             "event_key": event_key,
-            "status": "pending",
+            "status": (
+                "MISSED_FREEZE"
+                if not segment["is_recovery"]
+                and segment_idx in recovered_parent_indices
+                else "pending"
+            ),
             "alternatives": [],
         }
         ledger_path = ledger_root / f"{event_key}.json"
+        if segment["is_recovery"]:
+            try:
+                terminal = load_exact_terminal_record(
+                    ledger_root, segment["_recovery_contract"]
+                )
+            except SegmentRecoveryError as exc:
+                base.update(
+                    {
+                        "status": "invalid_terminal_event",
+                        "error": str(exc),
+                    }
+                )
+                segment_payloads.append(base)
+                continue
+            if terminal is not None:
+                if ledger_path.is_file():
+                    try:
+                        conflicting_ledger = json.loads(
+                            ledger_path.read_text(encoding="utf-8")
+                        )
+                    except (OSError, json.JSONDecodeError):
+                        conflicting_ledger = {}
+                    if conflicting_ledger.get("state") == "PUBLISHED":
+                        base.update(
+                            {
+                                "status": "invalid_terminal_event",
+                                "error": (
+                                    "terminal receipt conflicts with a "
+                                    "PUBLISHED ledger"
+                                ),
+                            }
+                        )
+                        segment_payloads.append(base)
+                        continue
+                base.update(
+                    {
+                        "status": "MISSED_RECOVERY_FREEZE",
+                        "terminal_receipt_sha256": str(
+                            terminal["terminal_receipt_sha256"]
+                        ),
+                        "terminal_observed_at": str(
+                            terminal["observed_at_hkt"]
+                        ),
+                        "terminal_reason": str(terminal["reason"]),
+                        "exact_n_terminal_cells": terminal[
+                            "exact_n_cells"
+                        ],
+                        "correct_score": {
+                            "status": "MISSED_RECOVERY_FREEZE",
+                            "budget_statuses": terminal[
+                                "correct_score_budget_statuses"
+                            ],
+                            "execution_enabled": False,
+                            "frontend_selectable": False,
+                            "roi_authorized": False,
+                        },
+                    }
+                )
+                segment_payloads.append(base)
+                continue
         if not ledger_path.is_file():
             segment_payloads.append(base)
             continue
@@ -4452,12 +4621,12 @@ def _exact_n_freeze_payload(
             if (
                 ledger.get("state") != "PUBLISHED"
                 or str(ledger.get("segment_manifest_sha256") or "")
-                != str(contract["manifest_sha256"])
+                != segment_contract_sha256
             ):
                 raise ValueError("ledger is not a matching PUBLISHED event")
             artifact_manifest_path = Path(str(ledger["artifact_manifest"]))
             expected_root = (
-                output_root / str(issue) / f"segment_{segment_idx}" / event_key
+                output_root / str(issue) / segment_identity / event_key
             ).resolve()
             if artifact_manifest_path.resolve().parent != expected_root:
                 raise ValueError("artifact manifest path differs from event identity")
@@ -4481,9 +4650,18 @@ def _exact_n_freeze_payload(
             if (
                 str(artifact_manifest.get("event_key") or "") != event_key
                 or str(artifact_manifest.get("segment_manifest_sha256") or "")
-                != str(contract["manifest_sha256"])
+                != segment_contract_sha256
                 or list(artifact_manifest.get("segment_match_indices") or [])
                 != list(segment["match_indices"])
+                or str(
+                    artifact_manifest.get("segment_identity")
+                    or f"segment_{segment_idx}"
+                )
+                != segment_identity
+                or str(
+                    artifact_manifest.get("recovery_manifest_sha256") or ""
+                )
+                != str(segment.get("recovery_manifest_sha256") or "")
             ):
                 raise ValueError("artifact manifest differs from segment contract")
             exact_entries = [
@@ -4591,6 +4769,7 @@ def _exact_n_freeze_payload(
         "segment_counts": [
             int(segment["match_count"]) for segment in contract["segments"]
         ],
+        "recovery_segments": recovery_records,
         "segments": segment_payloads,
         "exact_n_frontend_selectable": exact_n_frontend_selectable,
         "correct_score_execution_enabled": False,

@@ -18,6 +18,7 @@ import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Callable
 from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +43,15 @@ from src.natural_day_manifest import (  # noqa: E402
     segment_membership,
     verify_manifest,
     verify_operational_windows,
+)
+from src.segment_recovery import (  # noqa: E402
+    SegmentRecoveryError,
+    canonical as recovery_canonical,
+    exact_event_lock,
+    load_published_recovery,
+    recovery_exact_terminal_path,
+    verify_manifest as verify_recovery_manifest,
+    verify_operational_window as verify_recovery_operational_window,
 )
 from src.structured_input_receipt import (  # noqa: E402
     receipt_path,
@@ -119,6 +129,46 @@ def require_canonical_segment_contract(
     return published
 
 
+def require_canonical_recovery_contract(
+    db_path: Path,
+    *,
+    issue: str,
+    parent_segment_idx: int,
+    supplied_manifest: dict[str, object],
+) -> tuple[dict[str, object], dict[str, object]]:
+    supplied_sha = verify_recovery_manifest(supplied_manifest)
+    with sqlite3.connect(db_path) as connection:
+        recovery = load_published_recovery(
+            connection, str(issue), int(parent_segment_idx)
+        )
+        if recovery is None:
+            raise SegmentRecoveryError("canonical recovery publication is missing")
+        verify_recovery_operational_window(connection, recovery)
+        parent_contract = load_published_manifest(connection, str(issue))
+        if parent_contract is None:
+            raise NaturalDayManifestError(
+                "canonical natural-day parent publication is missing"
+            )
+        verify_operational_windows(connection, parent_contract)
+    if (
+        recovery_canonical(
+            {
+                key: value
+                for key, value in recovery.items()
+                if key != "manifest_path"
+            }
+        )
+        != recovery_canonical(supplied_manifest)
+        or supplied_sha != str(recovery["manifest_sha256"])
+        or int(recovery["parent_segment_idx"]) != int(parent_segment_idx)
+        or recovery["status"] != "PUBLISHED_RECOVERY"
+    ):
+        raise SegmentRecoveryError(
+            "supplied recovery differs from canonical SQLite publication"
+        )
+    return recovery, parent_contract
+
+
 def _atomic_write_json(path: Path, payload: dict[str, object]) -> None:
     fd, temporary = tempfile.mkstemp(
         prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
@@ -140,11 +190,15 @@ def promote_verified_package(
     destination: Path,
     ledger: Path,
     ledger_payload: dict[str, object],
+    before_reservation: Callable[[], None] | None = None,
+    before_published: Callable[[], None] | None = None,
 ) -> dict[str, object]:
     """Verify before reservation and again before making the ledger authoritative."""
     staged_verification = verify_exact_n_directory(stage)
     if staged_verification.get("status") != "PASS":
         raise RuntimeError("fail closed: staged exact-N package verification failed")
+    if before_reservation is not None:
+        before_reservation()
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
@@ -183,6 +237,25 @@ def promote_verified_package(
         raise RuntimeError(
             "fail closed: visible exact-N package verification failed"
         ) from exc
+
+    if before_published is not None:
+        try:
+            before_published()
+        except BaseException as exc:
+            _atomic_write_json(
+                ledger,
+                {
+                    **ledger_payload,
+                    "state": "PUBLICATION_ABORTED",
+                    "verification_phase": "BEFORE_PUBLISHED",
+                    "publication_error": f"{type(exc).__name__}: {exc}",
+                    "staged_package_verification": staged_verification,
+                    "visible_package_verification": visible_verification,
+                },
+            )
+            raise RuntimeError(
+                "fail closed: exact-N publication lost terminal ownership"
+            ) from exc
 
     _atomic_write_json(
         ledger,
@@ -371,7 +444,12 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--issue", required=True)
     p.add_argument("--segment", type=int, required=True)
-    p.add_argument("--manifest", type=Path, required=True)
+    p.add_argument("--manifest", type=Path)
+    p.add_argument(
+        "--recovery-manifest",
+        type=Path,
+        help="canonical BJ-SEG-RECOVERY-001 child manifest",
+    )
     p.add_argument("--structured-csv", type=Path, required=True)
     p.add_argument(
         "--input-receipt",
@@ -389,21 +467,61 @@ def main() -> None:
     p.add_argument("--sample-attempts", type=int, default=12000)
     p.add_argument("--sample-seed", type=int, default=20260707)
     a = p.parse_args()
-    manifest = json.loads(a.manifest.read_text())
-    try:
-        manifest = require_canonical_segment_contract(
-            a.db,
-            issue=str(a.issue),
-            supplied_manifest=manifest,
-        )
-        claimed = verify_manifest(manifest)
-    except (NaturalDayManifestError, sqlite3.Error) as exc:
+    if (a.manifest is None) == (a.recovery_manifest is None):
         raise SystemExit(
-            "fail closed: manifest is not the canonical DB publication"
-        ) from exc
-    seg = next(
-        (x for x in manifest["segments"] if int(x["segment_idx"]) == a.segment), None
-    )
+            "fail closed: provide exactly one of --manifest or --recovery-manifest"
+        )
+    recovery: dict[str, object] | None = None
+    if a.recovery_manifest is not None:
+        supplied_recovery = json.loads(a.recovery_manifest.read_text())
+        try:
+            recovery, parent_contract = require_canonical_recovery_contract(
+                a.db,
+                issue=str(a.issue),
+                parent_segment_idx=int(a.segment),
+                supplied_manifest=supplied_recovery,
+            )
+        except (
+            NaturalDayManifestError,
+            SegmentRecoveryError,
+            sqlite3.Error,
+        ) as exc:
+            raise SystemExit(
+                "fail closed: recovery manifest is not the canonical DB publication"
+            ) from exc
+        claimed = str(recovery["manifest_sha256"])
+        segment_identity = str(recovery["child_identity"])
+        denominator_match_indices = [
+            int(value) for value in parent_contract["denominator_match_indices"]
+        ]
+        seg = {
+            "segment_idx": int(a.segment),
+            "match_indices": [
+                int(item["match_idx"]) for item in recovery["included"]
+            ],
+            "freeze_at": str(recovery["recovery_freeze_at"]),
+        }
+    else:
+        manifest = json.loads(a.manifest.read_text())
+        try:
+            manifest = require_canonical_segment_contract(
+                a.db,
+                issue=str(a.issue),
+                supplied_manifest=manifest,
+            )
+            claimed = verify_manifest(manifest)
+        except (NaturalDayManifestError, sqlite3.Error) as exc:
+            raise SystemExit(
+                "fail closed: manifest is not the canonical DB publication"
+            ) from exc
+        seg = next(
+            (x for x in manifest["segments"] if int(x["segment_idx"]) == a.segment),
+            None,
+        )
+        segment_identity = f"segment_{int(a.segment)}"
+        denominator_match_indices = [
+            int(value) for value in manifest["denominator_match_indices"]
+        ]
     if not seg:
         raise SystemExit("fail closed: segment absent from manifest")
     scheduled = hkt(seg["freeze_at"])
@@ -431,13 +549,29 @@ def main() -> None:
     # A segment can be frozen only once.  The identity deliberately excludes
     # wall-clock time so retrying with a different timestamp cannot mint a new
     # freeze identity for the same issue/segment.
-    event_key = digest({"issue": str(a.issue), "segment_idx": a.segment})
+    event_identity = (
+        {"issue": str(a.issue), "segment_identity": segment_identity}
+        if recovery is not None
+        else {"issue": str(a.issue), "segment_idx": a.segment}
+    )
+    event_key = digest(event_identity)
     ledger = a.ledger_root / f"{event_key}.json"
+    terminal_ledger = (
+        recovery_exact_terminal_path(
+            a.ledger_root, str(a.issue), segment_identity
+        )
+        if recovery is not None
+        else None
+    )
     if ledger.exists():
         raise SystemExit(f"fail closed: freeze event already bound: {event_key}")
+    if terminal_ledger is not None and terminal_ledger.exists():
+        raise SystemExit(
+            f"fail closed: recovery freeze is terminally missed: {event_key}"
+        )
     legs = rolling.load_legs(a.structured_csv, a.db, issue=a.issue)
     by_idx = {x.match_idx: x for x in legs}
-    if set(by_idx) != set(manifest["denominator_match_indices"]) or any(
+    if set(by_idx) != set(denominator_match_indices) or any(
         i not in by_idx for i in expected
     ):
         raise SystemExit("fail closed: input membership mismatch")
@@ -450,13 +584,14 @@ def main() -> None:
         "schema_version": "exact_n_decision_input_v1",
         "issue": str(a.issue),
         "segment_idx": a.segment,
+        "segment_identity": segment_identity,
+        "parent_segment_idx": int(a.segment) if recovery is not None else None,
+        "recovery_manifest_sha256": claimed if recovery is not None else "",
         "segment_manifest_sha256": claimed,
         "structured_csv": str(a.structured_csv),
         "structured_csv_sha256": source_sha,
         "structured_csv_size_bytes": a.structured_csv.stat().st_size,
-        "denominator_match_indices": [
-            int(value) for value in manifest["denominator_match_indices"]
-        ],
+        "denominator_match_indices": denominator_match_indices,
         "generator_receipt": str(input_receipt_path),
         "generator_receipt_sha256": source_receipt["sha256"],
         "input_generated_at": input_generated_at_text,
@@ -469,6 +604,9 @@ def main() -> None:
         "capability_id": "BJ-BET-FREEZE-001",
         "issue": str(a.issue),
         "segment_idx": a.segment,
+        "segment_identity": segment_identity,
+        "parent_segment_idx": int(a.segment) if recovery is not None else None,
+        "recovery_manifest_sha256": claimed if recovery is not None else "",
         "segment_match_indices": list(expected),
         "segment_manifest_sha256": claimed,
         "decision_input_sha256": source_sha,
@@ -513,6 +651,17 @@ def main() -> None:
                 },
             ]
         )
+        if recovery is not None and a.recovery_manifest is not None:
+            recovery_bytes = a.recovery_manifest.read_bytes()
+            (stage / "recovery_manifest.json").write_bytes(recovery_bytes)
+            payloads.append(
+                {
+                    "file": "recovery_manifest.json",
+                    "sha256": file_hash(stage / "recovery_manifest.json"),
+                    "artifact_type": "segment_recovery_contract",
+                    "semantic_sha256": claimed,
+                }
+            )
         (stage / "decision_input_manifest.json").write_bytes(
             canonical({**input_manifest, "sha256": input_manifest_sha256}) + b"\n"
         )
@@ -565,7 +714,7 @@ def main() -> None:
                 base_cost = sum(x.candidate.cost_units * 2 for x in staked)
                 payload = {
                     **common,
-                    "plan_id": f"{a.issue}_s{a.segment}_n{n}_b{budget}_{event_key[:12]}",
+                    "plan_id": f"{a.issue}_{segment_identity}_n{n}_b{budget}_{event_key[:12]}",
                     "requested_n": n,
                     "artifact_n": n,
                     "recommended_n": n,
@@ -641,18 +790,42 @@ def main() -> None:
             )
         )
         destination = (
-            a.output_root / str(a.issue) / f"segment_{a.segment}" / event_key
+            a.output_root / str(a.issue) / segment_identity / event_key
         )
-        verification = promote_verified_package(
-            stage=stage,
-            destination=destination,
-            ledger=ledger,
-            ledger_payload={
-                "schema_version": "exact_n_freeze_ledger_v1",
-                **common,
-                "artifact_manifest": str(destination / "manifest.json"),
-            },
-        )
+
+        def before_reservation() -> None:
+            require_pre_freeze_wall_clock(scheduled)
+            if ledger.exists():
+                raise RuntimeError(
+                    f"freeze event already bound: {event_key}"
+                )
+            if terminal_ledger is not None and terminal_ledger.exists():
+                raise RuntimeError(
+                    f"recovery freeze is terminally missed: {event_key}"
+                )
+
+        def before_published() -> None:
+            require_pre_freeze_wall_clock(scheduled)
+            if terminal_ledger is not None and terminal_ledger.exists():
+                raise RuntimeError(
+                    f"recovery terminal owns event: {event_key}"
+                )
+
+        with exact_event_lock(a.ledger_root, event_key):
+            verification = promote_verified_package(
+                stage=stage,
+                destination=destination,
+                ledger=ledger,
+                ledger_payload={
+                    "schema_version": "exact_n_freeze_ledger_v1",
+                    **common,
+                    "artifact_manifest": str(
+                        destination / "manifest.json"
+                    ),
+                },
+                before_reservation=before_reservation,
+                before_published=before_published,
+            )
         print(
             json.dumps(
                 {

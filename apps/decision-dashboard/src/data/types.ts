@@ -1077,8 +1077,22 @@ export interface ExactNFreezeData {
   status: string;
   segmentManifestSha256: string;
   exactNFrontendSelectable: boolean;
+  recoverySegments: Array<{
+    segmentIdentity: string;
+    parentSegmentIdx: number;
+    parentStatus: string;
+    status: string;
+    matchCount: number;
+    freezeAt: string;
+    recoveryManifestSha256: string;
+  }>;
   segments: Array<{
     segmentIdx: number;
+    segmentIdentity: string;
+    isRecovery: boolean;
+    parentSegmentIdx?: number;
+    parentStatus: string;
+    recoveryManifestSha256: string;
     matchCount: number;
     freezeAt: string;
     effectiveDecisionAt: string;

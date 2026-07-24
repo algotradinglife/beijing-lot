@@ -1,0 +1,9 @@
+{
+  "schema_version": "segment_recovery_activation_v1",
+  "capability_id": "BJ-SEG-RECOVERY-001",
+  "enabled": true,
+  "issue": "26078",
+  "parent_segment_idx": 1,
+  "hard_stop_at_hkt": "2026-07-25T20:25:00+08:00",
+  "activation_source": "issue_22_pi_activation_amendment"
+}

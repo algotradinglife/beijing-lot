@@ -7,8 +7,13 @@ export const mockDashboardData: DashboardData = {
     status: 'available',
     segmentManifestSha256: 'mock-segment-manifest',
     exactNFrontendSelectable: true,
+    recoverySegments: [],
     segments: [{
       segmentIdx: 1,
+      segmentIdentity: 'segment_1',
+      isRecovery: false,
+      parentStatus: '',
+      recoveryManifestSha256: '',
       matchCount: 8,
       freezeAt: '2026-06-30T17:35:00+08:00',
       effectiveDecisionAt: '2026-06-30T17:30:00+08:00',

@@ -184,6 +184,7 @@ def publish(
     output_root: Path,
     now: datetime,
     adopt_pre_freeze_manifest: Path | None = None,
+    adopt_existing_pre_freeze_windows: bool = False,
 ) -> dict[str, Any]:
     """Publish manifest bytes, publication identity and windows as one unit.
 
@@ -252,9 +253,17 @@ def publish(
         earliest = min(item.freeze_at for item in built.segments)
         adoption_proof: dict[str, Any] | None = None
         adopted_incident: dict[str, Any] = {}
-        if now >= earliest and adopt_pre_freeze_manifest is None:
+        if (
+            now >= earliest
+            and adopt_pre_freeze_manifest is None
+            and not adopt_existing_pre_freeze_windows
+        ):
             raise NaturalDayManifestError(
                 f"fail closed: first freeze {iso(earliest)} has passed"
+            )
+        if adopt_pre_freeze_manifest is not None and adopt_existing_pre_freeze_windows:
+            raise NaturalDayManifestError(
+                "choose one natural-day adoption proof mode"
             )
         if adopt_pre_freeze_manifest is not None:
             adoption_proof, adopted_incident = _legacy_adoption_proof(
@@ -263,6 +272,51 @@ def publish(
                 earliest_freeze=earliest,
             )
             verify_operational_windows(conn, manifest)
+        elif adopt_existing_pre_freeze_windows:
+            verify_operational_windows(conn, manifest)
+            existing_rows = [
+                dict(row)
+                for row in conn.execute(
+                    """
+                    SELECT issue,segment_idx,segment_start,segment_end,freeze_at,
+                           match_indices_json,created_at,manual_frozen_at
+                    FROM segment_decision_windows
+                    WHERE issue=?
+                    ORDER BY segment_idx
+                    """,
+                    (str(issue),),
+                )
+            ]
+            if not existing_rows:
+                raise NaturalDayManifestError(
+                    "no existing operational windows to adopt"
+                )
+            created_clocks: list[datetime] = []
+            for row in existing_rows:
+                try:
+                    created_clocks.append(_as_hkt(str(row["created_at"])))
+                except (TypeError, ValueError) as exc:
+                    raise NaturalDayManifestError(
+                        "existing operational window lacks a valid creation clock"
+                    ) from exc
+            if any(created >= earliest for created in created_clocks):
+                raise NaturalDayManifestError(
+                    "existing operational windows were not all created before first freeze"
+                )
+            adoption_proof = {
+                "mode": "adopt_verified_pre_freeze_operational_windows",
+                "adopted_at_hkt": iso(now),
+                "window_created_at_hkt": [
+                    iso(value) for value in created_clocks
+                ],
+                "window_rows_sha256": hashlib.sha256(
+                    canonical(existing_rows)
+                ).hexdigest(),
+            }
+            adopted_incident = {
+                "preexisting_operational_windows": existing_rows,
+                "preexisting_window_count": len(existing_rows),
+            }
         else:
             ledger = ROOT / "results/research/multimarket_segment_freeze_v1/ledger"
             if ledger.exists() and any(
@@ -419,6 +473,14 @@ def main() -> None:
             "published before the first freeze; never changes membership"
         ),
     )
+    parser.add_argument(
+        "--adopt-existing-pre-freeze-windows",
+        action="store_true",
+        help=(
+            "register already-correct operational rows only when their stored "
+            "creation clocks all predate the first freeze; never rewrites rows"
+        ),
+    )
     args = parser.parse_args()
     now = (
         datetime.fromisoformat(args.now_hkt)
@@ -432,6 +494,9 @@ def main() -> None:
             output_root=args.output_root,
             now=now,
             adopt_pre_freeze_manifest=args.adopt_pre_freeze_manifest,
+            adopt_existing_pre_freeze_windows=(
+                args.adopt_existing_pre_freeze_windows
+            ),
         )
     except NaturalDayManifestError as exc:
         raise SystemExit(str(exc)) from exc

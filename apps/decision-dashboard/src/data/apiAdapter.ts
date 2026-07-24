@@ -1907,11 +1907,28 @@ function transformExactNFreezes(raw: unknown): ExactNFreezeData {
     status: asString(obj.status),
     segmentManifestSha256: asString(obj.segment_manifest_sha256),
     exactNFrontendSelectable: asBoolean(obj.exact_n_frontend_selectable),
+    recoverySegments: asArray(obj.recovery_segments).map((rawRecovery) => {
+      const recovery = asObject(rawRecovery);
+      return {
+        segmentIdentity: asString(recovery.segment_identity),
+        parentSegmentIdx: asMaybeNumber(recovery.parent_segment_idx) ?? 0,
+        parentStatus: asString(recovery.parent_status),
+        status: asString(recovery.status),
+        matchCount: asMaybeNumber(recovery.match_count) ?? 0,
+        freezeAt: asString(recovery.freeze_at),
+        recoveryManifestSha256: asString(recovery.recovery_manifest_sha256),
+      };
+    }),
     segments: asArray(obj.segments).map((rawSegment) => {
       const segment = asObject(rawSegment);
       const correctScore = asObject(segment.correct_score);
       return {
         segmentIdx: asMaybeNumber(segment.segment_idx) ?? 0,
+        segmentIdentity: asString(segment.segment_identity) || `segment_${asMaybeNumber(segment.segment_idx) ?? 0}`,
+        isRecovery: asBoolean(segment.is_recovery),
+        parentSegmentIdx: asMaybeNumber(segment.parent_segment_idx),
+        parentStatus: asString(segment.parent_status),
+        recoveryManifestSha256: asString(segment.recovery_manifest_sha256),
         matchCount: asMaybeNumber(segment.match_count) ?? 0,
         freezeAt: asString(segment.freeze_at),
         effectiveDecisionAt: asString(segment.effective_decision_at),
