@@ -71,6 +71,30 @@ entries:
       Combined PR #23. 5 PI review rounds. PR merged by PI.
       Graph state updated to COMPLETED by reconciler
       2026-07-25T00:36Z.
+  BJ-SEG-RECOVERY-001:
+    session_id: no_agent
+    executor: everything-bot-engineer
+    profile: engineer
+    runtime: codex
+    branch: research/bj-seg-recovery-001
+    worktree: /tmp/wt-bj-seg-recovery-001
+    base_revision: 2935f837314b910281b4c5d76db7e4394255a093
+    commits: []
+    pr_number: null
+    started_at: "2026-07-24T17:29:48Z"
+    last_seen: "2026-07-24T17:43:20Z"
+    status: running
+    execution_phase: implementing
+    actionable_node: BJ-SEG-RECOVERY-001
+    blocked_nodes: []
+    blockers: []
+    selected_next_action: implement_validate_and_publish_recovery_capability
+    deadline_reason: owner_authorized_time_bound_recovery_before_2026_07_25_20_25_hkt
+    wip_slot: engineering_primary
+    wip: 1
+    notes: >-
+      Sole engineering action selected after both prerequisites completed.
+      User-required no_agent execution is isolated to the registered worktree.
 
 metadata:
   created_at: "2026-07-24T09:09:31Z"

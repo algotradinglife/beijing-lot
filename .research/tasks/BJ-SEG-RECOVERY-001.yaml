@@ -1,0 +1,105 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: BJ-SEG-RECOVERY-001
+  title: Deterministic missed-freeze recovery segments
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-PHASE1
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/22"
+    - BJ-SEG-DAY-001
+    - BJ-BET-FREEZE-001
+
+spec:
+  type: capability
+  intent:
+    objective: Publish at most one immutable child for the still strictly eligible remainder of a missed parent segment without mutating the parent.
+    question: Can schedule-only T-25 eligibility recover prospective coverage while retaining complete parent and exclusion evidence?
+    hypothesis: A one-shot wall-clock publication using kickoff_at - 25m greater than the atomic publication clock plus the fixed min-20/max-36h policy remains strictly prospective.
+    expected_value: Recover auditable operational coverage without backdating or changing strategy inputs.
+    out_of_scope:
+      - Probability, SP, selection, ticket parameter, settlement, or release changes
+      - Rewriting or reclassifying the parent segment
+      - Repeated rolling recovery or post-deadline backfill
+      - ROI or result-based eligibility
+
+  context:
+    inputs:
+      - Issue #22 deterministic recovery contract and activation amendment
+      - Canonical natural-day parent publication
+      - Normalized match schedule clocks
+      - BJ-BET-FREEZE-001 exact-N and correct-score gate
+    assumptions:
+      - Parent Segment 1 remains MISSED_FREEZE
+      - Each parent permits one recovery ordinal only
+      - Segment 2 and Segment 3 canonical membership and scheduling remain unchanged
+    scheduling:
+      priority_class: P0
+      deadline_at_hkt: "2026-07-25T20:25:00+08:00"
+      preemptible: false
+      wip_slot: engineering_primary
+      selection_reason: owner_authorized_time_bound_recovery
+
+  execution:
+    required_capabilities:
+      - python_development
+      - database_engineering
+      - frontend_development
+      - testing
+    uncertainty: medium
+    complexity: high
+
+  risk:
+    overall: high
+    scientific: low
+    engineering: high
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - Content-addressed recovery manifest and SHA256SUMS
+      - Parent MISSED_FREEZE plus child identity and complete denominator
+      - One canonical SQLite recovery publication and operational window
+      - Exact-N 15-cell package and correct-score paper audit or honest missed evidence
+      - API/UI parent and child identity without fallback
+      - Clean-checkout semantic verification receipt
+    checks:
+      - schema_validation
+      - automated_tests
+      - adversarial_time_boundary_tests
+      - cross_consumer_consistency
+    human_gates:
+      - engineering_validation
+      - research_pi_review
+
+status:
+  current: EXECUTING
+  attempts: 1
+  routing:
+    executor_mode: isolated_session
+    profile: engineer
+    runtime: codex
+    reason: "PI activation amendment on Issue #22 at 2026-07-25 00:56 HKT; executed in user-requested no_agent mode."
+  artifacts: []
+  result: {}
+  history:
+    - action: plan_task
+      ts: "2026-07-24T16:56:31Z"
+      actor: research_pi
+      from: CREATED
+      to: PLANNING
+      reason: "PI activation amendment superseded the earlier backlog decision."
+    - action: make_ready
+      ts: "2026-07-24T17:23:18Z"
+      actor: research_pi
+      from: PLANNING
+      to: READY
+      reason: "Both canonical graph prerequisites are complete and the owner-authorized P0 deadline is registered."
+    - action: start_execution
+      ts: "2026-07-24T17:29:48Z"
+      actor: reconciler
+      from: READY
+      to: EXECUTING
+      reason: "Selected as the sole engineering_primary action with WIP=1."

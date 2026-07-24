@@ -12,6 +12,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from src.segment_recovery import verify_manifest as verify_recovery_manifest
+
 N_VALUES = (3, 4, 5, 6, 7)
 BUDGETS = (512, 768, 1024)
 EXPECTED_GRID = {(n, budget) for n in N_VALUES for budget in BUDGETS}
@@ -175,6 +177,16 @@ def verify_directory(root: Path) -> dict[str, Any]:
             int(payload["segment_idx"]),
             payload["decision_input_generated_at"],
             payload["manual_frozen_at"],
+            str(
+                payload.get("segment_identity")
+                or f"segment_{int(payload['segment_idx'])}"
+            ),
+            (
+                int(payload["parent_segment_idx"])
+                if payload.get("parent_segment_idx") is not None
+                else None
+            ),
+            str(payload.get("recovery_manifest_sha256") or ""),
         )
         common = common or key
         if key != common:
@@ -184,7 +196,11 @@ def verify_directory(root: Path) -> dict[str, Any]:
             raise ValueError(f"manifest artifact hash mismatch: {path.name}")
     if grid != EXPECTED_GRID:
         raise ValueError("exact 5×3 N/budget grid missing or duplicated")
-    expected_event_key = _digest({"issue": common[7], "segment_idx": common[8]})
+    expected_event_key = _digest(
+        {"issue": common[7], "segment_identity": common[11]}
+        if common[13]
+        else {"issue": common[7], "segment_idx": common[8]}
+    )
     if common[6] != expected_event_key:
         raise ValueError("issue/segment event identity mismatch")
     manifest_identity = (
@@ -199,6 +215,16 @@ def verify_directory(root: Path) -> dict[str, Any]:
         int(manifest.get("segment_idx", -1)),
         manifest.get("decision_input_generated_at"),
         manifest.get("manual_frozen_at"),
+        str(
+            manifest.get("segment_identity")
+            or f"segment_{int(manifest.get('segment_idx', -1))}"
+        ),
+        (
+            int(manifest["parent_segment_idx"])
+            if manifest.get("parent_segment_idx") is not None
+            else None
+        ),
+        str(manifest.get("recovery_manifest_sha256") or ""),
     )
     if manifest_identity != common:
         raise ValueError("top-level manifest frozen identity mismatch")
@@ -217,8 +243,45 @@ def verify_directory(root: Path) -> dict[str, Any]:
         input_payload.get("schema_version") != "exact_n_decision_input_v1"
         or str(input_payload.get("issue")) != common[7]
         or int(input_payload.get("segment_idx", -1)) != common[8]
+        or str(
+            input_payload.get("segment_identity")
+            or f"segment_{int(input_payload.get('segment_idx', -1))}"
+        )
+        != common[11]
+        or (
+            int(input_payload["parent_segment_idx"])
+            if input_payload.get("parent_segment_idx") is not None
+            else None
+        )
+        != common[12]
+        or str(input_payload.get("recovery_manifest_sha256") or "") != common[13]
     ):
         raise ValueError("decision input issue/segment identity mismatch")
+    if common[13]:
+        recovery_path = root / "recovery_manifest.json"
+        if not recovery_path.is_file():
+            raise ValueError("recovery exact-N package lacks recovery manifest")
+        recovery = json.loads(recovery_path.read_text(encoding="utf-8"))
+        recovery_sha = verify_recovery_manifest(recovery)
+        if (
+            recovery_sha != common[13]
+            or common[1] != recovery_sha
+            or str(recovery.get("child_identity")) != common[11]
+            or int(recovery.get("parent_segment_idx", -1)) != common[12]
+            or [int(item["match_idx"]) for item in recovery.get("included", [])]
+            != [int(value) for value in common[0]]
+            or datetime.fromisoformat(str(recovery.get("recovery_freeze_at")))
+            != datetime.fromisoformat(str(common[4]))
+        ):
+            raise ValueError("exact-N package differs from recovery contract")
+        recovery_entry = artifact_entries.get("recovery_manifest.json")
+        if (
+            not recovery_entry
+            or str(recovery_entry.get("semantic_sha256") or "") != common[13]
+            or str(recovery_entry.get("sha256") or "")
+            != _file_hash(recovery_path)
+        ):
+            raise ValueError("recovery manifest artifact linkage mismatch")
     source_bytes = root / "structured_input.csv"
     source_receipt = json.loads(
         (root / "structured_input_receipt.json").read_text(encoding="utf-8")
@@ -289,6 +352,12 @@ def verify_directory(root: Path) -> dict[str, Any]:
         or score.get("effective_decision_at") != common[5]
         or str(score.get("issue")) != common[7]
         or int(score.get("segment_idx", -1)) != common[8]
+        or str(
+            score.get("segment_identity")
+            or f"segment_{int(score.get('segment_idx', -1))}"
+        )
+        != common[11]
+        or str(score.get("recovery_manifest_sha256") or "") != common[13]
         or score.get("exact_n") is not True
     ):
         raise ValueError("correct-score audit frozen identity mismatch")
@@ -439,6 +508,8 @@ def verify_directory(root: Path) -> dict[str, Any]:
         "structured_input.csv",
         "structured_input_receipt.json",
     }
+    if common[13]:
+        expected_artifacts.add("recovery_manifest.json")
     if set(artifact_entries) != expected_artifacts:
         raise ValueError("manifest artifact file set mismatch")
     if set(sums) != expected_artifacts | {"manifest.json"}:

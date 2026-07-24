@@ -221,6 +221,130 @@ def test_verified_pre_freeze_manifest_can_be_adopted_without_rewriting_windows(
     assert audit["adoption_proof"]["legacy_manifest_sha256"] == legacy["manifest_sha256"]
 
 
+def test_verified_pre_freeze_windows_can_be_adopted_without_rewriting_rows(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "test.sqlite"
+    original_output = tmp_path / "original"
+    adopted_output = tmp_path / "adopted"
+    _database(db)
+    original = _publish(db, original_output)
+
+    conn = sqlite3.connect(db)
+    rows_before = conn.execute(
+        """
+        SELECT issue,segment_idx,segment_start,segment_end,freeze_at,
+               match_indices_json,created_at,manual_frozen_at
+        FROM segment_decision_windows
+        WHERE issue='26078'
+        ORDER BY segment_idx
+        """
+    ).fetchall()
+    conn.execute("DROP TABLE natural_day_segment_publications")
+    conn.commit()
+    conn.close()
+
+    adopted = publisher.publish(
+        issue="26078",
+        db_path=db,
+        output_root=adopted_output,
+        now=datetime.fromisoformat("2026-07-25T20:00:00+08:00"),
+        adopt_existing_pre_freeze_windows=True,
+    )
+    conn = sqlite3.connect(db)
+    rows_after = conn.execute(
+        """
+        SELECT issue,segment_idx,segment_start,segment_end,freeze_at,
+               match_indices_json,created_at,manual_frozen_at
+        FROM segment_decision_windows
+        WHERE issue='26078'
+        ORDER BY segment_idx
+        """
+    ).fetchall()
+    publication = load_published_manifest(conn, "26078")
+    conn.close()
+
+    assert adopted["sha256"] == original["sha256"]
+    assert rows_after == rows_before
+    assert publication is not None
+    assert publication["published_at_hkt"] == "2026-07-25T20:00:00+08:00"
+    audit = json.loads(
+        (
+            Path(str(adopted["manifest"])).parent
+            / "incident_wrong_entire_issue_window.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert audit["adoption_proof"] == {
+        "mode": "adopt_verified_pre_freeze_operational_windows",
+        "adopted_at_hkt": "2026-07-25T20:00:00+08:00",
+        "window_created_at_hkt": [
+            "2026-07-24T12:00:00+08:00",
+            "2026-07-24T12:00:00+08:00",
+            "2026-07-24T12:00:00+08:00",
+        ],
+        "window_rows_sha256": audit["adoption_proof"]["window_rows_sha256"],
+    }
+
+
+def test_window_adoption_rejects_post_freeze_creation_clock(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "test.sqlite"
+    _database(db)
+    _publish(db, tmp_path / "original")
+    conn = sqlite3.connect(db)
+    conn.execute("DROP TABLE natural_day_segment_publications")
+    conn.execute(
+        """
+        UPDATE segment_decision_windows
+        SET created_at='2026-07-25T17:55:00+08:00'
+        WHERE issue='26078' AND segment_idx=1
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(
+        NaturalDayManifestError,
+        match="not all created before first freeze",
+    ):
+        publisher.publish(
+            issue="26078",
+            db_path=db,
+            output_root=tmp_path / "adopted",
+            now=datetime.fromisoformat("2026-07-25T20:00:00+08:00"),
+            adopt_existing_pre_freeze_windows=True,
+        )
+
+
+def test_window_adoption_rejects_noncanonical_membership(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "test.sqlite"
+    _database(db)
+    _publish(db, tmp_path / "original")
+    conn = sqlite3.connect(db)
+    conn.execute("DROP TABLE natural_day_segment_publications")
+    conn.execute(
+        """
+        UPDATE segment_decision_windows
+        SET match_indices_json='[1,2,3]'
+        WHERE issue='26078' AND segment_idx=1
+        """
+    )
+    conn.commit()
+    conn.close()
+
+    with pytest.raises(NaturalDayManifestError):
+        publisher.publish(
+            issue="26078",
+            db_path=db,
+            output_root=tmp_path / "adopted",
+            now=datetime.fromisoformat("2026-07-25T20:00:00+08:00"),
+            adopt_existing_pre_freeze_windows=True,
+        )
+
+
 def test_cross_layer_verifier_rejects_stale_by_segment_artifact(
     tmp_path: Path,
 ) -> None:
