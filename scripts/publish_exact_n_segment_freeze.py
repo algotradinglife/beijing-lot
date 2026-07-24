@@ -35,10 +35,22 @@ def hkt(value: str) -> datetime:
 
 
 def score_audit(root: Path, issue: str, indices: tuple[int, ...], decision_at: datetime) -> tuple[dict[str, object], list[dict[str, object]]]:
-    batches = sorted((root / issue).glob("*/manifest.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    batches = sorted((root / issue).glob("*/manifest.json"))
     if not batches:
         return {"capture_status": "missing_capture_bundle"}, [{"match_idx": i, "eligible": False, "reasons": ["missing_p42_capture_bundle"]} for i in indices]
-    manifest_path = batches[0]; batch = manifest_path.parent
+    # Select only a bundle whose own SHA256SUMS verifies; mtime is not evidence.
+    valid=[]
+    for candidate in batches:
+        batch=candidate.parent; sums=batch/"SHA256SUMS"
+        if not sums.exists(): continue
+        try:
+            entries=[line.split("  ",1) for line in sums.read_text().splitlines() if "  " in line]
+            if all((batch/name).exists() and file_hash(batch/name)==sha for sha,name in entries): valid.append(candidate)
+        except OSError: pass
+    batches=valid
+    if not batches:
+        return {"capture_status":"no_sha256_verified_capture_bundle"}, [{"match_idx":i,"eligible":False,"reasons":["no_sha256_verified_capture_bundle"]} for i in indices]
+    manifest_path = batches[-1]; batch = manifest_path.parent
     manifest = json.loads(manifest_path.read_text())
     rows: dict[int, dict[str, str]] = {}
     snapshots = batch / "snapshots.csv"
