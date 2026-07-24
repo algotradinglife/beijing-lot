@@ -1368,12 +1368,16 @@ function BettingPlan({
 	        <span>15 套为互斥备选，不合计投入</span>
 	        {exactN.segmentManifestSha256 ? <small>segment {exactN.segmentManifestSha256.slice(0, 12)}</small> : null}
 	      </div>
-	      {exactN.recoverySegments.map((segment) => <div className="status-row" key={segment.segmentIdentity}>
-	        <Badge tone={segment.status === 'PUBLISHED_RECOVERY' ? 'good' : 'warn'}>parent #{segment.parentSegmentIdx}: {segment.parentStatus}</Badge>
-	        <b>{segment.segmentIdentity}</b>
-	        <span>{segment.status} · {segment.matchCount} 场 · freeze {segment.freezeAt || 'N/A'}</span>
-	        <small>recovery {segment.recoveryManifestSha256.slice(0, 12)}</small>
-	      </div>)}
+	      {exactN.recoverySegments.map((segment) => {
+	        const exactChild = exactN.segments.find((candidate) => candidate.segmentIdentity === segment.segmentIdentity);
+	        const missed = exactChild?.status === 'MISSED_RECOVERY_FREEZE';
+	        return <div className="status-row" key={segment.segmentIdentity}>
+	          <Badge tone={missed ? 'bad' : segment.status === 'PUBLISHED_RECOVERY' ? 'good' : 'warn'}>parent #{segment.parentSegmentIdx}: {segment.parentStatus}</Badge>
+	          <b>{segment.segmentIdentity}</b>
+	          <span>{segment.status} · exact-N {exactChild?.status || 'missing'} · {segment.matchCount} 场 · freeze {segment.freezeAt || 'N/A'}</span>
+	          <small>recovery {segment.recoveryManifestSha256.slice(0, 12)}</small>
+	        </div>;
+	      })}
 	      {exactN.segments.flatMap((segment) => segment.alternatives).length
 	        ? <div className="table-wrap"><table><thead><tr><th>选择</th><th>段</th><th>Exact N</th><th>预算</th><th>票数</th><th>基础/实际成本</th><th>利用率</th><th>输入/冻结</th><th>状态</th></tr></thead><tbody>
 	          {exactN.segments.flatMap((segment) => segment.alternatives.map((alternative) => <tr key={alternative.planId}>

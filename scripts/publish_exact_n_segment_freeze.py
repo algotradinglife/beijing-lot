@@ -47,6 +47,7 @@ from src.segment_recovery import (  # noqa: E402
     SegmentRecoveryError,
     canonical as recovery_canonical,
     load_published_recovery,
+    recovery_exact_terminal_path,
     verify_manifest as verify_recovery_manifest,
     verify_operational_window as verify_recovery_operational_window,
 )
@@ -530,8 +531,19 @@ def main() -> None:
     )
     event_key = digest(event_identity)
     ledger = a.ledger_root / f"{event_key}.json"
+    terminal_ledger = (
+        recovery_exact_terminal_path(
+            a.ledger_root, str(a.issue), segment_identity
+        )
+        if recovery is not None
+        else None
+    )
     if ledger.exists():
         raise SystemExit(f"fail closed: freeze event already bound: {event_key}")
+    if terminal_ledger is not None and terminal_ledger.exists():
+        raise SystemExit(
+            f"fail closed: recovery freeze is terminally missed: {event_key}"
+        )
     legs = rolling.load_legs(a.structured_csv, a.db, issue=a.issue)
     by_idx = {x.match_idx: x for x in legs}
     if set(by_idx) != set(denominator_match_indices) or any(
@@ -755,6 +767,14 @@ def main() -> None:
         destination = (
             a.output_root / str(a.issue) / segment_identity / event_key
         )
+        try:
+            require_pre_freeze_wall_clock(scheduled)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from exc
+        if terminal_ledger is not None and terminal_ledger.exists():
+            raise SystemExit(
+                f"fail closed: recovery freeze became terminally missed: {event_key}"
+            )
         verification = promote_verified_package(
             stage=stage,
             destination=destination,

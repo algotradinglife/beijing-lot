@@ -76,7 +76,7 @@ spec:
 
 status:
   current: EXECUTING
-  attempts: 1
+  attempts: 2
   routing:
     executor_mode: isolated_session
     profile: engineer
@@ -103,3 +103,9 @@ status:
       from: READY
       to: EXECUTING
       reason: "Selected as the sole engineering_primary action with WIP=1."
+    - action: pi_review_changes_requested
+      ts: "2026-07-24T18:00:51Z"
+      actor: research_pi
+      from: EXECUTING
+      to: EXECUTING
+      reason: "Round 1 requested durable past-due exact-N terminal evidence and a production-managed recovery activation handoff."

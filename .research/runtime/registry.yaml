@@ -79,22 +79,25 @@ entries:
     branch: research/bj-seg-recovery-001
     worktree: /tmp/wt-bj-seg-recovery-001
     base_revision: 2935f837314b910281b4c5d76db7e4394255a093
-    commits: []
-    pr_number: null
+    commits:
+      - 506e87af32cfa2333208c6d79e588a301617ef53
+    pr_number: 24
     started_at: "2026-07-24T17:29:48Z"
-    last_seen: "2026-07-24T17:43:20Z"
+    last_seen: "2026-07-24T18:04:27Z"
     status: running
-    execution_phase: implementing
+    execution_phase: pi_review_rework
     actionable_node: BJ-SEG-RECOVERY-001
     blocked_nodes: []
     blockers: []
-    selected_next_action: implement_validate_and_publish_recovery_capability
+    selected_next_action: address_pr24_round1_findings
     deadline_reason: owner_authorized_time_bound_recovery_before_2026_07_25_20_25_hkt
     wip_slot: engineering_primary
     wip: 1
     notes: >-
       Sole engineering action selected after both prerequisites completed.
       User-required no_agent execution is isolated to the registered worktree.
+      PR #24 round 1 requested durable past-due exact-N terminal evidence
+      and production-managed activation.
 
 metadata:
   created_at: "2026-07-24T09:09:31Z"

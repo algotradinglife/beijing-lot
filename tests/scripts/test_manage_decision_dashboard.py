@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/manage_decision_dashboard.py"
@@ -75,3 +77,34 @@ def test_health_payload_includes_sp_refresh(monkeypatch) -> None:
     assert payload["logs"]["sp_refresh"].endswith("live_sp_refresh.log")
     assert payload["score_model_odds_refresh"]["status"] == "running"
     assert "scripts/live_score_model_odds_refresh_loop.py" in " ".join(payload["score_model_odds_refresh"]["command"])
+    artifact_command = payload["artifact_refresh"]["command"]
+    assert artifact_command[
+        artifact_command.index("--recovery-issue") + 1
+    ] == "26078"
+    assert artifact_command[
+        artifact_command.index("--recovery-parent-segment") + 1
+    ] == "1"
+    assert artifact_command[
+        artifact_command.index("--recovery-hard-stop-hkt") + 1
+    ] == "2026-07-25T20:25:00+08:00"
+    assert payload["artifact_refresh"]["segment_recovery_activation"][
+        "enabled"
+    ] is True
+
+
+def test_invalid_recovery_activation_fails_closed(
+    monkeypatch, tmp_path: Path
+) -> None:
+    mod = _load_module()
+    invalid = tmp_path / "activation.json"
+    invalid.write_text(
+        '{"schema_version":"segment_recovery_activation_v1",'
+        '"capability_id":"BJ-SEG-RECOVERY-001","enabled":true,'
+        '"issue":"current","parent_segment_idx":1,'
+        '"hard_stop_at_hkt":"2026-07-25T20:25:00+08:00"}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(mod, "SEGMENT_RECOVERY_ACTIVATION_PATH", invalid)
+    parser = mod._build_parser()
+    with pytest.raises(RuntimeError, match="not fail-closed"):
+        mod._artifact_refresh_command(parser.parse_args(["health"]))

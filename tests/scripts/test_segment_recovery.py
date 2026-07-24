@@ -20,7 +20,12 @@ from scripts.verify_exact_n_freeze import (
 )
 from scripts.verify_segment_recovery import verify
 from src.decision_api import app as decision_app
-from src.segment_recovery import SegmentRecoveryError, load_published_recovery
+from src.segment_recovery import (
+    SegmentRecoveryError,
+    load_published_recovery,
+    recovery_exact_terminal_path,
+    verify_exact_terminal_record,
+)
 from src.structured_input_receipt import write_receipt
 
 
@@ -512,6 +517,140 @@ def test_live_coordinator_targets_recovery_identity_and_manifest(
     command = commands[0]
     assert command[command.index("--recovery-manifest") + 1] == recovery["manifest"]
     assert "--manifest" not in command
+
+
+def test_past_due_recovery_creates_durable_terminal_exact_n_receipt(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "test.sqlite"
+    _database(db)
+    _publish_parent(db, tmp_path / "natural")
+    recovery_result = recovery_publisher.publish(
+        issue="26078",
+        parent_segment_idx=1,
+        db_path=db,
+        output_root=tmp_path / "recovery",
+        exact_ledger_root=tmp_path / "exact-ledger",
+        observed_at=datetime.fromisoformat("2026-07-25T00:55:15+08:00"),
+    )
+    recovery = json.loads(Path(str(recovery_result["manifest"])).read_text())
+    ledger_root = tmp_path / "exact-ledger"
+    event_key = exact_n_publisher.digest(
+        {
+            "issue": "26078",
+            "segment_identity": "segment_1_recovery_1",
+        }
+    )
+    prior_path = ledger_root / f"{event_key}.json"
+    prior_path.parent.mkdir(parents=True, exist_ok=True)
+    prior_path.write_text(
+        json.dumps({"state": "RESERVED", "event_key": event_key}) + "\n",
+        encoding="utf-8",
+    )
+
+    first = refresh_loop.coordinate_due_exact_n_freeze(
+        db,
+        "26078",
+        structured_csv=tmp_path / "missing-structured.csv",
+        now=datetime.fromisoformat("2026-07-25T01:40:01+08:00"),
+        output_root=tmp_path / "exact-output",
+        ledger_root=ledger_root,
+        correct_score_root=tmp_path / "score",
+    )
+    assert first["status"] == "MISSED_RECOVERY_FREEZE", first
+    assert first["idempotent"] is False
+    assert len(first["exact_n_cells"]) == 15
+    terminal_path = recovery_exact_terminal_path(
+        ledger_root, "26078", "segment_1_recovery_1"
+    )
+    terminal = json.loads(terminal_path.read_text())
+    receipt_sha = verify_exact_terminal_record(
+        terminal, recovery, ledger_root=ledger_root
+    )
+    assert receipt_sha == first["terminal_receipt_sha256"]
+    assert terminal["prior_ledger_state"] == "RESERVED"
+    assert (
+        terminal["prior_ledger_sha256"]
+        == hashlib.sha256(prior_path.read_bytes()).hexdigest()
+    )
+
+    second = refresh_loop.coordinate_due_exact_n_freeze(
+        db,
+        "26078",
+        structured_csv=tmp_path / "still-missing.csv",
+        now=datetime.fromisoformat("2026-07-25T02:00:00+08:00"),
+        output_root=tmp_path / "exact-output",
+        ledger_root=ledger_root,
+        correct_score_root=tmp_path / "score",
+    )
+    assert second["status"] == "MISSED_RECOVERY_FREEZE"
+    assert second["idempotent"] is True
+    assert second["terminal_receipt_sha256"] == receipt_sha
+
+    conn = sqlite3.connect(db)
+    api = decision_app._exact_n_freeze_payload(
+        conn,
+        "26078",
+        output_root=tmp_path / "exact-output",
+        ledger_root=ledger_root,
+    )
+    conn.close()
+    child = next(
+        segment
+        for segment in api["segments"]
+        if segment["segment_identity"] == "segment_1_recovery_1"
+    )
+    assert child["status"] == "MISSED_RECOVERY_FREEZE"
+    assert child["terminal_receipt_sha256"] == receipt_sha
+    assert len(child["exact_n_terminal_cells"]) == 15
+    assert child["correct_score"]["status"] == "MISSED_RECOVERY_FREEZE"
+
+
+def test_terminal_receipt_tamper_is_rejected_by_api(tmp_path: Path) -> None:
+    db = tmp_path / "test.sqlite"
+    _database(db)
+    _publish_parent(db, tmp_path / "natural")
+    recovery_publisher.publish(
+        issue="26078",
+        parent_segment_idx=1,
+        db_path=db,
+        output_root=tmp_path / "recovery",
+        exact_ledger_root=tmp_path / "exact-ledger",
+        observed_at=datetime.fromisoformat("2026-07-25T00:55:15+08:00"),
+    )
+    ledger_root = tmp_path / "exact-ledger"
+    refresh_loop.coordinate_due_exact_n_freeze(
+        db,
+        "26078",
+        structured_csv=tmp_path / "missing.csv",
+        now=datetime.fromisoformat("2026-07-25T01:40:01+08:00"),
+        ledger_root=ledger_root,
+    )
+    terminal_path = recovery_exact_terminal_path(
+        ledger_root, "26078", "segment_1_recovery_1"
+    )
+    terminal = json.loads(terminal_path.read_text())
+    terminal["exact_n_cells"].pop()
+    terminal["terminal_receipt_sha256"] = hashlib.sha256(
+        recovery_publisher.canonical(
+            {
+                key: value
+                for key, value in terminal.items()
+                if key != "terminal_receipt_sha256"
+            }
+        )
+    ).hexdigest()
+    terminal_path.write_text(json.dumps(terminal), encoding="utf-8")
+
+    conn = sqlite3.connect(db)
+    api = decision_app._exact_n_freeze_payload(conn, "26078", ledger_root=ledger_root)
+    conn.close()
+    child = next(
+        segment
+        for segment in api["segments"]
+        if segment["segment_identity"] == "segment_1_recovery_1"
+    )
+    assert child["status"] == "invalid_terminal_event"
 
 
 def test_recovery_child_publishes_and_verifies_full_exact_n_package(

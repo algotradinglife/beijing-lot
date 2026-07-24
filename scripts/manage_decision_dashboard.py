@@ -13,7 +13,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -40,10 +40,88 @@ DEFAULT_SCORE_MODEL_ODDS_REFRESH_INTERVAL = float(
 )
 DEFAULT_SP_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_SP_REFRESH_INTERVAL", "900"))
 DEFAULT_ARTIFACT_REFRESH_INTERVAL = float(os.environ.get("BEIDAN_ARTIFACT_REFRESH_INTERVAL", "300"))
+SEGMENT_RECOVERY_ACTIVATION_PATH = (
+    ROOT / "config/segment_recovery_activation.json"
+)
 ENV_FILES = (
     Path.home() / ".config/beidanlot/webui.env",
     Path.home() / ".config/beidanlot/decision_dashboard.env",
 )
+
+
+def _segment_recovery_activation() -> dict[str, Any]:
+    if not SEGMENT_RECOVERY_ACTIVATION_PATH.is_file():
+        return {"enabled": False, "reason": "activation_file_missing"}
+    try:
+        payload = json.loads(
+            SEGMENT_RECOVERY_ACTIVATION_PATH.read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            "invalid segment recovery activation file"
+        ) from exc
+    if payload.get("schema_version") != "segment_recovery_activation_v1":
+        raise RuntimeError("unsupported segment recovery activation schema")
+    if payload.get("enabled") is not True:
+        return {"enabled": False, "reason": "activation_disabled"}
+    issue = str(payload.get("issue") or "")
+    try:
+        parent_segment_idx = int(payload["parent_segment_idx"])
+        hard_stop = datetime.fromisoformat(
+            str(payload["hard_stop_at_hkt"])
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise RuntimeError(
+            "segment recovery activation fields are invalid"
+        ) from exc
+    if (
+        payload.get("capability_id") != "BJ-SEG-RECOVERY-001"
+        or not issue.isdigit()
+        or parent_segment_idx <= 0
+        or hard_stop.tzinfo is None
+        or hard_stop.utcoffset() != timedelta(hours=8)
+    ):
+        raise RuntimeError(
+            "segment recovery activation is not fail-closed"
+        )
+    return {
+        "enabled": True,
+        "capability_id": "BJ-SEG-RECOVERY-001",
+        "issue": issue,
+        "parent_segment_idx": parent_segment_idx,
+        "hard_stop_at_hkt": hard_stop.isoformat(timespec="seconds"),
+        "activation_file": str(SEGMENT_RECOVERY_ACTIVATION_PATH),
+    }
+
+
+def _artifact_refresh_command(args: argparse.Namespace) -> list[str]:
+    command = [
+        sys.executable,
+        str(ROOT / "scripts/live_artifact_refresh_loop.py"),
+        "--db",
+        str(ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"),
+        "--issue",
+        "current",
+        "--interval",
+        str(args.artifact_refresh_interval),
+        "--timeout",
+        "300",
+        "--max-refresh-age-minutes",
+        str(args.artifact_refresh_max_sp_age_minutes),
+    ]
+    activation = _segment_recovery_activation()
+    if activation["enabled"]:
+        command.extend(
+            [
+                "--recovery-issue",
+                str(activation["issue"]),
+                "--recovery-parent-segment",
+                str(activation["parent_segment_idx"]),
+                "--recovery-hard-stop-hkt",
+                str(activation["hard_stop_at_hkt"]),
+            ]
+        )
+    return command
 
 
 def _now_iso() -> str:
@@ -457,20 +535,7 @@ def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
         "--timeout",
         str(max(25, int(args.timeout * 6))),
     ]
-    artifact_refresh_command = [
-        sys.executable,
-        str(ROOT / "scripts/live_artifact_refresh_loop.py"),
-        "--db",
-        str(ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"),
-        "--issue",
-        "current",
-        "--interval",
-        str(args.artifact_refresh_interval),
-        "--timeout",
-        "300",
-        "--max-refresh-age-minutes",
-        str(args.artifact_refresh_max_sp_age_minutes),
-    ]
+    artifact_refresh_command = _artifact_refresh_command(args)
     gate_opener = _gate_authenticated_opener(urls["api_local"], timeout_sec=args.timeout)
     operations_probe = _json_probe(
         f"{urls['api_local']}/api/issues/current/operations",
@@ -529,6 +594,9 @@ def _health_payload(args: argparse.Namespace) -> dict[str, Any]:
                 "interval_sec": args.artifact_refresh_interval,
                 "enabled": not args.no_artifact_refresh,
                 "max_sp_age_minutes": args.artifact_refresh_max_sp_age_minutes,
+                "segment_recovery_activation": (
+                    _segment_recovery_activation()
+                ),
             },
         ),
         "health": {
@@ -725,20 +793,7 @@ def _start_artifact_refresh(args: argparse.Namespace) -> None:
         return
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
-    command = [
-        sys.executable,
-        str(ROOT / "scripts/live_artifact_refresh_loop.py"),
-        "--db",
-        str(ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"),
-        "--issue",
-        "current",
-        "--interval",
-        str(args.artifact_refresh_interval),
-        "--timeout",
-        "300",
-        "--max-refresh-age-minutes",
-        str(args.artifact_refresh_max_sp_age_minutes),
-    ]
+    command = _artifact_refresh_command(args)
     with ARTIFACT_REFRESH_LOG.open("ab") as log:
         subprocess.Popen(
             command,

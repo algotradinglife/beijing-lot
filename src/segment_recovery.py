@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sqlite3
 from datetime import datetime, timedelta
@@ -15,6 +16,9 @@ SCHEMA_VERSION = "segment_recovery_manifest_v1"
 POLICY_ID = "BJ-SEG-RECOVERY-001/deterministic_recovery_v1"
 PUBLICATION_TABLE = "segment_recovery_publications"
 WINDOW_TABLE = "segment_recovery_windows"
+EXACT_N_VALUES = (3, 4, 5, 6, 7)
+EXACT_N_BUDGETS = (512, 768, 1024)
+EXACT_TERMINAL_SCHEMA = "recovery_exact_n_terminal_v1"
 PUBLICATION_TABLE_SQL = f"""
 CREATE TABLE IF NOT EXISTS {PUBLICATION_TABLE} (
     issue TEXT NOT NULL,
@@ -61,6 +65,44 @@ def manifest_sha256(manifest: Mapping[str, Any]) -> str:
     return hashlib.sha256(canonical(unsigned)).hexdigest()
 
 
+def _payload_sha256(payload: Mapping[str, Any], field: str) -> str:
+    unsigned = {key: value for key, value in payload.items() if key != field}
+    return hashlib.sha256(canonical(unsigned)).hexdigest()
+
+
+def recovery_exact_event_key(issue: str, child_identity: str) -> str:
+    return hashlib.sha256(
+        canonical({"issue": str(issue), "segment_identity": str(child_identity)})
+    ).hexdigest()
+
+
+def recovery_exact_terminal_path(
+    ledger_root: Path, issue: str, child_identity: str
+) -> Path:
+    event_key = recovery_exact_event_key(issue, child_identity)
+    return ledger_root / f"{event_key}.terminal.json"
+
+
+def load_exact_terminal_record(
+    ledger_root: Path, recovery: Mapping[str, Any]
+) -> dict[str, Any] | None:
+    path = recovery_exact_terminal_path(
+        ledger_root,
+        str(recovery["issue"]),
+        str(recovery["child_identity"]),
+    )
+    if not path.is_file():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SegmentRecoveryError(
+            "recovery exact-N terminal receipt is unreadable"
+        ) from exc
+    verify_exact_terminal_record(record, recovery, ledger_root=ledger_root)
+    return record
+
+
 def _aware(value: object) -> datetime:
     parsed = datetime.fromisoformat(str(value))
     if parsed.tzinfo is None:
@@ -90,6 +132,225 @@ def schedule_input_sha256(manifest: Mapping[str, Any]) -> str:
             }
         )
     ).hexdigest()
+
+
+def verify_exact_terminal_record(
+    record: Mapping[str, Any],
+    recovery: Mapping[str, Any],
+    *,
+    ledger_root: Path | None = None,
+) -> str:
+    claimed = str(record.get("terminal_receipt_sha256") or "")
+    if (
+        record.get("schema_version") != EXACT_TERMINAL_SCHEMA
+        or record.get("capability_id") != "BJ-BET-FREEZE-001"
+        or record.get("state") != "MISSED_RECOVERY_FREEZE"
+        or record.get("immutable") is not True
+        or record.get("reason") != "past_due_without_verified_published_exact_n_event"
+        or claimed != _payload_sha256(record, "terminal_receipt_sha256")
+    ):
+        raise SegmentRecoveryError("invalid recovery exact-N terminal receipt")
+    expected_event = recovery_exact_event_key(
+        str(recovery["issue"]), str(recovery["child_identity"])
+    )
+    expected_members = [int(item["match_idx"]) for item in recovery["included"]]
+    if (
+        str(record.get("event_key") or "") != expected_event
+        or str(record.get("issue") or "") != str(recovery["issue"])
+        or str(record.get("segment_identity") or "") != str(recovery["child_identity"])
+        or int(record.get("parent_segment_idx", -1))
+        != int(recovery["parent_segment_idx"])
+        or str(record.get("recovery_manifest_sha256") or "")
+        != str(recovery["manifest_sha256"])
+        or [int(value) for value in record.get("segment_match_indices", [])]
+        != expected_members
+        or str(record.get("scheduled_freeze_at") or "")
+        != str(recovery["recovery_freeze_at"])
+    ):
+        raise SegmentRecoveryError("terminal receipt differs from recovery contract")
+    observed = _aware(record["observed_at_hkt"])
+    freeze_at = _aware(record["scheduled_freeze_at"])
+    if observed <= freeze_at:
+        raise SegmentRecoveryError(
+            "terminal receipt was created before recovery exact-N became past due"
+        )
+    cells = record.get("exact_n_cells")
+    if (
+        not isinstance(cells, list)
+        or any(not isinstance(item, dict) for item in cells)
+        or {
+            (
+                int(item.get("requested_n", -1)),
+                int(item.get("requested_budget_yuan", -1)),
+            )
+            for item in cells
+        }
+        != {
+            (n_value, budget)
+            for n_value in EXACT_N_VALUES
+            for budget in EXACT_N_BUDGETS
+        }
+        or len(cells) != len(EXACT_N_VALUES) * len(EXACT_N_BUDGETS)
+    ):
+        raise SegmentRecoveryError("terminal exact-N grid mismatch")
+    if any(
+        item.get("status") != "MISSED_RECOVERY_FREEZE"
+        or int(item.get("ticket_count", -1)) != 0
+        or float(item.get("actual_cost_yuan", -1)) != 0
+        or not str(item.get("reason") or "")
+        for item in cells
+    ):
+        raise SegmentRecoveryError("terminal exact-N cell evidence mismatch")
+    score_rows = record.get("correct_score_budget_statuses")
+    if (
+        not isinstance(score_rows, list)
+        or any(not isinstance(item, dict) for item in score_rows)
+        or {int(item.get("requested_budget_yuan", -1)) for item in score_rows}
+        != set(EXACT_N_BUDGETS)
+        or len(score_rows) != len(EXACT_N_BUDGETS)
+    ):
+        raise SegmentRecoveryError("terminal correct-score grid mismatch")
+    if any(
+        item.get("status") != "MISSED_RECOVERY_FREEZE"
+        or float(item.get("actual_cost_yuan", -1)) != 0
+        or not str(item.get("reason") or "")
+        for item in score_rows
+    ):
+        raise SegmentRecoveryError("terminal correct-score evidence mismatch")
+    prior_sha = str(record.get("prior_ledger_sha256") or "")
+    prior_name = str(record.get("prior_ledger_file") or "")
+    prior_state = str(record.get("prior_ledger_state") or "")
+    if bool(prior_sha) != bool(prior_name) or bool(prior_sha) != bool(prior_state):
+        raise SegmentRecoveryError("terminal prior-ledger linkage is incomplete")
+    if prior_sha and (
+        not re.fullmatch(r"[0-9a-f]{64}", prior_sha)
+        or prior_name != f"{expected_event}.json"
+    ):
+        raise SegmentRecoveryError("terminal prior-ledger linkage is invalid")
+    if prior_sha and ledger_root is not None:
+        prior_path = ledger_root / prior_name
+        if (
+            not prior_path.is_file()
+            or hashlib.sha256(prior_path.read_bytes()).hexdigest() != prior_sha
+        ):
+            raise SegmentRecoveryError("terminal prior-ledger bytes have changed")
+        try:
+            prior_payload = json.loads(prior_path.read_text(encoding="utf-8"))
+            actual_prior_state = str(prior_payload.get("state") or "")
+        except (TypeError, json.JSONDecodeError):
+            actual_prior_state = "INVALID_UNVERIFIED"
+        if actual_prior_state != prior_state:
+            raise SegmentRecoveryError("terminal prior-ledger state linkage mismatch")
+    return claimed
+
+
+def publish_exact_terminal_record(
+    ledger_root: Path,
+    recovery: Mapping[str, Any],
+    *,
+    observed_at: datetime,
+) -> tuple[dict[str, Any], bool]:
+    """Create the immutable past-due exact-N receipt once per recovery child."""
+    recovery_contract = {
+        key: value for key, value in recovery.items() if key != "manifest_path"
+    }
+    verify_manifest(recovery_contract)
+    if recovery["status"] != "PUBLISHED_RECOVERY":
+        raise SegmentRecoveryError(
+            "only a published recovery child can miss its exact-N freeze"
+        )
+    issue = str(recovery["issue"])
+    child_identity = str(recovery["child_identity"])
+    event_key = recovery_exact_event_key(issue, child_identity)
+    ledger_root = ledger_root.resolve()
+    ledger_root.mkdir(parents=True, exist_ok=True)
+    terminal_path = recovery_exact_terminal_path(ledger_root, issue, child_identity)
+    if terminal_path.is_file():
+        existing = json.loads(terminal_path.read_text(encoding="utf-8"))
+        verify_exact_terminal_record(existing, recovery, ledger_root=ledger_root)
+        return existing, True
+
+    prior_path = ledger_root / f"{event_key}.json"
+    prior_bytes = prior_path.read_bytes() if prior_path.is_file() else b""
+    prior_state = ""
+    if prior_bytes:
+        try:
+            prior = json.loads(prior_bytes)
+            prior_state = str(prior.get("state") or "")
+        except (TypeError, json.JSONDecodeError):
+            prior_state = "INVALID_UNVERIFIED"
+        if prior_state == "PUBLISHED":
+            raise SegmentRecoveryError(
+                "cannot mark a PUBLISHED exact-N ledger as missed"
+            )
+    observed = observed_at
+    if observed.tzinfo is None:
+        raise SegmentRecoveryError("terminal observation clock lacks timezone")
+    observed = observed.astimezone(_aware(recovery["recovery_freeze_at"]).tzinfo)
+    record: dict[str, Any] = {
+        "schema_version": EXACT_TERMINAL_SCHEMA,
+        "capability_id": "BJ-BET-FREEZE-001",
+        "state": "MISSED_RECOVERY_FREEZE",
+        "issue": issue,
+        "parent_segment_idx": int(recovery["parent_segment_idx"]),
+        "segment_identity": child_identity,
+        "event_key": event_key,
+        "recovery_manifest_sha256": str(recovery["manifest_sha256"]),
+        "segment_match_indices": [
+            int(item["match_idx"]) for item in recovery["included"]
+        ],
+        "scheduled_freeze_at": str(recovery["recovery_freeze_at"]),
+        "observed_at_hkt": observed.isoformat(timespec="microseconds"),
+        "reason": "past_due_without_verified_published_exact_n_event",
+        "prior_ledger_file": prior_path.name if prior_bytes else "",
+        "prior_ledger_sha256": (
+            hashlib.sha256(prior_bytes).hexdigest() if prior_bytes else ""
+        ),
+        "prior_ledger_state": prior_state,
+        "exact_n_cells": [
+            {
+                "requested_n": n_value,
+                "requested_budget_yuan": budget,
+                "status": "MISSED_RECOVERY_FREEZE",
+                "ticket_count": 0,
+                "actual_cost_yuan": 0,
+                "reason": "recovery_exact_n_deadline_passed",
+            }
+            for n_value in EXACT_N_VALUES
+            for budget in EXACT_N_BUDGETS
+        ],
+        "correct_score_budget_statuses": [
+            {
+                "requested_budget_yuan": budget,
+                "status": "MISSED_RECOVERY_FREEZE",
+                "actual_cost_yuan": 0,
+                "reason": "recovery_correct_score_deadline_passed",
+            }
+            for budget in EXACT_N_BUDGETS
+        ],
+        "immutable": True,
+    }
+    record["terminal_receipt_sha256"] = _payload_sha256(
+        record, "terminal_receipt_sha256"
+    )
+    verify_exact_terminal_record(record, recovery, ledger_root=ledger_root)
+    try:
+        fd = os.open(terminal_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        existing = load_exact_terminal_record(ledger_root, recovery)
+        if existing is None:
+            raise SegmentRecoveryError("concurrent terminal receipt disappeared")
+        return existing, True
+    with os.fdopen(fd, "wb") as stream:
+        stream.write(canonical(record) + b"\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    directory_fd = os.open(ledger_root, os.O_RDONLY)
+    try:
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+    return record, False
 
 
 def verify_manifest(manifest: Mapping[str, Any]) -> str:

@@ -28,6 +28,7 @@ from src.natural_day_manifest import (
 from src.segment_recovery import (
     PUBLICATION_TABLE as RECOVERY_PUBLICATION_TABLE,
     SegmentRecoveryError,
+    load_exact_terminal_record,
     load_published_recovery,
     verify_operational_window as verify_recovery_operational_window,
 )
@@ -4504,6 +4505,7 @@ def _exact_n_freeze_payload(
                         "recovery_manifest_sha256": str(
                             recovery["manifest_sha256"]
                         ),
+                        "_recovery_contract": recovery,
                     }
                 )
         except SegmentRecoveryError as exc:
@@ -4551,6 +4553,66 @@ def _exact_n_freeze_payload(
             "alternatives": [],
         }
         ledger_path = ledger_root / f"{event_key}.json"
+        if segment["is_recovery"]:
+            try:
+                terminal = load_exact_terminal_record(
+                    ledger_root, segment["_recovery_contract"]
+                )
+            except SegmentRecoveryError as exc:
+                base.update(
+                    {
+                        "status": "invalid_terminal_event",
+                        "error": str(exc),
+                    }
+                )
+                segment_payloads.append(base)
+                continue
+            if terminal is not None:
+                if ledger_path.is_file():
+                    try:
+                        conflicting_ledger = json.loads(
+                            ledger_path.read_text(encoding="utf-8")
+                        )
+                    except (OSError, json.JSONDecodeError):
+                        conflicting_ledger = {}
+                    if conflicting_ledger.get("state") == "PUBLISHED":
+                        base.update(
+                            {
+                                "status": "invalid_terminal_event",
+                                "error": (
+                                    "terminal receipt conflicts with a "
+                                    "PUBLISHED ledger"
+                                ),
+                            }
+                        )
+                        segment_payloads.append(base)
+                        continue
+                base.update(
+                    {
+                        "status": "MISSED_RECOVERY_FREEZE",
+                        "terminal_receipt_sha256": str(
+                            terminal["terminal_receipt_sha256"]
+                        ),
+                        "terminal_observed_at": str(
+                            terminal["observed_at_hkt"]
+                        ),
+                        "terminal_reason": str(terminal["reason"]),
+                        "exact_n_terminal_cells": terminal[
+                            "exact_n_cells"
+                        ],
+                        "correct_score": {
+                            "status": "MISSED_RECOVERY_FREEZE",
+                            "budget_statuses": terminal[
+                                "correct_score_budget_statuses"
+                            ],
+                            "execution_enabled": False,
+                            "frontend_selectable": False,
+                            "roi_authorized": False,
+                        },
+                    }
+                )
+                segment_payloads.append(base)
+                continue
         if not ledger_path.is_file():
             segment_payloads.append(base)
             continue
