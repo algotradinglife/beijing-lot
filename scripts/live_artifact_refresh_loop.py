@@ -11,6 +11,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -61,6 +62,7 @@ DEFAULT_CORRECT_SCORE_ROOT = ROOT / "results/data_collection/correct_score_price
 DEFAULT_EXACT_N_TRIGGER_LEAD_MINUTES = 10.0
 DEFAULT_FINAL_INPUT_REFRESH_LEAD_MINUTES = 30.0
 DEFAULT_RECOVERY_OUTPUT_ROOT = ROOT / "results/research/segment_recovery_v1"
+HK_TZ = ZoneInfo("Asia/Hong_Kong")
 
 
 def coordinate_segment_recovery(
@@ -111,6 +113,15 @@ def coordinate_segment_recovery(
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+def _align_clock(value: datetime, reference: datetime) -> datetime:
+    """Normalize contract clocks to HKT without depending on the host timezone."""
+    if reference.tzinfo is None:
+        raise ValueError("reference clock lacks timezone")
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=HK_TZ)
+    return value.astimezone(HK_TZ)
 
 
 def _status_complete(status: dict[str, Any]) -> bool:
@@ -609,14 +620,21 @@ def coordinate_due_exact_n_freeze(
         }
         for segment in manifest["segments"]
     ] + recovery_segments
+    recovery_freezes = [
+        (
+            _align_clock(
+                datetime.fromisoformat(str(segment["freeze_at"])),
+                observed_at,
+            ),
+            segment,
+        )
+        for segment in recovery_segments
+    ]
     past_due_recoveries = sorted(
         (
-            (
-                datetime.fromisoformat(str(segment["freeze_at"])),
-                segment,
-            )
-            for segment in recovery_segments
-            if datetime.fromisoformat(str(segment["freeze_at"])) < observed_at
+            (freeze_at, segment)
+            for freeze_at, segment in recovery_freezes
+            if freeze_at < observed_at
         ),
         key=lambda item: item[0],
     )
@@ -740,16 +758,24 @@ def coordinate_due_exact_n_freeze(
 
     upcoming: list[tuple[datetime, dict[str, Any]]] = []
     for segment in all_segments:
-        freeze_at = datetime.fromisoformat(str(segment["freeze_at"]))
-        if freeze_at.tzinfo is None:
-            freeze_at = freeze_at.astimezone()
+        freeze_at = _align_clock(
+            datetime.fromisoformat(str(segment["freeze_at"])),
+            observed_at,
+        )
         if freeze_at - timedelta(minutes=trigger_lead_minutes) <= observed_at <= freeze_at:
             upcoming.append((freeze_at, segment))
     if not upcoming:
         future = sorted(
-            datetime.fromisoformat(str(segment["freeze_at"]))
+            _align_clock(
+                datetime.fromisoformat(str(segment["freeze_at"])),
+                observed_at,
+            )
             for segment in all_segments
-            if datetime.fromisoformat(str(segment["freeze_at"])) > observed_at
+            if _align_clock(
+                datetime.fromisoformat(str(segment["freeze_at"])),
+                observed_at,
+            )
+            > observed_at
         )
         return {
             "status": "pending",
@@ -1001,7 +1027,11 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
         args.db, args.issue, observed_at=observed_at
     )
     freeze_at_text = str(segment_plan_freeze.get("freeze_at") or "")
-    freeze_at = datetime.fromisoformat(freeze_at_text) if freeze_at_text else None
+    freeze_at = (
+        _align_clock(datetime.fromisoformat(freeze_at_text), observed_at)
+        if freeze_at_text
+        else None
+    )
     force_final_refresh = bool(
         freeze_at is not None
         and not segment_plan_freeze.get("locked")
@@ -1013,7 +1043,10 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
         recovery_freeze_text = str(recovery.get("freeze_at") or "")
         if not recovery_freeze_text:
             continue
-        recovery_freeze = datetime.fromisoformat(recovery_freeze_text)
+        recovery_freeze = _align_clock(
+            datetime.fromisoformat(recovery_freeze_text),
+            observed_at,
+        )
         if (
             recovery_freeze - timedelta(
                 minutes=DEFAULT_FINAL_INPUT_REFRESH_LEAD_MINUTES
