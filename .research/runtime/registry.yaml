@@ -59,25 +59,32 @@ entries:
       - 506e87af32cfa2333208c6d79e588a301617ef53
       - 7cfacb03bdb066e2271b072a04078fe7331d4023
       - 842d1c771d5b69e98317f353d4ce4122109e10b3
+      - 14e910531eee3a9d7e73eaa676f943fb5fdd9665
     pr_number: 24
     started_at: "2026-07-24T17:29:48Z"
-    last_seen: "2026-07-24T18:27:30Z"
-    status: pr_review_changes_requested
-    execution_phase: changes_requested
+    last_seen: "2026-07-24T18:43:06Z"
+    status: pr_approved
+    execution_phase: approved_pending_merge
     priority_class: P0
     deadline_at_hkt: "2026-07-25T20:25:00+08:00"
-    last_review_at: "2026-07-24T18:19:38Z"
+    last_review_at: "2026-07-24T18:43:06Z"
     actionable_node: BJ-SEG-RECOVERY-001
     blocked_nodes: []
     blockers: []
-    selected_next_action: address_pi_round2_atomic_terminal_finding
+    selected_next_action: resolve_main_conflict_and_revalidate_merge_head
     deadline_reason: owner_authorized_time_bound_recovery_before_2026_07_25_20_25_hkt
     wip_slot: engineering_primary
     wip: 1
     notes: >-
-      PR #24 PI round 2 found a PUBLISHED-vs-MISSED race between the exact-N
-      ledger and terminal receipt; the merge-only 842d1c7 did not address it.
-      Engineer is implementing one shared event-level atomic ownership lock.
+      PR #24 implements BJ-SEG-RECOVERY-001 capability.
+      Round 1 (506e87a, 18:00:51Z): CHANGES_REQUESTED — P0 (missed freeze terminal) + P1 (prod activation).
+      Round 2 (7cfacb0, 18:16:24Z): CHANGES_REQUESTED — P0 (atomic MISSED-vs-PUBLISHED) persists.
+      Round 3 (842d1c7, 18:19:38Z): CHANGES_REQUESTED — P0 same finding, 3rd round.
+      Round 4 (14e9105, 18:33:41Z): COMMENTED — PI confirms all findings resolved. Approval held for EV gate.
+      EV (14e9105, 02:37+00:00): PASS — HermesPM Engineering Validation complete. All 16 recovery tests pass.
+      PI final approval (14e9105, 18:43:06Z): APPROVED. Main advanced with
+      reconciler-only registry commits; resolve that conflict and validate the
+      merge HEAD before landing.
 
 metadata:
   created_at: "2026-07-24T09:09:31Z"
