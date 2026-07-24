@@ -60,18 +60,19 @@ entries:
       - 7cfacb03bdb066e2271b072a04078fe7331d4023
       - 842d1c771d5b69e98317f353d4ce4122109e10b3
       - 14e910531eee3a9d7e73eaa676f943fb5fdd9665
+      - 1c4773adc04078ae1f54a7083276afe6a97ad084
     pr_number: 24
     started_at: "2026-07-24T17:29:48Z"
-    last_seen: "2026-07-24T18:43:06Z"
-    status: pr_approved
-    execution_phase: approved_pending_merge
+    last_seen: "2026-07-24T18:47:26Z"
+    status: engineering_validation_pending
+    execution_phase: validating
     priority_class: P0
     deadline_at_hkt: "2026-07-25T20:25:00+08:00"
-    last_review_at: "2026-07-24T18:43:06Z"
+    last_review_at: "2026-07-24T18:47:26Z"
     actionable_node: BJ-SEG-RECOVERY-001
     blocked_nodes: []
     blockers: []
-    selected_next_action: resolve_main_conflict_and_revalidate_merge_head
+    selected_next_action: hermespm_engineering_validation
     deadline_reason: owner_authorized_time_bound_recovery_before_2026_07_25_20_25_hkt
     wip_slot: engineering_primary
     wip: 1
@@ -81,10 +82,11 @@ entries:
       Round 2 (7cfacb0, 18:16:24Z): CHANGES_REQUESTED — P0 (atomic MISSED-vs-PUBLISHED) persists.
       Round 3 (842d1c7, 18:19:38Z): CHANGES_REQUESTED — P0 same finding, 3rd round.
       Round 4 (14e9105, 18:33:41Z): COMMENTED — PI confirms all findings resolved. Approval held for EV gate.
-      EV (14e9105, 02:37+00:00): PASS — HermesPM Engineering Validation complete. All 16 recovery tests pass.
-      PI final approval (14e9105, 18:43:06Z): APPROVED. Main advanced with
-      reconciler-only registry commits; resolve that conflict and validate the
-      merge HEAD before landing.
+      EV (14e9105, receipt published 2026-07-24T18:42:18Z): PASS — HermesPM
+      Engineering Validation complete. PI final approval on 14e9105 was
+      published at 2026-07-24T18:43:06Z; both are historical evidence for that
+      exact HEAD only. Merge HEAD 1c4773a incorporates reconciler-only registry
+      commits and is pending exact-head Engineering Validation and PI re-review.
 
 metadata:
   created_at: "2026-07-24T09:09:31Z"
