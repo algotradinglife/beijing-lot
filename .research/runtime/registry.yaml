@@ -61,14 +61,15 @@ entries:
       - 14e910531eee3a9d7e73eaa676f943fb5fdd9665
       - 1c4773adc04078ae1f54a7083276afe6a97ad084
       - 2b1774b7eb64391e633932f8a4f7ce7720656534
+      - c4fed76306fca884b275aa91b8386e538f88cec6
     pr_number: 24
     started_at: "2026-07-24T17:29:48Z"
-    last_seen: "2026-07-25T02:37:27Z"
+    last_seen: "2026-07-25T03:15:28Z"
     status: pr_review_pending_validation
     execution_phase: pending_ev
     priority_class: P0
     deadline_at_hkt: "2026-07-25T20:25:00+08:00"
-    last_review_at: "2026-07-24T18:53:34Z"
+    last_review_at: "2026-07-24T19:13:08Z"
     notes: >-
       PR #24 implements BJ-SEG-RECOVERY-001 capability.
       Round 1 (506e87a, 18:00:51Z): CHANGES_REQUESTED — P0 (missed freeze terminal) + P1 (prod activation).
@@ -79,7 +80,9 @@ entries:
       PI APPROVED (14e9105, 18:43:06Z): Final PI approval on HEAD 14e9105.
       Round 5 (1c4773a, 18:47:26Z): CHANGES_REQUESTED — Registry prematurely carried prior-head approval onto unvalidated merge HEAD.
       Round 6 (2b1774b, 18:53:34Z): COMMENTED — Merge-head registry findings resolved; approval held for exact-head EV.
-      Current HEAD: 2b1774b. Needs: HermesPM EV gate on exact HEAD 2b1774b → PI re-approval → merge.
+      Round 7 (c4fed76, 19:13:08Z): COMMENTED — PI confirms merge-head increment (registry only) has no new blocker. Approval held for exact-head EV.
+      EV (c4fed76, receipt published 2026-07-25T03:15:28Z): PASS — HermesPM Engineering Validation on exact HEAD c4fed76. 16/16 recovery tests pass. Code byte-equivalent to approved 14e9105.
+      Current HEAD: c4fed76. Status: EV PASSED → needs PI final approval on same HEAD → merge.
 
 metadata:
   created_at: "2026-07-24T09:09:31Z"
