@@ -1,0 +1,50 @@
+# Research OS — Runtime Registry
+# Auto-managed by reconciler. Do not edit manually.
+entries:
+  BJ-SEG-DAY-001:
+    session_id: null
+    executor: everything-bot-engineer
+    profile: engineer
+    runtime: codex
+    branch: research/bj-bet-freeze-001
+    worktree: null
+    commits:
+      - 4a2b47f183d4036e67e102cfbe46ec427fe45f25
+      - 72a8a0618df8702fafef32fa6e121603b76abba4
+      - 36dee2075fcd24e6cf1b515784aa164c81f15c55
+      - c359c6011a20f10d2f79d8f7e352f84be9d4aa04
+      - 0bbf74827cb9e8480f8e98e1fc2dc97db237ce82
+    pr_number: 21
+    started_at: "2026-07-24T09:07:37Z"
+    last_seen: "2026-07-24T09:27:58Z"
+    status: pr_open_has_conflicts
+    execution_phase: completed
+    notes: >-
+      Code complete. No active session needed — awaiting conflict resolution
+      and PI review. PR #21 has add/add conflict in BET-FREEZE task yaml.
+      session_not_alive anomaly is expected (execution phase done).
+      Reconciler (2026-07-24T09:34Z): transitioned graph EXECUTING→REVIEW.
+  BJ-BET-FREEZE-001:
+    session_id: null
+    executor: everything-bot-engineer
+    profile: engineer
+    runtime: codex
+    branch: research/bj-bet-freeze-001
+    worktree: null
+    commits:
+      - 36dee2075fcd24e6cf1b515784aa164c81f15c55
+      - c359c6011a20f10d2f79d8f7e352f84be9d4aa04
+      - 0bbf74827cb9e8480f8e98e1fc2dc97db237ce82
+    pr_number: 21
+    started_at: "2026-07-24T09:07:37Z"
+    last_seen: "2026-07-24T09:27:58Z"
+    status: pr_open_has_conflicts
+    execution_phase: completed
+    notes: >-
+      Code complete — Segment 1 exact-N artifacts frozen at 17:15 HKT.
+      No active session needed. PR #21 awaiting conflict resolution and PI review.
+      Reconciler (2026-07-24T09:34Z): transitioned graph CREATED→REVIEW (was stale).
+
+metadata:
+  created_at: "2026-07-24T09:09:31Z"
+  reconciler_version: "0.1.1"

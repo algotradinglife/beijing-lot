@@ -1,0 +1,4 @@
+{
+  "ts": "2026-07-24T09:14:54.539361+00:00",
+  "fatal_error": "expected str, bytes or os.PathLike object, not NoneType"
+}

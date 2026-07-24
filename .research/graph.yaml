@@ -27,11 +27,11 @@ spec:
     - id: BJ-SEG-DAY-001
       node_type: task
       ref: tasks/BJ-SEG-DAY-001.yaml
-      state: REVIEW
+      state: AWAITING_DECISION
     - id: BJ-BET-FREEZE-001
       node_type: task
       ref: tasks/BJ-BET-FREEZE-001.yaml
-      state: REVIEW
+      state: AWAITING_DECISION
 
   edges:
     - from: GOAL-BOOT

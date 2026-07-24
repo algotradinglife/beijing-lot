@@ -1,0 +1,4 @@
+{
+  "ts": "2026-07-24T09:27:46.184568+00:00",
+  "fatal_error": "while scanning a simple key\n  in \"/home/drwho1985/workspace/soccer/beijing-lot/.research/tasks/BJ-BET-FREEZE-001.yaml\", line 62, column 1\ncould not find expected ':'\n  in \"/home/drwho1985/workspace/soccer/beijing-lot/.research/tasks/BJ-BET-FREEZE-001.yaml\", line 63, column 10"
+}

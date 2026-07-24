@@ -1,0 +1,23 @@
+{
+  "ts": "2026-07-24T09:08:48.102702+00:00",
+  "reconciler_version": "0.1.0",
+  "project": "/home/drwho1985/workspace/soccer/beijing-lot",
+  "graph": "beijing-lot-pilot",
+  "runtime": {
+    "created_at": null,
+    "reconciler_version": "0.1.0"
+  },
+  "nodes_checked": 6,
+  "nodes_alive": 0,
+  "nodes_anomaly": 1,
+  "anomalies": [
+    {
+      "node": "BJ-SEG-DAY-001",
+      "state": "EXECUTING",
+      "issue": "no_runtime_registration",
+      "detail": "Node is EXECUTING but has no runtime entry"
+    }
+  ],
+  "heartbeat_updates": [],
+  "warnings": []
+}

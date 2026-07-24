@@ -1,0 +1,16 @@
+{
+  "ts": "2026-07-24T10:09:56.374434+00:00",
+  "reconciler_version": "0.1.0",
+  "project": "/home/drwho1985/workspace/soccer/beijing-lot",
+  "graph": "beijing-lot-pilot",
+  "runtime": {
+    "created_at": "2026-07-24T09:09:31Z",
+    "reconciler_version": "0.1.1"
+  },
+  "nodes_checked": 6,
+  "nodes_alive": 0,
+  "nodes_anomaly": 0,
+  "anomalies": [],
+  "heartbeat_updates": [],
+  "warnings": []
+}
