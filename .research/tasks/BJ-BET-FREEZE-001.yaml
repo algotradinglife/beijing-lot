@@ -1,0 +1,71 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: BJ-BET-FREEZE-001
+  title: Exact-N and correct-score freeze for 26078
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-PHASE1
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/20"
+    - "https://github.com/algotradinglife/beijing-lot/issues/19"
+
+spec:
+  type: capability
+  intent:
+    objective: Freeze N=3/4/5/6/7 exact-N plans + correct-score plan at each segment's freeze time for 26078, using BJ-SEG-DAY-001's segment manifest.
+    question: Can exact-N and correct-score plans be atomically frozen at the same segment freeze point, producing deterministic, immutable artifact sets?
+    hypothesis: The existing max_n-based selector can be extended to produce independent N-specific frozen artifacts without changing plan generation logic.
+    expected_value: Enable operational comparison of exact-N freeze points vs max_n recommendations.
+    out_of_scope:
+      - Changing v3.3.3/v4.2 probability, selection or decision chain
+      - ROI, EV/q or N optimization
+      - Settlement logic
+      - Production strategy execution flags
+
+  context:
+    inputs:
+      - Issue #20: full capability contract
+      - Issue #19 / BJ-SEG-DAY-001 segment manifest for 26078
+      - Existing max_n selector and plan generation
+    assumptions:
+      - BJ-SEG-DAY-001 produces correct segment manifest before 17:55
+      - 17:55 HKT freeze deadline applies to both tasks
+
+  execution:
+    required_capabilities:
+      - python_development
+      - testing
+    uncertainty: medium
+    complexity: medium
+
+  risk:
+    overall: medium
+    scientific: low
+    engineering: medium
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - Exact N=3/4/5/6/7 frozen plans at each segment freeze point
+      - Correct-score frozen plan
+      - All artifacts immutable and hash-verified
+      - No strategy/ticket/probability changes
+    checks:
+      - schema_validation
+      - automated_tests
+    human_gates:
+      - research_pi_review
+
+status:
+  current: CREATED
+  attempts: 0
+  routing:
+    executor_mode: isolated_session
+    profile: engineer
+    runtime: codex
+    reason: Capability task, time-sensitive (17:55 HKT freeze), depends on #19 segment manifest
+  artifacts: []
+  result: {}
+  history: []
