@@ -299,7 +299,7 @@ def test_runtime_consumers_bind_to_publication_and_reject_stale_cache(
         "pending",
         "pending",
     ]
-
+    assert exact_n_api["exact_n_frontend_selectable"] is False
     plan = plans / "26078_active_fixture"
     plan.mkdir(parents=True)
     summary_path = plan / "segment_betting_plan_summary.json"
@@ -370,6 +370,29 @@ def test_runtime_consumers_bind_to_publication_and_reject_stale_cache(
     assert payload["status"] == "missing"
     assert payload["freeze_state"]["stale_segment_contract_plan_count"] == 1
     assert payload["source"]["segment_contract"]["segment_counts"] == [63, 72, 38]
+
+
+def test_exact_n_selection_boundary_requires_frozen_tickets() -> None:
+    assert (
+        decision_app._exact_n_alternative_frontend_selectable(
+            {
+                "exact_n": True,
+                "status": "UNAVAILABLE_EXACT_N_BUDGET",
+                "tickets": [],
+            }
+        )
+        is False
+    )
+    assert (
+        decision_app._exact_n_alternative_frontend_selectable(
+            {
+                "exact_n": True,
+                "status": "FROZEN_EXACT_N_BUDGET",
+                "tickets": [{"match_indices": [1, 2, 3]}],
+            }
+        )
+        is True
+    )
 
 
 def test_live_coordinator_publishes_due_segment_from_canonical_manifest(

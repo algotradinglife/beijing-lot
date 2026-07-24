@@ -20,8 +20,17 @@ for line in (BUNDLE / "SHA256SUMS").read_text(encoding="utf-8").splitlines():
     entries[name] = digest
     if file_hash(BUNDLE / name) != digest:
         raise SystemExit(f"FAIL: source byte mismatch: {name}")
+actual_files = {
+    path.name
+    for path in BUNDLE.iterdir()
+    if path.is_file() and path.name != "SHA256SUMS"
+}
+if set(entries) != actual_files:
+    raise SystemExit("FAIL: SHA256SUMS does not bind the complete source bundle")
 
 manifest = json.loads((BUNDLE / "manifest.json").read_text(encoding="utf-8"))
+decision_input = BUNDLE / "structured_shadow_26078.csv"
+decision_input_sha256 = file_hash(decision_input)
 if manifest.get("schema_version") != "exact_n_segment_freeze_v1":
     raise SystemExit("FAIL: unexpected historical schema")
 if {int(item["requested_n"]) for item in manifest["artifacts"] if "requested_n" in item} != {3, 4, 5, 6, 7}:
@@ -30,6 +39,8 @@ if any("requested_budget_yuan" in item for item in manifest["artifacts"]):
     raise SystemExit("FAIL: historical bundle unexpectedly claims an N×budget matrix")
 if manifest.get("sha256") != "fc07fba06a0315abbd21339db17affb37042185d9c5eb38cefd59d2bb6a41974":
     raise SystemExit("FAIL: historical manifest payload identity mismatch")
+if decision_input_sha256 != manifest.get("decision_input_sha256"):
+    raise SystemExit("FAIL: packaged structured input differs from historical claim")
 
 receipt = {
     "status": "PASS",
@@ -38,7 +49,7 @@ receipt = {
     "source_sha256s_sha256": file_hash(BUNDLE / "SHA256SUMS"),
     "manifest_file_sha256": file_hash(BUNDLE / "manifest.json"),
     "manifest_payload_sha256": manifest["sha256"],
-    "decision_input_sha256": manifest["decision_input_sha256"],
+    "decision_input_sha256": decision_input_sha256,
     "reasons": [
         "historical_schema_v1_not_exact_n_budget_matrix_v2",
         "no_5x3_budget_grid",

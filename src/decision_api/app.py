@@ -4389,6 +4389,18 @@ def _segment_plan_freeze_state(
     return state
 
 
+def _exact_n_alternative_frontend_selectable(
+    alternative: dict[str, Any],
+) -> bool:
+    tickets = alternative.get("tickets")
+    return (
+        alternative.get("exact_n") is True
+        and alternative.get("status") == "FROZEN_EXACT_N_BUDGET"
+        and isinstance(tickets, list)
+        and bool(tickets)
+    )
+
+
 def _exact_n_freeze_payload(
     conn: sqlite3.Connection,
     issue: str,
@@ -4495,6 +4507,14 @@ def _exact_n_freeze_payload(
                 ).hexdigest()
                 if claimed != actual or claimed != str(entry["sha256"]):
                     raise ValueError("exact-N alternative hash mismatch")
+                tickets = (
+                    alternative.get("tickets")
+                    if isinstance(alternative.get("tickets"), list)
+                    else []
+                )
+                frontend_selectable = _exact_n_alternative_frontend_selectable(
+                    alternative
+                )
                 alternatives.append({
                     "plan_id": str(alternative.get("plan_id") or ""),
                     "exact_n": alternative.get("exact_n") is True,
@@ -4517,10 +4537,8 @@ def _exact_n_freeze_payload(
                         alternative.get("budget_utilization")
                     ),
                     "status": str(alternative.get("status") or ""),
-                    "ticket_count": len(alternative.get("tickets") or []),
-                    "tickets": alternative.get("tickets")
-                    if isinstance(alternative.get("tickets"), list)
-                    else [],
+                    "ticket_count": len(tickets),
+                    "tickets": tickets,
                     "sha256": claimed,
                     "decision_input_sha256": str(
                         alternative.get("decision_input_sha256") or ""
@@ -4531,7 +4549,7 @@ def _exact_n_freeze_payload(
                     "effective_decision_at": str(
                         alternative.get("effective_decision_at") or ""
                     ),
-                    "frontend_selectable": True,
+                    "frontend_selectable": frontend_selectable,
                 })
             score_path = artifact_manifest_path.parent / "correct_score_audit.json"
             score = json.loads(score_path.read_text(encoding="utf-8"))
@@ -4559,6 +4577,11 @@ def _exact_n_freeze_payload(
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             base.update({"status": "invalid_published_event", "error": str(exc)})
         segment_payloads.append(base)
+    exact_n_frontend_selectable = any(
+        alternative.get("frontend_selectable") is True
+        for segment in segment_payloads
+        for alternative in segment.get("alternatives", [])
+    )
     return {
         "schema_version": "exact_n_segment_freeze_api_v1",
         "issue": str(issue),
@@ -4568,7 +4591,7 @@ def _exact_n_freeze_payload(
             int(segment["match_count"]) for segment in contract["segments"]
         ],
         "segments": segment_payloads,
-        "exact_n_frontend_selectable": True,
+        "exact_n_frontend_selectable": exact_n_frontend_selectable,
         "correct_score_execution_enabled": False,
         "correct_score_frontend_selectable": False,
         "correct_score_roi_authorized": False,

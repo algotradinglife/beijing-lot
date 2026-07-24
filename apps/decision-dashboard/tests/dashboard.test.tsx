@@ -364,6 +364,49 @@ describe('北单实盘决策台 v1', () => {
 	    expect((screen.getByLabelText('选择投入方式') as HTMLSelectElement).value).toBe('scale_to_budget');
 	  });
 
+  it('requires an explicit Exact-N selection and never auto-selects a plan', async () => {
+    vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(mockDashboardData);
+    render(<App />);
+    await screen.findByRole('button', { name: '下注设计' });
+    await userEvent.click(screen.getByRole('button', { name: '下注设计' }));
+
+    const radio = screen.getByRole('radio', { name: '选择 Exact-N 26052_s1_n3_b512' }) as HTMLInputElement;
+    expect(radio.disabled).toBe(false);
+    expect(radio.checked).toBe(false);
+    expect(screen.getByText('未选择（无自动回退）')).toBeInTheDocument();
+    await userEvent.click(radio);
+    expect(radio.checked).toBe(true);
+    expect(screen.getByText('26052_s1_n3_b512')).toBeInTheDocument();
+  });
+
+  it('disables selection for unavailable Exact-N cells with no tickets', async () => {
+    const unavailable = {
+      ...mockDashboardData,
+      exactNFreezes: {
+        ...mockDashboardData.exactNFreezes,
+        exactNFrontendSelectable: false,
+        segments: mockDashboardData.exactNFreezes.segments.map((segment) => ({
+          ...segment,
+          alternatives: segment.alternatives.map((alternative) => ({
+            ...alternative,
+            status: 'UNAVAILABLE_EXACT_N_BUDGET',
+            ticketCount: 0,
+            frontendSelectable: false,
+          })),
+        })),
+      },
+    };
+    vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(unavailable);
+    render(<App />);
+    await screen.findByRole('button', { name: '下注设计' });
+    await userEvent.click(screen.getByRole('button', { name: '下注设计' }));
+
+    const radio = screen.getByRole('radio', { name: '选择 Exact-N 26052_s1_n3_b512' }) as HTMLInputElement;
+    expect(radio.disabled).toBe(true);
+    expect(radio.checked).toBe(false);
+    expect(screen.getByText('未选择（无自动回退）')).toBeInTheDocument();
+  });
+
   it('renders v4.2 execution variants from executable picks and keeps audit recommendations separate', async () => {
     const today = relativeIsoDate(0);
     const lateProxy0004Id = 'shadow_v4.2.0000_execution_late_proxy_fullcap2';

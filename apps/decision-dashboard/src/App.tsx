@@ -1321,6 +1321,13 @@ function BettingPlan({
 	    : variantOptions.find((option) => option.isDefault)?.variantId || variantOptions[0]?.variantId || '';
 	  const topBundles = data.bundles.slice(0, 12);
 	  const planUpdatedAt = data.artifactStatus.updatedAt || data.selectedPlan?.updatedAt || '';
+	  const [selectedExactNPlanId, setSelectedExactNPlanId] = useState('');
+	  const selectableExactNPlanIds = exactN.segments.flatMap((segment) => segment.alternatives)
+	    .filter((alternative) => alternative.frontendSelectable)
+	    .map((alternative) => alternative.planId);
+	  const effectiveSelectedExactNPlanId = selectableExactNPlanIds.includes(selectedExactNPlanId)
+	    ? selectedExactNPlanId
+	    : '';
 	  const displayedMatchByIdx = useMemo(() => {
 	    const entries = issueMatches.map((match, index) => {
 	      const displayed = applyDecisionVariant(match, selectedVariantValue);
@@ -1362,8 +1369,16 @@ function BettingPlan({
 	        {exactN.segmentManifestSha256 ? <small>segment {exactN.segmentManifestSha256.slice(0, 12)}</small> : null}
 	      </div>
 	      {exactN.segments.flatMap((segment) => segment.alternatives).length
-	        ? <div className="table-wrap"><table><thead><tr><th>段</th><th>Exact N</th><th>预算</th><th>票数</th><th>基础/实际成本</th><th>利用率</th><th>输入/冻结</th><th>状态</th></tr></thead><tbody>
+	        ? <div className="table-wrap"><table><thead><tr><th>选择</th><th>段</th><th>Exact N</th><th>预算</th><th>票数</th><th>基础/实际成本</th><th>利用率</th><th>输入/冻结</th><th>状态</th></tr></thead><tbody>
 	          {exactN.segments.flatMap((segment) => segment.alternatives.map((alternative) => <tr key={alternative.planId}>
+	            <td><input
+	              type="radio"
+	              name="exact-n-freeze-plan"
+	              aria-label={`选择 Exact-N ${alternative.planId}`}
+	              disabled={!alternative.frontendSelectable}
+	              checked={effectiveSelectedExactNPlanId === alternative.planId}
+	              onChange={() => setSelectedExactNPlanId(alternative.planId)}
+	            /></td>
 	            <td>#{segment.segmentIdx}</td>
 	            <td>{alternative.exactN ? 'Exact' : '无效'} {alternative.requestedN} / {alternative.artifactN}</td>
 	            <td>{moneyFixed(alternative.requestedBudgetYuan)}</td>
@@ -1375,6 +1390,12 @@ function BettingPlan({
 	          </tr>))}
 	        </tbody></table></div>
 	        : <div className="empty-state"><b>尚无前瞻 Exact-N 冻结</b><span>不会回退到旧 max_n、其他 N、其他 segment 或 mock。</span></div>}
+	      <div className="status-row">
+	        <span>当前选择</span>
+	        <Badge tone={effectiveSelectedExactNPlanId ? 'good' : 'neutral'}>
+	          {effectiveSelectedExactNPlanId || '未选择（无自动回退）'}
+	        </Badge>
+	      </div>
 	      {exactN.segments.some((segment) => segment.correctScore)
 	        ? <p>正确比分仅为 paper audit，固定不可选择、不可执行。</p>
 	        : null}
