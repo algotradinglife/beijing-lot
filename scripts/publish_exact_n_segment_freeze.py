@@ -87,7 +87,10 @@ def main() -> None:
     scheduled = hkt(seg["freeze_at"])
     if decision_at > scheduled: raise SystemExit("MISSED_FREEZE: decision is after absolute freeze")
     expected = tuple(int(x) for x in seg["match_indices"]); source_sha = file_hash(a.structured_csv)
-    event_key = digest({"issue": str(a.issue), "segment_idx": a.segment, "manual_frozen_at": decision_at.isoformat(timespec="seconds"), "manifest_sha256": claimed, "decision_input_sha256": source_sha})
+    # A segment can be frozen only once.  The identity deliberately excludes
+    # wall-clock time so retrying with a different timestamp cannot mint a new
+    # freeze identity for the same issue/segment.
+    event_key = digest({"issue": str(a.issue), "segment_idx": a.segment})
     ledger = a.ledger_root / f"{event_key}.json"
     if ledger.exists(): raise SystemExit(f"fail closed: freeze event already bound: {event_key}")
     legs = rolling.load_legs(a.structured_csv, a.db, issue=a.issue); by_idx = {x.match_idx: x for x in legs}
@@ -106,15 +109,20 @@ def main() -> None:
                 actual = cost*2; payload = {**common, "plan_id": f"{a.issue}_s{a.segment}_n{n}_b{budget}_{event_key[:12]}", "requested_n": n, "artifact_n": n, "recommended_n": n, "requested_budget_yuan": budget, "actual_budget_yuan": actual, "unused_budget_yuan": budget-actual, "budget_utilization": actual/budget if budget else 0, "status": "FROZEN_EXACT_N" if tickets else "UNAVAILABLE_EXACT_N", "tickets": tickets, "reason": reason if tickets else "no_eligible_exact_n_candidate_or_budgeted_bundle"}; payload["sha256"] = digest(payload)
                 name = f"exact_n_{n}_budget_{budget}.json"; (stage/name).write_bytes(canonical(payload)+b"\n"); payloads.append({"file": name, "sha256": payload["sha256"], "requested_n": n, "requested_budget_yuan": budget, "status": payload["status"]})
         score_meta, match_audit = score_audit(a.correct_score_root, str(a.issue), expected, decision_at)
-        score = {**common, **score_meta, "artifact_type": "correct_score_paper", "status": "UNAVAILABLE_CORRECT_SCORE_PLAN", "execution_enabled": False, "frontend_selectable": False, "roi_authorized": False, "per_match_audit": match_audit}; score["sha256"] = digest(score)
+        score = {**common, **score_meta, "artifact_type": "correct_score_paper", "status": "UNAVAILABLE_CORRECT_SCORE_PLAN", "execution_enabled": False, "frontend_selectable": False, "roi_authorized": False, "per_match_audit": match_audit, "budget_statuses": [{"requested_budget_yuan": b, "status": "UNAVAILABLE_CORRECT_SCORE_PLAN", "stake_yuan": 0} for b in BUDGETS]}; score["sha256"] = digest(score)
         (stage/"correct_score_audit.json").write_bytes(canonical(score)+b"\n"); payloads.append({"file":"correct_score_audit.json","sha256":score["sha256"],"status":score["status"]})
         top = {**common, "schema_version":"exact_n_budget_matrix_freeze_v2", "artifacts":payloads, "immutable":True}; top["sha256"] = digest(top)
         (stage/"manifest.json").write_bytes(canonical(top)+b"\n")
         (stage/"SHA256SUMS").write_text("\n".join(f"{file_hash(stage/x['file'])}  {x['file']}" for x in payloads)+f"\n{file_hash(stage/'manifest.json')}  manifest.json\n")
         destination = a.output_root / str(a.issue) / f"segment_{a.segment}" / event_key; destination.parent.mkdir(parents=True, exist_ok=True)
         if destination.exists(): raise SystemExit("fail closed: content-addressed output exists")
-        os.replace(stage, destination); a.ledger_root.mkdir(parents=True, exist_ok=True)
-        ledger.write_bytes(canonical({"schema_version":"exact_n_freeze_ledger_v1", **common, "artifact_manifest":str(destination/'manifest.json'), "artifact_manifest_sha256":file_hash(destination/'manifest.json')})+b"\n")
+        # Reserve the immutable event before exposing the artifact.  A crash
+        # leaves an explicit incomplete ledger record rather than a second key.
+        a.ledger_root.mkdir(parents=True, exist_ok=True)
+        fd = os.open(ledger, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f: f.write(canonical({"schema_version":"exact_n_freeze_ledger_v1", **common, "state":"RESERVED", "artifact_manifest":str(destination/'manifest.json')})+b"\n")
+        os.replace(stage, destination)
+        ledger.write_bytes(canonical({"schema_version":"exact_n_freeze_ledger_v1", **common, "state":"PUBLISHED", "artifact_manifest":str(destination/'manifest.json'), "artifact_manifest_sha256":file_hash(destination/'manifest.json')})+b"\n")
         print(json.dumps({"event_key":event_key,"destination":str(destination),"variants":15,"ledger":str(ledger)}))
     except BaseException: shutil.rmtree(stage, ignore_errors=True); raise
 

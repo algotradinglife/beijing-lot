@@ -72,8 +72,12 @@ def main() -> None:
             "incident_audit": {"replaced_window_count": len(old), "pre_correction_sha256": old_hash, "pre_correction_windows": old},
         }
         manifest["manifest_sha256"] = hashlib.sha256(canonical(manifest)).hexdigest()
-        destination = args.output_root / str(args.issue) / "natural_day_v1"
-        destination.mkdir(parents=True, exist_ok=True)
+        # Content-address the published contract; never overwrite a prior
+        # manifest/audit pair.  Existing identical publication is idempotent.
+        destination = args.output_root / str(args.issue) / "natural_day_v1" / manifest["manifest_sha256"]
+        if destination.exists():
+            raise SystemExit("fail closed: natural-day manifest already published")
+        destination.mkdir(parents=True, exist_ok=False)
         audit_path = destination / "incident_wrong_entire_issue_window.json"
         manifest_path = destination / "segment_manifest.json"
         audit_path.write_bytes(canonical(manifest["incident_audit"]) + b"\n")

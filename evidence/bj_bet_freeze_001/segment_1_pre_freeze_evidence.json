@@ -1,5 +1,5 @@
 {
-  "status": "PRE_FREEZE_OUT_OF_CONTRACT_EVIDENCE",
+  "status": "MISSED_FREEZE_PRE_FREEZE_OUT_OF_CONTRACT",
   "issue": "26078",
   "segment_idx": 1,
   "natural_day_manifest_sha256": "a95c3b057070b0a8c1861bee0e36b1733f271e4afded5b8b1115faf39668a463",
