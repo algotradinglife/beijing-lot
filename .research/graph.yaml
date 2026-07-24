@@ -24,6 +24,10 @@ spec:
       node_type: task
       ref: tasks/BJ-MM-FREEZE-001.yaml
       state: COMPLETED
+    - id: BJ-SEG-DAY-001
+      node_type: task
+      ref: tasks/BJ-SEG-DAY-001.yaml
+      state: CREATED
 
   edges:
     - from: GOAL-BOOT
@@ -31,6 +35,9 @@ spec:
       relation: decomposes_to
     - from: GOAL-PHASE1
       to: BJ-MM-FREEZE-001
+      relation: decomposes_to
+    - from: GOAL-PHASE1
+      to: BJ-SEG-DAY-001
       relation: decomposes_to
     - from: BJ-BOOT-001
       to: BJ-MM-FREEZE-001

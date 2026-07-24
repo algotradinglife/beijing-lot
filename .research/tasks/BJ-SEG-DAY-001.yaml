@@ -1,0 +1,78 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: BJ-SEG-DAY-001
+  title: Deterministic natural-day segment policy
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-PHASE1
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/19"
+
+spec:
+  type: capability
+  intent:
+    objective: Replace rolling-window/entire-issue segment boundaries with deterministic Asia/Hong_Kong natural-day policy across all consumers (betting plans, operational windows, DB freeze windows, API/frontend, research freezes).
+    question: Can deterministic natural-day-based segment rules produce 63/72/38 split for 26078 with consistent membership and freeze_at across all consumers?
+    hypothesis: Natural-day priority + min 20 matches + max 36h span produces consistent segments without tuning on ROI or outcomes.
+    expected_value: Eliminate conflicting segment definitions between by_segment artifacts and segment_decision_windows.
+    out_of_scope:
+      - v3.3.3, v4.2, probability, selection or decision chain changes
+      - N, budget, ticket group, EV/q or ROI optimization
+      - Threshold tuning based on match outcome
+      - Settlement rule changes
+      - Historical research event/ledger mutation
+      - Historical recalculation as prospective evidence
+
+  context:
+    inputs:
+      - Issue #19: full capability contract with Deterministic Policy v1
+      - 26078 fixture with 5-day match distribution
+      - Existing by_segment artifact, operational_windows.json, segment_decision_windows
+      - Current 26078 incorrect single-segment (173 matches) — must preserve as incident audit
+    assumptions:
+      - Segment #1 freeze at 17:55 HKT today is the hard deadline
+      - Current 26078 window must be preserved/hashed before correction
+      - Correction is allowed only before first freeze binds the ledger
+
+  execution:
+    required_capabilities:
+      - python_development
+      - database_engineering
+      - testing
+    uncertainty: medium
+    complexity: medium
+
+  risk:
+    overall: medium
+    scientific: low
+    engineering: medium
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - 26078 fixture produces exact 63/72/38 split with freeze_at table
+      - All consumers use identical segment identity/membership/freeze_at
+      - Skipped issues/days produce structured reasons with full denominators
+      - Current 26078 incorrect window preserved as incident audit record
+      - Segment manifest published before 17:55 HKT freeze
+      - No strategy/model/ticket changes
+    checks:
+      - schema_validation
+      - automated_tests
+      - cross_consumer_consistency
+    human_gates:
+      - research_pi_review
+
+status:
+  current: CREATED
+  attempts: 0
+  routing:
+    executor_mode: isolated_session
+    profile: engineer
+    runtime: codex
+    reason: Capability task, medium complexity, time-sensitive (17:55 HKT freeze deadline)
+  artifacts: []
+  result: {}
+  history: []
