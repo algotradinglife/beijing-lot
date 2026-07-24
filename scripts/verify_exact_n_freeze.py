@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import re
@@ -19,6 +20,11 @@ EXACT_STATUSES = {
     "UNAVAILABLE_EXACT_N_BUDGET",
 }
 SCORE_BUDGET_STATUS = "UNAVAILABLE_SCORE_STAKING_RULE"
+OPEN_SALE_STATES = frozenset({"OPEN", "ON_SALE", "OPEN_PREGAME"})
+REQUIRED_SCORE_CODES = frozenset(
+    {f"{home}-{away}" for home in range(5) for away in range(5)}
+    | {"home_other", "draw_other", "away_other"}
+)
 
 
 def _canonical(value: object) -> bytes:
@@ -82,6 +88,8 @@ def verify_directory(root: Path) -> dict[str, Any]:
     manifest_hash = _payload_hash(manifest)
     if manifest.get("schema_version") != "exact_n_budget_matrix_freeze_v2":
         raise ValueError("unsupported package schema")
+    if manifest.get("exact_n") is not True or manifest.get("immutable") is not True:
+        raise ValueError("top-level exact-N immutability contract missing")
 
     files = sorted(root.glob("exact_n_*_budget_*.json"))
     if len(files) != 15:
@@ -101,6 +109,8 @@ def verify_directory(root: Path) -> dict[str, Any]:
         recommended_n = int(payload["recommended_n"])
         if not (requested_n == artifact_n and artifact_n == recommended_n):
             raise ValueError("semantic identity/N mismatch")
+        if payload.get("exact_n") is not True:
+            raise ValueError("exact_n contract flag must be true")
         budget = int(payload["requested_budget_yuan"])
         grid.add((requested_n, budget))
         if payload.get("status") not in EXACT_STATUSES:
@@ -161,6 +171,8 @@ def verify_directory(root: Path) -> dict[str, Any]:
             payload["scheduled_freeze_at"],
             payload["effective_decision_at"],
             payload["event_key"],
+            str(payload["issue"]),
+            int(payload["segment_idx"]),
         )
         common = common or key
         if key != common:
@@ -170,6 +182,22 @@ def verify_directory(root: Path) -> dict[str, Any]:
             raise ValueError(f"manifest artifact hash mismatch: {path.name}")
     if grid != EXPECTED_GRID:
         raise ValueError("exact 5×3 N/budget grid missing or duplicated")
+    expected_event_key = _digest({"issue": common[7], "segment_idx": common[8]})
+    if common[6] != expected_event_key:
+        raise ValueError("issue/segment event identity mismatch")
+    manifest_identity = (
+        manifest.get("segment_match_indices"),
+        manifest.get("segment_manifest_sha256"),
+        manifest.get("decision_input_sha256"),
+        manifest.get("decision_input_manifest_sha256"),
+        manifest.get("scheduled_freeze_at"),
+        manifest.get("effective_decision_at"),
+        manifest.get("event_key"),
+        str(manifest.get("issue")),
+        int(manifest.get("segment_idx", -1)),
+    )
+    if manifest_identity != common:
+        raise ValueError("top-level manifest frozen identity mismatch")
 
     input_payload = json.loads(
         (root / "decision_input_manifest.json").read_text(encoding="utf-8")
@@ -181,6 +209,12 @@ def verify_directory(root: Path) -> dict[str, Any]:
         raise ValueError("decision input bytes linkage mismatch")
     if input_payload.get("segment_manifest_sha256") != common[1]:
         raise ValueError("decision input segment linkage mismatch")
+    if (
+        input_payload.get("schema_version") != "exact_n_decision_input_v1"
+        or str(input_payload.get("issue")) != common[7]
+        or int(input_payload.get("segment_idx", -1)) != common[8]
+    ):
+        raise ValueError("decision input issue/segment identity mismatch")
     source_bytes = root / "structured_input.csv"
     source_receipt = json.loads(
         (root / "structured_input_receipt.json").read_text(encoding="utf-8")
@@ -194,6 +228,24 @@ def verify_directory(root: Path) -> dict[str, Any]:
         != source_bytes.stat().st_size
     ):
         raise ValueError("packaged decision input generation receipt mismatch")
+    if (
+        source_receipt.get("schema_version")
+        != "structured_decision_input_receipt_v1"
+        or str(source_receipt.get("issue")) != common[7]
+    ):
+        raise ValueError("structured input receipt identity mismatch")
+    denominator = {
+        int(value) for value in input_payload.get("denominator_match_indices", [])
+    }
+    with source_bytes.open(encoding="utf-8", newline="") as stream:
+        source_rows = list(csv.DictReader(stream))
+    if (
+        not source_rows
+        or {str(row.get("issue") or "") for row in source_rows} != {common[7]}
+        or {int(row.get("match_idx") or -1) for row in source_rows} != denominator
+        or not set(common[0]).issubset(denominator)
+    ):
+        raise ValueError("packaged structured input membership mismatch")
     generated_at = datetime.fromisoformat(str(source_receipt["generated_at_utc"]))
     refresh_opens = datetime.fromisoformat(str(input_payload["final_refresh_opens_at"]))
     effective_at = datetime.fromisoformat(str(input_payload["effective_decision_at"]))
@@ -215,18 +267,26 @@ def verify_directory(root: Path) -> dict[str, Any]:
         score.get("segment_manifest_sha256") != common[1]
         or score.get("decision_input_sha256") != common[2]
         or score.get("effective_decision_at") != common[5]
+        or str(score.get("issue")) != common[7]
+        or int(score.get("segment_idx", -1)) != common[8]
+        or score.get("exact_n") is not True
     ):
         raise ValueError("correct-score audit frozen identity mismatch")
+    budget_statuses = score.get("budget_statuses", [])
     score_budgets = {
         (
             int(item["requested_budget_yuan"]),
             str(item["status"]),
         )
-        for item in score.get("budget_statuses", [])
+        for item in budget_statuses
     }
-    if score_budgets != {(budget, SCORE_BUDGET_STATUS) for budget in BUDGETS}:
+    if (
+        not isinstance(budget_statuses, list)
+        or len(budget_statuses) != len(BUDGETS)
+        or score_budgets != {(budget, SCORE_BUDGET_STATUS) for budget in BUDGETS}
+    ):
         raise ValueError("correct-score budget status grid mismatch")
-    for status in score.get("budget_statuses", []):
+    for status in budget_statuses:
         if (
             float(status.get("actual_cost_yuan", -1)) != 0
             or not str(status.get("reason") or "")
@@ -274,11 +334,15 @@ def verify_directory(root: Path) -> dict[str, Any]:
             continue
         if any(not str(item.get(key) or "") for key in required):
             raise ValueError("correct-score vector lacks complete source evidence")
-        unknown_sale_state = str(item["sale_state"]).startswith("UNKNOWN")
-        if eligible and (reasons or unknown_sale_state):
+        sale_state = str(item["sale_state"]).upper()
+        sale_open = sale_state in OPEN_SALE_STATES
+        if eligible and (reasons or not sale_open):
             raise ValueError("eligible correct-score match has unresolved evidence")
-        if unknown_sale_state and "missing_source_sale_state" not in reasons:
-            raise ValueError("unknown correct-score sale state lacks explicit reason")
+        if not sale_open and not {
+            "missing_source_sale_state",
+            "source_sale_state_not_open",
+        }.intersection(str(reason) for reason in reasons):
+            raise ValueError("unavailable sale state lacks explicit reason")
         fetched = datetime.fromisoformat(str(item["fetched_at_utc"]))
         snapshot_at = datetime.fromisoformat(str(item["snapshot_ts_hkt"]))
         if (
@@ -303,6 +367,15 @@ def verify_directory(root: Path) -> dict[str, Any]:
         codes = [str(row.get("outcome_code") or "") for row in vector]
         if not all(codes) or len(codes) != len(set(codes)):
             raise ValueError("correct-score vector contains missing/duplicate outcomes")
+        if any(
+            not str(row.get("outcome_group") or "")
+            or not str(row.get("outcome_label") or "")
+            or float(row.get("sp") or 0) <= 1
+            for row in vector
+        ):
+            raise ValueError("correct-score vector contains invalid price evidence")
+        if eligible and set(codes) != REQUIRED_SCORE_CODES:
+            raise ValueError("eligible correct-score vector is not the complete schema")
         model_input = {
             "issue": str(score["issue"]),
             "match_idx": int(item["match_idx"]),
@@ -322,6 +395,11 @@ def verify_directory(root: Path) -> dict[str, Any]:
         for flag in ("execution_enabled", "frontend_selectable", "roi_authorized")
     ):
         raise ValueError("unsafe correct-score policy flag")
+    if (
+        score.get("artifact_type") != "correct_score_paper"
+        or score.get("status") != "UNAVAILABLE_CORRECT_SCORE_PLAN"
+    ):
+        raise ValueError("invalid correct-score paper artifact status")
     score_entry = artifact_entries.get("correct_score_audit.json")
     if not score_entry or score_entry.get("sha256") != score_hash:
         raise ValueError("correct-score manifest linkage mismatch")

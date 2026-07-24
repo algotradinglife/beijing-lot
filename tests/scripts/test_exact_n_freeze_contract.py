@@ -29,12 +29,16 @@ def write_payload(path: Path, value: dict[str, object]) -> str:
 def package(root: Path) -> Path:
     root.mkdir()
     common = {
+        "issue": "26078",
+        "segment_idx": 2,
         "segment_match_indices": [1, 2, 3],
         "segment_manifest_sha256": "a" * 64,
         "decision_input_sha256": "b" * 64,
         "scheduled_freeze_at": "2026-07-26T00:55:00+08:00",
         "effective_decision_at": "2026-07-26T00:50:00+08:00",
-        "event_key": "c" * 64,
+        "event_key": hashlib.sha256(
+            canonical({"issue": "26078", "segment_idx": 2})
+        ).hexdigest(),
     }
     source_bytes = b"issue,match_idx\n26078,1\n26078,2\n26078,3\n"
     (root / "structured_input.csv").write_bytes(source_bytes)
@@ -60,6 +64,7 @@ def package(root: Path) -> Path:
         "structured_csv_sha256": common["decision_input_sha256"],
         "structured_csv_size_bytes": len(source_bytes),
         "generator_receipt_sha256": source_receipt_sha,
+        "denominator_match_indices": [1, 2, 3],
         "input_generated_at": "2026-07-26T00:40:00+08:00",
         "input_observed_at": common["effective_decision_at"],
         "final_refresh_opens_at": "2026-07-26T00:25:00+08:00",
@@ -107,6 +112,8 @@ def package(root: Path) -> Path:
             artifacts.append({"file": name, "sha256": claimed})
     score = {
         **common,
+        "exact_n": True,
+        "artifact_type": "correct_score_paper",
         "status": "UNAVAILABLE_CORRECT_SCORE_PLAN",
         "execution_enabled": False,
         "frontend_selectable": False,
@@ -135,6 +142,8 @@ def package(root: Path) -> Path:
     manifest = {
         **common,
         "schema_version": "exact_n_budget_matrix_freeze_v2",
+        "exact_n": True,
+        "immutable": True,
         "artifacts": artifacts,
     }
     write_payload(root / "manifest.json", manifest)
@@ -185,6 +194,28 @@ def test_verifier_rejects_requested_n_4_to_recommended_n_3(tmp_path: Path) -> No
     target.write_text(json.dumps(payload), encoding="utf-8")
     rehash_package(root, target)
     with pytest.raises(ValueError, match="identity/N mismatch"):
+        verify_directory(root)
+
+
+def test_verifier_rejects_rehashed_false_exact_n_flag(tmp_path: Path) -> None:
+    root = package(tmp_path / "package")
+    target = root / "exact_n_3_budget_512.json"
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    payload["exact_n"] = False
+    target.write_text(json.dumps(payload), encoding="utf-8")
+    rehash_package(root, target)
+    with pytest.raises(ValueError, match="flag must be true"):
+        verify_directory(root)
+
+
+def test_verifier_rejects_rehashed_issue_segment_identity(tmp_path: Path) -> None:
+    root = package(tmp_path / "package")
+    target = root / "exact_n_3_budget_512.json"
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    payload["segment_idx"] = 3
+    target.write_text(json.dumps(payload), encoding="utf-8")
+    rehash_package(root, target)
+    with pytest.raises(ValueError, match="15 cells"):
         verify_directory(root)
 
 
@@ -263,6 +294,61 @@ def test_verifier_rejects_incomplete_correct_score_denominator(
     target.write_text(json.dumps(payload), encoding="utf-8")
     rehash_package(root, target)
     with pytest.raises(ValueError, match="exact segment denominator"):
+        verify_directory(root)
+
+
+def _make_score_match_look_eligible(
+    root: Path, *, sale_state: str
+) -> Path:
+    target = root / "correct_score_audit.json"
+    payload = json.loads(target.read_text(encoding="utf-8"))
+    payload["verified_capture_bundles"] = [
+        {"path": "/fixture", "sha256s_sha256": "a" * 64}
+    ]
+    payload["per_match_audit"][0] = {
+        "match_idx": 1,
+        "eligible": True,
+        "reasons": [],
+        "snapshot_id": "snapshot",
+        "snapshot_ts_hkt": "2026-07-26T00:45:00+08:00",
+        "source_time_raw": "00:45",
+        "fetched_at_utc": "2026-07-25T16:45:01+00:00",
+        "sale_state": sale_state,
+        "phase": "pregame",
+        "raw_payload_sha256": "b" * 64,
+        "raw_row_sha256": "c" * 64,
+        "capture_batch_id": "batch",
+        "capture_bundle": "/fixture",
+        "capture_bundle_sha256s_sha256": "a" * 64,
+        "outcome_schema_sha256": "d" * 64,
+        "correct_score_model_input_sha256": "e" * 64,
+        "complete_price_vector": [
+            {
+                "outcome_code": "0-0",
+                "outcome_group": "draw",
+                "outcome_label": "0-0",
+                "sp": "7.5",
+            }
+        ],
+    }
+    target.write_text(json.dumps(payload), encoding="utf-8")
+    rehash_package(root, target)
+    return target
+
+
+def test_verifier_rejects_rehashed_closed_sale_state(tmp_path: Path) -> None:
+    root = package(tmp_path / "package")
+    _make_score_match_look_eligible(root, sale_state="CLOSED")
+    with pytest.raises(ValueError, match="unresolved evidence"):
+        verify_directory(root)
+
+
+def test_verifier_rejects_rehashed_incomplete_eligible_score_vector(
+    tmp_path: Path,
+) -> None:
+    root = package(tmp_path / "package")
+    _make_score_match_look_eligible(root, sale_state="OPEN")
+    with pytest.raises(ValueError, match="complete schema"):
         verify_directory(root)
 
 
@@ -410,3 +496,67 @@ def test_score_audit_rejects_snapshot_fetched_after_decision(
     )
     assert audits[0]["eligible"] is False
     assert audits[0]["reasons"] == ["no_snapshot_with_predecision_fetch_clock"]
+
+
+def test_score_audit_rejects_closed_sale_state(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    issue_root = tmp_path / "26078" / "batch"
+    issue_root.mkdir(parents=True)
+    required = (
+        "manifest.json",
+        "snapshots.csv",
+        "prices.csv",
+        "mapping_inventory.csv",
+        "page_inventory.csv",
+    )
+    for name in required:
+        (issue_root / name).write_text("fixture", encoding="utf-8")
+    (issue_root / "SHA256SUMS").write_text(
+        "".join(f"{'0' * 64}  {name}\n" for name in required),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        publisher,
+        "verify_correct_score_bundle",
+        lambda *_args, **_kwargs: {
+            "manifest": {
+                "provider": "nowscore",
+                "bookmaker_key": "crown",
+                "capture_batch_id": "batch",
+            },
+            "sha256s_sha256": "a" * 64,
+        },
+    )
+    snapshot = {
+        "issue": "26078",
+        "match_idx": "1",
+        "complete": "1",
+        "phase": "pregame",
+        "snapshot_ts_hkt": "2026-07-26T00:45:00+08:00",
+        "snapshot_id": "closed",
+        "outcome_count": "0",
+        "fetched_at_utc": "2026-07-25T16:45:01+00:00",
+        "sale_state": "CLOSED",
+        "source_time_raw": "00:45",
+        "raw_payload_sha256": "d" * 64,
+        "raw_row_sha256": "e" * 64,
+        "capture_batch_id": "batch",
+        "outcome_schema_sha256": "f" * 64,
+        "_capture_bundle": str(issue_root),
+        "_capture_bundle_sha": "a" * 64,
+    }
+    monkeypatch.setattr(
+        publisher,
+        "read_capture_bundles",
+        lambda _bundles: ([snapshot], [], [], []),
+    )
+    _, audits = publisher.score_audit(
+        tmp_path,
+        "26078",
+        (1,),
+        publisher.hkt("2026-07-26T00:50:00+08:00"),
+    )
+    assert audits[0]["eligible"] is False
+    assert "source_sale_state_not_open" in audits[0]["reasons"]

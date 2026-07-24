@@ -40,6 +40,11 @@ from src.structured_input_receipt import (  # noqa: E402
 
 HKT = ZoneInfo("Asia/Hong_Kong")
 N_VALUES, BUDGETS = (3, 4, 5, 6, 7), (512, 768, 1024)
+OPEN_SALE_STATES = frozenset({"OPEN", "ON_SALE", "OPEN_PREGAME"})
+REQUIRED_SCORE_CODES = frozenset(
+    {f"{home}-{away}" for home in range(5) for away in range(5)}
+    | {"home_other", "draw_other", "away_other"}
+)
 DEFAULT_LEDGER = ROOT / "results/research/exact_n_segment_freeze_v1/ledger"
 DEFAULT_SCORE_ROOT = ROOT / "results/data_collection/correct_score_price_history_v1"
 
@@ -191,11 +196,19 @@ def score_audit(
         reasons: list[str] = []
         if len(vector) != int(selected.get("outcome_count") or 0):
             reasons.append("incomplete_price_vector")
+        vector_codes = [str(row["outcome_code"]) for row in vector]
+        if (
+            len(vector_codes) != len(set(vector_codes))
+            or set(vector_codes) != REQUIRED_SCORE_CODES
+        ):
+            reasons.append("incomplete_required_price_vector")
         sale_state = str(
             selected.get("sale_state") or selected.get("market_sale_state") or ""
         )
         if not sale_state:
             reasons.append("missing_source_sale_state")
+        elif sale_state.upper() not in OPEN_SALE_STATES:
+            reasons.append("source_sale_state_not_open")
         model_input = {
             "issue": issue,
             "match_idx": idx,
@@ -316,6 +329,9 @@ def main() -> None:
         "structured_csv": str(a.structured_csv),
         "structured_csv_sha256": source_sha,
         "structured_csv_size_bytes": a.structured_csv.stat().st_size,
+        "denominator_match_indices": [
+            int(value) for value in manifest["denominator_match_indices"]
+        ],
         "generator_receipt": str(input_receipt_path),
         "generator_receipt_sha256": source_receipt["sha256"],
         "input_generated_at": input_generated_at.isoformat(timespec="seconds"),
