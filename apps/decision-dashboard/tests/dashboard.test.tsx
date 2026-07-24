@@ -1137,6 +1137,14 @@ describe('北单实盘决策台 v1', () => {
         segments: [],
         bundles: [],
       },
+      '/api/issues/26052/exact-n-freezes': {
+        schema_version: 'exact_n_segment_freeze_api_v1',
+        issue: '26052',
+        status: 'available',
+        segment_manifest_sha256: 'fixture',
+        exact_n_frontend_selectable: true,
+        segments: [],
+      },
       '/api/issues/26052/operations': { issue: '26052', issue_status: {}, runtime: {}, sources: [], snapshots: {}, review: {}, versions: {}, warnings: [], source: {} },
     };
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {

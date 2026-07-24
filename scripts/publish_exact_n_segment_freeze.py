@@ -5,10 +5,17 @@ Segment 1's original files remain historical pre-freeze evidence.  This command
 is for prospective segments only: one invocation makes one manual/automatic
 freeze event and a second invocation for the same event key fails closed.
 """
+
 from __future__ import annotations
 
-import argparse, csv, hashlib, json, os, shutil, sys, tempfile
-from datetime import datetime, timezone
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import sys
+import tempfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -16,6 +23,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts import estimate_segment_betting_plan as plan  # noqa: E402
 from scripts import replay_rolling_segment_n_tickets as rolling  # noqa: E402
+from scripts.manage_correct_score_price_history import (  # noqa: E402
+    CAPTURE_SCHEMA,
+    read_capture_bundles,
+    verify_correct_score_bundle,
+)
+from src.correct_score_price_history import (  # noqa: E402
+    CorrectScorePriceError,
+    select_latest_complete,
+)
 from src.natural_day_manifest import NaturalDayManifestError, verify_manifest  # noqa: E402
 
 HKT = ZoneInfo("Asia/Hong_Kong")
@@ -25,122 +41,438 @@ DEFAULT_SCORE_ROOT = ROOT / "results/data_collection/correct_score_price_history
 
 
 def canonical(value: object) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode()
 
 
-def digest(value: object) -> str: return hashlib.sha256(canonical(value)).hexdigest()
-def file_hash(path: Path) -> str: return hashlib.sha256(path.read_bytes()).hexdigest()
+def digest(value: object) -> str:
+    return hashlib.sha256(canonical(value)).hexdigest()
+
+
+def file_hash(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def hkt(value: str) -> datetime:
     d = datetime.fromisoformat(value) if value else datetime.now(timezone.utc)
     return (d if d.tzinfo else d.replace(tzinfo=HKT)).astimezone(HKT)
 
 
-def score_audit(root: Path, issue: str, indices: tuple[int, ...], decision_at: datetime) -> tuple[dict[str, object], list[dict[str, object]]]:
-    batches = sorted((root / issue).glob("*/manifest.json"))
-    if not batches:
-        return {"capture_status": "missing_capture_bundle"}, [{"match_idx": i, "eligible": False, "reasons": ["missing_p42_capture_bundle"]} for i in indices]
-    # Select only a bundle whose own SHA256SUMS verifies; mtime is not evidence.
-    valid=[]
-    for candidate in batches:
-        batch=candidate.parent; sums=batch/"SHA256SUMS"
-        if not sums.exists(): continue
+def score_audit(
+    root: Path, issue: str, indices: tuple[int, ...], decision_at: datetime
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    required = {
+        "manifest.json",
+        "snapshots.csv",
+        "prices.csv",
+        "mapping_inventory.csv",
+        "page_inventory.csv",
+        "SHA256SUMS",
+    }
+    bundles: list[Path] = []
+    bundle_receipts: list[dict[str, object]] = []
+    for candidate in sorted((root / issue).glob("*/manifest.json")):
+        batch = candidate.parent
+        if not required.issubset(
+            {path.name for path in batch.iterdir() if path.is_file()}
+        ):
+            continue
         try:
-            entries=[line.split("  ",1) for line in sums.read_text().splitlines() if "  " in line]
-            if all((batch/name).exists() and file_hash(batch/name)==sha for sha,name in entries): valid.append(candidate)
-        except OSError: pass
-    batches=valid
-    if not batches:
-        return {"capture_status":"no_sha256_verified_capture_bundle"}, [{"match_idx":i,"eligible":False,"reasons":["no_sha256_verified_capture_bundle"]} for i in indices]
-    manifest_path = batches[-1]; batch = manifest_path.parent
-    manifest = json.loads(manifest_path.read_text())
-    rows: dict[int, dict[str, str]] = {}
-    snapshots = batch / "snapshots.csv"
-    if snapshots.exists():
-        with snapshots.open(encoding="utf-8", newline="") as f:
-            for row in csv.DictReader(f):
-                idx = int(row["match_idx"])
-                # Latest pre-decision observation is the only candidate.
-                try: observed = hkt(row.get("snapshot_ts_hkt", ""))
-                except ValueError: continue
-                if observed <= decision_at and (idx not in rows or observed > hkt(rows[idx].get("snapshot_ts_hkt", ""))): rows[idx] = row
+            bound_files = {
+                line.split("  ", 1)[1]
+                for line in (batch / "SHA256SUMS")
+                .read_text(encoding="utf-8")
+                .splitlines()
+                if "  " in line
+            }
+        except OSError:
+            continue
+        if not (required - {"SHA256SUMS"}).issubset(bound_files):
+            continue
+        try:
+            verification = verify_correct_score_bundle(
+                batch, expected_schema=CAPTURE_SCHEMA
+            )
+        except (OSError, ValueError, CorrectScorePriceError):
+            continue
+        manifest = verification["manifest"]
+        if (
+            manifest.get("provider") != "nowscore"
+            or manifest.get("bookmaker_key") != "crown"
+        ):
+            continue
+        bundles.append(batch)
+        bundle_receipts.append(
+            {
+                "path": str(batch),
+                "capture_batch_id": str(manifest.get("capture_batch_id") or ""),
+                "manifest_sha256": file_hash(candidate),
+                "sha256s_sha256": str(verification["sha256s_sha256"]),
+            }
+        )
+    if not bundles:
+        return {
+            "capture_status": "no_strict_sha256_verified_capture_bundle",
+            "verified_capture_bundles": [],
+            "selection_rule": (
+                "latest complete pregame vector per match across all verified "
+                "bundles at or before effective_decision_at"
+            ),
+        }, [
+            {
+                "match_idx": idx,
+                "eligible": False,
+                "reasons": ["no_strict_sha256_verified_capture_bundle"],
+                "complete_price_vector": [],
+            }
+            for idx in indices
+        ]
+
+    snapshots, prices, _pages, _metadata = read_capture_bundles(bundles)
+    snapshots = [row for row in snapshots if row.get("issue") == issue]
     audits: list[dict[str, object]] = []
     for idx in indices:
-        row, reasons = rows.get(idx), []
-        if not row: reasons.append("missing_predecision_p42_snapshot")
-        else:
-            for column, reason, wanted in (("complete", "incomplete_market", "1"), ("exact_score_complete", "incomplete_exact_score_catalogue", "1"), ("phase", "non_prematch_phase", "pregame")):
-                if row.get(column) != wanted: reasons.append(reason)
-            if not row.get("raw_payload_sha256"): reasons.append("missing_raw_payload_hash")
-            raw = batch / row.get("raw_file", "")
-            if not raw.exists(): reasons.append("missing_raw_payload")
-            elif row.get("raw_payload_sha256") != file_hash(raw): reasons.append("raw_payload_hash_mismatch")
-            # This capture schema has no immutable sale/cutoff clock or calibrated
-            # score-model input; do not infer either from a three-way artifact.
-            reasons.extend(["missing_sale_or_cutoff_clock", "missing_calibrated_correct_score_model_input"])
-        audits.append({"match_idx": idx, "eligible": not reasons, "reasons": reasons,
-                       "snapshot_id": row.get("snapshot_id", "") if row else "", "snapshot_ts_hkt": row.get("snapshot_ts_hkt", "") if row else "",
-                       "raw_payload_sha256": row.get("raw_payload_sha256", "") if row else ""})
-    return {"capture_manifest": str(manifest_path), "capture_manifest_sha256": file_hash(manifest_path), "capture_batch_id": manifest.get("capture_batch_id", "")}, audits
+        candidates = [row for row in snapshots if int(row.get("match_idx") or 0) == idx]
+        selected, reason = select_latest_complete(candidates, decision_at)
+        if selected is None:
+            audits.append(
+                {
+                    "match_idx": idx,
+                    "eligible": False,
+                    "reasons": [reason or "missing_predecision_p42_snapshot"],
+                    "complete_price_vector": [],
+                }
+            )
+            continue
+        vector = [
+            {
+                "outcome_code": row["outcome_code"],
+                "outcome_group": row["outcome_group"],
+                "outcome_label": row["outcome_label"],
+                "sp": row["sp"],
+            }
+            for row in prices
+            if row.get("snapshot_id") == selected.get("snapshot_id")
+            and row.get("_capture_bundle") == selected.get("_capture_bundle")
+        ]
+        vector.sort(key=lambda row: str(row["outcome_code"]))
+        reasons: list[str] = []
+        if len(vector) != int(selected.get("outcome_count") or 0):
+            reasons.append("incomplete_price_vector")
+        model_input = {
+            "issue": issue,
+            "match_idx": idx,
+            "snapshot_id": selected["snapshot_id"],
+            "outcome_schema_sha256": selected["outcome_schema_sha256"],
+            "prices": vector,
+        }
+        audits.append(
+            {
+                "match_idx": idx,
+                "eligible": not reasons,
+                "reasons": reasons,
+                "snapshot_id": selected["snapshot_id"],
+                "snapshot_ts_hkt": selected["snapshot_ts_hkt"],
+                "source_time_raw": selected["source_time_raw"],
+                "source_timestamp_scope": selected.get("source_timestamp_scope", ""),
+                "fetched_at_utc": selected["fetched_at_utc"],
+                "sale_state": "open_pregame_observation",
+                "phase": selected["phase"],
+                "raw_payload_sha256": selected["raw_payload_sha256"],
+                "raw_row_sha256": selected["raw_row_sha256"],
+                "capture_batch_id": selected["capture_batch_id"],
+                "capture_bundle": selected["_capture_bundle"],
+                "capture_bundle_sha256s_sha256": selected["_capture_bundle_sha"],
+                "outcome_schema_sha256": selected["outcome_schema_sha256"],
+                "complete_price_vector": vector,
+                "correct_score_model_input_sha256": digest(model_input),
+            }
+        )
+    return {
+        "capture_status": "verified_cross_bundle_asof",
+        "verified_capture_bundles": bundle_receipts,
+        "selection_rule": (
+            "latest complete pregame vector per match across all verified "
+            "bundles at or before effective_decision_at"
+        ),
+    }, audits
 
 
 def main() -> None:
     p = argparse.ArgumentParser()
-    p.add_argument("--issue", required=True); p.add_argument("--segment", type=int, required=True)
-    p.add_argument("--manifest", type=Path, required=True); p.add_argument("--structured-csv", type=Path, required=True)
-    p.add_argument("--db", type=Path, default=ROOT / "data/derived/500_bjdc/500_bjdc.sqlite")
-    p.add_argument("--output-root", type=Path, default=ROOT / "results/exact_n_segment_freeze")
-    p.add_argument("--ledger-root", type=Path, default=DEFAULT_LEDGER); p.add_argument("--correct-score-root", type=Path, default=DEFAULT_SCORE_ROOT)
-    p.add_argument("--decision-at-hkt", default="", help="manual freeze time; defaults to now")
-    p.add_argument("--sample-attempts", type=int, default=12000); p.add_argument("--sample-seed", type=int, default=20260707)
-    a = p.parse_args(); decision_at = hkt(a.decision_at_hkt)
+    p.add_argument("--issue", required=True)
+    p.add_argument("--segment", type=int, required=True)
+    p.add_argument("--manifest", type=Path, required=True)
+    p.add_argument("--structured-csv", type=Path, required=True)
+    p.add_argument(
+        "--db", type=Path, default=ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
+    )
+    p.add_argument(
+        "--output-root", type=Path, default=ROOT / "results/exact_n_segment_freeze"
+    )
+    p.add_argument("--ledger-root", type=Path, default=DEFAULT_LEDGER)
+    p.add_argument("--correct-score-root", type=Path, default=DEFAULT_SCORE_ROOT)
+    p.add_argument(
+        "--decision-at-hkt", default="", help="manual freeze time; defaults to now"
+    )
+    p.add_argument("--sample-attempts", type=int, default=12000)
+    p.add_argument("--sample-seed", type=int, default=20260707)
+    a = p.parse_args()
+    decision_at = hkt(a.decision_at_hkt)
     manifest = json.loads(a.manifest.read_text())
     try:
         claimed = verify_manifest(manifest)
     except NaturalDayManifestError as exc:
         raise SystemExit("fail closed: invalid natural-day manifest") from exc
-    if manifest.get("issue") != str(a.issue): raise SystemExit("fail closed: invalid natural-day manifest")
-    seg = next((x for x in manifest["segments"] if int(x["segment_idx"]) == a.segment), None)
-    if not seg: raise SystemExit("fail closed: segment absent from manifest")
+    if manifest.get("issue") != str(a.issue):
+        raise SystemExit("fail closed: invalid natural-day manifest")
+    seg = next(
+        (x for x in manifest["segments"] if int(x["segment_idx"]) == a.segment), None
+    )
+    if not seg:
+        raise SystemExit("fail closed: segment absent from manifest")
     scheduled = hkt(seg["freeze_at"])
-    if decision_at > scheduled: raise SystemExit("MISSED_FREEZE: decision is after absolute freeze")
-    expected = tuple(int(x) for x in seg["match_indices"]); source_sha = file_hash(a.structured_csv)
+    if decision_at > scheduled:
+        raise SystemExit("MISSED_FREEZE: decision is after absolute freeze")
+    expected = tuple(int(x) for x in seg["match_indices"])
+    source_sha = file_hash(a.structured_csv)
+    input_generated_at = datetime.fromtimestamp(
+        a.structured_csv.stat().st_mtime, scheduled.tzinfo
+    )
+    final_refresh_opens_at = scheduled - timedelta(minutes=30)
+    if not (final_refresh_opens_at <= input_generated_at <= decision_at):
+        raise SystemExit(
+            "fail closed: decision input was not generated during the target "
+            "segment final legal refresh window"
+        )
     # A segment can be frozen only once.  The identity deliberately excludes
     # wall-clock time so retrying with a different timestamp cannot mint a new
     # freeze identity for the same issue/segment.
     event_key = digest({"issue": str(a.issue), "segment_idx": a.segment})
     ledger = a.ledger_root / f"{event_key}.json"
-    if ledger.exists(): raise SystemExit(f"fail closed: freeze event already bound: {event_key}")
-    legs = rolling.load_legs(a.structured_csv, a.db, issue=a.issue); by_idx = {x.match_idx: x for x in legs}
-    if set(by_idx) != set(manifest["denominator_match_indices"]) or any(i not in by_idx for i in expected): raise SystemExit("fail closed: input membership mismatch")
-    metrics = [x for leg in (by_idx[i] for i in expected) if (x := plan.leg_metrics(leg, "active")) is not None]
-    common = {"capability_id": "BJ-BET-FREEZE-001", "issue": str(a.issue), "segment_idx": a.segment, "segment_match_indices": list(expected), "segment_manifest_sha256": claimed, "decision_input_sha256": source_sha, "scheduled_freeze_at": scheduled.isoformat(timespec="seconds"), "manual_frozen_at": decision_at.isoformat(timespec="seconds"), "effective_decision_at": decision_at.isoformat(timespec="seconds"), "event_key": event_key, "exact_n": True}
-    a.output_root.mkdir(parents=True, exist_ok=True); stage = Path(tempfile.mkdtemp(prefix="exact_n_", dir=a.output_root)); payloads = []
+    if ledger.exists():
+        raise SystemExit(f"fail closed: freeze event already bound: {event_key}")
+    legs = rolling.load_legs(a.structured_csv, a.db, issue=a.issue)
+    by_idx = {x.match_idx: x for x in legs}
+    if set(by_idx) != set(manifest["denominator_match_indices"]) or any(
+        i not in by_idx for i in expected
+    ):
+        raise SystemExit("fail closed: input membership mismatch")
+    metrics = [
+        x
+        for leg in (by_idx[i] for i in expected)
+        if (x := plan.leg_metrics(leg, "active")) is not None
+    ]
+    input_manifest = {
+        "schema_version": "exact_n_decision_input_v1",
+        "issue": str(a.issue),
+        "segment_idx": a.segment,
+        "segment_manifest_sha256": claimed,
+        "structured_csv": str(a.structured_csv),
+        "structured_csv_sha256": source_sha,
+        "structured_csv_size_bytes": a.structured_csv.stat().st_size,
+        "input_generated_at": input_generated_at.isoformat(timespec="seconds"),
+        "input_observed_at": decision_at.isoformat(timespec="seconds"),
+        "final_refresh_opens_at": final_refresh_opens_at.isoformat(timespec="seconds"),
+        "effective_decision_at": decision_at.isoformat(timespec="seconds"),
+    }
+    input_manifest_sha256 = digest(input_manifest)
+    common = {
+        "capability_id": "BJ-BET-FREEZE-001",
+        "issue": str(a.issue),
+        "segment_idx": a.segment,
+        "segment_match_indices": list(expected),
+        "segment_manifest_sha256": claimed,
+        "decision_input_sha256": source_sha,
+        "decision_input_manifest_sha256": input_manifest_sha256,
+        "decision_input_generated_at": input_generated_at.isoformat(timespec="seconds"),
+        "scheduled_freeze_at": scheduled.isoformat(timespec="seconds"),
+        "manual_frozen_at": decision_at.isoformat(timespec="seconds"),
+        "effective_decision_at": decision_at.isoformat(timespec="seconds"),
+        "event_key": event_key,
+        "exact_n": True,
+    }
+    a.output_root.mkdir(parents=True, exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix="exact_n_", dir=a.output_root))
+    payloads = []
     try:
+        (stage / "decision_input_manifest.json").write_bytes(
+            canonical({**input_manifest, "sha256": input_manifest_sha256}) + b"\n"
+        )
+        payloads.append(
+            {
+                "file": "decision_input_manifest.json",
+                "sha256": input_manifest_sha256,
+                "artifact_type": "decision_input",
+            }
+        )
         for budget in BUDGETS:
             for n in N_VALUES:
-                units = budget / 2; candidates = plan.generate_candidates(metrics=metrics, segment_idx=a.segment, arm="active", n_value=n, budget_units=units, sample_attempts=a.sample_attempts, seed=plan.stable_seed(a.sample_seed, a.segment, budget, n))
-                selected = plan.select_bundles([x for x in candidates if len(x.match_indices) == n], budget_units=units, max_overlap=max(0, n-2), positive_ev_only=True, max_bundle_cost_units=units * .4)
-                staked, cost, reason = plan.apply_stake_mode(selected, budget_units=units, stake_mode="scale_to_budget", max_bundle_cost_units=units * .4)
-                tickets = [{"match_indices": list(x.candidate.match_indices), "leg_codes": list(x.candidate.leg_codes), "actual_n": len(x.candidate.match_indices), "stake_multiplier": x.stake_multiplier, "cost_yuan": x.candidate.cost_units*x.stake_multiplier*2} for x in staked]
-                if any(t["actual_n"] != n for t in tickets): raise SystemExit("fail closed: exact-N mismatch")
-                actual = cost*2; payload = {**common, "plan_id": f"{a.issue}_s{a.segment}_n{n}_b{budget}_{event_key[:12]}", "requested_n": n, "artifact_n": n, "recommended_n": n, "requested_budget_yuan": budget, "actual_budget_yuan": actual, "unused_budget_yuan": budget-actual, "budget_utilization": actual/budget if budget else 0, "status": "FROZEN_EXACT_N" if tickets else "UNAVAILABLE_EXACT_N", "tickets": tickets, "reason": reason if tickets else "no_eligible_exact_n_candidate_or_budgeted_bundle"}; payload["sha256"] = digest(payload)
-                name = f"exact_n_{n}_budget_{budget}.json"; (stage/name).write_bytes(canonical(payload)+b"\n"); payloads.append({"file": name, "sha256": payload["sha256"], "requested_n": n, "requested_budget_yuan": budget, "status": payload["status"]})
-        score_meta, match_audit = score_audit(a.correct_score_root, str(a.issue), expected, decision_at)
-        score = {**common, **score_meta, "artifact_type": "correct_score_paper", "status": "UNAVAILABLE_CORRECT_SCORE_PLAN", "execution_enabled": False, "frontend_selectable": False, "roi_authorized": False, "per_match_audit": match_audit, "budget_statuses": [{"requested_budget_yuan": b, "status": "UNAVAILABLE_CORRECT_SCORE_PLAN", "stake_yuan": 0} for b in BUDGETS]}; score["sha256"] = digest(score)
-        (stage/"correct_score_audit.json").write_bytes(canonical(score)+b"\n"); payloads.append({"file":"correct_score_audit.json","sha256":score["sha256"],"status":score["status"]})
-        top = {**common, "schema_version":"exact_n_budget_matrix_freeze_v2", "artifacts":payloads, "immutable":True}; top["sha256"] = digest(top)
-        (stage/"manifest.json").write_bytes(canonical(top)+b"\n")
-        (stage/"SHA256SUMS").write_text("\n".join(f"{file_hash(stage/x['file'])}  {x['file']}" for x in payloads)+f"\n{file_hash(stage/'manifest.json')}  manifest.json\n")
-        destination = a.output_root / str(a.issue) / f"segment_{a.segment}" / event_key; destination.parent.mkdir(parents=True, exist_ok=True)
-        if destination.exists(): raise SystemExit("fail closed: content-addressed output exists")
+                units = budget / 2
+                candidates = plan.generate_candidates(
+                    metrics=metrics,
+                    segment_idx=a.segment,
+                    arm="active",
+                    n_value=n,
+                    budget_units=units,
+                    sample_attempts=a.sample_attempts,
+                    seed=plan.stable_seed(a.sample_seed, a.segment, budget, n),
+                )
+                selected = plan.select_bundles(
+                    [x for x in candidates if len(x.match_indices) == n],
+                    budget_units=units,
+                    max_overlap=max(0, n - 2),
+                    positive_ev_only=True,
+                    max_bundle_cost_units=units * 0.4,
+                )
+                staked, cost, reason = plan.apply_stake_mode(
+                    selected,
+                    budget_units=units,
+                    stake_mode="scale_to_budget",
+                    max_bundle_cost_units=units * 0.4,
+                )
+                tickets = [
+                    {
+                        "match_indices": list(x.candidate.match_indices),
+                        "leg_codes": list(x.candidate.leg_codes),
+                        "actual_n": len(x.candidate.match_indices),
+                        "stake_multiplier": x.stake_multiplier,
+                        "cost_yuan": x.candidate.cost_units * x.stake_multiplier * 2,
+                    }
+                    for x in staked
+                ]
+                if any(t["actual_n"] != n for t in tickets):
+                    raise SystemExit("fail closed: exact-N mismatch")
+                actual = cost * 2
+                base_cost = sum(x.candidate.cost_units * 2 for x in staked)
+                payload = {
+                    **common,
+                    "plan_id": f"{a.issue}_s{a.segment}_n{n}_b{budget}_{event_key[:12]}",
+                    "requested_n": n,
+                    "artifact_n": n,
+                    "recommended_n": n,
+                    "requested_budget_yuan": budget,
+                    "base_cost_yuan": base_cost,
+                    "actual_cost_yuan": actual,
+                    "unused_budget_yuan": budget - actual,
+                    "budget_utilization": actual / budget if budget else 0,
+                    "status": "FROZEN_EXACT_N_BUDGET"
+                    if tickets
+                    else "UNAVAILABLE_EXACT_N_BUDGET",
+                    "tickets": tickets,
+                    "reason": reason
+                    if tickets
+                    else "no_eligible_exact_n_candidate_or_budgeted_bundle",
+                }
+                payload["sha256"] = digest(payload)
+                name = f"exact_n_{n}_budget_{budget}.json"
+                (stage / name).write_bytes(canonical(payload) + b"\n")
+                payloads.append(
+                    {
+                        "file": name,
+                        "sha256": payload["sha256"],
+                        "requested_n": n,
+                        "requested_budget_yuan": budget,
+                        "status": payload["status"],
+                    }
+                )
+        score_meta, match_audit = score_audit(
+            a.correct_score_root, str(a.issue), expected, decision_at
+        )
+        score = {
+            **common,
+            **score_meta,
+            "artifact_type": "correct_score_paper",
+            "status": "UNAVAILABLE_CORRECT_SCORE_PLAN",
+            "execution_enabled": False,
+            "frontend_selectable": False,
+            "roi_authorized": False,
+            "per_match_audit": match_audit,
+            "budget_statuses": [
+                {
+                    "requested_budget_yuan": b,
+                    "status": "UNAVAILABLE_SCORE_STAKING_RULE",
+                    "actual_cost_yuan": 0,
+                    "reason": "no_preregistered_correct_score_staking_rule",
+                }
+                for b in BUDGETS
+            ],
+        }
+        score["sha256"] = digest(score)
+        (stage / "correct_score_audit.json").write_bytes(canonical(score) + b"\n")
+        payloads.append(
+            {
+                "file": "correct_score_audit.json",
+                "sha256": score["sha256"],
+                "status": score["status"],
+            }
+        )
+        top = {
+            **common,
+            "schema_version": "exact_n_budget_matrix_freeze_v2",
+            "artifacts": payloads,
+            "immutable": True,
+        }
+        top["sha256"] = digest(top)
+        (stage / "manifest.json").write_bytes(canonical(top) + b"\n")
+        (stage / "SHA256SUMS").write_text(
+            "".join(
+                f"{file_hash(path)}  {path.name}\n"
+                for path in sorted(stage.iterdir())
+                if path.is_file() and path.name != "SHA256SUMS"
+            )
+        )
+        destination = a.output_root / str(a.issue) / f"segment_{a.segment}" / event_key
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.exists():
+            raise SystemExit("fail closed: content-addressed output exists")
         # Reserve the immutable event before exposing the artifact.  A crash
         # leaves an explicit incomplete ledger record rather than a second key.
         a.ledger_root.mkdir(parents=True, exist_ok=True)
         fd = os.open(ledger, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, "wb") as f: f.write(canonical({"schema_version":"exact_n_freeze_ledger_v1", **common, "state":"RESERVED", "artifact_manifest":str(destination/'manifest.json')})+b"\n")
+        with os.fdopen(fd, "wb") as f:
+            f.write(
+                canonical(
+                    {
+                        "schema_version": "exact_n_freeze_ledger_v1",
+                        **common,
+                        "state": "RESERVED",
+                        "artifact_manifest": str(destination / "manifest.json"),
+                    }
+                )
+                + b"\n"
+            )
         os.replace(stage, destination)
-        ledger.write_bytes(canonical({"schema_version":"exact_n_freeze_ledger_v1", **common, "state":"PUBLISHED", "artifact_manifest":str(destination/'manifest.json'), "artifact_manifest_sha256":file_hash(destination/'manifest.json')})+b"\n")
-        print(json.dumps({"event_key":event_key,"destination":str(destination),"variants":15,"ledger":str(ledger)}))
-    except BaseException: shutil.rmtree(stage, ignore_errors=True); raise
+        ledger.write_bytes(
+            canonical(
+                {
+                    "schema_version": "exact_n_freeze_ledger_v1",
+                    **common,
+                    "state": "PUBLISHED",
+                    "artifact_manifest": str(destination / "manifest.json"),
+                    "artifact_manifest_sha256": file_hash(
+                        destination / "manifest.json"
+                    ),
+                    "package_sha256s_sha256": file_hash(destination / "SHA256SUMS"),
+                }
+            )
+            + b"\n"
+        )
+        print(
+            json.dumps(
+                {
+                    "event_key": event_key,
+                    "destination": str(destination),
+                    "variants": 15,
+                    "ledger": str(ledger),
+                }
+            )
+        )
+    except BaseException:
+        shutil.rmtree(stage, ignore_errors=True)
+        raise
 
-if __name__ == "__main__": main()
+
+if __name__ == "__main__":
+    main()

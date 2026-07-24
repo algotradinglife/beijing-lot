@@ -1140,6 +1140,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-overlap", type=int, default=None)
     parser.add_argument("--max-bundle-spend-pct", type=float, default=0.4)
     parser.add_argument("--allow-negative-ev", action="store_true")
+    parser.add_argument(
+        "--research-allow-unpublished-segment-contract",
+        action="store_true",
+        help=(
+            "Research-only fallback that recomputes natural-day segments when "
+            "no canonical publication exists. Never use for operational by_segment."
+        ),
+    )
     parser.add_argument("--json", action="store_true")
     return parser.parse_args(argv)
 
@@ -1193,6 +1201,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     all_segments = rolling.build_segments(
         eligible_legs,
         db_path=args.db,
+        require_published_contract=(
+            planning_scope == "by_segment"
+            and not args.research_allow_unpublished_segment_contract
+        ),
         base_window_hours=args.window_hours,
         extend_hours=rolling.parse_extend_hours(args.extend_hours),
         min_matches=args.min_matches,
@@ -1286,6 +1298,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
         "arm": args.arm,
         "structured_csv": str(args.structured_csv),
+        "structured_csv_sha256": hashlib.sha256(
+            Path(args.structured_csv).read_bytes()
+        ).hexdigest(),
+        "structured_csv_generated_at": datetime.fromtimestamp(
+            Path(args.structured_csv).stat().st_mtime, timezone.utc
+        ).astimezone().isoformat(timespec="seconds"),
         "source_rows": len(legs),
         "eligible_rows_before_decision_filter": len(eligible_before_decision_filter),
         "eligible_rows": len(eligible_legs),
@@ -1295,6 +1313,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "segments": len(segments),
         "planning_scope": planning_scope,
         "artifact_planning_scope": planning_scope,
+        "research_unpublished_segment_fallback": bool(
+            args.research_allow_unpublished_segment_contract
+        ),
         "segment_manifest_sha256": segment_manifest_sha256,
         "segment_manifest_path": segment_manifest_path,
         "selection_binding": selection_binding(planning_scope),

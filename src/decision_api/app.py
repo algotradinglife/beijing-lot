@@ -26,6 +26,7 @@ from src.natural_day_manifest import (
     verify_operational_windows,
 )
 from src.sqlite_runtime import connect_sqlite
+from scripts.verify_exact_n_freeze import verify_directory as verify_exact_n_directory
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -4272,9 +4273,14 @@ def _segment_plan_path_from_payload(value: Any) -> Path | None:
     return path
 
 
-def _segment_plan_freeze_state(conn: sqlite3.Connection, issue: str) -> dict[str, Any]:
+def _segment_plan_freeze_state(
+    conn: sqlite3.Connection,
+    issue: str,
+    *,
+    observed_at: datetime | None = None,
+) -> dict[str, Any]:
     state: dict[str, Any] = {
-        "policy": "first_kickoff_minus_1h_issue_wide_lock",
+        "policy": "next_unfrozen_published_segment",
         "leg_filter_policy": "no_started_match_filter_after_lock",
         "issue": str(issue),
         "freeze_minutes_before_first_kickoff": SEGMENT_PLAN_FREEZE_MINUTES_BEFORE_FIRST_KICKOFF,
@@ -4288,21 +4294,47 @@ def _segment_plan_freeze_state(conn: sqlite3.Connection, issue: str) -> dict[str
         segment_contract = load_published_manifest(conn, issue)
         if segment_contract is not None:
             verify_operational_windows(conn, segment_contract)
-            first_segment = segment_contract["segments"][0]
-            freeze_at = _parse_timestamp_to_hk(str(first_segment["freeze_at"]))
-            first_kickoff = _parse_timestamp_to_hk(str(first_segment["segment_start"]))
+            now = (observed_at or datetime.now(HK_TZ)).astimezone(HK_TZ)
+            segment_states = []
+            for item in segment_contract["segments"]:
+                item_freeze = _parse_timestamp_to_hk(str(item["freeze_at"]))
+                item_kickoff = _parse_timestamp_to_hk(str(item["segment_start"]))
+                if item_freeze is None or item_kickoff is None:
+                    state["reason"] = "published_segment_contract_time_unparseable"
+                    return state
+                segment_states.append({
+                    "segment_idx": int(item["segment_idx"]),
+                    "freeze_at": item_freeze,
+                    "first_kickoff": item_kickoff,
+                    "locked": now >= item_freeze,
+                })
+            target = next(
+                (item for item in segment_states if not item["locked"]),
+                segment_states[-1],
+            )
+            freeze_at = target["freeze_at"]
+            first_kickoff = target["first_kickoff"]
             if freeze_at is None or first_kickoff is None:
                 state["reason"] = "published_segment_contract_time_unparseable"
                 return state
-            now = datetime.now(HK_TZ)
             locked = now >= freeze_at
             state.update({
-                "policy": str(segment_contract["policy"]),
+                "policy": f"{segment_contract['policy']}/per_segment_refresh_lock",
                 "segment_manifest_sha256": str(segment_contract["manifest_sha256"]),
                 "segment_manifest_path": str(segment_contract["manifest_path"]),
+                "segment_idx": int(target["segment_idx"]),
                 "segment_counts": [
                     int(segment["match_count"])
                     for segment in segment_contract["segments"]
+                ],
+                "segments": [
+                    {
+                        "segment_idx": int(item["segment_idx"]),
+                        "freeze_at": item["freeze_at"].isoformat(timespec="seconds"),
+                        "first_kickoff": item["first_kickoff"].isoformat(timespec="seconds"),
+                        "locked": bool(item["locked"]),
+                    }
+                    for item in segment_states
                 ],
                 "freeze_minutes_before_first_kickoff": round(
                     (first_kickoff - freeze_at).total_seconds() / 60,
@@ -4313,9 +4345,9 @@ def _segment_plan_freeze_state(conn: sqlite3.Connection, issue: str) -> dict[str
                 "now": now.strftime("%Y-%m-%d %H:%M:%S"),
                 "locked": locked,
                 "reason": (
-                    "locked_after_published_segment_freeze"
+                    "all_published_segments_locked"
                     if locked
-                    else "before_published_segment_freeze"
+                    else "before_target_segment_freeze"
                 ),
             })
             return state
@@ -4421,6 +4453,19 @@ def _exact_n_freeze_payload(
                 artifact_manifest_path.read_text(encoding="utf-8")
             )
             if (
+                hashlib.sha256(artifact_manifest_path.read_bytes()).hexdigest()
+                != str(ledger.get("artifact_manifest_sha256") or "")
+            ):
+                raise ValueError("ledger artifact_manifest_sha256 mismatch")
+            verification = verify_exact_n_directory(
+                artifact_manifest_path.parent
+            )
+            if (
+                verification["package_sha256s_sha256"]
+                != str(ledger.get("package_sha256s_sha256") or "")
+            ):
+                raise ValueError("ledger package SHA256SUMS mismatch")
+            if (
                 str(artifact_manifest.get("event_key") or "") != event_key
                 or str(artifact_manifest.get("segment_manifest_sha256") or "")
                 != str(contract["manifest_sha256"])
@@ -4452,14 +4497,18 @@ def _exact_n_freeze_payload(
                     raise ValueError("exact-N alternative hash mismatch")
                 alternatives.append({
                     "plan_id": str(alternative.get("plan_id") or ""),
+                    "exact_n": alternative.get("exact_n") is True,
                     "requested_n": _safe_int(alternative.get("requested_n")),
+                    "artifact_n": _safe_int(alternative.get("artifact_n")),
+                    "recommended_n": _safe_int(alternative.get("recommended_n")),
                     "requested_budget_yuan": _safe_float(
                         alternative.get("requested_budget_yuan")
                     ),
+                    "base_cost_yuan": _safe_float(
+                        alternative.get("base_cost_yuan")
+                    ),
                     "actual_cost_yuan": _safe_float(
                         alternative.get("actual_cost_yuan")
-                        if "actual_cost_yuan" in alternative
-                        else alternative.get("actual_budget_yuan")
                     ),
                     "unused_budget_yuan": _safe_float(
                         alternative.get("unused_budget_yuan")
@@ -4468,11 +4517,24 @@ def _exact_n_freeze_payload(
                         alternative.get("budget_utilization")
                     ),
                     "status": str(alternative.get("status") or ""),
+                    "ticket_count": len(alternative.get("tickets") or []),
                     "tickets": alternative.get("tickets")
                     if isinstance(alternative.get("tickets"), list)
                     else [],
                     "sha256": claimed,
+                    "decision_input_sha256": str(
+                        alternative.get("decision_input_sha256") or ""
+                    ),
+                    "freeze_at": str(
+                        alternative.get("scheduled_freeze_at") or ""
+                    ),
+                    "effective_decision_at": str(
+                        alternative.get("effective_decision_at") or ""
+                    ),
+                    "frontend_selectable": True,
                 })
+            score_path = artifact_manifest_path.parent / "correct_score_audit.json"
+            score = json.loads(score_path.read_text(encoding="utf-8"))
             base.update({
                 "status": "published",
                 "effective_decision_at": str(
@@ -4485,6 +4547,14 @@ def _exact_n_freeze_payload(
                         float(item["requested_budget_yuan"] or 0),
                     ),
                 ),
+                "verification": verification,
+                "correct_score": {
+                    "status": str(score.get("status") or ""),
+                    "budget_statuses": score.get("budget_statuses", []),
+                    "execution_enabled": False,
+                    "frontend_selectable": False,
+                    "roi_authorized": False,
+                },
             })
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             base.update({"status": "invalid_published_event", "error": str(exc)})
@@ -4498,9 +4568,10 @@ def _exact_n_freeze_payload(
             int(segment["match_count"]) for segment in contract["segments"]
         ],
         "segments": segment_payloads,
-        "execution_enabled": False,
-        "frontend_selectable": False,
-        "roi_authorized": False,
+        "exact_n_frontend_selectable": True,
+        "correct_score_execution_enabled": False,
+        "correct_score_frontend_selectable": False,
+        "correct_score_roi_authorized": False,
     }
 
 

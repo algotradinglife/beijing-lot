@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -222,6 +224,8 @@ def test_cross_layer_verifier_rejects_stale_by_segment_artifact(
     db = tmp_path / "test.sqlite"
     output = tmp_path / "results"
     plans = tmp_path / "plans"
+    structured = tmp_path / "structured.csv"
+    structured.write_text("fixture\n", encoding="utf-8")
     _database(db)
     result = _publish(db, output)
     manifest_path = Path(str(result["manifest"]))
@@ -255,6 +259,8 @@ def test_runtime_consumers_bind_to_publication_and_reject_stale_cache(
     db = tmp_path / "test.sqlite"
     output = tmp_path / "results"
     plans = tmp_path / "plans"
+    structured = tmp_path / "structured.csv"
+    structured.write_text("fixture\n", encoding="utf-8")
     _database(db)
     result = _publish(db, output)
 
@@ -301,6 +307,9 @@ def test_runtime_consumers_bind_to_publication_and_reject_stale_cache(
         "label": "fixture",
         "betting_strategy_version": "segment_betting_v0.4.0000",
         "structured_csv": str(tmp_path / "structured.csv"),
+        "structured_csv_sha256": hashlib.sha256(
+            structured.read_bytes()
+        ).hexdigest(),
         "planning_scope": "by_segment",
         "artifact_planning_scope": "by_segment",
         "segment_manifest_sha256": "stale",
@@ -372,6 +381,8 @@ def test_live_coordinator_publishes_due_segment_from_canonical_manifest(
     structured.write_text("fixture\n", encoding="utf-8")
     _database(db)
     publication = _publish(db, output)
+    refreshed_at = datetime.fromisoformat("2026-07-25T17:45:00+08:00")
+    os.utime(structured, (refreshed_at.timestamp(), refreshed_at.timestamp()))
     commands: list[list[str]] = []
 
     def run(command, **_kwargs):
@@ -403,3 +414,69 @@ def test_live_coordinator_publishes_due_segment_from_canonical_manifest(
     assert len(commands) == 1
     assert commands[0][commands[0].index("--manifest") + 1] == publication["manifest"]
     assert commands[0][commands[0].index("--segment") + 1] == "1"
+
+
+def test_freeze_state_advances_to_next_unfrozen_segment(tmp_path: Path) -> None:
+    db = tmp_path / "test.sqlite"
+    output = tmp_path / "results"
+    _database(db)
+    _publish(db, output)
+    conn = sqlite3.connect(db)
+    state = decision_app._segment_plan_freeze_state(
+        conn,
+        "26078",
+        observed_at=datetime.fromisoformat("2026-07-26T00:00:00+08:00"),
+    )
+    conn.close()
+    assert state["segment_idx"] == 2
+    assert state["locked"] is False
+    assert state["segments"][0]["locked"] is True
+    assert state["segments"][1]["locked"] is False
+
+
+def test_operational_by_segment_requires_published_manifest(tmp_path: Path) -> None:
+    db = tmp_path / "test.sqlite"
+    _database(db)
+    conn = sqlite3.connect(db)
+    rows = conn.execute(
+        "SELECT match_idx,end_time FROM matches WHERE issue='26078' ORDER BY match_idx"
+    ).fetchall()
+    conn.close()
+    legs = [
+        SimpleNamespace(
+            issue="26078",
+            match_idx=int(match_idx),
+            kickoff=datetime.fromisoformat(end_time),
+        )
+        for match_idx, end_time in rows
+    ]
+    with pytest.raises(ValueError, match="published natural-day segment contract"):
+        rolling.build_segments(
+            legs,
+            db_path=db,
+            require_published_contract=True,
+        )
+
+
+def test_live_coordinator_rejects_stale_previous_segment_input(
+    tmp_path: Path,
+) -> None:
+    db = tmp_path / "test.sqlite"
+    output = tmp_path / "results"
+    structured = tmp_path / "structured.csv"
+    structured.write_text("fixture\n", encoding="utf-8")
+    stale = datetime.fromisoformat("2026-07-24T17:45:00+08:00")
+    os.utime(structured, (stale.timestamp(), stale.timestamp()))
+    _database(db)
+    _publish(db, output)
+    result = refresh_loop.coordinate_due_exact_n_freeze(
+        db,
+        "26078",
+        structured_csv=structured,
+        now=datetime.fromisoformat("2026-07-26T00:50:00+08:00"),
+        output_root=tmp_path / "freeze-root",
+        ledger_root=tmp_path / "ledger",
+        correct_score_root=tmp_path / "score",
+    )
+    assert result["status"] == "failed_closed_stale_segment_input"
+    assert result["segment_idx"] == 2

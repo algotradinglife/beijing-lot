@@ -1280,6 +1280,7 @@ function bettingPlanStatusTone(value?: string): 'good' | 'warn' | 'bad' | 'neutr
 
 function BettingPlan({
   data,
+  exactN,
   availableIssues,
   decisionVariantOptions,
 	  issueMatches,
@@ -1295,6 +1296,7 @@ function BettingPlan({
 	  onStakeModeChange,
 	}: {
 	  data: DashboardData['segmentBettingPlan'];
+	  exactN: DashboardData['exactNFreezes'];
 	  availableIssues: DashboardData['availableIssues'];
 	  decisionVariantOptions: DecisionVariantOption[];
 	  issueMatches: IssueMatchRow[];
@@ -1350,7 +1352,33 @@ function BettingPlan({
 	        </select></label>
 	      </div>
 	      {data.availabilityStatus !== 'available' ? <div className="empty-state"><b>暂无下注计划</b><span>{data.unavailableReason === 'segment_betting_plan_artifact_missing' ? '当前期下注计划还未生成，请稍后刷新。' : data.unavailableReason || '当前期下注计划还未生成。'}</span></div> : null}
-		    </Card>
+	    </Card>
+	    <Card title="Exact-N 冻结备选">
+	      <div className="status-row">
+	        <Badge tone={exactN.exactNFrontendSelectable ? 'good' : 'warn'}>
+	          {exactN.exactNFrontendSelectable ? '可选择' : '不可选择'}
+	        </Badge>
+	        <span>15 套为互斥备选，不合计投入</span>
+	        {exactN.segmentManifestSha256 ? <small>segment {exactN.segmentManifestSha256.slice(0, 12)}</small> : null}
+	      </div>
+	      {exactN.segments.flatMap((segment) => segment.alternatives).length
+	        ? <div className="table-wrap"><table><thead><tr><th>段</th><th>Exact N</th><th>预算</th><th>票数</th><th>基础/实际成本</th><th>利用率</th><th>输入/冻结</th><th>状态</th></tr></thead><tbody>
+	          {exactN.segments.flatMap((segment) => segment.alternatives.map((alternative) => <tr key={alternative.planId}>
+	            <td>#{segment.segmentIdx}</td>
+	            <td>{alternative.exactN ? 'Exact' : '无效'} {alternative.requestedN} / {alternative.artifactN}</td>
+	            <td>{moneyFixed(alternative.requestedBudgetYuan)}</td>
+	            <td>{alternative.ticketCount}</td>
+	            <td>{moneyFixed(alternative.baseCostYuan)} / {moneyFixed(alternative.actualCostYuan)}</td>
+	            <td>{Math.round(alternative.budgetUtilization * 100)}%</td>
+	            <td><small>{alternative.decisionInputSha256.slice(0, 12)}<br/>{alternative.freezeAt}</small></td>
+	            <td><Badge tone={alternative.frontendSelectable ? 'good' : 'warn'}>{alternative.status}</Badge></td>
+	          </tr>))}
+	        </tbody></table></div>
+	        : <div className="empty-state"><b>尚无前瞻 Exact-N 冻结</b><span>不会回退到旧 max_n、其他 N、其他 segment 或 mock。</span></div>}
+	      {exactN.segments.some((segment) => segment.correctScore)
+	        ? <p>正确比分仅为 paper audit，固定不可选择、不可执行。</p>
+	        : null}
+	    </Card>
 		    <Card title={selectedPlanningScope === 'entire_issue' ? '整期计划' : '分段计划'}>
 	      {data.segments.length ? <div className="table-wrap"><table><thead><tr><th>段</th><th>时间窗</th><th>场次</th><th>N</th><th>票组</th><th>预算/成本</th><th>风险</th></tr></thead><tbody>{data.segments.map((segment) => <tr key={segment.segmentIdx ?? segment.segmentStart}>
 	        <td>#{segment.segmentIdx}</td>
@@ -1959,16 +1987,26 @@ export default function App() {
 	      const requestedBudgetYuan = selectedSegmentBudgetYuan.trim() ? Number(selectedSegmentBudgetYuan) : undefined;
 	      const normalizedBudgetYuan = requestedBudgetYuan !== undefined && Number.isFinite(requestedBudgetYuan) ? requestedBudgetYuan : undefined;
 	      loaded = data.segmentBettingPlan?.issueId === issueId
+	        && data.exactNFreezes?.issueId === issueId
 	        && data.segmentBettingPlan?.requestedDecisionVariantId === selectedDecisionVariant
 	        && data.segmentBettingPlan?.requestedPlanningScope === selectedBettingPlanScope
 	        && (normalizedBudgetYuan === undefined || data.segmentBettingPlan?.requestedSegmentBudgetYuan === normalizedBudgetYuan)
 	        && (!selectedSegmentStakeMode || data.segmentBettingPlan?.requestedStakeMode === selectedSegmentStakeMode);
-	      promise = loaded ? undefined : adapter.getSegmentBettingPlan(issueId, selectedDecisionVariant, undefined, {
-	        planningScope: selectedBettingPlanScope,
-	        segmentBudgetYuan: normalizedBudgetYuan,
-	        stakeMode: selectedSegmentStakeMode,
-	      });
-	      apply = (prev, payload) => ({ ...prev, segmentBettingPlan: payload as DashboardData['segmentBettingPlan'] });
+	      promise = loaded ? undefined : Promise.all([
+	        adapter.getSegmentBettingPlan(issueId, selectedDecisionVariant, undefined, {
+	          planningScope: selectedBettingPlanScope,
+	          segmentBudgetYuan: normalizedBudgetYuan,
+	          stakeMode: selectedSegmentStakeMode,
+	        }),
+	        adapter.getExactNFreezes(issueId),
+	      ]);
+	      apply = (prev, payload) => {
+	        const [segmentBettingPlan, exactNFreezes] = payload as [
+	          DashboardData['segmentBettingPlan'],
+	          DashboardData['exactNFreezes'],
+	        ];
+	        return { ...prev, segmentBettingPlan, exactNFreezes };
+	      };
       message = '正在加载下注设计...';
     } else if (page === 'Live Signals') {
       loaded = data.liveSignals?.issueId === issueId;
@@ -2086,8 +2124,9 @@ export default function App() {
 	        setPage('Match Detail');
 	      }}
 	    />}
-	    {page === 'Betting Plan' && (data.segmentBettingPlan ? <BettingPlan
+	    {page === 'Betting Plan' && (data.segmentBettingPlan && data.exactNFreezes ? <BettingPlan
 	      data={data.segmentBettingPlan}
+	      exactN={data.exactNFreezes}
 	      availableIssues={data.availableIssues}
 	      decisionVariantOptions={availableDecisionVariants}
 	      issueMatches={data.issue.matches}

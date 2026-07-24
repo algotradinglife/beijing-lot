@@ -45,6 +45,7 @@ DEFAULT_EXACT_N_OUTPUT_ROOT = ROOT / "results/exact_n_segment_freeze"
 DEFAULT_EXACT_N_LEDGER_ROOT = ROOT / "results/research/exact_n_segment_freeze_v1/ledger"
 DEFAULT_CORRECT_SCORE_ROOT = ROOT / "results/data_collection/correct_score_price_history_v1"
 DEFAULT_EXACT_N_TRIGGER_LEAD_MINUTES = 10.0
+DEFAULT_FINAL_INPUT_REFRESH_LEAD_MINUTES = 30.0
 
 
 def now_iso() -> str:
@@ -75,7 +76,13 @@ def _small_status(status: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def ensure_active_artifact(db_path: Path, issue: str, *, timeout_sec: int) -> dict[str, Any]:
+def ensure_active_artifact(
+    db_path: Path,
+    issue: str,
+    *,
+    timeout_sec: int,
+    force_refresh: bool = False,
+) -> dict[str, Any]:
     with decision_app._connect(db_path) as conn:
         resolved = decision_app._resolve_issue(conn, issue)
         before = decision_app._decision_artifact_status_payload(
@@ -83,7 +90,7 @@ def ensure_active_artifact(db_path: Path, issue: str, *, timeout_sec: int) -> di
             resolved,
             variant_id=decision_app.STABLE_DECISION_VARIANT_ID,
         )
-        if _status_complete(before):
+        if _status_complete(before) and not force_refresh:
             return {
                 "issue": resolved,
                 "action": "active_artifact_already_available",
@@ -117,7 +124,11 @@ def ensure_active_artifact(db_path: Path, issue: str, *, timeout_sec: int) -> di
         conn.commit()
         return {
             "issue": resolved,
-            "action": "generated_active_artifact",
+            "action": (
+                "refreshed_active_artifact_for_target_segment"
+                if force_refresh
+                else "generated_active_artifact"
+            ),
             "materialize": {
                 "count": materialize.get("count", 0),
                 "actions": materialize.get("actions", {}),
@@ -162,14 +173,21 @@ def publish_v4_2_artifacts(
     return outputs
 
 
-def segment_plan_freeze_state(db_path: Path, issue: str) -> dict[str, Any]:
+def segment_plan_freeze_state(
+    db_path: Path,
+    issue: str,
+    *,
+    observed_at: datetime | None = None,
+) -> dict[str, Any]:
     try:
         with decision_app._connect(db_path) as conn:
             resolved = decision_app._resolve_issue(conn, issue)
-            return decision_app._segment_plan_freeze_state(conn, resolved)
+            return decision_app._segment_plan_freeze_state(
+                conn, resolved, observed_at=observed_at
+            )
     except Exception as exc:
         return {
-            "policy": "first_kickoff_minus_1h_issue_wide_lock",
+            "policy": "next_unfrozen_published_segment",
             "issue": str(issue),
             "locked": False,
             "reason": f"freeze_state_unavailable:{type(exc).__name__}",
@@ -307,6 +325,13 @@ def _segment_plan_exists(
             continue
         if _resolve_project_path(payload.get("structured_csv")) != _resolve_project_path(spec.get("structured_csv")):
             continue
+        structured_path = _resolve_project_path(spec.get("structured_csv"))
+        if not structured_path.is_file():
+            continue
+        if str(payload.get("structured_csv_sha256") or "") != hashlib.sha256(
+            structured_path.read_bytes()
+        ).hexdigest():
+            continue
         if str(payload.get("planning_scope") or settings.get("planning_scope") or "") != scope:
             continue
         if (
@@ -398,6 +423,15 @@ def ensure_segment_betting_plans(
             if manifest is not None:
                 verify_operational_windows(conn, manifest)
                 segment_manifest_sha256 = str(manifest["manifest_sha256"])
+            elif "by_segment" in scopes:
+                return [{
+                    "status": "failed_closed_missing_published_segment_contract",
+                    "planning_scope": "by_segment",
+                    "error": (
+                        "operational by_segment generation requires the canonical "
+                        "BJ-SEG-DAY-001 publication"
+                    ),
+                }]
     except NaturalDayManifestError as exc:
         return [{
             "status": "failed_closed_segment_contract",
@@ -487,6 +521,22 @@ def coordinate_due_exact_n_freeze(
         }
 
     _freeze_at, segment = min(upcoming, key=lambda item: item[0])
+    input_generated_at = datetime.fromtimestamp(
+        structured_csv.stat().st_mtime, _freeze_at.tzinfo
+    )
+    final_refresh_opens_at = _freeze_at - timedelta(
+        minutes=DEFAULT_FINAL_INPUT_REFRESH_LEAD_MINUTES
+    )
+    if not (final_refresh_opens_at <= input_generated_at <= observed_at <= _freeze_at):
+        return {
+            "status": "failed_closed_stale_segment_input",
+            "segment_idx": int(segment["segment_idx"]),
+            "structured_csv": str(structured_csv),
+            "input_generated_at": input_generated_at.isoformat(timespec="seconds"),
+            "final_refresh_opens_at": final_refresh_opens_at.isoformat(timespec="seconds"),
+            "effective_decision_at": observed_at.isoformat(timespec="seconds"),
+            "freeze_at": _freeze_at.isoformat(timespec="seconds"),
+        }
     event_key = hashlib.sha256(
         json.dumps(
             {"issue": str(issue), "segment_idx": int(segment["segment_idx"])},
@@ -575,7 +625,25 @@ def coordinate_due_exact_n_freeze(
 
 
 def run_once(args: argparse.Namespace) -> dict[str, Any]:
-    active = ensure_active_artifact(args.db, args.issue, timeout_sec=args.timeout)
+    observed_at = datetime.now(timezone.utc).astimezone()
+    segment_plan_freeze = segment_plan_freeze_state(
+        args.db, args.issue, observed_at=observed_at
+    )
+    freeze_at_text = str(segment_plan_freeze.get("freeze_at") or "")
+    freeze_at = datetime.fromisoformat(freeze_at_text) if freeze_at_text else None
+    force_final_refresh = bool(
+        freeze_at is not None
+        and not segment_plan_freeze.get("locked")
+        and freeze_at - timedelta(minutes=DEFAULT_FINAL_INPUT_REFRESH_LEAD_MINUTES)
+        <= observed_at
+        <= freeze_at
+    )
+    active = ensure_active_artifact(
+        args.db,
+        args.issue,
+        timeout_sec=args.timeout,
+        force_refresh=force_final_refresh,
+    )
     issue = str(active.get("issue") or args.issue)
     status = active.get("artifact_status") if isinstance(active.get("artifact_status"), dict) else {}
     v4_2: list[dict[str, Any]] = []
@@ -586,13 +654,17 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
             max_refresh_age_minutes=args.max_refresh_age_minutes,
             artifact_versions=args.v4_2_artifact_version,
         )
-    segment_plan_freeze = segment_plan_freeze_state(args.db, issue)
+    if issue != str(args.issue):
+        segment_plan_freeze = segment_plan_freeze_state(
+            args.db, issue, observed_at=observed_at
+        )
     segment_betting_plans: list[dict[str, Any]] = []
     if status.get("status") == "available" and args.ensure_segment_betting_plans:
         if segment_plan_freeze.get("locked"):
             segment_betting_plans = [{
                 "status": "skipped_frozen",
-                "reason": "segment_betting_plan_locked_before_first_kickoff",
+                "reason": "all_published_segments_locked",
+                "segment_idx": segment_plan_freeze.get("segment_idx"),
                 "freeze_at": segment_plan_freeze.get("freeze_at", ""),
                 "first_kickoff": segment_plan_freeze.get("first_kickoff", ""),
             }]
@@ -612,13 +684,16 @@ def run_once(args: argparse.Namespace) -> dict[str, Any]:
             plan_dir=args.segment_plan_dir,
             structured_dir=args.structured_shadow_dir,
         )
-        preferred = next(
-            (
-                spec
-                for spec in specs
-                if str(spec.get("label") or "") == "v3.3.3"
-            ),
-            specs[0] if specs else None,
+        stable_specs = [
+            spec
+            for spec in specs
+            if str(spec.get("label") or "") == "v3.3.3"
+            and Path(spec["structured_csv"]).is_file()
+        ]
+        preferred = max(
+            stable_specs or specs,
+            key=lambda spec: Path(spec["structured_csv"]).stat().st_mtime,
+            default=None,
         )
         if preferred is None:
             exact_n_freeze = {"status": "skipped_no_structured_artifacts"}

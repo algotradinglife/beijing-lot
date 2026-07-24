@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "conclusion": "MISSED_FREEZE_PRE_FREEZE_OUT_OF_CONTRACT",
+  "decision_input_sha256": "1ec86a0ef13579d6738ec80335f003445bfc7ba1c4acc56b6a01707ec36e655a",
+  "manifest_file_sha256": "1ab8dee627a8b81cd9cc86659e9ac95b1cae1b9414ba875f1333f11a3b4eef5a",
+  "manifest_payload_sha256": "fc07fba06a0315abbd21339db17affb37042185d9c5eb38cefd59d2bb6a41974",
+  "source_sha256s_sha256": "957eae3854e4d6a1656e654745f3af6a1aa67f7f8ab998f15a992d49de126e49",
+  "source_files_verified": 7,
+  "reasons": [
+    "historical_schema_v1_not_exact_n_budget_matrix_v2",
+    "no_5x3_budget_grid",
+    "no_effective_decision_binding",
+    "no_append_only_segment_ledger",
+    "correct_score_record_is_incident_evidence_not_a_contract_freeze"
+  ]
+}

@@ -12,7 +12,7 @@ import sqlite3
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -178,6 +178,7 @@ def build_segments(
     legs: list[LegRow],
     *,
     db_path: Path | None = None,
+    require_published_contract: bool = False,
     base_window_hours: float = 12.0,
     extend_hours: list[float] | None = None,
     min_matches: int = 6,
@@ -215,12 +216,20 @@ def build_segments(
                         )
                     )
                 return published
+            if require_published_contract:
+                raise ValueError(
+                    "published natural-day segment contract is required for operational by_segment generation"
+                )
         except NaturalDayManifestError as exc:
             raise ValueError(
                 f"published natural-day segment contract is invalid: {exc}"
             ) from exc
         finally:
             conn.close()
+    if require_published_contract:
+        raise ValueError(
+            "published natural-day segment contract is required for operational by_segment generation"
+        )
     result = build_natural_day_segments(legs[0].issue, legs)
     return [
         Segment(
