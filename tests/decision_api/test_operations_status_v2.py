@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.scrape_500_bjdc import create_schema
 from src.decision_api import app as appmod
-from src.operations_adapters import build_collection_domain
+from src.operations_adapters import build_collection_domain, safe_diagnostic_text
 from src.operations_status import STABLE_STATUSES, build_operations_v2, legacy_warnings
 
 
@@ -236,6 +236,46 @@ def test_next_action_compares_mixed_offsets_chronologically() -> None:
     assert payload["summary"]["next_action_title"] == "下一个 segment 定时冻结"
 
 
+def test_repeated_build_preserves_first_seen_and_advances_last_seen() -> None:
+    domains = _base_domains()
+    domains["artifacts"].update(
+        {
+            "status": "partial",
+            "draft_count": 1,
+            "draft_match_ids": ["26078_001"],
+        }
+    )
+    first = build_operations_v2(
+        issue="26078",
+        generated_at="2026-07-25T19:00:00+08:00",
+        runtime=domains["runtime"],
+        collection=domains["collection"],
+        artifacts=domains["artifacts"],
+        scheduled_freeze=domains["scheduled_freeze"],
+        adhoc_service=domains["adhoc_service"],
+        settlement_review=domains["settlement_review"],
+    )
+    first_by_id = {alert["alert_id"]: alert for alert in first["alerts"]}
+
+    second = build_operations_v2(
+        issue="26078",
+        generated_at="2026-07-25T19:01:00+08:00",
+        runtime=domains["runtime"],
+        collection=domains["collection"],
+        artifacts=domains["artifacts"],
+        scheduled_freeze=domains["scheduled_freeze"],
+        adhoc_service=domains["adhoc_service"],
+        settlement_review=domains["settlement_review"],
+        prior_alert_lifecycle=first_by_id,
+    )
+
+    assert len(second["alerts"]) == 1
+    repeated = second["alerts"][0]
+    assert repeated["alert_id"] in first_by_id
+    assert repeated["first_seen_at"] == "2026-07-25T19:00:00+08:00"
+    assert repeated["last_seen_at"] == "2026-07-25T19:01:00+08:00"
+
+
 def test_checkpoint_collectors_without_telemetry_are_due(tmp_path: Path) -> None:
     db_path = tmp_path / "operations.sqlite"
     _minimal_operations_db(db_path)
@@ -293,7 +333,7 @@ def test_collector_errors_redact_local_paths(tmp_path: Path) -> None:
                     0.1,
                     0,
                     0,
-                    "failed at /tmp/operator/retry.txt",
+                    r"failed at /var/lib/operator/retry.txt and C:\ops\private\retry.log",
                 ),
             ],
         )
@@ -310,8 +350,36 @@ def test_collector_errors_redact_local_paths(tmp_path: Path) -> None:
 
     collector = next(row for row in domain["collectors"] if row["collector_id"] == "issue_html_500")
     assert collector["status"] == "failed"
-    assert collector["error"] == "failed at [redacted-path]"
+    assert collector["error"] == "failed at [redacted-path] and [redacted-path]"
     assert collector["first_unhealthy_at"] == "2026-07-25 10:00:01"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/var/log/service/error.log",
+        "/opt/beidan/runtime.json",
+        "/srv/private/key",
+        "/root/.config/token",
+        "/private/var/db/item",
+        "/mnt/data/snapshot.sqlite",
+        "/etc/secret",
+        r"C:\Users\operator\secret.txt",
+        "D:/ops/private/log.txt",
+        r"\\server\share\private\log.txt",
+        "file:///home/operator/private/token.txt",
+        "file://server/share/private/token.txt",
+        "path:/etc/operator/token",
+    ],
+)
+def test_shared_diagnostic_sanitizer_redacts_absolute_paths(path: str) -> None:
+    assert path not in safe_diagnostic_text(f"collector failed at {path}")
+    assert "[redacted-path]" in safe_diagnostic_text(f"collector failed at {path}")
+
+
+def test_shared_diagnostic_sanitizer_preserves_urls() -> None:
+    url = "https://status.example.test/api/health"
+    assert safe_diagnostic_text(f"probe {url} failed") == f"probe {url} failed"
 
 
 def test_legacy_collector_reads_its_own_database(tmp_path: Path) -> None:
@@ -454,7 +522,9 @@ def test_malformed_research_freeze_becomes_failed_status(
     monkeypatch.setattr(
         appmod,
         "verify_segment_freeze",
-        lambda _path: (_ for _ in ()).throw(KeyError("malformed manifest")),
+        lambda _path: (_ for _ in ()).throw(
+            KeyError(r"malformed /opt/freeze/manifest.json from C:\ops\freeze\manifest.json")
+        ),
     )
 
     result = appmod._research_freeze_for_segment(
@@ -465,7 +535,144 @@ def test_malformed_research_freeze_becomes_failed_status(
 
     assert result["status"] == "failed"
     assert result["verification_status"] == "failed"
-    assert "malformed manifest" in result["detail"]
+    assert "/opt/freeze/manifest.json" not in result["detail"]
+    assert r"C:\ops\freeze\manifest.json" not in result["detail"]
+    assert result["detail"].count("[redacted-path]") == 2
+
+
+@pytest.mark.parametrize("state", ["FAILED", "REJECTED", "PENDING"])
+def test_recent_adhoc_request_state_does_not_define_service_health(
+    tmp_path: Path,
+    state: str,
+) -> None:
+    db_path = tmp_path / "operations.sqlite"
+    _minimal_operations_db(db_path)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute(
+            """
+            CREATE TABLE adhoc_betting_request_ledger (
+                request_id TEXT PRIMARY KEY,
+                issue TEXT NOT NULL,
+                requested_at_hkt TEXT NOT NULL,
+                input_asof_hkt TEXT,
+                immutable_status TEXT,
+                valid_until_hkt TEXT,
+                sale_status_verified INTEGER,
+                research_evidence_eligible INTEGER,
+                scheduled_freeze_event_id TEXT,
+                state TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO adhoc_betting_request_ledger VALUES(
+                'published-request', '26078', '2026-07-25T18:00:00+08:00',
+                '2026-07-25T17:59:00+08:00', 'READY_FOR_REVIEW',
+                '2026-07-25T19:00:00+08:00', 1, 0, NULL, 'PUBLISHED'
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO adhoc_betting_request_ledger VALUES(
+                'recent-request', '26078', '2026-07-25T19:00:00+08:00',
+                '2026-07-25T18:59:00+08:00', 'INPUT_INVALID',
+                '', 0, 0, NULL, ?
+            )
+            """,
+            (state,),
+        )
+        domain = appmod._operations_adhoc_domain(conn, issue="26078")
+    finally:
+        conn.close()
+
+    assert domain["status"] == "ok"
+    assert domain["capability_available"] is True
+    assert domain["last_success_at"] == "2026-07-25T18:00:00+08:00"
+    assert domain["recent_request"]["state"] == state
+    assert domain["recent_request"]["status"] == "INPUT_INVALID"
+    assert domain["recent_request"]["separation_valid"] is True
+
+    domains = _base_domains()
+    domains["adhoc_service"] = domain
+    payload = build_operations_v2(
+        issue="26078",
+        generated_at="2026-07-25T19:01:00+08:00",
+        runtime=domains["runtime"],
+        collection=domains["collection"],
+        artifacts=domains["artifacts"],
+        scheduled_freeze=domains["scheduled_freeze"],
+        adhoc_service=domains["adhoc_service"],
+        settlement_review=domains["settlement_review"],
+    )
+    assert not any(alert["domain"] == "adhoc_service" for alert in payload["alerts"])
+
+
+def test_invalid_adhoc_evidence_isolation_alerts_without_marking_service_down(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "operations.sqlite"
+    _minimal_operations_db(db_path)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute(
+            """
+            CREATE TABLE adhoc_betting_request_ledger (
+                request_id TEXT PRIMARY KEY,
+                issue TEXT NOT NULL,
+                requested_at_hkt TEXT NOT NULL,
+                input_asof_hkt TEXT,
+                immutable_status TEXT,
+                valid_until_hkt TEXT,
+                sale_status_verified INTEGER,
+                research_evidence_eligible INTEGER,
+                scheduled_freeze_event_id TEXT,
+                state TEXT NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO adhoc_betting_request_ledger VALUES(
+                'invalid-isolation', '26078', '2026-07-25T19:00:00+08:00',
+                '2026-07-25T18:59:00+08:00', 'READY_FOR_REVIEW',
+                '2026-07-25T20:00:00+08:00', 1, 1, 'scheduled-event', 'PUBLISHED'
+            )
+            """
+        )
+        domain = appmod._operations_adhoc_domain(conn, issue="26078")
+    finally:
+        conn.close()
+
+    assert domain["status"] == "failed"
+    assert domain["service_status"] == "ok"
+    assert domain["isolation_status"] == "failed"
+    assert domain["capability_available"] is True
+    assert domain["recent_request"]["separation_valid"] is False
+
+    domains = _base_domains()
+    domains["adhoc_service"] = domain
+    payload = build_operations_v2(
+        issue="26078",
+        generated_at="2026-07-25T19:01:00+08:00",
+        runtime=domains["runtime"],
+        collection=domains["collection"],
+        artifacts=domains["artifacts"],
+        scheduled_freeze=domains["scheduled_freeze"],
+        adhoc_service=domains["adhoc_service"],
+        settlement_review=domains["settlement_review"],
+    )
+    adhoc_codes = [
+        alert["code"]
+        for alert in payload["alerts"]
+        if alert["domain"] == "adhoc_service"
+    ]
+    assert adhoc_codes == ["adhoc_isolation_invalid"]
+    assert payload["summary"]["blocker_count"] == 1
 
 
 def _minimal_operations_db(path: Path) -> None:
@@ -514,6 +721,78 @@ def test_operations_endpoint_declares_v2_and_validates_schema(
 ) -> None:
     db_path = tmp_path / "operations.sqlite"
     _minimal_operations_db(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        appmod._ensure_live_workflow_schema(conn)
+        appmod._ensure_postmatch_review_run_schema(conn)
+        conn.execute(
+            """
+            INSERT INTO live_workflow_runs(
+                run_id, issue, mode, status, dry_run, requested_by, started_at,
+                finished_at, elapsed_sec, error, plan_json, result_json
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                "workflow-path-redaction",
+                "26078",
+                "live_day_refresh_v1",
+                "failed",
+                1,
+                "pytest",
+                "2026-07-25T18:00:00+08:00",
+                "2026-07-25T18:01:00+08:00",
+                60,
+                "/srv/workflow/private.log",
+                "[]",
+                "{}",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO live_workflow_steps(
+                run_id, step_idx, step_key, label, status, command_json,
+                started_at, finished_at, elapsed_sec, error, result_json
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                "workflow-path-redaction",
+                0,
+                "refresh",
+                "refresh",
+                "failed",
+                "[]",
+                "2026-07-25T18:00:00+08:00",
+                "2026-07-25T18:01:00+08:00",
+                60,
+                r"C:\ops\workflow\private.log",
+                "{}",
+            ),
+        )
+        conn.execute(
+            """
+            INSERT INTO postmatch_review_runs(
+                run_id, issue, mode, status, dry_run, requested_by, started_at,
+                finished_at, elapsed_sec, error, command_json, result_json
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                "review-path-redaction",
+                "26078",
+                "postmatch_review_v1",
+                "failed",
+                1,
+                "pytest",
+                "2026-07-25T18:02:00+08:00",
+                "2026-07-25T18:03:00+08:00",
+                60,
+                "/private/review/result.json",
+                "[]",
+                "{}",
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
     monkeypatch.setattr(appmod, "DEFAULT_RESEARCH_SEGMENT_FREEZE_ROOT", tmp_path / "research")
     app = appmod.create_app(sqlite_db=db_path, adhoc_betting_root=tmp_path / "adhoc")
 
@@ -541,7 +820,61 @@ def test_operations_endpoint_declares_v2_and_validates_schema(
     }
     serialized = json.dumps(payload, ensure_ascii=False)
     assert str(tmp_path) not in serialized
+    assert "/srv/workflow/private.log" not in serialized
+    assert r"C:\ops\workflow\private.log" not in serialized
+    assert "/private/review/result.json" not in serialized
     assert all(step["command"] == [] for step in payload["workflow"]["steps"])
+
+
+def test_operations_endpoint_persists_alert_lifecycle_across_polls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    db_path = tmp_path / "operations.sqlite"
+    _minimal_operations_db(db_path)
+    monkeypatch.setattr(appmod, "DEFAULT_RESEARCH_SEGMENT_FREEZE_ROOT", tmp_path / "research")
+    real_datetime = appmod.datetime
+
+    class MutableDateTime(real_datetime):
+        current = real_datetime.fromisoformat("2026-07-25T19:00:00+08:00")
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.current.astimezone(tz) if tz is not None else cls.current.replace(tzinfo=None)
+
+    monkeypatch.setattr(appmod, "datetime", MutableDateTime)
+    app = appmod.create_app(sqlite_db=db_path, adhoc_betting_root=tmp_path / "adhoc")
+    client = app.test_client()
+
+    first = client.get("/api/issues/26078/operations").get_json()
+    MutableDateTime.current = real_datetime.fromisoformat("2026-07-25T19:01:00+08:00")
+    second = client.get("/api/issues/26078/operations").get_json()
+
+    first_by_id = {alert["alert_id"]: alert for alert in first["alerts"]}
+    second_by_id = {alert["alert_id"]: alert for alert in second["alerts"]}
+    assert first_by_id
+    assert first_by_id.keys() == second_by_id.keys()
+    for alert_id, first_alert in first_by_id.items():
+        second_alert = second_by_id[alert_id]
+        assert second_alert["first_seen_at"] == first_alert["first_seen_at"]
+        assert second_alert["last_seen_at"] == "2026-07-25T19:01:00+08:00"
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            """
+            SELECT alert_id, first_seen_at, last_seen_at, resolved_at
+            FROM operations_alert_lifecycle
+            WHERE issue=?
+            """,
+            ("26078",),
+        ).fetchall()
+    finally:
+        conn.close()
+    assert {row["alert_id"] for row in rows} == first_by_id.keys()
+    assert all(row["resolved_at"] is None for row in rows)
+    assert all(row["last_seen_at"] == "2026-07-25T19:01:00+08:00" for row in rows)
 
 
 def test_operations_legacy_capture_status_is_missing_for_empty_issue(

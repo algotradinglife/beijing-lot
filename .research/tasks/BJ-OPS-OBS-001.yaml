@@ -83,7 +83,7 @@ spec:
       - research_pi_review
 
 status:
-  current: AWAITING_REVIEW
+  current: READY
   attempts: 0
   routing:
     executor_mode: isolated_session
@@ -94,52 +94,8 @@ status:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/30"
       artifact_type: issue
       description: Approved capability execution contract
-    - uri: "https://github.com/algotradinglife/beijing-lot/pull/34"
-      artifact_type: pull_request
-      description: Operations Status v2 implementation and Engineering Validation
-  result:
-    pull_request: 34
-    implementation_head: 1f1b13a
-    reviewed_head: 1f1b13a
-    automated_engineering_validation: PASS
-    independent_codex_review: PASS
-    browser_device_visual_validation: PASS
-    browser_device_visual_evidence: "Controlled local mock flow exercised the existing Operations tab at 1440x1000 and 375x812. CJK text rendered, desktop and mobile had no document-level horizontal overflow, the collector table scrolled only inside its bounded container, dry-run returned an explicit completion message, write remained disabled without pending work, and the browser reported no console errors or failed requests."
-    python_tests: 71_passed
-    dashboard_tests: 24_passed
-    frontend_build: PASS
-    schema_validation: PASS
-    diff_check: PASS
-    review_findings_closed:
-      - "Collector telemetry is evaluated per source/table and cannot be masked by a newer global timestamp."
-      - "Runtime, freeze, workflow, empty-issue compatibility, and mixed-offset next-action status semantics fail visibly and sort chronologically."
-      - "Diagnostics redact unrestricted paths and process commands."
-      - "Running work is no longer rendered as a failure, and the 375px page no longer expands to the collector table intrinsic width."
+  result: {}
   history:
-    - action: ready_for_research_pi_review
-      ts: "2026-07-25T21:02:17+08:00"
-      actor: engineer
-      from: VALIDATING
-      to: AWAITING_REVIEW
-      reason: "Engineering Validation is complete and draft PR #34 contains the fixed develop-to-main implementation under the Engineer identity. Capability semantics, visual evidence, and scope boundaries are ready for PI review."
-    - action: independent_codex_review_completed
-      ts: "2026-07-25T20:56:25+08:00"
-      actor: engineer
-      from: VALIDATING
-      to: VALIDATING
-      reason: "Final independent Codex review found no discrete actionable regressions after compatibility and mixed-offset next-action fixes; focused backend and frontend suites passed."
-    - action: automated_and_visual_engineering_validation_completed
-      ts: "2026-07-25T20:56:00+08:00"
-      actor: engineer
-      from: EXECUTING
-      to: VALIDATING
-      reason: "Validated Operations Status v2 with 71 decision_api tests, 24 dashboard tests, production build, JSON Schema validation, compile/diff checks, and controlled 1440px/375px browser QA with CJK rendering, bounded table scrolling, no document overflow, no console errors, and no failed requests."
-    - action: start_execution
-      ts: "2026-07-25T19:25:28+08:00"
-      actor: engineer
-      from: READY
-      to: EXECUTING
-      reason: "Engineer started BJ-OPS-OBS-001 in the fixed develop worktree at immutable base 8c1d974ed249b5b51be1b489421db34bf7b256a9."
     - action: routing_updated
       ts: "2026-07-25T11:10:47Z"
       actor: research_pi

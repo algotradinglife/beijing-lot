@@ -38,14 +38,36 @@ class CollectionPlanError(ValueError):
     """The machine-readable collector plan is missing or invalid."""
 
 
-def _safe_diagnostic_text(value: Any) -> str:
+def safe_diagnostic_text(value: Any) -> str:
+    """Redact absolute filesystem paths from externally visible diagnostics."""
+
     text = str(value or "")
-    text = re.sub(
-        r"(?<![:\w])/(?:home|Users|tmp|var|opt|srv|root|private|mnt)/[^\s,;]+",
-        "[redacted-path]",
-        text,
+    preserved_urls: dict[str, str] = {}
+
+    def preserve_url(match: re.Match[str]) -> str:
+        token = f"__diagnostic_url_{len(preserved_urls)}__"
+        preserved_urls[token] = match.group(0)
+        return token
+
+    # Web URLs are controlled diagnostic references rather than filesystem
+    # paths. Preserve them while applying broad absolute-path redaction.
+    text = re.sub(r"\bhttps?://[^\s,;\"'<>]+", preserve_url, text, flags=re.IGNORECASE)
+    patterns = (
+        # Local and UNC file URIs, including file:///C:/... forms.
+        r"(?i)\bfile:(?://|/)[^\s,;\"'<>]+",
+        # Drive-letter paths with either Windows or POSIX separators.
+        r"(?<![A-Za-z0-9_])[A-Za-z]:[\\/][^\s,;\"'<>]+",
+        # UNC paths.
+        r"(?<![\\\w])\\\\[^\\\s,;\"'<>]+\\[^\\\s,;\"'<>]+(?:\\[^\s,;\"'<>]+)*",
+        # Any POSIX absolute path, including values after punctuation such as
+        # "path:/var/log". Web URLs were preserved above.
+        r"(?<![/A-Za-z0-9_])/(?!/)[^\s,;\"'<>]+",
     )
-    return re.sub(r"\b[A-Za-z]:\\[^\s,;]+", "[redacted-path]", text)
+    for pattern in patterns:
+        text = re.sub(pattern, "[redacted-path]", text)
+    for token, url in preserved_urls.items():
+        text = text.replace(token, url)
+    return text
 
 
 def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
@@ -593,7 +615,7 @@ def build_collection_domain(
                 "fail_count": int(telemetry.get("fail_count") or 0),
                 "total_attempts": int(telemetry.get("total_attempts") or 0),
                 "rows_parsed": int(telemetry.get("rows_parsed") or 0),
-                "error": _safe_diagnostic_text(telemetry.get("error")),
+                "error": safe_diagnostic_text(telemetry.get("error")),
                 "markets": list(MARKET_BY_COLLECTOR.get(collector_id, ())),
                 "auto_recovery_expected": enabled and interval > 0,
                 "retry_count": int(telemetry.get("fail_count") or 0),

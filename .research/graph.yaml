@@ -55,7 +55,7 @@ spec:
     - id: BJ-OPS-OBS-001
       node_type: task
       ref: tasks/BJ-OPS-OBS-001.yaml
-      state: AWAITING_REVIEW
+      state: ACTIVE
 
   edges:
     - from: GOAL-BOOT

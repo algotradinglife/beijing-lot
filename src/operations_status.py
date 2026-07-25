@@ -363,27 +363,52 @@ def _freeze_alerts(scheduled_freeze: Mapping[str, Any], observed_at: str) -> lis
 
 
 def _adhoc_alerts(adhoc: Mapping[str, Any], observed_at: str) -> list[dict[str, Any]]:
-    status = str(adhoc.get("status") or "missing")
-    if status not in {"failed", "blocked", "missing", "stale", "partial"}:
-        return []
-    return [
-        _alert(
-            code=f"adhoc_service_{status}",
-            domain="adhoc_service",
-            severity="blocker" if status in {"failed", "blocked"} else "warning",
-            title="即时生成服务不可用",
-            detail=str(adhoc.get("detail") or "即时生成能力最近状态异常。"),
-            impact="用户即时生成请求可能无法完成；不影响定时研究冻结证据。",
-            next_action=str(adhoc.get("next_action") or "检查即时生成 API 和最近请求诊断 ID。"),
-            observed_at=observed_at,
-            last_seen_at=str(adhoc.get("last_request_at") or ""),
-            last_success_at=str(adhoc.get("last_success_at") or ""),
-            auto_recovery_expected=False,
-            affected={"sources": ["adhoc_service"], "count": 1},
-            links=list(adhoc.get("links") or []),
-            blocks={"adhoc_generation": True},
+    alerts: list[dict[str, Any]] = []
+    isolation_status = str(adhoc.get("isolation_status") or "")
+    if isolation_status == "failed":
+        alerts.append(
+            _alert(
+                code="adhoc_isolation_invalid",
+                domain="adhoc_service",
+                severity="blocker",
+                title="即时生成研究隔离标记无效",
+                detail=str(adhoc.get("detail") or "最近请求违反 adhoc 与定时研究证据隔离契约。"),
+                impact="该请求不能被视为独立 adhoc 产物，且不得进入定时研究证据。",
+                next_action=str(adhoc.get("next_action") or "检查请求 ledger 并隔离受影响产物。"),
+                observed_at=observed_at,
+                last_seen_at=str(adhoc.get("last_request_at") or ""),
+                last_success_at=str(adhoc.get("last_success_at") or ""),
+                auto_recovery_expected=False,
+                affected={"sources": ["adhoc_request_ledger"], "count": 1},
+                links=list(adhoc.get("links") or []),
+                blocks={"research_freeze": True, "adhoc_generation": True},
+            )
         )
-    ]
+    service_status = str(
+        adhoc.get("service_status")
+        or (adhoc.get("status") if not isolation_status else "ok")
+        or "missing"
+    )
+    if service_status in {"failed", "blocked", "missing", "stale", "partial"}:
+        alerts.append(
+            _alert(
+                code=f"adhoc_service_{service_status}",
+                domain="adhoc_service",
+                severity="blocker" if service_status in {"failed", "blocked"} else "warning",
+                title="即时生成服务不可用",
+                detail=str(adhoc.get("service_detail") or adhoc.get("detail") or "即时生成能力最近状态异常。"),
+                impact="用户即时生成请求可能无法完成；不影响定时研究冻结证据。",
+                next_action=str(adhoc.get("service_next_action") or "检查即时生成 API 和服务探针。"),
+                observed_at=observed_at,
+                last_seen_at=str(adhoc.get("service_checked_at") or ""),
+                last_success_at=str(adhoc.get("last_success_at") or ""),
+                auto_recovery_expected=False,
+                affected={"sources": ["adhoc_service"], "count": 1},
+                links=list(adhoc.get("links") or []),
+                blocks={"adhoc_generation": True},
+            )
+        )
+    return alerts
 
 
 def _settlement_alerts(settlement: Mapping[str, Any], observed_at: str) -> list[dict[str, Any]]:
@@ -463,6 +488,30 @@ def _sort_alerts(alerts: list[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 
+def _apply_alert_lifecycle(
+    alerts: list[dict[str, Any]],
+    *,
+    observed_at: str,
+    prior_alert_lifecycle: Mapping[str, Mapping[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Reconcile active alerts with their persisted observation lifecycle."""
+
+    prior = prior_alert_lifecycle or {}
+    for alert in alerts:
+        previous = prior.get(str(alert["alert_id"]))
+        if isinstance(previous, Mapping):
+            alert["first_seen_at"] = _time(
+                previous.get("first_seen_at"),
+                _time(alert.get("first_seen_at"), observed_at),
+            )
+        else:
+            alert["first_seen_at"] = _time(alert.get("first_seen_at"), observed_at)
+        # last_seen_at describes the latest canonical observation, not the
+        # source event timestamp carried by last_success_at/next_due_at.
+        alert["last_seen_at"] = observed_at
+    return alerts
+
+
 def build_operations_v2(
     *,
     issue: str,
@@ -473,6 +522,7 @@ def build_operations_v2(
     scheduled_freeze: Mapping[str, Any],
     adhoc_service: Mapping[str, Any],
     settlement_review: Mapping[str, Any],
+    prior_alert_lifecycle: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Return the canonical v2 domains, summary, and sole alert list."""
 
@@ -485,14 +535,18 @@ def build_operations_v2(
         "settlement_review": dict(settlement_review),
     }
     alerts = _sort_alerts(
-        [
-            *_runtime_alerts(runtime, generated_at),
-            *_collection_alerts(collection, generated_at),
-            *_artifact_alerts(artifacts, generated_at),
-            *_freeze_alerts(scheduled_freeze, generated_at),
-            *_adhoc_alerts(adhoc_service, generated_at),
-            *_settlement_alerts(settlement_review, generated_at),
-        ]
+        _apply_alert_lifecycle(
+            [
+                *_runtime_alerts(runtime, generated_at),
+                *_collection_alerts(collection, generated_at),
+                *_artifact_alerts(artifacts, generated_at),
+                *_freeze_alerts(scheduled_freeze, generated_at),
+                *_adhoc_alerts(adhoc_service, generated_at),
+                *_settlement_alerts(settlement_review, generated_at),
+            ],
+            observed_at=generated_at,
+            prior_alert_lifecycle=prior_alert_lifecycle,
+        )
     )
     blockers = sum(alert["severity"] == "blocker" for alert in alerts)
     warnings = sum(alert["severity"] == "warning" for alert in alerts)

@@ -42,7 +42,7 @@ from src.natural_day_manifest import (
     load_published_manifest,
     verify_operational_windows,
 )
-from src.operations_adapters import build_collection_domain
+from src.operations_adapters import build_collection_domain, safe_diagnostic_text
 from src.operations_status import aggregate_status, build_operations_v2, legacy_warnings
 from src.segment_recovery import (
     PUBLICATION_TABLE as RECOVERY_PUBLICATION_TABLE,
@@ -995,6 +995,104 @@ def _ensure_postmatch_review_run_schema(conn: sqlite3.Connection) -> None:
         """
     )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_postmatch_review_runs_issue ON postmatch_review_runs(issue, started_at DESC)")
+
+
+def _ensure_operations_alert_lifecycle_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS operations_alert_lifecycle (
+            issue TEXT NOT NULL,
+            alert_id TEXT NOT NULL,
+            code TEXT NOT NULL,
+            domain TEXT NOT NULL,
+            first_seen_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL,
+            resolved_at TEXT,
+            PRIMARY KEY (issue, alert_id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_operations_alert_lifecycle_open
+        ON operations_alert_lifecycle(issue, resolved_at)
+        """
+    )
+
+
+def _open_operations_alert_lifecycle(
+    conn: sqlite3.Connection,
+    *,
+    issue: str,
+) -> dict[str, dict[str, Any]]:
+    return {
+        str(row["alert_id"]): dict(row)
+        for row in conn.execute(
+            """
+            SELECT alert_id, code, domain, first_seen_at, last_seen_at
+            FROM operations_alert_lifecycle
+            WHERE issue=? AND resolved_at IS NULL
+            """,
+            (issue,),
+        )
+    }
+
+
+def _persist_operations_alert_lifecycle(
+    conn: sqlite3.Connection,
+    *,
+    issue: str,
+    observed_at: str,
+    alerts: list[dict[str, Any]],
+) -> None:
+    active_ids = {str(alert["alert_id"]) for alert in alerts}
+    for alert in alerts:
+        conn.execute(
+            """
+            INSERT INTO operations_alert_lifecycle(
+                issue, alert_id, code, domain, first_seen_at, last_seen_at, resolved_at
+            ) VALUES(?,?,?,?,?,?,NULL)
+            ON CONFLICT(issue, alert_id) DO UPDATE SET
+                code=excluded.code,
+                domain=excluded.domain,
+                first_seen_at=CASE
+                    WHEN operations_alert_lifecycle.resolved_at IS NULL
+                    THEN operations_alert_lifecycle.first_seen_at
+                    ELSE excluded.first_seen_at
+                END,
+                last_seen_at=excluded.last_seen_at,
+                resolved_at=NULL
+            """,
+            (
+                issue,
+                str(alert["alert_id"]),
+                str(alert["code"]),
+                str(alert["domain"]),
+                str(alert["first_seen_at"]),
+                str(alert["last_seen_at"]),
+            ),
+        )
+    open_ids = {
+        str(row["alert_id"])
+        for row in conn.execute(
+            """
+            SELECT alert_id
+            FROM operations_alert_lifecycle
+            WHERE issue=? AND resolved_at IS NULL
+            """,
+            (issue,),
+        )
+    }
+    for alert_id in open_ids - active_ids:
+        conn.execute(
+            """
+            UPDATE operations_alert_lifecycle
+            SET resolved_at=?
+            WHERE issue=? AND alert_id=? AND resolved_at IS NULL
+            """,
+            (observed_at, issue, alert_id),
+        )
+    conn.commit()
 
 
 def _json_loads(value: Any, fallback: Any) -> Any:
@@ -7932,10 +8030,7 @@ def _latest_issue_specific_success(source_statuses: list[dict[str, Any]]) -> str
 def _safe_operations_text(value: Any) -> str:
     """Remove unrestricted filesystem paths from public operations diagnostics."""
 
-    text = str(value or "")
-    text = text.replace(str(PROJECT_ROOT), "[project]")
-    text = re.sub(r"/(?:home|Users|tmp)/[^\s,;]+", "[redacted-path]", text)
-    return text
+    return safe_diagnostic_text(value)
 
 
 def _operations_runtime_domain(
@@ -8286,6 +8381,8 @@ def _operations_adhoc_domain(conn: sqlite3.Connection, *, issue: str) -> dict[st
     if not _table_exists(conn, table):
         return {
             "status": "ok",
+            "service_status": "ok",
+            "isolation_status": "ok",
             "capability_available": True,
             "recent_request": None,
             "last_request_at": "",
@@ -8310,6 +8407,8 @@ def _operations_adhoc_domain(conn: sqlite3.Connection, *, issue: str) -> dict[st
     if row is None:
         return {
             "status": "ok",
+            "service_status": "ok",
+            "isolation_status": "ok",
             "capability_available": True,
             "recent_request": None,
             "last_request_at": "",
@@ -8320,18 +8419,50 @@ def _operations_adhoc_domain(conn: sqlite3.Connection, *, issue: str) -> dict[st
             "links": [{"kind": "page", "label": "即时生成", "ref": "page:adhoc-betting"}],
         }
     valid_separation = row["research_evidence_eligible"] == 0 and row["scheduled_freeze_event_id"] is None
-    status = "ok" if row["state"] == "PUBLISHED" and valid_separation else "failed"
+    latest_success = conn.execute(
+        f"""
+        SELECT requested_at_hkt
+        FROM {table}
+        WHERE issue=?
+          AND state='PUBLISHED'
+          AND immutable_status='READY_FOR_REVIEW'
+          AND research_evidence_eligible=0
+          AND scheduled_freeze_event_id IS NULL
+        ORDER BY requested_at_hkt DESC, request_id DESC
+        LIMIT 1
+        """,
+        (issue,),
+    ).fetchone()
+    recent_state = str(row["state"] or "")
+    recent_published = recent_state == "PUBLISHED" and valid_separation
     return {
-        "status": status,
-        "capability_available": status == "ok",
+        # A request outcome is not a service probe. Reaching this endpoint
+        # proves the API capability is available; request state remains an
+        # independent, auditable fact below.
+        "status": "ok" if valid_separation else "failed",
+        "service_status": "ok",
+        "isolation_status": "ok" if valid_separation else "failed",
+        "capability_available": True,
         "last_request_at": str(row["requested_at_hkt"] or ""),
-        "last_success_at": str(row["requested_at_hkt"] or "") if status == "ok" else "",
+        "last_success_at": (
+            str(latest_success["requested_at_hkt"] or "")
+            if latest_success is not None
+            else ""
+        ),
         "detail": (
             "最近请求保存在独立 adhoc namespace，不进入定时研究证据。"
-            if status == "ok"
-            else "最近请求 ledger 状态或研究隔离标记无效。"
+            if recent_published
+            else "最近请求违反 adhoc 与定时研究证据隔离契约。"
+            if not valid_separation
+            else f"即时生成 API 可用；最近请求状态为 {recent_state or 'UNKNOWN'}，不作为服务健康判据。"
         ),
-        "next_action": "检查即时生成请求诊断 ID和隔离标记。",
+        "next_action": (
+            ""
+            if recent_published
+            else "隔离该请求产物并修复 ledger 的研究证据资格与冻结事件引用。"
+            if not valid_separation
+            else "按请求诊断 ID检查输入、有效期或拒绝原因；服务健康需以独立探针判定。"
+        ),
         "recent_request": {
             "request_id": str(row["request_id"] or ""),
             "requested_at": str(row["requested_at_hkt"] or ""),
@@ -8339,7 +8470,8 @@ def _operations_adhoc_domain(conn: sqlite3.Connection, *, issue: str) -> dict[st
             "status": str(row["immutable_status"] or ""),
             "valid_until": str(row["valid_until_hkt"] or ""),
             "sale_status_verified_at_generation": bool(row["sale_status_verified"]),
-            "state": str(row["state"] or ""),
+            "state": recent_state,
+            "separation_valid": valid_separation,
         },
         "scheduled_freeze_event_id": None,
         "research_evidence_eligible": False,
@@ -8430,6 +8562,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
     _ensure_decision_snapshot_schema(conn)
     _ensure_live_workflow_schema(conn)
     _ensure_postmatch_review_run_schema(conn)
+    _ensure_operations_alert_lifecycle_schema(conn)
     resolved = _resolve_issue(conn, issue)
     observed_at = datetime.now(HK_TZ)
     generated_at = observed_at.isoformat(timespec="seconds")
@@ -8657,6 +8790,13 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
         scheduled_freeze=scheduled_freeze_domain,
         adhoc_service=adhoc_domain,
         settlement_review=settlement_domain,
+        prior_alert_lifecycle=_open_operations_alert_lifecycle(conn, issue=resolved),
+    )
+    _persist_operations_alert_lifecycle(
+        conn,
+        issue=resolved,
+        observed_at=generated_at,
+        alerts=canonical["alerts"],
     )
     collection_status = str(collection_domain.get("status") or "missing")
     capture_status = (
