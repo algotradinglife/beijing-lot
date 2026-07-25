@@ -82,12 +82,12 @@ spec:
 
 status:
   current: AWAITING_REVIEW
-  attempts: 1
+  attempts: 2
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "Automated engineering validation, independent local Codex review, and user-authorized browser/device visual validation passed on PR #29. The branch is ready for Research PI review; this remains implementation capability rather than prospective live-betting or research-evidence proof."
+    reason: "PI follow-up implementation and new-head engineering validation are complete in the isolated worktree. PR #29 awaits Research PI re-review; this remains implementation capability only, not prospective live-betting or research-evidence proof."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/28"
       artifact_type: issue
@@ -96,16 +96,33 @@ status:
       artifact_type: pull_request
       description: Isolated adhoc betting workflow awaiting Research PI review
   result:
-    implementation_head: 1b5049e2f354608eec1b368307d28ff295f1b3c7
+    implementation_head: 8cde25f
+    pi_review_state: CHANGES_REQUESTED
+    pi_reviewed_head: af6814fa6f3069b1b31e4ee584b3b0ab6e35e4c6
     automated_engineering_validation: PASS
     independent_codex_review: PASS
     browser_device_visual_validation: PASS
     browser_device_visual_evidence: "Controlled local fixture: generated N=5 / ¥1024 plan through the real API and web flow; 375x812 viewport had no horizontal overflow, CJK text rendered, desktop layout had no console errors, and the generated four-page 595x842 pt A4 PDF had legible uncut first and last pages. HTML and CSV downloads returned OPERATIONAL_CURRENT."
-    python_tests: 33_passed
+    python_tests: 34_passed
     dashboard_tests: 23_passed
     frontend_build: PASS
     diff_check: PASS
+    review_followup_validation: "PASS: released 12000-attempt Exact-N contract is shared with the scheduled publisher; plan/manifest freeze source/version/selection/staking parameters; verifier replays ticket order/cost/reason; fully rehashed replacement-ticket adversarial test rejects."
+    independent_codex_review_followup: PASS
+    baseline_note: "Three unrelated estimate_segment_betting_plan tests fail identically at pre-change af6814f and this revised worktree; they are not caused by this follow-up diff."
   history:
+    - action: followup_engineering_validation_completed
+      ts: "2026-07-25T15:42:30+08:00"
+      actor: engineer
+      from: EXECUTING
+      to: AWAITING_REVIEW
+      reason: "Validated the PI follow-up with 28 adhoc package tests plus 6 adhoc API tests, 23 dashboard tests, TypeScript/Vite build, Ruff, diff check, and an independent local Codex review. New tests prove a fully rehashed valid-looking ticket substitution is rejected by deterministic portfolio replay."
+    - action: research_pi_changes_requested
+      ts: "2026-07-25T15:37:44+08:00"
+      actor: research_pi
+      from: AWAITING_REVIEW
+      to: EXECUTING
+      reason: "PR #29 requires the released Exact-N sampling contract, deterministic portfolio replay from immutable inputs, and UI wording that limits refresh to valid_until server-clock classification rather than live sale-state revalidation."
     - action: ready_for_research_pi_review
       ts: "2026-07-25T15:14:56+08:00"
       actor: engineer
