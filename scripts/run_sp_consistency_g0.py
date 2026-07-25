@@ -36,6 +36,10 @@ def parse_args() -> argparse.Namespace:
     repo = _repo_root()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--p34-db", type=Path, default=repo / "data/beidan_live.db")
+    parser.add_argument(
+        "--p34-raw-bundle-root", type=Path, default=repo / "results/data_collection",
+        help="Root containing immutable p34 raw bundles addressed by SHA256SUMS digest.",
+    )
     parser.add_argument("--p0-db", type=Path, default=repo / "data/derived/500_bjdc/500_bjdc.sqlite")
     parser.add_argument(
         "--p42-freeze-root", type=Path, default=repo / "results/research/multimarket_segment_freeze_v1"
@@ -61,6 +65,7 @@ def main() -> int:
     atomic = create_g0_input_snapshot(
         work_dir=work,
         p34_db=arguments.p34_db,
+        p34_raw_bundle_root=arguments.p34_raw_bundle_root,
         p0_db=arguments.p0_db,
         p42_freeze_root=arguments.p42_freeze_root,
         model_search_roots=arguments.model_search_root,
@@ -68,6 +73,7 @@ def main() -> int:
     audit = run_g0_coverage_audit(
         p34_db=atomic.p34_snapshot,
         p34_source_schema=atomic.p34_source_schema,
+        p34_raw_bundle_root=atomic.p34_raw_bundle_root,
         p0_db=atomic.p0_snapshot,
         p42_freeze_root=atomic.p42_root,
         model_inventory=atomic.model_inventory,
@@ -102,6 +108,7 @@ def main() -> int:
             input_files=[
                 atomic.p34_snapshot,
                 atomic.p34_source_schema,
+                atomic.p34_raw_bundle_archive,
                 atomic.p0_snapshot,
                 atomic.p42_archive,
                 atomic.model_inventory,

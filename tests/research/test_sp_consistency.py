@@ -12,6 +12,7 @@ from research.sp_consistency.mapping import (
     score_distribution_handicap_bounds,
 )
 from research.sp_consistency.snapshot import create_g0_input_snapshot
+from research.sp_consistency.snapshot import sha256_file
 from src.research_freeze_protocol import create_freeze_package
 
 
@@ -59,10 +60,20 @@ def _p0_fixture(path: Path) -> None:
     connection.close()
 
 
-def _p34_strict_provenance_fixture(path: Path) -> None:
+def _raw_bundle_fixture(root: Path) -> str:
+    bundle = root / "bundle"
+    bundle.mkdir(parents=True)
+    payload = bundle / "raw.json"
+    payload.write_text('{"capture":"fixture"}\n', encoding="utf-8")
+    sums = bundle / "SHA256SUMS"
+    sums.write_text(f"{sha256_file(payload)}  raw.json\n", encoding="utf-8")
+    return sha256_file(sums)
+
+
+def _p34_strict_provenance_fixture(path: Path, bundle_hash: str) -> None:
     connection = sqlite3.connect(path)
     connection.executescript(
-        """
+        f"""
         CREATE TABLE matches (match_id TEXT PRIMARY KEY, issue TEXT, match_idx INTEGER, kickoff_ts TEXT);
         CREATE TABLE snapshots (
             match_id TEXT, snapshot_ts TEXT, sp_3 REAL, sp_1 REAL, sp_0 REAL,
@@ -71,7 +82,7 @@ def _p34_strict_provenance_fixture(path: Path) -> None:
         INSERT INTO matches VALUES ('m1', '26080', 1, '2026-07-25T18:00:00Z');
         INSERT INTO snapshots VALUES (
             'm1', '2026-07-25T10:00:00Z', 2.0, 3.0, 4.0,
-            '2026-07-25T09:50:00Z', '2026-07-25T09:55:00Z', 'batch-1', 'aabbcc'
+            '2026-07-25T09:50:00Z', '2026-07-25T09:55:00Z', 'batch-1', '{bundle_hash}'
         );
         """
     )
@@ -93,6 +104,7 @@ def test_g0_is_outcome_blind_and_fails_closed_without_strict_p34_provenance(tmp_
     report = run_g0_coverage_audit(
         p34_db=atomic.p34_snapshot,
         p34_source_schema=atomic.p34_source_schema,
+        p34_raw_bundle_root=atomic.p34_raw_bundle_root,
         p0_db=atomic.p0_snapshot,
         p42_freeze_root=atomic.p42_root,
         model_inventory=atomic.model_inventory,
@@ -112,7 +124,8 @@ def test_g0_is_outcome_blind_and_fails_closed_without_strict_p34_provenance(tmp_
 def test_g0_exports_and_evaluates_strict_p34_provenance_when_source_fields_exist(tmp_path: Path):
     p34 = tmp_path / "p34-strict.db"
     p0 = tmp_path / "p0.db"
-    _p34_strict_provenance_fixture(p34)
+    raw_root = tmp_path / "raw-bundles"
+    _p34_strict_provenance_fixture(p34, _raw_bundle_fixture(raw_root))
     _p0_fixture(p0)
     atomic = create_g0_input_snapshot(
         work_dir=tmp_path / "atomic",
@@ -120,10 +133,12 @@ def test_g0_exports_and_evaluates_strict_p34_provenance_when_source_fields_exist
         p0_db=p0,
         p42_freeze_root=tmp_path / "no-freezes",
         model_search_roots=[tmp_path / "no-model-assets"],
+        p34_raw_bundle_root=raw_root,
     )
     report = run_g0_coverage_audit(
         p34_db=atomic.p34_snapshot,
         p34_source_schema=atomic.p34_source_schema,
+        p34_raw_bundle_root=atomic.p34_raw_bundle_root,
         p0_db=atomic.p0_snapshot,
         p42_freeze_root=atomic.p42_root,
         model_inventory=atomic.model_inventory,
@@ -134,6 +149,34 @@ def test_g0_exports_and_evaluates_strict_p34_provenance_when_source_fields_exist
     assert report["coverage"]["p34"]["source_schema"]["all_required_fields_present"] is True
     assert report["coverage"]["model_score"]["status"] == "UNKNOWN_NOT_EVALUATED"
     assert report["coverage"]["model_score"]["strict_complete_match_markets"] is None
+
+
+@pytest.mark.parametrize("bundle_hash", ["aabbcc", "f" * 64])
+def test_g0_rejects_malformed_or_unbound_immutable_bundle_hash(tmp_path: Path, bundle_hash: str):
+    p34 = tmp_path / "p34-invalid-bundle.db"
+    p0 = tmp_path / "p0.db"
+    _p34_strict_provenance_fixture(p34, bundle_hash)
+    _p0_fixture(p0)
+    atomic = create_g0_input_snapshot(
+        work_dir=tmp_path / "atomic",
+        p34_db=p34,
+        p0_db=p0,
+        p42_freeze_root=tmp_path / "no-freezes",
+        model_search_roots=[tmp_path / "no-model-assets"],
+        p34_raw_bundle_root=tmp_path / "empty-raw-bundles",
+    )
+    report = run_g0_coverage_audit(
+        p34_db=atomic.p34_snapshot,
+        p34_source_schema=atomic.p34_source_schema,
+        p34_raw_bundle_root=atomic.p34_raw_bundle_root,
+        p0_db=atomic.p0_snapshot,
+        p42_freeze_root=atomic.p42_root,
+        model_inventory=atomic.model_inventory,
+        input_fingerprints=atomic.fingerprints,
+        audit_at_utc="2026-07-25T10:00:00+00:00",
+    )
+    assert report["coverage"]["p34"]["strict_complete_match_markets"] == 0
+    assert report["coverage"]["p34"]["rejections"]["invalid_or_unbound_immutable_bundle_sha256"] == 1
 
 
 def test_atomic_g0_inputs_rebuild_same_audit_and_freeze_identity(tmp_path: Path):
@@ -157,6 +200,7 @@ def test_atomic_g0_inputs_rebuild_same_audit_and_freeze_identity(tmp_path: Path)
         audit = run_g0_coverage_audit(
             p34_db=atomic.p34_snapshot,
             p34_source_schema=atomic.p34_source_schema,
+            p34_raw_bundle_root=atomic.p34_raw_bundle_root,
             p0_db=atomic.p0_snapshot,
             p42_freeze_root=atomic.p42_root,
             model_inventory=atomic.model_inventory,
@@ -173,7 +217,7 @@ def test_atomic_g0_inputs_rebuild_same_audit_and_freeze_identity(tmp_path: Path)
         freezes.append(create_freeze_package(
             tmp_path / f"freeze-{index}", experiment_id="SP-CONSISTENCY-001A-G0-R4",
             research_question="fixture", model_version="fixture-v1",
-            input_files=[atomic.p34_snapshot, atomic.p34_source_schema, atomic.p0_snapshot, atomic.p42_archive, atomic.model_inventory, atomic.fingerprints, audit_path],
+            input_files=[atomic.p34_snapshot, atomic.p34_source_schema, atomic.p34_raw_bundle_archive, atomic.p0_snapshot, atomic.p42_archive, atomic.model_inventory, atomic.fingerprints, audit_path],
             decision_files=[decision_path], config_file=config_path,
             git_commit="1234567", frozen_at_utc="2026-07-25T10:00:00+00:00",
         ))

@@ -17,6 +17,7 @@ from pathlib import Path
 from statistics import median
 from typing import Any
 
+from research.sp_consistency.snapshot import SHA256_RE, _verified_raw_bundle_id
 from src.multimarket_p0 import MultimarketP0Error, verify_segment_freeze
 
 
@@ -67,7 +68,21 @@ def _nonempty(value: object) -> bool:
     return value is not None and bool(str(value).strip())
 
 
-def _p34_coverage(connection: sqlite3.Connection, source_schema_path: Path) -> dict[str, Any]:
+def _verified_p34_raw_bundle_ids(root: Path) -> set[str]:
+    if not root.is_dir():
+        return set()
+    verified: set[str] = set()
+    for candidate in sorted(root.iterdir()):
+        if not candidate.is_dir() or candidate.is_symlink():
+            continue
+        try:
+            verified.add(_verified_raw_bundle_id(candidate))
+        except (OSError, ValueError):
+            continue
+    return verified
+
+
+def _p34_coverage(connection: sqlite3.Connection, source_schema_path: Path, raw_bundle_root: Path) -> dict[str, Any]:
     if not (_table_exists(connection, "matches") and _table_exists(connection, "snapshots")):
         return {
             "status": "unavailable",
@@ -104,6 +119,8 @@ def _p34_coverage(connection: sqlite3.Connection, source_schema_path: Path) -> d
     strict_by_issue: Counter[str] = Counter()
     missing_provenance_by_issue: Counter[str] = Counter()
     invalid_provenance_clock_by_issue: Counter[str] = Counter()
+    invalid_or_unbound_bundle_by_issue: Counter[str] = Counter()
+    verified_bundle_ids = _verified_p34_raw_bundle_ids(raw_bundle_root)
     for row in connection.execute(
         "SELECT match_id, snapshot_ts, sp_3, sp_1, sp_0, source_observed_at, fetched_at, raw_batch_id, immutable_bundle_sha256 "
         "FROM snapshots ORDER BY match_id, snapshot_ts"
@@ -137,6 +154,14 @@ def _p34_coverage(connection: sqlite3.Connection, source_schema_path: Path) -> d
         if not all_required_fields_present or not all(_nonempty(value) for value in values):
             missing_provenance_by_issue[issue] += 1
             continue
+        bundle_hash = str(row["immutable_bundle_sha256"]).strip()
+        if (
+            not SHA256_RE.fullmatch(bundle_hash)
+            or bundle_hash != bundle_hash.lower()
+            or bundle_hash not in verified_bundle_ids
+        ):
+            invalid_or_unbound_bundle_by_issue[issue] += 1
+            continue
         source_at = _parse_utc(str(row["source_observed_at"]), naive_timezone=HKT)
         fetched_at = _parse_utc(str(row["fetched_at"]), naive_timezone=HKT)
         if source_at is None or fetched_at is None or source_at > fetched_at or fetched_at > snapshot_at:
@@ -169,6 +194,7 @@ def _p34_coverage(connection: sqlite3.Connection, source_schema_path: Path) -> d
                 "missing_immutable_raw_bundle_provenance": missing_provenance_by_issue[issue],
                 "missing_source_and_fetch_dual_clock": missing_provenance_by_issue[issue] + invalid_provenance_clock_by_issue[issue],
                 "invalid_provenance_clock_order": invalid_provenance_clock_by_issue[issue],
+                "invalid_or_unbound_immutable_bundle_sha256": invalid_or_unbound_bundle_by_issue[issue],
             }
             for issue in issues
         ],
@@ -186,6 +212,7 @@ def _p34_coverage(connection: sqlite3.Connection, source_schema_path: Path) -> d
             "missing_immutable_raw_bundle_provenance": sum(missing_provenance_by_issue.values()),
             "missing_source_and_fetch_dual_clock": sum(missing_provenance_by_issue.values()) + sum(invalid_provenance_clock_by_issue.values()),
             "invalid_provenance_clock_order": sum(invalid_provenance_clock_by_issue.values()),
+            "invalid_or_unbound_immutable_bundle_sha256": sum(invalid_or_unbound_bundle_by_issue.values()),
             "post_kickoff_or_unparseable_complete_observation": complete_observations
             - clocked_pre_kickoff_observations,
             "match_mapping_or_clock_missing": malformed_clock_rows,
@@ -198,6 +225,7 @@ def _p34_coverage(connection: sqlite3.Connection, source_schema_path: Path) -> d
             "all_required_fields_present": all_required_fields_present,
             "missing_required_fields": schema_missing_fields,
             "required_provenance": provenance_contract,
+            "verified_raw_bundle_sha256s": sorted(verified_bundle_ids),
         },
     }
 
@@ -331,7 +359,7 @@ def _model_score_coverage(inventory_path: Path) -> dict[str, Any]:
 
 
 def run_g0_coverage_audit(
-    *, p34_db: Path, p34_source_schema: Path, p0_db: Path, p42_freeze_root: Path, model_inventory: Path, input_fingerprints: Path, audit_at_utc: str
+    *, p34_db: Path, p34_source_schema: Path, p34_raw_bundle_root: Path, p0_db: Path, p42_freeze_root: Path, model_inventory: Path, input_fingerprints: Path, audit_at_utc: str
 ) -> dict[str, Any]:
     """Return a deterministic, outcome-blind G0 coverage report.
 
@@ -350,7 +378,7 @@ def run_g0_coverage_audit(
     p34_connection = _read_only_connection(p34_path)
     p0_connection = _read_only_connection(p0_path)
     try:
-        p34 = _p34_coverage(p34_connection, p34_source_schema)
+        p34 = _p34_coverage(p34_connection, p34_source_schema, p34_raw_bundle_root)
         p42 = _p42_frozen_coverage(p42_freeze_root, p0_connection)
     finally:
         p34_connection.close()
@@ -386,6 +414,7 @@ def run_g0_coverage_audit(
                 "snapshots.match_id", "snapshots.snapshot_ts", "snapshots.sp_3", "snapshots.sp_1", "snapshots.sp_0",
                 "snapshots.source_observed_at", "snapshots.fetched_at", "snapshots.raw_batch_id",
                 "snapshots.immutable_bundle_sha256", "p34_source_schema.json",
+                "p34_raw_bundles/SHA256SUMS",
             ],
             "p0_columns": ["matches.issue", "matches.match_idx", "matches.handicap_line"],
             "prohibited_tables_or_columns": ["settlements", "result_code", "fthg", "ftag", "winning_sp", "score"],

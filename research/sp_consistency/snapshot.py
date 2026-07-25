@@ -14,6 +14,7 @@ import json
 import shutil
 import sqlite3
 import tarfile
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -22,6 +23,7 @@ from src.multimarket_p0 import MultimarketP0Error, verify_segment_freeze
 
 
 MODEL_TERMS = ("william", "willhill", "1x2", "over_under", "overunder", "ou_")
+SHA256_RE = re.compile(r"[0-9a-f]{64}")
 P34_PROVENANCE_COLUMNS = {
     "source_observed_at": ("source_observed_at", "source_updated_at", "source_updatetime"),
     "fetched_at": ("fetched_at_utc", "fetched_at"),
@@ -41,6 +43,31 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(4 * 1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _verified_raw_bundle_id(path: Path) -> str:
+    """Verify a raw bundle and return its SHA256SUMS identity.
+
+    The p34 provenance contract uses the SHA-256 of an immutable bundle's
+    SHA256SUMS file, not a free-form payload identifier.  Every entry must be
+    a regular, in-bundle file whose digest matches the manifest.
+    """
+
+    sums = path / "SHA256SUMS"
+    if not sums.is_file() or sums.is_symlink():
+        raise ValueError("raw bundle SHA256SUMS missing")
+    for line in sums.read_text(encoding="utf-8").splitlines():
+        try:
+            digest, name = line.split("  ", 1)
+        except ValueError as exc:
+            raise ValueError("invalid raw bundle SHA256SUMS entry") from exc
+        relative = Path(name)
+        if not SHA256_RE.fullmatch(digest) or relative.is_absolute() or ".." in relative.parts or not relative.parts:
+            raise ValueError("unsafe raw bundle SHA256SUMS entry")
+        target = path / relative
+        if not target.is_file() or target.is_symlink() or sha256_file(target) != digest:
+            raise ValueError("raw bundle checksum mismatch")
+    return sha256_file(sums)
 
 
 def _read_only(path: Path) -> sqlite3.Connection:
@@ -164,7 +191,14 @@ def _snapshot_p34(source: Path, destination: Path, schema_destination: Path) -> 
     finally:
         connection.close()
     return {
-        "p34": {"logical_name": "p34_g0_snapshot.sqlite", "rows": {"matches": len(matches), "snapshots": len(snapshots)}},
+        "p34": {
+            "logical_name": "p34_g0_snapshot.sqlite",
+            "rows": {"matches": len(matches), "snapshots": len(snapshots)},
+            "referenced_raw_bundle_sha256s": sorted({
+                str(row[8]).strip() for row in snapshots
+                if SHA256_RE.fullmatch(str(row[8]).strip()) and str(row[8]).strip() == str(row[8]).strip().lower()
+            }),
+        },
         "schema": {"logical_name": "p34_source_schema.json"},
     }
 
@@ -265,10 +299,39 @@ def _copy_verified_p42_packages(source_root: Path, destination: Path) -> list[di
     return copied
 
 
+def _copy_verified_p34_raw_bundles(
+    source_root: Path, destination: Path, required_hashes: Iterable[str]
+) -> dict[str, list[str]]:
+    """Copy only p34 raw bundles whose verified manifest IDs are referenced."""
+
+    required = set(required_hashes)
+    destination.mkdir(parents=True, exist_ok=True)
+    if not required:
+        return {"required": [], "verified": [], "missing": []}
+    verified: set[str] = set()
+    if source_root.is_dir():
+        for sums in sorted(source_root.rglob("SHA256SUMS")):
+            try:
+                bundle_id = _verified_raw_bundle_id(sums.parent)
+            except (OSError, ValueError):
+                continue
+            if bundle_id not in required or bundle_id in verified:
+                continue
+            shutil.copytree(sums.parent, destination / bundle_id)
+            verified.add(bundle_id)
+    return {
+        "required": sorted(required),
+        "verified": sorted(verified),
+        "missing": sorted(required - verified),
+    }
+
+
 @dataclass(frozen=True)
 class G0InputSnapshot:
     p34_snapshot: Path
     p34_source_schema: Path
+    p34_raw_bundle_archive: Path
+    p34_raw_bundle_root: Path
     p0_snapshot: Path
     p42_archive: Path
     p42_root: Path
@@ -277,7 +340,8 @@ class G0InputSnapshot:
 
 
 def create_g0_input_snapshot(
-    *, work_dir: Path, p34_db: Path, p0_db: Path, p42_freeze_root: Path, model_search_roots: Iterable[Path]
+    *, work_dir: Path, p34_db: Path, p0_db: Path, p42_freeze_root: Path, model_search_roots: Iterable[Path],
+    p34_raw_bundle_root: Path | None = None,
 ) -> G0InputSnapshot:
     """Create the entire immutable, outcome-blind input set before running G0."""
 
@@ -285,12 +349,19 @@ def create_g0_input_snapshot(
     inputs.mkdir(parents=True)
     p34_snapshot = inputs / "p34_g0_snapshot.sqlite"
     p34_source_schema = inputs / "p34_source_schema.json"
+    p34_raw_bundle_root_copy = inputs / "p34_raw_bundles"
+    p34_raw_bundle_archive = inputs / "p34_raw_bundles.tar.gz"
     p0_snapshot = inputs / "p0_handicap_snapshot.sqlite"
     p42_root = inputs / "p42_segment_freezes"
     p42_archive = inputs / "p42_segment_freezes.tar.gz"
     model_inventory = inputs / "model_score_inventory.json"
     fingerprints = inputs / "input_fingerprints.json"
     p34_info = _snapshot_p34(p34_db, p34_snapshot, p34_source_schema)
+    required_bundle_hashes = list(p34_info["p34"]["referenced_raw_bundle_sha256s"])
+    raw_bundle_info = _copy_verified_p34_raw_bundles(
+        p34_raw_bundle_root or p34_db.parent, p34_raw_bundle_root_copy, required_bundle_hashes
+    )
+    _deterministic_tar(p34_raw_bundle_root_copy, p34_raw_bundle_archive)
     p0_info = _snapshot_p0_handicaps(p0_db, p0_snapshot)
     p42_packages = _copy_verified_p42_packages(p42_freeze_root, p42_root)
     _deterministic_tar(p42_root, p42_archive)
@@ -299,9 +370,16 @@ def create_g0_input_snapshot(
         "schema_version": "sp_consistency_g0_atomic_inputs_v2",
         "p34": {**p34_info["p34"], "bytes": p34_snapshot.stat().st_size, "sha256": sha256_file(p34_snapshot)},
         "p34_source_schema": {**p34_info["schema"], "bytes": p34_source_schema.stat().st_size, "sha256": sha256_file(p34_source_schema)},
+        "p34_raw_bundles": {
+            "logical_name": "p34_raw_bundles.tar.gz", "bytes": p34_raw_bundle_archive.stat().st_size,
+            "sha256": sha256_file(p34_raw_bundle_archive), **raw_bundle_info,
+        },
         "p0": {"logical_name": "p0_handicap_snapshot.sqlite", "bytes": p0_snapshot.stat().st_size, "sha256": sha256_file(p0_snapshot), "rows": p0_info["rows"]},
         "p42": {"logical_name": "p42_segment_freezes.tar.gz", "bytes": p42_archive.stat().st_size, "sha256": sha256_file(p42_archive), "verified_packages": p42_packages},
         "model_score_inventory": {"logical_name": "model_score_inventory.json", "bytes": model_inventory.stat().st_size, "sha256": sha256_file(model_inventory)},
     }
     fingerprints.write_text(json.dumps(records, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return G0InputSnapshot(p34_snapshot, p34_source_schema, p0_snapshot, p42_archive, p42_root, model_inventory, fingerprints)
+    return G0InputSnapshot(
+        p34_snapshot, p34_source_schema, p34_raw_bundle_archive, p34_raw_bundle_root_copy,
+        p0_snapshot, p42_archive, p42_root, model_inventory, fingerprints,
+    )
