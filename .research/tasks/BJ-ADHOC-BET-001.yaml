@@ -87,7 +87,7 @@ status:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "Engineering Validation and an independent local Codex review passed on PR #29 HEAD 1b5049e; awaiting Research PI review."
+    reason: "Automated engineering validation and an independent local Codex review passed on PR #29 implementation HEAD 1b5049e. Browser/device visual validation is still pending user-approved setup, then Research PI review."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/28"
       artifact_type: issue
@@ -97,19 +97,20 @@ status:
       description: Isolated adhoc betting workflow awaiting Research PI review
   result:
     implementation_head: 1b5049e2f354608eec1b368307d28ff295f1b3c7
-    engineering_validation: PASS
+    automated_engineering_validation: PASS
     independent_codex_review: PASS
+    browser_device_visual_validation: PENDING_USER_CONFIRMATION
     python_tests: 33_passed
     dashboard_tests: 23_passed
     frontend_build: PASS
     diff_check: PASS
   history:
-    - action: engineering_validation_completed
+    - action: automated_engineering_validation_completed
       ts: "2026-07-25T14:35:59+08:00"
       actor: everything-bot-engineer
       from: EXECUTING
       to: VALIDATING
-      reason: "Validated PR #29 HEAD 1b5049e: 33 adhoc Python tests, 23 dashboard tests, production build, and diff check passed. Independent validation reproduced and closed the valid_until download race; an independent local Codex review found no actionable regression. Research PI review remains required."
+      reason: "Validated PR #29 implementation HEAD 1b5049e: 33 adhoc Python tests, 23 dashboard tests, production build, and diff check passed. Independent validation reproduced and closed the valid_until download race; an independent local Codex review found no actionable regression. Browser/device visual validation remains pending because its one-time local setup requires user approval; Research PI review follows that gate."
     - action: implementation_complete_pending_validation
       ts: "2026-07-25T14:10:00+08:00"
       actor: engineer
