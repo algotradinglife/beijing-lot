@@ -236,7 +236,7 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
             exclusions["invalid_or_sentinel_kickoff"] += 1
             continue
         if not isinstance(season, int) or season not in {*TRAIN_SEASONS, *TEST_SEASONS}:
-            exclusions["outside_frozen_2014_2024_window"] += 1
+            exclusions["outside_frozen_2014_2025_window"] += 1
             continue
         values = (row["league"], row["home"], row["away"])
         if any(value is None or not str(value).strip() for value in values):
