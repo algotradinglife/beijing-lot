@@ -41,9 +41,7 @@ spec:
       dispatch_rank: 2
       preemptible: false
       wip_slot: engineering_primary
-      selection_reason: next_engineer_capability_after_current_fix_cycle
-      queue_after_active_task: BJ-FREEZE-REVIEW-001
-      queue_note: Scheduling order only; BJ-ADHOC-BET-001 has no domain dependency on BJ-FREEZE-REVIEW-001.
+      selection_reason: highest_priority_ready_engineer_capability
 
   execution:
     required_capabilities:
@@ -89,7 +87,7 @@ status:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "ROUTE: Engineer. P0 READY but queued in engineering_primary behind the active BJ-FREEZE-REVIEW-001 fix cycle."
+    reason: "ROUTE: Engineer. P0 READY; all graph dependencies are complete and engineering_primary was released by BJ-FREEZE-REVIEW-001."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/28"
       artifact_type: issue
@@ -114,3 +112,9 @@ status:
       from: PLANNING
       to: READY
       reason: "Capability contract is complete and exact-N dependencies are resolved; shared engineering_primary WIP keeps it queued behind BJ-FREEZE-REVIEW-001."
+    - action: wip_slot_released
+      ts: "2026-07-25T04:43:16Z"
+      actor: research_pi
+      from: READY
+      to: READY
+      reason: "BJ-FREEZE-REVIEW-001 completed after PI approval and merge; BJ-ADHOC-BET-001 is now the highest-priority eligible task for engineering_primary."

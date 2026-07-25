@@ -81,13 +81,13 @@ spec:
       - research_pi_review
 
 status:
-  current: REVIEW
+  current: COMPLETED
   attempts: 1
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "ROUTE: Engineer. Audit-only remediation and Engineering Validation are complete; scope decisions and PI review route to owner/strategist."
+    reason: "PR #27 approved by the Research PI on 2fd5ca5 and merged as a19eda9. Capability complete; engineering_primary WIP released."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/pull/27"
       artifact_type: pull_request
@@ -101,8 +101,12 @@ status:
     pi_review_head: 9bba71121711867e44a18969abe14aebe52402ac
     pi_review_decision: CHANGES_REQUESTED
     audit_only_fix_commit: 72765ccd7e23c91724e254501abbce296acb5506
+    final_pi_review_head: 2fd5ca5bc5ab6837c60fe9382355b188a3e95949
+    final_pi_review_decision: APPROVED
+    merge_commit: a19eda95a00892896fe0375477d42718ebfd9d8b
     bundle_id: 23a437058df57483cf710ef7f8d1c55b7520a4480cd2be0f78d0c69fa2946dfd
     bundle_status: SOURCE_INTEGRITY_PASS
+    usage_boundary: RESEARCH_AUDIT_ONLY_NOT_FOR_PURCHASE
     bundle_sha256sums_digest: dc6a3b609476a2d59ae24aeadc45cdc5dc857b1e78014fd6e37cef4f4bdf7fbe
     tests: 53_passed
     clean_checkout_verifier: PASS
@@ -130,5 +134,11 @@ status:
       ts: "2026-07-25T04:23:00Z"
       actor: everything-bot-engineer
       from: EXECUTING
-      to: REVIEW
+      to: VALIDATING
       reason: "Audit-only rescope, portable evidence, complete content identity, clean-checkout verification, 53 tests, Ruff, graph validation, and cross-root PDF byte identity passed on the PR fix."
+    - action: operational_completion
+      ts: "2026-07-25T04:43:16Z"
+      actor: research_pi
+      from: VALIDATING
+      to: COMPLETED
+      reason: "PI approved exact HEAD 2fd5ca5 after confirming the audit-only usage boundary, prospective freeze binding, zero terminal-field overlap with included or selected legs, and honest correct-score unavailability; PR #27 merged as a19eda9."
