@@ -1,6 +1,6 @@
 # SCORE-HCAP-HIST-001 — historical score model to handicap 3/1/0
 
-Status: `g0_pending; no_formal_result`
+Status: `frozen_retrospective_result_pending_independent_validation`
 
 This is retrospective chronological research only. It never creates tickets, stakes, ROI, EV, budget, production, API, frontend, or release authority.
 
@@ -21,3 +21,11 @@ G0 exports only canonical identifiers, chronology, teams, integer handicap, hist
 G0 additionally emits an outcome-independent feature-availability matrix. This is an inventory only: it does not calculate an incremental feature result, alter B0/B1, or alter the primary metric or decision rule. It explicitly marks source fields without an independently reliable pre-kickoff timestamp as terminal-prohibited. In particular, the existing `walkforward_beidan_result_model_eval.py` consumer names `TEAM_FORM_PROB_KEYS` and related `team_*` values, but `load_match_extras()` does not populate them; they are zero-valued placeholders, not historical team-form evidence. Any feature ablation needs a separately scoped Issue.
 
 Evidence is capped at C unless raw-source provenance becomes independently verifiable. Any eventual result is retrospective re-analysis, never untouched forward validation or a profitability claim.
+
+## Frozen result
+
+G0 passed as `G0_ELIGIBLE_EVIDENCE_C`: 187,150 qualified rows; ten test seasons (2016–2025), each above 1,000; 37 result-code mismatches in 187,187 comparable rows (0.0198%); and no unresolved canonical or normalized-team conflicts. The G0 R2 freeze ID is `87176ca340422f0294fa201331a511d6988d740e3eb7f8be007d9549165a17e6`.
+
+The single frozen B0/B1 replay used 151,742 held-out rows. B0 Log Loss was 1.085172 and B1 was 1.116602, for `delta = +0.031429` (B1 minus B0). The fixed-seed, season-stratified issue-block bootstrap 95% percentile interval was `[+0.029705, +0.033233]`; all ten season deltas were positive. The preregistered decision is therefore `NO_REPRODUCIBLE_INCREMENTAL_SIGNAL`. This is a negative retrospective result, not a claim about football, markets, profitability, or a prospective strategy.
+
+The B0/B1 freeze ID is `a8ecc767249005464d41c53b1ed7a4c70f5c25a2f438c33653a4c7acfe8f4103`. Evidence remains C because no row-level immutable raw-source bundle was available. The next step is independent Engineering Validation and PI research review; a new feature-ablation question, if desired, requires a separate Issue.
