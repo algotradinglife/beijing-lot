@@ -83,7 +83,7 @@ spec:
       - research_pi_review
 
 status:
-  current: VALIDATING
+  current: AWAITING_REVIEW
   attempts: 0
   routing:
     executor_mode: isolated_session
@@ -94,7 +94,13 @@ status:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/30"
       artifact_type: issue
       description: Approved capability execution contract
+    - uri: "https://github.com/algotradinglife/beijing-lot/pull/33"
+      artifact_type: pull_request
+      description: Operations Status v2 implementation and Engineering Validation
   result:
+    pull_request: 33
+    implementation_head: 1f1b13a
+    reviewed_head: 1f1b13a
     automated_engineering_validation: PASS
     independent_codex_review: PASS
     browser_device_visual_validation: PASS
@@ -110,6 +116,12 @@ status:
       - "Diagnostics redact unrestricted paths and process commands."
       - "Running work is no longer rendered as a failure, and the 375px page no longer expands to the collector table intrinsic width."
   history:
+    - action: ready_for_research_pi_review
+      ts: "2026-07-25T21:02:17+08:00"
+      actor: engineer
+      from: VALIDATING
+      to: AWAITING_REVIEW
+      reason: "Engineering Validation is complete and draft PR #33 contains the fixed develop-to-main implementation. Capability semantics, visual evidence, and scope boundaries are ready for PI review."
     - action: independent_codex_review_completed
       ts: "2026-07-25T20:56:25+08:00"
       actor: engineer
