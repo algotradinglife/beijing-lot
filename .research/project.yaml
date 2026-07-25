@@ -37,6 +37,7 @@ spec:
     - probability-modeling
     - market-calibration
     - bankroll-management
+    - operational-quality
 
   capabilities:
     required:
