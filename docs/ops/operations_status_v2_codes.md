@@ -46,3 +46,12 @@
 - 对数据展示、研究冻结、即时生成和结算的阻断标记。
 
 顶部阻断数、警告数和“待处理事项”必须直接使用同一 `alerts` 列表。
+
+## 公共诊断边界
+
+异常、数据库错误和健康探针错误属于不可信自由文本。Operations API 会将其中
+的 HTTP(S) URL、Authorization/Bearer、token、API key、password、cookie
+及绝对文件路径替换为脱敏标记。运行时兼容字段只暴露状态白名单，不透传原始
+command、diagnostics 或 URL 快照。
+
+可导航的受控引用必须由后端写入结构化 `links[]`，不能通过异常文本传递。

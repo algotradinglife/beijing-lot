@@ -8041,9 +8041,59 @@ def _latest_issue_specific_success(source_statuses: list[dict[str, Any]]) -> str
 
 
 def _safe_operations_text(value: Any) -> str:
-    """Remove unrestricted filesystem paths from public operations diagnostics."""
+    """Remove secrets and internal locations from public operations diagnostics."""
 
     return safe_diagnostic_text(value)
+
+
+def _public_operations_runtime_status(
+    runtime_status: dict[str, Any],
+) -> dict[str, Any]:
+    """Expose only the runtime facts required by the Operations compatibility view."""
+
+    public = {
+        key: runtime_status.get(key)
+        for key in (
+            "schema",
+            "checked_at",
+            "public_diagnostics",
+            "access_mode",
+            "external_access_configured",
+            "api_process_status",
+            "frontend_process_status",
+        )
+        if key in runtime_status
+    }
+    health = (
+        runtime_status.get("health")
+        if isinstance(runtime_status.get("health"), dict)
+        else {}
+    )
+    public_health: dict[str, Any] = {}
+    for component in ("api", "frontend_local", "operations"):
+        probe = health.get(component)
+        if not isinstance(probe, dict):
+            continue
+        public_probe = {
+            key: probe.get(key)
+            for key in (
+                "ok",
+                "status",
+                "latency_ms",
+                "issue",
+                "workflow_status",
+                "review_task_status",
+            )
+            if key in probe
+        }
+        if probe.get("error"):
+            public_probe["error"] = _safe_operations_text(probe.get("error"))
+        public_health[component] = public_probe
+    for key in ("host_smoke_count", "host_smoke_ok_count"):
+        if key in health:
+            public_health[key] = health.get(key)
+    public["health"] = public_health
+    return public
 
 
 def _operations_runtime_domain(
@@ -8824,6 +8874,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
     runtime_health = runtime_status.get("health") if isinstance(runtime_status.get("health"), dict) else {}
     api_probe = runtime_health.get("api") if isinstance(runtime_health.get("api"), dict) else {}
     frontend_probe = runtime_health.get("frontend_local") if isinstance(runtime_health.get("frontend_local"), dict) else {}
+    public_runtime_status = _public_operations_runtime_status(runtime_status)
 
     return {
         "schema_version": canonical["schema_version"],
@@ -8851,7 +8902,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
             "frontend_remote_url": "",
             "frontend_port": "",
             "frontend_health": "ok" if frontend_probe.get("ok") else "warn",
-            **runtime_status,
+            **public_runtime_status,
         },
         "sources": source_statuses,
         "snapshots": {

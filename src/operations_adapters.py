@@ -39,19 +39,66 @@ class CollectionPlanError(ValueError):
 
 
 def safe_diagnostic_text(value: Any) -> str:
-    """Redact absolute filesystem paths from externally visible diagnostics."""
+    """Redact secrets and internal locations from public free-form diagnostics."""
 
     text = str(value or "")
-    preserved_urls: dict[str, str] = {}
-
-    def preserve_url(match: re.Match[str]) -> str:
-        token = f"__diagnostic_url_{len(preserved_urls)}__"
-        preserved_urls[token] = match.group(0)
-        return token
-
-    # Web URLs are controlled diagnostic references rather than filesystem
-    # paths. Preserve them while applying broad absolute-path redaction.
-    text = re.sub(r"\bhttps?://[^\s,;\"'<>]+", preserve_url, text, flags=re.IGNORECASE)
+    # URLs embedded in exceptions are untrusted free-form text. Public,
+    # operator-controlled references belong in the structured ``links`` field;
+    # replacing the whole URL prevents userinfo, signed queries, and fragments
+    # from leaking while retaining the fact that a remote reference existed.
+    text = re.sub(
+        r"\bhttps?://[^\s,;\"'<>]+",
+        "[redacted-url]",
+        text,
+        flags=re.IGNORECASE,
+    )
+    # Header-style credentials can contain spaces and cookie separators, so
+    # redact the complete remainder of their line before handling scalar
+    # key/value forms.
+    text = re.sub(
+        r"""(?imx)
+        (?:["']?)
+        \b(authorization|proxy-authorization|cookie|set-cookie)\b
+        (?:["']?)
+        \s*[:=]\s*[^\r\n]*
+        """,
+        lambda match: f"{match.group(1)}: [redacted-secret]",
+        text,
+    )
+    text = re.sub(
+        r"(?i)\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]+",
+        lambda match: f"{match.group(1)} [redacted-secret]",
+        text,
+    )
+    text = re.sub(
+        r"""(?ix)
+        (?:["']?)
+        \b(
+            (?:access|refresh|id|auth)[_-]?token
+            | token
+            | api[_-]?key
+            | apikey
+            | password
+            | passwd
+            | pwd
+            | client[_-]?secret
+            | secret
+            | session(?:[_-]?id)?
+        )
+        \b
+        (?:["']?)
+        (\s*[:=]\s*)
+        (
+            "(?:\\.|[^"\\])*"
+            | '(?:\\.|[^'\\])*'
+            | [^\s,;]+
+        )
+        """,
+        lambda match: (
+            f"{match.group(1)}{match.group(2)}[redacted-secret]"
+        ),
+        text,
+    )
     patterns = (
         # Local and UNC file URIs, including file:///C:/... forms.
         r"(?i)\bfile:(?://|/)[^\s,;\"'<>]+",
@@ -65,8 +112,6 @@ def safe_diagnostic_text(value: Any) -> str:
     )
     for pattern in patterns:
         text = re.sub(pattern, "[redacted-path]", text)
-    for token, url in preserved_urls.items():
-        text = text.replace(token, url)
     return text
 
 

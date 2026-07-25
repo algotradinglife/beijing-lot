@@ -377,9 +377,44 @@ def test_shared_diagnostic_sanitizer_redacts_absolute_paths(path: str) -> None:
     assert "[redacted-path]" in safe_diagnostic_text(f"collector failed at {path}")
 
 
-def test_shared_diagnostic_sanitizer_preserves_urls() -> None:
-    url = "https://status.example.test/api/health"
-    assert safe_diagnostic_text(f"probe {url} failed") == f"probe {url} failed"
+@pytest.mark.parametrize(
+    ("diagnostic", "secret"),
+    [
+        (
+            "probe https://user:url-password@status.example.test/health"
+            "?token=url-query-secret#url-fragment-secret failed",
+            "url-password",
+        ),
+        (
+            "probe https://user:url-password@status.example.test/health"
+            "?token=url-query-secret#url-fragment-secret failed",
+            "url-query-secret",
+        ),
+        (
+            "probe https://user:url-password@status.example.test/health"
+            "?token=url-query-secret#url-fragment-secret failed",
+            "url-fragment-secret",
+        ),
+        ("Authorization: Bearer authorization-secret", "authorization-secret"),
+        ("proxy-authorization=Basic cHJveHktc2VjcmV0", "cHJveHktc2VjcmV0"),
+        ("retry with Bearer standalone-secret", "standalone-secret"),
+        ("api_key=api-key-secret", "api-key-secret"),
+        ("access-token: access-token-secret", "access-token-secret"),
+        ('password="password secret"', "password secret"),
+        ('{"token": "json-token-secret"}', "json-token-secret"),
+        ('{"clientSecret": "json-client-secret"}', "json-client-secret"),
+        ("Cookie: session=cookie-secret; Secure", "cookie-secret"),
+        ("Set-Cookie=session=set-cookie-secret; HttpOnly", "set-cookie-secret"),
+    ],
+)
+def test_shared_diagnostic_sanitizer_redacts_credentials(
+    diagnostic: str,
+    secret: str,
+) -> None:
+    sanitized = safe_diagnostic_text(diagnostic)
+
+    assert secret not in sanitized
+    assert "[redacted-" in sanitized
 
 
 def test_legacy_collector_reads_its_own_database(tmp_path: Path) -> None:
@@ -727,6 +762,27 @@ def test_operations_endpoint_declares_v2_and_validates_schema(
         appmod._ensure_postmatch_review_run_schema(conn)
         conn.execute(
             """
+            INSERT INTO fetch_log(
+                fetched_at,kind,issue,url,status,ok,elapsed_sec,bytes,rows_parsed,error
+            ) VALUES(?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                "2026-07-25 18:04:00",
+                "issue_html",
+                "26078",
+                "controlled-source",
+                500,
+                0,
+                0.1,
+                0,
+                0,
+                "collector failed at "
+                "https://collector-user:collector-url-secret@collector.invalid/"
+                "retry?token=collector-query-secret",
+            ),
+        )
+        conn.execute(
+            """
             INSERT INTO live_workflow_runs(
                 run_id, issue, mode, status, dry_run, requested_by, started_at,
                 finished_at, elapsed_sec, error, plan_json, result_json
@@ -742,7 +798,7 @@ def test_operations_endpoint_declares_v2_and_validates_schema(
                 "2026-07-25T18:00:00+08:00",
                 "2026-07-25T18:01:00+08:00",
                 60,
-                "/srv/workflow/private.log",
+                "api_key=workflow-api-key-secret path=/srv/workflow/private.log",
                 "[]",
                 "{}",
             ),
@@ -764,7 +820,7 @@ def test_operations_endpoint_declares_v2_and_validates_schema(
                 "2026-07-25T18:00:00+08:00",
                 "2026-07-25T18:01:00+08:00",
                 60,
-                r"C:\ops\workflow\private.log",
+                r"password=workflow-password-secret at C:\ops\workflow\private.log",
                 "{}",
             ),
         )
@@ -785,7 +841,7 @@ def test_operations_endpoint_declares_v2_and_validates_schema(
                 "2026-07-25T18:02:00+08:00",
                 "2026-07-25T18:03:00+08:00",
                 60,
-                "/private/review/result.json",
+                "Cookie: session=review-cookie-secret; source=/private/review/result.json",
                 "[]",
                 "{}",
             ),
@@ -793,7 +849,85 @@ def test_operations_endpoint_declares_v2_and_validates_schema(
         conn.commit()
     finally:
         conn.close()
-    monkeypatch.setattr(appmod, "DEFAULT_RESEARCH_SEGMENT_FREEZE_ROOT", tmp_path / "research")
+    research_event = tmp_path / "research/26078/segment_01/event-secret"
+    research_event.mkdir(parents=True)
+    original_research_freeze = appmod._research_freeze_for_segment
+
+    def research_freeze_from_fixture(
+        *,
+        issue: str,
+        segment_idx: int,
+        root: Path,
+    ) -> dict:
+        del root
+        return original_research_freeze(
+            issue=issue,
+            segment_idx=segment_idx,
+            root=tmp_path / "research",
+        )
+
+    monkeypatch.setattr(
+        appmod,
+        "_dashboard_runtime_summary",
+        lambda: {
+            "checked_at": "2026-07-25T18:05:00+08:00",
+            "access_mode": "local_only",
+            "external_access_configured": False,
+            "api_process_status": "failed",
+            "frontend_process_status": "running",
+            "diagnostics": {
+                "api_command": ["--token", "runtime-command-secret"],
+                "status_url": (
+                    "https://runtime-user:runtime-url-secret@runtime.invalid/"
+                    "status?signature=runtime-signature-secret"
+                ),
+            },
+            "health": {
+                "api": {
+                    "ok": False,
+                    "status": 503,
+                    "error": "Authorization: Bearer runtime-bearer-secret",
+                },
+                "frontend_local": {"ok": True, "status": 200, "error": ""},
+            },
+        },
+    )
+    monkeypatch.setattr(
+        appmod,
+        "_exact_n_freeze_payload",
+        lambda _conn, _issue: {
+            "issue": "26078",
+            "status": "published",
+            "segments": [
+                {
+                    "segment_idx": 1,
+                    "segment_identity": "segment_1",
+                    "freeze_at": "2026-07-25T18:00:00+08:00",
+                    "effective_decision_at": "2026-07-25T17:59:00+08:00",
+                    "status": "published",
+                    "verification": {},
+                    "event_key": "fixture-event",
+                    "match_count": 1,
+                    "alternatives": [],
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        appmod,
+        "verify_segment_freeze",
+        lambda _path: (_ for _ in ()).throw(
+            ValueError(
+                "password=freeze-password-secret "
+                "manifest=/opt/freeze/private.json"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        appmod,
+        "_research_freeze_for_segment",
+        research_freeze_from_fixture,
+    )
     app = appmod.create_app(sqlite_db=db_path, adhoc_betting_root=tmp_path / "adhoc")
 
     response = app.test_client().get("/api/issues/26078/operations")
@@ -820,9 +954,54 @@ def test_operations_endpoint_declares_v2_and_validates_schema(
     }
     serialized = json.dumps(payload, ensure_ascii=False)
     assert str(tmp_path) not in serialized
-    assert "/srv/workflow/private.log" not in serialized
-    assert r"C:\ops\workflow\private.log" not in serialized
-    assert "/private/review/result.json" not in serialized
+    for secret in (
+        "collector-url-secret",
+        "collector-query-secret",
+        "workflow-api-key-secret",
+        "workflow-password-secret",
+        "review-cookie-secret",
+        "runtime-bearer-secret",
+        "runtime-command-secret",
+        "runtime-url-secret",
+        "runtime-signature-secret",
+        "freeze-password-secret",
+    ):
+        assert secret not in serialized
+    for internal_path in (
+        "/srv/workflow/private.log",
+        r"C:\ops\workflow\private.log",
+        "/private/review/result.json",
+        "/opt/freeze/private.json",
+    ):
+        assert internal_path not in serialized
+    assert "[redacted-url]" in serialized
+    assert "[redacted-secret]" in serialized
+    assert "diagnostics" not in payload["runtime"]
+    collector = next(
+        item
+        for item in payload["domains"]["collection"]["collectors"]
+        if item["collector_id"] == "issue_html_500"
+    )
+    assert collector["error"] == "collector failed at [redacted-url]"
+    runtime_api = next(
+        item
+        for item in payload["domains"]["runtime"]["components"]
+        if item["component_id"] == "api"
+    )
+    assert runtime_api["detail"] == "Authorization: [redacted-secret]"
+    assert (
+        payload["workflow"]["error"]
+        == "api_key=[redacted-secret] path=[redacted-path]"
+    )
+    assert (
+        payload["review"]["task"]["error"]
+        == "Cookie: [redacted-secret]"
+    )
+    freeze = payload["domains"]["scheduled_freeze"]["segments"][0]
+    assert (
+        freeze["research_freeze"]["detail"]
+        == "password=[redacted-secret] manifest=[redacted-path]"
+    )
     assert all(step["command"] == [] for step in payload["workflow"]["steps"])
 
 
