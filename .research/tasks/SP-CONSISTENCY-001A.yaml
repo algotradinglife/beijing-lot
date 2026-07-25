@@ -9,6 +9,7 @@ metadata:
   parent_id: GOAL-PHASE1
   related_ids:
     - "https://github.com/algotradinglife/beijing-lot/issues/31"
+    - "https://github.com/algotradinglife/beijing-lot/pull/32"
     - SP-EFF-001
     - MM-DATA-AUDIT-001
     - BJ-MM-FREEZE-001
@@ -73,18 +74,43 @@ spec:
       - research_pi_review
 
 status:
-  current: READY
-  attempts: 0
+  current: COMPLETED
+  attempts: 1
   routing:
     executor_mode: isolated_session
     profile: strategist
     runtime: codex
-    reason: "Issue #31 carries state/ready and owner/strategist. Strategist may execute G0 and preregistration immediately, but must stop at failed data/tail gates and may not infer dispatch authority from this informational task status."
+    reason: "Completed at G0 with a fail-closed insufficient-data verdict; no further stage is authorized."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/31"
       artifact_type: issue
-      description: PI-approved experiment contract and GitHub dispatch source
-  result: {}
+      description: PI-approved experiment contract and evidence discussion
+    - uri: "https://github.com/algotradinglife/beijing-lot/pull/32"
+      artifact_type: pull_request
+      description: Merged outcome-blind G0 implementation and preregistration
+    - uri: "https://github.com/algotradinglife/beijing-lot/releases/download/sp-consistency-001a-g0-r4/SP-CONSISTENCY-001A-G0-R4.tar.gz"
+      artifact_type: freeze_package
+      description: Immutable R4 evidence package
+    - uri: "https://github.com/algotradinglife/beijing-lot/issues/31#issuecomment-5078829036"
+      artifact_type: engineering_receipt
+      description: Independent clean-checkout validation receipt
+  result:
+    evidence_scope: outcome_blind_g0_only
+    verdict: INSUFFICIENT_STRICT_DATA
+    formal_comparison_authorized: false
+    research_question_answered: false
+    freeze_id: 12db65db1b7e4e976336c75df424d3866a0066dec5bbd92bce39accfe4c8fd4e
+    merge_commit: 43c2d1e088d19ce7edaf146d6dc6dbe3415e7b67
+    coverage:
+      p34_strict_match_markets: 0
+      p42_strict_match_markets: 31
+      p42_exact_tail_match_markets: 20
+      paired_same_time_match_markets: 0
+      model_score_status: UNKNOWN_NOT_EVALUATED
+    limitations:
+      - Frozen p34 source schema lacks all required immutable provenance roles.
+      - No contract-validated William Hill 1X2 and O/U score-input panel was available.
+      - G1, G2, Stage A, Stage B, outcome scoring, backtest, and ROI remain unauthorized.
   history:
     - action: task_created
       ts: "2026-07-25T12:06:52Z"
@@ -92,3 +118,9 @@ status:
       from: null
       to: READY
       reason: "PI created Issue #31 with positive Strategist routing labels and preregistered G0-G3 research gates."
+    - action: task_completed
+      ts: "2026-07-25T16:20:00Z"
+      actor: research_pi
+      from: READY
+      to: COMPLETED
+      reason: "G0 was independently verified and merged with INSUFFICIENT_STRICT_DATA; the formal comparison remains unauthorized and unanswered."
