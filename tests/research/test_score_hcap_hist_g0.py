@@ -54,6 +54,7 @@ def test_g0_exports_outcome_panel_without_sp_fields_and_is_byte_stable(tmp_path:
 
     assert first["audit_data"]["gate"]["status"] == "G0_ELIGIBLE_EVIDENCE_C"
     assert first["audit_data"]["gate"]["formal_b0_b1_authorized"] is True
+    assert first["audit_data"]["provenance"]["source_database"]["sha256"] == g0.sha256_file(first_source)
     assert first["audit_data"]["query_audit"]["ticket_budget_roi_output"] is False
     assert g0.sha256_file(first["panel"]) == g0.sha256_file(second["panel"])
     panel = sqlite3.connect(first["panel"])
@@ -121,7 +122,10 @@ def test_skellam_mapping_and_walkforward_are_chronological(tmp_path: Path, monke
     first, second = tmp_path / "first.sqlite", tmp_path / "second.sqlite"
     _panel_fixture(first)
     _panel_fixture(second, future_extra=True)
-    one = walkforward.run_walkforward(panel=first, output_dir=tmp_path / "one")
+    config = {"g0_freeze_id": "fixture-g0", "execution_enabled": False}
+    one = walkforward.run_walkforward(panel=first, output_dir=tmp_path / "one", frozen_config=config)
     two = walkforward.run_walkforward(panel=second, output_dir=tmp_path / "two")
     assert one["summary"]["aggregate"] == two["summary"]["aggregate"]
     assert (tmp_path / "one" / "bootstrap_deltas.csv").read_bytes() == (tmp_path / "two" / "bootstrap_deltas.csv").read_bytes()
+    receipt = json.loads((tmp_path / "one" / "reproducibility_receipt.json").read_text(encoding="utf-8"))
+    assert receipt["outputs"]["frozen_b0_b1_config.json"] == walkforward.sha256_file(tmp_path / "one" / "frozen_b0_b1_config.json")
