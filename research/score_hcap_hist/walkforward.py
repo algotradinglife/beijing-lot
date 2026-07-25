@@ -113,6 +113,8 @@ def _fit_predict(panel: Path) -> list[dict[str, Any]]:
         for row in test:
             hcp = int(row["handicap"])
             b0 = _class_probabilities(by_handicap.get(hcp, Counter())) if hcp in by_handicap else global_prior
+            if abs(sum(b0) - 1.0) > 1e-12:
+                raise ValueError("B0 probabilities do not sum to one within 1e-12")
             home = home_stats.get((str(row["league"]), str(row["normalized_home"])), [0.0, 0.0, 0.0])
             away = away_stats.get((str(row["league"]), str(row["normalized_away"])), [0.0, 0.0, 0.0])
             lambda_home = math.sqrt(_smoothed_rate(home[0], int(home[2]), global_home_gf) * _smoothed_rate(away[1], int(away[2]), global_home_gf))
@@ -184,8 +186,11 @@ def run_walkforward(
             for bin_index in range(10):
                 low, high = bin_index / 10, (bin_index + 1) / 10
                 values = [row for row in rows if low <= float(row[f"{model}_p{label}"]) < high or (bin_index == 9 and float(row[f"{model}_p{label}"]) == 1)]
-                if values:
-                    calibration.append({"model": model, "class": label, "bin_low": low, "bin_high": high, "n": len(values), "mean_probability": np.mean([float(r[f"{model}_p{label}"]) for r in values]), "observed_rate": np.mean([str(r["label_310"]) == label for r in values])})
+                calibration.append({
+                    "model": model, "class": label, "bin_low": low, "bin_high": high, "n": len(values),
+                    "mean_probability": float(np.mean([float(r[f"{model}_p{label}"]) for r in values])) if values else None,
+                    "observed_rate": float(np.mean([str(r["label_310"]) == label for r in values])) if values else None,
+                })
     _write_csv(output_dir / "calibration_bins.csv", calibration, list(calibration[0]))
     def strata(field: str, value: str) -> list[dict[str, Any]]:
         subset = [row for row in rows if str(row[field]) == value]
@@ -208,8 +213,9 @@ def run_walkforward(
     _write_csv(output_dir / "bootstrap_deltas.csv", bootstrap, list(bootstrap[0]))
     deltas = np.asarray([float(row["delta_log_loss_b1_minus_b0"]) for row in bootstrap])
     negatives = sum(float(row["delta_log_loss_b1_minus_b0"]) < 0 for row in season_metrics)
-    signal = aggregate["delta_log_loss_b1_minus_b0"] < 0 and float(np.quantile(deltas, .975)) < 0 and negatives >= 7
-    final = {"experiment_id": "SCORE-HCAP-HIST-001", "status": "RETROSPECTIVE_INCREMENTAL_PREDICTIVE_SIGNAL" if signal else "NO_REPRODUCIBLE_INCREMENTAL_SIGNAL", "decision_rule": {"pooled_delta_negative": aggregate["delta_log_loss_b1_minus_b0"] < 0, "bootstrap_ci_upper_negative": float(np.quantile(deltas, .975)) < 0, "negative_seasons": negatives, "required_negative_seasons": 7}, "execution_enabled": False, "roi_authorized": False, "evidence_level": "C", "outcome_visibility": "historical_known"}
+    required_negative_seasons = 7 if len(TEST_SEASONS) == 10 else math.ceil(0.7 * len(TEST_SEASONS))
+    signal = aggregate["delta_log_loss_b1_minus_b0"] < 0 and float(np.quantile(deltas, .975)) < 0 and negatives >= required_negative_seasons
+    final = {"experiment_id": "SCORE-HCAP-HIST-001", "status": "RETROSPECTIVE_INCREMENTAL_PREDICTIVE_SIGNAL" if signal else "NO_REPRODUCIBLE_INCREMENTAL_SIGNAL", "decision_rule": {"pooled_delta_negative": aggregate["delta_log_loss_b1_minus_b0"] < 0, "bootstrap_ci_upper_negative": float(np.quantile(deltas, .975)) < 0, "negative_seasons": negatives, "required_negative_seasons": required_negative_seasons, "test_season_count": len(TEST_SEASONS)}, "execution_enabled": False, "roi_authorized": False, "evidence_level": "C", "outcome_visibility": "historical_known"}
     bootstrap_summary = {"seed": BOOTSTRAP_SEED, "replicates": BOOTSTRAP_REPLICATES, "ci_95_percentile": [float(np.quantile(deltas, .025)), float(np.quantile(deltas, .975))]}
     summary = {"aggregate": aggregate, "bootstrap": bootstrap_summary, "final_decision": final}
     (output_dir / "aggregate_metrics.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
