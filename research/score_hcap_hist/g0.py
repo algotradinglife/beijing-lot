@@ -284,6 +284,15 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
     mismatch_rate = mismatch / result_comparison_rows if result_comparison_rows else 1.0
     canonical_key_conflicts = sum(1 for match_ids in canonical_keys.values() if len(match_ids) > 1)
     test_counts = {str(year): by_season_eligible[year] for year in TEST_SEASONS}
+    handicap_distribution: dict[str, dict[str, int]] = {}
+    cold_start: dict[str, dict[str, float | int]] = {}
+    for year in TEST_SEASONS:
+        earlier_home = {(str(row[5]), str(row[8])) for row in inserted if int(row[4]) < year}
+        earlier_away = {(str(row[5]), str(row[9])) for row in inserted if int(row[4]) < year}
+        season_rows = [row for row in inserted if int(row[4]) == year]
+        handicap_distribution[str(year)] = dict(sorted(Counter(str(row[10]) for row in season_rows).items(), key=lambda item: int(item[0])))
+        cold = sum((str(row[5]), str(row[8])) not in earlier_home or (str(row[5]), str(row[9])) not in earlier_away for row in season_rows)
+        cold_start[str(year)] = {"cold_start_rows": cold, "cold_start_rate": cold / len(season_rows) if season_rows else 0.0}
     gate_reasons: list[str] = []
     if len(inserted) < MIN_ROWS:
         gate_reasons.append("qualified_rows_below_100000")
@@ -321,6 +330,8 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
             "by_season_raw": {str(year): count for year, count in sorted(by_season_raw.items())},
             "by_season_qualified": {str(year): count for year, count in sorted(by_season_eligible.items())},
             "test_season_counts": test_counts,
+            "test_season_handicap_distribution": handicap_distribution,
+            "test_season_cold_start": cold_start,
             "result_code_comparison_rows": result_comparison_rows,
             "stored_result_code_mismatches": mismatch,
             "stored_result_code_mismatch_rate": mismatch_rate,
@@ -330,6 +341,7 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         },
         "chronology": {"train_seasons": list(TRAIN_SEASONS), "test_seasons": list(TEST_SEASONS), "sort_key": ["kickoff_utc", "match_id"]},
         "provenance": {"source_meta_present": bool(schema["source_meta"]), "row_level_immutable_raw_bundle_verified": False, "evidence_level": evidence_level},
+        "historical_peek_scope": "This source has been used by prior project retrospective analyses; all outputs are therefore retrospective re-analysis, not untouched forward validation.",
         "feature_availability_matrix": matrix,
         "gate": {
             "status": "G0_ELIGIBLE_EVIDENCE_C" if not gate_reasons else "INSUFFICIENT_HISTORICAL_DATA",
