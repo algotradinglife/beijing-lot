@@ -93,8 +93,8 @@ def _fit_predict(panel: Path) -> list[dict[str, Any]]:
         connection.close()
     predictions: list[dict[str, Any]] = []
     for year in TEST_SEASONS:
-        train = [row for row in all_rows if int(row["season_year"]) < year]
-        test = [row for row in all_rows if int(row["season_year"]) == year]
+        train = [row for row in all_rows if int(row["fold_year"]) < year]
+        test = [row for row in all_rows if int(row["fold_year"]) == year]
         if not train or not test:
             raise ValueError(f"missing frozen train/test rows for season {year}")
         global_home_gf = sum(int(row["fthg"]) for row in train) / len(train)

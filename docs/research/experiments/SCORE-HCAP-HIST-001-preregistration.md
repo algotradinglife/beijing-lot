@@ -33,11 +33,22 @@ manifest, and SHA-256s before any B0/B1 metric runs.
 
 G0 fails closed for fewer than 100,000 qualified rows; fewer than eight test
 seasons or fewer than 1,000 rows in any test season; unresolvable chronology;
+any source-season/canonical-clock disagreement in the frozen window;
 unresolved duplicate/conflicting identity; recomputed result-code mismatch
 above 0.5%; or an unreproducible package. Noninteger handicaps, invalid/sentinel
 timestamps, missing identities, invalid scores, and mismatched stored labels
 are counted under frozen exclusion rules. Team keys are
 `(league, normalized_team)`.
+
+`fold_year` is always the calendar year of normalized `kickoff_utc`; the
+denormalized source `season_year` is retained only as a provenance diagnostic.
+No fold may fall back to it. A missing canonical clock is excluded before
+membership, while a source-season mismatch or unresolved source season inside
+the canonical 2014–2025 window fails G0 and is excluded. G0 also freezes the
+complete `settlement_quality` distribution. The only admissible status is
+`trusted` with `has_trusted_settlement=1`; blank, unknown, `missing_sp`,
+`mismatch`, and all other statuses are excluded before panel insertion. This
+uses frozen status metadata only, never any SP value.
 
 The source has already been used by historical project analysis. Therefore all
 results are retrospective re-analysis. Without independently verifiable
@@ -50,6 +61,13 @@ The fixed initial training period is 2014–2015. Test folds are 2016 through
 split and no within-test-season update. Each prediction may use only its prior
 season scores, the current integer handicap, and current league/team identity
 for historical lookup.
+
+Before a B0/B1 metric can begin, its runner verifies the immutable G0 package,
+manifest, G0 authorization decision, exact frozen panel SHA-256, source-database
+SHA-256/size, and feature-matrix source identity. It derives the G0 freeze ID
+from that verified manifest; neither a free-form freeze ID nor an
+operator-supplied panel is accepted. The published B0/B1 package must retain
+the same panel and source snapshot identities.
 
 Forbidden inputs are the current/future score or outcome, any same-test-season
 result, p34/p42 SP, final/winning SP, European odds, exotic odds without a
