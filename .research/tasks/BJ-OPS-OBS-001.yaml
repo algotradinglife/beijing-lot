@@ -9,6 +9,7 @@ metadata:
   parent_id: GOAL-OPS-QUALITY
   related_ids:
     - "https://github.com/algotradinglife/beijing-lot/issues/30"
+    - "https://github.com/algotradinglife/beijing-lot/pull/34"
     - BJ-MM-FREEZE-001
     - BJ-BET-FREEZE-001
     - BJ-ADHOC-BET-001
@@ -83,18 +84,39 @@ spec:
       - research_pi_review
 
 status:
-  current: READY
-  attempts: 0
+  current: COMPLETED
+  attempts: 1
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "Issue #30 is the highest-priority ready task in the engineering_primary operational-quality lane. Engineer must reuse fixed worktree .worktrees/develop on branch develop; no per-Issue branch/worktree is allowed. Engineer owns implementation and Engineering Validation; PI review is limited to contract boundaries and honest status semantics."
+    reason: "Capability merged after independent Engineering Validation and final PI contract approval."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/30"
       artifact_type: issue
       description: Approved capability execution contract
-  result: {}
+    - uri: "https://github.com/algotradinglife/beijing-lot/pull/34"
+      artifact_type: pull_request
+      description: Merged Operations Status v2 implementation
+    - uri: "https://github.com/algotradinglife/beijing-lot/pull/34#issuecomment-5079670658"
+      artifact_type: engineering_receipt
+      description: Exact-HEAD Engineering Validation receipt
+  result:
+    capability_status: delivered
+    schema_version: operations_status_v2
+    merge_commit: 33d65638587dcd8b3c17883a4397f73764ed34cc
+    backend_tests_passed: 104
+    frontend_tests_passed: 25
+    production_build: passed
+    boundaries:
+      backend_canonical_alerts: true
+      alert_lifecycle_persisted: true
+      collector_market_status_independent: true
+      scheduled_and_adhoc_separated: true
+      public_diagnostics_redacted: true
+      offline_purchase_inferred: false
+      actual_roi_claimed: false
+      strategy_or_research_authority_changed: false
   history:
     - action: routing_updated
       ts: "2026-07-25T11:10:47Z"
@@ -114,3 +136,9 @@ status:
       from: CREATED
       to: READY
       reason: "Scope, dependencies, acceptance, routing, and scientific boundaries are defined; completed dependencies make the Engineer capability ready."
+    - action: task_completed
+      ts: "2026-07-25T17:56:00Z"
+      actor: research_pi
+      from: READY
+      to: COMPLETED
+      reason: "PR #34 merged after all PI findings closed and exact-HEAD Engineering Validation passed."
