@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import csv
 import sqlite3
 from pathlib import Path
 
@@ -93,7 +94,7 @@ def test_g0_fails_closed_for_result_mismatch_and_identity_conflicts(tmp_path: Pa
     assert audit == result["audit_data"]
 
 
-def _panel_fixture(path: Path, *, future_extra: bool = False) -> None:
+def _panel_fixture(path: Path, *, future_extra: bool = False, same_season_extra: bool = False, cold_start: bool = False) -> None:
     connection = sqlite3.connect(path)
     connection.executescript(
         """
@@ -107,8 +108,10 @@ def _panel_fixture(path: Path, *, future_extra: bool = False) -> None:
     rows = [
         (1, "1401", 1, "2014-01-01T00:00:00+00:00", 2014, "L", "A", "B", "a", "b", 0, 1, 0, "3", "trusted"),
         (2, "1501", 1, "2015-01-01T00:00:00+00:00", 2015, "L", "B", "A", "b", "a", 0, 0, 1, "0", "trusted"),
-        (3, "1601", 1, "2016-01-01T00:00:00+00:00", 2016, "L", "A", "B", "a", "b", 0, 1, 1, "1", "trusted"),
+        (3, "1601", 1, "2016-01-01T00:00:00+00:00", 2016, "L", "C" if cold_start else "A", "D" if cold_start else "B", "c" if cold_start else "a", "d" if cold_start else "b", 0, 1, 1, "1", "trusted"),
     ]
+    if same_season_extra:
+        rows.append((5, "1602", 1, "2016-06-01T00:00:00+00:00", 2016, "L", "A", "B", "a", "b", 0, 8, 0, "3", "trusted"))
     if future_extra:
         rows.append((4, "1701", 1, "2017-01-01T00:00:00+00:00", 2017, "L", "A", "B", "a", "b", 0, 9, 0, "3", "trusted"))
     connection.executemany("INSERT INTO panel VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
@@ -117,6 +120,11 @@ def _panel_fixture(path: Path, *, future_extra: bool = False) -> None:
 
 
 def test_skellam_mapping_and_walkforward_are_chronological(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    assert g0._label(1, 0, 0) == "3"
+    assert g0._label(1, 1, 0) == "1"
+    assert g0._label(0, 1, 0) == "0"
+    assert g0._label(0, 1, 1) == "1"
+    assert g0._label(1, 0, -1) == "1"
     assert sum(walkforward.handicap_probabilities(1.2, 0.9, -1)) == pytest.approx(1.0, abs=1e-12)
     assert sum(walkforward.handicap_probabilities(1.2, 0.9, 0)) == pytest.approx(1.0, abs=1e-12)
     assert sum(walkforward.handicap_probabilities(1.2, 0.9, 1)) == pytest.approx(1.0, abs=1e-12)
@@ -125,6 +133,8 @@ def test_skellam_mapping_and_walkforward_are_chronological(tmp_path: Path, monke
     first, second = tmp_path / "first.sqlite", tmp_path / "second.sqlite"
     _panel_fixture(first)
     _panel_fixture(second, future_extra=True)
+    same_season = tmp_path / "same-season.sqlite"
+    _panel_fixture(same_season, same_season_extra=True)
     config = {"g0_freeze_id": "fixture-g0", "execution_enabled": False}
     one = walkforward.run_walkforward(panel=first, output_dir=tmp_path / "one", frozen_config=config)
     two = walkforward.run_walkforward(panel=second, output_dir=tmp_path / "two")
@@ -132,3 +142,22 @@ def test_skellam_mapping_and_walkforward_are_chronological(tmp_path: Path, monke
     assert (tmp_path / "one" / "bootstrap_deltas.csv").read_bytes() == (tmp_path / "two" / "bootstrap_deltas.csv").read_bytes()
     receipt = json.loads((tmp_path / "one" / "reproducibility_receipt.json").read_text(encoding="utf-8"))
     assert receipt["outputs"]["frozen_b0_b1_config.json"] == walkforward.sha256_file(tmp_path / "one" / "frozen_b0_b1_config.json")
+    first_prediction = next(row for row in walkforward._fit_predict(first) if row["match_id"] == 3)
+    same_season_prediction = next(row for row in walkforward._fit_predict(same_season) if row["match_id"] == 3)
+    assert first_prediction == same_season_prediction
+    calibration_rows = list(csv.DictReader((tmp_path / "one" / "calibration_bins.csv").open(encoding="utf-8")))
+    assert len(calibration_rows) == 2 * 3 * 10
+    assert not any("ticket" in path.name or "roi" in path.name for path in (tmp_path / "one").iterdir())
+
+
+def test_walkforward_cold_start_uses_global_role_fallback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(walkforward, "TEST_SEASONS", (2016,))
+    monkeypatch.setattr(walkforward, "BOOTSTRAP_REPLICATES", 2)
+    panel = tmp_path / "cold.sqlite"
+    _panel_fixture(panel, cold_start=True)
+    result = walkforward.run_walkforward(panel=panel, output_dir=tmp_path / "cold")
+    row = next(csv.DictReader((tmp_path / "cold" / "predictions.csv").open(encoding="utf-8")))
+    assert row["cold_start"] == "1"
+    assert float(row["lambda_home"]) > 0
+    assert float(row["lambda_away"]) > 0
+    assert result["summary"]["final_decision"]["decision_rule"]["test_season_count"] == 1
