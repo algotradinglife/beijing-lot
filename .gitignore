@@ -92,7 +92,7 @@ target/
 !src/webui/templates/*.html
 *.zip
 
-# BJ-BET-SLIP-001 immutable acceptance bundle.
-!evidence/bj_bet_slip_001/
-!evidence/bj_bet_slip_001/**
-evidence/bj_bet_slip_001/.publish.lock
+# BJ-FREEZE-REVIEW-001 immutable acceptance bundle.
+!evidence/bj_freeze_review_001/
+!evidence/bj_freeze_review_001/**
+evidence/bj_freeze_review_001/.publish.lock

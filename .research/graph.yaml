@@ -36,9 +36,9 @@ spec:
       node_type: task
       ref: tasks/BJ-SEG-RECOVERY-001.yaml
       state: COMPLETED
-    - id: BJ-BET-SLIP-001
+    - id: BJ-FREEZE-REVIEW-001
       node_type: task
-      ref: tasks/BJ-BET-SLIP-001.yaml
+      ref: tasks/BJ-FREEZE-REVIEW-001.yaml
       state: REVIEW
 
   edges:
@@ -70,11 +70,11 @@ spec:
       to: BJ-BET-FREEZE-001
       relation: depends_on
     - from: GOAL-PHASE1
-      to: BJ-BET-SLIP-001
+      to: BJ-FREEZE-REVIEW-001
       relation: decomposes_to
-    - from: BJ-BET-SLIP-001
+    - from: BJ-FREEZE-REVIEW-001
       to: BJ-BET-FREEZE-001
       relation: depends_on
-    - from: BJ-BET-SLIP-001
+    - from: BJ-FREEZE-REVIEW-001
       to: BJ-SEG-RECOVERY-001
       relation: depends_on

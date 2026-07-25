@@ -1,0 +1,111 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: BJ-FREEZE-REVIEW-001
+  title: Research Capability — audit-only human views for scheduled freezes
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-PHASE1
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/26"
+    - BJ-BET-FREEZE-001
+    - BJ-SEG-RECOVERY-001
+
+spec:
+  type: capability
+  intent:
+    objective: Deterministically render mobile/A4 Chinese audit views from an immutable, verifier-passing scheduled exact-N freeze package.
+    question: Can every human-readable review record remain byte-bound to its frozen plan and metadata while every page stays unambiguously non-purchasable?
+    hypothesis: A source-only renderer with independent bundle verification can support later Strategist analysis without changing freeze or execution authority.
+    expected_value: Improve manual evidence review of scheduled research freezes while keeping them separate from adhoc betting.
+    out_of_scope:
+      - Match selection, probability, ticket, code, stake, or budget changes
+      - Runtime database, API, network, or later-artifact lookups
+      - Correct-score execution, settlement, ROI, or automated ordering
+      - Modification of any immutable source freeze
+      - Purchase eligibility, shop entry, live filtering, downloads, restaking, or reduced executable plans
+
+  context:
+    inputs:
+      - Issue #26 and PI kickoff-source amendment
+      - BJ-BET-FREEZE-001 exact-N package verifier
+      - BJ-SEG-RECOVERY-001 immutable recovery manifest
+    assumptions:
+      - Recovery kickoff is used only from a package-bound recovery manifest
+      - Team, league, and handicap metadata comes only from frozen structured input
+
+  execution:
+    required_capabilities:
+      - python_development
+      - document_rendering
+      - testing
+    uncertainty: medium
+    complexity: high
+
+  risk:
+    overall: high
+    scientific: low
+    engineering: high
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - Fifteen independent HTML and PDF freeze review views for the 26078 recovery fixture
+      - plan_matrix.csv and ticket_legs.csv
+      - Content-addressed freeze_review_manifest.json and SHA256SUMS
+      - Fail-closed renderer and verifier
+    checks:
+      - schema_validation
+      - automated_tests
+      - source_hash_and_semantic_verification
+      - mobile_and_a4_layout_validation
+    human_gates:
+      - engineering_validation
+      - research_pi_review
+
+status:
+  current: REVIEW
+  attempts: 1
+  routing:
+    executor_mode: isolated_session
+    profile: engineer
+    runtime: codex
+    reason: "PR #27 architecture amendment is assigned directly to owner/engineer in no_agent mode; scope decisions route to owner/strategist."
+  artifacts:
+    - "PR #27: https://github.com/algotradinglife/beijing-lot/pull/27"
+    - evidence/bj_freeze_review_001/23a437058df57483cf710ef7f8d1c55b7520a4480cd2be0f78d0c69fa2946dfd
+  result:
+    superseded_capability_id: BJ-BET-SLIP-001
+    implementation_commit: ad485eef9babf487d90474a61e8b3e60e668d81f
+    engineering_validation_head: 9bba71121711867e44a18969abe14aebe52402ac
+    pi_review_head: 9bba71121711867e44a18969abe14aebe52402ac
+    pi_review_decision: CHANGES_REQUESTED
+    bundle_id: 23a437058df57483cf710ef7f8d1c55b7520a4480cd2be0f78d0c69fa2946dfd
+    bundle_status: SOURCE_INTEGRITY_PASS
+    tests: 53_passed
+  history:
+    - action: register_and_start
+      ts: "2026-07-25T02:10:06Z"
+      actor: HermesPM
+      from: CREATED
+      to: EXECUTING
+      reason: "PI accepted the recovery kickoff-source amendment and authorized normal implementation flow."
+    - action: reconcile_runtime_registration
+      ts: "2026-07-25T02:45:18Z"
+      actor: reconciler
+      from: UNKNOWN
+      to: REVIEW
+      reason: "Branch capability/bj-bet-slip-001 detected by M7/pr_no_runtime_registration. PR #27 open, mergeable, awaiting PI review (hh1985). Issue #26 labeled state/review."
+    - action: pi_review_changes_requested
+      ts: "2026-07-25T03:15:20Z"
+      actor: hh1985
+      from: REVIEW
+      to: REVIEW
+      reason: "PI reviewed exact HEAD 9bba71121711867e44a18969abe14aebe52402ac and requested honest purchase-status separation, complete content addressing, clean-checkout assets, and exact review-head evidence; fixes route to owner/engineer."
+    - action: architecture_rescope
+      ts: "2026-07-25T03:37:15Z"
+      actor: hh1985
+      from: REVIEW
+      to: REVIEW
+      reason: "Strategist superseded shop-use wording: #26/PR #27 is now BJ-FREEZE-REVIEW-001, preserves every scheduled frozen ticket, and marks every page research audit only / NOT FOR PURCHASE. Adhoc betting is a separate capability."
