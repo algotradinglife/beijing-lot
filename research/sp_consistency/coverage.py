@@ -63,12 +63,28 @@ def _percentile(values: list[float], quantile: float) -> float | None:
     return round(ordered[index], 6)
 
 
-def _p34_coverage(connection: sqlite3.Connection) -> dict[str, Any]:
+def _nonempty(value: object) -> bool:
+    return value is not None and bool(str(value).strip())
+
+
+def _p34_coverage(connection: sqlite3.Connection, source_schema_path: Path) -> dict[str, Any]:
     if not (_table_exists(connection, "matches") and _table_exists(connection, "snapshots")):
         return {
             "status": "unavailable",
             "strict_complete_match_markets": 0,
             "rejections": {"missing_p34_matches_or_snapshots_table": 1},
+        }
+
+    try:
+        source_schema = json.loads(source_schema_path.read_text(encoding="utf-8"))
+        provenance_contract = source_schema["required_provenance"]
+        all_required_fields_present = bool(source_schema["all_required_fields_present"])
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+        return {
+            "status": "unavailable",
+            "strict_complete_match_markets": 0,
+            "rejections": {"missing_or_invalid_frozen_p34_source_schema": 1},
+            "source_schema_error": type(exc).__name__,
         }
 
     matches = connection.execute(
@@ -84,8 +100,13 @@ def _p34_coverage(connection: sqlite3.Connection) -> dict[str, Any]:
     malformed_clock_rows = 0
     complete_by_issue: Counter[str] = Counter()
     pre_kickoff_observations_by_issue: Counter[str] = Counter()
+    strict_matches: set[str] = set()
+    strict_by_issue: Counter[str] = Counter()
+    missing_provenance_by_issue: Counter[str] = Counter()
+    invalid_provenance_clock_by_issue: Counter[str] = Counter()
     for row in connection.execute(
-        "SELECT match_id, snapshot_ts, sp_3, sp_1, sp_0 FROM snapshots ORDER BY match_id, snapshot_ts"
+        "SELECT match_id, snapshot_ts, sp_3, sp_1, sp_0, source_observed_at, fetched_at, raw_batch_id, immutable_bundle_sha256 "
+        "FROM snapshots ORDER BY match_id, snapshot_ts"
     ):
         prices = (row["sp_3"], row["sp_1"], row["sp_0"])
         if not all(isinstance(price, (int, float)) and math.isfinite(float(price)) and float(price) > 1 for price in prices):
@@ -111,13 +132,29 @@ def _p34_coverage(connection: sqlite3.Connection) -> dict[str, Any]:
         if previous is None or lead_minutes < previous:
             latest_leads[match_id] = lead_minutes
 
+        issue = str(match["issue"])
+        values = (row["source_observed_at"], row["fetched_at"], row["raw_batch_id"], row["immutable_bundle_sha256"])
+        if not all_required_fields_present or not all(_nonempty(value) for value in values):
+            missing_provenance_by_issue[issue] += 1
+            continue
+        source_at = _parse_utc(str(row["source_observed_at"]), naive_timezone=HKT)
+        fetched_at = _parse_utc(str(row["fetched_at"]), naive_timezone=HKT)
+        if source_at is None or fetched_at is None or source_at > fetched_at or fetched_at > snapshot_at:
+            invalid_provenance_clock_by_issue[issue] += 1
+            continue
+        if match_id not in strict_matches:
+            strict_matches.add(match_id)
+            strict_by_issue[issue] += 1
+
     leads = list(latest_leads.values())
     pre_kickoff_matches_by_issue = Counter(str(rows_by_match[match_id]["issue"]) for match_id in latest_leads)
-    # `snapshots` contains processed three-way values only.  It has no source
-    # observed clock, fetch clock, raw payload, batch ID, or SHA256SUMS bundle,
-    # therefore every otherwise-clocked candidate remains non-strict.
+    schema_missing_fields = [
+        role for role, details in provenance_contract.items()
+        if not isinstance(details, dict) or not details.get("available_in_source_schema")
+    ]
+    strict_status = "available_strict_provenance" if strict_matches else "partial_no_immutable_provenance"
     return {
-        "status": "partial_no_immutable_provenance",
+        "status": strict_status,
         "issues": len(issues),
         "match_markets": len(matches),
         "by_season": dict(sorted(season_counts.items())),
@@ -128,32 +165,40 @@ def _p34_coverage(connection: sqlite3.Connection) -> dict[str, Any]:
                 "complete_vector_observations": complete_by_issue[issue],
                 "clocked_pre_kickoff_observations": pre_kickoff_observations_by_issue[issue],
                 "clocked_pre_kickoff_match_markets": pre_kickoff_matches_by_issue[issue],
-                "strict_complete_match_markets": 0,
-                "missing_immutable_raw_bundle_provenance": pre_kickoff_matches_by_issue[issue],
-                "missing_source_and_fetch_dual_clock": pre_kickoff_matches_by_issue[issue],
+                "strict_complete_match_markets": strict_by_issue[issue],
+                "missing_immutable_raw_bundle_provenance": missing_provenance_by_issue[issue],
+                "missing_source_and_fetch_dual_clock": missing_provenance_by_issue[issue] + invalid_provenance_clock_by_issue[issue],
+                "invalid_provenance_clock_order": invalid_provenance_clock_by_issue[issue],
             }
             for issue in issues
         ],
         "complete_vector_observations": complete_observations,
         "clocked_pre_kickoff_observations": clocked_pre_kickoff_observations,
         "clocked_pre_kickoff_match_markets": len(latest_leads),
-        "strict_complete_match_markets": 0,
+        "strict_complete_match_markets": len(strict_matches),
         "lead_minutes_latest_eligible_snapshot": {
             "p50": round(median(leads), 6) if leads else None,
             "p95": _percentile(leads, 0.95),
             "max": round(max(leads), 6) if leads else None,
         },
         "rejections": {
-            "missing_immutable_raw_bundle_provenance": len(latest_leads),
-            "missing_source_and_fetch_dual_clock": len(latest_leads),
+            "required_provenance_fields_absent_from_source_schema": len(schema_missing_fields),
+            "missing_immutable_raw_bundle_provenance": sum(missing_provenance_by_issue.values()),
+            "missing_source_and_fetch_dual_clock": sum(missing_provenance_by_issue.values()) + sum(invalid_provenance_clock_by_issue.values()),
+            "invalid_provenance_clock_order": sum(invalid_provenance_clock_by_issue.values()),
             "post_kickoff_or_unparseable_complete_observation": complete_observations
             - clocked_pre_kickoff_observations,
             "match_mapping_or_clock_missing": malformed_clock_rows,
         },
         "notes": [
-            "p34 snapshots are retained only as coverage diagnostics.",
-            "No p34 row is strict evidence until a source-observed clock, fetch clock, raw batch, and immutable bundle all exist.",
+            "The frozen p34 source-schema inventory was captured from the same read transaction as the exported rows.",
+            "Strict p34 evidence requires source-observed and fetch clocks, a raw batch ID, immutable bundle hash, and source <= fetch <= decision < kickoff.",
         ],
+        "source_schema": {
+            "all_required_fields_present": all_required_fields_present,
+            "missing_required_fields": schema_missing_fields,
+            "required_provenance": provenance_contract,
+        },
     }
 
 
@@ -255,7 +300,7 @@ def _is_finite_price(value: str) -> bool:
 
 
 def _model_score_coverage(inventory_path: Path) -> dict[str, Any]:
-    """Classify the frozen mechanical inventory; never assume zero by fiat."""
+    """Report inventory without asserting contract eligibility absent a validator."""
 
     try:
         inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
@@ -266,27 +311,27 @@ def _model_score_coverage(inventory_path: Path) -> dict[str, Any]:
             "rejections": {"missing_or_invalid_frozen_model_inventory": 1},
             "inventory_error": type(exc).__name__,
         }
-    eligible = inventory.get("strict_eligible_assets", [])
-    rejections = inventory.get("rejection_counts", {})
-    if not isinstance(eligible, list) or not isinstance(rejections, dict):
+    eligibility = inventory.get("strict_eligibility")
+    observations = inventory.get("inventory_observations", {})
+    if not isinstance(eligibility, dict) or not isinstance(observations, dict):
         return {
             "status": "unavailable",
             "strict_complete_match_markets": 0,
             "rejections": {"malformed_frozen_model_inventory": 1},
         }
     return {
-        "status": "available" if eligible else "unavailable",
-        "strict_complete_match_markets": 0,
+        "status": str(eligibility.get("status") or "UNKNOWN_NOT_EVALUATED"),
+        "strict_complete_match_markets": None,
         "candidate_table_or_view_count": len(inventory.get("scanned_p0_schema_candidates", [])),
         "candidate_file_count": sum(1 for item in inventory.get("scanned_file_candidates", []) if "path" in item),
-        "strict_eligible_assets": eligible,
-        "rejections": rejections,
+        "eligibility_reason": str(eligibility.get("reason") or ""),
+        "inventory_observations": observations,
         "inventory_sha256_bound": True,
     }
 
 
 def run_g0_coverage_audit(
-    *, p34_db: Path, p0_db: Path, p42_freeze_root: Path, model_inventory: Path, input_fingerprints: Path, audit_at_utc: str
+    *, p34_db: Path, p34_source_schema: Path, p0_db: Path, p42_freeze_root: Path, model_inventory: Path, input_fingerprints: Path, audit_at_utc: str
 ) -> dict[str, Any]:
     """Return a deterministic, outcome-blind G0 coverage report.
 
@@ -299,13 +344,13 @@ def run_g0_coverage_audit(
         raise ValueError("audit_at_utc must be an explicit ISO-8601 timestamp")
     p34_path = p34_db.resolve()
     p0_path = p0_db.resolve()
-    if not p34_path.is_file() or not p0_path.is_file() or not model_inventory.is_file() or not input_fingerprints.is_file():
+    if not p34_path.is_file() or not p34_source_schema.is_file() or not p0_path.is_file() or not model_inventory.is_file() or not input_fingerprints.is_file():
         raise FileNotFoundError("G0 requires complete atomic p34/p0/model input snapshots")
 
     p34_connection = _read_only_connection(p34_path)
     p0_connection = _read_only_connection(p0_path)
     try:
-        p34 = _p34_coverage(p34_connection)
+        p34 = _p34_coverage(p34_connection, p34_source_schema)
         p42 = _p42_frozen_coverage(p42_freeze_root, p0_connection)
     finally:
         p34_connection.close()
@@ -324,8 +369,8 @@ def run_g0_coverage_audit(
         eligibility_reasons.append("no_strict_p34_asof_provenance")
     if strict_p42 == 0:
         eligibility_reasons.append("no_strict_p42_complete_market")
-    if model_score["strict_complete_match_markets"] == 0:
-        eligibility_reasons.append("no_strict_model_score_input")
+    if model_score["status"] == "UNKNOWN_NOT_EVALUATED":
+        eligibility_reasons.append("model_score_contract_not_evaluated")
     if paired_p34_p42 == 0 and paired_p34_model == 0:
         eligibility_reasons.append("no_strict_common_decision_time_pairs")
 
@@ -348,9 +393,10 @@ def run_g0_coverage_audit(
             "p42": p42,
             "paired": {
                 "denominator_p34_match_markets": denominator,
-                "p34_model_same_decision_time": paired_p34_model,
+                "p34_model_same_decision_time": None,
                 "p34_p42_same_decision_time": paired_p34_p42,
-                "strict_pair_rate": 0.0,
+                "strict_pair_rate": None,
+                "model_score_pairing_status": "UNKNOWN_NOT_EVALUATED",
             },
         },
         "preregistered_thresholds": {

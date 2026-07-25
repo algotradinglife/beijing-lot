@@ -67,6 +67,7 @@ def main() -> int:
     )
     audit = run_g0_coverage_audit(
         p34_db=atomic.p34_snapshot,
+        p34_source_schema=atomic.p34_source_schema,
         p0_db=atomic.p0_snapshot,
         p42_freeze_root=atomic.p42_root,
         model_inventory=atomic.model_inventory,
@@ -95,11 +96,12 @@ def main() -> int:
     if arguments.freeze_dir:
         package = create_freeze_package(
             arguments.freeze_dir,
-            experiment_id="SP-CONSISTENCY-001A-G0-R2",
+            experiment_id="SP-CONSISTENCY-001A-G0-R3",
             research_question="Does strict p34 plus score-distribution as-of coverage authorize SP-CONSISTENCY-001A?",
             model_version=G0_CONFIG_VERSION,
             input_files=[
                 atomic.p34_snapshot,
+                atomic.p34_source_schema,
                 atomic.p0_snapshot,
                 atomic.p42_archive,
                 atomic.model_inventory,
