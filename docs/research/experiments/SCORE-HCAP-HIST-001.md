@@ -24,8 +24,8 @@ Evidence is capped at C unless raw-source provenance becomes independently verif
 
 ## Frozen result
 
-G0 passed as `G0_ELIGIBLE_EVIDENCE_C`: 187,150 qualified rows; ten test seasons (2016–2025), each above 1,000; 37 result-code mismatches in 187,187 comparable rows (0.0198%); and no unresolved canonical or normalized-team conflicts. The G0 R3 freeze ID is `c6326e792167184c3dd31d6b5394e77e8bef6355893ac2ffcb8b96b12d9354b7`.
+G0 passed as `G0_ELIGIBLE_EVIDENCE_C`: 187,150 qualified rows; ten test seasons (2016–2025), each above 1,000; 37 result-code mismatches in 187,187 comparable rows (0.0198%); and no unresolved canonical or normalized-team conflicts. The read-only source identity is SHA-256 `c35a42800a7998ede97c5105371cd78a293a151a9c004a6fef54081e7646fdc7`. The 2,560 source rows without an auxiliary issue/index are outside the candidate panel; valid source issue/index keys have no conflicts. The G0 R5 freeze ID is `fe247e5ccf387054a17f86ec8fc3410fd1838e96b81ad0d8e085e114b62139b2`.
 
 The single frozen B0/B1 replay used 151,742 held-out rows. B0 Log Loss was 1.085172 and B1 was 1.116602, for `delta = +0.031429` (B1 minus B0). The fixed-seed, season-stratified issue-block bootstrap 95% percentile interval was `[+0.029705, +0.033233]`; all ten season deltas were positive. The preregistered decision is therefore `NO_REPRODUCIBLE_INCREMENTAL_SIGNAL`. This is a negative retrospective result, not a claim about football, markets, profitability, or a prospective strategy.
 
-The B0/B1 R2 freeze ID is `e9beedec9aa85121f8cdc88f94e77f6565fcc29043c804ce7723effc7f3f7e9c`. Evidence remains C because no row-level immutable raw-source bundle was available. The next step is independent Engineering Validation and PI research review; a new feature-ablation question, if desired, requires a separate Issue.
+The B0/B1 R4 freeze ID is `5ad66af6709b8ae93862812dc3072c7d6730b2d40300ff291372504f665af71d`. Evidence remains C because no row-level immutable raw-source bundle was available. The next step is independent Engineering Validation and PI research review; a new feature-ablation question, if desired, requires a separate Issue.
