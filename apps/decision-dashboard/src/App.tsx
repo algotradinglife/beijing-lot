@@ -1281,10 +1281,10 @@ function bettingPlanStatusTone(value?: string): 'good' | 'warn' | 'bad' | 'neutr
 
 function adhocPlanStatusLabel(value?: string) {
   if (value === 'GENERATING') return '正在生成';
-  if (value === 'DOWNLOADABLE_CURRENT') return '当前可下注';
+  if (value === 'DOWNLOADABLE_CURRENT') return '有效期内，可下载';
   if (value === 'EXPIRED_NOT_PURCHASABLE') return '已失效，不可下注';
-  if (value === 'UNAVAILABLE_ADHOC_PLAN') return '当前不可生成';
-  if (value === 'UNVERIFIED_SALE_STATE') return '售卖状态未核验';
+  if (value === 'UNAVAILABLE_ADHOC_PLAN') return '生成时不可用';
+  if (value === 'UNVERIFIED_SALE_STATE') return '生成时售卖状态未核验';
   if (value === 'FAILED_CLOSED') return '已安全拒绝';
   if (value === 'READY_FOR_REVIEW') return '待人工核对';
   return value || '等待生成';
@@ -1418,10 +1418,10 @@ function AdhocBetting({
   return <div className="grid page-grid adhoc-page">
     <Card title={`即时下注 / Issue ${selectedIssue}`} icon={<WalletCards />}>
       <div className="adhoc-mode-strip" aria-label="即时下注与研究冻结边界">
-        <div className="adhoc-mode current"><b>即时下注（本次独立请求）</b><span>当前售卖状态、赛程与正式 v3.3.3 输入重新核验。</span></div>
+        <div className="adhoc-mode current"><b>即时下注（本次独立请求）</b><span>仅在本次生成前采集售卖状态、赛程与正式 v3.3.3 输入快照。</span></div>
         <div className="adhoc-mode audit"><b>研究冻结审计（独立只读）</b><span>不读取、不复制、不执行任何 Scheduled Research Freeze 票包。</span></div>
       </div>
-      <p className="adhoc-boundary">只生成当前请求时可售的单一 Exact-N 方案；没有“改 N、补票、沿用旧票或回退到研究冻结”的路径。</p>
+      <p className="adhoc-boundary">只按本次请求时的售卖快照生成单一 Exact-N 方案；没有“改 N、补票、沿用旧票或回退到研究冻结”的路径。</p>
       <div className="adhoc-controls">
         <label>期号<select aria-label="选择即时下注期号" value={selectedIssue} onChange={(event) => onIssueChange(event.target.value)}>
           {availableIssues.map((issue) => <option key={issue.issueId} value={issue.issueId}>{issue.label.replace('历史回放', '历史参考')}</option>)}
@@ -1435,14 +1435,14 @@ function AdhocBetting({
         <div className="adhoc-action"><button type="button" className="adhoc-primary" onClick={generatePlan} disabled={submitting || !preview}>{submitting ? '正在生成…' : '生成即时方案'}</button></div>
       </div>
       <div className="adhoc-summary" aria-live="polite">
-        <div><span>当前符合条件</span><b>{preview ? `${preview.eligibleMatchCount} 场` : '正在核验'}</b></div>
+        <div><span>本次预览符合条件</span><b>{preview ? `${preview.eligibleMatchCount} 场` : '正在核验'}</b></div>
         <div><span>排除场次</span><b>{preview ? `${preview.excludedMatchCount} 场` : '-'}</b></div>
         <div><span>输入截至</span><b>{preview?.inputAsOf || '-'}</b></div>
         <div><span>安全余量</span><b>{preview ? `${preview.safetyMarginSeconds} 秒` : '-'}</b></div>
       </div>
       {preview ? <div className="adhoc-exclusions"><b>完整分母与排除原因：</b><span>{adhocExclusionText(preview.exclusionCounts)}</span></div> : null}
-      {preview ? <AdhocDenominator title="查看当前完整资格分母" matches={preview.matches} /> : null}
-      {insufficient ? <div className="empty-state"><b>当前无法生成 N={requestedN}</b><span>只有 {preview?.eligibleMatchCount ?? 0} 场通过当前资格核验；系统不会降为较小 N 或采用旧票。</span></div> : null}
+      {preview ? <AdhocDenominator title="查看本次预览完整资格分母" matches={preview.matches} /> : null}
+      {insufficient ? <div className="empty-state"><b>本次无法生成 N={requestedN}</b><span>只有 {preview?.eligibleMatchCount ?? 0} 场通过本次预览资格核验；系统不会降为较小 N 或采用旧票。</span></div> : null}
       {previewError ? <div className="empty-state" role="alert"><b>资格核验失败</b><span>{previewError}</span></div> : null}
       {planError ? <div className="empty-state" role="alert"><b>即时方案操作失败</b><span>{planError}</span></div> : null}
     </Card>
@@ -1450,22 +1450,23 @@ function AdhocBetting({
     {plan ? <Card title="即时方案 / 可打印票面" icon={<CheckCircle2 />}>
       <div className="adhoc-plan-head">
         <div><Badge tone={adhocPlanStatusTone(plan.currentStatus)}>{adhocPlanStatusLabel(plan.currentStatus)}</Badge><span> 请求 {plan.requestId.slice(0, 16)}</span></div>
-        <button type="button" onClick={refreshPlan}>刷新当前资格</button>
+        <button type="button" onClick={refreshPlan}>刷新有效期状态</button>
       </div>
-      {plan.currentStatus === 'EXPIRED_NOT_PURCHASABLE' ? <div className="adhoc-expired" role="alert"><b>已失效，不可下注</b><span>服务器时钟已重新核验此请求的可售窗口；请重新生成，不会替换或修改原票面。</span></div> : null}
+      <p className="adhoc-boundary">刷新只按服务器时钟复核本包的 valid_until；不会重新抓取售卖状态。售卖资格是生成时快照，请在门店再次确认销售开放。</p>
+      {plan.currentStatus === 'EXPIRED_NOT_PURCHASABLE' ? <div className="adhoc-expired" role="alert"><b>已失效，不可下注</b><span>服务器时钟显示本包已超过 valid_until；请重新生成，不会替换或修改原票面。</span></div> : null}
       <div className="adhoc-summary adhoc-plan-summary">
         <div><span>Exact N / 预算</span><b>N={plan.requestedN} / {money(plan.requestedBudgetYuan)}</b></div>
         <div><span>票数 / 基础成本</span><b>{plan.ticketCount} / {moneyFixed(plan.baseCostYuan)}</b></div>
         <div><span>实际成本</span><b>{moneyFixed(plan.actualCostYuan)}</b></div>
         <div><span>未用预算</span><b>{moneyFixed(plan.unusedBudgetYuan)}</b></div>
         <div><span>预算利用率</span><b>{(plan.budgetUtilization * 100).toFixed(2)}%</b></div>
-        <div><span>可用至</span><b>{plan.validUntil || '-'}</b></div>
+        <div><span>冻结有效至</span><b>{plan.validUntil || '-'}</b></div>
         <div><span>生成时间</span><b>{plan.requestedAt}</b></div>
         <div><span>输入截至</span><b>{plan.inputAsOf}</b></div>
         <div><span>输入哈希</span><b>{plan.inputSha256.slice(0, 16) || '-'}</b></div>
         <div><span>方案状态</span><b>{adhocPlanStatusLabel(plan.status)}</b></div>
       </div>
-      <p className="adhoc-boundary">本方案为 request-time 独立包：research_evidence_eligible=false，scheduled_freeze_event_id=null；不提供正确比分执行。</p>
+      <p className="adhoc-boundary">本方案为 request-time 独立包：售卖状态仅代表生成时快照，research_evidence_eligible=false，scheduled_freeze_event_id=null；不提供正确比分执行。</p>
       <AdhocDenominator title="查看本次冻结资格分母" matches={plan.denominator} />
       {plan.tickets.length ? <div className="adhoc-ticket-list">
         {plan.tickets.map((ticket) => <section className="adhoc-ticket" key={ticket.ticketNo}>
@@ -1479,13 +1480,13 @@ function AdhocBetting({
             </label>)}
           </div>
         </section>)}
-      </div> : <div className="empty-state"><b>不可生成当前 Exact-N 方案</b><span>{plan.unavailableReasons.join('；') || plan.planReason || '当前输入不满足生成条件。'}</span></div>}
+      </div> : <div className="empty-state"><b>本次无法生成 Exact-N 方案</b><span>{plan.unavailableReasons.join('；') || plan.planReason || '本次输入不满足生成条件。'}</span></div>}
       <div className="adhoc-download-row">
         <b>下载票面</b>
         {operationalDownloadsEnabled ? <>
-          {(['pdf', 'html', 'csv'] as const).map((format) => <a className="adhoc-download" key={format} href={adapter.adhocBettingDownloadUrl(plan.requestId, format)} title={`下载当前有效的 ${format.toUpperCase()} 票面`}><Download aria-hidden="true" />下载 {format.toUpperCase()}</a>)}
+          {(['pdf', 'html', 'csv'] as const).map((format) => <a className="adhoc-download" key={format} href={adapter.adhocBettingDownloadUrl(plan.requestId, format)} title={`下载 valid_until 内的 ${format.toUpperCase()} 票面；仍需现场确认销售开放`}><Download aria-hidden="true" />下载 {format.toUpperCase()}</a>)}
         </> : <>
-          {(['PDF', 'HTML', 'CSV'] as const).map((format) => <button type="button" key={format} disabled title="方案已失效或售卖资格未核验，不能下载用于下注">{format} 下载已禁用</button>)}
+          {(['PDF', 'HTML', 'CSV'] as const).map((format) => <button type="button" key={format} disabled title="方案已失效或生成时售卖资格未核验，不能下载用于下注">{format} 下载已禁用</button>)}
         </>}
         {plan.auditDownloadsAvailable ? <a className="adhoc-download audit" href={adapter.adhocBettingDownloadUrl(plan.requestId, 'pdf', true)} title="下载只读审计记录，不能用于下注"><Download aria-hidden="true" />下载审计记录（PDF）</a> : null}
       </div>

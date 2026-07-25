@@ -63,7 +63,6 @@ DEFAULT_FONT_FILE = (
 )
 DEFAULT_SAFETY_MARGIN_SECONDS = 120
 DEFAULT_MAX_SOURCE_AGE_SECONDS = 900
-DEFAULT_SAMPLE_ATTEMPTS = 4000
 
 REQUIRED_PACKAGE_FILES = frozenset(
     {
@@ -450,9 +449,27 @@ def _make_portfolio(
     n_value: int,
     budget_yuan: int,
     seed: int,
-    sample_attempts: int,
+    portfolio_contract: dict[str, Any] | None = None,
 ) -> tuple[list[dict[str, Any]], float, float, str]:
-    """Use the released deterministic exact-N core without an N/budget fallback."""
+    """Use the released deterministic Exact-N contract without a fallback."""
+
+    contract = portfolio_contract or portfolio.published_exact_n_portfolio_contract(
+        n_value=n_value,
+        budget_yuan=budget_yuan,
+        arm="shadow",
+        segment_idx=0,
+    )
+    try:
+        contract = portfolio.validate_published_exact_n_portfolio_contract(contract)
+    except ValueError as exc:
+        raise AdhocBettingError("adhoc Exact-N portfolio contract is invalid") from exc
+    if (
+        int(contract["requested_n"]) != n_value
+        or float(contract["requested_budget_yuan"]) != float(budget_yuan)
+        or str(contract["arm"]) != "shadow"
+        or int(contract["segment_idx"]) != 0
+    ):
+        raise AdhocBettingError("adhoc Exact-N portfolio contract does not bind this request")
 
     legs: list[rolling.LegRow] = []
     for row in eligible:
@@ -479,29 +496,12 @@ def _make_portfolio(
     if len(metrics) < n_value:
         return [], 0.0, 0.0, "eligible_match_count_below_requested_n"
 
-    budget_units = budget_yuan / 2.0
-    candidates = portfolio.generate_candidates(
+    staked, spent_units, reason = portfolio.execute_published_exact_n_portfolio(
         metrics=metrics,
-        segment_idx=0,
-        arm="shadow",
-        n_value=n_value,
-        budget_units=budget_units,
-        sample_attempts=max(1, int(sample_attempts)),
+        contract=contract,
         seed=seed,
     )
-    selected = portfolio.select_bundles(
-        [candidate for candidate in candidates if len(candidate.match_indices) == n_value],
-        budget_units=budget_units,
-        max_overlap=max(0, n_value - 2),
-        positive_ev_only=True,
-        max_bundle_cost_units=budget_units * 0.4,
-    )
-    staked, spent_units, reason = portfolio.apply_stake_mode(
-        selected,
-        budget_units=budget_units,
-        stake_mode="scale_to_budget",
-        max_bundle_cost_units=budget_units * 0.4,
-    )
+    stake_yuan_per_unit = float(contract["stake_yuan_per_unit"])
     tickets: list[dict[str, Any]] = []
     for ticket_number, item in enumerate(staked, start=1):
         candidate = item.candidate
@@ -514,11 +514,14 @@ def _make_portfolio(
                 "leg_codes": list(candidate.leg_codes),
                 "actual_n": len(candidate.match_indices),
                 "stake_multiplier": int(item.stake_multiplier),
-                "base_cost_yuan": round(candidate.cost_units * 2.0, 2),
-                "cost_yuan": round(candidate.cost_units * item.stake_multiplier * 2.0, 2),
+                "base_cost_yuan": round(candidate.cost_units * stake_yuan_per_unit, 2),
+                "cost_yuan": round(
+                    candidate.cost_units * item.stake_multiplier * stake_yuan_per_unit,
+                    2,
+                ),
             }
         )
-    actual_cost = round(spent_units * 2.0, 2)
+    actual_cost = round(spent_units * stake_yuan_per_unit, 2)
     base_cost = round(sum(float(ticket["base_cost_yuan"]) for ticket in tickets), 2)
     if actual_cost > budget_yuan + 1e-9:
         raise AdhocBettingError("exact-N portfolio core exceeded the requested budget")
@@ -779,14 +782,12 @@ class AdhocBettingStore:
         font_file: str | os.PathLike[str] = DEFAULT_FONT_FILE,
         safety_margin_seconds: int = DEFAULT_SAFETY_MARGIN_SECONDS,
         max_source_age_seconds: int = DEFAULT_MAX_SOURCE_AGE_SECONDS,
-        sample_attempts: int = DEFAULT_SAMPLE_ATTEMPTS,
     ) -> None:
         self.db_path = Path(db_path)
         self.root = Path(root)
         self.font_file = Path(font_file)
         self.safety_margin = timedelta(seconds=max(0, int(safety_margin_seconds)))
         self.max_source_age = timedelta(seconds=max(1, int(max_source_age_seconds)))
-        self.sample_attempts = max(1, int(sample_attempts))
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=30)
@@ -1069,13 +1070,20 @@ class AdhocBettingStore:
             requested_n,
             requested_budget_yuan,
         )
+        portfolio_contract = portfolio.published_exact_n_portfolio_contract(
+            n_value=requested_n,
+            budget_yuan=requested_budget_yuan,
+            arm="shadow",
+            segment_idx=0,
+        )
+        portfolio_contract_sha256 = digest(portfolio_contract)
         tickets, base_cost, actual_cost, portfolio_reason = _make_portfolio(
             eligible=eligible,
             issue=issue,
             n_value=requested_n,
             budget_yuan=requested_budget_yuan,
             seed=seed,
-            sample_attempts=self.sample_attempts,
+            portfolio_contract=portfolio_contract,
         )
         sale_status_verified = bool(tickets) and all(
             row["sale_status"] in OPEN_SALE_STATES and row["pass_allowed"] is True
@@ -1119,6 +1127,8 @@ class AdhocBettingStore:
                 "reason": portfolio_reason,
                 "unavailable_reasons": unavailable_reasons,
                 "deterministic_seed": seed,
+                "portfolio_contract": portfolio_contract,
+                "portfolio_contract_sha256": portfolio_contract_sha256,
                 "tickets": tickets,
                 "correct_score_status": "UNAVAILABLE_ADHOC_CORRECT_SCORE",
             }
@@ -1152,6 +1162,8 @@ class AdhocBettingStore:
             "decision_input_sha256": str(decision_input["sha256"]),
             "eligible_denominator_sha256": str(eligibility["sha256"]),
             "exact_n_plan_sha256": str(plan["sha256"]),
+            "portfolio_contract": portfolio_contract,
+            "portfolio_contract_sha256": portfolio_contract_sha256,
             "source_snapshot_sha256": source_snapshot_sha256,
             "decision_variant_id": str(decision_input["decision_variant_id"]),
             "correct_score_status": "UNAVAILABLE_ADHOC_CORRECT_SCORE",
@@ -1321,6 +1333,12 @@ class AdhocBettingStore:
 
     @staticmethod
     def _current_status(manifest: dict[str, Any], now: datetime) -> str:
+        """Classify immutable package validity using only the server clock.
+
+        This deliberately does not refresh sale status or any decision input;
+        those facts are a generation-time snapshot in the immutable package.
+        """
+
         immutable_status = str(manifest.get("status") or "FAILED_CLOSED")
         if immutable_status == "UNAVAILABLE_ADHOC_PLAN":
             return "UNAVAILABLE_ADHOC_PLAN"
@@ -1403,6 +1421,9 @@ class AdhocBettingStore:
             "valid_until_hkt": str(manifest.get("valid_until_hkt") or ""),
             "status": str(manifest["status"]),
             "current_status": current_status,
+            "current_status_recheck_scope": "VALID_UNTIL_SERVER_CLOCK_ONLY",
+            "sale_eligibility_scope": "GENERATION_TIME_SNAPSHOT_ONLY",
+            "shop_sale_confirmation_required": True,
             "structural_verification_status": str(manifest["structural_verification_status"]),
             "sale_status_verified": bool(manifest["sale_status_verified"]),
             "operational_downloads_enabled": current_status == "DOWNLOADABLE_CURRENT",
@@ -1542,6 +1563,42 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
         raise AdhocBettingError("adhoc request N/budget contract is invalid") from exc
     if n_value not in ALLOWED_N_VALUES or budget not in ALLOWED_BUDGETS:
         raise AdhocBettingError("adhoc request N/budget contract is invalid")
+    portfolio_contract = plan.get("portfolio_contract")
+    portfolio_contract_sha256 = str(plan.get("portfolio_contract_sha256") or "")
+    if (
+        not isinstance(portfolio_contract, dict)
+        or not re.fullmatch(r"[0-9a-f]{64}", portfolio_contract_sha256)
+        or portfolio_contract_sha256 != digest(portfolio_contract)
+        or manifest.get("portfolio_contract") != portfolio_contract
+        or str(manifest.get("portfolio_contract_sha256") or "") != portfolio_contract_sha256
+    ):
+        raise AdhocBettingError("adhoc Exact-N portfolio contract linkage mismatch")
+    try:
+        checked_portfolio_contract = portfolio.validate_published_exact_n_portfolio_contract(
+            portfolio_contract
+        )
+    except ValueError as exc:
+        raise AdhocBettingError("adhoc Exact-N portfolio contract is not released") from exc
+    if (
+        int(checked_portfolio_contract["requested_n"]) != n_value
+        or float(checked_portfolio_contract["requested_budget_yuan"]) != budget
+        or str(checked_portfolio_contract["arm"]) != "shadow"
+        or int(checked_portfolio_contract["segment_idx"]) != 0
+    ):
+        raise AdhocBettingError("adhoc Exact-N portfolio contract does not bind the request")
+    try:
+        deterministic_seed = int(plan.get("deterministic_seed"))
+    except (TypeError, ValueError) as exc:
+        raise AdhocBettingError("adhoc deterministic seed is invalid") from exc
+    expected_seed = portfolio.stable_seed(
+        CAPABILITY_ID,
+        str(manifest["request_id"]),
+        source_snapshot_sha256,
+        n_value,
+        int(budget),
+    )
+    if deterministic_seed != expected_seed:
+        raise AdhocBettingError("adhoc deterministic seed is not bound to the request input")
     tickets = plan.get("tickets")
     if not isinstance(tickets, list):
         raise AdhocBettingError("adhoc tickets are malformed")
@@ -1752,6 +1809,24 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
         != round(actual_cost / budget, 8)
     ):
         raise AdhocBettingError("adhoc plan and manifest costs do not reconcile")
+    try:
+        rebuilt_tickets, rebuilt_base_cost, rebuilt_actual_cost, rebuilt_reason = _make_portfolio(
+            eligible=[decision_rows[idx] for idx in sorted(included_rows)],
+            issue=str(manifest["issue"]),
+            n_value=n_value,
+            budget_yuan=int(budget),
+            seed=deterministic_seed,
+            portfolio_contract=checked_portfolio_contract,
+        )
+    except AdhocBettingError as exc:
+        raise AdhocBettingError("adhoc Exact-N portfolio cannot be reconstructed") from exc
+    if (
+        canonical(tickets) != canonical(rebuilt_tickets)
+        or round(base_cost, 2) != round(rebuilt_base_cost, 2)
+        or round(actual_cost, 2) != round(rebuilt_actual_cost, 2)
+        or str(plan.get("reason") or "") != rebuilt_reason
+    ):
+        raise AdhocBettingError("adhoc Exact-N portfolio replay mismatch")
     if str(plan.get("status") or "") != str(manifest.get("status") or ""):
         raise AdhocBettingError("adhoc plan/manifest status mismatch")
     if (

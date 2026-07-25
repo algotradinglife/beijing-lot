@@ -464,7 +464,12 @@ def main() -> None:
     )
     p.add_argument("--ledger-root", type=Path, default=DEFAULT_LEDGER)
     p.add_argument("--correct-score-root", type=Path, default=DEFAULT_SCORE_ROOT)
-    p.add_argument("--sample-attempts", type=int, default=12000)
+    p.add_argument(
+        "--sample-attempts",
+        type=int,
+        default=plan.PUBLISHED_EXACT_N_SAMPLE_ATTEMPTS,
+        help="released Exact-N candidate sampling count",
+    )
     p.add_argument("--sample-seed", type=int, default=20260707)
     a = p.parse_args()
     if (a.manifest is None) == (a.recovery_manifest is None):

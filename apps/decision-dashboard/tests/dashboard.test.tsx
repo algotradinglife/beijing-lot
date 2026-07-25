@@ -312,7 +312,7 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getByText(/年度表现/)).toBeInTheDocument();
   });
 
-  it('generates a separately scoped adhoc Exact-N plan with printable current downloads', async () => {
+  it('generates a separately scoped adhoc Exact-N plan with printable valid-until downloads', async () => {
     const scheduledFreezeSpy = vi.spyOn(ApiDashboardAdapter.prototype, 'getExactNFreezes');
     render(<App />);
     await userEvent.click(await screen.findByRole('button', { name: '即时下注' }));
@@ -321,14 +321,17 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getByText('即时下注（本次独立请求）')).toBeInTheDocument();
     expect(screen.getByText('研究冻结审计（独立只读）')).toBeInTheDocument();
     expect(screen.queryByText('Exact-N 冻结备选')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByText('查看当前完整资格分母（8 场）'));
+    await userEvent.click(screen.getByText('查看本次预览完整资格分母（8 场）'));
     expect(screen.getByText('#1 示例主队 1 vs 示例客队 1')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'N=4' }));
     await userEvent.click(screen.getByRole('button', { name: '¥768' }));
     await userEvent.click(screen.getByRole('button', { name: '生成即时方案' }));
 
     expect(await screen.findByText('即时方案 / 可打印票面')).toBeInTheDocument();
-    expect(screen.getByText('当前可下注')).toBeInTheDocument();
+    expect(screen.getByText('有效期内，可下载')).toBeInTheDocument();
+    expect(screen.getByText(/刷新只按服务器时钟复核本包的 valid_until；不会重新抓取售卖状态/)).toBeInTheDocument();
+    expect(screen.getByText(/请在门店再次确认销售开放/)).toBeInTheDocument();
+    expect(screen.queryByText('当前可下注')).not.toBeInTheDocument();
     expect(screen.getByText('N=4 / ¥768')).toBeInTheDocument();
     expect(screen.getByText(/第 1 票 · Exact N=4/)).toBeInTheDocument();
     expect(screen.getByText('查看本次冻结资格分母（8 场）')).toBeInTheDocument();
@@ -356,6 +359,9 @@ describe('北单实盘决策台 v1', () => {
       validUntil: '2026-07-25T12:01:00+08:00',
       status: 'UNAVAILABLE_ADHOC_PLAN',
       currentStatus: 'EXPIRED_NOT_PURCHASABLE',
+      currentStatusRecheckScope: 'VALID_UNTIL_SERVER_CLOCK_ONLY',
+      saleEligibilityScope: 'GENERATION_TIME_SNAPSHOT_ONLY',
+      shopSaleConfirmationRequired: true,
       structuralVerificationStatus: 'STRUCTURAL_INTEGRITY_PASS',
       saleStatusVerified: false,
       operationalDownloadsEnabled: false,

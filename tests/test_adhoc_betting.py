@@ -23,6 +23,7 @@ from src.adhoc_betting import (
     file_hash,
     verify_package,
 )
+from scripts.estimate_segment_betting_plan import PUBLISHED_EXACT_N_SAMPLE_ATTEMPTS
 
 
 NOW = datetime(2026, 7, 25, 12, 0, tzinfo=HKT)
@@ -109,7 +110,6 @@ def _store(tmp_path: Path) -> AdhocBettingStore:
         db_path=tmp_path / "adhoc.sqlite",
         root=tmp_path / "adhoc-packages",
         font_file=DEFAULT_FONT_FILE,
-        sample_attempts=200,
     )
 
 
@@ -142,7 +142,6 @@ def test_each_allowed_exact_n_stays_exact_without_a_fallback(n_value: int) -> No
         n_value=n_value,
         budget_yuan=512,
         seed=42 + n_value,
-        sample_attempts=200,
     )
     assert tickets
     assert 0 < actual_cost <= 512
@@ -169,6 +168,9 @@ def test_current_exact_n_package_is_verified_content_addressed_and_separate(tmp_
     result = _create(store, _source_snapshot())
 
     assert result["current_status"] == "DOWNLOADABLE_CURRENT"
+    assert result["current_status_recheck_scope"] == "VALID_UNTIL_SERVER_CLOCK_ONLY"
+    assert result["sale_eligibility_scope"] == "GENERATION_TIME_SNAPSHOT_ONLY"
+    assert result["shop_sale_confirmation_required"] is True
     assert result["status"] == "READY_FOR_REVIEW"
     assert result["operational_downloads_enabled"] is True
     assert result["research_evidence_eligible"] is False
@@ -194,6 +196,13 @@ def test_current_exact_n_package_is_verified_content_addressed_and_separate(tmp_
     assert manifest["base_cost_yuan"] == plan["base_cost_yuan"]
     assert manifest["actual_cost_yuan"] == plan["actual_cost_yuan"]
     assert manifest["budget_utilization"] == plan["budget_utilization"]
+    assert manifest["portfolio_contract"] == plan["portfolio_contract"]
+    assert manifest["portfolio_contract_sha256"] == plan["portfolio_contract_sha256"]
+    assert plan["portfolio_contract"]["sample_attempts"] == PUBLISHED_EXACT_N_SAMPLE_ATTEMPTS
+    assert plan["portfolio_contract"]["max_overlap"] == 1
+    assert plan["portfolio_contract"]["positive_ev_only"] is True
+    assert plan["portfolio_contract"]["stake_mode"] == "scale_to_budget"
+    assert len(plan["portfolio_contract"]["portfolio_core_source_sha256"]) == 64
     assert all(item["actual_n"] == manifest["requested_n"] for item in plan["tickets"])
     assert manifest["pdf_font_reference"] == "evidence/bj_adhoc_bet_001/assets/fonts/NotoSansCJKsc-Regular.otf"
     assert len(manifest["pdf_font_sha256"]) == 64
@@ -315,7 +324,70 @@ def test_rehashed_tampering_is_rejected_by_semantic_verifier(tmp_path: Path) -> 
         encoding="utf-8",
     )
 
-    with pytest.raises(AdhocBettingError, match="exact-N ticket contract failed"):
+    with pytest.raises(AdhocBettingError, match="portfolio contract does not bind the request"):
+        verify_package(rehashed_package)
+
+
+def test_fully_rehashed_ticket_replacement_is_rejected_by_portfolio_replay(tmp_path: Path) -> None:
+    """A self-consistent package cannot substitute a valid-looking ticket set."""
+
+    store = _store(tmp_path)
+    result = _create(store, _source_snapshot())
+    package = tmp_path / "adhoc-packages" / "packages" / "26078" / str(result["package_id"])
+    plan_path = package / "exact_n_plan.json"
+    manifest_path = package / "adhoc_request_manifest.json"
+    denominator = json.loads((package / "eligible_denominator.json").read_text(encoding="utf-8"))
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    assert plan["tickets"]
+    changed_ticket = plan["tickets"][0]
+    old_indices = {int(value) for value in changed_ticket["match_indices"]}
+    replacement = next(
+        int(row["match_idx"])
+        for row in denominator["included"]
+        if int(row["match_idx"]) not in old_indices
+    )
+    changed_ticket["match_indices"][-1] = replacement
+    # The fixture gives every leg the same code/price, so this replacement
+    # remains structurally valid and cost-consistent before the replay check.
+    plan.pop("sha256", None)
+    plan["sha256"] = digest(plan)
+    plan_path.write_bytes(canonical(plan) + b"\n")
+
+    included_by_idx = {int(row["match_idx"]): row for row in denominator["included"]}
+    selected_indices = {
+        int(match_idx)
+        for ticket in plan["tickets"]
+        for match_idx in ticket["match_indices"]
+    }
+    safety_margin = int(denominator["safety_margin_seconds"])
+    manifest["valid_until_hkt"] = min(
+        datetime.fromisoformat(str(included_by_idx[idx]["sale_cutoff_hkt"]))
+        - timedelta(seconds=safety_margin)
+        for idx in selected_indices
+    ).isoformat()
+    manifest["exact_n_plan_sha256"] = plan["sha256"]
+    for artifact in manifest["artifacts"]:
+        if artifact["file"] == "exact_n_plan.json":
+            artifact["sha256"] = file_hash(plan_path)
+    manifest.pop("sha256", None)
+    manifest["package_id"] = _package_identity(manifest)
+    manifest["sha256"] = digest(manifest)
+    manifest_path.write_bytes(canonical(manifest) + b"\n")
+
+    rehashed_package = package.with_name(manifest["package_id"])
+    package.rename(rehashed_package)
+    (rehashed_package / "SHA256SUMS").write_text(
+        "".join(
+            f"{file_hash(path)}  {path.name}\n"
+            for path in sorted(rehashed_package.iterdir())
+            if path.is_file() and path.name != "SHA256SUMS"
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AdhocBettingError, match="Exact-N portfolio replay mismatch"):
         verify_package(rehashed_package)
 
 

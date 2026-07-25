@@ -1166,6 +1166,9 @@ export interface AdhocBettingPlanData {
   validUntil: string;
   status: string;
   currentStatus: string;
+  currentStatusRecheckScope: 'VALID_UNTIL_SERVER_CLOCK_ONLY' | string;
+  saleEligibilityScope: 'GENERATION_TIME_SNAPSHOT_ONLY' | string;
+  shopSaleConfirmationRequired: boolean;
   structuralVerificationStatus: string;
   saleStatusVerified: boolean;
   operationalDownloadsEnabled: boolean;
