@@ -1,0 +1,94 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: SP-CONSISTENCY-001A
+  title: Score distribution consistency and incremental information for handicap 3/1/0
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-PHASE1
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/31"
+    - SP-EFF-001
+    - MM-DATA-AUDIT-001
+    - BJ-MM-FREEZE-001
+
+spec:
+  type: research
+  intent:
+    objective: Determine whether strict pre-match score distributions map consistently into Beijing handicap 3/1/0 probabilities and whether they add out-of-sample predictive information beyond p34 SP-only.
+    question: At one absolute pre-match decision time, how closely do score-derived handicap probabilities agree with de-vigged p34 market probabilities, and do they improve holdout log loss or Brier score beyond p34 SP-only?
+    hypothesis: Structured discrepancies may exist, but incremental value remains unproven until strict paired as-of coverage, tail completeness, chronological holdout, and multiplicity controls pass.
+    expected_value: Separate score-to-handicap probability research from N-leg portfolio results and establish an auditable Phase 1 consistency baseline.
+    out_of_scope:
+      - Production strategy, v3.3.3, or v4.2 changes
+      - Correct-score Top-k, EV, q, staking, tickets, N-leg portfolios, or ROI
+      - Terminal or winning SP used as a pre-match feature
+      - Retrospective reconstruction presented as strict evidence
+      - Automatic execution or release authority
+
+  context:
+    issue_contract: "https://github.com/algotradinglife/beijing-lot/issues/31"
+    immediate_stage: G0 historical coverage/provenance audit and preregistration
+    formal_analysis_gate: G0 through G2 must be frozen before RQ1/RQ2 outcome analysis
+    existing_baseline: scripts/evaluate_n7_matchpredict_integration.py MatchPredictPoissonModel
+    dispatch_source: GitHub labels state/ready plus owner/strategist
+
+  execution:
+    required_capabilities:
+      - statistical_research
+      - probability_modeling
+      - temporal_data_audit
+      - reproducible_analysis
+    uncertainty: high
+    complexity: high
+
+  risk:
+    overall: high
+    scientific: high
+    engineering: medium
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - Frozen G0 coverage and provenance audit
+      - Preregistered score-to-handicap mapping and tail treatment
+      - Deterministic mapper tests for positive, zero, and negative handicaps
+      - Stage A consistency report when authorized
+      - Stage B chronological B0/B1/B2 comparison only when authorized
+      - Freeze Protocol package and honest evidence classification
+    checks:
+      - strict_asof_validation
+      - terminal_input_rejection
+      - denominator_and_exclusion_freeze
+      - tail_mass_bounds_or_rejection
+      - chronological_holdout
+      - issue_block_uncertainty
+      - multiplicity_control
+      - reproducibility_validation
+      - no_strategy_or_portfolio_scope_drift
+    human_gates:
+      - formal_analysis_authorization_after_g0_g2
+      - engineering_reproducibility_validation
+      - research_pi_review
+
+status:
+  current: READY
+  attempts: 0
+  routing:
+    executor_mode: isolated_session
+    profile: strategist
+    runtime: codex
+    reason: "Issue #31 carries state/ready and owner/strategist. Strategist may execute G0 and preregistration immediately, but must stop at failed data/tail gates and may not infer dispatch authority from this informational task status."
+  artifacts:
+    - uri: "https://github.com/algotradinglife/beijing-lot/issues/31"
+      artifact_type: issue
+      description: PI-approved experiment contract and GitHub dispatch source
+  result: {}
+  history:
+    - action: task_created
+      ts: "2026-07-25T12:06:52Z"
+      actor: research_pi
+      from: null
+      to: READY
+      reason: "PI created Issue #31 with positive Strategist routing labels and preregistered G0-G3 research gates."
