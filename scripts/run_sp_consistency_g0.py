@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from research.sp_consistency.coverage import G0_CONFIG_VERSION, run_g0_coverage_audit  # noqa: E402
+from research.sp_consistency.snapshot import create_g0_input_snapshot  # noqa: E402
 from src.research_freeze_protocol import create_freeze_package, verify_freeze_package  # noqa: E402
 
 
@@ -39,6 +40,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--p42-freeze-root", type=Path, default=repo / "results/research/multimarket_segment_freeze_v1"
     )
+    parser.add_argument(
+        "--model-search-root", type=Path, action="append",
+        default=[repo / "results/data_collection", repo / "results/research", repo / "data/derived"],
+        help="Outcome-blind roots mechanically inventoried for declared William Hill 1X2/O/U inputs.",
+    )
     parser.add_argument("--work-dir", type=Path, required=True)
     parser.add_argument("--audit-at-utc", required=True)
     parser.add_argument("--freeze-dir", type=Path)
@@ -52,10 +58,19 @@ def main() -> int:
     if work.exists():
         raise FileExistsError(f"G0 work directory already exists: {work}")
     work.mkdir(parents=True)
-    audit = run_g0_coverage_audit(
+    atomic = create_g0_input_snapshot(
+        work_dir=work,
         p34_db=arguments.p34_db,
         p0_db=arguments.p0_db,
         p42_freeze_root=arguments.p42_freeze_root,
+        model_search_roots=arguments.model_search_root,
+    )
+    audit = run_g0_coverage_audit(
+        p34_db=atomic.p34_snapshot,
+        p0_db=atomic.p0_snapshot,
+        p42_freeze_root=atomic.p42_root,
+        model_inventory=atomic.model_inventory,
+        input_fingerprints=atomic.fingerprints,
         audit_at_utc=arguments.audit_at_utc,
     )
     config = {
@@ -80,14 +95,20 @@ def main() -> int:
     if arguments.freeze_dir:
         package = create_freeze_package(
             arguments.freeze_dir,
-            experiment_id="SP-CONSISTENCY-001A-G0",
+            experiment_id="SP-CONSISTENCY-001A-G0-R1",
             research_question="Does strict p34 plus score-distribution as-of coverage authorize SP-CONSISTENCY-001A?",
             model_version=G0_CONFIG_VERSION,
-            input_files=[work / "coverage_audit.json"],
+            input_files=[
+                atomic.p34_snapshot,
+                atomic.p0_snapshot,
+                atomic.p42_archive,
+                atomic.model_inventory,
+                atomic.fingerprints,
+                work / "coverage_audit.json",
+            ],
             decision_files=[work / "g0_decision.json"],
             config_file=work / "g0_config.json",
             metadata_files=[ROOT / "docs/research/experiments/SP-CONSISTENCY-001A.md"],
-            input_datasets=[arguments.p34_db],
             git_commit=arguments.git_commit,
             frozen_at_utc=arguments.audit_at_utc,
         )

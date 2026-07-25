@@ -12,11 +12,13 @@ from .mapping import (
     poisson_grid_handicap_bounds,
     score_distribution_handicap_bounds,
 )
+from .snapshot import create_g0_input_snapshot
 
 __all__ = [
     "G0_CONFIG_VERSION",
     "HandicapProbabilityBounds",
     "aggregate_complete_score_distribution",
+    "create_g0_input_snapshot",
     "poisson_grid_handicap_bounds",
     "run_g0_coverage_audit",
     "score_distribution_handicap_bounds",

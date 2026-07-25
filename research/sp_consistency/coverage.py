@@ -8,7 +8,6 @@ the availability and provenance of permissible pre-match inputs.
 from __future__ import annotations
 
 import csv
-import hashlib
 import json
 import math
 import sqlite3
@@ -26,14 +25,6 @@ HKT = timezone(timedelta(hours=8))
 G0_CONFIG_VERSION = "sp-consistency-g0-v1"
 MIN_STRICT_PAIRED_ROWS = 200
 MIN_STRICT_PAIRED_ISSUES = 8
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(4 * 1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _read_only_connection(path: Path) -> sqlite3.Connection:
@@ -72,18 +63,6 @@ def _percentile(values: list[float], quantile: float) -> float | None:
     return round(ordered[index], 6)
 
 
-def _file_fingerprint(path: Path) -> dict[str, Any]:
-    item = path.resolve()
-    if not item.is_file():
-        return {"path": str(item), "status": "missing"}
-    return {
-        "path": str(item),
-        "status": "present",
-        "bytes": item.stat().st_size,
-        "sha256": _sha256_file(item),
-    }
-
-
 def _p34_coverage(connection: sqlite3.Connection) -> dict[str, Any]:
     if not (_table_exists(connection, "matches") and _table_exists(connection, "snapshots")):
         return {
@@ -103,6 +82,8 @@ def _p34_coverage(connection: sqlite3.Connection) -> dict[str, Any]:
     clocked_pre_kickoff_observations = 0
     latest_leads: dict[str, float] = {}
     malformed_clock_rows = 0
+    complete_by_issue: Counter[str] = Counter()
+    pre_kickoff_observations_by_issue: Counter[str] = Counter()
     for row in connection.execute(
         "SELECT match_id, snapshot_ts, sp_3, sp_1, sp_0 FROM snapshots ORDER BY match_id, snapshot_ts"
     ):
@@ -114,6 +95,7 @@ def _p34_coverage(connection: sqlite3.Connection) -> dict[str, Any]:
         if match is None:
             malformed_clock_rows += 1
             continue
+        complete_by_issue[str(match["issue"])] += 1
         snapshot_at = _parse_utc(str(row["snapshot_ts"]))
         kickoff_at = _parse_utc(str(match["kickoff_ts"]), naive_timezone=HKT)
         if snapshot_at is None or kickoff_at is None:
@@ -122,6 +104,7 @@ def _p34_coverage(connection: sqlite3.Connection) -> dict[str, Any]:
         if snapshot_at >= kickoff_at:
             continue
         clocked_pre_kickoff_observations += 1
+        pre_kickoff_observations_by_issue[str(match["issue"])] += 1
         lead_minutes = (kickoff_at - snapshot_at).total_seconds() / 60
         match_id = str(row["match_id"])
         previous = latest_leads.get(match_id)
@@ -129,6 +112,7 @@ def _p34_coverage(connection: sqlite3.Connection) -> dict[str, Any]:
             latest_leads[match_id] = lead_minutes
 
     leads = list(latest_leads.values())
+    pre_kickoff_matches_by_issue = Counter(str(rows_by_match[match_id]["issue"]) for match_id in latest_leads)
     # `snapshots` contains processed three-way values only.  It has no source
     # observed clock, fetch clock, raw payload, batch ID, or SHA256SUMS bundle,
     # therefore every otherwise-clocked candidate remains non-strict.
@@ -137,6 +121,19 @@ def _p34_coverage(connection: sqlite3.Connection) -> dict[str, Any]:
         "issues": len(issues),
         "match_markets": len(matches),
         "by_season": dict(sorted(season_counts.items())),
+        "by_issue": [
+            {
+                "issue": issue,
+                "match_markets": sum(1 for row in matches if str(row["issue"]) == issue),
+                "complete_vector_observations": complete_by_issue[issue],
+                "clocked_pre_kickoff_observations": pre_kickoff_observations_by_issue[issue],
+                "clocked_pre_kickoff_match_markets": pre_kickoff_matches_by_issue[issue],
+                "strict_complete_match_markets": 0,
+                "missing_immutable_raw_bundle_provenance": pre_kickoff_matches_by_issue[issue],
+                "missing_source_and_fetch_dual_clock": pre_kickoff_matches_by_issue[issue],
+            }
+            for issue in issues
+        ],
         "complete_vector_observations": complete_observations,
         "clocked_pre_kickoff_observations": clocked_pre_kickoff_observations,
         "clocked_pre_kickoff_match_markets": len(latest_leads),
@@ -257,8 +254,39 @@ def _is_finite_price(value: str) -> bool:
         return False
 
 
+def _model_score_coverage(inventory_path: Path) -> dict[str, Any]:
+    """Classify the frozen mechanical inventory; never assume zero by fiat."""
+
+    try:
+        inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return {
+            "status": "unavailable",
+            "strict_complete_match_markets": 0,
+            "rejections": {"missing_or_invalid_frozen_model_inventory": 1},
+            "inventory_error": type(exc).__name__,
+        }
+    eligible = inventory.get("strict_eligible_assets", [])
+    rejections = inventory.get("rejection_counts", {})
+    if not isinstance(eligible, list) or not isinstance(rejections, dict):
+        return {
+            "status": "unavailable",
+            "strict_complete_match_markets": 0,
+            "rejections": {"malformed_frozen_model_inventory": 1},
+        }
+    return {
+        "status": "available" if eligible else "unavailable",
+        "strict_complete_match_markets": 0,
+        "candidate_table_or_view_count": len(inventory.get("scanned_p0_schema_candidates", [])),
+        "candidate_file_count": sum(1 for item in inventory.get("scanned_file_candidates", []) if "path" in item),
+        "strict_eligible_assets": eligible,
+        "rejections": rejections,
+        "inventory_sha256_bound": True,
+    }
+
+
 def run_g0_coverage_audit(
-    *, p34_db: Path, p0_db: Path, p42_freeze_root: Path, audit_at_utc: str
+    *, p34_db: Path, p0_db: Path, p42_freeze_root: Path, model_inventory: Path, input_fingerprints: Path, audit_at_utc: str
 ) -> dict[str, Any]:
     """Return a deterministic, outcome-blind G0 coverage report.
 
@@ -271,8 +299,8 @@ def run_g0_coverage_audit(
         raise ValueError("audit_at_utc must be an explicit ISO-8601 timestamp")
     p34_path = p34_db.resolve()
     p0_path = p0_db.resolve()
-    if not p34_path.is_file() or not p0_path.is_file():
-        raise FileNotFoundError("G0 requires readable p34 and p0 SQLite databases")
+    if not p34_path.is_file() or not p0_path.is_file() or not model_inventory.is_file() or not input_fingerprints.is_file():
+        raise FileNotFoundError("G0 requires complete atomic p34/p0/model input snapshots")
 
     p34_connection = _read_only_connection(p34_path)
     p0_connection = _read_only_connection(p0_path)
@@ -289,14 +317,7 @@ def run_g0_coverage_audit(
     # There is deliberately no join against approximate/legacy p34 or p42
     # rows.  A common immutable same-decision-time identity is mandatory.
     paired_p34_p42 = 0
-    model_score = {
-        "status": "unavailable",
-        "strict_complete_match_markets": 0,
-        "rejections": {
-            "no_strict_william_hill_1x2_ou_snapshot_contract": 1,
-            "no_frozen_independent_poisson_input_panel": 1,
-        },
-    }
+    model_score = _model_score_coverage(model_inventory)
     paired_p34_model = 0
     eligibility_reasons = []
     if strict_p34 == 0:
@@ -314,11 +335,13 @@ def run_g0_coverage_audit(
         "stage": "G0",
         "audit_at_utc": audit_at.isoformat(timespec="seconds"),
         "outcomes_loaded": False,
-        "data_sources": {
-            "p34_snapshot_database": _file_fingerprint(p34_path),
-            "p34_snapshot_wal": _file_fingerprint(p34_path.with_name(p34_path.name + "-wal")),
-            "p42_segment_freeze_root": str(p42_freeze_root.resolve()),
+        "query_audit": {
+            "p34_columns": ["matches.match_id", "matches.issue", "matches.match_idx", "matches.kickoff_ts", "snapshots.match_id", "snapshots.snapshot_ts", "snapshots.sp_3", "snapshots.sp_1", "snapshots.sp_0"],
+            "p0_columns": ["matches.issue", "matches.match_idx", "matches.handicap_line"],
+            "prohibited_tables_or_columns": ["settlements", "result_code", "fthg", "ftag", "winning_sp", "score"],
+            "outcome_accessed": False,
         },
+        "data_sources": json.loads(input_fingerprints.read_text(encoding="utf-8")),
         "coverage": {
             "p34": p34,
             "model_score": model_score,
