@@ -1,0 +1,82 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: BJ-BET-SLIP-001
+  title: Printable betting slips from verified freezes
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-PHASE1
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/26"
+    - BJ-BET-FREEZE-001
+    - BJ-SEG-RECOVERY-001
+
+spec:
+  type: capability
+  intent:
+    objective: Deterministically render mobile/A4 Chinese betting slips from an immutable, verifier-passing exact-N freeze package.
+    question: Can every human-readable ticket remain byte-bound to its frozen plan and metadata while all mismatches fail closed?
+    hypothesis: A source-only renderer with independent bundle verification can add a human view without changing any freeze or execution authority.
+    expected_value: Reduce manual transcription errors at the lottery counter while preserving the exact frozen ticket contract.
+    out_of_scope:
+      - Match selection, probability, ticket, code, stake, or budget changes
+      - Runtime database, API, network, or later-artifact lookups
+      - Correct-score execution, settlement, ROI, or automated ordering
+      - Modification of any immutable source freeze
+
+  context:
+    inputs:
+      - Issue #26 and PI kickoff-source amendment
+      - BJ-BET-FREEZE-001 exact-N package verifier
+      - BJ-SEG-RECOVERY-001 immutable recovery manifest
+    assumptions:
+      - Recovery kickoff is used only from a package-bound recovery manifest
+      - Team, league, and handicap metadata comes only from frozen structured input
+
+  execution:
+    required_capabilities:
+      - python_development
+      - document_rendering
+      - testing
+    uncertainty: medium
+    complexity: high
+
+  risk:
+    overall: high
+    scientific: low
+    engineering: high
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - Fifteen independent HTML and PDF betting slips for the 26078 recovery fixture
+      - plan_matrix.csv and ticket_legs.csv
+      - Content-addressed betting_slip_manifest.json and SHA256SUMS
+      - Fail-closed renderer and verifier
+    checks:
+      - schema_validation
+      - automated_tests
+      - source_hash_and_semantic_verification
+      - mobile_and_a4_layout_validation
+    human_gates:
+      - engineering_validation
+      - research_pi_review
+
+status:
+  current: EXECUTING
+  attempts: 1
+  routing:
+    executor_mode: isolated_session
+    profile: engineer
+    runtime: codex
+    reason: "Issue #26 handoff; owner-requested no_agent execution in an independent worktree."
+  artifacts: []
+  result: {}
+  history:
+    - action: register_and_start
+      ts: "2026-07-25T02:10:06Z"
+      actor: HermesPM
+      from: CREATED
+      to: EXECUTING
+      reason: "PI accepted the recovery kickoff-source amendment and authorized normal implementation flow."

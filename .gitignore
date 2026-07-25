@@ -91,3 +91,8 @@ target/
 !apps/decision-dashboard/index.html
 !src/webui/templates/*.html
 *.zip
+
+# BJ-BET-SLIP-001 immutable acceptance bundle.
+!evidence/bj_bet_slip_001/
+!evidence/bj_bet_slip_001/**
+evidence/bj_bet_slip_001/.publish.lock
