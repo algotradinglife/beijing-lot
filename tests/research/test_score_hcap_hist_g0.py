@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from research.score_hcap_hist import g0
+from research.score_hcap_hist import walkforward
 
 
 def _source_fixture(path: Path, rows: list[tuple[object, ...]]) -> None:
@@ -86,3 +87,41 @@ def test_g0_fails_closed_for_result_mismatch_and_identity_conflicts(tmp_path: Pa
     assert "unresolved_duplicate_or_canonical_key_conflicts" in result["audit_data"]["gate"]["reasons"]
     audit = json.loads(result["audit"].read_text(encoding="utf-8"))
     assert audit == result["audit_data"]
+
+
+def _panel_fixture(path: Path, *, future_extra: bool = False) -> None:
+    connection = sqlite3.connect(path)
+    connection.executescript(
+        """
+        CREATE TABLE panel (
+          match_id INTEGER PRIMARY KEY, issue TEXT, match_idx INTEGER, kickoff_utc TEXT, season_year INTEGER,
+          league TEXT, home_team TEXT, away_team TEXT, normalized_home TEXT, normalized_away TEXT,
+          handicap INTEGER, fthg INTEGER, ftag INTEGER, label_310 TEXT, settlement_quality TEXT
+        );
+        """
+    )
+    rows = [
+        (1, "1401", 1, "2014-01-01T00:00:00+00:00", 2014, "L", "A", "B", "a", "b", 0, 1, 0, "3", "trusted"),
+        (2, "1501", 1, "2015-01-01T00:00:00+00:00", 2015, "L", "B", "A", "b", "a", 0, 0, 1, "0", "trusted"),
+        (3, "1601", 1, "2016-01-01T00:00:00+00:00", 2016, "L", "A", "B", "a", "b", 0, 1, 1, "1", "trusted"),
+    ]
+    if future_extra:
+        rows.append((4, "1701", 1, "2017-01-01T00:00:00+00:00", 2017, "L", "A", "B", "a", "b", 0, 9, 0, "3", "trusted"))
+    connection.executemany("INSERT INTO panel VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
+    connection.commit()
+    connection.close()
+
+
+def test_skellam_mapping_and_walkforward_are_chronological(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    assert sum(walkforward.handicap_probabilities(1.2, 0.9, -1)) == pytest.approx(1.0, abs=1e-12)
+    assert sum(walkforward.handicap_probabilities(1.2, 0.9, 0)) == pytest.approx(1.0, abs=1e-12)
+    assert sum(walkforward.handicap_probabilities(1.2, 0.9, 1)) == pytest.approx(1.0, abs=1e-12)
+    monkeypatch.setattr(walkforward, "TEST_SEASONS", (2016,))
+    monkeypatch.setattr(walkforward, "BOOTSTRAP_REPLICATES", 4)
+    first, second = tmp_path / "first.sqlite", tmp_path / "second.sqlite"
+    _panel_fixture(first)
+    _panel_fixture(second, future_extra=True)
+    one = walkforward.run_walkforward(panel=first, output_dir=tmp_path / "one")
+    two = walkforward.run_walkforward(panel=second, output_dir=tmp_path / "two")
+    assert one["summary"]["aggregate"] == two["summary"]["aggregate"]
+    assert (tmp_path / "one" / "bootstrap_deltas.csv").read_bytes() == (tmp_path / "two" / "bootstrap_deltas.csv").read_bytes()
