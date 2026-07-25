@@ -81,19 +81,31 @@ spec:
       - research_pi_review
 
 status:
-  current: READY
-  attempts: 0
+  current: EXECUTING
+  attempts: 1
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "ROUTE: Engineer. P0 READY; all graph dependencies are complete and engineering_primary was released by BJ-FREEZE-REVIEW-001."
+    reason: "ROUTE: Engineer. Implementing the isolated adhoc API, immutable package, printable renderer, and immediate web workflow; no Hermes routing dependency."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/28"
       artifact_type: issue
       description: Approved execution contract
   result: {}
   history:
+    - action: implementation_complete_pending_validation
+      ts: "2026-07-25T14:10:00+08:00"
+      actor: engineer
+      from: EXECUTING
+      to: EXECUTING
+      reason: "Implemented the isolated adhoc API, append-only package/ledger, guarded downloads, printable CJK PDF, and distinct web workflow. 32 Python tests, 23 dashboard tests, TypeScript build, and new-file Ruff checks pass; independent engineering validation and PI review remain required."
+    - action: start_execution
+      ts: "2026-07-25T13:41:42+08:00"
+      actor: engineer
+      from: READY
+      to: EXECUTING
+      reason: "Engineer started BJ-ADHOC-BET-001 in an isolated worktree after the capability became the active engineering_primary item."
     - action: task_created
       ts: "2026-07-25T03:39:10Z"
       actor: research_pi
