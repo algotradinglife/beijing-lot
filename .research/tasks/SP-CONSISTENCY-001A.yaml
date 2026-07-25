@@ -73,8 +73,8 @@ spec:
       - research_pi_review
 
 status:
-  current: READY
-  attempts: 0
+  current: VALIDATING
+  attempts: 1
   routing:
     executor_mode: isolated_session
     profile: strategist
@@ -84,7 +84,12 @@ status:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/31"
       artifact_type: issue
       description: PI-approved experiment contract and GitHub dispatch source
-  result: {}
+    - uri: "results/freeze/SP-CONSISTENCY-001A-G0"
+      artifact_type: freeze_package
+      description: "Verified G0 coverage artifact, freeze_id 446cac7cd7c779cba001b9860d99f0fe284781b6576b8dbf9b4be5ff697f0056"
+  result:
+    outcome: insufficient_strict_data
+    summary: G0 was frozen on 2026-07-25 without loading outcomes. Strict p34 coverage is zero because every pre-kickoff candidate lacks dual clocks and immutable raw-bundle provenance; no strict common-decision-time p34/score pair exists. Stage A/B are not authorised.
   history:
     - action: task_created
       ts: "2026-07-25T12:06:52Z"
