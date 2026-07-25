@@ -254,24 +254,39 @@ function Badge({ children, tone = 'neutral' }: { children: React.ReactNode; tone
 }
 
 function statusTone(status?: string): 'good' | 'warn' | 'bad' | 'neutral' {
-  if (status === 'ok' || status === 'active' || status === 'served_by_api') return 'good';
-  if (status === 'failed' || status === 'missing' || status === 'bad' || status === 'missing_build' || status === 'api_missing') return 'bad';
-  if (status === 'partial' || status === 'stale' || status === 'warn' || status === 'draft_replacement') return 'warn';
-  return 'neutral';
+  if (status === 'ok' || status === 'active' || status === 'served_by_api' || status === 'frozen' || status === 'succeeded' || status === 'success' || status === 'dry_run') return 'good';
+  if (status === 'failed' || status === 'missing' || status === 'bad' || status === 'blocked' || status === 'missed' || status === 'verification_failed' || status === 'missing_build' || status === 'api_missing') return 'bad';
+  if (status === 'partial' || status === 'stale' || status === 'warn' || status === 'due' || status === 'scheduled' || status === 'unavailable' || status === 'draft_replacement') return 'warn';
+  if (!status || status === 'running' || status === 'not_applicable' || status === 'not_run' || status === 'planned') return 'neutral';
+  return 'bad';
 }
 
 function opsStatusLabel(status?: string) {
   if (!status) return '未运行';
-  if (status === 'ok') return '正常';
-  if (status === 'active') return '生效';
-  if (status === 'dry_run') return '试运行完成';
-  if (status === 'running') return '运行中';
-  if (status === 'planned') return '计划中';
-  if (status === 'partial') return '部分数据';
-  if (status === 'stale') return '过期';
-  if (status === 'failed') return '失败';
-  if (status === 'missing') return '缺失';
-  return status;
+  const labels: Record<string, string> = {
+    ok: '正常',
+    active: '生效',
+    dry_run: '试运行完成',
+    succeeded: '成功',
+    success: '成功',
+    running: '运行中',
+    planned: '计划中',
+    due: '待执行',
+    partial: '部分完成',
+    stale: '已过期',
+    failed: '失败',
+    missing: '缺失',
+    blocked: '已阻断',
+    not_applicable: '不适用',
+    not_run: '尚未运行',
+    warn: '需关注',
+    scheduled: '已计划',
+    frozen: '已冻结',
+    missed: '已错过',
+    unavailable: '不可用',
+    verification_failed: '校验失败',
+  };
+  return labels[status] || `未知状态（${status}）`;
 }
 
 function minutesLabel(value?: number) {
@@ -1759,185 +1774,174 @@ function OperationsStatus({
   reviewTaskState?: ReviewTaskState;
   onRunPostmatchReview: (issueId: string, dryRun: boolean) => Promise<void>;
 }) {
-  const hasDraft = data.snapshots.draftReplacementCount > 0;
-  const unreviewed = data.review.unreviewedSettledCount > 0;
-  const failedSources = data.sources.filter((source) => source.status === 'failed');
-  const warningSources = data.sources.filter((source) => source.status === 'partial' || source.status === 'stale');
-  const sourceHealthTone = failedSources.length ? 'bad' : warningSources.length ? 'warn' : 'good';
+  const { summary, domains, alerts } = data;
+  const hasDraft = domains.artifacts.draftCount > 0;
+  const unreviewed = domains.settlementReview.unreviewedMatchIds.length > 0;
   const workflowTone = statusTone(data.workflow.status);
   const reviewTask = data.review.task;
   const reviewTaskTone = statusTone(reviewTask.status);
   const currentReviewTaskState = reviewTaskState?.issueId === data.issueId ? reviewTaskState : undefined;
   const reviewTaskRunning = currentReviewTaskState?.status === 'submitting';
-  const runtimeHealth = data.runtime.health;
-  const runtimeProblems = [
-    runtimeHealth?.api?.ok === false ? 'API 健康检查异常' : '',
-    runtimeHealth?.frontendLocal?.ok === false ? '前端本地健康检查异常' : '',
-    runtimeHealth?.operations?.ok === false ? '运行状态 API 异常' : '',
-  ].filter(Boolean);
-  const staleSnapshot = (data.issueStatus.latestSnapshotAgeMinutes ?? 0) > 60;
-  const missingSettlementSp = Math.max(0, data.issueStatus.finishedCount - data.issueStatus.settledSpCount);
   const completedWorkflowSteps = data.workflow.steps.filter((step) => statusTone(step.status) === 'good').length;
   const workflowStepSummary = data.workflow.steps.length
     ? `${completedWorkflowSteps}/${data.workflow.steps.length} 步完成`
     : '尚未运行';
-  const todoItems: Array<{ key: string; tone: 'good' | 'warn' | 'bad' | 'neutral'; code: string; title: string; detail: string }> = [];
-  if (failedSources.length) {
-    todoItems.push({
-      key: 'source_failed',
-      tone: 'bad',
-      code: '数据源',
-      title: '数据源抓取失败',
-      detail: failedSources.map((source) => source.sourceName).join('、'),
-    });
-  }
-  if (warningSources.length) {
-    todoItems.push({
-      key: 'source_warning',
-      tone: 'warn',
-      code: '数据源',
-      title: '数据源过期或不完整',
-      detail: warningSources.map((source) => `${source.sourceName} ${minutesLabel(source.ageMinutes)}`).join('、'),
-    });
-  }
-  if (staleSnapshot) {
-    todoItems.push({
-      key: 'snapshot_stale',
-      tone: 'warn',
-      code: '快照',
-      title: '当前期快照偏旧',
-      detail: `最新快照 ${data.issueStatus.latestSnapshotAt || '缺失'}，距今 ${minutesLabel(data.issueStatus.latestSnapshotAgeMinutes)}`,
-    });
-  }
-  if (missingSettlementSp > 0) {
-    todoItems.push({
-      key: 'settlement_sp_gap',
-      tone: 'warn',
-      code: '结算SP',
-      title: '已完赛但结算SP未齐',
-      detail: `${missingSettlementSp} 场需要继续刷新结算SP`,
-    });
-  }
-  if (hasDraft) {
-    todoItems.push({
-      key: 'pending_draft',
-      tone: 'warn',
-      code: '决策',
-      title: '待确认决策草稿',
-      detail: `${data.snapshots.draftReplacementCount} 条决策草稿需要确认后才进入正式展示`,
-    });
-  }
-  if (unreviewed) {
-    todoItems.push({
-      key: 'postmatch_review',
-      tone: 'warn',
-      code: '复盘',
-      title: '未复盘赛果',
-      detail: `${data.review.unreviewedSettledCount} 场已结算未复盘，建议先 dry-run 再写入`,
-    });
-  }
-  if (data.workflow.error) {
-    todoItems.push({
-      key: 'workflow_failed',
-      tone: 'bad',
-      code: '刷新',
-      title: '刷新流程失败',
-      detail: data.workflow.error,
-    });
-  }
-  if (reviewTask.error) {
-    todoItems.push({
-      key: 'review_failed',
-      tone: 'bad',
-      code: '复盘',
-      title: '复盘任务失败',
-      detail: reviewTask.error,
-    });
-  }
-  if (runtimeProblems.length) {
-    todoItems.push({
-      key: 'runtime_health',
-      tone: 'bad',
-      code: '服务',
-      title: '服务健康检查异常',
-      detail: runtimeProblems.join('、'),
-    });
-  }
+  const domainLabel = (domain: string) => ({
+    runtime: '服务运行',
+    collection: '数据采集',
+    artifacts: '决策产物',
+    scheduled_freeze: '定时冻结',
+    adhoc_service: '即时生成',
+    settlement_review: '结算复盘',
+  }[domain] || `未知域（${domain}）`);
+  const affectedLabel = (alert: typeof alerts[number]) => {
+    const values = [
+      ...alert.affected.segments,
+      ...alert.affected.matches,
+      ...alert.affected.markets,
+      ...alert.affected.sources,
+    ];
+    return values.length ? values.slice(0, 4).join('、') + (values.length > 4 ? ` 等 ${values.length} 项` : '') : `${alert.affectedCount} 项`;
+  };
   return <div className="grid page-grid operations-page">
-    <Card title={`实盘健康检查 / Issue ${data.issueId}`} icon={<Activity />}>
-      <div className="hero-stats">
-        <div><span>当前期</span><b>{data.issueStatus.currentIssue || data.issueId}</b><small>{data.generatedAt}</small></div>
-        <div><span>比赛</span><b>{data.issueStatus.matchCount}</b><small>{data.issueStatus.finishedCount} 已完赛 / {data.issueStatus.openCount} 未完赛</small></div>
-        <div><span>数据源</span><b><Badge tone={sourceHealthTone}>{opsStatusLabel(data.issueStatus.captureStatus)}</Badge></b><small>最新 {data.issueStatus.latestSnapshotAt || '缺'} · {minutesLabel(data.issueStatus.latestSnapshotAgeMinutes)}</small></div>
-        <div><span>待处理</span><b>{data.snapshots.draftReplacementCount + data.review.unreviewedSettledCount}</b><small>{data.snapshots.draftReplacementCount} 草稿 / {data.review.unreviewedSettledCount} 未复盘</small></div>
+    <Card title={`系统运行状态 / Issue ${data.issueId}`} icon={<Activity />}>
+      <div className="hero-stats ops-summary-grid">
+        <div><span>当前期</span><b>{data.issueStatus.currentIssue || data.issueId}</b><small>schema {data.schemaVersion}</small></div>
+        <div><span>最后刷新</span><b>{data.generatedAt || '缺'}</b><small>{summary.message}</small></div>
+        <div><span>阻断项</span><b className={summary.blockerCount ? 'bad-text' : 'good-text'}>{summary.blockerCount}</b><small>影响系统能力，不代表策略质量</small></div>
+        <div><span>警告</span><b className={summary.warningCount ? 'warn-value' : 'good-text'}>{summary.warningCount}</b><small>全部来自后端 canonical alerts</small></div>
+        <div><span>下一个计划动作</span><b>{summary.nextActionAt || '暂无'}</b><small>{summary.nextActionTitle || '当前没有已知计划动作'}</small></div>
       </div>
     </Card>
 
     <Card title="待处理事项" icon={<AlertTriangle />}>
-      {todoItems.length ? <div className="ops-warning-list">{todoItems.map((item) => <div key={item.key} className={`ops-warning ${item.tone}`}>
-        <Badge tone={item.tone}>{item.code}</Badge>
-        <b>{item.title}</b>
-        <span>{item.detail}</span>
-      </div>)}</div> : <div className="empty-state"><b>没有阻断项</b><span>当前数据、决策快照和复盘状态可用于实盘检查。</span></div>}
+      {alerts.length ? <div className="ops-alert-list">{alerts.map((alert) => {
+        const tone = alert.severity === 'blocker' ? 'bad' : 'warn';
+        return <article key={alert.alertId} className={`ops-alert ${tone}`}>
+          <div className="ops-alert-head">
+            <span><Badge tone={tone}>{alert.severity === 'blocker' ? '阻断' : '警告'}</Badge><Badge tone="neutral">{domainLabel(alert.domain)}</Badge></span>
+            <code>{alert.alertId}</code>
+          </div>
+          <h3>{alert.title}</h3>
+          <p>{alert.detail}</p>
+          <dl>
+            <div><dt>影响</dt><dd>{alert.impact}</dd></div>
+            <div><dt>下一动作</dt><dd>{alert.nextAction}</dd></div>
+            <div><dt>恢复预期</dt><dd>{alert.autoRecoveryExpected ? `预计自动恢复${alert.nextDueAt ? ` · 下次 ${alert.nextDueAt}` : ''}` : '需要人工处理或确认'}</dd></div>
+            <div><dt>时间</dt><dd>首次 {alert.firstSeenAt || '-'} · 最近 {alert.lastSeenAt || alert.observedAt || '-'} · 最近成功 {alert.lastSuccessAt || '-'}</dd></div>
+            <div><dt>影响范围</dt><dd>{affectedLabel(alert)}</dd></div>
+          </dl>
+        </article>;
+      })}</div> : <div className="empty-state ops-clear"><b>当前未发现系统阻断</b><span>{summary.message || '这不代表策略、执行或收益已经就绪。'}</span></div>}
     </Card>
 
-    <Card title="数据源健康" icon={<Database />}>
-      <div className="table-wrap"><table><thead><tr><th>数据源</th><th>状态</th><th>最后成功</th><th>新鲜度</th><th>采集</th><th>错误摘要</th></tr></thead><tbody>{data.sources.map((source) => <tr key={source.sourceName}><td>{source.sourceName}</td><td><Badge tone={statusTone(source.status)}>{opsStatusLabel(source.status)}</Badge></td><td>{source.lastSuccessAt || '-'}</td><td>{minutesLabel(source.ageMinutes)}</td><td>{source.okCount}/{source.totalAttempts}<br/><small>失败 {source.failCount}</small></td><td>{source.error || '-'}</td></tr>)}</tbody></table></div>
-    </Card>
-
-    <div className="grid two-col">
-      <Card title="决策快照">
-        <div className="ops-kpi-grid">
-          <div><span>正式</span><b>{data.snapshots.activeCount}</b></div>
-          <div><span>待确认</span><b className={hasDraft ? 'warn-value' : undefined}>{data.snapshots.draftReplacementCount}</b></div>
-          <div><span>历史</span><b>{data.snapshots.supersededCount}</b></div>
-        </div>
-        {hasDraft ? <div className="table-wrap"><table><thead><tr><th>#</th><th>比赛</th><th>生成</th><th>检查</th></tr></thead><tbody>{data.snapshots.pendingDrafts.map((draft) => <tr key={draft.matchId}><td>{draft.matchIdx}</td><td>{draft.matchId}</td><td>{draft.generatedAt}</td><td>{draft.checkedAt}</td></tr>)}</tbody></table></div> : <p>没有待确认决策草稿。</p>}
-      </Card>
-
-      <Card title="复盘进度">
-        <div className="ops-kpi-grid">
-          <div><span>已结算</span><b>{data.review.settledMatchCount}</b></div>
-          <div><span>已复盘</span><b>{data.review.reviewedMatchCount}</b></div>
-          <div><span>未复盘</span><b className={unreviewed ? 'warn-value' : undefined}>{data.review.unreviewedSettledCount}</b></div>
-        </div>
-        <p>最新复盘 {data.review.latestReviewAt || '-'}</p>
-        <div className="review-task-panel">
-          <div className="review-task-head">
-            <div><span>任务</span><b><Badge tone={reviewTaskTone}>{opsStatusLabel(reviewTask.status)}</Badge></b><small>{reviewTask.dryRun ? '试运行' : '正式写入'}</small></div>
-            <div><span>检查</span><b>{reviewTask.result.wouldInsert ?? '-'}</b><small>预计写入</small></div>
-            <div><span>耗时</span><b>{secondsLabel(reviewTask.elapsedSec)}</b><small>{reviewTask.finishedAt || reviewTask.startedAt || '-'}</small></div>
-          </div>
-          <div className="snapshot-action-row">
-            <button type="button" disabled={reviewTaskRunning} onClick={() => onRunPostmatchReview(data.issueId, true)}>
-              {reviewTaskRunning ? '运行中...' : '复盘 dry-run'}
-            </button>
-            <button type="button" disabled={reviewTaskRunning || data.review.unreviewedSettledCount === 0} onClick={() => onRunPostmatchReview(data.issueId, false)}>
-              执行复盘写入
-            </button>
-            <small className={currentReviewTaskState?.status === 'failed' ? 'bad-value' : currentReviewTaskState?.status === 'succeeded' ? 'good-text' : undefined}>
-              {currentReviewTaskState?.message || '试运行先检查，正式写入只处理未复盘赛果'}
-            </small>
-          </div>
-          {reviewTask.error ? <div className="ops-warning bad"><Badge tone="bad">复盘</Badge><b>复盘失败</b><span>{reviewTask.error}</span></div> : null}
-          <div className="review-task-result">
-            <span>预计写入 {reviewTask.result.wouldInsert ?? '-'}</span>
-            <span>已写入 {reviewTask.result.inserted ?? '-'}</span>
-            <span>覆盖命中 {reviewTask.result.coverageHits ?? '-'}</span>
-            <span>收益 {reviewTask.result.profit !== undefined ? money(reviewTask.result.profit) : '-'}</span>
-          </div>
-        </div>
-        {unreviewed && <div className="table-wrap"><table><thead><tr><th>#</th><th>比赛</th><th>赛果</th><th>SP</th></tr></thead><tbody>{data.review.unreviewedMatches.map((match) => <tr key={match.matchId}><td>{match.matchIdx}</td><td>{match.label}<br/><small>{match.matchId}</small></td><td>{match.resultLabel}</td><td>{match.winningSp ?? '-'}</td></tr>)}</tbody></table></div>}
-      </Card>
-    </div>
-
-    <Card title="操作区" icon={<Server />}>
-      <div className="workflow-head">
-        <div><span>刷新流程</span><b><Badge tone={workflowTone}>{opsStatusLabel(data.workflow.status)}</Badge></b><small>{workflowStepSummary}</small></div>
-        <div><span>数据检查</span><b><Badge tone={statusTone(data.runtime.apiHealth)}>{healthProbeLabel(runtimeHealth?.api)}</Badge></b><small>{data.runtime.checkedAt || '未检查'}</small></div>
-        <div><span>页面访问</span><b>{accessModeLabel(data.runtime.accessMode, data.runtime.externalAccessConfigured)}</b><small>{data.runtime.publicDiagnostics ? '诊断开启' : '诊断关闭'}</small></div>
-        <div><span>最近耗时</span><b>{secondsLabel(data.workflow.elapsedSec)}</b><small>{data.workflow.finishedAt || data.workflow.startedAt || '-'}</small></div>
+    <Card title="数据采集" icon={<Database />} className="ops-domain-card" >
+      <div className="ops-domain-head">
+        <span><Badge tone={statusTone(domains.collection.status)}>{opsStatusLabel(domains.collection.status)}</Badge> 计划 {domains.collection.planSchemaVersion || '缺失'}</span>
+        <small>每个采集器按独立 SLA、覆盖率和最近成功判断；不会被其他来源的较新时间掩盖。</small>
       </div>
+      {domains.collection.planError ? <div className="ops-inline-error">{domains.collection.planError}</div> : null}
+      <div className="table-wrap"><table className="ops-collector-table"><thead><tr><th>采集器 / 市场</th><th>状态</th><th>最后尝试 / 成功</th><th>新鲜度 / 下次</th><th>覆盖率</th><th>错误 / 动作</th></tr></thead><tbody>{domains.collection.collectors.map((collector) => <tr id={`collector-${collector.collectorId}`} key={collector.collectorId}>
+        <td><b>{collector.label}</b><small>{collector.collectorId} · {collector.importance} · {collector.ownerProcess}{collector.markets.length ? ` · ${collector.markets.join('/')}` : ''}</small></td>
+        <td><Badge tone={statusTone(collector.status)}>{opsStatusLabel(collector.status)}</Badge><small>{collector.statusDetail}</small></td>
+        <td>{collector.lastAttemptAt || '-'}<small>成功 {collector.lastSuccessAt || '-'}</small></td>
+        <td>{minutesLabel(collector.ageMinutes)}<small>下次 {collector.nextDueAt || '-'}</small></td>
+        <td>{collector.coverageRate === undefined ? '-' : pct(collector.coverageRate)}<small>{collector.coveredCount}/{collector.expectedCount} · 缺 {collector.missingCount}</small></td>
+        <td>{collector.error || '-'}<small>{collector.maintenanceAction || '-'}</small></td>
+      </tr>)}</tbody></table></div>
+    </Card>
+
+    <Card title="冻结与产物" icon={<Clock />} className="ops-domain-card" >
+      <div className="ops-boundary-grid" id="artifacts">
+        <section>
+          <div className="ops-boundary-title"><b>定时研究冻结 / exact-N</b><Badge tone={statusTone(domains.scheduledFreeze.status)}>{opsStatusLabel(domains.scheduledFreeze.status)}</Badge></div>
+          <p>按 segment 的前瞻冻结；可进入对应研究证据链。即时生成请求不会写入这里。</p>
+          <div className="ops-freeze-timeline">{domains.scheduledFreeze.segments.map((segment) => <article key={segment.segmentIdentity} className={`ops-freeze-item ${statusTone(segment.timelineStatus)}`}>
+            <div className="ops-freeze-marker" aria-hidden="true" />
+            <div>
+              <div className="ops-freeze-head"><b>{segment.segmentIdentity}</b><Badge tone={statusTone(segment.timelineStatus)}>{opsStatusLabel(segment.timelineStatus)}</Badge></div>
+              <p>{segment.detail}</p>
+              <small>计划 {segment.freezeAt || '-'} · 发布 {segment.publishedAt || '-'} · {segment.matchCount} 场</small>
+              <div className="ops-freeze-evidence">
+                <span>exact-N <Badge tone={statusTone(segment.exactN.verificationStatus)}>{opsStatusLabel(segment.exactN.verificationStatus)}</Badge> {segment.exactN.alternativeCount} 产物</span>
+                <span>p40/p42 <Badge tone={statusTone(segment.researchFreeze.verificationStatus)}>{opsStatusLabel(segment.researchFreeze.verificationStatus)}</Badge> {segment.researchFreeze.pairedOverlapMatches ?? 0} 配对覆盖</span>
+              </div>
+              <code>{segment.exactN.eventId || segment.researchFreeze.eventId || '无 event ID'}</code>
+            </div>
+          </article>)}</div>
+        </section>
+        <section className="ops-adhoc-boundary">
+          <div className="ops-boundary-title"><b>用户即时生成服务</b><Badge tone={statusTone(domains.adhocService.status)}>{opsStatusLabel(domains.adhocService.status)}</Badge></div>
+          <p>{domains.adhocService.detail}</p>
+          <dl>
+            <div><dt>能力</dt><dd>{domains.adhocService.capabilityAvailable ? '可请求' : '不可用'}</dd></div>
+            <div><dt>研究证据资格</dt><dd>{domains.adhocService.researchEvidenceEligible ? '有' : '无（独立 namespace）'}</dd></div>
+            <div><dt>最近请求</dt><dd>{domains.adhocService.recentRequest?.requestId || '无'}</dd></div>
+            <div><dt>请求时间</dt><dd>{domains.adhocService.recentRequest?.requestedAt || '-'}</dd></div>
+          </dl>
+          <small>这里只展示服务与最近请求状态，不记录、推断或宣称线下实际购买。</small>
+        </section>
+      </div>
+
+      <div className="ops-artifact-strip">
+        <div><span>active 决策</span><b><Badge tone={statusTone(domains.artifacts.activeDecision.status)}>{opsStatusLabel(domains.artifacts.activeDecision.status)}</Badge></b><small>{domains.artifacts.activeDecision.actualCount}/{domains.artifacts.activeDecision.expectedCount} 覆盖</small></div>
+        <div><span>待确认草稿</span><b className={hasDraft ? 'warn-value' : undefined}>{domains.artifacts.draftCount}</b><small>不会自动覆盖 active</small></div>
+        <div><span>历史版本</span><b>{domains.artifacts.supersededCount}</b><small>保留追溯</small></div>
+        <div><span>配置 hash</span><b>{domains.artifacts.activeDecision.configHash.slice(0, 12) || '-'}</b><small>{domains.artifacts.activeDecision.version || '-'}</small></div>
+      </div>
+      {hasDraft ? <div className="table-wrap"><table><thead><tr><th>#</th><th>比赛</th><th>生成</th><th>检查</th></tr></thead><tbody>{data.snapshots.pendingDrafts.map((draft) => <tr key={draft.matchId}><td>{draft.matchIdx}</td><td>{draft.matchId}</td><td>{draft.generatedAt}</td><td>{draft.checkedAt}</td></tr>)}</tbody></table></div> : <p>没有待确认决策草稿。</p>}
+    </Card>
+
+    <Card title="服务运行" icon={<Server />} className="ops-domain-card" >
+      <div className="ops-runtime-grid">{domains.runtime.components.map((component) => <div key={component.componentId}>
+        <span>{component.label}</span>
+        <b><Badge tone={statusTone(component.status)}>{opsStatusLabel(component.status)}</Badge></b>
+        <small>{component.detail}</small>
+        <small>检查 {component.checkedAt || '-'} · {component.latencyMs === undefined ? '-' : `${component.latencyMs.toFixed(1)}ms`}</small>
+      </div>)}</div>
+      <div className="workflow-head">
+        <div><span>完整刷新 workflow</span><b><Badge tone={workflowTone}>{opsStatusLabel(data.workflow.status)}</Badge></b><small>{workflowStepSummary}</small></div>
+        <div><span>访问模式</span><b>{accessModeLabel(domains.runtime.accessMode, domains.runtime.externalAccessConfigured)}</b><small>只描述连接状态</small></div>
+        <div><span>最近耗时</span><b>{secondsLabel(data.workflow.elapsedSec)}</b><small>{data.workflow.finishedAt || data.workflow.startedAt || '-'}</small></div>
+        <div><span>最近运行 ID</span><b>{data.workflow.runId || '-'}</b><small>诊断引用，不暴露进程命令</small></div>
+      </div>
+    </Card>
+
+    <Card title="结算复盘" icon={<Activity />} className="ops-domain-card" >
+      <div className="ops-kpi-grid">
+        <div><span>已结算</span><b>{domains.settlementReview.settledMatchCount}</b></div>
+        <div><span>winning SP</span><b>{domains.settlementReview.winningSpCount}</b></div>
+        <div><span>已复盘</span><b>{domains.settlementReview.reviewedMatchCount}</b></div>
+        <div><span>缺结算 SP</span><b className={domains.settlementReview.missingWinningSpMatchIds.length ? 'warn-value' : undefined}>{domains.settlementReview.missingWinningSpMatchIds.length}</b></div>
+        <div><span>未复盘</span><b className={unreviewed ? 'warn-value' : undefined}>{domains.settlementReview.unreviewedMatchIds.length}</b></div>
+      </div>
+      <p className="ops-boundary-note">这里只展示赛果、winning SP、方案模拟结算与复盘任务；不推断用户线下购买，也不把模拟结果称为真实 ROI。</p>
+      <div className="review-task-panel">
+        <div className="review-task-head">
+          <div><span>任务</span><b><Badge tone={reviewTaskTone}>{opsStatusLabel(reviewTask.status)}</Badge></b><small>{reviewTask.dryRun ? '试运行' : '正式写入'}</small></div>
+          <div><span>检查</span><b>{reviewTask.result.wouldInsert ?? '-'}</b><small>预计写入</small></div>
+          <div><span>耗时</span><b>{secondsLabel(reviewTask.elapsedSec)}</b><small>{reviewTask.finishedAt || reviewTask.startedAt || '-'}</small></div>
+        </div>
+        <div className="snapshot-action-row">
+          <button type="button" disabled={reviewTaskRunning} onClick={() => onRunPostmatchReview(data.issueId, true)}>
+            {reviewTaskRunning ? '运行中...' : '复盘 dry-run'}
+          </button>
+          <button type="button" disabled={reviewTaskRunning || domains.settlementReview.unreviewedMatchIds.length === 0} onClick={() => onRunPostmatchReview(data.issueId, false)}>
+            执行复盘写入
+          </button>
+          <small className={currentReviewTaskState?.status === 'failed' ? 'bad-value' : currentReviewTaskState?.status === 'succeeded' ? 'good-text' : undefined}>
+            {currentReviewTaskState?.message || '试运行先检查，正式写入沿用现有权限与执行语义'}
+          </small>
+        </div>
+        {reviewTask.error ? <div className="ops-warning bad"><Badge tone="bad">复盘</Badge><b>复盘失败</b><span>{reviewTask.error}</span></div> : null}
+        <div className="review-task-result">
+          <span>预计写入 {reviewTask.result.wouldInsert ?? '-'}</span>
+          <span>已写入 {reviewTask.result.inserted ?? '-'}</span>
+          <span>覆盖命中 {reviewTask.result.coverageHits ?? '-'}</span>
+          <span>方案模拟结果 {reviewTask.result.profit !== undefined ? money(reviewTask.result.profit) : '-'}</span>
+        </div>
+      </div>
+      {unreviewed && <div className="table-wrap"><table><thead><tr><th>#</th><th>比赛</th><th>赛果</th><th>SP</th></tr></thead><tbody>{data.review.unreviewedMatches.map((match) => <tr key={match.matchId}><td>{match.matchIdx}</td><td>{match.label}<br/><small>{match.matchId}</small></td><td>{match.resultLabel}</td><td>{match.winningSp ?? '-'}</td></tr>)}</tbody></table></div>}
     </Card>
   </div>;
 }

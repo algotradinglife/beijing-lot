@@ -51,7 +51,7 @@ spec:
     - id: BJ-OPS-OBS-001
       node_type: task
       ref: tasks/BJ-OPS-OBS-001.yaml
-      state: READY
+      state: VALIDATING
 
   edges:
     - from: GOAL-BOOT

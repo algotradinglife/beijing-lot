@@ -1423,6 +1423,16 @@ function transformMainStrategy(raw: unknown): MainStrategyData {
 
 function transformOperationsStatus(raw: unknown): OperationsStatusData {
   const obj = asObject(raw);
+  const summary = asObject(obj.summary);
+  const domains = asObject(obj.domains);
+  const runtimeDomain = asObject(domains.runtime);
+  const collectionDomain = asObject(domains.collection);
+  const artifactsDomain = asObject(domains.artifacts);
+  const activeDecision = asObject(artifactsDomain.active_decision ?? artifactsDomain.activeDecision);
+  const freezeDomain = asObject(domains.scheduled_freeze ?? domains.scheduledFreeze);
+  const adhocDomain = asObject(domains.adhoc_service ?? domains.adhocService);
+  const adhocRecent = asObject(adhocDomain.recent_request ?? adhocDomain.recentRequest);
+  const settlementDomain = asObject(domains.settlement_review ?? domains.settlementReview);
   const issueStatus = asObject(obj.issue_status ?? obj.issueStatus);
   const runtime = asObject(obj.runtime);
   const snapshots = asObject(obj.snapshots);
@@ -1436,8 +1446,215 @@ function transformOperationsStatus(raw: unknown): OperationsStatusData {
   const runtimeDiagnostics = asObject(runtime.diagnostics);
   const runtimeUrls = asObject(runtime.urls ?? runtimeDiagnostics.urls);
   return {
+    schemaVersion: asString(obj.schema_version, asString(obj.schemaVersion, 'operations_status_v1')),
     issueId: asString(obj.issue, asString(obj.issueId)),
     generatedAt: asString(obj.generated_at, asString(obj.generatedAt)),
+    summary: {
+      status: asString(summary.status, 'missing'),
+      blockerCount: asNumber(summary.blocker_count, asNumber(summary.blockerCount)),
+      warningCount: asNumber(summary.warning_count, asNumber(summary.warningCount)),
+      nextActionAt: asString(summary.next_action_at, asString(summary.nextActionAt)),
+      nextActionTitle: asString(summary.next_action_title, asString(summary.nextActionTitle)),
+      message: asString(summary.message),
+    },
+    domains: {
+      runtime: {
+        status: asString(runtimeDomain.status, 'missing'),
+        checkedAt: asString(runtimeDomain.checked_at, asString(runtimeDomain.checkedAt)),
+        accessMode: asString(runtimeDomain.access_mode, asString(runtimeDomain.accessMode)),
+        externalAccessConfigured: asBoolean(runtimeDomain.external_access_configured, asBoolean(runtimeDomain.externalAccessConfigured)),
+        components: asArray(runtimeDomain.components).map((rawComponent) => {
+          const component = asObject(rawComponent);
+          return {
+            componentId: asString(component.component_id, asString(component.componentId)),
+            label: asString(component.label),
+            status: asString(component.status, 'missing'),
+            processStatus: asString(component.process_status, asString(component.processStatus)),
+            checkedAt: asString(component.checked_at, asString(component.checkedAt)),
+            lastSuccessAt: asString(component.last_success_at, asString(component.lastSuccessAt)),
+            latencyMs: asMaybeNumber(component.latency_ms ?? component.latencyMs),
+            httpStatus: asMaybeNumber(component.http_status ?? component.httpStatus),
+            detail: asString(component.detail),
+          };
+        }),
+      },
+      collection: {
+        status: asString(collectionDomain.status, 'missing'),
+        planStatus: asString(collectionDomain.plan_status, asString(collectionDomain.planStatus)),
+        planSchemaVersion: asString(collectionDomain.plan_schema_version, asString(collectionDomain.planSchemaVersion)),
+        planRef: asString(collectionDomain.plan_ref, asString(collectionDomain.planRef)),
+        planError: asString(collectionDomain.plan_error, asString(collectionDomain.planError)),
+        collectors: asArray(collectionDomain.collectors).map((rawCollector) => {
+          const collector = asObject(rawCollector);
+          return {
+            collectorId: asString(collector.collector_id, asString(collector.collectorId)),
+            label: asString(collector.label),
+            importance: asString(collector.importance),
+            enabled: asBoolean(collector.enabled),
+            ownerProcess: asString(collector.owner_process, asString(collector.ownerProcess)),
+            processStatus: asString(collector.process_status, asString(collector.processStatus)),
+            status: asString(collector.status, 'missing'),
+            statusDetail: asString(collector.status_detail, asString(collector.statusDetail)),
+            scheduleIntervalSec: asNumber(collector.schedule_interval_sec, asNumber(collector.scheduleIntervalSec)),
+            staleAfterSec: asNumber(collector.stale_after_sec, asNumber(collector.staleAfterSec)),
+            lastAttemptAt: asString(collector.last_attempt_at, asString(collector.lastAttemptAt)),
+            lastSuccessAt: asString(collector.last_success_at, asString(collector.lastSuccessAt)),
+            lastErrorAt: asString(collector.last_error_at, asString(collector.lastErrorAt)),
+            nextDueAt: asString(collector.next_due_at, asString(collector.nextDueAt)),
+            ageMinutes: asMaybeNumber(collector.age_minutes ?? collector.ageMinutes),
+            coverageRate: asMaybeNumber(collector.coverage_rate ?? collector.coverageRate),
+            coveredCount: asNumber(collector.covered_count, asNumber(collector.coveredCount)),
+            expectedCount: asNumber(collector.expected_count, asNumber(collector.expectedCount)),
+            missingCount: asNumber(collector.missing_count, asNumber(collector.missingCount)),
+            missingMatchIds: asArray(collector.missing_match_ids ?? collector.missingMatchIds).map((value) => asString(value)).filter(Boolean),
+            okCount: asNumber(collector.ok_count, asNumber(collector.okCount)),
+            failCount: asNumber(collector.fail_count, asNumber(collector.failCount)),
+            totalAttempts: asNumber(collector.total_attempts, asNumber(collector.totalAttempts)),
+            rowsParsed: asNumber(collector.rows_parsed, asNumber(collector.rowsParsed)),
+            error: asString(collector.error) || undefined,
+            markets: asArray(collector.markets).map((value) => asString(value)).filter(Boolean),
+            autoRecoveryExpected: asBoolean(collector.auto_recovery_expected, asBoolean(collector.autoRecoveryExpected)),
+            retryCount: asMaybeNumber(collector.retry_count ?? collector.retryCount),
+            maintenanceAction: asString(collector.maintenance_action, asString(collector.maintenanceAction)),
+          };
+        }),
+      },
+      artifacts: {
+        status: asString(artifactsDomain.status, 'missing'),
+        activeDecision: {
+          status: asString(activeDecision.status, 'missing'),
+          version: asString(activeDecision.version),
+          configHash: asString(activeDecision.config_hash, asString(activeDecision.configHash)),
+          generatedAt: asString(activeDecision.generated_at, asString(activeDecision.generatedAt)),
+          inputAt: asString(activeDecision.input_at, asString(activeDecision.inputAt)),
+          expectedCount: asNumber(activeDecision.expected_count, asNumber(activeDecision.expectedCount)),
+          actualCount: asNumber(activeDecision.actual_count, asNumber(activeDecision.actualCount)),
+          missingCount: asNumber(activeDecision.missing_count, asNumber(activeDecision.missingCount)),
+          missingMatchIds: asArray(activeDecision.missing_match_ids ?? activeDecision.missingMatchIds).map((value) => asString(value)).filter(Boolean),
+          detail: asString(activeDecision.detail),
+        },
+        draftCount: asNumber(artifactsDomain.draft_count, asNumber(artifactsDomain.draftCount)),
+        draftMatchIds: asArray(artifactsDomain.draft_match_ids ?? artifactsDomain.draftMatchIds).map((value) => asString(value)).filter(Boolean),
+        supersededCount: asNumber(artifactsDomain.superseded_count, asNumber(artifactsDomain.supersededCount)),
+        scheduledResearchEvidenceEligible: asBoolean(artifactsDomain.scheduled_research_evidence_eligible, asBoolean(artifactsDomain.scheduledResearchEvidenceEligible)),
+        adhocNamespaceUsed: asBoolean(artifactsDomain.adhoc_namespace_used, asBoolean(artifactsDomain.adhocNamespaceUsed)),
+      },
+      scheduledFreeze: {
+        status: asString(freezeDomain.status, 'missing'),
+        timelineContract: asString(freezeDomain.timeline_contract, asString(freezeDomain.timelineContract)),
+        researchAndAdhocSeparated: asBoolean(freezeDomain.research_and_adhoc_separated, asBoolean(freezeDomain.researchAndAdhocSeparated)),
+        nextDueAt: asString(freezeDomain.next_due_at, asString(freezeDomain.nextDueAt)),
+        segments: asArray(freezeDomain.segments).map((rawSegment) => {
+          const segment = asObject(rawSegment);
+          const exactN = asObject(segment.exact_n ?? segment.exactN);
+          const researchFreeze = asObject(segment.research_freeze ?? segment.researchFreeze);
+          return {
+            segmentIdx: asNumber(segment.segment_idx, asNumber(segment.segmentIdx)),
+            segmentIdentity: asString(segment.segment_identity, asString(segment.segmentIdentity)),
+            isRecovery: asBoolean(segment.is_recovery, asBoolean(segment.isRecovery)),
+            timelineStatus: asString(segment.timeline_status, asString(segment.timelineStatus, 'unavailable')),
+            freezeAt: asString(segment.freeze_at, asString(segment.freezeAt)),
+            publishedAt: asString(segment.published_at, asString(segment.publishedAt)),
+            observedAt: asString(segment.observed_at, asString(segment.observedAt)),
+            nextDueAt: asString(segment.next_due_at, asString(segment.nextDueAt)),
+            matchCount: asNumber(segment.match_count, asNumber(segment.matchCount)),
+            detail: asString(segment.detail),
+            autoRecoveryExpected: asBoolean(segment.auto_recovery_expected, asBoolean(segment.autoRecoveryExpected)),
+            exactN: {
+              status: asString(exactN.status, 'missing'),
+              sourceStatus: asString(exactN.source_status, asString(exactN.sourceStatus)),
+              verificationStatus: asString(exactN.verification_status, asString(exactN.verificationStatus)),
+              eventId: asString(exactN.event_id, asString(exactN.eventId)),
+              artifactRef: asString(exactN.artifact_ref, asString(exactN.artifactRef)),
+              alternativeCount: asNumber(exactN.alternative_count, asNumber(exactN.alternativeCount)),
+              selectableCount: asNumber(exactN.selectable_count, asNumber(exactN.selectableCount)),
+              researchEvidenceEligible: asBoolean(exactN.research_evidence_eligible, asBoolean(exactN.researchEvidenceEligible)),
+            },
+            researchFreeze: {
+              status: asString(researchFreeze.status, 'missing'),
+              verificationStatus: asString(researchFreeze.verification_status, asString(researchFreeze.verificationStatus)),
+              eventId: asString(researchFreeze.event_id, asString(researchFreeze.eventId)),
+              artifactRef: asString(researchFreeze.artifact_ref, asString(researchFreeze.artifactRef)),
+              detail: asString(researchFreeze.detail),
+              pairedOverlapMatches: asMaybeNumber(researchFreeze.paired_overlap_matches ?? researchFreeze.pairedOverlapMatches),
+              frozenMatchMarkets: asMaybeNumber(researchFreeze.frozen_match_markets ?? researchFreeze.frozenMatchMarkets),
+            },
+          };
+        }),
+      },
+      adhocService: {
+        status: asString(adhocDomain.status, 'missing'),
+        capabilityAvailable: asBoolean(adhocDomain.capability_available, asBoolean(adhocDomain.capabilityAvailable)),
+        lastRequestAt: asString(adhocDomain.last_request_at, asString(adhocDomain.lastRequestAt)),
+        lastSuccessAt: asString(adhocDomain.last_success_at, asString(adhocDomain.lastSuccessAt)),
+        detail: asString(adhocDomain.detail),
+        scheduledFreezeEventId: asString(adhocDomain.scheduled_freeze_event_id, asString(adhocDomain.scheduledFreezeEventId)) || undefined,
+        researchEvidenceEligible: asBoolean(adhocDomain.research_evidence_eligible, asBoolean(adhocDomain.researchEvidenceEligible)),
+        recentRequest: Object.keys(adhocRecent).length ? {
+          requestId: asString(adhocRecent.request_id, asString(adhocRecent.requestId)),
+          requestedAt: asString(adhocRecent.requested_at, asString(adhocRecent.requestedAt)),
+          inputAsof: asString(adhocRecent.input_asof, asString(adhocRecent.inputAsof)),
+          status: asString(adhocRecent.status),
+          validUntil: asString(adhocRecent.valid_until, asString(adhocRecent.validUntil)),
+          saleStatusVerifiedAtGeneration: asBoolean(adhocRecent.sale_status_verified_at_generation, asBoolean(adhocRecent.saleStatusVerifiedAtGeneration)),
+          state: asString(adhocRecent.state),
+        } : undefined,
+      },
+      settlementReview: {
+        status: asString(settlementDomain.status, 'missing'),
+        settledMatchCount: asNumber(settlementDomain.settled_match_count, asNumber(settlementDomain.settledMatchCount)),
+        winningSpCount: asNumber(settlementDomain.winning_sp_count, asNumber(settlementDomain.winningSpCount)),
+        reviewedMatchCount: asNumber(settlementDomain.reviewed_match_count, asNumber(settlementDomain.reviewedMatchCount)),
+        missingWinningSpMatchIds: asArray(settlementDomain.missing_winning_sp_match_ids ?? settlementDomain.missingWinningSpMatchIds).map((value) => asString(value)).filter(Boolean),
+        unreviewedMatchIds: asArray(settlementDomain.unreviewed_match_ids ?? settlementDomain.unreviewedMatchIds).map((value) => asString(value)).filter(Boolean),
+        latestReviewAt: asString(settlementDomain.latest_review_at, asString(settlementDomain.latestReviewAt)),
+        lastSettlementSuccessAt: asString(settlementDomain.last_settlement_success_at, asString(settlementDomain.lastSettlementSuccessAt)),
+        nextDueAt: asString(settlementDomain.next_due_at, asString(settlementDomain.nextDueAt)),
+        simulationOnly: asBoolean(settlementDomain.simulation_only, asBoolean(settlementDomain.simulationOnly)),
+        offlinePurchaseInferred: asBoolean(settlementDomain.offline_purchase_inferred, asBoolean(settlementDomain.offlinePurchaseInferred)),
+        actualRoiClaimed: asBoolean(settlementDomain.actual_roi_claimed, asBoolean(settlementDomain.actualRoiClaimed)),
+      },
+    },
+    alerts: asArray(obj.alerts).map((rawAlert) => {
+      const alert = asObject(rawAlert);
+      const affected = asObject(alert.affected);
+      const blocks = asObject(alert.blocks);
+      return {
+        alertId: asString(alert.alert_id, asString(alert.alertId)),
+        code: asString(alert.code),
+        domain: asString(alert.domain),
+        severity: asString(alert.severity, 'blocker'),
+        status: asString(alert.status, 'open'),
+        title: asString(alert.title),
+        detail: asString(alert.detail),
+        impact: asString(alert.impact),
+        nextAction: asString(alert.next_action, asString(alert.nextAction)),
+        observedAt: asString(alert.observed_at, asString(alert.observedAt)),
+        firstSeenAt: asString(alert.first_seen_at, asString(alert.firstSeenAt)),
+        lastSeenAt: asString(alert.last_seen_at, asString(alert.lastSeenAt)),
+        lastSuccessAt: asString(alert.last_success_at, asString(alert.lastSuccessAt)),
+        nextDueAt: asString(alert.next_due_at, asString(alert.nextDueAt)),
+        affectedCount: asNumber(alert.affected_count, asNumber(alert.affectedCount)),
+        affected: {
+          segments: asArray(affected.segments).map((value) => asString(value)).filter(Boolean),
+          matches: asArray(affected.matches).map((value) => asString(value)).filter(Boolean),
+          markets: asArray(affected.markets).map((value) => asString(value)).filter(Boolean),
+          sources: asArray(affected.sources).map((value) => asString(value)).filter(Boolean),
+        },
+        autoRecoveryExpected: asBoolean(alert.auto_recovery_expected, asBoolean(alert.autoRecoveryExpected)),
+        retryCount: asMaybeNumber(alert.retry_count ?? alert.retryCount),
+        links: asArray(alert.links).map((rawLink) => {
+          const link = asObject(rawLink);
+          return { kind: asString(link.kind), label: asString(link.label), ref: asString(link.ref) };
+        }),
+        blocks: {
+          dataDisplay: asBoolean(blocks.data_display, asBoolean(blocks.dataDisplay)),
+          researchFreeze: asBoolean(blocks.research_freeze, asBoolean(blocks.researchFreeze)),
+          adhocGeneration: asBoolean(blocks.adhoc_generation, asBoolean(blocks.adhocGeneration)),
+          settlement: asBoolean(blocks.settlement),
+        },
+      };
+    }),
     issueStatus: {
       currentIssue: asString(issueStatus.current_issue, asString(issueStatus.currentIssue)),
       matchCount: asNumber(issueStatus.match_count, asNumber(issueStatus.matchCount)),

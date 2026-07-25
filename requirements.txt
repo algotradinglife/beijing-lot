@@ -25,4 +25,5 @@ fonttools==4.63.0 # BJ-FREEZE-REVIEW-001 tracked CJK subset/coverage verificatio
 
 # --- dev / test ---
 pytest==9.0.3
+jsonschema==4.25.1  # Operations Status v2 API contract validation
 scikit-learn>=1.6  # Track B P2 walk-forward models
