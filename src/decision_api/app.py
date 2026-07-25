@@ -1057,11 +1057,23 @@ def _persist_operations_alert_lifecycle(
                 domain=excluded.domain,
                 first_seen_at=CASE
                     WHEN operations_alert_lifecycle.resolved_at IS NULL
-                    THEN operations_alert_lifecycle.first_seen_at
+                    THEN MIN(
+                        operations_alert_lifecycle.first_seen_at,
+                        excluded.first_seen_at
+                    )
                     ELSE excluded.first_seen_at
                 END,
-                last_seen_at=excluded.last_seen_at,
+                last_seen_at=CASE
+                    WHEN operations_alert_lifecycle.resolved_at IS NULL
+                    THEN MAX(
+                        operations_alert_lifecycle.last_seen_at,
+                        excluded.last_seen_at
+                    )
+                    ELSE excluded.last_seen_at
+                END,
                 resolved_at=NULL
+            WHERE operations_alert_lifecycle.resolved_at IS NULL
+               OR operations_alert_lifecycle.resolved_at <= excluded.last_seen_at
             """,
             (
                 issue,
@@ -1089,8 +1101,9 @@ def _persist_operations_alert_lifecycle(
             UPDATE operations_alert_lifecycle
             SET resolved_at=?
             WHERE issue=? AND alert_id=? AND resolved_at IS NULL
+              AND last_seen_at <= ?
             """,
-            (observed_at, issue, alert_id),
+            (observed_at, issue, alert_id, observed_at),
         )
     conn.commit()
 

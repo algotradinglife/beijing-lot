@@ -279,6 +279,8 @@ export const mockDashboardData: DashboardData = {
       },
       adhocService: {
         status: 'ok',
+        serviceStatus: 'ok',
+        isolationStatus: 'ok',
         capabilityAvailable: true,
         lastRequestAt: '',
         lastSuccessAt: '',

@@ -783,6 +783,8 @@ export interface OperationsStatusData {
     };
     adhocService: {
       status: string;
+      serviceStatus: string;
+      isolationStatus: string;
       capabilityAvailable: boolean;
       lastRequestAt: string;
       lastSuccessAt: string;
@@ -797,6 +799,7 @@ export interface OperationsStatusData {
         validUntil: string;
         saleStatusVerifiedAtGeneration: boolean;
         state: string;
+        separationValid: boolean;
       };
     };
     settlementReview: {

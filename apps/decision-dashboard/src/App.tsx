@@ -1871,13 +1871,17 @@ function OperationsStatus({
           </article>)}</div>
         </section>
         <section className="ops-adhoc-boundary">
-          <div className="ops-boundary-title"><b>用户即时生成服务</b><Badge tone={statusTone(domains.adhocService.status)}>{opsStatusLabel(domains.adhocService.status)}</Badge></div>
+          <div className="ops-boundary-title"><b>用户即时生成服务</b><Badge tone={statusTone(domains.adhocService.serviceStatus)}>{opsStatusLabel(domains.adhocService.serviceStatus)}</Badge></div>
           <p>{domains.adhocService.detail}</p>
           <dl>
             <div><dt>能力</dt><dd>{domains.adhocService.capabilityAvailable ? '可请求' : '不可用'}</dd></div>
-            <div><dt>研究证据资格</dt><dd>{domains.adhocService.researchEvidenceEligible ? '有' : '无（独立 namespace）'}</dd></div>
+            <div><dt>服务健康</dt><dd>{opsStatusLabel(domains.adhocService.serviceStatus)}</dd></div>
+            <div><dt>研究隔离</dt><dd>{opsStatusLabel(domains.adhocService.isolationStatus)}</dd></div>
             <div><dt>最近请求</dt><dd>{domains.adhocService.recentRequest?.requestId || '无'}</dd></div>
-            <div><dt>请求时间</dt><dd>{domains.adhocService.recentRequest?.requestedAt || '-'}</dd></div>
+            <div><dt>请求状态</dt><dd>{domains.adhocService.recentRequest?.state || '无请求'}</dd></div>
+            <div><dt>请求产物</dt><dd>{domains.adhocService.recentRequest?.status || '-'}</dd></div>
+            <div><dt>隔离校验</dt><dd>{domains.adhocService.recentRequest ? (domains.adhocService.recentRequest.separationValid ? '通过' : '失败') : '-'}</dd></div>
+            <div><dt>研究证据资格</dt><dd>{domains.adhocService.researchEvidenceEligible ? '有' : '无（独立 namespace）'}</dd></div>
           </dl>
           <small>这里只展示服务与最近请求状态，不记录、推断或宣称线下实际购买。</small>
         </section>

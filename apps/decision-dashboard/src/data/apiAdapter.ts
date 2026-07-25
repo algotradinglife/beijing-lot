@@ -1584,6 +1584,14 @@ function transformOperationsStatus(raw: unknown): OperationsStatusData {
       },
       adhocService: {
         status: asString(adhocDomain.status, 'missing'),
+        serviceStatus: asString(
+          adhocDomain.service_status,
+          asString(adhocDomain.serviceStatus, asString(adhocDomain.status, 'missing')),
+        ),
+        isolationStatus: asString(
+          adhocDomain.isolation_status,
+          asString(adhocDomain.isolationStatus, 'missing'),
+        ),
         capabilityAvailable: asBoolean(adhocDomain.capability_available, asBoolean(adhocDomain.capabilityAvailable)),
         lastRequestAt: asString(adhocDomain.last_request_at, asString(adhocDomain.lastRequestAt)),
         lastSuccessAt: asString(adhocDomain.last_success_at, asString(adhocDomain.lastSuccessAt)),
@@ -1598,6 +1606,7 @@ function transformOperationsStatus(raw: unknown): OperationsStatusData {
           validUntil: asString(adhocRecent.valid_until, asString(adhocRecent.validUntil)),
           saleStatusVerifiedAtGeneration: asBoolean(adhocRecent.sale_status_verified_at_generation, asBoolean(adhocRecent.saleStatusVerifiedAtGeneration)),
           state: asString(adhocRecent.state),
+          separationValid: asBoolean(adhocRecent.separation_valid, asBoolean(adhocRecent.separationValid)),
         } : undefined,
       },
       settlementReview: {

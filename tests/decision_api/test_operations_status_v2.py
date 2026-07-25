@@ -877,6 +877,90 @@ def test_operations_endpoint_persists_alert_lifecycle_across_polls(
     assert all(row["last_seen_at"] == "2026-07-25T19:01:00+08:00" for row in rows)
 
 
+def test_alert_lifecycle_is_monotonic_across_out_of_order_polls(
+    tmp_path: Path,
+) -> None:
+    db_path = tmp_path / "operations.sqlite"
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    alert = {
+        "alert_id": "ops-monotonic",
+        "code": "runtime_api_failed",
+        "domain": "runtime",
+        "first_seen_at": "2026-07-25T19:01:00+08:00",
+        "last_seen_at": "2026-07-25T19:01:00+08:00",
+    }
+    try:
+        appmod._ensure_operations_alert_lifecycle_schema(conn)
+        appmod._persist_operations_alert_lifecycle(
+            conn,
+            issue="26078",
+            observed_at="2026-07-25T19:01:00+08:00",
+            alerts=[alert],
+        )
+
+        stale_alert = {
+            **alert,
+            "first_seen_at": "2026-07-25T19:00:00+08:00",
+            "last_seen_at": "2026-07-25T19:00:00+08:00",
+        }
+        appmod._persist_operations_alert_lifecycle(
+            conn,
+            issue="26078",
+            observed_at="2026-07-25T19:00:00+08:00",
+            alerts=[stale_alert],
+        )
+        appmod._persist_operations_alert_lifecycle(
+            conn,
+            issue="26078",
+            observed_at="2026-07-25T19:00:30+08:00",
+            alerts=[],
+        )
+
+        active = conn.execute(
+            """
+            SELECT first_seen_at, last_seen_at, resolved_at
+            FROM operations_alert_lifecycle
+            WHERE issue=? AND alert_id=?
+            """,
+            ("26078", "ops-monotonic"),
+        ).fetchone()
+        assert dict(active) == {
+            "first_seen_at": "2026-07-25T19:00:00+08:00",
+            "last_seen_at": "2026-07-25T19:01:00+08:00",
+            "resolved_at": None,
+        }
+
+        appmod._persist_operations_alert_lifecycle(
+            conn,
+            issue="26078",
+            observed_at="2026-07-25T19:02:00+08:00",
+            alerts=[],
+        )
+        appmod._persist_operations_alert_lifecycle(
+            conn,
+            issue="26078",
+            observed_at="2026-07-25T19:01:30+08:00",
+            alerts=[stale_alert],
+        )
+        resolved = conn.execute(
+            """
+            SELECT first_seen_at, last_seen_at, resolved_at
+            FROM operations_alert_lifecycle
+            WHERE issue=? AND alert_id=?
+            """,
+            ("26078", "ops-monotonic"),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert dict(resolved) == {
+        "first_seen_at": "2026-07-25T19:00:00+08:00",
+        "last_seen_at": "2026-07-25T19:01:00+08:00",
+        "resolved_at": "2026-07-25T19:02:00+08:00",
+    }
+
+
 def test_operations_legacy_capture_status_is_missing_for_empty_issue(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -250,6 +250,8 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getByText('1 条决策草稿待确认')).toBeInTheDocument();
     expect(screen.getByText('定时研究冻结 / exact-N')).toBeInTheDocument();
     expect(screen.getByText('用户即时生成服务')).toBeInTheDocument();
+    expect(screen.getByText('服务健康')).toBeInTheDocument();
+    expect(screen.getByText('研究隔离')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '复盘 dry-run' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '执行复盘写入' })).toBeInTheDocument();
     expect(screen.queryByText('实盘日流程')).not.toBeInTheDocument();
@@ -349,6 +351,47 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getAllByText('0').length).toBeGreaterThanOrEqual(2);
     const workflowStatus = within(screen.getByText('完整刷新 workflow').parentElement as HTMLElement).getByText('运行中');
     expect(workflowStatus).toHaveClass('badge', 'neutral');
+  });
+
+  it('shows healthy adhoc service separately from a rejected recent request', async () => {
+    const dashboardData: DashboardData = {
+      ...mockDashboardData,
+      operations: {
+        ...mockDashboardData.operations,
+        domains: {
+          ...mockDashboardData.operations.domains,
+          adhocService: {
+            ...mockDashboardData.operations.domains.adhocService,
+            status: 'ok',
+            serviceStatus: 'ok',
+            isolationStatus: 'ok',
+            capabilityAvailable: true,
+            recentRequest: {
+              requestId: 'adhoc-rejected',
+              requestedAt: '2026-07-25T19:00:00+08:00',
+              inputAsof: '2026-07-25T18:59:00+08:00',
+              status: 'INPUT_INVALID',
+              validUntil: '',
+              saleStatusVerifiedAtGeneration: false,
+              state: 'REJECTED',
+              separationValid: true,
+            },
+          },
+        },
+      },
+    };
+    vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(dashboardData);
+
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: '运行状态' }));
+
+    const adhocSection = screen.getByText('用户即时生成服务').closest('section');
+    expect(adhocSection).not.toBeNull();
+    expect(within(adhocSection!).getAllByText('正常').length).toBeGreaterThanOrEqual(2);
+    expect(within(adhocSection!).getByText('REJECTED')).toBeInTheDocument();
+    expect(within(adhocSection!).getByText('INPUT_INVALID')).toBeInTheDocument();
+    expect(within(adhocSection!).getByText('通过')).toBeInTheDocument();
+    expect(within(adhocSection!).queryByText('不可用')).not.toBeInTheDocument();
   });
 
   it('generates a separately scoped adhoc Exact-N plan with printable valid-until downloads', async () => {

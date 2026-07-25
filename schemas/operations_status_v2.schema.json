@@ -142,10 +142,18 @@
             {
               "type": "object",
               "required": [
+                "service_status",
+                "isolation_status",
                 "capability_available",
                 "research_evidence_eligible"
               ],
               "properties": {
+                "service_status": {
+                  "$ref": "#/$defs/status"
+                },
+                "isolation_status": {
+                  "$ref": "#/$defs/status"
+                },
                 "capability_available": {
                   "type": "boolean"
                 },
