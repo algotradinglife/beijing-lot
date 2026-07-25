@@ -1,0 +1,23 @@
+# SCORE-HCAP-HIST-001 — historical score model to handicap 3/1/0
+
+Status: `g0_pending; no_formal_result`
+
+This is retrospective chronological research only. It never creates tickets, stakes, ROI, EV, budget, production, API, frontend, or release authority.
+
+## Frozen question and boundary
+
+RQ1 compares, by complete held-out season, a score-history independent-Poisson model against a handicap-only `Dirichlet(1,1,1)` historical prior. Every test prediction may use only earlier complete seasons, the current integer handicap, and `(league, normalized_team)` identity. The outcome label is historical-known and is never an input to its own season model.
+
+Initial train seasons are 2014–2015; test seasons are 2016–2025, subject to G0's deterministic qualification audit. G0 accepts the window only with at least 100,000 qualified rows, at least eight test seasons, at least 1,000 qualified rows in every test season, resolvable chronological keys, no unresolved duplicate identity, a stored-result-code recomputation mismatch rate at or below 0.5%, and a reproducible freeze.
+
+## Preregistered B0/B1 analysis (locked until G0 passes)
+
+For each test season, fitting uses only seasons before that season; no fixture in the test season updates an estimate. B0 is the handicap-only empirical historical class distribution with a symmetric `Dirichlet(1,1,1)` prior. B1 is an independently scored Poisson model by `league × normalized team`, with clearly documented deterministic shrinkage for sparse team history and exact/adaptive-tail Skellam conversion of score margins to 3/1/0 probabilities. It consumes only the frozen G0 panel and its integer handicap; it never reads odds, SP, prices, returns, tickets, stake, N, EV, Kelly, or ROI fields.
+
+The primary metric is pooled three-class log loss, `B1 - B0`. Secondary outputs are multiclass Brier score, calibration, season diagnostics, handicap strata, and cold-start strata. Bootstrap resampling is by issue, with 2,000 deterministic replicates. The only favorable retrospective decision requires a negative pooled log-loss delta, a bootstrap 95% CI upper bound below zero, and the Issue #35 preregistered season-stability condition. No outcome changes any frozen prediction; any result remains retrospective re-analysis, not forward validation or a profitability claim.
+
+G0 exports only canonical identifiers, chronology, teams, integer handicap, historical score labels, stored result code, and settlement-status diagnostics. It does not read any SP, final/winning SP, European odds, ticket, N, EV, Kelly, or ROI column. If G0 fails, no B0/B1 metric may run.
+
+G0 additionally emits an outcome-independent feature-availability matrix. This is an inventory only: it does not calculate an incremental feature result, alter B0/B1, or alter the primary metric or decision rule. It explicitly marks source fields without an independently reliable pre-kickoff timestamp as terminal-prohibited. In particular, the existing `walkforward_beidan_result_model_eval.py` consumer names `TEAM_FORM_PROB_KEYS` and related `team_*` values, but `load_match_extras()` does not populate them; they are zero-valued placeholders, not historical team-form evidence. Any feature ablation needs a separately scoped Issue.
+
+Evidence is capped at C unless raw-source provenance becomes independently verifiable. Any eventual result is retrospective re-analysis, never untouched forward validation or a profitability claim.
