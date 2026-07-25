@@ -36,6 +36,10 @@ spec:
       node_type: task
       ref: tasks/BJ-SEG-RECOVERY-001.yaml
       state: COMPLETED
+    - id: SP-CONSISTENCY-001A
+      node_type: task
+      ref: tasks/SP-CONSISTENCY-001A.yaml
+      state: EXECUTING
 
   edges:
     - from: GOAL-BOOT
@@ -64,4 +68,10 @@ spec:
       relation: depends_on
     - from: BJ-SEG-RECOVERY-001
       to: BJ-BET-FREEZE-001
+      relation: depends_on
+    - from: GOAL-PHASE1
+      to: SP-CONSISTENCY-001A
+      relation: decomposes_to
+    - from: SP-CONSISTENCY-001A
+      to: BJ-MM-FREEZE-001
       relation: depends_on

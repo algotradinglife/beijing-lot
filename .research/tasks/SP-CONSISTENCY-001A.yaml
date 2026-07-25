@@ -1,0 +1,67 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: SP-CONSISTENCY-001A
+  title: Score distribution vs handicap 3/1/0
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-PHASE1
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/31"
+    - "https://github.com/algotradinglife/beijing-lot/issues/17"
+    - "https://github.com/algotradinglife/beijing-lot/issues/11"
+
+spec:
+  type: experiment
+  intent:
+    objective: Compare a complete score distribution mechanically mapped to Beijing handicap 3/1/0 with an aligned, de-vigged p34 probability; test only sample-out-of-time incremental predictive information after strict data gates pass.
+    question: At one common pre-kickoff decision time, do score-derived 3/1/0 probabilities have stable probability-space discrepancies from p34, and improve proper scores beyond p34 SP alone?
+    hypothesis: Score-derived probabilities contain a reproducible, non-artifactual probability-space discrepancy and improve chronological holdout log loss or Brier score beyond p34 alone.
+    expected_value: Determine whether a later market-information study is technically and statistically justified; it cannot authorise betting or a strategy release.
+    out_of_scope:
+      - Portfolio, ticket, N-leg, stake, EV, q, ROI, or bankroll analysis
+      - v3.3.3/v4.2 strategy logic, settlement rules, release manifests, or production API/frontend changes
+      - Correct-score Top-k or stake allocation
+      - Causal or betting-advantage claims
+  context:
+    preregistration:
+      primary_score_source: market_derived_p42_when_complete_and_exactly_mappable
+      secondary_score_source: william_hill_1x2_ou_independent_poisson_when_strictly_frozen
+      p34_primary_baseline: proportional_inverse_sp_devig
+      g0_min_strict_paired_rows: 200
+      g0_min_strict_paired_issues: 8
+      selection_rule: Retain only p34 and score inputs with the same declared decision time, source_observed_at <= fetched_at <= decision_at < kickoff_at, complete required vectors, and immutable provenance.
+      chronological_holdout_rule: Sort eligible issue IDs ascending; use the earliest 70 percent of issue blocks for training/calibration and the final 30 percent for holdout. B2 may choose alpha in {0.00,0.25,0.50,0.75,1.00} by training-only issue-block cross-validation.
+      primary_metric: multiclass_log_loss
+      secondary_metric: multiclass_brier_score
+      uncertainty: issue_block_bootstrap_95_percent_ci
+      execution_enabled: false
+      frontend_selectable: false
+      roi_authorized: false
+  acceptance:
+    required_artifacts:
+      - docs/research/experiments/SP-CONSISTENCY-001A.md
+      - research/sp_consistency/coverage.py
+      - research/sp_consistency/mapping.py
+      - scripts/run_sp_consistency_g0.py
+      - immutable G0 Freeze Protocol v1 package
+    checks:
+      - G0 frozen before any predictive comparison
+      - score-to-handicap positive/zero/negative handicap and tail-bound tests
+      - no outcome, portfolio, or strategy code in G0
+    human_gates:
+      - engineering_reproducibility_validation
+      - research_pi_review
+
+status:
+  current: EXECUTING
+  attempts: 1
+  routing:
+    executor_mode: isolated_session
+    profile: strategist
+    runtime: codex
+    reason: Issue #31 is explicitly routed to the resident Strategist.
+  result:
+    outcome: pending_g0
+    summary: Preregistration and outcome-blind G0 coverage audit are required before Stage A or Stage B.
