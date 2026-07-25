@@ -28,7 +28,7 @@ def main() -> int:
     config_path = args.work_dir / "g0_config.json"
     decision_path.write_text(json.dumps(decision, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     config_path.write_text(json.dumps({"experiment_type": "retrospective_walk_forward", "outcome_visibility": "historical_known", "execution_enabled": False}, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    package = create_freeze_package(args.freeze_dir, experiment_id="SCORE-HCAP-HIST-001-G0", research_question="Is the historical score-to-handicap panel eligible for the preregistered retrospective walk-forward experiment?", model_version="score-hcap-hist-g0-v1", input_files=[result["panel"], result["schema"], result["audit"], result["matrix"]], decision_files=[decision_path], config_file=config_path, metadata_files=[ROOT / "docs/research/experiments/SCORE-HCAP-HIST-001.md"], git_commit=args.git_commit, frozen_at_utc=args.frozen_at_utc)
+    package = create_freeze_package(args.freeze_dir, experiment_id="SCORE-HCAP-HIST-001-G0", research_question="Is the historical score-to-handicap panel eligible for the preregistered retrospective walk-forward experiment?", model_version="score-hcap-hist-g0-v1", input_files=[result["panel"], result["schema"], result["audit"], result["matrix"]], decision_files=[decision_path], config_file=config_path, metadata_files=[ROOT / "docs/research/experiments/SCORE-HCAP-HIST-001-preregistration.md"], git_commit=args.git_commit, frozen_at_utc=args.frozen_at_utc)
     print(json.dumps({"audit": result["audit_data"], "freeze": package, "verification": verify_freeze_package(args.freeze_dir)}, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 

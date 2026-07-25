@@ -25,7 +25,6 @@ def main() -> int:
     parser.add_argument("--frozen-at-utc", required=True)
     parser.add_argument("--git-commit", required=True)
     args = parser.parse_args()
-    result = run_walkforward(panel=args.panel, output_dir=args.output_dir)
     config = {
         "experiment_id": "SCORE-HCAP-HIST-001", "experiment_type": "retrospective_walk_forward",
         "outcome_visibility": "historical_known", "execution_enabled": False, "frontend_selectable": False,
@@ -34,8 +33,8 @@ def main() -> int:
         "b1": {"type": "independent_poisson", "prior_exposure": PRIOR_EXPOSURE, "mapping": "exact_skellam"},
         "bootstrap": {"seed": BOOTSTRAP_SEED, "replicates": BOOTSTRAP_REPLICATES, "block": "issue", "stratified_by": "season"},
     }
+    result = run_walkforward(panel=args.panel, output_dir=args.output_dir, frozen_config=config)
     config_path = args.output_dir / "frozen_b0_b1_config.json"
-    config_path.write_text(json.dumps(config, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     decision = args.output_dir / "final_decision.json"
     outputs = sorted(path for path in args.output_dir.iterdir() if path.is_file() and path.name not in {"final_decision.json", "frozen_b0_b1_config.json"})
     package = create_freeze_package(
@@ -43,7 +42,7 @@ def main() -> int:
         research_question="Does the frozen score-history independent-Poisson model improve 3/1/0 log loss over the frozen handicap-only prior?",
         model_version="score-hcap-hist-b1-v1", input_files=[args.panel], prediction_files=outputs,
         decision_files=[decision], config_file=config_path,
-        metadata_files=[ROOT / "docs/research/experiments/SCORE-HCAP-HIST-001.md"],
+        metadata_files=[ROOT / "docs/research/experiments/SCORE-HCAP-HIST-001-preregistration.md"],
         git_commit=args.git_commit, frozen_at_utc=args.frozen_at_utc,
     )
     print(json.dumps({"summary": result["summary"], "freeze": package, "verification": verify_freeze_package(args.freeze_dir)}, indent=2, sort_keys=True))

@@ -101,12 +101,19 @@ def export_feature_availability_matrix(*, source_db: Path, destination: Path) ->
     source.row_factory = sqlite3.Row
     source.execute("PRAGMA query_only = ON")
     try:
+        match_feature_columns = {str(row[1]) for row in source.execute("PRAGMA table_info(match_features)")}
+        rank_expression = (
+            "SUM(CASE WHEN home_rank IS NOT NULL AND TRIM(home_rank) <> '' AND away_rank IS NOT NULL AND TRIM(away_rank) <> '' THEN 1 ELSE 0 END) AS ranks_present"
+            if {"home_rank", "away_rank"} <= match_feature_columns else "0 AS ranks_present"
+        )
         base = source.execute(
-            """
+            f"""
             SELECT COUNT(*) AS rows, MIN(kickoff_ts) AS earliest, MAX(kickoff_ts) AS latest,
                    SUM(CASE WHEN league IS NOT NULL AND TRIM(league) <> '' THEN 1 ELSE 0 END) AS league_present,
                    SUM(CASE WHEN home IS NOT NULL AND TRIM(home) <> '' AND away IS NOT NULL AND TRIM(away) <> '' THEN 1 ELSE 0 END) AS teams_present,
-                   SUM(CASE WHEN home_rank IS NOT NULL AND TRIM(home_rank) <> '' AND away_rank IS NOT NULL AND TRIM(away_rank) <> '' THEN 1 ELSE 0 END) AS ranks_present
+                   SUM(CASE WHEN home IS NOT NULL AND TRIM(home) <> '' AND away IS NOT NULL AND TRIM(away) <> '' AND fthg IS NOT NULL AND ftag IS NOT NULL THEN 1 ELSE 0 END) AS score_history_present,
+                   SUM(CASE WHEN home IS NOT NULL AND TRIM(home) <> '' AND away IS NOT NULL AND TRIM(away) <> '' AND result_code IS NOT NULL AND TRIM(result_code) <> '' THEN 1 ELSE 0 END) AS result_history_present,
+                   {rank_expression}
             FROM match_features
             WHERE season_year BETWEEN 2014 AND 2025
               AND kickoff_ts IS NOT NULL AND kickoff_ts NOT LIKE '1899-12-30%'
@@ -148,6 +155,8 @@ def export_feature_availability_matrix(*, source_db: Path, destination: Path) ->
 
     earliest, latest = str(base["earliest"] or ""), str(base["latest"] or "")
     team_coverage = int(base["teams_present"] or 0)
+    score_coverage = int(base["score_history_present"] or 0)
+    result_coverage = int(base["result_history_present"] or 0)
     league_coverage = int(base["league_present"] or 0)
     rank_coverage = int(base["ranks_present"] or 0)
     common = {"earliest_chronology": earliest, "latest_chronology": latest}
@@ -160,11 +169,11 @@ def export_feature_availability_matrix(*, source_db: Path, destination: Path) ->
                 "proposed_future_ablation_priority": priority, "existing_consumer_status": status, "notes": notes}
     matrix = [
         item("rank", "pre_match_ranks", "raw", "match_features", "home_rank;away_rank", rank_coverage, "terminal-prohibited", "requires independently timestamped pre-kickoff rank capture", "no as-of timestamp; terminal row may be revised", "P2", "load_match_extras reads ranks; not eligible as strict evidence", "availability only"),
-        item("team_history", "rolling_GF_GA", "derived", "match_features", "kickoff_ts;league;home;away;fthg;ftag", team_coverage, "strict-derived", strict_rule, "must never include same-fixture score", "P1", "not consumed by formal B0/B1", "score fields are not read by this matrix" , identity_conflicts),
-        item("team_history", "recent_WDL_points", "derived", "match_features", "kickoff_ts;league;home;away;result_code", team_coverage, "strict-derived", strict_rule, "must never include same-fixture result", "P1", "not consumed by formal B0/B1", "result values are not read by this matrix", identity_conflicts),
-        item("team_history", "home_away_role_form", "derived", "match_features", "kickoff_ts;league;home;away;result_code", team_coverage, "strict-derived", strict_rule, "role and result must precede fixture", "P1", "TEAM_FORM_PROB_KEYS/team_* are consumed elsewhere but load_match_extras does not populate them", "existing placeholders fall to zero; not evidence of available team form", identity_conflicts),
-        item("team_history", "draw_clean_sheet_BTTS_rates", "derived", "match_features", "kickoff_ts;league;home;away;fthg;ftag", team_coverage, "strict-derived", strict_rule, "must never include current score", "P2", "not consumed by formal B0/B1", "score fields are not read by this matrix", identity_conflicts),
-        item("score_distribution", "score_variance_overdispersion", "derived", "match_features", "kickoff_ts;league;home;away;fthg;ftag", team_coverage, "strict-derived", strict_rule, "requires pre-fixture-only score history", "P2", "not consumed by formal B0/B1", "score fields are not read by this matrix", identity_conflicts),
+        item("team_history", "rolling_GF_GA", "derived", "match_features", "kickoff_ts;league;home;away;fthg;ftag", score_coverage, "strict-derived", strict_rule, "must never include same-fixture score", "P1", "not consumed by formal B0/B1", "only score-field presence, not score values, is inspected here" , identity_conflicts),
+        item("team_history", "recent_WDL_points", "derived", "match_features", "kickoff_ts;league;home;away;result_code", result_coverage, "strict-derived", strict_rule, "must never include same-fixture result", "P1", "not consumed by formal B0/B1", "only result-field presence, not result values, is inspected here", identity_conflicts),
+        item("team_history", "home_away_role_form", "derived", "match_features", "kickoff_ts;league;home;away;result_code", result_coverage, "strict-derived", strict_rule, "role and result must precede fixture", "P1", "TEAM_FORM_PROB_KEYS/team_* are consumed elsewhere but load_match_extras does not populate them", "existing placeholders fall to zero; not evidence of available team form", identity_conflicts),
+        item("team_history", "draw_clean_sheet_BTTS_rates", "derived", "match_features", "kickoff_ts;league;home;away;fthg;ftag", score_coverage, "strict-derived", strict_rule, "must never include current score", "P2", "not consumed by formal B0/B1", "only score-field presence, not score values, is inspected here", identity_conflicts),
+        item("score_distribution", "score_variance_overdispersion", "derived", "match_features", "kickoff_ts;league;home;away;fthg;ftag", score_coverage, "strict-derived", strict_rule, "requires pre-fixture-only score history", "P2", "not consumed by formal B0/B1", "only score-field presence, not score values, is inspected here", identity_conflicts),
         item("calendar", "rest_days", "derived", "match_features", "kickoff_ts;league;home;away", team_coverage, "strict-derived", strict_rule, "ambiguous team identity or kickoff timezone", "P2", "not consumed by formal B0/B1", "source kickoff timezone provenance is unavailable", identity_conflicts),
         item("calendar", "season_phase", "derived", "match_features", "season_year;kickoff_ts", rows, "strict-derived", "derive fixed ordinal phase from predeclared season calendar rule", "season boundary definition must be frozen", "P3", "not consumed by formal B0/B1", "calendar-only availability"),
         item("opponent_strength", "opponent_Elo", "derived", "match_features", "kickoff_ts;league;home;away;result_code", team_coverage, "strict-derived", strict_rule, "same-fixture or future update leakage", "P1", "not consumed by formal B0/B1", "result values are not read by this matrix", identity_conflicts),
@@ -217,6 +226,7 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         """
     )
     raw = len(rows)
+    source_db_identity = {"filename": source_db.name, "bytes": source_db.stat().st_size, "sha256": sha256_file(source_db)}
     exclusions: Counter[str] = Counter()
     by_season_raw: Counter[int] = Counter()
     by_season_eligible: Counter[int] = Counter()
@@ -224,10 +234,16 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
     result_comparison_rows = 0
     normalized_names: dict[tuple[str, str], set[str]] = defaultdict(set)
     canonical_keys: dict[tuple[str, int], set[int]] = defaultdict(set)
+    source_match_ids: Counter[int] = Counter()
+    source_issue_match_idx: dict[tuple[str, int], set[int]] = defaultdict(set)
+    mismatch_quality: Counter[str] = Counter()
     seen_match_ids: set[int] = set()
     duplicate_match_ids = 0
     inserted: list[tuple[Any, ...]] = []
     for row in rows:
+        raw_match_id = int(row["match_id"])
+        source_match_ids[raw_match_id] += 1
+        source_issue_match_idx[(str(row["issue"] or ""), int(row["match_idx"] or 0))].add(raw_match_id)
         season = row["season_year"]
         if isinstance(season, int):
             by_season_raw[season] += 1
@@ -254,6 +270,7 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         stored = str(row["result_code"] or "")
         if stored != computed:
             mismatch += 1
+            mismatch_quality[str(row["settlement_quality"] or "")] += 1
             exclusions["stored_result_code_mismatch"] += 1
             continue
         league = str(row["league"]).strip()
@@ -283,6 +300,8 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
     conflict_names = sum(1 for raw_names in normalized_names.values() if len(raw_names) > 1)
     mismatch_rate = mismatch / result_comparison_rows if result_comparison_rows else 1.0
     canonical_key_conflicts = sum(1 for match_ids in canonical_keys.values() if len(match_ids) > 1)
+    source_duplicate_match_ids = sum(count - 1 for count in source_match_ids.values() if count > 1)
+    source_issue_match_idx_conflicts = sum(1 for match_ids in source_issue_match_idx.values() if len(match_ids) > 1)
     test_counts = {str(year): by_season_eligible[year] for year in TEST_SEASONS}
     handicap_distribution: dict[str, dict[str, int]] = {}
     cold_start: dict[str, dict[str, float | int]] = {}
@@ -335,12 +354,15 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
             "result_code_comparison_rows": result_comparison_rows,
             "stored_result_code_mismatches": mismatch,
             "stored_result_code_mismatch_rate": mismatch_rate,
+            "stored_result_code_mismatch_by_settlement_quality": dict(sorted(mismatch_quality.items())),
+            "source_duplicate_match_ids": source_duplicate_match_ids,
+            "source_issue_match_idx_conflicts": source_issue_match_idx_conflicts,
             "duplicate_match_ids": duplicate_match_ids,
             "issue_match_idx_conflicts": canonical_key_conflicts,
             "normalized_team_identity_conflicts": conflict_names,
         },
         "chronology": {"train_seasons": list(TRAIN_SEASONS), "test_seasons": list(TEST_SEASONS), "sort_key": ["kickoff_utc", "match_id"]},
-        "provenance": {"source_meta_present": bool(schema["source_meta"]), "row_level_immutable_raw_bundle_verified": False, "evidence_level": evidence_level},
+        "provenance": {"source_database": source_db_identity, "source_meta_present": bool(schema["source_meta"]), "row_level_immutable_raw_bundle_verified": False, "evidence_level": evidence_level},
         "historical_peek_scope": "This source has been used by prior project retrospective analyses; all outputs are therefore retrospective re-analysis, not untouched forward validation.",
         "feature_availability_matrix": matrix,
         "gate": {

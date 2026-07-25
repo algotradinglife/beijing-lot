@@ -8,7 +8,7 @@ import math
 import sqlite3
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 import numpy as np
 from scipy.stats import skellam
@@ -148,9 +148,15 @@ def _bootstrap(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return output
 
 
-def run_walkforward(*, panel: Path, output_dir: Path) -> dict[str, Any]:
+def run_walkforward(
+    *, panel: Path, output_dir: Path, frozen_config: Mapping[str, Any] | None = None
+) -> dict[str, Any]:
     """Run the single pre-registered B0/B1 configuration once from G0 panel."""
     output_dir.mkdir(parents=True, exist_ok=False)
+    if frozen_config is not None:
+        (output_dir / "frozen_b0_b1_config.json").write_text(
+            json.dumps(dict(frozen_config), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     rows = _fit_predict(panel)
     _write_csv(output_dir / "predictions.csv", rows, list(rows[0]))
     aggregate = {model: _metrics(rows, model) for model in ("b0", "b1")}
