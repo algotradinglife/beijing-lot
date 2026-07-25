@@ -94,11 +94,11 @@ status:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/30"
       artifact_type: issue
       description: Approved capability execution contract
-    - uri: "https://github.com/algotradinglife/beijing-lot/pull/33"
+    - uri: "https://github.com/algotradinglife/beijing-lot/pull/34"
       artifact_type: pull_request
       description: Operations Status v2 implementation and Engineering Validation
   result:
-    pull_request: 33
+    pull_request: 34
     implementation_head: 1f1b13a
     reviewed_head: 1f1b13a
     automated_engineering_validation: PASS
@@ -121,7 +121,7 @@ status:
       actor: engineer
       from: VALIDATING
       to: AWAITING_REVIEW
-      reason: "Engineering Validation is complete and draft PR #33 contains the fixed develop-to-main implementation. Capability semantics, visual evidence, and scope boundaries are ready for PI review."
+      reason: "Engineering Validation is complete and draft PR #34 contains the fixed develop-to-main implementation under the Engineer identity. Capability semantics, visual evidence, and scope boundaries are ready for PI review."
     - action: independent_codex_review_completed
       ts: "2026-07-25T20:56:25+08:00"
       actor: engineer
