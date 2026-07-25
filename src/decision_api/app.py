@@ -9220,7 +9220,7 @@ def create_app(
             target, payload = adhoc_store.artifact_path(
                 request_id,
                 fmt=fmt,
-                now=_adhoc_request_clock(),
+                clock_provider=_adhoc_request_clock,
                 audit_only=audit_only,
             )
         except AdhocPlanNotFound as exc:

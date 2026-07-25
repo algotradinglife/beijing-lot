@@ -28,7 +28,7 @@ from collections import Counter
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 from zoneinfo import ZoneInfo
 
 from scripts import estimate_segment_betting_plan as portfolio
@@ -1249,10 +1249,32 @@ class AdhocBettingStore:
         *,
         fmt: str,
         now: datetime | None = None,
+        clock_provider: Callable[[], datetime] | None = None,
         audit_only: bool = False,
     ) -> tuple[Path, dict[str, Any]]:
-        clock = (now or datetime.now(timezone.utc)).astimezone(HKT)
-        payload = self.get(request_id, now=clock)
+        """Return one verified artifact, checking operational expiry at response time.
+
+        Runtime callers provide ``clock_provider`` so a request that crosses
+        ``valid_until_hkt`` while its immutable package is being verified
+        cannot still receive an operational download.  ``now`` remains for
+        deterministic callers/tests, where its deliberately frozen value is
+        used for both checks.
+        """
+        if now is not None and clock_provider is not None:
+            raise AdhocBettingError("supply either now or clock_provider, not both")
+        if clock_provider is None:
+            frozen_clock = (now or datetime.now(timezone.utc)).astimezone(HKT)
+
+            def clock_provider() -> datetime:
+                return frozen_clock
+
+        def trusted_clock() -> datetime:
+            candidate = clock_provider()
+            if not isinstance(candidate, datetime):
+                raise AdhocBettingError("trusted adhoc clock must return a datetime")
+            return candidate.astimezone(HKT)
+
+        payload = self.get(request_id, now=trusted_clock())
         current = str(payload["current_status"])
         if not audit_only and current != "DOWNLOADABLE_CURRENT":
             raise AdhocBettingError(
@@ -1273,11 +1295,29 @@ class AdhocBettingStore:
             ).fetchone()
         if row is None:
             raise AdhocPlanNotFound("adhoc request was not found")
-        root, _manifest, _plan, _denominator = _load_package(self.root, row)
+        root, manifest, plan, denominator = _load_package(self.root, row)
         target = root / name
         if not target.is_file():
             raise AdhocBettingError("verified adhoc package is missing the requested artifact")
-        return target, {**payload, "audit_only_download": bool(audit_only)}
+
+        # This is intentionally after the complete package/ledger/SHA256SUMS
+        # verification above and immediately before the caller constructs its
+        # file response.  A request that crosses the immutable validity bound
+        # during verification must fail closed rather than carry a stale
+        # OPERATIONAL_CURRENT result into ``send_file``.
+        final_payload = self._public_result(
+            manifest=manifest,
+            plan=plan,
+            denominator=denominator,
+            now=trusted_clock(),
+            idempotent=True,
+        )
+        current = str(final_payload["current_status"])
+        if not audit_only and current != "DOWNLOADABLE_CURRENT":
+            raise AdhocBettingError(
+                f"operational download disabled: {current}; generate a new adhoc request"
+            )
+        return target, {**final_payload, "audit_only_download": bool(audit_only)}
 
     @staticmethod
     def _current_status(manifest: dict[str, Any], now: datetime) -> str:

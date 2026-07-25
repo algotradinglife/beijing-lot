@@ -400,6 +400,32 @@ def test_adhoc_api_expiry_disables_operational_download_but_allows_audit(tmp_pat
     assert audit.headers["X-Adhoc-Usage-Boundary"] == "AUDIT_ONLY_EXPIRED_RECORD"
 
 
+def test_adhoc_api_download_rechecks_clock_after_package_verification(tmp_path: Path, monkeypatch) -> None:
+    app, _db_path, _shadow_dir = _app(tmp_path, monkeypatch)
+    client = app.test_client()
+    generated = client.post(
+        "/api/adhoc-betting-plans",
+        json=_request_payload("api-crossing-expiry-request"),
+        headers=OPERATOR_HEADERS,
+    ).get_json()
+    expiry = datetime.fromisoformat(generated["valid_until_hkt"])
+    clock_calls: list[datetime] = []
+
+    def crossing_clock() -> datetime:
+        clock_calls.append(expiry)
+        if len(clock_calls) == 1:
+            return expiry - timedelta(microseconds=1)
+        return expiry
+
+    app.config["ADHOC_BETTING_NOW"] = crossing_clock
+    blocked = client.get(f"/api/adhoc-betting-plans/{generated['request_id']}/download?format=pdf")
+
+    assert blocked.status_code == 409
+    assert blocked.get_json()["status"] == "FAILED_CLOSED"
+    assert "EXPIRED_NOT_PURCHASABLE" in blocked.get_json()["error"]
+    assert len(clock_calls) >= 2
+
+
 def test_adhoc_api_fails_closed_for_unknown_or_insufficient_current_eligibility(tmp_path: Path, monkeypatch) -> None:
     app, db_path, _shadow_dir = _app(tmp_path, monkeypatch)
     conn = sqlite3.connect(db_path)
