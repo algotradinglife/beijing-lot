@@ -1,6 +1,6 @@
 # SP-CONSISTENCY-001A — score distribution vs handicap 3/1/0
 
-Status: `g0_r4_pending; no_formal_result`
+Status: `g0_r4_frozen_insufficient_strict_data; no_formal_result`
 
 This is a Phase 1 market-information experiment, not a betting or portfolio study. It may not create tickets, stakes, expected-value filters, ROI claims, release authority, or frontend/API choices.
 
@@ -46,4 +46,13 @@ The R4 entry point records query-level outcome prohibitions, per-season/per-issu
 
 ## Frozen evidence
 
-R4 package identifiers, archive digest, and the mechanically supported G0 result are recorded here only after the new immutable package is published. Until then, neither the retired R2/R3 package nor a filename-only model inventory is cited as current PI evidence.
+The independently downloadable R4 package is [SP-CONSISTENCY-001A-G0-R4.tar.gz](https://github.com/algotradinglife/beijing-lot/releases/download/sp-consistency-001a-g0-r4/SP-CONSISTENCY-001A-G0-R4.tar.gz). Its archive SHA-256 is `38da775b022f458b3d8024b6d710b7937d8042e9687b3fc0421aa7e9f710668d` (18,119,742 bytes). It contains the complete Freeze Protocol v1 package and is anchored by tag `sp-consistency-001a-g0-r4` at code commit `126218bb975bc54d741e0562382fc09b832c0245`.
+
+- Freeze ID: `12db65db1b7e4e976336c75df424d3866a0066dec5bbd92bce39accfe4c8fd4e`
+- Manifest SHA-256: `45e19d58dee645b82366e362da6d13b9f3b3151f3db9b99c159c89668136ca0b`
+- Package checksum-list SHA-256: `dbae108a06dff41588d04f896200ccf51ef373b27b2b5d6ccaa33e47b6c6ee15`
+- Verification: `python scripts/manage_research_freeze.py verify-freeze --package-dir SP-CONSISTENCY-001A-G0-R4` returns `status: valid` after unpacking.
+
+The same-transaction source-schema inventory is frozen as `p34_source_schema.json` (SHA-256 `cd0983468a96af93fa09faebcfca2fa40defd0630d1cb5bed943566e6bbaf994`). It establishes that the p34 source `snapshots` schema has none of the four required roles: source-observed clock, fetch clock, raw batch ID, or immutable bundle hash. Accordingly, 3,790 p34 match-markets over 25 issues yield zero strict p34 match-markets by a source-schema-supported gate, not by an intentionally lossy export. The copied and verified p42 input has 31 strict match-markets (20 exact-tail mappings). The frozen filename/hash inventory identifies 365 model-source candidates, but its strict eligibility is `UNKNOWN_NOT_EVALUATED`; it is not treated as zero coverage and no model pairing is reported.
+
+The frozen G0 verdict is `INSUFFICIENT_STRICT_DATA`; G1/G2, Stage A, Stage B, settled-outcome access, prediction scoring, and backtests remain unauthorized.
