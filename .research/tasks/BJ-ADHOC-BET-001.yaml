@@ -81,19 +81,35 @@ spec:
       - research_pi_review
 
 status:
-  current: EXECUTING
+  current: VALIDATING
   attempts: 1
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "ROUTE: Engineer. Implementing the isolated adhoc API, immutable package, printable renderer, and immediate web workflow; no Hermes routing dependency."
+    reason: "Engineering Validation and an independent local Codex review passed on PR #29 HEAD 1b5049e; awaiting Research PI review."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/28"
       artifact_type: issue
       description: Approved execution contract
-  result: {}
+    - uri: "https://github.com/algotradinglife/beijing-lot/pull/29"
+      artifact_type: pull_request
+      description: Isolated adhoc betting workflow awaiting Research PI review
+  result:
+    implementation_head: 1b5049e2f354608eec1b368307d28ff295f1b3c7
+    engineering_validation: PASS
+    independent_codex_review: PASS
+    python_tests: 33_passed
+    dashboard_tests: 23_passed
+    frontend_build: PASS
+    diff_check: PASS
   history:
+    - action: engineering_validation_completed
+      ts: "2026-07-25T14:35:59+08:00"
+      actor: everything-bot-engineer
+      from: EXECUTING
+      to: VALIDATING
+      reason: "Validated PR #29 HEAD 1b5049e: 33 adhoc Python tests, 23 dashboard tests, production build, and diff check passed. Independent validation reproduced and closed the valid_until download race; an independent local Codex review found no actionable regression. Research PI review remains required."
     - action: implementation_complete_pending_validation
       ts: "2026-07-25T14:10:00+08:00"
       actor: engineer
