@@ -656,8 +656,199 @@ export interface MainStrategyData {
 }
 
 export interface OperationsStatusData {
+  schemaVersion: string;
   issueId: string;
   generatedAt: string;
+  summary: {
+    status: string;
+    blockerCount: number;
+    warningCount: number;
+    nextActionAt: string;
+    nextActionTitle: string;
+    message: string;
+  };
+  domains: {
+    runtime: {
+      status: string;
+      checkedAt: string;
+      accessMode: string;
+      externalAccessConfigured: boolean;
+      components: Array<{
+        componentId: string;
+        label: string;
+        status: string;
+        processStatus: string;
+        checkedAt: string;
+        lastSuccessAt: string;
+        latencyMs?: number;
+        httpStatus?: number;
+        detail: string;
+      }>;
+    };
+    collection: {
+      status: string;
+      planStatus: string;
+      planSchemaVersion: string;
+      planRef: string;
+      planError: string;
+      collectors: Array<{
+        collectorId: string;
+        label: string;
+        importance: string;
+        enabled: boolean;
+        ownerProcess: string;
+        processStatus: string;
+        status: string;
+        statusDetail: string;
+        scheduleIntervalSec: number;
+        staleAfterSec: number;
+        lastAttemptAt: string;
+        lastSuccessAt: string;
+        lastErrorAt: string;
+        nextDueAt: string;
+        ageMinutes?: number;
+        coverageRate?: number;
+        coveredCount: number;
+        expectedCount: number;
+        missingCount: number;
+        missingMatchIds: string[];
+        okCount: number;
+        failCount: number;
+        totalAttempts: number;
+        rowsParsed: number;
+        error?: string;
+        markets: string[];
+        autoRecoveryExpected: boolean;
+        retryCount?: number;
+        maintenanceAction: string;
+      }>;
+    };
+    artifacts: {
+      status: string;
+      activeDecision: {
+        status: string;
+        version: string;
+        configHash: string;
+        generatedAt: string;
+        inputAt: string;
+        expectedCount: number;
+        actualCount: number;
+        missingCount: number;
+        missingMatchIds: string[];
+        detail: string;
+      };
+      draftCount: number;
+      draftMatchIds: string[];
+      supersededCount: number;
+      scheduledResearchEvidenceEligible: boolean;
+      adhocNamespaceUsed: boolean;
+    };
+    scheduledFreeze: {
+      status: string;
+      timelineContract: string;
+      researchAndAdhocSeparated: boolean;
+      nextDueAt: string;
+      segments: Array<{
+        segmentIdx: number;
+        segmentIdentity: string;
+        isRecovery: boolean;
+        timelineStatus: string;
+        freezeAt: string;
+        publishedAt: string;
+        observedAt: string;
+        nextDueAt: string;
+        matchCount: number;
+        detail: string;
+        autoRecoveryExpected: boolean;
+        exactN: {
+          status: string;
+          sourceStatus: string;
+          verificationStatus: string;
+          eventId: string;
+          artifactRef: string;
+          alternativeCount: number;
+          selectableCount: number;
+          researchEvidenceEligible: boolean;
+        };
+        researchFreeze: {
+          status: string;
+          verificationStatus: string;
+          eventId: string;
+          artifactRef: string;
+          detail: string;
+          pairedOverlapMatches?: number;
+          frozenMatchMarkets?: number;
+        };
+      }>;
+    };
+    adhocService: {
+      status: string;
+      serviceStatus: string;
+      isolationStatus: string;
+      capabilityAvailable: boolean;
+      lastRequestAt: string;
+      lastSuccessAt: string;
+      detail: string;
+      scheduledFreezeEventId?: string;
+      researchEvidenceEligible: boolean;
+      recentRequest?: {
+        requestId: string;
+        requestedAt: string;
+        inputAsof: string;
+        status: string;
+        validUntil: string;
+        saleStatusVerifiedAtGeneration: boolean;
+        state: string;
+        separationValid: boolean;
+      };
+    };
+    settlementReview: {
+      status: string;
+      settledMatchCount: number;
+      winningSpCount: number;
+      reviewedMatchCount: number;
+      missingWinningSpMatchIds: string[];
+      unreviewedMatchIds: string[];
+      latestReviewAt: string;
+      lastSettlementSuccessAt: string;
+      nextDueAt: string;
+      simulationOnly: boolean;
+      offlinePurchaseInferred: boolean;
+      actualRoiClaimed: boolean;
+    };
+  };
+  alerts: Array<{
+    alertId: string;
+    code: string;
+    domain: string;
+    severity: 'blocker' | 'warning' | string;
+    status: string;
+    title: string;
+    detail: string;
+    impact: string;
+    nextAction: string;
+    observedAt: string;
+    firstSeenAt: string;
+    lastSeenAt: string;
+    lastSuccessAt: string;
+    nextDueAt: string;
+    affectedCount: number;
+    affected: {
+      segments: string[];
+      matches: string[];
+      markets: string[];
+      sources: string[];
+    };
+    autoRecoveryExpected: boolean;
+    retryCount?: number;
+    links: Array<{ kind: string; label: string; ref: string }>;
+    blocks: {
+      dataDisplay: boolean;
+      researchFreeze: boolean;
+      adhocGeneration: boolean;
+      settlement: boolean;
+    };
+  }>;
   issueStatus: {
     currentIssue: string;
     matchCount: number;

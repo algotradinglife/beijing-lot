@@ -241,20 +241,24 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.queryByText('不可用')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: '运行状态' }));
-    expect(screen.getByText(/实盘健康检查 \/ Issue 26071/)).toBeInTheDocument();
+    expect(screen.getByText(/系统运行状态 \/ Issue 26071/)).toBeInTheDocument();
     expect(screen.getByText('待处理事项')).toBeInTheDocument();
-    expect(screen.getByText('数据源健康')).toBeInTheDocument();
-    expect(screen.getByText('决策快照')).toBeInTheDocument();
-    expect(screen.getByText('复盘进度')).toBeInTheDocument();
-    expect(screen.getByText('操作区')).toBeInTheDocument();
-    expect(screen.getByText('待确认决策草稿')).toBeInTheDocument();
+    expect(screen.getByText('数据采集')).toBeInTheDocument();
+    expect(screen.getByText('冻结与产物')).toBeInTheDocument();
+    expect(screen.getByText('服务运行')).toBeInTheDocument();
+    expect(screen.getByText('结算复盘')).toBeInTheDocument();
+    expect(screen.getByText('1 条决策草稿待确认')).toBeInTheDocument();
+    expect(screen.getByText('定时研究冻结 / exact-N')).toBeInTheDocument();
+    expect(screen.getByText('用户即时生成服务')).toBeInTheDocument();
+    expect(screen.getByText('服务健康')).toBeInTheDocument();
+    expect(screen.getByText('研究隔离')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '复盘 dry-run' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '执行复盘写入' })).toBeInTheDocument();
     expect(screen.queryByText('实盘日流程')).not.toBeInTheDocument();
     expect(screen.queryByText('访问与服务')).not.toBeInTheDocument();
     expect(screen.queryByText('版本锁定')).not.toBeInTheDocument();
     expect(screen.queryByText('数据源新鲜度')).not.toBeInTheDocument();
-    expect(screen.queryByText('wf_26071_mock')).not.toBeInTheDocument();
+    expect(screen.getByText('wf_26071_mock')).toBeInTheDocument();
     expect(screen.queryByText(/Host smoke/)).not.toBeInTheDocument();
     expect(screen.queryByText(/triggerEndpoint/)).not.toBeInTheDocument();
     expect(screen.queryByText(/draft_replacement_pending/)).not.toBeInTheDocument();
@@ -267,9 +271,9 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.queryByText(/pid 1001/)).not.toBeInTheDocument();
     expect(screen.queryByText(/pid 1002/)).not.toBeInTheDocument();
     expect(screen.queryByText('trade-server.tail0aa0e9.ts.net')).not.toBeInTheDocument();
-    expect(screen.queryByText('f2ad3ef6')).not.toBeInTheDocument();
-    expect(screen.getByText('26071_014')).toBeInTheDocument();
-    expect(screen.getByText(/1 条决策草稿/)).toBeInTheDocument();
+    expect(screen.getByText('f2ad3ef6402d')).toBeInTheDocument();
+    expect(screen.getAllByText('26071_014').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/1 条决策草稿/).length).toBeGreaterThan(0);
 
     await userEvent.click(screen.getByRole('button', { name: '实时信号' }));
     expect(screen.getAllByText(/source_failed/).length).toBeGreaterThan(0);
@@ -310,6 +314,84 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getAllByText(/baseline_384_hybrid/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/selector_v2_frozen/).length).toBeGreaterThan(0);
     expect(screen.getByText(/年度表现/)).toBeInTheDocument();
+  });
+
+  it('renders only canonical backend alerts and does not reinterpret legacy warnings', async () => {
+    const dashboardData: DashboardData = {
+      ...mockDashboardData,
+      operations: {
+        ...mockDashboardData.operations,
+        workflow: {
+          ...mockDashboardData.operations.workflow,
+          status: 'running',
+        },
+        summary: {
+          ...mockDashboardData.operations.summary,
+          status: 'ok',
+          blockerCount: 0,
+          warningCount: 0,
+          message: '当前未发现系统阻断；这不代表策略、执行或收益已经就绪。',
+        },
+        alerts: [],
+        warnings: [{
+          code: 'legacy_frontend_only_warning',
+          severity: 'bad',
+          label: '这条兼容 warning 不得单独显示',
+          detail: 'canonical alerts 中不存在',
+        }],
+      },
+    };
+    vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(dashboardData);
+
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: '运行状态' }));
+
+    expect(screen.getByText('当前未发现系统阻断')).toBeInTheDocument();
+    expect(screen.queryByText('这条兼容 warning 不得单独显示')).not.toBeInTheDocument();
+    expect(screen.getAllByText('0').length).toBeGreaterThanOrEqual(2);
+    const workflowStatus = within(screen.getByText('完整刷新 workflow').parentElement as HTMLElement).getByText('运行中');
+    expect(workflowStatus).toHaveClass('badge', 'neutral');
+  });
+
+  it('shows healthy adhoc service separately from a rejected recent request', async () => {
+    const dashboardData: DashboardData = {
+      ...mockDashboardData,
+      operations: {
+        ...mockDashboardData.operations,
+        domains: {
+          ...mockDashboardData.operations.domains,
+          adhocService: {
+            ...mockDashboardData.operations.domains.adhocService,
+            status: 'ok',
+            serviceStatus: 'ok',
+            isolationStatus: 'ok',
+            capabilityAvailable: true,
+            recentRequest: {
+              requestId: 'adhoc-rejected',
+              requestedAt: '2026-07-25T19:00:00+08:00',
+              inputAsof: '2026-07-25T18:59:00+08:00',
+              status: 'INPUT_INVALID',
+              validUntil: '',
+              saleStatusVerifiedAtGeneration: false,
+              state: 'REJECTED',
+              separationValid: true,
+            },
+          },
+        },
+      },
+    };
+    vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(dashboardData);
+
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: '运行状态' }));
+
+    const adhocSection = screen.getByText('用户即时生成服务').closest('section');
+    expect(adhocSection).not.toBeNull();
+    expect(within(adhocSection!).getAllByText('正常').length).toBeGreaterThanOrEqual(2);
+    expect(within(adhocSection!).getByText('REJECTED')).toBeInTheDocument();
+    expect(within(adhocSection!).getByText('INPUT_INVALID')).toBeInTheDocument();
+    expect(within(adhocSection!).getByText('通过')).toBeInTheDocument();
+    expect(within(adhocSection!).queryByText('不可用')).not.toBeInTheDocument();
   });
 
   it('generates a separately scoped adhoc Exact-N plan with printable valid-until downloads', async () => {

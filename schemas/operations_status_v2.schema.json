@@ -1,0 +1,585 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://beijing-lot.local/schemas/operations_status_v2.schema.json",
+  "title": "Beijing Lot Operations Status v2",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "issue",
+    "generated_at",
+    "summary",
+    "domains",
+    "alerts",
+    "issue_status",
+    "runtime",
+    "sources",
+    "snapshots",
+    "review",
+    "workflow",
+    "versions",
+    "warnings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "operations_status_v2"
+    },
+    "issue": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "blocker_count",
+        "warning_count",
+        "next_action_at",
+        "next_action_title",
+        "message"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "blocker_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warning_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next_action_at": {
+          "type": "string"
+        },
+        "next_action_title": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "domains": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtime",
+        "collection",
+        "artifacts",
+        "scheduled_freeze",
+        "adhoc_service",
+        "settlement_review"
+      ],
+      "properties": {
+        "runtime": {
+          "$ref": "#/$defs/domain"
+        },
+        "collection": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/domain"
+            },
+            {
+              "type": "object",
+              "required": [
+                "plan_status",
+                "collectors"
+              ],
+              "properties": {
+                "plan_status": {
+                  "$ref": "#/$defs/status"
+                },
+                "collectors": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/collector"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "artifacts": {
+          "$ref": "#/$defs/domain"
+        },
+        "scheduled_freeze": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/domain"
+            },
+            {
+              "type": "object",
+              "required": [
+                "research_and_adhoc_separated",
+                "segments"
+              ],
+              "properties": {
+                "research_and_adhoc_separated": {
+                  "const": true
+                },
+                "segments": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/segment"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "adhoc_service": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/domain"
+            },
+            {
+              "type": "object",
+              "required": [
+                "service_status",
+                "isolation_status",
+                "capability_available",
+                "research_evidence_eligible"
+              ],
+              "properties": {
+                "service_status": {
+                  "$ref": "#/$defs/status"
+                },
+                "isolation_status": {
+                  "$ref": "#/$defs/status"
+                },
+                "capability_available": {
+                  "type": "boolean"
+                },
+                "research_evidence_eligible": {
+                  "const": false
+                },
+                "scheduled_freeze_event_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "settlement_review": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/domain"
+            },
+            {
+              "type": "object",
+              "required": [
+                "simulation_only",
+                "offline_purchase_inferred",
+                "actual_roi_claimed"
+              ],
+              "properties": {
+                "simulation_only": {
+                  "const": true
+                },
+                "offline_purchase_inferred": {
+                  "const": false
+                },
+                "actual_roi_claimed": {
+                  "const": false
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "alerts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/alert"
+      }
+    },
+    "issue_status": {
+      "type": "object"
+    },
+    "runtime": {
+      "type": "object"
+    },
+    "sources": {
+      "type": "array"
+    },
+    "snapshots": {
+      "type": "object"
+    },
+    "review": {
+      "type": "object"
+    },
+    "workflow": {
+      "type": "object"
+    },
+    "versions": {
+      "type": "object"
+    },
+    "warnings": {
+      "type": "array"
+    },
+    "source": {
+      "type": "object"
+    }
+  },
+  "$defs": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "running",
+        "due",
+        "partial",
+        "stale",
+        "failed",
+        "missing",
+        "blocked",
+        "not_applicable"
+      ]
+    },
+    "domain": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        }
+      }
+    },
+    "collector": {
+      "type": "object",
+      "required": [
+        "collector_id",
+        "label",
+        "importance",
+        "enabled",
+        "status",
+        "last_attempt_at",
+        "last_success_at",
+        "next_due_at",
+        "coverage_rate",
+        "covered_count",
+        "expected_count",
+        "missing_count",
+        "maintenance_action"
+      ],
+      "properties": {
+        "collector_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "importance": {
+          "enum": [
+            "critical",
+            "important",
+            "fallback"
+          ]
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "last_attempt_at": {
+          "type": "string"
+        },
+        "last_success_at": {
+          "type": "string"
+        },
+        "next_due_at": {
+          "type": "string"
+        },
+        "coverage_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "covered_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maintenance_action": {
+          "type": "string"
+        }
+      }
+    },
+    "segment": {
+      "type": "object",
+      "required": [
+        "segment_identity",
+        "timeline_status",
+        "freeze_at",
+        "detail",
+        "exact_n",
+        "research_freeze"
+      ],
+      "properties": {
+        "segment_identity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timeline_status": {
+          "enum": [
+            "scheduled",
+            "frozen",
+            "missed",
+            "unavailable",
+            "verification_failed"
+          ]
+        },
+        "freeze_at": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exact_n": {
+          "$ref": "#/$defs/evidence"
+        },
+        "research_freeze": {
+          "$ref": "#/$defs/evidence"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "status",
+        "verification_status",
+        "event_id",
+        "artifact_ref"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "verification_status": {
+          "$ref": "#/$defs/status"
+        },
+        "event_id": {
+          "type": "string"
+        },
+        "artifact_ref": {
+          "type": "string"
+        }
+      }
+    },
+    "alert": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alert_id",
+        "code",
+        "domain",
+        "severity",
+        "status",
+        "title",
+        "detail",
+        "impact",
+        "next_action",
+        "observed_at",
+        "first_seen_at",
+        "last_seen_at",
+        "last_success_at",
+        "next_due_at",
+        "affected_count",
+        "affected",
+        "auto_recovery_expected",
+        "retry_count",
+        "links",
+        "blocks"
+      ],
+      "properties": {
+        "alert_id": {
+          "type": "string",
+          "pattern": "^ops-[0-9a-f]{20}$"
+        },
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain": {
+          "enum": [
+            "runtime",
+            "collection",
+            "artifacts",
+            "scheduled_freeze",
+            "adhoc_service",
+            "settlement_review"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "blocker",
+            "warning"
+          ]
+        },
+        "status": {
+          "enum": [
+            "open",
+            "recovering"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        },
+        "impact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "next_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "first_seen_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "last_seen_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "last_success_at": {
+          "type": "string"
+        },
+        "next_due_at": {
+          "type": "string"
+        },
+        "affected_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "affected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "segments",
+            "matches",
+            "markets",
+            "sources"
+          ],
+          "properties": {
+            "segments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "matches": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "markets": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sources": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "auto_recovery_expected": {
+          "type": "boolean"
+        },
+        "retry_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "label",
+              "ref"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "ref": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "blocks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "data_display",
+            "research_freeze",
+            "adhoc_generation",
+            "settlement"
+          ],
+          "properties": {
+            "data_display": {
+              "type": "boolean"
+            },
+            "research_freeze": {
+              "type": "boolean"
+            },
+            "adhoc_generation": {
+              "type": "boolean"
+            },
+            "settlement": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  }
+}

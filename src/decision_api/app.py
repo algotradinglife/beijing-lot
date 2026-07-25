@@ -42,6 +42,8 @@ from src.natural_day_manifest import (
     load_published_manifest,
     verify_operational_windows,
 )
+from src.operations_adapters import build_collection_domain, safe_diagnostic_text
+from src.operations_status import aggregate_status, build_operations_v2, legacy_warnings
 from src.segment_recovery import (
     PUBLICATION_TABLE as RECOVERY_PUBLICATION_TABLE,
     SegmentRecoveryError,
@@ -51,6 +53,10 @@ from src.segment_recovery import (
 )
 from src.sqlite_runtime import connect_sqlite
 from src.structured_input_receipt import receipt_path, verify_receipt
+from src.multimarket_p0 import (
+    DEFAULT_SEGMENT_FREEZE_ROOT as DEFAULT_RESEARCH_SEGMENT_FREEZE_ROOT,
+    verify_segment_freeze,
+)
 from scripts.verify_exact_n_freeze import verify_directory as verify_exact_n_directory
 
 
@@ -69,6 +75,7 @@ EXACT_N_SEGMENT_FREEZE_DIR = PROJECT_ROOT / "results/exact_n_segment_freeze"
 EXACT_N_SEGMENT_FREEZE_LEDGER_DIR = PROJECT_ROOT / "results/research/exact_n_segment_freeze_v1/ledger"
 DECISION_VERSIONS_CONFIG = PROJECT_ROOT / "config/decision_versions.json"
 STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
+DATA_COLLECTION_PLAN_CONFIG = PROJECT_ROOT / "config/data_collection_plan.json"
 DEFAULT_DASHBOARD_RUNTIME_STATUS = PROJECT_ROOT / "tmp/decision_dashboard/runtime_status.json"
 DEFAULT_DASHBOARD_STATIC_DIR = PROJECT_ROOT / "apps/decision-dashboard/dist"
 DEFAULT_ADHOC_BETTING_ROOT = DEFAULT_ADHOC_ROOT
@@ -988,6 +995,117 @@ def _ensure_postmatch_review_run_schema(conn: sqlite3.Connection) -> None:
         """
     )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_postmatch_review_runs_issue ON postmatch_review_runs(issue, started_at DESC)")
+
+
+def _ensure_operations_alert_lifecycle_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS operations_alert_lifecycle (
+            issue TEXT NOT NULL,
+            alert_id TEXT NOT NULL,
+            code TEXT NOT NULL,
+            domain TEXT NOT NULL,
+            first_seen_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL,
+            resolved_at TEXT,
+            PRIMARY KEY (issue, alert_id)
+        )
+        """
+    )
+    conn.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_operations_alert_lifecycle_open
+        ON operations_alert_lifecycle(issue, resolved_at)
+        """
+    )
+
+
+def _open_operations_alert_lifecycle(
+    conn: sqlite3.Connection,
+    *,
+    issue: str,
+) -> dict[str, dict[str, Any]]:
+    return {
+        str(row["alert_id"]): dict(row)
+        for row in conn.execute(
+            """
+            SELECT alert_id, code, domain, first_seen_at, last_seen_at
+            FROM operations_alert_lifecycle
+            WHERE issue=? AND resolved_at IS NULL
+            """,
+            (issue,),
+        )
+    }
+
+
+def _persist_operations_alert_lifecycle(
+    conn: sqlite3.Connection,
+    *,
+    issue: str,
+    observed_at: str,
+    alerts: list[dict[str, Any]],
+) -> None:
+    active_ids = {str(alert["alert_id"]) for alert in alerts}
+    for alert in alerts:
+        conn.execute(
+            """
+            INSERT INTO operations_alert_lifecycle(
+                issue, alert_id, code, domain, first_seen_at, last_seen_at, resolved_at
+            ) VALUES(?,?,?,?,?,?,NULL)
+            ON CONFLICT(issue, alert_id) DO UPDATE SET
+                code=excluded.code,
+                domain=excluded.domain,
+                first_seen_at=CASE
+                    WHEN operations_alert_lifecycle.resolved_at IS NULL
+                    THEN MIN(
+                        operations_alert_lifecycle.first_seen_at,
+                        excluded.first_seen_at
+                    )
+                    ELSE excluded.first_seen_at
+                END,
+                last_seen_at=CASE
+                    WHEN operations_alert_lifecycle.resolved_at IS NULL
+                    THEN MAX(
+                        operations_alert_lifecycle.last_seen_at,
+                        excluded.last_seen_at
+                    )
+                    ELSE excluded.last_seen_at
+                END,
+                resolved_at=NULL
+            WHERE operations_alert_lifecycle.resolved_at IS NULL
+               OR operations_alert_lifecycle.resolved_at <= excluded.last_seen_at
+            """,
+            (
+                issue,
+                str(alert["alert_id"]),
+                str(alert["code"]),
+                str(alert["domain"]),
+                str(alert["first_seen_at"]),
+                str(alert["last_seen_at"]),
+            ),
+        )
+    open_ids = {
+        str(row["alert_id"])
+        for row in conn.execute(
+            """
+            SELECT alert_id
+            FROM operations_alert_lifecycle
+            WHERE issue=? AND resolved_at IS NULL
+            """,
+            (issue,),
+        )
+    }
+    for alert_id in open_ids - active_ids:
+        conn.execute(
+            """
+            UPDATE operations_alert_lifecycle
+            SET resolved_at=?
+            WHERE issue=? AND alert_id=? AND resolved_at IS NULL
+              AND last_seen_at <= ?
+            """,
+            (observed_at, issue, alert_id, observed_at),
+        )
+    conn.commit()
 
 
 def _json_loads(value: Any, fallback: Any) -> Any:
@@ -7922,6 +8040,508 @@ def _latest_issue_specific_success(source_statuses: list[dict[str, Any]]) -> str
     return max(parsed_candidates, default=(None, ""))[1] if parsed_candidates else ""
 
 
+def _safe_operations_text(value: Any) -> str:
+    """Remove secrets and internal locations from public operations diagnostics."""
+
+    return safe_diagnostic_text(value)
+
+
+def _public_operations_runtime_status(
+    runtime_status: dict[str, Any],
+) -> dict[str, Any]:
+    """Expose only the runtime facts required by the Operations compatibility view."""
+
+    public = {
+        key: runtime_status.get(key)
+        for key in (
+            "schema",
+            "checked_at",
+            "public_diagnostics",
+            "access_mode",
+            "external_access_configured",
+            "api_process_status",
+            "frontend_process_status",
+        )
+        if key in runtime_status
+    }
+    health = (
+        runtime_status.get("health")
+        if isinstance(runtime_status.get("health"), dict)
+        else {}
+    )
+    public_health: dict[str, Any] = {}
+    for component in ("api", "frontend_local", "operations"):
+        probe = health.get(component)
+        if not isinstance(probe, dict):
+            continue
+        public_probe = {
+            key: probe.get(key)
+            for key in (
+                "ok",
+                "status",
+                "latency_ms",
+                "issue",
+                "workflow_status",
+                "review_task_status",
+            )
+            if key in probe
+        }
+        if probe.get("error"):
+            public_probe["error"] = _safe_operations_text(probe.get("error"))
+        public_health[component] = public_probe
+    for key in ("host_smoke_count", "host_smoke_ok_count"):
+        if key in health:
+            public_health[key] = health.get(key)
+    public["health"] = public_health
+    return public
+
+
+def _operations_runtime_domain(
+    runtime_status: dict[str, Any],
+    workflow: dict[str, Any],
+    *,
+    observed_at: str,
+) -> dict[str, Any]:
+    health = runtime_status.get("health") if isinstance(runtime_status.get("health"), dict) else {}
+    api_probe = health.get("api") if isinstance(health.get("api"), dict) else {}
+    frontend_probe = health.get("frontend_local") if isinstance(health.get("frontend_local"), dict) else {}
+    runtime_snapshot_missing = runtime_status.get("access_mode") == "runtime_status_missing"
+
+    def probe_component(
+        component_id: str,
+        label: str,
+        probe: dict[str, Any],
+        process_status: str,
+    ) -> dict[str, Any]:
+        request_proves_api = component_id == "api" and not probe and runtime_snapshot_missing
+        if request_proves_api or probe.get("ok") is True:
+            status = "ok"
+        elif component_id == "frontend" and not probe and runtime_snapshot_missing:
+            status = "partial"
+        elif probe:
+            status = "failed"
+        elif process_status in {"running", "ok"}:
+            status = "partial"
+        else:
+            status = "missing"
+        return {
+            "component_id": component_id,
+            "label": label,
+            "status": status,
+            "process_status": "served_by_api" if request_proves_api else process_status or "not_applicable",
+            "checked_at": str(runtime_status.get("checked_at") or observed_at),
+            "latency_ms": _safe_float(probe.get("latency_ms")),
+            "http_status": _safe_int(probe.get("status")),
+            "detail": (
+                "当前 Operations API 请求已成功处理。"
+                if request_proves_api
+                else _safe_operations_text(probe.get("error"))
+            )
+            or (
+                "健康探针通过。"
+                if status == "ok"
+                else "运行状态文件未提供可验证的健康探针。"
+                if status == "missing"
+                else "进程存在，但健康探针信息不完整。"
+                if status == "partial"
+                else "健康探针失败。"
+            ),
+            "impact": "状态页面的数据请求可能受影响。" if component_id == "api" else "页面访问可能受影响。",
+            "next_action": "检查服务健康探针和最近运行日志。",
+            "auto_recovery_expected": False,
+            "links": [{"kind": "api", "label": "健康探针", "ref": f"diagnostic:{component_id}-health"}],
+        }
+
+    components = [
+        probe_component(
+            "api",
+            "Operations API",
+            api_probe,
+            str(runtime_status.get("api_process_status") or ""),
+        ),
+        probe_component(
+            "frontend",
+            "决策看板前端",
+            frontend_probe,
+            str(runtime_status.get("frontend_process_status") or ""),
+        ),
+    ]
+    workflow_status = str(workflow.get("status") or "not_run")
+    normalized_workflow_status = {
+        "failed": "failed",
+        "running": "running",
+        "dry_run": "ok",
+        "succeeded": "ok",
+        "success": "ok",
+        "not_run": "not_applicable",
+    }.get(workflow_status, "partial")
+    components.append(
+        {
+            "component_id": "refresh_workflow",
+            "label": "数据刷新 workflow",
+            "status": normalized_workflow_status,
+            "process_status": normalized_workflow_status,
+            "checked_at": str(workflow.get("finished_at") or workflow.get("started_at") or observed_at),
+            "last_success_at": (
+                str(workflow.get("finished_at") or "")
+                if normalized_workflow_status == "ok"
+                else ""
+            ),
+            "detail": _safe_operations_text(workflow.get("error"))
+            or ("尚未运行手工完整刷新；常驻采集器状态需单独检查。" if workflow_status == "not_run" else "最近 workflow 状态已记录。"),
+            "impact": "最近一次手工完整刷新未完成；各常驻采集器状态仍独立展示。",
+            "next_action": "检查失败步骤诊断 ID后再决定是否重跑。",
+            "auto_recovery_expected": False,
+            "links": [{"kind": "api", "label": "刷新 workflow", "ref": f"workflow:{workflow.get('run_id') or 'not-run'}"}],
+        }
+    )
+    return {
+        "status": aggregate_status(component["status"] for component in components),
+        "checked_at": str(runtime_status.get("checked_at") or observed_at),
+        "access_mode": str(runtime_status.get("access_mode") or "runtime_status_missing"),
+        "external_access_configured": bool(runtime_status.get("external_access_configured")),
+        "components": components,
+    }
+
+
+def _operations_artifact_domain(
+    *,
+    resolved: str,
+    rows: list[sqlite3.Row],
+    snapshot_counts: dict[str, int],
+    snapshot_completeness: dict[str, Any],
+    active_generated_at: str,
+    pending_drafts: list[dict[str, Any]],
+    versions: dict[str, Any],
+) -> dict[str, Any]:
+    missing_indices = [int(value) for value in snapshot_completeness.get("missing_match_idx") or []]
+    expected = int(snapshot_completeness.get("expected_count") or len(rows))
+    actual = int(snapshot_completeness.get("actual_count") or snapshot_counts.get("active", 0))
+    if expected == 0:
+        active_status = "missing"
+    elif snapshot_completeness.get("complete"):
+        active_status = "ok"
+    elif actual:
+        active_status = "partial"
+    else:
+        active_status = "missing"
+    return {
+        "status": aggregate_status(
+            [
+                active_status,
+                "partial" if pending_drafts else "ok",
+            ]
+        ),
+        "active_decision": {
+            "status": active_status,
+            "version": str(versions.get("decision_chain_version") or ""),
+            "config_hash": str(versions.get("decision_config_hash") or ""),
+            "generated_at": active_generated_at,
+            "input_at": "",
+            "expected_count": expected,
+            "actual_count": actual,
+            "missing_count": len(missing_indices),
+            "missing_match_ids": [f"{resolved}_{idx:03d}" for idx in missing_indices],
+            "detail": (
+                "active 决策覆盖当前期全部比赛。"
+                if active_status == "ok"
+                else f"active={actual} / matches={expected}。"
+            ),
+            "next_action": "检查缺失场次的正式输入与产物生成记录。",
+            "links": [{"kind": "page", "label": "决策产物", "ref": "operations:#artifacts"}],
+        },
+        "draft_count": len(pending_drafts),
+        "draft_match_ids": [str(row.get("match_id") or "") for row in pending_drafts],
+        "superseded_count": int(snapshot_counts.get("superseded", 0)),
+        "scheduled_research_evidence_eligible": True,
+        "adhoc_namespace_used": False,
+    }
+
+
+def _research_freeze_for_segment(
+    *,
+    issue: str,
+    segment_idx: int,
+    root: Path,
+) -> dict[str, Any]:
+    segment_root = root / issue / f"segment_{segment_idx:02d}"
+    events = sorted(
+        (
+            entry
+            for entry in segment_root.iterdir()
+            if entry.is_dir() and not entry.is_symlink()
+        ),
+        key=lambda entry: entry.name,
+    ) if segment_root.is_dir() else []
+    if not events:
+        return {
+            "status": "missing",
+            "verification_status": "missing",
+            "event_id": "",
+            "artifact_ref": "",
+            "detail": "未找到 p40/p42 research freeze 包。",
+        }
+    if len(events) > 1:
+        return {
+            "status": "failed",
+            "verification_status": "failed",
+            "event_id": "",
+            "artifact_ref": "",
+            "detail": "同一 segment 存在多个 research freeze event，需人工核查。",
+        }
+    event = events[0]
+    try:
+        verification = verify_segment_freeze(event)
+    except Exception as exc:
+        return {
+            "status": "failed",
+            "verification_status": "failed",
+            "event_id": event.name,
+            "artifact_ref": f"research-freeze:{issue}/segment_{segment_idx:02d}/{event.name}",
+            "detail": _safe_operations_text(exc),
+        }
+    return {
+        "status": "ok",
+        "verification_status": "ok",
+        "event_id": str(verification.get("event_id") or event.name),
+        "artifact_ref": f"research-freeze:{issue}/segment_{segment_idx:02d}/{event.name}",
+        "paired_overlap_matches": int(verification.get("paired_overlap_matches") or 0),
+        "frozen_match_markets": int(verification.get("frozen_match_markets") or 0),
+        "detail": "p40/p42 research freeze 包通过递归校验。",
+    }
+
+
+def _operations_scheduled_freeze_domain(
+    *,
+    issue: str,
+    exact_payload: dict[str, Any],
+    observed_at: datetime,
+    research_root: Path = DEFAULT_RESEARCH_SEGMENT_FREEZE_ROOT,
+) -> dict[str, Any]:
+    source_segments = exact_payload.get("segments") if isinstance(exact_payload.get("segments"), list) else []
+    if not source_segments:
+        source_segments = [
+            {
+                "segment_idx": 0,
+                "segment_identity": "segment_contract",
+                "freeze_at": "",
+                "status": str(exact_payload.get("status") or "unavailable"),
+                "error": exact_payload.get("error") or "当前期没有可用的 segment 冻结契约。",
+                "alternatives": [],
+            }
+        ]
+    segments: list[dict[str, Any]] = []
+    for raw in source_segments:
+        segment_idx = int(raw.get("segment_idx") or 0)
+        identity = str(raw.get("segment_identity") or f"segment_{segment_idx}")
+        exact_status = str(raw.get("status") or "pending")
+        freeze_at = _parse_timestamp_to_hk(str(raw.get("freeze_at") or ""))
+        is_recovery = bool(raw.get("is_recovery"))
+        research = (
+            {
+                "status": "not_applicable",
+                "verification_status": "not_applicable",
+                "event_id": "",
+                "artifact_ref": "",
+                "detail": "recovery segment 不复用原 segment 的 p40/p42 research freeze 身份。",
+            }
+            if is_recovery or segment_idx <= 0
+            else _research_freeze_for_segment(
+                issue=issue,
+                segment_idx=segment_idx,
+                root=research_root,
+            )
+        )
+        exact_verified = exact_status == "published" and isinstance(raw.get("verification"), dict)
+        if exact_status in {"invalid_published_event", "invalid_terminal_event", "invalid_segment_contract", "invalid_recovery_contract"}:
+            timeline_status = "verification_failed"
+        elif exact_status in {"MISSED_FREEZE", "MISSED_RECOVERY_FREEZE"}:
+            timeline_status = "missed"
+        elif exact_status == "published":
+            timeline_status = "verification_failed" if not exact_verified else "frozen"
+        elif exact_status == "pending" and freeze_at is not None:
+            timeline_status = "scheduled" if observed_at < freeze_at else "missed"
+        else:
+            timeline_status = "unavailable"
+        if research["status"] == "failed":
+            timeline_status = "verification_failed"
+        elif research["status"] == "missing" and timeline_status == "frozen" and not is_recovery:
+            timeline_status = "unavailable"
+        alternatives = raw.get("alternatives") if isinstance(raw.get("alternatives"), list) else []
+        selectable_count = sum(item.get("frontend_selectable") is True for item in alternatives if isinstance(item, dict))
+        exact_ref = f"exact-n-freeze:{issue}/{identity}/{str(raw.get('event_key') or '')}"
+        next_due_at = freeze_at.isoformat(timespec="seconds") if timeline_status == "scheduled" and freeze_at else ""
+        detail = _safe_operations_text(raw.get("error")) or (
+            "定时 exact-N 与研究冻结身份均独立记录。"
+            if timeline_status == "frozen"
+            else "冻结窗口尚未到达。"
+            if timeline_status == "scheduled"
+            else "冻结窗口已错过，不能事后补造成前瞻冻结。"
+            if timeline_status == "missed"
+            else research.get("detail") or "冻结证据不可用。"
+        )
+        segments.append(
+            {
+                "segment_idx": segment_idx,
+                "segment_identity": identity,
+                "is_recovery": is_recovery,
+                "timeline_status": timeline_status,
+                "freeze_at": str(raw.get("freeze_at") or ""),
+                "published_at": str(raw.get("effective_decision_at") or ""),
+                "observed_at": observed_at.isoformat(timespec="seconds"),
+                "next_due_at": next_due_at,
+                "match_count": int(raw.get("match_count") or 0),
+                "detail": detail,
+                "impact": "该 segment 的定时冻结证据与 exact-N 产物状态受影响。",
+                "next_action": (
+                    "系统将按计划窗口自动尝试冻结。"
+                    if timeline_status == "scheduled"
+                    else "检查不可变 ledger 和校验摘要；错过窗口不得事后伪造。"
+                ),
+                "auto_recovery_expected": timeline_status == "scheduled",
+                "retry_count": None,
+                "exact_n": {
+                    "status": "ok" if exact_verified else "failed" if "invalid" in exact_status else "missing",
+                    "source_status": exact_status,
+                    "verification_status": "ok" if exact_verified else "failed" if "invalid" in exact_status else "missing",
+                    "event_id": str(raw.get("event_key") or ""),
+                    "artifact_ref": exact_ref,
+                    "alternative_count": len(alternatives),
+                    "selectable_count": selectable_count,
+                    "research_evidence_eligible": True,
+                },
+                "research_freeze": research,
+                "links": [
+                    {"kind": "api", "label": "exact-N 冻结", "ref": f"/api/issues/{issue}/exact-n-freezes#{identity}"},
+                    *(
+                        [{"kind": "artifact", "label": "p40/p42 校验包", "ref": str(research["artifact_ref"])}]
+                        if research.get("artifact_ref")
+                        else []
+                    ),
+                ],
+            }
+        )
+    status_map = {
+        "verification_failed": "failed",
+        "missed": "blocked",
+        "unavailable": "missing",
+        "scheduled": "due",
+        "frozen": "ok",
+    }
+    domain_status = aggregate_status(status_map.get(segment["timeline_status"], "failed") for segment in segments)
+    next_actions = [segment["next_due_at"] for segment in segments if segment.get("next_due_at")]
+    return {
+        "status": domain_status,
+        "timeline_contract": "scheduled / frozen / missed / unavailable / verification_failed",
+        "research_and_adhoc_separated": True,
+        "next_due_at": min(next_actions, default=""),
+        "segments": segments,
+    }
+
+
+def _operations_adhoc_domain(conn: sqlite3.Connection, *, issue: str) -> dict[str, Any]:
+    table = "adhoc_betting_request_ledger"
+    if not _table_exists(conn, table):
+        return {
+            "status": "ok",
+            "service_status": "ok",
+            "isolation_status": "ok",
+            "capability_available": True,
+            "recent_request": None,
+            "last_request_at": "",
+            "last_success_at": "",
+            "detail": "即时生成 API 可用；当前尚无请求记录。",
+            "scheduled_freeze_event_id": None,
+            "research_evidence_eligible": False,
+            "links": [{"kind": "page", "label": "即时生成", "ref": "page:adhoc-betting"}],
+        }
+    row = conn.execute(
+        f"""
+        SELECT request_id,requested_at_hkt,input_asof_hkt,immutable_status,
+               valid_until_hkt,sale_status_verified,research_evidence_eligible,
+               scheduled_freeze_event_id,state
+        FROM {table}
+        WHERE issue=?
+        ORDER BY requested_at_hkt DESC, request_id DESC
+        LIMIT 1
+        """,
+        (issue,),
+    ).fetchone()
+    if row is None:
+        return {
+            "status": "ok",
+            "service_status": "ok",
+            "isolation_status": "ok",
+            "capability_available": True,
+            "recent_request": None,
+            "last_request_at": "",
+            "last_success_at": "",
+            "detail": "即时生成 API 可用；当前期尚无请求记录。",
+            "scheduled_freeze_event_id": None,
+            "research_evidence_eligible": False,
+            "links": [{"kind": "page", "label": "即时生成", "ref": "page:adhoc-betting"}],
+        }
+    valid_separation = row["research_evidence_eligible"] == 0 and row["scheduled_freeze_event_id"] is None
+    latest_success = conn.execute(
+        f"""
+        SELECT requested_at_hkt
+        FROM {table}
+        WHERE issue=?
+          AND state='PUBLISHED'
+          AND immutable_status='READY_FOR_REVIEW'
+          AND research_evidence_eligible=0
+          AND scheduled_freeze_event_id IS NULL
+        ORDER BY requested_at_hkt DESC, request_id DESC
+        LIMIT 1
+        """,
+        (issue,),
+    ).fetchone()
+    recent_state = str(row["state"] or "")
+    recent_published = recent_state == "PUBLISHED" and valid_separation
+    return {
+        # A request outcome is not a service probe. Reaching this endpoint
+        # proves the API capability is available; request state remains an
+        # independent, auditable fact below.
+        "status": "ok" if valid_separation else "failed",
+        "service_status": "ok",
+        "isolation_status": "ok" if valid_separation else "failed",
+        "capability_available": True,
+        "last_request_at": str(row["requested_at_hkt"] or ""),
+        "last_success_at": (
+            str(latest_success["requested_at_hkt"] or "")
+            if latest_success is not None
+            else ""
+        ),
+        "detail": (
+            "最近请求保存在独立 adhoc namespace，不进入定时研究证据。"
+            if recent_published
+            else "最近请求违反 adhoc 与定时研究证据隔离契约。"
+            if not valid_separation
+            else f"即时生成 API 可用；最近请求状态为 {recent_state or 'UNKNOWN'}，不作为服务健康判据。"
+        ),
+        "next_action": (
+            ""
+            if recent_published
+            else "隔离该请求产物并修复 ledger 的研究证据资格与冻结事件引用。"
+            if not valid_separation
+            else "按请求诊断 ID检查输入、有效期或拒绝原因；服务健康需以独立探针判定。"
+        ),
+        "recent_request": {
+            "request_id": str(row["request_id"] or ""),
+            "requested_at": str(row["requested_at_hkt"] or ""),
+            "input_asof": str(row["input_asof_hkt"] or ""),
+            "status": str(row["immutable_status"] or ""),
+            "valid_until": str(row["valid_until_hkt"] or ""),
+            "sale_status_verified_at_generation": bool(row["sale_status_verified"]),
+            "state": recent_state,
+            "separation_valid": valid_separation,
+        },
+        "scheduled_freeze_event_id": None,
+        "research_evidence_eligible": False,
+        "links": [{"kind": "page", "label": "即时生成", "ref": "page:adhoc-betting"}],
+    }
+
+
 def _dashboard(
     conn: sqlite3.Connection,
     issue: str,
@@ -8005,20 +8625,38 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
     _ensure_decision_snapshot_schema(conn)
     _ensure_live_workflow_schema(conn)
     _ensure_postmatch_review_run_schema(conn)
+    _ensure_operations_alert_lifecycle_schema(conn)
     resolved = _resolve_issue(conn, issue)
+    observed_at = datetime.now(HK_TZ)
+    generated_at = observed_at.isoformat(timespec="seconds")
+    current_issue = _resolve_issue(conn, "current")
     rows = _issue_rows(conn, resolved, only_date=None)
     versions = _active_version_bundle()
     preferred_review = str(versions.get("review_version") or "v3_decision_variant_active_v3_3_3_tags")
     settled_rows = [row for row in rows if row["result_code"] is not None or row["winning_sp"] is not None]
     winning_sp_rows = [row for row in rows if row["winning_sp"] is not None]
 
-    source_statuses = _source_statuses(conn, resolved)
+    source_statuses = [
+        {**source, "error": _safe_operations_text(source.get("error"))}
+        for source in _source_statuses(conn, resolved)
+    ]
 
     snapshot_counts = {row["status"]: int(row["n"]) for row in conn.execute(
         "SELECT status, COUNT(*) AS n FROM llm_decision_snapshots WHERE issue=? GROUP BY status",
         (resolved,),
     )}
     snapshot_completeness = active_snapshot_completeness(conn, resolved).to_dict()
+    active_generated_at = str(
+        conn.execute(
+            """
+            SELECT MAX(generated_at)
+            FROM llm_decision_snapshots
+            WHERE issue=? AND status='active'
+            """,
+            (resolved,),
+        ).fetchone()[0]
+        or ""
+    )
     pending_drafts = [
         {
             "match_idx": int(row["match_idx"]),
@@ -8081,81 +8719,172 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
     latest_snapshot_at = max(parsed_candidates, default=(None, ""))[1] if parsed_candidates else ""
 
     runtime_status = _dashboard_runtime_summary()
-    runtime_health = runtime_status.get("health") if isinstance(runtime_status.get("health"), dict) else {}
-    api_probe = runtime_health.get("api") if isinstance(runtime_health.get("api"), dict) else {}
-    frontend_probe = runtime_health.get("frontend_local") if isinstance(runtime_health.get("frontend_local"), dict) else {}
-
-    warnings: list[dict[str, Any]] = []
-    if not rows:
-        warnings.append({"code": "no_matches", "severity": "bad", "label": "当前期无比赛", "detail": "SQLite matches 表未返回当前期比赛。"})
-    for source in source_statuses:
-        if source["status"] in {"failed", "stale", "partial"}:
-            severity = "bad" if source["status"] == "failed" else "warn"
-            warnings.append({
-                "code": f"source_{source['status']}",
-                "severity": severity,
-                "label": f"{source['source_name']} {source['status']}",
-                "detail": source.get("error") or f"last_success={source.get('last_success_at') or '缺'}",
-            })
-    if pending_drafts:
-        warnings.append({
-            "code": "draft_replacement_pending",
-            "severity": "warn",
-            "label": f"{len(pending_drafts)} 条 draft 待确认",
-            "detail": "需要人工确认后才会覆盖 active 决策。",
-        })
-    if unreviewed_matches:
-        warnings.append({
-            "code": "postmatch_review_missing",
-            "severity": "warn",
-            "label": f"{len(unreviewed_matches)} 场已结算未复盘",
-            "detail": f"review_version={preferred_review}",
-        })
-    if not snapshot_completeness.get("complete"):
-        missing = snapshot_completeness.get("missing_match_idx") or []
-        warnings.append({
-            "code": "active_snapshot_missing",
-            "severity": "warn",
-            "label": "active 决策快照未覆盖全部比赛",
-            "detail": f"active={snapshot_completeness.get('actual_count')} / matches={snapshot_completeness.get('expected_count')}; missing={missing}",
-        })
     latest_workflow = _latest_workflow_payload(conn, resolved)
     workflow_trigger_endpoint = f"POST /api/issues/{resolved}/live-workflow?dry_run=1"
     if latest_workflow:
-        latest_workflow = {**latest_workflow, "trigger_endpoint": workflow_trigger_endpoint}
-    if latest_workflow and latest_workflow.get("status") == "failed":
-        warnings.append({
-            "code": "workflow_failed",
-            "severity": "bad",
-            "label": "最近实盘刷新失败",
-            "detail": str(latest_workflow.get("error") or "workflow step failed"),
-        })
+        latest_workflow = {
+            **latest_workflow,
+            "error": _safe_operations_text(latest_workflow.get("error")),
+            "command": [],
+            "steps": [
+                {
+                    **step,
+                    "command": [],
+                    "error": _safe_operations_text(step.get("error")),
+                }
+                for step in latest_workflow.get("steps", [])
+                if isinstance(step, dict)
+            ],
+            "trigger_endpoint": workflow_trigger_endpoint,
+        }
     latest_review_task = _latest_postmatch_review_run_payload(conn, resolved)
     postmatch_trigger_endpoint = f"POST /api/issues/{resolved}/postmatch-review?dry_run=1"
     if latest_review_task:
-        latest_review_task = {**latest_review_task, "trigger_endpoint": postmatch_trigger_endpoint}
-    if latest_review_task and latest_review_task.get("status") == "failed":
-        warnings.append({
-            "code": "postmatch_review_failed",
-            "severity": "bad",
-            "label": "最近赛后复盘失败",
-            "detail": str(latest_review_task.get("error") or "review_settled_matches failed"),
-        })
+        latest_review_task = {
+            **latest_review_task,
+            "error": _safe_operations_text(latest_review_task.get("error")),
+            "command": [],
+            "trigger_endpoint": postmatch_trigger_endpoint,
+        }
 
-    if not rows:
-        capture_status = "missing"
-    elif any(source["status"] in {"failed", "stale"} for source in source_statuses):
-        capture_status = "warn"
-    elif any(source["status"] == "partial" for source in source_statuses):
-        capture_status = "partial"
-    else:
-        capture_status = "ok"
+    workflow = latest_workflow or {
+        "run_id": "",
+        "issue": resolved,
+        "mode": "live_day_refresh_v1",
+        "status": "not_run",
+        "dry_run": False,
+        "requested_by": "",
+        "started_at": "",
+        "finished_at": "",
+        "elapsed_sec": None,
+        "error": "",
+        "command": [],
+        "steps": [],
+        "trigger_endpoint": workflow_trigger_endpoint,
+    }
+    review_task = latest_review_task or {
+        "run_id": "",
+        "issue": resolved,
+        "mode": "postmatch_review_v1",
+        "status": "not_run",
+        "dry_run": False,
+        "requested_by": "",
+        "started_at": "",
+        "finished_at": "",
+        "elapsed_sec": None,
+        "error": "",
+        "command": [],
+        "result": {},
+        "trigger_endpoint": postmatch_trigger_endpoint,
+    }
+    runtime_domain = _operations_runtime_domain(
+        runtime_status,
+        workflow,
+        observed_at=generated_at,
+    )
+    collection_domain = build_collection_domain(
+        conn,
+        issue=resolved,
+        current_issue=current_issue,
+        observed_at=observed_at,
+        plan_path=DATA_COLLECTION_PLAN_CONFIG,
+    )
+    artifact_domain = _operations_artifact_domain(
+        resolved=resolved,
+        rows=rows,
+        snapshot_counts=snapshot_counts,
+        snapshot_completeness=snapshot_completeness,
+        active_generated_at=active_generated_at,
+        pending_drafts=pending_drafts,
+        versions=versions,
+    )
+    exact_freeze = _exact_n_freeze_payload(conn, resolved)
+    scheduled_freeze_domain = _operations_scheduled_freeze_domain(
+        issue=resolved,
+        exact_payload=exact_freeze,
+        observed_at=observed_at,
+    )
+    adhoc_domain = _operations_adhoc_domain(conn, issue=resolved)
+    missing_winning_sp_ids = [
+        _match_id(row)
+        for row in rows
+        if row["result_code"] is not None and row["winning_sp"] is None
+    ]
+    settlement_domain = {
+        "status": aggregate_status(
+            [
+                "partial" if missing_winning_sp_ids else "ok",
+                "partial" if unreviewed_matches else "ok",
+                "failed" if review_task.get("status") == "failed" else "ok",
+            ]
+        ),
+        "settled_match_count": len(settled_rows),
+        "winning_sp_count": len(winning_sp_rows),
+        "reviewed_match_count": len(reviewed_indices & settled_indices),
+        "missing_winning_sp_match_ids": missing_winning_sp_ids,
+        "unreviewed_match_ids": [str(item["match_id"]) for item in unreviewed_matches],
+        "latest_review_at": latest_review_at,
+        "last_settlement_success_at": latest_snapshot_at,
+        "next_due_at": "",
+        "task": {
+            "run_id": str(review_task.get("run_id") or ""),
+            "status": str(review_task.get("status") or "not_run"),
+            "started_at": str(review_task.get("started_at") or ""),
+            "finished_at": str(review_task.get("finished_at") or ""),
+            "error": _safe_operations_text(review_task.get("error")),
+            "links": [
+                {
+                    "kind": "api",
+                    "label": "复盘任务",
+                    "ref": f"postmatch-review:{review_task.get('run_id') or 'not-run'}",
+                }
+            ],
+        },
+        "simulation_only": True,
+        "offline_purchase_inferred": False,
+        "actual_roi_claimed": False,
+    }
+    canonical = build_operations_v2(
+        issue=resolved,
+        generated_at=generated_at,
+        runtime=runtime_domain,
+        collection=collection_domain,
+        artifacts=artifact_domain,
+        scheduled_freeze=scheduled_freeze_domain,
+        adhoc_service=adhoc_domain,
+        settlement_review=settlement_domain,
+        prior_alert_lifecycle=_open_operations_alert_lifecycle(conn, issue=resolved),
+    )
+    _persist_operations_alert_lifecycle(
+        conn,
+        issue=resolved,
+        observed_at=generated_at,
+        alerts=canonical["alerts"],
+    )
+    collection_status = str(collection_domain.get("status") or "missing")
+    capture_status = (
+        "ok"
+        if collection_status in {"ok", "running", "not_applicable"}
+        else "missing"
+        if collection_status == "missing"
+        else "partial"
+        if collection_status in {"partial", "due"}
+        else "warn"
+    )
+    runtime_health = runtime_status.get("health") if isinstance(runtime_status.get("health"), dict) else {}
+    api_probe = runtime_health.get("api") if isinstance(runtime_health.get("api"), dict) else {}
+    frontend_probe = runtime_health.get("frontend_local") if isinstance(runtime_health.get("frontend_local"), dict) else {}
+    public_runtime_status = _public_operations_runtime_status(runtime_status)
 
     return {
+        "schema_version": canonical["schema_version"],
         "issue": resolved,
-        "generated_at": _now_hk_iso(),
+        "generated_at": generated_at,
+        "summary": canonical["summary"],
+        "domains": canonical["domains"],
+        "alerts": canonical["alerts"],
         "issue_status": {
-            "current_issue": _resolve_issue(conn, "current"),
+            "current_issue": current_issue,
             "match_count": len(rows),
             "finished_count": len(settled_rows),
             "settled_sp_count": len(winning_sp_rows),
@@ -8173,7 +8902,7 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
             "frontend_remote_url": "",
             "frontend_port": "",
             "frontend_health": "ok" if frontend_probe.get("ok") else "warn",
-            **runtime_status,
+            **public_runtime_status,
         },
         "sources": source_statuses,
         "snapshots": {
@@ -8190,40 +8919,11 @@ def _operations_status_payload(conn: sqlite3.Connection, issue: str) -> dict[str
             "unreviewed_settled_count": len(unreviewed_matches),
             "latest_review_at": latest_review_at,
             "unreviewed_matches": unreviewed_matches,
-            "task": latest_review_task
-            or {
-                "run_id": "",
-                "issue": resolved,
-                "mode": "postmatch_review_v1",
-                "status": "not_run",
-                "dry_run": False,
-                "requested_by": "",
-                "started_at": "",
-                "finished_at": "",
-                "elapsed_sec": None,
-                "error": "",
-                "command": [],
-                "result": {},
-                "trigger_endpoint": postmatch_trigger_endpoint,
-            },
+            "task": review_task,
         },
-        "workflow": latest_workflow
-        or {
-            "run_id": "",
-            "issue": resolved,
-            "mode": "live_day_refresh_v1",
-            "status": "not_run",
-            "dry_run": False,
-            "requested_by": "",
-            "started_at": "",
-            "finished_at": "",
-            "elapsed_sec": None,
-            "error": "",
-            "steps": [],
-            "trigger_endpoint": workflow_trigger_endpoint,
-        },
+        "workflow": workflow,
         "versions": versions,
-        "warnings": warnings,
+        "warnings": legacy_warnings(canonical["alerts"]),
         "source": {
             "sqlite_db": _public_diagnostics_path(conn.execute("PRAGMA database_list").fetchone()["file"]),
             "tables": ["matches", "fetch_log", "llm_decision_snapshots", "postmatch_reviews", "postmatch_review_issue_summary"],

@@ -1,0 +1,100 @@
+[
+  {
+    "name": "all_normal",
+    "mutation": {},
+    "expected_codes": [],
+    "expected_blockers": 0,
+    "expected_warnings": 0
+  },
+  {
+    "name": "collector_missing",
+    "mutation": {
+      "domain": "collection",
+      "target": "collector",
+      "status": "missing"
+    },
+    "expected_codes": [
+      "collector_critical_feed_missing"
+    ],
+    "expected_blockers": 1,
+    "expected_warnings": 0
+  },
+  {
+    "name": "collector_stale",
+    "mutation": {
+      "domain": "collection",
+      "target": "collector",
+      "status": "stale"
+    },
+    "expected_codes": [
+      "collector_critical_feed_stale"
+    ],
+    "expected_blockers": 0,
+    "expected_warnings": 1
+  },
+  {
+    "name": "collector_partial",
+    "mutation": {
+      "domain": "collection",
+      "target": "collector",
+      "status": "partial"
+    },
+    "expected_codes": [
+      "collector_critical_feed_partial"
+    ],
+    "expected_blockers": 0,
+    "expected_warnings": 1
+  },
+  {
+    "name": "workflow_failed",
+    "mutation": {
+      "domain": "runtime",
+      "target": "workflow",
+      "status": "failed"
+    },
+    "expected_codes": [
+      "workflow_failed"
+    ],
+    "expected_blockers": 1,
+    "expected_warnings": 0
+  },
+  {
+    "name": "freeze_missed",
+    "mutation": {
+      "domain": "scheduled_freeze",
+      "target": "segment",
+      "status": "missed"
+    },
+    "expected_codes": [
+      "scheduled_freeze_missed"
+    ],
+    "expected_blockers": 1,
+    "expected_warnings": 0
+  },
+  {
+    "name": "freeze_verification_failed",
+    "mutation": {
+      "domain": "scheduled_freeze",
+      "target": "segment",
+      "status": "verification_failed"
+    },
+    "expected_codes": [
+      "scheduled_freeze_verification_failed"
+    ],
+    "expected_blockers": 1,
+    "expected_warnings": 0
+  },
+  {
+    "name": "runtime_probe_failed",
+    "mutation": {
+      "domain": "runtime",
+      "target": "api",
+      "status": "failed"
+    },
+    "expected_codes": [
+      "runtime_api_failed"
+    ],
+    "expected_blockers": 1,
+    "expected_warnings": 0
+  }
+]
