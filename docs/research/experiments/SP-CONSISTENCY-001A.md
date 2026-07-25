@@ -1,6 +1,6 @@
 # SP-CONSISTENCY-001A — score distribution vs handicap 3/1/0
 
-Status: `g0_r2_pending; no_formal_result`
+Status: `g0_r2_frozen_insufficient_strict_data; no_formal_result`
 
 This is a Phase 1 market-information experiment, not a betting or portfolio study. It may not create tickets, stakes, expected-value filters, ROI claims, release authority, or frontend/API choices.
 
@@ -28,7 +28,7 @@ Eligible issue IDs are sorted chronologically. The earliest 70% are training/cal
 
 The original local-only G0 package is not cited as evidence: it did not bind every result-affecting input atomically and was not published durably. It remains untouched on the originating machine but is superseded, not repaired or overwritten.
 
-R2 first exports an outcome-blind p34 SQLite subset and p0 handicap SQLite subset from read transactions, copies and verifies p42 segment packages, archives those p42 bytes deterministically, and writes a mechanical William Hill 1X2/O/U candidate inventory. G0 then reads only these exported inputs. All exported files, the audit JSON, and the fail-closed decision are copied into one new Freeze Protocol v1 package. Paths inside the frozen JSON are logical rather than workstation-local. The package is to be published as a durable release asset before PI evidence review.
+R2 first exports an outcome-blind p34 SQLite subset and p0 handicap SQLite subset from read transactions, copies and verifies p42 segment packages, archives those p42 bytes deterministically, and writes a mechanical William Hill 1X2/O/U candidate inventory. G0 then reads only these exported inputs. All exported files, the audit JSON, and the fail-closed decision are copied into one new Freeze Protocol v1 package. Paths inside the frozen JSON are logical rather than workstation-local.
 
 The required R2 command is:
 
@@ -41,3 +41,14 @@ python scripts/run_sp_consistency_g0.py \
 ```
 
 The R2 entry point records query-level outcome prohibitions, per-season/per-issue denominators and exclusions, all input hashes, model-input inventory/rejections, and verified p42 identities. It does not load final scores and cannot report predictive results.
+
+## Frozen R2 evidence
+
+The independently downloadable release asset is [SP-CONSISTENCY-001A-G0-R2.tar.gz](https://github.com/algotradinglife/beijing-lot/releases/download/sp-consistency-001a-g0-r2/SP-CONSISTENCY-001A-G0-R2.tar.gz). Its archive SHA-256 is `9d80ff71b43fdc3bea6664ccd6d47237b230ad61aeb546406369e0068320f062` (17,266,374 bytes). It contains the complete Freeze Protocol v1 package and is anchored by tag `sp-consistency-001a-g0-r2` at code commit `4a763a3cc5b50a07e017742234ec57ba10d6dab0`.
+
+- Freeze ID: `2e8466c70cfa02033e997b6826f6920c2be178e4ac21c84a82e867da9d1cfb32`
+- Manifest SHA-256: `90b819f2625e0126db24ba45cc278e343fbb00be581ec8fadaab16e03955b816`
+- Package checksum-list SHA-256: `616f20689d8ef6a3a3d1e2a9e0eec4417aa5e7b69c152ba7bbaaea36a2c60c3a`
+- Verification: `python scripts/manage_research_freeze.py verify-freeze --package-dir SP-CONSISTENCY-001A-G0-R2` returns `status: valid` after unpacking.
+
+The outcome-blind audit recorded 3,790 p34 match-markets over 25 issues but zero strict p34 match-markets because immutable raw-bundle and dual-clock provenance are absent. The copied and verified p42 input has 31 strict match-markets (20 exact-tail mappings). The mechanical model inventory found 365 filename candidates, zero eligible strict William Hill 1X2/O/U panels, and zero strict common-decision-time pairs. The frozen G0 verdict is therefore `INSUFFICIENT_STRICT_DATA`; G1/G2, Stage A, Stage B, settled-outcome access, prediction scoring, and backtests remain unauthorized.
