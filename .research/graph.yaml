@@ -43,7 +43,7 @@ spec:
     - id: BJ-ADHOC-BET-001
       node_type: task
       ref: tasks/BJ-ADHOC-BET-001.yaml
-      state: AWAITING_REVIEW
+      state: COMPLETED
 
   edges:
     - from: GOAL-BOOT

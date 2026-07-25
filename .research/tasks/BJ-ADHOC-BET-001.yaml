@@ -81,13 +81,13 @@ spec:
       - research_pi_review
 
 status:
-  current: AWAITING_REVIEW
+  current: COMPLETED
   attempts: 2
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "PI follow-up implementation and new-head engineering validation are complete in the isolated worktree. PR #29 awaits Research PI re-review; this remains implementation capability only, not prospective live-betting or research-evidence proof."
+    reason: "PI approved current HEAD 445733a after the Engineer follow-up validation, and PR #29 merged as 99ab687. The completed capability remains operational implementation only, not prospective live-betting or research-evidence proof."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/28"
       artifact_type: issue
@@ -98,6 +98,9 @@ status:
     - uri: "https://github.com/algotradinglife/beijing-lot/pull/29#pullrequestreview-4778787757"
       artifact_type: pi_review
       description: PI changes requested on af6814f
+    - uri: https://github.com/algotradinglife/beijing-lot/pull/29#pullrequestreview-4779082620
+      artifact_type: pi_review
+      description: PI approval on current HEAD 445733a
   result:
     pull_request: 29
     pi_review:
@@ -119,7 +122,29 @@ status:
     review_followup_validation: "PASS: released 12000-attempt Exact-N contract is shared with the scheduled publisher; plan/manifest freeze source/version/selection/staking parameters; verifier replays ticket order/cost/reason; fully rehashed replacement-ticket adversarial test rejects."
     independent_codex_review_followup: PASS
     baseline_note: "Three unrelated estimate_segment_betting_plan tests fail identically at pre-change af6814f and this revised worktree; they are not caused by this follow-up diff."
+    reviewed_head: 445733a4dc60308092d9b64d28de35844f4dec25
+    merge_commit: 99ab6874d9740747c2908978ad82679c7452a7d6
+    final_pi_review:
+      decision: APPROVED
+      review_id: 4779082620
+      findings_closed:
+        - 'P0: adhoc generation now shares the released 12000-attempt Exact-N contract with the scheduled publisher.'
+        - 'P1: immutable packages freeze the complete portfolio contract and fail closed unless deterministic replay exactly reproduces tickets, order, costs, and reason.'
+        - 'P1: API and UI state honestly that refresh only rechecks valid_until and that sale eligibility is a generation-time snapshot requiring shop confirmation.'
+      evidence_boundary: Capability implementation only; no strategy-performance, prospective-sale, or research-evidence claim.
   history:
+    - action: pull_request_merged
+      ts: '2026-07-25T18:03:02+08:00'
+      actor: research_pi
+      from: AWAITING_REVIEW
+      to: COMPLETED
+      reason: 'PR #29 merged as 99ab687 after PI approval. Issue #28 may close; the capability remains excluded from scheduled forward evidence.'
+    - action: research_pi_approved
+      ts: '2026-07-25T18:02:41+08:00'
+      actor: research_pi
+      from: AWAITING_REVIEW
+      to: AWAITING_REVIEW
+      reason: PI approved current HEAD 445733a after confirming all prior P0/P1 findings were closed without new research-contract violations.
     - action: followup_engineering_validation_completed
       ts: "2026-07-25T15:42:30+08:00"
       actor: engineer
