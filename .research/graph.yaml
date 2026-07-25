@@ -44,6 +44,14 @@ spec:
       node_type: task
       ref: tasks/BJ-ADHOC-BET-001.yaml
       state: COMPLETED
+    - id: GOAL-OPS-QUALITY
+      node_type: goal
+      ref: .research/project.yaml#spec.programs
+      state: ACTIVE
+    - id: BJ-OPS-OBS-001
+      node_type: task
+      ref: tasks/BJ-OPS-OBS-001.yaml
+      state: READY
 
   edges:
     - from: GOAL-BOOT
@@ -87,4 +95,16 @@ spec:
       relation: decomposes_to
     - from: BJ-ADHOC-BET-001
       to: BJ-BET-FREEZE-001
+      relation: depends_on
+    - from: GOAL-OPS-QUALITY
+      to: BJ-OPS-OBS-001
+      relation: decomposes_to
+    - from: BJ-OPS-OBS-001
+      to: BJ-MM-FREEZE-001
+      relation: depends_on
+    - from: BJ-OPS-OBS-001
+      to: BJ-BET-FREEZE-001
+      relation: depends_on
+    - from: BJ-OPS-OBS-001
+      to: BJ-ADHOC-BET-001
       relation: depends_on
