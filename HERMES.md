@@ -3,16 +3,16 @@
 This repository uses [Research OS](https://github.com/algotradinglife/research-os-template)
 for structured, evidence-driven research and capability development.
 
-**Start here, then follow the machine-readable bootstrap contract.**
+**Start here, then follow the local dispatch override below.**
 
 ## Entry point
 
-1. Read `kernel/controller.yaml` from the Research OS template
-2. Read `kernel/system.yaml`
-3. Read `.research/project.yaml`
-4. Read `.research/graph.yaml`
-5. Read task files referenced by active graph nodes
-6. Read remaining kernel policies and profiles from the template
+1. Read this file, including the local dispatch override
+2. Read `.research/project.yaml`
+3. Read `.research/graph.yaml` for roadmap and dependency context
+4. Read task files referenced by roadmap nodes
+5. Read the corresponding GitHub Issue execution contract and labels
+6. Use the pinned template only for schema, validation, evidence, and authority guidance not overridden here
 
 ## Pinned reference
 
@@ -20,47 +20,70 @@ for structured, evidence-driven research and capability development.
 - **Ref:** `c4f95f423dbb4acba8c3f7acb9ced2f766c2e34d`
 - **Controller:** `kernel/controller.yaml`
 
-## Control loop
-
-Observe persisted graph and repository state
-→ Evaluate authority, data policy, risk, dependencies, and retry budget
-→ Select one next action
-→ Bind an executor or request a human gate
-→ Collect immutable artifact references
-→ Run the required validation gate
-→ Apply one valid state transition
-→ Persist audit and graph updates
-→ Recalculate
-
 ## Authority boundaries
 
 | Role | Actions |
 |------|---------|
-| **hh1985 / PI** (research owner) | Own research intent, issue contracts, task priority, dependency edges, routing profile, PI review, final domain decisions, and merges |
-| **Engineer** (resident Codex session) | Execute tasks routed with `profile: engineer`; perform code changes, commits, pushes, PR creation, and Engineering Validation |
-| **Strategist** (resident Codex session) | Execute tasks routed with `profile: strategist`; perform strategy research and report evidence without changing production execution authority |
-| **Hermes** (controller) | Read the PI-maintained graph and task YAML, dispatch the highest-priority eligible task to the named resident session, manage operational state transitions, and trigger validation |
+| **hh1985 / PI** (research owner) | Own research intent, Issue contracts, roadmap priority, graph dependencies, `state/ready` authorization, PI review, final domain decisions, and merges |
+| **Engineer** (resident Codex session) | Execute Issues routed with `owner/engineer`; perform code changes, commits, pushes, PR creation, and Engineering Validation |
+| **Strategist** (resident Codex session) | Execute Issues routed with `owner/strategist`; perform strategy research and report evidence without changing production execution authority |
+| **Hermes** (controller) | Poll positive GitHub routing labels, notify the named resident session, route explicit Issue/comment recipients, and avoid inferring readiness from open Issues |
 
-For full authority definitions, see `kernel/system.yaml` in the Research OS template.
+## Local dispatch override
 
-## Local routing contract
+GitHub Issue labels are the operational dispatch source of truth for this repository. This local rule overrides template graph-based dispatch.
 
-- `.research/graph.yaml` and `.research/tasks/*.yaml` are the dispatch source of truth.
-- The PI owns task creation, priority, dependency relationships, and `status.routing.profile`.
-- Hermes may persist operational state, runtime registration, and audit history, but must not change PI-owned intent, priority, dependencies, or task owner.
-- `profile: engineer` routes to the resident Engineer session; `profile: strategist` routes to the resident Strategist session.
-- Both resident sessions use the shared GitHub identity `everything-bot-engineer`. GitHub `owner/engineer` and `owner/strategist` labels identify the real route; the account name does not.
+- The PI authorizes execution by adding `state/ready` plus exactly one owner label: `owner/engineer` or `owner/strategist`.
+- Hermes selects only open Issues carrying both `state/ready` and the matching owner label.
+- Hermes must never use a negative query such as “not completed/cancelled”. An unlabeled Issue is not dispatchable.
+- On successful claim, `state/ready` must be removed before another notification can be sent for the same Issue.
+- Issue number plus triggering comment ID is the idempotency key for notifications.
+- Open Issues waiting for matches, external data, or prospective evidence remain non-dispatchable unless the PI explicitly restores `state/ready`.
+- A mismatch between labels and the Issue contract fails closed and is reported to the PI.
+
+Recommended positive queries:
+
+```text
+is:issue is:open label:state/ready label:owner/engineer
+is:issue is:open label:state/ready label:owner/strategist
+```
+
+## Notification contract
+
+Issue bodies and comments can route notifications without graph participation:
+
+```text
+[TO: Engineer][ACTION]
+[TO: Strategist][QUESTION]
+[TO: PI][REVIEW]
+```
+
+- Hermes notifies only the explicit recipient through the corresponding session.
+- Hermes does not contact recipients by posting its own GitHub Issue comment.
+- A notification does not itself authorize a new task claim; `state/ready` remains required.
+- PR review findings belong on the PR. Execution-contract questions belong on the Issue.
+- Engineer and Strategist share the GitHub identity `everything-bot-engineer`, so the explicit recipient marker and owner label are authoritative.
+
+## Research OS graph contract
+
+- `.research/graph.yaml` is maintained by the PI as a roadmap, dependency map, and research-history aid.
+- Graph node state is coarse planning metadata, not Hermes's real-time dispatch state.
+- `.research/tasks/*.yaml` preserve intent, acceptance, routing context, and durable evidence; their operational status is informational rather than a dispatch trigger.
+- Hermes may read graph/task files for context but must not use them to discover or authorize the next GitHub Issue.
+- Engineer, Strategist, and Hermes do not edit PI-owned roadmap or task-intent fields.
+
+## Engineer workspace contract
+
 - Engineer execution is fixed to worktree `.worktrees/develop` and branch `develop`.
-- Engineer must not create per-Issue branches or worktrees. Before starting the next Engineer task, `develop` must be synchronized with current `main` and contain no residue from a prior merged or abandoned task.
+- Engineer must not create per-Issue branches or worktrees.
+- Before starting the next Engineer Issue, `develop` must be synchronized with current `main` and contain no residue from a prior merged or abandoned task.
 - Engineer commits and pushes task changes on `develop` and opens the implementation PR from `develop` to `main`.
-- A task is dispatchable only when it is `READY`, its `depends_on` nodes are complete, and its scheduling WIP slot is free.
-- Within one WIP slot, an existing `EXECUTING` or `VALIDATING` task remains the current action. Otherwise Hermes selects the eligible `READY` task by `priority_class`, then `dispatch_rank`.
-- GitHub comments do not need to mention HermesPM. Hermes derives dispatch decisions from these persisted control-plane files.
 
 ## Recovery
 
 If chat context is lost, recover from:
+- GitHub Issue labels and explicit recipient comments for current dispatch
+- GitHub Issue and PR history for execution state
 - Project configuration (`.research/project.yaml`)
-- Graph and task YAML (`.research/graph.yaml`, `.research/tasks/`)
-- Git revision state
-- Validation records and audit history
+- PI roadmap and task archive (`.research/graph.yaml`, `.research/tasks/`)
+- Git revision state and validation records
