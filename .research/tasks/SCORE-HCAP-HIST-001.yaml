@@ -1,0 +1,93 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: SCORE-HCAP-HIST-001
+  title: Historical score model to handicap 3/1/0
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-PHASE1
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/35"
+    - SP-CONSISTENCY-001A
+
+spec:
+  type: research
+  intent:
+    objective: Determine whether a historical score-distribution model adds reproducible retrospective predictive information for Beijing handicap 3/1/0 beyond a handicap-only historical prior.
+    question: Under expanding whole-season chronological holdout, does a score-history independent-Poisson model reduce multiclass log loss relative to a training-only handicap prior?
+    hypothesis: A reproducible reduction may exist, but the null remains no incremental signal and any positive result is retrospective Evidence B at most.
+    expected_value: Establish a leakage-controlled result-layer benchmark that is independent of unavailable strict correct-score price histories and separate from strategy or portfolio evaluation.
+    out_of_scope:
+      - p34 or p42 market-price consistency and incremental-price claims
+      - Correct-score EV, q, Top-k, staking, tickets, N-leg portfolios, or ROI
+      - v3.3.3 or v4.2 strategy changes
+      - Terminal or winning SP used as pre-match input
+      - Random split, same-season updates, or post-outcome parameter selection
+      - Production API, frontend, database, execution, or release changes
+
+  context:
+    issue_contract: "https://github.com/algotradinglife/beijing-lot/issues/35"
+    immediate_stage: G0 historical panel provenance, chronology, denominator, and exclusion freeze
+    formal_analysis_gate: G0 must pass and the frozen B0/B1 configuration must be reproducible before metric computation
+    predecessor: SP-CONSISTENCY-001A ended at G0 with INSUFFICIENT_STRICT_DATA for paired p34/p42 price research
+    legacy_reference: scripts/evaluate_n7_matchpredict_integration.py MatchPredictPoissonModel is archaeology-only
+    dispatch_source: GitHub labels state/ready plus owner/strategist
+
+  execution:
+    required_capabilities:
+      - statistical_research
+      - probability_modeling
+      - temporal_data_audit
+      - reproducible_analysis
+    uncertainty: high
+    complexity: high
+
+  risk:
+    overall: high
+    scientific: high
+    engineering: medium
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - Frozen minimal historical panel with manifest and SHA256SUMS
+      - Preregistered chronology, exclusions, B0/B1 model, metrics, bootstrap, and decision rule
+      - Exact or bounded-tail score-to-handicap probability mapping
+      - Expanding whole-season predictions and aggregate, season, calibration, handicap, and cold-start diagnostics when G0 passes
+      - Explicit archaeology-only legacy reproduction when feasible
+      - Honest retrospective evidence classification and final decision
+    checks:
+      - canonical_chronology_validation
+      - label_recomputation_and_conflict_audit
+      - denominator_and_exclusion_freeze
+      - no_future_or_same_season_training
+      - skellam_exact_or_tail_mass_bound
+      - issue_block_bootstrap
+      - deterministic_reproducibility
+      - no_market_price_or_terminal_input
+      - no_strategy_or_portfolio_scope_drift
+    human_gates:
+      - engineering_reproducibility_validation
+      - research_pi_review
+
+status:
+  current: READY
+  attempts: 0
+  routing:
+    executor_mode: isolated_session
+    profile: strategist
+    runtime: codex
+    reason: "PI created Issue #35 with explicit Strategist routing and a frozen retrospective experiment contract."
+  artifacts:
+    - uri: "https://github.com/algotradinglife/beijing-lot/issues/35"
+      artifact_type: issue
+      description: PI-approved retrospective experiment contract
+  result: null
+  history:
+    - action: task_created
+      ts: "2026-07-26T02:49:36+08:00"
+      actor: research_pi
+      from: null
+      to: READY
+      reason: "PI prioritized a leakage-controlled historical score-to-handicap study after strict p34/p42 price coverage proved insufficient."
