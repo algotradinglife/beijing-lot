@@ -1,0 +1,110 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: BJ-OPS-OBS-001
+  title: Refine the existing Operations tab into an actionable status control plane
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-OPS-QUALITY
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/30"
+    - BJ-MM-FREEZE-001
+    - BJ-BET-FREEZE-001
+    - BJ-ADHOC-BET-001
+
+spec:
+  type: capability
+  intent:
+    objective: Incrementally refine the existing Operations tab and API into a canonical, actionable, and traceable view of runtime, collection, artifacts, freezes, adhoc service health, and settlement review.
+    question: Can one backend-owned status and alert contract explain what is wrong, what is affected, when it happened, whether recovery is automatic, and what action is next without changing strategy or research conclusions?
+    hypothesis: A backward-compatible Operations Status v2 with backend-owned alerts and domain-specific health prevents frontend drift and false-green aggregate status.
+    expected_value: Make existing system warnings understandable and operationally useful while preserving the current page, workflows, and scientific boundaries.
+    out_of_scope:
+      - Strategy, model, probability, portfolio, budget, or ticket selection changes
+      - Automatic ticket purchase, payment, or terminal integration
+      - Recording or inferring offline purchases and actual user ROI
+      - Collector, freeze, or settlement core rewrites
+      - Changes to Research Phase 1 evidence or release authority
+
+  context:
+    inputs:
+      - Issue #30 capability contract
+      - Existing GET /api/issues/<issue>/operations API
+      - Existing OperationsStatus React page
+      - Existing runtime probes, source status, segment freezes, adhoc service, and settlement review state
+    assumptions:
+      - Backend is the sole authority for alert derivation
+      - Critical domains are evaluated independently so a fresh source cannot hide another stale source
+      - Scheduled research freezes and adhoc generation remain visibly and semantically separate
+      - Capability health never implies strategy quality, execution readiness, or profitability
+    scheduling:
+      priority_class: P1
+      dispatch_rank: 1
+      preemptible: true
+      wip_slot: engineering_primary
+      selection_reason: highest_priority_ready_operational_quality_capability
+
+  execution:
+    required_capabilities:
+      - python_development
+      - api_design
+      - frontend_development
+      - observability
+      - testing
+    uncertainty: medium
+    complexity: high
+
+  risk:
+    overall: medium
+    scientific: low
+    engineering: medium
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - Backward-compatible Operations Status v2 schema and serializer
+      - Backend-owned canonical alert list with impact, next action, clocks, recovery expectation, and affected scope
+      - Existing Operations tab refined in place with domain-specific status and segment freeze timeline
+      - Scheduled freeze and adhoc service status kept separate
+      - Collector and market status that cannot be masked by one global latest timestamp
+      - Controlled diagnostic references without secrets or unrestricted filesystem paths
+      - Operator-facing status-code reference
+    checks:
+      - schema_validation
+      - api_contract_tests
+      - frontend_component_tests
+      - alert_semantic_consistency
+      - failure_fixture_coverage
+      - playwright_desktop_mobile_validation
+      - scope_boundary_check
+    human_gates:
+      - engineering_validation
+      - research_pi_review
+
+status:
+  current: READY
+  attempts: 0
+  routing:
+    executor_mode: isolated_session
+    profile: engineer
+    runtime: codex
+    reason: "Issue #30 is the highest-priority ready task in the engineering_primary operational-quality lane. The resident Engineer owns implementation and Engineering Validation; PI review is limited to contract boundaries and honest status semantics."
+  artifacts:
+    - uri: "https://github.com/algotradinglife/beijing-lot/issues/30"
+      artifact_type: issue
+      description: Approved capability execution contract
+  result: {}
+  history:
+    - action: task_created
+      ts: "2026-07-25T10:40:26Z"
+      actor: research_pi
+      from: null
+      to: CREATED
+      reason: "PI created Issue #30 after reviewing the existing Operations page and API implementation."
+    - action: make_ready
+      ts: "2026-07-25T10:40:26Z"
+      actor: research_pi
+      from: CREATED
+      to: READY
+      reason: "Scope, dependencies, acceptance, routing, and scientific boundaries are defined; completed dependencies make the Engineer capability ready."
