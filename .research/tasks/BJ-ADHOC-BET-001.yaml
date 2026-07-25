@@ -81,13 +81,13 @@ spec:
       - research_pi_review
 
 status:
-  current: VALIDATING
+  current: AWAITING_REVIEW
   attempts: 1
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "Automated engineering validation, independent local Codex review, and user-authorized browser/device visual validation passed on PR #29 implementation HEAD 1b5049e. Research PI review remains the final gate."
+    reason: "Automated engineering validation, independent local Codex review, and user-authorized browser/device visual validation passed on PR #29. The branch is ready for Research PI review; this remains implementation capability rather than prospective live-betting or research-evidence proof."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/28"
       artifact_type: issue
@@ -106,6 +106,12 @@ status:
     frontend_build: PASS
     diff_check: PASS
   history:
+    - action: ready_for_research_pi_review
+      ts: "2026-07-25T15:14:56+08:00"
+      actor: engineer
+      from: VALIDATING
+      to: AWAITING_REVIEW
+      reason: "Engineering validation is complete and PR #29 was moved from draft to ready for review. No claim is made that a fixture validation constitutes prospective live-betting or research evidence."
     - action: browser_device_visual_validation_completed
       ts: "2026-07-25T14:58:03+08:00"
       actor: engineer
