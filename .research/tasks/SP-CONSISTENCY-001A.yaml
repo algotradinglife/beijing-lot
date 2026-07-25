@@ -55,7 +55,7 @@ spec:
       - research_pi_review
 
 status:
-  current: EXECUTING
+  current: VALIDATING
   attempts: 1
   routing:
     executor_mode: isolated_session
@@ -63,5 +63,9 @@ status:
     runtime: codex
     reason: Issue #31 is explicitly routed to the resident Strategist.
   result:
-    outcome: pending_g0
-    summary: Preregistration and outcome-blind G0 coverage audit are required before Stage A or Stage B.
+    outcome: insufficient_strict_data
+    summary: G0 was frozen on 2026-07-25 without loading outcomes. Strict p34 coverage is zero because every pre-kickoff candidate lacks dual clocks and immutable raw-bundle provenance; no strict common-decision-time p34/score pair exists. Stage A/B are not authorised.
+  artifacts:
+    - uri: "results/freeze/SP-CONSISTENCY-001A-G0"
+      artifact_type: freeze_package
+      description: "Verified G0 coverage artifact, freeze_id 446cac7cd7c779cba001b9860d99f0fe284781b6576b8dbf9b4be5ff697f0056"

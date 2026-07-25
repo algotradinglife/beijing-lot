@@ -10,6 +10,7 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | `SP-EFF-001` | SP-EFF-001: Does Beijing Single Match SP contain calibrated predictive information about 90-minute handicap 3/1/0 outcomes? | `research/sp-eff-001` | `14993d22c46585a8ad7ce8067cd1a87758eb986ac0028256ef49b3415451658a` | `reviewed` | `directional_sp_information_no_holm_rejection` | `A` |
 | `MM-DATA-AUDIT-001` | For each target market (Handicap 3/1/0, Correct Score, Total Goals, Half/Full Time), does the current forward data chain provide sufficient evidence to support strict as-of research under Freeze Protocol v1? | `research/mm-data-audit-001` | `e3fee9f2241b258eb6fa406b50e80d403193448d73a9ea070c0a1e386ee8c976` | `reviewed` | `no_market_end_to_end_ready` | `B` |
+| `SP-CONSISTENCY-001A-G0` | Does strict p34 plus score-distribution as-of coverage authorize SP-CONSISTENCY-001A? | `strategy/active` | `446cac7cd7c779cba001b9860d99f0fe284781b6576b8dbf9b4be5ff697f0056` | `frozen` | `insufficient_strict_data; Stage A/B not authorized` | `C` |
 
 ### MM-DATA-AUDIT-001 verification snapshot
 
