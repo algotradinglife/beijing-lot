@@ -47,7 +47,7 @@ spec:
     - id: SP-CONSISTENCY-001A
       node_type: task
       ref: tasks/SP-CONSISTENCY-001A.yaml
-      state: ACTIVE
+      state: COMPLETED
     - id: GOAL-OPS-QUALITY
       node_type: goal
       ref: .research/project.yaml#spec.programs
