@@ -89,13 +89,19 @@ status:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "Issue #30 is the highest-priority ready task in the engineering_primary operational-quality lane. The resident Engineer owns implementation and Engineering Validation; PI review is limited to contract boundaries and honest status semantics."
+    reason: "Issue #30 is the highest-priority ready task in the engineering_primary operational-quality lane. Engineer must reuse fixed worktree .worktrees/develop on branch develop; no per-Issue branch/worktree is allowed. Engineer owns implementation and Engineering Validation; PI review is limited to contract boundaries and honest status semantics."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/30"
       artifact_type: issue
       description: Approved capability execution contract
   result: {}
   history:
+    - action: routing_updated
+      ts: "2026-07-25T11:10:47Z"
+      actor: research_pi
+      from: READY
+      to: READY
+      reason: "Engineer execution is standardized on .worktrees/develop and branch develop; the prior per-Issue branch suggestion is revoked."
     - action: task_created
       ts: "2026-07-25T10:40:26Z"
       actor: research_pi
