@@ -34,6 +34,16 @@ BETTING_STRATEGY_FAMILY = "segment_betting_plan"
 BETTING_STRATEGY_VERSION = "segment_betting_v0.4.0000"
 ARTIFACT_SCHEMA_VERSION = "segment_betting_artifact_v1"
 
+# This is the released Exact-N generation contract used by the scheduled
+# publisher.  Consumers that create a separately named package must use this
+# exact contract instead of silently selecting their own sampling settings.
+EXACT_N_PORTFOLIO_CONTRACT_SCHEMA_VERSION = "published_exact_n_portfolio_contract_v1"
+PUBLISHED_EXACT_N_SAMPLE_ATTEMPTS = 12000
+PUBLISHED_EXACT_N_MAX_BUNDLE_COST_RATIO = 0.4
+PUBLISHED_EXACT_N_POSITIVE_EV_ONLY = True
+PUBLISHED_EXACT_N_STAKE_MODE = "scale_to_budget"
+PUBLISHED_EXACT_N_STAKE_YUAN_PER_UNIT = 2.0
+
 
 @dataclass(frozen=True)
 class LegMetrics:
@@ -82,6 +92,128 @@ def product(values: Iterable[float]) -> float:
 def stable_seed(*parts: object) -> int:
     text = "|".join(str(part) for part in parts)
     return int(hashlib.sha256(text.encode("utf-8")).hexdigest()[:16], 16)
+
+
+def exact_n_portfolio_core_source_sha256() -> str:
+    """Return the clean-checkout digest of the deterministic portfolio core."""
+
+    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+
+def exact_n_leg_row_source_sha256() -> str:
+    """Bind the LegRow implementation used to reconstruct Exact-N inputs."""
+
+    return hashlib.sha256(Path(rolling.__file__).read_bytes()).hexdigest()
+
+
+def published_exact_n_portfolio_contract(
+    *,
+    n_value: int,
+    budget_yuan: float,
+    arm: str,
+    segment_idx: int,
+) -> dict[str, Any]:
+    """Return the immutable released Exact-N portfolio parameter contract.
+
+    The contract deliberately fixes every parameter that can change candidate
+    generation, bundle selection, or staking.  It is small enough to embed in
+    a package and strict enough for a clean checkout to reconstruct tickets.
+    """
+
+    try:
+        n = int(n_value)
+        budget = float(budget_yuan)
+        segment = int(segment_idx)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Exact-N portfolio contract inputs are invalid") from exc
+    if n <= 0 or not math.isfinite(budget) or budget <= 0 or segment < 0:
+        raise ValueError("Exact-N portfolio contract inputs are invalid")
+    if arm not in {"active", "shadow"}:
+        raise ValueError("Exact-N portfolio arm is invalid")
+    budget_units = round(budget / PUBLISHED_EXACT_N_STAKE_YUAN_PER_UNIT, 8)
+    per_ticket_cost_cap_units = round(
+        budget_units * PUBLISHED_EXACT_N_MAX_BUNDLE_COST_RATIO,
+        8,
+    )
+    return {
+        "schema_version": EXACT_N_PORTFOLIO_CONTRACT_SCHEMA_VERSION,
+        "strategy_family": BETTING_STRATEGY_FAMILY,
+        "strategy_version": BETTING_STRATEGY_VERSION,
+        "source_digest_algorithm": "sha256",
+        "portfolio_core_source_sha256": exact_n_portfolio_core_source_sha256(),
+        "leg_row_core_source_sha256": exact_n_leg_row_source_sha256(),
+        "arm": arm,
+        "segment_idx": segment,
+        "requested_n": n,
+        "requested_budget_yuan": budget,
+        "budget_units": budget_units,
+        "stake_yuan_per_unit": PUBLISHED_EXACT_N_STAKE_YUAN_PER_UNIT,
+        "sample_attempts": PUBLISHED_EXACT_N_SAMPLE_ATTEMPTS,
+        "max_overlap": max(0, n - 2),
+        "positive_ev_only": PUBLISHED_EXACT_N_POSITIVE_EV_ONLY,
+        "per_ticket_cost_cap_units": per_ticket_cost_cap_units,
+        "per_ticket_cost_cap_yuan": round(
+            per_ticket_cost_cap_units * PUBLISHED_EXACT_N_STAKE_YUAN_PER_UNIT,
+            8,
+        ),
+        "stake_mode": PUBLISHED_EXACT_N_STAKE_MODE,
+    }
+
+
+def validate_published_exact_n_portfolio_contract(contract: object) -> dict[str, Any]:
+    """Fail closed unless a package carries the released Exact-N contract."""
+
+    if not isinstance(contract, dict):
+        raise ValueError("Exact-N portfolio contract is malformed")
+    try:
+        expected = published_exact_n_portfolio_contract(
+            n_value=int(contract["requested_n"]),
+            budget_yuan=float(contract["requested_budget_yuan"]),
+            arm=str(contract["arm"]),
+            segment_idx=int(contract["segment_idx"]),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("Exact-N portfolio contract is malformed") from exc
+    # Exact equality intentionally rejects a rehashed package that changes a
+    # knob (for example sample_attempts) while preserving its own file hashes.
+    if contract != expected:
+        raise ValueError("Exact-N portfolio contract differs from the released contract")
+    return expected
+
+
+def execute_published_exact_n_portfolio(
+    *,
+    metrics: list[LegMetrics],
+    contract: object,
+    seed: int,
+) -> tuple[list[StakedBundle], float, str]:
+    """Generate, select, and stake an Exact-N portfolio from its contract."""
+
+    checked = validate_published_exact_n_portfolio_contract(contract)
+    n_value = int(checked["requested_n"])
+    budget_units = float(checked["budget_units"])
+    candidates = generate_candidates(
+        metrics=metrics,
+        segment_idx=int(checked["segment_idx"]),
+        arm=str(checked["arm"]),
+        n_value=n_value,
+        budget_units=budget_units,
+        sample_attempts=int(checked["sample_attempts"]),
+        seed=int(seed),
+    )
+    selected = select_bundles(
+        [candidate for candidate in candidates if len(candidate.match_indices) == n_value],
+        budget_units=budget_units,
+        max_overlap=int(checked["max_overlap"]),
+        positive_ev_only=bool(checked["positive_ev_only"]),
+        max_bundle_cost_units=float(checked["per_ticket_cost_cap_units"]),
+    )
+    return apply_stake_mode(
+        selected,
+        budget_units=budget_units,
+        stake_mode=str(checked["stake_mode"]),
+        max_bundle_cost_units=float(checked["per_ticket_cost_cap_units"]),
+    )
 
 
 def slugify(value: str) -> str:

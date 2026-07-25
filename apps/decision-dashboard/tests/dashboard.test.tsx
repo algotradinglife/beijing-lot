@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
 import { mockDashboardData } from '../src/data/mockData';
 import { ApiDashboardAdapter } from '../src/data/apiAdapter';
-import type { DashboardData } from '../src/data/types';
+import type { AdhocBettingPlanData, DashboardData } from '../src/data/types';
 
 beforeEach(() => {
   vi.stubEnv('VITE_DATA_MODE', 'mock');
@@ -78,8 +78,8 @@ describe('北单实盘决策台 v1', () => {
     vi.spyOn(ApiDashboardAdapter.prototype, 'getDashboardData').mockResolvedValue(dashboardData);
     render(<App />);
     await screen.findByRole('button', { name: '期次看板' });
-     expect(screen.getByText('UI betting-scope-v0400-0140')).toBeInTheDocument();
-    for (const page of ['期次看板', '赛后复盘', '下注设计', '运行状态', '实时信号', '策略实验']) {
+     expect(screen.getByText('UI betting-scope-v0400-0150')).toBeInTheDocument();
+    for (const page of ['期次看板', '赛后复盘', '下注设计', '即时下注', '运行状态', '实时信号', '策略实验']) {
       expect(screen.getByRole('button', { name: page })).toBeInTheDocument();
     }
     expect(screen.queryByRole('button', { name: '投注构建' })).not.toBeInTheDocument();
@@ -310,6 +310,89 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getAllByText(/baseline_384_hybrid/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/selector_v2_frozen/).length).toBeGreaterThan(0);
     expect(screen.getByText(/年度表现/)).toBeInTheDocument();
+  });
+
+  it('generates a separately scoped adhoc Exact-N plan with printable valid-until downloads', async () => {
+    const scheduledFreezeSpy = vi.spyOn(ApiDashboardAdapter.prototype, 'getExactNFreezes');
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: '即时下注' }));
+    await screen.findByText('8 场');
+
+    expect(screen.getByText('即时下注（本次独立请求）')).toBeInTheDocument();
+    expect(screen.getByText('研究冻结审计（独立只读）')).toBeInTheDocument();
+    expect(screen.queryByText('Exact-N 冻结备选')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText('查看本次预览完整资格分母（8 场）'));
+    expect(screen.getByText('#1 示例主队 1 vs 示例客队 1')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'N=4' }));
+    await userEvent.click(screen.getByRole('button', { name: '¥768' }));
+    await userEvent.click(screen.getByRole('button', { name: '生成即时方案' }));
+
+    expect(await screen.findByText('即时方案 / 可打印票面')).toBeInTheDocument();
+    expect(screen.getByText('有效期内，可下载')).toBeInTheDocument();
+    expect(screen.getByText(/刷新只按服务器时钟复核本包的 valid_until；不会重新抓取售卖状态/)).toBeInTheDocument();
+    expect(screen.getByText(/请在门店再次确认销售开放/)).toBeInTheDocument();
+    expect(screen.queryByText('当前可下注')).not.toBeInTheDocument();
+    expect(screen.getByText('N=4 / ¥768')).toBeInTheDocument();
+    expect(screen.getByText(/第 1 票 · Exact N=4/)).toBeInTheDocument();
+    expect(screen.getByText('查看本次冻结资格分母（8 场）')).toBeInTheDocument();
+    expect(screen.getByLabelText('现场勾选第 1 票 #1')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '下载 PDF' })).toHaveAttribute('href', expect.stringContaining('/download?format=pdf'));
+    expect(screen.getByRole('link', { name: '下载 HTML' })).toHaveAttribute('href', expect.stringContaining('/download?format=html'));
+    expect(screen.getByRole('link', { name: '下载 CSV' })).toHaveAttribute('href', expect.stringContaining('/download?format=csv'));
+    expect(scheduledFreezeSpy).not.toHaveBeenCalled();
+  });
+
+  it('disables operational adhoc downloads after expiry while retaining an explicit audit record', async () => {
+    const expiredPlan: AdhocBettingPlanData = {
+      schemaVersion: 'adhoc_betting_package_v1',
+      capabilityId: 'BJ-ADHOC-BET-001',
+      requestId: 'expired-adhoc-request',
+      issueId: '26052',
+      requestedAt: '2026-07-25T12:00:00+08:00',
+      inputAsOf: '2026-07-25T12:00:00+08:00',
+      requestedN: 3,
+      requestedBudgetYuan: 512,
+      baseCostYuan: 0,
+      actualCostYuan: 0,
+      unusedBudgetYuan: 512,
+      budgetUtilization: 0,
+      validUntil: '2026-07-25T12:01:00+08:00',
+      status: 'UNAVAILABLE_ADHOC_PLAN',
+      currentStatus: 'EXPIRED_NOT_PURCHASABLE',
+      currentStatusRecheckScope: 'VALID_UNTIL_SERVER_CLOCK_ONLY',
+      saleEligibilityScope: 'GENERATION_TIME_SNAPSHOT_ONLY',
+      shopSaleConfirmationRequired: true,
+      structuralVerificationStatus: 'STRUCTURAL_INTEGRITY_PASS',
+      saleStatusVerified: false,
+      operationalDownloadsEnabled: false,
+      auditDownloadsAvailable: true,
+      ticketCount: 0,
+      eligibleMatchCount: 2,
+      excludedMatchCount: 6,
+      exclusionCounts: { kickoff_inside_safety_margin: 6 },
+      denominator: [],
+      tickets: [],
+      planReason: 'insufficient_eligible_matches_for_exact_n',
+      unavailableReasons: ['insufficient_eligible_matches_for_exact_n'],
+      inputSha256: 'expired-input',
+      manifestSha256: 'expired-manifest',
+      packageId: 'expired-package',
+      researchEvidenceEligible: false,
+      scheduledFreezeEventId: null,
+      correctScoreStatus: 'UNAVAILABLE_ADHOC_CORRECT_SCORE',
+      idempotent: false,
+    };
+    vi.spyOn(ApiDashboardAdapter.prototype, 'createAdhocBettingPlan').mockResolvedValue(expiredPlan);
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: '即时下注' }));
+    await screen.findByText('8 场');
+    await userEvent.click(screen.getByRole('button', { name: '生成即时方案' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('已失效，不可下注');
+    expect(screen.getByRole('button', { name: 'PDF 下载已禁用' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'HTML 下载已禁用' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'CSV 下载已禁用' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: '下载审计记录（PDF）' })).toHaveAttribute('href', expect.stringContaining('/audit-download?format=pdf'));
   });
 
   it('keeps betting plan decision version selectable before plan artifacts are generated', async () => {
@@ -829,6 +912,83 @@ describe('北单实盘决策台 v1', () => {
   it('uses an adapter layer that can switch from mock to fetch API', async () => {
     const adapter = new ApiDashboardAdapter({ mode: 'mock' });
     await expect(adapter.getIssueDashboard('26052')).resolves.toMatchObject({ issueId: '26052' });
+  });
+
+  it('uses the dedicated adhoc API contract with a JSON operator request body', async () => {
+    const eligibility = {
+      schema_version: 'adhoc_betting_eligibility_preview_v1',
+      capability_id: 'BJ-ADHOC-BET-001',
+      issue: '26052',
+      observed_at_hkt: '2026-07-25T12:00:00+08:00',
+      input_asof_hkt: '2026-07-25T12:00:00+08:00',
+      status: 'ELIGIBILITY_PREVIEW',
+      eligible_match_count: 8,
+      excluded_match_count: 0,
+      exclusion_counts: {},
+      safety_margin_seconds: 120,
+      preview_only: true,
+    };
+    const plan = {
+      schema_version: 'adhoc_betting_package_v1',
+      capability_id: 'BJ-ADHOC-BET-001',
+      request_id: 'adhoc-request-1',
+      issue: '26052',
+      requested_at_hkt: '2026-07-25T12:00:00+08:00',
+      input_asof_hkt: '2026-07-25T12:00:00+08:00',
+      requested_n: 3,
+      requested_budget_yuan: 512,
+      base_cost_yuan: 2,
+      actual_cost_yuan: 2,
+      unused_budget_yuan: 510,
+      budget_utilization: 0.00390625,
+      valid_until_hkt: '2026-07-25T13:00:00+08:00',
+      status: 'READY_FOR_REVIEW',
+      current_status: 'DOWNLOADABLE_CURRENT',
+      structural_verification_status: 'STRUCTURAL_INTEGRITY_PASS',
+      sale_status_verified: true,
+      operational_downloads_enabled: true,
+      audit_downloads_available: true,
+      ticket_count: 1,
+      eligible_match_count: 8,
+      excluded_match_count: 0,
+      exclusion_counts: {},
+      tickets: [{
+        ticket_no: 1,
+        actual_n: 3,
+        stake_multiplier: 1,
+        base_cost_yuan: 2,
+        cost_yuan: 2,
+        legs: [{ match_idx: 1, match_id: '26052_001', selection_code: '3', selection_label: '胜', kickoff_at_hkt: '2026-07-25T14:00:00+08:00', league: '英超', home: '甲', away: '乙', handicap_line: 0 }],
+      }],
+      plan_reason: 'exact_n_ready',
+      unavailable_reasons: [],
+      input_sha256: 'input-hash',
+      manifest_sha256: 'manifest-hash',
+      package_id: 'package-id',
+      correct_score_status: 'UNAVAILABLE_ADHOC_CORRECT_SCORE',
+      idempotent: false,
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input).replace('http://api.test', '');
+      return { ok: true, json: async () => url.includes('/eligibility') ? eligibility : plan } as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    window.localStorage.setItem('BEIDAN_OPERATOR_TOKEN', 'adhoc-operator-token');
+
+    const adapter = new ApiDashboardAdapter({ mode: 'fetch', baseUrl: 'http://api.test' });
+    await expect(adapter.getAdhocBettingEligibility('26052')).resolves.toMatchObject({ issueId: '26052', eligibleMatchCount: 8, previewOnly: true });
+    await expect(adapter.createAdhocBettingPlan({ issueId: '26052', requestedN: 3, requestedBudgetYuan: 512, idempotencyKey: 'browser-retry-key' })).resolves.toMatchObject({ requestId: 'adhoc-request-1', requestedN: 3, requestedBudgetYuan: 512 });
+    await expect(adapter.getAdhocBettingPlan('adhoc-request-1')).resolves.toMatchObject({ requestId: 'adhoc-request-1' });
+
+    const postCall = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith('/api/adhoc-betting-plans') && init?.method === 'POST');
+    expect(postCall).toBeDefined();
+    const request = postCall?.[1];
+    expect(request).toBeDefined();
+    expect(new Headers(request?.headers).get('X-Beidan-Operator-Token')).toBe('adhoc-operator-token');
+    expect(new Headers(request?.headers).get('Content-Type')).toBe('application/json');
+    expect(JSON.parse(String(request?.body))).toEqual({ issue: '26052', requested_n: 3, requested_budget_yuan: 512, idempotency_key: 'browser-retry-key' });
+    expect(adapter.adhocBettingDownloadUrl('adhoc-request-1', 'pdf')).toBe('http://api.test/api/adhoc-betting-plans/adhoc-request-1/download?format=pdf');
+    expect(adapter.adhocBettingDownloadUrl('adhoc-request-1', 'pdf', true)).toBe('http://api.test/api/adhoc-betting-plans/adhoc-request-1/audit-download?format=pdf');
   });
 
   it('fetches only the issue list and issue dashboard for the initial shell', async () => {

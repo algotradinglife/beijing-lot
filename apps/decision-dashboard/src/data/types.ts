@@ -1120,3 +1120,89 @@ export interface ExactNFreezeData {
     };
   }>;
 }
+
+export interface AdhocMatchEligibilityData {
+  matchIdx: number;
+  matchId: string;
+  league: string;
+  home: string;
+  away: string;
+  handicapLine?: number | string | null;
+  kickoffAt: string;
+  eligible: boolean;
+  exclusionReasons: string[];
+}
+
+export interface AdhocBettingEligibilityData {
+  schemaVersion: string;
+  capabilityId: string;
+  issueId: string;
+  observedAt: string;
+  inputAsOf: string;
+  status: string;
+  eligibleMatchCount: number;
+  excludedMatchCount: number;
+  exclusionCounts: Record<string, number>;
+  matches: AdhocMatchEligibilityData[];
+  safetyMarginSeconds: number;
+  previewOnly: boolean;
+  researchEvidenceEligible: false;
+  scheduledFreezeEventId: null;
+}
+
+export interface AdhocBettingPlanData {
+  schemaVersion: string;
+  capabilityId: string;
+  requestId: string;
+  issueId: string;
+  requestedAt: string;
+  inputAsOf: string;
+  requestedN: number;
+  requestedBudgetYuan: number;
+  baseCostYuan: number;
+  actualCostYuan: number;
+  unusedBudgetYuan: number;
+  budgetUtilization: number;
+  validUntil: string;
+  status: string;
+  currentStatus: string;
+  currentStatusRecheckScope: 'VALID_UNTIL_SERVER_CLOCK_ONLY' | string;
+  saleEligibilityScope: 'GENERATION_TIME_SNAPSHOT_ONLY' | string;
+  shopSaleConfirmationRequired: boolean;
+  structuralVerificationStatus: string;
+  saleStatusVerified: boolean;
+  operationalDownloadsEnabled: boolean;
+  auditDownloadsAvailable: boolean;
+  ticketCount: number;
+  eligibleMatchCount: number;
+  excludedMatchCount: number;
+  exclusionCounts: Record<string, number>;
+  denominator: AdhocMatchEligibilityData[];
+  tickets: Array<{
+    ticketNo: number;
+    actualN: number;
+    stakeMultiplier: number;
+    baseCostYuan: number;
+    costYuan: number;
+    legs: Array<{
+      matchIdx: number;
+      matchId: string;
+      selectionCode: string;
+      selectionLabel: string;
+      kickoffAt: string;
+      league: string;
+      home: string;
+      away: string;
+      handicapLine?: number | string | null;
+    }>;
+  }>;
+  planReason: string;
+  unavailableReasons: string[];
+  inputSha256: string;
+  manifestSha256: string;
+  packageId: string;
+  researchEvidenceEligible: false;
+  scheduledFreezeEventId: null;
+  correctScoreStatus: string;
+  idempotent: boolean;
+}

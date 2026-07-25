@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, Gauge, LineChart, Server, ShieldAlert, WalletCards } from 'lucide-react';
+import { Activity, AlertTriangle, BarChart3, CheckCircle2, Clock, Database, Download, Gauge, LineChart, Server, ShieldAlert, WalletCards } from 'lucide-react';
 import { ApiDashboardAdapter } from './data/apiAdapter';
 import { ACTIVE_DECISION_VARIANT_ID, DEFAULT_DECISION_VARIANT_ID, decisionVersionLabel, displayableDecisionVariants, isActiveDecisionVariant, isShadowDecisionVariant } from './decisionVariants';
-import type { DashboardData, DecisionArtifactStatusData, DecisionVariantData, DecisionVariantOption, IssueDashboardData, IssueMatchRow, IssueOption } from './data/types';
+import type { AdhocBettingEligibilityData, AdhocBettingPlanData, AdhocMatchEligibilityData, DashboardData, DecisionArtifactStatusData, DecisionVariantData, DecisionVariantOption, IssueDashboardData, IssueMatchRow, IssueOption } from './data/types';
 
-type Page = 'Issue Dashboard' | 'Match Detail' | 'Operations' | 'Betting Plan' | 'Live Signals' | 'Settlement Review' | 'Strategy Lab';
-const pages: Page[] = ['Issue Dashboard', 'Settlement Review', 'Betting Plan', 'Operations', 'Live Signals', 'Strategy Lab'];
-const UI_BUILD_LABEL = 'UI betting-scope-v0400-0140';
+type Page = 'Issue Dashboard' | 'Match Detail' | 'Operations' | 'Betting Plan' | 'Adhoc Betting' | 'Live Signals' | 'Settlement Review' | 'Strategy Lab';
+const pages: Page[] = ['Issue Dashboard', 'Settlement Review', 'Betting Plan', 'Adhoc Betting', 'Operations', 'Live Signals', 'Strategy Lab'];
+const UI_BUILD_LABEL = 'UI betting-scope-v0400-0150';
 const PAGE_LABELS: Record<Page, string> = {
   'Issue Dashboard': '期次看板',
   'Settlement Review': '赛后复盘',
   'Betting Plan': '下注设计',
+  'Adhoc Betting': '即时下注',
   Operations: '运行状态',
   'Live Signals': '实时信号',
   'Strategy Lab': '策略实验',
@@ -1278,6 +1279,221 @@ function bettingPlanStatusTone(value?: string): 'good' | 'warn' | 'bad' | 'neutr
   return 'neutral';
 }
 
+function adhocPlanStatusLabel(value?: string) {
+  if (value === 'GENERATING') return '正在生成';
+  if (value === 'DOWNLOADABLE_CURRENT') return '有效期内，可下载';
+  if (value === 'EXPIRED_NOT_PURCHASABLE') return '已失效，不可下注';
+  if (value === 'UNAVAILABLE_ADHOC_PLAN') return '生成时不可用';
+  if (value === 'UNVERIFIED_SALE_STATE') return '生成时售卖状态未核验';
+  if (value === 'FAILED_CLOSED') return '已安全拒绝';
+  if (value === 'READY_FOR_REVIEW') return '待人工核对';
+  return value || '等待生成';
+}
+
+function adhocPlanStatusTone(value?: string): 'good' | 'warn' | 'bad' | 'neutral' {
+  if (value === 'DOWNLOADABLE_CURRENT') return 'good';
+  if (value === 'EXPIRED_NOT_PURCHASABLE' || value === 'UNAVAILABLE_ADHOC_PLAN' || value === 'FAILED_CLOSED') return 'bad';
+  if (value === 'READY_FOR_REVIEW' || value === 'UNVERIFIED_SALE_STATE') return 'warn';
+  return 'neutral';
+}
+
+function adhocIdempotencyKey() {
+  return `adhoc-ui-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function adhocExclusionText(exclusionCounts: Record<string, number>) {
+  const entries = Object.entries(exclusionCounts).filter(([, count]) => count > 0);
+  return entries.length ? entries.map(([reason, count]) => `${reason} × ${count}`).join('；') : '无';
+}
+
+function AdhocDenominator({ title, matches }: { title: string; matches: AdhocMatchEligibilityData[] }) {
+  if (!matches.length) return null;
+  return <details className="adhoc-denominator">
+    <summary>{title}（{matches.length} 场）</summary>
+    <div className="adhoc-denominator-list">
+      {matches.map((match) => <div className="adhoc-denominator-row" key={`${match.matchIdx}-${match.matchId}`}>
+        <div><b>#{match.matchIdx} {match.home} vs {match.away}</b><small>{match.league} · {match.kickoffAt}{match.handicapLine === null ? '' : ` · 让球 ${match.handicapLine}`}</small></div>
+        <div><Badge tone={match.eligible ? 'good' : 'warn'}>{match.eligible ? '符合资格' : '已排除'}</Badge>{match.exclusionReasons.length ? <small>{match.exclusionReasons.join('；')}</small> : null}</div>
+      </div>)}
+    </div>
+  </details>;
+}
+
+function AdhocBetting({
+  adapter,
+  availableIssues,
+  selectedIssue,
+  onIssueChange,
+}: {
+  adapter: ApiDashboardAdapter;
+  availableIssues: IssueOption[];
+  selectedIssue: string;
+  onIssueChange: (issueId: string) => void;
+}) {
+  const [requestedN, setRequestedN] = useState(3);
+  const [requestedBudgetYuan, setRequestedBudgetYuan] = useState(512);
+  const [preview, setPreview] = useState<AdhocBettingEligibilityData>();
+  const [previewError, setPreviewError] = useState<string>();
+  const [plan, setPlan] = useState<AdhocBettingPlanData>();
+  const [planError, setPlanError] = useState<string>();
+  const [submitting, setSubmitting] = useState(false);
+  const requestKeyRef = useRef<{ signature: string; key: string } | undefined>(undefined);
+
+  useEffect(() => {
+    let active = true;
+    setPreview(undefined);
+    setPreviewError(undefined);
+    setPlan(undefined);
+    setPlanError(undefined);
+    requestKeyRef.current = undefined;
+    adapter.getAdhocBettingEligibility(selectedIssue)
+      .then((result) => {
+        if (active) setPreview(result);
+      })
+      .catch((error: unknown) => {
+        if (active) setPreviewError(error instanceof Error ? error.message : String(error));
+      });
+    return () => { active = false; };
+  }, [adapter, selectedIssue]);
+
+  useEffect(() => {
+    if (!plan?.requestId) return;
+    let active = true;
+    const refresh = () => {
+      adapter.getAdhocBettingPlan(plan.requestId)
+        .then((result) => {
+          if (active) setPlan(result);
+        })
+        .catch((error: unknown) => {
+          if (active) setPlanError(error instanceof Error ? error.message : String(error));
+        });
+    };
+    const timer = window.setInterval(refresh, 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [adapter, plan?.requestId]);
+
+  const refreshPlan = async () => {
+    if (!plan?.requestId) return;
+    setPlanError(undefined);
+    try {
+      setPlan(await adapter.getAdhocBettingPlan(plan.requestId));
+    } catch (error: unknown) {
+      setPlanError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const generatePlan = async () => {
+    const signature = `${selectedIssue}:${requestedN}:${requestedBudgetYuan}`;
+    const existing = requestKeyRef.current;
+    const idempotencyKey = existing?.signature === signature ? existing.key : adhocIdempotencyKey();
+    requestKeyRef.current = { signature, key: idempotencyKey };
+    setSubmitting(true);
+    setPlanError(undefined);
+    try {
+      const result = await adapter.createAdhocBettingPlan({
+        issueId: selectedIssue,
+        requestedN,
+        requestedBudgetYuan,
+        idempotencyKey,
+      });
+      setPlan(result);
+      requestKeyRef.current = undefined;
+    } catch (error: unknown) {
+      setPlanError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const operationalDownloadsEnabled = Boolean(
+    plan
+    && plan.currentStatus === 'DOWNLOADABLE_CURRENT'
+    && plan.operationalDownloadsEnabled,
+  );
+  const insufficient = Boolean(preview && preview.eligibleMatchCount < requestedN);
+
+  return <div className="grid page-grid adhoc-page">
+    <Card title={`即时下注 / Issue ${selectedIssue}`} icon={<WalletCards />}>
+      <div className="adhoc-mode-strip" aria-label="即时下注与研究冻结边界">
+        <div className="adhoc-mode current"><b>即时下注（本次独立请求）</b><span>仅在本次生成前采集售卖状态、赛程与正式 v3.3.3 输入快照。</span></div>
+        <div className="adhoc-mode audit"><b>研究冻结审计（独立只读）</b><span>不读取、不复制、不执行任何 Scheduled Research Freeze 票包。</span></div>
+      </div>
+      <p className="adhoc-boundary">只按本次请求时的售卖快照生成单一 Exact-N 方案；没有“改 N、补票、沿用旧票或回退到研究冻结”的路径。</p>
+      <div className="adhoc-controls">
+        <label>期号<select aria-label="选择即时下注期号" value={selectedIssue} onChange={(event) => onIssueChange(event.target.value)}>
+          {availableIssues.map((issue) => <option key={issue.issueId} value={issue.issueId}>{issue.label.replace('历史回放', '历史参考')}</option>)}
+        </select></label>
+        <div className="adhoc-choice-field"><span>选择 N</span><div className="adhoc-choice-group" aria-label="选择 N">
+          {[3, 4, 5, 6, 7].map((value) => <button type="button" key={value} className={requestedN === value ? 'active' : ''} aria-pressed={requestedN === value} onClick={() => setRequestedN(value)}>N={value}</button>)}
+        </div></div>
+        <div className="adhoc-choice-field"><span>选择预算</span><div className="adhoc-choice-group" aria-label="选择预算">
+          {[512, 768, 1024].map((value) => <button type="button" key={value} className={requestedBudgetYuan === value ? 'active' : ''} aria-pressed={requestedBudgetYuan === value} onClick={() => setRequestedBudgetYuan(value)}>¥{value}</button>)}
+        </div></div>
+        <div className="adhoc-action"><button type="button" className="adhoc-primary" onClick={generatePlan} disabled={submitting || !preview}>{submitting ? '正在生成…' : '生成即时方案'}</button></div>
+      </div>
+      <div className="adhoc-summary" aria-live="polite">
+        <div><span>本次预览符合条件</span><b>{preview ? `${preview.eligibleMatchCount} 场` : '正在核验'}</b></div>
+        <div><span>排除场次</span><b>{preview ? `${preview.excludedMatchCount} 场` : '-'}</b></div>
+        <div><span>输入截至</span><b>{preview?.inputAsOf || '-'}</b></div>
+        <div><span>安全余量</span><b>{preview ? `${preview.safetyMarginSeconds} 秒` : '-'}</b></div>
+      </div>
+      {preview ? <div className="adhoc-exclusions"><b>完整分母与排除原因：</b><span>{adhocExclusionText(preview.exclusionCounts)}</span></div> : null}
+      {preview ? <AdhocDenominator title="查看本次预览完整资格分母" matches={preview.matches} /> : null}
+      {insufficient ? <div className="empty-state"><b>本次无法生成 N={requestedN}</b><span>只有 {preview?.eligibleMatchCount ?? 0} 场通过本次预览资格核验；系统不会降为较小 N 或采用旧票。</span></div> : null}
+      {previewError ? <div className="empty-state" role="alert"><b>资格核验失败</b><span>{previewError}</span></div> : null}
+      {planError ? <div className="empty-state" role="alert"><b>即时方案操作失败</b><span>{planError}</span></div> : null}
+    </Card>
+
+    {plan ? <Card title="即时方案 / 可打印票面" icon={<CheckCircle2 />}>
+      <div className="adhoc-plan-head">
+        <div><Badge tone={adhocPlanStatusTone(plan.currentStatus)}>{adhocPlanStatusLabel(plan.currentStatus)}</Badge><span> 请求 {plan.requestId.slice(0, 16)}</span></div>
+        <button type="button" onClick={refreshPlan}>刷新有效期状态</button>
+      </div>
+      <p className="adhoc-boundary">刷新只按服务器时钟复核本包的 valid_until；不会重新抓取售卖状态。售卖资格是生成时快照，请在门店再次确认销售开放。</p>
+      {plan.currentStatus === 'EXPIRED_NOT_PURCHASABLE' ? <div className="adhoc-expired" role="alert"><b>已失效，不可下注</b><span>服务器时钟显示本包已超过 valid_until；请重新生成，不会替换或修改原票面。</span></div> : null}
+      <div className="adhoc-summary adhoc-plan-summary">
+        <div><span>Exact N / 预算</span><b>N={plan.requestedN} / {money(plan.requestedBudgetYuan)}</b></div>
+        <div><span>票数 / 基础成本</span><b>{plan.ticketCount} / {moneyFixed(plan.baseCostYuan)}</b></div>
+        <div><span>实际成本</span><b>{moneyFixed(plan.actualCostYuan)}</b></div>
+        <div><span>未用预算</span><b>{moneyFixed(plan.unusedBudgetYuan)}</b></div>
+        <div><span>预算利用率</span><b>{(plan.budgetUtilization * 100).toFixed(2)}%</b></div>
+        <div><span>冻结有效至</span><b>{plan.validUntil || '-'}</b></div>
+        <div><span>生成时间</span><b>{plan.requestedAt}</b></div>
+        <div><span>输入截至</span><b>{plan.inputAsOf}</b></div>
+        <div><span>输入哈希</span><b>{plan.inputSha256.slice(0, 16) || '-'}</b></div>
+        <div><span>方案状态</span><b>{adhocPlanStatusLabel(plan.status)}</b></div>
+      </div>
+      <p className="adhoc-boundary">本方案为 request-time 独立包：售卖状态仅代表生成时快照，research_evidence_eligible=false，scheduled_freeze_event_id=null；不提供正确比分执行。</p>
+      <AdhocDenominator title="查看本次冻结资格分母" matches={plan.denominator} />
+      {plan.tickets.length ? <div className="adhoc-ticket-list">
+        {plan.tickets.map((ticket) => <section className="adhoc-ticket" key={ticket.ticketNo}>
+          <header className="adhoc-ticket-head"><b>第 {ticket.ticketNo} 票 · Exact N={ticket.actualN}</b><span>倍数 {ticket.stakeMultiplier} · {moneyFixed(ticket.costYuan)}</span></header>
+          <div className="adhoc-leg-list">
+            {ticket.legs.map((leg) => <label className="adhoc-leg" key={`${ticket.ticketNo}-${leg.matchId}`}>
+              <input type="checkbox" aria-label={`现场勾选第 ${ticket.ticketNo} 票 #${leg.matchIdx}`} />
+              <span className="adhoc-leg-index">#{leg.matchIdx}</span>
+              <span><b>{leg.home} vs {leg.away}</b><small>{leg.league} · {leg.kickoffAt}{leg.handicapLine === null ? '' : ` · 让球 ${leg.handicapLine}`}</small></span>
+              <strong>{leg.selectionCode} · {leg.selectionLabel}</strong>
+            </label>)}
+          </div>
+        </section>)}
+      </div> : <div className="empty-state"><b>本次无法生成 Exact-N 方案</b><span>{plan.unavailableReasons.join('；') || plan.planReason || '本次输入不满足生成条件。'}</span></div>}
+      <div className="adhoc-download-row">
+        <b>下载票面</b>
+        {operationalDownloadsEnabled ? <>
+          {(['pdf', 'html', 'csv'] as const).map((format) => <a className="adhoc-download" key={format} href={adapter.adhocBettingDownloadUrl(plan.requestId, format)} title={`下载 valid_until 内的 ${format.toUpperCase()} 票面；仍需现场确认销售开放`}><Download aria-hidden="true" />下载 {format.toUpperCase()}</a>)}
+        </> : <>
+          {(['PDF', 'HTML', 'CSV'] as const).map((format) => <button type="button" key={format} disabled title="方案已失效或生成时售卖资格未核验，不能下载用于下注">{format} 下载已禁用</button>)}
+        </>}
+        {plan.auditDownloadsAvailable ? <a className="adhoc-download audit" href={adapter.adhocBettingDownloadUrl(plan.requestId, 'pdf', true)} title="下载只读审计记录，不能用于下注"><Download aria-hidden="true" />下载审计记录（PDF）</a> : null}
+      </div>
+    </Card> : null}
+  </div>;
+}
+
 function BettingPlan({
   data,
   exactN,
@@ -2180,6 +2396,15 @@ export default function App() {
 		      selectedStakeMode={selectedSegmentStakeMode}
 		      onStakeModeChange={setSelectedSegmentStakeMode}
 		    /> : <DeferredPage title="下注设计" loading={activePageLoad} error={activePageError} />)}
+	    {page === 'Adhoc Betting' && <AdhocBetting
+	      adapter={adapter}
+	      availableIssues={data.availableIssues}
+	      selectedIssue={selectedIssueOption}
+	      onIssueChange={(issueId) => {
+	        setSelectedIssue(issueId);
+	        setSelectedMatchId(undefined);
+	      }}
+	    />}
 	    {page === 'Match Detail' && (data.matchDetail ? <MatchDetail
 	      data={data.matchDetail}
 	      selectedDecisionVariant={effectiveSelectedDecisionVariant}

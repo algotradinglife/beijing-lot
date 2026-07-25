@@ -81,20 +81,20 @@ spec:
       - research_pi_review
 
 status:
-  current: EXECUTING
-  attempts: 1
+  current: AWAITING_REVIEW
+  attempts: 2
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "ROUTE: Engineer. PR #29 PI review requested changes on af6814f; engineering_primary remains occupied for the fix cycle."
+    reason: "PI follow-up implementation and new-head engineering validation are complete in the isolated worktree. PR #29 awaits Research PI re-review; this remains implementation capability only, not prospective live-betting or research-evidence proof."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/28"
       artifact_type: issue
       description: Approved execution contract
     - uri: "https://github.com/algotradinglife/beijing-lot/pull/29"
       artifact_type: pull_request
-      description: Engineer implementation and validation receipt
+      description: Engineer follow-up implementation and validation receipt
     - uri: "https://github.com/algotradinglife/beijing-lot/pull/29#pullrequestreview-4778787757"
       artifact_type: pi_review
       description: PI changes requested on af6814f
@@ -107,7 +107,55 @@ status:
         - "P0: adhoc sample_attempts=4000 changes the released exact-N portfolio contract, whose production default is 12000."
         - "P1: package does not bind the full portfolio contract or deterministically regenerate tickets during semantic verification."
         - "P1: UI claims current sale qualification although refresh only rechecks the immutable valid_until clock."
+    implementation_head: 8cde25f
+    automated_engineering_validation: PASS
+    independent_codex_review: PASS
+    browser_device_visual_validation: PASS
+    browser_device_visual_evidence: "Controlled local fixture: generated N=5 / ¥1024 plan through the real API and web flow; 375x812 viewport had no horizontal overflow, CJK text rendered, desktop layout had no console errors, and the generated four-page 595x842 pt A4 PDF had legible uncut first and last pages. HTML and CSV downloads returned OPERATIONAL_CURRENT."
+    python_tests: 34_passed
+    dashboard_tests: 23_passed
+    frontend_build: PASS
+    diff_check: PASS
+    review_followup_validation: "PASS: released 12000-attempt Exact-N contract is shared with the scheduled publisher; plan/manifest freeze source/version/selection/staking parameters; verifier replays ticket order/cost/reason; fully rehashed replacement-ticket adversarial test rejects."
+    independent_codex_review_followup: PASS
+    baseline_note: "Three unrelated estimate_segment_betting_plan tests fail identically at pre-change af6814f and this revised worktree; they are not caused by this follow-up diff."
   history:
+    - action: followup_engineering_validation_completed
+      ts: "2026-07-25T15:42:30+08:00"
+      actor: engineer
+      from: EXECUTING
+      to: AWAITING_REVIEW
+      reason: "Validated the PI follow-up with 28 adhoc package tests plus 6 adhoc API tests, 23 dashboard tests, TypeScript/Vite build, Ruff, diff check, and an independent local Codex review. New tests prove a fully rehashed valid-looking ticket substitution is rejected by deterministic portfolio replay."
+    - action: ready_for_research_pi_review
+      ts: "2026-07-25T15:14:56+08:00"
+      actor: engineer
+      from: VALIDATING
+      to: AWAITING_REVIEW
+      reason: "Engineering validation is complete and PR #29 was moved from draft to ready for review. No claim is made that a fixture validation constitutes prospective live-betting or research evidence."
+    - action: browser_device_visual_validation_completed
+      ts: "2026-07-25T14:58:03+08:00"
+      actor: engineer
+      from: VALIDATING
+      to: VALIDATING
+      reason: "After user authorization, a controlled local fixture exercised the real web/API flow: N=5 / ¥1024 plan generation, current PDF/HTML/CSV downloads, 375px no-overflow rendering, desktop CJK rendering without console errors, and complete A4 PDF first/last pages. This is implementation validation only, not prospective live-betting evidence."
+    - action: automated_engineering_validation_completed
+      ts: "2026-07-25T14:35:59+08:00"
+      actor: everything-bot-engineer
+      from: EXECUTING
+      to: VALIDATING
+      reason: "Validated PR #29 implementation HEAD 1b5049e: 33 adhoc Python tests, 23 dashboard tests, production build, and diff check passed. Independent validation reproduced and closed the valid_until download race; an independent local Codex review found no actionable regression. Browser/device visual validation remains pending because its one-time local setup requires user approval; Research PI review follows that gate."
+    - action: implementation_complete_pending_validation
+      ts: "2026-07-25T14:10:00+08:00"
+      actor: engineer
+      from: EXECUTING
+      to: EXECUTING
+      reason: "Implemented the isolated adhoc API, append-only package/ledger, guarded downloads, printable CJK PDF, and distinct web workflow. 32 Python tests, 23 dashboard tests, TypeScript build, and new-file Ruff checks pass; independent engineering validation and PI review remain required."
+    - action: start_execution
+      ts: "2026-07-25T13:41:42+08:00"
+      actor: engineer
+      from: READY
+      to: EXECUTING
+      reason: "Engineer started BJ-ADHOC-BET-001 in an isolated worktree after the capability became the active engineering_primary item."
     - action: task_created
       ts: "2026-07-25T03:39:10Z"
       actor: research_pi

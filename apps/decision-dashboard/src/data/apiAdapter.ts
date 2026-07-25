@@ -1,6 +1,6 @@
 import { mockDashboardData } from './mockData';
 import { DEFAULT_DECISION_VARIANT_ID } from '../decisionVariants';
-import type { CandidateRole, CoverageType, DashboardData, DecisionArtifactCompleteness, DecisionArtifactGenerateResult, DecisionArtifactStatusData, DecisionSnapshotConfirmResult, DecisionSnapshotData, DecisionVariantData, DecisionVariantOption, ExactNFreezeData, IssueDashboardData, IssueMatchRow, IssueOption, LiveSignalsData, MainStrategyData, MatchDetailData, OddsConsensus, OperationsStatusData, PostmatchReviewData, ScrapeStatus, SegmentBettingPlanData, SelectorShadowData, SettlementData, StrategyLabData, StrategyVersionContext, TicketData } from './types';
+import type { AdhocBettingEligibilityData, AdhocBettingPlanData, CandidateRole, CoverageType, DashboardData, DecisionArtifactCompleteness, DecisionArtifactGenerateResult, DecisionArtifactStatusData, DecisionSnapshotConfirmResult, DecisionSnapshotData, DecisionVariantData, DecisionVariantOption, ExactNFreezeData, IssueDashboardData, IssueMatchRow, IssueOption, LiveSignalsData, MainStrategyData, MatchDetailData, OddsConsensus, OperationsStatusData, PostmatchReviewData, ScrapeStatus, SegmentBettingPlanData, SelectorShadowData, SettlementData, StrategyLabData, StrategyVersionContext, TicketData } from './types';
 
 export type AdapterMode = 'mock' | 'fetch';
 
@@ -1962,6 +1962,216 @@ function transformExactNFreezes(raw: unknown): ExactNFreezeData {
   };
 }
 
+function transformAdhocMatchEligibility(raw: unknown) {
+  const row = asObject(raw);
+  const handicap = row.handicap_line;
+  return {
+    matchIdx: asNumber(row.match_idx),
+    matchId: asString(row.match_id),
+    league: asString(row.league),
+    home: asString(row.home),
+    away: asString(row.away),
+    handicapLine: typeof handicap === 'number' || typeof handicap === 'string' ? handicap : null,
+    kickoffAt: asString(row.kickoff_at_hkt),
+    eligible: asBoolean(row.eligible),
+    exclusionReasons: asStringList(row.exclusion_reasons),
+  };
+}
+
+function transformAdhocBettingEligibility(raw: unknown): AdhocBettingEligibilityData {
+  const obj = asObject(raw);
+  return {
+    schemaVersion: asString(obj.schema_version),
+    capabilityId: asString(obj.capability_id),
+    issueId: asString(obj.issue),
+    observedAt: asString(obj.observed_at_hkt),
+    inputAsOf: asString(obj.input_asof_hkt),
+    status: asString(obj.status),
+    eligibleMatchCount: asNumber(obj.eligible_match_count),
+    excludedMatchCount: asNumber(obj.excluded_match_count),
+    exclusionCounts: asNumberRecord(obj.exclusion_counts),
+    matches: asArray(obj.matches).map(transformAdhocMatchEligibility),
+    safetyMarginSeconds: asNumber(obj.safety_margin_seconds),
+    previewOnly: asBoolean(obj.preview_only),
+    researchEvidenceEligible: false,
+    scheduledFreezeEventId: null,
+  };
+}
+
+function transformAdhocBettingPlan(raw: unknown): AdhocBettingPlanData {
+  const obj = asObject(raw);
+  return {
+    schemaVersion: asString(obj.schema_version),
+    capabilityId: asString(obj.capability_id),
+    requestId: asString(obj.request_id),
+    issueId: asString(obj.issue),
+    requestedAt: asString(obj.requested_at_hkt),
+    inputAsOf: asString(obj.input_asof_hkt),
+    requestedN: asNumber(obj.requested_n),
+    requestedBudgetYuan: asNumber(obj.requested_budget_yuan),
+    baseCostYuan: asNumber(obj.base_cost_yuan),
+    actualCostYuan: asNumber(obj.actual_cost_yuan),
+    unusedBudgetYuan: asNumber(obj.unused_budget_yuan),
+    budgetUtilization: asNumber(obj.budget_utilization),
+    validUntil: asString(obj.valid_until_hkt),
+    status: asString(obj.status),
+    currentStatus: asString(obj.current_status),
+    currentStatusRecheckScope: asString(obj.current_status_recheck_scope),
+    saleEligibilityScope: asString(obj.sale_eligibility_scope),
+    shopSaleConfirmationRequired: asBoolean(obj.shop_sale_confirmation_required),
+    structuralVerificationStatus: asString(obj.structural_verification_status),
+    saleStatusVerified: asBoolean(obj.sale_status_verified),
+    operationalDownloadsEnabled: asBoolean(obj.operational_downloads_enabled),
+    auditDownloadsAvailable: asBoolean(obj.audit_downloads_available),
+    ticketCount: asNumber(obj.ticket_count),
+    eligibleMatchCount: asNumber(obj.eligible_match_count),
+    excludedMatchCount: asNumber(obj.excluded_match_count),
+    exclusionCounts: asNumberRecord(obj.exclusion_counts),
+    denominator: asArray(obj.denominator).map(transformAdhocMatchEligibility),
+    tickets: asArray(obj.tickets).map((rawTicket) => {
+      const ticket = asObject(rawTicket);
+      return {
+        ticketNo: asNumber(ticket.ticket_no),
+        actualN: asNumber(ticket.actual_n),
+        stakeMultiplier: asNumber(ticket.stake_multiplier),
+        baseCostYuan: asNumber(ticket.base_cost_yuan),
+        costYuan: asNumber(ticket.cost_yuan),
+        legs: asArray(ticket.legs).map((rawLeg) => {
+          const leg = asObject(rawLeg);
+          const handicap = leg.handicap_line;
+          return {
+            matchIdx: asNumber(leg.match_idx),
+            matchId: asString(leg.match_id),
+            selectionCode: asString(leg.selection_code),
+            selectionLabel: asString(leg.selection_label),
+            kickoffAt: asString(leg.kickoff_at_hkt),
+            league: asString(leg.league),
+            home: asString(leg.home),
+            away: asString(leg.away),
+            handicapLine: typeof handicap === 'number' || typeof handicap === 'string' ? handicap : null,
+          };
+        }),
+      };
+    }),
+    planReason: asString(obj.plan_reason),
+    unavailableReasons: asStringList(obj.unavailable_reasons),
+    inputSha256: asString(obj.input_sha256),
+    manifestSha256: asString(obj.manifest_sha256),
+    packageId: asString(obj.package_id),
+    researchEvidenceEligible: false,
+    scheduledFreezeEventId: null,
+    correctScoreStatus: asString(obj.correct_score_status),
+    idempotent: asBoolean(obj.idempotent),
+  };
+}
+
+function mockAdhocBettingEligibility(issueId: string): AdhocBettingEligibilityData {
+  return {
+    schemaVersion: 'adhoc_betting_eligibility_preview_v1',
+    capabilityId: 'BJ-ADHOC-BET-001',
+    issueId,
+    observedAt: '2026-07-25T12:00:00+08:00',
+    inputAsOf: '2026-07-25T12:00:00+08:00',
+    status: 'ELIGIBILITY_PREVIEW',
+    eligibleMatchCount: 8,
+    excludedMatchCount: 0,
+    exclusionCounts: {},
+    matches: Array.from({ length: 8 }, (_, index) => ({
+      matchIdx: index + 1,
+      matchId: `${issueId}_${String(index + 1).padStart(3, '0')}`,
+      league: '示例联赛',
+      home: `示例主队 ${index + 1}`,
+      away: `示例客队 ${index + 1}`,
+      handicapLine: null,
+      kickoffAt: '2026-07-25T20:30:00+08:00',
+      eligible: true,
+      exclusionReasons: [],
+    })),
+    safetyMarginSeconds: 120,
+    previewOnly: true,
+    researchEvidenceEligible: false,
+    scheduledFreezeEventId: null,
+  };
+}
+
+function mockAdhocBettingPlan(
+  issueId: string,
+  requestedN: number,
+  requestedBudgetYuan: number,
+): AdhocBettingPlanData {
+  const choices = [
+    { matchIdx: 1, matchId: `${issueId}_001`, selectionCode: '3', selectionLabel: '胜', league: '英超', home: '示例主队 A', away: '示例客队 A' },
+    { matchIdx: 2, matchId: `${issueId}_002`, selectionCode: '1', selectionLabel: '平', league: '西甲', home: '示例主队 B', away: '示例客队 B' },
+    { matchIdx: 3, matchId: `${issueId}_003`, selectionCode: '0', selectionLabel: '负', league: '意甲', home: '示例主队 C', away: '示例客队 C' },
+    { matchIdx: 4, matchId: `${issueId}_004`, selectionCode: '3', selectionLabel: '胜', league: '德甲', home: '示例主队 D', away: '示例客队 D' },
+    { matchIdx: 5, matchId: `${issueId}_005`, selectionCode: '1', selectionLabel: '平', league: '法甲', home: '示例主队 E', away: '示例客队 E' },
+    { matchIdx: 6, matchId: `${issueId}_006`, selectionCode: '0', selectionLabel: '负', league: '荷甲', home: '示例主队 F', away: '示例客队 F' },
+    { matchIdx: 7, matchId: `${issueId}_007`, selectionCode: '3', selectionLabel: '胜', league: '葡超', home: '示例主队 G', away: '示例客队 G' },
+    { matchIdx: 8, matchId: `${issueId}_008`, selectionCode: '1', selectionLabel: '平', league: '比甲', home: '示例主队 H', away: '示例客队 H' },
+  ];
+  const legCount = requestedN;
+  const ticketCost = 2;
+  const tickets = Array.from({ length: 3 }, (_, ticketIndex) => ({
+    ticketNo: ticketIndex + 1,
+    actualN: legCount,
+    stakeMultiplier: 1,
+    baseCostYuan: ticketCost,
+    costYuan: ticketCost,
+    legs: Array.from({ length: legCount }, (_, legIndex) => choices[(ticketIndex + legIndex) % choices.length]).map((choice) => ({
+        ...choice,
+        kickoffAt: '2026-07-25T20:30:00+08:00',
+        handicapLine: null,
+      })),
+  }));
+  const actualCostYuan = tickets.reduce((total, ticket) => total + ticket.costYuan, 0);
+  const requestId = `mock-${issueId}-n${legCount}-b${requestedBudgetYuan}`;
+  return {
+    schemaVersion: 'adhoc_betting_package_v1',
+    capabilityId: 'BJ-ADHOC-BET-001',
+    requestId,
+    issueId,
+    requestedAt: '2026-07-25T12:00:00+08:00',
+    inputAsOf: '2026-07-25T12:00:00+08:00',
+    requestedN: legCount,
+    requestedBudgetYuan,
+    baseCostYuan: tickets.reduce((total, ticket) => total + ticket.baseCostYuan, 0),
+    actualCostYuan,
+    unusedBudgetYuan: requestedBudgetYuan - actualCostYuan,
+    budgetUtilization: actualCostYuan / requestedBudgetYuan,
+    validUntil: '2026-07-25T20:28:00+08:00',
+    status: 'READY_FOR_REVIEW',
+    currentStatus: 'DOWNLOADABLE_CURRENT',
+    currentStatusRecheckScope: 'VALID_UNTIL_SERVER_CLOCK_ONLY',
+    saleEligibilityScope: 'GENERATION_TIME_SNAPSHOT_ONLY',
+    shopSaleConfirmationRequired: true,
+    structuralVerificationStatus: 'STRUCTURAL_INTEGRITY_PASS',
+    saleStatusVerified: true,
+    operationalDownloadsEnabled: true,
+    auditDownloadsAvailable: true,
+    ticketCount: tickets.length,
+    eligibleMatchCount: 8,
+    excludedMatchCount: 0,
+    exclusionCounts: {},
+    denominator: choices.map((choice) => ({
+      ...choice,
+      handicapLine: null,
+      kickoffAt: '2026-07-25T20:30:00+08:00',
+      eligible: true,
+      exclusionReasons: [],
+    })),
+    tickets,
+    planReason: 'mock exact-N portfolio',
+    unavailableReasons: [],
+    inputSha256: 'mock-current-input-sha256',
+    manifestSha256: 'mock-adhoc-manifest-sha256',
+    packageId: 'mock-adhoc-package-id',
+    researchEvidenceEligible: false,
+    scheduledFreezeEventId: null,
+    correctScoreStatus: 'UNAVAILABLE_ADHOC_CORRECT_SCORE',
+    idempotent: false,
+  };
+}
+
 export class ApiDashboardAdapter {
   private mode: AdapterMode;
   private baseUrl: string;
@@ -1978,9 +2188,26 @@ export class ApiDashboardAdapter {
     return transform(await response.json());
   }
 
-  private async postJson<T>(path: string, fallback: T, transform: (payload: unknown) => T = (payload) => payload as T): Promise<T> {
+  private async postJson<T>(
+    path: string,
+    fallback: T,
+    transform: (payload: unknown) => T = (payload) => payload as T,
+    body?: unknown,
+  ): Promise<T> {
     if (this.mode === 'mock') return fallback;
-    const response = await fetch(`${this.baseUrl}${path}`, { method: 'POST', headers: operatorTokenHeaders() });
+    const headers = operatorTokenHeaders();
+    const request = body === undefined
+      ? { method: 'POST', headers }
+      : {
+        method: 'POST',
+        headers: (() => {
+          const requestHeaders = new Headers(headers);
+          requestHeaders.set('Content-Type', 'application/json');
+          return requestHeaders;
+        })(),
+        body: JSON.stringify(body),
+      };
+    const response = await fetch(`${this.baseUrl}${path}`, request);
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const message = asString(asObject(payload).error, `API ${path} failed: ${response.status}`);
@@ -2100,6 +2327,52 @@ export class ApiDashboardAdapter {
 
   getOperationsStatus(issueId: string): Promise<OperationsStatusData> {
     return this.getJson(`/api/issues/${issueId}/operations`, mockDashboardData.operations, transformOperationsStatus);
+  }
+
+  getAdhocBettingEligibility(issueId: string): Promise<AdhocBettingEligibilityData> {
+    const issue = encodeURIComponent(issueId);
+    return this.getJson(
+      `/api/adhoc-betting-plans/eligibility?issue=${issue}`,
+      mockAdhocBettingEligibility(issueId),
+      transformAdhocBettingEligibility,
+    );
+  }
+
+  createAdhocBettingPlan(request: {
+    issueId: string;
+    requestedN: number;
+    requestedBudgetYuan: number;
+    idempotencyKey: string;
+  }): Promise<AdhocBettingPlanData> {
+    return this.postJson(
+      '/api/adhoc-betting-plans',
+      mockAdhocBettingPlan(request.issueId, request.requestedN, request.requestedBudgetYuan),
+      transformAdhocBettingPlan,
+      {
+        issue: request.issueId,
+        requested_n: request.requestedN,
+        requested_budget_yuan: request.requestedBudgetYuan,
+        idempotency_key: request.idempotencyKey,
+      },
+    );
+  }
+
+  getAdhocBettingPlan(requestId: string): Promise<AdhocBettingPlanData> {
+    const encodedId = encodeURIComponent(requestId);
+    return this.getJson(
+      `/api/adhoc-betting-plans/${encodedId}`,
+      mockAdhocBettingPlan('mock', 3, 512),
+      transformAdhocBettingPlan,
+    );
+  }
+
+  adhocBettingDownloadUrl(
+    requestId: string,
+    format: 'pdf' | 'html' | 'csv',
+    auditOnly = false,
+  ): string {
+    const endpoint = auditOnly ? 'audit-download' : 'download';
+    return `${this.baseUrl}/api/adhoc-betting-plans/${encodeURIComponent(requestId)}/${endpoint}?format=${format}`;
   }
 
   async getDashboardShell(issueId: string, decisionVariantId?: string): Promise<Pick<DashboardData, 'availableIssues' | 'issue'>> {

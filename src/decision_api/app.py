@@ -17,8 +17,25 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, redirect, render_template_string, request, send_from_directory, session
+from flask import (
+    Flask,
+    jsonify,
+    redirect,
+    render_template_string,
+    request,
+    send_file,
+    send_from_directory,
+    session,
+)
 
+from src.adhoc_betting import (
+    AdhocBettingError,
+    AdhocBettingStore,
+    AdhocIdempotencyConflict,
+    AdhocPlanNotFound,
+    DEFAULT_ADHOC_ROOT,
+    DEFAULT_FONT_FILE,
+)
 from src.decision_artifact_completeness import active_snapshot_completeness, completeness_for_indices
 from src.natural_day_manifest import (
     NaturalDayManifestError,
@@ -33,6 +50,7 @@ from src.segment_recovery import (
     verify_operational_window as verify_recovery_operational_window,
 )
 from src.sqlite_runtime import connect_sqlite
+from src.structured_input_receipt import receipt_path, verify_receipt
 from scripts.verify_exact_n_freeze import verify_directory as verify_exact_n_directory
 
 
@@ -53,6 +71,7 @@ DECISION_VERSIONS_CONFIG = PROJECT_ROOT / "config/decision_versions.json"
 STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
 DEFAULT_DASHBOARD_RUNTIME_STATUS = PROJECT_ROOT / "tmp/decision_dashboard/runtime_status.json"
 DEFAULT_DASHBOARD_STATIC_DIR = PROJECT_ROOT / "apps/decision-dashboard/dist"
+DEFAULT_ADHOC_BETTING_ROOT = DEFAULT_ADHOC_ROOT
 DEFAULT_DECISION_API_HOST = "127.0.0.1"
 DEFAULT_CACHE_TTL_SEC = 30.0
 OPERATOR_TOKEN_ENV = "BEIDAN_DECISION_API_OPERATOR_TOKEN"
@@ -3470,6 +3489,561 @@ def _structured_shadow_rows_from_csv(path: Path) -> tuple[dict[int, dict[str, An
     except ValueError:
         source = str(path)
     return rows, source
+
+
+def _adhoc_hk_iso(value: datetime) -> str:
+    return value.astimezone(HK_TZ).isoformat(timespec="seconds")
+
+
+def _adhoc_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int) and value in {0, 1}:
+        return bool(value)
+    text = str(value or "").strip().lower()
+    if text in {"1", "true", "yes", "y", "open", "allowed", "allow"}:
+        return True
+    if text in {"0", "false", "no", "n", "closed", "denied", "deny"}:
+        return False
+    return None
+
+
+def _adhoc_match_status(status: Any, status_text: Any) -> str:
+    machine = str(status or "").strip().lower()
+    text = str(status_text or "").strip().lower()
+    if not machine and not text:
+        return "UNKNOWN"
+
+    # The normalized status field is authoritative when present.  A page's
+    # retained display text can lag one cycle behind it (for example,
+    # ``status=live`` with a stale ``未开赛`` label).
+    if machine in {"cancelled", "canceled", "cancel"}:
+        return "CANCELLED"
+    if machine in {"postponed", "postpone"}:
+        return "POSTPONED"
+    if machine in {"finished", "settled", "complete", "completed"}:
+        return "FINISHED"
+    if machine in {"live", "playing", "inplay", "in_play", "started"}:
+        return "LIVE" if machine != "started" else "STARTED"
+    if machine in {"not_started", "scheduled", "pending", "upcoming"}:
+        return "SCHEDULED"
+    text = f"{machine} {text}".strip()
+    if any(token in text for token in ("cancel", "取消")):
+        return "CANCELLED"
+    if any(token in text for token in ("postpon", "延期", "推迟")):
+        return "POSTPONED"
+    if any(token in text for token in ("finish", "settled", "完场", "已结束")):
+        return "FINISHED"
+    if any(token in text for token in ("live", "playing", "进行", "中场")):
+        return "LIVE"
+    if any(token in text for token in ("scheduled", "upcoming", "pending", "not_started", "未开赛", "未开始", "待开")):
+        return "SCHEDULED"
+    if any(token in text for token in ("start", "开赛")):
+        return "STARTED"
+    return "UNKNOWN"
+
+
+def _adhoc_kickoff_hkt(
+    *,
+    sale_cutoff: str,
+    schedule_date: str,
+    kickoff_time: str,
+) -> datetime | None:
+    """Resolve the Nowscore kickoff clock without borrowing scheduled state."""
+
+    direct = _parse_timestamp_to_hk(kickoff_time)
+    if direct is not None:
+        return direct
+    if schedule_date and kickoff_time:
+        direct = _parse_timestamp_to_hk(f"{schedule_date} {kickoff_time}")
+        if direct is not None:
+            return direct
+    cutoff = _parse_timestamp_to_hk(sale_cutoff)
+    match = re.fullmatch(r"\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*", str(kickoff_time or ""))
+    if cutoff is None or match is None:
+        return None
+    hour, minute = (int(part) for part in match.groups())
+    candidates = [
+        (cutoff + timedelta(days=offset)).replace(
+            hour=hour, minute=minute, second=0, microsecond=0
+        )
+        for offset in (-1, 0, 1)
+    ]
+    return min(
+        (value for value in candidates if cutoff <= value <= cutoff + timedelta(hours=12)),
+        default=None,
+    )
+
+
+def _adhoc_formal_structured_input(
+    *,
+    issue: str,
+    expected_indices: set[int],
+    request_clock: datetime,
+    release: dict[str, Any] | None = None,
+) -> tuple[dict[int, dict[str, Any]], dict[str, Any]]:
+    """Select the newest verified *formal* active v3.3.3 input, fail closed.
+
+    The ordinary dashboard scans CSV mtimes for presentation.  An adhoc plan
+    cannot do that: it needs an authenticated receipt clock and complete
+    membership before it can bind a request-time package.
+    """
+
+    release = release or _active_strategy_release()
+    candidates: list[tuple[datetime, Path, dict[int, dict[str, Any]], dict[str, Any]]] = []
+    rejected: list[str] = []
+    for path in _structured_shadow_csv_candidates(issue, release):
+        rows, _source = _structured_shadow_rows_from_csv(path)
+        source_variant = _shadow_source_variant_id(rows)
+        if _public_decision_variant_id(source_variant, release) != FORMAL_DECISION_VARIANT_ID:
+            continue
+        try:
+            receipt = verify_receipt(path, receipt_path(path), issue=issue)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            rejected.append(f"receipt_invalid:{path.name}:{type(exc).__name__}")
+            continue
+        generated = receipt.get("generated_at")
+        if not isinstance(generated, datetime):
+            rejected.append(f"receipt_clock_missing:{path.name}")
+            continue
+        generated_hk = generated.astimezone(HK_TZ)
+        if generated_hk > request_clock:
+            rejected.append(f"receipt_clock_after_request:{path.name}")
+            continue
+        if set(rows) != expected_indices:
+            rejected.append(f"receipt_membership_incomplete:{path.name}")
+            continue
+        candidates.append((generated_hk, path, rows, receipt))
+    if not candidates:
+        return {}, {
+            "status": "UNAVAILABLE_FORMAL_INPUT",
+            "decision_variant_id": FORMAL_DECISION_VARIANT_ID,
+            "rejected_candidates": rejected,
+        }
+    generated_hk, path, rows, receipt = max(
+        candidates,
+        key=lambda item: (item[0], item[1].as_posix()),
+    )
+    return rows, {
+        "status": "VERIFIED_FORMAL_INPUT",
+        "decision_variant_id": FORMAL_DECISION_VARIANT_ID,
+        "structured_csv": _relative_display_path(path),
+        "structured_csv_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "structured_receipt": _relative_display_path(receipt_path(path)),
+        "structured_receipt_sha256": str(receipt.get("sha256") or ""),
+        "generated_at_hkt": _adhoc_hk_iso(generated_hk),
+        "rejected_candidates": rejected,
+    }
+
+
+def _adhoc_latest_live_sp(
+    conn: sqlite3.Connection,
+    issue: str,
+    *,
+    request_clock: datetime,
+) -> dict[int, dict[str, Any]]:
+    """Select the latest complete 500 live-SP vector that existed at request time.
+
+    Do not let a row with a later source/fetch clock stand in for the request
+    snapshot.  The selected record retains both clocks so the immutable package
+    can prove which 500 observation it used.
+    """
+
+    if not _table_exists(conn, "live_sp_snapshots"):
+        return {}
+    rows = conn.execute(
+        """
+        SELECT row_idx, sp_home, sp_draw, sp_away, fetched_at, source_updatetime
+        FROM live_sp_snapshots
+        WHERE issue=? AND playid=34
+        """,
+        (issue,),
+    ).fetchall()
+    selected: dict[int, dict[str, Any]] = {}
+    for record in rows:
+        row = dict(record)
+        idx = _safe_int(row.get("row_idx"))
+        if idx is None:
+            continue
+        if any(
+            (_safe_float(row.get(column)) or 0.0) <= 0.0
+            for column in ("sp_home", "sp_draw", "sp_away")
+        ):
+            continue
+        source_clock = _parse_timestamp_to_hk(str(row.get("source_updatetime") or ""))
+        fetched_clock = _parse_timestamp_to_hk(str(row.get("fetched_at") or ""))
+        if (
+            source_clock is None
+            or fetched_clock is None
+            or source_clock > request_clock
+            or fetched_clock > request_clock
+        ):
+            continue
+        candidate_clock = max(source_clock, fetched_clock)
+        current = selected.get(idx)
+        current_clock = current.get("_selection_clock") if current else None
+        if current_clock is not None and candidate_clock <= current_clock:
+            continue
+        selected[idx] = {
+            **row,
+            "source_updatetime_hkt": _adhoc_hk_iso(source_clock),
+            "fetched_at_hkt": _adhoc_hk_iso(fetched_clock),
+            "raw_snapshot_sha256": hashlib.sha256(
+                _json_dumps(row).encode("utf-8")
+            ).hexdigest(),
+            "_selection_clock": candidate_clock,
+        }
+    for row in selected.values():
+        row.pop("_selection_clock", None)
+    return selected
+
+
+def _adhoc_market_metadata(
+    conn: sqlite3.Connection,
+    issue: str,
+    *,
+    request_clock: datetime,
+) -> dict[int, dict[str, Any]]:
+    """Return one coherent 3-way market snapshot per match as of the request.
+
+    A three-way vector is only operationally meaningful when every outcome is
+    from the same complete snapshot and agrees on sale state, parlay permission,
+    and sale cutoff.  A representative outcome row is not sufficient: it could
+    make a closed or stale leg look purchasable.
+    """
+
+    if not _table_exists(conn, "live_market_sp_snapshots"):
+        return {}
+    columns = {
+        str(row[1])
+        for row in conn.execute("PRAGMA table_info(live_market_sp_snapshots)").fetchall()
+    }
+    required = {"issue", "row_idx", "playid", "outcome_code", "sp"}
+    if not required.issubset(columns):
+        return {}
+
+    def column(name: str) -> str:
+        return name if name in columns else f"NULL AS {name}"
+
+    rows = conn.execute(
+        f"""
+        SELECT
+            row_idx, outcome_code, sp,
+            {column('parlay_allowed')},
+            {column('sale_status')},
+            {column('sale_cutoff_hkt')},
+            {column('fetched_at_utc')},
+            {column('source_updated_at_hkt')},
+            {column('fetched_at')},
+            {column('source_updatetime')},
+            {column('batch_id')}
+        FROM live_market_sp_snapshots
+        WHERE issue=? AND playid=34
+        """,
+        (issue,),
+    ).fetchall()
+    grouped: dict[tuple[int, str], list[dict[str, Any]]] = defaultdict(list)
+    for record in rows:
+        row = dict(record)
+        idx = _safe_int(row.get("row_idx"))
+        if idx is None:
+            continue
+        key = str(
+            row.get("batch_id")
+            or row.get("fetched_at_utc")
+            or row.get("fetched_at")
+            or row.get("source_updated_at_hkt")
+            or row.get("source_updatetime")
+            or ""
+        )
+        if not key:
+            continue
+        grouped[(idx, key)].append(row)
+
+    selected: dict[int, dict[str, Any]] = {}
+    for (idx, _key), group in grouped.items():
+        if len(group) != len(OUTCOME_ORDER):
+            continue
+        by_code = {str(row.get("outcome_code") or ""): row for row in group}
+        if set(by_code) != set(OUTCOME_ORDER):
+            continue
+        if any((_safe_float(by_code[code].get("sp")) or 0.0) <= 0 for code in OUTCOME_ORDER):
+            continue
+        sale_values = {
+            str(by_code[code].get("sale_status") or "").upper()
+            for code in OUTCOME_ORDER
+        }
+        pass_values = {
+            _adhoc_bool(by_code[code].get("parlay_allowed"))
+            for code in OUTCOME_ORDER
+        }
+        if len(sale_values) != 1 or len(pass_values) != 1:
+            continue
+        source_clocks: dict[str, datetime] = {}
+        fetched_clocks: dict[str, datetime] = {}
+        cutoff_clocks: dict[str, datetime] = {}
+        incomplete = False
+        for code in OUTCOME_ORDER:
+            row = by_code[code]
+            source_clock = _parse_timestamp_to_hk(
+                str(row.get("source_updated_at_hkt") or row.get("source_updatetime") or "")
+            )
+            fetched_clock = _parse_timestamp_to_hk(
+                str(row.get("fetched_at_utc") or row.get("fetched_at") or "")
+            )
+            cutoff_clock = _parse_timestamp_to_hk(str(row.get("sale_cutoff_hkt") or ""))
+            if (
+                source_clock is None
+                or fetched_clock is None
+                or cutoff_clock is None
+                or source_clock > request_clock
+                or fetched_clock > request_clock
+            ):
+                incomplete = True
+                break
+            source_clocks[code] = source_clock
+            fetched_clocks[code] = fetched_clock
+            cutoff_clocks[code] = cutoff_clock
+        if incomplete or len(set(cutoff_clocks.values())) != 1:
+            continue
+        clock = max([*source_clocks.values(), *fetched_clocks.values()])
+        current = selected.get(idx)
+        current_clock = current.get("_selection_clock") if current else None
+        if current_clock is not None and clock is not None and clock <= current_clock:
+            continue
+        selected[idx] = {
+            "sp": {code: float(_safe_float(by_code[code].get("sp")) or 0.0) for code in OUTCOME_ORDER},
+            "parlay_allowed": next(iter(pass_values)),
+            "sale_status": next(iter(sale_values)),
+            "sale_cutoff_hkt": _adhoc_hk_iso(next(iter(cutoff_clocks.values()))),
+            "source_observed_at": min(source_clocks.values()),
+            "fetched_at": min(fetched_clocks.values()),
+            "latest_observed_at": clock,
+            "outcome_source_clocks_hkt": {
+                code: _adhoc_hk_iso(source_clocks[code]) for code in OUTCOME_ORDER
+            },
+            "outcome_fetched_clocks_hkt": {
+                code: _adhoc_hk_iso(fetched_clocks[code]) for code in OUTCOME_ORDER
+            },
+            "raw_snapshot_hash": hashlib.sha256(
+                _json_dumps({code: by_code[code] for code in OUTCOME_ORDER}).encode("utf-8")
+            ).hexdigest(),
+            "_selection_clock": clock,
+        }
+    for row in selected.values():
+        row.pop("_selection_clock", None)
+    return selected
+
+
+def _adhoc_nowscore_rows(conn: sqlite3.Connection, issue: str) -> dict[int, dict[str, Any]]:
+    if not _table_exists(conn, "nowscore_bjdc_matches"):
+        return {}
+    columns = {
+        str(row[1]) for row in conn.execute("PRAGMA table_info(nowscore_bjdc_matches)").fetchall()
+    }
+    if not {"issue", "match_idx"}.issubset(columns):
+        return {}
+
+    def column(name: str) -> str:
+        return name if name in columns else f"NULL AS {name}"
+
+    rows = conn.execute(
+        f"""
+        SELECT match_idx,
+               {column('fetched_at')}, {column('schedule_date')}, {column('kickoff_time')},
+               {column('status')}, {column('status_text')}, {column('can_sale')},
+               {column('score')}, {column('result_code')}
+        FROM nowscore_bjdc_matches
+        WHERE issue=?
+        """,
+        (issue,),
+    ).fetchall()
+    return {int(row["match_idx"]): dict(row) for row in rows}
+
+
+def _build_adhoc_source_snapshot(
+    conn: sqlite3.Connection,
+    issue: str,
+    *,
+    request_clock: datetime,
+) -> dict[str, Any]:
+    """Freeze an independent current-source snapshot for one user request.
+
+    This deliberately does not inspect natural-day manifests, segment plans,
+    exact-N freeze ledgers, or any scheduled package.  A missing current source
+    is represented in the denominator and becomes an unavailable adhoc record.
+    """
+
+    resolved = _resolve_issue(conn, issue)
+    match_rows = _issue_rows(conn, resolved, only_date=None)
+    expected = {int(row["match_idx"]) for row in match_rows}
+    decision_rows, decision_metadata = _adhoc_formal_structured_input(
+        issue=resolved,
+        expected_indices=expected,
+        request_clock=request_clock,
+    )
+    live_sp = _adhoc_latest_live_sp(conn, resolved, request_clock=request_clock)
+    market = _adhoc_market_metadata(conn, resolved, request_clock=request_clock)
+    nowscore = _adhoc_nowscore_rows(conn, resolved)
+    normalized_rows: list[dict[str, Any]] = []
+    all_source_clocks: list[datetime] = []
+
+    for row in match_rows:
+        idx = int(row["match_idx"])
+        structured = decision_rows.get(idx, {})
+        live = live_sp.get(idx, {})
+        market_row = market.get(idx, {})
+        nowscore_row = nowscore.get(idx, {})
+        cutoff_text = str(row["end_time"] or "")
+        cutoff = _parse_timestamp_to_hk(cutoff_text)
+        kickoff = _adhoc_kickoff_hkt(
+            sale_cutoff=cutoff_text,
+            schedule_date=str(nowscore_row.get("schedule_date") or row["schedule_date"] or ""),
+            kickoff_time=str(nowscore_row.get("kickoff_time") or ""),
+        )
+        decision_reasons: list[str] = []
+        if not structured:
+            decision_reasons.append("FORMAL_ACTIVE_V3_3_3_INPUT_UNAVAILABLE")
+        if not live:
+            decision_reasons.append("LIVE_SP_VECTOR_UNAVAILABLE")
+        if not market_row:
+            decision_reasons.append("LIVE_MARKET_SNAPSHOT_UNAVAILABLE")
+        if not cutoff_text or cutoff is None:
+            decision_reasons.append("SALE_CUTOFF_UNVERIFIED")
+        market_cutoff = _parse_timestamp_to_hk(str(market_row.get("sale_cutoff_hkt") or ""))
+        if market_row and market_cutoff is None:
+            decision_reasons.append("MARKET_SALE_CUTOFF_UNVERIFIED")
+        elif market_cutoff is not None and cutoff is not None and market_cutoff != cutoff:
+            decision_reasons.append("SALE_CUTOFF_METADATA_MISMATCH")
+
+        match_clock = _parse_timestamp_to_hk(str(row["html_fetched_at"] or ""))
+        nowscore_clock = _parse_timestamp_to_hk(str(nowscore_row.get("fetched_at") or ""))
+        live_source_clock = _parse_timestamp_to_hk(str(live.get("source_updatetime_hkt") or ""))
+        live_fetch_clock = _parse_timestamp_to_hk(str(live.get("fetched_at_hkt") or ""))
+        market_source_clock = (
+            market_row.get("source_observed_at")
+            if isinstance(market_row.get("source_observed_at"), datetime)
+            else None
+        )
+        market_fetch_clock = (
+            market_row.get("fetched_at")
+            if isinstance(market_row.get("fetched_at"), datetime)
+            else None
+        )
+        market_latest_clock = (
+            market_row.get("latest_observed_at")
+            if isinstance(market_row.get("latest_observed_at"), datetime)
+            else None
+        )
+        required_clocks = [
+            _parse_timestamp_to_hk(str(decision_metadata.get("generated_at_hkt") or "")),
+            match_clock,
+            nowscore_clock,
+            live_source_clock,
+            live_fetch_clock,
+            market_source_clock,
+            market_fetch_clock,
+            market_latest_clock,
+        ]
+        if any(clock is None for clock in required_clocks):
+            decision_reasons.append("REQUIRED_SOURCE_CLOCK_UNVERIFIED")
+        if any(clock is not None and clock > request_clock for clock in required_clocks):
+            decision_reasons.append("SOURCE_CLOCK_AFTER_REQUEST")
+        source_observed = min((clock for clock in required_clocks if clock is not None), default=None)
+        if source_observed is not None:
+            all_source_clocks.append(source_observed)
+
+        disabled = str(row["disabled"] or "").strip().lower()
+        disabled_sale = True if disabled == "no" else False if disabled else None
+        nowscore_sale = _adhoc_bool(nowscore_row.get("can_sale"))
+        market_sale_text = str(market_row.get("sale_status") or "").upper()
+        market_sale = True if market_sale_text in {"OPEN", "ON_SALE", "OPEN_PREGAME"} else False if market_sale_text in {"CLOSED", "OFF_SALE"} else None
+        sale_signals = [disabled_sale, nowscore_sale, market_sale]
+        if False in sale_signals:
+            sale_status = "CLOSED"
+        elif all(signal is True for signal in sale_signals):
+            sale_status = "OPEN"
+        else:
+            sale_status = "UNKNOWN"
+        pass_allowed = _adhoc_bool(market_row.get("parlay_allowed"))
+        match_status = _adhoc_match_status(
+            nowscore_row.get("status"), nowscore_row.get("status_text")
+        )
+        selection_codes = _selection_codes_from_value(structured.get("shadow_selection_codes"))
+        probabilities = {
+            code: _safe_float(structured.get(f"p_{code}"))
+            for code in OUTCOME_ORDER
+        }
+        sp = {
+            "3": _safe_float(live.get("sp_home")),
+            "1": _safe_float(live.get("sp_draw")),
+            "0": _safe_float(live.get("sp_away")),
+        }
+        status = "READY" if not decision_reasons else "UNVERIFIED"
+        normalized_rows.append(
+            {
+                "match_idx": idx,
+                "match_id": _match_id(row),
+                "league": str(row["league"] or ""),
+                "home": str(row["home"] or ""),
+                "away": str(row["away"] or ""),
+                "handicap_line": row["handicap_line"],
+                "kickoff_at_hkt": _adhoc_hk_iso(kickoff) if kickoff else "",
+                "sale_cutoff_hkt": _adhoc_hk_iso(cutoff) if cutoff else "",
+                "sale_status": sale_status,
+                "pass_allowed": pass_allowed,
+                "match_status": match_status,
+                "score": str(nowscore_row.get("score") or row["score"] or ""),
+                "result_code": str(nowscore_row.get("result_code") or row["result_code"] or ""),
+                "source_observed_at_hkt": _adhoc_hk_iso(source_observed) if source_observed else "",
+                "decision_input_status": status,
+                "decision_input_reasons": sorted(set(decision_reasons)),
+                "selection_codes": selection_codes,
+                "probabilities": probabilities,
+                "sp": sp,
+                "source_provenance": {
+                    "match_html_fetched_at_hkt": _adhoc_hk_iso(match_clock) if match_clock else "",
+                    "nowscore_fetched_at_hkt": _adhoc_hk_iso(nowscore_clock) if nowscore_clock else "",
+                    "formal_decision_generated_at_hkt": str(decision_metadata.get("generated_at_hkt") or ""),
+                    "live_sp_source_updated_at_hkt": _adhoc_hk_iso(live_source_clock) if live_source_clock else "",
+                    "live_sp_fetched_at_hkt": _adhoc_hk_iso(live_fetch_clock) if live_fetch_clock else "",
+                    "live_sp_snapshot_sha256": str(live.get("raw_snapshot_sha256") or ""),
+                    "market_source_observed_at_hkt": _adhoc_hk_iso(market_source_clock) if market_source_clock else "",
+                    "market_fetched_at_hkt": _adhoc_hk_iso(market_fetch_clock) if market_fetch_clock else "",
+                    "market_latest_observed_at_hkt": _adhoc_hk_iso(market_latest_clock) if market_latest_clock else "",
+                    "market_outcome_source_clocks_hkt": dict(market_row.get("outcome_source_clocks_hkt") or {}),
+                    "market_outcome_fetched_clocks_hkt": dict(market_row.get("outcome_fetched_clocks_hkt") or {}),
+                    "market_snapshot_sha256": str(market_row.get("raw_snapshot_hash") or ""),
+                    "market_sale_status": market_sale_text or "UNKNOWN",
+                    "market_parlay_allowed": pass_allowed,
+                    "market_sale_cutoff_hkt": _adhoc_hk_iso(market_cutoff) if market_cutoff else "",
+                },
+            }
+        )
+
+    input_asof = min(all_source_clocks, default=request_clock)
+    return {
+        "issue": resolved,
+        "input_asof_hkt": _adhoc_hk_iso(input_asof),
+        "decision_variant_id": FORMAL_DECISION_VARIANT_ID,
+        "source_metadata": {
+            "schema_version": "adhoc_request_time_source_snapshot_v1",
+            "request_clock_hkt": _adhoc_hk_iso(request_clock),
+            "input_asof_policy": "oldest_required_observation_clock",
+            "complete_denominator_match_count": len(normalized_rows),
+            "formal_decision_input": decision_metadata,
+            "sale_metadata_contract": {
+                "requires": [
+                    "500_disabled_no",
+                    "nowscore_can_sale_true",
+                    "complete_live_market_sale_open",
+                    "complete_live_market_parlay_allowed",
+                ],
+                "fallback": "fail_closed_unknown",
+            },
+        },
+        "matches": normalized_rows,
+    }
 
 
 def _shadow_variant_id(rows: dict[int, dict[str, Any]]) -> str:
@@ -8123,10 +8697,17 @@ def create_app(
     *,
     sqlite_db: str | os.PathLike[str] = DEFAULT_500_DB,
     results_dir: str | os.PathLike[str] = DEFAULT_RESULTS_DIR,
+    adhoc_betting_root: str | os.PathLike[str] = DEFAULT_ADHOC_BETTING_ROOT,
+    adhoc_font_file: str | os.PathLike[str] = DEFAULT_FONT_FILE,
 ) -> Flask:
     app = Flask(__name__, static_folder=None)
     db_path = Path(sqlite_db)
     result_path = Path(results_dir)
+    adhoc_store = AdhocBettingStore(
+        db_path=db_path,
+        root=Path(adhoc_betting_root),
+        font_file=Path(adhoc_font_file),
+    )
     static_dir = Path(os.environ.get("BEIDAN_DASHBOARD_STATIC_DIR", DEFAULT_DASHBOARD_STATIC_DIR))
     gate_password = next((os.environ.get(name) for name in DASHBOARD_GATE_PASSWORD_ENVS if os.environ.get(name)), "")
     gate_secret = next((os.environ.get(name) for name in DASHBOARD_GATE_SECRET_ENVS if os.environ.get(name)), gate_password)
@@ -8158,6 +8739,17 @@ def create_app(
 
     def _cache_clear() -> None:
         response_cache.clear()
+
+    def _adhoc_request_clock() -> datetime:
+        configured = app.config.get("ADHOC_BETTING_NOW")
+        value = configured() if callable(configured) else configured
+        if isinstance(value, datetime):
+            return value.astimezone(HK_TZ) if value.tzinfo else value.replace(tzinfo=HK_TZ)
+        if value not in {None, ""}:
+            parsed = _parse_timestamp_to_hk(str(value))
+            if parsed is not None:
+                return parsed
+        return datetime.now(HK_TZ)
 
     def _serve_index():
         index_path = static_dir / "index.html"
@@ -8538,6 +9130,128 @@ def create_app(
                     return jsonify({"error": f"Unknown issue: {issue}"}), 404
                 resolved = raw_issue
             return jsonify(_exact_n_freeze_payload(conn, resolved))
+
+    @app.get("/api/adhoc-betting-plans/eligibility")
+    def adhoc_betting_eligibility():
+        issue = str(request.args.get("issue") or "current")
+        clock = _adhoc_request_clock()
+        try:
+            with _connect(db_path) as conn:
+                source_snapshot = _build_adhoc_source_snapshot(
+                    conn,
+                    issue,
+                    request_clock=clock,
+                )
+            payload = adhoc_store.eligibility_preview(source_snapshot=source_snapshot, now=clock)
+        except LookupError as exc:
+            return jsonify({"error": str(exc), "status": "FAILED_CLOSED"}), 404
+        except AdhocBettingError as exc:
+            return jsonify({"error": str(exc), "status": "FAILED_CLOSED"}), 422
+        except Exception:
+            return jsonify({"error": "adhoc eligibility check failed closed", "status": "FAILED_CLOSED"}), 500
+        response = jsonify(payload)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.post("/api/adhoc-betting-plans")
+    def create_adhoc_betting_plan():
+        body = request.get_json(silent=True) or {}
+        if not isinstance(body, dict):
+            return jsonify({"error": "request body must be a JSON object"}), 400
+        issue = str(body.get("issue") or body.get("issue_id") or "current")
+        requested_n = body.get("requested_n", body.get("requestedN", body.get("n")))
+        requested_budget = body.get(
+            "requested_budget_yuan",
+            body.get("requestedBudgetYuan", body.get("budget_yuan", body.get("budget"))),
+        )
+        idempotency_key = (
+            body.get("idempotency_key")
+            or body.get("idempotencyKey")
+            or request.headers.get("Idempotency-Key")
+        )
+        clock = _adhoc_request_clock()
+        try:
+            with _connect(db_path) as conn:
+                source_snapshot = _build_adhoc_source_snapshot(
+                    conn,
+                    issue,
+                    request_clock=clock,
+                )
+            payload = adhoc_store.create_or_get(
+                issue=source_snapshot["issue"],
+                requested_n=requested_n,
+                requested_budget_yuan=requested_budget,
+                idempotency_key=idempotency_key,
+                source_snapshot=source_snapshot,
+                now=clock,
+            )
+        except LookupError as exc:
+            return jsonify({"error": str(exc), "status": "FAILED_CLOSED"}), 404
+        except AdhocIdempotencyConflict as exc:
+            return jsonify({"error": str(exc), "status": "FAILED_CLOSED"}), 409
+        except AdhocBettingError as exc:
+            return jsonify({"error": str(exc), "status": "FAILED_CLOSED"}), 422
+        except Exception:
+            return jsonify({"error": "adhoc plan generation failed closed", "status": "FAILED_CLOSED"}), 500
+        response = jsonify(payload)
+        response.status_code = 200 if payload.get("idempotent") else 201
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.get("/api/adhoc-betting-plans/<request_id>")
+    def get_adhoc_betting_plan(request_id: str):
+        try:
+            payload = adhoc_store.get(request_id, now=_adhoc_request_clock())
+        except AdhocPlanNotFound as exc:
+            return jsonify({"error": str(exc), "status": "FAILED_CLOSED"}), 404
+        except AdhocBettingError:
+            return jsonify({"error": "adhoc package failed verification", "status": "FAILED_CLOSED"}), 409
+        response = jsonify(payload)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    def _adhoc_download_response(
+        request_id: str,
+        *,
+        audit_only: bool,
+    ):
+        fmt = str(request.args.get("format") or "").lower()
+        try:
+            target, payload = adhoc_store.artifact_path(
+                request_id,
+                fmt=fmt,
+                clock_provider=_adhoc_request_clock,
+                audit_only=audit_only,
+            )
+        except AdhocPlanNotFound as exc:
+            return jsonify({"error": str(exc), "status": "FAILED_CLOSED"}), 404
+        except AdhocBettingError as exc:
+            return jsonify({"error": str(exc), "status": "FAILED_CLOSED"}), 409
+        mimetypes = {
+            "pdf": "application/pdf",
+            "html": "text/html",
+            "csv": "text/csv",
+        }
+        response = send_file(
+            target,
+            mimetype=mimetypes[fmt],
+            as_attachment=True,
+            download_name=f"beidan-adhoc-{request_id[:12]}.{fmt}",
+            max_age=0,
+        )
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Adhoc-Usage-Boundary"] = (
+            "AUDIT_ONLY_EXPIRED_RECORD" if payload["audit_only_download"] else "OPERATIONAL_CURRENT"
+        )
+        return response
+
+    @app.get("/api/adhoc-betting-plans/<request_id>/download")
+    def download_adhoc_betting_plan(request_id: str):
+        return _adhoc_download_response(request_id, audit_only=False)
+
+    @app.get("/api/adhoc-betting-plans/<request_id>/audit-download")
+    def download_adhoc_betting_audit(request_id: str):
+        return _adhoc_download_response(request_id, audit_only=True)
 
     @app.get("/api/issues/<issue>/signals")
     def signals(issue: str):
