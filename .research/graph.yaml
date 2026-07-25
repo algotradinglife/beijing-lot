@@ -43,7 +43,7 @@ spec:
     - id: BJ-ADHOC-BET-001
       node_type: task
       ref: tasks/BJ-ADHOC-BET-001.yaml
-      state: READY
+      state: EXECUTING
 
   edges:
     - from: GOAL-BOOT
