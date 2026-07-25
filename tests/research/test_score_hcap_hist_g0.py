@@ -75,6 +75,7 @@ def test_g0_fails_closed_for_result_mismatch_and_identity_conflicts(tmp_path: Pa
     rows.append(tuple(mismatch))
     rows.append(_row(100, 2017, issue="same", match_idx=5))
     rows.append(_row(101, 2017, issue="same", match_idx=5))
+    rows.append(_row(102, 2018, issue=" ", match_idx=6))
     source = tmp_path / "invalid.db"
     _source_fixture(source, rows)
 
@@ -84,6 +85,8 @@ def test_g0_fails_closed_for_result_mismatch_and_identity_conflicts(tmp_path: Pa
     assert result["audit_data"]["gate"]["formal_b0_b1_authorized"] is False
     assert coverage["stored_result_code_mismatches"] == 1
     assert coverage["issue_match_idx_conflicts"] == 1
+    assert coverage["source_missing_issue_or_match_idx"] == 1
+    assert coverage["exclusions"]["missing_issue_or_match_idx"] == 1
     assert "result_code_mismatch_rate_above_0_5_percent" in result["audit_data"]["gate"]["reasons"]
     assert "unresolved_duplicate_or_canonical_key_conflicts" in result["audit_data"]["gate"]["reasons"]
     audit = json.loads(result["audit"].read_text(encoding="utf-8"))

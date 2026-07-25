@@ -236,6 +236,7 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
     canonical_keys: dict[tuple[str, int], set[int]] = defaultdict(set)
     source_match_ids: Counter[int] = Counter()
     source_issue_match_idx: dict[tuple[str, int], set[int]] = defaultdict(set)
+    source_missing_issue_or_match_idx = 0
     mismatch_quality: Counter[str] = Counter()
     seen_match_ids: set[int] = set()
     duplicate_match_ids = 0
@@ -243,7 +244,11 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
     for row in rows:
         raw_match_id = int(row["match_id"])
         source_match_ids[raw_match_id] += 1
-        source_issue_match_idx[(str(row["issue"] or ""), int(row["match_idx"] or 0))].add(raw_match_id)
+        raw_issue = str(row["issue"] or "").strip()
+        if not raw_issue or row["match_idx"] is None:
+            source_missing_issue_or_match_idx += 1
+        else:
+            source_issue_match_idx[(raw_issue, int(row["match_idx"]))].add(raw_match_id)
         season = row["season_year"]
         if isinstance(season, int):
             by_season_raw[season] += 1
@@ -257,6 +262,10 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         values = (row["league"], row["home"], row["away"])
         if any(value is None or not str(value).strip() for value in values):
             exclusions["missing_team_identity"] += 1
+            continue
+        issue = str(row["issue"] or "").strip()
+        if not issue or row["match_idx"] is None:
+            exclusions["missing_issue_or_match_idx"] += 1
             continue
         handicap_raw = row["handicap_line_norm"]
         if not isinstance(handicap_raw, (int, float)) or not math.isfinite(float(handicap_raw)) or not float(handicap_raw).is_integer():
@@ -282,11 +291,11 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
             exclusions["duplicate_match_id"] += 1
             continue
         seen_match_ids.add(match_id)
-        canonical_keys[(str(row["issue"] or ""), int(row["match_idx"] or 0))].add(match_id)
+        canonical_keys[(issue, int(row["match_idx"]))].add(match_id)
         normalized_names[(league, normalized_home)].add(home)
         normalized_names[(league, normalized_away)].add(away)
         inserted.append((
-            match_id, str(row["issue"] or ""), int(row["match_idx"] or 0), kickoff, season,
+            match_id, issue, int(row["match_idx"]), kickoff, season,
             league, home, away, normalized_home, normalized_away, int(handicap_raw), int(row["fthg"]),
             int(row["ftag"]), computed, str(row["settlement_quality"] or ""),
         ))
@@ -357,6 +366,7 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
             "stored_result_code_mismatch_by_settlement_quality": dict(sorted(mismatch_quality.items())),
             "source_duplicate_match_ids": source_duplicate_match_ids,
             "source_issue_match_idx_conflicts": source_issue_match_idx_conflicts,
+            "source_missing_issue_or_match_idx": source_missing_issue_or_match_idx,
             "duplicate_match_ids": duplicate_match_ids,
             "issue_match_idx_conflicts": canonical_key_conflicts,
             "normalized_team_identity_conflicts": conflict_names,
