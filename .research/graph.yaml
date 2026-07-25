@@ -40,6 +40,10 @@ spec:
       node_type: task
       ref: tasks/BJ-FREEZE-REVIEW-001.yaml
       state: REVIEW
+    - id: BJ-ADHOC-BET-001
+      node_type: task
+      ref: tasks/BJ-ADHOC-BET-001.yaml
+      state: READY
 
   edges:
     - from: GOAL-BOOT
@@ -77,4 +81,10 @@ spec:
       relation: depends_on
     - from: BJ-FREEZE-REVIEW-001
       to: BJ-SEG-RECOVERY-001
+      relation: depends_on
+    - from: GOAL-PHASE1
+      to: BJ-ADHOC-BET-001
+      relation: decomposes_to
+    - from: BJ-ADHOC-BET-001
+      to: BJ-BET-FREEZE-001
       relation: depends_on
