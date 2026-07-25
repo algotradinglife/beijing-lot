@@ -39,7 +39,7 @@ spec:
     - id: BJ-FREEZE-REVIEW-001
       node_type: task
       ref: tasks/BJ-FREEZE-REVIEW-001.yaml
-      state: EXECUTING
+      state: REVIEW
     - id: BJ-ADHOC-BET-001
       node_type: task
       ref: tasks/BJ-ADHOC-BET-001.yaml

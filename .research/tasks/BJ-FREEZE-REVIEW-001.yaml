@@ -17,15 +17,15 @@ spec:
   type: capability
   intent:
     objective: Render scheduled freeze packages as portable, independently verifiable HTML, PDF, and CSV audit views that never claim current purchase authority.
-    question: Can a source-only renderer make scheduled exact-N freezes easy to inspect without changing their evidence meaning or presenting them as current betting plans?
-    hypothesis: A content-addressed view derived only from frozen package bytes can improve human auditability while remaining explicitly NOT FOR PURCHASE.
-    expected_value: Give the PI and Strategist readable views for scheduled forward evidence, settlement, and later analysis.
+    question: Can every human-readable review record remain byte-bound to its frozen plan and metadata while every page stays unambiguously non-purchasable?
+    hypothesis: A content-addressed source-only renderer with independent verification can improve human auditability without changing freeze or execution authority.
+    expected_value: Give the PI and Strategist readable views for scheduled forward evidence and later analysis.
     out_of_scope:
       - Request-time sale or cutoff checks
       - User-triggered adhoc plan generation
-      - Current purchase eligibility or shop-entry instructions
-      - Ticket purchase, payment, or terminal integration
-      - Probability, selection, strategy, or portfolio changes
+      - Current purchase eligibility, shop-entry instructions, or downloads
+      - Ticket filtering, restaking, reduced plans, purchase, payment, or terminal integration
+      - Probability, selection, strategy, portfolio, settlement, or ROI changes
       - Mutation of scheduled freezes, ledgers, or evidence status
 
   context:
@@ -33,10 +33,12 @@ spec:
       - Issue #26 audit-only capability contract and PI architecture amendment
       - PR #27 implementation and PI change requests
       - BJ-BET-FREEZE-001 scheduled freeze packages
-      - BJ-SEG-RECOVERY-001 recovery manifests
+      - BJ-SEG-RECOVERY-001 immutable recovery manifests
     assumptions:
       - Frozen source packages remain immutable
       - A source-integrity PASS does not imply that a ticket is currently purchasable
+      - Recovery kickoff is used only from a package-bound recovery manifest
+      - Team, league, and handicap metadata comes only from frozen structured input
     scheduling:
       priority_class: P0
       dispatch_rank: 1
@@ -60,34 +62,51 @@ spec:
 
   acceptance:
     required_artifacts:
-      - Portable HTML, PDF, and CSV audit views derived only from scheduled freeze bytes
+      - Fifteen independent portable HTML and PDF audit views for the 26078 recovery fixture
+      - plan_matrix.csv and ticket_legs.csv
       - Prominent NOT FOR PURCHASE classification in every human-facing view
-      - Source integrity reported separately from operational eligibility
-      - Content-addressed manifest and SHA256SUMS with cross-root reproducibility
-      - Independent verifier that does not require untracked source paths or host-specific fonts
+      - Source integrity reported separately from the non-purchase usage boundary
+      - Content-addressed freeze_review_manifest.json and SHA256SUMS
+      - Fail-closed renderer and independent clean-checkout verifier
       - No strategy, ticket selection, probability, scheduled freeze, or production execution changes
     checks:
       - schema_validation
       - automated_tests
+      - source_hash_and_semantic_verification
       - clean_checkout_reproducibility
       - cross_output_root_byte_identity
+      - mobile_and_a4_layout_validation
     human_gates:
       - engineering_validation
       - research_pi_review
 
 status:
-  current: EXECUTING
+  current: REVIEW
   attempts: 1
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "ROUTE: Engineer. PR #27 has PI changes requested and must be respecified as audit-only before re-review."
+    reason: "ROUTE: Engineer. Audit-only remediation and Engineering Validation are complete; scope decisions and PI review route to owner/strategist."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/pull/27"
       artifact_type: pull_request
-      description: Existing implementation under audit-only fix cycle
-  result: {}
+      description: Audit-only freeze-review implementation awaiting PI re-review
+    - uri: evidence/bj_freeze_review_001/23a437058df57483cf710ef7f8d1c55b7520a4480cd2be0f78d0c69fa2946dfd
+      artifact_type: evidence_bundle
+      description: Portable content-addressed 26078 freeze-review bundle
+  result:
+    superseded_capability_id: BJ-BET-SLIP-001
+    historical_implementation_commit: ad485eef9babf487d90474a61e8b3e60e668d81f
+    pi_review_head: 9bba71121711867e44a18969abe14aebe52402ac
+    pi_review_decision: CHANGES_REQUESTED
+    audit_only_fix_commit: 72765ccd7e23c91724e254501abbce296acb5506
+    bundle_id: 23a437058df57483cf710ef7f8d1c55b7520a4480cd2be0f78d0c69fa2946dfd
+    bundle_status: SOURCE_INTEGRITY_PASS
+    bundle_sha256sums_digest: dc6a3b609476a2d59ae24aeadc45cdc5dc857b1e78014fd6e37cef4f4bdf7fbe
+    tests: 53_passed
+    clean_checkout_verifier: PASS
+    cross_output_root_byte_identity: PASS
   history:
     - action: reconcile_runtime_registration
       ts: "2026-07-25T02:45:18Z"
@@ -100,10 +119,16 @@ status:
       actor: research_pi
       from: VALIDATING
       to: EXECUTING
-      reason: "PI found that a post-kickoff rendering was presented as purchasable and identified content-addressing and portability gaps."
+      reason: "PI found an actionable post-kickoff presentation plus content-addressing, portability, and exact-head evidence gaps."
     - action: pi_architecture_rescope
       ts: "2026-07-25T03:37:28Z"
       actor: research_pi
       from: EXECUTING
       to: EXECUTING
       reason: "Issue #26 was narrowed to audit-only scheduled-freeze views; current adhoc betting was separated into BJ-ADHOC-BET-001."
+    - action: engineering_validation_completed
+      ts: "2026-07-25T04:23:00Z"
+      actor: everything-bot-engineer
+      from: EXECUTING
+      to: REVIEW
+      reason: "Audit-only rescope, portable evidence, complete content identity, clean-checkout verification, 53 tests, Ruff, graph validation, and cross-root PDF byte identity passed on the PR fix."
