@@ -93,6 +93,12 @@ def test_g0_fails_closed_for_result_mismatch_and_identity_conflicts(tmp_path: Pa
     non_trusted = list(_row(104, 2018, issue="missing-sp", match_idx=8))
     non_trusted[14], non_trusted[15] = "missing_sp", 0
     rows.append(tuple(non_trusted))
+    bad_trusted_flag = list(_row(106, 2019, issue="bad-trusted-flag", match_idx=10))
+    bad_trusted_flag[15] = 0
+    rows.append(tuple(bad_trusted_flag))
+    unknown_status = list(_row(107, 2020, issue="unknown-status", match_idx=11))
+    unknown_status[14], unknown_status[15] = "unknown", 0
+    rows.append(tuple(unknown_status))
     season_mismatch = list(_row(105, 2015, issue="season-mismatch", match_idx=9))
     season_mismatch[3] = "2016-06-01 12:00:00"
     rows.append(tuple(season_mismatch))
@@ -113,10 +119,13 @@ def test_g0_fails_closed_for_result_mismatch_and_identity_conflicts(tmp_path: Pa
     assert status["eligible_settlement_qualities"] == ["trusted"]
     assert status["candidate_quality_counts_after_clock_identity_handicap_score_filters"]["missing_sp"] == 1
     assert coverage["exclusions"]["ineligible_settlement_quality_missing_sp"] == 1
+    assert coverage["exclusions"]["trusted_status_without_trusted_settlement_flag"] == 1
+    assert coverage["exclusions"]["ineligible_settlement_quality_unknown"] == 1
     assert coverage["exclusions"]["source_season_kickoff_year_mismatch"] == 1
     assert result["audit_data"]["chronology"]["diagnostics"]["source_season_disagreement_in_canonical_window"] == 1
     assert "result_code_mismatch_rate_above_0_5_percent" in result["audit_data"]["gate"]["reasons"]
     assert "unresolved_duplicate_or_canonical_key_conflicts" in result["audit_data"]["gate"]["reasons"]
+    assert "source_season_kickoff_year_mismatch_in_canonical_window" in result["audit_data"]["gate"]["reasons"]
     audit = json.loads(result["audit"].read_text(encoding="utf-8"))
     assert audit == result["audit_data"]
 
