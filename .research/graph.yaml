@@ -48,6 +48,10 @@ spec:
       node_type: task
       ref: tasks/SP-CONSISTENCY-001A.yaml
       state: COMPLETED
+    - id: SCORE-HCAP-HIST-001
+      node_type: task
+      ref: tasks/SCORE-HCAP-HIST-001.yaml
+      state: ACTIVE
     - id: GOAL-OPS-QUALITY
       node_type: goal
       ref: .research/project.yaml#spec.programs
@@ -106,6 +110,12 @@ spec:
     - from: SP-CONSISTENCY-001A
       to: BJ-MM-FREEZE-001
       relation: depends_on
+    - from: GOAL-PHASE1
+      to: SCORE-HCAP-HIST-001
+      relation: decomposes_to
+    - from: SP-CONSISTENCY-001A
+      to: SCORE-HCAP-HIST-001
+      relation: informs
     - from: GOAL-OPS-QUALITY
       to: BJ-OPS-OBS-001
       relation: decomposes_to
