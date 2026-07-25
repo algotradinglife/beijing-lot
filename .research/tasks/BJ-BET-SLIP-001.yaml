@@ -3,7 +3,7 @@ kind: Task
 
 metadata:
   id: BJ-BET-SLIP-001
-  title: Printable betting slips from verified freezes
+  title: Operational Capability — printable betting slips from verified freezes
   project_id: beijing-lot-research
   version: "0.1.0"
   parent_id: GOAL-PHASE1
@@ -64,15 +64,21 @@ spec:
       - research_pi_review
 
 status:
-  current: EXECUTING
+  current: REVIEW
   attempts: 1
   routing:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "Issue #26 handoff; owner-requested no_agent execution in an independent worktree."
-  artifacts: []
-  result: {}
+    reason: "PR #27 passed Engineering Validation and is awaiting PI review; implementation used the owner-requested no_agent mode in an independent worktree."
+  artifacts:
+    - "PR #27: https://github.com/algotradinglife/beijing-lot/pull/27"
+    - evidence/bj_bet_slip_001/52b1cbaf1611f94e9265001e6febee9d091409a20a1b68e27d984f077120aca7
+  result:
+    implementation_head: ad485eef9babf487d90474a61e8b3e60e668d81f
+    bundle_id: 52b1cbaf1611f94e9265001e6febee9d091409a20a1b68e27d984f077120aca7
+    bundle_status: PASS
+    tests: 49_passed
   history:
     - action: register_and_start
       ts: "2026-07-25T02:10:06Z"
@@ -80,3 +86,9 @@ status:
       from: CREATED
       to: EXECUTING
       reason: "PI accepted the recovery kickoff-source amendment and authorized normal implementation flow."
+    - action: reconcile_runtime_registration
+      ts: "2026-07-25T02:45:18Z"
+      actor: reconciler
+      from: UNKNOWN
+      to: REVIEW
+      reason: "Branch capability/bj-bet-slip-001 detected by M7/pr_no_runtime_registration. PR #27 open, mergeable, awaiting PI review (hh1985). Issue #26 labeled state/review."

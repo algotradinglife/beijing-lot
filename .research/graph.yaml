@@ -39,7 +39,7 @@ spec:
     - id: BJ-BET-SLIP-001
       node_type: task
       ref: tasks/BJ-BET-SLIP-001.yaml
-      state: EXECUTING
+      state: REVIEW
 
   edges:
     - from: GOAL-BOOT
