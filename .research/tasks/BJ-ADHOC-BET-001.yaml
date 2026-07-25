@@ -94,11 +94,20 @@ status:
       description: Approved execution contract
     - uri: "https://github.com/algotradinglife/beijing-lot/pull/29"
       artifact_type: pull_request
-      description: Isolated adhoc betting workflow awaiting Research PI review
+      description: Engineer follow-up implementation and validation receipt
+    - uri: "https://github.com/algotradinglife/beijing-lot/pull/29#pullrequestreview-4778787757"
+      artifact_type: pi_review
+      description: PI changes requested on af6814f
   result:
+    pull_request: 29
+    pi_review:
+      head: af6814fa6f3069b1b31e4ee584b3b0ab6e35e4c6
+      decision: CHANGES_REQUESTED
+      blocking_findings:
+        - "P0: adhoc sample_attempts=4000 changes the released exact-N portfolio contract, whose production default is 12000."
+        - "P1: package does not bind the full portfolio contract or deterministically regenerate tickets during semantic verification."
+        - "P1: UI claims current sale qualification although refresh only rechecks the immutable valid_until clock."
     implementation_head: 8cde25f
-    pi_review_state: CHANGES_REQUESTED
-    pi_reviewed_head: af6814fa6f3069b1b31e4ee584b3b0ab6e35e4c6
     automated_engineering_validation: PASS
     independent_codex_review: PASS
     browser_device_visual_validation: PASS
@@ -117,12 +126,6 @@ status:
       from: EXECUTING
       to: AWAITING_REVIEW
       reason: "Validated the PI follow-up with 28 adhoc package tests plus 6 adhoc API tests, 23 dashboard tests, TypeScript/Vite build, Ruff, diff check, and an independent local Codex review. New tests prove a fully rehashed valid-looking ticket substitution is rejected by deterministic portfolio replay."
-    - action: research_pi_changes_requested
-      ts: "2026-07-25T15:37:44+08:00"
-      actor: research_pi
-      from: AWAITING_REVIEW
-      to: EXECUTING
-      reason: "PR #29 requires the released Exact-N sampling contract, deterministic portfolio replay from immutable inputs, and UI wording that limits refresh to valid_until server-clock classification rather than live sale-state revalidation."
     - action: ready_for_research_pi_review
       ts: "2026-07-25T15:14:56+08:00"
       actor: engineer
@@ -177,3 +180,21 @@ status:
       from: READY
       to: READY
       reason: "BJ-FREEZE-REVIEW-001 completed after PI approval and merge; BJ-ADHOC-BET-001 is now the highest-priority eligible task for engineering_primary."
+    - action: execution_started
+      ts: "2026-07-25T04:45:02Z"
+      actor: engineer
+      from: READY
+      to: EXECUTING
+      reason: "Engineer claimed Issue #28 and opened PR #29."
+    - action: engineering_validation_reported
+      ts: "2026-07-25T07:04:42Z"
+      actor: engineer
+      from: EXECUTING
+      to: VALIDATING
+      reason: "PR #29 reported automated, browser, mobile, A4, and cross-layer Engineering Validation on af6814f."
+    - action: pi_review_changes_requested
+      ts: "2026-07-25T07:18:38Z"
+      actor: research_pi
+      from: VALIDATING
+      to: EXECUTING
+      reason: "PI review on af6814f found one P0 portfolio-parameter drift and two P1 reproducibility/presentation honesty gaps."
