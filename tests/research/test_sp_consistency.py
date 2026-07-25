@@ -60,13 +60,26 @@ def _p0_fixture(path: Path) -> None:
     connection.close()
 
 
-def _raw_bundle_fixture(root: Path) -> str:
+def _raw_bundle_fixture(root: Path, *, invalid: str | None = None) -> str:
     bundle = root / "bundle"
     bundle.mkdir(parents=True)
-    payload = bundle / "raw.json"
+    payload = bundle / "nested" / "raw.json"
+    payload.parent.mkdir()
     payload.write_text('{"capture":"fixture"}\n', encoding="utf-8")
     sums = bundle / "SHA256SUMS"
-    sums.write_text(f"{sha256_file(payload)}  raw.json\n", encoding="utf-8")
+    if invalid == "empty":
+        sums.write_text("", encoding="utf-8")
+    elif invalid == "duplicate":
+        sums.write_text(
+            f"{sha256_file(payload)}  nested/raw.json\n{sha256_file(payload)}  nested//raw.json\n",
+            encoding="utf-8",
+        )
+    else:
+        sums.write_text(f"{sha256_file(payload)}  nested/raw.json\n", encoding="utf-8")
+    if invalid == "extra":
+        (bundle / "unlisted.json").write_text('{"extra":true}\n', encoding="utf-8")
+    if invalid == "symlink":
+        (bundle / "payload-link").symlink_to(payload.relative_to(bundle))
     return sha256_file(sums)
 
 
@@ -164,6 +177,35 @@ def test_g0_rejects_malformed_or_unbound_immutable_bundle_hash(tmp_path: Path, b
         p42_freeze_root=tmp_path / "no-freezes",
         model_search_roots=[tmp_path / "no-model-assets"],
         p34_raw_bundle_root=tmp_path / "empty-raw-bundles",
+    )
+    report = run_g0_coverage_audit(
+        p34_db=atomic.p34_snapshot,
+        p34_source_schema=atomic.p34_source_schema,
+        p34_raw_bundle_root=atomic.p34_raw_bundle_root,
+        p0_db=atomic.p0_snapshot,
+        p42_freeze_root=atomic.p42_root,
+        model_inventory=atomic.model_inventory,
+        input_fingerprints=atomic.fingerprints,
+        audit_at_utc="2026-07-25T10:00:00+00:00",
+    )
+    assert report["coverage"]["p34"]["strict_complete_match_markets"] == 0
+    assert report["coverage"]["p34"]["rejections"]["invalid_or_unbound_immutable_bundle_sha256"] == 1
+
+
+@pytest.mark.parametrize("invalid", ["empty", "duplicate", "extra", "symlink"])
+def test_g0_rejects_incomplete_or_ambiguous_raw_bundle_manifest(tmp_path: Path, invalid: str):
+    p34 = tmp_path / "p34-invalid-manifest.db"
+    p0 = tmp_path / "p0.db"
+    raw_root = tmp_path / "raw-bundles"
+    _p34_strict_provenance_fixture(p34, _raw_bundle_fixture(raw_root, invalid=invalid))
+    _p0_fixture(p0)
+    atomic = create_g0_input_snapshot(
+        work_dir=tmp_path / "atomic",
+        p34_db=p34,
+        p0_db=p0,
+        p42_freeze_root=tmp_path / "no-freezes",
+        model_search_roots=[tmp_path / "no-model-assets"],
+        p34_raw_bundle_root=raw_root,
     )
     report = run_g0_coverage_audit(
         p34_db=atomic.p34_snapshot,

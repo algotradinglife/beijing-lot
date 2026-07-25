@@ -56,17 +56,39 @@ def _verified_raw_bundle_id(path: Path) -> str:
     sums = path / "SHA256SUMS"
     if not sums.is_file() or sums.is_symlink():
         raise ValueError("raw bundle SHA256SUMS missing")
+    entries: dict[str, str] = {}
     for line in sums.read_text(encoding="utf-8").splitlines():
         try:
             digest, name = line.split("  ", 1)
         except ValueError as exc:
             raise ValueError("invalid raw bundle SHA256SUMS entry") from exc
         relative = Path(name)
-        if not SHA256_RE.fullmatch(digest) or relative.is_absolute() or ".." in relative.parts or not relative.parts:
+        normalized = relative.as_posix()
+        if (
+            not SHA256_RE.fullmatch(digest)
+            or relative.is_absolute()
+            or ".." in relative.parts
+            or not relative.parts
+            or normalized == "SHA256SUMS"
+            or normalized in entries
+        ):
             raise ValueError("unsafe raw bundle SHA256SUMS entry")
         target = path / relative
         if not target.is_file() or target.is_symlink() or sha256_file(target) != digest:
             raise ValueError("raw bundle checksum mismatch")
+        entries[normalized] = digest
+    if not entries:
+        raise ValueError("raw bundle SHA256SUMS must not be empty")
+
+    actual: set[str] = set()
+    for candidate in path.rglob("*"):
+        relative = candidate.relative_to(path).as_posix()
+        if candidate.is_symlink() or not (candidate.is_dir() or candidate.is_file()):
+            raise ValueError("raw bundle contains a symlink or non-regular member")
+        if candidate.is_file() and relative != "SHA256SUMS":
+            actual.add(relative)
+    if set(entries) != actual:
+        raise ValueError("raw bundle SHA256SUMS does not exactly cover bundle files")
     return sha256_file(sums)
 
 
