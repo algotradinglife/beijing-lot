@@ -44,6 +44,10 @@ spec:
       node_type: task
       ref: tasks/BJ-ADHOC-BET-001.yaml
       state: COMPLETED
+    - id: SP-CONSISTENCY-001A
+      node_type: task
+      ref: tasks/SP-CONSISTENCY-001A.yaml
+      state: ACTIVE
     - id: GOAL-OPS-QUALITY
       node_type: goal
       ref: .research/project.yaml#spec.programs
@@ -51,7 +55,7 @@ spec:
     - id: BJ-OPS-OBS-001
       node_type: task
       ref: tasks/BJ-OPS-OBS-001.yaml
-      state: READY
+      state: ACTIVE
 
   edges:
     - from: GOAL-BOOT
@@ -95,6 +99,12 @@ spec:
       relation: decomposes_to
     - from: BJ-ADHOC-BET-001
       to: BJ-BET-FREEZE-001
+      relation: depends_on
+    - from: GOAL-PHASE1
+      to: SP-CONSISTENCY-001A
+      relation: decomposes_to
+    - from: SP-CONSISTENCY-001A
+      to: BJ-MM-FREEZE-001
       relation: depends_on
     - from: GOAL-OPS-QUALITY
       to: BJ-OPS-OBS-001
