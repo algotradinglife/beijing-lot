@@ -18,13 +18,18 @@ from typing import Any
 
 REQUIRED_COLUMNS = (
     "match_id", "issue", "match_idx", "kickoff_ts", "season_year", "league", "home", "away",
-    "handicap_line_norm", "fthg", "ftag", "result_code", "settlement_quality",
+    "handicap_line_norm", "fthg", "ftag", "result_code", "settlement_quality", "has_trusted_settlement",
 )
 TEST_SEASONS = tuple(range(2016, 2026))
 TRAIN_SEASONS = (2014, 2015)
 MIN_ROWS = 100_000
 MIN_TEST_ROWS = 1_000
 UTC = timezone.utc
+# The source builder derives ``season_year`` from the raw kickoff string, but
+# the panel must not trust that denormalized value for fold membership.  The
+# canonical normalized UTC clock is the sole temporal authority.
+FOLD_MAPPING = "calendar_year_from_normalized_kickoff_utc"
+ELIGIBLE_SETTLEMENT_QUALITIES = ("trusted",)
 
 
 def sha256_file(path: Path) -> str:
@@ -76,6 +81,16 @@ def _label(home_goals: int, away_goals: int, handicap: int) -> str:
 
 def _normalize(value: object) -> str:
     return " ".join(str(value).strip().casefold().split())
+
+
+def _settlement_quality(value: object) -> str:
+    """Normalize the source status without inventing a missing status."""
+
+    return str(value).strip().casefold() if value is not None else ""
+
+
+def _status_name(value: str) -> str:
+    return value or "<blank>"
 
 
 def _schema_inventory(connection: sqlite3.Connection) -> dict[str, Any]:
@@ -130,7 +145,7 @@ def export_feature_availability_matrix(*, source_db: Path, destination: Path) ->
                    SUM(CASE WHEN home IS NOT NULL AND TRIM(home) <> '' AND away IS NOT NULL AND TRIM(away) <> '' AND result_code IS NOT NULL AND TRIM(result_code) <> '' THEN 1 ELSE 0 END) AS result_history_present,
                    {rank_expression}
             FROM match_features
-            WHERE season_year BETWEEN 2014 AND 2025
+            WHERE CAST(substr(kickoff_ts, 1, 4) AS INTEGER) BETWEEN 2014 AND 2025
               AND kickoff_ts IS NOT NULL AND kickoff_ts NOT LIKE '1899-12-30%'
             """
         ).fetchone()
@@ -140,7 +155,7 @@ def export_feature_availability_matrix(*, source_db: Path, destination: Path) ->
         for row in source.execute(
             """
             SELECT league, home, away FROM match_features
-            WHERE season_year BETWEEN 2014 AND 2025
+            WHERE CAST(substr(kickoff_ts, 1, 4) AS INTEGER) BETWEEN 2014 AND 2025
               AND kickoff_ts IS NOT NULL AND kickoff_ts NOT LIKE '1899-12-30%'
               AND league IS NOT NULL AND TRIM(league) <> ''
               AND home IS NOT NULL AND TRIM(home) <> ''
@@ -160,7 +175,7 @@ def export_feature_availability_matrix(*, source_db: Path, destination: Path) ->
                 """
                 SELECT COUNT(DISTINCT mc.match_id)
                 FROM market_consensus mc JOIN match_features mf ON mf.match_id = mc.match_id
-                WHERE mf.season_year BETWEEN 2014 AND 2025
+                WHERE CAST(substr(mf.kickoff_ts, 1, 4) AS INTEGER) BETWEEN 2014 AND 2025
                   AND mf.kickoff_ts IS NOT NULL AND mf.kickoff_ts NOT LIKE '1899-12-30%'
                   AND mc.market IN ('euro_1x2','asian_handicap','over_under') AND mc.snapshot IN ('final','10h')
                 """
@@ -201,7 +216,17 @@ def export_feature_availability_matrix(*, source_db: Path, destination: Path) ->
         writer = csv.DictWriter(handle, fieldnames=MATRIX_COLUMNS)
         writer.writeheader()
         writer.writerows(matrix)
-    return {"path": destination.name, "rows": len(matrix), "outcome_independent": True, "sha256": sha256_file(destination)}
+    return {
+        "path": destination.name,
+        "rows": len(matrix),
+        "outcome_independent": True,
+        "sha256": sha256_file(destination),
+        "source_database": {
+            "filename": source_db.name,
+            "bytes": source_db.stat().st_size,
+            "sha256": sha256_file(source_db),
+        },
+    }
 
 
 def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
@@ -222,7 +247,7 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
             raise ValueError(f"missing required source columns: {schema['missing_required_columns']}")
         rows = source.execute(
             "SELECT match_id,issue,match_idx,kickoff_ts,season_year,league,home,away,"
-            "handicap_line_norm,fthg,ftag,result_code,settlement_quality "
+            "handicap_line_norm,fthg,ftag,result_code,settlement_quality,has_trusted_settlement "
             "FROM match_features ORDER BY kickoff_ts,match_id"
         ).fetchall()
     finally:
@@ -233,20 +258,24 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         """
         CREATE TABLE panel (
           match_id INTEGER PRIMARY KEY, issue TEXT, match_idx INTEGER, kickoff_utc TEXT NOT NULL,
-          season_year INTEGER NOT NULL, league TEXT NOT NULL, home_team TEXT NOT NULL, away_team TEXT NOT NULL,
+          fold_year INTEGER NOT NULL, source_season_year INTEGER NOT NULL,
+          league TEXT NOT NULL, home_team TEXT NOT NULL, away_team TEXT NOT NULL,
           normalized_home TEXT NOT NULL, normalized_away TEXT NOT NULL, handicap INTEGER NOT NULL,
-          fthg INTEGER NOT NULL, ftag INTEGER NOT NULL, label_310 TEXT NOT NULL, settlement_quality TEXT
+          fthg INTEGER NOT NULL, ftag INTEGER NOT NULL, label_310 TEXT NOT NULL, settlement_quality TEXT NOT NULL
         );
-        CREATE INDEX panel_season_clock ON panel(season_year,kickoff_utc,match_id);
+        CREATE INDEX panel_fold_clock ON panel(fold_year,kickoff_utc,match_id);
         """
     )
     raw = len(rows)
     source_db_identity = {"filename": source_db.name, "bytes": source_db.stat().st_size, "sha256": sha256_file(source_db)}
     exclusions: Counter[str] = Counter()
-    by_season_raw: Counter[int] = Counter()
-    by_season_eligible: Counter[int] = Counter()
+    by_source_season_raw: Counter[int] = Counter()
+    by_fold_year_raw: Counter[int] = Counter()
+    by_fold_year_eligible: Counter[int] = Counter()
     mismatch = 0
     result_comparison_rows = 0
+    eligible_result_comparison_rows = 0
+    eligible_result_mismatch = 0
     normalized_names: dict[tuple[str, str], set[str]] = defaultdict(set)
     canonical_keys: dict[tuple[str, int], set[int]] = defaultdict(set)
     source_match_ids: Counter[int] = Counter()
@@ -259,6 +288,10 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
     source_score_diagnostics: Counter[str] = Counter()
     score_diagnostics: Counter[str] = Counter()
     settlement_quality_counts: Counter[str] = Counter()
+    settlement_candidate_counts: Counter[str] = Counter()
+    eligible_settlement_counts: Counter[str] = Counter()
+    settlement_flag_counts: Counter[str] = Counter()
+    chronology_diagnostics: Counter[str] = Counter()
     parseable_kickoff_min: str | None = None
     parseable_kickoff_max: str | None = None
     max_home_goals: int | None = None
@@ -281,8 +314,11 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
             source_issue_match_idx[(raw_issue, int(row["match_idx"]))].add(raw_match_id)
         season = row["season_year"]
         if isinstance(season, int):
-            by_season_raw[season] += 1
-        settlement_quality_counts[str(row["settlement_quality"] or "")] += 1
+            by_source_season_raw[season] += 1
+        quality = _settlement_quality(row["settlement_quality"])
+        settlement_quality_counts[_status_name(quality)] += 1
+        trusted_flag = row["has_trusted_settlement"]
+        settlement_flag_counts[f"{_status_name(quality)}|{trusted_flag if trusted_flag is not None else '<null>'}"] += 1
         kickoff_diagnostics[_kickoff_status(row["kickoff_ts"])] += 1
         raw_home_goals, raw_away_goals = row["fthg"], row["ftag"]
         if raw_home_goals is None or raw_away_goals is None:
@@ -302,12 +338,31 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
                 source_score_diagnostics["rows_above_20_goals"] += 1
         kickoff = _parse_kickoff(row["kickoff_ts"])
         if kickoff is None:
+            chronology_diagnostics["unresolved_canonical_clock_rows"] += 1
             exclusions["invalid_or_sentinel_kickoff"] += 1
             continue
         parseable_kickoff_min = kickoff if parseable_kickoff_min is None else min(parseable_kickoff_min, kickoff)
         parseable_kickoff_max = kickoff if parseable_kickoff_max is None else max(parseable_kickoff_max, kickoff)
-        if not isinstance(season, int) or season not in {*TRAIN_SEASONS, *TEST_SEASONS}:
-            exclusions["outside_frozen_2014_2025_window"] += 1
+        fold_year = int(kickoff[:4])
+        chronology_diagnostics["parseable_canonical_clock_rows"] += 1
+        if isinstance(season, int):
+            if season == fold_year:
+                chronology_diagnostics["source_season_agrees_with_canonical_clock"] += 1
+            else:
+                chronology_diagnostics["source_season_disagrees_with_canonical_clock"] += 1
+        else:
+            chronology_diagnostics["source_season_unresolved"] += 1
+        if fold_year not in {*TRAIN_SEASONS, *TEST_SEASONS}:
+            exclusions["outside_frozen_2014_2025_canonical_window"] += 1
+            continue
+        by_fold_year_raw[fold_year] += 1
+        if not isinstance(season, int):
+            chronology_diagnostics["unresolved_source_season_in_canonical_window"] += 1
+            exclusions["unresolved_source_season_for_canonical_clock"] += 1
+            continue
+        if season != fold_year:
+            chronology_diagnostics["source_season_disagreement_in_canonical_window"] += 1
+            exclusions["source_season_kickoff_year_mismatch"] += 1
             continue
         values = (row["league"], row["home"], row["away"])
         if any(value is None or not str(value).strip() for value in values):
@@ -345,10 +400,22 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         result_comparison_rows += 1
         computed = _label(int(row["fthg"]), int(row["ftag"]), int(handicap_raw))
         stored = str(row["result_code"] or "")
-        if stored != computed:
+        result_mismatch = stored != computed
+        if result_mismatch:
             mismatch += 1
-            mismatch_quality[str(row["settlement_quality"] or "")] += 1
+            mismatch_quality[_status_name(quality)] += 1
             exclusions["stored_result_code_mismatch"] += 1
+        settlement_candidate_counts[_status_name(quality)] += 1
+        if quality not in ELIGIBLE_SETTLEMENT_QUALITIES:
+            exclusions[f"ineligible_settlement_quality_{_status_name(quality)}"] += 1
+            continue
+        if trusted_flag != 1:
+            exclusions["trusted_status_without_trusted_settlement_flag"] += 1
+            continue
+        eligible_settlement_counts[_status_name(quality)] += 1
+        eligible_result_comparison_rows += 1
+        if result_mismatch:
+            eligible_result_mismatch += 1
             continue
         league = str(row["league"]).strip()
         home, away = str(row["home"]).strip(), str(row["away"]).strip()
@@ -364,32 +431,36 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         normalized_names[(league, normalized_home)].add(home)
         normalized_names[(league, normalized_away)].add(away)
         inserted.append((
-            match_id, issue, int(row["match_idx"]), kickoff, season,
+            match_id, issue, int(row["match_idx"]), kickoff, fold_year, season,
             league, home, away, normalized_home, normalized_away, int(handicap_raw), int(row["fthg"]),
-            int(row["ftag"]), computed, str(row["settlement_quality"] or ""),
+            int(row["ftag"]), computed, quality,
         ))
-        by_season_eligible[season] += 1
+        by_fold_year_eligible[fold_year] += 1
     inserted.sort(key=lambda item: (item[3], item[0]))
-    output.executemany("INSERT INTO panel VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", inserted)
+    output.executemany("INSERT INTO panel VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", inserted)
     output.commit()
     output.execute("VACUUM")
     output.close()
+    panel_sha256 = sha256_file(panel_path)
 
     conflict_names = sum(1 for raw_names in normalized_names.values() if len(raw_names) > 1)
     mismatch_rate = mismatch / result_comparison_rows if result_comparison_rows else 1.0
     canonical_key_conflicts = sum(1 for match_ids in canonical_keys.values() if len(match_ids) > 1)
     source_duplicate_match_ids = sum(count - 1 for count in source_match_ids.values() if count > 1)
     source_issue_match_idx_conflicts = sum(1 for match_ids in source_issue_match_idx.values() if len(match_ids) > 1)
-    test_counts = {str(year): by_season_eligible[year] for year in TEST_SEASONS}
+    test_counts = {str(year): by_fold_year_eligible[year] for year in TEST_SEASONS}
     handicap_distribution: dict[str, dict[str, int]] = {}
     cold_start: dict[str, dict[str, float | int]] = {}
     for year in TEST_SEASONS:
-        earlier_home = {(str(row[5]), str(row[8])) for row in inserted if int(row[4]) < year}
-        earlier_away = {(str(row[5]), str(row[9])) for row in inserted if int(row[4]) < year}
+        earlier_home = {(str(row[6]), str(row[9])) for row in inserted if int(row[4]) < year}
+        earlier_away = {(str(row[6]), str(row[10])) for row in inserted if int(row[4]) < year}
         season_rows = [row for row in inserted if int(row[4]) == year]
-        handicap_distribution[str(year)] = dict(sorted(Counter(str(row[10]) for row in season_rows).items(), key=lambda item: int(item[0])))
-        cold = sum((str(row[5]), str(row[8])) not in earlier_home or (str(row[5]), str(row[9])) not in earlier_away for row in season_rows)
+        handicap_distribution[str(year)] = dict(sorted(Counter(str(row[11]) for row in season_rows).items(), key=lambda item: int(item[0])))
+        cold = sum((str(row[6]), str(row[9])) not in earlier_home or (str(row[6]), str(row[10])) not in earlier_away for row in season_rows)
         cold_start[str(year)] = {"cold_start_rows": cold, "cold_start_rate": cold / len(season_rows) if season_rows else 0.0}
+    admitted_chronology_violations = sum(int(row[4]) != int(row[5]) for row in inserted)
+    admitted_unresolved_clock_rows = sum(_parse_kickoff(row[3]) is None for row in inserted)
+    admitted_ineligible_settlement_rows = sum(row[-1] not in ELIGIBLE_SETTLEMENT_QUALITIES for row in inserted)
     gate_reasons: list[str] = []
     if len(inserted) < MIN_ROWS:
         gate_reasons.append("qualified_rows_below_100000")
@@ -401,6 +472,16 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         gate_reasons.append("unresolved_duplicate_or_canonical_key_conflicts")
     if conflict_names:
         gate_reasons.append("normalized_team_identity_conflicts_require_resolution")
+    if admitted_chronology_violations:
+        gate_reasons.append("unresolved_chronology_rows_admitted")
+    if admitted_unresolved_clock_rows:
+        gate_reasons.append("unresolved_canonical_clock_rows_admitted")
+    if chronology_diagnostics["unresolved_source_season_in_canonical_window"]:
+        gate_reasons.append("unresolved_source_season_in_canonical_window")
+    if chronology_diagnostics["source_season_disagreement_in_canonical_window"]:
+        gate_reasons.append("source_season_kickoff_year_mismatch_in_canonical_window")
+    if admitted_ineligible_settlement_rows:
+        gate_reasons.append("ineligible_settlement_rows_admitted")
     # Source metadata identifies derivation paths but contains no immutable
     # row-level raw-bundle identity, so Evidence B is not supportable.
     evidence_level = "C" if not gate_reasons else "D"
@@ -408,7 +489,7 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
     source_column_names = {str(column["name"]) for column in schema["columns"]}
     explicit_special_status_fields = sorted(
         column for column in source_column_names
-        if any(token in column.casefold() for token in ("cancel", "postpon", "abandon", "status", "settlement"))
+        if any(token in column.casefold() for token in ("cancel", "postpon", "abandon", "status", "settlement", "trusted"))
     )
     audit = {
         "experiment_id": "SCORE-HCAP-HIST-001",
@@ -428,6 +509,7 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         "coverage": {
             "raw_rows": raw,
             "qualified_rows": len(inserted),
+            "qualified_panel_sha256": panel_sha256,
             "issue_range": {
                 "source_min": min(source_issues) if source_issues else None,
                 "source_max": max(source_issues) if source_issues else None,
@@ -459,12 +541,23 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
             },
             "special_status_diagnostics": {
                 "explicit_status_columns": explicit_special_status_fields,
-                "settlement_quality_counts": dict(sorted(settlement_quality_counts.items())),
-                "treatment": "No explicit cancellation/postponement/abandonment field exists in match_features; rows with missing, noninteger, or negative scores are excluded and counted."
+                "source_quality_counts": dict(sorted(settlement_quality_counts.items())),
+                "candidate_quality_counts_after_clock_identity_handicap_score_filters": dict(sorted(settlement_candidate_counts.items())),
+                "source_quality_and_flag_counts": dict(sorted(settlement_flag_counts.items())),
+                "eligible_settlement_qualities": list(ELIGIBLE_SETTLEMENT_QUALITIES),
+                "eligible_quality_counts_before_result_code_filter": dict(sorted(eligible_settlement_counts.items())),
+                "candidate_status_denominator": sum(settlement_candidate_counts.values()),
+                "eligible_status_denominator": sum(eligible_settlement_counts.values()),
+                "eligible_result_code_comparison_rows": eligible_result_comparison_rows,
+                "eligible_result_code_mismatches": eligible_result_mismatch,
+                "eligible_result_code_mismatch_rate": eligible_result_mismatch / eligible_result_comparison_rows if eligible_result_comparison_rows else 1.0,
+                "source_semantics": "The v4_settlement_quality builder emits trusted only when result_code is present, winning_sp is positive, and score/handicap agrees when available; missing_sp and mismatch are non-trusted. This experiment reads no SP value and uses only this frozen status plus has_trusted_settlement=1 as an eligibility gate.",
+                "treatment": "Only settlement_quality=trusted with has_trusted_settlement=1 is eligible. Blank, unknown, missing_sp, mismatch, and every other non-trusted status are excluded before panel insertion; score/result inconsistencies are separately counted and excluded."
             },
             "exclusions": dict(sorted(exclusions.items())),
-            "by_season_raw": {str(year): count for year, count in sorted(by_season_raw.items())},
-            "by_season_qualified": {str(year): count for year, count in sorted(by_season_eligible.items())},
+            "by_source_season_raw": {str(year): count for year, count in sorted(by_source_season_raw.items())},
+            "by_canonical_fold_year_raw": {str(year): count for year, count in sorted(by_fold_year_raw.items())},
+            "by_canonical_fold_year_qualified": {str(year): count for year, count in sorted(by_fold_year_eligible.items())},
             "test_season_counts": test_counts,
             "test_season_handicap_distribution": handicap_distribution,
             "test_season_cold_start": cold_start,
@@ -479,7 +572,18 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
             "issue_match_idx_conflicts": canonical_key_conflicts,
             "normalized_team_identity_conflicts": conflict_names,
         },
-        "chronology": {"train_seasons": list(TRAIN_SEASONS), "test_seasons": list(TEST_SEASONS), "sort_key": ["kickoff_utc", "match_id"]},
+        "chronology": {
+            "fold_mapping": FOLD_MAPPING,
+            "canonical_clock": "normalized kickoff_utc; naive source timestamps are deterministically interpreted as UTC",
+            "train_seasons": list(TRAIN_SEASONS),
+            "test_seasons": list(TEST_SEASONS),
+            "sort_key": ["kickoff_utc", "match_id"],
+            "source_season_role": "provenance diagnostic only; B0/B1 fold membership is derived solely from canonical kickoff_utc",
+            "diagnostics": dict(sorted(chronology_diagnostics.items())),
+            "mismatch_treatment": "Rows with a canonical-window source_season_year that is missing/noninteger or disagrees with canonical kickoff year are excluded before panel insertion; no source-season fallback is permitted.",
+            "admitted_rows_with_source_season_disagreement": admitted_chronology_violations,
+            "unresolved_clock_rows_admitted": admitted_unresolved_clock_rows,
+        },
         "provenance": {"source_database": source_db_identity, "source_meta_present": bool(schema["source_meta"]), "row_level_immutable_raw_bundle_verified": False, "evidence_level": evidence_level},
         "historical_peek_scope": "This source has been used by prior project retrospective analyses; all outputs are therefore retrospective re-analysis, not untouched forward validation.",
         "feature_availability_matrix": matrix,

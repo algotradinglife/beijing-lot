@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from research.score_hcap_hist.g0 import export_g0_panel  # noqa: E402
+from research.score_hcap_hist.g0 import ELIGIBLE_SETTLEMENT_QUALITIES, FOLD_MAPPING, export_g0_panel  # noqa: E402
 from src.research_freeze_protocol import create_freeze_package, verify_freeze_package  # noqa: E402
 
 
@@ -27,8 +27,8 @@ def main() -> int:
     decision_path = args.work_dir / "g0_decision.json"
     config_path = args.work_dir / "g0_config.json"
     decision_path.write_text(json.dumps(decision, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    config_path.write_text(json.dumps({"experiment_type": "retrospective_walk_forward", "outcome_visibility": "historical_known", "execution_enabled": False}, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    package = create_freeze_package(args.freeze_dir, experiment_id="SCORE-HCAP-HIST-001-G0", research_question="Is the historical score-to-handicap panel eligible for the preregistered retrospective walk-forward experiment?", model_version="score-hcap-hist-g0-v1", input_files=[result["panel"], result["schema"], result["audit"], result["matrix"]], decision_files=[decision_path], config_file=config_path, metadata_files=[ROOT / "docs/research/experiments/SCORE-HCAP-HIST-001-preregistration.md"], git_commit=args.git_commit, frozen_at_utc=args.frozen_at_utc)
+    config_path.write_text(json.dumps({"experiment_type": "retrospective_walk_forward", "outcome_visibility": "historical_known", "execution_enabled": False, "fold_mapping": FOLD_MAPPING, "eligible_settlement_qualities": list(ELIGIBLE_SETTLEMENT_QUALITIES)}, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    package = create_freeze_package(args.freeze_dir, experiment_id="SCORE-HCAP-HIST-001-G0", research_question="Is the historical score-to-handicap panel eligible for the preregistered retrospective walk-forward experiment?", model_version="score-hcap-hist-g0-v1", input_files=[result["panel"], result["schema"], result["audit"], result["matrix"]], input_datasets=[args.source_db], decision_files=[decision_path], config_file=config_path, metadata_files=[ROOT / "docs/research/experiments/SCORE-HCAP-HIST-001-preregistration.md"], git_commit=args.git_commit, frozen_at_utc=args.frozen_at_utc)
     print(json.dumps({"audit": result["audit_data"], "freeze": package, "verification": verify_freeze_package(args.freeze_dir)}, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 
