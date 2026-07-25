@@ -24,8 +24,8 @@ Evidence is capped at C unless raw-source provenance becomes independently verif
 
 ## Frozen result
 
-G0 passed as `G0_ELIGIBLE_EVIDENCE_C`: 187,150 qualified rows; ten test seasons (2016–2025), each above 1,000; 37 result-code mismatches in 187,187 comparable rows (0.0198%); and no unresolved canonical or normalized-team conflicts. The G0 R2 freeze ID is `87176ca340422f0294fa201331a511d6988d740e3eb7f8be007d9549165a17e6`.
+G0 passed as `G0_ELIGIBLE_EVIDENCE_C`: 187,150 qualified rows; ten test seasons (2016–2025), each above 1,000; 37 result-code mismatches in 187,187 comparable rows (0.0198%); and no unresolved canonical or normalized-team conflicts. The G0 R3 freeze ID is `c6326e792167184c3dd31d6b5394e77e8bef6355893ac2ffcb8b96b12d9354b7`.
 
 The single frozen B0/B1 replay used 151,742 held-out rows. B0 Log Loss was 1.085172 and B1 was 1.116602, for `delta = +0.031429` (B1 minus B0). The fixed-seed, season-stratified issue-block bootstrap 95% percentile interval was `[+0.029705, +0.033233]`; all ten season deltas were positive. The preregistered decision is therefore `NO_REPRODUCIBLE_INCREMENTAL_SIGNAL`. This is a negative retrospective result, not a claim about football, markets, profitability, or a prospective strategy.
 
-The B0/B1 freeze ID is `a8ecc767249005464d41c53b1ed7a4c70f5c25a2f438c33653a4c7acfe8f4103`. Evidence remains C because no row-level immutable raw-source bundle was available. The next step is independent Engineering Validation and PI research review; a new feature-ablation question, if desired, requires a separate Issue.
+The B0/B1 R2 freeze ID is `e9beedec9aa85121f8cdc88f94e77f6565fcc29043c804ce7723effc7f3f7e9c`. Evidence remains C because no row-level immutable raw-source bundle was available. The next step is independent Engineering Validation and PI research review; a new feature-ablation question, if desired, requires a separate Issue.
