@@ -87,7 +87,7 @@ status:
     executor_mode: isolated_session
     profile: engineer
     runtime: codex
-    reason: "Automated engineering validation and an independent local Codex review passed on PR #29 implementation HEAD 1b5049e. Browser/device visual validation is still pending user-approved setup, then Research PI review."
+    reason: "Automated engineering validation, independent local Codex review, and user-authorized browser/device visual validation passed on PR #29 implementation HEAD 1b5049e. Research PI review remains the final gate."
   artifacts:
     - uri: "https://github.com/algotradinglife/beijing-lot/issues/28"
       artifact_type: issue
@@ -99,12 +99,19 @@ status:
     implementation_head: 1b5049e2f354608eec1b368307d28ff295f1b3c7
     automated_engineering_validation: PASS
     independent_codex_review: PASS
-    browser_device_visual_validation: PENDING_USER_CONFIRMATION
+    browser_device_visual_validation: PASS
+    browser_device_visual_evidence: "Controlled local fixture: generated N=5 / ¥1024 plan through the real API and web flow; 375x812 viewport had no horizontal overflow, CJK text rendered, desktop layout had no console errors, and the generated four-page 595x842 pt A4 PDF had legible uncut first and last pages. HTML and CSV downloads returned OPERATIONAL_CURRENT."
     python_tests: 33_passed
     dashboard_tests: 23_passed
     frontend_build: PASS
     diff_check: PASS
   history:
+    - action: browser_device_visual_validation_completed
+      ts: "2026-07-25T14:58:03+08:00"
+      actor: engineer
+      from: VALIDATING
+      to: VALIDATING
+      reason: "After user authorization, a controlled local fixture exercised the real web/API flow: N=5 / ¥1024 plan generation, current PDF/HTML/CSV downloads, 375px no-overflow rendering, desktop CJK rendering without console errors, and complete A4 PDF first/last pages. This is implementation validation only, not prospective live-betting evidence."
     - action: automated_engineering_validation_completed
       ts: "2026-07-25T14:35:59+08:00"
       actor: everything-bot-engineer
