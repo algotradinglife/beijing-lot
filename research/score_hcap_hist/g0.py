@@ -54,6 +54,21 @@ def _parse_kickoff(value: object) -> str | None:
     return parsed.astimezone(UTC).isoformat(timespec="seconds")
 
 
+def _kickoff_status(value: object) -> str:
+    """Classify raw kickoff availability without changing the frozen filter."""
+
+    if value is None or not str(value).strip():
+        return "missing"
+    text = str(value).strip()
+    if text.startswith("1899-12-30"):
+        return "sentinel"
+    try:
+        datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return "unparseable"
+    return "parseable"
+
+
 def _label(home_goals: int, away_goals: int, handicap: int) -> str:
     margin = home_goals + handicap - away_goals
     return "3" if margin > 0 else "1" if margin == 0 else "0"
@@ -238,12 +253,27 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
     source_issue_match_idx: dict[tuple[str, int], set[int]] = defaultdict(set)
     source_missing_issue_or_match_idx = 0
     mismatch_quality: Counter[str] = Counter()
+    source_issues: set[str] = set()
+    qualified_issues: set[str] = set()
+    kickoff_diagnostics: Counter[str] = Counter()
+    source_score_diagnostics: Counter[str] = Counter()
+    score_diagnostics: Counter[str] = Counter()
+    settlement_quality_counts: Counter[str] = Counter()
+    parseable_kickoff_min: str | None = None
+    parseable_kickoff_max: str | None = None
+    max_home_goals: int | None = None
+    max_away_goals: int | None = None
+    source_max_home_goals: int | None = None
+    source_max_away_goals: int | None = None
     seen_match_ids: set[int] = set()
     duplicate_match_ids = 0
     inserted: list[tuple[Any, ...]] = []
     for row in rows:
         raw_match_id = int(row["match_id"])
         source_match_ids[raw_match_id] += 1
+        raw_issue_text = str(row["issue"] or "").strip()
+        if raw_issue_text:
+            source_issues.add(raw_issue_text)
         raw_issue = str(row["issue"] or "").strip()
         if not raw_issue or row["match_idx"] is None:
             source_missing_issue_or_match_idx += 1
@@ -252,10 +282,30 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         season = row["season_year"]
         if isinstance(season, int):
             by_season_raw[season] += 1
+        settlement_quality_counts[str(row["settlement_quality"] or "")] += 1
+        kickoff_diagnostics[_kickoff_status(row["kickoff_ts"])] += 1
+        raw_home_goals, raw_away_goals = row["fthg"], row["ftag"]
+        if raw_home_goals is None or raw_away_goals is None:
+            source_score_diagnostics["rows_with_missing_score"] += 1
+            if raw_home_goals is None:
+                source_score_diagnostics["missing_fthg"] += 1
+            if raw_away_goals is None:
+                source_score_diagnostics["missing_ftag"] += 1
+        elif not isinstance(raw_home_goals, int) or not isinstance(raw_away_goals, int):
+            source_score_diagnostics["rows_with_noninteger_score"] += 1
+        elif raw_home_goals < 0 or raw_away_goals < 0:
+            source_score_diagnostics["rows_with_negative_score"] += 1
+        else:
+            source_max_home_goals = raw_home_goals if source_max_home_goals is None else max(source_max_home_goals, raw_home_goals)
+            source_max_away_goals = raw_away_goals if source_max_away_goals is None else max(source_max_away_goals, raw_away_goals)
+            if raw_home_goals > 20 or raw_away_goals > 20:
+                source_score_diagnostics["rows_above_20_goals"] += 1
         kickoff = _parse_kickoff(row["kickoff_ts"])
         if kickoff is None:
             exclusions["invalid_or_sentinel_kickoff"] += 1
             continue
+        parseable_kickoff_min = kickoff if parseable_kickoff_min is None else min(parseable_kickoff_min, kickoff)
+        parseable_kickoff_max = kickoff if parseable_kickoff_max is None else max(parseable_kickoff_max, kickoff)
         if not isinstance(season, int) or season not in {*TRAIN_SEASONS, *TEST_SEASONS}:
             exclusions["outside_frozen_2014_2025_window"] += 1
             continue
@@ -271,9 +321,27 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         if not isinstance(handicap_raw, (int, float)) or not math.isfinite(float(handicap_raw)) or not float(handicap_raw).is_integer():
             exclusions["missing_or_noninteger_handicap"] += 1
             continue
-        if not isinstance(row["fthg"], int) or not isinstance(row["ftag"], int) or row["fthg"] < 0 or row["ftag"] < 0:
+        home_goals, away_goals = row["fthg"], row["ftag"]
+        if home_goals is None or away_goals is None:
+            score_diagnostics["rows_with_missing_score"] += 1
+            if home_goals is None:
+                score_diagnostics["missing_fthg"] += 1
+            if away_goals is None:
+                score_diagnostics["missing_ftag"] += 1
             exclusions["missing_or_invalid_score"] += 1
             continue
+        if not isinstance(home_goals, int) or not isinstance(away_goals, int):
+            score_diagnostics["rows_with_noninteger_score"] += 1
+            exclusions["missing_or_invalid_score"] += 1
+            continue
+        if home_goals < 0 or away_goals < 0:
+            score_diagnostics["rows_with_negative_score"] += 1
+            exclusions["missing_or_invalid_score"] += 1
+            continue
+        max_home_goals = home_goals if max_home_goals is None else max(max_home_goals, home_goals)
+        max_away_goals = away_goals if max_away_goals is None else max(max_away_goals, away_goals)
+        if home_goals > 20 or away_goals > 20:
+            score_diagnostics["rows_above_20_goals"] += 1
         result_comparison_rows += 1
         computed = _label(int(row["fthg"]), int(row["ftag"]), int(handicap_raw))
         stored = str(row["result_code"] or "")
@@ -292,6 +360,7 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
             continue
         seen_match_ids.add(match_id)
         canonical_keys[(issue, int(row["match_idx"]))].add(match_id)
+        qualified_issues.add(issue)
         normalized_names[(league, normalized_home)].add(home)
         normalized_names[(league, normalized_away)].add(away)
         inserted.append((
@@ -336,6 +405,11 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
     # row-level raw-bundle identity, so Evidence B is not supportable.
     evidence_level = "C" if not gate_reasons else "D"
     matrix = export_feature_availability_matrix(source_db=source_db, destination=matrix_path)
+    source_column_names = {str(column["name"]) for column in schema["columns"]}
+    explicit_special_status_fields = sorted(
+        column for column in source_column_names
+        if any(token in column.casefold() for token in ("cancel", "postpon", "abandon", "status", "settlement"))
+    )
     audit = {
         "experiment_id": "SCORE-HCAP-HIST-001",
         "stage": "G0",
@@ -354,6 +428,40 @@ def export_g0_panel(*, source_db: Path, work_dir: Path) -> dict[str, Any]:
         "coverage": {
             "raw_rows": raw,
             "qualified_rows": len(inserted),
+            "issue_range": {
+                "source_min": min(source_issues) if source_issues else None,
+                "source_max": max(source_issues) if source_issues else None,
+                "source_distinct": len(source_issues),
+                "qualified_min": min(qualified_issues) if qualified_issues else None,
+                "qualified_max": max(qualified_issues) if qualified_issues else None,
+                "qualified_distinct": len(qualified_issues),
+            },
+            "kickoff_parseability": {
+                "parseable_rows": kickoff_diagnostics["parseable"],
+                "parseable_rate": kickoff_diagnostics["parseable"] / raw if raw else 0.0,
+                "missing_rows": kickoff_diagnostics["missing"],
+                "sentinel_rows": kickoff_diagnostics["sentinel"],
+                "unparseable_rows": kickoff_diagnostics["unparseable"],
+                "parseable_min_utc": parseable_kickoff_min,
+                "parseable_max_utc": parseable_kickoff_max,
+            },
+            "score_diagnostics": {
+                "source": {
+                    **dict(sorted(source_score_diagnostics.items())),
+                    "max_fthg": source_max_home_goals,
+                    "max_ftag": source_max_away_goals,
+                },
+                "candidate_after_time_identity_handicap_filters": {
+                    **dict(sorted(score_diagnostics.items())),
+                    "max_fthg": max_home_goals,
+                    "max_ftag": max_away_goals,
+                },
+            },
+            "special_status_diagnostics": {
+                "explicit_status_columns": explicit_special_status_fields,
+                "settlement_quality_counts": dict(sorted(settlement_quality_counts.items())),
+                "treatment": "No explicit cancellation/postponement/abandonment field exists in match_features; rows with missing, noninteger, or negative scores are excluded and counted."
+            },
             "exclusions": dict(sorted(exclusions.items())),
             "by_season_raw": {str(year): count for year, count in sorted(by_season_raw.items())},
             "by_season_qualified": {str(year): count for year, count in sorted(by_season_eligible.items())},

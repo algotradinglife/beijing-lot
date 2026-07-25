@@ -56,6 +56,8 @@ def test_g0_exports_outcome_panel_without_sp_fields_and_is_byte_stable(tmp_path:
     assert first["audit_data"]["gate"]["status"] == "G0_ELIGIBLE_EVIDENCE_C"
     assert first["audit_data"]["gate"]["formal_b0_b1_authorized"] is True
     assert first["audit_data"]["provenance"]["source_database"]["sha256"] == g0.sha256_file(first_source)
+    assert first["audit_data"]["coverage"]["issue_range"]["source_min"] == "201401"
+    assert first["audit_data"]["coverage"]["kickoff_parseability"]["parseable_rows"] == len(rows)
     assert first["audit_data"]["query_audit"]["ticket_budget_roi_output"] is False
     assert g0.sha256_file(first["panel"]) == g0.sha256_file(second["panel"])
     panel = sqlite3.connect(first["panel"])
@@ -77,6 +79,9 @@ def test_g0_fails_closed_for_result_mismatch_and_identity_conflicts(tmp_path: Pa
     rows.append(_row(100, 2017, issue="same", match_idx=5))
     rows.append(_row(101, 2017, issue="same", match_idx=5))
     rows.append(_row(102, 2018, issue=" ", match_idx=6))
+    missing_score = list(_row(103, 2018, issue="missing-score", match_idx=7))
+    missing_score[11] = None
+    rows.append(tuple(missing_score))
     source = tmp_path / "invalid.db"
     _source_fixture(source, rows)
 
@@ -88,6 +93,9 @@ def test_g0_fails_closed_for_result_mismatch_and_identity_conflicts(tmp_path: Pa
     assert coverage["issue_match_idx_conflicts"] == 1
     assert coverage["source_missing_issue_or_match_idx"] == 1
     assert coverage["exclusions"]["missing_issue_or_match_idx"] == 1
+    assert coverage["score_diagnostics"]["source"]["rows_with_missing_score"] == 1
+    assert coverage["score_diagnostics"]["candidate_after_time_identity_handicap_filters"]["rows_with_missing_score"] == 1
+    assert coverage["special_status_diagnostics"]["treatment"].startswith("No explicit cancellation")
     assert "result_code_mismatch_rate_above_0_5_percent" in result["audit_data"]["gate"]["reasons"]
     assert "unresolved_duplicate_or_canonical_key_conflicts" in result["audit_data"]["gate"]["reasons"]
     audit = json.loads(result["audit"].read_text(encoding="utf-8"))
