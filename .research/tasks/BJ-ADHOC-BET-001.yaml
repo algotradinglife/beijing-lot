@@ -1,0 +1,116 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: BJ-ADHOC-BET-001
+  title: Adhoc betting plan web generation and download
+  project_id: beijing-lot-research
+  version: "0.1.0"
+  parent_id: GOAL-PHASE1
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/28"
+    - BJ-BET-FREEZE-001
+
+spec:
+  type: capability
+  intent:
+    objective: Let a user request one current exact-N plan and budget on the web, inspect it immediately, and download matching HTML, PDF, and CSV while the bound sale window remains valid.
+    question: Can request-time eligibility, deterministic exact-N construction, immutable packaging, web display, and guarded downloads support manual betting without contaminating scheduled research evidence?
+    hypothesis: A separately orchestrated, append-only adhoc namespace can reuse the released v3.3.3 decision and exact-N portfolio core while enforcing current eligibility and research_evidence_eligible=false.
+    expected_value: Provide an honest, user-initiated operational workflow for selecting N=3/4/5/6/7 and budget 512/768/1024 yuan.
+    out_of_scope:
+      - Scheduled research freeze rendering or mutation
+      - Correct-score betting
+      - Automatic ticket purchase, payment, or terminal integration
+      - New strategy, model, probability, or portfolio optimization
+      - Historical reconstruction presented as current betting
+      - Adhoc results entering scheduled forward evidence, ROI, or release evidence
+
+  context:
+    inputs:
+      - Issue #28 full capability and hard-separation contract
+      - Current production active_v3.3.3 decisions
+      - Existing deterministic exact-N portfolio core
+      - Current sale, cutoff, schedule, SP, and decision-input metadata
+    assumptions:
+      - Unknown, stale, started, closed, cancelled, postponed, or non-passable matches fail closed
+      - Every request binds one N, one budget, one server clock, complete eligibility denominator, input hashes, and deterministic seed
+      - Correct-score execution remains unavailable
+    scheduling:
+      priority_class: P0
+      dispatch_rank: 2
+      preemptible: false
+      wip_slot: engineering_primary
+      selection_reason: next_engineer_capability_after_current_fix_cycle
+      queue_after_active_task: BJ-FREEZE-REVIEW-001
+      queue_note: Scheduling order only; BJ-ADHOC-BET-001 has no domain dependency on BJ-FREEZE-REVIEW-001.
+
+  execution:
+    required_capabilities:
+      - python_development
+      - database_engineering
+      - frontend_development
+      - document_rendering
+      - testing
+    uncertainty: medium
+    complexity: high
+
+  risk:
+    overall: high
+    scientific: low
+    engineering: high
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - Separate adhoc API, storage namespace, ledger, manifest, statuses, and web mode
+      - Web controls for exact N=3/4/5/6/7 and budget 512/768/1024 yuan
+      - Immediate immutable plan display with request, as-of, validity, cost, exclusions, and leg details
+      - Matching HTML, PDF, and CSV downloads enabled only while current sale eligibility is verified
+      - Append-only content-addressed request package with SHA256SUMS and full eligibility denominator
+      - Enforced research_evidence_eligible=false and scheduled_freeze_event_id=null
+      - No exact-N, budget, segment, or older-artifact fallback
+      - No strategy, model, scheduled freeze, research ledger, or release-manifest change
+    checks:
+      - schema_validation
+      - automated_tests
+      - api_ui_download_identity
+      - expiry_race_tests
+      - mobile_and_a4_render_validation
+      - scheduled_adhoc_namespace_isolation
+    human_gates:
+      - engineering_validation
+      - research_pi_review
+
+status:
+  current: READY
+  attempts: 0
+  routing:
+    executor_mode: isolated_session
+    profile: engineer
+    runtime: codex
+    reason: "ROUTE: Engineer. P0 READY but queued in engineering_primary behind the active BJ-FREEZE-REVIEW-001 fix cycle."
+  artifacts:
+    - uri: "https://github.com/algotradinglife/beijing-lot/issues/28"
+      artifact_type: issue
+      description: Approved execution contract
+  result: {}
+  history:
+    - action: task_created
+      ts: "2026-07-25T03:39:10Z"
+      actor: research_pi
+      from: null
+      to: CREATED
+      reason: "Issue #28 created with separate scheduled-freeze and adhoc-betting architecture."
+    - action: plan_task
+      ts: "2026-07-25T03:59:39Z"
+      actor: research_pi
+      from: CREATED
+      to: PLANNING
+      reason: "PI registered intent, risk, routing, acceptance, and scheduling metadata."
+    - action: make_ready
+      ts: "2026-07-25T03:59:39Z"
+      actor: research_pi
+      from: PLANNING
+      to: READY
+      reason: "Capability contract is complete and exact-N dependencies are resolved; shared engineering_primary WIP keeps it queued behind BJ-FREEZE-REVIEW-001."

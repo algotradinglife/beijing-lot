@@ -1,0 +1,109 @@
+api_version: research-os/v0.1
+kind: Task
+
+metadata:
+  id: BJ-FREEZE-REVIEW-001
+  title: Audit-only human views for scheduled freezes
+  project_id: beijing-lot-research
+  version: "0.2.0"
+  parent_id: GOAL-PHASE1
+  related_ids:
+    - "https://github.com/algotradinglife/beijing-lot/issues/26"
+    - "https://github.com/algotradinglife/beijing-lot/pull/27"
+    - BJ-BET-FREEZE-001
+    - BJ-SEG-RECOVERY-001
+
+spec:
+  type: capability
+  intent:
+    objective: Render scheduled freeze packages as portable, independently verifiable HTML, PDF, and CSV audit views that never claim current purchase authority.
+    question: Can a source-only renderer make scheduled exact-N freezes easy to inspect without changing their evidence meaning or presenting them as current betting plans?
+    hypothesis: A content-addressed view derived only from frozen package bytes can improve human auditability while remaining explicitly NOT FOR PURCHASE.
+    expected_value: Give the PI and Strategist readable views for scheduled forward evidence, settlement, and later analysis.
+    out_of_scope:
+      - Request-time sale or cutoff checks
+      - User-triggered adhoc plan generation
+      - Current purchase eligibility or shop-entry instructions
+      - Ticket purchase, payment, or terminal integration
+      - Probability, selection, strategy, or portfolio changes
+      - Mutation of scheduled freezes, ledgers, or evidence status
+
+  context:
+    inputs:
+      - Issue #26 audit-only capability contract and PI architecture amendment
+      - PR #27 implementation and PI change requests
+      - BJ-BET-FREEZE-001 scheduled freeze packages
+      - BJ-SEG-RECOVERY-001 recovery manifests
+    assumptions:
+      - Frozen source packages remain immutable
+      - A source-integrity PASS does not imply that a ticket is currently purchasable
+    scheduling:
+      priority_class: P0
+      dispatch_rank: 1
+      preemptible: false
+      wip_slot: engineering_primary
+      selection_reason: current_pr_fix_cycle
+
+  execution:
+    required_capabilities:
+      - python_development
+      - document_rendering
+      - testing
+    uncertainty: low
+    complexity: medium
+
+  risk:
+    overall: medium
+    scientific: low
+    engineering: medium
+    data_classification: internal
+
+  acceptance:
+    required_artifacts:
+      - Portable HTML, PDF, and CSV audit views derived only from scheduled freeze bytes
+      - Prominent NOT FOR PURCHASE classification in every human-facing view
+      - Source integrity reported separately from operational eligibility
+      - Content-addressed manifest and SHA256SUMS with cross-root reproducibility
+      - Independent verifier that does not require untracked source paths or host-specific fonts
+      - No strategy, ticket selection, probability, scheduled freeze, or production execution changes
+    checks:
+      - schema_validation
+      - automated_tests
+      - clean_checkout_reproducibility
+      - cross_output_root_byte_identity
+    human_gates:
+      - engineering_validation
+      - research_pi_review
+
+status:
+  current: EXECUTING
+  attempts: 1
+  routing:
+    executor_mode: isolated_session
+    profile: engineer
+    runtime: codex
+    reason: "ROUTE: Engineer. PR #27 has PI changes requested and must be respecified as audit-only before re-review."
+  artifacts:
+    - uri: "https://github.com/algotradinglife/beijing-lot/pull/27"
+      artifact_type: pull_request
+      description: Existing implementation under audit-only fix cycle
+  result: {}
+  history:
+    - action: reconcile_runtime_registration
+      ts: "2026-07-25T02:45:18Z"
+      actor: reconciler
+      from: UNKNOWN
+      to: VALIDATING
+      reason: "Branch capability/bj-bet-slip-001 and PR #27 registered for the original printable-slip contract."
+    - action: pi_review_changes_requested
+      ts: "2026-07-25T03:15:20Z"
+      actor: research_pi
+      from: VALIDATING
+      to: EXECUTING
+      reason: "PI found that a post-kickoff rendering was presented as purchasable and identified content-addressing and portability gaps."
+    - action: pi_architecture_rescope
+      ts: "2026-07-25T03:37:28Z"
+      actor: research_pi
+      from: EXECUTING
+      to: EXECUTING
+      reason: "Issue #26 was narrowed to audit-only scheduled-freeze views; current adhoc betting was separated into BJ-ADHOC-BET-001."
