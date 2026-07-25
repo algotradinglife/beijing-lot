@@ -55,7 +55,7 @@ spec:
     - id: BJ-OPS-OBS-001
       node_type: task
       ref: tasks/BJ-OPS-OBS-001.yaml
-      state: ACTIVE
+      state: COMPLETED
 
   edges:
     - from: GOAL-BOOT
