@@ -50,6 +50,9 @@ For full authority definitions, see `kernel/system.yaml` in the Research OS temp
 - Hermes may persist operational state, runtime registration, and audit history, but must not change PI-owned intent, priority, dependencies, or task owner.
 - `profile: engineer` routes to the resident Engineer session; `profile: strategist` routes to the resident Strategist session.
 - Both resident sessions use the shared GitHub identity `everything-bot-engineer`. GitHub `owner/engineer` and `owner/strategist` labels identify the real route; the account name does not.
+- Engineer execution is fixed to worktree `.worktrees/develop` and branch `develop`.
+- Engineer must not create per-Issue branches or worktrees. Before starting the next Engineer task, `develop` must be synchronized with current `main` and contain no residue from a prior merged or abandoned task.
+- Engineer commits and pushes task changes on `develop` and opens the implementation PR from `develop` to `main`.
 - A task is dispatchable only when it is `READY`, its `depends_on` nodes are complete, and its scheduling WIP slot is free.
 - Within one WIP slot, an existing `EXECUTING` or `VALIDATING` task remains the current action. Otherwise Hermes selects the eligible `READY` task by `priority_class`, then `dispatch_rank`.
 - GitHub comments do not need to mention HermesPM. Hermes derives dispatch decisions from these persisted control-plane files.
