@@ -296,7 +296,7 @@ def create_g0_input_snapshot(
     _deterministic_tar(p42_root, p42_archive)
     _write_model_inventory(model_inventory, p0_info, model_search_roots)
     records = {
-        "schema_version": "sp_consistency_g0_atomic_inputs_v1",
+        "schema_version": "sp_consistency_g0_atomic_inputs_v2",
         "p34": {**p34_info["p34"], "bytes": p34_snapshot.stat().st_size, "sha256": sha256_file(p34_snapshot)},
         "p34_source_schema": {**p34_info["schema"], "bytes": p34_source_schema.stat().st_size, "sha256": sha256_file(p34_source_schema)},
         "p0": {"logical_name": "p0_handicap_snapshot.sqlite", "bytes": p0_snapshot.stat().st_size, "sha256": sha256_file(p0_snapshot), "rows": p0_info["rows"]},

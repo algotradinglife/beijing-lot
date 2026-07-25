@@ -381,7 +381,12 @@ def run_g0_coverage_audit(
         "audit_at_utc": audit_at.isoformat(timespec="seconds"),
         "outcomes_loaded": False,
         "query_audit": {
-            "p34_columns": ["matches.match_id", "matches.issue", "matches.match_idx", "matches.kickoff_ts", "snapshots.match_id", "snapshots.snapshot_ts", "snapshots.sp_3", "snapshots.sp_1", "snapshots.sp_0"],
+            "p34_columns": [
+                "matches.match_id", "matches.issue", "matches.match_idx", "matches.kickoff_ts",
+                "snapshots.match_id", "snapshots.snapshot_ts", "snapshots.sp_3", "snapshots.sp_1", "snapshots.sp_0",
+                "snapshots.source_observed_at", "snapshots.fetched_at", "snapshots.raw_batch_id",
+                "snapshots.immutable_bundle_sha256", "p34_source_schema.json",
+            ],
             "p0_columns": ["matches.issue", "matches.match_idx", "matches.handicap_line"],
             "prohibited_tables_or_columns": ["settlements", "result_code", "fthg", "ftag", "winning_sp", "score"],
             "outcome_accessed": False,

@@ -171,7 +171,7 @@ def test_atomic_g0_inputs_rebuild_same_audit_and_freeze_identity(tmp_path: Path)
         config_path.write_text('{"version":"fixture"}', encoding="utf-8")
         decision_path.write_text('{"decision":"INSUFFICIENT_STRICT_DATA"}', encoding="utf-8")
         freezes.append(create_freeze_package(
-            tmp_path / f"freeze-{index}", experiment_id="SP-CONSISTENCY-001A-G0-R3",
+            tmp_path / f"freeze-{index}", experiment_id="SP-CONSISTENCY-001A-G0-R4",
             research_question="fixture", model_version="fixture-v1",
             input_files=[atomic.p34_snapshot, atomic.p34_source_schema, atomic.p0_snapshot, atomic.p42_archive, atomic.model_inventory, atomic.fingerprints, audit_path],
             decision_files=[decision_path], config_file=config_path,

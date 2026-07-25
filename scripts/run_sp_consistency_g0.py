@@ -96,7 +96,7 @@ def main() -> int:
     if arguments.freeze_dir:
         package = create_freeze_package(
             arguments.freeze_dir,
-            experiment_id="SP-CONSISTENCY-001A-G0-R3",
+            experiment_id="SP-CONSISTENCY-001A-G0-R4",
             research_question="Does strict p34 plus score-distribution as-of coverage authorize SP-CONSISTENCY-001A?",
             model_version=G0_CONFIG_VERSION,
             input_files=[
