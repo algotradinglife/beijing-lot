@@ -86,6 +86,7 @@ def test_g0_is_outcome_blind_and_fails_closed_without_strict_p34_provenance(tmp_
     assert report["gate"]["formal_comparison_authorized"] is False
     assert report["query_audit"]["outcome_accessed"] is False
     assert report["coverage"]["p34"]["by_issue"][0]["strict_complete_match_markets"] == 0
+    assert str(tmp_path) not in str(report)
 
 
 def test_atomic_g0_inputs_rebuild_same_audit_and_freeze_identity(tmp_path: Path):

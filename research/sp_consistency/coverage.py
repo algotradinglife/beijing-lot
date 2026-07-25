@@ -221,7 +221,7 @@ def _p42_frozen_coverage(freeze_root: Path, p0_connection: sqlite3.Connection) -
         issues.add(str(manifest["issue"]))
         packages.append(
             {
-                "path": str(package),
+                "frozen_input_package": package.name,
                 "issue": str(manifest["issue"]),
                 "segment_idx": int(manifest["segment_idx"]),
                 "event_id": str(manifest["event_id"]),

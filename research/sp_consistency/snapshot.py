@@ -107,8 +107,9 @@ def _candidate_file_inventory(roots: Iterable[Path]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
     for root in roots:
         resolved = root.resolve()
+        label = root.name
         if not resolved.exists():
-            candidates.append({"root": str(resolved), "status": "missing"})
+            candidates.append({"root": label, "status": "missing"})
             continue
         for path in sorted(resolved.rglob("*")):
             if not path.is_file() or path.is_symlink():
@@ -116,7 +117,7 @@ def _candidate_file_inventory(roots: Iterable[Path]) -> list[dict[str, Any]]:
             name = path.name.lower()
             if any(term in name for term in MODEL_TERMS):
                 candidates.append(
-                    {"path": str(path.relative_to(resolved)), "root": str(resolved), "bytes": path.stat().st_size, "sha256": sha256_file(path)}
+                    {"path": str(path.relative_to(resolved)), "root": label, "bytes": path.stat().st_size, "sha256": sha256_file(path)}
                 )
     return candidates
 
@@ -133,6 +134,7 @@ def _write_model_inventory(destination: Path, p0_info: dict[str, Any], roots: It
         "rejection_counts": {
             "no_named_candidate_table_or_view": 0 if schema_matches else 1,
             "no_named_candidate_file": 0 if any("path" in item for item in file_candidates) else 1,
+            "candidate_assets_without_complete_frozen_wh_1x2_ou_panel": sum(1 for item in file_candidates if "path" in item),
             "no_strict_frozen_william_hill_1x2_ou_contract": 1,
         },
     }
