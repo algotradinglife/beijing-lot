@@ -58,11 +58,6 @@ FORMAL_ARTIFACT_VARIANT_IDS = frozenset(
 CONCENTRATION_CONTRACT_SCHEMA_VERSION = "adhoc_match_concentration_contract_v1"
 MAX_TICKET_OCCURRENCES_PER_MATCH = 2
 _LEGACY_LEDGER_BINDING = object()
-# ``create_or_get`` is deliberately not a general-purpose package writer.  A
-# callback must prove that it ran the canonical API resolver before an
-# operational v3 package is allowed.  ``None`` (including from a no-op
-# callback) is never an authorization result.
-_CANONICAL_SOURCE_AUTHORIZATION = object()
 LEDGER_SCHEMA_VERSION = "adhoc_betting_ledger_v1"
 CONTENT_ID_SCHEMA = "adhoc_betting_content_id_v1"
 REQUEST_ID_SCHEMA = "adhoc_betting_request_id_v1"
@@ -150,17 +145,6 @@ class AdhocPlanNotFound(AdhocBettingError):
 
 class AdhocIdempotencyConflict(AdhocBettingError):
     """A client replayed an idempotency key with different request fields."""
-
-
-def _canonical_source_authorization() -> object:
-    """Return the opaque capability accepted after canonical API resolution.
-
-    This remains module-private because it is an in-process trust boundary,
-    not user-supplied package metadata.  The Decision API returns it only
-    after rebuilding and byte-comparing the request-time source snapshot.
-    """
-
-    return _CANONICAL_SOURCE_AUTHORIZATION
 
 
 def canonical(value: object) -> bytes:
@@ -1371,15 +1355,33 @@ class AdhocBettingStore:
         font_file: str | os.PathLike[str] = DEFAULT_FONT_FILE,
         safety_margin_seconds: int = DEFAULT_SAFETY_MARGIN_SECONDS,
         max_source_age_seconds: int = DEFAULT_MAX_SOURCE_AGE_SECONDS,
-        canonical_source_authorizer: Callable[[dict[str, Any], str, datetime], object]
-        | None = None,
     ) -> None:
         self.db_path = Path(db_path)
         self.root = Path(root)
         self.font_file = Path(font_file)
         self.safety_margin = timedelta(seconds=max(0, int(safety_margin_seconds)))
         self.max_source_age = timedelta(seconds=max(1, int(max_source_age_seconds)))
-        self.canonical_source_authorizer = canonical_source_authorizer
+        self._canonical_source_authorizer: Callable[
+            [dict[str, Any], str, datetime], None
+        ] | None = None
+
+    @classmethod
+    def _from_canonical_source_resolver(
+        cls,
+        *,
+        canonical_source_resolver: Callable[[dict[str, Any], str, datetime], None],
+        **kwargs: object,
+    ) -> "AdhocBettingStore":
+        """Build the operational Store solely for the canonical API boundary.
+
+        The public constructor never accepts a caller-provided authority.
+        This private factory is intentionally used by the API composition
+        root after it has selected the canonical resolver.
+        """
+
+        store = cls(**kwargs)
+        store._canonical_source_authorizer = canonical_source_resolver
+        return store
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=30)
@@ -1475,17 +1477,11 @@ class AdhocBettingStore:
         requested_at_text = _iso_hkt(requested_at)
         if str(source_snapshot.get("issue") or "") != issue_text:
             raise AdhocBettingError("source snapshot issue does not match the request")
-        if self.canonical_source_authorizer is None:
+        if self._canonical_source_authorizer is None:
             raise AdhocBettingError(
                 "operational adhoc publication requires the canonical source resolver"
             )
-        authorization = self.canonical_source_authorizer(
-            source_snapshot, issue_text, requested_at
-        )
-        if authorization is not _CANONICAL_SOURCE_AUTHORIZATION:
-            raise AdhocBettingError(
-                "operational adhoc publication lacks trusted canonical source authorization"
-            )
+        self._canonical_source_authorizer(source_snapshot, issue_text, requested_at)
         _verify_formal_decision_binding(
             issue=issue_text,
             decision_variant_id=source_snapshot.get("decision_variant_id"),

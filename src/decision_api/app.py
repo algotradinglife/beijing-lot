@@ -29,7 +29,6 @@ from flask import (
 )
 
 from src.adhoc_betting import (
-    _canonical_source_authorization,
     AdhocBettingError,
     AdhocBettingStore,
     AdhocIdempotencyConflict,
@@ -9433,7 +9432,7 @@ def create_app(
 
     def _authorize_canonical_adhoc_source(
         source_snapshot: dict[str, Any], issue: str, request_clock: datetime
-    ) -> object:
+    ) -> None:
         """Reject caller-built snapshots at the operational publication boundary."""
 
         with _connect(db_path) as conn:
@@ -9444,13 +9443,12 @@ def create_app(
             raise AdhocBettingError(
                 "adhoc source snapshot does not match the canonical API resolver"
             )
-        return _canonical_source_authorization()
 
-    adhoc_store = AdhocBettingStore(
+    adhoc_store = AdhocBettingStore._from_canonical_source_resolver(
         db_path=db_path,
         root=Path(adhoc_betting_root),
         font_file=Path(adhoc_font_file),
-        canonical_source_authorizer=_authorize_canonical_adhoc_source,
+        canonical_source_resolver=_authorize_canonical_adhoc_source,
     )
     static_dir = Path(os.environ.get("BEIDAN_DASHBOARD_STATIC_DIR", DEFAULT_DASHBOARD_STATIC_DIR))
     gate_password = next((os.environ.get(name) for name in DASHBOARD_GATE_PASSWORD_ENVS if os.environ.get(name)), "")

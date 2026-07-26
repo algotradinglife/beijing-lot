@@ -154,13 +154,11 @@ def _source_snapshot(
 
 def _store(tmp_path: Path) -> AdhocBettingStore:
     assert DEFAULT_FONT_FILE.is_file(), "the reviewed portable CJK font is required"
-    return AdhocBettingStore(
+    return AdhocBettingStore._from_canonical_source_resolver(
         db_path=tmp_path / "adhoc.sqlite",
         root=tmp_path / "adhoc-packages",
         font_file=DEFAULT_FONT_FILE,
-        canonical_source_authorizer=lambda _source, _issue, _clock: (
-            adhoc_module._canonical_source_authorization()
-        ),
+        canonical_source_resolver=lambda _source, _issue, _clock: None,
     )
 
 
@@ -745,16 +743,14 @@ def test_manual_snapshot_with_correct_issue_cannot_publish_operational_v3(
         _create(manual_store, source)
 
 
-def test_noop_source_authorizer_cannot_publish_operational_v3(tmp_path: Path) -> None:
-    manual_store = AdhocBettingStore(
-        db_path=tmp_path / "manual-noop.sqlite",
-        root=tmp_path / "manual-noop-packages",
-        font_file=DEFAULT_FONT_FILE,
-        canonical_source_authorizer=lambda _source, _issue, _clock: None,
-    )
-
-    with pytest.raises(AdhocBettingError, match="trusted canonical source authorization"):
-        _create(manual_store, _source_snapshot())
+def test_public_store_constructor_rejects_authorizer_injection(tmp_path: Path) -> None:
+    with pytest.raises(TypeError, match="canonical_source_authorizer"):
+        AdhocBettingStore(
+            db_path=tmp_path / "manual-noop.sqlite",
+            root=tmp_path / "manual-noop-packages",
+            font_file=DEFAULT_FONT_FILE,
+            canonical_source_authorizer=lambda _source, _issue, _clock: None,  # type: ignore[call-arg]
+        )
 
 
 def test_receipt_valid_retired_formal_variant_fails_closed(tmp_path: Path) -> None:
