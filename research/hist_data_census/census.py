@@ -1116,6 +1116,7 @@ def _audit_bundle(reference: SourceReference) -> tuple[dict[str, Any], Counter[s
     capture_clock_present = any(key in manifest for key in ("fetched_at_utc", "created_at_utc", "capture_batch_id"))
     source_clock_present = any(key in manifest for key in ("source_updated_at_hkt", "source_updatetime"))
     strict_rows = counter["complete_forward_open_rows"]
+    counter["strict_forward_rows"] += strict_rows
     incomplete = (
         counter["incomplete_match_indices"] + counter["failed_or_missing_pages"] + counter["failed_pages"]
         + counter["rejected_pages"] + counter["failure_rows"]

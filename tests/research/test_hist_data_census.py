@@ -186,7 +186,7 @@ def census_fixture(tmp_path: Path) -> Path:
             [("1:0",), ("2:1",)],
         )
         connection.executemany(
-            "INSERT INTO live_market_sp_snapshots VALUES ('26076', 40, 'total_goals', 'm1', ?, 2.5, '2026-07-25T01:00:00Z', 'forward_complete_open', 'open')",
+            "INSERT INTO live_market_sp_snapshots VALUES ('26076', 40, 'total_goals', 'm1', ?, 2.5, '2026-07-25T01:00:00Z', 'terminal_backfill_exploratory_only', 'open')",
             [("0~1",), ("2~3",)],
         )
         connection.execute(
