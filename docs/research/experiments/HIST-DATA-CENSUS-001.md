@@ -10,8 +10,8 @@ make a ticket recommendation.
 
 The audit first froze a metadata-only inventory before opening any source
 coverage, schema, workbook cell, CSV row, or capture manifest payload. The
-accepted G0 inventory contains 2,644 logical assets and is bound to
-`8db2bbeab282ce1ab120bc5a2d7151ba5de42e88efeb872b14f1dd56b88308b0`.
+final release receipt carries the authoritative inventory SHA-256; this prose
+reports only the corresponding frozen inventory count of 2,649 logical assets.
 
 The public inventory contains logical IDs, repository-relative locators,
 filenames, byte counts and SHA-256 values only. It does not contain local
@@ -23,25 +23,26 @@ At the audit boundary the inventory contained:
 
 | Candidate class | Count |
 | --- | ---: |
-| immutable forward-capture bundles | 2,112 |
-| research-artifact bundles | 304 |
+| immutable forward-capture bundles | 2,117 |
+| research-artifact bundles | 308 |
 | freeze bundles | 1 |
 | SQLite databases | 17 |
-| SQLite sidecars | 22 |
+| SQLite sidecars | 18 |
 | CSV/Parquet-like tabular exports | 53 |
 | JSON artifacts | 65 (one sensitive configuration excluded) |
+| auxiliary/non-tabular repository files | 30 |
 | workbooks | 39 repository workbooks + 1 runtime-supplied vendor workbook |
 
-All 2,417 immutable bundles selected from the G0 inventory passed exact
+All 2,426 immutable bundles selected from the G0 inventory passed exact
 `SHA256SUMS` coverage and content verification in the read-only audit.
 
 ## Source-change boundary
 
-The live collector continued writing while this audit ran. Six frozen logical
-assets—the live and 500-BJDC database files plus their WAL/SHM sidecars—changed
-after G0. They are explicitly marked `SOURCE_DRIFT_FAIL_CLOSED` in the
-evidence package and contribute no schema, coverage, price, or outcome evidence
-to this release. Four later-discovered assets are likewise excluded rather
+The live collector continued writing while this audit ran. Four frozen logical
+assets—the WAL/SHM sidecars of the live and 500-BJDC databases—changed after
+G0. They are explicitly marked `SOURCE_DRIFT_FAIL_CLOSED` in the evidence
+package and contribute no schema, coverage, price, or outcome evidence to this
+release. Four later-discovered assets are likewise excluded rather
 than retroactively added to G0.
 
 This is an evidence boundary, not a data-loss claim. A future integration or
@@ -93,8 +94,8 @@ The audit found checksum-valid immutable capture bundles with declared
 
 | Play | Market | Rows | Classification |
 | ---: | --- | ---: | --- |
-| 40 | total goals | 45,417 | `conditional_strict_forward` only after row-level source/capture time, sale/open and cutoff checks |
-| 42 | correct score | 20,384 | `conditional_strict_forward` only after the same row-level checks |
+| 40 | total goals | 45,567 | `conditional_strict_forward` only after row-level source/capture time, sale/open and cutoff checks |
+| 42 | correct score | 20,501 | `conditional_strict_forward` only after the same row-level checks |
 | 41 | upper/lower odd/even | 0 qualified | no strict price subset; capture rows remain unclassified |
 | 51 | half/full | 0 qualified | no strict price subset; capture rows remain unclassified |
 
