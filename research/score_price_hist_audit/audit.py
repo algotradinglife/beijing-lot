@@ -467,7 +467,7 @@ def _vba_evidence(workbook: ZipFile) -> dict[str, Any]:
             "url_marker_present": present(b"http"),
             "timestamp_marker_present": any(present(token) for token in (b"timestamp", b"time", b"10h")),
             "score_market_marker_present": any(present(token) for token in (b"score", b"odds", b"sp")),
-            "credential_like_marker_present": any(present(token) for token in (b"password", b"token", b"secret")),
+            "authentication_material_marker_present": any(present(token) for token in (b"password", b"token", b"secret")),
         },
         "provider_identity_from_vba": "UNRESOLVED",
     }

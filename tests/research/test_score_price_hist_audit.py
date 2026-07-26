@@ -198,6 +198,8 @@ def test_timestamp_binding_fails_closed_and_prohibited_fields_are_absent(tmp_pat
     rendered = canonical_bytes(artifacts).decode("utf-8")
     for field in ("\"winning_sp\"", "\"result_code\"", "\"profit\"", "\"payout\"", "\"ticket\"", "\"prediction\""):
         assert field not in rendered
+    for sensitive_token in ("/private/vendor", "credential", "password", "raw_vba", "source_bytes"):
+        assert sensitive_token not in rendered
 
 
 def create_package(tmp_path: Path) -> tuple[Path, Path, Path, object, object]:
