@@ -19,6 +19,17 @@ Status: `blocked fail-closed; no correct-score signal, selection, or ROI claim`
   panel. The committed SQLite-related files are importer/runtime code, not a
   tracked timestamped correct-score odds dataset.
 
+### Later provenance correction (2026-07-26)
+
+`SCORE-PRICE-HIST-AUDIT-001` subsequently established that the runtime
+long-horizon XLSM conversion has a populated 26-outcome numeric score-price
+tail. This corrects the narrow **presence** claim above: the asset is not
+absent. It does not change this report's no-candidate conclusion because the
+audit could not establish provider identity, Beijing p42 identity, source
+observation time, or a binding from `ts_10h` to that vector. Its frozen
+classification is `PROHIBITED` for replay, not an admissible historical
+correct-score price panel.
+
 Therefore there is no admissible input for calibration, Top-k, or EV/q results.
 Terminal/final odds were not sought, read, or substituted.
 
