@@ -29,6 +29,7 @@ from flask import (
 )
 
 from src.adhoc_betting import (
+    _canonical_source_authorization,
     AdhocBettingError,
     AdhocBettingStore,
     AdhocIdempotencyConflict,
@@ -9432,7 +9433,7 @@ def create_app(
 
     def _authorize_canonical_adhoc_source(
         source_snapshot: dict[str, Any], issue: str, request_clock: datetime
-    ) -> None:
+    ) -> object:
         """Reject caller-built snapshots at the operational publication boundary."""
 
         with _connect(db_path) as conn:
@@ -9443,6 +9444,7 @@ def create_app(
             raise AdhocBettingError(
                 "adhoc source snapshot does not match the canonical API resolver"
             )
+        return _canonical_source_authorization()
 
     adhoc_store = AdhocBettingStore(
         db_path=db_path,

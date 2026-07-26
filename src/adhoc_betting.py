@@ -58,6 +58,11 @@ FORMAL_ARTIFACT_VARIANT_IDS = frozenset(
 CONCENTRATION_CONTRACT_SCHEMA_VERSION = "adhoc_match_concentration_contract_v1"
 MAX_TICKET_OCCURRENCES_PER_MATCH = 2
 _LEGACY_LEDGER_BINDING = object()
+# ``create_or_get`` is deliberately not a general-purpose package writer.  A
+# callback must prove that it ran the canonical API resolver before an
+# operational v3 package is allowed.  ``None`` (including from a no-op
+# callback) is never an authorization result.
+_CANONICAL_SOURCE_AUTHORIZATION = object()
 LEDGER_SCHEMA_VERSION = "adhoc_betting_ledger_v1"
 CONTENT_ID_SCHEMA = "adhoc_betting_content_id_v1"
 REQUEST_ID_SCHEMA = "adhoc_betting_request_id_v1"
@@ -145,6 +150,17 @@ class AdhocPlanNotFound(AdhocBettingError):
 
 class AdhocIdempotencyConflict(AdhocBettingError):
     """A client replayed an idempotency key with different request fields."""
+
+
+def _canonical_source_authorization() -> object:
+    """Return the opaque capability accepted after canonical API resolution.
+
+    This remains module-private because it is an in-process trust boundary,
+    not user-supplied package metadata.  The Decision API returns it only
+    after rebuilding and byte-comparing the request-time source snapshot.
+    """
+
+    return _CANONICAL_SOURCE_AUTHORIZATION
 
 
 def canonical(value: object) -> bytes:
@@ -1096,6 +1112,20 @@ def _verify_pdf_concentration_view(
                 ),
             ]
         )
+        # The PDF is an operational artifact, so its human-readable legs must
+        # agree with the formally bound selection codes as well as its cost
+        # and concentration summaries.  A fully re-hashed PDF with e.g. 胜
+        # rendered as 平 must therefore fail verification.
+        for match_idx, code_text in zip(
+            ticket.get("match_indices", []), ticket.get("leg_codes", [])
+        ):
+            idx = int(match_idx)
+            match = match_by_idx[idx]
+            codes = [code for code in str(code_text).split("+") if code]
+            required.append(
+                f"#{idx}{_selection_label(codes)}"
+                f"{match['home']}vs{match['away']}"
+            )
     if any(re.sub(r"\s+", "", fragment) not in normalized for fragment in required):
         raise AdhocBettingError("adhoc PDF concentration view mismatch")
 
@@ -1341,7 +1371,7 @@ class AdhocBettingStore:
         font_file: str | os.PathLike[str] = DEFAULT_FONT_FILE,
         safety_margin_seconds: int = DEFAULT_SAFETY_MARGIN_SECONDS,
         max_source_age_seconds: int = DEFAULT_MAX_SOURCE_AGE_SECONDS,
-        canonical_source_authorizer: Callable[[dict[str, Any], str, datetime], None]
+        canonical_source_authorizer: Callable[[dict[str, Any], str, datetime], object]
         | None = None,
     ) -> None:
         self.db_path = Path(db_path)
@@ -1449,7 +1479,13 @@ class AdhocBettingStore:
             raise AdhocBettingError(
                 "operational adhoc publication requires the canonical source resolver"
             )
-        self.canonical_source_authorizer(source_snapshot, issue_text, requested_at)
+        authorization = self.canonical_source_authorizer(
+            source_snapshot, issue_text, requested_at
+        )
+        if authorization is not _CANONICAL_SOURCE_AUTHORIZATION:
+            raise AdhocBettingError(
+                "operational adhoc publication lacks trusted canonical source authorization"
+            )
         _verify_formal_decision_binding(
             issue=issue_text,
             decision_variant_id=source_snapshot.get("decision_variant_id"),

@@ -158,7 +158,9 @@ def _store(tmp_path: Path) -> AdhocBettingStore:
         db_path=tmp_path / "adhoc.sqlite",
         root=tmp_path / "adhoc-packages",
         font_file=DEFAULT_FONT_FILE,
-        canonical_source_authorizer=lambda _source, _issue, _clock: None,
+        canonical_source_authorizer=lambda _source, _issue, _clock: (
+            adhoc_module._canonical_source_authorization()
+        ),
     )
 
 
@@ -743,6 +745,18 @@ def test_manual_snapshot_with_correct_issue_cannot_publish_operational_v3(
         _create(manual_store, source)
 
 
+def test_noop_source_authorizer_cannot_publish_operational_v3(tmp_path: Path) -> None:
+    manual_store = AdhocBettingStore(
+        db_path=tmp_path / "manual-noop.sqlite",
+        root=tmp_path / "manual-noop-packages",
+        font_file=DEFAULT_FONT_FILE,
+        canonical_source_authorizer=lambda _source, _issue, _clock: None,
+    )
+
+    with pytest.raises(AdhocBettingError, match="trusted canonical source authorization"):
+        _create(manual_store, _source_snapshot())
+
+
 def test_receipt_valid_retired_formal_variant_fails_closed(tmp_path: Path) -> None:
     store = _store(tmp_path)
     source = _source_snapshot()
@@ -919,6 +933,32 @@ def test_fully_rehashed_pdf_without_concentration_evidence_is_rejected(
     with pytest.raises(
         AdhocBettingError, match="PDF concentration view"
     ):
+        verify_package(rehashed_package)
+
+
+def test_fully_rehashed_pdf_with_wrong_rendered_leg_label_is_rejected(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    result = _create(store, _source_snapshot())
+    package = tmp_path / "adhoc-packages" / "packages" / "26078" / str(
+        result["package_id"]
+    )
+    manifest = json.loads(
+        (package / "adhoc_request_manifest.json").read_text(encoding="utf-8")
+    )
+    altered_html = (package / "adhoc_betting_view.html").read_text(
+        encoding="utf-8"
+    ).replace("胜", "平")
+    adhoc_module._write_pdf(
+        altered_html,
+        package / "adhoc_betting_slip.pdf",
+        DEFAULT_FONT_FILE,
+        str(manifest["request_id"])[:32],
+    )
+    rehashed_package = _rehash_package(package)
+
+    with pytest.raises(AdhocBettingError, match="PDF concentration view"):
         verify_package(rehashed_package)
 
 
