@@ -39,6 +39,26 @@ def _git_commit() -> str:
         raise CensusError("current git commit cannot be resolved") from exc
 
 
+def _bound_git_commit(requested_commit: str | None) -> str:
+    """Bind a newly frozen package to the exact clean code checkout that ran it."""
+
+    head = _git_commit()
+    if requested_commit is not None and requested_commit != head:
+        raise CensusError("new census evidence must bind the current exact HEAD commit")
+    try:
+        status = subprocess.check_output(
+            ["git", "status", "--porcelain", "--untracked-files=normal"],
+            cwd=ROOT,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise CensusError("working-tree cleanliness cannot be verified before freezing evidence") from exc
+    if status.strip():
+        raise CensusError("commit or remove non-ignored working-tree changes before freezing evidence")
+    return head
+
+
 def _arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -77,7 +97,7 @@ def main() -> int:
         source_root = (arguments.source_root or main_repository_root(ROOT)).expanduser().resolve()
         runtime_inputs = [parse_runtime_input(value) for value in arguments.runtime_input]
         if arguments.command == "inventory":
-            git_commit = arguments.git_commit or _git_commit()
+            git_commit = _bound_git_commit(arguments.git_commit)
             rows = build_source_inventory(repository_root=source_root, runtime_inputs=runtime_inputs)
             paths = write_inventory_artifacts(
                 arguments.output_dir,
@@ -109,7 +129,7 @@ def main() -> int:
                 verify_current_sources=not arguments.skip_current_source_check,
             )
         elif arguments.command == "audit":
-            git_commit = arguments.git_commit or _git_commit()
+            git_commit = _bound_git_commit(arguments.git_commit)
             artifacts = audit_frozen_inventory(
                 inventory_package=arguments.inventory_package,
                 repository_root=source_root,

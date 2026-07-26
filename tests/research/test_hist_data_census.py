@@ -8,6 +8,9 @@ from pathlib import Path
 
 import pytest
 
+import research.hist_data_census.census as census_module
+from scripts import run_hist_data_census as census_cli
+
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -147,6 +150,19 @@ def test_inventory_decision_is_precoverage_only(tmp_path: Path) -> None:
     assert decision["next_permitted_phase"] == "READ_ONLY_SCHEMA_AND_COVERAGE_AUDIT_AFTER_INVENTORY_VERIFICATION"
 
 
+def test_new_freeze_requires_clean_exact_head(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(census_cli, "_git_commit", lambda: COMMIT)
+    with pytest.raises(CensusError, match="current exact HEAD"):
+        census_cli._bound_git_commit("b" * 40)
+
+    monkeypatch.setattr(census_cli.subprocess, "check_output", lambda *args, **kwargs: " M research/hist_data_census/census.py\n")
+    with pytest.raises(CensusError, match="working-tree changes"):
+        census_cli._bound_git_commit(COMMIT)
+
+    monkeypatch.setattr(census_cli.subprocess, "check_output", lambda *args, **kwargs: "")
+    assert census_cli._bound_git_commit(COMMIT) == COMMIT
+
+
 def write_sha256sums(bundle: Path) -> None:
     entries = []
     for source in sorted(item for item in bundle.rglob("*") if item.is_file() and item.name != "SHA256SUMS"):
@@ -163,7 +179,7 @@ def census_fixture(tmp_path: Path) -> Path:
         connection.executescript(
             """
             CREATE TABLE matches(
-                match_id INTEGER PRIMARY KEY, issue TEXT, kickoff_ts TEXT,
+                match_id INTEGER PRIMARY KEY, issue TEXT, season TEXT, kickoff_ts TEXT,
                 handicap_line REAL, fthg INTEGER, ftag INTEGER, result_code TEXT
             );
             CREATE TABLE exotic_odds(match_id INTEGER, market TEXT, outcome TEXT, odds REAL);
@@ -179,7 +195,7 @@ def census_fixture(tmp_path: Path) -> Path:
             """
         )
         connection.execute(
-            "INSERT INTO matches VALUES (1, '26076', '2026-07-25T12:00:00+00:00', 0.5, 2, 1, '3')"
+            "INSERT INTO matches VALUES (1, '26076', '2025-26', '2026-07-25T12:00:00+00:00', 0.5, 2, 1, '3')"
         )
         connection.executemany(
             "INSERT INTO exotic_odds VALUES (1, 'score', ?, 2.5)",
@@ -244,6 +260,16 @@ def test_full_census_requires_frozen_inventory_and_keeps_terminal_values_out(tmp
     )
     assert feature["terminal_guard"] == "true"
     assert feature["pre_match_feature_eligible"] == "false"
+    kickoff = next(
+        row for row in artifacts["timestamp_provenance.csv"]
+        if row["table_name"] == "matches" and row["field_name"] == "kickoff_ts"
+    )
+    assert kickoff["period_start"] == "2026-07-25"
+    assert kickoff["period_end"] == "2026-07-25"
+    assert any(
+        row["table_name"] == "matches" and row["period_basis"] == "SEASON" and row["period_value"] == "2025-26"
+        for row in artifacts["coverage_by_period.csv"]
+    )
     assert any(
         row["market"] == "correct_score" and row["admissible_use"] == "prohibited"
         for row in artifacts["admissible_use_matrix.csv"]
@@ -281,6 +307,17 @@ def test_full_census_requires_frozen_inventory_and_keeps_terminal_values_out(tmp
     assert verified["status"] == "valid"
     assert verified["inventory_bound"] is True
 
+    bundle = source_root / "results" / "data_collection" / "multimarket_sp_capture_v1" / "26076" / "batch-a"
+    (bundle / "raw.json").write_text('{"changed":"after-freeze"}', encoding="utf-8")
+    current_source_check = verify_census_package(
+        package,
+        inventory_package=inventory_package,
+        repository_root=source_root,
+        runtime_inputs=[],
+    )
+    assert current_source_check["current_frozen_source_identity"] == "CURRENT_AUDITED_ASSET_DRIFT"
+    assert current_source_check["current_bundle_integrity_invalidated_asset_count"] == 1
+
 
 def test_census_fails_closed_per_asset_when_a_live_source_drifts(tmp_path: Path) -> None:
     source_root = census_fixture(tmp_path)
@@ -295,7 +332,7 @@ def test_census_fails_closed_per_asset_when_a_live_source_drifts(tmp_path: Path)
     )
     database = source_root / "data" / "derived" / "beidan_xlsm" / "beidan_xlsm.sqlite"
     with sqlite3.connect(database) as connection:
-        connection.execute("INSERT INTO matches VALUES (2, '26077', '2026-07-26T12:00:00+00:00', 0.0, 0, 0, '1')")
+        connection.execute("INSERT INTO matches VALUES (2, '26077', '2025-26', '2026-07-26T12:00:00+00:00', 0.0, 0, 0, '1')")
 
     artifacts = audit_frozen_inventory(
         inventory_package=inventory_package,
@@ -312,3 +349,101 @@ def test_census_fails_closed_per_asset_when_a_live_source_drifts(tmp_path: Path)
         row["logical_asset_id"] == drift["logical_asset_id"]
         for row in artifacts["schema_dictionary.csv"]
     )
+
+
+def test_readiness_requires_a_nonempty_checksum_valid_bundle(tmp_path: Path) -> None:
+    source_root = census_fixture(tmp_path)
+    bundle = source_root / "results" / "data_collection" / "multimarket_sp_capture_v1" / "26076" / "batch-a"
+    (bundle / "SHA256SUMS").write_text("", encoding="utf-8")
+    inventory = build_source_inventory(repository_root=source_root)
+    inventory_paths = write_inventory_artifacts(tmp_path / "inventory-output", inventory, git_commit=COMMIT)
+    inventory_package = tmp_path / "freeze" / "inventory"
+    create_inventory_package(
+        inventory_paths,
+        output_dir=inventory_package,
+        git_commit=COMMIT,
+        frozen_at_utc="2026-07-26T00:00:00+00:00",
+    )
+
+    artifacts = audit_frozen_inventory(
+        inventory_package=inventory_package,
+        repository_root=source_root,
+        runtime_inputs=[],
+        git_commit=COMMIT,
+    )
+
+    integrity = next(row for row in artifacts["bundle_integrity.csv"] if row["market"] == "total_goals")
+    assert integrity["checksum_status"] == "EMPTY"
+    p40 = next(row for row in artifacts["model_readiness_matrix.csv"] if row["play_id"] == "40")
+    assert p40["price_ready"] == "false"
+    assert "forward-complete-open rows=0" in p40["sample_scope"]
+
+
+def test_readiness_requires_a_numeric_strict_candidate_count(tmp_path: Path) -> None:
+    source_root = census_fixture(tmp_path)
+    bundle = source_root / "results" / "data_collection" / "multimarket_sp_capture_v1" / "26076" / "batch-a"
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    manifest["complete_forward_open_rows"] = True
+    (bundle / "manifest.json").write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+    write_sha256sums(bundle)
+    inventory = build_source_inventory(repository_root=source_root)
+    inventory_paths = write_inventory_artifacts(tmp_path / "inventory-output", inventory, git_commit=COMMIT)
+    inventory_package = tmp_path / "freeze" / "inventory"
+    create_inventory_package(
+        inventory_paths,
+        output_dir=inventory_package,
+        git_commit=COMMIT,
+        frozen_at_utc="2026-07-26T00:00:00+00:00",
+    )
+
+    artifacts = audit_frozen_inventory(
+        inventory_package=inventory_package,
+        repository_root=source_root,
+        runtime_inputs=[],
+        git_commit=COMMIT,
+    )
+
+    integrity = next(row for row in artifacts["bundle_integrity.csv"] if row["market"] == "total_goals")
+    assert integrity["checksum_status"] == "PASS"
+    assert integrity["strict_candidate_rows"] == 0
+    p40 = next(row for row in artifacts["model_readiness_matrix.csv"] if row["play_id"] == "40")
+    assert p40["price_ready"] == "false"
+
+
+def test_readiness_drops_bundle_that_drifts_during_audit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source_root = census_fixture(tmp_path)
+    inventory = build_source_inventory(repository_root=source_root)
+    inventory_paths = write_inventory_artifacts(tmp_path / "inventory-output", inventory, git_commit=COMMIT)
+    inventory_package = tmp_path / "freeze" / "inventory"
+    create_inventory_package(
+        inventory_paths,
+        output_dir=inventory_package,
+        git_commit=COMMIT,
+        frozen_at_utc="2026-07-26T00:00:00+00:00",
+    )
+    bundle = source_root / "results" / "data_collection" / "multimarket_sp_capture_v1" / "26076" / "batch-a"
+    original_inventory = census_module.build_source_inventory
+    observed_calls = 0
+
+    def inventory_with_late_bundle_drift(*args: object, **kwargs: object) -> list[dict[str, object]]:
+        nonlocal observed_calls
+        observed_calls += 1
+        if observed_calls == 2:
+            (bundle / "raw.json").write_text('{"changed":"after-initial-checksum"}', encoding="utf-8")
+        return original_inventory(*args, **kwargs)
+
+    monkeypatch.setattr(census_module, "build_source_inventory", inventory_with_late_bundle_drift)
+    artifacts = audit_frozen_inventory(
+        inventory_package=inventory_package,
+        repository_root=source_root,
+        runtime_inputs=[],
+        git_commit=COMMIT,
+    )
+
+    report = artifacts["audit_report.json"]
+    assert report["source_drifted_asset_count"] == 0
+    assert report["bundle_integrity_invalidated_asset_count"] == 1
+    assert not artifacts["bundle_integrity.csv"]
+    p40 = next(row for row in artifacts["model_readiness_matrix.csv"] if row["play_id"] == "40")
+    assert p40["price_ready"] == "false"
+    assert "forward-complete-open rows=0" in p40["sample_scope"]

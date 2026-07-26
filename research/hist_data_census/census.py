@@ -48,6 +48,8 @@ CENSUS_SCHEMA = "hist_data_census_v1"
 FULL_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 ISSUE_RE = re.compile(r"^(?:\d{5,8})$")
 YEAR_RE = re.compile(r"^(?:19|20)\d{2}$")
+ISO_DATE_RE = re.compile(r"^((?:19|20)\d{2}-\d{2}-\d{2})(?:[T\s].*)?$")
+SEASON_RE = re.compile(r"^(?:19|20)\d{2}(?:[-/](?:(?:19|20)?\d{2}))?$")
 SQL_IDENTIFIER_RE = re.compile(r"^[^\x00]+$")
 
 SCHEMA_COLUMNS = (
@@ -352,6 +354,19 @@ def _safe_year(value: Any) -> str:
     return rendered if YEAR_RE.fullmatch(rendered) else "UNKNOWN_OR_NON_ISO"
 
 
+def _safe_period_date(value: Any) -> str:
+    rendered = str(value).strip()
+    match = ISO_DATE_RE.fullmatch(rendered)
+    if match:
+        return str(match.group(1))
+    return rendered if YEAR_RE.fullmatch(rendered) else "UNKNOWN_OR_NON_ISO"
+
+
+def _safe_season(value: Any) -> str:
+    rendered = str(value).strip()
+    return rendered if SEASON_RE.fullmatch(rendered) else "UNKNOWN_OR_NON_ISO"
+
+
 def _connect_read_only(path: Path) -> sqlite3.Connection:
     uri = f"file:{path.as_posix()}?mode=ro"
     connection = sqlite3.connect(uri, uri=True)
@@ -496,6 +511,28 @@ def _basic_table_coverage(
                 "date_or_issue_field": date_column,
                 "coverage_status": "PROFILED" if year != "UNKNOWN_OR_NON_ISO" else "DATE_SEMANTICS_UNRESOLVED",
                 "coverage_note": "calendar year is reported only for ISO-like event-time values; non-ISO values are not coerced",
+            })
+    season_column = _choose_column(columns, ("season",))
+    if season_column:
+        counts = Counter()
+        for item in connection.execute(
+            f"SELECT {_quote_identifier(season_column)} AS value, COUNT(*) AS count "
+            f"FROM {_quote_identifier(table_name)} GROUP BY {_quote_identifier(season_column)}"
+        ):
+            counts[_safe_season(item["value"])] += int(item["count"])
+        for season, count in sorted(counts.items()):
+            rows.append({
+                **base,
+                "table_name": table_name,
+                "market": "ALL",
+                "period_basis": "SEASON",
+                "period_value": season,
+                "row_count": count,
+                "distinct_match_count": "",
+                "distinct_issue_count": "",
+                "date_or_issue_field": season_column,
+                "coverage_status": "PROFILED" if season != "UNKNOWN_OR_NON_ISO" else "SEASON_SEMANTICS_UNRESOLVED",
+                "coverage_note": "season labels are reported as stored only when their year form is structurally recognizable",
             })
     return rows
 
@@ -658,13 +695,13 @@ def _timestamp_rows(
             try:
                 values = connection.execute(
                     f"SELECT COUNT({_quote_identifier(field_name)}) AS present, "
-                    f"MIN(SUBSTR(CAST({_quote_identifier(field_name)} AS TEXT), 1, 4)) AS first_value, "
-                    f"MAX(SUBSTR(CAST({_quote_identifier(field_name)} AS TEXT), 1, 4)) AS last_value "
+                    f"MIN(CAST({_quote_identifier(field_name)} AS TEXT)) AS first_value, "
+                    f"MAX(CAST({_quote_identifier(field_name)} AS TEXT)) AS last_value "
                     f"FROM {_quote_identifier(table_name)}"
                 ).fetchone()
                 non_null = int(values["present"])
-                period_start = _safe_year(values["first_value"])
-                period_end = _safe_year(values["last_value"])
+                period_start = _safe_period_date(values["first_value"])
+                period_end = _safe_period_date(values["last_value"])
             except sqlite3.Error:
                 pass
         output.append({
@@ -1054,12 +1091,14 @@ def _verify_sha256sums(bundle: Path) -> tuple[str, int, int]:
             relative = Path(name)
             if (
                 separator != "  " or len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest)
-                or not name or relative.is_absolute() or ".." in relative.parts or name in entries
+                or not name or "\x00" in name or relative.is_absolute() or ".." in relative.parts or name in entries
             ):
                 return "INVALID_FORMAT", len(entries), 0
             entries[name] = digest
     except OSError:
         return "UNREADABLE", 0, 0
+    if not entries:
+        return "EMPTY", 0, 0
     actual: set[str] = set()
     for candidate in bundle.rglob("*"):
         if candidate.is_dir():
@@ -1082,10 +1121,10 @@ def _verify_sha256sums(bundle: Path) -> tuple[str, int, int]:
 
 def _safe_manifest_stat(payload: Mapping[str, Any], key: str) -> int:
     value = payload.get(key)
-    return int(value) if isinstance(value, int) and value >= 0 else 0
+    return int(value) if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
 
 
-def _audit_bundle(reference: SourceReference) -> tuple[dict[str, Any], Counter[str]]:
+def _audit_bundle(reference: SourceReference) -> dict[str, Any]:
     if reference.path is None:
         raise CensusError("bundle inventory row lacks a safe source locator")
     bundle = reference.path
@@ -1116,7 +1155,6 @@ def _audit_bundle(reference: SourceReference) -> tuple[dict[str, Any], Counter[s
     capture_clock_present = any(key in manifest for key in ("fetched_at_utc", "created_at_utc", "capture_batch_id"))
     source_clock_present = any(key in manifest for key in ("source_updated_at_hkt", "source_updatetime"))
     strict_rows = counter["complete_forward_open_rows"]
-    counter["strict_forward_rows"] += strict_rows
     incomplete = (
         counter["incomplete_match_indices"] + counter["failed_or_missing_pages"] + counter["failed_pages"]
         + counter["rejected_pages"] + counter["failure_rows"]
@@ -1141,10 +1179,7 @@ def _audit_bundle(reference: SourceReference) -> tuple[dict[str, Any], Counter[s
         "manifest_key_sha256": key_hash,
         "bundle_note": f"manifest status class={normalized_status}; raw URLs/payloads/timestamps are not published",
     }
-    if market in TARGET_MARKETS:
-        counter["bundle_count"] += 1
-        counter["checksum_pass_bundles"] += int(checksum_status == "PASS")
-    return row, counter
+    return row
 
 
 def _asset_classification(reference: SourceReference) -> tuple[str, str, str, str, str]:
@@ -1330,6 +1365,35 @@ def _readiness_rows(context: Mapping[str, Counter[str]]) -> list[dict[str, Any]]
     return rows
 
 
+def _strict_context_from_verified_bundle_rows(
+    rows: Iterable[Mapping[str, Any]],
+) -> dict[str, Counter[str]]:
+    """Derive strict candidate totals only from surviving verified bundles.
+
+    The audit may discover a source change only in its second identity check.
+    Readiness is therefore intentionally calculated after drifted bundle rows
+    have been removed, rather than from counters accumulated while opening
+    sources.  A declared manifest count is never strict evidence by itself:
+    checksum integrity and a capture clock are both required first.
+    """
+
+    key_by_market = {definition["market"]: key for key, definition in TARGET_MARKETS.items()}
+    context: dict[str, Counter[str]] = defaultdict(Counter)
+    for row in rows:
+        market = key_by_market.get(str(row.get("market", "")))
+        if market is None:
+            continue
+        if str(row.get("checksum_status", "")) != "PASS" or str(row.get("capture_clock_present", "")) != "true":
+            continue
+        try:
+            strict_rows = int(row.get("strict_candidate_rows", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+        if strict_rows > 0:
+            context[market]["strict_forward_rows"] += strict_rows
+    return context
+
+
 def _inventory_reference(package: Path) -> dict[str, str]:
     manifest_path = package / "manifest.json"
     try:
@@ -1396,9 +1460,15 @@ def _drifted_asset_ids(
     }
 
 
-def _source_drift_rows(reference: SourceReference, *, phase: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+def _source_drift_rows(
+    reference: SourceReference,
+    *,
+    phase: str,
+    change_subject: str = "frozen source identity",
+    provenance_grade: str = "SOURCE_DRIFT_AFTER_G0",
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     base = _asset_base(reference)
-    reason = f"frozen source identity changed {phase}; no schema, coverage, outcome or price evidence from this asset is used"
+    reason = f"{change_subject} changed {phase}; no schema, coverage, outcome or price evidence from this asset is used"
     coverage = {
         **base,
         "table_name": "",
@@ -1420,7 +1490,7 @@ def _source_drift_rows(reference: SourceReference, *, phase: str) -> tuple[dict[
         "market": "ALL",
         "admissible_use": "prohibited",
         "strict_conditions": "none until a new frozen inventory/snapshot is verified",
-        "provenance_grade": "SOURCE_DRIFT_AFTER_G0",
+        "provenance_grade": provenance_grade,
         "classification_reason": reason,
     }
     integration = {
@@ -1434,7 +1504,7 @@ def _source_drift_rows(reference: SourceReference, *, phase: str) -> tuple[dict[
         "lineage_fields": "logical_asset_id;frozen source sha256",
         "required_transforms": "new inventory freeze or immutable local snapshot before any future read",
         "deduplication_key": "none",
-        "timestamp_grade": "SOURCE_DRIFT_AFTER_G0",
+        "timestamp_grade": provenance_grade,
         "limitations": reason,
     }
     return coverage, admissible, integration
@@ -1465,8 +1535,7 @@ def audit_frozen_inventory(
     drifted_before = _drifted_asset_ids(inventory_rows, observed_start)
     output: dict[str, list[dict[str, Any]]] = defaultdict(list)
     output["source_inventory.csv"] = [dict(row) for row in inventory_rows]
-    market_context: dict[str, Counter[str]] = defaultdict(Counter)
-
+    initial_bundle_integrity: dict[str, str] = {}
     for reference in references:
         if reference.asset_id in drifted_before:
             coverage, admissible, integration = _source_drift_rows(reference, phase="before audit")
@@ -1478,11 +1547,9 @@ def audit_frozen_inventory(
         output["admissible_use_matrix.csv"].append(admissible)
         output["integration_decisions.csv"].append(integration)
         if reference.kind == "sqlite_database" and reference.path is not None:
-            partial, contexts = _audit_sqlite(reference)
+            partial, _ = _audit_sqlite(reference)
             for name, rows in partial.items():
                 output[name].extend(rows)
-            for market, counts in contexts.items():
-                market_context[market].update(counts)
         elif reference.kind == "tabular_export" and reference.path is not None:
             partial = _audit_tabular(reference)
             for name, rows in partial.items():
@@ -1491,11 +1558,11 @@ def audit_frozen_inventory(
             if reference.path.suffix.casefold() in {".xlsm", ".xlsx"}:
                 output["workbook_structure.csv"].extend(_audit_workbook(reference))
         elif reference.kind == "immutable_bundle" and reference.path is not None:
-            row, counts = _audit_bundle(reference)
+            row = _audit_bundle(reference)
             output["bundle_integrity.csv"].append(row)
+            initial_bundle_integrity[reference.asset_id] = str(row["checksum_status"])
             market = next((key for key, item in TARGET_MARKETS.items() if item["market"] == row["market"]), "")
             if market:
-                market_context[market].update(counts)
                 if row["checksum_status"] == "PASS" and row["capture_clock_present"] == "true" and int(row["strict_candidate_rows"] or 0) > 0:
                     output["admissible_use_matrix.csv"].append({
                         "scope_level": "bundle_subset",
@@ -1543,39 +1610,58 @@ def audit_frozen_inventory(
             })
             break
 
-    output["research_view_design.csv"].extend(_view_rows())
-    output["market_outcome_schemas.csv"].extend(_target_contract_schema_rows())
-    output["model_readiness_matrix.csv"].extend(_readiness_rows(market_context))
-
     # A second identity check removes all structural evidence for any source
     # that changed during the read.  That preserves a useful audit of stable
     # assets without silently mixing an active live database into it.
     observed_end = build_source_inventory(repository_root=source_root, runtime_inputs=runtime_inputs)
     drifted_after = _drifted_asset_ids(inventory_rows, observed_end)
+    bundle_integrity_invalidated = {
+        reference.asset_id
+        for reference in references
+        if initial_bundle_integrity.get(reference.asset_id) == "PASS"
+        and reference.path is not None
+        and _verify_sha256sums(reference.path)[0] != "PASS"
+    }
     drifted_assets = drifted_before | drifted_after
+    blocked_assets = drifted_assets | bundle_integrity_invalidated
     frozen_asset_ids = {str(row["logical_asset_id"]) for row in inventory_rows}
     newly_discovered_after_g0 = sorted(
         str(row["logical_asset_id"])
         for row in observed_end
         if str(row["logical_asset_id"]) not in frozen_asset_ids
     )
-    if drifted_assets:
+    if blocked_assets:
         for name, rows in output.items():
             if name == "source_inventory.csv":
                 continue
             output[name] = [
                 row for row in rows
-                if str(row.get("logical_asset_id", "")) not in drifted_assets
+                if str(row.get("logical_asset_id", "")) not in blocked_assets
             ]
         references_by_id = {reference.asset_id: reference for reference in references}
-        for asset_id in sorted(drifted_assets):
+        for asset_id in sorted(blocked_assets):
+            integrity_changed = asset_id in bundle_integrity_invalidated and asset_id not in drifted_assets
             coverage, admissible, integration = _source_drift_rows(
                 references_by_id[asset_id],
-                phase="before audit" if asset_id in drifted_before else "during audit",
+                phase=(
+                    "before audit" if asset_id in drifted_before
+                    else "after initial checksum verification" if integrity_changed
+                    else "during audit"
+                ),
+                change_subject="immutable bundle checksum identity" if integrity_changed else "frozen source identity",
+                provenance_grade=(
+                    "BUNDLE_INTEGRITY_CHANGED_DURING_AUDIT" if integrity_changed else "SOURCE_DRIFT_AFTER_G0"
+                ),
             )
             output["coverage_by_period.csv"].append(coverage)
             output["admissible_use_matrix.csv"].append(admissible)
             output["integration_decisions.csv"].append(integration)
+
+    output["research_view_design.csv"].extend(_view_rows())
+    output["market_outcome_schemas.csv"].extend(_target_contract_schema_rows())
+    output["model_readiness_matrix.csv"].extend(
+        _readiness_rows(_strict_context_from_verified_bundle_rows(output["bundle_integrity.csv"]))
+    )
 
     inventory_ref = _inventory_reference(package)
     audit_report = {
@@ -1590,13 +1676,15 @@ def audit_frozen_inventory(
         "database_assets_profiled": sum(reference.kind == "sqlite_database" for reference in references),
         "scope_boundary": "Data archaeology and admissible-use classification only; no model fitting, prediction, calibration, backtest, EV, q, ROI, ticket, stake, selection or strategy conclusion.",
         "score_price_hist_dependency": "incorporated_without_reinterpretation: historical correct-score price replay remains prohibited",
-        "source_identity_verified_before_and_after": not drifted_assets,
+        "source_identity_verified_before_and_after": not blocked_assets,
         "mixed_source_evidence_blocked": True,
         "source_drifted_asset_count": len(drifted_assets),
         "source_drifted_logical_asset_ids": sorted(drifted_assets),
+        "bundle_integrity_invalidated_asset_count": len(bundle_integrity_invalidated),
+        "bundle_integrity_invalidated_logical_asset_ids": sorted(bundle_integrity_invalidated),
         "new_unfrozen_asset_count": len(newly_discovered_after_g0),
         "new_unfrozen_logical_asset_ids": newly_discovered_after_g0,
-        "stable_asset_count": len(inventory_rows) - len(drifted_assets),
+        "stable_asset_count": len(inventory_rows) - len(blocked_assets),
     }
     config = {
         "schema_version": CENSUS_SCHEMA,
@@ -1623,9 +1711,11 @@ def audit_frozen_inventory(
         ),
         "source_inventory_sha256": expected_inventory_identity,
         **inventory_ref,
-        "source_identity_verified_before_and_after": not drifted_assets,
+        "source_identity_verified_before_and_after": not blocked_assets,
         "source_drifted_asset_count": len(drifted_assets),
         "source_drifted_logical_asset_ids": sorted(drifted_assets),
+        "bundle_integrity_invalidated_asset_count": len(bundle_integrity_invalidated),
+        "bundle_integrity_invalidated_logical_asset_ids": sorted(bundle_integrity_invalidated),
         "new_unfrozen_asset_count": len(newly_discovered_after_g0),
         "new_unfrozen_logical_asset_ids": newly_discovered_after_g0,
         "mixed_source_evidence_blocked": True,
@@ -1792,12 +1882,30 @@ def verify_census_package(
         if report.get("inventory_freeze_id") != inventory_ref["inventory_freeze_id"]:
             raise CensusError("census package inventory freeze reference mismatch")
     current_frozen_source_identity = "NOT_REQUESTED"
+    current_bundle_integrity_invalidated: set[str] = set()
     if repository_root is not None:
         frozen_rows = _read_csv(inventory / "inputs" / "source_inventory.csv") if inventory_package is not None else []
         observed = build_source_inventory(repository_root=repository_root, runtime_inputs=runtime_inputs)
         currently_drifted = _drifted_asset_ids(frozen_rows, observed) if frozen_rows else set()
         audited_drifted = set(str(item) for item in report.get("source_drifted_logical_asset_ids", []))
-        stable_audited = not (currently_drifted - audited_drifted)
+        audited_bundle_status = {
+            str(row.get("logical_asset_id", "")): str(row.get("checksum_status", ""))
+            for row in public_rows["bundle_integrity.csv"]
+        }
+        if frozen_rows:
+            for reference in _references(
+                frozen_rows,
+                repository_root=repository_root.expanduser().resolve(),
+                runtime_inputs=runtime_inputs,
+            ):
+                if (
+                    reference.kind == "immutable_bundle"
+                    and reference.path is not None
+                    and audited_bundle_status.get(reference.asset_id) == "PASS"
+                    and _verify_sha256sums(reference.path)[0] != "PASS"
+                ):
+                    current_bundle_integrity_invalidated.add(reference.asset_id)
+        stable_audited = not (currently_drifted - audited_drifted) and not current_bundle_integrity_invalidated
         current_frozen_source_identity = "STABLE_FOR_AUDITED_ASSETS" if stable_audited else "CURRENT_AUDITED_ASSET_DRIFT"
     return {
         "status": "valid",
@@ -1807,6 +1915,8 @@ def verify_census_package(
         "artifact_count": len(REQUIRED_CENSUS_ARTIFACTS),
         "inventory_bound": inventory_package is not None,
         "current_frozen_source_identity": current_frozen_source_identity,
+        "current_bundle_integrity_invalidated_asset_count": len(current_bundle_integrity_invalidated),
+        "current_bundle_integrity_invalidated_logical_asset_ids": sorted(current_bundle_integrity_invalidated),
         "sha256s_sha256": generic["sha256s_sha256"],
         "manifest_sha256": generic["manifest_sha256"],
     }
