@@ -415,6 +415,12 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getByText(/请在门店再次确认销售开放/)).toBeInTheDocument();
     expect(screen.queryByText('当前可下注')).not.toBeInTheDocument();
     expect(screen.getByText('N=4 / ¥768')).toBeInTheDocument();
+    expect(screen.getByText('不可变请求 / 发布包数 / 生成批次数')).toBeInTheDocument();
+    expect(screen.getByText('mock-26052-n4-b768 / 1 / 1')).toBeInTheDocument();
+    expect(screen.getByText('逐场集中度证据哈希')).toBeInTheDocument();
+    expect(screen.getByText('mock-occurrences-sha256')).toBeInTheDocument();
+    expect(screen.getByText('单场票数硬上限 / 实际最大')).toBeInTheDocument();
+    expect(screen.getByText(/预算是上限而非目标；集中度、票间重叠或组合成本造成的未用预算/)).toBeInTheDocument();
     expect(screen.getByText(/第 1 票 · Exact N=4/)).toBeInTheDocument();
     expect(screen.getByText('查看本次冻结资格分母（8 场）')).toBeInTheDocument();
     expect(screen.getByLabelText('现场勾选第 1 票 #1')).toBeInTheDocument();
@@ -426,9 +432,14 @@ describe('北单实盘决策台 v1', () => {
 
   it('disables operational adhoc downloads after expiry while retaining an explicit audit record', async () => {
     const expiredPlan: AdhocBettingPlanData = {
-      schemaVersion: 'adhoc_betting_package_v1',
+      schemaVersion: 'adhoc_betting_package_v2',
       capabilityId: 'BJ-ADHOC-BET-001',
+      packageSchemaVersion: 'adhoc_betting_package_v2',
+      concentrationContractApplied: true,
       requestId: 'expired-adhoc-request',
+      immutableRequestId: 'expired-adhoc-request',
+      publishedPackageCount: 1,
+      generationBatchCount: 1,
       issueId: '26052',
       requestedAt: '2026-07-25T12:00:00+08:00',
       inputAsOf: '2026-07-25T12:00:00+08:00',
@@ -474,6 +485,65 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getByRole('button', { name: 'PDF 下载已禁用' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'HTML 下载已禁用' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'CSV 下载已禁用' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: '下载审计记录（PDF）' })).toHaveAttribute('href', expect.stringContaining('/audit-download?format=pdf'));
+  });
+
+  it('marks a v1 adhoc package as audit-only without a two-ticket compliance claim', async () => {
+    const historicalPlan: AdhocBettingPlanData = {
+      schemaVersion: 'adhoc_betting_api_v1',
+      capabilityId: 'BJ-ADHOC-BET-001',
+      packageSchemaVersion: 'adhoc_betting_package_v1',
+      concentrationContractApplied: false,
+      requestId: 'historical-adhoc-request',
+      immutableRequestId: '',
+      publishedPackageCount: 0,
+      generationBatchCount: 0,
+      issueId: '26052',
+      requestedAt: '2026-07-25T12:00:00+08:00',
+      inputAsOf: '2026-07-25T12:00:00+08:00',
+      requestedN: 3,
+      requestedBudgetYuan: 512,
+      baseCostYuan: 6,
+      actualCostYuan: 6,
+      unusedBudgetYuan: 506,
+      budgetUtilization: 6 / 512,
+      validUntil: '2026-07-25T20:28:00+08:00',
+      status: 'READY_FOR_REVIEW',
+      currentStatus: 'HISTORICAL_NO_CONCENTRATION_CONTRACT',
+      currentStatusRecheckScope: 'HISTORICAL_AUDIT_ONLY',
+      saleEligibilityScope: 'GENERATION_TIME_SNAPSHOT_ONLY',
+      shopSaleConfirmationRequired: true,
+      structuralVerificationStatus: 'STRUCTURAL_INTEGRITY_PASS',
+      saleStatusVerified: true,
+      operationalDownloadsEnabled: false,
+      auditDownloadsAvailable: true,
+      ticketCount: 1,
+      eligibleMatchCount: 3,
+      excludedMatchCount: 0,
+      exclusionCounts: {},
+      denominator: [],
+      tickets: [],
+      planReason: 'historical audit record',
+      unavailableReasons: [],
+      inputSha256: 'historical-input',
+      manifestSha256: 'historical-manifest',
+      packageId: 'historical-package',
+      researchEvidenceEligible: false,
+      scheduledFreezeEventId: null,
+      correctScoreStatus: 'UNAVAILABLE_ADHOC_CORRECT_SCORE',
+      idempotent: true,
+    };
+    vi.spyOn(ApiDashboardAdapter.prototype, 'createAdhocBettingPlan').mockResolvedValue(historicalPlan);
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: '即时下注' }));
+    await screen.findByText('8 场');
+    await userEvent.click(screen.getByRole('button', { name: '生成即时方案' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('历史方案，未应用每场最多两票约束');
+    expect(screen.getByText('历史方案，仅审计')).toBeInTheDocument();
+    expect(screen.queryByText('单场票数硬上限 / 实际最大')).not.toBeInTheDocument();
+    expect(screen.queryByText('逐场集中度证据哈希')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'PDF 下载已禁用' })).toBeDisabled();
     expect(screen.getByRole('link', { name: '下载审计记录（PDF）' })).toHaveAttribute('href', expect.stringContaining('/audit-download?format=pdf'));
   });
 
@@ -1005,13 +1075,27 @@ describe('北单实盘决策台 v1', () => {
       input_asof_hkt: '2026-07-25T12:00:00+08:00',
       status: 'ELIGIBILITY_PREVIEW',
       eligible_match_count: 8,
+      max_ticket_occurrences_per_match: 2,
+      total_match_occurrence_capacity: 16,
+      theoretical_ticket_count_cap: 5,
+      max_actual_ticket_occurrences_per_match: 1,
+      average_ticket_occurrences_per_match: 0.375,
+      match_occurrences_sha256: 'occurrence-hash',
+      match_occurrences: [{
+        match_idx: 1,
+        match_id: '26052_001',
+        ticket_numbers: [1],
+        distinct_ticket_occurrence_count: 1,
+        spend_weighted_exposure_yuan: 2,
+        spend_weighted_exposure_ratio: 1,
+      }],
       excluded_match_count: 0,
       exclusion_counts: {},
       safety_margin_seconds: 120,
       preview_only: true,
     };
     const plan = {
-      schema_version: 'adhoc_betting_package_v1',
+      schema_version: 'adhoc_betting_package_v2',
       capability_id: 'BJ-ADHOC-BET-001',
       request_id: 'adhoc-request-1',
       issue: '26052',
@@ -1040,7 +1124,7 @@ describe('北单实盘决策台 v1', () => {
         stake_multiplier: 1,
         base_cost_yuan: 2,
         cost_yuan: 2,
-        legs: [{ match_idx: 1, match_id: '26052_001', selection_code: '3', selection_label: '胜', kickoff_at_hkt: '2026-07-25T14:00:00+08:00', league: '英超', home: '甲', away: '乙', handicap_line: 0 }],
+        legs: [{ match_idx: 1, match_id: '26052_001', selection_code: '3', selection_label: '胜', kickoff_at_hkt: '2026-07-25T14:00:00+08:00', league: '英超', home: '甲', away: '乙', handicap_line: 0, match_ticket_occurrence_count: 1, match_ticket_numbers: [1] }],
       }],
       plan_reason: 'exact_n_ready',
       unavailable_reasons: [],

@@ -1297,6 +1297,7 @@ function bettingPlanStatusTone(value?: string): 'good' | 'warn' | 'bad' | 'neutr
 function adhocPlanStatusLabel(value?: string) {
   if (value === 'GENERATING') return '正在生成';
   if (value === 'DOWNLOADABLE_CURRENT') return '有效期内，可下载';
+  if (value === 'HISTORICAL_NO_CONCENTRATION_CONTRACT') return '历史方案，仅审计';
   if (value === 'EXPIRED_NOT_PURCHASABLE') return '已失效，不可下注';
   if (value === 'UNAVAILABLE_ADHOC_PLAN') return '生成时不可用';
   if (value === 'UNVERIFIED_SALE_STATE') return '生成时售卖状态未核验';
@@ -1307,7 +1308,7 @@ function adhocPlanStatusLabel(value?: string) {
 
 function adhocPlanStatusTone(value?: string): 'good' | 'warn' | 'bad' | 'neutral' {
   if (value === 'DOWNLOADABLE_CURRENT') return 'good';
-  if (value === 'EXPIRED_NOT_PURCHASABLE' || value === 'UNAVAILABLE_ADHOC_PLAN' || value === 'FAILED_CLOSED') return 'bad';
+  if (value === 'EXPIRED_NOT_PURCHASABLE' || value === 'UNAVAILABLE_ADHOC_PLAN' || value === 'FAILED_CLOSED' || value === 'HISTORICAL_NO_CONCENTRATION_CONTRACT') return 'bad';
   if (value === 'READY_FOR_REVIEW' || value === 'UNVERIFIED_SALE_STATE') return 'warn';
   return 'neutral';
 }
@@ -1436,7 +1437,7 @@ function AdhocBetting({
         <div className="adhoc-mode current"><b>即时下注（本次独立请求）</b><span>仅在本次生成前采集售卖状态、赛程与正式 v3.3.3 输入快照。</span></div>
         <div className="adhoc-mode audit"><b>研究冻结审计（独立只读）</b><span>不读取、不复制、不执行任何 Scheduled Research Freeze 票包。</span></div>
       </div>
-      <p className="adhoc-boundary">只按本次请求时的售卖快照生成单一 Exact-N 方案；没有“改 N、补票、沿用旧票或回退到研究冻结”的路径。</p>
+      <p className="adhoc-boundary">只按本次请求时的售卖快照生成单一 Exact-N 方案；同一场比赛最多出现于两张不同票，没有“改 N、加倍追满、补票、沿用旧票或回退到研究冻结”的路径。</p>
       <div className="adhoc-controls">
         <label>期号<select aria-label="选择即时下注期号" value={selectedIssue} onChange={(event) => onIssueChange(event.target.value)}>
           {availableIssues.map((issue) => <option key={issue.issueId} value={issue.issueId}>{issue.label.replace('历史回放', '历史参考')}</option>)}
@@ -1469,6 +1470,7 @@ function AdhocBetting({
       </div>
       <p className="adhoc-boundary">刷新只按服务器时钟复核本包的 valid_until；不会重新抓取售卖状态。售卖资格是生成时快照，请在门店再次确认销售开放。</p>
       {plan.currentStatus === 'EXPIRED_NOT_PURCHASABLE' ? <div className="adhoc-expired" role="alert"><b>已失效，不可下注</b><span>服务器时钟显示本包已超过 valid_until；请重新生成，不会替换或修改原票面。</span></div> : null}
+      {!plan.concentrationContractApplied ? <div className="adhoc-expired" role="alert"><b>历史方案，未应用每场最多两票约束</b><span>包格式 {plan.packageSchemaVersion || '未知'} 未携带当前两票集中度合约；仅可下载审计记录，不可用于下注。</span></div> : null}
       <div className="adhoc-summary adhoc-plan-summary">
         <div><span>Exact N / 预算</span><b>N={plan.requestedN} / {money(plan.requestedBudgetYuan)}</b></div>
         <div><span>票数 / 基础成本</span><b>{plan.ticketCount} / {moneyFixed(plan.baseCostYuan)}</b></div>
@@ -1480,8 +1482,25 @@ function AdhocBetting({
         <div><span>输入截至</span><b>{plan.inputAsOf}</b></div>
         <div><span>输入哈希</span><b>{plan.inputSha256.slice(0, 16) || '-'}</b></div>
         <div><span>方案状态</span><b>{adhocPlanStatusLabel(plan.status)}</b></div>
+        {plan.concentrationContractApplied ? <>
+          <div><span>不可变请求 / 发布包数 / 生成批次数</span><b>{plan.immutableRequestId || '-'} / {plan.publishedPackageCount} / {plan.generationBatchCount}</b></div>
+          <div><span>逐场集中度证据哈希</span><b>{plan.matchOccurrencesSha256 || '-'}</b></div>
+          <div><span>单场票数硬上限 / 实际最大</span><b>{plan.maxTicketOccurrencesPerMatch || '-'} / {plan.maxActualTicketOccurrencesPerMatch ?? '-'}</b></div>
+          <div><span>总容量 / 理论票数上限</span><b>{plan.totalMatchOccurrenceCapacity ?? '-'} / {plan.theoreticalTicketCountCap ?? '-'}</b></div>
+          <div><span>平均单场票数</span><b>{(plan.averageTicketOccurrencesPerMatch ?? 0).toFixed(4)}</b></div>
+        </> : <div><span>包格式</span><b>{plan.packageSchemaVersion || '-'}</b></div>}
       </div>
+      <p className="adhoc-boundary">{plan.concentrationContractApplied ? '预算是上限而非目标；集中度、票间重叠或组合成本造成的未用预算会如实保留，不代表失败，也不会通过提高倍数或重复等价票补齐。' : '历史方案的金额和票面保持原始审计记录；系统不会把它重新解释为当前集中度规则下的方案。'}</p>
       <p className="adhoc-boundary">本方案为 request-time 独立包：售卖状态仅代表生成时快照，research_evidence_eligible=false，scheduled_freeze_event_id=null；不提供正确比分执行。</p>
+      {plan.concentrationContractApplied && plan.matchOccurrences?.length ? <details className="adhoc-denominator">
+        <summary>查看每场比赛所在票号（{plan.matchOccurrences.length} 场）</summary>
+        <div className="adhoc-denominator-list">
+          {plan.matchOccurrences.map((occurrence) => <div className="adhoc-denominator-row" key={occurrence.matchId}>
+            <div><b>#{occurrence.matchIdx} {occurrence.matchId}</b><small>票号：{occurrence.ticketNumbers.length ? occurrence.ticketNumbers.join('、') : '未入选'}</small></div>
+            <div><Badge tone={occurrence.distinctTicketOccurrenceCount <= 2 ? 'good' : 'warn'}>{occurrence.distinctTicketOccurrenceCount} / 2 票</Badge><small>投入加权暴露 {moneyFixed(occurrence.spendWeightedExposureYuan)} · {(occurrence.spendWeightedExposureRatio * 100).toFixed(2)}%</small></div>
+          </div>)}
+        </div>
+      </details> : null}
       <AdhocDenominator title="查看本次冻结资格分母" matches={plan.denominator} />
       {plan.tickets.length ? <div className="adhoc-ticket-list">
         {plan.tickets.map((ticket) => <section className="adhoc-ticket" key={ticket.ticketNo}>
@@ -1490,7 +1509,7 @@ function AdhocBetting({
             {ticket.legs.map((leg) => <label className="adhoc-leg" key={`${ticket.ticketNo}-${leg.matchId}`}>
               <input type="checkbox" aria-label={`现场勾选第 ${ticket.ticketNo} 票 #${leg.matchIdx}`} />
               <span className="adhoc-leg-index">#{leg.matchIdx}</span>
-              <span><b>{leg.home} vs {leg.away}</b><small>{leg.league} · {leg.kickoffAt}{leg.handicapLine === null ? '' : ` · 让球 ${leg.handicapLine}`}</small></span>
+              <span><b>{leg.home} vs {leg.away}</b><small>{leg.league} · {leg.kickoffAt}{leg.handicapLine === null ? '' : ` · 让球 ${leg.handicapLine}`} · 出现于第 {leg.matchTicketNumbers?.join('、') || ticket.ticketNo} 票</small></span>
               <strong>{leg.selectionCode} · {leg.selectionLabel}</strong>
             </label>)}
           </div>

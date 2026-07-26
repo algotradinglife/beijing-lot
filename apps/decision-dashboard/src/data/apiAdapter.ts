@@ -2229,7 +2229,12 @@ function transformAdhocBettingPlan(raw: unknown): AdhocBettingPlanData {
   return {
     schemaVersion: asString(obj.schema_version),
     capabilityId: asString(obj.capability_id),
+    packageSchemaVersion: asString(obj.package_schema_version),
+    concentrationContractApplied: asBoolean(obj.concentration_contract_applied),
     requestId: asString(obj.request_id),
+    immutableRequestId: asString(obj.immutable_request_id),
+    publishedPackageCount: asNumber(obj.published_package_count),
+    generationBatchCount: asNumber(obj.generation_batch_count),
     issueId: asString(obj.issue),
     requestedAt: asString(obj.requested_at_hkt),
     inputAsOf: asString(obj.input_asof_hkt),
@@ -2251,6 +2256,23 @@ function transformAdhocBettingPlan(raw: unknown): AdhocBettingPlanData {
     auditDownloadsAvailable: asBoolean(obj.audit_downloads_available),
     ticketCount: asNumber(obj.ticket_count),
     eligibleMatchCount: asNumber(obj.eligible_match_count),
+    maxTicketOccurrencesPerMatch: asNumber(obj.max_ticket_occurrences_per_match),
+    totalMatchOccurrenceCapacity: asNumber(obj.total_match_occurrence_capacity),
+    theoreticalTicketCountCap: asNumber(obj.theoretical_ticket_count_cap),
+    maxActualTicketOccurrencesPerMatch: asNumber(obj.max_actual_ticket_occurrences_per_match),
+    averageTicketOccurrencesPerMatch: asNumber(obj.average_ticket_occurrences_per_match),
+    matchOccurrencesSha256: asString(obj.match_occurrences_sha256),
+    matchOccurrences: asArray(obj.match_occurrences).map((rawOccurrence) => {
+      const occurrence = asObject(rawOccurrence);
+      return {
+        matchIdx: asNumber(occurrence.match_idx),
+        matchId: asString(occurrence.match_id),
+        ticketNumbers: asArray(occurrence.ticket_numbers).map(asNumber),
+        distinctTicketOccurrenceCount: asNumber(occurrence.distinct_ticket_occurrence_count),
+        spendWeightedExposureYuan: asNumber(occurrence.spend_weighted_exposure_yuan),
+        spendWeightedExposureRatio: asNumber(occurrence.spend_weighted_exposure_ratio),
+      };
+    }),
     excludedMatchCount: asNumber(obj.excluded_match_count),
     exclusionCounts: asNumberRecord(obj.exclusion_counts),
     denominator: asArray(obj.denominator).map(transformAdhocMatchEligibility),
@@ -2275,6 +2297,8 @@ function transformAdhocBettingPlan(raw: unknown): AdhocBettingPlanData {
             home: asString(leg.home),
             away: asString(leg.away),
             handicapLine: typeof handicap === 'number' || typeof handicap === 'string' ? handicap : null,
+            matchTicketOccurrenceCount: asNumber(leg.match_ticket_occurrence_count),
+            matchTicketNumbers: asArray(leg.match_ticket_numbers).map(asNumber),
           };
         }),
       };
@@ -2337,7 +2361,7 @@ function mockAdhocBettingPlan(
   ];
   const legCount = requestedN;
   const ticketCost = 2;
-  const tickets = Array.from({ length: 3 }, (_, ticketIndex) => ({
+  const tickets = Array.from({ length: 2 }, (_, ticketIndex) => ({
     ticketNo: ticketIndex + 1,
     actualN: legCount,
     stakeMultiplier: 1,
@@ -2349,12 +2373,39 @@ function mockAdhocBettingPlan(
         handicapLine: null,
       })),
   }));
+  const matchOccurrences = choices.map((choice) => {
+    const ticketNumbers = tickets
+      .filter((ticket) => ticket.legs.some((leg) => leg.matchIdx === choice.matchIdx))
+      .map((ticket) => ticket.ticketNo);
+    return {
+      matchIdx: choice.matchIdx,
+      matchId: choice.matchId,
+      ticketNumbers,
+      distinctTicketOccurrenceCount: ticketNumbers.length,
+      spendWeightedExposureYuan: ticketNumbers.length * ticketCost,
+      spendWeightedExposureRatio: ticketNumbers.length / tickets.length,
+    };
+  });
+  tickets.forEach((ticket) => {
+    ticket.legs.forEach((leg) => {
+      const occurrence = matchOccurrences.find((item) => item.matchIdx === leg.matchIdx);
+      Object.assign(leg, {
+        matchTicketOccurrenceCount: occurrence?.distinctTicketOccurrenceCount || 0,
+        matchTicketNumbers: occurrence?.ticketNumbers || [],
+      });
+    });
+  });
   const actualCostYuan = tickets.reduce((total, ticket) => total + ticket.costYuan, 0);
   const requestId = `mock-${issueId}-n${legCount}-b${requestedBudgetYuan}`;
   return {
-    schemaVersion: 'adhoc_betting_package_v1',
+    schemaVersion: 'adhoc_betting_package_v2',
     capabilityId: 'BJ-ADHOC-BET-001',
+    packageSchemaVersion: 'adhoc_betting_package_v2',
+    concentrationContractApplied: true,
     requestId,
+    immutableRequestId: requestId,
+    publishedPackageCount: 1,
+    generationBatchCount: 1,
     issueId,
     requestedAt: '2026-07-25T12:00:00+08:00',
     inputAsOf: '2026-07-25T12:00:00+08:00',
@@ -2376,6 +2427,13 @@ function mockAdhocBettingPlan(
     auditDownloadsAvailable: true,
     ticketCount: tickets.length,
     eligibleMatchCount: 8,
+    maxTicketOccurrencesPerMatch: 2,
+    totalMatchOccurrenceCapacity: 16,
+    theoreticalTicketCountCap: Math.floor(16 / legCount),
+    maxActualTicketOccurrencesPerMatch: Math.max(...matchOccurrences.map((item) => item.distinctTicketOccurrenceCount)),
+    averageTicketOccurrencesPerMatch: (tickets.length * legCount) / choices.length,
+    matchOccurrencesSha256: 'mock-occurrences-sha256',
+    matchOccurrences,
     excludedMatchCount: 0,
     exclusionCounts: {},
     denominator: choices.map((choice) => ({

@@ -39,7 +39,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 HKT = ZoneInfo("Asia/Hong_Kong")
 
 CAPABILITY_ID = "BJ-ADHOC-BET-001"
-PACKAGE_SCHEMA_VERSION = "adhoc_betting_package_v1"
+CONCENTRATION_CAPABILITY_ID = "BJ-ADHOC-CONCENTRATION-001"
+PACKAGE_SCHEMA_VERSION = "adhoc_betting_package_v2"
+LEGACY_PACKAGE_SCHEMA_VERSIONS = frozenset({"adhoc_betting_package_v1"})
+CONCENTRATION_CONTRACT_SCHEMA_VERSION = "adhoc_match_concentration_contract_v1"
+MAX_TICKET_OCCURRENCES_PER_MATCH = 2
+_LEGACY_LEDGER_BINDING = object()
 LEDGER_SCHEMA_VERSION = "adhoc_betting_ledger_v1"
 CONTENT_ID_SCHEMA = "adhoc_betting_content_id_v1"
 REQUEST_ID_SCHEMA = "adhoc_betting_request_id_v1"
@@ -76,6 +81,44 @@ REQUIRED_PACKAGE_FILES = frozenset(
         "SHA256SUMS",
     }
 )
+TICKET_LEG_CSV_FIELDS = [
+    "row_type",
+    "request_id",
+    "immutable_request_id",
+    "published_package_count",
+    "generation_batch_count",
+    "match_occurrences_sha256",
+    "ticket_no",
+    "match_idx",
+    "match_id",
+    "match_ticket_occurrence_count",
+    "match_ticket_numbers",
+    "match_spend_weighted_exposure_yuan",
+    "match_spend_weighted_exposure_ratio",
+    "selection_code",
+    "selection_label",
+    "kickoff_at_hkt",
+    "league",
+    "home",
+    "away",
+    "handicap_line",
+    "stake_multiplier",
+    "ticket_cost_yuan",
+    "concentration_capability_id",
+    "match_identity_field",
+    "max_ticket_occurrences_per_match",
+    "max_actual_ticket_occurrences_per_match",
+    "average_ticket_occurrences_per_match",
+    "eligible_match_count",
+    "total_match_occurrence_capacity",
+    "theoretical_ticket_count_cap",
+    "actual_ticket_count",
+    "requested_budget_yuan",
+    "base_cost_yuan",
+    "actual_cost_yuan",
+    "unused_budget_yuan",
+    "valid_until_hkt",
+]
 
 
 class AdhocBettingError(ValueError):
@@ -340,6 +383,8 @@ def _normalize_match(
     codes = _codes(raw.get("selection_codes"))
     if not codes:
         reasons.append("MISSING_DECISION_CODES")
+    elif len(codes) != len(set(codes)):
+        reasons.append("DUPLICATE_DECISION_CODES")
     probabilities: dict[str, float] = {}
     sp: dict[str, float] = {}
     raw_probabilities = raw.get("probabilities")
@@ -450,6 +495,7 @@ def _make_portfolio(
     budget_yuan: int,
     seed: int,
     portfolio_contract: dict[str, Any] | None = None,
+    concentration_enforced: bool = True,
 ) -> tuple[list[dict[str, Any]], float, float, str]:
     """Use the released deterministic Exact-N contract without a fallback."""
 
@@ -496,15 +542,86 @@ def _make_portfolio(
     if len(metrics) < n_value:
         return [], 0.0, 0.0, "eligible_match_count_below_requested_n"
 
-    staked, spent_units, reason = portfolio.execute_published_exact_n_portfolio(
-        metrics=metrics,
-        contract=contract,
-        seed=seed,
-    )
+    selected_with_multiplier: list[tuple[portfolio.BundleCandidate, int]]
+    if not concentration_enforced:
+        legacy_staked, spent_units, reason = (
+            portfolio.execute_published_exact_n_portfolio(
+                metrics=metrics,
+                contract=contract,
+                seed=seed,
+            )
+        )
+        selected_with_multiplier = [
+            (item.candidate, int(item.stake_multiplier))
+            for item in legacy_staked
+        ]
+    else:
+        budget_units = float(contract["budget_units"])
+        candidates = portfolio.generate_candidates(
+            metrics=metrics,
+            segment_idx=int(contract["segment_idx"]),
+            arm=str(contract["arm"]),
+            n_value=n_value,
+            budget_units=budget_units,
+            sample_attempts=int(contract["sample_attempts"]),
+            seed=seed,
+        )
+        ordered = sorted(
+            candidates,
+            key=lambda item: (
+                item.expected_profit_units,
+                item.expected_roi,
+                item.hit_prob,
+                -item.cost_units,
+                tuple(-value for value in item.match_indices),
+            ),
+            reverse=True,
+        )
+        selected: list[portfolio.BundleCandidate] = []
+        selected_sets: list[set[int]] = []
+        occurrences: Counter[int] = Counter()
+        spent_units = 0.0
+        for candidate in ordered:
+            if len(candidate.match_indices) != n_value:
+                continue
+            if bool(contract["positive_ev_only"]) and candidate.expected_profit_units <= 0:
+                continue
+            if (
+                candidate.cost_units <= 0
+                or candidate.cost_units
+                > float(contract["per_ticket_cost_cap_units"])
+            ):
+                continue
+            if spent_units + candidate.cost_units > budget_units:
+                continue
+            current = set(candidate.match_indices)
+            if len(current) != n_value:
+                continue
+            if any(
+                occurrences[idx] >= MAX_TICKET_OCCURRENCES_PER_MATCH
+                for idx in current
+            ):
+                continue
+            if any(
+                len(current & previous) > int(contract["max_overlap"])
+                for previous in selected_sets
+            ):
+                continue
+            selected.append(candidate)
+            selected_sets.append(current)
+            occurrences.update(current)
+            spent_units += candidate.cost_units
+        selected_with_multiplier = [(candidate, 1) for candidate in selected]
+        reason = (
+            "adhoc_concentration_capped_unit_once"
+            if selected
+            else "no_compliant_exact_n_ticket"
+        )
     stake_yuan_per_unit = float(contract["stake_yuan_per_unit"])
     tickets: list[dict[str, Any]] = []
-    for ticket_number, item in enumerate(staked, start=1):
-        candidate = item.candidate
+    for ticket_number, (candidate, multiplier) in enumerate(
+        selected_with_multiplier, start=1
+    ):
         if len(candidate.match_indices) != n_value:
             raise AdhocBettingError("exact-N portfolio core returned a non-exact ticket")
         tickets.append(
@@ -513,11 +630,10 @@ def _make_portfolio(
                 "match_indices": list(candidate.match_indices),
                 "leg_codes": list(candidate.leg_codes),
                 "actual_n": len(candidate.match_indices),
-                "stake_multiplier": int(item.stake_multiplier),
+                "stake_multiplier": multiplier,
                 "base_cost_yuan": round(candidate.cost_units * stake_yuan_per_unit, 2),
                 "cost_yuan": round(
-                    candidate.cost_units * item.stake_multiplier * stake_yuan_per_unit,
-                    2,
+                    candidate.cost_units * multiplier * stake_yuan_per_unit, 2
                 ),
             }
         )
@@ -528,6 +644,66 @@ def _make_portfolio(
     return tickets, base_cost, actual_cost, reason
 
 
+def _concentration_diagnostics(
+    *,
+    request_id: str,
+    eligible: list[dict[str, Any]],
+    tickets: list[dict[str, Any]],
+    n_value: int,
+    actual_cost_yuan: float,
+) -> dict[str, Any]:
+    ticket_numbers: dict[int, list[int]] = {
+        int(row["match_idx"]): [] for row in eligible
+    }
+    spend: Counter[int] = Counter()
+    for ticket in tickets:
+        ticket_no = int(ticket["ticket_no"])
+        cost = float(ticket["cost_yuan"])
+        for raw_idx in {int(value) for value in ticket["match_indices"]}:
+            ticket_numbers.setdefault(raw_idx, []).append(ticket_no)
+            spend[raw_idx] += cost
+    rows = []
+    for row in sorted(eligible, key=lambda item: int(item["match_idx"])):
+        idx = int(row["match_idx"])
+        numbers = sorted(set(ticket_numbers.get(idx, [])))
+        rows.append(
+            {
+                "match_idx": idx,
+                "match_id": str(row["match_id"]),
+                "ticket_numbers": numbers,
+                "distinct_ticket_occurrence_count": len(numbers),
+                "spend_weighted_exposure_yuan": round(float(spend[idx]), 2),
+                "spend_weighted_exposure_ratio": round(
+                    float(spend[idx]) / actual_cost_yuan, 8
+                ) if actual_cost_yuan else 0.0,
+            }
+        )
+    counts = [int(row["distinct_ticket_occurrence_count"]) for row in rows]
+    eligible_count = len(eligible)
+    total_capacity = eligible_count * MAX_TICKET_OCCURRENCES_PER_MATCH
+    return {
+        "schema_version": CONCENTRATION_CONTRACT_SCHEMA_VERSION,
+        "capability_id": CONCENTRATION_CAPABILITY_ID,
+        "immutable_request_id": request_id,
+        "published_package_count": 1,
+        "generation_batch_count": 1,
+        "match_identity_field": "match_id",
+        "max_ticket_occurrences_per_match": MAX_TICKET_OCCURRENCES_PER_MATCH,
+        "stake_mode": "unit_once",
+        "duplicate_equivalent_tickets_allowed": False,
+        "eligible_match_count": eligible_count,
+        "total_match_occurrence_capacity": total_capacity,
+        "theoretical_ticket_count_cap": total_capacity // n_value,
+        "actual_ticket_count": len(tickets),
+        "max_actual_ticket_occurrences_per_match": max(counts, default=0),
+        "average_ticket_occurrences_per_match": round(
+            sum(counts) / eligible_count, 8
+        ) if eligible_count else 0.0,
+        "match_occurrences": rows,
+        "match_occurrences_sha256": digest(rows),
+    }
+
+
 def _render_html(
     *,
     manifest: dict[str, Any],
@@ -535,17 +711,37 @@ def _render_html(
     match_by_idx: dict[int, dict[str, Any]],
 ) -> str:
     title = "北单即时方案"
+    concentration = plan.get("concentration_contract") or {}
+    occurrence_by_idx = {
+        int(row["match_idx"]): row
+        for row in concentration.get("match_occurrences", [])
+        if isinstance(row, dict)
+    }
+    occurrence_rows = "".join(
+        "<tr>"
+        f"<td>#{int(row['match_idx'])} {html.escape(str(match_by_idx[int(row['match_idx'])]['home']))} vs {html.escape(str(match_by_idx[int(row['match_idx'])]['away']))}</td>"
+        f"<td>{'、'.join(str(value) for value in row.get('ticket_numbers', [])) or '未入选'}</td>"
+        f"<td>{int(row.get('distinct_ticket_occurrence_count', 0))} / {MAX_TICKET_OCCURRENCES_PER_MATCH}</td>"
+        f"<td>¥{float(row.get('spend_weighted_exposure_yuan', 0)):.2f} · {float(row.get('spend_weighted_exposure_ratio', 0)) * 100:.2f}%</td>"
+        "</tr>"
+        for row in concentration.get("match_occurrences", [])
+        if isinstance(row, dict) and int(row.get("match_idx", 0)) in match_by_idx
+    )
     rows: list[str] = []
     for ticket in plan["tickets"]:
         legs: list[str] = []
         for match_idx, code_text in zip(ticket["match_indices"], ticket["leg_codes"]):
             match = match_by_idx[int(match_idx)]
             codes = [code for code in str(code_text).split("+") if code]
+            occurrence = occurrence_by_idx.get(int(match_idx), {})
+            ticket_numbers = "、".join(
+                str(value) for value in occurrence.get("ticket_numbers", [])
+            ) or "无"
             legs.append(
                 "<li>"
                 f"<strong>#{int(match_idx)} {_selection_label(codes)}</strong>"
                 f"<span>{html.escape(str(match['home']))} vs {html.escape(str(match['away']))}</span>"
-                f"<small>{html.escape(str(match['league']))} · {html.escape(str(match['kickoff_at_hkt']))} · 让球 {html.escape(str(match['handicap_line'] if match['handicap_line'] is not None else '-'))}</small>"
+                f"<small>{html.escape(str(match['league']))} · {html.escape(str(match['kickoff_at_hkt']))} · 让球 {html.escape(str(match['handicap_line'] if match['handicap_line'] is not None else '-'))} · 出现于第 {ticket_numbers} 票</small>"
                 "</li>"
             )
         rows.append(
@@ -569,6 +765,7 @@ h1 {{ margin:0 0 5px; font-size:22px; }} .notice {{ color:#9a3412; font-weight:7
 .ticket header {{ display:flex; justify-content:space-between; gap:8px; border-bottom:1px solid #d8e1ed; padding-bottom:5px; }}
 ol {{ margin:8px 0 0; padding-left:20px; }} li {{ margin:5px 0; }} li strong, li span, li small {{ display:block; }} li strong {{ font-size:14px; color:#102a56; }} li small {{ color:#53657b; }}
 .footer {{ margin-top:12px; color:#596b82; font-size:10px; }} .unavailable {{ border:1px solid #f0b49b; padding:12px; background:#fff7f4; }}
+table {{ width:100%; border-collapse:collapse; margin:8px 0 12px; }} th,td {{ border:1px solid #d8e1ed; padding:4px 6px; text-align:left; }} th {{ background:#eef5ff; color:#0f3c78; }}
 </style></head><body>
 <h1>{title}</h1>
 <p class=\"notice\">仅在有效期内可用于人工核对；过期后必须重新生成，不会自动替换、删票或重算。</p>
@@ -576,7 +773,14 @@ ol {{ margin:8px 0 0; padding-left:20px; }} li {{ margin:5px 0; }} li strong, li
 <div>生成/请求时间 <b>{html.escape(str(manifest['requested_at_hkt']))}</b></div><div>输入 as-of <b>{html.escape(str(manifest['input_asof_hkt']))}</b></div>
 <div>有效至 <b>{html.escape(str(manifest['valid_until_hkt'] or '无可用窗口'))}</b></div><div>exact N / 预算 <b>N={int(manifest['requested_n'])} / ¥{int(manifest['requested_budget_yuan'])}</b></div>
 <div>票数 / 基础成本 <b>{len(plan['tickets'])} / ¥{float(plan['base_cost_yuan']):.2f}</b></div><div>实际成本 / 未用预算 <b>¥{float(plan['actual_cost_yuan']):.2f} / ¥{float(plan['unused_budget_yuan']):.2f}</b></div>
-<div>预算利用率 <b>{float(plan['budget_utilization']) * 100:.2f}%</b></div></div>
+<div>预算利用率 <b>{float(plan['budget_utilization']) * 100:.2f}%</b></div>
+<div>不可变请求 / 发布包数 / 生成批次数 <b>{html.escape(str(concentration.get('immutable_request_id', '')))} / {int(concentration.get('published_package_count', 0))} / {int(concentration.get('generation_batch_count', 0))}</b></div>
+<div>逐场集中度证据哈希 <b>{html.escape(str(concentration.get('match_occurrences_sha256', '')))}</b></div>
+<div>单场票数硬上限 / 实际最大值 <b>{int(concentration.get('max_ticket_occurrences_per_match', 0))} / {int(concentration.get('max_actual_ticket_occurrences_per_match', 0))}</b></div>
+<div>总容量 / 理论票数上限 <b>{int(concentration.get('total_match_occurrence_capacity', 0))} / {int(concentration.get('theoretical_ticket_count_cap', 0))}</b></div>
+<div>平均单场票数 <b>{float(concentration.get('average_ticket_occurrences_per_match', 0)):.4f}</b></div></div>
+<p class=\"notice\">预算是上限而非目标；集中度或组合约束造成的未用预算将如实保留，不会通过加倍或重复票追满。</p>
+<table><thead><tr><th>比赛</th><th>所在票号</th><th>票数 / 上限</th><th>投入加权暴露</th></tr></thead><tbody>{occurrence_rows}</tbody></table>
 {body}
 <p class=\"footer\">{CAPABILITY_ID} · research_evidence_eligible=false · scheduled_freeze_event_id=null · 正确比分执行未开放。</p>
 </body></html>"""
@@ -661,24 +865,185 @@ def _write_pdf(html_text: str, target: Path, font_file: Path, identifier: str) -
     return f"WeasyPrint/{weasyprint.__version__}"
 
 
+def _verify_pdf_concentration_view(
+    *,
+    pdf_path: Path,
+    manifest: dict[str, Any],
+    plan: dict[str, Any],
+    match_by_idx: dict[int, dict[str, Any]],
+    concentration: dict[str, Any],
+) -> None:
+    """Fail closed unless the PDF exposes the recomputed concentration view."""
+
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(str(pdf_path))
+        extracted = "".join(page.extract_text() or "" for page in reader.pages)
+    except Exception as exc:
+        raise AdhocBettingError(
+            "adhoc PDF concentration view cannot be inspected"
+        ) from exc
+    normalized = re.sub(r"\s+", "", extracted)
+    required = [
+        "北单即时方案",
+        str(manifest["request_id"]),
+        "单场票数硬上限/实际最大值",
+        (
+            f"{int(concentration['max_ticket_occurrences_per_match'])}/"
+            f"{int(concentration['max_actual_ticket_occurrences_per_match'])}"
+        ),
+        "总容量/理论票数上限",
+        (
+            f"{int(concentration['total_match_occurrence_capacity'])}/"
+            f"{int(concentration['theoretical_ticket_count_cap'])}"
+        ),
+        "集中度或组合约束造成的未用预算",
+        f"¥{float(plan['actual_cost_yuan']):.2f}/¥{float(plan['unused_budget_yuan']):.2f}",
+        "不可变请求/发布包数/生成批次数",
+        (
+            f"{concentration['immutable_request_id']}/"
+            f"{int(concentration['published_package_count'])}/"
+            f"{int(concentration['generation_batch_count'])}"
+        ),
+        "逐场集中度证据哈希",
+        str(concentration["match_occurrences_sha256"]),
+    ]
+    for occurrence in concentration.get("match_occurrences", []):
+        idx = int(occurrence["match_idx"])
+        match = match_by_idx[idx]
+        ticket_numbers = "、".join(
+            str(value) for value in occurrence.get("ticket_numbers", [])
+        ) or "未入选"
+        required.extend(
+            [
+                f"#{idx}{match['home']}vs{match['away']}",
+                ticket_numbers,
+                (
+                    f"{int(occurrence['distinct_ticket_occurrence_count'])}/"
+                    f"{MAX_TICKET_OCCURRENCES_PER_MATCH}"
+                ),
+                (
+                    f"¥{float(occurrence['spend_weighted_exposure_yuan']):.2f}·"
+                    f"{float(occurrence['spend_weighted_exposure_ratio']) * 100:.2f}%"
+                ),
+            ]
+        )
+    for ticket in plan.get("tickets", []):
+        required.extend(
+            [
+                (
+                    f"第{int(ticket['ticket_no'])}票·"
+                    f"{int(ticket['actual_n'])}串1"
+                ),
+                (
+                    f"¥{float(ticket['cost_yuan']):.2f}·"
+                    f"倍数{int(ticket['stake_multiplier'])}"
+                ),
+            ]
+        )
+    if any(re.sub(r"\s+", "", fragment) not in normalized for fragment in required):
+        raise AdhocBettingError("adhoc PDF concentration view mismatch")
+
+
 def _ticket_leg_rows(
     *,
     request_id: str,
     tickets: list[dict[str, Any]],
     match_by_idx: dict[int, dict[str, Any]],
     valid_until_hkt: str,
+    concentration: dict[str, Any],
+    requested_budget_yuan: float,
+    base_cost_yuan: float,
+    actual_cost_yuan: float,
 ) -> list[dict[str, object]]:
-    rows: list[dict[str, object]] = []
+    summary: dict[str, object] = {
+        "immutable_request_id": str(
+            concentration.get("immutable_request_id") or ""
+        ),
+        "published_package_count": int(
+            concentration.get("published_package_count") or 0
+        ),
+        "generation_batch_count": int(
+            concentration.get("generation_batch_count") or 0
+        ),
+        "match_occurrences_sha256": str(
+            concentration.get("match_occurrences_sha256") or ""
+        ),
+        "concentration_capability_id": str(
+            concentration.get("capability_id") or ""
+        ),
+        "match_identity_field": str(
+            concentration.get("match_identity_field") or ""
+        ),
+        "max_ticket_occurrences_per_match": int(
+            concentration.get("max_ticket_occurrences_per_match") or 0
+        ),
+        "max_actual_ticket_occurrences_per_match": int(
+            concentration.get("max_actual_ticket_occurrences_per_match") or 0
+        ),
+        "average_ticket_occurrences_per_match": (
+            f"{float(concentration.get('average_ticket_occurrences_per_match') or 0):.8f}"
+        ),
+        "eligible_match_count": int(
+            concentration.get("eligible_match_count") or 0
+        ),
+        "total_match_occurrence_capacity": int(
+            concentration.get("total_match_occurrence_capacity") or 0
+        ),
+        "theoretical_ticket_count_cap": int(
+            concentration.get("theoretical_ticket_count_cap") or 0
+        ),
+        "actual_ticket_count": int(
+            concentration.get("actual_ticket_count") or 0
+        ),
+        "requested_budget_yuan": f"{requested_budget_yuan:.2f}",
+        "base_cost_yuan": f"{base_cost_yuan:.2f}",
+        "actual_cost_yuan": f"{actual_cost_yuan:.2f}",
+        "unused_budget_yuan": (
+            f"{requested_budget_yuan - actual_cost_yuan:.2f}"
+        ),
+        "valid_until_hkt": valid_until_hkt,
+    }
+    occurrence_by_idx = {
+        int(row["match_idx"]): row
+        for row in concentration.get("match_occurrences", [])
+        if isinstance(row, dict) and "match_idx" in row
+    }
+    ticket_numbers_by_idx: dict[int, list[int]] = {}
+    for ticket in tickets:
+        for raw_idx in {int(value) for value in ticket["match_indices"]}:
+            ticket_numbers_by_idx.setdefault(raw_idx, []).append(int(ticket["ticket_no"]))
+    rows: list[dict[str, object]] = [
+        {
+            **summary,
+            "row_type": "portfolio_summary",
+            "request_id": request_id,
+        }
+    ]
     for ticket in tickets:
         for match_idx, leg_codes in zip(ticket["match_indices"], ticket["leg_codes"]):
             match = match_by_idx[int(match_idx)]
+            occurrence = occurrence_by_idx[int(match_idx)]
             codes = [code for code in str(leg_codes).split("+") if code]
             rows.append(
                 {
+                    **summary,
+                    "row_type": "ticket_leg",
                     "request_id": request_id,
                     "ticket_no": int(ticket["ticket_no"]),
                     "match_idx": int(match_idx),
                     "match_id": str(match["match_id"]),
+                    "match_ticket_occurrence_count": len(ticket_numbers_by_idx[int(match_idx)]),
+                    "match_ticket_numbers": ",".join(
+                        str(value) for value in sorted(ticket_numbers_by_idx[int(match_idx)])
+                    ),
+                    "match_spend_weighted_exposure_yuan": (
+                        f"{float(occurrence.get('spend_weighted_exposure_yuan') or 0):.2f}"
+                    ),
+                    "match_spend_weighted_exposure_ratio": (
+                        f"{float(occurrence.get('spend_weighted_exposure_ratio') or 0):.8f}"
+                    ),
                     "selection_code": "+".join(codes),
                     "selection_label": _selection_label(codes),
                     "kickoff_at_hkt": str(match["kickoff_at_hkt"]),
@@ -688,9 +1053,44 @@ def _ticket_leg_rows(
                     "handicap_line": match["handicap_line"] if match["handicap_line"] is not None else "",
                     "stake_multiplier": int(ticket["stake_multiplier"]),
                     "ticket_cost_yuan": f"{float(ticket['cost_yuan']):.2f}",
-                    "valid_until_hkt": valid_until_hkt,
                 }
             )
+    for occurrence in concentration.get("match_occurrences", []):
+        if not isinstance(occurrence, dict) or int(
+            occurrence.get("distinct_ticket_occurrence_count") or 0
+        ) > 0:
+            continue
+        match_idx = int(occurrence["match_idx"])
+        match = match_by_idx[match_idx]
+        rows.append(
+            {
+                **summary,
+                "row_type": "eligible_match_not_selected",
+                "request_id": request_id,
+                "ticket_no": "",
+                "match_idx": match_idx,
+                "match_id": str(match["match_id"]),
+                "match_ticket_occurrence_count": 0,
+                "match_ticket_numbers": "",
+                "match_spend_weighted_exposure_yuan": (
+                    f"{float(occurrence.get('spend_weighted_exposure_yuan') or 0):.2f}"
+                ),
+                "match_spend_weighted_exposure_ratio": (
+                    f"{float(occurrence.get('spend_weighted_exposure_ratio') or 0):.8f}"
+                ),
+                "selection_code": "",
+                "selection_label": "",
+                "kickoff_at_hkt": str(match["kickoff_at_hkt"]),
+                "league": str(match["league"]),
+                "home": str(match["home"]),
+                "away": str(match["away"]),
+                "handicap_line": match["handicap_line"]
+                if match["handicap_line"] is not None
+                else "",
+                "stake_multiplier": "",
+                "ticket_cost_yuan": "",
+            }
+        )
     return rows
 
 
@@ -734,9 +1134,8 @@ def _load_package(root: Path, row: sqlite3.Row | dict[str, Any]) -> tuple[Path, 
     package_id = str(row["package_id"])
     issue = str(row["issue"])
     path = _package_dir(root, issue, package_id)
-    verification = verify_package(path)
-    if verification["status"] != "PASS":  # defensive; verifier raises on failure.
-        raise AdhocBettingError("adhoc package verification did not pass")
+    if not path.is_dir():
+        raise AdhocBettingError("adhoc package directory is missing")
     manifest = _json_load(path / "adhoc_request_manifest.json")
     ledger_bindings = {
         "request_id": str(manifest.get("request_id") or ""),
@@ -758,6 +1157,12 @@ def _load_package(root: Path, row: sqlite3.Row | dict[str, Any]) -> tuple[Path, 
     recorded_path = Path(str(row["package_path"])).resolve()
     if recorded_path != path.resolve():
         raise AdhocBettingError("adhoc ledger/package binding mismatch: package_path")
+    verification = _verify_package(
+        path,
+        _legacy_ledger_binding=_LEGACY_LEDGER_BINDING,
+    )
+    if verification["status"] != "PASS":  # defensive; verifier raises on failure.
+        raise AdhocBettingError("adhoc package verification did not pass")
     return (
         path,
         manifest,
@@ -839,6 +1244,9 @@ class AdhocBettingStore:
         indices = [int(row["match_idx"]) for row in normalized]
         if len(indices) != len(set(indices)) or any(index <= 0 for index in indices):
             raise AdhocBettingError("source snapshot denominator has invalid or duplicate match indices")
+        match_ids = [str(row.get("match_id") or "") for row in normalized]
+        if any(not value for value in match_ids) or len(match_ids) != len(set(match_ids)):
+            raise AdhocBettingError("source snapshot denominator has invalid or duplicate match IDs")
         excluded = [row for row in normalized if not row["included"]]
         counts: Counter[str] = Counter()
         for row in excluded:
@@ -1085,6 +1493,13 @@ class AdhocBettingStore:
             seed=seed,
             portfolio_contract=portfolio_contract,
         )
+        concentration = _concentration_diagnostics(
+            request_id=request_id,
+            eligible=eligible,
+            tickets=tickets,
+            n_value=requested_n,
+            actual_cost_yuan=actual_cost,
+        )
         sale_status_verified = bool(tickets) and all(
             row["sale_status"] in OPEN_SALE_STATES and row["pass_allowed"] is True
             for row in eligible
@@ -1129,6 +1544,8 @@ class AdhocBettingStore:
                 "deterministic_seed": seed,
                 "portfolio_contract": portfolio_contract,
                 "portfolio_contract_sha256": portfolio_contract_sha256,
+                "concentration_contract": concentration,
+                "concentration_contract_sha256": digest(concentration),
                 "tickets": tickets,
                 "correct_score_status": "UNAVAILABLE_ADHOC_CORRECT_SCORE",
             }
@@ -1164,6 +1581,8 @@ class AdhocBettingStore:
             "exact_n_plan_sha256": str(plan["sha256"]),
             "portfolio_contract": portfolio_contract,
             "portfolio_contract_sha256": portfolio_contract_sha256,
+            "concentration_contract": concentration,
+            "concentration_contract_sha256": digest(concentration),
             "source_snapshot_sha256": source_snapshot_sha256,
             "decision_variant_id": str(decision_input["decision_variant_id"]),
             "correct_score_status": "UNAVAILABLE_ADHOC_CORRECT_SCORE",
@@ -1182,23 +1601,12 @@ class AdhocBettingStore:
                     tickets=tickets,
                     match_by_idx=match_by_idx,
                     valid_until_hkt=str(provisional_manifest["valid_until_hkt"]),
+                    concentration=concentration,
+                    requested_budget_yuan=float(requested_budget_yuan),
+                    base_cost_yuan=float(base_cost),
+                    actual_cost_yuan=float(actual_cost),
                 ),
-                [
-                    "request_id",
-                    "ticket_no",
-                    "match_idx",
-                    "match_id",
-                    "selection_code",
-                    "selection_label",
-                    "kickoff_at_hkt",
-                    "league",
-                    "home",
-                    "away",
-                    "handicap_line",
-                    "stake_multiplier",
-                    "ticket_cost_yuan",
-                    "valid_until_hkt",
-                ],
+                TICKET_LEG_CSV_FIELDS,
             )
         )
         artifacts = [
@@ -1332,7 +1740,34 @@ class AdhocBettingStore:
         return target, {**final_payload, "audit_only_download": bool(audit_only)}
 
     @staticmethod
-    def _current_status(manifest: dict[str, Any], now: datetime) -> str:
+    def _concentration_contract_applied(
+        manifest: dict[str, Any], plan: dict[str, Any]
+    ) -> bool:
+        """Whether this immutable package carries the v2 two-ticket contract.
+
+        A trusted-ledger v1 package remains readable as an historical audit
+        artifact, but must never inherit the operational meaning of the v2
+        concentration capability merely because it is still inside a former
+        validity window.
+        """
+
+        concentration = plan.get("concentration_contract")
+        return (
+            str(manifest.get("schema_version") or "") == PACKAGE_SCHEMA_VERSION
+            and isinstance(concentration, dict)
+            and manifest.get("concentration_contract") == concentration
+            and str(concentration.get("schema_version") or "")
+            == CONCENTRATION_CONTRACT_SCHEMA_VERSION
+            and str(concentration.get("capability_id") or "")
+            == CONCENTRATION_CAPABILITY_ID
+            and int(concentration.get("max_ticket_occurrences_per_match") or 0)
+            == MAX_TICKET_OCCURRENCES_PER_MATCH
+        )
+
+    @classmethod
+    def _current_status(
+        cls, manifest: dict[str, Any], plan: dict[str, Any], now: datetime
+    ) -> str:
         """Classify immutable package validity using only the server clock.
 
         This deliberately does not refresh sale status or any decision input;
@@ -1344,6 +1779,8 @@ class AdhocBettingStore:
             return "UNAVAILABLE_ADHOC_PLAN"
         if immutable_status != "READY_FOR_REVIEW":
             return "FAILED_CLOSED"
+        if not cls._concentration_contract_applied(manifest, plan):
+            return "HISTORICAL_NO_CONCENTRATION_CONTRACT"
         if not bool(manifest.get("sale_status_verified")):
             return "UNVERIFIED_SALE_STATE"
         valid_until = str(manifest.get("valid_until_hkt") or "")
@@ -1362,12 +1799,21 @@ class AdhocBettingStore:
         now: datetime,
         idempotent: bool,
     ) -> dict[str, Any]:
-        current_status = self._current_status(manifest, now)
+        concentration_applied = self._concentration_contract_applied(manifest, plan)
+        current_status = self._current_status(manifest, plan, now)
         included = denominator.get("included") if isinstance(denominator.get("included"), list) else []
         match_by_idx = {
             int(row["match_idx"]): row
             for row in included
             if isinstance(row, dict) and str(row.get("match_idx") or "").isdigit()
+        }
+        concentration = plan.get("concentration_contract") if concentration_applied else None
+        if not isinstance(concentration, dict):
+            concentration = {}
+        occurrence_by_idx = {
+            int(row["match_idx"]): row
+            for row in concentration.get("match_occurrences", [])
+            if isinstance(row, dict)
         }
         tickets: list[dict[str, Any]] = []
         for ticket in plan.get("tickets", []):
@@ -1376,6 +1822,7 @@ class AdhocBettingStore:
             legs: list[dict[str, Any]] = []
             for match_idx, code_text in zip(ticket.get("match_indices", []), ticket.get("leg_codes", [])):
                 match = match_by_idx.get(int(match_idx), {})
+                occurrence = occurrence_by_idx.get(int(match_idx), {})
                 codes = [code for code in str(code_text).split("+") if code]
                 legs.append(
                     {
@@ -1388,6 +1835,12 @@ class AdhocBettingStore:
                         "home": str(match.get("home") or ""),
                         "away": str(match.get("away") or ""),
                         "handicap_line": match.get("handicap_line"),
+                        "match_ticket_occurrence_count": int(
+                            occurrence.get("distinct_ticket_occurrence_count") or 0
+                        ),
+                        "match_ticket_numbers": list(
+                            occurrence.get("ticket_numbers") or []
+                        ),
                     }
                 )
             tickets.append(
@@ -1408,6 +1861,8 @@ class AdhocBettingStore:
         return {
             "schema_version": "adhoc_betting_api_v1",
             "capability_id": CAPABILITY_ID,
+            "package_schema_version": str(manifest.get("schema_version") or ""),
+            "concentration_contract_applied": concentration_applied,
             "request_id": str(manifest["request_id"]),
             "issue": str(manifest["issue"]),
             "requested_at_hkt": str(manifest["requested_at_hkt"]),
@@ -1421,7 +1876,11 @@ class AdhocBettingStore:
             "valid_until_hkt": str(manifest.get("valid_until_hkt") or ""),
             "status": str(manifest["status"]),
             "current_status": current_status,
-            "current_status_recheck_scope": "VALID_UNTIL_SERVER_CLOCK_ONLY",
+            "current_status_recheck_scope": (
+                "VALID_UNTIL_SERVER_CLOCK_ONLY"
+                if concentration_applied
+                else "HISTORICAL_AUDIT_ONLY"
+            ),
             "sale_eligibility_scope": "GENERATION_TIME_SNAPSHOT_ONLY",
             "shop_sale_confirmation_required": True,
             "structural_verification_status": str(manifest["structural_verification_status"]),
@@ -1430,6 +1889,34 @@ class AdhocBettingStore:
             "audit_downloads_available": True,
             "ticket_count": len(tickets),
             "eligible_match_count": int(denominator.get("eligible_match_count") or 0),
+            "max_ticket_occurrences_per_match": int(
+                concentration.get("max_ticket_occurrences_per_match") or 0
+            ),
+            "immutable_request_id": str(
+                concentration.get("immutable_request_id") or ""
+            ),
+            "published_package_count": int(
+                concentration.get("published_package_count") or 0
+            ),
+            "generation_batch_count": int(
+                concentration.get("generation_batch_count") or 0
+            ),
+            "total_match_occurrence_capacity": int(
+                concentration.get("total_match_occurrence_capacity") or 0
+            ),
+            "theoretical_ticket_count_cap": int(
+                concentration.get("theoretical_ticket_count_cap") or 0
+            ),
+            "max_actual_ticket_occurrences_per_match": int(
+                concentration.get("max_actual_ticket_occurrences_per_match") or 0
+            ),
+            "average_ticket_occurrences_per_match": float(
+                concentration.get("average_ticket_occurrences_per_match") or 0
+            ),
+            "match_occurrences_sha256": str(
+                concentration.get("match_occurrences_sha256") or ""
+            ),
+            "match_occurrences": list(concentration.get("match_occurrences") or []),
             "excluded_match_count": int(denominator.get("excluded_match_count") or 0),
             "exclusion_counts": dict(sorted(exclusion_counts.items())),
             "denominator": _public_denominator_rows(
@@ -1452,12 +1939,19 @@ class AdhocBettingStore:
         }
 
 
-def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False) -> dict[str, Any]:
+def _verify_package(
+    root: str | os.PathLike[str],
+    *,
+    allow_staging: bool = False,
+    _legacy_ledger_binding: object | None = None,
+) -> dict[str, Any]:
     """Verify the full package before API exposure or download.
 
     This intentionally validates semantic linkage as well as file hashes so a
     rehashed, self-consistent-looking package cannot claim a different N,
-    budget, scheduled identity, or mutable output directory.
+    budget, scheduled identity, or mutable output directory. The private
+    legacy binding is available only after ``_load_package`` has matched every
+    immutable ledger field; the public verifier cannot self-authorize v1.
     """
 
     path = Path(root)
@@ -1502,8 +1996,10 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
         (plan, "exact-N plan"),
     ):
         _verify_payload_hash(payload, label=label)
+    package_schema = str(manifest.get("schema_version") or "")
+    concentration_enforced = package_schema not in LEGACY_PACKAGE_SCHEMA_VERSIONS
     if (
-        manifest.get("schema_version") != PACKAGE_SCHEMA_VERSION
+        package_schema not in {PACKAGE_SCHEMA_VERSION, *LEGACY_PACKAGE_SCHEMA_VERSIONS}
         or manifest.get("capability_id") != CAPABILITY_ID
         or manifest.get("content_id_schema") != CONTENT_ID_SCHEMA
         or manifest.get("immutable") is not True
@@ -1515,15 +2011,26 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
     package_id = str(manifest.get("package_id") or "")
     if not re.fullmatch(r"[0-9a-f]{64}", package_id) or package_id != _package_identity(manifest):
         raise AdhocBettingError("adhoc package content identity mismatch")
+    if (
+        package_schema in LEGACY_PACKAGE_SCHEMA_VERSIONS
+        and _legacy_ledger_binding is not _LEGACY_LEDGER_BINDING
+    ):
+        raise AdhocBettingError(
+            "legacy adhoc package requires trusted ledger binding"
+        )
     if not allow_staging and path.name != package_id:
         raise AdhocBettingError("adhoc package directory is not content-addressed")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, list):
         raise AdhocBettingError("adhoc manifest artifacts are missing")
-    artifact_hashes = {
-        str(item.get("file")): str(item.get("sha256"))
+    artifact_records = {
+        str(item.get("file")): item
         for item in artifacts
         if isinstance(item, dict)
+    }
+    artifact_hashes = {
+        name: str(item.get("sha256"))
+        for name, item in artifact_records.items()
     }
     expected_artifacts = REQUIRED_PACKAGE_FILES - {"SHA256SUMS", "adhoc_request_manifest.json"}
     if set(artifact_hashes) != expected_artifacts:
@@ -1531,6 +2038,13 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
     for name, claimed in artifact_hashes.items():
         if claimed != file_hash(path / name):
             raise AdhocBettingError(f"adhoc manifest artifact hash mismatch: {name}")
+    if concentration_enforced and str(
+        artifact_records["adhoc_betting_slip.pdf"].get(
+            "source_html_sha256"
+        )
+        or ""
+    ) != file_hash(path / "adhoc_betting_view.html"):
+        raise AdhocBettingError("adhoc PDF source HTML linkage mismatch")
     if (
         str(manifest.get("decision_input_sha256")) != str(decision_input.get("sha256"))
         or str(manifest.get("eligible_denominator_sha256")) != str(denominator.get("sha256"))
@@ -1625,6 +2139,9 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
         raise AdhocBettingError("adhoc denominator included/excluded membership overlaps")
     decision_rows = indexed_rows(decision_input.get("matches"), label="decision input")
     denominator_rows = {**included_rows, **excluded_rows}
+    match_ids = [str(row.get("match_id") or "") for row in denominator_rows.values()]
+    if any(not value for value in match_ids) or len(match_ids) != len(set(match_ids)):
+        raise AdhocBettingError("adhoc denominator has invalid or duplicate match IDs")
     if set(decision_rows) != set(denominator_rows) or any(
         decision_rows[idx] != denominator_rows[idx] for idx in decision_rows
     ):
@@ -1745,6 +2262,11 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
 
     total = 0.0
     selected_rows: dict[int, dict[str, Any]] = {}
+    occurrence_ticket_numbers: dict[int, list[int]] = {
+        idx: [] for idx in included_rows
+    }
+    spend_by_match: Counter[int] = Counter()
+    ticket_sets: list[set[int]] = []
     for ticket in tickets:
         if not isinstance(ticket, dict):
             raise AdhocBettingError("adhoc ticket is malformed")
@@ -1767,8 +2289,20 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
         cost = _as_number(ticket.get("cost_yuan"), label="ticket cost")
         ticket_base_cost = _as_number(ticket.get("base_cost_yuan"), label="ticket base cost")
         multiplier = int(ticket.get("stake_multiplier") or 0)
+        if concentration_enforced and multiplier != 1:
+            raise AdhocBettingError("adhoc concentration contract forbids multiplier scaling")
         if cost <= 0 or ticket_base_cost <= 0 or round(ticket_base_cost * multiplier, 2) != round(cost, 2):
             raise AdhocBettingError("adhoc ticket cost is invalid")
+        current_ticket_set = {int(value) for value in indices}
+        if concentration_enforced and any(
+            len(current_ticket_set & previous) > int(checked_portfolio_contract["max_overlap"])
+            for previous in ticket_sets
+        ):
+            raise AdhocBettingError("adhoc ticket overlap contract failed")
+        ticket_sets.append(current_ticket_set)
+        ticket_no = int(ticket.get("ticket_no") or 0)
+        if ticket_no != len(ticket_sets):
+            raise AdhocBettingError("adhoc ticket numbering is invalid")
         for raw_idx, raw_codes in zip(indices, codes):
             idx = int(raw_idx)
             row = included_rows.get(idx)
@@ -1776,6 +2310,10 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
                 raise AdhocBettingError("adhoc ticket selects an excluded or absent match")
             ticket_codes = [code for code in str(raw_codes).split("+") if code]
             allowed_codes = {str(code) for code in row.get("selection_codes") or []}
+            if len(ticket_codes) != len(set(ticket_codes)):
+                raise AdhocBettingError(
+                    "adhoc ticket contains duplicate selection codes"
+                )
             if not ticket_codes or not set(ticket_codes).issubset(allowed_codes):
                 raise AdhocBettingError("adhoc ticket selection is not bound to formal decision input")
             rechecked = _normalize_match(
@@ -1787,7 +2325,115 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
             if not rechecked["included"] or rechecked != row:
                 raise AdhocBettingError("adhoc ticket no longer satisfies its frozen eligibility contract")
             selected_rows[idx] = row
+            occurrence_ticket_numbers.setdefault(idx, []).append(ticket_no)
+            spend_by_match[idx] += cost
         total += cost
+    recomputed_rows: list[dict[str, Any]] = []
+    if concentration_enforced:
+        for idx, row in sorted(included_rows.items()):
+            numbers = sorted(set(occurrence_ticket_numbers.get(idx, [])))
+            if len(numbers) > MAX_TICKET_OCCURRENCES_PER_MATCH:
+                raise AdhocBettingError(
+                    "adhoc match exceeds the two-ticket concentration cap"
+                )
+            recomputed_rows.append(
+                {
+                    "match_idx": idx,
+                    "match_id": str(row.get("match_id") or ""),
+                    "ticket_numbers": numbers,
+                    "distinct_ticket_occurrence_count": len(numbers),
+                    "spend_weighted_exposure_yuan": round(float(spend_by_match[idx]), 2),
+                    "spend_weighted_exposure_ratio": round(
+                        float(spend_by_match[idx]) / total, 8
+                    ) if total else 0.0,
+                }
+            )
+        expected_concentration = {
+            "schema_version": CONCENTRATION_CONTRACT_SCHEMA_VERSION,
+            "capability_id": CONCENTRATION_CAPABILITY_ID,
+            "immutable_request_id": str(manifest["request_id"]),
+            "published_package_count": 1,
+            "generation_batch_count": 1,
+            "match_identity_field": "match_id",
+            "max_ticket_occurrences_per_match": MAX_TICKET_OCCURRENCES_PER_MATCH,
+            "stake_mode": "unit_once",
+            "duplicate_equivalent_tickets_allowed": False,
+            "eligible_match_count": len(included_rows),
+            "total_match_occurrence_capacity": len(included_rows)
+            * MAX_TICKET_OCCURRENCES_PER_MATCH,
+            "theoretical_ticket_count_cap": (
+                len(included_rows) * MAX_TICKET_OCCURRENCES_PER_MATCH
+            ) // n_value,
+            "actual_ticket_count": len(tickets),
+            "max_actual_ticket_occurrences_per_match": max(
+                (
+                    int(row["distinct_ticket_occurrence_count"])
+                    for row in recomputed_rows
+                ),
+                default=0,
+            ),
+            "average_ticket_occurrences_per_match": round(
+                sum(
+                    int(row["distinct_ticket_occurrence_count"])
+                    for row in recomputed_rows
+                )
+                / len(included_rows),
+                8,
+            ) if included_rows else 0.0,
+            "match_occurrences": recomputed_rows,
+            "match_occurrences_sha256": digest(recomputed_rows),
+        }
+        concentration = plan.get("concentration_contract")
+        if (
+            not isinstance(concentration, dict)
+            or concentration != expected_concentration
+            or manifest.get("concentration_contract") != concentration
+            or str(plan.get("concentration_contract_sha256") or "") != digest(concentration)
+            or str(manifest.get("concentration_contract_sha256") or "")
+            != digest(concentration)
+        ):
+            raise AdhocBettingError("adhoc concentration evidence does not reconcile")
+        expected_html = _render_html(
+            manifest=manifest,
+            plan=plan,
+            match_by_idx=denominator_rows,
+        )
+        if (path / "adhoc_betting_view.html").read_text(
+            encoding="utf-8"
+        ) != expected_html:
+            raise AdhocBettingError("adhoc HTML concentration view mismatch")
+        expected_csv = _csv_bytes(
+            _ticket_leg_rows(
+                request_id=str(manifest["request_id"]),
+                tickets=tickets,
+                match_by_idx=denominator_rows,
+                valid_until_hkt=str(manifest.get("valid_until_hkt") or ""),
+                concentration=concentration,
+                requested_budget_yuan=float(budget),
+                base_cost_yuan=float(
+                    _as_number(
+                        manifest.get("base_cost_yuan"),
+                        label="base_cost_yuan",
+                    )
+                ),
+                actual_cost_yuan=float(
+                    _as_number(
+                        manifest.get("actual_cost_yuan"),
+                        label="actual_cost_yuan",
+                    )
+                ),
+            ),
+            TICKET_LEG_CSV_FIELDS,
+        )
+        if (path / "ticket_legs.csv").read_bytes() != expected_csv:
+            raise AdhocBettingError("adhoc CSV concentration view mismatch")
+        _verify_pdf_concentration_view(
+            pdf_path=path / "adhoc_betting_slip.pdf",
+            manifest=manifest,
+            plan=plan,
+            match_by_idx=denominator_rows,
+            concentration=concentration,
+        )
     actual_cost = _as_number(manifest.get("actual_cost_yuan"), label="actual_cost_yuan")
     base_cost = _as_number(manifest.get("base_cost_yuan"), label="base_cost_yuan")
     if round(total, 2) != round(actual_cost, 2) or actual_cost > budget + 1e-9:
@@ -1817,6 +2463,7 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
             budget_yuan=int(budget),
             seed=deterministic_seed,
             portfolio_contract=checked_portfolio_contract,
+            concentration_enforced=concentration_enforced,
         )
     except AdhocBettingError as exc:
         raise AdhocBettingError("adhoc Exact-N portfolio cannot be reconstructed") from exc
@@ -1876,4 +2523,66 @@ def verify_package(root: str | os.PathLike[str], *, allow_staging: bool = False)
         "manifest_sha256": str(manifest["sha256"]),
         "ticket_count": len(tickets),
         "actual_cost_yuan": actual_cost,
+        "unused_budget_yuan": _as_number(
+            manifest.get("unused_budget_yuan"), label="unused_budget_yuan"
+        ),
+        "eligible_match_count": len(included_rows),
+        "total_match_occurrence_capacity": (
+            len(included_rows) * MAX_TICKET_OCCURRENCES_PER_MATCH
+            if concentration_enforced
+            else None
+        ),
+        "theoretical_ticket_count_cap": (
+            (len(included_rows) * MAX_TICKET_OCCURRENCES_PER_MATCH) // n_value
+            if concentration_enforced
+            else None
+        ),
+        "max_ticket_occurrences_per_match": (
+            MAX_TICKET_OCCURRENCES_PER_MATCH if concentration_enforced else None
+        ),
+        "max_actual_ticket_occurrences_per_match": max(
+            (len(set(values)) for values in occurrence_ticket_numbers.values()),
+            default=0,
+        ),
+        "average_ticket_occurrences_per_match": (
+            round(
+                sum(len(set(values)) for values in occurrence_ticket_numbers.values())
+                / len(included_rows),
+                8,
+            )
+            if concentration_enforced and included_rows
+            else 0.0 if concentration_enforced else None
+        ),
+        "match_occurrences_sha256": (
+            str(
+                (plan.get("concentration_contract") or {}).get(
+                    "match_occurrences_sha256"
+                )
+                or ""
+            )
+            if concentration_enforced
+            else None
+        ),
+        "match_occurrences": (
+            recomputed_rows if concentration_enforced else None
+        ),
+        "portfolio_contract_sha256": portfolio_contract_sha256,
+        "deterministic_seed": deterministic_seed,
+        "source_snapshot_sha256": source_snapshot_sha256,
+        "decision_input_sha256": str(manifest["decision_input_sha256"]),
+        "immutable_request_id": str(manifest["request_id"]),
+        "published_package_count": 1,
+        "generation_batch_count": 1,
     }
+
+
+def verify_package(
+    root: str | os.PathLike[str], *, allow_staging: bool = False
+) -> dict[str, Any]:
+    """Public verification entry point for current v2 packages.
+
+    Historical v1 packages are exposed only through ``AdhocBettingStore``,
+    where the append-only ledger is checked before the private verifier runs.
+    """
+
+    return _verify_package(root, allow_staging=allow_staging)

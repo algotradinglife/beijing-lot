@@ -9941,7 +9941,12 @@ def create_app(
         )
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Adhoc-Usage-Boundary"] = (
-            "AUDIT_ONLY_EXPIRED_RECORD" if payload["audit_only_download"] else "OPERATIONAL_CURRENT"
+            "AUDIT_ONLY_HISTORICAL_RECORD"
+            if payload["audit_only_download"]
+            and payload["current_status"] == "HISTORICAL_NO_CONCENTRATION_CONTRACT"
+            else "AUDIT_ONLY_EXPIRED_RECORD"
+            if payload["audit_only_download"]
+            else "OPERATIONAL_CURRENT"
         )
         return response
 
