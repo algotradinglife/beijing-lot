@@ -18,6 +18,7 @@ pyarrow==24.0.0   # parquet cache for sp_drift research panel
 weasyprint==69.0  # BJ-FREEZE-REVIEW-001 deterministic HTML-to-PDF rendering
 pypdf==6.14.2     # BJ-FREEZE-REVIEW-001 PDF binding/page verification
 fonttools==4.63.0 # BJ-FREEZE-REVIEW-001 tracked CJK subset/coverage verification
+cryptography==49.0.0 # BJ-ADHOC-FORMAL-BINDING-001 Ed25519 publication attestation
 
 # --- optional: only needed for specific tasks (lazy-imported) ---
 # camoufox       # src/live_collector/soccerway.py — JS-rendered Soccerway scraping
