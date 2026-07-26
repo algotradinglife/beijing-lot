@@ -10,8 +10,8 @@ make a ticket recommendation.
 
 The audit first froze a metadata-only inventory before opening any source
 coverage, schema, workbook cell, CSV row, or capture manifest payload. The
-accepted G0 inventory contains 2,627 logical assets and is bound to
-`b2ee73f63b346eff5d73fcf5d3b564824df452857fa69a5b137541ce1df32896`.
+accepted G0 inventory contains 2,644 logical assets and is bound to
+`8db2bbeab282ce1ab120bc5a2d7151ba5de42e88efeb872b14f1dd56b88308b0`.
 
 The public inventory contains logical IDs, repository-relative locators,
 filenames, byte counts and SHA-256 values only. It does not contain local
@@ -23,16 +23,16 @@ At the audit boundary the inventory contained:
 
 | Candidate class | Count |
 | --- | ---: |
-| immutable forward-capture bundles | 2,111 |
-| research-artifact bundles | 302 |
+| immutable forward-capture bundles | 2,112 |
+| research-artifact bundles | 304 |
 | freeze bundles | 1 |
 | SQLite databases | 17 |
-| SQLite sidecars | 8 |
+| SQLite sidecars | 22 |
 | CSV/Parquet-like tabular exports | 53 |
 | JSON artifacts | 65 (one sensitive configuration excluded) |
 | workbooks | 39 repository workbooks + 1 runtime-supplied vendor workbook |
 
-All 2,414 immutable bundles selected from the G0 inventory passed exact
+All 2,417 immutable bundles selected from the G0 inventory passed exact
 `SHA256SUMS` coverage and content verification in the read-only audit.
 
 ## Source-change boundary
@@ -41,7 +41,7 @@ The live collector continued writing while this audit ran. Six frozen logical
 assets—the live and 500-BJDC database files plus their WAL/SHM sidecars—changed
 after G0. They are explicitly marked `SOURCE_DRIFT_FAIL_CLOSED` in the
 evidence package and contribute no schema, coverage, price, or outcome evidence
-to this release. Sixteen later-discovered assets are likewise excluded rather
+to this release. Four later-discovered assets are likewise excluded rather
 than retroactively added to G0.
 
 This is an evidence boundary, not a data-loss claim. A future integration or
