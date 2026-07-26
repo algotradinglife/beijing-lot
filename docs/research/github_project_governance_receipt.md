@@ -1,6 +1,6 @@
 # BJ-PROJECT-CONTROL-001 verification receipt
 
-Validation timestamp: `2026-07-26T05:39:43Z`
+Validation timestamp: `2026-07-26T05:47:09Z`
 
 This receipt contains only GitHub planning metadata. It contains no token,
 credential, local path, environment dump, private service URL, or sensitive
@@ -90,7 +90,8 @@ No routing label description, color, or name was changed.
 | #20 `BJ-BET-FREEZE-001` | BJ Prediction & Betting | Done | Engineer | P0 | EV+PI | `domain/portfolio`, `domain/freeze-execution`, `type/capability` | Its primary deliverable is exact-N and budget betting alternatives plus their immutable freeze. |
 | #35 `SCORE-HCAP-HIST-001` | BJ Prediction & Betting | Ready | Strategist | P1 | EV+PI | `domain/football-modeling`, `type/research` | Its executable contract is a historical score-distribution model comparison. |
 | #37 `SCORE-PRICE-HIST-AUDIT-001` | BJ Data Platform | Ready | Strategist | P1 | EV+PI | `domain/data-provenance`, `type/audit` | Its primary deliverable is existence, lineage, timestamp, and eligibility classification for a historical data asset. |
-| #38 `BJ-PROJECT-CONTROL-001` | BJ Product & Operations | In Progress | Engineer | P1 | EV+PI | `domain/operations`, `domain/research-os`, `type/capability` | Its primary deliverable is the GitHub/Research OS planning control plane. |
+| #38 `BJ-PROJECT-CONTROL-001` | BJ Product & Operations | Review | Engineer | P1 | EV+PI | `domain/operations`, `domain/research-os`, `type/capability` | Its primary deliverable is the GitHub/Research OS planning control plane. |
+| #40 `HIST-DATA-CENSUS-001` | BJ Data Platform | Waiting | Strategist | P1 | EV+PI | `domain/data-provenance`, `type/audit` | Its contract explicitly assigns the Data Platform and blocks dispatch on #37 acceptance, so it remains a non-ready waiting item. |
 
 Every open Issue is mapped exactly once. There are no unmapped or ambiguous
 open Issues at this validation timestamp.
@@ -109,7 +110,7 @@ Closed historical Issues were not mass-migrated.
 
 ## Milestone, routing, and Research OS invariants
 
-- The five open Issues and three completed anchors have no Milestone changes.
+- The six open Issues and three completed anchors have no Milestone changes.
 - `owner/*` and `state/*` labels remain the Hermes dispatch source of truth.
 - Project Status is a human planning field and does not mutate routing labels.
 - `.research/graph.yaml`, `.research/tasks/`, and
