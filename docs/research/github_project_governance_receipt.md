@@ -1,6 +1,6 @@
 # BJ-PROJECT-CONTROL-001 verification receipt
 
-Validation timestamp: `2026-07-26T07:18:06Z`
+Validation timestamp: `2026-07-26T07:24:40Z`
 
 This receipt contains only GitHub planning metadata. It contains no token,
 credential, local path, environment dump, private service URL, or sensitive
@@ -88,7 +88,7 @@ No routing label description, color, or name was changed.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | #17 `BJ-MM-FREEZE-001` | BJ Data Platform | In Progress | Engineer | P0 | EV+PI | `domain/data-collection`, `domain/data-provenance`, `domain/freeze-execution`, `type/capability` | Its primary deliverable is a strict collector/input-freeze and provenance capability; its prospective ledger audit is complete but its exact-HEAD evidence PR remains queued for EV/PI acceptance. |
 | #20 `BJ-BET-FREEZE-001` | BJ Prediction & Betting | In Progress | Engineer | P0 | EV+PI | `domain/portfolio`, `domain/freeze-execution`, `type/capability` | Its primary deliverable is exact-N and budget betting alternatives plus their immutable freeze; its missed-checkpoint receipt is complete but its exact-HEAD evidence PR remains queued for EV/PI acceptance. |
-| #35 `SCORE-HCAP-HIST-001` | BJ Prediction & Betting | In Progress | Strategist | P1 | EV+PI | `domain/football-modeling`, `type/research` | PI accepted the R7 research interpretation, but exact-HEAD EV requested byte-reproducibility corrections and a fresh validation cycle. |
+| #35 `SCORE-HCAP-HIST-001` | BJ Prediction & Betting | Waiting | Strategist | P1 | EV+PI | `domain/football-modeling`, `type/research` | PI accepted the R7 research interpretation, but exact-HEAD EV requested byte-reproducibility corrections; PI paused that revision until #37 / PR #39 reaches disposition. |
 | #37 `SCORE-PRICE-HIST-AUDIT-001` | BJ Data Platform | In Progress | Strategist | P1 | EV+PI | `domain/data-provenance`, `type/audit` | The private read-only source handoff is ready and PI directed Strategist to regenerate append-only R5 evidence and obtain fresh exact-HEAD EV. |
 | #38 `BJ-PROJECT-CONTROL-001` | BJ Product & Operations | Review | Engineer | P1 | EV+PI | `domain/operations`, `domain/research-os`, `type/capability` | Its primary deliverable is the GitHub/Research OS planning control plane. |
 | #40 `HIST-DATA-CENSUS-001` | BJ Data Platform | Waiting | Strategist | P1 | EV+PI | `domain/data-provenance`, `type/audit` | Its contract explicitly assigns the Data Platform and blocks dispatch on #37 acceptance, so it remains a non-ready waiting item. |
@@ -97,10 +97,12 @@ Every open Issue is mapped exactly once. There are no unmapped or ambiguous
 open Issues at this validation timestamp.
 
 These lifecycle values follow the latest explicit evidence rather than merged
-implementation state. In particular, the PI `HANDOFF READY` action for #37 at
+implementation state. The PI `HANDOFF READY` action for #37 at
 `2026-07-26T07:15:50Z` supersedes its earlier access-wait state and places the
-corrective R5 cycle in progress. Project Status does not itself add or remove
-the retained routing labels.
+corrective R5 cycle in progress. The later PI scheduling decision at
+`2026-07-26T07:19:31Z` places #35 in `Waiting` until #37 / PR #39 reaches PI
+disposition; its stale `state/ready` dispatch label was removed. Project Status
+does not otherwise add or remove routing labels.
 
 ## Completed foundation anchors
 
