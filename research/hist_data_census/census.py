@@ -134,6 +134,7 @@ TARGET_MARKETS = {
     "p42": {"play_id": "42", "market": "correct_score", "expected_outcomes": 25},
     "p51": {"play_id": "51", "market": "half_full", "expected_outcomes": 9},
 }
+HISTORICAL_XLSM_SQLITE_ASSET_SUFFIX = "derived-beidan-xlsm-beidan-xlsm-sqlite"
 
 # These tables are explicitly profiled.  Large modelling tables remain in the
 # schema dictionary, but their unindexed row-wide aggregation is deliberately
@@ -256,13 +257,13 @@ def _field_assessment(reference: SourceReference, table_name: str, field_name: s
         eligible = "false"
         grade = "TERMINAL_OR_POST_EVENT"
         note = "terminal or result-derived value is excluded from every pre-match feature view"
-    elif reference.asset_id.endswith("derived-beidan-xlsm-beidan-xlsm-sqlite") and table == "exotic_odds" and field == "odds":
+    elif reference.asset_id.endswith(HISTORICAL_XLSM_SQLITE_ASSET_SUFFIX) and table == "exotic_odds" and field == "odds":
         admissible = "historical_proxy;descriptive_only"
         decision = "INTEGRATE_PROXY"
         destination = "historical_exploratory_v1"
         eligible = "false"
         grade = "UNVERIFIED_TIME_BY_MARKET"
-        note = "market-specific override is required: SCORE-PRICE-HIST-AUDIT-001 prohibits the correct-score subset; other rows remain proxy-only until time binding is proved"
+        note = "market-specific overrides govern this field: the historical 4-way p40 and 26-way p42 subsets are prohibited; other rows remain proxy-only until time binding is proved"
     elif role == "price_or_probability":
         admissible = "historical_proxy;descriptive_only"
         decision = "INTEGRATE_PROXY"
@@ -1124,6 +1125,16 @@ def _safe_manifest_stat(payload: Mapping[str, Any], key: str) -> int:
     return int(value) if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
 
 
+def _manifest_clock_present(payload: Mapping[str, Any], keys: Sequence[str]) -> bool:
+    """Require an actual non-empty clock value, not merely a manifest key."""
+
+    for key in keys:
+        value = payload.get(key)
+        if value is not None and not isinstance(value, bool) and str(value).strip():
+            return True
+    return False
+
+
 def _audit_bundle(reference: SourceReference) -> dict[str, Any]:
     if reference.path is None:
         raise CensusError("bundle inventory row lacks a safe source locator")
@@ -1152,8 +1163,10 @@ def _audit_bundle(reference: SourceReference) -> dict[str, Any]:
     status = manifest.get("status")
     normalized_status = str(status).casefold() if isinstance(status, str) and str(status).casefold() in SAFE_STATUS_VALUES else "UNKNOWN"
     key_hash = sha256_bytes(canonical_bytes(sorted(str(key) for key in manifest))) if manifest else ""
-    capture_clock_present = any(key in manifest for key in ("fetched_at_utc", "created_at_utc", "capture_batch_id"))
-    source_clock_present = any(key in manifest for key in ("source_updated_at_hkt", "source_updatetime"))
+    capture_clock_present = _manifest_clock_present(manifest, ("fetched_at_utc", "created_at_utc"))
+    source_clock_present = _manifest_clock_present(
+        manifest, ("source_updated_at_hkt", "source_updatetime")
+    )
     strict_rows = counter["complete_forward_open_rows"]
     incomplete = (
         counter["incomplete_match_indices"] + counter["failed_or_missing_pages"] + counter["failed_pages"]
@@ -1177,7 +1190,10 @@ def _audit_bundle(reference: SourceReference) -> dict[str, Any]:
         "terminal_rows": counter["terminal_rows"],
         "incomplete_rows": incomplete,
         "manifest_key_sha256": key_hash,
-        "bundle_note": f"manifest status class={normalized_status}; raw URLs/payloads/timestamps are not published",
+        "bundle_note": (
+            f"manifest status class={normalized_status}; declared strict rows require checksum plus non-empty "
+            "source/capture clocks before any strict promotion; raw URLs/payloads/timestamps are not published"
+        ),
     }
     return row
 
@@ -1268,14 +1284,65 @@ def _p42_override(reference: SourceReference) -> tuple[dict[str, Any], dict[str,
     )
 
 
+def _p40_schema_incompatibility_override(
+    reference: SourceReference,
+    *,
+    observed_outcome_count: int,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Fail closed on the historical four-way total-goals price schema.
+
+    The generic ``odds`` field is shared across historical markets.  Its
+    field-level proxy classification cannot establish that this source's
+    four-way outcome partition maps to Beijing p40's current eight-way
+    contract.  A market-specific prohibition therefore takes precedence until
+    a separately scoped mapping and provenance audit says otherwise.
+    """
+
+    expected_outcome_count = TARGET_MARKETS["p40"]["expected_outcomes"]
+    reason = (
+        "HIST-DATA-CENSUS-001 observed a historical "
+        f"{observed_outcome_count}-way total-goals schema, while the declared current Beijing p40 contract has "
+        f"{expected_outcome_count} outcomes; no explicit outcome mapping or market/time provenance binds the "
+        "historical price vector to current p40, so price proxy and integration are prohibited"
+    )
+    base = _asset_base(reference)
+    return (
+        {
+            "scope_level": "field_market",
+            **base,
+            "table_name": "exotic_odds",
+            "field_name": "odds",
+            "market": "total_goals",
+            "admissible_use": "prohibited",
+            "strict_conditions": "none; a separately scoped positive p40 outcome-mapping, market-identity and price-time provenance audit is required",
+            "provenance_grade": "HISTORICAL_P40_SCHEMA_INCOMPATIBLE",
+            "classification_reason": reason,
+        },
+        {
+            "scope_level": "field_market",
+            **base,
+            "table_name": "exotic_odds",
+            "field_name": "odds",
+            "market": "total_goals",
+            "integration_decision": "PROHIBITED",
+            "destination_layer": "none",
+            "lineage_fields": "match_id;market;outcome;source asset sha256",
+            "required_transforms": "none; retain raw evidence only",
+            "deduplication_key": "match_id;market;outcome",
+            "timestamp_grade": "HISTORICAL_P40_SCHEMA_INCOMPATIBLE",
+            "limitations": reason,
+        },
+    )
+
+
 def _view_rows() -> list[dict[str, str]]:
     return [
         {
             "view_name": "strict_asof_v1",
-            "input_provenance_requirement": "immutable or append-only row with source/capture clock, pre-cutoff relation, sale/open eligibility and exact checksum lineage",
+            "input_provenance_requirement": "immutable or append-only row with non-empty source and capture clocks, pre-cutoff relation, sale/open eligibility and exact checksum lineage",
             "terminal_value_rule": "exclude outcome, final, winning and settlement fields",
             "allowed_asset_classes": "only individually verified strict rows; no historical proxy substitution",
-            "row_level_guard": "capture_time < declared_cutoff AND sale_state=open AND integrity=PASS",
+            "row_level_guard": "source_time present AND capture_time < declared_cutoff AND sale_state=open AND integrity=PASS",
             "status": "DESIGNED_NOT_PRODUCTIONIZED",
         },
         {
@@ -1334,7 +1401,7 @@ def _readiness_rows(context: Mapping[str, Counter[str]]) -> list[dict[str, Any]]
         elif key == "p40":
             values = ("true", "historical_proxy", "conditional_strict_forward" if strict else "false", "conditional_strict_forward" if strict else "historical_proxy", "true", "false",
                       f"immutable p40 forward-complete-open rows={strict}; broader historical labels/context", "forward capture issues plus historical proxy context",
-                      "strict use remains row-level and does not include terminal/backfill rows", "HIST-DATA-INTEGRATION-001")
+                      "historical 4-way total-goals price is PROHIBITED pending mapping/market/time proof; strict use remains row-level and excludes terminal/backfill rows", "HIST-DATA-INTEGRATION-001")
         elif key == "p41":
             values = ("true", "historical_proxy", "false", "historical_proxy", "true", "false",
                       "settlement-derived labels/context; p41 capture rows are unclassified", "historical proxy context; no qualified p41 price panel",
@@ -1374,7 +1441,8 @@ def _strict_context_from_verified_bundle_rows(
     Readiness is therefore intentionally calculated after drifted bundle rows
     have been removed, rather than from counters accumulated while opening
     sources.  A declared manifest count is never strict evidence by itself:
-    checksum integrity and a capture clock are both required first.
+    checksum integrity and non-empty source and capture clocks are all
+    required first.
     """
 
     key_by_market = {definition["market"]: key for key, definition in TARGET_MARKETS.items()}
@@ -1383,15 +1451,26 @@ def _strict_context_from_verified_bundle_rows(
         market = key_by_market.get(str(row.get("market", "")))
         if market is None:
             continue
-        if str(row.get("checksum_status", "")) != "PASS" or str(row.get("capture_clock_present", "")) != "true":
-            continue
-        try:
-            strict_rows = int(row.get("strict_candidate_rows", 0) or 0)
-        except (TypeError, ValueError):
-            continue
-        if strict_rows > 0:
+        strict_rows = _strict_bundle_candidate_rows(row)
+        if strict_rows:
             context[market]["strict_forward_rows"] += strict_rows
     return context
+
+
+def _strict_bundle_candidate_rows(row: Mapping[str, Any]) -> int:
+    """Return declared strict rows only when every bundle-level prerequisite holds."""
+
+    if (
+        str(row.get("checksum_status", "")) != "PASS"
+        or str(row.get("capture_clock_present", "")) != "true"
+        or str(row.get("source_clock_present", "")) != "true"
+    ):
+        return 0
+    try:
+        strict_rows = int(row.get("strict_candidate_rows", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+    return strict_rows if strict_rows > 0 else 0
 
 
 def _inventory_reference(package: Path) -> dict[str, str]:
@@ -1563,7 +1642,7 @@ def audit_frozen_inventory(
             initial_bundle_integrity[reference.asset_id] = str(row["checksum_status"])
             market = next((key for key, item in TARGET_MARKETS.items() if item["market"] == row["market"]), "")
             if market:
-                if row["checksum_status"] == "PASS" and row["capture_clock_present"] == "true" and int(row["strict_candidate_rows"] or 0) > 0:
+                if _strict_bundle_candidate_rows(row):
                     output["admissible_use_matrix.csv"].append({
                         "scope_level": "bundle_subset",
                         **_asset_base(reference),
@@ -1571,7 +1650,7 @@ def audit_frozen_inventory(
                         "field_name": "",
                         "market": row["market"],
                         "admissible_use": "strict_replay",
-                        "strict_conditions": "checksum=PASS; complete_forward_open_rows>0; source/capture clock retained; row-level sale/cutoff verification still required",
+                        "strict_conditions": "checksum=PASS; complete_forward_open_rows>0; non-empty source clock; non-empty capture clock; row-level sale/cutoff verification still required",
                         "provenance_grade": "IMMUTABLE_FORWARD_CAPTURE_CONDITIONAL",
                         "classification_reason": "only the declared forward-complete-open subset is eligible; terminal/backfill rows remain excluded",
                     })
@@ -1584,7 +1663,7 @@ def audit_frozen_inventory(
                         "integration_decision": "INTEGRATE_STRICT",
                         "destination_layer": "strict_asof_v1",
                         "lineage_fields": "bundle logical ID; SHA256SUMS identity; issue; playid; capture batch",
-                        "required_transforms": "filter forward_complete_open; retain capture/source clocks and sale state; block terminal/backfill rows",
+                        "required_transforms": "filter forward_complete_open; retain non-empty capture/source clocks and sale state; block terminal/backfill rows",
                         "deduplication_key": "issue;match_id;market;outcome;capture_batch",
                         "timestamp_grade": "IMMUTABLE_FORWARD_CAPTURE_CONDITIONAL",
                         "limitations": "not a blanket family-level promotion; row-level cutoff and sale eligibility remain mandatory",
@@ -1593,7 +1672,7 @@ def audit_frozen_inventory(
     # The #37 finding is a fixed external dependency and must override any
     # generic field-name heuristic in this broader audit.
     for reference in references:
-        if reference.asset_id not in drifted_before and reference.asset_id.endswith("derived-beidan-xlsm-beidan-xlsm-sqlite"):
+        if reference.asset_id not in drifted_before and reference.asset_id.endswith(HISTORICAL_XLSM_SQLITE_ASSET_SUFFIX):
             admissible, integration = _p42_override(reference)
             output["admissible_use_matrix.csv"].append(admissible)
             output["integration_decisions.csv"].append(integration)
@@ -1608,6 +1687,35 @@ def audit_frozen_inventory(
                 "schema_status": "SCORE_PRICE_HIST_AUDIT_001_ACCEPTED_OVERRIDE",
                 "schema_note": "presence does not establish provider, Beijing p42 market identity, or row-level observation time; no replay/proxy price use is authorized",
             })
+            historical_p40_outcomes = {
+                str(row["outcome_value"])
+                for row in output["market_outcome_schemas.csv"]
+                if row.get("logical_asset_id") == reference.asset_id
+                and row.get("table_name") == "exotic_odds"
+                and row.get("market") == "total_goals"
+            }
+            expected_p40_outcomes = TARGET_MARKETS["p40"]["expected_outcomes"]
+            if historical_p40_outcomes and len(historical_p40_outcomes) != expected_p40_outcomes:
+                admissible, integration = _p40_schema_incompatibility_override(
+                    reference,
+                    observed_outcome_count=len(historical_p40_outcomes),
+                )
+                output["admissible_use_matrix.csv"].append(admissible)
+                output["integration_decisions.csv"].append(integration)
+                output["market_outcome_schemas.csv"].append({
+                    **_asset_base(reference),
+                    "table_name": "exotic_odds",
+                    "market": "total_goals",
+                    "outcome_field": "outcome",
+                    "outcome_value": (
+                        f"HISTORICAL_{len(historical_p40_outcomes)}_WAY_NOT_MECHANICALLY_CURRENT_P40_"
+                        f"{expected_p40_outcomes}_WAY"
+                    ),
+                    "row_count": "",
+                    "distinct_match_count": "",
+                    "schema_status": "HISTORICAL_P40_SCHEMA_INCOMPATIBLE_OVERRIDE",
+                    "schema_note": "historical total-goals price proxy/integration is prohibited pending an explicit outcome mapping plus market/time provenance audit",
+                })
             break
 
     # A second identity check removes all structural evidence for any source

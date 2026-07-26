@@ -55,7 +55,7 @@ issues. Its `exotic_odds` table has 7,615,491 rows:
 
 | Historical market label | Rows | Observed outcome labels | Admissible boundary |
 | --- | ---: | ---: | --- |
-| total goals | 781,076 | 4 | `historical_proxy; descriptive_only` until price-time binding is established |
+| total goals | 781,076 | 4 | historical `odds` is `PROHIBITED`: the 4-way partition is not mechanically current 8-way p40, and mapping/market/time provenance is unproved; non-price labels/context remain separately classified |
 | half/full | 1,757,421 | 9 | `historical_proxy; descriptive_only` until price-time binding is established |
 | score | 5,076,994 | 26 | special prohibition below |
 
@@ -86,6 +86,18 @@ timestamp_grade = UNVERIFIED_MARKET_AND_TIME
 It is not a historical Beijing p42 pre-match SP panel and cannot be used for
 strict replay, proxy price comparison, score-model evaluation, or ROI research.
 
+### Total-goals schema compatibility: explicit p40 prohibition
+
+The same historical `exotic_odds` source contains a four-outcome
+`total_goals` price partition, while the declared current Beijing p40 contract
+has eight outcomes. A matching market name does not establish an outcome
+mapping, Beijing market identity, or row-level price-time binding. Its
+`odds` field is therefore frozen as `prohibited` / `PROHIBITED` at the
+`field_market` level for `total_goals`. This is a price-vector boundary only:
+historical labels and non-price context retain their separately disclosed
+proxy or label classifications. A future positive p40 mapping plus
+market/time-provenance audit is required before any historical p40 price use.
+
 ## Forward immutable subset
 
 The audit found checksum-valid immutable capture bundles with declared
@@ -93,8 +105,8 @@ The audit found checksum-valid immutable capture bundles with declared
 
 | Play | Market | Rows | Classification |
 | ---: | --- | ---: | --- |
-| 40 | total goals | exact released `bundle_integrity.csv` count | `conditional_strict_forward` only after row-level source/capture time, sale/open and cutoff checks |
-| 42 | correct score | exact released `bundle_integrity.csv` count | `conditional_strict_forward` only after the same row-level checks |
+| 40 | total goals | exact released `bundle_integrity.csv` count | `conditional_strict_forward` only after non-empty source **and** capture clocks plus row-level sale/open and cutoff checks |
+| 42 | correct score | exact released `bundle_integrity.csv` count | `conditional_strict_forward` only after the same source/capture-clock and row-level checks |
 | 41 | upper/lower odd/even | 0 qualified | no strict price subset; capture rows remain unclassified |
 | 51 | half/full | 0 qualified | no strict price subset; capture rows remain unclassified |
 
@@ -120,17 +132,18 @@ well, that a price is tradable, or that the play is profitable.
 
 | Asset/table class | Decision | Destination | Required guard |
 | --- | --- | --- | --- |
-| immutable p40/p42 forward-complete-open bundle subset | `INTEGRATE_STRICT` | `strict_asof_v1` | exact bundle integrity, row-level capture/cutoff/sale proof; exclude terminal/backfill rows |
+| immutable p40/p42 forward-complete-open bundle subset | `INTEGRATE_STRICT` | `strict_asof_v1` | exact bundle integrity, non-empty source and capture clocks, row-level capture/cutoff/sale proof; exclude terminal/backfill rows |
 | XLSM named snapshots, rankings, context and raw historical 3-way exports | `INTEGRATE_PROXY` | `historical_exploratory_v1` | preserve source hash/time grade; do not call as-of |
 | scores, result codes, final/winning SP and settlement state | `SETTLEMENT_ONLY` | `settlement_truth_v1` | terminal guard; never export as a feature or pre-match price |
 | historical XLSM correct-score price vector | `PROHIBITED` | none | #37 provider/market/time failure and 26-vs-25 schema mismatch |
+| historical XLSM total-goals price vector | `PROHIBITED` | none | 4-way historical schema is not mechanically current 8-way p40; mapping/market/time provenance unproved |
 | raw workbooks / unknown auxiliary artifacts | `KEEP_RAW_ONLY` | raw provenance | future source-specific contract required |
 | G0-drifting live DB assets | `PROHIBITED` in this freeze | none | take a new immutable snapshot before inspection |
 
 ## Designed research views (not productionized)
 
-1. `strict_asof_v1`: immutable/append-only evidence with capture and cutoff
-   proof, open sale state and no terminal inputs.
+1. `strict_asof_v1`: immutable/append-only evidence with non-empty source and
+   capture clocks, cutoff proof, open sale state and no terminal inputs.
 2. `historical_exploratory_v1`: row-level proxy grades retained; terminal fields
    removed before any feature projection.
 3. `settlement_truth_v1`: result, special-state and payout truth only; it cannot
@@ -148,9 +161,10 @@ The later Engineer-owned integration Issue should:
 3. materialize the three views above with an enforced terminal-field denylist;
 4. use explicit, source-specific deduplication keys rather than team-name or
    row-adjacency inference;
-5. ingest only the p40/p42 `forward_complete_open` subset into strict staging;
-6. keep historical XLSM context in proxy staging and retain correct-score price
-   odds raw-only/prohibited; and
+5. ingest only the p40/p42 `forward_complete_open` subset with non-empty
+   source and capture clocks into strict staging;
+6. keep historical XLSM context in proxy staging and retain correct-score and
+   four-way total-goals price odds raw-only/prohibited; and
 7. create an immutable snapshot workflow for continuously changing live SQLite
    databases before any later frozen audit or replay.
 

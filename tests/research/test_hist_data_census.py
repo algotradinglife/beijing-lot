@@ -202,6 +202,10 @@ def census_fixture(tmp_path: Path) -> Path:
             [("1:0",), ("2:1",)],
         )
         connection.executemany(
+            "INSERT INTO exotic_odds VALUES (1, 'total_goals', ?, 2.5)",
+            [("0~1",), ("2~3",), ("4~6",), ("7+",)],
+        )
+        connection.executemany(
             "INSERT INTO live_market_sp_snapshots VALUES ('26076', 40, 'total_goals', 'm1', ?, 2.5, '2026-07-25T01:00:00Z', 'terminal_backfill_exploratory_only', 'open')",
             [("0~1",), ("2~3",)],
         )
@@ -274,6 +278,30 @@ def test_full_census_requires_frozen_inventory_and_keeps_terminal_values_out(tmp
         row["market"] == "correct_score" and row["admissible_use"] == "prohibited"
         for row in artifacts["admissible_use_matrix.csv"]
     )
+    p40_override = next(
+        row for row in artifacts["admissible_use_matrix.csv"]
+        if row["scope_level"] == "field_market"
+        and row["table_name"] == "exotic_odds"
+        and row["field_name"] == "odds"
+        and row["market"] == "total_goals"
+    )
+    assert p40_override["admissible_use"] == "prohibited"
+    assert p40_override["provenance_grade"] == "HISTORICAL_P40_SCHEMA_INCOMPATIBLE"
+    assert any(
+        row["market"] == "total_goals"
+        and row["schema_status"] == "HISTORICAL_P40_SCHEMA_INCOMPATIBLE_OVERRIDE"
+        and row["outcome_value"] == "HISTORICAL_4_WAY_NOT_MECHANICALLY_CURRENT_P40_8_WAY"
+        for row in artifacts["market_outcome_schemas.csv"]
+    )
+    p40_integration = next(
+        row for row in artifacts["integration_decisions.csv"]
+        if row["scope_level"] == "field_market"
+        and row["table_name"] == "exotic_odds"
+        and row["field_name"] == "odds"
+        and row["market"] == "total_goals"
+    )
+    assert p40_integration["integration_decision"] == "PROHIBITED"
+    assert p40_integration["destination_layer"] == "none"
     p40 = next(row for row in artifacts["model_readiness_matrix.csv"] if row["play_id"] == "40")
     assert p40["price_ready"] == "conditional_strict_forward"
     assert "forward-complete-open rows=2" in p40["sample_scope"]
@@ -406,6 +434,84 @@ def test_readiness_requires_a_numeric_strict_candidate_count(tmp_path: Path) -> 
     integrity = next(row for row in artifacts["bundle_integrity.csv"] if row["market"] == "total_goals")
     assert integrity["checksum_status"] == "PASS"
     assert integrity["strict_candidate_rows"] == 0
+    p40 = next(row for row in artifacts["model_readiness_matrix.csv"] if row["play_id"] == "40")
+    assert p40["price_ready"] == "false"
+
+
+def test_strict_promotion_requires_nonempty_source_and_capture_clocks(tmp_path: Path) -> None:
+    source_root = census_fixture(tmp_path)
+    bundle = source_root / "results" / "data_collection" / "multimarket_sp_capture_v1" / "26076" / "batch-a"
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    manifest["source_updated_at_hkt"] = ""
+    (bundle / "manifest.json").write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+    write_sha256sums(bundle)
+    inventory = build_source_inventory(repository_root=source_root)
+    inventory_paths = write_inventory_artifacts(tmp_path / "inventory-output", inventory, git_commit=COMMIT)
+    inventory_package = tmp_path / "freeze" / "inventory"
+    create_inventory_package(
+        inventory_paths,
+        output_dir=inventory_package,
+        git_commit=COMMIT,
+        frozen_at_utc="2026-07-26T00:00:00+00:00",
+    )
+
+    artifacts = audit_frozen_inventory(
+        inventory_package=inventory_package,
+        repository_root=source_root,
+        runtime_inputs=[],
+        git_commit=COMMIT,
+    )
+
+    integrity = next(row for row in artifacts["bundle_integrity.csv"] if row["market"] == "total_goals")
+    assert integrity["checksum_status"] == "PASS"
+    assert integrity["capture_clock_present"] == "true"
+    assert integrity["source_clock_present"] == "false"
+    assert integrity["strict_candidate_rows"] == 2
+    assert not any(
+        row["scope_level"] == "bundle_subset" and row["admissible_use"] == "strict_replay"
+        for row in artifacts["admissible_use_matrix.csv"]
+    )
+    assert not any(
+        row["scope_level"] == "bundle_subset" and row["integration_decision"] == "INTEGRATE_STRICT"
+        for row in artifacts["integration_decisions.csv"]
+    )
+    p40 = next(row for row in artifacts["model_readiness_matrix.csv"] if row["play_id"] == "40")
+    assert p40["price_ready"] == "false"
+    assert "forward-complete-open rows=0" in p40["sample_scope"]
+
+
+def test_strict_promotion_does_not_treat_a_batch_identifier_as_a_capture_clock(tmp_path: Path) -> None:
+    source_root = census_fixture(tmp_path)
+    bundle = source_root / "results" / "data_collection" / "multimarket_sp_capture_v1" / "26076" / "batch-a"
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    manifest.pop("fetched_at_utc")
+    manifest["capture_batch_id"] = "batch-only-is-not-a-clock"
+    (bundle / "manifest.json").write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+    write_sha256sums(bundle)
+    inventory = build_source_inventory(repository_root=source_root)
+    inventory_paths = write_inventory_artifacts(tmp_path / "inventory-output", inventory, git_commit=COMMIT)
+    inventory_package = tmp_path / "freeze" / "inventory"
+    create_inventory_package(
+        inventory_paths,
+        output_dir=inventory_package,
+        git_commit=COMMIT,
+        frozen_at_utc="2026-07-26T00:00:00+00:00",
+    )
+
+    artifacts = audit_frozen_inventory(
+        inventory_package=inventory_package,
+        repository_root=source_root,
+        runtime_inputs=[],
+        git_commit=COMMIT,
+    )
+
+    integrity = next(row for row in artifacts["bundle_integrity.csv"] if row["market"] == "total_goals")
+    assert integrity["capture_clock_present"] == "false"
+    assert integrity["source_clock_present"] == "true"
+    assert not any(
+        row["scope_level"] == "bundle_subset" and row["admissible_use"] == "strict_replay"
+        for row in artifacts["admissible_use_matrix.csv"]
+    )
     p40 = next(row for row in artifacts["model_readiness_matrix.csv"] if row["play_id"] == "40")
     assert p40["price_ready"] == "false"
 
