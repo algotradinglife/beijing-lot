@@ -21,7 +21,53 @@ Portfolio Decision
 Forward Validation
 ```
 
+## Integrated planning control plane
+
+The historical Phase 0–5 record below remains the narrative research history.
+GitHub planning uses a complementary cross-Project maturity roadmap:
+
+| Layer | Responsibility |
+| --- | --- |
+| Project | The one durable functional home of an Issue |
+| Milestone | The one PI-owned cross-Project maturity stage advanced by an Issue |
+| Labels | Domain, work type, owner, and dispatch state |
+| Research OS | Scientific and evidence dependencies |
+
+The three Projects are:
+
+- **BJ Data Platform** — sources, provenance, immutable datasets, freezes, and
+  settlement truth;
+- **BJ Prediction & Betting** — probability, models, decision chains,
+  portfolios, and paper-only betting research;
+- **BJ Product & Operations** — product workflows, runtime operations,
+  observability, reliability, and the Research OS control plane.
+
+The integrated maturity stages are:
+
+| Milestone | Lifecycle | Stage question or goal |
+| --- | --- | --- |
+| M0 — Controlled Research Foundation | Completed | Is the auditable control plane needed to conduct research in place? |
+| M1 — Research Data Readiness | Active | Which historical and forward assets support which claims under which provenance, time, and quality boundaries? |
+| M2 — Probability and Model Evidence | Planned | Do market information and timestamp-safe football context add calibrated, reproducible probability information? |
+| M3 — Decision and Portfolio Paper Evaluation | Planned | Do decision-chain and portfolio layers add separately measurable paper-only value? |
+| M4 — Forward Operational Validation | Planned | Can frozen candidates operate prospectively and repeatedly under real collection, timing, and settlement conditions? |
+| M5 — Release Readiness and Continuous Research | Planned | Has any candidate earned a separate controlled release review? |
+
+Only PI may define, activate, close, rename, or change the lifecycle of a
+Milestone. `Active` does not make every Issue in a stage executable, and
+`Planned` is not dispatch or release authority. Each Issue still requires its
+own contract and routing state. No Milestone authorizes execution, frontend
+selectability, ROI claims, or automatic promotion to a later stage.
+
+See
+[`github_milestone_governance.md`](github_milestone_governance.md)
+for the operating contract and
+[`github_milestone_governance_receipt.md`](github_milestone_governance_receipt.md)
+for the initial live mapping.
+
 ---
+
+## Historical Phase 0–5 record
 
 # Phase 0: Research Infrastructure (Completed)
 
