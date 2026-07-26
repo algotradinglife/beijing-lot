@@ -844,7 +844,7 @@ def _audit_sqlite(reference: SourceReference) -> tuple[dict[str, list[dict[str, 
                             ):
                                 label = str(entry["value"] or "UNKNOWN")
                                 if label == "forward_complete_open":
-                                    contexts[market]["strict_forward_rows"] += int(entry["count"])
+                                    contexts[market]["database_forward_candidate_rows"] += int(entry["count"])
                                 elif "terminal" in label or "post_cutoff" in label:
                                     contexts[market]["terminal_or_postcutoff_rows"] += int(entry["count"])
                                 else:

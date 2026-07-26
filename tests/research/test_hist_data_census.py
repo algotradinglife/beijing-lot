@@ -250,6 +250,7 @@ def test_full_census_requires_frozen_inventory_and_keeps_terminal_values_out(tmp
     )
     p40 = next(row for row in artifacts["model_readiness_matrix.csv"] if row["play_id"] == "40")
     assert p40["price_ready"] == "conditional_strict_forward"
+    assert "forward-complete-open rows=2" in p40["sample_scope"]
     assert p40["roi_ready"] == "false"
     rendered = canonical_bytes(artifacts).decode("utf-8")
     assert str(source_root) not in rendered
