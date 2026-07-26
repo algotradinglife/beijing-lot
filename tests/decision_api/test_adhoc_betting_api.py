@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import src.adhoc_betting as adhoc_module
 from src.adhoc_betting import (
     DEFAULT_FONT_FILE,
     HKT,
@@ -305,10 +306,10 @@ def _request_payload(key: str) -> dict[str, object]:
     }
 
 
-def _downgrade_generated_package_to_legacy(
+def _strip_legacy_concentration_fields(
     *, db_path: Path, root: Path, result: dict[str, object]
 ) -> None:
-    """Fixture-only trusted-ledger replay of a still-unexpired v1 package."""
+    """Fixture-only representation of a trusted pre-v2 immutable package."""
 
     package = root / "packages" / ISSUE / str(result["package_id"])
     plan_path = package / "exact_n_plan.json"
@@ -321,7 +322,6 @@ def _downgrade_generated_package_to_legacy(
 
     manifest_path = package / "adhoc_request_manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    manifest["schema_version"] = "adhoc_betting_package_v1"
     manifest.pop("concentration_contract", None)
     manifest.pop("concentration_contract_sha256", None)
     manifest["exact_n_plan_sha256"] = plan["sha256"]
@@ -507,18 +507,37 @@ def test_adhoc_api_expiry_disables_operational_download_but_allows_audit(tmp_pat
 def test_adhoc_api_legacy_v1_is_audit_only_even_before_its_valid_until(
     tmp_path: Path, monkeypatch
 ) -> None:
-    app, db_path, _shadow_dir = _app(tmp_path, monkeypatch)
+    original_make_portfolio = adhoc_module._make_portfolio
+    original_verify_package = adhoc_module.verify_package
+
+    def legacy_make_portfolio(**kwargs):
+        kwargs["concentration_enforced"] = False
+        return original_make_portfolio(**kwargs)
+
+    def pre_upgrade_verify_package(root, **kwargs):
+        return adhoc_module._verify_package(
+            root,
+            _legacy_ledger_binding=adhoc_module._LEGACY_LEDGER_BINDING,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(adhoc_module, "PACKAGE_SCHEMA_VERSION", "adhoc_betting_package_v1")
+    monkeypatch.setattr(adhoc_module, "_make_portfolio", legacy_make_portfolio)
+    monkeypatch.setattr(adhoc_module, "verify_package", pre_upgrade_verify_package)
+    app, _db_path, _shadow_dir = _app(tmp_path, monkeypatch)
     client = app.test_client()
     generated = client.post(
         "/api/adhoc-betting-plans",
         json=_request_payload("api-legacy-v1-request"),
         headers=OPERATOR_HEADERS,
     ).get_json()
-    _downgrade_generated_package_to_legacy(
-        db_path=db_path,
+    _strip_legacy_concentration_fields(
+        db_path=_db_path,
         root=tmp_path / "adhoc",
         result=generated,
     )
+    monkeypatch.setattr(adhoc_module, "PACKAGE_SCHEMA_VERSION", "adhoc_betting_package_v2")
+    monkeypatch.setattr(adhoc_module, "verify_package", original_verify_package)
 
     observed = client.get(f"/api/adhoc-betting-plans/{generated['request_id']}")
     assert observed.status_code == 200
