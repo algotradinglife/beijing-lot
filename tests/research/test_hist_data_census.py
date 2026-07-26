@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -21,6 +23,13 @@ from research.hist_data_census.audit import (  # noqa: E402
     parse_runtime_input,
     verify_inventory_package,
     write_inventory_artifacts,
+)
+from research.hist_data_census.census import (  # noqa: E402
+    REQUIRED_CENSUS_ARTIFACTS,
+    audit_frozen_inventory,
+    create_census_package,
+    verify_census_package,
+    write_census_artifacts,
 )
 
 
@@ -136,3 +145,122 @@ def test_inventory_decision_is_precoverage_only(tmp_path: Path) -> None:
     decision = json.loads((package / "decision" / "inventory_freeze_decision.json").read_text(encoding="utf-8"))
     assert decision["coverage_or_schema_inspected"] is False
     assert decision["next_permitted_phase"] == "READ_ONLY_SCHEMA_AND_COVERAGE_AUDIT_AFTER_INVENTORY_VERIFICATION"
+
+
+def write_sha256sums(bundle: Path) -> None:
+    entries = []
+    for source in sorted(item for item in bundle.rglob("*") if item.is_file() and item.name != "SHA256SUMS"):
+        digest = hashlib.sha256(source.read_bytes()).hexdigest()
+        entries.append(f"{digest}  {source.relative_to(bundle).as_posix()}\n")
+    (bundle / "SHA256SUMS").write_text("".join(entries), encoding="utf-8")
+
+
+def census_fixture(tmp_path: Path) -> Path:
+    source_root = tmp_path / "repository"
+    database = source_root / "data" / "derived" / "beidan_xlsm" / "beidan_xlsm.sqlite"
+    database.parent.mkdir(parents=True)
+    with sqlite3.connect(database) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE matches(
+                match_id INTEGER PRIMARY KEY, issue TEXT, kickoff_ts TEXT,
+                handicap_line REAL, fthg INTEGER, ftag INTEGER, result_code TEXT
+            );
+            CREATE TABLE exotic_odds(match_id INTEGER, market TEXT, outcome TEXT, odds REAL);
+            CREATE TABLE live_market_sp_snapshots(
+                issue TEXT, playid INTEGER, market_key TEXT, match_id TEXT,
+                outcome_code TEXT, sp REAL, fetched_at_utc TEXT,
+                capture_classification TEXT, sale_status TEXT
+            );
+            CREATE TABLE multimarket_settlement_truth(
+                issue TEXT, match_id TEXT, market_key TEXT, fthg INTEGER, ftag INTEGER,
+                outcome_code TEXT, winning_sp REAL, settlement_status TEXT
+            );
+            """
+        )
+        connection.execute(
+            "INSERT INTO matches VALUES (1, '26076', '2026-07-25T12:00:00+00:00', 0.5, 2, 1, '3')"
+        )
+        connection.executemany(
+            "INSERT INTO exotic_odds VALUES (1, 'score', ?, 2.5)",
+            [("1:0",), ("2:1",)],
+        )
+        connection.executemany(
+            "INSERT INTO live_market_sp_snapshots VALUES ('26076', 40, 'total_goals', 'm1', ?, 2.5, '2026-07-25T01:00:00Z', 'forward_complete_open', 'open')",
+            [("0~1",), ("2~3",)],
+        )
+        connection.execute(
+            "INSERT INTO multimarket_settlement_truth VALUES ('26076', 'm1', 'total_goals', 2, 1, '2~3', 2.5, 'settled')"
+        )
+    bundle = source_root / "results" / "data_collection" / "multimarket_sp_capture_v1" / "26076" / "batch-a"
+    write_bytes(
+        bundle / "manifest.json",
+        json.dumps(
+            {
+                "issue": "26076",
+                "playid": 40,
+                "market_key": "total_goals",
+                "fetched_at_utc": "2026-07-25T01:00:00Z",
+                "source_updated_at_hkt": "2026-07-25T09:00:00+08:00",
+                "complete_forward_open_rows": 2,
+                "terminal_rows": 0,
+            }, sort_keys=True).encode("utf-8"),
+    )
+    write_bytes(bundle / "raw.json", b'{"not":"published"}')
+    write_sha256sums(bundle)
+    return source_root
+
+
+def test_full_census_requires_frozen_inventory_and_keeps_terminal_values_out(tmp_path: Path) -> None:
+    source_root = census_fixture(tmp_path)
+    inventory = build_source_inventory(repository_root=source_root)
+    inventory_paths = write_inventory_artifacts(tmp_path / "inventory-output", inventory, git_commit=COMMIT)
+    inventory_package = tmp_path / "freeze" / "inventory"
+    create_inventory_package(
+        inventory_paths,
+        output_dir=inventory_package,
+        git_commit=COMMIT,
+        frozen_at_utc="2026-07-26T00:00:00+00:00",
+    )
+
+    artifacts = audit_frozen_inventory(
+        inventory_package=inventory_package,
+        repository_root=source_root,
+        runtime_inputs=[],
+        git_commit=COMMIT,
+    )
+    assert set(artifacts) == set(REQUIRED_CENSUS_ARTIFACTS)
+    assert artifacts["audit_report.json"]["source_identity_verified_before_and_after"] is True
+    feature = next(
+        row for row in artifacts["feature_availability.csv"]
+        if row["table_name"] == "matches" and row["field_name"] == "fthg"
+    )
+    assert feature["terminal_guard"] == "true"
+    assert feature["pre_match_feature_eligible"] == "false"
+    assert any(
+        row["market"] == "correct_score" and row["admissible_use"] == "prohibited"
+        for row in artifacts["admissible_use_matrix.csv"]
+    )
+    p40 = next(row for row in artifacts["model_readiness_matrix.csv"] if row["play_id"] == "40")
+    assert p40["price_ready"] == "conditional_strict_forward"
+    assert p40["roi_ready"] == "false"
+    rendered = canonical_bytes(artifacts).decode("utf-8")
+    assert str(source_root) not in rendered
+    assert "not\":\"published" not in rendered
+
+    paths = write_census_artifacts(tmp_path / "census-output", artifacts)
+    package = tmp_path / "freeze" / "census"
+    create_census_package(
+        paths,
+        output_dir=package,
+        git_commit=COMMIT,
+        frozen_at_utc="2026-07-26T00:01:00+00:00",
+    )
+    verified = verify_census_package(
+        package,
+        inventory_package=inventory_package,
+        repository_root=source_root,
+        runtime_inputs=[],
+    )
+    assert verified["status"] == "valid"
+    assert verified["inventory_bound"] is True
