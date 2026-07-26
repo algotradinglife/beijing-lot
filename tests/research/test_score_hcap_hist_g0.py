@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import numpy as np
 
 from research.score_hcap_hist import g0
 from research.score_hcap_hist import binding
@@ -398,6 +399,41 @@ def test_persisted_float_codec_coalesces_one_ulp_variants() -> None:
     assert walkforward.persisted_float_text(value) == walkforward.persisted_float_text(
         math.nextafter(value, math.inf)
     )
+
+
+def test_metrics_bootstrap_and_decision_use_full_precision_probability_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """The .13g codec is an output boundary, never a formal metric input."""
+
+    monkeypatch.setattr(walkforward, "TEST_SEASONS", (2016,))
+    monkeypatch.setattr(walkforward, "BOOTSTRAP_REPLICATES", 4)
+    panel = tmp_path / "full-precision.sqlite"
+    _panel_fixture(panel)
+
+    full_precision_rows = walkforward._fit_predict(panel)
+    assert any(
+        float(row[field]) != float(walkforward.persisted_float_text(float(row[field])))
+        for row in full_precision_rows
+        for field in ("lambda_home", "lambda_away", "b0_p3", "b0_p1", "b0_p0", "b1_p3", "b1_p1", "b1_p0")
+    )
+    expected_metrics = {
+        model: walkforward._metrics(full_precision_rows, model)
+        for model in ("b0", "b1")
+    }
+    expected_bootstrap = walkforward._bootstrap(full_precision_rows)
+
+    result = walkforward.run_walkforward(panel=panel, output_dir=tmp_path / "output")
+    for model in ("b0", "b1"):
+        for name, value in expected_metrics[model].items():
+            assert result["summary"]["aggregate"][model][name] == value
+    expected_deltas = np.asarray(
+        [row["delta_log_loss_b1_minus_b0"] for row in expected_bootstrap], dtype=float
+    )
+    assert result["summary"]["bootstrap"]["ci_95_percentile"] == [
+        float(np.quantile(expected_deltas, 0.025)),
+        float(np.quantile(expected_deltas, 0.975)),
+    ]
 
 
 def test_verified_runner_replays_complete_b0_b1_package_byte_for_byte(

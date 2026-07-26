@@ -22,11 +22,11 @@ TEST_SEASONS = tuple(range(2016, 2026))
 PRIOR_EXPOSURE = 5.0
 BOOTSTRAP_REPLICATES = 2_000
 BOOTSTRAP_SEED = 20260726
-# The formal model is evaluated from the persisted prediction file.  This
-# codec deliberately removes machine-level last-bit variation from SciPy while
-# preserving a probability sum tolerance far tighter than the contract's
-# 1e-12 requirement.  It is representation only: B0/B1 formulae, folds,
-# metrics, bootstrap seed, and decision rule are unchanged.
+# The formal model, metrics, bootstrap, and decision use the in-memory
+# full-precision probability vectors.  This codec is applied only at the
+# CSV/JSON output boundary.  It deliberately removes machine-level last-bit
+# variation from SciPy while preserving a probability sum tolerance far tighter
+# than the contract's 1e-12 requirement.
 PERSISTED_FLOAT_SIGNIFICANT_DIGITS = 13
 PERSISTED_FLOAT_FORMAT = f".{PERSISTED_FLOAT_SIGNIFICANT_DIGITS}g"
 
@@ -39,7 +39,10 @@ def persistence_contract() -> dict[str, Any]:
         "format": PERSISTED_FLOAT_FORMAT,
         "significant_digits": PERSISTED_FLOAT_SIGNIFICANT_DIGITS,
         "rounding": "python_general_format_round_to_nearest_even",
-        "scope": "all persisted B0/B1 numeric outputs; model computation remains full precision",
+        "scope": (
+            "CSV/JSON serialization only; in-memory B0/B1 probabilities remain "
+            "full precision for metrics, bootstrap, and decision"
+        ),
     }
 
 
@@ -76,13 +79,18 @@ def persisted_float_text(value: float) -> str:
     return format(_canonical_float(value), PERSISTED_FLOAT_FORMAT)
 
 
-def _persist_probability_triplet(
+def _validate_persisted_probability_triplet(
     probabilities: tuple[float, float, float], label: str
-) -> tuple[str, str, str]:
+) -> None:
+    """Validate that output-boundary serialization preserves the probability contract.
+
+    The returned model rows intentionally retain ``probabilities`` at full
+    precision.  This check is solely for the serialized CSV representation.
+    """
+
     serialized = tuple(persisted_float_text(value) for value in probabilities)
     if abs(sum(float(value) for value in serialized) - 1.0) > 1e-12:
         raise ValueError(f"{label} persisted probabilities do not sum to one within 1e-12")
-    return serialized[0], serialized[1], serialized[2]
 
 
 def _canonical_payload(value: Any) -> Any:
@@ -211,14 +219,17 @@ def _fit_predict(panel: Path) -> list[dict[str, Any]]:
             lambda_home = math.sqrt(_smoothed_rate(home[0], int(home[2]), global_home_gf) * _smoothed_rate(away[1], int(away[2]), global_home_gf))
             lambda_away = math.sqrt(_smoothed_rate(away[0], int(away[2]), global_away_gf) * _smoothed_rate(home[1], int(home[2]), global_away_gf))
             b1 = handicap_probabilities(lambda_home, lambda_away, hcp)
-            persisted_b0 = _persist_probability_triplet(b0, "B0")
-            persisted_b1 = _persist_probability_triplet(b1, "Skellam")
+            # Check the output representation without replacing the formal
+            # metric inputs.  RQ1 metrics and the decision must consume these
+            # unrounded probability values.
+            _validate_persisted_probability_triplet(b0, "B0")
+            _validate_persisted_probability_triplet(b1, "Skellam")
             predictions.append({
                 "fold_season": year, "match_id": int(row["match_id"]), "issue": str(row["issue"]), "match_idx": int(row["match_idx"]),
                 "kickoff_utc": str(row["kickoff_utc"]), "league": str(row["league"]), "handicap": hcp, "label_310": str(row["label_310"]),
-                "cold_start": int(home[2] == 0 or away[2] == 0), "lambda_home": persisted_float_text(lambda_home), "lambda_away": persisted_float_text(lambda_away),
-                **{f"b0_p{label}": value for label, value in zip(CLASSES, persisted_b0)},
-                **{f"b1_p{label}": value for label, value in zip(CLASSES, persisted_b1)},
+                "cold_start": int(home[2] == 0 or away[2] == 0), "lambda_home": lambda_home, "lambda_away": lambda_away,
+                **{f"b0_p{label}": value for label, value in zip(CLASSES, b0)},
+                **{f"b1_p{label}": value for label, value in zip(CLASSES, b1)},
             })
     return sorted(predictions, key=lambda row: (row["fold_season"], row["kickoff_utc"], row["match_id"]))
 
@@ -239,7 +250,9 @@ def _bootstrap(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         for groups in ordered.values():
             sampled = groups[rng.integers(0, len(groups), size=len(groups))].sum(axis=0)
             sum_b1 += sampled[0]; sum_b0 += sampled[1]; total_n += sampled[2]
-        output.append({"replicate": replicate, "delta_log_loss_b1_minus_b0": persisted_float_text(sum_b1 / total_n - sum_b0 / total_n)})
+        # Keep the full-precision bootstrap draw for quantiles and the
+        # decision.  ``_write_csv`` applies the output codec later.
+        output.append({"replicate": replicate, "delta_log_loss_b1_minus_b0": sum_b1 / total_n - sum_b0 / total_n})
     return output
 
 
@@ -310,7 +323,10 @@ def run_walkforward(
     signal = aggregate["delta_log_loss_b1_minus_b0"] < 0 and float(np.quantile(deltas, .975)) < 0 and negatives >= required_negative_seasons
     final = {"experiment_id": "SCORE-HCAP-HIST-001", "status": "RETROSPECTIVE_INCREMENTAL_PREDICTIVE_SIGNAL" if signal else "NO_REPRODUCIBLE_INCREMENTAL_SIGNAL", "decision_rule": {"pooled_delta_negative": aggregate["delta_log_loss_b1_minus_b0"] < 0, "bootstrap_ci_upper_negative": float(np.quantile(deltas, .975)) < 0, "negative_seasons": negatives, "required_negative_seasons": required_negative_seasons, "test_season_count": len(TEST_SEASONS)}, "execution_enabled": False, "roi_authorized": False, "evidence_level": "C", "outcome_visibility": "historical_known"}
     bootstrap_summary = {"seed": BOOTSTRAP_SEED, "replicates": BOOTSTRAP_REPLICATES, "ci_95_percentile": [float(np.quantile(deltas, .025)), float(np.quantile(deltas, .975))]}
-    summary = _canonical_payload({"aggregate": aggregate, "bootstrap": bootstrap_summary, "final_decision": final})
+    # Keep this returned value full precision too.  The JSON writer owns all
+    # serialization canonicalization, so no formal metric is derived from a
+    # canonicalized persisted value.
+    summary = {"aggregate": aggregate, "bootstrap": bootstrap_summary, "final_decision": final}
     _write_json(output_dir / "aggregate_metrics.json", summary)
     _write_json(output_dir / "bootstrap_summary.json", bootstrap_summary)
     _write_json(output_dir / "final_decision.json", final)
