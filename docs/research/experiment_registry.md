@@ -12,6 +12,7 @@
 | `MM-DATA-AUDIT-001` | For each target market (Handicap 3/1/0, Correct Score, Total Goals, Half/Full Time), does the current forward data chain provide sufficient evidence to support strict as-of research under Freeze Protocol v1? | `research/mm-data-audit-001` | `e3fee9f2241b258eb6fa406b50e80d403193448d73a9ea070c0a1e386ee8c976` | `reviewed` | `no_market_end_to_end_ready` | `B` |
 | `SP-CONSISTENCY-001A-G0-R4` | Is strict paired pre-match coverage sufficient to compare score-derived and p34 handicap probabilities without leakage or retrospective substitution? | `strategy/active` | `12db65db1b7e4e976336c75df424d3866a0066dec5bbd92bce39accfe4c8fd4e` | `reviewed` | `insufficient_strict_data_no_formal_comparison` | `C (coverage gate only)` |
 | `SCORE-PRICE-HIST-AUDIT-001` | Does the XLSM-derived historical score-price vector exist, and can its provider, market identity, and time semantics support any historical research use? | `strategy/active` | R5 package manifest | `frozen_pending_review` | `price_vector_present_but_identity_and_time_unverified; replay_prohibited` | `D` |
+| `HIST-DATA-CENSUS-001` | Which long-horizon historical assets may support strict replay, proxy analysis, labels, settlement, or no research input? | `research/hist-data-census-001` | immutable census package manifest | `frozen_pending_review` | `inventory_and_admissible_use_matrix_frozen; no model_or_roi_conclusion` | `data eligibility audit` |
 
 ### MM-DATA-AUDIT-001 verification snapshot
 
