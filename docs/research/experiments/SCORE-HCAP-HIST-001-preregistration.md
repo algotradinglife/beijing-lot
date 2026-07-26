@@ -104,9 +104,12 @@ representation contract, not a model or parameter change: it suppresses
 cross-build last-bit differences from the Skellam backend while retaining a
 persisted probability-sum error below the same `1e-12` contract. The B0/B1
 package records this codec in its frozen config and writes a pathless runtime
-receipt with CPython, NumPy, SciPy and floating-point identity. A clean replay
-must reproduce the complete output and freeze-package bytes for the same frozen
-inputs, timestamp and git commit.
+receipt with CPython, NumPy, SciPy and floating-point identity. Its executable
+contract is exact: CPython `3.14.4`, NumPy `2.4.6`, SciPy `1.17.1`, IEEE binary
+radix `2` with a 53-bit mantissa, and `scipy.stats.skellam`. The runner fails
+closed before output if any value differs. A clean replay must reproduce the
+complete output and freeze-package bytes for the same frozen inputs, timestamp,
+git commit, and this exact runtime contract.
 
 ## Inference and decision
 

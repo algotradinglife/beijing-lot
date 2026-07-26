@@ -53,6 +53,7 @@ def frozen_b0_b1_config(binding: G0Binding) -> dict[str, Any]:
             "stratified_by": "season",
         },
         "persisted_float_codec": walkforward.persistence_contract(),
+        "frozen_runtime_contract": walkforward.frozen_runtime_contract(),
         "runtime_environment_receipt": "runtime_environment.json",
     }
 

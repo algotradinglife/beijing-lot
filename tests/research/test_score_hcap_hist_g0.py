@@ -401,6 +401,16 @@ def test_persisted_float_codec_coalesces_one_ulp_variants() -> None:
     )
 
 
+def test_walkforward_rejects_non_frozen_numerical_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    observed = walkforward.runtime_environment()
+    observed["python"] = dict(observed["python"])
+    observed["python"]["version"] = "3.14.6"
+    monkeypatch.setattr(walkforward, "runtime_environment", lambda: observed)
+
+    with pytest.raises(RuntimeError, match="python_version"):
+        walkforward.require_frozen_runtime()
+
+
 def test_metrics_bootstrap_and_decision_use_full_precision_probability_rows(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -475,6 +485,7 @@ def test_verified_runner_replays_complete_b0_b1_package_byte_for_byte(
     )
     manifest = json.loads((tmp_path / "first-freeze" / "manifest.json").read_text(encoding="utf-8"))
     assert config["persisted_float_codec"] == walkforward.persistence_contract()
+    assert config["frozen_runtime_contract"] == walkforward.frozen_runtime_contract()
     assert environment["persistence_contract"] == walkforward.persistence_contract()
     assert receipt["outputs"]["runtime_environment.json"] == walkforward.sha256_file(
         tmp_path / "first-output" / "runtime_environment.json"

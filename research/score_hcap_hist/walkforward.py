@@ -29,6 +29,15 @@ BOOTSTRAP_SEED = 20260726
 # than the contract's 1e-12 requirement.
 PERSISTED_FLOAT_SIGNIFICANT_DIGITS = 13
 PERSISTED_FLOAT_FORMAT = f".{PERSISTED_FLOAT_SIGNIFICANT_DIGITS}g"
+FROZEN_RUNTIME = {
+    "python_implementation": "CPython",
+    "python_version": "3.14.4",
+    "numpy_version": "2.4.6",
+    "scipy_version": "1.17.1",
+    "probability_backend": "scipy.stats.skellam",
+    "float_radix": 2,
+    "float_mantissa_bits": 53,
+}
 
 
 def persistence_contract() -> dict[str, Any]:
@@ -46,6 +55,18 @@ def persistence_contract() -> dict[str, Any]:
     }
 
 
+def frozen_runtime_contract() -> dict[str, Any]:
+    """Return the exact executable/numerical replay contract.
+
+    The package receipt intentionally records the observed runtime.  This
+    separate, immutable contract makes the required CPython patch release
+    explicit and lets the runner fail before publishing a non-replayable
+    package from a merely compatible interpreter (for example CPython 3.14.6).
+    """
+
+    return dict(FROZEN_RUNTIME)
+
+
 def runtime_environment() -> dict[str, Any]:
     """Return a pathless numerical-runtime receipt for the frozen replay."""
 
@@ -61,6 +82,32 @@ def runtime_environment() -> dict[str, Any]:
         "probability_backend": "scipy.stats.skellam",
         "persistence_contract": persistence_contract(),
     }
+
+
+def require_frozen_runtime() -> dict[str, Any]:
+    """Fail closed unless the observed runtime exactly matches the freeze."""
+
+    environment = runtime_environment()
+    observed = {
+        "python_implementation": environment["python"]["implementation"],
+        "python_version": environment["python"]["version"],
+        "numpy_version": environment["numpy_version"],
+        "scipy_version": environment["scipy_version"],
+        "probability_backend": environment["probability_backend"],
+        "float_radix": environment["python"]["float_radix"],
+        "float_mantissa_bits": environment["python"]["float_mantissa_bits"],
+    }
+    mismatches = {
+        name: {"expected": expected, "observed": observed[name]}
+        for name, expected in FROZEN_RUNTIME.items()
+        if observed[name] != expected
+    }
+    if mismatches:
+        raise RuntimeError(
+            "SCORE-HCAP-HIST-001 requires the frozen numerical runtime: "
+            + json.dumps(mismatches, sort_keys=True)
+        )
+    return environment
 
 
 def _canonical_float(value: float) -> float:
@@ -263,7 +310,7 @@ def run_walkforward(
     output_dir.mkdir(parents=True, exist_ok=False)
     if frozen_config is not None:
         _write_json(output_dir / "frozen_b0_b1_config.json", dict(frozen_config))
-    environment = runtime_environment()
+    environment = require_frozen_runtime()
     _write_json(output_dir / "runtime_environment.json", environment)
     rows = _fit_predict(panel)
     _write_csv(output_dir / "predictions.csv", rows, list(rows[0]))
