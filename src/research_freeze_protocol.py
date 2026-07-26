@@ -318,6 +318,36 @@ def _ensure_outside(output: Path, protected: Path) -> None:
     raise ResearchFreezeError("downstream package must not be written inside the immutable freeze package")
 
 
+def _input_dataset_records(
+    sources: Iterable[Path], labels: Iterable[str] | None
+) -> list[dict[str, Any]]:
+    """Bind source bytes under portable logical IDs, never local paths.
+
+    ``input_dataset`` is provenance identity, not a recovery instruction.  A
+    package must therefore retain an operator-independent logical name plus
+    bytes and digest, rather than expose the workstation path from which the
+    bytes were read.  Existing packages remain valid through the verifier's
+    backwards-compatible reader; all newly created packages use this pathless
+    representation.
+    """
+
+    dataset_sources = tuple(_require_regular_source(Path(path)) for path in sources)
+    supplied_labels = tuple(labels) if labels is not None else tuple(
+        f"source-{index:03d}" for index in range(1, len(dataset_sources) + 1)
+    )
+    if len(supplied_labels) != len(dataset_sources):
+        raise ResearchFreezeError("input dataset labels must match input datasets")
+    normalized_labels = tuple(
+        safe_protocol_id(str(label), "input dataset logical name") for label in supplied_labels
+    )
+    if len(set(normalized_labels)) != len(normalized_labels):
+        raise ResearchFreezeError("input dataset logical names must be unique")
+    return [
+        {"path": label, "bytes": source.stat().st_size, "sha256": sha256_file(source)}
+        for source, label in zip(dataset_sources, normalized_labels)
+    ]
+
+
 def create_freeze_package(
     output_dir: Path,
     *,
@@ -331,6 +361,7 @@ def create_freeze_package(
     decision_directory: str = "decision",
     metadata_files: Iterable[Path] = (),
     input_datasets: Iterable[Path] = (),
+    input_dataset_labels: Iterable[str] | None = None,
     git_commit: str | None = None,
     frozen_at_utc: str | None = None,
 ) -> dict[str, Any]:
@@ -347,11 +378,7 @@ def create_freeze_package(
         raise ResearchFreezeError("git commit must be a hexadecimal commit identifier")
     frozen_at = explicit_utc(frozen_at_utc) if frozen_at_utc else utc_now()
     metadata_sources = tuple(metadata_files)
-    dataset_sources = tuple(Path(path) for path in input_datasets)
-    datasets = [
-        {"path": str(path), "bytes": path.stat().st_size, "sha256": sha256_file(path)}
-        for path in dataset_sources
-    ]
+    datasets = _input_dataset_records(input_datasets, input_dataset_labels)
 
     def build(stage: Path) -> None:
         inputs = _copy_assets(stage, "inputs", input_files)
