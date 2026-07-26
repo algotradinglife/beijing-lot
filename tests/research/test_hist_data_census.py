@@ -229,6 +229,13 @@ def test_full_census_requires_frozen_inventory_and_keeps_terminal_values_out(tmp
         runtime_inputs=[],
         git_commit=COMMIT,
     )
+    repeated = audit_frozen_inventory(
+        inventory_package=inventory_package,
+        repository_root=source_root,
+        runtime_inputs=[],
+        git_commit=COMMIT,
+    )
+    assert canonical_bytes(artifacts) == canonical_bytes(repeated)
     assert set(artifacts) == set(REQUIRED_CENSUS_ARTIFACTS)
     assert artifacts["audit_report.json"]["source_identity_verified_before_and_after"] is True
     feature = next(
@@ -249,6 +256,14 @@ def test_full_census_requires_frozen_inventory_and_keeps_terminal_values_out(tmp
     assert "not\":\"published" not in rendered
 
     paths = write_census_artifacts(tmp_path / "census-output", artifacts)
+    repeated_paths = write_census_artifacts(tmp_path / "census-output-repeat", repeated)
+    assert {
+        name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for name, path in paths.items()
+    } == {
+        name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for name, path in repeated_paths.items()
+    }
     package = tmp_path / "freeze" / "census"
     create_census_package(
         paths,
