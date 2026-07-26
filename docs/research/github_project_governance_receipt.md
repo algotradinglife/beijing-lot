@@ -1,6 +1,6 @@
 # BJ-PROJECT-CONTROL-001 verification receipt
 
-Validation timestamp: `2026-07-26T05:47:09Z`
+Validation timestamp: `2026-07-26T07:18:06Z`
 
 This receipt contains only GitHub planning metadata. It contains no token,
 credential, local path, environment dump, private service URL, or sensitive
@@ -86,15 +86,21 @@ No routing label description, color, or name was changed.
 
 | Issue | Primary Project | Project Status | Owner Role | Priority | Review Gate | Fine labels | Deterministic rationale |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| #17 `BJ-MM-FREEZE-001` | BJ Data Platform | Done | Engineer | P0 | EV+PI | `domain/data-collection`, `domain/data-provenance`, `domain/freeze-execution`, `type/capability` | Its primary deliverable is a strict collector/input-freeze and provenance capability; cross-domain freeze use remains a label. |
-| #20 `BJ-BET-FREEZE-001` | BJ Prediction & Betting | Done | Engineer | P0 | EV+PI | `domain/portfolio`, `domain/freeze-execution`, `type/capability` | Its primary deliverable is exact-N and budget betting alternatives plus their immutable freeze. |
-| #35 `SCORE-HCAP-HIST-001` | BJ Prediction & Betting | Ready | Strategist | P1 | EV+PI | `domain/football-modeling`, `type/research` | Its executable contract is a historical score-distribution model comparison. |
-| #37 `SCORE-PRICE-HIST-AUDIT-001` | BJ Data Platform | Ready | Strategist | P1 | EV+PI | `domain/data-provenance`, `type/audit` | Its primary deliverable is existence, lineage, timestamp, and eligibility classification for a historical data asset. |
+| #17 `BJ-MM-FREEZE-001` | BJ Data Platform | In Progress | Engineer | P0 | EV+PI | `domain/data-collection`, `domain/data-provenance`, `domain/freeze-execution`, `type/capability` | Its primary deliverable is a strict collector/input-freeze and provenance capability; its prospective ledger audit is complete but its exact-HEAD evidence PR remains queued for EV/PI acceptance. |
+| #20 `BJ-BET-FREEZE-001` | BJ Prediction & Betting | In Progress | Engineer | P0 | EV+PI | `domain/portfolio`, `domain/freeze-execution`, `type/capability` | Its primary deliverable is exact-N and budget betting alternatives plus their immutable freeze; its missed-checkpoint receipt is complete but its exact-HEAD evidence PR remains queued for EV/PI acceptance. |
+| #35 `SCORE-HCAP-HIST-001` | BJ Prediction & Betting | In Progress | Strategist | P1 | EV+PI | `domain/football-modeling`, `type/research` | PI accepted the R7 research interpretation, but exact-HEAD EV requested byte-reproducibility corrections and a fresh validation cycle. |
+| #37 `SCORE-PRICE-HIST-AUDIT-001` | BJ Data Platform | In Progress | Strategist | P1 | EV+PI | `domain/data-provenance`, `type/audit` | The private read-only source handoff is ready and PI directed Strategist to regenerate append-only R5 evidence and obtain fresh exact-HEAD EV. |
 | #38 `BJ-PROJECT-CONTROL-001` | BJ Product & Operations | Review | Engineer | P1 | EV+PI | `domain/operations`, `domain/research-os`, `type/capability` | Its primary deliverable is the GitHub/Research OS planning control plane. |
 | #40 `HIST-DATA-CENSUS-001` | BJ Data Platform | Waiting | Strategist | P1 | EV+PI | `domain/data-provenance`, `type/audit` | Its contract explicitly assigns the Data Platform and blocks dispatch on #37 acceptance, so it remains a non-ready waiting item. |
 
 Every open Issue is mapped exactly once. There are no unmapped or ambiguous
 open Issues at this validation timestamp.
+
+These lifecycle values follow the latest explicit evidence rather than merged
+implementation state. In particular, the PI `HANDOFF READY` action for #37 at
+`2026-07-26T07:15:50Z` supersedes its earlier access-wait state and places the
+corrective R5 cycle in progress. Project Status does not itself add or remove
+the retained routing labels.
 
 ## Completed foundation anchors
 
@@ -111,6 +117,9 @@ Closed historical Issues were not mass-migrated.
 ## Milestone, routing, and Research OS invariants
 
 - The six open Issues and three completed anchors have no Milestone changes.
+- PI-owned Milestones, when introduced, are integrated cross-Project roadmap
+  stages or maturity gates and may optionally carry target dates. This
+  capability created and assigned none.
 - `owner/*` and `state/*` labels remain the Hermes dispatch source of truth.
 - Project Status is a human planning field and does not mutate routing labels.
 - `.research/graph.yaml`, `.research/tasks/`, and

@@ -12,7 +12,7 @@ any product/runtime behavior.
 | --- | --- |
 | GitHub Project | Broad, durable functional domain |
 | Labels | Fine-grained domain, work type, routing, and dispatch |
-| Milestone | Time dimension; intentionally not configured by this capability |
+| Milestone | PI-owned cross-Project roadmap stage or maturity gate; may carry a target date |
 | Issue | Executable contract |
 | Pull request | Implementation and review evidence |
 | `.research/graph.yaml` | Scientific and evidence dependencies, not daily workflow state |
@@ -151,7 +151,10 @@ For cross-project work, create a dependent Issue in the downstream Project and
 link the two contracts. The upstream Issue produces its own evidence; the
 downstream Issue consumes only the accepted interface or immutable artifact.
 
-Milestones will later provide dates, release windows, or planning periods. This
+PI owns one integrated roadmap across the three Projects. A Milestone represents
+a cross-Project roadmap stage or maturity gate such as M1 and may optionally
+carry a target date. PI decomposes each Milestone into finer executable Issues
+whose primary deliverables remain in their one appropriate Project. This
 capability creates, edits, and assigns no Milestones.
 
 ## Status verification
