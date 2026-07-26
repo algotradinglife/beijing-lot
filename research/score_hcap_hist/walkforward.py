@@ -5,12 +5,15 @@ import csv
 import hashlib
 import json
 import math
+import platform
 import sqlite3
+import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 import numpy as np
+import scipy
 from scipy.stats import skellam
 
 
@@ -19,6 +22,85 @@ TEST_SEASONS = tuple(range(2016, 2026))
 PRIOR_EXPOSURE = 5.0
 BOOTSTRAP_REPLICATES = 2_000
 BOOTSTRAP_SEED = 20260726
+# The formal model is evaluated from the persisted prediction file.  This
+# codec deliberately removes machine-level last-bit variation from SciPy while
+# preserving a probability sum tolerance far tighter than the contract's
+# 1e-12 requirement.  It is representation only: B0/B1 formulae, folds,
+# metrics, bootstrap seed, and decision rule are unchanged.
+PERSISTED_FLOAT_SIGNIFICANT_DIGITS = 13
+PERSISTED_FLOAT_FORMAT = f".{PERSISTED_FLOAT_SIGNIFICANT_DIGITS}g"
+
+
+def persistence_contract() -> dict[str, Any]:
+    """Return the frozen representation contract for all persisted floats."""
+
+    return {
+        "kind": "decimal_significant_digits",
+        "format": PERSISTED_FLOAT_FORMAT,
+        "significant_digits": PERSISTED_FLOAT_SIGNIFICANT_DIGITS,
+        "rounding": "python_general_format_round_to_nearest_even",
+        "scope": "all persisted B0/B1 numeric outputs; model computation remains full precision",
+    }
+
+
+def runtime_environment() -> dict[str, Any]:
+    """Return a pathless numerical-runtime receipt for the frozen replay."""
+
+    return {
+        "python": {
+            "implementation": platform.python_implementation(),
+            "version": platform.python_version(),
+            "float_radix": sys.float_info.radix,
+            "float_mantissa_bits": sys.float_info.mant_dig,
+        },
+        "numpy_version": np.__version__,
+        "scipy_version": scipy.__version__,
+        "probability_backend": "scipy.stats.skellam",
+        "persistence_contract": persistence_contract(),
+    }
+
+
+def _canonical_float(value: float) -> float:
+    """Round a finite value to the frozen portable output representation."""
+
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("persisted numerical outputs must be finite")
+    canonical = float(format(number, PERSISTED_FLOAT_FORMAT))
+    return 0.0 if canonical == 0.0 else canonical
+
+
+def persisted_float_text(value: float) -> str:
+    """Serialize a numeric output under the frozen portable float codec."""
+
+    return format(_canonical_float(value), PERSISTED_FLOAT_FORMAT)
+
+
+def _persist_probability_triplet(
+    probabilities: tuple[float, float, float], label: str
+) -> tuple[str, str, str]:
+    serialized = tuple(persisted_float_text(value) for value in probabilities)
+    if abs(sum(float(value) for value in serialized) - 1.0) > 1e-12:
+        raise ValueError(f"{label} persisted probabilities do not sum to one within 1e-12")
+    return serialized[0], serialized[1], serialized[2]
+
+
+def _canonical_payload(value: Any) -> Any:
+    if isinstance(value, (float, np.floating)):
+        return _canonical_float(float(value))
+    if isinstance(value, dict):
+        return {str(key): _canonical_payload(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_canonical_payload(item) for item in value]
+    if isinstance(value, tuple):
+        return [_canonical_payload(item) for item in value]
+    return value
+
+
+def _write_json(path: Path, value: Mapping[str, Any]) -> None:
+    path.write_text(
+        json.dumps(_canonical_payload(value), indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def sha256_file(path: Path) -> str:
@@ -77,11 +159,20 @@ def _metrics(rows: Iterable[dict[str, Any]], model: str) -> dict[str, float | in
     return result
 
 
+def _csv_value(value: Any) -> Any:
+    return persisted_float_text(value) if isinstance(value, (float, np.floating)) else value
+
+
 def _write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(
+            [
+                {field: _csv_value(row[field]) for field in fields}
+                for row in rows
+            ]
+        )
 
 
 def _fit_predict(panel: Path) -> list[dict[str, Any]]:
@@ -120,12 +211,14 @@ def _fit_predict(panel: Path) -> list[dict[str, Any]]:
             lambda_home = math.sqrt(_smoothed_rate(home[0], int(home[2]), global_home_gf) * _smoothed_rate(away[1], int(away[2]), global_home_gf))
             lambda_away = math.sqrt(_smoothed_rate(away[0], int(away[2]), global_away_gf) * _smoothed_rate(home[1], int(home[2]), global_away_gf))
             b1 = handicap_probabilities(lambda_home, lambda_away, hcp)
+            persisted_b0 = _persist_probability_triplet(b0, "B0")
+            persisted_b1 = _persist_probability_triplet(b1, "Skellam")
             predictions.append({
                 "fold_season": year, "match_id": int(row["match_id"]), "issue": str(row["issue"]), "match_idx": int(row["match_idx"]),
                 "kickoff_utc": str(row["kickoff_utc"]), "league": str(row["league"]), "handicap": hcp, "label_310": str(row["label_310"]),
-                "cold_start": int(home[2] == 0 or away[2] == 0), "lambda_home": f"{lambda_home:.15g}", "lambda_away": f"{lambda_away:.15g}",
-                **{f"b0_p{label}": f"{value:.15g}" for label, value in zip(CLASSES, b0)},
-                **{f"b1_p{label}": f"{value:.15g}" for label, value in zip(CLASSES, b1)},
+                "cold_start": int(home[2] == 0 or away[2] == 0), "lambda_home": persisted_float_text(lambda_home), "lambda_away": persisted_float_text(lambda_away),
+                **{f"b0_p{label}": value for label, value in zip(CLASSES, persisted_b0)},
+                **{f"b1_p{label}": value for label, value in zip(CLASSES, persisted_b1)},
             })
     return sorted(predictions, key=lambda row: (row["fold_season"], row["kickoff_utc"], row["match_id"]))
 
@@ -146,7 +239,7 @@ def _bootstrap(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         for groups in ordered.values():
             sampled = groups[rng.integers(0, len(groups), size=len(groups))].sum(axis=0)
             sum_b1 += sampled[0]; sum_b0 += sampled[1]; total_n += sampled[2]
-        output.append({"replicate": replicate, "delta_log_loss_b1_minus_b0": f"{sum_b1 / total_n - sum_b0 / total_n:.15g}"})
+        output.append({"replicate": replicate, "delta_log_loss_b1_minus_b0": persisted_float_text(sum_b1 / total_n - sum_b0 / total_n)})
     return output
 
 
@@ -156,9 +249,9 @@ def run_walkforward(
     """Run the single pre-registered B0/B1 configuration once from G0 panel."""
     output_dir.mkdir(parents=True, exist_ok=False)
     if frozen_config is not None:
-        (output_dir / "frozen_b0_b1_config.json").write_text(
-            json.dumps(dict(frozen_config), indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        _write_json(output_dir / "frozen_b0_b1_config.json", dict(frozen_config))
+    environment = runtime_environment()
+    _write_json(output_dir / "runtime_environment.json", environment)
     rows = _fit_predict(panel)
     _write_csv(output_dir / "predictions.csv", rows, list(rows[0]))
     aggregate = {model: _metrics(rows, model) for model in ("b0", "b1")}
@@ -217,10 +310,25 @@ def run_walkforward(
     signal = aggregate["delta_log_loss_b1_minus_b0"] < 0 and float(np.quantile(deltas, .975)) < 0 and negatives >= required_negative_seasons
     final = {"experiment_id": "SCORE-HCAP-HIST-001", "status": "RETROSPECTIVE_INCREMENTAL_PREDICTIVE_SIGNAL" if signal else "NO_REPRODUCIBLE_INCREMENTAL_SIGNAL", "decision_rule": {"pooled_delta_negative": aggregate["delta_log_loss_b1_minus_b0"] < 0, "bootstrap_ci_upper_negative": float(np.quantile(deltas, .975)) < 0, "negative_seasons": negatives, "required_negative_seasons": required_negative_seasons, "test_season_count": len(TEST_SEASONS)}, "execution_enabled": False, "roi_authorized": False, "evidence_level": "C", "outcome_visibility": "historical_known"}
     bootstrap_summary = {"seed": BOOTSTRAP_SEED, "replicates": BOOTSTRAP_REPLICATES, "ci_95_percentile": [float(np.quantile(deltas, .025)), float(np.quantile(deltas, .975))]}
-    summary = {"aggregate": aggregate, "bootstrap": bootstrap_summary, "final_decision": final}
-    (output_dir / "aggregate_metrics.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    (output_dir / "bootstrap_summary.json").write_text(json.dumps(bootstrap_summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    (output_dir / "final_decision.json").write_text(json.dumps(final, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    receipt = {"panel_sha256": sha256_file(panel), "outputs": {path.name: sha256_file(path) for path in sorted(output_dir.iterdir()) if path.is_file()}, "configuration": {"prior_exposure": PRIOR_EXPOSURE, "bootstrap_seed": BOOTSTRAP_SEED, "bootstrap_replicates": BOOTSTRAP_REPLICATES, "test_seasons": list(TEST_SEASONS)}}
-    (output_dir / "reproducibility_receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    summary = _canonical_payload({"aggregate": aggregate, "bootstrap": bootstrap_summary, "final_decision": final})
+    _write_json(output_dir / "aggregate_metrics.json", summary)
+    _write_json(output_dir / "bootstrap_summary.json", bootstrap_summary)
+    _write_json(output_dir / "final_decision.json", final)
+    receipt = {
+        "panel_sha256": sha256_file(panel),
+        "outputs": {
+            path.name: sha256_file(path)
+            for path in sorted(output_dir.iterdir())
+            if path.is_file()
+        },
+        "configuration": {
+            "prior_exposure": PRIOR_EXPOSURE,
+            "bootstrap_seed": BOOTSTRAP_SEED,
+            "bootstrap_replicates": BOOTSTRAP_REPLICATES,
+            "test_seasons": list(TEST_SEASONS),
+            "persistence_contract": persistence_contract(),
+        },
+        "runtime_environment_sha256": sha256_file(output_dir / "runtime_environment.json"),
+    }
+    _write_json(output_dir / "reproducibility_receipt.json", receipt)
     return {"output_dir": output_dir, "summary": summary}

@@ -95,6 +95,18 @@ the mapping is exact Skellam: `P(3)=P(D>-k)`, `P(1)=P(D=-k)`, and
 extra home multiplier, league one-hot, parameter search, calibration, or added
 feature.
 
+## Reproducible numerical representation
+
+The model and metric calculations remain full precision, but every persisted
+numeric B0/B1 output is serialized with Python general format at 13 significant
+decimal digits (`.13g`). This is a representation contract, not a model or
+parameter change: it suppresses cross-build last-bit differences from the
+Skellam backend while retaining a persisted probability-sum error below the
+same `1e-12` contract. The B0/B1 package records this codec in its frozen
+config and writes a pathless runtime receipt with CPython, NumPy, SciPy and
+floating-point identity. A clean replay must reproduce the complete output and
+freeze-package bytes for the same frozen inputs, timestamp and git commit.
+
 ## Inference and decision
 
 The primary quantity is pooled `delta = LogLoss(B1) - LogLoss(B0)`. The

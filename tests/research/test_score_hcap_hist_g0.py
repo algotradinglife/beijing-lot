@@ -2,19 +2,28 @@ from __future__ import annotations
 
 import json
 import csv
+import math
 import sqlite3
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from research.score_hcap_hist import g0
 from research.score_hcap_hist import binding
+from research.score_hcap_hist import runner
 from research.score_hcap_hist import walkforward
 from src.research_freeze_protocol import ResearchFreezeError, create_freeze_package
 
 
-def _source_fixture(path: Path, rows: list[tuple[object, ...]]) -> None:
+def _source_fixture(
+    path: Path,
+    rows: list[tuple[object, ...]],
+    *,
+    source_meta: list[tuple[str, str]] | None = None,
+) -> None:
     connection = sqlite3.connect(path)
     connection.executescript(
         """
@@ -28,6 +37,8 @@ def _source_fixture(path: Path, rows: list[tuple[object, ...]]) -> None:
         INSERT INTO source_meta VALUES ('built_at', '2026-07-26T00:00:00Z');
         """
     )
+    if source_meta:
+        connection.executemany("INSERT INTO source_meta VALUES (?,?)", source_meta)
     connection.executemany("INSERT INTO match_features VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
     connection.commit()
     connection.close()
@@ -75,6 +86,30 @@ def test_g0_exports_outcome_panel_without_sp_fields_and_is_byte_stable(tmp_path:
     assert "fold_year" in columns
     assert "source_season_year" in columns
     assert first_clock.endswith("+00:00")
+
+
+def test_g0_schema_redacts_source_meta_values(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(g0, "MIN_ROWS", 1)
+    monkeypatch.setattr(g0, "MIN_TEST_ROWS", 1)
+    source = tmp_path / "source.db"
+    local_locator = "/private/workstation/history/beidan_xlsm.sqlite"
+    secret_like_value = "not-for-publication"
+    _source_fixture(
+        source,
+        _eligible_rows(),
+        source_meta=[("history_db", local_locator), ("private_note", secret_like_value)],
+    )
+
+    result = g0.export_g0_panel(source_db=source, work_dir=tmp_path / "result")
+    schema_text = result["schema"].read_text(encoding="utf-8")
+    schema = json.loads(schema_text)
+
+    assert local_locator not in schema_text
+    assert secret_like_value not in schema_text
+    history_meta = next(item for item in schema["source_meta"] if item["key"] == "history_db")
+    assert history_meta["value_visibility"] == "redacted"
+    assert history_meta["value_present"] is True
+    assert len(history_meta["value_sha256"]) == 64
 
 
 def test_g0_fails_closed_for_result_mismatch_and_identity_conflicts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -130,11 +165,16 @@ def test_g0_fails_closed_for_result_mismatch_and_identity_conflicts(tmp_path: Pa
     assert audit == result["audit_data"]
 
 
-def _freeze_g0_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, dict[str, object], Path]:
+def _freeze_g0_fixture(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    rows: list[tuple[object, ...]] | None = None,
+) -> tuple[Path, dict[str, object], Path]:
     monkeypatch.setattr(g0, "MIN_ROWS", 1)
     monkeypatch.setattr(g0, "MIN_TEST_ROWS", 1)
     source = tmp_path / "source.db"
-    _source_fixture(source, _eligible_rows())
+    _source_fixture(source, rows or _eligible_rows())
     result = g0.export_g0_panel(source_db=source, work_dir=tmp_path / "g0-work")
     decision = tmp_path / "g0-work" / "g0_decision.json"
     config = tmp_path / "g0-work" / "g0_config.json"
@@ -304,3 +344,104 @@ def test_walkforward_cold_start_uses_global_role_fallback(tmp_path: Path, monkey
     assert float(row["lambda_home"]) > 0
     assert float(row["lambda_away"]) > 0
     assert result["summary"]["final_decision"]["decision_rule"]["test_season_count"] == 1
+
+
+def _tree_bytes(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def _isolated_runner_replay(
+    *, g0_freeze: Path, source: Path, output: Path, freeze: Path
+) -> dict[str, object]:
+    code = """
+import json
+import sys
+from pathlib import Path
+from research.score_hcap_hist import runner, walkforward
+
+walkforward.TEST_SEASONS = (2016,)
+walkforward.BOOTSTRAP_REPLICATES = 4
+result = runner.run_and_freeze(
+    g0_freeze_dir=Path(sys.argv[1]),
+    source_db=Path(sys.argv[2]),
+    output_dir=Path(sys.argv[3]),
+    freeze_dir=Path(sys.argv[4]),
+    frozen_at_utc="2026-07-26T00:00:00+00:00",
+    git_commit="a" * 40,
+)
+print(json.dumps(result, sort_keys=True))
+"""
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            code,
+            str(g0_freeze),
+            str(source),
+            str(output),
+            str(freeze),
+        ],
+        cwd=Path(__file__).resolve().parents[2],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    return json.loads(completed.stdout)
+
+
+def test_persisted_float_codec_coalesces_one_ulp_variants() -> None:
+    value = 0.123456789012345
+    assert walkforward.persisted_float_text(value) == walkforward.persisted_float_text(
+        math.nextafter(value, math.inf)
+    )
+
+
+def test_verified_runner_replays_complete_b0_b1_package_byte_for_byte(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    rows = _eligible_rows()
+    second_train = list(rows[1])
+    second_train[11:14] = [0, 1, "0"]
+    rows[1] = tuple(second_train)
+    source, _result, g0_freeze = _freeze_g0_fixture(tmp_path, monkeypatch, rows=rows)
+    first = _isolated_runner_replay(
+        g0_freeze=g0_freeze,
+        source=source,
+        output=tmp_path / "first-output",
+        freeze=tmp_path / "first-freeze",
+    )
+    second = _isolated_runner_replay(
+        g0_freeze=g0_freeze,
+        source=source,
+        output=tmp_path / "second-output",
+        freeze=tmp_path / "second-freeze",
+    )
+
+    assert first["summary"] == second["summary"]
+    assert first["freeze"]["freeze_id"] == second["freeze"]["freeze_id"]
+    assert _tree_bytes(tmp_path / "first-output") == _tree_bytes(tmp_path / "second-output")
+    assert _tree_bytes(tmp_path / "first-freeze") == _tree_bytes(tmp_path / "second-freeze")
+    verified = binding.verified_g0_binding(g0_freeze_dir=g0_freeze, source_db=source)
+    binding.verify_b0_b1_package_binding(tmp_path / "first-freeze", verified)
+
+    config = json.loads(
+        (tmp_path / "first-output" / "frozen_b0_b1_config.json").read_text(encoding="utf-8")
+    )
+    environment = json.loads(
+        (tmp_path / "first-output" / "runtime_environment.json").read_text(encoding="utf-8")
+    )
+    receipt = json.loads(
+        (tmp_path / "first-output" / "reproducibility_receipt.json").read_text(encoding="utf-8")
+    )
+    manifest = json.loads((tmp_path / "first-freeze" / "manifest.json").read_text(encoding="utf-8"))
+    assert config["persisted_float_codec"] == walkforward.persistence_contract()
+    assert environment["persistence_contract"] == walkforward.persistence_contract()
+    assert receipt["outputs"]["runtime_environment.json"] == walkforward.sha256_file(
+        tmp_path / "first-output" / "runtime_environment.json"
+    )
+    assert manifest["input_dataset"][0]["path"] == runner.SOURCE_LOGICAL_ID
+    assert str(tmp_path) not in json.dumps(manifest, sort_keys=True)

@@ -7,6 +7,7 @@ label panel.  It creates no ticket, return, EV, ROI, or production artifact.
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import math
 import sqlite3
@@ -33,8 +34,6 @@ ELIGIBLE_SETTLEMENT_QUALITIES = ("trusted",)
 
 
 def sha256_file(path: Path) -> str:
-    import hashlib
-
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(4 * 1024 * 1024), b""):
@@ -93,6 +92,17 @@ def _status_name(value: str) -> str:
     return value or "<blank>"
 
 
+def _redacted_source_meta(value: object) -> dict[str, str | bool]:
+    """Bind source metadata without publishing local locators or values."""
+
+    raw = "" if value is None else str(value)
+    return {
+        "value_present": bool(raw),
+        "value_sha256": hashlib.sha256(raw.encode("utf-8")).hexdigest(),
+        "value_visibility": "redacted",
+    }
+
+
 def _schema_inventory(connection: sqlite3.Connection) -> dict[str, Any]:
     rows = connection.execute("PRAGMA table_info(match_features)").fetchall()
     return {
@@ -101,7 +111,10 @@ def _schema_inventory(connection: sqlite3.Connection) -> dict[str, Any]:
         "required_columns": list(REQUIRED_COLUMNS),
         "missing_required_columns": sorted(set(REQUIRED_COLUMNS) - {str(row[1]) for row in rows}),
         "source_meta": [
-            {"key": str(row[0]), "value": str(row[1] or "")}
+            {
+                "key": str(row[0]),
+                **_redacted_source_meta(row[1]),
+            }
             for row in connection.execute("SELECT key,value FROM source_meta ORDER BY key")
         ],
     }
