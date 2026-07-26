@@ -1345,6 +1345,9 @@ export interface AdhocBettingPlanData {
   schemaVersion: string;
   capabilityId: string;
   requestId: string;
+  immutableRequestId: string;
+  publishedPackageCount: number;
+  generationBatchCount: number;
   issueId: string;
   requestedAt: string;
   inputAsOf: string;
@@ -1366,6 +1369,20 @@ export interface AdhocBettingPlanData {
   auditDownloadsAvailable: boolean;
   ticketCount: number;
   eligibleMatchCount: number;
+  maxTicketOccurrencesPerMatch?: number;
+  totalMatchOccurrenceCapacity?: number;
+  theoreticalTicketCountCap?: number;
+  maxActualTicketOccurrencesPerMatch?: number;
+  averageTicketOccurrencesPerMatch?: number;
+  matchOccurrencesSha256?: string;
+  matchOccurrences?: Array<{
+    matchIdx: number;
+    matchId: string;
+    ticketNumbers: number[];
+    distinctTicketOccurrenceCount: number;
+    spendWeightedExposureYuan: number;
+    spendWeightedExposureRatio: number;
+  }>;
   excludedMatchCount: number;
   exclusionCounts: Record<string, number>;
   denominator: AdhocMatchEligibilityData[];
@@ -1385,6 +1402,8 @@ export interface AdhocBettingPlanData {
       home: string;
       away: string;
       handicapLine?: number | string | null;
+      matchTicketOccurrenceCount?: number;
+      matchTicketNumbers?: number[];
     }>;
   }>;
   planReason: string;

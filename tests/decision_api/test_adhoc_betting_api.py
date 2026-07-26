@@ -339,6 +339,14 @@ def test_adhoc_api_generates_current_plan_and_identical_downloads(tmp_path: Path
     assert payload["research_evidence_eligible"] is False
     assert payload["scheduled_freeze_event_id"] is None
     assert payload["ticket_count"] > 0
+    assert payload["immutable_request_id"] == payload["request_id"]
+    assert payload["published_package_count"] == 1
+    assert payload["generation_batch_count"] == 1
+    assert payload["max_ticket_occurrences_per_match"] == 2
+    assert payload["max_actual_ticket_occurrences_per_match"] <= 2
+    assert payload["total_match_occurrence_capacity"] == 16
+    assert payload["theoretical_ticket_count_cap"] == 5
+    assert len(payload["match_occurrences"]) == 8
     assert all(ticket["actual_n"] == 3 for ticket in payload["tickets"])
     assert payload["base_cost_yuan"] > 0
     assert 0 < payload["budget_utilization"] <= 1
@@ -358,16 +366,44 @@ def test_adhoc_api_generates_current_plan_and_identical_downloads(tmp_path: Path
     assert observed.status_code == 200
     assert observed.get_json()["manifest_sha256"] == payload["manifest_sha256"]
     downloads: dict[str, bytes] = {}
-    for fmt, prefix in (("pdf", b"%PDF"), ("html", b"<!doctype html>"), ("csv", b"request_id,")):
+    for fmt, prefix in (("pdf", b"%PDF"), ("html", b"<!doctype html>"), ("csv", b"row_type,")):
         download = client.get(f"/api/adhoc-betting-plans/{payload['request_id']}/download?format={fmt}")
         assert download.status_code == 200
         assert download.headers["X-Adhoc-Usage-Boundary"] == "OPERATIONAL_CURRENT"
         assert download.data.startswith(prefix)
         downloads[fmt] = download.data
     assert payload["request_id"].encode() in downloads["html"]
+    assert "不可变请求 / 发布包数 / 生成批次数".encode() in downloads["html"]
+    assert "逐场集中度证据哈希".encode() in downloads["html"]
+    assert payload["match_occurrences_sha256"].encode() in downloads["html"]
+    assert "单场票数硬上限".encode() in downloads["html"]
     csv_rows = list(csv.DictReader(io.StringIO(downloads["csv"].decode())))
-    assert len(csv_rows) == payload["ticket_count"] * 3
-    assert {row["selection_code"] for row in csv_rows} == {"3"}
+    summary_rows = [row for row in csv_rows if row["row_type"] == "portfolio_summary"]
+    assert len(summary_rows) == 1
+    assert summary_rows[0]["immutable_request_id"] == payload["request_id"]
+    assert summary_rows[0]["published_package_count"] == "1"
+    assert summary_rows[0]["generation_batch_count"] == "1"
+    assert (
+        summary_rows[0]["match_occurrences_sha256"]
+        == payload["match_occurrences_sha256"]
+    )
+    assert summary_rows[0]["max_ticket_occurrences_per_match"] == "2"
+    assert int(summary_rows[0]["max_actual_ticket_occurrences_per_match"]) <= 2
+    assert summary_rows[0]["total_match_occurrence_capacity"] == "16"
+    assert summary_rows[0]["theoretical_ticket_count_cap"] == "5"
+    assert float(summary_rows[0]["unused_budget_yuan"]) > 0
+    ticket_leg_rows = [row for row in csv_rows if row["row_type"] == "ticket_leg"]
+    assert len(ticket_leg_rows) == payload["ticket_count"] * 3
+    assert {row["selection_code"] for row in ticket_leg_rows} == {"3"}
+    assert {row["match_id"] for row in csv_rows if row["match_id"]} == {
+        row["match_id"] for row in payload["match_occurrences"]
+    }
+    assert all(
+        row["match_spend_weighted_exposure_yuan"]
+        and row["match_spend_weighted_exposure_ratio"]
+        for row in csv_rows
+        if row["match_id"]
+    )
     expected_legs = [
         (str(ticket["ticket_no"]), str(leg["match_idx"]), str(leg["selection_code"]))
         for ticket in payload["tickets"]
@@ -375,7 +411,7 @@ def test_adhoc_api_generates_current_plan_and_identical_downloads(tmp_path: Path
     ]
     assert [
         (row["ticket_no"], row["match_idx"], row["selection_code"])
-        for row in csv_rows
+        for row in ticket_leg_rows
     ] == expected_legs
 
 

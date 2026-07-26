@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 from pypdf import PdfReader
 
+import src.adhoc_betting as adhoc_module
 from src.adhoc_betting import (
     AdhocBettingError,
     AdhocBettingStore,
@@ -147,6 +149,128 @@ def test_each_allowed_exact_n_stays_exact_without_a_fallback(n_value: int) -> No
     assert 0 < actual_cost <= 512
     assert all(ticket["actual_n"] == n_value for ticket in tickets)
     assert all(len(ticket["match_indices"]) == n_value for ticket in tickets)
+    occurrence_counts = Counter(
+        int(match_idx)
+        for ticket in tickets
+        for match_idx in ticket["match_indices"]
+    )
+    assert max(occurrence_counts.values(), default=0) <= 2
+    assert all(ticket["stake_multiplier"] == 1 for ticket in tickets)
+
+
+@pytest.mark.parametrize("n_value", [3, 4, 5, 6, 7])
+@pytest.mark.parametrize("budget", [512, 768, 1024])
+def test_concentration_matrix_returns_compliant_smaller_plans(
+    n_value: int, budget: int
+) -> None:
+    source = _source_snapshot(count=38)
+    normalized = [
+        _normalize_match(
+            dict(row),
+            requested_at=NOW,
+            max_source_age=timedelta(minutes=15),
+            safety_margin=timedelta(seconds=120),
+        )
+        for row in source["matches"]  # type: ignore[index]
+    ]
+    tickets, _base_cost, actual_cost, reason = _make_portfolio(
+        eligible=normalized,
+        issue="26078",
+        n_value=n_value,
+        budget_yuan=budget,
+        seed=42 + n_value,
+    )
+    counts = Counter(
+        int(match_idx)
+        for ticket in tickets
+        for match_idx in ticket["match_indices"]
+    )
+    assert tickets
+    assert max(counts.values(), default=0) <= 2
+    assert len(tickets) <= (38 * 2) // n_value
+    assert actual_cost < budget
+    assert reason == "adhoc_concentration_capped_unit_once"
+
+
+def test_fixed_38_match_capacity_examples_are_deterministic() -> None:
+    source = _source_snapshot(count=38)
+    normalized = [
+        _normalize_match(
+            dict(row),
+            requested_at=NOW,
+            max_source_age=timedelta(minutes=15),
+            safety_margin=timedelta(seconds=120),
+        )
+        for row in source["matches"]  # type: ignore[index]
+    ]
+    n3 = _make_portfolio(
+        eligible=normalized, issue="26078", n_value=3, budget_yuan=1024, seed=45
+    )[0]
+    n4 = _make_portfolio(
+        eligible=normalized, issue="26078", n_value=4, budget_yuan=1024, seed=46
+    )[0]
+    assert len(n3) <= 25
+    assert len(n4) <= 19
+
+
+def test_no_compliant_exact_n_ticket_is_the_only_selector_unavailable_case() -> None:
+    source = _source_snapshot(
+        mutate={
+            idx: {
+                "probabilities": {"3": 0.05, "1": 0.475, "0": 0.475},
+                "sp": {"3": 1.01, "1": 2.0, "0": 2.0},
+            }
+            for idx in range(1, 9)
+        }
+    )
+    normalized = [
+        _normalize_match(
+            dict(row),
+            requested_at=NOW,
+            max_source_age=timedelta(minutes=15),
+            safety_margin=timedelta(seconds=120),
+        )
+        for row in source["matches"]  # type: ignore[index]
+    ]
+    tickets, base_cost, actual_cost, reason = _make_portfolio(
+        eligible=normalized, issue="26078", n_value=3, budget_yuan=512, seed=42
+    )
+    assert tickets == []
+    assert base_cost == actual_cost == 0
+    assert reason == "no_compliant_exact_n_ticket"
+
+
+def test_legacy_v1_replay_path_preserves_released_scaled_portfolio() -> None:
+    source = _source_snapshot()
+    normalized = [
+        _normalize_match(
+            dict(row),
+            requested_at=NOW,
+            max_source_age=timedelta(minutes=15),
+            safety_margin=timedelta(seconds=120),
+        )
+        for row in source["matches"]  # type: ignore[index]
+    ]
+    first = _make_portfolio(
+        eligible=normalized,
+        issue="26078",
+        n_value=3,
+        budget_yuan=512,
+        seed=42,
+        concentration_enforced=False,
+    )
+    second = _make_portfolio(
+        eligible=normalized,
+        issue="26078",
+        n_value=3,
+        budget_yuan=512,
+        seed=42,
+        concentration_enforced=False,
+    )
+    assert first == second
+    assert first[0]
+    assert any(ticket["stake_multiplier"] > 1 for ticket in first[0])
+    assert first[2] <= 512
 
 
 @pytest.mark.parametrize("n_value", [3, 4, 5, 6, 7])
@@ -176,6 +300,11 @@ def test_current_exact_n_package_is_verified_content_addressed_and_separate(tmp_
     assert result["research_evidence_eligible"] is False
     assert result["scheduled_freeze_event_id"] is None
     assert result["ticket_count"] > 0
+    assert result["max_ticket_occurrences_per_match"] == 2
+    assert result["max_actual_ticket_occurrences_per_match"] <= 2
+    assert result["total_match_occurrence_capacity"] == 16
+    assert result["theoretical_ticket_count_cap"] == 5
+    assert len(result["match_occurrences"]) == 8
     assert 0 < float(result["actual_cost_yuan"]) <= 512
     assert all(ticket["actual_n"] == 3 for ticket in result["tickets"])
     assert len(result["denominator"]) == 8
@@ -188,6 +317,21 @@ def test_current_exact_n_package_is_verified_content_addressed_and_separate(tmp_
     verified = verify_package(package)
     assert verified["status"] == "PASS"
     assert verified["request_id"] == result["request_id"]
+    assert verified["immutable_request_id"] == result["request_id"]
+    assert verified["published_package_count"] == 1
+    assert verified["generation_batch_count"] == 1
+    assert verified["total_match_occurrence_capacity"] == 16
+    assert verified["theoretical_ticket_count_cap"] == 5
+    assert verified["unused_budget_yuan"] == result["unused_budget_yuan"]
+    assert verified["match_occurrences_sha256"]
+    assert verified["match_occurrences"] == result["match_occurrences"]
+    assert len(verified["match_occurrences"]) == verified["eligible_match_count"]
+    assert all(
+        row["distinct_ticket_occurrence_count"] <= 2
+        for row in verified["match_occurrences"]
+    )
+    assert verified["portfolio_contract_sha256"]
+    assert verified["decision_input_sha256"]
 
     manifest = json.loads((package / "adhoc_request_manifest.json").read_text(encoding="utf-8"))
     plan = json.loads((package / "exact_n_plan.json").read_text(encoding="utf-8"))
@@ -198,6 +342,16 @@ def test_current_exact_n_package_is_verified_content_addressed_and_separate(tmp_
     assert manifest["budget_utilization"] == plan["budget_utilization"]
     assert manifest["portfolio_contract"] == plan["portfolio_contract"]
     assert manifest["portfolio_contract_sha256"] == plan["portfolio_contract_sha256"]
+    assert manifest["concentration_contract"] == plan["concentration_contract"]
+    assert plan["concentration_contract"]["max_ticket_occurrences_per_match"] == 2
+    assert plan["concentration_contract"]["immutable_request_id"] == result["request_id"]
+    assert plan["concentration_contract"]["published_package_count"] == 1
+    assert plan["concentration_contract"]["generation_batch_count"] == 1
+    assert plan["concentration_contract"]["match_identity_field"] == "match_id"
+    assert plan["concentration_contract"]["stake_mode"] == "unit_once"
+    assert plan["concentration_contract"]["duplicate_equivalent_tickets_allowed"] is False
+    assert plan["concentration_contract"]["max_actual_ticket_occurrences_per_match"] <= 2
+    assert plan["concentration_contract"]["match_occurrences_sha256"]
     assert plan["portfolio_contract"]["sample_attempts"] == PUBLISHED_EXACT_N_SAMPLE_ATTEMPTS
     assert plan["portfolio_contract"]["max_overlap"] == 1
     assert plan["portfolio_contract"]["positive_ev_only"] is True
@@ -210,11 +364,111 @@ def test_current_exact_n_package_is_verified_content_addressed_and_separate(tmp_
     html_view = (package / "adhoc_betting_view.html").read_text(encoding="utf-8")
     assert "@page { size:A4" in html_view
     assert "break-inside:avoid" in html_view
+    assert "不可变请求 / 发布包数 / 生成批次数" in html_view
+    assert "逐场集中度证据哈希" in html_view
+    assert result["match_occurrences_sha256"] in html_view
+    assert "单场票数硬上限 / 实际最大值" in html_view
+    assert "集中度或组合约束造成的未用预算" in html_view
     reader = PdfReader(str(package / "adhoc_betting_slip.pdf"))
     assert len(reader.pages) >= 1
     pdf_text = "".join(page.extract_text() or "" for page in reader.pages)
     assert "北单即时方案" in pdf_text
     assert str(result["request_id"]) in pdf_text
+    assert "不可变请求 / 发布包数 / 生成批次数" in pdf_text
+    assert "逐场集中度证据哈希" in pdf_text
+    assert result["match_occurrences_sha256"] in pdf_text
+    assert "单场票数硬上限 / 实际最大值" in pdf_text
+    assert "总容量 / 理论票数上限" in pdf_text
+    assert "集中度或组合约束造成的未用预算" in pdf_text
+
+
+def test_legacy_v1_package_without_concentration_fields_still_replays(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_make_portfolio = adhoc_module._make_portfolio
+    original_verify_package = adhoc_module.verify_package
+
+    def legacy_make_portfolio(**kwargs):
+        kwargs["concentration_enforced"] = False
+        return original_make_portfolio(**kwargs)
+
+    def pre_upgrade_verify_package(root, **kwargs):
+        return adhoc_module._verify_package(
+            root,
+            _legacy_ledger_binding=adhoc_module._LEGACY_LEDGER_BINDING,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(
+        adhoc_module, "PACKAGE_SCHEMA_VERSION", "adhoc_betting_package_v1"
+    )
+    monkeypatch.setattr(adhoc_module, "_make_portfolio", legacy_make_portfolio)
+    monkeypatch.setattr(
+        adhoc_module, "verify_package", pre_upgrade_verify_package
+    )
+    store = _store(tmp_path)
+    result = _create(store, _source_snapshot(), key="legacy-v1-package")
+    monkeypatch.setattr(adhoc_module, "verify_package", original_verify_package)
+    package = tmp_path / "adhoc-packages" / "packages" / "26078" / str(
+        result["package_id"]
+    )
+
+    plan_path = package / "exact_n_plan.json"
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    plan.pop("concentration_contract", None)
+    plan.pop("concentration_contract_sha256", None)
+    plan.pop("sha256", None)
+    plan["sha256"] = digest(plan)
+    plan_path.write_bytes(canonical(plan) + b"\n")
+
+    manifest_path = package / "adhoc_request_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest.pop("concentration_contract", None)
+    manifest.pop("concentration_contract_sha256", None)
+    manifest["exact_n_plan_sha256"] = plan["sha256"]
+    for artifact in manifest["artifacts"]:
+        if artifact["file"] == "exact_n_plan.json":
+            artifact["sha256"] = file_hash(plan_path)
+    manifest.pop("sha256", None)
+    manifest["package_id"] = _package_identity(manifest)
+    manifest["sha256"] = digest(manifest)
+    manifest_path.write_bytes(canonical(manifest) + b"\n")
+
+    legacy_package = package.with_name(manifest["package_id"])
+    package.rename(legacy_package)
+    (legacy_package / "SHA256SUMS").write_text(
+        "".join(
+            f"{file_hash(path)}  {path.name}\n"
+            for path in sorted(legacy_package.iterdir())
+            if path.is_file() and path.name != "SHA256SUMS"
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(
+        AdhocBettingError, match="requires trusted ledger binding"
+    ):
+        verify_package(legacy_package)
+    conn = sqlite3.connect(tmp_path / "adhoc.sqlite")
+    try:
+        conn.execute(
+            """
+            UPDATE adhoc_betting_request_ledger
+            SET package_id=?, manifest_sha256=?, package_path=?
+            WHERE request_id=?
+            """,
+            (
+                str(manifest["package_id"]),
+                str(manifest["sha256"]),
+                str(legacy_package.resolve()),
+                str(result["request_id"]),
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    assert store.get(str(result["request_id"]))["package_id"] == str(
+        manifest["package_id"]
+    )
 
 
 def test_fail_closed_exclusions_cannot_produce_n_fallback(tmp_path: Path) -> None:
@@ -246,6 +500,13 @@ def test_fail_closed_exclusions_cannot_produce_n_fallback(tmp_path: Path) -> Non
         store.artifact_path(str(result["request_id"]), fmt="pdf", now=NOW)
 
 
+def test_duplicate_match_id_cannot_evade_concentration_identity(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    source = _source_snapshot(mutate={2: {"match_id": "26078_001"}})
+    with pytest.raises(AdhocBettingError, match="duplicate match IDs"):
+        _create(store, source)
+
+
 def test_identical_retry_is_idempotent_and_changed_bound_input_is_new_request(tmp_path: Path) -> None:
     store = _store(tmp_path)
     first = _create(store, _source_snapshot(), key="same-bound-request")
@@ -270,6 +531,21 @@ def test_identical_retry_is_idempotent_and_changed_bound_input_is_new_request(tm
     assert changed["request_id"] != first["request_id"]
     assert changed["package_id"] != first["package_id"]
     assert later["request_id"] != first["request_id"]
+    for result in (first, changed, later):
+        package = (
+            tmp_path
+            / "adhoc-packages"
+            / "packages"
+            / "26078"
+            / str(result["package_id"])
+        )
+        plan = json.loads(
+            (package / "exact_n_plan.json").read_text(encoding="utf-8")
+        )
+        concentration = plan["concentration_contract"]
+        assert concentration["immutable_request_id"] == result["request_id"]
+        assert concentration["published_package_count"] == 1
+        assert concentration["generation_batch_count"] == 1
 
 
 def test_expiry_blocks_operational_download_but_preserves_audit_record(tmp_path: Path) -> None:
@@ -328,8 +604,134 @@ def test_rehashed_tampering_is_rejected_by_semantic_verifier(tmp_path: Path) -> 
         verify_package(rehashed_package)
 
 
-def test_fully_rehashed_ticket_replacement_is_rejected_by_portfolio_replay(tmp_path: Path) -> None:
-    """A self-consistent package cannot substitute a valid-looking ticket set."""
+def test_duplicate_selection_code_cannot_evade_scale_a_rehashed_ticket(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    result = _create(store, _source_snapshot())
+    package = (
+        tmp_path
+        / "adhoc-packages"
+        / "packages"
+        / "26078"
+        / str(result["package_id"])
+    )
+    plan_path = package / "exact_n_plan.json"
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    original_code = str(plan["tickets"][0]["leg_codes"][0])
+    plan["tickets"][0]["leg_codes"][0] = f"{original_code}+{original_code}"
+    plan.pop("sha256", None)
+    plan["sha256"] = digest(plan)
+    plan_path.write_bytes(canonical(plan) + b"\n")
+
+    manifest_path = package / "adhoc_request_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["exact_n_plan_sha256"] = plan["sha256"]
+    for artifact in manifest["artifacts"]:
+        if artifact["file"] == "exact_n_plan.json":
+            artifact["sha256"] = file_hash(plan_path)
+    manifest.pop("sha256", None)
+    manifest["package_id"] = _package_identity(manifest)
+    manifest["sha256"] = digest(manifest)
+    manifest_path.write_bytes(canonical(manifest) + b"\n")
+
+    rehashed_package = package.with_name(manifest["package_id"])
+    package.rename(rehashed_package)
+    (rehashed_package / "SHA256SUMS").write_text(
+        "".join(
+            f"{file_hash(path)}  {path.name}\n"
+            for path in sorted(rehashed_package.iterdir())
+            if path.is_file() and path.name != "SHA256SUMS"
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        AdhocBettingError, match="duplicate selection codes"
+    ):
+        verify_package(rehashed_package)
+
+
+def test_fully_rehashed_pdf_without_concentration_evidence_is_rejected(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    result = _create(store, _source_snapshot())
+    package = tmp_path / "adhoc-packages" / "packages" / "26078" / str(
+        result["package_id"]
+    )
+    pdf_path = package / "adhoc_betting_slip.pdf"
+    pdf_path.write_bytes(
+        b"%PDF-1.4\nNO CONCENTRATION EVIDENCE\n%%EOF\n"
+    )
+
+    manifest_path = package / "adhoc_request_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for artifact in manifest["artifacts"]:
+        if artifact["file"] == "adhoc_betting_slip.pdf":
+            artifact["sha256"] = file_hash(pdf_path)
+    manifest.pop("sha256", None)
+    manifest["package_id"] = _package_identity(manifest)
+    manifest["sha256"] = digest(manifest)
+    manifest_path.write_bytes(canonical(manifest) + b"\n")
+
+    rehashed_package = package.with_name(manifest["package_id"])
+    package.rename(rehashed_package)
+    (rehashed_package / "SHA256SUMS").write_text(
+        "".join(
+            f"{file_hash(path)}  {path.name}\n"
+            for path in sorted(rehashed_package.iterdir())
+            if path.is_file() and path.name != "SHA256SUMS"
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        AdhocBettingError, match="PDF concentration view"
+    ):
+        verify_package(rehashed_package)
+
+
+def test_rehashed_v2_to_v1_schema_downgrade_cannot_skip_replay(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    result = _create(store, _source_snapshot())
+    package = tmp_path / "adhoc-packages" / "packages" / "26078" / str(
+        result["package_id"]
+    )
+    manifest_path = package / "adhoc_request_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["schema_version"] = "adhoc_betting_package_v1"
+    manifest.pop("sha256", None)
+    manifest["package_id"] = _package_identity(manifest)
+    manifest["sha256"] = digest(manifest)
+    manifest_path.write_bytes(canonical(manifest) + b"\n")
+
+    rehashed_package = package.with_name(manifest["package_id"])
+    package.rename(rehashed_package)
+    (rehashed_package / "SHA256SUMS").write_text(
+        "".join(
+            f"{file_hash(path)}  {path.name}\n"
+            for path in sorted(rehashed_package.iterdir())
+            if path.is_file() and path.name != "SHA256SUMS"
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        AdhocBettingError, match="requires trusted ledger binding"
+    ):
+        verify_package(rehashed_package)
+    with pytest.raises(
+        TypeError, match="unexpected keyword argument"
+    ):
+        verify_package(
+            rehashed_package,
+            trusted_legacy_package_id=str(result["package_id"]),
+        )
+
+
+def test_fully_rehashed_third_match_occurrence_is_rejected(tmp_path: Path) -> None:
+    """Changing codes, hashes, or ticket composition cannot hide a third occurrence."""
 
     store = _store(tmp_path)
     result = _create(store, _source_snapshot())
@@ -340,17 +742,25 @@ def test_fully_rehashed_ticket_replacement_is_rejected_by_portfolio_replay(tmp_p
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
-    assert plan["tickets"]
-    changed_ticket = plan["tickets"][0]
-    old_indices = {int(value) for value in changed_ticket["match_indices"]}
-    replacement = next(
+    counts = Counter(
+        int(match_idx)
+        for ticket in plan["tickets"]
+        for match_idx in ticket["match_indices"]
+    )
+    target = next(idx for idx, count in counts.items() if count == 2)
+    unused = [
         int(row["match_idx"])
         for row in denominator["included"]
-        if int(row["match_idx"]) not in old_indices
+        if int(row["match_idx"]) not in counts
+    ]
+    assert len(unused) >= 2
+    changed_ticket = next(
+        ticket for ticket in plan["tickets"] if target not in ticket["match_indices"]
     )
-    changed_ticket["match_indices"][-1] = replacement
-    # The fixture gives every leg the same code/price, so this replacement
-    # remains structurally valid and cost-consistent before the replay check.
+    # The two unused matches keep every pair overlap within the released limit,
+    # while target becomes a third distinct-ticket occurrence.
+    changed_ticket["match_indices"] = [target, unused[0], unused[1]]
+    changed_ticket["leg_codes"] = ["3", "3", "3"]
     plan.pop("sha256", None)
     plan["sha256"] = digest(plan)
     plan_path.write_bytes(canonical(plan) + b"\n")
@@ -387,7 +797,7 @@ def test_fully_rehashed_ticket_replacement_is_rejected_by_portfolio_replay(tmp_p
         encoding="utf-8",
     )
 
-    with pytest.raises(AdhocBettingError, match="Exact-N portfolio replay mismatch"):
+    with pytest.raises(AdhocBettingError, match="two-ticket concentration cap"):
         verify_package(rehashed_package)
 
 
