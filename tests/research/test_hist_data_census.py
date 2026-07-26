@@ -264,3 +264,35 @@ def test_full_census_requires_frozen_inventory_and_keeps_terminal_values_out(tmp
     )
     assert verified["status"] == "valid"
     assert verified["inventory_bound"] is True
+
+
+def test_census_fails_closed_per_asset_when_a_live_source_drifts(tmp_path: Path) -> None:
+    source_root = census_fixture(tmp_path)
+    inventory = build_source_inventory(repository_root=source_root)
+    inventory_paths = write_inventory_artifacts(tmp_path / "inventory-output", inventory, git_commit=COMMIT)
+    inventory_package = tmp_path / "freeze" / "inventory"
+    create_inventory_package(
+        inventory_paths,
+        output_dir=inventory_package,
+        git_commit=COMMIT,
+        frozen_at_utc="2026-07-26T00:00:00+00:00",
+    )
+    database = source_root / "data" / "derived" / "beidan_xlsm" / "beidan_xlsm.sqlite"
+    with sqlite3.connect(database) as connection:
+        connection.execute("INSERT INTO matches VALUES (2, '26077', '2026-07-26T12:00:00+00:00', 0.0, 0, 0, '1')")
+
+    artifacts = audit_frozen_inventory(
+        inventory_package=inventory_package,
+        repository_root=source_root,
+        runtime_inputs=[],
+        git_commit=COMMIT,
+    )
+    report = artifacts["audit_report.json"]
+    assert report["source_identity_verified_before_and_after"] is False
+    assert report["source_drifted_asset_count"] == 1
+    drift = next(row for row in artifacts["coverage_by_period.csv"] if row["coverage_status"] == "SOURCE_DRIFT_FAIL_CLOSED")
+    assert drift["logical_asset_id"].endswith("derived-beidan-xlsm-beidan-xlsm-sqlite")
+    assert not any(
+        row["logical_asset_id"] == drift["logical_asset_id"]
+        for row in artifacts["schema_dictionary.csv"]
+    )

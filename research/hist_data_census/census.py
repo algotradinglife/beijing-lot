@@ -1373,6 +1373,72 @@ def _references(
     return output
 
 
+def _drifted_asset_ids(
+    expected_rows: Sequence[Mapping[str, str]],
+    observed_rows: Sequence[Mapping[str, Any]],
+) -> set[str]:
+    """Return frozen assets whose public identity changed after G0.
+
+    Newly discovered assets are intentionally not folded into a frozen census;
+    they belong to a later inventory release.  A changed frozen asset is kept
+    in the public inventory but is not inspected further in this run.
+    """
+
+    fields = ("availability", "bytes", "sha256", "bundle_file_count")
+    expected = {str(row["logical_asset_id"]): row for row in expected_rows}
+    observed = {str(row["logical_asset_id"]): row for row in observed_rows}
+    return {
+        asset_id
+        for asset_id, before in expected.items()
+        if asset_id not in observed
+        or any(str(before.get(field, "")) != str(observed[asset_id].get(field, "")) for field in fields)
+    }
+
+
+def _source_drift_rows(reference: SourceReference, *, phase: str) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    base = _asset_base(reference)
+    reason = f"frozen source identity changed {phase}; no schema, coverage, outcome or price evidence from this asset is used"
+    coverage = {
+        **base,
+        "table_name": "",
+        "market": "ALL",
+        "period_basis": "SOURCE_IDENTITY",
+        "period_value": "DRIFTED_AFTER_G0",
+        "row_count": "",
+        "distinct_match_count": "",
+        "distinct_issue_count": "",
+        "date_or_issue_field": "",
+        "coverage_status": "SOURCE_DRIFT_FAIL_CLOSED",
+        "coverage_note": reason,
+    }
+    admissible = {
+        "scope_level": "asset",
+        **base,
+        "table_name": "",
+        "field_name": "",
+        "market": "ALL",
+        "admissible_use": "prohibited",
+        "strict_conditions": "none until a new frozen inventory/snapshot is verified",
+        "provenance_grade": "SOURCE_DRIFT_AFTER_G0",
+        "classification_reason": reason,
+    }
+    integration = {
+        "scope_level": "asset",
+        **base,
+        "table_name": "",
+        "field_name": "",
+        "market": "ALL",
+        "integration_decision": "PROHIBITED",
+        "destination_layer": "none",
+        "lineage_fields": "logical_asset_id;frozen source sha256",
+        "required_transforms": "new inventory freeze or immutable local snapshot before any future read",
+        "deduplication_key": "none",
+        "timestamp_grade": "SOURCE_DRIFT_AFTER_G0",
+        "limitations": reason,
+    }
+    return coverage, admissible, integration
+
+
 def audit_frozen_inventory(
     *,
     inventory_package: Path,
@@ -1389,16 +1455,24 @@ def audit_frozen_inventory(
         package,
         repository_root=source_root,
         runtime_inputs=runtime_inputs,
-        verify_current_sources=True,
+        verify_current_sources=False,
     )
     inventory_rows = _read_csv(package / "inputs" / "source_inventory.csv")
     expected_inventory_identity = inventory_identity(inventory_rows)
     references = _references(inventory_rows, repository_root=source_root, runtime_inputs=runtime_inputs)
+    observed_start = build_source_inventory(repository_root=source_root, runtime_inputs=runtime_inputs)
+    drifted_before = _drifted_asset_ids(inventory_rows, observed_start)
     output: dict[str, list[dict[str, Any]]] = defaultdict(list)
     output["source_inventory.csv"] = [dict(row) for row in inventory_rows]
     market_context: dict[str, Counter[str]] = defaultdict(Counter)
 
     for reference in references:
+        if reference.asset_id in drifted_before:
+            coverage, admissible, integration = _source_drift_rows(reference, phase="before audit")
+            output["coverage_by_period.csv"].append(coverage)
+            output["admissible_use_matrix.csv"].append(admissible)
+            output["integration_decisions.csv"].append(integration)
+            continue
         admissible, integration = _asset_matrix_rows(reference)
         output["admissible_use_matrix.csv"].append(admissible)
         output["integration_decisions.csv"].append(integration)
@@ -1451,7 +1525,7 @@ def audit_frozen_inventory(
     # The #37 finding is a fixed external dependency and must override any
     # generic field-name heuristic in this broader audit.
     for reference in references:
-        if reference.asset_id.endswith("derived-beidan-xlsm-beidan-xlsm-sqlite"):
+        if reference.asset_id not in drifted_before and reference.asset_id.endswith("derived-beidan-xlsm-beidan-xlsm-sqlite"):
             admissible, integration = _p42_override(reference)
             output["admissible_use_matrix.csv"].append(admissible)
             output["integration_decisions.csv"].append(integration)
@@ -1472,11 +1546,35 @@ def audit_frozen_inventory(
     output["market_outcome_schemas.csv"].extend(_target_contract_schema_rows())
     output["model_readiness_matrix.csv"].extend(_readiness_rows(market_context))
 
-    # A second complete identity check prevents a silently changing live source
-    # from being represented as the frozen historical census input.
+    # A second identity check removes all structural evidence for any source
+    # that changed during the read.  That preserves a useful audit of stable
+    # assets without silently mixing an active live database into it.
     observed_end = build_source_inventory(repository_root=source_root, runtime_inputs=runtime_inputs)
-    if inventory_identity(observed_end) != expected_inventory_identity:
-        raise CensusError("runtime source inventory changed while the census was reading it")
+    drifted_after = _drifted_asset_ids(inventory_rows, observed_end)
+    drifted_assets = drifted_before | drifted_after
+    frozen_asset_ids = {str(row["logical_asset_id"]) for row in inventory_rows}
+    newly_discovered_after_g0 = sorted(
+        str(row["logical_asset_id"])
+        for row in observed_end
+        if str(row["logical_asset_id"]) not in frozen_asset_ids
+    )
+    if drifted_assets:
+        for name, rows in output.items():
+            if name == "source_inventory.csv":
+                continue
+            output[name] = [
+                row for row in rows
+                if str(row.get("logical_asset_id", "")) not in drifted_assets
+            ]
+        references_by_id = {reference.asset_id: reference for reference in references}
+        for asset_id in sorted(drifted_assets):
+            coverage, admissible, integration = _source_drift_rows(
+                references_by_id[asset_id],
+                phase="before audit" if asset_id in drifted_before else "during audit",
+            )
+            output["coverage_by_period.csv"].append(coverage)
+            output["admissible_use_matrix.csv"].append(admissible)
+            output["integration_decisions.csv"].append(integration)
 
     inventory_ref = _inventory_reference(package)
     audit_report = {
@@ -1491,7 +1589,13 @@ def audit_frozen_inventory(
         "database_assets_profiled": sum(reference.kind == "sqlite_database" for reference in references),
         "scope_boundary": "Data archaeology and admissible-use classification only; no model fitting, prediction, calibration, backtest, EV, q, ROI, ticket, stake, selection or strategy conclusion.",
         "score_price_hist_dependency": "incorporated_without_reinterpretation: historical correct-score price replay remains prohibited",
-        "source_identity_verified_before_and_after": True,
+        "source_identity_verified_before_and_after": not drifted_assets,
+        "mixed_source_evidence_blocked": True,
+        "source_drifted_asset_count": len(drifted_assets),
+        "source_drifted_logical_asset_ids": sorted(drifted_assets),
+        "new_unfrozen_asset_count": len(newly_discovered_after_g0),
+        "new_unfrozen_logical_asset_ids": newly_discovered_after_g0,
+        "stable_asset_count": len(inventory_rows) - len(drifted_assets),
     }
     config = {
         "schema_version": CENSUS_SCHEMA,
@@ -1518,7 +1622,12 @@ def audit_frozen_inventory(
         ),
         "source_inventory_sha256": expected_inventory_identity,
         **inventory_ref,
-        "source_identity_verified_before_and_after": True,
+        "source_identity_verified_before_and_after": not drifted_assets,
+        "source_drifted_asset_count": len(drifted_assets),
+        "source_drifted_logical_asset_ids": sorted(drifted_assets),
+        "new_unfrozen_asset_count": len(newly_discovered_after_g0),
+        "new_unfrozen_logical_asset_ids": newly_discovered_after_g0,
+        "mixed_source_evidence_blocked": True,
         "public_redaction_verified": True,
         "no_model_or_return_analysis": True,
     }
@@ -1674,13 +1783,21 @@ def verify_census_package(
             inventory,
             repository_root=repository_root,
             runtime_inputs=runtime_inputs,
-            verify_current_sources=repository_root is not None,
+            verify_current_sources=False,
         )
         inventory_ref = _inventory_reference(inventory)
         if report.get("source_inventory_sha256") != inventory_check["source_inventory_sha256"]:
             raise CensusError("census package does not bind the supplied frozen G0 inventory")
         if report.get("inventory_freeze_id") != inventory_ref["inventory_freeze_id"]:
             raise CensusError("census package inventory freeze reference mismatch")
+    current_frozen_source_identity = "NOT_REQUESTED"
+    if repository_root is not None:
+        frozen_rows = _read_csv(inventory / "inputs" / "source_inventory.csv") if inventory_package is not None else []
+        observed = build_source_inventory(repository_root=repository_root, runtime_inputs=runtime_inputs)
+        currently_drifted = _drifted_asset_ids(frozen_rows, observed) if frozen_rows else set()
+        audited_drifted = set(str(item) for item in report.get("source_drifted_logical_asset_ids", []))
+        stable_audited = not (currently_drifted - audited_drifted)
+        current_frozen_source_identity = "STABLE_FOR_AUDITED_ASSETS" if stable_audited else "CURRENT_AUDITED_ASSET_DRIFT"
     return {
         "status": "valid",
         "audit_id": AUDIT_ID,
@@ -1688,6 +1805,7 @@ def verify_census_package(
         "source_inventory_sha256": report.get("source_inventory_sha256"),
         "artifact_count": len(REQUIRED_CENSUS_ARTIFACTS),
         "inventory_bound": inventory_package is not None,
+        "current_frozen_source_identity": current_frozen_source_identity,
         "sha256s_sha256": generic["sha256s_sha256"],
         "manifest_sha256": generic["manifest_sha256"],
     }
