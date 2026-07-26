@@ -204,7 +204,7 @@ def test_timestamp_binding_fails_closed_and_prohibited_fields_are_absent(tmp_pat
 
 def create_package(tmp_path: Path) -> tuple[Path, Path, Path, object, object]:
     workbook, database, workbook_input, database_input = audit_fixture(tmp_path)
-    artifacts = audit_inputs(workbook_input, [database_input])
+    artifacts = audit_inputs(workbook_input, [database_input], git_commit="a" * 40)
     artifact_paths = write_audit_artifacts(tmp_path / "audit-output", artifacts)
     create_audit_package(
         artifact_paths,
@@ -219,6 +219,7 @@ def test_package_reproduces_and_rejects_source_hash_mismatch(tmp_path: Path) -> 
     package, _, database, workbook_input, database_input = create_package(tmp_path)
     verified = verify_audit_package(package, workbook_input=workbook_input, database_inputs=[database_input])
     assert verified["status"] == "valid"
+    assert verified["git_commit"] == "a" * 40
     with sqlite3.connect(database) as connection:
         connection.execute("UPDATE source_meta SET value = 'changed' WHERE key = 'no_exotic'")
     with pytest.raises(ScorePriceAuditError, match="hash mismatch"):
@@ -249,3 +250,19 @@ def test_package_checksum_tamper_and_public_redaction_are_rejected(tmp_path: Pat
     source_inventory.write_text(contents + "tamper\n", encoding="utf-8")
     with pytest.raises(ScorePriceAuditError, match="checksum"):
         verify_audit_package(package, workbook_input=workbook_input, database_inputs=[database_input])
+
+
+def test_package_requires_an_exact_full_git_commit_binding(tmp_path: Path) -> None:
+    _, _, workbook_input, database_input = audit_fixture(tmp_path)
+    with pytest.raises(ScorePriceAuditError, match="full 40-character"):
+        audit_inputs(workbook_input, [database_input], git_commit="a" * 7)
+
+    artifacts = audit_inputs(workbook_input, [database_input])
+    paths = write_audit_artifacts(tmp_path / "audit-output", artifacts)
+    with pytest.raises(ScorePriceAuditError, match="reproducibility receipt"):
+        create_audit_package(
+            paths,
+            output_dir=tmp_path / "freeze" / AUDIT_ID,
+            git_commit="a" * 40,
+            frozen_at_utc="2026-07-26T00:00:00+00:00",
+        )

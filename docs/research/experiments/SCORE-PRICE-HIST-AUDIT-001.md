@@ -135,10 +135,12 @@ python scripts/run_score_price_hist_audit.py verify \
   --database modeling_plus=<runtime-modeling.sqlite>
 ```
 
-The independently downloadable R4 evidence package is published with tag
-`score-price-hist-audit-001-r4`. Its manifest, `SHA256SUMS`, source identities,
-redacted structural evidence, full coverage, classification, and reproduction
-receipt are the authority for this result. Source workbooks/databases are not
+The independently downloadable R5 evidence package is published with tag
+`score-price-hist-audit-001-r5`. Its manifest and reproduction receipt both
+bind the exact full 40-character Git commit; verification rejects abbreviated
+or mismatched commit identifiers. Together with `SHA256SUMS`, source
+identities, redacted structural evidence, full coverage, and classification,
+they are the authority for this result. Source workbooks/databases are not
 published.
 
 ## Boundary

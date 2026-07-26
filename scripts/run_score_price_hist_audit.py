@@ -60,12 +60,18 @@ def main() -> int:
         workbook = parse_input_spec(arguments.workbook, kind="workbook")
         databases = [parse_input_spec(value, kind="database") for value in arguments.database]
         if arguments.command == "audit":
-            artifacts = audit_inputs(workbook, databases, sample_rows=arguments.sample_rows)
+            git_commit = arguments.git_commit or _git_commit()
+            artifacts = audit_inputs(
+                workbook,
+                databases,
+                sample_rows=arguments.sample_rows,
+                git_commit=git_commit,
+            )
             paths = write_audit_artifacts(arguments.output_dir, artifacts)
             package = create_audit_package(
                 paths,
                 output_dir=arguments.freeze_dir,
-                git_commit=arguments.git_commit or _git_commit(),
+                git_commit=git_commit,
                 frozen_at_utc=arguments.frozen_at_utc,
             )
             result = {

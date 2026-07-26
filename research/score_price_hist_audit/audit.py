@@ -46,6 +46,7 @@ OFFICE_REL_NS = "{http://schemas.openxmlformats.org/officeDocument/2006/relation
 PACKAGE_REL_NS = "{http://schemas.openxmlformats.org/package/2006/relationships}"
 CELL_REF_RE = re.compile(r"^([A-Z]+)([0-9]+)$")
 LOGICAL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$")
+FULL_GIT_COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
 ABSOLUTE_PATH_RE = re.compile(r"(?:^|[\"'\s])(?:/[A-Za-z0-9_.~/-]+|[A-Za-z]:[\\/][^\"'\s]*)")
 
 # These are the explicit column contracts in the converter, expressed here so
@@ -967,8 +968,21 @@ def _audit_config() -> dict[str, Any]:
     }
 
 
-def _receipt(artifacts: Mapping[str, Any], inventory: Mapping[str, Any]) -> dict[str, Any]:
-    return {
+def _full_git_commit(value: str) -> str:
+    """Accept only an unambiguous full Git object identifier for evidence binding."""
+
+    if not FULL_GIT_COMMIT_RE.fullmatch(value):
+        raise ScorePriceAuditError("audit evidence requires a full 40-character lowercase git commit")
+    return value
+
+
+def _receipt(
+    artifacts: Mapping[str, Any],
+    inventory: Mapping[str, Any],
+    *,
+    git_commit: str | None,
+) -> dict[str, Any]:
+    receipt = {
         "schema_version": AUDIT_SCHEMA,
         "audit_id": AUDIT_ID,
         "command_template": (
@@ -987,6 +1001,9 @@ def _receipt(artifacts: Mapping[str, Any], inventory: Mapping[str, Any]) -> dict
         "no_outcome_or_performance_fields_read": True,
         "public_redaction_verified": True,
     }
+    if git_commit is not None:
+        receipt["git_commit"] = _full_git_commit(git_commit)
+    return receipt
 
 
 def _walk_public(value: Any) -> Iterable[tuple[str | None, Any]]:
@@ -1022,6 +1039,7 @@ def audit_inputs(
     *,
     sample_rows: int = 64,
     expected_inventory: Mapping[str, Any] | None = None,
+    git_commit: str | None = None,
 ) -> dict[str, Any]:
     """Run G0--G4 and return public, deterministic artifacts in memory."""
 
@@ -1065,7 +1083,11 @@ def audit_inputs(
         "classification.json": classification,
         "audit_config.json": config,
     }
-    artifacts["reproducibility_receipt.json"] = _receipt(artifacts, inventory)
+    artifacts["reproducibility_receipt.json"] = _receipt(
+        artifacts,
+        inventory,
+        git_commit=_full_git_commit(git_commit) if git_commit is not None else None,
+    )
     assert_public_redaction(artifacts, all_inputs)
     return artifacts
 
@@ -1108,6 +1130,14 @@ def create_audit_package(
 ) -> dict[str, Any]:
     """Wrap redacted artifacts in the repository's immutable freeze protocol."""
 
+    commit = _full_git_commit(git_commit)
+    try:
+        receipt = json.loads(artifact_paths["reproducibility_receipt.json"].read_text(encoding="utf-8"))
+    except (KeyError, OSError, json.JSONDecodeError) as exc:
+        raise ScorePriceAuditError("audit package requires a valid reproducibility receipt") from exc
+    if receipt.get("git_commit") != commit:
+        raise ScorePriceAuditError("reproducibility receipt must bind the exact full git commit")
+
     inputs = [
         artifact_paths[name]
         for name in (
@@ -1131,7 +1161,7 @@ def create_audit_package(
         # Do not use input_datasets: the generic protocol serializes local paths
         # there.  Source hashes are instead bound by source_inventory.json.
         input_datasets=[],
-        git_commit=git_commit,
+        git_commit=commit,
         frozen_at_utc=frozen_at_utc,
     )
 
@@ -1165,6 +1195,14 @@ def verify_audit_package(
         protocol = verify_freeze_package(package)
     except ResearchFreezeError as exc:
         raise ScorePriceAuditError("immutable audit package checksum verification failed") from exc
+    try:
+        manifest = json.loads((package / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ScorePriceAuditError("audit package contains an invalid manifest") from exc
+    commit = _full_git_commit(str(manifest.get("git_commit", "")))
+    receipt = _load_public_json(package, "reproducibility_receipt.json")
+    if receipt.get("git_commit") != commit:
+        raise ScorePriceAuditError("audit reproducibility receipt does not bind the exact full git commit")
     inventory = _load_public_json(package, "source_inventory.json")
     verify_runtime_inventory([workbook_input, *database_inputs], inventory)
     regenerated = audit_inputs(
@@ -1172,6 +1210,7 @@ def verify_audit_package(
         database_inputs,
         sample_rows=sample_rows,
         expected_inventory=inventory,
+        git_commit=commit,
     )
     for name in PUBLIC_ARTIFACTS:
         stored = _load_public_json(package, name)
@@ -1181,6 +1220,7 @@ def verify_audit_package(
     return {
         "status": "valid",
         "audit_id": AUDIT_ID,
+        "git_commit": commit,
         "freeze_id": protocol["freeze_id"],
         "sha256s_sha256": protocol["sha256s_sha256"],
         "runtime_source_hashes_verified": True,
