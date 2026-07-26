@@ -292,6 +292,8 @@ def test_current_exact_n_package_is_verified_content_addressed_and_separate(tmp_
     result = _create(store, _source_snapshot())
 
     assert result["current_status"] == "DOWNLOADABLE_CURRENT"
+    assert result["package_schema_version"] == "adhoc_betting_package_v2"
+    assert result["concentration_contract_applied"] is True
     assert result["current_status_recheck_scope"] == "VALID_UNTIL_SERVER_CLOCK_ONLY"
     assert result["sale_eligibility_scope"] == "GENERATION_TIME_SNAPSHOT_ONLY"
     assert result["shop_sale_confirmation_required"] is True
@@ -466,9 +468,19 @@ def test_legacy_v1_package_without_concentration_fields_still_replays(
         conn.commit()
     finally:
         conn.close()
-    assert store.get(str(result["request_id"]))["package_id"] == str(
-        manifest["package_id"]
+    replayed = store.get(str(result["request_id"]), now=NOW)
+    assert replayed["package_id"] == str(manifest["package_id"])
+    assert replayed["package_schema_version"] == "adhoc_betting_package_v1"
+    assert replayed["concentration_contract_applied"] is False
+    assert replayed["current_status"] == "HISTORICAL_NO_CONCENTRATION_CONTRACT"
+    assert replayed["operational_downloads_enabled"] is False
+    with pytest.raises(AdhocBettingError, match="HISTORICAL_NO_CONCENTRATION_CONTRACT"):
+        store.artifact_path(str(result["request_id"]), fmt="pdf", now=NOW)
+    audit_path, audit_payload = store.artifact_path(
+        str(result["request_id"]), fmt="pdf", now=NOW, audit_only=True
     )
+    assert audit_path.name == "adhoc_betting_slip.pdf"
+    assert audit_payload["audit_only_download"] is True
 
 
 def test_fail_closed_exclusions_cannot_produce_n_fallback(tmp_path: Path) -> None:

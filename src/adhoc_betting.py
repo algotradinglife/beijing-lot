@@ -1740,7 +1740,34 @@ class AdhocBettingStore:
         return target, {**final_payload, "audit_only_download": bool(audit_only)}
 
     @staticmethod
-    def _current_status(manifest: dict[str, Any], now: datetime) -> str:
+    def _concentration_contract_applied(
+        manifest: dict[str, Any], plan: dict[str, Any]
+    ) -> bool:
+        """Whether this immutable package carries the v2 two-ticket contract.
+
+        A trusted-ledger v1 package remains readable as an historical audit
+        artifact, but must never inherit the operational meaning of the v2
+        concentration capability merely because it is still inside a former
+        validity window.
+        """
+
+        concentration = plan.get("concentration_contract")
+        return (
+            str(manifest.get("schema_version") or "") == PACKAGE_SCHEMA_VERSION
+            and isinstance(concentration, dict)
+            and manifest.get("concentration_contract") == concentration
+            and str(concentration.get("schema_version") or "")
+            == CONCENTRATION_CONTRACT_SCHEMA_VERSION
+            and str(concentration.get("capability_id") or "")
+            == CONCENTRATION_CAPABILITY_ID
+            and int(concentration.get("max_ticket_occurrences_per_match") or 0)
+            == MAX_TICKET_OCCURRENCES_PER_MATCH
+        )
+
+    @classmethod
+    def _current_status(
+        cls, manifest: dict[str, Any], plan: dict[str, Any], now: datetime
+    ) -> str:
         """Classify immutable package validity using only the server clock.
 
         This deliberately does not refresh sale status or any decision input;
@@ -1752,6 +1779,8 @@ class AdhocBettingStore:
             return "UNAVAILABLE_ADHOC_PLAN"
         if immutable_status != "READY_FOR_REVIEW":
             return "FAILED_CLOSED"
+        if not cls._concentration_contract_applied(manifest, plan):
+            return "HISTORICAL_NO_CONCENTRATION_CONTRACT"
         if not bool(manifest.get("sale_status_verified")):
             return "UNVERIFIED_SALE_STATE"
         valid_until = str(manifest.get("valid_until_hkt") or "")
@@ -1770,14 +1799,15 @@ class AdhocBettingStore:
         now: datetime,
         idempotent: bool,
     ) -> dict[str, Any]:
-        current_status = self._current_status(manifest, now)
+        concentration_applied = self._concentration_contract_applied(manifest, plan)
+        current_status = self._current_status(manifest, plan, now)
         included = denominator.get("included") if isinstance(denominator.get("included"), list) else []
         match_by_idx = {
             int(row["match_idx"]): row
             for row in included
             if isinstance(row, dict) and str(row.get("match_idx") or "").isdigit()
         }
-        concentration = plan.get("concentration_contract")
+        concentration = plan.get("concentration_contract") if concentration_applied else None
         if not isinstance(concentration, dict):
             concentration = {}
         occurrence_by_idx = {
@@ -1831,6 +1861,8 @@ class AdhocBettingStore:
         return {
             "schema_version": "adhoc_betting_api_v1",
             "capability_id": CAPABILITY_ID,
+            "package_schema_version": str(manifest.get("schema_version") or ""),
+            "concentration_contract_applied": concentration_applied,
             "request_id": str(manifest["request_id"]),
             "issue": str(manifest["issue"]),
             "requested_at_hkt": str(manifest["requested_at_hkt"]),
@@ -1844,7 +1876,11 @@ class AdhocBettingStore:
             "valid_until_hkt": str(manifest.get("valid_until_hkt") or ""),
             "status": str(manifest["status"]),
             "current_status": current_status,
-            "current_status_recheck_scope": "VALID_UNTIL_SERVER_CLOCK_ONLY",
+            "current_status_recheck_scope": (
+                "VALID_UNTIL_SERVER_CLOCK_ONLY"
+                if concentration_applied
+                else "HISTORICAL_AUDIT_ONLY"
+            ),
             "sale_eligibility_scope": "GENERATION_TIME_SNAPSHOT_ONLY",
             "shop_sale_confirmation_required": True,
             "structural_verification_status": str(manifest["structural_verification_status"]),

@@ -1344,6 +1344,8 @@ export interface AdhocBettingEligibilityData {
 export interface AdhocBettingPlanData {
   schemaVersion: string;
   capabilityId: string;
+  packageSchemaVersion: string;
+  concentrationContractApplied: boolean;
   requestId: string;
   immutableRequestId: string;
   publishedPackageCount: number;

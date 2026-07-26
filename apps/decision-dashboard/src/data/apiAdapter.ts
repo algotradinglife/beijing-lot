@@ -2229,6 +2229,8 @@ function transformAdhocBettingPlan(raw: unknown): AdhocBettingPlanData {
   return {
     schemaVersion: asString(obj.schema_version),
     capabilityId: asString(obj.capability_id),
+    packageSchemaVersion: asString(obj.package_schema_version),
+    concentrationContractApplied: asBoolean(obj.concentration_contract_applied),
     requestId: asString(obj.request_id),
     immutableRequestId: asString(obj.immutable_request_id),
     publishedPackageCount: asNumber(obj.published_package_count),
@@ -2398,6 +2400,8 @@ function mockAdhocBettingPlan(
   return {
     schemaVersion: 'adhoc_betting_package_v2',
     capabilityId: 'BJ-ADHOC-BET-001',
+    packageSchemaVersion: 'adhoc_betting_package_v2',
+    concentrationContractApplied: true,
     requestId,
     immutableRequestId: requestId,
     publishedPackageCount: 1,

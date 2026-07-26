@@ -2,11 +2,19 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from src.adhoc_betting import DEFAULT_FONT_FILE, HKT
+from src.adhoc_betting import (
+    DEFAULT_FONT_FILE,
+    HKT,
+    _package_identity,
+    canonical,
+    digest,
+    file_hash,
+)
 from src.decision_api import app as appmod
 from src.structured_input_receipt import write_receipt
 
@@ -297,6 +305,64 @@ def _request_payload(key: str) -> dict[str, object]:
     }
 
 
+def _downgrade_generated_package_to_legacy(
+    *, db_path: Path, root: Path, result: dict[str, object]
+) -> None:
+    """Fixture-only trusted-ledger replay of a still-unexpired v1 package."""
+
+    package = root / "packages" / ISSUE / str(result["package_id"])
+    plan_path = package / "exact_n_plan.json"
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    plan.pop("concentration_contract", None)
+    plan.pop("concentration_contract_sha256", None)
+    plan.pop("sha256", None)
+    plan["sha256"] = digest(plan)
+    plan_path.write_bytes(canonical(plan) + b"\n")
+
+    manifest_path = package / "adhoc_request_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["schema_version"] = "adhoc_betting_package_v1"
+    manifest.pop("concentration_contract", None)
+    manifest.pop("concentration_contract_sha256", None)
+    manifest["exact_n_plan_sha256"] = plan["sha256"]
+    for artifact in manifest["artifacts"]:
+        if artifact["file"] == "exact_n_plan.json":
+            artifact["sha256"] = file_hash(plan_path)
+    manifest.pop("sha256", None)
+    manifest["package_id"] = _package_identity(manifest)
+    manifest["sha256"] = digest(manifest)
+    manifest_path.write_bytes(canonical(manifest) + b"\n")
+
+    legacy_package = package.with_name(manifest["package_id"])
+    package.rename(legacy_package)
+    (legacy_package / "SHA256SUMS").write_text(
+        "".join(
+            f"{file_hash(path)}  {path.name}\n"
+            for path in sorted(legacy_package.iterdir())
+            if path.is_file() and path.name != "SHA256SUMS"
+        ),
+        encoding="utf-8",
+    )
+    connection = sqlite3.connect(db_path)
+    try:
+        connection.execute(
+            """
+            UPDATE adhoc_betting_request_ledger
+            SET package_id=?, manifest_sha256=?, package_path=?
+            WHERE request_id=?
+            """,
+            (
+                str(manifest["package_id"]),
+                str(manifest["sha256"]),
+                str(legacy_package.resolve()),
+                str(result["request_id"]),
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def test_adhoc_api_generates_current_plan_and_identical_downloads(tmp_path: Path, monkeypatch) -> None:
     app, _db_path, _shadow_dir = _app(tmp_path, monkeypatch)
     client = app.test_client()
@@ -336,6 +402,8 @@ def test_adhoc_api_generates_current_plan_and_identical_downloads(tmp_path: Path
     assert generated.status_code == 201
     payload = generated.get_json()
     assert payload["current_status"] == "DOWNLOADABLE_CURRENT"
+    assert payload["package_schema_version"] == "adhoc_betting_package_v2"
+    assert payload["concentration_contract_applied"] is True
     assert payload["research_evidence_eligible"] is False
     assert payload["scheduled_freeze_event_id"] is None
     assert payload["ticket_count"] > 0
@@ -434,6 +502,43 @@ def test_adhoc_api_expiry_disables_operational_download_but_allows_audit(tmp_pat
     audit = client.get(f"/api/adhoc-betting-plans/{generated['request_id']}/audit-download?format=pdf")
     assert audit.status_code == 200
     assert audit.headers["X-Adhoc-Usage-Boundary"] == "AUDIT_ONLY_EXPIRED_RECORD"
+
+
+def test_adhoc_api_legacy_v1_is_audit_only_even_before_its_valid_until(
+    tmp_path: Path, monkeypatch
+) -> None:
+    app, db_path, _shadow_dir = _app(tmp_path, monkeypatch)
+    client = app.test_client()
+    generated = client.post(
+        "/api/adhoc-betting-plans",
+        json=_request_payload("api-legacy-v1-request"),
+        headers=OPERATOR_HEADERS,
+    ).get_json()
+    _downgrade_generated_package_to_legacy(
+        db_path=db_path,
+        root=tmp_path / "adhoc",
+        result=generated,
+    )
+
+    observed = client.get(f"/api/adhoc-betting-plans/{generated['request_id']}")
+    assert observed.status_code == 200
+    payload = observed.get_json()
+    assert payload["package_schema_version"] == "adhoc_betting_package_v1"
+    assert payload["concentration_contract_applied"] is False
+    assert payload["current_status"] == "HISTORICAL_NO_CONCENTRATION_CONTRACT"
+    assert payload["operational_downloads_enabled"] is False
+    assert payload["current_status_recheck_scope"] == "HISTORICAL_AUDIT_ONLY"
+
+    blocked = client.get(
+        f"/api/adhoc-betting-plans/{generated['request_id']}/download?format=pdf"
+    )
+    assert blocked.status_code == 409
+    assert "HISTORICAL_NO_CONCENTRATION_CONTRACT" in blocked.get_json()["error"]
+    audit = client.get(
+        f"/api/adhoc-betting-plans/{generated['request_id']}/audit-download?format=pdf"
+    )
+    assert audit.status_code == 200
+    assert audit.headers["X-Adhoc-Usage-Boundary"] == "AUDIT_ONLY_HISTORICAL_RECORD"
 
 
 def test_adhoc_api_download_rechecks_clock_after_package_verification(tmp_path: Path, monkeypatch) -> None:

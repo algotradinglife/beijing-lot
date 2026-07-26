@@ -434,6 +434,8 @@ describe('北单实盘决策台 v1', () => {
     const expiredPlan: AdhocBettingPlanData = {
       schemaVersion: 'adhoc_betting_package_v2',
       capabilityId: 'BJ-ADHOC-BET-001',
+      packageSchemaVersion: 'adhoc_betting_package_v2',
+      concentrationContractApplied: true,
       requestId: 'expired-adhoc-request',
       immutableRequestId: 'expired-adhoc-request',
       publishedPackageCount: 1,
@@ -483,6 +485,65 @@ describe('北单实盘决策台 v1', () => {
     expect(screen.getByRole('button', { name: 'PDF 下载已禁用' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'HTML 下载已禁用' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'CSV 下载已禁用' })).toBeDisabled();
+    expect(screen.getByRole('link', { name: '下载审计记录（PDF）' })).toHaveAttribute('href', expect.stringContaining('/audit-download?format=pdf'));
+  });
+
+  it('marks a v1 adhoc package as audit-only without a two-ticket compliance claim', async () => {
+    const historicalPlan: AdhocBettingPlanData = {
+      schemaVersion: 'adhoc_betting_api_v1',
+      capabilityId: 'BJ-ADHOC-BET-001',
+      packageSchemaVersion: 'adhoc_betting_package_v1',
+      concentrationContractApplied: false,
+      requestId: 'historical-adhoc-request',
+      immutableRequestId: '',
+      publishedPackageCount: 0,
+      generationBatchCount: 0,
+      issueId: '26052',
+      requestedAt: '2026-07-25T12:00:00+08:00',
+      inputAsOf: '2026-07-25T12:00:00+08:00',
+      requestedN: 3,
+      requestedBudgetYuan: 512,
+      baseCostYuan: 6,
+      actualCostYuan: 6,
+      unusedBudgetYuan: 506,
+      budgetUtilization: 6 / 512,
+      validUntil: '2026-07-25T20:28:00+08:00',
+      status: 'READY_FOR_REVIEW',
+      currentStatus: 'HISTORICAL_NO_CONCENTRATION_CONTRACT',
+      currentStatusRecheckScope: 'HISTORICAL_AUDIT_ONLY',
+      saleEligibilityScope: 'GENERATION_TIME_SNAPSHOT_ONLY',
+      shopSaleConfirmationRequired: true,
+      structuralVerificationStatus: 'STRUCTURAL_INTEGRITY_PASS',
+      saleStatusVerified: true,
+      operationalDownloadsEnabled: false,
+      auditDownloadsAvailable: true,
+      ticketCount: 1,
+      eligibleMatchCount: 3,
+      excludedMatchCount: 0,
+      exclusionCounts: {},
+      denominator: [],
+      tickets: [],
+      planReason: 'historical audit record',
+      unavailableReasons: [],
+      inputSha256: 'historical-input',
+      manifestSha256: 'historical-manifest',
+      packageId: 'historical-package',
+      researchEvidenceEligible: false,
+      scheduledFreezeEventId: null,
+      correctScoreStatus: 'UNAVAILABLE_ADHOC_CORRECT_SCORE',
+      idempotent: true,
+    };
+    vi.spyOn(ApiDashboardAdapter.prototype, 'createAdhocBettingPlan').mockResolvedValue(historicalPlan);
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: '即时下注' }));
+    await screen.findByText('8 场');
+    await userEvent.click(screen.getByRole('button', { name: '生成即时方案' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('历史方案，未应用每场最多两票约束');
+    expect(screen.getByText('历史方案，仅审计')).toBeInTheDocument();
+    expect(screen.queryByText('单场票数硬上限 / 实际最大')).not.toBeInTheDocument();
+    expect(screen.queryByText('逐场集中度证据哈希')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'PDF 下载已禁用' })).toBeDisabled();
     expect(screen.getByRole('link', { name: '下载审计记录（PDF）' })).toHaveAttribute('href', expect.stringContaining('/audit-download?format=pdf'));
   });
 
