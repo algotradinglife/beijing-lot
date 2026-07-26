@@ -1,7 +1,6 @@
 # BJ-MM-FREEZE-001 — p40/p42 strict segment freeze gate
 
-Status: `operational_evidence_ready`; capability task, not a predictive
-experiment. Final G4/G5 classification remains a PI decision.
+Status: `reviewed`; capability task, not a predictive experiment.
 
 ## Preregistration
 
@@ -118,9 +117,26 @@ Both packages fix `execution_enabled=false`, `frontend_selectable=false`, and
 `roi_authorized=false`. The preregistered mechanical predicate—two
 automatically selected post-activation segment events, each with verified
 immutable provenance, genuine pre-cutoff observations, and non-zero paired
-p40/p42 overlap—is satisfied by the published ledger state. PI review owns the
-final G4/G5 classification. This receipt does not test market consistency,
+p40/p42 overlap—is satisfied by the published ledger state.
+
+## PI G4/G5 classification
+
+- `G4 segment_asof_freeze_capability = READY_STRICT` for the declared
+  prospective scope and rows that pass the frozen eligibility rules.
+- `G5 immutable_publication_and_reproducibility = READY_STRICT` for the
+  declared two-event operational scope.
+- `market_coverage = PARTIAL`: paired coverage is 31/63 and 40/72; p42 rejects
+  32 matches in each checkpoint as `invalid_sp`; checkpoint 2 contains two
+  included market rows without a published kickoff clock; and maximum
+  source/capture staleness is about 1,697 minutes.
+
+This passes the preregistered operational capability gate. It does not
+establish full-market availability, freshness sufficiency, market consistency,
 calibration, predictive quality, statistical sample sufficiency, or ROI.
+Issue #17 may close after this report is merged, but no downstream statistical
+experiment is automatically authorized. A later consistency experiment may
+consume only explicitly eligible overlap rows under its own preregistered
+data-quality rules.
 
 ## Reproduction
 
