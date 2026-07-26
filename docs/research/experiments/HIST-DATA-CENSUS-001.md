@@ -10,8 +10,10 @@ make a ticket recommendation.
 
 The audit first froze a metadata-only inventory before opening any source
 coverage, schema, workbook cell, CSV row, or capture manifest payload. The
-final release receipt carries the authoritative inventory SHA-256; this prose
-reports only the corresponding frozen inventory count of 2,649 logical assets.
+final release receipt and `source_inventory.csv` carry the authoritative
+point-in-time count and inventory SHA-256. They are not duplicated in prose
+because the live capture roots can legitimately acquire new assets between
+separate freezes.
 
 The public inventory contains logical IDs, repository-relative locators,
 filenames, byte counts and SHA-256 values only. It does not contain local
@@ -21,28 +23,25 @@ are never executed.
 
 At the audit boundary the inventory contained:
 
-| Candidate class | Count |
+| Candidate class | Frozen evidence |
 | --- | ---: |
-| immutable forward-capture bundles | 2,117 |
-| research-artifact bundles | 308 |
-| freeze bundles | 1 |
-| SQLite databases | 17 |
-| SQLite sidecars | 18 |
-| CSV/Parquet-like tabular exports | 53 |
-| JSON artifacts | 65 (one sensitive configuration excluded) |
-| auxiliary/non-tabular repository files | 30 |
-| workbooks | 39 repository workbooks + 1 runtime-supplied vendor workbook |
+| immutable forward-capture bundles | exact count in `source_inventory.csv` |
+| research-artifact bundles and freeze bundles | exact count in `source_inventory.csv` |
+| SQLite databases and sidecars | exact count in `source_inventory.csv` |
+| CSV/Parquet-like exports and JSON artifacts | exact count in `source_inventory.csv`; sensitive configuration remains excluded |
+| auxiliary/non-tabular repository files | deterministic raw-only inventory rows |
+| repository and runtime-supplied workbooks | filenames, byte counts and SHA-256 only |
 
-All 2,426 immutable bundles selected from the G0 inventory passed exact
-`SHA256SUMS` coverage and content verification in the read-only audit.
+Only bundle rows that pass exact `SHA256SUMS` coverage and content verification
+can contribute a strict candidate count; the exact status/count matrix is in
+`bundle_integrity.csv`.
 
 ## Source-change boundary
 
-The live collector continued writing while this audit ran. Four frozen logical
-assets—the WAL/SHM sidecars of the live and 500-BJDC databases—changed after
-G0. They are explicitly marked `SOURCE_DRIFT_FAIL_CLOSED` in the evidence
-package and contribute no schema, coverage, price, or outcome evidence to this
-release. Four later-discovered assets are likewise excluded rather
+The live collector continued writing while this audit ran. Any frozen logical
+asset that changes after G0 is explicitly marked `SOURCE_DRIFT_FAIL_CLOSED` in
+the evidence package and contributes no schema, coverage, price, or outcome
+evidence to that release. Later-discovered assets are likewise excluded rather
 than retroactively added to G0.
 
 This is an evidence boundary, not a data-loss claim. A future integration or
@@ -94,8 +93,8 @@ The audit found checksum-valid immutable capture bundles with declared
 
 | Play | Market | Rows | Classification |
 | ---: | --- | ---: | --- |
-| 40 | total goals | 45,567 | `conditional_strict_forward` only after row-level source/capture time, sale/open and cutoff checks |
-| 42 | correct score | 20,501 | `conditional_strict_forward` only after the same row-level checks |
+| 40 | total goals | exact released `bundle_integrity.csv` count | `conditional_strict_forward` only after row-level source/capture time, sale/open and cutoff checks |
+| 42 | correct score | exact released `bundle_integrity.csv` count | `conditional_strict_forward` only after the same row-level checks |
 | 41 | upper/lower odd/even | 0 qualified | no strict price subset; capture rows remain unclassified |
 | 51 | half/full | 0 qualified | no strict price subset; capture rows remain unclassified |
 
