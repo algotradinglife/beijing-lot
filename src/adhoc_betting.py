@@ -51,7 +51,6 @@ CONCENTRATION_PACKAGE_SCHEMA_VERSIONS = frozenset(
     {"adhoc_betting_package_v2", PACKAGE_SCHEMA_VERSION}
 )
 FORMAL_DECISION_VARIANT_ID = "active_v3.3.3"
-FORMAL_SOURCE_BUILDER = "decision_api._build_adhoc_source_snapshot_v1"
 FORMAL_BINDING_SCHEMA_VERSION = "adhoc_formal_selection_binding_v1"
 CONCENTRATION_CONTRACT_SCHEMA_VERSION = "adhoc_match_concentration_contract_v1"
 MAX_TICKET_OCCURRENCES_PER_MATCH = 2
@@ -367,8 +366,18 @@ def _verify_formal_decision_binding(
         raise AdhocBettingError("adhoc decision input is not the formal active_v3.3.3 variant")
     if not isinstance(source_metadata, dict):
         raise AdhocBettingError("adhoc decision input source metadata is missing")
-    if str(source_metadata.get("source_builder") or "") != FORMAL_SOURCE_BUILDER:
-        raise AdhocBettingError("adhoc source was not built by the canonical formal resolver")
+    # ``source_builder`` is observational provenance only: a caller can copy
+    # text.  Trust is established by re-reading the formal CSV and its receipt
+    # below, not by a caller-supplied claim about which function made a dict.
+    candidate_filter = source_metadata.get("operator_candidate_filter")
+    if candidate_filter is not None:
+        if (
+            not isinstance(candidate_filter, dict)
+            or str(candidate_filter.get("authorized_issue") or "") != issue
+        ):
+            raise AdhocBettingError(
+                "adhoc operator candidate filter is not authorized for the request issue"
+            )
     formal_input = source_metadata.get("formal_decision_input")
     if (
         not isinstance(formal_input, dict)

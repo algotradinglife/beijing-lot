@@ -712,6 +712,18 @@ def test_missing_formal_artifact_fails_closed_before_publication(tmp_path: Path)
         _create(store, source)
 
 
+def test_spoofed_source_builder_cannot_authorize_wrong_issue(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    source = _source_snapshot()
+    source["source_metadata"]["source_builder"] = "manual.runtime.copy"  # type: ignore[index]
+    source["source_metadata"]["operator_candidate_filter"] = {  # type: ignore[index]
+        "authorized_issue": 28
+    }
+
+    with pytest.raises(AdhocBettingError, match="not authorized for the request issue"):
+        _create(store, source)
+
+
 def test_pre_formal_binding_v2_package_is_audit_only(tmp_path: Path) -> None:
     store = _store(tmp_path)
     result = _create(store, _source_snapshot())

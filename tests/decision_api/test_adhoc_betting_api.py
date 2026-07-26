@@ -422,6 +422,14 @@ def test_adhoc_api_generates_current_plan_and_identical_downloads(tmp_path: Path
     assert 0 < payload["budget_utilization"] <= 1
     assert len(payload["denominator"]) == 8
     assert all(match["eligible"] is True for match in payload["denominator"])
+    package = tmp_path / "adhoc" / "packages" / ISSUE / payload["package_id"]
+    decision_input = json.loads(
+        (package / "decision_input.json").read_text(encoding="utf-8")
+    )
+    formal_input = decision_input["source_metadata"]["formal_decision_input"]
+    assert formal_input["structured_receipt_sha256"] == file_hash(
+        appmod.PROJECT_ROOT / Path(formal_input["structured_receipt"])
+    )
 
     retry = client.post(
         "/api/adhoc-betting-plans",

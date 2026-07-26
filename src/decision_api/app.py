@@ -3767,7 +3767,13 @@ def _adhoc_formal_structured_input(
         "structured_csv": _relative_display_path(path),
         "structured_csv_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         "structured_receipt": _relative_display_path(receipt_path(path)),
-        "structured_receipt_sha256": str(receipt.get("sha256") or ""),
+        # Bind the exact receipt artifact bytes.  ``receipt['sha256']`` is
+        # only the receipt payload's internal canonical digest, not its file
+        # hash, and therefore cannot satisfy the package verifier's artifact
+        # integrity check.
+        "structured_receipt_sha256": hashlib.sha256(
+            receipt_path(path).read_bytes()
+        ).hexdigest(),
         "generated_at_hkt": _adhoc_hk_iso(generated_hk),
         "rejected_candidates": rejected,
     }
