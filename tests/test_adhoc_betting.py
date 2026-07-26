@@ -158,6 +158,7 @@ def _store(tmp_path: Path) -> AdhocBettingStore:
         db_path=tmp_path / "adhoc.sqlite",
         root=tmp_path / "adhoc-packages",
         font_file=DEFAULT_FONT_FILE,
+        canonical_source_authorizer=lambda _source, _issue, _clock: None,
     )
 
 
@@ -721,6 +722,43 @@ def test_spoofed_source_builder_cannot_authorize_wrong_issue(tmp_path: Path) -> 
     }
 
     with pytest.raises(AdhocBettingError, match="not authorized for the request issue"):
+        _create(store, source)
+
+
+def test_manual_snapshot_with_correct_issue_cannot_publish_operational_v3(
+    tmp_path: Path,
+) -> None:
+    manual_store = AdhocBettingStore(
+        db_path=tmp_path / "manual.sqlite",
+        root=tmp_path / "manual-packages",
+        font_file=DEFAULT_FONT_FILE,
+    )
+    source = _source_snapshot()
+    source["source_metadata"]["source_builder"] = "manual.runtime.copy"  # type: ignore[index]
+    source["source_metadata"]["operator_candidate_filter"] = {  # type: ignore[index]
+        "authorized_issue": "26078"
+    }
+
+    with pytest.raises(AdhocBettingError, match="requires the canonical source resolver"):
+        _create(manual_store, source)
+
+
+def test_receipt_valid_retired_formal_variant_fails_closed(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    source = _source_snapshot()
+    formal_input = source["source_metadata"]["formal_decision_input"]  # type: ignore[index]
+    csv_path = Path(formal_input["structured_csv"])
+    csv_path.write_text(
+        csv_path.read_text(encoding="utf-8").replace(
+            "active_v3.3.3", "retired_v3.2.0"
+        ),
+        encoding="utf-8",
+    )
+    receipt = write_receipt(csv_path, issue="26078", generated_at=NOW, source={"fixture": "retired"})
+    formal_input["structured_csv_sha256"] = file_hash(csv_path)
+    formal_input["structured_receipt_sha256"] = file_hash(receipt)
+
+    with pytest.raises(AdhocBettingError, match="variant is not mapped"):
         _create(store, source)
 
 

@@ -52,6 +52,9 @@ CONCENTRATION_PACKAGE_SCHEMA_VERSIONS = frozenset(
 )
 FORMAL_DECISION_VARIANT_ID = "active_v3.3.3"
 FORMAL_BINDING_SCHEMA_VERSION = "adhoc_formal_selection_binding_v1"
+FORMAL_ARTIFACT_VARIANT_IDS = frozenset(
+    {FORMAL_DECISION_VARIANT_ID, "shadow_v3.3.3"}
+)
 CONCENTRATION_CONTRACT_SCHEMA_VERSION = "adhoc_match_concentration_contract_v1"
 MAX_TICKET_OCCURRENCES_PER_MATCH = 2
 _LEGACY_LEDGER_BINDING = object()
@@ -412,7 +415,12 @@ def _verify_formal_decision_binding(
     try:
         with csv_path.open(newline="", encoding="utf-8") as stream:
             reader = csv.DictReader(stream)
-            required = {"issue", "match_idx", "shadow_selection_codes"}
+            required = {
+                "issue",
+                "match_idx",
+                "shadow_arm",
+                "shadow_selection_codes",
+            }
             if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
                 raise AdhocBettingError("adhoc formal structured CSV lacks required columns")
             for record in reader:
@@ -424,6 +432,10 @@ def _verify_formal_decision_binding(
                     raise AdhocBettingError("adhoc formal CSV has invalid match index") from exc
                 if idx <= 0 or idx in formal_rows:
                     raise AdhocBettingError("adhoc formal CSV has duplicate match index")
+                if str(record.get("shadow_arm") or "") not in FORMAL_ARTIFACT_VARIANT_IDS:
+                    raise AdhocBettingError(
+                        "adhoc formal CSV variant is not mapped to active_v3.3.3"
+                    )
                 formal_rows[idx] = _codes(record.get("shadow_selection_codes"))
     except OSError as exc:
         raise AdhocBettingError("adhoc formal structured CSV cannot be read") from exc
@@ -1329,12 +1341,15 @@ class AdhocBettingStore:
         font_file: str | os.PathLike[str] = DEFAULT_FONT_FILE,
         safety_margin_seconds: int = DEFAULT_SAFETY_MARGIN_SECONDS,
         max_source_age_seconds: int = DEFAULT_MAX_SOURCE_AGE_SECONDS,
+        canonical_source_authorizer: Callable[[dict[str, Any], str, datetime], None]
+        | None = None,
     ) -> None:
         self.db_path = Path(db_path)
         self.root = Path(root)
         self.font_file = Path(font_file)
         self.safety_margin = timedelta(seconds=max(0, int(safety_margin_seconds)))
         self.max_source_age = timedelta(seconds=max(1, int(max_source_age_seconds)))
+        self.canonical_source_authorizer = canonical_source_authorizer
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=30)
@@ -1430,6 +1445,11 @@ class AdhocBettingStore:
         requested_at_text = _iso_hkt(requested_at)
         if str(source_snapshot.get("issue") or "") != issue_text:
             raise AdhocBettingError("source snapshot issue does not match the request")
+        if self.canonical_source_authorizer is None:
+            raise AdhocBettingError(
+                "operational adhoc publication requires the canonical source resolver"
+            )
+        self.canonical_source_authorizer(source_snapshot, issue_text, requested_at)
         _verify_formal_decision_binding(
             issue=issue_text,
             decision_variant_id=source_snapshot.get("decision_variant_id"),

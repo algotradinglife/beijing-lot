@@ -9429,10 +9429,26 @@ def create_app(
     app = Flask(__name__, static_folder=None)
     db_path = Path(sqlite_db)
     result_path = Path(results_dir)
+
+    def _authorize_canonical_adhoc_source(
+        source_snapshot: dict[str, Any], issue: str, request_clock: datetime
+    ) -> None:
+        """Reject caller-built snapshots at the operational publication boundary."""
+
+        with _connect(db_path) as conn:
+            canonical_source = _build_adhoc_source_snapshot(
+                conn, issue, request_clock=request_clock
+            )
+        if source_snapshot != canonical_source:
+            raise AdhocBettingError(
+                "adhoc source snapshot does not match the canonical API resolver"
+            )
+
     adhoc_store = AdhocBettingStore(
         db_path=db_path,
         root=Path(adhoc_betting_root),
         font_file=Path(adhoc_font_file),
+        canonical_source_authorizer=_authorize_canonical_adhoc_source,
     )
     static_dir = Path(os.environ.get("BEIDAN_DASHBOARD_STATIC_DIR", DEFAULT_DASHBOARD_STATIC_DIR))
     gate_password = next((os.environ.get(name) for name in DASHBOARD_GATE_PASSWORD_ENVS if os.environ.get(name)), "")
