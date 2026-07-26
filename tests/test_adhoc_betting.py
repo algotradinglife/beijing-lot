@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import sqlite3
 from collections import Counter
@@ -25,10 +26,46 @@ from src.adhoc_betting import (
     file_hash,
     verify_package,
 )
+from src.structured_input_receipt import write_receipt
 from scripts.estimate_segment_betting_plan import PUBLISHED_EXACT_N_SAMPLE_ATTEMPTS
 
 
 NOW = datetime(2026, 7, 25, 12, 0, tzinfo=HKT)
+
+
+@pytest.fixture(autouse=True)
+def _formal_artifact_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep unit-test formal artifacts outside the repository worktree."""
+
+    monkeypatch.setattr(adhoc_module, "PROJECT_ROOT", tmp_path)
+
+
+def _formal_fixture(*, count: int = 38) -> tuple[Path, Path]:
+    path = (
+        adhoc_module.PROJECT_ROOT
+        / "results"
+        / "structured_decision_chain_shadow"
+        / "26078_fixture_active_v3.3.3"
+        / "structured_shadow_26078.csv"
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(
+            stream,
+            fieldnames=["issue", "match_idx", "shadow_arm", "shadow_selection_codes"],
+        )
+        writer.writeheader()
+        for idx in range(1, count + 1):
+            writer.writerow(
+                {
+                    "issue": "26078",
+                    "match_idx": idx,
+                    "shadow_arm": "active_v3.3.3",
+                    "shadow_selection_codes": "3",
+                }
+            )
+    receipt = write_receipt(path, issue="26078", generated_at=NOW, source={"fixture": "adhoc"})
+    return path, receipt
 
 
 def _source_snapshot(
@@ -37,6 +74,7 @@ def _source_snapshot(
     count: int = 8,
     mutate: dict[int, dict[str, object]] | None = None,
 ) -> dict[str, object]:
+    formal_csv, formal_receipt = _formal_fixture()
     matches: list[dict[str, object]] = []
     for match_idx in range(1, count + 1):
         row: dict[str, object] = {
@@ -91,15 +129,23 @@ def _source_snapshot(
         "decision_variant_id": "active_v3.3.3",
         "source_metadata": {
             "fixture": "adhoc-betting-v1",
+            "source_builder": "decision_api._build_adhoc_source_snapshot_v1",
             "snapshot_clock_hkt": now.isoformat(),
             "request_clock_hkt": now.isoformat(),
             "input_asof_policy": "oldest_required_observation_clock",
             "formal_decision_input": {
                 "status": "VERIFIED_FORMAL_INPUT",
                 "decision_variant_id": "active_v3.3.3",
+                "binding_schema_version": "adhoc_formal_selection_binding_v1",
+                "formal_selection_column": "shadow_selection_codes",
+                "formal_selection_codes_sha256": adhoc_module._formal_selection_digest(
+                    {idx: ("3",) for idx in range(1, 39)}
+                ),
+                "structured_csv": str(formal_csv),
+                "structured_receipt": str(formal_receipt),
                 "generated_at_hkt": now.isoformat(),
-                "structured_csv_sha256": "c" * 64,
-                "structured_receipt_sha256": "d" * 64,
+                "structured_csv_sha256": file_hash(formal_csv),
+                "structured_receipt_sha256": file_hash(formal_receipt),
             },
         },
         "matches": matches,
@@ -124,6 +170,45 @@ def _create(store: AdhocBettingStore, source: dict[str, object], *, key: str = "
         source_snapshot=source,
         now=NOW,
     )
+
+
+def _rehash_package(package: Path) -> Path:
+    """Model an attacker who recomputes every mutable package hash."""
+
+    manifest_path = package / "adhoc_request_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    for filename in ("eligible_denominator.json", "decision_input.json", "exact_n_plan.json"):
+        path = package / filename
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload.pop("sha256", None)
+        payload["sha256"] = digest(payload)
+        path.write_bytes(canonical(payload) + b"\n")
+    manifest["eligible_denominator_sha256"] = json.loads(
+        (package / "eligible_denominator.json").read_text(encoding="utf-8")
+    )["sha256"]
+    manifest["decision_input_sha256"] = json.loads(
+        (package / "decision_input.json").read_text(encoding="utf-8")
+    )["sha256"]
+    manifest["exact_n_plan_sha256"] = json.loads(
+        (package / "exact_n_plan.json").read_text(encoding="utf-8")
+    )["sha256"]
+    for artifact in manifest["artifacts"]:
+        artifact["sha256"] = file_hash(package / artifact["file"])
+    manifest.pop("sha256", None)
+    manifest["package_id"] = _package_identity(manifest)
+    manifest["sha256"] = digest(manifest)
+    manifest_path.write_bytes(canonical(manifest) + b"\n")
+    rehashed = package.with_name(manifest["package_id"])
+    package.rename(rehashed)
+    (rehashed / "SHA256SUMS").write_text(
+        "".join(
+            f"{file_hash(path)}  {path.name}\n"
+            for path in sorted(rehashed.iterdir())
+            if path.is_file() and path.name != "SHA256SUMS"
+        ),
+        encoding="utf-8",
+    )
+    return rehashed
 
 
 @pytest.mark.parametrize("n_value", [3, 4, 5, 6, 7])
@@ -292,7 +377,7 @@ def test_current_exact_n_package_is_verified_content_addressed_and_separate(tmp_
     result = _create(store, _source_snapshot())
 
     assert result["current_status"] == "DOWNLOADABLE_CURRENT"
-    assert result["package_schema_version"] == "adhoc_betting_package_v2"
+    assert result["package_schema_version"] == "adhoc_betting_package_v3"
     assert result["concentration_contract_applied"] is True
     assert result["current_status_recheck_scope"] == "VALID_UNTIL_SERVER_CLOCK_ONLY"
     assert result["sale_eligibility_scope"] == "GENERATION_TIME_SNAPSHOT_ONLY"
@@ -360,7 +445,7 @@ def test_current_exact_n_package_is_verified_content_addressed_and_separate(tmp_
     assert plan["portfolio_contract"]["stake_mode"] == "scale_to_budget"
     assert len(plan["portfolio_contract"]["portfolio_core_source_sha256"]) == 64
     assert all(item["actual_n"] == manifest["requested_n"] for item in plan["tickets"])
-    assert manifest["pdf_font_reference"] == "evidence/bj_adhoc_bet_001/assets/fonts/NotoSansCJKsc-Regular.otf"
+    assert manifest["pdf_font_reference"].startswith("external://adhoc-font/sha256/")
     assert len(manifest["pdf_font_sha256"]) == 64
 
     html_view = (package / "adhoc_betting_view.html").read_text(encoding="utf-8")
@@ -575,6 +660,89 @@ def test_expiry_blocks_operational_download_but_preserves_audit_record(tmp_path:
     )
     assert audit_path.name == "adhoc_betting_view.html"
     assert audit_payload["audit_only_download"] is True
+
+
+def test_fully_rehashed_wrong_formal_column_is_rejected(tmp_path: Path) -> None:
+    """Internal package hashes cannot replace CSV-to-leg semantic binding."""
+
+    store = _store(tmp_path)
+    result = _create(store, _source_snapshot())
+    package = tmp_path / "adhoc-packages" / "packages" / "26078" / str(result["package_id"])
+    denominator_path = package / "eligible_denominator.json"
+    decision_path = package / "decision_input.json"
+    plan_path = package / "exact_n_plan.json"
+    denominator = json.loads(denominator_path.read_text(encoding="utf-8"))
+    decision_input = json.loads(decision_path.read_text(encoding="utf-8"))
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    for row in [*denominator["included"], *decision_input["matches"]]:
+        row["selection_codes"] = ["1"]
+    for ticket in plan["tickets"]:
+        ticket["leg_codes"] = ["1"] * len(ticket["leg_codes"])
+    denominator_path.write_bytes(canonical(denominator) + b"\n")
+    decision_path.write_bytes(canonical(decision_input) + b"\n")
+    plan_path.write_bytes(canonical(plan) + b"\n")
+    rehashed = _rehash_package(package)
+
+    with pytest.raises(AdhocBettingError, match="formal shadow_selection_codes"):
+        verify_package(rehashed)
+
+
+def test_formal_csv_byte_change_with_old_receipt_fails_closed(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    result = _create(store, _source_snapshot())
+    package = tmp_path / "adhoc-packages" / "packages" / "26078" / str(result["package_id"])
+    decision_input = json.loads((package / "decision_input.json").read_text(encoding="utf-8"))
+    csv_path = Path(decision_input["source_metadata"]["formal_decision_input"]["structured_csv"])
+    csv_path.write_text(
+        csv_path.read_text(encoding="utf-8").replace(",3\n", ",1\n", 1),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AdhocBettingError, match="formal artifact hash"):
+        verify_package(package)
+
+
+def test_missing_formal_artifact_fails_closed_before_publication(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    source = _source_snapshot()
+    source["source_metadata"]["formal_decision_input"]["structured_csv"] = (  # type: ignore[index]
+        "results/structured_decision_chain_shadow/missing/structured_shadow_26078.csv"
+    )
+    with pytest.raises(AdhocBettingError, match="trusted formal artifact root"):
+        _create(store, source)
+
+
+def test_pre_formal_binding_v2_package_is_audit_only(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    result = _create(store, _source_snapshot())
+    package = tmp_path / "adhoc-packages" / "packages" / "26078" / str(result["package_id"])
+    manifest_path = package / "adhoc_request_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["schema_version"] = "adhoc_betting_package_v2"
+    manifest_path.write_bytes(canonical(manifest) + b"\n")
+    historical = _rehash_package(package)
+    historical_manifest = json.loads(
+        (historical / "adhoc_request_manifest.json").read_text(encoding="utf-8")
+    )
+    connection = sqlite3.connect(tmp_path / "adhoc.sqlite")
+    try:
+        connection.execute(
+            "UPDATE adhoc_betting_request_ledger SET package_id=?, manifest_sha256=?, package_path=? WHERE request_id=?",
+            (
+                historical.name,
+                historical_manifest["sha256"],
+                str(historical.resolve()),
+                result["request_id"],
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    replayed = store.get(str(result["request_id"]), now=NOW)
+    assert replayed["package_schema_version"] == "adhoc_betting_package_v2"
+    assert replayed["current_status"] == "HISTORICAL_NO_CONCENTRATION_CONTRACT"
+    assert replayed["operational_downloads_enabled"] is False
 
 
 def test_rehashed_tampering_is_rejected_by_semantic_verifier(tmp_path: Path) -> None:

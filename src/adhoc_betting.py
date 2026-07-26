@@ -33,6 +33,7 @@ from zoneinfo import ZoneInfo
 
 from scripts import estimate_segment_betting_plan as portfolio
 from scripts import replay_rolling_segment_n_tickets as rolling
+from src.structured_input_receipt import receipt_path, verify_receipt
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -40,8 +41,18 @@ HKT = ZoneInfo("Asia/Hong_Kong")
 
 CAPABILITY_ID = "BJ-ADHOC-BET-001"
 CONCENTRATION_CAPABILITY_ID = "BJ-ADHOC-CONCENTRATION-001"
-PACKAGE_SCHEMA_VERSION = "adhoc_betting_package_v2"
-LEGACY_PACKAGE_SCHEMA_VERSIONS = frozenset({"adhoc_betting_package_v1"})
+PACKAGE_SCHEMA_VERSION = "adhoc_betting_package_v3"
+# v2 proved the concentration contract, but did not bind its executable legs
+# back to the formal structured artifact.  It is therefore audit-only too.
+LEGACY_PACKAGE_SCHEMA_VERSIONS = frozenset(
+    {"adhoc_betting_package_v1", "adhoc_betting_package_v2"}
+)
+CONCENTRATION_PACKAGE_SCHEMA_VERSIONS = frozenset(
+    {"adhoc_betting_package_v2", PACKAGE_SCHEMA_VERSION}
+)
+FORMAL_DECISION_VARIANT_ID = "active_v3.3.3"
+FORMAL_SOURCE_BUILDER = "decision_api._build_adhoc_source_snapshot_v1"
+FORMAL_BINDING_SCHEMA_VERSION = "adhoc_formal_selection_binding_v1"
 CONCENTRATION_CONTRACT_SCHEMA_VERSION = "adhoc_match_concentration_contract_v1"
 MAX_TICKET_OCCURRENCES_PER_MATCH = 2
 _LEGACY_LEDGER_BINDING = object()
@@ -68,6 +79,7 @@ DEFAULT_FONT_FILE = (
 )
 DEFAULT_SAFETY_MARGIN_SECONDS = 120
 DEFAULT_MAX_SOURCE_AGE_SECONDS = 900
+FORMAL_STRUCTURED_ROOT = "results/structured_decision_chain_shadow"
 
 REQUIRED_PACKAGE_FILES = frozenset(
     {
@@ -304,6 +316,127 @@ def _source_snapshot_hash(source_snapshot: dict[str, Any]) -> str:
     if claimed and claimed != actual:
         raise AdhocBettingError("source snapshot SHA-256 mismatch")
     return actual
+
+
+def _formal_selection_digest(rows: dict[int, tuple[str, ...]]) -> str:
+    """Digest the executable formal selection map, never a caller-chosen column."""
+
+    return digest(
+        [
+            {"match_idx": idx, "selection_codes": list(codes)}
+            for idx, codes in sorted(rows.items())
+        ]
+    )
+
+
+def _trusted_formal_artifact_path(value: object, *, label: str) -> Path:
+    """Resolve a formal CSV/receipt only beneath the reviewed results root."""
+
+    text = str(value or "").strip()
+    if not text:
+        raise AdhocBettingError(f"{label} is missing")
+    candidate = Path(text)
+    candidate = candidate if candidate.is_absolute() else PROJECT_ROOT / candidate
+    try:
+        resolved = candidate.resolve(strict=True)
+        trusted_root = (PROJECT_ROOT / FORMAL_STRUCTURED_ROOT).resolve(strict=True)
+        resolved.relative_to(trusted_root)
+    except (OSError, ValueError) as exc:
+        raise AdhocBettingError(f"{label} is outside the trusted formal artifact root") from exc
+    if not resolved.is_file():
+        raise AdhocBettingError(f"{label} is not a regular file")
+    return resolved
+
+
+def _verify_formal_decision_binding(
+    *,
+    issue: str,
+    decision_variant_id: object,
+    source_metadata: object,
+    rows: object,
+) -> None:
+    """Bind every frozen adhoc selector to the verified formal shadow CSV.
+
+    Package hashes can prove a package is self-consistent, but cannot prove a
+    caller used the right CSV column.  This verifier re-opens the reviewed
+    structured artifact, verifies its receipt and bytes, then compares the
+    executable ``shadow_selection_codes`` map to the frozen decision input.
+    """
+
+    if str(decision_variant_id or "") != FORMAL_DECISION_VARIANT_ID:
+        raise AdhocBettingError("adhoc decision input is not the formal active_v3.3.3 variant")
+    if not isinstance(source_metadata, dict):
+        raise AdhocBettingError("adhoc decision input source metadata is missing")
+    if str(source_metadata.get("source_builder") or "") != FORMAL_SOURCE_BUILDER:
+        raise AdhocBettingError("adhoc source was not built by the canonical formal resolver")
+    formal_input = source_metadata.get("formal_decision_input")
+    if (
+        not isinstance(formal_input, dict)
+        or str(formal_input.get("status") or "") != "VERIFIED_FORMAL_INPUT"
+        or str(formal_input.get("decision_variant_id") or "")
+        != FORMAL_DECISION_VARIANT_ID
+        or str(formal_input.get("binding_schema_version") or "")
+        != FORMAL_BINDING_SCHEMA_VERSION
+    ):
+        raise AdhocBettingError("adhoc formal decision input contract is invalid")
+    csv_path = _trusted_formal_artifact_path(
+        formal_input.get("structured_csv"), label="formal structured CSV"
+    )
+    receipt = _trusted_formal_artifact_path(
+        formal_input.get("structured_receipt"), label="formal structured receipt"
+    )
+    if receipt != receipt_path(csv_path).resolve():
+        raise AdhocBettingError("adhoc formal receipt path does not match structured CSV")
+    csv_hash = file_hash(csv_path)
+    receipt_hash = file_hash(receipt)
+    if (
+        str(formal_input.get("structured_csv_sha256") or "") != csv_hash
+        or str(formal_input.get("structured_receipt_sha256") or "") != receipt_hash
+    ):
+        raise AdhocBettingError("adhoc formal artifact hash does not bind current bytes")
+    try:
+        verify_receipt(csv_path, receipt, issue=issue)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise AdhocBettingError("adhoc formal structured receipt is invalid") from exc
+
+    formal_rows: dict[int, tuple[str, ...]] = {}
+    try:
+        with csv_path.open(newline="", encoding="utf-8") as stream:
+            reader = csv.DictReader(stream)
+            required = {"issue", "match_idx", "shadow_selection_codes"}
+            if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
+                raise AdhocBettingError("adhoc formal structured CSV lacks required columns")
+            for record in reader:
+                if str(record.get("issue") or "") != issue:
+                    continue
+                try:
+                    idx = int(record.get("match_idx") or 0)
+                except (TypeError, ValueError) as exc:
+                    raise AdhocBettingError("adhoc formal CSV has invalid match index") from exc
+                if idx <= 0 or idx in formal_rows:
+                    raise AdhocBettingError("adhoc formal CSV has duplicate match index")
+                formal_rows[idx] = _codes(record.get("shadow_selection_codes"))
+    except OSError as exc:
+        raise AdhocBettingError("adhoc formal structured CSV cannot be read") from exc
+    if not formal_rows:
+        raise AdhocBettingError("adhoc formal structured CSV has no rows for issue")
+    if str(formal_input.get("formal_selection_codes_sha256") or "") != _formal_selection_digest(formal_rows):
+        raise AdhocBettingError("adhoc formal selection digest does not bind structured CSV")
+    if not isinstance(rows, list) or not rows:
+        raise AdhocBettingError("adhoc decision input has no rows to bind formally")
+    for row in rows:
+        if not isinstance(row, dict):
+            raise AdhocBettingError("adhoc decision input row is malformed")
+        try:
+            idx = int(row.get("match_idx") or 0)
+        except (TypeError, ValueError) as exc:
+            raise AdhocBettingError("adhoc decision input row has invalid match index") from exc
+        if idx not in formal_rows:
+            raise AdhocBettingError("adhoc decision input match is absent from formal CSV")
+        if tuple(str(code) for code in row.get("selection_codes") or []) != formal_rows[idx]:
+            raise AdhocBettingError(
+                "adhoc decision input selection is not bound to formal shadow_selection_codes"
+            )
 
 
 def _normalize_match(
@@ -1288,6 +1421,12 @@ class AdhocBettingStore:
         requested_at_text = _iso_hkt(requested_at)
         if str(source_snapshot.get("issue") or "") != issue_text:
             raise AdhocBettingError("source snapshot issue does not match the request")
+        _verify_formal_decision_binding(
+            issue=issue_text,
+            decision_variant_id=source_snapshot.get("decision_variant_id"),
+            source_metadata=source_snapshot.get("source_metadata"),
+            rows=source_snapshot.get("matches"),
+        )
 
         with _exclusive_lock(self.root):
             with self._connect() as conn:
@@ -1743,12 +1882,11 @@ class AdhocBettingStore:
     def _concentration_contract_applied(
         manifest: dict[str, Any], plan: dict[str, Any]
     ) -> bool:
-        """Whether this immutable package carries the v2 two-ticket contract.
+        """Whether this immutable package carries the current operational contract.
 
-        A trusted-ledger v1 package remains readable as an historical audit
-        artifact, but must never inherit the operational meaning of the v2
-        concentration capability merely because it is still inside a former
-        validity window.
+        v1 and v2 packages remain readable as historical audit artifacts, but
+        must never inherit operational meaning because they lack either the
+        concentration or formal structured-selection binding respectively.
         """
 
         concentration = plan.get("concentration_contract")
@@ -1997,7 +2135,8 @@ def _verify_package(
     ):
         _verify_payload_hash(payload, label=label)
     package_schema = str(manifest.get("schema_version") or "")
-    concentration_enforced = package_schema not in LEGACY_PACKAGE_SCHEMA_VERSIONS
+    concentration_enforced = package_schema in CONCENTRATION_PACKAGE_SCHEMA_VERSIONS
+    formal_binding_enforced = package_schema == PACKAGE_SCHEMA_VERSION
     if (
         package_schema not in {PACKAGE_SCHEMA_VERSION, *LEGACY_PACKAGE_SCHEMA_VERSIONS}
         or manifest.get("capability_id") != CAPABILITY_ID
@@ -2012,7 +2151,7 @@ def _verify_package(
     if not re.fullmatch(r"[0-9a-f]{64}", package_id) or package_id != _package_identity(manifest):
         raise AdhocBettingError("adhoc package content identity mismatch")
     if (
-        package_schema in LEGACY_PACKAGE_SCHEMA_VERSIONS
+        package_schema == "adhoc_betting_package_v1"
         and _legacy_ledger_binding is not _LEGACY_LEDGER_BINDING
     ):
         raise AdhocBettingError(
@@ -2066,6 +2205,13 @@ def _verify_package(
         raise AdhocBettingError("adhoc decision input identity mismatch")
     if str(decision_input.get("decision_variant_id") or "") != "active_v3.3.3":
         raise AdhocBettingError("adhoc decision input is not the formal active_v3.3.3 variant")
+    if formal_binding_enforced:
+        _verify_formal_decision_binding(
+            issue=str(manifest.get("issue") or ""),
+            decision_variant_id=decision_input.get("decision_variant_id"),
+            source_metadata=decision_input.get("source_metadata"),
+            rows=decision_input.get("matches"),
+        )
     requested_at = _parse_hkt(manifest.get("requested_at_hkt"), label="requested_at_hkt")
     input_asof = _parse_hkt(manifest.get("input_asof_hkt"), label="input_asof_hkt")
     if input_asof > requested_at:

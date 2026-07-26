@@ -283,7 +283,9 @@ def _write_structured_input(shadow_dir: Path, *, p3: float = 0.5) -> Path:
 
 def _app(tmp_path: Path, monkeypatch):
     db_path = tmp_path / "500.sqlite"
-    shadow_dir = tmp_path / "structured-shadow"
+    shadow_dir = tmp_path / "results" / "structured_decision_chain_shadow"
+    monkeypatch.setattr(appmod, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(adhoc_module, "PROJECT_ROOT", tmp_path)
     _build_db(db_path)
     _write_structured_input(shadow_dir)
     monkeypatch.setenv("BEIDAN_DECISION_API_OPERATOR_TOKEN", OPERATOR_TOKEN)
@@ -402,7 +404,7 @@ def test_adhoc_api_generates_current_plan_and_identical_downloads(tmp_path: Path
     assert generated.status_code == 201
     payload = generated.get_json()
     assert payload["current_status"] == "DOWNLOADABLE_CURRENT"
-    assert payload["package_schema_version"] == "adhoc_betting_package_v2"
+    assert payload["package_schema_version"] == "adhoc_betting_package_v3"
     assert payload["concentration_contract_applied"] is True
     assert payload["research_evidence_eligible"] is False
     assert payload["scheduled_freeze_event_id"] is None

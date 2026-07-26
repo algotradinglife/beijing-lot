@@ -3742,9 +3742,28 @@ def _adhoc_formal_structured_input(
         candidates,
         key=lambda item: (item[0], item[1].as_posix()),
     )
+    formal_selection_codes_sha256 = hashlib.sha256(
+        json.dumps(
+            [
+                {
+                    "match_idx": idx,
+                    "selection_codes": _selection_codes_from_value(
+                        row.get("shadow_selection_codes")
+                    ),
+                }
+                for idx, row in sorted(rows.items())
+            ],
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
     return rows, {
         "status": "VERIFIED_FORMAL_INPUT",
         "decision_variant_id": FORMAL_DECISION_VARIANT_ID,
+        "binding_schema_version": "adhoc_formal_selection_binding_v1",
+        "formal_selection_column": "shadow_selection_codes",
+        "formal_selection_codes_sha256": formal_selection_codes_sha256,
         "structured_csv": _relative_display_path(path),
         "structured_csv_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         "structured_receipt": _relative_display_path(receipt_path(path)),
@@ -4146,6 +4165,7 @@ def _build_adhoc_source_snapshot(
         "decision_variant_id": FORMAL_DECISION_VARIANT_ID,
         "source_metadata": {
             "schema_version": "adhoc_request_time_source_snapshot_v1",
+            "source_builder": "decision_api._build_adhoc_source_snapshot_v1",
             "request_clock_hkt": _adhoc_hk_iso(request_clock),
             "input_asof_policy": "oldest_required_observation_clock",
             "complete_denominator_match_count": len(normalized_rows),
