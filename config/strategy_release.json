@@ -51,20 +51,13 @@
         {
           "variant_id": "active_v3.3.3",
           "version_id": "3.3.3",
-          "kind": "shadow",
+          "kind": "active",
           "label": "正式版 v3.3.3",
-          "source": "structured_shadow_csv",
-          "artifact_key": "structured_shadow_dir",
-          "artifact_variant_ids": [
-            "shadow_v3.3.3"
-          ],
-          "legacy_variant_ids": [
-            "shadow_v3.3.3"
-          ],
+          "source": "structured_active_csv",
+          "artifact_key": "structured_active_dir",
           "is_default": true,
           "selectable": true,
           "legacy_aliases": ["shadow_v3.3.3"],
-          "planned_direct_shadow_arm": "active_v3.3.3",
           "readiness": {
             "artifact_required": true,
             "defaultable_when": "available",
@@ -129,6 +122,7 @@
         "linegap_drift_dir": "results/main_strategy_linegap_drift_depth_20260630",
         "joint_leg_rows_csv": "results/n7_q_conf_drift_joint_2014_10h_trusted_plus2026_linefill_20260630/joint_leg_rows.csv",
         "structured_shadow_dir": "results/structured_decision_chain_shadow",
+        "structured_active_dir": "results/structured_decision_chain_active",
         "postmatch_ticket_pool_dir": "results/postmatch_ticket_pool_artifacts",
         "segment_betting_plan_dir": "results/segment_betting_plan"
       },

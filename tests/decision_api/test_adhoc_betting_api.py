@@ -21,7 +21,7 @@ from src.adhoc_betting import (
     file_hash,
 )
 from src.decision_api import app as appmod
-from src.structured_input_receipt import write_receipt
+from src.native_active_artifact import csv_bytes, write_native_artifact
 
 
 OPERATOR_TOKEN = "adhoc-pytest-operator"
@@ -30,7 +30,7 @@ NOW = datetime(2026, 7, 25, 12, 0, tzinfo=HKT)
 ISSUE = "26078"
 
 
-def _release(shadow_dir: Path) -> dict[str, object]:
+def _release(active_dir: Path) -> dict[str, object]:
     return {
         "release_id": "adhoc-test-release",
         "effective_from_issue": ISSUE,
@@ -38,17 +38,15 @@ def _release(shadow_dir: Path) -> dict[str, object]:
             {
                 "variant_id": "active_v3.3.3",
                 "version_id": "3.3.3",
-                "kind": "shadow",
+                "kind": "active",
                 "label": "正式版 v3.3.3",
-                "source": "structured_shadow_csv",
-                "artifact_key": "structured_shadow_dir",
-                "artifact_variant_ids": ["shadow_v3.3.3"],
-                "legacy_variant_ids": ["shadow_v3.3.3"],
+                "source": "structured_active_csv",
+                "artifact_key": "structured_active_dir",
                 "is_default": True,
                 "selectable": True,
             }
         ],
-        "artifacts": {"structured_shadow_dir": str(shadow_dir)},
+        "artifacts": {"structured_active_dir": str(active_dir)},
     }
 
 
@@ -252,42 +250,34 @@ def _build_db(path: Path) -> None:
         conn.close()
 
 
-def _write_structured_input(shadow_dir: Path, *, p3: float = 0.5) -> Path:
-    target = shadow_dir / f"{ISSUE}_fixture_shadow_v3.3.3" / f"structured_shadow_{ISSUE}.csv"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(
-            handle,
-            fieldnames=[
-                "issue",
-                "match_idx",
-                "shadow_arm",
-                "shadow_selection_codes",
-                "p_3",
-                "p_1",
-                "p_0",
-            ],
-        )
-        writer.writeheader()
-        for idx in range(1, 9):
-            writer.writerow(
-                {
-                    "issue": ISSUE,
-                    "match_idx": idx,
-                    "shadow_arm": "shadow_v3.3.3",
-                    "shadow_selection_codes": "3",
-                    "p_3": p3,
-                    "p_1": (1 - p3) / 2,
-                    "p_0": (1 - p3) / 2,
-                }
-            )
-    write_receipt(target, issue=ISSUE, generated_at=NOW, source={"fixture": "adhoc"})
+def _write_structured_input(active_dir: Path, *, p3: float = 0.5) -> Path:
+    fields = ["issue", "match_idx", "decision_variant_id", "active_arm", "selection_codes", "p_3", "p_1", "p_0"]
+    records = [
+        {
+            "issue": ISSUE,
+            "match_idx": idx,
+            "decision_variant_id": "active_v3.3.3",
+            "active_arm": "active_v3.3.3",
+            "selection_codes": "3",
+            "p_3": p3,
+            "p_1": (1 - p3) / 2,
+            "p_0": (1 - p3) / 2,
+        }
+        for idx in range(1, 9)
+    ]
+    target, _receipt, _verified = write_native_artifact(
+        output_root=active_dir,
+        issue=ISSUE,
+        generated_at=NOW,
+        csv_content=csv_bytes(records, fieldnames=fields),
+        source={"fixture": "adhoc-native-v2"},
+    )
     return target
 
 
 def _app(tmp_path: Path, monkeypatch):
     db_path = tmp_path / "500.sqlite"
-    shadow_dir = tmp_path / "results" / "structured_decision_chain_shadow"
+    shadow_dir = tmp_path / "results" / "structured_decision_chain_active"
     monkeypatch.setattr(appmod, "PROJECT_ROOT", tmp_path)
     monkeypatch.setattr(adhoc_module, "PROJECT_ROOT", tmp_path)
     _build_db(db_path)

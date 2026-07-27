@@ -39,6 +39,7 @@ from src.adhoc_publication_attestation import (
     sign_statement,
     verify_attestation,
 )
+from src.native_active_artifact import NativeArtifactError, validate_native_artifact
 from src.structured_input_receipt import receipt_path, verify_receipt
 
 
@@ -58,10 +59,8 @@ CONCENTRATION_PACKAGE_SCHEMA_VERSIONS = frozenset(
     {"adhoc_betting_package_v2", PACKAGE_SCHEMA_VERSION}
 )
 FORMAL_DECISION_VARIANT_ID = "active_v3.3.3"
-FORMAL_BINDING_SCHEMA_VERSION = "adhoc_formal_selection_binding_v1"
-FORMAL_ARTIFACT_VARIANT_IDS = frozenset(
-    {FORMAL_DECISION_VARIANT_ID, "shadow_v3.3.3"}
-)
+FORMAL_BINDING_SCHEMA_VERSION = "adhoc_formal_selection_binding_v2"
+LEGACY_FORMAL_BINDING_SCHEMA_VERSION = "adhoc_formal_selection_binding_v1"
 CONCENTRATION_CONTRACT_SCHEMA_VERSION = "adhoc_match_concentration_contract_v1"
 MAX_TICKET_OCCURRENCES_PER_MATCH = 2
 _LEGACY_LEDGER_BINDING = object()
@@ -88,7 +87,7 @@ DEFAULT_FONT_FILE = (
 )
 DEFAULT_SAFETY_MARGIN_SECONDS = 120
 DEFAULT_MAX_SOURCE_AGE_SECONDS = 900
-FORMAL_STRUCTURED_ROOT = "results/structured_decision_chain_shadow"
+FORMAL_STRUCTURED_ROOT = "results/structured_decision_chain_active"
 PUBLICATION_KEY_REGISTRY = "config/adhoc_publication_keys.json"
 PUBLICATION_ATTESTATION_FILE = "publication_attestation.json"
 
@@ -248,6 +247,9 @@ def _publication_statement(
         "valid_until_hkt": str(manifest.get("valid_until_hkt") or ""),
         "package_schema_version": str(manifest.get("schema_version") or ""),
         "decision_variant_id": str(manifest.get("decision_variant_id") or ""),
+        "formal_binding_schema_version": str(
+            formal.get("binding_schema_version") or ""
+        ),
         "formal_structured_csv_sha256": str(
             formal.get("structured_csv_sha256") or ""
         ),
@@ -433,9 +435,9 @@ def _verify_formal_decision_binding(
     """Bind every frozen adhoc selector to the verified formal shadow CSV.
 
     Package hashes can prove a package is self-consistent, but cannot prove a
-    caller used the right CSV column.  This verifier re-opens the reviewed
-    structured artifact, verifies its receipt and bytes, then compares the
-    executable ``shadow_selection_codes`` map to the frozen decision input.
+    caller used the right CSV column. This verifier re-opens the native v2
+    artifact, verifies its receipt and bytes, then compares executable
+    ``selection_codes`` to the frozen decision input.
     """
 
     if str(decision_variant_id or "") != FORMAL_DECISION_VARIANT_ID:
@@ -461,6 +463,10 @@ def _verify_formal_decision_binding(
         != FORMAL_DECISION_VARIANT_ID
         or str(formal_input.get("binding_schema_version") or "")
         != FORMAL_BINDING_SCHEMA_VERSION
+        or str(formal_input.get("formal_selection_column") or "")
+        != "selection_codes"
+        or str(formal_input.get("formal_active_arm") or "")
+        != FORMAL_DECISION_VARIANT_ID
     ):
         raise AdhocBettingError("adhoc formal decision input contract is invalid")
     csv_path = _trusted_formal_artifact_path(
@@ -480,7 +486,8 @@ def _verify_formal_decision_binding(
         raise AdhocBettingError("adhoc formal artifact hash does not bind current bytes")
     try:
         verify_receipt(csv_path, receipt, issue=issue)
-    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        validate_native_artifact(csv_path, issue=issue)
+    except (NativeArtifactError, OSError, ValueError, json.JSONDecodeError) as exc:
         raise AdhocBettingError("adhoc formal structured receipt is invalid") from exc
 
     formal_rows: dict[int, tuple[str, ...]] = {}
@@ -490,8 +497,9 @@ def _verify_formal_decision_binding(
             required = {
                 "issue",
                 "match_idx",
-                "shadow_arm",
-                "shadow_selection_codes",
+                "decision_variant_id",
+                "active_arm",
+                "selection_codes",
             }
             if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
                 raise AdhocBettingError("adhoc formal structured CSV lacks required columns")
@@ -504,11 +512,13 @@ def _verify_formal_decision_binding(
                     raise AdhocBettingError("adhoc formal CSV has invalid match index") from exc
                 if idx <= 0 or idx in formal_rows:
                     raise AdhocBettingError("adhoc formal CSV has duplicate match index")
-                if str(record.get("shadow_arm") or "") not in FORMAL_ARTIFACT_VARIANT_IDS:
+                if str(record.get("decision_variant_id") or "") != FORMAL_DECISION_VARIANT_ID:
                     raise AdhocBettingError(
-                        "adhoc formal CSV variant is not mapped to active_v3.3.3"
+                        "adhoc formal CSV variant is not active_v3.3.3"
                     )
-                formal_rows[idx] = _codes(record.get("shadow_selection_codes"))
+                if str(record.get("active_arm") or "") != FORMAL_DECISION_VARIANT_ID:
+                    raise AdhocBettingError("adhoc formal CSV arm is not active")
+                formal_rows[idx] = _codes(record.get("selection_codes"))
     except OSError as exc:
         raise AdhocBettingError("adhoc formal structured CSV cannot be read") from exc
     if not formal_rows:
@@ -528,7 +538,7 @@ def _verify_formal_decision_binding(
             raise AdhocBettingError("adhoc decision input match is absent from formal CSV")
         if tuple(str(code) for code in row.get("selection_codes") or []) != formal_rows[idx]:
             raise AdhocBettingError(
-                "adhoc decision input selection is not bound to formal shadow_selection_codes"
+                "adhoc decision input selection is not bound to formal native selection_codes"
             )
 
 

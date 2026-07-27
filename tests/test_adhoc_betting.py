@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import csv
 import json
 import sqlite3
 from collections import Counter
@@ -29,6 +28,7 @@ from src.adhoc_betting import (
     file_hash,
     verify_package,
 )
+from src.native_active_artifact import csv_bytes, write_native_artifact
 from src.structured_input_receipt import write_receipt
 from scripts.estimate_segment_betting_plan import PUBLISHED_EXACT_N_SAMPLE_ATTEMPTS
 
@@ -78,30 +78,23 @@ def _formal_artifact_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def _formal_fixture(*, count: int = 38) -> tuple[Path, Path]:
-    path = (
-        adhoc_module.PROJECT_ROOT
-        / "results"
-        / "structured_decision_chain_shadow"
-        / "26078_fixture_active_v3.3.3"
-        / "structured_shadow_26078.csv"
+    records = [
+        {
+            "issue": "26078",
+            "match_idx": idx,
+            "decision_variant_id": "active_v3.3.3",
+            "active_arm": "active_v3.3.3",
+            "selection_codes": "3",
+        }
+        for idx in range(1, count + 1)
+    ]
+    path, receipt, _verified = write_native_artifact(
+        output_root=adhoc_module.PROJECT_ROOT / "results" / "structured_decision_chain_active",
+        issue="26078",
+        generated_at=NOW,
+        csv_content=csv_bytes(records, fieldnames=list(records[0])),
+        source={"fixture": "adhoc-native-v2"},
     )
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(
-            stream,
-            fieldnames=["issue", "match_idx", "shadow_arm", "shadow_selection_codes"],
-        )
-        writer.writeheader()
-        for idx in range(1, count + 1):
-            writer.writerow(
-                {
-                    "issue": "26078",
-                    "match_idx": idx,
-                    "shadow_arm": "active_v3.3.3",
-                    "shadow_selection_codes": "3",
-                }
-            )
-    receipt = write_receipt(path, issue="26078", generated_at=NOW, source={"fixture": "adhoc"})
     return path, receipt
 
 
@@ -173,8 +166,9 @@ def _source_snapshot(
             "formal_decision_input": {
                 "status": "VERIFIED_FORMAL_INPUT",
                 "decision_variant_id": "active_v3.3.3",
-                "binding_schema_version": "adhoc_formal_selection_binding_v1",
-                "formal_selection_column": "shadow_selection_codes",
+                "binding_schema_version": "adhoc_formal_selection_binding_v2",
+                "formal_selection_column": "selection_codes",
+                "formal_active_arm": "active_v3.3.3",
                 "formal_selection_codes_sha256": adhoc_module._formal_selection_digest(
                     {idx: ("3",) for idx in range(1, 39)}
                 ),
@@ -760,6 +754,33 @@ def test_missing_formal_artifact_fails_closed_before_publication(tmp_path: Path)
         _create(store, source)
 
 
+def test_v1_binding_cannot_generate_new_operational_package(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    source = _source_snapshot()
+    formal = source["source_metadata"]["formal_decision_input"]  # type: ignore[index]
+    formal["binding_schema_version"] = "adhoc_formal_selection_binding_v1"
+
+    with pytest.raises(AdhocBettingError, match="formal decision input contract"):
+        _create(store, source)
+
+
+def test_v2_binding_rejects_shadow_root_and_column(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    source = _source_snapshot()
+    formal = source["source_metadata"]["formal_decision_input"]  # type: ignore[index]
+    formal["formal_selection_column"] = "shadow_selection_codes"
+    with pytest.raises(AdhocBettingError, match="formal decision input contract"):
+        _create(store, source)
+
+    source = _source_snapshot()
+    formal = source["source_metadata"]["formal_decision_input"]  # type: ignore[index]
+    formal["structured_csv"] = str(formal["structured_csv"]).replace(
+        "structured_decision_chain_active", "structured_decision_chain_shadow"
+    )
+    with pytest.raises(AdhocBettingError, match="trusted formal artifact root"):
+        _create(store, source)
+
+
 def test_spoofed_source_builder_cannot_authorize_wrong_issue(tmp_path: Path) -> None:
     store = _store(tmp_path)
     source = _source_snapshot()
@@ -855,7 +876,7 @@ def test_receipt_valid_retired_formal_variant_fails_closed(tmp_path: Path) -> No
     formal_input["structured_csv_sha256"] = file_hash(csv_path)
     formal_input["structured_receipt_sha256"] = file_hash(receipt)
 
-    with pytest.raises(AdhocBettingError, match="variant is not mapped"):
+    with pytest.raises(AdhocBettingError, match="formal structured receipt is invalid"):
         _create(store, source)
 
 

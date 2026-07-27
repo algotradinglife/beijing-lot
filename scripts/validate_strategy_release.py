@@ -176,10 +176,10 @@ def _validate_release_contract(release_key: str, release: dict[str, Any], errors
         kind = str(variant.get("kind") or "")
         if kind not in {"active", "shadow", "draft"}:
             errors.append(f"{release_key} decision_variants[{idx}].kind is invalid")
-        if kind == "shadow":
+        if kind == "shadow" or str(variant.get("source") or "") == "structured_active_csv":
             artifact_key = str(variant.get("artifact_key") or "")
             if not artifact_key:
-                errors.append(f"{release_key} shadow decision variant {variant.get('variant_id', idx)} must set artifact_key")
+                errors.append(f"{release_key} artifact-backed decision variant {variant.get('variant_id', idx)} must set artifact_key")
             elif artifact_key not in artifacts:
                 errors.append(f"{release_key} shadow decision variant {variant.get('variant_id', idx)} artifact_key not in artifacts: {artifact_key}")
         readiness = variant.get("readiness", {})

@@ -173,7 +173,7 @@
           "enum": ["active", "shadow", "draft"]
         },
         "source": {
-          "enum": ["active_snapshot", "structured_shadow_csv", "strategy_artifact"]
+          "enum": ["active_snapshot", "structured_active_csv", "structured_shadow_csv", "strategy_artifact"]
         },
         "artifact_key": {
           "type": "string"

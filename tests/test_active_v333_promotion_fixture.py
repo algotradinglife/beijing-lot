@@ -5,7 +5,10 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+from datetime import datetime, timezone
 from pathlib import Path
+
+from src.native_active_artifact import csv_bytes, validate_native_artifact, write_native_artifact
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,3 +63,38 @@ def test_active_v333_promotion_fixture_is_self_contained_and_reproducible() -> N
     assert source["receipt_schema_version"] == "structured_decision_input_receipt_v1"
     assert source["csv_sha256"] == "4adf064b950901e70906c0db000d41f28c7cfd6b183e8e7d334436ebc82d6a4f"
     assert source["receipt_file_sha256"] == "2bf4c49fc0410f03d2922142321f6c7b93e7ab2e6429edfe83fa573ab58c411c"
+
+
+def test_fixed_projection_converts_to_native_v2_with_zero_selection_difference(
+    tmp_path: Path,
+) -> None:
+    """The frozen formal map has an exact native v2 representation."""
+
+    with PROJECTION.open(newline="", encoding="utf-8") as stream:
+        legacy_rows = list(csv.DictReader(stream))
+    native_records = [
+        {
+            "issue": "26078",
+            "match_idx": row["match_idx"],
+            "decision_variant_id": "active_v3.3.3",
+            "active_arm": "active_v3.3.3",
+            "selection_codes": row["shadow_selection_codes"],
+        }
+        for row in legacy_rows
+    ]
+    csv_path, _receipt, _verified = write_native_artifact(
+        output_root=tmp_path,
+        issue="26078",
+        generated_at=datetime(2026, 7, 26, 16, 37, 35, 691221, tzinfo=timezone.utc),
+        csv_content=csv_bytes(
+            native_records,
+            fieldnames=["issue", "match_idx", "decision_variant_id", "active_arm", "selection_codes"],
+        ),
+        source={"fixture": "promotion-zero-difference"},
+    )
+    native_rows = validate_native_artifact(csv_path, issue="26078")["rows"]
+    projected = [
+        {"match_idx": int(row["match_idx"]), "selection_codes": row["selection_codes"].split("+")}
+        for _idx, row in sorted(native_rows.items())
+    ]
+    assert _sha256(projected) == "e72f7b4a0a6b8038fcacf7b74716a0c891335456c75e7ffe54337950f37eac4e"

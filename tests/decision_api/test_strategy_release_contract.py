@@ -115,8 +115,11 @@ def test_current_strategy_release_keeps_v3_3_3_as_runtime_default() -> None:
     assert variants["active_v3"]["readiness"]["defaultable_when"] == "never"
     assert variants["active_v3.3.3"]["is_default"] is True
     assert variants["active_v3.3.3"]["selectable"] is True
+    assert variants["active_v3.3.3"]["kind"] == "active"
+    assert variants["active_v3.3.3"]["source"] == "structured_active_csv"
+    assert variants["active_v3.3.3"]["artifact_key"] == "structured_active_dir"
     assert "shadow_v3.3.3" in variants["active_v3.3.3"]["legacy_aliases"]
-    assert "shadow_v3.3.3" in variants["active_v3.3.3"].get("legacy_variant_ids", [])
+    assert "shadow_v3.3.3" not in variants["active_v3.3.3"].get("legacy_variant_ids", [])
     assert variants["active_v3.3.3"]["readiness"]["missing_behavior"] == "artifact_missing"
     assert not any("execution_strict" in variant_id for variant_id in variants)
     for variant_id, version_id in (
@@ -128,6 +131,17 @@ def test_current_strategy_release_keeps_v3_3_3_as_runtime_default() -> None:
         assert late["is_default"] is False
         assert late["selectable"] is True
         assert late["readiness"]["defaultable_when"] == "never"
+
+
+def test_legacy_shadow_alias_cannot_select_native_operational_variant() -> None:
+    option = {
+        "variant_id": "active_v3.3.3",
+        "source": "structured_active_csv",
+        "legacy_aliases": ["shadow_v3.3.3"],
+    }
+
+    assert appmod._option_matches_variant_id(option, "active_v3.3.3") is True
+    assert appmod._option_matches_variant_id(option, "shadow_v3.3.3") is False
 
 
 def _write_registry(tmp_path: Path, registry: dict[str, Any]) -> Path:

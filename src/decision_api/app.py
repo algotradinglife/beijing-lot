@@ -42,6 +42,7 @@ from src.natural_day_manifest import (
     load_published_manifest,
     verify_operational_windows,
 )
+from src.native_active_artifact import NativeArtifactError, validate_native_artifact
 from src.operations_adapters import build_collection_domain, safe_diagnostic_text
 from src.operations_status import aggregate_status, build_operations_v2, legacy_warnings
 from src.segment_recovery import (
@@ -52,7 +53,7 @@ from src.segment_recovery import (
     verify_operational_window as verify_recovery_operational_window,
 )
 from src.sqlite_runtime import connect_sqlite
-from src.structured_input_receipt import receipt_path, verify_receipt
+from src.structured_input_receipt import receipt_path
 from src.multimarket_p0 import (
     DEFAULT_SEGMENT_FREEZE_ROOT as DEFAULT_RESEARCH_SEGMENT_FREEZE_ROOT,
     verify_segment_freeze,
@@ -69,6 +70,7 @@ HIGH_N_SELECTOR_RESULTS_DIR = PROJECT_ROOT / "results/high_n_selector_plus2026_l
 LINEGAP_DRIFT_RESULTS_DIR = PROJECT_ROOT / "results/main_strategy_linegap_drift_depth_20260630"
 JOINT_LEG_RESULTS_DIR = PROJECT_ROOT / "results/n7_q_conf_drift_joint_2014_10h_trusted_plus2026_linefill_20260630"
 STRUCTURED_DECISION_SHADOW_DIR = PROJECT_ROOT / "results/structured_decision_chain_shadow"
+STRUCTURED_DECISION_ACTIVE_DIR = PROJECT_ROOT / "results/structured_decision_chain_active"
 POSTMATCH_TICKET_POOL_DIR = PROJECT_ROOT / "results/postmatch_ticket_pool_artifacts"
 SEGMENT_BETTING_PLAN_DIR = PROJECT_ROOT / "results/segment_betting_plan"
 EXACT_N_SEGMENT_FREEZE_DIR = PROJECT_ROOT / "results/exact_n_segment_freeze"
@@ -108,6 +110,7 @@ SHADOW_DECISION_VERSION = "llm_chain_bet_protect_stop_v3.3.3"
 SHADOW_DECISION_LABEL = "active v3.3.3"
 SHADOW_DECISION_VARIANT_KIND = "shadow"
 SHADOW_DECISION_FAMILY = "structured_shadow"
+NATIVE_DECISION_FAMILY = "structured_active"
 MAIN_STRATEGY_ARMS = (
     {
         "arm_id": "b384_dd32_smooth100",
@@ -213,16 +216,13 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
                 {
                     "variant_id": SHADOW_DECISION_VARIANT_ID,
                     "version_id": "3.3.3",
-                    "kind": SHADOW_DECISION_VARIANT_KIND,
+                    "kind": ACTIVE_DECISION_VARIANT_KIND,
                     "label": "正式版 v3.3.3",
-                    "source": "structured_shadow_csv",
-                    "artifact_key": "structured_shadow_dir",
-                    "artifact_variant_ids": [LEGACY_SHADOW_DECISION_VARIANT_ID],
-                    "legacy_variant_ids": [LEGACY_SHADOW_DECISION_VARIANT_ID],
+                    "source": "structured_active_csv",
+                    "artifact_key": "structured_active_dir",
                     "is_default": True,
                     "selectable": True,
                     "legacy_aliases": [LEGACY_SHADOW_DECISION_VARIANT_ID],
-                    "planned_direct_shadow_arm": SHADOW_DECISION_VARIANT_ID,
                     "readiness": {
                         "artifact_required": True,
                         "defaultable_when": "available",
@@ -274,6 +274,7 @@ DEFAULT_STRATEGY_RELEASE_REGISTRY: dict[str, Any] = {
                 "linegap_drift_dir": str(LINEGAP_DRIFT_RESULTS_DIR.relative_to(PROJECT_ROOT)),
                 "joint_leg_rows_csv": str((JOINT_LEG_RESULTS_DIR / "joint_leg_rows.csv").relative_to(PROJECT_ROOT)),
                 "structured_shadow_dir": str(STRUCTURED_DECISION_SHADOW_DIR.relative_to(PROJECT_ROOT)),
+                "structured_active_dir": str(STRUCTURED_DECISION_ACTIVE_DIR.relative_to(PROJECT_ROOT)),
                 "postmatch_ticket_pool_dir": str(POSTMATCH_TICKET_POOL_DIR.relative_to(PROJECT_ROOT)),
                 "segment_betting_plan_dir": str(SEGMENT_BETTING_PLAN_DIR.relative_to(PROJECT_ROOT)),
             },
@@ -444,6 +445,10 @@ def _strategy_linegap_drift_dir(release: dict[str, Any] | None = None) -> Path:
 
 def _strategy_shadow_dir(release: dict[str, Any] | None = None) -> Path:
     return _strategy_artifact_path("structured_shadow_dir", STRUCTURED_DECISION_SHADOW_DIR, release)
+
+
+def _strategy_active_dir(release: dict[str, Any] | None = None) -> Path:
+    return _strategy_artifact_path("structured_active_dir", STRUCTURED_DECISION_ACTIVE_DIR, release)
 
 
 def _strategy_postmatch_ticket_pool_dir(release: dict[str, Any] | None = None) -> Path:
@@ -1631,7 +1636,7 @@ def _live_workflow_step_defs(issue: str, db_path: Path) -> list[dict[str, Any]]:
             "timeout_sec": 300,
             "command": [
                 py,
-                str(PROJECT_ROOT / "scripts/evaluate_structured_decision_chain_shadow.py"),
+                str(PROJECT_ROOT / "scripts/evaluate_structured_decision_chain_active.py"),
                 "--db",
                 db_arg,
                 "--issue",
@@ -1893,11 +1898,10 @@ def _decision_artifact_generator_artifact_id(manifest: dict[str, Any]) -> str:
 def _decision_artifact_generation_supported(manifest: dict[str, Any]) -> bool:
     if not manifest:
         return False
-    if manifest.get("source") != "structured_shadow_csv":
-        return False
-    artifact_id = _decision_artifact_generator_artifact_id(manifest)
-    # The current strategy generator writes shadow_v3.3.3, exposed publicly as active_v3.3.3.
-    return artifact_id == LEGACY_SHADOW_DECISION_VARIANT_ID
+    return (
+        manifest.get("source") == "structured_active_csv"
+        and str(manifest.get("variant_id") or "") == FORMAL_DECISION_VARIANT_ID
+    )
 
 
 def _decision_artifact_latest_complete_variant(
@@ -1907,32 +1911,32 @@ def _decision_artifact_latest_complete_variant(
     *,
     release: dict[str, Any] | None = None,
 ) -> tuple[dict[int, dict[str, Any]] | None, str, dict[str, Any] | None]:
-    public_id = str(manifest.get("variant_id") or "")
-    artifact_id = _decision_artifact_generator_artifact_id(manifest)
-    candidates: list[tuple[Path, dict[int, dict[str, Any]], str]] = []
-    for path in _structured_shadow_csv_candidates(issue, release):
-        rows, source = _structured_shadow_rows_from_csv(path)
-        if not rows:
+    if manifest.get("source") != "structured_active_csv":
+        return None, "", None
+    candidates: list[tuple[datetime, Path, dict[int, dict[str, Any]], str]] = []
+    for path in _structured_active_csv_candidates(issue, release):
+        try:
+            rows, source, verified = _structured_active_rows_from_csv(path, issue=issue)
+        except NativeArtifactError:
             continue
-        row_artifact_id = _shadow_variant_id(rows)
-        row_public_id = _public_decision_variant_id(row_artifact_id, release)
-        if row_artifact_id != artifact_id and row_public_id != public_id:
+        generated = verified["receipt"].get("generated_at")
+        if not isinstance(generated, datetime):
             continue
-        candidates.append((path, rows, source))
+        candidates.append((generated, path, rows, source))
     if not candidates:
         completeness = completeness_for_indices(
             issue=issue,
-            scope="structured_shadow_csv",
+            scope="structured_active_csv",
             expected_indices=expected_indices,
             actual_indices=[],
         ).to_dict()
         return None, "", completeness
-    candidates.sort(key=lambda item: item[0].stat().st_mtime, reverse=True)
+    candidates.sort(key=lambda item: (item[0], item[1].parent.name), reverse=True)
     best_incomplete: tuple[dict[int, dict[str, Any]], str, dict[str, Any]] | None = None
-    for _path, rows, source in candidates:
+    for _generated, _path, rows, source in candidates:
         status = completeness_for_indices(
             issue=issue,
-            scope="structured_shadow_csv",
+            scope="structured_active_csv",
             expected_indices=expected_indices,
             actual_indices=rows.keys(),
         )
@@ -1999,7 +2003,7 @@ def _decision_artifact_status_payload(
         "expected_match_count": len(expected_indices),
         "completeness": completeness or completeness_for_indices(
             issue=resolved,
-            scope="structured_shadow_csv",
+            scope="structured_active_csv",
             expected_indices=expected_indices,
             actual_indices=[],
         ).to_dict(),
@@ -2042,7 +2046,7 @@ def _run_decision_artifact_generator(
     py = os.environ.get("PYTHON") or sys.executable
     command = [
         py,
-        str(PROJECT_ROOT / "scripts/evaluate_structured_decision_chain_shadow.py"),
+        str(PROJECT_ROOT / "scripts/evaluate_structured_decision_chain_active.py"),
         "--db",
         str(db_path),
         "--issue",
@@ -3612,6 +3616,27 @@ def _structured_shadow_rows_from_csv(path: Path) -> tuple[dict[int, dict[str, An
     return rows, source
 
 
+def _structured_active_csv_candidates(issue: str, release: dict[str, Any] | None = None) -> list[Path]:
+    active_dir = _strategy_active_dir(release)
+    candidates = [
+        path
+        for path in active_dir.glob(f"{issue}_*_{FORMAL_DECISION_VARIANT_ID}/structured_active_{issue}.csv")
+        if path.is_file()
+    ]
+    return sorted(candidates, key=lambda path: path.parent.name)
+
+
+def _structured_active_rows_from_csv(path: Path, *, issue: str) -> tuple[dict[int, dict[str, Any]], str, dict[str, Any]]:
+    """Read one immutable v2 native artifact, never falling back to shadow."""
+
+    verified = validate_native_artifact(path, issue=issue)
+    try:
+        source = str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        source = str(path)
+    return verified["rows"], source, verified
+
+
 def _adhoc_hk_iso(value: datetime) -> str:
     return value.astimezone(HK_TZ).isoformat(timespec="seconds")
 
@@ -3713,14 +3738,11 @@ def _adhoc_formal_structured_input(
     release = release or _active_strategy_release()
     candidates: list[tuple[datetime, Path, dict[int, dict[str, Any]], dict[str, Any]]] = []
     rejected: list[str] = []
-    for path in _structured_shadow_csv_candidates(issue, release):
-        rows, _source = _structured_shadow_rows_from_csv(path)
-        source_variant = _shadow_source_variant_id(rows)
-        if _public_decision_variant_id(source_variant, release) != FORMAL_DECISION_VARIANT_ID:
-            continue
+    for path in _structured_active_csv_candidates(issue, release):
         try:
-            receipt = verify_receipt(path, receipt_path(path), issue=issue)
-        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            rows, _source, verified = _structured_active_rows_from_csv(path, issue=issue)
+            receipt = verified["receipt"]
+        except (NativeArtifactError, OSError, ValueError, json.JSONDecodeError) as exc:
             rejected.append(f"receipt_invalid:{path.name}:{type(exc).__name__}")
             continue
         generated = receipt.get("generated_at")
@@ -3751,7 +3773,7 @@ def _adhoc_formal_structured_input(
                 {
                     "match_idx": idx,
                     "selection_codes": _selection_codes_from_value(
-                        row.get("shadow_selection_codes")
+                        row.get("selection_codes")
                     ),
                 }
                 for idx, row in sorted(rows.items())
@@ -3764,8 +3786,9 @@ def _adhoc_formal_structured_input(
     return rows, {
         "status": "VERIFIED_FORMAL_INPUT",
         "decision_variant_id": FORMAL_DECISION_VARIANT_ID,
-        "binding_schema_version": "adhoc_formal_selection_binding_v1",
-        "formal_selection_column": "shadow_selection_codes",
+        "binding_schema_version": "adhoc_formal_selection_binding_v2",
+        "formal_selection_column": "selection_codes",
+        "formal_active_arm": FORMAL_DECISION_VARIANT_ID,
         "formal_selection_codes_sha256": formal_selection_codes_sha256,
         "structured_csv": _relative_display_path(path),
         "structured_csv_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -4115,7 +4138,7 @@ def _build_adhoc_source_snapshot(
         match_status = _adhoc_match_status(
             nowscore_row.get("status"), nowscore_row.get("status_text")
         )
-        selection_codes = _selection_codes_from_value(structured.get("shadow_selection_codes"))
+        selection_codes = _selection_codes_from_value(structured.get("selection_codes"))
         probabilities = {
             code: _safe_float(structured.get(f"p_{code}"))
             for code in OUTCOME_ORDER
@@ -4246,7 +4269,13 @@ def _annotate_shadow_variant_rows(
 
 
 def _variant_option_aliases(option: dict[str, Any]) -> set[str]:
-    aliases = set(_variant_legacy_aliases(option))
+    # `shadow_v3.3.3` remains visible as audit provenance only. It must not
+    # resolve to the native operational option through a request parameter.
+    aliases = (
+        set()
+        if option.get("source") == "structured_active_csv"
+        else set(_variant_legacy_aliases(option))
+    )
     for key in ("legacy_variant_id", "source_variant_id"):
         value = str(option.get(key) or "").strip()
         if value:
@@ -4325,6 +4354,38 @@ def _structured_shadow_variants(issue: str, release: dict[str, Any] | None = Non
     return variants
 
 
+def _structured_active_variant_scan(
+    issue: str,
+    release: dict[str, Any] | None = None,
+) -> tuple[list[tuple[dict[int, dict[str, Any]], str]], list[str]]:
+    """Resolve formal native artifacts by signed receipt clock, never mtime."""
+
+    manifest = _manifest_variant_by_id(release).get(FORMAL_DECISION_VARIANT_ID, {})
+    if (
+        manifest.get("kind") != ACTIVE_DECISION_VARIANT_KIND
+        or manifest.get("source") != "structured_active_csv"
+    ):
+        return [], []
+    candidates: list[tuple[datetime, str, dict[int, dict[str, Any]], str]] = []
+    rejected: list[str] = []
+    for path in _structured_active_csv_candidates(issue, release):
+        try:
+            rows, source, verified = _structured_active_rows_from_csv(path, issue=issue)
+        except NativeArtifactError as exc:
+            rejected.append(f"{path.name}:{exc}")
+            continue
+        generated = verified["receipt"].get("generated_at")
+        if not isinstance(generated, datetime):
+            rejected.append(f"{path.name}:missing_generated_at")
+            continue
+        candidates.append((generated, path.parent.name, rows, source))
+    if not candidates:
+        return [], rejected
+    generated, _component, rows, source = max(candidates, key=lambda item: (item[0], item[1]))
+    del generated
+    return [(rows, source)], rejected
+
+
 def _complete_shadow_variants(
     issue: str,
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]],
@@ -4356,6 +4417,34 @@ def _complete_shadow_variants(
             "source_path": source_path,
             **status.to_dict(),
         })
+    return complete, incomplete
+
+
+def _complete_active_variants(
+    issue: str,
+    active_variants: list[tuple[dict[int, dict[str, Any]], str]],
+    expected_match_indices: set[int],
+    *,
+    ignore_extra: bool = False,
+) -> tuple[list[tuple[dict[int, dict[str, Any]], str]], list[dict[str, Any]]]:
+    complete: list[tuple[dict[int, dict[str, Any]], str]] = []
+    incomplete: list[dict[str, Any]] = []
+    for rows, source_path in active_variants:
+        status = completeness_for_indices(
+            issue=issue,
+            scope="structured_active_csv",
+            expected_indices=expected_match_indices,
+            actual_indices=rows.keys(),
+            ignore_extra=ignore_extra,
+        )
+        if status.complete:
+            complete.append((rows, source_path))
+        else:
+            incomplete.append({
+                "variant_id": FORMAL_DECISION_VARIANT_ID,
+                "source_path": source_path,
+                **status.to_dict(),
+            })
     return complete, incomplete
 
 
@@ -4492,6 +4581,58 @@ def _shadow_decision_variant(
         ],
         "decision_chain": _json_loads(row.get("shadow_chain_json"), []),
         "decision_categories": _json_loads(row.get("shadow_categories_json"), []),
+    }
+
+
+def _native_decision_variant(
+    row: dict[str, Any],
+    source_path: str,
+    *,
+    result_code: str = "",
+    release: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    codes = _selection_codes_from_value(row.get("selection_codes"))
+    manifest = _manifest_variant_by_id(release).get(FORMAL_DECISION_VARIANT_ID, {})
+    primary = str(row.get("primary_pick") or (codes[0] if codes else ""))
+    if primary not in OUTCOME_ORDER:
+        primary = codes[0] if codes else ""
+    coverage_hit = _csv_bool(row, "coverage_hit")
+    primary_hit = _csv_bool(row, "primary_hit")
+    if result_code and codes:
+        primary_hit = result_code == primary if primary else None
+        coverage_hit = result_code in codes
+    return {
+        "variant_id": FORMAL_DECISION_VARIANT_ID,
+        "source_variant_id": FORMAL_DECISION_VARIANT_ID,
+        "legacy_variant_id": "",
+        "legacy_aliases": _variant_legacy_aliases(manifest),
+        "kind": ACTIVE_DECISION_VARIANT_KIND,
+        "family": NATIVE_DECISION_FAMILY,
+        "label": manifest.get("label") or "正式版 v3.3.3",
+        "display_label": manifest.get("label") or "正式版 v3.3.3",
+        "version": row.get("decision_version") or SHADOW_DECISION_VERSION,
+        "version_id": manifest.get("version_id") or "3.3.3",
+        "source": "structured_active_csv",
+        "source_path": source_path,
+        "artifact_key": manifest.get("artifact_key", "structured_active_dir"),
+        "is_default": bool(manifest.get("is_default", False)),
+        "selectable": bool(manifest.get("selectable", True)),
+        "available": True,
+        **_decision_variant_readiness(manifest, available=True),
+        "recommendation": row.get("judgment") or ("停" if not codes else "+".join(OUTCOME_LABEL[code] for code in codes)),
+        "primary_pick": primary,
+        "protect_picks": codes[1:],
+        "selection_codes": codes,
+        "selection_type": row.get("selection_type") or _selection_type_from_codes(codes),
+        "stop_flag": _csv_bool(row, "stop_flag") if row.get("stop_flag") != "" else not codes,
+        "q_score": _safe_float(row.get("max_q")),
+        "probability": _safe_float(row.get(f"p_{primary}")) if primary else _safe_float(row.get("prob_top")),
+        "confidence_label": "",
+        "prediction_hit": coverage_hit,
+        "primary_hit": primary_hit,
+        "coverage_hit": coverage_hit,
+        "decision_chain": _json_loads(row.get("decision_chain_json"), []),
+        "decision_categories": _json_loads(row.get("decision_categories_json"), []),
     }
 
 
@@ -4794,11 +4935,16 @@ def _normalize_decision_variant_defaults(options: list[dict[str, Any]]) -> list[
 def _decision_variant_options(
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] | None = None,
     *,
+    active_variants: list[tuple[dict[int, dict[str, Any]], str]] | None = None,
     release: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     active_manifest = _manifest_default_active_variant(release)
     options: list[dict[str, Any]] = []
-    if active_manifest and active_manifest.get("selectable") is not False:
+    if (
+        active_manifest
+        and active_manifest.get("source") == "active_snapshot"
+        and active_manifest.get("selectable") is not False
+    ):
         active_variant_id = str(active_manifest.get("variant_id") or ACTIVE_DECISION_VARIANT_ID)
         active_readiness = _decision_variant_readiness(active_manifest, available=True)
         options.append({
@@ -4815,6 +4961,9 @@ def _decision_variant_options(
             "available": True,
             **active_readiness,
         })
+    for rows, source_path in active_variants or []:
+        if rows and source_path:
+            options.append(_native_decision_variant(next(iter(rows.values())), source_path, release=release))
     for rows, source_path in shadow_variants or []:
         if rows and source_path:
             option = _shadow_decision_option(rows, source_path, release=release)
@@ -6661,6 +6810,7 @@ def _attach_decision_variants(
     matches: list[dict[str, Any]],
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]],
     *,
+    active_variants: list[tuple[dict[int, dict[str, Any]], str]] | None = None,
     release: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     manifests = _manifest_variant_by_id(release)
@@ -6681,9 +6831,15 @@ def _attach_decision_variants(
     for match in matches:
         idx = _safe_int(match.get("match_idx"))
         variants = []
-        if active_manifest.get("selectable") is not False:
+        if (
+            active_manifest.get("source") == "active_snapshot"
+            and active_manifest.get("selectable") is not False
+        ):
             variants.append(_active_decision_variant(match, release=release))
         result_code = str(match.get("result_code") or "")
+        for active_rows, active_source_path in active_variants or []:
+            if idx is not None and idx in active_rows and active_source_path:
+                variants.append(_native_decision_variant(active_rows[idx], active_source_path, result_code=result_code, release=release))
         for shadow_rows, shadow_source_path in shadow_variants:
             if idx is not None and idx in shadow_rows and shadow_source_path:
                 variant_id = _public_decision_variant_id(_shadow_variant_id(shadow_rows), release)
@@ -7940,16 +8096,19 @@ def _main_strategy_payload(
 ) -> dict[str, Any]:
     release = _active_strategy_release()
     resolved = _resolve_main_strategy_issue(conn, issue)
+    active_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     suppressed_shadow_variant_ids: list[str] = []
     incomplete_shadow_variants: list[dict[str, Any]] = []
     if _live_issue_exists(conn, resolved):
         rows = _issue_rows(conn, resolved, only_date=None)
         if _should_scan_release_shadow_variants(resolved, rows, release):
+            active_variants, _rejected_active_artifacts = _structured_active_variant_scan(resolved, release)
             shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
             expected_indices = {int(row["match_idx"]) for row in rows}
+            active_variants, _incomplete_active_variants = _complete_active_variants(resolved, active_variants, expected_indices)
             shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(resolved, shadow_variants, expected_indices, release=release)
-    variant_options = _decision_variant_options(shadow_variants, release=release)
+    variant_options = _decision_variant_options(shadow_variants, active_variants=active_variants, release=release)
     historical_pool = _historical_ev_pool(resolved, release)
     live_proxy = (
         None
@@ -7989,6 +8148,7 @@ def _main_strategy_payload(
             "ticket_pool_dir": _relative_display_path(_strategy_artifact_path("ticket_pool_dir", HIGH_N_SELECTOR_RESULTS_DIR, release)),
             "ticket_pool_csv": _relative_display_path(_strategy_ticket_pool_csv(release)),
             "joint_leg_rows_csv": _relative_display_path(_strategy_joint_leg_rows_csv(release)),
+            "structured_active_dir": _relative_display_path(_strategy_active_dir(release)),
             "structured_shadow_dir": _relative_display_path(_strategy_shadow_dir(release)),
             "segment_betting_plan_dir": _relative_display_path(_strategy_segment_betting_plan_dir(release)),
             "model_db": _public_diagnostics_path(DEFAULT_MODEL_DB),
@@ -8584,12 +8744,17 @@ def _dashboard(
     resolved = _resolve_issue(conn, issue)
     rows = _issue_rows(conn, resolved, only_date=only_date)
     matches = [_apply_llm_issue_decision(conn, row, _match_summary(row)) for row in rows]
+    active_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     suppressed_shadow_variant_ids: list[str] = []
     incomplete_shadow_variants: list[dict[str, Any]] = []
     if _should_scan_release_shadow_variants(resolved, rows, release):
+        active_variants, _rejected_active_artifacts = _structured_active_variant_scan(resolved, release)
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
         expected_indices = {int(row["match_idx"]) for row in rows}
+        active_variants, _incomplete_active_variants = _complete_active_variants(
+            resolved, active_variants, expected_indices, ignore_extra=bool(only_date)
+        )
         shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(
             resolved,
             shadow_variants,
@@ -8597,8 +8762,8 @@ def _dashboard(
             release=release,
             ignore_extra=bool(only_date),
         )
-    matches = _attach_decision_variants(matches, shadow_variants, release=release)
-    variant_options = _decision_variant_options(shadow_variants, release=release)
+    matches = _attach_decision_variants(matches, shadow_variants, active_variants=active_variants, release=release)
+    variant_options = _decision_variant_options(shadow_variants, active_variants=active_variants, release=release)
     version_context = _strategy_version_context(
         release,
         variant_options,
@@ -9004,15 +9169,18 @@ def _match_detail(
                 "llm_source": gpt_decision["source"],
             }
         )
+    active_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     suppressed_shadow_variant_ids: list[str] = []
     incomplete_shadow_variants: list[dict[str, Any]] = []
     if _should_scan_release_shadow_variants(str(row["issue"]), rows, release):
+        active_variants, _rejected_active_artifacts = _structured_active_variant_scan(str(row["issue"]), release)
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(str(row["issue"]), release)
         expected_indices = {int(item["match_idx"]) for item in rows}
+        active_variants, _incomplete_active_variants = _complete_active_variants(str(row["issue"]), active_variants, expected_indices)
         shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(str(row["issue"]), shadow_variants, expected_indices, release=release)
-    _attach_decision_variants([summary], shadow_variants, release=release)
-    variant_options = _decision_variant_options(shadow_variants, release=release)
+    _attach_decision_variants([summary], shadow_variants, active_variants=active_variants, release=release)
+    variant_options = _decision_variant_options(shadow_variants, active_variants=active_variants, release=release)
     version_context = _strategy_version_context(
         release,
         variant_options,
@@ -9184,14 +9352,17 @@ def _settlement(
     resolved = _resolve_issue(conn, issue)
     release = _active_strategy_release()
     rows = _issue_rows(conn, resolved, only_date=None)
+    active_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     shadow_variants: list[tuple[dict[int, dict[str, Any]], str]] = []
     suppressed_shadow_variant_ids: list[str] = []
     incomplete_shadow_variants: list[dict[str, Any]] = []
     if _should_scan_release_shadow_variants(resolved, rows, release):
+        active_variants, _rejected_active_artifacts = _structured_active_variant_scan(resolved, release)
         shadow_variants, suppressed_shadow_variant_ids = _structured_shadow_variant_scan(resolved, release)
         expected_indices = {int(row["match_idx"]) for row in rows}
+        active_variants, _incomplete_active_variants = _complete_active_variants(resolved, active_variants, expected_indices)
         shadow_variants, incomplete_shadow_variants = _complete_shadow_variants(resolved, shadow_variants, expected_indices, release=release)
-    variant_options = _decision_variant_options(shadow_variants, release=release)
+    variant_options = _decision_variant_options(shadow_variants, active_variants=active_variants, release=release)
     version_context = _strategy_version_context(
         release,
         variant_options,
