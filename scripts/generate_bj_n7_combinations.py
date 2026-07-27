@@ -36,7 +36,7 @@ AUTHORIZED_SAFE_INPUT_FILENAME = "safe_input_v1.csv"
 AUTHORIZED_SAFE_INPUT_SHA256 = "03514b097b0ce4fe54a0129862b2ce0cd3963801afbf74901daa6a9a141678eb"
 AUTHORIZED_SAFE_INPUT_SIZE = 38570
 AUTHORIZED_SOURCE_SHA256 = "2f04f50d7fe6085f1353b6690c5e69bc6fb9befc2180fae780aa0bbd056b0233"
-COVERAGE_SCORE_SCALE = 10**15
+COVERAGE_SCORE_SCALE = 10**8
 
 
 class FreezeError(RuntimeError):
@@ -249,8 +249,7 @@ def _best_exact_quota(pool: list[Candidate], k: int) -> list[Candidate] | None:
     best_sum30 = int(sum(sum30[index] for index, bit in enumerate(deviation_bits) if bit))
     exact_constraints = [*base_constraints, LinearConstraint(sum30, best_sum30, best_sum30)]
 
-    normalized_coverage = coverage_units / COVERAGE_SCORE_SCALE
-    coverage_result = solve(-normalized_coverage, exact_constraints)
+    coverage_result = solve(-coverage_units, exact_constraints)
     if not coverage_result.success or coverage_result.x is None:
         raise FreezeError("ratio optimizer failed during coverage maximization")
     coverage_bits = np.rint(coverage_result.x).astype(int)
@@ -259,11 +258,7 @@ def _best_exact_quota(pool: list[Candidate], k: int) -> list[Candidate] | None:
     )
     lex_constraints = [
         *exact_constraints,
-        LinearConstraint(
-            normalized_coverage,
-            best_coverage_units / COVERAGE_SCORE_SCALE,
-            best_coverage_units / COVERAGE_SCORE_SCALE,
-        ),
+        LinearConstraint(coverage_units, best_coverage_units, best_coverage_units),
     ]
 
     # A 32-bit block objective is exactly representable as a float.  Fixing
@@ -398,12 +393,15 @@ def write_freeze(output_dir: Path, combinations: list[dict[str, str]], summary: 
     def write_csv(name: str, rows: list[dict[str, str]], fields: tuple[str, ...]) -> Path:
         path = output_dir / name
         with path.open("w", encoding="utf-8", newline="\n") as handle:
-            writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n"); writer.writeheader(); writer.writerows(rows)
+            writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+            writer.writeheader()
+            writer.writerows(rows)
         return path
     combos_path = write_csv("combinations.csv", combinations, ("combination_id", "issue", "arm", "k", "ordinal", "match_ids", "sequence", "n3", "n0", "n1", "coverage_score", "quoted_sp_product", "gross_pre_tax_payout_yuan"))
     summary_path = write_csv("summary.csv", summary, ("issue", "arm", "k", "disposition", "diagnostic_only", "sequence_count", "n3", "n0", "n1", "pct_3", "pct_0", "pct_1", "combination_ids_sha256"))
     manifest = {"experiment": EXPERIMENT, "source_sha256": AUTHORIZED_SOURCE_SHA256, "safe_input_filename": AUTHORIZED_SAFE_INPUT_FILENAME, "safe_input_schema": list(SAFE_SCHEMA), "safe_input_sha256": AUTHORIZED_SAFE_INPUT_SHA256, "config_sha256": AUTHORIZED_CONFIG_SHA256, "generator_sha256": sha256_file(Path(__file__)), "git_head": git_head, "parameters": {"code_order": list(CODE_ORDER), "k_values": list(KS), "sp_band": list(BAND), "payout_factor": PAYOUT_FACTOR, "payout_cap": PAYOUT_CAP, "coverage_score_scale": COVERAGE_SCORE_SCALE}, "outputs": {"combinations.csv": sha256_file(combos_path), "summary.csv": sha256_file(summary_path)}}
-    manifest_path = output_dir / "manifest.json"; manifest_path.write_bytes(canonical_json(manifest))
+    manifest_path = output_dir / "manifest.json"
+    manifest_path.write_bytes(canonical_json(manifest))
     checksum_paths = (combos_path, manifest_path, summary_path)
     (output_dir / "SHA256SUMS").write_text("".join(f"{sha256_file(path)}  {path.name}\n" for path in checksum_paths), encoding="utf-8", newline="\n")
 

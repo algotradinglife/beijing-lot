@@ -36,7 +36,8 @@ def _mixed_row(issue: str = "9001", match_idx: str = "1") -> dict[str, str]:
 def _write_mixed(path: Path, mod, rows: list[dict[str, str]], header=None) -> str:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=header or mod.SOURCE_HEADER, lineterminator="\n", extrasaction="ignore")
-        writer.writeheader(); writer.writerows(rows)
+        writer.writeheader()
+        writer.writerows(rows)
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 

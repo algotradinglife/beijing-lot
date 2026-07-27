@@ -74,6 +74,36 @@ def test_ratio_quota_exact_floor_and_lexical_tie_break() -> None:
     assert mod.quota_targets(1) == (3, 3, 1)
 
 
+def test_non_uniform_full_universe_k256_is_stable(
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    mod = _load_module()
+    prices = (
+        (3.75, 3.98, 4.09),
+        (4.38, 3.98, 4.34),
+        (2.56, 3.43, 4.39),
+        (3.80, 4.30, 2.73),
+        (3.44, 2.99, 3.59),
+        (3.65, 2.53, 2.93),
+        (3.06, 4.33, 4.03),
+    )
+    legs = tuple(
+        mod.Leg("26071", idx, f"synthetic_non_uniform_{idx}", "k", "c", "s", sp)
+        for idx, sp in enumerate(prices, 1)
+    )
+    pool = mod.candidates(legs, universe="SP_BAND_ONLY")
+    assert len(pool) == 2187
+    first = mod._best_exact_quota(pool, 256)
+    second = mod._best_exact_quota(pool, 256)
+    assert first is not None and second is not None
+    assert [item.sequence for item in first] == [item.sequence for item in second]
+    assert len({item.sequence for item in first}) == 256
+    need3, need0, _need1 = mod.quota_targets(256)
+    assert sum(item.counts[0] for item in first) >= need3
+    assert sum(item.counts[1] for item in first) >= need0
+    assert capfd.readouterr() == ("", "")
+
+
 def test_full_generate_k256_is_byte_identical_and_enforces_constraints(tmp_path: Path) -> None:
     mod = _load_module()
     legs = [
