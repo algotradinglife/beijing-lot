@@ -13,6 +13,7 @@ import sys
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -43,6 +44,12 @@ PUBLISHED_EXACT_N_MAX_BUNDLE_COST_RATIO = 0.4
 PUBLISHED_EXACT_N_POSITIVE_EV_ONLY = True
 PUBLISHED_EXACT_N_STAKE_MODE = "scale_to_budget"
 PUBLISHED_EXACT_N_STAKE_YUAN_PER_UNIT = 2.0
+BEIJING_SINGLE_MATCH_PAYOUT_FACTOR = Decimal("0.65")
+REALIZED_PAYOUT_SERIALIZATION_DECIMAL_PLACES = 6
+REALIZED_PAYOUT_ROUNDING_POLICY = (
+    "pre_round_decimal_value_serialized_to_6_decimal_places;"
+    "no_paid_cent_rounding_applied"
+)
 
 
 @dataclass(frozen=True)
@@ -87,6 +94,22 @@ def product(values: Iterable[float]) -> float:
     for value in values:
         out *= value
     return out
+
+
+def payout_units_with_official_factor(values: Iterable[float]) -> float:
+    """Apply the Beijing Single Match factor once to one physical combination.
+
+    The same exact boundary is shared by pre-result EV (``q_sum`` values) and
+    realized settlement (official winning SP values).  Currency cent-rounding
+    is deliberately not performed here because this module has no
+    authoritative paid-ticket rounding rule; existing artifacts serialize the
+    pre-round value to six places.
+    """
+
+    payout = BEIJING_SINGLE_MATCH_PAYOUT_FACTOR
+    for value in values:
+        payout *= Decimal(str(value))
+    return float(payout)
 
 
 def stable_seed(*parts: object) -> int:
@@ -651,12 +674,20 @@ def make_bundle_candidate(
 ) -> BundleCandidate:
     legs = [metrics[idx] for idx in indices]
     cost_units = product(float(item.width) for item in legs)
-    expected_payout_units = product(item.q_sum for item in legs)
+    expected_payout_units = payout_units_with_official_factor(
+        item.q_sum for item in legs
+    )
     expected_profit_units = expected_payout_units - cost_units
     expected_roi = expected_profit_units / cost_units if cost_units else -1.0
     hit_prob = product(item.hit_prob for item in legs)
     realized_hit = all(item.leg.actual_code in item.codes and item.leg.winning_sp is not None for item in legs)
-    payout_units = product(float(item.leg.winning_sp or 0.0) for item in legs) if realized_hit else 0.0
+    payout_units = (
+        payout_units_with_official_factor(
+            float(item.leg.winning_sp or 0.0) for item in legs
+        )
+        if realized_hit
+        else 0.0
+    )
     profit_units = payout_units - cost_units
     return BundleCandidate(
         segment_idx=segment_idx,
@@ -1120,8 +1151,9 @@ Generated: {generated}
 - Stake mode is `{args.stake_mode}`. `scale_to_budget` repeats selected bundles by score until the segment budget is nearly exhausted, while respecting `max_bundle_spend_pct={args.max_bundle_spend_pct}`; `unit_once` buys each selected bundle once.
 - Eligible matches are rows with executable selected codes for `--arm {args.arm}`. Rows with no-buy/stop are excluded from bundle selection.
 - N starts from half of eligible match count, capped at `{args.max_n}`, then drops by expected coverage hit rate using `select_rolling_segment_n.py`.
-- Each selected bundle is one small-combo N串1 ticket group: cost units are `product(width_i)`, yuan cost is `{args.stake_yuan_per_ticket}` times that. A hit pays one expanded ticket: `product(winning_sp_i)`.
-- Candidate bundles are sampled by leg hit probability and unit value `sum(p*sp)/width`; the selector buys positive-EV bundles under `{args.segment_budget_yuan}` yuan per segment with overlap guard `{args.max_overlap if args.max_overlap is not None else 'N-2'}` and per-bundle spend cap.
+- Each selected bundle is one small-combo N串1 ticket group: cost units are `product(width_i)`, yuan cost is `{args.stake_yuan_per_ticket}` times that. A realized hit pays one expanded physical combination using `stake_yuan_per_ticket × integer_multiplier × product(official_winning_sp_i) × {BEIJING_SINGLE_MATCH_PAYOUT_FACTOR}`.
+- Realized payout uses Decimal arithmetic before serialization. Published values are pre-round values serialized to `{REALIZED_PAYOUT_SERIALIZATION_DECIMAL_PLACES}` decimal places; no paid-ticket cent-rounding rule is applied by this module.
+- Candidate bundles are sampled by leg hit probability and unit value `sum(p*sp)/width`; expected payout applies the same single `{BEIJING_SINGLE_MATCH_PAYOUT_FACTOR}` ticket-level factor before expected profit, ordering, and the positive-EV gate. The selector buys corrected positive-EV bundles under `{args.segment_budget_yuan}` yuan per segment with overlap guard `{args.max_overlap if args.max_overlap is not None else 'N-2'}` and per-bundle spend cap.
 - Sampling stability is measured with `{seed_label}`. Multi-seed reports use the mean as the main estimate and min/p10/median/p90/max as the variation interval.
 - `settlement_status={summary.get("settlement_status", "")}` and `primary_metric_mode={summary.get("primary_metric_mode", "")}`. Open/live issues should use expected profit/ROI; realized payout/profit/ROI are only populated after the segment is fully settled.
 
@@ -1456,6 +1488,19 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "accepted": bool(planning_scope_risk(planning_scope)[0]),
             "level": planning_scope_risk(planning_scope)[1],
             "reason": planning_scope_risk(planning_scope)[2],
+        },
+        "payout_economics": {
+            "payout_factor": str(BEIJING_SINGLE_MATCH_PAYOUT_FACTOR),
+            "expected_formula": "payout_factor * product(q_sum)",
+            "realized_formula": (
+                "stake_yuan_per_ticket * integer_multiplier * "
+                "product(official_winning_sp) * payout_factor"
+            ),
+            "arithmetic": "decimal_before_serialization",
+            "serialization_decimal_places": (
+                REALIZED_PAYOUT_SERIALIZATION_DECIMAL_PLACES
+            ),
+            "rounding_policy": REALIZED_PAYOUT_ROUNDING_POLICY,
         },
         "summary": summary,
         "seed_aggregate": seed_aggregate,
