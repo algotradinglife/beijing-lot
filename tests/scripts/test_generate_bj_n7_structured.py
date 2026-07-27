@@ -58,6 +58,44 @@ def test_pair_threshold_and_repeatability():
     assert first == second
 
 
+def test_top256_has_no_bet_row_when_parent_threshold_is_unavailable():
+    mod = load()
+    legs = [
+        mod.base.Leg(issue, index, f"{issue}_{index}", "k", "d", "s", (4.5, 4.5, 2.0))
+        for issue in mod.base.ISSUES
+        for index in range(1, 8)
+    ]
+
+    combinations, summary = mod.generate(legs)
+
+    assert combinations == []
+    assert len(summary) == len(mod.base.ISSUES) * len(mod.THRESHOLDS) * 4
+    for issue in mod.base.ISSUES:
+        for threshold in mod.THRESHOLDS:
+            rows = [
+                row
+                for row in summary
+                if row["issue"] == issue and row["threshold"] == f"{threshold:.2f}"
+            ]
+            assert {row["arm"] for row in rows} == {
+                "STRUCTURED_2F_5D_288",
+                "STRUCTURED_2F_5D_TOP256",
+                "STRUCTURED_3F_4D_432",
+                "STRUCTURED_4F_3D_648",
+            }
+            top256 = next(
+                row for row in rows if row["arm"] == "STRUCTURED_2F_5D_TOP256"
+            )
+            assert top256 == {
+                "issue": issue,
+                "threshold": f"{threshold:.2f}",
+                "arm": "STRUCTURED_2F_5D_TOP256",
+                "disposition": "NO_BET_PARENT_THRESHOLD_UNAVAILABLE",
+                "combinations": "0",
+                "stake_yuan": "512",
+            }
+
+
 def test_assignment_uses_coverage_frontier_not_equal_value_float_noise():
     mod = load()
     prices = (
