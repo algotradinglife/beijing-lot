@@ -81,9 +81,7 @@ def test_assignment_uses_coverage_frontier_not_equal_value_float_noise():
         double_positions = tuple(
             index for index in range(7) if index not in full_positions
         )
-        options = [
-            mod.pair_options(legs[index], 0.75) for index in double_positions
-        ]
+        options = [mod.pair_options(legs[index], 0.75) for index in double_positions]
         if any(not values for values in options):
             continue
         feasible_coverages.extend(
