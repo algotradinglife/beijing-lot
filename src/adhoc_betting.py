@@ -446,14 +446,13 @@ def _verify_formal_decision_binding(
     # text.  Trust is established by re-reading the formal CSV and its receipt
     # below, not by a caller-supplied claim about which function made a dict.
     candidate_filter = source_metadata.get("operator_candidate_filter")
-    if candidate_filter is not None:
-        if (
-            not isinstance(candidate_filter, dict)
-            or str(candidate_filter.get("authorized_issue") or "") != issue
-        ):
-            raise AdhocBettingError(
-                "adhoc operator candidate filter is not authorized for the request issue"
-            )
+    if candidate_filter is not None and (
+        not isinstance(candidate_filter, dict)
+        or str(candidate_filter.get("authorized_issue") or "") != issue
+    ):
+        raise AdhocBettingError(
+            "adhoc operator candidate filter is not authorized for the request issue"
+        )
     formal_input = source_metadata.get("formal_decision_input")
     if (
         not isinstance(formal_input, dict)
