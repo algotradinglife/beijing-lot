@@ -19,6 +19,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.decision_artifact_completeness import active_snapshot_completeness, format_completeness_error  # noqa: E402
+from src.structured_v333_projection import canonical_v333_decision_projection  # noqa: E402
 from src.structured_input_receipt import write_receipt  # noqa: E402
 
 DEFAULT_DB = PROJECT_ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
@@ -1100,6 +1101,18 @@ def leg_profit(codes: list[str], result_code: str | None, winning_sp: float | No
     return -stake
 
 
+def canonical_v333_decision_record(row: ReplayRow) -> dict[str, Any]:
+    """Expose the v3.3.3 decision independently of legacy CSV vocabulary."""
+
+    return canonical_v333_decision_projection(
+        row,
+        result_rows=result_rows,
+        category_rows=decision_category_rows,
+        outcome_text=outcome_text,
+        leg_profit=leg_profit,
+    )
+
+
 def row_to_csv_dict(row: ReplayRow) -> dict[str, Any]:
     payload = row.payload
     structured = row.structured
@@ -1110,7 +1123,7 @@ def row_to_csv_dict(row: ReplayRow) -> dict[str, Any]:
     shadow_codes = list(structured.get("selection_codes", []))
     active_codes = row.active_selection_codes
     actual = row.result_code
-    shadow_categories = shadow_category_rows(structured, payload)
+    shadow_categories = decision_category_rows(structured, payload)
     return {
         "issue": row.issue,
         "match_idx": row.match_idx,
@@ -1169,7 +1182,7 @@ def row_to_csv_dict(row: ReplayRow) -> dict[str, Any]:
     }
 
 
-def shadow_category_rows(structured: dict[str, Any], payload: dict[str, Any]) -> list[dict[str, Any]]:
+def decision_category_rows(structured: dict[str, Any], payload: dict[str, Any]) -> list[dict[str, Any]]:
     match = payload.get("match", {})
     rows = result_rows(payload)
     sections = structured.get("sections", {}) if isinstance(structured.get("sections"), dict) else {}

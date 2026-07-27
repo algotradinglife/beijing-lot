@@ -43,6 +43,10 @@ from src.natural_day_manifest import (
     verify_operational_windows,
 )
 from src.native_active_artifact import NativeArtifactError, validate_native_artifact
+from src.native_promotion_cutover import (
+    NativePromotionCutoverError,
+    validate_native_promotion_cutover_receipt,
+)
 from src.operations_adapters import build_collection_domain, safe_diagnostic_text
 from src.operations_status import aggregate_status, build_operations_v2, legacy_warnings
 from src.segment_recovery import (
@@ -77,6 +81,7 @@ EXACT_N_SEGMENT_FREEZE_DIR = PROJECT_ROOT / "results/exact_n_segment_freeze"
 EXACT_N_SEGMENT_FREEZE_LEDGER_DIR = PROJECT_ROOT / "results/research/exact_n_segment_freeze_v1/ledger"
 DECISION_VERSIONS_CONFIG = PROJECT_ROOT / "config/decision_versions.json"
 STRATEGY_RELEASE_CONFIG = PROJECT_ROOT / "config/strategy_release.json"
+ADHOC_PUBLICATION_KEY_REGISTRY = PROJECT_ROOT / "config/adhoc_publication_keys.json"
 DATA_COLLECTION_PLAN_CONFIG = PROJECT_ROOT / "config/data_collection_plan.json"
 DEFAULT_DASHBOARD_RUNTIME_STATUS = PROJECT_ROOT / "tmp/decision_dashboard/runtime_status.json"
 DEFAULT_DASHBOARD_STATIC_DIR = PROJECT_ROOT / "apps/decision-dashboard/dist"
@@ -449,6 +454,43 @@ def _strategy_shadow_dir(release: dict[str, Any] | None = None) -> Path:
 
 def _strategy_active_dir(release: dict[str, Any] | None = None) -> Path:
     return _strategy_artifact_path("structured_active_dir", STRUCTURED_DECISION_ACTIVE_DIR, release)
+
+
+def _native_cutover_receipt_path(issue: str, release: dict[str, Any] | None = None) -> Path | None:
+    """Return the reviewed immutable pointer for this issue, never a latest scan."""
+
+    release = release or _active_strategy_release()
+    promotion = release.get("promotion") if isinstance(release.get("promotion"), dict) else {}
+    receipts = promotion.get("native_cutover_receipts") if isinstance(promotion, dict) else {}
+    if not isinstance(receipts, dict):
+        return None
+    value = receipts.get(str(issue))
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return _project_path(value)
+
+
+def _pinned_native_cutover_artifact(
+    issue: str, release: dict[str, Any] | None = None
+) -> tuple[Path | None, dict[str, Any] | None, str]:
+    """Resolve one registry-pinned native artifact; all failures are terminal."""
+
+    release = release or _active_strategy_release()
+    pointer = _native_cutover_receipt_path(issue, release)
+    if pointer is None:
+        return None, None, "cutover_receipt_missing"
+    try:
+        verified = validate_native_promotion_cutover_receipt(
+            pointer,
+            project_root=PROJECT_ROOT,
+            active_root=_strategy_active_dir(release),
+            key_registry_path=ADHOC_PUBLICATION_KEY_REGISTRY,
+        )
+    except NativePromotionCutoverError as exc:
+        return None, None, f"cutover_receipt_invalid:{exc}"
+    if str(verified["receipt"].get("issue") or "") != str(issue):
+        return None, None, "cutover_receipt_issue_mismatch"
+    return Path(verified["native_csv_path"]), verified, ""
 
 
 def _strategy_postmatch_ticket_pool_dir(release: dict[str, Any] | None = None) -> Path:
@@ -1913,17 +1955,8 @@ def _decision_artifact_latest_complete_variant(
 ) -> tuple[dict[int, dict[str, Any]] | None, str, dict[str, Any] | None]:
     if manifest.get("source") != "structured_active_csv":
         return None, "", None
-    candidates: list[tuple[datetime, Path, dict[int, dict[str, Any]], str]] = []
-    for path in _structured_active_csv_candidates(issue, release):
-        try:
-            rows, source, verified = _structured_active_rows_from_csv(path, issue=issue)
-        except NativeArtifactError:
-            continue
-        generated = verified["receipt"].get("generated_at")
-        if not isinstance(generated, datetime):
-            continue
-        candidates.append((generated, path, rows, source))
-    if not candidates:
+    path, _cutover, error = _pinned_native_cutover_artifact(issue, release)
+    if path is None:
         completeness = completeness_for_indices(
             issue=issue,
             scope="structured_active_csv",
@@ -1931,23 +1964,18 @@ def _decision_artifact_latest_complete_variant(
             actual_indices=[],
         ).to_dict()
         return None, "", completeness
-    candidates.sort(key=lambda item: (item[0], item[1].parent.name), reverse=True)
-    best_incomplete: tuple[dict[int, dict[str, Any]], str, dict[str, Any]] | None = None
-    for _generated, _path, rows, source in candidates:
-        status = completeness_for_indices(
-            issue=issue,
-            scope="structured_active_csv",
-            expected_indices=expected_indices,
-            actual_indices=rows.keys(),
-        )
-        status_payload = status.to_dict()
-        if status.complete:
-            return rows, source, status_payload
-        if best_incomplete is None:
-            best_incomplete = (rows, source, status_payload)
-    if best_incomplete is None:
+    del error
+    try:
+        rows, source, _verified = _structured_active_rows_from_csv(path, issue=issue)
+    except NativeArtifactError:
         return None, "", None
-    return best_incomplete
+    status_payload = completeness_for_indices(
+        issue=issue,
+        scope="structured_active_csv",
+        expected_indices=expected_indices,
+        actual_indices=rows.keys(),
+    ).to_dict()
+    return rows, source, status_payload
 
 
 def _decision_artifact_status_payload(
@@ -3738,7 +3766,14 @@ def _adhoc_formal_structured_input(
     release = release or _active_strategy_release()
     candidates: list[tuple[datetime, Path, dict[int, dict[str, Any]], dict[str, Any]]] = []
     rejected: list[str] = []
-    for path in _structured_active_csv_candidates(issue, release):
+    pinned_path, _cutover, cutover_error = _pinned_native_cutover_artifact(issue, release)
+    if pinned_path is None:
+        return {}, {
+            "status": "UNAVAILABLE_FORMAL_INPUT",
+            "decision_variant_id": FORMAL_DECISION_VARIANT_ID,
+            "rejected_candidates": [cutover_error],
+        }
+    for path in (pinned_path,):
         try:
             rows, _source, verified = _structured_active_rows_from_csv(path, issue=issue)
             receipt = verified["receipt"]
@@ -4366,24 +4401,14 @@ def _structured_active_variant_scan(
         or manifest.get("source") != "structured_active_csv"
     ):
         return [], []
-    candidates: list[tuple[datetime, str, dict[int, dict[str, Any]], str]] = []
-    rejected: list[str] = []
-    for path in _structured_active_csv_candidates(issue, release):
-        try:
-            rows, source, verified = _structured_active_rows_from_csv(path, issue=issue)
-        except NativeArtifactError as exc:
-            rejected.append(f"{path.name}:{exc}")
-            continue
-        generated = verified["receipt"].get("generated_at")
-        if not isinstance(generated, datetime):
-            rejected.append(f"{path.name}:missing_generated_at")
-            continue
-        candidates.append((generated, path.parent.name, rows, source))
-    if not candidates:
-        return [], rejected
-    generated, _component, rows, source = max(candidates, key=lambda item: (item[0], item[1]))
-    del generated
-    return [(rows, source)], rejected
+    path, _cutover, error = _pinned_native_cutover_artifact(issue, release)
+    if path is None:
+        return [], [error]
+    try:
+        rows, source, _verified = _structured_active_rows_from_csv(path, issue=issue)
+    except NativeArtifactError as exc:
+        return [], [f"{path.name}:{exc}"]
+    return [(rows, source)], []
 
 
 def _complete_shadow_variants(
@@ -4633,6 +4658,49 @@ def _native_decision_variant(
         "coverage_hit": coverage_hit,
         "decision_chain": _json_loads(row.get("decision_chain_json"), []),
         "decision_categories": _json_loads(row.get("decision_categories_json"), []),
+    }
+
+
+def _native_artifact_missing_placeholder(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Keep the formal default visible when its pinned native pointer fails."""
+
+    readiness = _decision_variant_readiness(
+        manifest, available=False, missing_behavior="artifact_missing"
+    )
+    return {
+        "variant_id": FORMAL_DECISION_VARIANT_ID,
+        "source_variant_id": FORMAL_DECISION_VARIANT_ID,
+        "legacy_variant_id": "",
+        "legacy_aliases": _variant_legacy_aliases(manifest),
+        "kind": ACTIVE_DECISION_VARIANT_KIND,
+        "family": NATIVE_DECISION_FAMILY,
+        "label": manifest.get("label") or "正式版 v3.3.3",
+        "display_label": manifest.get("label") or "正式版 v3.3.3",
+        "version": manifest.get("version_id") or "3.3.3",
+        "version_id": manifest.get("version_id") or "3.3.3",
+        "source": "structured_active_csv",
+        "source_path": "",
+        "artifact_key": manifest.get("artifact_key", "structured_active_dir"),
+        "is_default": bool(manifest.get("is_default", False)),
+        "selectable": bool(manifest.get("selectable", True)),
+        "available": False,
+        **readiness,
+        "recommendation": "正式版原生工件或 cutover receipt 不可用",
+        "primary_pick": "",
+        "protect_picks": [],
+        "selection_codes": [],
+        "selection_type": "no-buy",
+        "stop_flag": True,
+        "q_score": None,
+        "probability": None,
+        "confidence_label": "",
+        "prediction_hit": None,
+        "primary_hit": None,
+        "coverage_hit": None,
+        "execution_action": "skip_artifact_missing",
+        "execution_reasons": ["formal_native_cutover_artifact_missing_or_invalid"],
+        "decision_chain": [],
+        "decision_categories": [],
     }
 
 
@@ -4902,6 +4970,21 @@ def _manifest_shadow_placeholder_decision_variant(manifest: dict[str, Any]) -> d
 def _normalize_decision_variant_defaults(options: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not options:
         return options
+    formal_default = next(
+        (
+            item
+            for item in options
+            if item.get("variant_id") == FORMAL_DECISION_VARIANT_ID
+            and item.get("kind") == ACTIVE_DECISION_VARIANT_KIND
+            and item.get("is_default")
+        ),
+        None,
+    )
+    if formal_default is not None:
+        default_variant_id = FORMAL_DECISION_VARIANT_ID
+        for item in options:
+            item["is_default"] = str(item.get("variant_id") or "") == default_variant_id
+        return options
     defaultable_options = [
         item for item in options
         if item.get("available") is not False
@@ -4964,6 +5047,12 @@ def _decision_variant_options(
     for rows, source_path in active_variants or []:
         if rows and source_path:
             options.append(_native_decision_variant(next(iter(rows.values())), source_path, release=release))
+    if (
+        active_manifest
+        and active_manifest.get("source") == "structured_active_csv"
+        and not any(item.get("variant_id") == FORMAL_DECISION_VARIANT_ID for item in options)
+    ):
+        options.append(_native_artifact_missing_placeholder(active_manifest))
     for rows, source_path in shadow_variants or []:
         if rows and source_path:
             option = _shadow_decision_option(rows, source_path, release=release)
@@ -6840,6 +6929,11 @@ def _attach_decision_variants(
         for active_rows, active_source_path in active_variants or []:
             if idx is not None and idx in active_rows and active_source_path:
                 variants.append(_native_decision_variant(active_rows[idx], active_source_path, result_code=result_code, release=release))
+        if (
+            active_manifest.get("source") == "structured_active_csv"
+            and not any(item.get("variant_id") == FORMAL_DECISION_VARIANT_ID for item in variants)
+        ):
+            variants.append(_native_artifact_missing_placeholder(active_manifest))
         for shadow_rows, shadow_source_path in shadow_variants:
             if idx is not None and idx in shadow_rows and shadow_source_path:
                 variant_id = _public_decision_variant_id(_shadow_variant_id(shadow_rows), release)
@@ -6852,7 +6946,7 @@ def _attach_decision_variants(
             placeholder = _manifest_shadow_placeholder_decision_variant(manifest)
             if placeholder:
                 variants.append(placeholder)
-        match["decision_variants"] = variants
+        match["decision_variants"] = _normalize_decision_variant_defaults(variants)
     return matches
 
 

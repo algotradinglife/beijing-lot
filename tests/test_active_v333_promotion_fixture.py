@@ -98,3 +98,13 @@ def test_fixed_projection_converts_to_native_v2_with_zero_selection_difference(
         for _idx, row in sorted(native_rows.items())
     ]
     assert _sha256(projected) == "e72f7b4a0a6b8038fcacf7b74716a0c891335456c75e7ffe54337950f37eac4e"
+
+
+def test_native_generator_uses_the_canonical_projection_not_legacy_csv_fields() -> None:
+    source = (ROOT / "scripts" / "evaluate_structured_decision_chain_active.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "shadow_selection_codes" not in source
+    assert "row_to_csv_dict" not in source
+    assert "canonical_v333_decision_record" in source

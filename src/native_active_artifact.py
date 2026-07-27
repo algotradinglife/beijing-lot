@@ -27,7 +27,10 @@ class NativeArtifactError(ValueError):
 def _validated_issue(issue: str) -> str:
     """Return a numeric issue identifier safe for a filename and identity."""
 
-    if not isinstance(issue, str) or not re.fullmatch(r"[0-9]+", issue):
+    if (
+        not isinstance(issue, str)
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", issue)
+    ):
         raise NativeArtifactError("native issue identifier is unsafe")
     return issue
 

@@ -781,6 +781,16 @@ def test_v2_binding_rejects_shadow_root_and_column(tmp_path: Path) -> None:
         _create(store, source)
 
 
+def test_v2_binding_rejects_shadow_arm_substitution(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    source = _source_snapshot()
+    formal = source["source_metadata"]["formal_decision_input"]  # type: ignore[index]
+    formal["formal_active_arm"] = "shadow_v3.3.3"
+
+    with pytest.raises(AdhocBettingError, match="formal decision input contract"):
+        _create(store, source)
+
+
 def test_spoofed_source_builder_cannot_authorize_wrong_issue(tmp_path: Path) -> None:
     store = _store(tmp_path)
     source = _source_snapshot()

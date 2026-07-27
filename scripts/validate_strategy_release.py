@@ -230,6 +230,16 @@ def _validate_release_contract(release_key: str, release: dict[str, Any], errors
             errors.append(f"{release_key} active_v3.3.3 must declare shadow_v3.3.3 as a legacy alias")
         if readiness_payload.get("missing_behavior") != "artifact_missing":
             errors.append(f"{release_key} active_v3.3.3 missing_behavior must be artifact_missing")
+        if active_v333.get("source") == "structured_active_csv":
+            promotion = release.get("promotion") if isinstance(release.get("promotion"), dict) else {}
+            receipts = promotion.get("native_cutover_receipts") if isinstance(promotion, dict) else None
+            if not isinstance(receipts, dict) or not receipts:
+                errors.append(f"{release_key} native active_v3.3.3 requires native_cutover_receipts")
+            elif any(
+                not re.fullmatch(r"[0-9]+", str(issue)) or not isinstance(path, str) or not path.strip()
+                for issue, path in receipts.items()
+            ):
+                errors.append(f"{release_key} native_cutover_receipts must map numeric issues to receipt paths")
 
 
 def validate_strategy_release(

@@ -318,6 +318,14 @@ def _app(tmp_path: Path, monkeypatch):
     )
     monkeypatch.setenv("BEIDAN_DECISION_API_OPERATOR_TOKEN", OPERATOR_TOKEN)
     monkeypatch.setattr(appmod, "_active_strategy_release", lambda: _release(shadow_dir))
+    # This suite isolates attested package construction.  Pointer integrity is
+    # covered independently by test_native_promotion_cutover; the fixture
+    # deliberately advances its formal source in one test below.
+    def pinned_fixture(issue: str, release=None):
+        candidates = appmod._structured_active_csv_candidates(issue, release)
+        return (candidates[-1], {}, "") if candidates else (None, None, "fixture_missing")
+
+    monkeypatch.setattr(appmod, "_pinned_native_cutover_artifact", pinned_fixture)
     app = appmod.create_app(
         sqlite_db=db_path,
         adhoc_betting_root=tmp_path / "adhoc",

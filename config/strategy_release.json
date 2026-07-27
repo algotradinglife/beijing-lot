@@ -138,7 +138,10 @@
         "validated": true,
         "promoted_at": "2026-07-04",
         "promoted_by": "codex",
-        "rollback_release_id": ""
+        "rollback_release_id": "",
+        "native_cutover_receipts": {
+          "26078": "results/structured_decision_chain_active/cutover_receipts/26078.native_promotion_cutover_receipt.json"
+        }
       },
       "validation": {
         "report": "docs/strategy/strategy_worktree_model_ev_handoff_2026-07-02.md",

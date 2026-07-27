@@ -738,7 +738,7 @@ def _make_portfolio(
     contract = portfolio_contract or portfolio.published_exact_n_portfolio_contract(
         n_value=n_value,
         budget_yuan=budget_yuan,
-        arm="shadow",
+        arm="active",
         segment_idx=0,
     )
     try:
@@ -748,7 +748,7 @@ def _make_portfolio(
     if (
         int(contract["requested_n"]) != n_value
         or float(contract["requested_budget_yuan"]) != float(budget_yuan)
-        or str(contract["arm"]) != "shadow"
+        or str(contract["arm"]) != "active"
         or int(contract["segment_idx"]) != 0
     ):
         raise AdhocBettingError("adhoc Exact-N portfolio contract does not bind this request")
@@ -766,15 +766,15 @@ def _make_portfolio(
                 league=str(row["league"]),
                 home=str(row["home"]),
                 away=str(row["away"]),
-                active_codes=(),
-                shadow_codes=codes,
+                active_codes=codes,
+                shadow_codes=(),
                 probabilities={code: float(row["probabilities"][code]) for code in ("3", "1", "0")},
                 sp={code: float(row["sp"][code]) for code in ("3", "1", "0")},
                 actual_code=None,
                 winning_sp=None,
             )
         )
-    metrics = [metric for leg in legs if (metric := portfolio.leg_metrics(leg, "shadow")) is not None]
+    metrics = [metric for leg in legs if (metric := portfolio.leg_metrics(leg, "active")) is not None]
     if len(metrics) < n_value:
         return [], 0.0, 0.0, "eligible_match_count_below_requested_n"
 
@@ -1745,7 +1745,7 @@ class AdhocBettingStore:
         portfolio_contract = portfolio.published_exact_n_portfolio_contract(
             n_value=requested_n,
             budget_yuan=requested_budget_yuan,
-            arm="shadow",
+            arm="active",
             segment_idx=0,
         )
         portfolio_contract_sha256 = digest(portfolio_contract)
@@ -2445,7 +2445,7 @@ def _verify_package(
     if (
         int(checked_portfolio_contract["requested_n"]) != n_value
         or float(checked_portfolio_contract["requested_budget_yuan"]) != budget
-        or str(checked_portfolio_contract["arm"]) != "shadow"
+        or str(checked_portfolio_contract["arm"]) != "active"
         or int(checked_portfolio_contract["segment_idx"]) != 0
     ):
         raise AdhocBettingError("adhoc Exact-N portfolio contract does not bind the request")

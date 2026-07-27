@@ -10,8 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.decision_api import app as appmod
-from scripts import review_settled_matches as review_script
+from src.decision_api import app as appmod  # noqa: E402
+from src.native_active_artifact import csv_bytes, write_native_artifact  # noqa: E402
+from scripts import review_settled_matches as review_script  # noqa: E402
 
 
 OPERATOR_TOKEN = "pytest-operator-token"
@@ -45,7 +46,7 @@ def test_live_workflow_publishes_v4_2_execution_artifacts_after_snapshot_materia
     artifact_step = next(step for step in plan if step["step_key"] == "generate_active_v3_3_3_artifact")
     artifact_command = " ".join(str(item) for item in artifact_step["command"])
     assert artifact_step["kind"] == "subprocess"
-    assert "scripts/evaluate_structured_decision_chain_shadow.py" in artifact_command
+    assert "scripts/evaluate_structured_decision_chain_active.py" in artifact_command
     assert "--strict-completeness" in artifact_command
     publish_step = next(step for step in plan if step["step_key"] == "publish_v4_2_execution_artifacts")
     assert publish_step["kind"] == "subprocess"
@@ -183,7 +184,7 @@ def _build_minimal_500_db(path: Path) -> None:
         conn.close()
 
 
-def _release_with_shadow_dir(shadow_dir: Path) -> dict[str, object]:
+def _release_with_active_dir(active_dir: Path) -> dict[str, object]:
     return {
         "release_id": "test_release",
         "effective_from_issue": "review_tie_case",
@@ -191,19 +192,17 @@ def _release_with_shadow_dir(shadow_dir: Path) -> dict[str, object]:
             {
                 "variant_id": "active_v3.3.3",
                 "version_id": "3.3.3",
-                "kind": "shadow",
+                "kind": "active",
                 "label": "正式版 v3.3.3",
-                "source": "structured_shadow_csv",
-                "artifact_key": "structured_shadow_dir",
-                "artifact_variant_ids": ["shadow_v3.3.3"],
-                "legacy_variant_ids": ["shadow_v3.3.3"],
+                "source": "structured_active_csv",
+                "artifact_key": "structured_active_dir",
                 "is_default": True,
                 "selectable": True,
                 "readiness": {
                     "artifact_required": True,
                     "defaultable_when": "available",
                     "missing_behavior": "unavailable",
-                    "missing_reason": "structured_shadow_artifact_missing_for_issue",
+                    "missing_reason": "structured_active_artifact_missing_for_issue",
                 },
             },
             {
@@ -217,15 +216,15 @@ def _release_with_shadow_dir(shadow_dir: Path) -> dict[str, object]:
                 "selectable": True,
             },
         ],
-        "artifacts": {"structured_shadow_dir": str(shadow_dir)},
+        "artifacts": {"structured_active_dir": str(active_dir)},
     }
 
 
 def test_decision_artifact_status_reports_missing_formal_artifact(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "500_bjdc.sqlite"
-    shadow_dir = tmp_path / "structured_shadow"
+    active_dir = tmp_path / "structured_active"
     _build_minimal_500_db(db_path)
-    monkeypatch.setattr(appmod, "_active_strategy_release", lambda: _release_with_shadow_dir(shadow_dir))
+    monkeypatch.setattr(appmod, "_active_strategy_release", lambda: _release_with_active_dir(active_dir))
     app = appmod.create_app(sqlite_db=db_path)
     client = app.test_client()
 
@@ -235,17 +234,17 @@ def test_decision_artifact_status_reports_missing_formal_artifact(tmp_path: Path
     payload = response.get_json()
     assert payload["status"] == "missing"
     assert payload["variant_id"] == "active_v3.3.3"
-    assert payload["artifact_variant_id"] == "shadow_v3.3.3"
+    assert payload["artifact_variant_id"] == "active_v3.3.3"
     assert payload["generation_supported"] is True
     assert payload["completeness"]["missing_match_idx"] == [1]
 
 
 def test_generate_decision_artifact_runs_strategy_generator_and_reports_status(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "500_bjdc.sqlite"
-    shadow_dir = tmp_path / "structured_shadow"
+    active_dir = tmp_path / "structured_active"
     _build_minimal_500_db(db_path)
     monkeypatch.setenv("BEIDAN_DECISION_API_OPERATOR_TOKEN", OPERATOR_TOKEN)
-    monkeypatch.setattr(appmod, "_active_strategy_release", lambda: _release_with_shadow_dir(shadow_dir))
+    monkeypatch.setattr(appmod, "_active_strategy_release", lambda: _release_with_active_dir(active_dir))
     seen: dict[str, object] = {}
 
     def fake_run(command, *, cwd, capture_output, text, timeout, check):
@@ -257,13 +256,17 @@ def test_generate_decision_artifact_runs_strategy_generator_and_reports_status(t
             "timeout": timeout,
             "check": check,
         })
-        out_dir = shadow_dir / "review_tie_case_20260707_shadow_v3.3.3"
-        out_dir.mkdir(parents=True)
-        (out_dir / "structured_shadow_review_tie_case.csv").write_text(
-            "issue,match_idx,match_id,shadow_arm,shadow_version,shadow_primary,shadow_selection_codes,selection_type\n"
-            "review_tie_case,1,review_tie_case_001,shadow_v3.3.3,llm_chain_bet_protect_stop_v3.3.3_shadow,3,3,single\n",
-            encoding="utf-8",
+        csv_path, _receipt, _verified = write_native_artifact(
+            output_root=active_dir,
+            issue="review_tie_case",
+            generated_at=datetime(2026, 7, 7, tzinfo=timezone.utc),
+            csv_content=csv_bytes(
+                [{"issue": "review_tie_case", "match_idx": 1, "decision_variant_id": "active_v3.3.3", "active_arm": "active_v3.3.3", "selection_codes": "3"}],
+                fieldnames=["issue", "match_idx", "decision_variant_id", "active_arm", "selection_codes"],
+            ),
+            source={"fixture": "live-workflow"},
         )
+        monkeypatch.setattr(appmod, "_pinned_native_cutover_artifact", lambda issue, release=None: (csv_path, {}, ""))
         return type("Completed", (), {
             "returncode": 0,
             "stdout": json.dumps({"status": "generated", "csv": "fixture.csv"}),
@@ -286,8 +289,8 @@ def test_generate_decision_artifact_runs_strategy_generator_and_reports_status(t
     assert payload["status"] == "succeeded"
     assert payload["variant_id"] == "active_v3.3.3"
     assert payload["artifact_status"]["status"] == "available"
-    assert payload["artifact_status"]["source_path"].endswith("structured_shadow_review_tie_case.csv")
-    assert "scripts/evaluate_structured_decision_chain_shadow.py" in command_text
+    assert payload["artifact_status"]["source_path"].endswith("structured_active_review_tie_case.csv")
+    assert "scripts/evaluate_structured_decision_chain_active.py" in command_text
     assert "--issue review_tie_case" in command_text
     assert "--strict-completeness" in command_text
     assert seen["timeout"] == 12
@@ -295,10 +298,10 @@ def test_generate_decision_artifact_runs_strategy_generator_and_reports_status(t
 
 def test_generate_decision_artifact_rejects_late_proxy_variant(tmp_path: Path, monkeypatch) -> None:
     db_path = tmp_path / "500_bjdc.sqlite"
-    shadow_dir = tmp_path / "structured_shadow"
+    active_dir = tmp_path / "structured_active"
     _build_minimal_500_db(db_path)
     monkeypatch.setenv("BEIDAN_DECISION_API_OPERATOR_TOKEN", OPERATOR_TOKEN)
-    monkeypatch.setattr(appmod, "_active_strategy_release", lambda: _release_with_shadow_dir(shadow_dir))
+    monkeypatch.setattr(appmod, "_active_strategy_release", lambda: _release_with_active_dir(active_dir))
     app = appmod.create_app(sqlite_db=db_path)
     client = app.test_client()
 
