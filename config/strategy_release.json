@@ -140,7 +140,10 @@
         "promoted_by": "codex",
         "rollback_release_id": "",
         "native_cutover_receipts": {
-          "26078": "results/structured_decision_chain_active/cutover_receipts/26078.native_promotion_cutover_receipt.json"
+          "26078": {
+            "mode": "active",
+            "current_receipt_path": "results/structured_decision_chain_active/cutover_receipts/26078.native_promotion_cutover_receipt.json"
+          }
         }
       },
       "validation": {

@@ -15,19 +15,19 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts import evaluate_structured_decision_chain_shadow as legacy  # noqa: E402
 from src.decision_artifact_completeness import active_snapshot_completeness, format_completeness_error  # noqa: E402
 from src.native_active_artifact import csv_bytes, write_native_artifact  # noqa: E402
+from src import structured_v333_engine as engine  # noqa: E402
 
 
 DEFAULT_DB = PROJECT_ROOT / "data/derived/500_bjdc/500_bjdc.sqlite"
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "results/structured_decision_chain_active"
 
 
-def native_record(row: legacy.ReplayRow) -> dict[str, Any]:
+def native_record(row: engine.ReplayRow) -> dict[str, Any]:
     """Project the pre-existing v3.3.3 structured decision into v2 fields."""
 
-    decision = legacy.canonical_v333_decision_record(row)
+    decision = engine.canonical_v333_decision_record(row)
     return {
         "issue": decision["issue"],
         "match_idx": decision["match_idx"],
@@ -79,7 +79,7 @@ def run(issue: str, db_path: Path, output_root: Path, *, strict_completeness: bo
             if strict_completeness:
                 raise SystemExit(message)
             return {"status": "skipped", "reason": "active_decision_snapshots_incomplete", "completeness": completeness}
-        rows = legacy.load_issue_rows(conn, issue)
+        rows = engine.load_issue_rows(conn, issue)
     finally:
         conn.close()
     if not rows:

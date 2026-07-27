@@ -236,10 +236,21 @@ def _validate_release_contract(release_key: str, release: dict[str, Any], errors
             if not isinstance(receipts, dict) or not receipts:
                 errors.append(f"{release_key} native active_v3.3.3 requires native_cutover_receipts")
             elif any(
-                not re.fullmatch(r"[0-9]+", str(issue)) or not isinstance(path, str) or not path.strip()
-                for issue, path in receipts.items()
+                not re.fullmatch(r"[0-9]+", str(issue))
+                or not (
+                    isinstance(pointer, str)
+                    and pointer.strip()
+                    or isinstance(pointer, dict)
+                    and str(pointer.get("mode") or "") in {"active", "rollback"}
+                    and str(pointer.get("current_receipt_path") or "").strip()
+                    and (
+                        str(pointer.get("mode")) != "rollback"
+                        or str(pointer.get("rollback_target_receipt_path") or "").strip()
+                    )
+                )
+                for issue, pointer in receipts.items()
             ):
-                errors.append(f"{release_key} native_cutover_receipts must map numeric issues to receipt paths")
+                errors.append(f"{release_key} native_cutover_receipts must declare a valid active or rollback pointer")
 
 
 def validate_strategy_release(

@@ -456,8 +456,10 @@ def _strategy_active_dir(release: dict[str, Any] | None = None) -> Path:
     return _strategy_artifact_path("structured_active_dir", STRUCTURED_DECISION_ACTIVE_DIR, release)
 
 
-def _native_cutover_receipt_path(issue: str, release: dict[str, Any] | None = None) -> Path | None:
-    """Return the reviewed immutable pointer for this issue, never a latest scan."""
+def _native_cutover_receipt_config(
+    issue: str, release: dict[str, Any] | None = None
+) -> dict[str, str] | None:
+    """Read the reviewed cutover state; string entries remain v1 active pointers."""
 
     release = release or _active_strategy_release()
     promotion = release.get("promotion") if isinstance(release.get("promotion"), dict) else {}
@@ -465,9 +467,22 @@ def _native_cutover_receipt_path(issue: str, release: dict[str, Any] | None = No
     if not isinstance(receipts, dict):
         return None
     value = receipts.get(str(issue))
-    if not isinstance(value, str) or not value.strip():
+    if isinstance(value, str) and value.strip():
+        return {"mode": "active", "current_receipt_path": value}
+    if not isinstance(value, dict):
         return None
-    return _project_path(value)
+    mode = str(value.get("mode") or "").strip()
+    current = str(value.get("current_receipt_path") or "").strip()
+    target = str(value.get("rollback_target_receipt_path") or "").strip()
+    if mode not in {"active", "rollback"} or not current:
+        return None
+    if mode == "rollback" and not target:
+        return None
+    return {
+        "mode": mode,
+        "current_receipt_path": current,
+        "rollback_target_receipt_path": target,
+    }
 
 
 def _pinned_native_cutover_artifact(
@@ -476,21 +491,35 @@ def _pinned_native_cutover_artifact(
     """Resolve one registry-pinned native artifact; all failures are terminal."""
 
     release = release or _active_strategy_release()
-    pointer = _native_cutover_receipt_path(issue, release)
+    pointer = _native_cutover_receipt_config(issue, release)
     if pointer is None:
         return None, None, "cutover_receipt_missing"
     try:
-        verified = validate_native_promotion_cutover_receipt(
-            pointer,
+        current = validate_native_promotion_cutover_receipt(
+            _project_path(pointer["current_receipt_path"]),
             project_root=PROJECT_ROOT,
             active_root=_strategy_active_dir(release),
             key_registry_path=ADHOC_PUBLICATION_KEY_REGISTRY,
         )
     except NativePromotionCutoverError as exc:
         return None, None, f"cutover_receipt_invalid:{exc}"
-    if str(verified["receipt"].get("issue") or "") != str(issue):
+    if str(current["receipt"].get("issue") or "") != str(issue):
         return None, None, "cutover_receipt_issue_mismatch"
-    return Path(verified["native_csv_path"]), verified, ""
+    if pointer["mode"] == "active":
+        return Path(current["native_csv_path"]), current, ""
+    try:
+        target = validate_native_promotion_cutover_receipt(
+            _project_path(pointer["rollback_target_receipt_path"]),
+            project_root=PROJECT_ROOT,
+            active_root=_strategy_active_dir(release),
+            key_registry_path=ADHOC_PUBLICATION_KEY_REGISTRY,
+        )
+    except NativePromotionCutoverError as exc:
+        return None, None, f"rollback_target_receipt_invalid:{exc}"
+    expected = str(current["receipt"].get("previous_native_artifact_identity") or "")
+    if not expected or str(target["native_artifact_identity"]) != expected:
+        return None, None, "rollback_target_is_not_current_receipt_predecessor"
+    return Path(target["native_csv_path"]), target, ""
 
 
 def _strategy_postmatch_ticket_pool_dir(release: dict[str, Any] | None = None) -> Path:
@@ -3644,16 +3673,6 @@ def _structured_shadow_rows_from_csv(path: Path) -> tuple[dict[int, dict[str, An
     return rows, source
 
 
-def _structured_active_csv_candidates(issue: str, release: dict[str, Any] | None = None) -> list[Path]:
-    active_dir = _strategy_active_dir(release)
-    candidates = [
-        path
-        for path in active_dir.glob(f"{issue}_*_{FORMAL_DECISION_VARIANT_ID}/structured_active_{issue}.csv")
-        if path.is_file()
-    ]
-    return sorted(candidates, key=lambda path: path.parent.name)
-
-
 def _structured_active_rows_from_csv(path: Path, *, issue: str) -> tuple[dict[int, dict[str, Any]], str, dict[str, Any]]:
     """Read one immutable v2 native artifact, never falling back to shadow."""
 
@@ -3756,12 +3775,7 @@ def _adhoc_formal_structured_input(
     request_clock: datetime,
     release: dict[str, Any] | None = None,
 ) -> tuple[dict[int, dict[str, Any]], dict[str, Any]]:
-    """Select the newest verified *formal* active v3.3.3 input, fail closed.
-
-    The ordinary dashboard scans CSV mtimes for presentation.  An adhoc plan
-    cannot do that: it needs an authenticated receipt clock and complete
-    membership before it can bind a request-time package.
-    """
+    """Resolve only the registry-pinned formal input and fail closed."""
 
     release = release or _active_strategy_release()
     candidates: list[tuple[datetime, Path, dict[int, dict[str, Any]], dict[str, Any]]] = []

@@ -215,3 +215,51 @@ def test_operational_native_resolution_fails_closed_without_a_registry_pointer(t
     assert path is None
     assert verified is None
     assert error == "cutover_receipt_missing"
+
+
+def test_runtime_rollback_accepts_only_current_receipt_predecessor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    current_path = tmp_path / "current.json"
+    predecessor_path = tmp_path / "predecessor.json"
+    arbitrary_path = tmp_path / "arbitrary.json"
+    predecessor_identity = "active_v3.3.3:26078:" + "a" * 64
+    current = {
+        "receipt": {"issue": ISSUE, "previous_native_artifact_identity": predecessor_identity},
+        "native_artifact_identity": "active_v3.3.3:26078:" + "b" * 64,
+        "native_csv_path": tmp_path / "current.csv",
+    }
+    predecessor = {
+        "receipt": {"issue": ISSUE, "previous_native_artifact_identity": ""},
+        "native_artifact_identity": predecessor_identity,
+        "native_csv_path": tmp_path / "predecessor.csv",
+    }
+    arbitrary = {**predecessor, "native_artifact_identity": "active_v3.3.3:26078:" + "c" * 64}
+    verified_by_path = {current_path: current, predecessor_path: predecessor, arbitrary_path: arbitrary}
+    monkeypatch.setattr(
+        appmod,
+        "validate_native_promotion_cutover_receipt",
+        lambda path, **_kwargs: verified_by_path[path],
+    )
+    release = {
+        "artifacts": {"structured_active_dir": str(tmp_path / "active")},
+        "promotion": {
+            "native_cutover_receipts": {
+                ISSUE: {
+                    "mode": "rollback",
+                    "current_receipt_path": str(current_path),
+                    "rollback_target_receipt_path": str(predecessor_path),
+                }
+            }
+        },
+    }
+
+    resolved, _verified, error = appmod._pinned_native_cutover_artifact(ISSUE, release)
+    assert resolved == predecessor["native_csv_path"]
+    assert error == ""
+
+    release["promotion"]["native_cutover_receipts"][ISSUE]["rollback_target_receipt_path"] = str(arbitrary_path)  # type: ignore[index]
+    resolved, verified, error = appmod._pinned_native_cutover_artifact(ISSUE, release)
+    assert resolved is None
+    assert verified is None
+    assert error == "rollback_target_is_not_current_receipt_predecessor"

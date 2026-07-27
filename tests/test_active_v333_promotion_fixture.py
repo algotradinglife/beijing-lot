@@ -107,4 +107,5 @@ def test_native_generator_uses_the_canonical_projection_not_legacy_csv_fields() 
 
     assert "shadow_selection_codes" not in source
     assert "row_to_csv_dict" not in source
+    assert "evaluate_structured_decision_chain_shadow" not in source
     assert "canonical_v333_decision_record" in source
