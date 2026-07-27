@@ -20,7 +20,6 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PublicKey,
 )
 
-
 ATTESTATION_SCHEMA_VERSION = "adhoc_publication_attestation_v1"
 KEY_REGISTRY_SCHEMA_VERSION = "adhoc_publication_key_registry_v1"
 
