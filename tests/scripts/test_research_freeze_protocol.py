@@ -132,10 +132,38 @@ def test_freeze_records_input_dataset_hashes_in_its_identity(tmp_path: Path) -> 
 
     manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["input_dataset"] == [{
-        "path": str(dataset),
+        "path": "source-001",
         "bytes": len("fixture database bytes"),
         "sha256": protocol.sha256_file(dataset),
     }]
+    assert str(tmp_path) not in json.dumps(manifest, sort_keys=True)
+    assert protocol.verify_freeze_package(output)["status"] == "valid"
+
+
+def test_freeze_uses_explicit_pathless_dataset_logical_name(tmp_path: Path) -> None:
+    inputs = write(tmp_path / "sources/asof.csv", "match,probability\n1,0.61\n")
+    decisions = write(tmp_path / "sources/decision.csv", "match,choice\n1,3\n")
+    config = write(tmp_path / "sources/config.json", '{"seed": 17}\n')
+    dataset = write(tmp_path / "private/location/source.db", "fixture database bytes")
+    output = tmp_path / "freeze" / "EXP-DATASET-LOGICAL"
+
+    protocol.create_freeze_package(
+        output,
+        experiment_id="EXP-DATASET-LOGICAL",
+        research_question="Is the source identity portable without its local path?",
+        model_version="test-model-v1",
+        input_files=[inputs],
+        input_datasets=[dataset],
+        input_dataset_labels=["historical_xlsm"],
+        decision_files=[decisions],
+        config_file=config,
+        git_commit="a" * 40,
+        frozen_at_utc="2026-07-21T00:00:00+00:00",
+    )
+
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["input_dataset"][0]["path"] == "historical_xlsm"
+    assert str(dataset) not in json.dumps(manifest, sort_keys=True)
     assert protocol.verify_freeze_package(output)["status"] == "valid"
 
 
