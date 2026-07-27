@@ -80,6 +80,23 @@ def test_existing_native_path_with_different_bytes_fails_closed(tmp_path) -> Non
         )
 
 
+def test_native_writer_rejects_path_traversal_issue_before_creating_output(tmp_path) -> None:
+    output_root = tmp_path / "native-root"
+    content = csv_bytes(_records(), fieldnames=FIELDS)
+
+    with pytest.raises(NativeArtifactError, match="issue identifier is unsafe"):
+        write_native_artifact(
+            output_root=output_root,
+            issue="../outside",
+            generated_at=NOW,
+            csv_content=content,
+            source={"fixture": "unsafe-issue"},
+        )
+
+    assert not output_root.exists()
+    assert not (tmp_path / "outside_20260727T040000000000Z_active_v3.3.3").exists()
+
+
 def test_native_validator_rejects_legacy_shadow_columns(tmp_path) -> None:
     legacy_fields = [*FIELDS, "shadow_selection_codes"]
     with pytest.raises(NativeArtifactError, match="legacy shadow columns"):
