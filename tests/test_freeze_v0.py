@@ -111,6 +111,11 @@ def test_schedule_final_uses_latest_valid_before_cutoff_and_is_write_once(tmp_pa
         store.finalize_cutoff(issue="26100", cutoff_at=CUTOFF, finalized_at=datetime.fromisoformat("2026-07-30T12:02:00+08:00"))
 
 
+def test_scheduler_rejects_a_zero_safety_margin_instead_of_triggering_at_cutoff() -> None:
+    with pytest.raises(FreezeV0Error, match="invalid availability/cutoff schedule"):
+        hourly_attempt_times(available_at=datetime.fromisoformat("2026-07-30T09:00:00+08:00"), cutoff_at=CUTOFF, safety_margin=timedelta(0))
+
+
 def test_final_records_missed_freeze_when_no_attempt_passes(tmp_path) -> None:
     store = FreezeV0Store(tmp_path / "freeze_v0", replay_candidate_pool=_replay)
     final = store.finalize_cutoff(issue="26100", cutoff_at=CUTOFF, finalized_at=datetime.fromisoformat("2026-07-30T12:01:00+08:00"))

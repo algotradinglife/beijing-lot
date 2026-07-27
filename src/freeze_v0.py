@@ -131,7 +131,7 @@ def hourly_attempt_times(*, available_at: datetime, cutoff_at: datetime, safety_
     """Return hourly triggers plus a forced trigger before the completion cutoff."""
     available = _as_hkt(available_at, "available_at")
     cutoff = _as_hkt(cutoff_at, "cutoff_at")
-    if safety_margin < timedelta(0) or available >= cutoff:
+    if safety_margin <= timedelta(0) or available >= cutoff:
         raise FreezeV0Error("invalid availability/cutoff schedule")
     forced_trigger = cutoff - safety_margin
     times: list[datetime] = []
