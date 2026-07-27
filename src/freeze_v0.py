@@ -128,19 +128,19 @@ def _verify_sha_sums(root: Path) -> None:
 
 
 def hourly_attempt_times(*, available_at: datetime, cutoff_at: datetime, safety_margin: timedelta) -> list[datetime]:
-    """Return hourly attempts plus a forced cutoff attempt when necessary."""
+    """Return hourly triggers plus a forced trigger before the completion cutoff."""
     available = _as_hkt(available_at, "available_at")
     cutoff = _as_hkt(cutoff_at, "cutoff_at")
     if safety_margin < timedelta(0) or available >= cutoff:
         raise FreezeV0Error("invalid availability/cutoff schedule")
-    last_hourly = cutoff - safety_margin
+    forced_trigger = cutoff - safety_margin
     times: list[datetime] = []
     current = available
-    while current <= last_hourly:
+    while current <= forced_trigger:
         times.append(current)
         current += timedelta(hours=1)
-    if not times or times[-1] != cutoff:
-        times.append(cutoff)
+    if forced_trigger >= available and (not times or times[-1] != forced_trigger):
+        times.append(forced_trigger)
     return times
 
 
@@ -195,12 +195,14 @@ class FreezeV0Store:
             if not match.get("sale_cutoff_hkt") or not match.get("source_observed_at_hkt") or not match.get("sp_provenance_sha256"):
                 raise FreezeV0Error("complete decision/SP provenance is required for every match")
             _as_hkt(match["sale_cutoff_hkt"], "sale_cutoff_hkt")
-            _as_hkt(match["source_observed_at_hkt"], "source_observed_at_hkt")
+            if _as_hkt(match["source_observed_at_hkt"], "source_observed_at_hkt") > captured_at:
+                raise FreezeV0Error("match source observation is after trusted capture")
         if source_receipt.get("issue") != issue or source_receipt.get("issue_membership") != membership:
             raise FreezeV0Error("source receipt does not bind issue membership")
         if not source_receipt.get("trusted_clock_provenance") or not source_receipt.get("source_observed_at_hkt"):
             raise FreezeV0Error("trusted capture/source clocks are required")
-        _as_hkt(source_receipt["source_observed_at_hkt"], "source_observed_at_hkt")
+        if _as_hkt(source_receipt["source_observed_at_hkt"], "source_observed_at_hkt") > captured_at:
+            raise FreezeV0Error("source receipt observation is after trusted capture")
         source_cutoff = _as_hkt(source_receipt.get("cutoff_at_hkt"), "source_receipt.cutoff_at_hkt")
         earliest_kickoff = _as_hkt(source_receipt.get("earliest_kickoff_at_hkt"), "source_receipt.earliest_kickoff_at_hkt")
         if source_cutoff != cutoff_at or source_cutoff > earliest_kickoff:

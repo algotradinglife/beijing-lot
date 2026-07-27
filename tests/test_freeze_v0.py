@@ -96,7 +96,7 @@ def test_tamper_and_cutoff_fail_closed(tmp_path) -> None:
 def test_schedule_final_uses_latest_valid_before_cutoff_and_is_write_once(tmp_path) -> None:
     store = FreezeV0Store(tmp_path / "freeze_v0", replay_candidate_pool=_replay)
     assert hourly_attempt_times(available_at=datetime.fromisoformat("2026-07-30T09:10:00+08:00"), cutoff_at=CUTOFF, safety_margin=timedelta(minutes=5)) == [
-        datetime.fromisoformat("2026-07-30T09:10:00+08:00"), datetime.fromisoformat("2026-07-30T10:10:00+08:00"), datetime.fromisoformat("2026-07-30T11:10:00+08:00"), CUTOFF,
+        datetime.fromisoformat("2026-07-30T09:10:00+08:00"), datetime.fromisoformat("2026-07-30T10:10:00+08:00"), datetime.fromisoformat("2026-07-30T11:10:00+08:00"), datetime.fromisoformat("2026-07-30T11:55:00+08:00"),
     ]
     first = _capture(store, at=datetime.fromisoformat("2026-07-30T09:00:00+08:00"))
     second = _capture(store, at=datetime.fromisoformat("2026-07-30T11:00:00+08:00"))
@@ -134,3 +134,16 @@ def test_partial_pool_with_recomputed_hashes_fails_independent_replay(tmp_path) 
     result = store.capture_attempt(issue="26100", captured_at=datetime.fromisoformat("2026-07-30T09:00:00+08:00"), cutoff_at=CUTOFF, **payload)
     assert result["status"] == "FAIL"
     assert "deterministic replay" in result["reason"]
+
+
+@pytest.mark.parametrize("layer, reason", [("receipt", "source receipt observation"), ("match", "match source observation")])
+def test_future_source_observation_fails_before_candidate_selection(tmp_path, layer, reason) -> None:
+    store = FreezeV0Store(tmp_path / "freeze_v0", replay_candidate_pool=_replay)
+    payload = _inputs()
+    if layer == "receipt":
+        payload["source_receipt"]["source_observed_at_hkt"] = "2026-07-30T09:01:00+08:00"
+    else:
+        payload["decision_input"]["matches"][0]["source_observed_at_hkt"] = "2026-07-30T09:01:00+08:00"
+    result = store.capture_attempt(issue="26100", captured_at=datetime.fromisoformat("2026-07-30T09:00:00+08:00"), cutoff_at=CUTOFF, **payload)
+    assert result["status"] == "FAIL"
+    assert reason in result["reason"]
