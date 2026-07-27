@@ -217,6 +217,55 @@ def test_operational_native_resolution_fails_closed_without_a_registry_pointer(t
     assert error == "cutover_receipt_missing"
 
 
+def test_operational_native_resolution_rejects_a_pointer_for_another_issue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, active_root, key_registry, cutover = _cutover_fixture(tmp_path)
+    monkeypatch.setattr(appmod, "PROJECT_ROOT", root)
+    monkeypatch.setattr(appmod, "ADHOC_PUBLICATION_KEY_REGISTRY", key_registry)
+    release = {
+        "promotion": {
+            "native_cutover_receipts": {
+                "26079": {
+                    "mode": "active",
+                    "current_receipt_path": str(cutover),
+                }
+            }
+        },
+        "artifacts": {"structured_active_dir": str(active_root)},
+    }
+
+    path, verified, error = appmod._pinned_native_cutover_artifact("26079", release)
+
+    assert path is None
+    assert verified is None
+    assert error == "cutover_receipt_issue_mismatch"
+
+
+def test_adhoc_formal_input_does_not_fall_back_without_a_cutover_pointer(
+    tmp_path: Path,
+) -> None:
+    release = {
+        "promotion": {"native_cutover_receipts": {}},
+        "artifacts": {
+            "structured_active_dir": str(tmp_path / "active"),
+            "structured_shadow_dir": str(tmp_path / "shadow"),
+        },
+    }
+
+    rows, metadata = appmod._adhoc_formal_structured_input(
+        issue=ISSUE,
+        expected_indices={1},
+        request_clock=datetime(2026, 7, 27, tzinfo=timezone.utc),
+        release=release,
+    )
+
+    assert rows == {}
+    assert metadata["status"] == "UNAVAILABLE_FORMAL_INPUT"
+    assert metadata["decision_variant_id"] == "active_v3.3.3"
+    assert metadata["rejected_candidates"] == ["cutover_receipt_missing"]
+
+
 def test_runtime_rollback_accepts_only_current_receipt_predecessor(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

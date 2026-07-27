@@ -875,6 +875,9 @@ def test_postmatch_review_api_dry_run_and_real_write_review_rows(tmp_path: Path,
             headers={**OPERATOR_HEADERS, "X-Requested-By": "pytest-real"},
         )
         after_real = client.get("/api/issues/review_tie_case/operations").get_json()
+        default_settlement_response = client.get(
+            "/api/issues/review_tie_case/settlement"
+        )
         settlement_response = client.get("/api/issues/review_tie_case/settlement?decision_variant=active_v3.3.3")
         missing_response = client.get("/api/issues/review_tie_case/settlement?decision_variant=missing_v9")
         settlement = settlement_response.get_json()
@@ -893,6 +896,12 @@ def test_postmatch_review_api_dry_run_and_real_write_review_rows(tmp_path: Path,
     assert after_real["review"]["reviewed_match_count"] == 1
     assert after_real["review"]["unreviewed_settled_count"] == 0
     assert after_real["review"]["task"]["status"] == "succeeded"
+    assert default_settlement_response.status_code == 200
+    default_context = default_settlement_response.get_json()[
+        "strategy_version_context"
+    ]
+    assert default_context["selected_variant_id"] == "active_v3.3.3"
+    assert default_context["selection_status"] == "degraded"
     assert settlement_response.status_code == 200
     assert settlement["postmatch_review_issue_summary"]["n_reviews"] == 1
     assert settlement["postmatch_review_issue_summary"]["review_version"] == "v3_decision_variant_active_v3_3_3_tags"
