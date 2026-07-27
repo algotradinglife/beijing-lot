@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib.util
+import itertools
+import math
 import sys
 from pathlib import Path
 
@@ -54,6 +56,42 @@ def test_pair_threshold_and_repeatability():
     first = mod.generate(legs)
     second = mod.generate(legs)
     assert first == second
+
+
+def test_assignment_uses_coverage_frontier_not_equal_value_float_noise():
+    mod = load()
+    prices = (
+        (2.7903412434671564, 2.762895179109697, 4.3354035081808),
+        (2.675349020827538, 4.422857112960257, 2.6978038902579584),
+        (2.782950234665716, 4.317034857117581, 2.7291922656021774),
+        (2.5869637812212964, 4.256836598967818, 2.5818634470648423),
+        (2.664478519182561, 4.231131417140891, 2.7217063607248893),
+        (4.288757518388379, 2.528929714203542, 2.5452073790507064),
+        (2.5670123328790226, 2.6517463235640215, 4.237717031911586),
+    )
+    legs = tuple(
+        mod.base.Leg("26071", index, f"s{index}", "k", "d", "s", sp)
+        for index, sp in enumerate(prices, 1)
+    )
+    chosen = mod.choose_assignment(legs, full_count=2, threshold=0.75)
+    assert chosen is not None
+
+    feasible_coverages = []
+    for full_positions in itertools.combinations(range(7), 2):
+        double_positions = tuple(
+            index for index in range(7) if index not in full_positions
+        )
+        options = [mod.pair_options(legs[index], 0.75) for index in double_positions]
+        if any(not values for values in options):
+            continue
+        feasible_coverages.extend(
+            math.prod(pair.coverage for pair in pairs)
+            for pairs in itertools.product(*options)
+        )
+
+    assert chosen["package_coverage"] == pytest.approx(
+        max(feasible_coverages), rel=0.0, abs=1e-15
+    )
 
 
 def test_top256_summary_uses_retained_not_parent_coverage():

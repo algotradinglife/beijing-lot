@@ -77,12 +77,11 @@ def pair_options(leg: base.Leg, threshold: float) -> list[Pair]:
 
 def assignment_key(
     item: dict[str, object],
-) -> tuple[float, float, float, float, tuple[int, ...], tuple[str, ...]]:
+) -> tuple[float, float, float, tuple[int, ...], tuple[int, ...]]:
     excluded_rank = tuple(
         base.CODE_ORDER.index(code) for code in item["excluded_codes"]
     )
     return (
-        -float(item["expected_roi"]),
         -float(item["package_coverage"]),
         -float(item["double_h_product"]),
         -float(item["min_retained_sp"]),
