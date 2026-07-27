@@ -25,7 +25,7 @@ The only proposed native contract names are:
 | issue CSV | `structured_shadow_{issue}.csv` | `structured_active_{issue}.csv` |
 | executable selection column | `shadow_selection_codes` | `selection_codes` |
 | issue receipt | `structured_decision_input_receipt_v1` | `structured_decision_input_receipt_v1` |
-| native formal-binding schema | `adhoc_formal_selection_binding_v1` | `adhoc_formal_selection_binding_v1` |
+| formal-binding schema | `adhoc_formal_selection_binding_v1` (legacy only) | `adhoc_formal_selection_binding_v2` |
 
 `shadow_v3.3.3` becomes a read-only audit alias of `active_v3.3.3`; it is not a
 variant which can generate, sign, or publish an operational package.
@@ -49,6 +49,8 @@ re-sign anything.
 | Expected / actual row count | `173` / `173` (complete `match_idx` 1–173) |
 | Canonical map digest | `e72f7b4a0a6b8038fcacf7b74716a0c891335456c75e7ffe54337950f37eac4e` |
 | Semantic ticket-input fixture digest | `d9add04900e8fe9c7d636b9e60f8e3dde506eb765cc5fd3a768886cf81febed4` |
+| Committed projection fixture | `tests/fixtures/promotion/active_v333_26078_shadow_selection_projection.csv` / SHA-256 `8c726a5fea280e3b4770360479b90a99d27a135592e9d2884c8f8e7f8ce90d22` |
+| Committed provenance receipt | `tests/fixtures/promotion/active_v333_26078_shadow_selection_projection.receipt.json` / file SHA-256 `896943524e0227c8f13b3f55f8e1a24fe735ba8cffaa7c3c97d915a8b74d7092` / semantic SHA-256 `3325d1f6eea44047f7268bd2305e0c2bafd92292f214bf4c9fb89d7c37bf38e7` |
 
 The canonical map is UTF-8 SHA-256 of compact sorted-key JSON, with rows
 ordered by `match_idx`, each row exactly
@@ -74,8 +76,47 @@ bound to public variant `active_v3.3.3`. It does not use the CSV's
 Treating that retired column as a parity source would violate the no-fallback
 contract rather than prove this promotion.
 
+The committed projection fixture is the complete ordered 173-row extraction,
+not a runtime-only path. Its provenance receipt binds the issue, generation
+clock, original CSV and receipt paths, their file/semantic hashes, projection
+file hash, row count, canonical map digest, and semantic ticket-input digest.
+An independent exact-HEAD checkout reproduces all claims with:
+
+```bash
+uv run pytest tests/test_active_v333_promotion_fixture.py
+```
+
+`structured_decision_input_receipt_v1` is retained only as a source-contract-
+neutral byte/issue/clock receipt: its validator checks receipt schema, issue,
+CSV name, CSV bytes/size and a timezone-aware generation clock, but does not
+encode a root, arm, or selection-column meaning. The new v2 formal binding,
+not this generic receipt, owns those native semantic checks.
+
 Any mismatch is `PARITY_MISMATCH` and blocks cutover; no alternate strategy or
 legacy artifact may be substituted.
+
+## Formal-binding version boundary
+
+`adhoc_formal_selection_binding_v1` is explicitly a legacy shadow binding. It
+continues to verify immutable audit material only and can never produce a new
+`READY_FOR_REVIEW` package after this promotion.
+
+`adhoc_formal_selection_binding_v2` is the sole native operational binding. It
+requires all of the following together: `decision_variant_id=active_v3.3.3`,
+an active arm (not `shadow_arm`), a path beneath
+`results/structured_decision_chain_active`, a valid
+`structured_decision_input_receipt_v1` for that native CSV, exactly one row per
+`match_idx`, and the `selection_codes` column whose canonical digest binds the
+decision input. A v2 binding pointing to a shadow root or
+`shadow_selection_codes`, and a v1 binding presented as native, are both
+rejected before package generation. There is no automatic v1-to-v2 conversion
+at verification time.
+
+The implementation test set must cover all downgrade and cross-version cases:
+v1 cannot obtain `READY_FOR_REVIEW`; v2 cannot use a shadow root, shadow
+column, or shadow arm; v1 and v2 digest/receipt substitutions fail; and a v2
+native decision input cannot be verified with a legacy attestation. These are
+in addition to the fixed projection test above.
 
 ## Publication-attestation transition
 
@@ -84,9 +125,9 @@ contract; this promotion does not weaken it.
 
 | Requirement | Exact transition rule |
 | --- | --- |
-| Attestation schema | The signed wrapper remains `adhoc_publication_attestation_v1`; the native formal-selection binding remains `adhoc_formal_selection_binding_v1`. |
-| Signed statement | The canonical Ed25519 statement includes `unsigned_package_content_sha256`, issue/request/validity fields, package schema and `decision_variant_id`, native formal CSV SHA-256, native receipt SHA-256, canonical `formal_selection_codes_sha256`, decision-input, Exact-N and concentration SHA-256 values, plus `artifact_digest_set_sha256`. |
-| Native formal mapping | An attested `READY_FOR_REVIEW` package must bind `decision_variant_id=active_v3.3.3`, `formal_selection_column=selection_codes`, the native CSV/receipt paths and hashes, and the canonical selection digest. A legacy column or root fails closed. |
+| Attestation schema | The signed wrapper remains `adhoc_publication_attestation_v1`; a native package requires `adhoc_formal_selection_binding_v2`, while v1 is legacy audit-only. |
+| Signed statement | The canonical Ed25519 statement includes `formal_binding_schema_version=adhoc_formal_selection_binding_v2`, `unsigned_package_content_sha256`, issue/request/validity fields, package schema and `decision_variant_id`, native formal CSV SHA-256, native receipt SHA-256, canonical `formal_selection_codes_sha256`, decision-input, Exact-N and concentration SHA-256 values, plus `artifact_digest_set_sha256`. |
+| Native formal mapping | An attested `READY_FOR_REVIEW` package must bind `formal_binding_schema_version=adhoc_formal_selection_binding_v2`, `decision_variant_id=active_v3.3.3`, active arm semantics, `formal_selection_column=selection_codes`, the native CSV/receipt paths and hashes, and the canonical selection digest. A legacy binding, column, arm or root fails closed. |
 | Pinned public key | Verification uses version-controlled `config/adhoc_publication_keys.json`, schema `adhoc_publication_key_registry_v1`; only an `active` key whose `usage` matches its registry environment is valid. |
 | Private-key authority | Only the Decision API identity receives `BEIDAN_ADHOC_PUBLICATION_PRIVATE_KEY_FILE` and `BEIDAN_ADHOC_PUBLICATION_KEY_ID`, with a read-only PKCS#8 Ed25519 PEM mount. It alone may write the operational package root. |
 | Manual/runtime callers | A caller without that authority may create only an `UNATTESTED_AUDIT_ONLY` record in its audit root. It cannot be current, downloadable as operational, or later promoted by attaching a signature. |
@@ -104,7 +145,7 @@ publication target.
 | Artifact writer | shadow root and `structured_shadow_{issue}.csv` / writes shadow CSV + `structured_decision_input_receipt_v1` | `results/structured_decision_chain_active/{issue}_{generation}_active_v3.3.3/structured_active_{issue}.csv` / writes native CSV + same receipt schema | writer never writes old root after cutover | new native artifact is fully verified before pointer change | fixed 26078 CSV/hash/receipt/map parity receipt |
 | Shared resolver | shadow candidate scan and `shadow_selection_codes` / none | one resolver reads `structured_active_dir`, validates receipt, uniqueness and `selection_codes` / none | legacy reader is separate audit-only function, not resolver fallback | all operational consumers call this resolver | missing, duplicate, wrong issue, bad receipt and legacy-fallback tests |
 | Decision API | registry-selected shadow CSV / no direct CSV write | shared native resolver / no direct CSV write | may display legacy provenance only via audit endpoint | API package endpoint changes with resolver | API current-default + fail-closed response tests |
-| Adhoc builder / verifier | formal root `results/structured_decision_chain_shadow`, `shadow_selection_codes` / audit package only | native formal root, `selection_codes` / Decision API-only attested package write | old packages remain verifier-readable only under legacy/audit rules | native binding required for `READY_FOR_REVIEW` | formal binding, source-root escape, receipt/hash and parity tests |
+| Adhoc builder / verifier | v1 formal root `results/structured_decision_chain_shadow`, `shadow_arm`, `shadow_selection_codes` / audit package only | v2 native root, active arm and `selection_codes` / Decision API-only attested package write | v1 remains verifier-readable only as audit material | v2 native binding required for `READY_FOR_REVIEW` | v1 downgrade, v2-on-shadow root/column/arm, source-root escape, receipt/hash and parity tests |
 | N-ticket | shadow-derived decision input / no formal artifact write | shared native resolved decision input / no formal artifact write | no legacy operational N-ticket build | resolver cutover | exact-N input map digest parity test |
 | PDF / CSV | shadow-labelled source provenance / package files written only after existing checks | native `decision_variant_id`, formal hashes and `selection_codes` provenance / package files written only after native attestation | existing legacy files immutable/read-only | native package generation only | ticket-input fixture + PDF/CSV manifest digest receipt |
 | Segment betting | shadow-derived rows / no formal artifact write | shared native resolved rows / no formal artifact write | audit display may name legacy source but cannot choose it | resolver cutover | segment selection parity and unavailable-on-resolver-failure test |
@@ -117,7 +158,7 @@ publication target.
 
 1. Stage and independently verify a native artifact under
    `structured_active_dir`, with receipt schema
-   `structured_decision_input_receipt_v1`, a valid native formal-binding
+   `structured_decision_input_receipt_v1`, a valid v2 native formal-binding
    record, and the frozen parity receipt above. The staged artifact is not
    operational until the registry changes.
 2. Deploy the shared resolver and its fail-closed tests first. It must have no
@@ -161,8 +202,9 @@ legacy bytes.
    fixture parity;
 2. native artifact hash/receipt, complete issue membership and unique-index
    receipt;
-3. valid native Ed25519 publication attestation plus missing-key, invalid-key,
-   invalid-signature and statement-mismatch fail-closed tests;
+3. valid native Ed25519 publication attestation that binds v2, plus
+   missing-key, invalid-key, invalid-signature, statement-mismatch, downgrade
+   and cross-version-substitution fail-closed tests;
 4. legacy alias read-only/non-publishable test, `active_v3` non-fallback test,
    and unchanged v4.2 shadow/manual test;
 5. exact-HEAD independent Engineering Validation and PI review.
