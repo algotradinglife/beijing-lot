@@ -322,7 +322,12 @@ def _app(tmp_path: Path, monkeypatch):
     # covered independently by test_native_promotion_cutover; the fixture
     # deliberately advances its formal source in one test below.
     def pinned_fixture(issue: str, release=None):
-        candidates = appmod._structured_active_csv_candidates(issue, release)
+        active_dir = Path(str((release or _release(shadow_dir))["artifacts"]["structured_active_dir"]))
+        candidates = sorted(
+            active_dir.glob(
+                f"{issue}_*_active_v3.3.3/structured_active_{issue}.csv"
+            )
+        )
         return (candidates[-1], {}, "") if candidates else (None, None, "fixture_missing")
 
     monkeypatch.setattr(appmod, "_pinned_native_cutover_artifact", pinned_fixture)
