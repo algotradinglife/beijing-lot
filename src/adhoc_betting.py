@@ -33,6 +33,13 @@ from zoneinfo import ZoneInfo
 
 from scripts import estimate_segment_betting_plan as portfolio
 from scripts import replay_rolling_segment_n_tickets as rolling
+from src.adhoc_publication_attestation import (
+    ATTESTATION_SCHEMA_VERSION,
+    PublicationAttestationError,
+    sign_statement,
+    verify_attestation,
+)
+from src.structured_input_receipt import receipt_path, verify_receipt
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -40,8 +47,21 @@ HKT = ZoneInfo("Asia/Hong_Kong")
 
 CAPABILITY_ID = "BJ-ADHOC-BET-001"
 CONCENTRATION_CAPABILITY_ID = "BJ-ADHOC-CONCENTRATION-001"
-PACKAGE_SCHEMA_VERSION = "adhoc_betting_package_v2"
-LEGACY_PACKAGE_SCHEMA_VERSIONS = frozenset({"adhoc_betting_package_v1"})
+PACKAGE_SCHEMA_VERSION = "adhoc_betting_package_v3"
+ATTESTED_PACKAGE_SCHEMA_VERSION = "adhoc_betting_package_v3"
+# v2 proved the concentration contract, but did not bind its executable legs
+# back to the formal structured artifact.  It is therefore audit-only too.
+LEGACY_PACKAGE_SCHEMA_VERSIONS = frozenset(
+    {"adhoc_betting_package_v1", "adhoc_betting_package_v2"}
+)
+CONCENTRATION_PACKAGE_SCHEMA_VERSIONS = frozenset(
+    {"adhoc_betting_package_v2", PACKAGE_SCHEMA_VERSION}
+)
+FORMAL_DECISION_VARIANT_ID = "active_v3.3.3"
+FORMAL_BINDING_SCHEMA_VERSION = "adhoc_formal_selection_binding_v1"
+FORMAL_ARTIFACT_VARIANT_IDS = frozenset(
+    {FORMAL_DECISION_VARIANT_ID, "shadow_v3.3.3"}
+)
 CONCENTRATION_CONTRACT_SCHEMA_VERSION = "adhoc_match_concentration_contract_v1"
 MAX_TICKET_OCCURRENCES_PER_MATCH = 2
 _LEGACY_LEDGER_BINDING = object()
@@ -68,6 +88,9 @@ DEFAULT_FONT_FILE = (
 )
 DEFAULT_SAFETY_MARGIN_SECONDS = 120
 DEFAULT_MAX_SOURCE_AGE_SECONDS = 900
+FORMAL_STRUCTURED_ROOT = "results/structured_decision_chain_shadow"
+PUBLICATION_KEY_REGISTRY = "config/adhoc_publication_keys.json"
+PUBLICATION_ATTESTATION_FILE = "publication_attestation.json"
 
 REQUIRED_PACKAGE_FILES = frozenset(
     {
@@ -177,6 +200,70 @@ def _verify_payload_hash(payload: dict[str, Any], *, label: str) -> None:
 def _with_hash(payload: dict[str, Any]) -> dict[str, Any]:
     unsigned = _unsigned(payload)
     return {**unsigned, "sha256": digest(unsigned)}
+
+
+def _publication_statement(
+    manifest: dict[str, Any], decision_input: dict[str, Any]
+) -> dict[str, Any]:
+    """Build the deterministic, non-circular operational publication claim."""
+
+    unsigned_manifest = {
+        key: value
+        for key, value in manifest.items()
+        if key
+        not in {
+            "sha256",
+            "package_id",
+            "publication_attestation_sha256",
+            "publication_key_id",
+        }
+    }
+    unsigned_manifest["artifacts"] = [
+        artifact
+        for artifact in manifest.get("artifacts", [])
+        if isinstance(artifact, dict)
+        and artifact.get("file") != PUBLICATION_ATTESTATION_FILE
+    ]
+    formal = (decision_input.get("source_metadata") or {}).get(
+        "formal_decision_input"
+    )
+    if not isinstance(formal, dict):
+        formal = {}
+    content = {
+        "manifest": unsigned_manifest,
+        "artifact_digest_set": sorted(
+            (
+                str(artifact.get("file") or ""),
+                str(artifact.get("sha256") or ""),
+            )
+            for artifact in unsigned_manifest["artifacts"]
+        ),
+    }
+    return {
+        "attestation_schema_version": ATTESTATION_SCHEMA_VERSION,
+        "unsigned_package_content_sha256": digest(content),
+        "issue": str(manifest.get("issue") or ""),
+        "request_id": str(manifest.get("request_id") or ""),
+        "requested_at_hkt": str(manifest.get("requested_at_hkt") or ""),
+        "valid_until_hkt": str(manifest.get("valid_until_hkt") or ""),
+        "package_schema_version": str(manifest.get("schema_version") or ""),
+        "decision_variant_id": str(manifest.get("decision_variant_id") or ""),
+        "formal_structured_csv_sha256": str(
+            formal.get("structured_csv_sha256") or ""
+        ),
+        "formal_structured_receipt_sha256": str(
+            formal.get("structured_receipt_sha256") or ""
+        ),
+        "formal_selection_codes_sha256": str(
+            formal.get("formal_selection_codes_sha256") or ""
+        ),
+        "decision_input_sha256": str(manifest.get("decision_input_sha256") or ""),
+        "exact_n_plan_sha256": str(manifest.get("exact_n_plan_sha256") or ""),
+        "concentration_contract_sha256": str(
+            manifest.get("concentration_contract_sha256") or ""
+        ),
+        "artifact_digest_set_sha256": digest(content["artifact_digest_set"]),
+    }
 
 
 def _parse_hkt(value: object, *, label: str) -> datetime:
@@ -304,6 +391,145 @@ def _source_snapshot_hash(source_snapshot: dict[str, Any]) -> str:
     if claimed and claimed != actual:
         raise AdhocBettingError("source snapshot SHA-256 mismatch")
     return actual
+
+
+def _formal_selection_digest(rows: dict[int, tuple[str, ...]]) -> str:
+    """Digest the executable formal selection map, never a caller-chosen column."""
+
+    return digest(
+        [
+            {"match_idx": idx, "selection_codes": list(codes)}
+            for idx, codes in sorted(rows.items())
+        ]
+    )
+
+
+def _trusted_formal_artifact_path(value: object, *, label: str) -> Path:
+    """Resolve a formal CSV/receipt only beneath the reviewed results root."""
+
+    text = str(value or "").strip()
+    if not text:
+        raise AdhocBettingError(f"{label} is missing")
+    candidate = Path(text)
+    candidate = candidate if candidate.is_absolute() else PROJECT_ROOT / candidate
+    try:
+        resolved = candidate.resolve(strict=True)
+        trusted_root = (PROJECT_ROOT / FORMAL_STRUCTURED_ROOT).resolve(strict=True)
+        resolved.relative_to(trusted_root)
+    except (OSError, ValueError) as exc:
+        raise AdhocBettingError(f"{label} is outside the trusted formal artifact root") from exc
+    if not resolved.is_file():
+        raise AdhocBettingError(f"{label} is not a regular file")
+    return resolved
+
+
+def _verify_formal_decision_binding(
+    *,
+    issue: str,
+    decision_variant_id: object,
+    source_metadata: object,
+    rows: object,
+) -> None:
+    """Bind every frozen adhoc selector to the verified formal shadow CSV.
+
+    Package hashes can prove a package is self-consistent, but cannot prove a
+    caller used the right CSV column.  This verifier re-opens the reviewed
+    structured artifact, verifies its receipt and bytes, then compares the
+    executable ``shadow_selection_codes`` map to the frozen decision input.
+    """
+
+    if str(decision_variant_id or "") != FORMAL_DECISION_VARIANT_ID:
+        raise AdhocBettingError("adhoc decision input is not the formal active_v3.3.3 variant")
+    if not isinstance(source_metadata, dict):
+        raise AdhocBettingError("adhoc decision input source metadata is missing")
+    # ``source_builder`` is observational provenance only: a caller can copy
+    # text.  Trust is established by re-reading the formal CSV and its receipt
+    # below, not by a caller-supplied claim about which function made a dict.
+    candidate_filter = source_metadata.get("operator_candidate_filter")
+    if candidate_filter is not None and (
+        not isinstance(candidate_filter, dict)
+        or str(candidate_filter.get("authorized_issue") or "") != issue
+    ):
+        raise AdhocBettingError(
+            "adhoc operator candidate filter is not authorized for the request issue"
+        )
+    formal_input = source_metadata.get("formal_decision_input")
+    if (
+        not isinstance(formal_input, dict)
+        or str(formal_input.get("status") or "") != "VERIFIED_FORMAL_INPUT"
+        or str(formal_input.get("decision_variant_id") or "")
+        != FORMAL_DECISION_VARIANT_ID
+        or str(formal_input.get("binding_schema_version") or "")
+        != FORMAL_BINDING_SCHEMA_VERSION
+    ):
+        raise AdhocBettingError("adhoc formal decision input contract is invalid")
+    csv_path = _trusted_formal_artifact_path(
+        formal_input.get("structured_csv"), label="formal structured CSV"
+    )
+    receipt = _trusted_formal_artifact_path(
+        formal_input.get("structured_receipt"), label="formal structured receipt"
+    )
+    if receipt != receipt_path(csv_path).resolve():
+        raise AdhocBettingError("adhoc formal receipt path does not match structured CSV")
+    csv_hash = file_hash(csv_path)
+    receipt_hash = file_hash(receipt)
+    if (
+        str(formal_input.get("structured_csv_sha256") or "") != csv_hash
+        or str(formal_input.get("structured_receipt_sha256") or "") != receipt_hash
+    ):
+        raise AdhocBettingError("adhoc formal artifact hash does not bind current bytes")
+    try:
+        verify_receipt(csv_path, receipt, issue=issue)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise AdhocBettingError("adhoc formal structured receipt is invalid") from exc
+
+    formal_rows: dict[int, tuple[str, ...]] = {}
+    try:
+        with csv_path.open(newline="", encoding="utf-8") as stream:
+            reader = csv.DictReader(stream)
+            required = {
+                "issue",
+                "match_idx",
+                "shadow_arm",
+                "shadow_selection_codes",
+            }
+            if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
+                raise AdhocBettingError("adhoc formal structured CSV lacks required columns")
+            for record in reader:
+                if str(record.get("issue") or "") != issue:
+                    continue
+                try:
+                    idx = int(record.get("match_idx") or 0)
+                except (TypeError, ValueError) as exc:
+                    raise AdhocBettingError("adhoc formal CSV has invalid match index") from exc
+                if idx <= 0 or idx in formal_rows:
+                    raise AdhocBettingError("adhoc formal CSV has duplicate match index")
+                if str(record.get("shadow_arm") or "") not in FORMAL_ARTIFACT_VARIANT_IDS:
+                    raise AdhocBettingError(
+                        "adhoc formal CSV variant is not mapped to active_v3.3.3"
+                    )
+                formal_rows[idx] = _codes(record.get("shadow_selection_codes"))
+    except OSError as exc:
+        raise AdhocBettingError("adhoc formal structured CSV cannot be read") from exc
+    if not formal_rows:
+        raise AdhocBettingError("adhoc formal structured CSV has no rows for issue")
+    if str(formal_input.get("formal_selection_codes_sha256") or "") != _formal_selection_digest(formal_rows):
+        raise AdhocBettingError("adhoc formal selection digest does not bind structured CSV")
+    if not isinstance(rows, list) or not rows:
+        raise AdhocBettingError("adhoc decision input has no rows to bind formally")
+    for row in rows:
+        if not isinstance(row, dict):
+            raise AdhocBettingError("adhoc decision input row is malformed")
+        try:
+            idx = int(row.get("match_idx") or 0)
+        except (TypeError, ValueError) as exc:
+            raise AdhocBettingError("adhoc decision input row has invalid match index") from exc
+        if idx not in formal_rows:
+            raise AdhocBettingError("adhoc decision input match is absent from formal CSV")
+        if tuple(str(code) for code in row.get("selection_codes") or []) != formal_rows[idx]:
+            raise AdhocBettingError(
+                "adhoc decision input selection is not bound to formal shadow_selection_codes"
+            )
 
 
 def _normalize_match(
@@ -942,6 +1168,20 @@ def _verify_pdf_concentration_view(
                 ),
             ]
         )
+        # The PDF is an operational artifact, so its human-readable legs must
+        # agree with the formally bound selection codes as well as its cost
+        # and concentration summaries.  A fully re-hashed PDF with e.g. 胜
+        # rendered as 平 must therefore fail verification.
+        for match_idx, code_text in zip(
+            ticket.get("match_indices", []), ticket.get("leg_codes", [])
+        ):
+            idx = int(match_idx)
+            match = match_by_idx[idx]
+            codes = [code for code in str(code_text).split("+") if code]
+            required.append(
+                f"#{idx}{_selection_label(codes)}"
+                f"{match['home']}vs{match['away']}"
+            )
     if any(re.sub(r"\s+", "", fragment) not in normalized for fragment in required):
         raise AdhocBettingError("adhoc PDF concentration view mismatch")
 
@@ -1187,12 +1427,20 @@ class AdhocBettingStore:
         font_file: str | os.PathLike[str] = DEFAULT_FONT_FILE,
         safety_margin_seconds: int = DEFAULT_SAFETY_MARGIN_SECONDS,
         max_source_age_seconds: int = DEFAULT_MAX_SOURCE_AGE_SECONDS,
+        publication_private_key_file: str | os.PathLike[str] | None = None,
+        publication_key_id: str | None = None,
     ) -> None:
         self.db_path = Path(db_path)
         self.root = Path(root)
         self.font_file = Path(font_file)
         self.safety_margin = timedelta(seconds=max(0, int(safety_margin_seconds)))
         self.max_source_age = timedelta(seconds=max(1, int(max_source_age_seconds)))
+        self.publication_private_key_file = (
+            Path(publication_private_key_file)
+            if publication_private_key_file is not None
+            else None
+        )
+        self.publication_key_id = str(publication_key_id or "")
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=30)
@@ -1288,6 +1536,12 @@ class AdhocBettingStore:
         requested_at_text = _iso_hkt(requested_at)
         if str(source_snapshot.get("issue") or "") != issue_text:
             raise AdhocBettingError("source snapshot issue does not match the request")
+        _verify_formal_decision_binding(
+            issue=issue_text,
+            decision_variant_id=source_snapshot.get("decision_variant_id"),
+            source_metadata=source_snapshot.get("source_metadata"),
+            rows=source_snapshot.get("matches"),
+        )
 
         with _exclusive_lock(self.root):
             with self._connect() as conn:
@@ -1519,7 +1773,23 @@ class AdhocBettingStore:
             if selected
             else None
         )
-        status = "READY_FOR_REVIEW" if tickets and sale_status_verified else "UNAVAILABLE_ADHOC_PLAN"
+        authority_configured = (
+            self.publication_private_key_file is not None
+            and bool(self.publication_key_id)
+            and PACKAGE_SCHEMA_VERSION == ATTESTED_PACKAGE_SCHEMA_VERSION
+        )
+        status = (
+            "READY_FOR_REVIEW"
+            if tickets
+            and sale_status_verified
+            and (
+                authority_configured
+                or PACKAGE_SCHEMA_VERSION != ATTESTED_PACKAGE_SCHEMA_VERSION
+            )
+            else "UNATTESTED_AUDIT_ONLY"
+            if tickets and sale_status_verified
+            else "UNAVAILABLE_ADHOC_PLAN"
+        )
         unavailable_reasons: list[str] = []
         if not tickets:
             unavailable_reasons.append(portfolio_reason)
@@ -1625,6 +1895,32 @@ class AdhocBettingStore:
             "pdf_font_sha256": file_hash(self.font_file),
             "artifacts": artifacts,
         }
+        if (
+            status == "READY_FOR_REVIEW"
+            and PACKAGE_SCHEMA_VERSION == ATTESTED_PACKAGE_SCHEMA_VERSION
+        ):
+            assert self.publication_private_key_file is not None
+            statement = _publication_statement(manifest, decision_input)
+            try:
+                attestation = sign_statement(
+                    private_key_path=self.publication_private_key_file,
+                    key_id=self.publication_key_id,
+                    statement=statement,
+                )
+            except PublicationAttestationError as exc:
+                raise AdhocBettingError(str(exc)) from exc
+            attestation_path = stage / PUBLICATION_ATTESTATION_FILE
+            _json_dump(attestation_path, attestation)
+            manifest["publication_key_id"] = self.publication_key_id
+            manifest["publication_attestation_sha256"] = file_hash(attestation_path)
+            manifest["artifacts"] = [
+                *artifacts,
+                {
+                    "file": PUBLICATION_ATTESTATION_FILE,
+                    "sha256": file_hash(attestation_path),
+                    "artifact_type": "ed25519_publication_attestation",
+                },
+            ]
         package_id = _package_identity(manifest)
         manifest["package_id"] = package_id
         manifest = _with_hash(manifest)
@@ -1743,12 +2039,11 @@ class AdhocBettingStore:
     def _concentration_contract_applied(
         manifest: dict[str, Any], plan: dict[str, Any]
     ) -> bool:
-        """Whether this immutable package carries the v2 two-ticket contract.
+        """Whether this immutable package carries the current operational contract.
 
-        A trusted-ledger v1 package remains readable as an historical audit
-        artifact, but must never inherit the operational meaning of the v2
-        concentration capability merely because it is still inside a former
-        validity window.
+        v1 and v2 packages remain readable as historical audit artifacts, but
+        must never inherit operational meaning because they lack either the
+        concentration or formal structured-selection binding respectively.
         """
 
         concentration = plan.get("concentration_contract")
@@ -1777,6 +2072,8 @@ class AdhocBettingStore:
         immutable_status = str(manifest.get("status") or "FAILED_CLOSED")
         if immutable_status == "UNAVAILABLE_ADHOC_PLAN":
             return "UNAVAILABLE_ADHOC_PLAN"
+        if immutable_status == "UNATTESTED_AUDIT_ONLY":
+            return "UNATTESTED_AUDIT_ONLY"
         if immutable_status != "READY_FOR_REVIEW":
             return "FAILED_CLOSED"
         if not cls._concentration_contract_applied(manifest, plan):
@@ -1997,7 +2294,8 @@ def _verify_package(
     ):
         _verify_payload_hash(payload, label=label)
     package_schema = str(manifest.get("schema_version") or "")
-    concentration_enforced = package_schema not in LEGACY_PACKAGE_SCHEMA_VERSIONS
+    concentration_enforced = package_schema in CONCENTRATION_PACKAGE_SCHEMA_VERSIONS
+    formal_binding_enforced = package_schema == PACKAGE_SCHEMA_VERSION
     if (
         package_schema not in {PACKAGE_SCHEMA_VERSION, *LEGACY_PACKAGE_SCHEMA_VERSIONS}
         or manifest.get("capability_id") != CAPABILITY_ID
@@ -2012,7 +2310,7 @@ def _verify_package(
     if not re.fullmatch(r"[0-9a-f]{64}", package_id) or package_id != _package_identity(manifest):
         raise AdhocBettingError("adhoc package content identity mismatch")
     if (
-        package_schema in LEGACY_PACKAGE_SCHEMA_VERSIONS
+        package_schema == "adhoc_betting_package_v1"
         and _legacy_ledger_binding is not _LEGACY_LEDGER_BINDING
     ):
         raise AdhocBettingError(
@@ -2023,6 +2321,38 @@ def _verify_package(
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, list):
         raise AdhocBettingError("adhoc manifest artifacts are missing")
+    publication_attested = False
+    if package_schema == ATTESTED_PACKAGE_SCHEMA_VERSION:
+        attestation_path = path / PUBLICATION_ATTESTATION_FILE
+        if str(manifest.get("status") or "") == "READY_FOR_REVIEW":
+            if (
+                not attestation_path.is_file()
+                or str(manifest.get("publication_attestation_sha256") or "")
+                != file_hash(attestation_path)
+            ):
+                raise AdhocBettingError(
+                    "operational adhoc package lacks bound publication attestation"
+                )
+            attestation = _json_load(attestation_path)
+            if str(attestation.get("key_id") or "") != str(
+                manifest.get("publication_key_id") or ""
+            ):
+                raise AdhocBettingError("publication key identity mismatch")
+            try:
+                verify_attestation(
+                    attestation=attestation,
+                    expected_statement=_publication_statement(
+                        manifest, decision_input
+                    ),
+                    registry_path=PROJECT_ROOT / PUBLICATION_KEY_REGISTRY,
+                )
+            except PublicationAttestationError as exc:
+                raise AdhocBettingError(str(exc)) from exc
+            publication_attested = True
+        elif attestation_path.exists() or manifest.get("publication_attestation_sha256"):
+            raise AdhocBettingError(
+                "audit-only adhoc package cannot carry operational attestation"
+            )
     artifact_records = {
         str(item.get("file")): item
         for item in artifacts
@@ -2033,7 +2363,9 @@ def _verify_package(
         for name, item in artifact_records.items()
     }
     expected_artifacts = REQUIRED_PACKAGE_FILES - {"SHA256SUMS", "adhoc_request_manifest.json"}
-    if set(artifact_hashes) != expected_artifacts:
+    if publication_attested:
+        expected_artifacts = {*expected_artifacts, PUBLICATION_ATTESTATION_FILE}
+    if set(artifact_hashes) != set(expected_artifacts):
         raise AdhocBettingError("adhoc manifest artifact set mismatch")
     for name, claimed in artifact_hashes.items():
         if claimed != file_hash(path / name):
@@ -2066,6 +2398,13 @@ def _verify_package(
         raise AdhocBettingError("adhoc decision input identity mismatch")
     if str(decision_input.get("decision_variant_id") or "") != "active_v3.3.3":
         raise AdhocBettingError("adhoc decision input is not the formal active_v3.3.3 variant")
+    if formal_binding_enforced:
+        _verify_formal_decision_binding(
+            issue=str(manifest.get("issue") or ""),
+            decision_variant_id=decision_input.get("decision_variant_id"),
+            source_metadata=decision_input.get("source_metadata"),
+            rows=decision_input.get("matches"),
+        )
     requested_at = _parse_hkt(manifest.get("requested_at_hkt"), label="requested_at_hkt")
     input_asof = _parse_hkt(manifest.get("input_asof_hkt"), label="input_asof_hkt")
     if input_asof > requested_at:
@@ -2500,7 +2839,10 @@ def _verify_package(
             raise AdhocBettingError("adhoc selected tickets lack sale cutoffs") from exc
         if valid_until != expected_valid_until:
             raise AdhocBettingError("adhoc validity window is not bound to selected sale cutoffs")
-    elif manifest.get("status") != "UNAVAILABLE_ADHOC_PLAN":
+    elif manifest.get("status") not in {
+        "UNAVAILABLE_ADHOC_PLAN",
+        "UNATTESTED_AUDIT_ONLY",
+    }:
         raise AdhocBettingError("adhoc immutable status is unsupported")
     if len(denominator.get("included") or []) != int(
         denominator.get("eligible_match_count", -1)
@@ -2518,6 +2860,7 @@ def _verify_package(
         raise AdhocBettingError("adhoc denominator count does not reconcile")
     return {
         "status": "PASS",
+        "publication_attested": publication_attested,
         "request_id": str(manifest["request_id"]),
         "package_id": package_id,
         "manifest_sha256": str(manifest["sha256"]),
