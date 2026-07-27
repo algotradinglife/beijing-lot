@@ -167,11 +167,16 @@ publication target.
    registry. Its required immutable fields are `issue`, `native_csv_path`,
    `native_csv_sha256`, `native_receipt_sha256`,
    `formal_selection_codes_sha256`, `native_artifact_identity`,
-   `previous_native_artifact_identity`, `attestation_key_id`, and
-   `attestation_sha256`. `native_artifact_identity` is exactly
+   `previous_native_artifact_identity`,
+   `previous_native_generation_identity`, `attestation_key_id`, and
+   `attestation_sha256`. When a predecessor exists it additionally records
+   `previous_native_receipt_sha256`, `previous_attestation_sha256`, and
+   `previous_cutover_receipt_sha256`. `native_artifact_identity` is exactly
    `active_v3.3.3:{issue}:{native_csv_sha256}`; empty
-   `previous_native_artifact_identity` means rollback is unavailable and must
-   fail closed.
+   predecessor identity fields mean rollback is unavailable and must fail
+   closed. The predecessor generation identity additionally binds the receipt
+   clock so two generations with identical CSV bytes cannot impersonate each
+   other.
 4. Change the registry’s `active_v3.3.3` `kind`, `source`, and `artifact_key`
    as one reviewed release-config transition, naming that cutover receipt.
    This is the sole cutover switch.
@@ -183,8 +188,10 @@ The rollback target is the immediately preceding **verified native** artifact
 under the same `structured_active_dir` and receipt schema, identified by its
 immutable CSV SHA-256, receipt SHA-256, canonical map digest, and active-key
 attestation, encoded in
-`native_promotion_cutover_receipt_v1.previous_native_artifact_identity`. The
-deploy receipt must name this exact target before cutover. If there is no such
+`native_promotion_cutover_receipt_v1.previous_native_artifact_identity` and
+`previous_native_generation_identity`, with its native receipt, attestation,
+and cutover-receipt hashes. The deploy receipt must name this exact
+content-and-generation evidence set before cutover. If there is no such
 verified native predecessor, rollback is an abort to fail-closed
 unavailability—not a switch to a shadow artifact. A rollback changes only the
 reviewed native artifact pointer and re-verifies the complete native receipt
