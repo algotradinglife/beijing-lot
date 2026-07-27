@@ -4,6 +4,7 @@ import csv
 import hashlib
 import importlib.util
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -72,6 +73,34 @@ def test_ratio_quota_exact_floor_and_lexical_tie_break() -> None:
     chosen = mod._best_exact_quota([second, first], 1)
     assert chosen == [first]
     assert mod.quota_targets(1) == (3, 3, 1)
+
+
+def test_coverage_objective_is_not_quantized_before_tie_break() -> None:
+    mod = _load_module()
+    specs = (
+        (("3", "0", "0", "0", "0", "0", "1"), (1, 5, 1), 0.0010000162373924146),
+        (("3", "3", "3", "0", "0", "0", "0"), (3, 4, 0), 0.0010000142182863276),
+        (("3", "3", "3", "0", "1", "1", "1"), (3, 1, 3), 0.0010000054914622216),
+        (("3", "3", "3", "3", "3", "1", "1"), (5, 0, 2), 0.0010000022674936273),
+        (("3", "3", "3", "3", "0", "0", "0"), (4, 3, 0), 0.0010000002607210028),
+    )
+    pool = [
+        mod.Candidate(
+            sequence,
+            tuple(mod.CODE_ORDER.index(code) for code in sequence),
+            counts,
+            coverage,
+            1.0,
+            1.3,
+        )
+        for sequence, counts, coverage in specs
+    ]
+    chosen = mod._best_exact_quota(pool, 2)
+    assert chosen == [pool[1], pool[2]]
+    assert math.fsum(item.coverage for item in chosen) == pytest.approx(
+        0.0020000197097485494,
+        abs=1e-18,
+    )
 
 
 def test_non_uniform_full_universe_k256_is_stable(
