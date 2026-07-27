@@ -5,8 +5,11 @@ import importlib.util
 import json
 import sqlite3
 import sys
+from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -62,8 +65,78 @@ def test_bundle_candidate_uses_small_combo_cost_and_single_winning_ticket() -> N
 
     assert candidate.cost_units == 2
     assert candidate.realized_hit is True
-    assert candidate.payout_units == 28.0
-    assert candidate.profit_units == 26.0
+    assert mod.product(item.q_sum for item in metrics) > candidate.cost_units
+    assert candidate.expected_payout_units == 1.330875
+    assert candidate.expected_profit_units == -0.669125
+    assert candidate.payout_units == 18.2
+    assert candidate.profit_units == 16.2
+    assert mod.select_bundles(
+        [candidate],
+        budget_units=2,
+        max_overlap=1,
+        positive_ev_only=True,
+    ) == []
+
+
+def test_realized_payout_applies_return_factor_before_integer_multiplier() -> None:
+    mod = _load_module()
+    legs = [
+        _leg(mod, 1, ("3",), "3", 2.0),
+        _leg(mod, 2, ("0",), "0", 4.0),
+        _leg(mod, 3, ("1",), "1", 3.5),
+    ]
+    metrics = [mod.leg_metrics(leg, "shadow") for leg in legs]
+    assert all(metrics)
+
+    candidate = mod.make_bundle_candidate(
+        metrics=metrics,
+        indices=(0, 1, 2),
+        segment_idx=1,
+        bundle_idx=1,
+        arm="shadow",
+        n_value=3,
+    )
+    row = mod.candidate_to_row(
+        mod.StakedBundle(candidate=candidate, stake_multiplier=3),
+        stake_yuan_per_ticket=2,
+    )
+
+    assert candidate.payout_units == 18.2
+    assert row["scaled_payout_units"] == 54.6
+    assert row["scaled_payout_yuan"] == 109.2
+    assert row["scaled_profit_yuan"] == 103.2
+
+
+def test_truly_positive_net_ev_remains_selectable_after_payout_factor() -> None:
+    mod = _load_module()
+    legs = [
+        replace(
+            _leg(mod, idx, ("3",), "3", 2.0),
+            probabilities={"3": 0.8, "1": 0.1, "0": 0.1},
+        )
+        for idx in range(1, 4)
+    ]
+    metrics = [mod.leg_metrics(leg, "shadow") for leg in legs]
+    assert all(metrics)
+
+    candidate = mod.make_bundle_candidate(
+        metrics=metrics,
+        indices=(0, 1, 2),
+        segment_idx=1,
+        bundle_idx=1,
+        arm="shadow",
+        n_value=3,
+    )
+
+    assert candidate.cost_units == 1
+    assert candidate.expected_payout_units == 2.6624
+    assert candidate.expected_profit_units == pytest.approx(1.6624)
+    assert mod.select_bundles(
+        [candidate],
+        budget_units=1,
+        max_overlap=1,
+        positive_ev_only=True,
+    ) == [candidate]
 
 
 def test_settle_segment_selects_bundles_under_budget() -> None:
@@ -233,6 +306,20 @@ def test_run_writes_outputs(tmp_path: Path) -> None:
     assert summary_payload["artifact_planning_scope"] == "by_segment"
     assert summary_payload["selection_binding"]["match_selection_source"] == "issue_board_same_decision_variant"
     assert summary_payload["sp_drift_risk"]["accepted"] is False
+    assert summary_payload["payout_economics"] == {
+        "payout_factor": "0.65",
+        "expected_formula": "payout_factor * product(q_sum)",
+        "realized_formula": (
+            "stake_yuan_per_ticket * integer_multiplier * "
+            "product(official_winning_sp) * payout_factor"
+        ),
+        "arithmetic": "decimal_before_serialization",
+        "serialization_decimal_places": 6,
+        "rounding_policy": (
+            "pre_round_decimal_value_serialized_to_6_decimal_places;"
+            "no_paid_cent_rounding_applied"
+        ),
+    }
     assert summary_payload["settings"]["stake_mode"] == "scale_to_budget"
     assert summary_payload["seed_aggregate"]["summary_mode"] == "single_seed"
     assert any(item["key"] == "segment_budget_yuan" for item in summary_payload["parameter_schema"])
