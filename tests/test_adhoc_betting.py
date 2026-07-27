@@ -148,6 +148,11 @@ def _source_snapshot(
                     "3": now.isoformat(), "1": now.isoformat(), "0": now.isoformat(),
                 },
                 "market_snapshot_sha256": "b" * 64,
+                "market_batch_id": "c" * 64,
+                "market_receipt_path": (
+                    f"/tmp/adhoc-input/26078/{'c' * 64}.json"
+                ),
+                "market_receipt_sha256": "d" * 64,
                 "market_sale_status": "OPEN",
                 "market_parlay_allowed": True,
                 "market_sale_cutoff_hkt": (now + timedelta(hours=3 + match_idx)).isoformat(),
@@ -170,6 +175,11 @@ def _source_snapshot(
             "snapshot_clock_hkt": now.isoformat(),
             "request_clock_hkt": now.isoformat(),
             "input_asof_policy": "oldest_required_observation_clock",
+            "authoritative_market_batch_id": "c" * 64,
+            "authoritative_market_receipt_path": (
+                f"/tmp/adhoc-input/26078/{'c' * 64}.json"
+            ),
+            "authoritative_market_receipt_sha256": "d" * 64,
             "formal_decision_input": {
                 "status": "VERIFIED_FORMAL_INPUT",
                 "decision_variant_id": "active_v3.3.3",
@@ -209,6 +219,57 @@ def _create(store: AdhocBettingStore, source: dict[str, object], *, key: str = "
         source_snapshot=source,
         now=NOW,
     )
+
+
+def test_package_verifier_rejects_mixed_market_batch_ids(
+    tmp_path: Path,
+) -> None:
+    source = _source_snapshot()
+    matches = source["matches"]
+    assert isinstance(matches, list)
+    provenance = matches[1]["source_provenance"]
+    assert isinstance(provenance, dict)
+    provenance["market_batch_id"] = "e" * 64
+
+    with pytest.raises(
+        AdhocBettingError,
+        match="mixes multiple market batch IDs",
+    ):
+        _create(
+            _store(tmp_path),
+            source,
+            key="mixed-market-batch-package",
+        )
+
+
+@pytest.mark.parametrize("invalid_batch_id", ["", "not-a-sha256", None])
+def test_package_verifier_rejects_invalid_batch_binding_with_tampered_sp(
+    tmp_path: Path,
+    invalid_batch_id: str | None,
+) -> None:
+    source = _source_snapshot()
+    matches = source["matches"]
+    assert isinstance(matches, list)
+    provenance = matches[1]["source_provenance"]
+    assert isinstance(provenance, dict)
+    if invalid_batch_id is None:
+        provenance.pop("market_batch_id")
+    else:
+        provenance["market_batch_id"] = invalid_batch_id
+    matches[1]["sp"] = {"3": 99.0, "1": 99.0, "0": 99.0}
+
+    with pytest.raises(
+        AdhocBettingError,
+        match=(
+            "lacks one authoritative published market batch"
+            "|mixes multiple market batch IDs"
+        ),
+    ):
+        _create(
+            _store(tmp_path),
+            source,
+            key="missing-market-batch-binding",
+        )
 
 
 def _rehash_package(package: Path) -> Path:

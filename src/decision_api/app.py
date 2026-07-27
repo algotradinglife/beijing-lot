@@ -36,6 +36,14 @@ from src.adhoc_betting import (
     DEFAULT_ADHOC_ROOT,
     DEFAULT_FONT_FILE,
 )
+from src.adhoc_input_freshness import (
+    DEFAULT_RECEIPT_ROOT as ADHOC_INPUT_RECEIPT_ROOT,
+    AdhocInputFreshnessError,
+    normalized_match_rows_sha256,
+    resolve_kickoff_hkt,
+    verify_same_cycle_evidence,
+    verify_same_cycle_receipt,
+)
 from src.decision_artifact_completeness import active_snapshot_completeness, completeness_for_indices
 from src.natural_day_manifest import (
     NaturalDayManifestError,
@@ -3670,29 +3678,12 @@ def _adhoc_kickoff_hkt(
     schedule_date: str,
     kickoff_time: str,
 ) -> datetime | None:
-    """Resolve the Nowscore kickoff clock without borrowing scheduled state."""
+    """Resolve kickoff with the official sale cutoff as the date authority."""
 
-    direct = _parse_timestamp_to_hk(kickoff_time)
-    if direct is not None:
-        return direct
-    if schedule_date and kickoff_time:
-        direct = _parse_timestamp_to_hk(f"{schedule_date} {kickoff_time}")
-        if direct is not None:
-            return direct
-    cutoff = _parse_timestamp_to_hk(sale_cutoff)
-    match = re.fullmatch(r"\s*(\d{1,2}):(\d{2})(?::\d{2})?\s*", str(kickoff_time or ""))
-    if cutoff is None or match is None:
-        return None
-    hour, minute = (int(part) for part in match.groups())
-    candidates = [
-        (cutoff + timedelta(days=offset)).replace(
-            hour=hour, minute=minute, second=0, microsecond=0
-        )
-        for offset in (-1, 0, 1)
-    ]
-    return min(
-        (value for value in candidates if cutoff <= value <= cutoff + timedelta(hours=12)),
-        default=None,
+    return resolve_kickoff_hkt(
+        sale_cutoff=sale_cutoff,
+        schedule_date=schedule_date,
+        kickoff_time=kickoff_time,
     )
 
 
@@ -3782,68 +3773,6 @@ def _adhoc_formal_structured_input(
     }
 
 
-def _adhoc_latest_live_sp(
-    conn: sqlite3.Connection,
-    issue: str,
-    *,
-    request_clock: datetime,
-) -> dict[int, dict[str, Any]]:
-    """Select the latest complete 500 live-SP vector that existed at request time.
-
-    Do not let a row with a later source/fetch clock stand in for the request
-    snapshot.  The selected record retains both clocks so the immutable package
-    can prove which 500 observation it used.
-    """
-
-    if not _table_exists(conn, "live_sp_snapshots"):
-        return {}
-    rows = conn.execute(
-        """
-        SELECT row_idx, sp_home, sp_draw, sp_away, fetched_at, source_updatetime
-        FROM live_sp_snapshots
-        WHERE issue=? AND playid=34
-        """,
-        (issue,),
-    ).fetchall()
-    selected: dict[int, dict[str, Any]] = {}
-    for record in rows:
-        row = dict(record)
-        idx = _safe_int(row.get("row_idx"))
-        if idx is None:
-            continue
-        if any(
-            (_safe_float(row.get(column)) or 0.0) <= 0.0
-            for column in ("sp_home", "sp_draw", "sp_away")
-        ):
-            continue
-        source_clock = _parse_timestamp_to_hk(str(row.get("source_updatetime") or ""))
-        fetched_clock = _parse_timestamp_to_hk(str(row.get("fetched_at") or ""))
-        if (
-            source_clock is None
-            or fetched_clock is None
-            or source_clock > request_clock
-            or fetched_clock > request_clock
-        ):
-            continue
-        candidate_clock = max(source_clock, fetched_clock)
-        current = selected.get(idx)
-        current_clock = current.get("_selection_clock") if current else None
-        if current_clock is not None and candidate_clock <= current_clock:
-            continue
-        selected[idx] = {
-            **row,
-            "source_updatetime_hkt": _adhoc_hk_iso(source_clock),
-            "fetched_at_hkt": _adhoc_hk_iso(fetched_clock),
-            "raw_snapshot_sha256": hashlib.sha256(
-                _json_dumps(row).encode("utf-8")
-            ).hexdigest(),
-            "_selection_clock": candidate_clock,
-        }
-    for row in selected.values():
-        row.pop("_selection_clock", None)
-    return selected
-
-
 def _adhoc_market_metadata(
     conn: sqlite3.Connection,
     issue: str,
@@ -3874,7 +3803,7 @@ def _adhoc_market_metadata(
     rows = conn.execute(
         f"""
         SELECT
-            row_idx, outcome_code, sp,
+            issue, playid, row_idx, outcome_code, sp,
             {column('parlay_allowed')},
             {column('sale_status')},
             {column('sale_cutoff_hkt')},
@@ -3882,38 +3811,74 @@ def _adhoc_market_metadata(
             {column('source_updated_at_hkt')},
             {column('fetched_at')},
             {column('source_updatetime')},
-            {column('batch_id')}
+            {column('batch_id')},
+            {column('capture_classification')},
+            {column('eligibility_evidence_json')},
+            {column('eligibility_reasons_json')},
+            {column('publication_status')},
+            {column('eligibility_receipt_path')},
+            {column('eligibility_receipt_sha256')}
         FROM live_market_sp_snapshots
         WHERE issue=? AND playid=34
         """,
         (issue,),
     ).fetchall()
+    materialized = [dict(record) for record in rows]
+    batch_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    batch_clocks: dict[str, datetime] = {}
+    for row in materialized:
+        key = str(row.get("batch_id") or "")
+        if not key:
+            continue
+        if str(row.get("publication_status") or "").upper() != "PUBLISHED":
+            continue
+        batch_rows[key].append(row)
+        fetched_utc = str(row.get("fetched_at_utc") or row.get("fetched_at") or "")
+        fetched_clock = _parse_timestamp_to_hk(
+            fetched_utc,
+            naive_tz=timezone.utc,
+        )
+        if fetched_clock is None or fetched_clock > request_clock:
+            continue
+        previous = batch_clocks.get(key)
+        if previous is None or fetched_clock > previous:
+            batch_clocks[key] = fetched_clock
+    selected_batch_id = (
+        max(batch_clocks, key=lambda key: (batch_clocks[key], key))
+        if batch_clocks
+        else ""
+    )
+
     grouped: dict[tuple[int, str], list[dict[str, Any]]] = defaultdict(list)
-    for record in rows:
-        row = dict(record)
+    for row in materialized:
         idx = _safe_int(row.get("row_idx"))
         if idx is None:
             continue
-        key = str(
-            row.get("batch_id")
-            or row.get("fetched_at_utc")
-            or row.get("fetched_at")
-            or row.get("source_updated_at_hkt")
-            or row.get("source_updatetime")
-            or ""
-        )
+        key = str(row.get("batch_id") or "")
         if not key:
+            grouped[(idx, "__missing_batch_id__")].append(row)
+            continue
+        if key != selected_batch_id:
             continue
         grouped[(idx, key)].append(row)
 
     selected: dict[int, dict[str, Any]] = {}
-    for (idx, _key), group in grouped.items():
+    diagnostics: dict[int, set[str]] = defaultdict(set)
+    for (idx, key), group in grouped.items():
+        reasons: list[str] = []
+        if key == "__missing_batch_id__":
+            reasons.append("MARKET_BATCH_ID_MISSING")
         if len(group) != len(OUTCOME_ORDER):
-            continue
+            reasons.append("LIVE_SP_VECTOR_INCOMPLETE")
         by_code = {str(row.get("outcome_code") or ""): row for row in group}
         if set(by_code) != set(OUTCOME_ORDER):
-            continue
-        if any((_safe_float(by_code[code].get("sp")) or 0.0) <= 0 for code in OUTCOME_ORDER):
+            reasons.append("LIVE_SP_VECTOR_INCOMPLETE")
+        if set(by_code) == set(OUTCOME_ORDER) and any(
+            (_safe_float(by_code[code].get("sp")) or 0.0) <= 0 for code in OUTCOME_ORDER
+        ):
+            reasons.append("LIVE_SP_VECTOR_INVALID")
+        if reasons:
+            diagnostics[idx].update(reasons)
             continue
         sale_values = {
             str(by_code[code].get("sale_status") or "").upper()
@@ -3923,7 +3888,99 @@ def _adhoc_market_metadata(
             _adhoc_bool(by_code[code].get("parlay_allowed"))
             for code in OUTCOME_ORDER
         }
-        if len(sale_values) != 1 or len(pass_values) != 1:
+        if len(sale_values) != 1:
+            reasons.append("MARKET_SALE_STATUS_INCONSISTENT")
+        if len(pass_values) != 1:
+            reasons.append("MARKET_PARLAY_STATUS_INCONSISTENT")
+        classifications = {
+            str(by_code[code].get("capture_classification") or "")
+            for code in OUTCOME_ORDER
+        }
+        evidence_values = {
+            str(by_code[code].get("eligibility_evidence_json") or "")
+            for code in OUTCOME_ORDER
+        }
+        publication_values = {
+            str(by_code[code].get("publication_status") or "").upper()
+            for code in OUTCOME_ORDER
+        }
+        receipt_paths = {
+            str(by_code[code].get("eligibility_receipt_path") or "")
+            for code in OUTCOME_ORDER
+        }
+        receipt_hashes = {
+            str(by_code[code].get("eligibility_receipt_sha256") or "")
+            for code in OUTCOME_ORDER
+        }
+        if (
+            len(classifications) != 1
+            or len(evidence_values) != 1
+            or publication_values != {"PUBLISHED"}
+            or len(receipt_paths) != 1
+            or len(receipt_hashes) != 1
+        ):
+            reasons.append("SAME_CYCLE_EVIDENCE_INCONSISTENT")
+        evidence: dict[str, Any] = {}
+        if not reasons:
+            try:
+                evidence = verify_same_cycle_evidence(
+                    batch_id=key,
+                    capture_classification=next(iter(classifications)),
+                    evidence_json=next(iter(evidence_values)),
+                    normalized_rows=batch_rows[key],
+                    expected_issue=issue,
+                )
+            except AdhocInputFreshnessError:
+                reasons.append("SAME_CYCLE_EVIDENCE_INVALID")
+        if evidence and not reasons:
+            try:
+                receipt_path = Path(next(iter(receipt_paths))).resolve()
+                expected_receipt_path = (
+                    ADHOC_INPUT_RECEIPT_ROOT / issue / f"{key}.json"
+                ).resolve()
+                if receipt_path != expected_receipt_path:
+                    raise AdhocInputFreshnessError(
+                        "same-cycle receipt path mismatch"
+                    )
+                verify_same_cycle_receipt(
+                    path=receipt_path,
+                    batch_id=key,
+                    evidence=evidence,
+                    expected_file_sha256=next(iter(receipt_hashes)),
+                )
+            except AdhocInputFreshnessError:
+                reasons.append("SAME_CYCLE_RECEIPT_INVALID")
+        bound_reasons: set[str] = set()
+        for code in OUTCOME_ORDER:
+            try:
+                parsed_reasons = json.loads(
+                    str(by_code[code].get("eligibility_reasons_json") or "[]")
+                )
+            except json.JSONDecodeError:
+                reasons.append("SAME_CYCLE_REASONS_INVALID")
+                continue
+            if not isinstance(parsed_reasons, list):
+                reasons.append("SAME_CYCLE_REASONS_INVALID")
+                continue
+            bound_reasons.update(str(reason) for reason in parsed_reasons)
+        reasons.extend(bound_reasons)
+        if reasons:
+            selected[idx] = {
+                "usable": False,
+                "reasons": sorted(set(reasons)),
+                "batch_id": key,
+                "same_cycle_evidence": evidence,
+                "eligibility_receipt_path": (
+                    next(iter(receipt_paths))
+                    if len(receipt_paths) == 1
+                    else ""
+                ),
+                "eligibility_receipt_sha256": (
+                    next(iter(receipt_hashes))
+                    if len(receipt_hashes) == 1
+                    else ""
+                ),
+            }
             continue
         source_clocks: dict[str, datetime] = {}
         fetched_clocks: dict[str, datetime] = {}
@@ -3934,8 +3991,14 @@ def _adhoc_market_metadata(
             source_clock = _parse_timestamp_to_hk(
                 str(row.get("source_updated_at_hkt") or row.get("source_updatetime") or "")
             )
-            fetched_clock = _parse_timestamp_to_hk(
-                str(row.get("fetched_at_utc") or row.get("fetched_at") or "")
+            fetched_utc = str(row.get("fetched_at_utc") or "")
+            fetched_clock = (
+                _parse_timestamp_to_hk(fetched_utc, naive_tz=timezone.utc)
+                if fetched_utc
+                else _parse_timestamp_to_hk(
+                    str(row.get("fetched_at") or ""),
+                    naive_tz=timezone.utc,
+                )
             )
             cutoff_clock = _parse_timestamp_to_hk(str(row.get("sale_cutoff_hkt") or ""))
             if (
@@ -3950,7 +4013,11 @@ def _adhoc_market_metadata(
             source_clocks[code] = source_clock
             fetched_clocks[code] = fetched_clock
             cutoff_clocks[code] = cutoff_clock
-        if incomplete or len(set(cutoff_clocks.values())) != 1:
+        if incomplete:
+            diagnostics[idx].add("MARKET_SOURCE_CLOCK_UNVERIFIED")
+            continue
+        if len(set(cutoff_clocks.values())) != 1:
+            diagnostics[idx].add("MARKET_SALE_CUTOFF_INCONSISTENT")
             continue
         clock = max([*source_clocks.values(), *fetched_clocks.values()])
         current = selected.get(idx)
@@ -3958,6 +4025,12 @@ def _adhoc_market_metadata(
         if current_clock is not None and clock is not None and clock <= current_clock:
             continue
         selected[idx] = {
+            "usable": True,
+            "reasons": [],
+            "batch_id": key,
+            "same_cycle_evidence": evidence,
+            "eligibility_receipt_path": next(iter(receipt_paths)),
+            "eligibility_receipt_sha256": next(iter(receipt_hashes)),
             "sp": {code: float(_safe_float(by_code[code].get("sp")) or 0.0) for code in OUTCOME_ORDER},
             "parlay_allowed": next(iter(pass_values)),
             "sale_status": next(iter(sale_values)),
@@ -3976,6 +4049,24 @@ def _adhoc_market_metadata(
             ).hexdigest(),
             "_selection_clock": clock,
         }
+    for idx, reasons in diagnostics.items():
+        if idx not in selected:
+            selected[idx] = {
+                "usable": False,
+                "reasons": sorted(reasons),
+                "batch_id": selected_batch_id,
+            }
+    selected_batch_ids = {
+        str(row.get("batch_id") or "")
+        for row in selected.values()
+        if bool(row.get("usable"))
+    }
+    if len(selected_batch_ids) > 1:
+        for idx in list(selected):
+            selected[idx] = {
+                "usable": False,
+                "reasons": ["SAME_CYCLE_BATCH_INCONSISTENT"],
+            }
     for row in selected.values():
         row.pop("_selection_clock", None)
     return selected
@@ -3998,6 +4089,7 @@ def _adhoc_nowscore_rows(conn: sqlite3.Connection, issue: str) -> dict[int, dict
         SELECT match_idx,
                {column('fetched_at')}, {column('schedule_date')}, {column('kickoff_time')},
                {column('status')}, {column('status_text')}, {column('can_sale')},
+               {column('league')}, {column('home')}, {column('away')},
                {column('score')}, {column('result_code')}
         FROM nowscore_bjdc_matches
         WHERE issue=?
@@ -4028,16 +4120,68 @@ def _build_adhoc_source_snapshot(
         expected_indices=expected,
         request_clock=request_clock,
     )
-    live_sp = _adhoc_latest_live_sp(conn, resolved, request_clock=request_clock)
     market = _adhoc_market_metadata(conn, resolved, request_clock=request_clock)
     nowscore = _adhoc_nowscore_rows(conn, resolved)
     normalized_rows: list[dict[str, Any]] = []
     all_source_clocks: list[datetime] = []
+    global_market_reasons: list[str] = []
+    batch_members = {
+        idx: row
+        for idx, row in market.items()
+        if str(row.get("batch_id") or "")
+    }
+    market_batch_ids = {
+        str(row.get("batch_id") or "") for row in batch_members.values()
+    }
+    authoritative_evidence: dict[str, Any] = {}
+    if len(market_batch_ids) != 1:
+        global_market_reasons.append("SAME_CYCLE_BATCH_INCONSISTENT")
+    elif batch_members:
+        authoritative_evidence = dict(
+            next(
+                (
+                    row
+                    for row in batch_members.values()
+                    if isinstance(row.get("same_cycle_evidence"), dict)
+                    and row.get("same_cycle_evidence")
+                ),
+                {},
+            ).get("same_cycle_evidence")
+            or {}
+        )
+        try:
+            evidence_membership = {
+                int(value)
+                for value in authoritative_evidence.get(
+                    "denominator_match_indices", []
+                )
+            }
+        except (TypeError, ValueError):
+            evidence_membership = set()
+        if evidence_membership != expected or set(batch_members) != expected:
+            global_market_reasons.append(
+                "SAME_CYCLE_DENOMINATOR_MEMBERSHIP_MISMATCH"
+            )
+        try:
+            observed_match_rows_sha256 = normalized_match_rows_sha256(
+                [dict(row) for row in match_rows],
+                list(nowscore.values()),
+            )
+        except AdhocInputFreshnessError:
+            observed_match_rows_sha256 = ""
+        if observed_match_rows_sha256 != str(
+            authoritative_evidence.get(
+                "normalized_match_rows_sha256"
+            )
+            or ""
+        ):
+            global_market_reasons.append(
+                "SAME_CYCLE_MATCH_ROWS_MISMATCH"
+            )
 
     for row in match_rows:
         idx = int(row["match_idx"])
         structured = decision_rows.get(idx, {})
-        live = live_sp.get(idx, {})
         market_row = market.get(idx, {})
         nowscore_row = nowscore.get(idx, {})
         cutoff_text = str(row["end_time"] or "")
@@ -4048,12 +4192,15 @@ def _build_adhoc_source_snapshot(
             kickoff_time=str(nowscore_row.get("kickoff_time") or ""),
         )
         decision_reasons: list[str] = []
+        decision_reasons.extend(global_market_reasons)
         if not structured:
             decision_reasons.append("FORMAL_ACTIVE_V3_3_3_INPUT_UNAVAILABLE")
-        if not live:
-            decision_reasons.append("LIVE_SP_VECTOR_UNAVAILABLE")
         if not market_row:
             decision_reasons.append("LIVE_MARKET_SNAPSHOT_UNAVAILABLE")
+        elif not bool(market_row.get("usable")):
+            decision_reasons.extend(
+                str(reason) for reason in market_row.get("reasons", []) if str(reason)
+            )
         if not cutoff_text or cutoff is None:
             decision_reasons.append("SALE_CUTOFF_UNVERIFIED")
         market_cutoff = _parse_timestamp_to_hk(str(market_row.get("sale_cutoff_hkt") or ""))
@@ -4062,10 +4209,11 @@ def _build_adhoc_source_snapshot(
         elif market_cutoff is not None and cutoff is not None and market_cutoff != cutoff:
             decision_reasons.append("SALE_CUTOFF_METADATA_MISMATCH")
 
-        match_clock = _parse_timestamp_to_hk(str(row["html_fetched_at"] or ""))
+        match_clock = _parse_timestamp_to_hk(
+            str(row["html_fetched_at"] or ""),
+            naive_tz=timezone.utc,
+        )
         nowscore_clock = _parse_timestamp_to_hk(str(nowscore_row.get("fetched_at") or ""))
-        live_source_clock = _parse_timestamp_to_hk(str(live.get("source_updatetime_hkt") or ""))
-        live_fetch_clock = _parse_timestamp_to_hk(str(live.get("fetched_at_hkt") or ""))
         market_source_clock = (
             market_row.get("source_observed_at")
             if isinstance(market_row.get("source_observed_at"), datetime)
@@ -4081,12 +4229,31 @@ def _build_adhoc_source_snapshot(
             if isinstance(market_row.get("latest_observed_at"), datetime)
             else None
         )
+        evidence_clocks = (
+            (market_row.get("same_cycle_evidence") or {}).get("source_clocks_utc")
+            if isinstance(market_row.get("same_cycle_evidence"), dict)
+            else {}
+        )
+        if isinstance(evidence_clocks, dict) and evidence_clocks:
+            expected_match_clock = _parse_timestamp_to_hk(
+                str(evidence_clocks.get("issue_html") or "")
+            )
+            expected_nowscore_clock = _parse_timestamp_to_hk(
+                str(evidence_clocks.get("nowscore_html") or "")
+            )
+            expected_market_fetch_clock = _parse_timestamp_to_hk(
+                str(evidence_clocks.get("live_sp_xml") or "")
+            )
+            if match_clock != expected_match_clock:
+                decision_reasons.append("SAME_CYCLE_MATCH_CLOCK_MISMATCH")
+            if nowscore_clock != expected_nowscore_clock:
+                decision_reasons.append("SAME_CYCLE_NOWSCORE_CLOCK_MISMATCH")
+            if market_fetch_clock != expected_market_fetch_clock:
+                decision_reasons.append("SAME_CYCLE_SP_CLOCK_MISMATCH")
         required_clocks = [
             _parse_timestamp_to_hk(str(decision_metadata.get("generated_at_hkt") or "")),
             match_clock,
             nowscore_clock,
-            live_source_clock,
-            live_fetch_clock,
             market_source_clock,
             market_fetch_clock,
             market_latest_clock,
@@ -4099,15 +4266,11 @@ def _build_adhoc_source_snapshot(
         if source_observed is not None:
             all_source_clocks.append(source_observed)
 
-        disabled = str(row["disabled"] or "").strip().lower()
-        disabled_sale = True if disabled == "no" else False if disabled else None
-        nowscore_sale = _adhoc_bool(nowscore_row.get("can_sale"))
         market_sale_text = str(market_row.get("sale_status") or "").upper()
         market_sale = True if market_sale_text in {"OPEN", "ON_SALE", "OPEN_PREGAME"} else False if market_sale_text in {"CLOSED", "OFF_SALE"} else None
-        sale_signals = [disabled_sale, nowscore_sale, market_sale]
-        if False in sale_signals:
+        if market_sale is False:
             sale_status = "CLOSED"
-        elif all(signal is True for signal in sale_signals):
+        elif market_sale is True:
             sale_status = "OPEN"
         else:
             sale_status = "UNKNOWN"
@@ -4121,10 +4284,16 @@ def _build_adhoc_source_snapshot(
             for code in OUTCOME_ORDER
         }
         sp = {
-            "3": _safe_float(live.get("sp_home")),
-            "1": _safe_float(live.get("sp_draw")),
-            "0": _safe_float(live.get("sp_away")),
+            code: _safe_float((market_row.get("sp") or {}).get(code))
+            for code in OUTCOME_ORDER
         }
+        market_snapshot_hash = str(market_row.get("raw_snapshot_hash") or "")
+        same_cycle_evidence = dict(market_row.get("same_cycle_evidence") or {})
+        same_cycle_evidence_hash = (
+            hashlib.sha256(_json_dumps(same_cycle_evidence).encode("utf-8")).hexdigest()
+            if same_cycle_evidence
+            else ""
+        )
         status = "READY" if not decision_reasons else "UNVERIFIED"
         normalized_rows.append(
             {
@@ -4151,15 +4320,23 @@ def _build_adhoc_source_snapshot(
                     "match_html_fetched_at_hkt": _adhoc_hk_iso(match_clock) if match_clock else "",
                     "nowscore_fetched_at_hkt": _adhoc_hk_iso(nowscore_clock) if nowscore_clock else "",
                     "formal_decision_generated_at_hkt": str(decision_metadata.get("generated_at_hkt") or ""),
-                    "live_sp_source_updated_at_hkt": _adhoc_hk_iso(live_source_clock) if live_source_clock else "",
-                    "live_sp_fetched_at_hkt": _adhoc_hk_iso(live_fetch_clock) if live_fetch_clock else "",
-                    "live_sp_snapshot_sha256": str(live.get("raw_snapshot_sha256") or ""),
+                    "live_sp_source_updated_at_hkt": _adhoc_hk_iso(market_source_clock) if market_source_clock else "",
+                    "live_sp_fetched_at_hkt": _adhoc_hk_iso(market_fetch_clock) if market_fetch_clock else "",
+                    "live_sp_snapshot_sha256": market_snapshot_hash,
                     "market_source_observed_at_hkt": _adhoc_hk_iso(market_source_clock) if market_source_clock else "",
                     "market_fetched_at_hkt": _adhoc_hk_iso(market_fetch_clock) if market_fetch_clock else "",
                     "market_latest_observed_at_hkt": _adhoc_hk_iso(market_latest_clock) if market_latest_clock else "",
                     "market_outcome_source_clocks_hkt": dict(market_row.get("outcome_source_clocks_hkt") or {}),
                     "market_outcome_fetched_clocks_hkt": dict(market_row.get("outcome_fetched_clocks_hkt") or {}),
-                    "market_snapshot_sha256": str(market_row.get("raw_snapshot_hash") or ""),
+                    "market_snapshot_sha256": market_snapshot_hash,
+                    "market_batch_id": str(market_row.get("batch_id") or ""),
+                    "market_receipt_path": str(
+                        market_row.get("eligibility_receipt_path") or ""
+                    ),
+                    "market_receipt_sha256": str(
+                        market_row.get("eligibility_receipt_sha256") or ""
+                    ),
+                    "same_cycle_evidence_sha256": same_cycle_evidence_hash,
                     "market_sale_status": market_sale_text or "UNKNOWN",
                     "market_parlay_allowed": pass_allowed,
                     "market_sale_cutoff_hkt": _adhoc_hk_iso(market_cutoff) if market_cutoff else "",
@@ -4173,18 +4350,44 @@ def _build_adhoc_source_snapshot(
         "input_asof_hkt": _adhoc_hk_iso(input_asof),
         "decision_variant_id": FORMAL_DECISION_VARIANT_ID,
         "source_metadata": {
-            "schema_version": "adhoc_request_time_source_snapshot_v1",
-            "source_builder": "decision_api._build_adhoc_source_snapshot_v1",
+            "schema_version": "adhoc_request_time_source_snapshot_v2",
+            "source_builder": "decision_api._build_adhoc_source_snapshot_v2",
             "request_clock_hkt": _adhoc_hk_iso(request_clock),
             "input_asof_policy": "oldest_required_observation_clock",
             "complete_denominator_match_count": len(normalized_rows),
             "formal_decision_input": decision_metadata,
+            "authoritative_market_batch_id": (
+                next(iter(market_batch_ids))
+                if len(market_batch_ids) == 1
+                else ""
+            ),
+            "authoritative_market_receipt_path": (
+                str(
+                    next(iter(batch_members.values())).get(
+                        "eligibility_receipt_path"
+                    )
+                    or ""
+                )
+                if batch_members
+                else ""
+            ),
+            "authoritative_market_receipt_sha256": (
+                str(
+                    next(iter(batch_members.values())).get(
+                        "eligibility_receipt_sha256"
+                    )
+                    or ""
+                )
+                if batch_members
+                else ""
+            ),
             "sale_metadata_contract": {
                 "requires": [
+                    "content_addressed_same_cycle_batch",
                     "500_disabled_no",
                     "nowscore_can_sale_true",
-                    "complete_live_market_sale_open",
-                    "complete_live_market_parlay_allowed",
+                    "complete_playid34_sp_vector",
+                    "official_free_parlay_evidence",
                 ],
                 "fallback": "fail_closed_unknown",
             },

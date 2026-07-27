@@ -34,6 +34,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from src.sqlite_runtime import connect_sqlite  # noqa: E402
+from src.adhoc_input_freshness import explicit_utc  # noqa: E402
 from src.multimarket_p0 import (  # noqa: E402
     DEFAULT_CAPTURE_ROOT,
     TARGET_PLAYIDS as P0_TARGET_PLAYIDS,
@@ -155,7 +156,7 @@ class FetchResult:
 
 
 def now_utc() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def clean_text(raw: str | None) -> str:
@@ -768,7 +769,7 @@ def scrape_live_sp(conn: sqlite3.Connection, issue: str, args: argparse.Namespac
             raise ValueError("normalized market timestamp disagrees with legacy parser")
         conn.execute("SAVEPOINT scrape_live_sp")
         savepoint_active = True
-        fetched_at_utc = datetime.fromisoformat(fetched_at).replace(tzinfo=timezone.utc).isoformat()
+        fetched_at_utc = explicit_utc(fetched_at)
         for row in market_rows:
             row.update(
                 {
