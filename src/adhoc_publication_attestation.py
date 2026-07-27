@@ -13,12 +13,12 @@ import json
 from pathlib import Path
 from typing import Any
 
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
     Ed25519PublicKey,
 )
-from cryptography.exceptions import InvalidSignature
 
 
 ATTESTATION_SCHEMA_VERSION = "adhoc_publication_attestation_v1"
@@ -42,10 +42,18 @@ def _registry_key(registry_path: Path, key_id: str) -> dict[str, Any]:
         raise PublicationAttestationError("publication key registry is unavailable") from exc
     if registry.get("schema_version") != KEY_REGISTRY_SCHEMA_VERSION:
         raise PublicationAttestationError("publication key registry schema is invalid")
+    environment = str(registry.get("environment") or "")
+    if environment not in {"production", "test"}:
+        raise PublicationAttestationError("publication key registry environment is invalid")
     for item in registry.get("keys", []):
         if isinstance(item, dict) and item.get("key_id") == key_id:
             if item.get("status") != "active":
                 raise PublicationAttestationError("publication key is not active")
+            usage = str(item.get("usage") or "")
+            if usage not in {"production", "test"} or usage != environment:
+                raise PublicationAttestationError(
+                    "publication key usage does not match registry environment"
+                )
             return item
     raise PublicationAttestationError("publication key is unknown or revoked")
 

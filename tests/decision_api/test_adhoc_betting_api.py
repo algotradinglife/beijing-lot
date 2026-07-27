@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import base64
 import csv
 import io
 import json
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 import src.adhoc_betting as adhoc_module
 from src.adhoc_betting import (
@@ -288,12 +292,48 @@ def _app(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(adhoc_module, "PROJECT_ROOT", tmp_path)
     _build_db(db_path)
     _write_structured_input(shadow_dir)
+    private_key = Ed25519PrivateKey.generate()
+    private_path = tmp_path / "test-publication-private.pem"
+    private_path.write_bytes(
+        private_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    public_bytes = private_key.public_key().public_bytes(
+        serialization.Encoding.Raw,
+        serialization.PublicFormat.Raw,
+    )
+    registry = tmp_path / "config" / "adhoc_publication_keys.json"
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text(
+        json.dumps(
+            {
+                "schema_version": "adhoc_publication_key_registry_v1",
+                "environment": "test",
+                "keys": [
+                    {
+                        "key_id": "pytest-api-key",
+                        "status": "active",
+                        "usage": "test",
+                        "public_key_base64": base64.b64encode(public_bytes).decode(
+                            "ascii"
+                        ),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
     monkeypatch.setenv("BEIDAN_DECISION_API_OPERATOR_TOKEN", OPERATOR_TOKEN)
     monkeypatch.setattr(appmod, "_active_strategy_release", lambda: _release(shadow_dir))
     app = appmod.create_app(
         sqlite_db=db_path,
         adhoc_betting_root=tmp_path / "adhoc",
         adhoc_font_file=DEFAULT_FONT_FILE,
+        adhoc_publication_private_key_file=private_path,
+        adhoc_publication_key_id="pytest-api-key",
     )
     app.config["ADHOC_BETTING_NOW"] = lambda: NOW
     return app, db_path, shadow_dir
@@ -423,6 +463,14 @@ def test_adhoc_api_generates_current_plan_and_identical_downloads(tmp_path: Path
     assert len(payload["denominator"]) == 8
     assert all(match["eligible"] is True for match in payload["denominator"])
     package = tmp_path / "adhoc" / "packages" / ISSUE / payload["package_id"]
+    verified = adhoc_module.verify_package(package)
+    assert verified["publication_attested"] is True
+    assert "PRIVATE KEY" not in json.dumps(payload)
+    assert all(
+        b"PRIVATE KEY" not in artifact.read_bytes()
+        for artifact in package.iterdir()
+        if artifact.is_file()
+    )
     decision_input = json.loads(
         (package / "decision_input.json").read_text(encoding="utf-8")
     )
@@ -491,6 +539,37 @@ def test_adhoc_api_generates_current_plan_and_identical_downloads(tmp_path: Path
         (row["ticket_no"], row["match_idx"], row["selection_code"])
         for row in ticket_leg_rows
     ] == expected_legs
+
+
+def test_adhoc_api_without_publication_authority_fails_closed_before_generation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _configured_app, db_path, shadow_dir = _app(tmp_path, monkeypatch)
+    missing_root = tmp_path / "adhoc-without-authority"
+    monkeypatch.setattr(
+        appmod, "_active_strategy_release", lambda: _release(shadow_dir)
+    )
+    app = appmod.create_app(
+        sqlite_db=db_path,
+        adhoc_betting_root=missing_root,
+        adhoc_font_file=DEFAULT_FONT_FILE,
+        adhoc_publication_private_key_file=tmp_path / "missing-private.pem",
+        adhoc_publication_key_id="pytest-api-key",
+    )
+    app.config["ADHOC_BETTING_NOW"] = lambda: NOW
+
+    response = app.test_client().post(
+        "/api/adhoc-betting-plans",
+        json=_request_payload("api-missing-authority"),
+        headers=OPERATOR_HEADERS,
+    )
+
+    assert response.status_code == 503
+    assert response.get_json() == {
+        "error": "PUBLICATION_AUTHORITY_UNAVAILABLE",
+        "status": "FAILED_CLOSED",
+    }
+    assert not (missing_root / "packages").exists()
 
 
 def test_adhoc_api_expiry_disables_operational_download_but_allows_audit(tmp_path: Path, monkeypatch) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import csv
 import json
 import sqlite3
@@ -8,6 +9,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from pypdf import PdfReader
 
 import src.adhoc_betting as adhoc_module
@@ -38,6 +41,40 @@ def _formal_artifact_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> No
     """Keep unit-test formal artifacts outside the repository worktree."""
 
     monkeypatch.setattr(adhoc_module, "PROJECT_ROOT", tmp_path)
+    private_key = Ed25519PrivateKey.generate()
+    private_path = tmp_path / "test-publication-private.pem"
+    private_path.write_bytes(
+        private_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    public_bytes = private_key.public_key().public_bytes(
+        serialization.Encoding.Raw,
+        serialization.PublicFormat.Raw,
+    )
+    registry = tmp_path / "config" / "adhoc_publication_keys.json"
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text(
+        json.dumps(
+            {
+                "schema_version": "adhoc_publication_key_registry_v1",
+                "environment": "test",
+                "keys": [
+                    {
+                        "key_id": "pytest-adhoc-key",
+                        "status": "active",
+                        "usage": "test",
+                        "public_key_base64": base64.b64encode(public_bytes).decode(
+                            "ascii"
+                        ),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def _formal_fixture(*, count: int = 38) -> tuple[Path, Path]:
@@ -154,11 +191,12 @@ def _source_snapshot(
 
 def _store(tmp_path: Path) -> AdhocBettingStore:
     assert DEFAULT_FONT_FILE.is_file(), "the reviewed portable CJK font is required"
-    return AdhocBettingStore._from_canonical_source_resolver(
+    return AdhocBettingStore(
         db_path=tmp_path / "adhoc.sqlite",
         root=tmp_path / "adhoc-packages",
         font_file=DEFAULT_FONT_FILE,
-        canonical_source_resolver=lambda _source, _issue, _clock: None,
+        publication_private_key_file=tmp_path / "test-publication-private.pem",
+        publication_key_id="pytest-adhoc-key",
     )
 
 
@@ -193,6 +231,9 @@ def _rehash_package(package: Path) -> Path:
     manifest["exact_n_plan_sha256"] = json.loads(
         (package / "exact_n_plan.json").read_text(encoding="utf-8")
     )["sha256"]
+    attestation_path = package / "publication_attestation.json"
+    if attestation_path.is_file():
+        manifest["publication_attestation_sha256"] = file_hash(attestation_path)
     for artifact in manifest["artifacts"]:
         artifact["sha256"] = file_hash(package / artifact["file"])
     manifest.pop("sha256", None)
@@ -401,9 +442,13 @@ def test_current_exact_n_package_is_verified_content_addressed_and_separate(tmp_
 
     package = tmp_path / "adhoc-packages" / "packages" / "26078" / str(result["package_id"])
     assert package.is_dir()
-    assert {path.name for path in package.iterdir() if path.is_file()} == REQUIRED_PACKAGE_FILES
+    assert {path.name for path in package.iterdir() if path.is_file()} == {
+        *REQUIRED_PACKAGE_FILES,
+        "publication_attestation.json",
+    }
     verified = verify_package(package)
     assert verified["status"] == "PASS"
+    assert verified["publication_attested"] is True
     assert verified["request_id"] == result["request_id"]
     assert verified["immutable_request_id"] == result["request_id"]
     assert verified["published_package_count"] == 1
@@ -684,7 +729,9 @@ def test_fully_rehashed_wrong_formal_column_is_rejected(tmp_path: Path) -> None:
     plan_path.write_bytes(canonical(plan) + b"\n")
     rehashed = _rehash_package(package)
 
-    with pytest.raises(AdhocBettingError, match="formal shadow_selection_codes"):
+    with pytest.raises(
+        AdhocBettingError, match="publication attestation statement"
+    ):
         verify_package(rehashed)
 
 
@@ -739,8 +786,48 @@ def test_manual_snapshot_with_correct_issue_cannot_publish_operational_v3(
         "authorized_issue": "26078"
     }
 
-    with pytest.raises(AdhocBettingError, match="requires the canonical source resolver"):
-        _create(manual_store, source)
+    result = _create(manual_store, source)
+    assert result["current_status"] == "UNATTESTED_AUDIT_ONLY"
+    assert result["operational_downloads_enabled"] is False
+    package = (
+        tmp_path
+        / "manual-packages"
+        / "packages"
+        / "26078"
+        / str(result["package_id"])
+    )
+    assert verify_package(package)["publication_attested"] is False
+    with pytest.raises(AdhocBettingError, match="operational download disabled"):
+        manual_store.artifact_path(str(result["request_id"]), fmt="pdf", now=NOW)
+
+
+def test_caller_generated_keypair_cannot_publish_against_pinned_registry(
+    tmp_path: Path,
+) -> None:
+    attacker_key = Ed25519PrivateKey.generate()
+    attacker_path = tmp_path / "attacker-private.pem"
+    attacker_path.write_bytes(
+        attacker_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    attacker_store = AdhocBettingStore(
+        db_path=tmp_path / "attacker.sqlite",
+        root=tmp_path / "attacker-packages",
+        font_file=DEFAULT_FONT_FILE,
+        publication_private_key_file=attacker_path,
+        publication_key_id="caller-generated-key",
+    )
+
+    with pytest.raises(AdhocBettingError, match="unknown or revoked"):
+        _create(
+            attacker_store,
+            _source_snapshot(),
+            key="attacker-publication-attempt",
+        )
+    assert not (tmp_path / "attacker-packages" / "packages").exists()
 
 
 def test_public_store_constructor_rejects_authorizer_injection(tmp_path: Path) -> None:
@@ -779,6 +866,14 @@ def test_pre_formal_binding_v2_package_is_audit_only(tmp_path: Path) -> None:
     manifest_path = package / "adhoc_request_manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["schema_version"] = "adhoc_betting_package_v2"
+    manifest.pop("publication_key_id", None)
+    manifest.pop("publication_attestation_sha256", None)
+    manifest["artifacts"] = [
+        artifact
+        for artifact in manifest["artifacts"]
+        if artifact["file"] != "publication_attestation.json"
+    ]
+    (package / "publication_attestation.json").unlink()
     manifest_path.write_bytes(canonical(manifest) + b"\n")
     historical = _rehash_package(package)
     historical_manifest = json.loads(
@@ -840,7 +935,33 @@ def test_rehashed_tampering_is_rejected_by_semantic_verifier(tmp_path: Path) -> 
         encoding="utf-8",
     )
 
-    with pytest.raises(AdhocBettingError, match="portfolio contract does not bind the request"):
+    with pytest.raises(
+        AdhocBettingError, match="publication attestation statement"
+    ):
+        verify_package(rehashed_package)
+
+
+def test_fully_rehashed_altered_publication_signature_is_rejected(
+    tmp_path: Path,
+) -> None:
+    store = _store(tmp_path)
+    result = _create(store, _source_snapshot())
+    package = (
+        tmp_path
+        / "adhoc-packages"
+        / "packages"
+        / "26078"
+        / str(result["package_id"])
+    )
+    attestation_path = package / "publication_attestation.json"
+    attestation = json.loads(attestation_path.read_text(encoding="utf-8"))
+    attestation["signature_base64"] = base64.b64encode(b"x" * 64).decode(
+        "ascii"
+    )
+    attestation_path.write_bytes(canonical(attestation) + b"\n")
+    rehashed_package = _rehash_package(package)
+
+    with pytest.raises(AdhocBettingError, match="signature is invalid"):
         verify_package(rehashed_package)
 
 
@@ -887,7 +1008,7 @@ def test_duplicate_selection_code_cannot_evade_scale_a_rehashed_ticket(
     )
 
     with pytest.raises(
-        AdhocBettingError, match="duplicate selection codes"
+        AdhocBettingError, match="publication attestation statement"
     ):
         verify_package(rehashed_package)
 
@@ -927,7 +1048,7 @@ def test_fully_rehashed_pdf_without_concentration_evidence_is_rejected(
     )
 
     with pytest.raises(
-        AdhocBettingError, match="PDF concentration view"
+        AdhocBettingError, match="publication attestation statement"
     ):
         verify_package(rehashed_package)
 
@@ -954,7 +1075,9 @@ def test_fully_rehashed_pdf_with_wrong_rendered_leg_label_is_rejected(
     )
     rehashed_package = _rehash_package(package)
 
-    with pytest.raises(AdhocBettingError, match="PDF concentration view"):
+    with pytest.raises(
+        AdhocBettingError, match="publication attestation statement"
+    ):
         verify_package(rehashed_package)
 
 
@@ -1063,7 +1186,9 @@ def test_fully_rehashed_third_match_occurrence_is_rejected(tmp_path: Path) -> No
         encoding="utf-8",
     )
 
-    with pytest.raises(AdhocBettingError, match="two-ticket concentration cap"):
+    with pytest.raises(
+        AdhocBettingError, match="publication attestation statement"
+    ):
         verify_package(rehashed_package)
 
 
@@ -1101,7 +1226,9 @@ def test_rehashed_request_clock_disagreement_is_rejected_by_semantic_verifier(tm
         encoding="utf-8",
     )
 
-    with pytest.raises(AdhocBettingError, match="source request clock is not bound"):
+    with pytest.raises(
+        AdhocBettingError, match="publication attestation statement"
+    ):
         verify_package(rehashed_package)
 
 

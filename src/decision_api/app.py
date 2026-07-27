@@ -82,6 +82,10 @@ DEFAULT_ADHOC_BETTING_ROOT = DEFAULT_ADHOC_ROOT
 DEFAULT_DECISION_API_HOST = "127.0.0.1"
 DEFAULT_CACHE_TTL_SEC = 30.0
 OPERATOR_TOKEN_ENV = "BEIDAN_DECISION_API_OPERATOR_TOKEN"
+ADHOC_PUBLICATION_PRIVATE_KEY_FILE_ENV = (
+    "BEIDAN_ADHOC_PUBLICATION_PRIVATE_KEY_FILE"
+)
+ADHOC_PUBLICATION_KEY_ID_ENV = "BEIDAN_ADHOC_PUBLICATION_KEY_ID"
 OPERATOR_TOKEN_HEADER = "X-Beidan-Operator-Token"
 DASHBOARD_GATE_PASSWORD_ENVS = ("BEIDAN_DASHBOARD_GATE_PASS", "BEIDAN_GATE_PASS")
 DASHBOARD_GATE_SECRET_ENVS = ("BEIDAN_DASHBOARD_GATE_SECRET", "BEIDAN_SECRET")
@@ -3408,7 +3412,6 @@ def _gpt_fixed_chain_decision(
     prob_top_prob = _safe_float(prob_top.get("prob"))
     second = rows[1] if len(rows) > 1 else {}
     second_code = str(second.get("code") or "")
-    second_label = _outcome_text(second_code, summary)
     counter_scores: dict[str, float] = defaultdict(float)
     counter_reasons: dict[str, list[str]] = defaultdict(list)
 
@@ -9425,30 +9428,31 @@ def create_app(
     results_dir: str | os.PathLike[str] = DEFAULT_RESULTS_DIR,
     adhoc_betting_root: str | os.PathLike[str] = DEFAULT_ADHOC_BETTING_ROOT,
     adhoc_font_file: str | os.PathLike[str] = DEFAULT_FONT_FILE,
+    adhoc_publication_private_key_file: str | os.PathLike[str] | None = None,
+    adhoc_publication_key_id: str | None = None,
 ) -> Flask:
     app = Flask(__name__, static_folder=None)
     db_path = Path(sqlite_db)
     result_path = Path(results_dir)
 
-    def _authorize_canonical_adhoc_source(
-        source_snapshot: dict[str, Any], issue: str, request_clock: datetime
-    ) -> None:
-        """Reject caller-built snapshots at the operational publication boundary."""
-
-        with _connect(db_path) as conn:
-            canonical_source = _build_adhoc_source_snapshot(
-                conn, issue, request_clock=request_clock
-            )
-        if source_snapshot != canonical_source:
-            raise AdhocBettingError(
-                "adhoc source snapshot does not match the canonical API resolver"
-            )
-
-    adhoc_store = AdhocBettingStore._from_canonical_source_resolver(
+    configured_private_key = (
+        Path(adhoc_publication_private_key_file)
+        if adhoc_publication_private_key_file is not None
+        else Path(os.environ[ADHOC_PUBLICATION_PRIVATE_KEY_FILE_ENV])
+        if os.environ.get(ADHOC_PUBLICATION_PRIVATE_KEY_FILE_ENV)
+        else None
+    )
+    configured_key_id = str(
+        adhoc_publication_key_id
+        or os.environ.get(ADHOC_PUBLICATION_KEY_ID_ENV)
+        or ""
+    )
+    adhoc_store = AdhocBettingStore(
         db_path=db_path,
         root=Path(adhoc_betting_root),
         font_file=Path(adhoc_font_file),
-        canonical_source_resolver=_authorize_canonical_adhoc_source,
+        publication_private_key_file=configured_private_key,
+        publication_key_id=configured_key_id,
     )
     static_dir = Path(os.environ.get("BEIDAN_DASHBOARD_STATIC_DIR", DEFAULT_DASHBOARD_STATIC_DIR))
     gate_password = next((os.environ.get(name) for name in DASHBOARD_GATE_PASSWORD_ENVS if os.environ.get(name)), "")
@@ -9912,6 +9916,20 @@ def create_app(
             or request.headers.get("Idempotency-Key")
         )
         clock = _adhoc_request_clock()
+        if (
+            configured_private_key is None
+            or not configured_key_id
+            or not configured_private_key.is_file()
+        ):
+            return (
+                jsonify(
+                    {
+                        "error": "PUBLICATION_AUTHORITY_UNAVAILABLE",
+                        "status": "FAILED_CLOSED",
+                    }
+                ),
+                503,
+            )
         try:
             with _connect(db_path) as conn:
                 source_snapshot = _build_adhoc_source_snapshot(
@@ -9932,6 +9950,16 @@ def create_app(
         except AdhocIdempotencyConflict as exc:
             return jsonify({"error": str(exc), "status": "FAILED_CLOSED"}), 409
         except AdhocBettingError as exc:
+            if "PUBLICATION_AUTHORITY_UNAVAILABLE" in str(exc):
+                return (
+                    jsonify(
+                        {
+                            "error": "PUBLICATION_AUTHORITY_UNAVAILABLE",
+                            "status": "FAILED_CLOSED",
+                        }
+                    ),
+                    503,
+                )
             return jsonify({"error": str(exc), "status": "FAILED_CLOSED"}), 422
         except Exception:
             return jsonify({"error": "adhoc plan generation failed closed", "status": "FAILED_CLOSED"}), 500
