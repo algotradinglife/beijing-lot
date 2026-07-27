@@ -69,7 +69,7 @@ def capture(
     playid: int,
     payload: bytes,
     *,
-    fetched_at: str = "2026-07-16 12:00:00",
+    fetched_at: str = "2026-07-16T12:00:00+00:00",
 ) -> int:
     monkeypatch.setattr(
         scraper,
@@ -223,7 +223,7 @@ def test_segment_freeze_skips_late_candidate_and_rejects_closed_sale(
     capture(connection, monkeypatch, tmp_path, 40, market_xml(40))
     capture(connection, monkeypatch, tmp_path, 42, market_xml(42))
     # A newer otherwise-valid batch is after the shared absolute decision time.
-    capture(connection, monkeypatch, tmp_path, 40, market_xml(40, winner_sp=3.5), fetched_at="2026-07-16 14:00:00")
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40, winner_sp=3.5), fetched_at="2026-07-16T14:00:00+00:00")
     result = p0.freeze_segment(connection, "P0X", 1, tmp_path / "segment")
     package = Path(result["output_dir"])
     skipped = list(csv.DictReader((package / "skipped_candidates.csv").open(encoding="utf-8", newline="")))
@@ -267,7 +267,7 @@ def test_segment_freeze_skips_post_freeze_candidate_for_earlier_valid_batch(
     capture(connection, monkeypatch, tmp_path, 40, market_xml(40))
     capture(connection, monkeypatch, tmp_path, 42, market_xml(42))
     # A newer post-freeze p40 candidate is deliberately ineligible.
-    capture(connection, monkeypatch, tmp_path, 40, market_xml(40), fetched_at="2026-07-16 14:00:00")
+    capture(connection, monkeypatch, tmp_path, 40, market_xml(40), fetched_at="2026-07-16T14:00:00+00:00")
     result = p0.freeze_segment(connection, "P0X", 1, tmp_path / "segment-freezes")
     assert result["frozen_match_markets"] == 2
     skipped = list(csv.DictReader((Path(result["output_dir"]) / "skipped_candidates.csv").open(encoding="utf-8")))
@@ -306,7 +306,8 @@ def test_segment_verifier_rejects_semantic_tampering_after_rehash(
     next(row for row in rows if row["playid"] == "40")["outcome_code"] = "wrong-but-eight"
     with (wrong_codes / "frozen_outcomes.csv").open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), lineterminator="\n")
-        writer.writeheader(); writer.writerows(rows)
+        writer.writeheader()
+        writer.writerows(rows)
     p0._write_recursive_sums(wrong_codes)
     with pytest.raises(p0.MultimarketP0Error, match="raw batch SP mismatch"):
         p0.verify_segment_freeze(wrong_codes)
@@ -326,7 +327,8 @@ def test_segment_verifier_rejects_semantic_tampering_after_rehash(
     overlap[0]["p40_batch_id"] = "0" * 64
     with (bad_overlap / "paired_overlap.csv").open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=overlap[0].keys(), lineterminator="\n")
-        writer.writeheader(); writer.writerows(overlap)
+        writer.writeheader()
+        writer.writerows(overlap)
     p0._write_recursive_sums(bad_overlap)
     with pytest.raises(p0.MultimarketP0Error, match="paired overlap"):
         p0.verify_segment_freeze(bad_overlap)
@@ -334,11 +336,13 @@ def test_segment_verifier_rejects_semantic_tampering_after_rehash(
     malformed_overlap = tmp_path / "malformed-overlap" / package.name
     shutil.copytree(package, malformed_overlap)
     overlap = list(csv.DictReader((malformed_overlap / "paired_overlap.csv").open(encoding="utf-8", newline="")))
-    extra = dict(overlap[0]); extra["issue"] = "WRONG"
+    extra = dict(overlap[0])
+    extra["issue"] = "WRONG"
     overlap.append(extra)
     with (malformed_overlap / "paired_overlap.csv").open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=overlap[0].keys(), lineterminator="\n")
-        writer.writeheader(); writer.writerows(overlap)
+        writer.writeheader()
+        writer.writerows(overlap)
     manifest = json.loads((malformed_overlap / "manifest.json").read_text())
     manifest["paired_overlap_matches"] = 2
     (malformed_overlap / "manifest.json").write_text(json.dumps(manifest, sort_keys=True) + "\n")
@@ -352,7 +356,8 @@ def test_segment_verifier_rejects_semantic_tampering_after_rehash(
     overlap.append(dict(overlap[0]))
     with (duplicate_overlap / "paired_overlap.csv").open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=overlap[0].keys(), lineterminator="\n")
-        writer.writeheader(); writer.writerows(overlap)
+        writer.writeheader()
+        writer.writerows(overlap)
     manifest = json.loads((duplicate_overlap / "manifest.json").read_text())
     manifest["paired_overlap_matches"] = 2
     (duplicate_overlap / "manifest.json").write_text(json.dumps(manifest, sort_keys=True) + "\n")
@@ -365,7 +370,9 @@ def test_segment_verifier_rejects_semantic_tampering_after_rehash(
     rows = list(csv.DictReader((bad_sp / "frozen_outcomes.csv").open(encoding="utf-8", newline="")))
     rows[0]["sp"] = "99.0"
     with (bad_sp / "frozen_outcomes.csv").open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), lineterminator="\n"); writer.writeheader(); writer.writerows(rows)
+        writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
     p0._write_recursive_sums(bad_sp)
     with pytest.raises(p0.MultimarketP0Error, match="SP mismatch"):
         p0.verify_segment_freeze(bad_sp)
@@ -373,9 +380,12 @@ def test_segment_verifier_rejects_semantic_tampering_after_rehash(
     bad_match = tmp_path / "bad-match" / package.name
     shutil.copytree(package, bad_match)
     rows = list(csv.DictReader((bad_match / "frozen_outcomes.csv").open(encoding="utf-8", newline="")))
-    rows[0]["match_idx"] = "999"; rows[0]["match_id"] = "P0X_999"
+    rows[0]["match_idx"] = "999"
+    rows[0]["match_id"] = "P0X_999"
     with (bad_match / "frozen_outcomes.csv").open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), lineterminator="\n"); writer.writeheader(); writer.writerows(rows)
+        writer = csv.DictWriter(handle, fieldnames=rows[0].keys(), lineterminator="\n")
+        writer.writeheader()
+        writer.writerows(rows)
     p0._write_recursive_sums(bad_match)
     with pytest.raises(p0.MultimarketP0Error, match="manifest mapping"):
         p0.verify_segment_freeze(bad_match)

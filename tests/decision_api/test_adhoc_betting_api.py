@@ -5,7 +5,7 @@ import csv
 import io
 import json
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
@@ -19,6 +19,12 @@ from src.adhoc_betting import (
     canonical,
     digest,
     file_hash,
+)
+from src.adhoc_input_freshness import (
+    CAPTURE_CLASSIFICATION,
+    SCHEMA_VERSION as FRESHNESS_SCHEMA_VERSION,
+    canonical_json as freshness_canonical_json,
+    sha256_bytes as freshness_sha256_bytes,
 )
 from src.decision_api import app as appmod
 from src.structured_input_receipt import write_receipt
@@ -53,6 +59,30 @@ def _release(shadow_dir: Path) -> dict[str, object]:
 
 
 def _build_db(path: Path) -> None:
+    source_clock_utc = NOW.astimezone(timezone.utc).isoformat(timespec="seconds")
+    batch_identity = {
+        "schema_version": FRESHNESS_SCHEMA_VERSION,
+        "issue": ISSUE,
+        "source_clocks_utc": {
+            "issue_html": source_clock_utc,
+            "live_sp_xml": source_clock_utc,
+            "nowscore_html": source_clock_utc,
+        },
+        "source_sha256": {
+            "issue_html": "a" * 64,
+            "live_sp_xml": "b" * 64,
+            "nowscore_html": "c" * 64,
+        },
+        "parlay_modes": ["自由过关"],
+    }
+    batch_id = freshness_sha256_bytes(freshness_canonical_json(batch_identity))
+    evidence_json = freshness_canonical_json(
+        {
+            **batch_identity,
+            "batch_id": batch_id,
+            "clock_skew_seconds": 0,
+        }
+    ).decode("utf-8")
     conn = sqlite3.connect(path)
     try:
         conn.executescript(
@@ -143,7 +173,10 @@ def _build_db(path: Path) -> None:
                 sale_cutoff_hkt TEXT,
                 fetched_at_utc TEXT,
                 source_updated_at_hkt TEXT,
-                batch_id TEXT
+                batch_id TEXT,
+                capture_classification TEXT,
+                eligibility_evidence_json TEXT,
+                eligibility_reasons_json TEXT
             );
             """
         )
@@ -231,7 +264,7 @@ def _build_db(path: Path) -> None:
             for code in ("3", "1", "0"):
                 conn.execute(
                     """
-                    INSERT INTO live_market_sp_snapshots VALUES(?,?,?,?,?,?,?,?,?,?,?)
+                    INSERT INTO live_market_sp_snapshots VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     """,
                     (
                         ISSUE,
@@ -244,7 +277,10 @@ def _build_db(path: Path) -> None:
                         cutoff.isoformat(),
                         NOW.isoformat(),
                         NOW.isoformat(),
-                        f"fixture-batch-{idx}",
+                        batch_id,
+                        CAPTURE_CLASSIFICATION,
+                        evidence_json,
+                        "[]",
                     ),
                 )
         conn.commit()
@@ -679,8 +715,22 @@ def test_adhoc_api_fails_closed_for_unknown_or_insufficient_current_eligibility(
     app, db_path, _shadow_dir = _app(tmp_path, monkeypatch)
     conn = sqlite3.connect(db_path)
     try:
-        conn.execute("UPDATE nowscore_bjdc_matches SET can_sale=NULL WHERE match_idx IN (1, 2)")
-        conn.execute("UPDATE nowscore_bjdc_matches SET can_sale=0 WHERE match_idx IN (3, 4)")
+        conn.execute(
+            """
+            UPDATE live_market_sp_snapshots
+            SET sale_status='unknown',
+                eligibility_reasons_json='["SALE_STATUS_UNVERIFIED"]'
+            WHERE row_idx IN (1, 2)
+            """
+        )
+        conn.execute(
+            """
+            UPDATE live_market_sp_snapshots
+            SET sale_status='closed',
+                eligibility_reasons_json='["SALE_CLOSED"]'
+            WHERE row_idx IN (3, 4)
+            """
+        )
         conn.execute("UPDATE nowscore_bjdc_matches SET status='live' WHERE match_idx=5")
         conn.execute("UPDATE nowscore_bjdc_matches SET fetched_at=? WHERE match_idx=6", ((NOW - timedelta(hours=1)).isoformat(),))
         conn.execute("UPDATE nowscore_bjdc_matches SET status=NULL, status_text='' WHERE match_idx=7")
@@ -699,7 +749,7 @@ def test_adhoc_api_fails_closed_for_unknown_or_insufficient_current_eligibility(
     assert payload["current_status"] == "UNAVAILABLE_ADHOC_PLAN"
     assert payload["ticket_count"] == 0
     assert payload["eligible_match_count"] == 1
-    assert payload["exclusion_counts"]["UNKNOWN_SALE_STATE"] == 2
+    assert payload["exclusion_counts"]["SALE_STATUS_UNVERIFIED"] == 2
     assert payload["exclusion_counts"]["SALE_CLOSED"] == 2
     assert payload["exclusion_counts"]["MATCH_LIVE"] == 1
     assert payload["exclusion_counts"]["STALE_INPUT"] == 1
@@ -745,5 +795,79 @@ def test_adhoc_api_rejects_a_mixed_three_way_market_snapshot(tmp_path: Path, mon
     assert preview.status_code == 200
     match = next(row for row in preview.get_json()["matches"] if row["match_idx"] == 1)
     assert match["eligible"] is False
-    assert "LIVE_MARKET_SNAPSHOT_UNAVAILABLE" in match["exclusion_reasons"]
+    assert "MARKET_SALE_STATUS_INCONSISTENT" in match["exclusion_reasons"]
     assert "UNKNOWN_SALE_STATE" in match["exclusion_reasons"]
+
+
+def test_kickoff_reconciliation_preserves_official_25_13_denominator() -> None:
+    resolved = [
+        appmod._adhoc_kickoff_hkt(
+            sale_cutoff=(
+                "2026-07-27T12:00:00+08:00"
+                if index <= 25
+                else "2026-07-28T12:00:00+08:00"
+            ),
+            schedule_date=("2026-07-26" if index <= 25 else "2026-07-27"),
+            kickoff_time="14:00",
+        )
+        for index in range(1, 39)
+    ]
+
+    assert all(value is not None for value in resolved)
+    assert (
+        sum(value.date().isoformat() == "2026-07-27" for value in resolved if value)
+        == 25
+    )
+    assert (
+        sum(value.date().isoformat() == "2026-07-28" for value in resolved if value)
+        == 13
+    )
+
+
+def test_legacy_naive_utc_collector_clock_is_not_shifted_by_eight_hours(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app, db_path, _shadow_dir = _app(tmp_path, monkeypatch)
+    conn = sqlite3.connect(db_path)
+    try:
+        # 04:00 UTC is exactly 12:00 HKT.  Legacy rows used this timezone-less
+        # representation; parsing it as HKT would create a false eight-hour age.
+        conn.execute("UPDATE matches SET fetched_at='2026-07-25 04:00:00'")
+        conn.execute(
+            "UPDATE live_market_sp_snapshots SET fetched_at_utc='2026-07-25 04:00:00'"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    preview = app.test_client().get(
+        f"/api/adhoc-betting-plans/eligibility?issue={ISSUE}"
+    )
+    assert preview.status_code == 200
+    payload = preview.get_json()
+    assert payload["eligible_match_count"] == 8
+    assert "STALE_INPUT" not in payload["exclusion_counts"]
+
+
+def test_complete_but_stale_formal_input_fails_closed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app, _db_path, shadow_dir = _app(tmp_path, monkeypatch)
+    structured = next(shadow_dir.rglob("structured_shadow_*.csv"))
+    write_receipt(
+        structured,
+        issue=ISSUE,
+        generated_at=NOW - timedelta(hours=1),
+        source={"fixture": "complete-but-stale"},
+    )
+
+    preview = app.test_client().get(
+        f"/api/adhoc-betting-plans/eligibility?issue={ISSUE}"
+    )
+    assert preview.status_code == 200
+    payload = preview.get_json()
+    assert payload["eligible_match_count"] == 0
+    assert payload["exclusion_counts"]["STALE_INPUT"] == 8
+    assert len(payload["matches"]) == 8

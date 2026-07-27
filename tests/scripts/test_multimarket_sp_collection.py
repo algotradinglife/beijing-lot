@@ -74,7 +74,11 @@ def test_scrape_live_sp_writes_normalized_rows_and_distinct_fetch_kind(tmp_path:
             elapsed_sec=0.1,
         ),
     )
-    monkeypatch.setattr(scraper, "now_utc", lambda: "2026-07-16 12:00:00")
+    monkeypatch.setattr(
+        scraper,
+        "now_utc",
+        lambda: "2026-07-16T12:00:00+00:00",
+    )
     args = argparse.Namespace(
         playid=40,
         timeout=10,
