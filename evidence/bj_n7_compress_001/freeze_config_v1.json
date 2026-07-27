@@ -1,0 +1,17 @@
+{
+  "experiment": "BJ-N7-COMPRESS-001",
+  "safe_input_filename": "safe_input_v1.csv",
+  "safe_input_sha256": "03514b097b0ce4fe54a0129862b2ce0cd3963801afbf74901daa6a9a141678eb",
+  "safe_input_schema": [
+    "issue",
+    "match_idx",
+    "match_id",
+    "kickoff_ts",
+    "decision_cutoff_ts",
+    "snapshot_ts",
+    "quoted_sp_3",
+    "quoted_sp_1",
+    "quoted_sp_0"
+  ],
+  "source_sha256": "2f04f50d7fe6085f1353b6690c5e69bc6fb9befc2180fae780aa0bbd056b0233"
+}
