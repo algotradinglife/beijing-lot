@@ -459,7 +459,7 @@ def _strategy_active_dir(release: dict[str, Any] | None = None) -> Path:
 def _native_cutover_receipt_config(
     issue: str, release: dict[str, Any] | None = None
 ) -> dict[str, str] | None:
-    """Read the reviewed cutover state; string entries remain v1 active pointers."""
+    """Read one content-pinned reviewed cutover state."""
 
     release = release or _active_strategy_release()
     promotion = release.get("promotion") if isinstance(release.get("promotion"), dict) else {}
@@ -467,20 +467,24 @@ def _native_cutover_receipt_config(
     if not isinstance(receipts, dict):
         return None
     value = receipts.get(str(issue))
-    if isinstance(value, str) and value.strip():
-        return {"mode": "active", "current_receipt_path": value}
     if not isinstance(value, dict):
         return None
     mode = str(value.get("mode") or "").strip()
     current = str(value.get("current_receipt_path") or "").strip()
+    current_sha256 = str(value.get("current_receipt_sha256") or "").strip()
     target = str(value.get("rollback_target_receipt_path") or "").strip()
-    if mode not in {"active", "rollback"} or not current:
+    if (
+        mode not in {"active", "rollback"}
+        or not current
+        or not re.fullmatch(r"[0-9a-f]{64}", current_sha256)
+    ):
         return None
     if mode == "rollback" and not target:
         return None
     return {
         "mode": mode,
         "current_receipt_path": current,
+        "current_receipt_sha256": current_sha256,
         "rollback_target_receipt_path": target,
     }
 
@@ -494,9 +498,18 @@ def _pinned_native_cutover_artifact(
     pointer = _native_cutover_receipt_config(issue, release)
     if pointer is None:
         return None, None, "cutover_receipt_missing"
+    current_path = _project_path(pointer["current_receipt_path"])
+    try:
+        current_sha256 = hashlib.sha256(current_path.read_bytes()).hexdigest()
+    except OSError:
+        return None, None, "cutover_receipt_unreadable"
+    if not hmac.compare_digest(
+        current_sha256, pointer["current_receipt_sha256"]
+    ):
+        return None, None, "cutover_receipt_hash_mismatch"
     try:
         current = validate_native_promotion_cutover_receipt(
-            _project_path(pointer["current_receipt_path"]),
+            current_path,
             project_root=PROJECT_ROOT,
             active_root=_strategy_active_dir(release),
             key_registry_path=ADHOC_PUBLICATION_KEY_REGISTRY,

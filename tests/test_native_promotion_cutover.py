@@ -238,6 +238,7 @@ def test_operational_native_resolution_rejects_a_pointer_for_another_issue(
                 "26079": {
                     "mode": "active",
                     "current_receipt_path": str(cutover),
+                    "current_receipt_sha256": file_hash(cutover),
                 }
             }
         },
@@ -273,6 +274,37 @@ def test_adhoc_formal_input_does_not_fall_back_without_a_cutover_pointer(
     assert metadata["status"] == "UNAVAILABLE_FORMAL_INPUT"
     assert metadata["decision_variant_id"] == "active_v3.3.3"
     assert metadata["rejected_candidates"] == ["cutover_receipt_missing"]
+
+
+def test_registry_digest_rejects_in_place_cutover_receipt_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, active_root, key_registry, cutover = _cutover_fixture(tmp_path)
+    monkeypatch.setattr(appmod, "PROJECT_ROOT", root)
+    monkeypatch.setattr(appmod, "ADHOC_PUBLICATION_KEY_REGISTRY", key_registry)
+    release = {
+        "promotion": {
+            "native_cutover_receipts": {
+                ISSUE: {
+                    "mode": "active",
+                    "current_receipt_path": str(cutover),
+                    "current_receipt_sha256": file_hash(cutover),
+                }
+            }
+        },
+        "artifacts": {"structured_active_dir": str(active_root)},
+    }
+    payload = json.loads(cutover.read_text(encoding="utf-8"))
+    payload["previous_native_artifact_identity"] = (
+        "active_v3.3.3:26078:" + "a" * 64
+    )
+    cutover.write_text(json.dumps(payload), encoding="utf-8")
+
+    path, verified, error = appmod._pinned_native_cutover_artifact(ISSUE, release)
+
+    assert path is None
+    assert verified is None
+    assert error == "cutover_receipt_hash_mismatch"
 
 
 def test_runtime_rollback_accepts_only_current_receipt_predecessor(
@@ -325,6 +357,9 @@ def test_runtime_rollback_accepts_only_current_receipt_predecessor(
             "active_v3.3.3:26078:20260726T170000000000Z:" + "a" * 64
         ),
     }
+    current_path.write_text("current", encoding="utf-8")
+    predecessor_path.write_text("predecessor", encoding="utf-8")
+    arbitrary_path.write_text("arbitrary", encoding="utf-8")
     verified_by_path = {current_path: current, predecessor_path: predecessor, arbitrary_path: arbitrary}
     monkeypatch.setattr(
         appmod,
@@ -338,6 +373,7 @@ def test_runtime_rollback_accepts_only_current_receipt_predecessor(
                 ISSUE: {
                     "mode": "rollback",
                     "current_receipt_path": str(current_path),
+                    "current_receipt_sha256": file_hash(current_path),
                     "rollback_target_receipt_path": str(predecessor_path),
                 }
             }

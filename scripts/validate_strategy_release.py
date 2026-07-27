@@ -232,16 +232,18 @@ def _validate_release_contract(release_key: str, release: dict[str, Any], errors
         if active_v333.get("source") == "structured_active_csv":
             promotion = release.get("promotion") if isinstance(release.get("promotion"), dict) else {}
             receipts = promotion.get("native_cutover_receipts") if isinstance(promotion, dict) else None
-            if not isinstance(receipts, dict) or not receipts:
+            if not isinstance(receipts, dict):
                 errors.append(f"{release_key} native active_v3.3.3 requires native_cutover_receipts")
-            elif any(
+            elif receipts and any(
                 not re.fullmatch(r"[0-9]+", str(issue))
                 or not (
-                    isinstance(pointer, str)
-                    and pointer.strip()
-                    or isinstance(pointer, dict)
+                    isinstance(pointer, dict)
                     and str(pointer.get("mode") or "") in {"active", "rollback"}
                     and str(pointer.get("current_receipt_path") or "").strip()
+                    and re.fullmatch(
+                        r"[0-9a-f]{64}",
+                        str(pointer.get("current_receipt_sha256") or ""),
+                    )
                     and (
                         str(pointer.get("mode")) != "rollback"
                         or str(pointer.get("rollback_target_receipt_path") or "").strip()
@@ -249,7 +251,7 @@ def _validate_release_contract(release_key: str, release: dict[str, Any], errors
                 )
                 for issue, pointer in receipts.items()
             ):
-                errors.append(f"{release_key} native_cutover_receipts must declare a valid active or rollback pointer")
+                errors.append(f"{release_key} native_cutover_receipts must declare a content-pinned active or rollback pointer")
 
 
 def validate_strategy_release(

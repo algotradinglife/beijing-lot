@@ -178,11 +178,18 @@ publication target.
    clock so two generations with identical CSV bytes cannot impersonate each
    other.
 4. Change the registry’s `active_v3.3.3` `kind`, `source`, and `artifact_key`
-   as one reviewed release-config transition, naming that cutover receipt.
-   This is the sole cutover switch.
+   as one reviewed release-config transition, naming both the cutover receipt
+   path and its exact `current_receipt_sha256`. This content-bound registry
+   entry is the sole cutover switch; a path-only pointer is invalid.
 5. Enable attested operational publication only when the native binding and
    Ed25519 verification both pass. A staged native artifact with no active key
    remains `UNATTESTED_AUDIT_ONLY`.
+
+The checked-in registry intentionally has no active cutover entry while the
+production public key and staged receipt are unprovisioned. In that state the
+formal `active_v3.3.3` option remains the unavailable fail-closed default. A
+separate reviewed deployment change must add the public key plus the exact
+receipt path/SHA pair; a placeholder digest or path-only entry is forbidden.
 
 The rollback target is the immediately preceding **verified native** artifact
 under the same `structured_active_dir` and receipt schema, identified by its
