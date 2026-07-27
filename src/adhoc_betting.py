@@ -2507,19 +2507,55 @@ def _verify_package(
         source_metadata.get("authoritative_market_batch_id") or ""
     )
     if manifest.get("status") == "READY_FOR_REVIEW":
+        authoritative_receipt_path = str(
+            source_metadata.get(
+                "authoritative_market_receipt_path"
+            )
+            or ""
+        )
+        authoritative_receipt_sha256 = str(
+            source_metadata.get(
+                "authoritative_market_receipt_sha256"
+            )
+            or ""
+        )
+        rows_have_authoritative_binding = all(
+            isinstance(row.get("source_provenance"), dict)
+            and str(
+                (row.get("source_provenance") or {}).get(
+                    "market_batch_id"
+                )
+                or ""
+            )
+            == authoritative_market_batch_id
+            and str(
+                (row.get("source_provenance") or {}).get(
+                    "market_receipt_path"
+                )
+                or ""
+            )
+            == authoritative_receipt_path
+            and str(
+                (row.get("source_provenance") or {}).get(
+                    "market_receipt_sha256"
+                )
+                or ""
+            )
+            == authoritative_receipt_sha256
+            for row in decision_rows.values()
+        )
         if (
             len(market_batch_ids) != 1
+            or not re.fullmatch(
+                r"[0-9a-f]{64}", authoritative_market_batch_id
+            )
             or authoritative_market_batch_id
             != next(iter(market_batch_ids))
+            or not authoritative_receipt_path
             or not re.fullmatch(
-                r"[0-9a-f]{64}",
-                str(
-                    source_metadata.get(
-                        "authoritative_market_receipt_sha256"
-                    )
-                    or ""
-                ),
+                r"[0-9a-f]{64}", authoritative_receipt_sha256
             )
+            or not rows_have_authoritative_binding
         ):
             raise AdhocBettingError(
                 "adhoc package lacks one authoritative published market batch"

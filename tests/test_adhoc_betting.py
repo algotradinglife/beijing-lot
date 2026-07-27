@@ -242,6 +242,36 @@ def test_package_verifier_rejects_mixed_market_batch_ids(
         )
 
 
+@pytest.mark.parametrize("invalid_batch_id", ["", "not-a-sha256", None])
+def test_package_verifier_rejects_invalid_batch_binding_with_tampered_sp(
+    tmp_path: Path,
+    invalid_batch_id: str | None,
+) -> None:
+    source = _source_snapshot()
+    matches = source["matches"]
+    assert isinstance(matches, list)
+    provenance = matches[1]["source_provenance"]
+    assert isinstance(provenance, dict)
+    if invalid_batch_id is None:
+        provenance.pop("market_batch_id")
+    else:
+        provenance["market_batch_id"] = invalid_batch_id
+    matches[1]["sp"] = {"3": 99.0, "1": 99.0, "0": 99.0}
+
+    with pytest.raises(
+        AdhocBettingError,
+        match=(
+            "lacks one authoritative published market batch"
+            "|mixes multiple market batch IDs"
+        ),
+    ):
+        _create(
+            _store(tmp_path),
+            source,
+            key="missing-market-batch-binding",
+        )
+
+
 def _rehash_package(package: Path) -> Path:
     """Model an attacker who recomputes every mutable package hash."""
 
