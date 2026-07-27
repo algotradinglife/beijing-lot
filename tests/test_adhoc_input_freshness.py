@@ -131,6 +131,81 @@ def test_same_cycle_evidence_rejects_tampered_normalized_market_rows() -> None:
         )
 
 
+def test_same_cycle_batch_hashes_blank_settled_sp_without_blocking_open_rows() -> None:
+    issue_rows = [
+        {
+            "issue": "26078",
+            "match_idx": 1,
+            "end_time": "2026-07-27T13:30:00+08:00",
+            "disabled": "no",
+            "sp_home": 3.0,
+            "sp_draw": 3.0,
+            "sp_away": 3.0,
+            "fetched_at": "2026-07-27T04:00:00+00:00",
+        },
+        {
+            "issue": "26078",
+            "match_idx": 2,
+            "end_time": "2026-07-27T12:00:00+08:00",
+            "disabled": "yes",
+            "sp_home": None,
+            "sp_draw": None,
+            "sp_away": None,
+            "fetched_at": "2026-07-27T04:00:00+00:00",
+        },
+    ]
+    nowscore_rows = [
+        {
+            "issue": "26078",
+            "match_idx": index,
+            "can_sale": 1 if index == 1 else 0,
+            "schedule_date": "2026-07-27",
+            "kickoff_time": "14:00",
+            "fetched_at": "2026-07-27T04:00:01+00:00",
+        }
+        for index in (1, 2)
+    ]
+    market_rows = [
+        {
+            "issue": "26078",
+            "playid": 34,
+            "row_idx": index,
+            "outcome_code": code,
+            "sp": 3.0 if index == 1 else None,
+            "source_updatetime": "2026-07-27 12:00:00",
+        }
+        for index in (1, 2)
+        for code in ("3", "1", "0")
+    ]
+
+    batch = build_same_cycle_batch(
+        issue="26078",
+        issue_rows=issue_rows,
+        nowscore_rows=nowscore_rows,
+        market_rows=market_rows,
+        source_clocks_utc={
+            "issue_html": "2026-07-27T04:00:00+00:00",
+            "nowscore_html": "2026-07-27T04:00:01+00:00",
+            "live_sp_xml": "2026-07-27T04:00:02+00:00",
+        },
+        source_sha256={
+            "issue_html": "a" * 64,
+            "nowscore_html": "b" * 64,
+            "live_sp_xml": "c" * 64,
+        },
+        parlay_modes=("自由过关",),
+    )
+
+    assert batch["receipt"]["status"] == "PASS"
+    assert batch["receipt"]["eligible_match_indices"] == [1]
+    assert batch["receipt"]["rejection_counts"] == {
+        "LIVE_SP_VECTOR_INCOMPLETE": 1,
+        "OFFICIAL_SELECTION_VECTOR_INCOMPLETE": 1,
+        "SALE_CLOSED": 1,
+    }
+    assert len(batch["rows"]) == 6
+
+
 def test_same_cycle_receipt_is_required_and_bound_to_evidence(tmp_path) -> None:
     batch = _sources()
     evidence = json.loads(batch["rows"][0]["eligibility_evidence_json"])

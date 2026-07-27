@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -213,18 +214,34 @@ def normalized_market_rows_sha256(rows: Sequence[Mapping[str, Any]]) -> str:
         try:
             row_idx = int(row["row_idx"])
             playid = int(row.get("playid", 34))
-            sp = float(row["sp"])
         except (KeyError, TypeError, ValueError) as exc:
             raise AdhocInputFreshnessError(
-                "normalized market row identity or SP is invalid"
+                "normalized market row identity is invalid"
             ) from exc
+        raw_sp = row.get("sp")
+        if raw_sp is None or str(raw_sp).strip() == "":
+            # A settled/closed row can legitimately be present in the live XML
+            # with blank price attributes.  It remains in the hashed evidence
+            # and will be rejected by the complete-vector eligibility check;
+            # it must not prevent a same-cycle receipt for other open rows.
+            normalized_sp = ""
+        else:
+            try:
+                sp = float(raw_sp)
+            except (TypeError, ValueError) as exc:
+                raise AdhocInputFreshnessError(
+                    "normalized market SP is invalid"
+                ) from exc
+            if not math.isfinite(sp):
+                raise AdhocInputFreshnessError("normalized market SP is invalid")
+            normalized_sp = format(sp, ".12g")
         normalized.append(
             {
                 "issue": str(row.get("issue") or ""),
                 "playid": playid,
                 "row_idx": row_idx,
                 "outcome_code": str(row.get("outcome_code") or ""),
-                "sp": format(sp, ".12g"),
+                "sp": normalized_sp,
                 "sale_status": str(row.get("sale_status") or "").lower(),
                 "sale_cutoff_hkt": explicit_hkt(
                     str(row.get("sale_cutoff_hkt") or "")
