@@ -1291,11 +1291,18 @@ def summarize(rows: list[ReplayRow]) -> dict[str, Any]:
 
     def metrics(prefix: str) -> dict[str, Any]:
         if prefix == "active":
-            codes_fn = lambda row: row.active_selection_codes
-            primary_fn = lambda row: row.active_primary
+            def codes_fn(row: ReplayRow) -> list[str]:
+                return row.active_selection_codes
+
+            def primary_fn(row: ReplayRow) -> str | None:
+                return row.active_primary
         else:
-            codes_fn = lambda row: list(row.structured.get("selection_codes", []))
-            primary_fn = lambda row: row.structured.get("primary_pick")
+            def codes_fn(row: ReplayRow) -> list[str]:
+                return list(row.structured.get("selection_codes", []))
+
+            def primary_fn(row: ReplayRow) -> str | None:
+                value = row.structured.get("primary_pick")
+                return str(value) if value is not None else None
         bet_rows = [row for row in settled if codes_fn(row)]
         primary_hits = sum(1 for row in bet_rows if primary_fn(row) == row.result_code)
         coverage_hits = sum(1 for row in bet_rows if row.result_code in codes_fn(row))
