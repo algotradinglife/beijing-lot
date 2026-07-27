@@ -98,6 +98,7 @@ def _cutover_fixture(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
                 "native_artifact_identity": f"active_v3.3.3:{ISSUE}:{file_hash(csv_path)}",
                 "native_generation_identity": native["native_generation_identity"],
                 "previous_native_artifact_identity": "",
+                "previous_native_generation_identity": "",
                 "attestation_key_id": "cutover-test-key",
                 "attestation_path": str(attestation_path.relative_to(root)),
                 "attestation_sha256": file_hash(attestation_path),
@@ -193,6 +194,12 @@ def test_rollback_requires_an_explicit_native_predecessor_identity(tmp_path: Pat
     root, active_root, key_registry, cutover = _cutover_fixture(tmp_path)
     payload = json.loads(cutover.read_text(encoding="utf-8"))
     payload["previous_native_artifact_identity"] = "active_v3.3.3:26078:" + "a" * 64
+    payload["previous_native_generation_identity"] = (
+        "active_v3.3.3:26078:20260726T160000000000Z:" + "a" * 64
+    )
+    payload["previous_native_receipt_sha256"] = "b" * 64
+    payload["previous_attestation_sha256"] = "c" * 64
+    payload["previous_cutover_receipt_sha256"] = "d" * 64
     cutover.write_text(json.dumps(payload), encoding="utf-8")
 
     verified = validate_native_promotion_cutover_receipt(
@@ -201,7 +208,9 @@ def test_rollback_requires_an_explicit_native_predecessor_identity(tmp_path: Pat
         active_root=active_root,
         key_registry_path=key_registry,
     )
-    assert rollback_target_from_cutover_receipt(verified) == "active_v3.3.3:26078:" + "a" * 64
+    assert rollback_target_from_cutover_receipt(verified) == (
+        "active_v3.3.3:26078:20260726T160000000000Z:" + "a" * 64
+    )
 
 
 def test_operational_native_resolution_fails_closed_without_a_registry_pointer(tmp_path: Path) -> None:
@@ -273,17 +282,49 @@ def test_runtime_rollback_accepts_only_current_receipt_predecessor(
     predecessor_path = tmp_path / "predecessor.json"
     arbitrary_path = tmp_path / "arbitrary.json"
     predecessor_identity = "active_v3.3.3:26078:" + "a" * 64
+    predecessor_generation = (
+        "active_v3.3.3:26078:20260726T160000000000Z:" + "a" * 64
+    )
+    predecessor_descriptor = {
+        "previous_native_artifact_identity": predecessor_identity,
+        "previous_native_generation_identity": predecessor_generation,
+        "previous_native_receipt_sha256": "c" * 64,
+        "previous_attestation_sha256": "d" * 64,
+        "previous_cutover_receipt_sha256": "e" * 64,
+    }
     current = {
-        "receipt": {"issue": ISSUE, "previous_native_artifact_identity": predecessor_identity},
+        "receipt": {
+            "issue": ISSUE,
+            "previous_native_artifact_identity": predecessor_identity,
+            "previous_native_generation_identity": predecessor_generation,
+        },
         "native_artifact_identity": "active_v3.3.3:26078:" + "b" * 64,
+        "native_generation_identity": (
+            "active_v3.3.3:26078:20260727T160000000000Z:" + "b" * 64
+        ),
         "native_csv_path": tmp_path / "current.csv",
+        "previous_native_descriptor": predecessor_descriptor,
     }
     predecessor = {
-        "receipt": {"issue": ISSUE, "previous_native_artifact_identity": ""},
+        "receipt": {
+            "issue": ISSUE,
+            "previous_native_artifact_identity": "",
+            "previous_native_generation_identity": "",
+        },
         "native_artifact_identity": predecessor_identity,
+        "native_generation_identity": predecessor_generation,
+        "native_receipt_sha256": "c" * 64,
+        "attestation_sha256": "d" * 64,
+        "cutover_receipt_sha256": "e" * 64,
         "native_csv_path": tmp_path / "predecessor.csv",
     }
-    arbitrary = {**predecessor, "native_artifact_identity": "active_v3.3.3:26078:" + "c" * 64}
+    arbitrary = {
+        **predecessor,
+        # Same CSV/content identity, but a different generation receipt.
+        "native_generation_identity": (
+            "active_v3.3.3:26078:20260726T170000000000Z:" + "a" * 64
+        ),
+    }
     verified_by_path = {current_path: current, predecessor_path: predecessor, arbitrary_path: arbitrary}
     monkeypatch.setattr(
         appmod,

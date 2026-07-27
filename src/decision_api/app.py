@@ -516,8 +516,22 @@ def _pinned_native_cutover_artifact(
         )
     except NativePromotionCutoverError as exc:
         return None, None, f"rollback_target_receipt_invalid:{exc}"
-    expected = str(current["receipt"].get("previous_native_artifact_identity") or "")
-    if not expected or str(target["native_artifact_identity"]) != expected:
+    previous = current.get("previous_native_descriptor")
+    if not isinstance(previous, dict) or not previous.get("previous_native_generation_identity"):
+        return None, None, "rollback_target_is_not_current_receipt_predecessor"
+    expected = {
+        "native_generation_identity": str(previous["previous_native_generation_identity"]),
+        "native_receipt_sha256": str(previous["previous_native_receipt_sha256"]),
+        "attestation_sha256": str(previous["previous_attestation_sha256"]),
+        "cutover_receipt_sha256": str(previous["previous_cutover_receipt_sha256"]),
+    }
+    observed = {
+        "native_generation_identity": str(target.get("native_generation_identity") or ""),
+        "native_receipt_sha256": str(target.get("native_receipt_sha256") or ""),
+        "attestation_sha256": str(target.get("attestation_sha256") or ""),
+        "cutover_receipt_sha256": str(target.get("cutover_receipt_sha256") or ""),
+    }
+    if observed != expected:
         return None, None, "rollback_target_is_not_current_receipt_predecessor"
     return Path(target["native_csv_path"]), target, ""
 

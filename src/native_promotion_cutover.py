@@ -69,6 +69,44 @@ def _expected_artifact_identity(*, issue: str, csv_sha256: str) -> str:
     return f"{NATIVE_DECISION_VARIANT_ID}:{issue}:{csv_sha256}"
 
 
+def _previous_descriptor(receipt: dict[str, Any], *, issue: str) -> dict[str, str]:
+    """Read a complete immutable predecessor descriptor, or an explicit empty one."""
+
+    keys = (
+        "previous_native_artifact_identity",
+        "previous_native_generation_identity",
+        "previous_native_receipt_sha256",
+        "previous_attestation_sha256",
+        "previous_cutover_receipt_sha256",
+    )
+    values = {key: str(receipt.get(key) or "") for key in keys}
+    if not any(values.values()):
+        return values
+    if not all(values.values()):
+        raise NativePromotionCutoverError("cutover previous native descriptor is incomplete")
+    generation = values["previous_native_generation_identity"]
+    if not re.fullmatch(
+        rf"{re.escape(NATIVE_DECISION_VARIANT_ID)}:{re.escape(issue)}:\d{{8}}T\d{{12}}Z:[0-9a-f]{{64}}",
+        generation,
+    ):
+        raise NativePromotionCutoverError("cutover previous generation identity is invalid")
+    # The older short CSV-only identifier remains a compatibility field, but
+    # it must never be used as rollback authority.
+    expected_short = _expected_artifact_identity(
+        issue=issue, csv_sha256=generation.rsplit(":", 1)[1]
+    )
+    if values["previous_native_artifact_identity"] != expected_short:
+        raise NativePromotionCutoverError("cutover previous artifact identity is invalid")
+    for key in (
+        "previous_native_receipt_sha256",
+        "previous_attestation_sha256",
+        "previous_cutover_receipt_sha256",
+    ):
+        if not re.fullmatch(r"[0-9a-f]{64}", values[key]):
+            raise NativePromotionCutoverError("cutover previous evidence hash is invalid")
+    return values
+
+
 def validate_native_promotion_cutover_receipt(
     path: Path,
     *,
@@ -123,11 +161,7 @@ def validate_native_promotion_cutover_receipt(
     if str(receipt.get("native_generation_identity") or "") != str(native["native_generation_identity"]):
         raise NativePromotionCutoverError("cutover native generation identity mismatch")
 
-    previous = str(receipt.get("previous_native_artifact_identity") or "")
-    if previous and not re.fullmatch(
-        rf"{re.escape(NATIVE_DECISION_VARIANT_ID)}:{re.escape(issue)}:[0-9a-f]{{64}}", previous
-    ):
-        raise NativePromotionCutoverError("cutover previous native identity is invalid")
+    previous = _previous_descriptor(receipt, issue=issue)
 
     attestation_path = _safe_project_path(
         receipt.get("attestation_path"), project_root=project_root, label="attestation_path"
@@ -167,7 +201,11 @@ def validate_native_promotion_cutover_receipt(
         "native_csv_path": csv_path,
         "native_artifact_identity": expected_identity,
         "native_generation_identity": native["native_generation_identity"],
-        "rollback_available": bool(previous),
+        "native_receipt_sha256": receipt_sha256,
+        "attestation_sha256": file_hash(attestation_path),
+        "cutover_receipt_sha256": file_hash(receipt_file),
+        "previous_native_descriptor": previous,
+        "rollback_available": bool(previous["previous_native_generation_identity"]),
     }
 
 
@@ -175,7 +213,7 @@ def rollback_target_from_cutover_receipt(verified: dict[str, Any]) -> str:
     """Return the reviewed predecessor, refusing shadow or empty rollbacks."""
 
     receipt = verified.get("receipt") if isinstance(verified, dict) else None
-    previous = str(receipt.get("previous_native_artifact_identity") or "") if isinstance(receipt, dict) else ""
+    previous = str(receipt.get("previous_native_generation_identity") or "") if isinstance(receipt, dict) else ""
     if not previous:
         raise NativePromotionCutoverError("native rollback target is unavailable; fail closed")
     return previous
