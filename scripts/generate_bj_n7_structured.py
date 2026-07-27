@@ -275,6 +275,17 @@ def generate(legs: list[base.Leg]) -> tuple[list[dict[str, str]], list[dict[str,
                             "stake_yuan": str(stake),
                         }
                     )
+                    if arm == "STRUCTURED_2F_5D_288":
+                        summary.append(
+                            {
+                                "issue": issue,
+                                "threshold": f"{threshold:.2f}",
+                                "arm": "STRUCTURED_2F_5D_TOP256",
+                                "disposition": "NO_BET_PARENT_THRESHOLD_UNAVAILABLE",
+                                "combinations": "0",
+                                "stake_yuan": "512",
+                            }
+                        )
                     continue
                 pool = physical_pool(selected, assignment)
                 if len(pool) != expected_count:
