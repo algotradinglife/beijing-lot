@@ -37,9 +37,12 @@ from src.adhoc_betting import (
     DEFAULT_FONT_FILE,
 )
 from src.adhoc_input_freshness import (
+    DEFAULT_RECEIPT_ROOT as ADHOC_INPUT_RECEIPT_ROOT,
     AdhocInputFreshnessError,
+    normalized_match_rows_sha256,
     resolve_kickoff_hkt,
     verify_same_cycle_evidence,
+    verify_same_cycle_receipt,
 )
 from src.decision_artifact_completeness import active_snapshot_completeness, completeness_for_indices
 from src.natural_day_manifest import (
@@ -3800,7 +3803,7 @@ def _adhoc_market_metadata(
     rows = conn.execute(
         f"""
         SELECT
-            row_idx, outcome_code, sp,
+            issue, playid, row_idx, outcome_code, sp,
             {column('parlay_allowed')},
             {column('sale_status')},
             {column('sale_cutoff_hkt')},
@@ -3811,21 +3814,51 @@ def _adhoc_market_metadata(
             {column('batch_id')},
             {column('capture_classification')},
             {column('eligibility_evidence_json')},
-            {column('eligibility_reasons_json')}
+            {column('eligibility_reasons_json')},
+            {column('publication_status')},
+            {column('eligibility_receipt_path')},
+            {column('eligibility_receipt_sha256')}
         FROM live_market_sp_snapshots
         WHERE issue=? AND playid=34
         """,
         (issue,),
     ).fetchall()
+    materialized = [dict(record) for record in rows]
+    batch_rows: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    batch_clocks: dict[str, datetime] = {}
+    for row in materialized:
+        key = str(row.get("batch_id") or "")
+        if not key:
+            continue
+        if str(row.get("publication_status") or "").upper() != "PUBLISHED":
+            continue
+        batch_rows[key].append(row)
+        fetched_utc = str(row.get("fetched_at_utc") or row.get("fetched_at") or "")
+        fetched_clock = _parse_timestamp_to_hk(
+            fetched_utc,
+            naive_tz=timezone.utc,
+        )
+        if fetched_clock is None or fetched_clock > request_clock:
+            continue
+        previous = batch_clocks.get(key)
+        if previous is None or fetched_clock > previous:
+            batch_clocks[key] = fetched_clock
+    selected_batch_id = (
+        max(batch_clocks, key=lambda key: (batch_clocks[key], key))
+        if batch_clocks
+        else ""
+    )
+
     grouped: dict[tuple[int, str], list[dict[str, Any]]] = defaultdict(list)
-    for record in rows:
-        row = dict(record)
+    for row in materialized:
         idx = _safe_int(row.get("row_idx"))
         if idx is None:
             continue
         key = str(row.get("batch_id") or "")
         if not key:
             grouped[(idx, "__missing_batch_id__")].append(row)
+            continue
+        if key != selected_batch_id:
             continue
         grouped[(idx, key)].append(row)
 
@@ -3867,7 +3900,25 @@ def _adhoc_market_metadata(
             str(by_code[code].get("eligibility_evidence_json") or "")
             for code in OUTCOME_ORDER
         }
-        if len(classifications) != 1 or len(evidence_values) != 1:
+        publication_values = {
+            str(by_code[code].get("publication_status") or "").upper()
+            for code in OUTCOME_ORDER
+        }
+        receipt_paths = {
+            str(by_code[code].get("eligibility_receipt_path") or "")
+            for code in OUTCOME_ORDER
+        }
+        receipt_hashes = {
+            str(by_code[code].get("eligibility_receipt_sha256") or "")
+            for code in OUTCOME_ORDER
+        }
+        if (
+            len(classifications) != 1
+            or len(evidence_values) != 1
+            or publication_values != {"PUBLISHED"}
+            or len(receipt_paths) != 1
+            or len(receipt_hashes) != 1
+        ):
             reasons.append("SAME_CYCLE_EVIDENCE_INCONSISTENT")
         evidence: dict[str, Any] = {}
         if not reasons:
@@ -3876,10 +3927,29 @@ def _adhoc_market_metadata(
                     batch_id=key,
                     capture_classification=next(iter(classifications)),
                     evidence_json=next(iter(evidence_values)),
+                    normalized_rows=batch_rows[key],
                     expected_issue=issue,
                 )
             except AdhocInputFreshnessError:
                 reasons.append("SAME_CYCLE_EVIDENCE_INVALID")
+        if evidence and not reasons:
+            try:
+                receipt_path = Path(next(iter(receipt_paths))).resolve()
+                expected_receipt_path = (
+                    ADHOC_INPUT_RECEIPT_ROOT / issue / f"{key}.json"
+                ).resolve()
+                if receipt_path != expected_receipt_path:
+                    raise AdhocInputFreshnessError(
+                        "same-cycle receipt path mismatch"
+                    )
+                verify_same_cycle_receipt(
+                    path=receipt_path,
+                    batch_id=key,
+                    evidence=evidence,
+                    expected_file_sha256=next(iter(receipt_hashes)),
+                )
+            except AdhocInputFreshnessError:
+                reasons.append("SAME_CYCLE_RECEIPT_INVALID")
         bound_reasons: set[str] = set()
         for code in OUTCOME_ORDER:
             try:
@@ -3895,7 +3965,22 @@ def _adhoc_market_metadata(
             bound_reasons.update(str(reason) for reason in parsed_reasons)
         reasons.extend(bound_reasons)
         if reasons:
-            diagnostics[idx].update(reasons)
+            selected[idx] = {
+                "usable": False,
+                "reasons": sorted(set(reasons)),
+                "batch_id": key,
+                "same_cycle_evidence": evidence,
+                "eligibility_receipt_path": (
+                    next(iter(receipt_paths))
+                    if len(receipt_paths) == 1
+                    else ""
+                ),
+                "eligibility_receipt_sha256": (
+                    next(iter(receipt_hashes))
+                    if len(receipt_hashes) == 1
+                    else ""
+                ),
+            }
             continue
         source_clocks: dict[str, datetime] = {}
         fetched_clocks: dict[str, datetime] = {}
@@ -3944,6 +4029,8 @@ def _adhoc_market_metadata(
             "reasons": [],
             "batch_id": key,
             "same_cycle_evidence": evidence,
+            "eligibility_receipt_path": next(iter(receipt_paths)),
+            "eligibility_receipt_sha256": next(iter(receipt_hashes)),
             "sp": {code: float(_safe_float(by_code[code].get("sp")) or 0.0) for code in OUTCOME_ORDER},
             "parlay_allowed": next(iter(pass_values)),
             "sale_status": next(iter(sale_values)),
@@ -3967,6 +4054,18 @@ def _adhoc_market_metadata(
             selected[idx] = {
                 "usable": False,
                 "reasons": sorted(reasons),
+                "batch_id": selected_batch_id,
+            }
+    selected_batch_ids = {
+        str(row.get("batch_id") or "")
+        for row in selected.values()
+        if bool(row.get("usable"))
+    }
+    if len(selected_batch_ids) > 1:
+        for idx in list(selected):
+            selected[idx] = {
+                "usable": False,
+                "reasons": ["SAME_CYCLE_BATCH_INCONSISTENT"],
             }
     for row in selected.values():
         row.pop("_selection_clock", None)
@@ -3990,6 +4089,7 @@ def _adhoc_nowscore_rows(conn: sqlite3.Connection, issue: str) -> dict[int, dict
         SELECT match_idx,
                {column('fetched_at')}, {column('schedule_date')}, {column('kickoff_time')},
                {column('status')}, {column('status_text')}, {column('can_sale')},
+               {column('league')}, {column('home')}, {column('away')},
                {column('score')}, {column('result_code')}
         FROM nowscore_bjdc_matches
         WHERE issue=?
@@ -4024,6 +4124,60 @@ def _build_adhoc_source_snapshot(
     nowscore = _adhoc_nowscore_rows(conn, resolved)
     normalized_rows: list[dict[str, Any]] = []
     all_source_clocks: list[datetime] = []
+    global_market_reasons: list[str] = []
+    batch_members = {
+        idx: row
+        for idx, row in market.items()
+        if str(row.get("batch_id") or "")
+    }
+    market_batch_ids = {
+        str(row.get("batch_id") or "") for row in batch_members.values()
+    }
+    authoritative_evidence: dict[str, Any] = {}
+    if len(market_batch_ids) != 1:
+        global_market_reasons.append("SAME_CYCLE_BATCH_INCONSISTENT")
+    elif batch_members:
+        authoritative_evidence = dict(
+            next(
+                (
+                    row
+                    for row in batch_members.values()
+                    if isinstance(row.get("same_cycle_evidence"), dict)
+                    and row.get("same_cycle_evidence")
+                ),
+                {},
+            ).get("same_cycle_evidence")
+            or {}
+        )
+        try:
+            evidence_membership = {
+                int(value)
+                for value in authoritative_evidence.get(
+                    "denominator_match_indices", []
+                )
+            }
+        except (TypeError, ValueError):
+            evidence_membership = set()
+        if evidence_membership != expected or set(batch_members) != expected:
+            global_market_reasons.append(
+                "SAME_CYCLE_DENOMINATOR_MEMBERSHIP_MISMATCH"
+            )
+        try:
+            observed_match_rows_sha256 = normalized_match_rows_sha256(
+                [dict(row) for row in match_rows],
+                list(nowscore.values()),
+            )
+        except AdhocInputFreshnessError:
+            observed_match_rows_sha256 = ""
+        if observed_match_rows_sha256 != str(
+            authoritative_evidence.get(
+                "normalized_match_rows_sha256"
+            )
+            or ""
+        ):
+            global_market_reasons.append(
+                "SAME_CYCLE_MATCH_ROWS_MISMATCH"
+            )
 
     for row in match_rows:
         idx = int(row["match_idx"])
@@ -4038,6 +4192,7 @@ def _build_adhoc_source_snapshot(
             kickoff_time=str(nowscore_row.get("kickoff_time") or ""),
         )
         decision_reasons: list[str] = []
+        decision_reasons.extend(global_market_reasons)
         if not structured:
             decision_reasons.append("FORMAL_ACTIVE_V3_3_3_INPUT_UNAVAILABLE")
         if not market_row:
@@ -4175,6 +4330,12 @@ def _build_adhoc_source_snapshot(
                     "market_outcome_fetched_clocks_hkt": dict(market_row.get("outcome_fetched_clocks_hkt") or {}),
                     "market_snapshot_sha256": market_snapshot_hash,
                     "market_batch_id": str(market_row.get("batch_id") or ""),
+                    "market_receipt_path": str(
+                        market_row.get("eligibility_receipt_path") or ""
+                    ),
+                    "market_receipt_sha256": str(
+                        market_row.get("eligibility_receipt_sha256") or ""
+                    ),
                     "same_cycle_evidence_sha256": same_cycle_evidence_hash,
                     "market_sale_status": market_sale_text or "UNKNOWN",
                     "market_parlay_allowed": pass_allowed,
@@ -4195,6 +4356,31 @@ def _build_adhoc_source_snapshot(
             "input_asof_policy": "oldest_required_observation_clock",
             "complete_denominator_match_count": len(normalized_rows),
             "formal_decision_input": decision_metadata,
+            "authoritative_market_batch_id": (
+                next(iter(market_batch_ids))
+                if len(market_batch_ids) == 1
+                else ""
+            ),
+            "authoritative_market_receipt_path": (
+                str(
+                    next(iter(batch_members.values())).get(
+                        "eligibility_receipt_path"
+                    )
+                    or ""
+                )
+                if batch_members
+                else ""
+            ),
+            "authoritative_market_receipt_sha256": (
+                str(
+                    next(iter(batch_members.values())).get(
+                        "eligibility_receipt_sha256"
+                    )
+                    or ""
+                )
+                if batch_members
+                else ""
+            ),
             "sale_metadata_contract": {
                 "requires": [
                     "content_addressed_same_cycle_batch",

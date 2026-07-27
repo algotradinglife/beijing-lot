@@ -13,6 +13,7 @@ import hashlib
 import json
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 
@@ -22,6 +23,9 @@ OUTCOME_CODES = ("3", "1", "0")
 SCHEMA_VERSION = "adhoc_same_cycle_eligibility_v1"
 CAPTURE_CLASSIFICATION = "adhoc_same_cycle_bound"
 DEFAULT_MAX_CLOCK_SKEW = timedelta(minutes=5)
+DEFAULT_RECEIPT_ROOT = (
+    Path(__file__).resolve().parents[1] / "results" / "adhoc_input_freshness"
+)
 
 
 class AdhocInputFreshnessError(ValueError):
@@ -187,6 +191,153 @@ def _positive(value: Any) -> bool:
         return False
 
 
+def _normalized_reason_list(value: Any) -> list[str]:
+    parsed = value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise AdhocInputFreshnessError(
+                "eligibility reasons must be valid JSON"
+            ) from exc
+    if not isinstance(parsed, list):
+        raise AdhocInputFreshnessError("eligibility reasons must be a list")
+    return sorted({str(reason) for reason in parsed})
+
+
+def normalized_market_rows_sha256(rows: Sequence[Mapping[str, Any]]) -> str:
+    """Hash the normalized market facts consumed by adhoc generation."""
+
+    normalized: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            row_idx = int(row["row_idx"])
+            playid = int(row.get("playid", 34))
+            sp = float(row["sp"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AdhocInputFreshnessError(
+                "normalized market row identity or SP is invalid"
+            ) from exc
+        normalized.append(
+            {
+                "issue": str(row.get("issue") or ""),
+                "playid": playid,
+                "row_idx": row_idx,
+                "outcome_code": str(row.get("outcome_code") or ""),
+                "sp": format(sp, ".12g"),
+                "sale_status": str(row.get("sale_status") or "").lower(),
+                "sale_cutoff_hkt": explicit_hkt(
+                    str(row.get("sale_cutoff_hkt") or "")
+                ),
+                "parlay_allowed": str(row.get("parlay_allowed") or "").lower(),
+                "fetched_at_utc": explicit_utc(
+                    str(row.get("fetched_at_utc") or row.get("fetched_at") or "")
+                ),
+                "source_updated_at_hkt": explicit_hkt(
+                    str(
+                        row.get("source_updated_at_hkt")
+                        or row.get("source_updatetime")
+                        or ""
+                    )
+                ),
+                "eligibility_reasons": _normalized_reason_list(
+                    row.get("eligibility_reasons_json", [])
+                ),
+            }
+        )
+    normalized.sort(
+        key=lambda row: (
+            row["issue"],
+            row["playid"],
+            row["row_idx"],
+            row["outcome_code"],
+        )
+    )
+    return sha256_bytes(canonical_json(normalized))
+
+
+def normalized_match_rows_sha256(
+    issue_rows: Sequence[Mapping[str, Any]],
+    nowscore_rows: Sequence[Mapping[str, Any]],
+) -> str:
+    """Hash denominator identity, kickoff, sale state and source clocks."""
+
+    nowscore_by_idx = _unique_rows_by_index(
+        nowscore_rows,
+        key="match_idx",
+        source="Nowscore issue page",
+    )
+    normalized: list[dict[str, Any]] = []
+    for issue_row in issue_rows:
+        try:
+            match_idx = int(issue_row["match_idx"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AdhocInputFreshnessError(
+                "official issue row has invalid match index"
+            ) from exc
+        nowscore = nowscore_by_idx.get(match_idx, {})
+        cutoff_text = str(issue_row.get("end_time") or "")
+        try:
+            cutoff = explicit_hkt(cutoff_text)
+        except AdhocInputFreshnessError:
+            cutoff = ""
+        kickoff = (
+            resolve_kickoff_hkt(
+                sale_cutoff=cutoff,
+                schedule_date=str(nowscore.get("schedule_date") or ""),
+                kickoff_time=str(nowscore.get("kickoff_time") or ""),
+            )
+            if cutoff
+            else None
+        )
+        issue_fetched_at = str(
+            issue_row.get("fetched_at")
+            or issue_row.get("html_fetched_at")
+            or ""
+        )
+        nowscore_fetched_at = str(nowscore.get("fetched_at") or "")
+        normalized.append(
+            {
+                "issue": str(issue_row.get("issue") or ""),
+                "match_idx": match_idx,
+                "match_id": (
+                    f"{str(issue_row.get('issue') or '')}_{match_idx:03d}"
+                ),
+                "league": str(
+                    issue_row.get("league")
+                    or nowscore.get("league")
+                    or ""
+                ),
+                "home": str(
+                    issue_row.get("home") or nowscore.get("home") or ""
+                ),
+                "away": str(
+                    issue_row.get("away") or nowscore.get("away") or ""
+                ),
+                "kickoff_at_hkt": (
+                    explicit_hkt(kickoff) if kickoff is not None else ""
+                ),
+                "sale_cutoff_hkt": cutoff,
+                "official_disabled": str(
+                    issue_row.get("disabled") or ""
+                ).lower(),
+                "nowscore_can_sale": _as_bool(nowscore.get("can_sale")),
+                "issue_fetched_at_utc": (
+                    explicit_utc(issue_fetched_at)
+                    if issue_fetched_at
+                    else ""
+                ),
+                "nowscore_fetched_at_utc": (
+                    explicit_utc(nowscore_fetched_at)
+                    if nowscore_fetched_at
+                    else ""
+                ),
+            }
+        )
+    normalized.sort(key=lambda row: (row["issue"], row["match_idx"]))
+    return sha256_bytes(canonical_json(normalized))
+
+
 def _unique_rows_by_index(
     rows: Sequence[Mapping[str, Any]],
     *,
@@ -269,23 +420,6 @@ def build_same_cycle_batch(
         sorted({str(mode).strip() for mode in parlay_modes if str(mode).strip()})
     )
     parlay_proven = "自由过关" in modes
-    batch_identity = {
-        "schema_version": SCHEMA_VERSION,
-        "issue": str(issue),
-        "source_clocks_utc": {
-            name: explicit_utc(clock) for name, clock in sorted(clocks.items())
-        },
-        "source_sha256": dict(sorted(source_sha256.items())),
-        "parlay_modes": list(modes),
-    }
-    batch_id = sha256_bytes(canonical_json(batch_identity))
-    evidence = {
-        **batch_identity,
-        "batch_id": batch_id,
-        "clock_skew_seconds": int((newest - oldest).total_seconds()),
-    }
-    evidence_json = canonical_json(evidence).decode("utf-8")
-
     bound_rows: list[dict[str, Any]] = []
     rejection_counts: Counter[str] = Counter()
     eligible_indices: list[int] = []
@@ -359,7 +493,6 @@ def build_same_cycle_batch(
                         str(raw.get("source_updatetime") or "")
                     ),
                     "match_id": f"{issue}_{match_idx:03d}",
-                    "batch_id": batch_id,
                     "source_url": str(raw.get("source_url") or ""),
                     "sale_status": sale_status,
                     "sale_cutoff_hkt": cutoff or None,
@@ -369,12 +502,39 @@ def build_same_cycle_batch(
                     ),
                     "stake_limit_json": "{}",
                     "capture_classification": CAPTURE_CLASSIFICATION,
-                    "eligibility_evidence_json": evidence_json,
                     "eligibility_reasons_json": json.dumps(
                         reasons, ensure_ascii=False, separators=(",", ":")
                     ),
                 }
             )
+
+    batch_identity = {
+        "schema_version": SCHEMA_VERSION,
+        "issue": str(issue),
+        "source_clocks_utc": {
+            name: explicit_utc(clock) for name, clock in sorted(clocks.items())
+        },
+        "source_sha256": dict(sorted(source_sha256.items())),
+        "parlay_modes": list(modes),
+        "denominator_match_indices": sorted(issue_by_idx),
+        "normalized_match_rows_sha256": normalized_match_rows_sha256(
+            issue_rows,
+            nowscore_rows,
+        ),
+        "normalized_market_rows_sha256": normalized_market_rows_sha256(
+            bound_rows
+        ),
+    }
+    batch_id = sha256_bytes(canonical_json(batch_identity))
+    evidence = {
+        **batch_identity,
+        "batch_id": batch_id,
+        "clock_skew_seconds": int((newest - oldest).total_seconds()),
+    }
+    evidence_json = canonical_json(evidence).decode("utf-8")
+    for row in bound_rows:
+        row["batch_id"] = batch_id
+        row["eligibility_evidence_json"] = evidence_json
 
     receipt = {
         **evidence,
@@ -399,6 +559,7 @@ def verify_same_cycle_evidence(
     batch_id: str,
     capture_classification: str,
     evidence_json: str,
+    normalized_rows: Sequence[Mapping[str, Any]],
     expected_issue: str | None = None,
 ) -> dict[str, Any]:
     """Verify the content-addressed evidence stored with a market vector."""
@@ -445,4 +606,90 @@ def verify_same_cycle_evidence(
     modes = evidence.get("parlay_modes")
     if not isinstance(modes, list) or "自由过关" not in modes:
         raise AdhocInputFreshnessError("same-cycle evidence lacks free-parlay proof")
+    membership = evidence.get("denominator_match_indices")
+    if (
+        not isinstance(membership, list)
+        or not membership
+        or any(
+            not isinstance(value, int) or value <= 0
+            for value in membership
+        )
+        or membership != sorted(set(membership))
+    ):
+        raise AdhocInputFreshnessError(
+            "same-cycle denominator membership is invalid"
+        )
+    match_rows_sha256 = str(
+        evidence.get("normalized_match_rows_sha256") or ""
+    )
+    if (
+        len(match_rows_sha256) != 64
+        or any(
+            char not in "0123456789abcdef"
+            for char in match_rows_sha256
+        )
+    ):
+        raise AdhocInputFreshnessError(
+            "same-cycle normalized match rows hash is invalid"
+        )
+    expected_rows_sha256 = str(
+        evidence.get("normalized_market_rows_sha256") or ""
+    )
+    if (
+        not expected_rows_sha256
+        or normalized_market_rows_sha256(normalized_rows)
+        != expected_rows_sha256
+    ):
+        raise AdhocInputFreshnessError(
+            "same-cycle normalized market rows mismatch"
+        )
     return evidence
+
+
+def verify_same_cycle_receipt(
+    *,
+    path: Path,
+    batch_id: str,
+    evidence: Mapping[str, Any],
+    expected_file_sha256: str,
+) -> dict[str, Any]:
+    """Verify the immutable filesystem receipt required by a DB batch."""
+
+    try:
+        payload = path.read_bytes()
+    except OSError as exc:
+        raise AdhocInputFreshnessError(
+            "same-cycle receipt is unavailable"
+        ) from exc
+    if (
+        not expected_file_sha256
+        or sha256_bytes(payload) != expected_file_sha256
+    ):
+        raise AdhocInputFreshnessError(
+            "same-cycle receipt artifact hash mismatch"
+        )
+    try:
+        receipt = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise AdhocInputFreshnessError("same-cycle receipt is malformed") from exc
+    if not isinstance(receipt, dict):
+        raise AdhocInputFreshnessError("same-cycle receipt must be an object")
+    internal_sha256 = str(receipt.get("sha256") or "")
+    unsigned = {
+        key: value for key, value in receipt.items() if key != "sha256"
+    }
+    if (
+        not internal_sha256
+        or sha256_bytes(canonical_json(unsigned)) != internal_sha256
+    ):
+        raise AdhocInputFreshnessError(
+            "same-cycle receipt digest mismatch"
+        )
+    if str(receipt.get("batch_id") or "") != batch_id:
+        raise AdhocInputFreshnessError("same-cycle receipt batch mismatch")
+    for key, value in evidence.items():
+        if receipt.get(key) != value:
+            raise AdhocInputFreshnessError(
+                f"same-cycle receipt evidence mismatch: {key}"
+            )
+    return receipt

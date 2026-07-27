@@ -141,6 +141,9 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         "capture_classification": "TEXT NOT NULL DEFAULT 'legacy_unclassified'",
         "eligibility_evidence_json": "TEXT NOT NULL DEFAULT '{}'",
         "eligibility_reasons_json": "TEXT NOT NULL DEFAULT '[]'",
+        "publication_status": "TEXT NOT NULL DEFAULT 'unpublished'",
+        "eligibility_receipt_path": "TEXT",
+        "eligibility_receipt_sha256": "TEXT",
     }
     for name, definition in additions.items():
         if name not in columns:

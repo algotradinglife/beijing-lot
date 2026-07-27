@@ -2488,6 +2488,42 @@ def _verify_package(
     source_metadata = decision_input.get("source_metadata")
     if not isinstance(source_metadata, dict):
         raise AdhocBettingError("adhoc decision input source metadata is missing")
+    market_batch_ids = {
+        str((row.get("source_provenance") or {}).get("market_batch_id") or "")
+        for row in decision_rows.values()
+        if isinstance(row.get("source_provenance"), dict)
+        and str(
+            (row.get("source_provenance") or {}).get(
+                "market_batch_id"
+            )
+            or ""
+        )
+    }
+    if len(market_batch_ids) > 1:
+        raise AdhocBettingError(
+            "adhoc package mixes multiple market batch IDs"
+        )
+    authoritative_market_batch_id = str(
+        source_metadata.get("authoritative_market_batch_id") or ""
+    )
+    if manifest.get("status") == "READY_FOR_REVIEW":
+        if (
+            len(market_batch_ids) != 1
+            or authoritative_market_batch_id
+            != next(iter(market_batch_ids))
+            or not re.fullmatch(
+                r"[0-9a-f]{64}",
+                str(
+                    source_metadata.get(
+                        "authoritative_market_receipt_sha256"
+                    )
+                    or ""
+                ),
+            )
+        ):
+            raise AdhocBettingError(
+                "adhoc package lacks one authoritative published market batch"
+            )
     try:
         source_request_clock = _parse_hkt(
             source_metadata.get("request_clock_hkt"), label="source_metadata.request_clock_hkt"

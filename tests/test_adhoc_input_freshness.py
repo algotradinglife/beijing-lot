@@ -16,6 +16,7 @@ from src.adhoc_input_freshness import (
     parse_utc,
     sha256_bytes,
     verify_same_cycle_evidence,
+    verify_same_cycle_receipt,
 )
 
 
@@ -29,6 +30,10 @@ def _sources(*, parlay_modes: tuple[str, ...] = ("自由过关",)):
             "sp_home": 3.0,
             "sp_draw": 3.0,
             "sp_away": 3.0,
+            "home": "主队",
+            "away": "客队",
+            "league": "测试联赛",
+            "fetched_at": "2026-07-27T04:00:00+00:00",
         }
     ]
     nowscore_rows = [
@@ -36,6 +41,12 @@ def _sources(*, parlay_modes: tuple[str, ...] = ("自由过关",)):
             "issue": "26078",
             "match_idx": 1,
             "can_sale": 1,
+            "home": "主队",
+            "away": "客队",
+            "league": "测试联赛",
+            "schedule_date": "2026-07-27",
+            "kickoff_time": "14:00",
+            "fetched_at": "2026-07-27T04:00:01+00:00",
         }
     ]
     market_rows = [
@@ -95,9 +106,58 @@ def test_same_cycle_batch_binds_sp_sale_and_parlay_evidence() -> None:
         batch_id=batch["batch_id"],
         capture_classification=batch["rows"][0]["capture_classification"],
         evidence_json=batch["rows"][0]["eligibility_evidence_json"],
+        normalized_rows=batch["rows"],
         expected_issue="26078",
     )
     assert evidence["source_sha256"]["live_sp_xml"] == "c" * 64
+
+
+def test_same_cycle_evidence_rejects_tampered_normalized_market_rows() -> None:
+    batch = _sources()
+    tampered = [dict(row) for row in batch["rows"]]
+    for row in tampered:
+        row["sp"] = 99.0
+
+    with pytest.raises(
+        AdhocInputFreshnessError,
+        match="normalized market rows mismatch",
+    ):
+        verify_same_cycle_evidence(
+            batch_id=batch["batch_id"],
+            capture_classification=batch["rows"][0]["capture_classification"],
+            evidence_json=batch["rows"][0]["eligibility_evidence_json"],
+            normalized_rows=tampered,
+            expected_issue="26078",
+        )
+
+
+def test_same_cycle_receipt_is_required_and_bound_to_evidence(tmp_path) -> None:
+    batch = _sources()
+    evidence = json.loads(batch["rows"][0]["eligibility_evidence_json"])
+    receipt_path = tmp_path / f"{batch['batch_id']}.json"
+    receipt_path.write_bytes(canonical_json(batch["receipt"]) + b"\n")
+
+    verified = verify_same_cycle_receipt(
+        path=receipt_path,
+        batch_id=batch["batch_id"],
+        evidence=evidence,
+        expected_file_sha256=sha256_bytes(receipt_path.read_bytes()),
+    )
+    assert verified["normalized_market_rows_sha256"] == evidence[
+        "normalized_market_rows_sha256"
+    ]
+
+    receipt_path.unlink()
+    with pytest.raises(
+        AdhocInputFreshnessError,
+        match="receipt is unavailable",
+    ):
+        verify_same_cycle_receipt(
+            path=receipt_path,
+            batch_id=batch["batch_id"],
+            evidence=evidence,
+            expected_file_sha256="0" * 64,
+        )
 
 
 def test_missing_official_parlay_evidence_fails_with_specific_reason() -> None:
@@ -257,7 +317,8 @@ def test_one_shot_cli_function_publishes_one_atomic_batch(
         rows = conn.execute(
             """
             SELECT DISTINCT batch_id, capture_classification,
-                            fetched_at_utc, sale_status, parlay_allowed
+                            fetched_at_utc, sale_status, parlay_allowed,
+                            publication_status, eligibility_receipt_sha256
             FROM live_market_sp_snapshots
             """
         ).fetchall()
@@ -268,5 +329,124 @@ def test_one_shot_cli_function_publishes_one_atomic_batch(
             "2026-07-27T04:00:02+00:00",
             "open",
             "allowed",
+            "published",
+            result["receipt_sha256"],
         )
     ]
+
+
+def test_receipt_write_failure_rolls_back_database_rows(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    issue_rows = [
+        {
+            "issue": "26078",
+            "match_idx": 1,
+            "end_time": "2026-07-27T13:30:00+08:00",
+            "disabled": "no",
+            "sp_home": 3.0,
+            "sp_draw": 3.1,
+            "sp_away": 3.2,
+            "fetched_at": "",
+        }
+    ]
+    nowscore_rows = [
+        {
+            "issue": "26078",
+            "match_idx": 1,
+            "provider_match_id": "123",
+            "fetched_at": "",
+            "schedule_date": "2026-07-27",
+            "league": "测试联赛",
+            "kickoff_time": "14:00",
+            "status_text": "未开赛",
+            "status": "scheduled",
+            "can_sale": 1,
+            "home": "主队",
+            "away": "客队",
+            "handicap_text": "0",
+            "handicap_line": 0.0,
+            "score": "",
+            "halftime_score": "",
+            "result_code": None,
+            "panlu_url": "",
+            "asian_url": "",
+            "europe_url": "",
+            "analysis_url": "",
+            "recommendation_url": "",
+            "sp_url": "",
+            "raw_row_hash": "a" * 40,
+            "raw_row": "<tr/>",
+        }
+    ]
+    market_rows = [
+        {
+            "issue": "26078",
+            "playid": 34,
+            "market_key": "handicap_3way",
+            "row_idx": 1,
+            "outcome_code": code,
+            "outcome_label": code,
+            "sp": 3.0,
+            "source_attribute": attribute,
+            "source_updatetime": "2026-07-27 12:00:00",
+            "home": "主队",
+            "away": "客队",
+            "league": "测试联赛",
+            "raw_node": "<w1/>",
+        }
+        for code, attribute in (("3", "c1"), ("1", "c3"), ("0", "c5"))
+    ]
+
+    def parse_issue(_issue, _text, *, fetched_at):
+        rows = [dict(row) for row in issue_rows]
+        rows[0]["fetched_at"] = fetched_at
+        return rows
+
+    def parse_nowscore(_issue, _text, fetched_at):
+        rows = [dict(row) for row in nowscore_rows]
+        rows[0]["fetched_at"] = fetched_at
+        return rows
+
+    monkeypatch.setattr(refresh_script.source_500, "parse_issue_rows", parse_issue)
+    monkeypatch.setattr(refresh_script.source_nowscore, "parse_rows", parse_nowscore)
+    monkeypatch.setattr(
+        refresh_script.source_500,
+        "parse_live_market_sp",
+        lambda *_args: ("2026-07-27 12:00:00", [dict(row) for row in market_rows]),
+    )
+    monkeypatch.setattr(
+        refresh_script,
+        "_atomic_json",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("disk full")),
+    )
+    clocks = iter(
+        (
+            "2026-07-27T04:00:00+00:00",
+            "2026-07-27T04:00:01+00:00",
+            "2026-07-27T04:00:02+00:00",
+        )
+    )
+    database = tmp_path / "rollback.sqlite"
+
+    with pytest.raises(OSError, match="disk full"):
+        refresh_script.refresh_adhoc_inputs(
+            issue="26078",
+            db_path=database,
+            receipt_root=tmp_path / "receipts",
+            clock=lambda: next(clocks),
+            fetch_500=lambda url, **_kwargs: scrape_500_bjdc.FetchResult(
+                url=url,
+                status=200,
+                body=(
+                    "自由过关".encode("gb18030")
+                    if "index.php" in url
+                    else b"<root/>"
+                ),
+                elapsed_sec=0.01,
+            ),
+            fetch_nowscore=lambda *_args: (200, b"<table/>", 0.01),
+        )
+
+    assert not database.exists()

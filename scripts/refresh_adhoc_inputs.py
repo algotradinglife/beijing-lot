@@ -26,6 +26,7 @@ if str(ROOT) not in sys.path:
 from scripts import scrape_500_bjdc as source_500  # noqa: E402
 from scripts import scrape_nowscore_bjdc as source_nowscore  # noqa: E402
 from src.adhoc_input_freshness import (  # noqa: E402
+    DEFAULT_RECEIPT_ROOT,
     build_same_cycle_batch,
     canonical_json,
     explicit_utc,
@@ -35,7 +36,6 @@ from src.sqlite_runtime import connect_sqlite  # noqa: E402
 
 
 DEFAULT_DB = source_500.DEFAULT_DB
-DEFAULT_RECEIPT_ROOT = ROOT / "results" / "adhoc_input_freshness"
 PARLAY_MODE_MARKERS = ("自由过关",)
 
 
@@ -77,7 +77,8 @@ def _persist_bound_rows(
             fetched_at_utc, source_updated_at_hkt, sale_status, sale_cutoff_hkt,
             parlay_allowed, parlay_modes_json, stake_limit_json,
             capture_classification, eligibility_evidence_json,
-            eligibility_reasons_json
+            eligibility_reasons_json, publication_status,
+            eligibility_receipt_path, eligibility_receipt_sha256
         ) VALUES(
             :issue, :playid, :market_key, :fetched_at, :source_updatetime, :row_idx,
             :home, :away, :league, :outcome_code, :outcome_label, :sp,
@@ -85,7 +86,8 @@ def _persist_bound_rows(
             :fetched_at_utc, :source_updated_at_hkt, :sale_status, :sale_cutoff_hkt,
             :parlay_allowed, :parlay_modes_json, :stake_limit_json,
             :capture_classification, :eligibility_evidence_json,
-            :eligibility_reasons_json
+            :eligibility_reasons_json, :publication_status,
+            :eligibility_receipt_path, :eligibility_receipt_sha256
         )
         """,
         rows,
@@ -175,6 +177,20 @@ def refresh_adhoc_inputs(
         parlay_modes=parlay_modes,
     )
 
+    receipt = dict(batch["receipt"])
+    receipt_path = receipt_root / issue / f"{batch['batch_id']}.json"
+    _atomic_json(receipt_path, receipt)
+    receipt_sha256 = sha256_bytes(receipt_path.read_bytes())
+    published_rows = []
+    for row in batch["rows"]:
+        published_rows.append(
+            {
+                **row,
+                "publication_status": "published",
+                "eligibility_receipt_path": str(receipt_path.resolve()),
+                "eligibility_receipt_sha256": receipt_sha256,
+            }
+        )
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with connect_sqlite(db_path, row_factory=True) as conn:
         source_500.create_schema(conn)
@@ -183,15 +199,12 @@ def refresh_adhoc_inputs(
         try:
             source_500.upsert_matches(conn, issue_rows)
             source_nowscore.upsert_match_rows(conn, nowscore_rows)
-            _persist_bound_rows(conn, list(batch["rows"]))
+            _persist_bound_rows(conn, published_rows)
             conn.commit()
         except Exception:
             conn.rollback()
             raise
 
-    receipt = dict(batch["receipt"])
-    receipt_path = receipt_root / issue / f"{batch['batch_id']}.json"
-    _atomic_json(receipt_path, receipt)
     return {
         "status": receipt["status"],
         "issue": issue,
@@ -200,7 +213,7 @@ def refresh_adhoc_inputs(
         "match_count": receipt["match_count"],
         "rejection_counts": receipt["rejection_counts"],
         "receipt": str(receipt_path.resolve()),
-        "receipt_sha256": sha256_bytes(receipt_path.read_bytes()),
+        "receipt_sha256": receipt_sha256,
         "database": str(db_path.resolve()),
     }
 

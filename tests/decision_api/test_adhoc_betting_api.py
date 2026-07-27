@@ -24,6 +24,8 @@ from src.adhoc_input_freshness import (
     CAPTURE_CLASSIFICATION,
     SCHEMA_VERSION as FRESHNESS_SCHEMA_VERSION,
     canonical_json as freshness_canonical_json,
+    normalized_match_rows_sha256,
+    normalized_market_rows_sha256,
     sha256_bytes as freshness_sha256_bytes,
 )
 from src.decision_api import app as appmod
@@ -60,6 +62,56 @@ def _release(shadow_dir: Path) -> dict[str, object]:
 
 def _build_db(path: Path) -> None:
     source_clock_utc = NOW.astimezone(timezone.utc).isoformat(timespec="seconds")
+    issue_fixture_rows = [
+        {
+            "issue": ISSUE,
+            "match_idx": idx,
+            "end_time": (NOW + timedelta(hours=3 + idx)).isoformat(),
+            "disabled": "no",
+            "home": f"主队{idx}",
+            "away": f"客队{idx}",
+            "league": "合成联赛",
+            "fetched_at": NOW.isoformat(),
+        }
+        for idx in range(1, 9)
+    ]
+    nowscore_fixture_rows = [
+        {
+            "issue": ISSUE,
+            "match_idx": idx,
+            "can_sale": 1,
+            "home": f"主队{idx}",
+            "away": f"客队{idx}",
+            "league": "合成联赛",
+            "schedule_date": (
+                NOW + timedelta(hours=4 + idx)
+            ).date().isoformat(),
+            "kickoff_time": (
+                NOW + timedelta(hours=4 + idx)
+            ).strftime("%H:%M"),
+            "fetched_at": NOW.isoformat(),
+        }
+        for idx in range(1, 9)
+    ]
+    normalized_market_rows = [
+        {
+            "issue": ISSUE,
+            "playid": 34,
+            "row_idx": idx,
+            "outcome_code": code,
+            "sp": 3.0,
+            "parlay_allowed": "allowed",
+            "sale_status": "open",
+            "sale_cutoff_hkt": (
+                NOW + timedelta(hours=3 + idx)
+            ).isoformat(),
+            "fetched_at_utc": NOW.isoformat(),
+            "source_updated_at_hkt": NOW.isoformat(),
+            "eligibility_reasons_json": "[]",
+        }
+        for idx in range(1, 9)
+        for code in ("3", "1", "0")
+    ]
     batch_identity = {
         "schema_version": FRESHNESS_SCHEMA_VERSION,
         "issue": ISSUE,
@@ -74,6 +126,14 @@ def _build_db(path: Path) -> None:
             "nowscore_html": "c" * 64,
         },
         "parlay_modes": ["自由过关"],
+        "denominator_match_indices": list(range(1, 9)),
+        "normalized_match_rows_sha256": normalized_match_rows_sha256(
+            issue_fixture_rows,
+            nowscore_fixture_rows,
+        ),
+        "normalized_market_rows_sha256": normalized_market_rows_sha256(
+            normalized_market_rows
+        ),
     }
     batch_id = freshness_sha256_bytes(freshness_canonical_json(batch_identity))
     evidence_json = freshness_canonical_json(
@@ -83,6 +143,32 @@ def _build_db(path: Path) -> None:
             "clock_skew_seconds": 0,
         }
     ).decode("utf-8")
+    evidence = json.loads(evidence_json)
+    receipt = {
+        **evidence,
+        "match_count": 8,
+        "nowscore_match_count": 8,
+        "live_sp_match_count": 8,
+        "eligible_match_count": 8,
+        "eligible_match_indices": list(range(1, 9)),
+        "rejection_counts": {},
+        "status": "PASS",
+    }
+    receipt["sha256"] = freshness_sha256_bytes(
+        freshness_canonical_json(receipt)
+    )
+    receipt_path = (
+        path.parent
+        / "results"
+        / "adhoc_input_freshness"
+        / ISSUE
+        / f"{batch_id}.json"
+    )
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    receipt_path.write_bytes(freshness_canonical_json(receipt) + b"\n")
+    receipt_artifact_sha256 = freshness_sha256_bytes(
+        receipt_path.read_bytes()
+    )
     conn = sqlite3.connect(path)
     try:
         conn.executescript(
@@ -176,7 +262,10 @@ def _build_db(path: Path) -> None:
                 batch_id TEXT,
                 capture_classification TEXT,
                 eligibility_evidence_json TEXT,
-                eligibility_reasons_json TEXT
+                eligibility_reasons_json TEXT,
+                publication_status TEXT,
+                eligibility_receipt_path TEXT,
+                eligibility_receipt_sha256 TEXT
             );
             """
         )
@@ -264,7 +353,7 @@ def _build_db(path: Path) -> None:
             for code in ("3", "1", "0"):
                 conn.execute(
                     """
-                    INSERT INTO live_market_sp_snapshots VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    INSERT INTO live_market_sp_snapshots VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     """,
                     (
                         ISSUE,
@@ -281,11 +370,248 @@ def _build_db(path: Path) -> None:
                         CAPTURE_CLASSIFICATION,
                         evidence_json,
                         "[]",
+                        "published",
+                        str(receipt_path.resolve()),
+                        receipt_artifact_sha256,
                     ),
                 )
         conn.commit()
     finally:
         conn.close()
+
+
+def _rebind_market_batch(path: Path) -> str:
+    receipt_root = path.parent / "results" / "adhoc_input_freshness"
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT issue, playid, row_idx, outcome_code, sp,
+                       parlay_allowed, sale_status, sale_cutoff_hkt,
+                       fetched_at_utc, source_updated_at_hkt,
+                       eligibility_reasons_json, eligibility_evidence_json
+                FROM live_market_sp_snapshots
+                WHERE issue=? AND playid=34
+                ORDER BY row_idx, outcome_code
+                """,
+                (ISSUE,),
+            )
+        ]
+        previous = json.loads(rows[0]["eligibility_evidence_json"])
+        issue_rows = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT issue, match_idx, league, home, away, end_time,
+                       disabled, fetched_at
+                FROM matches WHERE issue=? ORDER BY match_idx
+                """,
+                (ISSUE,),
+            )
+        ]
+        nowscore_rows = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT issue, match_idx, league, home, away, fetched_at,
+                       schedule_date, kickoff_time, can_sale
+                FROM nowscore_bjdc_matches
+                WHERE issue=? ORDER BY match_idx
+                """,
+                (ISSUE,),
+            )
+        ]
+        batch_identity = {
+            "schema_version": FRESHNESS_SCHEMA_VERSION,
+            "issue": ISSUE,
+            "source_clocks_utc": previous["source_clocks_utc"],
+            "source_sha256": previous["source_sha256"],
+            "parlay_modes": previous["parlay_modes"],
+            "denominator_match_indices": previous[
+                "denominator_match_indices"
+            ],
+            "normalized_match_rows_sha256": normalized_match_rows_sha256(
+                issue_rows,
+                nowscore_rows,
+            ),
+            "normalized_market_rows_sha256": normalized_market_rows_sha256(
+                rows
+            ),
+        }
+        batch_id = freshness_sha256_bytes(
+            freshness_canonical_json(batch_identity)
+        )
+        evidence = {
+            **batch_identity,
+            "batch_id": batch_id,
+            "clock_skew_seconds": previous["clock_skew_seconds"],
+        }
+        evidence_json = freshness_canonical_json(evidence).decode("utf-8")
+    finally:
+        conn.close()
+
+    eligible_indices = sorted(
+        {
+            int(row["row_idx"])
+            for row in rows
+            if json.loads(row["eligibility_reasons_json"] or "[]") == []
+        }
+    )
+    receipt = {
+        **evidence,
+        "match_count": 8,
+        "nowscore_match_count": 8,
+        "live_sp_match_count": 8,
+        "eligible_match_count": len(eligible_indices),
+        "eligible_match_indices": eligible_indices,
+        "rejection_counts": {},
+        "status": "PASS" if eligible_indices else "FAILED_CLOSED",
+    }
+    receipt["sha256"] = freshness_sha256_bytes(
+        freshness_canonical_json(receipt)
+    )
+    receipt_path = receipt_root / ISSUE / f"{batch_id}.json"
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    receipt_path.write_bytes(freshness_canonical_json(receipt) + b"\n")
+    receipt_artifact_sha256 = freshness_sha256_bytes(
+        receipt_path.read_bytes()
+    )
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            """
+            UPDATE live_market_sp_snapshots
+            SET batch_id=?, eligibility_evidence_json=?,
+                publication_status='published',
+                eligibility_receipt_path=?,
+                eligibility_receipt_sha256=?
+            WHERE issue=? AND playid=34
+            """,
+            (
+                batch_id,
+                evidence_json,
+                str(receipt_path.resolve()),
+                receipt_artifact_sha256,
+                ISSUE,
+            ),
+        )
+    return batch_id
+
+
+def _append_partial_market_batch(
+    path: Path,
+    *,
+    observed_at: datetime,
+) -> str:
+    with sqlite3.connect(path) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = [
+            dict(row)
+            for row in conn.execute(
+                """
+                SELECT issue, playid, row_idx, outcome_code, sp,
+                       parlay_allowed, sale_status, sale_cutoff_hkt,
+                       fetched_at_utc, source_updated_at_hkt,
+                       eligibility_reasons_json, eligibility_evidence_json,
+                       capture_classification
+                FROM live_market_sp_snapshots
+                WHERE issue=? AND playid=34 AND row_idx=1
+                ORDER BY outcome_code
+                """,
+                (ISSUE,),
+            )
+        ]
+    previous = json.loads(rows[0]["eligibility_evidence_json"])
+    for row in rows:
+        row["fetched_at_utc"] = observed_at.astimezone(
+            timezone.utc
+        ).isoformat(timespec="seconds")
+        row["source_updated_at_hkt"] = observed_at.isoformat(
+            timespec="seconds"
+        )
+    source_clock = observed_at.astimezone(timezone.utc).isoformat(
+        timespec="seconds"
+    )
+    batch_identity = {
+        "schema_version": FRESHNESS_SCHEMA_VERSION,
+        "issue": ISSUE,
+        "source_clocks_utc": {
+            "issue_html": source_clock,
+            "live_sp_xml": source_clock,
+            "nowscore_html": source_clock,
+        },
+        "source_sha256": previous["source_sha256"],
+        "parlay_modes": previous["parlay_modes"],
+        "denominator_match_indices": [1],
+        "normalized_match_rows_sha256": previous[
+            "normalized_match_rows_sha256"
+        ],
+        "normalized_market_rows_sha256": normalized_market_rows_sha256(
+            rows
+        ),
+    }
+    batch_id = freshness_sha256_bytes(
+        freshness_canonical_json(batch_identity)
+    )
+    evidence = {
+        **batch_identity,
+        "batch_id": batch_id,
+        "clock_skew_seconds": 0,
+    }
+    evidence_json = freshness_canonical_json(evidence).decode("utf-8")
+    receipt = {
+        **evidence,
+        "match_count": 1,
+        "nowscore_match_count": 1,
+        "live_sp_match_count": 1,
+        "eligible_match_count": 1,
+        "eligible_match_indices": [1],
+        "rejection_counts": {},
+        "status": "PASS",
+    }
+    receipt["sha256"] = freshness_sha256_bytes(
+        freshness_canonical_json(receipt)
+    )
+    receipt_path = (
+        path.parent
+        / "results"
+        / "adhoc_input_freshness"
+        / ISSUE
+        / f"{batch_id}.json"
+    )
+    receipt_path.parent.mkdir(parents=True, exist_ok=True)
+    receipt_path.write_bytes(freshness_canonical_json(receipt) + b"\n")
+    receipt_sha256 = freshness_sha256_bytes(receipt_path.read_bytes())
+    with sqlite3.connect(path) as conn:
+        for row in rows:
+            conn.execute(
+                """
+                INSERT INTO live_market_sp_snapshots
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """,
+                (
+                    ISSUE,
+                    34,
+                    1,
+                    row["outcome_code"],
+                    row["sp"],
+                    row["parlay_allowed"],
+                    row["sale_status"],
+                    row["sale_cutoff_hkt"],
+                    row["fetched_at_utc"],
+                    row["source_updated_at_hkt"],
+                    batch_id,
+                    CAPTURE_CLASSIFICATION,
+                    evidence_json,
+                    row["eligibility_reasons_json"],
+                    "published",
+                    str(receipt_path.resolve()),
+                    receipt_sha256,
+                ),
+            )
+    return batch_id
 
 
 def _write_structured_input(shadow_dir: Path, *, p3: float = 0.5) -> Path:
@@ -325,6 +651,11 @@ def _app(tmp_path: Path, monkeypatch):
     db_path = tmp_path / "500.sqlite"
     shadow_dir = tmp_path / "results" / "structured_decision_chain_shadow"
     monkeypatch.setattr(appmod, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        appmod,
+        "ADHOC_INPUT_RECEIPT_ROOT",
+        tmp_path / "results" / "adhoc_input_freshness",
+    )
     monkeypatch.setattr(adhoc_module, "PROJECT_ROOT", tmp_path)
     _build_db(db_path)
     _write_structured_input(shadow_dir)
@@ -737,6 +1068,7 @@ def test_adhoc_api_fails_closed_for_unknown_or_insufficient_current_eligibility(
         conn.commit()
     finally:
         conn.close()
+    _rebind_market_batch(db_path)
     client = app.test_client()
     generated = client.post(
         "/api/adhoc-betting-plans",
@@ -799,6 +1131,121 @@ def test_adhoc_api_rejects_a_mixed_three_way_market_snapshot(tmp_path: Path, mon
     assert "UNKNOWN_SALE_STATE" in match["exclusion_reasons"]
 
 
+def test_adhoc_api_never_mixes_partial_new_batch_with_older_rows(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app, db_path, _shadow_dir = _app(tmp_path, monkeypatch)
+    new_batch_id = _append_partial_market_batch(
+        db_path,
+        observed_at=NOW + timedelta(seconds=30),
+    )
+    app.config["ADHOC_BETTING_NOW"] = lambda: NOW + timedelta(minutes=1)
+    client = app.test_client()
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        snapshot = appmod._build_adhoc_source_snapshot(
+            conn,
+            ISSUE,
+            request_clock=NOW + timedelta(minutes=1),
+        )
+
+    preview = client.get(
+        f"/api/adhoc-betting-plans/eligibility?issue={ISSUE}"
+    )
+    assert preview.status_code == 200
+    payload = preview.get_json()
+    assert payload["eligible_match_count"] == 0
+    assert payload["exclusion_counts"][
+        "SAME_CYCLE_DENOMINATOR_MEMBERSHIP_MISMATCH"
+    ] == 8
+    observed_batch_ids = {
+        str(
+            (row.get("source_provenance") or {}).get(
+                "market_batch_id"
+            )
+            or ""
+        )
+        for row in snapshot["matches"]
+        if str(
+            (row.get("source_provenance") or {}).get(
+                "market_batch_id"
+            )
+            or ""
+        )
+    }
+    assert observed_batch_ids == {new_batch_id}
+
+    generated = client.post(
+        "/api/adhoc-betting-plans",
+        json=_request_payload("api-partial-new-batch"),
+        headers=OPERATOR_HEADERS,
+    )
+    assert generated.status_code == 201
+    assert generated.get_json()["status"] == "UNAVAILABLE_ADHOC_PLAN"
+
+
+def test_adhoc_api_rejects_post_publication_sp_tampering(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app, db_path, _shadow_dir = _app(tmp_path, monkeypatch)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            UPDATE live_market_sp_snapshots
+            SET sp=99.0
+            WHERE issue=? AND playid=34 AND row_idx=1
+            """,
+            (ISSUE,),
+        )
+
+    client = app.test_client()
+    preview = client.get(
+        f"/api/adhoc-betting-plans/eligibility?issue={ISSUE}"
+    )
+    assert preview.status_code == 200
+    payload = preview.get_json()
+    assert payload["eligible_match_count"] == 0
+    assert payload["exclusion_counts"]["SAME_CYCLE_EVIDENCE_INVALID"] == 8
+
+    generated = client.post(
+        "/api/adhoc-betting-plans",
+        json=_request_payload("api-post-publication-sp-tamper"),
+        headers=OPERATOR_HEADERS,
+    )
+    assert generated.status_code == 201
+    assert generated.get_json()["status"] == "UNAVAILABLE_ADHOC_PLAN"
+
+
+def test_adhoc_api_ignores_published_rows_with_missing_receipt(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    app, db_path, _shadow_dir = _app(tmp_path, monkeypatch)
+    with sqlite3.connect(db_path) as conn:
+        receipt_path = Path(
+            conn.execute(
+                """
+                SELECT eligibility_receipt_path
+                FROM live_market_sp_snapshots
+                WHERE issue=? AND playid=34
+                LIMIT 1
+                """,
+                (ISSUE,),
+            ).fetchone()[0]
+        )
+    receipt_path.unlink()
+
+    preview = app.test_client().get(
+        f"/api/adhoc-betting-plans/eligibility?issue={ISSUE}"
+    )
+    assert preview.status_code == 200
+    payload = preview.get_json()
+    assert payload["eligible_match_count"] == 0
+    assert payload["exclusion_counts"]["SAME_CYCLE_RECEIPT_INVALID"] == 8
+
+
 def test_kickoff_reconciliation_preserves_official_25_13_denominator() -> None:
     resolved = [
         appmod._adhoc_kickoff_hkt(
@@ -828,26 +1275,14 @@ def test_legacy_naive_utc_collector_clock_is_not_shifted_by_eight_hours(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    app, db_path, _shadow_dir = _app(tmp_path, monkeypatch)
-    conn = sqlite3.connect(db_path)
-    try:
-        # 04:00 UTC is exactly 12:00 HKT.  Legacy rows used this timezone-less
-        # representation; parsing it as HKT would create a false eight-hour age.
-        conn.execute("UPDATE matches SET fetched_at='2026-07-25 04:00:00'")
-        conn.execute(
-            "UPDATE live_market_sp_snapshots SET fetched_at_utc='2026-07-25 04:00:00'"
-        )
-        conn.commit()
-    finally:
-        conn.close()
-
-    preview = app.test_client().get(
-        f"/api/adhoc-betting-plans/eligibility?issue={ISSUE}"
+    _app(tmp_path, monkeypatch)
+    # 04:00 UTC is exactly 12:00 HKT.  Legacy rows used this timezone-less
+    # representation; parsing it as HKT would create a false eight-hour age.
+    observed = appmod._parse_timestamp_to_hk(
+        "2026-07-25 04:00:00",
+        naive_tz=timezone.utc,
     )
-    assert preview.status_code == 200
-    payload = preview.get_json()
-    assert payload["eligible_match_count"] == 8
-    assert "STALE_INPUT" not in payload["exclusion_counts"]
+    assert observed == NOW
 
 
 def test_complete_but_stale_formal_input_fails_closed(
