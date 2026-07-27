@@ -113,6 +113,7 @@ def validate_native_promotion_cutover_receipt(
     project_root: Path,
     active_root: Path,
     key_registry_path: Path,
+    expected_receipt_sha256: str | None = None,
 ) -> dict[str, Any]:
     """Validate the reviewed cutover pointer and all artifacts it binds.
 
@@ -124,7 +125,14 @@ def validate_native_promotion_cutover_receipt(
 
     receipt_file = _safe_project_path(path, project_root=project_root, label="path")
     try:
-        receipt = json.loads(receipt_file.read_text(encoding="utf-8"))
+        receipt_bytes = receipt_file.read_bytes()
+        cutover_receipt_sha256 = hashlib.sha256(receipt_bytes).hexdigest()
+        if (
+            expected_receipt_sha256 is not None
+            and cutover_receipt_sha256 != expected_receipt_sha256
+        ):
+            raise NativePromotionCutoverError("cutover receipt hash mismatch")
+        receipt = json.loads(receipt_bytes)
     except (OSError, json.JSONDecodeError) as exc:
         raise NativePromotionCutoverError("cutover receipt is unreadable") from exc
     if not isinstance(receipt, dict) or receipt.get("schema_version") != CUTOVER_RECEIPT_SCHEMA_VERSION:
@@ -203,7 +211,7 @@ def validate_native_promotion_cutover_receipt(
         "native_generation_identity": native["native_generation_identity"],
         "native_receipt_sha256": receipt_sha256,
         "attestation_sha256": file_hash(attestation_path),
-        "cutover_receipt_sha256": file_hash(receipt_file),
+        "cutover_receipt_sha256": cutover_receipt_sha256,
         "previous_native_descriptor": previous,
         "rollback_available": bool(previous["previous_native_generation_identity"]),
     }

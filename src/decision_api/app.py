@@ -500,19 +500,12 @@ def _pinned_native_cutover_artifact(
         return None, None, "cutover_receipt_missing"
     current_path = _project_path(pointer["current_receipt_path"])
     try:
-        current_sha256 = hashlib.sha256(current_path.read_bytes()).hexdigest()
-    except OSError:
-        return None, None, "cutover_receipt_unreadable"
-    if not hmac.compare_digest(
-        current_sha256, pointer["current_receipt_sha256"]
-    ):
-        return None, None, "cutover_receipt_hash_mismatch"
-    try:
         current = validate_native_promotion_cutover_receipt(
             current_path,
             project_root=PROJECT_ROOT,
             active_root=_strategy_active_dir(release),
             key_registry_path=ADHOC_PUBLICATION_KEY_REGISTRY,
+            expected_receipt_sha256=pointer["current_receipt_sha256"],
         )
     except NativePromotionCutoverError as exc:
         return None, None, f"cutover_receipt_invalid:{exc}"
@@ -520,18 +513,23 @@ def _pinned_native_cutover_artifact(
         return None, None, "cutover_receipt_issue_mismatch"
     if pointer["mode"] == "active":
         return Path(current["native_csv_path"]), current, ""
+    previous = current.get("previous_native_descriptor")
+    if not isinstance(previous, dict) or not previous.get(
+        "previous_native_generation_identity"
+    ):
+        return None, None, "rollback_target_is_not_current_receipt_predecessor"
     try:
         target = validate_native_promotion_cutover_receipt(
             _project_path(pointer["rollback_target_receipt_path"]),
             project_root=PROJECT_ROOT,
             active_root=_strategy_active_dir(release),
             key_registry_path=ADHOC_PUBLICATION_KEY_REGISTRY,
+            expected_receipt_sha256=str(
+                previous["previous_cutover_receipt_sha256"]
+            ),
         )
     except NativePromotionCutoverError as exc:
         return None, None, f"rollback_target_receipt_invalid:{exc}"
-    previous = current.get("previous_native_descriptor")
-    if not isinstance(previous, dict) or not previous.get("previous_native_generation_identity"):
-        return None, None, "rollback_target_is_not_current_receipt_predecessor"
     expected = {
         "native_generation_identity": str(previous["previous_native_generation_identity"]),
         "native_receipt_sha256": str(previous["previous_native_receipt_sha256"]),

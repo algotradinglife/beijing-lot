@@ -304,7 +304,52 @@ def test_registry_digest_rejects_in_place_cutover_receipt_mutation(
 
     assert path is None
     assert verified is None
-    assert error == "cutover_receipt_hash_mismatch"
+    assert error == "cutover_receipt_invalid:cutover receipt hash mismatch"
+
+
+def test_registry_digest_and_parser_use_the_same_receipt_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root, active_root, key_registry, cutover = _cutover_fixture(tmp_path)
+    monkeypatch.setattr(appmod, "PROJECT_ROOT", root)
+    monkeypatch.setattr(appmod, "ADHOC_PUBLICATION_KEY_REGISTRY", key_registry)
+    pinned_bytes = cutover.read_bytes()
+    pinned_sha256 = file_hash(cutover)
+    pinned_payload = json.loads(pinned_bytes)
+    swapped_payload = {**pinned_payload, "unreviewed_swap": True}
+    swapped_bytes = json.dumps(swapped_payload).encode("utf-8")
+    original_read_bytes = Path.read_bytes
+    swapped = False
+
+    def read_and_swap(path: Path) -> bytes:
+        nonlocal swapped
+        data = original_read_bytes(path)
+        if path.resolve() == cutover.resolve() and not swapped:
+            cutover.write_bytes(swapped_bytes)
+            swapped = True
+        return data
+
+    monkeypatch.setattr(Path, "read_bytes", read_and_swap)
+    release = {
+        "promotion": {
+            "native_cutover_receipts": {
+                ISSUE: {
+                    "mode": "active",
+                    "current_receipt_path": str(cutover),
+                    "current_receipt_sha256": pinned_sha256,
+                }
+            }
+        },
+        "artifacts": {"structured_active_dir": str(active_root)},
+    }
+
+    path, verified, error = appmod._pinned_native_cutover_artifact(ISSUE, release)
+
+    assert swapped is True
+    assert path == (root / pinned_payload["native_csv_path"]).resolve()
+    assert verified is not None
+    assert verified["cutover_receipt_sha256"] == pinned_sha256
+    assert error == ""
 
 
 def test_runtime_rollback_accepts_only_current_receipt_predecessor(
