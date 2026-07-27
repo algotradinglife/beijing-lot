@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/project_bj_n7_safe_input.py"
 
@@ -63,3 +62,28 @@ def test_header_mismatch_and_duplicate_identity_fail_closed(tmp_path: Path) -> N
     expected = _write_mixed(source, mod, [_mixed_row(), _mixed_row()])
     with pytest.raises(mod.ProjectionError, match="duplicate"):
         mod.project(source, tmp_path / "out.csv", expected_sha256=expected)
+
+
+@pytest.mark.parametrize("raw", ["NaN", "inf", "-inf"])
+def test_project_rejects_non_finite_sp(tmp_path: Path, raw: str) -> None:
+    mod = _load_module()
+    source = tmp_path / "mixed.csv"
+    row = _mixed_row()
+    row["quoted_sp_3"] = raw
+    expected = _write_mixed(source, mod, [row])
+    with pytest.raises(mod.ProjectionError, match="quoted SP"):
+        mod.project(source, tmp_path / "out.csv", expected_sha256=expected)
+
+
+def test_project_refuses_source_and_existing_destination(tmp_path: Path) -> None:
+    mod = _load_module()
+    source = tmp_path / "mixed.csv"
+    expected = _write_mixed(source, mod, [_mixed_row()])
+    with pytest.raises(mod.ProjectionError, match="equals authorized source"):
+        mod.project(source, source, expected_sha256=expected)
+
+    destination = tmp_path / "existing.csv"
+    destination.write_text("do not overwrite\n", encoding="utf-8")
+    with pytest.raises(mod.ProjectionError, match="already exists"):
+        mod.project(source, destination, expected_sha256=expected)
+    assert destination.read_text(encoding="utf-8") == "do not overwrite\n"

@@ -11,9 +11,10 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import math
 import sys
+from io import StringIO
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 AUTHORIZED_SOURCE = ROOT / "results/research/bj_n4_sp_prevalence_001/prevalence_r2/chosen_pre_decision_vectors.csv"
@@ -44,16 +45,26 @@ def _canonical_sp(raw: str) -> str:
         value = float(raw)
     except (TypeError, ValueError) as exc:
         raise ProjectionError("invalid quoted SP in allowlisted projection") from exc
-    if value <= 0.0:
-        raise ProjectionError("non-positive quoted SP in allowlisted projection")
+    if not math.isfinite(value) or value <= 0.0:
+        raise ProjectionError("invalid quoted SP in allowlisted projection")
     return f"{value:.8f}"
 
 
 def project(source: Path, destination: Path, *, expected_sha256: str = AUTHORIZED_SOURCE_SHA256) -> tuple[int, str, str]:
     """Validate and project source without ever reading a forbidden field value."""
-    if sha256_file(source) != expected_sha256:
+    if source.resolve() == destination.resolve():
+        raise ProjectionError("projection destination equals authorized source")
+    if destination.exists() or destination.is_symlink():
+        raise ProjectionError("projection destination already exists")
+    try:
+        source_bytes = source.read_bytes()
+        source_sha256 = hashlib.sha256(source_bytes).hexdigest()
+        source_text = source_bytes.decode("utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise ProjectionError("authorized source is unreadable") from exc
+    if source_sha256 != expected_sha256:
         raise ProjectionError("source SHA-256 mismatch")
-    with source.open("r", encoding="utf-8", newline="") as handle:
+    with StringIO(source_text, newline="") as handle:
         reader = csv.DictReader(handle)
         if tuple(reader.fieldnames or ()) != SOURCE_HEADER:
             raise ProjectionError("source header mismatch")
@@ -87,7 +98,7 @@ def project(source: Path, destination: Path, *, expected_sha256: str = AUTHORIZE
             })
     safe_rows.sort(key=lambda item: (int(item["issue"]), int(item["match_idx"]), item["match_id"]))
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with destination.open("w", encoding="utf-8", newline="\n") as handle:
+    with destination.open("x", encoding="utf-8", newline="\n") as handle:
         writer = csv.DictWriter(handle, fieldnames=SAFE_HEADER, lineterminator="\n")
         writer.writeheader()
         writer.writerows(safe_rows)
