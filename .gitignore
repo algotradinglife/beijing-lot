@@ -29,6 +29,7 @@ tmp/
 temp/
 # === 数据文件类型 ===
 *.csv
+!docs/research-notes/evidence/issue-83-continuous-market-metrics.csv
 *.tsv
 *.parquet
 *.feather

@@ -91,6 +91,9 @@ initial/10h/1h 只能作为历史时间代理。结论必须由
 
 - [Gate B 证据回执](https://github.com/algotradinglife/beijing-lot/issues/83#issuecomment-5117810382)
 - [PI 终审回执](https://github.com/algotradinglife/beijing-lot/issues/83#issuecomment-5117862697)
+- [Top2 尾部与 `+2` 让球线机器可读投影](evidence/issue-83-continuous-market-metrics.csv)
+  （SHA-256
+  `d00eabe6111f2c288e60e5132dc6bfa62336ddf4106c77aaa37f5c3e88a76107`）
 
 下表是 Issue 回执接受的本地资产标识，不表示这些目录已经进入 `main`：
 
@@ -105,8 +108,10 @@ Gate B 中 `prediction_rows.csv` 的 SHA-256 为
 PI 已独立复算 12 组快照 × arm 聚合指标。
 
 这些行级资产当前只存在于本机 `.worktrees/strategy/`，未被本 PR 纳入 Git，
-因此不能仅从仓库恢复。当前可持久审计的是 GitHub 回执、资产标识、哈希和
-本页结论；不得把它描述成仓库内已持久化的完整证据包。
+因此不能仅从仓库恢复。仓库只持久化了上述 15 行机器可读投影；其
+`source_asset` 和 `source_sha256` 列把每行绑定到已接受源文件。当前可持久
+审计的是 GitHub 回执、资产标识、源文件哈希、这份窄投影和本页结论；不得
+把它描述成仓库内已持久化的完整证据包。
 
 > [!warning]
 > 本地 `results/bj83_gate_b_settlement_v3/` 是 PI 授权前产生的
@@ -165,6 +170,7 @@ Gap 定义为“实际覆盖率减去平均预测概率”。负值表示模型�
 | 10h | -1.00pp | **+0.10pp** | -4.07pp | **-3.91pp** |
 | 1h | -1.07pp | **-0.35pp** | -4.56pp | **-3.42pp** |
 
+表中未取整的 `n`、平均概率、实际覆盖和 gap 已进入上述机器可读投影。
 这些阈值只用于描述校准，不是新的选腿门槛。不同 arm 进入尾部的比赛集合
 也不同，不能只比较尾部命中率而忽略总体 Log loss 和 Brier。
 
@@ -181,6 +187,7 @@ Gap 定义为“实际覆盖率减去平均预测概率”。负值表示模型�
 | 10h | 2,271 | +0.004920 | -0.001851 |
 | 1h | 2,271 | +0.008149 | +0.000776 |
 
+表中未取整的 Δ Log loss、Δ Brier 和 Δ Top1 已进入上述机器可读投影。
 `+2` 的 Log loss 在三个快照都反向，且样本量远小于 `0`、`-1` 等主线。
 这要求 #77 单独报告 `+2`，但不能在看到历史结果后直接发明“排除 +2”的规则。
 是否排除必须由预注册的前瞻验证决定。

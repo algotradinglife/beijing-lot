@@ -147,6 +147,11 @@ initial 格只有 111 场，50.45% 不应单独解读。
 `CONTINUOUS_EURO_BJLINE`。下表仍使用
 `Gap = 实际 Top2 覆盖率 - 平均预测 Top2 概率`：
 
+以下 #83 对比的未取整数值、样本量和源文件哈希见
+[机器可读投影](evidence/issue-83-continuous-market-metrics.csv)
+（SHA-256
+`d00eabe6111f2c288e60e5132dc6bfa62336ddf4106c77aaa37f5c3e88a76107`）。
+
 | 快照 | 阈值 | 离散基线 Gap | 连续 EURO Gap | 绝对误差是否缩小 |
 | --- | --- | ---: | ---: | --- |
 | initial | Top2 ≥80% | -3.85pp | **-2.15pp** | 是 |
