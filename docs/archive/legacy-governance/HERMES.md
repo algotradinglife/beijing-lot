@@ -1,3 +1,11 @@
+# Archived — Beijing Lot Research OS Controller Entry
+
+> Archived on 2026-07-29. The text below is the retired root `HERMES.md`,
+> preserved for historical context only. It is not an active control-plane
+> contract. See the repository-root `AGENTS.md` for current governance.
+
+---
+
 # Beijing Lot — Research OS Controller Entry
 
 This repository uses [Research OS](https://github.com/algotradinglife/research-os-template)

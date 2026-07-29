@@ -18,6 +18,13 @@ Beijing-lot 是一个以北单足球让球胜平负为主的研究与决策辅�
 系统。正式决策配置中存在概率模型、q 值和 v3.3.3 决策链，但这些是工程配置，不能替代
 独立的样本外有效性证明。
 
+## Research Wiki
+
+研究结论、校准图表和实验之间的关系，集中维护在
+[[Research-Wiki|Beijing-lot Research Wiki]]。Wiki 使用 Obsidian 双链组织，
+当前入口包括 EURO + 北单让球基线、Top1 / Top2 校准曲线、Issue #82
+离散市场融合实验，以及 Issue #83 连续市场概率模型。
+
 ### 1.1 Top-level directory tree
 
 ```text

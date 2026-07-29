@@ -29,6 +29,7 @@ tmp/
 temp/
 # === 数据文件类型 ===
 *.csv
+!docs/research-notes/evidence/issue-83-continuous-market-metrics.csv
 *.tsv
 *.parquet
 *.feather
@@ -80,6 +81,7 @@ target/
 # === AI/VCS 元数据（每机器各自维护）===
 .jj/
 .claude/
+.gstack/
 # Python
 *.pyo
 # OS
@@ -91,6 +93,7 @@ target/
 !apps/decision-dashboard/index.html
 !src/webui/templates/*.html
 *.zip
+!docs/references/score_prediction_v7_7_1/original/比分预测V7.7.1.zip
 
 # BJ-FREEZE-REVIEW-001 immutable acceptance bundle.
 !evidence/bj_freeze_review_001/
