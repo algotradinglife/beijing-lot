@@ -1,0 +1,19 @@
+{
+  "accepted_group_ids": [
+    "26076-G01",
+    "26077-G01",
+    "26079-G01",
+    "26079-G02"
+  ],
+  "gate_a_disposition": "G1_SOURCE_CAPACITY_LT5_NO_CROSS_ISSUE_MANUFACTURE",
+  "gate_a_sha256s": {
+    "audit_bj76_g1_native_line_source.py": "b5423e8fee1c687f1e52503bdb938e1238a56637d58da3146ac0b569f195c833",
+    "chronological_group_order.csv": "7d844389ff5b83ffd17dd6eea9b71b892879d79e92198a14f3ee50239c533e0d",
+    "excluded_leftovers.csv": "edc817d85263d74962f0968e473a246a6443cd41d115f9904f02bbd4124c1829",
+    "issue_capacity.csv": "072a37fd5490d3fe8ce559a942a93e52f52a77ef232dbdd3336107a33f56ea1f",
+    "match_availability.csv": "93283df47ca7badf7ab61c7865c6d5a9c3c00810313018f5df30080ae7353323",
+    "potential_groups.csv": "d072829b887598fa230e635bcdcece8fef1a81ded0c4f778be58743c972133e9",
+    "source_card.json": "a45c134499f18f3648db200e77544dacc3a506c75e57d282f606426421cd1da4"
+  },
+  "gate_a_source_card_sha256": "a45c134499f18f3648db200e77544dacc3a506c75e57d282f606426421cd1da4"
+}

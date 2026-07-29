@@ -1,0 +1,36 @@
+{
+  "calculator": "settle_bj76_gatec_outcome_settlement.py",
+  "canonical_source_url_template": "https://zx.500.com/zqdc/kaijiang.php?playid=1&expect={issue}",
+  "experiment": "BJ-N7-V771-TOPMASS-001",
+  "files": [
+    "settle_bj76_gatec_outcome_settlement.py",
+    "source_page_receipt.csv",
+    "outcome_joined_leg_rows.csv",
+    "quote_to_final_retention.csv",
+    "group_arm_settlement.csv",
+    "aggregate_metrics.csv",
+    "coverage_marginal_gain_curve.csv",
+    "outlier_ex_best_payout_sensitivity.csv",
+    "raw_quote_extreme_vs_final_diagnostic.csv",
+    "preoutcome_verification.json"
+  ],
+  "groups": [
+    "26076-G01",
+    "26077-G01",
+    "26079-G01",
+    "26079-G02"
+  ],
+  "issues": [
+    "26076",
+    "26077",
+    "26079"
+  ],
+  "preoutcome_freeze_sha256sums": "900f96d9b6542ac2fa0b757a1ab5b6240307082be50533556d579f4be134c9e5",
+  "raw_page_hashes": {
+    "26076": "0e2bb0186a86f431791c712e72959185fad9e5fad30e5f7feb3b51ecef408705",
+    "26077": "461d201ba2ff79f880f819c59035cc61570351510740c84fb8b30e377d75ef77",
+    "26079": "88ea78bc1e7b9841c1458e63d476a49c8a5bb43b9825d347488417216f08eb90"
+  },
+  "reproducibility": "rerun with --source-pages <first-bundle>/source_pages; all files must be byte-identical",
+  "stage": "GATE_C_OUTCOME_SETTLEMENT"
+}

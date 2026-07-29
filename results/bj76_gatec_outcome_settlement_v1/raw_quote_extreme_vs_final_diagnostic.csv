@@ -1,0 +1,5 @@
+group_id,issue,legs,realized_prebet_quote_ge_5_legs,realized_final_sp_ge_5_legs,mean_final_over_prebet_ratio,group_final_winning_sp_product,diagnostic_only
+26076-G01,26076,7,0,0,1.016621791221045700283641115,2374.03031362184160,YES: raw quoted-SP extremes are not a retroactive eligibility rule and SP5 is not applied
+26077-G01,26077,7,1,0,1.047361029484947250303996944,1545.67541700000000,YES: raw quoted-SP extremes are not a retroactive eligibility rule and SP5 is not applied
+26079-G01,26079,4,0,0,1.006283777918227339018509960,,YES: raw quoted-SP extremes are not a retroactive eligibility rule and SP5 is not applied
+26079-G02,26079,0,0,0,NA,,YES: raw quoted-SP extremes are not a retroactive eligibility rule and SP5 is not applied
