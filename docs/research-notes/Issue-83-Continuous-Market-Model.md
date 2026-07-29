@@ -87,9 +87,14 @@ initial/10h/1h 只能作为历史时间代理。结论必须由
 [Issue #77](https://github.com/algotradinglife/beijing-lot/issues/77)
 用真实时间戳的新样本验证。
 
-### 可复核资产
+### 证据回执与存储边界
 
-| 资产 | 位置 | `SHA256SUMS.json` SHA-256 |
+- [Gate B 证据回执](https://github.com/algotradinglife/beijing-lot/issues/83#issuecomment-5117810382)
+- [PI 终审回执](https://github.com/algotradinglife/beijing-lot/issues/83#issuecomment-5117862697)
+
+下表是 Issue 回执接受的本地资产标识，不表示这些目录已经进入 `main`：
+
+| 资产 | Strategist 本地位置 | `SHA256SUMS.json` SHA-256 |
 | --- | --- | --- |
 | 唯一授权 Gate A v3 | `results/bj83_gate_a_preoutcome_v3/` | `32b420c15ba7bbaace52aeb90127c3d3a108c8b18cf0ddc18515a0759f2c22a7` |
 | PI 授权 Gate B | `results/bj83_gate_b_settlement_v3_pi_authorized/` | `0311b14d11306e14af6b727adc47dedcd679c39c25ed78486073a2b620b6b0fa` |
@@ -99,8 +104,12 @@ Gate B 中 `prediction_rows.csv` 的 SHA-256 为
 `3c55cdc58ef14a19406c91de93f96df88f5cb88a10ef583d00e3fc902c6b0330`。
 PI 已独立复算 12 组快照 × arm 聚合指标。
 
+这些行级资产当前只存在于本机 `.worktrees/strategy/`，未被本 PR 纳入 Git，
+因此不能仅从仓库恢复。当前可持久审计的是 GitHub 回执、资产标识、哈希和
+本页结论；不得把它描述成仓库内已持久化的完整证据包。
+
 > [!warning]
-> `results/bj83_gate_b_settlement_v3/` 是 PI 授权前产生的
+> 本地 `results/bj83_gate_b_settlement_v3/` 是 PI 授权前产生的
 > `INVALID_PARTIAL_PREAUTH`。它不能恢复、汇总、引用或覆盖。
 
 ## 核心结果
