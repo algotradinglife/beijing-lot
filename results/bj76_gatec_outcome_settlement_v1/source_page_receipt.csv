@@ -1,0 +1,4 @@
+issue,completed_page_url,http_status,bytes,sha256,positive_3way_rows,reproducibility
+26076,https://zx.500.com/zqdc/kaijiang.php?playid=1&expect=26076,200,137153,0e2bb0186a86f431791c712e72959185fad9e5fad30e5f7feb3b51ecef408705,91,initial retrieval uses canonical URL; rerun consumes these byte-identical saved raw pages
+26077,https://zx.500.com/zqdc/kaijiang.php?playid=1&expect=26077,200,119861,461d201ba2ff79f880f819c59035cc61570351510740c84fb8b30e377d75ef77,75,initial retrieval uses canonical URL; rerun consumes these byte-identical saved raw pages
+26079,https://zx.500.com/zqdc/kaijiang.php?playid=1&expect=26079,200,99934,88ea78bc1e7b9841c1458e63d476a49c8a5bb43b9825d347488417216f08eb90,13,initial retrieval uses canonical URL; rerun consumes these byte-identical saved raw pages

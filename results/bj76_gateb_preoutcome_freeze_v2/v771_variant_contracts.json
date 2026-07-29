@@ -1,0 +1,16 @@
+{
+  "V771_AUX_MIDBAND_PAIR_SUM": {
+    "diagnostic_label": "V771_AUX_MIDBAND_PAIR_SUM_NON_N7",
+    "effect_on_n7_probability": "NO; auxiliary board is formed after the final distribution, so this rule cannot change p3/p1/p0 or N7 sequence ranking.",
+    "fixed_rule": "Compare the two-score large and small auxiliary candidates by their summed Bayes_Score.",
+    "manual_reference": "V7.7.1 Step 11, 10% < P_big < 20%"
+  },
+  "V771_SCORE_OTHER_TAIL_PROPORTIONAL": {
+    "effect_on_n7_probability": "YES",
+    "fixed_rule": "Allocate each other-score market mass over its internal 45-grid scores in proportion to tail-corrected model mass; use equal split only if that internal model mass is zero.",
+    "manual_reference": "V7.7.1 Step 6 / Step 9 score-other aggregate markets",
+    "variant_label": "V771_SCORE_OTHER_TAIL_PROPORTIONAL"
+  },
+  "no_counterfactual_variant": "The supplied manual provides no alternate formula for either rule. A divergent arm would be invented, so none is generated.",
+  "numerical_topmass_variant": "V771_SCORE_OTHER_TAIL_PROPORTIONAL__AUX_MIDBAND_PAIR_SUM"
+}

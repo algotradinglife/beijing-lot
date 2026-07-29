@@ -1,0 +1,4116 @@
+{
+  "contract": {
+    "allowed_tables": {
+      "500_bjdc.sqlite": [
+        "live_market_sp_snapshots"
+      ],
+      "beidan_live.db": [
+        "matches",
+        "snapshots"
+      ]
+    },
+    "outcome_scope": "OUTCOME_UNEXPOSED",
+    "prohibited": [
+      "settlements",
+      "matches score/result fields",
+      "final SP",
+      "500 completed pages",
+      "outcome artifacts"
+    ],
+    "selection_factor": 0.65,
+    "sp_band_inclusive": [
+      2.5,
+      4.5
+    ]
+  },
+  "legs": [
+    {
+      "away": "光州FC",
+      "common_cutoff_utc": "2026-07-19T07:08:20Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.2447784559159404,
+        "delta_adjusted": 0.26271338172224423,
+        "delta_half_full": 0.01793492580630382,
+        "delta_spread_raw": -0.028076037228482106,
+        "delta_spread_used": -0.014038018614241053,
+        "delta_total": 0.01793492580630382,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.9930098381730912,
+        "lambda_home": 1.2557232198953354,
+        "market_weight": 0.6062830869503856,
+        "mu": 2.373690210675572,
+        "mu_adjusted": 2.2487330580684266,
+        "p_big": 0.26710239784207,
+        "p_cover": 0.3167363415599934,
+        "p_half_full_home": 0.5600704426374498,
+        "p_win": 0.5759020300813676,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.012186514171219
+      },
+      "entropy_nats": 1.0548941346913785,
+      "fid": "1373234",
+      "group_id": "26076-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 2.36,
+        "1": 3.83,
+        "3": 3.15
+      },
+      "home": "FC安养",
+      "issue": "26076",
+      "kickoff_utc": "2026-07-19T10:30:00Z",
+      "leg_no": 1,
+      "match_id": "26076_065",
+      "match_idx": 65,
+      "one_x_two": {
+        "0": 5.39,
+        "1": 3.64,
+        "3": 1.6
+      },
+      "p0": 0.47538533776235303,
+      "p1": 0.24899437251997597,
+      "p3": 0.27562028971767083,
+      "top15_scores": [
+        {
+          "bayes_score": 1109.444154446089,
+          "probability": 0.1109444154446089,
+          "score": "1-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1087.1874280552179,
+          "probability": 0.1087187428055218,
+          "score": "2-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1050.6197477143846,
+          "probability": 0.10506197477143847,
+          "score": "1-0",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1006.8245054147939,
+          "probability": 0.10068245054147938,
+          "score": "2-0",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 795.1493479436944,
+          "probability": 0.07951493479436944,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 698.9592595603922,
+          "probability": 0.06989592595603922,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 615.3550614612957,
+          "probability": 0.06153550614612957,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 520.6352241448864,
+          "probability": 0.05206352241448864,
+          "score": "3-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 497.4402241852085,
+          "probability": 0.04974402241852085,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 447.5676697716045,
+          "probability": 0.04475676697716045,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 350.00193497843924,
+          "probability": 0.035000193497843925,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 238.9093286750075,
+          "probability": 0.02389093286750075,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 223.85375449737282,
+          "probability": 0.02238537544973728,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 212.8931974091221,
+          "probability": 0.02128931974091221,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 183.6338968605745,
+          "probability": 0.01836338968605745,
+          "score": "1-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7510056274800239,
+      "v771_grid_dropped_mass": 0.001070044083943289,
+      "v771_grid_pre_normalization_mass": 0.9989299559160567
+    },
+    {
+      "away": "FC首尔",
+      "common_cutoff_utc": "2026-07-19T07:08:20Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": -1.1602245101278796,
+        "delta_adjusted": -1.2504876011030297,
+        "delta_half_full": -0.09026309097515012,
+        "delta_spread_raw": -0.014641443905104782,
+        "delta_spread_used": -0.007320721952552391,
+        "delta_total": -0.09026309097515012,
+        "direction_conflict": true,
+        "draw_hijack_applied": true,
+        "lambda_away": 1.6909821063514632,
+        "lambda_home": 0.4404945052484335,
+        "market_weight": 0.5848727109512795,
+        "mu": 2.191643149538603,
+        "mu_adjusted": 2.1314766115998967,
+        "p_big": 0.22284019735708527,
+        "p_cover": 0.40744822059155,
+        "p_half_full_home": 0.15205388391295832,
+        "p_win": 0.18995837936438612,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0286473159527194,
+        "tail_side": "away",
+        "zero_multiplier": 1.0536833187737682
+      },
+      "entropy_nats": 1.0961550758781378,
+      "fid": "1373171",
+      "group_id": "26076-G01",
+      "handicap_line": 1,
+      "handicap_quotes": {
+        "0": 3.19,
+        "1": 3.57,
+        "3": 2.45
+      },
+      "home": "富川1995",
+      "issue": "26076",
+      "kickoff_utc": "2026-07-19T10:30:00Z",
+      "leg_no": 2,
+      "match_id": "26076_066",
+      "match_idx": 66,
+      "one_x_two": {
+        "0": 1.69,
+        "1": 3.5,
+        "3": 4.86
+      },
+      "p0": 0.35631130260398736,
+      "p1": 0.3015367810036656,
+      "p3": 0.342151916392347,
+      "top15_scores": [
+        {
+          "bayes_score": 1599.2882609309115,
+          "probability": 0.15992882609309114,
+          "score": "0-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1402.7771546783647,
+          "probability": 0.14027771546783646,
+          "score": "0-2",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1201.3387592512101,
+          "probability": 0.12013387592512101,
+          "score": "1-2",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1042.726120267433,
+          "probability": 0.1042726120267433,
+          "score": "1-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 798.8509026633707,
+          "probability": 0.07988509026633707,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 725.9406211858719,
+          "probability": 0.0725940621185872,
+          "score": "0-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 595.8388745603132,
+          "probability": 0.059583887456031326,
+          "score": "1-3",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 511.08130555938607,
+          "probability": 0.05110813055593861,
+          "score": "1-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 326.7091352764153,
+          "probability": 0.03267091352764153,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 307.4970501658046,
+          "probability": 0.030749705016580458,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 290.160845701334,
+          "probability": 0.0290160845701334,
+          "score": "0-4",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 203.4980735309747,
+          "probability": 0.02034980735309747,
+          "score": "2-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 183.23088715325173,
+          "probability": 0.018323088715325172,
+          "score": "1-4",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 146.30102667055525,
+          "probability": 0.014630102667055524,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 86.48912852970847,
+          "probability": 0.008648912852970847,
+          "score": "2-4",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.6984632189963343,
+      "v771_grid_dropped_mass": 0.000833672424969456,
+      "v771_grid_pre_normalization_mass": 0.9991663275750305
+    },
+    {
+      "away": "安山绿人",
+      "common_cutoff_utc": "2026-07-19T07:08:20Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.08041770196730139,
+        "delta_adjusted": 0.0641762424195347,
+        "delta_half_full": 0.003441969170508627,
+        "delta_spread_raw": -0.03248291909553339,
+        "delta_spread_used": -0.016241459547766696,
+        "delta_total": -0.016241459547766696,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 1.0797701429711721,
+        "lambda_home": 1.143946385390707,
+        "market_weight": 0.606790533402885,
+        "mu": 2.367936842509176,
+        "mu_adjusted": 2.223716528361879,
+        "p_big": 0.24815079654988953,
+        "p_cover": 0.2845719661335842,
+        "p_half_full_home": 0.5114752449100215,
+        "p_win": 0.5251093918560479,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.0029964714679642
+      },
+      "entropy_nats": 1.038254952487565,
+      "fid": "1373556",
+      "group_id": "26076-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 2.42,
+        "1": 3.3,
+        "3": 3.51
+      },
+      "home": "庆南FC",
+      "issue": "26076",
+      "kickoff_utc": "2026-07-19T10:30:00Z",
+      "leg_no": 3,
+      "match_id": "26076_067",
+      "match_idx": 67,
+      "one_x_two": {
+        "0": 4.19,
+        "1": 3.52,
+        "3": 1.73
+      },
+      "p0": 0.49661561271764715,
+      "p1": 0.28253394451597874,
+      "p3": 0.2208504427663741,
+      "top15_scores": [
+        {
+          "bayes_score": 1236.590407594565,
+          "probability": 0.1236590407594565,
+          "score": "1-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1234.7376650012413,
+          "probability": 0.12347376650012414,
+          "score": "2-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1206.7038712227406,
+          "probability": 0.12067038712227407,
+          "score": "1-0",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 914.3868250890044,
+          "probability": 0.09143868250890044,
+          "score": "2-0",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 800.599874848276,
+          "probability": 0.08005998748482761,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 761.1147066435689,
+          "probability": 0.07611147066435689,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 569.4067142585366,
+          "probability": 0.056940671425853656,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 544.4196367235908,
+          "probability": 0.05444196367235908,
+          "score": "3-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 539.9802669163173,
+          "probability": 0.05399802669163173,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 357.3878355076931,
+          "probability": 0.035738783550769315,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 314.9318623313867,
+          "probability": 0.03149318623313867,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 307.3208617020726,
+          "probability": 0.03073208617020726,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 155.12483842532788,
+          "probability": 0.015512483842532787,
+          "score": "1-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 151.6960402595219,
+          "probability": 0.015169604025952192,
+          "score": "2-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 140.7871063801479,
+          "probability": 0.014078710638014788,
+          "score": "4-1",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7791495572336259,
+      "v771_grid_dropped_mass": 0.0009885110808859343,
+      "v771_grid_pre_normalization_mass": 0.9990114889191141
+    },
+    {
+      "away": "坡州前沿",
+      "common_cutoff_utc": "2026-07-19T07:08:20Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.5564778561384884,
+        "delta_adjusted": 0.6281989730759657,
+        "delta_half_full": 0.07172111693747726,
+        "delta_spread_raw": -0.01464752944158168,
+        "delta_spread_used": -0.00732376472079084,
+        "delta_total": 0.07172111693747726,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.8936165891198415,
+        "lambda_home": 1.5218155621958074,
+        "market_weight": 0.5902912897249154,
+        "mu": 2.4836432210713246,
+        "mu_adjusted": 2.415432151315649,
+        "p_big": 0.29537633345084024,
+        "p_cover": 0.40740886727750286,
+        "p_half_full_home": 0.7602856220518726,
+        "p_win": 0.6672109196147035,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.003272334329371,
+        "tail_side": "home",
+        "zero_multiplier": 1.027763206747008
+      },
+      "entropy_nats": 1.0910905983504628,
+      "fid": "1373557",
+      "group_id": "26076-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 3.23,
+        "1": 3.52,
+        "3": 2.45
+      },
+      "home": "水原三星蓝翼",
+      "issue": "26076",
+      "kickoff_utc": "2026-07-19T10:30:00Z",
+      "leg_no": 4,
+      "match_id": "26076_068",
+      "match_idx": 68,
+      "one_x_two": {
+        "0": 6.76,
+        "1": 4.57,
+        "3": 1.36
+      },
+      "p0": 0.3711066451300742,
+      "p1": 0.2774326988821409,
+      "p3": 0.35146065598778503,
+      "top15_scores": [
+        {
+          "bayes_score": 1227.2077669674602,
+          "probability": 0.12272077669674603,
+          "score": "1-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1169.4166197097659,
+          "probability": 0.11694166197097658,
+          "score": "2-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1119.576300753425,
+          "probability": 0.11195763007534248,
+          "score": "2-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 969.4464746210916,
+          "probability": 0.09694464746210917,
+          "score": "1-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 800.2915760118462,
+          "probability": 0.08002915760118462,
+          "score": "3-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 694.6852359183773,
+          "probability": 0.06946852359183774,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 617.4988306476257,
+          "probability": 0.061749883064762576,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 614.1754163716445,
+          "probability": 0.061417541637164445,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 424.5827399655707,
+          "probability": 0.04245827399655707,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 348.33299848307485,
+          "probability": 0.034833299848307485,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 336.1090041301743,
+          "probability": 0.03361090041301743,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 266.85065664766785,
+          "probability": 0.026685065664766784,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 244.77288225468172,
+          "probability": 0.02447728822546817,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 225.41601302383486,
+          "probability": 0.022541601302383488,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 123.12877717091848,
+          "probability": 0.012312877717091848,
+          "score": "4-2",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7225673011178593,
+      "v771_grid_dropped_mass": 0.0017448882099797558,
+      "v771_grid_pre_normalization_mass": 0.9982551117900202
+    },
+    {
+      "away": "桑德维肯",
+      "common_cutoff_utc": "2026-07-19T07:08:20Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.3361032855776933,
+        "delta_adjusted": 0.3606747839856628,
+        "delta_half_full": 0.02457149840796944,
+        "delta_spread_raw": -0.003972825215443618,
+        "delta_spread_used": -0.003972825215443618,
+        "delta_total": 0.02457149840796944,
+        "direction_conflict": false,
+        "draw_hijack_applied": false,
+        "lambda_away": 1.0503219797757173,
+        "lambda_home": 1.4109967637613798,
+        "market_weight": 0.6042957371402957,
+        "mu": 2.479790822616692,
+        "mu_adjusted": 2.461318743537097,
+        "p_big": 0.3163803636007717,
+        "p_cover": 0.47514940054192495,
+        "p_half_full_home": 0.5826496257313765,
+        "p_win": 0.6035141436164109,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.0162971841124697
+      },
+      "entropy_nats": 1.0660996256031536,
+      "fid": "1364886",
+      "group_id": "26076-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 3.06,
+        "1": 5.02,
+        "3": 2.1
+      },
+      "home": "北雪平",
+      "issue": "26076",
+      "kickoff_utc": "2026-07-19T11:00:00Z",
+      "leg_no": 5,
+      "match_id": "26076_071",
+      "match_idx": 71,
+      "one_x_two": {
+        "0": 5.05,
+        "1": 4.27,
+        "3": 1.52
+      },
+      "p0": 0.45418904342203786,
+      "p1": 0.25502994409992047,
+      "p3": 0.2907810124780418,
+      "top15_scores": [
+        {
+          "bayes_score": 1086.1776088017327,
+          "probability": 0.10861776088017328,
+          "score": "2-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1057.494956188261,
+          "probability": 0.10574949561882611,
+          "score": "1-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 996.1465515944498,
+          "probability": 0.09961465515944498,
+          "score": "1-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 955.2849726798105,
+          "probability": 0.09552849726798104,
+          "score": "2-0",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 793.7916154542559,
+          "probability": 0.07937916154542558,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 713.466986433803,
+          "probability": 0.0713466986433803,
+          "score": "3-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 705.2844837924313,
+          "probability": 0.07052844837924313,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 550.5575890384678,
+          "probability": 0.05505575890384678,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 447.46936478749313,
+          "probability": 0.04474693647874931,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 417.5472945683374,
+          "probability": 0.04175472945683374,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 296.5081959186859,
+          "probability": 0.02965081959186859,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 284.8102320729772,
+          "probability": 0.028481023207297722,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 215.88888409234195,
+          "probability": 0.021588888409234196,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 199.02286369001246,
+          "probability": 0.019902286369001244,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 164.42300225043456,
+          "probability": 0.016442300225043456,
+          "score": "1-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7449700559000796,
+      "v771_grid_dropped_mass": 0.0019442606051863764,
+      "v771_grid_pre_normalization_mass": 0.9980557393948136
+    },
+    {
+      "away": "康斯坦察法鲁尔",
+      "common_cutoff_utc": "2026-07-19T07:08:20Z",
+      "diagnostics": {
+        "auxiliary_mode": "小球",
+        "delta": -0.16881775262549203,
+        "delta_adjusted": -0.1910468682428709,
+        "delta_half_full": 0.00475071867631026,
+        "delta_spread_raw": -0.044458231234757735,
+        "delta_spread_used": -0.022229115617378867,
+        "delta_total": -0.022229115617378867,
+        "direction_conflict": true,
+        "draw_hijack_applied": true,
+        "lambda_away": 0.9227289383599964,
+        "lambda_home": 0.7316820701171254,
+        "market_weight": 0.6049969137936445,
+        "mu": 1.8048629068382165,
+        "mu_adjusted": 1.6544110084771217,
+        "p_big": 0.15808877095063043,
+        "p_cover": 0.18668460556494287,
+        "p_half_full_home": 0.5158410269508897,
+        "p_win": 0.44743935309973043,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "away",
+        "zero_multiplier": 1.0099566823465567
+      },
+      "entropy_nats": 0.8572210628107096,
+      "fid": "1434643",
+      "group_id": "26076-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 1.78,
+        "1": 3.96,
+        "3": 5.35
+      },
+      "home": "克卢日大学",
+      "issue": "26076",
+      "kickoff_utc": "2026-07-19T14:00:00Z",
+      "leg_no": 6,
+      "match_id": "26076_074",
+      "match_idx": 74,
+      "one_x_two": {
+        "0": 3.32,
+        "1": 3.32,
+        "3": 2.05
+      },
+      "p0": 0.6570690479177334,
+      "p1": 0.23413024074058764,
+      "p3": 0.10880071134167889,
+      "top15_scores": [
+        {
+          "bayes_score": 1711.202960951485,
+          "probability": 0.1711202960951485,
+          "score": "1-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1609.5201142476512,
+          "probability": 0.16095201142476512,
+          "score": "1-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1529.27731778215,
+          "probability": 0.152927731778215,
+          "score": "0-0",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1255.569731405331,
+          "probability": 0.1255569731405331,
+          "score": "0-1",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 579.4315579583916,
+          "probability": 0.05794315579583916,
+          "score": "2-1",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 548.596283867746,
+          "probability": 0.0548596283867746,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 530.3873635858579,
+          "probability": 0.05303873635858579,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 489.57430727896144,
+          "probability": 0.04895743072789614,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 407.0954508846063,
+          "probability": 0.04070954508846063,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 226.09881340744434,
+          "probability": 0.022609881340744434,
+          "score": "3-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 170.16917982774743,
+          "probability": 0.017016917982774743,
+          "score": "1-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 153.6599838835403,
+          "probability": 0.015365998388354028,
+          "score": "0-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 153.3935025157211,
+          "probability": 0.015339350251572112,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 112.11993565023472,
+          "probability": 0.011211993565023472,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 96.09494806866718,
+          "probability": 0.009609494806866717,
+          "score": "2-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.891199288658321,
+      "v771_grid_dropped_mass": 0.00012540522357173955,
+      "v771_grid_pre_normalization_mass": 0.9998745947764283
+    },
+    {
+      "away": "代格福什",
+      "common_cutoff_utc": "2026-07-19T07:08:20Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.8690312494923786,
+        "delta_adjusted": 0.9598741058257044,
+        "delta_half_full": 0.09084285633332578,
+        "delta_spread_raw": -0.032616275427824755,
+        "delta_spread_used": -0.016308137713912377,
+        "delta_total": 0.09084285633332578,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.7533189748823146,
+        "lambda_home": 1.713193080708019,
+        "market_weight": 0.5847043636787967,
+        "mu": 2.627178514383847,
+        "mu_adjusted": 2.4665120555903335,
+        "p_big": 0.3562430209400887,
+        "p_cover": 0.2835731397584734,
+        "p_half_full_home": 0.850986829306142,
+        "p_win": 0.7476822838701165,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0319789621062028,
+        "tail_side": "home",
+        "zero_multiplier": 1.0395749501732623
+      },
+      "entropy_nats": 1.017349822617519,
+      "fid": "1362707",
+      "group_id": "26076-G01",
+      "handicap_line": -2,
+      "handicap_quotes": {
+        "0": 1.91,
+        "1": 5.15,
+        "3": 3.52
+      },
+      "home": "哈马比",
+      "issue": "26076",
+      "kickoff_utc": "2026-07-19T14:30:00Z",
+      "leg_no": 7,
+      "match_id": "26076_076",
+      "match_idx": 76,
+      "one_x_two": {
+        "0": 10.34,
+        "1": 5.7,
+        "3": 1.24
+      },
+      "p0": 0.5295183764326752,
+      "p1": 0.22897928458099717,
+      "p3": 0.24150233898632753,
+      "top15_scores": [
+        {
+          "bayes_score": 1244.9560667897424,
+          "probability": 0.12449560667897425,
+          "score": "2-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1155.3882008012731,
+          "probability": 0.11553882008012731,
+          "score": "1-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1035.6758504181996,
+          "probability": 0.10356758504181995,
+          "score": "2-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 922.7292462169451,
+          "probability": 0.09227292462169451,
+          "score": "1-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 907.7894965567533,
+          "probability": 0.09077894965567533,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 840.9774653771179,
+          "probability": 0.08409774653771179,
+          "score": "3-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 459.01340225978595,
+          "probability": 0.045901340225978596,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 423.8447342717799,
+          "probability": 0.042384473427177986,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 353.11236174236086,
+          "probability": 0.03531123617423609,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 327.2901587179352,
+          "probability": 0.03272901587179352,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 271.6245478920766,
+          "probability": 0.02716245478920766,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 265.887652670323,
+          "probability": 0.0265887652670323,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 265.577455496412,
+          "probability": 0.026557745549641198,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 215.2450708669997,
+          "probability": 0.02152450708669997,
+          "score": "6-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 169.08492336542852,
+          "probability": 0.016908492336542853,
+          "score": "6-1",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7710207154190027,
+      "v771_grid_dropped_mass": 0.002048357174977533,
+      "v771_grid_pre_normalization_mass": 0.9979516428250225
+    },
+    {
+      "away": "赫拉德茨克拉洛韦",
+      "common_cutoff_utc": "2026-07-23T11:19:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.5353796660653914,
+        "delta_adjusted": 0.573593869845362,
+        "delta_half_full": 0.038214203779970576,
+        "delta_spread_raw": -0.011104004360016947,
+        "delta_spread_used": -0.005552002180008474,
+        "delta_total": 0.038214203779970576,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 1.168069560558458,
+        "lambda_home": 1.74166343040382,
+        "market_weight": 0.600219267190345,
+        "mu": 2.9716017639813077,
+        "mu_adjusted": 2.909732990962278,
+        "p_big": 0.3819590630915656,
+        "p_cover": 0.4301490747361772,
+        "p_half_full_home": 0.6302490474295047,
+        "p_win": 0.6613295085326231,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.036249514560573,
+        "tail_side": "home",
+        "zero_multiplier": 1.023113824988301
+      },
+      "entropy_nats": 1.0769350119004983,
+      "fid": "1440681",
+      "group_id": "26077-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 2.71,
+        "1": 4.95,
+        "3": 2.32
+      },
+      "home": "特罗姆瑟",
+      "issue": "26077",
+      "kickoff_utc": "2026-07-23T17:00:00Z",
+      "leg_no": 1,
+      "match_id": "26077_056",
+      "match_idx": 56,
+      "one_x_two": {
+        "0": 7.14,
+        "1": 4.43,
+        "3": 1.4
+      },
+      "p0": 0.40440140856491824,
+      "p1": 0.24162903226648913,
+      "p3": 0.3539695591685927,
+      "top15_scores": [
+        {
+          "bayes_score": 987.0978777846765,
+          "probability": 0.09870978777846764,
+          "score": "2-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 928.6397678027068,
+          "probability": 0.09286397678027068,
+          "score": "1-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 918.2165406492984,
+          "probability": 0.09182165406492984,
+          "score": "1-0",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 868.4741881958072,
+          "probability": 0.08684741881958072,
+          "score": "3-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 854.3852271026452,
+          "probability": 0.08543852271026452,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 729.7381388376058,
+          "probability": 0.07297381388376058,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 565.1884979928466,
+          "probability": 0.056518849799284655,
+          "score": "2-2",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 519.4851777593719,
+          "probability": 0.051948517775937196,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 506.6816498827615,
+          "probability": 0.05066816498827615,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 464.19258580085875,
+          "probability": 0.04641925858008587,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 379.0888401853864,
+          "probability": 0.03790888401853864,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 373.2834958852569,
+          "probability": 0.03732834958852569,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 321.50438709498593,
+          "probability": 0.032150438709498595,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 286.10023306314037,
+          "probability": 0.02861002330631404,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 158.5311124926016,
+          "probability": 0.01585311124926016,
+          "score": "1-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7583709677335109,
+      "v771_grid_dropped_mass": 0.005584536744769664,
+      "v771_grid_pre_normalization_mass": 0.9944154632552303
+    },
+    {
+      "away": "费伦茨瓦罗斯",
+      "common_cutoff_utc": "2026-07-23T11:19:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.32866419372330896,
+        "delta_adjusted": 0.31468369714556066,
+        "delta_half_full": 0.002185383361383171,
+        "delta_spread_raw": -0.02796099315549661,
+        "delta_spread_used": -0.013980496577748304,
+        "delta_total": -0.013980496577748304,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 1.1300559135431998,
+        "lambda_home": 1.4447396106887602,
+        "market_weight": 0.6074682019929177,
+        "mu": 2.717252549095092,
+        "mu_adjusted": 2.57479552423196,
+        "p_big": 0.307055560179041,
+        "p_cover": 0.3175558953998804,
+        "p_half_full_home": 0.5072851266862304,
+        "p_win": 0.601286938624204,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.0135942309771722
+      },
+      "entropy_nats": 1.0514663261658115,
+      "fid": "1449796",
+      "group_id": "26077-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 2.19,
+        "1": 4.39,
+        "3": 3.14
+      },
+      "home": "特温特",
+      "issue": "26077",
+      "kickoff_utc": "2026-07-23T18:00:00Z",
+      "leg_no": 2,
+      "match_id": "26077_059",
+      "match_idx": 59,
+      "one_x_two": {
+        "0": 5.38,
+        "1": 4.04,
+        "3": 1.53
+      },
+      "p0": 0.48211374038438803,
+      "p1": 0.2607264732468225,
+      "p3": 0.25715978636878944,
+      "top15_scores": [
+        {
+          "bayes_score": 1197.660480252221,
+          "probability": 0.11976604802522212,
+          "score": "2-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1123.9095115550253,
+          "probability": 0.11239095115550254,
+          "score": "1-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1009.5950173763731,
+          "probability": 0.1009595017376373,
+          "score": "1-0",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 816.8598071913111,
+          "probability": 0.08168598071913111,
+          "score": "0-0",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 776.2556471074219,
+          "probability": 0.07762556471074218,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 671.1534761821978,
+          "probability": 0.06711534761821977,
+          "score": "3-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 639.5962548814913,
+          "probability": 0.06395962548814912,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 621.5925264401108,
+          "probability": 0.06215925264401108,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 541.8125295514263,
+          "probability": 0.05418125295514263,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 419.27679977654594,
+          "probability": 0.04192767997765459,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 313.88846363263673,
+          "probability": 0.031388846363263674,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 311.9678137054149,
+          "probability": 0.031196781370541493,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 217.7526999185194,
+          "probability": 0.02177526999185194,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 184.93548067137786,
+          "probability": 0.018493548067137787,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 168.862300253492,
+          "probability": 0.0168862300253492,
+          "score": "1-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7428402136312106,
+      "v771_grid_dropped_mass": 0.0025928320457261345,
+      "v771_grid_pre_normalization_mass": 0.9974071679542739
+    },
+    {
+      "away": "本菲卡",
+      "common_cutoff_utc": "2026-07-23T11:19:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": -1.5003803306309664,
+        "delta_adjusted": -1.570863235181925,
+        "delta_half_full": -0.07048290455095856,
+        "delta_spread_raw": -0.026366215462283557,
+        "delta_spread_used": -0.013183107731141779,
+        "delta_total": -0.07048290455095856,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 2.087406716566383,
+        "lambda_home": 0.5165434813844582,
+        "market_weight": 0.5906553416524962,
+        "mu": 2.739375770048184,
+        "mu_adjusted": 2.6039501979508413,
+        "p_big": 0.33092685984763415,
+        "p_cover": 0.32882279385494817,
+        "p_half_full_home": 0.24503796853446497,
+        "p_win": 0.13290944185820183,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0881110074849576,
+        "tail_side": "away",
+        "zero_multiplier": 1.056876426510155
+      },
+      "entropy_nats": 1.0383546731222622,
+      "fid": "1440677",
+      "group_id": "26077-G01",
+      "handicap_line": 1,
+      "handicap_quotes": {
+        "0": 1.99,
+        "1": 5.92,
+        "3": 3.04
+      },
+      "home": "圣加仑",
+      "issue": "26077",
+      "kickoff_utc": "2026-07-23T18:00:00Z",
+      "leg_no": 3,
+      "match_id": "26077_061",
+      "match_idx": 61,
+      "one_x_two": {
+        "0": 1.36,
+        "1": 4.82,
+        "3": 6.92
+      },
+      "p0": 0.500141654403394,
+      "p1": 0.23213564159791153,
+      "p3": 0.26772270399869463,
+      "top15_scores": [
+        {
+          "bayes_score": 1452.3515995128753,
+          "probability": 0.14523515995128752,
+          "score": "0-2",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1120.5049608301279,
+          "probability": 0.11205049608301278,
+          "score": "0-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 990.875015368245,
+          "probability": 0.09908750153682451,
+          "score": "1-2",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 928.3164155117017,
+          "probability": 0.09283164155117017,
+          "score": "1-3",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 904.6939471083627,
+          "probability": 0.09046939471083627,
+          "score": "0-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 739.8826859095176,
+          "probability": 0.07398826859095176,
+          "score": "1-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 621.428023422457,
+          "probability": 0.0621428023422457,
+          "score": "0-4",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 602.7539474498786,
+          "probability": 0.06027539474498786,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 533.432012869838,
+          "probability": 0.0533432012869838,
+          "score": "1-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 399.64198948659526,
+          "probability": 0.039964198948659525,
+          "score": "1-4",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 279.3003419222416,
+          "probability": 0.027930034192224163,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 211.40817281561627,
+          "probability": 0.021140817281561627,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 186.06423917642195,
+          "probability": 0.018606423917642195,
+          "score": "2-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 153.4335036023326,
+          "probability": 0.015343350360233259,
+          "score": "0-6",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 123.573336639054,
+          "probability": 0.012357333663905401,
+          "score": "0-5",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7678643584020886,
+      "v771_grid_dropped_mass": 0.003060586846400204,
+      "v771_grid_pre_normalization_mass": 0.9969394131535998
+    },
+    {
+      "away": "佩特罗库布",
+      "common_cutoff_utc": "2026-07-23T11:19:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.46394455936352874,
+        "delta_adjusted": 0.44748321795290186,
+        "delta_half_full": -0.005159585697694236,
+        "delta_spread_raw": -0.032922682821253754,
+        "delta_spread_used": -0.016461341410626877,
+        "delta_total": -0.016461341410626877,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.7712478375924486,
+        "lambda_home": 1.2187310555453506,
+        "market_weight": 0.6067246393421442,
+        "mu": 2.1209022534873885,
+        "mu_adjusted": 1.989978893137799,
+        "p_big": 0.25227390478818823,
+        "p_cover": 0.28127198368884815,
+        "p_half_full_home": 0.4827945932251383,
+        "p_win": 0.6410514600667763,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.0216000766136675
+      },
+      "entropy_nats": 1.0456931504177254,
+      "fid": "1451057",
+      "group_id": "26077-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 1.75,
+        "1": 6.74,
+        "3": 3.55
+      },
+      "home": "巴尼亚卢卡战士",
+      "issue": "26077",
+      "kickoff_utc": "2026-07-23T18:30:00Z",
+      "leg_no": 4,
+      "match_id": "26077_062",
+      "match_idx": 62,
+      "one_x_two": {
+        "0": 5.94,
+        "1": 4.48,
+        "3": 1.43
+      },
+      "p0": 0.49115749094743394,
+      "p1": 0.25410522524064305,
+      "p3": 0.2547372838119232,
+      "top15_scores": [
+        {
+          "bayes_score": 1539.820249322086,
+          "probability": 0.1539820249322086,
+          "score": "1-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1351.997337588746,
+          "probability": 0.1351997337588746,
+          "score": "0-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1229.6004301009018,
+          "probability": 0.12296004301009018,
+          "score": "1-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 819.942820106383,
+          "probability": 0.0819942820106383,
+          "score": "0-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 801.3556136877032,
+          "probability": 0.08013556136877033,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 726.6069372570066,
+          "probability": 0.07266069372570066,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 569.9425269842317,
+          "probability": 0.05699425269842317,
+          "score": "2-2",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 433.62460454717797,
+          "probability": 0.0433624604547178,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 404.0072329198082,
+          "probability": 0.04040072329198082,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 403.1898900572152,
+          "probability": 0.04031898900572152,
+          "score": "3-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 311.4629710978985,
+          "probability": 0.03114629710978985,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 218.62478801246638,
+          "probability": 0.02186247880124664,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 151.77259257991855,
+          "probability": 0.015177259257991854,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 151.56635940922246,
+          "probability": 0.015156635940922246,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 123.05870641811507,
+          "probability": 0.012305870641811507,
+          "score": "4-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7458947747593572,
+      "v771_grid_dropped_mass": 0.00047192108797955434,
+      "v771_grid_pre_normalization_mass": 0.9995280789120204
+    },
+    {
+      "away": "德里城",
+      "common_cutoff_utc": "2026-07-23T11:19:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 1.1981144750995136,
+        "delta_adjusted": 1.2637395646422622,
+        "delta_half_full": 0.06562508954274852,
+        "delta_spread_raw": -0.03576200800167312,
+        "delta_spread_used": -0.01788100400083656,
+        "delta_total": 0.06562508954274852,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.631663633567746,
+        "lambda_home": 1.8954031982100084,
+        "market_weight": 0.5920860076133051,
+        "mu": 2.7086950319128,
+        "mu_adjusted": 2.5270668317777543,
+        "p_big": 0.3119409634602855,
+        "p_cover": 0.2595118847342264,
+        "p_half_full_home": 0.7345677787778787,
+        "p_win": 0.8172226888595574,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0593104797315012,
+        "tail_side": "home",
+        "zero_multiplier": 1.0488080666018915
+      },
+      "entropy_nats": 1.0356717391724577,
+      "fid": "1451044",
+      "group_id": "26077-G01",
+      "handicap_line": -2,
+      "handicap_quotes": {
+        "0": 1.72,
+        "1": 6.26,
+        "3": 3.85
+      },
+      "home": "里耶卡",
+      "issue": "26077",
+      "kickoff_utc": "2026-07-23T18:45:00Z",
+      "leg_no": 5,
+      "match_id": "26077_063",
+      "match_idx": 63,
+      "one_x_two": {
+        "0": 16.26,
+        "1": 7.33,
+        "3": 1.13
+      },
+      "p0": 0.5057354513533225,
+      "p1": 0.24575035498001443,
+      "p3": 0.2485141936666631,
+      "top15_scores": [
+        {
+          "bayes_score": 1496.8883448854313,
+          "probability": 0.14968883448854312,
+          "score": "2-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1257.7792248205433,
+          "probability": 0.12577792248205433,
+          "score": "1-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1165.1149791915523,
+          "probability": 0.11651149791915522,
+          "score": "2-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1032.7721436768184,
+          "probability": 0.10327721436768184,
+          "score": "1-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 980.130627025658,
+          "probability": 0.0980130627025658,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 821.560267192495,
+          "probability": 0.0821560267192495,
+          "score": "3-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 636.7308280802117,
+          "probability": 0.06367308280802117,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 435.41003121647816,
+          "probability": 0.04354100312164782,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 304.5716894371829,
+          "probability": 0.03045716894371829,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 268.95586252473953,
+          "probability": 0.02689558625247395,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 211.42451399857944,
+          "probability": 0.021142451399857945,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 180.8868210952299,
+          "probability": 0.01808868210952299,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 173.55838010378343,
+          "probability": 0.017355838010378342,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 162.61588230710566,
+          "probability": 0.016261588230710566,
+          "score": "6-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 116.07781267885368,
+          "probability": 0.011607781267885368,
+          "score": "4-2",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7542496450199856,
+      "v771_grid_dropped_mass": 0.0024592277679081898,
+      "v771_grid_pre_normalization_mass": 0.9975407722320918
+    },
+    {
+      "away": "格雷米奥",
+      "common_cutoff_utc": "2026-07-23T11:19:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.2615624717172301,
+        "delta_adjusted": 0.17898866151830586,
+        "delta_half_full": -0.08257381019892426,
+        "delta_spread_raw": -0.04466836373428245,
+        "delta_spread_used": -0.022334181867141225,
+        "delta_total": -0.08257381019892426,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.9533689001538068,
+        "lambda_home": 1.1323575616721127,
+        "market_weight": 0.5871118947665028,
+        "mu": 2.2763805787426707,
+        "mu_adjusted": 2.0857264618259195,
+        "p_big": 0.2652836115791618,
+        "p_cover": 0.1847804131448306,
+        "p_half_full_home": 0.19045646932297175,
+        "p_win": 0.5810178324623,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.0084919139621698
+      },
+      "entropy_nats": 0.9893030339401988,
+      "fid": "1413172",
+      "group_id": "26077-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 1.45,
+        "1": 7.76,
+        "3": 5.39
+      },
+      "home": "玻利瓦尔",
+      "issue": "26077",
+      "kickoff_utc": "2026-07-23T22:00:00Z",
+      "leg_no": 6,
+      "match_id": "26077_066",
+      "match_idx": 66,
+      "one_x_two": {
+        "0": 5.09,
+        "1": 3.89,
+        "3": 1.59
+      },
+      "p0": 0.5612152545092541,
+      "p1": 0.22957855340878483,
+      "p3": 0.20920619208196117,
+      "top15_scores": [
+        {
+          "bayes_score": 1276.9809247602782,
+          "probability": 0.1276980924760278,
+          "score": "1-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1261.9251198527838,
+          "probability": 0.1261925119852784,
+          "score": "1-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1044.948216737818,
+          "probability": 0.1044948216737818,
+          "score": "0-0",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 792.9168130823753,
+          "probability": 0.07929168130823752,
+          "score": "2-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 753.9232498250155,
+          "probability": 0.07539232498250155,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 672.6946150269778,
+          "probability": 0.06726946150269777,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 586.6976457117208,
+          "probability": 0.05866976457117208,
+          "score": "2-2",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 547.6623871365846,
+          "probability": 0.054766238713658454,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 450.665207193933,
+          "probability": 0.0450665207193933,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 391.94293949238147,
+          "probability": 0.039194293949238145,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 386.1597133645923,
+          "probability": 0.03861597133645923,
+          "score": "3-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 253.40875323369104,
+          "probability": 0.025340875323369105,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 243.62597630472985,
+          "probability": 0.024362597630472986,
+          "score": "1-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 213.8411614166287,
+          "probability": 0.02138411614166287,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 167.84571264001733,
+          "probability": 0.016784571264001732,
+          "score": "3-2",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.790793807918039,
+      "v771_grid_dropped_mass": 0.0006418267630037278,
+      "v771_grid_pre_normalization_mass": 0.9993581732369963
+    },
+    {
+      "away": "维多利亚",
+      "common_cutoff_utc": "2026-07-23T11:19:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.15111858112741358,
+        "delta_adjusted": 0.13101592255715275,
+        "delta_half_full": -0.010856565511932252,
+        "delta_spread_raw": -0.04020531714052169,
+        "delta_spread_used": -0.020102658570260844,
+        "delta_total": -0.020102658570260844,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 1.0384700451003783,
+        "lambda_home": 1.1694859676575309,
+        "market_weight": 0.6056337081474372,
+        "mu": 2.3879733080854253,
+        "mu_adjusted": 2.207956012757909,
+        "p_big": 0.24593941443774886,
+        "p_cover": 0.2236330124923203,
+        "p_half_full_home": 0.4637480583546944,
+        "p_win": 0.5470846315254022,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.0060862250832185
+      },
+      "entropy_nats": 1.0217800283909142,
+      "fid": "1362188",
+      "group_id": "26077-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 1.68,
+        "1": 5.46,
+        "3": 4.46
+      },
+      "home": "博塔弗戈",
+      "issue": "26077",
+      "kickoff_utc": "2026-07-23T22:30:00Z",
+      "leg_no": 7,
+      "match_id": "26077_067",
+      "match_idx": 67,
+      "one_x_two": {
+        "0": 4.78,
+        "1": 3.6,
+        "3": 1.7
+      },
+      "p0": 0.5194825875834059,
+      "p1": 0.26994373905570895,
+      "p3": 0.21057367336088514,
+      "top15_scores": [
+        {
+          "bayes_score": 1318.7885458678063,
+          "probability": 0.13187885458678064,
+          "score": "1-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1244.4220417314862,
+          "probability": 0.12444220417314862,
+          "score": "2-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1187.5826695862638,
+          "probability": 0.11875826695862639,
+          "score": "1-0",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1039.2460044115724,
+          "probability": 0.10392460044115723,
+          "score": "0-0",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 800.6366026038214,
+          "probability": 0.08006366026038214,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 668.7419393268748,
+          "probability": 0.06687419393268748,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 652.221151856421,
+          "probability": 0.0652221151856421,
+          "score": "2-2",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 570.5810816285145,
+          "probability": 0.05705810816285146,
+          "score": "3-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 486.1690522838991,
+          "probability": 0.048616905228389906,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 381.1450587615595,
+          "probability": 0.038114505876155946,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 303.969895165904,
+          "probability": 0.030396989516590398,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 221.50407932557889,
+          "probability": 0.02215040793255789,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 175.30757827265458,
+          "probability": 0.01753075782726546,
+          "score": "1-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 159.68267442225257,
+          "probability": 0.015968267442225258,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 128.07053073997773,
+          "probability": 0.012807053073997772,
+          "score": "4-1",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7894263266391148,
+      "v771_grid_dropped_mass": 0.0009432459373238666,
+      "v771_grid_pre_normalization_mass": 0.9990567540626761
+    },
+    {
+      "away": "阿瓦伊",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.2746720253107364,
+        "delta_adjusted": 0.3239538180938098,
+        "delta_half_full": 0.04928179278307337,
+        "delta_spread_raw": -0.017365037397052138,
+        "delta_spread_used": -0.008682518698526069,
+        "delta_total": 0.04928179278307337,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 1.1995520747507642,
+        "lambda_home": 1.5235058928445742,
+        "market_weight": 0.59692441131936,
+        "mu": 2.814703140010105,
+        "mu_adjusted": 2.7230579675953384,
+        "p_big": 0.3090840049300867,
+        "p_cover": 0.3897141107470009,
+        "p_half_full_home": 0.6705983193277312,
+        "p_win": 0.5850016277173837,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.003525883926686,
+        "tail_side": "home",
+        "zero_multiplier": 1.0137178899397747
+      },
+      "entropy_nats": 1.0807398798308672,
+      "fid": "1384146",
+      "group_id": "26079-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 3.31,
+        "1": 3.23,
+        "3": 2.56
+      },
+      "home": "尤文图德",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-28T22:30:00Z",
+      "leg_no": 1,
+      "match_id": "26079_009",
+      "match_idx": 9,
+      "one_x_two": {
+        "0": 5.99,
+        "1": 3.51,
+        "3": 1.57
+      },
+      "p0": 0.41175957455415224,
+      "p1": 0.2578269191283756,
+      "p3": 0.33041350631747207,
+      "top15_scores": [
+        {
+          "bayes_score": 1141.7330004385083,
+          "probability": 0.11417330004385082,
+          "score": "2-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1135.5603753311548,
+          "probability": 0.11355603753311547,
+          "score": "2-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1030.0719693539522,
+          "probability": 0.10300719693539523,
+          "score": "1-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1022.0583819433526,
+          "probability": 0.10220583819433526,
+          "score": "1-0",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 747.8966553603747,
+          "probability": 0.07478966553603747,
+          "score": "3-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 637.748449215711,
+          "probability": 0.06377484492157111,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 578.4648463595865,
+          "probability": 0.05784648463595865,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 489.71736626592633,
+          "probability": 0.048971736626592634,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 487.15778973487113,
+          "probability": 0.04871577897348711,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 440.5365946319456,
+          "probability": 0.04405365946319456,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 325.3203255480472,
+          "probability": 0.03253203255480472,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 280.94813634666474,
+          "probability": 0.028094813634666475,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 234.67605331926245,
+          "probability": 0.023467605331926246,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 201.99904269035866,
+          "probability": 0.020199904269035868,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 182.306170734981,
+          "probability": 0.0182306170734981,
+          "score": "1-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7421730808716243,
+      "v771_grid_dropped_mass": 0.003690631540957501,
+      "v771_grid_pre_normalization_mass": 0.9963093684590425
+    },
+    {
+      "away": "里奥夸尔托大学生",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.5953361553506945,
+        "delta_adjusted": 0.653716311226309,
+        "delta_half_full": 0.058380155875614494,
+        "delta_spread_raw": -0.006037758784060668,
+        "delta_spread_used": -0.003018879392030334,
+        "delta_total": 0.058380155875614494,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.905349944631809,
+        "lambda_home": 1.5590662558581179,
+        "market_weight": 0.5942263693850915,
+        "mu": 2.4926348150208915,
+        "mu_adjusted": 2.464416200489927,
+        "p_big": 0.2705728930798581,
+        "p_cover": 0.4621921134040804,
+        "p_half_full_home": 0.7054290492223445,
+        "p_win": 0.6779070889811226,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0088599383787176,
+        "tail_side": "home",
+        "zero_multiplier": 1.028764132210051
+      },
+      "entropy_nats": 1.0902893097147162,
+      "fid": "1410043",
+      "group_id": "26079-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 4.44,
+        "1": 3.19,
+        "3": 2.16
+      },
+      "home": "阿根廷青年人",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T00:15:00Z",
+      "leg_no": 2,
+      "match_id": "26079_010",
+      "match_idx": 10,
+      "one_x_two": {
+        "0": 9.5,
+        "1": 4.14,
+        "3": 1.37
+      },
+      "p0": 0.360764456370129,
+      "p1": 0.27358908330687187,
+      "p3": 0.365646460322999,
+      "top15_scores": [
+        {
+          "bayes_score": 1372.6399753662604,
+          "probability": 0.13726399753662605,
+          "score": "1-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1334.9510467259709,
+          "probability": 0.1334951046725971,
+          "score": "2-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1052.9974743542193,
+          "probability": 0.10529974743542193,
+          "score": "2-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 942.6107792774158,
+          "probability": 0.09426107792774158,
+          "score": "1-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 768.6568769094912,
+          "probability": 0.07686568769094912,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 720.1294046468341,
+          "probability": 0.07201294046468341,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 712.4425056859825,
+          "probability": 0.07124425056859825,
+          "score": "3-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 493.71530509593407,
+          "probability": 0.049371530509593406,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 389.579041835978,
+          "probability": 0.0389579041835978,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 353.2921293594925,
+          "probability": 0.03532921293594925,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 275.0618278282437,
+          "probability": 0.02750618278282437,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 261.17202086085643,
+          "probability": 0.026117202086085645,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 241.987205412096,
+          "probability": 0.024198720541209598,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 194.06675186593486,
+          "probability": 0.019406675186593485,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 109.53991360619946,
+          "probability": 0.010953991360619947,
+          "score": "1-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7264109166931281,
+      "v771_grid_dropped_mass": 0.001989113536121856,
+      "v771_grid_pre_normalization_mass": 0.9980108864638781
+    },
+    {
+      "away": "委内瑞拉中央大学",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.7777354693260365,
+        "delta_adjusted": 0.8591244256317467,
+        "delta_half_full": 0.08138895630571014,
+        "delta_spread_raw": -0.027048677561440228,
+        "delta_spread_used": -0.013524338780720114,
+        "delta_total": 0.08138895630571014,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 1.08555259405152,
+        "lambda_home": 1.9446770196832668,
+        "market_weight": 0.5874579634715604,
+        "mu": 3.192122143608275,
+        "mu_adjusted": 3.030229613734787,
+        "p_big": 0.40875495449297605,
+        "p_cover": 0.3240223463687151,
+        "p_half_full_home": 0.8039116448724657,
+        "p_win": 0.7255516813703695,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.06670155295249,
+        "tail_side": "home",
+        "zero_multiplier": 1.0320799899971818
+      },
+      "entropy_nats": 1.0077455038571603,
+      "fid": "1413187",
+      "group_id": "26079-G01",
+      "handicap_line": -2,
+      "handicap_quotes": {
+        "0": 2.32,
+        "1": 4.06,
+        "3": 3.08
+      },
+      "home": "桑托斯",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T00:30:00Z",
+      "leg_no": 3,
+      "match_id": "26079_012",
+      "match_idx": 12,
+      "one_x_two": {
+        "0": 9.36,
+        "1": 5.3,
+        "3": 1.28
+      },
+      "p0": 0.5408726473337898,
+      "p1": 0.22127096974396138,
+      "p3": 0.23785638292224864,
+      "top15_scores": [
+        {
+          "bayes_score": 1062.1387927521648,
+          "probability": 0.10621387927521647,
+          "score": "2-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1023.5576285454878,
+          "probability": 0.10235576285454878,
+          "score": "2-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 868.1410547650072,
+          "probability": 0.08681410547650072,
+          "score": "3-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 859.9948581590963,
+          "probability": 0.08599948581590963,
+          "score": "3-0",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 847.1745909769854,
+          "probability": 0.08471745909769854,
+          "score": "1-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 808.8376942727343,
+          "probability": 0.08088376942727343,
+          "score": "1-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 500.525565333465,
+          "probability": 0.050052556533346504,
+          "score": "4-0",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 474.3352471896431,
+          "probability": 0.04743352471896431,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 413.94024087999065,
+          "probability": 0.04139402408799907,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 412.6285849260508,
+          "probability": 0.04126285849260508,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 359.28981241634585,
+          "probability": 0.035928981241634586,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 311.8675696475588,
+          "probability": 0.031186756964755882,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 302.7016966810233,
+          "probability": 0.03027016966810233,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 208.85870052865087,
+          "probability": 0.020885870052865088,
+          "score": "4-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 171.416012487217,
+          "probability": 0.0171416012487217,
+          "score": "4-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7787290302560385,
+      "v771_grid_dropped_mass": 0.007192976232773485,
+      "v771_grid_pre_normalization_mass": 0.9928070237672265
+    },
+    {
+      "away": "博塔弗戈SP",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.01668900156617327,
+        "delta_adjusted": -0.002091488032267906,
+        "delta_half_full": 0.0065015002764999335,
+        "delta_spread_raw": -0.03756097919688235,
+        "delta_spread_used": -0.018780489598441176,
+        "delta_total": -0.018780489598441176,
+        "direction_conflict": true,
+        "draw_hijack_applied": true,
+        "lambda_away": 1.302376655192703,
+        "lambda_home": 1.300285167160435,
+        "market_weight": 0.6060297595173135,
+        "mu": 2.7998461262988563,
+        "mu_adjusted": 2.602661822353138,
+        "p_big": 0.30891660127185666,
+        "p_cover": 0.2452777675316967,
+        "p_half_full_home": 0.5216852540272615,
+        "p_win": 0.5052151238591915,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "away",
+        "zero_multiplier": 1.0000896034938922
+      },
+      "entropy_nats": 0.9976562023919897,
+      "fid": "1384144",
+      "group_id": "26079-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 2.19,
+        "1": 3.34,
+        "3": 4.07
+      },
+      "home": "福塔莱萨",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T00:35:00Z",
+      "leg_no": 4,
+      "match_id": "26079_013",
+      "match_idx": 13,
+      "one_x_two": {
+        "0": 4.34,
+        "1": 3.25,
+        "3": 1.82
+      },
+      "p0": 0.551454963147424,
+      "p1": 0.239930597293984,
+      "p3": 0.20861443955859182,
+      "top15_scores": [
+        {
+          "bayes_score": 1280.7985583039663,
+          "probability": 0.12807985583039663,
+          "score": "1-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1025.6464607270818,
+          "probability": 0.10256464607270818,
+          "score": "2-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 987.0691647980967,
+          "probability": 0.09870691647980967,
+          "score": "1-0",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 700.8906022830641,
+          "probability": 0.07008906022830641,
+          "score": "2-0",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 699.0055784424999,
+          "probability": 0.06990055784424999,
+          "score": "0-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 681.9032613560072,
+          "probability": 0.06819032613560072,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 630.75686285575,
+          "probability": 0.063075686285575,
+          "score": "0-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 583.8493776095364,
+          "probability": 0.058384937760953645,
+          "score": "2-2",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 487.4641183539399,
+          "probability": 0.048746411835393993,
+          "score": "3-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 368.74349544452417,
+          "probability": 0.036874349544452414,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 345.9564194402675,
+          "probability": 0.03459564194402675,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 301.04077330734634,
+          "probability": 0.030104077330734634,
+          "score": "1-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 288.3632152297454,
+          "probability": 0.028836321522974537,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 210.92923328265158,
+          "probability": 0.021092923328265158,
+          "score": "2-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 190.06358363017597,
+          "probability": 0.019006358363017596,
+          "score": "0-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7913855604414081,
+      "v771_grid_dropped_mass": 0.0027649813697021575,
+      "v771_grid_pre_normalization_mass": 0.9972350186302978
+    },
+    {
+      "away": "金浦FC",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "小球",
+        "delta": 0.38747572289001,
+        "delta_adjusted": 0.28196875717977193,
+        "delta_half_full": -0.10550696571023806,
+        "delta_spread_raw": -0.047488363070007755,
+        "delta_spread_used": -0.023744181535003878,
+        "delta_total": -0.10550696571023806,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.5589806543838478,
+        "lambda_home": 0.8409494115636198,
+        "market_weight": 0.580470738991547,
+        "mu": 1.5367646352305482,
+        "mu_adjusted": 1.3999300659474676,
+        "p_big": 0.15131698376065672,
+        "p_cover": 0.15839324855953563,
+        "p_half_full_home": 0.06302074294485453,
+        "p_win": 0.6187732752720276,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.015449570570546
+      },
+      "entropy_nats": 0.9595558234663785,
+      "fid": "1455185",
+      "group_id": "26079-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 1.39,
+        "1": 7.98,
+        "3": 6.29
+      },
+      "home": "仁川联",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T10:00:00Z",
+      "leg_no": 5,
+      "match_id": "26079_015",
+      "match_idx": 15,
+      "one_x_two": {
+        "0": 5.56,
+        "1": 4.13,
+        "3": 1.46
+      },
+      "p0": 0.5883326964874341,
+      "p1": 0.2316632204174256,
+      "p3": 0.1800040830951404,
+      "top15_scores": [
+        {
+          "bayes_score": 1797.3595720106653,
+          "probability": 0.17973595720106653,
+          "score": "0-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1481.042412169564,
+          "probability": 0.1481042412169564,
+          "score": "1-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1367.4598137145406,
+          "probability": 0.13674598137145405,
+          "score": "1-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1128.0108743735482,
+          "probability": 0.11280108743735483,
+          "score": "0-1",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 849.7276867426265,
+          "probability": 0.08497276867426265,
+          "score": "2-0",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 631.0547864370313,
+          "probability": 0.06310547864370314,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 466.0961942114603,
+          "probability": 0.046609619421146026,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 440.54228497207083,
+          "probability": 0.04405422849720708,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 346.7246333233588,
+          "probability": 0.034672463332335875,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 287.58203550587547,
+          "probability": 0.028758203550587547,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 259.26200946957516,
+          "probability": 0.025926200946957516,
+          "score": "3-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 162.10779033304578,
+          "probability": 0.01621077903330458,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 138.3891801937383,
+          "probability": 0.01383891801937383,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 101.6678278053032,
+          "probability": 0.01016678278053032,
+          "score": "1-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 77.30458689308963,
+          "probability": 0.007730458689308964,
+          "score": "3-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.8199959169048597,
+      "v771_grid_dropped_mass": 3.6969480907034225e-05,
+      "v771_grid_pre_normalization_mass": 0.999963030519093
+    },
+    {
+      "away": "FC首尔",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "小球",
+        "delta": -1.099512365293653,
+        "delta_adjusted": -1.1259453471655774,
+        "delta_half_full": -0.026432981871924457,
+        "delta_spread_raw": 0.03401147096714724,
+        "delta_spread_used": 0.01700573548357362,
+        "delta_total": -0.026432981871924457,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 1.3900082999174466,
+        "lambda_home": 0.2640629527518692,
+        "market_weight": 0.6037387429943707,
+        "mu": 1.5549121593607604,
+        "mu_adjusted": 1.6540712526693158,
+        "p_big": 0.18742498379771097,
+        "p_cover": 0.7269767673276847,
+        "p_half_full_home": 0.4109606419079636,
+        "p_win": 0.20191142818683538,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "away",
+        "zero_multiplier": 1.0560733471846127
+      },
+      "entropy_nats": 1.0534579261084567,
+      "fid": "1455182",
+      "group_id": "26079-G01",
+      "handicap_line": 1,
+      "handicap_quotes": {
+        "0": 6.49,
+        "1": 8.33,
+        "3": 1.37
+      },
+      "home": "釜山IPark",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T10:00:00Z",
+      "leg_no": 6,
+      "match_id": "26079_017",
+      "match_idx": 17,
+      "one_x_two": {
+        "0": 1.64,
+        "1": 3.75,
+        "3": 4.51
+      },
+      "p0": 0.2681086650134185,
+      "p1": 0.2533393966595585,
+      "p3": 0.47855193832702303,
+      "top15_scores": [
+        {
+          "bayes_score": 1768.7343695506927,
+          "probability": 0.17687343695506927,
+          "score": "0-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1765.6648162134595,
+          "probability": 0.17656648162134594,
+          "score": "0-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1064.731787914326,
+          "probability": 0.10647317879143262,
+          "score": "0-2",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1051.300699218564,
+          "probability": 0.1051300699218564,
+          "score": "1-1",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 717.3635042349059,
+          "probability": 0.0717363504234906,
+          "score": "1-0",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 537.9454432280415,
+          "probability": 0.05379454432280415,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 504.69102618718017,
+          "probability": 0.050469102618718016,
+          "score": "0-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 379.35709700359104,
+          "probability": 0.0379357097003591,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 356.6998844219039,
+          "probability": 0.03566998844219039,
+          "score": "1-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 222.1081044088133,
+          "probability": 0.02221081044088133,
+          "score": "2-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 194.6365108390317,
+          "probability": 0.01946365108390317,
+          "score": "0-4",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 183.72893804060828,
+          "probability": 0.01837289380406083,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 169.66853482127095,
+          "probability": 0.016966853482127096,
+          "score": "0-6",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 166.92520178931449,
+          "probability": 0.01669252017893145,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 152.2324804315217,
+          "probability": 0.015223248043152171,
+          "score": "3-0",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7466606033404415,
+      "v771_grid_dropped_mass": 0.0001501848926395155,
+      "v771_grid_pre_normalization_mass": 0.9998498151073605
+    },
+    {
+      "away": "坡州前沿",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "小球",
+        "delta": 0.27448984189637055,
+        "delta_adjusted": 0.17358484891164458,
+        "delta_half_full": -0.10090499298472597,
+        "delta_spread_raw": -0.049555022030360114,
+        "delta_spread_used": -0.024777511015180057,
+        "delta_total": -0.10090499298472597,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.577284109377483,
+        "lambda_home": 0.7508689582891275,
+        "market_weight": 0.5817941325723716,
+        "mu": 1.464200205353795,
+        "mu_adjusted": 1.3281530676666105,
+        "p_big": 0.14260401339681197,
+        "p_cover": 0.13795384550044465,
+        "p_half_full_home": 0.09217074651021646,
+        "p_win": 0.5849463397373811,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.0096895961227517
+      },
+      "entropy_nats": 0.9406626329509569,
+      "fid": "1455181",
+      "group_id": "26079-G01",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 1.35,
+        "1": 7.94,
+        "3": 7.21
+      },
+      "home": "富川1995",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T10:00:00Z",
+      "leg_no": 7,
+      "match_id": "26079_018",
+      "match_idx": 18,
+      "one_x_two": {
+        "0": 5.12,
+        "1": 3.81,
+        "3": 1.55
+      },
+      "p0": 0.606048014693601,
+      "p1": 0.22079422351121963,
+      "p3": 0.17315776179517928,
+      "top15_scores": [
+        {
+          "bayes_score": 2139.6136468307423,
+          "probability": 0.21396136468307422,
+          "score": "0-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1462.282434638362,
+          "probability": 0.1462282434638362,
+          "score": "1-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1354.3729479308608,
+          "probability": 0.13543729479308608,
+          "score": "1-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1210.2531974403046,
+          "probability": 0.12102531974403045,
+          "score": "0-1",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 690.3263542789495,
+          "probability": 0.06903263542789495,
+          "score": "2-0",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 555.3581764249884,
+          "probability": 0.05553581764249885,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 476.6473102095375,
+          "probability": 0.047664731020953754,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 430.646313484572,
+          "probability": 0.0430646313484572,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 319.5667870140767,
+          "probability": 0.03195667870140767,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 225.32538035488759,
+          "probability": 0.02253253803548876,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 202.65056664722212,
+          "probability": 0.02026505666472221,
+          "score": "3-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 167.68825989123764,
+          "probability": 0.016768825989123763,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 132.08549895184734,
+          "probability": 0.013208549895184735,
+          "score": "4-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 88.96281350372567,
+          "probability": 0.008896281350372567,
+          "score": "6-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 86.77122490232537,
+          "probability": 0.008677122490232538,
+          "score": "0-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.8268422382048206,
+      "v771_grid_dropped_mass": 2.456787140892036e-05,
+      "v771_grid_pre_normalization_mass": 0.9999754321285911
+    },
+    {
+      "away": "FC安养",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": -0.7922934973290887,
+        "delta_adjusted": -0.7732222051801846,
+        "delta_half_full": -0.00999646823673797,
+        "delta_spread_raw": 0.038142584297808216,
+        "delta_spread_used": 0.019071292148904108,
+        "delta_total": 0.019071292148904108,
+        "direction_conflict": true,
+        "draw_hijack_applied": true,
+        "lambda_away": 1.2079640762432982,
+        "lambda_home": 0.4347418710631136,
+        "market_weight": 0.6059426436301754,
+        "mu": 1.5330651940593298,
+        "mu_adjusted": 1.6427059473064118,
+        "p_big": 0.20109880221760118,
+        "p_cover": 0.759405814523143,
+        "p_half_full_home": 0.46662897692543487,
+        "p_win": 0.27083961971893317,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "away",
+        "zero_multiplier": 1.0406716516382384
+      },
+      "entropy_nats": 1.015478046669542,
+      "fid": "1455189",
+      "group_id": "26079-G02",
+      "handicap_line": 1,
+      "handicap_quotes": {
+        "0": 7.08,
+        "1": 9.94,
+        "3": 1.31
+      },
+      "home": "忠北清州FC",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T10:30:00Z",
+      "leg_no": 1,
+      "match_id": "26079_019",
+      "match_idx": 19,
+      "one_x_two": {
+        "0": 1.94,
+        "1": 3.47,
+        "3": 3.35
+      },
+      "p0": 0.2266397300594053,
+      "p1": 0.24163757233086755,
+      "p3": 0.5317226976097272,
+      "top15_scores": [
+        {
+          "bayes_score": 1616.0920858326458,
+          "probability": 0.16160920858326458,
+          "score": "0-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1608.327316963556,
+          "probability": 0.16083273169635562,
+          "score": "0-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1207.8794999537113,
+          "probability": 0.12078794999537114,
+          "score": "1-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 937.9398111603335,
+          "probability": 0.09379398111603335,
+          "score": "1-0",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 836.3940603231164,
+          "probability": 0.08363940603231164,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 516.4444176915564,
+          "probability": 0.05164444176915564,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 391.24827408937256,
+          "probability": 0.03912482740893725,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 385.5071881680705,
+          "probability": 0.03855071881680705,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 371.4745319149803,
+          "probability": 0.03714745319149803,
+          "score": "1-3",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 316.7928921104342,
+          "probability": 0.03167928921104342,
+          "score": "0-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 251.91274886056033,
+          "probability": 0.025191274886056034,
+          "score": "2-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 224.510464702825,
+          "probability": 0.0224510464702825,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 177.70139340501055,
+          "probability": 0.017770139340501055,
+          "score": "0-4",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 172.38643153119168,
+          "probability": 0.017238643153119168,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 159.66086744469223,
+          "probability": 0.015966086744469223,
+          "score": "1-4",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7733602699405948,
+      "v771_grid_dropped_mass": 0.00013001878105189935,
+      "v771_grid_pre_normalization_mass": 0.9998699812189481
+    },
+    {
+      "away": "华城FC",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "小球",
+        "delta": 0.13334259788793704,
+        "delta_adjusted": 0.025583078455494845,
+        "delta_half_full": -0.10775951943244219,
+        "delta_spread_raw": -0.05053840966785208,
+        "delta_spread_used": -0.02526920483392604,
+        "delta_total": -0.10775951943244219,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.671410470511659,
+        "lambda_home": 0.6969935489671539,
+        "market_weight": 0.5798248009251308,
+        "mu": 1.5116469566714854,
+        "mu_adjusted": 1.368404019478813,
+        "p_big": 0.15198358710332371,
+        "p_cover": 0.12785497048124517,
+        "p_half_full_home": 0.047837990344625804,
+        "p_win": 0.5415733583760746,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.0014180462433384
+      },
+      "entropy_nats": 0.8894419881712253,
+      "fid": "1455190",
+      "group_id": "26079-G02",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 1.28,
+        "1": 10.72,
+        "3": 7.8
+      },
+      "home": "济州SK",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T10:30:00Z",
+      "leg_no": 2,
+      "match_id": "26079_020",
+      "match_idx": 20,
+      "one_x_two": {
+        "0": 4.41,
+        "1": 3.57,
+        "3": 1.67
+      },
+      "p0": 0.641891764332616,
+      "p1": 0.22340697990849,
+      "p3": 0.1347012557588942,
+      "top15_scores": [
+        {
+          "bayes_score": 2053.2863104488106,
+          "probability": 0.20532863104488105,
+          "score": "0-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1375.6017553976012,
+          "probability": 0.13756017553976013,
+          "score": "1-1",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1369.917969144899,
+          "probability": 0.1369917969144899,
+          "score": "1-0",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1333.063234870996,
+          "probability": 0.1333063234870996,
+          "score": "0-1",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 591.2721560277802,
+          "probability": 0.05912721560277801,
+          "score": "1-2",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 584.7636982918962,
+          "probability": 0.05847636982918961,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 531.9467341715454,
+          "probability": 0.05319467341715454,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 488.16171632677026,
+          "probability": 0.04881617163267703,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 268.22368373979765,
+          "probability": 0.026822368373979767,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 213.04187249315584,
+          "probability": 0.021304187249315584,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 201.14751830816277,
+          "probability": 0.020114751830816277,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 175.09747688799698,
+          "probability": 0.017509747688799697,
+          "score": "3-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 119.16322327529987,
+          "probability": 0.011916322327529988,
+          "score": "4-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 102.3449543385325,
+          "probability": 0.01023449543385325,
+          "score": "1-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 80.82772999886498,
+          "probability": 0.008082772999886498,
+          "score": "3-0",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.865298744241106,
+      "v771_grid_dropped_mass": 3.0544836378543216e-05,
+      "v771_grid_pre_normalization_mass": 0.9999694551636215
+    },
+    {
+      "away": "奥胡斯",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.10681929005139493,
+        "delta_adjusted": 0.04023427650790953,
+        "delta_half_full": -0.0665850135434854,
+        "delta_spread_raw": -0.03968288238113066,
+        "delta_spread_used": -0.01984144119056533,
+        "delta_total": -0.0665850135434854,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.7565359831985394,
+        "lambda_home": 0.796770259706449,
+        "market_weight": 0.5918030061142546,
+        "mu": 1.6781712538052678,
+        "mu_adjusted": 1.5533062429049884,
+        "p_big": 0.22877423662731394,
+        "p_cover": 0.22798263389435444,
+        "p_half_full_home": 0.26146121108041515,
+        "p_win": 0.5333315214067798,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.0021569236675993
+      },
+      "entropy_nats": 0.9973779030481242,
+      "fid": "1427653",
+      "group_id": "26079-G02",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 1.45,
+        "1": 11.98,
+        "3": 4.38
+      },
+      "home": "波兹南莱赫",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T17:00:00Z",
+      "leg_no": 3,
+      "match_id": "26079_024",
+      "match_idx": 24,
+      "one_x_two": {
+        "0": 4.22,
+        "1": 3.72,
+        "3": 1.73
+      },
+      "p0": 0.5529556632555918,
+      "p1": 0.22153527580208118,
+      "p3": 0.22550906094232698,
+      "top15_scores": [
+        {
+          "bayes_score": 1564.2618357221122,
+          "probability": 0.15642618357221122,
+          "score": "0-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1347.8216660576159,
+          "probability": 0.1347821666057616,
+          "score": "1-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1311.2642336933127,
+          "probability": 0.13112642336933128,
+          "score": "1-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1000.7046162289014,
+          "probability": 0.10007046162289014,
+          "score": "0-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 647.2413704897119,
+          "probability": 0.06472413704897119,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 644.7434652129259,
+          "probability": 0.0644743465212926,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 569.2687150038224,
+          "probability": 0.056926871500382246,
+          "score": "3-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 419.8619458018874,
+          "probability": 0.041986194580188735,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 408.3652903172572,
+          "probability": 0.040836529031725716,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 358.21348759491394,
+          "probability": 0.035821348759491396,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 342.54113955677343,
+          "probability": 0.034254113955677346,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 224.8831943770145,
+          "probability": 0.022488319437701448,
+          "score": "4-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 180.80367372537535,
+          "probability": 0.018080367372537536,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 177.37049164781686,
+          "probability": 0.017737049164781686,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 116.52489617225606,
+          "probability": 0.011652489617225606,
+          "score": "1-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.7784647241979188,
+      "v771_grid_dropped_mass": 7.863058410362278e-05,
+      "v771_grid_pre_normalization_mass": 0.9999213694158964
+    },
+    {
+      "away": "费内巴切",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "小球",
+        "delta": -1.3832228531205022,
+        "delta_adjusted": -1.3665968999815705,
+        "delta_half_full": -0.015066802932985367,
+        "delta_spread_raw": 0.03325190627786355,
+        "delta_spread_used": 0.016625953138931775,
+        "delta_total": 0.016625953138931775,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 1.4677498712877237,
+        "lambda_home": 0.2,
+        "market_weight": 0.6066753098482114,
+        "mu": 1.4768266524043747,
+        "mu_adjusted": 1.5689028425938771,
+        "p_big": 0.11089015795264313,
+        "p_cover": 0.721210279447711,
+        "p_half_full_home": 0.44960739030023095,
+        "p_win": 0.15071187893188945,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "away",
+        "zero_multiplier": 1.066275526206422
+      },
+      "entropy_nats": 1.053303075285069,
+      "fid": "1427656",
+      "group_id": "26079-G02",
+      "handicap_line": 1,
+      "handicap_quotes": {
+        "0": 5.68,
+        "1": 9.61,
+        "3": 1.38
+      },
+      "home": "扎布热矿工",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T18:00:00Z",
+      "leg_no": 4,
+      "match_id": "26079_027",
+      "match_idx": 27,
+      "one_x_two": {
+        "0": 1.46,
+        "1": 4.24,
+        "3": 6.12
+      },
+      "p0": 0.2591202090152299,
+      "p1": 0.26174040872139376,
+      "p3": 0.4791393822633762,
+      "top15_scores": [
+        {
+          "bayes_score": 2267.0231512337386,
+          "probability": 0.22670231512337388,
+          "score": "0-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1985.8539209338855,
+          "probability": 0.19858539209338855,
+          "score": "0-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1328.7720124264888,
+          "probability": 0.13287720124264887,
+          "score": "1-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1287.8771392910055,
+          "probability": 0.12878771392910054,
+          "score": "0-2",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 912.6796315823193,
+          "probability": 0.09126796315823194,
+          "score": "1-0",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 438.57771167736,
+          "probability": 0.043857771167736,
+          "score": "0-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 320.47022966857435,
+          "probability": 0.032047022966857436,
+          "score": "0-4",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 312.73999265113076,
+          "probability": 0.031273999265113074,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 223.90394373632634,
+          "probability": 0.022390394373632633,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 191.70125854992094,
+          "probability": 0.019170125854992094,
+          "score": "1-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 128.8215279330205,
+          "probability": 0.012882152793302048,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 120.56296917330957,
+          "probability": 0.012056296917330957,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 106.693473823636,
+          "probability": 0.0106693473823636,
+          "score": "0-6",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 84.74810833109562,
+          "probability": 0.008474810833109562,
+          "score": "1-4",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 53.660303838430984,
+          "probability": 0.005366030383843099,
+          "score": "0-5",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.74087979098477,
+      "v771_grid_dropped_mass": 0.00016614367031386745,
+      "v771_grid_pre_normalization_mass": 0.9998338563296861
+    },
+    {
+      "away": "麦德林独立",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.2529004343677585,
+        "delta_adjusted": 0.1512398427466432,
+        "delta_half_full": -0.10166059162111528,
+        "delta_spread_raw": -0.05381879739406926,
+        "delta_spread_used": -0.02690939869703463,
+        "delta_total": -0.10166059162111528,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.6881426771936354,
+        "lambda_home": 0.8393825199402787,
+        "market_weight": 0.5815765056730358,
+        "mu": 1.6989685277054372,
+        "mu_adjusted": 1.527525197133914,
+        "p_big": 0.1362011082643813,
+        "p_cover": 0.0921387672276797,
+        "p_half_full_home": 0.08754145385399156,
+        "p_win": 0.5783797281710406,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.0080599107506731
+      },
+      "entropy_nats": 0.830681881633563,
+      "fid": "1413182",
+      "group_id": "26079-G02",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 1.15,
+        "1": 25.38,
+        "3": 10.84
+      },
+      "home": "瓦斯科达伽马",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T22:00:00Z",
+      "leg_no": 5,
+      "match_id": "26079_029",
+      "match_idx": 29,
+      "one_x_two": {
+        "0": 5.12,
+        "1": 3.8,
+        "3": 1.59
+      },
+      "p0": 0.6698516880866748,
+      "p1": 0.2370300371224248,
+      "p3": 0.09311827479090055,
+      "top15_scores": [
+        {
+          "bayes_score": 2070.540686723597,
+          "probability": 0.2070540686723597,
+          "score": "0-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1854.7456532828483,
+          "probability": 0.18547456532828482,
+          "score": "1-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1749.9035208741973,
+          "probability": 0.17499035208741973,
+          "score": "1-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1328.0655131351557,
+          "probability": 0.13280655131351557,
+          "score": "0-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 574.3306858275799,
+          "probability": 0.057433068582758,
+          "score": "2-2",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 425.98648391541076,
+          "probability": 0.04259864839154107,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 370.56956556198014,
+          "probability": 0.03705695655619801,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 331.96254635081107,
+          "probability": 0.03319625463508111,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 328.7780205698149,
+          "probability": 0.03287780205698149,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 124.30162021105495,
+          "probability": 0.012430162021105496,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 118.77940419702357,
+          "probability": 0.011877940419702356,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 118.73661483299374,
+          "probability": 0.011873661483299373,
+          "score": "3-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 91.51349163193613,
+          "probability": 0.009151349163193613,
+          "score": "3-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 59.18943712145799,
+          "probability": 0.005918943712145799,
+          "score": "1-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 58.65752274534862,
+          "probability": 0.005865752274534862,
+          "score": "0-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.9068817252090996,
+      "v771_grid_dropped_mass": 6.978825376335873e-05,
+      "v771_grid_pre_normalization_mass": 0.9999302117462366
+    },
+    {
+      "away": "弗拉门戈",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "小球",
+        "delta": -0.9149082384283276,
+        "delta_adjusted": -0.935952620166319,
+        "delta_half_full": -0.02104438173799143,
+        "delta_spread_raw": 0.03604473773379155,
+        "delta_spread_used": 0.018022368866895774,
+        "delta_total": -0.02104438173799143,
+        "direction_conflict": true,
+        "draw_hijack_applied": true,
+        "lambda_away": 1.2422699391786367,
+        "lambda_home": 0.3063173190123178,
+        "market_weight": 0.6053516690641892,
+        "mu": 1.4505532375361554,
+        "mu_adjusted": 1.5485872581909546,
+        "p_big": 0.1097412737679884,
+        "p_cover": 0.7427008592225901,
+        "p_half_full_home": 0.42938630888235657,
+        "p_win": 0.2416535412739807,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "away",
+        "zero_multiplier": 1.0489941800892988
+      },
+      "entropy_nats": 1.0103213375274807,
+      "fid": "1362421",
+      "group_id": "26079-G02",
+      "handicap_line": 1,
+      "handicap_quotes": {
+        "0": 6.34,
+        "1": 9.92,
+        "3": 1.34
+      },
+      "home": "巴西国际",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T22:30:00Z",
+      "leg_no": 6,
+      "match_id": "26079_031",
+      "match_idx": 31,
+      "one_x_two": {
+        "0": 1.91,
+        "1": 3.43,
+        "3": 3.85
+      },
+      "p0": 0.19895106485986902,
+      "p1": 0.2691959632326163,
+      "p3": 0.5318529719075148,
+      "top15_scores": [
+        {
+          "bayes_score": 2140.3648401505807,
+          "probability": 0.21403648401505806,
+          "score": "0-1",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1845.6538983302044,
+          "probability": 0.18456538983302043,
+          "score": "0-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1615.003817470109,
+          "probability": 0.1615003817470109,
+          "score": "1-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1067.6683054089533,
+          "probability": 0.10676683054089534,
+          "score": "0-2",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 985.8192676359151,
+          "probability": 0.09858192676359151,
+          "score": "1-0",
+          "status": "小球"
+        },
+        {
+          "bayes_score": 500.0064062248719,
+          "probability": 0.05000064062248719,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 307.8299499744162,
+          "probability": 0.03078299499744162,
+          "score": "0-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 239.52151336279547,
+          "probability": 0.023952151336279547,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 194.20129070391076,
+          "probability": 0.019420129070391076,
+          "score": "2-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 193.79833043996084,
+          "probability": 0.019379833043996084,
+          "score": "1-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 184.11225806419196,
+          "probability": 0.018411225806419195,
+          "score": "0-4",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 163.03889958645678,
+          "probability": 0.01630388995864568,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 118.73678738213538,
+          "probability": 0.011873678738213538,
+          "score": "1-4",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 100.46525846757437,
+          "probability": 0.010046525846757437,
+          "score": "3-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 76.25137555759281,
+          "probability": 0.00762513755575928,
+          "score": "3-2",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.8010489351401311,
+      "v771_grid_dropped_mass": 8.988401096132748e-05,
+      "v771_grid_pre_normalization_mass": 0.9999101159890387
+    },
+    {
+      "away": "雷莫",
+      "common_cutoff_utc": "2026-07-28T16:02:54Z",
+      "diagnostics": {
+        "auxiliary_mode": "大球+补位",
+        "delta": 0.14840806465486553,
+        "delta_adjusted": 0.03898601298542903,
+        "delta_half_full": -0.1094220516694365,
+        "delta_spread_raw": -0.05385953309584522,
+        "delta_spread_used": -0.02692976654792261,
+        "delta_total": -0.1094220516694365,
+        "direction_conflict": true,
+        "draw_hijack_applied": false,
+        "lambda_away": 0.6524027090726277,
+        "lambda_home": 0.6913887220580566,
+        "market_weight": 0.5793488465821653,
+        "mu": 1.4947401983480957,
+        "mu_adjusted": 1.3437914311306842,
+        "p_big": 0.1274717244363648,
+        "p_cover": 0.0916733950118888,
+        "p_half_full_home": 0.03619212398096449,
+        "p_win": 0.5462449733724596,
+        "score_odds_count": 15,
+        "tail_multiplier": 1.0,
+        "tail_side": "home",
+        "zero_multiplier": 1.0021681214197211
+      },
+      "entropy_nats": 0.8428785664359687,
+      "fid": "1362440",
+      "group_id": "26079-G02",
+      "handicap_line": -1,
+      "handicap_quotes": {
+        "0": 1.19,
+        "1": 14.56,
+        "3": 10.9
+      },
+      "home": "米拉索尔",
+      "issue": "26079",
+      "kickoff_utc": "2026-07-29T22:30:00Z",
+      "leg_no": 7,
+      "match_id": "26079_032",
+      "match_idx": 32,
+      "one_x_two": {
+        "0": 4.76,
+        "1": 3.59,
+        "3": 1.7
+      },
+      "p0": 0.6636868011972583,
+      "p1": 0.2367300768674949,
+      "p3": 0.09958312193524688,
+      "top15_scores": [
+        {
+          "bayes_score": 2154.371278424942,
+          "probability": 0.2154371278424942,
+          "score": "0-0",
+          "status": "主榜TOP1"
+        },
+        {
+          "bayes_score": 1822.5375568931615,
+          "probability": 0.18225375568931615,
+          "score": "1-0",
+          "status": "主榜TOP2"
+        },
+        {
+          "bayes_score": 1677.677948699355,
+          "probability": 0.1677677948699355,
+          "score": "1-1",
+          "status": "主榜TOP3"
+        },
+        {
+          "bayes_score": 1292.8319325660564,
+          "probability": 0.12928319325660564,
+          "score": "0-1",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 523.3842112628319,
+          "probability": 0.05233842112628319,
+          "score": "2-2",
+          "status": "大球+补位"
+        },
+        {
+          "bayes_score": 454.7651513832468,
+          "probability": 0.04547651513832468,
+          "score": "2-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 436.8685986977302,
+          "probability": 0.04368685986977302,
+          "score": "2-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 398.35384315894896,
+          "probability": 0.039835384315894895,
+          "score": "0-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 313.2228671159239,
+          "probability": 0.031322286711592394,
+          "score": "1-2",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 141.20602736377285,
+          "probability": 0.014120602736377285,
+          "score": "4-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 134.2004367507413,
+          "probability": 0.013420043675074128,
+          "score": "4-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 114.53064362740172,
+          "probability": 0.011453064362740172,
+          "score": "3-1",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 108.34118178535117,
+          "probability": 0.010834118178535117,
+          "score": "3-0",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 66.31239691163543,
+          "probability": 0.006631239691163544,
+          "score": "0-3",
+          "status": "淘汰"
+        },
+        {
+          "bayes_score": 61.26228077911879,
+          "probability": 0.006126228077911879,
+          "score": "1-3",
+          "status": "淘汰"
+        }
+      ],
+      "top2_mass": 0.9004168780647532,
+      "v771_grid_dropped_mass": 2.6633483699467497e-05,
+      "v771_grid_pre_normalization_mass": 0.9999733665163005
+    }
+  ]
+}
