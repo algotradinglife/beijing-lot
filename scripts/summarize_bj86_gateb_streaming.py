@@ -343,9 +343,9 @@ def main() -> None:
     input_path, output, old_runner = args.input.resolve(), args.output.resolve(), args.old_runner.resolve()
     if output.exists():
         raise SystemExit(f"refusing to overwrite {output}")
+    actual_old_runner_sha256 = verify_old_summarizer(old_runner)
     if sha256(input_path) != EXPECTED_INPUT_SHA256:
         raise SystemExit("locked prediction CSV hash mismatch")
-    actual_old_runner_sha256 = verify_old_summarizer(old_runner)
     output.mkdir(parents=True)
     copied_runner = output / Path(__file__).name
     copied_runner.write_bytes(Path(__file__).read_bytes())
