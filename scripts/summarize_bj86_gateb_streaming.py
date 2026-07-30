@@ -49,6 +49,7 @@ ARMS = (
     "F1_MARKET_PLUS_STRENGTH_RESIDUAL",
 )
 EXPECTED_INPUT_SHA256 = "8b26fbbdcdafb6aaeff398ee85342a279b71b9f5789357da78b67274e8b93af2"
+ACCEPTED_OLD_SUMMARIZER_SHA256 = "dcc5912c0e8040a829367e3bcc559a82e08a632e5bdc1a833b5ee9380e1ffb26"
 EXPECTED_DATA_ROWS = 6_881_040
 
 
@@ -69,6 +70,17 @@ def write_csv(path: Path, rows: list[dict[str, object]], fields: list[str]) -> N
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
+
+
+def verify_old_summarizer(path: Path) -> str:
+    """Bind synthetic equivalence to the one PI-accepted v3.1 authority."""
+    actual = sha256(path)
+    if actual != ACCEPTED_OLD_SUMMARIZER_SHA256:
+        raise RuntimeError(
+            "accepted old-summarizer hash mismatch: "
+            f"expected={ACCEPTED_OLD_SUMMARIZER_SHA256} actual={actual}"
+        )
+    return actual
 
 
 class Metric:
@@ -280,6 +292,7 @@ def load_old_runner(path: Path):
 
 
 def synthetic_equivalence(old_runner: Path, output: Path) -> dict[str, object]:
+    actual_old_runner_sha256 = verify_old_summarizer(old_runner)
     with tempfile.TemporaryDirectory(prefix="bj86-streaming-") as temp:
         root = Path(temp)
         old, new = root / "old", root / "new"
@@ -298,7 +311,25 @@ def synthetic_equivalence(old_runner: Path, output: Path) -> dict[str, object]:
         equal = {name: sha256(old / name) == sha256(new / name) for name in fields}
         if not all(equal.values()):
             raise RuntimeError(f"synthetic byte comparison failed: {equal}")
-        receipt = {"status": "PASS", "old_runner_sha256": sha256(old_runner), "files_byte_identical": equal, "fixture_rows": len(rows), "streaming_fixture_summary": summary}
+        wrong_runner = root / "wrong_old_summarizer.py"
+        wrong_runner.write_bytes(old_runner.read_bytes() + b"\n# deterministic wrong-runner fixture\n")
+        try:
+            verify_old_summarizer(wrong_runner)
+        except RuntimeError as error:
+            wrong_runner_rejected = "accepted old-summarizer hash mismatch" in str(error)
+        else:
+            wrong_runner_rejected = False
+        if not wrong_runner_rejected:
+            raise RuntimeError("wrong old-summarizer fixture was not rejected")
+        receipt = {
+            "status": "PASS",
+            "old_runner_expected_sha256": ACCEPTED_OLD_SUMMARIZER_SHA256,
+            "old_runner_actual_sha256": actual_old_runner_sha256,
+            "wrong_runner_rejected": wrong_runner_rejected,
+            "files_byte_identical": equal,
+            "fixture_rows": len(rows),
+            "streaming_fixture_summary": summary,
+        }
         (output / "synthetic_equivalence_receipt.json").write_text(dump(receipt) + "\n", encoding="utf-8")
         return receipt
 
@@ -314,6 +345,7 @@ def main() -> None:
         raise SystemExit(f"refusing to overwrite {output}")
     if sha256(input_path) != EXPECTED_INPUT_SHA256:
         raise SystemExit("locked prediction CSV hash mismatch")
+    actual_old_runner_sha256 = verify_old_summarizer(old_runner)
     output.mkdir(parents=True)
     copied_runner = output / Path(__file__).name
     copied_runner.write_bytes(Path(__file__).read_bytes())
@@ -324,7 +356,10 @@ def main() -> None:
         "locked_prediction": {"path": str(input_path), "sha256": EXPECTED_INPUT_SHA256, "expected_data_rows": EXPECTED_DATA_ROWS, "fields": PREDICTION_FIELDS},
         "reporting": {"metric_schema": METRIC_FIELDS, "issue_bootstrap": {"replicates": 500, "seed": 86, "percentiles": [0.025, 0.975], "sufficient_statistics": ["n", "sum_logloss"]}, "V1": "QUOTED_BJDC_SP_UNAVAILABLE", "A1": "NO_LOCKED_ARBITRAGE_AUTHORITY"},
         "runner_sha256": sha256(copied_runner),
-        "old_summarizer_sha256": sha256(old_runner),
+        "old_summarizer": {
+            "expected_sha256": ACCEPTED_OLD_SUMMARIZER_SHA256,
+            "actual_sha256": actual_old_runner_sha256,
+        },
     }
     (output / "summary_recovery_config.json").write_text(dump(config) + "\n", encoding="utf-8")
     synthetic_equivalence(old_runner, output)
