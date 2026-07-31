@@ -11,15 +11,63 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "freeze_bj95_n7_pruning_gate_a.py"
+EURO_INPUT_SCRIPT = ROOT / "scripts" / "freeze_bj95_euro_safe_input.py"
 
 
-def load():
-    spec = importlib.util.spec_from_file_location("bj95_pruning", SCRIPT)
+def load_script(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def load():
+    return load_script("bj95_pruning", SCRIPT)
+
+
+def load_euro_input():
+    return load_script("bj95_euro_input", EURO_INPUT_SCRIPT)
+
+
+def assert_raises_runtime_error(callback):
+    try:
+        callback()
+    except RuntimeError:
+        return
+    raise AssertionError("expected RuntimeError")
+
+
+def card_without_runtime(card: dict[str, object]) -> dict[str, object]:
+    copied = json.loads(json.dumps(card))
+    compression = copied["compression_contract"]
+    assert isinstance(compression, dict)
+    compression.pop("runtime")
+    return copied
+
+
+def assert_replay_equivalence(mod, replay: Path, committed: Path, *, force_runtime_mismatch: bool) -> None:
+    replay_card = json.loads((replay / "preoutcome_card.json").read_text())
+    committed_card = json.loads((committed / "preoutcome_card.json").read_text())
+    replay_runtime = replay_card["compression_contract"]["runtime"]
+    committed_runtime = committed_card["compression_contract"]["runtime"]
+    same_runtime = replay_runtime == committed_runtime and not force_runtime_mismatch
+    if same_runtime:
+        assert (replay / "SHA256SUMS.json").read_bytes() == (committed / "SHA256SUMS.json").read_bytes()
+        return
+
+    # Gzip byte streams vary between zlib implementations even at fixed mtime.
+    # Across runtimes, verify the stable card/non-gzip data and decompressed
+    # payloads rather than pretending compressor-specific bytes are portable.
+    assert card_without_runtime(replay_card) == card_without_runtime(committed_card)
+    for name in ("availability_census.csv", "freeze_runner.py"):
+        assert (replay / name).read_bytes() == (committed / name).read_bytes()
+    expected = committed_card["compression_contract"]["canonical_decompressed_sha256"]
+    assert replay_card["compression_contract"]["canonical_decompressed_sha256"] == expected
+    for name, digest in expected.items():
+        assert mod.canonical_content_sha256(replay / name) == digest
+        assert mod.canonical_content_sha256(committed / name) == digest
 
 
 def leg(position: int, calibrated: tuple[float, float, float], euro: tuple[float, float, float]):
@@ -98,17 +146,48 @@ def test_descriptor_independently_binds_all_identities_and_safe_sources():
     assert mod.descriptor("PRIMARY-N7-test", "CAL_MIN_P", 3, allowed, changed) != independent
 
 
+def test_exact_safe_schemas_reject_extra_columns_in_both_producer_and_consumer():
+    mod = load()
+    producer = load_euro_input()
+    assert_raises_runtime_error(lambda: mod.assert_exact_schema(
+        (*mod.EURO_INPUT_FIELDS, "gross"), mod.EURO_INPUT_FIELDS, "consumer EURO"
+    ))
+    assert_raises_runtime_error(lambda: mod.assert_exact_schema(
+        (*mod.P91_SOURCE_FIELDS, "brier"), mod.P91_SOURCE_FIELDS, "consumer #91"
+    ))
+    assert_raises_runtime_error(lambda: producer.assert_exact_schema(
+        [*producer.P89_SOURCE_FIELDS, "net"], producer.P89_SOURCE_FIELDS, "producer #89"
+    ))
+    assert_raises_runtime_error(lambda: producer.assert_exact_schema(
+        [*producer.P91_SOURCE_FIELDS, "gross"], producer.P91_SOURCE_FIELDS, "producer #91"
+    ))
+
+
+def test_manifest_pin_fails_before_attempting_to_parse_untrusted_json():
+    mod = load()
+    with tempfile.TemporaryDirectory(prefix="bj95_manifest_pin_") as directory:
+        bundle = Path(directory)
+        (bundle / "SHA256SUMS.json").write_text("not-json\n")
+        assert_raises_runtime_error(lambda: mod.manifest_sha(bundle, "0" * 64))
+
+
 def test_safe_inputs_and_committed_bundle_replay_end_to_end():
     mod = load()
-    # The fixture itself is a committed Gate-A source; it must never offer a
-    # result-bearing header before the runner opens its first data row.
-    for source in (mod.P91 / "outcome_safe_legs.csv.gz", mod.EURO_INPUT / "euro_10h_safe_projection.csv.gz"):
+    sources = (
+        (mod.P91 / "outcome_safe_legs.csv.gz", mod.P91_SOURCE_FIELDS),
+        (mod.EURO_INPUT / "euro_10h_safe_projection.csv.gz", mod.EURO_INPUT_FIELDS),
+    )
+    for source, expected in sources:
         opener = __import__("gzip").open if source.suffix == ".gz" else open
         with opener(source, "rt", newline="") as handle:
             fieldnames = next(__import__("csv").reader(handle))
-        mod.assert_outcome_free_schema(fieldnames, str(source))
-    committed = mod.ROOT / "results" / "bj95_gate_a_preoutcome_v3" / "SHA256SUMS.json"
+        mod.assert_exact_schema(fieldnames, expected, str(source))
+    committed = mod.ROOT / "results" / "bj95_gate_a_preoutcome_v4"
     with tempfile.TemporaryDirectory(prefix="bj95_test_replay_") as directory:
         replay = Path(directory) / "bundle"
         mod.build(replay)
-        assert replay.joinpath("SHA256SUMS.json").read_bytes() == committed.read_bytes()
+        # This machine follows the recorded runtime path and therefore must
+        # preserve exact bytes; force the portable path too, to test the
+        # zlib-mismatch assertion that a reviewer exercises on CPython 3.14.4.
+        assert_replay_equivalence(mod, replay, committed, force_runtime_mismatch=False)
+        assert_replay_equivalence(mod, replay, committed, force_runtime_mismatch=True)

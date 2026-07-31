@@ -38,7 +38,9 @@ STAKE_PER_SEQUENCE = 2
 CONTRACT_ID = "BJ-HIST-N7-PRUNING-001"
 GENERATOR_VERSION = "bj95-analytic-cartesian-v1"
 P91_LEGS_SHA = "cd0fdfd42002bbeddc6a1676323ead65c4cb85915f2c1a83b916d6c2004526fc"
+P91_MANIFEST_SHA = "bd7159715cca84e9d2adb9e089d016ec4e4d72603f8f8d5a8b070eb5027c2c33"
 EURO_INPUT_SHA = "652bf5470eebc7f707a388b059d18f4e60fea932996fc8b58cbb8f1f2986a83a"
+EURO_INPUT_MANIFEST_SHA = "da88a276e485051a42698f2f2f73f79916f8cc86c7072508655323d0eaf07d5c"
 
 LEG_FIELDS = (
     "group_id", "position", "match_id", "issue", "match_idx", "year", "fold",
@@ -57,6 +59,12 @@ DELETION_FIELDS = (
     "handicap_line_norm", "calibrated_probability", "euro_novig_probability",
     "predicted_sp", "sp5", "p_times_sp5", "selection_score", "score_semantics",
 )
+P91_SOURCE_FIELDS = (
+    "cohort", "n", "group_id", "source_group_id", "position", "match_id", "issue", "match_idx", "year", "fold",
+    "p3", "p1", "p0", "point_sp_3", "point_sp_1", "point_sp_0", "m2_sp_3", "m2_sp_1", "m2_sp_0",
+    "point_sp5_3", "point_sp5_1", "point_sp5_0", "m2_sp5_3", "m2_sp5_1", "m2_sp5_0",
+)
+EURO_INPUT_FIELDS = ("match_id", "issue", "match_idx", "fold", "handicap_line_norm", "euro_3_10h", "euro_1_10h", "euro_0_10h")
 
 
 def repository_root(anchor: Path) -> Path:
@@ -69,7 +77,7 @@ def repository_root(anchor: Path) -> Path:
 
 
 ROOT = repository_root(Path(__file__))
-DEFAULT_OUT = ROOT / "results" / "bj95_gate_a_preoutcome_v3"
+DEFAULT_OUT = ROOT / "results" / "bj95_gate_a_preoutcome_v4"
 P91 = ROOT / "results" / "bj91_gate_a_preoutcome_v1r6"
 # A committed, content-addressed input; Gate A never opens #89's larger table.
 EURO_INPUT = ROOT / "results" / "bj95_euro_input_v1"
@@ -83,8 +91,10 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def manifest_sha(bundle: Path) -> str:
+def manifest_sha(bundle: Path, accepted_sha256: str) -> str:
     manifest = bundle / "SHA256SUMS.json"
+    if sha256(manifest) != accepted_sha256:
+        raise RuntimeError(f"unaccepted input manifest: {bundle}")
     declared = json.loads(manifest.read_text(encoding="utf-8"))
     actual = {
         path.name: sha256(path)
@@ -93,7 +103,7 @@ def manifest_sha(bundle: Path) -> str:
     }
     if actual != declared:
         raise RuntimeError(f"input manifest mismatch: {bundle}")
-    return sha256(manifest)
+    return accepted_sha256
 
 
 def fmt(value: float) -> str:
@@ -122,30 +132,21 @@ def identity(row: dict[str, str]) -> tuple[str, str, str, str]:
     return (row["match_id"], row["issue"], row["match_idx"], row["fold"])
 
 
-def assert_outcome_free_schema(fieldnames: Iterable[str], label: str) -> None:
-    forbidden = {"outcome", "score", "result", "result_code", "winning_sp", "final_sp", "payout", "roi", "settlement"}
-    found = forbidden & set(fieldnames)
-    if found:
-        raise RuntimeError(f"outcome-bearing columns in {label}: {sorted(found)}")
+def assert_exact_schema(fieldnames: Iterable[str] | None, expected: tuple[str, ...], label: str) -> None:
+    if tuple(fieldnames or ()) != expected:
+        raise RuntimeError(f"safe schema mismatch for {label}: {tuple(fieldnames or ())}")
 
 
 def euro_rows() -> dict[tuple[str, str, str, str], dict[str, object]]:
     path = EURO_INPUT / "euro_10h_safe_projection.csv.gz"
     if sha256(path) != EURO_INPUT_SHA:
         raise RuntimeError("#95 EURO safe-input hash mismatch")
-    required = {
-        "match_id", "issue", "match_idx", "fold", "handicap_line_norm",
-        "euro_3_10h", "euro_1_10h", "euro_0_10h",
-    }
     rows: dict[tuple[str, str, str, str], dict[str, object]] = {}
     with gzip.open(path, "rt", newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
-        if reader.fieldnames is None or not required.issubset(reader.fieldnames):
-            raise RuntimeError("#89 source lacks safe EURO fields")
-        assert_outcome_free_schema(reader.fieldnames, "#95 immutable EURO input")
+        assert_exact_schema(reader.fieldnames, EURO_INPUT_FIELDS, "#95 immutable EURO input")
         for raw in reader:
-            # Never project `outcome` or any result-derived field from #89.
-            safe = {field: raw[field] for field in required}
+            safe = {field: raw[field] for field in EURO_INPUT_FIELDS}
             key = identity(safe)
             if key in rows:
                 raise RuntimeError(f"duplicate #89 identity: {key}")
@@ -160,17 +161,10 @@ def primary_n7_legs(euros: dict[tuple[str, str, str, str], dict[str, object]]) -
     path = P91 / "outcome_safe_legs.csv.gz"
     if sha256(path) != P91_LEGS_SHA:
         raise RuntimeError("#91 outcome_safe_legs.csv.gz hash mismatch")
-    required = {
-        "cohort", "n", "group_id", "position", "match_id", "issue", "match_idx",
-        "year", "fold", "p3", "p1", "p0", "point_sp_3", "point_sp_1", "point_sp_0",
-        "point_sp5_3", "point_sp5_1", "point_sp5_0",
-    }
     rows: list[dict[str, object]] = []
     with gzip.open(path, "rt", newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
-        if reader.fieldnames is None or not required.issubset(reader.fieldnames):
-            raise RuntimeError("#91 safe-leg schema drift")
-        assert_outcome_free_schema(reader.fieldnames, "#91 safe N7 input")
+        assert_exact_schema(reader.fieldnames, P91_SOURCE_FIELDS, "#91 safe N7 input")
         for raw in reader:
             if raw["cohort"] != "PRIMARY" or raw["n"] != "7":
                 continue
@@ -297,8 +291,8 @@ def canonical_content_sha256(path: Path) -> str:
 def build(out: Path) -> dict[str, object]:
     if out.exists():
         raise RuntimeError(f"refusing to overwrite immutable bundle: {out}")
-    p91_manifest = manifest_sha(P91)
-    euro_input_manifest = manifest_sha(EURO_INPUT)
+    p91_manifest = manifest_sha(P91, P91_MANIFEST_SHA)
+    euro_input_manifest = manifest_sha(EURO_INPUT, EURO_INPUT_MANIFEST_SHA)
     euros = euro_rows()
     input_legs = primary_n7_legs(euros)
     by_group: dict[str, list[dict[str, object]]] = defaultdict(list)

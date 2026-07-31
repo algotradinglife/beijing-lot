@@ -7,6 +7,7 @@ never opens the larger historical #89 artifact after this input is committed.
 """
 from __future__ import annotations
 
+import argparse
 import csv
 import gzip
 import hashlib
@@ -20,13 +21,23 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "results" / "bj95_euro_input_v1"
 P91 = ROOT / "results" / "bj91_gate_a_preoutcome_v1r6"
-P89 = ROOT / "results" / "bj89_gate_a_preoutcome_v3"
 P91_LEGS_SHA = "cd0fdfd42002bbeddc6a1676323ead65c4cb85915f2c1a83b916d6c2004526fc"
+P91_MANIFEST_SHA = "bd7159715cca84e9d2adb9e089d016ec4e4d72603f8f8d5a8b070eb5027c2c33"
 P89_ROWS_SHA = "787bf3266403bebdcf3dfa4ae09f3dbc862a6542c04554fc1e37a0ba02296ae8"
+P89_MANIFEST_SHA = "b22c33bddc71972e3c2a5e7b95955087ece2441b5728da6424d19b3de6f503e2"
 FIELDS = ("match_id", "issue", "match_idx", "fold", "handicap_line_norm", "euro_3_10h", "euro_1_10h", "euro_0_10h")
-FORBIDDEN = {"outcome", "score", "result", "result_code", "winning_sp", "final_sp", "payout", "roi", "settlement"}
+P91_SOURCE_FIELDS = (
+    "cohort", "n", "group_id", "source_group_id", "position", "match_id", "issue", "match_idx", "year", "fold",
+    "p3", "p1", "p0", "point_sp_3", "point_sp_1", "point_sp_0", "m2_sp_3", "m2_sp_1", "m2_sp_0",
+    "point_sp5_3", "point_sp5_1", "point_sp5_0", "m2_sp5_3", "m2_sp5_1", "m2_sp5_0",
+)
+P89_SOURCE_FIELDS = (
+    "match_id", "issue", "match_idx", "kickoff_ts", "year", "fold", "handicap_line_norm", "n_complete_10h",
+    "euro_3_10h", "euro_1_10h", "euro_0_10h", "p3_raw", "p1_raw", "p0_raw", "top1_code_raw", "top1_mass_raw",
+    "top2_mass_raw", "entropy_raw", "dispersion_mean_relative_range", "initial_status", "p3_initial", "p1_initial",
+    "p0_initial", "initial_to_10h_log_probability_movement",
+)
 
 
 def sha256(path: Path) -> str:
@@ -37,13 +48,20 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def manifest_sha(bundle: Path) -> str:
+def manifest_sha(bundle: Path, accepted_sha256: str) -> str:
     manifest = bundle / "SHA256SUMS.json"
+    if sha256(manifest) != accepted_sha256:
+        raise RuntimeError(f"unaccepted manifest: {bundle}")
     expected = json.loads(manifest.read_text())
     actual = {p.name: sha256(p) for p in bundle.iterdir() if p.is_file() and p.name != manifest.name}
     if actual != expected:
         raise RuntimeError(f"manifest mismatch: {bundle}")
-    return sha256(manifest)
+    return accepted_sha256
+
+
+def assert_exact_schema(fieldnames: list[str] | None, expected: tuple[str, ...], label: str) -> None:
+    if tuple(fieldnames or ()) != expected:
+        raise RuntimeError(f"safe schema mismatch for {label}: {tuple(fieldnames or ())}")
 
 
 def content_sha256(path: Path) -> str:
@@ -63,26 +81,24 @@ def write_gzip(path: Path, rows: list[dict[str, str]]) -> None:
                 writer.writerows(rows)
 
 
-def main() -> None:
-    if OUT.exists():
-        raise RuntimeError(f"refusing to overwrite immutable output: {OUT}")
-    p91_manifest, p89_manifest = manifest_sha(P91), manifest_sha(P89)
-    p91_path, p89_path = P91 / "outcome_safe_legs.csv.gz", P89 / "frozen_preoutcome_rows.csv"
+def build(source: Path, out: Path) -> None:
+    if out.exists():
+        raise RuntimeError(f"refusing to overwrite immutable output: {out}")
+    p91_manifest, p89_manifest = manifest_sha(P91, P91_MANIFEST_SHA), manifest_sha(source.parent, P89_MANIFEST_SHA)
+    p91_path, p89_path = P91 / "outcome_safe_legs.csv.gz", source
     if sha256(p91_path) != P91_LEGS_SHA or sha256(p89_path) != P89_ROWS_SHA:
         raise RuntimeError("source payload hash mismatch")
     required_n7: set[tuple[str, str, str, str]] = set()
     with gzip.open(p91_path, "rt", newline="") as handle:
         reader = csv.DictReader(handle)
-        if reader.fieldnames is None or FORBIDDEN & set(reader.fieldnames):
-            raise RuntimeError("#91 source is not outcome-free")
+        assert_exact_schema(reader.fieldnames, P91_SOURCE_FIELDS, "#91 accepted source")
         for row in reader:
             if row["cohort"] == "PRIMARY" and row["n"] == "7":
                 required_n7.add((row["match_id"], row["issue"], row["match_idx"], row["fold"]))
     rows: dict[tuple[str, str, str, str], dict[str, str]] = {}
     with p89_path.open(newline="") as handle:
         reader = csv.DictReader(handle)
-        if reader.fieldnames is None or FORBIDDEN & set(reader.fieldnames) or not set(FIELDS).issubset(reader.fieldnames):
-            raise RuntimeError("#89 input schema is not a safe EURO projection source")
+        assert_exact_schema(reader.fieldnames, P89_SOURCE_FIELDS, "#89 accepted source")
         for raw in reader:
             key = (raw["match_id"], raw["issue"], raw["match_idx"], raw["fold"])
             if key in required_n7:
@@ -115,9 +131,13 @@ def main() -> None:
         (stage / "input_card.json").write_text(json.dumps(card, indent=2, sort_keys=True) + "\n")
         payload = {p.name: sha256(p) for p in sorted(stage.iterdir()) if p.is_file()}
         (stage / "SHA256SUMS.json").write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-        shutil.copytree(stage, OUT)
-    print(json.dumps({"out": str(OUT), "rows": len(rows)}, sort_keys=True))
+        shutil.copytree(stage, out)
+    print(json.dumps({"out": str(out), "rows": len(rows)}, sort_keys=True))
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--source", type=Path, required=True, help="accepted #89 frozen_preoutcome_rows.csv")
+    parser.add_argument("--output", type=Path, required=True, help="new immutable safe-input bundle")
+    args = parser.parse_args()
+    build(args.source, args.output)
