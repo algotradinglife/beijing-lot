@@ -30,9 +30,9 @@ def root() -> Path:
 
 
 ROOT = root()
-FREEZE = ROOT / "results/bj90_gate_a_preoutcome_v4"
-LEDGER = ROOT / "results/bj90_gate_b_target_ledger_v2"
-OUT = ROOT / "results/bj90_gate_b_price_vectors_v4"
+FREEZE = ROOT / "results/bj90_gate_a_preoutcome_v4r1"
+LEDGER = ROOT / "results/bj90_gate_b_target_ledger_v2r1"
+OUT = ROOT / "results/bj90_gate_b_price_vectors_v4r1"
 CODES = ("3", "1", "0")
 LAMBDA = 10.0
 NUMERIC_DIM = 42
@@ -377,7 +377,7 @@ def main() -> int:
         card = {
             "issue": 90, "stage": "GATE_B_FIXED_CHRONOLOGICAL_PRICE_EVALUATION", "created_at_utc": datetime.now(timezone.utc).isoformat(),
             "gate_a_manifest_sha256": gate_a_manifest, "ledger_manifest_sha256": ledger_manifest,
-            "inputs": "Gate-A v4 target-unexposed rows plus Gate-B v2 one-query official-SP ledger; complete case only where target_reason=AVAILABLE_POSITIVE",
+            "inputs": "Gate-A v4r1 target-unexposed rows plus Gate-B v2r1 one-query official-SP ledger; complete case only where target_reason=AVAILABLE_POSITIVE",
             "one_hot_contract": "zero initialized matrix; intercept/numeric features plus only a known training-league indicator; unseen league is all-zero",
             "promotion_rule": "locked PI five-condition M1+M2 rule; diagnostics are descriptive only",
             "label": "RETROSPECTIVE_PRICE_TARGET; NOT_OBSERVED_PREBET_BJDC_QUOTE",

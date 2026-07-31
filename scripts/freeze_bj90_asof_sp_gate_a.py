@@ -2,6 +2,7 @@
 """Outcome-free Gate-A source/fold/model-card freeze for Issue #90."""
 from __future__ import annotations
 
+import argparse
 import csv
 import hashlib
 import json
@@ -15,6 +16,8 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+from bj90_source_locator import add_source_argument, resolve_source
+
 
 def repository_root() -> Path:
     for candidate in (Path(__file__).resolve().parent, *Path(__file__).resolve().parents):
@@ -24,8 +27,7 @@ def repository_root() -> Path:
 
 
 ROOT = repository_root()
-SOURCE = ROOT.parent.parent / "data/derived/beidan_xlsm/beidan_xlsm.sqlite"
-OUT = ROOT / "results/bj90_gate_a_preoutcome_v4"
+OUT = ROOT / "results/bj90_gate_a_preoutcome_v4r1"
 SNAPSHOTS = ("euro_1x2", "asian_handicap", "over_under")
 
 
@@ -49,13 +51,17 @@ def complete(prefix: str, row: sqlite3.Row) -> bool:
     return all(row[f"{prefix}_{field}"] is not None for field in ("n", "v1", "v2", "v3", "i_v1", "i_v2", "i_v3")) and int(row[f"{prefix}_n"]) > 0
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    add_source_argument(parser)
+    args = parser.parse_args(argv)
+    source = resolve_source(ROOT, args.source_db)
     if OUT.exists():
         raise SystemExit(f"refusing to overwrite immutable output: {OUT}")
     stage = Path(tempfile.mkdtemp(prefix="bj90-gate-a-", dir=OUT.parent))
     try:
-        source_sha = digest(SOURCE)
-        conn = sqlite3.connect(f"file:{SOURCE}?mode=ro", uri=True)
+        source_sha = digest(source)
+        conn = sqlite3.connect(f"file:{source}?mode=ro", uri=True)
         conn.row_factory = sqlite3.Row
         # Gate A is strictly target-unexposed.  Later price labels are not joined,
         # selected, or used to determine this frozen universe.
@@ -123,7 +129,7 @@ def main() -> int:
             "issue": 90,
             "stage": "GATE_A_OUTCOME_UNEXPOSED_SOURCE_AND_MODEL_CARD",
             "created_at_utc": datetime.now(timezone.utc).isoformat(),
-            "source": {"path": str(SOURCE), "sha256": source_sha},
+            "source": {"logical_path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite", "sha256": source_sha},
             "eligibility": "kickoff in 2018-2025; normalized BJDC line; complete 10h+initial EURO/Asian/OU consensus",
             "chronology": "2018 warm-up; strict expanding OOS years 2019-2025. A fold can use only earlier years for any target-fitted mapping.",
             "allowed_pre10h_features": [
@@ -156,6 +162,7 @@ def main() -> int:
         write_csv(stage / "source_census.csv", source_census)
         (stage / "experiment_card.json").write_text(json.dumps(card, indent=2, sort_keys=True) + "\n")
         shutil.copyfile(__file__, stage / "freeze_runner.py")
+        shutil.copyfile(Path(__file__).with_name("bj90_source_locator.py"), stage / "bj90_source_locator.py")
         manifest = {path.name: digest(path) for path in sorted(stage.iterdir()) if path.is_file()}
         (stage / "SHA256SUMS.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
         os.replace(stage, OUT)

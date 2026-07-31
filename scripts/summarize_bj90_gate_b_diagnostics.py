@@ -9,7 +9,7 @@ def root():
  for p in (Path(__file__).resolve().parent,*Path(__file__).resolve().parents):
   if (p/'AGENTS.md').is_file() and (p/'scripts').is_dir():return p
  raise RuntimeError('root')
-R=root(); I=R/'results/bj90_gate_b_price_vectors_v4'; O=R/'results/bj90_gate_b_diagnostics_v4r1'; C=('3','1','0')
+R=root(); I=R/'results/bj90_gate_b_price_vectors_v4r1'; O=R/'results/bj90_gate_b_diagnostics_v4r2'; C=('3','1','0')
 def sh(p):
  h=hashlib.sha256()
  with p.open('rb') as f:
@@ -44,7 +44,7 @@ def main():
    z=yearly[year];z[0]+=1;z[1]+=v[1]/v[0];z[2]+=v[2]/v[0];z[3]+=v[3]/v[0];z[4]+=v[4]/v[0]
   slices=[{'method':k[0],'code':k[1],'dimension':k[2],'slice':k[3],'n':v[0],'logmae':v[1]/v[0],'mean_prediction_minus_target':v[2]/v[0]} for k,v in sorted(groups.items())]
   yrs=[{'year':k,'policy_logmae':v[1]/v[0],'m0_logmae':v[2]/v[0],'policy_rankdisp':v[3]/v[0],'m0_rankdisp':v[4]/v[0],'policy_no_worse_logmae':v[1]<=v[2]} for k,v in sorted(yearly.items())]
-  write(s/'diagnostic_slices.csv',slices);write(s/'m2_coverage.csv',[{'year':k[0],'code':k[1],'n':v[0],'m2_conservative_coverage':v[1]/v[0]} for k,v in sorted(cov.items())]);write(s/'high_sp_tail.csv',[{'year':k[0],'code':k[1],'target_sp_ge_5_n':v[0],'m0_logmae':v[1]/v[0],'m1_logmae':v[2]/v[0]} for k,v in sorted(tail.items())]);write(s/'metrics_by_year.csv',yrs);shutil.copyfile(__file__,s/'diagnostic_runner.py');meta={'input_manifest_sha256':sh(I/'SHA256SUMS.json'),'input_bundle':'bj90_gate_b_price_vectors_v4','metric_semantics':'equal-issue, matching evaluator metrics_by_year.csv','scope':'streaming diagnostics only; no SQLite/model/selector access'};(s/'diagnostic_card.json').write_text(json.dumps(meta,indent=2,sort_keys=True)+"\n");mm={p.name:sh(p) for p in s.iterdir() if p.is_file()};(s/'SHA256SUMS.json').write_text(json.dumps(mm,indent=2,sort_keys=True)+"\n");os.replace(s,O);print(json.dumps({'output':str(O),'manifest':sh(O/'SHA256SUMS.json')}))
+  write(s/'diagnostic_slices.csv',slices);write(s/'m2_coverage.csv',[{'year':k[0],'code':k[1],'n':v[0],'m2_conservative_coverage':v[1]/v[0]} for k,v in sorted(cov.items())]);write(s/'high_sp_tail.csv',[{'year':k[0],'code':k[1],'target_sp_ge_5_n':v[0],'m0_logmae':v[1]/v[0],'m1_logmae':v[2]/v[0]} for k,v in sorted(tail.items())]);write(s/'metrics_by_year.csv',yrs);shutil.copyfile(__file__,s/'diagnostic_runner.py');meta={'input_manifest_sha256':sh(I/'SHA256SUMS.json'),'input_bundle':'bj90_gate_b_price_vectors_v4r1','metric_semantics':'equal-issue, matching evaluator metrics_by_year.csv','scope':'streaming diagnostics only; no SQLite/model/selector access'};(s/'diagnostic_card.json').write_text(json.dumps(meta,indent=2,sort_keys=True)+"\n");mm={p.name:sh(p) for p in s.iterdir() if p.is_file()};(s/'SHA256SUMS.json').write_text(json.dumps(mm,indent=2,sort_keys=True)+"\n");os.replace(s,O);print(json.dumps({'output':str(O),'manifest':sh(O/'SHA256SUMS.json')}))
  except Exception:
   shutil.rmtree(s,ignore_errors=True);raise
 if __name__=='__main__':main()
