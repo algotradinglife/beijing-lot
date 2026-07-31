@@ -15,8 +15,10 @@ import gzip
 import hashlib
 import io
 import json
+import platform
 import shutil
 import tempfile
+import zlib
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Iterable
@@ -36,7 +38,7 @@ STAKE_PER_SEQUENCE = 2
 CONTRACT_ID = "BJ-HIST-N7-PRUNING-001"
 GENERATOR_VERSION = "bj95-analytic-cartesian-v1"
 P91_LEGS_SHA = "cd0fdfd42002bbeddc6a1676323ead65c4cb85915f2c1a83b916d6c2004526fc"
-P89_ROWS_SHA = "ef02fccffdbe1d4f3cb70a4c8f7d24037bf2b9a40bea71e6fe0fbf465d679e7e"
+P89_ROWS_SHA = "787bf3266403bebdcf3dfa4ae09f3dbc862a6542c04554fc1e37a0ba02296ae8"
 
 LEG_FIELDS = (
     "group_id", "position", "match_id", "issue", "match_idx", "year", "fold",
@@ -67,9 +69,11 @@ def repository_root(anchor: Path) -> Path:
 
 
 ROOT = repository_root(Path(__file__))
-DEFAULT_OUT = ROOT / "results" / "bj95_gate_a_preoutcome_v1"
+DEFAULT_OUT = ROOT / "results" / "bj95_gate_a_preoutcome_v2"
 P91 = ROOT / "results" / "bj91_gate_a_preoutcome_v1r6"
-P89 = ROOT / "results" / "bj89_gate_b_selector_v1_1"
+# This is #89's committed Gate-A table.  Unlike the later Gate-B evidence it
+# contains no outcome/result-derived column and is therefore admissible here.
+P89 = ROOT / "results" / "bj89_gate_a_preoutcome_v3"
 
 
 def sha256(path: Path) -> str:
@@ -119,10 +123,17 @@ def identity(row: dict[str, str]) -> tuple[str, str, str, str]:
     return (row["match_id"], row["issue"], row["match_idx"], row["fold"])
 
 
+def assert_outcome_free_schema(fieldnames: Iterable[str], label: str) -> None:
+    forbidden = {"outcome", "score", "result", "result_code", "winning_sp", "final_sp", "payout", "roi", "settlement"}
+    found = forbidden & set(fieldnames)
+    if found:
+        raise RuntimeError(f"outcome-bearing columns in {label}: {sorted(found)}")
+
+
 def euro_rows() -> dict[tuple[str, str, str, str], dict[str, object]]:
-    path = P89 / "deployed_policy_rows.csv"
+    path = P89 / "frozen_preoutcome_rows.csv"
     if sha256(path) != P89_ROWS_SHA:
-        raise RuntimeError("#89 deployed_policy_rows.csv hash mismatch")
+        raise RuntimeError("#89 frozen_preoutcome_rows.csv hash mismatch")
     required = {
         "match_id", "issue", "match_idx", "fold", "handicap_line_norm",
         "euro_3_10h", "euro_1_10h", "euro_0_10h",
@@ -132,6 +143,7 @@ def euro_rows() -> dict[tuple[str, str, str, str], dict[str, object]]:
         reader = csv.DictReader(handle)
         if reader.fieldnames is None or not required.issubset(reader.fieldnames):
             raise RuntimeError("#89 source lacks safe EURO fields")
+        assert_outcome_free_schema(reader.fieldnames, "#89 Gate-A EURO input")
         for raw in reader:
             # Never project `outcome` or any result-derived field from #89.
             safe = {field: raw[field] for field in required}
@@ -159,6 +171,7 @@ def primary_n7_legs(euros: dict[tuple[str, str, str, str], dict[str, object]]) -
         reader = csv.DictReader(handle)
         if reader.fieldnames is None or not required.issubset(reader.fieldnames):
             raise RuntimeError("#91 safe-leg schema drift")
+        assert_outcome_free_schema(reader.fieldnames, "#91 safe N7 input")
         for raw in reader:
             if raw["cohort"] != "PRIMARY" or raw["n"] != "7":
                 continue
@@ -235,11 +248,24 @@ def deletion_order(legs: list[dict[str, object]], arm: str) -> tuple[list[dict[s
     return candidates, None
 
 
-def descriptor(group_id: str, arm: str, depth: int, allowed: list[tuple[str, ...]]) -> str:
+def descriptor(
+    group_id: str,
+    arm: str,
+    depth: int,
+    allowed: list[tuple[str, ...]],
+    ordered_identities: list[tuple[str, str, str, str]],
+) -> str:
+    if len(ordered_identities) != 7:
+        raise RuntimeError("portfolio descriptor requires all seven ordered identities")
     return canonical_hash({
         "contract": CONTRACT_ID, "generator_version": GENERATOR_VERSION,
         "group_id": group_id, "arm": arm, "depth": depth,
         "code_order": CODES, "allowed_codes_by_position": allowed,
+        "ordered_match_identities": ordered_identities,
+        "safe_source_payload_sha256": {
+            "bj91_outcome_safe_legs.csv.gz": P91_LEGS_SHA,
+            "bj89_frozen_preoutcome_rows.csv": P89_ROWS_SHA,
+        },
     })
 
 
@@ -258,6 +284,15 @@ def write_gzip_csv(path: Path, fields: Iterable[str], rows: Iterable[dict[str, o
                 writer = csv.DictWriter(handle, fieldnames=list(fields), lineterminator="\n")
                 writer.writeheader()
                 writer.writerows(rows)
+
+
+def canonical_content_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    opener = gzip.open if path.suffix == ".gz" else open
+    with opener(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def build(out: Path) -> dict[str, object]:
@@ -281,6 +316,10 @@ def build(out: Path) -> dict[str, object]:
         availability = Counter()
         for group_id, legs in sorted(by_group.items()):
             first = legs[0]
+            ordered_identities = [
+                (str(leg["match_id"]), str(leg["issue"]), str(leg["match_idx"]), str(leg["fold"]))
+                for leg in legs
+            ]
             for leg in legs:
                 cal = leg["calibrated_probability"]
                 euro = leg["euro_probability"]
@@ -302,7 +341,7 @@ def build(out: Path) -> dict[str, object]:
                 "arm": CONTROL_ARM, "depth": 0, "disposition": "AVAILABLE", "eligible_removals": 7,
                 "actual_removals": 0, "removed_positions": "", "removed_codes": "", "formula_k": 2187,
                 "selected_sequence_count": 2187, "stake_yuan": 4374, "calibrated_mass": "1", "euro_novig_mass": "1",
-                "portfolio_descriptor_sha256": descriptor(group_id, CONTROL_ARM, 0, full_allowed), "generator_version": GENERATOR_VERSION,
+                "portfolio_descriptor_sha256": descriptor(group_id, CONTROL_ARM, 0, full_allowed, ordered_identities), "generator_version": GENERATOR_VERSION,
             })
             for arm in PRUNING_ARMS:
                 ordered, unavailable = deletion_order(legs, arm)
@@ -354,7 +393,7 @@ def build(out: Path) -> dict[str, object]:
                         "actual_removals": depth, "removed_positions": "|".join(str(item["leg"]["position"]) for item in selected),
                         "removed_codes": "|".join(str(item["code"]) for item in selected), "formula_k": expected_k,
                         "selected_sequence_count": k, "stake_yuan": k * STAKE_PER_SEQUENCE, "calibrated_mass": fmt(cal_mass),
-                        "euro_novig_mass": fmt(euro_mass), "portfolio_descriptor_sha256": descriptor(group_id, arm, depth, allowed),
+                        "euro_novig_mass": fmt(euro_mass), "portfolio_descriptor_sha256": descriptor(group_id, arm, depth, allowed, ordered_identities),
                         "generator_version": GENERATOR_VERSION,
                     })
         write_gzip_csv(temp / "outcome_safe_n7_legs.csv.gz", LEG_FIELDS, safe_legs)
@@ -364,12 +403,17 @@ def build(out: Path) -> dict[str, object]:
             {"arm": arm, "disposition": disposition, "group_count": count}
             for (arm, disposition), count in sorted(availability.items())
         ))
+        content_hashes = {
+            path.name: canonical_content_sha256(path)
+            for path in sorted(temp.iterdir())
+            if path.is_file() and path.suffix == ".gz"
+        }
         card = {
             "issue": 95, "stage": "GATE_A_PREOUTCOME_STRUCTURED_PRUNING_FREEZE", "contract": CONTRACT_ID,
             "outcome_boundary": "No result, score, winning/final SP, payout, ROI, or settlement field is projected, emitted, or used.",
             "source_boundary": {
                 "bj91_bundle": "results/bj91_gate_a_preoutcome_v1r6", "bj91_manifest_sha256": p91_manifest,
-                "bj91_n7_legs_sha256": P91_LEGS_SHA, "bj89_bundle": "results/bj89_gate_b_selector_v1_1",
+                "bj91_n7_legs_sha256": P91_LEGS_SHA, "bj89_bundle": "results/bj89_gate_a_preoutcome_v3",
                 "bj89_manifest_sha256": p89_manifest, "bj89_rows_sha256": P89_ROWS_SHA,
                 "bj89_projection": ["match_id", "issue", "match_idx", "fold", "handicap_line_norm", "euro_3_10h", "euro_1_10h", "euro_0_10h"],
             },
@@ -377,7 +421,13 @@ def build(out: Path) -> dict[str, object]:
             "code_order": list(CODES), "depths": list(DEPTHS), "arms": [CONTROL_ARM, *PRUNING_ARMS],
             "sequence_definition": "At depth d, forbid exactly one frozen code in each of d distinct legs; selected set is the ordered Cartesian product of allowed code sets.",
             "k_formula": "K=2^d*3^(7-d); stake_yuan=2*K; factor 0.65 is reserved for Gate B settlement only.",
-            "hash_definition": "portfolio_descriptor_sha256 is SHA-256 canonical JSON of contract, generator, group, arm, depth, code order and allowed codes by all seven positions; it uniquely defines every physical sequence.",
+            "hash_definition": "portfolio_descriptor_sha256 is SHA-256 canonical JSON of contract, generator, group, arm, depth, code order, allowed codes by position, ordered seven match identities and both safe-source payload hashes; it uniquely defines every physical sequence.",
+            "compression_contract": {
+                "gzip_mtime": 0,
+                "runtime": {"python": platform.python_version(), "zlib_compile": zlib.ZLIB_VERSION, "zlib_runtime": getattr(zlib, "ZLIB_RUNTIME_VERSION", zlib.ZLIB_VERSION)},
+                "canonical_decompressed_sha256": content_hashes,
+                "cross_environment_verification": "byte manifest is authoritative within the recorded runtime; compare canonical_decompressed_sha256 for gzip payload equivalence across compressor implementations.",
+            },
             "model_market_agree_rule": "only legs whose calibrated and EURO no-vig bottom code agree are eligible; depth beyond eligible count is UNAVAILABLE_BY_RULE.",
             "random_rule": "removed code and removal order are independently derived from SHA-256 of contract ID, group ID, position and purpose; it is a baseline only.",
             "counts": {"groups": len(by_group), "legs": len(safe_legs), "frontier_rows": len(frontier), "deletion_rows": len(removals)},
