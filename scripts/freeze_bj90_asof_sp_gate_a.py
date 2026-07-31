@@ -25,7 +25,7 @@ def repository_root() -> Path:
 
 ROOT = repository_root()
 SOURCE = ROOT.parent.parent / "data/derived/beidan_xlsm/beidan_xlsm.sqlite"
-OUT = ROOT / "results/bj90_gate_a_preoutcome_v3"
+OUT = ROOT / "results/bj90_gate_a_preoutcome_v4"
 SNAPSHOTS = ("euro_1x2", "asian_handicap", "over_under")
 
 
@@ -57,8 +57,8 @@ def main() -> int:
         source_sha = digest(SOURCE)
         conn = sqlite3.connect(f"file:{SOURCE}?mode=ro", uri=True)
         conn.row_factory = sqlite3.Row
-        # The three official-SP fields are a retrospective price target only.
-        # Neither result/result_code nor winning_sp is selected anywhere here.
+        # Gate A is strictly target-unexposed.  Later price labels are not joined,
+        # selected, or used to determine this frozen universe.
         query = """
         SELECT m.match_id,m.issue,m.match_idx,m.kickoff_ts,m.league,m.handicap_line_norm,
                e.n_complete euro_n,e.v1_avg euro_v1,e.v2_avg euro_v2,e.v3_avg euro_v3,e.v1_min euro_min1,e.v2_min euro_min2,e.v3_min euro_min3,e.v1_max euro_max1,e.v2_max euro_max2,e.v3_max euro_max3,
@@ -66,8 +66,7 @@ def main() -> int:
                a.n_complete asian_n,a.v1_avg asian_v1,a.v2_avg asian_v2,a.v3_avg asian_v3,a.v1_min asian_min1,a.v2_min asian_min2,a.v3_min asian_min3,a.v1_max asian_max1,a.v2_max asian_max2,a.v3_max asian_max3,
                ai.v1_avg asian_i_v1,ai.v2_avg asian_i_v2,ai.v3_avg asian_i_v3,
                o.n_complete ou_n,o.v1_avg ou_v1,o.v2_avg ou_v2,o.v3_avg ou_v3,o.v1_min ou_min1,o.v2_min ou_min2,o.v3_min ou_min3,o.v1_max ou_max1,o.v2_max ou_max2,o.v3_max ou_max3,
-               oi.v1_avg ou_i_v1,oi.v2_avg ou_i_v2,oi.v3_avg ou_i_v3,
-               f.official_sp_3,f.official_sp_1,f.official_sp_0
+               oi.v1_avg ou_i_v1,oi.v2_avg ou_i_v2,oi.v3_avg ou_i_v3
           FROM matches m
           LEFT JOIN market_consensus e  ON e.match_id=m.match_id AND e.market='euro_1x2' AND e.snapshot='10h'
           LEFT JOIN market_consensus ei ON ei.match_id=m.match_id AND ei.market='euro_1x2' AND ei.snapshot='initial'
@@ -75,7 +74,6 @@ def main() -> int:
           LEFT JOIN market_consensus ai ON ai.match_id=m.match_id AND ai.market='asian_handicap' AND ai.snapshot='initial'
           LEFT JOIN market_consensus o  ON o.match_id=m.match_id AND o.market='over_under' AND o.snapshot='10h'
           LEFT JOIN market_consensus oi ON oi.match_id=m.match_id AND oi.market='over_under' AND oi.snapshot='initial'
-          JOIN match_features f ON f.match_id=m.match_id
          WHERE m.kickoff_ts >= '2018-01-01' AND m.kickoff_ts < '2026-01-01'
         """
         all_rows = list(conn.execute(query))
@@ -93,11 +91,9 @@ def main() -> int:
             c["total"] += 1
             line_ok = row["handicap_line_norm"] is not None
             market_ok = all(complete(name, row) for name in ("euro", "asian", "ou"))
-            target_ok = all(row[name] is not None and float(row[name]) > 0 for name in ("official_sp_3", "official_sp_1", "official_sp_0"))
             c["line_ok"] += line_ok
             c["market_ok"] += market_ok
-            c["target_ok"] += target_ok
-            if line_ok and market_ok and target_ok:
+            if line_ok and market_ok:
                 signed_line_fields = ("asian_v2", "asian_i_v2", "asian_min2", "asian_max2", "ou_v2", "ou_i_v2", "ou_min2", "ou_max2")
                 if not all(math.isfinite(float(row[field])) for field in signed_line_fields):
                     raise RuntimeError(f"non-finite signed market line for match_id={row['match_id']}")
@@ -120,7 +116,7 @@ def main() -> int:
                 raise RuntimeError(f"empty expanding fold {year}")
             fold_plan.append({"fold": f"OOS_{year}", "train_years": f"2018-{year - 1}", "test_year": year, "train_n": train, "test_n": test})
         source_census = [
-            {"year": year, "total": c["total"], "line_ok": c["line_ok"], "market10h_and_initial_complete": c["market_ok"], "official_sp_vector_complete": c["target_ok"], "eligible": c["eligible"]}
+            {"year": year, "total": c["total"], "line_ok": c["line_ok"], "market10h_and_initial_complete": c["market_ok"], "eligible": c["eligible"]}
             for year, c in sorted(census.items())
         ]
         card = {
@@ -128,7 +124,7 @@ def main() -> int:
             "stage": "GATE_A_OUTCOME_UNEXPOSED_SOURCE_AND_MODEL_CARD",
             "created_at_utc": datetime.now(timezone.utc).isoformat(),
             "source": {"path": str(SOURCE), "sha256": source_sha},
-            "eligibility": "kickoff in 2018-2025; normalized BJDC line; complete 10h+initial EURO/Asian/OU consensus; positive official_sp_3/1/0 target availability",
+            "eligibility": "kickoff in 2018-2025; normalized BJDC line; complete 10h+initial EURO/Asian/OU consensus",
             "chronology": "2018 warm-up; strict expanding OOS years 2019-2025. A fold can use only earlier years for any target-fitted mapping.",
             "allowed_pre10h_features": [
                 "euro_1x2 10h/initial consensus means and 10h bookmaker count",
@@ -136,7 +132,7 @@ def main() -> int:
                 "over_under 10h/initial consensus means and 10h bookmaker count",
                 "normalized BJDC handicap, league, kickoff time context",
             ],
-            "retrospective_target_only": "match_features.official_sp_3, official_sp_1, official_sp_0; vectors are deliberately absent from frozen_preoutcome_rows.csv",
+            "gate_a_boundary": "No later price label or target-availability field is read, selected, or used for eligibility. Such availability is recorded only by the one Gate-B ledger.",
             "forbidden": ["score", "result_label", "result_code", "winning_sp", "outcome_features", "ROI", "portfolio", "N", "K", "stake", "SP-cap search"],
             "feature_vector_v3": {
                 "code_mapping": "for EURO and target vectors, v1->code 3, v2->code 1, v3->code 0",

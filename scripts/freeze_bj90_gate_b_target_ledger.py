@@ -20,7 +20,7 @@ def root() -> Path:
     raise RuntimeError("repository root unavailable")
 
 
-ROOT=root(); FREEZE=ROOT/"results/bj90_gate_a_preoutcome_v3"; OUT=ROOT/"results/bj90_gate_b_target_ledger_v1"
+ROOT=root(); FREEZE=ROOT/"results/bj90_gate_a_preoutcome_v4"; OUT=ROOT/"results/bj90_gate_b_target_ledger_v2"
 SOURCE=ROOT.parent.parent/"data/derived/beidan_xlsm/beidan_xlsm.sqlite"
 
 
@@ -46,15 +46,22 @@ def main() -> int:
     try:
         manifest=json.loads((FREEZE/"SHA256SUMS.json").read_text())
         actual={p.name:sha(p) for p in FREEZE.iterdir() if p.is_file() and p.name!="SHA256SUMS.json"}
-        if actual != manifest: raise RuntimeError("Gate-A v3 manifest mismatch")
+        if actual != manifest: raise RuntimeError("Gate-A v4 manifest mismatch")
         card=json.loads((FREEZE/"experiment_card.json").read_text())
         if sha(SOURCE)!=card["source"]["sha256"]: raise RuntimeError("source bytes changed")
         rows=read(FREEZE/"frozen_preoutcome_rows.csv"); ids=[int(r["match_id"]) for r in rows]
+        if len(ids) != len(set(ids)):
+            raise RuntimeError("Gate-A match_id is non-unique")
+        # Gate B's one and only target query. json_each binds all frozen
+        # identities in one statement, avoiding chunked target reads.
         target={}; conn=sqlite3.connect(f"file:{SOURCE}?mode=ro",uri=True)
-        for i in range(0,len(ids),900):
-            part=ids[i:i+900]; marks=",".join("?" for _ in part)
-            # Gate B's sole target access; result and winning-SP columns are never selected.
-            for mid,s3,s1,s0 in conn.execute(f"SELECT match_id,official_sp_3,official_sp_1,official_sp_0 FROM match_features WHERE match_id IN ({marks})",part): target[int(mid)]=(s3,s1,s0)
+        query="""
+          SELECT match_id,official_sp_3,official_sp_1,official_sp_0
+            FROM match_features
+           WHERE match_id IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
+        """
+        for mid,s3,s1,s0 in conn.execute(query, (json.dumps(ids),)):
+            target[int(mid)]=(s3,s1,s0)
         conn.close(); ledger=[]
         for r in rows:
             mid=int(r["match_id"]); values=target.get(mid)
@@ -62,9 +69,17 @@ def main() -> int:
             elif any(v is None or float(v)<=0 for v in values): reason="NONPOSITIVE"; values=("","","")
             else: reason="AVAILABLE_POSITIVE"
             ledger.append({"match_id":mid,"issue":r["issue"],"match_idx":r["match_idx"],"year":r["year"],"fold":r["fold"],"target_reason":reason,"sp_3":values[0],"sp_1":values[1],"sp_0":values[2]})
-        if any(r["target_reason"]!="AVAILABLE_POSITIVE" for r in ledger): raise RuntimeError("target ledger incomplete")
+        if len(ledger) != len(rows) or {int(r["match_id"]) for r in ledger} != set(ids):
+            raise RuntimeError("target ledger does not cover frozen Gate-A identities")
         write(stage/"official_sp_target_ledger.csv",ledger)
-        meta={"issue":90,"stage":"GATE_B_AUTHORIZED_OFFICIAL_SP_TARGET_LEDGER","created_at_utc":datetime.now(timezone.utc).isoformat(),"gate_a_manifest_sha256":sha(FREEZE/"SHA256SUMS.json"),"source_sha256":card["source"]["sha256"],"target_read_whitelist":["match_features.match_id","match_features.official_sp_3","match_features.official_sp_1","match_features.official_sp_0"],"prohibited":["score","result_label","result_code","winning_sp","ROI","portfolio","N","K","stake"]}
+        availability={}
+        for r in ledger:
+            key=(r["year"],r["target_reason"]); availability[key]=availability.get(key,0)+1
+        write(stage/"target_availability_by_year.csv",[
+            {"year":year,"target_reason":reason,"n":n}
+            for (year,reason),n in sorted(availability.items(), key=lambda x:(int(x[0][0]), x[0][1]))
+        ])
+        meta={"issue":90,"stage":"GATE_B_AUTHORIZED_OFFICIAL_SP_TARGET_LEDGER","created_at_utc":datetime.now(timezone.utc).isoformat(),"gate_a_manifest_sha256":sha(FREEZE/"SHA256SUMS.json"),"source_sha256":card["source"]["sha256"],"frozen_identity_n":len(ids),"target_read_statement":"one SELECT against match_features using json_each over all frozen match_id values","target_read_whitelist":["match_features.match_id","match_features.official_sp_3","match_features.official_sp_1","match_features.official_sp_0"],"target_statuses":["AVAILABLE_POSITIVE","MISSING_ROW","NONPOSITIVE"],"prohibited":["score","result_label","result_code","winning_sp","ROI","portfolio","N","K","stake"]}
         (stage/"ledger_card.json").write_text(json.dumps(meta,indent=2,sort_keys=True)+"\n");shutil.copyfile(__file__,stage/"ledger_runner.py")
         m={p.name:sha(p) for p in sorted(stage.iterdir()) if p.is_file()};(stage/"SHA256SUMS.json").write_text(json.dumps(m,indent=2,sort_keys=True)+"\n")
         os.replace(stage,OUT);print(json.dumps({"output":str(OUT),"n":len(ledger),"manifest_sha256":sha(OUT/"SHA256SUMS.json")},sort_keys=True));return 0
