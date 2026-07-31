@@ -18,15 +18,15 @@ import os
 import shutil
 import tempfile
 from collections import Counter, defaultdict
+from decimal import Decimal, getcontext
 from pathlib import Path
 from typing import Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-# v1/v1r1/v1r2 were local, uncommitted dry runs: v1 exposed an ulp-sensitive
-# comparator order, v1r1 exposed redundant payload bloat, and v1r2 needed a
-# clearer N7-only paired-baseline label.  v1r3 is the first reviewable freeze.
-OUT = ROOT / "results" / "bj91_gate_a_preoutcome_v1r3"
+# v1-v1r3 are superseded local/reviewed freezes. v1r4 fixes exact
+# probability ordering and the complete #64 settlement implementation bind.
+OUT = ROOT / "results" / "bj91_gate_a_preoutcome_v1r4"
 P89 = ROOT / "results" / "bj89_gate_b_selector_v1_1"
 P90 = ROOT / "results" / "bj90_downstream_safe_projection_v1r1"
 P79 = ROOT / "results" / "bj79_gate_a_closing_sp_proxy_v2r1"
@@ -41,7 +41,9 @@ P89_ROWS_SHA = "ef02fccffdbe1d4f3cb70a4c8f7d24037bf2b9a40bea71e6fe0fbf465d679e7e
 P90_VECTORS_SHA = "2375e5570a9fb964f1beb5f4a20e5019755f62213ebde1463a609d23d1e2807b"
 P79_LEGS_SHA = "3eb93433fa92f6c4327dd97b24ed7581d338eda2a338b34cd1b4d1bb87fa7efe"
 P79_SEQUENCES_SHA = "f838293723c1d32722311dcee1a442ab3f3424b2f5f0e38eb2c5d7e65dbea1c8"
-SHARED_SETTLEMENT_COMMIT = "15b6a03bf2909fe7376b393472c"
+SHARED_SETTLEMENT_COMMIT = "15b6a03bf2909fe7376b393472c7ec67d23398ba"
+SHARED_SETTLEMENT_RUNNER_PATH = "scripts/estimate_segment_betting_plan.py"
+SHARED_SETTLEMENT_TEST_PATH = "tests/scripts/test_estimate_segment_betting_plan.py"
 SHARED_SETTLEMENT_RUNNER_SHA = "cf981324deba1ecdd4c823cf42ff1d390538e9d3f14b561cb2112fcc0543569d"
 SHARED_SETTLEMENT_TEST_SHA = "376be20f90680c9912cba0778630b39b90a80b6377ecd6862a0249e2ef2355f3"
 
@@ -68,6 +70,10 @@ GROUP_FIELDS = [
     "inherited79_k", "inherited79_retained_mass", "inherited79_stake_yuan",
 ]
 SELECTION_FIELDS = ["cohort", "n", "group_id", "arm", "rank", "sequence"]
+
+# Seven source decimals with up to 17 significant digits require more than
+# the default 28-place Decimal context for an exact product and comparison.
+getcontext().prec = 128
 
 
 def sha256(path: Path) -> str:
@@ -152,6 +158,7 @@ def common_rows(probabilities: dict[tuple[str, str, str, str], dict[str, str]], 
             "match_id": p["match_id"], "issue": p["issue"], "match_idx": p["match_idx"],
             "year": p["year"], "fold": p["fold"],
             "probability": {code: float(p[f"p{code}"]) for code in CODES},
+            "probability_decimal": {code: Decimal(p[f"p{code}"]) for code in CODES},
             "point_sp": {code: float(sp[f"deployed_sp_{code}"]) for code in CODES},
             "m2_sp": {code: float(sp[f"m2_conservative_sp_{code}"]) for code in CODES},
         }
@@ -265,6 +272,19 @@ def seq_metrics(legs: list[dict[str, object]], sequence: str) -> dict[str, float
     }
 
 
+def exact_joint_probability(legs: list[dict[str, object]], sequence: str) -> Decimal:
+    """Multiply the frozen decimal source values without float rounding."""
+    value = Decimal(1)
+    for leg, code in zip(legs, sequence):
+        value *= Decimal(leg["probability_decimal"][code])
+    return value
+
+
+def probability_desc_order(scored):
+    """True exact joint-probability DESC, then the frozen 3/1/0 tuple order."""
+    return sorted(scored, key=lambda item: (-item[2], tuple(CODE_RANK[code] for code in item[0])))
+
+
 def write_csv(path: Path, fields: list[str], rows: Iterable[dict[str, object]]) -> None:
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
@@ -298,18 +318,15 @@ def emit_group(group: dict[str, object], selections, summary_rows: list[dict[str
     legs = group["legs"]
     n = int(group["n"])
     all_sequences = ["".join(item) for item in itertools.product(CODES, repeat=n)]
-    scored = [(sequence, seq_metrics(legs, sequence)) for sequence in all_sequences]
-    point = [(sequence, values) for sequence, values in scored if values["point_ev_per_2"] > 0.0]
-    conservative = [(sequence, values) for sequence, values in scored if values["conservative_ev_per_2"] > 0.0]
-    # Equal mathematical products can differ by one binary ulp when their
-    # factors are multiplied in a different code-position order.  Canonical
-    # 15-decimal comparison makes the locked code tuple the true tie-break.
-    probability_order = sorted(scored, key=lambda item: (-round(item[1]["joint_probability"], 15), tuple(CODE_RANK[code] for code in item[0])))
+    scored = [(sequence, seq_metrics(legs, sequence), exact_joint_probability(legs, sequence)) for sequence in all_sequences]
+    point = [(sequence, values) for sequence, values, _ in scored if values["point_ev_per_2"] > 0.0]
+    conservative = [(sequence, values) for sequence, values, _ in scored if values["conservative_ev_per_2"] > 0.0]
+    probability_order = probability_desc_order(scored)
     arms = {
         "POINT_SP5_POSITIVE_EV": point,
         "CONSERVATIVE_M2_SP5_POSITIVE_EV": conservative,
-        "PROBABILITY_ONLY_MATCHED_TO_POINT": probability_order[:len(point)],
-        "PROBABILITY_ONLY_MATCHED_TO_CONSERVATIVE": probability_order[:len(conservative)],
+        "PROBABILITY_ONLY_MATCHED_TO_POINT": [(sequence, values) for sequence, values, _ in probability_order[:len(point)]],
+        "PROBABILITY_ONLY_MATCHED_TO_CONSERVATIVE": [(sequence, values) for sequence, values, _ in probability_order[:len(conservative)]],
     }
     for arm, items in arms.items():
         for rank, (sequence, values) in enumerate(items, start=1):
@@ -338,8 +355,8 @@ def emit_group(group: dict[str, object], selections, summary_rows: list[dict[str
         "probability_matched_point_k": len(point), "probability_matched_conservative_k": len(conservative),
         "full_coverage_k": 3 ** n, "point_retained_mass": fmt(mass(point)),
         "conservative_retained_mass": fmt(mass(conservative)),
-        "probability_matched_point_mass": fmt(mass(probability_order[:len(point)])),
-        "probability_matched_conservative_mass": fmt(mass(probability_order[:len(conservative)])),
+        "probability_matched_point_mass": fmt(mass([(sequence, values) for sequence, values, _ in probability_order[:len(point)]])),
+        "probability_matched_conservative_mass": fmt(mass([(sequence, values) for sequence, values, _ in probability_order[:len(conservative)]])),
         "full_coverage_mass": "1", "point_stake_yuan": STAKE_PER_SEQUENCE_YUAN * len(point),
         "conservative_stake_yuan": STAKE_PER_SEQUENCE_YUAN * len(conservative),
         "probability_matched_point_stake_yuan": STAKE_PER_SEQUENCE_YUAN * len(point),
@@ -417,7 +434,7 @@ def main() -> int:
             "comparators": ["POINT_SP5_POSITIVE_EV", "CONSERVATIVE_M2_SP5_POSITIVE_EV", "PROBABILITY_ONLY_MATCHED_TO_POINT", "PROBABILITY_ONLY_MATCHED_TO_CONSERVATIVE", "FULL_3_TO_N_ANALYTIC", "INHERITED79_SP5_CAPPED_60PCT_PREFIX_N7_PAIRED_ONLY"],
             "probability_tie_order": ["3", "1", "0"],
             "stake_rule": "cost_yuan=2*K; no multiplier; K is output not an eligibility gate",
-            "gate_b_settlement_binding": {"commit": SHARED_SETTLEMENT_COMMIT, "runner_sha256": SHARED_SETTLEMENT_RUNNER_SHA, "test_sha256": SHARED_SETTLEMENT_TEST_SHA, "factor": "0.65", "rounding": "pre_round_decimal_value_serialized_to_6_decimal_places; no_paid_cent_rounding_applied"},
+            "gate_b_settlement_binding": {"commit": SHARED_SETTLEMENT_COMMIT, "runner_path": SHARED_SETTLEMENT_RUNNER_PATH, "runner_sha256": SHARED_SETTLEMENT_RUNNER_SHA, "test_path": SHARED_SETTLEMENT_TEST_PATH, "test_sha256": SHARED_SETTLEMENT_TEST_SHA, "factor": "0.65", "rounding": "pre_round_decimal_value_serialized_to_6_decimal_places; no_paid_cent_rounding_applied"},
             "files": ["outcome_safe_legs.csv.gz", "group_definitions.csv", "primary_partition_census.csv", "inherited79_overlap_census.csv", "selected_sequences.jsonl.gz", "group_arm_summaries.csv", "preoutcome_card.json", "freeze_runner.py"],
             "counts": {"groups": len(all_groups), "outcome_safe_leg_rows": leg_count, "primary_groups": {str(n): len(primary_by_n[n]) for n in N_VALUES}, "paired79_groups": len(paired_groups)},
         }

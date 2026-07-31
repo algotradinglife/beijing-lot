@@ -8,6 +8,7 @@ import csv
 import gzip
 import hashlib
 from collections import Counter
+from decimal import Decimal
 from pathlib import Path
 
 
@@ -16,8 +17,8 @@ SPEC = importlib.util.spec_from_file_location("bj91_gate_a", ROOT / "scripts" / 
 assert SPEC and SPEC.loader
 MOD = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MOD)
-BUNDLE = ROOT / "results" / "bj91_gate_a_preoutcome_v1r3"
-MANIFEST_SHA256 = "6a1cef2e9256e190854c380b82ea00fee5fc1b72bb71cf2e513a3a6e55934a14"
+BUNDLE = ROOT / "results" / "bj91_gate_a_preoutcome_v1r4"
+MANIFEST_SHA256 = "d181ffbab29c2a79abee26183d9957146625e21b4f930bfacf8fb2ff08918960"
 
 
 def leg(index: int, *, issue: str = "26001", fold: str = "OOS_2024") -> dict[str, object]:
@@ -25,6 +26,7 @@ def leg(index: int, *, issue: str = "26001", fold: str = "OOS_2024") -> dict[str
         "match_id": str(100 + index), "issue": issue, "match_idx": str(index),
         "year": "2024", "fold": fold,
         "probability": {"3": 0.70, "1": 0.20, "0": 0.10},
+        "probability_decimal": {"3": Decimal("0.70"), "1": Decimal("0.20"), "0": Decimal("0.10")},
         "point_sp": {"3": 9.0, "1": 2.0, "0": 2.0},
         "m2_sp": {"3": 8.0, "1": 2.0, "0": 2.0},
     }
@@ -68,7 +70,7 @@ def test_effective_sp_is_capped_before_strict_ev_and_probability_comparator_is_m
     assert all(MOD.seq_metrics(group["legs"], row["sequence"])["point_ev_per_2"] > 0 for row in point)
     assert [row["sequence"] for row in matched] == [row["sequence"] for row in sorted(
         matched,
-        key=lambda row: (-round(MOD.seq_metrics(group["legs"], row["sequence"])["joint_probability"], 15), tuple(MOD.CODE_RANK[code] for code in row["sequence"])),
+        key=lambda row: (-MOD.exact_joint_probability(group["legs"], row["sequence"]), tuple(MOD.CODE_RANK[code] for code in row["sequence"])),
     )]
 
 
@@ -79,6 +81,20 @@ def test_gate_a_schema_names_are_outcome_safe() -> None:
     assert MOD.PAYOUT_FACTOR == 0.65
     assert MOD.SP_CAP == 5.0
     assert MOD.STAKE_PER_SEQUENCE_YUAN == 2
+
+
+def test_probability_order_preserves_unequal_values_inside_old_rounding_bucket() -> None:
+    # Both values round to zero at 15 decimal places.  The old implementation
+    # would incorrectly choose the 3-leading code tuple first; exact Decimal
+    # DESC must select the larger 1-leading probability first.
+    scored = [
+        ("3333", {}, Decimal("0.00000000000000010")),
+        ("1111", {}, Decimal("0.00000000000000020")),
+    ]
+    assert [sequence for sequence, _, _ in MOD.probability_desc_order(scored)] == ["1111", "3333"]
+    assert len(MOD.SHARED_SETTLEMENT_COMMIT) == 40
+    assert MOD.SHARED_SETTLEMENT_RUNNER_PATH == "scripts/estimate_segment_betting_plan.py"
+    assert MOD.SHARED_SETTLEMENT_TEST_PATH == "tests/scripts/test_estimate_segment_betting_plan.py"
 
 
 def test_committed_freeze_is_manifest_bound_and_groupwise_consistent() -> None:

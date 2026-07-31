@@ -37,10 +37,12 @@
     "freeze_runner.py"
   ],
   "gate_b_settlement_binding": {
-    "commit": "15b6a03bf2909fe7376b393472c",
+    "commit": "15b6a03bf2909fe7376b393472c7ec67d23398ba",
     "factor": "0.65",
     "rounding": "pre_round_decimal_value_serialized_to_6_decimal_places; no_paid_cent_rounding_applied",
+    "runner_path": "scripts/estimate_segment_betting_plan.py",
     "runner_sha256": "cf981324deba1ecdd4c823cf42ff1d390538e9d3f14b561cb2112fcc0543569d",
+    "test_path": "tests/scripts/test_estimate_segment_betting_plan.py",
     "test_sha256": "376be20f90680c9912cba0778630b39b90a80b6377ecd6862a0249e2ef2355f3"
   },
   "inherited79_overlap_census": {
