@@ -1,10 +1,11 @@
 {
-  "freeze_runner.py": "a89de26c375296ab1bb5eb670e178c010398076961419713b8ddb6377a7a60ae",
+  "freeze_runner.py": "4401cc6ba028785be543f03f146d7016353ed225137511150abcc61eadcee825",
   "group_arm_summaries.csv": "d1cf9a02f357234d43f824c17dc1ad70853527e235d29618ae75aa3cb5ed1955",
   "group_definitions.csv": "7deae14e38be31c533819e45be998510bc1c70f37d7d6b67c72f20418fb66163",
   "inherited79_overlap_census.csv": "96869c4b0331b9072af6b96f734505eda6c8b4f231d8f4c42a44e8084beadc14",
+  "outcome_safe_common_inputs.csv.gz": "51abf343304bb40e56989e90e3e007492b816abc0dddb31437c8b1c5d7730165",
   "outcome_safe_legs.csv.gz": "abc7704d807729b91ab32a391b7033e9b843da1949902f0eac1bfe482128f62f",
-  "preoutcome_card.json": "0aa8d78e25e2537ba338f5d7188c9767c35eff5bfc8f6988fc8a9623049e8285",
+  "preoutcome_card.json": "4e47c129aebedbb2ac0005bd6c8711a7da365293535a6b0409e1406d9d433696",
   "primary_partition_census.csv": "b63677074c85c0bc1fcf90de4390c6fb9f3cfbb1e5da0bb0e35fed37714f82c2",
   "selected_sequences.jsonl.gz": "06b31d2c1f6662cad21a41785bb932875c7eaaabcb3fcd6d7312b889d3d0ba29"
 }

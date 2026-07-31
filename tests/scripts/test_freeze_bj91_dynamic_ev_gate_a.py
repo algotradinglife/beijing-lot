@@ -17,8 +17,8 @@ SPEC = importlib.util.spec_from_file_location("bj91_gate_a", ROOT / "scripts" / 
 assert SPEC and SPEC.loader
 MOD = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MOD)
-BUNDLE = ROOT / "results" / "bj91_gate_a_preoutcome_v1r4"
-MANIFEST_SHA256 = "d181ffbab29c2a79abee26183d9957146625e21b4f930bfacf8fb2ff08918960"
+BUNDLE = ROOT / "results" / "bj91_gate_a_preoutcome_v1r5"
+MANIFEST_SHA256 = "c325c7a429232ba550152a3d35ba2e96285108908c03fba3769d54f6f8dadc35"
 
 
 def leg(index: int, *, issue: str = "26001", fold: str = "OOS_2024") -> dict[str, object]:
@@ -75,7 +75,7 @@ def test_effective_sp_is_capped_before_strict_ev_and_probability_comparator_is_m
 
 
 def test_gate_a_schema_names_are_outcome_safe() -> None:
-    text = " ".join(MOD.LEG_FIELDS + MOD.GROUP_FIELDS + MOD.SELECTION_FIELDS).lower()
+    text = " ".join(MOD.COMMON_INPUT_FIELDS + MOD.LEG_FIELDS + MOD.GROUP_FIELDS + MOD.SELECTION_FIELDS).lower()
     for forbidden in ("outcome", "result", "winning", "roi", "settlement", "score"):
         assert forbidden not in text
     assert MOD.PAYOUT_FACTOR == 0.65
@@ -108,6 +108,7 @@ def test_committed_freeze_is_manifest_bound_and_groupwise_consistent() -> None:
     assert hashlib.sha256((BUNDLE / "SHA256SUMS.json").read_bytes()).hexdigest() == MANIFEST_SHA256
     card = json.loads((BUNDLE / "preoutcome_card.json").read_text())
     assert card["common_row_count"] == 47_819
+    assert card["counts"]["common_input_rows"] == 47_819
     assert card["inherited79_overlap_census"] == {
         "complete_common": 2419,
         "partial_overlap": 6077,
@@ -115,6 +116,11 @@ def test_committed_freeze_is_manifest_bound_and_groupwise_consistent() -> None:
         "cross_fold_full_overlap_in_partial": 1,
     }
     assert card["counts"]["primary_groups"] == {"4": 11823, "5": 9424, "7": 6686}
+    with gzip.open(BUNDLE / "outcome_safe_common_inputs.csv.gz", "rt", newline="", encoding="utf-8") as handle:
+        common_rows = list(csv.DictReader(handle))
+    assert len(common_rows) == 47_819
+    assert list(common_rows[0]) == MOD.COMMON_INPUT_FIELDS
+    assert len({(row["match_id"], row["issue"], row["match_idx"], row["fold"]) for row in common_rows}) == len(common_rows)
     with (BUNDLE / "group_arm_summaries.csv").open(newline="", encoding="utf-8") as handle:
         summaries = list(csv.DictReader(handle))
     assert len(summaries) == card["counts"]["groups"] == 30_352

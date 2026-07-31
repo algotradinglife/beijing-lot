@@ -24,9 +24,10 @@ from typing import Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-# v1-v1r3 are superseded local/reviewed freezes. v1r4 fixes exact
-# probability ordering and the complete #64 settlement implementation bind.
-OUT = ROOT / "results" / "bj91_gate_a_preoutcome_v1r4"
+# v1-v1r4 are superseded local/reviewed freezes. v1r5 adds the complete
+# common-input table so every source-census category is reproducible without
+# reopening an upstream package.
+OUT = ROOT / "results" / "bj91_gate_a_preoutcome_v1r5"
 P89 = ROOT / "results" / "bj89_gate_b_selector_v1_1"
 P90 = ROOT / "results" / "bj90_downstream_safe_projection_v1r1"
 P79 = ROOT / "results" / "bj79_gate_a_closing_sp_proxy_v2r1"
@@ -58,6 +59,11 @@ LEG_FIELDS = [
     "match_idx", "year", "fold", "p3", "p1", "p0", "point_sp_3", "point_sp_1",
     "point_sp_0", "m2_sp_3", "m2_sp_1", "m2_sp_0", "point_sp5_3", "point_sp5_1",
     "point_sp5_0", "m2_sp5_3", "m2_sp5_1", "m2_sp5_0",
+]
+COMMON_INPUT_FIELDS = [
+    "match_id", "issue", "match_idx", "year", "fold", "p3", "p1", "p0",
+    "point_sp_3", "point_sp_1", "point_sp_0", "m2_sp_3", "m2_sp_1", "m2_sp_0",
+    "point_sp5_3", "point_sp5_1", "point_sp5_0", "m2_sp5_3", "m2_sp5_1", "m2_sp5_0",
 ]
 GROUP_FIELDS = [
     "cohort", "n", "group_id", "source_group_id", "issue", "fold", "year",
@@ -314,6 +320,27 @@ def write_legs(path: Path, groups: list[dict[str, object]]) -> int:
     return count
 
 
+def write_common_inputs(path: Path, common: dict[tuple[str, str, str, str], dict[str, object]]) -> int:
+    """Persist every #89/#90 common row, including dropped N remainders."""
+    count = 0
+    with path.open("wb") as raw, gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as compressed:
+        with io.TextIOWrapper(compressed, encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=COMMON_INPUT_FIELDS, lineterminator="\n")
+            writer.writeheader()
+            for key in sorted(common, key=lambda item: (int(item[1]), item[3], int(item[2]), int(item[0]))):
+                leg = common[key]
+                row = {key: leg[key] for key in ("match_id", "issue", "match_idx", "year", "fold")}
+                for code in CODES:
+                    row[f"p{code}"] = fmt(float(leg["probability"][code]))
+                    row[f"point_sp_{code}"] = fmt(float(leg["point_sp"][code]))
+                    row[f"m2_sp_{code}"] = fmt(float(leg["m2_sp"][code]))
+                    row[f"point_sp5_{code}"] = fmt(min(float(leg["point_sp"][code]), SP_CAP))
+                    row[f"m2_sp5_{code}"] = fmt(min(float(leg["m2_sp"][code]), SP_CAP))
+                writer.writerow(row)
+                count += 1
+    return count
+
+
 def emit_group(group: dict[str, object], selections, summary_rows: list[dict[str, object]], inherited: dict[str, object] | None = None) -> None:
     legs = group["legs"]
     n = int(group["n"])
@@ -407,6 +434,7 @@ def main() -> int:
         write_csv(stage / "primary_partition_census.csv", ["cohort", "n", "issue", "fold", "input_rows", "complete_groups", "dropped_remainder_rows", "drop_rule"], census_rows)
         write_csv(stage / "inherited79_overlap_census.csv", ["category", "group_count"], [{"category": key, "group_count": overlap_census[key]} for key in ("complete_common", "partial_overlap", "zero_overlap")])
         write_csv(stage / "group_definitions.csv", ["cohort", "n", "group_id", "source_group_id", "issue", "fold", "year", "group_ordinal", "n_legs"], [{**{key: group[key] for key in ("cohort", "n", "group_id", "source_group_id", "issue", "fold", "year", "group_ordinal")}, "n_legs": len(group["legs"])} for group in all_groups])
+        common_input_count = write_common_inputs(stage / "outcome_safe_common_inputs.csv.gz", common)
         leg_count = write_legs(stage / "outcome_safe_legs.csv.gz", all_groups)
         group_summaries = []
         selection_path = stage / "selected_sequences.jsonl.gz"
@@ -435,8 +463,8 @@ def main() -> int:
             "probability_tie_order": ["3", "1", "0"],
             "stake_rule": "cost_yuan=2*K; no multiplier; K is output not an eligibility gate",
             "gate_b_settlement_binding": {"commit": SHARED_SETTLEMENT_COMMIT, "runner_path": SHARED_SETTLEMENT_RUNNER_PATH, "runner_sha256": SHARED_SETTLEMENT_RUNNER_SHA, "test_path": SHARED_SETTLEMENT_TEST_PATH, "test_sha256": SHARED_SETTLEMENT_TEST_SHA, "factor": "0.65", "rounding": "pre_round_decimal_value_serialized_to_6_decimal_places; no_paid_cent_rounding_applied"},
-            "files": ["outcome_safe_legs.csv.gz", "group_definitions.csv", "primary_partition_census.csv", "inherited79_overlap_census.csv", "selected_sequences.jsonl.gz", "group_arm_summaries.csv", "preoutcome_card.json", "freeze_runner.py"],
-            "counts": {"groups": len(all_groups), "outcome_safe_leg_rows": leg_count, "primary_groups": {str(n): len(primary_by_n[n]) for n in N_VALUES}, "paired79_groups": len(paired_groups)},
+            "files": ["outcome_safe_common_inputs.csv.gz", "outcome_safe_legs.csv.gz", "group_definitions.csv", "primary_partition_census.csv", "inherited79_overlap_census.csv", "selected_sequences.jsonl.gz", "group_arm_summaries.csv", "preoutcome_card.json", "freeze_runner.py"],
+            "counts": {"common_input_rows": common_input_count, "groups": len(all_groups), "outcome_safe_leg_rows": leg_count, "primary_groups": {str(n): len(primary_by_n[n]) for n in N_VALUES}, "paired79_groups": len(paired_groups)},
         }
         (stage / "preoutcome_card.json").write_text(json.dumps(card, indent=2, sort_keys=True) + "\n")
         shutil.copyfile(__file__, stage / "freeze_runner.py")
