@@ -62,6 +62,9 @@ def test_projection_is_exact_and_rejects_schema_or_identity_drift(monkeypatch: p
     assert projected[0]["deployed_sp_3"] == "2.20"
     assert projected[1]["deployed_sp_3"] == "2.10"
 
+    with pytest.raises(RuntimeError, match="unexpected projected row count"):
+        MOD.validate_projection(projected[:-1], source_rows)
+
     unsafe = [dict(row) for row in projected]
     unsafe[0]["target_sp_3"] = "9.99"
     with pytest.raises(RuntimeError, match="schema drift"):
