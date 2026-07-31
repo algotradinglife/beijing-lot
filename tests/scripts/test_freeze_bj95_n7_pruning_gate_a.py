@@ -109,6 +109,84 @@ def test_model_market_agree_is_unavailable_only_after_eligible_removals():
     assert all(item["code"] == "0" for item in order)
 
 
+def selected_pairs(order):
+    return [(item["leg"]["position"], item["code"]) for item in order]
+
+
+def test_all_deterministic_pruning_arms_have_independent_orders_and_tie_breaks():
+    mod = load()
+    calibrated = (
+        (0.10, 0.60, 0.30),  # position tie at 0.10 is resolved before p2
+        (0.60, 0.10, 0.30),
+        (0.50, 0.30, 0.20),
+        (0.20, 0.40, 0.40),
+        (0.40, 0.30, 0.30),  # equal code score resolves to code 1, not 0
+        (0.40, 0.30, 0.30),
+        (0.40, 0.40, 0.20),
+    )
+    euro = (
+        (0.50, 0.30, 0.20),
+        (0.10, 0.50, 0.40),
+        (0.40, 0.40, 0.20),
+        (0.40, 0.10, 0.50),
+        (0.30, 0.30, 0.40),  # equal code score resolves to code 3
+        (0.50, 0.25, 0.25),
+        (0.50, 0.30, 0.20),
+    )
+    rule_legs = [leg(position, calibrated[position - 1], euro[position - 1]) for position in range(1, 8)]
+
+    cal_order, cal_unavailable = mod.deletion_order(rule_legs, "CAL_MIN_P")
+    assert cal_unavailable is None
+    assert selected_pairs(cal_order) == [(1, "3"), (2, "1"), (3, "0"), (4, "3"), (7, "0"), (5, "1"), (6, "1")]
+
+    euro_order, euro_unavailable = mod.deletion_order(rule_legs, "EURO_MIN_P")
+    assert euro_unavailable is None
+    assert selected_pairs(euro_order) == [(2, "3"), (4, "1"), (1, "0"), (3, "0"), (7, "0"), (6, "1"), (5, "3")]
+
+    pxsp5_legs = [leg(position, (1 / 3, 1 / 3, 1 / 3), euro[position - 1]) for position in range(1, 8)]
+    for position, sp5 in enumerate(((3, 6, 9), (6, 3, 9), (9, 6, 3), (3, 6, 9), (6, 3, 9), (9, 6, 3), (3, 3, 9)), start=1):
+        pxsp5_legs[position - 1]["sp5"] = dict(zip(("3", "1", "0"), sp5))
+    pxsp5_order, pxsp5_unavailable = mod.deletion_order(pxsp5_legs, "MIN_PXSP5")
+    assert pxsp5_unavailable is None
+    assert selected_pairs(pxsp5_order) == [(1, "3"), (2, "1"), (3, "0"), (4, "3"), (5, "1"), (6, "0"), (7, "3")]
+
+    agree_legs = [leg(position, (0.50, 0.30, 0.20), (0.50, 0.20, 0.30)) for position in range(1, 8)]
+    for position in (1, 2, 3):
+        agree_legs[position - 1]["euro_probability"] = {"3": 0.50, "1": 0.30, "0": 0.20}
+    agree_order, unavailable = mod.deletion_order(agree_legs, "MODEL_MARKET_AGREE")
+    assert unavailable == "UNAVAILABLE_BY_RULE"
+    assert selected_pairs(agree_order) == [(1, "0"), (2, "0"), (3, "0")]
+
+
+def test_model_market_depth_boundary_uses_shared_k_and_stake_contract():
+    mod = load()
+    for depth in range(1, 8):
+        disposition, formula_k, selected_count, stake_yuan = mod.depth_contract(depth, 3, "UNAVAILABLE_BY_RULE")
+        assert formula_k == 2**depth * 3**(7 - depth)
+        if depth <= 3:
+            assert (disposition, selected_count, stake_yuan) == ("AVAILABLE", formula_k, 2 * formula_k)
+        else:
+            assert (disposition, selected_count, stake_yuan) == ("UNAVAILABLE_BY_RULE", 0, 0)
+
+
+def test_nonfinite_and_invalid_numeric_ingress_is_fail_closed_before_ranking():
+    mod = load()
+    valid_euro = {"match_id": "m", "euro_3_10h": "2.0", "euro_1_10h": "3.0", "euro_0_10h": "4.0"}
+    for bad in ("nan", "inf", "-inf", "1.0", "0", "-1"):
+        row = dict(valid_euro)
+        row["euro_1_10h"] = bad
+        assert_raises_runtime_error(lambda row=row: mod.no_vig_probabilities(row))
+    for bad in ("nan", "inf", "-inf", "0", "-1"):
+        assert_raises_runtime_error(lambda bad=bad: mod.finite_positive(bad, "test"))
+    assert_raises_runtime_error(lambda: mod.valid_probability_vector({"3": float("nan"), "1": 0.5, "0": 0.5}, "test"))
+    bad_sp5 = [leg(position, (0.5, 0.3, 0.2), (0.5, 0.3, 0.2)) for position in range(1, 8)]
+    bad_sp5[0]["sp5"]["3"] = float("inf")
+    assert_raises_runtime_error(lambda: mod.deletion_order(bad_sp5, "MIN_PXSP5"))
+    bad_predicted_sp = [leg(position, (0.5, 0.3, 0.2), (0.5, 0.3, 0.2)) for position in range(1, 8)]
+    bad_predicted_sp[0]["predicted_sp"]["1"] = 0.0
+    assert_raises_runtime_error(lambda: mod.deletion_order(bad_predicted_sp, "CAL_MIN_P"))
+
+
 def test_random_baseline_is_deterministic_and_outcome_free():
     mod = load()
     legs = [leg(position, (0.5, 0.3, 0.2), (0.4, 0.35, 0.25)) for position in range(1, 8)]
@@ -182,7 +260,7 @@ def test_safe_inputs_and_committed_bundle_replay_end_to_end():
         with opener(source, "rt", newline="") as handle:
             fieldnames = next(__import__("csv").reader(handle))
         mod.assert_exact_schema(fieldnames, expected, str(source))
-    committed = mod.ROOT / "results" / "bj95_gate_a_preoutcome_v4"
+    committed = mod.ROOT / "results" / "bj95_gate_a_preoutcome_v5"
     with tempfile.TemporaryDirectory(prefix="bj95_test_replay_") as directory:
         replay = Path(directory) / "bundle"
         mod.build(replay)

@@ -15,6 +15,7 @@ import gzip
 import hashlib
 import io
 import json
+import math
 import platform
 import shutil
 import tempfile
@@ -77,7 +78,7 @@ def repository_root(anchor: Path) -> Path:
 
 
 ROOT = repository_root(Path(__file__))
-DEFAULT_OUT = ROOT / "results" / "bj95_gate_a_preoutcome_v4"
+DEFAULT_OUT = ROOT / "results" / "bj95_gate_a_preoutcome_v5"
 P91 = ROOT / "results" / "bj91_gate_a_preoutcome_v1r6"
 # A committed, content-addressed input; Gate A never opens #89's larger table.
 EURO_INPUT = ROOT / "results" / "bj95_euro_input_v1"
@@ -110,6 +111,8 @@ def fmt(value: float) -> str:
     # 17 significant digits round-trip an IEEE-754 input exactly.  This keeps
     # the safe projection independently replayable without rounding a ranking
     # boundary before it is written to the immutable package.
+    if not math.isfinite(value):
+        raise RuntimeError("refusing to emit non-finite numeric value")
     return format(value, ".17g")
 
 
@@ -119,13 +122,41 @@ def canonical_hash(value: object) -> str:
     ).hexdigest()
 
 
+def finite_float(raw: str | float, label: str) -> float:
+    try:
+        value = float(raw)
+    except (TypeError, ValueError) as error:
+        raise RuntimeError(f"invalid numeric {label}: {raw!r}") from error
+    if not math.isfinite(value):
+        raise RuntimeError(f"non-finite numeric {label}: {raw!r}")
+    return value
+
+
+def finite_positive(raw: str | float, label: str) -> float:
+    value = finite_float(raw, label)
+    if value <= 0.0:
+        raise RuntimeError(f"non-positive numeric {label}: {raw!r}")
+    return value
+
+
+def valid_probability_vector(values: dict[str, float], label: str) -> None:
+    if set(values) != set(CODES) or any(not math.isfinite(value) or value <= 0.0 for value in values.values()):
+        raise RuntimeError(f"invalid probability domain: {label}")
+    if abs(sum(values.values()) - 1.0) > 1e-9:
+        raise RuntimeError(f"invalid probability total: {label}")
+
+
 def no_vig_probabilities(row: dict[str, str]) -> dict[str, float]:
-    odds = {code: float(row[f"euro_{code}_10h"]) for code in CODES}
+    odds = {code: finite_float(row[f"euro_{code}_10h"], f"EURO odds {row['match_id']} {code}") for code in CODES}
     if any(value <= 1.0 for value in odds.values()):
         raise RuntimeError(f"invalid EURO odds for {row['match_id']}")
     inverse = {code: 1.0 / value for code, value in odds.items()}
     total = sum(inverse.values())
-    return {code: inverse[code] / total for code in CODES}
+    if not math.isfinite(total) or total <= 0.0:
+        raise RuntimeError(f"invalid EURO normalizer for {row['match_id']}")
+    probability = {code: inverse[code] / total for code in CODES}
+    valid_probability_vector(probability, f"EURO no-vig {row['match_id']}")
+    return probability
 
 
 def identity(row: dict[str, str]) -> tuple[str, str, str, str]:
@@ -172,9 +203,10 @@ def primary_n7_legs(euros: dict[tuple[str, str, str, str], dict[str, object]]) -
             euro = euros.get(key)
             if euro is None:
                 raise RuntimeError(f"missing #89 EURO identity for #91 N7 leg: {key}")
-            probability = {code: float(raw[f"p{code}"]) for code in CODES}
-            if abs(sum(probability.values()) - 1.0) > 1e-9 or min(probability.values()) <= 0:
-                raise RuntimeError(f"invalid calibrated probabilities: {key}")
+            probability = {code: finite_positive(raw[f"p{code}"], f"calibrated probability {key} {code}") for code in CODES}
+            valid_probability_vector(probability, f"calibrated {key}")
+            predicted_sp = {code: finite_positive(raw[f"point_sp_{code}"], f"predicted SP {key} {code}") for code in CODES}
+            sp5 = {code: finite_positive(raw[f"point_sp5_{code}"], f"SP5 {key} {code}") for code in CODES}
             rows.append({
                 "group_id": raw["group_id"], "position": int(raw["position"]),
                 "match_id": raw["match_id"], "issue": raw["issue"], "match_idx": raw["match_idx"],
@@ -182,8 +214,8 @@ def primary_n7_legs(euros: dict[tuple[str, str, str, str], dict[str, object]]) -
                 "handicap_line_norm": euro["handicap_line_norm"],
                 "calibrated_probability": probability,
                 "euro_probability": euro["euro_probability"],
-                "predicted_sp": {code: float(raw[f"point_sp_{code}"]) for code in CODES},
-                "sp5": {code: float(raw[f"point_sp5_{code}"]) for code in CODES},
+                "predicted_sp": predicted_sp,
+                "sp5": sp5,
             })
     groups: dict[str, list[dict[str, object]]] = defaultdict(list)
     for row in rows:
@@ -198,6 +230,7 @@ def primary_n7_legs(euros: dict[tuple[str, str, str, str], dict[str, object]]) -
 
 
 def bottom_code(probability: dict[str, float]) -> str:
+    valid_probability_vector(probability, "pruning candidate")
     return min(CODES, key=lambda code: (probability[code], CODES.index(code)))
 
 
@@ -212,7 +245,14 @@ def deletion_order(legs: list[dict[str, object]], arm: str) -> tuple[list[dict[s
     for leg in legs:
         cal = leg["calibrated_probability"]
         euro = leg["euro_probability"]
-        assert isinstance(cal, dict) and isinstance(euro, dict)
+        sp5 = leg["sp5"]
+        predicted_sp = leg["predicted_sp"]
+        assert isinstance(cal, dict) and isinstance(euro, dict) and isinstance(sp5, dict) and isinstance(predicted_sp, dict)
+        valid_probability_vector(cal, f"calibrated candidate {leg['position']}")
+        valid_probability_vector(euro, f"EURO candidate {leg['position']}")
+        for code in CODES:
+            finite_positive(sp5[code], f"SP5 candidate {leg['position']} {code}")
+            finite_positive(predicted_sp[code], f"predicted SP candidate {leg['position']} {code}")
         if arm == "CAL_MIN_P":
             code, score, semantics = bottom_code(cal), None, "ascending_calibrated_probability"
             score = cal[code]
@@ -220,8 +260,8 @@ def deletion_order(legs: list[dict[str, object]], arm: str) -> tuple[list[dict[s
             code, score, semantics = bottom_code(euro), None, "ascending_euro_novig_probability"
             score = euro[code]
         elif arm == "MIN_PXSP5":
-            code = min(CODES, key=lambda value: (cal[value] * float(leg["sp5"][value]), CODES.index(value)))
-            score, semantics = cal[code] * float(leg["sp5"][code]), "ascending_calibrated_probability_times_sp5"
+            code = min(CODES, key=lambda value: (cal[value] * sp5[value], CODES.index(value)))
+            score, semantics = cal[code] * sp5[code], "ascending_calibrated_probability_times_sp5"
         elif arm == "MODEL_MARKET_AGREE":
             cal_bottom, euro_bottom = bottom_code(cal), bottom_code(euro)
             if cal_bottom != euro_bottom:
@@ -260,6 +300,16 @@ def descriptor(
             "bj95_euro_10h_safe_projection.csv.gz": EURO_INPUT_SHA,
         },
     })
+
+
+def depth_contract(depth: int, eligible_removals: int, unavailable: str | None) -> tuple[str, int, int, int]:
+    """Return disposition and physical ticket arithmetic for a frozen depth."""
+    if depth not in DEPTHS[1:]:
+        raise RuntimeError(f"invalid pruning depth: {depth}")
+    k = 2**depth * 3**(7 - depth)
+    if unavailable is not None and eligible_removals < depth:
+        return unavailable, k, 0, 0
+    return "AVAILABLE", k, k, k * STAKE_PER_SEQUENCE
 
 
 def write_csv(path: Path, fields: Iterable[str], rows: Iterable[dict[str, object]]) -> None:
@@ -356,12 +406,13 @@ def build(out: Path) -> dict[str, object]:
                     })
                 for depth in DEPTHS[1:]:
                     selected = ordered[:depth]
-                    if unavailable is not None and len(ordered) < depth:
+                    disposition, expected_k, selected_count, stake_yuan = depth_contract(depth, len(ordered), unavailable)
+                    if disposition != "AVAILABLE":
                         frontier.append({
                             "cohort": "PRIMARY_N7", "group_id": group_id, "issue": first["issue"], "fold": first["fold"], "year": first["year"],
                             "arm": arm, "depth": depth, "disposition": unavailable, "eligible_removals": len(ordered),
-                            "actual_removals": 0, "removed_positions": "", "removed_codes": "", "formula_k": 2**depth * 3**(7-depth),
-                            "selected_sequence_count": 0, "stake_yuan": 0, "calibrated_mass": "", "euro_novig_mass": "",
+                            "actual_removals": 0, "removed_positions": "", "removed_codes": "", "formula_k": expected_k,
+                            "selected_sequence_count": selected_count, "stake_yuan": stake_yuan, "calibrated_mass": "", "euro_novig_mass": "",
                             "portfolio_descriptor_sha256": "", "generator_version": GENERATOR_VERSION,
                         })
                         continue
@@ -377,7 +428,6 @@ def build(out: Path) -> dict[str, object]:
                         k *= len(choices)
                         cal_mass *= sum(cal[code] for code in choices)
                         euro_mass *= sum(euro[code] for code in choices)
-                    expected_k = 2**depth * 3**(7-depth)
                     if k != expected_k:
                         raise RuntimeError(f"analytic K mismatch: {group_id} {arm} d={depth}")
                     frontier.append({
@@ -385,7 +435,7 @@ def build(out: Path) -> dict[str, object]:
                         "arm": arm, "depth": depth, "disposition": "AVAILABLE", "eligible_removals": len(ordered),
                         "actual_removals": depth, "removed_positions": "|".join(str(item["leg"]["position"]) for item in selected),
                         "removed_codes": "|".join(str(item["code"]) for item in selected), "formula_k": expected_k,
-                        "selected_sequence_count": k, "stake_yuan": k * STAKE_PER_SEQUENCE, "calibrated_mass": fmt(cal_mass),
+                        "selected_sequence_count": selected_count, "stake_yuan": stake_yuan, "calibrated_mass": fmt(cal_mass),
                         "euro_novig_mass": fmt(euro_mass), "portfolio_descriptor_sha256": descriptor(group_id, arm, depth, allowed, ordered_identities),
                         "generator_version": GENERATOR_VERSION,
                     })
