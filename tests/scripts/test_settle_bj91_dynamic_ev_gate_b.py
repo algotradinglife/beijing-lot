@@ -49,4 +49,11 @@ def test_aggregate_counts_unavailable_without_silently_dropping_it() -> None:
 def test_gate_a_manifest_and_source_identity_are_locked_constants() -> None:
     assert len(MOD.EXPECTED_GATE_A_MANIFEST) == 64
     assert len(MOD.EXPECTED_SOURCE_SHA256) == 64
+    assert MOD.SOURCE_DB_REPOSITORY_PATH == Path("data/derived/beidan_xlsm/beidan_xlsm.sqlite")
+    assert MOD.SOURCE_DB == ROOT / MOD.SOURCE_DB_REPOSITORY_PATH
     assert MOD.ARM_SPECS["FULL_3_TO_N_ANALYTIC"][0] == "full_coverage_k"
+
+
+def test_runner_locates_repository_root_from_scripts_or_archived_bundle() -> None:
+    assert MOD.repository_root(ROOT / "scripts" / "settle_bj91_dynamic_ev_gate_b.py") == ROOT
+    assert MOD.repository_root(ROOT / "results" / "bj91_gate_b_outcome_settlement_v1" / "settlement_runner.py") == ROOT

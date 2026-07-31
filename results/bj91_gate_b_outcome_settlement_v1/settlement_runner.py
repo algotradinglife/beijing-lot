@@ -13,6 +13,7 @@ import hashlib
 import itertools
 import json
 import os
+import argparse
 import shutil
 import sqlite3
 import tempfile
@@ -22,11 +23,24 @@ from decimal import Decimal, InvalidOperation, getcontext
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+def repository_root(anchor: Path) -> Path:
+    """Find the checkout root for either scripts/ or archived runners."""
+    resolved = anchor.resolve()
+    for candidate in (resolved.parent, *resolved.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    raise RuntimeError(f"cannot locate repository root from {anchor}")
+
+
+ROOT = repository_root(Path(__file__))
 FREEZE = ROOT / "results" / "bj91_gate_a_preoutcome_v1r6"
 INHERITED79 = ROOT / "results" / "bj79_gate_a_closing_sp_proxy_v2r1"
 OUT = ROOT / "results" / "bj91_gate_b_outcome_settlement_v1"
-SOURCE_DB = ROOT.parent.parent / "data" / "derived" / "beidan_xlsm" / "beidan_xlsm.sqlite"
+# A clean checkout resolves this default inside the repository.  A linked
+# worktree that keeps the large source beside the checkout can pass
+# --source-db explicitly; that runtime path is never persisted as evidence.
+SOURCE_DB_REPOSITORY_PATH = Path("data/derived/beidan_xlsm/beidan_xlsm.sqlite")
+SOURCE_DB = ROOT / SOURCE_DB_REPOSITORY_PATH
 
 EXPECTED_GATE_A_MANIFEST = "bd7159715cca84e9d2adb9e089d016ec4e4d72603f8f8d5a8b070eb5027c2c33"
 EXPECTED_SOURCE_SHA256 = "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
@@ -380,6 +394,13 @@ def sp_error_summary(rows: list[dict[str, object]]) -> list[dict[str, object]]:
 
 
 def main() -> int:
+    global SOURCE_DB, OUT
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source-db", type=Path, default=SOURCE_DB, help="canonical SQLite input; default is repository-relative data/derived/beidan_xlsm/beidan_xlsm.sqlite")
+    parser.add_argument("--output", type=Path, default=OUT, help="immutable Gate-B output directory")
+    args = parser.parse_args()
+    SOURCE_DB = args.source_db.resolve()
+    OUT = args.output.resolve()
     if OUT.exists():
         raise SystemExit(f"refusing to overwrite immutable output: {OUT}")
     stage = Path(tempfile.mkdtemp(prefix="bj91-gate-b-", dir=OUT.parent))
@@ -477,7 +498,8 @@ def main() -> int:
             "stage": "GATE_B_ONE_SHOT_OUTCOME_SETTLEMENT",
             "generated_at_utc": datetime.now(timezone.utc).isoformat(),
             "provenance": provenance,
-            "input_freeze": str(FREEZE),
+            "input_freeze": "results/bj91_gate_a_preoutcome_v1r6",
+            "canonical_source_repository_path": SOURCE_DB_REPOSITORY_PATH.as_posix(),
             "outcome_read_whitelist": ["match_features.match_id", "match_features.result_code", "match_features.winning_sp", "match_features.winning_sp_source", "match_features.settlement_quality", "match_features.has_trusted_settlement"],
             "quarter_rule": "derived from frozen issue YYMM... identity; no additional outcome column read",
             "settlement_rule": "stake=2*K; gross=2*0.65*product(final winning SP) only on a selected full-N hit; final winning SP uncapped; factor applied exactly once; pre-round Decimal serialized to 6 places; no paid-cent rounding",

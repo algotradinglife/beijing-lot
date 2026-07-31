@@ -7,8 +7,9 @@
     "FULL_3_TO_N_ANALYTIC",
     "INHERITED79_SP5_CAPPED_60PCT_PREFIX"
   ],
-  "generated_at_utc": "2026-07-31T04:30:36.899227+00:00",
-  "input_freeze": "/home/drwho1985/workspace/soccer/beijing-lot/.worktrees/strategy/results/bj91_gate_a_preoutcome_v1r6",
+  "canonical_source_repository_path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+  "generated_at_utc": "2026-07-31T05:47:26.808838+00:00",
+  "input_freeze": "results/bj91_gate_a_preoutcome_v1r6",
   "issue": 91,
   "outcome_read_whitelist": [
     "match_features.match_id",
