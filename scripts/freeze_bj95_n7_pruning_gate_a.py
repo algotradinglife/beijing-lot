@@ -38,7 +38,7 @@ STAKE_PER_SEQUENCE = 2
 CONTRACT_ID = "BJ-HIST-N7-PRUNING-001"
 GENERATOR_VERSION = "bj95-analytic-cartesian-v1"
 P91_LEGS_SHA = "cd0fdfd42002bbeddc6a1676323ead65c4cb85915f2c1a83b916d6c2004526fc"
-P89_ROWS_SHA = "787bf3266403bebdcf3dfa4ae09f3dbc862a6542c04554fc1e37a0ba02296ae8"
+EURO_INPUT_SHA = "652bf5470eebc7f707a388b059d18f4e60fea932996fc8b58cbb8f1f2986a83a"
 
 LEG_FIELDS = (
     "group_id", "position", "match_id", "issue", "match_idx", "year", "fold",
@@ -69,11 +69,10 @@ def repository_root(anchor: Path) -> Path:
 
 
 ROOT = repository_root(Path(__file__))
-DEFAULT_OUT = ROOT / "results" / "bj95_gate_a_preoutcome_v2"
+DEFAULT_OUT = ROOT / "results" / "bj95_gate_a_preoutcome_v3"
 P91 = ROOT / "results" / "bj91_gate_a_preoutcome_v1r6"
-# This is #89's committed Gate-A table.  Unlike the later Gate-B evidence it
-# contains no outcome/result-derived column and is therefore admissible here.
-P89 = ROOT / "results" / "bj89_gate_a_preoutcome_v3"
+# A committed, content-addressed input; Gate A never opens #89's larger table.
+EURO_INPUT = ROOT / "results" / "bj95_euro_input_v1"
 
 
 def sha256(path: Path) -> str:
@@ -131,19 +130,19 @@ def assert_outcome_free_schema(fieldnames: Iterable[str], label: str) -> None:
 
 
 def euro_rows() -> dict[tuple[str, str, str, str], dict[str, object]]:
-    path = P89 / "frozen_preoutcome_rows.csv"
-    if sha256(path) != P89_ROWS_SHA:
-        raise RuntimeError("#89 frozen_preoutcome_rows.csv hash mismatch")
+    path = EURO_INPUT / "euro_10h_safe_projection.csv.gz"
+    if sha256(path) != EURO_INPUT_SHA:
+        raise RuntimeError("#95 EURO safe-input hash mismatch")
     required = {
         "match_id", "issue", "match_idx", "fold", "handicap_line_norm",
         "euro_3_10h", "euro_1_10h", "euro_0_10h",
     }
     rows: dict[tuple[str, str, str, str], dict[str, object]] = {}
-    with path.open(newline="", encoding="utf-8") as handle:
+    with gzip.open(path, "rt", newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         if reader.fieldnames is None or not required.issubset(reader.fieldnames):
             raise RuntimeError("#89 source lacks safe EURO fields")
-        assert_outcome_free_schema(reader.fieldnames, "#89 Gate-A EURO input")
+        assert_outcome_free_schema(reader.fieldnames, "#95 immutable EURO input")
         for raw in reader:
             # Never project `outcome` or any result-derived field from #89.
             safe = {field: raw[field] for field in required}
@@ -264,7 +263,7 @@ def descriptor(
         "ordered_match_identities": ordered_identities,
         "safe_source_payload_sha256": {
             "bj91_outcome_safe_legs.csv.gz": P91_LEGS_SHA,
-            "bj89_frozen_preoutcome_rows.csv": P89_ROWS_SHA,
+            "bj95_euro_10h_safe_projection.csv.gz": EURO_INPUT_SHA,
         },
     })
 
@@ -299,7 +298,7 @@ def build(out: Path) -> dict[str, object]:
     if out.exists():
         raise RuntimeError(f"refusing to overwrite immutable bundle: {out}")
     p91_manifest = manifest_sha(P91)
-    p89_manifest = manifest_sha(P89)
+    euro_input_manifest = manifest_sha(EURO_INPUT)
     euros = euro_rows()
     input_legs = primary_n7_legs(euros)
     by_group: dict[str, list[dict[str, object]]] = defaultdict(list)
@@ -413,9 +412,10 @@ def build(out: Path) -> dict[str, object]:
             "outcome_boundary": "No result, score, winning/final SP, payout, ROI, or settlement field is projected, emitted, or used.",
             "source_boundary": {
                 "bj91_bundle": "results/bj91_gate_a_preoutcome_v1r6", "bj91_manifest_sha256": p91_manifest,
-                "bj91_n7_legs_sha256": P91_LEGS_SHA, "bj89_bundle": "results/bj89_gate_a_preoutcome_v3",
-                "bj89_manifest_sha256": p89_manifest, "bj89_rows_sha256": P89_ROWS_SHA,
-                "bj89_projection": ["match_id", "issue", "match_idx", "fold", "handicap_line_norm", "euro_3_10h", "euro_1_10h", "euro_0_10h"],
+                "bj91_n7_legs_sha256": P91_LEGS_SHA,
+                "euro_input_bundle": "results/bj95_euro_input_v1", "euro_input_manifest_sha256": euro_input_manifest,
+                "euro_input_payload_sha256": EURO_INPUT_SHA,
+                "euro_projection": ["match_id", "issue", "match_idx", "fold", "handicap_line_norm", "euro_3_10h", "euro_1_10h", "euro_0_10h"],
             },
             "grouping": "exactly the 6,686 PRIMARY N=7 chronological groups frozen by #91; no group regenerated or filtered",
             "code_order": list(CODES), "depths": list(DEPTHS), "arms": [CONTROL_ARM, *PRUNING_ARMS],

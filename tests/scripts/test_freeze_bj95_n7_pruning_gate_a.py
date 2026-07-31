@@ -88,7 +88,7 @@ def test_descriptor_independently_binds_all_identities_and_safe_sources():
         "ordered_match_identities": identities,
         "safe_source_payload_sha256": {
             "bj91_outcome_safe_legs.csv.gz": mod.P91_LEGS_SHA,
-            "bj89_frozen_preoutcome_rows.csv": mod.P89_ROWS_SHA,
+            "bj95_euro_10h_safe_projection.csv.gz": mod.EURO_INPUT_SHA,
         },
     }
     independent = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
@@ -102,12 +102,12 @@ def test_safe_inputs_and_committed_bundle_replay_end_to_end():
     mod = load()
     # The fixture itself is a committed Gate-A source; it must never offer a
     # result-bearing header before the runner opens its first data row.
-    for source in (mod.P91 / "outcome_safe_legs.csv.gz", mod.P89 / "frozen_preoutcome_rows.csv"):
+    for source in (mod.P91 / "outcome_safe_legs.csv.gz", mod.EURO_INPUT / "euro_10h_safe_projection.csv.gz"):
         opener = __import__("gzip").open if source.suffix == ".gz" else open
         with opener(source, "rt", newline="") as handle:
             fieldnames = next(__import__("csv").reader(handle))
         mod.assert_outcome_free_schema(fieldnames, str(source))
-    committed = mod.ROOT / "results" / "bj95_gate_a_preoutcome_v2" / "SHA256SUMS.json"
+    committed = mod.ROOT / "results" / "bj95_gate_a_preoutcome_v3" / "SHA256SUMS.json"
     with tempfile.TemporaryDirectory(prefix="bj95_test_replay_") as directory:
         replay = Path(directory) / "bundle"
         mod.build(replay)
