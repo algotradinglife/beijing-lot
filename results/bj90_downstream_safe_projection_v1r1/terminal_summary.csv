@@ -1,0 +1,2 @@
+decision,evaluable_complete_case_n,frozen_preoutcome_n,high_sp_ge5_m0_logmae,high_sp_ge5_m1_logmae,m0_logmae_same,m0_rankdisp_same,next_period_method,policy_logmae,policy_rankdisp,years_logmae_no_worse_than_m0
+PROMOTABLE_CANDIDATE,117801,119976,0.3930421608840989,0.25332097695254263,0.29026148168714544,0.5296818416168643,M1_RIDGE_LOG_SP,0.14177015436367335,0.3257832864333421,7
