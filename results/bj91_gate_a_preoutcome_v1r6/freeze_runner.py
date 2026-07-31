@@ -24,10 +24,10 @@ from typing import Iterable
 
 
 ROOT = Path(__file__).resolve().parents[1]
-# v1-v1r4 are superseded local/reviewed freezes. v1r5 adds the complete
-# common-input table so every source-census category is reproducible without
-# reopening an upstream package.
-OUT = ROOT / "results" / "bj91_gate_a_preoutcome_v1r5"
+# v1-v1r5 are superseded local/reviewed freezes. v1r6 preserves the exact
+# source Decimal probabilities in durable safe tables for independent top-K
+# reconstruction, as well as the complete common-input table.
+OUT = ROOT / "results" / "bj91_gate_a_preoutcome_v1r6"
 P89 = ROOT / "results" / "bj89_gate_b_selector_v1_1"
 P90 = ROOT / "results" / "bj90_downstream_safe_projection_v1r1"
 P79 = ROOT / "results" / "bj79_gate_a_closing_sp_proxy_v2r1"
@@ -310,7 +310,7 @@ def write_legs(path: Path, groups: list[dict[str, object]]) -> int:
                     row.update({key: leg[key] for key in ("match_id", "issue", "match_idx", "year", "fold")})
                     row["position"] = position
                     for code in CODES:
-                        row[f"p{code}"] = fmt(float(leg["probability"][code]))
+                        row[f"p{code}"] = str(leg["probability_decimal"][code])
                         row[f"point_sp_{code}"] = fmt(float(leg["point_sp"][code]))
                         row[f"m2_sp_{code}"] = fmt(float(leg["m2_sp"][code]))
                         row[f"point_sp5_{code}"] = fmt(min(float(leg["point_sp"][code]), SP_CAP))
@@ -331,7 +331,7 @@ def write_common_inputs(path: Path, common: dict[tuple[str, str, str, str], dict
                 leg = common[key]
                 row = {key: leg[key] for key in ("match_id", "issue", "match_idx", "year", "fold")}
                 for code in CODES:
-                    row[f"p{code}"] = fmt(float(leg["probability"][code]))
+                    row[f"p{code}"] = str(leg["probability_decimal"][code])
                     row[f"point_sp_{code}"] = fmt(float(leg["point_sp"][code]))
                     row[f"m2_sp_{code}"] = fmt(float(leg["m2_sp"][code]))
                     row[f"point_sp5_{code}"] = fmt(min(float(leg["point_sp"][code]), SP_CAP))

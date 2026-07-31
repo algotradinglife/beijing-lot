@@ -17,8 +17,8 @@ SPEC = importlib.util.spec_from_file_location("bj91_gate_a", ROOT / "scripts" / 
 assert SPEC and SPEC.loader
 MOD = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MOD)
-BUNDLE = ROOT / "results" / "bj91_gate_a_preoutcome_v1r5"
-MANIFEST_SHA256 = "c325c7a429232ba550152a3d35ba2e96285108908c03fba3769d54f6f8dadc35"
+BUNDLE = ROOT / "results" / "bj91_gate_a_preoutcome_v1r6"
+MANIFEST_SHA256 = "bd7159715cca84e9d2adb9e089d016ec4e4d72603f8f8d5a8b070eb5027c2c33"
 
 
 def leg(index: int, *, issue: str = "26001", fold: str = "OOS_2024") -> dict[str, object]:
@@ -95,6 +95,26 @@ def test_probability_order_preserves_unequal_values_inside_old_rounding_bucket()
     assert len(MOD.SHARED_SETTLEMENT_COMMIT) == 40
     assert MOD.SHARED_SETTLEMENT_RUNNER_PATH == "scripts/estimate_segment_betting_plan.py"
     assert MOD.SHARED_SETTLEMENT_TEST_PATH == "tests/scripts/test_estimate_segment_betting_plan.py"
+
+
+def test_safe_tables_preserve_source_decimal_probability_text(tmp_path: Path) -> None:
+    source = leg(1)
+    source["probability_decimal"] = {
+        "3": Decimal("0.12345678901234567"),
+        "1": Decimal("0.23456789012345678"),
+        "0": Decimal("0.64197532086419755"),
+    }
+    source["probability"] = {code: float(value) for code, value in source["probability_decimal"].items()}
+    group = {
+        "cohort": "PRIMARY", "n": 4, "group_id": "G", "source_group_id": "",
+        "issue": "26001", "fold": "OOS_2024", "year": "2024", "group_ordinal": 1,
+        "legs": [source, leg(2), leg(3), leg(4)],
+    }
+    path = tmp_path / "legs.csv.gz"
+    MOD.write_legs(path, [group])
+    with gzip.open(path, "rt", newline="", encoding="utf-8") as handle:
+        first = next(csv.DictReader(handle))
+    assert first["p3"] == "0.12345678901234567"
 
 
 def test_committed_freeze_is_manifest_bound_and_groupwise_consistent() -> None:
