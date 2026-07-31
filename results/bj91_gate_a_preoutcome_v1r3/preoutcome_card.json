@@ -1,0 +1,74 @@
+{
+  "common_identity_key": [
+    "match_id",
+    "issue",
+    "match_idx",
+    "fold"
+  ],
+  "common_row_count": 47819,
+  "comparators": [
+    "POINT_SP5_POSITIVE_EV",
+    "CONSERVATIVE_M2_SP5_POSITIVE_EV",
+    "PROBABILITY_ONLY_MATCHED_TO_POINT",
+    "PROBABILITY_ONLY_MATCHED_TO_CONSERVATIVE",
+    "FULL_3_TO_N_ANALYTIC",
+    "INHERITED79_SP5_CAPPED_60PCT_PREFIX_N7_PAIRED_ONLY"
+  ],
+  "counts": {
+    "groups": 30352,
+    "outcome_safe_leg_rows": 158147,
+    "paired79_groups": 2419,
+    "primary_groups": {
+      "4": 11823,
+      "5": 9424,
+      "7": 6686
+    }
+  },
+  "effective_sp_rule": "codewise min(predicted_sp, 5.0) before EV ranking for both point and M2 price arms",
+  "ev_per_2_rule": "2*(0.65*joint_calibrated_probability*product(effective_sp)-1), strict > 0",
+  "files": [
+    "outcome_safe_legs.csv.gz",
+    "group_definitions.csv",
+    "primary_partition_census.csv",
+    "inherited79_overlap_census.csv",
+    "selected_sequences.jsonl.gz",
+    "group_arm_summaries.csv",
+    "preoutcome_card.json",
+    "freeze_runner.py"
+  ],
+  "gate_b_settlement_binding": {
+    "commit": "15b6a03bf2909fe7376b393472c",
+    "factor": "0.65",
+    "rounding": "pre_round_decimal_value_serialized_to_6_decimal_places; no_paid_cent_rounding_applied",
+    "runner_sha256": "cf981324deba1ecdd4c823cf42ff1d390538e9d3f14b561cb2112fcc0543569d",
+    "test_sha256": "376be20f90680c9912cba0778630b39b90a80b6377ecd6862a0249e2ef2355f3"
+  },
+  "inherited79_overlap_census": {
+    "complete_common": 2419,
+    "cross_fold_full_overlap_in_partial": 1,
+    "partial_overlap": 6077,
+    "zero_overlap": 1405
+  },
+  "input_manifests_sha256": {
+    "bj79": "1c6ae6ec87cfe8a709dd017d391e65f08982622e189807ebd4edb31e7eb95b64",
+    "bj89": "0afdfe28748e9a686f4bb4ecb4e71449234e87f29c7fd2c891828514aacb49f2",
+    "bj90": "4a1107ca64d169bf0171a394d1e450a14ee5386005fce34f6ca7ebb70bd720b2"
+  },
+  "issue": 91,
+  "outcome_boundary": "No result, score, winning-SP, ROI, or settlement input is read or emitted.",
+  "paired79_grouping": "The #79 60% SP5 prefix is evaluated only on byte-frozen complete seven-leg groups; #91 N7 arms are re-evaluated on identical leg identities.",
+  "primary_grouping": "For every N partition by issue/fold, sort numeric match_idx then match_id, take non-overlapping N-row chunks, drop only final remainder <N.",
+  "probability_tie_order": [
+    "3",
+    "1",
+    "0"
+  ],
+  "required_payload_sha256": {
+    "deployed_policy_rows.csv": "ef02fccffdbe1d4f3cb70a4c8f7d24037bf2b9a40bea71e6fe0fbf465d679e7e",
+    "frozen_group_legs.csv": "3eb93433fa92f6c4327dd97b24ed7581d338eda2a338b34cd1b4d1bb87fa7efe",
+    "frozen_prefix_sequences.jsonl.gz": "f838293723c1d32722311dcee1a442ab3f3424b2f5f0e38eb2c5d7e65dbea1c8",
+    "oos_prediction_vectors.csv.gz": "2375e5570a9fb964f1beb5f4a20e5019755f62213ebde1463a609d23d1e2807b"
+  },
+  "stage": "GATE_A_CORRECTED_PREOUTCOME_FREEZE",
+  "stake_rule": "cost_yuan=2*K; no multiplier; K is output not an eligibility gate"
+}
