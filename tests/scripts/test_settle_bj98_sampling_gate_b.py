@@ -67,10 +67,23 @@ def test_manifest_rejects_wrong_identity_and_extra_file(tmp_path):
     raises(lambda: mod.exact_manifest(tmp_path, "0" * 64))
 
 
+def test_authenticated_snapshot_survives_later_original_source_replacement(tmp_path):
+    mod = load()
+    original = tmp_path / "source.csv"
+    private = tmp_path / "private"
+    private.mkdir()
+    original.write_bytes(b"accepted snapshot\n")
+    accepted_hash = mod.sha256(original)
+    snapshot = mod.authenticated_snapshot(private, "input.csv", original, accepted_hash)
+    original.write_bytes(b"replaced after authentication\n")
+    assert snapshot.read_bytes() == b"accepted snapshot\n"
+    assert mod.sha256(snapshot) == accepted_hash
+
+
 def test_settlement_card_binds_private_leg_hash_and_factor():
     card = json.loads(
         (
-            ROOT / "results/bj98_gate_b_outcome_settlement_v2/settlement_card.json"
+            ROOT / "results/bj98_gate_b_outcome_settlement_v3/settlement_card.json"
         ).read_text()
     )
     assert card["factor"] == "0.65"
@@ -79,10 +92,17 @@ def test_settlement_card_binds_private_leg_hash_and_factor():
     assert "no implicit credit" in card["bankroll_execution"]
     assert card["portable_replay_identity"].startswith("CONTENT_SHA256SUMS.json")
     assert card["terminal_disposition"].startswith("NO_PROMOTION")
+    assert set(card["private_snapshot_sha256"]) == {
+        "bj98_sampling_frontier.csv.gz",
+        "bj95_safe_legs.csv.gz",
+        "bj95_canonical_outcome_join.csv",
+        "bj95_group_frontier_settlement.csv",
+        "bj91_group_arm_settlement.csv",
+    }
 
 
 def test_v2_package_has_required_diagnostics_and_matched_controls():
-    package = ROOT / "results/bj98_gate_b_outcome_settlement_v2"
+    package = ROOT / "results/bj98_gate_b_outcome_settlement_v3"
     controls = (
         (package / "quality_matched_control_comparison.csv").read_text().splitlines()
     )
@@ -105,7 +125,7 @@ def test_v2_package_has_required_diagnostics_and_matched_controls():
 
 def test_bankroll_execution_has_no_implicit_credit_path():
     rows = (
-        (ROOT / "results/bj98_gate_b_outcome_settlement_v2/bankroll_execution.csv")
+        (ROOT / "results/bj98_gate_b_outcome_settlement_v3/bankroll_execution.csv")
         .read_text()
         .splitlines()
     )
@@ -114,7 +134,7 @@ def test_bankroll_execution_has_no_implicit_credit_path():
 
 
 def test_packaged_runner_replays_portably_with_explicit_authenticated_inputs():
-    package = ROOT / "results/bj98_gate_b_outcome_settlement_v2"
+    package = ROOT / "results/bj98_gate_b_outcome_settlement_v3"
     with tempfile.TemporaryDirectory(dir=ROOT) as temp_name:
         temp = Path(temp_name)
         runner = temp / "settlement_runner.py"

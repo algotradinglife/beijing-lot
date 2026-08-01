@@ -154,7 +154,7 @@ GATE_A = ROOT / "results" / "bj98_gate_a_preoutcome_v1"
 BJ95 = ROOT / "results" / "bj95_gate_b_outcome_settlement_v2r8"
 BJ95_GATE_A = ROOT / "results" / "bj95_gate_a_preoutcome_v5"
 BJ91 = ROOT / "results" / "bj91_gate_b_outcome_settlement_v1"
-OUT = ROOT / "results" / "bj98_gate_b_outcome_settlement_v2"
+OUT = ROOT / "results" / "bj98_gate_b_outcome_settlement_v3"
 
 
 def sha256(path: Path) -> str:
@@ -187,6 +187,27 @@ def exact_manifest(bundle: Path, expected: str) -> dict[str, str]:
     return declared
 
 
+def authenticated_snapshot(
+    private_dir: Path,
+    name: str,
+    source: Path,
+    expected_sha256: str,
+    *,
+    expected_decompressed_sha256: str | None = None,
+) -> Path:
+    """Copy an authenticated input once, then bind every later read to that copy."""
+    destination = private_dir / name
+    shutil.copyfile(source, destination)
+    if sha256(destination) != expected_sha256:
+        raise RuntimeError(f"authenticated source drift during copy: {source}")
+    if (
+        expected_decompressed_sha256 is not None
+        and decompressed_sha256(destination) != expected_decompressed_sha256
+    ):
+        raise RuntimeError(f"authenticated decompressed source drift: {source}")
+    return destination
+
+
 def read_gzip(path: Path, fields: tuple[str, ...]) -> Iterable[dict[str, str]]:
     with gzip.open(path, "rt", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
@@ -217,6 +238,7 @@ def quarter(issue: str) -> str:
 
 
 def load_truth_and_legs(
+    outcome_path: Path,
     leg_path: Path,
 ) -> tuple[dict[str, tuple[str, Decimal, str]], dict[str, list[dict[str, str]]]]:
     outcome = {
@@ -225,7 +247,7 @@ def load_truth_and_legs(
             Decimal(row["winning_sp"]),
             row["winning_sp_source"],
         )
-        for row in read_csv(BJ95 / "canonical_outcome_join.csv", OUTCOME_FIELDS)
+        for row in read_csv(outcome_path, OUTCOME_FIELDS)
     }
     if any(code not in CODES or sp <= 0 for code, sp, _ in outcome.values()):
         raise RuntimeError("invalid canonical outcome payload")
@@ -319,13 +341,15 @@ def stable_bootstrap_indices(key: str, population: int, count: int) -> Iterable[
 
 def settle(
     stage: Path,
+    frontier_path: Path,
+    outcome_path: Path,
     leg_path: Path,
 ) -> tuple[
     dict[tuple[str, str], Metrics],
     dict[tuple[str, str], dict[str, tuple[Decimal, Decimal]]],
     dict[tuple[str, str], list[Decimal]],
 ]:
-    truth, legs = load_truth_and_legs(leg_path)
+    truth, legs = load_truth_and_legs(outcome_path, leg_path)
     metrics: dict[tuple[str, str], Metrics] = defaultdict(Metrics)
     by_issue: dict[tuple[str, str], dict[str, tuple[Decimal, Decimal]]] = defaultdict(
         lambda: defaultdict(lambda: (Decimal(0), Decimal(0)))
@@ -343,7 +367,7 @@ def settle(
             handle, fieldnames=SETTLEMENT_FIELDS, lineterminator="\n"
         )
         writer.writeheader()
-        for row in read_gzip(GATE_A / "sampling_frontier.csv.gz", GATE_A_FIELDS):
+        for row in read_gzip(frontier_path, GATE_A_FIELDS):
             group = legs.get(row["group_id"])
             if group is None:
                 raise RuntimeError("Gate-A group is outside frozen #95 cohort")
@@ -484,7 +508,10 @@ def write_summaries(
 
 
 def write_control_comparison(
-    stage: Path, metrics: dict[tuple[str, str], Metrics]
+    stage: Path,
+    metrics: dict[tuple[str, str], Metrics],
+    bj95_control_path: Path,
+    bj91_control_path: Path,
 ) -> None:
     """Bind published #91/#95 controls without recomputing either policy."""
     totals: list[tuple[str, str, str, int, Decimal, Decimal]] = []
@@ -494,9 +521,7 @@ def write_control_comparison(
     ):
         metric = metrics[(arm, seed)]
         totals.append(("BJ98", arm, "", metric.bets, metric.stake, metric.gross))
-    with (BJ95 / "group_frontier_settlement.csv").open(
-        newline="", encoding="utf-8"
-    ) as handle:
+    with bj95_control_path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         buckets: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
         for row in reader:
@@ -509,9 +534,7 @@ def write_control_comparison(
             stake = sum((Decimal(row["stake_yuan"]) for row in rows), Decimal(0))
             gross = sum((Decimal(row["gross_yuan"]) for row in rows), Decimal(0))
             totals.append(("BJ95", arm, depth, len(rows), stake, gross))
-    with (BJ91 / "group_arm_settlement.csv").open(
-        newline="", encoding="utf-8"
-    ) as handle:
+    with bj91_control_path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
         buckets: dict[str, list[dict[str, str]]] = defaultdict(list)
         allowed = {
@@ -547,10 +570,15 @@ def write_control_comparison(
             )
 
 
-def write_quality_matched_controls(stage: Path) -> None:
+def write_quality_matched_controls(
+    stage: Path,
+    frontier_path: Path,
+    bj95_control_path: Path,
+    bj91_control_path: Path,
+) -> None:
     """Compare #91/#95 only on the fixed 3,900 quality-selected identities."""
     selected: set[str] = set()
-    for row in read_gzip(GATE_A / "sampling_frontier.csv.gz", GATE_A_FIELDS):
+    for row in read_gzip(frontier_path, GATE_A_FIELDS):
         if (
             row["arm"] == "QUALITY_WEIGHTED_OMIT"
             and row["seed"] == "10001"
@@ -589,13 +617,13 @@ def write_quality_matched_controls(stage: Path) -> None:
     for family, path, arm_field, required in (
         (
             "BJ95",
-            BJ95 / "group_frontier_settlement.csv",
+            bj95_control_path,
             "arm",
             {"FULL_COVERAGE_CONTROL", "CAL_MIN_P"},
         ),
         (
             "BJ91",
-            BJ91 / "group_arm_settlement.csv",
+            bj91_control_path,
             "arm",
             {
                 "FULL_3_TO_N_ANALYTIC",
@@ -650,9 +678,14 @@ def write_quality_matched_controls(stage: Path) -> None:
         writer.writerows(rows)
 
 
-def write_calibration_and_sensitivity(stage: Path, leg_path: Path) -> None:
+def write_calibration_and_sensitivity(
+    stage: Path,
+    frontier_path: Path,
+    outcome_path: Path,
+    leg_path: Path,
+) -> None:
     """Report outcome diagnostics without changing the frozen tickets or selection."""
-    truth, legs = load_truth_and_legs(leg_path)
+    truth, legs = load_truth_and_legs(outcome_path, leg_path)
     bins: dict[int, dict[str, Decimal | int]] = defaultdict(
         lambda: {
             "legs": 0,
@@ -698,7 +731,7 @@ def write_calibration_and_sensitivity(stage: Path, leg_path: Path) -> None:
             )
 
     sensitivity: dict[tuple[str, str, Decimal], list[Decimal]] = defaultdict(list)
-    for row in read_gzip(GATE_A / "sampling_frontier.csv.gz", GATE_A_FIELDS):
+    for row in read_gzip(frontier_path, GATE_A_FIELDS):
         if row["selection_status"] != "SELECTED" or row["arm"] not in {
             "WEIGHTED_OMIT",
             "QUALITY_WEIGHTED_OMIT",
@@ -790,31 +823,76 @@ def write_bankroll_execution(stage: Path) -> None:
 def build(out: Path) -> dict[str, object]:
     if out.exists():
         raise RuntimeError(f"refusing to overwrite immutable output: {out}")
-    exact_manifest(GATE_A, GATE_A_MANIFEST)
-    exact_manifest(BJ95_GATE_A, BJ95_GATE_A_MANIFEST)
-    exact_manifest(BJ95, BJ95_MANIFEST)
-    exact_manifest(BJ91, BJ91_MANIFEST)
+    gate_a_manifest = exact_manifest(GATE_A, GATE_A_MANIFEST)
+    bj95_gate_a_manifest = exact_manifest(BJ95_GATE_A, BJ95_GATE_A_MANIFEST)
+    bj95_manifest = exact_manifest(BJ95, BJ95_MANIFEST)
+    bj91_manifest = exact_manifest(BJ91, BJ91_MANIFEST)
     with tempfile.TemporaryDirectory(
         prefix=".bj98_gate_b_", dir=out.parent
     ) as temp_name:
         stage = Path(temp_name)
-        private_legs = stage / "_authenticated_bj95_safe_legs.csv.gz"
-        shutil.copyfile(BJ95_GATE_A / "outcome_safe_n7_legs.csv.gz", private_legs)
-        if decompressed_sha256(private_legs) != LEG_SHA:
-            raise RuntimeError("authenticated #95 safe-leg binding drift")
-        metrics, by_issue, fold_rois = settle(stage, private_legs)
+        private_dir = stage / "_authenticated_inputs"
+        private_dir.mkdir()
+        frontier_path = authenticated_snapshot(
+            private_dir,
+            "bj98_sampling_frontier.csv.gz",
+            GATE_A / "sampling_frontier.csv.gz",
+            gate_a_manifest["sampling_frontier.csv.gz"],
+        )
+        leg_path = authenticated_snapshot(
+            private_dir,
+            "bj95_safe_legs.csv.gz",
+            BJ95_GATE_A / "outcome_safe_n7_legs.csv.gz",
+            bj95_gate_a_manifest["outcome_safe_n7_legs.csv.gz"],
+            expected_decompressed_sha256=LEG_SHA,
+        )
+        outcome_path = authenticated_snapshot(
+            private_dir,
+            "bj95_canonical_outcome_join.csv",
+            BJ95 / "canonical_outcome_join.csv",
+            bj95_manifest["canonical_outcome_join.csv"],
+        )
+        bj95_control_path = authenticated_snapshot(
+            private_dir,
+            "bj95_group_frontier_settlement.csv",
+            BJ95 / "group_frontier_settlement.csv",
+            bj95_manifest["group_frontier_settlement.csv"],
+        )
+        bj91_control_path = authenticated_snapshot(
+            private_dir,
+            "bj91_group_arm_settlement.csv",
+            BJ91 / "group_arm_settlement.csv",
+            bj91_manifest["group_arm_settlement.csv"],
+        )
+        metrics, by_issue, fold_rois = settle(
+            stage, frontier_path, outcome_path, leg_path
+        )
         write_summaries(stage, metrics, by_issue, fold_rois)
-        write_control_comparison(stage, metrics)
-        write_quality_matched_controls(stage)
+        write_control_comparison(stage, metrics, bj95_control_path, bj91_control_path)
+        write_quality_matched_controls(
+            stage, frontier_path, bj95_control_path, bj91_control_path
+        )
         write_bankroll_execution(stage)
-        write_calibration_and_sensitivity(stage, private_legs)
-        private_legs.unlink()
+        write_calibration_and_sensitivity(stage, frontier_path, outcome_path, leg_path)
+        snapshot_hashes = {
+            path.name: sha256(path)
+            for path in (
+                frontier_path,
+                leg_path,
+                outcome_path,
+                bj95_control_path,
+                bj91_control_path,
+            )
+        }
+        shutil.rmtree(private_dir)
         card = {
             "issue": 98,
             "stage": "GATE_B_ONE_SHOT_CANONICAL_OUTCOME_SETTLEMENT",
             "gate_a_manifest_sha256": GATE_A_MANIFEST,
             "bj95_gate_a_manifest_sha256": BJ95_GATE_A_MANIFEST,
             "bj95_safe_leg_decompressed_sha256": LEG_SHA,
+            "private_snapshot_sha256": snapshot_hashes,
+            "private_snapshot_protocol": "every parsed accepted source was byte-verified against its accepted manifest after copy, then parsed only from the private build snapshot",
             "canonical_outcome_bundle": "results/bj95_gate_b_outcome_settlement_v2r8",
             "canonical_outcome_manifest_sha256": BJ95_MANIFEST,
             "bj91_control_manifest_sha256": BJ91_MANIFEST,
