@@ -97,3 +97,6 @@ Gate A 输入只绑定 #106 的 outcome-unexposed `q_atlas` 与 #101 的 pool ce
 ## 下一步
 
 PI 接受 exact Gate A HEAD 后，另行授权 Gate B。Gate B 不重新选阈值、不新增 arm，并为每个 arm 输出 stake、hits、gross/tax/net、绝对 ROI、年度/fold/LOYO、回撤、最长连败、集中度以及剔除最佳 issue/payout 的结果。正 ROI 或可晋级结果再触发严格独立 EV；负值和零候选仍按正常研究结果报告。
+
+Gate B 已在不改变本页冻结矩阵的前提下完成。完整税后比较和策略解读见
+[Gate B 结算报告](bj121_expected_sp_probability_gate_b_2026-08-02.md)。
