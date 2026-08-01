@@ -1,0 +1,83 @@
+{
+  "arms": [
+    "FULL_COVER_CONTROL",
+    "FIXED_LOWEST_P_OMIT",
+    "UNIFORM_OMIT",
+    "WEIGHTED_OMIT",
+    "QUALITY_UNIFORM_OMIT",
+    "QUALITY_WEIGHTED_OMIT"
+  ],
+  "canonical_decompressed_sha256": {
+    "sampling_frontier.csv.gz": "5c9e3674d9ff44d8c51e675fa96ce744f368aae96afd526dc4e64e19d177a57c"
+  },
+  "contract": "BJ-HIST-SAMPLING-001",
+  "counts": {
+    "frontier_rows": 869180,
+    "groups": 6686,
+    "legs": 46802
+  },
+  "grouping": "exactly the 6,686 chronological PRIMARY N=7 groups frozen by #91/#95; no group is regenerated or filtered.",
+  "issue": 98,
+  "match_selection": {
+    "first_year": "full-coverage fallback because no earlier fold exists",
+    "quality": "mean seven-leg calibrated top-1 probability",
+    "threshold": "empirical 75th percentile of strictly earlier calendar-year groups"
+  },
+  "outcome_boundary": "No result, score, winning/final SP, payout, gross, net, ROI, or settlement payload is read or emitted.",
+  "sampling": {
+    "seeds": [
+      10001,
+      10002,
+      10003,
+      10004,
+      10005,
+      10006,
+      10007,
+      10008,
+      10009,
+      10010,
+      10011,
+      10012,
+      10013,
+      10014,
+      10015,
+      10016,
+      10017,
+      10018,
+      10019,
+      10020,
+      10021,
+      10022,
+      10023,
+      10024,
+      10025,
+      10026,
+      10027,
+      10028,
+      10029,
+      10030,
+      10031,
+      10032
+    ],
+    "uniform": "one omitted code per leg uniformly over 3/1/0",
+    "weighted": "one omitted code per leg with weight 1-p(code), deterministically sampled from SHA-256"
+  },
+  "settlement_contract": "Gate B only: use frozen 0.65 settlement factor and canonical outcome join; no SP5 retroactivity or upstream regeneration.",
+  "source_boundary": {
+    "deferred_settlement_controls": [
+      "#91 dynamic-EV",
+      "#95 structured-pruning"
+    ],
+    "transitive_frozen_inputs": [
+      "#89",
+      "#90",
+      "#91",
+      "#95"
+    ],
+    "used_bundle": "results/bj95_gate_a_preoutcome_v5",
+    "used_manifest_sha256": "10b4d6d274aef53e1e1d4abe30cd9f683cf296865ee131f00f5c1e1d16d0725c",
+    "used_safe_leg_payload_sha256": "369c2ab398cb996bcd913f9ff7d3d71431303c957bb349e43b774c87c40e377e"
+  },
+  "stage": "GATE_A_PREOUTCOME_SAMPLING_FREEZE",
+  "ticket_contract": "full control K=3^7=2187 and stake=2*K; every selected omission ticket K=2^7=128 and stake=2*K; stake and K are outputs, not eligibility gates."
+}
