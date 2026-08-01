@@ -182,7 +182,7 @@ def test_self_contained_v2r6_subprocess_replay_is_byte_exact() -> None:
 
 
 def test_production_settlement_payout_wiring_reproduces_the_canonical_ledger() -> None:
-    canonical = ROOT / "results" / "bj95_gate_b_outcome_settlement_v1" / "group_frontier_settlement.csv"
+    canonical = ROOT / "results" / "bj95_gate_b_outcome_settlement_v2r6" / "group_frontier_settlement.csv"
     with tempfile.TemporaryDirectory(dir=ROOT / "results") as directory:
         output = Path(directory) / "production"
         subprocess.run([sys.executable, str(ROOT / "scripts" / "settle_bj95_n7_pruning_gate_b.py"), "--output", str(output)], check=True, cwd=ROOT)
