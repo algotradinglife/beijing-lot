@@ -1,0 +1,24 @@
+{
+  "availability_rule": "All Gate-A rows stay in the denominator. Rows with a selected frozen portfolio but missing canonical outcomes are UNAVAILABLE_CANONICAL_OUTCOME with zero stake and no alternate outcome source.",
+  "contract": "BJ-HIST-JOINT-N7-001",
+  "input_freeze": "results/bj105_gate_a_preoutcome_v2r3",
+  "issue": 105,
+  "outcome_source": "results/bj95_gate_b_outcome_settlement_v2r8/canonical_outcome_join.csv",
+  "provenance": {
+    "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "gate_a_content_identity_sha256": "c9555e069fd5e593001ebba9d651ed1f08d5619eb770a634f07987a568f6fd8b",
+    "gate_a_manifest_sha256": "e11b24c31a86582aa254a7af7b7cbdc535547f82c018042253baec196d069912",
+    "outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc"
+  },
+  "row_counts": {
+    "NO_BET_GATE_A": 499069,
+    "SETTLED": 12019,
+    "UNAVAILABLE_CANONICAL_OUTCOME": 1008,
+    "frontiers": 512096,
+    "gate_a_available": 13027
+  },
+  "scope": "historical paper research only; no purchase, production, or promotion recommendation.",
+  "settlement_rule": "For a settled frozen portfolio, hit iff every final result lies in its frozen allowed set; gross=2*0.65*product(final winning SP) on hit, else 0. K and stake are frozen outputs, never eligibility gates.",
+  "stage": "GATE_B_ONE_SHOT_CANONICAL_OUTCOME_SETTLEMENT",
+  "tax_rule": "Counterfactual policies are separate. Aggregate that policy's gross prizes by issue/game before tax; if bucket gross is at least 10000 yuan, apply 20% to all gross in the bucket. Tax is allocated proportionally to its winning portfolios."
+}
