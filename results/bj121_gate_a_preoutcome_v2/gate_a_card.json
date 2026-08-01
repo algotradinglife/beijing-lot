@@ -1,0 +1,83 @@
+{
+  "arms": [
+    "NO_BET_CONTROL",
+    "DAN_N4",
+    "DOUBLE_N4",
+    "FULL_N4",
+    "DAN_N7",
+    "DOUBLE_N7",
+    "FULL_N7",
+    "DAN_DYNAMIC_4_7",
+    "DOUBLE_DYNAMIC_4_7",
+    "FULL_DYNAMIC_4_7"
+  ],
+  "candidate_definition": "DAN=max p_cal code when max p_cal>=.50; DOUBLE=all but min p_cal code when min p_cal<=low threshold; FULL=all three codes. Role expected SP is geometric mean of the allowed codes' predicted SP. Selected N legs must meet both role expected-SP and portfolio GM-SP thresholds.",
+  "gate_b": "Only exact immutable frontier may be settled; no threshold, role, arm, or pool may be added after outcome access.",
+  "issue": 121,
+  "outcome_boundary": "No result, final SP, payout, tax, ROI or settlement source is opened in Gate A.",
+  "provenance": {
+    "atlas_manifest": "fb45cacccb4c9ab2b52c8a538f489fb3e3197fa138245f0d83cf98a3cbb0db5d",
+    "atlas_payload": "b710dd4fe792e69727b898a615e1cb4899175e329c71bcee46788fb859c43b26",
+    "membership_payload": "6b1361797956123eaeb9e2d015eae7bf7ef28ee020a902e710f12284442a7014",
+    "pool_manifest": "86e37682a95fad2a2a67187f1ee528f665d371583c621dc9d14af58f74302447",
+    "pool_payload": "38c96ac4509801f68dd3e2469be619a8954ef06291faca2e9cd6d04cb7b6332a"
+  },
+  "scope": "historical paper-only research; no purchase, production or promotion.",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_EXPECTED_SP_FRONTIER",
+  "variants": {
+    "ESP15_LOWP20": {
+      "dan_probability_min": "0.50",
+      "expected_sp_min": "1.5",
+      "gm_sp_min": "1.8",
+      "low_probability_max": "0.20"
+    },
+    "ESP15_LOWP25": {
+      "dan_probability_min": "0.50",
+      "expected_sp_min": "1.5",
+      "gm_sp_min": "1.8",
+      "low_probability_max": "0.25"
+    },
+    "ESP15_LOWP30": {
+      "dan_probability_min": "0.50",
+      "expected_sp_min": "1.5",
+      "gm_sp_min": "1.8",
+      "low_probability_max": "0.30"
+    },
+    "ESP20_LOWP20": {
+      "dan_probability_min": "0.45",
+      "expected_sp_min": "2.0",
+      "gm_sp_min": "2.2",
+      "low_probability_max": "0.20"
+    },
+    "ESP20_LOWP25": {
+      "dan_probability_min": "0.45",
+      "expected_sp_min": "2.0",
+      "gm_sp_min": "2.2",
+      "low_probability_max": "0.25"
+    },
+    "ESP20_LOWP30": {
+      "dan_probability_min": "0.45",
+      "expected_sp_min": "2.0",
+      "gm_sp_min": "2.2",
+      "low_probability_max": "0.30"
+    },
+    "ESP25_LOWP20": {
+      "dan_probability_min": "0.45",
+      "expected_sp_min": "2.5",
+      "gm_sp_min": "2.7",
+      "low_probability_max": "0.20"
+    },
+    "ESP25_LOWP25": {
+      "dan_probability_min": "0.45",
+      "expected_sp_min": "2.5",
+      "gm_sp_min": "2.7",
+      "low_probability_max": "0.25"
+    },
+    "ESP25_LOWP30": {
+      "dan_probability_min": "0.45",
+      "expected_sp_min": "2.5",
+      "gm_sp_min": "2.7",
+      "low_probability_max": "0.30"
+    }
+  }
+}

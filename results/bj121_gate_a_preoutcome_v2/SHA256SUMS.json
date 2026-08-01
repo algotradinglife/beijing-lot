@@ -1,0 +1,8 @@
+{
+  "README.md": "dc799d2e4981b52d71546563471eb024c339b6c2ac5225a67db534d1cc962d71",
+  "candidate_assignments.csv": "defe3e67db1cccee111052db5f508bcb9c49afdce912e2d3e0f664f5ab74582a",
+  "frontier_density_summary.csv": "ffd7769ab220b6f69b8a530e68a3413cac16091616e2a52613111ce438a0d042",
+  "gate_a_card.json": "fd9546763bc4f06eec23b0d419c8cc3d73916991a2be74fea60dc5cf0694e8bc",
+  "portfolio_frontier.csv": "5fcab7329771fe126200f15f6df4dd2468ee8d736a039e54b414096795fdb81b",
+  "runner.py": "ea6f60d5383ca2ff86b0c33ce087f15dd6237b2d0febdd31f487580ab36bf05b"
+}
