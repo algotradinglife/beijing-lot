@@ -27,8 +27,8 @@ GM_THRESHOLDS = (2.90, 3.00, 3.10, 3.20)
 DEPTHS = (0, 1, 2, 3)
 STAKE_PER_SEQUENCE = 2
 CONTRACT = "BJ-HIST-JOINT-N7-001"
-GENERATOR_VERSION = "bj105-joint-analytic-v3"
-CONTENT_IDENTITY_VERSION = "bj105-portable-content-v1"
+GENERATOR_VERSION = "bj105-joint-analytic-v4"
+CONTENT_IDENTITY_VERSION = "bj105-portable-content-v2"
 BJ101_MANIFEST = "86e37682a95fad2a2a67187f1ee528f665d371583c621dc9d14af58f74302447"
 BJ90_MANIFEST = "4a1107ca64d169bf0171a394d1e450a14ee5386005fce34f6ca7ebb70bd720b2"
 
@@ -80,7 +80,7 @@ def repo_root(anchor: Path) -> Path:
 ROOT = repo_root(Path(__file__))
 BJ101 = ROOT / "results" / "bj101_gate_a_preoutcome_v1r1"
 BJ90 = ROOT / "results" / "bj90_downstream_safe_projection_v1r1"
-OUT = ROOT / "results" / "bj105_gate_a_preoutcome_v2r2"
+OUT = ROOT / "results" / "bj105_gate_a_preoutcome_v2r3"
 
 
 def sha256(path: Path) -> str:
@@ -142,8 +142,6 @@ def verify_portable_replay(replay: Path, committed: Path) -> dict[str, object]:
             payload.get("canonical_decompressed_sha256"),
             payload.get("canonical_decompressed_bytes"),
         )
-        if committed_manifest.get(name) != payload.get("committed_artifact_sha256"):
-            raise RuntimeError(f"committed gzip artifact drift: {name}")
         if decompressed_identity(committed / name) != expected:
             raise RuntimeError(f"committed canonical content drift: {name}")
         if decompressed_identity(replay / name) != expected:
@@ -471,7 +469,6 @@ def build(out: Path, bj101: Path = BJ101, bj90: Path = BJ90) -> dict[str, int]:
             "gzip_payloads": {
                 name: {
                     "container_type": "gzip",
-                    "committed_artifact_sha256": sha256(stage / name),
                     "canonical_decompressed_sha256": decompressed_identity(stage / name)[0],
                     "canonical_decompressed_bytes": decompressed_identity(stage / name)[1],
                 }

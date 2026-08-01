@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import csv
 import gzip
 import hashlib
+import io
 import json
 import math
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -37,8 +40,6 @@ def write_portable_bundle(
     *,
     frontier_content: bytes,
     role_content: bytes,
-    committed_frontier: bytes,
-    committed_roles: bytes,
     replay_frontier: bytes,
     replay_roles: bytes,
     control: bytes = b"stable-control\n",
@@ -52,13 +53,11 @@ def write_portable_bundle(
         "gzip_payloads": {
             "joint_n7_frontier.csv.gz": {
                 "container_type": "gzip",
-                "committed_artifact_sha256": digest(committed_frontier),
                 "canonical_decompressed_sha256": digest(frontier_content),
                 "canonical_decompressed_bytes": len(frontier_content),
             },
             "role_assignments.csv.gz": {
                 "container_type": "gzip",
-                "committed_artifact_sha256": digest(committed_roles),
                 "canonical_decompressed_sha256": digest(role_content),
                 "canonical_decompressed_bytes": len(role_content),
             },
@@ -160,7 +159,7 @@ def test_gate_a_schemas_exclude_settlement_fields() -> None:
 def test_current_gate_a_does_not_ingest_the_no_promotion_q_atlas() -> None:
     source = SCRIPT.read_text(encoding="utf-8")
     assert "bj106_gate" not in source
-    assert MOD.OUT.name == "bj105_gate_a_preoutcome_v2r2"
+    assert MOD.OUT.name == "bj105_gate_a_preoutcome_v2r3"
 
 
 def test_portable_replay_accepts_wrapper_only_gzip_variation() -> None:
@@ -176,12 +175,10 @@ def test_portable_replay_accepts_wrapper_only_gzip_variation() -> None:
         committed, replay = root / "committed", root / "replay"
         write_portable_bundle(
             committed, frontier_content=frontier, role_content=roles,
-            committed_frontier=committed_frontier, committed_roles=committed_roles,
             replay_frontier=committed_frontier, replay_roles=committed_roles,
         )
         write_portable_bundle(
             replay, frontier_content=frontier, role_content=roles,
-            committed_frontier=committed_frontier, committed_roles=committed_roles,
             replay_frontier=replay_frontier, replay_roles=replay_roles,
         )
         assert MOD.verify_portable_replay(replay, committed) == {
@@ -198,19 +195,88 @@ def test_portable_replay_rejects_canonical_content_and_control_drift() -> None:
         committed, drifted_content, drifted_control = root / "committed", root / "content", root / "control"
         write_portable_bundle(
             committed, frontier_content=frontier, role_content=roles,
-            committed_frontier=compressed_frontier, committed_roles=compressed_roles,
             replay_frontier=compressed_frontier, replay_roles=compressed_roles,
         )
         write_portable_bundle(
             drifted_content, frontier_content=frontier, role_content=roles,
-            committed_frontier=compressed_frontier, committed_roles=compressed_roles,
             replay_frontier=compressed_frontier, replay_roles=gzip.compress(b"roles-drift\n", mtime=0),
         )
         write_portable_bundle(
             drifted_control, frontier_content=frontier, role_content=roles,
-            committed_frontier=compressed_frontier, committed_roles=compressed_roles,
             replay_frontier=compressed_frontier, replay_roles=compressed_roles,
             control=b"drifted-control\n",
         )
+        raises_runtime_error(lambda: MOD.verify_portable_replay(drifted_content, committed))
+        raises_runtime_error(lambda: MOD.verify_portable_replay(drifted_control, committed))
+
+
+def write_authenticated_inputs(root: Path) -> tuple[Path, Path]:
+    bj101, bj90 = root / "bj101", root / "bj90"
+    bj101.mkdir()
+    bj90.mkdir()
+    membership = []
+    predictions = []
+    for index in range(1, 8):
+        membership.append({
+            "issue": "26001", "fold": "2020", "year": "2020", "pool_id": "26001-2020-S01",
+            "segment_index": "1", "pool_disposition": "AVAILABLE", "match_id": f"26001_{index:03d}",
+            "match_idx": str(index), "kickoff_ts": f"2020-01-0{index}T12:00:00Z", "p3": "0.60",
+            "p1": "0.30", "p0": "0.10", "deleted_code": "0", "p_min": "0.10",
+            "p_min_rank": str(index), "p_min_bucket": "LE_0_10", "eligible_t05": "0",
+            "eligible_t10": "1", "eligible_t15": "1", "eligible_t20": "1",
+        })
+        predictions.append({
+            "match_id": f"26001_{index:03d}", "issue": "26001", "match_idx": str(index),
+            "year": "2020", "fold": "2020", "deployed_method": "TEST", "deployed_sp_3": "3.00",
+            "deployed_sp_1": "3.10", "deployed_sp_0": "3.20", "m2_conservative_sp_3": "2.80",
+            "m2_conservative_sp_1": "2.90", "m2_conservative_sp_0": "3.00",
+        })
+    MOD.write_csv(bj101 / "issue_pool_membership.csv", MOD.MEMBERSHIP_FIELDS, membership)
+    MOD.write_csv(bj101 / "issue_pool_census.csv", MOD.POOL_FIELDS, [{
+        "issue": "26001", "fold": "2020", "year": "2020", "pool_id": "26001-2020-S01",
+        "segment_index": "1", "pool_disposition": "AVAILABLE", "eligible_match_count": "7",
+        "pool_match_count": "7", "first_kickoff_ts": "2020-01-01T12:00:00Z",
+        "last_kickoff_ts": "2020-01-07T12:00:00Z", "window_hours": "144", "terminal_remainder": "0",
+    }])
+    prediction_csv = io.StringIO(newline="")
+    writer = csv.DictWriter(prediction_csv, fieldnames=MOD.SP_FIELDS, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(predictions)
+    (bj90 / "oos_prediction_vectors.csv.gz").write_bytes(
+        gzip.compress(prediction_csv.getvalue().encode("utf-8"), mtime=0)
+    )
+    write_manifest(bj101)
+    write_manifest(bj90)
+    return bj101, bj90
+
+
+def test_real_builder_replay_accepts_wrapper_only_variation_and_rejects_drift() -> None:
+    with tempfile.TemporaryDirectory(prefix="bj105_builder_replay_") as directory:
+        root = Path(directory)
+        bj101, bj90 = write_authenticated_inputs(root)
+        committed, replay = root / "committed", root / "replay"
+        original = MOD.BJ101_MANIFEST, MOD.BJ90_MANIFEST
+        MOD.BJ101_MANIFEST, MOD.BJ90_MANIFEST = MOD.sha256(bj101 / "SHA256SUMS.json"), MOD.sha256(bj90 / "SHA256SUMS.json")
+        try:
+            MOD.build(committed, bj101, bj90)
+            MOD.build(replay, bj101, bj90)
+        finally:
+            MOD.BJ101_MANIFEST, MOD.BJ90_MANIFEST = original
+        assert (committed / "CONTENT_IDENTITY.json").read_bytes() == (replay / "CONTENT_IDENTITY.json").read_bytes()
+        for name, mtime in (("joint_n7_frontier.csv.gz", 1), ("role_assignments.csv.gz", 2)):
+            payload = gzip.decompress((replay / name).read_bytes())
+            (replay / name).write_bytes(gzip.compress(payload, compresslevel=1, mtime=mtime))
+        write_manifest(replay)
+        result = MOD.verify_portable_replay(replay, committed)
+        assert result["status"] == "PASS"
+        assert result["gzip_wrapper_byte_identical"] is False
+        drifted_content, drifted_control = root / "content_drift", root / "control_drift"
+        shutil.copytree(replay, drifted_content)
+        shutil.copytree(replay, drifted_control)
+        role_payload = gzip.decompress((drifted_content / "role_assignments.csv.gz").read_bytes())
+        (drifted_content / "role_assignments.csv.gz").write_bytes(gzip.compress(role_payload + b"drift\n", mtime=3))
+        write_manifest(drifted_content)
+        (drifted_control / "candidate_scatter.csv").write_text("drift\n", encoding="utf-8")
+        write_manifest(drifted_control)
         raises_runtime_error(lambda: MOD.verify_portable_replay(drifted_content, committed))
         raises_runtime_error(lambda: MOD.verify_portable_replay(drifted_control, committed))
