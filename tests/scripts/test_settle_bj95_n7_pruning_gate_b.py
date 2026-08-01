@@ -83,6 +83,17 @@ def test_break_even_diagnostic_is_derived_from_realised_hit_gross_only() -> None
         {"arm": "A", "depth": "1", "year": "2020", "quarter": "2020-Q1", "settlement_status": "SETTLED", "hit": "YES", "gross_yuan": "20", "stake_yuan": "10"},
         {"arm": "A", "depth": "1", "year": "2020", "quarter": "2020-Q1", "settlement_status": "SETTLED", "hit": "NO", "gross_yuan": "0", "stake_yuan": "10"},
     ]
-    recovery.add_break_even_fields(summary, rows)
+    recovery.add_break_even_fields(summary[0], rows)
     assert summary[0]["break_even_hits_at_observed_mean_hit_gross"] == "1.000000000000"
     assert summary[0]["break_even_coverage_rate_at_observed_mean_hit_gross"] == "0.500000000000"
+
+
+def test_recovery_requires_explicit_self_contained_source() -> None:
+    recovery_spec = importlib.util.spec_from_file_location(
+        "bj95_gate_b_recovery", ROOT / "scripts" / "summarize_bj95_gate_b_v1_recovery.py"
+    )
+    assert recovery_spec and recovery_spec.loader
+    recovery = importlib.util.module_from_spec(recovery_spec)
+    recovery_spec.loader.exec_module(recovery)
+    assert recovery.EXPECTED_V1_MANIFEST == "3cff428525acc36f9073a50440c9909f1ebbb0f62fa7dd894721e5a86344c865"
+    assert recovery.EXPECTED_CANONICAL_PAYLOAD_HASHES["group_frontier_settlement.csv"] == "03c862d78ccdd55ab2e770780ce9d108d96dc086c7381d9e8f20cf2c1f04d09f"
