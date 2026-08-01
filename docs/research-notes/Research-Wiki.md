@@ -80,7 +80,7 @@ flowchart LR
 | 改善来自 EURO、亚盘还是盘口移动？ | [[Issue-83-Continuous-Market-Model#改善归因]] |
 | 为什么最终只把简单模型交给 #77？ | [[Issue-83-Continuous-Market-Model#PI 决策]] |
 | 哪条北单让球线仍然薄弱？ | [[Issue-83-Continuous-Market-Model#原生让球线异质性]] |
-| 如何按期望 SP 选场，并按最低赛果概率决定全包、双选或单选胆？ | [#121 Gate A 阈值冻结](../research/bj121_expected_sp_probability_gate_a_2026-08-02.md) |
+| 如何按期望 SP 选场，并按最低赛果概率决定全包、双选或单选胆？ | [#121 Gate B 完整结算（未晋级）](../research/bj121_expected_sp_probability_gate_b_2026-08-02.md) |
 
 ## 证据等级
 
@@ -94,6 +94,10 @@ flowchart LR
 当前 #82、#83 和本次校准曲线属于 **C级历史 timing proxy**。它们适合缩小
 研究方向，不适合直接决定真钱投注。#83 的“晋级”只表示进入 #77 的严格前瞻
 比较，不表示生产或投注晋级。
+
+同样地，#121 的完整 `E_SP × p_min` 历史前沿没有产生任何税后正向、稳健候选：
+严格低概率删除会压缩 stake，但未抵消 65% 因子、final-SP 结算和 issue-level tax。
+这是一项 `NO_PROMOTION` 研究结果，不能据此挑选或推荐投注阈值。
 
 ## 相关笔记
 

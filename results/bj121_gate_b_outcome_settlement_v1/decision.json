@@ -1,0 +1,6 @@
+{
+  "candidate_ids": [],
+  "positive_candidate_count": 0,
+  "rule": "A positive row is not promoted. It must be positive after issue-level tax, exclude-best-payout and exclude-best-issue, and in every frozen annual and LOYO slice; any survivor requires strict independent EV.",
+  "terminal_disposition": "NO_PROMOTION"
+}
