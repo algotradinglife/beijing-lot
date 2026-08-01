@@ -1,0 +1,25 @@
+{
+  "compression_contract": {
+    "canonical_decompressed_sha256": {
+      "euro_10h_safe_projection.csv.gz": "d4625ca0f8fc829818093e59cdc44a7dddfaf89051ac7d625e67257263f44b0f"
+    },
+    "gzip_mtime": 0,
+    "runtime": {
+      "python": "3.14.6",
+      "zlib_compile": "1.3.1.zlib-ng",
+      "zlib_runtime": "1.3.1.zlib-ng"
+    }
+  },
+  "identity": "all and only #91 PRIMARY N7 legs; match_id, issue, match_idx, fold",
+  "issue": 95,
+  "outcome_boundary": "Only identity, handicap line and 10h EURO odds are emitted; no outcome, score, result, final SP, payout, ROI or settlement field is read or emitted.",
+  "purpose": "immutable clean-checkout input for #95 Gate-A EURO no-vig pruning arms",
+  "rows": 46802,
+  "source": {
+    "bj89_gate_a_manifest_sha256": "b22c33bddc71972e3c2a5e7b95955087ece2441b5728da6424d19b3de6f503e2",
+    "bj89_gate_a_rows_sha256": "787bf3266403bebdcf3dfa4ae09f3dbc862a6542c04554fc1e37a0ba02296ae8",
+    "bj91_manifest_sha256": "bd7159715cca84e9d2adb9e089d016ec4e4d72603f8f8d5a8b070eb5027c2c33",
+    "bj91_n7_legs_sha256": "cd0fdfd42002bbeddc6a1676323ead65c4cb85915f2c1a83b916d6c2004526fc"
+  },
+  "stage": "GATE_A_SAFE_EURO_INPUT"
+}
