@@ -17,9 +17,17 @@ from pathlib import Path
 
 CODES = ("3", "1", "0")
 CONTRACT = "BJ-HIST-Q-ATLAS-001"
-VERSION = "bj106-q-atlas-v2"
+VERSION = "bj106-q-atlas-v2r1"
 MIN_SUPPORT = 500
 TICKET_FACTOR = 0.65
+CONTENT_IDENTITY_VERSION = "bj106-portable-content-v1"
+CANONICAL_Q_ATLAS_ARTIFACT_SHA256 = (
+    "b710dd4fe792e69727b898a615e1cb4899175e329c71bcee46788fb859c43b26"
+)
+CANONICAL_Q_ATLAS_CONTENT_SHA256 = (
+    "ba3c3e1a846466a95376117b0d9ac44650bc1de9cb894ded3d84f0609efa4dbe"
+)
+CANONICAL_Q_ATLAS_CONTENT_BYTES = 44_208_242
 GM_REFERENCE_THRESHOLDS = {
     n_legs: (1.0 / TICKET_FACTOR) ** (1.0 / n_legs) for n_legs in range(4, 10)
 }
@@ -157,7 +165,7 @@ ROOT = root(Path(__file__))
 P89 = ROOT / "results" / "bj89_gate_a_preoutcome_v3"
 P90 = ROOT / "results" / "bj90_downstream_safe_projection_v1r1"
 P91 = ROOT / "results" / "bj91_gate_a_preoutcome_v1r6"
-OUT = ROOT / "results" / "bj106_gate_a_preoutcome_v2"
+OUT = ROOT / "results" / "bj106_gate_a_preoutcome_v2r1"
 
 
 def sha256(path: Path) -> str:
@@ -166,6 +174,86 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def decompressed_identity(path: Path) -> tuple[str, int]:
+    """Return the canonical decompressed SHA-256 and byte length of a gzip file."""
+    digest = hashlib.sha256()
+    size = 0
+    with gzip.open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+            size += len(chunk)
+    return digest.hexdigest(), size
+
+
+def verified_bundle_manifest(path: Path) -> dict[str, str]:
+    """Verify a bundle's own exact byte manifest and return its entries."""
+    manifest_path = path / "SHA256SUMS.json"
+    declared = json.loads(manifest_path.read_text(encoding="utf-8"))
+    actual = {
+        item.name: sha256(item)
+        for item in path.iterdir()
+        if item.is_file() and item.name != manifest_path.name
+    }
+    if not isinstance(declared, dict) or actual != declared:
+        raise RuntimeError(f"manifest coverage drift: {path}")
+    return declared
+
+
+def verify_portable_replay(replay: Path, committed: Path) -> dict[str, object]:
+    """Verify replay identity without conflating gzip wrappers with CSV content."""
+    replay_manifest = verified_bundle_manifest(replay)
+    committed_manifest = verified_bundle_manifest(committed)
+    identity_name = "CONTENT_IDENTITY.json"
+    replay_identity_path = replay / identity_name
+    committed_identity_path = committed / identity_name
+    if replay_identity_path.read_bytes() != committed_identity_path.read_bytes():
+        raise RuntimeError("portable content-identity metadata drift")
+    identity = json.loads(committed_identity_path.read_text(encoding="utf-8"))
+    if identity.get("contract_version") != CONTENT_IDENTITY_VERSION:
+        raise RuntimeError("unsupported portable content-identity contract")
+    gzip_payloads = identity.get("gzip_payloads")
+    controls = identity.get("non_compressed_controls")
+    if not isinstance(gzip_payloads, dict) or not isinstance(controls, dict):
+        raise RuntimeError("invalid portable content-identity metadata")
+    expected_files = {
+        *gzip_payloads,
+        *controls,
+        identity_name,
+    }
+    if set(committed_manifest) != expected_files or set(replay_manifest) != expected_files:
+        raise RuntimeError("portable bundle file-set drift")
+    for name, metadata in gzip_payloads.items():
+        if not isinstance(metadata, dict) or metadata.get("container_type") != "gzip":
+            raise RuntimeError(f"invalid gzip identity metadata: {name}")
+        committed_artifact = metadata.get("committed_artifact_sha256")
+        canonical_hash = metadata.get("canonical_decompressed_sha256")
+        canonical_bytes = metadata.get("canonical_decompressed_bytes")
+        if committed_manifest.get(name) != committed_artifact:
+            raise RuntimeError(f"committed gzip artifact drift: {name}")
+        committed_content = decompressed_identity(committed / name)
+        replay_content = decompressed_identity(replay / name)
+        expected_content = (canonical_hash, canonical_bytes)
+        if committed_content != expected_content or replay_content != expected_content:
+            raise RuntimeError(f"canonical decompressed content drift: {name}")
+    for name, expected_hash in controls.items():
+        if not isinstance(expected_hash, str):
+            raise RuntimeError(f"invalid non-compressed control metadata: {name}")
+        if (
+            committed_manifest.get(name) != expected_hash
+            or replay_manifest.get(name) != expected_hash
+            or (committed / name).read_bytes() != (replay / name).read_bytes()
+        ):
+            raise RuntimeError(f"non-compressed control drift: {name}")
+    return {
+        "status": "PASS",
+        "gzip_wrapper_byte_identical": all(
+            replay_manifest[name] == committed_manifest[name] for name in gzip_payloads
+        ),
+        "gzip_payloads": len(gzip_payloads),
+        "non_compressed_controls": len(controls),
+    }
 
 
 def exact_bundle(path: Path, expected: str) -> dict[str, str]:
@@ -548,6 +636,15 @@ def build(
                 "match_outcomes": len(base_rows),
                 "selected_strata": len(census),
             },
+            "compression_contract": {
+                "portable_identity": "CONTENT_IDENTITY.json",
+                "container_type": "gzip",
+                "gzip_payload": "q_atlas.csv.gz",
+                "committed_artifact_sha256": CANONICAL_Q_ATLAS_ARTIFACT_SHA256,
+                "canonical_decompressed_sha256": CANONICAL_Q_ATLAS_CONTENT_SHA256,
+                "canonical_decompressed_bytes": CANONICAL_Q_ATLAS_CONTENT_BYTES,
+                "verification": "The committed gzip delivery remains byte-bound by SHA256SUMS.json. Cross-runtime replay compares canonical decompressed CSV identity and exact bytes for every non-compressed control; gzip wrapper-byte variation alone is not content drift.",
+            },
             "definitions": {
                 "q_hat_pre_factor_leg_contribution": "p_cal * predicted_sp",
                 "q_lb_pre_factor_leg_contribution": "p_cal * conservative_sp",
@@ -590,6 +687,36 @@ def build(
             json.dumps(card, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
         shutil.copy2(Path(__file__), stage / "freeze_runner.py")
+        content_hash, content_bytes = decompressed_identity(atlas_path)
+        if (
+            content_hash != CANONICAL_Q_ATLAS_CONTENT_SHA256
+            or content_bytes != CANONICAL_Q_ATLAS_CONTENT_BYTES
+        ):
+            raise RuntimeError("canonical q_atlas.csv content drift")
+        control_names = (
+            "freeze_runner.py",
+            "gate_a_card.json",
+            "source_census.csv",
+            "stratum_census.csv",
+        )
+        content_identity = {
+            "contract_version": CONTENT_IDENTITY_VERSION,
+            "gzip_payloads": {
+                "q_atlas.csv.gz": {
+                    "container_type": "gzip",
+                    "committed_artifact_sha256": CANONICAL_Q_ATLAS_ARTIFACT_SHA256,
+                    "canonical_decompressed_sha256": content_hash,
+                    "canonical_decompressed_bytes": content_bytes,
+                }
+            },
+            "non_compressed_controls": {
+                name: sha256(stage / name) for name in control_names
+            },
+        }
+        (stage / "CONTENT_IDENTITY.json").write_text(
+            json.dumps(content_identity, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
         manifest = {
             item.name: sha256(item)
             for item in sorted(stage.iterdir())
@@ -613,18 +740,23 @@ def main() -> None:
     parser.add_argument("--bj89", type=Path, default=P89)
     parser.add_argument("--bj90", type=Path, default=P90)
     parser.add_argument("--bj91", type=Path, default=P91)
-    args = parser.parse_args()
-    print(
-        json.dumps(
-            build(
-                args.output.resolve(),
-                args.bj89.resolve(),
-                args.bj90.resolve(),
-                args.bj91.resolve(),
-            ),
-            sort_keys=True,
-        )
+    parser.add_argument(
+        "--verify-against",
+        type=Path,
+        help="after replay, verify portable identity against a committed bundle",
     )
+    args = parser.parse_args()
+    result: dict[str, object] = build(
+        args.output.resolve(),
+        args.bj89.resolve(),
+        args.bj90.resolve(),
+        args.bj91.resolve(),
+    )
+    if args.verify_against:
+        result["portable_replay"] = verify_portable_replay(
+            args.output.resolve(), args.verify_against.resolve()
+        )
+    print(json.dumps(result, sort_keys=True))
 
 
 if __name__ == "__main__":

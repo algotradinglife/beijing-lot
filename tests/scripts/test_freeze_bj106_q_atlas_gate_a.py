@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+import gzip
+import hashlib
+import json
 import math
+import tempfile
 from pathlib import Path
 
 
@@ -11,6 +15,58 @@ SPEC = importlib.util.spec_from_file_location("freeze_bj106_q_atlas_gate_a", SCR
 assert SPEC and SPEC.loader
 MOD = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MOD)
+
+
+def digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def write_manifest(bundle: Path) -> None:
+    entries = {
+        path.name: MOD.sha256(path)
+        for path in sorted(bundle.iterdir())
+        if path.is_file() and path.name != "SHA256SUMS.json"
+    }
+    (bundle / "SHA256SUMS.json").write_text(
+        json.dumps(entries, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def write_portable_bundle(
+    bundle: Path,
+    *,
+    content: bytes,
+    committed_gzip: bytes,
+    replay_gzip: bytes,
+    control: bytes = b"stable-control\n",
+) -> None:
+    bundle.mkdir()
+    (bundle / "q_atlas.csv.gz").write_bytes(replay_gzip)
+    (bundle / "control.txt").write_bytes(control)
+    metadata = {
+        "contract_version": MOD.CONTENT_IDENTITY_VERSION,
+        "gzip_payloads": {
+            "q_atlas.csv.gz": {
+                "container_type": "gzip",
+                "committed_artifact_sha256": digest(committed_gzip),
+                "canonical_decompressed_sha256": digest(content),
+                "canonical_decompressed_bytes": len(content),
+            }
+        },
+        "non_compressed_controls": {"control.txt": digest(b"stable-control\n")},
+    }
+    (bundle / "CONTENT_IDENTITY.json").write_text(
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    write_manifest(bundle)
+
+
+def raises_runtime_error(callback) -> None:
+    try:
+        callback()
+    except RuntimeError:
+        return
+    raise AssertionError("expected RuntimeError")
 
 
 def test_fixed_probability_sp_and_q_bands() -> None:
@@ -72,3 +128,76 @@ def test_handicap_sign_is_numeric_and_neutral_safe() -> None:
     assert MOD.handicap_sign("-0.5") == "HNEG"
     assert MOD.handicap_sign("0.0") == "HZERO"
     assert MOD.handicap_sign("0.5") == "HPOS"
+
+
+def test_portable_replay_accepts_gzip_wrapper_variation() -> None:
+    content = b"a,b\n1,2\n"
+    committed_gzip = gzip.compress(content, compresslevel=9, mtime=0)
+    replay_gzip = gzip.compress(content, compresslevel=1, mtime=1)
+    assert committed_gzip != replay_gzip
+    with tempfile.TemporaryDirectory(prefix="bj106_portable_") as directory:
+        root = Path(directory)
+        committed, replay = root / "committed", root / "replay"
+        write_portable_bundle(
+            committed,
+            content=content,
+            committed_gzip=committed_gzip,
+            replay_gzip=committed_gzip,
+        )
+        write_portable_bundle(
+            replay,
+            content=content,
+            committed_gzip=committed_gzip,
+            replay_gzip=replay_gzip,
+        )
+        result = MOD.verify_portable_replay(replay, committed)
+        assert result == {
+            "status": "PASS",
+            "gzip_wrapper_byte_identical": False,
+            "gzip_payloads": 1,
+            "non_compressed_controls": 1,
+        }
+
+
+def test_portable_replay_rejects_canonical_content_drift() -> None:
+    content = b"a,b\n1,2\n"
+    committed_gzip = gzip.compress(content, mtime=0)
+    drifted_gzip = gzip.compress(b"a,b\n1,3\n", mtime=0)
+    with tempfile.TemporaryDirectory(prefix="bj106_content_drift_") as directory:
+        root = Path(directory)
+        committed, replay = root / "committed", root / "replay"
+        write_portable_bundle(
+            committed,
+            content=content,
+            committed_gzip=committed_gzip,
+            replay_gzip=committed_gzip,
+        )
+        write_portable_bundle(
+            replay,
+            content=content,
+            committed_gzip=committed_gzip,
+            replay_gzip=drifted_gzip,
+        )
+        raises_runtime_error(lambda: MOD.verify_portable_replay(replay, committed))
+
+
+def test_portable_replay_rejects_non_compressed_control_drift() -> None:
+    content = b"a,b\n1,2\n"
+    compressed = gzip.compress(content, mtime=0)
+    with tempfile.TemporaryDirectory(prefix="bj106_control_drift_") as directory:
+        root = Path(directory)
+        committed, replay = root / "committed", root / "replay"
+        write_portable_bundle(
+            committed,
+            content=content,
+            committed_gzip=compressed,
+            replay_gzip=compressed,
+        )
+        write_portable_bundle(
+            replay,
+            content=content,
+            committed_gzip=compressed,
+            replay_gzip=compressed,
+            control=b"drifted-control\n",
+        )
+        raises_runtime_error(lambda: MOD.verify_portable_replay(replay, committed))
