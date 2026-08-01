@@ -20,17 +20,10 @@ from decimal import Decimal
 from pathlib import Path
 from types import ModuleType
 
-
-def repository_root(anchor: Path) -> Path:
-    resolved = anchor.resolve()
-    for candidate in (resolved.parent, *resolved.parents):
-        if (candidate / ".git").exists():
-            return candidate
-    raise RuntimeError(f"cannot locate repository root from {anchor}")
-
-
-ROOT = repository_root(Path(__file__))
-OUT = ROOT / "results" / "bj95_gate_b_outcome_settlement_v2r7"
+LAUNCH_DIRECTORY = Path(__file__).resolve().parent
+ROOT = LAUNCH_DIRECTORY.parent
+OUT = ROOT / "results" / "bj95_gate_b_outcome_settlement_v2r8"
+EXECUTING_RECOVERY_SOURCE_BYTES = Path(__file__).read_bytes()
 EXPECTED_V1_MANIFEST = (
     "3cff428525acc36f9073a50440c9909f1ebbb0f62fa7dd894721e5a86344c865"
 )
@@ -40,11 +33,15 @@ EXPECTED_CANONICAL_RUNNER_SHA256 = (
 EXPECTED_BJ91_MANIFEST = (
     "07957d4e21076bc9799f16e3b582e36854a16858436f07adf306260a474c271f"
 )
+EXPECTED_BJ91_GROUP_ARM_SHA256 = (
+    "cc2504f4e7809cac5e2111edfdb3ddbed1e62c31c9370cc76d0486431120a023"
+)
 EXPECTED_GROUP_ROWS = 240_696
 EXPECTED_GROUPS = 6_686
-RECOVERY_STAGE = "GATE_B_SELF_CONTAINED_NON_OUTCOME_SUMMARY_RECOVERY_V2R7"
+RECOVERY_STAGE = "GATE_B_SELF_CONTAINED_NON_OUTCOME_SUMMARY_RECOVERY_V2R8"
 SUPPORTED_RECOVERY_STAGES = (
     "GATE_B_SELF_CONTAINED_NON_OUTCOME_SUMMARY_RECOVERY_V2R6",
+    "GATE_B_SELF_CONTAINED_NON_OUTCOME_SUMMARY_RECOVERY_V2R7",
     RECOVERY_STAGE,
 )
 BJ91_BUNDLE = ROOT / "results" / "bj91_gate_b_outcome_settlement_v1"
@@ -90,6 +87,23 @@ SETTLEMENT_FIELDS = (
     "paid_cent_rounding_applied",
     "hit_break_even_threshold",
     "hit_profit_after_factor",
+)
+SUMMARY_SETTLEMENT_FIELDS = (
+    "group_id",
+    "issue",
+    "year",
+    "quarter",
+    "arm",
+    "depth",
+    "gate_a_disposition",
+    "settlement_status",
+    "selected_sequence_count",
+    "stake_yuan",
+    "calibrated_mass",
+    "euro_novig_mass",
+    "hit",
+    "gross_yuan",
+    "net_yuan",
 )
 BJ91_FIELDS = (
     "cohort",
@@ -208,7 +222,9 @@ def read_exact_csv(path: Path, fields: tuple[str, ...]) -> list[dict[str, str]]:
         return list(reader)
 
 
-def authenticate_source(source: Path, manifest: dict[str, str]) -> tuple[str, Path]:
+def authenticate_source(
+    source: Path, manifest: dict[str, str]
+) -> tuple[str, Path, str]:
     required = {
         "canonical_outcome_join.csv",
         "group_frontier_settlement.csv",
@@ -238,20 +254,21 @@ def authenticate_source(source: Path, manifest: dict[str, str]) -> tuple[str, Pa
     for filename, expected in EXPECTED_CANONICAL_PAYLOAD_HASHES.items():
         if manifest.get(filename) != expected:
             raise RuntimeError(f"canonical settlement payload drift: {filename}")
-    return generated_at, runner
+    return generated_at, runner, str(stage)
 
 
-def load_authenticated_runner(runner: Path) -> ModuleType:
+def load_authenticated_runner(runner: Path, work: Path) -> ModuleType:
     """Execute exactly the runner source bytes that were hashed in the manifest."""
     source_bytes = runner.read_bytes()
     if sha256_bytes(source_bytes) != EXPECTED_CANONICAL_RUNNER_SHA256:
         raise RuntimeError("canonical settlement runner changed after authentication")
     module = ModuleType("bj95_authenticated_canonical_runner")
-    # The verified source may live in a private snapshot outside the checkout,
-    # while the archived runner resolves project-relative immutable inputs from
-    # __file__.  Use a checkout-local filename only as that location hint; the
-    # compiled bytes remain the authenticated snapshot bytes above.
-    execution_filename = ROOT / "scripts" / runner.name
+    # The archived runner only needs its project root while importing constants.
+    # Give it a private shim root so replay does not require a Git checkout;
+    # the compiled bytes remain the authenticated snapshot bytes above.
+    shim_root = work / "canonical_runner_shim"
+    (shim_root / ".git").mkdir(parents=True)
+    execution_filename = shim_root / runner.name
     module.__file__ = str(execution_filename)
     exec(  # noqa: S102 - source bytes are authenticated immediately above.
         compile(source_bytes, str(execution_filename), "exec"), module.__dict__
@@ -279,6 +296,20 @@ def validate_settlement_rows(rows: list[dict[str, str]]) -> None:
                 raise RuntimeError("NO_BET row has selections or stake")
         else:
             raise RuntimeError(f"unknown Gate-A disposition: {disposition!r}")
+
+
+def read_compact_settlement_rows(path: Path) -> list[dict[str, str]]:
+    compact_rows: list[dict[str, str]] = []
+    with path.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        if tuple(reader.fieldnames or ()) != SETTLEMENT_FIELDS:
+            raise RuntimeError(f"schema mismatch for {path}: {reader.fieldnames}")
+        for row in reader:
+            validate_settlement_rows([row])
+            compact_rows.append(
+                {field: row[field] for field in SUMMARY_SETTLEMENT_FIELDS}
+            )
+    return compact_rows
 
 
 def aggregate(rows: list[dict[str, object]], **scope: object) -> dict[str, object]:
@@ -497,17 +528,23 @@ def load_correct_bj91_comparison(
         raise RuntimeError("#91 settlement is absent from accepted manifest")
     expected_keys = {(group_id, arm) for group_id in group_ids for arm in BJ91_ARMS}
     selected: dict[tuple[str, str], dict[str, str]] = {}
-    for row in read_exact_csv(bundle / "group_arm_settlement.csv", BJ91_FIELDS):
-        if (
-            row["cohort"] == "PRIMARY"
-            and row["n"] == "7"
-            and row["group_id"] in group_ids
-            and row["arm"] in BJ91_ARMS
-        ):
-            key = (row["group_id"], row["arm"])
-            if key in selected:
-                raise RuntimeError(f"duplicate #91 comparison key: {key}")
-            selected[key] = row
+    with (bundle / "group_arm_settlement.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        reader = csv.DictReader(handle)
+        if tuple(reader.fieldnames or ()) != BJ91_FIELDS:
+            raise RuntimeError("#91 settlement schema drift")
+        for row in reader:
+            if (
+                row["cohort"] == "PRIMARY"
+                and row["n"] == "7"
+                and row["group_id"] in group_ids
+                and row["arm"] in BJ91_ARMS
+            ):
+                key = (row["group_id"], row["arm"])
+                if key in selected:
+                    raise RuntimeError(f"duplicate #91 comparison key: {key}")
+                selected[key] = row
     if set(selected) != expected_keys:
         raise RuntimeError("#91 comparison key coverage drift")
     return [
@@ -531,6 +568,34 @@ def load_correct_bj91_comparison(
     ]
 
 
+def snapshot_bj91_comparison_input(
+    source: Path,
+    source_manifest: dict[str, str],
+    stage_name: str,
+    work: Path,
+) -> Path:
+    """Provide the exact #91 comparison payload from package or accepted source."""
+    snapshot = work / "bj91_snapshot"
+    snapshot.mkdir()
+    embedded = source / "bj91_group_arm_settlement.csv"
+    if stage_name == RECOVERY_STAGE:
+        if source_manifest.get(embedded.name) != EXPECTED_BJ91_GROUP_ARM_SHA256:
+            raise RuntimeError("embedded #91 comparison payload identity drift")
+        shutil.copyfile(embedded, snapshot / "group_arm_settlement.csv")
+    else:
+        external = work / "bj91_external"
+        manifest, _ = snapshot_bundle(BJ91_BUNDLE, external, EXPECTED_BJ91_MANIFEST)
+        if manifest.get("group_arm_settlement.csv") != EXPECTED_BJ91_GROUP_ARM_SHA256:
+            raise RuntimeError("accepted #91 comparison payload identity drift")
+        shutil.copyfile(
+            external / "group_arm_settlement.csv",
+            snapshot / "group_arm_settlement.csv",
+        )
+    if sha256(snapshot / "group_arm_settlement.csv") != EXPECTED_BJ91_GROUP_ARM_SHA256:
+        raise RuntimeError("#91 comparison payload changed after authentication")
+    return snapshot
+
+
 def write_rows(
     runner: ModuleType, stage: Path, rows: dict[str, list[dict[str, object]]]
 ) -> None:
@@ -552,7 +617,7 @@ def main() -> int:
         "--output",
         type=Path,
         default=OUT,
-        help="new immutable v2r7 recovery bundle",
+        help="new immutable v2r8 recovery bundle",
     )
     args = parser.parse_args()
     source = args.source.resolve()
@@ -564,18 +629,18 @@ def main() -> int:
     try:
         source_snapshot = work / "source_snapshot"
         source_manifest, _ = snapshot_bundle(source, source_snapshot)
-        canonical_generated_at, runner_path = authenticate_source(
+        canonical_generated_at, runner_path, source_stage = authenticate_source(
             source_snapshot, source_manifest
         )
-        runner = load_authenticated_runner(runner_path)
-        bj91_snapshot = work / "bj91_snapshot"
-        snapshot_bundle(BJ91_BUNDLE, bj91_snapshot, EXPECTED_BJ91_MANIFEST)
-        settlement_rows = read_exact_csv(
-            source_snapshot / "group_frontier_settlement.csv", SETTLEMENT_FIELDS
+        runner = load_authenticated_runner(runner_path, work)
+        bj91_snapshot = snapshot_bj91_comparison_input(
+            source_snapshot, source_manifest, source_stage, work
+        )
+        settlement_rows = read_compact_settlement_rows(
+            source_snapshot / "group_frontier_settlement.csv"
         )
         if len(settlement_rows) != EXPECTED_GROUP_ROWS:
             raise RuntimeError("settlement frontier cardinality drift")
-        validate_settlement_rows(settlement_rows)
         group_ids = {row["group_id"] for row in settlement_rows}
         if len(group_ids) != EXPECTED_GROUPS:
             raise RuntimeError("settlement group cardinality drift")
@@ -590,6 +655,10 @@ def main() -> int:
         stage.mkdir()
         for filename in EXPECTED_CANONICAL_PAYLOAD_HASHES:
             shutil.copyfile(source_snapshot / filename, stage / filename)
+        shutil.copyfile(
+            bj91_snapshot / "group_arm_settlement.csv",
+            stage / "bj91_group_arm_settlement.csv",
+        )
         write_rows(
             runner,
             stage,
@@ -609,7 +678,9 @@ def main() -> int:
             encoding="utf-8",
         )
         shutil.copyfile(runner_path, stage / "canonical_settlement_runner.py")
-        shutil.copyfile(__file__, stage / "summary_recovery_runner.py")
+        (stage / "summary_recovery_runner.py").write_bytes(
+            EXECUTING_RECOVERY_SOURCE_BYTES
+        )
         card = {
             "issue": 95,
             "stage": RECOVERY_STAGE,
@@ -618,6 +689,8 @@ def main() -> int:
             "canonical_settlement_payload_hashes": EXPECTED_CANONICAL_PAYLOAD_HASHES,
             "canonical_settlement_runner_sha256": EXPECTED_CANONICAL_RUNNER_SHA256,
             "bj91_comparison_manifest_sha256": EXPECTED_BJ91_MANIFEST,
+            "bj91_group_arm_settlement_sha256": EXPECTED_BJ91_GROUP_ARM_SHA256,
+            "recovery_runner_sha256": sha256_bytes(EXECUTING_RECOVERY_SOURCE_BYTES),
             "outcome_database_read": False,
             "outcome_payload_parsed_for_join": False,
             "outcome_payload_copy_only": True,
@@ -627,9 +700,9 @@ def main() -> int:
                 "primary settlement row changes."
             ),
             "replay_contract": (
-                "Replay any complete accepted source to any writable filesystem. "
-                "Output copies are inode-independent, byte-identical, and leave the "
-                "source digest unchanged."
+                "Replay this complete v2r8 package from any location to any writable "
+                "filesystem. The #91 comparison payload is embedded and authenticated; "
+                "output copies are inode-independent and leave the source unchanged."
             ),
             "decision_rule": decision["rule"],
             "scope": "historical research only; NO_PROMOTION is not a production or purchase recommendation.",

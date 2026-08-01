@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -306,31 +307,40 @@ def test_recovery_rejects_inconsistent_disposition_status_hit_k_and_stake() -> N
     expect_runtime_error(lambda: recovery.validate_settlement_rows([row]))
 
 
-def test_v2r7_replay_is_cross_device_inode_independent_and_source_safe() -> None:
+def test_v2r8_replays_outside_git_with_embedded_bj91_and_source_safe() -> None:
     recovery = recovery_module()
-    bundle = ROOT / "results" / "bj95_gate_b_outcome_settlement_v2r7"
+    bundle = ROOT / "results" / "bj95_gate_b_outcome_settlement_v2r8"
     assert bundle.is_dir(), (
-        "generate the committed v2r7 bundle before running this test"
+        "generate the committed v2r8 bundle before running this test"
     )
     source_manifest = recovery.sha256(bundle / "SHA256SUMS.json")
     with tempfile.TemporaryDirectory(dir="/dev/shm") as directory:
+        external_source = Path(directory) / "complete-package-outside-git"
+        shutil.copytree(bundle, external_source)
         replay = Path(directory) / "replay"
         subprocess.run(
             [
                 sys.executable,
-                str(bundle / "summary_recovery_runner.py"),
+                str(external_source / "summary_recovery_runner.py"),
                 "--source",
-                str(bundle),
+                str(external_source),
                 "--output",
                 str(replay),
             ],
             check=True,
-            cwd=ROOT,
+            cwd=directory,
         )
         filename = "group_frontier_settlement.csv"
-        assert os.stat(bundle / filename).st_ino != os.stat(replay / filename).st_ino
-        assert (bundle / filename).read_bytes() == (replay / filename).read_bytes()
+        assert (
+            os.stat(external_source / filename).st_ino
+            != os.stat(replay / filename).st_ino
+        )
+        assert (external_source / filename).read_bytes() == (
+            replay / filename
+        ).read_bytes()
         with (replay / filename).open("ab") as handle:
             handle.write(b"\nmutation-only-in-replay\n")
+        assert recovery.sha256(external_source / "SHA256SUMS.json") == source_manifest
+        recovery.exact_manifest(external_source, source_manifest)
     assert recovery.sha256(bundle / "SHA256SUMS.json") == source_manifest
     recovery.exact_manifest(bundle, source_manifest)
