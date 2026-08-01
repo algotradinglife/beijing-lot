@@ -81,7 +81,7 @@ def root(anchor: Path) -> Path:
 ROOT = root(Path(__file__))
 GATE_A = ROOT / "results" / "bj101_gate_a_preoutcome_v1r1"
 DEFAULT_DB = ROOT.parents[1] / "data" / "derived" / "beidan_xlsm" / "beidan_xlsm.sqlite"
-OUT = ROOT / "results" / "bj101_gate_b_outcome_settlement_v1r2"
+OUT = ROOT / "results" / "bj101_gate_b_outcome_settlement_v1r3"
 
 
 def sha(path: Path) -> str:
@@ -204,19 +204,21 @@ def outcomes(db: Path, match_ids: list[str]) -> dict[str, dict[str, str]]:
         raise RuntimeError("canonical outcome database hash drift")
     connection = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     try:
-        placeholders = ",".join("?" for _ in match_ids)
-        query = f"""
-            select match_id, result_code, winning_sp, winning_sp_source,
-                   settlement_quality, has_trusted_settlement
-            from match_features where match_id in ({placeholders})
-        """
         result = {}
-        for item in connection.execute(query, tuple(int(value) for value in match_ids)):
-            row = dict(zip(OUTCOME_FIELDS, item, strict=True))
-            row = {key: "" if value is None else str(value) for key, value in row.items()}
-            if row["result_code"] not in CODES or Decimal(row["winning_sp"]) <= 0 or row["settlement_quality"] != "trusted" or row["has_trusted_settlement"] != "1":
-                raise RuntimeError(f"untrusted canonical outcome {row['match_id']}")
-            result[row["match_id"]] = row
+        for start in range(0, len(match_ids), 900):
+            batch = match_ids[start:start + 900]
+            placeholders = ",".join("?" for _ in batch)
+            query = f"""
+                select match_id, result_code, winning_sp, winning_sp_source,
+                       settlement_quality, has_trusted_settlement
+                from match_features where match_id in ({placeholders})
+            """
+            for item in connection.execute(query, tuple(int(value) for value in batch)):
+                row = dict(zip(OUTCOME_FIELDS, item, strict=True))
+                row = {key: "" if value is None else str(value) for key, value in row.items()}
+                if row["result_code"] not in CODES or Decimal(row["winning_sp"]) <= 0 or row["settlement_quality"] != "trusted" or row["has_trusted_settlement"] != "1":
+                    raise RuntimeError(f"untrusted canonical outcome {row['match_id']}")
+                result[row["match_id"]] = row
         if len(result) != len(match_ids):
             raise RuntimeError("canonical outcome coverage drift")
         return result

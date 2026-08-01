@@ -32,8 +32,8 @@ def test_e6_matches_direct_combinations():
 
 def test_gate_b_package_manifest_and_primary_summary_are_consistent():
     mod = load()
-    bundle = ROOT / "results" / "bj101_gate_b_outcome_settlement_v1r2"
-    manifest = mod.exact_manifest(bundle, "2d250d47172c524fe0d06eafe5e02a0abccdc2b6b2f435093171e58294cdab09")
+    bundle = ROOT / "results" / "bj101_gate_b_outcome_settlement_v1r3"
+    manifest = mod.exact_manifest(bundle, "5e4b3b07b309cf9b757b240dc447b6d5c3a10e51e590468f67ef82298fa11416")
     assert len(manifest) == 10
     summaries = mod.read_csv(bundle / "settlement_summary.csv", mod.SUMMARY_FIELDS)
     primary = next(row for row in summaries if row["threshold"] == "T10" and row["arm"] == "COLD_PMIN")
