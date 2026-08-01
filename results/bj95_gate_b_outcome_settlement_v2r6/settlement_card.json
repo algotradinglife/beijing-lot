@@ -1,4 +1,5 @@
 {
+  "bj91_comparison_manifest_sha256": "07957d4e21076bc9799f16e3b582e36854a16858436f07adf306260a474c271f",
   "canonical_settlement_generated_at_utc": "2026-08-01T00:55:26.967105+00:00",
   "canonical_settlement_manifest_sha256": "3cff428525acc36f9073a50440c9909f1ebbb0f62fa7dd894721e5a86344c865",
   "canonical_settlement_payload_hashes": {
@@ -6,14 +7,14 @@
     "full_control_reconciliation_with_bj91.csv": "edbf2b48d62293a7f5ee925e3a93bcacbdde34618d742984ae8dd7143ee221b1",
     "group_frontier_settlement.csv": "03c862d78ccdd55ab2e770780ce9d108d96dc086c7381d9e8f20cf2c1f04d09f"
   },
+  "canonical_settlement_runner_sha256": "42fc4843f6e8b2bced6b9262fed95890deaaeb9a68c793dcbe93dd3a034a1187",
   "decision_rule": "No frozen pruning frontier satisfied positive ALL, ex-best-group, ex-best-issue, every annual, and every LOYO ROI simultaneously.",
   "issue": 95,
   "outcome_database_read": false,
   "outcome_payload_copy_only": true,
   "outcome_payload_parsed_for_join": false,
-  "recovery_scope": "Recompute summaries from already-settled v1 rows, add realised-payout break-even diagnostics to ALL/year/quarter/LOYO scopes, and correct #91 K=0 comparison rows to NO_BET. No frozen frontier, outcome, final SP, formula K, stake, payout, or #95 primary settlement row changes.",
-  "replay_contract": "Pass this complete bundle itself as --source and a new empty directory as --output. The replay must reproduce every payload byte and the SHA256SUMS.json hash exactly; no untracked v1 directory is required.",
+  "recovery_scope": "Recompute summaries from settled rows only; use signed issue net for ex-best-issue robustness; emit #91 EURO mass unavailable; no primary settlement row changes.",
+  "replay_contract": "Pass this complete v2r6 bundle itself as --source and a new empty directory as --output. The replay must reproduce every payload byte and SHA256SUMS.json exactly without untracked files.",
   "scope": "historical research only; NO_PROMOTION is not a production or purchase recommendation.",
-  "stage": "GATE_B_SELF_CONTAINED_NON_OUTCOME_SUMMARY_RECOVERY_V2R2",
-  "supersedes": "v1 reporting summaries only; canonical outcome join and group/frontier settlement payloads are byte-identical in this self-contained package."
+  "stage": "GATE_B_SELF_CONTAINED_NON_OUTCOME_SUMMARY_RECOVERY_V2R6"
 }

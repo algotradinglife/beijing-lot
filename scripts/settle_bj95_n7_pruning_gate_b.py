@@ -291,13 +291,17 @@ def aggregate(rows: list[dict[str, object]], **scope: object) -> dict[str, objec
     profitable_hits = sum(row["hit"] == "YES" and decimal(row["net_yuan"], "net") > 0 for row in bet_rows)
     mean_cal_mass = sum((decimal(row["calibrated_mass"], "cal mass") for row in bet_rows), Decimal("0")) / Decimal(len(bet_rows)) if bet_rows else None
     mean_euro_mass = sum((decimal(row["euro_novig_mass"], "euro mass") for row in bet_rows), Decimal("0")) / Decimal(len(bet_rows)) if bet_rows else None
+    # Concentration is intentionally positive-only, but robustness must remove
+    # the issue with the largest signed total net, including any losing issue.
     positive = [(max(Decimal("0"), decimal(row["net_yuan"], "net")), row) for row in bet_rows]
     total_positive = sum((value for value, _ in positive), Decimal("0"))
-    by_issue: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+    positive_by_issue: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
+    signed_by_issue: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
     for value, row in positive:
-        by_issue[str(row["issue"])] += value
+        positive_by_issue[str(row["issue"])] += value
+        signed_by_issue[str(row["issue"])] += decimal(row["net_yuan"], "net")
     best = max(bet_rows, key=lambda row: decimal(row["net_yuan"], "net"), default=None)
-    best_issue = max(by_issue, key=by_issue.get, default="")
+    best_issue = max(signed_by_issue, key=signed_by_issue.get, default="")
     without_best_group = [row for row in bet_rows if best is None or row["group_id"] != best["group_id"]]
     without_best_issue = [row for row in bet_rows if row["issue"] != best_issue]
     ex_group_net, ex_group_stake = net_and_stake(without_best_group)
@@ -317,7 +321,7 @@ def aggregate(rows: list[dict[str, object]], **scope: object) -> dict[str, objec
         "ex_best_group_net_yuan": six(ex_group_net), "ex_best_group_roi": ratio(ex_group_net / ex_group_stake) if ex_group_stake else "",
         "ex_best_issue_net_yuan": six(ex_issue_net), "ex_best_issue_roi": ratio(ex_issue_net / ex_issue_stake) if ex_issue_stake else "",
         "positive_net_top_group_share": ratio(max((value for value, _ in positive), default=Decimal("0")) / total_positive) if total_positive else "",
-        "positive_net_top_issue_share": ratio(max(by_issue.values(), default=Decimal("0")) / total_positive) if total_positive else "",
+        "positive_net_top_issue_share": ratio(max(positive_by_issue.values(), default=Decimal("0")) / total_positive) if total_positive else "",
     }
 
 
