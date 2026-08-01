@@ -7,7 +7,7 @@ tags:
   - research
   - moc
 status: active
-updated: 2026-07-29
+updated: 2026-08-02
 ---
 
 # Beijing-lot Research Wiki
@@ -80,6 +80,7 @@ flowchart LR
 | 改善来自 EURO、亚盘还是盘口移动？ | [[Issue-83-Continuous-Market-Model#改善归因]] |
 | 为什么最终只把简单模型交给 #77？ | [[Issue-83-Continuous-Market-Model#PI 决策]] |
 | 哪条北单让球线仍然薄弱？ | [[Issue-83-Continuous-Market-Model#原生让球线异质性]] |
+| 如何按期望 SP 选场，并按最低赛果概率决定全包、双选或单选胆？ | [#121 Gate A 阈值冻结](../research/bj121_expected_sp_probability_gate_a_2026-08-02.md) |
 
 ## 证据等级
 
@@ -103,3 +104,4 @@ flowchart LR
 - [Issue #82](https://github.com/algotradinglife/beijing-lot/issues/82)
 - [Issue #83](https://github.com/algotradinglife/beijing-lot/issues/83)
 - [Issue #77](https://github.com/algotradinglife/beijing-lot/issues/77)
+- [Issue #121：期望 SP × 最小赛果概率阈值](https://github.com/algotradinglife/beijing-lot/issues/121)

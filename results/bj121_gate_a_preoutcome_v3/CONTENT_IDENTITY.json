@@ -1,0 +1,19 @@
+{
+  "contract_version": "bj121-portable-content-v1",
+  "gzip_payloads": {
+    "candidate_assignments.csv.gz": {
+      "canonical_decompressed_bytes": 313112622,
+      "canonical_decompressed_sha256": "32127d28320be079df80fb032a806202daafdbeec6223e07d048fad888541884"
+    },
+    "portfolio_frontier.csv.gz": {
+      "canonical_decompressed_bytes": 123789104,
+      "canonical_decompressed_sha256": "fcb4273e7bc36501be4ca71bf58c4303d0a3890c15b148305275dfdd65391957"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "338d3a96e2a5eea38cb2f9d1f3a02dcf1f5772c7a4b071c0491dd19069204f35",
+    "frontier_density_summary.csv": "b3de8b5cff26877c962ca7176cf60618f6170e6fbf6af071d2edd9aba91930b6",
+    "gate_a_card.json": "4e851928d25c9fa2bd61de41cfadf5cab918299490c39eca10ffca60418d8261",
+    "runner.py": "439da8e9b0edbd40f7703a68602454f3d0e966bddb21cf6328b7238520e01d8a"
+  }
+}
