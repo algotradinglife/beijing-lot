@@ -1,0 +1,13 @@
+{
+  "CONTENT_IDENTITY.json": "e9d62f84a090008eb0fd9573746fce62d6fe4712cf4744155acc80e11f1c1638",
+  "annual_metrics.csv": "48e40e7226c5002f59022c0ba08218062bd29b6bbbd2de6943d78d08c359935d",
+  "canonical_outcome_join.csv": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+  "chronological_fold_metrics.csv": "933dd0e5befb496d5d41ab37cbb7a393b2b8d57fe6e65046ca48d009a1e1a0d5",
+  "concentration_diagnostics.csv": "bad700aa17feaea3006d9628f3a0103e3741786e297fc49dc4ee3fd8b61e8d5e",
+  "ex_best_sensitivity.csv": "5a0027bf0d6ef47025e9131273237c7cc27f5e1f3d2b4118b98fcf1b1402052d",
+  "leave_one_year_out_metrics.csv": "41e69b409960baffb8ed157ace2d7a8100debf3fc2ed4d7862e497f3507e82ec",
+  "settled_q_atlas.csv.gz": "5712686aa5653cce44da80f8814574a35ab5c15b209194a2c4b2cfc6451cf140",
+  "settlement_card.json": "d3aa8b10c9193b7302694d7b972614b7f520b662a1314938bfb43d3c69125a05",
+  "settlement_runner.py": "c1f452ff890f172513bc192c484d81989248087a1442a3210be5a88708011e0e",
+  "stratum_settlement_summary.csv": "7640523f2d43182eb55adc1b55691c1e43e9d85ad4c1036214369be15b3a04d5"
+}

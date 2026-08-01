@@ -1,0 +1,10 @@
+{
+  "canonical_outcome_join.csv": {
+    "sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89"
+  },
+  "settled_q_atlas.csv.gz": {
+    "canonical_decompressed_bytes": 58071402,
+    "canonical_decompressed_sha256": "2c7b9ddf0d88909591eae7ad16165b9f0d0dc95534f29fbd3d919d7176f538b1",
+    "container_type": "gzip"
+  }
+}
