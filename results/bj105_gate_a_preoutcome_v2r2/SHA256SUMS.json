@@ -1,0 +1,11 @@
+{
+  "CONTENT_IDENTITY.json": "6a5f850c0ebff143e2f52e72b8ca9bf2eb51eeb86ec4d45881214aa7748df90b",
+  "candidate_scatter.csv": "286bd99133b77a2a11b5e58c7a18d6670f966ade08801bd883698ea52d03e502",
+  "freeze_runner.py": "6062341c889de579bf387dd04d9d0dcbf4b6d1abfbf622edd27e7abf14fd58d3",
+  "frontier_summary.csv": "4c1e90ecb27a5cbce7eaeda8b03b9e5788b7dfe68629577457867e31b16f6a17",
+  "gate_a_card.json": "04a4538f91f6724113503e5c08518429df8d0a7482c67455d7c5c167194135fa",
+  "joint_n7_frontier.csv.gz": "31f59999cfc700a55ef371ea89e9b460fa13ef4f83a1bc3704c3e31a15939d99",
+  "pool_census.csv": "38c96ac4509801f68dd3e2469be619a8954ef06291faca2e9cd6d04cb7b6332a",
+  "role_assignments.csv.gz": "ca792116216d30c62581fca4843b5aeac4ac0e1abf35ab84bc258d28ebf50cba",
+  "source_census.csv": "2d0e38993f1bbe44089abb4a76bba858f6e9fbfc98c7d3b48a81083ffe819d3a"
+}

@@ -27,7 +27,8 @@ GM_THRESHOLDS = (2.90, 3.00, 3.10, 3.20)
 DEPTHS = (0, 1, 2, 3)
 STAKE_PER_SEQUENCE = 2
 CONTRACT = "BJ-HIST-JOINT-N7-001"
-GENERATOR_VERSION = "bj105-joint-analytic-v2"
+GENERATOR_VERSION = "bj105-joint-analytic-v3"
+CONTENT_IDENTITY_VERSION = "bj105-portable-content-v1"
 BJ101_MANIFEST = "86e37682a95fad2a2a67187f1ee528f665d371583c621dc9d14af58f74302447"
 BJ90_MANIFEST = "4a1107ca64d169bf0171a394d1e450a14ee5386005fce34f6ca7ebb70bd720b2"
 
@@ -79,7 +80,7 @@ def repo_root(anchor: Path) -> Path:
 ROOT = repo_root(Path(__file__))
 BJ101 = ROOT / "results" / "bj101_gate_a_preoutcome_v1r1"
 BJ90 = ROOT / "results" / "bj90_downstream_safe_projection_v1r1"
-OUT = ROOT / "results" / "bj105_gate_a_preoutcome_v2r1"
+OUT = ROOT / "results" / "bj105_gate_a_preoutcome_v2r2"
 
 
 def sha256(path: Path) -> str:
@@ -88,6 +89,81 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def decompressed_identity(path: Path) -> tuple[str, int]:
+    """Return the canonical decompressed SHA-256 and byte length of a gzip payload."""
+    digest = hashlib.sha256()
+    size = 0
+    with gzip.open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(chunk)
+            size += len(chunk)
+    return digest.hexdigest(), size
+
+
+def verified_bundle_manifest(path: Path) -> dict[str, str]:
+    """Verify an exact delivery manifest before applying portable-content rules."""
+    manifest_path = path / "SHA256SUMS.json"
+    declared = json.loads(manifest_path.read_text(encoding="utf-8"))
+    actual = {
+        item.name: sha256(item)
+        for item in path.iterdir()
+        if item.is_file() and item.name != manifest_path.name
+    }
+    if not isinstance(declared, dict) or actual != declared:
+        raise RuntimeError(f"manifest coverage drift: {path}")
+    return declared
+
+
+def verify_portable_replay(replay: Path, committed: Path) -> dict[str, object]:
+    """Accept wrapper-only gzip variation but reject content/control drift."""
+    replay_manifest = verified_bundle_manifest(replay)
+    committed_manifest = verified_bundle_manifest(committed)
+    identity_name = "CONTENT_IDENTITY.json"
+    replay_identity = replay / identity_name
+    committed_identity = committed / identity_name
+    if replay_identity.read_bytes() != committed_identity.read_bytes():
+        raise RuntimeError("portable content-identity metadata drift")
+    metadata = json.loads(committed_identity.read_text(encoding="utf-8"))
+    if metadata.get("contract_version") != CONTENT_IDENTITY_VERSION:
+        raise RuntimeError("unsupported portable content-identity contract")
+    gzip_payloads = metadata.get("gzip_payloads")
+    controls = metadata.get("non_compressed_controls")
+    if not isinstance(gzip_payloads, dict) or not isinstance(controls, dict):
+        raise RuntimeError("invalid portable content-identity metadata")
+    expected_files = {*gzip_payloads, *controls, identity_name}
+    if set(committed_manifest) != expected_files or set(replay_manifest) != expected_files:
+        raise RuntimeError("portable bundle file-set drift")
+    for name, payload in gzip_payloads.items():
+        if not isinstance(payload, dict) or payload.get("container_type") != "gzip":
+            raise RuntimeError(f"invalid gzip identity metadata: {name}")
+        expected = (
+            payload.get("canonical_decompressed_sha256"),
+            payload.get("canonical_decompressed_bytes"),
+        )
+        if committed_manifest.get(name) != payload.get("committed_artifact_sha256"):
+            raise RuntimeError(f"committed gzip artifact drift: {name}")
+        if decompressed_identity(committed / name) != expected:
+            raise RuntimeError(f"committed canonical content drift: {name}")
+        if decompressed_identity(replay / name) != expected:
+            raise RuntimeError(f"replay canonical content drift: {name}")
+    for name, expected_hash in controls.items():
+        if (
+            not isinstance(expected_hash, str)
+            or committed_manifest.get(name) != expected_hash
+            or replay_manifest.get(name) != expected_hash
+            or (committed / name).read_bytes() != (replay / name).read_bytes()
+        ):
+            raise RuntimeError(f"non-compressed control drift: {name}")
+    return {
+        "status": "PASS",
+        "gzip_wrapper_byte_identical": all(
+            replay_manifest[name] == committed_manifest[name] for name in gzip_payloads
+        ),
+        "gzip_payloads": len(gzip_payloads),
+        "non_compressed_controls": len(controls),
+    }
 
 
 def exact_bundle(path: Path, expected_manifest: str) -> dict[str, str]:
@@ -378,9 +454,37 @@ def build(out: Path, bj101: Path = BJ101, bj90: Path = BJ90) -> dict[str, int]:
             {"source": "bj101_gate_a_preoutcome_v1r1", "role": "accepted issue segmentation and calibrated probability", "manifest_sha256": BJ101_MANIFEST, "payload": "issue_pool_membership.csv", "payload_sha256": m101["issue_pool_membership.csv"], "rows": len(membership), "join_status": "all rows joined to #90 prediction"},
             {"source": "bj90_downstream_safe_projection_v1r1", "role": "as-of final-SP prediction", "manifest_sha256": BJ90_MANIFEST, "payload": "oos_prediction_vectors.csv.gz", "payload_sha256": m90["oos_prediction_vectors.csv.gz"], "rows": len(sp), "join_status": "all #101 membership rows joined"},
         ])
-        card = {"issue": 105, "contract": CONTRACT, "generator_version": GENERATOR_VERSION, "stage": "GATE_A_OUTCOME_UNEXPOSED_JOINT_N7_FREEZE", "input_manifests": {"bj101": BJ101_MANIFEST, "bj90": BJ90_MANIFEST}, "output_rows": {"candidate_scatter": len(scatter), "portfolio_frontier": frontier_count, "role_assignments": role_count}, "outcome_boundary": "No result, winning SP, payout, tax, ROI, or settlement input is read or emitted.", "upstream_boundary": "#106 is terminal NO_PROMOTION. Its q-atlas is not read, ranked, promoted, or used as a match, role, threshold, or portfolio signal in this Gate-A freeze.", "selection": "Within each accepted #101 AVAILABLE pool, select seven highest joint_match_rank_value = q_max * (1 - entropy/log(3)); ties q_max descending then match_idx ascending.", "features": "E_SP=sum(p*s_hat); q=p*s_hat; D=q_argmin/mean(q_other_two); scatter contains p_min, E_SP, D, entropy and uncertainty.", "grid": {"depths": DEPTHS, "p_min_thresholds": THRESHOLDS, "gm_expected_sp_thresholds": GM_THRESHOLDS, "arms": arms}, "gm_gate": "Apply threshold to the geometric mean of seven E_SP values. Geometric mean of predicted top-code SP is diagnostic only.", "roles": "FIXED/HASH/WEIGHTED use m DOUBLE plus 7-m FULL. JOINT_ROLE uses one deterministic SINGLE (highest p_max/q_max) plus m DOUBLE and remaining FULL; m=0 is represented by full-cover control.", "accounting": "K=3^full*2^double. expected_portfolio_mass is H, the product of every role's retained probability. Thus FIXED/HASH/WEIGHTED m-double arms have K=2^m*3^(7-m) and H=product(1-p_deleted); JOINT_ROLE additionally includes its SINGLE probability. G_BE=[K/(0.65*H)]^(1/7) applies 0.65 exactly once and is only a first-order pre-tax diagnostic; exact tax-aware payout is Gate-B-only.", "gate_b": "UNAUTHORIZED pending independent EV and PI acceptance of this exact Gate-A package.", "scope": "paper-only historical research; no purchase, production, frontend, or ROI promotion."}
+        card = {"issue": 105, "contract": CONTRACT, "generator_version": GENERATOR_VERSION, "stage": "GATE_A_OUTCOME_UNEXPOSED_JOINT_N7_FREEZE", "input_manifests": {"bj101": BJ101_MANIFEST, "bj90": BJ90_MANIFEST}, "output_rows": {"candidate_scatter": len(scatter), "portfolio_frontier": frontier_count, "role_assignments": role_count}, "outcome_boundary": "No result, winning SP, payout, tax, ROI, or settlement input is read or emitted.", "upstream_boundary": "#106 is terminal NO_PROMOTION. Its q-atlas is not read, ranked, promoted, or used as a match, role, threshold, or portfolio signal in this Gate-A freeze.", "selection": "Within each accepted #101 AVAILABLE pool, select seven highest joint_match_rank_value = q_max * (1 - entropy/log(3)); ties q_max descending then match_idx ascending.", "features": "E_SP=sum(p*s_hat); q=p*s_hat; D=q_argmin/mean(q_other_two); scatter contains p_min, E_SP, D, entropy and uncertainty.", "grid": {"depths": DEPTHS, "p_min_thresholds": THRESHOLDS, "gm_expected_sp_thresholds": GM_THRESHOLDS, "arms": arms}, "gm_gate": "Apply threshold to the geometric mean of seven E_SP values. Geometric mean of predicted top-code SP is diagnostic only.", "roles": "FIXED/HASH/WEIGHTED use m DOUBLE plus 7-m FULL. JOINT_ROLE uses one deterministic SINGLE (highest p_max/q_max) plus m DOUBLE and remaining FULL; m=0 is represented by full-cover control.", "accounting": "K=3^full*2^double. expected_portfolio_mass is H, the product of every role's retained probability. Thus FIXED/HASH/WEIGHTED m-double arms have K=2^m*3^(7-m) and H=product(1-p_deleted); JOINT_ROLE additionally includes its SINGLE probability. G_BE=[K/(0.65*H)]^(1/7) applies 0.65 exactly once and is only a first-order pre-tax diagnostic; exact tax-aware payout is Gate-B-only.", "compression_contract": {"portable_identity": "CONTENT_IDENTITY.json", "gzip_payloads": ["joint_n7_frontier.csv.gz", "role_assignments.csv.gz"], "verification": "The committed gzip delivery remains byte-bound by SHA256SUMS.json. Cross-runtime replay accepts wrapper-only gzip variation only when canonical decompressed content is exact, while every non-gzip payload remains byte-bound."}, "gate_b": "UNAUTHORIZED pending independent EV and PI acceptance of this exact Gate-A package.", "scope": "paper-only historical research; no purchase, production, frontend, or ROI promotion."}
         (stage / "gate_a_card.json").write_text(json.dumps(card, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         shutil.copy2(Path(__file__), stage / "freeze_runner.py")
+        gzip_names = ("joint_n7_frontier.csv.gz", "role_assignments.csv.gz")
+        control_names = (
+            "candidate_scatter.csv",
+            "freeze_runner.py",
+            "frontier_summary.csv",
+            "gate_a_card.json",
+            "pool_census.csv",
+            "source_census.csv",
+        )
+        content_identity = {
+            "contract_version": CONTENT_IDENTITY_VERSION,
+            "gzip_payloads": {
+                name: {
+                    "container_type": "gzip",
+                    "committed_artifact_sha256": sha256(stage / name),
+                    "canonical_decompressed_sha256": decompressed_identity(stage / name)[0],
+                    "canonical_decompressed_bytes": decompressed_identity(stage / name)[1],
+                }
+                for name in gzip_names
+            },
+            "non_compressed_controls": {
+                name: sha256(stage / name) for name in control_names
+            },
+        }
+        (stage / "CONTENT_IDENTITY.json").write_text(
+            json.dumps(content_identity, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
         manifest = {item.name: sha256(item) for item in sorted(stage.iterdir()) if item.is_file()}
         (stage / "SHA256SUMS.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         shutil.rmtree(private); shutil.copytree(stage, out)
@@ -390,7 +494,12 @@ def build(out: Path, bj101: Path = BJ101, bj90: Path = BJ90) -> dict[str, int]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=OUT); parser.add_argument("--bj101", type=Path, default=BJ101); parser.add_argument("--bj90", type=Path, default=BJ90)
-    args = parser.parse_args(); print(json.dumps(build(args.output.resolve(), args.bj101.resolve(), args.bj90.resolve()), sort_keys=True))
+    parser.add_argument("--verify-against", type=Path, help="verify portable content identity after replay")
+    args = parser.parse_args()
+    result: dict[str, object] = build(args.output.resolve(), args.bj101.resolve(), args.bj90.resolve())
+    if args.verify_against:
+        result["portable_replay"] = verify_portable_replay(args.output.resolve(), args.verify_against.resolve())
+    print(json.dumps(result, sort_keys=True))
 
 
 if __name__ == "__main__":
