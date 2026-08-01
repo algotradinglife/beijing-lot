@@ -1,0 +1,42 @@
+{
+  "bankroll_execution": "chronological frozen CSV order within each issue; a ticket is skipped when its stake exceeds current cash balance; no implicit credit",
+  "bj91_control_manifest_sha256": "07957d4e21076bc9799f16e3b582e36854a16858436f07adf306260a474c271f",
+  "bj95_gate_a_manifest_sha256": "10b4d6d274aef53e1e1d4abe30cd9f683cf296865ee131f00f5c1e1d16d0725c",
+  "bj95_safe_leg_decompressed_sha256": "369c2ab398cb996bcd913f9ff7d3d71431303c957bb349e43b774c87c40e377e",
+  "bootstrap": {
+    "bankrolls_yuan": [
+      10000,
+      100000,
+      1000000
+    ],
+    "interpretation": "loss-threshold distribution, not a ruin model; it does not claim stake-affordability execution",
+    "prng": "SHA256-seeded 64-bit LCG; version-independent",
+    "replicates": 200,
+    "unit": "issue"
+  },
+  "calibration_diagnostics": "top-1 calibration and multiclass Brier score on the authenticated #95 frozen legs; descriptive only",
+  "canonical_outcome_bundle": "results/bj95_gate_b_outcome_settlement_v2r8",
+  "canonical_outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "controls": "#91 dynamic-EV and #95 structured-pruning accepted comparators",
+  "factor": "0.65",
+  "factor_application": "gross=2*0.65*uncapped final winning-SP product for each hit; exactly once",
+  "fold_summary": "empirical fold range, not a confidence interval",
+  "gate_a_manifest_sha256": "fd142cc2594f2e71b4b81136e91e7ecfcf8623b07c94d92d0b9c1cf6a212b4cb",
+  "issue": 98,
+  "matched_controls": "#91/#95 controls restricted to the exact 3,900 QUALITY_WEIGHTED_OMIT selected group identities",
+  "outcome_payload": "#95 canonical_outcome_join.csv only",
+  "outcome_read_once": true,
+  "portable_replay_identity": "CONTENT_SHA256SUMS.json; it hashes the decompressed group settlement payload because gzip transport bytes may vary across supported zlib builds",
+  "private_snapshot_protocol": "every parsed accepted source was byte-verified against its accepted manifest after copy, then parsed only from the private build snapshot",
+  "private_snapshot_sha256": {
+    "bj91_group_arm_settlement.csv": "cc2504f4e7809cac5e2111edfdb3ddbed1e62c31c9370cc76d0486431120a023",
+    "bj95_canonical_outcome_join.csv": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "bj95_group_frontier_settlement.csv": "03c862d78ccdd55ab2e770780ce9d108d96dc086c7381d9e8f20cf2c1f04d09f",
+    "bj95_safe_legs.csv.gz": "c432f33234e50799c28a76319f735029a530cfe7db081b1a0ae99cca1144b24b",
+    "bj98_sampling_frontier.csv.gz": "0052eb0d466a5f619a03cecc68d6d4add0804206d242480b825a5f328ca0419d"
+  },
+  "probability_misspecification_sensitivity": "fixed frozen weighted tickets evaluated at temperature 0.80/1.00/1.20; no omission, selection, stake, or outcome result is changed",
+  "scope": "historical research only; no purchase or production promotion",
+  "stage": "GATE_B_ONE_SHOT_CANONICAL_OUTCOME_SETTLEMENT",
+  "terminal_disposition": "NO_PROMOTION: all 130 frozen candidate arm/seed aggregates have non-positive ROI; matched controls are diagnostic only"
+}

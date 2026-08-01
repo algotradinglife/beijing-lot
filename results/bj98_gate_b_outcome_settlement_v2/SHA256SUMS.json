@@ -1,0 +1,13 @@
+{
+  "CONTENT_SHA256SUMS.json": "ae64475cb2a90bb3dce672aaad9273ca09ea3415961f49183aa4ee93f9684cf3",
+  "accepted_control_comparison.csv": "d42e971d3023c58bc1ba6b75c804eda471b979e7ec5d07841254d48a8aeb237d",
+  "arm_seed_summary.csv": "69441774d7d703d844d8416c56bfb7102250ded2f3c090a3dc0f8209f6339b46",
+  "bankroll_execution.csv": "496fec8454dff740001ea014329ff70f2e93f733238492522dbe09b20af4bd4e",
+  "budget_bootstrap.csv": "1d204b026e872a466efc0b90f6c56423397dc55d78043e47d6ef9ef526af457f",
+  "calibration_diagnostics.csv": "13ca51c343c3ae2b55691a99e8596d188ff6e172bca6aafa7038e437c26c19a0",
+  "group_seed_settlement.csv.gz": "4746eb8b1f430681eba6e73c31fee376f3463eeeb8a4d573db786dca41ea3d0a",
+  "probability_misspecification_sensitivity.csv": "245a7c73018c8dbb0f779a4b2cbe574a752dba7361e68a9bea299fb1b9431654",
+  "quality_matched_control_comparison.csv": "4c2fc0b86f0c5ffcd5562cebd9f4d145599c8d397bbddfe990fc0fa597561210",
+  "settlement_card.json": "2f9ccf0fbefc58eb779728f7834fd93500122c57325e26b47af4e477a6ad4156",
+  "settlement_runner.py": "a30c8dd82c8bc94369df8337a1e6052447e1edda69d8e9de53e8aad2dc478c01"
+}

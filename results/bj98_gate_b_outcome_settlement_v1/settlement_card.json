@@ -1,0 +1,23 @@
+{
+  "bj91_control_manifest_sha256": "07957d4e21076bc9799f16e3b582e36854a16858436f07adf306260a474c271f",
+  "bootstrap": {
+    "bankrolls_yuan": [
+      10000,
+      100000,
+      1000000
+    ],
+    "replicates": 200,
+    "unit": "issue"
+  },
+  "canonical_outcome_bundle": "results/bj95_gate_b_outcome_settlement_v2r8",
+  "canonical_outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "controls": "#91 dynamic-EV and #95 structured-pruning are bound accepted comparators; exact primary-group comparison is reserved for terminal report",
+  "factor": "0.65",
+  "factor_application": "gross=2*0.65*uncapped final winning-SP product for each hit; exactly once",
+  "gate_a_manifest_sha256": "fd142cc2594f2e71b4b81136e91e7ecfcf8623b07c94d92d0b9c1cf6a212b4cb",
+  "issue": 98,
+  "outcome_payload": "#95 canonical_outcome_join.csv only",
+  "outcome_read_once": true,
+  "scope": "historical research only; no purchase or production promotion",
+  "stage": "GATE_B_ONE_SHOT_CANONICAL_OUTCOME_SETTLEMENT"
+}
