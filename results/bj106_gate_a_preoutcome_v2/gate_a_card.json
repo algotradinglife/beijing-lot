@@ -1,0 +1,63 @@
+{
+  "bands": {
+    "probability": [
+      "0,.10,.20,.35,.50,.70,1"
+    ],
+    "q": [
+      "0,.65,.90,1.10,1.35,1.538461538462,2,inf"
+    ],
+    "sp": [
+      "1,2,3,5,10,inf"
+    ]
+  },
+  "comparison_family": "Every selected stratum with support>=500, >=3 years and non-code-only fallback enters Gate B. No row or stratum is excluded by q_hat, q_lb or any per-leg factor threshold.",
+  "contract": "BJ-HIST-Q-ATLAS-001",
+  "definitions": {
+    "complete_ticket_expected_gross_per_unit": "0.65 * product(q_i)",
+    "complete_ticket_realized_gross_per_unit": "0.65 * product(realized_leg_contribution_pre_factor_i)",
+    "factor_application": "apply 0.65 exactly once after assembling the complete N-leg ticket; never deduct or gate at row/stratum level",
+    "q_hat_pre_factor_leg_contribution": "p_cal * predicted_sp",
+    "q_lb_pre_factor_leg_contribution": "p_cal * conservative_sp",
+    "realized_leg_contribution_pre_factor": "indicator(actual_result_code == candidate_code) * final_winning_sp(candidate_code)"
+  },
+  "gate_b": "UNAUTHORIZED pending independent EV and PI acceptance of this exact package.",
+  "gm_break_even_reference": {
+    "N4": "1.113708824555",
+    "N5": "1.089976987048",
+    "N6": "1.074437375218",
+    "N7": "1.063473477626",
+    "N8": "1.055324037704",
+    "N9": "1.049028783948"
+  },
+  "handicap_boundary": "accepted #89 source is degenerate at handicap_line_norm=0.0; the exact/support fallback remains frozen and no nonzero handicap is inferred",
+  "input_manifests": {
+    "bj89": "b22c33bddc71972e3c2a5e7b95955087ece2441b5728da6424d19b3de6f503e2",
+    "bj90": "4a1107ca64d169bf0171a394d1e450a14ee5386005fce34f6ca7ebb70bd720b2",
+    "bj91_outcome_safe_probability_carrier": "bd7159715cca84e9d2adb9e089d016ec4e4d72603f8f8d5a8b070eb5027c2c33"
+  },
+  "issue": 106,
+  "league_boundary": "league unavailable in accepted safe inputs; emitted explicitly as UNAVAILABLE_SOURCE and never inferred",
+  "multiple_comparison": "Gate B Benjamini-Hochberg FDR 0.10 over the complete comparison-eligible selected-stratum family; no alternate family",
+  "nomination": "At most two strata from the frozen comparison family, only BH q<=0.10, positive lower 95% issue-cluster bounds for calibration alignment and realized pre-factor leg contribution under point and conservative views, stable direction in every chronological fold and leave-one-year-out, and positive after ex-best-payout and ex-best-issue removal. No individual row or stratum must exceed 1/0.65; downstream economics require exact complete-ticket product-q, factor-once and tax-adjusted evaluation.",
+  "outcome_boundary": "candidate_code is the prospective 3/1/0 code, not an observed result. No actual result, score, winning SP, payout, tax, ROI, or settlement input is read or emitted.",
+  "rows": {
+    "match_outcomes": 143457,
+    "matches": 47819,
+    "selected_strata": 17
+  },
+  "scope": "historical paper-only research; no purchase, production, frontend, or portfolio promotion.",
+  "shrinkage": "Gate B occurrence posterior mean and interval use Jeffreys Beta(0.5,0.5); realized pre-factor leg contribution remains unshrunk and cells below frozen support remain explicit unavailable",
+  "sparse_fallback": {
+    "minimum_rows": 500,
+    "order": [
+      "code+p_band+q_lb_band+exact_handicap",
+      "code+p_band+q_lb_band+handicap_sign",
+      "code+p_band+q_lb_band",
+      "code+q_lb_band",
+      "code_only"
+    ]
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_Q_ATLAS",
+  "uncertainty": "Gate B exact Jeffreys Beta(0.5,0.5) occurrence interval plus 10000 issue-cluster bootstrap replicates, seed 10620260801",
+  "version": "bj106-q-atlas-v2"
+}
