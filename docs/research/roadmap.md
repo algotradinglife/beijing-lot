@@ -28,10 +28,13 @@ GitHub planning uses a complementary cross-Project maturity roadmap:
 
 | Layer | Responsibility |
 | --- | --- |
-| Project | The one durable functional home of an Issue |
+| Project | The one durable functional home of an Issue; membership determines the responsible role |
 | Milestone | The one PI-owned cross-Project maturity stage advanced by an Issue |
-| Labels | Domain, work type, owner, and dispatch state |
-| Research OS | Scientific and evidence dependencies |
+| Native Issue Graph | `blockedBy` / `blocking` dependencies and `parent` / `subIssues` decomposition |
+| Issue Type | The authoritative kind of work |
+| Project Status | The authoritative lifecycle state |
+| Labels | Non-authoritative domain and work-type taxonomy only |
+| Local Research OS | Derived cache or execution notes; never the planning source of truth |
 
 The three Projects are:
 
@@ -64,6 +67,59 @@ See
 for the operating contract and
 [`github_milestone_governance_receipt.md`](github_milestone_governance_receipt.md)
 for the initial live mapping.
+
+## Current strategy evidence roadmap
+
+Updated: **2026-08-01 20:42 CST (UTC+08:00)**
+
+The current bottleneck is evidence of durable outcome-level price value, not
+another unconstrained portfolio search. Accepted work already provides rolling
+out-of-sample calibrated probabilities ([#89]) and outcome-safe predicted BJDC
+SP vectors ([#90]). Later N-leg, pruning, and sampling studies ([#91], [#95],
+[#98], and [#101]) showed that stake reduction or isolated positive cells do
+not by themselves overcome the 0.65 factor, tax, and payout concentration.
+
+The active sequence therefore separates source of edge, entry selection, and
+portfolio packaging:
+
+```text
+#89 calibrated probability + #90 predicted SP (Done)
+                         |
+                         v
+#106 outcome-level q = p x SP value atlas (Ready)
+                /                    \
+               v                      v
+#107 issue-level value gate       #105 joint N7 construction
+             (Inbox)                    (Blocked)
+                \                    /
+                         v
+#108 tax-aware dynamic-N and path frontier (Inbox)
+```
+
+| Order | Issue | Project status | Milestone | Native dependency | Intended output |
+| --- | --- | --- | --- | --- | --- |
+| 1 | [#106] outcome-level probability-SP value atlas | Ready | M2 | #89 and #90 (closed) | At most two robust value pockets, or `NO_PROMOTION` |
+| 2A | [#107] issue-level value-density/no-bet gate | Inbox | M3 | Blocked by #106 | One deterministic issue-entry gate, or `NO_PROMOTION` |
+| 2B | [#105] joint match selection, pruning and GM-SP gate | Blocked | M3 | Blocked by #106 | Fixed-N7 joint construction result |
+| 3 | [#108] tax-aware dynamic-N asymmetric path frontier | Inbox | M3 | Blocked by #105 and #107 | Tax-adjusted dynamic-N comparison |
+
+Only #106 is executable now. #90 is reused rather than duplicated: it already
+produced an accepted historical predicted-SP candidate. Downstream issues may
+consume accepted immutable artifacts, but may not refit upstream models after
+outcome access. A relative improvement from a still-negative baseline, lower
+stake, or higher hit rate is not promotion evidence; positive tax-adjusted OOS
+EV/ROI and robustness remain required.
+
+[#89]: https://github.com/algotradinglife/beijing-lot/issues/89
+[#90]: https://github.com/algotradinglife/beijing-lot/issues/90
+[#91]: https://github.com/algotradinglife/beijing-lot/issues/91
+[#95]: https://github.com/algotradinglife/beijing-lot/issues/95
+[#98]: https://github.com/algotradinglife/beijing-lot/issues/98
+[#101]: https://github.com/algotradinglife/beijing-lot/issues/101
+[#105]: https://github.com/algotradinglife/beijing-lot/issues/105
+[#106]: https://github.com/algotradinglife/beijing-lot/issues/106
+[#107]: https://github.com/algotradinglife/beijing-lot/issues/107
+[#108]: https://github.com/algotradinglife/beijing-lot/issues/108
 
 ---
 
