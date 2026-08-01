@@ -1,0 +1,43 @@
+{
+  "canonical_outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "canonical_outcome_payload_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+  "canonical_outcome_source": "results/bj95_gate_b_outcome_settlement_v2r8/canonical_outcome_join.csv",
+  "definitions": {
+    "calibration_alignment": "actual occurrence - mean(p_cal)",
+    "conservative_gap": "mean(realized_pre_factor_leg_contribution - q_lb)",
+    "point_gap": "mean(realized_pre_factor_leg_contribution - q_hat)",
+    "realized_pre_factor_leg_contribution": "indicator(actual_result_code == candidate_code) * final_winning_sp"
+  },
+  "factor_boundary": "0.65 is absent from per-leg/stratum eligibility and is reserved for later complete-ticket economics, applied exactly once after ticket assembly.",
+  "gate_a_content_identity_sha256": "306fe9c79ecae8ff4a1a8e4769cf13fbc43aa9da449f6c5f7f5d61986b561d4d",
+  "gate_a_manifest_sha256": "fb45cacccb4c9ab2b52c8a538f489fb3e3197fa138245f0d83cf98a3cbb0db5d",
+  "issue": 106,
+  "nominated_strata": [],
+  "nomination_rule": "At most two strata; BH q<=0.10, positive lower issue-bootstrap 95% bounds for calibration, point and conservative contribution gaps, positive point/conservative direction in every frozen fold and LOYO, and positive point/conservative gaps after ex-best-payout and ex-best-issue. Any missing condition is NO_PROMOTION for that stratum.",
+  "outcome_join_rule": "left join every frozen 3/1/0 atlas row on match_id; 1,017 frozen matches absent from the canonical source remain UNAVAILABLE_CANONICAL_OUTCOME and are never dropped",
+  "outcome_read_once": true,
+  "rows": {
+    "comparison_family": 14,
+    "frozen_atlas": 143457,
+    "settled": 140406,
+    "unavailable": 3051
+  },
+  "scope": "historical paper-only research; no portfolio construction, purchase, production policy, or performance promotion.",
+  "stage": "GATE_B_ONE_SHOT_OUTCOME_SETTLEMENT",
+  "terminal_disposition": "NO_PROMOTION",
+  "uncertainty": {
+    "Jeffreys_occurrence": "Beta(0.5,0.5) 95% interval",
+    "fdr": {
+      "family": "all 14 frozen comparison-eligible strata",
+      "level": "0.10",
+      "method": "Benjamini-Hochberg",
+      "p_value": "one-sided issue-cluster Student-t test on per-issue sum(realized - q_lb)"
+    },
+    "issue_cluster_bootstrap": {
+      "interval": "percentile 95%",
+      "replicates": 10000,
+      "rng": "SHA256-seeded 64-bit LCG",
+      "seed": "10620260801"
+    }
+  }
+}
