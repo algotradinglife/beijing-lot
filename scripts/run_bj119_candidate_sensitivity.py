@@ -12,7 +12,7 @@ def root(p):
   if (x/'.git').exists(): return x
  raise RuntimeError('repository root not found')
 ROOT=root(Path(__file__)); A106=ROOT/'results/bj106_gate_a_preoutcome_v2r1'; B106=ROOT/'results/bj106_gate_b_outcome_settlement_v1'; M101=ROOT/'results/bj101_gate_a_preoutcome_v1r1'; OUTCOMES=ROOT/'results/bj95_gate_b_outcome_settlement_v2r8'
-GA=ROOT/'results/bj119_gate_a_preoutcome_v1r1'; GB=ROOT/'results/bj119_gate_b_outcome_settlement_v1r2'
+GA=ROOT/'results/bj119_gate_a_preoutcome_v1r1'; GB=ROOT/'results/bj119_gate_b_outcome_settlement_v1r3'
 MAN={'a106':'fb45cacccb4c9ab2b52c8a538f489fb3e3197fa138245f0d83cf98a3cbb0db5d','b106':'d112cc1f1c8b538b7a36e0c4b03de70aa9532f1cd2d9f38598afbd21b7223c86','m101':'86e37682a95fad2a2a67187f1ee528f665d371583c621dc9d14af58f74302447','out':'fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc'}
 # Gate B refuses a different Gate-A frontier, even when that alternate package
 # happens to be self-consistent.
@@ -58,6 +58,11 @@ def csvread(p,fields):
   return list(r)
 def ids(r):return (r['issue'],r['pool_id'])
 def vkey(r):return (r['variant_id'],r['arm'])
+def chronology_key(r):
+ # Issue identifiers changed width after 2019, so they are identifiers rather
+ # than a sortable calendar.  The frozen pool timestamp is the authoritative
+ # chronology; year, segment and pool ID make the ordering total/deterministic.
+ return (int(r['year']),r['first_kickoff_ts'],int(r['segment_index']),r['pool_id'])
 
 def validate_gate_a():
  ma=manifest(A106,MAN['a106'],('gate_a_card.json','q_atlas.csv.gz'));mb=manifest(B106,MAN['b106'],('settlement_card.json',));mm=manifest(M101,MAN['m101'],('issue_pool_census.csv','issue_pool_membership.csv'))
@@ -165,7 +170,9 @@ def settle(output,ga):
   for k in sorted({vkey(r) for r in rows}):
    rs=[r for r in rows if vkey(r)==k];bet=[r for r in rs if r['settlement_status']=='SETTLED'];stake=sum((dec(r['stake_yuan']) for r in bet),Decimal(0));net=sum((dec(r['net_yuan']) for r in bet),Decimal(0));gross=sum((dec(r['gross_yuan']) for r in bet),Decimal(0));tax=sum((dec(r['tax_yuan']) for r in bet),Decimal(0));hits=sum(r['coverage_hit']=='YES' for r in bet);issue=defaultdict(Decimal)
    for r in bet:issue[r['issue']]+=dec(r['net_yuan'])
-   best=max(issue,key=issue.get,default='');ex=net-issue.get(best,Decimal(0));summary.append({'variant_id':k[0],'arm':k[1],'frontiers':len(rs),'eligible_periods':len(bet),'no_bet':len(rs)-len(bet),'tickets':sum(int(r['formula_k']) for r in bet),'stake_yuan':money(stake),'hits':hits,'hit_rate':format(hits/len(bet),'.12f') if bet else '','gross_yuan':money(gross),'tax_yuan':money(tax),'net_yuan':money(net),'roi':format(net/stake,'.12f') if stake else '','best_issue':best,'ex_best_issue_roi':format(ex/(stake-sum(dec(r['stake_yuan']) for r in bet if r['issue']==best)),'.12f') if best and stake>sum(dec(r['stake_yuan']) for r in bet if r['issue']==best) else ''})
+   best=max(issue,key=issue.get,default='');ex=net-issue.get(best,Decimal(0));gate_a_no_bet=sum(r['settlement_status']=='NO_BET_GATE_A' for r in rs);outcome_unavailable=sum(r['settlement_status']=='UNAVAILABLE_CANONICAL_OUTCOME' for r in rs);non_settled=gate_a_no_bet+outcome_unavailable
+   if len(bet)+non_settled!=len(rs):raise RuntimeError('settlement denominator partition drift')
+   summary.append({'variant_id':k[0],'arm':k[1],'frontiers':len(rs),'eligible_periods':len(bet),'gate_a_no_bet':gate_a_no_bet,'outcome_unavailable':outcome_unavailable,'non_settled':non_settled,'tickets':sum(int(r['formula_k']) for r in bet),'stake_yuan':money(stake),'hits':hits,'hit_rate':format(hits/len(bet),'.12f') if bet else '','gross_yuan':money(gross),'tax_yuan':money(tax),'net_yuan':money(net),'roi':format(net/stake,'.12f') if stake else '','best_issue':best,'ex_best_issue_roi':format(ex/(stake-sum(dec(r['stake_yuan']) for r in bet if r['issue']==best)),'.12f') if best and stake>sum(dec(r['stake_yuan']) for r in bet if r['issue']==best) else ''})
   # Every frozen arm receives the same chronological and leave-one-year-out
   # views. These are reports only: no threshold/arm selection happens here.
   robust=[]
@@ -175,9 +182,11 @@ def settle(output,ga):
    for r in bet:issue[r['issue']]+=dec(r['net_yuan'])
    best_issue=max(issue,key=issue.get,default='');best_issue_stake=sum((dec(r['stake_yuan']) for r in bet if r['issue']==best_issue),Decimal(0));best_payout=max(bet,key=lambda r:dec(r['gross_yuan']),default=None);best_payout_stake=dec(best_payout['stake_yuan']) if best_payout else Decimal(0);best_payout_net=dec(best_payout['net_yuan']) if best_payout else Decimal(0)
    cum=peak=dd=Decimal(0);streak=maxstreak=0
-   for r in sorted(bet,key=lambda x:(int(x['issue']),x['pool_id'])):
+   for r in sorted(bet,key=chronology_key):
     cum+=dec(r['net_yuan']);peak=max(peak,cum);dd=max(dd,peak-cum);streak=0 if r['coverage_hit']=='YES' else streak+1;maxstreak=max(maxstreak,streak)
-   return {'scope':scope,'scope_value':val,'variant_id':k[0],'arm':k[1],'eligible_periods':len(bet),'no_bet':len(rs)-len(bet),'tickets':sum(int(r['formula_k']) for r in bet),'stake_yuan':money(stake),'hits':hits,'hit_rate':format(hits/len(bet),'.12f') if bet else '','gross_yuan':money(gross),'tax_yuan':money(tax),'net_yuan':money(net),'roi':format(net/stake,'.12f') if stake else '','max_drawdown_yuan':money(dd),'longest_losing_streak':maxstreak,'best_issue':best_issue,'ex_best_issue_roi':format((net-issue.get(best_issue,Decimal(0)))/(stake-best_issue_stake),'.12f') if best_issue and stake>best_issue_stake else '','best_payout_pool':best_payout['pool_id'] if best_payout else '','ex_best_payout_roi':format((net-best_payout_net)/(stake-best_payout_stake),'.12f') if best_payout and stake>best_payout_stake else '','top_issue_positive_net_share':format(max((max(Decimal(0),x) for x in issue.values()),default=Decimal(0))/sum((max(Decimal(0),x) for x in issue.values()),Decimal(0)),'.12f') if any(x>0 for x in issue.values()) else ''}
+   gate_a_no_bet=sum(r['settlement_status']=='NO_BET_GATE_A' for r in rs);outcome_unavailable=sum(r['settlement_status']=='UNAVAILABLE_CANONICAL_OUTCOME' for r in rs);non_settled=gate_a_no_bet+outcome_unavailable
+   if len(bet)+non_settled!=len(rs):raise RuntimeError('robustness denominator partition drift')
+   return {'scope':scope,'scope_value':val,'variant_id':k[0],'arm':k[1],'frontiers':len(rs),'eligible_periods':len(bet),'gate_a_no_bet':gate_a_no_bet,'outcome_unavailable':outcome_unavailable,'non_settled':non_settled,'tickets':sum(int(r['formula_k']) for r in bet),'stake_yuan':money(stake),'hits':hits,'hit_rate':format(hits/len(bet),'.12f') if bet else '','gross_yuan':money(gross),'tax_yuan':money(tax),'net_yuan':money(net),'roi':format(net/stake,'.12f') if stake else '','max_drawdown_yuan':money(dd),'longest_losing_streak':maxstreak,'best_issue':best_issue,'ex_best_issue_roi':format((net-issue.get(best_issue,Decimal(0)))/(stake-best_issue_stake),'.12f') if best_issue and stake>best_issue_stake else '','best_payout_pool':best_payout['pool_id'] if best_payout else '','ex_best_payout_roi':format((net-best_payout_net)/(stake-best_payout_stake),'.12f') if best_payout and stake>best_payout_stake else '','top_issue_positive_net_share':format(max((max(Decimal(0),x) for x in issue.values()),default=Decimal(0))/sum((max(Decimal(0),x) for x in issue.values()),Decimal(0)),'.12f') if any(x>0 for x in issue.values()) else ''}
   years=sorted({r['year'] for r in rows});folds=sorted({r['fold'] for r in rows})
   for k in sorted({vkey(r) for r in rows}):
    rs=[r for r in rows if vkey(r)==k];robust.append(agg('ALL','ALL',rs,k))
@@ -195,7 +204,7 @@ def settle(output,ga):
     'top_issue_positive_net_share':a['top_issue_positive_net_share'],
    })
   write(stage/'variant_roi_comparison.csv',tuple(summary[0]),summary)
-  (stage/'decision.json').write_text(json.dumps({'decision':'FROZEN_RESULTS_PENDING_EV_IF_POSITIVE','rule':'No variant is promotable solely from this table; positive/robust rows require strict independent EV before promotion.'},indent=2,sort_keys=True)+'\n');card={'issue':119,'stage':'GATE_B_CANONICAL_FROZEN_VARIANT_SETTLEMENT','gate_a_manifest':sha(ga/'SHA256SUMS.json'),'outcome_manifest':MAN['out'],'settlement':'canonical final SP; factor .65 once; tax aggregated per variant/arm/issue','scope':'paper-only; no promotion without independent EV'};(stage/'settlement_card.json').write_text(json.dumps(card,indent=2,sort_keys=True)+'\n');shutil.copyfile(__file__,stage/'runner.py');m={p.name:sha(p) for p in sorted(stage.iterdir()) if p.is_file()};(stage/'SHA256SUMS.json').write_text(json.dumps(m,indent=2,sort_keys=True)+'\n');os.replace(stage,output);print(json.dumps({'manifest':sha(output/'SHA256SUMS.json'),'rows':len(rows),'summary':len(summary)}))
+  (stage/'decision.json').write_text(json.dumps({'decision':'FROZEN_RESULTS_PENDING_EV_IF_POSITIVE','rule':'No variant is promotable solely from this table; positive/robust rows require strict independent EV before promotion.'},indent=2,sort_keys=True)+'\n');card={'issue':119,'stage':'GATE_B_CANONICAL_FROZEN_VARIANT_SETTLEMENT','gate_a_manifest':sha(ga/'SHA256SUMS.json'),'outcome_manifest':MAN['out'],'settlement':'canonical final SP; factor .65 once; tax aggregated per variant/arm/issue','robustness_chronology':'year, first_kickoff_ts, segment_index, pool_id','denominator_partition':'eligible_periods + gate_a_no_bet + outcome_unavailable = frontiers','scope':'paper-only; no promotion without independent EV'};(stage/'settlement_card.json').write_text(json.dumps(card,indent=2,sort_keys=True)+'\n');shutil.copyfile(__file__,stage/'runner.py');m={p.name:sha(p) for p in sorted(stage.iterdir()) if p.is_file()};(stage/'SHA256SUMS.json').write_text(json.dumps(m,indent=2,sort_keys=True)+'\n');os.replace(stage,output);print(json.dumps({'manifest':sha(output/'SHA256SUMS.json'),'rows':len(rows),'summary':len(summary)}))
  finally:
   if stage.exists():shutil.rmtree(stage,ignore_errors=True)
 def main():

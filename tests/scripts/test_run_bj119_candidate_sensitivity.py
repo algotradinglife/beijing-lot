@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "run_bj119_candidate_sensitivity.py"
 GATE_A = ROOT / "results" / "bj119_gate_a_preoutcome_v1r1"
-GATE_B = ROOT / "results" / "bj119_gate_b_outcome_settlement_v1r2"
+GATE_B = ROOT / "results" / "bj119_gate_b_outcome_settlement_v1r3"
 
 
 def load():
@@ -67,6 +67,19 @@ def test_committed_packages_are_complete_and_gate_b_pins_gate_a() -> None:
         comparison = list(csv.DictReader(handle))
     assert len(comparison) == 56
     assert all("ex_best_payout_roi" in row for row in comparison)
+    assert all(
+        int(row["frontiers"])
+        == int(row["eligible_periods"])
+        + int(row["gate_a_no_bet"])
+        + int(row["outcome_unavailable"])
+        == 2_659
+        for row in comparison
+    )
+    assert all(
+        int(row["non_settled"])
+        == int(row["gate_a_no_bet"]) + int(row["outcome_unavailable"])
+        for row in comparison
+    )
     assert any(row["roi"] and float(row["roi"]) > 0 for row in comparison)
 
 
@@ -76,3 +89,36 @@ def test_settlement_has_every_required_robustness_scope() -> None:
     assert len(rows) == 1_232
     assert {row["scope"] for row in rows} == {"ALL", "YEAR", "FOLD", "LOYO"}
     assert all(row["max_drawdown_yuan"] != "" for row in rows)
+    assert all(
+        int(row["frontiers"])
+        == int(row["eligible_periods"])
+        + int(row["gate_a_no_bet"])
+        + int(row["outcome_unavailable"])
+        for row in rows
+    )
+    assert all(
+        int(row["non_settled"])
+        == int(row["gate_a_no_bet"]) + int(row["outcome_unavailable"])
+        for row in rows
+    )
+    assert all(int(row["frontiers"]) == 2_659 for row in rows if row["scope"] == "ALL")
+
+
+def test_chronology_uses_frozen_kickoff_not_numeric_issue_id() -> None:
+    module = load()
+    earlier_long_issue_id = {
+        "year": "2019",
+        "first_kickoff_ts": "2019-01-01 03:00:00",
+        "segment_index": "1",
+        "pool_id": "190101-OOS_2019-S01",
+        "issue": "190101",
+    }
+    later_short_issue_id = {
+        "year": "2020",
+        "first_kickoff_ts": "2020-01-01 03:00:00",
+        "segment_index": "1",
+        "pool_id": "20001-OOS_2020-S01",
+        "issue": "20001",
+    }
+    assert int(earlier_long_issue_id["issue"]) > int(later_short_issue_id["issue"])
+    assert module.chronology_key(earlier_long_issue_id) < module.chronology_key(later_short_issue_id)

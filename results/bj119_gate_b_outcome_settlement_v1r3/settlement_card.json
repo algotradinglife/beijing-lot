@@ -1,0 +1,10 @@
+{
+  "denominator_partition": "eligible_periods + gate_a_no_bet + outcome_unavailable = frontiers",
+  "gate_a_manifest": "bc2684f6e38dac76af6943e0fbd134613dbb3d2af9d80160a6505354e5311983",
+  "issue": 119,
+  "outcome_manifest": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "robustness_chronology": "year, first_kickoff_ts, segment_index, pool_id",
+  "scope": "paper-only; no promotion without independent EV",
+  "settlement": "canonical final SP; factor .65 once; tax aggregated per variant/arm/issue",
+  "stage": "GATE_B_CANONICAL_FROZEN_VARIANT_SETTLEMENT"
+}
