@@ -1,0 +1,4 @@
+{
+  "decision": "NO_PROMOTION",
+  "rule": "No frozen pruning frontier satisfied positive ALL, ex-best-group, ex-best-issue, every annual, and every LOYO ROI simultaneously."
+}
