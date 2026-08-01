@@ -39,6 +39,13 @@ updated: 2026-08-02
    反转。因此 #77 只接收 `CONTINUOUS_EURO_BJLINE`。
 6. **Top2 比 Top1 更贴近 N7 双选问题。** Top2 的覆盖率可以用来估计双选腿，
    但多腿之间并不独立，不能直接把单腿覆盖率连乘后当成真实票命中率。
+7. **放松候选标准会产生候选，但尚未得到跨年可推广优势。** #119 的冻结
+   敏感性网格显示 q/p 阈值会强烈改变候选密度；少量正 ROI 全部或几乎全部集中在
+   2019 的少数 observation。宽松单选与全覆盖总体为负，严格 #106 控制仍为
+   零候选。Gate B v1r3 已按真实 kickoff 时序修正回撤/连败，并将 Gate-A
+   `NO_BET` 与 canonical outcome 不可用分别报告；这两项报告修正不改变任何
+   stake、gross、tax、net 或 ROI。结果正在等待窄范围独立复验，不能用于购买或生产。详见
+   [[Issue-119-Candidate-Sensitivity|Issue #119 候选标准敏感性]]。
 
 ## 知识图谱
 
@@ -79,6 +86,7 @@ flowchart LR
 | 连续 EURO 比离散分桶改善了多少？ | [[Issue-83-Continuous-Market-Model#核心结果]] |
 | 改善来自 EURO、亚盘还是盘口移动？ | [[Issue-83-Continuous-Market-Model#改善归因]] |
 | 为什么最终只把简单模型交给 #77？ | [[Issue-83-Continuous-Market-Model#PI 决策]] |
+| 严格候选门槛是否错过了可用信号？ | [[Issue-119-Candidate-Sensitivity#结论与下一步]] |
 | 哪条北单让球线仍然薄弱？ | [[Issue-83-Continuous-Market-Model#原生让球线异质性]] |
 | 如何按期望 SP 选场，并按最低赛果概率决定全包、双选或单选胆？ | [#121 Gate A 阈值冻结](../research/bj121_expected_sp_probability_gate_a_2026-08-02.md) |
 
@@ -100,6 +108,7 @@ flowchart LR
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
 - [[track_b_beat_the_close|Track B：超越市场基线]]
 - [[single_match_probability_calibration|单场概率校准设计]]
+- [[Issue-119-Candidate-Sensitivity|Issue #119 候选标准敏感性]]
 - [[roadmap|研究路线图]]
 - [Issue #82](https://github.com/algotradinglife/beijing-lot/issues/82)
 - [Issue #83](https://github.com/algotradinglife/beijing-lot/issues/83)
