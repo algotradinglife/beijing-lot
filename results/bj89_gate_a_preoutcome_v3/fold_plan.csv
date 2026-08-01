@@ -1,0 +1,8 @@
+fold,train_years,test_year,chronology,target_outcome_access
+OOS_2019,2018-2018,2019,expanding calendar-year; all model/gate fit uses train years only,FORBIDDEN_IN_GATE_A
+OOS_2020,2018-2019,2020,expanding calendar-year; all model/gate fit uses train years only,FORBIDDEN_IN_GATE_A
+OOS_2021,2018-2020,2021,expanding calendar-year; all model/gate fit uses train years only,FORBIDDEN_IN_GATE_A
+OOS_2022,2018-2021,2022,expanding calendar-year; all model/gate fit uses train years only,FORBIDDEN_IN_GATE_A
+OOS_2023,2018-2022,2023,expanding calendar-year; all model/gate fit uses train years only,FORBIDDEN_IN_GATE_A
+OOS_2024,2018-2023,2024,expanding calendar-year; all model/gate fit uses train years only,FORBIDDEN_IN_GATE_A
+OOS_2025,2018-2024,2025,expanding calendar-year; all model/gate fit uses train years only,FORBIDDEN_IN_GATE_A
