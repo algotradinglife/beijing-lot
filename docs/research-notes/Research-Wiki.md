@@ -89,6 +89,7 @@ flowchart LR
 | 严格候选门槛是否错过了可用信号？ | [[Issue-119-Candidate-Sensitivity#结论与下一步]] |
 | 哪条北单让球线仍然薄弱？ | [[Issue-83-Continuous-Market-Model#原生让球线异质性]] |
 | 如何按期望 SP 选场，并按最低赛果概率决定全包、双选或单选胆？ | [#121 Gate A 阈值冻结](../research/bj121_expected_sp_probability_gate_a_2026-08-02.md) · [Gate B ROI 对比](../research/bj121_expected_sp_probability_gate_b_2026-08-02.md) |
+| 同一 N7 中全局只删一个最低概率代码是否有价值？ | [#127 Gate A 匹配单码删除冻结](../research/bj127_global_single_prune_gate_a_2026-08-02.md) |
 
 ## 证据等级
 
@@ -114,6 +115,11 @@ ROI 从约 `-31%` 改善至约 `-23%~-24%`；提高 E_SP/GM 门槛再改善不�
 百分点。说明“高 E_SP 选场 + 删除最低概率赛果”有效压缩了成本，但当前两个
 静态指标不足以形成正 edge。下一轮应引入基本面、盘口变化、让球线/联赛条件、
 SP 不确定性或税线控制，而不是在已结算阈值附近事后微调。
+
+## #127：匹配全局单码删除
+
+#127 是与 #121 不同的、只删除一个全局最低概率代码的 matched-pair 复查。目前只
+冻结完整赛前矩阵和可视化证据；没有 outcome、ROI 或晋级结论，等待独立 Gate-A 审查。
 
 ## 相关笔记
 
