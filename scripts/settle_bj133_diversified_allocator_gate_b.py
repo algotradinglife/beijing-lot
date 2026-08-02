@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""One-shot outcome settlement for #133's accepted diversified N7 freeze.
+"""One-shot outcome settlement for #133's diversified N7 allocation freeze.
 
-Only the immutable #133 Gate-A bundle and the canonical final-SP outcome
-payload are read.  Sampling is deterministic Q-weighted sampling without
-replacement; every tax decision is made on an individual winning ticket, never
-on an issue, arm, or policy aggregate.  Temporary files are staged beside the
-requested result directory (under ``results/``), never in ``/tmp``.
+The immutable Gate-A v1 allocation package is retained unchanged.  Its v2
+outcome-unexposed additive package supplies the independent Q-weighted
+with-replacement (WR) control.  The settlement compares that natural
+probability concentration baseline with WOR-distinct sensitivity and explicit
+allocation caps.  Every tax decision is made per winning ticket—not per
+issue, arm, or policy aggregate.  Temporary files are staged under
+``results/``, never in ``/tmp``.
 """
 from __future__ import annotations
 
 import argparse
+import bisect
 import csv
 import gzip
 import hashlib
@@ -28,8 +31,9 @@ from typing import Iterable, Iterator
 
 
 CONTRACT = "BJ-HIST-DIVERSIFIED-N7-ALLOCATOR-001"
-VERSION = "bj133-gate-b-v1-ticket-tax"
+VERSION = "bj133-gate-b-v2-wr-baseline-ticket-tax"
 FREEZE_MANIFEST = "1fff3f904fcb9a5efed231771880be8ae0603b0d8f3c7d0365937fcfe9985e79"
+WR_FREEZE_MANIFEST = "7dc284bc7050b71b7bce5a15aa228470a6eff4b0a2345bc0631ec5cd8d1d899f"
 OUTCOME_MANIFEST = "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc"
 OUTCOME_PAYLOAD = "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89"
 CODES = ("3", "1", "0")
@@ -51,8 +55,9 @@ def repo_root(anchor: Path) -> Path:
 
 ROOT = repo_root(Path(__file__))
 FREEZE = ROOT / "results" / "bj133_gate_a_preoutcome_v1"
+WR_FREEZE = ROOT / "results" / "bj133_gate_a_preoutcome_v2_wr_additive"
 OUTCOME_SOURCE = ROOT / "results" / "bj95_gate_b_outcome_settlement_v2r8"
-OUTPUT = ROOT / "results" / "bj133_gate_b_outcome_settlement_v1"
+OUTPUT = ROOT / "results" / "bj133_gate_b_outcome_settlement_v2"
 
 PLAN_FIELDS = (
     "config_id", "config_role", "gate_id", "top_k_id", "issue", "fold", "year", "issue_instance",
@@ -72,6 +77,12 @@ ROLE_REQUIRED = {
     "gate_id", "portfolio_id", "issue", "fold", "year", "issue_instance", "match_id", "selection_rank",
     "q_weight3", "q_weight1", "q_weight0",
 }
+WR_SAMPLER_REQUIRED = {
+    "config_id", "config_role", "gate_id", "top_k_id", "issue", "fold", "year", "issue_instance",
+    "allocator_id", "allocator_family", "ticket_M", "probability_vector", "ticket_mechanism", "seed",
+    "seed_role", "source_ticket_mechanism", "duplicate_policy", "selected_identity_count",
+    "selected_portfolio_ids", "selection_status", "planned_draw_count", "planned_stake_yuan", "outcome_boundary",
+}
 OUTCOME_FIELDS = (
     "match_id", "result_code", "winning_sp", "winning_sp_source", "settlement_quality", "has_trusted_settlement",
 )
@@ -79,7 +90,8 @@ SETTLEMENT_FIELDS = (
     "issue", "fold", "year", "issue_instance", "config_id", "config_role", "gate_id", "top_k_id",
     "allocator_id", "allocator_family", "allocator_interpretation", "seed", "seed_role", "ticket_M",
     "ticket_mechanism", "frozen_selection_status", "settlement_status", "selected_identity_count",
-    "selected_portfolio_ids", "planned_draw_count", "planned_stake_yuan", "full_control_stake_yuan",
+    "selected_portfolio_ids", "planned_draw_count", "unique_ticket_draw_count", "duplicate_ticket_draw_count",
+    "duplicate_ticket_draw_group_count", "planned_stake_yuan", "full_control_stake_yuan",
     "capital_utilization_vs_exact_full", "hit_ticket_count", "coverage_hit", "gross_pre_tax_yuan", "tax_yuan",
     "after_tax_gross_yuan", "pre_tax_net_yuan", "tax_adjusted_net_yuan", "no_tax_roi", "tax_adjusted_roi",
     "unique_match_count", "total_leg_slots", "overlap_leg_slots", "max_match_exposure",
@@ -87,7 +99,7 @@ SETTLEMENT_FIELDS = (
     "gross_top_identity_share", "outcome_gap_count", "taxable_hit_ticket_count", "non_taxable_hit_ticket_count",
 )
 TICKET_FIELDS = (
-    "issue", "fold", "year", "issue_instance", "config_id", "allocator_id", "seed", "portfolio_id",
+    "issue", "fold", "year", "issue_instance", "config_id", "allocator_id", "ticket_mechanism", "seed", "portfolio_id",
     "winning_ticket_gross_yuan", "winning_ticket_count", "per_ticket_tax_yuan", "tax_yuan", "tax_rule",
 )
 SUMMARY_FIELDS = (
@@ -95,6 +107,7 @@ SUMMARY_FIELDS = (
     "allocator_family", "allocator_interpretation", "seed", "seed_role", "ticket_M", "ticket_mechanism",
     "frozen_available_issue_count", "frozen_no_bet_issue_count", "settled_issue_count",
     "unavailable_outcome_issue_count", "planned_draw_count", "stake_yuan", "full_control_stake_yuan",
+    "unique_ticket_draw_count", "duplicate_ticket_draw_count", "duplicate_ticket_draw_group_count",
     "capital_utilization_vs_exact_full", "hit_ticket_count", "coverage_hits", "coverage_hit_rate",
     "gross_pre_tax_yuan", "tax_yuan", "after_tax_gross_yuan", "pre_tax_net_yuan", "tax_adjusted_net_yuan",
     "no_tax_roi", "tax_adjusted_roi", "max_drawdown_yuan", "longest_miss_streak", "gross_top_issue_share",
@@ -103,27 +116,27 @@ SUMMARY_FIELDS = (
     "max_pairwise_jaccard", "max_q_delete_exposure",
 )
 EFFECT_FIELDS = (
-    "scope", "scope_value", "effect", "config_id", "allocator_id", "seed", "baseline_config_id",
-    "baseline_allocator_id", "baseline_seed", "support_issue_count", "candidate_issue_count", "stake_yuan",
+    "scope", "scope_value", "effect", "comparison_class", "config_id", "allocator_id", "ticket_mechanism", "seed", "baseline_config_id",
+    "baseline_allocator_id", "baseline_ticket_mechanism", "baseline_seed", "support_issue_count", "candidate_issue_count", "stake_yuan",
     "baseline_stake_yuan", "full_reference_stake_yuan", "no_tax_roi", "baseline_no_tax_roi",
     "no_tax_roi_delta", "tax_adjusted_roi", "baseline_tax_adjusted_roi", "tax_adjusted_roi_delta",
     "gross_pre_tax_yuan_delta", "tax_yuan_delta", "coverage_hit_rate_delta", "gross_top_issue_share_delta",
     "gross_issue_hhi_delta", "matched_support_rule",
 )
 BOOTSTRAP_FIELDS = (
-    "effect", "config_id", "allocator_id", "seed", "support_issue_count", "replicates", "metric",
+    "effect", "comparison_class", "config_id", "allocator_id", "ticket_mechanism", "seed", "support_issue_count", "replicates", "metric",
     "point_estimate", "ci95_low", "ci95_high", "one_sided_positive_p", "two_sided_sign_p",
     "primary_family_size", "bonferroni_two_sided_p", "fwer_alpha", "passes_fwer_positive",
 )
 COMPARISON_FIELDS = (
-    "comparison_id", "effect", "config_id", "allocator_id", "seed", "is_primary_economic_comparison",
+    "comparison_id", "effect", "comparison_class", "config_id", "allocator_id", "ticket_mechanism", "seed", "is_primary_economic_comparison",
     "support_issue_count", "all_no_tax_roi_delta", "all_tax_adjusted_roi_delta", "all_bootstrap_ci95_low",
     "all_bootstrap_ci95_high", "bonferroni_two_sided_p", "tax_bootstrap_ci95_low",
     "tax_bootstrap_ci95_high", "tax_bonferroni_two_sided_p", "fwer_alpha", "all_seed_persistence_group",
     "classification",
 )
 TAX_RECON_FIELDS = (
-    "config_id", "allocator_id", "seed", "ticket_ledger_hit_ticket_count", "ticket_ledger_taxable_ticket_count",
+    "config_id", "allocator_id", "ticket_mechanism", "seed", "ticket_ledger_hit_ticket_count", "ticket_ledger_taxable_ticket_count",
     "ticket_ledger_tax_yuan", "issue_ledger_tax_yuan", "difference_yuan", "tax_rule",
 )
 SOURCE_FIELDS = ("source", "role", "identity", "sha256", "rows", "join_status")
@@ -274,6 +287,12 @@ def validate_inputs() -> dict[str, str]:
         raise RuntimeError("Gate-A identity portable digest drift")
     if content["gzip_payloads"]["candidate_role_vectors.csv.gz"]["canonical_decompressed_sha256"] != decompressed_digest(FREEZE / "candidate_role_vectors.csv.gz")[0]:
         raise RuntimeError("Gate-A role portable digest drift")
+    wr_freeze = verified_manifest(WR_FREEZE, WR_FREEZE_MANIFEST)
+    wr_card = json.loads((WR_FREEZE / "gate_a_v2_card.json").read_text(encoding="utf-8"))
+    if (wr_card.get("contract") != CONTRACT
+            or wr_card.get("stage") != "GATE_A_OUTCOME_UNEXPOSED_WR_DUPLICATE_STAKE_ADDITIVE_FREEZE"
+            or wr_card.get("v1_binding", {}).get("manifest_sha256") != FREEZE_MANIFEST):
+        raise RuntimeError("unexpected Gate-A v2 WR additive contract")
     outcome = verified_manifest(OUTCOME_SOURCE, OUTCOME_MANIFEST)
     if outcome.get("canonical_outcome_join.csv") != OUTCOME_PAYLOAD:
         raise RuntimeError("canonical final-SP payload drift")
@@ -283,6 +302,9 @@ def validate_inputs() -> dict[str, str]:
         "gate_a_plan_sha256": freeze["allocation_plan.csv"],
         "gate_a_identity_payload_sha256": freeze["candidate_identity_catalog.csv.gz"],
         "gate_a_role_payload_sha256": freeze["candidate_role_vectors.csv.gz"],
+        "gate_a_v2_wr_manifest_sha256": WR_FREEZE_MANIFEST,
+        "gate_a_v2_wr_content_identity_sha256": wr_freeze["CONTENT_IDENTITY.json"],
+        "gate_a_v2_wr_sampler_plan_sha256": wr_freeze["wr_sampler_plan.csv"],
         "outcome_manifest_sha256": OUTCOME_MANIFEST,
         "canonical_outcome_join_sha256": OUTCOME_PAYLOAD,
     }
@@ -316,6 +338,45 @@ def load_plans() -> list[dict[str, str]]:
     if len(keys) != len(plans):
         raise RuntimeError("Gate-A allocation-plan uniqueness drift")
     return plans
+
+
+def load_wr_plans(plans: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Load the v2 additive WR arm and prove its exact v1-plan coverage."""
+    with (WR_FREEZE / "wr_sampler_plan.csv").open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        if not WR_SAMPLER_REQUIRED <= set(reader.fieldnames or ()):
+            raise RuntimeError("Gate-A v2 WR sampler schema lacks required columns")
+        wr_plans = list(reader)
+    if len(wr_plans) != 46_980:
+        raise RuntimeError(f"Gate-A v2 WR sampler denominator drift: {len(wr_plans)}")
+    source = {
+        (row["config_id"], row["allocator_id"], row["issue_instance"]): row
+        for row in plans if row["ticket_mechanism"] == "Q_INFORMED_WOR_DISTINCT"
+    }
+    grouped: dict[tuple[str, str, str], list[dict[str, str]]] = defaultdict(list)
+    for row in wr_plans:
+        if (row["ticket_mechanism"] != "Q_INFORMED_WR_DUPLICATE_STAKE"
+                or row["source_ticket_mechanism"] != "Q_INFORMED_WOR_DISTINCT"
+                or row["duplicate_policy"] != "EACH_INDEPENDENT_DRAW_IS_A_SEPARATE_Y2_TICKET_AND_TAX_UNIT"):
+            raise RuntimeError("unexpected Gate-A v2 WR sampler semantics")
+        key = row["config_id"], row["allocator_id"], row["issue_instance"]
+        grouped[key].append(row)
+        original = source.get(key)
+        if original is None:
+            raise RuntimeError("WR sampler references a non-sampled Gate-A v1 plan")
+        for field in (
+            "config_role", "gate_id", "top_k_id", "issue", "fold", "year", "allocator_family", "ticket_M",
+            "probability_vector", "selected_identity_count", "selected_portfolio_ids", "selection_status",
+            "planned_draw_count", "planned_stake_yuan", "outcome_boundary",
+        ):
+            if row[field] != original[field]:
+                raise RuntimeError(f"WR sampler drifts from Gate-A v1 in {field}")
+    if set(grouped) != set(source):
+        raise RuntimeError("WR sampler coverage differs from Gate-A v1 sampled plans")
+    for values in grouped.values():
+        if {row["seed"] for row in values} != {"133001", "133002", "133003"}:
+            raise RuntimeError("WR sampler seed coverage drift")
+    return wr_plans
 
 
 def load_identities(outcomes: dict[str, dict[str, str]]) -> dict[tuple[str, str], Identity]:
@@ -392,17 +453,60 @@ def weighted_without_replacement_rank(identity: Identity, seed: int) -> int:
     return rank
 
 
-def expanded_plans(plans: list[dict[str, str]]) -> Iterator[dict[str, str]]:
+def weighted_with_replacement_stats(identity: Identity, seed: int, ticket_m: int) -> tuple[int, int, int, int]:
+    """Return hit tickets, unique draws, duplicate draws and duplicate groups.
+
+    Draw position is part of the deterministic key: repeated outcomes are not
+    collapsed.  A duplicate therefore remains a separately paid ¥2 ticket and
+    can produce a separately taxable winning ticket during settlement.
+    """
+    if identity.truth_index is None:
+        raise RuntimeError("cannot sample an identity missing canonical outcomes")
+    weights = q_weights(identity)
+    cumulative: list[float] = []
+    running = 0.0
+    for weight in weights:
+        running += weight
+        cumulative.append(running)
+    if abs(cumulative[-1] - 1.0) > 1e-8:
+        raise RuntimeError("WR ticket-space normalization drift")
+    counts: dict[int, int] = defaultdict(int)
+    for draw in range(ticket_m):
+        uniform = stable_uniform("bj133", "Q_WR", seed, identity.key[0], identity.key[1], draw)
+        ordinal = bisect.bisect_left(cumulative, uniform)
+        if ordinal >= FULL_K:
+            ordinal = FULL_K - 1
+        counts[ordinal] += 1
+    unique = len(counts)
+    duplicates = ticket_m - unique
+    duplicate_groups = sum(count > 1 for count in counts.values())
+    return counts.get(identity.truth_index, 0), unique, duplicates, duplicate_groups
+
+
+def expanded_plans(plans: list[dict[str, str]], wr_plans: list[dict[str, str]]) -> Iterator[dict[str, str]]:
     for plan in plans:
         if plan["ticket_mechanism"] == "EXACT_K4_FULL":
             yield {**plan, "seed": "NA", "seed_role": "CONTROL"}
         else:
             for seed in ("133001", "133002", "133003"):
                 yield {**plan, "seed": seed, "seed_role": "PRIMARY" if seed == "133001" else "SENSITIVITY"}
+    source = {
+        (plan["config_id"], plan["allocator_id"], plan["issue_instance"]): plan
+        for plan in plans if plan["ticket_mechanism"] == "Q_INFORMED_WOR_DISTINCT"
+    }
+    for wr_plan in wr_plans:
+        key = wr_plan["config_id"], wr_plan["allocator_id"], wr_plan["issue_instance"]
+        base = source[key]
+        yield {
+            **base,
+            "ticket_mechanism": wr_plan["ticket_mechanism"],
+            "seed": wr_plan["seed"],
+            "seed_role": wr_plan["seed_role"],
+        }
 
 
-def plan_key(plan: dict[str, str]) -> tuple[str, str, str]:
-    return plan["config_id"], plan["allocator_id"], plan["seed"]
+def plan_key(plan: dict[str, str]) -> tuple[str, str, str, str]:
+    return plan["config_id"], plan["allocator_id"], plan["ticket_mechanism"], plan["seed"]
 
 
 def outcome_status(plan: dict[str, str], selected: list[Identity]) -> str:
@@ -416,7 +520,7 @@ def outcome_status(plan: dict[str, str], selected: list[Identity]) -> str:
 def settle_plan(
     plan: dict[str, str],
     identities: dict[tuple[str, str], Identity],
-    rank_cache: dict[tuple[tuple[str, str], int], int],
+    sampling_cache: dict[tuple[tuple[str, str], str, int, int], tuple[int, int, int, int]],
     ticket_writer: csv.DictWriter,
     audit: TaxAudit,
 ) -> dict[str, object]:
@@ -439,57 +543,70 @@ def settle_plan(
     }
     if status != "SETTLED":
         return {
-            **common, "planned_draw_count": 0, "planned_stake_yuan": Decimal(0), "capital_utilization_vs_exact_full": None,
+            **common, "planned_draw_count": 0, "unique_ticket_draw_count": 0, "duplicate_ticket_draw_count": 0,
+            "duplicate_ticket_draw_group_count": 0, "planned_stake_yuan": Decimal(0), "capital_utilization_vs_exact_full": None,
             "hit_ticket_count": 0, "coverage_hit": 0, "gross_pre_tax_yuan": Decimal(0), "tax_yuan": Decimal(0),
             "after_tax_gross_yuan": Decimal(0), "pre_tax_net_yuan": Decimal(0), "tax_adjusted_net_yuan": Decimal(0),
             "no_tax_roi": None, "tax_adjusted_roi": None, "gross_top_identity_share": None,
             "outcome_gap_count": sum(identity.outcome_gap_count for identity in selected), "taxable_hit_ticket_count": 0,
             "non_taxable_hit_ticket_count": 0,
         }
-    hit_count, gross, tax = 0, Decimal(0), Decimal(0)
-    individual_gross: list[Decimal] = []
+    hit_count, taxable, gross, tax = 0, 0, Decimal(0), Decimal(0)
+    identity_gross: list[Decimal] = []
+    unique_draws, duplicate_draws, duplicate_groups = 0, 0, 0
     ticket_m = int(plan["ticket_M"])
     for identity in selected:
         if identity.payout_per_ticket is None:
             raise RuntimeError("settled identity lacks ticket payout")
         if plan["ticket_mechanism"] == "EXACT_K4_FULL":
-            hit = 1
+            hit, unique, duplicates, groups = 1, FULL_K, 0, 0
         else:
-            cache_key = identity.key, int(plan["seed"])
-            if cache_key not in rank_cache:
-                rank_cache[cache_key] = weighted_without_replacement_rank(identity, int(plan["seed"]))
-            hit = int(rank_cache[cache_key] <= ticket_m)
+            cache_key = identity.key, plan["ticket_mechanism"], int(plan["seed"]), ticket_m
+            if cache_key not in sampling_cache:
+                if plan["ticket_mechanism"] == "Q_INFORMED_WOR_DISTINCT":
+                    hit = int(weighted_without_replacement_rank(identity, int(plan["seed"])) <= ticket_m)
+                    sampling_cache[cache_key] = hit, ticket_m, 0, 0
+                elif plan["ticket_mechanism"] == "Q_INFORMED_WR_DUPLICATE_STAKE":
+                    sampling_cache[cache_key] = weighted_with_replacement_stats(identity, int(plan["seed"]), ticket_m)
+                else:
+                    raise RuntimeError(f"unsupported ticket mechanism: {plan['ticket_mechanism']}")
+            hit, unique, duplicates, groups = sampling_cache[cache_key]
+        unique_draws += unique
+        duplicate_draws += duplicates
+        duplicate_groups += groups
         if not hit:
-            individual_gross.append(Decimal(0))
+            identity_gross.append(Decimal(0))
             continue
         # Persist and aggregate one canonical ticket-level monetary amount so
         # the visible ticket ledger, the policy ledger, and tax reconciliation
         # agree exactly at the declared ¥0.000001 precision.
         per_ticket_gross = identity.payout_per_ticket.quantize(MONEY_QUANTUM)
         per_ticket_tax = ticket_tax(per_ticket_gross).quantize(MONEY_QUANTUM)
-        hit_count += 1
-        gross += per_ticket_gross
-        tax += per_ticket_tax
-        individual_gross.append(per_ticket_gross)
-        audit.add(per_ticket_tax, 1)
+        hit_count += hit
+        gross += per_ticket_gross * hit
+        tax += per_ticket_tax * hit
+        taxable += hit if per_ticket_tax else 0
+        identity_gross.append(per_ticket_gross * hit)
+        audit.add(per_ticket_tax, hit)
         ticket_writer.writerow({
             "issue": plan["issue"], "fold": plan["fold"], "year": plan["year"], "issue_instance": plan["issue_instance"],
-            "config_id": plan["config_id"], "allocator_id": plan["allocator_id"], "seed": plan["seed"],
+            "config_id": plan["config_id"], "allocator_id": plan["allocator_id"], "ticket_mechanism": plan["ticket_mechanism"], "seed": plan["seed"],
             "portfolio_id": identity.key[1], "winning_ticket_gross_yuan": money(per_ticket_gross),
-            "winning_ticket_count": 1, "per_ticket_tax_yuan": money(per_ticket_tax), "tax_yuan": money(per_ticket_tax),
+            "winning_ticket_count": hit, "per_ticket_tax_yuan": money(per_ticket_tax), "tax_yuan": money(per_ticket_tax * hit),
             "tax_rule": "20pct_if_each_ticket_gross_gte_10000_no_aggregate_pooling",
         })
     draws = len(selected) * ticket_m
     stake = UNIT_STAKE * draws
     pre_tax_net, tax_net = gross - stake, gross - tax - stake
-    taxable = sum(1 for value in individual_gross if value and ticket_tax(value))
     return {
-        **common, "planned_draw_count": draws, "planned_stake_yuan": stake,
+        **common, "planned_draw_count": draws, "unique_ticket_draw_count": unique_draws,
+        "duplicate_ticket_draw_count": duplicate_draws, "duplicate_ticket_draw_group_count": duplicate_groups,
+        "planned_stake_yuan": stake,
         "capital_utilization_vs_exact_full": Decimal(0) if not common["full_control_stake_yuan"] else stake / common["full_control_stake_yuan"],
         "hit_ticket_count": hit_count, "coverage_hit": int(bool(hit_count)), "gross_pre_tax_yuan": gross, "tax_yuan": tax,
         "after_tax_gross_yuan": gross - tax, "pre_tax_net_yuan": pre_tax_net, "tax_adjusted_net_yuan": tax_net,
         "no_tax_roi": pre_tax_net / stake if stake else None, "tax_adjusted_roi": tax_net / stake if stake else None,
-        "gross_top_identity_share": max(individual_gross, default=Decimal(0)) / gross if gross else None, "outcome_gap_count": 0,
+        "gross_top_identity_share": max(identity_gross, default=Decimal(0)) / gross if gross else None, "outcome_gap_count": 0,
         "taxable_hit_ticket_count": taxable, "non_taxable_hit_ticket_count": hit_count - taxable,
     }
 
@@ -544,6 +661,9 @@ class Metric:
             "settled_issue_count": len(rows), "unavailable_outcome_issue_count": unavailable,
             "planned_draw_count": sum(int(row["planned_draw_count"]) for row in rows), "stake_yuan": stake,
             "full_control_stake_yuan": full_stake, "capital_utilization_vs_exact_full": stake / full_stake if full_stake else None,
+            "unique_ticket_draw_count": sum(int(row["unique_ticket_draw_count"]) for row in rows),
+            "duplicate_ticket_draw_count": sum(int(row["duplicate_ticket_draw_count"]) for row in rows),
+            "duplicate_ticket_draw_group_count": sum(int(row["duplicate_ticket_draw_group_count"]) for row in rows),
             "hit_ticket_count": hits, "coverage_hits": coverage, "coverage_hit_rate": Decimal(coverage) / len(rows) if rows else None,
             "gross_pre_tax_yuan": gross, "tax_yuan": tax, "after_tax_gross_yuan": gross - tax,
             "pre_tax_net_yuan": pre_tax_net, "tax_adjusted_net_yuan": tax_net,
@@ -570,10 +690,10 @@ def metric_meta(plan: dict[str, str]) -> dict[str, object]:
     }
 
 
-def metrics_for(rows: list[dict[str, object]]) -> tuple[list[dict[str, object]], dict[tuple[str, str, str], list[dict[str, object]]]]:
-    policy_rows: dict[tuple[str, str, str], list[dict[str, object]]] = defaultdict(list)
+def metrics_for(rows: list[dict[str, object]]) -> tuple[list[dict[str, object]], dict[tuple[str, str, str, str], list[dict[str, object]]]]:
+    policy_rows: dict[tuple[str, str, str, str], list[dict[str, object]]] = defaultdict(list)
     for row in rows:
-        policy_rows[(str(row["config_id"]), str(row["allocator_id"]), str(row["seed"]))].append(row)
+        policy_rows[(str(row["config_id"]), str(row["allocator_id"]), str(row["ticket_mechanism"]), str(row["seed"]))].append(row)
     summaries: list[dict[str, object]] = []
     for key, values in sorted(policy_rows.items()):
         values.sort(key=lambda row: (str(row["year"]), str(row["issue"]), str(row["fold"])))
@@ -600,12 +720,14 @@ def matched_rows(left: list[dict[str, object]], right: list[dict[str, object]], 
 
 def effect_row(
     effect: str,
+    comparison_class: str,
     candidate: list[dict[str, object]],
     baseline: list[dict[str, object]],
     scope: str,
     value: str,
     baseline_config_id: str,
     baseline_allocator_id: str,
+    baseline_ticket_mechanism: str,
     baseline_seed: str,
 ) -> tuple[dict[str, object], list[tuple[dict[str, object], dict[str, object]]]]:
     pairs, candidate_issue_count = matched_rows(candidate, baseline, scope, value)
@@ -629,10 +751,12 @@ def effect_row(
     left_share = max((left["gross_pre_tax_yuan"] for left, _right in pairs), default=Decimal(0)) / left_gross if left_gross else None
     right_share = max((right["gross_pre_tax_yuan"] for _left, right in pairs), default=Decimal(0)) / right_gross if right_gross else None
     return ({
-        "scope": scope, "scope_value": value, "effect": effect, "config_id": candidate[0]["config_id"],
-        "allocator_id": candidate[0]["allocator_id"], "seed": candidate[0]["seed"],
+        "scope": scope, "scope_value": value, "effect": effect, "comparison_class": comparison_class,
+        "config_id": candidate[0]["config_id"], "allocator_id": candidate[0]["allocator_id"],
+        "ticket_mechanism": candidate[0]["ticket_mechanism"], "seed": candidate[0]["seed"],
         "baseline_config_id": baseline_config_id, "baseline_allocator_id": baseline_allocator_id,
-        "baseline_seed": baseline_seed, "support_issue_count": len(pairs), "candidate_issue_count": candidate_issue_count,
+        "baseline_ticket_mechanism": baseline_ticket_mechanism, "baseline_seed": baseline_seed,
+        "support_issue_count": len(pairs), "candidate_issue_count": candidate_issue_count,
         "stake_yuan": left_stake, "baseline_stake_yuan": right_stake,
         "full_reference_stake_yuan": sum((left["full_control_stake_yuan"] for left, _right in pairs), Decimal(0)),
         "no_tax_roi": left_pre / left_stake if left_stake else None,
@@ -684,15 +808,16 @@ def bootstrap(
         positive = sum(value <= 0 for value in values) / len(values)
         negative = sum(value >= 0 for value in values) / len(values)
         output.append({
-            "effect": effect["effect"], "config_id": effect["config_id"], "allocator_id": effect["allocator_id"],
-            "seed": effect["seed"], "support_issue_count": len(pairs), "replicates": BOOTSTRAP_REPLICATES,
+            "effect": effect["effect"], "comparison_class": effect["comparison_class"], "config_id": effect["config_id"],
+            "allocator_id": effect["allocator_id"], "ticket_mechanism": effect["ticket_mechanism"], "seed": effect["seed"],
+            "support_issue_count": len(pairs), "replicates": BOOTSTRAP_REPLICATES,
             "metric": metric, "point_estimate": point, "ci95_low": quantile(values, 0.025), "ci95_high": quantile(values, 0.975),
             "one_sided_positive_p": positive, "two_sided_sign_p": min(1.0, 2.0 * min(positive, negative)),
         })
     return output
 
 
-def build_effects(policy_rows: dict[tuple[str, str, str], list[dict[str, object]]]) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+def build_effects(policy_rows: dict[tuple[str, str, str, str], list[dict[str, object]]]) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
     effects: list[dict[str, object]] = []
     bootstrap_rows: list[dict[str, object]] = []
     scopes = [("ALL", "ALL")]
@@ -701,49 +826,75 @@ def build_effects(policy_rows: dict[tuple[str, str, str], list[dict[str, object]
     scopes.extend(("YEAR", value) for value in years)
     scopes.extend(("FOLD", value) for value in folds)
     scopes.extend(("LEAVE_ONE_YEAR_OUT", value) for value in years)
+    active_allocators = sorted({key[1] for key in policy_rows if key[1] != "CONCENTRATED_TOP_SCORE"})
     for config in ("PRIMARY_NO_GATE_K4_M64", "PRIMARY_NO_GATE_K4_M128"):
         full_config = "ECONOMIC_CONTROL_NO_GATE_K4_FULL"
-        for allocator in ("Q_DELETE_EXPOSURE_CAP_1", "Q_DELETE_EXPOSURE_CAP_2"):
-            for seed in ("133001", "133002", "133003"):
-                candidate = policy_rows[(config, allocator, seed)]
-                concentrated = policy_rows[(config, "CONCENTRATED_TOP_SCORE", seed)]
-                full = policy_rows[(full_config, allocator, "NA")]
-                for scope, value in scopes:
-                    row, pairs = effect_row("ALLOCATOR_MINUS_CONCENTRATED", candidate, concentrated, scope, value, config, "CONCENTRATED_TOP_SCORE", seed)
+        for seed in ("133001", "133002", "133003"):
+            wr_baseline = policy_rows[(config, "CONCENTRATED_TOP_SCORE", "Q_INFORMED_WR_DUPLICATE_STAKE", seed)]
+            wor_baseline = policy_rows[(config, "CONCENTRATED_TOP_SCORE", "Q_INFORMED_WOR_DISTINCT", seed)]
+            full = policy_rows[(full_config, "CONCENTRATED_TOP_SCORE", "EXACT_K4_FULL", "NA")]
+            for scope, value in scopes:
+                row, pairs = effect_row(
+                    "WOR_DISTINCT_MINUS_WR_BASELINE", "SAMPLING_SENSITIVITY", wor_baseline, wr_baseline,
+                    scope, value, config, "CONCENTRATED_TOP_SCORE", "Q_INFORMED_WR_DUPLICATE_STAKE", seed,
+                )
+                effects.append(row)
+                row, pairs = effect_row(
+                    "WR_BASELINE_MINUS_FULL_CAPITAL_NORMALIZED", "ECONOMIC_FULL_CONTROL", wr_baseline, full,
+                    scope, value, full_config, "CONCENTRATED_TOP_SCORE", "EXACT_K4_FULL", "NA",
+                )
+                effects.append(row)
+                for allocator in active_allocators:
+                    primary = allocator in {"Q_DELETE_EXPOSURE_CAP_1", "Q_DELETE_EXPOSURE_CAP_2"}
+                    class_name = "PRIMARY_ACTIVE_OVERLAP_CAP" if primary else "ACTIVE_OVERLAP_CAP_CONTROL"
+                    candidate_wr = policy_rows[(config, allocator, "Q_INFORMED_WR_DUPLICATE_STAKE", seed)]
+                    candidate_wor = policy_rows[(config, allocator, "Q_INFORMED_WOR_DISTINCT", seed)]
+                    row, pairs = effect_row(
+                        "ACTIVE_CAP_WR_MINUS_WR_BASELINE", class_name, candidate_wr, wr_baseline,
+                        scope, value, config, "CONCENTRATED_TOP_SCORE", "Q_INFORMED_WR_DUPLICATE_STAKE", seed,
+                    )
                     effects.append(row)
-                    if scope == "ALL":
-                        bootstrap_rows.extend(bootstrap(row, pairs, f"bj133|{config}|{allocator}|{seed}|concentrated"))
-                    row, pairs = effect_row("ALLOCATOR_MINUS_FULL_CAPITAL_NORMALIZED", candidate, full, scope, value, full_config, allocator, "NA")
+                    if scope == "ALL" and primary:
+                        bootstrap_rows.extend(bootstrap(row, pairs, f"bj133|{config}|{allocator}|{seed}|wr-baseline"))
+                    row, _pairs = effect_row(
+                        "ACTIVE_CAP_WOR_MINUS_WR_BASELINE", "SAMPLING_AND_CAP_SENSITIVITY", candidate_wor, wr_baseline,
+                        scope, value, config, "CONCENTRATED_TOP_SCORE", "Q_INFORMED_WR_DUPLICATE_STAKE", seed,
+                    )
                     effects.append(row)
-                    if scope == "ALL":
-                        bootstrap_rows.extend(bootstrap(row, pairs, f"bj133|{config}|{allocator}|{seed}|full"))
+                    row, _pairs = effect_row(
+                        "ACTIVE_CAP_WOR_MINUS_ACTIVE_CAP_WR", "SAMPLING_SENSITIVITY", candidate_wor, candidate_wr,
+                        scope, value, config, allocator, "Q_INFORMED_WR_DUPLICATE_STAKE", seed,
+                    )
+                    effects.append(row)
     return effects, bootstrap_rows
 
 
 def comparison_diagnostics(effects: list[dict[str, object]], bootstraps: list[dict[str, object]]) -> tuple[list[dict[str, object]], dict[str, object]]:
-    primary = [row for row in effects if row["scope"] == "ALL"]
+    primary = [row for row in effects if row["scope"] == "ALL" and row["comparison_class"] == "PRIMARY_ACTIVE_OVERLAP_CAP"]
     family_size = len(primary) * 2
-    bootstrap_index = {(row["effect"], row["config_id"], row["allocator_id"], row["seed"], row["metric"]): row for row in bootstraps}
+    bootstrap_index = {(row["effect"], row["config_id"], row["allocator_id"], row["ticket_mechanism"], row["seed"], row["metric"]): row for row in bootstraps}
     output: list[dict[str, object]] = []
-    persistence: dict[tuple[str, str, str], list[dict[str, object]]] = defaultdict(list)
+    persistence: dict[tuple[str, str, str, str], list[dict[str, object]]] = defaultdict(list)
     for row in primary:
-        boot = bootstrap_index[(row["effect"], row["config_id"], row["allocator_id"], row["seed"], "no_tax_roi_delta")]
-        boot_tax = bootstrap_index[(row["effect"], row["config_id"], row["allocator_id"], row["seed"], "tax_adjusted_roi_delta")]
+        key = row["effect"], row["config_id"], row["allocator_id"], row["ticket_mechanism"], row["seed"]
+        boot = bootstrap_index[(*key, "no_tax_roi_delta")]
+        boot_tax = bootstrap_index[(*key, "tax_adjusted_roi_delta")]
         p = float(boot["two_sided_sign_p"])
         tax_p = float(boot_tax["two_sided_sign_p"])
         output.append({
-            "comparison_id": "|".join(str(row[name]) for name in ("effect", "config_id", "allocator_id", "seed")),
-            "effect": row["effect"], "config_id": row["config_id"], "allocator_id": row["allocator_id"], "seed": row["seed"],
+            "comparison_id": "|".join(str(row[name]) for name in ("effect", "config_id", "allocator_id", "ticket_mechanism", "seed")),
+            "effect": row["effect"], "comparison_class": row["comparison_class"], "config_id": row["config_id"],
+            "allocator_id": row["allocator_id"], "ticket_mechanism": row["ticket_mechanism"], "seed": row["seed"],
             "is_primary_economic_comparison": "TRUE", "support_issue_count": row["support_issue_count"],
             "all_no_tax_roi_delta": row["no_tax_roi_delta"], "all_tax_adjusted_roi_delta": row["tax_adjusted_roi_delta"],
             "all_bootstrap_ci95_low": boot["ci95_low"], "all_bootstrap_ci95_high": boot["ci95_high"],
             "bonferroni_two_sided_p": min(1.0, p * family_size),
             "tax_bootstrap_ci95_low": boot_tax["ci95_low"], "tax_bootstrap_ci95_high": boot_tax["ci95_high"],
             "tax_bonferroni_two_sided_p": min(1.0, tax_p * family_size), "fwer_alpha": 0.05,
-            "all_seed_persistence_group": f"{row['effect']}|{row['config_id']}|{row['allocator_id']}",
-            "classification": "PRIMARY_IDENTIFIABLE_EFFECT; strict EV required before any promotion if durable positive",
+            "all_seed_persistence_group": f"{row['effect']}|{row['config_id']}|{row['allocator_id']}|{row['ticket_mechanism']}",
+            "classification": "PRIMARY_WR_BASELINE_ACTIVE_CAP_EFFECT; strict EV required before any promotion if durable positive",
         })
-        persistence[(str(row["effect"]), str(row["config_id"]), str(row["allocator_id"]))].append(row)
+        persistence[(str(row["effect"]), str(row["config_id"]), str(row["allocator_id"]), str(row["ticket_mechanism"]))].append(row)
     robust = []
     for key, values in persistence.items():
         if {str(row["seed"]) for row in values} != {"133001", "133002", "133003"}:
@@ -751,9 +902,9 @@ def comparison_diagnostics(effects: list[dict[str, object]], bootstraps: list[di
         global_positive = all(float(row["no_tax_roi_delta"]) > 0 and float(row["tax_adjusted_roi_delta"]) > 0 for row in values)
         if not global_positive:
             continue
-        same = [row for row in effects if (row["effect"], row["config_id"], row["allocator_id"]) == key]
+        same = [row for row in effects if (row["effect"], row["config_id"], row["allocator_id"], row["ticket_mechanism"]) == key]
         chronological = [row for row in same if row["scope"] in {"YEAR", "FOLD", "LEAVE_ONE_YEAR_OUT"}]
-        matching_diag = [row for row in output if (row["effect"], row["config_id"], row["allocator_id"]) == key]
+        matching_diag = [row for row in output if (row["effect"], row["config_id"], row["allocator_id"], row["ticket_mechanism"]) == key]
         fwer_positive = matching_diag and all(
             float(row["bonferroni_two_sided_p"]) < 0.05
             and float(row["tax_bonferroni_two_sided_p"]) < 0.05
@@ -770,7 +921,7 @@ def comparison_diagnostics(effects: list[dict[str, object]], bootstraps: list[di
         "primary_effect_comparisons": len(primary),
         "primary_metric_tests_for_bonferroni": family_size,
         "strict_ev_candidates": ["|".join(key) for key in sorted(robust)],
-        "rule": "A candidate must have positive no-tax and ticket-tax-adjusted deltas in every frozen seed, ALL/YEAR/FOLD/LOYO view, and Bonferroni-adjusted all-scope issue-bootstrap support before it can request strict independent EV. No result promotes purchase, production, or betting.",
+        "rule": "Only Q-delete exposure cap 1/2 under the Q_INFORMED_WR_DUPLICATE_STAKE active-cap-versus-WR-baseline comparison are primary. A candidate must have positive no-tax and ticket-tax-adjusted deltas in every frozen seed, ALL/YEAR/FOLD/LOYO view, and Bonferroni-adjusted all-scope issue-bootstrap support before it can request strict independent EV. No result promotes purchase, production, or betting.",
     }
     for row in bootstraps:
         row["primary_family_size"] = family_size
@@ -800,22 +951,23 @@ def build(output: Path) -> dict[str, object]:
         provenance = validate_inputs()
         outcomes = load_outcomes()
         plans = load_plans()
+        wr_plans = load_wr_plans(plans)
         validate_full_alignment(plans)
         identities = load_identities(outcomes)
-        rank_cache: dict[tuple[tuple[str, str], int], int] = {}
+        sampling_cache: dict[tuple[tuple[str, str], str, int, int], tuple[int, int, int, int]] = {}
         rows: list[dict[str, object]] = []
-        tax_audit: dict[tuple[str, str, str], TaxAudit] = defaultdict(TaxAudit)
+        tax_audit: dict[tuple[str, str, str, str], TaxAudit] = defaultdict(TaxAudit)
         ticket_handles = gzip_writer(stage / "winning_ticket_tax_ledger.csv.gz", TICKET_FIELDS)
         try:
             ticket_writer = ticket_handles[-1]
-            for plan in expanded_plans(plans):
+            for plan in expanded_plans(plans, wr_plans):
                 key = plan_key(plan)
-                rows.append(settle_plan(plan, identities, rank_cache, ticket_writer, tax_audit[key]))
+                rows.append(settle_plan(plan, identities, sampling_cache, ticket_writer, tax_audit[key]))
         finally:
             close_gzip(ticket_handles)
-        if len(rows) != 52_200:
+        if len(rows) != 99_180:
             raise RuntimeError(f"expanded settlement denominator drift: {len(rows)}")
-        rows.sort(key=lambda row: (str(row["year"]), str(row["issue"]), str(row["fold"]), str(row["config_id"]), str(row["allocator_id"]), str(row["seed"])))
+        rows.sort(key=lambda row: (str(row["year"]), str(row["issue"]), str(row["fold"]), str(row["config_id"]), str(row["allocator_id"]), str(row["ticket_mechanism"]), str(row["seed"])))
         write_gzip_csv(stage / "issue_allocator_settlement.csv.gz", SETTLEMENT_FIELDS, (serializable(row) for row in rows))
         summaries, policy_rows = metrics_for(rows)
         write_csv(stage / "allocator_frontier_summary.csv", SUMMARY_FIELDS, (serializable(row) for row in summaries))
@@ -825,21 +977,22 @@ def build(output: Path) -> dict[str, object]:
         write_csv(stage / "issue_bootstrap_diagnostics.csv", BOOTSTRAP_FIELDS, (serializable(row) for row in bootstraps))
         write_csv(stage / "multiple_comparison_diagnostics.csv", COMPARISON_FIELDS, (serializable(row) for row in comparison_rows))
         reconciliation = []
-        summary_index = {(row["scope"], row["scope_value"], row["config_id"], row["allocator_id"], row["seed"]): row for row in summaries}
+        summary_index = {(row["scope"], row["scope_value"], row["config_id"], row["allocator_id"], row["ticket_mechanism"], row["seed"]): row for row in summaries}
         for key, audit in sorted(tax_audit.items()):
             issue_tax = summary_index[("ALL", "ALL", *key)]["tax_yuan"]
             difference = audit.tax_yuan - issue_tax
             if abs(difference) > Decimal("0.000001"):
                 raise RuntimeError(f"ticket-tax reconciliation drift for {key}: {difference}")
             reconciliation.append({
-                "config_id": key[0], "allocator_id": key[1], "seed": key[2],
+                "config_id": key[0], "allocator_id": key[1], "ticket_mechanism": key[2], "seed": key[3],
                 "ticket_ledger_hit_ticket_count": audit.hit_tickets, "ticket_ledger_taxable_ticket_count": audit.taxable_tickets,
                 "ticket_ledger_tax_yuan": audit.tax_yuan, "issue_ledger_tax_yuan": issue_tax, "difference_yuan": difference,
                 "tax_rule": "20pct_if_each_ticket_gross_gte_10000_no_aggregate_pooling",
             })
         write_csv(stage / "ticket_tax_reconciliation.csv", TAX_RECON_FIELDS, (serializable(row) for row in reconciliation))
         write_csv(stage / "source_census.csv", SOURCE_FIELDS, [
-            {"source": "bj133_gate_a_preoutcome_v1", "role": "accepted immutable complete-issue allocation/ticket freeze", "identity": "SHA256SUMS.json", "sha256": FREEZE_MANIFEST, "rows": 20_880, "join_status": "all frozen allocator rows retained; no selection or cap is recomputed"},
+            {"source": "bj133_gate_a_preoutcome_v1", "role": "accepted immutable complete-issue allocation/WOR-distinct freeze", "identity": "SHA256SUMS.json", "sha256": FREEZE_MANIFEST, "rows": 20_880, "join_status": "all frozen allocator rows retained; no selection or cap is recomputed"},
+            {"source": "bj133_gate_a_preoutcome_v2_wr_additive", "role": "immutable outcome-unexposed WR duplicate-stake control", "identity": "SHA256SUMS.json", "sha256": WR_FREEZE_MANIFEST, "rows": len(wr_plans), "join_status": "identical non-FULL complete-issue identities/gates/K/M/seeds; only independent with-replacement ticket draws added"},
             {"source": "bj95_gate_b_outcome_settlement_v2r8", "role": "canonical trusted final-SP outcome truth", "identity": "canonical_outcome_join.csv", "sha256": OUTCOME_PAYLOAD, "rows": len(outcomes), "join_status": "trusted result/final-SP only; gaps retain zero stake"},
         ])
         (stage / "decision.json").write_text(json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -849,27 +1002,27 @@ def build(output: Path) -> dict[str, object]:
             "runner_version": VERSION,
             "stage": "GATE_B_ONE_SHOT_COMPLETE_ISSUE_OUTCOME_SETTLEMENT",
             "provenance": provenance,
-            "input_boundary": "Only immutable Gate-A allocation/candidate/Q-role inputs and the canonical trusted final-SP outcome payload are read. No candidate selection, cap, ticket budget, or upstream #137 result is recomputed or used as an economic edge.",
+            "input_boundary": "Only immutable Gate-A v1 allocation/candidate/Q-role inputs, the Gate-A v2 outcome-unexposed WR sampler plan, and the canonical trusted final-SP outcome payload are read. No candidate selection, cap, ticket budget, or upstream #137 result is recomputed or used as an economic edge.",
             "scope": "historical paper research only; no purchase, production, betting, or promotion authority.",
-            "sampling": "Q_INFORMED_WOR_DISTINCT uses deterministic exponential-race weighted sampling without replacement over the 3^7 ticket space, keyed by frozen gate/portfolio identity and frozen seed. EXACT_K4_FULL covers all 2187 sequences once. There are no duplicate selected tickets in the sampled arms.",
+            "sampling": "Q_INFORMED_WR_DUPLICATE_STAKE is the natural probability baseline: each deterministic draw-position key produces one independent Q-weighted ticket over the 3^7 space; repeated code vectors stay separate ¥2 tickets and separate individual tax units. Q_INFORMED_WOR_DISTINCT is an unchanged no-duplicate sensitivity arm. EXACT_K4_FULL covers all 2187 sequences once.",
             "tax": "Tax is secondary to no_tax_roi and is applied per individual winning ticket: 20% iff that one ticket's gross is at least ¥10,000. No issue, identity, arm, policy, draw count, or portfolio aggregate is used to cross the tax threshold. winning_ticket_tax_ledger.csv.gz and ticket_tax_reconciliation.csv make this auditable.",
-            "comparisons": "Primary effects are Q-delete exposure cap 1/2 minus CONCENTRATED_TOP_SCORE on exact complete-issue matched support at M64/M128 and the same allocator minus its exact-K4 FULL capital-normalized ROI reference. FULL raw stake is preserved separately; it is not a literal equal-ticket-budget comparator. Secondary ESP300_GM290 cap 1/2/4 rows are descriptive only.",
-            "frontier": "All frozen cap rows are retained. Match/Jaccard/joint structural no-bets and identity-equivalent cap rows are controls, not independent strategies; their inability to diversify stems from the frozen six-shared-leg construction.",
-            "metrics": "Pre-tax no_tax_roi precedes tax-adjusted ROI. Complete-issue participation, capital utilization, payout concentration, ex-largest issue, drawdown, YEAR/FOLD/LOYO, deterministic issue bootstrap, and a 24-comparison Bonferroni diagnostic are included.",
+            "comparisons": "Primary effects are Q-delete exposure cap 1/2 under WR minus the same-config/seed CONCENTRATED_TOP_SCORE WR baseline on exact complete-issue matched support at M64/M128. WOR-distinct-minus-WR and active-cap WOR-minus-WR are explicit sampling sensitivities; MATCH/JACCARD/joint and other q-delete caps are control rows. WR baseline minus exact-K4 FULL is capital-normalized only; FULL raw stake remains separate and is not an equal-ticket-budget comparator.",
+            "frontier": "All frozen q-delete, MATCH_EXPOSURE, JACCARD and joint-cap rows are retained under both WR and WOR sampling. They distinguish active allocation-overlap removal from natural Q-probability duplicate concentration; structural no-bets remain explicit controls.",
+            "metrics": "Pre-tax no_tax_roi precedes tax-adjusted ROI. The settlement reports exact unique/duplicate draw counts, selected-identity shared-leg exposure, capital utilization, payout concentration, ex-largest issue, drawdown, YEAR/FOLD/LOYO, deterministic issue bootstrap, and a primary 12-comparison/24-metric Bonferroni diagnostic.",
             "decision": decision,
         }
         (stage / "settlement_card.json").write_text(json.dumps(card, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         shutil.copy2(__file__, stage / "settlement_runner.py")
         (stage / "README.md").write_text(
-            "# #133 Gate B — diversified N7 allocation\n\n"
-            "One-shot canonical outcome settlement of the accepted Gate-A allocator freeze. "
+            "# #133 Gate B v2 — diversified N7 allocation\n\n"
+            "One-shot canonical outcome settlement of Gate-A v1 plus its immutable WR additive control. "
             "Tax is computed per winning ticket, never after pooling issue or policy receipts. "
             "Replay with `python3 settlement_runner.py --output <new-dir>`; staging is under `results/`, never `/tmp`.\n",
             encoding="utf-8",
         )
         compressed = ("issue_allocator_settlement.csv.gz", "matched_effects.csv.gz", "winning_ticket_tax_ledger.csv.gz")
         content = {
-            "contract_version": "bj133-gate-b-portable-content-v1",
+            "contract_version": "bj133-gate-b-portable-content-v2",
             "gzip_payloads": {name: {"canonical_decompressed_sha256": decompressed_digest(stage / name)[0], "canonical_decompressed_bytes": decompressed_digest(stage / name)[1]} for name in compressed},
             "non_compressed_controls": {item.name: sha256(item) for item in sorted(stage.iterdir()) if item.is_file() and item.name not in compressed},
         }
