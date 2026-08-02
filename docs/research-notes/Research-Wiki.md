@@ -120,10 +120,11 @@ SP 不确定性或税线控制，而不是在已结算阈值附近事后微调�
 
 #127 是与 #121 不同的、只删除一个全局最低概率代码的 matched-pair 复查。Gate A v2
 将低 `p_min` 删除候选与六个高 `E_SP` companion 明确分离：候选自身不受 match-level
-`E_SP` floor 限制，七场组合才受 `GM_E_SP` 检验。Gate B 的 9 个冻结 variant 全部是负
-税后 ROI；最严格 `.20` PRUNE 为 -19.91%，同场 FULL 为 -21.75%。PRUNE 固定节省三分之一
-stake，但删码实际发生约 18%–24%，税后改善主要来自较低 tax exposure 而非正的无税 edge，
-所以结论为 `NO_PROMOTION`。
+`E_SP` floor 限制，七场组合才受 `GM_E_SP` 检验。Gate B 的 9 个冻结 variant 在绝对
+无税及实际税后 ROI 上全部为负；最严格 `.20` PRUNE 为 -10.30% 无税、-19.91% 税后，
+同场 FULL 为 -8.35% 无税、-21.75% 税后。PRUNE 固定节省三分之一 stake，删码实际发生约
+18%–24%；无税 ROI 相对 FULL 在 7/9 行微升、2/9 行下降，但均未达 breakeven。税后改善
+主要来自较低 tax exposure 而非正的无税 edge，所以结论为 `NO_PROMOTION`。
 
 ## 相关笔记
 

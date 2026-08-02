@@ -98,3 +98,23 @@ def test_all_threshold_rows_are_nonpositive_and_robustness_is_present() -> None:
         robust = list(csv.DictReader(handle))
     assert {row["scope"] for row in robust} == {"YEAR", "FOLD", "LEAVE_ONE_YEAR_OUT"}
     assert len(list(PACKAGE.glob("matched_pair_deltas.csv"))) == 1
+
+
+def test_complete_no_tax_tax_and_portable_content_comparison() -> None:
+    with (PACKAGE / "threshold_curves.csv").open(newline="") as handle:
+        curves = [row for row in csv.DictReader(handle) if row["scope"] == "ALL"]
+    assert len(curves) == 9
+    no_tax_delta = [Decimal(row["no_tax_roi_delta_prune_minus_full"]) for row in curves]
+    assert sum(delta > 0 for delta in no_tax_delta) == 7
+    assert sum(delta < 0 for delta in no_tax_delta) == 2
+    assert all(Decimal(row["full_no_tax_roi"]) < 0 and Decimal(row["prune_no_tax_roi"]) < 0
+               and Decimal(row["full_tax_adjusted_roi"]) < 0 and Decimal(row["prune_tax_adjusted_roi"]) < 0
+               for row in curves)
+    strict = next(row for row in curves if row["variant_id"] == "ESP300_GM305_LOWP20")
+    assert strict["no_tax_roi_delta_prune_minus_full"] == "-0.019484298795"
+    content = json.loads((PACKAGE / "CONTENT_IDENTITY.json").read_text(encoding="utf-8"))
+    assert hashlib.sha256((PACKAGE / "CONTENT_IDENTITY.json").read_bytes()).hexdigest() == (
+        "dbce7701d14ff20b14e286856d997233227ebdd7b61e072747a6e56f12091226"
+    )
+    assert content["gzip_payloads"]["portfolio_settlement.csv.gz"]["canonical_decompressed_bytes"] > 0
+    assert "portfolio_settlement.csv.gz" not in content["non_compressed_controls"]
