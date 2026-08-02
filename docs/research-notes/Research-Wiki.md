@@ -203,6 +203,36 @@ bootstrap 区间跨过 0，以及独立验证未通过集中度/多重比较稳�
 消失，则要明确归因于 M、采样机制、候选池扩展或 issue concentration，而不是简单
 以 `NO_PROMOTION` 结束。
 
+### #151/#154：固定候选复现与独立验证结论（2026-08-02）
+
+#151 固定 #137 `NO_GATE/K4` identities、Q vectors、seeds 和历史 sampler namespace，
+没有重新挑参。原始 `Q_INFORMED_WOR_DISTINCT/M64` 税前 ROI 被精确复现：
+
+| seed | WOR/M64 税前 ROI | 税后 ROI |
+|---:|---:|---:|
+| 137001 | +16.38% | +5.06% |
+| 137002 | +11.77% | +5.95% |
+| 137003 | +2.67% | -3.02% |
+| 三 seed 平均 | **+10.27%** | — |
+
+邻近 WOR 点的三 seed 平均也为正：M48 `+5.30%`、M80 `+4.29%`、M128
+`+0.86%`。但是相同固定候选的 WR/M64 平均税前 ROI 为 **-24.86%**，且整个 WR
+M 网格均为负；matched K4 FULL 为 **-15.77%**。因此历史阳性是明显的
+**WOR-distinct sampler-specific signal**，不是候选池在任意抽样机制下的普遍正 EV。
+
+#154 从 fresh detached checkout 独立重建 #137 sampler，并对全部 171 个非 FULL WOR
+surface rows 得到零差异，确认历史结果是真实可重放的。但严格稳健性仍不成立：
+
+- 三个 seed 的 issue-bootstrap 95% 区间均跨 0；
+- 去掉最大贡献 issue 后税前 ROI 为 `-11.47%`、`+0.08%`、`-9.46%`；
+- top issue gross share 为 `24.23%`、`10.82%`、`12.16%`；
+- 58 个 M × 3 seeds 仍暴露于同一历史样本和多重比较。
+
+最终分级为 **PASS_REPRODUCTION_ONLY**：#137 正收益候选及其附近 WOR 正值簇被独立
+复现，值得作为 sampler 设计线索保留；但收益依赖少数期次、bootstrap 不稳定，不能
+晋级为已验证正 EV，也不产生购买、生产或投注授权。后续若继续，应使用冻结的 WOR
+机制进行真正的 held-out / forward validation，而不是继续在同一历史窗口选 M。
+
 ## 知识图谱
 
 ```mermaid
