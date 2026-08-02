@@ -9,8 +9,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PACKAGE = ROOT / "results" / "bj145_gate_a_preoutcome_v3"
-MANIFEST = "abd2966ec1f1352753653c39f0f55cd4cf1d2d3714bf135d3d49dd142c5f44bb"
+PACKAGE = ROOT / "results" / "bj145_gate_a_preoutcome_v4"
+MANIFEST = "608ce7e8b07c46c5670b956e3459d9cccc0cb88e785aed804ba6ea55c227784a"
 
 
 def rows(path: Path):
@@ -105,6 +105,8 @@ def test_complete_plan_surface_and_per_ticket_accounting():
     mechanisms = rows(PACKAGE / "mechanism_contract.csv")
     assert len(mechanisms) == 6
     assert all("no" in row["tax_unit_rule"] and "pooling" in row["tax_unit_rule"] for row in mechanisms)
+    assert all(row["expected_unique_formula"] for row in mechanisms)
+    assert all(row["realized_unique_rule"] for row in mechanisms)
 
 
 def test_no_target_outcome_fields_in_frozen_payload_headers():

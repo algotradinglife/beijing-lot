@@ -257,7 +257,9 @@ deterministic residual/systematic、cap `{1,2,4,8}`、top-mass 与 FULL。低 M 
 
 Gate B 尚未授权；若获授权，先报税前 `no_tax_roi` 和同 stake 的机制差异，再单独报逐票
 税，并保留 seed、LOYO、YEAR/FOLD、issue bootstrap、最大期次剔除、coverage 与重复票
-浓度。该冻结不构成购买、生产或投注授权。详见 [#145 Gate A](../research/bj145_ticket_allocation_gate_a_2026-08-03.md)。
+浓度。v4 机制契约另行显式记录每个 arm 的 expected-unique formula 与 realized-unique
+rule，避免把 WR 的重复票、WOR 的无放回 distinct 和 FULL 控制混为同一指标。该冻结不构成
+购买、生产或投注授权。详见 [#145 Gate A](../research/bj145_ticket_allocation_gate_a_2026-08-03.md)。
 
 ## 知识图谱
 

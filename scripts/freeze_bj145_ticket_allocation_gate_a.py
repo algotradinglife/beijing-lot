@@ -24,8 +24,8 @@ from pathlib import Path
 
 
 CONTRACT = "BJ-HIST-TICKET-ALLOCATION-001"
-VERSION = "bj145-gate-a-v2"
-CONTENT_VERSION = "bj145-gate-a-content-v2"
+VERSION = "bj145-gate-a-v3"
+CONTENT_VERSION = "bj145-gate-a-content-v3"
 UNIT_STAKE_YUAN = 2
 FULL_TICKETS = 3 ** 7
 SEEDS = ("137001", "137002", "137003")
@@ -75,7 +75,7 @@ PLAN_FIELDS = (
 )
 MECHANISM_FIELDS = (
     "mechanism", "sampling_role", "weight_source_scope", "seed_scope", "cap_scope", "allocation_rule",
-    "duplicate_policy", "tax_unit_rule", "full_control", "outcome_boundary",
+    "expected_unique_formula", "realized_unique_rule", "duplicate_policy", "tax_unit_rule", "full_control", "outcome_boundary",
 )
 SOURCE_FIELDS = ("source", "role", "identity", "sha256", "rows", "join_status")
 GRID_FIELDS = ("grid_ordinal", "M", "grid_band", "is_full_control", "low_M_surface", "outcome_boundary")
@@ -92,7 +92,7 @@ ROOT = find_root()
 SOURCE_151 = ROOT / "results" / "bj151_gate_a_preoutcome_v1"
 SOURCE_137 = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
 SOURCE_148 = ROOT / "results" / "bj148_gate_a_preoutcome_v1"
-OUTPUT = ROOT / "results" / "bj145_gate_a_preoutcome_v3"
+OUTPUT = ROOT / "results" / "bj145_gate_a_preoutcome_v4"
 
 
 def sha256(path: Path) -> str:
@@ -232,12 +232,12 @@ def normalize_role(row: dict[str, str], arm_id: str, source_package: str) -> dic
 
 def make_mechanisms() -> list[dict[str, object]]:
     rows = [
-        {"mechanism": "WR_DUPLICATE_STAKE", "sampling_role": "PRIMARY_WEIGHTED_WR", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": ";".join(SEEDS), "cap_scope": "NA", "allocation_rule": "independent deterministic hash draws using bj137|WR|seed|identity_signature|draw_index; exact duplicates retained", "duplicate_policy": "each independent draw is a separate ¥2 ticket and separate tax unit", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
-        {"mechanism": "WOR_DISTINCT", "sampling_role": "PRIMARY_WEIGHTED_WOR", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": ";".join(SEEDS), "cap_scope": "NA", "allocation_rule": "deterministic exponential-key weighted sampling without replacement using bj137|WOR|seed|identity_signature|ticket_ordinal", "duplicate_policy": "distinct ticket codes only within each identity", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
-        {"mechanism": "RESIDUAL_SYSTEMATIC", "sampling_role": "RESIDUAL_PROPORTIONAL", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": "NA", "cap_scope": "NA", "allocation_rule": "Hamilton/largest-remainder integer allocation over the 2187 ticket-code weights; deterministic ordinal tie-break", "duplicate_policy": "integer multiplicities follow proportional quotas", "tax_unit_rule": "each repeated ¥2 copy is a separate ticket and tax unit; no pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
-        {"mechanism": "CAPPED_REPEAT", "sampling_role": "CAPPED_PROPORTIONAL", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": "NA", "cap_scope": "1;2;4;8", "allocation_rule": "Hamilton proportional allocation with per-ticket-code multiplicity cap; deterministic reallocation of cap overflow by residual quota and ordinal", "duplicate_policy": "repeats allowed up to frozen cap per exact N7 ticket code", "tax_unit_rule": "each repeated ¥2 copy is a separate ticket and tax unit; no pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
-        {"mechanism": "DETERMINISTIC_TOP_MASS", "sampling_role": "TOP_MASS_CONTROL", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": "NA", "cap_scope": "1", "allocation_rule": "select the M highest-weight exact ticket codes with deterministic (weight desc, ordinal asc) tie-break", "duplicate_policy": "distinct ticket codes only", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
-        {"mechanism": "FULL_ENUMERATED", "sampling_role": "FULL_CONTROL", "weight_source_scope": "NA", "seed_scope": "NA", "cap_scope": "1", "allocation_rule": "enumerate all 2187 exact ticket codes once per selected identity", "duplicate_policy": "all 2187 distinct tickets", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "true", "outcome_boundary": "pre-outcome allocation specification only"},
+        {"mechanism": "WR_DUPLICATE_STAKE", "sampling_role": "PRIMARY_WEIGHTED_WR", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": ";".join(SEEDS), "cap_scope": "NA", "allocation_rule": "independent deterministic hash draws using bj137|WR|seed|identity_signature|draw_index; exact duplicates retained", "expected_unique_formula": "sum_t[1-(1-w(t))^M]", "realized_unique_rule": "count distinct ticket codes; duplicate draws retained", "duplicate_policy": "each independent draw is a separate ¥2 ticket and separate tax unit", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
+        {"mechanism": "WOR_DISTINCT", "sampling_role": "PRIMARY_WEIGHTED_WOR", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": ";".join(SEEDS), "cap_scope": "NA", "allocation_rule": "deterministic exponential-key weighted sampling without replacement using bj137|WOR|seed|identity_signature|ticket_ordinal", "expected_unique_formula": "M distinct ticket codes", "realized_unique_rule": "exactly M distinct ticket codes per identity", "duplicate_policy": "distinct ticket codes only within each identity", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
+        {"mechanism": "RESIDUAL_SYSTEMATIC", "sampling_role": "RESIDUAL_PROPORTIONAL", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": "NA", "cap_scope": "NA", "allocation_rule": "Hamilton/largest-remainder integer allocation over 2187 ticket-code weights; deterministic ordinal tie-break", "expected_unique_formula": "positive-count codes from Hamilton allocation", "realized_unique_rule": "count positive integer multiplicities; retain every copy", "duplicate_policy": "integer multiplicities follow proportional quotas", "tax_unit_rule": "each repeated ¥2 copy is a separate ticket and tax unit; no pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
+        {"mechanism": "CAPPED_REPEAT", "sampling_role": "CAPPED_PROPORTIONAL", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": "NA", "cap_scope": "1;2;4;8", "allocation_rule": "Hamilton proportional allocation with per-ticket-code cap; deterministic residual reallocation", "expected_unique_formula": "positive-count codes under frozen cap", "realized_unique_rule": "count positive codes and repeated copies; no code exceeds cap", "duplicate_policy": "repeats allowed up to frozen cap per exact N7 ticket code", "tax_unit_rule": "each repeated ¥2 copy is a separate ticket and tax unit; no pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
+        {"mechanism": "DETERMINISTIC_TOP_MASS", "sampling_role": "TOP_MASS_CONTROL", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": "NA", "cap_scope": "1", "allocation_rule": "select M highest-weight exact ticket codes; weight desc then ordinal asc", "expected_unique_formula": "M distinct ticket codes", "realized_unique_rule": "exactly M distinct ticket codes per identity", "duplicate_policy": "distinct ticket codes only", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
+        {"mechanism": "FULL_ENUMERATED", "sampling_role": "FULL_CONTROL", "weight_source_scope": "NA", "seed_scope": "NA", "cap_scope": "1", "allocation_rule": "enumerate all 2187 exact ticket codes once per identity", "expected_unique_formula": "2187 distinct ticket codes", "realized_unique_rule": "all 2187 distinct tickets per identity", "duplicate_policy": "all 2187 distinct tickets", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "true", "outcome_boundary": "pre-outcome allocation specification only"},
     ]
     return rows
 
