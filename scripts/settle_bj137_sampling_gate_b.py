@@ -28,7 +28,7 @@ from typing import Iterable
 
 CODES = ("3", "1", "0")
 CONTRACT = "BJ-HIST-PROB-SAMPLING-N7-001"
-VERSION = "bj137-gate-b-v1"
+VERSION = "bj137-gate-b-v2r1-ticket-tax-audit"
 FREEZE_MANIFEST = "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df"
 OUTCOME_MANIFEST = "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc"
 OUTCOME_PAYLOAD = "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89"
@@ -48,7 +48,7 @@ def repository_root() -> Path:
 ROOT = repository_root()
 FREEZE = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
 OUTCOME_BUNDLE = ROOT / "results" / "bj95_gate_b_outcome_settlement_v2r8"
-OUTPUT = ROOT / "results" / "bj137_gate_b_outcome_settlement_v1"
+OUTPUT = ROOT / "results" / "bj137_gate_b_outcome_settlement_v2r1"
 
 ISSUE_FIELDS = (
     "issue", "fold", "year", "issue_instance", "eligible_match_count", "first_kickoff_ts",
@@ -102,7 +102,18 @@ ISSUE_SETTLEMENT_FIELDS = (
     "expected_unique_ticket_count", "hit_ticket_count", "coverage_hit", "gross_pre_tax_yuan", "tax_yuan",
     "after_tax_gross_yuan", "pre_tax_net_yuan", "tax_adjusted_net_yuan", "no_tax_roi", "tax_adjusted_roi",
     "unique_match_count", "total_leg_slots", "overlap_leg_slots", "max_match_exposure",
-    "gross_top_identity_share", "outcome_gap_count", "tax_bucket_key",
+    "gross_top_identity_share", "outcome_gap_count", "taxable_hit_ticket_count",
+    "non_taxable_hit_ticket_count",
+)
+TICKET_TAX_FIELDS = (
+    "issue", "fold", "year", "issue_instance", "gate_id", "top_k_id", "sampler_id", "M", "seed",
+    "portfolio_id", "winning_ticket_gross_yuan", "winning_ticket_count", "per_ticket_tax_yuan",
+    "tax_yuan", "tax_rule",
+)
+TAX_RECONCILIATION_FIELDS = (
+    "gate_id", "top_k_id", "sampler_id", "probability_vector", "M", "seed",
+    "ticket_ledger_hit_ticket_count", "ticket_ledger_taxable_ticket_count",
+    "ticket_ledger_tax_yuan", "issue_ledger_tax_yuan", "difference_yuan",
 )
 SUMMARY_FIELDS = (
     "scope", "scope_value", "gate_id", "top_k_id", "requested_n7_count", "sampler_id",
@@ -227,9 +238,9 @@ def expected_unique(weights: list[float], draws: int) -> float:
     return sum(-math.expm1(draws * math.log1p(-weight)) for weight in weights)
 
 
-def ticket_tax(winning_ticket_gross: float, hit_tickets: int) -> float:
-    """Tax individual winning tickets; never manufacture a pooled threshold."""
-    return hit_tickets * (winning_ticket_gross * TAX_RATE if winning_ticket_gross >= TAX_THRESHOLD else 0.0)
+def ticket_tax(winning_ticket_gross: float) -> float:
+    """Tax exactly one realised winning ticket; no aggregate is an input."""
+    return winning_ticket_gross * TAX_RATE if winning_ticket_gross >= TAX_THRESHOLD else 0.0
 
 
 def target_index(roles: list[dict[str, str]], outcomes: dict[str, dict[str, str]]) -> tuple[int, float, bool]:
@@ -261,6 +272,21 @@ class Identity:
     truth_index: int
     winning_payout: float
     outcome_missing: bool
+
+
+@dataclass
+class TicketTaxAudit:
+    """Ticket-level tax multiplicities, kept separate from issue-policy reporting."""
+
+    hit_tickets: int = 0
+    taxable_tickets: int = 0
+    tax_yuan: float = 0.0
+
+    def add(self, per_ticket_tax: float, hit_tickets: int) -> None:
+        self.hit_tickets += hit_tickets
+        if per_ticket_tax:
+            self.taxable_tickets += hit_tickets
+            self.tax_yuan += per_ticket_tax * hit_tickets
 
 
 def prefix_stats_with_replacement(weights: list[float], truth: int, seed: int, key: str) -> dict[int, SampleStat]:
@@ -514,28 +540,56 @@ def overlap_geometry(selected: list[Identity]) -> tuple[int, int, int, int]:
     return len(counts), len(selected) * 7, len(selected) * 7 - len(counts), max(counts.values(), default=0)
 
 
-def issue_result(participation: dict[str, str], plan: dict[str, str], identities: dict[tuple[str, str], Identity], profiles: dict[str, dict[tuple[str, str, int, str], SampleStat]]) -> dict[str, object]:
+def issue_result(
+    participation: dict[str, str],
+    plan: dict[str, str],
+    identities: dict[tuple[str, str], Identity],
+    profiles: dict[str, dict[tuple[str, str, int, str], SampleStat]],
+    ticket_writer: csv.DictWriter | None = None,
+    ticket_audit: TicketTaxAudit | None = None,
+) -> dict[str, object]:
     ids = [value for value in participation["selected_portfolio_ids"].split("|") if value]
     common = {
         "issue": participation["issue"], "fold": participation["fold"], "year": participation["year"], "issue_instance": participation["issue_instance"], "first_kickoff_ts": participation["first_kickoff_ts"],
         **make_meta(plan), "frozen_disposition": participation["disposition"], "selected_identity_count": len(ids),
-        "tax_bucket_key": "|".join((participation["issue_instance"], plan["gate_id"], plan["top_k_id"], plan["sampler_id"], plan["M"], plan["seed"])),
     }
     if not ids:
-        return {**common, "settlement_status": "NO_BET_FROZEN", "planned_draw_count": 0, "planned_stake_yuan": 0.0, "realized_unique_ticket_count": 0, "expected_unique_ticket_count": 0.0, "hit_ticket_count": 0, "coverage_hit": 0, "gross_pre_tax_yuan": 0.0, "tax_yuan": 0.0, "after_tax_gross_yuan": 0.0, "pre_tax_net_yuan": 0.0, "tax_adjusted_net_yuan": 0.0, "no_tax_roi": None, "tax_adjusted_roi": None, "unique_match_count": 0, "total_leg_slots": 0, "overlap_leg_slots": 0, "max_match_exposure": 0, "gross_top_identity_share": None, "outcome_gap_count": 0}
+        return {**common, "settlement_status": "NO_BET_FROZEN", "planned_draw_count": 0, "planned_stake_yuan": 0.0, "realized_unique_ticket_count": 0, "expected_unique_ticket_count": 0.0, "hit_ticket_count": 0, "coverage_hit": 0, "gross_pre_tax_yuan": 0.0, "tax_yuan": 0.0, "after_tax_gross_yuan": 0.0, "pre_tax_net_yuan": 0.0, "tax_adjusted_net_yuan": 0.0, "no_tax_roi": None, "tax_adjusted_roi": None, "unique_match_count": 0, "total_leg_slots": 0, "overlap_leg_slots": 0, "max_match_exposure": 0, "gross_top_identity_share": None, "outcome_gap_count": 0, "taxable_hit_ticket_count": 0, "non_taxable_hit_ticket_count": 0}
     selected = [identities[(plan["gate_id"], portfolio_id)] for portfolio_id in ids]
     missing = sum(identity.outcome_missing for identity in selected)
     unique_matches, total_slots, overlap, max_exposure = overlap_geometry(selected)
     if missing:
-        return {**common, "settlement_status": "UNAVAILABLE_CANONICAL_OUTCOME", "planned_draw_count": 0, "planned_stake_yuan": 0.0, "realized_unique_ticket_count": 0, "expected_unique_ticket_count": 0.0, "hit_ticket_count": 0, "coverage_hit": 0, "gross_pre_tax_yuan": 0.0, "tax_yuan": 0.0, "after_tax_gross_yuan": 0.0, "pre_tax_net_yuan": 0.0, "tax_adjusted_net_yuan": 0.0, "no_tax_roi": None, "tax_adjusted_roi": None, "unique_match_count": unique_matches, "total_leg_slots": total_slots, "overlap_leg_slots": overlap, "max_match_exposure": max_exposure, "gross_top_identity_share": None, "outcome_gap_count": missing}
+        return {**common, "settlement_status": "UNAVAILABLE_CANONICAL_OUTCOME", "planned_draw_count": 0, "planned_stake_yuan": 0.0, "realized_unique_ticket_count": 0, "expected_unique_ticket_count": 0.0, "hit_ticket_count": 0, "coverage_hit": 0, "gross_pre_tax_yuan": 0.0, "tax_yuan": 0.0, "after_tax_gross_yuan": 0.0, "pre_tax_net_yuan": 0.0, "tax_adjusted_net_yuan": 0.0, "no_tax_roi": None, "tax_adjusted_roi": None, "unique_match_count": unique_matches, "total_leg_slots": total_slots, "overlap_leg_slots": overlap, "max_match_exposure": max_exposure, "gross_top_identity_share": None, "outcome_gap_count": missing, "taxable_hit_ticket_count": 0, "non_taxable_hit_ticket_count": 0}
     stats = [profile_stat(profiles[identity.signature], plan) for identity in selected]
     individual_gross = [stat.hit_tickets * identity.winning_payout for stat, identity in zip(stats, selected)]
-    # A realised ticket is the tax unit.  In particular, a WR duplicate is a
-    # separately staked / separately assessed ticket, not a reason to pool
-    # multiple identical draws into an artificial threshold-crossing payout.
-    individual_tax = [ticket_tax(identity.winning_payout, stat.hit_tickets) for stat, identity in zip(stats, selected)]
+    individual_tax = []
+    taxable_hits = 0
+    # The threshold is applied to one winning ticket before counts are summed
+    # only for reporting.  A WR duplicate remains an independent ticket.
+    for portfolio_id, stat, identity in zip(ids, stats, selected):
+        if not stat.hit_tickets:
+            continue
+        per_ticket_gross = identity.winning_payout
+        per_ticket_tax = ticket_tax(per_ticket_gross)
+        tax = per_ticket_tax * stat.hit_tickets
+        individual_tax.append(tax)
+        if per_ticket_tax:
+            taxable_hits += stat.hit_tickets
+        if ticket_writer is not None:
+            ticket_writer.writerow({
+                "issue": participation["issue"], "fold": participation["fold"], "year": participation["year"],
+                "issue_instance": participation["issue_instance"], "gate_id": plan["gate_id"],
+                "top_k_id": plan["top_k_id"], "sampler_id": plan["sampler_id"], "M": plan["M"],
+                "seed": plan["seed"], "portfolio_id": portfolio_id,
+                "winning_ticket_gross_yuan": fmt(per_ticket_gross), "winning_ticket_count": stat.hit_tickets,
+                "per_ticket_tax_yuan": fmt(per_ticket_tax), "tax_yuan": fmt(tax),
+                "tax_rule": "20pct_if_each_ticket_gross_gte_10000",
+            })
+        if ticket_audit is not None:
+            ticket_audit.add(per_ticket_tax, stat.hit_tickets)
     draws = len(selected) * int(plan["M"]); stake = draws * UNIT_STAKE; gross = sum(individual_gross); tax = sum(individual_tax)
-    return {**common, "settlement_status": "SETTLED", "planned_draw_count": draws, "planned_stake_yuan": stake, "realized_unique_ticket_count": sum(stat.unique_tickets for stat in stats), "expected_unique_ticket_count": sum(stat.expected_unique_tickets for stat in stats), "hit_ticket_count": sum(stat.hit_tickets for stat in stats), "coverage_hit": int(any(stat.hit_tickets for stat in stats)), "gross_pre_tax_yuan": gross, "tax_yuan": tax, "after_tax_gross_yuan": gross-tax, "pre_tax_net_yuan": gross-stake, "tax_adjusted_net_yuan": gross-tax-stake, "no_tax_roi": (gross-stake)/stake if stake else None, "tax_adjusted_roi": (gross-tax-stake)/stake if stake else None, "unique_match_count": unique_matches, "total_leg_slots": total_slots, "overlap_leg_slots": overlap, "max_match_exposure": max_exposure, "gross_top_identity_share": max(individual_gross)/gross if gross else None, "outcome_gap_count": 0}
+    hits = sum(stat.hit_tickets for stat in stats)
+    return {**common, "settlement_status": "SETTLED", "planned_draw_count": draws, "planned_stake_yuan": stake, "realized_unique_ticket_count": sum(stat.unique_tickets for stat in stats), "expected_unique_ticket_count": sum(stat.expected_unique_tickets for stat in stats), "hit_ticket_count": hits, "coverage_hit": int(bool(hits)), "gross_pre_tax_yuan": gross, "tax_yuan": tax, "after_tax_gross_yuan": gross-tax, "pre_tax_net_yuan": gross-stake, "tax_adjusted_net_yuan": gross-tax-stake, "no_tax_roi": (gross-stake)/stake if stake else None, "tax_adjusted_roi": (gross-tax-stake)/stake if stake else None, "unique_match_count": unique_matches, "total_leg_slots": total_slots, "overlap_leg_slots": overlap, "max_match_exposure": max_exposure, "gross_top_identity_share": max(individual_gross)/gross if gross else None, "outcome_gap_count": 0, "taxable_hit_ticket_count": taxable_hits, "non_taxable_hit_ticket_count": hits-taxable_hits}
 
 
 def serializable_issue(row: dict[str, object]) -> dict[str, object]:
@@ -649,7 +703,10 @@ def build(output: Path, workers: int | None = None) -> dict[str, object]:
             if key not in metrics: metrics[key] = Metric(make_meta(plan))
             return metrics[key]
         settlement = gzip_writer(stage / "issue_policy_settlement.csv.gz", ISSUE_SETTLEMENT_FIELDS)
+        ticket_settlement = gzip_writer(stage / "ticket_tax_ledger.csv.gz", TICKET_TAX_FIELDS)
         issue_writer = settlement[-1]
+        ticket_writer = ticket_settlement[-1]
+        ticket_audit_by_plan: dict[tuple[str, str, str, str, str, str], TicketTaxAudit] = defaultdict(TicketTaxAudit)
         issue_count = 0
         ordered_issues = sorted(participation_by_issue.values(), key=lambda values: next(iter(values.values()))["first_kickoff_ts"])
         worker_count = max(1, min(4, workers if workers is not None else (os.cpu_count() or 1)))
@@ -669,7 +726,10 @@ def build(output: Path, workers: int | None = None) -> dict[str, object]:
                 issue_profiles[signature] = profile
             for key, participation in sorted(issue_cells.items()):
                 for plan in plans[key]:
-                    row = issue_result(participation, plan, identities, issue_profiles)
+                    row = issue_result(
+                        participation, plan, identities, issue_profiles, ticket_writer,
+                        ticket_audit_by_plan[plan_key(plan)],
+                    )
                     issue_writer.writerow(serializable_issue(row)); issue_count += 1
                     metric("ALL", "ALL", plan).add(row)
                     metric("YEAR", str(row["year"]), plan).add(row)
@@ -678,10 +738,31 @@ def build(output: Path, workers: int | None = None) -> dict[str, object]:
                         if str(row["year"]) != str(omitted_year):
                             metric("LEAVE_ONE_YEAR_OUT", str(omitted_year), plan).add(row)
         close_gzip(settlement)
+        close_gzip(ticket_settlement)
         if issue_count != 5_028_600:
             raise RuntimeError(f"unexpected Gate-B issue-policy surface: {issue_count}")
         summaries = [entry.row(scope, value) for (scope, value, _key), entry in sorted(metrics.items())]
         write_gzip_csv(stage / "surface_summary.csv.gz", SUMMARY_FIELDS, summaries)
+        all_summary = {
+            (row["gate_id"], row["top_k_id"], row["sampler_id"], row["probability_vector"], row["M"], row["seed"]): row
+            for row in summaries if row["scope"] == "ALL" and row["scope_value"] == "ALL"
+        }
+        reconciliation: list[dict[str, object]] = []
+        for key, plan in sorted(plan_by_key.items()):
+            audit = ticket_audit_by_plan[key]
+            issue_tax = float(all_summary[key]["tax_yuan"])
+            difference = audit.tax_yuan - issue_tax
+            if abs(difference) > 1e-6:
+                raise RuntimeError(f"ticket-tax reconciliation drift for {key}: {difference}")
+            reconciliation.append({
+                "gate_id": plan["gate_id"], "top_k_id": plan["top_k_id"], "sampler_id": plan["sampler_id"],
+                "probability_vector": plan["probability_vector"], "M": plan["M"], "seed": plan["seed"],
+                "ticket_ledger_hit_ticket_count": audit.hit_tickets,
+                "ticket_ledger_taxable_ticket_count": audit.taxable_tickets,
+                "ticket_ledger_tax_yuan": fmt(audit.tax_yuan), "issue_ledger_tax_yuan": fmt(issue_tax),
+                "difference_yuan": fmt(difference),
+            })
+        write_csv(stage / "ticket_tax_reconciliation.csv", TAX_RECONCILIATION_FIELDS, reconciliation)
         selector, sampler, interaction = lift_rows(summaries)
         write_gzip_csv(stage / "selector_lift.csv.gz", LIFT_FIELDS, selector)
         write_gzip_csv(stage / "sampler_lift.csv.gz", LIFT_FIELDS, sampler)
@@ -693,13 +774,13 @@ def build(output: Path, workers: int | None = None) -> dict[str, object]:
             {"source": "bj137_gate_a_preoutcome_v2", "role": "accepted outcome-unexposed complete-issue sampling surface", "manifest_sha256": FREEZE_MANIFEST, "payload": "issue_participation_grid.csv; n7_role_vectors.csv.gz; sampler_plan.csv", "payload_sha256": provenance["gate_a_content_identity_sha256"], "rows": 71704, "join_status": "all 10×5 participation cells retained; explicit frozen no-bets remain"},
             {"source": "bj95_gate_b_outcome_settlement_v2r8", "role": "canonical final-SP settlement truth", "manifest_sha256": OUTCOME_MANIFEST, "payload": "canonical_outcome_join.csv", "payload_sha256": OUTCOME_PAYLOAD, "rows": len(outcomes), "join_status": "trusted canonical outcomes only; missing joins fail closed without stake"},
         ])
-        card = {"issue": 137, "contract": CONTRACT, "runner_version": VERSION, "stage": "GATE_B_COMPLETE_ISSUE_OUTCOME_SETTLEMENT", "provenance": provenance, "input_boundary": "Only accepted Gate-A v2 and canonical final-SP settlement input are read. Gate-A v3/post-acceptance material is not read.", "scope": "historical paper research only; no purchase, production, or promotion authority.", "sampling_replay": "The accepted Gate-A hash-based samplers are replayed exactly. Each ordered selected_match_ids tuple is its sampler key; duplicate draws retain stake, while WOR/top/delete arms are distinct-ticket mechanisms.", "settlement": "Each selected ticket pays ¥2×0.65×product(canonical final winning SP) per hit. Tax is assessed per realised winning ticket: 20% only where that individual ticket gross is at least ¥10,000. Tickets, identities and issue-policy arms are never aggregated merely to cross the tax threshold; duplicated WR hits are separately assessed tickets.", "accounting": "M is per selected N7. Issue draws and stake are selected_identity_count×M and selected_identity_count×M×¥2. K/M are frozen outputs rather than rejection gates. Frozen no-bets are retained separately from unavailable canonical outcomes. tax_bucket_key is retained as an issue-policy ledger partition only, not as a tax aggregation unit.", "metrics": "surface_summary.csv.gz contains ALL/YEAR/FOLD/LOYO; issue_policy_settlement is the issue-level ledger. Selector lift uses same-gate K_ALL FULL; sampler lift uses exact selected-K FULL; interaction uses K_ALL FULL. Overlap, duplicate/unique ticket coverage, concentration, drawdown, miss streak and largest-event sensitivity are retained.", "decision": decision}
+        card = {"issue": 137, "contract": CONTRACT, "runner_version": VERSION, "stage": "GATE_B_COMPLETE_ISSUE_OUTCOME_SETTLEMENT", "provenance": provenance, "input_boundary": "Only accepted Gate-A v2 and canonical final-SP settlement input are read. Gate-A v3/post-acceptance material is not read.", "scope": "historical paper research only; no purchase, production, or promotion authority.", "sampling_replay": "The accepted Gate-A hash-based samplers are replayed exactly. Each ordered selected_match_ids tuple is its sampler key; duplicate draws retain stake, while WOR/top/delete arms are distinct-ticket mechanisms.", "settlement": "Each selected ticket pays ¥2×0.65×product(canonical final winning SP) per hit. The ticket itself is the only tax unit: 20% applies only where that one ticket's gross is at least ¥10,000. No issue, N7 identity, sampler draw, M replicate, strategy arm or ticket count is pooled to determine the threshold. A duplicate WR hit is represented as an independent ticket count at the same per-ticket gross.", "accounting": "M is per selected N7. Issue draws and stake are selected_identity_count×M and selected_identity_count×M×¥2. K/M are frozen outputs rather than rejection gates. Frozen no-bets are retained separately from unavailable canonical outcomes. ticket_tax_ledger.csv.gz records each winning portfolio/draw multiplicity with its individual ticket gross and per-ticket tax; ticket_tax_reconciliation.csv proves its total exactly matches the issue ledger.", "metrics": "surface_summary.csv.gz contains ALL/YEAR/FOLD/LOYO; issue_policy_settlement is the issue-level ledger. Selector lift uses same-gate K_ALL FULL; sampler lift uses exact selected-K FULL; interaction uses K_ALL FULL. Overlap, duplicate/unique ticket coverage, concentration, drawdown, miss streak and largest-event sensitivity are retained.", "decision": decision}
         (stage / "settlement_card.json").write_text(json.dumps(card, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         shutil.copy2(__file__, stage / "settlement_runner.py")
-        (stage / "README.md").write_text("# #137 Gate B — probability-weighted N7 sampling\n\nOne-shot canonical settlement of the accepted Gate-A v2 complete-issue gate×K×M sampling surface. This is historical paper research only.\n", encoding="utf-8")
+        (stage / "README.md").write_text("# #137 Gate B — probability-weighted N7 sampling\n\nOne-shot canonical settlement of the accepted Gate-A v2 complete-issue gate×K×M sampling surface. `ticket_tax_ledger.csv.gz` is a winning-ticket multiplicity ledger and `ticket_tax_reconciliation.csv` reconciles it exactly to the issue-policy ledger. This is historical paper research only.\n", encoding="utf-8")
         snapshot.unlink()
-        compressed = ("issue_policy_settlement.csv.gz", "surface_summary.csv.gz", "selector_lift.csv.gz", "sampler_lift.csv.gz", "interaction_surface.csv.gz")
-        content = {"contract_version": "bj137-gate-b-portable-content-v1", "gzip_payloads": {name: {"canonical_decompressed_sha256": uncompressed(stage / name)[0], "canonical_decompressed_bytes": uncompressed(stage / name)[1]} for name in compressed}, "non_compressed_controls": {item.name: sha(item) for item in sorted(stage.iterdir()) if item.is_file() and item.name not in compressed}}
+        compressed = ("issue_policy_settlement.csv.gz", "ticket_tax_ledger.csv.gz", "surface_summary.csv.gz", "selector_lift.csv.gz", "sampler_lift.csv.gz", "interaction_surface.csv.gz")
+        content = {"contract_version": "bj137-gate-b-portable-content-v2", "gzip_payloads": {name: {"canonical_decompressed_sha256": uncompressed(stage / name)[0], "canonical_decompressed_bytes": uncompressed(stage / name)[1]} for name in compressed}, "non_compressed_controls": {item.name: sha(item) for item in sorted(stage.iterdir()) if item.is_file() and item.name not in compressed}}
         (stage / "CONTENT_IDENTITY.json").write_text(json.dumps(content, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         sums = {item.name: sha(item) for item in sorted(stage.iterdir()) if item.is_file()}
         (stage / "SHA256SUMS.json").write_text(json.dumps(sums, indent=2, sort_keys=True) + "\n", encoding="utf-8")

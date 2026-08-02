@@ -17,16 +17,24 @@ decision: NO_PROMOTION
   `0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df`；
 - 唯一赛后真值：canonical final-SP join，payload
   `13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89`；
-- Gate-B v2 包：`results/bj137_gate_b_outcome_settlement_v2`，manifest
-  `718d8756813ac363d82b1d2fca2524366f4d0427575fe2b5926d7e2b29d6cbd4`；
+- 早期 Gate-B v2 包保留不改；可复审的税务修订包为
+  `results/bj137_gate_b_outcome_settlement_v2r1`，manifest
+  `f4848d61b7eab31b97077751fdb2f49ad242e483033c6d29524ba4f7b43445fb`；
 - 348 个完整 `(issue, fold)` 实例，10 个 E_SP/GM_E_SP gate、
   `K={1,2,4,8,ALL}`、13 个 `M`、三种随机 seed，以及 FULL、top-mass、
   model/market/blend/q 抽样和两个 hard-delete control；
 - 共 5,028,600 条 issue-policy 台账、317,900 条 ALL/YEAR/FOLD/LOYO 汇总。
 
 每张命中序列的毛回报为 `¥2 × 0.65 × Π(final winning SP)`。税务按**单张
-中奖彩票**处理：单张毛回报达到 ¥10,000 才收 20%；不把多张票、多个 identity 或同一
-issue-policy 的收益相加以跨越门槛。WR 重复抽到的序列仍是各自 stake、各自判断税线的票。
+中奖彩票**处理：先对这一张票的毛回报判断 `≥¥10,000`，仅该张票才收 20%；不把多张
+票、多个 identity、多个 `M` 重复、同一 issue-policy 或任何策略臂的收益相加以跨越门槛。
+WR 重复抽到的序列仍是各自 stake、各自判断税线的票。
+
+`ticket_tax_ledger.csv.gz` 逐行保存命中 portfolio/draw 的单张毛回报、独立票数、单张
+税额及其乘数；`ticket_tax_reconciliation.csv` 对 14,450 个冻结策略逐一核对该逐票账本
+与 issue-policy 账本。全部差额为零，合计税额同为 `¥324,774,233.06`。因此 v2r1 没有
+更改任何结算数值：四个原始汇总/增量矩阵的解压内容哈希与 v2 完全一致；它只移除了会让
+人误解为税务分桶的字段，并把单票税务证据持久化。
 
 ## 主结果
 

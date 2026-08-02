@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "settle_bj137_sampling_gate_b.py"
-PACKAGE = ROOT / "results" / "bj137_gate_b_outcome_settlement_v2"
+PACKAGE = ROOT / "results" / "bj137_gate_b_outcome_settlement_v2r1"
 
 
 def load_module():
@@ -43,9 +43,9 @@ def test_hash_sampling_is_reproducible_and_duplicate_aware() -> None:
 def test_tax_is_per_winning_ticket_not_pooled_by_issue_policy() -> None:
     runner = load_module()
     # Two ¥9,000 winnings must not be pooled to invent a taxable ¥18,000 prize.
-    assert runner.ticket_tax(9_000.0, 2) == 0.0
+    assert runner.ticket_tax(9_000.0) + runner.ticket_tax(9_000.0) == 0.0
     # A duplicate WR hit is still two independent ¥10,001 winning tickets.
-    assert runner.ticket_tax(10_001.0, 2) == 4_000.4
+    assert runner.ticket_tax(10_001.0) * 2 == 4_000.4
 
 
 def test_sparse_all_scope_positive_cannot_bypass_chronological_gate() -> None:
@@ -85,7 +85,7 @@ def test_frozen_surface_is_complete_before_outcome_access() -> None:
     assert {len(rows) for rows in plans.values()} == {289}
 
 
-def test_v2_package_is_immutable_lossless_and_no_promotion() -> None:
+def test_v2r1_package_is_immutable_lossless_and_no_promotion() -> None:
     def digest(path: Path) -> str:
         value = hashlib.sha256()
         with path.open("rb") as handle:
@@ -94,7 +94,7 @@ def test_v2_package_is_immutable_lossless_and_no_promotion() -> None:
         return value.hexdigest()
     manifest = json.loads((PACKAGE / "SHA256SUMS.json").read_text(encoding="utf-8"))
     actual = {path.name: digest(path) for path in PACKAGE.iterdir() if path.is_file() and path.name != "SHA256SUMS.json"}
-    assert digest(PACKAGE / "SHA256SUMS.json") == "718d8756813ac363d82b1d2fca2524366f4d0427575fe2b5926d7e2b29d6cbd4"
+    assert digest(PACKAGE / "SHA256SUMS.json") == "f4848d61b7eab31b97077751fdb2f49ad242e483033c6d29524ba4f7b43445fb"
     assert manifest == actual
     decision = json.loads((PACKAGE / "decision.json").read_text(encoding="utf-8"))
     assert decision["decision"] == "NO_PROMOTION"
@@ -103,3 +103,20 @@ def test_v2_package_is_immutable_lossless_and_no_promotion() -> None:
         summary = list(csv.DictReader(handle))
     assert len(summary) == 317_900
     assert {row["scope"] for row in summary} == {"ALL", "YEAR", "FOLD", "LEAVE_ONE_YEAR_OUT"}
+
+
+def test_ticket_tax_ledger_reconciles_without_pooling() -> None:
+    with (PACKAGE / "ticket_tax_reconciliation.csv").open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 14_450
+    assert all(abs(float(row["difference_yuan"])) < 1e-9 for row in rows)
+    assert abs(sum(float(row["ticket_ledger_tax_yuan"]) for row in rows) - sum(float(row["issue_ledger_tax_yuan"]) for row in rows)) < 1e-9
+    with gzip.open(PACKAGE / "ticket_tax_ledger.csv.gz", "rt", newline="", encoding="utf-8") as handle:
+        first = next(csv.DictReader(handle))
+    assert first["tax_rule"] == "20pct_if_each_ticket_gross_gte_10000"
+    assert float(first["per_ticket_tax_yuan"]) == runner_tax(float(first["winning_ticket_gross_yuan"]))
+
+
+def runner_tax(gross: float) -> float:
+    runner = load_module()
+    return runner.ticket_tax(gross)
