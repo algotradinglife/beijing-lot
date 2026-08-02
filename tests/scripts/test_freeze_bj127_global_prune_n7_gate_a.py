@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "freeze_bj127_global_prune_n7_gate_a.py"
-PACKAGE = ROOT / "results" / "bj127_gate_a_preoutcome_v1"
+PACKAGE = ROOT / "results" / "bj127_gate_a_preoutcome_v2"
 
 
 def sha256(path: Path) -> str:
@@ -51,11 +51,11 @@ def test_complete_manifest_and_portable_replay_identity(tmp_path: Path) -> None:
 def test_native_pool_denominator_and_matched_ticket_identity() -> None:
     module = load()
     rows = list(frontiers())
-    assert len(rows) == 170_483
+    assert len(rows) == 204_361
     assert Counter(row["arm"] for row in rows) == {
         "NO_BET_CONTROL": 23_931,
-        "MATCHED_FULL_N7": 73_276,
-        "PRUNE_ONE_GLOBAL_N7": 73_276,
+        "MATCHED_FULL_N7": 90_215,
+        "PRUNE_ONE_GLOBAL_N7": 90_215,
     }
     no_bets = Counter((row["variant_id"], row["pool_id"]) for row in rows if row["arm"] == "NO_BET_CONTROL")
     assert len(no_bets) == len(module.VARIANTS) * 2659
@@ -69,12 +69,13 @@ def test_native_pool_denominator_and_matched_ticket_identity() -> None:
 
 
 def test_one_global_deletion_and_no_unavailable_window_portfolios() -> None:
+    module = load()
     arms: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
     for row in frontiers():
         if row["disposition"] == "AVAILABLE":
             assert row["pool_disposition"] == "AVAILABLE"
             arms[(row["variant_id"], row["portfolio_id"])].append(row)
-    assert len(arms) == 73_276
+    assert len(arms) == 90_215
     for pair in arms.values():
         assert {row["arm"] for row in pair} == {"MATCHED_FULL_N7", "PRUNE_ONE_GLOBAL_N7"}
         assert {row["selected_match_ids"] for row in pair}.__len__() == 1
@@ -90,6 +91,55 @@ def test_one_global_deletion_and_no_unavailable_window_portfolios() -> None:
         code = deleted[0]["global_deleted_code"]
         assert all(row["prune_allowed_codes"] == "310" for row in values if row is not deleted[0])
         assert code not in deleted[0]["prune_allowed_codes"]
+        expected = min((float(row[f"p{candidate_code}"]), int(row["match_idx"]), module.CODES.index(candidate_code),
+                        row["match_id"], candidate_code)
+                       for row in values for candidate_code in module.CODES)
+        assert (deleted[0]["match_id"], code) == (expected[3], expected[4])
+
+
+def test_low_esp_candidate_is_retained_while_only_companions_take_match_floor() -> None:
+    module = load()
+
+    def match(match_id: str, match_idx: int, e_sp: float, p: dict[str, float]) -> dict[str, object]:
+        return {"match_id": match_id, "match_idx": str(match_idx), "e_sp": e_sp, "p_min": min(p.values()), "p": p}
+
+    candidate = match("candidate", 1, 2.50, {"3": .01, "1": .49, "0": .50})
+    companions = [match(f"companion-{index}", index + 1, 3.20, {"3": .34, "1": .33, "0": .33})
+                  for index in range(6)]
+    assembled = module.assemble_selection(candidate, [candidate, *companions], 3.00, 3.05)
+    assert assembled is not None
+    selected, gm = assembled
+    assert candidate in selected
+    assert candidate["e_sp"] < 3.00 <= min(float(row["e_sp"]) for row in selected if row is not candidate)
+    assert gm >= 3.05
+    deleted_match, deleted_code, _ = module.global_minimum(selected)
+    assert (deleted_match["match_id"], deleted_code) == ("candidate", "3")
+
+
+def test_role_separation_expands_the_frozen_low_probability_frontier() -> None:
+    with (PACKAGE / "threshold_census.csv").open(newline="", encoding="utf-8") as handle:
+        census = {row["variant_id"]: int(row["deduplicated_portfolios"]) for row in csv.DictReader(handle)}
+    assert census["ESP280_GM290_LOWP20"] == 1_135
+    assert census["ESP290_GM300_LOWP20"] == 1_011
+    assert census["ESP300_GM305_LOWP20"] == 371
+    assert census["ESP300_GM305_LOWP30"] == 17_330
+
+    saw_low_esp_candidate = False
+    for values in _role_groups().values():
+        candidate = next(row for row in values if row["is_deletion_candidate"] == "1")
+        variant = candidate["variant_id"]
+        e_sp_floor = {"ESP280": 2.80, "ESP290": 2.90, "ESP300": 3.00}[variant[:6]]
+        if float(candidate["e_sp"]) < e_sp_floor:
+            saw_low_esp_candidate = True
+    assert saw_low_esp_candidate
+
+
+def _role_groups() -> dict[tuple[str, str], list[dict[str, str]]]:
+    groups: dict[tuple[str, str], list[dict[str, str]]] = defaultdict(list)
+    with gzip.open(PACKAGE / "portfolio_role_assignments.csv.gz", "rt", newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            groups[(row["variant_id"], row["portfolio_id"])].append(row)
+    return groups
 
 
 def test_gate_a_has_no_settlement_dependency_and_emits_scatter_evidence() -> None:
@@ -98,6 +148,8 @@ def test_gate_a_has_no_settlement_dependency_and_emits_scatter_evidence() -> Non
         assert forbidden not in source
     card = json.loads((PACKAGE / "gate_a_card.json").read_text(encoding="utf-8"))
     assert card["outcome_boundary"].startswith("No result")
-    assert card["denominator"]["role_rows"] == 512_932
+    assert card["denominator"]["role_rows"] == 631_505
     assert (PACKAGE / "scatter_hexbin_density.csv").stat().st_size > 0
     assert len(list(PACKAGE.glob("scatter_issue_*.svg"))) == 3
+    svg = next(PACKAGE.glob("scatter_issue_*.svg")).read_text(encoding="utf-8")
+    assert "orange=candidate, red=global delete, green=companions" in svg

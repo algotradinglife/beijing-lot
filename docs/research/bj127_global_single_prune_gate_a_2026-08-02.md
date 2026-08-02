@@ -2,7 +2,7 @@
 
 日期：2026-08-02（CST）
 Issue：[GitHub #127](https://github.com/algotradinglife/beijing-lot/issues/127)
-状态：赛果未暴露的 Gate A；历史纸面研究，不构成投注、生产或晋级建议。
+状态：赛果未暴露的 Gate A v2 候选；历史纸面研究，不构成投注、生产或晋级建议。
 
 ## 研究边界
 
@@ -27,8 +27,9 @@ E_SP  = Σ_code[p_cal(code) × predicted_sp(code)]
 
 固定 9 个 variant：`E_SP / GM_E_SP` 配对门槛为 `2.80/2.90`、`2.90/3.00`、
 `3.00/3.05`，交叉 `p_min=.20/.25/.30`。每个 #101 `AVAILABLE` pool 内的低概率
-候选都必须进入其自己的 N7，再加入其余 6 个 `E_SP` 最高、通过 match floor 的比赛；
-组合也须通过 `GM_E_SP`。
+候选仅由 `p_min` 决定，**不要求候选自身通过 `E_SP` match floor**；候选必须进入其自己的
+N7，再加入其余 6 个 `E_SP` 最高、通过 match floor 的比赛。只有完整七场组合才须通过
+`GM_E_SP`。这使“低概率删除腿”和“高 E_SP 的全包 companion 腿”保持各自的冻结角色。
 
 随后在该 7 场的全部 21 个代码中，按 `p`、`match_idx`、代码顺序确定唯一全局最小码。
 只删除该码，按 `(7 场集合, 删除比赛, 删除代码)` 去重。所有非 `AVAILABLE` 窗口仍留在
@@ -49,13 +50,13 @@ E_SP  = Σ_code[p_cal(code) × predicted_sp(code)]
 | outcome-unexposed scatter coordinates | 47,819 matches |
 | variants | 9 |
 | `NO_BET_CONTROL` rows | 23,931 |
-| 去重 portfolio identities | 73,276 |
-| FULL / PRUNE 匹配行 | 各 73,276 |
-| frontier rows | 170,483 |
-| 7-leg role assignments | 512,932 |
+| 去重 portfolio identities | 90,215 |
+| FULL / PRUNE 匹配行 | 各 90,215 |
+| frontier rows | 204,361 |
+| 7-leg role assignments | 631,505 |
 
-`threshold_census.csv` 是完整阈值密度表：最宽松 `2.80/2.90, .30` 有 24,558 个
-identity；最严格 `3.00/3.05, .20` 只有 3 个。它是赛前可用性差异，不是收益排序。
+`threshold_census.csv` 是完整阈值密度表：最宽松 `2.80/2.90, .30` 有 20,920 个
+identity；最严格 `3.00/3.05, .20` 有 371 个。它是赛前可用性差异，不是收益排序。
 
 ## 散点、密度与代表性图形
 
@@ -67,13 +68,15 @@ identity；最严格 `3.00/3.05, .20` 只有 3 个。它是赛前可用性差异
 - `scatter_issue_22091.svg`
 - `scatter_issue_25042.svg`
 
-SVG 中的参考线是 `p_min=.30`、`E_SP=3.00`，红点为至少一个已冻结组合选择的比赛。
-它们解释的是输入空间与可用性，不是基于回报挑选的门槛。
+SVG 中的参考线是 `p_min=.30`、`E_SP=3.00`。每张图选取该 issue 的一个确定性
+representative portfolio：橙色是 `p_min` 删除候选、红色是全局删除码所在比赛、绿色是六个
+高 `E_SP` companion；若候选恰好也是全局删除码所在比赛则为紫色。它们解释的是输入空间与
+可用性，不是基于回报挑选的门槛。
 
 ## 审计与复现
 
-不可变包：`results/bj127_gate_a_preoutcome_v1/`
-manifest：`bf5752322ff973625fd7c47c0e41e63fcaf80c961e341062721c2276b691e6dc`
+不可变包：`results/bj127_gate_a_preoutcome_v2/`
+manifest：`a8eeb50204bb9a2d69578538e28943a432bea11083661a63b950a5ab5a2481da`
 
 - `matched_frontier.csv.gz`：完整 no-bet 分母与每个 matched pair；
 - `portfolio_role_assignments.csv.gz`：7 场集合、唯一全局删除码及 FULL/PRUNE codes；
@@ -81,8 +84,8 @@ manifest：`bf5752322ff973625fd7c47c0e41e63fcaf80c961e341062721c2276b691e6dc`
 - `CONTENT_IDENTITY.json`、`SHA256SUMS.json`、`runner.py`：可移植身份与重放。
 
 `python3 runner.py --output <new-dir>` 可在新路径重放同一内容身份。聚焦测试覆盖
-完整分母、2,187/1,458 固定会计、唯一删除、不可用窗口 no-bet、散点证据与 outcome
-隔离。
+完整分母、2,187/1,458 固定会计、唯一删除、低 `E_SP` 候选保留/六个 companion 门槛、
+不可用窗口 no-bet、角色区分散点证据与 outcome 隔离。
 
 ## 下一步
 

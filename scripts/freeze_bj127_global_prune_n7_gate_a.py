@@ -23,8 +23,8 @@ from pathlib import Path
 
 CODES = ("3", "1", "0")
 CONTRACT = "BJ-HIST-PRUNE-ONE-GLOBAL-N7-001"
-VERSION = "bj127-gatea-v1"
-CONTENT_VERSION = "bj127-portable-content-v1"
+VERSION = "bj127-gatea-v2"
+CONTENT_VERSION = "bj127-portable-content-v2"
 BJ106_MANIFEST = "fb45cacccb4c9ab2b52c8a538f489fb3e3197fa138245f0d83cf98a3cbb0db5d"
 BJ101_MANIFEST = "86e37682a95fad2a2a67187f1ee528f665d371583c621dc9d14af58f74302447"
 FULL_K = 3 ** 7
@@ -78,7 +78,7 @@ def root(path: Path) -> Path:
 ROOT = root(Path(__file__))
 BJ106 = ROOT / "results" / "bj106_gate_a_preoutcome_v2r1"
 BJ101 = ROOT / "results" / "bj101_gate_a_preoutcome_v1r1"
-OUTPUT = ROOT / "results" / "bj127_gate_a_preoutcome_v1"
+OUTPUT = ROOT / "results" / "bj127_gate_a_preoutcome_v2"
 
 
 def sha256(path: Path) -> str:
@@ -187,6 +187,26 @@ def global_minimum(selected: list[dict[str, object]]) -> tuple[dict[str, object]
     return match, code, probability
 
 
+def assemble_selection(candidate: dict[str, object], pool_matches: list[dict[str, object]], e_sp_min: float,
+                       gm_e_sp_min: float) -> tuple[list[dict[str, object]], float] | None:
+    """Build the contracted asymmetric seven-leg set without outcome input.
+
+    The deletion candidate is eligible only by its p_min.  The other six legs
+    are the highest-E_SP matches satisfying the per-match E_SP floor.  The GM
+    threshold applies only to the completed seven-leg selection.
+    """
+    companions = [match for match in pool_matches
+                  if match["match_id"] != candidate["match_id"] and float(match["e_sp"]) >= e_sp_min][:6]
+    selected = [candidate, *companions]
+    selected.sort(key=lambda match: (-float(match["e_sp"]), float(match["p_min"]), int(str(match["match_idx"]))))
+    if len(selected) != 7:
+        return None
+    gm = geometric([float(match["e_sp"]) for match in selected])
+    if gm < gm_e_sp_min:
+        return None
+    return selected, gm
+
+
 def hexbin(scatter: list[dict[str, object]]) -> list[dict[str, object]]:
     bins: dict[tuple[int, int], int] = defaultdict(int)
     for row in scatter:
@@ -198,7 +218,7 @@ def hexbin(scatter: list[dict[str, object]]) -> list[dict[str, object]]:
             for (p, e), count in sorted(bins.items())]
 
 
-def scatter_svg(issue: str, rows: list[dict[str, object]], selected_ids: set[str]) -> str:
+def scatter_svg(issue: str, rows: list[dict[str, object]], selection: dict[str, object]) -> str:
     width, height, left, bottom = 720, 440, 60, 50
     chart_w, chart_h = width - left - 30, height - 40 - bottom
     p_max = max(.35, max(float(row["p_min"]) for row in rows) * 1.05)
@@ -206,8 +226,13 @@ def scatter_svg(issue: str, rows: list[dict[str, object]], selected_ids: set[str
     e_min = min(2.0, math.floor(e_min * 10) / 10); e_max = max(3.5, math.ceil(e_max * 10) / 10)
     def x(value: float) -> float: return left + chart_w * value / p_max
     def y(value: float) -> float: return 40 + chart_h * (e_max - value) / (e_max - e_min)
+    candidate_id = str(selection["candidate_match_id"])
+    deleted_match_id = str(selection["deleted_match_id"])
+    companion_ids = {str(match_id) for match_id in selection["companion_match_ids"]}
+    variant_id = html.escape(str(selection["variant_id"]))
     lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
              '<rect width="100%" height="100%" fill="white"/>', f'<text x="{left}" y="22" font-family="sans-serif" font-size="16">Issue {html.escape(issue)} — outcome-unexposed p_min × E_SP</text>',
+             f'<text x="{left}" y="37" font-family="sans-serif" font-size="11">representative {variant_id}: orange=candidate, red=global delete, green=companions</text>',
              f'<line x1="{left}" y1="{height-bottom}" x2="{width-30}" y2="{height-bottom}" stroke="#333"/>',
              f'<line x1="{left}" y1="40" x2="{left}" y2="{height-bottom}" stroke="#333"/>',
              f'<line x1="{x(.30):.2f}" y1="40" x2="{x(.30):.2f}" y2="{height-bottom}" stroke="#a66" stroke-dasharray="4"/>',
@@ -215,9 +240,22 @@ def scatter_svg(issue: str, rows: list[dict[str, object]], selected_ids: set[str
              f'<text x="{x(.30)+4:.2f}" y="{height-bottom-5}" font-size="11">p_min=.30</text>',
              f'<text x="{left+4}" y="{y(3.00)-4:.2f}" font-size="11">E_SP=3.00</text>']
     for row in rows:
-        color = "#d62728" if str(row["match_id"]) in selected_ids else "#4c78a8"
-        radius = 5 if color == "#d62728" else 3
-        lines.append(f'<circle cx="{x(float(row["p_min"])):.2f}" cy="{y(float(row["e_sp"])):.2f}" r="{radius}" fill="{color}" fill-opacity=".75"><title>match {html.escape(str(row["match_id"]))}</title></circle>')
+        match_id = str(row["match_id"])
+        is_candidate = match_id == candidate_id
+        is_deleted = match_id == deleted_match_id
+        is_companion = match_id in companion_ids
+        if is_candidate and is_deleted:
+            color, role = "#9467bd", "prune candidate and global deleted-code match"
+        elif is_candidate:
+            color, role = "#ff7f0e", "prune candidate"
+        elif is_deleted:
+            color, role = "#d62728", "global deleted-code match"
+        elif is_companion:
+            color, role = "#2ca02c", "full-cover companion"
+        else:
+            color, role = "#4c78a8", "not in representative portfolio"
+        radius = 5 if is_candidate or is_deleted or is_companion else 3
+        lines.append(f'<circle cx="{x(float(row["p_min"])):.2f}" cy="{y(float(row["e_sp"])):.2f}" r="{radius}" fill="{color}" fill-opacity=".75"><title>match {html.escape(match_id)}: {role}</title></circle>')
     lines.append(f'<text x="{left}" y="{height-12}" font-size="12">p_min</text><text x="8" y="{height/2:.2f}" font-size="12" transform="rotate(-90 8 {height/2:.2f})">E_SP</text></svg>')
     return "\n".join(lines) + "\n"
 
@@ -238,7 +276,7 @@ def freeze(output: Path) -> dict[str, object]:
             scatter_writer.writerow({field: fmt(float(combined[field])) if field in {"p_min", "e_sp", "p3", "p1", "p0", "q3", "q1", "q0"} else combined[field] for field in SCATTER_FIELDS})
         summary = {variant: defaultdict(int) for variant in VARIANTS}
         portfolio_count = role_count = frontier_count = 0
-        representative: dict[str, set[str]] = defaultdict(set)
+        representative: dict[str, dict[str, object]] = {}
         issue_scatter: dict[str, list[dict[str, object]]] = defaultdict(list)
         for row in scatter: issue_scatter[str(row["issue"])].append(row)
         for variant, rule in VARIANTS.items():
@@ -248,16 +286,12 @@ def freeze(output: Path) -> dict[str, object]:
                 # an invitation to reach through to their raw memberships.
                 pool_is_available = pool["pool_disposition"] == "AVAILABLE"
                 matches = by_pool.get(pool["pool_id"], []) if pool_is_available else []
-                eligible = [match for match in matches if float(match["e_sp"]) >= rule["e_sp_min"]]
-                candidates = [match for match in eligible if float(match["p_min"]) <= rule["p_min_max"]]
+                candidates = [match for match in matches if float(match["p_min"]) <= rule["p_min_max"]]
                 unique: dict[str, tuple[dict[str, object], list[dict[str, object]], dict[str, object], str, float]] = {}
                 for candidate in candidates:
-                    companions = [match for match in eligible if match["match_id"] != candidate["match_id"]][:6]
-                    selected = [candidate, *companions]
-                    selected.sort(key=lambda match: (-float(match["e_sp"]), float(match["p_min"]), int(str(match["match_idx"]))))
-                    if len(selected) != 7: continue
-                    gm = geometric([float(match["e_sp"]) for match in selected])
-                    if gm < rule["gm_e_sp_min"]: continue
+                    assembled = assemble_selection(candidate, matches, rule["e_sp_min"], rule["gm_e_sp_min"])
+                    if assembled is None: continue
+                    selected, gm = assembled
                     deleted_match, deleted_code, deleted_probability = global_minimum(selected)
                     signature = identity({"variant": variant, "pool": pool["pool_id"], "matches": [match["match_id"] for match in selected], "deleted_match": deleted_match["match_id"], "deleted_code": deleted_code})
                     unique[signature] = (candidate, selected, deleted_match, deleted_code, deleted_probability)
@@ -275,7 +309,16 @@ def freeze(output: Path) -> dict[str, object]:
                         p = match["p"]; assert isinstance(p, dict)
                         prune_codes = "".join(code for code in CODES if not (match["match_id"] == deleted_match["match_id"] and code == deleted_code))
                         role_writer.writerow({"variant_id": variant, "portfolio_id": portfolio_id, "issue": pool["issue"], "fold": pool["fold"], "year": pool["year"], "pool_id": pool["pool_id"], "match_id": match["match_id"], "match_idx": match["match_idx"], "selection_rank": rank, "e_sp": fmt(float(match["e_sp"])), "p_min": fmt(float(match["p_min"])), "p3": fmt(float(p["3"])), "p1": fmt(float(p["1"])), "p0": fmt(float(p["0"])), "is_deletion_candidate": int(match["match_id"] == candidate["match_id"]), "is_global_deleted_code_match": int(match["match_id"] == deleted_match["match_id"]), "global_deleted_code": deleted_code, "global_deleted_probability": fmt(deleted_probability), "full_allowed_codes": "310", "prune_allowed_codes": prune_codes})
-                        representative[str(pool["issue"])].add(str(match["match_id"])); role_count += 1
+                        role_count += 1
+                    issue = str(pool["issue"])
+                    if issue not in representative:
+                        representative[issue] = {
+                            "variant_id": variant,
+                            "portfolio_id": portfolio_id,
+                            "candidate_match_id": candidate["match_id"],
+                            "deleted_match_id": deleted_match["match_id"],
+                            "companion_match_ids": [match["match_id"] for match in selected if match["match_id"] != candidate["match_id"]],
+                        }
                     portfolio_count += 1; summary[variant]["deduplicated_portfolios"] += 1; summary[variant]["matched_full_rows"] += 1; summary[variant]["prune_one_rows"] += 1; summary[variant]["full_tickets"] += FULL_K; summary[variant]["prune_tickets"] += PRUNE_K; summary[variant]["full_stake_yuan"] += FULL_K * UNIT_STAKE; summary[variant]["prune_stake_yuan"] += PRUNE_K * UNIT_STAKE
         for handles in (scatter_handles, frontier_handles, role_handles): close_gzip(handles)
         with (stage / "threshold_census.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -291,8 +334,8 @@ def freeze(output: Path) -> dict[str, object]:
         card = {"issue": 127, "contract": CONTRACT, "generator_version": VERSION, "stage": "GATE_A_OUTCOME_UNEXPOSED_MATCHED_FREEZE", "provenance": provenance,
                 "denominator": {"native_issues": 344, "native_pools": 2659, "frontier_rows": frontier_count, "portfolio_identities": portfolio_count, "role_rows": role_count},
                 "variants": VARIANTS, "matched_pair": {"MATCHED_FULL_N7": {"tickets": FULL_K, "stake_yuan": FULL_K * UNIT_STAKE}, "PRUNE_ONE_GLOBAL_N7": {"tickets": PRUNE_K, "stake_yuan": PRUNE_K * UNIT_STAKE}, "stake_reduction_fraction": "1/3"},
-                "selection": "Only #101 AVAILABLE native pools can construct a portfolio; every unavailable pool remains an explicit NO_BET row. For each p_min deletion candidate with E_SP floor, include it plus six highest-E_SP other eligible matches in its native pool. Require GM_E_SP. Select exactly one global minimum probability among all 21 selected outcome codes, with p then match_idx then code deterministic tie-breaks; remove only that code.",
-                "scatter": {"coordinates": "one row per native #101 member with p_min and E_SP", "hexbin": "fixed .025 p_min × .25 E_SP bins", "representative_issue_rule": "lowest, median and highest issue with a frozen portfolio; SVG uses strict p_min=.30 / E_SP=3.00 reference lines and highlights selected matches"},
+                "selection": "Only #101 AVAILABLE native pools can construct a portfolio; every unavailable pool remains an explicit NO_BET row. Every p_min deletion candidate is eligible regardless of its own E_SP. Include it plus six highest-E_SP other matches in its native pool that satisfy the E_SP floor, then require GM_E_SP over the completed seven-leg set. Select exactly one global minimum probability among all 21 selected outcome codes, with p then match_idx then code deterministic tie-breaks; remove only that code.",
+                "scatter": {"coordinates": "one row per native #101 member with p_min and E_SP", "hexbin": "fixed .025 p_min × .25 E_SP bins", "representative_issue_rule": "lowest, median and highest issue with a frozen portfolio; each SVG uses the first deterministic portfolio for that issue and distinguishes prune candidate, global deleted-code match, and the six full-cover companions"},
                 "outcome_boundary": "No result, final SP, payout, tax, ROI, or settlement source is read or emitted. Gate B is NOT_RUN and NOT_AUTHORIZED.", "scope": "historical paper-only research; no purchase, production, or promotion"}
         (stage / "gate_a_card.json").write_text(json.dumps(card, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         shutil.copyfile(__file__, stage / "runner.py")
