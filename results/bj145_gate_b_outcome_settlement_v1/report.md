@@ -5,3 +5,5 @@ Gate-A manifest `da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114
 The complete mechanism × weight × M/cap/seed surface is retained. Pre-tax `no_tax_roi` is primary; individual-ticket tax is secondary and never pooled. Tax reconciliation covers every frozen configuration, including zero-winning-ticket configurations.
 
 This historical settlement is descriptive only. Positive same-window surfaces are not promotion evidence; strict independent EV and held-out/forward validation are required. No purchase, production, betting, or promotion authority.
+
+Integration candidate: `mechanism_surface_median.svg` plots median pre-tax ROI by frozen M and mechanism for each arm across the weight/cap/seed surface. It is descriptive only and does not select a winning cell.

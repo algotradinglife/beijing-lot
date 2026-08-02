@@ -31,6 +31,10 @@
   "promotion_authorized": false,
   "secondary_arm": "SECONDARY_ESP300_GM290_K8",
   "settlement_scope": "all frozen issue/configuration rows; unavailable outcomes remain zero-stake and are not imputed",
+  "chart_integration_candidate": {
+    "file": "mechanism_surface_median.svg",
+    "rule": "median pre-tax ROI by M and mechanism across frozen weight/cap/seed cells, separately by arm; descriptive only"
+  },
   "source_manifests_transitive": {
     "bj137": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
     "bj148": "fd4a0f4dc0ab5ef97f3c260a082515aa7874a60a1ac1e5e0ecd865fdb1eeafd6",

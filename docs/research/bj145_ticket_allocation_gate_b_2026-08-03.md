@@ -5,7 +5,7 @@
 Gate B consumes only the accepted Gate-A freeze and the canonical trusted
 outcome/final-SP join. The published package is
 `results/bj145_gate_b_outcome_settlement_v1` with `SHA256SUMS.json` SHA-256
-`1b45f83f62444732aaf783b696208d7862b6079a3445923fa51c26762715d69b`.
+`818bbf1c8c547478e158e127ad267e365705e54df9227e0c1cde180a31640ec2`.
 
 - Gate-A manifest: `da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114c`
 - canonical outcome manifest: `fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc`
@@ -35,6 +35,9 @@ sources. Focused replay checks verify the Gate-A allocator binding, golden
 vectors, WR/WOR/residual/capped/FULL metric parity, row denominators, and
 manifest coverage. No SQLite database is published in the package; the large
 stage-local SQLite index was used only for streaming post-processing.
+`mechanism_surface_median.svg` is the chart integration candidate: it plots
+median pre-tax ROI by M and mechanism across frozen weight/cap/seed cells for
+each arm, without selecting a winning cell.
 
 ## Descriptive result
 

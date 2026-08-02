@@ -54,6 +54,8 @@ def test_surface_denominators_tax_and_decision():
         "tax_reconciliation_rows": 2892,
     }
     assert json.loads((PACKAGE / "decision.json").read_text(encoding="utf-8"))["promotion_authorized"] is False
+    assert "mechanism_surface_median.svg" in (PACKAGE / "settlement_card.json").read_text(encoding="utf-8")
+    assert "descriptive surface" in (PACKAGE / "mechanism_surface_median.svg").read_text(encoding="utf-8")
     tax = _csv_rows(PACKAGE / "tax_reconciliation.csv")
     assert len(tax) == 2892
     assert {row["status"] for row in tax} == {"PASS"}

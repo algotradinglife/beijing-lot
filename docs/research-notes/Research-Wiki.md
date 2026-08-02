@@ -270,7 +270,7 @@ fingerprints 绑定进 manifest，避免在 Gate B 才首次决定 residual/capp
 
 Gate B 已按同一冻结输入完成一次性 outcome join。不可变包为
 `results/bj145_gate_b_outcome_settlement_v1`，`SHA256SUMS.json` 为
-`1b45f83f62444732aaf783b696208d7862b6079a3445923fa51c26762715d69b`。包内有
+`818bbf1c8c547478e158e127ad267e365705e54df9227e0c1cde180a31640ec2`。包内有
 1,006,416 行、2,892 个配置、63,624 个 scope summary、63,360 个 FULL 对照差、
 5,760 个 bootstrap 行和 2,880 个 Holm 行；税务 reconciliation 覆盖全部配置且
 2,892 行均 PASS。逐票税按单张中奖票计算，绝不按 issue、policy 或多票汇总。
@@ -281,7 +281,9 @@ Gate B 已按同一冻结输入完成一次性 outcome join。不可变包为
 的描述性最大值分别为主臂税前 84.76%、次臂 72.05%，但这是大矩阵中挑出的
 same-window cell，不能视为独立 EV。终局为
 **DESCRIPTIVE_SURFACE_ONLY_NO_PROMOTION**；必须经 strict independent-EV 与
-held-out/forward validation 后才可讨论策略晋级。详见 [#145 Gate B](../research/bj145_ticket_allocation_gate_b_2026-08-03.md)。
+held-out/forward validation 后才可讨论策略晋级。图表候选为包内
+`mechanism_surface_median.svg`（按 arm/mechanism/M 汇总冻结 weight/cap/seed 的
+税前 ROI 中位数，不挑选赢家）。详见 [#145 Gate B](../research/bj145_ticket_allocation_gate_b_2026-08-03.md)。
 
 ## 知识图谱
 
