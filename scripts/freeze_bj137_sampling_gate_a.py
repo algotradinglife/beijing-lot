@@ -31,8 +31,8 @@ FULL_K = 3 ** N
 PRUNED_K = 2 * 3 ** (N - 1)
 UNIT_STAKE = 2
 CONTRACT = "BJ-HIST-PROB-SAMPLING-N7-001"
-VERSION = "bj137-gate-a-v1"
-CONTENT_VERSION = "bj137-gate-a-content-v1"
+VERSION = "bj137-gate-a-v2"
+CONTENT_VERSION = "bj137-gate-a-content-v2"
 BJ132_MANIFEST = "6583503ee80fd2b40bb1c000917ff094afa0551b6a3f0af4b8d175a6432872f9"
 MAX_IDENTITIES_PER_ISSUE_GATE = 32
 M_GRID = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 1458, 2187)
@@ -54,7 +54,7 @@ def repository_root() -> Path:
 ROOT = repository_root()
 SOURCE_132 = ROOT / "results" / "bj132_gate_a_complete_issue_preoutcome_v1r1"
 SOURCE_DB = ROOT.parent.parent / "data" / "derived" / "beidan_xlsm" / "beidan_xlsm.sqlite"
-OUTPUT = ROOT / "results" / "bj137_gate_a_preoutcome_v1"
+OUTPUT = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
 
 GATES = ({"gate_id": "NO_GATE", "e_sp_min": 0.0, "gm_e_sp_min": 0.0},) + tuple(
     {
@@ -65,6 +65,7 @@ GATES = ({"gate_id": "NO_GATE", "e_sp_min": 0.0, "gm_e_sp_min": 0.0},) + tuple(
     for e_sp in (2.80, 2.90, 3.00)
     for gm in (2.90, 3.00, 3.05)
 )
+TOP_K = (1, 2, 4, 8, "ALL")
 
 SCATTER_FIELDS = (
     "issue", "fold", "year", "issue_instance", "match_id", "match_idx", "kickoff_ts",
@@ -95,7 +96,7 @@ IDENTITY_FIELDS = ISSUE_CENSUS_FIELDS + (
     "candidate_rank_in_complete_issue", "candidate_count_complete_issue", "candidate_search_count",
     "candidate_cap_applied", "selected_match_ids", "selected_n", "gm_e_sp", "full_k",
     "full_stake_yuan", "p_min_delete_match_id", "p_min_delete_code", "q_min_delete_match_id",
-    "q_min_delete_code", "descriptor_sha256", "selection_scope", "segment_boundary",
+    "q_min_delete_code", "descriptor_sha256", "participation_rank", "selection_scope", "segment_boundary",
 )
 ROLE_FIELDS = (
     "gate_id", "portfolio_id", "issue", "fold", "year", "issue_instance", "match_id",
@@ -108,9 +109,15 @@ ROLE_FIELDS = (
     "q_min_delete_match_id", "q_min_delete_code",
 )
 SAMPLER_PLAN_FIELDS = (
-    "gate_id", "sampler_id", "probability_vector", "mechanism", "duplicate_policy", "M",
-    "seed", "seed_role", "ticket_space_k", "stake_per_draw_yuan", "expected_unique_formula",
+    "gate_id", "top_k_id", "requested_n7_count", "sampler_id", "probability_vector", "mechanism",
+    "duplicate_policy", "M", "M_scope", "seed", "seed_role", "ticket_space_k", "stake_per_draw_yuan",
+    "issue_total_draw_formula", "issue_total_stake_formula", "expected_unique_formula",
     "realized_unique_rule", "outcome_boundary", "primary_or_sensitivity",
+)
+PARTICIPATION_FIELDS = ISSUE_CENSUS_FIELDS + (
+    "gate_id", "top_k_id", "requested_n7_count", "available_identity_count", "selected_identity_count",
+    "selected_portfolio_ids", "full_ticket_count", "full_stake_yuan", "sample_M_scope",
+    "issue_total_draw_formula", "issue_total_stake_formula", "disposition", "reason",
 )
 CALIBRATION_MAP_FIELDS = (
     "fold", "test_year", "train_years", "outcome_code", "handicap_bucket", "probability_bin",
@@ -488,11 +495,16 @@ def delete_code(selected: list[dict[str, object]], field: str) -> tuple[str, str
     return match_id, code
 
 
+def top_k_id(value: int | str) -> str:
+    return "K_ALL" if value == "ALL" else f"K{int(value)}"
+
+
 def build_identities(by_issue: dict[tuple[str, str, str], list[dict[str, object]]], issue_census: dict[tuple[str, str, str], dict[str, str]], stage: Path):
     identity_handles = gzip_writer(stage / "n7_identities.csv.gz", IDENTITY_FIELDS)
     role_handles = gzip_writer(stage / "n7_role_vectors.csv.gz", ROLE_FIELDS)
     iw, rw = identity_handles[-1], role_handles[-1]
     census_rows: list[dict[str, object]] = []
+    participation_rows: list[dict[str, object]] = []
     identities = roles = 0
     try:
         for gate in GATES:
@@ -534,7 +546,15 @@ def build_identities(by_issue: dict[tuple[str, str, str], list[dict[str, object]
                     "full_ticket_count": len(unique) * FULL_K, "full_stake_yuan": len(unique) * FULL_K * UNIT_STAKE,
                     "disposition": disposition, "reason": reason,
                 })
-                for ordinal, (_, entry) in enumerate(sorted(unique.items()), 1):
+                ranked = sorted(
+                    unique.values(),
+                    key=lambda entry: (
+                        entry[3],
+                        tuple(str(row["match_id"]) for row in entry[1]),
+                    ),
+                )
+                frozen_portfolio_ids: list[str] = []
+                for ordinal, entry in enumerate(ranked, 1):
                     candidate, selected, gm, candidate_rank = entry
                     portfolio_id = compact_hash({
                         "contract": CONTRACT, "gate": gate["gate_id"], "issue_instance": base["issue_instance"],
@@ -561,9 +581,11 @@ def build_identities(by_issue: dict[tuple[str, str, str], list[dict[str, object]
                         "gm_e_sp": fmt(gm), "full_k": FULL_K, "full_stake_yuan": FULL_K * UNIT_STAKE,
                         "p_min_delete_match_id": p_min_match, "p_min_delete_code": p_min_code,
                         "q_min_delete_match_id": q_match, "q_min_delete_code": q_code,
-                        "descriptor_sha256": descriptor, "selection_scope": "COMPLETE_ISSUE",
+                        "descriptor_sha256": descriptor, "participation_rank": ordinal,
+                        "selection_scope": "COMPLETE_ISSUE",
                         "segment_boundary": "NONE; source segments are diagnostic-only",
                     })
+                    frozen_portfolio_ids.append(portfolio_id)
                     for rank, row in enumerate(selected, 1):
                         rw.writerow({
                             "gate_id": gate["gate_id"], "portfolio_id": portfolio_id, "issue": row["issue"],
@@ -584,10 +606,33 @@ def build_identities(by_issue: dict[tuple[str, str, str], list[dict[str, object]
                         })
                         roles += 1
                     identities += 1
+                for requested in TOP_K:
+                    if requested == "ALL":
+                        selected_ids = frozen_portfolio_ids
+                        top_reason = reason
+                    elif len(frozen_portfolio_ids) >= int(requested):
+                        selected_ids = frozen_portfolio_ids[:int(requested)]
+                        top_reason = "PORTFOLIOS_AVAILABLE"
+                    else:
+                        selected_ids = []
+                        top_reason = "INSUFFICIENT_N7_IDENTITIES_FOR_REQUESTED_K"
+                    participation_rows.append({
+                        **base, "gate_id": gate["gate_id"], "top_k_id": top_k_id(requested),
+                        "requested_n7_count": requested, "available_identity_count": len(frozen_portfolio_ids),
+                        "selected_identity_count": len(selected_ids),
+                        "selected_portfolio_ids": "|".join(selected_ids),
+                        "full_ticket_count": len(selected_ids) * FULL_K,
+                        "full_stake_yuan": len(selected_ids) * FULL_K * UNIT_STAKE,
+                        "sample_M_scope": "PER_N7_IDENTITY; issue total is selected_identity_count × M",
+                        "issue_total_draw_formula": "selected_identity_count × M",
+                        "issue_total_stake_formula": "selected_identity_count × M × ¥2",
+                        "disposition": "AVAILABLE" if selected_ids else "NO_BET",
+                        "reason": top_reason,
+                    })
     finally:
         close_gzip(identity_handles)
         close_gzip(role_handles)
-    return census_rows, identities, roles
+    return census_rows, participation_rows, identities, roles
 
 
 def sampler_plan_rows() -> list[dict[str, object]]:
@@ -597,29 +642,32 @@ def sampler_plan_rows() -> list[dict[str, object]]:
         "expected_unique_formula": "sum_t[1-(1-w(t))^M] for independent draws; distinct mechanisms equal M/FULL_K",
         "outcome_boundary": "pre-outcome sampler only; Gate B must report realized unique ticket count and all settlement metrics",
     }
-    def append(gate_id: str, sampler_id: str, vector: str, mechanism: str, duplicate: str, m: int, seed: object, role: str, primary: str):
+    def append(gate_id: str, requested_k: int | str, sampler_id: str, vector: str, mechanism: str, duplicate: str, m: int, seed: object, role: str, primary: str):
         rows.append({
-            "gate_id": gate_id, "sampler_id": sampler_id, "probability_vector": vector,
-            "mechanism": mechanism, "duplicate_policy": duplicate, "M": m, "seed": seed,
-            "seed_role": role, **base,
+            "gate_id": gate_id, "top_k_id": top_k_id(requested_k), "requested_n7_count": requested_k,
+            "sampler_id": sampler_id, "probability_vector": vector, "mechanism": mechanism,
+            "duplicate_policy": duplicate, "M": m, "M_scope": "PER_N7_IDENTITY", "seed": seed,
+            "seed_role": role, "issue_total_draw_formula": "selected_identity_count × M",
+            "issue_total_stake_formula": "selected_identity_count × M × ¥2", **base,
             "realized_unique_rule": "count distinct ticket identities; duplicate draws retain separate ¥2 stakes" if duplicate == "DUPLICATE_STAKES" else "all selected tickets are distinct",
             "primary_or_sensitivity": primary,
         })
     for gate in GATES:
         gate_id = str(gate["gate_id"])
-        append(gate_id, "FULL_N7_CONTROL", "UNIFORM_FULL", "ENUMERATE_FULL", "NOT_APPLICABLE", FULL_K, "NA", "CONTROL", "CONTROL")
-        for m in M_GRID:
-            append(gate_id, "TOP_MODEL_P_CAL_DISTINCT", "MODEL_P_CAL", "DETERMINISTIC_TOP_MASS", "DEDUPLICATED", m, "NA", "DETERMINISTIC", "MATCHED_CONTROL")
-            for seed in SENSITIVITY_SEEDS:
-                role = "PRIMARY" if seed == PRIMARY_SEED else "SENSITIVITY"
-                append(gate_id, "MODEL_P_CAL_WR_DUPLICATE_STAKES", "MODEL_P_CAL", "INDEPENDENT_WITH_REPLACEMENT", "DUPLICATE_STAKES", m, seed, role, "PRIMARY" if role == "PRIMARY" else "SENSITIVITY")
-                append(gate_id, "MODEL_P_CAL_WOR_DISTINCT", "MODEL_P_CAL", "WEIGHTED_WITHOUT_REPLACEMENT", "DEDUPLICATED", m, seed, role, "PRIMARY" if role == "PRIMARY" else "SENSITIVITY")
-                append(gate_id, "MARKET_WF_CAL_WOR_DISTINCT", "MARKET_WF_CAL", "WEIGHTED_WITHOUT_REPLACEMENT", "DEDUPLICATED", m, seed, role, "COMPARATOR")
-                for alpha in BLEND_ALPHAS:
-                    append(gate_id, f"BLEND_A{int(alpha * 100):02d}_WOR_DISTINCT", f"BLEND_A{int(alpha * 100):02d}", "WEIGHTED_WITHOUT_REPLACEMENT", "DEDUPLICATED", m, seed, role, "COMPARATOR")
-                append(gate_id, "Q_INFORMED_WOR_DISTINCT", "Q_WEIGHT", "WEIGHTED_WITHOUT_REPLACEMENT", "DEDUPLICATED", m, seed, role, "SECONDARY")
-        append(gate_id, "P_MIN_GLOBAL_DELETE_CONTROL", "MODEL_P_CAL", "ONE_GLOBAL_CODE_DELETE", "DEDUPLICATED", PRUNED_K, "NA", "CONTROL", "HARD_PRUNE_CONTROL")
-        append(gate_id, "Q_MIN_GLOBAL_DELETE_CONTROL", "Q_WEIGHT", "ONE_GLOBAL_CODE_DELETE", "DEDUPLICATED", PRUNED_K, "NA", "CONTROL", "HARD_PRUNE_CONTROL")
+        for requested_k in TOP_K:
+            append(gate_id, requested_k, "FULL_N7_CONTROL", "UNIFORM_FULL", "ENUMERATE_FULL", "NOT_APPLICABLE", FULL_K, "NA", "CONTROL", "CONTROL")
+            for m in M_GRID:
+                append(gate_id, requested_k, "TOP_MODEL_P_CAL_DISTINCT", "MODEL_P_CAL", "DETERMINISTIC_TOP_MASS", "DEDUPLICATED", m, "NA", "DETERMINISTIC", "MATCHED_CONTROL")
+                for seed in SENSITIVITY_SEEDS:
+                    role = "PRIMARY" if seed == PRIMARY_SEED else "SENSITIVITY"
+                    append(gate_id, requested_k, "MODEL_P_CAL_WR_DUPLICATE_STAKES", "MODEL_P_CAL", "INDEPENDENT_WITH_REPLACEMENT", "DUPLICATE_STAKES", m, seed, role, "PRIMARY" if role == "PRIMARY" else "SENSITIVITY")
+                    append(gate_id, requested_k, "MODEL_P_CAL_WOR_DISTINCT", "MODEL_P_CAL", "WEIGHTED_WITHOUT_REPLACEMENT", "DEDUPLICATED", m, seed, role, "PRIMARY" if role == "PRIMARY" else "SENSITIVITY")
+                    append(gate_id, requested_k, "MARKET_WF_CAL_WOR_DISTINCT", "MARKET_WF_CAL", "WEIGHTED_WITHOUT_REPLACEMENT", "DEDUPLICATED", m, seed, role, "COMPARATOR")
+                    for alpha in BLEND_ALPHAS:
+                        append(gate_id, requested_k, f"BLEND_A{int(alpha * 100):02d}_WOR_DISTINCT", f"BLEND_A{int(alpha * 100):02d}", "WEIGHTED_WITHOUT_REPLACEMENT", "DEDUPLICATED", m, seed, role, "COMPARATOR")
+                    append(gate_id, requested_k, "Q_INFORMED_WOR_DISTINCT", "Q_WEIGHT", "WEIGHTED_WITHOUT_REPLACEMENT", "DEDUPLICATED", m, seed, role, "SECONDARY")
+            append(gate_id, requested_k, "P_MIN_GLOBAL_DELETE_CONTROL", "MODEL_P_CAL", "ONE_GLOBAL_CODE_DELETE", "DEDUPLICATED", PRUNED_K, "NA", "CONTROL", "HARD_PRUNE_CONTROL")
+            append(gate_id, requested_k, "Q_MIN_GLOBAL_DELETE_CONTROL", "Q_WEIGHT", "ONE_GLOBAL_CODE_DELETE", "DEDUPLICATED", PRUNED_K, "NA", "CONTROL", "HARD_PRUNE_CONTROL")
     return rows
 
 
@@ -664,10 +712,11 @@ def freeze(output: Path, source_132: Path = SOURCE_132, source_db: Path = SOURCE
             group.sort(key=lambda row: (str(row["kickoff_ts"]), int(str(row["match_idx"])), int(str(row["match_id"]))))
             if len(group) != int(census_by_issue[key]["eligible_match_count"]):
                 raise RuntimeError(f"complete-issue match count drift: {key}")
-        gate_census, identities, roles = build_identities(by_issue, census_by_issue, stage)
+        gate_census, participation, identities, roles = build_identities(by_issue, census_by_issue, stage)
         write_csv(stage / "match_vectors.csv", MATCH_VECTOR_FIELDS, [match_vector_row(row) for row in sorted(rows, key=lambda item: (int(str(item["year"])), int(str(item["issue"])), int(str(item["match_idx"])), int(str(item["match_id"]))))])
         write_csv(stage / "issue_census.csv", ISSUE_CENSUS_FIELDS, issue_census_rows)
         write_csv(stage / "gate_issue_census.csv", GATE_CENSUS_FIELDS, gate_census)
+        write_csv(stage / "issue_participation_grid.csv", PARTICIPATION_FIELDS, participation)
         write_csv(stage / "sampler_plan.csv", SAMPLER_PLAN_FIELDS, sampler_plan_rows())
         write_csv(stage / "market_calibration_map.csv", CALIBRATION_MAP_FIELDS, calibration_map)
         write_csv(stage / "market_calibration_census.csv", CALIBRATION_CENSUS_FIELDS, calibration_census)
@@ -686,7 +735,7 @@ def freeze(output: Path, source_132: Path = SOURCE_132, source_db: Path = SOURCE
                 "database_sha256": db_hash,
                 "database_path": str(source_db),
             },
-            "denominator": {"eligible_matches": len(rows), "issue_instances": len(by_issue), "gates": len(GATES), "portfolio_identities": identities, "role_rows": roles},
+            "denominator": {"eligible_matches": len(rows), "issue_instances": len(by_issue), "gates": len(GATES), "top_k_arms": len(TOP_K), "portfolio_identities": identities, "role_rows": roles, "issue_participation_rows": len(participation)},
             "complete_issue_contract": {
                 "primary_unit": "(issue, fold) complete lottery issue; no selection or performance partition follows source segments",
                 "gate_application": "match-level E_SP floor is applied over every eligible match in the complete issue before seven-leg construction; identity GM_E_SP is then checked",
@@ -694,11 +743,14 @@ def freeze(output: Path, source_132: Path = SOURCE_132, source_db: Path = SOURCE
                 "large_issue_cap": MAX_IDENTITIES_PER_ISSUE_GATE,
                 "n7_construction": "each candidate plus the six highest E_SP gate-passing companions from the same undivided issue; duplicate identities collapse deterministically",
                 "no_bet": "each gate×issue with no valid identity is retained explicitly as NO_BET",
+                "selection_axis": "each gate ranks deduplicated N7 identities by candidate rank and identity key, then freezes K=1,2,4,8 and ALL participation rows; a fixed K has explicit NO_BET if insufficient identities rather than borrowing from a segment",
             },
             "gates": GATES,
             "sampler_contract": {
                 "ticket_space": FULL_K,
                 "M_grid": M_GRID,
+                "M_scope": "M is a per-selected-N7 ticket count. For every issue×gate×K arm, issue total draws=selected_identity_count×M and issue total stake=selected_identity_count×M×¥2; the participation grid freezes selected identity lists and FULL baselines before outcome access.",
+                "top_K_grid": TOP_K,
                 "seeds": {"primary": PRIMARY_SEED, "bounded_sensitivity": SENSITIVITY_SEEDS},
                 "model_p_cal": "accepted #132 calibrated model probability p3/p1/p0",
                 "market_p_cal": "10h EURO reciprocal-odds overround-normalized, mapped with strictly-prior calendar-year hit-rate bins and outcome-code×handicap×probability strata where n>=100",
@@ -719,8 +771,8 @@ def freeze(output: Path, source_132: Path = SOURCE_132, source_db: Path = SOURCE
             "gate_b_requirements": {
                 "authorization": "NOT_RUN_AND_NOT_AUTHORIZED_PENDING_PI_ACCEPTANCE",
                 "settlement_unit": "complete issue; aggregate duplicate stakes, overlap, gross return and actual tax at issue level",
-                "metrics": ["taxfree and actual-tax ROI", "sampler-minus-FULL and sampler-minus-hard-control deltas", "stake/draw/unique/gross retention", "expected versus realized unique coverage", "hit/coverage, payout concentration, drawdown, miss streak, largest-event sensitivity", "issue/year/fold/LOYO and full ROI-versus-M curves"],
-                "sweet_spot": "fixed before outcomes: relevant matched delta must persist across all three seeds and chronological fold/LOYO views; a single seed-local maximum cannot nominate policy; taxfree and taxpaid conclusions are separate",
+                "metrics": ["taxfree and actual-tax ROI", "selector lift versus the same-gate K_ALL FULL baseline", "sampler-minus-the-exact-same-selected-FULL baseline and sampler-minus-hard-control deltas", "gate×K×M interaction surface without hiding either main effect", "stake/draw/unique/gross retention with issue-total reconciliation", "expected versus realized unique coverage", "hit/coverage, payout concentration, drawdown, miss streak, largest-event sensitivity", "issue/year/fold/LOYO and full ROI-versus-M curves"],
+                "sweet_spot": "fixed before outcomes: relevant matched delta must persist across all three seeds and chronological fold/LOYO views; a single seed-local maximum cannot nominate policy; taxfree and taxpaid conclusions are separate. Selection-only improvement is reported even if sampler lift is absent.",
             },
             "outcome_boundary": "No test outcome, score, final SP, winning SP, settlement, payout, ROI, tax realization, or post-kickoff market is read or emitted. Historical aggregate targets are used only for the expressly-required strictly-prior market calibration transform.",
             "scope": "historical paper research only; no purchase, production, or promotion authority.",
@@ -729,7 +781,7 @@ def freeze(output: Path, source_132: Path = SOURCE_132, source_db: Path = SOURCE
         shutil.copyfile(__file__, stage / "freeze_runner.py")
         (stage / "README.md").write_text(
             "# #137 Gate A: complete-issue probability sampling freeze\n\n"
-            "This immutable package freezes only pre-outcome selector, market-calibration, identity, and sampler inputs. "
+            "This immutable package freezes complete-issue K=1/2/4/8/ALL participation, pre-outcome selector, market-calibration, identity, and sampler inputs. "
             "Gate B is not authorized. Replay with `python3 freeze_runner.py --output <new-dir>`; temporary staging is created beside the output, never in `/tmp`.\n",
             encoding="utf-8",
         )

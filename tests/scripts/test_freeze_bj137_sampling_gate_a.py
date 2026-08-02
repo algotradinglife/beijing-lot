@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "freeze_bj137_sampling_gate_a.py"
-PACKAGE = ROOT / "results" / "bj137_gate_a_preoutcome_v1"
+PACKAGE = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
 
 
 def load():
@@ -120,8 +120,10 @@ def test_real_freeze_has_complete_manifest_and_required_primary_surface() -> Non
         "eligible_matches": 47819,
         "issue_instances": 348,
         "gates": 10,
+        "top_k_arms": 5,
         "portfolio_identities": 71704,
         "role_rows": 501928,
+        "issue_participation_rows": 17400,
     }
     assert card["source"]["database_sha256"] == "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
     assert card["gate_b_requirements"]["authorization"].startswith("NOT_RUN")
@@ -135,11 +137,29 @@ def test_real_freeze_has_complete_manifest_and_required_primary_surface() -> Non
     assert {row["seed"] for row in plans if row["sampler_id"] == "MODEL_P_CAL_WR_DUPLICATE_STAKES"} == {
         "137001", "137002", "137003"
     }
+    assert {row["top_k_id"] for row in plans} == {"K1", "K2", "K4", "K8", "K_ALL"}
+    assert {row["M_scope"] for row in plans} == {"PER_N7_IDENTITY"}
     assert all(
         row["duplicate_policy"] == "DUPLICATE_STAKES"
         for row in plans
         if row["sampler_id"] == "MODEL_P_CAL_WR_DUPLICATE_STAKES"
     )
+
+    participation = list(csv.DictReader((PACKAGE / "issue_participation_grid.csv").open(newline="")))
+    assert len(participation) == 348 * 10 * 5
+    assert {row["top_k_id"] for row in participation} == {"K1", "K2", "K4", "K8", "K_ALL"}
+    assert {row["sample_M_scope"] for row in participation} == {
+        "PER_N7_IDENTITY; issue total is selected_identity_count × M"
+    }
+    for row in participation:
+        assert int(row["full_ticket_count"]) == int(row["selected_identity_count"]) * 2187
+        assert int(row["full_stake_yuan"]) == int(row["full_ticket_count"]) * 2
+        if row["disposition"] == "AVAILABLE":
+            requested = row["requested_n7_count"]
+            if requested != "ALL":
+                assert int(row["selected_identity_count"]) == int(requested)
+        else:
+            assert row["selected_identity_count"] == "0"
 
 
 def test_real_freeze_keeps_issue_whole_and_vector_roles_normalized() -> None:
@@ -157,6 +177,7 @@ def test_real_freeze_keeps_issue_whole_and_vector_roles_normalized() -> None:
     assert {row["segment_boundary"] for row in identities} == {"NONE; source segments are diagnostic-only"}
     assert {row["selected_n"] for row in identities} == {"7"}
     assert all(int(row["candidate_search_count"]) <= 32 for row in identities)
+    assert all(int(row["participation_rank"]) >= 1 for row in identities)
 
     grouped = defaultdict(list)
     for row in gzip_rows("n7_role_vectors.csv.gz"):
