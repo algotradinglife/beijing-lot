@@ -242,6 +242,26 @@ surface rows 得到零差异，确认历史结果是真实可重放的。但严�
 晋级为已验证正 EV，也不产生购买、生产或投注授权。后续若继续，应使用冻结的 WOR
 机制进行真正的 held-out / forward validation，而不是继续在同一历史窗口选 M。
 
+### #145：WR/WOR/残差/封顶重复票分配冻结（Gate A，2026-08-03）
+
+#145 不再重开 #137/#151 的候选选择，而是固定 #151 的 `NO_GATE/K4` candidate，另加
+`ESP300_GM290/K8` 作为次级敏感性臂。Gate A 只冻结分配规则，不读取结算结果：696 个
+issue-arm 行、3,540 个 N7 identity、24,780 个 role 行和 1,006,416 个分配计划行均为
+赛前输入。
+
+同一 identity、同一 issue stake 下保留六个权重源（`MODEL_P_CAL`、`MARKET_WF_CAL`、
+`BLEND_A25/A50/A75`、`Q_WEIGHT`），并比较 weighted WR duplicate-stake、WOR-distinct、
+deterministic residual/systematic、cap `{1,2,4,8}`、top-mass 与 FULL。低 M 面是
+`16..256` 步长 16，`512/1024/1458/2187` 仅作收敛控制；沿用 #137 的三枚 seed
+`137001/2/3`。每个重复 `¥2` ticket 单独计数和未来单票税，不按 issue 或 policy 汇总。
+
+Gate B 尚未授权；若获授权，先报税前 `no_tax_roi` 和同 stake 的机制差异，再单独报逐票
+税，并保留 seed、LOYO、YEAR/FOLD、issue bootstrap、最大期次剔除、coverage 与重复票
+浓度。v5 机制契约另行显式记录每个 arm 的 expected-unique formula 与 realized-unique
+rule，并将 `bj145_allocation_engine.py` 与六个 N7 golden-vector fingerprints 绑定进
+manifest，避免在 Gate B 才首次决定 residual/capped 的票码倍数，也避免把 WR 的重复票、WOR 的无放回 distinct 和 FULL 控制混为同一指标。该冻结不构成
+购买、生产或投注授权。详见 [#145 Gate A](../research/bj145_ticket_allocation_gate_a_2026-08-03.md)。
+
 ## 知识图谱
 
 ```mermaid
