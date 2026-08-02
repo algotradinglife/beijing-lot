@@ -33,8 +33,8 @@ from bj145_allocation_engine import (
 
 
 CONTRACT = "BJ-HIST-TICKET-ALLOCATION-001"
-VERSION = "bj145-gate-a-v6"
-CONTENT_VERSION = "bj145-gate-a-content-v6"
+VERSION = "bj145-gate-a-v7"
+CONTENT_VERSION = "bj145-gate-a-content-v7"
 UNIT_STAKE_YUAN = 2
 FULL_TICKETS = 3 ** 7
 SEEDS = ("137001", "137002", "137003")
@@ -101,7 +101,7 @@ ROOT = find_root()
 SOURCE_151 = ROOT / "results" / "bj151_gate_a_preoutcome_v1"
 SOURCE_137 = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
 SOURCE_148 = ROOT / "results" / "bj148_gate_a_preoutcome_v1"
-OUTPUT = ROOT / "results" / "bj145_gate_a_preoutcome_v7"
+OUTPUT = ROOT / "results" / "bj145_gate_a_preoutcome_v8"
 ALLOCATION_ENGINE_SOURCE = Path(__file__).resolve().with_name("bj145_allocation_engine.py")
 
 
@@ -283,7 +283,7 @@ def make_golden_vectors() -> dict[str, object]:
     return {
         "schema_version": "bj145-allocation-golden-v1",
         "engine_version": ENGINE_VERSION,
-        "weight_rule": "golden_weights_v1: ((ordinal*37+11)%1009)+1, ordinal 0..2186",
+        "weight_rule": "golden_weights_v2: raw=((ordinal*37+11)%1009)+1 then divide by sum(raw), ordinal 0..2186",
         "ticket_order": "#137 CODES=(3,1,0) product order; ordinal 0000000..2222222 is mapped through CODES",
         "outcome_boundary": "synthetic positive weights only; no outcome/final-SP/payout/ROI/tax data",
         "cases": cases,

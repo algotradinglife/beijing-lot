@@ -56,8 +56,9 @@ def stable_uniform(*parts: object) -> float:
 
 
 def _inverse_cdf(weights: tuple[float, ...], unit: float) -> int:
-    total = sum(weights)
-    target = unit * total
+    # #137 compares the raw stable_uniform directly to cumulative rounded
+    # probability masses; do not rescale by the floating-point total.
+    target = unit
     cumulative = 0.0
     for ordinal, weight in enumerate(weights):
         cumulative += weight
@@ -189,7 +190,9 @@ def golden_weights(ticket_space_k: int = FULL_TICKETS) -> tuple[float, ...]:
     """Stable positive synthetic vector used only for executable golden vectors."""
     if ticket_space_k < 1:
         raise ValueError("ticket space must be positive")
-    return tuple(float(((ordinal * 37 + 11) % 1009) + 1) for ordinal in range(ticket_space_k))
+    raw = tuple(float(((ordinal * 37 + 11) % 1009) + 1) for ordinal in range(ticket_space_k))
+    total = sum(raw)
+    return tuple(value / total for value in raw)
 
 
 def ticket_code(ordinal: int, legs: int = 7) -> str:

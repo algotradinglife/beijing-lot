@@ -9,8 +9,8 @@ candidate selection. The controlling primary identity is the accepted #151
 #137 `ESP300_GM290/K8` participation list. Both preserve complete issue units;
 source segments are not selection units.
 
-The package is `results/bj145_gate_a_preoutcome_v7` with manifest
-`5fb9a52902d1138b3776267ceeb6363be9c495b320e07ffd55f7e86b718264d3`.
+The package is `results/bj145_gate_a_preoutcome_v8` with manifest
+`da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114c`.
 It contains 696 issue-arm rows, 3,540 selected identities, 24,780 role rows,
 and 1,006,416 allocation-plan rows. The primary arm has 339 available and 9
 explicit K4 no-bets; the secondary arm has 273 available and 75 explicit K8
@@ -43,7 +43,10 @@ WOR, Hamilton residual, iterated capped-Hamilton, deterministic top-mass, and
 FULL multiplicities by the exact #137 `(3,1,0)` product-order ticket ordinal.
 WR/WOR use the exact #137 `stable_uniform` token sequence and bind
 `identity_signature` to the frozen `selected_match_ids` pipe string. Direct
-parity tests compare both mechanisms against the immutable #137 Gate-A runner.
+parity tests compare both mechanisms against the immutable #137 Gate-A runner,
+including a real `BLEND_A50`, seed `137003`, M2187 regression whose rounded
+weight total is `1.0000000000020002`; WR uses raw-unit comparison with no
+rescaling.
 Gate B must byte-verify this module and binding before consuming any settled rows.
 
 ## Timing and review boundary

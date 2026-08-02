@@ -257,9 +257,10 @@ deterministic residual/systematic、cap `{1,2,4,8}`、top-mass 与 FULL。低 M 
 
 Gate B 尚未授权；若获授权，先报税前 `no_tax_roi` 和同 stake 的机制差异，再单独报逐票
 税，并保留 seed、LOYO、YEAR/FOLD、issue bootstrap、最大期次剔除、coverage 与重复票
-浓度。v7 在 v5 绑定基础上逐字复用 #137 `stable_uniform`、WR/WOR token 顺序，并将
+浓度。v8 在 v5 绑定基础上逐字复用 #137 `stable_uniform`、WR/WOR token 顺序，并将
 `identity_signature` 固定为 `selected_match_ids`；新增直接对照测试，确保相同权重/seed/identity
-产生相同票码倍数。v7 机制契约另行显式记录每个 arm 的 expected-unique formula 与
+产生相同票码倍数，并增加真实 BLEND_A50/M2187 原始单位回归，防止总和缩放再次引入
+边界票码偏移。v8 机制契约另行显式记录每个 arm 的 expected-unique formula 与
 realized-unique rule，并将 `bj145_allocation_engine.py` 与六个 N7 golden-vector
 fingerprints 绑定进 manifest，避免在 Gate B 才首次决定 residual/capped 的票码倍数，也避免
 把 WR 的重复票、WOR 的无放回 distinct 和 FULL 控制混为同一指标。该冻结不构成

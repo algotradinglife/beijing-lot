@@ -10,8 +10,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PACKAGE = ROOT / "results" / "bj145_gate_a_preoutcome_v7"
-MANIFEST = "5fb9a52902d1138b3776267ceeb6363be9c495b320e07ffd55f7e86b718264d3"
+PACKAGE = ROOT / "results" / "bj145_gate_a_preoutcome_v8"
+MANIFEST = "da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114c"
 SOURCE_137 = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
 SOURCE_137_MANIFEST = "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df"
 
@@ -198,3 +198,35 @@ def test_wr_wor_namespace_parity_against_immutable_137_runner():
             expected_wor[ordinal[ticket]] += 1
         actual_wor = module.allocate("WOR_DISTINCT", flat_weights, 32, seed=str(seed), identity_signature=identity_signature)
         assert actual_wor == tuple(expected_wor)
+
+
+def test_wr_raw_unit_real_cell_m2187_regression_against_137():
+    source = load_module(SOURCE_137 / "freeze_runner.py", "bj137_real_cell_reference")
+    module = package_engine()
+    identity = next(
+        row for row in gzip_rows(PACKAGE / "identity_catalog.csv.gz")
+        if row["arm_id"] == "SECONDARY_ESP300_GM290_K8"
+        and row["issue_instance"] == "20101@OOS_2020"
+        and row["portfolio_id"] == "7c1f7df8c2a7f25df04ce7e31daf6258817e6a13b9a03eff53a00d418ed35b67"
+    )
+    roles = [
+        row for row in gzip_rows(PACKAGE / "role_vectors.csv.gz")
+        if row["arm_id"] == identity["arm_id"]
+        and row["issue_instance"] == identity["issue_instance"]
+        and row["portfolio_id"] == identity["portfolio_id"]
+    ]
+    roles.sort(key=lambda row: int(row["match_idx"]))
+    reference_weights = source.ticket_weights([{code: float(row[f"p_blend_a50_{code}"]) for code in source.CODES} for row in roles])
+    flat_weights = [mass for _, mass in reference_weights]
+    expected = [0] * source.FULL_K
+    ordinal = {ticket: index for index, (ticket, _) in enumerate(reference_weights)}
+    selected = source.weighted_with_replacement(reference_weights, 2187, 137003, identity["selected_match_ids"])
+    for ticket in selected:
+        expected[ordinal[ticket]] += 1
+    actual = module.allocate(
+        "WR_DUPLICATE_STAKE", flat_weights, 2187, seed="137003",
+        identity_signature=identity["selected_match_ids"],
+    )
+    assert actual == tuple(expected)
+    assert actual[427] == 1
+    assert actual[428] == 0
