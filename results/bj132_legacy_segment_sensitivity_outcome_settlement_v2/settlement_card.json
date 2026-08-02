@@ -1,5 +1,7 @@
 {
-  "boundary": "No matching, selection, q/p ranking, code deletion, threshold, or capital amount is regenerated after outcome source validation.",
+  "applies_to": "superseded segment-compatible Gate-A v1 only",
+  "boundary": "No matching, selection, q/p ranking, code deletion, threshold, or capital amount is regenerated after outcome source validation. This package is non-controlling legacy sensitivity evidence, not the #132 primary outcome settlement.",
+  "classification": "LEGACY_SEGMENT_SENSITIVITY_NON_CONTROLLING",
   "contract": "BJ-HIST-DELETE-SCORE-N7-001",
   "denominator": {
     "frontier_rows": 294576,
@@ -9,14 +11,15 @@
     "variants": 9
   },
   "issue": 132,
+  "primary_issue_level_result": "NOT_RUN",
   "provenance": {
     "gate_a_content_identity_sha256": "fa232d1c32023cfb39278b4c95b9033adf6194e322c3de66c353283d88e73933",
     "gate_a_manifest_sha256": "5b41fef30543647eef1dec5cfd65e4a12343c898ebd929d13393a2d6f1371937",
     "outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
     "outcome_payload_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89"
   },
-  "runner_version": "bj132-gateb-v1",
+  "runner_version": "bj132-legacy-segment-sensitivity-v2",
   "settlement": "A \u00a52 sequence pays \u00a52\u00d70.65\u00d7product(final winning SP) exactly once iff frozen allowed codes cover all truth; final SP is uncapped.",
-  "stage": "GATE_B_MATCHED_CANONICAL_OUTCOME_SETTLEMENT",
+  "stage": "LEGACY_SEGMENT_SENSITIVITY_OUTCOME_SETTLEMENT",
   "tax": "Within issue+variant+arm paper policy, apply 20% to winning gross iff aggregate gross is at least \u00a510,000."
 }

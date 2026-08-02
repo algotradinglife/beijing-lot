@@ -1,0 +1,10 @@
+{
+  "applies_to": "superseded segment-compatible Gate-A v1 only",
+  "classification": "LEGACY_SEGMENT_SENSITIVITY_NON_CONTROLLING",
+  "decision": "NO_PROMOTION",
+  "positive_all_rows": 0,
+  "primary_issue_level_result": "NOT_RUN",
+  "promotion_authorized": false,
+  "rule": "This NO_PROMOTION decision applies only to the legacy segment sensitivity. The primary complete-issue result is NOT_RUN pending acceptance and settlement of replacement Gate A.",
+  "strict_independent_ev_required": false
+}

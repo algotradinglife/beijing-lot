@@ -1,7 +1,0 @@
-{
-  "decision": "NO_PROMOTION",
-  "positive_all_rows": 0,
-  "promotion_authorized": false,
-  "rule": "Positive historical deletion-score ROI requires strict independent EV; otherwise no promotion.",
-  "strict_independent_ev_required": false
-}

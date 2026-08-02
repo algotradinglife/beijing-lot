@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""One-shot canonical Gate-B settlement for #132's accepted p-min/q-min freeze."""
+"""One-shot legacy segment-sensitivity settlement for #132.
+
+This runner is deliberately non-controlling. It settles the superseded
+segment-compatible Gate-A v1 only as sensitivity evidence; the complete-issue
+primary result remains NOT_RUN pending a separately accepted replacement Gate A.
+"""
 from __future__ import annotations
 
 import argparse
@@ -20,7 +25,7 @@ from pathlib import Path
 
 CODES = ("3", "1", "0")
 CONTRACT = "BJ-HIST-DELETE-SCORE-N7-001"
-VERSION = "bj132-gateb-v1"
+VERSION = "bj132-legacy-segment-sensitivity-v2"
 FREEZE_MANIFEST = "5b41fef30543647eef1dec5cfd65e4a12343c898ebd929d13393a2d6f1371937"
 OUTCOME_MANIFEST = "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc"
 OUTCOME_PAYLOAD = "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89"
@@ -86,7 +91,7 @@ def repo(anchor: Path) -> Path:
 ROOT = repo(Path(__file__))
 FREEZE = ROOT / "results" / "bj132_gate_a_preoutcome_v1"
 OUTCOMES = ROOT / "results" / "bj95_gate_b_outcome_settlement_v2r8"
-OUTPUT = ROOT / "results" / "bj132_gate_b_outcome_settlement_v2"
+OUTPUT = ROOT / "results" / "bj132_legacy_segment_sensitivity_outcome_settlement_v2"
 
 
 def sha(path: Path) -> str:
@@ -317,8 +322,11 @@ def build(output:Path)->dict[str,object]:
                 gross=dec(row["gross_pre_tax_yuan"],"gross");tax=gross*TAX_RATE if buckets[bucket(row)]>=TAX_THRESHOLD else Decimal(0);stake=dec(row["stake_yuan"],"stake") if row["settlement_status"]=="SETTLED" else Decimal(0)
                 writer.writerow({**row,"stake_yuan":money(stake),"issue_policy_gross_yuan":money(buckets[bucket(row)]),"tax_yuan":money(tax),"after_tax_gross_yuan":money(gross-tax),"pre_tax_net_yuan":money(gross-stake),"tax_adjusted_net_yuan":money(gross-tax-stake)})
         close_gzip(handles);pre.unlink();all_rows,robust=all_summaries(stage/"portfolio_settlement.csv.gz");write_csv(stage/"arm_summary.csv",SUMMARY_FIELDS,all_rows);write_csv(stage/"robustness_summary.csv",SUMMARY_FIELDS,robust);write_csv(stage/"ranker_comparison.csv",COMPARISON_FIELDS,comparisons(all_rows+robust));write_pair_and_strata(stage,stage/"portfolio_settlement.csv.gz")
-        positives=[row for row in all_rows if row["arm"]!="MATCHED_FULL_N7" and row["tax_adjusted_roi"] and dec(row["tax_adjusted_roi"],"roi")>0];decision={"decision":"POSITIVE_REQUIRES_STRICT_INDEPENDENT_EV" if positives else "NO_PROMOTION","positive_all_rows":len(positives),"promotion_authorized":False,"strict_independent_ev_required":bool(positives),"rule":"Positive historical deletion-score ROI requires strict independent EV; otherwise no promotion."};(stage/"decision.json").write_text(json.dumps(decision,indent=2,sort_keys=True)+"\n",encoding="utf-8")
-        card={"issue":132,"contract":CONTRACT,"runner_version":VERSION,"stage":"GATE_B_MATCHED_CANONICAL_OUTCOME_SETTLEMENT","provenance":provenance,"denominator":{"frontier_rows":294576,"no_bet_rows":23931,"portfolio_identities":90215,"role_rows":1894515,"variants":9},"settlement":"A ¥2 sequence pays ¥2×0.65×product(final winning SP) exactly once iff frozen allowed codes cover all truth; final SP is uncapped.","tax":"Within issue+variant+arm paper policy, apply 20% to winning gross iff aggregate gross is at least ¥10,000.","boundary":"No matching, selection, q/p ranking, code deletion, threshold, or capital amount is regenerated after outcome source validation."};(stage/"settlement_card.json").write_text(json.dumps(card,indent=2,sort_keys=True)+"\n",encoding="utf-8");shutil.copyfile(__file__,stage/"settlement_runner.py");(stage/"README.md").write_text("# #132 Gate B\n\nCanonical settlement of accepted FULL / p-min deletion / q-min deletion Gate A. Compare portable content identity after replay.\n",encoding="utf-8")
+        positives=[row for row in all_rows if row["arm"]!="MATCHED_FULL_N7" and row["tax_adjusted_roi"] and dec(row["tax_adjusted_roi"],"roi")>0]
+        decision={"decision":"POSITIVE_REQUIRES_STRICT_INDEPENDENT_EV" if positives else "NO_PROMOTION","classification":"LEGACY_SEGMENT_SENSITIVITY_NON_CONTROLLING","applies_to":"superseded segment-compatible Gate-A v1 only","primary_issue_level_result":"NOT_RUN","positive_all_rows":len(positives),"promotion_authorized":False,"strict_independent_ev_required":bool(positives),"rule":"This NO_PROMOTION decision applies only to the legacy segment sensitivity. The primary complete-issue result is NOT_RUN pending acceptance and settlement of replacement Gate A."}
+        (stage/"decision.json").write_text(json.dumps(decision,indent=2,sort_keys=True)+"\n",encoding="utf-8")
+        card={"issue":132,"contract":CONTRACT,"runner_version":VERSION,"stage":"LEGACY_SEGMENT_SENSITIVITY_OUTCOME_SETTLEMENT","classification":"LEGACY_SEGMENT_SENSITIVITY_NON_CONTROLLING","applies_to":"superseded segment-compatible Gate-A v1 only","primary_issue_level_result":"NOT_RUN","provenance":provenance,"denominator":{"frontier_rows":294576,"no_bet_rows":23931,"portfolio_identities":90215,"role_rows":1894515,"variants":9},"settlement":"A ¥2 sequence pays ¥2×0.65×product(final winning SP) exactly once iff frozen allowed codes cover all truth; final SP is uncapped.","tax":"Within issue+variant+arm paper policy, apply 20% to winning gross iff aggregate gross is at least ¥10,000.","boundary":"No matching, selection, q/p ranking, code deletion, threshold, or capital amount is regenerated after outcome source validation. This package is non-controlling legacy sensitivity evidence, not the #132 primary outcome settlement."}
+        (stage/"settlement_card.json").write_text(json.dumps(card,indent=2,sort_keys=True)+"\n",encoding="utf-8");shutil.copyfile(__file__,stage/"settlement_runner.py");(stage/"README.md").write_text("# #132 legacy segment sensitivity\n\nNon-controlling settlement of the superseded segment-compatible Gate-A v1. `NO_PROMOTION` in this package applies only to this legacy comparator; the primary complete-issue result is `NOT_RUN`. Compare portable content identity after replay.\n",encoding="utf-8")
         def uncompressed(path:Path)->tuple[str,int]:
             digest,size=hashlib.sha256(),0
             with gzip.open(path,"rb") as handle:

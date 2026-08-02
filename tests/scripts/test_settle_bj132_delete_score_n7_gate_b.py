@@ -1,4 +1,4 @@
-"""Integrity and matched-accounting checks for #132 canonical Gate B."""
+"""Integrity and matched-accounting checks for #132 legacy segment sensitivity."""
 from __future__ import annotations
 
 import csv
@@ -10,7 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-PACKAGE = ROOT / "results/bj132_gate_b_outcome_settlement_v2"
+PACKAGE = ROOT / "results/bj132_legacy_segment_sensitivity_outcome_settlement_v2"
 BASELINE = ROOT / "results/bj127_gate_b_outcome_settlement_v1"
 
 
@@ -33,7 +33,7 @@ def aggregate(path: Path, arm: str) -> dict[str, tuple[Decimal, Decimal, Decimal
     return {key: tuple(value) for key, value in total.items()}
 
 
-def test_manifest_denominator_and_no_promotion() -> None:
+def test_manifest_denominator_and_legacy_no_promotion_scope() -> None:
     manifest = json.loads((PACKAGE / "SHA256SUMS.json").read_text())
     actual = {item.name: hashlib.sha256(item.read_bytes()).hexdigest() for item in PACKAGE.iterdir()
               if item.is_file() and item.name != "SHA256SUMS.json"}
@@ -41,7 +41,10 @@ def test_manifest_denominator_and_no_promotion() -> None:
     assert Counter(row["settlement_status"] for row in rows()) == {
         "NO_BET_GATE_A": 23_931, "SETTLED": 260_262, "UNAVAILABLE_CANONICAL_OUTCOME": 10_383,
     }
-    assert json.loads((PACKAGE / "decision.json").read_text())["decision"] == "NO_PROMOTION"
+    decision = json.loads((PACKAGE / "decision.json").read_text())
+    assert decision["decision"] == "NO_PROMOTION"
+    assert decision["classification"] == "LEGACY_SEGMENT_SENSITIVITY_NON_CONTROLLING"
+    assert decision["primary_issue_level_result"] == "NOT_RUN"
 
 
 def test_full_exactly_reproduces_accepted_bj127_settlement() -> None:

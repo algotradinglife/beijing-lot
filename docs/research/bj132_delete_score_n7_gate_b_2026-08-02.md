@@ -1,4 +1,9 @@
-# #132 Gate B — `p_min` 与 `q=p×predicted_SP` 全局删码结算
+# #132 legacy segment sensitivity — `p_min` 与 `q=p×predicted_SP` 全局删码结算
+
+> 此包只结算已 supersede 的 segment-compatible Gate-A v1，分类为
+> `LEGACY_SEGMENT_SENSITIVITY / NON_CONTROLLING`。以下 `NO_PROMOTION` 只适用于该
+> legacy comparator；#132 的 complete-issue primary result 为 `NOT_RUN`，必须等待
+> replacement Gate A 被 PI 接受后才可进行新的 Gate B。
 
 ## 绑定与可复现性
 
@@ -7,9 +12,9 @@
 - canonical final-SP outcome join：#95 Gate B v2r8，manifest
   `fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc`；
 - Gate B v1 的本地同文件系统计算结果保留不改；v2 使用相同冻结和算法，补上跨文件系统
-  clean-replay 的原子交付恢复。最终包为 `results/bj132_gate_b_outcome_settlement_v2/`，manifest
-  `4ef44f02711ff0eb1952799572a3efa10217d8e3e107ca5efd6be74fabec5433`。v1/v2 的三份 gzip
-  payload、摘要、比较、分层和决策文件 SHA-256 均逐字相同；v2 仅改变 runner 的跨设备交付。
+  clean-replay 的原子交付恢复。经 scope reclassification 后的最终包为
+  `results/bj132_legacy_segment_sensitivity_outcome_settlement_v2/`；其数值 payload 保持不变，
+  仅更新 decision/card/README/runner 的 legacy attribution。
 
 结算只打开通过 manifest 验证后的赛果源。每个 ¥2 序列仅在命中时支付
 `¥2×0.65×七场最终中奖 SP 乘积`；按 issue × variant × arm 汇总 gross 达 ¥10,000
@@ -33,7 +38,7 @@ ROI 差异是删除评分的边际差异，而非选场或资金规模差异。
 全部 18 条 non-FULL ALL-scope 行的无税与实际税后 ROI 都为负；因而此处的税后改善来自
 较低的 tax exposure，不能解释为正的 payout edge。`q_min` 在 8/9 个 variant 的无税 ROI
 相对 FULL 更高（`p_min` 为 7/9），但没有一条达到 breakeven；也没有证据表明它稳定地优于
-`p_min`。结论：`NO_PROMOTION`。
+`p_min`。legacy 结论：`NO_PROMOTION`（非 controlling；不代表 complete-issue primary）。
 
 ## 分层与风险
 
