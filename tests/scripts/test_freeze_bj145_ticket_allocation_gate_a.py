@@ -3,14 +3,15 @@ from __future__ import annotations
 import csv
 import gzip
 import hashlib
+import importlib.util
 import json
 from collections import Counter
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PACKAGE = ROOT / "results" / "bj145_gate_a_preoutcome_v4"
-MANIFEST = "608ce7e8b07c46c5670b956e3459d9cccc0cb88e785aed804ba6ea55c227784a"
+PACKAGE = ROOT / "results" / "bj145_gate_a_preoutcome_v5"
+MANIFEST = "7fd0432e6af30f26a2ebc59e7f5c0846a4b8b8af4c368cd8a5b1c57afc99ab44"
 
 
 def rows(path: Path):
@@ -21,6 +22,14 @@ def rows(path: Path):
 def gzip_rows(path: Path):
     with gzip.open(path, "rt", newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def package_engine():
+    spec = importlib.util.spec_from_file_location("bj145_package_engine", PACKAGE / "bj145_allocation_engine.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_manifest_is_self_consistent_and_bound():
@@ -59,6 +68,11 @@ def test_gate_a_contract_and_denominators():
         "WR_DUPLICATE_STAKE", "WOR_DISTINCT", "RESIDUAL_SYSTEMATIC", "CAPPED_REPEAT",
         "DETERMINISTIC_TOP_MASS", "FULL_ENUMERATED",
     ]
+    binding = json.loads((PACKAGE / "allocation_binding.json").read_text(encoding="utf-8"))
+    assert card["allocation_binding"] == binding
+    assert hashlib.sha256((PACKAGE / binding["module_file"]).read_bytes()).hexdigest() == binding["module_sha256"]
+    assert hashlib.sha256((PACKAGE / binding["golden_vectors_file"]).read_bytes()).hexdigest() == binding["golden_vectors_sha256"]
+    assert binding["ticket_space"] == {"legs": 7, "outcomes_per_leg": 3, "k": 2187, "ordinal_order": "base-3 0000000..2222222"}
 
 
 def test_selection_and_role_geometry():
@@ -116,3 +130,29 @@ def test_no_target_outcome_fields_in_frozen_payload_headers():
             fields = next(csv.reader(handle))
         fields = [field for field in fields if field not in {"tax_unit_rule", "outcome_boundary"}]
         assert not any(any(token in field.lower() for token in forbidden) for field in fields)
+
+
+def test_executable_allocator_golden_vectors_and_fingerprints():
+    module = package_engine()
+    vectors = json.loads((PACKAGE / "allocation_golden_vectors.json").read_text(encoding="utf-8"))
+    assert vectors["engine_version"] == module.ENGINE_VERSION
+    weights = module.golden_weights(2187)
+    assert len(vectors["cases"]) == 6
+    for case in vectors["cases"]:
+        counts = module.allocate(
+            case["mechanism"], weights, case["M"], seed=case["seed"],
+            identity_signature=case["identity_signature"], cap=case["cap"],
+        )
+        fingerprint = module.counts_fingerprint(counts)
+        assert fingerprint == {
+            "counts_sha256": case["counts_sha256"],
+            "draw_count": case["draw_count"],
+            "unique_count": case["unique_count"],
+            "duplicate_count": case["duplicate_count"],
+            "max_multiplicity": case["max_multiplicity"],
+        }
+        assert sum(counts) == case["M"]
+        if case["mechanism"] in {"WOR_DISTINCT", "DETERMINISTIC_TOP_MASS", "FULL_ENUMERATED"}:
+            assert max(counts) <= 1
+        if case["mechanism"] == "CAPPED_REPEAT":
+            assert max(counts) <= case["cap"]

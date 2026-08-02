@@ -22,10 +22,19 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable
 from pathlib import Path
 
+from bj145_allocation_engine import (
+    ENGINE_VERSION,
+    FULL_TICKETS as ENGINE_FULL_TICKETS,
+    MECHANISMS as ENGINE_MECHANISMS,
+    allocate,
+    counts_fingerprint,
+    golden_weights,
+)
+
 
 CONTRACT = "BJ-HIST-TICKET-ALLOCATION-001"
-VERSION = "bj145-gate-a-v3"
-CONTENT_VERSION = "bj145-gate-a-content-v3"
+VERSION = "bj145-gate-a-v4"
+CONTENT_VERSION = "bj145-gate-a-content-v4"
 UNIT_STAKE_YUAN = 2
 FULL_TICKETS = 3 ** 7
 SEEDS = ("137001", "137002", "137003")
@@ -92,7 +101,8 @@ ROOT = find_root()
 SOURCE_151 = ROOT / "results" / "bj151_gate_a_preoutcome_v1"
 SOURCE_137 = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
 SOURCE_148 = ROOT / "results" / "bj148_gate_a_preoutcome_v1"
-OUTPUT = ROOT / "results" / "bj145_gate_a_preoutcome_v4"
+OUTPUT = ROOT / "results" / "bj145_gate_a_preoutcome_v5"
+ALLOCATION_ENGINE_SOURCE = Path(__file__).resolve().with_name("bj145_allocation_engine.py")
 
 
 def sha256(path: Path) -> str:
@@ -250,6 +260,36 @@ def make_grid() -> list[dict[str, object]]:
     return rows
 
 
+def make_golden_vectors() -> dict[str, object]:
+    if ENGINE_FULL_TICKETS != FULL_TICKETS or tuple(ENGINE_MECHANISMS) != tuple(row["mechanism"] for row in make_mechanisms()):
+        raise RuntimeError("allocation engine mechanism contract drift")
+    weights = golden_weights(FULL_TICKETS)
+    specs = (
+        {"mechanism": "WR_DUPLICATE_STAKE", "M": 16, "seed": "137001", "identity_signature": "golden-primary", "cap": None},
+        {"mechanism": "WOR_DISTINCT", "M": 32, "seed": "137002", "identity_signature": "golden-secondary", "cap": None},
+        {"mechanism": "RESIDUAL_SYSTEMATIC", "M": 64, "seed": "NA", "identity_signature": "golden-residual", "cap": None},
+        {"mechanism": "CAPPED_REPEAT", "M": 128, "seed": "NA", "identity_signature": "golden-capped", "cap": 2},
+        {"mechanism": "DETERMINISTIC_TOP_MASS", "M": 256, "seed": "NA", "identity_signature": "golden-top", "cap": None},
+        {"mechanism": "FULL_ENUMERATED", "M": FULL_TICKETS, "seed": "NA", "identity_signature": "golden-full", "cap": None},
+    )
+    cases = []
+    for spec in specs:
+        counts = allocate(
+            str(spec["mechanism"]), weights, int(spec["M"]), seed=str(spec["seed"]),
+            identity_signature=str(spec["identity_signature"]), cap=spec["cap"],
+        )
+        fingerprint = counts_fingerprint(counts)
+        cases.append({**spec, "ticket_space_k": FULL_TICKETS, **fingerprint})
+    return {
+        "schema_version": "bj145-allocation-golden-v1",
+        "engine_version": ENGINE_VERSION,
+        "weight_rule": "golden_weights_v1: ((ordinal*37+11)%1009)+1, ordinal 0..2186",
+        "ticket_order": "base-3 ordinal, 0000000 through 2222222",
+        "outcome_boundary": "synthetic positive weights only; no outcome/final-SP/payout/ROI/tax data",
+        "cases": cases,
+    }
+
+
 def make_cohorts(cohort_151: list[dict[str, str]], cohort_137: list[dict[str, str]]) -> list[dict[str, object]]:
     primary = [source_row_to_cohort(row, "PRIMARY_NO_GATE_K4", "results/bj151_gate_a_preoutcome_v1", "exact #151 fixed #137 NO_GATE/K4 identity list; no outcome reselection") for row in cohort_151]
     secondary = [source_row_to_cohort(row, "SECONDARY_ESP300_GM290_K8", "results/bj137_gate_a_preoutcome_v2", "exact #137 ESP300_GM290/K8 participation list; secondary sensitivity only") for row in cohort_137]
@@ -327,6 +367,22 @@ def freeze(output: Path) -> dict[str, object]:
         write_gzip_csv(stage / "role_vectors.csv.gz", ROLE_FIELDS, roles)
         write_gzip_csv(stage / "allocation_plan.csv.gz", PLAN_FIELDS, plans)
         write_csv(stage / "mechanism_contract.csv", MECHANISM_FIELDS, mechanisms)
+        shutil.copy2(ALLOCATION_ENGINE_SOURCE, stage / "bj145_allocation_engine.py")
+        golden_vectors = make_golden_vectors()
+        (stage / "allocation_golden_vectors.json").write_text(json.dumps(golden_vectors, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        allocation_binding = {
+            "binding_version": "bj145-allocation-binding-v1",
+            "module_file": "bj145_allocation_engine.py",
+            "module_sha256": sha256(stage / "bj145_allocation_engine.py"),
+            "golden_vectors_file": "allocation_golden_vectors.json",
+            "golden_vectors_sha256": sha256(stage / "allocation_golden_vectors.json"),
+            "engine_version": ENGINE_VERSION,
+            "api": "allocate(mechanism, weights, M, seed, identity_signature, cap) -> integer multiplicities by base-3 ticket ordinal",
+            "mechanisms": list(ENGINE_MECHANISMS),
+            "ticket_space": {"legs": 7, "outcomes_per_leg": 3, "k": FULL_TICKETS, "ordinal_order": "base-3 0000000..2222222"},
+            "outcome_boundary": "executable allocation only; no outcome/final-SP/payout/ROI/tax input accepted",
+        }
+        (stage / "allocation_binding.json").write_text(json.dumps(allocation_binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         write_csv(stage / "source_census.csv", SOURCE_FIELDS, [
             {"source": "bj151_gate_a_preoutcome_v1", "role": "fixed controlling #151 NO_GATE/K4 identities and Q vectors", "identity": "SHA256SUMS.json", "sha256": SOURCE_151_MANIFEST, "rows": 1356, "join_status": "all 348 #151 issue rows retained; 339 available and nine explicit no-bets"},
             {"source": "bj137_gate_a_preoutcome_v2", "role": "secondary ESP300_GM290/K8 sensitivity identities and vectors", "identity": "SHA256SUMS.json", "sha256": SOURCE_137_MANIFEST, "rows": 2184, "join_status": "all 348 K8 issue rows retained; 273 available and 75 explicit no-bets"},
@@ -340,6 +396,7 @@ def freeze(output: Path) -> dict[str, object]:
             "selection_contract": {"primary": "exact #151 NO_GATE/K4 selected identities; no outcome reselection", "secondary": "exact #137 ESP300_GM290/K8 participation list only", "unit": "complete issue × gate × K; no issue segmentation", "no_bet": "retain NO_BET_K_UNSATISFIED with zero planned stake"},
             "weights": list(WEIGHT_SOURCES),
             "mechanisms": [row["mechanism"] for row in mechanisms],
+            "allocation_binding": allocation_binding,
             "m_grid": list(M_GRID),
             "caps": list(CAPS),
             "seeds": list(SEEDS),
@@ -352,7 +409,7 @@ def freeze(output: Path) -> dict[str, object]:
         }
         (stage / "gate_a_card.json").write_text(json.dumps(card, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         shutil.copy2(__file__, stage / "freeze_runner.py")
-        (stage / "README.md").write_text("# #145 Gate A: calibrated ticket allocation freeze\n\nThis package freezes the accepted #151 fixed candidate, the contract-authorized #137 K8 sensitivity, six pre-result weight sources, and WR/WOR/residual/capped/FULL allocation rules. It contains no outcome or settlement data. Every ¥2 repeat remains an individual future tax unit; no pooled tax is computed. Replay with `python3 freeze_runner.py --output <new-dir>`; staging remains under `results/`, never `/tmp`. Gate B requires PI authorization.\n", encoding="utf-8")
+        (stage / "README.md").write_text("# #145 Gate A: calibrated ticket allocation freeze\n\nThis package freezes the accepted #151 fixed candidate, the contract-authorized #137 K8 sensitivity, six pre-result weight sources, and WR/WOR/residual/capped/FULL allocation rules. The manifest binds `bj145_allocation_engine.py` and its golden-vector fingerprints; Gate B must byte-verify this module and binding before settlement. It contains no outcome or settlement data. Every ¥2 repeat remains an individual future tax unit; no pooled tax is computed. Replay with `python3 freeze_runner.py --output <new-dir>`; staging remains under `results/`, never `/tmp`. Gate B requires PI authorization.\n", encoding="utf-8")
         compressed = ("identity_catalog.csv.gz", "role_vectors.csv.gz", "allocation_plan.csv.gz")
         content = {"contract_version": CONTENT_VERSION, "gzip_payloads": {name: {"canonical_decompressed_sha256": _decompressed_sha256(stage / name)} for name in compressed}, "non_compressed_controls": {item.name: sha256(item) for item in sorted(stage.iterdir()) if item.is_file() and item.name not in compressed}}
         (stage / "CONTENT_IDENTITY.json").write_text(json.dumps(content, indent=2, sort_keys=True) + "\n", encoding="utf-8")

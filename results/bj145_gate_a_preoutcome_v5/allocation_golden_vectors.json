@@ -1,0 +1,87 @@
+{
+  "cases": [
+    {
+      "M": 16,
+      "cap": null,
+      "counts_sha256": "d2ffb18690e1833b449726987f5940518ee2df32a7ec67ccbd67433facc09739",
+      "draw_count": 16,
+      "duplicate_count": 1,
+      "identity_signature": "golden-primary",
+      "max_multiplicity": 2,
+      "mechanism": "WR_DUPLICATE_STAKE",
+      "seed": "137001",
+      "ticket_space_k": 2187,
+      "unique_count": 15
+    },
+    {
+      "M": 32,
+      "cap": null,
+      "counts_sha256": "ca9384bd9676c401d21ecbd38faa21be675d3a2749ffe6bf36cd16dac417560d",
+      "draw_count": 32,
+      "duplicate_count": 0,
+      "identity_signature": "golden-secondary",
+      "max_multiplicity": 1,
+      "mechanism": "WOR_DISTINCT",
+      "seed": "137002",
+      "ticket_space_k": 2187,
+      "unique_count": 32
+    },
+    {
+      "M": 64,
+      "cap": null,
+      "counts_sha256": "4de7ada5fb2b5d2b73bb3e5331756c29e82cafa3343e679c30c464b92197a742",
+      "draw_count": 64,
+      "duplicate_count": 0,
+      "identity_signature": "golden-residual",
+      "max_multiplicity": 1,
+      "mechanism": "RESIDUAL_SYSTEMATIC",
+      "seed": "NA",
+      "ticket_space_k": 2187,
+      "unique_count": 64
+    },
+    {
+      "M": 128,
+      "cap": 2,
+      "counts_sha256": "783676fb1331410a09b49eb7b054a6041b9b47b4e1b1eb53f3bd1a85121fe09d",
+      "draw_count": 128,
+      "duplicate_count": 64,
+      "identity_signature": "golden-capped",
+      "max_multiplicity": 2,
+      "mechanism": "CAPPED_REPEAT",
+      "seed": "NA",
+      "ticket_space_k": 2187,
+      "unique_count": 64
+    },
+    {
+      "M": 256,
+      "cap": null,
+      "counts_sha256": "a0a3badbe28985aef911a679ddf35d5d6632f4d118a330746066de905c16676a",
+      "draw_count": 256,
+      "duplicate_count": 0,
+      "identity_signature": "golden-top",
+      "max_multiplicity": 1,
+      "mechanism": "DETERMINISTIC_TOP_MASS",
+      "seed": "NA",
+      "ticket_space_k": 2187,
+      "unique_count": 256
+    },
+    {
+      "M": 2187,
+      "cap": null,
+      "counts_sha256": "2a07555f67e421922f06431ffbc21faf15f0c378b4628d43a3bf65c9c11af947",
+      "draw_count": 2187,
+      "duplicate_count": 0,
+      "identity_signature": "golden-full",
+      "max_multiplicity": 1,
+      "mechanism": "FULL_ENUMERATED",
+      "seed": "NA",
+      "ticket_space_k": 2187,
+      "unique_count": 2187
+    }
+  ],
+  "engine_version": "bj145-allocation-engine-v1",
+  "outcome_boundary": "synthetic positive weights only; no outcome/final-SP/payout/ROI/tax data",
+  "schema_version": "bj145-allocation-golden-v1",
+  "ticket_order": "base-3 ordinal, 0000000 through 2222222",
+  "weight_rule": "golden_weights_v1: ((ordinal*37+11)%1009)+1, ordinal 0..2186"
+}

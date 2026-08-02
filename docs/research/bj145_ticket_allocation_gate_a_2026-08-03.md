@@ -9,8 +9,8 @@ candidate selection. The controlling primary identity is the accepted #151
 #137 `ESP300_GM290/K8` participation list. Both preserve complete issue units;
 source segments are not selection units.
 
-The package is `results/bj145_gate_a_preoutcome_v4` with manifest
-`608ce7e8b07c46c5670b956e3459d9cccc0cb88e785aed804ba6ea55c227784a`.
+The package is `results/bj145_gate_a_preoutcome_v5` with manifest
+`7fd0432e6af30f26a2ebc59e7f5c0846a4b8b8af4c368cd8a5b1c57afc99ab44`.
 It contains 696 issue-arm rows, 3,540 selected identities, 24,780 role rows,
 and 1,006,416 allocation-plan rows. The primary arm has 339 available and 9
 explicit K4 no-bets; the secondary arm has 273 available and 75 explicit K8
@@ -35,6 +35,13 @@ repeats remain separate tickets. The mechanism contract also records the
 expected-unique formula and realized-unique rule for every arm (including
 duplicate retention for WR and exact distinctness for WOR/FULL). The package records the per-ticket tax rule
 but computes no tax at Gate A and never pools tickets by issue or policy.
+
+The package additionally binds `bj145_allocation_engine.py` (SHA-256 recorded
+in `allocation_binding.json`) and six N7 golden-vector fingerprints in
+`allocation_golden_vectors.json`. The module implements weighted WR, weighted
+WOR, Hamilton residual, iterated capped-Hamilton, deterministic top-mass, and
+FULL multiplicities by base-3 ticket ordinal. Gate B must byte-verify this
+module and binding before consuming any settled rows.
 
 ## Timing and review boundary
 
