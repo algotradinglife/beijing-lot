@@ -270,7 +270,7 @@ fingerprints 绑定进 manifest，避免在 Gate B 才首次决定 residual/capp
 
 Gate B 已按同一冻结输入完成一次性 outcome join。不可变包为
 `results/bj145_gate_b_outcome_settlement_v1`，`SHA256SUMS.json` 为
-`818bbf1c8c547478e158e127ad267e365705e54df9227e0c1cde180a31640ec2`。包内有
+`dbf9af7bdc2161ec707fddd8ad9716573bfec475f489f445c5b261af39135a8d`。包内有
 1,006,416 行、2,892 个配置、63,624 个 scope summary、63,360 个 FULL 对照差、
 5,760 个 bootstrap 行和 2,880 个 Holm 行；税务 reconciliation 覆盖全部配置且
 2,892 行均 PASS。逐票税按单张中奖票计算，绝不按 issue、policy 或多票汇总。

@@ -749,12 +749,13 @@ def build(output: Path) -> dict[str, object]:
                 return ratio(Decimal(row[field]) - Decimal(baseline[field])) if row[field] and baseline[field] else ""
             full_deltas.append({"scope": row["scope"], "scope_value": row["scope_value"], "arm_id": row["arm_id"], "weight_source": row["weight_source"], "sampling_role": row["sampling_role"], "mechanism": row["mechanism"], "cap": row["cap"], "M": row["M"], "seed": row["seed"], "baseline_mechanism": "FULL_ENUMERATED", "baseline_M": FULL_TICKETS, "support_issue_count": row["settled_issue_count"], "no_tax_roi": row["no_tax_roi"], "full_no_tax_roi": baseline["no_tax_roi"], "no_tax_roi_delta": diff("no_tax_roi"), "tax_adjusted_roi": row["tax_adjusted_roi"], "full_tax_adjusted_roi": baseline["tax_adjusted_roi"], "tax_adjusted_roi_delta": diff("tax_adjusted_roi"), "coverage_hit_rate": row["coverage_hit_rate"], "full_coverage_hit_rate": baseline["coverage_hit_rate"], "coverage_hit_rate_delta": diff("coverage_hit_rate"), "unique_ticket_coverage": row["unique_ticket_coverage"], "full_unique_ticket_coverage": baseline["unique_ticket_coverage"], "unique_ticket_coverage_delta": diff("unique_ticket_coverage"), "duplicate_ticket_ratio": row["duplicate_ticket_ratio"], "full_duplicate_ticket_ratio": baseline["duplicate_ticket_ratio"], "duplicate_ticket_ratio_delta": diff("duplicate_ticket_ratio"), "comparison_rule": "same arm/weight/scope and exact frozen issue support; FULL stake is the K=2187 economic control"})
         write_csv(stage / "full_control_deltas.csv", FULL_DELTA_FIELDS, full_deltas)
-        all_summary = {(row["arm_id"], row["weight_source"], row["mechanism"], row["cap"], row["M"], row["seed"]): row for row in summaries if row["scope"] == "ALL"}
-        def load_config_rows(key: tuple[str, str, str, str, str, str]) -> list[dict[str, str]]:
-            arm, weight, mechanism, cap, m_value, seed = key
+        all_summary = {(row["arm_id"], row["weight_source"], row["mechanism"], row["sampling_role"], row["cap"], row["M"], row["seed"]): row for row in summaries if row["scope"] == "ALL"}
+        summary_roles = {(row["arm_id"], row["weight_source"], row["mechanism"], row["cap"], row["M"], row["seed"]): row["sampling_role"] for row in summaries if row["scope"] == "ALL"}
+        def load_config_rows(key: tuple[str, str, str, str, str, str, str]) -> list[dict[str, str]]:
+            config = "|".join(key)
             payloads = [json.loads(value[0]) for value in connection.execute(
-                "SELECT payload FROM issue_rows WHERE arm_id=? AND weight_source=? AND mechanism=? AND cap=? AND m_value=? AND seed=? ORDER BY year, issue_instance",
-                (arm, weight, mechanism, cap, int(m_value), seed),
+                "SELECT payload FROM issue_rows WHERE config=? ORDER BY year, issue_instance",
+                (config,),
             )]
             if len(payloads) != 348:
                 raise RuntimeError(f"configuration issue denominator drift during replay: {key}: {len(payloads)}")
@@ -770,7 +771,8 @@ def build(output: Path) -> dict[str, object]:
                         seeds = ("NA",) if mechanism not in {"WR_DUPLICATE_STAKE", "WOR_DISTINCT"} else ("137001", "137002", "137003")
                         for cap in caps:
                             for seed in seeds:
-                                variants.append((mechanism, cap, seed, all_summary[(arm, weight, mechanism, cap, str(m), seed)]))
+                                sampling_role = summary_roles[(arm, weight, mechanism, cap, str(m), seed)]
+                                variants.append((mechanism, cap, seed, all_summary[(arm, weight, mechanism, sampling_role, cap, str(m), seed)]))
                     for left, right in itertools.combinations(variants, 2):
                         if left[2] != right[2] and left[2] != "NA" and right[2] != "NA":
                             continue
@@ -779,9 +781,9 @@ def build(output: Path) -> dict[str, object]:
         write_csv(stage / "mechanism_pairwise_deltas.csv", PAIR_FIELDS, pair_rows)
         weight_pairs = []
         for arm in ("PRIMARY_NO_GATE_K4", "SECONDARY_ESP300_GM290_K8"):
-            for mechanism, cap, m, seed in {(row["mechanism"], row["cap"], row["M"], row["seed"]) for row in summaries if row["scope"] == "ALL" and row["mechanism"] != "FULL_ENUMERATED"}:
+            for mechanism, cap, m, seed, sampling_role in {(row["mechanism"], row["cap"], row["M"], row["seed"], row["sampling_role"]) for row in summaries if row["scope"] == "ALL" and row["mechanism"] != "FULL_ENUMERATED"}:
                 for left_weight, right_weight in itertools.combinations(WEIGHT_SOURCES, 2):
-                    l, r = all_summary[(arm, left_weight, mechanism, cap, m, seed)], all_summary[(arm, right_weight, mechanism, cap, m, seed)]
+                    l, r = all_summary[(arm, left_weight, mechanism, sampling_role, cap, m, seed)], all_summary[(arm, right_weight, mechanism, sampling_role, cap, m, seed)]
                     weight_pairs.append({"scope": "ALL", "scope_value": "ALL", "arm_id": arm, "weight_source": f"{left_weight}_VS_{right_weight}", "M": m, "left_mechanism": mechanism, "left_cap": cap, "left_seed": seed, "right_mechanism": mechanism, "right_cap": cap, "right_seed": seed, "support_issue_count": min(int(l["settled_issue_count"]), int(r["settled_issue_count"])), "left_no_tax_roi": l["no_tax_roi"], "right_no_tax_roi": r["no_tax_roi"], "no_tax_roi_delta_left_minus_right": ratio(Decimal(l["no_tax_roi"]) - Decimal(r["no_tax_roi"])) if l["no_tax_roi"] and r["no_tax_roi"] else "", "left_tax_adjusted_roi": l["tax_adjusted_roi"], "right_tax_adjusted_roi": r["tax_adjusted_roi"], "tax_adjusted_roi_delta_left_minus_right": ratio(Decimal(l["tax_adjusted_roi"]) - Decimal(r["tax_adjusted_roi"])) if l["tax_adjusted_roi"] and r["tax_adjusted_roi"] else "", "coverage_hit_rate_delta_left_minus_right": ratio(Decimal(l["coverage_hit_rate"]) - Decimal(r["coverage_hit_rate"])), "duplicate_ratio_delta_left_minus_right": ratio(Decimal(l["duplicate_ticket_ratio"] or 0) - Decimal(r["duplicate_ticket_ratio"] or 0)), "comparison_rule": "equal arm/mechanism/cap/M/seed and issue-level stake; weight-source effect only"})
         write_csv(stage / "weight_pairwise_deltas.csv", PAIR_FIELDS, weight_pairs)
         code_rows = []
@@ -795,9 +797,8 @@ def build(output: Path) -> dict[str, object]:
             if row["scope"] != "ALL":
                 continue
             key = (row["arm_id"], row["weight_source"], row["mechanism"], row["sampling_role"], row["cap"], str(row["M"]), row["seed"])
-            baseline_key = (row["arm_id"], row["weight_source"], "FULL_ENUMERATED", "FULL_ENUMERATED", "NA", str(FULL_TICKETS), "NA")
-            candidate_key = (row["arm_id"], row["weight_source"], row["mechanism"], row["cap"], str(row["M"]), row["seed"])
-            baseline_key = (row["arm_id"], row["weight_source"], "FULL_ENUMERATED", "NA", str(FULL_TICKETS), "NA")
+            baseline_key = (row["arm_id"], row["weight_source"], "FULL_ENUMERATED", "FULL_CONTROL", "NA", str(FULL_TICKETS), "NA")
+            candidate_key = (row["arm_id"], row["weight_source"], row["mechanism"], row["sampling_role"], row["cap"], str(row["M"]), row["seed"])
             candidate, baseline = load_config_rows(candidate_key), load_config_rows(baseline_key)
             result = bootstrap_pair(candidate, baseline, "pre_tax_net_yuan", f"{CONTRACT}|BOOTSTRAP|{key}")
             bootstrap_rows.append({"comparison": "VS_FULL", "scope": "ALL", "scope_value": "ALL", "arm_id": row["arm_id"], "weight_source": row["weight_source"], "mechanism": row["mechanism"], "cap": row["cap"], "M": row["M"], "seed": row["seed"], "baseline_mechanism": "FULL_ENUMERATED", "baseline_cap": "NA", "baseline_seed": "NA", "metric": "no_tax_roi_delta", "support_issue_count": result["support_issue_count"], "replicates": result["replicates"], "point_estimate": ratio(result["point_estimate"]), "ci95_low": ratio(result["ci95_low"]), "ci95_high": ratio(result["ci95_high"]), "one_sided_positive_p": ratio(result["one_sided_positive_p"]), "two_sided_sign_p": ratio(result["two_sided_sign_p"])})
@@ -809,9 +810,8 @@ def build(output: Path) -> dict[str, object]:
             if row["scope"] != "ALL" or not row["no_tax_roi_delta"]:
                 continue
             key = (row["arm_id"], row["weight_source"], row["mechanism"], row["sampling_role"], row["cap"], str(row["M"]), row["seed"])
-            baseline_key = (row["arm_id"], row["weight_source"], "FULL_ENUMERATED", "FULL_ENUMERATED", "NA", str(FULL_TICKETS), "NA")
-            candidate_key = (row["arm_id"], row["weight_source"], row["mechanism"], row["cap"], str(row["M"]), row["seed"])
-            baseline_key = (row["arm_id"], row["weight_source"], "FULL_ENUMERATED", "NA", str(FULL_TICKETS), "NA")
+            baseline_key = (row["arm_id"], row["weight_source"], "FULL_ENUMERATED", "FULL_CONTROL", "NA", str(FULL_TICKETS), "NA")
+            candidate_key = (row["arm_id"], row["weight_source"], row["mechanism"], row["sampling_role"], row["cap"], str(row["M"]), row["seed"])
             candidate, baseline = load_config_rows(candidate_key), load_config_rows(baseline_key)
             values = []
             for a, b in zip(candidate, baseline):
@@ -828,8 +828,9 @@ def build(output: Path) -> dict[str, object]:
         ledger_keys = set(tax_audit)
         for key, audit in tax_audit.items():
             arm, weight, mechanism, cap, m, seed, sampling_role = key
-            query = "SELECT payload FROM issue_rows WHERE arm_id=? AND weight_source=? AND mechanism=? AND cap=? AND m_value=? AND seed=?"
-            issue_tax = sum((decimal(json.loads(payload)["tax_yuan"], "issue tax") for (payload,) in connection.execute(query, (arm, weight, mechanism, cap, int(m), seed))), Decimal(0))
+            config = "|".join((arm, weight, mechanism, sampling_role, cap, m, seed))
+            query = "SELECT payload FROM issue_rows WHERE config=?"
+            issue_tax = sum((decimal(json.loads(payload)["tax_yuan"], "issue tax") for (payload,) in connection.execute(query, (config,))), Decimal(0))
             if abs(audit[2] - issue_tax) > MONEY_QUANTUM:
                 raise RuntimeError(f"tax ledger mismatch: {key}: {audit[2] - issue_tax}")
         decision = {
@@ -860,7 +861,7 @@ def build(output: Path) -> dict[str, object]:
         write_csv(stage / "source_census.csv", SOURCE_FIELDS, [
             {"source": "bj145_gate_a_preoutcome_v8", "role": "accepted immutable allocation identities, vectors and complete mechanism plan surface", "identity": "SHA256SUMS.json", "sha256": GATE_A_MANIFEST, "rows": 1_006_416, "join_status": "byte-verified before outcome read; no selection/M/weight/seed/stake rule changed"},
             {"source": "bj95_gate_b_outcome_settlement_v2r8", "role": "canonical trusted result and final-SP join", "identity": "canonical_outcome_join.csv", "sha256": OUTCOME_PAYLOAD, "rows": len(outcomes), "join_status": "trusted complete-issue settlement only; incomplete issues zero executed stake"},
-            {"source": "bj151_gate_b_outcome_settlement_v1", "role": "contract context only; not read for outcome numbers", "identity": "SHA256SUMS.json", "sha256": "7b88be8af887674875f831f2da0951a1bf7664041f40c10be00d09194ce6fbe2", "rows": "NA", "join_status": "#151/#154 lineage retained; no settled rows imported"},
+            {"source": "bj151_gate_b_outcome_settlement_v1", "role": "contract context only; not read for outcome numbers", "identity": "SHA256SUMS.json", "sha256": SOURCE_151_MANIFEST, "rows": "NA", "join_status": "#151/#154 lineage retained; no settled rows imported"},
             {"source": "bj154_independent_ev_v1", "role": "contract context only; not read for outcome numbers", "identity": "SHA256SUMS.json", "sha256": SOURCE_154_MANIFEST, "rows": "NA", "join_status": "independent EV lineage retained; no settlement rows imported"},
         ])
         card = {

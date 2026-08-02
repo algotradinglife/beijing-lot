@@ -33,7 +33,7 @@
     "report.md": "d44f1c2ee2b5af6e68e2f1c06da1aaaf5ce1e99409dbc5245ef369729f5e6d8f",
     "settlement_card.json": "bda5d6010f703668911c45bc4e94bd89b3cd5fe732a74de96b555e0225396113",
     "settlement_finalizer.py": "1d7433afb8ac3175bdb0e2cbcaf1d6a6d1a636b12306afd23f5fbf79f9ffa356",
-    "settlement_runner.py": "a76708a52d866c22e72712aee8fb0aad35ad57758b234b597f870a6396493cb2",
+    "settlement_runner.py": "ad1a487aa5cf10500a028440266f473d78a61c4858623b89e9508b97ea1d8e15",
     "source_census.csv": "0931bfd71f38c10bd9d0e9d901cee2f24d1985fd8717a5b0d7f6d4de2bcd3658",
     "tax_reconciliation.csv": "f6a2532ce853f6d244cb85942ea48606b27dcc5d4252f353d20619e2a1beb8ea",
     "weight_pairwise_deltas.csv": "c7f8b8f1b66e54682468efc8a478a3530decb5241532c2c8fb86677f0a8e4a11"

@@ -5,7 +5,7 @@
 Gate B consumes only the accepted Gate-A freeze and the canonical trusted
 outcome/final-SP join. The published package is
 `results/bj145_gate_b_outcome_settlement_v1` with `SHA256SUMS.json` SHA-256
-`818bbf1c8c547478e158e127ad267e365705e54df9227e0c1cde180a31640ec2`.
+`dbf9af7bdc2161ec707fddd8ad9716573bfec475f489f445c5b261af39135a8d`.
 
 - Gate-A manifest: `da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114c`
 - canonical outcome manifest: `fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc`
