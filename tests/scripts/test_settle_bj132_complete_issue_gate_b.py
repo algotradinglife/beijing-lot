@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts/settle_bj132_complete_issue_gate_b.py"
-PACKAGE = ROOT / "results/bj132_gate_b_complete_issue_outcome_settlement_v1"
+PACKAGE = ROOT / "results/bj132_gate_b_complete_issue_outcome_settlement_v1r1"
 
 
 def module():
@@ -95,6 +95,11 @@ def test_all_primary_arms_are_negative_and_robustness_is_complete() -> None:
     assert len(accounting) == 7_413
     assert all(row["tax_bucket_key"] == f"{row['issue_instance']}|{row['variant_id']}|{row['arm']}" for row in accounting)
     assert {row["loyo_unit"] for row in accounting} == {"entire issue instance held intact within its year/fold"}
+    with (PACKAGE / "issue_support_summary.csv").open(newline="", encoding="utf-8") as handle:
+        issue_support = list(csv.DictReader(handle))
+    assert len(issue_support) == 10_545
+    assert {row["scope"] for row in issue_support} == {"ISSUE"}
+    assert all(row["scope_value"] == f"{row['issue']}@{row['fold']}" for row in issue_support)
 
 
 def test_portable_content_and_primary_diagnostics_are_present() -> None:
@@ -107,3 +112,7 @@ def test_portable_content_and_primary_diagnostics_are_present() -> None:
     for name, expected in (("matched_full_deltas.csv.gz", 85_976), ("q_minus_p_disagreement_deltas.csv.gz", 35_117)):
         with gzip.open(PACKAGE / name, "rt", newline="", encoding="utf-8") as handle:
             assert sum(1 for _ in csv.DictReader(handle)) == expected
+    with (PACKAGE / "ranker_comparison.csv").open(newline="", encoding="utf-8") as handle:
+        comparisons = list(csv.DictReader(handle))
+    assert comparisons and all(Decimal(row["gross_lost_yuan_vs_full"]) >= 0 for row in comparisons)
+    assert all(row["gross_loss_per_deleted_code_occurrence_yuan"] for row in comparisons)

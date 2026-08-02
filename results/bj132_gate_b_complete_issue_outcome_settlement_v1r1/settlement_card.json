@@ -1,0 +1,28 @@
+{
+  "accounting": "K/stake are frozen outputs, not gates; all frozen portfolios are retained with no overlap rejection. Unavailable canonical outcomes receive zero realized stake and are never replaced.",
+  "boundary": "No matching, candidate ranking, N7 construction, deletion ranking, threshold, budget, or capital amount is regenerated after outcome validation.",
+  "contract": "BJ-HIST-DELETE-SCORE-N7-001",
+  "frozen_matrix": {
+    "frontier_rows": 160734,
+    "no_bet_rows": 3132,
+    "portfolio_identities": 52534,
+    "ranker_disagreement_pairs": 43120,
+    "role_rows": 367738,
+    "variants": 9
+  },
+  "issue": 132,
+  "legacy_boundary": "The superseded segment Gate-A/Gate-B result is non-controlling sensitivity only and is not read by this runner.",
+  "primary_unit": "complete (issue, fold) instance; no segment is used for selection, tax, participation, overlap, folds, or LOYO",
+  "provenance": {
+    "gate_a_content_identity_sha256": "d6eac4c45fdf3fa156014aed8062a264be5e8bd7ae9d17090205831f5d784074",
+    "gate_a_manifest_sha256": "6583503ee80fd2b40bb1c000917ff094afa0551b6a3f0af4b8d175a6432872f9",
+    "outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+    "outcome_payload_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89"
+  },
+  "required_diagnostics": "ranker_comparison includes matched FULL deltas, stake/gross retention and explicit payout-loss severity; deletion_strata includes calibration and ROI by E_SP, GM_E_SP, probability, predicted-SP and outcome type; issue_support_summary provides per-issue support.",
+  "robustness": "ALL/YEAR/FOLD/LEAVE_ONE_YEAR_OUT summaries preserve complete issue instances; issue_policy_accounting retains participation and tax buckets.",
+  "runner_version": "bj132-complete-issue-gateb-v1r1",
+  "settlement": "A \u00a52 sequence pays \u00a52\u00d70.65\u00d7product(canonical final winning SP) exactly once iff frozen allowed codes cover truth; final SP is uncapped.",
+  "stage": "GATE_B_PRIMARY_COMPLETE_ISSUE_OUTCOME_SETTLEMENT",
+  "tax": "Aggregate gross by frozen issue_instance\u00d7variant\u00d7arm tax_bucket_key; if it reaches \u00a510,000, tax each winning portfolio gross at 20%."
+}

@@ -25,10 +25,11 @@ issue-level.
 - Tax is evaluated independently within the frozen
   `issue_instance|variant|arm` bucket at the ¥10,000 threshold; 7,413 bucket
   records preserve that accounting and the intact LOYO unit.
-- The result package has immutable manifest
-  `21d79b651a8f01b1f65614499f9683d927e181916f69ce0b1308dbb325759eba` and
+- The result package `results/bj132_gate_b_complete_issue_outcome_settlement_v1r1`
+  has immutable manifest
+  `deb3d39f937e11ff71638cb6b2d3c1e1d63c5ca25c0ac972f3e785b2a8cbf4f5` and
   content identity
-  `620087db9ec2784dced0dbfc04a32a4289a7afae34f6a1746d074972cafb0105`.
+  `7c8668beb068a76d4a4771f77eaaabd00977edf6ad5cc28425ffa790300bab36`.
 
 ## Result
 
@@ -44,7 +45,8 @@ best tax-adjusted result by arm is:
 `P_MIN_DELETE_N7` lowers stake to exactly two-thirds of matched FULL, but the
 best result remains negative. `Q_MIN_DELETE_N7` does not improve on this
 primary outcome. YEAR, FOLD and LEAVE_ONE_YEAR_OUT tables are retained in the
-package; no promotion is authorized.
+package, alongside explicit per-issue support and payout-loss-severity fields;
+no promotion is authorized.
 
 ## Reproduction
 
