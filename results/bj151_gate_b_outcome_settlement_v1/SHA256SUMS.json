@@ -1,0 +1,16 @@
+{
+  "CONTENT_IDENTITY.json": "3214868b35b74c7ebdefeea5041dc30af86caeaced6a2a877db46e6c7e63508e",
+  "README.md": "72a119d65263baf30e315ff5774a13b614cb696933563cb6205685a3fb367185",
+  "candidate_vs_broader_pool_m_curve.csv": "183330c6b5ce47cd95ae8ca1be4ff345b7e9dbca2aa99cf17f7cab347862a112",
+  "decision.json": "20165e874043090db254dbbbaa51f91117d1fea53bbf7d64939eb83be002ec82",
+  "full_control_deltas.csv": "4f6abf194d2747406b252b651cb75e8da740ffa8b48f2f67f6bfc876d25c8e48",
+  "issue_bootstrap_full_deltas.csv": "f0743291fd6e1f453844827827b4a1d56dea0af15cf8b29e4fc6f47ff24b3a34",
+  "issue_m_grid_settlement.csv.gz": "33fbe5f6a2186b6ec28cd0ce66356058da9e54007301eb836bcdbb008ebce512",
+  "m_grid_surface_summary.csv": "b99bdf0f85fbfeb7543d7ea0837d760e381b0dc34d10cdec64c446edc9607369",
+  "settlement_card.json": "27d0b3f63ced3deae6457300498e823149b902e911802142d76ef0c8086e92e6",
+  "settlement_runner.py": "645ebd32a61fbe935dcf44d96084d725f574a9292cd3833ae7585ae131f8fd0f",
+  "shared_engine.py": "2b53ebc3cef28ae4d794973f9c70783eda767e59004349e54238531f3c3a26bf",
+  "source_census.csv": "cf4c41189b1a8b91d2b623daf5d22593ba7f820c3b397b59eaa68b493fa4ac09",
+  "ticket_tax_reconciliation.csv": "40a3300afa869f54825a92e206ae222783f1ef27cb61bd49439947eaf35bf5e6",
+  "winning_ticket_tax_ledger.csv.gz": "4735efd7664f1134463d6b06ba5f60b29bbbc73bfe7052b625544c6d5365f625"
+}

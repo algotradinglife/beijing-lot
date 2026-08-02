@@ -1,0 +1,11 @@
+{
+  "decision": "FIXED_CANDIDATE_REPRODUCTION_ONLY",
+  "historical_reference": "#137 NO_GATE/K4/Q_INFORMED_WOR_DISTINCT/M64",
+  "promotion_authorized": false,
+  "reference_no_tax_roi_by_seed": {
+    "137001": "0.16375566811484990157480314960629921259842519685039370078740157480314960629921260",
+    "137002": "0.11773577106914370078740157480314960629921259842519685039370078740157480314960630",
+    "137003": "0.026680342104453740157480314960629921259842519685039370078740157480314960629921260"
+  },
+  "rule": "This is a fixed-candidate historical reproduction, not an independent validation or a new parameter search. Pre-tax ROI is primary and tax is secondary. Any apparent positive needs a separate strict independent EV; no purchase, production, betting or promotion is authorized."
+}
