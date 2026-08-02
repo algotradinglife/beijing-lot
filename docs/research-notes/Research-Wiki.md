@@ -211,15 +211,20 @@ v3 将所有 selector、sampler、interaction 和 M=1458 hard-control 比较改�
 `NO_GATE/K4/Q_INFORMED_WOR_DISTINCT/M64`：三个 seed 税前 ROI 为 +16.38%/+11.77%/
 +2.67%，相对 exact-K FULL 增量为 +32.15pp/+27.54pp/+18.44pp。但其最大单一期次份额
 最高 24.23%，去掉最大期次后绝对 ROI 为 -11.47%/+0.08%/-9.46%（两负、一条近盈亏平衡
-正值），且 issue bootstrap 区间跨零；因此当前状态是
-`POSITIVE_CONCENTRATED_REQUIRES_STRICT_INDEPENDENT_EV`，而不是推广或投注授权。
+正值）。#144 已完成独立只读 EV：包哈希、Gate-A/赛果绑定、逐票税务和重放均通过，但三组
+seed 的 20,000 次配对 issue-bootstrap matched-lift 95% 区间都跨零，且该候选来自 5,300 个
+冻结 gate×K×sampler/vector×M 选择组。保守的家族错误率控制不能把普通区间已跨零的候选
+转为已验证正 edge；终局决定为 `NO_PROMOTION`，解释层级
+`NOT_VALIDATED_AFTER_CONCENTRATION_OR_MULTIPLE_TESTING`。这区分了**完整性通过**与
+**统计未验证**，并不授权推广、购买或生产部署。
 
 v3r1 报告派生包补齐完整解释：同族 Q-WOR/K4 曲线在 M32/64/128/256 中仅 M64 同时通过
 三 seed 绝对 ROI 和 LOYO；ESP300/GM*/K8/Q/M128 是次级近盈亏平衡信号（ROI
 +4.46%/-2.23%/+4.46%，增量 +20.58pp/+13.89pp/+20.58pp，最差 LOYO +5.90pp），不能替代
 主候选。机制面中 q-WOR 为 111 个 ALL 正增量、29 个 LOYO 稳定、1 个绝对 edge；model
 WOR 为 98/19/0，model WR 为 57/1/0，market WOR 为 53/0/0；raw M1 峰值不通过 controlling
-rule。详见 [#137 Gate B v3r1 共同支持集结算](../research/bj137_probability_weighted_sampling_gate_b_2026-08-02.md)。
+rule。上述数值保留为描述性历史证据，不能据此回写选择规则或创建投注包。详见
+[#137 Gate B v3r1 共同支持集终局结算](../research/bj137_probability_weighted_sampling_gate_b_2026-08-02.md)。
 
 ## 相关笔记
 

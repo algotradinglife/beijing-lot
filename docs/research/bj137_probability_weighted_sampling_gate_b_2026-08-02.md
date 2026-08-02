@@ -1,14 +1,17 @@
 ---
 title: "#137 概率加权 N7 抽样：Gate B v3r1 共同支持集结算"
 date: 2026-08-02
-status: in_review
-decision: POSITIVE_CONCENTRATED_REQUIRES_STRICT_INDEPENDENT_EV
+status: complete
+decision: NO_PROMOTION
+interpretation_tier: NOT_VALIDATED_AFTER_CONCENTRATION_OR_MULTIPLE_TESTING
 ---
 
-# #137：选场 × 概率加权 N7 抽样 v3r1 共同支持集结算
+# #137：选场 × 概率加权 N7 抽样 v3r1 共同支持集终局结算
 
-阶段：Gate B v3r1 报告派生结算，等待 PI 复审。它识别出一个**集中型正候选**，必须先经严格、
-独立的 EV 复验；本报告不构成购买、生产或投注授权。
+阶段：Gate B v3r1 已完成终局历史结算，并由 #144 作严格、独立的只读 EV 复验。候选的包
+完整性通过，但统计上未能验证为正：它不再是待推广候选，终局决定为 `NO_PROMOTION`，解释
+层级为 `NOT_VALIDATED_AFTER_CONCENTRATION_OR_MULTIPLE_TESTING`。本报告不构成购买、生产或
+投注授权。
 
 ## 冻结、结算与税务边界
 
@@ -68,7 +71,7 @@ YEAR/FOLD 单元给出正增量占比、最差/最佳/平均增量和标准差�
 q 的税后 ROI 约 -11.87%，而 p 约 -16.37%；这是有限样本下的相对效率信号，不是跨年
 稳定 edge，也不能替代 #132 的删码结论。
 
-## 主结论：一个需独立复验的集中型候选
+## 主结论：描述性集中信号，但未通过独立统计验证
 
 新的主规则为：随机抽样臂须在三个冻结 seed 的 ALL 共同支持集 `no_tax_roi_delta` 都为正，
 且每个 LOYO 年份省略、每个 seed 都为正。YEAR/FOLD 只作诊断。若三 seed 的**绝对**
@@ -88,10 +91,17 @@ q 的税后 ROI 约 -11.87%，而 p 约 -16.37%；这是有限样本下的相对
 该候选不是稳健推广结论：其最大单一期次毛回报份额分别为 24.23%、10.82%、12.16%；
 去掉候选最大毛回报期次后，137001 与 137003 的绝对税前 ROI 为 -11.47% 与 -9.46%，
 137002 为接近盈亏平衡的 **+0.08%**，而不是负值。尽管配对的 leave-one-issue-
-out 税前增量仍全为正（最差约 +5.24pp、+16.67pp、+7.53pp），固定种子的期次 bootstrap
-95% 区间均跨越零。因此结论是
-`POSITIVE_CONCENTRATED_REQUIRES_STRICT_INDEPENDENT_EV`：可提交独立 EV 复验，不能推广或
-交易。
+out 税前增量仍全为正（最差约 +5.24pp、+16.67pp、+7.53pp），#144 用独立预登记 seed
+执行 20,000 次配对 issue bootstrap 后，三个 matched-lift 95% 区间均跨越零：
+`[-23.011,+106.721]pp`、`[-13.313,+74.394]pp`、`[-22.447,+65.426]pp`。
+
+#144 同时独立复核了完整逐票台账、税务、Gate-A/outcome 绑定及重放，完整性均通过；但该候选
+来自 5,300 个冻结 gate × K × sampler/vector × M 选择组。即使不声称不具尾部精度的
+bootstrap-max p 值，普通 bootstrap 下界已全部为负，保守的家族错误率控制不可能把它转为
+已验证的正 edge。因此终局结论是 `NO_PROMOTION` /
+`NOT_VALIDATED_AFTER_CONCENTRATION_OR_MULTIPLE_TESTING`：保留税前三 seed 绝对 ROI、21 个
+LOYO 正增量和 M 曲线作为**描述性研究证据**，但不把它解释为可推广、可购买或可生产部署的
+正策略。税后结果仍是次级执行/税务敏感性，不决定此科学结论。
 
 ### 同族 M 曲线与 FULL 归因
 
@@ -146,5 +156,6 @@ top-mass 也按无随机 seed 的单独规则评估：102 个 ALL 税前正增�
 - `candidate_fragility.csv` 对每个候选 seed 保存最大期次份额、同一期次剔除后的配对
   税前 delta、254 个 leave-one-issue-out 结果，以及 5,000 次固定种子 issue bootstrap。
 
-下一步只能由独立执行者用冻结合同复验这个集中型候选；不得以这份历史包修改 Gate-A、
-选择新的 M/seed，或生成投注包。
+终局边界：不得以这份历史包修改 Gate-A、选择新的 M/seed，或生成投注包。任何新的假设
+必须由新的、赛前定义的研究合同检验，而不能把本次 5,300 组历史选择面中的局部峰值回写成
+策略规则。
