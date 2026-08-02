@@ -1,0 +1,13 @@
+{
+  "CONTENT_IDENTITY.json": "b2899cb9423cb77169a1984c3c15e74e718399b1ddf690f96bf2f4365850e60d",
+  "README.md": "adc31b61a70bb25bec92195051438be04cd8850cba2f3bc073d2a817bf08cbac",
+  "allocation_plan.csv.gz": "f2e201502c4d335607b9673215fe9884a06c3545541adfc3a9edc7a14e9c0088",
+  "freeze_runner.py": "9c62d3bbc78cd30e4d45b5d71161a1227366a84bfeecb549ff790bb970e16149",
+  "gate_a_card.json": "8ba6ec87d0d75cb7c731fb702f9acdd4dfb276fc50cb23af7278d51f8544a4e5",
+  "identity_catalog.csv.gz": "9640e427e5b75bd494dc611a8996b8dd700badc9ef4d5eddd5eb78e816441290",
+  "m_grid.csv": "42d5ab505e0ad35412e99dffdb91b0a54affc5981d78bf89f154d99500d05f11",
+  "mechanism_contract.csv": "17f09ea7141d78789c95ae53bf07b59a36003be83946c2115687a286fb171cb5",
+  "role_vectors.csv.gz": "d311f38dc4c0f304f843a8cb016a1ffcafe79ff752d2ac92f4d5ba6e7273f008",
+  "selection_cohort.csv": "a2889c32cd6c706923cdc8ee57a7d29aa9be5866ead4744175eeca26f0156e70",
+  "source_census.csv": "b0ba1dc12facf9c3e1528fe987697e4f27dce893d5c0fd28a093c3bdfbce5ba3"
+}
