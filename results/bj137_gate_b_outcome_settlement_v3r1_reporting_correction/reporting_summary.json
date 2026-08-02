@@ -1,0 +1,2298 @@
+{
+  "decision_inherited": {
+    "absolute_edge_deterministic_top_mass_candidates": 0,
+    "absolute_edge_numeric_sampler_candidates": 1,
+    "all_scope_positive_hard_control_candidates": 133,
+    "all_scope_positive_selector_candidates": 4,
+    "all_seed_positive_deterministic_top_mass_candidates": 102,
+    "all_seed_positive_numeric_sampler_candidates": 464,
+    "decision": "POSITIVE_CONCENTRATED_REQUIRES_STRICT_INDEPENDENT_EV",
+    "loyo_stable_deterministic_top_mass_candidates": 13,
+    "loyo_stable_hard_control_candidates": 29,
+    "loyo_stable_numeric_sampler_candidates": 50,
+    "loyo_stable_selector_candidates": 0,
+    "primary_economic_scale": "no_tax_roi (BJ Single Match 0.65 factor included; per-ticket tax not deducted)",
+    "promotion_authorized": false,
+    "promotion_candidates": [
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.321452386813",
+          "137002": "0.275432489775",
+          "137003": "0.184377060811"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.163755668107",
+          "137002": "0.117735771069",
+          "137003": "0.026680342104"
+        },
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 254,
+          "137002": 254,
+          "137003": 254
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      }
+    ],
+    "rule": "Primary ranking and decision use common-support no-tax ROI deltas. Numeric samplers require positive ALL deltas in all three frozen seeds and positive deltas in every leave-one-year-out omission and seed. Deterministic top-mass is evaluated separately without a numeric-seed requirement. YEAR and FOLD rows are diagnostics, not unanimity vetoes. A stable lift whose candidate no-tax ROI is positive in every frozen seed is a positive candidate requiring strict independent EV; tax-adjusted metrics remain secondary execution sensitivity.",
+    "stable_efficiency_signals": [
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.244582352211",
+          "137002": "0.309848669430",
+          "137003": "0.122235590128"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.075246750444",
+          "137002": "0.140513067663",
+          "137003": "-0.047100011639"
+        },
+        "gate_id": "ESP280_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 209,
+          "137002": 209,
+          "137003": 209
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.244333788924",
+          "137002": "0.267482005117",
+          "137003": "0.126944348474"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.079488517759",
+          "137002": "0.102636733952",
+          "137003": "-0.037900922690"
+        },
+        "gate_id": "ESP280_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.164236462465",
+          "137002": "0.513274586569",
+          "137003": "0.068836906761"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "-0.000608808699",
+          "137002": "0.348429315405",
+          "137003": "-0.096008364404"
+        },
+        "gate_id": "ESP280_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.215281953936",
+          "137002": "0.127458769760",
+          "137003": "0.193274888171"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.050436682771",
+          "137002": "-0.037386501404",
+          "137003": "0.028429617006"
+        },
+        "gate_id": "ESP280_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.267843102471",
+          "137002": "0.675305878355",
+          "137003": "0.125368627510"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.102997831306",
+          "137002": "0.510460607190",
+          "137003": "-0.039476643655"
+        },
+        "gate_id": "ESP280_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "1458",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.037769232766"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.127076038399"
+        },
+        "gate_id": "ESP280_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 194
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.244582352211",
+          "137002": "0.309848669430",
+          "137003": "0.122235590128"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.075246750444",
+          "137002": "0.140513067663",
+          "137003": "-0.047100011639"
+        },
+        "gate_id": "ESP280_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 209,
+          "137002": 209,
+          "137003": 209
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.244333788924",
+          "137002": "0.267482005117",
+          "137003": "0.126944348474"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.079488517759",
+          "137002": "0.102636733952",
+          "137003": "-0.037900922690"
+        },
+        "gate_id": "ESP280_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.164236462465",
+          "137002": "0.513274586569",
+          "137003": "0.068836906761"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "-0.000608808699",
+          "137002": "0.348429315405",
+          "137003": "-0.096008364404"
+        },
+        "gate_id": "ESP280_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.215281953936",
+          "137002": "0.127458769760",
+          "137003": "0.193274888171"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.050436682771",
+          "137002": "-0.037386501404",
+          "137003": "0.028429617006"
+        },
+        "gate_id": "ESP280_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.267843102471",
+          "137002": "0.675305878355",
+          "137003": "0.125368627510"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.102997831306",
+          "137002": "0.510460607190",
+          "137003": "-0.039476643655"
+        },
+        "gate_id": "ESP280_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "1458",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.037769232766"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.127076038399"
+        },
+        "gate_id": "ESP280_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 194
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.248098373953",
+          "137002": "0.313678471544",
+          "137003": "0.125163406283"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.080416205975",
+          "137002": "0.145996303565",
+          "137003": "-0.042518761695"
+        },
+        "gate_id": "ESP280_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 208,
+          "137002": 208,
+          "137003": 208
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.248229456918",
+          "137002": "0.271497612055",
+          "137003": "0.130231781026"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.085081722515",
+          "137002": "0.108349877651",
+          "137003": "-0.032915953378"
+        },
+        "gate_id": "ESP280_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 193,
+          "137002": 193,
+          "137003": 193
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.167717118405",
+          "137002": "0.518563730199",
+          "137003": "0.071823264485"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.004569384002",
+          "137002": "0.355415995795",
+          "137003": "-0.091324469919"
+        },
+        "gate_id": "ESP280_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 193,
+          "137002": 193,
+          "137003": 193
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.219027094287",
+          "137002": "0.130748867707",
+          "137003": "0.196906002275"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.055879359884",
+          "137002": "-0.032398866697",
+          "137003": "0.033758267872"
+        },
+        "gate_id": "ESP280_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 193,
+          "137002": 193,
+          "137003": 193
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.271860580380",
+          "137002": "0.681434562357",
+          "137003": "0.128647895703"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.108712845976",
+          "137002": "0.518286827953",
+          "137003": "-0.034499838700"
+        },
+        "gate_id": "ESP280_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 193,
+          "137002": 193,
+          "137003": 193
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "1458",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.036650083366"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.126497651037"
+        },
+        "gate_id": "ESP280_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 193
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.244582352211",
+          "137002": "0.309848669430",
+          "137003": "0.122235590128"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.075246750444",
+          "137002": "0.140513067663",
+          "137003": "-0.047100011639"
+        },
+        "gate_id": "ESP290_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 209,
+          "137002": 209,
+          "137003": 209
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.244333788924",
+          "137002": "0.267482005117",
+          "137003": "0.126944348474"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.079488517759",
+          "137002": "0.102636733952",
+          "137003": "-0.037900922690"
+        },
+        "gate_id": "ESP290_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.164236462465",
+          "137002": "0.513274586569",
+          "137003": "0.068836906761"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "-0.000608808699",
+          "137002": "0.348429315405",
+          "137003": "-0.096008364404"
+        },
+        "gate_id": "ESP290_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.215281953936",
+          "137002": "0.127458769760",
+          "137003": "0.193274888171"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.050436682771",
+          "137002": "-0.037386501404",
+          "137003": "0.028429617006"
+        },
+        "gate_id": "ESP290_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.267843102471",
+          "137002": "0.675305878355",
+          "137003": "0.125368627510"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.102997831306",
+          "137002": "0.510460607190",
+          "137003": "-0.039476643655"
+        },
+        "gate_id": "ESP290_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "1458",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.037769232766"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.127076038399"
+        },
+        "gate_id": "ESP290_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 194
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.244582352211",
+          "137002": "0.309848669430",
+          "137003": "0.122235590128"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.075246750444",
+          "137002": "0.140513067663",
+          "137003": "-0.047100011639"
+        },
+        "gate_id": "ESP290_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 209,
+          "137002": 209,
+          "137003": 209
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.244333788924",
+          "137002": "0.267482005117",
+          "137003": "0.126944348474"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.079488517759",
+          "137002": "0.102636733952",
+          "137003": "-0.037900922690"
+        },
+        "gate_id": "ESP290_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.164236462465",
+          "137002": "0.513274586569",
+          "137003": "0.068836906761"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "-0.000608808699",
+          "137002": "0.348429315405",
+          "137003": "-0.096008364404"
+        },
+        "gate_id": "ESP290_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.215281953936",
+          "137002": "0.127458769760",
+          "137003": "0.193274888171"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.050436682771",
+          "137002": "-0.037386501404",
+          "137003": "0.028429617006"
+        },
+        "gate_id": "ESP290_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.267843102471",
+          "137002": "0.675305878355",
+          "137003": "0.125368627510"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.102997831306",
+          "137002": "0.510460607190",
+          "137003": "-0.039476643655"
+        },
+        "gate_id": "ESP290_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 194,
+          "137002": 194,
+          "137003": 194
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "1458",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.037769232766"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.127076038399"
+        },
+        "gate_id": "ESP290_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 194
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.248098373953",
+          "137002": "0.313678471544",
+          "137003": "0.125163406283"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.080416205975",
+          "137002": "0.145996303565",
+          "137003": "-0.042518761695"
+        },
+        "gate_id": "ESP290_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 208,
+          "137002": 208,
+          "137003": 208
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.248229456918",
+          "137002": "0.271497612055",
+          "137003": "0.130231781026"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.085081722515",
+          "137002": "0.108349877651",
+          "137003": "-0.032915953378"
+        },
+        "gate_id": "ESP290_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 193,
+          "137002": 193,
+          "137003": 193
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.167717118405",
+          "137002": "0.518563730199",
+          "137003": "0.071823264485"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.004569384002",
+          "137002": "0.355415995795",
+          "137003": "-0.091324469919"
+        },
+        "gate_id": "ESP290_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 193,
+          "137002": 193,
+          "137003": 193
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.219027094287",
+          "137002": "0.130748867707",
+          "137003": "0.196906002275"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.055879359884",
+          "137002": "-0.032398866697",
+          "137003": "0.033758267872"
+        },
+        "gate_id": "ESP290_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 193,
+          "137002": 193,
+          "137003": 193
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.271860580380",
+          "137002": "0.681434562357",
+          "137003": "0.128647895703"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.108712845976",
+          "137002": "0.518286827953",
+          "137003": "-0.034499838700"
+        },
+        "gate_id": "ESP290_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 193,
+          "137002": 193,
+          "137003": 193
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "1458",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.036650083366"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.126497651037"
+        },
+        "gate_id": "ESP290_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 193
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.248098373953",
+          "137002": "0.313678471544",
+          "137003": "0.125163406283"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.080416205975",
+          "137002": "0.145996303565",
+          "137003": "-0.042518761695"
+        },
+        "gate_id": "ESP300_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 208,
+          "137002": 208,
+          "137003": 208
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.219726568856",
+          "137002": "0.281160184929",
+          "137003": "0.138415130538"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.058522019460",
+          "137002": "0.119955635533",
+          "137003": "-0.022789418858"
+        },
+        "gate_id": "ESP300_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.157332076873",
+          "137002": "0.530813382844",
+          "137003": "0.079395006494"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "-0.003872472523",
+          "137002": "0.369608833448",
+          "137003": "-0.081809542902"
+        },
+        "gate_id": "ESP300_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.205758540919",
+          "137002": "0.138937631739",
+          "137003": "0.205787511172"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.044553991523",
+          "137002": "-0.022266917657",
+          "137003": "0.044582961776"
+        },
+        "gate_id": "ESP300_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.243605138637",
+          "137002": "0.695389668741",
+          "137003": "0.136814660029"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.082400589240",
+          "137002": "0.534185119345",
+          "137003": "-0.024389889367"
+        },
+        "gate_id": "ESP300_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "1458",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.040916491523"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.120288057873"
+        },
+        "gate_id": "ESP300_GM290",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 191
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.248098373953",
+          "137002": "0.313678471544",
+          "137003": "0.125163406283"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.080416205975",
+          "137002": "0.145996303565",
+          "137003": "-0.042518761695"
+        },
+        "gate_id": "ESP300_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 208,
+          "137002": 208,
+          "137003": 208
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.219726568856",
+          "137002": "0.281160184929",
+          "137003": "0.138415130538"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.058522019460",
+          "137002": "0.119955635533",
+          "137003": "-0.022789418858"
+        },
+        "gate_id": "ESP300_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.157332076873",
+          "137002": "0.530813382844",
+          "137003": "0.079395006494"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "-0.003872472523",
+          "137002": "0.369608833448",
+          "137003": "-0.081809542902"
+        },
+        "gate_id": "ESP300_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.205758540919",
+          "137002": "0.138937631739",
+          "137003": "0.205787511172"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.044553991523",
+          "137002": "-0.022266917657",
+          "137003": "0.044582961776"
+        },
+        "gate_id": "ESP300_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.243605138637",
+          "137002": "0.695389668741",
+          "137003": "0.136814660029"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.082400589240",
+          "137002": "0.534185119345",
+          "137003": "-0.024389889367"
+        },
+        "gate_id": "ESP300_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "1458",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.040916491523"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.120288057873"
+        },
+        "gate_id": "ESP300_GM300",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 191
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.248098373953",
+          "137002": "0.313678471544",
+          "137003": "0.125163406283"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.080416205975",
+          "137002": "0.145996303565",
+          "137003": "-0.042518761695"
+        },
+        "gate_id": "ESP300_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 208,
+          "137002": 208,
+          "137003": 208
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.219726568856",
+          "137002": "0.281160184929",
+          "137003": "0.138415130538"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.058522019460",
+          "137002": "0.119955635533",
+          "137003": "-0.022789418858"
+        },
+        "gate_id": "ESP300_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.157332076873",
+          "137002": "0.530813382844",
+          "137003": "0.079395006494"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "-0.003872472523",
+          "137002": "0.369608833448",
+          "137003": "-0.081809542902"
+        },
+        "gate_id": "ESP300_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.205758540919",
+          "137002": "0.138937631739",
+          "137003": "0.205787511172"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.044553991523",
+          "137002": "-0.022266917657",
+          "137003": "0.044582961776"
+        },
+        "gate_id": "ESP300_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "32",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.243605138637",
+          "137002": "0.695389668741",
+          "137003": "0.136814660029"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.082400589240",
+          "137002": "0.534185119345",
+          "137003": "-0.024389889367"
+        },
+        "gate_id": "ESP300_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 191,
+          "137002": 191,
+          "137003": 191
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "1458",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.040916491523"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.120288057873"
+        },
+        "gate_id": "ESP300_GM305",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 191
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "512",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.100170097576"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.046887627259"
+        },
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 271
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K1"
+      },
+      {
+        "M": "128",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.116516488745",
+          "137002": "0.202367872688",
+          "137003": "0.180029096213"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "-0.041180229961",
+          "137002": "0.044671153982",
+          "137003": "0.022332377507"
+        },
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 254,
+          "137002": 254,
+          "137003": 254
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.321452386813",
+          "137002": "0.275432489775",
+          "137003": "0.184377060811"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "0.163755668107",
+          "137002": "0.117735771069",
+          "137003": "0.026680342104"
+        },
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 254,
+          "137002": 254,
+          "137003": 254
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "1024",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.048210537208"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.109486181498"
+        },
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 254
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "1458",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.033653219032"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.124043499675"
+        },
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 254
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K4"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.100372137826",
+          "137002": "0.372370366886",
+          "137003": "0.140392936531"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "-0.068927989122",
+          "137002": "0.203070239938",
+          "137003": "-0.028907190417"
+        },
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 237,
+          "137002": 237,
+          "137003": 237
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "BLEND_A75",
+        "sampler_id": "BLEND_A75_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "64",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.120361056149",
+          "137002": "0.402645668058",
+          "137003": "0.122707820872"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "-0.048939070799",
+          "137002": "0.233345541110",
+          "137003": "-0.046592306076"
+        },
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 237,
+          "137002": 237,
+          "137003": 237
+        },
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WOR_DISTINCT",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "1024",
+        "all_scope_no_tax_delta_by_seed": {
+          "137001": "0.080357061055",
+          "137002": "0.048120016106",
+          "137003": "0.093346114597"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "137001": "-0.088943065893",
+          "137002": "-0.121180110842",
+          "137003": "-0.075954012351"
+        },
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count_by_seed": {
+          "137001": 237,
+          "137002": 237,
+          "137003": 237
+        },
+        "mechanism": "INDEPENDENT_WITH_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WR_DUPLICATE_STAKES",
+        "seed_kind": "THREE_FROZEN_SEEDS",
+        "seeds": [
+          "137001",
+          "137002",
+          "137003"
+        ],
+        "top_k_id": "K8"
+      },
+      {
+        "M": "1458",
+        "all_scope_no_tax_delta_by_seed": {
+          "NA": "0.035383955964"
+        },
+        "all_scope_no_tax_roi_by_seed": {
+          "NA": "-0.133916170984"
+        },
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count_by_seed": {
+          "NA": 237
+        },
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "TOP_MODEL_P_CAL_DISTINCT",
+        "seed_kind": "DETERMINISTIC",
+        "seeds": [
+          "NA"
+        ],
+        "top_k_id": "K8"
+      }
+    ],
+    "strict_independent_ev_required": true
+  },
+  "fragility_source": "candidate_fragility.csv from v3 parent; no new concentration computation",
+  "issue": 137,
+  "parent_content_identity_sha256": "be2012567f0aa1690be8e50711afe00233f8686fc5baa9423c400637e9a35f5f",
+  "parent_manifest_sha256": "fe55b7bdd8508a2b19bba2a57ecde9c7238feab1000a15a78ac24689cf89fb31",
+  "parent_package": "results/bj137_gate_b_outcome_settlement_v3_common_support",
+  "primary_candidate": "NO_GATE/K4/Q_INFORMED_WOR_DISTINCT/M64",
+  "report_summary": {
+    "family_rows": [
+      {
+        "absolute_pre_tax_edge_groups": 0,
+        "all_seed_positive_delta_groups": 43,
+        "loyo_stable_delta_groups": 0,
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "BLEND_A25",
+        "seed_rule": "THREE_FROZEN_SEEDS",
+        "surface_groups": 650
+      },
+      {
+        "absolute_pre_tax_edge_groups": 0,
+        "all_seed_positive_delta_groups": 51,
+        "loyo_stable_delta_groups": 0,
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "BLEND_A50",
+        "seed_rule": "THREE_FROZEN_SEEDS",
+        "surface_groups": 650
+      },
+      {
+        "absolute_pre_tax_edge_groups": 0,
+        "all_seed_positive_delta_groups": 51,
+        "loyo_stable_delta_groups": 1,
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "BLEND_A75",
+        "seed_rule": "THREE_FROZEN_SEEDS",
+        "surface_groups": 650
+      },
+      {
+        "absolute_pre_tax_edge_groups": 0,
+        "all_seed_positive_delta_groups": 53,
+        "loyo_stable_delta_groups": 0,
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MARKET_WF_CAL",
+        "seed_rule": "THREE_FROZEN_SEEDS",
+        "surface_groups": 650
+      },
+      {
+        "absolute_pre_tax_edge_groups": 0,
+        "all_seed_positive_delta_groups": 102,
+        "loyo_stable_delta_groups": 13,
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "probability_vector": "MODEL_P_CAL",
+        "seed_rule": "DETERMINISTIC_NO_SEED",
+        "surface_groups": 650
+      },
+      {
+        "absolute_pre_tax_edge_groups": 0,
+        "all_seed_positive_delta_groups": 40,
+        "loyo_stable_delta_groups": 16,
+        "mechanism": "GLOBAL_SINGLE_CODE_DELETE",
+        "probability_vector": "MODEL_P_CAL",
+        "seed_rule": "DETERMINISTIC_NO_SEED",
+        "surface_groups": 50
+      },
+      {
+        "absolute_pre_tax_edge_groups": 0,
+        "all_seed_positive_delta_groups": 57,
+        "loyo_stable_delta_groups": 1,
+        "mechanism": "INDEPENDENT_WITH_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "seed_rule": "THREE_FROZEN_SEEDS",
+        "surface_groups": 650
+      },
+      {
+        "absolute_pre_tax_edge_groups": 0,
+        "all_seed_positive_delta_groups": 98,
+        "loyo_stable_delta_groups": 19,
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "MODEL_P_CAL",
+        "seed_rule": "THREE_FROZEN_SEEDS",
+        "surface_groups": 650
+      },
+      {
+        "absolute_pre_tax_edge_groups": 0,
+        "all_seed_positive_delta_groups": 50,
+        "loyo_stable_delta_groups": 13,
+        "mechanism": "GLOBAL_SINGLE_CODE_DELETE",
+        "probability_vector": "Q_WEIGHT",
+        "seed_rule": "DETERMINISTIC_NO_SEED",
+        "surface_groups": 50
+      },
+      {
+        "absolute_pre_tax_edge_groups": 1,
+        "all_seed_positive_delta_groups": 111,
+        "loyo_stable_delta_groups": 29,
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "probability_vector": "Q_WEIGHT",
+        "seed_rule": "THREE_FROZEN_SEEDS",
+        "surface_groups": 650
+      }
+    ],
+    "primary_curve": [
+      {
+        "M": "32",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "-0.212405213444",
+        "candidate_tax_adjusted_roi": "-0.254156378752",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "-0.054708494738",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137001",
+        "tax_adjusted_roi_delta": "-0.065394369623",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "-0.179977250036"
+      },
+      {
+        "M": "32",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "0.356127718027",
+        "candidate_tax_adjusted_roi": "0.288084840459",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.513824436733",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137002",
+        "tax_adjusted_roi_delta": "0.476846849589",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "0.073668626533"
+      },
+      {
+        "M": "32",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "-0.241494702956",
+        "candidate_tax_adjusted_roi": "-0.241494702956",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "-0.083797984250",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137003",
+        "tax_adjusted_roi_delta": "-0.052732693826",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "-0.264206933085"
+      },
+      {
+        "M": "64",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "0.163755668107",
+        "candidate_tax_adjusted_roi": "0.050563044730",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.321452386813",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137001",
+        "tax_adjusted_roi_delta": "0.239325053859",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "0.095063154774"
+      },
+      {
+        "M": "64",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "0.117735771069",
+        "candidate_tax_adjusted_roi": "0.059533543776",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.275432489775",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137002",
+        "tax_adjusted_roi_delta": "0.248295552906",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "0.121539217348"
+      },
+      {
+        "M": "64",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "0.026680342104",
+        "candidate_tax_adjusted_roi": "-0.030213366495",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.184377060811",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137003",
+        "tax_adjusted_roi_delta": "0.158548642634",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "0.080797921106"
+      },
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "-0.041180229961",
+        "candidate_tax_adjusted_roi": "-0.097776541650",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.116516488745",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137001",
+        "tax_adjusted_roi_delta": "0.090985467480",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "0.054010968121"
+      },
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "0.044671153982",
+        "candidate_tax_adjusted_roi": "-0.003245550328",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.202367872688",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137002",
+        "tax_adjusted_roi_delta": "0.185516458802",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "0.114722762177"
+      },
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "0.022332377507",
+        "candidate_tax_adjusted_roi": "-0.054165721868",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.180029096213",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137003",
+        "tax_adjusted_roi_delta": "0.134596287262",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "0.104455690338"
+      },
+      {
+        "M": "256",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "-0.015146678034",
+        "candidate_tax_adjusted_roi": "-0.072492455749",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.142550040672",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137001",
+        "tax_adjusted_roi_delta": "0.116269553381",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "0.050187315809"
+      },
+      {
+        "M": "256",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "-0.085309035612",
+        "candidate_tax_adjusted_roi": "-0.122967349283",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.072387683094",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137002",
+        "tax_adjusted_roi_delta": "0.065794659847",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "-0.034964701842"
+      },
+      {
+        "M": "256",
+        "baseline_no_tax_roi": "-0.157696718706",
+        "baseline_tax_adjusted_roi": "-0.188762009130",
+        "candidate_no_tax_roi": "-0.302482253085",
+        "candidate_tax_adjusted_roi": "-0.349169087623",
+        "gate_id": "NO_GATE",
+        "matched_settled_issue_count": "254",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "-0.144785534379",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137003",
+        "tax_adjusted_roi_delta": "-0.160407078494",
+        "top_k_id": "K4",
+        "worst_loyo_no_tax_roi_delta": "-0.226028000282"
+      }
+    ],
+    "raw_max": {
+      "absolute_pre_tax_edge": false,
+      "all_seed_positive": false,
+      "loyo_stable": false,
+      "row": {
+        "M": "1",
+        "baseline_no_tax_roi": "-0.171184352104",
+        "baseline_tax_adjusted_roi": "-0.196341566329",
+        "candidate_no_tax_roi": "7.729461581081",
+        "candidate_tax_adjusted_roi": "7.729461581081",
+        "gate_id": "ESP280_GM305",
+        "matched_settled_issue_count": "222",
+        "mechanism": "INDEPENDENT_WITH_REPLACEMENT",
+        "no_tax_roi_delta": "7.900645933185",
+        "probability_vector": "MODEL_P_CAL",
+        "sampler_id": "MODEL_P_CAL_WR_DUPLICATE_STAKES",
+        "seed": "137001",
+        "tax_adjusted_roi_delta": "7.925803147410",
+        "top_k_id": "K1",
+        "worst_loyo_no_tax_roi_delta": ""
+      }
+    },
+    "secondary_curve": [
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.161204549396",
+        "baseline_tax_adjusted_roi": "-0.183034215053",
+        "candidate_no_tax_roi": "0.044553991523",
+        "candidate_tax_adjusted_roi": "0.002570914226",
+        "gate_id": "ESP300_GM290",
+        "matched_settled_issue_count": "191",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.205758540919",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137001",
+        "tax_adjusted_roi_delta": "0.185605129279",
+        "top_k_id": "K8",
+        "worst_loyo_no_tax_roi_delta": "0.067747792898"
+      },
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.161204549396",
+        "baseline_tax_adjusted_roi": "-0.183034215053",
+        "candidate_no_tax_roi": "-0.022266917657",
+        "candidate_tax_adjusted_roi": "-0.056664955643",
+        "gate_id": "ESP300_GM290",
+        "matched_settled_issue_count": "191",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.138937631739",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137002",
+        "tax_adjusted_roi_delta": "0.126369259410",
+        "top_k_id": "K8",
+        "worst_loyo_no_tax_roi_delta": "0.059005729505"
+      },
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.161204549396",
+        "baseline_tax_adjusted_roi": "-0.183034215053",
+        "candidate_no_tax_roi": "0.044582961776",
+        "candidate_tax_adjusted_roi": "-0.000658437313",
+        "gate_id": "ESP300_GM290",
+        "matched_settled_issue_count": "191",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.205787511172",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137003",
+        "tax_adjusted_roi_delta": "0.182375777740",
+        "top_k_id": "K8",
+        "worst_loyo_no_tax_roi_delta": "0.167616235829"
+      },
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.161204549396",
+        "baseline_tax_adjusted_roi": "-0.183034215053",
+        "candidate_no_tax_roi": "0.044553991523",
+        "candidate_tax_adjusted_roi": "0.002570914226",
+        "gate_id": "ESP300_GM300",
+        "matched_settled_issue_count": "191",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.205758540919",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137001",
+        "tax_adjusted_roi_delta": "0.185605129279",
+        "top_k_id": "K8",
+        "worst_loyo_no_tax_roi_delta": "0.067747792898"
+      },
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.161204549396",
+        "baseline_tax_adjusted_roi": "-0.183034215053",
+        "candidate_no_tax_roi": "-0.022266917657",
+        "candidate_tax_adjusted_roi": "-0.056664955643",
+        "gate_id": "ESP300_GM300",
+        "matched_settled_issue_count": "191",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.138937631739",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137002",
+        "tax_adjusted_roi_delta": "0.126369259410",
+        "top_k_id": "K8",
+        "worst_loyo_no_tax_roi_delta": "0.059005729505"
+      },
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.161204549396",
+        "baseline_tax_adjusted_roi": "-0.183034215053",
+        "candidate_no_tax_roi": "0.044582961776",
+        "candidate_tax_adjusted_roi": "-0.000658437313",
+        "gate_id": "ESP300_GM300",
+        "matched_settled_issue_count": "191",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.205787511172",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137003",
+        "tax_adjusted_roi_delta": "0.182375777740",
+        "top_k_id": "K8",
+        "worst_loyo_no_tax_roi_delta": "0.167616235829"
+      },
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.161204549396",
+        "baseline_tax_adjusted_roi": "-0.183034215053",
+        "candidate_no_tax_roi": "0.044553991523",
+        "candidate_tax_adjusted_roi": "0.002570914226",
+        "gate_id": "ESP300_GM305",
+        "matched_settled_issue_count": "191",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.205758540919",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137001",
+        "tax_adjusted_roi_delta": "0.185605129279",
+        "top_k_id": "K8",
+        "worst_loyo_no_tax_roi_delta": "0.067747792898"
+      },
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.161204549396",
+        "baseline_tax_adjusted_roi": "-0.183034215053",
+        "candidate_no_tax_roi": "-0.022266917657",
+        "candidate_tax_adjusted_roi": "-0.056664955643",
+        "gate_id": "ESP300_GM305",
+        "matched_settled_issue_count": "191",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.138937631739",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137002",
+        "tax_adjusted_roi_delta": "0.126369259410",
+        "top_k_id": "K8",
+        "worst_loyo_no_tax_roi_delta": "0.059005729505"
+      },
+      {
+        "M": "128",
+        "baseline_no_tax_roi": "-0.161204549396",
+        "baseline_tax_adjusted_roi": "-0.183034215053",
+        "candidate_no_tax_roi": "0.044582961776",
+        "candidate_tax_adjusted_roi": "-0.000658437313",
+        "gate_id": "ESP300_GM305",
+        "matched_settled_issue_count": "191",
+        "mechanism": "WEIGHTED_WITHOUT_REPLACEMENT",
+        "no_tax_roi_delta": "0.205787511172",
+        "probability_vector": "Q_WEIGHT",
+        "sampler_id": "Q_INFORMED_WOR_DISTINCT",
+        "seed": "137003",
+        "tax_adjusted_roi_delta": "0.182375777740",
+        "top_k_id": "K8",
+        "worst_loyo_no_tax_roi_delta": "0.167616235829"
+      }
+    ],
+    "selector_all_positive_count": 4,
+    "selector_k1": {
+      "M": "2187",
+      "baseline_M": "2187",
+      "baseline_coverage_hit_rate": "1.000000000000",
+      "baseline_gross_pre_tax_yuan": "17077143.839781",
+      "baseline_no_tax_roi": "-0.185428841854",
+      "baseline_probability_vector": "UNIFORM_FULL",
+      "baseline_sampler_id": "FULL_N7_CONTROL",
+      "baseline_seed": "NA",
+      "baseline_settled_issue_count": "187",
+      "baseline_stake_yuan": "20964582.000000",
+      "baseline_tax_adjusted_roi": "-0.203766826182",
+      "baseline_tax_yuan": "384448.176150",
+      "baseline_top_k_id": "K_ALL",
+      "candidate_coverage_hit_rate": "1.000000000000",
+      "candidate_gross_pre_tax_yuan": "674639.495824",
+      "candidate_no_tax_roi": "-0.175194824273",
+      "candidate_settled_issue_count": "271",
+      "candidate_stake_yuan": "817938.000000",
+      "candidate_tax_adjusted_roi": "-0.202797328131",
+      "candidate_tax_yuan": "22577.136801",
+      "coverage_hit_rate_delta": "0.000000000000",
+      "duplicate_policy": "DEDUPLICATED",
+      "effect": "SELECTOR_VS_K_ALL_FULL_COMMON_SUPPORT",
+      "gate_id": "NO_GATE",
+      "matched_settled_issue_count": "187",
+      "mechanism": "ENUMERATE_FULL",
+      "no_tax_roi_delta": "0.010234017582",
+      "probability_vector": "UNIFORM_FULL",
+      "sampler_id": "FULL_N7_CONTROL",
+      "scope": "ALL",
+      "scope_value": "ALL",
+      "seed": "NA",
+      "tax_adjusted_roi_delta": "0.000969498051",
+      "top_k_id": "K1"
+    },
+    "selector_loyo_stable_count": 0
+  },
+  "scope": "report-only derivative; historical paper research; no purchase, production, or promotion authority",
+  "stage": "GATE_B_V3R1_REPORTING_CORRECTION"
+}
