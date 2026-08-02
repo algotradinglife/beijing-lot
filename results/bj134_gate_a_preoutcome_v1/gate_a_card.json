@@ -1,0 +1,118 @@
+{
+  "arms": {
+    "DECISION_CHAIN_ONLY": {
+      "definition": "existing q=p*predicted_SP decision-chain score",
+      "score_field": "decision_percentile"
+    },
+    "FUNDAMENTALS_ONLY": {
+      "definition": "past-only strength/form/rank/rest confidence",
+      "score_field": "fundamental_percentile"
+    },
+    "FUNDAMENTALS_PLUS_DECISION": {
+      "definition": "0.50 market + 0.25 fundamental + 0.25 decision",
+      "score_field": "combined_percentile"
+    },
+    "MARKET_E_SP_GM": {
+      "definition": "market-only E_SP/GM_E_SP FULL baseline",
+      "score_field": "market_percentile"
+    }
+  },
+  "candidate_contract": {
+    "candidate_universe": "all #132 complete-issue FULL N7 identities within each frozen threshold variant",
+    "insufficient_k": "explicit NO_BET_K_UNSATISFIED; no borrowing or cap relaxation",
+    "k_grid": [
+      "1",
+      "2",
+      "4",
+      "8",
+      "16",
+      "ALL"
+    ],
+    "primary_unit": "complete (issue, fold) issue instance",
+    "rank_scope": "within variant × complete issue; no source segment is a selection unit",
+    "stake": "K × 2187 FULL tickets × ¥2; identical across arms"
+  },
+  "chronology": {
+    "history_rule": "for target year y, history query is season_year < y; no target-year result is read or used",
+    "same_issue": "all frozen identities for an issue remain intact; selection is issue-level",
+    "target_years": [
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025
+    ]
+  },
+  "contract": "BJ-HIST-FUNDAMENTAL-OVERLAY-N7-001",
+  "counts": {
+    "feature_rows": 10334,
+    "frontier_rows": 59304,
+    "portfolio_rows": 52534,
+    "unique_target_matches": 10334
+  },
+  "feature_contract": {
+    "combined": "within-issue percentile score = 0.50 market + 0.25 fundamental + 0.25 decision",
+    "decision_chain": "existing #132 q=p×predicted_SP q_max geometric mean",
+    "fundamental": "past-only Elo, rolling points/goal-difference, rank differential, rest and history-depth confidence; fixed constants, no target-year outcomes",
+    "market": "existing #132 E_SP geometric mean",
+    "missing_data": "missing team IDs/history yields neutral fundamental probabilities and retained explicit missingness; no silent drop"
+  },
+  "generator_version": "bj134-gate-a-v1",
+  "issue": 134,
+  "output_boundary": "No target result, score, final SP, winning SP, payout, tax, ROI, settlement, or post-kickoff field is selected or emitted. Gate B is unauthorized pending PI review.",
+  "scope": "historical paper research only; no purchase, production, betting or promotion authority",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_FULL_N7_OVERLAY_FREEZE",
+  "threshold_grid": {
+    "ESP280_GM290_LOWP20": {
+      "e_sp_min": 2.8,
+      "gm_e_sp_min": 2.9,
+      "p_min_max": 0.2
+    },
+    "ESP280_GM290_LOWP25": {
+      "e_sp_min": 2.8,
+      "gm_e_sp_min": 2.9,
+      "p_min_max": 0.25
+    },
+    "ESP280_GM290_LOWP30": {
+      "e_sp_min": 2.8,
+      "gm_e_sp_min": 2.9,
+      "p_min_max": 0.3
+    },
+    "ESP290_GM300_LOWP20": {
+      "e_sp_min": 2.9,
+      "gm_e_sp_min": 3.0,
+      "p_min_max": 0.2
+    },
+    "ESP290_GM300_LOWP25": {
+      "e_sp_min": 2.9,
+      "gm_e_sp_min": 3.0,
+      "p_min_max": 0.25
+    },
+    "ESP290_GM300_LOWP30": {
+      "e_sp_min": 2.9,
+      "gm_e_sp_min": 3.0,
+      "p_min_max": 0.3
+    },
+    "ESP300_GM305_LOWP20": {
+      "e_sp_min": 3.0,
+      "gm_e_sp_min": 3.05,
+      "p_min_max": 0.2
+    },
+    "ESP300_GM305_LOWP25": {
+      "e_sp_min": 3.0,
+      "gm_e_sp_min": 3.05,
+      "p_min_max": 0.25
+    },
+    "ESP300_GM305_LOWP30": {
+      "e_sp_min": 3.0,
+      "gm_e_sp_min": 3.05,
+      "p_min_max": 0.3
+    }
+  },
+  "upstream": {
+    "identity_scope": "#132 complete-issue matched FULL N7 identities; no candidate search or allocation rewrite",
+    "manifest_sha256": "6583503ee80fd2b40bb1c000917ff094afa0551b6a3f0af4b8d175a6432872f9",
+    "package": "results/bj132_gate_a_complete_issue_preoutcome_v1r1"
+  }
+}

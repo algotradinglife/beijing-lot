@@ -1,0 +1,12 @@
+{
+  "CONTENT_IDENTITY.json": "e6608b3a8d0dd08e404a790c6e39740e3f94ba16dffb3f0f20da38c9f4dd90e6",
+  "README.md": "0efd975df960351c84cf404a817b3761efaf4a7f1a542f66733e00e1d83cca6b",
+  "feature_family_ablation.csv": "38511592152a9f8ac3f6891de6c20618b1347503ef8dc6edd871f193657aa793",
+  "freeze_runner.py": "9f2d7aa16fb5adbfd50fca02e30c5dae89775463c93c8e5e6801797a5bb9bebb",
+  "gate_a_card.json": "5933f929f0a754294b574251b641540e0b6a7dc1cb8c1b690fd9d4662ca29689",
+  "match_feature_scores.csv": "71e398e6303ffa87c68493c99d042a8df635150534566d3528b8ee4c00a8f0d6",
+  "portfolio_scores.csv": "c68a0bbd4c146f58cf2939c1483f86734d674e24cc199dbc29aeb4bcc9de7e56",
+  "selection_frontier.csv": "54148988c8115745bd738f7b1718ce503a2dfdd1aa524619db677dd5b4fd5022",
+  "source_census.csv": "e533416e50d57f56c0776bc06875dbdd5042e4be4ef1c63656344414b05cc215",
+  "threshold_census.csv": "94866248ff57fce2637000c435f82f99b8c9bf21dfe115f2a69cd75c359254b5"
+}

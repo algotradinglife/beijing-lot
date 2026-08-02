@@ -391,6 +391,10 @@ rule。上述数值保留为描述性历史证据，不能据此回写选择规�
 
 ## 相关笔记
 
+## #134：基本面与决策链叠加（Gate A）
+
+#134 已冻结同一完整期次 FULL N7 identity 上的市场、基本面、决策链和组合叠加四个选择臂。Gate A 包含 52,534 个上游 #132 portfolio identity、9 个 E_SP/GM_E_SP 阈值变体、`K={1,2,4,8,16,ALL}` 的同预算前沿，以及 10,334 个目标 match 的严格早期历史特征。基本面状态只使用目标年份之前的 Elo、滚动状态、排名、休息和历史深度；不读取或输出目标赛果、最终 SP、结算或税务字段。该包只冻结可复查的选择输入，尚未产生经济结论；Gate B 仍需 PI 授权，任何正向同窗结果都必须另行严格独立 EV 与 held-out/forward 验证。详见 [#134 Gate A](../research/bj134_fundamental_overlay_n7_gate_a_2026-08-03.md)。
+
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
 - [[track_b_beat_the_close|Track B：超越市场基线]]
 - [[single_match_probability_calibration|单场概率校准设计]]

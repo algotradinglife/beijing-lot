@@ -1,0 +1,5 @@
+arm,decision_chain_component,definition,fundamental_component,market_component,score_field
+MARKET_E_SP_GM,no,market-only E_SP/GM_E_SP FULL baseline,no,yes,market_percentile
+FUNDAMENTALS_ONLY,no,past-only strength/form/rank/rest confidence,yes,no,fundamental_percentile
+DECISION_CHAIN_ONLY,yes,existing q=p*predicted_SP decision-chain score,no,no,decision_percentile
+FUNDAMENTALS_PLUS_DECISION,yes,0.50 market + 0.25 fundamental + 0.25 decision,yes,yes,combined_percentile
