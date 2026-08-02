@@ -131,8 +131,11 @@ SP 不确定性或税线控制，而不是在已结算阈值附近事后微调�
 #131 以 #127 已冻结的七场与全局删码为 selector baseline，不重新选场。它预注册在 729 张
 omitted-code slab 中按固定嵌套顺序加回 0%、5%、10%、20%、33%、50%、100% 的票，并以三个
 赛果未知 seed 检查样本顺序敏感性。0% 精确复现 hard prune，100% 精确复现 FULL；中间 sleeve
-仅改变 portfolio-layer coverage，不能被解释为新的 selector edge。Gate A 已冻结，等待 PI
-授权 outcome settlement；没有 ROI 或策略晋级结论。
+仅改变 portfolio-layer coverage，不能被解释为新的 selector edge。Gate B 已结算：9 个 selector ×
+3 个 seed × 7 个 sleeve 的 189 个 ALL-scope 行，无税和实际税后 ROI 全部为负。主 seed 的
+严格 selector 以 hard prune -19.91% 税后最佳，10% sleeve -20.11%、FULL -21.75%；其它 seed
+的“最佳”比例又变化，故局部改善不构成稳定、可推广的 sleeve 深度。结论为 `NO_PROMOTION`。
+详见 [#131 Gate B 完整结算](../research/bj131_soft_cover_n7_gate_b_2026-08-02.md)。
 
 ### 选场与剪枝的分离归因
 
