@@ -175,6 +175,41 @@ maximum；最好的 worst-seed 点是 `M=96`，三个 seed 仍为 -13.98%、-13.
 带来稳定的税前回报改善。当前阶段应把 M 视为资金—覆盖率—风险的选择参数，而不是
 独立 alpha 来源；后续优先改善候选场次和决策链，再重新评估 M 曲线。
 
+### 从 #137 正收益候选到 #151 固定候选复现（2026-08-02）
+
+此前 #137 曾出现一个值得保留的描述性正收益候选：
+`NO_GATE/K4/Q_INFORMED_WOR_DISTINCT/M64`。三个 seed 的税前 ROI 约为
+`+16.38%`、`+11.77%` 和 `+2.67%`，相对匹配 FULL 也有较大提升。但这不是已确认
+的正 EV，原因包括：候选来自约 5,300 个参数组的筛选、收益集中于少数 issue、issue
+bootstrap 区间跨过 0，以及独立验证未通过集中度/多重比较稳定性门槛。
+
+后续研究并没有把该结果简单丢弃，而是分层处理：
+
+```text
+#137：发现描述性候选
+   ↓ 固定 identities / gate / selection definition
+#133：测试 overlap / allocator，发现候选池共享六条 companion legs
+   ↓ 固定 common-support，遍历 M=16..2187
+#148：没有稳定 M 甜区；M 主要改变资金暴露、重复率和 coverage
+   ↓ 不重新挑参、不 outcome re-select
+#151：复现 #137 候选，并与 #148 broader-pool 曲线并列
+```
+
+因此当前 Wiki 的证据分层是：
+
+- **已知**：#137 有描述性正结果，但没有严格样本外稳定证据；#133 的当前候选池
+  不适合通过强制去重创造稳定增量；#148 没有跨 seed 稳定的 M 甜区。
+- **仍待验证**：#137 的候选定义本身是否具有可复现结构，或者正收益只是参数筛选、
+  seed 波动和 issue concentration 的组合。
+- **#151 的约束**：只继承 #137 冻结的 candidate definition，不重新遍历 outcome
+  选择；比较 WR、WOR、FULL 和密集 M 曲线，并报告 candidate−FULL 及其相对
+  #148 broader-pool 的差异。
+
+这条路线保留了正收益假设的研究价值，同时避免把历史筛选峰值误当作已授权 edge。
+若 #151 出现跨 seed、LOYO 和 bootstrap 稳定的阳性结果，再进入严格独立 EV；若阳性
+消失，则要明确归因于 M、采样机制、候选池扩展或 issue concentration，而不是简单
+以 `NO_PROMOTION` 结束。
+
 ## 知识图谱
 
 ```mermaid
