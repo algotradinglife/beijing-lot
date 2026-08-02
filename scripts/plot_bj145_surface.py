@@ -9,7 +9,10 @@ from collections import defaultdict
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = next(
+    candidate for candidate in Path(__file__).resolve().parents
+    if (candidate / "results").is_dir()
+)
 PACKAGE = ROOT / "results" / "bj145_gate_b_outcome_settlement_v1"
 OUT = PACKAGE / "mechanism_surface_median.svg"
 ARMS = ("PRIMARY_NO_GATE_K4", "SECONDARY_ESP300_GM290_K8")
