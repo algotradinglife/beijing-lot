@@ -1,0 +1,100 @@
+{
+  "accounting": {
+    "budget": "stake and K are reported outputs, never a rejection gate",
+    "folds_and_loyo": "every output retains fold/year; any LOYO report holds each complete issue instance intact",
+    "participation": "all frozen portfolios are retained; no overlap rejection",
+    "tax": "Gate B will aggregate gross by issue_instance, variant, arm and apply the existing actual-tax rule without cross-issue aggregation"
+  },
+  "arms": {
+    "MATCHED_FULL_N7": {
+      "stake_yuan": 4374,
+      "tickets": 2187
+    },
+    "P_MIN_DELETE_N7": {
+      "stake_yuan": 2916,
+      "tickets": 1458
+    },
+    "Q_MIN_DELETE_N7": {
+      "stake_yuan": 2916,
+      "tickets": 1458
+    }
+  },
+  "complete_issue_contract": {
+    "candidate_competition": "all complete-issue matches with p_min <= variant maximum sort by p_min, match_idx, match_id; deterministic top 32 are searched",
+    "insufficient_issue_rule": "<7 matches is an explicit NO_BET row",
+    "large_issue_cap": 32,
+    "n7_construction": "candidate plus six highest E_SP eligible companions from the whole same issue instance; candidates and companions compete across the full issue",
+    "primary_unit": "(issue, fold) issue instance; no issue is segmented for selection or construction",
+    "segment_metadata": "source pool_id/segment_index is never read as a selection, availability, or construction constraint"
+  },
+  "contract": "BJ-HIST-DELETE-SCORE-N7-001",
+  "deletion_rule": "Within each matched seven-match portfolio, p_min selects argmin calibrated p and q_min selects argmin q=p*predicted_SP, with match_idx then code-order (3,1,0) tie breaks. The match set is identical across three arms.",
+  "denominator": {
+    "eligible_matches": 47819,
+    "frontier_rows": 160734,
+    "issue_instances": 348,
+    "portfolio_identities": 52534,
+    "ranker_disagreements": 43120,
+    "role_rows": 367738
+  },
+  "generator_version": "bj132-complete-issue-gatea-v1",
+  "issue": 132,
+  "legacy_boundary": "results/bj132_gate_a_preoutcome_v1 and its settlement are immutable segment-compatible legacy comparators only; they are non-controlling sensitivity evidence.",
+  "outcome_boundary": "No result, score, final SP, payout, tax realization, ROI, or settlement source is read or emitted. Gate B is NOT_RUN and NOT_AUTHORIZED pending PI acceptance of this exact replacement Gate A.",
+  "provenance": {
+    "bj101_manifest_sha256": "86e37682a95fad2a2a67187f1ee528f665d371583c621dc9d14af58f74302447",
+    "bj101_membership_sha256": "6b1361797956123eaeb9e2d015eae7bf7ef28ee020a902e710f12284442a7014",
+    "bj90_manifest_sha256": "4a1107ca64d169bf0171a394d1e450a14ee5386005fce34f6ca7ebb70bd720b2",
+    "bj90_prediction_sha256": "2375e5570a9fb964f1beb5f4a20e5019755f62213ebde1463a609d23d1e2807b"
+  },
+  "role_encoding": "one seven-row role assignment per portfolio; the frontier's p/q deletion identities deterministically derive all three arms' allowed-code sets without arm-by-arm role duplication",
+  "scope": "historical paper-only research; no purchase, production, or promotion.",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_COMPLETE_ISSUE_MATCHED_FREEZE",
+  "variants": {
+    "ESP280_GM290_LOWP20": {
+      "e_sp_min": 2.8,
+      "gm_e_sp_min": 2.9,
+      "p_min_max": 0.2
+    },
+    "ESP280_GM290_LOWP25": {
+      "e_sp_min": 2.8,
+      "gm_e_sp_min": 2.9,
+      "p_min_max": 0.25
+    },
+    "ESP280_GM290_LOWP30": {
+      "e_sp_min": 2.8,
+      "gm_e_sp_min": 2.9,
+      "p_min_max": 0.3
+    },
+    "ESP290_GM300_LOWP20": {
+      "e_sp_min": 2.9,
+      "gm_e_sp_min": 3.0,
+      "p_min_max": 0.2
+    },
+    "ESP290_GM300_LOWP25": {
+      "e_sp_min": 2.9,
+      "gm_e_sp_min": 3.0,
+      "p_min_max": 0.25
+    },
+    "ESP290_GM300_LOWP30": {
+      "e_sp_min": 2.9,
+      "gm_e_sp_min": 3.0,
+      "p_min_max": 0.3
+    },
+    "ESP300_GM305_LOWP20": {
+      "e_sp_min": 3.0,
+      "gm_e_sp_min": 3.05,
+      "p_min_max": 0.2
+    },
+    "ESP300_GM305_LOWP25": {
+      "e_sp_min": 3.0,
+      "gm_e_sp_min": 3.05,
+      "p_min_max": 0.25
+    },
+    "ESP300_GM305_LOWP30": {
+      "e_sp_min": 3.0,
+      "gm_e_sp_min": 3.05,
+      "p_min_max": 0.3
+    }
+  }
+}
