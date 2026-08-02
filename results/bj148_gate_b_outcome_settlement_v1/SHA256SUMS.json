@@ -1,0 +1,14 @@
+{
+  "CONTENT_IDENTITY.json": "38c3325fba0eb02f8701e96ac7cdee4fe9d1aabf146a48b954a0cacf08764b5b",
+  "README.md": "244070e3a6e1ff88ab8ab847708bda8b88579b3c11908309361dd724e04e0818",
+  "decision.json": "6435c55d616518ea18f8bf4e5507cb37ca3951583022ef4b37d8de32ba7566b6",
+  "full_control_deltas.csv": "d41ddcdaffabbb6626f333fbe3ad2415d2cb971a34d6290335a2e773664304e4",
+  "issue_bootstrap_full_deltas.csv": "486d58d0bc720a851707b5e03ccc01fb99aa8b19a8070941fb4bbdcdbcd2ced6",
+  "issue_m_grid_settlement.csv.gz": "09f1d422f656cfa59954d20a933b157cd263a1d65344f1b4904d4bb1863dcd36",
+  "m_grid_surface_summary.csv": "b650f26d7d13a217cbf79b4e0a98d144505bf665833fabcc2ed405af31e9624e",
+  "settlement_card.json": "4c16a4f9f82aa5da67b02463c52c123f5b0ff4da4dcf165be7e357cc1c060012",
+  "settlement_runner.py": "2b53ebc3cef28ae4d794973f9c70783eda767e59004349e54238531f3c3a26bf",
+  "source_census.csv": "70f7b71deaaf0a31a9dcf3f7464b3829aaa3b6e875b2b5e0a24c17b94279f0d1",
+  "ticket_tax_reconciliation.csv": "1d0019bfb4c9d5267e7aa43ce19b5292441a4c0eeec39b6e43ef314a1042d9c0",
+  "winning_ticket_tax_ledger.csv.gz": "7100547e8aef0f06a7bfade7018a265d96477a89a4a5305a34c5567cdfb87697"
+}
