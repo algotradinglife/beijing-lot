@@ -139,6 +139,8 @@ sets，再重复 WR/WOR/overlap-cap 对照。
 
 ### #148 Gate B：密集 M 曲线（2026-08-02）
 
+![#148 dense M-grid curve](assets/bj148_dense_m_grid_curve.png)
+
 #148 在固定 common-support identities、三组 seed 和完整 issue 单位上，遍历 58 个
 M 点：`16..512` 步长 16，`576..1024` 和 `1088..2112` 步长 64，另加 FULL
 `M=2187`。没有单期下注上限；每期所有可用 identities 都参与，资金随候选数量自然
