@@ -1,0 +1,163 @@
+{
+  "complete_issue_contract": {
+    "candidate_competition": "all gate-passing complete-issue matches rank by E_SP descending, p_min ascending, match_idx, match_id; deterministic top 32 candidates are searched",
+    "gate_application": "match-level E_SP floor is applied over every eligible match in the complete issue before seven-leg construction; identity GM_E_SP is then checked",
+    "large_issue_cap": 32,
+    "n7_construction": "each candidate plus the six highest E_SP gate-passing companions from the same undivided issue; duplicate identities collapse deterministically",
+    "no_bet": "each gate\u00d7issue with no valid identity is retained explicitly as NO_BET",
+    "overlap_accounting": "every issue\u00d7gate\u00d7K participation row freezes selected identities, unique selected match count, total seven-leg positions, overlap excess legs, maximum per-match identity exposure, and the exact-ticket collision policy before outcomes",
+    "primary_unit": "(issue, fold) complete lottery issue; no selection or performance partition follows source segments",
+    "selection_axis": "each gate ranks deduplicated N7 identities by candidate rank and identity key, then freezes K=1,2,4,8 and ALL participation rows; a fixed K has explicit NO_BET if insufficient identities rather than borrowing from a segment"
+  },
+  "contract": "BJ-HIST-PROB-SAMPLING-N7-001",
+  "denominator": {
+    "eligible_matches": 47819,
+    "gates": 10,
+    "issue_instances": 348,
+    "issue_participation_rows": 17400,
+    "portfolio_identities": 71704,
+    "role_rows": 501928,
+    "top_k_arms": 5
+  },
+  "gate_b_requirements": {
+    "authorization": "NOT_RUN_AND_NOT_AUTHORIZED_PENDING_PI_ACCEPTANCE",
+    "metrics": [
+      "taxfree and actual-tax ROI",
+      "selector lift versus the same-gate K_ALL FULL baseline",
+      "sampler-minus-the-exact-same-selected-FULL baseline and sampler-minus-hard-control deltas",
+      "gate\u00d7K\u00d7M interaction surface without hiding either main effect",
+      "stake/draw/unique/gross retention with issue-total reconciliation",
+      "within-issue match overlap exposure and exact-ticket collision reconciliation",
+      "expected versus realized unique coverage",
+      "hit/coverage, payout concentration, drawdown, miss streak, largest-event sensitivity",
+      "issue/year/fold/LOYO and full ROI-versus-M curves"
+    ],
+    "settlement_unit": "complete issue; aggregate duplicate stakes, overlap, gross return and actual tax at issue level",
+    "sweet_spot": "fixed before outcomes: relevant matched delta must persist across all three seeds and chronological fold/LOYO views; a single seed-local maximum cannot nominate policy; taxfree and taxpaid conclusions are separate. Selection-only improvement is reported even if sampler lift is absent."
+  },
+  "gates": [
+    {
+      "e_sp_min": 0.0,
+      "gate_id": "NO_GATE",
+      "gm_e_sp_min": 0.0
+    },
+    {
+      "e_sp_min": 2.8,
+      "gate_id": "ESP280_GM290",
+      "gm_e_sp_min": 2.9
+    },
+    {
+      "e_sp_min": 2.8,
+      "gate_id": "ESP280_GM300",
+      "gm_e_sp_min": 3.0
+    },
+    {
+      "e_sp_min": 2.8,
+      "gate_id": "ESP280_GM305",
+      "gm_e_sp_min": 3.05
+    },
+    {
+      "e_sp_min": 2.9,
+      "gate_id": "ESP290_GM290",
+      "gm_e_sp_min": 2.9
+    },
+    {
+      "e_sp_min": 2.9,
+      "gate_id": "ESP290_GM300",
+      "gm_e_sp_min": 3.0
+    },
+    {
+      "e_sp_min": 2.9,
+      "gate_id": "ESP290_GM305",
+      "gm_e_sp_min": 3.05
+    },
+    {
+      "e_sp_min": 3.0,
+      "gate_id": "ESP300_GM290",
+      "gm_e_sp_min": 2.9
+    },
+    {
+      "e_sp_min": 3.0,
+      "gate_id": "ESP300_GM300",
+      "gm_e_sp_min": 3.0
+    },
+    {
+      "e_sp_min": 3.0,
+      "gate_id": "ESP300_GM305",
+      "gm_e_sp_min": 3.05
+    }
+  ],
+  "generator_version": "bj137-gate-a-v3",
+  "issue": 137,
+  "market_calibration": {
+    "chronology": "for test year y, only outcomes with calendar year y'<y contribute; test-row outcome access is zero",
+    "fallback": "code\u00d7handicap\u00d7bin, then code\u00d7bin, then code global; each receives fixed 50-observation shrinkage to code global hit rate before three-way renormalization",
+    "settlement_boundary": "only aggregate historical hit counts are emitted; no match-level result_code, final SP, payout, ROI, or tax source is read into the package",
+    "strata": [
+      "outcome code",
+      "handicap sign bucket",
+      "10h market-probability decile"
+    ],
+    "warmup_year": 2018
+  },
+  "outcome_boundary": "No test outcome, score, final SP, winning SP, settlement, payout, ROI, tax realization, or post-kickoff market is read or emitted. Historical aggregate targets are used only for the expressly-required strictly-prior market calibration transform.",
+  "sampler_contract": {
+    "M_grid": [
+      1,
+      2,
+      4,
+      8,
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024,
+      1458,
+      2187
+    ],
+    "M_scope": "M is a per-selected-N7 ticket count. For every issue\u00d7gate\u00d7K arm, issue total draws=selected_identity_count\u00d7M and issue total stake=selected_identity_count\u00d7M\u00d7\u00a52; the participation grid freezes selected identity lists, FULL baselines, and shared-match exposure before outcome access.",
+    "blend": {
+      "0.25": "0.25*model_p_cal + 0.75*market_p_cal; renormalized",
+      "0.5": "0.5*model_p_cal + 0.5*market_p_cal; renormalized",
+      "0.75": "0.75*model_p_cal + 0.25*market_p_cal; renormalized"
+    },
+    "controls": [
+      "FULL_N7_CONTROL",
+      "TOP_MODEL_P_CAL_DISTINCT",
+      "P_MIN_GLOBAL_DELETE_CONTROL",
+      "Q_MIN_GLOBAL_DELETE_CONTROL"
+    ],
+    "expected_unique": "for each identity and M under replacement, sum_t(1-(1-w(t))^M); Gate B must compare this analytic result to realized distinct count",
+    "market_p_cal": "10h EURO reciprocal-odds overround-normalized, mapped with strictly-prior calendar-year hit-rate bins and outcome-code\u00d7handicap\u00d7probability strata where n>=100",
+    "model_p_cal": "accepted #132 calibrated model probability p3/p1/p0",
+    "q_secondary": "normalize(model_p_cal * predicted_SP) per match; optional #132-derived secondary only",
+    "seeds": {
+      "bounded_sensitivity": [
+        137001,
+        137002,
+        137003
+      ],
+      "primary": 137001
+    },
+    "ticket_space": 2187,
+    "top_K_grid": [
+      1,
+      2,
+      4,
+      8,
+      "ALL"
+    ],
+    "with_replacement": "independent deterministic hash draws; repeated tickets retain distinct \u00a52 stakes; Gate B reports draw count and distinct-ticket count separately",
+    "without_replacement": "deterministic exponential-key probability-proportional distinct sampling"
+  },
+  "scope": "historical paper research only; no purchase, production, or promotion authority.",
+  "source": {
+    "bj132_candidate_scatter_sha256": "ed4cadbbd4fde22d99f05ad8545c53dcdf61e90202efece511da06e6ab44cb1c",
+    "bj132_manifest_sha256": "6583503ee80fd2b40bb1c000917ff094afa0551b6a3f0af4b8d175a6432872f9",
+    "database_path": "/home/drwho1985/workspace/soccer/beijing-lot/data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+    "database_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_COMPLETE_ISSUE_SAMPLING_FREEZE"
+}

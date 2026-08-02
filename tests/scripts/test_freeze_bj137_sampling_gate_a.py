@@ -14,7 +14,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "freeze_bj137_sampling_gate_a.py"
-PACKAGE = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
+PACKAGE = ROOT / "results" / "bj137_gate_a_preoutcome_v3"
 
 
 def load():
@@ -139,6 +139,9 @@ def test_real_freeze_has_complete_manifest_and_required_primary_surface() -> Non
     }
     assert {row["top_k_id"] for row in plans} == {"K1", "K2", "K4", "K8", "K_ALL"}
     assert {row["M_scope"] for row in plans} == {"PER_N7_IDENTITY"}
+    assert {row["exact_cross_identity_ticket_overlap_policy"] for row in plans} == {
+        "ticket key includes ordered seven frozen match ids plus 3/1/0 codes; deduplicated N7 identities imply zero exact cross-identity ticket collisions, while shared-match exposure is recorded per issue×gate×K"
+    }
     assert all(
         row["duplicate_policy"] == "DUPLICATE_STAKES"
         for row in plans
@@ -160,6 +163,10 @@ def test_real_freeze_has_complete_manifest_and_required_primary_surface() -> Non
                 assert int(row["selected_identity_count"]) == int(requested)
         else:
             assert row["selected_identity_count"] == "0"
+        assert int(row["total_selected_leg_count"]) == 7 * int(row["selected_identity_count"])
+        assert int(row["match_overlap_excess_legs"]) == int(row["total_selected_leg_count"]) - int(row["unique_selected_match_count"])
+        assert int(row["max_match_identity_exposure"]) <= int(row["selected_identity_count"])
+        assert row["exact_cross_identity_ticket_overlap_policy"].startswith("ticket key includes ordered seven match ids")
 
 
 def test_real_freeze_keeps_issue_whole_and_vector_roles_normalized() -> None:

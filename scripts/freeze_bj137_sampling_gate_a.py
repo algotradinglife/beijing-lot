@@ -31,8 +31,8 @@ FULL_K = 3 ** N
 PRUNED_K = 2 * 3 ** (N - 1)
 UNIT_STAKE = 2
 CONTRACT = "BJ-HIST-PROB-SAMPLING-N7-001"
-VERSION = "bj137-gate-a-v2"
-CONTENT_VERSION = "bj137-gate-a-content-v2"
+VERSION = "bj137-gate-a-v3"
+CONTENT_VERSION = "bj137-gate-a-content-v3"
 BJ132_MANIFEST = "6583503ee80fd2b40bb1c000917ff094afa0551b6a3f0af4b8d175a6432872f9"
 MAX_IDENTITIES_PER_ISSUE_GATE = 32
 M_GRID = (1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 1458, 2187)
@@ -54,7 +54,7 @@ def repository_root() -> Path:
 ROOT = repository_root()
 SOURCE_132 = ROOT / "results" / "bj132_gate_a_complete_issue_preoutcome_v1r1"
 SOURCE_DB = ROOT.parent.parent / "data" / "derived" / "beidan_xlsm" / "beidan_xlsm.sqlite"
-OUTPUT = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
+OUTPUT = ROOT / "results" / "bj137_gate_a_preoutcome_v3"
 
 GATES = ({"gate_id": "NO_GATE", "e_sp_min": 0.0, "gm_e_sp_min": 0.0},) + tuple(
     {
@@ -112,12 +112,14 @@ SAMPLER_PLAN_FIELDS = (
     "gate_id", "top_k_id", "requested_n7_count", "sampler_id", "probability_vector", "mechanism",
     "duplicate_policy", "M", "M_scope", "seed", "seed_role", "ticket_space_k", "stake_per_draw_yuan",
     "issue_total_draw_formula", "issue_total_stake_formula", "expected_unique_formula",
-    "realized_unique_rule", "outcome_boundary", "primary_or_sensitivity",
+    "realized_unique_rule", "exact_cross_identity_ticket_overlap_policy", "outcome_boundary", "primary_or_sensitivity",
 )
 PARTICIPATION_FIELDS = ISSUE_CENSUS_FIELDS + (
     "gate_id", "top_k_id", "requested_n7_count", "available_identity_count", "selected_identity_count",
     "selected_portfolio_ids", "full_ticket_count", "full_stake_yuan", "sample_M_scope",
     "issue_total_draw_formula", "issue_total_stake_formula", "disposition", "reason",
+    "unique_selected_match_count", "total_selected_leg_count", "match_overlap_excess_legs",
+    "max_match_identity_exposure", "exact_cross_identity_ticket_overlap_policy",
 )
 CALIBRATION_MAP_FIELDS = (
     "fold", "test_year", "train_years", "outcome_code", "handicap_bucket", "probability_bin",
@@ -553,7 +555,7 @@ def build_identities(by_issue: dict[tuple[str, str, str], list[dict[str, object]
                         tuple(str(row["match_id"]) for row in entry[1]),
                     ),
                 )
-                frozen_portfolio_ids: list[str] = []
+                frozen_portfolios: list[tuple[str, tuple[str, ...]]] = []
                 for ordinal, entry in enumerate(ranked, 1):
                     candidate, selected, gm, candidate_rank = entry
                     portfolio_id = compact_hash({
@@ -585,7 +587,7 @@ def build_identities(by_issue: dict[tuple[str, str, str], list[dict[str, object]
                         "selection_scope": "COMPLETE_ISSUE",
                         "segment_boundary": "NONE; source segments are diagnostic-only",
                     })
-                    frozen_portfolio_ids.append(portfolio_id)
+                    frozen_portfolios.append((portfolio_id, tuple(str(row["match_id"]) for row in selected)))
                     for rank, row in enumerate(selected, 1):
                         rw.writerow({
                             "gate_id": gate["gate_id"], "portfolio_id": portfolio_id, "issue": row["issue"],
@@ -608,17 +610,22 @@ def build_identities(by_issue: dict[tuple[str, str, str], list[dict[str, object]
                     identities += 1
                 for requested in TOP_K:
                     if requested == "ALL":
-                        selected_ids = frozen_portfolio_ids
+                        selected_portfolios = frozen_portfolios
                         top_reason = reason
-                    elif len(frozen_portfolio_ids) >= int(requested):
-                        selected_ids = frozen_portfolio_ids[:int(requested)]
+                    elif len(frozen_portfolios) >= int(requested):
+                        selected_portfolios = frozen_portfolios[:int(requested)]
                         top_reason = "PORTFOLIOS_AVAILABLE"
                     else:
-                        selected_ids = []
+                        selected_portfolios = []
                         top_reason = "INSUFFICIENT_N7_IDENTITIES_FOR_REQUESTED_K"
+                    selected_ids = [portfolio_id for portfolio_id, _ in selected_portfolios]
+                    match_exposure = Counter(
+                        match_id for _, match_ids in selected_portfolios for match_id in match_ids
+                    )
+                    total_legs = sum(match_exposure.values())
                     participation_rows.append({
                         **base, "gate_id": gate["gate_id"], "top_k_id": top_k_id(requested),
-                        "requested_n7_count": requested, "available_identity_count": len(frozen_portfolio_ids),
+                        "requested_n7_count": requested, "available_identity_count": len(frozen_portfolios),
                         "selected_identity_count": len(selected_ids),
                         "selected_portfolio_ids": "|".join(selected_ids),
                         "full_ticket_count": len(selected_ids) * FULL_K,
@@ -628,6 +635,11 @@ def build_identities(by_issue: dict[tuple[str, str, str], list[dict[str, object]
                         "issue_total_stake_formula": "selected_identity_count × M × ¥2",
                         "disposition": "AVAILABLE" if selected_ids else "NO_BET",
                         "reason": top_reason,
+                        "unique_selected_match_count": len(match_exposure),
+                        "total_selected_leg_count": total_legs,
+                        "match_overlap_excess_legs": total_legs - len(match_exposure),
+                        "max_match_identity_exposure": max(match_exposure.values(), default=0),
+                        "exact_cross_identity_ticket_overlap_policy": "ticket key includes ordered seven match ids plus outcome codes; deduplicated N7 identities have no exact cross-identity ticket collision; shared match exposure is counted above",
                     })
     finally:
         close_gzip(identity_handles)
@@ -650,6 +662,7 @@ def sampler_plan_rows() -> list[dict[str, object]]:
             "seed_role": role, "issue_total_draw_formula": "selected_identity_count × M",
             "issue_total_stake_formula": "selected_identity_count × M × ¥2", **base,
             "realized_unique_rule": "count distinct ticket identities; duplicate draws retain separate ¥2 stakes" if duplicate == "DUPLICATE_STAKES" else "all selected tickets are distinct",
+            "exact_cross_identity_ticket_overlap_policy": "ticket key includes ordered seven frozen match ids plus 3/1/0 codes; deduplicated N7 identities imply zero exact cross-identity ticket collisions, while shared-match exposure is recorded per issue×gate×K",
             "primary_or_sensitivity": primary,
         })
     for gate in GATES:
@@ -744,12 +757,13 @@ def freeze(output: Path, source_132: Path = SOURCE_132, source_db: Path = SOURCE
                 "n7_construction": "each candidate plus the six highest E_SP gate-passing companions from the same undivided issue; duplicate identities collapse deterministically",
                 "no_bet": "each gate×issue with no valid identity is retained explicitly as NO_BET",
                 "selection_axis": "each gate ranks deduplicated N7 identities by candidate rank and identity key, then freezes K=1,2,4,8 and ALL participation rows; a fixed K has explicit NO_BET if insufficient identities rather than borrowing from a segment",
+                "overlap_accounting": "every issue×gate×K participation row freezes selected identities, unique selected match count, total seven-leg positions, overlap excess legs, maximum per-match identity exposure, and the exact-ticket collision policy before outcomes",
             },
             "gates": GATES,
             "sampler_contract": {
                 "ticket_space": FULL_K,
                 "M_grid": M_GRID,
-                "M_scope": "M is a per-selected-N7 ticket count. For every issue×gate×K arm, issue total draws=selected_identity_count×M and issue total stake=selected_identity_count×M×¥2; the participation grid freezes selected identity lists and FULL baselines before outcome access.",
+                "M_scope": "M is a per-selected-N7 ticket count. For every issue×gate×K arm, issue total draws=selected_identity_count×M and issue total stake=selected_identity_count×M×¥2; the participation grid freezes selected identity lists, FULL baselines, and shared-match exposure before outcome access.",
                 "top_K_grid": TOP_K,
                 "seeds": {"primary": PRIMARY_SEED, "bounded_sensitivity": SENSITIVITY_SEEDS},
                 "model_p_cal": "accepted #132 calibrated model probability p3/p1/p0",
@@ -771,7 +785,7 @@ def freeze(output: Path, source_132: Path = SOURCE_132, source_db: Path = SOURCE
             "gate_b_requirements": {
                 "authorization": "NOT_RUN_AND_NOT_AUTHORIZED_PENDING_PI_ACCEPTANCE",
                 "settlement_unit": "complete issue; aggregate duplicate stakes, overlap, gross return and actual tax at issue level",
-                "metrics": ["taxfree and actual-tax ROI", "selector lift versus the same-gate K_ALL FULL baseline", "sampler-minus-the-exact-same-selected-FULL baseline and sampler-minus-hard-control deltas", "gate×K×M interaction surface without hiding either main effect", "stake/draw/unique/gross retention with issue-total reconciliation", "expected versus realized unique coverage", "hit/coverage, payout concentration, drawdown, miss streak, largest-event sensitivity", "issue/year/fold/LOYO and full ROI-versus-M curves"],
+                "metrics": ["taxfree and actual-tax ROI", "selector lift versus the same-gate K_ALL FULL baseline", "sampler-minus-the-exact-same-selected-FULL baseline and sampler-minus-hard-control deltas", "gate×K×M interaction surface without hiding either main effect", "stake/draw/unique/gross retention with issue-total reconciliation", "within-issue match overlap exposure and exact-ticket collision reconciliation", "expected versus realized unique coverage", "hit/coverage, payout concentration, drawdown, miss streak, largest-event sensitivity", "issue/year/fold/LOYO and full ROI-versus-M curves"],
                 "sweet_spot": "fixed before outcomes: relevant matched delta must persist across all three seeds and chronological fold/LOYO views; a single seed-local maximum cannot nominate policy; taxfree and taxpaid conclusions are separate. Selection-only improvement is reported even if sampler lift is absent.",
             },
             "outcome_boundary": "No test outcome, score, final SP, winning SP, settlement, payout, ROI, tax realization, or post-kickoff market is read or emitted. Historical aggregate targets are used only for the expressly-required strictly-prior market calibration transform.",

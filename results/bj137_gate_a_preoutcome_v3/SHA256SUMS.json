@@ -1,0 +1,16 @@
+{
+  "CONTENT_IDENTITY.json": "d598635d563e4dc088d9af63ac16a85468058c752e0fd0077ecf9f502dd59d21",
+  "README.md": "c1341a0a05f4c6a6171f318532718888b5db57522174cf2daf620fc130c16c4b",
+  "freeze_runner.py": "c66b3081ed4c9625d896178913b6c09d515521ffa3020c57458f303202800fe3",
+  "gate_a_card.json": "d01c04f99fae962ce605a9b7d70d0c31497106c3aeb49a7750703c300318bfff",
+  "gate_issue_census.csv": "2aad38f0c94df0e3bf4424dc56823d2564b6ac5afa74281101e059ede4355618",
+  "issue_census.csv": "69d7463b6f83af4127059d6ea34095292646ec2a98abc39d56551b76d6ea6dd5",
+  "issue_participation_grid.csv": "b8fc1147598b949e1802bbd3b475f16dfe72f1b35521a5b5d9ef5286fd720b46",
+  "market_calibration_census.csv": "5f8b5a8abae6d9bcc08fc6a25eccab75dd2a0628e728f48539e323acaebd00b1",
+  "market_calibration_map.csv": "1f61e21092929317e08eea626e3d46ab9eb4192921da850052cd8a829ace74b4",
+  "match_vectors.csv": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+  "n7_identities.csv.gz": "c6f94c7b9e3431f62c681b134322988adeeac0fe3f84881e7705ea5595a7f8e3",
+  "n7_role_vectors.csv.gz": "1a6ac41e5e34c400c5c2a62f9799e2f76d56f4aaa3d13b67b88505443788cdaa",
+  "sampler_plan.csv": "51956781eb68441e4e59274ceaf486fb0e3d4c0f9daa2cf244ca47ef953ca1c2",
+  "source_census.csv": "338e1ccd687258036502886c3a3777541447ee4fd15a30f5cadbabaf686adfbe"
+}
