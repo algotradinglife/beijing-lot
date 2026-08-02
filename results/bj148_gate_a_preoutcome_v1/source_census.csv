@@ -1,0 +1,3 @@
+source,role,identity,sha256,rows,join_status
+bj137_gate_a_preoutcome_v2,accepted outcome-unexposed complete-issue NO_GATE/K_ALL universe,SHA256SUMS.json,0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df,348,all 348 complete issues retained; five explicit source NO_BET rows preserved
+bj133_gate_a_preoutcome_v1,accepted outcome-unexposed inherited rank-32 candidate identities and calibrated Q-weight role vectors,SHA256SUMS.json,1fff3f904fcb9a5efed231771880be8ae0603b0d8f3c7d0365937fcfe9985e79,8550,"NO_GATE only; all 8,550 common-support identities retained with no K or stake cap"

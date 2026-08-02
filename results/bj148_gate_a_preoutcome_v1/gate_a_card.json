@@ -1,0 +1,122 @@
+{
+  "complete_issue_contract": {
+    "common_support": "#137 NO_GATE/K_ALL complete-issue universe intersected with #133 NO_GATE inherited deterministic rank-32 candidate catalogue",
+    "identity_inclusion": "every inherited common-support identity is included for an AVAILABLE issue; no K, allocator, or issue-stake cap is applied",
+    "no_bet": "all five #137 NO_GATE/K_ALL source no-bet issues remain explicit zero-stake rows at every M and arm",
+    "primary_unit": "complete (issue, fold) lottery issue; source segments are diagnostic-only"
+  },
+  "contract": "BJ-HIST-N7-M-GRID-001",
+  "denominator": {
+    "available_issue_rows": 343,
+    "common_support_identities": 8550,
+    "common_support_role_rows": 59850,
+    "complete_issue_rows": 348,
+    "dense_m_points": 58,
+    "no_bet_issue_rows": 5,
+    "sampled_m_points": 57,
+    "sampling_plan_rows": 119364,
+    "seed_count": 3
+  },
+  "gate_b_requirements": {
+    "authorization": "NOT_RUN_AND_NOT_AUTHORIZED_PENDING_PI_ACCEPTANCE",
+    "promotion": "No historical result authorizes purchase, production, betting, or promotion. Any apparent positive region requires separate strict independent EV review and validation."
+  },
+  "generator_version": "bj148-gate-a-v1",
+  "issue": 148,
+  "metrics_frozen_for_gate_b": [
+    "no_tax_roi primary and tax_adjusted_roi reference",
+    "complete-issue hit rate and ticket coverage",
+    "mean/P50/P90/P95/max issue stake; total stake and capital utilization",
+    "duplicate ticket ratio and unique-ticket coverage",
+    "matched deltas versus FULL for ROI/hit/stake",
+    "YEAR/FOLD/LOYO and issue bootstrap",
+    "full WR M curve is primary; WOR is a sensitivity; no single M or seed can nominate a policy"
+  ],
+  "outcome_boundary": "No test outcome, score, final/winning SP, settlement, payout, ROI, tax realization, or post-kickoff input is read or emitted.",
+  "sampling_contract": {
+    "dense_m_grid": [
+      16,
+      32,
+      48,
+      64,
+      80,
+      96,
+      112,
+      128,
+      144,
+      160,
+      176,
+      192,
+      208,
+      224,
+      240,
+      256,
+      272,
+      288,
+      304,
+      320,
+      336,
+      352,
+      368,
+      384,
+      400,
+      416,
+      432,
+      448,
+      464,
+      480,
+      496,
+      512,
+      576,
+      640,
+      704,
+      768,
+      832,
+      896,
+      960,
+      1024,
+      1088,
+      1152,
+      1216,
+      1280,
+      1344,
+      1408,
+      1472,
+      1536,
+      1600,
+      1664,
+      1728,
+      1792,
+      1856,
+      1920,
+      1984,
+      2048,
+      2112,
+      2187
+    ],
+    "full_control": "M=2187 is FULL_ENUMERATED exactly once per issue; it is not a with-replacement draw",
+    "probability_vector": "frozen #133 Q_WEIGHT three-way vector per N7 leg",
+    "seeds": [
+      "133001",
+      "133002",
+      "133003"
+    ],
+    "wor_sensitivity": "Q_INFORMED_WOR_DISTINCT: M distinct Q-weighted tickets per identity",
+    "wr_primary": "Q_INFORMED_WR_DUPLICATE_STAKE: M independent draws per identity, each draw is a separate \u00a52 ticket even if duplicate"
+  },
+  "scope": "historical paper research only; no purchase, production, betting, or promotion authority.",
+  "sources": {
+    "bj133_gate_a_v1": {
+      "content_identity_sha256": "68159b1adb428181874998a223121b4ee16e632071402eb56b0dd9326d233bb1",
+      "identity_payload_sha256": "39f6d2a0e3b81da630275fc4dc43c308cb43512a97d70ad98bfcaf0d79200907",
+      "manifest_sha256": "1fff3f904fcb9a5efed231771880be8ae0603b0d8f3c7d0365937fcfe9985e79",
+      "role_payload_sha256": "3aaf08a97ad86c558d62955ebb0b8bfa1a1bbf7b1c076f4b03b7ba62a85606c9"
+    },
+    "bj137_gate_a_v2": {
+      "content_identity_sha256": "36d6afcc33a5b5ceb3e4a990bfe6ec05503be115270c3489f4973dc3a59dd236",
+      "issue_universe_payload_sha256": "e8fbcb1430d65e8d3c83c173b7d21b1deeb6463fd15d9f018c145923059f61d6",
+      "manifest_sha256": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df"
+    }
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_DENSE_M_GRID_COMMON_SUPPORT_FREEZE"
+}
