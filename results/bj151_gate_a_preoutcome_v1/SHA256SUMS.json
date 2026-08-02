@@ -1,0 +1,12 @@
+{
+  "CONTENT_IDENTITY.json": "ac36bc2422d1afd22c3bb4bd680568401cbaec30e0d2006d13afcdfa141b89a5",
+  "README.md": "5f69aef64e19f18fd4ad8abf8a997e3dfcc09ce559edbcd5ff56ae1a9649258b",
+  "candidate_cohort.csv": "b05b518f7bfe908ba1a488bea99eaeb596bd0909da566fabe929dc1290d41e98",
+  "candidate_identities.csv.gz": "79ee1392fac21b14169879f12339ad9d3c92334f7f960ce26ccfc218438cf6a4",
+  "candidate_role_vectors.csv.gz": "4a0fea7974b455b620e820e29c78f73655c11a3ffa72eb22ee8ad0ab3e848045",
+  "dense_m_grid.csv": "cc7aec4eef7cd604385a82686ac5932ee117b9437678657f8d04cefb6298cda5",
+  "freeze_runner.py": "c03d875e1b692a57209654a4e53fab34b18f465c60e631a99f5db8d00d6d2593",
+  "gate_a_card.json": "d904feb957f8bb10a1bdea493c24b37da06c8a42ace018992d59189156c6e76e",
+  "sampling_plan.csv": "739b5b6020f9ea9c5144f0d10ae7c56881086cbc8cd96c9901ca177102155bae",
+  "source_census.csv": "653ade000c9f5e138c5c9dd763dbed7c010f23364b8f17c4dc4b3d2dd8a0ce8d"
+}
