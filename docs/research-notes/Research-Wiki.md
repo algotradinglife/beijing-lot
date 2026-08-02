@@ -126,6 +126,47 @@ SP 不确定性或税线控制，而不是在已结算阈值附近事后微调�
 18%–24%；无税 ROI 相对 FULL 在 7/9 行微升、2/9 行下降，但均未达 breakeven。税后改善
 主要来自较低 tax exposure 而非正的无税 edge，所以结论为 `NO_PROMOTION`。
 
+### 选场与剪枝的分离归因
+
+在同一 `p_min<=0.20` 口径下，`E_SP/GM_E_SP` 门槛越严格，FULL 基线从 -15.14%
+改善到 -8.35%，即选场贡献 **+6.79pp**；但 matched PRUNE 相对 FULL 的无税增量没有
+随之稳定改善，最严格档反而为 **-1.95pp**。因此 #127 中绝对表现的主要改善来自选场，
+不能记在删码策略名下。
+
+| 选场门槛 | FULL 无税 ROI | PRUNE 无税 ROI | PRUNE−FULL | 删码开出率 |
+|---|---:|---:|---:|---:|
+| `ESP280_GM290_LOWP20` | -15.14% | -15.28% | -0.15pp | 18.23% |
+| `ESP290_GM300_LOWP20` | -13.24% | -13.14% | +0.10pp | 18.32% |
+| `ESP300_GM305_LOWP20` | -8.35% | -10.30% | -1.95pp | 18.66% |
+
+最严格档的 18.66% 删码开出率也不是新的预测进步：它与 #101 同口径
+`p_min<=0.20` 的 18.46% 几乎一致，符合概率校准预期。#121 删除多场赛果，coverage
+定义不同，不能把它当成这个 18.46% 的直接对照。按 `E_SP` 分层后的删码开出率也没有
+显示稳定单调下降；当前样本只能支持“校准正常”，不能支持“选场使删码更准”。
+
+因此 `NO_PROMOTION` 同时表达两件事，而不是笼统否定整个方向：
+
+1. 当前 `E_SP/GM_E_SP` 选场虽显著改善 FULL 基线，但仍未把无税 ROI 推到正值；
+2. 在同一批七场、同一资金口径下，当前 `p_min` 硬删除没有提供稳定的边际增量。
+
+这不等于所有剪枝都不可行。对“删一个代码、stake 保留 2/3”的策略，剪枝无税 ROI
+优于 FULL 的必要条件是删码后的 gross return retention 高于 `2/3`。#127 最严格档只有
+65.249%，未越过这条 matched 基准线。
+
+### 后续研究的强制双指标报告
+
+以后所有“选场 + 剪枝/抽样”研究必须同时报告以下两组指标，且使用同一批 N7、同一
+结算窗口和可比资金口径：
+
+1. **选场基线**：每个选场门槛下的 matched FULL 无税/税后 ROI，用来衡量 selector
+   相对历史 FULL 的改善；
+2. **剪枝增量**：同门槛下 `PRUNE−FULL` 无税/税后 ROI，并同时报告 stake retention、
+   gross return retention 与删码开出率，用来判断删码是否独立贡献 edge。
+
+禁止用 PRUNE 的绝对 ROI 代替剪枝增量，也禁止把税负下降产生的表面改善解释为无税
+edge。负结果仍需给出完整参数遍历、分层切片和 Wiki 结论，不能以“无候选”或
+fail-close 代替策略分析。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
@@ -136,4 +177,6 @@ SP 不确定性或税线控制，而不是在已结算阈值附近事后微调�
 - [Issue #82](https://github.com/algotradinglife/beijing-lot/issues/82)
 - [Issue #83](https://github.com/algotradinglife/beijing-lot/issues/83)
 - [Issue #77](https://github.com/algotradinglife/beijing-lot/issues/77)
+- [Issue #101：按期冷门赛果剪枝](https://github.com/algotradinglife/beijing-lot/issues/101)
 - [Issue #121：期望 SP × 最小赛果概率阈值](https://github.com/algotradinglife/beijing-lot/issues/121)
+- [Issue #127：匹配全局单码删除](https://github.com/algotradinglife/beijing-lot/issues/127)
