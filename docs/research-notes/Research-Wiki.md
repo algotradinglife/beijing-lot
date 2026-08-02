@@ -212,6 +212,8 @@ bootstrap 区间跨过 0，以及独立验证未通过集中度/多重比较稳�
 
 ### #151/#154：固定候选复现与独立验证结论（2026-08-02）
 
+![#151 WR vs WOR dense M curve](assets/bj151_wr_wor_dense_m_curve.png)
+
 #151 固定 #137 `NO_GATE/K4` identities、Q vectors、seeds 和历史 sampler namespace，
 没有重新挑参。原始 `Q_INFORMED_WOR_DISTINCT/M64` 税前 ROI 被精确复现：
 
