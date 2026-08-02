@@ -1,0 +1,10 @@
+{
+  "CONTENT_IDENTITY.json": "5fbbee454b8886a3d1c572563b91183b243564e98b2fc9cc02c967ef00d003eb",
+  "README.md": "b19ec4bdf957a6f1f0c073d18363ab2c82235b17dfbe911ffe6e683e30a07979",
+  "gate_a_card.json": "e3003de9d409b48719c9c1ea0008e6c1a72dd1b9427e63b2416315853d02c992",
+  "no_bet_control.csv.gz": "12473a1cc7b80adb6577290c48475a254685841568d5db310eb632fbb63dac9d",
+  "portfolio_base.csv.gz": "95497c92d4d9852ddbe9dfa25bfdc7f3ff7f1900d2b39f486a133cb763e25e1f",
+  "portfolio_seed_order.csv.gz": "e985dbc9f133e59468eac53262bae110e7d60e542792154b5c2fcefe5ae02b58",
+  "runner.py": "9aefba2d90a67366ced1df673fb8adec8ae556918b6f397f0d4b2f0d8851ebdc",
+  "sleeve_matrix.csv": "1f13be80c7d882c4dbcdae37bf6bfed5074f275970398c101fb3cb3c95b7a92d"
+}
