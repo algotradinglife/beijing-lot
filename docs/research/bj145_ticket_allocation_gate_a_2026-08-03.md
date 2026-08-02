@@ -9,8 +9,8 @@ candidate selection. The controlling primary identity is the accepted #151
 #137 `ESP300_GM290/K8` participation list. Both preserve complete issue units;
 source segments are not selection units.
 
-The package is `results/bj145_gate_a_preoutcome_v5` with manifest
-`7fd0432e6af30f26a2ebc59e7f5c0846a4b8b8af4c368cd8a5b1c57afc99ab44`.
+The package is `results/bj145_gate_a_preoutcome_v7` with manifest
+`5fb9a52902d1138b3776267ceeb6363be9c495b320e07ffd55f7e86b718264d3`.
 It contains 696 issue-arm rows, 3,540 selected identities, 24,780 role rows,
 and 1,006,416 allocation-plan rows. The primary arm has 339 available and 9
 explicit K4 no-bets; the secondary arm has 273 available and 75 explicit K8
@@ -40,8 +40,11 @@ The package additionally binds `bj145_allocation_engine.py` (SHA-256 recorded
 in `allocation_binding.json`) and six N7 golden-vector fingerprints in
 `allocation_golden_vectors.json`. The module implements weighted WR, weighted
 WOR, Hamilton residual, iterated capped-Hamilton, deterministic top-mass, and
-FULL multiplicities by base-3 ticket ordinal. Gate B must byte-verify this
-module and binding before consuming any settled rows.
+FULL multiplicities by the exact #137 `(3,1,0)` product-order ticket ordinal.
+WR/WOR use the exact #137 `stable_uniform` token sequence and bind
+`identity_signature` to the frozen `selected_match_ids` pipe string. Direct
+parity tests compare both mechanisms against the immutable #137 Gate-A runner.
+Gate B must byte-verify this module and binding before consuming any settled rows.
 
 ## Timing and review boundary
 

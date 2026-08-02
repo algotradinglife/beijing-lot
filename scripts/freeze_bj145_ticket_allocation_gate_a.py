@@ -33,8 +33,8 @@ from bj145_allocation_engine import (
 
 
 CONTRACT = "BJ-HIST-TICKET-ALLOCATION-001"
-VERSION = "bj145-gate-a-v4"
-CONTENT_VERSION = "bj145-gate-a-content-v4"
+VERSION = "bj145-gate-a-v6"
+CONTENT_VERSION = "bj145-gate-a-content-v6"
 UNIT_STAKE_YUAN = 2
 FULL_TICKETS = 3 ** 7
 SEEDS = ("137001", "137002", "137003")
@@ -101,7 +101,7 @@ ROOT = find_root()
 SOURCE_151 = ROOT / "results" / "bj151_gate_a_preoutcome_v1"
 SOURCE_137 = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
 SOURCE_148 = ROOT / "results" / "bj148_gate_a_preoutcome_v1"
-OUTPUT = ROOT / "results" / "bj145_gate_a_preoutcome_v5"
+OUTPUT = ROOT / "results" / "bj145_gate_a_preoutcome_v7"
 ALLOCATION_ENGINE_SOURCE = Path(__file__).resolve().with_name("bj145_allocation_engine.py")
 
 
@@ -242,8 +242,8 @@ def normalize_role(row: dict[str, str], arm_id: str, source_package: str) -> dic
 
 def make_mechanisms() -> list[dict[str, object]]:
     rows = [
-        {"mechanism": "WR_DUPLICATE_STAKE", "sampling_role": "PRIMARY_WEIGHTED_WR", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": ";".join(SEEDS), "cap_scope": "NA", "allocation_rule": "independent deterministic hash draws using bj137|WR|seed|identity_signature|draw_index; exact duplicates retained", "expected_unique_formula": "sum_t[1-(1-w(t))^M]", "realized_unique_rule": "count distinct ticket codes; duplicate draws retained", "duplicate_policy": "each independent draw is a separate ¥2 ticket and separate tax unit", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
-        {"mechanism": "WOR_DISTINCT", "sampling_role": "PRIMARY_WEIGHTED_WOR", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": ";".join(SEEDS), "cap_scope": "NA", "allocation_rule": "deterministic exponential-key weighted sampling without replacement using bj137|WOR|seed|identity_signature|ticket_ordinal", "expected_unique_formula": "M distinct ticket codes", "realized_unique_rule": "exactly M distinct ticket codes per identity", "duplicate_policy": "distinct ticket codes only within each identity", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
+        {"mechanism": "WR_DUPLICATE_STAKE", "sampling_role": "PRIMARY_WEIGHTED_WR", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": ";".join(SEEDS), "cap_scope": "NA", "allocation_rule": "exact #137 stable_uniform(\"bj137\",\"WR\",seed,selected_match_ids,draw_index); exact duplicates retained", "expected_unique_formula": "sum_t[1-(1-w(t))^M]", "realized_unique_rule": "count distinct ticket codes; duplicate draws retained", "duplicate_policy": "each independent draw is a separate ¥2 ticket and separate tax unit", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
+        {"mechanism": "WOR_DISTINCT", "sampling_role": "PRIMARY_WEIGHTED_WOR", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": ";".join(SEEDS), "cap_scope": "NA", "allocation_rule": "exact #137 stable_uniform(\"bj137\",\"WOR\",seed,selected_match_ids,ordinal); exponential-key weighted sampling without replacement", "expected_unique_formula": "M distinct ticket codes", "realized_unique_rule": "exactly M distinct ticket codes per identity", "duplicate_policy": "distinct ticket codes only within each identity", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
         {"mechanism": "RESIDUAL_SYSTEMATIC", "sampling_role": "RESIDUAL_PROPORTIONAL", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": "NA", "cap_scope": "NA", "allocation_rule": "Hamilton/largest-remainder integer allocation over 2187 ticket-code weights; deterministic ordinal tie-break", "expected_unique_formula": "positive-count codes from Hamilton allocation", "realized_unique_rule": "count positive integer multiplicities; retain every copy", "duplicate_policy": "integer multiplicities follow proportional quotas", "tax_unit_rule": "each repeated ¥2 copy is a separate ticket and tax unit; no pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
         {"mechanism": "CAPPED_REPEAT", "sampling_role": "CAPPED_PROPORTIONAL", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": "NA", "cap_scope": "1;2;4;8", "allocation_rule": "Hamilton proportional allocation with per-ticket-code cap; deterministic residual reallocation", "expected_unique_formula": "positive-count codes under frozen cap", "realized_unique_rule": "count positive codes and repeated copies; no code exceeds cap", "duplicate_policy": "repeats allowed up to frozen cap per exact N7 ticket code", "tax_unit_rule": "each repeated ¥2 copy is a separate ticket and tax unit; no pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
         {"mechanism": "DETERMINISTIC_TOP_MASS", "sampling_role": "TOP_MASS_CONTROL", "weight_source_scope": ";".join(WEIGHT_SOURCES), "seed_scope": "NA", "cap_scope": "1", "allocation_rule": "select M highest-weight exact ticket codes; weight desc then ordinal asc", "expected_unique_formula": "M distinct ticket codes", "realized_unique_rule": "exactly M distinct ticket codes per identity", "duplicate_policy": "distinct ticket codes only", "tax_unit_rule": "per ¥2 ticket; no issue/policy pooling", "full_control": "false", "outcome_boundary": "pre-outcome allocation specification only"},
@@ -284,7 +284,7 @@ def make_golden_vectors() -> dict[str, object]:
         "schema_version": "bj145-allocation-golden-v1",
         "engine_version": ENGINE_VERSION,
         "weight_rule": "golden_weights_v1: ((ordinal*37+11)%1009)+1, ordinal 0..2186",
-        "ticket_order": "base-3 ordinal, 0000000 through 2222222",
+        "ticket_order": "#137 CODES=(3,1,0) product order; ordinal 0000000..2222222 is mapped through CODES",
         "outcome_boundary": "synthetic positive weights only; no outcome/final-SP/payout/ROI/tax data",
         "cases": cases,
     }
@@ -371,15 +371,16 @@ def freeze(output: Path) -> dict[str, object]:
         golden_vectors = make_golden_vectors()
         (stage / "allocation_golden_vectors.json").write_text(json.dumps(golden_vectors, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         allocation_binding = {
-            "binding_version": "bj145-allocation-binding-v1",
+            "binding_version": "bj145-allocation-binding-v2",
             "module_file": "bj145_allocation_engine.py",
             "module_sha256": sha256(stage / "bj145_allocation_engine.py"),
             "golden_vectors_file": "allocation_golden_vectors.json",
             "golden_vectors_sha256": sha256(stage / "allocation_golden_vectors.json"),
             "engine_version": ENGINE_VERSION,
-            "api": "allocate(mechanism, weights, M, seed, identity_signature, cap) -> integer multiplicities by base-3 ticket ordinal",
+            "api": "allocate(mechanism, weights, M, seed, identity_signature, cap) -> integer multiplicities by #137 base-3 ticket ordinal",
             "mechanisms": list(ENGINE_MECHANISMS),
-            "ticket_space": {"legs": 7, "outcomes_per_leg": 3, "k": FULL_TICKETS, "ordinal_order": "base-3 0000000..2222222"},
+            "ticket_space": {"legs": 7, "outcomes_per_leg": 3, "k": FULL_TICKETS, "codes": ["3", "1", "0"], "ordinal_order": "#137 product order"},
+            "identity_signature_rule": "exact selected_match_ids pipe string from frozen identity row; no portfolio_id substitution",
             "outcome_boundary": "executable allocation only; no outcome/final-SP/payout/ROI/tax input accepted",
         }
         (stage / "allocation_binding.json").write_text(json.dumps(allocation_binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")

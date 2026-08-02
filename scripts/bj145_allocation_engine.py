@@ -14,9 +14,10 @@ import math
 from typing import Sequence
 
 
-ENGINE_VERSION = "bj145-allocation-engine-v1"
+ENGINE_VERSION = "bj145-allocation-engine-v2"
 FULL_TICKETS = 3 ** 7
 UNIT_STAKE_YUAN = 2
+CODES = ("3", "1", "0")
 MECHANISMS = (
     "WR_DUPLICATE_STAKE",
     "WOR_DISTINCT",
@@ -47,10 +48,11 @@ def _validate_m(m: int, k: int, cap: int | None = None) -> int:
     return int(m)
 
 
-def _hash_unit(*parts: object) -> float:
+def stable_uniform(*parts: object) -> float:
+    """Exact #137 stable_uniform: first 64 SHA-256 bits plus 0.5."""
     payload = "|".join(str(part) for part in parts).encode("utf-8")
-    integer = int.from_bytes(hashlib.sha256(payload).digest(), "big")
-    return (integer + 1) / (2 ** 256 + 1)
+    value = int.from_bytes(hashlib.sha256(payload).digest()[:8], "big")
+    return (value + 0.5) / (2 ** 64)
 
 
 def _inverse_cdf(weights: tuple[float, ...], unit: float) -> int:
@@ -59,7 +61,7 @@ def _inverse_cdf(weights: tuple[float, ...], unit: float) -> int:
     cumulative = 0.0
     for ordinal, weight in enumerate(weights):
         cumulative += weight
-        if target < cumulative or ordinal == len(weights) - 1:
+        if target <= cumulative or ordinal == len(weights) - 1:
             return ordinal
     raise AssertionError("inverse CDF did not select an ordinal")
 
@@ -67,7 +69,7 @@ def _inverse_cdf(weights: tuple[float, ...], unit: float) -> int:
 def _wr(weights: tuple[float, ...], m: int, seed: str, identity_signature: str) -> tuple[int, ...]:
     counts = [0] * len(weights)
     for draw_index in range(m):
-        unit = _hash_unit("bj145", "WR", seed, identity_signature, draw_index)
+        unit = stable_uniform("bj137", "WR", seed, identity_signature, draw_index)
         counts[_inverse_cdf(weights, unit)] += 1
     return tuple(counts)
 
@@ -78,7 +80,7 @@ def _wor(weights: tuple[float, ...], m: int, seed: str, identity_signature: str)
         if weight <= 0:
             key = math.inf
         else:
-            unit = _hash_unit("bj145", "WOR", seed, identity_signature, "ticket_ordinal", ordinal)
+            unit = max(stable_uniform("bj137", "WOR", seed, identity_signature, ordinal), 1e-18)
             key = -math.log(unit) / weight
         keys.append((key, ordinal))
     selected = sorted(keys)[:m]
@@ -196,6 +198,6 @@ def ticket_code(ordinal: int, legs: int = 7) -> str:
     digits = ["0"] * legs
     value = ordinal
     for index in range(legs - 1, -1, -1):
-        digits[index] = str(value % 3)
+        digits[index] = CODES[value % 3]
         value //= 3
     return "".join(digits)
