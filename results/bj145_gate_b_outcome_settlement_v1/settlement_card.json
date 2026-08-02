@@ -1,0 +1,51 @@
+{
+  "contract": "BJ-HIST-TICKET-ALLOCATION-001",
+  "decision": "DESCRIPTIVE_SURFACE_ONLY_NO_PROMOTION",
+  "gate_a_manifest_sha256": "da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114c",
+  "issue": 145,
+  "m_grid": [
+    16,
+    32,
+    48,
+    64,
+    80,
+    96,
+    112,
+    128,
+    144,
+    160,
+    176,
+    192,
+    208,
+    224,
+    240,
+    256,
+    512,
+    1024,
+    1458,
+    2187
+  ],
+  "outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "outcome_payload_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+  "primary_arm": "PRIMARY_NO_GATE_K4",
+  "promotion_authorized": false,
+  "secondary_arm": "SECONDARY_ESP300_GM290_K8",
+  "settlement_scope": "all frozen issue/configuration rows; unavailable outcomes remain zero-stake and are not imputed",
+  "source_manifests_transitive": {
+    "bj137": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
+    "bj148": "fd4a0f4dc0ab5ef97f3c260a082515aa7874a60a1ac1e5e0ecd865fdb1eeafd6",
+    "bj151": "3605278bd6067fc7aa279a0625f4c4cab91603d8a1490c8608381e8fca997ac6",
+    "bj154": "f81146959fd734c3d15a2579a3921b2afc86d6f633e174c8294763279f9937c5"
+  },
+  "surface": {
+    "bootstrap_rows": 5760,
+    "configuration_count": 2892,
+    "full_control_delta_rows": 63360,
+    "holm_rows": 2880,
+    "issue_rows": 1006416,
+    "summary_rows": 63624,
+    "tax_reconciliation_rows": 2892
+  },
+  "tax_rule": "20pct if each individual winning ticket gross >= 10000 yuan; no pooling or aggregation",
+  "version": "bj145-gate-b-v1-outcome-settlement"
+}
