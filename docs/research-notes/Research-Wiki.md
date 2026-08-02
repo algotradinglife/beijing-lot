@@ -89,7 +89,7 @@ flowchart LR
 | 严格候选门槛是否错过了可用信号？ | [[Issue-119-Candidate-Sensitivity#结论与下一步]] |
 | 哪条北单让球线仍然薄弱？ | [[Issue-83-Continuous-Market-Model#原生让球线异质性]] |
 | 如何按期望 SP 选场，并按最低赛果概率决定全包、双选或单选胆？ | [#121 Gate A 阈值冻结](../research/bj121_expected_sp_probability_gate_a_2026-08-02.md) · [Gate B ROI 对比](../research/bj121_expected_sp_probability_gate_b_2026-08-02.md) |
-| 同一 N7 中全局只删一个最低概率代码是否有价值？ | [#127 Gate A 匹配单码删除冻结](../research/bj127_global_single_prune_gate_a_2026-08-02.md) |
+| 同一 N7 中全局只删一个最低概率代码是否有价值？ | [#127 Gate A 匹配单码删除冻结](../research/bj127_global_single_prune_gate_a_2026-08-02.md) · [Gate B matched settlement](../research/bj127_global_single_prune_gate_b_2026-08-02.md) |
 
 ## 证据等级
 
@@ -120,8 +120,10 @@ SP 不确定性或税线控制，而不是在已结算阈值附近事后微调�
 
 #127 是与 #121 不同的、只删除一个全局最低概率代码的 matched-pair 复查。Gate A v2
 将低 `p_min` 删除候选与六个高 `E_SP` companion 明确分离：候选自身不受 match-level
-`E_SP` floor 限制，七场组合才受 `GM_E_SP` 检验。它目前只冻结完整赛前矩阵与角色可辨识的
-可视化证据；没有 outcome、ROI 或晋级结论，等待 PI Gate-A 复审。
+`E_SP` floor 限制，七场组合才受 `GM_E_SP` 检验。Gate B 的 9 个冻结 variant 全部是负
+税后 ROI；最严格 `.20` PRUNE 为 -19.91%，同场 FULL 为 -21.75%。PRUNE 固定节省三分之一
+stake，但删码实际发生约 18%–24%，税后改善主要来自较低 tax exposure 而非正的无税 edge，
+所以结论为 `NO_PROMOTION`。
 
 ## 相关笔记
 

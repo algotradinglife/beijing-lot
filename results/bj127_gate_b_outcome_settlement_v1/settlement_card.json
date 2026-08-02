@@ -1,0 +1,24 @@
+{
+  "availability_rule": "Every Gate-A row is retained. NO_BET_GATE_A and UNAVAILABLE_CANONICAL_OUTCOME both receive zero realized stake and are never replaced.",
+  "chronology_rule": "Drawdown and miss streak sort first_kickoff_ts, pool_id, portfolio_id.",
+  "contract": "BJ-HIST-PRUNE-ONE-GLOBAL-N7-001",
+  "frozen_matrix": {
+    "frontier_rows": 204361,
+    "no_bet_rows": 23931,
+    "portfolio_identities": 90215,
+    "role_rows": 631505,
+    "variants": 9
+  },
+  "issue": 127,
+  "provenance": {
+    "canonical_outcome_payload_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "gate_a_content_identity_sha256": "ac99388115df79c6c76b13f5d168ab9d3607b3db508c0a467025b1a7f79db29c",
+    "gate_a_manifest_sha256": "a8eeb50204bb9a2d69578538e28943a432bea11083661a63b950a5ab5a2481da",
+    "outcome_source_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc"
+  },
+  "runner_version": "bj127-gateb-v1",
+  "scope": "historical research only; no purchase, production, or promotion authorization",
+  "settlement_rule": "Hit iff every canonical result code is in the frozen arm's allowed codes; gross=2*0.65*product(canonical final winning SP) once on hit, else zero; final SP is uncapped.",
+  "stage": "GATE_B_MATCHED_CANONICAL_OUTCOME_SETTLEMENT",
+  "tax_rule": "Each variant/arm is a distinct paper policy. Aggregate its gross by native issue; when issue-policy gross >=10000, apply 20% tax to every winning portfolio gross in that bucket."
+}
