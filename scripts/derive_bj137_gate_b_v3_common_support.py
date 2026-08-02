@@ -31,10 +31,8 @@ from settle_bj137_sampling_gate_b import (
     CONTRACT,
     FREEZE,
     FREEZE_MANIFEST,
-    OUTCOME_BUNDLE,
     OUTCOME_MANIFEST,
     OUTCOME_PAYLOAD,
-    OUTCOME_FIELDS,
     ROOT,
     VECTOR_FIELDS,
     exact_bundle,
@@ -55,7 +53,6 @@ SOURCE_LEDGER = INPUT / "issue_policy_settlement.csv.gz"
 SOURCE_SUMMARY = INPUT / "surface_summary.csv.gz"
 
 LEDGER_KEY = ("gate_id", "top_k_id", "sampler_id", "probability_vector", "M", "seed")
-SCOPE_NAMES = ("ALL", "YEAR", "FOLD", "LEAVE_ONE_YEAR_OUT")
 NUMERIC_SEEDS = {"137001", "137002", "137003"}
 HARD_CONTROLS = ("P_MIN_GLOBAL_DELETE_CONTROL", "Q_MIN_GLOBAL_DELETE_CONTROL")
 
@@ -231,7 +228,6 @@ def issue_pairs(rows: list[dict[str, str]]) -> Iterator[tuple[str, dict[str, str
 def aggregate(selector: str) -> dict[tuple[str, tuple[str, str, str, str, str, str], tuple[str, str, str, str, str, str]], PairAggregate]:
     values: dict[tuple[str, tuple[str, str, str, str, str, str], tuple[str, str, str, str, str, str]], PairAggregate] = {}
     for rows in iter_issue_rows():
-        issue_value = rows[0][selector] if selector in {"year", "fold"} else "ALL"
         for effect, candidate, baseline in issue_pairs(rows):
             key = pair_descriptor(effect, candidate, baseline)
             values.setdefault(key, PairAggregate.empty()).observe(candidate, baseline)

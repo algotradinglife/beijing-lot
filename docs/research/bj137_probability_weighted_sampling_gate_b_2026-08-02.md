@@ -1,13 +1,13 @@
 ---
-title: "#137 概率加权 N7 抽样：Gate B 共同支持集结算"
+title: "#137 概率加权 N7 抽样：Gate B v3r1 共同支持集结算"
 date: 2026-08-02
 status: in_review
 decision: POSITIVE_CONCENTRATED_REQUIRES_STRICT_INDEPENDENT_EV
 ---
 
-# #137：选场 × 概率加权 N7 抽样共同支持集结算
+# #137：选场 × 概率加权 N7 抽样 v3r1 共同支持集结算
 
-阶段：Gate B v3 派生结算，等待 PI 复审。它识别出一个**集中型正候选**，必须先经严格、
+阶段：Gate B v3r1 报告派生结算，等待 PI 复审。它识别出一个**集中型正候选**，必须先经严格、
 独立的 EV 复验；本报告不构成购买、生产或投注授权。
 
 ## 冻结、结算与税务边界
@@ -25,6 +25,11 @@ decision: POSITIVE_CONCENTRATED_REQUIRES_STRICT_INDEPENDENT_EV
   `results/bj137_gate_b_outcome_settlement_v3_common_support`，manifest
   `fe55b7bdd8508a2b19bba2a57ecde9c7238feab1000a15a78ac24689cf89fb31`，content identity
   `be2012567f0aa1690be8e50711afe00233f8686fc5baa9423c400637e9a35f5f`。
+- 本报告修订包为只读派生
+  `results/bj137_gate_b_outcome_settlement_v3r1_reporting_correction`，manifest
+  `7453eb917bc4b5422ac13f2d46af540c7c4ebb87a163d8f247b67a9615cd27c0`，content identity
+  `17c8ee093c399e0693c139203a5fa2fc34a4d7f743cf50db2cd1f7ca9b23a19d`。它只汇总已冻结的
+  v3 矩阵，不读取 Gate-A、重抽票、改变台账、共同支持集或候选规则。
 
 每张命中序列的毛回报是 `¥2 × 0.65 × Π(final winning SP)`。20% 税只按**这一张**
 中奖彩票是否达到 `¥10,000` 判断；绝不把多张票、多个 identity、M 重复、期次或策略臂
@@ -81,11 +86,52 @@ q 的税后 ROI 约 -11.87%，而 p 约 -16.37%；这是有限样本下的相对
 | 137003 | 254 | +2.67% | +18.44pp | -3.02% | +15.85pp |
 
 该候选不是稳健推广结论：其最大单一期次毛回报份额分别为 24.23%、10.82%、12.16%；
-去掉候选最大毛回报期次后，三个 seed 的绝对税前 ROI 均转负。尽管配对的 leave-one-issue-
+去掉候选最大毛回报期次后，137001 与 137003 的绝对税前 ROI 为 -11.47% 与 -9.46%，
+137002 为接近盈亏平衡的 **+0.08%**，而不是负值。尽管配对的 leave-one-issue-
 out 税前增量仍全为正（最差约 +5.24pp、+16.67pp、+7.53pp），固定种子的期次 bootstrap
 95% 区间均跨越零。因此结论是
 `POSITIVE_CONCENTRATED_REQUIRES_STRICT_INDEPENDENT_EV`：可提交独立 EV 复验，不能推广或
 交易。
+
+### 同族 M 曲线与 FULL 归因
+
+下表是同一 `NO_GATE/K4/Q_INFORMED_WOR_DISTINCT`、同一 exact-K FULL 基准的税前曲线。
+数值为“候选绝对 ROI / sampler-minus-FULL 增量”，三个 seed 依次为 137001/2/3；并非选取
+局部最大值。只有 M64 在三个 seed 同时有正绝对 ROI 和正 LOYO 增量。
+
+| M | seed 137001 | seed 137002 | seed 137003 | 最差 LOYO 增量 |
+| ---: | --- | --- | --- | ---: |
+| 32 | -21.24% / -5.47pp | +35.61% / +51.38pp | -24.15% / -8.38pp | -26.42pp |
+| 64 | +16.38% / +32.15pp | +11.77% / +27.54pp | +2.67% / +18.44pp | +8.08pp |
+| 128 | -4.12% / +11.65pp | +4.47% / +20.24pp | +2.23% / +18.00pp | +5.40pp |
+| 256 | -1.51% / +14.26pp | -8.53% / +7.24pp | -30.25% / -14.48pp | -22.60pp |
+
+`NO_GATE/K1/FULL` 对 `K_ALL/FULL` 的共同支持 selector 归因为 271/187/187 个期次、
+税前 +1.02pp、税后 +0.10pp；全部 selector 中虽有 4 个 ALL 税前正增量，但没有一个
+LOYO 稳定。因此这里的 M64 信号是 sampler 相对同一 K4 FULL 的归因，不能偷换成
+selection edge。
+
+### 次级 ESP300/GM*/K8/Q/M128 信号
+
+三个 ESP300/GM 门在冻结数据上拥有同一组 191 个匹配期次/seed。它们是较低集中度的
+近盈亏平衡敏感性，不取代主候选；v3 的 `candidate_fragility.csv` 按合同只为绝对正候选
+生成，所以该次级臂没有额外 concentration 行。
+
+| gate | 税前 ROI（137001/2/3） | 对 exact-K FULL 税前增量（137001/2/3） | 最差 LOYO |
+| --- | --- | --- | ---: |
+| ESP300_GM290 | +4.46% / -2.23% / +4.46% | +20.58pp / +13.89pp / +20.58pp | +5.90pp |
+| ESP300_GM300 | +4.46% / -2.23% / +4.46% | +20.58pp / +13.89pp / +20.58pp | +5.90pp |
+| ESP300_GM305 | +4.46% / -2.23% / +4.46% | +20.58pp / +13.89pp / +20.58pp | +5.90pp |
+
+### 概率向量与 WR/WOR 紧凑面
+
+v3r1 的 `mechanism_summary.csv` 以 gate×K×sampler×M 计数：model WOR 有 98 个 ALL
+正增量组、19 个 LOYO 稳定、0 个绝对 edge；model WR 有 57/1/0；market WOR 有 53/0/0；
+blend A25/A50/A75 WOR 为 43/0/0、51/0/0、51/1/0；q WOR 为 111/29/**1**。deterministic
+top-mass 是 102/13/0，p/q global single-code delete 分别为 40/16/0 与 50/13/0。
+
+原始 ALL 单 seed 最大值为 `ESP280_GM305/K1/MODEL_P_CAL_WR/M1/137001` 的 +790.06pp，
+但它不通过 all-seed、LOYO 或绝对 edge 规则，故只是极稀疏峰值而非候选。
 
 top-mass 也按无随机 seed 的单独规则评估：102 个 ALL 税前正增量、13 个 LOYO 稳定，
 但没有绝对税前 ROI 为正的候选。selector 有 4 个 ALL 正增量、0 个 LOYO 稳定；所以本次
