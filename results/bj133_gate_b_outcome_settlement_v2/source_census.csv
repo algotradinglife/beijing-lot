@@ -1,0 +1,4 @@
+source,role,identity,sha256,rows,join_status
+bj133_gate_a_preoutcome_v1,accepted immutable complete-issue allocation/WOR-distinct freeze,SHA256SUMS.json,1fff3f904fcb9a5efed231771880be8ae0603b0d8f3c7d0365937fcfe9985e79,20880,all frozen allocator rows retained; no selection or cap is recomputed
+bj133_gate_a_preoutcome_v2_wr_additive,immutable outcome-unexposed WR duplicate-stake control,SHA256SUMS.json,7dc284bc7050b71b7bce5a15aa228470a6eff4b0a2345bc0631ec5cd8d1d899f,46980,identical non-FULL complete-issue identities/gates/K/M/seeds; only independent with-replacement ticket draws added
+bj95_gate_b_outcome_settlement_v2r8,canonical trusted final-SP outcome truth,canonical_outcome_join.csv,13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89,46802,trusted result/final-SP only; gaps retain zero stake
