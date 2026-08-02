@@ -1,0 +1,24 @@
+{
+  "contract_version": "bj148-gate-b-portable-content-v1",
+  "gzip_payloads": {
+    "issue_m_grid_settlement.csv.gz": {
+      "canonical_decompressed_bytes": 38772404,
+      "canonical_decompressed_sha256": "705e5ac67e466f49490c7a534a3a84b8bbdd7a83c4bb7a3d7ef645649e2d3dbb"
+    },
+    "winning_ticket_tax_ledger.csv.gz": {
+      "canonical_decompressed_bytes": 123959730,
+      "canonical_decompressed_sha256": "97737c488bd95db0268f5f79e566f7872d15d5ba9b277115f1b6df8c7b977954"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "244070e3a6e1ff88ab8ab847708bda8b88579b3c11908309361dd724e04e0818",
+    "decision.json": "6435c55d616518ea18f8bf4e5507cb37ca3951583022ef4b37d8de32ba7566b6",
+    "full_control_deltas.csv": "d41ddcdaffabbb6626f333fbe3ad2415d2cb971a34d6290335a2e773664304e4",
+    "issue_bootstrap_full_deltas.csv": "486d58d0bc720a851707b5e03ccc01fb99aa8b19a8070941fb4bbdcdbcd2ced6",
+    "m_grid_surface_summary.csv": "b650f26d7d13a217cbf79b4e0a98d144505bf665833fabcc2ed405af31e9624e",
+    "settlement_card.json": "4c16a4f9f82aa5da67b02463c52c123f5b0ff4da4dcf165be7e357cc1c060012",
+    "settlement_runner.py": "2b53ebc3cef28ae4d794973f9c70783eda767e59004349e54238531f3c3a26bf",
+    "source_census.csv": "70f7b71deaaf0a31a9dcf3f7464b3829aaa3b6e875b2b5e0a24c17b94279f0d1",
+    "ticket_tax_reconciliation.csv": "1d0019bfb4c9d5267e7aa43ce19b5292441a4c0eeec39b6e43ef314a1042d9c0"
+  }
+}
