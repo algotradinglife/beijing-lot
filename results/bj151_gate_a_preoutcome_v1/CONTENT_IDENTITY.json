@@ -1,0 +1,20 @@
+{
+  "contract_version": "bj151-gate-a-content-v1",
+  "gzip_payloads": {
+    "candidate_identities.csv.gz": {
+      "canonical_decompressed_sha256": "585a967e7f9e47539152e2e053272c24ddaf2af1ebbcaf3268f2215232447489"
+    },
+    "candidate_role_vectors.csv.gz": {
+      "canonical_decompressed_sha256": "00b500b9292dbed92eafcbddca0325f7cf4ac0c3e70b8979eabe4ca6d6a2189a"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "5f69aef64e19f18fd4ad8abf8a997e3dfcc09ce559edbcd5ff56ae1a9649258b",
+    "candidate_cohort.csv": "b05b518f7bfe908ba1a488bea99eaeb596bd0909da566fabe929dc1290d41e98",
+    "dense_m_grid.csv": "cc7aec4eef7cd604385a82686ac5932ee117b9437678657f8d04cefb6298cda5",
+    "freeze_runner.py": "c03d875e1b692a57209654a4e53fab34b18f465c60e631a99f5db8d00d6d2593",
+    "gate_a_card.json": "d904feb957f8bb10a1bdea493c24b37da06c8a42ace018992d59189156c6e76e",
+    "sampling_plan.csv": "739b5b6020f9ea9c5144f0d10ae7c56881086cbc8cd96c9901ca177102155bae",
+    "source_census.csv": "653ade000c9f5e138c5c9dd763dbed7c010f23364b8f17c4dc4b3d2dd8a0ce8d"
+  }
+}
