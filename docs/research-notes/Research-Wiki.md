@@ -201,11 +201,18 @@ YEAR、FOLD 与 leave-one-year-out 切片均作为诊断保留；此处的 `NO_P
 已逐票确定的税额；绝不汇总多张票来跨越税线。v2r1 的逐票账本对 14,450 个策略与
 issue-policy 汇总账本全部零差额对账。
 
-全矩阵有许多小 M 的局部正 ROI，但这不是可推广的 edge：461 个组合虽在三 seed 的
-ALL-scope matched sampler lift 中同时为正，却没有任何一个在所有 YEAR/FOLD/LOYO
-切片持续为正。selector 也没有通过同样的时间稳定性检验。因此结论是
-`NO_PROMOTION`，并且不触发严格独立 EV。详见
-[#137 Gate B 完整结算](../research/bj137_probability_weighted_sampling_gate_b_2026-08-02.md)。
+v3 将所有 selector、sampler、interaction 和 M=1458 hard-control 比较改为候选与基准
+共同 `SETTLED` 完整期次的配对计算：685,080 行参数面同时报告双方支持数、税前主 ROI/
+增量和税后敏感性。NO_GATE/K1 对 K_ALL 的例子从旧的未匹配 +3.84pp/+2.05pp 降为共同
+187 期上的税前 +1.02pp、税后 +0.10pp，不能再解释为 selector 改善。
+
+主尺度为 `no_tax_roi`（已含北单 0.65 因子，不扣逐票税）；随机策略需要三 seed 的 ALL
+和全部 LOYO 配对增量为正，YEAR/FOLD 只保留为离散度诊断。唯一绝对税前正候选是
+`NO_GATE/K4/Q_INFORMED_WOR_DISTINCT/M64`：三个 seed 税前 ROI 为 +16.38%/+11.77%/
++2.67%，相对 exact-K FULL 增量为 +32.15pp/+27.54pp/+18.44pp。但其最大单一期次份额
+最高 24.23%，去掉最大期次后三个绝对 ROI 都转负，且 issue bootstrap 区间跨零；因此当前
+状态是 `POSITIVE_CONCENTRATED_REQUIRES_STRICT_INDEPENDENT_EV`，而不是推广或投注授权。
+详见 [#137 Gate B 共同支持集结算](../research/bj137_probability_weighted_sampling_gate_b_2026-08-02.md)。
 
 ## 相关笔记
 
