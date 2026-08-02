@@ -193,6 +193,18 @@ YEAR、FOLD 与 leave-one-year-out 切片均作为诊断保留；此处的 `NO_P
 当前完整期次历史证据不支持推广，并非购买建议。详见
 [#132 完整期次 Gate B](../research/bj132_complete_issue_gate_b_2026-08-02.md)。
 
+## #137：选场 × 概率加权 N7 抽样
+
+#137 把完整期次的选场、`K={1,2,4,8,ALL}` identity 参与数和每个 N7 的抽样数
+`M` 分开冻结；随后结算 10 个 gate、13 个 M、多个概率向量和三种随机 seed 的全矩阵。
+税按单张实际中奖彩票处理，绝不把多张票汇总来跨越税线。
+
+全矩阵有许多小 M 的局部正 ROI，但这不是可推广的 edge：461 个组合虽在三 seed 的
+ALL-scope matched sampler lift 中同时为正，却没有任何一个在所有 YEAR/FOLD/LOYO
+切片持续为正。selector 也没有通过同样的时间稳定性检验。因此结论是
+`NO_PROMOTION`，并且不触发严格独立 EV。详见
+[#137 Gate B 完整结算](../research/bj137_probability_weighted_sampling_gate_b_2026-08-02.md)。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
