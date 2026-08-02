@@ -90,6 +90,7 @@ flowchart LR
 | 哪条北单让球线仍然薄弱？ | [[Issue-83-Continuous-Market-Model#原生让球线异质性]] |
 | 如何按期望 SP 选场，并按最低赛果概率决定全包、双选或单选胆？ | [#121 Gate A 阈值冻结](../research/bj121_expected_sp_probability_gate_a_2026-08-02.md) · [Gate B ROI 对比](../research/bj121_expected_sp_probability_gate_b_2026-08-02.md) |
 | 同一 N7 中全局只删一个最低概率代码是否有价值？ | [#127 Gate A 匹配单码删除冻结](../research/bj127_global_single_prune_gate_a_2026-08-02.md) · [Gate B matched settlement](../research/bj127_global_single_prune_gate_b_2026-08-02.md) |
+| 用 `q=p×predicted_SP` 取代 `p_min` 选择全局删码是否更好？ | [#132 Gate A 匹配冻结](../research/bj132_delete_score_n7_gate_a_2026-08-02.md) · [Gate B q-vs-p settlement](../research/bj132_delete_score_n7_gate_b_2026-08-02.md) |
 
 ## 证据等级
 
@@ -136,6 +137,15 @@ omitted-code slab 中按固定嵌套顺序加回 0%、5%、10%、20%、33%、50%
 严格 selector 以 hard prune -19.91% 税后最佳，10% sleeve -20.11%、FULL -21.75%；其它 seed
 的“最佳”比例又变化，故局部改善不构成稳定、可推广的 sleeve 深度。结论为 `NO_PROMOTION`。
 详见 [#131 Gate B 完整结算](../research/bj131_soft_cover_n7_gate_b_2026-08-02.md)。
+
+## #132：`q=p×predicted_SP` 作为删码分数
+
+#132 固定继承 #127 的七场组合和 FULL 基线，只把“删除哪一个全局代码”从最小概率
+`p_min` 换成最小预期 payout contribution `q=p×predicted_SP`。赛前两种删码在
+79,549/90,215 组合中不同，故不是一个退化比较。结算后两种删码的 9 个 ALL-scope
+variant 都仍为负；`q_min` 的最佳绝对税后 ROI 为 -20.17%（严格档），不及 `p_min` 的
+-19.91%，且相对 FULL 的无税增量仍为 -0.25pp。较宽阈值下 q 有时改善无税 ROI，但没有
+稳定、可推广、正 ROI 的证据。结论为 `NO_PROMOTION`；不要把较低税后损失解释成价值 edge。
 
 ### 选场与剪枝的分离归因
 

@@ -1,0 +1,27 @@
+{
+  "contract_version": "bj132-gateb-portable-content-v1",
+  "gzip_payloads": {
+    "matched_full_deltas.csv.gz": {
+      "canonical_decompressed_bytes": 48259815,
+      "canonical_decompressed_sha256": "97f01d16affa0caf1612daa60d1682bbaec6442b97cf7bef6d543d74f2c35899"
+    },
+    "portfolio_settlement.csv.gz": {
+      "canonical_decompressed_bytes": 186829744,
+      "canonical_decompressed_sha256": "09a721805fde117d58f47107827b7e994114d85c8dbd499f399098809538cd07"
+    },
+    "q_minus_p_disagreement_deltas.csv.gz": {
+      "canonical_decompressed_bytes": 22539679,
+      "canonical_decompressed_sha256": "d32a0b71ab607cf721b6f83e6d5515492c3ef103ddcea48ccd5760c2564b8201"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "2ebf88c5b7136d7f9f8d3d651dcb3410a96191642004203e73464627157d399b",
+    "arm_summary.csv": "dbe9ea8f64c884816845d068d8bcd392b55e209dd8c2298a720b1f41de690d38",
+    "decision.json": "a77d6c2237faddb17461febbe0396b9756e2db3c5c25f9a16b760c4e0c572582",
+    "deletion_strata.csv": "164389056a05237b1e6257d2749a70d4e15ad74176cd1d0c4cd5376b880fd68d",
+    "ranker_comparison.csv": "b7bcb937d624f59f1fa4d5dc1d42b2c6d388c5250c797d02a2edb0e16fbc126b",
+    "robustness_summary.csv": "68ce60bd297fb4cee43aeacb4850f35cb9ff6b83c534c4d88b9b3cd99ad723ef",
+    "settlement_card.json": "53b06c14b2ac52e00fcc11df6c88aaa6106c0835344820614c7235e946ee4375",
+    "settlement_runner.py": "7c55c4d6bb7a75a901941255480fa25f95bc57785a6f9bcd6d9758a54ae7979f"
+  }
+}
