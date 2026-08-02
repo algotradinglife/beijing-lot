@@ -1,0 +1,14 @@
+{
+  "CONTENT_IDENTITY.json": "25581ee1bc056d80f511a976bd63636ba7c052b361d8c878b0c369c7ac14a7ff",
+  "README.md": "ed82f43974ebf336eb5e4720942cfb61cefc0ae848cac3d9e44779cbea117766",
+  "gate_a_card.json": "68dfa57e7e2ed1eade176023abc468ed77ff63c2c7a558be5594c4fe1f1dca77",
+  "matched_frontier.csv.gz": "e649b29ce4058c0140630754389095955e0577a4d42443b05a2e9ee93827219e",
+  "portfolio_role_assignments.csv.gz": "3f2f485f4d165f7dc186fb7519d35bd7b2821916680853bce162394bb4dd8d1b",
+  "runner.py": "8ecd2ffb81cfcb5a482aaf035900d109a8d46a70fb0371bed887d30f328f4409",
+  "scatter_coordinates.csv.gz": "ea16ed1e757260258515d750958fede6e6603a3f593d8ec521e2378086d0448f",
+  "scatter_hexbin_density.csv": "41a09a81829ed5bb3e04f6cd39fe2d3e409ef14007ca5692d4feeb854863e4db",
+  "scatter_issue_20011.svg": "ca1f2fbb0e2eb72e5289e51a7dbadd8d8bfe14ba2dfc74f2bad2bdefbec7efa0",
+  "scatter_issue_22091.svg": "4826078991917bedd6da4ab038e94a71bcd0eb6560734c4877d0721d58e775f6",
+  "scatter_issue_25042.svg": "db4ae8c72002fc8fb2d3785e25fde8831eebd9d5de69659ecc1dd09c0232afd7",
+  "threshold_census.csv": "772ac63e5a14643ac2b2806639af9e815bf6db248ddc263e89a102b073d34658"
+}
