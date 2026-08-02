@@ -1,0 +1,19 @@
+{
+  "contract_version": "bj127-gateb-portable-content-v1",
+  "gzip_payloads": {
+    "portfolio_settlement.csv.gz": {
+      "canonical_decompressed_bytes": 112908439,
+      "canonical_decompressed_sha256": "15e2d2ffdd6071faa66f5c2959ec425a243fa7157a8bd7758898ae18fbec9562"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "c112d2f95ae383ab5deb1f8f5fd7779229cf0b4cbcdbd0e564800b3b52fedaa1",
+    "arm_comparison.csv": "251d08686fbff30f4be29b4c61eca629cf48059ff49caa3454f1f8fd6c9473a5",
+    "decision.json": "02a423bf9461070fab023d9ef66794e71ce96b3e2db7260d4b27aa8b66ca4bad",
+    "matched_pair_deltas.csv": "482e47705d64531cf27dcb1b8a1193b606fbb73d56f76b2260dcfc5463f4dd11",
+    "robustness_summary.csv": "dc55481c07fa1441af9a9e6a82402cb13cffa9a84c48634b6a3d1bb18fc4aeae",
+    "settlement_card.json": "c78802d77f352b5363a417a8b045bf1a228758ab841dffeeec85254d825ab474",
+    "settlement_runner.py": "ebcdf697a38ebdc6f04e45eb7c68ffbe6924233815b8020db9dcc07925b023f0",
+    "threshold_curves.csv": "4fd23bd600e6b6e67e027cd63266adc6aa54d9c5716f184c150c26473209039e"
+  }
+}
