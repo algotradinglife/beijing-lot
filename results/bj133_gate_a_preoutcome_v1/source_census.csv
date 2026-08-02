@@ -1,0 +1,3 @@
+source,role,identity,sha256,rows,join_status
+bj137_gate_a_preoutcome_v2,accepted outcome-unexposed complete-issue candidate and Q-weight source,SHA256SUMS.json,0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df,71704,only NO_GATE and ESP300_GM290 candidate pools up to deterministic rank 32 retained
+#137 Gate B / #144,design attribution only; no ledger or outcome payload read,NO_PROMOTION / NOT_VALIDATED_AFTER_CONCENTRATION_OR_MULTIPLE_TESTING,NOT_APPLICABLE,0,"primary M64/M128 and secondary ESP300_GM290/K8 inputs are diagnostic controls, not accepted edges"

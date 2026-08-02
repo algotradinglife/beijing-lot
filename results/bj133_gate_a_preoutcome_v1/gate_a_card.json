@@ -1,0 +1,188 @@
+{
+  "allocator_frontier": [
+    {
+      "allocator_id": "CONCENTRATED_TOP_SCORE",
+      "delete_cap": null,
+      "family": "CONCENTRATED_CONTROL",
+      "jaccard_cap": null,
+      "match_cap": null
+    },
+    {
+      "allocator_id": "MATCH_EXPOSURE_CAP_1",
+      "delete_cap": null,
+      "family": "MATCH_CAP",
+      "jaccard_cap": null,
+      "match_cap": 1
+    },
+    {
+      "allocator_id": "MATCH_EXPOSURE_CAP_2",
+      "delete_cap": null,
+      "family": "MATCH_CAP",
+      "jaccard_cap": null,
+      "match_cap": 2
+    },
+    {
+      "allocator_id": "MATCH_EXPOSURE_CAP_3",
+      "delete_cap": null,
+      "family": "MATCH_CAP",
+      "jaccard_cap": null,
+      "match_cap": 3
+    },
+    {
+      "allocator_id": "MATCH_EXPOSURE_CAP_4",
+      "delete_cap": null,
+      "family": "MATCH_CAP",
+      "jaccard_cap": null,
+      "match_cap": 4
+    },
+    {
+      "allocator_id": "JACCARD_CAP_050",
+      "delete_cap": null,
+      "family": "OVERLAP_CAP",
+      "jaccard_cap": 0.5,
+      "match_cap": null
+    },
+    {
+      "allocator_id": "JACCARD_CAP_075",
+      "delete_cap": null,
+      "family": "OVERLAP_CAP",
+      "jaccard_cap": 0.75,
+      "match_cap": null
+    },
+    {
+      "allocator_id": "JACCARD_CAP_100",
+      "delete_cap": null,
+      "family": "OVERLAP_CAP",
+      "jaccard_cap": 1.0,
+      "match_cap": null
+    },
+    {
+      "allocator_id": "Q_DELETE_EXPOSURE_CAP_1",
+      "delete_cap": 1,
+      "family": "DELETE_CODE_CAP",
+      "jaccard_cap": null,
+      "match_cap": null
+    },
+    {
+      "allocator_id": "Q_DELETE_EXPOSURE_CAP_2",
+      "delete_cap": 2,
+      "family": "DELETE_CODE_CAP",
+      "jaccard_cap": null,
+      "match_cap": null
+    },
+    {
+      "allocator_id": "Q_DELETE_EXPOSURE_CAP_4",
+      "delete_cap": 4,
+      "family": "DELETE_CODE_CAP",
+      "jaccard_cap": null,
+      "match_cap": null
+    },
+    {
+      "allocator_id": "Q_DELETE_EXPOSURE_CAP_8",
+      "delete_cap": 8,
+      "family": "DELETE_CODE_CAP",
+      "jaccard_cap": null,
+      "match_cap": null
+    },
+    {
+      "allocator_id": "JOINT_M2_J075_Q2",
+      "delete_cap": 2,
+      "family": "JOINT_CAP",
+      "jaccard_cap": 0.75,
+      "match_cap": 2
+    },
+    {
+      "allocator_id": "JOINT_M3_J075_Q3",
+      "delete_cap": 3,
+      "family": "JOINT_CAP",
+      "jaccard_cap": 0.75,
+      "match_cap": 3
+    },
+    {
+      "allocator_id": "JOINT_M4_J100_Q4",
+      "delete_cap": 4,
+      "family": "JOINT_CAP",
+      "jaccard_cap": 1.0,
+      "match_cap": 4
+    }
+  ],
+  "complete_issue_contract": {
+    "budget": "all allocator arms within a config have selected_identity_count \u00d7 M \u00d7 \u00a52 stake; no partial allocation is substituted when a strict cap fails",
+    "candidate_pool": "same frozen #137 identity pool, deterministic candidate-rank order, first 32 identities per complete issue\u00d7gate",
+    "comparison": "allocator-minus-CONCENTRATED_TOP_SCORE and allocator-minus-exact-K-FULL are Gate-B matched effects on the same complete issues and configured issue budget",
+    "no_bet": "strict cap infeasibility yields an explicit NO_BET_CAP_UNSATISFIED row; it never relaxes or borrows identities from another segment",
+    "primary_unit": "complete (issue, fold) lottery issue; source segments are diagnostic-only"
+  },
+  "configurations": [
+    {
+      "config_id": "PRIMARY_NO_GATE_K4_M64",
+      "gate_id": "NO_GATE",
+      "probability_vector": "Q_WEIGHT",
+      "role": "PRIMARY_DIAGNOSTIC",
+      "target_identity_count": 4,
+      "ticket_M": 64,
+      "ticket_mechanism": "Q_INFORMED_WOR_DISTINCT",
+      "top_k_id": "K4"
+    },
+    {
+      "config_id": "PRIMARY_NO_GATE_K4_M128",
+      "gate_id": "NO_GATE",
+      "probability_vector": "Q_WEIGHT",
+      "role": "ADJACENT_M_SENSITIVITY",
+      "target_identity_count": 4,
+      "ticket_M": 128,
+      "ticket_mechanism": "Q_INFORMED_WOR_DISTINCT",
+      "top_k_id": "K4"
+    },
+    {
+      "config_id": "ECONOMIC_CONTROL_NO_GATE_K4_FULL",
+      "gate_id": "NO_GATE",
+      "probability_vector": "UNIFORM_FULL",
+      "role": "ECONOMIC_CONTROL",
+      "target_identity_count": 4,
+      "ticket_M": 2187,
+      "ticket_mechanism": "EXACT_K4_FULL",
+      "top_k_id": "K4"
+    },
+    {
+      "config_id": "SECONDARY_ESP300_GM290_K8_M128",
+      "gate_id": "ESP300_GM290",
+      "probability_vector": "Q_WEIGHT",
+      "role": "SECONDARY_SELECTION_SENSITIVITY",
+      "target_identity_count": 8,
+      "ticket_M": 128,
+      "ticket_mechanism": "Q_INFORMED_WOR_DISTINCT",
+      "top_k_id": "K8"
+    }
+  ],
+  "contract": "BJ-HIST-DIVERSIFIED-N7-ALLOCATOR-001",
+  "denominator": {
+    "allocator_arms": 15,
+    "candidate_identity_rows": 15390,
+    "candidate_role_rows": 107730,
+    "complete_issue_gate_pools": 2980,
+    "configs": 4,
+    "configuration_rows": 20880,
+    "source_identity_rows": 71704
+  },
+  "gate_b_requirements": {
+    "authorization": "NOT_RUN_AND_NOT_AUTHORIZED_PENDING_PI_ACCEPTANCE",
+    "positive_result": "requires separate strict EV and later held-out/forward validation; no result promotes purchase, production, or betting"
+  },
+  "generator_version": "bj133-gate-a-v1",
+  "issue": 133,
+  "metrics_frozen_for_gate_b": [
+    "pre-tax no_tax_roi primary; tax_adjusted_roi secondary",
+    "matched allocator-minus-concentrated and allocator-minus-FULL effects",
+    "participation/capital utilization",
+    "match exposure, q-deleted-code exposure, pairwise Jaccard and effective independent match count",
+    "payout concentration, drawdown, issue bootstrap and multiple-comparison diagnostics"
+  ],
+  "outcome_boundary": "No test outcome, score, final/winning SP, settlement, payout, ROI, tax realization, or post-kickoff input is read or emitted. The #137 outcome-informed result supplies only the accepted diagnostic configuration labels.",
+  "scope": "historical paper research only; no purchase, production, or promotion authority.",
+  "source": {
+    "bj137_gate_a_v2_content_identity_sha256": "36d6afcc33a5b5ceb3e4a990bfe6ec05503be115270c3489f4973dc3a59dd236",
+    "bj137_gate_a_v2_manifest_sha256": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df"
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_COMPLETE_ISSUE_DIVERSIFIED_ALLOCATION_FREEZE"
+}
