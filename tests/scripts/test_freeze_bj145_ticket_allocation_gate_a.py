@@ -10,8 +10,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PACKAGE = ROOT / "results" / "bj145_gate_a_preoutcome_v5"
-MANIFEST = "7fd0432e6af30f26a2ebc59e7f5c0846a4b8b8af4c368cd8a5b1c57afc99ab44"
+PACKAGE = ROOT / "results" / "bj145_gate_a_preoutcome_v8"
+MANIFEST = "da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114c"
+SOURCE_137 = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
+SOURCE_137_MANIFEST = "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df"
 
 
 def rows(path: Path):
@@ -26,6 +28,14 @@ def gzip_rows(path: Path):
 
 def package_engine():
     spec = importlib.util.spec_from_file_location("bj145_package_engine", PACKAGE / "bj145_allocation_engine.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def load_module(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -70,9 +80,11 @@ def test_gate_a_contract_and_denominators():
     ]
     binding = json.loads((PACKAGE / "allocation_binding.json").read_text(encoding="utf-8"))
     assert card["allocation_binding"] == binding
+    assert binding["binding_version"] == "bj145-allocation-binding-v2"
     assert hashlib.sha256((PACKAGE / binding["module_file"]).read_bytes()).hexdigest() == binding["module_sha256"]
     assert hashlib.sha256((PACKAGE / binding["golden_vectors_file"]).read_bytes()).hexdigest() == binding["golden_vectors_sha256"]
-    assert binding["ticket_space"] == {"legs": 7, "outcomes_per_leg": 3, "k": 2187, "ordinal_order": "base-3 0000000..2222222"}
+    assert binding["ticket_space"] == {"legs": 7, "outcomes_per_leg": 3, "k": 2187, "codes": ["3", "1", "0"], "ordinal_order": "#137 product order"}
+    assert binding["identity_signature_rule"] == "exact selected_match_ids pipe string from frozen identity row; no portfolio_id substitution"
 
 
 def test_selection_and_role_geometry():
@@ -156,3 +168,65 @@ def test_executable_allocator_golden_vectors_and_fingerprints():
             assert max(counts) <= 1
         if case["mechanism"] == "CAPPED_REPEAT":
             assert max(counts) <= case["cap"]
+
+
+def test_wr_wor_namespace_parity_against_immutable_137_runner():
+    assert hashlib.sha256((SOURCE_137 / "SHA256SUMS.json").read_bytes()).hexdigest() == SOURCE_137_MANIFEST
+    source = load_module(SOURCE_137 / "freeze_runner.py", "bj137_namespace_reference")
+    module = package_engine()
+    for parts in (("bj137", "WR", 137001, "identity", 0), ("bj137", "WOR", 137002, "identity", 41)):
+        assert module.stable_uniform(*parts) == source.stable_uniform(*parts)
+    identity = gzip_rows(SOURCE_137 / "n7_identities.csv.gz")[0]
+    identity_signature = identity["selected_match_ids"]
+    roles = [
+        row for row in gzip_rows(SOURCE_137 / "n7_role_vectors.csv.gz")
+        if row["issue_instance"] == identity["issue_instance"] and row["portfolio_id"] == identity["portfolio_id"]
+    ]
+    roles.sort(key=lambda row: int(row["match_idx"]))
+    leg_vectors = [{code: float(row[f"p_model{code}"]) for code in source.CODES} for row in roles]
+    reference_weights = source.ticket_weights(leg_vectors)
+    flat_weights = [mass for _, mass in reference_weights]
+    ordinal = {ticket: index for index, (ticket, _) in enumerate(reference_weights)}
+    for seed in (137001, 137002, 137003):
+        expected_wr = [0] * source.FULL_K
+        for ticket in source.weighted_with_replacement(reference_weights, 32, seed, identity_signature):
+            expected_wr[ordinal[ticket]] += 1
+        actual_wr = module.allocate("WR_DUPLICATE_STAKE", flat_weights, 32, seed=str(seed), identity_signature=identity_signature)
+        assert actual_wr == tuple(expected_wr)
+        expected_wor = [0] * source.FULL_K
+        for ticket in source.weighted_without_replacement(reference_weights, 32, seed, identity_signature):
+            expected_wor[ordinal[ticket]] += 1
+        actual_wor = module.allocate("WOR_DISTINCT", flat_weights, 32, seed=str(seed), identity_signature=identity_signature)
+        assert actual_wor == tuple(expected_wor)
+
+
+def test_wr_raw_unit_real_cell_m2187_regression_against_137():
+    source = load_module(SOURCE_137 / "freeze_runner.py", "bj137_real_cell_reference")
+    module = package_engine()
+    identity = next(
+        row for row in gzip_rows(PACKAGE / "identity_catalog.csv.gz")
+        if row["arm_id"] == "SECONDARY_ESP300_GM290_K8"
+        and row["issue_instance"] == "20101@OOS_2020"
+        and row["portfolio_id"] == "7c1f7df8c2a7f25df04ce7e31daf6258817e6a13b9a03eff53a00d418ed35b67"
+    )
+    roles = [
+        row for row in gzip_rows(PACKAGE / "role_vectors.csv.gz")
+        if row["arm_id"] == identity["arm_id"]
+        and row["issue_instance"] == identity["issue_instance"]
+        and row["portfolio_id"] == identity["portfolio_id"]
+    ]
+    roles.sort(key=lambda row: int(row["match_idx"]))
+    reference_weights = source.ticket_weights([{code: float(row[f"p_blend_a50_{code}"]) for code in source.CODES} for row in roles])
+    flat_weights = [mass for _, mass in reference_weights]
+    expected = [0] * source.FULL_K
+    ordinal = {ticket: index for index, (ticket, _) in enumerate(reference_weights)}
+    selected = source.weighted_with_replacement(reference_weights, 2187, 137003, identity["selected_match_ids"])
+    for ticket in selected:
+        expected[ordinal[ticket]] += 1
+    actual = module.allocate(
+        "WR_DUPLICATE_STAKE", flat_weights, 2187, seed="137003",
+        identity_signature=identity["selected_match_ids"],
+    )
+    assert actual == tuple(expected)
+    assert actual[427] == 1
+    assert actual[428] == 0
