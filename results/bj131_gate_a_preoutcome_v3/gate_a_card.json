@@ -1,0 +1,55 @@
+{
+  "contract": "BJ-HIST-SOFT-COVER-N7-001",
+  "denominator": {
+    "active_base_rows": 90215,
+    "logical_active_matrix_rows": 1894515,
+    "logical_no_bet_matrix_rows": 502551,
+    "no_bet_base_rows": 23931,
+    "portfolio_seed_order_rows": 270645,
+    "seed_count": 3,
+    "sleeve_count": 7,
+    "source_active_identities": 90215,
+    "source_no_bet_rows": 23931
+  },
+  "issue": 131,
+  "nested_order": "For each portfolio+seed, apply rank=(a*lex_index+b) mod 729 to the fixed omitted-code-slab lexicographic index, with coprime a and b derived from SHA256 seed/portfolio hashes; each sleeve is the ascending-rank prefix of this frozen permutation.",
+  "normalization": "portfolio_base + portfolio_seed_order + sleeve_matrix + no_bet_control materialize the logical active/no-bet cross-product without repeating base metadata per sleeve.",
+  "outcome_boundary": "This stage opens only #127 Gate-A v2 metadata/role inputs. It does not open results, final SP, payout, tax, ROI, #127 Gate-B, or any settlement output.",
+  "seeds": [
+    {
+      "role": "PRIMARY",
+      "seed": "131001"
+    },
+    {
+      "role": "SENS_A",
+      "seed": "131017"
+    },
+    {
+      "role": "SENS_B",
+      "seed": "131031"
+    }
+  ],
+  "selection_boundary": "#127 selected seven matches, global omitted code, pool/window, and selector rows are copied without re-selection.",
+  "sleeves": {
+    "fractions_nominal": [
+      "0.00",
+      "0.05",
+      "0.10",
+      "0.20",
+      "0.33",
+      "0.50",
+      "1.00"
+    ],
+    "full_tickets": 2187,
+    "hard_prune_tickets": 1458,
+    "omitted_code_slab_tickets": 729,
+    "ticket_rounding": "nearest integer of 729*s, .5 upward; endpoints exact",
+    "unit_stake_yuan": 2
+  },
+  "source": {
+    "manifest_sha256": "a8eeb50204bb9a2d69578538e28943a432bea11083661a63b950a5ab5a2481da",
+    "package": "results/bj127_gate_a_preoutcome_v2"
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_SOFT_COVER_FREEZE",
+  "version": "bj131-gatea-v3"
+}

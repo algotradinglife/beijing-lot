@@ -126,6 +126,14 @@ SP 不确定性或税线控制，而不是在已结算阈值附近事后微调�
 18%–24%；无税 ROI 相对 FULL 在 7/9 行微升、2/9 行下降，但均未达 breakeven。税后改善
 主要来自较低 tax exposure 而非正的无税 edge，所以结论为 `NO_PROMOTION`。
 
+## #131：全局删码的软覆盖 sleeve
+
+#131 以 #127 已冻结的七场与全局删码为 selector baseline，不重新选场。它预注册在 729 张
+omitted-code slab 中按固定嵌套顺序加回 0%、5%、10%、20%、33%、50%、100% 的票，并以三个
+赛果未知 seed 检查样本顺序敏感性。0% 精确复现 hard prune，100% 精确复现 FULL；中间 sleeve
+仅改变 portfolio-layer coverage，不能被解释为新的 selector edge。Gate A 已冻结，等待 PI
+授权 outcome settlement；没有 ROI 或策略晋级结论。
+
 ### 选场与剪枝的分离归因
 
 在同一 `p_min<=0.20` 口径下，`E_SP/GM_E_SP` 门槛越严格，FULL 基线从 -15.14%
