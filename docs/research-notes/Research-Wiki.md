@@ -7,7 +7,7 @@ tags:
   - research
   - moc
 status: active
-updated: 2026-07-29
+updated: 2026-08-02
 ---
 
 # Beijing-lot Research Wiki
@@ -39,6 +39,69 @@ updated: 2026-07-29
    反转。因此 #77 只接收 `CONTINUOUS_EURO_BJLINE`。
 6. **Top2 比 Top1 更贴近 N7 双选问题。** Top2 的覆盖率可以用来估计双选腿，
    但多腿之间并不独立，不能直接把单腿覆盖率连乘后当成真实票命中率。
+
+## 近期 N7 策略结论（2026-08-02）
+
+这一节记录最近几轮研究的可复用结论，供后续候选生成、选场和组合层研究引用。
+统一经济口径是税前 `no_tax_roi`：已包含北单 `0.65` 派彩系数，但不扣逐票税；税后
+结果只作次级参考。
+
+### 选场、删码与软覆盖
+
+- **#127：绝对改善主要来自选场，不是硬删码。** 在同一 `p_min<=0.20` 口径下，
+  更严格的 `E_SP/GM_E_SP` 使 FULL 基线改善 **+6.79pp**；PRUNE−FULL 的增量
+  却没有稳定改善，最严格档反而为 **-1.95pp**。18.66% 的删码开出率与 #101 的
+  18.46% 基本一致，更像概率校准正常，而不是删码策略获得了新 edge。
+- **#131：软覆盖没有稳定甜区。** 从 hard prune 到 FULL 的 sleeve（0%、5%、10%、
+  20%、33%、50%、100%）在 189 个 ALL-scope 行上税前和税后均未出现可推广的正结果；
+  不同 seed 的局部最佳比例不一致，因此不能把某个 sleeve 深度固化为策略规则。
+- **#132：完整期次的 `q=p×predicted_SP` 没有击败 `p_min`。** 以完整 `(issue, fold)`
+  为主单位，p-min、q-min 和 FULL 的冻结比较中，所有非控制 ALL 行均为负；最佳
+  `p_min` 仍未达到盈亏平衡，q 排序没有提供稳定增量。早期按 segment 的结果不再作为
+  主结论。
+
+这三项共同确立一个强制报告规范：任何“选场 + 剪枝/抽样”实验都必须同时报告
+每个选场门槛的 matched FULL 基线，以及同门槛下的 `PRUNE−FULL` 增量、stake retention
+和 gross-return retention。不能用 PRUNE 绝对 ROI 代替剪枝增量，也不能把降低税负
+解释成税前 edge。
+
+### 概率抽样与独立验证
+
+- **#137：找到描述性最强的候选，但没有得到验证。** `NO_GATE/K4/Q-WOR/M64`
+  的三个 seed 税前 ROI 为 `+16.38%/+11.77%/+2.67%`，相对 exact-K FULL 的增量为
+  `+32.15pp/+27.54pp/+18.44pp`；21 个 seed×LOYO 配对增量均为正。这个结果来自
+  `q=p×predicted_SP` 的无放回抽样，不等于单纯选场或市场概率映射已经产生 edge。
+- **#144：完整性通过，统计确认失败。** 独立重放、Gate-A/赛果绑定、逐票税务和
+  manifest 均通过；但最大一期贡献最高 **24.23%**，去掉最大期次后两个 seed 的绝对
+  税前 ROI 为负，三组 issue-bootstrap 95% 区间均跨零。候选来自 5,300 个冻结参数组，
+  因此终局为 `NO_PROMOTION`，解释层级为
+  `NOT_VALIDATED_AFTER_CONCENTRATION_OR_MULTIPLE_TESTING`。
+
+结论不是“概率抽样无效”，而是：它显示了值得继续研究的资金效率信号，但目前不能
+区分真实 edge 与少数大额期次加上大量参数搜索造成的集中性结果。任何正结果都需要
+真正 held-out/forward 数据和严格独立 EV；普通负结果则应给出完整参数面和解释，不应
+用 `fail-close` 或“无候选”替代分析。
+
+### #146：分散化的当前结构瓶颈
+
+PR #146 对 Issue #133 冻结了完整期次的 allocator frontier。关键发现不是收益，而是
+候选几何：#137 的 N7 identity 大量共享 **6 条 companion legs**，所以主 K4 池中
+match cap 1–3、Jaccard `.50` 以及联合严格 cap 均无法形成完整的 4 个 N7；q-delete
+cap 1/2 分别仅在 **101/348** 和 **142/348** 个期次可行，cap 4 则基本回到集中结构。
+
+这说明当前瓶颈主要在上游 N7 候选生成，而不是 allocator 本身。#133 Gate B 因此只应
+把 q-delete cap 1/2 作为有辨识度的新分散臂，报告集中度、重叠、参与率、资金利用率和
+税前 `PRUNE/ALLOCATOR−FULL` 增量；match/Jaccard 严格 cap 的结构性 `NO_BET` 作为诊断，
+不能伪装成策略比较。FULL 与 M64/M128 的原始 stake 不同，FULL 只能作为资本归一化 ROI
+基线，原始资金量必须单独报告。
+
+### 后续推导的控制规则
+
+1. 主分析单位是完整期次，segment 只能作为诊断标签。
+2. 先分离 selector lift、sampler/allocator lift 和 interaction，再讨论总 ROI。
+3. 先看税前结果；税后只用于说明税线和资金暴露的影响。
+4. 每个候选都要报告集中度、最大期次敏感性、LOYO 和按期 bootstrap。
+5. “描述性阳性”不等于推广；必须经过样本外验证。负结果也必须留下参数遍历和可复用的结构结论。
 
 ## 知识图谱
 
