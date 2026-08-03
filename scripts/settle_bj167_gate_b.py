@@ -131,13 +131,16 @@ def ticket_tax(gross: Decimal) -> Decimal:
     return gross * TAX_RATE if gross >= TAX_THRESHOLD else Decimal(0)
 
 
-def rank_task(spec: tuple[str, str, tuple[tuple[float, float, float], ...], int]) -> tuple[str, dict[str, int]]:
+def rank_task(spec: tuple[str, str, tuple[tuple[float, float, float], ...], int | None]) -> tuple[str, dict[str, int | None]]:
     identity_id, signature, q_vectors, truth_idx = spec
     weights = tuple(math.prod(q_vectors[index][CODES.index(code)] for index, code in enumerate(ticket)) for ticket in itertools.product(CODES, repeat=N))
     if abs(sum(weights) - 1.0) > 2e-8:
         raise RuntimeError(f"Q mass drift: {identity_id}")
-    ranks = {}
+    ranks: dict[str, int | None] = {}
     for seed in SEEDS:
+        if truth_idx is None:
+            ranks[seed] = None
+            continue
         truth_weight = weights[truth_idx]
         truth_key = math.inf if truth_weight <= 0 else -math.log(max(stable_uniform("bj137", "WOR", seed, signature, truth_idx), 1e-18)) / truth_weight
         rank = 1
@@ -172,6 +175,8 @@ def aggregate_template(part: dict[str, str], m: int, seed: str) -> dict[str, obj
 
 
 def update_aggregate(agg: dict[str, object], row: dict[str, object]) -> None:
+    if row["settlement_status"] != "SETTLED":
+        return
     agg["settled_identity_count"] = int(agg["settled_identity_count"]) + 1
     agg["executed_draw_count"] = int(agg["executed_draw_count"]) + int(row["executed_draw_count"])
     for field in ("stake_yuan", "gross_pre_tax_yuan", "tax_yuan", "after_tax_gross_yuan", "pre_tax_net_yuan", "tax_adjusted_net_yuan"):
@@ -255,10 +260,12 @@ def main() -> None:
     truth_by_identity = {}
     for identity in identities:
         ordered = sorted(role_map[identity["identity_id"]], key=lambda row: int(row["selection_rank"]))
-        truth = "".join(outcomes[row["match_id"]]["result_code"] for row in ordered); truth_idx = truth_ordinal(truth); truth_by_identity[identity["identity_id"]] = truth
+        missing = any(row["match_id"] not in outcomes for row in ordered)
+        truth = "" if missing else "".join(outcomes[row["match_id"]]["result_code"] for row in ordered)
+        truth_idx = None if missing else truth_ordinal(truth); truth_by_identity[identity["identity_id"]] = truth
         q_vectors = tuple(tuple(float(row[f"q_weight{code}"]) for code in CODES) for row in ordered)
         rank_specs.append((identity["identity_id"], identity["selected_match_ids"], q_vectors, truth_idx))
-    ranks: dict[tuple[str, str], int] = {}
+    ranks: dict[tuple[str, str], int | None] = {}
     workers = max(1, min(8, os.cpu_count() or 1))
     with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
         for identity_id, values in executor.map(rank_task, rank_specs, chunksize=1):
@@ -269,16 +276,22 @@ def main() -> None:
     identity_rows = []
     truth_bins = Counter()
     for identity in identities:
-        iid = identity["identity_id"]; ordered = sorted(role_map[iid], key=lambda row: int(row["selection_rank"])); truth = truth_by_identity[iid]; truth_idx = truth_ordinal(truth)
+        iid = identity["identity_id"]; ordered = sorted(role_map[iid], key=lambda row: int(row["selection_rank"])); truth = truth_by_identity[iid]; truth_idx = None if not truth else truth_ordinal(truth)
+        missing = truth_idx is None
         product = Decimal(1); expected_product = Decimal(1); sources = set()
-        for role in ordered:
-            outcome = outcomes[role["match_id"]]; product *= dec(outcome["winning_sp"], "winning SP"); sources.add(outcome["winning_sp_source"]); expected_product *= sum(dec(role[f"q_weight{code}"], "q") * dec(role[f"predicted_sp{code}"], "predicted SP") for code in CODES)
+        if not missing:
+            for role in ordered:
+                outcome = outcomes[role["match_id"]]; product *= dec(outcome["winning_sp"], "winning SP"); sources.add(outcome["winning_sp_source"]); expected_product *= sum(dec(role[f"q_weight{code}"], "q") * dec(role[f"predicted_sp{code}"], "predicted SP") for code in CODES)
         for seed in SEEDS:
-            rank = ranks[(iid, seed)]; truth_bins["1-32" if rank <= 32 else "33-64" if rank <= 64 else "65-128" if rank <= 128 else ">128"] += 1
+            rank = ranks[(iid, seed)]
+            if rank is None:
+                truth_bins["UNAVAILABLE"] += 1
+            else:
+                truth_bins["1-32" if rank <= 32 else "33-64" if rank <= 64 else "65-128" if rank <= 128 else ">128"] += 1
             ordinals = allocation_map[(iid, seed)]
             for m in M_GRID:
-                selected = ordinals[:m]; hit = rank <= m; gross = STAKE * FACTOR * product if hit else Decimal(0); tax = ticket_tax(gross) if hit else Decimal(0); stake = STAKE * m; after = gross - tax
-                row = {"identity_id": iid, "issue": identity["issue"], "fold": identity["fold"], "year": identity["year"], "issue_instance": identity["issue_instance"], "n": N, "M": m, "nominal_M": m, "effective_M": m, "seed": seed, "saturation_status": "PARTIAL_WOR", "truth_sequence": truth, "truth_ordinal": truth_idx, "truth_rank": rank, "coverage_hit": "YES" if hit else "NO", "winning_ticket_count": int(hit), "planned_draw_count": m, "executed_draw_count": m, "stake_yuan": money(stake), "unique_ticket_count": m, "duplicate_ticket_count": 0, "expected_sp_product_q": money(expected_product), "actual_winning_sp_product": money(product) if hit else "", "gross_pre_tax_yuan": money(gross), "taxable_winning_ticket_count": int(bool(tax)), "tax_yuan": money(tax), "after_tax_gross_yuan": money(after), "pre_tax_net_yuan": money(gross - stake), "tax_adjusted_net_yuan": money(after - stake), "no_tax_roi": ratio((gross - stake) / stake), "tax_adjusted_roi": ratio((after - stake) / stake), "allocation_fingerprint": hashlib.sha256(json.dumps(selected, separators=(",", ":")).encode()).hexdigest(), "winning_sp_sources": ";".join(sorted(sources)), "settlement_status": "SETTLED"}
+                selected = ordinals[:m]; hit = (not missing) and rank <= m; stake = STAKE * m if not missing else Decimal(0); gross = STAKE * FACTOR * product if hit else Decimal(0); tax = ticket_tax(gross) if hit else Decimal(0); after = gross - tax
+                row = {"identity_id": iid, "issue": identity["issue"], "fold": identity["fold"], "year": identity["year"], "issue_instance": identity["issue_instance"], "n": N, "M": m, "nominal_M": m, "effective_M": m, "seed": seed, "saturation_status": "PARTIAL_WOR", "truth_sequence": truth, "truth_ordinal": truth_idx if not missing else "", "truth_rank": rank if rank is not None else "", "coverage_hit": "YES" if hit else "NO" if not missing else "", "winning_ticket_count": int(hit), "planned_draw_count": m, "executed_draw_count": m if not missing else 0, "stake_yuan": money(stake), "unique_ticket_count": m if not missing else 0, "duplicate_ticket_count": 0, "expected_sp_product_q": money(expected_product) if not missing else "", "actual_winning_sp_product": money(product) if hit else "", "gross_pre_tax_yuan": money(gross), "taxable_winning_ticket_count": int(bool(tax)), "tax_yuan": money(tax), "after_tax_gross_yuan": money(after), "pre_tax_net_yuan": money(gross - stake), "tax_adjusted_net_yuan": money(after - stake), "no_tax_roi": ratio((gross - stake) / stake) if stake else "", "tax_adjusted_roi": ratio((after - stake) / stake) if stake else "", "allocation_fingerprint": hashlib.sha256(json.dumps(selected, separators=(",", ":")).encode()).hexdigest(), "winning_sp_sources": ";".join(sorted(sources)) if not missing else "", "settlement_status": "SETTLED" if not missing else "UNAVAILABLE_CANONICAL_OUTCOME"}
                 identity_rows.append(row)
                 update_aggregate(groups[(identity["issue_instance"], m, seed)], {**row, "kickoff_ts": ordered[0]["kickoff_ts"]})
     identity_rows.sort(key=lambda row: (int(row["year"]), int(row["issue"]), str(row["seed"]), int(row["M"]), row["identity_id"]))
