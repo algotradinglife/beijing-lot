@@ -8,7 +8,7 @@ science cell.  Seed-level rows remain diagnostics, never football histories.
 """
 from __future__ import annotations
 
-import argparse, array, csv, ctypes, gzip, importlib.util, json, math, shutil, subprocess
+import argparse, array, csv, ctypes, gzip, importlib.util, json, math, os, shutil, subprocess
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -314,9 +314,12 @@ def reconcile_scientific_screen(out: Path, screen: Path, selectors: list[dict], 
 
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument("--screening-output",default="results/bj167_gate_b_strategy_atlas_v3r1_recovered_final_v1"); ap.add_argument("--output",default="results/bj167_gate_b_strategy_atlas_v3r1_scientific_stability_exact"); ap.add_argument("--checkpoint-output",default="results/bj167_gate_b_strategy_atlas_v3r1_shared_science_checkpoint_v1"); ap.add_argument("--replay-to-checkpoint",action="store_true"); ap.add_argument("--finalize-checkpoint",action="store_true"); ap.add_argument("--preflight",action="store_true"); args=ap.parse_args()
+    ap=argparse.ArgumentParser(); ap.add_argument("--screening-output",default="results/bj167_gate_b_strategy_atlas_v3r1_recovered_final_v1"); ap.add_argument("--output",default="results/bj167_gate_b_strategy_atlas_v3r1_scientific_stability_exact"); ap.add_argument("--checkpoint-output",default="results/bj167_gate_b_strategy_atlas_v3r1_shared_science_checkpoint_v1"); ap.add_argument("--replay-to-checkpoint","--replay-only",dest="replay_to_checkpoint",action="store_true"); ap.add_argument("--finalize-checkpoint","--scientific-finalize",dest="finalize_checkpoint",action="store_true"); ap.add_argument("--preflight",action="store_true"); args=ap.parse_args()
     screen, final, checkpoint=ROOT/args.screening_output, ROOT/args.output, ROOT/args.checkpoint_output
     if sum((args.replay_to_checkpoint,args.finalize_checkpoint,args.preflight)) != 1: raise RuntimeError("choose exactly one of --replay-to-checkpoint, --finalize-checkpoint, --preflight")
+    if os.environ.get("BJ167_TEST_FORBID_OUTCOME_SUPPORT") == "1":
+        def forbidden(*_args, **_kwargs): raise RuntimeError("test guard: finalizer opened outcome/support path")
+        R.load_outcomes=forbidden; R.build_supports=forbidden
     if not (screen/"SHA256SUMS.json").exists(): raise RuntimeError("completed immutable screen required")
     sums=json.loads((screen/"SHA256SUMS.json").read_text())
     for name,digest in sums.items():

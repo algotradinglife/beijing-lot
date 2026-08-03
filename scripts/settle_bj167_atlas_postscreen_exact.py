@@ -10,7 +10,7 @@ and chronology diagnostics without restarting or reducing the screen.
 """
 from __future__ import annotations
 
-import argparse, array, csv, ctypes, gzip, importlib.util, json, math, shutil, statistics, subprocess
+import argparse, array, csv, ctypes, gzip, importlib.util, json, math, os, shutil, statistics, subprocess
 from collections import defaultdict
 from decimal import Decimal
 from pathlib import Path
@@ -639,6 +639,8 @@ def main() -> None:
         print(json.dumps(report, sort_keys=True), flush=True)
         return
     if not args.finalize_checkpoint: raise RuntimeError("postscreen output requires explicit --finalize-checkpoint")
+    if os.environ.get("BJ167_TEST_FORBID_OUTCOME_SUPPORT") == "1":
+        globals()["replay_candidates"] = lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("test guard: postscreen replay invoked"))
     post_start = execution_snapshot()
     if final.exists(): raise RuntimeError("refusing to replace immutable post-screening package")
     stage = Path(str(final) + ".stage")
