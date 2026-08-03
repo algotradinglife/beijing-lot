@@ -9,7 +9,7 @@ surface again.
 """
 from __future__ import annotations
 
-import argparse, array, csv, ctypes, gzip, hashlib, importlib.util, json, math
+import argparse, array, csv, ctypes, gzip, hashlib, importlib.util, json, math, os, shutil, subprocess
 from collections import defaultdict
 from pathlib import Path
 
@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNNER_PATH = ROOT / "scripts" / "settle_bj167_strategy_atlas_gate_b_exact.py"
 ARCHIVE_DEFAULT = ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_exact.failed-stability-label-20260803T2247"
 SELECTOR = "S1_NO_GATE_K4"
+CHECKPOINT_CONTRACT = "bj167-gate-b-v3r1-bounded-recovery-checkpoint-v1"
 
 spec = importlib.util.spec_from_file_location("bj167_exact", RUNNER_PATH)
 R = importlib.util.module_from_spec(spec); assert spec.loader is not None; spec.loader.exec_module(R)
@@ -29,6 +30,39 @@ def sha(p: Path) -> str:
 
 def ptr(a, typ):
     return ctypes.cast((typ * len(a)).from_buffer(a), ctypes.POINTER(typ))
+
+def execution_snapshot():
+    return {
+        "git_head": subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
+                                    text=True, stdout=subprocess.PIPE).stdout.strip(),
+        "recovery_runner_path": str(Path(__file__).relative_to(ROOT)),
+        "recovery_runner_sha256": sha(Path(__file__)),
+        "screen_runner_path": str(RUNNER_PATH.relative_to(ROOT)),
+        "screen_runner_sha256": sha(RUNNER_PATH),
+        "native_wrapper_path": "scripts/bj167_exact_atlas.cpp",
+        "native_wrapper_sha256": sha(ROOT / "scripts" / "bj167_exact_atlas.cpp"),
+        "frozen_allocator_path": "scripts/bj145_fast_alloc.cpp",
+        "frozen_allocator_sha256": sha(ROOT / "scripts" / "bj145_fast_alloc.cpp"),
+    }
+
+def checkpoint_binding(archive: Path, census: dict, snapshot: dict) -> dict:
+    """All immutable identities a resumed finalizer must reproduce exactly."""
+    return {
+        "contract": CHECKPOINT_CONTRACT,
+        "archive_path": str(archive.relative_to(ROOT)),
+        "archive_payload_sha256": census["payload_sha256"],
+        "archive_anchor": census["anchor"],
+        "gate_a_manifest_sha256": sha(R.GA / "SHA256SUMS.json"),
+        "gate_a_content_identity_sha256": sha(R.GA / "CONTENT_IDENTITY.json"),
+        "outcome_manifest_sha256": R.EXPECTED_OUTCOME_MANIFEST,
+        "outcome_payload_sha256": sha(R.OUTCOMES),
+        "execution": snapshot,
+    }
+
+def deterministic_gz_rows(path: Path, fields: list[str], rows) -> None:
+    with gzip.GzipFile(filename=str(path), mode="wb", mtime=0) as raw, __import__("io").TextIOWrapper(raw, newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
+        for row in rows: w.writerow({k: row.get(k, "") for k in fields})
 
 def archive_census(archive: Path) -> dict:
     shards = sorted(archive.glob("cell_metrics-*.csv.gz"))
@@ -193,11 +227,98 @@ def replay_bounded_targets(archive):
             raise RuntimeError(f"bounded target replay drift for global cell {si*R.NCELL+cell}")
     return specs, issue_rows, net, stake, status
 
+def write_sparse_checkpoint(checkpoint: Path, archive: Path, census: dict, specs, issue_rows, net, stake, status, snapshot: dict) -> Path:
+    """Atomically retain the exact bounded replay before any finalization work.
+
+    This is deliberately a standalone immutable package.  A later recovery
+    phase must consume these arrays after checking both their own manifest and
+    every bound input identity; it must never silently invoke the allocator
+    again just because a downstream reporting step failed.
+    """
+    if checkpoint.exists():
+        raise RuntimeError(f"refusing to replace immutable sparse checkpoint: {checkpoint}")
+    stage = Path(str(checkpoint) + ".stage")
+    if stage.exists():
+        raise RuntimeError(f"refusing to reuse sparse checkpoint staging path: {stage}")
+    stage.mkdir(parents=True)
+    binding = checkpoint_binding(archive, census, snapshot)
+    (stage / "checkpoint_binding.json").write_text(json.dumps(binding, sort_keys=True, indent=2) + "\n")
+    (stage / "issue_order.csv").write_text((archive / "issue_order.csv").read_text())
+    target_fields = ["target_index", "target", "global_cell"]
+    with (stage / "target_registry.csv").open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=target_fields); w.writeheader()
+        for ti, (label, cell) in enumerate(specs):
+            w.writerow({"target_index": ti, "target": label, "global_cell": cell})
+    def rows():
+        for ti, (label, cell) in enumerate(specs):
+            for ii, issue in enumerate(issue_rows):
+                yield {"target_index": ti, "target": label, "global_cell": cell,
+                       "issue_index": ii, "issue_instance": issue["issue_instance"],
+                       "pre_tax_net_yuan": f"{net[ti][ii]:.6f}",
+                       "stake_yuan": f"{stake[ti][ii]:.6f}"}
+    deterministic_gz_rows(stage / "sparse_issue_arrays.csv.gz",
+                          ["target_index", "target", "global_cell", "issue_index", "issue_instance", "pre_tax_net_yuan", "stake_yuan"], rows())
+    summary = {
+        "bounded_target_count": len(specs), "issue_count": len(issue_rows),
+        "policy_status_counts": {k: list(status.values()).count(k) for k in sorted(set(status.values()))},
+        "array_shape": [len(specs), len(issue_rows)],
+        "replay_equivalence": "every target total stake_yuan and pre_tax_net_yuan equals archived S1 cell_metrics within 1e-6",
+    }
+    (stage / "checkpoint_summary.json").write_text(json.dumps(summary, sort_keys=True, indent=2) + "\n")
+    R.write_file_census(stage)
+    R.finalize_package_identity(stage, CHECKPOINT_CONTRACT, {
+        "archive_payload_sha256": census["payload_sha256"],
+        "gate_a_manifest_sha256": binding["gate_a_manifest_sha256"],
+        "gate_a_content_identity_sha256": binding["gate_a_content_identity_sha256"],
+        "outcome_manifest_sha256": binding["outcome_manifest_sha256"],
+        "outcome_payload_sha256": binding["outcome_payload_sha256"],
+        "recovery_runner_sha256": snapshot["recovery_runner_sha256"],
+        "native_wrapper_sha256": snapshot["native_wrapper_sha256"],
+        "frozen_allocator_sha256": snapshot["frozen_allocator_sha256"],
+    })
+    R.atomic_publish(stage, checkpoint)
+    return checkpoint
+
+def verify_sparse_checkpoint(checkpoint: Path, archive: Path, census: dict, snapshot: dict):
+    """Load only a fully bound sparse checkpoint; fail closed on any drift."""
+    sums_path, identity_path = checkpoint / "SHA256SUMS.json", checkpoint / "CONTENT_IDENTITY.json"
+    if not sums_path.exists() or not identity_path.exists():
+        raise RuntimeError("sparse checkpoint lacks immutable manifest/identity")
+    sums = json.loads(sums_path.read_text())
+    for name, digest in sums.items():
+        p = checkpoint / name
+        if not p.exists() or sha(p) != digest:
+            raise RuntimeError(f"sparse checkpoint payload drift: {name}")
+    binding = json.loads((checkpoint / "checkpoint_binding.json").read_text())
+    if binding != checkpoint_binding(archive, census, snapshot):
+        raise RuntimeError("sparse checkpoint immutable input/executable binding drift")
+    with (checkpoint / "target_registry.csv").open(newline="") as f:
+        specs = [(r["target"], int(r["global_cell"])) for r in csv.DictReader(f)]
+    with (checkpoint / "issue_order.csv").open(newline="") as f:
+        issue_rows = list(csv.DictReader(f))
+    net = [[0.0] * len(issue_rows) for _ in specs]; stake = [[0.0] * len(issue_rows) for _ in specs]
+    by_issue = {r["issue_instance"]: int(r["issue_index"]) for r in issue_rows}
+    with gzip.open(checkpoint / "sparse_issue_arrays.csv.gz", "rt", newline="") as f:
+        count = 0
+        for row in csv.DictReader(f):
+            ti, ii = int(row["target_index"]), by_issue.get(row["issue_instance"], -1)
+            if not (0 <= ti < len(specs) and 0 <= ii < len(issue_rows)):
+                raise RuntimeError("sparse checkpoint array key drift")
+            net[ti][ii] = float(row["pre_tax_net_yuan"]); stake[ti][ii] = float(row["stake_yuan"]); count += 1
+    if count != len(specs) * len(issue_rows):
+        raise RuntimeError("sparse checkpoint array census drift")
+    return specs, issue_rows, net, stake
+
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument("--archive",type=Path,default=ARCHIVE_DEFAULT); ap.add_argument("--verify-only",action="store_true"); args=ap.parse_args()
-    census=archive_census(args.archive); print(json.dumps(census,sort_keys=True),flush=True)
+    ap=argparse.ArgumentParser(); ap.add_argument("--archive",type=Path,default=ARCHIVE_DEFAULT); ap.add_argument("--verify-only",action="store_true"); ap.add_argument("--checkpoint",type=Path,default=ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_recovery_checkpoint_v1"); ap.add_argument("--resume-checkpoint",action="store_true"); args=ap.parse_args()
+    census=archive_census(args.archive); snapshot=execution_snapshot(); print(json.dumps(census,sort_keys=True),flush=True)
     if args.verify_only: return
+    if args.resume_checkpoint:
+        specs, issue_rows, net, stake = verify_sparse_checkpoint(args.checkpoint, args.archive, census, snapshot)
+        print(json.dumps({"checkpoint": str(args.checkpoint), "resume": "verified", "bounded_target_count": len(specs), "issue_count": len(issue_rows)}, sort_keys=True), flush=True)
+        return
     specs, issue_rows, net, stake, status = replay_bounded_targets(args.archive)
-    print(json.dumps({"bounded_target_count":len(specs),"issue_count":len(issue_rows),"policy_status_counts":{k:list(status.values()).count(k) for k in sorted(set(status.values()))}},sort_keys=True),flush=True)
+    checkpoint = write_sparse_checkpoint(args.checkpoint, args.archive, census, specs, issue_rows, net, stake, status, snapshot)
+    print(json.dumps({"checkpoint":str(checkpoint),"bounded_target_count":len(specs),"issue_count":len(issue_rows),"policy_status_counts":{k:list(status.values()).count(k) for k in sorted(set(status.values()))}},sort_keys=True),flush=True)
 
 if __name__ == "__main__": main()

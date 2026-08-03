@@ -204,6 +204,30 @@ def test_recovery_support_persists_production_payout_before_replay():
     else:
         assert record["payout"] == 0.0
 
+def test_recovery_sparse_checkpoint_is_atomic_bound_and_resumable():
+    recovery = load("bj167_recovery_checkpoint", ROOT / "scripts" / "recover_bj167_gate_b_exact.py")
+    archive = ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_exact.failed-stability-label-20260803T2247"
+    checkpoint = ROOT / ".scratch" / "bj167_sparse_checkpoint_fixture"
+    if checkpoint.exists(): __import__("shutil").rmtree(checkpoint)
+    stage = Path(str(checkpoint) + ".stage")
+    if stage.exists(): __import__("shutil").rmtree(stage)
+    issue_rows, _ = recovery.load_issue_order(archive)
+    census = {"payload_sha256": {"fixture_archive": "fixture_sha"},
+              "anchor": {"no_tax_roi": "-0.132793126141", "matched_full_lift": "0.024903592563"}}
+    snapshot = recovery.execution_snapshot()
+    specs = [("fixture/S1/Q/WOR/M64", 7)]
+    net = [[float(i - 2) for i in range(len(issue_rows))]]
+    stake = [[2.0 for _ in issue_rows]]
+    recovery.write_sparse_checkpoint(checkpoint, archive, census, specs, issue_rows, net, stake,
+                                     {"SETTLED": 1}, snapshot)
+    loaded_specs, loaded_issues, loaded_net, loaded_stake = recovery.verify_sparse_checkpoint(
+        checkpoint, archive, census, snapshot
+    )
+    assert loaded_specs == specs and loaded_issues == issue_rows
+    assert loaded_net == net and loaded_stake == stake
+    assert not stage.exists() and (checkpoint / "SHA256SUMS.json").exists()
+    __import__("shutil").rmtree(checkpoint)
+
 def test_common_support_hash_tokens_are_selector_scoped():
     mod=load("runner_common_scope", SCRIPT)
     # The same canonical support may be reused by multiple selectors, but a
