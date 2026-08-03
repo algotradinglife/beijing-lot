@@ -15,6 +15,7 @@ ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location("bj167_runner",ROOT/"scripts"/"settle_bj167_strategy_atlas_gate_b_exact.py")
 R=importlib.util.module_from_spec(spec); assert spec.loader is not None; spec.loader.exec_module(R)
 CELLS_PER_SELECTOR=963
+CHECKPOINT_CONTRACT="bj167-gate-b-v3r1-shared-science-candidate-checkpoint-v1"
 # The completed screen serializes every seed-level monetary total with
 # ``money(...)=%.6f`` before it sums the 100 stochastic rows.  The companion
 # instead pools those same ticket totals before it writes its comparison.
@@ -40,7 +41,7 @@ def execution_snapshot() -> dict:
             "frozen_allocator_sha256": R.sha(ROOT / "scripts" / "bj145_fast_alloc.cpp")}
 
 
-def write_execution_provenance(out: Path, screen: Path, start: dict, end: dict) -> None:
+def write_execution_provenance(out: Path, screen: Path, start: dict, end: dict, checkpoint: Path | None = None) -> None:
     """Persist both real boundaries; source drift in flight invalidates output."""
     if start != end:
         raise RuntimeError("all-scientific executable identity changed during run")
@@ -53,6 +54,8 @@ def write_execution_provenance(out: Path, screen: Path, start: dict, end: dict) 
                                       "content_identity_sha256": R.sha(content)},
                "all_scientific_execution_start": start,
                "all_scientific_execution_end": end}
+    if checkpoint is not None:
+        payload["shared_science_checkpoint"]={"package":checkpoint.name,"manifest_sha256":R.sha(checkpoint/"SHA256SUMS.json"),"mode":"RESUME_NO_TICKET_REPLAY"}
     (out / "execution_provenance.json").write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n")
 
 
@@ -134,19 +137,132 @@ def configure():
     lib=R.compile_engine(ROOT,"bj167_scientific_stability_exact.so")
     pd=ctypes.POINTER(ctypes.c_double); pi=ctypes.POINTER(ctypes.c_int)
     lib.bj167_scientific_set_buffers.argtypes = (
-        [pd] * 5 + [ctypes.POINTER(ctypes.c_ubyte), pi] + [pd] * 7 +
+        [pd] * 6 + [ctypes.POINTER(ctypes.c_ubyte), pi] + [pd] * 7 +
         [pd] * 3 + [pi] * 2 + [pd] * 4 + [pd] * 2 + [pi] +
         [pd] * 2 + [ctypes.c_int] * 3
     )
     lib.bj167_scientific_begin_issue.argtypes=[ctypes.c_int,ctypes.c_int,ctypes.c_int]
     lib.bj167_scientific_process_source.argtypes=[pd,ctypes.c_int,ctypes.c_char_p,ctypes.c_double,pi,ctypes.c_int,ctypes.c_int]
     lib.bj167_scientific_add_structural.argtypes=[ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_double]
+    lib.bj167_scientific_set_candidate_issue_buffers.argtypes=[pi,ctypes.c_int]+[pd]*11
     return lib
+
+
+def candidate_science_mapping(screen: Path, selectors: list[dict], selector_idx: dict[str, int], cells: list[tuple]) -> tuple[list[dict], array.array]:
+    """Bind every immutable frozen candidate to one pooled science cell.
+
+    The recovered screen's ``global_cell`` is a display/address in the wide
+    24,723-cell screen.  This mapping deliberately preserves it as provenance
+    while deriving the distinct 963-cell pooled address from the immutable
+    candidate identity.  No positional or label heuristic is permitted.
+    """
+    post_path=ROOT/"scripts"/"settle_bj167_atlas_postscreen_exact.py"
+    spec=importlib.util.spec_from_file_location("bj167_postscreen_checkpoint",post_path)
+    post=importlib.util.module_from_spec(spec); assert spec.loader is not None; spec.loader.exec_module(post)
+    recovered=post.verify_recovered_screen(screen)
+    rows=post.load_recovered_frozen_candidates(screen,recovered)
+    local={cell:i for i,cell in enumerate(cells)}
+    mapping=[]; addresses=array.array("i")
+    for row in rows:
+        cell,science_m=scientific_cell_identity(row)
+        if row["selector_id"] not in selector_idx or cell not in local:
+            raise RuntimeError(f"frozen candidate cannot map to scientific cell: {row['candidate_index']}")
+        at=selector_idx[row["selector_id"]]*len(cells)+local[cell]
+        mapping.append({"candidate_index":row["candidate_index"],"selector_id":row["selector_id"],"weight_source":row["weight_source"],"mechanism":row["mechanism"],"cap":row["cap"],"M":row["M"],"science_M":science_m,"seed_scope":row["seed_scope"],"screen_global_cell":row.get("global_cell",""),"global_science_cell":at,"candidate_inclusion":row["candidate_inclusion"],"screen_stake_yuan":row["screen_stake_yuan"],"screen_no_tax_roi":row["screen_no_tax_roi"],"screen_matched_full_lift":row["screen_matched_full_lift"]})
+        addresses.append(at)
+    if [r["candidate_index"] for r in mapping] != list(range(len(mapping))):
+        raise RuntimeError("candidate checkpoint mapping index drift")
+    return mapping, addresses
+
+
+def scientific_cell_identity(row: dict) -> tuple[tuple[str,str,str,str,str], str]:
+    """Return the explicit 963-cell identity while retaining the frozen key."""
+    # The wide screen stored global P/Q-delete controls with M=NA because
+    # they are structural rather than sampled.  The immutable 963-cell
+    # science layout represents the same 3^7-3^6 support explicitly as
+    # M=1458; callers retain the original frozen M beside this mapping.
+    science_m="1458" if row["mechanism"] in {"P_MIN_GLOBAL_DELETE","Q_MIN_GLOBAL_DELETE"} and row["M"]=="NA" else row["M"]
+    return (row["weight_source"],row["mechanism"],row["cap"],science_m,row["seed_scope"]),science_m
+
+
+def checkpoint_array_specs(candidate_values: dict[str, array.array], nissue: int) -> dict[str, dict]:
+    return {name:{"path":f"candidate_issue_arrays/{name}.f64","typecode":"d","shape":[len(candidate_values[name])//nissue,nissue]} for name in sorted(candidate_values)}
+
+
+def aggregate_array_specs(science_values: dict[str, tuple[array.array, list[int]]]) -> dict[str, dict]:
+    return {name:{"path":f"science_aggregate_arrays/{name}.{value.typecode}","typecode":value.typecode,"shape":shape} for name,(value,shape) in sorted(science_values.items())}
+
+
+def write_candidate_checkpoint(checkpoint: Path, screen: Path, mapping: list[dict], issue_rows: list[dict], candidate_values: dict[str, array.array], science_values: dict[str, tuple[array.array, list[int]]], execution: dict) -> None:
+    """Atomically persist the one native replay's candidate issue ledger."""
+    if checkpoint.exists(): raise RuntimeError("refusing to replace immutable shared checkpoint")
+    stage=Path(str(checkpoint)+".stage")
+    if stage.exists(): raise RuntimeError("stale shared checkpoint stage exists")
+    stage.mkdir(parents=True)
+    try:
+        with (stage/"candidate_science_mapping.csv").open("w",newline="") as f:
+            fields=["candidate_index","selector_id","weight_source","mechanism","cap","M","science_M","seed_scope","screen_global_cell","global_science_cell","candidate_inclusion","screen_stake_yuan","screen_no_tax_roi","screen_matched_full_lift"]
+            w=csv.DictWriter(f,fieldnames=fields);w.writeheader();w.writerows(mapping)
+        with (stage/"issue_order.csv").open("w",newline="") as f:
+            w=csv.DictWriter(f,fieldnames=list(issue_rows[0]));w.writeheader();w.writerows(issue_rows)
+        shutil.copyfile(screen/"candidate_freeze.csv",stage/"candidate_freeze.csv")
+        shutil.copyfile(screen/"candidate_freeze.json",stage/"candidate_freeze.json")
+        specs=checkpoint_array_specs(candidate_values,len(issue_rows))
+        for name,spec in specs.items():
+            p=stage/spec["path"];p.parent.mkdir(parents=True,exist_ok=True)
+            with p.open("wb") as f: candidate_values[name].tofile(f)
+        science_specs=aggregate_array_specs(science_values)
+        for name,spec in science_specs.items():
+            p=stage/spec["path"];p.parent.mkdir(parents=True,exist_ok=True)
+            with p.open("wb") as f: science_values[name][0].tofile(f)
+        metadata={"contract":CHECKPOINT_CONTRACT,"screening_package":screen.name,"screening_manifest_sha256":R.sha(screen/"SHA256SUMS.json"),"screening_content_identity_sha256":R.sha(screen/"CONTENT_IDENTITY.json"),"candidate_freeze_sha256":R.sha(screen/"candidate_freeze.csv"),"candidate_count":len(mapping),"issue_count":len(issue_rows),"candidate_science_mapping_sha256":R.sha(stage/"candidate_science_mapping.csv"),"issue_order_sha256":R.sha(stage/"issue_order.csv"),"array_specs":specs,"science_aggregate_specs":science_specs,"native_execution":execution,"frozen_allocator_sha256":R.sha(ROOT/"scripts"/"bj145_fast_alloc.cpp"),"native_wrapper_sha256":R.sha(NATIVE_WRAPPER_PATH)}
+        (stage/"checkpoint_metadata.json").write_text(json.dumps(metadata,sort_keys=True,indent=2)+"\n")
+        R.write_file_census(stage)
+        R.finalize_package_identity(stage,CHECKPOINT_CONTRACT,{"candidate_count":len(mapping),"issue_count":len(issue_rows),"candidate_freeze_sha256":metadata["candidate_freeze_sha256"],"screening_manifest_sha256":metadata["screening_manifest_sha256"],"candidate_science_mapping_sha256":metadata["candidate_science_mapping_sha256"]})
+        R.atomic_publish(stage,checkpoint)
+    except Exception:
+        # Keep a failed stage for diagnosis; atomic publication ensures it can
+        # never be mistaken for an immutable checkpoint.
+        raise
+
+
+def verify_candidate_checkpoint(checkpoint: Path, screen: Path) -> tuple[dict, list[dict], list[dict], dict[str,array.array], dict[str,array.array]]:
+    """Load a complete atomic checkpoint; no ticket replay is available here."""
+    meta=json.loads((checkpoint/"checkpoint_metadata.json").read_text())
+    if meta.get("contract")!=CHECKPOINT_CONTRACT: raise RuntimeError("shared checkpoint contract mismatch")
+    if meta.get("screening_manifest_sha256")!=R.sha(screen/"SHA256SUMS.json"): raise RuntimeError("shared checkpoint screen manifest drift")
+    sums=json.loads((checkpoint/"SHA256SUMS.json").read_text())
+    for name,digest in sums.items():
+        if R.sha(checkpoint/name)!=digest: raise RuntimeError(f"shared checkpoint payload drift: {name}")
+    mapping=list(csv.DictReader((checkpoint/"candidate_science_mapping.csv").open(newline="")))
+    issues=list(csv.DictReader((checkpoint/"issue_order.csv").open(newline="")))
+    if len(mapping)!=int(meta["candidate_count"]) or len(issues)!=int(meta["issue_count"]): raise RuntimeError("shared checkpoint dimension drift")
+    values={}
+    for name,spec in meta["array_specs"].items():
+        a=array.array(spec["typecode"])
+        with (checkpoint/spec["path"]).open("rb") as f:a.fromfile(f,(checkpoint/spec["path"]).stat().st_size//a.itemsize)
+        if len(a)!=math.prod(spec["shape"]): raise RuntimeError(f"shared checkpoint array shape drift: {name}")
+        values[name]=a
+    science={}
+    for name,spec in meta.get("science_aggregate_specs",{}).items():
+        a=array.array(spec["typecode"])
+        with (checkpoint/spec["path"]).open("rb") as f:a.fromfile(f,(checkpoint/spec["path"]).stat().st_size//a.itemsize)
+        if len(a)!=math.prod(spec["shape"]): raise RuntimeError(f"shared checkpoint scientific array shape drift: {name}")
+        science[name]=a
+    if not science: raise RuntimeError("shared checkpoint lacks resumable scientific aggregates")
+    return meta,mapping,issues,values,science
 
 
 def write_gz(path, fields, emit):
     with gzip.GzipFile(filename=str(path),mode="wb",mtime=0) as gb, __import__("io").TextIOWrapper(gb,newline="") as f:
         w=csv.DictWriter(f,fieldnames=fields);w.writeheader(); emit(w)
+
+
+def scientific_checkpoint_values(allv, cumulative, peak, drawdown, miss, longest_miss, yn, ys, fn, fs, largest, largest_stake, largest_issue, full_issue_net, full_issue_stake, total, year_count, fold_count, selector_count, issue_count):
+    """Named aggregate state required by the no-replay scientific finalizer."""
+    values={f"allv_{i}":(v,[total]) for i,v in enumerate(allv)}
+    values.update({"cumulative":(cumulative,[total]),"peak":(peak,[total]),"drawdown":(drawdown,[total]),"miss":(miss,[total]),"longest_miss":(longest_miss,[total]),"year_net":(yn,[total,year_count]),"year_stake":(ys,[total,year_count]),"fold_net":(fn,[total,fold_count]),"fold_stake":(fs,[total,fold_count]),"largest":(largest,[total]),"largest_stake":(largest_stake,[total]),"largest_issue":(largest_issue,[total]),"full_issue_net":(full_issue_net,[selector_count,issue_count]),"full_issue_stake":(full_issue_stake,[selector_count,issue_count])})
+    return values
 
 
 def reconcile_scientific_screen(out: Path, screen: Path, selectors: list[dict], cells: list[tuple],
@@ -188,18 +304,28 @@ def reconcile_scientific_screen(out: Path, screen: Path, selectors: list[dict], 
 
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument("--screening-output",default="results/bj167_gate_b_strategy_atlas_v3r1_exact"); ap.add_argument("--output",default="results/bj167_gate_b_strategy_atlas_v3r1_scientific_stability_exact"); args=ap.parse_args()
-    screen, final=ROOT/args.screening_output, ROOT/args.output
+    ap=argparse.ArgumentParser(); ap.add_argument("--screening-output",default="results/bj167_gate_b_strategy_atlas_v3r1_recovered_final_v1"); ap.add_argument("--output",default="results/bj167_gate_b_strategy_atlas_v3r1_scientific_stability_exact"); ap.add_argument("--checkpoint-output",default="results/bj167_gate_b_strategy_atlas_v3r1_shared_science_checkpoint_v1"); ap.add_argument("--resume-checkpoint",action="store_true"); ap.add_argument("--preflight",action="store_true"); args=ap.parse_args()
+    screen, final, checkpoint=ROOT/args.screening_output, ROOT/args.output, ROOT/args.checkpoint_output
     execution_start=execution_snapshot()
     if final.exists(): raise RuntimeError("refusing to replace immutable stability companion")
     if not (screen/"SHA256SUMS.json").exists(): raise RuntimeError("completed immutable screen required")
     sums=json.loads((screen/"SHA256SUMS.json").read_text())
     for name,digest in sums.items():
         if R.sha(screen/name)!=digest: raise RuntimeError(f"screening payload drift: {name}")
+    if args.preflight:
+        _outcomes=R.load_outcomes(); selectors,selector_idx,*_=R.load_surface()
+        mapping,_addresses=candidate_science_mapping(screen,selectors,selector_idx,science_cells())
+        issue_count=sum(1 for _ in csv.DictReader((screen/"issue_order.csv").open(newline="")))
+        print(json.dumps({"contract":CHECKPOINT_CONTRACT,"mode":"PREFLIGHT_ONLY_NO_TICKET_REPLAY","candidate_count":len(mapping),"science_cells_per_selector":CELLS_PER_SELECTOR,"selector_count":len(selectors),"issue_count":issue_count,"candidate_issue_array_rows":len(mapping)*issue_count,"candidate_issue_array_bytes":len(mapping)*issue_count*10*8,"scientific_aggregate_checkpoint":"required for --resume-checkpoint","screen_manifest_sha256":R.sha(screen/"SHA256SUMS.json")},sort_keys=True),flush=True)
+        return
     stage=Path(str(final)+".stage")
     if stage.exists(): raise RuntimeError("stale stability stage exists")
     stage.mkdir(parents=True); out=stage
-    order_rows=list(csv.DictReader((screen/"issue_order.csv").open(newline="")))
+    checkpoint_saved=None
+    if args.resume_checkpoint:
+        checkpoint_meta,_checkpoint_mapping,order_rows,_checkpoint_candidates,checkpoint_saved=verify_candidate_checkpoint(checkpoint,screen)
+    else:
+        order_rows=list(csv.DictReader((screen/"issue_order.csv").open(newline="")))
     issues=[r["issue_instance"] for r in order_rows]; meta={r["issue_instance"]:r for r in order_rows}; nissue=len(issues)
     years=sorted({meta[x]["year"] for x in issues}); folds=sorted({meta[x]["fold"] for x in issues}); year_i={x:i for i,x in enumerate(years)}; fold_i={x:i for i,x in enumerate(folds)}
     year_issue_count={name: sum(meta[x]["year"] == name for x in issues) for name in years}
@@ -209,28 +335,38 @@ def main():
     R.build_policy_status(census,supports,selector_idx)
     if set(issues)!=set(by_issue): raise RuntimeError("screening and canonical issue universes differ")
     cells=science_cells(); ncell=len(cells); total=len(selectors)*ncell
-    zeros=lambda:array.array("d",[0.0])*total
-    tmp=[zeros() for _ in range(5)]; allv=[zeros() for _ in range(7)]
-    mark=array.array("B",[0])*total; touched=array.array("i",[0])*total
-    cumulative=zeros(); peak=zeros(); drawdown=zeros(); miss=array.array("i",[0])*total; longest_miss=array.array("i",[0])*total
-    yn=array.array("d",[0.0])*(total*len(years)); ys=array.array("d",[0.0])*(total*len(years)); fn=array.array("d",[0.0])*(total*len(folds)); fs=array.array("d",[0.0])*(total*len(folds))
-    largest=array.array("d",[-math.inf])*total; largest_stake=zeros(); largest_issue=array.array("i",[-1])*total
-    full_issue_net=array.array("d",[0.0])*(len(selectors)*nissue); full_issue_stake=array.array("d",[0.0])*(len(selectors)*nissue)
-    lib=configure(); pd=ctypes.c_double; pi=ctypes.c_int
-    lib.bj167_scientific_set_buffers(*(R.ptr(x,pd) for x in tmp),R.ptr(mark,ctypes.c_ubyte),R.ptr(touched,pi),*(R.ptr(x,pd) for x in allv),R.ptr(cumulative,pd),R.ptr(peak,pd),R.ptr(drawdown,pd),R.ptr(miss,pi),R.ptr(longest_miss,pi),R.ptr(yn,pd),R.ptr(ys,pd),R.ptr(fn,pd),R.ptr(fs,pd),R.ptr(largest,pd),R.ptr(largest_stake,pd),R.ptr(largest_issue,pi),R.ptr(full_issue_net,pd),R.ptr(full_issue_stake,pd),len(years),len(folds),nissue)
-    for ii,issue in enumerate(issues):
-        lib.bj167_scientific_begin_issue(ii,year_i[meta[issue]["year"]],fold_i[meta[issue]["fold"]])
-        for s in by_issue[issue]:
-            occ=array.array("i",s["eligible_selectors"])
-            if not occ: continue
-            signature="|".join(s["mids"]).encode()
-            for src_i,src in enumerate(R.SOURCES):
-                role=array.array("d",[v for rr in s["roles"] for v in rr["source"][src]])
-                lib.bj167_scientific_process_source(R.ptr(role,pd),s["truth"],signature,s["payout"],R.ptr(occ,pi),len(occ),src_i*160)
-            pl,pc,ql,qc=R.derive_delete(s["roles"])
-            for si in occ: lib.bj167_scientific_add_structural(si,s["truth"],pl,pc,ql,qc,s["payout"])
-        lib.bj167_scientific_end_issue()
-        if (ii+1)%10==0: print(f"scientific stability issues {ii+1}/{nissue}",flush=True)
+    if args.resume_checkpoint:
+        required=[*(f"allv_{i}" for i in range(7)),"cumulative","peak","drawdown","miss","longest_miss","year_net","year_stake","fold_net","fold_stake","largest","largest_stake","largest_issue","full_issue_net","full_issue_stake"]
+        if set(required)!=set(checkpoint_saved): raise RuntimeError("shared checkpoint scientific aggregate schema drift")
+        allv=[checkpoint_saved[f"allv_{i}"] for i in range(7)]; cumulative=checkpoint_saved["cumulative"]; peak=checkpoint_saved["peak"]; drawdown=checkpoint_saved["drawdown"]; miss=checkpoint_saved["miss"]; longest_miss=checkpoint_saved["longest_miss"]; yn=checkpoint_saved["year_net"]; ys=checkpoint_saved["year_stake"]; fn=checkpoint_saved["fold_net"]; fs=checkpoint_saved["fold_stake"]; largest=checkpoint_saved["largest"]; largest_stake=checkpoint_saved["largest_stake"]; largest_issue=checkpoint_saved["largest_issue"]; full_issue_net=checkpoint_saved["full_issue_net"]; full_issue_stake=checkpoint_saved["full_issue_stake"]
+    else:
+        frozen_mapping,candidate_addresses=candidate_science_mapping(screen,selectors,selector_idx,cells)
+        zeros=lambda:array.array("d",[0.0])*total
+        tmp=[zeros() for _ in range(6)]; allv=[zeros() for _ in range(7)]
+        mark=array.array("B",[0])*total; touched=array.array("i",[0])*total
+        cumulative=zeros(); peak=zeros(); drawdown=zeros(); miss=array.array("i",[0])*total; longest_miss=array.array("i",[0])*total
+        yn=array.array("d",[0.0])*(total*len(years)); ys=array.array("d",[0.0])*(total*len(years)); fn=array.array("d",[0.0])*(total*len(folds)); fs=array.array("d",[0.0])*(total*len(folds))
+        largest=array.array("d",[-math.inf])*total; largest_stake=zeros(); largest_issue=array.array("i",[-1])*total
+        full_issue_net=array.array("d",[0.0])*(len(selectors)*nissue); full_issue_stake=array.array("d",[0.0])*(len(selectors)*nissue)
+        candidate_values={name:array.array("d",[0.0])*(len(frozen_mapping)*nissue) for name in ("net","stake","gross","tax","hit","tax_line_hit","full_net","full_stake","full_gross","full_tax","full_hit")}
+        lib=configure(); pd=ctypes.c_double; pi=ctypes.c_int
+        lib.bj167_scientific_set_buffers(*(R.ptr(x,pd) for x in tmp),R.ptr(mark,ctypes.c_ubyte),R.ptr(touched,pi),*(R.ptr(x,pd) for x in allv),R.ptr(cumulative,pd),R.ptr(peak,pd),R.ptr(drawdown,pd),R.ptr(miss,pi),R.ptr(longest_miss,pi),R.ptr(yn,pd),R.ptr(ys,pd),R.ptr(fn,pd),R.ptr(fs,pd),R.ptr(largest,pd),R.ptr(largest_stake,pd),R.ptr(largest_issue,pi),R.ptr(full_issue_net,pd),R.ptr(full_issue_stake,pd),len(years),len(folds),nissue)
+        lib.bj167_scientific_set_candidate_issue_buffers(R.ptr(candidate_addresses,pi),len(frozen_mapping),*(R.ptr(candidate_values[name],pd) for name in ("net","stake","gross","tax","hit","tax_line_hit","full_net","full_stake","full_gross","full_tax","full_hit")))
+        for ii,issue in enumerate(issues):
+            lib.bj167_scientific_begin_issue(ii,year_i[meta[issue]["year"]],fold_i[meta[issue]["fold"]])
+            for s in by_issue[issue]:
+                occ=array.array("i",s["eligible_selectors"])
+                if not occ: continue
+                signature="|".join(s["mids"]).encode()
+                for src_i,src in enumerate(R.SOURCES):
+                    role=array.array("d",[v for rr in s["roles"] for v in rr["source"][src]])
+                    lib.bj167_scientific_process_source(R.ptr(role,pd),s["truth"],signature,s["payout"],R.ptr(occ,pi),len(occ),src_i*160)
+                pl,pc,ql,qc=R.derive_delete(s["roles"])
+                for si in occ: lib.bj167_scientific_add_structural(si,s["truth"],pl,pc,ql,qc,s["payout"])
+            lib.bj167_scientific_end_issue()
+            if (ii+1)%10==0: print(f"scientific stability issues {ii+1}/{nissue}",flush=True)
+        # This is the sole native ticket replay for both downstream packages.
+        write_candidate_checkpoint(checkpoint,screen,frozen_mapping,order_rows,candidate_values,scientific_checkpoint_values(allv,cumulative,peak,drawdown,miss,longest_miss,yn,ys,fn,fs,largest,largest_stake,largest_issue,full_issue_net,full_issue_stake,total,len(years),len(folds),len(selectors),nissue),execution_start)
     # The scalar summary is the keyed all-cell coverage census.  Slices below
     # are derived from exact cell/year/fold totals, never seed pseudo-history.
     fields=["global_science_cell","selector_id","weight_source","mechanism","cap","M","seed_scope","coverage_scope","coverage_status","no_tax_roi","matched_full_no_tax_roi","paired_lift","ex_largest_issue_no_tax_roi","ex_largest_issue_full_roi","ex_largest_issue_lift","ex_largest_year_no_tax_roi","ex_largest_year_full_roi","ex_largest_year_lift","largest_signed_issue","largest_signed_issue_net_yuan","largest_signed_year","gross_issue_hhi","gross_top_issue_share","drawdown_no_tax_yuan","longest_miss_streak","year_slice_count","fold_slice_count","loyo_slice_count"]
@@ -283,7 +419,7 @@ def main():
     coverage={"contract":"bj167-gate-b-v3r1-scientific-stability","scientific_cell_count":total,"selector_count":len(selectors),"science_cells_per_selector":ncell,"stochastic_unit":"100-seed pooled ensemble","deterministic_unit":"one arm","year_count":len(years),"fold_count":len(folds),"screen_reconciliation":"scientific_screen_reconciliation.csv.gz exact PASS required","coverage":"all scientific cells receive YEAR/FOLD/LOYO, signed-largest issue/year, paired selector FULL exclusions, pooled HHI/top share/drawdown/miss streak"}
     (out/"scientific_stability_coverage.json").write_text(json.dumps(coverage,sort_keys=True,indent=2)+"\n")
     execution_end=execution_snapshot()
-    write_execution_provenance(out,screen,execution_start,execution_end)
+    write_execution_provenance(out,screen,execution_start,execution_end,checkpoint if args.resume_checkpoint else None)
     R.write_file_census(out);R.finalize_package_identity(out,"bj167-gate-b-v3r1-scientific-stability",{"screening_manifest_sha256":R.sha(screen/"SHA256SUMS.json"),"screening_content_identity_sha256":R.sha(screen/"CONTENT_IDENTITY.json"),"all_scientific_execution_head":execution_start["git_head"],"all_scientific_runner_sha256":execution_start["runner_sha256"],"all_scientific_native_wrapper_sha256":execution_start["native_wrapper_sha256"],"allocator_sha256":R.EXPECTED_ALLOCATOR_SHA256,"scientific_cell_count":total});R.atomic_publish(stage,final);print(f"WROTE {final}",flush=True)
 
 if __name__=="__main__": main()

@@ -117,6 +117,10 @@ def test_all_scientific_layout_includes_deterministic_and_m2187_contract_cells()
     assert SCIENCE.retained_issue_count("YEAR", "2023", 7, years, folds) == 2
     assert SCIENCE.retained_issue_count("FOLD", "F1", 7, years, folds) == 1
     assert SCIENCE.retained_issue_count("LOYO", "2023", 7, years, folds) == 5
+    # Structural deletes were NA in the wide frozen screen, but map to the
+    # explicit 1458-ticket science-cell address without rewriting that key.
+    cell, science_m = SCIENCE.scientific_cell_identity({"weight_source":"NA", "mechanism":"Q_MIN_GLOBAL_DELETE", "cap":"NA", "M":"NA", "seed_scope":"DETERMINISTIC"})
+    assert science_m == "1458" and cell in cells
 
 
 def test_scientific_native_companion_m2187_reconciles_production_role_shape():
@@ -127,13 +131,16 @@ def test_scientific_native_companion_m2187_reconciles_production_role_shape():
             row = next(reader); assert (row["selector_id"], row["issue_instance"], row["portfolio_id"]) == key; raw.append(row)
     roles = [POST.R.role_values(r) for r in raw]; n = 963
     ds = lambda: array.array("d", [0.0]) * n
-    tmp = [ds() for _ in range(5)]; totals = [ds() for _ in range(7)]
+    tmp = [ds() for _ in range(6)]; totals = [ds() for _ in range(7)]
     mark = array.array("B", [0]) * n; touched = array.array("i", [0]) * n
     cumulative = ds(); peak = ds(); drawdown = ds(); miss = array.array("i", [0]) * n; longest_miss = array.array("i", [0]) * n
     year_net = ds(); year_stake = ds(); fold_net = ds(); fold_stake = ds(); largest = array.array("d", [-float("inf")]) * n; largest_stake = ds(); largest_issue = array.array("i", [-1]) * n
     full_issue_net = array.array("d", [0.0]); full_issue_stake = array.array("d", [0.0])
     lib = SCIENCE.configure(); pd = __import__("ctypes").c_double; pi = __import__("ctypes").c_int
     lib.bj167_scientific_set_buffers(*(POST.R.ptr(x, pd) for x in tmp), POST.R.ptr(mark, __import__("ctypes").c_ubyte), POST.R.ptr(touched, pi), *(POST.R.ptr(x, pd) for x in totals), POST.R.ptr(cumulative, pd), POST.R.ptr(peak, pd), POST.R.ptr(drawdown, pd), POST.R.ptr(miss, pi), POST.R.ptr(longest_miss, pi), POST.R.ptr(year_net, pd), POST.R.ptr(year_stake, pd), POST.R.ptr(fold_net, pd), POST.R.ptr(fold_stake, pd), POST.R.ptr(largest, pd), POST.R.ptr(largest_stake, pd), POST.R.ptr(largest_issue, pi), POST.R.ptr(full_issue_net, pd), POST.R.ptr(full_issue_stake, pd), 1, 1, 1)
+    candidate_at = array.array("i", [20 + 19])
+    captured = {name: array.array("d", [0.0]) for name in ("net", "stake", "gross", "tax", "hit", "tax_line_hit", "full_net", "full_stake", "full_gross", "full_tax", "full_hit")}
+    lib.bj167_scientific_set_candidate_issue_buffers(POST.R.ptr(candidate_at, pi), 1, *(POST.R.ptr(captured[name], pd) for name in ("net", "stake", "gross", "tax", "hit", "tax_line_hit", "full_net", "full_stake", "full_gross", "full_tax", "full_hit")))
     occ = array.array("i", [0]); source = array.array("d", [v for role in roles for v in role["source"]["Q_WEIGHT"]])
     lib.bj167_scientific_begin_issue(0, 0, 0)
     lib.bj167_scientific_process_source(POST.R.ptr(source, pd), 0, b"production-science-fixture", 2.0, POST.R.ptr(occ, pi), 1, 0)
@@ -144,6 +151,12 @@ def test_scientific_native_companion_m2187_reconciles_production_role_shape():
     assert totals[0][wor] / 100 == totals[0][full] and totals[1][wor] / 100 == totals[1][full]
     assert totals[0][top] == totals[0][full] and totals[1][top] == totals[1][full]
     assert totals[1][160 + 20 + 19] == totals[1][wor]
+    # Candidate capture occurs in the production native end_issue boundary.
+    # WOR has 100 real seed tickets, so its matched FULL control is scaled to
+    # the identical stake universe rather than silently using one FULL ticket.
+    assert captured["stake"][0] == totals[1][wor]
+    assert captured["full_stake"][0] == totals[1][full] * 100
+    assert captured["gross"][0] == totals[2][wor]
 
 
 def test_scientific_reconciliation_requires_complete_keyed_963_surface():
@@ -179,6 +192,27 @@ def test_scientific_reconciliation_100_seed_rounding_envelope_is_exactly_bounded
     # A difference beyond the declared serialization envelope remains a hard
     # mismatch; this is not a generic tolerance relaxation.
     assert abs(screen_serialized_gross - (pooled_gross + 0.00011)) > money_bound
+
+
+def test_shared_science_checkpoint_is_atomic_and_resumable_without_ticket_replay():
+    root = ROOT / ".scratch" / "bj167_shared_science_checkpoint_fixture"
+    if root.exists(): shutil.rmtree(root)
+    screen = root / "screen"; checkpoint = root / "checkpoint"; screen.mkdir(parents=True)
+    (screen / "SHA256SUMS.json").write_text("{}\n"); (screen / "CONTENT_IDENTITY.json").write_text("{}\n")
+    (screen / "candidate_freeze.csv").write_text("candidate_index\n0\n")
+    (screen / "candidate_freeze.json").write_text("{}\n")
+    mapping = [{"candidate_index": 0, "selector_id": "S0", "weight_source": "Q_WEIGHT", "mechanism": "WOR_DISTINCT", "cap": "NA", "M": "64", "science_M": "64", "seed_scope": "ENSEMBLE_100", "screen_global_cell": "42", "global_science_cell": 39, "candidate_inclusion": "ABSOLUTE_POSITIVE", "screen_stake_yuan": "12.000000", "screen_no_tax_roi": "0.100000000000", "screen_matched_full_lift": "0.200000000000"}]
+    issue_rows = [{"issue_instance": "I1", "year": "2024", "fold": "F1", "first_kickoff_ts": "2024-01-01T00:00:00Z"}, {"issue_instance": "I2", "year": "2025", "fold": "F2", "first_kickoff_ts": "2025-01-01T00:00:00Z"}]
+    candidate = {name: array.array("d", [1.0, 2.0]) for name in ("net", "stake", "gross", "tax", "hit", "tax_line_hit", "full_net", "full_stake", "full_gross", "full_tax", "full_hit")}
+    aggregate = {"allv_0": (array.array("d", [3.0]), [1]), "largest_issue": (array.array("i", [1]), [1])}
+    SCIENCE.write_candidate_checkpoint(checkpoint, screen, mapping, issue_rows, candidate, aggregate, {"git_head": "fixture"})
+    meta, loaded_mapping, loaded_issues, loaded_candidate, loaded_aggregate = SCIENCE.verify_candidate_checkpoint(checkpoint, screen)
+    assert meta["candidate_count"] == 1 and not Path(str(checkpoint) + ".stage").exists()
+    assert loaded_mapping == [{k: str(v) for k, v in mapping[0].items()}]
+    assert [r["issue_instance"] for r in loaded_issues] == ["I1", "I2"]
+    assert list(loaded_candidate["gross"]) == [1.0, 2.0]
+    assert list(loaded_aggregate["allv_0"]) == [3.0] and list(loaded_aggregate["largest_issue"]) == [1]
+    shutil.rmtree(root)
 
 
 def test_full_atlas_chart_sources_cover_deterministic_dense_m_and_selector_controls():
@@ -224,12 +258,44 @@ def test_execution_provenance_binds_screen_and_postscreen_identities():
     screen = root / "screen"; out = root / "out"; screen.mkdir(parents=True); out.mkdir()
     (screen / "SHA256SUMS.json").write_text("{}\n"); (screen / "CONTENT_IDENTITY.json").write_text("{}\n")
     snap = POST.execution_snapshot()
-    POST.write_execution_provenance(out, screen, snap, snap)
+    recovered = {"manifest_sha256":"manifest", "content_identity_sha256":"identity", "recovery_provenance_sha256":"recovery",
+                 "candidate_freeze_sha256":"freeze", "candidate_freeze_count":2, "candidate_total_screen_stake_yuan":"4.000000",
+                 "recovery_finalizer_execution_start":{"git_head":"recovery-start"}, "recovery_finalizer_execution_end":{"git_head":"recovery-end"},
+                 "historical_screen_execution":{"git_head":POST.SCREENING_EXECUTION_HEAD,"runner_sha256":POST.SCREENING_RUNNER_SHA256,"native_wrapper_sha256":POST.SCREENING_NATIVE_WRAPPER_SHA256}}
+    POST.write_execution_provenance(out, screen, snap, snap, recovered)
     data = json.loads((out / "execution_provenance.json").read_text())
-    assert data["screening_execution"]["git_head"] == POST.SCREENING_EXECUTION_HEAD
-    assert data["screening_execution"]["runner_sha256"] == POST.SCREENING_RUNNER_SHA256
+    assert data["historical_screen_execution"]["git_head"] == POST.SCREENING_EXECUTION_HEAD
+    assert data["historical_screen_execution"]["runner_sha256"] == POST.SCREENING_RUNNER_SHA256
+    assert data["recovered_screening_package"]["candidate_freeze_sha256"] == "freeze"
+    assert data["current_companion_dependency_hashes"]["screen_runner_sha256"] == POST.R.sha(POST.RUNNER_PATH)
     assert data["postscreen_execution_start"] == data["postscreen_execution_end"] == snap
     shutil.rmtree(root)
+
+
+def test_recovered_package_preflight_consumes_exact_candidate_freeze():
+    screen = ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_recovered_final_v1"
+    recovered = POST.verify_recovered_screen(screen)
+    rows = POST.load_recovered_frozen_candidates(screen, recovered)
+    assert recovered["candidate_freeze_count"] == 17135
+    assert recovered["candidate_freeze_sha256"] == "56d77536807e1d8ab0e71caf547685820db68b71755becf336aafe84969dc15a"
+    assert len(rows) == recovered["candidate_freeze_count"]
+    assert sum(__import__("decimal").Decimal(r["screen_stake_yuan"]) for r in rows) == __import__("decimal").Decimal("7033958580.000000")
+    assert rows[0]["candidate_index"] == 0 and rows[-1]["candidate_index"] == 17134
+    preserved_robust_source_cells = [r for r in rows if r["global_cell"] != r["ensemble_global_cell"]]
+    assert len(preserved_robust_source_cells) == 5
+    assert all("PREDECLARED_ROBUST_SCREEN" in r["candidate_inclusion"] for r in preserved_robust_source_cells)
+
+
+def test_screen_replay_equivalence_allows_only_serialization_delta_and_rejects_material_drift():
+    candidate = {"selector_id":"S", "weight_source":"Q", "mechanism":"WOR_DISTINCT", "cap":"NA", "M":"64", "seed_scope":"ENSEMBLE_100",
+                 "screen_stake_yuan":"100.000000", "screen_no_tax_roi":"0.100000000000", "screen_matched_full_lift":"0.200000000000"}
+    report = POST.assert_screen_replay_equivalence(candidate, 100.0, 110.0, 100.0, 90.0)
+    assert report["no_tax_roi"]["delta"] == "0E-12"
+    try:
+        POST.assert_screen_replay_equivalence(candidate, 100.0, 110.0001, 100.0, 90.0)
+        assert False, "material screen/replay ROI drift must fail closed"
+    except RuntimeError as exc:
+        assert "material no_tax_roi drift" in str(exc)
 
 
 def test_scientific_execution_provenance_is_independent_and_fail_closed():
