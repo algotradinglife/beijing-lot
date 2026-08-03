@@ -49,6 +49,25 @@ Both exact-K FULL controls are negative. All apparent gains below are therefore 
 
 Q-based weighting creates the highest same-window peaks, especially under WOR, but the large number of tested cells and unstable concentration views prevent promotion. Blends and market/model weights do not show a uniformly superior surface.
 
+### Matched weighting attribution
+
+Every row below holds arm, mechanism, cap, M, seed, issue support and stake fixed. Positive delta favors Q-based value weighting.
+
+| arm | matched contrast | cells | median pre-tax Δ | Q better | Q worse | ties | median coverage Δ | median duplicate Δ |
+|---|---|---|---|---|---|---|---|---|
+| PRIMARY_NO_GATE_K4 | Q_WEIGHT − MODEL_P_CAL | 240 | -5.14% | 91/240 | 144/240 | 5/240 | -6.69% | -0.00% |
+| PRIMARY_NO_GATE_K4 | Q_WEIGHT − MARKET_WF_CAL | 240 | -1.61% | 106/240 | 129/240 | 5/240 | -6.50% | -0.00% |
+| PRIMARY_NO_GATE_K4 | Q_WEIGHT − BLEND_A25 | 240 | -3.06% | 98/240 | 137/240 | 5/240 | -7.28% | -0.00% |
+| PRIMARY_NO_GATE_K4 | Q_WEIGHT − BLEND_A50 | 240 | -0.70% | 111/240 | 124/240 | 5/240 | -7.09% | -0.00% |
+| PRIMARY_NO_GATE_K4 | Q_WEIGHT − BLEND_A75 | 240 | -2.88% | 94/240 | 141/240 | 5/240 | -6.69% | -0.00% |
+| SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − MODEL_P_CAL | 240 | -5.48% | 66/240 | 168/240 | 6/240 | -6.81% | -0.00% |
+| SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − MARKET_WF_CAL | 240 | -3.49% | 101/240 | 134/240 | 5/240 | -4.71% | -0.00% |
+| SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − BLEND_A25 | 240 | -5.86% | 72/240 | 163/240 | 5/240 | -7.33% | -0.00% |
+| SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − BLEND_A50 | 240 | -5.51% | 69/240 | 166/240 | 5/240 | -7.85% | -0.00% |
+| SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − BLEND_A75 | 240 | -7.12% | 68/240 | 167/240 | 5/240 | -6.81% | -0.00% |
+
+Across all five matched comparators, Q_WEIGHT has a -2.85% primary median pre-tax delta (better/worse/tie 500/675/25 of 1200) and a -5.52% secondary delta (376/798/26 of 1200). Its isolated historical peaks therefore are not a general matched weighting gain.
+
 ## Mechanism, coverage, stake and gross retention
 
 | arm | mechanism | median ROI | stake | draws | unique draws | duplicate draws | coverage | capital use | unique ratio | duplicate ratio | gross retention | hit tickets | winning identities |
@@ -71,6 +90,31 @@ Q-based weighting creates the highest same-window peaks, especially under WOR, b
 | SECONDARY_ESP300_GM290_K8 | WR_DUPLICATE_STAKE | -18.97% | ¥513,408.00 | 256,704 | 245,830 | 10,696 | +49.21% | +7.68% | +95.66% | +4.34% | +7.41% | 108,328 | 79,928 |
 
 WOR raises distinct-code coverage relative to WR at equal M, while WR naturally retains duplicate stake. Residual and capped repeats trade duplicate concentration for closer proportional allocation; changing the cap moves exposure and concentration but does not create a cap whose result is stable across weights, seeds, years and folds.
+
+### Matched mechanism and cap attribution
+
+Every contrast holds arm, weight, M and issue-level stake fixed. Randomized comparisons also retain the frozen seed. Positive values favor the mechanism named first.
+
+| arm | matched contrast | cells | median pre-tax Δ | first better | first worse | ties | median coverage Δ | median duplicate Δ |
+|---|---|---|---|---|---|---|---|---|
+| PRIMARY_NO_GATE_K4 | WOR − WR | 360 | +5.77% | 243/360 | 117/360 | 0/360 | +0.79% | -4.42% |
+| PRIMARY_NO_GATE_K4 | WR − residual | 360 | -1.16% | 165/360 | 195/360 | 0/360 | +3.54% | +4.42% |
+| PRIMARY_NO_GATE_K4 | WOR − residual | 360 | +2.74% | 213/360 | 144/360 | 3/360 | +3.94% | +0.00% |
+| PRIMARY_NO_GATE_K4 | cap1 − residual | 120 | -0.00% | 12/120 | 18/120 | 90/120 | -0.00% | -0.00% |
+| PRIMARY_NO_GATE_K4 | cap2 − residual | 120 | -0.39% | 59/120 | 60/120 | 1/120 | -9.45% | +50.00% |
+| PRIMARY_NO_GATE_K4 | cap4 − residual | 120 | -2.74% | 51/120 | 68/120 | 1/120 | -15.55% | +75.00% |
+| PRIMARY_NO_GATE_K4 | cap8 − residual | 120 | -12.24% | 24/120 | 95/120 | 1/120 | -20.08% | +87.50% |
+| SECONDARY_ESP300_GM290_K8 | WOR − WR | 360 | +9.69% | 285/360 | 75/360 | 0/360 | +5.76% | -4.34% |
+| SECONDARY_ESP300_GM290_K8 | WR − residual | 360 | +1.55% | 205/360 | 155/360 | 0/360 | +17.02% | +4.34% |
+| SECONDARY_ESP300_GM290_K8 | WOR − residual | 360 | +13.10% | 313/360 | 44/360 | 3/360 | +24.08% | +0.00% |
+| SECONDARY_ESP300_GM290_K8 | cap1 − residual | 120 | -0.00% | 15/120 | 6/120 | 99/120 | -0.00% | -0.00% |
+| SECONDARY_ESP300_GM290_K8 | cap2 − residual | 120 | -0.35% | 55/120 | 64/120 | 1/120 | -8.38% | +50.00% |
+| SECONDARY_ESP300_GM290_K8 | cap4 − residual | 120 | -4.90% | 43/120 | 76/120 | 1/120 | -15.71% | +75.00% |
+| SECONDARY_ESP300_GM290_K8 | cap8 − residual | 120 | -19.20% | 22/120 | 97/120 | 1/120 | -20.94% | +87.50% |
+
+Matched WOR−WR attribution is directionally favorable to WOR: primary median +5.77% with 243/360 favorable cells and secondary +9.69% with 285/360. WOR's median duplicate-ratio delta is -4.42% / -4.34% while its settled coverage delta is +0.79% / +5.76%.
+WR versus residual is not common-direction evidence: primary median -1.16% (165/360 favorable) versus secondary +1.55% (205/360 favorable), while WR adds about +4.42% / +4.34% duplicate ratio.
+Cap 1 is effectively the distinct/residual identity control. Caps 2, 4 and 8 have negative matched median ROI deltas versus residual in both arms, progressively lower coverage and progressively higher duplicate concentration; no repeat cap improves the frozen tradeoff stably.
 
 ## Concentration and path risk
 
@@ -104,7 +148,20 @@ The concentration/path table uses the same settled positive-stake denominator as
 | SECONDARY_ESP300_GM290_K8 | WOR_DISTINCT | +8.89% | +67.23% | 120 |
 | SECONDARY_ESP300_GM290_K8 | WR_DUPLICATE_STAKE | +14.76% | +35.07% | 120 |
 
-Issue bootstrap has 2,880 pre-tax comparisons: 52 have a lower 95% bound above zero and 2,605 cross zero. Holm-adjusted paired issue sign tests below 0.05: 1,983/2,880. These counts describe the frozen surface; they do not convert same-window cells into independent validation.
+Issue bootstrap has 2,880 pre-tax comparisons: 52 have a lower 95% bound above zero and 2,605 cross zero. Holm-adjusted paired issue sign tests below 0.05 total 1,983/2,880, but direction matters: 1,898 have a negative-issue majority and only 85 have a positive-issue majority.
+The paired sign statistic is per-issue candidate-minus-FULL ROI and mainly records coverage/miss direction, not payout magnitude. A cell can therefore have positive aggregate ROI from a few large wins while most issue-level signs are negative; 1,983 significance flags are not 1,983 favorable discoveries.
+
+### Binding to the prior #151/#154 cluster
+
+| seed | Q-WOR M64 ROI | ex-largest ROI | bootstrap Δ vs FULL 95% CI |
+|---|---|---|---|
+| 137001 | +16.38% | -11.47% | [-12.35%, +101.90%] |
+| 137002 | +11.77% | +0.08% | [-11.85%, +72.33%] |
+| 137003 | +2.67% | -9.46% | [-21.32%, +64.71%] |
+
+The primary Q-WOR/M64 values are the already-reproduced #151/#154 historical cluster, not a new #145 discovery. All three bootstrap intervals cross zero; excluding each seed's largest gross issue changes the three ROIs to about -11.47%, +0.08% and -9.46%, matching the prior validation warning.
+Within the frozen M64 slices, YEAR and FOLD are each positive in 12/21 rows (median +2.63%); LOYO is positive in 15/21 (median +10.79%). This is mixed, not uniform stability.
+The M16/seed137002 +84.76% peak is a seed outlier: the three primary Q-WOR M16 seed ROIs are -42.54%, +84.76% and -29.30%, with a cross-seed median of -29.30%.
 
 ## YEAR / FOLD / LOYO and concentration
 
@@ -131,6 +188,14 @@ Issue bootstrap has 2,880 pre-tax comparisons: 52 have a lower 95% bound above z
 
 The high historical cells are sensitive to issue concentration and seed. Ex-largest and leave-one-issue-out results are reported in pre-tax units so payout concentration is not obscured by tax mechanics.
 
+## Five terminal questions
+
+1. **Matched value of probability/value weighting:** Q_WEIGHT does not dominate the five probability/market/blend comparators. Holding mechanism/cap/M/seed/stake fixed, its aggregate matched median delta is -2.85% in primary (500 better, 675 worse, 25 ties of 1200) and -5.52% in secondary (376/798/26 of 1200). The high Q peaks are tail cells, not a general weighting gain.
+2. **Matched WOR effect:** WOR−WR has median pre-tax deltas of +5.77% primary and +9.69% secondary, favorable in 243/360 and 285/360 matched cells. WOR improves distinct coverage and removes WR duplicate exposure, so the mechanism has a plausible historical attribution, but this is not promotion evidence.
+3. **Matched WR/residual effect:** WR−residual is -1.16% primary (165/360 favorable) and +1.55% secondary (205/360 favorable), with roughly +4.4pp duplicate ratio. The direction changes by arm; neither WR nor residual is a stable winner.
+4. **Repeat-cap tradeoff:** cap1 is the near-identity distinct control. Relative to residual, cap2/cap4/cap8 primary median deltas are -0.39%, -2.74%, -12.24%; secondary deltas are -0.35%, -4.90%, -19.20%. Coverage falls and duplicate concentration rises as cap loosens; no cap improves the tradeoff stably.
+5. **Stable sweet spot:** none. The prior Q-WOR/M64 cluster is positive across its three pooled seeds but all three bootstrap intervals cross zero and ex-largest ROIs are -11.47%, +0.08% and -9.46%; YEAR/FOLD are positive in 12/21 and LOYO in 15/21. Across the whole surface only 52/2880 bootstrap lower bounds are positive, 2605/2880 intervals cross zero, and Holm direction is 85 positive-majority versus 1898 negative-majority. The M16 peak is a seed outlier, not a sweet spot.
+
 ## Drawdown and accounting conventions
 
 - Stake is `selected_identity_count × M × ¥2`; every WR duplicate is an independent ¥2 ticket.
@@ -140,6 +205,6 @@ The high historical cells are sensitive to issue concentration and seed. Ex-larg
 
 ## Terminal interpretation
 
-`DESCRIPTIVE_SURFACE_ONLY_NO_PROMOTION` remains the only supported decision. Allocation mechanism, cap and M materially change coverage, duplicate exposure, capital use and payout concentration. The strongest same-window Q-WOR cells do not survive the full multiplicity/concentration/seed/LOYO interpretation as promotion evidence. Any positive candidate still requires strict independent EV and genuinely held-out or forward validation.
+`DESCRIPTIVE_SURFACE_ONLY_NO_PROMOTION` remains the only supported decision. Allocation mechanism, cap and M materially change coverage, duplicate exposure, capital use and payout concentration. Matched attribution supports WOR as the most plausible distinct-coverage mechanism and binds its mid-M positive cluster to #151/#154, but attribution is not promotion: the strongest same-window Q-WOR cells do not survive the full multiplicity/concentration/seed/LOYO interpretation. WR, residual and repeat caps likewise have no common stable advantage. Any positive candidate still requires strict independent EV and genuinely held-out or forward validation.
 
 Charts: `roi_vs_m_cap.svg`, `matched_pre_tax_comparison.svg`, and `uncertainty_stability.svg`. The full numeric surfaces remain the authoritative evidence.

@@ -42,6 +42,8 @@ def main() -> None:
     args = parser.parse_args()
     package = args.package.resolve()
     summary = read(package / "mechanism_weight_surface_summary.csv")
+    weight_pairs = read(package / "weight_pairwise_deltas.csv")
+    mechanism_pairs = read(package / "mechanism_pairwise_deltas.csv")
     bootstrap = read(package / "issue_bootstrap.csv")
     multiple = read(package / "multiple_comparison.csv")
     loio = read(package / "leave_one_issue_out_summary.csv")
@@ -190,9 +192,83 @@ def main() -> None:
         ],
         weight_rows,
     )
+    weight_comparators = (
+        "MODEL_P_CAL",
+        "MARKET_WF_CAL",
+        "BLEND_A25",
+        "BLEND_A50",
+        "BLEND_A75",
+    )
+    matched_weight_rows = []
+    q_weight_aggregate: dict[str, tuple[list[float], int, int, int]] = {}
+    for arm in arms:
+        aggregate: list[float] = []
+        for comparator in weight_comparators:
+            values = [
+                row
+                for row in weight_pairs
+                if row["arm_id"] == arm
+                and row["weight_source"] == f"{comparator}_VS_Q_WEIGHT"
+            ]
+            roi = [
+                -float(row["no_tax_roi_delta_left_minus_right"]) for row in values
+            ]
+            coverage = [
+                -float(row["coverage_hit_rate_delta_left_minus_right"])
+                for row in values
+            ]
+            duplicate = [
+                -float(row["duplicate_ratio_delta_left_minus_right"])
+                for row in values
+            ]
+            aggregate.extend(roi)
+            matched_weight_rows.append(
+                [
+                    arm,
+                    f"Q_WEIGHT − {comparator}",
+                    len(roi),
+                    pct(med(roi)),
+                    f"{sum(value > 0 for value in roi)}/{len(roi)}",
+                    f"{sum(value < 0 for value in roi)}/{len(roi)}",
+                    f"{sum(value == 0 for value in roi)}/{len(roi)}",
+                    pct(med(coverage)),
+                    pct(med(duplicate)),
+                ]
+            )
+        q_weight_aggregate[arm] = (
+            aggregate,
+            sum(value > 0 for value in aggregate),
+            sum(value < 0 for value in aggregate),
+            sum(value == 0 for value in aggregate),
+        )
     lines += [
         "",
         "Q-based weighting creates the highest same-window peaks, especially under WOR, but the large number of tested cells and unstable concentration views prevent promotion. Blends and market/model weights do not show a uniformly superior surface.",
+        "",
+        "### Matched weighting attribution",
+        "",
+        "Every row below holds arm, mechanism, cap, M, seed, issue support and stake fixed. Positive delta favors Q-based value weighting.",
+        "",
+    ]
+    lines += markdown_table(
+        [
+            "arm",
+            "matched contrast",
+            "cells",
+            "median pre-tax Δ",
+            "Q better",
+            "Q worse",
+            "ties",
+            "median coverage Δ",
+            "median duplicate Δ",
+        ],
+        matched_weight_rows,
+    )
+    primary_q = q_weight_aggregate["PRIMARY_NO_GATE_K4"]
+    secondary_q = q_weight_aggregate["SECONDARY_ESP300_GM290_K8"]
+    lines += [
+        "",
+        f"Across all five matched comparators, Q_WEIGHT has a {pct(med(primary_q[0]))} primary median pre-tax delta (better/worse/tie {primary_q[1]}/{primary_q[2]}/{primary_q[3]} of {len(primary_q[0])}) and a {pct(med(secondary_q[0]))} secondary delta ({secondary_q[1]}/{secondary_q[2]}/{secondary_q[3]} of {len(secondary_q[0])}). Its isolated historical peaks therefore are not a general matched weighting gain.",
         "",
         "## Mechanism, coverage, stake and gross retention",
         "",
@@ -254,9 +330,147 @@ def main() -> None:
         ],
         mech_rows,
     )
+
+    def matched_contrast(
+        arm: str,
+        left_mechanism: str,
+        left_cap: str,
+        right_mechanism: str,
+        right_cap: str,
+    ) -> dict[str, object]:
+        values = [
+            row
+            for row in mechanism_pairs
+            if row["arm_id"] == arm
+            and row["left_mechanism"] == left_mechanism
+            and row["left_cap"] == left_cap
+            and row["right_mechanism"] == right_mechanism
+            and row["right_cap"] == right_cap
+        ]
+        sign = 1.0
+        if not values:
+            values = [
+                row
+                for row in mechanism_pairs
+                if row["arm_id"] == arm
+                and row["left_mechanism"] == right_mechanism
+                and row["left_cap"] == right_cap
+                and row["right_mechanism"] == left_mechanism
+                and row["right_cap"] == left_cap
+            ]
+            sign = -1.0
+        if not values:
+            raise RuntimeError(
+                f"missing matched mechanism contrast: {arm}: "
+                f"{left_mechanism}/{left_cap} vs {right_mechanism}/{right_cap}"
+            )
+        roi = [
+            sign * float(row["no_tax_roi_delta_left_minus_right"])
+            for row in values
+        ]
+        coverage = [
+            sign * float(row["coverage_hit_rate_delta_left_minus_right"])
+            for row in values
+        ]
+        duplicate = [
+            sign * float(row["duplicate_ratio_delta_left_minus_right"])
+            for row in values
+        ]
+        return {
+            "cells": len(roi),
+            "roi": roi,
+            "roi_median": med(roi),
+            "favorable": sum(value > 0 for value in roi),
+            "negative": sum(value < 0 for value in roi),
+            "ties": sum(value == 0 for value in roi),
+            "coverage_median": med(coverage),
+            "duplicate_median": med(duplicate),
+        }
+
+    contrast_specs = (
+        ("WOR − WR", "WOR_DISTINCT", "NA", "WR_DUPLICATE_STAKE", "NA"),
+        (
+            "WR − residual",
+            "WR_DUPLICATE_STAKE",
+            "NA",
+            "RESIDUAL_SYSTEMATIC",
+            "NA",
+        ),
+        (
+            "WOR − residual",
+            "WOR_DISTINCT",
+            "NA",
+            "RESIDUAL_SYSTEMATIC",
+            "NA",
+        ),
+        ("cap1 − residual", "CAPPED_REPEAT", "1", "RESIDUAL_SYSTEMATIC", "NA"),
+        ("cap2 − residual", "CAPPED_REPEAT", "2", "RESIDUAL_SYSTEMATIC", "NA"),
+        ("cap4 − residual", "CAPPED_REPEAT", "4", "RESIDUAL_SYSTEMATIC", "NA"),
+        ("cap8 − residual", "CAPPED_REPEAT", "8", "RESIDUAL_SYSTEMATIC", "NA"),
+    )
+    mechanism_contrast_stats: dict[tuple[str, str], dict[str, object]] = {}
+    mechanism_contrast_rows = []
+    for arm in arms:
+        for label, left_mechanism, left_cap, right_mechanism, right_cap in contrast_specs:
+            stats = matched_contrast(
+                arm,
+                left_mechanism,
+                left_cap,
+                right_mechanism,
+                right_cap,
+            )
+            mechanism_contrast_stats[(arm, label)] = stats
+            mechanism_contrast_rows.append(
+                [
+                    arm,
+                    label,
+                    stats["cells"],
+                    pct(float(stats["roi_median"])),
+                    f"{stats['favorable']}/{stats['cells']}",
+                    f"{stats['negative']}/{stats['cells']}",
+                    f"{stats['ties']}/{stats['cells']}",
+                    pct(float(stats["coverage_median"])),
+                    pct(float(stats["duplicate_median"])),
+                ]
+            )
     lines += [
         "",
         "WOR raises distinct-code coverage relative to WR at equal M, while WR naturally retains duplicate stake. Residual and capped repeats trade duplicate concentration for closer proportional allocation; changing the cap moves exposure and concentration but does not create a cap whose result is stable across weights, seeds, years and folds.",
+        "",
+        "### Matched mechanism and cap attribution",
+        "",
+        "Every contrast holds arm, weight, M and issue-level stake fixed. Randomized comparisons also retain the frozen seed. Positive values favor the mechanism named first.",
+        "",
+    ]
+    lines += markdown_table(
+        [
+            "arm",
+            "matched contrast",
+            "cells",
+            "median pre-tax Δ",
+            "first better",
+            "first worse",
+            "ties",
+            "median coverage Δ",
+            "median duplicate Δ",
+        ],
+        mechanism_contrast_rows,
+    )
+    primary_wor = mechanism_contrast_stats[("PRIMARY_NO_GATE_K4", "WOR − WR")]
+    secondary_wor = mechanism_contrast_stats[
+        ("SECONDARY_ESP300_GM290_K8", "WOR − WR")
+    ]
+    primary_wr_residual = mechanism_contrast_stats[
+        ("PRIMARY_NO_GATE_K4", "WR − residual")
+    ]
+    secondary_wr_residual = mechanism_contrast_stats[
+        ("SECONDARY_ESP300_GM290_K8", "WR − residual")
+    ]
+    lines += [
+        "",
+        f"Matched WOR−WR attribution is directionally favorable to WOR: primary median {pct(float(primary_wor['roi_median']))} with {primary_wor['favorable']}/{primary_wor['cells']} favorable cells and secondary {pct(float(secondary_wor['roi_median']))} with {secondary_wor['favorable']}/{secondary_wor['cells']}. WOR's median duplicate-ratio delta is {pct(float(primary_wor['duplicate_median']))} / {pct(float(secondary_wor['duplicate_median']))} while its settled coverage delta is {pct(float(primary_wor['coverage_median']))} / {pct(float(secondary_wor['coverage_median']))}.",
+        f"WR versus residual is not common-direction evidence: primary median {pct(float(primary_wr_residual['roi_median']))} ({primary_wr_residual['favorable']}/{primary_wr_residual['cells']} favorable) versus secondary {pct(float(secondary_wr_residual['roi_median']))} ({secondary_wr_residual['favorable']}/{secondary_wr_residual['cells']} favorable), while WR adds about {pct(float(primary_wr_residual['duplicate_median']))} / {pct(float(secondary_wr_residual['duplicate_median']))} duplicate ratio.",
+        "Cap 1 is effectively the distinct/residual identity control. Caps 2, 4 and 8 have negative matched median ROI deltas versus residual in both arms, progressively lower coverage and progressively higher duplicate concentration; no repeat cap improves the frozen tradeoff stably.",
         "",
         "## Concentration and path risk",
         "",
@@ -334,12 +548,104 @@ def main() -> None:
     crossing = sum(
         float(row["ci95_low"]) <= 0 <= float(row["ci95_high"]) for row in boot_primary
     )
-    holm_positive = sum(
-        float(row["holm_p"]) < 0.05 for row in multiple if row["holm_p"]
+    holm_significant = [
+        row for row in multiple if row["holm_p"] and float(row["holm_p"]) < 0.05
+    ]
+    holm_positive_majority = sum(
+        int(row["positive_issue_count"]) > int(row["negative_issue_count"])
+        for row in holm_significant
+    )
+    holm_negative_majority = sum(
+        int(row["negative_issue_count"]) > int(row["positive_issue_count"])
+        for row in holm_significant
     )
     lines += [
         "",
-        f"Issue bootstrap has {len(boot_primary):,} pre-tax comparisons: {positive_ci:,} have a lower 95% bound above zero and {crossing:,} cross zero. Holm-adjusted paired issue sign tests below 0.05: {holm_positive:,}/{len(multiple):,}. These counts describe the frozen surface; they do not convert same-window cells into independent validation.",
+        f"Issue bootstrap has {len(boot_primary):,} pre-tax comparisons: {positive_ci:,} have a lower 95% bound above zero and {crossing:,} cross zero. Holm-adjusted paired issue sign tests below 0.05 total {len(holm_significant):,}/{len(multiple):,}, but direction matters: {holm_negative_majority:,} have a negative-issue majority and only {holm_positive_majority:,} have a positive-issue majority.",
+        "The paired sign statistic is per-issue candidate-minus-FULL ROI and mainly records coverage/miss direction, not payout magnitude. A cell can therefore have positive aggregate ROI from a few large wins while most issue-level signs are negative; 1,983 significance flags are not 1,983 favorable discoveries.",
+        "",
+        "### Binding to the prior #151/#154 cluster",
+        "",
+    ]
+    m64_rows = sorted(
+        (
+            row
+            for row in all_rows
+            if row["arm_id"] == "PRIMARY_NO_GATE_K4"
+            and row["weight_source"] == "Q_WEIGHT"
+            and row["mechanism"] == "WOR_DISTINCT"
+            and row["M"] == "64"
+        ),
+        key=lambda row: row["seed"],
+    )
+    m64_binding_rows = []
+    for row in m64_rows:
+        ex_largest = next(
+            value
+            for value in largest
+            if value["arm_id"] == row["arm_id"]
+            and value["weight_source"] == row["weight_source"]
+            and value["mechanism"] == row["mechanism"]
+            and value["cap"] == row["cap"]
+            and value["M"] == row["M"]
+            and value["seed"] == row["seed"]
+        )
+        boot = next(
+            value
+            for value in boot_primary
+            if value["arm_id"] == row["arm_id"]
+            and value["weight_source"] == row["weight_source"]
+            and value["mechanism"] == row["mechanism"]
+            and value["cap"] == row["cap"]
+            and value["M"] == row["M"]
+            and value["seed"] == row["seed"]
+        )
+        m64_binding_rows.append(
+            [
+                row["seed"],
+                pct(float(row["no_tax_roi"])),
+                pct(float(ex_largest["no_tax_roi_excluding_largest"])),
+                f"[{pct(float(boot['ci95_low']))}, {pct(float(boot['ci95_high']))}]",
+            ]
+        )
+    lines += markdown_table(
+        ["seed", "Q-WOR M64 ROI", "ex-largest ROI", "bootstrap Δ vs FULL 95% CI"],
+        m64_binding_rows,
+    )
+    m64_scope_rows = [
+        row
+        for row in summary
+        if row["arm_id"] == "PRIMARY_NO_GATE_K4"
+        and row["weight_source"] == "Q_WEIGHT"
+        and row["mechanism"] == "WOR_DISTINCT"
+        and row["M"] == "64"
+    ]
+    scope_stability = {}
+    for scope in ("YEAR", "FOLD", "LOYO"):
+        values = [
+            float(row["no_tax_roi"])
+            for row in m64_scope_rows
+            if row["scope"] == scope and row["no_tax_roi"]
+        ]
+        scope_stability[scope] = (
+            len(values),
+            sum(value > 0 for value in values),
+            sum(value < 0 for value in values),
+            med(values),
+        )
+    m16_values = [
+        float(row["no_tax_roi"])
+        for row in all_rows
+        if row["arm_id"] == "PRIMARY_NO_GATE_K4"
+        and row["weight_source"] == "Q_WEIGHT"
+        and row["mechanism"] == "WOR_DISTINCT"
+        and row["M"] == "16"
+    ]
+    lines += [
+        "",
+        "The primary Q-WOR/M64 values are the already-reproduced #151/#154 historical cluster, not a new #145 discovery. All three bootstrap intervals cross zero; excluding each seed's largest gross issue changes the three ROIs to about -11.47%, +0.08% and -9.46%, matching the prior validation warning.",
+        f"Within the frozen M64 slices, YEAR and FOLD are each positive in {scope_stability['YEAR'][1]}/{scope_stability['YEAR'][0]} rows (median {pct(float(scope_stability['YEAR'][3]))}); LOYO is positive in {scope_stability['LOYO'][1]}/{scope_stability['LOYO'][0]} (median {pct(float(scope_stability['LOYO'][3]))}). This is mixed, not uniform stability.",
+        f"The M16/seed137002 +84.76% peak is a seed outlier: the three primary Q-WOR M16 seed ROIs are -42.54%, +84.76% and -29.30%, with a cross-seed median of {pct(med(m16_values))}.",
         "",
         "## YEAR / FOLD / LOYO and concentration",
         "",
@@ -454,6 +760,14 @@ def main() -> None:
         "",
         "The high historical cells are sensitive to issue concentration and seed. Ex-largest and leave-one-issue-out results are reported in pre-tax units so payout concentration is not obscured by tax mechanics.",
         "",
+        "## Five terminal questions",
+        "",
+        f"1. **Matched value of probability/value weighting:** Q_WEIGHT does not dominate the five probability/market/blend comparators. Holding mechanism/cap/M/seed/stake fixed, its aggregate matched median delta is {pct(med(primary_q[0]))} in primary ({primary_q[1]} better, {primary_q[2]} worse, {primary_q[3]} ties of {len(primary_q[0])}) and {pct(med(secondary_q[0]))} in secondary ({secondary_q[1]}/{secondary_q[2]}/{secondary_q[3]} of {len(secondary_q[0])}). The high Q peaks are tail cells, not a general weighting gain.",
+        f"2. **Matched WOR effect:** WOR−WR has median pre-tax deltas of {pct(float(primary_wor['roi_median']))} primary and {pct(float(secondary_wor['roi_median']))} secondary, favorable in {primary_wor['favorable']}/{primary_wor['cells']} and {secondary_wor['favorable']}/{secondary_wor['cells']} matched cells. WOR improves distinct coverage and removes WR duplicate exposure, so the mechanism has a plausible historical attribution, but this is not promotion evidence.",
+        f"3. **Matched WR/residual effect:** WR−residual is {pct(float(primary_wr_residual['roi_median']))} primary ({primary_wr_residual['favorable']}/{primary_wr_residual['cells']} favorable) and {pct(float(secondary_wr_residual['roi_median']))} secondary ({secondary_wr_residual['favorable']}/{secondary_wr_residual['cells']} favorable), with roughly +4.4pp duplicate ratio. The direction changes by arm; neither WR nor residual is a stable winner.",
+        f"4. **Repeat-cap tradeoff:** cap1 is the near-identity distinct control. Relative to residual, cap2/cap4/cap8 primary median deltas are {pct(float(mechanism_contrast_stats[('PRIMARY_NO_GATE_K4', 'cap2 − residual')]['roi_median']))}, {pct(float(mechanism_contrast_stats[('PRIMARY_NO_GATE_K4', 'cap4 − residual')]['roi_median']))}, {pct(float(mechanism_contrast_stats[('PRIMARY_NO_GATE_K4', 'cap8 − residual')]['roi_median']))}; secondary deltas are {pct(float(mechanism_contrast_stats[('SECONDARY_ESP300_GM290_K8', 'cap2 − residual')]['roi_median']))}, {pct(float(mechanism_contrast_stats[('SECONDARY_ESP300_GM290_K8', 'cap4 − residual')]['roi_median']))}, {pct(float(mechanism_contrast_stats[('SECONDARY_ESP300_GM290_K8', 'cap8 − residual')]['roi_median']))}. Coverage falls and duplicate concentration rises as cap loosens; no cap improves the tradeoff stably.",
+        f"5. **Stable sweet spot:** none. The prior Q-WOR/M64 cluster is positive across its three pooled seeds but all three bootstrap intervals cross zero and ex-largest ROIs are -11.47%, +0.08% and -9.46%; YEAR/FOLD are positive in {scope_stability['YEAR'][1]}/{scope_stability['YEAR'][0]} and LOYO in {scope_stability['LOYO'][1]}/{scope_stability['LOYO'][0]}. Across the whole surface only {positive_ci}/{len(boot_primary)} bootstrap lower bounds are positive, {crossing}/{len(boot_primary)} intervals cross zero, and Holm direction is {holm_positive_majority} positive-majority versus {holm_negative_majority} negative-majority. The M16 peak is a seed outlier, not a sweet spot.",
+        "",
         "## Drawdown and accounting conventions",
         "",
         "- Stake is `selected_identity_count × M × ¥2`; every WR duplicate is an independent ¥2 ticket.",
@@ -463,7 +777,7 @@ def main() -> None:
         "",
         "## Terminal interpretation",
         "",
-        "`DESCRIPTIVE_SURFACE_ONLY_NO_PROMOTION` remains the only supported decision. Allocation mechanism, cap and M materially change coverage, duplicate exposure, capital use and payout concentration. The strongest same-window Q-WOR cells do not survive the full multiplicity/concentration/seed/LOYO interpretation as promotion evidence. Any positive candidate still requires strict independent EV and genuinely held-out or forward validation.",
+        "`DESCRIPTIVE_SURFACE_ONLY_NO_PROMOTION` remains the only supported decision. Allocation mechanism, cap and M materially change coverage, duplicate exposure, capital use and payout concentration. Matched attribution supports WOR as the most plausible distinct-coverage mechanism and binds its mid-M positive cluster to #151/#154, but attribution is not promotion: the strongest same-window Q-WOR cells do not survive the full multiplicity/concentration/seed/LOYO interpretation. WR, residual and repeat caps likewise have no common stable advantage. Any positive candidate still requires strict independent EV and genuinely held-out or forward validation.",
         "",
         "Charts: `roi_vs_m_cap.svg`, `matched_pre_tax_comparison.svg`, and `uncertainty_stability.svg`. The full numeric surfaces remain the authoritative evidence.",
         "",

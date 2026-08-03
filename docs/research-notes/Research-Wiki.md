@@ -304,6 +304,11 @@ coverage、wager miss streak 和 chronological drawdown 只使用 `SETTLED + pos
 | `BLEND_A75` | -18.62% | +67.97% | 16/240 |
 | `Q_WEIGHT` | -15.77% | +84.76% | 61/240 |
 
+但 matched 归因并不支持把 Q 峰值解释成普遍权重优势：固定机制、cap、M、seed、stake
+后，`Q_WEIGHT` 相对其余五个权重的主臂中位差为 -2.85pp（500 better / 675 worse /
+25 tie，共 1,200 cells），次臂为 -5.52pp（376 / 798 / 26）。因此 Q 的最高 cell 是
+尾部峰值，而不是跨配置的一般改善。
+
 WOR 在相同 M 下消除 exact duplicate，主/次臂的中位 coverage 为 30.51%/56.02%，
 中位税前 ROI 为 -11.68%/-8.51%；WR 保留自然重复 stake，中位 duplicate ratio
 4.42%/4.34%，税前 ROI 为 -18.04%/-18.97%。residual、top-mass 和 cap=1 的
@@ -313,15 +318,40 @@ WOR 在相同 M 下消除 exact duplicate，主/次臂的中位 coverage 为 30.
 本身都不是 edge；因此同时报告 capital utilization、gross retention、hit tickets、
 winning identities、top-issue share、HHI、drawdown 和 miss streak。
 
+matched 机制归因进一步区分了“机制信号”和“可晋级策略”：固定 arm、weight、M、stake
+与 seed 后，WOR−WR 的主/次臂中位税前差为 +5.77pp/+9.69pp，分别有 243/360、
+285/360 cells 有利于 WOR；WOR 同时把 duplicate-ratio 中位数降低约 4.42pp/4.34pp。
+WR−residual 则方向不一致：主臂 -1.16pp（165/360 有利），次臂 +1.55pp
+（205/360 有利）。cap2/cap4/cap8 相对 residual 的主臂中位差为
+-0.39pp/-2.74pp/-12.24pp，次臂为 -0.35pp/-4.90pp/-19.20pp；coverage 随 cap
+放宽下降而重复集中上升，没有稳定的 cap tradeoff 改善。
+
 #### 稳定性与集中度
 
 WR/WOR 的 matched seed ROI range 并不小：主臂中位 22.51pp/22.01pp，次臂
 14.76pp/8.89pp；p95 可达 56.60pp–67.23pp。2,880 个税前 issue-bootstrap 比较中
-只有 52 个 lower 95% bound 高于零，2,605 个区间跨零；Holm 行必须结合方向、
-same-window multiplicity 与集中度解释，不能只按 `p<.05` 选赢家。每个配置另有真实
+只有 52 个 lower 95% bound 高于零，2,605 个区间跨零。1,983 个 Holm-significant
+sign rows 中，1,898 个是 negative-issue majority，只有 85 个是 positive-issue majority；
+这个 per-issue candidate−FULL sign test 主要记录 coverage/miss 方向，不衡量少量大额
+派彩的幅度，因此不能把 1,983 解释成有利发现。每个配置另有真实
 leave-one-issue-out（保留造成 min/max 的 issue ID）和“剔除本配置最大 gross issue 后
 相对 matched FULL”的税前敏感性。历史最高的主臂 Q-WOR/M16/137002 从 +84.76%
 降到 ex-largest +48.43%，但其它 seed 与 bootstrap 不稳定；这仍不是独立正 EV。
+
+主臂 Q-WOR/M64 的三个 seed 为 +16.38%/+11.77%/+2.67%，这正是 #151/#154 已复现
+的历史簇，不是 #145 新发现；三条 bootstrap CI 全部跨零，剔除各自最大 gross issue 后
+为 -11.47%/+0.08%/-9.46%。该簇 YEAR/FOLD 仅 12/21 行为正，LOYO 15/21 为正，
+仍是 mixed stability。M16/137002 的 +84.76% 更是 seed outlier：另两个 seed 为
+-42.54% 与 -29.30%，跨 seed 中位数 -29.30%。
+
+#### 五个终局问题
+
+1. **概率/价值权重是否有 matched 增益？** 没有；Q 对五类匹配权重的中位差在两臂均负。
+2. **WOR 是否改善？** 历史 matched 归因支持 distinct-coverage/WOR，但不构成晋级证据。
+3. **WR 或 residual 是否更好？** 两臂方向相反，且 WR 增加约 4.4pp 重复暴露。
+4. **repeat cap 是否改善 tradeoff？** cap1 接近 distinct identity control；cap2/4/8 均无稳定改善。
+5. **是否存在稳定 sweet spot？** 没有；seed、YEAR/FOLD/LOYO、LOIO、ex-largest、
+   bootstrap 与 multiplicity 的联合证据均不支持晋级。
 
 完整 outcome-code atlas 对 2,892 个配置各列 2,187 个代码，共 6,324,804 行：目标概率
 质量、实际分配 ticket copies/frequency、两者 delta 与真实赛果 identity/hit 分开记录；
@@ -337,7 +367,7 @@ leave-one-issue-out（保留造成 min/max 的 issue ID）和“剔除本配置�
 终局仍为 **DESCRIPTIVE_SURFACE_ONLY_NO_PROMOTION**。高历史 cell 只能作为后续 strict
 independent-EV 与真正 held-out/forward validation 的候选，不能产生购买、生产或投注
 授权。v2 不可变清单 `SHA256SUMS.json` 的 SHA-256 为
-`5353b8875748168407a7d9ff2171e98854bd8f411cc9a09baa2d87db6f37e488`。完整表格和
+`10d5a5082a175ddc965b01fb257e8e5c7e91a844d7ee823fd6d2ad5aeff84cc9`。完整表格和
 解释见 v2 包内 `report.md`；Gate-A 设计仍见
 [#145 Gate A](../research/bj145_ticket_allocation_gate_a_2026-08-03.md)。
 
