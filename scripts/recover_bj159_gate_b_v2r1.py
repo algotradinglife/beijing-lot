@@ -57,8 +57,9 @@ SUMMARY_FIELDS = (
     "coverage_hit_rate", "ticket_hit_rate", "gross_pre_tax_yuan", "taxable_winning_ticket_count",
     "tax_line_share", "tax_yuan", "after_tax_gross_yuan", "pre_tax_net_yuan", "tax_adjusted_net_yuan",
     "no_tax_roi", "tax_adjusted_roi", "gm_expected_sp_mean", "expected_sp_product_q_mean",
-    "actual_winning_sp_product_mean", "gross_top_issue_share", "gross_issue_hhi", "largest_issue",
-    "largest_issue_gross_yuan", "largest_issue_stake_yuan", "largest_issue_pre_tax_net_yuan",
+    "actual_winning_sp_product_mean", "gross_top_issue", "gross_top_issue_gross_yuan",
+    "gross_top_issue_share", "gross_issue_hhi", "largest_issue", "largest_issue_gross_yuan",
+    "largest_issue_stake_yuan", "largest_issue_pre_tax_net_yuan",
     "largest_issue_tax_adjusted_net_yuan", "ex_largest_issue_no_tax_roi",
     "ex_largest_issue_tax_adjusted_roi", "largest_year", "largest_year_stake_yuan",
     "largest_year_pre_tax_net_yuan", "largest_year_tax_adjusted_net_yuan", "ex_largest_year_no_tax_roi",
@@ -110,6 +111,34 @@ def write_csv(path: Path, fields: tuple[str, ...], rows: list[dict[str, object]]
         writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n", extrasaction="raise")
         writer.writeheader()
         writer.writerows(rows)
+
+
+def numeric_values(rows: list[dict[str, object]], field: str) -> list[Decimal]:
+    return [dec(row[field], field) for row in rows if row.get(field, "") not in ("", None)]
+
+
+def decimal_sd(values: list[Decimal]) -> Decimal:
+    if len(values) < 2:
+        return Decimal(0)
+    mean_value = sum(values, Decimal(0)) / len(values)
+    return (sum((value - mean_value) ** 2 for value in values) / len(values)).sqrt()
+
+
+def stats(rows: list[dict[str, object]], field: str, *, ratio_field: bool = False) -> dict[str, object]:
+    values = numeric_values(rows, field)
+    if not values:
+        return {"count": 0, "min": "", "mean": "", "max": "", "sd": "", "positive_count": 0, "positive_fraction": ""}
+    positives = sum(value > 0 for value in values)
+    formatter = ratio if ratio_field else money
+    return {
+        "count": len(values),
+        "min": formatter(min(values)),
+        "mean": formatter(sum(values, Decimal(0)) / len(values)),
+        "max": formatter(max(values)),
+        "sd": formatter(decimal_sd(values)),
+        "positive_count": positives,
+        "positive_fraction": ratio(Decimal(positives) / len(values)),
+    }
 
 
 def verify_source() -> tuple[dict[str, str], dict[str, object]]:
@@ -245,8 +274,9 @@ def summary_rows(issue_rows: list[dict[str, str]], scope: str, scope_value: str)
         "gm_expected_sp_mean": ratio(sum(gm_values, Decimal(0)) / len(gm_values) if gm_values else None),
         "expected_sp_product_q_mean": ratio(sum(expected_values, Decimal(0)) / len(expected_values) if expected_values else None),
         "actual_winning_sp_product_mean": ratio(sum(actual_values, Decimal(0)) / len(actual_values) if actual_values else None),
+        "gross_top_issue": largest_gross_issue, "gross_top_issue_gross_yuan": money(largest_gross["gross"]),
         "gross_top_issue_share": ratio(largest_gross["gross"] / total_gross if total_gross else None), "gross_issue_hhi": ratio(hhi),
-        "largest_issue": largest_issue, "largest_issue_gross_yuan": money(largest_gross["gross"]),
+        "largest_issue": largest_issue, "largest_issue_gross_yuan": money(issue_contribution["gross"]),
         "largest_issue_stake_yuan": money(issue_contribution["stake"]), "largest_issue_pre_tax_net_yuan": money(issue_contribution["pre"]),
         "largest_issue_tax_adjusted_net_yuan": money(issue_contribution["tax"]),
         "ex_largest_issue_no_tax_roi": exclusion_roi(pre_net, stake, issue_contribution),
@@ -307,34 +337,132 @@ def write_svg(path: Path, title: str, ylabel: str, series: dict[str, list[tuple[
 
 
 def write_uncertainty_svg(path: Path, bootstrap_rows: list[dict[str, str]]) -> None:
-    """Plot seed-mean bootstrap point estimates and 95% envelope for M=64."""
-    points: list[tuple[int, float, float, float]] = []
+    """Plot seed-specific bootstrap point estimates and intervals for M=64.
+
+    The source bootstrap rows are independent per-seed issue resamples. Their
+    intervals are deliberately drawn separately; this function never averages
+    interval endpoints and never labels an endpoint envelope as a CI for the
+    seed-mean estimator.
+    """
+    points: list[tuple[int, str, float, float, float, float]] = []
     for n in N_GRID:
         rows = [row for row in bootstrap_rows if int(row["n"]) == n and int(row["M"]) == 64 and row["metric"] == "no_tax_roi"]
-        if not rows:
-            continue
-        point = sum(float(row["point_estimate"]) for row in rows) / len(rows)
-        low = sum(float(row["ci95_low"]) for row in rows) / len(rows)
-        high = sum(float(row["ci95_high"]) for row in rows) / len(rows)
-        points.append((n, point, low, high))
+        for row in sorted(rows, key=lambda item: item["seed"]):
+            points.append((n, row["seed"], float(row["point_estimate"]), float(row["ci95_low"]), float(row["ci95_high"]), float(row["positive_fraction"])))
     width, height, left, bottom = 860, 470, 78, 62
     if not points:
         path.write_text("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"860\" height=\"470\"/>\n", encoding="utf-8"); return
-    ymin = min(point[2] for point in points); ymax = max(point[3] for point in points); ymin, ymax = min(ymin, 0.0), max(ymax, 0.0)
+    ymin = min(point[3] for point in points); ymax = max(point[4] for point in points); ymin, ymax = min(ymin, 0.0), max(ymax, 0.0)
     span = max(ymax - ymin, .05); ymin -= span * .08; ymax += span * .08
     chart_w, chart_h = width - left - 40, height - bottom - 35
     def x(n: int) -> float: return left + chart_w * (n - 2) / 8
     def y(value: float) -> float: return 35 + chart_h * (ymax - value) / (ymax - ymin)
-    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}"><rect width="100%" height="100%" fill="white"/><text x="{left}" y="22" font-size="16">#159 M=64 bootstrap uncertainty (seed-mean no-tax ROI)</text><line x1="{left}" y1="{height-bottom}" x2="{width-40}" y2="{height-bottom}" stroke="#333"/><line x1="{left}" y1="35" x2="{left}" y2="{height-bottom}" stroke="#333"/><text x="8" y="{height/2}" font-size="12" transform="rotate(-90 8 {height/2})">ROI and 95% interval</text>']
+    colors = {"137001": "#1f77b4", "137002": "#d62728", "137003": "#2ca02c"}
+    offsets = {"137001": -5.0, "137002": 0.0, "137003": 5.0}
+    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}"><rect width="100%" height="100%" fill="white"/><text x="{left}" y="22" font-size="16">#159 M=64 seed-specific issue bootstrap (no-tax ROI)</text><line x1="{left}" y1="{height-bottom}" x2="{width-40}" y2="{height-bottom}" stroke="#333"/><line x1="{left}" y1="35" x2="{left}" y2="{height-bottom}" stroke="#333"/><text x="8" y="{height/2}" font-size="12" transform="rotate(-90 8 {height/2})">ROI; seed-specific bootstrap 95% CI</text>']
     for n in range(2, 11): lines.append(f'<text x="{x(n)-5:.1f}" y="{height-bottom+18}" font-size="11">{n}</text>')
     if ymin < 0 < ymax: lines.append(f'<line x1="{left}" y1="{y(0):.1f}" x2="{width-40}" y2="{y(0):.1f}" stroke="#999" stroke-dasharray="4,4"/>')
-    coords = " ".join(f"{x(n):.1f},{y(point):.1f}" for n, point, _, _ in points)
-    lines.append(f'<polyline fill="none" stroke="#1f77b4" stroke-width="2" points="{coords}"/>')
-    for n, point, low, high in points:
-        xx = x(n)
-        lines.append(f'<line x1="{xx:.1f}" y1="{y(low):.1f}" x2="{xx:.1f}" y2="{y(high):.1f}" stroke="#d62728" stroke-width="2"/><line x1="{xx-5:.1f}" y1="{y(low):.1f}" x2="{xx+5:.1f}" y2="{y(low):.1f}" stroke="#d62728"/><line x1="{xx-5:.1f}" y1="{y(high):.1f}" x2="{xx+5:.1f}" y2="{y(high):.1f}" stroke="#d62728"/><circle cx="{xx:.1f}" cy="{y(point):.1f}" r="4" fill="#1f77b4"><title>N={n}: point={point:.6f}, CI=[{low:.6f}, {high:.6f}]</title></circle>')
-    lines.append('<text x="650" y="45" font-size="11" fill="#1f77b4">point estimate</text><text x="650" y="62" font-size="11" fill="#d62728">bootstrap 95% interval</text></svg>\n')
+    for n, seed, point, low, high, positive_fraction in points:
+        color = colors.get(seed, "#9467bd")
+        xx = x(n) + offsets.get(seed, 0.0)
+        lines.append(f'<line x1="{xx:.1f}" y1="{y(low):.1f}" x2="{xx:.1f}" y2="{y(high):.1f}" stroke="{color}" stroke-width="2"/><line x1="{xx-3:.1f}" y1="{y(low):.1f}" x2="{xx+3:.1f}" y2="{y(low):.1f}" stroke="{color}"/><line x1="{xx-3:.1f}" y1="{y(high):.1f}" x2="{xx+3:.1f}" y2="{y(high):.1f}" stroke="{color}"/><circle cx="{xx:.1f}" cy="{y(point):.1f}" r="3" fill="{color}"><title>N={n}, seed={seed}: point={point:.6f}, seed-specific bootstrap 95% CI=[{low:.6f}, {high:.6f}], positive fraction={positive_fraction:.6f}</title></circle>')
+    lines.append('<text x="650" y="45" font-size="11" fill="#1f77b4">seed 137001</text><text x="650" y="62" font-size="11" fill="#d62728">seed 137002</text><text x="650" y="79" font-size="11" fill="#2ca02c">seed 137003</text></svg>\n')
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def integer_stats(rows: list[dict[str, object]], field: str) -> dict[str, object]:
+    values = [int(row[field]) for row in rows if row.get(field, "") not in ("", None)]
+    if not values:
+        return {"count": 0, "min": None, "mean": None, "max": None}
+    return {"count": len(values), "min": min(values), "mean": sum(values) / len(values), "max": max(values)}
+
+
+def build_analysis(
+    all_summaries: list[dict[str, object]],
+    robustness: list[dict[str, object]],
+    deltas: list[dict[str, object]],
+    bootstrap_rows: list[dict[str, str]],
+    overlap_rows: list[dict[str, str]],
+) -> dict[str, object]:
+    count_fields = (
+        "effective_M", "planned_identity_count", "settled_identity_count", "unique_ticket_count",
+        "duplicate_ticket_count", "winning_ticket_count", "hit_identity_count", "taxable_winning_ticket_count",
+        "longest_executed_miss_streak",
+    )
+    ratio_fields = (
+        "capital_utilization_vs_full", "duplicate_ticket_ratio", "coverage_hit_rate", "ticket_hit_rate",
+        "tax_line_share", "gm_expected_sp_mean", "expected_sp_product_q_mean", "actual_winning_sp_product_mean",
+        "no_tax_roi", "tax_adjusted_roi", "gross_top_issue_share", "gross_issue_hhi",
+    )
+    money_fields = (
+        "planned_stake_yuan", "stake_yuan", "gross_pre_tax_yuan", "tax_yuan", "after_tax_gross_yuan",
+        "pre_tax_net_yuan", "tax_adjusted_net_yuan", "max_drawdown_no_tax_yuan", "max_drawdown_tax_adjusted_yuan",
+    )
+    surface = {"all_cell_count": len(all_summaries), "metrics": {}}
+    for field in count_fields:
+        surface["metrics"][field] = integer_stats(all_summaries, field)
+    for field in ratio_fields:
+        surface["metrics"][field] = stats(all_summaries, field, ratio_field=True)
+    for field in money_fields:
+        surface["metrics"][field] = stats(all_summaries, field)
+
+    m64_seed_stability: list[dict[str, object]] = []
+    for n in N_GRID:
+        rows = [row for row in all_summaries if int(row["n"]) == n and int(row["M"]) == 64]
+        boot = [row for row in bootstrap_rows if int(row["n"]) == n and int(row["M"]) == 64 and row["metric"] == "no_tax_roi"]
+        m64_seed_stability.append({
+            "n": n,
+            "seed_rows": [{"seed": row["seed"], "no_tax_roi": row["no_tax_roi"], "tax_adjusted_roi": row["tax_adjusted_roi"], "coverage_hit_rate": row["coverage_hit_rate"], "stake_yuan": row["stake_yuan"]} for row in rows],
+            "seed_no_tax_roi": stats(rows, "no_tax_roi", ratio_field=True),
+            "seed_tax_adjusted_roi": stats(rows, "tax_adjusted_roi", ratio_field=True),
+            "seed_coverage_hit_rate": stats(rows, "coverage_hit_rate", ratio_field=True),
+            "seed_stake_yuan": stats(rows, "stake_yuan"),
+            "bootstrap_seed_specific_point_estimate": stats(boot, "point_estimate", ratio_field=True),
+            "bootstrap_seed_specific_ci95_low": stats(boot, "ci95_low", ratio_field=True),
+            "bootstrap_seed_specific_ci95_high": stats(boot, "ci95_high", ratio_field=True),
+            "bootstrap_positive_fraction": stats(boot, "positive_fraction", ratio_field=True),
+            "bootstrap_support_issue_count": integer_stats(boot, "support_issue_count"),
+            "bootstrap_replicates": integer_stats(boot, "replicates"),
+        })
+
+    robustness_summary: list[dict[str, object]] = []
+    for scope in ("YEAR", "FOLD", "LOYO"):
+        values = sorted({str(row["scope_value"]) for row in robustness if row["scope"] == scope})
+        for value in values:
+            rows = [row for row in robustness if row["scope"] == scope and str(row["scope_value"]) == value]
+            robustness_summary.append({
+                "scope": scope, "scope_value": value, "row_count": len(rows),
+                "pre_tax_roi": stats(rows, "no_tax_roi", ratio_field=True),
+                "tax_adjusted_roi": stats(rows, "tax_adjusted_roi", ratio_field=True),
+                "coverage_hit_rate": stats(rows, "coverage_hit_rate", ratio_field=True),
+                "gross_top_issue_share": stats(rows, "gross_top_issue_share", ratio_field=True),
+                "positive_pre_tax_cells": sum(dec(row["no_tax_roi"], "ROI") > 0 for row in rows if row["no_tax_roi"] != ""),
+            })
+
+    matched_summary: list[dict[str, object]] = []
+    for n in N_GRID:
+        rows = [row for row in deltas if int(row["n"]) == n]
+        matched_summary.append({
+            "n": n, "row_count": len(rows), "common_issue_count": integer_stats(rows, "common_issue_count"),
+            "n_no_tax_roi": stats(rows, "n_no_tax_roi", ratio_field=True),
+            "n7_no_tax_roi": stats(rows, "n7_no_tax_roi", ratio_field=True),
+            "no_tax_roi_delta": stats(rows, "no_tax_roi_delta", ratio_field=True),
+            "tax_adjusted_roi_delta": stats(rows, "tax_adjusted_roi_delta", ratio_field=True),
+            "positive_delta_rows": sum(dec(row["no_tax_roi_delta"], "delta") > 0 for row in rows),
+        })
+
+    overlap = [{
+        "n": int(row["n"]), "identity_count": int(row["identity_count"]), "issue_count": int(row["issue_count"]),
+        "pair_count": int(row["pair_count"]), "mean_shared_leg_count": row["mean_shared_leg_count"],
+        "max_shared_leg_count": int(row["max_shared_leg_count"]), "mean_jaccard": row["mean_jaccard"],
+        "max_jaccard": row["max_jaccard"], "duplicate_ticket_policy": row["duplicate_ticket_policy"],
+    } for row in sorted(overlap_rows, key=lambda item: int(item["n"]))]
+    return {
+        "contract": CONTRACT, "analysis_boundary": "derived from copied v2 issue ledger, issue bootstrap and overlap rows only",
+        "pre_tax_primary_tax_secondary": True, "surface": surface, "m64_seed_stability": m64_seed_stability,
+        "robustness": robustness_summary, "matched_n7": matched_summary, "overlap": overlap,
+        "bootstrap_interval_semantics": "Each interval is a seed-specific issue bootstrap 95% interval; endpoint envelopes are descriptive and are not a combined CI for the seed mean.",
+    }
 
 
 def build(output: Path) -> dict[str, object]:
@@ -369,6 +497,9 @@ def build(output: Path) -> dict[str, object]:
         shutil.copyfile(SOURCE / "issue_bootstrap.csv", stage / "issue_bootstrap.csv")
         shutil.copyfile(SOURCE / "overlap_summary.csv", stage / "overlap_summary.csv")
         bootstrap_rows = list(csv.DictReader((stage / "issue_bootstrap.csv").open(newline="", encoding="utf-8")))
+        overlap_rows = list(csv.DictReader((stage / "overlap_summary.csv").open(newline="", encoding="utf-8")))
+        analysis = build_analysis(all_summaries, robustness, deltas, bootstrap_rows, overlap_rows)
+        (stage / "analysis_summary.json").write_text(json.dumps(analysis, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         curve_rows = []
         for n in N_GRID:
             rows = [row for row in all_summaries if int(row["n"]) == n and int(row["M"]) == 64]
@@ -404,21 +535,76 @@ def build(output: Path) -> dict[str, object]:
         def mean_m64(field: str, n: int) -> str:
             vals = [dec(row[field], field) for row in m64 if int(row["n"]) == n and row[field] != ""]
             return ratio(sum(vals, Decimal(0)) / len(vals)) if vals else ""
-        report: list[str] = ["# #159 Gate B v2r1 — reporting recovery", "", "This package is a reporting-only recovery from the authenticated #159 Gate-B v2 ledgers. It does not reopen Gate A, reread canonical outcomes, or alter any identity, issue, winning-ticket, tax, or settlement row.", "", "## Source binding", "", f"- v2 source package manifest: `{V2_MANIFEST}`", f"- v2 source content identity: `{V2_CONTENT_IDENTITY}`", "- copied ledgers are inode-independent byte-for-byte copies; see `source_v2_binding.json`.", "- the repository GitHub Wiki is disabled; the durable Research-Wiki section is committed at `docs/research-notes/Research-Wiki.md`.", "", "## Corrections", "", "1. Largest issue/year is selected by signed pre-tax net contribution among positive-stake issue rows; exclusions subtract that group's actual stake, pre-tax net, and tax-adjusted net separately.", "2. Miss streaks distinguish frozen-calendar rows from executed positive-stake support; no-bet and unavailable rows are never counted in the executed streak.", "3. Drawdown is emitted separately for pre-tax primary and tax-adjusted secondary net.", "", "## Complete ALL N×M×seed surface", "", "The following table is the complete primary/secondary and concentration-control surface. `M` remains a reporting label and actual stake is already settled in the copied ledger.", "", "| N | M | seed | settled IDs | executed tickets | stake ¥ | pre-tax ROI | tax ROI | ex-issue pre-tax ROI | ex-year pre-tax ROI | executed miss streak |", "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+        def s(metric: str, key: str) -> object:
+            return analysis["surface"]["metrics"][metric][key]
+
+        report: list[str] = [
+            "# #159 Gate B v2r1 — reporting recovery", "",
+            "This package is a reporting-only recovery from the authenticated #159 Gate-B v2 ledgers. It does not reopen Gate A, reread canonical outcomes, or alter any identity, issue, winning-ticket, tax, or settlement row.", "",
+            "## Source binding", "", f"- v2 source package manifest: `{V2_MANIFEST}`", f"- v2 source content identity: `{V2_CONTENT_IDENTITY}`",
+            "- copied ledgers are inode-independent byte-for-byte copies; see `source_v2_binding.json`.",
+            "- the repository GitHub Wiki is disabled; the durable Research-Wiki section is committed at `docs/research-notes/Research-Wiki.md`.", "",
+            "## Corrections", "",
+            "1. `largest_issue` and every `largest_issue_*` value are bound to the issue with the largest signed pre-tax net contribution among positive-stake issue rows; `gross_top_issue`/`gross_top_issue_gross_yuan` are separately named gross concentration fields.",
+            "2. Largest issue/year exclusions subtract that selected group's actual stake, pre-tax net, and tax-adjusted net separately.",
+            "3. Miss streaks distinguish frozen-calendar rows from frozen no-bet/unavailable rows and executed positive-stake support; no-bet and unavailable rows are never counted in the executed streak.",
+            "4. Drawdown is emitted separately for pre-tax primary and tax-adjusted secondary net.",
+            "5. Bootstrap intervals in `uncertainty_M64.svg` and `analysis_summary.json` are seed-specific issue-bootstrap intervals. Their endpoint range is a descriptive envelope, not a combined confidence interval for the seed mean.", "",
+            "## Quantitative terminal synthesis (pre-tax primary; tax secondary)", "",
+            f"The complete ALL surface contains **{len(all_summaries)} cells** (N=2..10 × nominal M=32/64/128 × three seeds). The immutable `surface_summary.csv` has {len(all_summaries) + len(robustness)} rows and every detailed field; `analysis_summary.json` is the compact quantitative synthesis.", "",
+            "| metric across 81 ALL cells | min | mean | max |", "|---|---:|---:|---:|",
+            f"| effective M | {s('effective_M','min')} | {s('effective_M','mean'):.2f} | {s('effective_M','max')} |",
+            f"| planned identities | {s('planned_identity_count','min')} | {s('planned_identity_count','mean'):.2f} | {s('planned_identity_count','max')} |",
+            f"| settled identities | {s('settled_identity_count','min')} | {s('settled_identity_count','mean'):.2f} | {s('settled_identity_count','max')} |",
+            f"| unique tickets | {s('unique_ticket_count','min')} | {s('unique_ticket_count','mean'):.2f} | {s('unique_ticket_count','max')} |",
+            f"| duplicate tickets | {s('duplicate_ticket_count','min')} | {s('duplicate_ticket_count','mean'):.2f} | {s('duplicate_ticket_count','max')} |",
+            f"| hit identities | {s('hit_identity_count','min')} | {s('hit_identity_count','mean'):.2f} | {s('hit_identity_count','max')} |",
+            f"| winning tickets | {s('winning_ticket_count','min')} | {s('winning_ticket_count','mean'):.2f} | {s('winning_ticket_count','max')} |",
+            f"| identity coverage hit rate | {s('coverage_hit_rate','min')} | {s('coverage_hit_rate','mean')} | {s('coverage_hit_rate','max')} |",
+            f"| GM expected SP mean | {s('gm_expected_sp_mean','min')} | {s('gm_expected_sp_mean','mean')} | {s('gm_expected_sp_mean','max')} |",
+            f"| realized gross payout ¥ | {s('gross_pre_tax_yuan','min')} | {s('gross_pre_tax_yuan','mean')} | {s('gross_pre_tax_yuan','max')} |",
+            f"| tax ¥ | {s('tax_yuan','min')} | {s('tax_yuan','mean')} | {s('tax_yuan','max')} |",
+            f"| pre-tax net ROI | {s('no_tax_roi','min')} | {s('no_tax_roi','mean')} | {s('no_tax_roi','max')} |",
+            f"| tax-adjusted ROI | {s('tax_adjusted_roi','min')} | {s('tax_adjusted_roi','mean')} | {s('tax_adjusted_roi','max')} |",
+            f"| gross top-issue share | {s('gross_top_issue_share','min')} | {s('gross_top_issue_share','mean')} | {s('gross_top_issue_share','max')} |",
+            f"| gross issue HHI | {s('gross_issue_hhi','min')} | {s('gross_issue_hhi','mean')} | {s('gross_issue_hhi','max')} |",
+            f"| pre-tax max drawdown ¥ | {s('max_drawdown_no_tax_yuan','min')} | {s('max_drawdown_no_tax_yuan','mean')} | {s('max_drawdown_no_tax_yuan','max')} |",
+            f"| tax-adjusted max drawdown ¥ | {s('max_drawdown_tax_adjusted_yuan','min')} | {s('max_drawdown_tax_adjusted_yuan','mean')} | {s('max_drawdown_tax_adjusted_yuan','max')} |", "",
+            "The table is an across-cell range/mean, not a pooled bankroll result. Stake and payout remain per executed ticket/identity; tax is calculated per winning ticket under the frozen no-pooling rule.", "",
+            "## Complete ALL N×M×seed surface", "",
+            "The row-level CSV is authoritative for the full surface. The readable table below exposes the principal participation, multiplicity, payout, concentration and drawdown fields; saturation is reported by `saturation_status` and effective M is explicit.", "",
+            "| N | M | seed | eff M | sat. | planned IDs | settled IDs | unique | dup | hits | wins | coverage | GM E[SP] | gross ¥ | tax ¥ | pre-tax ROI | tax ROI | gross top share | HHI | DD pre ¥ | DD tax ¥ |", "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
         for row in all_summaries:
-            report.append(f"| {row['n']} | {row['M']} | {row['seed']} | {row['settled_identity_count']} | {row['executed_draw_count']} | {row['stake_yuan']} | {row['no_tax_roi']} | {row['tax_adjusted_roi']} | {row['ex_largest_issue_no_tax_roi']} | {row['ex_largest_year_no_tax_roi']} | {row['longest_executed_miss_streak']} |")
-        report += ["", "## M=64 seed-mean stability", "", "| N | raw pre-tax ROI | ex-largest-issue ROI | ex-largest-year ROI | raw tax ROI | executed miss streak |", "|---:|---:|---:|---:|---:|---:|"]
-        for n in N_GRID:
-            report.append(f"| {n} | {mean_m64('no_tax_roi', n)} | {mean_m64('ex_largest_issue_no_tax_roi', n)} | {mean_m64('ex_largest_year_no_tax_roi', n)} | {mean_m64('tax_adjusted_roi', n)} | {mean_m64('longest_executed_miss_streak', n)} |")
+            report.append(f"| {row['n']} | {row['M']} | {row['seed']} | {row['effective_M']} | {row['saturation_status']} | {row['planned_identity_count']} | {row['settled_identity_count']} | {row['unique_ticket_count']} | {row['duplicate_ticket_count']} | {row['hit_identity_count']} | {row['winning_ticket_count']} | {row['coverage_hit_rate']} | {row['gm_expected_sp_mean']} | {row['gross_pre_tax_yuan']} | {row['tax_yuan']} | {row['no_tax_roi']} | {row['tax_adjusted_roi']} | {row['gross_top_issue_share']} | {row['gross_issue_hhi']} | {row['max_drawdown_no_tax_yuan']} | {row['max_drawdown_tax_adjusted_yuan']} |")
+
+        report += ["", "## M=64 seed stability and bootstrap evidence", "", "The three seeds are kept separate. The interval column is a **seed-specific bootstrap 95% interval envelope** (`min low` to `max high`), not a CI for a seed-mean estimator.", "", "| N | seed ROI mean | seed ROI min..max | seed ROI SD | bootstrap point min..max | seed-specific CI envelope | positive fraction min..max | support issues |", "|---:|---:|---:|---:|---:|---:|---:|---:|"]
+        for entry in analysis["m64_seed_stability"]:
+            roi = entry["seed_no_tax_roi"]; point = entry["bootstrap_seed_specific_point_estimate"]; low = entry["bootstrap_seed_specific_ci95_low"]; high = entry["bootstrap_seed_specific_ci95_high"]; pf = entry["bootstrap_positive_fraction"]; support = entry["bootstrap_support_issue_count"]
+            report.append(f"| {entry['n']} | {roi['mean']} | {roi['min']}..{roi['max']} | {roi['sd']} | {point['min']}..{point['max']} | [{low['min']}, {high['max']}] | {pf['min']}..{pf['max']} | {support['min']}..{support['max']} |")
+
+        report += ["", "## YEAR / FOLD / LOYO robustness", "", "Each row below aggregates the 81 N×M×seed cells for one held-out scope. Positive-cell counts are pre-tax and no cells are pooled across scopes.", "", "| scope | value | cells | pre-tax ROI min..max | pre-tax ROI mean | tax ROI min..max | coverage min..max | positive pre-tax cells |", "|---|---:|---:|---:|---:|---:|---:|---:|"]
+        for entry in analysis["robustness"]:
+            pre = entry["pre_tax_roi"]; tax = entry["tax_adjusted_roi"]; cov = entry["coverage_hit_rate"]
+            report.append(f"| {entry['scope']} | {entry['scope_value']} | {entry['row_count']} | {pre['min']}..{pre['max']} | {pre['mean']} | {tax['min']}..{tax['max']} | {cov['min']}..{cov['max']} | {entry['positive_pre_tax_cells']} |")
+
+        report += ["", "## Matched/common-support N7 deltas", "", "The matched comparison uses only common executed issue instances for each N×M×seed and keeps N7 as a descriptive baseline. Deltas are pre-tax primary; tax-adjusted deltas are secondary.", "", "| N | cells | common issues min..max | delta min..max | delta mean | positive delta rows |", "|---:|---:|---:|---:|---:|---:|"]
+        for entry in analysis["matched_n7"]:
+            support = entry["common_issue_count"]; delta = entry["no_tax_roi_delta"]
+            report.append(f"| {entry['n']} | {entry['row_count']} | {support['min']}..{support['max']} | {delta['min']}..{delta['max']} | {delta['mean']} | {entry['positive_delta_rows']} |")
+
+        report += ["", "## Cross-identity overlap", "", "Overlap is descriptive only: WOR remains distinct within each identity, while shared legs across identities are retained and no ticket deduplication is applied.", "", "| N | identities | issues | pairs | mean shared legs | max shared legs | mean Jaccard | max Jaccard |", "|---:|---:|---:|---:|---:|---:|---:|---:|"]
+        for row in analysis["overlap"]:
+            report.append(f"| {row['n']} | {row['identity_count']} | {row['issue_count']} | {row['pair_count']} | {row['mean_shared_leg_count']} | {row['max_shared_leg_count']} | {row['mean_jaccard']} | {row['max_jaccard']} |")
+
         raw9, issue9, year9 = (mean_m64(field, 9) for field in ("no_tax_roi", "ex_largest_issue_no_tax_roi", "ex_largest_year_no_tax_roi"))
-        report += ["", "## Interpretation", "", f"The raw M=64 N=9 seed-mean pre-tax ROI is `{raw9}`; after removing each seed's largest signed issue contribution it is `{issue9}`, and after removing each seed's largest signed year contribution it is `{year9}`. Across all 81 ALL cells, raw positives={len(positives_raw)}, positives after largest-issue exclusion={len(positives_issue)}, positives after largest-year exclusion={len(positives_year)}.", "", "The positive N=9 cluster is therefore an extreme concentration signal, not evidence of a stable N sweet spot. The result is descriptive, requires strict independent EV and held-out/forward validation, and grants no purchase, production, betting, or promotion authority.", "", "## Artifacts", "", "- `surface_summary.csv`: complete ALL plus YEAR/FOLD/LOYO summaries with corrected controls.", "- `matched_n7_deltas.csv`: matched/common-support pre-tax-primary deltas against N7.", "- `roi_surface_pre_tax.svg`, `matched_n7_pre_tax_delta.svg`, `stability_exclusions_M64.svg`, `uncertainty_M64.svg`: readable primary, stability and bootstrap uncertainty charts.", "- `issue_bootstrap.csv` and `overlap_summary.csv`: copied from the authenticated v2 package; no underlying ledger changed.", "- `identity_settlement.csv.gz`, `issue_settlement.csv.gz`, `winning_ticket_tax_ledger.csv.gz`: byte-for-byte source evidence copies.", ""]
+        report += ["", "## Interpretation and decision boundary", "", f"For M=64, N=9 has raw seed-mean pre-tax ROI `{raw9}`; removing each seed's largest signed issue gives `{issue9}`, and removing each seed's largest signed year gives `{year9}`. Across all 81 ALL cells, raw positives={len(positives_raw)}, positives after largest-issue exclusion={len(positives_issue)}, positives after largest-year exclusion={len(positives_year)}.", "", "The positive N=9 cluster is therefore an extreme concentration signal, not evidence of a stable N sweet spot. YEAR/FOLD/LOYO ranges, matched N7 support/deltas, seed dispersion, per-seed bootstrap intervals and overlap are all exposed above and in the immutable linked tables. The descriptive result requires strict independent EV plus held-out/forward validation and grants no purchase, production, betting, or promotion authority.", "", "## Artifacts", "", "- `analysis_summary.json`: quantitative synthesis with metric ranges, seed dispersion, seed-specific bootstrap evidence, YEAR/FOLD/LOYO, matched N7 and overlap summaries.", "- `surface_summary.csv`: complete ALL plus YEAR/FOLD/LOYO rows; corrected signed-largest and explicitly named gross-top fields.", "- `matched_n7_deltas.csv`: matched/common-support pre-tax-primary deltas against N7.", "- `roi_surface_pre_tax.svg`, `matched_n7_pre_tax_delta.svg`, `stability_exclusions_M64.svg`, `uncertainty_M64.svg`: primary, stability and seed-specific bootstrap charts.", "- `issue_bootstrap.csv` and `overlap_summary.csv`: copied from the authenticated v2 package; no underlying ledger changed.", "- `identity_settlement.csv.gz`, `issue_settlement.csv.gz`, `winning_ticket_tax_ledger.csv.gz`: byte-for-byte source evidence copies.", ""]
         (stage / "report.md").write_text("\n".join(report), encoding="utf-8")
         source_census = {"source_v2_package_manifest_sha256": V2_MANIFEST, "source_v2_content_identity_sha256": V2_CONTENT_IDENTITY, "source_outcome_and_selection_ledgers": "copied byte-for-byte; recovery reads only issue_settlement.csv.gz", "canonical_outcome_loader": "NOT_OPENED_BY_RECOVERY", "recovery_boundary": "derived reporting only"}
         (stage / "source_census.json").write_text(json.dumps(source_census, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         card = {"issue": 159, "contract": CONTRACT, "runner_version": VERSION, "stage": "GATE_B_REPORTING_RECOVERY", "source_v2_manifest_sha256": V2_MANIFEST, "source_v2_content_identity_sha256": V2_CONTENT_IDENTITY, "gate_a_manifest_sha256": source_card["provenance"]["gate_a_manifest_sha256"], "canonical_outcome_manifest_sha256": source_card["provenance"]["canonical_outcome_manifest_sha256"], "decision": decision, "correction_boundary": "v2 identity, issue and winning-ticket ledgers are copied byte-for-byte and never recomputed; recovery does not open canonical outcomes", "exclusion_rule": "largest signed pre-tax net contribution among executed positive-stake rows; remove actual stake and both net variants", "miss_streak_rule": "frozen-calendar and executed-positive-stake streaks are emitted separately", "drawdown_rule": "pre-tax-primary and tax-adjusted-secondary net drawdowns are emitted separately", "output": {"issue_settlement_rows": len(issue_rows), "surface_summary_rows": len(all_summaries) + len(robustness), "matched_delta_rows": len(deltas), "positive_all_rows": len(positives_raw), "positive_after_largest_issue_exclusion": len(positives_issue), "positive_after_largest_year_exclusion": len(positives_year), "copied_ledger_files": list(LEDGER_NAMES)}, "scope": "historical paper-only reporting recovery; no purchase, production, betting or promotion authority"}
         (stage / "settlement_card.json").write_text(json.dumps(card, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         shutil.copy2(Path(__file__), stage / "recovery_runner.py")
-        (stage / "README.md").write_text("# #159 Gate B v2r1\n\nReporting-only recovery from the authenticated `bj159_gate_b_outcome_settlement_v2` ledgers. The recovery does not open canonical outcomes or alter settlement rows. Replay with `python3 recovery_runner.py --output <new-dir>`; staging uses the repository `.scratch` directory, never `/tmp`.\n", encoding="utf-8")
+        (stage / "README.md").write_text("# #159 Gate B v2r1\n\nReporting-only recovery from the authenticated `bj159_gate_b_outcome_settlement_v2` ledgers. The recovery does not open canonical outcomes or alter settlement rows. `analysis_summary.json` contains the quantitative terminal synthesis; `report.md` links the full immutable row-level surfaces. Replay with `python3 recovery_runner.py --output <new-dir>`; staging uses the repository `.scratch` directory, never `/tmp`.\n", encoding="utf-8")
         content = {"contract_version": "bj159-gateb-content-v2r1", "source_v2_manifest_sha256": V2_MANIFEST, "source_v2_content_identity_sha256": V2_CONTENT_IDENTITY, "copied_ledger_bytes_sha256": {name: sha256(stage / name) for name in LEDGER_NAMES}, "non_compressed_controls": {p.name: sha256(p) for p in sorted(stage.iterdir()) if p.is_file() and p.name not in LEDGER_NAMES}}
         (stage / "CONTENT_IDENTITY.json").write_text(json.dumps(content, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         sums = {p.name: sha256(p) for p in sorted(stage.iterdir())}; (stage / "SHA256SUMS.json").write_text(json.dumps(sums, indent=2, sort_keys=True) + "\n", encoding="utf-8")

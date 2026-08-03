@@ -16,8 +16,8 @@ concentration, exclusion, miss-streak and drawdown interpretation.
 - package manifest: `ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917`
 - content identity: `42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08`
 - reporting-recovery package: `results/bj159_gate_b_outcome_settlement_v2r1`
-- reporting-recovery manifest: `546d2a0aa026ea8f8bdaccad0cb9b7079d3e690e8db83c09675d62f0eb6077ef`
-- reporting-recovery content identity: `a33c802d98b00172a2cd84d32b7085a4900508f3b9c420afb30ecea6168b92ea`
+- reporting-recovery manifest: `17b42f65b834f2b5afff0e52795588f95340d76810f7faec75b193b6eecc4cc8`
+- reporting-recovery content identity: `7ba60fcc8fa99c620c019f6098e3d9e8b5bb112f6622799baffa9c6f2422cbaf`
 
 Nominal `M={32,64,128}` is preserved as a reporting label. Every actual draw
 and stake uses `effective_M=min(nominal_M,3^N)`. The 21 saturated plan cells

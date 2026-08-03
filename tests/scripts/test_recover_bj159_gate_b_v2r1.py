@@ -11,8 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / "results" / "bj159_gate_b_outcome_settlement_v2r1"
 SOURCE = ROOT / "results" / "bj159_gate_b_outcome_settlement_v2"
-EXPECTED_MANIFEST = "546d2a0aa026ea8f8bdaccad0cb9b7079d3e690e8db83c09675d62f0eb6077ef"
-EXPECTED_CONTENT = "a33c802d98b00172a2cd84d32b7085a4900508f3b9c420afb30ecea6168b92ea"
+EXPECTED_MANIFEST = "17b42f65b834f2b5afff0e52795588f95340d76810f7faec75b193b6eecc4cc8"
+EXPECTED_CONTENT = "7ba60fcc8fa99c620c019f6098e3d9e8b5bb112f6622799baffa9c6f2422cbaf"
 V2_MANIFEST = "ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917"
 V2_CONTENT = "42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08"
 
@@ -79,6 +79,19 @@ def test_signed_issue_exclusion_uses_net_and_actual_stake():
     assert module.exclusion_tax_roi(module.Decimal("-128"), module.Decimal("30"), contribution) == "-12.000000000000"
 
 
+def test_signed_largest_issue_gross_is_not_gross_top_issue():
+    module = load_recovery()
+    rows = [
+        issue_row(issue_instance="signed-largest", year="2021", stake_yuan="20", gross_pre_tax_yuan="10", pre_tax_net_yuan="-5", tax_adjusted_net_yuan="-8"),
+        issue_row(issue_instance="gross-top", year="2020", stake_yuan="10", gross_pre_tax_yuan="1000", pre_tax_net_yuan="-100", tax_adjusted_net_yuan="-120"),
+    ]
+    summary = module.summary_rows(rows, "ALL", "ALL")
+    assert summary["largest_issue"] == "signed-largest"
+    assert summary["largest_issue_gross_yuan"] == "10.000000"
+    assert summary["gross_top_issue"] == "gross-top"
+    assert summary["gross_top_issue_gross_yuan"] == "1000.000000"
+
+
 def test_summary_has_year_controls_drawdown_and_separate_support_streaks():
     module = load_recovery()
     rows = [
@@ -98,6 +111,21 @@ def test_summary_has_year_controls_drawdown_and_separate_support_streaks():
     assert summary["longest_executed_miss_streak"] == 1
 
 
+def test_uncertainty_chart_keeps_seed_specific_intervals_separate(tmp_path):
+    module = load_recovery()
+    chart = tmp_path / "uncertainty.svg"
+    rows = [
+        {"n": "2", "M": "64", "seed": "137001", "metric": "no_tax_roi", "point_estimate": "-0.1", "ci95_low": "-0.3", "ci95_high": "0.1", "positive_fraction": "0.2"},
+        {"n": "2", "M": "64", "seed": "137002", "metric": "no_tax_roi", "point_estimate": "0.2", "ci95_low": "-0.2", "ci95_high": "0.5", "positive_fraction": "0.4"},
+    ]
+    module.write_uncertainty_svg(chart, rows)
+    text = chart.read_text(encoding="utf-8")
+    assert "seed-specific issue bootstrap" in text
+    assert "seed-specific bootstrap 95% CI" in text
+    assert "seed-mean no-tax ROI" not in text
+    assert "seed 137001" in text and "seed 137002" in text
+
+
 def test_research_wiki_and_external_report_bind_final_package_hashes():
     report = ROOT / "docs" / "research" / "bj159_selected_wor_cross_n_gate_b_v2r1_2026-08-03.md"
     wiki = ROOT / "docs" / "research-notes" / "Research-Wiki.md"
@@ -106,3 +134,18 @@ def test_research_wiki_and_external_report_bind_final_package_hashes():
     text = report.read_text(encoding="utf-8") + wiki.read_text(encoding="utf-8")
     assert EXPECTED_MANIFEST in text
     assert EXPECTED_CONTENT in text
+
+
+def test_package_contains_quantitative_terminal_synthesis_and_corrected_fields():
+    analysis = json.loads((PACKAGE / "analysis_summary.json").read_text(encoding="utf-8"))
+    assert analysis["surface"]["all_cell_count"] == 81
+    assert analysis["m64_seed_stability"][7]["n"] == 9
+    assert "seed-specific" in analysis["bootstrap_interval_semantics"]
+    header = (PACKAGE / "surface_summary.csv").read_text(encoding="utf-8").splitlines()[0]
+    assert "gross_top_issue" in header
+    assert "gross_top_issue_gross_yuan" in header
+    report = (PACKAGE / "report.md").read_text(encoding="utf-8")
+    assert "Quantitative terminal synthesis" in report
+    assert "YEAR / FOLD / LOYO robustness" in report
+    assert "Matched/common-support N7 deltas" in report
+    assert "seed-specific bootstrap 95% interval envelope" in report

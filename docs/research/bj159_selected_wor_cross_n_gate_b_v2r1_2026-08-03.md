@@ -11,8 +11,8 @@ ticket, payout, tax, stake, net, or ROI settlement row.
 - v2 source manifest: `ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917`
 - v2 source content identity: `42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08`
 - v2r1 recovery package: `results/bj159_gate_b_outcome_settlement_v2r1`
-- v2r1 manifest: `546d2a0aa026ea8f8bdaccad0cb9b7079d3e690e8db83c09675d62f0eb6077ef`
-- v2r1 content identity: `a33c802d98b00172a2cd84d32b7085a4900508f3b9c420afb30ecea6168b92ea`
+- v2r1 manifest: `17b42f65b834f2b5afff0e52795588f95340d76810f7faec75b193b6eecc4cc8`
+- v2r1 content identity: `7ba60fcc8fa99c620c019f6098e3d9e8b5bb112f6622799baffa9c6f2422cbaf`
 - source package contains 63,180 identity rows, 28,188 complete-issue rows,
   and 81 ALL N×M×seed cells; v2r1 copies the three settlement ledgers
   byte-for-byte with independent inodes.
@@ -48,12 +48,15 @@ Those files include participation, selected identities, actual tickets/stake,
 hit and winning multiplicity, coverage, GM expected SP, realized payout and
 tax, YEAR/FOLD/LOYO robustness, issue bootstrap, matched/common-support N7
 deltas, overlap, signed largest-issue/year exclusions, both drawdowns, and
-both miss-streak supports. Figures are:
+both miss-streak supports. `analysis_summary.json` supplies readable ranges,
+means, seed dispersion, per-seed bootstrap support/positive fractions, and the
+matched/overlap summaries. Figures are:
 
 - `roi_surface_pre_tax.svg` — complete M=32/64/128 pre-tax ROI curves;
 - `matched_n7_pre_tax_delta.svg` — common-support pre-tax deltas versus N7;
 - `stability_exclusions_M64.svg` — raw versus largest-issue/year exclusions;
-- `uncertainty_M64.svg` — M=64 bootstrap point estimates and 95% intervals.
+- `uncertainty_M64.svg` — M=64 **seed-specific** bootstrap point estimates and
+  intervals; endpoint ranges are not a combined CI for the seed mean.
 
 ## M=64 seed-mean stability
 
@@ -75,6 +78,20 @@ cluster is therefore an extreme contribution-concentration signal, not a
 stable N sweet spot. It remains descriptive same-window evidence and requires
 strict independent EV plus held-out/forward validation. There is no purchase,
 production, betting, or promotion authority.
+
+The M=64 N=9 seed ROI values range from `-0.730186` to `+2.799801` with
+seed SD `1.508451`; the three seed-specific bootstrap point estimates have the
+same range, their interval envelope is `[-1.000000, +10.528226]`, and the
+per-seed bootstrap positive fractions range from `0.017` to `0.753`. These are
+not evidence of a common positive estimator. The M=64 N=10 seed range is
+`[-1.000000, -0.731628]`, while N=8 ranges from `-1.000000` to `+0.866500`,
+illustrating the instability outside the N=9 cluster as well.
+
+YEAR/FOLD/LOYO are not pooled: OOS-2019 has no settled support; OOS-2020 to
+OOS-2025 have pre-tax cell means from `-0.410219` to `+0.181908`, and LOYO
+means range from `-0.259308` to `-0.077555` despite positive maxima in every
+LOYO slice. Matched N7 deltas, common-issue support, and cross-identity overlap
+are explicitly tabulated in the package report and `analysis_summary.json`.
 
 ## Tax/accounting boundary
 

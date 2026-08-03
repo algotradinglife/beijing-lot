@@ -558,21 +558,41 @@ winning-ticket、stake、payout、tax、net 或 ROI 行。
 
 - source v2 manifest：`ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917`
 - source v2 content identity：`42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08`
-- v2r1 manifest：`546d2a0aa026ea8f8bdaccad0cb9b7079d3e690e8db83c09675d62f0eb6077ef`
-- v2r1 content identity：`a33c802d98b00172a2cd84d32b7085a4900508f3b9c420afb30ecea6168b92ea`
+- v2r1 manifest：`17b42f65b834f2b5afff0e52795588f95340d76810f7faec75b193b6eecc4cc8`
+- v2r1 content identity：`7ba60fcc8fa99c620c019f6098e3d9e8b5bb112f6622799baffa9c6f2422cbaf`
 
 完整 81 个 N×M×seed 主表（税前主指标、税后次指标、实际 stake/ticket、coverage、
 YEAR/FOLD/LOYO、bootstrap、matched/common-support N7、overlap、最大 issue/year 排除、
 双 drawdown 和双 miss streak）在不可变包的 `report.md`、`surface_summary.csv`、
-`issue_bootstrap.csv` 与 `matched_n7_deltas.csv` 中。图表包括 `roi_surface_pre_tax.svg`、
-`matched_n7_pre_tax_delta.svg`、`stability_exclusions_M64.svg` 和 `uncertainty_M64.svg`。可读结论和 M64 摘要见
+`analysis_summary.json`、`issue_bootstrap.csv` 与 `matched_n7_deltas.csv` 中。图表包括：
+
+![#159 pre-tax ROI surface](../../results/bj159_gate_b_outcome_settlement_v2r1/roi_surface_pre_tax.svg)
+
+![#159 matched N7 pre-tax delta](../../results/bj159_gate_b_outcome_settlement_v2r1/matched_n7_pre_tax_delta.svg)
+
+![#159 concentration exclusions](../../results/bj159_gate_b_outcome_settlement_v2r1/stability_exclusions_M64.svg)
+
+![#159 seed-specific bootstrap uncertainty](../../results/bj159_gate_b_outcome_settlement_v2r1/uncertainty_M64.svg)
+
+可读结论和 M64 摘要见
 [#159 v2r1 reporting recovery](../research/bj159_selected_wor_cross_n_gate_b_v2r1_2026-08-03.md)。
 
-M64 seed-mean 的关键读回如下：N=9 原始税前 ROI `+71.97%`，去掉每个 seed 的最大
+M64 seed stability 的关键读回如下：N=9 三个 seed 的原始税前 ROI 范围为
+`-73.0186%` 至 `+279.9801%`（SD `150.8451%`）；其 seed-specific bootstrap
+point estimate 范围相同，seed-specific interval envelope 为 `[-1.000000, +10.528226]`，
+positive fraction 范围为 `0.017` 至 `0.753`。这不是 seed-mean estimator 的组合 CI。
+N=9 seed-mean 原始税前 ROI 为 `+71.97%`，去掉每个 seed 的最大
 signed-issue 贡献后为 `-76.05%`，去掉最大 signed-year 贡献后为 `-93.12%`；其余 N
 的原始曲线均为负。81 个 ALL 行中原始正值 8 行、最大 issue 排除后仅 1 行、最大 year
 排除后 0 行。因此 N=9 是极端集中度信号，不是稳定的 N 甜点，也不构成 strict EV、
 样本外验证、购买、生产或推广授权。
+
+完整表面中的 across-cell 范围还显示：effective M 为 `9..128`，identity coverage
+为 `0..1`，gross top-issue share 为 `0.0263..1.0000`，pre-tax max drawdown 为
+`¥212.960421..¥243456.000000`。YEAR/FOLD/LOYO 不汇总资金：OOS-2019 没有 settled
+support；OOS-2020 至 OOS-2025 的 pre-tax cell mean 为 `-0.410219..+0.181908`，
+LOYO mean 为 `-0.259308..-0.077555`。matched/common-support N7 deltas、support
+counts 与 cross-identity overlap 均见 `analysis_summary.json` 和 report 表格。
 
 本次修正把最大贡献定义为**正 stake 行中 signed pre-tax net 的最大值**，排除时分别
 扣除实际 stake、pre-tax net 和 tax-adjusted net；税仍按单张中奖 ¥2 ticket 独立判断，
