@@ -15,6 +15,13 @@ ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location("bj167_runner",ROOT/"scripts"/"settle_bj167_strategy_atlas_gate_b_exact.py")
 R=importlib.util.module_from_spec(spec); assert spec.loader is not None; spec.loader.exec_module(R)
 CELLS_PER_SELECTOR=963
+# The completed screen serializes every seed-level monetary total with
+# ``money(...)=%.6f`` before it sums the 100 stochastic rows.  The companion
+# instead pools those same ticket totals before it writes its comparison.
+# These are therefore the only permitted reconciliation differences: half a
+# decimal quantum for each serialized seed (or one deterministic row).
+MONEY_QUANTUM = 1e-6
+RATIO_QUANTUM = 1e-12
 
 
 def science_cells():
@@ -52,6 +59,38 @@ def same_or_blank(actual: float | None, expected: str, tol: float) -> tuple[bool
     return abs(actual - float(expected)) <= tol, f"{actual:.12f}", expected
 
 
+def serialization_money_envelope(seed_scope: str) -> float:
+    """Maximum declared screen-rounding error for a pooled money total."""
+    return 0.5 * MONEY_QUANTUM * (100 if seed_scope == "ENSEMBLE_100" else 1)
+
+
+def serialization_roi_envelope(screen_gross: str, screen_stake: str, seed_scope: str) -> float:
+    """Conservative ROI error induced by the declared six-decimal path.
+
+    It evaluates the two monotone gross/stake interval endpoints rather than
+    applying a fixed ratio epsilon, so small-stake cells receive the larger
+    mathematically necessary tolerance.  The final half ratio quantum covers
+    the screen's twelve-decimal ROI text serialization.
+    """
+    if screen_gross == "" or screen_stake == "":
+        return 0.0
+    gross, stake = float(screen_gross), float(screen_stake)
+    # Zero-stake rows have blank ROI/lift by contract; their money totals are
+    # still checked below, but no ratio envelope is needed.
+    if stake == 0.0:
+        return 0.0
+    money_error = serialization_money_envelope(seed_scope)
+    if stake <= money_error:
+        # A nonblank ROI cannot be meaningfully reconstructed if its printed
+        # denominator is inside the money envelope.  This is a malformed
+        # immutable screen, not a reason to accept an unbounded mismatch.
+        raise RuntimeError("screen ROI denominator is inside rounding envelope")
+    reported = (gross - stake) / stake
+    lo = ((gross - money_error) - (stake + money_error)) / (stake + money_error)
+    hi = ((gross + money_error) - (stake - money_error)) / (stake - money_error)
+    return max(abs(reported - lo), abs(hi - reported)) + 0.5 * RATIO_QUANTUM
+
+
 def retained_issue_count(slice_type: str, name: str, nissue: int, year_counts: dict[str, int], fold_counts: dict[str, int]) -> int:
     if slice_type == "YEAR": return year_counts[name]
     if slice_type == "FOLD": return fold_counts[name]
@@ -85,25 +124,32 @@ def reconcile_scientific_screen(out: Path, screen: Path, selectors: list[dict], 
     expected = len(selectors) * len(cells)
     if len(screened) != expected:
         raise RuntimeError(f"immutable screen scientific-row count {len(screened)} != {expected}")
-    fields=["global_science_cell","selector_id","weight_source","mechanism","cap","M","seed_scope","screen_stake_yuan","replay_stake_yuan","stake_delta_yuan","screen_gross_yuan","replay_gross_yuan","gross_delta_yuan","screen_no_tax_roi","replay_no_tax_roi","roi_delta","screen_matched_full_no_tax_roi","replay_matched_full_no_tax_roi","full_roi_delta","screen_matched_full_lift","replay_matched_full_lift","lift_delta","reconciliation_status"]
+    fields=["global_science_cell","selector_id","weight_source","mechanism","cap","M","seed_scope","screen_stake_yuan","replay_stake_yuan","stake_delta_yuan","screen_stake_tolerance_yuan","screen_gross_yuan","replay_gross_yuan","gross_delta_yuan","screen_gross_tolerance_yuan","screen_no_tax_roi","replay_no_tax_roi","roi_delta","roi_tolerance","screen_matched_full_no_tax_roi","replay_matched_full_no_tax_roi","full_roi_delta","full_roi_tolerance","screen_matched_full_lift","replay_matched_full_lift","lift_delta","lift_tolerance","serialization_precision_envelope","reconciliation_status"]
     mismatch=0
     def emit(w):
         nonlocal mismatch
         for si,sel in enumerate(selectors):
             full_at=si*len(cells)+960; fnet,fstake=allv[0][full_at],allv[1][full_at]; froi=fnet/fstake if fstake else None
+            full_key=science_key(sel["selector_id"],cells[960]); full_screen=screened.get(full_key)
+            if full_screen is None: raise RuntimeError(f"scientific FULL control not present in screen: {full_key}")
+            full_money_tol=serialization_money_envelope(cells[960][4])
+            full_roi_tol=serialization_roi_envelope(full_screen["gross_pre_tax_yuan"],full_screen["stake_yuan"],cells[960][4])
             for ci,cell in enumerate(cells):
                 at=si*len(cells)+ci; key=science_key(sel["selector_id"],cell); screen_row=screened.pop(key,None)
                 if screen_row is None: raise RuntimeError(f"scientific cell not present in screen: {key}")
                 net,stake,gross=allv[0][at],allv[1][at],allv[2][at]; roi=net/stake if stake else None; lift=roi-froi if roi is not None and froi is not None else None
-                ok_s, a_s, e_s=same_or_blank(stake,screen_row["stake_yuan"],1e-6)
-                ok_g, a_g, e_g=same_or_blank(gross,screen_row["gross_pre_tax_yuan"],1e-6)
-                ok_r, a_r, e_r=same_or_blank(roi,screen_row["no_tax_roi"],1e-9)
-                ok_f, a_f, e_f=same_or_blank(froi,screen_row["matched_full_no_tax_roi"],1e-9)
-                ok_l, a_l, e_l=same_or_blank(lift,screen_row["matched_full_lift"],1e-9)
+                money_tol=serialization_money_envelope(cell[4])
+                roi_tol=serialization_roi_envelope(screen_row["gross_pre_tax_yuan"],screen_row["stake_yuan"],cell[4])
+                lift_tol=roi_tol + full_roi_tol + RATIO_QUANTUM
+                ok_s, a_s, e_s=same_or_blank(stake,screen_row["stake_yuan"],money_tol)
+                ok_g, a_g, e_g=same_or_blank(gross,screen_row["gross_pre_tax_yuan"],money_tol)
+                ok_r, a_r, e_r=same_or_blank(roi,screen_row["no_tax_roi"],roi_tol)
+                ok_f, a_f, e_f=same_or_blank(froi,screen_row["matched_full_no_tax_roi"],full_roi_tol)
+                ok_l, a_l, e_l=same_or_blank(lift,screen_row["matched_full_lift"],lift_tol)
                 ok=ok_s and ok_g and ok_r and ok_f and ok_l
                 mismatch += not ok
                 def delta(a,e): return "" if a=="" or e=="" else f"{float(a)-float(e):.12f}"
-                w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":cell[0],"mechanism":cell[1],"cap":cell[2],"M":cell[3],"seed_scope":cell[4],"screen_stake_yuan":e_s,"replay_stake_yuan":a_s,"stake_delta_yuan":delta(a_s,e_s),"screen_gross_yuan":e_g,"replay_gross_yuan":a_g,"gross_delta_yuan":delta(a_g,e_g),"screen_no_tax_roi":e_r,"replay_no_tax_roi":a_r,"roi_delta":delta(a_r,e_r),"screen_matched_full_no_tax_roi":e_f,"replay_matched_full_no_tax_roi":a_f,"full_roi_delta":delta(a_f,e_f),"screen_matched_full_lift":e_l,"replay_matched_full_lift":a_l,"lift_delta":delta(a_l,e_l),"reconciliation_status":"PASS" if ok else "FAIL"})
+                w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":cell[0],"mechanism":cell[1],"cap":cell[2],"M":cell[3],"seed_scope":cell[4],"screen_stake_yuan":e_s,"replay_stake_yuan":a_s,"stake_delta_yuan":delta(a_s,e_s),"screen_stake_tolerance_yuan":f"{money_tol:.12f}","screen_gross_yuan":e_g,"replay_gross_yuan":a_g,"gross_delta_yuan":delta(a_g,e_g),"screen_gross_tolerance_yuan":f"{money_tol:.12f}","screen_no_tax_roi":e_r,"replay_no_tax_roi":a_r,"roi_delta":delta(a_r,e_r),"roi_tolerance":f"{roi_tol:.12f}","screen_matched_full_no_tax_roi":e_f,"replay_matched_full_no_tax_roi":a_f,"full_roi_delta":delta(a_f,e_f),"full_roi_tolerance":f"{full_roi_tol:.12f}","screen_matched_full_lift":e_l,"replay_matched_full_lift":a_l,"lift_delta":delta(a_l,e_l),"lift_tolerance":f"{lift_tol:.12f}","serialization_precision_envelope":"100x_half_1e-6_seed_money + adaptive_roi" if cell[4] == "ENSEMBLE_100" else "one_half_1e-6_money + adaptive_roi","reconciliation_status":"PASS" if ok else "FAIL"})
     write_gz(out/"scientific_screen_reconciliation.csv.gz",fields,emit)
     if screened: raise RuntimeError(f"unmapped immutable screening scientific rows: {len(screened)}")
     if mismatch: raise RuntimeError(f"scientific screen reconciliation mismatch count={mismatch}")

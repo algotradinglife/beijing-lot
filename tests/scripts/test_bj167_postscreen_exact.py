@@ -161,3 +161,21 @@ def test_scientific_reconciliation_requires_complete_keyed_963_surface():
         rows = list(csv.DictReader(f))
     assert len(rows) == 963 and all(r["reconciliation_status"] == "PASS" for r in rows)
     shutil.rmtree(root)
+
+
+def test_scientific_reconciliation_100_seed_rounding_envelope_is_exactly_bounded():
+    """The companion pools before writing; the screen rounds each seed first."""
+    full_precision_seed_gross = [0.0000005001] * 100
+    screen_serialized_gross = sum(float(f"{x:.6f}") for x in full_precision_seed_gross)
+    pooled_gross = sum(full_precision_seed_gross)
+    assert screen_serialized_gross != pooled_gross
+    money_bound = SCIENCE.serialization_money_envelope("ENSEMBLE_100")
+    assert abs(screen_serialized_gross - pooled_gross) <= money_bound
+    stake = 1.0
+    screen_roi = (screen_serialized_gross - stake) / stake
+    pooled_roi = (pooled_gross - stake) / stake
+    roi_bound = SCIENCE.serialization_roi_envelope(f"{screen_serialized_gross:.6f}", f"{stake:.6f}", "ENSEMBLE_100")
+    assert abs(screen_roi - pooled_roi) <= roi_bound
+    # A difference beyond the declared serialization envelope remains a hard
+    # mismatch; this is not a generic tolerance relaxation.
+    assert abs(screen_serialized_gross - (pooled_gross + 0.00011)) > money_bound
