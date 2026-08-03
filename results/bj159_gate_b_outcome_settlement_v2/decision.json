@@ -1,0 +1,7 @@
+{
+  "decision": "POSITIVE_REQUIRES_STRICT_INDEPENDENT_EV",
+  "positive_all_rows": 8,
+  "promotion_authorized": false,
+  "rule": "Pre-tax no_tax_roi is primary and tax-adjusted ROI secondary; same-window historical positives are descriptive and require strict independent EV plus held-out/forward validation; no purchase, production, betting or promotion authority.",
+  "strict_independent_ev_required": true
+}

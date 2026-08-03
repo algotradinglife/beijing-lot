@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import argparse
 import csv
+import concurrent.futures
 import gzip
 import hashlib
+import heapq
 import io
 import itertools
 import json
@@ -183,15 +185,62 @@ def ticket_tax(gross: Decimal) -> Decimal:
     return gross * TAX_RATE if gross >= TAX_THRESHOLD else Decimal(0)
 
 
-def allocation_rank(weights: tuple[float, ...], seed: str, signature: str, n: int) -> tuple[int, ...]:
-    keys: list[tuple[float, int]] = []
-    for ordinal, weight in enumerate(weights):
-        if weight <= 0:
-            key = math.inf
-        else:
-            key = -math.log(max(stable_uniform("bj137", "WOR", seed, signature, ordinal), 1e-18)) / weight
-        keys.append((key, ordinal))
-    return tuple(ordinal for _, ordinal in sorted(keys))
+def allocation_top(weights: tuple[float, ...], seed: str, signature: str, n: int, top_count: int, truth_idx: int | None) -> tuple[tuple[int, ...], int | None]:
+    """Return the exact first ``top_count`` WOR tickets and truth rank.
+
+    The old implementation sorted the entire 3^N space for every identity.
+    ``heapq.nsmallest`` keeps the same `(key, ordinal)` ordering and stable
+    hash namespace while avoiding an unnecessary full sort; the truth rank is
+    counted against the same exact key ordering.
+    """
+    truth_item: tuple[float, int] | None = None
+    if truth_idx is not None:
+        weight = weights[truth_idx]
+        key = math.inf if weight <= 0 else -math.log(max(stable_uniform("bj137", "WOR", seed, signature, truth_idx), 1e-18)) / weight
+        truth_item = (key, truth_idx)
+    less = 0
+    def items():
+        nonlocal less
+        for ordinal, weight in enumerate(weights):
+            key = math.inf if weight <= 0 else -math.log(max(stable_uniform("bj137", "WOR", seed, signature, ordinal), 1e-18)) / weight
+            item = (key, ordinal)
+            if truth_item is not None and item < truth_item:
+                less += 1
+            yield item
+    top = tuple(ordinal for _, ordinal in heapq.nsmallest(top_count, items()))
+    return top, (less + 1 if truth_item is not None else None)
+
+
+def allocation_task(spec: tuple[str, int, str, tuple[tuple[float, float, float], ...], tuple[str, ...], tuple[str, ...] | None]) -> tuple[str, str, tuple[int, ...], int | None]:
+    """Process-pool worker for one identity's deterministic seed surface."""
+    identity_id, n, signature, qweights, seeds, truth_codes = spec
+    weights = tuple(math.prod(qweights[i][CODES.index(code)] for i, code in enumerate(ticket)) for ticket in itertools.product(CODES, repeat=n))
+    if abs(sum(weights) - 1.0) > 2e-8:
+        raise RuntimeError(f"ticket q mass drift: {identity_id}")
+    output = []
+    for seed, truth_code in zip(seeds, truth_codes or (None,) * len(seeds)):
+        truth_idx = None if truth_code is None else truth_ordinal(truth_code)
+        top, rank = allocation_top(weights, seed, signature, n, min(128, 3 ** n), truth_idx)
+        output.append((identity_id, seed, top, rank))
+    return output
+
+
+def precompute_ranks(identities: list[dict[str, str]], role_map: dict[str, list[dict[str, str]]], outcomes: dict[str, dict[str, str]]) -> dict[tuple[str, str], tuple[tuple[int, ...], int | None]]:
+    specs = []
+    seeds = tuple(SEEDS)
+    for identity in identities:
+        roles = sorted(role_map[identity["identity_id"]], key=lambda row: int(row["selection_rank"]))
+        qweights = tuple(tuple(float(role[f"q_weight{code}"]) for code in CODES) for role in roles)
+        missing = any(role["match_id"] not in outcomes for role in roles)
+        truth_codes = None if missing else ("".join(outcomes[role["match_id"]]["result_code"] for role in roles),) * len(seeds)
+        specs.append((identity["identity_id"], int(identity["n"]), identity["selected_match_ids"], qweights, seeds, truth_codes))
+    cache: dict[tuple[str, str], tuple[tuple[int, ...], int | None]] = {}
+    workers = max(1, min(8, os.cpu_count() or 1))
+    with concurrent.futures.ProcessPoolExecutor(max_workers=workers) as executor:
+        for result in executor.map(allocation_task, specs, chunksize=1):
+            for identity_id, seed, top, rank in result:
+                cache[(identity_id, seed)] = (top, rank)
+    return cache
 
 
 def quantile(values: list[Decimal], q: float) -> Decimal:
@@ -325,26 +374,34 @@ def load_freeze() -> tuple[list[dict[str, str]], dict[str, list[dict[str, str]]]
     return participation, dict(role_map), {row["identity_id"]: row for row in identities}, kickoff_by_issue, plan_map
 
 
-def settlement_row(identity: dict[str, str], roles: list[dict[str, str]], plan: dict[str, str], seed: str, outcomes: dict[str, dict[str, str]], allocation_cache: dict[tuple[str, str, int], tuple[tuple[int, ...], str]]) -> dict[str, object]:
+def settlement_row(identity: dict[str, str], roles: list[dict[str, str]], plan: dict[str, str], seed: str, outcomes: dict[str, dict[str, str]], allocation_cache: dict[tuple[str, str, int], tuple[tuple[int, ...], str]], rank_cache: dict[tuple[str, str], tuple[tuple[int, ...], int | None]], weight_cache: dict[str, tuple[float, ...]]) -> dict[str, object]:
     n = int(identity["n"]); nominal_m = int(plan["nominal_M"]); effective_m = int(plan["effective_M"]); saturation_status = plan["saturation_status"]; signature = identity["selected_match_ids"]
     missing = [row["match_id"] for row in roles if row["match_id"] not in outcomes]
+    truth = "" if missing else "".join(outcomes[row["match_id"]]["result_code"] for row in roles)
+    truth_idx = None if missing else truth_ordinal(truth)
     planned = effective_m; full_stake = Decimal(effective_m) * UNIT_STAKE
     allocation_key = f"{identity['identity_id']}|{seed}|effective_M={effective_m}"
     cache_key = (identity["identity_id"], seed, effective_m)
-    weights = [math.prod(float(roles[i][f"q_weight{code}"]) for i, code in enumerate(ticket)) for ticket in itertools.product(CODES, repeat=n)]
-    if abs(sum(weights) - 1.0) > 2e-8: raise RuntimeError(f"ticket q mass drift: {identity['identity_id']}")
+    rank_key = (identity["identity_id"], seed)
+    if rank_key not in rank_cache:
+        if identity["identity_id"] not in weight_cache:
+            weight_cache[identity["identity_id"]] = tuple(math.prod(float(roles[i][f"q_weight{code}"]) for i, code in enumerate(ticket)) for ticket in itertools.product(CODES, repeat=n))
+            if abs(sum(weight_cache[identity["identity_id"]]) - 1.0) > 2e-8: raise RuntimeError(f"ticket q mass drift: {identity['identity_id']}")
+        weights = weight_cache[identity["identity_id"]]
+        rank_cache[rank_key] = allocation_top(weights, seed, signature, n, min(128, 3 ** n), truth_idx)
+    ranked, truth_rank = rank_cache[rank_key]
     if cache_key not in allocation_cache:
-        ranked = allocation_rank(tuple(weights), seed, signature, n); selected = tuple(ranked[:effective_m]); fingerprint = hashlib.sha256(json.dumps(selected, separators=(",", ":")).encode()).hexdigest(); allocation_cache[cache_key] = (selected, fingerprint)
+        selected = tuple(ranked[:effective_m]); fingerprint = hashlib.sha256(json.dumps(selected, separators=(",", ":")).encode()).hexdigest(); allocation_cache[cache_key] = (selected, fingerprint)
     selected, fingerprint = allocation_cache[cache_key]
     base = {"identity_id": identity["identity_id"], "issue": identity["issue"], "fold": identity["fold"], "year": identity["year"], "issue_instance": identity["issue_instance"], "n": n, "M": nominal_m, "nominal_M": nominal_m, "effective_M": effective_m, "seed": seed, "saturation_status": saturation_status, "allocation_equivalence_key": allocation_key, "planned_draw_count": planned, "executed_draw_count": 0 if missing else planned, "stake_yuan": money(Decimal(0) if missing else full_stake), "unique_ticket_count": 0 if missing else effective_m, "duplicate_ticket_count": 0, "duplicate_ticket_ratio": ratio(0), "allocation_fingerprint": fingerprint, "outcome_gap_count": len(missing), "settlement_status": "UNAVAILABLE_CANONICAL_OUTCOME" if missing else "SETTLED"}
     if missing:
         return {**base, "truth_sequence": "", "truth_ordinal": "", "truth_rank": "", "coverage_hit": "", "winning_ticket_count": 0, "gm_e_sp": identity["gm_e_sp"], "expected_sp_product_q": "", "actual_winning_sp_product": "", "gross_pre_tax_yuan": money(Decimal(0)), "taxable_winning_ticket_count": 0, "tax_yuan": money(Decimal(0)), "after_tax_gross_yuan": money(Decimal(0)), "pre_tax_net_yuan": money(Decimal(0)), "tax_adjusted_net_yuan": money(Decimal(0)), "no_tax_roi": "", "tax_adjusted_roi": "", "winning_sp_sources": ""}
-    truth = "".join(outcomes[row["match_id"]]["result_code"] for row in roles); truth_idx = truth_ordinal(truth)
     product = Decimal(1); sources = set(); expected_product = Decimal(1)
     for role in roles:
         outcome = outcomes[role["match_id"]]; product *= dec(outcome["winning_sp"], "winning SP"); sources.add(outcome["winning_sp_source"])
         expected_leg = sum(dec(role[f"q_weight{code}"], "q weight") * dec(role[f"predicted_sp{code}"], "predicted SP") for code in CODES); expected_product *= expected_leg
-    ranked = allocation_rank(tuple(weights), seed, signature, n); rank = ranked.index(truth_idx) + 1; hit = rank <= effective_m
+    if truth_rank is None: raise RuntimeError("settled identity missing truth rank")
+    rank = truth_rank; hit = rank <= effective_m
     gross = UNIT_STAKE * PAYOUT_FACTOR * product if hit else Decimal(0); tax = ticket_tax(gross) if hit else Decimal(0); after = gross - tax; stake = full_stake
     return {**base, "truth_sequence": truth, "truth_ordinal": truth_idx, "truth_rank": rank, "coverage_hit": "YES" if hit else "NO", "winning_ticket_count": int(hit), "gm_e_sp": identity["gm_e_sp"], "expected_sp_product_q": money(expected_product), "actual_winning_sp_product": money(product) if hit else "", "gross_pre_tax_yuan": money(gross), "taxable_winning_ticket_count": int(bool(tax)), "tax_yuan": money(tax), "after_tax_gross_yuan": money(after), "pre_tax_net_yuan": money(gross - stake), "tax_adjusted_net_yuan": money(after - stake), "no_tax_roi": ratio((gross - stake) / stake), "tax_adjusted_roi": ratio((after - stake) / stake), "winning_sp_sources": ";".join(sorted(sources))}
 
@@ -368,7 +425,7 @@ def summary_rows(issue_rows: list[dict[str, object]], scope: str, scope_value: s
 def bootstrap(issue_rows_by_config: dict[tuple[int, int, str], list[dict[str, object]]], n: int, nominal_m: int, seed: str) -> list[dict[str, object]]:
     rows = [row for row in issue_rows_by_config[(n, nominal_m, seed)] if dec(row["stake_yuan"], "stake") > 0]
     if not rows: return []
-    rng = random.Random(int.from_bytes(hashlib.sha256(f"{CONTRACT}|bootstrap|{n}|{m}|{seed}".encode()).digest()[:8], "big")); output = []
+    rng = random.Random(int.from_bytes(hashlib.sha256(f"{CONTRACT}|bootstrap|{n}|{nominal_m}|{seed}".encode()).digest()[:8], "big")); output = []
     for metric in ("pre_tax_net_yuan", "tax_adjusted_net_yuan"):
         values = []
         for _ in range(BOOTSTRAP_REPLICATES):
@@ -419,13 +476,15 @@ def build(output: Path) -> dict[str, object]:
         identity_handles = gzip_writer(stage / "identity_settlement.csv.gz", IDENTITY_SETTLEMENT_FIELDS); identity_writer = identity_handles[-1]
         tax_handles = gzip_writer(stage / "winning_ticket_tax_ledger.csv.gz", ("identity_id", "issue", "issue_instance", "n", "M", "nominal_M", "effective_M", "seed", "saturation_status", "gross_yuan", "tax_yuan", "tax_rule")); tax_writer = tax_handles[-1]
         allocation_cache: dict[tuple[str, str, int], tuple[tuple[int, ...], str]] = {}
+        rank_cache: dict[tuple[str, str], tuple[tuple[int, ...], int | None]] = precompute_ranks(identities, role_map, outcomes)
+        weight_cache: dict[str, tuple[float, ...]] = {}
         identity_count_by_n = Counter(int(row["n"]) for row in identities); settled_count = Counter(); unavailable_count = Counter()
         for identity in sorted(identities, key=lambda row: (int(row["year"]), int(row["issue"]), int(row["n"]), row["identity_id"])):
             roles = sorted(role_map[identity["identity_id"]], key=lambda row: int(row["selection_rank"]))
             for nominal_m in M_GRID:
                 for seed in SEEDS:
                     plan = plan_map[(int(identity["n"]), nominal_m, seed)]
-                    row = settlement_row(identity, roles, plan, seed, outcomes, allocation_cache); identity_writer.writerow(row)
+                    row = settlement_row(identity, roles, plan, seed, outcomes, allocation_cache, rank_cache, weight_cache); identity_writer.writerow(row)
                     issue_rows_by_config[(int(identity["n"]), nominal_m, seed)].append(row)
                     if row["settlement_status"] == "SETTLED": settled_count[int(identity["n"])] += 1
                     else: unavailable_count[int(identity["n"])] += 1
@@ -488,10 +547,12 @@ def build(output: Path) -> dict[str, object]:
         positives = [row for row in all_summaries if row["no_tax_roi"] and dec(row["no_tax_roi"], "ROI") > 0]
         decision = {"decision": "POSITIVE_REQUIRES_STRICT_INDEPENDENT_EV" if positives else "NO_PROMOTION", "positive_all_rows": len(positives), "strict_independent_ev_required": bool(positives), "promotion_authorized": False, "rule": "Pre-tax no_tax_roi is primary and tax-adjusted ROI secondary; same-window historical positives are descriptive and require strict independent EV plus held-out/forward validation; no purchase, production, betting or promotion authority."}
         (stage / "decision.json").write_text(json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        report = ["# #159 Gate B v2 — selected-baseline WOR cross-N", "", "Canonical settlement of the accepted outcome-unexposed Gate-A package.", "", f"Decision: **{decision['decision']}**.", "", "The primary nominal M=64 surface and nominal M=32/128 sensitivity use deterministic Q-informed WOR without replacement. Actual draws and stake use `effective_M=min(nominal_M,3^N)`. Every selected identity gets effective_M distinct tickets at ¥2 each; the 21 FULL_SPACE_SATURATED nominal rows are the same allocation per identity/seed/effective_M, not duplicate WOR tickets. Tax is applied only per individual winning ticket reaching ¥10,000 gross, never by pooling issue or policy stakes.", "", "## Identity counts", "", "| N | identities |", "|---:|---:|"] + [f"| {n} | {identity_count_by_n[n]} |" for n in N_GRID] + ["", "## Interpretation", "", "The N curve is descriptive. Matched N-versus-N7 deltas use common positive-stake issue support only; YEAR/FOLD/LOYO, issue bootstrap, overlap and largest-issue controls are included in the package. No historical row authorizes purchase, production, betting or promotion.", ""]
+        report = ["# #159 Gate B v2 — selected-baseline WOR cross-N", "", "Canonical settlement of the accepted outcome-unexposed Gate-A package.", "", f"Decision: **{decision['decision']}**.", "", "The primary nominal M=64 surface and nominal M=32/128 sensitivity use deterministic Q-informed WOR without replacement. Actual draws and stake use `effective_M=min(nominal_M,3^N)`. Every selected identity gets effective_M distinct tickets at ¥2 each; the 21 FULL_SPACE_SATURATED nominal rows are the same allocation per identity/seed/effective_M, not duplicate WOR tickets. Tax is applied only per individual winning ticket reaching ¥10,000 gross, never by pooling issue or policy stakes.", "", "## Identity counts", "", "| N | identities |", "|---:|---:|"] + [f"| {n} | {identity_count_by_n[n]} |" for n in N_GRID] + ["", "## Complete ALL N×M×seed surface", "", "Every row below is a separate frozen nominal-M/seed reporting cell; `effective_M`, actual stake, and coverage are explicit. The 21 saturated cells are equivalent allocations, not extra WR tickets.", "", "| N | nominal M | effective M | seed | settled identities | executed tickets | stake ¥ | coverage | no-tax ROI | tax ROI |", "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+        report.extend(f"| {row['n']} | {row['nominal_M']} | {row['effective_M']} | {row['seed']} | {row['settled_identity_count']} | {row['executed_draw_count']} | {row['stake_yuan']} | {row['coverage_hit_rate']} | {row['no_tax_roi']} | {row['tax_adjusted_roi']} |" for row in all_summaries)
+        report += ["", "## Interpretation", "", "The N curve is descriptive. Matched N-versus-N7 deltas use common positive-stake issue support only; YEAR/FOLD/LOYO, issue bootstrap, overlap and largest-issue controls are included in the package. Any positive historical cells remain descriptive and require strict independent EV plus held-out/forward validation. No historical row authorizes purchase, production, betting or promotion.", ""]
         (stage / "report.md").write_text("\n".join(report), encoding="utf-8")
         write_csv(stage / "source_census.csv", SOURCE_FIELDS, [{"source": "bj159_gate_a_preoutcome_v2r1", "role": "accepted immutable complete-issue identities and nominal/effective WOR plan", "identity": "SHA256SUMS.json", "sha256": FREEZE_MANIFEST, "rows": len(identities), "join_status": "all identities retained; no selection recomputation"}, {"source": "bj95_gate_b_outcome_settlement_v2r8", "role": "canonical trusted result/final-SP only", "identity": "canonical_outcome_join.csv", "sha256": OUTCOME_PAYLOAD, "rows": len(outcomes), "join_status": "complete identity settlement; missing legs receive zero executed stake"}])
-        card = {"issue": 159, "contract": CONTRACT, "runner_version": VERSION, "stage": "GATE_B_CANONICAL_OUTCOME_SETTLEMENT", "provenance": provenance, "settlement_rule": "Hit iff the frozen truth code is among the effective_M distinct Q-WOR tickets; gross=¥2×0.65×product(trusted final winning SP) exactly once on hit.", "saturation_rule": "nominal_M is a reporting label; effective_M=min(nominal_M,3^N) controls actual draw count and stake; FULL_SPACE_SATURATED nominal rows share one allocation per identity/seed/effective_M and are not extra WR tickets.", "tax_rule": "20% is applied per individual winning ¥2 ticket iff that ticket gross >= ¥10,000; no issue/policy pooling or aggregation.", "unit": "complete lottery issue; native pool is provenance only", "decision": decision, "output": {"identity_settlement_rows": len(settled_rows), "issue_settlement_rows": len(issue_output), "surface_summary_rows": len(all_summaries) + len(robustness), "bootstrap_rows": len(list((stage / "issue_bootstrap.csv").open())) - 1, "matched_delta_rows": len(deltas), "saturated_nominal_rows": 21 * len(identities)}, "scope": "historical paper-only research; no purchase, production, betting or promotion authority"}
+        card = {"issue": 159, "contract": CONTRACT, "runner_version": VERSION, "stage": "GATE_B_CANONICAL_OUTCOME_SETTLEMENT", "provenance": provenance, "settlement_rule": "Hit iff the frozen truth code is among the effective_M distinct Q-WOR tickets; gross=¥2×0.65×product(trusted final winning SP) exactly once on hit.", "saturation_rule": "nominal_M is a reporting label; effective_M=min(nominal_M,3^N) controls actual draw count and stake; FULL_SPACE_SATURATED nominal rows share one allocation per identity/seed/effective_M and are not extra WR tickets.", "tax_rule": "20% is applied per individual winning ¥2 ticket iff that ticket gross >= ¥10,000; no issue/policy pooling or aggregation.", "unit": "complete lottery issue; native pool is provenance only", "decision": decision, "output": {"identity_settlement_rows": len(settled_rows), "issue_settlement_rows": len(issue_output), "surface_summary_rows": len(all_summaries) + len(robustness), "bootstrap_rows": len(list((stage / "issue_bootstrap.csv").open())) - 1, "matched_delta_rows": len(deltas), "saturated_nominal_rows": sum(row["saturation_status"] == "FULL_SPACE_SATURATED" for row in settled_rows)}, "scope": "historical paper-only research; no purchase, production, betting or promotion authority"}
         (stage / "settlement_card.json").write_text(json.dumps(card, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         shutil.copy2(Path(__file__), stage / "settlement_runner.py")
         (stage / "README.md").write_text("# #159 Gate B v2\n\nCanonical outcome settlement of the accepted selected-baseline Q-informed WOR cross-N freeze. `M`/`nominal_M` is the frozen reporting label; `effective_M=min(nominal_M,3^N)` is the actual number of distinct tickets and actual stake. Saturated nominal cells are one allocation per identity/seed/effective_M, not duplicate WOR tickets. Replay with `python3 settlement_runner.py --output <new-dir>`; staging is beside the output and never uses `/tmp`.\n", encoding="utf-8")
