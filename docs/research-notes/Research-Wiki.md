@@ -563,8 +563,12 @@ winning-ticket、stake、payout、tax、net 或 ROI 行。
 
 完整 81 个 N×M×seed 主表（税前主指标、税后次指标、实际 stake/ticket、coverage、
 YEAR/FOLD/LOYO、bootstrap、matched/common-support N7、overlap、最大 issue/year 排除、
-双 drawdown 和双 miss streak）在不可变包的 `report.md`、`surface_summary.csv`、
-`analysis_summary.json`、`issue_bootstrap.csv` 与 `matched_n7_deltas.csv` 中。图表包括：
+双 drawdown 和双 miss streak）可直接读取不可变包的
+[`report.md`](../../results/bj159_gate_b_outcome_settlement_v2r1/report.md)、
+[`surface_summary.csv`](../../results/bj159_gate_b_outcome_settlement_v2r1/surface_summary.csv)、
+[`analysis_summary.json`](../../results/bj159_gate_b_outcome_settlement_v2r1/analysis_summary.json)、
+[`issue_bootstrap.csv`](../../results/bj159_gate_b_outcome_settlement_v2r1/issue_bootstrap.csv) 与
+[`matched_n7_deltas.csv`](../../results/bj159_gate_b_outcome_settlement_v2r1/matched_n7_deltas.csv)。图表包括：
 
 ![#159 pre-tax ROI surface](../../results/bj159_gate_b_outcome_settlement_v2r1/roi_surface_pre_tax.svg)
 
