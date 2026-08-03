@@ -172,10 +172,18 @@ def point(values: array.array, stakes: array.array) -> float | None:
     return sum(values) / denom if denom else None
 
 
-def bh(rows: list[dict], field: str, prefix: str) -> None:
+def bh(rows: list[dict], field: str, prefix: str, full_family_size: int) -> None:
     valid = [(i, float(r[field])) for i, r in enumerate(rows) if r.get(field, "") != ""]
-    valid.sort(key=lambda x: x[1]); m = len(valid); ceiling = 1.0
-    for rank in range(m, 0, -1):
+    if full_family_size < len(valid):
+        raise RuntimeError("searched-family count cannot be smaller than bootstrapped candidate count")
+    # Unbootstrapped full-surface cells are conservatively represented as
+    # p=1.  Their ordered ranks trail all finite candidate p-values, so the
+    # BH adjustment below uses the immutable full search family without
+    # pretending the candidate freeze was the scientific search universe.
+    valid.sort(key=lambda x: x[1]); m = full_family_size; ceiling = 1.0
+    # The remaining m-len(valid) implicit p=1 entries have adjusted p=1, so
+    # start the monotone reverse pass at the last observed rank.
+    for rank in range(len(valid), 0, -1):
         i, p = valid[rank - 1]; adjusted = min(ceiling, p * m / rank); ceiling = adjusted
         rows[i][prefix + "_bh_adjusted_p"] = adjusted
         rows[i][prefix + "_bonferroni_adjusted_p"] = min(1.0, p * m)
@@ -183,7 +191,7 @@ def bh(rows: list[dict], field: str, prefix: str) -> None:
         r.setdefault(prefix + "_bh_adjusted_p", None); r.setdefault(prefix + "_bonferroni_adjusted_p", None)
 
 
-def bootstrap_rows(rows: list[dict], values: dict[str, list[array.array]], issue_order: list[str], issue_meta: dict, out: Path) -> list[dict]:
+def bootstrap_rows(rows: list[dict], values: dict[str, list[array.array]], issue_order: list[str], issue_meta: dict, out: Path, full_family_size: int) -> list[dict]:
     n, c = len(issue_order), len(rows)
     draws, draws_sha = R.build_common_draw_matrix(n, REPLICATES, DRAW_SEED)
     (out / "paired_bootstrap_draw_matrix.json").write_text(json.dumps({"seed": DRAW_SEED, "unit": "issue_instance", "issue_count": n, "replicate_count": REPLICATES, "sha256": draws_sha}, sort_keys=True, indent=2) + "\n")
@@ -232,13 +240,16 @@ def bootstrap_rows(rows: list[dict], values: dict[str, list[array.array]], issue
                              "largest_signed_issue_net_yuan": net[largest_issue], "ex_largest_year_no_tax_roi": ex_year_net / ex_year_stake if ex_year_stake else None,
                              "largest_signed_year": signed_year, "drawdown_no_tax_yuan": dd, "gross_issue_hhi": hhi,
                              "gross_top_issue_share": top, "bootstrap_draw_matrix_sha256": draws_sha})
-    bh(out_rows, "candidate_two_sided_p", "candidate")
-    bh(out_rows, "paired_lift_two_sided_p", "paired_lift")
+    bh(out_rows, "candidate_two_sided_p", "candidate", full_family_size)
+    bh(out_rows, "paired_lift_two_sided_p", "paired_lift", full_family_size)
+    for row in out_rows:
+        row["candidate_freeze_count"] = len(rows)
+        row["full_search_family_count"] = full_family_size
     return out_rows
 
 
 def write_stability(rows: list[dict], values: dict[str, list[array.array]], issue_order: list[str], issue_meta: dict, out: Path) -> None:
-    fields = ["candidate_index", "split_type", "split", "retained_issue_count", "no_tax_roi", "stake_yuan"]
+    fields = ["candidate_index", "split_type", "split", "retained_issue_count", "candidate_no_tax_roi", "matched_full_no_tax_roi", "paired_lift", "candidate_stake_yuan", "matched_full_stake_yuan"]
     years = sorted({issue_meta[x]["year"] for x in issue_order}); folds = sorted({issue_meta[x]["fold"] for x in issue_order})
     with (out / "stability_year_fold_loyo.csv").open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
@@ -247,25 +258,29 @@ def write_stability(rows: list[dict], values: dict[str, list[array.array]], issu
                 for name in names:
                     ix = [i for i, issue in enumerate(issue_order) if keep(issue, name)]
                     net = sum(values["net"][ci][i] for i in ix); stake = sum(values["stake"][ci][i] for i in ix)
-                    w.writerow({"candidate_index": ci, "split_type": split_type, "split": name, "retained_issue_count": len(ix), "no_tax_roi": "" if stake == 0 else f"{net/stake:.12f}", "stake_yuan": f"{stake:.6f}"})
+                    fnet = sum(values["full_net"][ci][i] for i in ix); fstake = sum(values["full_stake"][ci][i] for i in ix)
+                    roi = net/stake if stake else None; froi = fnet/fstake if fstake else None
+                    w.writerow({"candidate_index": ci, "split_type": split_type, "split": name, "retained_issue_count": len(ix), "candidate_no_tax_roi": "" if roi is None else f"{roi:.12f}", "matched_full_no_tax_roi": "" if froi is None else f"{froi:.12f}", "paired_lift": "" if roi is None or froi is None else f"{roi-froi:.12f}", "candidate_stake_yuan": f"{stake:.6f}", "matched_full_stake_yuan": f"{fstake:.6f}"})
 
 
 def write_seed_quantiles(screen: Path, out: Path) -> None:
     """Required min/max/p10/p90 summaries from the full seed-level ledger."""
-    fields = ["selector_id", "weight_source", "mechanism", "cap", "M", "seed_count", "roi_min", "roi_p10", "roi_p25", "roi_median", "roi_p75", "roi_p90", "roi_max", "roi_mean", "roi_sd", "roi_mcse", "positive_roi_fraction"]
+    fields = ["selector_id", "weight_source", "mechanism", "cap", "M", "seed_count", "roi_min", "roi_p10", "roi_p25", "roi_median", "roi_p75", "roi_p90", "roi_max", "roi_mean", "roi_sd", "roi_mcse", "positive_roi_fraction", "lift_min", "lift_p10", "lift_p25", "lift_median", "lift_p75", "lift_p90", "lift_max", "lift_mean", "lift_sd", "lift_mcse", "positive_lift_fraction"]
     with gzip.GzipFile(filename=str(out / "seed_ensemble_quantiles.csv.gz"), mode="wb", mtime=0) as gb, __import__("io").TextIOWrapper(gb, newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
         for fp in sorted(screen.glob("cell_metrics-*.csv.gz")):
-            groups: dict[tuple, list[float]] = defaultdict(list)
+            groups: dict[tuple, list[tuple[float, float]]] = defaultdict(list)
             with gzip.open(fp, "rt", newline="") as src:
                 for r in csv.DictReader(src):
-                    if r["mechanism"] in {"WR_DUPLICATE_STAKE", "WOR_DISTINCT"} and r["no_tax_roi"]:
-                        groups[(r["selector_id"], r["weight_source"], r["mechanism"], r["cap"], r["M"])].append(float(r["no_tax_roi"]))
-            for key, vals in sorted(groups.items()):
-                if len(vals) != 100: raise RuntimeError(f"incomplete seed ensemble {key}: {len(vals)}")
-                vals.sort(); mean = statistics.mean(vals); sd = statistics.stdev(vals)
-                q = lambda p: vals[min(len(vals) - 1, int(p * len(vals)))]
-                w.writerow(dict(zip(fields, (*key, 100, f"{vals[0]:.12f}", f"{q(.10):.12f}", f"{q(.25):.12f}", f"{statistics.median(vals):.12f}", f"{q(.75):.12f}", f"{q(.90):.12f}", f"{vals[-1]:.12f}", f"{mean:.12f}", f"{sd:.12f}", f"{sd/math.sqrt(100):.12f}", f"{sum(v > 0 for v in vals)/100:.12f}"))))
+                    if r["mechanism"] in {"WR_DUPLICATE_STAKE", "WOR_DISTINCT"} and r["no_tax_roi"] and r["matched_full_lift"]:
+                        groups[(r["selector_id"], r["weight_source"], r["mechanism"], r["cap"], r["M"])].append((float(r["no_tax_roi"]), float(r["matched_full_lift"])))
+            for key, pairs in sorted(groups.items()):
+                if len(pairs) != 100: raise RuntimeError(f"incomplete seed ensemble {key}: {len(pairs)}")
+                def summary(vals):
+                    vals = sorted(vals); mean = statistics.mean(vals); sd = statistics.stdev(vals)
+                    q = lambda p: vals[min(len(vals) - 1, int(p * len(vals)))]
+                    return (f"{vals[0]:.12f}", f"{q(.10):.12f}", f"{q(.25):.12f}", f"{statistics.median(vals):.12f}", f"{q(.75):.12f}", f"{q(.90):.12f}", f"{vals[-1]:.12f}", f"{mean:.12f}", f"{sd:.12f}", f"{sd/math.sqrt(100):.12f}", f"{sum(v > 0 for v in vals)/100:.12f}")
+                w.writerow(dict(zip(fields, (*key, 100, *summary([x[0] for x in pairs]), *summary([x[1] for x in pairs])))))
 
 
 def write_outputs(rows: list[dict], boot: list[dict], values: dict[str, list[array.array]], issue_order: list[str], issue_meta: dict, out: Path) -> None:
@@ -296,11 +311,11 @@ def write_outputs(rows: list[dict], boot: list[dict], values: dict[str, list[arr
             for i, issue in enumerate(issue_order):
                 w.writerow({"candidate_index": ci, "issue_index": i, "issue_instance": issue, "first_kickoff_ts": issue_meta[issue]["first_kickoff_ts"], "year": issue_meta[issue]["year"], "candidate_stake_yuan": f"{values['stake'][ci][i]:.6f}", "candidate_gross_yuan": f"{values['gross'][ci][i]:.6f}", "candidate_tax_yuan": f"{values['tax'][ci][i]:.6f}", "candidate_net_yuan": f"{values['net'][ci][i]:.6f}", "matched_full_stake_yuan": f"{values['full_stake'][ci][i]:.6f}", "matched_full_gross_yuan": f"{values['full_gross'][ci][i]:.6f}", "matched_full_net_yuan": f"{values['full_net'][ci][i]:.6f}"})
     with (out / "chart_source_tax_line_exposure_retention.csv").open("w", newline="") as f:
-        fields3 = ["candidate_index", "gross_pre_tax_yuan", "tax_yuan", "tax_line_exposure_yuan", "gross_return_retention", "tax_to_gross_fraction", "pre_tax_no_tax_roi", "tax_adjusted_roi", "tax_line_hit_ticket_count"]
+        fields3 = ["candidate_index", "gross_pre_tax_yuan", "matched_full_gross_yuan", "tax_yuan", "tax_line_exposure_yuan", "gross_return_retention_vs_matched_full", "after_tax_gross_retention", "tax_to_gross_fraction", "pre_tax_no_tax_roi", "tax_adjusted_roi", "tax_line_hit_ticket_count"]
         w = csv.DictWriter(f, fieldnames=fields3); w.writeheader()
         for ci, b in by_index.items():
-            gross, tax, stake = sum(values["gross"][ci]), sum(values["tax"][ci]), sum(values["stake"][ci])
-            w.writerow({"candidate_index": ci, "gross_pre_tax_yuan": f"{gross:.6f}", "tax_yuan": f"{tax:.6f}", "tax_line_exposure_yuan": f"{tax / .20:.6f}", "gross_return_retention": "" if gross == 0 else f"{(gross-tax)/gross:.12f}", "tax_to_gross_fraction": "" if gross == 0 else f"{tax/gross:.12f}", "pre_tax_no_tax_roi": "" if stake == 0 else f"{(gross-stake)/stake:.12f}", "tax_adjusted_roi": "" if stake == 0 else f"{(gross-tax-stake)/stake:.12f}", "tax_line_hit_ticket_count": f"{sum(values['tax_line_hit'][ci]):.0f}"})
+            gross, tax, stake, full_gross = sum(values["gross"][ci]), sum(values["tax"][ci]), sum(values["stake"][ci]), sum(values["full_gross"][ci])
+            w.writerow({"candidate_index": ci, "gross_pre_tax_yuan": f"{gross:.6f}", "matched_full_gross_yuan": f"{full_gross:.6f}", "tax_yuan": f"{tax:.6f}", "tax_line_exposure_yuan": f"{tax / .20:.6f}", "gross_return_retention_vs_matched_full": "" if full_gross == 0 else f"{gross/full_gross:.12f}", "after_tax_gross_retention": "" if gross == 0 else f"{(gross-tax)/gross:.12f}", "tax_to_gross_fraction": "" if gross == 0 else f"{tax/gross:.12f}", "pre_tax_no_tax_roi": "" if stake == 0 else f"{(gross-stake)/stake:.12f}", "tax_adjusted_roi": "" if stake == 0 else f"{(gross-tax-stake)/stake:.12f}", "tax_line_hit_ticket_count": f"{sum(values['tax_line_hit'][ci]):.0f}"})
     with (out / "bh_descriptive_significance.csv").open("w", newline="") as f:
         fields4 = ["candidate_index", "family", "nominal_two_sided_p", "bh_adjusted_p", "bonferroni_adjusted_p", "interpretation"]
         w = csv.DictWriter(f, fieldnames=fields4); w.writeheader()
@@ -327,7 +342,9 @@ def main() -> None:
     rows = candidate_rows(screen)
     write_candidate_freeze(out, rows, screen); print(f"frozen post-screening candidates={len(rows)}", flush=True)
     values = replay_candidates(rows, issue_order, issue_meta, out)
-    boot = bootstrap_rows(rows, values, issue_order, issue_meta, out)
+    adjustment = json.loads((screen / "multiple_search_adjustment.json").read_text())
+    full_family_size = int(adjustment["tested_surface_cells"])
+    boot = bootstrap_rows(rows, values, issue_order, issue_meta, out, full_family_size)
     write_stability(rows, values, issue_order, issue_meta, out)
     write_seed_quantiles(screen, out)
     write_outputs(rows, boot, values, issue_order, issue_meta, out)
@@ -336,7 +353,7 @@ def main() -> None:
     shutil.copyfile(screen / "baseline_registry.csv", out / "baseline_registry_v3r1.csv")
     shutil.copyfile(out / "baseline_registry_v3r1.csv", out / "chart_source_baseline_bridge.csv")
     shutil.copyfile(out / "seed_ensemble_quantiles.csv.gz", out / "chart_source_seed_ensemble_quantiles.csv.gz")
-    (out / "settlement_card.json").write_text(json.dumps({"contract": CONTRACT, "screening_package": str(screen.name), "screening_manifest_sha256": R.sha(screen / "SHA256SUMS.json"), "candidate_rule": "absolute positive + raw Pareto + prior robust screen", "candidate_count": len(rows), "exact_replay": "frozen #145 native allocator; accepted tie behavior", "bootstrap": {"replicates": REPLICATES, "unit": "issue_instance", "shared_draw_seed": DRAW_SEED}, "primary_metric": "pre-tax no_tax_roi", "promotion_authorized": False}, sort_keys=True, indent=2) + "\n")
+    (out / "settlement_card.json").write_text(json.dumps({"contract": CONTRACT, "screening_package": str(screen.name), "screening_manifest_sha256": R.sha(screen / "SHA256SUMS.json"), "candidate_rule": "absolute positive + raw Pareto + prior robust screen", "candidate_count": len(rows), "full_search_family_count": full_family_size, "exact_replay": "frozen #145 native allocator; accepted tie behavior", "bootstrap": {"replicates": REPLICATES, "unit": "issue_instance", "shared_draw_seed": DRAW_SEED}, "primary_metric": "pre-tax no_tax_roi", "promotion_authorized": False}, sort_keys=True, indent=2) + "\n")
     (out / "README.md").write_text("# #167 post-screening exact evidence v3r1\n\nThis immutable companion package freezes the completed primary screen's absolute-positive and raw-Pareto aggregate cells, then replays those cells at ticket level. All candidate versus FULL resamples use one common 20,000-draw issue matrix. BH and Bonferroni values are descriptive post-screening adjustments only; they do not promote a policy.\n")
     R.write_file_census(out)
     R.finalize_package_identity(out, CONTRACT, {"screening_manifest_sha256": R.sha(screen / "SHA256SUMS.json"), "bootstrap_replicates": REPLICATES, "shared_draw_seed": DRAW_SEED, "allocator_sha256": R.EXPECTED_ALLOCATOR_SHA256})

@@ -38,7 +38,7 @@ def test_candidate_freeze_union_and_shared_paired_bootstrap():
     # resample matrix rather than advancing a per-target RNG.
     issue_order = ["I1", "I2", "I3"]
     issue_meta = {x: {"year": "2024" if x != "I3" else "2025", "fold": "OOS_2024", "first_kickoff_ts": x} for x in issue_order}
-    boot = POST.bootstrap_rows(frozen, values, issue_order, issue_meta, out)
+    boot = POST.bootstrap_rows(frozen, values, issue_order, issue_meta, out, full_family_size=100)
     assert len(boot) == 2 and boot[0]["bootstrap_draw_matrix_sha256"] == boot[1]["bootstrap_draw_matrix_sha256"]
     assert boot[0]["candidate_ci95_low"] is not None and boot[0]["paired_lift_two_sided_p"] is not None
     assert json.loads((out / "paired_bootstrap_draw_matrix.json").read_text())["replicate_count"] == 20_000
@@ -48,7 +48,8 @@ def test_candidate_freeze_union_and_shared_paired_bootstrap():
     POST.write_stability(frozen, values, issue_order, issue_meta, out)
     POST.write_outputs(frozen, boot, values, issue_order, issue_meta, out)
     tax_chart = list(csv.DictReader((out / "chart_source_tax_line_exposure_retention.csv").open(newline="")))
-    assert len(tax_chart) == 2 and tax_chart[0]["gross_return_retention"] == "1.000000000000"
+    assert len(tax_chart) == 2 and tax_chart[0]["gross_return_retention_vs_matched_full"] == "0.875000000000"
+    assert float(boot[0]["candidate_bonferroni_adjusted_p"]) >= float(boot[0]["candidate_two_sided_p"])
     assert (out / "candidate_paired_bootstrap_20000.csv").exists() and (out / "bh_descriptive_significance.csv").exists()
     shutil.rmtree(FIXTURE)
 
@@ -77,3 +78,9 @@ def test_production_role_vector_q_delete_and_native_profile():
     candidate = {"mechanism": "WOR_DISTINCT", "weight_source": "Q_WEIGHT", "M": "64", "cap": "NA", "seed_scope": "ENSEMBLE_100"}
     hit, unique, duplicate, _ = POST.metric_for(candidate, roles, 0, {"Q_WEIGHT": buffers})
     assert unique + duplicate == 100 * 64 and hit >= 0
+    # Gate-A's M=2187 contract: WOR has the same FULL ticket result for each
+    # real seed (hence the 100x aggregate), while top-mass is exactly FULL.
+    wor = POST.metric_for(dict(candidate, M="2187"), roles, 0, {"Q_WEIGHT": buffers})
+    top = POST.metric_for({"mechanism": "DETERMINISTIC_TOP_MASS", "weight_source": "Q_WEIGHT", "M": "2187", "cap": "NA", "seed_scope": "DETERMINISTIC"}, roles, 0, {"Q_WEIGHT": buffers})
+    full = POST.metric_for({"mechanism": "FULL_ENUMERATED", "weight_source": "NA", "M": "2187", "cap": "NA", "seed_scope": "DETERMINISTIC"}, roles, 0, {})
+    assert tuple(v // 100 for v in wor[:3]) == full[:3] and top[:3] == full[:3]

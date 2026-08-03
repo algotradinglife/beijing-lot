@@ -306,4 +306,93 @@ void bj167_paired_issue_bootstrap(const double *candidate_net, const double *can
     }
 }
 
+// Scientific-cell stability companion.  The first Gate-B pass stores the
+// complete seed ledger; this bounded exact companion reduces each stochastic
+// 100-seed family to one scientific cell while preserving exact issue totals.
+// It is intentionally separate from the full-screen buffers so the active
+// screening process remains byte-for-byte untouched.
+static constexpr int SCI_CELLS_PER_SELECTOR = 963;
+static double *SCI_TMP_NET = nullptr, *SCI_TMP_STAKE = nullptr, *SCI_TMP_GROSS = nullptr, *SCI_TMP_TAX = nullptr, *SCI_TMP_HIT = nullptr;
+static unsigned char *SCI_MARK = nullptr;
+static int *SCI_TOUCHED = nullptr, SCI_TOUCHED_LEN = 0;
+static double *SCI_NET = nullptr, *SCI_STAKE = nullptr, *SCI_GROSS = nullptr, *SCI_TAX = nullptr, *SCI_HIT = nullptr;
+static double *SCI_YEAR_NET = nullptr, *SCI_YEAR_STAKE = nullptr, *SCI_FOLD_NET = nullptr, *SCI_FOLD_STAKE = nullptr;
+static double *SCI_LARGEST_NET = nullptr, *SCI_LARGEST_STAKE = nullptr;
+static double *SCI_FULL_ISSUE_NET = nullptr, *SCI_FULL_ISSUE_STAKE = nullptr;
+static int *SCI_LARGEST_ISSUE = nullptr, SCI_YEAR_COUNT = 0, SCI_FOLD_COUNT = 0, SCI_ISSUE_COUNT = 0, SCI_YEAR = -1, SCI_FOLD = -1, SCI_ISSUE = -1;
+
+void bj167_scientific_set_buffers(double *tmp_net, double *tmp_stake, double *tmp_gross, double *tmp_tax, double *tmp_hit,
+                                  unsigned char *mark, int *touched,
+                                  double *net, double *stake, double *gross, double *tax, double *hit,
+                                  double *year_net, double *year_stake, double *fold_net, double *fold_stake,
+                                  double *largest_net, double *largest_stake, int *largest_issue,
+                                  double *full_issue_net, double *full_issue_stake,
+                                  int year_count, int fold_count, int issue_count) {
+    SCI_TMP_NET=tmp_net; SCI_TMP_STAKE=tmp_stake; SCI_TMP_GROSS=tmp_gross; SCI_TMP_TAX=tmp_tax; SCI_TMP_HIT=tmp_hit;
+    SCI_MARK=mark; SCI_TOUCHED=touched; SCI_NET=net; SCI_STAKE=stake; SCI_GROSS=gross; SCI_TAX=tax; SCI_HIT=hit;
+    SCI_YEAR_NET=year_net; SCI_YEAR_STAKE=year_stake; SCI_FOLD_NET=fold_net; SCI_FOLD_STAKE=fold_stake;
+    SCI_LARGEST_NET=largest_net; SCI_LARGEST_STAKE=largest_stake; SCI_LARGEST_ISSUE=largest_issue;
+    SCI_FULL_ISSUE_NET=full_issue_net; SCI_FULL_ISSUE_STAKE=full_issue_stake;
+    SCI_YEAR_COUNT=year_count; SCI_FOLD_COUNT=fold_count; SCI_ISSUE_COUNT=issue_count;
+}
+
+void bj167_scientific_begin_issue(int issue_index, int year_index, int fold_index) {
+    SCI_TOUCHED_LEN=0; SCI_ISSUE=issue_index; SCI_YEAR=year_index; SCI_FOLD=fold_index;
+}
+
+static void scientific_add(int selector, int cell, const int *metrics, double payout) {
+    const int at = selector * SCI_CELLS_PER_SELECTOR + cell;
+    if (!SCI_MARK[at]) { SCI_MARK[at]=1; SCI_TOUCHED[SCI_TOUCHED_LEN++]=at; }
+    const double stake=2.0*(metrics[1]+metrics[2]), gross=payout*metrics[0];
+    SCI_TMP_NET[at] += gross-stake; SCI_TMP_STAKE[at] += stake; SCI_TMP_GROSS[at] += gross;
+    SCI_TMP_TAX[at] += payout >= 10000.0 ? payout*.20*metrics[0] : 0.0; SCI_TMP_HIT[at] += metrics[0];
+}
+
+void bj167_scientific_end_issue() {
+    for (int j=0;j<SCI_TOUCHED_LEN;++j) {
+        const int at=SCI_TOUCHED[j]; const double net=SCI_TMP_NET[at], stake=SCI_TMP_STAKE[at];
+        SCI_NET[at]+=net; SCI_STAKE[at]+=stake; SCI_GROSS[at]+=SCI_TMP_GROSS[at]; SCI_TAX[at]+=SCI_TMP_TAX[at]; SCI_HIT[at]+=SCI_TMP_HIT[at];
+        if (SCI_YEAR>=0) { const std::size_t yi=static_cast<std::size_t>(at)*SCI_YEAR_COUNT+SCI_YEAR; SCI_YEAR_NET[yi]+=net; SCI_YEAR_STAKE[yi]+=stake; }
+        if (SCI_FOLD>=0) { const std::size_t fi=static_cast<std::size_t>(at)*SCI_FOLD_COUNT+SCI_FOLD; SCI_FOLD_NET[fi]+=net; SCI_FOLD_STAKE[fi]+=stake; }
+        if (net > SCI_LARGEST_NET[at]) { SCI_LARGEST_NET[at]=net; SCI_LARGEST_STAKE[at]=stake; SCI_LARGEST_ISSUE[at]=SCI_ISSUE; }
+        if (at % SCI_CELLS_PER_SELECTOR == 960 && SCI_ISSUE >= 0) {
+            const int selector=at/SCI_CELLS_PER_SELECTOR;
+            SCI_FULL_ISSUE_NET[static_cast<std::size_t>(selector)*SCI_ISSUE_COUNT+SCI_ISSUE]=net;
+            SCI_FULL_ISSUE_STAKE[static_cast<std::size_t>(selector)*SCI_ISSUE_COUNT+SCI_ISSUE]=stake;
+        }
+        SCI_TMP_NET[at]=SCI_TMP_STAKE[at]=SCI_TMP_GROSS[at]=SCI_TMP_TAX[at]=SCI_TMP_HIT[at]=0.0; SCI_MARK[at]=0;
+    }
+    SCI_TOUCHED_LEN=0;
+}
+
+void bj167_scientific_process_source(const double *role_probs, int truth, const char *seed_signature, double payout,
+                                     const int *selector_ids, int occurrence_count, int source_base) {
+    std::array<int, SEEDCOUNT*MCOUNT*4> wr{}, wor{};
+    std::array<int, MCOUNT*4> residual{}, top{};
+    std::array<int, 4*MCOUNT*4> capped{};
+    std::array<int,4> full{};
+    bj167_profile_allocation(role_probs, truth, seed_signature, wr.data(), wor.data(), residual.data(), capped.data(), top.data(), full.data());
+    // source layout: WR[0:20], WOR[20:40], residual[40:60], capped[60:140], top[140:160].
+    // WR/WOR aggregate all actual seeds; no fake repeated deterministic rows.
+    for (int mi=0;mi<MCOUNT;++mi) {
+        int wr_sum[4]={0,0,0,0}, wor_sum[4]={0,0,0,0};
+        for (int si=0;si<SEEDCOUNT;++si) for (int k=0;k<4;++k) { wr_sum[k]+=wr[(si*MCOUNT+mi)*4+k]; wor_sum[k]+=wor[(si*MCOUNT+mi)*4+k]; }
+        for (int oi=0;oi<occurrence_count;++oi) { scientific_add(selector_ids[oi],source_base+mi,wr_sum,payout); scientific_add(selector_ids[oi],source_base+20+mi,wor_sum,payout); scientific_add(selector_ids[oi],source_base+40+mi,residual.data()+mi*4,payout); scientific_add(selector_ids[oi],source_base+140+mi,top.data()+mi*4,payout); }
+        for (int cap=0;cap<4;++cap) for (int oi=0;oi<occurrence_count;++oi) scientific_add(selector_ids[oi],source_base+60+cap*MCOUNT+mi,capped.data()+(cap*MCOUNT+mi)*4,payout);
+        // Contractual equivalence at M=2187: WOR (after removing the 100x
+        // seed multiplicity) and top-mass are exactly FULL ticket profiles.
+        if (mi==MCOUNT-1) {
+            for (int k=0;k<4;++k) if (wor_sum[k] != full[k]*SEEDCOUNT || top[mi*4+k] != full[k]) std::abort();
+        }
+    }
+}
+
+void bj167_scientific_add_structural(int selector, int truth_code, int p_leg, int p_code, int q_leg, int q_code, double payout) {
+    const int full[4]={1,FULL_TICKETS,0,0};
+    const int p_hit=((truth_code/static_cast<int>(std::pow(3,6-p_leg)))%3)!=p_code;
+    const int q_hit=((truth_code/static_cast<int>(std::pow(3,6-q_leg)))%3)!=q_code;
+    const int p[4]={p_hit,1458,0,0}, q[4]={q_hit,1458,0,0};
+    scientific_add(selector,960,full,payout); scientific_add(selector,961,p,payout); scientific_add(selector,962,q,payout);
+}
+
 }
