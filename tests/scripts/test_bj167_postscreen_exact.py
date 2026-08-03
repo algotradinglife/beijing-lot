@@ -8,6 +8,8 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / ".scratch" / "bj167_postscreen_fixture"
 spec = importlib.util.spec_from_file_location("bj167_postscreen", ROOT / "scripts" / "settle_bj167_atlas_postscreen_exact.py")
 POST = importlib.util.module_from_spec(spec); assert spec.loader is not None; spec.loader.exec_module(POST)
+science_spec = importlib.util.spec_from_file_location("bj167_science", ROOT / "scripts" / "settle_bj167_scientific_stability_exact.py")
+SCIENCE = importlib.util.module_from_spec(science_spec); assert science_spec.loader is not None; science_spec.loader.exec_module(SCIENCE)
 
 
 def test_candidate_freeze_union_and_shared_paired_bootstrap():
@@ -84,3 +86,13 @@ def test_production_role_vector_q_delete_and_native_profile():
     top = POST.metric_for({"mechanism": "DETERMINISTIC_TOP_MASS", "weight_source": "Q_WEIGHT", "M": "2187", "cap": "NA", "seed_scope": "DETERMINISTIC"}, roles, 0, {"Q_WEIGHT": buffers})
     full = POST.metric_for({"mechanism": "FULL_ENUMERATED", "weight_source": "NA", "M": "2187", "cap": "NA", "seed_scope": "DETERMINISTIC"}, roles, 0, {})
     assert tuple(v // 100 for v in wor[:3]) == full[:3] and top[:3] == full[:3]
+
+
+def test_all_scientific_layout_includes_deterministic_and_m2187_contract_cells():
+    cells = SCIENCE.science_cells()
+    assert len(cells) == 963
+    for source in POST.R.SOURCES:
+        assert (source, "WOR_DISTINCT", "NA", "2187", "ENSEMBLE_100") in cells
+        assert (source, "DETERMINISTIC_TOP_MASS", "NA", "2187", "DETERMINISTIC") in cells
+        assert (source, "CAPPED_REPEAT", "8", "16", "DETERMINISTIC") in cells
+    assert cells[-3:] == [("NA", "FULL_ENUMERATED", "NA", "2187", "DETERMINISTIC"), ("NA", "P_MIN_GLOBAL_DELETE", "NA", "1458", "DETERMINISTIC"), ("NA", "Q_MIN_GLOBAL_DELETE", "NA", "1458", "DETERMINISTIC")]
