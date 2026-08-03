@@ -230,3 +230,23 @@ def test_execution_provenance_binds_screen_and_postscreen_identities():
     assert data["screening_execution"]["runner_sha256"] == POST.SCREENING_RUNNER_SHA256
     assert data["postscreen_execution_start"] == data["postscreen_execution_end"] == snap
     shutil.rmtree(root)
+
+
+def test_scientific_execution_provenance_is_independent_and_fail_closed():
+    root = ROOT / ".scratch" / "bj167_scientific_execution_provenance_fixture"
+    if root.exists(): shutil.rmtree(root)
+    screen = root / "screen"; out = root / "out"; screen.mkdir(parents=True); out.mkdir()
+    (screen / "SHA256SUMS.json").write_text("{}\n"); (screen / "CONTENT_IDENTITY.json").write_text("{}\n")
+    snap = SCIENCE.execution_snapshot()
+    SCIENCE.write_execution_provenance(out, screen, snap, snap)
+    data = json.loads((out / "execution_provenance.json").read_text())
+    assert data["consumed_screening"]["manifest_sha256"] == SCIENCE.R.sha(screen / "SHA256SUMS.json")
+    assert data["consumed_screening"]["content_identity_sha256"] == SCIENCE.R.sha(screen / "CONTENT_IDENTITY.json")
+    assert data["all_scientific_execution_start"] == data["all_scientific_execution_end"] == snap
+    changed = dict(snap); changed["runner_sha256"] = "changed"
+    try:
+        SCIENCE.write_execution_provenance(out, screen, snap, changed)
+        assert False, "execution drift must fail closed"
+    except RuntimeError as exc:
+        assert "changed during run" in str(exc)
+    shutil.rmtree(root)

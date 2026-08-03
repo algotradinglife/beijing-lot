@@ -8,7 +8,7 @@ science cell.  Seed-level rows remain diagnostics, never football histories.
 """
 from __future__ import annotations
 
-import argparse, array, csv, ctypes, gzip, importlib.util, json, math, shutil
+import argparse, array, csv, ctypes, gzip, importlib.util, json, math, shutil, subprocess
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -22,6 +22,38 @@ CELLS_PER_SELECTOR=963
 # decimal quantum for each serialized seed (or one deterministic row).
 MONEY_QUANTUM = 1e-6
 RATIO_QUANTUM = 1e-12
+NATIVE_WRAPPER_PATH = ROOT / "scripts" / "bj167_exact_atlas.cpp"
+
+
+def git_head() -> str:
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, text=True,
+                          stdout=subprocess.PIPE).stdout.strip()
+
+
+def execution_snapshot() -> dict:
+    """Identity of this independent all-scientific executable."""
+    return {"git_head": git_head(), "runner_path": str(Path(__file__).relative_to(ROOT)),
+            "runner_sha256": R.sha(Path(__file__)),
+            "native_wrapper_path": str(NATIVE_WRAPPER_PATH.relative_to(ROOT)),
+            "native_wrapper_sha256": R.sha(NATIVE_WRAPPER_PATH),
+            "frozen_allocator_path": "scripts/bj145_fast_alloc.cpp",
+            "frozen_allocator_sha256": R.sha(ROOT / "scripts" / "bj145_fast_alloc.cpp")}
+
+
+def write_execution_provenance(out: Path, screen: Path, start: dict, end: dict) -> None:
+    """Persist both real boundaries; source drift in flight invalidates output."""
+    if start != end:
+        raise RuntimeError("all-scientific executable identity changed during run")
+    content = screen / "CONTENT_IDENTITY.json"
+    if not content.exists():
+        raise RuntimeError("completed screen content identity required")
+    payload = {"contract": "bj167-gate-b-v3r1-scientific-stability",
+               "consumed_screening": {"package": screen.name,
+                                      "manifest_sha256": R.sha(screen / "SHA256SUMS.json"),
+                                      "content_identity_sha256": R.sha(content)},
+               "all_scientific_execution_start": start,
+               "all_scientific_execution_end": end}
+    (out / "execution_provenance.json").write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n")
 
 
 def science_cells():
@@ -158,6 +190,7 @@ def reconcile_scientific_screen(out: Path, screen: Path, selectors: list[dict], 
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument("--screening-output",default="results/bj167_gate_b_strategy_atlas_v3r1_exact"); ap.add_argument("--output",default="results/bj167_gate_b_strategy_atlas_v3r1_scientific_stability_exact"); args=ap.parse_args()
     screen, final=ROOT/args.screening_output, ROOT/args.output
+    execution_start=execution_snapshot()
     if final.exists(): raise RuntimeError("refusing to replace immutable stability companion")
     if not (screen/"SHA256SUMS.json").exists(): raise RuntimeError("completed immutable screen required")
     sums=json.loads((screen/"SHA256SUMS.json").read_text())
@@ -249,6 +282,8 @@ def main():
                     if not ok: raise RuntimeError(f"M2187 reconciliation drift {sel['selector_id']} {src} {me}")
     coverage={"contract":"bj167-gate-b-v3r1-scientific-stability","scientific_cell_count":total,"selector_count":len(selectors),"science_cells_per_selector":ncell,"stochastic_unit":"100-seed pooled ensemble","deterministic_unit":"one arm","year_count":len(years),"fold_count":len(folds),"screen_reconciliation":"scientific_screen_reconciliation.csv.gz exact PASS required","coverage":"all scientific cells receive YEAR/FOLD/LOYO, signed-largest issue/year, paired selector FULL exclusions, pooled HHI/top share/drawdown/miss streak"}
     (out/"scientific_stability_coverage.json").write_text(json.dumps(coverage,sort_keys=True,indent=2)+"\n")
-    R.write_file_census(out);R.finalize_package_identity(out,"bj167-gate-b-v3r1-scientific-stability",{"screening_manifest_sha256":R.sha(screen/"SHA256SUMS.json"),"allocator_sha256":R.EXPECTED_ALLOCATOR_SHA256,"scientific_cell_count":total});R.atomic_publish(stage,final);print(f"WROTE {final}",flush=True)
+    execution_end=execution_snapshot()
+    write_execution_provenance(out,screen,execution_start,execution_end)
+    R.write_file_census(out);R.finalize_package_identity(out,"bj167-gate-b-v3r1-scientific-stability",{"screening_manifest_sha256":R.sha(screen/"SHA256SUMS.json"),"screening_content_identity_sha256":R.sha(screen/"CONTENT_IDENTITY.json"),"all_scientific_execution_head":execution_start["git_head"],"all_scientific_runner_sha256":execution_start["runner_sha256"],"all_scientific_native_wrapper_sha256":execution_start["native_wrapper_sha256"],"allocator_sha256":R.EXPECTED_ALLOCATOR_SHA256,"scientific_cell_count":total});R.atomic_publish(stage,final);print(f"WROTE {final}",flush=True)
 
 if __name__=="__main__": main()
