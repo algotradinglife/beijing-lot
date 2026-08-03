@@ -37,7 +37,7 @@ from typing import Iterable
 
 
 CONTRACT = "BJ-HIST-TICKET-ALLOCATION-001"
-VERSION = "bj145-gate-b-v1-outcome-settlement"
+VERSION = "bj145-gate-b-v2-substantive-correction"
 GATE_A_MANIFEST = "da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114c"
 OUTCOME_MANIFEST = "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc"
 OUTCOME_PAYLOAD = "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89"
@@ -94,7 +94,8 @@ SUMMARY_FIELDS = (
     "pre_tax_net_yuan", "tax_adjusted_net_yuan", "no_tax_roi", "tax_adjusted_roi", "gross_top_issue_share",
     "gross_issue_hhi", "gross_top_identity_share", "largest_issue_gross_yuan", "max_drawdown_yuan",
     "longest_miss_streak", "outcome_gap_count", "truth_target_mass_mean", "truth_realized_frequency",
-    "truth_frequency_delta",
+    "truth_frequency_delta", "wagered_support_issue_count", "coverage_denominator_issue_count",
+    "coverage_denominator_rule", "miss_streak_denominator_rule",
 )
 FULL_DELTA_FIELDS = (
     "scope", "scope_value", "arm_id", "weight_source", "sampling_role", "mechanism", "cap", "M", "seed",
@@ -102,7 +103,9 @@ FULL_DELTA_FIELDS = (
     "tax_adjusted_roi", "full_tax_adjusted_roi", "tax_adjusted_roi_delta", "coverage_hit_rate",
     "full_coverage_hit_rate", "coverage_hit_rate_delta", "unique_ticket_coverage", "full_unique_ticket_coverage",
     "unique_ticket_coverage_delta", "duplicate_ticket_ratio", "full_duplicate_ticket_ratio",
-    "duplicate_ticket_ratio_delta", "comparison_rule",
+    "duplicate_ticket_ratio_delta", "wagered_support_issue_count", "full_wagered_support_issue_count",
+    "coverage_denominator_issue_count", "full_coverage_denominator_issue_count", "coverage_denominator_rule",
+    "comparison_rule",
 )
 PAIR_FIELDS = (
     "scope", "scope_value", "arm_id", "weight_source", "M", "left_mechanism", "left_cap", "left_seed",
@@ -142,7 +145,7 @@ def repository_root() -> Path:
 ROOT = repository_root()
 GATE_A = ROOT / "results" / "bj145_gate_a_preoutcome_v8"
 OUTCOME_SOURCE = ROOT / "results" / "bj95_gate_b_outcome_settlement_v2r8"
-OUTPUT = ROOT / "results" / "bj145_gate_b_outcome_settlement_v1"
+OUTPUT = ROOT / "results" / "bj145_gate_b_outcome_settlement_v2"
 
 
 def sha256(path: Path) -> str:
@@ -497,7 +500,7 @@ def config_key(row: dict[str, object]) -> tuple[str, str, str, str, str, str, st
 def summary(scope: str, scope_value: str, rows: list[dict[str, str]]) -> dict[str, object]:
     if not rows:
         raise RuntimeError("empty summary scope")
-    settled = [row for row in rows if row["settlement_status"] == "SETTLED"]
+    settled = [row for row in rows if row["settlement_status"] == "SETTLED" and decimal(row["planned_stake_yuan"], "settled stake") > 0]
     stake = sum((decimal(row["planned_stake_yuan"], "stake") for row in rows), Decimal(0))
     frozen_stake = sum((decimal(row["frozen_planned_stake_yuan"], "frozen stake") for row in rows), Decimal(0))
     full_stake = sum((decimal(row["full_control_stake_yuan"], "full stake") for row in rows), Decimal(0))
@@ -513,11 +516,11 @@ def summary(scope: str, scope_value: str, rows: list[dict[str, str]]) -> dict[st
     duplicate_groups = sum(int(row["duplicate_ticket_draw_group_count"]) for row in rows)
     hits = sum(int(row["hit_ticket_count"]) for row in rows)
     winning_identities = sum(int(row["winning_identity_count"]) for row in rows)
-    coverage_hits = sum(int(row["coverage_hit"]) for row in rows)
+    coverage_hits = sum(int(row["coverage_hit"]) for row in settled)
     issue_gross = [decimal(row["gross_pre_tax_yuan"], "issue gross") for row in rows]
     cumulative = peak = drawdown = Decimal(0)
     misses = longest = 0
-    for row in sorted(rows, key=lambda item: (int(item["year"]), int(item["issue"]))):
+    for row in sorted(settled, key=lambda item: (int(item["year"]), int(item["issue"]))):
         cumulative += decimal(row["tax_adjusted_net_yuan"], "tax net")
         peak = max(peak, cumulative)
         drawdown = max(drawdown, peak - cumulative)
@@ -547,7 +550,7 @@ def summary(scope: str, scope_value: str, rows: list[dict[str, str]]) -> dict[st
         "duplicate_ticket_draw_count": duplicate, "duplicate_ticket_draw_group_count": duplicate_groups,
         "unique_ticket_coverage": ratio(Decimal(unique) / Decimal(draws) if draws else None), "duplicate_ticket_ratio": ratio(Decimal(duplicate) / Decimal(draws) if draws else None),
         "hit_ticket_count": hits, "winning_identity_count": winning_identities, "coverage_hits": coverage_hits,
-        "coverage_hit_rate": ratio(Decimal(coverage_hits) / Decimal(len(rows))), "gross_pre_tax_yuan": money(gross), "tax_yuan": money(tax),
+        "coverage_hit_rate": ratio(Decimal(coverage_hits) / Decimal(len(settled)) if settled else None), "gross_pre_tax_yuan": money(gross), "tax_yuan": money(tax),
         "after_tax_gross_yuan": money(gross - tax), "pre_tax_net_yuan": money(net), "tax_adjusted_net_yuan": money(tax_net),
         "no_tax_roi": ratio(net / stake if stake else None), "tax_adjusted_roi": ratio(tax_net / stake if stake else None),
         "gross_top_issue_share": ratio(max(issue_gross, default=Decimal(0)) / gross if gross else None), "gross_issue_hhi": ratio(hhi),
@@ -555,6 +558,9 @@ def summary(scope: str, scope_value: str, rows: list[dict[str, str]]) -> dict[st
         "largest_issue_gross_yuan": money(max(issue_gross, default=Decimal(0))), "max_drawdown_yuan": money(drawdown), "longest_miss_streak": longest,
         "outcome_gap_count": sum(int(row["outcome_gap_count"]) for row in rows), "truth_target_mass_mean": ratio(target_mean),
         "truth_realized_frequency": ratio(realized_mean), "truth_frequency_delta": ratio(realized_mean - target_mean if target_mean is not None and realized_mean is not None else None),
+        "wagered_support_issue_count": len(settled), "coverage_denominator_issue_count": len(settled),
+        "coverage_denominator_rule": "SETTLED positive-stake issue rows only; Gate-A no-bets and unavailable outcomes excluded",
+        "miss_streak_denominator_rule": "SETTLED positive-stake issue rows in chronological order; unavailable/no-bet rows excluded",
     }
 
 
@@ -747,7 +753,7 @@ def build(output: Path) -> dict[str, object]:
             baseline = full_index[(row["scope"], row["scope_value"], row["arm_id"], row["weight_source"])]
             def diff(field):
                 return ratio(Decimal(row[field]) - Decimal(baseline[field])) if row[field] and baseline[field] else ""
-            full_deltas.append({"scope": row["scope"], "scope_value": row["scope_value"], "arm_id": row["arm_id"], "weight_source": row["weight_source"], "sampling_role": row["sampling_role"], "mechanism": row["mechanism"], "cap": row["cap"], "M": row["M"], "seed": row["seed"], "baseline_mechanism": "FULL_ENUMERATED", "baseline_M": FULL_TICKETS, "support_issue_count": row["settled_issue_count"], "no_tax_roi": row["no_tax_roi"], "full_no_tax_roi": baseline["no_tax_roi"], "no_tax_roi_delta": diff("no_tax_roi"), "tax_adjusted_roi": row["tax_adjusted_roi"], "full_tax_adjusted_roi": baseline["tax_adjusted_roi"], "tax_adjusted_roi_delta": diff("tax_adjusted_roi"), "coverage_hit_rate": row["coverage_hit_rate"], "full_coverage_hit_rate": baseline["coverage_hit_rate"], "coverage_hit_rate_delta": diff("coverage_hit_rate"), "unique_ticket_coverage": row["unique_ticket_coverage"], "full_unique_ticket_coverage": baseline["unique_ticket_coverage"], "unique_ticket_coverage_delta": diff("unique_ticket_coverage"), "duplicate_ticket_ratio": row["duplicate_ticket_ratio"], "full_duplicate_ticket_ratio": baseline["duplicate_ticket_ratio"], "duplicate_ticket_ratio_delta": diff("duplicate_ticket_ratio"), "comparison_rule": "same arm/weight/scope and exact frozen issue support; FULL stake is the K=2187 economic control"})
+            full_deltas.append({"scope": row["scope"], "scope_value": row["scope_value"], "arm_id": row["arm_id"], "weight_source": row["weight_source"], "sampling_role": row["sampling_role"], "mechanism": row["mechanism"], "cap": row["cap"], "M": row["M"], "seed": row["seed"], "baseline_mechanism": "FULL_ENUMERATED", "baseline_M": FULL_TICKETS, "support_issue_count": row["settled_issue_count"], "no_tax_roi": row["no_tax_roi"], "full_no_tax_roi": baseline["no_tax_roi"], "no_tax_roi_delta": diff("no_tax_roi"), "tax_adjusted_roi": row["tax_adjusted_roi"], "full_tax_adjusted_roi": baseline["tax_adjusted_roi"], "tax_adjusted_roi_delta": diff("tax_adjusted_roi"), "coverage_hit_rate": row["coverage_hit_rate"], "full_coverage_hit_rate": baseline["coverage_hit_rate"], "coverage_hit_rate_delta": diff("coverage_hit_rate"), "unique_ticket_coverage": row["unique_ticket_coverage"], "full_unique_ticket_coverage": baseline["unique_ticket_coverage"], "unique_ticket_coverage_delta": diff("unique_ticket_coverage"), "duplicate_ticket_ratio": row["duplicate_ticket_ratio"], "full_duplicate_ticket_ratio": baseline["duplicate_ticket_ratio"], "duplicate_ticket_ratio_delta": diff("duplicate_ticket_ratio"), "wagered_support_issue_count": row["wagered_support_issue_count"], "full_wagered_support_issue_count": baseline["wagered_support_issue_count"], "coverage_denominator_issue_count": row["coverage_denominator_issue_count"], "full_coverage_denominator_issue_count": baseline["coverage_denominator_issue_count"], "coverage_denominator_rule": row["coverage_denominator_rule"], "comparison_rule": "same arm/weight/scope and exact frozen issue support; FULL stake is the K=2187 economic control"})
         write_csv(stage / "full_control_deltas.csv", FULL_DELTA_FIELDS, full_deltas)
         all_summary = {(row["arm_id"], row["weight_source"], row["mechanism"], row["sampling_role"], row["cap"], row["M"], row["seed"]): row for row in summaries if row["scope"] == "ALL"}
         summary_roles = {(row["arm_id"], row["weight_source"], row["mechanism"], row["cap"], row["M"], row["seed"]): row["sampling_role"] for row in summaries if row["scope"] == "ALL"}
@@ -868,7 +874,7 @@ def build(output: Path) -> dict[str, object]:
             "issue": 145, "contract": CONTRACT, "runner_version": VERSION, "stage": "GATE_B_ONE_SHOT_TICKET_ALLOCATION_OUTCOME_SETTLEMENT",
             "gate_a_manifest_sha256": GATE_A_MANIFEST, "outcome_manifest_sha256": OUTCOME_MANIFEST, "outcome_payload_sha256": OUTCOME_PAYLOAD,
             "allocator_binding": binding, "surface": {"issue_rows": expected_plan_rows, "configurations": len(config_rows), "summary_rows": len(summaries), "full_delta_rows": len(full_deltas), "mechanism_pairwise_rows": len(pair_rows), "weight_pairwise_rows": len(weight_pairs), "bootstrap_rows": len(bootstrap_rows), "code_rows": len(code_rows), "multiple_comparison_rows": len(mc_rows)},
-            "accounting": {"unit_stake_yuan": 2, "primary": "pre-tax no_tax_roi", "tax_secondary": "20pct if individual winning ticket gross >= 10000; no pooling", "incomplete_issue_rule": "zero executed stake; retained in every denominator"},
+            "accounting": {"unit_stake_yuan": 2, "primary": "pre-tax no_tax_roi", "tax_secondary": "20pct if individual winning ticket gross >= 10000; no pooling", "incomplete_issue_rule": "zero executed stake; retained in frozen-universe availability counts but excluded from wagering coverage, miss streak and drawdown"},
             "outcome_boundary": "settled historical result/final-SP data is read only after Gate-A v8 byte verification; no future/prospective input or selection tuning",
             "decision": decision,
         }
@@ -879,7 +885,7 @@ def build(output: Path) -> dict[str, object]:
         shutil.copy2(GATE_A / "bj145_allocation_engine.py", stage / "bj145_allocation_engine.py")
         connection.close(); db_path.unlink()
         compressed = ("issue_allocation_settlement.csv.gz", "winning_ticket_tax_ledger.csv.gz")
-        content = {"contract_version": "bj145-gate-b-portable-content-v1", "gzip_payloads": {name: {"canonical_decompressed_sha256": decompressed_digest(stage / name)[0], "canonical_decompressed_bytes": decompressed_digest(stage / name)[1]} for name in compressed}, "non_compressed_controls": {item.name: sha256(item) for item in sorted(stage.iterdir()) if item.is_file() and item.name not in compressed}}
+        content = {"contract_version": "bj145-gate-b-base-settlement-v2", "gzip_payloads": {name: {"canonical_decompressed_sha256": decompressed_digest(stage / name)[0], "canonical_decompressed_bytes": decompressed_digest(stage / name)[1]} for name in compressed}, "non_compressed_controls": {item.name: sha256(item) for item in sorted(stage.iterdir()) if item.is_file() and item.name not in compressed}}
         (stage / "CONTENT_IDENTITY.json").write_text(json.dumps(content, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         manifest = {item.name: sha256(item) for item in sorted(stage.iterdir()) if item.is_file()}
         (stage / "SHA256SUMS.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")

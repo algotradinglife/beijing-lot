@@ -266,24 +266,80 @@ fingerprints 绑定进 manifest，避免在 Gate B 才首次决定 residual/capp
 把 WR 的重复票、WOR 的无放回 distinct 和 FULL 控制混为同一指标。该冻结不构成
 购买、生产或投注授权。详见 [#145 Gate A](../research/bj145_ticket_allocation_gate_a_2026-08-03.md)。
 
-### #145：Gate B 结算（2026-08-03）
+### #145：Gate B v2 完整结算与分配机制解释（2026-08-03）
 
-Gate B 已按同一冻结输入完成一次性 outcome join。不可变包为
-`results/bj145_gate_b_outcome_settlement_v1`，`SHA256SUMS.json` 为
-`ec330f834fee3a47b8af70738a3ca0b532a35c75b383a580a0de236af80fc1d0`。包内有
-1,006,416 行、2,892 个配置、63,624 个 scope summary、63,360 个 FULL 对照差、
-5,760 个 bootstrap 行和 2,880 个 Holm 行；税务 reconciliation 覆盖全部配置且
-2,892 行均 PASS。逐票税按单张中奖票计算，绝不按 issue、policy 或多票汇总。
+v1 包原样保留，但其 coverage/miss 分母和 outcome-code marginal 不再作为终局解释。
+权威替代包为 `results/bj145_gate_b_outcome_settlement_v2`；它不改 Gate-A v8 的
+identity、权重、机制、M、cap、seed 或逐 issue 结算行，只修正结算后的汇总、完整
+2,187-code allocation atlas、机制对照、稳定性分析、图表和报告。全矩阵仍为
+1,006,416 个 issue/config 行、2,892 个配置、63,624 个 ALL/YEAR/FOLD/LOYO summary、
+63,360 个 matched FULL 差、12,960 个全 M-grid 机制 pair、5,760 个 bootstrap 和
+2,880 个 Holm 行；税务 reconciliation 2,892/2,892 PASS。
 
-共同 settled support 上，`PRIMARY_NO_GATE_K4` FULL 税前 ROI 为 -15.77%、税后
--18.88%（254 个 settled issues）；`SECONDARY_ESP300_GM290_K8` FULL 为
--16.12%/-18.30%（191 个）。同一历史窗口内，`Q_WEIGHT/WOR_DISTINCT/M16/137002`
-的描述性最大值分别为主臂税前 84.76%、次臂 72.05%，但这是大矩阵中挑出的
-same-window cell，不能视为独立 EV。终局为
-**DESCRIPTIVE_SURFACE_ONLY_NO_PROMOTION**；必须经 strict independent-EV 与
-held-out/forward validation 后才可讨论策略晋级。图表候选为包内
-`mechanism_surface_median.svg`（按 arm/mechanism/M 汇总冻结 weight/cap/seed 的
-税前 ROI 中位数，不挑选赢家）。详见 [#145 Gate B](../research/bj145_ticket_allocation_gate_b_2026-08-03.md)。
+#### 分母修正与 FULL 控制
+
+coverage、wager miss streak 和 chronological drawdown 只使用 `SETTLED + positive-stake`
+行；Gate-A no-bet 与 canonical outcome unavailable 单独计数，不再伪装成 miss。主臂
+支持集为 254 issues / 1,016 identities，次臂为 191 / 1,528。FULL 在两个支持集上均为
+100% coverage；旧口径把主臂 `Q_WEIGHT/WOR_DISTINCT/M16/137002` 记成 13/348，v2
+修正为 13/254 = 5.1181%。
+
+| arm | FULL 税前 ROI | FULL 税后 ROI | settled issues | FULL coverage | tax-net max drawdown |
+|---|---:|---:|---:|---:|---:|
+| `PRIMARY_NO_GATE_K4` | -15.77% | -18.88% | 254 | 100.00% | ¥865,364.85 |
+| `SECONDARY_ESP300_GM290_K8` | -16.12% | -18.30% | 191 | 100.00% | ¥1,246,062.84 |
+
+#### 权重、机制与 cap
+
+六个权重源的非 FULL 历史中位税前 ROI 均为负；`Q_WEIGHT` 产生最高 same-window
+峰值，但也有明显 seed/期次集中。以下是主臂中位数；次臂的结论方向相同，完整六权重
+×机制×cap×M×seed 数字面保存在包内 `mechanism_weight_surface_summary.csv`。
+
+| 主臂权重 | 中位税前 ROI | 描述性最大值 | 正值 cells |
+|---|---:|---:|---:|
+| `MODEL_P_CAL` | -17.79% | +67.97% | 26/240 |
+| `MARKET_WF_CAL` | -14.38% | +55.01% | 24/240 |
+| `BLEND_A25` | -17.49% | +55.01% | 17/240 |
+| `BLEND_A50` | -20.79% | +67.97% | 12/240 |
+| `BLEND_A75` | -18.62% | +67.97% | 16/240 |
+| `Q_WEIGHT` | -15.77% | +84.76% | 61/240 |
+
+WOR 在相同 M 下消除 exact duplicate，主/次臂的中位 coverage 为 30.51%/56.02%，
+中位税前 ROI 为 -11.68%/-8.51%；WR 保留自然重复 stake，中位 duplicate ratio
+4.42%/4.34%，税前 ROI 为 -18.04%/-18.97%。residual、top-mass 和 cap=1 的
+中位 unique ratio 为 100%；cap 从 1 增至 8 时重复集中和 miss streak 显著上升，主臂
+中位税前 ROI 从 -18.06% 降至 -30.56%，次臂从 -20.16% 降至 -40.40%。没有一个 cap
+在六权重、三 seed、YEAR/FOLD/LOYO 上形成稳定优势。降低 stake 或提高 unique coverage
+本身都不是 edge；因此同时报告 capital utilization、gross retention、hit tickets、
+winning identities、top-issue share、HHI、drawdown 和 miss streak。
+
+#### 稳定性与集中度
+
+WR/WOR 的 matched seed ROI range 并不小：主臂中位 22.51pp/22.01pp，次臂
+14.76pp/8.89pp；p95 可达 56.60pp–67.23pp。2,880 个税前 issue-bootstrap 比较中
+只有 52 个 lower 95% bound 高于零，2,605 个区间跨零；Holm 行必须结合方向、
+same-window multiplicity 与集中度解释，不能只按 `p<.05` 选赢家。每个配置另有真实
+leave-one-issue-out（保留造成 min/max 的 issue ID）和“剔除本配置最大 gross issue 后
+相对 matched FULL”的税前敏感性。历史最高的主臂 Q-WOR/M16/137002 从 +84.76%
+降到 ex-largest +48.43%，但其它 seed 与 bootstrap 不稳定；这仍不是独立正 EV。
+
+完整 outcome-code atlas 对 2,892 个配置各列 2,187 个代码，共 6,324,804 行：目标概率
+质量、实际分配 ticket copies/frequency、两者 delta 与真实赛果 identity/hit 分开记录；
+每配置目标与 realized frequency 均守恒为 1，delta 和为 0。M=512/1024/1458/2187
+也进入 matched pairwise 收敛控制，不再只看 M≤256。
+
+![#145 税前 ROI 随 M/cap 的完整曲线](../../results/bj145_gate_b_outcome_settlement_v2/roi_vs_m_cap.svg)
+
+![#145 相对 matched FULL 的税前比较](../../results/bj145_gate_b_outcome_settlement_v2/matched_pre_tax_comparison.svg)
+
+![#145 issue-bootstrap 不确定性与稳定性](../../results/bj145_gate_b_outcome_settlement_v2/uncertainty_stability.svg)
+
+终局仍为 **DESCRIPTIVE_SURFACE_ONLY_NO_PROMOTION**。高历史 cell 只能作为后续 strict
+independent-EV 与真正 held-out/forward validation 的候选，不能产生购买、生产或投注
+授权。v2 不可变清单 `SHA256SUMS.json` 的 SHA-256 为
+`5353b8875748168407a7d9ff2171e98854bd8f411cc9a09baa2d87db6f37e488`。完整表格和
+解释见 v2 包内 `report.md`；Gate-A 设计仍见
+[#145 Gate A](../research/bj145_ticket_allocation_gate_a_2026-08-03.md)。
 
 ## 知识图谱
 

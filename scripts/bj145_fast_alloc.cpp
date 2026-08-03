@@ -132,7 +132,8 @@ void bj145_wr_profile(const double* weights, int k, int truth, const char* seed,
     std::vector<int> counts(k,0); int hits=0,unique=0,groups=0,grid=0;
     for(int draw=1;draw<=maximum;++draw){
         const double unit=stable_uniform("WR",seed,signature,draw-1);
-        const int ticket=static_cast<int>(std::lower_bound(cumulative.begin(),cumulative.end(),unit)-cumulative.begin());
+        const auto found = std::lower_bound(cumulative.begin(), cumulative.end(), unit);
+        const int ticket = found == cumulative.end() ? k - 1 : static_cast<int>(found - cumulative.begin());
         const int prior=counts[ticket]; ++counts[ticket]; if(ticket==truth)++hits; if(prior==0)++unique; if(prior==1)++groups;
         if(grid<n_m && draw==ms[grid]){out[grid*4]=hits;out[grid*4+1]=unique;out[grid*4+2]=draw-unique;out[grid*4+3]=groups;++grid;}
     }
@@ -144,6 +145,78 @@ void bj145_wor_profile(const double* weights, int k, int truth, const char* seed
     std::sort(keys.begin(),keys.end(),[](const auto&a,const auto&b){if(a.first!=b.first)return a.first<b.first;return a.second<b.second;});
     int rank=0; for(int i=0;i<k;++i)if(keys[i].second==truth){rank=i+1;break;}
     for(int j=0;j<n_m;++j){int m=ms[j];out[j*4]=rank<=m;out[j*4+1]=m;out[j*4+2]=0;out[j*4+3]=0;}
+}
+
+// Aggregate complete ticket-code marginals for a frozen identity cohort.  The
+// existing profile entry points intentionally return only settlement metrics;
+// this additive entry point exposes the full allocation vector needed by the
+// Gate-B outcome-code atlas.  It does not accept outcomes or payouts: `truths`
+// is used only to keep actual-hit counts separate from allocation frequency.
+static void snapshot(const std::vector<int>& counts, int truth, int m, int k, int index,
+                     long long* allocated, long long* actual_identity, long long* actual_hit) {
+    for (int ordinal = 0; ordinal < k; ++ordinal) {
+        allocated[index * k + ordinal] += counts[ordinal];
+    }
+    if (truth >= 0 && truth < k) {
+        actual_identity[index * k + truth] += 1;
+        actual_hit[index * k + truth] += counts[truth];
+    }
+}
+
+void bj145_code_aggregate_grid(const double* weights_flat, int n_identity, int k,
+                               const int* truths, const char* const* signatures,
+                               int mechanism, int cap, const char* seed,
+                               const int* ms, int n_m, long long* allocated,
+                               long long* actual_identity, long long* actual_hit) {
+    if (n_identity < 0 || k <= 0 || n_m <= 0) return;
+    for (int identity = 0; identity < n_identity; ++identity) {
+        const double* weights = weights_flat + static_cast<std::size_t>(identity) * k;
+        const int truth = truths[identity];
+        const char* signature = signatures[identity];
+        std::vector<int> counts;
+        if (mechanism == 0 || mechanism == 1) {
+            // WR/WOR can be generated once and copied at each requested M.
+            counts.assign(k, 0);
+            if (mechanism == 0) {
+                std::vector<double> cumulative(k); double running = 0.0;
+                for (int ordinal = 0; ordinal < k; ++ordinal) { running += weights[ordinal]; cumulative[ordinal] = running; }
+                int grid = 0;
+                for (int draw = 1; draw <= ms[n_m - 1]; ++draw) {
+                    const double unit = stable_uniform("WR", seed, signature, draw - 1);
+                    const auto found = std::lower_bound(cumulative.begin(), cumulative.end(), unit);
+                    const int ticket = found == cumulative.end() ? k - 1 : static_cast<int>(found - cumulative.begin());
+                    ++counts[ticket];
+                    if (grid < n_m && draw == ms[grid]) { snapshot(counts, truth, draw, k, grid, allocated, actual_identity, actual_hit); ++grid; }
+                }
+            } else {
+                std::vector<std::pair<double, int>> keys; keys.reserve(k);
+                for (int ordinal = 0; ordinal < k; ++ordinal) {
+                    const double key = weights[ordinal] > 0.0 ? -std::log(std::max(stable_uniform("WOR", seed, signature, ordinal), 1e-18)) / weights[ordinal] : INFINITY;
+                    keys.emplace_back(key, ordinal);
+                }
+                std::sort(keys.begin(), keys.end(), [](const auto& a, const auto& b) { if (a.first != b.first) return a.first < b.first; return a.second < b.second; });
+                int grid = 0;
+                for (int rank = 0; rank < k && grid < n_m; ++rank) {
+                    ++counts[keys[rank].second];
+                    if (rank + 1 == ms[grid]) { snapshot(counts, truth, rank + 1, k, grid, allocated, actual_identity, actual_hit); ++grid; }
+                }
+            }
+            continue;
+        }
+        for (int grid = 0; grid < n_m; ++grid) {
+            const int m = ms[grid];
+            if (mechanism == 2) hamilton(weights, k, m, counts);
+            else if (mechanism == 3) capped_hamilton(weights, k, m, cap, counts);
+            else if (mechanism == 4) {
+                counts.assign(k, 0);
+                std::vector<int> order(k); std::iota(order.begin(), order.end(), 0);
+                std::sort(order.begin(), order.end(), [&](int a, int b) { if (weights[a] != weights[b]) return weights[a] > weights[b]; return a < b; });
+                for (int rank = 0; rank < m; ++rank) ++counts[order[rank]];
+            } else if (mechanism == 5) counts.assign(k, 1);
+            else return;
+            snapshot(counts, truth, m, k, grid, allocated, actual_identity, actual_hit);
+        }
+    }
 }
 
 void bj145_bootstrap(const double* candidate_net, const double* candidate_stake, const double* baseline_net, const double* baseline_stake, int n, int replicates, uint64_t seed, double* out) {

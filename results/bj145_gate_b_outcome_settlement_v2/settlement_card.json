@@ -1,0 +1,73 @@
+{
+  "charts": [
+    "roi_vs_m_cap.svg",
+    "matched_pre_tax_comparison.svg",
+    "uncertainty_stability.svg"
+  ],
+  "contract": "BJ-HIST-TICKET-ALLOCATION-001",
+  "decision": "DESCRIPTIVE_SURFACE_ONLY_NO_PROMOTION",
+  "drawdown_rule": "chronological cumulative tax-adjusted net over settled positive-stake issue rows",
+  "gate_a_manifest_sha256": "da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114c",
+  "issue": 145,
+  "m_grid": [
+    16,
+    32,
+    48,
+    64,
+    80,
+    96,
+    112,
+    128,
+    144,
+    160,
+    176,
+    192,
+    208,
+    224,
+    240,
+    256,
+    512,
+    1024,
+    1458,
+    2187
+  ],
+  "outcome_code_decompressed_bytes": 2915441076,
+  "outcome_code_decompressed_sha256": "c7a39e1a16b1aaaa20155cfb57e348889da268eb8d437acbee3c40c6e55beeb5",
+  "outcome_code_files": [
+    "outcome_code_frequency.part-01-of-08.csv.gz",
+    "outcome_code_frequency.part-02-of-08.csv.gz",
+    "outcome_code_frequency.part-03-of-08.csv.gz",
+    "outcome_code_frequency.part-04-of-08.csv.gz",
+    "outcome_code_frequency.part-05-of-08.csv.gz",
+    "outcome_code_frequency.part-06-of-08.csv.gz",
+    "outcome_code_frequency.part-07-of-08.csv.gz",
+    "outcome_code_frequency.part-08-of-08.csv.gz"
+  ],
+  "outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "outcome_payload_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+  "promotion_authorized": false,
+  "source_manifests_transitive": {
+    "bj137": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
+    "bj148": "fd4a0f4dc0ab5ef97f3c260a082515aa7874a60a1ac1e5e0ecd865fdb1eeafd6",
+    "bj151": "3605278bd6067fc7aa279a0625f4c4cab91603d8a1490c8608381e8fca997ac6",
+    "bj154": "f81146959fd734c3d15a2579a3921b2afc86d6f633e174c8294763279f9937c5"
+  },
+  "supersedes": "results/bj145_gate_b_outcome_settlement_v1 (retained unchanged)",
+  "support_rule": "coverage, miss streak and drawdown use settled positive-stake issue rows; Gate-A no-bets and unavailable outcomes are separate",
+  "surface": {
+    "bootstrap_rows": 5760,
+    "codes_per_configuration": 2187,
+    "configuration_count": 2892,
+    "full_control_delta_rows": 63360,
+    "holm_rows": 2880,
+    "issue_rows": 1006416,
+    "largest_issue_exclusion_rows": 2892,
+    "leave_one_issue_out_rows": 2892,
+    "mechanism_pairwise_rows": 12960,
+    "outcome_code_rows": 6324804,
+    "summary_rows": 63624,
+    "tax_reconciliation_rows": 2892
+  },
+  "tax_rule": "20pct per individual winning ticket iff gross >= 10000 yuan; no pooling or aggregation",
+  "version": "bj145-gate-b-v2-substantive-correction"
+}
