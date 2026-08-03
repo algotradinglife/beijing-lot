@@ -1,0 +1,3 @@
+# #159 Gate A v2 — selected-baseline WOR cross-N
+
+Outcome-unexposed freeze of the accepted #127 ESP300_GM305_LOWP20 selector for N=2..10 and the fixed #145 Q-informed WOR allocator at nominal M=32/64/128 and seeds 137001/137002/137003. Selection is performed once over each complete `issue@fold`; native pool/segment IDs are provenance only. Gate B must consume this package without recomputing identities. For nominal M above 3^N, `effective_M` and actual stake use the full ticket space and the saturated nominal rows are one allocation, not duplicate WOR. Run `python3 freeze_runner.py --output <new-dir>` from a compatible checkout; staging remains beside the output under `.scratch` and never uses `/tmp`.

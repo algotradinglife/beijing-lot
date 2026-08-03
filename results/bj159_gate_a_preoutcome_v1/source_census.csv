@@ -1,0 +1,3 @@
+source,role,identity,sha256,rows,join_status
+bj127_gate_a_preoutcome_v2,accepted ESP300_GM305_LOWP20 selector and outcome-unexposed p/E_SP/q vectors,SHA256SUMS.json,a8eeb50204bb9a2d69578538e28943a432bea11083661a63b950a5ab5a2481da,47819,all immutable scatter rows read; no outcomes or settlement fields opened
+bj145_gate_a_preoutcome_v8,accepted Q-informed WOR allocator and identity-signature contract,SHA256SUMS.json,da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114c,24780,allocation contract only; no Gate-B rows or outcomes opened
