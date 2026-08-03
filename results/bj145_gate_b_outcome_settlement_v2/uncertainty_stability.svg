@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="720" viewBox="0 0 1180 720">
+<rect width="100%" height="100%" fill="white"/>
+<style>text{font-family:Arial,sans-serif;fill:#111827}.grid{stroke:#e5e7eb;stroke-width:1}.axis{stroke:#374151;stroke-width:1}.line{fill:none;stroke-width:2}.band{fill-opacity:.16}.legend{font-size:11px}</style>
+<text x="82" y="30" font-size="19" font-weight="bold">#145 Gate-B bootstrap uncertainty and stability</text>
+<text x="82" y="50" font-size="12">Median point estimate; shaded band is the cross-cell IQR of issue-bootstrap 95% bounds. Descriptive only.</text>
+<text x="82" y="70.0" font-size="14" font-weight="bold">PRIMARY_NO_GATE_K4</text>
+<line class="grid" x1="82" x2="1142" y1="338.0" y2="338.0"/>
+<text x="72" y="342.0" text-anchor="end" font-size="10">-0.90</text>
+<line class="grid" x1="82" x2="1142" y1="273.5" y2="273.5"/>
+<text x="72" y="277.5" text-anchor="end" font-size="10">-0.47</text>
+<line class="grid" x1="82" x2="1142" y1="209.0" y2="209.0"/>
+<text x="72" y="213.0" text-anchor="end" font-size="10">-0.05</text>
+<line class="grid" x1="82" x2="1142" y1="144.5" y2="144.5"/>
+<text x="72" y="148.5" text-anchor="end" font-size="10">0.38</text>
+<line class="grid" x1="82" x2="1142" y1="80.0" y2="80.0"/>
+<text x="72" y="84.0" text-anchor="end" font-size="10">0.81</text>
+<line x1="82" x2="1142" y1="202.1" y2="202.1" stroke="#111827" stroke-dasharray="4 4"/>
+<polygon class="band" fill="#2563eb" points="82.0,97.8 137.8,129.1 193.6,128.4 249.4,135.5 305.2,135.9 360.9,142.4 416.7,137.2 472.5,140.0 528.3,144.9 584.1,146.5 639.9,146.3 695.7,150.2 751.5,150.0 807.3,152.8 863.1,149.4 918.8,154.7 974.6,170.3 1030.4,172.7 1086.2,178.5 1142.0,182.3 1142.0,214.8 1086.2,220.7 1030.4,227.9 974.6,236.4 918.8,244.5 863.1,247.0 807.3,247.4 751.5,250.4 695.7,249.5 639.9,249.6 584.1,249.8 528.3,253.9 472.5,254.9 416.7,257.3 360.9,269.7 305.2,270.3 249.4,274.6 193.6,289.5 137.8,289.4 82.0,314.0"/>
+<polyline class="line" stroke="#1d4ed8" points="82.0,226.6 137.8,212.9 193.6,208.3 249.4,209.8 305.2,208.3 360.9,206.4 416.7,206.0 472.5,206.1 528.3,205.5 584.1,208.5 639.9,208.3 695.7,205.9 751.5,206.9 807.3,206.6 863.1,205.8 918.8,206.1 974.6,202.7 1030.4,196.9 1086.2,198.7 1142.0,202.1"/>
+<text x="82.0" y="356.0" text-anchor="middle" font-size="9">16</text>
+<text x="193.6" y="356.0" text-anchor="middle" font-size="9">48</text>
+<text x="305.2" y="356.0" text-anchor="middle" font-size="9">80</text>
+<text x="416.7" y="356.0" text-anchor="middle" font-size="9">112</text>
+<text x="528.3" y="356.0" text-anchor="middle" font-size="9">144</text>
+<text x="639.9" y="356.0" text-anchor="middle" font-size="9">176</text>
+<text x="751.5" y="356.0" text-anchor="middle" font-size="9">208</text>
+<text x="863.1" y="356.0" text-anchor="middle" font-size="9">240</text>
+<text x="974.6" y="356.0" text-anchor="middle" font-size="9">512</text>
+<text x="1030.4" y="356.0" text-anchor="middle" font-size="9">1024</text>
+<text x="1086.2" y="356.0" text-anchor="middle" font-size="9">1458</text>
+<text x="1142.0" y="356.0" text-anchor="middle" font-size="9">2187</text>
+<text x="82" y="382.0" font-size="14" font-weight="bold">SECONDARY_ESP300_GM290_K8</text>
+<line class="grid" x1="82" x2="1142" y1="650.0" y2="650.0"/>
+<text x="72" y="654.0" text-anchor="end" font-size="10">-0.90</text>
+<line class="grid" x1="82" x2="1142" y1="585.5" y2="585.5"/>
+<text x="72" y="589.5" text-anchor="end" font-size="10">-0.47</text>
+<line class="grid" x1="82" x2="1142" y1="521.0" y2="521.0"/>
+<text x="72" y="525.0" text-anchor="end" font-size="10">-0.05</text>
+<line class="grid" x1="82" x2="1142" y1="456.5" y2="456.5"/>
+<text x="72" y="460.5" text-anchor="end" font-size="10">0.38</text>
+<line class="grid" x1="82" x2="1142" y1="392.0" y2="392.0"/>
+<text x="72" y="396.0" text-anchor="end" font-size="10">0.81</text>
+<line x1="82" x2="1142" y1="514.1" y2="514.1" stroke="#111827" stroke-dasharray="4 4"/>
+<polygon class="band" fill="#2563eb" points="82.0,423.6 137.8,424.2 193.6,431.7 249.4,451.5 305.2,452.5 360.9,453.8 416.7,460.3 472.5,460.2 528.3,466.5 584.1,466.6 639.9,468.6 695.7,470.5 751.5,473.2 807.3,477.3 863.1,476.2 918.8,478.4 974.6,488.5 1030.4,493.8 1086.2,495.7 1142.0,499.2 1142.0,532.0 1086.2,539.6 1030.4,542.2 974.6,555.2 918.8,561.4 863.1,561.8 807.3,562.7 751.5,563.0 695.7,562.5 639.9,563.4 584.1,565.7 528.3,564.7 472.5,569.3 416.7,571.4 360.9,568.0 305.2,574.9 249.4,579.8 193.6,601.5 137.8,619.0 82.0,632.2"/>
+<polyline class="line" stroke="#1d4ed8" points="82.0,554.1 137.8,516.9 193.6,510.7 249.4,516.7 305.2,516.7 360.9,517.4 416.7,518.4 472.5,513.9 528.3,513.8 584.1,515.7 639.9,517.1 695.7,518.3 751.5,519.1 807.3,519.7 863.1,518.1 918.8,517.0 974.6,518.9 1030.4,515.8 1086.2,514.4 1142.0,514.1"/>
+<text x="82.0" y="668.0" text-anchor="middle" font-size="9">16</text>
+<text x="193.6" y="668.0" text-anchor="middle" font-size="9">48</text>
+<text x="305.2" y="668.0" text-anchor="middle" font-size="9">80</text>
+<text x="416.7" y="668.0" text-anchor="middle" font-size="9">112</text>
+<text x="528.3" y="668.0" text-anchor="middle" font-size="9">144</text>
+<text x="639.9" y="668.0" text-anchor="middle" font-size="9">176</text>
+<text x="751.5" y="668.0" text-anchor="middle" font-size="9">208</text>
+<text x="863.1" y="668.0" text-anchor="middle" font-size="9">240</text>
+<text x="974.6" y="668.0" text-anchor="middle" font-size="9">512</text>
+<text x="1030.4" y="668.0" text-anchor="middle" font-size="9">1024</text>
+<text x="1086.2" y="668.0" text-anchor="middle" font-size="9">1458</text>
+<text x="1142.0" y="668.0" text-anchor="middle" font-size="9">2187</text>
+<text x="18" y="380" transform="rotate(-90 18 380)" font-size="12">pre-tax ROI delta vs matched FULL</text>
+</svg>
