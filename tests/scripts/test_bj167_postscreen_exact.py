@@ -52,6 +52,16 @@ def test_candidate_freeze_union_and_shared_paired_bootstrap():
     tax_chart = list(csv.DictReader((out / "chart_source_tax_line_exposure_retention.csv").open(newline="")))
     assert len(tax_chart) == 2 and tax_chart[0]["gross_return_retention_vs_matched_full"] == "0.875000000000"
     assert float(boot[0]["candidate_bonferroni_adjusted_p"]) >= float(boot[0]["candidate_two_sided_p"])
+    slices = list(csv.DictReader((out / "stability_year_fold_loyo.csv").open(newline="")))
+    # Every emitted slice carries both sides of the selector-matched control
+    # and the exact difference, rather than candidate-only ROI.
+    assert all({"candidate_no_tax_roi", "matched_full_no_tax_roi", "paired_lift"} <= set(r) for r in slices)
+    year_2024 = next(r for r in slices if r["candidate_index"] == "0" and r["split_type"] == "YEAR" and r["split"] == "2024")
+    assert year_2024["candidate_no_tax_roi"] == "0.250000000000" and year_2024["matched_full_no_tax_roi"] == "-0.375000000000" and year_2024["paired_lift"] == "0.625000000000"
+    explicit = [{"p": .01}, {"p": .02}]
+    POST.bh(explicit, "p", "fixture", full_family_size=20)
+    assert explicit[0]["fixture_bonferroni_adjusted_p"] == .2
+    assert explicit[0]["fixture_bh_adjusted_p"] == .2
     assert (out / "candidate_paired_bootstrap_20000.csv").exists() and (out / "bh_descriptive_significance.csv").exists()
     shutil.rmtree(FIXTURE)
 
