@@ -228,6 +228,16 @@ def test_recovery_sparse_checkpoint_is_atomic_bound_and_resumable():
     assert not stage.exists() and (checkpoint / "SHA256SUMS.json").exists()
     __import__("shutil").rmtree(checkpoint)
 
+def test_recovery_robust_metrics_normalize_direct_and_ensemble_schemas():
+    recovery = load("bj167_recovery_robust_metrics", ROOT / "scripts" / "recover_bj167_gate_b_exact.py")
+    assert recovery.robust_metric_pair({"drawdown_no_tax_yuan": "12.5", "gross_issue_hhi": "0.2"}) == (12.5, 0.2)
+    assert recovery.robust_metric_pair({"seed_mean_drawdown_no_tax_yuan": "7.5", "seed_gross_weighted_mean_issue_hhi": "0.1"}) == (7.5, 0.1)
+    try:
+        recovery.robust_metric_pair({})
+        assert False, "schema drift must fail closed"
+    except RuntimeError:
+        pass
+
 def test_common_support_hash_tokens_are_selector_scoped():
     mod=load("runner_common_scope", SCRIPT)
     # The same canonical support may be reused by multiple selectors, but a
