@@ -106,7 +106,7 @@ def test_scientific_native_companion_m2187_reconciles_production_role_shape():
             row = next(reader); assert (row["selector_id"], row["issue_instance"], row["portfolio_id"]) == key; raw.append(row)
     roles = [POST.R.role_values(r) for r in raw]; n = 963
     ds = lambda: array.array("d", [0.0]) * n
-    tmp = [ds() for _ in range(5)]; totals = [ds() for _ in range(5)]
+    tmp = [ds() for _ in range(5)]; totals = [ds() for _ in range(7)]
     mark = array.array("B", [0]) * n; touched = array.array("i", [0]) * n
     year_net = ds(); year_stake = ds(); fold_net = ds(); fold_stake = ds(); largest = array.array("d", [-float("inf")]) * n; largest_stake = ds(); largest_issue = array.array("i", [-1]) * n
     full_issue_net = array.array("d", [0.0]); full_issue_stake = array.array("d", [0.0])

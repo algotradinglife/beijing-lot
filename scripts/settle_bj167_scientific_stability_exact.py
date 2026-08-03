@@ -34,7 +34,7 @@ def science_cells():
 def configure():
     lib=R.compile_engine(ROOT,"bj167_scientific_stability_exact.so")
     pd=ctypes.POINTER(ctypes.c_double); pi=ctypes.POINTER(ctypes.c_int)
-    lib.bj167_scientific_set_buffers.argtypes=[pd,pd,pd,pd,pd,ctypes.POINTER(ctypes.c_ubyte),pi,pd,pd,pd,pd,pd,pd,pd,pd,pd,pd,pd,pi,pd,pd,ctypes.c_int,ctypes.c_int,ctypes.c_int]
+    lib.bj167_scientific_set_buffers.argtypes=[pd,pd,pd,pd,pd,ctypes.POINTER(ctypes.c_ubyte),pi,pd,pd,pd,pd,pd,pd,pd,pd,pd,pd,pd,pd,pd,pi,pd,pd,ctypes.c_int,ctypes.c_int,ctypes.c_int]
     lib.bj167_scientific_begin_issue.argtypes=[ctypes.c_int,ctypes.c_int,ctypes.c_int]
     lib.bj167_scientific_process_source.argtypes=[pd,ctypes.c_int,ctypes.c_char_p,ctypes.c_double,pi,ctypes.c_int,ctypes.c_int]
     lib.bj167_scientific_add_structural.argtypes=[ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_double]
@@ -66,7 +66,7 @@ def main():
     if set(issues)!=set(by_issue): raise RuntimeError("screening and canonical issue universes differ")
     cells=science_cells(); ncell=len(cells); total=len(selectors)*ncell
     zeros=lambda:array.array("d",[0.0])*total
-    tmp=[zeros() for _ in range(5)]; allv=[zeros() for _ in range(5)]
+    tmp=[zeros() for _ in range(5)]; allv=[zeros() for _ in range(7)]
     mark=array.array("B",[0])*total; touched=array.array("i",[0])*total
     yn=array.array("d",[0.0])*(total*len(years)); ys=array.array("d",[0.0])*(total*len(years)); fn=array.array("d",[0.0])*(total*len(folds)); fs=array.array("d",[0.0])*(total*len(folds))
     largest=array.array("d",[-math.inf])*total; largest_stake=zeros(); largest_issue=array.array("i",[-1])*total
@@ -88,7 +88,7 @@ def main():
         if (ii+1)%10==0: print(f"scientific stability issues {ii+1}/{nissue}",flush=True)
     # The scalar summary is the keyed all-cell coverage census.  Slices below
     # are derived from exact cell/year/fold totals, never seed pseudo-history.
-    fields=["global_science_cell","selector_id","weight_source","mechanism","cap","M","seed_scope","coverage_scope","coverage_status","no_tax_roi","matched_full_no_tax_roi","paired_lift","ex_largest_issue_no_tax_roi","ex_largest_issue_full_roi","ex_largest_issue_lift","ex_largest_year_no_tax_roi","ex_largest_year_full_roi","ex_largest_year_lift","largest_signed_issue","largest_signed_issue_net_yuan","largest_signed_year","gross_issue_hhi_unavailable","year_slice_count","fold_slice_count","loyo_slice_count"]
+    fields=["global_science_cell","selector_id","weight_source","mechanism","cap","M","seed_scope","coverage_scope","coverage_status","no_tax_roi","matched_full_no_tax_roi","paired_lift","ex_largest_issue_no_tax_roi","ex_largest_issue_full_roi","ex_largest_issue_lift","ex_largest_year_no_tax_roi","ex_largest_year_full_roi","ex_largest_year_lift","largest_signed_issue","largest_signed_issue_net_yuan","largest_signed_year","gross_issue_hhi","gross_top_issue_share","year_slice_count","fold_slice_count","loyo_slice_count"]
     def summary_emit(w):
         for si,sel in enumerate(selectors):
             full_at=si*ncell+960; fnet,fstake=allv[0][full_at],allv[1][full_at]
@@ -96,7 +96,8 @@ def main():
                 at=si*ncell+ci; net,stake=allv[0][at],allv[1][at]; roi=net/stake if stake else None; froi=fnet/fstake if fstake else None; lift=roi-froi if roi is not None and froi is not None else None
                 li=largest_issue[at]; ex_stake=stake-(largest_stake[at] if li>=0 else 0); ex_net=net-(largest[at] if li>=0 else 0); fex_net=fnet-(full_issue_net[si*nissue+li] if li>=0 else 0); fex_stake=fstake-(full_issue_stake[si*nissue+li] if li>=0 else 0); exroi=ex_net/ex_stake if ex_stake else None; fexroi=fex_net/fex_stake if fex_stake else None
                 byyear=[(yn[at*len(years)+yi],ys[at*len(years)+yi]) for yi in range(len(years))]; ly=max(range(len(years)),key=lambda yi:byyear[yi][0]); ynet=net-byyear[ly][0]; ystake=stake-byyear[ly][1]; fy_net=fnet-yn[full_at*len(years)+ly]; fy_stake=fstake-ys[full_at*len(years)+ly]; yroi=ynet/ystake if ystake else None; fyroi=fy_net/fy_stake if fy_stake else None
-                w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":src,"mechanism":me,"cap":cap,"M":m,"seed_scope":scope,"coverage_scope":"ALL_ATLAS_SCIENTIFIC_CELLS","coverage_status":"EXACT_YEAR_FOLD_LOYO_AND_EXCLUSIONS","no_tax_roi":"" if roi is None else f"{roi:.12f}","matched_full_no_tax_roi":"" if froi is None else f"{froi:.12f}","paired_lift":"" if lift is None else f"{lift:.12f}","ex_largest_issue_no_tax_roi":"" if exroi is None else f"{exroi:.12f}","ex_largest_issue_full_roi":"" if fexroi is None else f"{fexroi:.12f}","ex_largest_issue_lift":"" if exroi is None or fexroi is None else f"{exroi-fexroi:.12f}","ex_largest_year_no_tax_roi":"" if yroi is None else f"{yroi:.12f}","ex_largest_year_full_roi":"" if fyroi is None else f"{fyroi:.12f}","ex_largest_year_lift":"" if yroi is None or fyroi is None else f"{yroi-fyroi:.12f}","largest_signed_issue":issues[li] if li>=0 else "","largest_signed_issue_net_yuan":"" if li<0 else f"{largest[at]:.6f}","largest_signed_year":years[ly],"gross_issue_hhi_unavailable":"see candidate exact contribution companion for 20k candidate diagnostics","year_slice_count":len(years),"fold_slice_count":len(folds),"loyo_slice_count":len(years)})
+                gross=allv[2][at]; hhi=allv[5][at]/(gross*gross) if gross else 0.0; top=allv[6][at]/gross if gross else 0.0
+                w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":src,"mechanism":me,"cap":cap,"M":m,"seed_scope":scope,"coverage_scope":"ALL_ATLAS_SCIENTIFIC_CELLS","coverage_status":"EXACT_YEAR_FOLD_LOYO_AND_EXCLUSIONS","no_tax_roi":"" if roi is None else f"{roi:.12f}","matched_full_no_tax_roi":"" if froi is None else f"{froi:.12f}","paired_lift":"" if lift is None else f"{lift:.12f}","ex_largest_issue_no_tax_roi":"" if exroi is None else f"{exroi:.12f}","ex_largest_issue_full_roi":"" if fexroi is None else f"{fexroi:.12f}","ex_largest_issue_lift":"" if exroi is None or fexroi is None else f"{exroi-fexroi:.12f}","ex_largest_year_no_tax_roi":"" if yroi is None else f"{yroi:.12f}","ex_largest_year_full_roi":"" if fyroi is None else f"{fyroi:.12f}","ex_largest_year_lift":"" if yroi is None or fyroi is None else f"{yroi-fyroi:.12f}","largest_signed_issue":issues[li] if li>=0 else "","largest_signed_issue_net_yuan":"" if li<0 else f"{largest[at]:.6f}","largest_signed_year":years[ly],"gross_issue_hhi":f"{hhi:.12f}","gross_top_issue_share":f"{top:.12f}","year_slice_count":len(years),"fold_slice_count":len(folds),"loyo_slice_count":len(years)})
     write_gz(out/"scientific_cell_stability_summary.csv.gz",fields,summary_emit)
     # This large chart source deliberately has one aggregate scientific cell
     # per slice; stochastic seeds are pooled before this point.
