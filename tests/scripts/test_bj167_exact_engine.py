@@ -38,6 +38,15 @@ def test_surface_maps_are_source_specific_and_numeric():
     assert mod.CAPS == (1,2,4,8)
     assert mod.M_GRID[-4:] == (512,1024,1458,2187)
 
+def test_stability_metadata_never_parses_short_delete_labels():
+    mod=load("runner_stability_metadata", SCRIPT)
+    cells=[{"mechanism":"P_MIN_GLOBAL_DELETE","M":"2187"}, {"mechanism":"CAPPED_REPEAT","M":"64"}]
+    # Delete labels deliberately lack the old assumed third slash component.
+    assert mod.stability_mechanism_m({"role":"DELETE_CONTROL_SCREEN","global_cell":0,"label":"S1_NO_GATE_K4/P_MIN_GLOBAL_DELETE"}, cells) == ("P_MIN_GLOBAL_DELETE","2187")
+    assert mod.stability_mechanism_m({"role":"ALLOCATION_FAMILY_SCREEN","global_cell":1,"label":"S1/Q/CAPPED"}, cells) == ("CAPPED_REPEAT","64")
+    assert mod.stability_mechanism_m({"role":"MATCHED_FULL_CONFIRMATORY","global_cell":0,"label":"S1_NO_GATE_K4/FULL_ENUMERATED"}, cells) == ("MATCHED_FULL","2187")
+    assert mod.stability_mechanism_m({"role":"CONFIRMATORY_INCUMBENT_100_SEED","global_cell":-1,"label":"S1/Q/WOR/M64/ENSEMBLE_100"}, cells) == ("WOR_DISTINCT","64")
+
 def test_cpp_real_prefix_golden_and_backing_lifetime():
     mod=load("runner2", SCRIPT); alloc=load("alloc", ALLOC); lib=engine()
     assert hashlib.sha256((ROOT/"scripts"/"bj145_fast_alloc.cpp").read_bytes()).hexdigest() == mod.EXPECTED_ALLOCATOR_SHA256

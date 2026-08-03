@@ -350,6 +350,16 @@ def write_file_census(out: Path):
 
 def ptr(a, ctype): return ctypes.cast((ctype * len(a)).from_buffer(a), ctypes.POINTER(ctype))
 
+def stability_mechanism_m(spec, cell_meta):
+    """Return stability-table mechanism/M from frozen metadata, never labels."""
+    if spec["role"] == "MATCHED_FULL_CONFIRMATORY":
+        return "MATCHED_FULL", "2187"
+    if spec.get("global_cell", -1) >= 0:
+        frozen_cell = cell_meta[spec["global_cell"] % NCELL]
+        return frozen_cell["mechanism"], frozen_cell["M"]
+    # The declared 100-seed incumbent is an aggregate of Q/WOR/M64 targets.
+    return "WOR_DISTINCT", "64"
+
 def compile_engine(root: Path, so_name: str = "bj167_exact_atlas.so"):
     cpp = root / "scripts" / "bj167_exact_atlas.cpp"; so = root / ".scratch" / so_name
     # Keep compiler intermediates in the worktree scratch area.  The full
@@ -658,8 +668,9 @@ def main():
             nets,stakes=issue_arrays(spec)
             years=sorted({m["year"] for m in issue_meta.values()}); folds=sorted({m["fold"] for m in issue_meta.values()})
             selector_id=selectors[spec["selector_index"]]["selector_id"]
-            mech="MATCHED_FULL" if spec["role"]=="MATCHED_FULL_CONFIRMATORY" else spec["label"].split("/")[2]
-            mval="2187" if spec["role"]=="MATCHED_FULL_CONFIRMATORY" else ""
+            # Target labels are human-readable audit identifiers, not a
+            # schema: global-delete controls have only two components.
+            mech, mval = stability_mechanism_m(spec, cell_meta)
             scope="BOUNDED_TARGET_REGISTRY"
             seed_scope="DETERMINISTIC" if spec["role"]=="MATCHED_FULL_CONFIRMATORY" else ("ENSEMBLE_100" if spec.get("aggregate_direct_indices") is not None else "TARGET")
             def emit(kind,label,ix,year="",fold="",loyo=""):
