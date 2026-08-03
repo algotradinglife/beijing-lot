@@ -164,6 +164,46 @@ def test_mixed_available_missing_identity_closes_selector_issue_policy():
         # The available identity in I is not partially settled.
         assert s["eligible_selectors"] == ([] if s["issue_instance"]=="I" else [0])
 
+def test_recovery_accepts_only_zero_support_frozen_no_bets_outside_identity_chronology():
+    recovery = load("bj167_recovery_policy_boundary", ROOT / "scripts" / "recover_bj167_gate_b_exact.py")
+    status = {"I": "SETTLED", "J": "NO_BET_FROZEN", "K": "NO_BET_FROZEN"}
+    supports = {("I", "a"): {"issue": "I"}, ("K", "b"): {"issue": "K"}}
+    # J exists only in the selector census (K-unsatisfied) and is correctly
+    # absent from the archived identity chronology.
+    assert recovery.validate_archive_policy_boundary(status, supports, {"I", "K"}) == {
+        "I": "SETTLED", "K": "NO_BET_FROZEN"
+    }
+    try:
+        recovery.validate_archive_policy_boundary({"I": "SETTLED", "J": "SETTLED"}, supports, {"I"})
+        assert False, "settling a census-only issue must fail closed"
+    except RuntimeError as exc:
+        assert "zero-support" in str(exc)
+    try:
+        recovery.validate_archive_policy_boundary({"I": "SETTLED", "K": "NO_BET_FROZEN"}, supports, {"I"})
+        assert False, "a support outside archived chronology must fail closed"
+    except RuntimeError as exc:
+        assert "zero-support" in str(exc)
+
+def test_recovery_support_persists_production_payout_before_replay():
+    runner = load("runner_recovery_payout", SCRIPT)
+    recovery = load("bj167_recovery_payout", ROOT / "scripts" / "recover_bj167_gate_b_exact.py")
+    idr = runner.GzipRows(sorted(runner.GA.glob("selector_identities-*.csv.gz")))
+    rvr = runner.GzipRows(sorted(runner.GA.glob("selector_role_vectors-*.csv.gz")))
+    identity = idr.next()
+    role_rows = [rvr.next() for _ in range(7)]
+    assert identity is not None and all(row is not None for row in role_rows)
+    roles = [runner.role_values(row) for row in role_rows]
+    outcomes = runner.load_outcomes()
+    record = recovery.canonical_s1_support(
+        identity["issue_instance"], identity["selected_match_ids"].split("|"), roles, outcomes
+    )
+    assert "payout" in record
+    if record["available"]:
+        expected = 2.0 * .65 * math.prod(outcomes[mid][1] for mid in record["mids"])
+        assert record["payout"] == expected
+    else:
+        assert record["payout"] == 0.0
+
 def test_common_support_hash_tokens_are_selector_scoped():
     mod=load("runner_common_scope", SCRIPT)
     # The same canonical support may be reused by multiple selectors, but a
