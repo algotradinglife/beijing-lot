@@ -295,6 +295,55 @@ def common_support_identity_tokens(supports, selector_index):
         for portfolio_id in s.get("portfolio_ids_by_selector", {}).get(selector_index, [])
     )
 
+def matched_full_denominator_metadata(supports, selector_index, selector_issue_total,
+                                      selector_available_issues, selector_unavailable_issues,
+                                      selector_no_bet_issues, selector_identity_total,
+                                      selector_available_identity, selector_unavailable_identity,
+                                      selector_no_bet_identity):
+    """Return selector-local policy denominators and the settled support hash."""
+    settled_issues = len(selector_available_issues[selector_index])
+    unavailable_issues = len(selector_unavailable_issues[selector_index])
+    no_bet_issues = len(selector_no_bet_issues[selector_index])
+    if settled_issues + unavailable_issues + no_bet_issues != selector_issue_total[selector_index]:
+        raise RuntimeError(f"selector issue-policy denominator drift for {selector_index}")
+    settled_identities = selector_available_identity[selector_index]
+    unavailable_identities = selector_unavailable_identity[selector_index]
+    no_bet_identities = selector_no_bet_identity[selector_index]
+    if settled_identities + unavailable_identities + no_bet_identities != selector_identity_total[selector_index]:
+        raise RuntimeError(f"selector identity denominator drift for {selector_index}")
+    tokens = common_support_identity_tokens(supports, selector_index)
+    if len(tokens) != settled_identities:
+        raise RuntimeError(f"selector settled support hash denominator drift for {selector_index}")
+    support_hash = hashlib.sha256("\n".join(tokens).encode()).hexdigest()
+    denominator = (
+        f"issue policies: SETTLED={settled_issues}; UNAVAILABLE_CANONICAL_OUTCOME={unavailable_issues}; "
+        f"NO_BET_FROZEN={no_bet_issues}; identities: SETTLED={settled_identities}; "
+        f"UNAVAILABLE_CANONICAL_OUTCOME={unavailable_identities}; NO_BET_FROZEN={no_bet_identities}"
+    )
+    return denominator, support_hash
+
+def assert_s1_incumbent_anchors(incumbent):
+    """Protect the accepted #167-v2r3 absolute, FULL, and lift bridge."""
+    anchors = (
+        ("candidate ROI", incumbent["no_tax_roi"], COMMON_SUPPORT_INCUMBENT_ROI),
+        ("matched FULL ROI", incumbent["matched_full_no_tax_roi"], "-0.157696718701"),
+        ("matched FULL lift", incumbent["matched_full_lift"], COMMON_SUPPORT_INCUMBENT_LIFT),
+    )
+    for name, actual, expected in anchors:
+        if abs(float(actual) - float(expected)) > 1e-12:
+            raise RuntimeError(f"current v3r1 S1 common-support {name} does not match accepted v2r3 bridge")
+
+def write_file_census(out: Path):
+    """Census completed payloads only; never include a stale self-size row."""
+    census_path = out / "file_census.csv"
+    with census_path.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["relative_path", "bytes", "sha256"])
+        for p in sorted(out.rglob("*")):
+            if p.is_file() and p.name not in {"SHA256SUMS.json", "CONTENT_IDENTITY.json", "file_census.csv"}:
+                w.writerow([str(p.relative_to(out)), p.stat().st_size, sha(p)])
+    return census_path
+
 def ptr(a, ctype): return ctypes.cast((ctype * len(a)).from_buffer(a), ctypes.POINTER(ctype))
 
 def compile_engine(root: Path, so_name: str = "bj167_exact_atlas.so"):
@@ -633,7 +682,7 @@ def main():
     if len(common_support_tokens) != selector_available_identity[common_support_si]:
         raise RuntimeError("S1 common-support identity denominator drift")
     common_support_hash=hashlib.sha256("\n".join(common_support_tokens).encode()).hexdigest()
-    baseline_fields=["baseline_id","source_issue_package","source_manifest","source_gate_a_manifest","source_gate_b_manifest","reference_outcome_package","cohort_denominator","common_support_hash","selector","weight_vector","mechanism","M","seed_aggregation","stake_rule","pre_tax_roi","matched_full_lift","seed_mcse","positive_seed_fraction","bootstrap_lower","bootstrap_upper","ex_largest_issue_roi","ex_largest_year_roi","evidence_grade","incumbent_or_challenger","added_lever","decision_reason","outcome_boundary"]
+    baseline_fields=["baseline_id","source_issue_package","source_manifest","source_gate_a_manifest","source_gate_b_manifest","outcome_input_manifest","generated_package_identity","reference_outcome_package","cohort_denominator","common_support_hash","selector","weight_vector","mechanism","M","seed_aggregation","stake_rule","pre_tax_roi","matched_full_lift","seed_mcse","positive_seed_fraction","bootstrap_lower","bootstrap_upper","ex_largest_issue_roi","ex_largest_year_roi","evidence_grade","incumbent_or_challenger","added_lever","decision_reason","outcome_boundary"]
     bootstrap_rows={}
     with (out/"issue_cluster_bootstrap.csv").open(newline="") as bf:
         for br in csv.DictReader(bf): bootstrap_rows[br["target"]]=br
@@ -641,8 +690,7 @@ def main():
     with gzip.open(ensemble_path,"rt",newline="") as ef: ensemble_rows=list(csv.DictReader(ef))
     incumbent=next((r for r in ensemble_rows if r["selector_id"]=="S1_NO_GATE_K4" and r["weight_source"]=="Q_WEIGHT" and r["mechanism"]=="WOR_DISTINCT" and r["M"]=="64" and r["seed_scope"]=="ENSEMBLE_100"),None)
     if incumbent is None: raise RuntimeError("missing S1 Q/WOR M64 100-seed ensemble baseline")
-    if abs(float(incumbent["no_tax_roi"]) - float(COMMON_SUPPORT_INCUMBENT_ROI)) > 1e-12:
-        raise RuntimeError("current v3r1 S1 common-support reproduction does not match accepted v2r3 incumbent")
+    assert_s1_incumbent_anchors(incumbent)
     full_roi=float(incumbent["matched_full_no_tax_roi"])
     inc_spec=next(x for x in target_specs if x["role"]=="CONFIRMATORY_INCUMBENT_100_SEED")
     inc_nets,inc_stakes=issue_arrays(inc_spec); positive_idx=[i for i,s in enumerate(inc_stakes) if s>0]
@@ -668,10 +716,16 @@ def main():
         r159=next(r for r in summary159["m64_seed_stability"] if int(r["n"])==7)
         if abs(float(r159["seed_no_tax_roi"]["mean"])+0.222262319469)>1e-12: raise RuntimeError("#159 N7/M64 numeric bridge drift")
         bw.writerow(base_row(baseline_id="B159_N7_M64_TRANSFER",source_issue_package="#159 Gate-B v2r1",source_manifest=BJ159_GATE_B_MANIFEST,source_gate_a_manifest=BJ159_GATE_A_MANIFEST,source_gate_b_manifest=BJ159_GATE_B_MANIFEST,reference_outcome_package="#95 v2r8",cohort_denominator="N7 M64; complete-issue denominator; three seed rows",common_support_hash="#159-accepted-support",selector="selected-WOR",weight_vector="NA",mechanism="WOR_DISTINCT",M="64",seed_aggregation="N7",stake_rule="#159 declared stake",pre_tax_roi=f"{float(r159['seed_no_tax_roi']['mean']):.12f}",ex_largest_issue_roi="",ex_largest_year_roi="",evidence_grade="DISCOVERY",incumbent_or_challenger="TRANSFER",decision_reason="N7/M64 contract bridge; denominator and numeric verified; Gate-A and Gate-B manifests are explicit",outcome_boundary="#159 accepted outcome bundle"))
-        for sid in selectors:
+        for si, sid in enumerate(selectors):
             # Deterministic FULL control is explicitly emitted once per selector.
             rr=next(r for r in ensemble_rows if r["selector_id"]==sid["selector_id"] and r["mechanism"]=="FULL_ENUMERATED")
-            bw.writerow(base_row(baseline_id="MATCHED_FULL",source_issue_package="#167 exact Gate-B",source_manifest=EXPECTED_GA_MANIFEST,source_gate_a_manifest=EXPECTED_GA_MANIFEST,source_gate_b_manifest=EXPECTED_OUTCOME_MANIFEST,reference_outcome_package="#95 v2r8",cohort_denominator=f"{len(issue_order)} settled/available selector×issue rows",common_support_hash=common_support_hash,selector=sid["selector_id"],weight_vector="NA",mechanism="FULL_ENUMERATED",M="2187",seed_aggregation="DETERMINISTIC",stake_rule="¥2 per full ticket",pre_tax_roi=rr["no_tax_roi"],matched_full_lift="0.000000000000",evidence_grade="DISCOVERY",incumbent_or_challenger="MATCHED_FULL",decision_reason="matched denominator control",outcome_boundary="#95 v2r8 trusted outcomes"))
+            matched_denominator, selector_support_hash = matched_full_denominator_metadata(
+                supports, si, selector_issue_total, selector_available_issues,
+                selector_unavailable_issues, selector_no_bet_issues,
+                selector_identity_total, selector_available_identity,
+                selector_unavailable_identity, selector_no_bet_identity,
+            )
+            bw.writerow(base_row(baseline_id="MATCHED_FULL",source_issue_package="#167 Gate-B v3r1 exact generated control",source_manifest=EXPECTED_GA_MANIFEST,source_gate_a_manifest=EXPECTED_GA_MANIFEST,source_gate_b_manifest="",outcome_input_manifest=EXPECTED_OUTCOME_MANIFEST,generated_package_identity="GENERATED_AT_FINALIZATION",reference_outcome_package="#95 v2r8",cohort_denominator=matched_denominator,common_support_hash=selector_support_hash,selector=sid["selector_id"],weight_vector="NA",mechanism="FULL_ENUMERATED",M="2187",seed_aggregation="DETERMINISTIC",stake_rule="¥2 per full ticket",pre_tax_roi=rr["no_tax_roi"],matched_full_lift="0.000000000000",evidence_grade="DISCOVERY",incumbent_or_challenger="MATCHED_FULL",decision_reason="selector-specific fail-closed matched-FULL denominator control; final package identity generated at finalization",outcome_boundary="#95 v2r8 trusted outcomes"))
     # Pareto surfaces.  The full 492×24,723 surface is written as shards, so
     # never materialise its ~12.2M rows in Python.  A compact metric stream is
     # externally sorted in the package scratch area and scanned once; only
@@ -781,13 +835,7 @@ def main():
     shutil.copyfile(out/"baseline_registry.csv", out/"chart_source_baseline_bridge.csv")
     write_chart_source_pareto(out/"chart_source_pareto.csv", out/"raw_pareto_front.csv", out/"robust_pareto_front.csv")
     (out/"source_binding.json").write_text(json.dumps({"issue":167,"contract":"GATE_B_EXACT_TICKET_REPLAY_V3R1","sqlite_used":False,"gate_a":{"package":"bj167_gate_a_strategy_atlas_v3r1","SHA256SUMS.json":EXPECTED_GA_MANIFEST,"CONTENT_IDENTITY.json":EXPECTED_GA_CONTENT},"outcome":{"package":"bj95_gate_b_outcome_settlement_v2r8","SHA256SUMS.json":EXPECTED_OUTCOME_MANIFEST,"canonical_outcome_join.csv":EXPECTED_OUTCOME_PAYLOAD,"rows":len(outcomes)},"accepted_gate_a_bridges":{"bj151":BJ151_GATE_A_MANIFEST,"bj159":BJ159_GATE_A_MANIFEST},"accepted_gate_b_bridges":{"bj167_v2r3_common_support":COMMON_SUPPORT_INCUMBENT_MANIFEST,"bj151":BJ151_GATE_B_MANIFEST,"bj159":BJ159_GATE_B_MANIFEST},"missing_outcome_matches":missing_matches,"policy_denominator":"selector×issue; any missing selected identity closes the policy","source_files":["#167 Gate-A v3r1 selector/role/allocation shards","#95 v2r8 canonical_outcome_join.csv","#167 v2r3 common-support incumbent","#151 Gate-A/Gate-B settlement","#159 Gate-A/Gate-B settlement"]},sort_keys=True,indent=2)+"\n")
-    census_path=out/"file_census.csv"
-    with census_path.open("w",newline="") as f:
-        w=csv.writer(f); w.writerow(["relative_path","bytes","sha256"])
-        for p in sorted(out.rglob("*")):
-            if p.is_file() and p.name not in {"SHA256SUMS.json","CONTENT_IDENTITY.json","file_census.csv"}:
-                w.writerow([str(p.relative_to(out)),p.stat().st_size,sha(p)])
-        w.writerow(["file_census.csv",census_path.stat().st_size,"SELF_HASH_EXCLUDED_FROM_ROW"])
+    write_file_census(out)
     # source_binding and file_census are now present, so the production
     # identity helper hashes the complete staged payload exactly once.
     finalize_package_identity(out, "bj167-gate-b-exact-v3r1", {"gate_a_manifest_sha256":EXPECTED_GA_MANIFEST,"gate_a_content_identity_sha256":EXPECTED_GA_CONTENT,"outcome_manifest_sha256":EXPECTED_OUTCOME_MANIFEST,"outcome_payload_sha256":EXPECTED_OUTCOME_PAYLOAD,"sqlite_used":False,"policy_denominator":"selector×issue fail-closed"})

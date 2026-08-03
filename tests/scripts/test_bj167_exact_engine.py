@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import array, ctypes, gc, hashlib, importlib.util, json, os, subprocess, csv, gzip, math, itertools
+from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -157,6 +158,18 @@ def test_common_support_hash_tokens_are_selector_scoped():
     }
     assert mod.common_support_identity_tokens(supports,0)==["I|s1-id","J|s1-id-2"]
     assert mod.common_support_identity_tokens(supports,1)==["I|s2-id"]
+    totals=defaultdict(int,{0:2,1:1}); identity_totals=defaultdict(int,{0:2,1:1})
+    available_issues=defaultdict(set,{0:{"I","J"},1:{"I"}})
+    unavailable_issues=defaultdict(set); no_bet_issues=defaultdict(set)
+    available_ids=defaultdict(int,{0:2,1:1}); unavailable_ids=defaultdict(int); no_bet_ids=defaultdict(int)
+    s1_denominator,s1_hash=mod.matched_full_denominator_metadata(
+        supports,0,totals,available_issues,unavailable_issues,no_bet_issues,
+        identity_totals,available_ids,unavailable_ids,no_bet_ids)
+    s2_denominator,s2_hash=mod.matched_full_denominator_metadata(
+        supports,1,totals,available_issues,unavailable_issues,no_bet_issues,
+        identity_totals,available_ids,unavailable_ids,no_bet_ids)
+    assert "SETTLED=2" in s1_denominator and "SETTLED=1" in s2_denominator
+    assert s1_hash != s2_hash
 
 def test_accepted_bj137_numeric_anchor_is_not_a_placeholder():
     # Recompute (do not reread) the first three accepted #137/#151 M64
@@ -210,3 +223,14 @@ def test_accepted_bj137_numeric_anchor_is_not_a_placeholder():
         assert abs(roi-exp_candidate) < 2e-9
         assert abs(full_roi-exp_full) < 2e-9
         assert abs(lift-exp_lift) < 2e-9
+    mod=load("runner_incumbent_anchor", SCRIPT)
+    accepted={"no_tax_roi":"-0.132793126135","matched_full_no_tax_roi":"-0.157696718701","matched_full_lift":"0.024903592566"}
+    mod.assert_s1_incumbent_anchors(accepted)
+    for key in accepted:
+        broken=dict(accepted); broken[key]="0.000000000000"
+        try:
+            mod.assert_s1_incumbent_anchors(broken)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError(f"accepted S1 bridge did not guard {key}")

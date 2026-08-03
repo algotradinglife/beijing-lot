@@ -38,6 +38,12 @@ def test_small_output_builder_fixture():
     RUNNER.write_chart_source_pareto(stage/"chart_source_pareto.csv",raw,robust)
     chart=stage/"chart_source_pareto.csv"; assert "Q_WEIGHT" in chart.read_text() and ",1,64," in chart.read_text()
     assert RUNNER.robust_dominates((.2,.1,.1,1,.1),(.1,.1,0,2,.2))
+    # The production census intentionally excludes itself: a self-size row
+    # would be stale before the writer flushes and invalidate the manifest.
+    census=RUNNER.write_file_census(stage)
+    census_rows=list(csv.DictReader(census.open(newline="")))
+    assert all(r["relative_path"] != "file_census.csv" for r in census_rows)
+    assert {r["relative_path"] for r in census_rows} >= {"cell_metrics-000.csv.gz","chart_source_pareto.csv"}
     # Atomic publication: final path is absent until all staged files/hash are
     # complete, then one explicit rename exposes the package.
     RUNNER.finalize_package_identity(stage,"fixture-v1",{"fixture":True,"sqlite_used":False})
