@@ -100,12 +100,16 @@ def test_production_role_vector_q_delete_and_native_profile():
 
 def test_all_scientific_layout_includes_deterministic_and_m2187_contract_cells():
     cells = SCIENCE.science_cells()
-    assert len(cells) == 963
+    assert len(cells) == 963 and len(set(cells)) == 963
     for source in POST.R.SOURCES:
         assert (source, "WOR_DISTINCT", "NA", "2187", "ENSEMBLE_100") in cells
         assert (source, "DETERMINISTIC_TOP_MASS", "NA", "2187", "DETERMINISTIC") in cells
         assert (source, "CAPPED_REPEAT", "8", "16", "DETERMINISTIC") in cells
     assert cells[-3:] == [("NA", "FULL_ENUMERATED", "NA", "2187", "DETERMINISTIC"), ("NA", "P_MIN_GLOBAL_DELETE", "NA", "1458", "DETERMINISTIC"), ("NA", "Q_MIN_GLOBAL_DELETE", "NA", "1458", "DETERMINISTIC")]
+    years, folds = {"2023": 2, "2024": 5}, {"F1": 1, "F2": 6}
+    assert SCIENCE.retained_issue_count("YEAR", "2023", 7, years, folds) == 2
+    assert SCIENCE.retained_issue_count("FOLD", "F1", 7, years, folds) == 1
+    assert SCIENCE.retained_issue_count("LOYO", "2023", 7, years, folds) == 5
 
 
 def test_scientific_native_companion_m2187_reconciles_production_role_shape():
@@ -126,7 +130,27 @@ def test_scientific_native_companion_m2187_reconciles_production_role_shape():
     occ = array.array("i", [0]); source = array.array("d", [v for role in roles for v in role["source"]["Q_WEIGHT"]])
     lib.bj167_scientific_begin_issue(0, 0, 0)
     lib.bj167_scientific_process_source(POST.R.ptr(source, pd), 0, b"production-science-fixture", 2.0, POST.R.ptr(occ, pi), 1, 0)
+    # Nonzero source base must not alias the Q_WEIGHT/base-zero accumulator.
+    lib.bj167_scientific_process_source(POST.R.ptr(source, pd), 0, b"production-science-fixture", 2.0, POST.R.ptr(occ, pi), 1, 160)
     pl, pc, ql, qc = POST.R.derive_delete(roles); lib.bj167_scientific_add_structural(0, 0, pl, pc, ql, qc, 2.0); lib.bj167_scientific_end_issue()
     full = 960; wor = 20 + 19; top = 140 + 19
     assert totals[0][wor] / 100 == totals[0][full] and totals[1][wor] / 100 == totals[1][full]
     assert totals[0][top] == totals[0][full] and totals[1][top] == totals[1][full]
+    assert totals[1][160 + 20 + 19] == totals[1][wor]
+
+
+def test_scientific_reconciliation_requires_complete_keyed_963_surface():
+    root = ROOT / ".scratch" / "bj167_scientific_reconciliation_fixture"
+    if root.exists(): shutil.rmtree(root)
+    screen = root / "screen"; out = root / "out"; screen.mkdir(parents=True); out.mkdir()
+    fields = ["selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope", "stake_yuan", "gross_pre_tax_yuan", "no_tax_roi", "matched_full_no_tax_roi", "matched_full_lift"]
+    with gzip.open(screen / "ensemble_metrics.csv.gz", "wt", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
+        for src, mechanism, cap, m, scope in SCIENCE.science_cells():
+            w.writerow({"selector_id": "S0", "weight_source": src, "mechanism": mechanism, "cap": cap, "M": m, "seed_scope": scope, "stake_yuan": "0.000000", "gross_pre_tax_yuan": "0.000000", "no_tax_roi": "", "matched_full_no_tax_roi": "", "matched_full_lift": ""})
+    cells = SCIENCE.science_cells(); allv = [array.array("d", [0.0]) * len(cells) for _ in range(7)]
+    SCIENCE.reconcile_scientific_screen(out, screen, [{"selector_id": "S0"}], cells, allv)
+    with gzip.open(out / "scientific_screen_reconciliation.csv.gz", "rt", newline="") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 963 and all(r["reconciliation_status"] == "PASS" for r in rows)
+    shutil.rmtree(root)
