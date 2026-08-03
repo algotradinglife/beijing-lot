@@ -227,4 +227,83 @@ void bj167_add_delete(int selector, int cell, int truth_code, int deleted_leg, i
     add_profile(selector, cell, local, payout, identity, stake, gross, tax, unique_sum, duplicate_sum, hit_sum, coverage_sum);
 }
 
+// Bounded post-screening replay glue.  It deliberately shares the frozen
+// #145 allocation routines used by the full atlas, but returns profiles to a
+// caller that has already frozen a small candidate set.  No allocation
+// semantics live in Python, which preserves the accepted native tie cases.
+void bj167_profile_allocation(const double *role_probs, int truth, const char *seed_signature,
+                              int *wr_metrics, int *wor_metrics, int *residual_metrics,
+                              int *capped_metrics, int *top_metrics, int *full_metrics) {
+    std::array<double, FULL_TICKETS> weights{};
+    weights[0] = 1.0;
+    int used = 1;
+    for (int leg = 0; leg < 7; ++leg) {
+        std::array<double, FULL_TICKETS> next{};
+        int next_used = 0;
+        for (int prefix = 0; prefix < used; ++prefix)
+            for (int code = 0; code < 3; ++code)
+                next[next_used++] = weights[prefix] * role_probs[leg * 3 + code];
+        weights = next;
+        used = next_used;
+    }
+    std::vector<int> ms;
+    const int m_grid[MCOUNT] = {16,32,48,64,80,96,112,128,144,160,176,192,208,224,240,256,512,1024,1458,2187};
+    ms.assign(m_grid, m_grid + MCOUNT);
+    #pragma omp parallel for schedule(static)
+    for (int seed_idx = 0; seed_idx < SEEDCOUNT; ++seed_idx) {
+        char local_seed[16];
+        std::snprintf(local_seed, sizeof(local_seed), "137%03d", seed_idx + 1);
+        bj145_wr_profile(weights.data(), FULL_TICKETS, truth, local_seed, seed_signature, ms.data(), MCOUNT,
+                         wr_metrics + seed_idx * MCOUNT * 4);
+        bj145_wor_profile(weights.data(), FULL_TICKETS, truth, local_seed, seed_signature, ms.data(), MCOUNT,
+                          wor_metrics + seed_idx * MCOUNT * 4);
+    }
+    bj145_profile(weights.data(), FULL_TICKETS, truth, 0, ms.data(), MCOUNT, residual_metrics);
+    static constexpr int CAPS[4] = {1, 2, 4, 8};
+    for (int cap_idx = 0; cap_idx < 4; ++cap_idx)
+        bj145_profile(weights.data(), FULL_TICKETS, truth, CAPS[cap_idx], ms.data(), MCOUNT,
+                      capped_metrics + cap_idx * MCOUNT * 4);
+    for (int m_idx = 0; m_idx < MCOUNT; ++m_idx) {
+        std::vector<int> counts(FULL_TICKETS, 0), order(FULL_TICKETS);
+        std::iota(order.begin(), order.end(), 0);
+        std::sort(order.begin(), order.end(), [&](int a, int b) {
+            if (weights[a] != weights[b]) return weights[a] > weights[b];
+            return a < b;
+        });
+        for (int rank = 0; rank < m_grid[m_idx]; ++rank) ++counts[order[rank]];
+        write_metrics(counts, truth, m_grid[m_idx], top_metrics + m_idx * 4);
+    }
+    full_metrics[0] = 1; full_metrics[1] = FULL_TICKETS;
+    full_metrics[2] = 0; full_metrics[3] = 0;
+}
+
+// One common deterministic issue-resample matrix is supplied by Python.  The
+// candidate and selector-matched FULL denominators are accumulated together
+// for every draw, so the returned lift is genuinely paired.
+void bj167_paired_issue_bootstrap(const double *candidate_net, const double *candidate_stake,
+                                  const double *full_net, const double *full_stake,
+                                  int candidate_count, int issue_count,
+                                  const unsigned int *draws, int replicates,
+                                  double *candidate_roi, double *full_roi, double *lift_roi) {
+    #pragma omp parallel for schedule(static)
+    for (int c = 0; c < candidate_count; ++c) {
+        const double *cn = candidate_net + static_cast<std::size_t>(c) * issue_count;
+        const double *cs = candidate_stake + static_cast<std::size_t>(c) * issue_count;
+        const double *fn = full_net + static_cast<std::size_t>(c) * issue_count;
+        const double *fs = full_stake + static_cast<std::size_t>(c) * issue_count;
+        for (int r = 0; r < replicates; ++r) {
+            double cnet = 0.0, cstake = 0.0, fnet = 0.0, fstake = 0.0;
+            const unsigned int *ix = draws + static_cast<std::size_t>(r) * issue_count;
+            for (int j = 0; j < issue_count; ++j) {
+                const unsigned int i = ix[j];
+                cnet += cn[i]; cstake += cs[i]; fnet += fn[i]; fstake += fs[i];
+            }
+            const std::size_t out = static_cast<std::size_t>(c) * replicates + r;
+            candidate_roi[out] = cstake > 0.0 ? cnet / cstake : std::numeric_limits<double>::quiet_NaN();
+            full_roi[out] = fstake > 0.0 ? fnet / fstake : std::numeric_limits<double>::quiet_NaN();
+            lift_roi[out] = (cstake > 0.0 && fstake > 0.0) ? candidate_roi[out] - full_roi[out] : std::numeric_limits<double>::quiet_NaN();
+        }
+    }
+}
+
 }
