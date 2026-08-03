@@ -205,13 +205,87 @@ def test_shared_science_checkpoint_is_atomic_and_resumable_without_ticket_replay
     issue_rows = [{"issue_instance": "I1", "year": "2024", "fold": "F1", "first_kickoff_ts": "2024-01-01T00:00:00Z"}, {"issue_instance": "I2", "year": "2025", "fold": "F2", "first_kickoff_ts": "2025-01-01T00:00:00Z"}]
     candidate = {name: array.array("d", [1.0, 2.0]) for name in ("net", "stake", "gross", "tax", "hit", "tax_line_hit", "full_net", "full_stake", "full_gross", "full_tax", "full_hit")}
     aggregate = {"allv_0": (array.array("d", [3.0]), [1]), "largest_issue": (array.array("i", [1]), [1])}
-    SCIENCE.write_candidate_checkpoint(checkpoint, screen, mapping, issue_rows, candidate, aggregate, {"git_head": "fixture"})
-    meta, loaded_mapping, loaded_issues, loaded_candidate, loaded_aggregate = SCIENCE.verify_candidate_checkpoint(checkpoint, screen)
+    selectors = [{"selector_id":"S0", "family":"FIXTURE"}]; cells = [("Q_WEIGHT", "WOR_DISTINCT", "NA", "64", "ENSEMBLE_100")]
+    SCIENCE.write_candidate_checkpoint(checkpoint, screen, mapping, issue_rows, selectors, cells, candidate, aggregate, {"git_head": "fixture"}, {"git_head": "fixture"})
+    meta, loaded_mapping, loaded_issues, loaded_selectors, loaded_cells, loaded_candidate, loaded_aggregate = SCIENCE.verify_candidate_checkpoint(checkpoint, screen)
     assert meta["candidate_count"] == 1 and not Path(str(checkpoint) + ".stage").exists()
     assert loaded_mapping == [{k: str(v) for k, v in mapping[0].items()}]
     assert [r["issue_instance"] for r in loaded_issues] == ["I1", "I2"]
+    assert loaded_selectors == selectors and loaded_cells == cells
     assert list(loaded_candidate["gross"]) == [1.0, 2.0]
     assert list(loaded_aggregate["allv_0"]) == [3.0] and list(loaded_aggregate["largest_issue"]) == [1]
+    shutil.rmtree(root)
+
+
+def test_actual_scientific_finalizer_reads_disk_checkpoint_without_outcomes_or_supports():
+    root = ROOT / ".scratch" / "bj167_scientific_disk_finalizer_fixture"
+    if root.exists(): shutil.rmtree(root)
+    screen = root / "screen"; checkpoint = root / "checkpoint"; final = root / "final"; screen.mkdir(parents=True)
+    (screen / "SHA256SUMS.json").write_text("{}\n"); (screen / "CONTENT_IDENTITY.json").write_text("{}\n")
+    (screen / "candidate_freeze.csv").write_text("candidate_index\n0\n"); (screen / "candidate_freeze.json").write_text("{}\n")
+    issue = [{"issue_index":"0", "issue_instance":"I1", "first_kickoff_ts":"2024-01-01T00:00:00Z", "year":"2024", "fold":"F1", "loyo":"2024", "ordering_rule":"fixture"}]
+    selectors = [{"selector_id":"S0", "family":"FIXTURE"}]; cells = SCIENCE.science_cells(); total = len(cells)
+    fields = ["selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope", "stake_yuan", "gross_pre_tax_yuan", "no_tax_roi", "matched_full_no_tax_roi", "matched_full_lift"]
+    with gzip.open(screen / "ensemble_metrics.csv.gz", "wt", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
+        for src, mechanism, cap, m, scope in cells: w.writerow({"selector_id":"S0", "weight_source":src, "mechanism":mechanism, "cap":cap, "M":m, "seed_scope":scope, "stake_yuan":"0.000000", "gross_pre_tax_yuan":"0.000000", "no_tax_roi":"", "matched_full_no_tax_roi":"", "matched_full_lift":""})
+    mapping = [{"candidate_index":0,"selector_id":"S0","weight_source":"Q_WEIGHT","mechanism":"WOR_DISTINCT","cap":"NA","M":"64","science_M":"64","seed_scope":"ENSEMBLE_100","screen_global_cell":"1","global_science_cell":39,"candidate_inclusion":"FIXTURE","screen_stake_yuan":"0.000000","screen_no_tax_roi":"","screen_matched_full_lift":""}]
+    candidate = {name:array.array("d", [0.0]) for name in ("net","stake","gross","tax","hit","tax_line_hit","full_net","full_stake","full_gross","full_tax","full_hit")}
+    d = lambda: array.array("d", [0.0]) * total
+    allv=[d() for _ in range(7)]; aggregate=SCIENCE.scientific_checkpoint_values(allv,d(),d(),d(),array.array("i",[0])*total,array.array("i",[0])*total,array.array("d",[0.0])*total,array.array("d",[0.0])*total,array.array("d",[0.0])*total,array.array("d",[0.0])*total,array.array("d",[-float("inf")])*total,d(),array.array("i",[-1])*total,array.array("d",[0.0]),array.array("d",[0.0]),total,1,1,1,1)
+    SCIENCE.write_candidate_checkpoint(checkpoint, screen, mapping, issue, selectors, cells, candidate, aggregate, {"git_head":"fixture"}, {"git_head":"fixture"})
+    del candidate, aggregate, allv
+    __import__("gc").collect()
+    old_argv, old_outcomes, old_supports = __import__("sys").argv, SCIENCE.R.load_outcomes, SCIENCE.R.build_supports
+    SCIENCE.R.load_outcomes = lambda: (_ for _ in ()).throw(AssertionError("finalizer must not load outcomes"))
+    SCIENCE.R.build_supports = lambda *_: (_ for _ in ()).throw(AssertionError("finalizer must not construct supports"))
+    try:
+        __import__("sys").argv = ["scientific", "--screening-output", str(screen.relative_to(ROOT)), "--checkpoint-output", str(checkpoint.relative_to(ROOT)), "--output", str(final.relative_to(ROOT)), "--finalize-checkpoint"]
+        SCIENCE.main()
+    finally:
+        __import__("sys").argv, SCIENCE.R.load_outcomes, SCIENCE.R.build_supports = old_argv, old_outcomes, old_supports
+    assert (final / "SHA256SUMS.json").exists() and (final / "scientific_screen_reconciliation.csv.gz").exists()
+    shutil.rmtree(root)
+
+
+def test_actual_postscreen_finalizer_reads_disk_checkpoint_without_replay():
+    root = ROOT / ".scratch" / "bj167_postscreen_disk_finalizer_fixture"
+    if root.exists(): shutil.rmtree(root)
+    screen = root / "screen"; checkpoint = root / "checkpoint"; final = root / "final"; screen.mkdir(parents=True)
+    issue = [{"issue_index":"0", "issue_instance":"I1", "first_kickoff_ts":"2024-01-01T00:00:00Z", "year":"2024", "fold":"F1", "loyo":"2024", "ordering_rule":"fixture"}]
+    selectors = [{"selector_id":"S0", "family":"FIXTURE"}]; cells = [("Q_WEIGHT", "WOR_DISTINCT", "NA", "64", "ENSEMBLE_100")]
+    ensemble_fields = ["selector_id","weight_source","mechanism","cap","M","seed","seed_scope","global_cell","stake_yuan","gross_pre_tax_yuan","tax_yuan","no_tax_roi","tax_adjusted_roi","matched_full_lift","matched_full_no_tax_roi","coverage_hit_rate","ticket_hit_rate","capital_utilization_vs_full","seed_mean_drawdown_no_tax_yuan","seed_gross_weighted_mean_issue_hhi"]
+    ensemble_rows = [
+        {"selector_id":"S0","weight_source":"Q_WEIGHT","mechanism":"WOR_DISTINCT","cap":"NA","M":"64","seed":"ENSEMBLE_100","seed_scope":"ENSEMBLE_100","global_cell":"1","stake_yuan":"2.000000","gross_pre_tax_yuan":"3.000000","tax_yuan":"0.000000","no_tax_roi":"0.500000000000","tax_adjusted_roi":"0.500000000000","matched_full_lift":"0.500000000000","matched_full_no_tax_roi":"0.000000000000","coverage_hit_rate":"1","ticket_hit_rate":"1","capital_utilization_vs_full":"1","seed_mean_drawdown_no_tax_yuan":"0","seed_gross_weighted_mean_issue_hhi":"1"},
+        {"selector_id":"S0","weight_source":"NA","mechanism":"FULL_ENUMERATED","cap":"NA","M":"2187","seed":"NA","seed_scope":"DETERMINISTIC","global_cell":"2","stake_yuan":"2.000000","gross_pre_tax_yuan":"2.000000","tax_yuan":"0.000000","no_tax_roi":"0.000000000000","tax_adjusted_roi":"0.000000000000","matched_full_lift":"0.000000000000","matched_full_no_tax_roi":"0.000000000000","coverage_hit_rate":"1","ticket_hit_rate":"1","capital_utilization_vs_full":"1","seed_mean_drawdown_no_tax_yuan":"0","seed_gross_weighted_mean_issue_hhi":"1"},
+    ]
+    with gzip.open(screen / "ensemble_metrics.csv.gz", "wt", newline="") as f: w=csv.DictWriter(f,fieldnames=ensemble_fields);w.writeheader();w.writerows(ensemble_rows)
+    freeze_fields=["candidate_index","selector_id","weight_source","mechanism","cap","M","seed","seed_scope","global_cell","candidate_inclusion","screen_no_tax_roi","screen_matched_full_lift","screen_stake_yuan"]
+    frozen={"candidate_index":"0","selector_id":"S0","weight_source":"Q_WEIGHT","mechanism":"WOR_DISTINCT","cap":"NA","M":"64","seed":"ENSEMBLE_100","seed_scope":"ENSEMBLE_100","global_cell":"1","candidate_inclusion":"ABSOLUTE_POSITIVE","screen_no_tax_roi":"0.500000000000","screen_matched_full_lift":"0.500000000000","screen_stake_yuan":"2.000000"}
+    with (screen / "candidate_freeze.csv").open("w",newline="") as f: w=csv.DictWriter(f,fieldnames=freeze_fields);w.writeheader();w.writerow(frozen)
+    (screen / "candidate_freeze.json").write_text(json.dumps({"contract":POST.RECOVERED_SCREEN_CONTRACT,"candidate_count":1,"candidate_freeze_sha256":POST.R.sha(screen/"candidate_freeze.csv"),"candidate_total_screen_stake_yuan":"2.000000"})+"\n")
+    (screen / "recovery_provenance.json").write_text(json.dumps({"contract":POST.RECOVERED_SCREEN_CONTRACT,"no_full_replay":True,"archive_immutable_payloads_copied_byte_for_byte":True,"finalizer_execution_start":{},"finalizer_execution_end":{}})+"\n")
+    (screen / "multiple_search_adjustment.json").write_text('{"tested_surface_cells": 2}\n')
+    with (screen / "issue_order.csv").open("w", newline="") as f: w=csv.DictWriter(f,fieldnames=list(issue[0]));w.writeheader();w.writerows(issue)
+    (screen / "baseline_registry.csv").write_text("baseline\nfixture\n"); (screen / "selector_policy_census.csv").write_text("selector_id,issue_instance,status\nS0,I1,SETTLED\n")
+    (screen / "robust_pareto_front.csv").write_text(",".join(ensemble_fields)+"\n")
+    (screen / "CONTENT_IDENTITY.json").write_text(json.dumps({"contract_version":POST.RECOVERED_SCREEN_CONTRACT})+"\n")
+    payloads={p.name:POST.R.sha(p) for p in screen.iterdir() if p.is_file() and p.name not in {"SHA256SUMS.json","CONTENT_IDENTITY.json"}}
+    payloads["CONTENT_IDENTITY.json"]=POST.R.sha(screen/"CONTENT_IDENTITY.json"); (screen / "SHA256SUMS.json").write_text(json.dumps(payloads,sort_keys=True)+"\n")
+    mapping=[{k:v for k,v in frozen.items() if k not in {"seed", "global_cell"}} | {"science_M":"64","screen_global_cell":"1","global_science_cell":0}]
+    candidate={"net":array.array("d",[1.0]),"stake":array.array("d",[2.0]),"gross":array.array("d",[3.0]),"tax":array.array("d",[0.0]),"hit":array.array("d",[1.0]),"tax_line_hit":array.array("d",[0.0]),"full_net":array.array("d",[0.0]),"full_stake":array.array("d",[2.0]),"full_gross":array.array("d",[2.0]),"full_tax":array.array("d",[0.0]),"full_hit":array.array("d",[1.0])}
+    aggregate={"allv_0":(array.array("d",[0.0]),[1]),"largest_issue":(array.array("i",[-1]),[1])}
+    SCIENCE.write_candidate_checkpoint(checkpoint,screen,mapping,issue,selectors,cells,candidate,aggregate,{"git_head":"fixture"},{"git_head":"fixture"})
+    del candidate, aggregate
+    __import__("gc").collect()
+    old_argv, old_replay = __import__("sys").argv, POST.replay_candidates
+    POST.replay_candidates = lambda *_: (_ for _ in ()).throw(AssertionError("postscreen finalizer must not replay tickets"))
+    try:
+        __import__("sys").argv=["postscreen","--screening-output",str(screen.relative_to(ROOT)),"--checkpoint",str(checkpoint.relative_to(ROOT)),"--output",str(final.relative_to(ROOT)),"--finalize-checkpoint"]
+        POST.main()
+    finally:
+        __import__("sys").argv, POST.replay_candidates = old_argv, old_replay
+    assert (final/"SHA256SUMS.json").exists() and (final/"candidate_paired_bootstrap_20000.csv").exists()
     shutil.rmtree(root)
 
 

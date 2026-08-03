@@ -166,12 +166,12 @@ class CheckpointIssueArrays:
                 for i in range(len(values) // self.issue_count)]
 
 
-def load_shared_checkpoint(checkpoint: Path, screen: Path, rows: list[dict]) -> tuple[dict, CheckpointIssueArrays, list[dict], list[dict]]:
+def load_shared_checkpoint(checkpoint: Path, screen: Path, rows: list[dict]) -> tuple[dict, CheckpointIssueArrays, list[dict], list[dict], list[dict]]:
     """Verify the sole native replay checkpoint and bind it to frozen keys."""
     science_path = ROOT / "scripts" / "settle_bj167_scientific_stability_exact.py"
     spec = importlib.util.spec_from_file_location("bj167_science_checkpoint", science_path)
     science = importlib.util.module_from_spec(spec); assert spec.loader is not None; spec.loader.exec_module(science)
-    meta, mapping, issue_rows, raw, _science = science.verify_candidate_checkpoint(checkpoint, screen)
+    meta, mapping, issue_rows, selectors, _cells, raw, _science = science.verify_candidate_checkpoint(checkpoint, screen)
     if len(mapping) != len(rows): raise RuntimeError("shared checkpoint candidate count drift")
     for frozen, mapped in zip(rows, mapping):
         for field in ("candidate_index", "selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope", "candidate_inclusion", "screen_stake_yuan", "screen_no_tax_roi", "screen_matched_full_lift"):
@@ -180,7 +180,7 @@ def load_shared_checkpoint(checkpoint: Path, screen: Path, rows: list[dict]) -> 
         if str(frozen.get("global_cell", "")) != str(mapped.get("screen_global_cell", "")):
             raise RuntimeError(f"shared checkpoint frozen global-cell drift: {frozen['candidate_index']}")
         frozen["global_science_cell"] = mapped["global_science_cell"]
-    return meta, CheckpointIssueArrays(raw, len(issue_rows)), mapping, issue_rows
+    return meta, CheckpointIssueArrays(raw, len(issue_rows)), mapping, issue_rows, selectors
 
 
 def reconcile_candidate_checkpoint(rows: list[dict], values: CheckpointIssueArrays, out: Path) -> None:
@@ -608,7 +608,7 @@ def preflight_report(screen: Path, recovered: dict, rows: list[dict]) -> dict:
     """Exact input census plus conservative resource model; it performs no replay."""
     issue_count = sum(1 for _ in csv.DictReader((screen / "issue_order.csv").open(newline="")))
     candidate_count = len(rows)
-    value_arrays_bytes = candidate_count * issue_count * 10 * 8
+    value_arrays_bytes = candidate_count * issue_count * 11 * 8
     draws_bytes = REPLICATES * issue_count * 4
     bootstrap_chunk_bytes = min(32, candidate_count) * REPLICATES * 3 * 8
     contribution_rows = candidate_count * issue_count
@@ -628,7 +628,7 @@ def preflight_report(screen: Path, recovered: dict, rows: list[dict]) -> dict:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(); ap.add_argument("--screening-output", default="results/bj167_gate_b_strategy_atlas_v3r1_recovered_final_v1"); ap.add_argument("--checkpoint", default="results/bj167_gate_b_strategy_atlas_v3r1_shared_science_checkpoint_v1"); ap.add_argument("--output", default="results/bj167_gate_b_strategy_atlas_v3r1_postscreen_exact"); ap.add_argument("--preflight", action="store_true"); args = ap.parse_args()
+    ap = argparse.ArgumentParser(); ap.add_argument("--screening-output", default="results/bj167_gate_b_strategy_atlas_v3r1_recovered_final_v1"); ap.add_argument("--checkpoint", default="results/bj167_gate_b_strategy_atlas_v3r1_shared_science_checkpoint_v1"); ap.add_argument("--output", default="results/bj167_gate_b_strategy_atlas_v3r1_postscreen_exact"); ap.add_argument("--finalize-checkpoint", action="store_true"); ap.add_argument("--preflight", action="store_true"); args = ap.parse_args()
     screen, checkpoint, final = ROOT / args.screening_output, ROOT / args.checkpoint, ROOT / args.output
     recovered = verify_recovered_screen(screen)
     rows = load_recovered_frozen_candidates(screen, recovered)
@@ -638,12 +638,13 @@ def main() -> None:
         report["companion_ticket_replay"] = "FORBIDDEN; bootstrap finalizer consumes shared checkpoint only"
         print(json.dumps(report, sort_keys=True), flush=True)
         return
+    if not args.finalize_checkpoint: raise RuntimeError("postscreen output requires explicit --finalize-checkpoint")
     post_start = execution_snapshot()
     if final.exists(): raise RuntimeError("refusing to replace immutable post-screening package")
     stage = Path(str(final) + ".stage")
     if stage.exists(): raise RuntimeError("refusing to reuse a stale staging package")
     stage.mkdir(parents=True); out = stage
-    checkpoint_meta, values, mapping, issue_rows = load_shared_checkpoint(checkpoint, screen, rows)
+    checkpoint_meta, values, mapping, issue_rows, checkpoint_selectors = load_shared_checkpoint(checkpoint, screen, rows)
     if checkpoint_meta["candidate_freeze_sha256"] != recovered["candidate_freeze_sha256"]:
         raise RuntimeError("shared checkpoint candidate freeze hash drift")
     issue_order = [r["issue_instance"] for r in issue_rows]
@@ -663,11 +664,11 @@ def main() -> None:
     shutil.copyfile(screen / "baseline_registry.csv", out / "baseline_registry_v3r1.csv")
     shutil.copyfile(out / "baseline_registry_v3r1.csv", out / "chart_source_baseline_bridge.csv")
     shutil.copyfile(out / "seed_ensemble_quantiles.csv.gz", out / "chart_source_seed_ensemble_quantiles.csv.gz")
-    write_full_atlas_chart_sources(screen, out)
+    write_full_atlas_chart_sources(screen, out, checkpoint_selectors)
     post_end = execution_snapshot()
     write_execution_provenance(out, screen, post_start, post_end, recovered, checkpoint)
     (out / "settlement_card.json").write_text(json.dumps({"contract": CONTRACT, "screening_package": str(screen.name), "screening_manifest_sha256": recovered["manifest_sha256"], "recovered_candidate_freeze_sha256": recovered["candidate_freeze_sha256"], "historical_screening_execution": recovered["historical_screen_execution"], "postscreen_execution_head": post_start["git_head"], "execution_provenance": "execution_provenance.json", "candidate_rule": "exact recovered union(absolute positive, raw Pareto, robust Pareto)", "candidate_freeze_count": len(rows), "full_search_family_count": full_family_size, "exact_replay": "frozen #145 native allocator; accepted tie behavior", "screen_replay_roi_serialization_tolerance": str(SCREEN_REPLAY_ROI_TOLERANCE), "bootstrap": {"replicates": REPLICATES, "unit": "issue_instance", "shared_draw_seed": DRAW_SEED}, "primary_metric": "pre-tax no_tax_roi", "promotion_authorized": False}, sort_keys=True, indent=2) + "\n")
-    (out / "README.md").write_text("# #167 post-screening exact evidence v3r1\n\nThis immutable companion package freezes the completed primary screen's absolute-positive and raw-Pareto aggregate cells, then replays those cells at ticket level. All candidate versus FULL resamples use one common 20,000-draw issue matrix. BH and Bonferroni values are descriptive post-screening adjustments only; they do not promote a policy.\n")
+    (out / "README.md").write_text("# #167 post-screening exact evidence v3r1\n\nThis immutable companion package consumes the shared scientific replay checkpoint for the completed primary screen's frozen absolute-positive and raw-Pareto aggregate cells. It performs no ticket replay: all candidate versus FULL resamples use one common 20,000-draw issue matrix over checkpointed issue ledgers. BH and Bonferroni values are descriptive post-screening adjustments only; they do not promote a policy.\n")
     R.write_file_census(out)
     R.finalize_package_identity(out, CONTRACT, {"recovered_screening_manifest_sha256": recovered["manifest_sha256"], "recovered_candidate_freeze_sha256": recovered["candidate_freeze_sha256"], "shared_science_checkpoint_manifest_sha256": R.sha(checkpoint/"SHA256SUMS.json"), "historical_screening_execution_head": SCREENING_EXECUTION_HEAD, "historical_screening_runner_sha256": SCREENING_RUNNER_SHA256, "postscreen_execution_head": post_start["git_head"], "postscreen_runner_sha256": post_start["runner_sha256"], "postscreen_native_wrapper_sha256": post_start["native_wrapper_sha256"], "bootstrap_replicates": REPLICATES, "shared_draw_seed": DRAW_SEED, "allocator_sha256": R.EXPECTED_ALLOCATOR_SHA256})
     R.atomic_publish(stage, final)
