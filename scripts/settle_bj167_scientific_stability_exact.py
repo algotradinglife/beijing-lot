@@ -34,7 +34,7 @@ def science_cells():
 def configure():
     lib=R.compile_engine(ROOT,"bj167_scientific_stability_exact.so")
     pd=ctypes.POINTER(ctypes.c_double); pi=ctypes.POINTER(ctypes.c_int)
-    lib.bj167_scientific_set_buffers.argtypes=[pd,pd,pd,pd,pd,ctypes.POINTER(ctypes.c_ubyte),pi,pd,pd,pd,pd,pd,pd,pd,pd,pd,pd,pi,pd,pd,ctypes.c_int,ctypes.c_int,ctypes.c_int]
+    lib.bj167_scientific_set_buffers.argtypes=[pd,pd,pd,pd,pd,ctypes.POINTER(ctypes.c_ubyte),pi,pd,pd,pd,pd,pd,pd,pd,pd,pd,pd,pd,pi,pd,pd,ctypes.c_int,ctypes.c_int,ctypes.c_int]
     lib.bj167_scientific_begin_issue.argtypes=[ctypes.c_int,ctypes.c_int,ctypes.c_int]
     lib.bj167_scientific_process_source.argtypes=[pd,ctypes.c_int,ctypes.c_char_p,ctypes.c_double,pi,ctypes.c_int,ctypes.c_int]
     lib.bj167_scientific_add_structural.argtypes=[ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_double]
