@@ -652,6 +652,47 @@ seed SD 为 `21.08%`。平均最大税前回撤随 M 为 `¥25,719.79/¥39,626.4
 完整 v1r2 见
 [`#167 Gate-B v1r2 package`](../../results/bj167_gate_b_outcome_settlement_v1r2/README.md)。
 
+### #167 controlling amendment：#137/#151 fixed candidate absolute Edge（2026-08-03）
+
+PI 后续 live contract 已取代原 #159 transfer 口径。旧的 #159-based v1/v1r2 只保留作
+transfer/generalization diagnostic；控制答案改为精确 `#137 NO_GATE/K4/Q_INFORMED_WOR_DISTINCT/M64/Q_WEIGHT`
+候选与同一 issue/identity/outcome support 的 FULL 对照。新的 Gate-A 只从已接受的 #151
+Gate-A 复制 1,356 identities、9,492 role rows 和 348 个 issue rows，再冻结
+`137001..137100` 的 100 个 WOR seed allocation；没有打开赛果或 SP。
+
+- Gate-A v2 manifest：`7d6698705a61c416387ae6aee713751b05f337147943e9d781a46252317076d`
+- Gate-A v2 content identity：`0c4c3a6103d37e94707ac4837480af16d8e1bbc27472821edc106920fd66288f`
+- Gate-B v2r3 manifest：`e604ac63a977a375acc4808eb822cd7272fe52dac9d16ff646894677d43a9668`
+- Gate-B v2r3 content identity：`147e5d6f6debbcbb34be458d32a9fd848240ff01b8d67da0506fc707d0e68e4b`
+
+三 seed reproduction 与 #151 完全一致：M64 candidate pre-tax ROI
+`+16.3756%/+11.7736%/+2.6680%`，matched FULL 为 `-15.7697%`，paired lift
+`+32.1452pp/+27.5432pp/+18.4377pp`。扩展到 100 seeds 后，candidate absolute
+pre-tax ROI 均值为 M32/M64/M128 `-15.0232%/-13.2793%/-13.7673%`，对应
+candidate-minus-FULL lift `+0.7464pp/+2.4904pp/+2.0024pp`；M64 positive-seed
+fraction 为 `22%`、lift positive fraction `48%`。FULL 的同 cohort pre-tax ROI 为
+`-15.7697%`，不能与 #127 或 #159 的不同 denominator 混用。
+
+M64 allocator MC 95% 区间为 candidate `[-17.47%, -9.08%]`、lift
+`[-1.70%, +6.69%]`；20,000 次 issue-block paired bootstrap 区间为 candidate
+`[-24.48%, -0.88%]`、lift `[-2.31%, +7.77%]`。因此 terminal state 是
+`NO_STABLE_LIFT`，而不是 `ABSOLUTE_EDGE_SUPPORTED` 或 `RELATIVE_LIFT_ONLY`。
+平均最大候选税前回撤 M32/M64/M128 为 `¥24,134/¥38,677/¥61,108`，M64 seed
+最长 miss streak 最大为 `70`；M64 平均 gross-issue HHI 为 `0.0709`，排除最大
+signed issue/year 后 candidate ROI 仍约为 `-27.19%/-29.57%`，paired lift 约为
+`-10.53pp/-13.05pp`。这说明前三 seed 的正值是集中且不稳定的历史线索。
+
+每个 issue block 的 bootstrap 同时携带 100 个 candidate seed rows 与一个 matched FULL
+row；`ensemble_year_fold_loyo.csv` 给出 equal-seed ensemble 的 YEAR/FOLD/LOYO，
+`ticket_tax_reconciliation.csv` 验证逐张中奖 ¥2 ticket 的税，`seed_overlap_distribution.csv`
+给出全部 seed 对的 M64 overlap（均值 `2.971%`），`truth_rank_distribution.csv` 把实际
+truth coverage 与均匀 3^7 ticket-space fraction 并列。结论仍是纸面研究，不授予严格 EV、
+购买、生产、下注或推广权限。
+
+完整控制包见
+[`#167 Gate-A v2`](../../results/bj167_gate_a_preoutcome_v2/README.md) 与
+[`#167 Gate-B v2r3`](../../results/bj167_gate_b_outcome_settlement_v2r3/README.md)。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]

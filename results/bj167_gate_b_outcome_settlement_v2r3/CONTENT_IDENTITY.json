@@ -1,0 +1,31 @@
+{
+  "contract": "BJ-HIST-N7-SEED-ENSEMBLE-002",
+  "files": {
+    "README.md": "e1db93ceb7e1c23e295cc9587b8d8b8bcf3db7af18d17dc31b5ee3c735e157c6",
+    "bootstrap_absolute_vs_lift.svg": "bc915947e532407d2aeac8a634a1f713d6ba5bba58592ddf009622a4b584983c",
+    "concentration_exclusions.svg": "13eff272fd739409c57b3b9b6ac4197ada7103c7db2eacd5ea783a0723f4070e",
+    "decision.json": "d728a20e53d99ff039179cd4c50996e5368bdacbd543266f2c9e4cddebceef96",
+    "ensemble_summary.csv": "1e85668ac7a7e1b4615e016861b1b26dea8895739073518644be58730255bf79",
+    "ensemble_year_fold_loyo.csv": "cda150b023c63207a1566c9e79063d29b4c0fbeca81ec1bff8364f11ac5320c8",
+    "identity_settlement.csv.gz": "e1db21faaaa8a2ba688535cbbc80ffe67f475e70609a1c2b52c62ea58d81510c",
+    "interpretation.md": "66d39c45c0122baccef1f18a1158a8e775e02a1e72f3a1cf33e7c2ccd09f5324",
+    "issue_settlement.csv": "51e274327f831f055525b34b5e43b1f441e0ee805a4d6d08458d701aa59560a1",
+    "m_seed_dispersion.svg": "342bbbee7bbcfd0495f9e199539cff5c11ce91a67e292703e2f25e4c483bf306",
+    "paired_issue_bootstrap_replicates.csv": "88990b5b9f785bcca000f839989dc9872924dc861c818245259f246f419a6594",
+    "paired_issue_bootstrap_summary.csv": "9ba4c62f8c95e1d3873bb0f1c68fccfe3baa6c2aedd325a4707268f244f7fcba",
+    "prefix_convergence.csv": "f17e1238c80ae602bc6cc5b179f40d2ae61659bc0b8df9556a7f0e6009345faf",
+    "prefix_convergence.svg": "aca11afc8051ab8ece1d75b357ee2287fae64d990f58a764a6dc123e71015133",
+    "seed_overlap_distribution.csv": "17c03412caa9f35e4e71005899dccd364b72838d13544bb7843ab67c5b9c9378",
+    "seed_roi_lift.svg": "e3e3c75366db4e0a257bdad1686583d052d084cd48760a065d1139f4d1826712",
+    "seed_summary.csv": "3e0c4564c316bd07650b45b2155c7e3fbcca973822c59c8cd7c4a679187d1a72",
+    "settlement_runner.py": "91ef9462d07375c4b4827cdbdaeab1066a85dba83cda3d14346d6ec0e48a803a",
+    "source_binding.json": "7c37bf7a6a28c09056f82aaccfc0ee38f8025c7811c0727d1ea0f87ded15a3df",
+    "three_seed_reproduction.csv": "6bfdd76238bb45d19e7e8948ee9af82549b64fa7baaba758bf0572a3821f4cd9",
+    "ticket_tax_reconciliation.csv": "14eb2f9fd702452812d87c6e02e4acc62a17515eb991514bfef56539e55b24a2",
+    "truth_rank_distribution.csv": "001ebd2fca2f25347a9cadd6dc83ef14e17130590c6400101c21c673922724b6",
+    "validation_card.json": "ffb4c7b5c4587ac61a0fd1a7f63f6c42a2de1f77f1097172916b7bdbbd69a1a6",
+    "variance_decomposition.csv": "ffef23524e19ce045ef19779006ecacf483db5a68f51203ce7218b753b6f02e0",
+    "winning_ticket_tax_ledger.csv.gz": "1ac829b8a4cad1b2f3c1547b7b326925d74dfb3bcabba1967590eb2a8d1e65d4"
+  },
+  "package": "bj167_gate_b_outcome_settlement_v2r3"
+}

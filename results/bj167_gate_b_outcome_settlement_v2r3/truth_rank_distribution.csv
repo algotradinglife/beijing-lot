@@ -1,0 +1,13 @@
+M,rank_bin,identity_seed_count,available_identity_seed_count,realized_fraction,uniform_ticket_space_fraction,coverage_dependence_note
+32,1-32,1545,109100,0.014161319890,0.014631915866,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
+32,33-64,1593,109100,0.014601283226,0.014631915866,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
+32,65-128,3186,109100,0.029202566453,0.014631915866,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
+32,>128,102776,109100,0.942034830431,0.014631915866,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
+64,1-32,1545,109100,0.014161319890,0.029263831733,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
+64,33-64,1593,109100,0.014601283226,0.029263831733,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
+64,65-128,3186,109100,0.029202566453,0.029263831733,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
+64,>128,102776,109100,0.942034830431,0.029263831733,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
+128,1-32,1545,109100,0.014161319890,0.058527663466,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
+128,33-64,1593,109100,0.014601283226,0.058527663466,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
+128,65-128,3186,109100,0.029202566453,0.058527663466,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
+128,>128,102776,109100,0.942034830431,0.058527663466,truth rank is evaluated after canonical outcome join; seeds share frozen identities and q vectors
