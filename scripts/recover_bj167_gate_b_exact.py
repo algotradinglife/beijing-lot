@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse, array, csv, ctypes, gzip, hashlib, importlib.util, json, math, os, shutil, subprocess
 from collections import defaultdict
+from decimal import Decimal
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +25,26 @@ spec = importlib.util.spec_from_file_location("bj167_exact", RUNNER_PATH)
 R = importlib.util.module_from_spec(spec); assert spec.loader is not None; spec.loader.exec_module(R)
 post_spec = importlib.util.spec_from_file_location("bj167_postscreen", POSTSCREEN_PATH)
 POST = importlib.util.module_from_spec(post_spec); assert post_spec.loader is not None; post_spec.loader.exec_module(POST)
+S1_RECOVERY_INCUMBENT_IDENTITY = {
+    "selector_id": SELECTOR,
+    "weight_source": "Q_WEIGHT",
+    "mechanism": "WOR_DISTINCT",
+    "cap": "NA",
+    "M": "64",
+    "seed": "ENSEMBLE_100",
+    "seed_scope": "ENSEMBLE_100",
+    "seed_count": "100",
+    "stake_yuan": "13004800.000000",
+    "comparable_incumbent_roi": R.COMMON_SUPPORT_INCUMBENT_ROI,
+    "comparable_incumbent_manifest": R.COMMON_SUPPORT_INCUMBENT_MANIFEST,
+    "champion_common_support_disposition": "COMPARABLE_COMMON_SUPPORT_INCUMBENT",
+}
+S1_RECOVERY_ROI_ANCHORS = (
+    ("candidate_no_tax_roi", "no_tax_roi", R.COMMON_SUPPORT_INCUMBENT_ROI, "stake_yuan"),
+    ("matched_full_no_tax_roi", "matched_full_no_tax_roi", "-0.157696718701", "matched_full_stake_yuan"),
+    ("matched_full_lift", "matched_full_lift", R.COMMON_SUPPORT_INCUMBENT_LIFT, "stake_yuan"),
+)
+S1_RECOVERY_SERIALIZATION_TOLERANCE = Decimal("1e-10")
 
 def sha(p: Path) -> str:
     h = hashlib.sha256()
@@ -92,6 +113,59 @@ def archive_census(archive: Path) -> dict:
     if abs(float(anchor["matched_full_lift"]) - float(R.COMMON_SUPPORT_INCUMBENT_LIFT)) > 1e-10: raise RuntimeError("archive S1 matched-FULL lift anchor drift")
     return {"archive": archive.name, "cell_shards": len(shards), "cell_rows": rows, "payload_sha256": hashes,
             "anchor": {"no_tax_roi": anchor["no_tax_roi"], "matched_full_lift": anchor["matched_full_lift"]}}
+
+def assert_recovery_s1_incumbent_bridge(incumbent: dict, matched_full: dict) -> list[dict]:
+    """Accept only a documented formatting delta after exact bridge identity checks.
+
+    The accepted v2r3 constants remain the bridge.  This recovery never uses
+    a near-enough row selected by value: every cohort, allocation and
+    common-support identity field is fixed first.  Only the final decimal
+    serialization of the three reported ROI values may differ by <= 1e-10.
+    """
+    for field, expected in S1_RECOVERY_INCUMBENT_IDENTITY.items():
+        actual = incumbent.get(field, "")
+        if actual != expected:
+            raise RuntimeError(
+                f"S1 recovery incumbent identity drift {field}: "
+                f"expected {expected!r}, got {actual!r}"
+            )
+    full_identity = {
+        "selector_id": SELECTOR,
+        "weight_source": "NA",
+        "mechanism": "FULL_ENUMERATED",
+        "cap": "NA",
+        "M": "2187",
+        "seed_scope": "DETERMINISTIC",
+        "stake_yuan": "4443984.000000",
+    }
+    for field, expected in full_identity.items():
+        actual = matched_full.get(field, "")
+        if actual != expected:
+            raise RuntimeError(
+                f"S1 recovery matched-FULL identity drift {field}: "
+                f"expected {expected!r}, got {actual!r}"
+            )
+    values = {"stake_yuan": incumbent["stake_yuan"], "matched_full_stake_yuan": matched_full["stake_yuan"]}
+    report = []
+    for metric, field, expected, stake_field in S1_RECOVERY_ROI_ANCHORS:
+        actual = incumbent[field]
+        delta = Decimal(actual) - Decimal(expected)
+        if abs(delta) > S1_RECOVERY_SERIALIZATION_TOLERANCE:
+            raise RuntimeError(
+                f"S1 recovery {metric} material bridge drift: expected {expected}, "
+                f"got {actual}, delta {delta}"
+            )
+        stake = Decimal(values[stake_field])
+        report.append({
+            "metric": metric,
+            "actual": actual,
+            "expected": expected,
+            "delta": format(delta, "f"),
+            "stake_yuan": values[stake_field],
+            "implied_yuan": f"{delta * stake:.12f}",
+            "tolerance": str(S1_RECOVERY_SERIALIZATION_TOLERANCE),
+        })
+    return report
 
 def canonical_s1_support(issue, mids, roles, outcomes):
     """Build one exact S1 canonical support from retained Gate-A role rows."""
@@ -493,7 +567,7 @@ def write_baseline_registry(stage: Path, policies: list[dict], detail: dict, spe
             if r["mechanism"] == "FULL_ENUMERATED": full_rows[r["selector_id"]] = r
             if (r["selector_id"],r["weight_source"],r["mechanism"],r["M"],r["seed_scope"]) == (SELECTOR,"Q_WEIGHT","WOR_DISTINCT","64","ENSEMBLE_100"): incumbent=r
     if incumbent is None or len(full_rows) != R.NSEL: raise RuntimeError("baseline FULL/incumbent registry drift")
-    R.assert_s1_incumbent_anchors(incumbent)
+    bridge_serialization = assert_recovery_s1_incumbent_bridge(incumbent, full_rows[SELECTOR])
     inc_net, inc_stake = aggregate_m64_wor(specs, net, stake)
     total_net,total_stake=sum(inc_net),sum(inc_stake); k=max(range(len(inc_net)),key=lambda i:inc_net[i])
     ex_i=(total_net-inc_net[k])/(total_stake-inc_stake[k]) if total_stake-inc_stake[k] else 0.0
@@ -520,6 +594,7 @@ def write_baseline_registry(stage: Path, policies: list[dict], detail: dict, spe
             d=detail[selector]; h=hashlib.sha256("\n".join(sorted(d["tokens"])).encode()).hexdigest()
             w.writerow(base(baseline_id="MATCHED_FULL",source_issue_package="#167 Gate-B v3r1 exact generated control",source_manifest=R.EXPECTED_GA_MANIFEST,source_gate_a_manifest=R.EXPECTED_GA_MANIFEST,outcome_input_manifest=R.EXPECTED_OUTCOME_MANIFEST,generated_package_identity="GENERATED_AT_FINALIZATION",reference_outcome_package="#95 v2r8",cohort_denominator=denom(d),common_support_hash=h,selector=selector,weight_vector="NA",mechanism="FULL_ENUMERATED",M="2187",seed_aggregation="DETERMINISTIC",stake_rule="¥2 per full ticket",pre_tax_roi=row["no_tax_roi"],matched_full_lift="0.000000000000",evidence_grade="DISCOVERY",incumbent_or_challenger="MATCHED_FULL",decision_reason="selector-specific fail-closed matched FULL control",outcome_boundary="#95 v2r8 trusted outcomes"))
     shutil.copyfile(stage / "baseline_registry.csv", stage / "chart_source_baseline_bridge.csv")
+    return bridge_serialization
 
 def write_screen_candidate_freeze(stage: Path, checkpoint: Path, rows: list[dict]) -> tuple[str, float]:
     """Freeze the exact POST candidate union without a self-referential hash."""
@@ -537,7 +612,7 @@ def write_screen_candidate_freeze(stage: Path, checkpoint: Path, rows: list[dict
     (stage/"candidate_freeze.json").write_text(json.dumps({"contract":"bj167-gate-b-v3r1-recovery-finalizer-v1","screen_checkpoint_sha256s":sha(checkpoint/"SHA256SUMS.json"),"candidate_count":len(rows),"candidate_freeze_sha256":digest,"candidate_total_screen_stake_yuan":f"{cost:.6f}","inclusion_rule":"union(absolute positive aggregate cells, raw Pareto cells, robust Pareto cells)"},sort_keys=True,indent=2)+"\n")
     return digest,cost
 
-def write_recovery_provenance(stage: Path, archive: Path, checkpoint: Path, census: dict, finalizer_start: dict, finalizer_end: dict) -> None:
+def write_recovery_provenance(stage: Path, archive: Path, checkpoint: Path, census: dict, finalizer_start: dict, finalizer_end: dict, bridge_serialization: list[dict]) -> None:
     # This archive died during the stability writer.  Only that incomplete
     # payload is regenerated; every other archived input must remain bytewise.
     regenerated={"stability_year_fold_loyo.csv"}
@@ -545,7 +620,7 @@ def write_recovery_provenance(stage: Path, archive: Path, checkpoint: Path, cens
     copied={name:sha(stage/name) for name in immutable}
     if copied != immutable: raise RuntimeError("archived immutable payload byte identity drift during finalizer staging")
     checkpoint_identity=json.loads((checkpoint/"CONTENT_IDENTITY.json").read_text())
-    payload={"contract":"bj167-gate-b-v3r1-recovery-finalizer-v1","no_full_replay":True,"archive":{"path":str(archive.relative_to(ROOT)),"payload_sha256":archive_hashes,"immutable_payload_sha256":immutable,"explicitly_regenerated_incomplete_or_derived_files":sorted(regenerated),"screen_census":census},"checkpoint":{"path":str(checkpoint.relative_to(ROOT)),"content_identity_sha256":sha(checkpoint/"CONTENT_IDENTITY.json"),"producer_execution":json.loads((checkpoint/"checkpoint_binding.json").read_text())["execution"]},"finalizer_execution_start":finalizer_start,"finalizer_execution_end":finalizer_end,"archive_immutable_payloads_copied_byte_for_byte":True}
+    payload={"contract":"bj167-gate-b-v3r1-recovery-finalizer-v1","no_full_replay":True,"archive":{"path":str(archive.relative_to(ROOT)),"payload_sha256":archive_hashes,"immutable_payload_sha256":immutable,"explicitly_regenerated_incomplete_or_derived_files":sorted(regenerated),"screen_census":census},"checkpoint":{"path":str(checkpoint.relative_to(ROOT)),"content_identity_sha256":sha(checkpoint/"CONTENT_IDENTITY.json"),"producer_execution":json.loads((checkpoint/"checkpoint_binding.json").read_text())["execution"]},"s1_incumbent_bridge":{"identity":S1_RECOVERY_INCUMBENT_IDENTITY,"roi_serialization_tolerance":str(S1_RECOVERY_SERIALIZATION_TOLERANCE),"actual_expected_delta_implied_yuan":bridge_serialization},"finalizer_execution_start":finalizer_start,"finalizer_execution_end":finalizer_end,"archive_immutable_payloads_copied_byte_for_byte":True}
     (stage/"recovery_provenance.json").write_text(json.dumps(payload,sort_keys=True,indent=2)+"\n")
 
 def archived_support_census(archive: Path) -> tuple[int, int]:
@@ -572,7 +647,7 @@ def finalize_from_checkpoint(final_out: Path, checkpoint: Path, archive: Path, c
     robust_count=write_robust_pareto(stage,archive,specs,issue_rows,net,stake)
     R.write_chart_source_pareto(stage/"chart_source_pareto.csv",stage/"raw_pareto_front.csv",stage/"robust_pareto_front.csv")
     POST.write_full_atlas_chart_sources(stage,stage,policy_rows=policies)
-    write_baseline_registry(stage, policies, detail, specs, issue_rows, net, stake)
+    bridge_serialization=write_baseline_registry(stage, policies, detail, specs, issue_rows, net, stake)
     candidates=POST.candidate_rows(stage); candidate_hash,candidate_cost=write_screen_candidate_freeze(stage,checkpoint,candidates)
     counts=defaultdict(int)
     for r in policies: counts[r["status"]]+=1
@@ -592,7 +667,7 @@ def finalize_from_checkpoint(final_out: Path, checkpoint: Path, archive: Path, c
     (stage/"README.md").write_text("# #167 v3r1 recovered final screen\n\nThis atomic recovery finalizes immutable archived exact-screen payloads and the PI-audited 209×343 sparse checkpoint. It does not replay the 492×24,723 scientific surface and does not authorize companion settlement or promotion.\n")
     end=execution_snapshot()
     if start != end: raise RuntimeError("finalizer executable identity changed in flight")
-    write_recovery_provenance(stage,archive,checkpoint,census,start,end)
+    write_recovery_provenance(stage,archive,checkpoint,census,start,end,bridge_serialization)
     R.write_file_census(stage)
     R.finalize_package_identity(stage,"bj167-gate-b-v3r1-recovery-finalizer-v1",{"archive_payload_sha256":census["payload_sha256"],"checkpoint_content_identity_sha256":sha(checkpoint/"CONTENT_IDENTITY.json"),"no_full_replay":True,"finalizer_execution":end})
     R.atomic_publish(stage,final_out)

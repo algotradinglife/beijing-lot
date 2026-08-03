@@ -238,6 +238,26 @@ def test_recovery_robust_metrics_normalize_direct_and_ensemble_schemas():
     except RuntimeError:
         pass
 
+def test_recovery_incumbent_bridge_allows_only_documented_serialization_delta():
+    recovery = load("bj167_recovery_incumbent_bridge", ROOT / "scripts" / "recover_bj167_gate_b_exact.py")
+    archive = ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_exact.failed-stability-label-20260803T2247"
+    with gzip.open(archive / "ensemble_metrics.csv.gz", "rt", newline="") as f:
+        rows = list(csv.DictReader(f))
+    incumbent = next(r for r in rows if (r["selector_id"], r["weight_source"], r["mechanism"], r["cap"], r["M"], r["seed_scope"]) == ("S1_NO_GATE_K4", "Q_WEIGHT", "WOR_DISTINCT", "NA", "64", "ENSEMBLE_100"))
+    matched_full = next(r for r in rows if (r["selector_id"], r["mechanism"]) == ("S1_NO_GATE_K4", "FULL_ENUMERATED"))
+    report = recovery.assert_recovery_s1_incumbent_bridge(incumbent, matched_full)
+    candidate = next(r for r in report if r["metric"] == "candidate_no_tax_roi")
+    assert candidate["actual"] == "-0.132793126141"
+    assert candidate["expected"] == "-0.132793126135"
+    assert candidate["delta"] == "-0.000000000006"
+    assert candidate["implied_yuan"] == "-0.000078028800"
+    materially_drifted = dict(incumbent, no_tax_roi="-0.132793126250")
+    try:
+        recovery.assert_recovery_s1_incumbent_bridge(materially_drifted, matched_full)
+        assert False, "material S1 bridge ROI drift must fail closed"
+    except RuntimeError as exc:
+        assert "material bridge drift" in str(exc)
+
 def test_recovery_stability_fixture_uses_frozen_registry_metadata(tmp_path):
     recovery = load("bj167_recovery_stability", ROOT / "scripts" / "recover_bj167_gate_b_exact.py")
     archive = ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_exact.failed-stability-label-20260803T2247"
