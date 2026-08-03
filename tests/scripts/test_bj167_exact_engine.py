@@ -59,6 +59,13 @@ def test_cpp_real_prefix_golden_and_backing_lifetime():
         qvals=[float(rr[f"q_weight{code}"]) for rr in role_rows for code in ("3","1","0")]
         if max(qvals)-min(qvals)>1e-4: break
     assert max(qvals)-min(qvals)>1e-4, "production capped golden must be non-uniform"
+    parsed_roles=[mod.role_values(rr) for rr in role_rows]
+    assert all(role["q_weight"] == role["source"]["Q_WEIGHT"] for role in parsed_roles)
+    _,_,q_leg,q_code=mod.derive_delete(parsed_roles)
+    expected_q_leg,expected_q_code=min(
+        ((leg,code) for leg in range(7) for code in range(3)),
+        key=lambda x: (parsed_roles[x[0]]["source"]["Q_WEIGHT"][x[1]],x[0],x[1]))
+    assert (q_leg,q_code)==(expected_q_leg,expected_q_code)
     role=array.array("d", [v for rr in role_rows for v in mod.role_values(rr)["source"]["Q_WEIGHT"]])
     signature=identity["selected_match_ids"]
     # Construct the role-product vector with the same level-by-level

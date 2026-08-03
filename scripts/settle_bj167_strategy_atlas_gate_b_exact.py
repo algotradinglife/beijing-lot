@@ -221,6 +221,10 @@ def load_surface():
 def role_values(r):
     return {"match_id": r["match_id"], "match_idx": r.get("match_idx", ""), "kickoff_ts": r.get("kickoff_ts", ""), "p_min": float(r["p_min"]),
             "p_model": tuple(float(r[x]) for x in SOURCE_COLUMNS["MODEL_P_CAL"]),
+            # The Q-delete structural arm ranks the exact frozen Q vector.
+            # Retain it explicitly as well as in `source`, because its
+            # delete rule is independent of the allocation replay loop.
+            "q_weight": tuple(float(r[x]) for x in SOURCE_COLUMNS["Q_WEIGHT"]),
             "source": {s: tuple(float(r[x]) for x in cols) for s,cols in SOURCE_COLUMNS.items()}}
 
 def build_supports(outcomes, selector_idx):
