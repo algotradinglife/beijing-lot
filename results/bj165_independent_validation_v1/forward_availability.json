@@ -1,0 +1,12 @@
+{
+  "candidate_rule": "issue > 26079",
+  "fixture_note": "fixture DBs are audit fixtures only; they contain no post-26079 prospective issue",
+  "fixtures_checked": [
+    "tests/fixtures/mm_data_audit_500_bjdc.db",
+    "tests/fixtures/mm_data_audit_live.db"
+  ],
+  "max_known_issue_from_native_runtime_readback": 26079,
+  "new_issue_count": 0,
+  "same_window_reuse": false,
+  "status": "WAITING_FOR_FORWARD_DATA"
+}

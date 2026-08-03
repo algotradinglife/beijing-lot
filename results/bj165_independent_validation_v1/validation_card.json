@@ -1,0 +1,47 @@
+{
+  "allocation_checks": {
+    "failures": 0,
+    "rows": 63180
+  },
+  "bootstrap_discrepancies": 0,
+  "contract": "BJ-EV-159-N9-001",
+  "focus_n7_n10_m64_rows": 12,
+  "gate_a": {
+    "identity_count_by_n": {
+      "10": 1094,
+      "2": 38,
+      "3": 335,
+      "4": 648,
+      "5": 844,
+      "6": 937,
+      "7": 1005,
+      "8": 1042,
+      "9": 1077
+    },
+    "identity_rows": 7020,
+    "participation_rows": 3132,
+    "role_rows": 49519,
+    "sampling_plan_rows": 81,
+    "structural_failures": 0
+  },
+  "head_end": "cc3da7d7bdeae2f28be872593973de2b19538778",
+  "head_start": "cc3da7d7bdeae2f28be872593973de2b19538778",
+  "identity_comparison_keys": 60942,
+  "identity_discrepancies": 0,
+  "identity_rows_checked": 63180,
+  "issue": 165,
+  "matched_n7_discrepancies": 0,
+  "material_discrepancies": 0,
+  "no_purchase_production_or_betting_authority": true,
+  "overlap_discrepancies": 0,
+  "pre_tax_primary": true,
+  "promotion_authorized": false,
+  "stage": "STAGE_1_INDEPENDENT_EV_PLUS_STAGE_2_FORWARD_PROTOCOL",
+  "stage1_decision": "PASS_ZERO_MATERIAL_DISCREPANCIES",
+  "stage2_decision": "WAITING_FOR_FORWARD_DATA",
+  "surface_discrepancies": 0,
+  "surface_rows_checked": 1782,
+  "target_head": "cc3da7d7bdeae2f28be872593973de2b19538778",
+  "tax_rule": "20% per independent winning \u00a52 ticket gross >= \u00a510000; no issue/policy pooling",
+  "tax_secondary": true
+}

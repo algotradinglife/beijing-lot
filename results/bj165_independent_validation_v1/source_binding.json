@@ -1,0 +1,14 @@
+{
+  "authoritative_source_rows_are_read_only": true,
+  "canonical_outcome_manifest": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "canonical_outcome_payload": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+  "contract": "BJ-EV-159-N9-001",
+  "independent_checkout_head": "cc3da7d7bdeae2f28be872593973de2b19538778",
+  "issue": 165,
+  "source_gate_a_manifest": "a15c585fc1836da4f558d07ce19c925561bfd1c240e834b7e3e0da22701cd325",
+  "source_gate_b_v2r1_content_identity": "7ba60fcc8fa99c620c019f6098e3d9e8b5bb112f6622799baffa9c6f2422cbaf",
+  "source_gate_b_v2r1_manifest": "17b42f65b834f2b5afff0e52795588f95340d76810f7faec75b193b6eecc4cc8",
+  "source_outcome_loader_not_imported": true,
+  "source_v2_content_identity": "42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08",
+  "source_v2_manifest": "ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917"
+}

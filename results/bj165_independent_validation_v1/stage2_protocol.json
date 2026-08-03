@@ -1,0 +1,60 @@
+{
+  "controls": [
+    {
+      "M": 64,
+      "allocator": "Q_INFORMED_WOR",
+      "n": 7,
+      "seeds": [
+        "137001",
+        "137002",
+        "137003"
+      ]
+    },
+    {
+      "M": 64,
+      "allocator": "Q_INFORMED_WOR",
+      "n": 8,
+      "seeds": [
+        "137001",
+        "137002",
+        "137003"
+      ]
+    },
+    {
+      "M": 64,
+      "allocator": "Q_INFORMED_WOR",
+      "n": 10,
+      "seeds": [
+        "137001",
+        "137002",
+        "137003"
+      ]
+    }
+  ],
+  "failure_mode": "WAITING_FOR_FORWARD_DATA until a genuinely new issue/outcome is available",
+  "outcome_boundary": "No outcome from the #159 historical window may be reused; no thresholds, selector, allocator, N, M or seeds may change.",
+  "primary": {
+    "M": 64,
+    "allocator": "Q_INFORMED_WOR",
+    "n": 9,
+    "seeds": [
+      "137001",
+      "137002",
+      "137003"
+    ]
+  },
+  "primary_metric": "pre-tax no_tax_roi",
+  "promotion_rule": "held-out/forward pre-tax evidence must not be driven by one issue, year or seed",
+  "required_outputs": [
+    "stake",
+    "ticket_count",
+    "coverage",
+    "hit_multiplicity",
+    "drawdown",
+    "largest_issue",
+    "largest_year",
+    "seed_dispersion"
+  ],
+  "secondary_metric": "tax_adjusted_roi",
+  "status": "WAITING_FOR_FORWARD_DATA"
+}

@@ -1,0 +1,20 @@
+{
+  "contract": "BJ-EV-159-N9-001",
+  "files": {
+    "README.md": "c6abd7a7d8096682bdb08dfda4a0abc442a3a63710143710dcd87b6b07ff0165",
+    "allocation_reconciliation.csv": "c88a2e126cec5145cf42cbd6771890a6355066b90ca69c5bf34f7ffc35f7c18b",
+    "bootstrap_discrepancies.csv": "b5625e04ffc871261f92c9a83c1a29cb50eafa8e503bfa5e8cbfe7163e890845",
+    "forward_availability.json": "dd1238a35d1549f12b71db2aa63ea1b249d55d4f8682c962a0c5f7e8ec8837cf",
+    "identity_discrepancies.csv": "b5625e04ffc871261f92c9a83c1a29cb50eafa8e503bfa5e8cbfe7163e890845",
+    "matched_n7_discrepancies.csv": "b5625e04ffc871261f92c9a83c1a29cb50eafa8e503bfa5e8cbfe7163e890845",
+    "n7_n10_m64_focus.csv": "00803561c5eece824b632a4548189b1c62fbf22d841f73dd8c112e1e8c5c199e",
+    "overlap_discrepancies.csv": "b5625e04ffc871261f92c9a83c1a29cb50eafa8e503bfa5e8cbfe7163e890845",
+    "recomputed_surface_summary.csv": "f8273b960f06ca272ca198e687378119289819448cc41b67b1f294c2a883be07",
+    "source_binding.json": "a5ffcb035dfb41ff8898566266bfab5e769da8506cd6e38b6911e9eb64e9c8a8",
+    "stage2_protocol.json": "6bcc4d85aa685cb2f0c3b54d16a4257b8df2a658559806c8e01c605aa975e868",
+    "surface_discrepancies.csv": "b5625e04ffc871261f92c9a83c1a29cb50eafa8e503bfa5e8cbfe7163e890845",
+    "validation_card.json": "ff11b3309981f297fd72e48e59cc1e9b0ce3809c221fad060c6c720bb4b260f1",
+    "validation_runner.py": "414ad26aed70f961e592124bdb760a186326e45e9404183d5c8b2bac48396bfc"
+  },
+  "package": "bj165_independent_validation_v1"
+}
