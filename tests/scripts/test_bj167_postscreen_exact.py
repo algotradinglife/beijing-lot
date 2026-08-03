@@ -217,6 +217,42 @@ def test_shared_science_checkpoint_is_atomic_and_resumable_without_ticket_replay
     shutil.rmtree(root)
 
 
+def test_checkpoint_arrays_are_cached_candidate_major_o1_views():
+    raw = {
+        "net": array.array("d", [1.0, 2.0, 3.0, 4.0]),
+        "stake": array.array("d", [5.0, 6.0, 7.0, 8.0]),
+    }
+    values = POST.CheckpointIssueArrays(raw, issue_count=2)
+    # Named lookup returns one prebuilt CandidateMajorArray, rather than
+    # allocating a complete list of candidate slices on each access.
+    assert values["net"] is values["net"]
+    assert isinstance(values["net"], POST.CandidateMajorArray)
+    assert len(values["net"]) == 2
+    # Candidate lookup is the same retained memoryview object and remains
+    # candidate-major / issue-minor.
+    assert values["net"][1] is values["net"][1]
+    assert list(values["net"][0]) == [1.0, 2.0]
+    assert list(values["net"][1]) == [3.0, 4.0]
+
+
+def test_unique_stages_do_not_reuse_or_block_failed_attempts():
+    root = ROOT / ".scratch" / "bj167_unique_stage_fixture"
+    if root.exists(): shutil.rmtree(root)
+    target = root / "immutable_package"
+    # This is the legacy stale fixed staging name; a retry must not reuse or
+    # be blocked by it.
+    legacy = Path(str(target) + ".stage")
+    legacy.mkdir(parents=True)
+    scientific_first = SCIENCE.unique_stage(target)
+    scientific_second = SCIENCE.unique_stage(target)
+    post_first = POST.unique_stage(target)
+    assert scientific_first != scientific_second != post_first
+    assert all(path.exists() and path.parent == root
+               for path in (scientific_first, scientific_second, post_first))
+    assert legacy.exists()
+    shutil.rmtree(root)
+
+
 def test_actual_scientific_finalizer_reads_disk_checkpoint_without_outcomes_or_supports():
     root = ROOT / ".scratch" / "bj167_scientific_disk_finalizer_fixture"
     if root.exists(): shutil.rmtree(root)

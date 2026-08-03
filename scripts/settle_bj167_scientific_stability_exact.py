@@ -8,7 +8,7 @@ science cell.  Seed-level rows remain diagnostics, never football histories.
 """
 from __future__ import annotations
 
-import argparse, array, csv, ctypes, gzip, importlib.util, json, math, os, shutil, subprocess
+import argparse, array, csv, ctypes, gzip, importlib.util, json, math, os, shutil, subprocess, uuid
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -24,6 +24,23 @@ CHECKPOINT_CONTRACT="bj167-gate-b-v3r1-shared-science-candidate-checkpoint-v1"
 MONEY_QUANTUM = 1e-6
 RATIO_QUANTUM = 1e-12
 NATIVE_WRAPPER_PATH = ROOT / "scripts" / "bj167_exact_atlas.cpp"
+
+
+def unique_stage(target: Path) -> Path:
+    """Create a fresh retry-safe staging directory beside ``target``.
+
+    A failed immutable-package attempt must never block its retry by retaining
+    a fixed ``.stage`` directory. Each attempt gets a fresh unmanifested
+    directory; only a successful atomic publish claims the immutable target.
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    while True:
+        stage = target.with_name(f"{target.name}.stage-{uuid.uuid4().hex}")
+        try:
+            stage.mkdir()
+            return stage
+        except FileExistsError:
+            continue
 
 
 def git_head() -> str:
@@ -197,9 +214,7 @@ def write_candidate_checkpoint(checkpoint: Path, screen: Path, mapping: list[dic
     """Atomically persist the one native replay's candidate issue ledger."""
     if execution_start != execution_end: raise RuntimeError("scientific replay executable identity changed during run")
     if checkpoint.exists(): raise RuntimeError("refusing to replace immutable shared checkpoint")
-    stage=Path(str(checkpoint)+".stage")
-    if stage.exists(): raise RuntimeError("stale shared checkpoint stage exists")
-    stage.mkdir(parents=True)
+    stage=unique_stage(checkpoint)
     try:
         with (stage/"candidate_science_mapping.csv").open("w",newline="") as f:
             fields=["candidate_index","selector_id","weight_source","mechanism","cap","M","science_M","seed_scope","screen_global_cell","global_science_cell","candidate_inclusion","screen_stake_yuan","screen_no_tax_roi","screen_matched_full_lift"]
@@ -373,9 +388,7 @@ def main():
     execution_start=execution_snapshot()
     checkpoint_meta,_checkpoint_mapping,order_rows,selectors,cells,_checkpoint_candidates,checkpoint_saved=verify_candidate_checkpoint(checkpoint,screen)
     if final.exists(): raise RuntimeError("refusing to replace immutable stability companion")
-    stage=Path(str(final)+".stage")
-    if stage.exists(): raise RuntimeError("stale stability stage exists")
-    stage.mkdir(parents=True); out=stage
+    stage=unique_stage(final); out=stage
     issues=[r["issue_instance"] for r in order_rows]; meta={r["issue_instance"]:r for r in order_rows}; nissue=len(issues)
     years=sorted({meta[x]["year"] for x in issues}); folds=sorted({meta[x]["fold"] for x in issues}); year_i={x:i for i,x in enumerate(years)}; fold_i={x:i for i,x in enumerate(folds)}
     year_issue_count={name: sum(meta[x]["year"] == name for x in issues) for name in years}

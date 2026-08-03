@@ -10,7 +10,7 @@ and chronology diagnostics without restarting or reducing the screen.
 """
 from __future__ import annotations
 
-import argparse, array, csv, ctypes, gzip, importlib.util, json, math, os, shutil, statistics, subprocess
+import argparse, array, csv, ctypes, gzip, importlib.util, json, math, os, shutil, statistics, subprocess, uuid
 from collections import defaultdict
 from decimal import Decimal
 from pathlib import Path
@@ -155,15 +155,51 @@ def assert_screen_replay_equivalence(candidate: dict, stake: float, gross: float
     return report
 
 
+class CandidateMajorArray:
+    """O(1) candidate lookup over one candidate-major checkpoint array.
+
+    Candidate views are constructed exactly once while opening the checkpoint.
+    Reconciliation/bootstrap/stability can then repeatedly index candidates
+    without rebuilding every candidate slice list for each lookup.
+    """
+    def __init__(self, raw: array.array, issue_count: int):
+        if issue_count <= 0 or len(raw) % issue_count:
+            raise RuntimeError("candidate-major checkpoint array shape drift")
+        self.issue_count = issue_count
+        values = memoryview(raw)
+        self._rows = tuple(
+            values[i * issue_count:(i + 1) * issue_count]
+            for i in range(len(values) // issue_count)
+        )
+
+    def __len__(self) -> int:
+        return len(self._rows)
+
+    def __getitem__(self, candidate_index: int) -> memoryview:
+        return self._rows[candidate_index]
+
+
 class CheckpointIssueArrays:
-    """Candidate-major, issue-minor read-only views over a shared checkpoint."""
+    """Named O(1) ``CandidateMajorArray`` checkpoint views."""
     def __init__(self, raw: dict[str, array.array], issue_count: int):
         self.raw, self.issue_count = raw, issue_count
+        self._arrays = {name: CandidateMajorArray(values, issue_count)
+                        for name, values in raw.items()}
 
-    def __getitem__(self, name: str):
-        values = memoryview(self.raw[name])
-        return [values[i * self.issue_count:(i + 1) * self.issue_count]
-                for i in range(len(values) // self.issue_count)]
+    def __getitem__(self, name: str) -> CandidateMajorArray:
+        return self._arrays[name]
+
+
+def unique_stage(target: Path) -> Path:
+    """Create a fresh retry-safe unmanifested staging directory."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    while True:
+        stage = target.with_name(f"{target.name}.stage-{uuid.uuid4().hex}")
+        try:
+            stage.mkdir()
+            return stage
+        except FileExistsError:
+            continue
 
 
 def load_shared_checkpoint(checkpoint: Path, screen: Path, rows: list[dict]) -> tuple[dict, CheckpointIssueArrays, list[dict], list[dict], list[dict]]:
@@ -641,14 +677,12 @@ def main() -> None:
     if not args.finalize_checkpoint: raise RuntimeError("postscreen output requires explicit --finalize-checkpoint")
     if os.environ.get("BJ167_TEST_FORBID_OUTCOME_SUPPORT") == "1":
         globals()["replay_candidates"] = lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("test guard: postscreen replay invoked"))
-    post_start = execution_snapshot()
     if final.exists(): raise RuntimeError("refusing to replace immutable post-screening package")
-    stage = Path(str(final) + ".stage")
-    if stage.exists(): raise RuntimeError("refusing to reuse a stale staging package")
-    stage.mkdir(parents=True); out = stage
     checkpoint_meta, values, mapping, issue_rows, checkpoint_selectors = load_shared_checkpoint(checkpoint, screen, rows)
     if checkpoint_meta["candidate_freeze_sha256"] != recovered["candidate_freeze_sha256"]:
         raise RuntimeError("shared checkpoint candidate freeze hash drift")
+    post_start = execution_snapshot()
+    stage = unique_stage(final); out = stage
     issue_order = [r["issue_instance"] for r in issue_rows]
     issue_meta = {r["issue_instance"]: r for r in issue_rows}
     shutil.copyfile(screen / "candidate_freeze.csv", out / "candidate_freeze.csv")
