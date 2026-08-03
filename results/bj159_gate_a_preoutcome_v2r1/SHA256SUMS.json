@@ -1,0 +1,13 @@
+{
+  "CONTENT_IDENTITY.json": "4ec52432ec6c1779bab33b0c4bdc4e381b0ae7434228637c509970291ed7361e",
+  "README.md": "7f563a38a2fd665dc0cd9035e0dfb0a8fa3555dff529e7fd17249ced9f8571a0",
+  "freeze_runner.py": "67638bd3e5c1f204666495eccfcd074ebbc4ca96b069bca51345a8a8891e082f",
+  "gate_a_card.json": "08e159dae7a72dde21a99d7f16b07fe516891be6d244e9449235e8c0b202f241",
+  "identity_catalog.csv.gz": "f99dc073ce72b1dec79b6573d2756c06fd5295151c6387d1d0b2b720d6e1ac68",
+  "issue_participation.csv": "448190b8bb099189204f132c9ea0c4ca242fc3da3fa7a9fb00fe16f77509abf6",
+  "n7_reference_audit.json": "4ce346edf35d3d26344992c7770b7d7fb37732796926d043cb4df93018c8121f",
+  "pool_census.csv": "cc9159c17e98afbe0f993d9ea01112f816f3193e6c3f523ec87c1d85d02ed7a3",
+  "role_vectors.csv.gz": "36902eafe30e28fa42021e7a01f4cee348a6beeeee6508991b72bc6f815c9b16",
+  "sampling_plan.csv": "499373fd96d94b91d04cafa865865edf875daa31af8117b5cca09f646fca6821",
+  "source_census.csv": "7a401d2e7ea2628d6594f484fc275083b882f6711fd0e423d6d35810a5a394fa"
+}
