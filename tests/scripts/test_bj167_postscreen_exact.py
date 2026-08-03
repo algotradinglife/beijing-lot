@@ -1,7 +1,7 @@
 """Production-path checks for the bounded #167 post-screening evidence pass."""
 from __future__ import annotations
 
-import array, csv, gzip, importlib.util, json, os, shutil, subprocess
+import array, csv, gzip, importlib.util, json, os, shutil, subprocess, sys, tracemalloc
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -217,22 +217,27 @@ def test_shared_science_checkpoint_is_atomic_and_resumable_without_ticket_replay
     shutil.rmtree(root)
 
 
-def test_checkpoint_arrays_are_cached_candidate_major_o1_views():
-    raw = {
-        "net": array.array("d", [1.0, 2.0, 3.0, 4.0]),
-        "stake": array.array("d", [5.0, 6.0, 7.0, 8.0]),
-    }
-    values = POST.CheckpointIssueArrays(raw, issue_count=2)
-    # Named lookup returns one prebuilt CandidateMajorArray, rather than
-    # allocating a complete list of candidate slices on each access.
-    assert values["net"] is values["net"]
-    assert isinstance(values["net"], POST.CandidateMajorArray)
-    assert len(values["net"]) == 2
-    # Candidate lookup is the same retained memoryview object and remains
-    # candidate-major / issue-minor.
-    assert values["net"][1] is values["net"][1]
-    assert list(values["net"][0]) == [1.0, 2.0]
-    assert list(values["net"][1]) == [3.0, 4.0]
+def test_checkpoint_arrays_cache_o1_candidate_major_view_at_production_count():
+    candidate_count, issue_count = 17_135, 2
+    raw = {"net": array.array("d", [float(i) for i in range(candidate_count * issue_count)])}
+    values = POST.CheckpointIssueArrays(raw, issue_count=issue_count)
+    # A named access returns the single retained CandidateMajorArray. The
+    # former implementation allocated a 17,135-element memoryview list for
+    # every one of these accesses.
+    view = values["net"]
+    assert values["net"] is view and isinstance(view, POST.CandidateMajorArray)
+    assert len(view) == candidate_count
+    assert not hasattr(view, "_rows")
+    tracemalloc.start()
+    baseline = tracemalloc.get_traced_memory()[0]
+    for ci in range(candidate_count):
+        assert values["net"][ci][0] == float(ci * issue_count)
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    # Each call obtains only its selected two-value slice. A 17,135-slice
+    # list on every values[name] lookup has a multi-megabyte peak here.
+    assert peak - baseline < 512 * 1024
+    assert current - baseline < 128 * 1024
 
 
 def test_unique_stages_do_not_reuse_or_block_failed_attempts():
@@ -278,8 +283,7 @@ def test_actual_scientific_finalizer_reads_disk_checkpoint_without_outcomes_or_s
     shutil.rmtree(root)
 
 
-def test_actual_postscreen_finalizer_reads_disk_checkpoint_without_replay():
-    root = ROOT / ".scratch" / "bj167_postscreen_disk_finalizer_fixture"
+def build_postscreen_disk_finalizer_fixture(root: Path) -> tuple[Path, Path, Path]:
     if root.exists(): shutil.rmtree(root)
     screen = root / "screen"; checkpoint = root / "checkpoint"; final = root / "final"; screen.mkdir(parents=True)
     issue = [{"issue_index":"0", "issue_instance":"I1", "first_kickoff_ts":"2024-01-01T00:00:00Z", "year":"2024", "fold":"F1", "loyo":"2024", "ordering_rule":"fixture"}]
@@ -308,9 +312,45 @@ def test_actual_postscreen_finalizer_reads_disk_checkpoint_without_replay():
     SCIENCE.write_candidate_checkpoint(checkpoint,screen,mapping,issue,selectors,cells,candidate,aggregate,{"git_head":"fixture"},{"git_head":"fixture"})
     del candidate, aggregate
     __import__("gc").collect()
+    return screen, checkpoint, final
+
+
+def test_actual_postscreen_finalizer_reads_disk_checkpoint_without_replay():
+    root = ROOT / ".scratch" / "bj167_postscreen_disk_finalizer_fixture"
+    screen, checkpoint, final = build_postscreen_disk_finalizer_fixture(root)
     proc=subprocess.run(["python3",str(ROOT/"scripts"/"settle_bj167_atlas_postscreen_exact.py"),"--screening-output",str(screen.relative_to(ROOT)),"--checkpoint",str(checkpoint.relative_to(ROOT)),"--output",str(final.relative_to(ROOT)),"--finalize-checkpoint"],cwd=ROOT,text=True,capture_output=True,env={**os.environ,"BJ167_TEST_FORBID_OUTCOME_SUPPORT":"1"})
     assert proc.returncode == 0, proc.stderr
     assert (final/"SHA256SUMS.json").exists() and (final/"candidate_paired_bootstrap_20000.csv").exists()
+    shutil.rmtree(root)
+
+
+def test_postscreen_finalizer_retries_from_checkpoint_after_render_failure(monkeypatch):
+    root = ROOT / ".scratch" / "bj167_postscreen_retry_after_render_failure_fixture"
+    screen, checkpoint, final = build_postscreen_disk_finalizer_fixture(root)
+    original_write_outputs = POST.write_outputs
+
+    def render_failure(*_args, **_kwargs):
+        raise RuntimeError("simulated render failure")
+
+    argv = ["postscreen", "--screening-output", str(screen.relative_to(ROOT)),
+            "--checkpoint", str(checkpoint.relative_to(ROOT)), "--output",
+            str(final.relative_to(ROOT)), "--finalize-checkpoint"]
+    monkeypatch.setattr(sys, "argv", argv)
+    monkeypatch.setattr(POST, "write_outputs", render_failure)
+    try:
+        POST.main()
+        assert False, "simulated render failure must stop the first finalizer"
+    except RuntimeError as exc:
+        assert str(exc) == "simulated render failure"
+    # A failed render leaves an unmanifested unique stage, but the immutable
+    # checkpoint is still intact and the retry must not reuse or collide with
+    # that abandoned stage.
+    failed_stages = list(root.glob("final.stage-*"))
+    assert len(failed_stages) == 1 and checkpoint.exists() and not final.exists()
+    monkeypatch.setattr(POST, "write_outputs", original_write_outputs)
+    POST.main()
+    assert final.exists() and (final / "SHA256SUMS.json").exists()
+    assert len(list(root.glob("final.stage-*"))) == 1
     shutil.rmtree(root)
 
 

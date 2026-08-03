@@ -158,25 +158,23 @@ def assert_screen_replay_equivalence(candidate: dict, stake: float, gross: float
 class CandidateMajorArray:
     """O(1) candidate lookup over one candidate-major checkpoint array.
 
-    Candidate views are constructed exactly once while opening the checkpoint.
-    Reconciliation/bootstrap/stability can then repeatedly index candidates
-    without rebuilding every candidate slice list for each lookup.
+    The named view is constructed exactly once while opening the checkpoint.
+    Each candidate lookup then makes one O(1) memoryview slice; it never
+    rebuilds an all-candidate list of slices.
     """
     def __init__(self, raw: array.array, issue_count: int):
         if issue_count <= 0 or len(raw) % issue_count:
             raise RuntimeError("candidate-major checkpoint array shape drift")
         self.issue_count = issue_count
-        values = memoryview(raw)
-        self._rows = tuple(
-            values[i * issue_count:(i + 1) * issue_count]
-            for i in range(len(values) // issue_count)
-        )
+        self._values = memoryview(raw)
+        self.candidate_count = len(raw) // issue_count
 
     def __len__(self) -> int:
-        return len(self._rows)
+        return self.candidate_count
 
     def __getitem__(self, candidate_index: int) -> memoryview:
-        return self._rows[candidate_index]
+        start = candidate_index * self.issue_count
+        return self._values[start:start + self.issue_count]
 
 
 class CheckpointIssueArrays:
