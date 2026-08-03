@@ -241,13 +241,46 @@ def main() -> None:
             sum(value < 0 for value in aggregate),
             sum(value == 0 for value in aggregate),
         )
+    matched_wor_weight_rows = []
+    q_wor_aggregate: dict[str, tuple[list[float], int, int, int]] = {}
+    for arm in arms:
+        aggregate = []
+        for comparator in weight_comparators:
+            values = [
+                row
+                for row in weight_pairs
+                if row["arm_id"] == arm
+                and row["weight_source"] == f"{comparator}_VS_Q_WEIGHT"
+                and row["left_mechanism"] == "WOR_DISTINCT"
+            ]
+            roi = [
+                -float(row["no_tax_roi_delta_left_minus_right"]) for row in values
+            ]
+            aggregate.extend(roi)
+            matched_wor_weight_rows.append(
+                [
+                    arm,
+                    f"Q_WEIGHT − {comparator}",
+                    len(roi),
+                    pct(med(roi)),
+                    f"{sum(value > 0 for value in roi)}/{len(roi)}",
+                    f"{sum(value < 0 for value in roi)}/{len(roi)}",
+                    f"{sum(value == 0 for value in roi)}/{len(roi)}",
+                ]
+            )
+        q_wor_aggregate[arm] = (
+            aggregate,
+            sum(value > 0 for value in aggregate),
+            sum(value < 0 for value in aggregate),
+            sum(value == 0 for value in aggregate),
+        )
     lines += [
         "",
         "Q-based weighting creates the highest same-window peaks, especially under WOR, but the large number of tested cells and unstable concentration views prevent promotion. Blends and market/model weights do not show a uniformly superior surface.",
         "",
         "### Matched weighting attribution",
         "",
-        "Every row below holds arm, mechanism, cap, M, seed, issue support and stake fixed. Positive delta favors Q-based value weighting.",
+        "The all-mechanism table below holds arm, mechanism, cap, M, seed, issue support and stake fixed. Positive delta favors Q-based value weighting.",
         "",
     ]
     lines += markdown_table(
@@ -264,11 +297,32 @@ def main() -> None:
         ],
         matched_weight_rows,
     )
-    primary_q = q_weight_aggregate["PRIMARY_NO_GATE_K4"]
-    secondary_q = q_weight_aggregate["SECONDARY_ESP300_GM290_K8"]
     lines += [
         "",
-        f"Across all five matched comparators, Q_WEIGHT has a {pct(med(primary_q[0]))} primary median pre-tax delta (better/worse/tie {primary_q[1]}/{primary_q[2]}/{primary_q[3]} of {len(primary_q[0])}) and a {pct(med(secondary_q[0]))} secondary delta ({secondary_q[1]}/{secondary_q[2]}/{secondary_q[3]} of {len(secondary_q[0])}). Its isolated historical peaks therefore are not a general matched weighting gain.",
+        "The main WOR slice is the preregistered value-weighting contrast:",
+        "",
+    ]
+    lines += markdown_table(
+        ["arm", "matched WOR contrast", "cells", "median pre-tax Δ", "Q better", "Q worse", "ties"],
+        matched_wor_weight_rows,
+    )
+    primary_q = q_weight_aggregate["PRIMARY_NO_GATE_K4"]
+    secondary_q = q_weight_aggregate["SECONDARY_ESP300_GM290_K8"]
+    primary_q_wor = q_wor_aggregate["PRIMARY_NO_GATE_K4"]
+    secondary_q_wor = q_wor_aggregate["SECONDARY_ESP300_GM290_K8"]
+    q_wor_primary_medians = [
+        float(row[3].rstrip("%")) / 100
+        for row in matched_wor_weight_rows
+        if row[0] == "PRIMARY_NO_GATE_K4"
+    ]
+    q_wor_secondary_medians = [
+        float(row[3].rstrip("%")) / 100
+        for row in matched_wor_weight_rows
+        if row[0] == "SECONDARY_ESP300_GM290_K8"
+    ]
+    lines += [
+        "",
+        f"Across all frozen mechanisms, Q_WEIGHT has a {pct(med(primary_q[0]))} primary median pre-tax delta (better/worse/tie {primary_q[1]}/{primary_q[2]}/{primary_q[3]} of {len(primary_q[0])}) and a {pct(med(secondary_q[0]))} secondary delta ({secondary_q[1]}/{secondary_q[2]}/{secondary_q[3]} of {len(secondary_q[0])}). On the main WOR slice specifically, the aggregate Q_WEIGHT delta is {pct(med(primary_q_wor[0]))} primary ({primary_q_wor[1]}/{primary_q_wor[2]}/{primary_q_wor[3]} of {len(primary_q_wor[0])}) and {pct(med(secondary_q_wor[0]))} secondary ({secondary_q_wor[1]}/{secondary_q_wor[2]}/{secondary_q_wor[3]} of {len(secondary_q_wor[0])}): a small/mixed matched lift, not a universal winner.",
         "",
         "## Mechanism, coverage, stake and gross retention",
         "",
@@ -407,6 +461,14 @@ def main() -> None:
         ("cap2 − residual", "CAPPED_REPEAT", "2", "RESIDUAL_SYSTEMATIC", "NA"),
         ("cap4 − residual", "CAPPED_REPEAT", "4", "RESIDUAL_SYSTEMATIC", "NA"),
         ("cap8 − residual", "CAPPED_REPEAT", "8", "RESIDUAL_SYSTEMATIC", "NA"),
+        ("cap1 − WOR", "CAPPED_REPEAT", "1", "WOR_DISTINCT", "NA"),
+        ("cap2 − WOR", "CAPPED_REPEAT", "2", "WOR_DISTINCT", "NA"),
+        ("cap4 − WOR", "CAPPED_REPEAT", "4", "WOR_DISTINCT", "NA"),
+        ("cap8 − WOR", "CAPPED_REPEAT", "8", "WOR_DISTINCT", "NA"),
+        ("cap1 − WR", "CAPPED_REPEAT", "1", "WR_DUPLICATE_STAKE", "NA"),
+        ("cap2 − WR", "CAPPED_REPEAT", "2", "WR_DUPLICATE_STAKE", "NA"),
+        ("cap4 − WR", "CAPPED_REPEAT", "4", "WR_DUPLICATE_STAKE", "NA"),
+        ("cap8 − WR", "CAPPED_REPEAT", "8", "WR_DUPLICATE_STAKE", "NA"),
     )
     mechanism_contrast_stats: dict[tuple[str, str], dict[str, object]] = {}
     mechanism_contrast_rows = []
@@ -466,11 +528,31 @@ def main() -> None:
     secondary_wr_residual = mechanism_contrast_stats[
         ("SECONDARY_ESP300_GM290_K8", "WR − residual")
     ]
+    primary_cap_wor = {
+        cap: mechanism_contrast_stats[("PRIMARY_NO_GATE_K4", f"cap{cap} − WOR")]
+        for cap in ("1", "2", "4", "8")
+    }
+    secondary_cap_wor = {
+        cap: mechanism_contrast_stats[
+            ("SECONDARY_ESP300_GM290_K8", f"cap{cap} − WOR")
+        ]
+        for cap in ("1", "2", "4", "8")
+    }
+    primary_cap_wr = {
+        cap: mechanism_contrast_stats[("PRIMARY_NO_GATE_K4", f"cap{cap} − WR")]
+        for cap in ("1", "2", "4", "8")
+    }
+    secondary_cap_wr = {
+        cap: mechanism_contrast_stats[
+            ("SECONDARY_ESP300_GM290_K8", f"cap{cap} − WR")
+        ]
+        for cap in ("1", "2", "4", "8")
+    }
     lines += [
         "",
         f"Matched WOR−WR attribution is directionally favorable to WOR: primary median {pct(float(primary_wor['roi_median']))} with {primary_wor['favorable']}/{primary_wor['cells']} favorable cells and secondary {pct(float(secondary_wor['roi_median']))} with {secondary_wor['favorable']}/{secondary_wor['cells']}. WOR's median duplicate-ratio delta is {pct(float(primary_wor['duplicate_median']))} / {pct(float(secondary_wor['duplicate_median']))} while its settled coverage delta is {pct(float(primary_wor['coverage_median']))} / {pct(float(secondary_wor['coverage_median']))}.",
         f"WR versus residual is not common-direction evidence: primary median {pct(float(primary_wr_residual['roi_median']))} ({primary_wr_residual['favorable']}/{primary_wr_residual['cells']} favorable) versus secondary {pct(float(secondary_wr_residual['roi_median']))} ({secondary_wr_residual['favorable']}/{secondary_wr_residual['cells']} favorable), while WR adds about {pct(float(primary_wr_residual['duplicate_median']))} / {pct(float(secondary_wr_residual['duplicate_median']))} duplicate ratio.",
-        "Cap 1 is effectively the distinct/residual identity control. Caps 2, 4 and 8 have negative matched median ROI deltas versus residual in both arms, progressively lower coverage and progressively higher duplicate concentration; no repeat cap improves the frozen tradeoff stably.",
+        f"Against WOR, cap1/cap8 median ROI deltas are {pct(float(primary_cap_wor['1']['roi_median']))}/{pct(float(primary_cap_wor['8']['roi_median']))} primary and {pct(float(secondary_cap_wor['1']['roi_median']))}/{pct(float(secondary_cap_wor['8']['roi_median']))} secondary; cap2/cap4 are also negative. Against WR, cap1 is mixed ({pct(float(primary_cap_wr['1']['roi_median']))}/{pct(float(secondary_cap_wr['1']['roi_median']))}), while cap2/4/8 are negative in both arms. Relative to residual, the same monotone concentration pattern remains; no repeat cap improves the frozen tradeoff stably.",
         "",
         "## Concentration and path risk",
         "",
@@ -762,10 +844,10 @@ def main() -> None:
         "",
         "## Five terminal questions",
         "",
-        f"1. **Matched value of probability/value weighting:** Q_WEIGHT does not dominate the five probability/market/blend comparators. Holding mechanism/cap/M/seed/stake fixed, its aggregate matched median delta is {pct(med(primary_q[0]))} in primary ({primary_q[1]} better, {primary_q[2]} worse, {primary_q[3]} ties of {len(primary_q[0])}) and {pct(med(secondary_q[0]))} in secondary ({secondary_q[1]}/{secondary_q[2]}/{secondary_q[3]} of {len(secondary_q[0])}). The high Q peaks are tail cells, not a general weighting gain.",
+        f"1. **Matched value of probability/value weighting:** On the main WOR slice, Q_WEIGHT has comparator medians ranging {pct(min(q_wor_primary_medians))} to {pct(max(q_wor_primary_medians))} in primary ({primary_q_wor[1]}/{len(primary_q_wor[0])} favorable overall) and {pct(min(q_wor_secondary_medians))} to {pct(max(q_wor_secondary_medians))} in secondary ({secondary_q_wor[1]}/{len(secondary_q_wor[0])} favorable overall). The lift is small/mixed and does not establish a universal weighting winner; across all mechanisms the pooled medians are {pct(med(primary_q[0]))}/{pct(med(secondary_q[0]))}.",
         f"2. **Matched WOR effect:** WOR−WR has median pre-tax deltas of {pct(float(primary_wor['roi_median']))} primary and {pct(float(secondary_wor['roi_median']))} secondary, favorable in {primary_wor['favorable']}/{primary_wor['cells']} and {secondary_wor['favorable']}/{secondary_wor['cells']} matched cells. WOR improves distinct coverage and removes WR duplicate exposure, so the mechanism has a plausible historical attribution, but this is not promotion evidence.",
         f"3. **Matched WR/residual effect:** WR−residual is {pct(float(primary_wr_residual['roi_median']))} primary ({primary_wr_residual['favorable']}/{primary_wr_residual['cells']} favorable) and {pct(float(secondary_wr_residual['roi_median']))} secondary ({secondary_wr_residual['favorable']}/{secondary_wr_residual['cells']} favorable), with roughly +4.4pp duplicate ratio. The direction changes by arm; neither WR nor residual is a stable winner.",
-        f"4. **Repeat-cap tradeoff:** cap1 is the near-identity distinct control. Relative to residual, cap2/cap4/cap8 primary median deltas are {pct(float(mechanism_contrast_stats[('PRIMARY_NO_GATE_K4', 'cap2 − residual')]['roi_median']))}, {pct(float(mechanism_contrast_stats[('PRIMARY_NO_GATE_K4', 'cap4 − residual')]['roi_median']))}, {pct(float(mechanism_contrast_stats[('PRIMARY_NO_GATE_K4', 'cap8 − residual')]['roi_median']))}; secondary deltas are {pct(float(mechanism_contrast_stats[('SECONDARY_ESP300_GM290_K8', 'cap2 − residual')]['roi_median']))}, {pct(float(mechanism_contrast_stats[('SECONDARY_ESP300_GM290_K8', 'cap4 − residual')]['roi_median']))}, {pct(float(mechanism_contrast_stats[('SECONDARY_ESP300_GM290_K8', 'cap8 − residual')]['roi_median']))}. Coverage falls and duplicate concentration rises as cap loosens; no cap improves the tradeoff stably.",
+        f"4. **Repeat-cap tradeoff:** cap1 is the near-identity distinct control. Relative to WOR, cap1/cap8 median deltas are {pct(float(primary_cap_wor['1']['roi_median']))}/{pct(float(primary_cap_wor['8']['roi_median']))} primary and {pct(float(secondary_cap_wor['1']['roi_median']))}/{pct(float(secondary_cap_wor['8']['roi_median']))} secondary; cap2/cap4 are also negative. Relative to WR, cap1 is mixed ({pct(float(primary_cap_wr['1']['roi_median']))}/{pct(float(secondary_cap_wr['1']['roi_median']))}) and cap2/4/8 are negative in both arms. Coverage falls and duplicate concentration rises as cap loosens; no cap improves the tradeoff stably.",
         f"5. **Stable sweet spot:** none. The prior Q-WOR/M64 cluster is positive across its three pooled seeds but all three bootstrap intervals cross zero and ex-largest ROIs are -11.47%, +0.08% and -9.46%; YEAR/FOLD are positive in {scope_stability['YEAR'][1]}/{scope_stability['YEAR'][0]} and LOYO in {scope_stability['LOYO'][1]}/{scope_stability['LOYO'][0]}. Across the whole surface only {positive_ci}/{len(boot_primary)} bootstrap lower bounds are positive, {crossing}/{len(boot_primary)} intervals cross zero, and Holm direction is {holm_positive_majority} positive-majority versus {holm_negative_majority} negative-majority. The M16 peak is a seed outlier, not a sweet spot.",
         "",
         "## Drawdown and accounting conventions",

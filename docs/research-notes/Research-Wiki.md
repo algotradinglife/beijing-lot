@@ -304,10 +304,11 @@ coverage、wager miss streak 和 chronological drawdown 只使用 `SETTLED + pos
 | `BLEND_A75` | -18.62% | +67.97% | 16/240 |
 | `Q_WEIGHT` | -15.77% | +84.76% | 61/240 |
 
-但 matched 归因并不支持把 Q 峰值解释成普遍权重优势：固定机制、cap、M、seed、stake
-后，`Q_WEIGHT` 相对其余五个权重的主臂中位差为 -2.85pp（500 better / 675 worse /
-25 tie，共 1,200 cells），次臂为 -5.52pp（376 / 798 / 26）。因此 Q 的最高 cell 是
-尾部峰值，而不是跨配置的一般改善。
+在主轴 WOR 上，固定 arm、机制、cap、M、seed、stake 后，`Q_WEIGHT` 相对其余五个
+权重的 matched 中位差在主臂为 +0.87pp～+2.41pp（53.3%～63.3% cells 有利），次臂
+为 0.00pp～+0.52pp（48.3%～53.3% 有利）。这是小幅、混合的 WOR-slice lift，不是
+普遍权重赢家；跨全部机制池化后中位差仍为 -2.85pp/-5.52pp，说明高 Q cell 不能脱离
+机制和 M 解释。
 
 WOR 在相同 M 下消除 exact duplicate，主/次臂的中位 coverage 为 30.51%/56.02%，
 中位税前 ROI 为 -11.68%/-8.51%；WR 保留自然重复 stake，中位 duplicate ratio
@@ -321,10 +322,11 @@ winning identities、top-issue share、HHI、drawdown 和 miss streak。
 matched 机制归因进一步区分了“机制信号”和“可晋级策略”：固定 arm、weight、M、stake
 与 seed 后，WOR−WR 的主/次臂中位税前差为 +5.77pp/+9.69pp，分别有 243/360、
 285/360 cells 有利于 WOR；WOR 同时把 duplicate-ratio 中位数降低约 4.42pp/4.34pp。
-WR−residual 则方向不一致：主臂 -1.16pp（165/360 有利），次臂 +1.55pp
-（205/360 有利）。cap2/cap4/cap8 相对 residual 的主臂中位差为
--0.39pp/-2.74pp/-12.24pp，次臂为 -0.35pp/-4.90pp/-19.20pp；coverage 随 cap
-放宽下降而重复集中上升，没有稳定的 cap tradeoff 改善。
+换向表示为 residual−WR：主臂 +1.16pp（195/360 有利），次臂 -1.55pp（155/360
+有利）；residual−WOR 为 -2.74pp/-13.10pp，仅 40.0%/12.2% cells 有利。cap−WOR
+的 cap1/cap8 中位差为 -2.56pp/-22.91pp（主臂）、-13.14pp/-34.36pp（次臂）；
+cap−WR 的 cap1 为 +1.19pp/-1.28pp，cap2/4/8 两臂均为负。coverage 随 cap 放宽下降
+而重复集中上升，没有稳定的 cap tradeoff 改善。
 
 #### 稳定性与集中度
 
@@ -346,7 +348,8 @@ leave-one-issue-out（保留造成 min/max 的 issue ID）和“剔除本配置�
 
 #### 五个终局问题
 
-1. **概率/价值权重是否有 matched 增益？** 没有；Q 对五类匹配权重的中位差在两臂均负。
+1. **概率/价值权重是否有 matched 增益？** 主轴 WOR 有小幅、混合的 Q lift（主臂
+   +0.87～+2.41pp，次臂 0.00～+0.52pp），但没有普遍权重赢家。
 2. **WOR 是否改善？** 历史 matched 归因支持 distinct-coverage/WOR，但不构成晋级证据。
 3. **WR 或 residual 是否更好？** 两臂方向相反，且 WR 增加约 4.4pp 重复暴露。
 4. **repeat cap 是否改善 tradeoff？** cap1 接近 distinct identity control；cap2/4/8 均无稳定改善。
@@ -367,7 +370,7 @@ leave-one-issue-out（保留造成 min/max 的 issue ID）和“剔除本配置�
 终局仍为 **DESCRIPTIVE_SURFACE_ONLY_NO_PROMOTION**。高历史 cell 只能作为后续 strict
 independent-EV 与真正 held-out/forward validation 的候选，不能产生购买、生产或投注
 授权。v2 不可变清单 `SHA256SUMS.json` 的 SHA-256 为
-`10d5a5082a175ddc965b01fb257e8e5c7e91a844d7ee823fd6d2ad5aeff84cc9`。完整表格和
+`a941ee3007599823332346b1d5e6596c9f1d2468b27e548418d960840f532b50`。完整表格和
 解释见 v2 包内 `report.md`；Gate-A 设计仍见
 [#145 Gate A](../research/bj145_ticket_allocation_gate_a_2026-08-03.md)。
 

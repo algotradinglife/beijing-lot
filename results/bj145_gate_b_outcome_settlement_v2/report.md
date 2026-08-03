@@ -51,7 +51,7 @@ Q-based weighting creates the highest same-window peaks, especially under WOR, b
 
 ### Matched weighting attribution
 
-Every row below holds arm, mechanism, cap, M, seed, issue support and stake fixed. Positive delta favors Q-based value weighting.
+The all-mechanism table below holds arm, mechanism, cap, M, seed, issue support and stake fixed. Positive delta favors Q-based value weighting.
 
 | arm | matched contrast | cells | median pre-tax Δ | Q better | Q worse | ties | median coverage Δ | median duplicate Δ |
 |---|---|---|---|---|---|---|---|---|
@@ -66,7 +66,22 @@ Every row below holds arm, mechanism, cap, M, seed, issue support and stake fixe
 | SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − BLEND_A50 | 240 | -5.51% | 69/240 | 166/240 | 5/240 | -7.85% | -0.00% |
 | SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − BLEND_A75 | 240 | -7.12% | 68/240 | 167/240 | 5/240 | -6.81% | -0.00% |
 
-Across all five matched comparators, Q_WEIGHT has a -2.85% primary median pre-tax delta (better/worse/tie 500/675/25 of 1200) and a -5.52% secondary delta (376/798/26 of 1200). Its isolated historical peaks therefore are not a general matched weighting gain.
+The main WOR slice is the preregistered value-weighting contrast:
+
+| arm | matched WOR contrast | cells | median pre-tax Δ | Q better | Q worse | ties |
+|---|---|---|---|---|---|---|
+| PRIMARY_NO_GATE_K4 | Q_WEIGHT − MODEL_P_CAL | 60 | +1.51% | 38/60 | 19/60 | 3/60 |
+| PRIMARY_NO_GATE_K4 | Q_WEIGHT − MARKET_WF_CAL | 60 | +0.87% | 32/60 | 25/60 | 3/60 |
+| PRIMARY_NO_GATE_K4 | Q_WEIGHT − BLEND_A25 | 60 | +1.25% | 32/60 | 25/60 | 3/60 |
+| PRIMARY_NO_GATE_K4 | Q_WEIGHT − BLEND_A50 | 60 | +2.41% | 34/60 | 23/60 | 3/60 |
+| PRIMARY_NO_GATE_K4 | Q_WEIGHT − BLEND_A75 | 60 | +1.64% | 34/60 | 23/60 | 3/60 |
+| SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − MODEL_P_CAL | 60 | -0.00% | 29/60 | 28/60 | 3/60 |
+| SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − MARKET_WF_CAL | 60 | +0.21% | 32/60 | 25/60 | 3/60 |
+| SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − BLEND_A25 | 60 | +0.26% | 31/60 | 26/60 | 3/60 |
+| SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − BLEND_A50 | 60 | +0.42% | 31/60 | 26/60 | 3/60 |
+| SECONDARY_ESP300_GM290_K8 | Q_WEIGHT − BLEND_A75 | 60 | +0.52% | 31/60 | 26/60 | 3/60 |
+
+Across all frozen mechanisms, Q_WEIGHT has a -2.85% primary median pre-tax delta (better/worse/tie 500/675/25 of 1200) and a -5.52% secondary delta (376/798/26 of 1200). On the main WOR slice specifically, the aggregate Q_WEIGHT delta is +1.39% primary (170/115/15 of 300) and +0.16% secondary (154/131/15 of 300): a small/mixed matched lift, not a universal winner.
 
 ## Mechanism, coverage, stake and gross retention
 
@@ -104,6 +119,14 @@ Every contrast holds arm, weight, M and issue-level stake fixed. Randomized comp
 | PRIMARY_NO_GATE_K4 | cap2 − residual | 120 | -0.39% | 59/120 | 60/120 | 1/120 | -9.45% | +50.00% |
 | PRIMARY_NO_GATE_K4 | cap4 − residual | 120 | -2.74% | 51/120 | 68/120 | 1/120 | -15.55% | +75.00% |
 | PRIMARY_NO_GATE_K4 | cap8 − residual | 120 | -12.24% | 24/120 | 95/120 | 1/120 | -20.08% | +87.50% |
+| PRIMARY_NO_GATE_K4 | cap1 − WOR | 360 | -2.56% | 140/360 | 202/360 | 18/360 | -3.94% | -0.00% |
+| PRIMARY_NO_GATE_K4 | cap2 − WOR | 360 | -7.73% | 126/360 | 234/360 | 0/360 | -14.57% | +50.00% |
+| PRIMARY_NO_GATE_K4 | cap4 − WOR | 360 | -11.63% | 108/360 | 252/360 | 0/360 | -20.47% | +75.00% |
+| PRIMARY_NO_GATE_K4 | cap8 − WOR | 360 | -22.91% | 51/360 | 309/360 | 0/360 | -24.02% | +87.50% |
+| PRIMARY_NO_GATE_K4 | cap1 − WR | 360 | +1.19% | 199/360 | 161/360 | 0/360 | -3.35% | -4.42% |
+| PRIMARY_NO_GATE_K4 | cap2 − WR | 360 | -0.37% | 175/360 | 185/360 | 0/360 | -14.17% | +45.58% |
+| PRIMARY_NO_GATE_K4 | cap4 − WR | 360 | -3.00% | 150/360 | 210/360 | 0/360 | -19.69% | +70.58% |
+| PRIMARY_NO_GATE_K4 | cap8 − WR | 360 | -14.70% | 74/360 | 286/360 | 0/360 | -24.02% | +83.08% |
 | SECONDARY_ESP300_GM290_K8 | WOR − WR | 360 | +9.69% | 285/360 | 75/360 | 0/360 | +5.76% | -4.34% |
 | SECONDARY_ESP300_GM290_K8 | WR − residual | 360 | +1.55% | 205/360 | 155/360 | 0/360 | +17.02% | +4.34% |
 | SECONDARY_ESP300_GM290_K8 | WOR − residual | 360 | +13.10% | 313/360 | 44/360 | 3/360 | +24.08% | +0.00% |
@@ -111,10 +134,18 @@ Every contrast holds arm, weight, M and issue-level stake fixed. Randomized comp
 | SECONDARY_ESP300_GM290_K8 | cap2 − residual | 120 | -0.35% | 55/120 | 64/120 | 1/120 | -8.38% | +50.00% |
 | SECONDARY_ESP300_GM290_K8 | cap4 − residual | 120 | -4.90% | 43/120 | 76/120 | 1/120 | -15.71% | +75.00% |
 | SECONDARY_ESP300_GM290_K8 | cap8 − residual | 120 | -19.20% | 22/120 | 97/120 | 1/120 | -20.94% | +87.50% |
+| SECONDARY_ESP300_GM290_K8 | cap1 − WOR | 360 | -13.14% | 45/360 | 297/360 | 18/360 | -24.08% | -0.00% |
+| SECONDARY_ESP300_GM290_K8 | cap2 − WOR | 360 | -10.27% | 27/360 | 333/360 | 0/360 | -35.08% | +50.00% |
+| SECONDARY_ESP300_GM290_K8 | cap4 − WOR | 360 | -11.31% | 22/360 | 338/360 | 0/360 | -43.19% | +75.00% |
+| SECONDARY_ESP300_GM290_K8 | cap8 − WOR | 360 | -34.36% | 26/360 | 334/360 | 0/360 | -48.17% | +87.50% |
+| SECONDARY_ESP300_GM290_K8 | cap1 − WR | 360 | -1.28% | 162/360 | 198/360 | 0/360 | -16.75% | -4.34% |
+| SECONDARY_ESP300_GM290_K8 | cap2 − WR | 360 | -1.90% | 157/360 | 203/360 | 0/360 | -28.01% | +45.66% |
+| SECONDARY_ESP300_GM290_K8 | cap4 − WR | 360 | -5.32% | 121/360 | 239/360 | 0/360 | -36.65% | +70.65% |
+| SECONDARY_ESP300_GM290_K8 | cap8 − WR | 360 | -20.27% | 57/360 | 303/360 | 0/360 | -41.36% | +83.15% |
 
 Matched WOR−WR attribution is directionally favorable to WOR: primary median +5.77% with 243/360 favorable cells and secondary +9.69% with 285/360. WOR's median duplicate-ratio delta is -4.42% / -4.34% while its settled coverage delta is +0.79% / +5.76%.
 WR versus residual is not common-direction evidence: primary median -1.16% (165/360 favorable) versus secondary +1.55% (205/360 favorable), while WR adds about +4.42% / +4.34% duplicate ratio.
-Cap 1 is effectively the distinct/residual identity control. Caps 2, 4 and 8 have negative matched median ROI deltas versus residual in both arms, progressively lower coverage and progressively higher duplicate concentration; no repeat cap improves the frozen tradeoff stably.
+Against WOR, cap1/cap8 median ROI deltas are -2.56%/-22.91% primary and -13.14%/-34.36% secondary; cap2/cap4 are also negative. Against WR, cap1 is mixed (+1.19%/-1.28%), while cap2/4/8 are negative in both arms. Relative to residual, the same monotone concentration pattern remains; no repeat cap improves the frozen tradeoff stably.
 
 ## Concentration and path risk
 
@@ -190,10 +221,10 @@ The high historical cells are sensitive to issue concentration and seed. Ex-larg
 
 ## Five terminal questions
 
-1. **Matched value of probability/value weighting:** Q_WEIGHT does not dominate the five probability/market/blend comparators. Holding mechanism/cap/M/seed/stake fixed, its aggregate matched median delta is -2.85% in primary (500 better, 675 worse, 25 ties of 1200) and -5.52% in secondary (376/798/26 of 1200). The high Q peaks are tail cells, not a general weighting gain.
+1. **Matched value of probability/value weighting:** On the main WOR slice, Q_WEIGHT has comparator medians ranging +0.87% to +2.41% in primary (170/300 favorable overall) and -0.00% to +0.52% in secondary (154/300 favorable overall). The lift is small/mixed and does not establish a universal weighting winner; across all mechanisms the pooled medians are -2.85%/-5.52%.
 2. **Matched WOR effect:** WOR−WR has median pre-tax deltas of +5.77% primary and +9.69% secondary, favorable in 243/360 and 285/360 matched cells. WOR improves distinct coverage and removes WR duplicate exposure, so the mechanism has a plausible historical attribution, but this is not promotion evidence.
 3. **Matched WR/residual effect:** WR−residual is -1.16% primary (165/360 favorable) and +1.55% secondary (205/360 favorable), with roughly +4.4pp duplicate ratio. The direction changes by arm; neither WR nor residual is a stable winner.
-4. **Repeat-cap tradeoff:** cap1 is the near-identity distinct control. Relative to residual, cap2/cap4/cap8 primary median deltas are -0.39%, -2.74%, -12.24%; secondary deltas are -0.35%, -4.90%, -19.20%. Coverage falls and duplicate concentration rises as cap loosens; no cap improves the tradeoff stably.
+4. **Repeat-cap tradeoff:** cap1 is the near-identity distinct control. Relative to WOR, cap1/cap8 median deltas are -2.56%/-22.91% primary and -13.14%/-34.36% secondary; cap2/cap4 are also negative. Relative to WR, cap1 is mixed (+1.19%/-1.28%) and cap2/4/8 are negative in both arms. Coverage falls and duplicate concentration rises as cap loosens; no cap improves the tradeoff stably.
 5. **Stable sweet spot:** none. The prior Q-WOR/M64 cluster is positive across its three pooled seeds but all three bootstrap intervals cross zero and ex-largest ROIs are -11.47%, +0.08% and -9.46%; YEAR/FOLD are positive in 12/21 and LOYO in 15/21. Across the whole surface only 52/2880 bootstrap lower bounds are positive, 2605/2880 intervals cross zero, and Holm direction is 85 positive-majority versus 1898 negative-majority. The M16 peak is a seed outlier, not a sweet spot.
 
 ## Drawdown and accounting conventions

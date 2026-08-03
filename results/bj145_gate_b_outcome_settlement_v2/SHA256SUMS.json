@@ -1,5 +1,5 @@
 {
-  "CONTENT_IDENTITY.json": "e5ebb462028b3abc9979656de37138c5674b52f1830d1ab6ee093c670236cf5b",
+  "CONTENT_IDENTITY.json": "fbe6326cb082b118ed3d031dafd2155bcff17a8b47ea9bcbe26fe10bdf408481",
   "allocation_binding.json": "41d0806b544f987feb914d0116c1b2874c2db7da7cb3d356a66a5e55a2b6deff",
   "allocation_golden_vectors.json": "06038d0f62317f0c5e22ba562eff6baf806f51741668d5ac22cd9266e7365875",
   "bj145_allocation_engine.py": "5b1ac6631ce22a447d883d514ed73e6795584c89d514e6be7562b2fd91bfa4ce",
@@ -31,8 +31,8 @@
   "outcome_code_frequency.part-08-of-08.csv.gz": "4eb99a5e84c7defbd0ba712afeff5b57fa1bae3f4fcd4aac54cca3153fb1a07c",
   "outcome_code_marginal_builder.py": "5db34504ac442f7ebb8ad9cb040b557af5fa8879b7ef2edef3d15f0f1e2578e3",
   "outcome_code_marginal_merger.py": "3d753d9b0070cdee4bce812410d50fecfc286e0ad1e57dded558422f57577386",
-  "report.md": "5a80e3c15876e9a7ec6e5f1d9f21c699f3f6f95dc5b3925dfe0be4f8af5ddb72",
-  "report_generator_v2.py": "93b4651be64d5cf7728687f149810efcc779f99dfaa4ce8d14636b6e7bcff7f8",
+  "report.md": "09859a7d1b5b3ec034c66c4f5099e5f11e7fe9855a0ddeec03f78529c5919cf2",
+  "report_generator_v2.py": "e99464f4122102fd7a04990c0a6157617968a437ac55f9df3adb1534eef83be6",
   "roi_vs_m_cap.svg": "a5f6fe5c976d78f3d1998bbbf7b480170bbdf70660e3ef226c083b0d258d10a4",
   "settlement_card.json": "ca586066cea817f8034b9d9b2786a24a5b26abed2cf867c5c44cf62699169990",
   "settlement_finalizer_v2.py": "3cc7d644e652e190d2e679632630fe85847d3b17fe354ae5367c50f76cadf293",
