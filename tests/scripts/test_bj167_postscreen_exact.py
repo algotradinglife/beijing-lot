@@ -15,8 +15,8 @@ def test_candidate_freeze_union_and_shared_paired_bootstrap():
     screen = FIXTURE / "screen"; out = FIXTURE / "out"; screen.mkdir(parents=True); out.mkdir()
     fields = ["selector_id", "weight_source", "mechanism", "cap", "M", "seed", "seed_scope", "global_cell", "no_tax_roi", "stake_yuan", "matched_full_lift"]
     rows = [
-        dict(selector_id="S0", weight_source="Q_WEIGHT", mechanism="WOR_DISTINCT", cap="NA", M="64", seed="ENSEMBLE_100", seed_scope="ENSEMBLE_100", global_cell="", no_tax_roi="0.10", stake_yuan="100", matched_full_lift="0.20"),
-        dict(selector_id="S0", weight_source="Q_WEIGHT", mechanism="CAPPED_REPEAT", cap="1", M="64", seed="NA", seed_scope="DETERMINISTIC", global_cell="9", no_tax_roi="-0.10", stake_yuan="100", matched_full_lift="0.01"),
+        dict(selector_id="S0", weight_source="Q_WEIGHT", mechanism="WOR_DISTINCT", cap="NA", M="64", seed="ENSEMBLE_100", seed_scope="ENSEMBLE_100", global_cell="", no_tax_roi="0.166666666667", stake_yuan="100", matched_full_lift=""),
+        dict(selector_id="S0", weight_source="Q_WEIGHT", mechanism="CAPPED_REPEAT", cap="1", M="64", seed="NA", seed_scope="DETERMINISTIC", global_cell="9", no_tax_roi="0.166666666667", stake_yuan="100", matched_full_lift=""),
     ]
     with gzip.open(screen / "ensemble_metrics.csv.gz", "wt", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields); w.writeheader(); w.writerows(rows)
@@ -25,12 +25,12 @@ def test_candidate_freeze_union_and_shared_paired_bootstrap():
     (screen / "SHA256SUMS.json").write_text("{}\n")
     frozen = POST.candidate_rows(screen)
     assert len(frozen) == 2
-    assert frozen[0]["candidate_inclusion"] == "RAW_PARETO"
-    assert "ABSOLUTE_POSITIVE" in frozen[1]["candidate_inclusion"]
+    assert "RAW_PARETO" in frozen[0]["candidate_inclusion"]
+    assert all("ABSOLUTE_POSITIVE" in r["candidate_inclusion"] for r in frozen)
     for i, r in enumerate(frozen): r["candidate_index"] = i
     n = 3
     values = {name: [array.array("d", value), array.array("d", value)] for name, value in {
-        "net": [2.0, -1.0, 0.0], "stake": [2.0, 2.0, 2.0], "gross": [4.0, 1.0, 2.0], "tax": [0.0, 0.0, 0.0], "hit": [1.0, 1.0, 1.0],
+        "net": [2.0, -1.0, 0.0], "stake": [2.0, 2.0, 2.0], "gross": [4.0, 1.0, 2.0], "tax": [0.0, 0.0, 0.0], "hit": [1.0, 1.0, 1.0], "tax_line_hit": [0.0, 0.0, 0.0],
         "full_net": [0.0, -3.0, -1.0], "full_stake": [4.0, 4.0, 4.0], "full_gross": [4.0, 1.0, 3.0], "full_tax": [0.0, 0.0, 0.0],
     }.items()}
     # The two candidates intentionally share this small fixture's ledger;

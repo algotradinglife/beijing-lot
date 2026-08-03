@@ -128,7 +128,7 @@ def replay_candidates(rows: list[dict], issue_order: list[str], issue_meta: dict
     R.build_policy_status(census_rows, supports, selector_idx)
     if set(issue_order) != set(by_issue): raise RuntimeError("screening issue order does not match canonical support universe")
     n, c = len(issue_order), len(rows)
-    values = {name: [array.array("d", [0.0]) * n for _ in range(c)] for name in ("net", "stake", "gross", "tax", "hit", "full_net", "full_stake", "full_gross", "full_tax")}
+    values = {name: [array.array("d", [0.0]) * n for _ in range(c)] for name in ("net", "stake", "gross", "tax", "hit", "tax_line_hit", "full_net", "full_stake", "full_gross", "full_tax")}
     by_selector: dict[int, list[dict]] = defaultdict(list)
     for row in rows:
         row["selector_index"] = selector_idx[row["selector_id"]]
@@ -151,6 +151,7 @@ def replay_candidates(rows: list[dict], issue_order: list[str], issue_meta: dict
                 stake = 2.0 * (unique + duplicate); gross = support["payout"] * hit
                 tax = support["payout"] * 0.20 * hit if support["payout"] >= 10_000.0 else 0.0
                 values["stake"][ci][ii] += stake; values["gross"][ci][ii] += gross; values["tax"][ci][ii] += tax; values["hit"][ci][ii] += hit
+                if support["payout"] >= 10_000.0: values["tax_line_hit"][ci][ii] += hit
                 values["net"][ci][ii] += gross - stake
                 mult = candidate_multiplier(candidate)
                 full_stake = 2.0 * 2187 * mult; full_gross = support["payout"] * mult
@@ -215,6 +216,12 @@ def bootstrap_rows(rows: list[dict], values: dict[str, list[array.array]], issue
                 if s: cum += v; peak = max(peak, cum); dd = max(dd, peak - cum)
             total_gross = sum(gross); hhi = sum(g * g for g in gross) / (total_gross * total_gross) if total_gross else 0.0
             top = max(gross) / total_gross if total_gross else 0.0
+            screen_roi = rows[ci].get("no_tax_roi", "")
+            if screen_roi and abs(roi - float(screen_roi)) > 1e-12:
+                raise RuntimeError(f"post-screen exact replay does not reproduce screening ROI for candidate {ci}: {roi} != {screen_roi}")
+            screen_lift = rows[ci].get("matched_full_lift", "")
+            if screen_lift and roi is not None and full_roi is not None and abs((roi - full_roi) - float(screen_lift)) > 1e-12:
+                raise RuntimeError(f"post-screen exact replay does not reproduce screening FULL lift for candidate {ci}")
             out_rows.append({"candidate_index": ci, "candidate_point_roi": roi, "full_point_roi": full_roi,
                              "paired_lift_point": roi - full_roi if roi is not None and full_roi is not None else None,
                              "candidate_ci95_low": quantile(cand, .025), "candidate_ci95_high": quantile(cand, .975),
@@ -293,11 +300,7 @@ def write_outputs(rows: list[dict], boot: list[dict], values: dict[str, list[arr
         w = csv.DictWriter(f, fieldnames=fields3); w.writeheader()
         for ci, b in by_index.items():
             gross, tax, stake = sum(values["gross"][ci]), sum(values["tax"][ci]), sum(values["stake"][ci])
-            # A ticket crosses the tax line precisely when its support payout
-            # does.  The exact count comes from taxable gross / payout only in
-            # the issue ledger; for charting expose taxable gross as monetary
-            # exposure, avoiding an invented count when payouts differ.
-            w.writerow({"candidate_index": ci, "gross_pre_tax_yuan": f"{gross:.6f}", "tax_yuan": f"{tax:.6f}", "tax_line_exposure_yuan": f"{tax / .20:.6f}", "gross_return_retention": "" if gross == 0 else f"{(gross-tax)/gross:.12f}", "tax_to_gross_fraction": "" if gross == 0 else f"{tax/gross:.12f}", "pre_tax_no_tax_roi": "" if stake == 0 else f"{(gross-stake)/stake:.12f}", "tax_adjusted_roi": "" if stake == 0 else f"{(gross-tax-stake)/stake:.12f}", "tax_line_hit_ticket_count": "UNAVAILABLE_MONETARY_EXPOSURE_REPORTED"})
+            w.writerow({"candidate_index": ci, "gross_pre_tax_yuan": f"{gross:.6f}", "tax_yuan": f"{tax:.6f}", "tax_line_exposure_yuan": f"{tax / .20:.6f}", "gross_return_retention": "" if gross == 0 else f"{(gross-tax)/gross:.12f}", "tax_to_gross_fraction": "" if gross == 0 else f"{tax/gross:.12f}", "pre_tax_no_tax_roi": "" if stake == 0 else f"{(gross-stake)/stake:.12f}", "tax_adjusted_roi": "" if stake == 0 else f"{(gross-tax-stake)/stake:.12f}", "tax_line_hit_ticket_count": f"{sum(values['tax_line_hit'][ci]):.0f}"})
     with (out / "bh_descriptive_significance.csv").open("w", newline="") as f:
         fields4 = ["candidate_index", "family", "nominal_two_sided_p", "bh_adjusted_p", "bonferroni_adjusted_p", "interpretation"]
         w = csv.DictWriter(f, fieldnames=fields4); w.writeheader()
@@ -310,6 +313,10 @@ def main() -> None:
     ap = argparse.ArgumentParser(); ap.add_argument("--screening-output", default="results/bj167_gate_b_strategy_atlas_v3r1_exact"); ap.add_argument("--output", default="results/bj167_gate_b_strategy_atlas_v3r1_postscreen_exact"); args = ap.parse_args()
     screen, final = ROOT / args.screening_output, ROOT / args.output
     if not (screen / "SHA256SUMS.json").exists(): raise RuntimeError("completed immutable screening package is required")
+    sums = json.loads((screen / "SHA256SUMS.json").read_text())
+    for name, digest in sums.items():
+        p = screen / name
+        if not p.exists() or R.sha(p) != digest: raise RuntimeError(f"screening package payload drift: {name}")
     if final.exists(): raise RuntimeError("refusing to replace immutable post-screening package")
     stage = Path(str(final) + ".stage")
     if stage.exists(): raise RuntimeError("refusing to reuse a stale staging package")
@@ -324,6 +331,11 @@ def main() -> None:
     write_stability(rows, values, issue_order, issue_meta, out)
     write_seed_quantiles(screen, out)
     write_outputs(rows, boot, values, issue_order, issue_meta, out)
+    # Retain the accepted bridge in the companion package so its chart source
+    # is explicit and carries the same v3r1 naming as the exact replay.
+    shutil.copyfile(screen / "baseline_registry.csv", out / "baseline_registry_v3r1.csv")
+    shutil.copyfile(out / "baseline_registry_v3r1.csv", out / "chart_source_baseline_bridge.csv")
+    shutil.copyfile(out / "seed_ensemble_quantiles.csv.gz", out / "chart_source_seed_ensemble_quantiles.csv.gz")
     (out / "settlement_card.json").write_text(json.dumps({"contract": CONTRACT, "screening_package": str(screen.name), "screening_manifest_sha256": R.sha(screen / "SHA256SUMS.json"), "candidate_rule": "absolute positive + raw Pareto + prior robust screen", "candidate_count": len(rows), "exact_replay": "frozen #145 native allocator; accepted tie behavior", "bootstrap": {"replicates": REPLICATES, "unit": "issue_instance", "shared_draw_seed": DRAW_SEED}, "primary_metric": "pre-tax no_tax_roi", "promotion_authorized": False}, sort_keys=True, indent=2) + "\n")
     (out / "README.md").write_text("# #167 post-screening exact evidence v3r1\n\nThis immutable companion package freezes the completed primary screen's absolute-positive and raw-Pareto aggregate cells, then replays those cells at ticket level. All candidate versus FULL resamples use one common 20,000-draw issue matrix. BH and Bonferroni values are descriptive post-screening adjustments only; they do not promote a policy.\n")
     R.write_file_census(out)
