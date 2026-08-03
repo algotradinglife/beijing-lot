@@ -248,7 +248,10 @@ def test_recovery_stability_fixture_uses_frozen_registry_metadata(tmp_path):
     rows = list(csv.DictReader((tmp_path / "stability_year_fold_loyo.csv").open()))
     assert count == len(rows) and count > 0
     p = next(r for r in rows if r["target"].endswith("/P_MIN_GLOBAL_DELETE") and r["slice_type"] == "YEAR")
-    assert p["mechanism"] == "P_MIN_GLOBAL_DELETE" and p["M"] == "2187"
+    # The frozen cell declares M=NA for a global-delete control; its 2187
+    # ticket-space is a separate frozen field, so the recovery must preserve
+    # the actual allocation-grid M rather than inventing one from a label.
+    assert p["mechanism"] == "P_MIN_GLOBAL_DELETE" and p["M"] == "NA"
     assert any(r["target"].endswith("/ENSEMBLE_100") and r["slice_type"] == "LOYO" for r in rows)
 
 def test_common_support_hash_tokens_are_selector_scoped():

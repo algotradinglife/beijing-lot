@@ -194,7 +194,7 @@ def test_full_atlas_chart_sources_cover_deterministic_dense_m_and_selector_contr
     with gzip.open(screen / "ensemble_metrics.csv.gz", "wt", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields); w.writeheader(); w.writerows(rows)
     selector = {"selector_id":"S0","family":"NO_GATE","gate_id":"G0","top_k":"4","lowp_source":"NONE","lowp_threshold":"","ranker":"Q"}
-    census = [{"selector_id":"S0","issue_instance":"I1","status":"SETTLED"},{"selector_id":"S0","issue_instance":"I2","status":"NO_BET"},{"selector_id":"S0","issue_instance":"I3","status":"UNAVAILABLE_CANONICAL_OUTCOME"}]
+    census = [{"selector_id":"S0","issue_instance":"I1","status":"SETTLED"},{"selector_id":"S0","issue_instance":"I2","status":"NO_BET_FROZEN"},{"selector_id":"S0","issue_instance":"I3","status":"UNAVAILABLE_CANONICAL_OUTCOME"}]
     POST.write_full_atlas_chart_sources(screen, out, [selector], census)
     with gzip.open(out / "chart_source_full_dense_m_curve_v3r1.csv.gz", "rt", newline="") as f: dense = list(csv.DictReader(f))
     assert {r["mechanism"] for r in dense} == {"FULL_ENUMERATED", "RESIDUAL_SYSTEMATIC", "WOR_DISTINCT"}

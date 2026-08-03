@@ -100,7 +100,10 @@ def write_full_atlas_chart_sources(screen: Path, out: Path, selector_rows: list[
         status = row.get("status", "")
         if status == "SETTLED": c["settled_policy_count"] += 1
         elif status == "UNAVAILABLE_CANONICAL_OUTCOME": c["unavailable_policy_count"] += 1
-        elif status == "NO_BET": c["no_bet_policy_count"] += 1
+        elif status in {"NO_BET", "NO_BET_FROZEN"}:
+            # Gate-B's pre-frozen zero-exposure policy is a no-bet, not an
+            # unavailable outcome; retain it in the denominator at zero stake.
+            c["no_bet_policy_count"] += 1
         else: raise RuntimeError(f"unknown selector policy status: {status}")
     with gzip.open(screen / "ensemble_metrics.csv.gz", "rt", newline="") as f:
         rows = list(csv.DictReader(f))
