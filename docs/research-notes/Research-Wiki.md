@@ -631,6 +631,27 @@ Allocator seed SD 随 M 增大而下降（M32 `31.44%`、M64 `21.08%`、M128 `16
 完整 seed、prefix、issue-bootstrap、variance decomposition、truth-rank、overlap 和图表见
 [`#167 Gate-B package`](../../results/bj167_gate_b_outcome_settlement_v1r1/README.md)。
 
+### #167 Gate-B v1r2：风险与时间切片补全
+
+PI 要求的 replacement package 保留 v1r1 不变，并把逐 seed 风险与时间稳定性控制补齐：
+
+- Gate-B v1r2 manifest：`6946ea6c92a871fe97159980e5a8440e5927cf789b272c227b7d3c4175e96758`
+- Gate-B v1r2 content identity：`6a86977a004b3a96c3b0eb9c488d4da2f272157af02051e01d4ff928f9dcee2f`
+- `seed_summary.csv` 对每个 M/seed 固定报告 stake、unique/duplicate tickets、coverage、税前/税后 ROI、税前/税后最大回撤、最长 miss streak、最大 signed issue/year 及排除后的 ROI。
+- `slice_summary.csv`、`year_fold_summary.csv` 和 `loyo_summary.csv` 用相同冻结 issue rows 给出 YEAR、FOLD 与 leave-one-year-out；没有针对切片重新选参。
+- 新增 `concentration_hhi.svg` 与 `drawdown.svg`，并保留 issue-cluster 2,000 次 bootstrap、truth-rank、seed overlap、prefix convergence 和 seed/outcome variance decomposition。
+
+v1r2 的 100-seed pre-tax ensemble 数值与 v1r1 一致：M32/M64/M128 均值分别为
+`-22.2972%/-19.9009%/-19.5673%`，positive-seed fraction 为 `21%/17%/11%`；M64
+seed SD 为 `21.08%`。平均最大税前回撤随 M 为 `¥25,719.79/¥39,626.49/¥68,084.81`
+（M32/M64/M128），最长未命中 issue streak 的 seed 最大值为 `94/66/34`。按 seed
+平均 gross-issue HHI 为 `0.1684/0.0903/0.0510`，排除最大 signed issue/year 后的
+均值仍为负（分别约 `-44.03%/-34.54%/-29.51%` 与 `-43.62%/-34.80%/-29.38%`）。
+这些只是风险与稳健性描述，不改变 `NO_PROMOTION`、严格 EV、样本外/前瞻验证和不生成购买包的边界。
+
+完整 v1r2 见
+[`#167 Gate-B v1r2 package`](../../results/bj167_gate_b_outcome_settlement_v1r2/README.md)。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
