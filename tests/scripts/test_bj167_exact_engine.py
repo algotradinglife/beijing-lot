@@ -258,6 +258,19 @@ def test_recovery_incumbent_bridge_allows_only_documented_serialization_delta():
     except RuntimeError as exc:
         assert "material bridge drift" in str(exc)
 
+def test_recovery_provenance_normalizes_cli_relative_checkpoint_path():
+    recovery = load("bj167_recovery_root_relative", ROOT / "scripts" / "recover_bj167_gate_b_exact.py")
+    checkpoint = Path("results/bj167_gate_b_strategy_atlas_v3r1_recovery_checkpoint_v1")
+    assert recovery.root_relative(checkpoint) == "results/bj167_gate_b_strategy_atlas_v3r1_recovery_checkpoint_v1"
+    assert recovery.root_relative(ROOT / checkpoint) == "results/bj167_gate_b_strategy_atlas_v3r1_recovery_checkpoint_v1"
+    args = __import__("argparse").Namespace(
+        archive=Path("results/bj167_gate_b_strategy_atlas_v3r1_exact.failed-stability-label-20260803T2247"),
+        checkpoint=checkpoint,
+        finalize_output=Path("results/bj167_gate_b_strategy_atlas_v3r1_recovered_final_v1"),
+    )
+    normalized = recovery.normalize_cli_paths(args)
+    assert all(path.is_absolute() for path in (normalized.archive, normalized.checkpoint, normalized.finalize_output))
+
 def test_recovery_stability_fixture_uses_frozen_registry_metadata(tmp_path):
     recovery = load("bj167_recovery_stability", ROOT / "scripts" / "recover_bj167_gate_b_exact.py")
     archive = ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_exact.failed-stability-label-20260803T2247"

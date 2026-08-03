@@ -52,6 +52,16 @@ def sha(p: Path) -> str:
         for b in iter(lambda: f.read(1 << 20), b""): h.update(b)
     return h.hexdigest()
 
+def root_relative(path: Path) -> str:
+    """Return a stable repository-relative path for absolute or CLI-relative input."""
+    return str(path.resolve().relative_to(ROOT))
+
+def normalize_cli_paths(args):
+    """Resolve CLI filesystem targets once before any recovery operation."""
+    args.archive=args.archive.resolve(); args.checkpoint=args.checkpoint.resolve()
+    if args.finalize_output is not None: args.finalize_output=args.finalize_output.resolve()
+    return args
+
 def ptr(a, typ):
     return ctypes.cast((typ * len(a)).from_buffer(a), ctypes.POINTER(typ))
 
@@ -620,7 +630,7 @@ def write_recovery_provenance(stage: Path, archive: Path, checkpoint: Path, cens
     copied={name:sha(stage/name) for name in immutable}
     if copied != immutable: raise RuntimeError("archived immutable payload byte identity drift during finalizer staging")
     checkpoint_identity=json.loads((checkpoint/"CONTENT_IDENTITY.json").read_text())
-    payload={"contract":"bj167-gate-b-v3r1-recovery-finalizer-v1","no_full_replay":True,"archive":{"path":str(archive.relative_to(ROOT)),"payload_sha256":archive_hashes,"immutable_payload_sha256":immutable,"explicitly_regenerated_incomplete_or_derived_files":sorted(regenerated),"screen_census":census},"checkpoint":{"path":str(checkpoint.relative_to(ROOT)),"content_identity_sha256":sha(checkpoint/"CONTENT_IDENTITY.json"),"producer_execution":json.loads((checkpoint/"checkpoint_binding.json").read_text())["execution"]},"s1_incumbent_bridge":{"identity":S1_RECOVERY_INCUMBENT_IDENTITY,"roi_serialization_tolerance":str(S1_RECOVERY_SERIALIZATION_TOLERANCE),"actual_expected_delta_implied_yuan":bridge_serialization},"finalizer_execution_start":finalizer_start,"finalizer_execution_end":finalizer_end,"archive_immutable_payloads_copied_byte_for_byte":True}
+    payload={"contract":"bj167-gate-b-v3r1-recovery-finalizer-v1","no_full_replay":True,"archive":{"path":root_relative(archive),"payload_sha256":archive_hashes,"immutable_payload_sha256":immutable,"explicitly_regenerated_incomplete_or_derived_files":sorted(regenerated),"screen_census":census},"checkpoint":{"path":root_relative(checkpoint),"content_identity_sha256":sha(checkpoint/"CONTENT_IDENTITY.json"),"producer_execution":json.loads((checkpoint/"checkpoint_binding.json").read_text())["execution"]},"s1_incumbent_bridge":{"identity":S1_RECOVERY_INCUMBENT_IDENTITY,"roi_serialization_tolerance":str(S1_RECOVERY_SERIALIZATION_TOLERANCE),"actual_expected_delta_implied_yuan":bridge_serialization},"finalizer_execution_start":finalizer_start,"finalizer_execution_end":finalizer_end,"archive_immutable_payloads_copied_byte_for_byte":True}
     (stage/"recovery_provenance.json").write_text(json.dumps(payload,sort_keys=True,indent=2)+"\n")
 
 def archived_support_census(archive: Path) -> tuple[int, int]:
@@ -675,6 +685,9 @@ def finalize_from_checkpoint(final_out: Path, checkpoint: Path, archive: Path, c
 
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument("--archive",type=Path,default=ARCHIVE_DEFAULT); ap.add_argument("--verify-only",action="store_true"); ap.add_argument("--checkpoint",type=Path,default=ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_recovery_checkpoint_v1"); ap.add_argument("--resume-checkpoint",action="store_true"); ap.add_argument("--finalize-output",type=Path); args=ap.parse_args()
+    # CLI paths may be relative to the worktree.  Normalize once at the
+    # boundary; provenance subsequently renders them through root_relative.
+    args=normalize_cli_paths(args)
     census=archive_census(args.archive); snapshot=execution_snapshot(); print(json.dumps(census,sort_keys=True),flush=True)
     if args.verify_only: return
     if args.resume_checkpoint:
