@@ -179,3 +179,49 @@ def test_scientific_reconciliation_100_seed_rounding_envelope_is_exactly_bounded
     # A difference beyond the declared serialization envelope remains a hard
     # mismatch; this is not a generic tolerance relaxation.
     assert abs(screen_serialized_gross - (pooled_gross + 0.00011)) > money_bound
+
+
+def test_full_atlas_chart_sources_cover_deterministic_dense_m_and_selector_controls():
+    root = ROOT / ".scratch" / "bj167_chart_source_fixture"
+    if root.exists(): shutil.rmtree(root)
+    screen = root / "screen"; out = root / "out"; screen.mkdir(parents=True); out.mkdir()
+    fields = ["selector_id", "weight_source", "mechanism", "cap", "M", "seed", "seed_count", "seed_scope", "stake_yuan", "gross_pre_tax_yuan", "tax_yuan", "no_tax_roi", "tax_adjusted_roi", "matched_full_lift", "coverage_hit_rate", "ticket_hit_rate", "capital_utilization_vs_full", "seed_mean_drawdown_no_tax_yuan", "seed_gross_weighted_mean_issue_hhi"]
+    rows = [
+        {"selector_id":"S0","weight_source":"NA","mechanism":"FULL_ENUMERATED","cap":"NA","M":"2187","seed":"NA","seed_count":"1","seed_scope":"DETERMINISTIC","stake_yuan":"100.000000","gross_pre_tax_yuan":"100.000000","tax_yuan":"0.000000","no_tax_roi":"0.000000000000","tax_adjusted_roi":"0.000000000000","matched_full_lift":"0.000000000000","coverage_hit_rate":"1.0","ticket_hit_rate":".1","capital_utilization_vs_full":"1.0","seed_mean_drawdown_no_tax_yuan":"0","seed_gross_weighted_mean_issue_hhi":".5"},
+        {"selector_id":"S0","weight_source":"Q_WEIGHT","mechanism":"RESIDUAL_SYSTEMATIC","cap":"NA","M":"16","seed":"NA","seed_count":"1","seed_scope":"DETERMINISTIC","stake_yuan":"16.000000","gross_pre_tax_yuan":"50.000000","tax_yuan":"10.000000","no_tax_roi":"2.125000000000","tax_adjusted_roi":"1.500000000000","matched_full_lift":"2.125000000000","coverage_hit_rate":".8","ticket_hit_rate":".2","capital_utilization_vs_full":".16","seed_mean_drawdown_no_tax_yuan":"-2","seed_gross_weighted_mean_issue_hhi":".3"},
+        {"selector_id":"S0","weight_source":"Q_WEIGHT","mechanism":"WOR_DISTINCT","cap":"NA","M":"16","seed":"ENSEMBLE_100","seed_count":"100","seed_scope":"ENSEMBLE_100","stake_yuan":"1600.000000","gross_pre_tax_yuan":"8000.000000","tax_yuan":"20.000000","no_tax_roi":"-.5","tax_adjusted_roi":"-.5125","matched_full_lift":"-.5","coverage_hit_rate":".7","ticket_hit_rate":".15","capital_utilization_vs_full":".16","seed_mean_drawdown_no_tax_yuan":"-4","seed_gross_weighted_mean_issue_hhi":".4"},
+    ]
+    with gzip.open(screen / "ensemble_metrics.csv.gz", "wt", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields); w.writeheader(); w.writerows(rows)
+    selector = {"selector_id":"S0","family":"NO_GATE","gate_id":"G0","top_k":"4","lowp_source":"NONE","lowp_threshold":"","ranker":"Q"}
+    census = [{"selector_id":"S0","issue_instance":"I1","status":"SETTLED"},{"selector_id":"S0","issue_instance":"I2","status":"NO_BET"},{"selector_id":"S0","issue_instance":"I3","status":"UNAVAILABLE_CANONICAL_OUTCOME"}]
+    POST.write_full_atlas_chart_sources(screen, out, [selector], census)
+    with gzip.open(out / "chart_source_full_dense_m_curve_v3r1.csv.gz", "rt", newline="") as f: dense = list(csv.DictReader(f))
+    assert {r["mechanism"] for r in dense} == {"FULL_ENUMERATED", "RESIDUAL_SYSTEMATIC", "WOR_DISTINCT"}
+    assert {"family", "gate_id", "top_k", "lowp_source", "ranker", "coverage_hit_rate", "ticket_hit_rate"} <= set(dense[0])
+    with gzip.open(out / "chart_source_selector_full_surface_v3r1.csv.gz", "rt", newline="") as f: full = next(csv.DictReader(f))
+    assert full["settled_policy_count"] == "1" and full["no_bet_policy_count"] == "1" and full["unavailable_policy_count"] == "1"
+    with gzip.open(out / "chart_source_capital_risk_tax_hit_v3r1.csv.gz", "rt", newline="") as f: capital = list(csv.DictReader(f))
+    residual = next(r for r in capital if r["mechanism"] == "RESIDUAL_SYSTEMATIC")
+    assert residual["no_tax_roi"] == "2.125000000000" and residual["tax_line_exposure_yuan"] == "50.000000"
+    assert residual["gross_return_retention_vs_matched_full"] == "0.500000000000"
+    assert residual["taxable_ticket_metric_status"] == "NOT_RETAINED_IN_SCREEN_LEDGER"
+    ensemble = next(r for r in capital if r["mechanism"] == "WOR_DISTINCT")
+    assert ensemble["gross_retention_normalization_scale"] == "100"
+    assert ensemble["normalized_gross_pre_tax_yuan"] == "80.000000"
+    assert ensemble["gross_return_retention_vs_matched_full"] == "0.800000000000"
+    shutil.rmtree(root)
+
+
+def test_execution_provenance_binds_screen_and_postscreen_identities():
+    root = ROOT / ".scratch" / "bj167_execution_provenance_fixture"
+    if root.exists(): shutil.rmtree(root)
+    screen = root / "screen"; out = root / "out"; screen.mkdir(parents=True); out.mkdir()
+    (screen / "SHA256SUMS.json").write_text("{}\n"); (screen / "CONTENT_IDENTITY.json").write_text("{}\n")
+    snap = POST.execution_snapshot()
+    POST.write_execution_provenance(out, screen, snap, snap)
+    data = json.loads((out / "execution_provenance.json").read_text())
+    assert data["screening_execution"]["git_head"] == POST.SCREENING_EXECUTION_HEAD
+    assert data["screening_execution"]["runner_sha256"] == POST.SCREENING_RUNNER_SHA256
+    assert data["postscreen_execution_start"] == data["postscreen_execution_end"] == snap
+    shutil.rmtree(root)

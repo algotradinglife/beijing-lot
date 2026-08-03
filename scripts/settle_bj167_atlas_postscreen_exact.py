@@ -10,7 +10,7 @@ and chronology diagnostics without restarting or reducing the screen.
 """
 from __future__ import annotations
 
-import argparse, array, csv, ctypes, gzip, hashlib, importlib.util, json, math, os, shutil, statistics
+import argparse, array, csv, ctypes, gzip, hashlib, importlib.util, json, math, os, shutil, statistics, subprocess
 from collections import defaultdict
 from pathlib import Path
 
@@ -22,10 +22,133 @@ R = importlib.util.module_from_spec(spec); assert spec.loader is not None; spec.
 REPLICATES = 20_000
 DRAW_SEED = 167137
 CONTRACT = "bj167-gate-b-v3r1-postscreen-exact"
+SCREENING_EXECUTION_HEAD = "d1717395a2ca5fc5e16554756723f296ec6053e8"
+SCREENING_RUNNER_SHA256 = "4d9ee1313ac66df5cf5f41d8db12a39352c626459c7c4d55af3d5074cc560f32"
+SCREENING_NATIVE_WRAPPER_SHA256 = "db6960d5a81ccde49f0bcb62a7c4424174feae1a4e754e64ef01de88a8b47829"
+NATIVE_WRAPPER_PATH = ROOT / "scripts" / "bj167_exact_atlas.cpp"
 
 
 def canonical_key(row: dict) -> tuple[str, str, str, str, str, str]:
     return tuple(row.get(k, "") for k in ("selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope"))
+
+
+def git_head() -> str:
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, text=True,
+                          stdout=subprocess.PIPE).stdout.strip()
+
+
+def execution_snapshot() -> dict:
+    """The post-screen executable identity, captured at real start and end."""
+    return {"git_head": git_head(), "runner_path": str(Path(__file__).relative_to(ROOT)),
+            "runner_sha256": R.sha(Path(__file__)),
+            "native_wrapper_path": str(NATIVE_WRAPPER_PATH.relative_to(ROOT)),
+            "native_wrapper_sha256": R.sha(NATIVE_WRAPPER_PATH),
+            "frozen_allocator_path": "scripts/bj145_fast_alloc.cpp",
+            "frozen_allocator_sha256": R.sha(ROOT / "scripts" / "bj145_fast_alloc.cpp")}
+
+
+def write_execution_provenance(out: Path, screen: Path, post_start: dict, post_end: dict) -> None:
+    if post_start != post_end:
+        raise RuntimeError("post-screen executable identity changed during run")
+    # The current Python screening runner must remain byte-identical to the
+    # process started at d171; the native wrapper is recorded separately
+    # because it later gained bounded post-screen entry points.
+    if R.sha(RUNNER_PATH) != SCREENING_RUNNER_SHA256:
+        raise RuntimeError("current screening runner no longer proves d171 execution semantics")
+    payload = {
+        "contract": CONTRACT,
+        "screening_execution": {
+            "git_head": SCREENING_EXECUTION_HEAD,
+            "runner_path": str(RUNNER_PATH.relative_to(ROOT)),
+            "runner_sha256": SCREENING_RUNNER_SHA256,
+            "native_wrapper_path": str(NATIVE_WRAPPER_PATH.relative_to(ROOT)),
+            "native_wrapper_sha256": SCREENING_NATIVE_WRAPPER_SHA256,
+            "screening_package": screen.name,
+            "screening_manifest_sha256": R.sha(screen / "SHA256SUMS.json"),
+            "screening_content_identity_sha256": R.sha(screen / "CONTENT_IDENTITY.json"),
+            "semantics_proof": "runner SHA equals the process-start d171 runner; later native wrapper additions are recorded only as post-screen identity and covered by production-path tests",
+        },
+        "postscreen_execution_start": post_start,
+        "postscreen_execution_end": post_end,
+    }
+    (out / "execution_provenance.json").write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n")
+
+
+def write_gz_rows(path: Path, fields: list[str], rows) -> None:
+    with gzip.GzipFile(filename=str(path), mode="wb", mtime=0) as gb, __import__("io").TextIOWrapper(gb, newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
+        for row in rows: w.writerow({k: row.get(k, "") for k in fields})
+
+
+def write_full_atlas_chart_sources(screen: Path, out: Path, selector_rows: list[dict] | None = None,
+                                   policy_rows: list[dict] | None = None) -> None:
+    """Render-ready full-atlas sources, derived only from immutable screen data.
+
+    The original screen's in-memory code predates these schema fields.  This
+    companion keeps that monetary package immutable and creates a keyed chart
+    layer with every deterministic dense-M arm retained once.
+    """
+    if selector_rows is None:
+        with (R.GA / "selector_grid.csv").open(newline="") as f: selector_rows = list(csv.DictReader(f))
+    if policy_rows is None:
+        with (screen / "selector_policy_census.csv").open(newline="") as f: policy_rows = list(csv.DictReader(f))
+    selectors = {r["selector_id"]: r for r in selector_rows}
+    census = defaultdict(lambda: {"selector_policy_count": 0, "settled_policy_count": 0,
+                                  "unavailable_policy_count": 0, "no_bet_policy_count": 0})
+    for row in policy_rows:
+        c = census[row["selector_id"]]; c["selector_policy_count"] += 1
+        status = row.get("status", "")
+        if status == "SETTLED": c["settled_policy_count"] += 1
+        elif status == "UNAVAILABLE_CANONICAL_OUTCOME": c["unavailable_policy_count"] += 1
+        elif status == "NO_BET": c["no_bet_policy_count"] += 1
+        else: raise RuntimeError(f"unknown selector policy status: {status}")
+    with gzip.open(screen / "ensemble_metrics.csv.gz", "rt", newline="") as f:
+        rows = list(csv.DictReader(f))
+    full_gross = {r["selector_id"]: float(r["gross_pre_tax_yuan"])
+                  for r in rows if r["mechanism"] == "FULL_ENUMERATED"}
+    if set(full_gross) != set(selectors):
+        raise RuntimeError("selector FULL chart control is incomplete")
+    def joined(row: dict) -> dict:
+        sid = row["selector_id"]
+        if sid not in selectors or sid not in census: raise RuntimeError(f"chart source selector join drift: {sid}")
+        outrow = dict(row); outrow.update(selectors[sid]); outrow.update(census[sid])
+        gross = float(row["gross_pre_tax_yuan"]); fg = full_gross[sid]
+        # Ensemble rows pool 100 seed ledgers whereas selector FULL is one
+        # deterministic realization.  Compare one seed-equivalent candidate
+        # gross to one matched-FULL gross; deterministic rows retain scale 1.
+        scale = int(row.get("seed_count") or (100 if row["seed_scope"] == "ENSEMBLE_100" else 1))
+        if scale <= 0: raise RuntimeError("invalid gross-retention normalization scale")
+        normalized_gross = gross / scale
+        outrow["gross_retention_normalization_scale"] = str(scale)
+        outrow["normalized_gross_pre_tax_yuan"] = f"{normalized_gross:.6f}"
+        outrow["gross_return_retention_vs_matched_full"] = "" if fg == 0 else f"{normalized_gross / fg:.12f}"
+        # The immutable primary surface retains monetary tax exactly.  Its
+        # pre-screen ledger did not retain taxable ticket counts, so expose
+        # count/rate as explicitly unavailable rather than inventing them.
+        outrow["tax_line_exposure_yuan"] = f"{float(row['tax_yuan']) / .20:.6f}"
+        outrow["taxable_winning_ticket_count"] = ""
+        outrow["taxable_winning_ticket_rate"] = ""
+        outrow["taxable_ticket_metric_status"] = "NOT_RETAINED_IN_SCREEN_LEDGER"
+        return outrow
+    rendered = [joined(r) for r in rows]
+    selector_fields = ["selector_id", "family", "gate_id", "top_k", "lowp_source", "lowp_threshold", "ranker",
+                       "selector_policy_count", "settled_policy_count", "unavailable_policy_count", "no_bet_policy_count",
+                       "stake_yuan", "gross_pre_tax_yuan", "no_tax_roi", "tax_adjusted_roi", "coverage_hit_rate",
+                       "ticket_hit_rate", "capital_utilization_vs_full", "seed_mean_drawdown_no_tax_yuan"]
+    write_gz_rows(out / "chart_source_selector_full_surface_v3r1.csv.gz", selector_fields,
+                  (r for r in rendered if r["mechanism"] == "FULL_ENUMERATED"))
+    dense_fields = ["selector_id", "family", "gate_id", "top_k", "lowp_source", "lowp_threshold", "ranker",
+                    "weight_source", "mechanism", "cap", "M", "seed", "seed_scope", "stake_yuan", "gross_pre_tax_yuan",
+                    "no_tax_roi", "matched_full_lift", "coverage_hit_rate", "ticket_hit_rate", "capital_utilization_vs_full"]
+    write_gz_rows(out / "chart_source_full_dense_m_curve_v3r1.csv.gz", dense_fields, rendered)
+    capital_fields = ["selector_id", "family", "gate_id", "top_k", "lowp_source", "lowp_threshold", "ranker",
+                      "weight_source", "mechanism", "cap", "M", "seed", "seed_scope", "stake_yuan", "gross_pre_tax_yuan",
+                      "no_tax_roi", "tax_adjusted_roi", "tax_yuan", "tax_line_exposure_yuan",
+                      "gross_retention_normalization_scale", "normalized_gross_pre_tax_yuan", "gross_return_retention_vs_matched_full", "taxable_winning_ticket_count", "taxable_winning_ticket_rate",
+                      "taxable_ticket_metric_status", "coverage_hit_rate", "ticket_hit_rate", "seed_mean_drawdown_no_tax_yuan",
+                      "seed_gross_weighted_mean_issue_hhi", "selector_policy_count", "settled_policy_count",
+                      "unavailable_policy_count", "no_bet_policy_count"]
+    write_gz_rows(out / "chart_source_capital_risk_tax_hit_v3r1.csv.gz", capital_fields, rendered)
 
 
 def candidate_rows(screen: Path) -> list[dict]:
@@ -327,6 +450,7 @@ def write_outputs(rows: list[dict], boot: list[dict], values: dict[str, list[arr
 def main() -> None:
     ap = argparse.ArgumentParser(); ap.add_argument("--screening-output", default="results/bj167_gate_b_strategy_atlas_v3r1_exact"); ap.add_argument("--output", default="results/bj167_gate_b_strategy_atlas_v3r1_postscreen_exact"); args = ap.parse_args()
     screen, final = ROOT / args.screening_output, ROOT / args.output
+    post_start = execution_snapshot()
     if not (screen / "SHA256SUMS.json").exists(): raise RuntimeError("completed immutable screening package is required")
     sums = json.loads((screen / "SHA256SUMS.json").read_text())
     for name, digest in sums.items():
@@ -353,10 +477,13 @@ def main() -> None:
     shutil.copyfile(screen / "baseline_registry.csv", out / "baseline_registry_v3r1.csv")
     shutil.copyfile(out / "baseline_registry_v3r1.csv", out / "chart_source_baseline_bridge.csv")
     shutil.copyfile(out / "seed_ensemble_quantiles.csv.gz", out / "chart_source_seed_ensemble_quantiles.csv.gz")
-    (out / "settlement_card.json").write_text(json.dumps({"contract": CONTRACT, "screening_package": str(screen.name), "screening_manifest_sha256": R.sha(screen / "SHA256SUMS.json"), "candidate_rule": "absolute positive + raw Pareto + prior robust screen", "candidate_freeze_count": len(rows), "full_search_family_count": full_family_size, "exact_replay": "frozen #145 native allocator; accepted tie behavior", "bootstrap": {"replicates": REPLICATES, "unit": "issue_instance", "shared_draw_seed": DRAW_SEED}, "primary_metric": "pre-tax no_tax_roi", "promotion_authorized": False}, sort_keys=True, indent=2) + "\n")
+    write_full_atlas_chart_sources(screen, out)
+    post_end = execution_snapshot()
+    write_execution_provenance(out, screen, post_start, post_end)
+    (out / "settlement_card.json").write_text(json.dumps({"contract": CONTRACT, "screening_package": str(screen.name), "screening_manifest_sha256": R.sha(screen / "SHA256SUMS.json"), "screening_execution_head": SCREENING_EXECUTION_HEAD, "postscreen_execution_head": post_start["git_head"], "execution_provenance": "execution_provenance.json", "candidate_rule": "absolute positive + raw Pareto + prior robust screen", "candidate_freeze_count": len(rows), "full_search_family_count": full_family_size, "exact_replay": "frozen #145 native allocator; accepted tie behavior", "bootstrap": {"replicates": REPLICATES, "unit": "issue_instance", "shared_draw_seed": DRAW_SEED}, "primary_metric": "pre-tax no_tax_roi", "promotion_authorized": False}, sort_keys=True, indent=2) + "\n")
     (out / "README.md").write_text("# #167 post-screening exact evidence v3r1\n\nThis immutable companion package freezes the completed primary screen's absolute-positive and raw-Pareto aggregate cells, then replays those cells at ticket level. All candidate versus FULL resamples use one common 20,000-draw issue matrix. BH and Bonferroni values are descriptive post-screening adjustments only; they do not promote a policy.\n")
     R.write_file_census(out)
-    R.finalize_package_identity(out, CONTRACT, {"screening_manifest_sha256": R.sha(screen / "SHA256SUMS.json"), "bootstrap_replicates": REPLICATES, "shared_draw_seed": DRAW_SEED, "allocator_sha256": R.EXPECTED_ALLOCATOR_SHA256})
+    R.finalize_package_identity(out, CONTRACT, {"screening_manifest_sha256": R.sha(screen / "SHA256SUMS.json"), "screening_execution_head": SCREENING_EXECUTION_HEAD, "screening_runner_sha256": SCREENING_RUNNER_SHA256, "screening_native_wrapper_sha256": SCREENING_NATIVE_WRAPPER_SHA256, "postscreen_execution_head": post_start["git_head"], "postscreen_runner_sha256": post_start["runner_sha256"], "postscreen_native_wrapper_sha256": post_start["native_wrapper_sha256"], "bootstrap_replicates": REPLICATES, "shared_draw_seed": DRAW_SEED, "allocator_sha256": R.EXPECTED_ALLOCATOR_SHA256})
     R.atomic_publish(stage, final)
     print(f"WROTE {final}", flush=True)
 
