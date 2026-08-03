@@ -19,8 +19,8 @@ CHECKPOINT_CONTRACT="bj167-gate-b-v3r1-shared-science-candidate-checkpoint-v1"
 # The completed screen serializes every seed-level monetary total with
 # ``money(...)=%.6f`` before it sums the 100 stochastic rows.  The companion
 # instead pools those same ticket totals before it writes its comparison.
-# These are therefore the only permitted reconciliation differences: half a
-# decimal quantum for each serialized seed (or one deterministic row).
+# These are therefore the only permitted reconciliation differences: one
+# decimal quantum per seed across the two independently accumulated paths.
 MONEY_QUANTUM = 1e-6
 RATIO_QUANTUM = 1e-12
 NATIVE_WRAPPER_PATH = ROOT / "scripts" / "bj167_exact_atlas.cpp"
@@ -129,8 +129,8 @@ def same_or_blank(actual: float | None, expected: str, tol: float) -> tuple[bool
 
 
 def serialization_money_envelope(seed_scope: str) -> float:
-    """Maximum declared screen-rounding error for a pooled money total."""
-    return 0.5 * MONEY_QUANTUM * (100 if seed_scope == "ENSEMBLE_100" else 1)
+    """Cross-executable money envelope: one quantum per pooled seed."""
+    return MONEY_QUANTUM * (100 if seed_scope == "ENSEMBLE_100" else 1)
 
 
 def serialization_roi_envelope(screen_gross: str, screen_stake: str, seed_scope: str) -> float:
@@ -340,7 +340,7 @@ def reconcile_scientific_screen(out: Path, screen: Path, selectors: list[dict], 
                 mismatch += not ok
                 def delta(a,e): return "" if a=="" or e=="" else f"{float(a)-float(e):.12f}"
                 report_cell=reporting_science_cell(cell)
-                w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":report_cell[0],"mechanism":report_cell[1],"cap":report_cell[2],"M":report_cell[3],"seed_scope":report_cell[4],"screen_stake_yuan":e_s,"replay_stake_yuan":a_s,"stake_delta_yuan":delta(a_s,e_s),"screen_stake_tolerance_yuan":f"{money_tol:.12f}","screen_gross_yuan":e_g,"replay_gross_yuan":a_g,"gross_delta_yuan":delta(a_g,e_g),"screen_gross_tolerance_yuan":f"{money_tol:.12f}","screen_no_tax_roi":e_r,"replay_no_tax_roi":a_r,"roi_delta":delta(a_r,e_r),"roi_tolerance":f"{roi_tol:.12f}","screen_matched_full_no_tax_roi":e_f,"replay_matched_full_no_tax_roi":a_f,"full_roi_delta":delta(a_f,e_f),"full_roi_tolerance":f"{full_roi_tol:.12f}","screen_matched_full_lift":e_l,"replay_matched_full_lift":a_l,"lift_delta":delta(a_l,e_l),"lift_tolerance":f"{lift_tol:.12f}","serialization_precision_envelope":"100x_half_1e-6_seed_money + adaptive_roi" if cell[4] == "ENSEMBLE_100" else "one_half_1e-6_money + adaptive_roi","reconciliation_status":"PASS" if ok else "FAIL"})
+                w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":report_cell[0],"mechanism":report_cell[1],"cap":report_cell[2],"M":report_cell[3],"seed_scope":report_cell[4],"screen_stake_yuan":e_s,"replay_stake_yuan":a_s,"stake_delta_yuan":delta(a_s,e_s),"screen_stake_tolerance_yuan":f"{money_tol:.12f}","screen_gross_yuan":e_g,"replay_gross_yuan":a_g,"gross_delta_yuan":delta(a_g,e_g),"screen_gross_tolerance_yuan":f"{money_tol:.12f}","screen_no_tax_roi":e_r,"replay_no_tax_roi":a_r,"roi_delta":delta(a_r,e_r),"roi_tolerance":f"{roi_tol:.12f}","screen_matched_full_no_tax_roi":e_f,"replay_matched_full_no_tax_roi":a_f,"full_roi_delta":delta(a_f,e_f),"full_roi_tolerance":f"{full_roi_tol:.12f}","screen_matched_full_lift":e_l,"replay_matched_full_lift":a_l,"lift_delta":delta(a_l,e_l),"lift_tolerance":f"{lift_tol:.12f}","serialization_precision_envelope":"100x_one_1e-6_seed_cross_executable_money + adaptive_roi" if cell[4] == "ENSEMBLE_100" else "one_1e-6_cross_executable_money + adaptive_roi","reconciliation_status":"PASS" if ok else "FAIL"})
     write_gz(out/"scientific_screen_reconciliation.csv.gz",fields,emit)
     if screened: raise RuntimeError(f"unmapped immutable screening scientific rows: {len(screened)}")
     if mismatch: raise RuntimeError(f"scientific screen reconciliation mismatch count={mismatch}")

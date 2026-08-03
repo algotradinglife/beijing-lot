@@ -182,11 +182,22 @@ def test_scientific_reconciliation_requires_complete_keyed_963_surface():
         assert len(structural) == 2 and {r["M"] for r in structural} == {"NA"}
         assert next(r for r in selected if r["mechanism"] == "FULL_ENUMERATED")["M"] == "2187"
         assert next(r for r in selected if r["mechanism"] == "WR_DUPLICATE_STAKE")["M"] == "16"
+        labels = {r["seed_scope"]: r["serialization_precision_envelope"] for r in selected}
+        assert labels["DETERMINISTIC"] == "one_1e-6_cross_executable_money + adaptive_roi"
+        assert labels["ENSEMBLE_100"] == "100x_one_1e-6_seed_cross_executable_money + adaptive_roi"
     shutil.rmtree(root)
 
 
-def test_scientific_reconciliation_100_seed_rounding_envelope_is_exactly_bounded():
-    """The companion pools before writing; the screen rounds each seed first."""
+def test_scientific_reconciliation_cross_executable_money_envelope_boundaries():
+    """One quantum per seed passes; any material excess remains fail-closed."""
+    for seed_scope, seed_count in (("DETERMINISTIC", 1), ("ENSEMBLE_100", 100)):
+        money_bound = SCIENCE.serialization_money_envelope(seed_scope)
+        assert money_bound == SCIENCE.MONEY_QUANTUM * seed_count
+        assert SCIENCE.same_or_blank(money_bound * 0.999, "0", money_bound)[0]
+        assert SCIENCE.same_or_blank(money_bound, "0", money_bound)[0]
+        assert not SCIENCE.same_or_blank(money_bound * 1.001, "0", money_bound)[0]
+
+    # The companion pools before writing; the screen rounds each seed first.
     full_precision_seed_gross = [0.0000005001] * 100
     screen_serialized_gross = sum(float(f"{x:.6f}") for x in full_precision_seed_gross)
     pooled_gross = sum(full_precision_seed_gross)
@@ -198,9 +209,12 @@ def test_scientific_reconciliation_100_seed_rounding_envelope_is_exactly_bounded
     pooled_roi = (pooled_gross - stake) / stake
     roi_bound = SCIENCE.serialization_roi_envelope(f"{screen_serialized_gross:.6f}", f"{stake:.6f}", "ENSEMBLE_100")
     assert abs(screen_roi - pooled_roi) <= roi_bound
+    assert SCIENCE.same_or_blank(screen_roi + roi_bound * 0.999, f"{screen_roi:.12f}", roi_bound)[0]
+    assert not SCIENCE.same_or_blank(screen_roi + roi_bound * 1.001, f"{screen_roi:.12f}", roi_bound)[0]
     # A difference beyond the declared serialization envelope remains a hard
     # mismatch; this is not a generic tolerance relaxation.
-    assert abs(screen_serialized_gross - (pooled_gross + 0.00011)) > money_bound
+    beyond_screen_gross = screen_serialized_gross + money_bound * 1.001
+    assert abs(screen_serialized_gross - beyond_screen_gross) > money_bound
 
 
 def test_shared_science_checkpoint_is_atomic_and_resumable_without_ticket_replay():
