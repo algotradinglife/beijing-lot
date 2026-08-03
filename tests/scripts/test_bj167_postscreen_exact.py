@@ -63,6 +63,13 @@ def test_candidate_freeze_union_and_shared_paired_bootstrap():
     assert explicit[0]["fixture_bonferroni_adjusted_p"] == .2
     assert explicit[0]["fixture_bh_adjusted_p"] == .2
     assert (out / "candidate_paired_bootstrap_20000.csv").exists() and (out / "bh_descriptive_significance.csv").exists()
+    # The candidate freeze is deliberately much smaller than the immutable
+    # searched family.  Both denominators must survive into the persisted
+    # significance artifact, rather than existing only during adjustment.
+    significance = list(csv.DictReader((out / "bh_descriptive_significance.csv").open(newline="")))
+    assert len(significance) == 4
+    assert {r["candidate_freeze_count"] for r in significance} == {"2"}
+    assert {r["full_search_family_count"] for r in significance} == {"100"}
     shutil.rmtree(FIXTURE)
 
 
