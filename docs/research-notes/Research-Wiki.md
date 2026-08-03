@@ -550,6 +550,35 @@ WOR 为 98/19/0，model WR 为 57/1/0，market WOR 为 53/0/0；raw M1 峰值不
 rule。上述数值保留为描述性历史证据，不能据此回写选择规则或创建投注包。详见
 [#137 Gate B v3r1 共同支持集终局结算](../research/bj137_probability_weighted_sampling_gate_b_2026-08-02.md)。
 
+## #159：selected-baseline WOR 跨 N reporting recovery（2026-08-03）
+
+#159 的 Gate-B v2 结算账本保持不可变；本节只记录从已认证账本派生的 v2r1
+reporting recovery。v2r1 不重新打开 canonical outcomes，不改变 identity、issue、
+winning-ticket、stake、payout、tax、net 或 ROI 行。
+
+- source v2 manifest：`ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917`
+- source v2 content identity：`42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08`
+- v2r1 manifest：`42d5347f4864f78a97ddc9b30f326e8e3f762d1bdd6b6ef965c1240e1a9b2273`
+- v2r1 content identity：`34f1ff0668517f80aaf2a92053497c411b9ad665d1aad7e34df14d7d0c268403`
+
+完整 81 个 N×M×seed 主表（税前主指标、税后次指标、实际 stake/ticket、coverage、
+YEAR/FOLD/LOYO、bootstrap、matched/common-support N7、overlap、最大 issue/year 排除、
+双 drawdown 和双 miss streak）在不可变包的 `report.md`、`surface_summary.csv`、
+`issue_bootstrap.csv` 与 `matched_n7_deltas.csv` 中。图表包括 `roi_surface_pre_tax.svg`、
+`matched_n7_pre_tax_delta.svg` 和 `stability_exclusions_M64.svg`。可读结论和 M64 摘要见
+[#159 v2r1 reporting recovery](../research/bj159_selected_wor_cross_n_gate_b_v2r1_2026-08-03.md)。
+
+M64 seed-mean 的关键读回如下：N=9 原始税前 ROI `+71.97%`，去掉每个 seed 的最大
+signed-issue 贡献后为 `-76.05%`，去掉最大 signed-year 贡献后为 `-93.12%`；其余 N
+的原始曲线均为负。81 个 ALL 行中原始正值 8 行、最大 issue 排除后仅 1 行、最大 year
+排除后 0 行。因此 N=9 是极端集中度信号，不是稳定的 N 甜点，也不构成 strict EV、
+样本外验证、购买、生产或推广授权。
+
+本次修正把最大贡献定义为**正 stake 行中 signed pre-tax net 的最大值**，排除时分别
+扣除实际 stake、pre-tax net 和 tax-adjusted net；税仍按单张中奖 ¥2 ticket 独立判断，
+绝不跨票、跨 issue 或跨 policy 汇总计税。执行 miss streak 明确跳过 no-bet 和 zero-stake
+unavailable rows；drawdown 同时提供税前主值和税后次值。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]

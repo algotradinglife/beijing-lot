@@ -1,8 +1,11 @@
-# #159 Gate B — selected-baseline WOR cross-N settlement
+# #159 Gate B — selected-baseline WOR cross-N settlement (source record)
 
-Gate-A v2r1 was merged by PI at `cc05012a737cc34e4897eef7619b60e492f2f059`.
-This one-shot Gate-B package settles only that immutable complete-issue
-selection surface against the accepted trusted outcome join.
+This document is the original v2 settlement source record.  Its identity is
+now explicitly bound to the immutable package that was actually reviewed;
+the earlier locator values below were stale and are superseded.  Reporting
+corrections are in
+`bj159_selected_wor_cross_n_gate_b_v2r1_2026-08-03.md` and must be used for
+concentration, exclusion, miss-streak and drawdown interpretation.
 
 ## Binding and accounting
 
@@ -10,8 +13,11 @@ selection surface against the accepted trusted outcome join.
 - Gate-B outcome manifest: `fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc`
 - canonical outcome payload: `13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89`
 - replacement package: `results/bj159_gate_b_outcome_settlement_v2`
-- package manifest: `98932f8c5a24937db9a948377bfb6cc16c61803b4860b7dbc7fed1c83d5388f5`
-- content identity: `eef1faf47766da52c29fe501e745c90b66c75d6defd239093500f49dd0ac4fd0`
+- package manifest: `ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917`
+- content identity: `42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08`
+- reporting-recovery package: `results/bj159_gate_b_outcome_settlement_v2r1`
+- reporting-recovery manifest: `42d5347f4864f78a97ddc9b30f326e8e3f762d1bdd6b6ef965c1240e1a9b2273`
+- reporting-recovery content identity: `34f1ff0668517f80aaf2a92053497c411b9ad665d1aad7e34df14d7d0c268403`
 
 Nominal `M={32,64,128}` is preserved as a reporting label. Every actual draw
 and stake uses `effective_M=min(nominal_M,3^N)`. The 21 saturated plan cells

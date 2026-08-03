@@ -1,0 +1,37 @@
+{
+  "canonical_outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "contract": "BJ-HIST-SELECTED-WOR-CROSS-N-001",
+  "correction_boundary": "v2 identity, issue and winning-ticket ledgers are copied byte-for-byte and never recomputed; recovery does not open canonical outcomes",
+  "decision": {
+    "decision": "POSITIVE_REQUIRES_STRICT_INDEPENDENT_EV",
+    "positive_after_largest_issue_exclusion": 1,
+    "positive_after_largest_year_exclusion": 0,
+    "positive_all_rows": 8,
+    "promotion_authorized": false,
+    "rule": "Pre-tax no_tax_roi is primary; tax-adjusted ROI is secondary. Largest issue/year controls use signed pre-tax net contribution and actual executed stake. Same-window positives are descriptive only and require strict independent EV plus held-out/forward validation; no purchase, production, betting or promotion authority.",
+    "strict_independent_ev_required": true
+  },
+  "drawdown_rule": "pre-tax-primary and tax-adjusted-secondary net drawdowns are emitted separately",
+  "exclusion_rule": "largest signed pre-tax net contribution among executed positive-stake rows; remove actual stake and both net variants",
+  "gate_a_manifest_sha256": "a15c585fc1836da4f558d07ce19c925561bfd1c240e834b7e3e0da22701cd325",
+  "issue": 159,
+  "miss_streak_rule": "frozen-calendar and executed-positive-stake streaks are emitted separately",
+  "output": {
+    "copied_ledger_files": [
+      "identity_settlement.csv.gz",
+      "issue_settlement.csv.gz",
+      "winning_ticket_tax_ledger.csv.gz"
+    ],
+    "issue_settlement_rows": 28188,
+    "matched_delta_rows": 81,
+    "positive_after_largest_issue_exclusion": 1,
+    "positive_after_largest_year_exclusion": 0,
+    "positive_all_rows": 8,
+    "surface_summary_rows": 1782
+  },
+  "runner_version": "bj159-gate-b-v2r1-reporting-recovery",
+  "scope": "historical paper-only reporting recovery; no purchase, production, betting or promotion authority",
+  "source_v2_content_identity_sha256": "42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08",
+  "source_v2_manifest_sha256": "ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917",
+  "stage": "GATE_B_REPORTING_RECOVERY"
+}
