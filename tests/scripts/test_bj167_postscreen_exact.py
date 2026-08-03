@@ -1,7 +1,7 @@
 """Production-path checks for the bounded #167 post-screening evidence pass."""
 from __future__ import annotations
 
-import array, csv, gzip, importlib.util, json, shutil
+import array, csv, gzip, importlib.util, json, os, shutil, subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -236,14 +236,8 @@ def test_actual_scientific_finalizer_reads_disk_checkpoint_without_outcomes_or_s
     SCIENCE.write_candidate_checkpoint(checkpoint, screen, mapping, issue, selectors, cells, candidate, aggregate, {"git_head":"fixture"}, {"git_head":"fixture"})
     del candidate, aggregate, allv
     __import__("gc").collect()
-    old_argv, old_outcomes, old_supports = __import__("sys").argv, SCIENCE.R.load_outcomes, SCIENCE.R.build_supports
-    SCIENCE.R.load_outcomes = lambda: (_ for _ in ()).throw(AssertionError("finalizer must not load outcomes"))
-    SCIENCE.R.build_supports = lambda *_: (_ for _ in ()).throw(AssertionError("finalizer must not construct supports"))
-    try:
-        __import__("sys").argv = ["scientific", "--screening-output", str(screen.relative_to(ROOT)), "--checkpoint-output", str(checkpoint.relative_to(ROOT)), "--output", str(final.relative_to(ROOT)), "--finalize-checkpoint"]
-        SCIENCE.main()
-    finally:
-        __import__("sys").argv, SCIENCE.R.load_outcomes, SCIENCE.R.build_supports = old_argv, old_outcomes, old_supports
+    proc=subprocess.run(["python3",str(ROOT/"scripts"/"settle_bj167_scientific_stability_exact.py"),"--screening-output",str(screen.relative_to(ROOT)),"--checkpoint-output",str(checkpoint.relative_to(ROOT)),"--output",str(final.relative_to(ROOT)),"--scientific-finalize"],cwd=ROOT,text=True,capture_output=True,env={**os.environ,"BJ167_TEST_FORBID_OUTCOME_SUPPORT":"1"})
+    assert proc.returncode == 0, proc.stderr
     assert (final / "SHA256SUMS.json").exists() and (final / "scientific_screen_reconciliation.csv.gz").exists()
     shutil.rmtree(root)
 
@@ -278,13 +272,8 @@ def test_actual_postscreen_finalizer_reads_disk_checkpoint_without_replay():
     SCIENCE.write_candidate_checkpoint(checkpoint,screen,mapping,issue,selectors,cells,candidate,aggregate,{"git_head":"fixture"},{"git_head":"fixture"})
     del candidate, aggregate
     __import__("gc").collect()
-    old_argv, old_replay = __import__("sys").argv, POST.replay_candidates
-    POST.replay_candidates = lambda *_: (_ for _ in ()).throw(AssertionError("postscreen finalizer must not replay tickets"))
-    try:
-        __import__("sys").argv=["postscreen","--screening-output",str(screen.relative_to(ROOT)),"--checkpoint",str(checkpoint.relative_to(ROOT)),"--output",str(final.relative_to(ROOT)),"--finalize-checkpoint"]
-        POST.main()
-    finally:
-        __import__("sys").argv, POST.replay_candidates = old_argv, old_replay
+    proc=subprocess.run(["python3",str(ROOT/"scripts"/"settle_bj167_atlas_postscreen_exact.py"),"--screening-output",str(screen.relative_to(ROOT)),"--checkpoint",str(checkpoint.relative_to(ROOT)),"--output",str(final.relative_to(ROOT)),"--finalize-checkpoint"],cwd=ROOT,text=True,capture_output=True,env={**os.environ,"BJ167_TEST_FORBID_OUTCOME_SUPPORT":"1"})
+    assert proc.returncode == 0, proc.stderr
     assert (final/"SHA256SUMS.json").exists() and (final/"candidate_paired_bootstrap_20000.csv").exists()
     shutil.rmtree(root)
 
