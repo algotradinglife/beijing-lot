@@ -164,14 +164,14 @@ IDENTITY_FIELDS = (
 ISSUE_FIELDS = (
     "issue", "fold", "year", "issue_instance", "n", "M", "nominal_M", "effective_M", "seed", "selection_status",
     "planned_identity_count", "settled_identity_count", "planned_draw_count", "executed_draw_count", "stake_yuan",
-    "full_control_stake_yuan", "winning_ticket_count", "hit_identity_count", "coverage_hit_rate", "gross_pre_tax_yuan",
+    "full_control_stake_yuan", "winning_ticket_count", "hit_identity_count", "coverage_hit_rate", "unique_ticket_count", "duplicate_ticket_count", "gross_pre_tax_yuan",
     "tax_yuan", "after_tax_gross_yuan", "pre_tax_net_yuan", "tax_adjusted_net_yuan", "no_tax_roi", "tax_adjusted_roi",
     "largest_signed_identity_net_yuan", "first_kickoff_ts",
 )
 
 
 def aggregate_template(part: dict[str, str], m: int, seed: str) -> dict[str, object]:
-    return {"issue": part["issue"], "fold": part["fold"], "year": part["year"], "issue_instance": part["issue_instance"], "n": N, "M": m, "nominal_M": m, "effective_M": m, "seed": seed, "selection_status": part["selection_status"], "planned_identity_count": int(part["selected_identity_count"]), "settled_identity_count": 0, "planned_draw_count": int(part["selected_identity_count"]) * m, "executed_draw_count": 0, "stake_yuan": Decimal(0), "full_control_stake_yuan": Decimal(int(part["selected_identity_count"]) * (3 ** N) * 2), "winning_ticket_count": 0, "hit_identity_count": 0, "gross_pre_tax_yuan": Decimal(0), "tax_yuan": Decimal(0), "after_tax_gross_yuan": Decimal(0), "pre_tax_net_yuan": Decimal(0), "tax_adjusted_net_yuan": Decimal(0), "largest_signed_identity_net_yuan": Decimal(0), "first_kickoff_ts": ""}
+    return {"issue": part["issue"], "fold": part["fold"], "year": part["year"], "issue_instance": part["issue_instance"], "n": N, "M": m, "nominal_M": m, "effective_M": m, "seed": seed, "selection_status": part["selection_status"], "planned_identity_count": int(part["selected_identity_count"]), "settled_identity_count": 0, "planned_draw_count": int(part["selected_identity_count"]) * m, "executed_draw_count": 0, "stake_yuan": Decimal(0), "full_control_stake_yuan": Decimal(int(part["selected_identity_count"]) * (3 ** N) * 2), "winning_ticket_count": 0, "hit_identity_count": 0, "unique_ticket_count": 0, "duplicate_ticket_count": 0, "gross_pre_tax_yuan": Decimal(0), "tax_yuan": Decimal(0), "after_tax_gross_yuan": Decimal(0), "pre_tax_net_yuan": Decimal(0), "tax_adjusted_net_yuan": Decimal(0), "largest_signed_identity_net_yuan": Decimal(0), "first_kickoff_ts": ""}
 
 
 def update_aggregate(agg: dict[str, object], row: dict[str, object]) -> None:
@@ -182,6 +182,8 @@ def update_aggregate(agg: dict[str, object], row: dict[str, object]) -> None:
     for field in ("stake_yuan", "gross_pre_tax_yuan", "tax_yuan", "after_tax_gross_yuan", "pre_tax_net_yuan", "tax_adjusted_net_yuan"):
         agg[field] = dec(agg[field], field) + dec(row[field], field)
     agg["winning_ticket_count"] = int(agg["winning_ticket_count"]) + int(row["winning_ticket_count"])
+    agg["unique_ticket_count"] = int(agg["unique_ticket_count"]) + int(row["unique_ticket_count"])
+    agg["duplicate_ticket_count"] = int(agg["duplicate_ticket_count"]) + int(row["duplicate_ticket_count"])
     agg["hit_identity_count"] = int(agg["hit_identity_count"]) + int(row["coverage_hit"] == "YES")
     agg["largest_signed_identity_net_yuan"] = max(dec(agg["largest_signed_identity_net_yuan"], "largest"), dec(row["pre_tax_net_yuan"], "pre net"))
     kickoff = str(row.get("kickoff_ts", ""))
@@ -202,18 +204,72 @@ def finalize_aggregate(agg: dict[str, object]) -> dict[str, object]:
 
 
 def summarize(issue_rows: list[dict[str, object]], scope: str, scope_value: str) -> dict[str, object]:
+    if not issue_rows:
+        raise RuntimeError(f"cannot summarize empty {scope} slice {scope_value}")
     first = issue_rows[0]
     stake = sum((dec(row["stake_yuan"], "stake") for row in issue_rows), Decimal(0))
     gross = sum((dec(row["gross_pre_tax_yuan"], "gross") for row in issue_rows), Decimal(0))
+    tax = sum((dec(row["tax_yuan"], "tax") for row in issue_rows), Decimal(0))
+    after_tax_gross = sum((dec(row["after_tax_gross_yuan"], "after tax gross") for row in issue_rows), Decimal(0))
     tax_net = sum((dec(row["tax_adjusted_net_yuan"], "tax net") for row in issue_rows), Decimal(0))
     pre = sum((dec(row["pre_tax_net_yuan"], "pre net") for row in issue_rows), Decimal(0))
     gross_by_issue = {str(row["issue_instance"]): dec(row["gross_pre_tax_yuan"], "gross") for row in issue_rows}
     signed_by_issue = {str(row["issue_instance"]): dec(row["pre_tax_net_yuan"], "pre net") for row in issue_rows}
+    stake_by_issue = {str(row["issue_instance"]): dec(row["stake_yuan"], "stake") for row in issue_rows}
+    gross_by_year: dict[str, Decimal] = defaultdict(Decimal)
+    signed_by_year: dict[str, Decimal] = defaultdict(Decimal)
+    stake_by_year: dict[str, Decimal] = defaultdict(Decimal)
+    for row in issue_rows:
+        year = str(row["year"])
+        gross_by_year[year] += dec(row["gross_pre_tax_yuan"], "gross")
+        signed_by_year[year] += dec(row["pre_tax_net_yuan"], "pre net")
+        stake_by_year[year] += dec(row["stake_yuan"], "stake")
     largest_issue, largest_signed = max(signed_by_issue.items(), key=lambda item: (item[1], item[0]), default=("", Decimal(0)))
-    largest_gross = max(gross_by_issue.values(), default=Decimal(0)); total_gross = sum(gross_by_issue.values(), Decimal(0))
+    largest_year, largest_signed_year = max(signed_by_year.items(), key=lambda item: (item[1], item[0]), default=("", Decimal(0)))
+    largest_abs_issue, largest_abs_issue_net = max(signed_by_issue.items(), key=lambda item: (abs(item[1]), item[0]), default=("", Decimal(0)))
+    largest_abs_year, largest_abs_year_net = max(signed_by_year.items(), key=lambda item: (abs(item[1]), item[0]), default=("", Decimal(0)))
+    gross_top_issue = max(gross_by_issue, key=gross_by_issue.get, default="")
+    largest_gross = gross_by_issue.get(gross_top_issue, Decimal(0)); total_gross = sum(gross_by_issue.values(), Decimal(0))
     hhi = sum((value / total_gross) ** 2 for value in gross_by_issue.values()) if total_gross else Decimal(0)
-    ex_stake = stake - next((dec(row["stake_yuan"], "stake") for row in issue_rows if row["issue_instance"] == largest_issue), Decimal(0))
-    out = {"scope": scope, "scope_value": scope_value, "n": N, "M": first["M"], "seed": first["seed"], "frozen_issue_count": len(issue_rows), "settled_issue_count": sum(int(row["settled_identity_count"]) > 0 for row in issue_rows), "planned_identity_count": sum(int(row["planned_identity_count"]) for row in issue_rows), "settled_identity_count": sum(int(row["settled_identity_count"]) for row in issue_rows), "planned_draw_count": sum(int(row["planned_draw_count"]) for row in issue_rows), "executed_draw_count": sum(int(row["executed_draw_count"]) for row in issue_rows), "stake_yuan": money(stake), "gross_pre_tax_yuan": money(gross), "tax_adjusted_net_yuan": money(tax_net), "pre_tax_net_yuan": money(pre), "no_tax_roi": ratio(pre / stake if stake else None), "tax_adjusted_roi": ratio(tax_net / stake if stake else None), "winning_ticket_count": sum(int(row["winning_ticket_count"]) for row in issue_rows), "hit_identity_count": sum(int(row["hit_identity_count"]) for row in issue_rows), "coverage_hit_rate": ratio(Decimal(sum(int(row["hit_identity_count"]) for row in issue_rows)) / sum(int(row["settled_identity_count"]) for row in issue_rows)) if sum(int(row["settled_identity_count"]) for row in issue_rows) else "", "gross_top_issue": max(gross_by_issue, key=gross_by_issue.get, default=""), "gross_top_issue_share": ratio(largest_gross / total_gross if total_gross else None), "gross_issue_hhi": ratio(hhi), "largest_signed_issue": largest_issue, "largest_signed_issue_net_yuan": money(largest_signed), "ex_largest_issue_no_tax_roi": ratio((pre - largest_signed) / ex_stake if ex_stake else None), "first_kickoff_ts": min((str(row["first_kickoff_ts"]) for row in issue_rows if row["first_kickoff_ts"]), default="")}
+    ex_issue_stake = stake - stake_by_issue.get(largest_issue, Decimal(0))
+    ex_year_stake = stake - stake_by_year.get(largest_year, Decimal(0))
+    ordered = sorted(issue_rows, key=lambda row: (str(row.get("first_kickoff_ts", "")), str(row["issue_instance"])))
+    cumulative_pre = Decimal(0); cumulative_tax = Decimal(0); peak_pre = Decimal(0); peak_tax = Decimal(0)
+    drawdown_pre = Decimal(0); drawdown_tax = Decimal(0); miss_streak = 0; longest_miss_streak = 0
+    for row in ordered:
+        if dec(row["stake_yuan"], "stake") <= 0:
+            continue
+        cumulative_pre += dec(row["pre_tax_net_yuan"], "pre net")
+        cumulative_tax += dec(row["tax_adjusted_net_yuan"], "tax net")
+        peak_pre = max(peak_pre, cumulative_pre); peak_tax = max(peak_tax, cumulative_tax)
+        drawdown_pre = max(drawdown_pre, peak_pre - cumulative_pre); drawdown_tax = max(drawdown_tax, peak_tax - cumulative_tax)
+        if int(row["hit_identity_count"]) > 0:
+            miss_streak = 0
+        else:
+            miss_streak += 1; longest_miss_streak = max(longest_miss_streak, miss_streak)
+    settled_identity_count = sum(int(row["settled_identity_count"]) for row in issue_rows)
+    hit_identity_count = sum(int(row["hit_identity_count"]) for row in issue_rows)
+    executed_draw_count = sum(int(row["executed_draw_count"]) for row in issue_rows)
+    winning_ticket_count = sum(int(row["winning_ticket_count"]) for row in issue_rows)
+    out = {
+        "scope": scope, "scope_value": scope_value, "n": N, "M": first["M"], "seed": first["seed"],
+        "frozen_issue_count": len(issue_rows), "settled_issue_count": sum(int(row["settled_identity_count"]) > 0 for row in issue_rows),
+        "planned_identity_count": sum(int(row["planned_identity_count"]) for row in issue_rows), "settled_identity_count": settled_identity_count,
+        "planned_draw_count": sum(int(row["planned_draw_count"]) for row in issue_rows), "executed_draw_count": executed_draw_count,
+        "stake_yuan": money(stake), "gross_pre_tax_yuan": money(gross), "tax_yuan": money(tax), "after_tax_gross_yuan": money(after_tax_gross),
+        "tax_adjusted_net_yuan": money(tax_net), "pre_tax_net_yuan": money(pre), "no_tax_roi": ratio(pre / stake if stake else None),
+        "tax_adjusted_roi": ratio(tax_net / stake if stake else None), "winning_ticket_count": winning_ticket_count,
+        "hit_identity_count": hit_identity_count, "coverage_hit_rate": ratio(Decimal(hit_identity_count) / settled_identity_count) if settled_identity_count else "",
+        "ticket_hit_rate": ratio(Decimal(winning_ticket_count) / executed_draw_count) if executed_draw_count else "",
+        "unique_ticket_count": sum(int(row["unique_ticket_count"]) for row in issue_rows), "duplicate_ticket_count": sum(int(row["duplicate_ticket_count"]) for row in issue_rows),
+        "gross_top_issue": gross_top_issue, "gross_top_issue_share": ratio(largest_gross / total_gross if total_gross else None), "gross_issue_hhi": ratio(hhi),
+        "largest_signed_issue": largest_issue, "largest_signed_issue_net_yuan": money(largest_signed), "largest_abs_signed_issue": largest_abs_issue, "largest_abs_signed_issue_net_yuan": money(largest_abs_issue_net),
+        "ex_largest_issue_no_tax_roi": ratio((pre - largest_signed) / ex_issue_stake if ex_issue_stake else None), "largest_signed_year": largest_year,
+        "largest_signed_year_net_yuan": money(largest_signed_year), "largest_abs_signed_year": largest_abs_year, "largest_abs_signed_year_net_yuan": money(largest_abs_year_net),
+        "ex_largest_year_no_tax_roi": ratio((pre - largest_signed_year) / ex_year_stake if ex_year_stake else None), "drawdown_no_tax_yuan": money(drawdown_pre),
+        "drawdown_tax_adjusted_yuan": money(drawdown_tax), "longest_miss_streak": longest_miss_streak,
+        "first_kickoff_ts": min((str(row["first_kickoff_ts"]) for row in issue_rows if row["first_kickoff_ts"]), default="")
+    }
     return out
 
 
@@ -304,6 +360,24 @@ def main() -> None:
             support = [row for row in issue_rows if int(row["M"]) == m and row["seed"] == seed]
             seed_rows.append(summarize(support, "SEED", seed))
     seed_fields = tuple(seed_rows[0].keys()); write_csv(output / "seed_summary.csv", seed_rows, seed_fields)
+    # Preserve explicit YEAR/FOLD/LOYO slices rather than hiding chronology in a
+    # single pooled seed row.  The same deterministic issue rows are reused; no
+    # outcomes are re-read or retuned for any slice.
+    slice_rows = []
+    for m in M_GRID:
+        for seed in SEEDS:
+            support = [row for row in issue_rows if int(row["M"]) == m and row["seed"] == seed]
+            years = sorted({str(row["year"]) for row in support})
+            folds = sorted({str(row["fold"]) for row in support})
+            for year in years:
+                slice_rows.append(summarize([row for row in support if str(row["year"]) == year], "YEAR", year))
+                slice_rows.append(summarize([row for row in support if str(row["year"]) != year], "LOYO", year))
+            for fold in folds:
+                slice_rows.append(summarize([row for row in support if str(row["fold"]) == fold], "FOLD", fold))
+    slice_fields = tuple(slice_rows[0].keys())
+    write_csv(output / "slice_summary.csv", slice_rows, slice_fields)
+    write_csv(output / "loyo_summary.csv", [row for row in slice_rows if row["scope"] == "LOYO"], slice_fields)
+    write_csv(output / "year_fold_summary.csv", [row for row in slice_rows if row["scope"] in ("YEAR", "FOLD")], slice_fields)
     ensemble_rows = []
     for m in M_GRID:
         values = [float(row["no_tax_roi"]) for row in seed_rows if int(row["M"]) == m]
@@ -345,10 +419,14 @@ def main() -> None:
     write_csv(output / "seed_overlap_summary.csv", overlap_rows, tuple(overlap_rows[0].keys()))
     svg_lines(output / "seed_ensemble_roi.svg", [{"seed": "ensemble", "M": int(row["M"]), "prefix_n": int(row["M"]), "prefix_mean_roi": row["mean_roi"]} for row in ensemble_rows], "#167 N7 seed-ensemble ROI by M", "prefix_mean_roi", "mean pre-tax ROI")
     svg_lines(output / "prefix_convergence.svg", [row for row in prefix_rows if int(row["M"]) == 64], "#167 N7 M64 prefix convergence", "prefix_mean_roi", "prefix mean pre-tax ROI")
+    concentration_chart = [{"seed": "ensemble", "M": int(m), "gross_issue_hhi": f"{statistics.fmean(float(row['gross_issue_hhi']) for row in seed_rows if int(row['M']) == m):.12f}"} for m in M_GRID]
+    drawdown_chart = [{"seed": "ensemble", "M": int(m), "drawdown_no_tax_yuan": f"{statistics.fmean(float(row['drawdown_no_tax_yuan']) for row in seed_rows if int(row['M']) == m):.12f}"} for m in M_GRID]
+    svg_lines(output / "concentration_hhi.svg", concentration_chart, "#167 gross issue concentration by M", "gross_issue_hhi", "gross issue HHI")
+    svg_lines(output / "drawdown.svg", drawdown_chart, "#167 pre-tax drawdown by M", "drawdown_no_tax_yuan", "drawdown (yuan)")
     generated = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    card = {"issue": 167, "contract": CONTRACT, "stage": "GATE_B_OUTCOME_SETTLEMENT_N7_SEED_ENSEMBLE", "generated_at_utc": generated, "head_start": args.head_start, "head_end": args.head_end, "gate_a_manifest": GA_MANIFEST, "gate_a_content_identity": GA_CONTENT, "outcome_manifest": OUTCOME_MANIFEST, "outcome_payload": OUTCOME_PAYLOAD, "n": N, "M_grid": list(M_GRID), "seed_count": len(SEEDS), "identity_count": len(identities), "identity_settlement_rows": len(identity_rows), "issue_settlement_rows": len(issue_rows), "bootstrap_replicates": BOOTSTRAP_REPLICATES, "primary_metric": "pre-tax no_tax_roi", "tax_secondary": True, "tax_rule": "20% per independent winning ¥2 ticket gross >= ¥10000; no pooling", "promotion_authorized": False, "no_purchase_production_or_betting_authority": True}
+    card = {"issue": 167, "contract": CONTRACT, "stage": "GATE_B_OUTCOME_SETTLEMENT_N7_SEED_ENSEMBLE", "generated_at_utc": generated, "head_start": args.head_start, "head_end": args.head_end, "gate_a_manifest": GA_MANIFEST, "gate_a_content_identity": GA_CONTENT, "outcome_manifest": OUTCOME_MANIFEST, "outcome_payload": OUTCOME_PAYLOAD, "n": N, "M_grid": list(M_GRID), "seed_count": len(SEEDS), "seed_panel": list(SEEDS), "identity_count": len(identities), "identity_settlement_rows": len(identity_rows), "issue_settlement_rows": len(issue_rows), "slice_summary_rows": len(slice_rows), "loyo_rows": sum(row["scope"] == "LOYO" for row in slice_rows), "bootstrap_replicates": BOOTSTRAP_REPLICATES, "primary_metric": "pre-tax no_tax_roi", "tax_secondary": True, "tax_rule": "20% per independent winning ¥2 ticket gross >= ¥10000; no pooling", "required_controls": ["seed-level drawdown", "longest miss streak", "largest signed issue and year with ex-largest ROI", "YEAR/FOLD/LOYO slices", "issue-cluster bootstrap >=2000", "allocator-seed versus historical-outcome variance decomposition", "seed overlap/truth-rank/coverage/M variance"], "promotion_authorized": False, "no_purchase_production_or_betting_authority": True}
     binding = {"issue": 167, "contract": CONTRACT, "gate_a_manifest": GA_MANIFEST, "gate_a_content_identity": GA_CONTENT, "canonical_outcome_manifest": OUTCOME_MANIFEST, "canonical_outcome_payload": OUTCOME_PAYLOAD, "outcome_loader": "read-only canonical_outcome_join.csv", "runner_head": __import__("subprocess").check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()}
-    interpretation = "# #167 N7 100-seed ensemble\n\nN=7 is fixed. M64 is primary; M32/M128 are sensitivities. The 100 seeds are allocator Monte Carlo draws, not 100 independent football histories. The ensemble mean/median and issue-cluster bootstrap must be read together; a positive seed mean alone is descriptive and does not authorize promotion.\n\nEach winning ¥2 ticket is taxed independently at the frozen rule; no issue/policy pooling is used. Prefix convergence is descriptive only. Any positive cluster remains subject to signed-largest issue/year exclusions and held-out validation.\n"
+    interpretation = "# #167 N7 100-seed ensemble\n\nN=7 is fixed. M64 is primary; M32/M128 are sensitivities. The 100 seeds (137001..137100) are allocator Monte Carlo draws, not 100 independent football histories. `seed_summary.csv` reports stake, independent-ticket accounting, coverage, pre-tax/tax-adjusted ROI, drawdown, longest miss streak, signed-largest issue/year contributions, and ex-largest ROI for every seed/M.\n\n`slice_summary.csv` separates YEAR and FOLD views and gives leave-one-year-out (LOYO) rows without retuning. `issue_cluster_bootstrap.csv` uses 2,000 issue-instance resamples per M; `variance_decomposition.csv` keeps allocator-seed variation distinct from historical issue/outcome uncertainty. `truth_rank_distribution.csv`, `seed_overlap_summary.csv`, and the M grid expose allocation sensitivity.\n\nEach winning ¥2 ticket is taxed independently at the frozen rule; no issue/policy pooling is used. A positive seed mean, a favorable slice, or a concentration-adjusted result is descriptive only and does not authorize promotion, production, or purchase. Any positive cluster still requires strict EV and held-out/forward validation.\n"
     output.mkdir(parents=True, exist_ok=True)
     (output / "validation_card.json").write_text(json.dumps(card, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (output / "source_binding.json").write_text(json.dumps(binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")
