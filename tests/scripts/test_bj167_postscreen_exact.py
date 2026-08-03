@@ -166,13 +166,22 @@ def test_scientific_reconciliation_requires_complete_keyed_963_surface():
     fields = ["selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope", "stake_yuan", "gross_pre_tax_yuan", "no_tax_roi", "matched_full_no_tax_roi", "matched_full_lift"]
     with gzip.open(screen / "ensemble_metrics.csv.gz", "wt", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
-        for src, mechanism, cap, m, scope in SCIENCE.science_cells():
-            w.writerow({"selector_id": "S0", "weight_source": src, "mechanism": mechanism, "cap": cap, "M": m, "seed_scope": scope, "stake_yuan": "0.000000", "gross_pre_tax_yuan": "0.000000", "no_tax_roi": "", "matched_full_no_tax_roi": "", "matched_full_lift": ""})
-    cells = SCIENCE.science_cells(); allv = [array.array("d", [0.0]) * len(cells) for _ in range(7)]
-    SCIENCE.reconcile_scientific_screen(out, screen, [{"selector_id": "S0"}], cells, allv)
+        for selector_id in ("S0", "S1"):
+            for cell in SCIENCE.science_cells():
+                src, mechanism, cap, m, scope = SCIENCE.reporting_science_cell(cell)
+                w.writerow({"selector_id": selector_id, "weight_source": src, "mechanism": mechanism, "cap": cap, "M": m, "seed_scope": scope, "stake_yuan": "0.000000", "gross_pre_tax_yuan": "0.000000", "no_tax_roi": "", "matched_full_no_tax_roi": "", "matched_full_lift": ""})
+    cells = SCIENCE.science_cells(); selectors = [{"selector_id": "S0"}, {"selector_id": "S1"}]
+    allv = [array.array("d", [0.0]) * (len(cells) * len(selectors)) for _ in range(7)]
+    SCIENCE.reconcile_scientific_screen(out, screen, selectors, cells, allv)
     with gzip.open(out / "scientific_screen_reconciliation.csv.gz", "rt", newline="") as f:
         rows = list(csv.DictReader(f))
-    assert len(rows) == 963 and all(r["reconciliation_status"] == "PASS" for r in rows)
+    assert len(rows) == 2 * 963 and all(r["reconciliation_status"] == "PASS" for r in rows)
+    for selector_id in ("S0", "S1"):
+        selected = [r for r in rows if r["selector_id"] == selector_id]
+        structural = [r for r in selected if r["mechanism"] in SCIENCE.STRUCTURAL_DELETE_MECHANISMS]
+        assert len(structural) == 2 and {r["M"] for r in structural} == {"NA"}
+        assert next(r for r in selected if r["mechanism"] == "FULL_ENUMERATED")["M"] == "2187"
+        assert next(r for r in selected if r["mechanism"] == "WR_DUPLICATE_STAKE")["M"] == "16"
     shutil.rmtree(root)
 
 

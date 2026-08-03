@@ -24,6 +24,7 @@ CHECKPOINT_CONTRACT="bj167-gate-b-v3r1-shared-science-candidate-checkpoint-v1"
 MONEY_QUANTUM = 1e-6
 RATIO_QUANTUM = 1e-12
 NATIVE_WRAPPER_PATH = ROOT / "scripts" / "bj167_exact_atlas.cpp"
+STRUCTURAL_DELETE_MECHANISMS = frozenset({"P_MIN_GLOBAL_DELETE", "Q_MIN_GLOBAL_DELETE"})
 
 
 def unique_stage(target: Path) -> Path:
@@ -90,8 +91,24 @@ def science_cells():
     return rows
 
 
+def reporting_science_cell(cell: tuple[str, str, str, str, str]) -> tuple[str, str, str, str, str]:
+    """Map an internal science cell to its frozen reporting identity.
+
+    Structural P/Q deletion has an economic support of 1,458 tickets in the
+    pooled companion, but it is not an M-grid sampling arm. The immutable
+    screen therefore reports those two controls as M=NA. No other M value is
+    normalized here.
+    """
+    source, mechanism, cap, m, seed_scope = cell
+    if mechanism in STRUCTURAL_DELETE_MECHANISMS:
+        if m not in {"1458", "NA"}:
+            raise RuntimeError(f"structural delete internal M drift: {mechanism} M={m}")
+        m = "NA"
+    return source, mechanism, cap, m, seed_scope
+
+
 def science_key(selector_id: str, cell: tuple[str, str, str, str, str]) -> tuple[str, str, str, str, str, str]:
-    return (selector_id, *cell)
+    return (selector_id, *reporting_science_cell(cell))
 
 
 def screening_science_rows(screen: Path) -> dict[tuple[str, str, str, str, str, str], dict]:
@@ -322,7 +339,8 @@ def reconcile_scientific_screen(out: Path, screen: Path, selectors: list[dict], 
                 ok=ok_s and ok_g and ok_r and ok_f and ok_l
                 mismatch += not ok
                 def delta(a,e): return "" if a=="" or e=="" else f"{float(a)-float(e):.12f}"
-                w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":cell[0],"mechanism":cell[1],"cap":cell[2],"M":cell[3],"seed_scope":cell[4],"screen_stake_yuan":e_s,"replay_stake_yuan":a_s,"stake_delta_yuan":delta(a_s,e_s),"screen_stake_tolerance_yuan":f"{money_tol:.12f}","screen_gross_yuan":e_g,"replay_gross_yuan":a_g,"gross_delta_yuan":delta(a_g,e_g),"screen_gross_tolerance_yuan":f"{money_tol:.12f}","screen_no_tax_roi":e_r,"replay_no_tax_roi":a_r,"roi_delta":delta(a_r,e_r),"roi_tolerance":f"{roi_tol:.12f}","screen_matched_full_no_tax_roi":e_f,"replay_matched_full_no_tax_roi":a_f,"full_roi_delta":delta(a_f,e_f),"full_roi_tolerance":f"{full_roi_tol:.12f}","screen_matched_full_lift":e_l,"replay_matched_full_lift":a_l,"lift_delta":delta(a_l,e_l),"lift_tolerance":f"{lift_tol:.12f}","serialization_precision_envelope":"100x_half_1e-6_seed_money + adaptive_roi" if cell[4] == "ENSEMBLE_100" else "one_half_1e-6_money + adaptive_roi","reconciliation_status":"PASS" if ok else "FAIL"})
+                report_cell=reporting_science_cell(cell)
+                w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":report_cell[0],"mechanism":report_cell[1],"cap":report_cell[2],"M":report_cell[3],"seed_scope":report_cell[4],"screen_stake_yuan":e_s,"replay_stake_yuan":a_s,"stake_delta_yuan":delta(a_s,e_s),"screen_stake_tolerance_yuan":f"{money_tol:.12f}","screen_gross_yuan":e_g,"replay_gross_yuan":a_g,"gross_delta_yuan":delta(a_g,e_g),"screen_gross_tolerance_yuan":f"{money_tol:.12f}","screen_no_tax_roi":e_r,"replay_no_tax_roi":a_r,"roi_delta":delta(a_r,e_r),"roi_tolerance":f"{roi_tol:.12f}","screen_matched_full_no_tax_roi":e_f,"replay_matched_full_no_tax_roi":a_f,"full_roi_delta":delta(a_f,e_f),"full_roi_tolerance":f"{full_roi_tol:.12f}","screen_matched_full_lift":e_l,"replay_matched_full_lift":a_l,"lift_delta":delta(a_l,e_l),"lift_tolerance":f"{lift_tol:.12f}","serialization_precision_envelope":"100x_half_1e-6_seed_money + adaptive_roi" if cell[4] == "ENSEMBLE_100" else "one_half_1e-6_money + adaptive_roi","reconciliation_status":"PASS" if ok else "FAIL"})
     write_gz(out/"scientific_screen_reconciliation.csv.gz",fields,emit)
     if screened: raise RuntimeError(f"unmapped immutable screening scientific rows: {len(screened)}")
     if mismatch: raise RuntimeError(f"scientific screen reconciliation mismatch count={mismatch}")
@@ -405,6 +423,7 @@ def main():
         for si,sel in enumerate(selectors):
             full_at=si*ncell+960; fnet,fstake=allv[0][full_at],allv[1][full_at]
             for ci,(src,me,cap,m,scope) in enumerate(cells):
+                report_m=reporting_science_cell((src,me,cap,m,scope))[3]
                 at=si*ncell+ci; net,stake=allv[0][at],allv[1][at]; roi=net/stake if stake else None; froi=fnet/fstake if fstake else None; lift=roi-froi if roi is not None and froi is not None else None
                 no_bet = stake == 0.0
                 li=largest_issue[at] if not no_bet else -1; ex_stake=stake-(largest_stake[at] if li>=0 else 0); ex_net=net-(largest[at] if li>=0 else 0); fex_net=fnet-(full_issue_net[si*nissue+li] if li>=0 else 0); fex_stake=fstake-(full_issue_stake[si*nissue+li] if li>=0 else 0); exroi=ex_net/ex_stake if ex_stake else None; fexroi=fex_net/fex_stake if fex_stake else None
@@ -412,7 +431,7 @@ def main():
                 ly=max(range(len(years)),key=lambda yi:byyear[yi][0]) if not no_bet else -1
                 ynet=net-byyear[ly][0] if ly>=0 else 0.0; ystake=stake-byyear[ly][1] if ly>=0 else 0.0; fy_net=fnet-yn[full_at*len(years)+ly] if ly>=0 else 0.0; fy_stake=fstake-ys[full_at*len(years)+ly] if ly>=0 else 0.0; yroi=ynet/ystake if ystake else None; fyroi=fy_net/fy_stake if fy_stake else None
                 gross=allv[2][at]; hhi=allv[5][at]/(gross*gross) if gross else 0.0; top=allv[6][at]/gross if gross else 0.0
-                w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":src,"mechanism":me,"cap":cap,"M":m,"seed_scope":scope,"coverage_scope":"ALL_ATLAS_SCIENTIFIC_CELLS","coverage_status":"NO_BET_ZERO_STAKE" if no_bet else "EXACT_YEAR_FOLD_LOYO_AND_EXCLUSIONS","no_tax_roi":"" if roi is None else f"{roi:.12f}","matched_full_no_tax_roi":"" if froi is None else f"{froi:.12f}","paired_lift":"" if lift is None else f"{lift:.12f}","ex_largest_issue_no_tax_roi":"" if exroi is None else f"{exroi:.12f}","ex_largest_issue_full_roi":"" if fexroi is None else f"{fexroi:.12f}","ex_largest_issue_lift":"" if exroi is None or fexroi is None else f"{exroi-fexroi:.12f}","ex_largest_year_no_tax_roi":"" if yroi is None else f"{yroi:.12f}","ex_largest_year_full_roi":"" if fyroi is None else f"{fyroi:.12f}","ex_largest_year_lift":"" if yroi is None or fyroi is None else f"{yroi-fyroi:.12f}","largest_signed_issue":issues[li] if li>=0 else "","largest_signed_issue_net_yuan":"" if li<0 else f"{largest[at]:.6f}","largest_signed_year":years[ly] if ly>=0 else "","gross_issue_hhi":"" if no_bet else f"{hhi:.12f}","gross_top_issue_share":"" if no_bet else f"{top:.12f}","drawdown_no_tax_yuan":"" if no_bet else f"{drawdown[at]:.6f}","longest_miss_streak":"" if no_bet else longest_miss[at],"year_slice_count":len(years),"fold_slice_count":len(folds),"loyo_slice_count":len(years)})
+                w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":src,"mechanism":me,"cap":cap,"M":report_m,"seed_scope":scope,"coverage_scope":"ALL_ATLAS_SCIENTIFIC_CELLS","coverage_status":"NO_BET_ZERO_STAKE" if no_bet else "EXACT_YEAR_FOLD_LOYO_AND_EXCLUSIONS","no_tax_roi":"" if roi is None else f"{roi:.12f}","matched_full_no_tax_roi":"" if froi is None else f"{froi:.12f}","paired_lift":"" if lift is None else f"{lift:.12f}","ex_largest_issue_no_tax_roi":"" if exroi is None else f"{exroi:.12f}","ex_largest_issue_full_roi":"" if fexroi is None else f"{fexroi:.12f}","ex_largest_issue_lift":"" if exroi is None or fexroi is None else f"{exroi-fexroi:.12f}","ex_largest_year_no_tax_roi":"" if yroi is None else f"{yroi:.12f}","ex_largest_year_full_roi":"" if fyroi is None else f"{fyroi:.12f}","ex_largest_year_lift":"" if yroi is None or fyroi is None else f"{yroi-fyroi:.12f}","largest_signed_issue":issues[li] if li>=0 else "","largest_signed_issue_net_yuan":"" if li<0 else f"{largest[at]:.6f}","largest_signed_year":years[ly] if ly>=0 else "","gross_issue_hhi":"" if no_bet else f"{hhi:.12f}","gross_top_issue_share":"" if no_bet else f"{top:.12f}","drawdown_no_tax_yuan":"" if no_bet else f"{drawdown[at]:.6f}","longest_miss_streak":"" if no_bet else longest_miss[at],"year_slice_count":len(years),"fold_slice_count":len(folds),"loyo_slice_count":len(years)})
     write_gz(out/"scientific_cell_stability_summary.csv.gz",fields,summary_emit)
     # Explicit all-surface read-back prevents the compact positional layout
     # from being mistaken for evidence of a correct selector/cell join.
@@ -425,6 +444,7 @@ def main():
         for si,sel in enumerate(selectors):
             full_at=si*ncell+960
             for ci,(src,me,cap,m,scope) in enumerate(cells):
+                report_m=reporting_science_cell((src,me,cap,m,scope))[3]
                 at=si*ncell+ci
                 for typ,names,nets,stakes,subtract in (("YEAR",years,yn,ys,False),("FOLD",folds,fn,fs,False),("LOYO",years,yn,ys,True)):
                     count=len(years) if typ!="FOLD" else len(folds)
@@ -433,7 +453,7 @@ def main():
                         if subtract: net,stake=allv[0][at]-net,allv[1][at]-stake; fnet,fstake=allv[0][full_at]-fnet,allv[1][full_at]-fstake
                         roi=net/stake if stake else None; froi=fnet/fstake if fstake else None
                         included = retained_issue_count(typ,name,nissue,year_issue_count,fold_issue_count)
-                        w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":src,"mechanism":me,"cap":cap,"M":m,"seed_scope":scope,"coverage_scope":"ALL_ATLAS_SCIENTIFIC_CELLS","slice_type":typ,"slice":name,"retained_issue_count":included,"candidate_no_tax_roi":"" if roi is None else f"{roi:.12f}","matched_full_no_tax_roi":"" if froi is None else f"{froi:.12f}","paired_lift":"" if roi is None or froi is None else f"{roi-froi:.12f}"})
+                        w.writerow({"global_science_cell":at,"selector_id":sel["selector_id"],"weight_source":src,"mechanism":me,"cap":cap,"M":report_m,"seed_scope":scope,"coverage_scope":"ALL_ATLAS_SCIENTIFIC_CELLS","slice_type":typ,"slice":name,"retained_issue_count":included,"candidate_no_tax_roi":"" if roi is None else f"{roi:.12f}","matched_full_no_tax_roi":"" if froi is None else f"{froi:.12f}","paired_lift":"" if roi is None or froi is None else f"{roi-froi:.12f}"})
     write_gz(out/"chart_source_chronology_slices_all_scientific.csv.gz",slice_fields,slice_emit)
     # Gate-A requires exact M2187 reconciliation versus selector-matched FULL.
     rec_fields=["selector_id","weight_source","mechanism","M","seed_scope","candidate_scale","normalized_candidate_stake_yuan","matched_full_stake_yuan","stake_difference_yuan","normalized_candidate_gross_yuan","matched_full_gross_yuan","gross_difference_yuan","normalized_candidate_net_yuan","matched_full_net_yuan","net_difference_yuan","reconciliation_status"]
