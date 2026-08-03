@@ -127,6 +127,6 @@ The positive N=9 cluster is therefore an extreme concentration signal, not evide
 
 - `surface_summary.csv`: complete ALL plus YEAR/FOLD/LOYO summaries with corrected controls.
 - `matched_n7_deltas.csv`: matched/common-support pre-tax-primary deltas against N7.
-- `roi_surface_pre_tax.svg`, `matched_n7_pre_tax_delta.svg`, `stability_exclusions_M64.svg`: readable primary and stability charts.
+- `roi_surface_pre_tax.svg`, `matched_n7_pre_tax_delta.svg`, `stability_exclusions_M64.svg`, `uncertainty_M64.svg`: readable primary, stability and bootstrap uncertainty charts.
 - `issue_bootstrap.csv` and `overlap_summary.csv`: copied from the authenticated v2 package; no underlying ledger changed.
 - `identity_settlement.csv.gz`, `issue_settlement.csv.gz`, `winning_ticket_tax_ledger.csv.gz`: byte-for-byte source evidence copies.

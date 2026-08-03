@@ -306,6 +306,37 @@ def write_svg(path: Path, title: str, ylabel: str, series: dict[str, list[tuple[
     lines.append("</svg>\n"); path.write_text("\n".join(lines), encoding="utf-8")
 
 
+def write_uncertainty_svg(path: Path, bootstrap_rows: list[dict[str, str]]) -> None:
+    """Plot seed-mean bootstrap point estimates and 95% envelope for M=64."""
+    points: list[tuple[int, float, float, float]] = []
+    for n in N_GRID:
+        rows = [row for row in bootstrap_rows if int(row["n"]) == n and int(row["M"]) == 64 and row["metric"] == "no_tax_roi"]
+        if not rows:
+            continue
+        point = sum(float(row["point_estimate"]) for row in rows) / len(rows)
+        low = sum(float(row["ci95_low"]) for row in rows) / len(rows)
+        high = sum(float(row["ci95_high"]) for row in rows) / len(rows)
+        points.append((n, point, low, high))
+    width, height, left, bottom = 860, 470, 78, 62
+    if not points:
+        path.write_text("<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"860\" height=\"470\"/>\n", encoding="utf-8"); return
+    ymin = min(point[2] for point in points); ymax = max(point[3] for point in points); ymin, ymax = min(ymin, 0.0), max(ymax, 0.0)
+    span = max(ymax - ymin, .05); ymin -= span * .08; ymax += span * .08
+    chart_w, chart_h = width - left - 40, height - bottom - 35
+    def x(n: int) -> float: return left + chart_w * (n - 2) / 8
+    def y(value: float) -> float: return 35 + chart_h * (ymax - value) / (ymax - ymin)
+    lines = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}"><rect width="100%" height="100%" fill="white"/><text x="{left}" y="22" font-size="16">#159 M=64 bootstrap uncertainty (seed-mean no-tax ROI)</text><line x1="{left}" y1="{height-bottom}" x2="{width-40}" y2="{height-bottom}" stroke="#333"/><line x1="{left}" y1="35" x2="{left}" y2="{height-bottom}" stroke="#333"/><text x="8" y="{height/2}" font-size="12" transform="rotate(-90 8 {height/2})">ROI and 95% interval</text>']
+    for n in range(2, 11): lines.append(f'<text x="{x(n)-5:.1f}" y="{height-bottom+18}" font-size="11">{n}</text>')
+    if ymin < 0 < ymax: lines.append(f'<line x1="{left}" y1="{y(0):.1f}" x2="{width-40}" y2="{y(0):.1f}" stroke="#999" stroke-dasharray="4,4"/>')
+    coords = " ".join(f"{x(n):.1f},{y(point):.1f}" for n, point, _, _ in points)
+    lines.append(f'<polyline fill="none" stroke="#1f77b4" stroke-width="2" points="{coords}"/>')
+    for n, point, low, high in points:
+        xx = x(n)
+        lines.append(f'<line x1="{xx:.1f}" y1="{y(low):.1f}" x2="{xx:.1f}" y2="{y(high):.1f}" stroke="#d62728" stroke-width="2"/><line x1="{xx-5:.1f}" y1="{y(low):.1f}" x2="{xx+5:.1f}" y2="{y(low):.1f}" stroke="#d62728"/><line x1="{xx-5:.1f}" y1="{y(high):.1f}" x2="{xx+5:.1f}" y2="{y(high):.1f}" stroke="#d62728"/><circle cx="{xx:.1f}" cy="{y(point):.1f}" r="4" fill="#1f77b4"><title>N={n}: point={point:.6f}, CI=[{low:.6f}, {high:.6f}]</title></circle>')
+    lines.append('<text x="650" y="45" font-size="11" fill="#1f77b4">point estimate</text><text x="650" y="62" font-size="11" fill="#d62728">bootstrap 95% interval</text></svg>\n')
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
 def build(output: Path) -> dict[str, object]:
     if output.exists():
         raise RuntimeError(f"refusing immutable overwrite: {output}")
@@ -337,6 +368,7 @@ def build(output: Path) -> dict[str, object]:
         deltas = matched_deltas(by_cfg); write_csv(stage / "matched_n7_deltas.csv", tuple(deltas[0].keys()), deltas)
         shutil.copyfile(SOURCE / "issue_bootstrap.csv", stage / "issue_bootstrap.csv")
         shutil.copyfile(SOURCE / "overlap_summary.csv", stage / "overlap_summary.csv")
+        bootstrap_rows = list(csv.DictReader((stage / "issue_bootstrap.csv").open(newline="", encoding="utf-8")))
         curve_rows = []
         for n in N_GRID:
             rows = [row for row in all_summaries if int(row["n"]) == n and int(row["M"]) == 64]
@@ -362,6 +394,7 @@ def build(output: Path) -> dict[str, object]:
             delta_series[f"M={m}"] = points
         write_svg(stage / "matched_n7_pre_tax_delta.svg", "#159 matched/common-support pre-tax delta vs N7", "ROI delta", delta_series)
         write_svg(stage / "stability_exclusions_M64.svg", "#159 M=64 stability after concentration exclusions", "pre-tax ROI", {"raw": values("no_tax_roi", 64), "ex-largest-issue": values("ex_largest_issue_no_tax_roi", 64), "ex-largest-year": values("ex_largest_year_no_tax_roi", 64)})
+        write_uncertainty_svg(stage / "uncertainty_M64.svg", bootstrap_rows)
         positives_raw = [row for row in all_summaries if row["no_tax_roi"] and dec(row["no_tax_roi"], "ROI") > 0]
         positives_issue = [row for row in all_summaries if row["ex_largest_issue_no_tax_roi"] and dec(row["ex_largest_issue_no_tax_roi"], "ex issue ROI") > 0]
         positives_year = [row for row in all_summaries if row["ex_largest_year_no_tax_roi"] and dec(row["ex_largest_year_no_tax_roi"], "ex year ROI") > 0]
@@ -378,7 +411,7 @@ def build(output: Path) -> dict[str, object]:
         for n in N_GRID:
             report.append(f"| {n} | {mean_m64('no_tax_roi', n)} | {mean_m64('ex_largest_issue_no_tax_roi', n)} | {mean_m64('ex_largest_year_no_tax_roi', n)} | {mean_m64('tax_adjusted_roi', n)} | {mean_m64('longest_executed_miss_streak', n)} |")
         raw9, issue9, year9 = (mean_m64(field, 9) for field in ("no_tax_roi", "ex_largest_issue_no_tax_roi", "ex_largest_year_no_tax_roi"))
-        report += ["", "## Interpretation", "", f"The raw M=64 N=9 seed-mean pre-tax ROI is `{raw9}`; after removing each seed's largest signed issue contribution it is `{issue9}`, and after removing each seed's largest signed year contribution it is `{year9}`. Across all 81 ALL cells, raw positives={len(positives_raw)}, positives after largest-issue exclusion={len(positives_issue)}, positives after largest-year exclusion={len(positives_year)}.", "", "The positive N=9 cluster is therefore an extreme concentration signal, not evidence of a stable N sweet spot. The result is descriptive, requires strict independent EV and held-out/forward validation, and grants no purchase, production, betting, or promotion authority.", "", "## Artifacts", "", "- `surface_summary.csv`: complete ALL plus YEAR/FOLD/LOYO summaries with corrected controls.", "- `matched_n7_deltas.csv`: matched/common-support pre-tax-primary deltas against N7.", "- `roi_surface_pre_tax.svg`, `matched_n7_pre_tax_delta.svg`, `stability_exclusions_M64.svg`: readable primary and stability charts.", "- `issue_bootstrap.csv` and `overlap_summary.csv`: copied from the authenticated v2 package; no underlying ledger changed.", "- `identity_settlement.csv.gz`, `issue_settlement.csv.gz`, `winning_ticket_tax_ledger.csv.gz`: byte-for-byte source evidence copies.", ""]
+        report += ["", "## Interpretation", "", f"The raw M=64 N=9 seed-mean pre-tax ROI is `{raw9}`; after removing each seed's largest signed issue contribution it is `{issue9}`, and after removing each seed's largest signed year contribution it is `{year9}`. Across all 81 ALL cells, raw positives={len(positives_raw)}, positives after largest-issue exclusion={len(positives_issue)}, positives after largest-year exclusion={len(positives_year)}.", "", "The positive N=9 cluster is therefore an extreme concentration signal, not evidence of a stable N sweet spot. The result is descriptive, requires strict independent EV and held-out/forward validation, and grants no purchase, production, betting, or promotion authority.", "", "## Artifacts", "", "- `surface_summary.csv`: complete ALL plus YEAR/FOLD/LOYO summaries with corrected controls.", "- `matched_n7_deltas.csv`: matched/common-support pre-tax-primary deltas against N7.", "- `roi_surface_pre_tax.svg`, `matched_n7_pre_tax_delta.svg`, `stability_exclusions_M64.svg`, `uncertainty_M64.svg`: readable primary, stability and bootstrap uncertainty charts.", "- `issue_bootstrap.csv` and `overlap_summary.csv`: copied from the authenticated v2 package; no underlying ledger changed.", "- `identity_settlement.csv.gz`, `issue_settlement.csv.gz`, `winning_ticket_tax_ledger.csv.gz`: byte-for-byte source evidence copies.", ""]
         (stage / "report.md").write_text("\n".join(report), encoding="utf-8")
         source_census = {"source_v2_package_manifest_sha256": V2_MANIFEST, "source_v2_content_identity_sha256": V2_CONTENT_IDENTITY, "source_outcome_and_selection_ledgers": "copied byte-for-byte; recovery reads only issue_settlement.csv.gz", "canonical_outcome_loader": "NOT_OPENED_BY_RECOVERY", "recovery_boundary": "derived reporting only"}
         (stage / "source_census.json").write_text(json.dumps(source_census, indent=2, sort_keys=True) + "\n", encoding="utf-8")

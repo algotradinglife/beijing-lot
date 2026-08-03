@@ -11,8 +11,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / "results" / "bj159_gate_b_outcome_settlement_v2r1"
 SOURCE = ROOT / "results" / "bj159_gate_b_outcome_settlement_v2"
-EXPECTED_MANIFEST = "42d5347f4864f78a97ddc9b30f326e8e3f762d1bdd6b6ef965c1240e1a9b2273"
-EXPECTED_CONTENT = "34f1ff0668517f80aaf2a92053497c411b9ad665d1aad7e34df14d7d0c268403"
+EXPECTED_MANIFEST = "546d2a0aa026ea8f8bdaccad0cb9b7079d3e690e8db83c09675d62f0eb6077ef"
+EXPECTED_CONTENT = "a33c802d98b00172a2cd84d32b7085a4900508f3b9c420afb30ecea6168b92ea"
 V2_MANIFEST = "ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917"
 V2_CONTENT = "42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08"
 

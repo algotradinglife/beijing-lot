@@ -558,14 +558,14 @@ winning-ticket、stake、payout、tax、net 或 ROI 行。
 
 - source v2 manifest：`ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917`
 - source v2 content identity：`42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08`
-- v2r1 manifest：`42d5347f4864f78a97ddc9b30f326e8e3f762d1bdd6b6ef965c1240e1a9b2273`
-- v2r1 content identity：`34f1ff0668517f80aaf2a92053497c411b9ad665d1aad7e34df14d7d0c268403`
+- v2r1 manifest：`546d2a0aa026ea8f8bdaccad0cb9b7079d3e690e8db83c09675d62f0eb6077ef`
+- v2r1 content identity：`a33c802d98b00172a2cd84d32b7085a4900508f3b9c420afb30ecea6168b92ea`
 
 完整 81 个 N×M×seed 主表（税前主指标、税后次指标、实际 stake/ticket、coverage、
 YEAR/FOLD/LOYO、bootstrap、matched/common-support N7、overlap、最大 issue/year 排除、
 双 drawdown 和双 miss streak）在不可变包的 `report.md`、`surface_summary.csv`、
 `issue_bootstrap.csv` 与 `matched_n7_deltas.csv` 中。图表包括 `roi_surface_pre_tax.svg`、
-`matched_n7_pre_tax_delta.svg` 和 `stability_exclusions_M64.svg`。可读结论和 M64 摘要见
+`matched_n7_pre_tax_delta.svg`、`stability_exclusions_M64.svg` 和 `uncertainty_M64.svg`。可读结论和 M64 摘要见
 [#159 v2r1 reporting recovery](../research/bj159_selected_wor_cross_n_gate_b_v2r1_2026-08-03.md)。
 
 M64 seed-mean 的关键读回如下：N=9 原始税前 ROI `+71.97%`，去掉每个 seed 的最大

@@ -13,14 +13,15 @@
     "matched_n7_pre_tax_delta.svg": "527e249f6aa147f810a3af1c2edff31de44fec67ed83d2f18d231236fd059ede",
     "n_curve_M64.csv": "efe72e3391f749bff7565aeafd29727549c03b9f48634b34a0afdee9f48d28ea",
     "overlap_summary.csv": "edddae7230af0b601303c1ae5235d82d8db8176ae3ec03231803507ffecdf09c",
-    "recovery_runner.py": "1b6dbf5482007ba69ac11ed57e434941e74ca3e1275b1eadf75cf1443482f7d6",
-    "report.md": "c9d0d86f39114e409e53cecf48a2c246846b4d0c2a0908f2f99c04a35b89b3c9",
+    "recovery_runner.py": "d9edfb96fa43e3fc01cbbe7fc920eed43eeb7abc281e970c4b1e8273ff42f0a5",
+    "report.md": "b7a62decd66ba554e11aed8cd684a9267d6501eeecfb9ded994e5c042a0177c3",
     "roi_surface_pre_tax.svg": "62b983051b0b4eb426b0f9869233d770186132027f4cc9e8b0d040ed7d1d65b4",
     "settlement_card.json": "252d6e082102af571e994e26de5d43fd052e47b947d606cd8c3b7e32fdead2fd",
     "source_census.json": "cf80771fd3c44383507845309bc02b89cb2bea7f867375e0dbf99230e1041e14",
     "source_v2_binding.json": "8f6b24881e7302e65a79e67f12f18ea20a5e749e992251f89c2b3d717fc989dc",
     "stability_exclusions_M64.svg": "284369919f0de50334133113e1101411f71812da61bdeca5f06a89ba53956a45",
-    "surface_summary.csv": "100eada6af10f7186f583ecef3a1e4624a4e6ba8969ee74b4b701be3deffd85e"
+    "surface_summary.csv": "100eada6af10f7186f583ecef3a1e4624a4e6ba8969ee74b4b701be3deffd85e",
+    "uncertainty_M64.svg": "03787f3deb8c103e9bbc75e93ae00e228d31acd5c1dbc75e9361f99c07940993"
   },
   "source_v2_content_identity_sha256": "42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08",
   "source_v2_manifest_sha256": "ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917"
