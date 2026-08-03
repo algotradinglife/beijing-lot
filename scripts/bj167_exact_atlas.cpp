@@ -316,6 +316,8 @@ static double *SCI_TMP_NET = nullptr, *SCI_TMP_STAKE = nullptr, *SCI_TMP_GROSS =
 static unsigned char *SCI_MARK = nullptr;
 static int *SCI_TOUCHED = nullptr, SCI_TOUCHED_LEN = 0;
 static double *SCI_NET = nullptr, *SCI_STAKE = nullptr, *SCI_GROSS = nullptr, *SCI_TAX = nullptr, *SCI_HIT = nullptr, *SCI_GROSS_SUMSQ = nullptr, *SCI_GROSS_TOP = nullptr;
+static double *SCI_CUM_NET = nullptr, *SCI_PEAK_NET = nullptr, *SCI_DRAWDOWN = nullptr;
+static int *SCI_MISS_STREAK = nullptr, *SCI_LONGEST_MISS = nullptr;
 static double *SCI_YEAR_NET = nullptr, *SCI_YEAR_STAKE = nullptr, *SCI_FOLD_NET = nullptr, *SCI_FOLD_STAKE = nullptr;
 static double *SCI_LARGEST_NET = nullptr, *SCI_LARGEST_STAKE = nullptr;
 static double *SCI_FULL_ISSUE_NET = nullptr, *SCI_FULL_ISSUE_STAKE = nullptr;
@@ -324,12 +326,14 @@ static int *SCI_LARGEST_ISSUE = nullptr, SCI_YEAR_COUNT = 0, SCI_FOLD_COUNT = 0,
 void bj167_scientific_set_buffers(double *tmp_net, double *tmp_stake, double *tmp_gross, double *tmp_tax, double *tmp_hit,
                                   unsigned char *mark, int *touched,
                                   double *net, double *stake, double *gross, double *tax, double *hit, double *gross_sumsq, double *gross_top,
+                                  double *cum_net, double *peak_net, double *drawdown, int *miss_streak, int *longest_miss,
                                   double *year_net, double *year_stake, double *fold_net, double *fold_stake,
                                   double *largest_net, double *largest_stake, int *largest_issue,
                                   double *full_issue_net, double *full_issue_stake,
                                   int year_count, int fold_count, int issue_count) {
     SCI_TMP_NET=tmp_net; SCI_TMP_STAKE=tmp_stake; SCI_TMP_GROSS=tmp_gross; SCI_TMP_TAX=tmp_tax; SCI_TMP_HIT=tmp_hit;
     SCI_MARK=mark; SCI_TOUCHED=touched; SCI_NET=net; SCI_STAKE=stake; SCI_GROSS=gross; SCI_TAX=tax; SCI_HIT=hit; SCI_GROSS_SUMSQ=gross_sumsq; SCI_GROSS_TOP=gross_top;
+    SCI_CUM_NET=cum_net; SCI_PEAK_NET=peak_net; SCI_DRAWDOWN=drawdown; SCI_MISS_STREAK=miss_streak; SCI_LONGEST_MISS=longest_miss;
     SCI_YEAR_NET=year_net; SCI_YEAR_STAKE=year_stake; SCI_FOLD_NET=fold_net; SCI_FOLD_STAKE=fold_stake;
     SCI_LARGEST_NET=largest_net; SCI_LARGEST_STAKE=largest_stake; SCI_LARGEST_ISSUE=largest_issue;
     SCI_FULL_ISSUE_NET=full_issue_net; SCI_FULL_ISSUE_STAKE=full_issue_stake;
@@ -353,6 +357,11 @@ void bj167_scientific_end_issue() {
         const int at=SCI_TOUCHED[j]; const double net=SCI_TMP_NET[at], stake=SCI_TMP_STAKE[at];
         SCI_NET[at]+=net; SCI_STAKE[at]+=stake; SCI_GROSS[at]+=SCI_TMP_GROSS[at]; SCI_TAX[at]+=SCI_TMP_TAX[at]; SCI_HIT[at]+=SCI_TMP_HIT[at];
         SCI_GROSS_SUMSQ[at]+=SCI_TMP_GROSS[at]*SCI_TMP_GROSS[at]; if (SCI_TMP_GROSS[at] > SCI_GROSS_TOP[at]) SCI_GROSS_TOP[at]=SCI_TMP_GROSS[at];
+        if (stake > 0.0) {
+            SCI_CUM_NET[at] += net; if (SCI_CUM_NET[at] > SCI_PEAK_NET[at]) SCI_PEAK_NET[at]=SCI_CUM_NET[at];
+            const double dd=SCI_PEAK_NET[at]-SCI_CUM_NET[at]; if (dd > SCI_DRAWDOWN[at]) SCI_DRAWDOWN[at]=dd;
+            if (SCI_TMP_HIT[at] > 0.0) SCI_MISS_STREAK[at]=0; else { ++SCI_MISS_STREAK[at]; if (SCI_MISS_STREAK[at]>SCI_LONGEST_MISS[at]) SCI_LONGEST_MISS[at]=SCI_MISS_STREAK[at]; }
+        }
         if (SCI_YEAR>=0) { const std::size_t yi=static_cast<std::size_t>(at)*SCI_YEAR_COUNT+SCI_YEAR; SCI_YEAR_NET[yi]+=net; SCI_YEAR_STAKE[yi]+=stake; }
         if (SCI_FOLD>=0) { const std::size_t fi=static_cast<std::size_t>(at)*SCI_FOLD_COUNT+SCI_FOLD; SCI_FOLD_NET[fi]+=net; SCI_FOLD_STAKE[fi]+=stake; }
         if (net > SCI_LARGEST_NET[at]) { SCI_LARGEST_NET[at]=net; SCI_LARGEST_STAKE[at]=stake; SCI_LARGEST_ISSUE[at]=SCI_ISSUE; }

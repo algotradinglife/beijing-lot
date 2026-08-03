@@ -108,10 +108,11 @@ def test_scientific_native_companion_m2187_reconciles_production_role_shape():
     ds = lambda: array.array("d", [0.0]) * n
     tmp = [ds() for _ in range(5)]; totals = [ds() for _ in range(7)]
     mark = array.array("B", [0]) * n; touched = array.array("i", [0]) * n
+    cumulative = ds(); peak = ds(); drawdown = ds(); miss = array.array("i", [0]) * n; longest_miss = array.array("i", [0]) * n
     year_net = ds(); year_stake = ds(); fold_net = ds(); fold_stake = ds(); largest = array.array("d", [-float("inf")]) * n; largest_stake = ds(); largest_issue = array.array("i", [-1]) * n
     full_issue_net = array.array("d", [0.0]); full_issue_stake = array.array("d", [0.0])
     lib = SCIENCE.configure(); pd = __import__("ctypes").c_double; pi = __import__("ctypes").c_int
-    lib.bj167_scientific_set_buffers(*(POST.R.ptr(x, pd) for x in tmp), POST.R.ptr(mark, __import__("ctypes").c_ubyte), POST.R.ptr(touched, pi), *(POST.R.ptr(x, pd) for x in totals), POST.R.ptr(year_net, pd), POST.R.ptr(year_stake, pd), POST.R.ptr(fold_net, pd), POST.R.ptr(fold_stake, pd), POST.R.ptr(largest, pd), POST.R.ptr(largest_stake, pd), POST.R.ptr(largest_issue, pi), POST.R.ptr(full_issue_net, pd), POST.R.ptr(full_issue_stake, pd), 1, 1, 1)
+    lib.bj167_scientific_set_buffers(*(POST.R.ptr(x, pd) for x in tmp), POST.R.ptr(mark, __import__("ctypes").c_ubyte), POST.R.ptr(touched, pi), *(POST.R.ptr(x, pd) for x in totals), POST.R.ptr(cumulative, pd), POST.R.ptr(peak, pd), POST.R.ptr(drawdown, pd), POST.R.ptr(miss, pi), POST.R.ptr(longest_miss, pi), POST.R.ptr(year_net, pd), POST.R.ptr(year_stake, pd), POST.R.ptr(fold_net, pd), POST.R.ptr(fold_stake, pd), POST.R.ptr(largest, pd), POST.R.ptr(largest_stake, pd), POST.R.ptr(largest_issue, pi), POST.R.ptr(full_issue_net, pd), POST.R.ptr(full_issue_stake, pd), 1, 1, 1)
     occ = array.array("i", [0]); source = array.array("d", [v for role in roles for v in role["source"]["Q_WEIGHT"]])
     lib.bj167_scientific_begin_issue(0, 0, 0)
     lib.bj167_scientific_process_source(POST.R.ptr(source, pd), 0, b"production-science-fixture", 2.0, POST.R.ptr(occ, pi), 1, 0)
