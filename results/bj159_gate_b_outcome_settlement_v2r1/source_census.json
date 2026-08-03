@@ -1,0 +1,7 @@
+{
+  "canonical_outcome_loader": "NOT_OPENED_BY_RECOVERY",
+  "recovery_boundary": "derived reporting only",
+  "source_outcome_and_selection_ledgers": "copied byte-for-byte; recovery reads only issue_settlement.csv.gz",
+  "source_v2_content_identity_sha256": "42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08",
+  "source_v2_package_manifest_sha256": "ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917"
+}

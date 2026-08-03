@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="430"><rect width="100%" height="100%" fill="white"/><text x="70" y="22" font-size="16">#159 N→coverage (M=64, seed mean)</text><line x1="70" y1="375" x2="730" y2="375" stroke="#333"/><line x1="70" y1="40" x2="70" y2="375" stroke="#333"/><text x="8" y="215.0" font-size="12" transform="rotate(-90 8 215.0)">identity coverage</text>
+<text x="65.0" y="393" font-size="11">2</text>
+<text x="147.5" y="393" font-size="11">3</text>
+<text x="230.0" y="393" font-size="11">4</text>
+<text x="312.5" y="393" font-size="11">5</text>
+<text x="395.0" y="393" font-size="11">6</text>
+<text x="477.5" y="393" font-size="11">7</text>
+<text x="560.0" y="393" font-size="11">8</text>
+<text x="642.5" y="393" font-size="11">9</text>
+<text x="725.0" y="393" font-size="11">10</text>
+<polyline fill="none" stroke="#1f77b4" stroke-width="2" points="70.0,67.9 152.5,67.9 235.0,128.8 317.5,274.6 400.0,324.0 482.5,340.7 565.0,345.3 647.5,346.8 730.0,347.1"/>
+<circle cx="70.0" cy="67.9" r="4" fill="#1f77b4"><title>N=2: 1.000000</title></circle>
+<circle cx="152.5" cy="67.9" r="4" fill="#1f77b4"><title>N=3: 1.000000</title></circle>
+<circle cx="235.0" cy="128.8" r="4" fill="#1f77b4"><title>N=4: 0.782093</title></circle>
+<circle cx="317.5" cy="274.6" r="4" fill="#1f77b4"><title>N=5: 0.260256</title></circle>
+<circle cx="400.0" cy="324.0" r="4" fill="#1f77b4"><title>N=6: 0.083333</title></circle>
+<circle cx="482.5" cy="340.7" r="4" fill="#1f77b4"><title>N=7: 0.023599</title></circle>
+<circle cx="565.0" cy="345.3" r="4" fill="#1f77b4"><title>N=8: 0.007231</title></circle>
+<circle cx="647.5" cy="346.8" r="4" fill="#1f77b4"><title>N=9: 0.001769</title></circle>
+<circle cx="730.0" cy="347.1" r="4" fill="#1f77b4"><title>N=10: 0.000701</title></circle>
+</svg>

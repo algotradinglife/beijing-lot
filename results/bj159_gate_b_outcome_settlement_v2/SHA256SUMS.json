@@ -1,0 +1,20 @@
+{
+  "CONTENT_IDENTITY.json": "42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08",
+  "README.md": "a6ef099951e65e4683219c20eb223130dc1286310e372d4d40c7e2d304f6e19f",
+  "coverage_vs_n_M64.svg": "afd04447e91c6ad4a2ad554f32e5697f1965d39ee92406c31001ab464e0d0366",
+  "decision.json": "a536cfa49234dbce76a1fb0069021282f82334c6a5b3a96885e2be8001969747",
+  "identity_settlement.csv.gz": "d7cd0363fbb569257f9325e3a672a3dc9c2723719a9b4c11cdb7e9f65edf6daa",
+  "issue_bootstrap.csv": "ba3e9065d0e8d3cdc532d6778f303207f4aefd2225628d6412f14238879aed3f",
+  "issue_settlement.csv.gz": "af8edfd941dc7cda0ece7c8dea69de64eee0bc1952e84efab59135f5232a9913",
+  "matched_n7_deltas.csv": "f4fb7a1ccc9e821bb0ea1d256d70316d2e16bf2ea3d8d526a6319c46d24ad8f4",
+  "n_curve_M64.csv": "d0dd63a3dd1ff52e716afdb4c599c1bb9b9dbee417feb01eef51033334bc9c4d",
+  "overlap_summary.csv": "edddae7230af0b601303c1ae5235d82d8db8176ae3ec03231803507ffecdf09c",
+  "report.md": "fbfb43df4ffd8f74da51d23c45e675993fa08eb6d314ce4059d4c2e3f908bf17",
+  "roi_vs_n_M64.svg": "93384bbb73302607e07c4b92ba699f841f832710123cb1b7eae5e8ea9a435e8c",
+  "settlement_card.json": "30e71a2a8660670df11f5f5459ff3fccab6623f4d0c0571eb9dbe9679c77d026",
+  "settlement_runner.py": "c528b452a1c28073886234efdf2da8569b2c372ae39950facdd47a7720e1b8a0",
+  "source_census.csv": "105058551a1db568e7861f805b684daec613ab3aa0e6ffd4293a3fc9b26a906a",
+  "stake_vs_n_M64.svg": "278c2152ad47615282c2f8ab1caad25e53e5c74fe890834ba56ed13a188e7243",
+  "surface_summary.csv": "87ed97627efd9f33279f57fca263f0c55b96b78e3195e9e5d8db19841c124702",
+  "winning_ticket_tax_ledger.csv.gz": "e0d48bf4db99ea1c8b201d983e2bf78d3b57f080207f98f2e70a3bc00f2b7ab9"
+}

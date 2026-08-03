@@ -1,0 +1,10 @@
+n,identity_count,issue_count,pair_count,mean_shared_leg_count,max_shared_leg_count,mean_jaccard,max_jaccard,duplicate_ticket_policy
+2,38,22,27,1.000000000000,1,0.333333333333,0.333333333333,"WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication"
+3,335,108,639,2.000000000000,2,0.500000000000,0.500000000000,"WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication"
+4,648,166,1487,3.000000000000,3,0.600000000000,0.600000000000,"WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication"
+5,844,190,2277,4.000000000000,4,0.666666666667,0.666666666667,"WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication"
+6,937,197,2695,5.000000000000,5,0.714285714286,0.714285714286,"WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication"
+7,1005,201,3050,6.000000000000,6,0.750000000000,0.750000000000,"WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication"
+8,1042,203,3203,7.000000000000,7,0.777777777778,0.777777777778,"WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication"
+9,1077,204,3379,8.000000000000,8,0.800000000000,0.800000000000,"WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication"
+10,1094,205,3471,9.000000000000,9,0.818181818182,0.818181818182,"WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication"

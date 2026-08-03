@@ -1,0 +1,9 @@
+{
+  "decision": "POSITIVE_REQUIRES_STRICT_INDEPENDENT_EV",
+  "positive_after_largest_issue_exclusion": 1,
+  "positive_after_largest_year_exclusion": 0,
+  "positive_all_rows": 8,
+  "promotion_authorized": false,
+  "rule": "Pre-tax no_tax_roi is primary; tax-adjusted ROI is secondary. Largest issue/year controls use signed pre-tax net contribution and actual executed stake. Same-window positives are descriptive only and require strict independent EV plus held-out/forward validation; no purchase, production, betting or promotion authority.",
+  "strict_independent_ev_required": true
+}

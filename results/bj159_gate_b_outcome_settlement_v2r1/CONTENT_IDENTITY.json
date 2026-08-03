@@ -1,0 +1,29 @@
+{
+  "contract_version": "bj159-gateb-content-v2r1",
+  "copied_ledger_bytes_sha256": {
+    "identity_settlement.csv.gz": "d7cd0363fbb569257f9325e3a672a3dc9c2723719a9b4c11cdb7e9f65edf6daa",
+    "issue_settlement.csv.gz": "af8edfd941dc7cda0ece7c8dea69de64eee0bc1952e84efab59135f5232a9913",
+    "winning_ticket_tax_ledger.csv.gz": "e0d48bf4db99ea1c8b201d983e2bf78d3b57f080207f98f2e70a3bc00f2b7ab9"
+  },
+  "non_compressed_controls": {
+    "README.md": "3c52b70cebb88b53fe8ae4e750c0741d680fb8e75ef21917d61f861741e0a3b1",
+    "analysis_summary.json": "631225b5a4ac59bfc84e30b02c08b66f923f10801b551bdbb001ac8fbb69025e",
+    "decision.json": "e03c76a1b58ce6b881ddddc844dd3a3b681e873a1df8908419648ad8a5d4355b",
+    "issue_bootstrap.csv": "ba3e9065d0e8d3cdc532d6778f303207f4aefd2225628d6412f14238879aed3f",
+    "matched_n7_deltas.csv": "7201af30271ecadbb119a30daa01f0348a599933ad47ebcf1875d4487e9aed00",
+    "matched_n7_pre_tax_delta.svg": "527e249f6aa147f810a3af1c2edff31de44fec67ed83d2f18d231236fd059ede",
+    "n_curve_M64.csv": "efe72e3391f749bff7565aeafd29727549c03b9f48634b34a0afdee9f48d28ea",
+    "overlap_summary.csv": "edddae7230af0b601303c1ae5235d82d8db8176ae3ec03231803507ffecdf09c",
+    "recovery_runner.py": "5512199cc68489840d778577d4eae22dc1b15ebb067f8df353c4f34ba1e0b29f",
+    "report.md": "b7fab1dd98d9cb8b6b5a26fc982b843aa795c8af43809ff3fbce5f693c4d6455",
+    "roi_surface_pre_tax.svg": "62b983051b0b4eb426b0f9869233d770186132027f4cc9e8b0d040ed7d1d65b4",
+    "settlement_card.json": "252d6e082102af571e994e26de5d43fd052e47b947d606cd8c3b7e32fdead2fd",
+    "source_census.json": "cf80771fd3c44383507845309bc02b89cb2bea7f867375e0dbf99230e1041e14",
+    "source_v2_binding.json": "8f6b24881e7302e65a79e67f12f18ea20a5e749e992251f89c2b3d717fc989dc",
+    "stability_exclusions_M64.svg": "284369919f0de50334133113e1101411f71812da61bdeca5f06a89ba53956a45",
+    "surface_summary.csv": "f8273b960f06ca272ca198e687378119289819448cc41b67b1f294c2a883be07",
+    "uncertainty_M64.svg": "f7d45483a96c3a94670397504d9d81e2284e86f8bfb76649321a7bd7c78dff21"
+  },
+  "source_v2_content_identity_sha256": "42f8960c9754efb3033cb6da54f38b759da3cb64d7272f195845aeabb51b1b08",
+  "source_v2_manifest_sha256": "ad724693f7fbee8a120030cb4ace852a4cf69011bf98b39b41ae427bcfbd0917"
+}
