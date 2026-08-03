@@ -42,6 +42,14 @@ def test_candidate_freeze_union_and_shared_paired_bootstrap():
     assert len(boot) == 2 and boot[0]["bootstrap_draw_matrix_sha256"] == boot[1]["bootstrap_draw_matrix_sha256"]
     assert boot[0]["candidate_ci95_low"] is not None and boot[0]["paired_lift_two_sided_p"] is not None
     assert json.loads((out / "paired_bootstrap_draw_matrix.json").read_text())["replicate_count"] == 20_000
+    # Exercise the actual production output helpers: blanking/retention and
+    # robust-front inputs come from their real implementation, not a copied
+    # miniature calculation in this test.
+    POST.write_stability(frozen, values, issue_order, issue_meta, out)
+    POST.write_outputs(frozen, boot, values, issue_order, issue_meta, out)
+    tax_chart = list(csv.DictReader((out / "chart_source_tax_line_exposure_retention.csv").open(newline="")))
+    assert len(tax_chart) == 2 and tax_chart[0]["gross_return_retention"] == "1.000000000000"
+    assert (out / "candidate_paired_bootstrap_20000.csv").exists() and (out / "bh_descriptive_significance.csv").exists()
     shutil.rmtree(FIXTURE)
 
 
