@@ -238,6 +238,19 @@ def test_recovery_robust_metrics_normalize_direct_and_ensemble_schemas():
     except RuntimeError:
         pass
 
+def test_recovery_stability_fixture_uses_frozen_registry_metadata(tmp_path):
+    recovery = load("bj167_recovery_stability", ROOT / "scripts" / "recover_bj167_gate_b_exact.py")
+    archive = ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_exact.failed-stability-label-20260803T2247"
+    checkpoint = ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_recovery_checkpoint_v1"
+    census = recovery.archive_census(archive)
+    specs, issue_rows, net, stake = recovery.verify_sparse_checkpoint(checkpoint, archive, census)
+    count = recovery.write_stability_from_checkpoint(tmp_path, archive, specs, issue_rows, net, stake)
+    rows = list(csv.DictReader((tmp_path / "stability_year_fold_loyo.csv").open()))
+    assert count == len(rows) and count > 0
+    p = next(r for r in rows if r["target"].endswith("/P_MIN_GLOBAL_DELETE") and r["slice_type"] == "YEAR")
+    assert p["mechanism"] == "P_MIN_GLOBAL_DELETE" and p["M"] == "2187"
+    assert any(r["target"].endswith("/ENSEMBLE_100") and r["slice_type"] == "LOYO" for r in rows)
+
 def test_common_support_hash_tokens_are_selector_scoped():
     mod=load("runner_common_scope", SCRIPT)
     # The same canonical support may be reused by multiple selectors, but a
