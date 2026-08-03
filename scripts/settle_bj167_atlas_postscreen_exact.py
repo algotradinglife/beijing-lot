@@ -120,12 +120,16 @@ def write_full_atlas_chart_sources(screen: Path, out: Path, selector_rows: list[
         if scale <= 0: raise RuntimeError("invalid gross-retention normalization scale")
         normalized_gross = gross / scale
         outrow["gross_retention_normalization_scale"] = str(scale)
+        outrow["normalized_stake_yuan"] = f"{float(row['stake_yuan']) / scale:.6f}"
         outrow["normalized_gross_pre_tax_yuan"] = f"{normalized_gross:.6f}"
         outrow["gross_return_retention_vs_matched_full"] = "" if fg == 0 else f"{normalized_gross / fg:.12f}"
         # The immutable primary surface retains monetary tax exactly.  Its
         # pre-screen ledger did not retain taxable ticket counts, so expose
         # count/rate as explicitly unavailable rather than inventing them.
-        outrow["tax_line_exposure_yuan"] = f"{float(row['tax_yuan']) / .20:.6f}"
+        tax = float(row["tax_yuan"])
+        outrow["tax_line_exposure_yuan"] = f"{tax / .20:.6f}"
+        outrow["normalized_tax_yuan"] = f"{tax / scale:.6f}"
+        outrow["normalized_tax_line_exposure_yuan"] = f"{tax / .20 / scale:.6f}"
         outrow["taxable_winning_ticket_count"] = ""
         outrow["taxable_winning_ticket_rate"] = ""
         outrow["taxable_ticket_metric_status"] = "NOT_RETAINED_IN_SCREEN_LEDGER"
@@ -143,8 +147,8 @@ def write_full_atlas_chart_sources(screen: Path, out: Path, selector_rows: list[
     write_gz_rows(out / "chart_source_full_dense_m_curve_v3r1.csv.gz", dense_fields, rendered)
     capital_fields = ["selector_id", "family", "gate_id", "top_k", "lowp_source", "lowp_threshold", "ranker",
                       "weight_source", "mechanism", "cap", "M", "seed", "seed_scope", "stake_yuan", "gross_pre_tax_yuan",
-                      "no_tax_roi", "tax_adjusted_roi", "tax_yuan", "tax_line_exposure_yuan",
-                      "gross_retention_normalization_scale", "normalized_gross_pre_tax_yuan", "gross_return_retention_vs_matched_full", "taxable_winning_ticket_count", "taxable_winning_ticket_rate",
+                      "no_tax_roi", "tax_adjusted_roi", "tax_yuan", "tax_line_exposure_yuan", "normalized_tax_yuan", "normalized_tax_line_exposure_yuan",
+                      "gross_retention_normalization_scale", "normalized_stake_yuan", "normalized_gross_pre_tax_yuan", "gross_return_retention_vs_matched_full", "taxable_winning_ticket_count", "taxable_winning_ticket_rate",
                       "taxable_ticket_metric_status", "coverage_hit_rate", "ticket_hit_rate", "seed_mean_drawdown_no_tax_yuan",
                       "seed_gross_weighted_mean_issue_hhi", "selector_policy_count", "settled_policy_count",
                       "unavailable_policy_count", "no_bet_policy_count"]

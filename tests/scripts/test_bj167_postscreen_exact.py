@@ -208,8 +208,13 @@ def test_full_atlas_chart_sources_cover_deterministic_dense_m_and_selector_contr
     assert residual["taxable_ticket_metric_status"] == "NOT_RETAINED_IN_SCREEN_LEDGER"
     ensemble = next(r for r in capital if r["mechanism"] == "WOR_DISTINCT")
     assert ensemble["gross_retention_normalization_scale"] == "100"
+    assert ensemble["normalized_stake_yuan"] == "16.000000"
     assert ensemble["normalized_gross_pre_tax_yuan"] == "80.000000"
     assert ensemble["gross_return_retention_vs_matched_full"] == "0.800000000000"
+    # The pooled ¥20 tax represents 100 seed ledgers: raw tax-line exposure
+    # is ¥100, but the renderable per-seed comparable exposure is ¥1.
+    assert ensemble["tax_line_exposure_yuan"] == "100.000000"
+    assert ensemble["normalized_tax_line_exposure_yuan"] == "1.000000"
     shutil.rmtree(root)
 
 
