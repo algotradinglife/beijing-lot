@@ -1,9 +1,8 @@
 {
   "activation": {
-    "baseline_created_after_acceptance_required": true,
-    "evidence_receipts_after_acceptance_required": true,
     "minimum_issue_exclusive": 26082,
     "preexisting_issues_may_not_be_relabelled": true,
+    "required_timestamp_order": "acceptance <= baseline input as-of <= package creation <= freeze; acceptance <= latest evidence receipt <= cutoff <= freeze",
     "rule": "A sample is valid only after PI accepts and merges this exact Gate-A package.",
     "status": "PENDING_PI_GATE_A_ACCEPTANCE"
   },
@@ -50,6 +49,7 @@
       "stake scaling"
     ],
     "handicap_translation": "diagnostic direction only; probabilities and handicap line remain unchanged",
+    "prospective_trace_builder": "decision_core.build_decision_trace content-addresses and validates every admitted trace before persistence",
     "risk_rule": "HIGH rejects identities containing that match; MEDIUM annotates only; CLEAR keeps B0 order"
   },
   "evidence_contract": {

@@ -17,6 +17,7 @@
   ],
   "outcome_accessed": false,
   "production_authority": false,
+  "prospective_trace_builder": "decision_core.build_decision_trace",
   "required_fact_kinds": [
     "injury",
     "suspension",

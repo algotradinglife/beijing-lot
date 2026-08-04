@@ -220,8 +220,7 @@ def forward_protocol(minimum_issue_exclusive: int) -> dict[str, object]:
             "status": "PENDING_PI_GATE_A_ACCEPTANCE",
             "rule": "A sample is valid only after PI accepts and merges this exact Gate-A package.",
             "minimum_issue_exclusive": minimum_issue_exclusive,
-            "baseline_created_after_acceptance_required": True,
-            "evidence_receipts_after_acceptance_required": True,
+            "required_timestamp_order": "acceptance <= baseline input as-of <= package creation <= freeze; acceptance <= latest evidence receipt <= cutoff <= freeze",
             "preexisting_issues_may_not_be_relabelled": True,
         },
         "sample_selector": {
@@ -266,6 +265,7 @@ def forward_protocol(minimum_issue_exclusive: int) -> dict[str, object]:
             "handicap_translation": "diagnostic direction only; probabilities and handicap line remain unchanged",
             "risk_rule": "HIGH rejects identities containing that match; MEDIUM annotates only; CLEAR keeps B0 order",
             "aggregation": "scan the exact frozen B0 candidate order and select the first fully covered identity without HIGH risk",
+            "prospective_trace_builder": "decision_core.build_decision_trace content-addresses and validates every admitted trace before persistence",
             "cross_field_validator": "decision_core.validate_decision_trace must pass before a decision trace is frozen",
             "decision_id": "SHA-256 of canonical trace JSON after removing only decision_id",
             "forbidden": [
@@ -475,6 +475,7 @@ def build(*, output: Path, runtime_db: Path, availability_checked_at_utc: str) -
             "existing_issue_count_excluded": len(runtime["existing_post_26079_issues"]),
             "decision_trace_schema": "decision_trace.schema.json",
             "decision_schema_version": SCHEMA_VERSION,
+            "prospective_trace_builder": "decision_core.build_decision_trace",
             "cross_field_validator": "decision_core.validate_decision_trace",
             "arm_count": len(arms),
             "required_fact_kinds": list(REQUIRED_KIND_MAX_AGE_SECONDS),

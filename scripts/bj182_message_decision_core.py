@@ -27,6 +27,16 @@ REQUIRED_KIND_MAX_AGE_SECONDS = {
     "motivation": 72 * 3600,
 }
 OPTIONAL_FACT_KINDS = ("confirmed_lineup", "schedule", "travel")
+FROZEN_SOURCE_HASHES = {
+    "source_181_ledger_sha256": "3c065be028c4022d33487095f08b9838c284853614f6617646dabe5e08c31229",
+    "source_181_asof_schema_sha256": "e763428d703197ec08eb2c4955ee45bc9925c84941bed8f3a9ac253edec161bd",
+    "source_181_coverage_schema_sha256": "22ffbaf6ef79eb484425c48307a29c08ba73d6a0bbf743e4023b37838ed9181d",
+    "source_180_gate_b_manifest_sha256": "9f48b29325d817ce873bd1430be459c9e70ad052064f8e03e02ccbc1d8bc6fcf",
+    "source_180_gate_b_content_identity_sha256": "d9b41dec45c1c6215755d9dad8774e00fc0f19f564ee6ef8bf2387cb8d309108",
+}
+TRACE_SOURCE_HASH_KEYS = frozenset(
+    (*FROZEN_SOURCE_HASHES, "baseline_package_sha256", "as_of_export_sha256")
+)
 
 AVAILABILITY_STATES = ("AVAILABLE", "DOUBTFUL", "UNAVAILABLE", "UNKNOWN")
 ROLE_CLASSES = (
@@ -68,6 +78,16 @@ def compute_decision_id(trace: Mapping[str, Any]) -> str:
     payload = dict(trace)
     payload.pop("decision_id", None)
     return sha256_json(payload)
+
+
+def build_decision_trace(trace_without_id: Mapping[str, Any]) -> dict[str, Any]:
+    """Content-address and validate one prospective trace before persistence."""
+
+    trace = json.loads(canonical_json(trace_without_id))
+    trace.pop("decision_id", None)
+    trace["decision_id"] = compute_decision_id(trace)
+    validate_decision_trace(trace)
+    return trace
 
 
 def _choice(value: object, allowed: Sequence[str], field: str) -> str:
@@ -474,16 +494,36 @@ def validate_decision_trace(trace: Mapping[str, Any]) -> None:
     )
     cutoff = _timestamp(evidence["cutoff_ts_utc"], "evidence cutoff")
     freeze = _timestamp(trace["freeze_ts_utc"], "decision freeze")
-    if not accepted_at < package_created_at <= freeze:
+    if not accepted_at <= input_as_of <= package_created_at <= freeze:
         raise DecisionContractError(
-            "baseline package must be created after activation and by decision freeze"
+            "baseline input/package chronology must be bounded by activation and freeze"
         )
-    if not accepted_at < latest_receipt <= cutoff <= freeze:
+    if not accepted_at <= latest_receipt <= cutoff <= freeze:
         raise DecisionContractError(
-            "evidence receipts must be recorded after activation and by cutoff/freeze"
+            "evidence receipt/cutoff chronology must be bounded by activation and freeze"
         )
     if input_as_of > cutoff:
         raise DecisionContractError("baseline input as-of cannot follow evidence cutoff")
+
+    coverage_hashes = evidence.get("coverage_report_sha256_by_kind")
+    if not isinstance(coverage_hashes, Mapping) or set(coverage_hashes) != set(
+        REQUIRED_KIND_MAX_AGE_SECONDS
+    ):
+        raise DecisionContractError(
+            "coverage report hashes must use exactly the frozen required fact kinds"
+        )
+
+    audit = trace.get("audit")
+    source_hashes = audit.get("source_hashes") if isinstance(audit, Mapping) else None
+    if not isinstance(source_hashes, Mapping) or set(source_hashes) != TRACE_SOURCE_HASH_KEYS:
+        raise DecisionContractError("audit source hashes must use exactly the frozen keys")
+    for key, expected_hash in FROZEN_SOURCE_HASHES.items():
+        if source_hashes.get(key) != expected_hash:
+            raise DecisionContractError(f"audit source hash mismatch: {key}")
+    if source_hashes.get("baseline_package_sha256") != baseline.get("package_id"):
+        raise DecisionContractError("baseline package source hash is not bound to package_id")
+    if source_hashes.get("as_of_export_sha256") != evidence.get("as_of_export_sha256"):
+        raise DecisionContractError("as-of export source hash is not bound to evidence")
 
     first = candidates[0]
     baseline_identity = (

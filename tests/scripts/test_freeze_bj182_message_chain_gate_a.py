@@ -418,14 +418,12 @@ def test_decision_trace_schema_requires_all_three_distinct_arms():
             "gate_a_acceptance_url": "https://github.com/algotradinglife/beijing-lot/issues/182#issuecomment-1",
             "gate_a_acceptance_recorded_at_utc": "2026-08-04T12:00:00Z",
             "minimum_issue_exclusive": 26082,
-            "baseline_created_after_activation": True,
-            "evidence_receipts_after_activation": True,
         },
         "baseline": {
             "selector": "B0_BEST_FULL",
             "request_id": "request-1",
             "package_id": "4" * 64,
-            "package_created_at_utc": "2026-08-04T12:30:00Z",
+            "package_created_at_utc": "2026-08-05T00:10:00Z",
             "input_as_of_utc": "2026-08-05T00:00:00Z",
             "candidate_universe_sha256": "5" * 64,
             "candidate_order": [
@@ -481,21 +479,73 @@ def test_decision_trace_schema_requires_all_three_distinct_arms():
             "selector_retuned": False,
             "allocator_changed": False,
             "ticket_economics_changed": False,
-            "source_hashes": {"baseline": "7" * 64},
+            "source_hashes": {
+                **CORE.FROZEN_SOURCE_HASHES,
+                "baseline_package_sha256": "4" * 64,
+                "as_of_export_sha256": "6" * 64,
+            },
         },
     }
-    trace["decision_id"] = CORE.compute_decision_id(trace)
+    trace = CORE.build_decision_trace(trace)
     validator.validate(trace)
     CORE.validate_decision_trace(trace)
+
+    old_issue = json.loads(json.dumps(trace))
+    old_issue["issue"] = "26081"
+    old_issue["decision_id"] = CORE.compute_decision_id(old_issue)
+    with pytest.raises(CORE.DecisionContractError, match="activation boundary"):
+        CORE.validate_decision_trace(old_issue)
+
+    pre_activation_freeze = json.loads(json.dumps(trace))
+    pre_activation_freeze["freeze_ts_utc"] = "2026-08-04T11:59:59Z"
+    pre_activation_freeze["decision_id"] = CORE.compute_decision_id(
+        pre_activation_freeze
+    )
+    with pytest.raises(CORE.DecisionContractError, match="activation and freeze"):
+        CORE.validate_decision_trace(pre_activation_freeze)
+
     drift = json.loads(json.dumps(trace))
     drift["baseline"]["selected_portfolio_id"] = "8" * 64
     drift["decision_id"] = CORE.compute_decision_id(drift)
     with pytest.raises(CORE.DecisionContractError, match="candidate rank 1"):
         CORE.validate_decision_trace(drift)
+
+    swapped_roles = json.loads(json.dumps(trace))
+    swapped_roles["arms"][0]["role"], swapped_roles["arms"][2]["role"] = (
+        swapped_roles["arms"][2]["role"],
+        swapped_roles["arms"][0]["role"],
+    )
+    swapped_roles["decision_id"] = CORE.compute_decision_id(swapped_roles)
+    with pytest.raises(CORE.DecisionContractError, match="frozen policy output"):
+        CORE.validate_decision_trace(swapped_roles)
+
+    zero_selected = json.loads(json.dumps(trace))
+    zero_selected["arms"][2]["planned_ticket_count"] = 0
+    zero_selected["arms"][2]["planned_stake_yuan"] = 0
+    zero_selected["decision_id"] = CORE.compute_decision_id(zero_selected)
+    with pytest.raises(CORE.DecisionContractError, match="frozen policy output"):
+        CORE.validate_decision_trace(zero_selected)
+
+    fake_coverage = json.loads(json.dumps(trace))
+    fake_coverage["evidence"]["coverage_report_sha256_by_kind"] = {
+        f"fake_{index}": hashlib.sha256(str(index).encode()).hexdigest()
+        for index in range(5)
+    }
+    fake_coverage["decision_id"] = CORE.compute_decision_id(fake_coverage)
+    with pytest.raises(jsonschema.ValidationError):
+        validator.validate(fake_coverage)
+    with pytest.raises(CORE.DecisionContractError, match="required fact kinds"):
+        CORE.validate_decision_trace(fake_coverage)
+
+    arbitrary_id = json.loads(json.dumps(trace))
+    arbitrary_id["decision_id"] = "a" * 64
+    with pytest.raises(CORE.DecisionContractError, match="canonical trace content hash"):
+        CORE.validate_decision_trace(arbitrary_id)
+
     early = json.loads(json.dumps(trace))
     early["baseline"]["package_created_at_utc"] = "2026-08-04T11:59:59Z"
     early["decision_id"] = CORE.compute_decision_id(early)
-    with pytest.raises(CORE.DecisionContractError, match="created after activation"):
+    with pytest.raises(CORE.DecisionContractError, match="activation and freeze"):
         CORE.validate_decision_trace(early)
     hindsight = json.loads(json.dumps(trace))
     hindsight["match_assessments"][0]["kickoff_ts_utc"] = "2026-08-05T00:59:59Z"
@@ -508,8 +558,9 @@ def test_decision_trace_schema_requires_all_three_distinct_arms():
     with pytest.raises(CORE.DecisionContractError, match="candidate match universe"):
         CORE.validate_decision_trace(incomplete)
     unhashed = json.loads(json.dumps(trace))
-    unhashed["audit"]["source_hashes"]["baseline"] = "9" * 64
-    with pytest.raises(CORE.DecisionContractError, match="canonical trace content hash"):
+    unhashed["audit"]["source_hashes"]["source_181_ledger_sha256"] = "9" * 64
+    unhashed["decision_id"] = CORE.compute_decision_id(unhashed)
+    with pytest.raises(CORE.DecisionContractError, match="source hash mismatch"):
         CORE.validate_decision_trace(unhashed)
     trace["arms"][2] = dict(trace["arms"][1])
     with pytest.raises(jsonschema.ValidationError):

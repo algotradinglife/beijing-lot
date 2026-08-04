@@ -79,16 +79,12 @@
       "required": [
         "gate_a_acceptance_url",
         "gate_a_acceptance_recorded_at_utc",
-        "minimum_issue_exclusive",
-        "baseline_created_after_activation",
-        "evidence_receipts_after_activation"
+        "minimum_issue_exclusive"
       ],
       "properties": {
         "gate_a_acceptance_url": {"type": "string", "format": "uri"},
         "gate_a_acceptance_recorded_at_utc": {"$ref": "#/$defs/timestamp"},
-        "minimum_issue_exclusive": {"type": "integer", "minimum": 26082},
-        "baseline_created_after_activation": {"const": true},
-        "evidence_receipts_after_activation": {"const": true}
+        "minimum_issue_exclusive": {"type": "integer", "minimum": 26082}
       }
     },
     "candidate": {
@@ -175,8 +171,15 @@
         "as_of_export_sha256": {"$ref": "#/$defs/sha256"},
         "coverage_report_sha256_by_kind": {
           "type": "object",
-          "minProperties": 5,
-          "additionalProperties": {"$ref": "#/$defs/sha256"}
+          "additionalProperties": false,
+          "required": ["injury", "suspension", "expected_lineup", "coach_change", "motivation"],
+          "properties": {
+            "injury": {"$ref": "#/$defs/sha256"},
+            "suspension": {"$ref": "#/$defs/sha256"},
+            "expected_lineup": {"$ref": "#/$defs/sha256"},
+            "coach_change": {"$ref": "#/$defs/sha256"},
+            "motivation": {"$ref": "#/$defs/sha256"}
+          }
         },
         "cutoff_ts_utc": {"$ref": "#/$defs/timestamp"},
         "max_receipt_sequence": {"type": "integer", "minimum": 1},
@@ -274,7 +277,28 @@
         "selector_retuned": {"const": false},
         "allocator_changed": {"const": false},
         "ticket_economics_changed": {"const": false},
-        "source_hashes": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/sha256"}}
+        "source_hashes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_181_ledger_sha256",
+            "source_181_asof_schema_sha256",
+            "source_181_coverage_schema_sha256",
+            "source_180_gate_b_manifest_sha256",
+            "source_180_gate_b_content_identity_sha256",
+            "baseline_package_sha256",
+            "as_of_export_sha256"
+          ],
+          "properties": {
+            "source_181_ledger_sha256": {"const": "3c065be028c4022d33487095f08b9838c284853614f6617646dabe5e08c31229"},
+            "source_181_asof_schema_sha256": {"const": "e763428d703197ec08eb2c4955ee45bc9925c84941bed8f3a9ac253edec161bd"},
+            "source_181_coverage_schema_sha256": {"const": "22ffbaf6ef79eb484425c48307a29c08ba73d6a0bbf743e4023b37838ed9181d"},
+            "source_180_gate_b_manifest_sha256": {"const": "9f48b29325d817ce873bd1430be459c9e70ad052064f8e03e02ccbc1d8bc6fcf"},
+            "source_180_gate_b_content_identity_sha256": {"const": "d9b41dec45c1c6215755d9dad8774e00fc0f19f564ee6ef8bf2387cb8d309108"},
+            "baseline_package_sha256": {"$ref": "#/$defs/sha256"},
+            "as_of_export_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        }
       }
     }
   }
