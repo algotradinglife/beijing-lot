@@ -1,0 +1,780 @@
+#!/usr/bin/env python3
+"""Exact bounded post-screening evidence for #167 Gate B v3r1.
+
+The first pass is deliberately left immutable: it settles the full frozen
+492 x 24,723 surface.  This second pass consumes that completed package,
+freezes every absolute-positive and raw-Pareto aggregate cell, and replays
+only that frozen set from canonical supports.  It therefore supplies paired
+20,000 issue-cluster draws, BH descriptive adjustments, actual concentration
+and chronology diagnostics without restarting or reducing the screen.
+"""
+from __future__ import annotations
+
+import argparse, array, csv, ctypes, gzip, importlib.util, json, math, os, shutil, statistics, subprocess, uuid
+from collections import defaultdict
+from decimal import Decimal
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+RUNNER_PATH = ROOT / "scripts" / "settle_bj167_strategy_atlas_gate_b_exact.py"
+spec = importlib.util.spec_from_file_location("bj167_exact_runner", RUNNER_PATH)
+R = importlib.util.module_from_spec(spec); assert spec.loader is not None; spec.loader.exec_module(R)
+
+REPLICATES = 20_000
+DRAW_SEED = 167137
+CONTRACT = "bj167-gate-b-v3r1-postscreen-exact"
+SCREENING_EXECUTION_HEAD = "d1717395a2ca5fc5e16554756723f296ec6053e8"
+SCREENING_RUNNER_SHA256 = "4d9ee1313ac66df5cf5f41d8db12a39352c626459c7c4d55af3d5074cc560f32"
+SCREENING_NATIVE_WRAPPER_SHA256 = "db6960d5a81ccde49f0bcb62a7c4424174feae1a4e754e64ef01de88a8b47829"
+NATIVE_WRAPPER_PATH = ROOT / "scripts" / "bj167_exact_atlas.cpp"
+RECOVERED_SCREEN_CONTRACT = "bj167-gate-b-v3r1-recovery-finalizer-v1"
+MONEY_QUANTUM_PER_SEED_YUAN = Decimal("0.000001")
+RATIO_QUANTUM = Decimal("0.000000000001")
+EXPORTED_IDENTITY_FIELDS = (
+    "selector_id", "weight_source", "mechanism", "cap", "M",
+    "seed_scope", "candidate_inclusion",
+)
+
+
+def canonical_key(row: dict) -> tuple[str, str, str, str, str, str]:
+    return tuple(row.get(k, "") for k in ("selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope"))
+
+
+def serialization_money_quantum(seed_scope: str) -> Decimal:
+    """Maximum cross-executable money serialization error for one cell."""
+    if seed_scope == "DETERMINISTIC":
+        seed_count = 1
+    elif seed_scope == "ENSEMBLE_100":
+        seed_count = 100
+    else:
+        raise RuntimeError(f"unknown postscreen seed scope: {seed_scope}")
+    return MONEY_QUANTUM_PER_SEED_YUAN * seed_count
+
+
+def adaptive_replay_tolerances(seed_scope: str, candidate_stake: Decimal,
+                               matched_full_stake: Decimal) -> dict[str, Decimal]:
+    """Propagate the frozen money quantum through both exact ROI denominators.
+
+    Candidate and matched-FULL totals use the same seed panel.  Each ROI gets
+    one money quantum per seed divided by its own exact reconciled stake, plus
+    one full twelve-decimal ratio serialization quantum.  Lift receives both
+    ROI bounds plus one further ratio quantum for its serialized subtraction.
+    """
+    if not candidate_stake.is_finite() or candidate_stake <= 0:
+        raise RuntimeError("post-screen candidate ROI denominator must be positive and finite")
+    if not matched_full_stake.is_finite() or matched_full_stake <= 0:
+        raise RuntimeError("post-screen matched-FULL ROI denominator must be positive and finite")
+    money_quantum = serialization_money_quantum(seed_scope)
+    candidate_roi = money_quantum / candidate_stake + RATIO_QUANTUM
+    matched_full_roi = money_quantum / matched_full_stake + RATIO_QUANTUM
+    return {
+        "money_quantum_yuan": money_quantum,
+        "candidate_roi_tolerance": candidate_roi,
+        "matched_full_roi_tolerance": matched_full_roi,
+        "matched_full_lift_tolerance": candidate_roi + matched_full_roi + RATIO_QUANTUM,
+    }
+
+
+def adaptive_tolerance_contract() -> dict:
+    """Machine-readable description shared by provenance and settlement card."""
+    return {
+        "money_quantum_per_seed_yuan": str(MONEY_QUANTUM_PER_SEED_YUAN),
+        "ratio_serialization_quantum": str(RATIO_QUANTUM),
+        "seed_scope_multiplier": {"DETERMINISTIC": 1, "ENSEMBLE_100": 100},
+        "candidate_roi": "money_quantum_per_seed * seed_count / exact_candidate_stake + ratio_quantum",
+        "matched_full_roi": "money_quantum_per_seed * seed_count / exact_matched_full_stake + ratio_quantum",
+        "matched_full_lift": "candidate_roi_tolerance + matched_full_roi_tolerance + ratio_quantum",
+        "boundary_rule": "absolute delta <= metric-specific tolerance; outside fails closed",
+        "stake_rule": "candidate stake must equal frozen screen stake at six decimals; both ROI denominators must be positive and finite",
+        "per_candidate_evidence": "candidate_checkpoint_reconciliation.csv",
+    }
+
+
+def git_head() -> str:
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, text=True,
+                          stdout=subprocess.PIPE).stdout.strip()
+
+
+def execution_snapshot() -> dict:
+    """The post-screen executable identity, captured at real start and end."""
+    return {"git_head": git_head(), "runner_path": str(Path(__file__).relative_to(ROOT)),
+            "runner_sha256": R.sha(Path(__file__)),
+            "native_wrapper_path": str(NATIVE_WRAPPER_PATH.relative_to(ROOT)),
+            "native_wrapper_sha256": R.sha(NATIVE_WRAPPER_PATH),
+            "frozen_allocator_path": "scripts/bj145_fast_alloc.cpp",
+            "frozen_allocator_sha256": R.sha(ROOT / "scripts" / "bj145_fast_alloc.cpp")}
+
+
+def verify_recovered_screen(screen: Path) -> dict:
+    """Verify the recovered package and its frozen candidate input before replay."""
+    required = ("SHA256SUMS.json", "CONTENT_IDENTITY.json", "recovery_provenance.json",
+                "candidate_freeze.csv", "candidate_freeze.json", "issue_order.csv",
+                "multiple_search_adjustment.json", "ensemble_metrics.csv.gz")
+    for name in required:
+        if not (screen / name).is_file():
+            raise RuntimeError(f"recovered screening package missing {name}")
+    sums = json.loads((screen / "SHA256SUMS.json").read_text())
+    for name, digest in sums.items():
+        payload = screen / name
+        if not payload.is_file() or R.sha(payload) != digest:
+            raise RuntimeError(f"recovered screening package payload drift: {name}")
+    identity = json.loads((screen / "CONTENT_IDENTITY.json").read_text())
+    provenance = json.loads((screen / "recovery_provenance.json").read_text())
+    if identity.get("contract_version") != RECOVERED_SCREEN_CONTRACT or provenance.get("contract") != RECOVERED_SCREEN_CONTRACT:
+        raise RuntimeError("post-screen requires the accepted recovered v3r1 package")
+    if provenance.get("no_full_replay") is not True or not provenance.get("archive_immutable_payloads_copied_byte_for_byte"):
+        raise RuntimeError("recovered package lacks immutable no-full-replay provenance")
+    frozen = json.loads((screen / "candidate_freeze.json").read_text())
+    freeze_path = screen / "candidate_freeze.csv"
+    if frozen.get("contract") != RECOVERED_SCREEN_CONTRACT or frozen.get("candidate_freeze_sha256") != R.sha(freeze_path):
+        raise RuntimeError("recovered candidate freeze hash/contract drift")
+    return {"manifest_sha256": R.sha(screen / "SHA256SUMS.json"),
+            "content_identity_sha256": R.sha(screen / "CONTENT_IDENTITY.json"),
+            "recovery_provenance_sha256": R.sha(screen / "recovery_provenance.json"),
+            "candidate_freeze_sha256": frozen["candidate_freeze_sha256"],
+            "candidate_freeze_count": int(frozen["candidate_count"]),
+            "candidate_total_screen_stake_yuan": frozen["candidate_total_screen_stake_yuan"],
+            "recovery_finalizer_execution_start": provenance["finalizer_execution_start"],
+            "recovery_finalizer_execution_end": provenance["finalizer_execution_end"],
+            "historical_screen_execution": {"git_head": SCREENING_EXECUTION_HEAD,
+                                               "runner_sha256": SCREENING_RUNNER_SHA256,
+                                               "native_wrapper_sha256": SCREENING_NATIVE_WRAPPER_SHA256}}
+
+
+def load_recovered_frozen_candidates(screen: Path, recovered: dict) -> list[dict]:
+    """Consume exactly the candidate-freeze emitted by the recovered package."""
+    with gzip.open(screen / "ensemble_metrics.csv.gz", "rt", newline="") as f:
+        ensemble = {canonical_key(r): r for r in csv.DictReader(f)}
+    with (screen / "candidate_freeze.csv").open(newline="") as f:
+        rows = list(csv.DictReader(f))
+    with (screen / "robust_pareto_front.csv").open(newline="") as f:
+        robust_rows = []
+        for row in csv.DictReader(f):
+            row.setdefault("seed_scope", "ENSEMBLE_100" if row.get("seed") == "ENSEMBLE_100" else "DETERMINISTIC")
+            robust_rows.append(row)
+        robust = {canonical_key(r): r for r in robust_rows}
+    if len(rows) != recovered["candidate_freeze_count"]:
+        raise RuntimeError("recovered candidate freeze count drift")
+    if [int(r["candidate_index"]) for r in rows] != list(range(len(rows))):
+        raise RuntimeError("recovered candidate freeze index sequence drift")
+    loaded = []
+    for frozen in rows:
+        key = canonical_key(frozen); source = ensemble.get(key)
+        if source is None:
+            raise RuntimeError(f"recovered candidate is absent from ensemble surface: {key}")
+        for field in ("selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope"):
+            if frozen.get(field, "") != source.get(field, ""):
+                raise RuntimeError(f"recovered candidate identity drift {field}: {key}")
+        # Five PI-audited PREDECLARED_ROBUST_SCREEN entries retain the source
+        # cell from the prior bounded robust registry rather than the display
+        # cell in ensemble_metrics.  Preserve that frozen identifier exactly,
+        # but require it to be independently bound to the robust source; an
+        # arbitrary global-cell mismatch remains fail-closed.
+        if frozen.get("global_cell", "") != source.get("global_cell", ""):
+            robust_row = robust.get(key)
+            if "PREDECLARED_ROBUST_SCREEN" not in frozen["candidate_inclusion"].split(";") or robust_row is None or robust_row.get("global_cell", "") != frozen.get("global_cell", ""):
+                raise RuntimeError(f"recovered candidate global-cell provenance drift: {key}")
+        if Decimal(frozen["screen_stake_yuan"]) != Decimal(source["stake_yuan"]):
+            raise RuntimeError(f"recovered candidate stake drift: {key}")
+        if frozen["screen_no_tax_roi"] != source["no_tax_roi"] or frozen["screen_matched_full_lift"] != source["matched_full_lift"]:
+            raise RuntimeError(f"recovered candidate screen metric drift: {key}")
+        loaded.append({**frozen, "candidate_index": int(frozen["candidate_index"]), "ensemble_global_cell": source.get("global_cell", ""), "no_tax_roi": frozen["screen_no_tax_roi"],
+                       "matched_full_lift": frozen["screen_matched_full_lift"],
+                       "stake_yuan": frozen["screen_stake_yuan"]})
+    if Decimal(sum(Decimal(r["screen_stake_yuan"]) for r in loaded)) != Decimal(recovered["candidate_total_screen_stake_yuan"]):
+        raise RuntimeError("recovered candidate freeze total stake drift")
+    return loaded
+
+
+def assert_screen_replay_equivalence(candidate: dict, stake: float, gross: float,
+                                     full_stake: float, full_gross: float) -> dict:
+    """Guard exact candidate identity/stake and only documented ROI serialization error."""
+    identity = canonical_key(candidate)
+    expected_stake = Decimal(candidate["screen_stake_yuan"])
+    actual_stake = Decimal(f"{stake:.6f}")
+    if actual_stake != expected_stake:
+        raise RuntimeError(f"post-screen exact replay stake drift for {identity}: {actual_stake} != {expected_stake}")
+    actual_full_stake = Decimal(f"{full_stake:.6f}")
+    tolerances = adaptive_replay_tolerances(candidate["seed_scope"], actual_stake, actual_full_stake)
+    roi = Decimal(f"{(gross - stake) / stake:.12f}")
+    full_roi = Decimal(f"{(full_gross - full_stake) / full_stake:.12f}")
+    checks = (("no_tax_roi", roi, Decimal(candidate["screen_no_tax_roi"]), tolerances["candidate_roi_tolerance"]),
+              ("matched_full_lift", roi - full_roi, Decimal(candidate["screen_matched_full_lift"]),
+               tolerances["matched_full_lift_tolerance"]))
+    report = {"identity": identity, "stake_yuan": f"{actual_stake:.6f}",
+              "matched_full_stake_yuan": f"{actual_full_stake:.6f}",
+              **{key: str(value) for key, value in tolerances.items()}}
+    for metric, actual, expected, tolerance in checks:
+        delta = actual - expected
+        if abs(delta) > tolerance:
+            raise RuntimeError(f"post-screen exact replay material {metric} drift for {identity}: "
+                               f"{actual} != {expected}; abs_delta={abs(delta)} tolerance={tolerance}")
+        report[metric] = {"actual": str(actual), "expected": str(expected), "delta": str(delta),
+                          "tolerance": str(tolerance)}
+    return report
+
+
+class CandidateMajorArray:
+    """O(1) candidate lookup over one candidate-major checkpoint array.
+
+    The named view is constructed exactly once while opening the checkpoint.
+    Each candidate lookup then makes one O(1) memoryview slice; it never
+    rebuilds an all-candidate list of slices.
+    """
+    def __init__(self, raw: array.array, issue_count: int):
+        if issue_count <= 0 or len(raw) % issue_count:
+            raise RuntimeError("candidate-major checkpoint array shape drift")
+        self.issue_count = issue_count
+        self._values = memoryview(raw)
+        self.candidate_count = len(raw) // issue_count
+
+    def __len__(self) -> int:
+        return self.candidate_count
+
+    def __getitem__(self, candidate_index: int) -> memoryview:
+        start = candidate_index * self.issue_count
+        return self._values[start:start + self.issue_count]
+
+
+class CheckpointIssueArrays:
+    """Named O(1) ``CandidateMajorArray`` checkpoint views."""
+    def __init__(self, raw: dict[str, array.array], issue_count: int):
+        self.raw, self.issue_count = raw, issue_count
+        self._arrays = {name: CandidateMajorArray(values, issue_count)
+                        for name, values in raw.items()}
+
+    def __getitem__(self, name: str) -> CandidateMajorArray:
+        return self._arrays[name]
+
+
+def unique_stage(target: Path) -> Path:
+    """Create a fresh retry-safe unmanifested staging directory."""
+    target.parent.mkdir(parents=True, exist_ok=True)
+    while True:
+        stage = target.with_name(f"{target.name}.stage-{uuid.uuid4().hex}")
+        try:
+            stage.mkdir()
+            return stage
+        except FileExistsError:
+            continue
+
+
+def load_shared_checkpoint(checkpoint: Path, screen: Path, rows: list[dict]) -> tuple[dict, CheckpointIssueArrays, list[dict], list[dict], list[dict]]:
+    """Verify the sole native replay checkpoint and bind it to frozen keys."""
+    science_path = ROOT / "scripts" / "settle_bj167_scientific_stability_exact.py"
+    spec = importlib.util.spec_from_file_location("bj167_science_checkpoint", science_path)
+    science = importlib.util.module_from_spec(spec); assert spec.loader is not None; spec.loader.exec_module(science)
+    meta, mapping, issue_rows, selectors, _cells, raw, _science = science.verify_candidate_checkpoint(checkpoint, screen)
+    if len(mapping) != len(rows): raise RuntimeError("shared checkpoint candidate count drift")
+    for frozen, mapped in zip(rows, mapping):
+        for field in ("candidate_index", "selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope", "candidate_inclusion", "screen_stake_yuan", "screen_no_tax_roi", "screen_matched_full_lift"):
+            if str(frozen.get(field, "")) != str(mapped.get(field, "")):
+                raise RuntimeError(f"shared checkpoint frozen identity drift {field}: {frozen['candidate_index']}")
+        if str(frozen.get("global_cell", "")) != str(mapped.get("screen_global_cell", "")):
+            raise RuntimeError(f"shared checkpoint frozen global-cell drift: {frozen['candidate_index']}")
+        frozen["global_science_cell"] = mapped["global_science_cell"]
+    return meta, CheckpointIssueArrays(raw, len(issue_rows)), mapping, issue_rows, selectors
+
+
+def reconcile_candidate_checkpoint(rows: list[dict], values: CheckpointIssueArrays, out: Path) -> None:
+    """Require candidate stake/ROI/lift to satisfy the adaptive frozen contract."""
+    fields=["candidate_index","selector_id","global_science_cell","seed_scope","screen_stake_yuan","checkpoint_stake_yuan","checkpoint_matched_full_stake_yuan","money_quantum_yuan","screen_no_tax_roi","checkpoint_no_tax_roi","screen_matched_full_lift","checkpoint_matched_full_lift","roi_delta","lift_delta","candidate_roi_tolerance","matched_full_roi_tolerance","matched_full_lift_tolerance","reconciliation_status"]
+    failed=0
+    with (out/"candidate_checkpoint_reconciliation.csv").open("w",newline="") as f:
+        w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
+        for candidate in rows:
+            ci=candidate["candidate_index"]
+            stake,gross=sum(values["stake"][ci]),sum(values["gross"][ci])
+            full_stake,full_gross=sum(values["full_stake"][ci]),sum(values["full_gross"][ci])
+            try:
+                report=assert_screen_replay_equivalence(candidate,stake,gross,full_stake,full_gross); status="PASS"
+            except RuntimeError:
+                failed+=1; status="FAIL"; report={"no_tax_roi":{"actual":"","delta":""},"matched_full_lift":{"actual":"","delta":""},"money_quantum_yuan":"","candidate_roi_tolerance":"","matched_full_roi_tolerance":"","matched_full_lift_tolerance":""}
+            w.writerow({"candidate_index":ci,"selector_id":candidate["selector_id"],"global_science_cell":candidate.get("global_science_cell","") ,"seed_scope":candidate["seed_scope"],"screen_stake_yuan":candidate["screen_stake_yuan"],"checkpoint_stake_yuan":f"{stake:.6f}","checkpoint_matched_full_stake_yuan":f"{full_stake:.6f}","money_quantum_yuan":report["money_quantum_yuan"],"screen_no_tax_roi":candidate["screen_no_tax_roi"],"checkpoint_no_tax_roi":report["no_tax_roi"].get("actual",""),"screen_matched_full_lift":candidate["screen_matched_full_lift"],"checkpoint_matched_full_lift":report["matched_full_lift"].get("actual",""),"roi_delta":report["no_tax_roi"].get("delta",""),"lift_delta":report["matched_full_lift"].get("delta",""),"candidate_roi_tolerance":report["candidate_roi_tolerance"],"matched_full_roi_tolerance":report["matched_full_roi_tolerance"],"matched_full_lift_tolerance":report["matched_full_lift_tolerance"],"reconciliation_status":status})
+    if failed: raise RuntimeError(f"candidate checkpoint reconciliation mismatch count={failed}")
+
+
+def write_execution_provenance(out: Path, screen: Path, post_start: dict, post_end: dict, recovered: dict, checkpoint: Path | None = None) -> None:
+    if post_start != post_end:
+        raise RuntimeError("post-screen executable identity changed during run")
+    payload = {
+        "contract": CONTRACT,
+        "historical_screen_execution": recovered["historical_screen_execution"],
+        "recovered_screening_package": {"package": screen.name, **{k:v for k,v in recovered.items() if k != "historical_screen_execution"}},
+        "current_companion_dependency_hashes": {"screen_runner_path": str(RUNNER_PATH.relative_to(ROOT)),
+                                                  "screen_runner_sha256": R.sha(RUNNER_PATH),
+                                                  "native_wrapper_path": str(NATIVE_WRAPPER_PATH.relative_to(ROOT)),
+                                                  "native_wrapper_sha256": R.sha(NATIVE_WRAPPER_PATH),
+                                                  "frozen_allocator_sha256": R.sha(ROOT / "scripts" / "bj145_fast_alloc.cpp")},
+        "screen_vs_replay_adaptive_tolerance": adaptive_tolerance_contract(),
+        "postscreen_execution_start": post_start,
+        "postscreen_execution_end": post_end,
+    }
+    if checkpoint is not None:
+        payload["shared_science_checkpoint"]={"package":checkpoint.name,"manifest_sha256":R.sha(checkpoint/"SHA256SUMS.json"),"mode":"BOOTSTRAP_FINALIZER_NO_TICKET_REPLAY"}
+    (out / "execution_provenance.json").write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n")
+
+
+def write_gz_rows(path: Path, fields: list[str], rows) -> None:
+    with gzip.GzipFile(filename=str(path), mode="wb", mtime=0) as gb, __import__("io").TextIOWrapper(gb, newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
+        for row in rows: w.writerow({k: row.get(k, "") for k in fields})
+
+
+def write_full_atlas_chart_sources(screen: Path, out: Path, selector_rows: list[dict] | None = None,
+                                   policy_rows: list[dict] | None = None) -> None:
+    """Render-ready full-atlas sources, derived only from immutable screen data.
+
+    The original screen's in-memory code predates these schema fields.  This
+    companion keeps that monetary package immutable and creates a keyed chart
+    layer with every deterministic dense-M arm retained once.
+    """
+    if selector_rows is None:
+        with (R.GA / "selector_grid.csv").open(newline="") as f: selector_rows = list(csv.DictReader(f))
+    if policy_rows is None:
+        with (screen / "selector_policy_census.csv").open(newline="") as f: policy_rows = list(csv.DictReader(f))
+    selectors = {r["selector_id"]: r for r in selector_rows}
+    census = defaultdict(lambda: {"selector_policy_count": 0, "settled_policy_count": 0,
+                                  "unavailable_policy_count": 0, "no_bet_policy_count": 0})
+    for row in policy_rows:
+        c = census[row["selector_id"]]; c["selector_policy_count"] += 1
+        status = row.get("status", "")
+        if status == "SETTLED": c["settled_policy_count"] += 1
+        elif status == "UNAVAILABLE_CANONICAL_OUTCOME": c["unavailable_policy_count"] += 1
+        elif status in {"NO_BET", "NO_BET_FROZEN"}:
+            # Gate-B's pre-frozen zero-exposure policy is a no-bet, not an
+            # unavailable outcome; retain it in the denominator at zero stake.
+            c["no_bet_policy_count"] += 1
+        else: raise RuntimeError(f"unknown selector policy status: {status}")
+    with gzip.open(screen / "ensemble_metrics.csv.gz", "rt", newline="") as f:
+        rows = list(csv.DictReader(f))
+    full_gross = {r["selector_id"]: float(r["gross_pre_tax_yuan"])
+                  for r in rows if r["mechanism"] == "FULL_ENUMERATED"}
+    if set(full_gross) != set(selectors):
+        raise RuntimeError("selector FULL chart control is incomplete")
+    def joined(row: dict) -> dict:
+        sid = row["selector_id"]
+        if sid not in selectors or sid not in census: raise RuntimeError(f"chart source selector join drift: {sid}")
+        outrow = dict(row); outrow.update(selectors[sid]); outrow.update(census[sid])
+        gross = float(row["gross_pre_tax_yuan"]); fg = full_gross[sid]
+        # Ensemble rows pool 100 seed ledgers whereas selector FULL is one
+        # deterministic realization.  Compare one seed-equivalent candidate
+        # gross to one matched-FULL gross; deterministic rows retain scale 1.
+        scale = int(row.get("seed_count") or (100 if row["seed_scope"] == "ENSEMBLE_100" else 1))
+        if scale <= 0: raise RuntimeError("invalid gross-retention normalization scale")
+        normalized_gross = gross / scale
+        outrow["gross_retention_normalization_scale"] = str(scale)
+        outrow["normalized_stake_yuan"] = f"{float(row['stake_yuan']) / scale:.6f}"
+        outrow["normalized_gross_pre_tax_yuan"] = f"{normalized_gross:.6f}"
+        outrow["gross_return_retention_vs_matched_full"] = "" if fg == 0 else f"{normalized_gross / fg:.12f}"
+        # The immutable primary surface retains monetary tax exactly.  Its
+        # pre-screen ledger did not retain taxable ticket counts, so expose
+        # count/rate as explicitly unavailable rather than inventing them.
+        tax = float(row["tax_yuan"])
+        outrow["tax_line_exposure_yuan"] = f"{tax / .20:.6f}"
+        outrow["normalized_tax_yuan"] = f"{tax / scale:.6f}"
+        outrow["normalized_tax_line_exposure_yuan"] = f"{tax / .20 / scale:.6f}"
+        outrow["taxable_winning_ticket_count"] = ""
+        outrow["taxable_winning_ticket_rate"] = ""
+        outrow["taxable_ticket_metric_status"] = "NOT_RETAINED_IN_SCREEN_LEDGER"
+        return outrow
+    rendered = [joined(r) for r in rows]
+    selector_fields = ["selector_id", "family", "gate_id", "top_k", "lowp_source", "lowp_threshold", "ranker",
+                       "selector_policy_count", "settled_policy_count", "unavailable_policy_count", "no_bet_policy_count",
+                       "stake_yuan", "gross_pre_tax_yuan", "no_tax_roi", "tax_adjusted_roi", "coverage_hit_rate",
+                       "ticket_hit_rate", "capital_utilization_vs_full", "seed_mean_drawdown_no_tax_yuan"]
+    write_gz_rows(out / "chart_source_selector_full_surface_v3r1.csv.gz", selector_fields,
+                  (r for r in rendered if r["mechanism"] == "FULL_ENUMERATED"))
+    dense_fields = ["selector_id", "family", "gate_id", "top_k", "lowp_source", "lowp_threshold", "ranker",
+                    "weight_source", "mechanism", "cap", "M", "seed", "seed_scope", "stake_yuan", "gross_pre_tax_yuan",
+                    "no_tax_roi", "matched_full_lift", "coverage_hit_rate", "ticket_hit_rate", "capital_utilization_vs_full"]
+    write_gz_rows(out / "chart_source_full_dense_m_curve_v3r1.csv.gz", dense_fields, rendered)
+    capital_fields = ["selector_id", "family", "gate_id", "top_k", "lowp_source", "lowp_threshold", "ranker",
+                      "weight_source", "mechanism", "cap", "M", "seed", "seed_scope", "stake_yuan", "gross_pre_tax_yuan",
+                      "no_tax_roi", "tax_adjusted_roi", "tax_yuan", "tax_line_exposure_yuan", "normalized_tax_yuan", "normalized_tax_line_exposure_yuan",
+                      "gross_retention_normalization_scale", "normalized_stake_yuan", "normalized_gross_pre_tax_yuan", "gross_return_retention_vs_matched_full", "taxable_winning_ticket_count", "taxable_winning_ticket_rate",
+                      "taxable_ticket_metric_status", "coverage_hit_rate", "ticket_hit_rate", "seed_mean_drawdown_no_tax_yuan",
+                      "seed_gross_weighted_mean_issue_hhi", "selector_policy_count", "settled_policy_count",
+                      "unavailable_policy_count", "no_bet_policy_count"]
+    write_gz_rows(out / "chart_source_capital_risk_tax_hit_v3r1.csv.gz", capital_fields, rendered)
+
+
+def candidate_rows(screen: Path) -> list[dict]:
+    """Freeze the required union before doing any second-pass settlement."""
+    selected: dict[tuple[str, str, str, str, str, str], dict] = {}
+    with gzip.open(screen / "ensemble_metrics.csv.gz", "rt", newline="") as f:
+        for row in csv.DictReader(f):
+            if row.get("no_tax_roi") and float(row["no_tax_roi"]) > 0 and float(row["stake_yuan"]) > 0:
+                key = canonical_key(row)
+                selected[key] = dict(row, candidate_inclusion="ABSOLUTE_POSITIVE")
+    with (screen / "raw_pareto_front.csv").open(newline="") as f:
+        for raw in csv.DictReader(f):
+            key = canonical_key(raw)
+            if key in selected:
+                selected[key]["candidate_inclusion"] += ";RAW_PARETO"
+            else:
+                selected[key] = dict(raw, candidate_inclusion="RAW_PARETO")
+    # The previous bounded robust screen is not final evidence, but retaining
+    # its identities makes the replacement front a superset rather than a
+    # winner-picked omission.
+    old_robust = screen / "robust_pareto_front.csv"
+    if old_robust.exists():
+        with old_robust.open(newline="") as f:
+            for raw in csv.DictReader(f):
+                raw.setdefault("seed_scope", "ENSEMBLE_100" if raw.get("seed") == "ENSEMBLE_100" else "DETERMINISTIC")
+                key = canonical_key(raw)
+                if key in selected:
+                    selected[key]["candidate_inclusion"] += ";PREDECLARED_ROBUST_SCREEN"
+                else:
+                    selected[key] = dict(raw, candidate_inclusion="PREDECLARED_ROBUST_SCREEN")
+    return [selected[k] for k in sorted(selected)]
+
+
+def write_candidate_freeze(out: Path, rows: list[dict], screen: Path) -> str:
+    fields = ["candidate_index", "selector_id", "weight_source", "mechanism", "cap", "M", "seed", "seed_scope", "global_cell", "candidate_inclusion", "screen_no_tax_roi", "screen_matched_full_lift"]
+    p = out / "candidate_freeze.csv"
+    with p.open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
+        for i, row in enumerate(rows):
+            row["candidate_index"] = i
+            w.writerow({"candidate_index": i, "selector_id": row.get("selector_id", ""), "weight_source": row.get("weight_source", ""),
+                        "mechanism": row.get("mechanism", ""), "cap": row.get("cap", ""), "M": row.get("M", ""),
+                        "seed": row.get("seed", ""), "seed_scope": row.get("seed_scope", ""), "global_cell": row.get("global_cell", ""),
+                        "candidate_inclusion": row["candidate_inclusion"], "screen_no_tax_roi": row.get("no_tax_roi", ""),
+                        "screen_matched_full_lift": row.get("matched_full_lift", "")})
+    payload = {"contract": CONTRACT, "screening_sha256s": R.sha(screen / "SHA256SUMS.json"),
+               "candidate_count": len(rows), "candidate_freeze_sha256": R.sha(p),
+               "inclusion_rule": "union(absolute positive aggregate cells, raw Pareto cells, prior bounded robust-screen identities)"}
+    (out / "candidate_freeze.json").write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n")
+    return payload["candidate_freeze_sha256"]
+
+
+def configure_native() -> ctypes.CDLL:
+    lib = R.compile_engine(ROOT, "bj167_postscreen_exact.so")
+    pi = ctypes.POINTER(ctypes.c_int); pd = ctypes.POINTER(ctypes.c_double); pu = ctypes.POINTER(ctypes.c_uint)
+    lib.bj167_profile_allocation.argtypes = [pd, ctypes.c_int, ctypes.c_char_p, pi, pi, pi, pi, pi, pi]
+    lib.bj167_paired_issue_bootstrap.argtypes = [pd, pd, pd, pd, ctypes.c_int, ctypes.c_int, pu, ctypes.c_int, pd, pd, pd]
+    return lib
+
+
+def profile_buffers() -> tuple[array.array, ...]:
+    return (array.array("i", [0]) * (100 * 20 * 4), array.array("i", [0]) * (100 * 20 * 4),
+            array.array("i", [0]) * (20 * 4), array.array("i", [0]) * (4 * 20 * 4),
+            array.array("i", [0]) * (20 * 4), array.array("i", [0]) * 4)
+
+
+def metric_for(candidate: dict, roles: list[dict], truth: int, profiles: dict[str, tuple[array.array, ...]]) -> tuple[int, int, int, int]:
+    """Return frozen-engine ticket metrics; Python only chooses the cell."""
+    mech = candidate["mechanism"]
+    if mech == "FULL_ENUMERATED": return (1, 2187, 0, 0)
+    if mech in {"P_MIN_GLOBAL_DELETE", "Q_MIN_GLOBAL_DELETE"}:
+        pl, pc, ql, qc = R.derive_delete(roles)
+        leg, code = (pl, pc) if mech.startswith("P_") else (ql, qc)
+        actual = (truth // (3 ** (6 - leg))) % 3
+        return (int(actual != code), 1458, 0, 0)
+    p = profiles[candidate["weight_source"]]
+    mi = R.M_GRID.index(int(candidate["M"]))
+    if mech == "WR_DUPLICATE_STAKE":
+        vals = [p[0][(si * 20 + mi) * 4:(si * 20 + mi + 1) * 4] for si in range(100)]
+        return tuple(sum(v[j] for v in vals) for j in range(4))
+    if mech == "WOR_DISTINCT":
+        vals = [p[1][(si * 20 + mi) * 4:(si * 20 + mi + 1) * 4] for si in range(100)]
+        return tuple(sum(v[j] for v in vals) for j in range(4))
+    if mech == "RESIDUAL_SYSTEMATIC": return tuple(p[2][mi * 4:(mi + 1) * 4])
+    if mech == "CAPPED_REPEAT":
+        ci = R.CAPS.index(int(candidate["cap"]))
+        return tuple(p[3][(ci * 20 + mi) * 4:(ci * 20 + mi + 1) * 4])
+    if mech == "DETERMINISTIC_TOP_MASS": return tuple(p[4][mi * 4:(mi + 1) * 4])
+    raise RuntimeError(f"unknown candidate mechanism: {mech}")
+
+
+def candidate_multiplier(candidate: dict) -> int:
+    return 100 if candidate["mechanism"] in {"WR_DUPLICATE_STAKE", "WOR_DISTINCT"} and candidate["seed_scope"] == "ENSEMBLE_100" else 1
+
+
+def replay_candidates(rows: list[dict], issue_order: list[str], issue_meta: dict, out: Path) -> dict[str, list[array.array]]:
+    R.verify_ga(); outcomes = R.load_outcomes(); selectors, selector_idx, _alloc, _cell_meta, _maps = R.load_surface()
+    supports, by_issue, _ignored_order, _identity_count = R.build_supports(outcomes, selector_idx)
+    with (R.GA / "selector_census.csv").open(newline="") as f: census_rows = list(csv.DictReader(f))
+    R.build_policy_status(census_rows, supports, selector_idx)
+    if set(issue_order) != set(by_issue): raise RuntimeError("screening issue order does not match canonical support universe")
+    n, c = len(issue_order), len(rows)
+    values = {name: [array.array("d", [0.0]) * n for _ in range(c)] for name in ("net", "stake", "gross", "tax", "hit", "tax_line_hit", "full_net", "full_stake", "full_gross", "full_tax")}
+    by_selector: dict[int, list[dict]] = defaultdict(list)
+    for row in rows:
+        row["selector_index"] = selector_idx[row["selector_id"]]
+        by_selector[row["selector_index"]].append(row)
+    lib = configure_native(); pd = ctypes.POINTER(ctypes.c_double); pi = ctypes.POINTER(ctypes.c_int)
+    for ii, issue in enumerate(issue_order):
+        for support in by_issue[issue]:
+            relevant = [r for si in support["eligible_selectors"] for r in by_selector.get(si, ())]
+            if not relevant: continue
+            need_sources = {r["weight_source"] for r in relevant if r["mechanism"] not in {"FULL_ENUMERATED", "P_MIN_GLOBAL_DELETE", "Q_MIN_GLOBAL_DELETE"}}
+            profiles: dict[str, tuple[array.array, ...]] = {}
+            for source in need_sources:
+                b = profile_buffers(); roles = array.array("d", [v for role in support["roles"] for v in role["source"][source]])
+                lib.bj167_profile_allocation(R.ptr(roles, ctypes.c_double), support["truth"], "|".join(support["mids"]).encode(),
+                                             *(R.ptr(x, ctypes.c_int) for x in b))
+                profiles[source] = b
+            for candidate in relevant:
+                ci = candidate["candidate_index"]
+                hit, unique, duplicate, _ = metric_for(candidate, support["roles"], support["truth"], profiles)
+                stake = 2.0 * (unique + duplicate); gross = support["payout"] * hit
+                tax = support["payout"] * 0.20 * hit if support["payout"] >= 10_000.0 else 0.0
+                values["stake"][ci][ii] += stake; values["gross"][ci][ii] += gross; values["tax"][ci][ii] += tax; values["hit"][ci][ii] += hit
+                if support["payout"] >= 10_000.0: values["tax_line_hit"][ci][ii] += hit
+                values["net"][ci][ii] += gross - stake
+                mult = candidate_multiplier(candidate)
+                full_stake = 2.0 * 2187 * mult; full_gross = support["payout"] * mult
+                full_tax = support["payout"] * .20 * mult if support["payout"] >= 10_000.0 else 0.0
+                values["full_stake"][ci][ii] += full_stake; values["full_gross"][ci][ii] += full_gross; values["full_tax"][ci][ii] += full_tax
+                values["full_net"][ci][ii] += full_gross - full_stake
+        if (ii + 1) % 10 == 0: print(f"postscreen replay issues {ii + 1}/{n}", flush=True)
+    return values
+
+
+def quantile(values: list[float], q: float) -> float | None:
+    x = sorted(v for v in values if math.isfinite(v))
+    return None if not x else x[min(len(x) - 1, max(0, int(q * len(x))))]
+
+
+def point(values: array.array, stakes: array.array) -> float | None:
+    denom = sum(stakes)
+    return sum(values) / denom if denom else None
+
+
+def bh(rows: list[dict], field: str, prefix: str, full_family_size: int) -> None:
+    valid = [(i, float(r[field])) for i, r in enumerate(rows) if r.get(field, "") != ""]
+    if full_family_size < len(valid):
+        raise RuntimeError("searched-family count cannot be smaller than bootstrapped candidate count")
+    # Unbootstrapped full-surface cells are conservatively represented as
+    # p=1.  Their ordered ranks trail all finite candidate p-values, so the
+    # BH adjustment below uses the immutable full search family without
+    # pretending the candidate freeze was the scientific search universe.
+    valid.sort(key=lambda x: x[1]); m = full_family_size; ceiling = 1.0
+    # The remaining m-len(valid) implicit p=1 entries have adjusted p=1, so
+    # start the monotone reverse pass at the last observed rank.
+    for rank in range(len(valid), 0, -1):
+        i, p = valid[rank - 1]; adjusted = min(ceiling, p * m / rank); ceiling = adjusted
+        rows[i][prefix + "_bh_adjusted_p"] = adjusted
+        rows[i][prefix + "_bonferroni_adjusted_p"] = min(1.0, p * m)
+    for r in rows:
+        r.setdefault(prefix + "_bh_adjusted_p", None); r.setdefault(prefix + "_bonferroni_adjusted_p", None)
+
+
+def bootstrap_rows(rows: list[dict], values: dict[str, list[array.array]], issue_order: list[str], issue_meta: dict, out: Path, full_family_size: int) -> list[dict]:
+    n, c = len(issue_order), len(rows)
+    draws, draws_sha = R.build_common_draw_matrix(n, REPLICATES, DRAW_SEED)
+    (out / "paired_bootstrap_draw_matrix.json").write_text(json.dumps({"seed": DRAW_SEED, "unit": "issue_instance", "issue_count": n, "replicate_count": REPLICATES, "sha256": draws_sha}, sort_keys=True, indent=2) + "\n")
+    lib = configure_native(); out_rows = []
+    for start in range(0, c, 32):
+        end = min(c, start + 32); size = end - start
+        def flat(name): return array.array("d", (x for ci in range(start, end) for x in values[name][ci]))
+        cn, cs, fn, fs = (flat(name) for name in ("net", "stake", "full_net", "full_stake"))
+        cr = array.array("d", [math.nan]) * (size * REPLICATES); fr = array.array("d", [math.nan]) * (size * REPLICATES); lr = array.array("d", [math.nan]) * (size * REPLICATES)
+        lib.bj167_paired_issue_bootstrap(R.ptr(cn, ctypes.c_double), R.ptr(cs, ctypes.c_double), R.ptr(fn, ctypes.c_double), R.ptr(fs, ctypes.c_double), size, n, R.ptr(draws, ctypes.c_uint), REPLICATES, R.ptr(cr, ctypes.c_double), R.ptr(fr, ctypes.c_double), R.ptr(lr, ctypes.c_double))
+        for local, ci in enumerate(range(start, end)):
+            cand = [x for x in cr[local * REPLICATES:(local + 1) * REPLICATES] if math.isfinite(x)]
+            full = [x for x in fr[local * REPLICATES:(local + 1) * REPLICATES] if math.isfinite(x)]
+            lift = [x for x in lr[local * REPLICATES:(local + 1) * REPLICATES] if math.isfinite(x)]
+            def pv(x):
+                if not x: return None
+                return min(1.0, 2.0 * min((sum(v <= 0 for v in x) + 1) / (len(x) + 1), (sum(v >= 0 for v in x) + 1) / (len(x) + 1)))
+            net, stake, gross = values["net"][ci], values["stake"][ci], values["gross"][ci]
+            full_net, full_stake = values["full_net"][ci], values["full_stake"][ci]
+            roi, full_roi = point(net, stake), point(full_net, full_stake)
+            by_year: dict[str, list[float]] = defaultdict(lambda: [0.0, 0.0])
+            for i, issue in enumerate(issue_order): by_year[issue_meta[issue]["year"]][0] += net[i]; by_year[issue_meta[issue]["year"]][1] += stake[i]
+            largest_issue = max(range(n), key=lambda i: net[i])
+            ex_stake = sum(stake) - stake[largest_issue]; ex_issue = (sum(net) - net[largest_issue]) / ex_stake if ex_stake else None
+            signed_year = max(by_year, key=lambda y: by_year[y][0])
+            ex_year_stake = sum(s for i, s in enumerate(stake) if issue_meta[issue_order[i]]["year"] != signed_year)
+            ex_year_net = sum(v for i, v in enumerate(net) if issue_meta[issue_order[i]]["year"] != signed_year)
+            cum = peak = dd = 0.0
+            for v, s in zip(net, stake):
+                if s: cum += v; peak = max(peak, cum); dd = max(dd, peak - cum)
+            total_gross = sum(gross); hhi = sum(g * g for g in gross) / (total_gross * total_gross) if total_gross else 0.0
+            top = max(gross) / total_gross if total_gross else 0.0
+            # Frozen production candidates always carry the exact recovered
+            # screen fields.  Keeping this guard conditional lets compact unit
+            # ledgers exercise bootstrap math without pretending to be a
+            # recovered immutable package.
+            equivalence = (assert_screen_replay_equivalence(rows[ci], sum(stake), sum(gross),
+                           sum(full_stake), sum(values["full_gross"][ci]))
+                           if "screen_stake_yuan" in rows[ci] else {})
+            out_rows.append({"candidate_index": ci, "candidate_point_roi": roi, "full_point_roi": full_roi,
+                             "paired_lift_point": roi - full_roi if roi is not None and full_roi is not None else None,
+                             "candidate_ci95_low": quantile(cand, .025), "candidate_ci95_high": quantile(cand, .975),
+                             "full_ci95_low": quantile(full, .025), "full_ci95_high": quantile(full, .975),
+                             "lift_ci95_low": quantile(lift, .025), "lift_ci95_high": quantile(lift, .975),
+                             "candidate_two_sided_p": pv(cand), "paired_lift_two_sided_p": pv(lift),
+                             "ex_largest_issue_no_tax_roi": ex_issue, "largest_signed_issue": issue_order[largest_issue],
+                             "largest_signed_issue_net_yuan": net[largest_issue], "ex_largest_year_no_tax_roi": ex_year_net / ex_year_stake if ex_year_stake else None,
+                             "largest_signed_year": signed_year, "drawdown_no_tax_yuan": dd, "gross_issue_hhi": hhi,
+                             "gross_top_issue_share": top, "bootstrap_draw_matrix_sha256": draws_sha,
+                             "screen_replay_equivalence": json.dumps(equivalence, sort_keys=True)})
+    bh(out_rows, "candidate_two_sided_p", "candidate", full_family_size)
+    bh(out_rows, "paired_lift_two_sided_p", "paired_lift", full_family_size)
+    for row in out_rows:
+        row["candidate_freeze_count"] = len(rows)
+        row["full_search_family_count"] = full_family_size
+    return out_rows
+
+
+def write_stability(rows: list[dict], values: dict[str, list[array.array]], issue_order: list[str], issue_meta: dict, out: Path) -> None:
+    fields = ["candidate_index", "split_type", "split", "retained_issue_count", "candidate_no_tax_roi", "matched_full_no_tax_roi", "paired_lift", "candidate_stake_yuan", "matched_full_stake_yuan"]
+    years = sorted({issue_meta[x]["year"] for x in issue_order}); folds = sorted({issue_meta[x]["fold"] for x in issue_order})
+    with (out / "stability_year_fold_loyo.csv").open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
+        for ci, _ in enumerate(rows):
+            for split_type, names, keep in (("YEAR", years, lambda x, z: issue_meta[x]["year"] == z), ("FOLD", folds, lambda x, z: issue_meta[x]["fold"] == z), ("LOYO", years, lambda x, z: issue_meta[x]["year"] != z)):
+                for name in names:
+                    ix = [i for i, issue in enumerate(issue_order) if keep(issue, name)]
+                    net = sum(values["net"][ci][i] for i in ix); stake = sum(values["stake"][ci][i] for i in ix)
+                    fnet = sum(values["full_net"][ci][i] for i in ix); fstake = sum(values["full_stake"][ci][i] for i in ix)
+                    roi = net/stake if stake else None; froi = fnet/fstake if fstake else None
+                    w.writerow({"candidate_index": ci, "split_type": split_type, "split": name, "retained_issue_count": len(ix), "candidate_no_tax_roi": "" if roi is None else f"{roi:.12f}", "matched_full_no_tax_roi": "" if froi is None else f"{froi:.12f}", "paired_lift": "" if roi is None or froi is None else f"{roi-froi:.12f}", "candidate_stake_yuan": f"{stake:.6f}", "matched_full_stake_yuan": f"{fstake:.6f}"})
+
+
+def write_seed_quantiles(screen: Path, out: Path) -> None:
+    """Required min/max/p10/p90 summaries from the full seed-level ledger."""
+    fields = ["selector_id", "weight_source", "mechanism", "cap", "M", "seed_count", "roi_min", "roi_p10", "roi_p25", "roi_median", "roi_p75", "roi_p90", "roi_max", "roi_mean", "roi_sd", "roi_mcse", "positive_roi_fraction", "lift_min", "lift_p10", "lift_p25", "lift_median", "lift_p75", "lift_p90", "lift_max", "lift_mean", "lift_sd", "lift_mcse", "positive_lift_fraction"]
+    with gzip.GzipFile(filename=str(out / "seed_ensemble_quantiles.csv.gz"), mode="wb", mtime=0) as gb, __import__("io").TextIOWrapper(gb, newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
+        for fp in sorted(screen.glob("cell_metrics-*.csv.gz")):
+            groups: dict[tuple, list[tuple[float, float]]] = defaultdict(list)
+            with gzip.open(fp, "rt", newline="") as src:
+                for r in csv.DictReader(src):
+                    if r["mechanism"] in {"WR_DUPLICATE_STAKE", "WOR_DISTINCT"} and r["no_tax_roi"] and r["matched_full_lift"]:
+                        groups[(r["selector_id"], r["weight_source"], r["mechanism"], r["cap"], r["M"])].append((float(r["no_tax_roi"]), float(r["matched_full_lift"])))
+            for key, pairs in sorted(groups.items()):
+                if len(pairs) != 100: raise RuntimeError(f"incomplete seed ensemble {key}: {len(pairs)}")
+                def summary(vals):
+                    vals = sorted(vals); mean = statistics.mean(vals); sd = statistics.stdev(vals)
+                    q = lambda p: vals[min(len(vals) - 1, int(p * len(vals)))]
+                    return (f"{vals[0]:.12f}", f"{q(.10):.12f}", f"{q(.25):.12f}", f"{statistics.median(vals):.12f}", f"{q(.75):.12f}", f"{q(.90):.12f}", f"{vals[-1]:.12f}", f"{mean:.12f}", f"{sd:.12f}", f"{sd/math.sqrt(100):.12f}", f"{sum(v > 0 for v in vals)/100:.12f}")
+                w.writerow(dict(zip(fields, (*key, 100, *summary([x[0] for x in pairs]), *summary([x[1] for x in pairs])))))
+
+
+def write_outputs(rows: list[dict], boot: list[dict], values: dict[str, list[array.array]], issue_order: list[str], issue_meta: dict, out: Path) -> None:
+    by_index = {x["candidate_index"]: x for x in boot}
+    fields = ["candidate_index", "selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope", "candidate_inclusion", "candidate_point_roi", "full_point_roi", "paired_lift_point", "candidate_ci95_low", "candidate_ci95_high", "lift_ci95_low", "lift_ci95_high", "candidate_two_sided_p", "candidate_bh_adjusted_p", "candidate_bonferroni_adjusted_p", "paired_lift_two_sided_p", "paired_lift_bh_adjusted_p", "paired_lift_bonferroni_adjusted_p", "ex_largest_issue_no_tax_roi", "ex_largest_year_no_tax_roi", "drawdown_no_tax_yuan", "gross_issue_hhi", "gross_top_issue_share", "largest_signed_issue", "largest_signed_year", "bootstrap_replicates", "bootstrap_unit", "candidate_freeze_count", "full_search_family_count", "descriptive_only"]
+    joined = []
+    for c in rows:
+        b = by_index[c["candidate_index"]]
+        # Bootstrap rows deliberately carry metrics only.  Frozen candidate
+        # identity is authoritative and must never be overwritten by blank
+        # metric-row placeholders during this deterministic join.
+        row = {k: b.get(k, "") for k in fields}
+        row.update({k: c.get(k, "") for k in ("candidate_index", *EXPORTED_IDENTITY_FIELDS)})
+        if any(row[k] in (None, "") for k in EXPORTED_IDENTITY_FIELDS):
+            raise RuntimeError(f"blank frozen candidate identity at candidate_index={c['candidate_index']}")
+        row.update({"bootstrap_replicates": REPLICATES, "bootstrap_unit": "paired issue_instance", "descriptive_only": "TRUE"})
+        joined.append(row)
+    with (out / "candidate_paired_bootstrap_20000.csv").open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
+        for r in joined: w.writerow({k: "" if r.get(k) is None else (f"{r[k]:.12f}" if isinstance(r.get(k), float) else r.get(k, "")) for k in fields})
+    def dominates(a, b):
+        return a[0] >= b[0] and a[1] >= b[1] and a[2] >= b[2] and a[3] <= b[3] and a[4] <= b[4] and (a[0] > b[0] or a[1] > b[1] or a[2] > b[2] or a[3] < b[3] or a[4] < b[4])
+    candidates = [(float(r["candidate_ci95_low"]), float(r["ex_largest_issue_no_tax_roi"]), float(r["ex_largest_year_no_tax_roi"]), float(r["drawdown_no_tax_yuan"]), float(r["gross_issue_hhi"]), r) for r in joined if r["candidate_ci95_low"] not in (None, "") and r["ex_largest_issue_no_tax_roi"] not in (None, "") and r["ex_largest_year_no_tax_roi"] not in (None, "")]
+    front = []
+    for x in sorted(candidates, key=lambda x: (-x[0], -x[1], -x[2], x[3], x[4], x[5]["candidate_index"])):
+        if any(dominates(y, x) for y in front): continue
+        front = [y for y in front if not dominates(x, y)]; front.append(x)
+    with (out / "robust_pareto_front_exact.csv").open("w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=fields + ["front_definition"]); w.writeheader()
+        for x in front: w.writerow(dict(x[5], front_definition="exact 20,000 paired-draw lower ROI + ex-largest issue/year ROI higher; drawdown/HHI lower"))
+    # Exact issue contributions support the tax-line exposure and retention
+    # charts; they are not reconstructed from aggregate tax amounts.
+    with gzip.GzipFile(filename=str(out / "candidate_issue_contributions.csv.gz"), mode="wb", mtime=0) as gb, __import__("io").TextIOWrapper(gb, newline="") as f:
+        fields2 = ["candidate_index", "issue_index", "issue_instance", "first_kickoff_ts", "year", "candidate_stake_yuan", "candidate_gross_yuan", "candidate_tax_yuan", "candidate_net_yuan", "matched_full_stake_yuan", "matched_full_gross_yuan", "matched_full_net_yuan"]
+        w = csv.DictWriter(f, fieldnames=fields2); w.writeheader()
+        for ci in range(len(rows)):
+            for i, issue in enumerate(issue_order):
+                w.writerow({"candidate_index": ci, "issue_index": i, "issue_instance": issue, "first_kickoff_ts": issue_meta[issue]["first_kickoff_ts"], "year": issue_meta[issue]["year"], "candidate_stake_yuan": f"{values['stake'][ci][i]:.6f}", "candidate_gross_yuan": f"{values['gross'][ci][i]:.6f}", "candidate_tax_yuan": f"{values['tax'][ci][i]:.6f}", "candidate_net_yuan": f"{values['net'][ci][i]:.6f}", "matched_full_stake_yuan": f"{values['full_stake'][ci][i]:.6f}", "matched_full_gross_yuan": f"{values['full_gross'][ci][i]:.6f}", "matched_full_net_yuan": f"{values['full_net'][ci][i]:.6f}"})
+    with (out / "chart_source_tax_line_exposure_retention.csv").open("w", newline="") as f:
+        fields3 = ["candidate_index", "gross_pre_tax_yuan", "matched_full_gross_yuan", "tax_yuan", "tax_line_exposure_yuan", "gross_return_retention_vs_matched_full", "after_tax_gross_retention", "tax_to_gross_fraction", "pre_tax_no_tax_roi", "tax_adjusted_roi", "tax_line_hit_ticket_count"]
+        w = csv.DictWriter(f, fieldnames=fields3); w.writeheader()
+        for ci, b in by_index.items():
+            gross, tax, stake, full_gross = sum(values["gross"][ci]), sum(values["tax"][ci]), sum(values["stake"][ci]), sum(values["full_gross"][ci])
+            w.writerow({"candidate_index": ci, "gross_pre_tax_yuan": f"{gross:.6f}", "matched_full_gross_yuan": f"{full_gross:.6f}", "tax_yuan": f"{tax:.6f}", "tax_line_exposure_yuan": f"{tax / .20:.6f}", "gross_return_retention_vs_matched_full": "" if full_gross == 0 else f"{gross/full_gross:.12f}", "after_tax_gross_retention": "" if gross == 0 else f"{(gross-tax)/gross:.12f}", "tax_to_gross_fraction": "" if gross == 0 else f"{tax/gross:.12f}", "pre_tax_no_tax_roi": "" if stake == 0 else f"{(gross-stake)/stake:.12f}", "tax_adjusted_roi": "" if stake == 0 else f"{(gross-tax-stake)/stake:.12f}", "tax_line_hit_ticket_count": f"{sum(values['tax_line_hit'][ci]):.0f}"})
+    with (out / "bh_descriptive_significance.csv").open("w", newline="") as f:
+        fields4 = ["candidate_index", "family", "candidate_freeze_count", "full_search_family_count", "nominal_two_sided_p", "bh_adjusted_p", "bonferroni_adjusted_p", "interpretation"]
+        w = csv.DictWriter(f, fieldnames=fields4); w.writeheader()
+        for r in joined:
+            for family, p, bp, bonf in (("absolute_roi", r["candidate_two_sided_p"], r["candidate_bh_adjusted_p"], r["candidate_bonferroni_adjusted_p"]), ("paired_lift", r["paired_lift_two_sided_p"], r["paired_lift_bh_adjusted_p"], r["paired_lift_bonferroni_adjusted_p"])):
+                w.writerow({"candidate_index": r["candidate_index"], "family": family, "candidate_freeze_count": r["candidate_freeze_count"], "full_search_family_count": r["full_search_family_count"], "nominal_two_sided_p": p, "bh_adjusted_p": bp, "bonferroni_adjusted_p": bonf, "interpretation": "descriptive post-screening adjustment; no promotion"})
+
+
+def preflight_report(screen: Path, recovered: dict, rows: list[dict]) -> dict:
+    """Exact input census plus conservative resource model; it performs no replay."""
+    issue_count = sum(1 for _ in csv.DictReader((screen / "issue_order.csv").open(newline="")))
+    candidate_count = len(rows)
+    value_arrays_bytes = candidate_count * issue_count * 11 * 8
+    draws_bytes = REPLICATES * issue_count * 4
+    bootstrap_chunk_bytes = min(32, candidate_count) * REPLICATES * 3 * 8
+    contribution_rows = candidate_count * issue_count
+    return {"contract": CONTRACT, "mode": "PREFLIGHT_ONLY_NO_COMPANION_REPLAY",
+            "recovered_manifest_sha256": recovered["manifest_sha256"],
+            "recovered_candidate_freeze_sha256": recovered["candidate_freeze_sha256"],
+            "candidate_freeze_count": candidate_count, "candidate_total_screen_stake_yuan": recovered["candidate_total_screen_stake_yuan"],
+            "issue_count": issue_count, "bootstrap_replicates": REPLICATES,
+            "paired_bootstrap_target_count": candidate_count,
+            "candidate_issue_contribution_rows": contribution_rows,
+            "estimated_live_value_arrays_bytes": value_arrays_bytes,
+            "estimated_common_draw_matrix_bytes": draws_bytes,
+            "estimated_one_bootstrap_chunk_bytes": bootstrap_chunk_bytes,
+            "estimated_peak_numeric_bytes_lower_bound": value_arrays_bytes + draws_bytes + bootstrap_chunk_bytes,
+            "estimated_candidate_issue_csv_uncompressed_bytes_at_160_per_row": contribution_rows * 160,
+            "runtime_estimate_method": "one shared 963-cell native replay; companion finalizers perform no ticket replay"}
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(); ap.add_argument("--screening-output", default="results/bj167_gate_b_strategy_atlas_v3r1_recovered_final_v1"); ap.add_argument("--checkpoint", default="results/bj167_gate_b_strategy_atlas_v3r1_shared_science_checkpoint_v1"); ap.add_argument("--output", default="results/bj167_gate_b_strategy_atlas_v3r1_postscreen_exact"); ap.add_argument("--finalize-checkpoint", action="store_true"); ap.add_argument("--preflight", action="store_true"); args = ap.parse_args()
+    screen, checkpoint, final = ROOT / args.screening_output, ROOT / args.checkpoint, ROOT / args.output
+    recovered = verify_recovered_screen(screen)
+    rows = load_recovered_frozen_candidates(screen, recovered)
+    if args.preflight:
+        report = preflight_report(screen, recovered, rows)
+        report["shared_checkpoint_required"] = str(checkpoint.relative_to(ROOT))
+        report["companion_ticket_replay"] = "FORBIDDEN; bootstrap finalizer consumes shared checkpoint only"
+        print(json.dumps(report, sort_keys=True), flush=True)
+        return
+    if not args.finalize_checkpoint: raise RuntimeError("postscreen output requires explicit --finalize-checkpoint")
+    if os.environ.get("BJ167_TEST_FORBID_OUTCOME_SUPPORT") == "1":
+        globals()["replay_candidates"] = lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("test guard: postscreen replay invoked"))
+    if final.exists(): raise RuntimeError("refusing to replace immutable post-screening package")
+    checkpoint_meta, values, mapping, issue_rows, checkpoint_selectors = load_shared_checkpoint(checkpoint, screen, rows)
+    if checkpoint_meta["candidate_freeze_sha256"] != recovered["candidate_freeze_sha256"]:
+        raise RuntimeError("shared checkpoint candidate freeze hash drift")
+    post_start = execution_snapshot()
+    stage = unique_stage(final); out = stage
+    issue_order = [r["issue_instance"] for r in issue_rows]
+    issue_meta = {r["issue_instance"]: r for r in issue_rows}
+    shutil.copyfile(screen / "candidate_freeze.csv", out / "candidate_freeze.csv")
+    shutil.copyfile(screen / "candidate_freeze.json", out / "candidate_freeze.json")
+    print(f"consumed recovered frozen post-screening candidates={len(rows)}", flush=True)
+    reconcile_candidate_checkpoint(rows, values, out)
+    adjustment = json.loads((screen / "multiple_search_adjustment.json").read_text())
+    full_family_size = int(adjustment["tested_surface_cells"])
+    boot = bootstrap_rows(rows, values, issue_order, issue_meta, out, full_family_size)
+    write_stability(rows, values, issue_order, issue_meta, out)
+    write_seed_quantiles(screen, out)
+    write_outputs(rows, boot, values, issue_order, issue_meta, out)
+    # Retain the accepted bridge in the companion package so its chart source
+    # is explicit and carries the same v3r1 naming as the exact replay.
+    shutil.copyfile(screen / "baseline_registry.csv", out / "baseline_registry_v3r1.csv")
+    shutil.copyfile(out / "baseline_registry_v3r1.csv", out / "chart_source_baseline_bridge.csv")
+    shutil.copyfile(out / "seed_ensemble_quantiles.csv.gz", out / "chart_source_seed_ensemble_quantiles.csv.gz")
+    write_full_atlas_chart_sources(screen, out, checkpoint_selectors)
+    post_end = execution_snapshot()
+    write_execution_provenance(out, screen, post_start, post_end, recovered, checkpoint)
+    (out / "settlement_card.json").write_text(json.dumps({"contract": CONTRACT, "screening_package": str(screen.name), "screening_manifest_sha256": recovered["manifest_sha256"], "recovered_candidate_freeze_sha256": recovered["candidate_freeze_sha256"], "historical_screening_execution": recovered["historical_screen_execution"], "postscreen_execution_head": post_start["git_head"], "execution_provenance": "execution_provenance.json", "candidate_rule": "exact recovered union(absolute positive, raw Pareto, robust Pareto)", "candidate_freeze_count": len(rows), "full_search_family_count": full_family_size, "exact_replay": "frozen #145 native allocator; accepted tie behavior", "screen_replay_adaptive_tolerance": adaptive_tolerance_contract(), "bootstrap": {"replicates": REPLICATES, "unit": "issue_instance", "shared_draw_seed": DRAW_SEED}, "primary_metric": "pre-tax no_tax_roi", "promotion_authorized": False}, sort_keys=True, indent=2) + "\n")
+    (out / "README.md").write_text("# #167 post-screening exact evidence v3r1\n\nThis immutable companion package consumes the shared scientific replay checkpoint for the completed primary screen's frozen absolute-positive and raw-Pareto aggregate cells. It performs no ticket replay: all candidate versus FULL resamples use one common 20,000-draw issue matrix over checkpointed issue ledgers. BH and Bonferroni values are descriptive post-screening adjustments only; they do not promote a policy.\n")
+    R.write_file_census(out)
+    R.finalize_package_identity(out, CONTRACT, {"recovered_screening_manifest_sha256": recovered["manifest_sha256"], "recovered_candidate_freeze_sha256": recovered["candidate_freeze_sha256"], "shared_science_checkpoint_manifest_sha256": R.sha(checkpoint/"SHA256SUMS.json"), "historical_screening_execution_head": SCREENING_EXECUTION_HEAD, "historical_screening_runner_sha256": SCREENING_RUNNER_SHA256, "postscreen_execution_head": post_start["git_head"], "postscreen_runner_sha256": post_start["runner_sha256"], "postscreen_native_wrapper_sha256": post_start["native_wrapper_sha256"], "bootstrap_replicates": REPLICATES, "shared_draw_seed": DRAW_SEED, "allocator_sha256": R.EXPECTED_ALLOCATOR_SHA256})
+    R.atomic_publish(stage, final)
+    print(f"WROTE {final}", flush=True)
+
+
+if __name__ == "__main__": main()

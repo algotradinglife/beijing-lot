@@ -1,0 +1,17 @@
+{
+  "identity_rows_times_n_equals_role_rows": true,
+  "selector_identities": {
+    "canonical_decompressed_sha256": "0f6c2b2f96103470ad47ef402c02d21daf72c805d7153db6c492f69c13b57cd7",
+    "key_fields": "selector_id|issue_instance|portfolio_id|selector_rank",
+    "kind": "selector_identities",
+    "row_count": 1306139,
+    "shard_count": 7
+  },
+  "selector_role_vectors": {
+    "canonical_decompressed_sha256": "a8aff7e399c0f923f8b4bf2769374844a18271c14051711cb23b0b324a7e2d59",
+    "key_fields": "selector_id|issue_instance|portfolio_id|selection_rank",
+    "kind": "selector_role_vectors",
+    "row_count": 9142973,
+    "shard_count": 46
+  }
+}

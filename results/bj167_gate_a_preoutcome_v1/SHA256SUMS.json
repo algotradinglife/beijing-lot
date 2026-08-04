@@ -1,0 +1,12 @@
+{
+  "CONTENT_IDENTITY.json": "3fb79bf49f15484067b8934e96c1b7a4a831762929c5892b15679d38b87d443b",
+  "README.md": "d907133dce68c56101d0cbcfc7cb8e35e413a4ceeab1e27876595be5a03152be",
+  "allocation_catalog.csv.gz": "53a9788525ea7a9b26f91d9f0fac055eda2e52308b0c53f0526369adaf03df58",
+  "freeze_runner.py": "285e570bee23ab4a181f5f2f5de76070f6484a6e5fee04c681bd3d4ebf9da80d",
+  "gate_a_card.json": "468669729f37de6e3d515a19fe891556e666251f8aa78e69e0b10c9b10165c26",
+  "identity_catalog.csv.gz": "0b3aef923385693d9891fe960b0dd78150c7e8598b0ff2929d8415eefd712245",
+  "issue_participation.csv": "6c850aad0631c603925d5120eec7d09ba474d3f090358eca57c07abd7d8f2b04",
+  "role_vectors.csv.gz": "00111854114c69d8815f146c269491b35bd483b8b573576c2e80ef948a9d1c59",
+  "sampling_plan.csv": "499bbeb9511cb2e91566d793fa8cbdee3bada46078da66a0d87e3cb2207f2a00",
+  "source_binding.json": "15fc3bfbffd791b965f077432ed4274e42330478397d992cf8ce3cb36ca341c8"
+}

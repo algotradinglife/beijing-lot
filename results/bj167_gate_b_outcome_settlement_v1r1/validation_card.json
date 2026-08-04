@@ -1,0 +1,28 @@
+{
+  "M_grid": [
+    32,
+    64,
+    128
+  ],
+  "bootstrap_replicates": 2000,
+  "contract": "BJ-HIST-N7-SEED-ENSEMBLE-001",
+  "gate_a_content_identity": "3fb79bf49f15484067b8934e96c1b7a4a831762929c5892b15679d38b87d443b",
+  "gate_a_manifest": "3e9cd84d8714ee52c979da26b174bb32e0c1d1cdb5e72bca9e34cc80deeaa519",
+  "generated_at_utc": "2026-08-03T04:38:20Z",
+  "head_end": "66f4f7b",
+  "head_start": "66f4f7b",
+  "identity_count": 1005,
+  "identity_settlement_rows": 301500,
+  "issue": 167,
+  "issue_settlement_rows": 104400,
+  "n": 7,
+  "no_purchase_production_or_betting_authority": true,
+  "outcome_manifest": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "outcome_payload": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+  "primary_metric": "pre-tax no_tax_roi",
+  "promotion_authorized": false,
+  "seed_count": 100,
+  "stage": "GATE_B_OUTCOME_SETTLEMENT_N7_SEED_ENSEMBLE",
+  "tax_rule": "20% per independent winning \u00a52 ticket gross >= \u00a510000; no pooling",
+  "tax_secondary": true
+}
