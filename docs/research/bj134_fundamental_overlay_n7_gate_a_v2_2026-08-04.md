@@ -1,5 +1,9 @@
 # #134 replacement Gate A — matched FULL N7 fundamental/decision overlay
 
+> Superseded by the PI Plan-v3 freeze in
+> `bj134_fundamental_overlay_n7_gate_a_v3_2026-08-04.md`. This v2 record is
+> retained only as a historical, non-authoritative receipt.
+
 ## Disposition
 
 This is the replacement outcome-unexposed Gate-A freeze for

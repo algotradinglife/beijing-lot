@@ -1,0 +1,856 @@
+{
+  "database_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+  "database_tables": {
+    "market_consensus": [
+      {
+        "cid": 0,
+        "default": null,
+        "name": "match_id",
+        "notnull": 0,
+        "pk": 0,
+        "type": "INT"
+      },
+      {
+        "cid": 1,
+        "default": null,
+        "name": "market",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 2,
+        "default": null,
+        "name": "snapshot",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 3,
+        "default": null,
+        "name": "n_rows",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 4,
+        "default": null,
+        "name": "n_v1",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 5,
+        "default": null,
+        "name": "n_v2",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 6,
+        "default": null,
+        "name": "n_v3",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 7,
+        "default": null,
+        "name": "n_complete",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 8,
+        "default": null,
+        "name": "v1_avg",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 9,
+        "default": null,
+        "name": "v2_avg",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 10,
+        "default": null,
+        "name": "v3_avg",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 11,
+        "default": null,
+        "name": "v1_sq_avg",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 12,
+        "default": null,
+        "name": "v2_sq_avg",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 13,
+        "default": null,
+        "name": "v3_sq_avg",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 14,
+        "default": null,
+        "name": "v1_min",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 15,
+        "default": null,
+        "name": "v2_min",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 16,
+        "default": null,
+        "name": "v3_min",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 17,
+        "default": null,
+        "name": "v1_max",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 18,
+        "default": null,
+        "name": "v2_max",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 19,
+        "default": null,
+        "name": "v3_max",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      }
+    ],
+    "match_features": [
+      {
+        "cid": 0,
+        "default": null,
+        "name": "match_id",
+        "notnull": 0,
+        "pk": 0,
+        "type": "INT"
+      },
+      {
+        "cid": 1,
+        "default": null,
+        "name": "issue",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 2,
+        "default": null,
+        "name": "match_idx",
+        "notnull": 0,
+        "pk": 0,
+        "type": "INT"
+      },
+      {
+        "cid": 3,
+        "default": null,
+        "name": "kickoff_ts",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 4,
+        "default": null,
+        "name": "season_year",
+        "notnull": 0,
+        "pk": 0,
+        "type": "INT"
+      },
+      {
+        "cid": 5,
+        "default": null,
+        "name": "league",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 6,
+        "default": null,
+        "name": "home",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 7,
+        "default": null,
+        "name": "away",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 8,
+        "default": null,
+        "name": "score",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 9,
+        "default": null,
+        "name": "home_rank",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 10,
+        "default": null,
+        "name": "away_rank",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 11,
+        "default": null,
+        "name": "handicap_line_raw",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 12,
+        "default": null,
+        "name": "handicap_line_norm",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 13,
+        "default": null,
+        "name": "handicap_norm_source",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 14,
+        "default": null,
+        "name": "result_label",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 15,
+        "default": null,
+        "name": "result_code_from_label",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 16,
+        "default": null,
+        "name": "result_code_3sp",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 17,
+        "default": null,
+        "name": "result_code_500",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 18,
+        "default": null,
+        "name": "result_code_history",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 19,
+        "default": null,
+        "name": "result_code",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 20,
+        "default": null,
+        "name": "winning_sp",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 21,
+        "default": null,
+        "name": "fthg",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 22,
+        "default": null,
+        "name": "ftag",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 23,
+        "default": null,
+        "name": "handicap_line_history",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 24,
+        "default": null,
+        "name": "history_avg_eu_home",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 25,
+        "default": null,
+        "name": "history_avg_eu_draw",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 26,
+        "default": null,
+        "name": "history_avg_eu_away",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 27,
+        "default": null,
+        "name": "official_500_avg_eu_home",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 28,
+        "default": null,
+        "name": "official_500_avg_eu_draw",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 29,
+        "default": null,
+        "name": "official_500_avg_eu_away",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 30,
+        "default": null,
+        "name": "official_sp_3",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 31,
+        "default": null,
+        "name": "official_sp_1",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 32,
+        "default": null,
+        "name": "official_sp_0",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 33,
+        "default": null,
+        "name": "has_3sp_join",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 34,
+        "default": null,
+        "name": "has_500_join",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 35,
+        "default": null,
+        "name": "has_history_join",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 36,
+        "default": null,
+        "name": "has_winning_sp",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 37,
+        "default": null,
+        "name": "winning_sp_source",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 38,
+        "default": null,
+        "name": "result_code_from_score_hcp",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 39,
+        "default": null,
+        "name": "settlement_quality",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      },
+      {
+        "cid": 40,
+        "default": null,
+        "name": "has_trusted_settlement",
+        "notnull": 0,
+        "pk": 0,
+        "type": ""
+      }
+    ],
+    "matches": [
+      {
+        "cid": 0,
+        "default": null,
+        "name": "match_id",
+        "notnull": 0,
+        "pk": 1,
+        "type": "INTEGER"
+      },
+      {
+        "cid": 1,
+        "default": null,
+        "name": "sheet_row",
+        "notnull": 1,
+        "pk": 0,
+        "type": "INTEGER"
+      },
+      {
+        "cid": 2,
+        "default": null,
+        "name": "issue",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 3,
+        "default": null,
+        "name": "match_idx",
+        "notnull": 0,
+        "pk": 0,
+        "type": "INTEGER"
+      },
+      {
+        "cid": 4,
+        "default": null,
+        "name": "kickoff_serial",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 5,
+        "default": null,
+        "name": "kickoff_ts",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 6,
+        "default": null,
+        "name": "league",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 7,
+        "default": null,
+        "name": "home_rank",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 8,
+        "default": null,
+        "name": "home",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 9,
+        "default": null,
+        "name": "score",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 10,
+        "default": null,
+        "name": "away",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 11,
+        "default": null,
+        "name": "away_rank",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 12,
+        "default": null,
+        "name": "handicap_line",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 13,
+        "default": null,
+        "name": "halftime_score",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 14,
+        "default": null,
+        "name": "result_label",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 15,
+        "default": null,
+        "name": "total_goals",
+        "notnull": 0,
+        "pk": 0,
+        "type": "INTEGER"
+      },
+      {
+        "cid": 16,
+        "default": null,
+        "name": "half_full",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 17,
+        "default": null,
+        "name": "provider_match_id",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 18,
+        "default": null,
+        "name": "ts_10h_serial",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 19,
+        "default": null,
+        "name": "ts_10h",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 20,
+        "default": null,
+        "name": "home_team_id",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 21,
+        "default": null,
+        "name": "away_team_id",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 22,
+        "default": null,
+        "name": "sclassid",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      },
+      {
+        "cid": 23,
+        "default": null,
+        "name": "handicap_line_norm",
+        "notnull": 0,
+        "pk": 0,
+        "type": "REAL"
+      },
+      {
+        "cid": 24,
+        "default": null,
+        "name": "handicap_norm_source",
+        "notnull": 0,
+        "pk": 0,
+        "type": "TEXT"
+      }
+    ]
+  },
+  "market_snapshot_semantics": {
+    "asian_ou_rule": "published consensus line v2; v1/v3 retained for coverage audit",
+    "euro_probability_rule": "no-vig inverse odds",
+    "excluded": [
+      "final"
+    ],
+    "included": [
+      "initial",
+      "10h",
+      "1h"
+    ],
+    "source": "market_consensus",
+    "vector_rule": "n>0 and v1/v2/v3 present"
+  },
+  "outcome_boundary": "Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking",
+  "target_projection": {
+    "columns": [
+      "match_id",
+      "issue",
+      "match_idx",
+      "kickoff_ts",
+      "year",
+      "league",
+      "home_team_id",
+      "away_team_id",
+      "home_rank",
+      "away_rank",
+      "handicap_line_norm",
+      "euro_initial_n",
+      "euro_initial_v1",
+      "euro_initial_v2",
+      "euro_initial_v3",
+      "euro_10h_n",
+      "euro_10h_v1",
+      "euro_10h_v2",
+      "euro_10h_v3",
+      "euro_1h_n",
+      "euro_1h_v1",
+      "euro_1h_v2",
+      "euro_1h_v3",
+      "euro_1h_min1",
+      "euro_1h_min2",
+      "euro_1h_min3",
+      "euro_1h_max1",
+      "euro_1h_max2",
+      "euro_1h_max3",
+      "asian_initial_n",
+      "asian_initial_v1",
+      "asian_initial_v2",
+      "asian_initial_v3",
+      "asian_10h_n",
+      "asian_10h_v1",
+      "asian_10h_v2",
+      "asian_10h_v3",
+      "asian_1h_n",
+      "asian_1h_v1",
+      "asian_1h_v2",
+      "asian_1h_v3",
+      "ou_initial_n",
+      "ou_initial_v1",
+      "ou_initial_v2",
+      "ou_initial_v3",
+      "ou_10h_n",
+      "ou_10h_v1",
+      "ou_10h_v2",
+      "ou_10h_v3",
+      "ou_1h_n",
+      "ou_1h_v1",
+      "ou_1h_v2",
+      "ou_1h_v3"
+    ],
+    "forbidden_families": [
+      "target result/score",
+      "final or winning SP",
+      "payout",
+      "tax",
+      "ROI",
+      "settlement"
+    ]
+  },
+  "training_projection": {
+    "outcomes": "permitted only for kickoff/calendar periods strictly before the target cutoff/fold",
+    "outer_year": "calendar year < target year",
+    "team_state": "kickoff < common issue cutoff"
+  },
+  "upstream_csv_fields": {
+    "candidate_role_vectors.csv.gz": [
+      "selector_id",
+      "family",
+      "issue_instance",
+      "portfolio_id",
+      "match_id",
+      "match_idx",
+      "selection_rank",
+      "kickoff_ts",
+      "e_sp",
+      "p_min",
+      "p_model3",
+      "p_model1",
+      "p_model0",
+      "p_market_cal3",
+      "p_market_cal1",
+      "p_market_cal0",
+      "p_blend_a25_3",
+      "p_blend_a25_1",
+      "p_blend_a25_0",
+      "p_blend_a50_3",
+      "p_blend_a50_1",
+      "p_blend_a50_0",
+      "p_blend_a75_3",
+      "p_blend_a75_1",
+      "p_blend_a75_0",
+      "q_weight3",
+      "q_weight1",
+      "q_weight0",
+      "outcome_boundary"
+    ],
+    "selection_identities.csv.gz": [
+      "selector_id",
+      "family",
+      "selector_rank",
+      "source_gate_id",
+      "issue",
+      "fold",
+      "year",
+      "issue_instance",
+      "portfolio_id",
+      "candidate_match_id",
+      "selected_match_ids",
+      "selected_n",
+      "gm_e_sp",
+      "identity_fingerprint",
+      "outcome_boundary"
+    ],
+    "selector_issue_census.csv": [
+      "candidate_identity_count",
+      "e_sp_min",
+      "family",
+      "fold",
+      "gate_id",
+      "gm_e_sp_min",
+      "issue",
+      "issue_instance",
+      "lowp_source",
+      "lowp_threshold",
+      "no_bet_reason",
+      "outcome_boundary",
+      "ranker",
+      "selected_identity_count",
+      "selected_portfolio_ids_sha256",
+      "selection_scope",
+      "selection_status",
+      "selector_id",
+      "top_k",
+      "year"
+    ]
+  }
+}

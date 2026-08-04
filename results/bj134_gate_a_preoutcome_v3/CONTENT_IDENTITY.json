@@ -1,0 +1,60 @@
+{
+  "contract_version": "bj134-gate-a-v3",
+  "controls": {
+    "all_arm_identity_sha256": "a88e38f413b8680dbd9f26ca1bc7871d62fb5c8261cd8594ec618d3a69efc115",
+    "base_main_commit": "d300d0bdb93efada661bfa039788e6536ff89257",
+    "candidate_selector": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K_ALL",
+    "database_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "incumbent_identity_sha256": "cc50e351dfb6aeea0f72cfefa29b3356e38cfcfea76bc54d284fa1a0457523c3",
+    "incumbent_selector": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K1",
+    "outer_year_parameter_sha256": "3b0761575f47931973a2c04e7cad6837badfa8b6c6aa4628945eabd205d2b495",
+    "source_175_sha256": "ec8161fc430c6ea4133f1da7c805772bbd8c8d22cffe8d450380e1c044b34681",
+    "source_176_manifest": "39316952296c2349f5da2f963d43c0baf0d812fba4eea967536a8b80bd57d5ee"
+  },
+  "denominator": {
+    "arm_count": 9,
+    "candidate_identity_rows": 424,
+    "candidate_role_rows": 2968,
+    "choice_opportunity_issues": 113,
+    "invariant_issues": 76,
+    "issue_census": 348,
+    "no_bet_rows": 1431,
+    "planned_stake_per_arm_yuan": 826686,
+    "selected_by_arm": {
+      "B0_BEST_FULL": 189,
+      "D1_DECISION_CHAIN_CORE": 189,
+      "F1_CORE_ALL": 189,
+      "F_MINUS_L": 189,
+      "F_MINUS_M": 189,
+      "F_MINUS_T": 189,
+      "L1_LEAGUE_CORE": 189,
+      "M1_MARKET_DYNAMICS": 189,
+      "T1_TEAM_CORE": 189
+    },
+    "selected_rows": 1701,
+    "selection_rows": 3132,
+    "unique_match_rows": 1558
+  },
+  "payloads": {
+    "README.md": "dc5cffd276fb83238694074fe03e9c0bc9797811fc4310d7520e4afac600bf61",
+    "arm_registry.csv": "8624033edd7db94db8f4fb002ae7c55f1f2b3b2ede83be4a10f94faafc3fedde",
+    "bj134_quick_core.py": "0836a11fe411ee080069400111170124b81ba8461114bcf9a87884837f12ef9a",
+    "candidate_role_vectors.csv.gz": "16a361311c550ef034b3a5f2e0384d8ac75d378a4c17d65fa3019247be18da2c",
+    "candidate_universe_scores.csv.gz": "3b226479dbb3a750bb6834237edad47e792d87bd2f64acdf7dfe1bb524cd45b1",
+    "feature_manifest.csv": "823d0ef2ddeedcc7634afa3098c06e9e00f96b93a27f0eebf849589042c268de",
+    "freeze_runner.py": "5e8ed201e52b53aa37787e4b7b11b3d2e61ec6946cc3efd06081c4dd622b501a",
+    "gate_a_card.json": "e2d3a114d757b63f565a79fb8ac64cba103baacffcefa24c994ed74719caa08e",
+    "identity_overlap.csv": "e18fb45a8059626cc61671bbd44a37ffbbf6d2c43625ac28e9eeb17b03a33839",
+    "issue_cutoff_registry.csv": "74f2d93cc31d15d519071b1e6a50203e9dcc76b6533994b75e2ed09dc1c03f94",
+    "match_feature_ledger.csv.gz": "c3009be7ab2b3abeaf1f797445d88af040512778ebc5910211bd6b6c38130af2",
+    "outer_year_model_freeze.json.gz": "322a1d68ee41f68a9fa7d8e041bcdd43ccc4dc45657fb56ea8d55781f65b2c62",
+    "outer_year_training_registry.csv": "7f546c91aa330c23fb0e7854795bb90ccb1f42b6156ba6507b281c3837bb01c3",
+    "segment_registry.csv": "5754e00fea34e4ecf125dbeb893862d8a6210802b1efbb4b5fca2dfb04273937",
+    "selection_freeze.csv": "26a121343f357754a0d24c9179918817c50a61a27f2b891ee39d6f17ad885e2e",
+    "snapshot_coverage.csv": "f59c2e137effa73290e95ada654d1813791fa42f5e28550dad01dcafa3631e05",
+    "source_binding.json": "be72d2157b3e08d7b9416acf1e9648d3e77b4e4caee54b29df24882260851d63",
+    "source_census.csv": "612ad6f64d0ef58148837ebf662be6b3256f14bbea9cef7e7e0812a3905ce407",
+    "source_schema.json": "54e29c1fa01c08ffa66bb8f67260a40b5e18f38fa7bd1424226d79065a48e466",
+    "threshold_registry.csv": "530b6bd0e86a74209c63d47670604068e6d8f172afbad125fb8ae57ceff31d7b"
+  }
+}
