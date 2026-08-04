@@ -6,6 +6,8 @@ Primary economic metric: **pre-tax ROI**. Tax-adjusted ROI is secondary.
 
 Scope: paper research only; no purchase, production, betting or promotion authority.
 
+Decision-maker companion: [N7 strategy atlas terminology and decision guide](Issue-167-N7-Strategy-Atlas-Decision-Guide.md).
+
 ## Decision summary
 
 #167 materially narrows the next search without proving production-grade positive EV.
@@ -243,9 +245,12 @@ incumbent.
 ## Route to #134
 
 The live Issue Graph currently shows [#134](https://github.com/algotradinglife/beijing-lot/issues/134)
-OPEN / Waiting in `BJ Prediction & Betting`; its native blocker #133 is closed. #167
-does not change #134's graph in this documentation PR, but supplies the missing portfolio
-starting points.
+OPEN / Blocked in `BJ Prediction & Betting`. Its completed market-stack dependencies
+#133 and #170 are closed; the remaining analysis-first blockers are the #167 decision
+guide [#175](https://github.com/algotradinglife/beijing-lot/issues/175) and the
+risk-adjusted time-series analysis [#176](https://github.com/algotradinglife/beijing-lot/issues/176).
+#167 supplies the portfolio starting points, but #134 must not resume until both new
+interpretation deliverables close.
 
 The fundamental/decision-chain overlay should test a small fixed inheritance panel:
 
