@@ -1,0 +1,129 @@
+{
+  "contract_version": "bj179-gate-a-v2",
+  "controls": {
+    "all_arm_identity_sha256": "695ecfa8f1cdcaa7b7059698d86e6cedfd8ce9c70e6bd45fab0cee1d6a7b7b9c",
+    "base_main_commit": "9ec5cf4856f546861e20fad76d110807576903c7",
+    "baseline_identity_sha256": "cc50e351dfb6aeea0f72cfefa29b3356e38cfcfea76bc54d284fa1a0457523c3",
+    "configurations": {
+      "BALANCED_CONSERVATIVE": {
+        "residual_scale_multiplier": 0.75,
+        "shrinkage_multiplier": 1.5,
+        "weights": {
+          "ASIAN_CALIBRATION": 0.15,
+          "BEIJING_SP_CALIBRATION": 0.2,
+          "BJ_HANDICAP_REGIME": 0.15,
+          "EURO_CALIBRATION": 0.2,
+          "LIQUIDITY_DRIFT": 0.15,
+          "RAW_HDA_SEASON": 0.15
+        }
+      },
+      "BALANCED_PRIMARY": {
+        "residual_scale_multiplier": 1.0,
+        "shrinkage_multiplier": 1.0,
+        "weights": {
+          "ASIAN_CALIBRATION": 0.15,
+          "BEIJING_SP_CALIBRATION": 0.2,
+          "BJ_HANDICAP_REGIME": 0.15,
+          "EURO_CALIBRATION": 0.2,
+          "LIQUIDITY_DRIFT": 0.15,
+          "RAW_HDA_SEASON": 0.15
+        }
+      },
+      "BALANCED_RESPONSIVE": {
+        "residual_scale_multiplier": 1.25,
+        "shrinkage_multiplier": 0.67,
+        "weights": {
+          "ASIAN_CALIBRATION": 0.15,
+          "BEIJING_SP_CALIBRATION": 0.2,
+          "BJ_HANDICAP_REGIME": 0.15,
+          "EURO_CALIBRATION": 0.2,
+          "LIQUIDITY_DRIFT": 0.15,
+          "RAW_HDA_SEASON": 0.15
+        }
+      },
+      "PRICING_HEAVY_CONSERVATIVE": {
+        "residual_scale_multiplier": 0.75,
+        "shrinkage_multiplier": 1.5,
+        "weights": {
+          "ASIAN_CALIBRATION": 0.18,
+          "BEIJING_SP_CALIBRATION": 0.22,
+          "BJ_HANDICAP_REGIME": 0.15,
+          "EURO_CALIBRATION": 0.2,
+          "LIQUIDITY_DRIFT": 0.15,
+          "RAW_HDA_SEASON": 0.1
+        }
+      },
+      "PRICING_HEAVY_PRIMARY": {
+        "residual_scale_multiplier": 1.0,
+        "shrinkage_multiplier": 1.0,
+        "weights": {
+          "ASIAN_CALIBRATION": 0.17,
+          "BEIJING_SP_CALIBRATION": 0.25,
+          "BJ_HANDICAP_REGIME": 0.1,
+          "EURO_CALIBRATION": 0.23,
+          "LIQUIDITY_DRIFT": 0.15,
+          "RAW_HDA_SEASON": 0.1
+        }
+      },
+      "REGIME_HEAVY_PRIMARY": {
+        "residual_scale_multiplier": 1.0,
+        "shrinkage_multiplier": 1.0,
+        "weights": {
+          "ASIAN_CALIBRATION": 0.1,
+          "BEIJING_SP_CALIBRATION": 0.13,
+          "BJ_HANDICAP_REGIME": 0.25,
+          "EURO_CALIBRATION": 0.12,
+          "LIQUIDITY_DRIFT": 0.15,
+          "RAW_HDA_SEASON": 0.25
+        }
+      }
+    },
+    "database_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "outer_year_parameter_sha256": "77ded6398aab1ba25edd342854e39a92b5555d01d3f10441365c58fb9ce5b3b4",
+    "primary_configuration": "BALANCED_PRIMARY",
+    "quick_identity_sha256": "0e296d3e8c445b0a3017eddc2c59a874d9a57570292d0554a2679d1d257612bb",
+    "source_134_manifest": "0a7e4d673e7fc5fd4832c91e3b519afe5a2bc3211b99f4c95f57c691921b65fd"
+  },
+  "denominator": {
+    "no_bet_rows": 2226,
+    "planned_stake_per_arm_yuan": 826686,
+    "selected_by_arm": {
+      "B0_BEST_FULL": 189,
+      "H1_DEEP_ALL": 189,
+      "H_CFG_BALANCED_CONSERVATIVE": 189,
+      "H_CFG_BALANCED_RESPONSIVE": 189,
+      "H_CFG_PRICING_CONSERVATIVE": 189,
+      "H_CFG_PRICING_HEAVY": 189,
+      "H_CFG_REGIME_HEAVY": 189,
+      "H_MINUS_ASIAN": 189,
+      "H_MINUS_BEIJING_SP": 189,
+      "H_MINUS_BJ_REGIME": 189,
+      "H_MINUS_EURO": 189,
+      "H_MINUS_LIQUIDITY": 189,
+      "H_MINUS_RAW_HDA": 189,
+      "Q1_QUICK_LEAGUE": 189
+    },
+    "selected_rows": 2646,
+    "selection_rows": 4872
+  },
+  "payloads": {
+    "README.md": "216ac1ad1f1f81d450b15a76311939d1c5f2606c1e10bd7ed13a95d4653c5530",
+    "arm_registry.csv": "0cab0e413f5413c830063c1b64acf4a3c2442f6ce823b6bb84aeb89e7e87a837",
+    "baseline_reproduction.csv": "1298939f813cc93b757acd7d92a69fdf57e318ed192104b03dcc64aae2beef13",
+    "bj179_hierarchical_league_core.py": "2c1defef21fb6c1be2353e9e7a6d7e06788a365d3c16824f705feab576e99b71",
+    "candidate_universe_scores.csv.gz": "0cb9d9afbe1d818a51f648f4a6286f48922e929aa3c713e7f2fd28aca4a12b66",
+    "feature_manifest.csv": "3b015902a145fa2c55cbf30bd1fa7d9f6ac78a14b12d36d773fbc9fee7cfbb76",
+    "freeze_runner.py": "747f70c263ad80d5efd2894fc065c5ee8aa79c64a3b12e98df6e0a07aba8500d",
+    "gate_a_card.json": "1874bfc61971c8921027c529797002ea44115b490703c8d6ba3e52e940f3ec1d",
+    "identity_overlap.csv": "18f9290e321bcc4395be69b30941861a32a5b3e026ff64bac252fe6b3704a0c7",
+    "match_probability_freeze.csv.gz": "ad473ced8314f81280b7a3ce27c0cf8ccbba57aebaac922b9734488105560e1f",
+    "missingness_registry.csv": "4d26b832eb3e8c03f8f9f959472f72549e60d3d7ab25866427d457f7004d580d",
+    "outer_year_parameter_freeze.json.gz": "bcdc0fc72fc2a419daa76226eae10663f6046fa076ce89e7596dce800b840f12",
+    "outer_year_training_registry.csv": "19ba9d92cb8348a820d450cafe85a2ecb5707b61b4073cf5a6bca4ef6770c942",
+    "parameter_frontier.csv": "28d88ad2c5214d4d46f46cbbc044e0c543832da2fe4d4fadb6db7d7ba0f13b51",
+    "selection_freeze.csv": "af338d74f2929030104f095f3626679c6fa1263bdaa64c24cda4611339aea3a8",
+    "source_binding.json": "02e206f2c25995604ceca637c5d6aed3995df24fc8352a3549a7f1552e9df063",
+    "source_census.csv": "052cb9e249773d008277ee4509ee469611ad94b9a8363e4051cca8cb200eb345",
+    "threshold_registry.csv": "9354b6388414dbae4085d7ad81d0ac721adeada96585a1a6d69eb55feccf9065"
+  }
+}

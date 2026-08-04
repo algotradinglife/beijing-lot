@@ -14,31 +14,73 @@
     },
     {
       "arm": "H1_DEEP_ALL",
-      "definition": "fixed four-family hierarchical league model",
+      "definition": "six-family BALANCED_PRIMARY hierarchical league model",
       "role": "PRIMARY",
       "score": "deep_all_gm_e_sp"
     },
     {
-      "arm": "H_MINUS_BASE",
-      "definition": "deep model without BASE_SEASON",
-      "role": "ABLATION",
-      "score": "deep_minus_base_gm_e_sp"
+      "arm": "H_CFG_BALANCED_CONSERVATIVE",
+      "definition": "balanced weights with stronger shrinkage and lower residual scale",
+      "role": "SENSITIVITY",
+      "score": "cfg_balanced_conservative_gm_e_sp"
     },
     {
-      "arm": "H_MINUS_GOAL",
-      "definition": "deep model without GOAL_HANDICAP",
-      "role": "ABLATION",
-      "score": "deep_minus_goal_gm_e_sp"
+      "arm": "H_CFG_BALANCED_RESPONSIVE",
+      "definition": "balanced weights with weaker shrinkage and higher residual scale",
+      "role": "SENSITIVITY",
+      "score": "cfg_balanced_responsive_gm_e_sp"
     },
     {
-      "arm": "H_MINUS_PRICING",
-      "definition": "deep model without PRICING_CALIBRATION",
+      "arm": "H_CFG_PRICING_HEAVY",
+      "definition": "pricing-heavy weights at primary shrinkage",
+      "role": "SENSITIVITY",
+      "score": "cfg_pricing_heavy_primary_gm_e_sp"
+    },
+    {
+      "arm": "H_CFG_REGIME_HEAVY",
+      "definition": "raw/BJ regime-heavy weights at primary shrinkage",
+      "role": "SENSITIVITY",
+      "score": "cfg_regime_heavy_primary_gm_e_sp"
+    },
+    {
+      "arm": "H_CFG_PRICING_CONSERVATIVE",
+      "definition": "pricing-heavy weights with conservative shrinkage",
+      "role": "SENSITIVITY",
+      "score": "cfg_pricing_heavy_conservative_gm_e_sp"
+    },
+    {
+      "arm": "H_MINUS_RAW_HDA",
+      "definition": "BALANCED_PRIMARY without RAW_HDA_SEASON",
       "role": "ABLATION",
-      "score": "deep_minus_pricing_gm_e_sp"
+      "score": "deep_minus_raw_hda_gm_e_sp"
+    },
+    {
+      "arm": "H_MINUS_BJ_REGIME",
+      "definition": "BALANCED_PRIMARY without BJ_HANDICAP_REGIME",
+      "role": "ABLATION",
+      "score": "deep_minus_bj_regime_gm_e_sp"
+    },
+    {
+      "arm": "H_MINUS_EURO",
+      "definition": "BALANCED_PRIMARY without EURO_CALIBRATION",
+      "role": "ABLATION",
+      "score": "deep_minus_euro_gm_e_sp"
+    },
+    {
+      "arm": "H_MINUS_ASIAN",
+      "definition": "BALANCED_PRIMARY without ASIAN_CALIBRATION",
+      "role": "ABLATION",
+      "score": "deep_minus_asian_gm_e_sp"
+    },
+    {
+      "arm": "H_MINUS_BEIJING_SP",
+      "definition": "BALANCED_PRIMARY without BEIJING_SP_CALIBRATION",
+      "role": "ABLATION",
+      "score": "deep_minus_beijing_sp_gm_e_sp"
     },
     {
       "arm": "H_MINUS_LIQUIDITY",
-      "definition": "deep model without LIQUIDITY_DRIFT",
+      "definition": "BALANCED_PRIMARY without LIQUIDITY_DRIFT",
       "role": "ABLATION",
       "score": "deep_minus_liquidity_gm_e_sp"
     }
@@ -73,19 +115,26 @@
   },
   "contract": "BJ-HIST-LEAGUE-MODEL-N7-001",
   "denominator": {
-    "no_bet_rows": 1113,
+    "no_bet_rows": 2226,
     "planned_stake_per_arm_yuan": 826686,
     "selected_by_arm": {
       "B0_BEST_FULL": 189,
       "H1_DEEP_ALL": 189,
-      "H_MINUS_BASE": 189,
-      "H_MINUS_GOAL": 189,
+      "H_CFG_BALANCED_CONSERVATIVE": 189,
+      "H_CFG_BALANCED_RESPONSIVE": 189,
+      "H_CFG_PRICING_CONSERVATIVE": 189,
+      "H_CFG_PRICING_HEAVY": 189,
+      "H_CFG_REGIME_HEAVY": 189,
+      "H_MINUS_ASIAN": 189,
+      "H_MINUS_BEIJING_SP": 189,
+      "H_MINUS_BJ_REGIME": 189,
+      "H_MINUS_EURO": 189,
       "H_MINUS_LIQUIDITY": 189,
-      "H_MINUS_PRICING": 189,
+      "H_MINUS_RAW_HDA": 189,
       "Q1_QUICK_LEAGUE": 189
     },
-    "selected_rows": 1323,
-    "selection_rows": 2436
+    "selected_rows": 2646,
+    "selection_rows": 4872
   },
   "economics_second_gate_b": [
     "matched FULL N7 pre-tax ROI/lift",
@@ -98,7 +147,14 @@
   "issue": 179,
   "outcome_boundary": "Gate A outcome-unexposed: target match result/final-SP/payout/tax/ROI/settlement fields are never read by target probability construction or identity ranking",
   "outer_year": "training kickoff year strictly less than target year; no same-year target outcome/history enters probability fit",
+  "parameter_frontier": {
+    "configuration_count": 6,
+    "policy": "all frozen configurations report probability metrics before any N7 economics",
+    "primary_ablation_count": 6,
+    "rows": 12
+  },
   "probability_first_gate_b": [
+    "complete weight/shrinkage/ablation frontier",
     "multiclass log loss",
     "multiclass Brier",
     "calibration by probability bin",
@@ -107,5 +163,5 @@
   "promotion_boundary": "paper research; positive claim requires strict independent EV; negative deep model cannot demote inherited B0",
   "stage": "GATE_A_OUTCOME_UNEXPOSED_HIERARCHICAL_LEAGUE_FREEZE",
   "thresholds": "descriptive raw cross-issue Q00/Q25/Q50/Q75 only; no participation/filter/selector retuning",
-  "version": "bj179-gate-a-v1"
+  "version": "bj179-gate-a-v2"
 }

@@ -16,7 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "freeze_bj179_hierarchical_league_gate_a.py"
 CORE_SCRIPT = ROOT / "scripts" / "bj179_hierarchical_league_core.py"
-PACKAGE = ROOT / "results" / "bj179_gate_a_preoutcome_v1"
+PACKAGE = ROOT / "results" / "bj179_gate_a_preoutcome_v2"
 
 
 def load(path: Path, name: str):
@@ -50,11 +50,16 @@ def market_row(**overrides):
         "euro_1h_max3": 3.80,
         "euro_1h_n": 20,
         "asian_initial_v2": -0.25,
+        "asian_1h_v1": 0.92,
         "asian_1h_v2": -0.50,
+        "asian_1h_v3": 0.98,
         "asian_1h_n": 15,
         "ou_initial_v2": 2.50,
         "ou_1h_v2": 2.75,
         "ou_1h_n": 15,
+        "official_sp_3": 2.20,
+        "official_sp_1": 3.50,
+        "official_sp_0": 3.30,
     }
     row.update(overrides)
     return row
@@ -66,19 +71,32 @@ def test_contract_freezes_exact_comparators_families_and_full_economics():
     assert module.BASE_MAIN_COMMIT == "9ec5cf4856f546861e20fad76d110807576903c7"
     assert module.FULL_TICKETS == 2187
     assert module.FULL_STAKE_YUAN == 4374
-    assert tuple(core.FAMILY_WEIGHTS) == module.FAMILIES
-    assert sum(core.FAMILY_WEIGHTS.values()) == pytest.approx(1.0)
+    assert core.FAMILIES == module.FAMILIES
+    assert tuple(core.CONFIGURATIONS) == module.CONFIG_NAMES
+    assert len(core.CONFIGURATIONS) == 6
+    assert all(
+        sum(config["weights"].values()) == pytest.approx(1.0)
+        for config in core.CONFIGURATIONS.values()
+    )
     assert [row[0] for row in module.ARMS] == [
         "B0_BEST_FULL",
         "Q1_QUICK_LEAGUE",
         "H1_DEEP_ALL",
-        "H_MINUS_BASE",
-        "H_MINUS_GOAL",
-        "H_MINUS_PRICING",
+        "H_CFG_BALANCED_CONSERVATIVE",
+        "H_CFG_BALANCED_RESPONSIVE",
+        "H_CFG_PRICING_HEAVY",
+        "H_CFG_REGIME_HEAVY",
+        "H_CFG_PRICING_CONSERVATIVE",
+        "H_MINUS_RAW_HDA",
+        "H_MINUS_BJ_REGIME",
+        "H_MINUS_EURO",
+        "H_MINUS_ASIAN",
+        "H_MINUS_BEIJING_SP",
         "H_MINUS_LIQUIDITY",
     ]
     assert all(
-        row[0].startswith(("B0_", "Q1_", "H1_", "H_MINUS_")) for row in module.ARMS
+        row[0].startswith(("B0_", "Q1_", "H1_", "H_CFG_", "H_MINUS_"))
+        for row in module.ARMS
     )
 
 
@@ -89,6 +107,106 @@ def test_chronology_rejects_target_or_future_season_and_keeps_prior_rows():
     assert model.training_rows == 1
     with pytest.raises(RuntimeError, match="future-season training row"):
         model.update(market_row(kickoff_ts="2020-01-01 00:00:00"))
+
+
+def test_raw_bj_euro_asian_and_beijing_sp_sources_are_consumed_separately():
+    runner = load(SCRIPT, "bj179_runner_consumption")
+    core = load(CORE_SCRIPT, "bj179_core_consumption")
+    historical_source = inspect.getsource(runner.historical_rows)
+    assert "mf.official_sp_3" in historical_source
+    assert "mf.official_sp_1" in historical_source
+    assert "mf.official_sp_0" in historical_source
+    model = core.HierarchicalLeagueModel(target_year=2020)
+    training = market_row(fthg=1, ftag=0, handicap_line_norm=-1.0)
+    model.update(training)
+    assert model.raw_global_counts == {"3": 1}
+    assert model.bj_global_counts == {"1": 1}
+    assert model.euro_complete_rows == 1
+    assert model.asian_complete_rows == 1
+    assert model.beijing_sp_complete_rows == 1
+    assert sum(model.euro_n.values()) == 1
+    assert sum(model.asian_n.values()) == 1
+    assert sum(model.beijing_sp_n.values()) == 1
+
+    missing_euro = market_row(fthg=2, ftag=1)
+    missing_euro.update(
+        {
+            "euro_1h_v1": None,
+            "euro_1h_v2": None,
+            "euro_1h_v3": None,
+            "official_sp_3": 2.2,
+            "official_sp_1": 3.1,
+            "official_sp_0": 3.4,
+        }
+    )
+    before = (
+        model.euro_complete_rows,
+        model.asian_complete_rows,
+        model.beijing_sp_complete_rows,
+    )
+    model.update(missing_euro)
+    after = (
+        model.euro_complete_rows,
+        model.asian_complete_rows,
+        model.beijing_sp_complete_rows,
+    )
+    assert after == (before[0], before[1] + 1, before[2] + 1)
+
+    missing_bj_line = market_row(fthg=1, ftag=1, handicap_line_norm=None)
+    raw_before = model.training_rows
+    bj_before = model.bj_training_rows
+    source_before = model.beijing_sp_source_complete_rows
+    calibrated_before = model.beijing_sp_complete_rows
+    model.update(missing_bj_line)
+    assert model.training_rows == raw_before + 1
+    assert model.bj_training_rows == bj_before
+    assert model.beijing_sp_source_complete_rows == source_before + 1
+    assert model.beijing_sp_complete_rows == calibrated_before
+
+    target = market_row(
+        fthg=None,
+        ftag=None,
+        target_bj_pred_sp_3=2.30,
+        target_bj_pred_sp_1=3.40,
+        target_bj_pred_sp_0=3.10,
+        official_sp_3=None,
+        official_sp_1=None,
+        official_sp_0=None,
+    )
+    baseline = (0.40, 0.30, 0.30)
+    frozen = model.family_vectors(target, baseline)
+    asian_mutated = model.family_vectors(
+        {**target, "asian_1h_v1": 0.72, "asian_1h_v3": 1.16}, baseline
+    )
+    beijing_mutated = model.family_vectors(
+        {
+            **target,
+            "target_bj_pred_sp_3": 1.80,
+            "target_bj_pred_sp_1": 4.20,
+            "target_bj_pred_sp_0": 5.20,
+        },
+        baseline,
+    )
+    assert asian_mutated["ASIAN_CALIBRATION"] != frozen["ASIAN_CALIBRATION"]
+    assert beijing_mutated["BEIJING_SP_CALIBRATION"] != frozen["BEIJING_SP_CALIBRATION"]
+    assert asian_mutated["EURO_CALIBRATION"] == frozen["EURO_CALIBRATION"]
+    assert beijing_mutated["EURO_CALIBRATION"] == frozen["EURO_CALIBRATION"]
+
+
+def test_parameter_frontier_covers_all_configs_and_primary_family_ablations():
+    module = load(SCRIPT, "bj179_frontier")
+    core = module.load_core()
+    rows = module.parameter_frontier_registry(core)
+    assert len(rows) == len(core.CONFIGURATIONS) + len(core.FAMILIES)
+    assert {row["configuration"] for row in rows} == set(core.CONFIGURATIONS)
+    assert {row["excluded_family"] for row in rows if row["excluded_family"]} == set(
+        core.FAMILIES
+    )
+    assert all(row["controlling"] == 1 for row in rows)
+    assert all(
+        row["gate_b_order"] == "PROBABILITY_FIRST_COMPLETE_FRONTIER_THEN_N7_ECONOMICS"
+        for row in rows
+    )
 
 
 def test_unknown_league_and_market_missingness_are_explicit_hierarchical_fallbacks():
@@ -113,7 +231,7 @@ def test_unknown_league_and_market_missingness_are_explicit_hierarchical_fallbac
     assert signature["breadth"] == "MISSING"
     assert signature["dispersion"] == "MISSING"
     families = model.family_vectors(unknown, (0.40, 0.30, 0.30))
-    assert set(families) == set(core.FAMILY_WEIGHTS)
+    assert set(families) == set(core.FAMILIES)
     for vector in families.values():
         assert sum(vector) == pytest.approx(1.0)
         assert all(value > 0 for value in vector)
@@ -134,11 +252,16 @@ def test_deep_model_and_each_ablation_are_fixed_normalized_outputs():
         )
     target = market_row(fthg=None, ftag=None)
     baseline = (0.40, 0.30, 0.30)
-    outputs = {"ALL": model.probabilities(target, baseline)}
+    outputs = {
+        name: model.probabilities(target, baseline, name)
+        for name in core.CONFIGURATIONS
+    }
     outputs.update(
         {
-            family: model.probabilities(target, baseline, family)
-            for family in core.FAMILY_WEIGHTS
+            family: model.probabilities(
+                target, baseline, core.PRIMARY_CONFIG, excluded=family
+            )
+            for family in core.FAMILIES
         }
     )
     assert (
@@ -171,6 +294,14 @@ def test_target_probability_projection_is_invariant_to_appended_outcome_fields()
         "p_market_cal3": "0.40",
         "p_market_cal1": "0.30",
         "p_market_cal0": "0.30",
+        "p_model3": "0.40",
+        "p_model1": "0.30",
+        "p_model0": "0.30",
+        "q_weight3": "0.40",
+        "q_weight1": "0.30",
+        "q_weight0": "0.30",
+        "e_sp": "3.0",
+        "match_id": "1",
     }
     baseline = module.probability_freeze([target], {"1": role}, {2020: model}, core)
     exposed = {
@@ -179,6 +310,10 @@ def test_target_probability_projection_is_invariant_to_appended_outcome_fields()
         "ftag": 0,
         "result_code": "3",
         "winning_sp": 99,
+        "official_sp_3": 1.01,
+        "official_sp_1": 99,
+        "official_sp_0": 99,
+        "final_sp": "1.01|99|99",
         "payout": 999,
         "tax": 1,
         "roi": 4,
@@ -199,13 +334,7 @@ def test_accepted_best_full_and_quick_identity_reproduction_without_outcomes():
     probabilities = []
     for match_id, role in role_by_match.items():
         row = {"match_id": match_id}
-        for name in (
-            "deep_all",
-            "deep_minus_base",
-            "deep_minus_goal",
-            "deep_minus_pricing",
-            "deep_minus_liquidity",
-        ):
+        for name in module.VECTOR_SPECS:
             for code in ("3", "1", "0"):
                 row[f"{name}_p{code}"] = role[f"p_market_cal{code}"]
         probabilities.append(row)
@@ -243,12 +372,14 @@ def test_generated_package_is_exact_manifest_covered_and_gate_b_is_closed():
         assert hashlib.sha256((PACKAGE / name).read_bytes()).hexdigest() == expected
     card = json.loads((PACKAGE / "gate_a_card.json").read_text(encoding="utf-8"))
     assert card["gate_b_status"] == "NOT_AUTHORIZED_PENDING_PI_GATE_A_REVIEW"
+    package_module = load(SCRIPT, "bj179_package")
+    arm_count = len(package_module.ARMS)
     assert card["denominator"] == {
-        "no_bet_rows": 159 * 7,
+        "no_bet_rows": 159 * arm_count,
         "planned_stake_per_arm_yuan": 189 * 4374,
-        "selected_by_arm": {arm: 189 for arm, *_ in load(SCRIPT, "bj179_package").ARMS},
-        "selected_rows": 189 * 7,
-        "selection_rows": 348 * 7,
+        "selected_by_arm": {arm: 189 for arm, *_ in package_module.ARMS},
+        "selected_rows": 189 * arm_count,
+        "selection_rows": 348 * arm_count,
     }
     with gzip.open(
         PACKAGE / "match_probability_freeze.csv.gz", "rt", newline="", encoding="utf-8"

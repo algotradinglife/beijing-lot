@@ -23,7 +23,7 @@ from typing import Iterable, Iterator, Mapping, Sequence
 
 ISSUE = 179
 CONTRACT = "BJ-HIST-LEAGUE-MODEL-N7-001"
-VERSION = "bj179-gate-a-v1"
+VERSION = "bj179-gate-a-v2"
 BASE_MAIN_COMMIT = "9ec5cf4856f546861e20fad76d110807576903c7"
 SOURCE_GATE_A_MANIFEST = (
     "0a7e4d673e7fc5fd4832c91e3b519afe5a2bc3211b99f4c95f57c691921b65fd"
@@ -43,16 +43,30 @@ FORBIDDEN_TARGET_FIELDS = {
     "ftag",
     "result_code",
     "winning_sp",
+    "official_sp_3",
+    "official_sp_1",
+    "official_sp_0",
+    "final_sp",
     "payout",
     "tax",
     "roi",
     "settlement",
 }
 FAMILIES = (
-    "BASE_SEASON",
-    "GOAL_HANDICAP",
-    "PRICING_CALIBRATION",
+    "RAW_HDA_SEASON",
+    "BJ_HANDICAP_REGIME",
+    "EURO_CALIBRATION",
+    "ASIAN_CALIBRATION",
+    "BEIJING_SP_CALIBRATION",
     "LIQUIDITY_DRIFT",
+)
+CONFIG_NAMES = (
+    "BALANCED_PRIMARY",
+    "BALANCED_CONSERVATIVE",
+    "BALANCED_RESPONSIVE",
+    "PRICING_HEAVY_PRIMARY",
+    "REGIME_HEAVY_PRIMARY",
+    "PRICING_HEAVY_CONSERVATIVE",
 )
 ARMS = (
     (
@@ -70,34 +84,90 @@ ARMS = (
     (
         "H1_DEEP_ALL",
         "deep_all_gm_e_sp",
-        "fixed four-family hierarchical league model",
+        "six-family BALANCED_PRIMARY hierarchical league model",
         "PRIMARY",
     ),
     (
-        "H_MINUS_BASE",
-        "deep_minus_base_gm_e_sp",
-        "deep model without BASE_SEASON",
+        "H_CFG_BALANCED_CONSERVATIVE",
+        "cfg_balanced_conservative_gm_e_sp",
+        "balanced weights with stronger shrinkage and lower residual scale",
+        "SENSITIVITY",
+    ),
+    (
+        "H_CFG_BALANCED_RESPONSIVE",
+        "cfg_balanced_responsive_gm_e_sp",
+        "balanced weights with weaker shrinkage and higher residual scale",
+        "SENSITIVITY",
+    ),
+    (
+        "H_CFG_PRICING_HEAVY",
+        "cfg_pricing_heavy_primary_gm_e_sp",
+        "pricing-heavy weights at primary shrinkage",
+        "SENSITIVITY",
+    ),
+    (
+        "H_CFG_REGIME_HEAVY",
+        "cfg_regime_heavy_primary_gm_e_sp",
+        "raw/BJ regime-heavy weights at primary shrinkage",
+        "SENSITIVITY",
+    ),
+    (
+        "H_CFG_PRICING_CONSERVATIVE",
+        "cfg_pricing_heavy_conservative_gm_e_sp",
+        "pricing-heavy weights with conservative shrinkage",
+        "SENSITIVITY",
+    ),
+    (
+        "H_MINUS_RAW_HDA",
+        "deep_minus_raw_hda_gm_e_sp",
+        "BALANCED_PRIMARY without RAW_HDA_SEASON",
         "ABLATION",
     ),
     (
-        "H_MINUS_GOAL",
-        "deep_minus_goal_gm_e_sp",
-        "deep model without GOAL_HANDICAP",
+        "H_MINUS_BJ_REGIME",
+        "deep_minus_bj_regime_gm_e_sp",
+        "BALANCED_PRIMARY without BJ_HANDICAP_REGIME",
         "ABLATION",
     ),
     (
-        "H_MINUS_PRICING",
-        "deep_minus_pricing_gm_e_sp",
-        "deep model without PRICING_CALIBRATION",
+        "H_MINUS_EURO",
+        "deep_minus_euro_gm_e_sp",
+        "BALANCED_PRIMARY without EURO_CALIBRATION",
+        "ABLATION",
+    ),
+    (
+        "H_MINUS_ASIAN",
+        "deep_minus_asian_gm_e_sp",
+        "BALANCED_PRIMARY without ASIAN_CALIBRATION",
+        "ABLATION",
+    ),
+    (
+        "H_MINUS_BEIJING_SP",
+        "deep_minus_beijing_sp_gm_e_sp",
+        "BALANCED_PRIMARY without BEIJING_SP_CALIBRATION",
         "ABLATION",
     ),
     (
         "H_MINUS_LIQUIDITY",
         "deep_minus_liquidity_gm_e_sp",
-        "deep model without LIQUIDITY_DRIFT",
+        "BALANCED_PRIMARY without LIQUIDITY_DRIFT",
         "ABLATION",
     ),
 )
+VECTOR_SPECS = {
+    "deep_all": ("BALANCED_PRIMARY", None),
+    "cfg_balanced_conservative": ("BALANCED_CONSERVATIVE", None),
+    "cfg_balanced_responsive": ("BALANCED_RESPONSIVE", None),
+    "cfg_pricing_heavy_primary": ("PRICING_HEAVY_PRIMARY", None),
+    "cfg_regime_heavy_primary": ("REGIME_HEAVY_PRIMARY", None),
+    "cfg_pricing_heavy_conservative": ("PRICING_HEAVY_CONSERVATIVE", None),
+    "deep_minus_raw_hda": ("BALANCED_PRIMARY", "RAW_HDA_SEASON"),
+    "deep_minus_bj_regime": ("BALANCED_PRIMARY", "BJ_HANDICAP_REGIME"),
+    "deep_minus_euro": ("BALANCED_PRIMARY", "EURO_CALIBRATION"),
+    "deep_minus_asian": ("BALANCED_PRIMARY", "ASIAN_CALIBRATION"),
+    "deep_minus_beijing_sp": ("BALANCED_PRIMARY", "BEIJING_SP_CALIBRATION"),
+    "deep_minus_liquidity": ("BALANCED_PRIMARY", "LIQUIDITY_DRIFT"),
+}
 
 
 def repo_root() -> Path:
@@ -113,7 +183,7 @@ def repo_root() -> Path:
 ROOT = repo_root()
 SOURCE = ROOT / "results" / "bj134_gate_a_preoutcome_v3"
 CORE_PATH = ROOT / "scripts" / "bj179_hierarchical_league_core.py"
-DEFAULT_OUTPUT = ROOT / "results" / "bj179_gate_a_preoutcome_v1"
+DEFAULT_OUTPUT = ROOT / "results" / "bj179_gate_a_preoutcome_v2"
 
 
 def find_source_db() -> Path:
@@ -275,7 +345,9 @@ def historical_rows(db: Path, before: str) -> Iterator[dict[str, object]]:
     connection = ro_connection(db)
     query = f"""
         SELECT m.match_id, m.kickoff_ts, m.league, mf.handicap_line_norm,
-               mf.fthg, mf.ftag, {market_select()}
+               mf.fthg, mf.ftag,
+               mf.official_sp_3, mf.official_sp_1, mf.official_sp_0,
+               {market_select()}
           FROM matches m JOIN match_features mf ON mf.match_id=m.match_id
           {market_joins()}
          WHERE m.kickoff_ts IS NOT NULL AND m.kickoff_ts < ?
@@ -395,9 +467,14 @@ def probability_freeze(
 ) -> list[dict[str, object]]:
     output = []
     for target in sorted(target_rows, key=lambda row: int(row["match_id"])):
-        match_id = target["match_id"]
+        safe_target = {
+            key: value
+            for key, value in target.items()
+            if key not in FORBIDDEN_TARGET_FIELDS
+        }
+        match_id = safe_target["match_id"]
         role = roles[match_id]
-        year = int(target["year"])
+        year = int(safe_target["year"])
         model = models[year]
         # The accepted #134 CSV stores probabilities at 12 decimal places.  Re-normalize
         # that exact serialized vector before downstream log pooling so a 1e-12 text
@@ -405,39 +482,59 @@ def probability_freeze(
         baseline = core.normalize(
             [float(role[f"p_market_cal{code}"]) for code in ("3", "1", "0")]
         )
-        families = model.family_vectors(target, baseline)
+        target_bj_sp = predicted_sp(role)
+        enriched = {
+            **safe_target,
+            **{
+                f"target_bj_pred_sp_{code}": target_bj_sp[index]
+                for index, code in enumerate(("3", "1", "0"))
+            },
+        }
+        families = model.family_vectors(enriched, baseline, "BALANCED_PRIMARY")
         vectors = {
             "market": baseline,
             "quick": core.normalize(
-                [float(target[f"league_p{code}"]) for code in ("3", "1", "0")]
+                [float(safe_target[f"league_p{code}"]) for code in ("3", "1", "0")]
             ),
-            "deep_all": model.probabilities(target, baseline),
-            "deep_minus_base": model.probabilities(target, baseline, "BASE_SEASON"),
-            "deep_minus_goal": model.probabilities(target, baseline, "GOAL_HANDICAP"),
-            "deep_minus_pricing": model.probabilities(
-                target, baseline, "PRICING_CALIBRATION"
-            ),
-            "deep_minus_liquidity": model.probabilities(
-                target, baseline, "LIQUIDITY_DRIFT"
-            ),
+            **{
+                name: model.probabilities(enriched, baseline, config, excluded)
+                for name, (config, excluded) in VECTOR_SPECS.items()
+            },
         }
         if any(abs(sum(vector) - 1.0) > 1e-12 for vector in vectors.values()):
             raise RuntimeError(f"probability normalization drift: {match_id}")
-        signatures = core.market_signature(target)
-        league = str(target.get("league") or "__UNKNOWN__")
+        signatures = core.market_signature(enriched)
+        league = str(safe_target.get("league") or "__UNKNOWN__")
+        euro_complete = (
+            core.no_vig([enriched.get(f"euro_1h_v{index}") for index in (1, 2, 3)])
+            is not None
+        )
+        asian_complete = core.asian_anchor(enriched, baseline) is not None
+        beijing_complete = core.beijing_sp_anchor(enriched) is not None
         row = {
             "match_id": match_id,
-            "issue": target["issue"],
-            "match_idx": target["match_idx"],
-            "kickoff_ts": target["kickoff_ts"],
+            "issue": safe_target["issue"],
+            "match_idx": safe_target["match_idx"],
+            "kickoff_ts": safe_target["kickoff_ts"],
             "year": year,
             "league": league,
-            "handicap_line_norm": target["handicap_line_norm"],
+            "handicap_line_norm": safe_target["handicap_line_norm"],
             "outer_year_train_rule": f"kickoff year < {year}",
-            "unknown_league_fallback": int(league not in model.league_counts),
-            "training_league_n": sum(model.league_counts[league].values()),
-            "total_bucket": core.total_bucket(target.get("ou_1h_v2")),
-            "handicap_bucket": core.handicap_bucket(target.get("handicap_line_norm")),
+            "unknown_league_fallback": int(league not in model.bj_league_counts),
+            "training_raw_league_n": sum(model.raw_league_counts[league].values()),
+            "training_bj_league_n": sum(model.bj_league_counts[league].values()),
+            "total_bucket": core.total_bucket(safe_target.get("ou_1h_v2")),
+            "handicap_bucket": core.handicap_bucket(
+                safe_target.get("handicap_line_norm")
+            ),
+            "asian_line_bucket": core.asian_line_bucket(safe_target.get("asian_1h_v2")),
+            "target_euro_source_complete": int(euro_complete),
+            "target_asian_source_complete": int(asian_complete),
+            "target_beijing_pred_sp_source_complete": int(beijing_complete),
+            **{
+                f"target_beijing_pred_sp_{code}": compact(target_bj_sp[index])
+                for index, code in enumerate(("3", "1", "0"))
+            },
             **{f"market_signature_{key}": value for key, value in signatures.items()},
         }
         for name, vector in vectors.items():
@@ -470,13 +567,7 @@ def score_candidates(
     for row in roles:
         roles_by_key[(row["issue_instance"], row["portfolio_id"])].append(row)
     output = []
-    vector_names = (
-        "deep_all",
-        "deep_minus_base",
-        "deep_minus_goal",
-        "deep_minus_pricing",
-        "deep_minus_liquidity",
-    )
+    vector_names = tuple(VECTOR_SPECS)
     for candidate in candidates:
         key = (candidate["issue_instance"], candidate["portfolio_id"])
         frozen_roles = sorted(
@@ -730,6 +821,16 @@ def missingness_registry(
                 "missing_total_line_count": sum(
                     row["total_bucket"] == "T_MISSING" for row in rows
                 ),
+                "missing_euro_source_count": sum(
+                    not int(row["target_euro_source_complete"]) for row in rows
+                ),
+                "missing_asian_source_count": sum(
+                    not int(row["target_asian_source_complete"]) for row in rows
+                ),
+                "missing_beijing_pred_sp_source_count": sum(
+                    not int(row["target_beijing_pred_sp_source_complete"])
+                    for row in rows
+                ),
                 **{
                     f"missing_{name}_count": sum(
                         row[f"market_signature_{name}"] == "MISSING" for row in rows
@@ -741,6 +842,34 @@ def missingness_registry(
             }
         )
     return output
+
+
+def parameter_frontier_registry(core: ModuleType) -> list[dict[str, object]]:
+    arm_by_score = {score: (arm, role) for arm, score, _, role in ARMS}
+    rows = []
+    for vector_name, (config_name, excluded) in VECTOR_SPECS.items():
+        config = core.CONFIGURATIONS[config_name]
+        score_field = f"{vector_name}_gm_e_sp"
+        arm, role = arm_by_score[score_field]
+        rows.append(
+            {
+                "arm": arm,
+                "arm_role": role,
+                "vector_name": vector_name,
+                "configuration": config_name,
+                "excluded_family": excluded or "",
+                **{
+                    f"weight_{family.lower()}": config["weights"][family]
+                    for family in FAMILIES
+                },
+                "shrinkage_multiplier": config["shrinkage_multiplier"],
+                "residual_scale_multiplier": config["residual_scale_multiplier"],
+                "gate_b_order": "PROBABILITY_FIRST_COMPLETE_FRONTIER_THEN_N7_ECONOMICS",
+                "controlling": 1,
+                "outcome_boundary": OUTCOME_BOUNDARY,
+            }
+        )
+    return rows
 
 
 def atomic_generate(output: Path, db: Path) -> dict[str, object]:
@@ -758,6 +887,11 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
             SOURCE, SOURCE_GATE_A_MANIFEST, SOURCE_GATE_A_CONTENT
         )
         core = load_core()
+        if (
+            tuple(core.FAMILIES) != FAMILIES
+            or tuple(core.CONFIGURATIONS) != CONFIG_NAMES
+        ):
+            raise RuntimeError("runner/core family or configuration contract drift")
         source = load_source_inputs()
         roles_by_match = canonical_role_by_match(source["roles"])
         years = sorted({int(row["year"]) for row in source["target"]})
@@ -771,6 +905,7 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
         overlap = build_overlap(selection)
         thresholds = threshold_registry(selection)
         missingness = missingness_registry(probabilities, models)
+        parameter_frontier = parameter_frontier_registry(core)
 
         write_gzip(
             stage / "match_probability_freeze.csv.gz",
@@ -785,19 +920,28 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
         write_csv(stage / "identity_overlap.csv", list(overlap[0]), overlap)
         write_csv(stage / "threshold_registry.csv", list(thresholds[0]), thresholds)
         write_csv(stage / "missingness_registry.csv", list(missingness[0]), missingness)
+        write_csv(
+            stage / "parameter_frontier.csv",
+            list(parameter_frontier[0]),
+            parameter_frontier,
+        )
 
         parameter_payload = {
             "contract": CONTRACT,
             "version": VERSION,
-            "family_weights": core.FAMILY_WEIGHTS,
+            "primary_configuration": core.PRIMARY_CONFIG,
+            "configurations": core.CONFIGURATIONS,
             "families": {
-                "BASE_SEASON": "global + league long-run + exponentially weighted prior seasons; Dirichlet alpha 3/120/60",
-                "GOAL_HANDICAP": "global/league quarter-line handicap and OU-total buckets; alpha 120/80/100/80",
-                "PRICING_CALIBRATION": "EURO no-vig residuals by league x handicap and league x market-mass; alpha 120; residual scale 0.50",
+                "RAW_HDA_SEASON": "raw score H/D/A global, league and exponentially weighted prior-season evidence",
+                "BJ_HANDICAP_REGIME": "separate Beijing-handicap truth by league/season, quarter-line handicap and OU-total buckets",
+                "EURO_CALIBRATION": "EURO no-vig residuals by league x BJ handicap and league x EURO mass",
+                "ASIAN_CALIBRATION": "Asian 1h home/away HK water plus signed line anchor; residuals by league x Asian line/side",
+                "BEIJING_SP_CALIBRATION": "historical official BJDC SP anchor and outcome-safe target predicted-SP anchor; residuals by league x BJ handicap/mass",
                 "LIQUIDITY_DRIFT": "breadth, dispersion, EURO/Asian/OU movement plus prior-season league residual; alpha 180/100; scale 0.35",
             },
-            "ablation": "remove exactly one family and renormalize remaining fixed log-pool weights",
-            "unknown_league": "global prior, global handicap/total cells and global liquidity cells; league cells contribute zero residual",
+            "frontier": "six pre-frozen configurations span weights, shrinkage and residual scales; primary has six leave-one-family-out ablations",
+            "ablation": "remove exactly one of six families from BALANCED_PRIMARY and renormalize remaining weights",
+            "unknown_league": "raw/BJ global priors and global regime cells; league calibration cells contribute zero residual",
             "folds": {str(year): models[year].to_payload() for year in years},
             "outcome_boundary": OUTCOME_BOUNDARY,
         }
@@ -838,24 +982,38 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
         write_csv(stage / "arm_registry.csv", list(arm_rows[0]), arm_rows)
         feature_rows = [
             {
-                "family": "BASE_SEASON",
-                "features": "league H/D/A and Beijing-handicap base rates; recency-weighted seasons",
+                "family": "RAW_HDA_SEASON",
+                "features": "raw score H/D/A global, league and recency-weighted season counts",
                 "timing": "OUTER_YEAR_TRAIN_LT_TARGET_YEAR",
                 "missingness": "global hierarchical fallback",
                 "controlling": 1,
             },
             {
-                "family": "GOAL_HANDICAP",
-                "features": "league/global quarter-line handicap and OU total regimes",
+                "family": "BJ_HANDICAP_REGIME",
+                "features": "separate Beijing-handicap outcome by league/season, signed BJ line and OU total",
                 "timing": "OUTER_YEAR_TRAIN_LT_TARGET_YEAR + TARGET_PREKICKOFF_LINE",
                 "missingness": "explicit T_MISSING/global cells",
                 "controlling": 1,
             },
             {
-                "family": "PRICING_CALIBRATION",
-                "features": "EURO no-vig residual by league/handicap/mass",
+                "family": "EURO_CALIBRATION",
+                "features": "EURO 1h no-vig residual by league/BJ-handicap/EURO-mass",
                 "timing": "OUTER_YEAR_TRAIN_LT_TARGET_YEAR + TARGET_PREKICKOFF_MARKET",
                 "missingness": "market baseline retained; missing residual zero",
+                "controlling": 1,
+            },
+            {
+                "family": "ASIAN_CALIBRATION",
+                "features": "Asian 1h home/away HK water and signed line anchor; league/line/side residual",
+                "timing": "OUTER_YEAR_TRAIN_LT_TARGET_YEAR + TARGET_PREKICKOFF_ASIAN_1H",
+                "missingness": "EURO target baseline fallback; explicit A/AS missing buckets",
+                "controlling": 1,
+            },
+            {
+                "family": "BEIJING_SP_CALIBRATION",
+                "features": "historical official BJDC SP; target outcome-safe predicted-SP reconstructed from #134 roles",
+                "timing": "HISTORICAL_OUTER_YEAR_OFFICIAL_SP + TARGET_PREOUTCOME_PREDICTED_SP",
+                "missingness": "EURO target baseline fallback; coverage reported by fold",
                 "controlling": 1,
             },
             {
@@ -890,7 +1048,7 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
             "database": {
                 "repository_path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
                 "sha256": SOURCE_DB_SHA256,
-                "access": "training rows only where kickoff year < target fold; target projection consumed from #134 outcome-unexposed ledger",
+                "access": "training rows only where kickoff year < target fold, including raw score, BJ line, official historical BJDC SP and market snapshots; target projection and predicted SP consumed from #134 outcome-unexposed roles",
             },
             "core": {
                 "path": "scripts/bj179_hierarchical_league_core.py",
@@ -912,7 +1070,7 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
             },
             {
                 "source": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
-                "role": "outer-year prior outcomes and market features",
+                "role": "outer-year raw/BJ outcomes plus EURO/Asian/official-BJ-SP training features",
                 "manifest": SOURCE_DB_SHA256,
                 "content": SOURCE_DB_SHA256,
                 "access": "training kickoff year < target only",
@@ -956,7 +1114,14 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
             ],
             "baseline_reproduction": reproduction,
             "outer_year": "training kickoff year strictly less than target year; no same-year target outcome/history enters probability fit",
+            "parameter_frontier": {
+                "configuration_count": len(CONFIG_NAMES),
+                "primary_ablation_count": len(FAMILIES),
+                "rows": len(parameter_frontier),
+                "policy": "all frozen configurations report probability metrics before any N7 economics",
+            },
             "probability_first_gate_b": [
+                "complete weight/shrinkage/ablation frontier",
                 "multiclass log loss",
                 "multiclass Brier",
                 "calibration by probability bin",
@@ -983,7 +1148,7 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
         }
         (stage / "gate_a_card.json").write_text(dump_json(card), encoding="utf-8")
         (stage / "README.md").write_text(
-            "# #179 Gate A v1\n\nOutcome-unexposed hierarchical league/season probability and FULL-N7 identity freeze. Gate B is not authorized.\n",
+            "# #179 Gate A v2\n\nOutcome-unexposed six-family hierarchical league/season probability, parameter-frontier and FULL-N7 identity freeze. Gate B is not authorized.\n",
             encoding="utf-8",
         )
         shutil.copyfile(CORE_PATH, stage / "bj179_hierarchical_league_core.py")
@@ -996,7 +1161,8 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
                 "base_main_commit": BASE_MAIN_COMMIT,
                 "source_134_manifest": SOURCE_GATE_A_MANIFEST,
                 "database_sha256": SOURCE_DB_SHA256,
-                "family_weights": core.FAMILY_WEIGHTS,
+                "primary_configuration": core.PRIMARY_CONFIG,
+                "configurations": core.CONFIGURATIONS,
                 "baseline_identity_sha256": reproduction[0]["identity_set_sha256"],
                 "quick_identity_sha256": reproduction[1]["identity_set_sha256"],
                 "all_arm_identity_sha256": canonical_hash(
