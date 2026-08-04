@@ -833,6 +833,23 @@ diagnostic。`LIQUIDITY_DRIFT` 仅是 prior-season EURO residual proxy，不代�
 season-by-source interaction。详见
 [`Issue-179-Hierarchical-League-N7`](Issue-179-Hierarchical-League-N7.md)。
 
+## #180 联赛感知的球队与对阵模型（2026-08-04）
+
+#180 在同一 1,558 场冻结概率面上比较 team-only、team+league 三配置与 7 个消融，
+再以 matched FULL N7 结算冻结 identity。结论为
+`NO_TEAM_MODEL_PROMOTION / RETAIN_B0`：team-only 的 log loss `1.080644`，明显弱于
+B0 `1.066377` 和 #179 diagnostic `1.064101`；保守 team+league 改善到 `1.064937`，
+但仍未超过 #179 diagnostic。
+
+经济上没有绝对正 ROI。`TL_MINUS_OPPONENT` 是唯一 matched B0 lift 为正的点估计：
+税前 ROI `-8.29%`、lift `+0.46pp`，但 20k bootstrap 95% CI
+`[-6.70pp,+8.18pp]`，6 个 LOYO ROI 全负，去最大 issue/year 后为
+`-12.00%/-9.91%`。它至多是 strict independent-EV 候选，不能晋级或回写调参。
+
+计税继续按每张独立 ¥2 票，不跨票或跨期汇总。详细概率、经济、消融、风险、图与
+不可变哈希见
+[`Issue-180-Team-Matchup-N7`](Issue-180-Team-Matchup-N7.md)。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
