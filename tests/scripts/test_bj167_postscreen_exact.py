@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import array, csv, gzip, importlib.util, json, os, shutil, subprocess, sys, tracemalloc
+from decimal import Decimal
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -344,6 +345,15 @@ def test_actual_postscreen_finalizer_reads_disk_checkpoint_without_replay():
     proc=subprocess.run(["python3",str(ROOT/"scripts"/"settle_bj167_atlas_postscreen_exact.py"),"--screening-output",str(screen.relative_to(ROOT)),"--checkpoint",str(checkpoint.relative_to(ROOT)),"--output",str(final.relative_to(ROOT)),"--finalize-checkpoint"],cwd=ROOT,text=True,capture_output=True,env={**os.environ,"BJ167_TEST_FORBID_OUTCOME_SUPPORT":"1"})
     assert proc.returncode == 0, proc.stderr
     assert (final/"SHA256SUMS.json").exists() and (final/"candidate_paired_bootstrap_20000.csv").exists()
+    card = json.loads((final / "settlement_card.json").read_text())
+    contract = card["screen_replay_adaptive_tolerance"]
+    assert contract["money_quantum_per_seed_yuan"] == "0.000001"
+    assert contract["ratio_serialization_quantum"] == "1E-12"
+    reconciliation = list(csv.DictReader((final / "candidate_checkpoint_reconciliation.csv").open(newline="")))
+    assert len(reconciliation) == 1
+    assert reconciliation[0]["candidate_roi_tolerance"] == "0.000050000001"
+    assert reconciliation[0]["matched_full_roi_tolerance"] == "0.000050000001"
+    assert reconciliation[0]["matched_full_lift_tolerance"] == "0.000100000003"
     shutil.rmtree(root)
 
 
@@ -430,6 +440,10 @@ def test_execution_provenance_binds_screen_and_postscreen_identities():
     assert data["historical_screen_execution"]["runner_sha256"] == POST.SCREENING_RUNNER_SHA256
     assert data["recovered_screening_package"]["candidate_freeze_sha256"] == "freeze"
     assert data["current_companion_dependency_hashes"]["screen_runner_sha256"] == POST.R.sha(POST.RUNNER_PATH)
+    tolerance = data["screen_vs_replay_adaptive_tolerance"]
+    assert tolerance["candidate_roi"].endswith("+ ratio_quantum")
+    assert tolerance["matched_full_lift"].endswith("+ ratio_quantum")
+    assert tolerance["per_candidate_evidence"] == "candidate_checkpoint_reconciliation.csv"
     assert data["postscreen_execution_start"] == data["postscreen_execution_end"] == snap
     shutil.rmtree(root)
 
@@ -453,11 +467,66 @@ def test_screen_replay_equivalence_allows_only_serialization_delta_and_rejects_m
                  "screen_stake_yuan":"100.000000", "screen_no_tax_roi":"0.100000000000", "screen_matched_full_lift":"0.200000000000"}
     report = POST.assert_screen_replay_equivalence(candidate, 100.0, 110.0, 100.0, 90.0)
     assert report["no_tax_roi"]["delta"] == "0E-12"
+    assert Decimal(report["candidate_roi_tolerance"]) == Decimal("0.000001000001")
+    assert Decimal(report["matched_full_roi_tolerance"]) == Decimal("0.000001000001")
+    assert Decimal(report["matched_full_lift_tolerance"]) == Decimal("0.000002000003")
     try:
-        POST.assert_screen_replay_equivalence(candidate, 100.0, 110.0001, 100.0, 90.0)
+        POST.assert_screen_replay_equivalence(candidate, 100.0, 110.0002, 100.0, 90.0)
         assert False, "material screen/replay ROI drift must fail closed"
     except RuntimeError as exc:
         assert "material no_tax_roi drift" in str(exc)
+def test_postscreen_adaptive_tolerance_inside_exact_outside_and_small_stake():
+    # A 100-seed small-stake cell propagates its ¥0.000100 money envelope
+    # through the exact candidate and matched-FULL denominators.
+    bounds = POST.adaptive_replay_tolerances("ENSEMBLE_100", Decimal("2.000000"), Decimal("4.000000"))
+    assert bounds["candidate_roi_tolerance"] == Decimal("0.000050000001")
+    assert bounds["matched_full_roi_tolerance"] == Decimal("0.000025000001")
+    assert bounds["matched_full_lift_tolerance"] == Decimal("0.000075000003")
+    base = {"selector_id":"S", "weight_source":"Q", "mechanism":"WOR_DISTINCT", "cap":"NA", "M":"64",
+            "seed_scope":"ENSEMBLE_100", "screen_stake_yuan":"100.000000",
+            "screen_matched_full_lift":"0.200000000000"}
+    inside = {**base, "screen_no_tax_roi":"0.099999000000"}
+    exact = {**base, "screen_no_tax_roi":"0.099998999999",
+             "screen_matched_full_lift":"0.199997999997"}
+    outside = {**base, "screen_no_tax_roi":"0.099998999998"}
+    assert POST.assert_screen_replay_equivalence(inside, 100.0, 110.0, 100.0, 90.0)["no_tax_roi"]["delta"] == "0.000001000000"
+    exact_report = POST.assert_screen_replay_equivalence(exact, 100.0, 110.0, 100.0, 90.0)
+    assert Decimal(exact_report["no_tax_roi"]["delta"]) == Decimal("0.000001000001")
+    assert Decimal(exact_report["matched_full_lift"]["delta"]) == Decimal("0.000002000003")
+    try:
+        POST.assert_screen_replay_equivalence(outside, 100.0, 110.0, 100.0, 90.0)
+        assert False, "one ratio quantum outside the adaptive ROI bound must fail closed"
+    except RuntimeError as exc:
+        assert "material no_tax_roi drift" in str(exc)
+    lift_outside = {**base, "screen_no_tax_roi":"0.100000000000",
+                    "screen_matched_full_lift":"0.199997999996"}
+    try:
+        POST.assert_screen_replay_equivalence(lift_outside, 100.0, 110.0, 100.0, 90.0)
+        assert False, "one ratio quantum outside the adaptive lift bound must fail closed"
+    except RuntimeError as exc:
+        assert "material matched_full_lift drift" in str(exc)
+
+    # One adjacent twelve-decimal ratio quantum must pass even when the money
+    # contribution is tiny; the prior half-quantum rule rejected this case.
+    adjacent = POST.adaptive_replay_tolerances("DETERMINISTIC", Decimal("10000000.000000"), Decimal("10000000.000000"))
+    assert adjacent["candidate_roi_tolerance"] == Decimal("1.1E-12")
+    assert POST.RATIO_QUANTUM <= adjacent["candidate_roi_tolerance"]
+    adjacent_candidate = {**base, "seed_scope":"DETERMINISTIC", "screen_stake_yuan":"10000000.000000",
+                          "screen_no_tax_roi":"-0.000000000001", "screen_matched_full_lift":"0.000000000000"}
+    assert POST.assert_screen_replay_equivalence(adjacent_candidate, 10000000.0, 10000000.0,
+                                                 10000000.0, 10000000.0)["no_tax_roi"]["delta"] == "1E-12"
+
+    for bad in (Decimal("0"), Decimal("-1"), Decimal("NaN")):
+        try:
+            POST.adaptive_replay_tolerances("DETERMINISTIC", bad, Decimal("2"))
+            assert False, "malformed candidate denominator must fail closed"
+        except RuntimeError as exc:
+            assert "candidate ROI denominator" in str(exc)
+    try:
+        POST.adaptive_replay_tolerances("DETERMINISTIC", Decimal("2"), Decimal("0"))
+        assert False, "zero matched-FULL denominator must fail closed"
+    except RuntimeError as exc:
+        assert "matched-FULL ROI denominator" in str(exc)
 
 
 def test_scientific_execution_provenance_is_independent_and_fail_closed():

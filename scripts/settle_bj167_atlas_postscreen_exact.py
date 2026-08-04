@@ -28,11 +28,62 @@ SCREENING_RUNNER_SHA256 = "4d9ee1313ac66df5cf5f41d8db12a39352c626459c7c4d55af3d5
 SCREENING_NATIVE_WRAPPER_SHA256 = "db6960d5a81ccde49f0bcb62a7c4424174feae1a4e754e64ef01de88a8b47829"
 NATIVE_WRAPPER_PATH = ROOT / "scripts" / "bj167_exact_atlas.cpp"
 RECOVERED_SCREEN_CONTRACT = "bj167-gate-b-v3r1-recovery-finalizer-v1"
-SCREEN_REPLAY_ROI_TOLERANCE = Decimal("1e-10")
+MONEY_QUANTUM_PER_SEED_YUAN = Decimal("0.000001")
+RATIO_QUANTUM = Decimal("0.000000000001")
 
 
 def canonical_key(row: dict) -> tuple[str, str, str, str, str, str]:
     return tuple(row.get(k, "") for k in ("selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope"))
+
+
+def serialization_money_quantum(seed_scope: str) -> Decimal:
+    """Maximum cross-executable money serialization error for one cell."""
+    if seed_scope == "DETERMINISTIC":
+        seed_count = 1
+    elif seed_scope == "ENSEMBLE_100":
+        seed_count = 100
+    else:
+        raise RuntimeError(f"unknown postscreen seed scope: {seed_scope}")
+    return MONEY_QUANTUM_PER_SEED_YUAN * seed_count
+
+
+def adaptive_replay_tolerances(seed_scope: str, candidate_stake: Decimal,
+                               matched_full_stake: Decimal) -> dict[str, Decimal]:
+    """Propagate the frozen money quantum through both exact ROI denominators.
+
+    Candidate and matched-FULL totals use the same seed panel.  Each ROI gets
+    one money quantum per seed divided by its own exact reconciled stake, plus
+    one full twelve-decimal ratio serialization quantum.  Lift receives both
+    ROI bounds plus one further ratio quantum for its serialized subtraction.
+    """
+    if not candidate_stake.is_finite() or candidate_stake <= 0:
+        raise RuntimeError("post-screen candidate ROI denominator must be positive and finite")
+    if not matched_full_stake.is_finite() or matched_full_stake <= 0:
+        raise RuntimeError("post-screen matched-FULL ROI denominator must be positive and finite")
+    money_quantum = serialization_money_quantum(seed_scope)
+    candidate_roi = money_quantum / candidate_stake + RATIO_QUANTUM
+    matched_full_roi = money_quantum / matched_full_stake + RATIO_QUANTUM
+    return {
+        "money_quantum_yuan": money_quantum,
+        "candidate_roi_tolerance": candidate_roi,
+        "matched_full_roi_tolerance": matched_full_roi,
+        "matched_full_lift_tolerance": candidate_roi + matched_full_roi + RATIO_QUANTUM,
+    }
+
+
+def adaptive_tolerance_contract() -> dict:
+    """Machine-readable description shared by provenance and settlement card."""
+    return {
+        "money_quantum_per_seed_yuan": str(MONEY_QUANTUM_PER_SEED_YUAN),
+        "ratio_serialization_quantum": str(RATIO_QUANTUM),
+        "seed_scope_multiplier": {"DETERMINISTIC": 1, "ENSEMBLE_100": 100},
+        "candidate_roi": "money_quantum_per_seed * seed_count / exact_candidate_stake + ratio_quantum",
+        "matched_full_roi": "money_quantum_per_seed * seed_count / exact_matched_full_stake + ratio_quantum",
+        "matched_full_lift": "candidate_roi_tolerance + matched_full_roi_tolerance + ratio_quantum",
+        "boundary_rule": "absolute delta <= metric-specific tolerance; outside fails closed",
+        "stake_rule": "candidate stake must equal frozen screen stake at six decimals; both ROI denominators must be positive and finite",
+        "per_candidate_evidence": "candidate_checkpoint_reconciliation.csv",
+    }
 
 
 def git_head() -> str:
@@ -139,19 +190,23 @@ def assert_screen_replay_equivalence(candidate: dict, stake: float, gross: float
     actual_stake = Decimal(f"{stake:.6f}")
     if actual_stake != expected_stake:
         raise RuntimeError(f"post-screen exact replay stake drift for {identity}: {actual_stake} != {expected_stake}")
-    roi = Decimal(f"{(gross - stake) / stake:.12f}") if stake else None
-    full_roi = Decimal(f"{(full_gross - full_stake) / full_stake:.12f}") if full_stake else None
-    checks = (("no_tax_roi", roi, Decimal(candidate["screen_no_tax_roi"])),
-              ("matched_full_lift", roi - full_roi if roi is not None and full_roi is not None else None,
-               Decimal(candidate["screen_matched_full_lift"])))
-    report = {"identity": identity, "stake_yuan": f"{actual_stake:.6f}", "tolerance": str(SCREEN_REPLAY_ROI_TOLERANCE)}
-    for metric, actual, expected in checks:
-        if actual is None:
-            raise RuntimeError(f"post-screen exact replay lacks {metric} for {identity}")
+    actual_full_stake = Decimal(f"{full_stake:.6f}")
+    tolerances = adaptive_replay_tolerances(candidate["seed_scope"], actual_stake, actual_full_stake)
+    roi = Decimal(f"{(gross - stake) / stake:.12f}")
+    full_roi = Decimal(f"{(full_gross - full_stake) / full_stake:.12f}")
+    checks = (("no_tax_roi", roi, Decimal(candidate["screen_no_tax_roi"]), tolerances["candidate_roi_tolerance"]),
+              ("matched_full_lift", roi - full_roi, Decimal(candidate["screen_matched_full_lift"]),
+               tolerances["matched_full_lift_tolerance"]))
+    report = {"identity": identity, "stake_yuan": f"{actual_stake:.6f}",
+              "matched_full_stake_yuan": f"{actual_full_stake:.6f}",
+              **{key: str(value) for key, value in tolerances.items()}}
+    for metric, actual, expected, tolerance in checks:
         delta = actual - expected
-        if abs(delta) > SCREEN_REPLAY_ROI_TOLERANCE:
-            raise RuntimeError(f"post-screen exact replay material {metric} drift for {identity}: {actual} != {expected}")
-        report[metric] = {"actual": str(actual), "expected": str(expected), "delta": str(delta)}
+        if abs(delta) > tolerance:
+            raise RuntimeError(f"post-screen exact replay material {metric} drift for {identity}: "
+                               f"{actual} != {expected}; abs_delta={abs(delta)} tolerance={tolerance}")
+        report[metric] = {"actual": str(actual), "expected": str(expected), "delta": str(delta),
+                          "tolerance": str(tolerance)}
     return report
 
 
@@ -218,8 +273,8 @@ def load_shared_checkpoint(checkpoint: Path, screen: Path, rows: list[dict]) -> 
 
 
 def reconcile_candidate_checkpoint(rows: list[dict], values: CheckpointIssueArrays, out: Path) -> None:
-    """Require candidate stake/ROI/lift to reproduce the frozen screen <=1e-10."""
-    fields=["candidate_index","selector_id","global_science_cell","screen_stake_yuan","checkpoint_stake_yuan","screen_no_tax_roi","checkpoint_no_tax_roi","screen_matched_full_lift","checkpoint_matched_full_lift","roi_delta","lift_delta","tolerance","reconciliation_status"]
+    """Require candidate stake/ROI/lift to satisfy the adaptive frozen contract."""
+    fields=["candidate_index","selector_id","global_science_cell","seed_scope","screen_stake_yuan","checkpoint_stake_yuan","checkpoint_matched_full_stake_yuan","money_quantum_yuan","screen_no_tax_roi","checkpoint_no_tax_roi","screen_matched_full_lift","checkpoint_matched_full_lift","roi_delta","lift_delta","candidate_roi_tolerance","matched_full_roi_tolerance","matched_full_lift_tolerance","reconciliation_status"]
     failed=0
     with (out/"candidate_checkpoint_reconciliation.csv").open("w",newline="") as f:
         w=csv.DictWriter(f,fieldnames=fields);w.writeheader()
@@ -230,8 +285,8 @@ def reconcile_candidate_checkpoint(rows: list[dict], values: CheckpointIssueArra
             try:
                 report=assert_screen_replay_equivalence(candidate,stake,gross,full_stake,full_gross); status="PASS"
             except RuntimeError:
-                failed+=1; status="FAIL"; report={"no_tax_roi":{"actual":"","delta":""},"matched_full_lift":{"actual":"","delta":""},"tolerance":str(SCREEN_REPLAY_ROI_TOLERANCE)}
-            w.writerow({"candidate_index":ci,"selector_id":candidate["selector_id"],"global_science_cell":candidate.get("global_science_cell","") ,"screen_stake_yuan":candidate["screen_stake_yuan"],"checkpoint_stake_yuan":f"{stake:.6f}","screen_no_tax_roi":candidate["screen_no_tax_roi"],"checkpoint_no_tax_roi":report["no_tax_roi"].get("actual",""),"screen_matched_full_lift":candidate["screen_matched_full_lift"],"checkpoint_matched_full_lift":report["matched_full_lift"].get("actual",""),"roi_delta":report["no_tax_roi"].get("delta",""),"lift_delta":report["matched_full_lift"].get("delta",""),"tolerance":report["tolerance"],"reconciliation_status":status})
+                failed+=1; status="FAIL"; report={"no_tax_roi":{"actual":"","delta":""},"matched_full_lift":{"actual":"","delta":""},"money_quantum_yuan":"","candidate_roi_tolerance":"","matched_full_roi_tolerance":"","matched_full_lift_tolerance":""}
+            w.writerow({"candidate_index":ci,"selector_id":candidate["selector_id"],"global_science_cell":candidate.get("global_science_cell","") ,"seed_scope":candidate["seed_scope"],"screen_stake_yuan":candidate["screen_stake_yuan"],"checkpoint_stake_yuan":f"{stake:.6f}","checkpoint_matched_full_stake_yuan":f"{full_stake:.6f}","money_quantum_yuan":report["money_quantum_yuan"],"screen_no_tax_roi":candidate["screen_no_tax_roi"],"checkpoint_no_tax_roi":report["no_tax_roi"].get("actual",""),"screen_matched_full_lift":candidate["screen_matched_full_lift"],"checkpoint_matched_full_lift":report["matched_full_lift"].get("actual",""),"roi_delta":report["no_tax_roi"].get("delta",""),"lift_delta":report["matched_full_lift"].get("delta",""),"candidate_roi_tolerance":report["candidate_roi_tolerance"],"matched_full_roi_tolerance":report["matched_full_roi_tolerance"],"matched_full_lift_tolerance":report["matched_full_lift_tolerance"],"reconciliation_status":status})
     if failed: raise RuntimeError(f"candidate checkpoint reconciliation mismatch count={failed}")
 
 
@@ -247,7 +302,7 @@ def write_execution_provenance(out: Path, screen: Path, post_start: dict, post_e
                                                   "native_wrapper_path": str(NATIVE_WRAPPER_PATH.relative_to(ROOT)),
                                                   "native_wrapper_sha256": R.sha(NATIVE_WRAPPER_PATH),
                                                   "frozen_allocator_sha256": R.sha(ROOT / "scripts" / "bj145_fast_alloc.cpp")},
-        "screen_vs_replay_roi_serialization_tolerance": str(SCREEN_REPLAY_ROI_TOLERANCE),
+        "screen_vs_replay_adaptive_tolerance": adaptive_tolerance_contract(),
         "postscreen_execution_start": post_start,
         "postscreen_execution_end": post_end,
     }
@@ -701,7 +756,7 @@ def main() -> None:
     write_full_atlas_chart_sources(screen, out, checkpoint_selectors)
     post_end = execution_snapshot()
     write_execution_provenance(out, screen, post_start, post_end, recovered, checkpoint)
-    (out / "settlement_card.json").write_text(json.dumps({"contract": CONTRACT, "screening_package": str(screen.name), "screening_manifest_sha256": recovered["manifest_sha256"], "recovered_candidate_freeze_sha256": recovered["candidate_freeze_sha256"], "historical_screening_execution": recovered["historical_screen_execution"], "postscreen_execution_head": post_start["git_head"], "execution_provenance": "execution_provenance.json", "candidate_rule": "exact recovered union(absolute positive, raw Pareto, robust Pareto)", "candidate_freeze_count": len(rows), "full_search_family_count": full_family_size, "exact_replay": "frozen #145 native allocator; accepted tie behavior", "screen_replay_roi_serialization_tolerance": str(SCREEN_REPLAY_ROI_TOLERANCE), "bootstrap": {"replicates": REPLICATES, "unit": "issue_instance", "shared_draw_seed": DRAW_SEED}, "primary_metric": "pre-tax no_tax_roi", "promotion_authorized": False}, sort_keys=True, indent=2) + "\n")
+    (out / "settlement_card.json").write_text(json.dumps({"contract": CONTRACT, "screening_package": str(screen.name), "screening_manifest_sha256": recovered["manifest_sha256"], "recovered_candidate_freeze_sha256": recovered["candidate_freeze_sha256"], "historical_screening_execution": recovered["historical_screen_execution"], "postscreen_execution_head": post_start["git_head"], "execution_provenance": "execution_provenance.json", "candidate_rule": "exact recovered union(absolute positive, raw Pareto, robust Pareto)", "candidate_freeze_count": len(rows), "full_search_family_count": full_family_size, "exact_replay": "frozen #145 native allocator; accepted tie behavior", "screen_replay_adaptive_tolerance": adaptive_tolerance_contract(), "bootstrap": {"replicates": REPLICATES, "unit": "issue_instance", "shared_draw_seed": DRAW_SEED}, "primary_metric": "pre-tax no_tax_roi", "promotion_authorized": False}, sort_keys=True, indent=2) + "\n")
     (out / "README.md").write_text("# #167 post-screening exact evidence v3r1\n\nThis immutable companion package consumes the shared scientific replay checkpoint for the completed primary screen's frozen absolute-positive and raw-Pareto aggregate cells. It performs no ticket replay: all candidate versus FULL resamples use one common 20,000-draw issue matrix over checkpointed issue ledgers. BH and Bonferroni values are descriptive post-screening adjustments only; they do not promote a policy.\n")
     R.write_file_census(out)
     R.finalize_package_identity(out, CONTRACT, {"recovered_screening_manifest_sha256": recovered["manifest_sha256"], "recovered_candidate_freeze_sha256": recovered["candidate_freeze_sha256"], "shared_science_checkpoint_manifest_sha256": R.sha(checkpoint/"SHA256SUMS.json"), "historical_screening_execution_head": SCREENING_EXECUTION_HEAD, "historical_screening_runner_sha256": SCREENING_RUNNER_SHA256, "postscreen_execution_head": post_start["git_head"], "postscreen_runner_sha256": post_start["runner_sha256"], "postscreen_native_wrapper_sha256": post_start["native_wrapper_sha256"], "bootstrap_replicates": REPLICATES, "shared_draw_seed": DRAW_SEED, "allocator_sha256": R.EXPECTED_ALLOCATOR_SHA256})
