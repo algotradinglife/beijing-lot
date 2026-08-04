@@ -1,0 +1,45 @@
+{
+  "candidate_selector_id": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K_ALL",
+  "contract": "BJ-HIST-FUNDAMENTAL-OVERLAY-N7-001",
+  "database": {
+    "history_query_rule": "season_year < target year",
+    "repository_path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+    "resolved_path_not_persisted": true,
+    "sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "target_query_columns": [
+      "match_id",
+      "issue",
+      "match_idx",
+      "kickoff_ts",
+      "year",
+      "league",
+      "home_team_id",
+      "away_team_id",
+      "home_rank",
+      "away_rank",
+      "handicap_line_norm"
+    ]
+  },
+  "incumbent_selector_id": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K1",
+  "outcome_boundary": "Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted",
+  "source_167_gate_a": {
+    "content_identity_sha256": "0806185a7a68b99fd2a6a465308d11e2886995f992bfa722adb287a4e6a4d147",
+    "manifest_sha256": "5a82422755723453638d25c90f91213da046a9e7bed87a851b2e5700faa9c724",
+    "package": "bj167_gate_a_strategy_atlas_v3r1",
+    "payload_count": 64
+  },
+  "source_170_gate_a": {
+    "content_identity_sha256": "adc4d0f96628c784149da998a20e8830cde26db4001fe457eaf9ca4b7bb74223",
+    "manifest_sha256": "bb60ac5638d29674ad8c1c05f1ffe3ab9cdf12acb70ebdae6cea679743136d87",
+    "package": "bj170_gate_a_preoutcome_v2",
+    "payload_count": 17
+  },
+  "source_170_gate_b": {
+    "access": "hash verification only; no semantic payload parsing",
+    "content_identity_sha256": "75325aa0f60e277ad3fbf9d90116450833106bc3863b412ea3efcad9948a47b2",
+    "manifest_sha256": "08e83353ad483e5d75911116a413186f007385f5dd37b8c4b757ac903221e512",
+    "package": "bj170_gate_b_selector_allocator_stack_v1",
+    "payload_count": 25
+  },
+  "version": "bj134-gate-a-v2"
+}

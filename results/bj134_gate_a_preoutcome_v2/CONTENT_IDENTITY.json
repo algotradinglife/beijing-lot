@@ -1,0 +1,48 @@
+{
+  "contract_version": "bj134-gate-a-v2",
+  "controls": {
+    "candidate_selector_id": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K_ALL",
+    "database_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "incumbent_selector_id": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K1",
+    "market_selected_identity_sha256": "cc50e351dfb6aeea0f72cfefa29b3356e38cfcfea76bc54d284fa1a0457523c3",
+    "source_167_manifest_sha256": "5a82422755723453638d25c90f91213da046a9e7bed87a851b2e5700faa9c724",
+    "source_170_gate_a_manifest_sha256": "bb60ac5638d29674ad8c1c05f1ffe3ab9cdf12acb70ebdae6cea679743136d87",
+    "source_170_gate_b_manifest_sha256": "08e83353ad483e5d75911116a413186f007385f5dd37b8c4b757ac903221e512"
+  },
+  "denominator": {
+    "candidate_identity_rows": 424,
+    "candidate_role_rows": 2968,
+    "issue_census": 348,
+    "issue_rows": 1392,
+    "no_bet_by_arm": {
+      "DECISION_CHAIN_ONLY": 159,
+      "FUNDAMENTALS_ONLY": 159,
+      "FUNDAMENTALS_PLUS_DECISION": 159,
+      "MARKET_BEST_FULL": 159
+    },
+    "planned_stake_per_arm_yuan": 826686,
+    "selected_by_arm": {
+      "DECISION_CHAIN_ONLY": 189,
+      "FUNDAMENTALS_ONLY": 189,
+      "FUNDAMENTALS_PLUS_DECISION": 189,
+      "MARKET_BEST_FULL": 189
+    },
+    "unique_match_feature_rows": 1558
+  },
+  "payloads": {
+    "README.md": "6d3edb5ef891cadcbc4bade8a6194c2d65b57e8a9d0802bd91d1d02a12784e56",
+    "arm_registry.csv": "322b319c63ca00c53dd749ad5960057f7ab2957751ff1c5e057dba679e382844",
+    "candidate_role_vectors.csv.gz": "ab4b240f3920a84837fc74bb03ac022a64d6b0ade3fe844c6965817df8027421",
+    "candidate_universe_scores.csv.gz": "5e53bbc010dcd28a87aa67f2d8a543273b643297daa08b55a4ac221e97fce126",
+    "freeze_runner.py": "3b8116dcb7de10acf6d8fbc7d59621e08fe7dece453ca63e2e859f4abd768f50",
+    "gate_a_card.json": "a55c350c003278114fee917db7f18ff4d0f961b85cccefc02278589f23261231",
+    "issue_identity_overlap.csv": "c94246836bdc921af0586ad012010ff082964fdec5adc458468100d48044b295",
+    "match_feature_scores.csv.gz": "4708165bdb3711386ae885867a98f1051918d65ebbdf931a8aaa2f7675c206c1",
+    "pairwise_identity_overlap.csv": "ca9401fb502ea8eaa76ab2f2fb9d4e1489c62eabda035129594c7f8cb85459de",
+    "segment_registry.csv": "193f9f25e5c8cd8bde961ce0bffb6b267ad42a71f7fef01a931b80be50de3146",
+    "selection_freeze.csv": "ab14397428230e26423c0afdea19cc61557e2abae108fff4c0886f027081dd3d",
+    "source_binding.json": "3eb0891345d1afc0eebad3c2ae7e81c2fe6182fa537c38ea938cc52995d729ea",
+    "source_census.csv": "1aba97e27f3647f91cf8d1c11f437351abeb92d842b8b0f0b2be385833b0a6c8",
+    "threshold_registry.csv": "ef69cfdeecc1401dff64e5cfa316432886998e0535af336c101bbe9858d9a24b"
+  }
+}
