@@ -1,0 +1,114 @@
+{
+  "allocation_arms": [
+    {
+      "M": 2187,
+      "arm": "FULL_ENUMERATED",
+      "cap": "NA",
+      "effective_parameter_key": "[\"NA\",\"FULL_ENUMERATED\",\"NA\",2187,\"NA\"]",
+      "mechanism": "FULL_ENUMERATED",
+      "weight_source": "NA"
+    },
+    {
+      "M": 192,
+      "arm": "Q_TOP_MASS_M192",
+      "cap": "NA",
+      "effective_parameter_key": "[\"Q_WEIGHT\",\"DETERMINISTIC_TOP_MASS\",\"NA\",192,\"NA\"]",
+      "mechanism": "DETERMINISTIC_TOP_MASS",
+      "weight_source": "Q_WEIGHT"
+    },
+    {
+      "M": 512,
+      "arm": "MODEL_CAP1_M512",
+      "cap": "1",
+      "effective_parameter_key": "[\"MODEL_P_CAL\",\"CAPPED_REPEAT\",1,512,\"NA\"]",
+      "mechanism": "CAPPED_REPEAT",
+      "weight_source": "MODEL_P_CAL"
+    }
+  ],
+  "contract": "BJ-HIST-N7-SELECTOR-ALLOCATOR-STACK-001",
+  "denominator": {
+    "allocation_arm_count": 3,
+    "exact_identity_support_rows": 1758,
+    "factorial_cell_count": 9,
+    "identity_allocation_rows": 5337,
+    "identity_rows": 1779,
+    "issue_rows": 1044,
+    "planned_stake_rows": 3132,
+    "role_rows": 12453,
+    "selector_count": 3,
+    "support_contrast_rows": 27,
+    "support_issue_rows": 1539,
+    "support_view_count": 7,
+    "unique_issue_instances": 348
+  },
+  "gate_b_metrics": [
+    "no_tax_roi primary",
+    "tax_adjusted_roi secondary",
+    "paired candidate-minus-selector-matched-FULL",
+    "participation and no-bet",
+    "duplicate/unique/concentration/risk diagnostics",
+    "common deterministic issue bootstrap"
+  ],
+  "gate_b_status": "NOT_RUN_AND_NOT_AUTHORIZED_PENDING_PI_GATE_A_ACCEPTANCE",
+  "issue": 170,
+  "outcome_boundary": "Gate A: outcome-unexposed; no score, result, final/winning SP, payout, tax realization, ROI, or settlement payload is parsed",
+  "primary_challengers": [
+    "BEST_FULL + Q_TOP_MASS_M192",
+    "BEST_FULL + MODEL_CAP1_M512"
+  ],
+  "promotion_boundary": "No historical point estimate authorizes purchase, betting, production, or promotion; any positive requires strict independent EV and held-out/forward validation.",
+  "selectors": [
+    {
+      "alias": "BEST_FULL",
+      "role": "#167 best matched-FULL selector; fixed primary stacking base",
+      "selector_id": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K1"
+    },
+    {
+      "alias": "Q_SOURCE",
+      "role": "#167 Q-sleeve source selector; fixed contextual comparator",
+      "selector_id": "S1_NO_GATE_K4"
+    },
+    {
+      "alias": "MODEL_SOURCE",
+      "role": "#167 model-sleeve source selector; fixed contextual comparator",
+      "selector_id": "S2_ESP300_GM305_P_MIN_LOWP20_VALUE_FIRST_K1"
+    }
+  ],
+  "source_binding": {
+    "allocator": {
+      "path": "scripts/bj145_fast_alloc.cpp",
+      "sha256": "5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93",
+      "status": "BYTE_FROZEN_AUTHORITATIVE"
+    },
+    "contract": "BJ-HIST-N7-SELECTOR-ALLOCATOR-STACK-001",
+    "gate_a": {
+      "content_identity_sha256": "0806185a7a68b99fd2a6a465308d11e2886995f992bfa722adb287a4e6a4d147",
+      "manifest_sha256": "5a82422755723453638d25c90f91213da046a9e7bed87a851b2e5700faa9c724",
+      "package": "bj167_gate_a_strategy_atlas_v3r1",
+      "payload_count": 64
+    },
+    "gate_b_terminal_evidence": {
+      "access": "cryptographic durability verification only; no payload parsing",
+      "content_identity_sha256": "bfe29083b74d5d212555c261e888d6f5d4d5fd163b56e1876944d1f5d04aa5c7",
+      "manifest_sha256": "b3fa02f5cc2722932ff55fffb0bd9672508f6e78104cfb2458ad81c826f3b313",
+      "package": "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1",
+      "payload_count": 24
+    },
+    "outcome_boundary": "Gate A: outcome-unexposed; no score, result, final/winning SP, payout, tax realization, ROI, or settlement payload is parsed",
+    "version": "bj170-gate-a-v2"
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_FIXED_3X3_FREEZE",
+  "support_views": [
+    "NATIVE_SUPPORT",
+    "PAIRWISE_COMMON_SUPPORT",
+    "THREE_WAY_COMMON_SUPPORT",
+    "EXACT_IDENTITY_OVERLAP_DIAGNOSTIC"
+  ],
+  "terminal_decision_enum": [
+    "STACKS",
+    "SELECTION_ONLY",
+    "ALLOCATOR_CONTEXT_ONLY",
+    "INCONCLUSIVE_SUPPORT"
+  ],
+  "version": "bj170-gate-a-v2"
+}

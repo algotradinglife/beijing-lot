@@ -1,0 +1,23 @@
+{
+  "allocator": {
+    "path": "scripts/bj145_fast_alloc.cpp",
+    "sha256": "5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93",
+    "status": "BYTE_FROZEN_AUTHORITATIVE"
+  },
+  "contract": "BJ-HIST-N7-SELECTOR-ALLOCATOR-STACK-001",
+  "gate_a": {
+    "content_identity_sha256": "0806185a7a68b99fd2a6a465308d11e2886995f992bfa722adb287a4e6a4d147",
+    "manifest_sha256": "5a82422755723453638d25c90f91213da046a9e7bed87a851b2e5700faa9c724",
+    "package": "bj167_gate_a_strategy_atlas_v3r1",
+    "payload_count": 64
+  },
+  "gate_b_terminal_evidence": {
+    "access": "cryptographic durability verification only; no payload parsing",
+    "content_identity_sha256": "bfe29083b74d5d212555c261e888d6f5d4d5fd163b56e1876944d1f5d04aa5c7",
+    "manifest_sha256": "b3fa02f5cc2722932ff55fffb0bd9672508f6e78104cfb2458ad81c826f3b313",
+    "package": "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1",
+    "payload_count": 24
+  },
+  "outcome_boundary": "Gate A: outcome-unexposed; no score, result, final/winning SP, payout, tax realization, ROI, or settlement payload is parsed",
+  "version": "bj170-gate-a-v1"
+}
