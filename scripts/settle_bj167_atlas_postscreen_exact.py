@@ -30,6 +30,10 @@ NATIVE_WRAPPER_PATH = ROOT / "scripts" / "bj167_exact_atlas.cpp"
 RECOVERED_SCREEN_CONTRACT = "bj167-gate-b-v3r1-recovery-finalizer-v1"
 MONEY_QUANTUM_PER_SEED_YUAN = Decimal("0.000001")
 RATIO_QUANTUM = Decimal("0.000000000001")
+EXPORTED_IDENTITY_FIELDS = (
+    "selector_id", "weight_source", "mechanism", "cap", "M",
+    "seed_scope", "candidate_inclusion",
+)
 
 
 def canonical_key(row: dict) -> tuple[str, str, str, str, str, str]:
@@ -657,7 +661,16 @@ def write_outputs(rows: list[dict], boot: list[dict], values: dict[str, list[arr
     fields = ["candidate_index", "selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope", "candidate_inclusion", "candidate_point_roi", "full_point_roi", "paired_lift_point", "candidate_ci95_low", "candidate_ci95_high", "lift_ci95_low", "lift_ci95_high", "candidate_two_sided_p", "candidate_bh_adjusted_p", "candidate_bonferroni_adjusted_p", "paired_lift_two_sided_p", "paired_lift_bh_adjusted_p", "paired_lift_bonferroni_adjusted_p", "ex_largest_issue_no_tax_roi", "ex_largest_year_no_tax_roi", "drawdown_no_tax_yuan", "gross_issue_hhi", "gross_top_issue_share", "largest_signed_issue", "largest_signed_year", "bootstrap_replicates", "bootstrap_unit", "candidate_freeze_count", "full_search_family_count", "descriptive_only"]
     joined = []
     for c in rows:
-        b = by_index[c["candidate_index"]]; row = {k: c.get(k, "") for k in fields}; row.update({k: b.get(k, "") for k in fields}); row.update({"bootstrap_replicates": REPLICATES, "bootstrap_unit": "paired issue_instance", "descriptive_only": "TRUE"}); joined.append(row)
+        b = by_index[c["candidate_index"]]
+        # Bootstrap rows deliberately carry metrics only.  Frozen candidate
+        # identity is authoritative and must never be overwritten by blank
+        # metric-row placeholders during this deterministic join.
+        row = {k: b.get(k, "") for k in fields}
+        row.update({k: c.get(k, "") for k in ("candidate_index", *EXPORTED_IDENTITY_FIELDS)})
+        if any(row[k] in (None, "") for k in EXPORTED_IDENTITY_FIELDS):
+            raise RuntimeError(f"blank frozen candidate identity at candidate_index={c['candidate_index']}")
+        row.update({"bootstrap_replicates": REPLICATES, "bootstrap_unit": "paired issue_instance", "descriptive_only": "TRUE"})
+        joined.append(row)
     with (out / "candidate_paired_bootstrap_20000.csv").open("w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
         for r in joined: w.writerow({k: "" if r.get(k) is None else (f"{r[k]:.12f}" if isinstance(r.get(k), float) else r.get(k, "")) for k in fields})

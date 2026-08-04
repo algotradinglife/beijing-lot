@@ -11,6 +11,8 @@ spec = importlib.util.spec_from_file_location("bj167_postscreen", ROOT / "script
 POST = importlib.util.module_from_spec(spec); assert spec.loader is not None; spec.loader.exec_module(POST)
 science_spec = importlib.util.spec_from_file_location("bj167_science", ROOT / "scripts" / "settle_bj167_scientific_stability_exact.py")
 SCIENCE = importlib.util.module_from_spec(science_spec); assert science_spec.loader is not None; science_spec.loader.exec_module(SCIENCE)
+correction_spec = importlib.util.spec_from_file_location("bj167_postscreen_identity_correction", ROOT / "scripts" / "correct_bj167_postscreen_identity.py")
+CORRECTION = importlib.util.module_from_spec(correction_spec); assert correction_spec.loader is not None; correction_spec.loader.exec_module(CORRECTION)
 
 
 def test_candidate_freeze_union_and_shared_paired_bootstrap():
@@ -50,6 +52,17 @@ def test_candidate_freeze_union_and_shared_paired_bootstrap():
     # miniature calculation in this test.
     POST.write_stability(frozen, values, issue_order, issue_meta, out)
     POST.write_outputs(frozen, boot, values, issue_order, issue_meta, out)
+    exported = list(csv.DictReader((out / "candidate_paired_bootstrap_20000.csv").open(newline="")))
+    assert len(exported) == len(frozen)
+    frozen_by_index = {str(row["candidate_index"]): row for row in frozen}
+    for row in exported:
+        expected = frozen_by_index[row["candidate_index"]]
+        assert all(row[field] == expected[field] for field in POST.EXPORTED_IDENTITY_FIELDS)
+    robust_export = list(csv.DictReader((out / "robust_pareto_front_exact.csv").open(newline="")))
+    assert robust_export
+    for row in robust_export:
+        expected = frozen_by_index[row["candidate_index"]]
+        assert all(row[field] == expected[field] for field in POST.EXPORTED_IDENTITY_FIELDS)
     tax_chart = list(csv.DictReader((out / "chart_source_tax_line_exposure_retention.csv").open(newline="")))
     assert len(tax_chart) == 2 and tax_chart[0]["gross_return_retention_vs_matched_full"] == "0.875000000000"
     assert float(boot[0]["candidate_bonferroni_adjusted_p"]) >= float(boot[0]["candidate_two_sided_p"])
@@ -72,6 +85,58 @@ def test_candidate_freeze_union_and_shared_paired_bootstrap():
     assert {r["candidate_freeze_count"] for r in significance} == {"2"}
     assert {r["full_search_family_count"] for r in significance} == {"100"}
     shutil.rmtree(FIXTURE)
+
+
+def test_identity_correction_package_preserves_science_and_unaffected_bytes():
+    root = ROOT / ".scratch" / "bj167_postscreen_identity_correction_fixture"
+    if root.exists(): shutil.rmtree(root)
+    source, output = root / "source", root / "corrected"
+    source.mkdir(parents=True)
+    freeze_fields = ["candidate_index", *CORRECTION.IDENTITY_FIELDS, "seed", "global_cell"]
+    frozen = [
+        {"candidate_index":"0", "selector_id":"S0", "weight_source":"Q_WEIGHT", "mechanism":"WOR_DISTINCT", "cap":"NA", "M":"64", "seed_scope":"ENSEMBLE_100", "candidate_inclusion":"ABSOLUTE_POSITIVE", "seed":"ENSEMBLE_100", "global_cell":""},
+        {"candidate_index":"1", "selector_id":"S1", "weight_source":"MODEL_P_CAL", "mechanism":"CAPPED_REPEAT", "cap":"2", "M":"112", "seed_scope":"DETERMINISTIC", "candidate_inclusion":"RAW_PARETO", "seed":"NA", "global_cell":"9"},
+    ]
+    with (source / "candidate_freeze.csv").open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=freeze_fields, lineterminator="\n"); writer.writeheader(); writer.writerows(frozen)
+    export_fields = ["candidate_index", *CORRECTION.IDENTITY_FIELDS, "candidate_point_roi", "candidate_ci95_low"]
+    blank_rows = [
+        {"candidate_index":"0", **{field:"" for field in CORRECTION.IDENTITY_FIELDS}, "candidate_point_roi":"0.123456789012", "candidate_ci95_low":"-0.010000000000"},
+        {"candidate_index":"1", **{field:"" for field in CORRECTION.IDENTITY_FIELDS}, "candidate_point_roi":"2.500000000000", "candidate_ci95_low":"-1.000000000000"},
+    ]
+    with (source / "candidate_paired_bootstrap_20000.csv").open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=export_fields, lineterminator="\n"); writer.writeheader(); writer.writerows(blank_rows)
+    with (source / "robust_pareto_front_exact.csv").open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=export_fields + ["front_definition"], lineterminator="\n"); writer.writeheader(); writer.writerow(dict(blank_rows[1], front_definition="fixture front"))
+    (source / "unchanged_science.bin").write_bytes(b"science-bytes-must-remain-identical\x00\xff")
+    (source / "CONTENT_IDENTITY.json").write_text('{"contract_version":"fixture"}\n')
+    manifest = {path.name: CORRECTION.sha(path) for path in sorted(source.iterdir()) if path.is_file()}
+    (source / "SHA256SUMS.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    manifest_sha = CORRECTION.sha(source / "SHA256SUMS.json")
+    content_sha = CORRECTION.sha(source / "CONTENT_IDENTITY.json")
+    freeze_sha = CORRECTION.sha(source / "candidate_freeze.csv")
+    source_before = {path.name: CORRECTION.sha(path) for path in source.iterdir() if path.is_file()}
+    result = CORRECTION.build(source, output, expected_manifest=manifest_sha,
+                              expected_content=content_sha, expected_freeze=freeze_sha)
+    assert result["candidate_identity_join_count"] == 2
+    assert result["robust_identity_join_count"] == 1
+    assert (output / "unchanged_science.bin").read_bytes() == (source / "unchanged_science.bin").read_bytes()
+    assert CORRECTION.sha(output / "unchanged_science.bin") == source_before["unchanged_science.bin"]
+    assert CORRECTION.projection_sha(output / "candidate_paired_bootstrap_20000.csv") == CORRECTION.projection_sha(source / "candidate_paired_bootstrap_20000.csv")
+    assert CORRECTION.projection_sha(output / "robust_pareto_front_exact.csv") == CORRECTION.projection_sha(source / "robust_pareto_front_exact.csv")
+    expected_by_index = {row["candidate_index"]: row for row in frozen}
+    for name in CORRECTION.CORRECTED_FILES:
+        with (output / name).open(newline="") as handle:
+            for row in csv.DictReader(handle):
+                assert all(row[field] == expected_by_index[row["candidate_index"]][field] for field in CORRECTION.IDENTITY_FIELDS)
+    assert source_before == {path.name: CORRECTION.sha(path) for path in source.iterdir() if path.is_file()}
+    provenance = json.loads((output / "correction_provenance.json").read_text())
+    assert provenance["mode"] == "DETERMINISTIC_IDENTITY_JOIN_ONLY_NO_TICKET_REPLAY_NO_BOOTSTRAP_RERUN"
+    assert provenance["bootstrap_draws_read_or_recomputed"] is False
+    assert provenance["correction_execution_head"] == subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    assert provenance["correction_runner_sha256"] == CORRECTION.sha(output / "identity_correction_runner.py")
+    CORRECTION.verify_manifest(output, result["manifest_sha256"], result["content_identity_sha256"])
+    shutil.rmtree(root)
 
 
 def test_production_role_vector_q_delete_and_native_profile():
