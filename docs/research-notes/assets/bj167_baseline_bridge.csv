@@ -1,0 +1,8 @@
+candidate,roi,low,high,grade
+#127 legacy FULL,-0.0835,,,legacy segment reference
+#137/#151 3-seed Q-WOR/M64,0.102724,,,discovery; only 3 seeds
+#159 N7/M64 transfer,-0.222262319469,,,complete-issue transfer diagnostic
+#167 100-seed Q-WOR/M64,-0.132793126141,-0.243038264298,-0.007458105869,comparable incumbent bridge
+"#167 best FULL, support≥100",-0.09467910799,,,selection baseline
+#167 Q top-mass/M192,0.203734955373,-0.3785589469,0.950404618172,high-return concentrated discovery
+#167 strict MODEL_P cap1/M512,0.081425291857,-0.097773561496,0.272276337545,broad-support sweet region

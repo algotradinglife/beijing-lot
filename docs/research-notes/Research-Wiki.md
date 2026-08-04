@@ -693,6 +693,68 @@ truth coverage 与均匀 3^7 ticket-space fraction 并列。结论仍是纸面�
 [`#167 Gate-A v2`](../../results/bj167_gate_a_preoutcome_v2/README.md) 与
 [`#167 Gate-B v2r3`](../../results/bj167_gate_b_outcome_settlement_v2r3/README.md)。
 
+## #167 最终策略图谱：selection × allocation × M × 100 seeds（2026-08-04）
+
+PR #168 已把 #167 从固定候选实验扩展为完整 N7 工艺图谱：492 个 selector、每个
+963 个有效 allocator/M cell，共 473,796 个搜索 cell；所有 WR/WOR cell 使用冻结的
+100 seeds。17,135 个正点估计或 Pareto 候选进入同一个 20,000 次 issue-block
+paired bootstrap。税前 ROI 是主口径，税后仅作敏感性。
+
+![#167 baseline bridge](assets/bj167_baseline_bridge.png)
+
+最终认知不是简单的 `NO_PROMOTION`，而是把下一轮的甜区缩小到可继承的几条路线：
+
+1. **选场仍是限制层。** settled issue≥100 的最好 FULL selector 是
+   `S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K1`，税前 ROI
+   **−9.47%**（163 期）。#127 的 −8.35% 属于 segment denominator，只保留作 legacy
+   reference，不能与 complete-issue FULL 直接比较。
+2. **WOR/WR 没有全局排名。** 在历史 `NO_GATE/K4 + Q_WEIGHT` 上，WOR/M64
+   **−13.28%** 优于 WR/M64 **−19.48%**；在严格
+   `ESP300_GM305/P_MIN/LOWP20/VALUE_FIRST/K1 + MODEL_P_CAL` 上，WR/M32
+   **−11.26%**，而 WOR/M32 **−24.69%**、最佳 WOR/M208 也只有 **−17.20%**。
+   机制优劣取决于 selector、概率权重和 M 的交互。
+3. **发现两个局部正点估计峰。** `NO_GATE/K4 + Q_WEIGHT + TOP_MASS/M192`
+   为 **+20.37%**，但 bootstrap 区间 `[−37.86%, +95.04%]`、去最大 year
+   **−14.99%**、top issue share 19.97%，属于高收益/高集中 discovery。
+   严格 S2 + `MODEL_P_CAL + cap1/M512` 为 **+8.14%**，matched FULL
+   **−21.61%**、lift **+29.76pp**，bootstrap `[−9.78%, +27.23%]`、lift
+   lower bound `+6.75pp`、去最大 issue `+4.40%`、去最大 year `−0.21%`、top
+   issue share 3.95%，是更值得继承的 broad-support sweet region。
+4. **不存在稳定 M 平台。** 两个峰分别集中在 M192 与 M512，邻近 M 点快速回落；M
+   是组合构造参数，不是独立 alpha。cap1/M512、top-mass/M512、residual/M512 在严格
+   selector 下实现同一组票；cap2/M1024 只是同组票重复两次，不算新发现。
+5. **100 seeds 解决的是 allocator MC 噪声，不是足球历史不确定性。** 17,135 个
+   postscreen 候选中 15,511 个绝对点估计为正，但没有任何一个 absolute issue-bootstrap
+   lower bound 大于 0；800 个在排除最大 issue/year 后仍为正，仍需结合 support 与
+   concentration 解读。#137/#151 三 seed +10.27% 的 Q-WOR/M64 在 100 seeds 下回到
+   −13.28%，说明前三 seed 是 discovery cluster，不是稳定绝对 Edge。
+
+![#167 allocation M curves](assets/bj167_allocation_m_curves.png)
+
+![#167 stability and Pareto views](assets/bj167_stability_and_pareto.png)
+
+### 2026-08-04 baseline ladder 与继承规则
+
+| 层级 | 当前参考 | 税前 ROI | 证据等级 | 决定 |
+|---|---|---:|---|---|
+| legacy selection | #127 `ESP300_GM305_LOWP20` FULL | −8.35% | segment legacy | 保留，不跨 denominator 替换 |
+| complete-issue transfer | #159 N7/M64 selected WOR | −22.23% | transfer diagnostic | 保留作迁移失败参照 |
+| complete-issue selection | #167 broad FULL | −9.47% | descriptive broad support | 作为 #134 的 selection baseline |
+| historical stochastic | `NO_GATE/K4 + Q_WEIGHT + WOR/M64` | −13.28% | 100-seed comparable bridge | 保留作机制基线 |
+| high-return sleeve | `NO_GATE/K4 + Q_WEIGHT + TOP_MASS/M192` | +20.37% | concentrated discovery | 只作压力/集中度袖套 |
+| broad sweet sleeve | strict S2 + `MODEL_P_CAL + cap1/M512` | +8.14% | broad-support discovery | 作为 #134 主继承袖套 |
+
+这张 ladder 不是把不同 denominator 的数值强行排序。下一轮必须先在 common support
+复现相应 incumbent，再分别报告 matched FULL、challenger−FULL、challenger−comparable
+incumbent。负结果只淘汰新增 lever，不能把研究基线重置到更差方案。
+
+完整 PI 报告、六组图、关键候选 CSV 和图表来源绑定见
+[`Issue-167-N7-Strategy-Atlas`](Issue-167-N7-Strategy-Atlas.md)、
+[`bj167_key_candidates.csv`](assets/bj167_key_candidates.csv) 与
+[`bj167_chart_manifest.csv`](assets/bj167_chart_manifest.csv)。后续 #134 应固定测试：
+broad FULL、Q-WOR/M64、Q top-mass/M192 和 strict MODEL_P cap1/M512；新 lever 只能是
+基本面或决策链 overlay，不得根据同批 outcomes 再调 selector/M/allocator。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
