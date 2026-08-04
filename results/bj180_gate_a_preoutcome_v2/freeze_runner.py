@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime as dt
 import gzip
 import hashlib
 import importlib.util
@@ -15,6 +16,7 @@ import os
 import shutil
 import sqlite3
 import sys
+from bisect import bisect_left, bisect_right
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
@@ -22,7 +24,7 @@ from types import ModuleType
 
 ISSUE = 180
 CONTRACT = "BJ-HIST-TEAM-MODEL-N7-001"
-VERSION = "bj180-gate-a-v1"
+VERSION = "bj180-gate-a-v2"
 BASE_MAIN_COMMIT = "210a791b0793e99e72358e02c8484458c900a98b"
 SOURCE_179 = "bj179_gate_a_preoutcome_v2"
 SOURCE_179_MANIFEST = "5839f5c03c94ef903472b64fffa3ad1462ec006717875d0a3903ecdfdc2aa056"
@@ -35,9 +37,11 @@ DB_REPOSITORY_PATH = Path("data/derived/beidan_xlsm/beidan_xlsm.sqlite")
 CORE_SOURCE_PATH = Path("scripts/bj180_team_matchup_core.py")
 FULL_TICKETS = 3**7
 FULL_STAKE_YUAN = 2 * FULL_TICKETS
+COMPLETION_EMBARGO_MINUTES = 180
 OUTCOME_BOUNDARY = (
     "Gate A outcome-unexposed: target rows expose no score/result/final-SP/payout/tax/ROI; "
-    "team state consumes only completed matches with kickoff strictly before the common issue cutoff"
+    "because the source has no completion timestamp, historical scores are available only when "
+    "kickoff <= common issue cutoff minus the fixed 180-minute completion embargo"
 )
 FORBIDDEN_TARGET_FIELDS = {
     "score",
@@ -172,7 +176,7 @@ def repo_root() -> Path:
 ROOT = repo_root()
 SOURCE_179_DIR = ROOT / "results" / SOURCE_179
 SOURCE_134_DIR = ROOT / "results" / SOURCE_134
-DEFAULT_OUTPUT = ROOT / "results" / "bj180_gate_a_preoutcome_v1"
+DEFAULT_OUTPUT = ROOT / "results" / "bj180_gate_a_preoutcome_v2"
 
 
 def sha256_file(path: Path) -> str:
@@ -402,33 +406,104 @@ def historical_rows(db: Path, before: str) -> Iterator[dict[str, object]]:
         connection.close()
 
 
+def history_available_through(cutoff: dt.datetime) -> dt.datetime:
+    """Latest kickoff whose final score may be used at this cutoff."""
+    return cutoff - dt.timedelta(minutes=COMPLETION_EMBARGO_MINUTES)
+
+
+def history_row_is_available(kickoff: dt.datetime, cutoff: dt.datetime) -> bool:
+    """The embargo boundary is inclusive; anything later remains unavailable."""
+    return kickoff <= history_available_through(cutoff)
+
+
+def historical_timeline(db: Path, before: str, core: ModuleType) -> list[dt.datetime]:
+    """Read only eligible-history kickoff times for the embargo audit."""
+    connection = ro_connection(db)
+    query = """
+        SELECT m.kickoff_ts
+          FROM matches m JOIN match_features mf ON mf.match_id=m.match_id
+         WHERE m.kickoff_ts IS NOT NULL AND m.kickoff_ts < ?
+           AND m.home_team_id IS NOT NULL AND m.away_team_id IS NOT NULL
+           AND mf.fthg IS NOT NULL AND mf.ftag IS NOT NULL
+         ORDER BY m.kickoff_ts, m.match_id
+    """
+    try:
+        return [
+            core.parse_ts(row["kickoff_ts"])
+            for row in connection.execute(query, (before,))
+        ]
+    finally:
+        connection.close()
+
+
 def probability_freeze(
     db: Path,
     targets: Mapping[int, Mapping[str, object]],
     source_probabilities: Sequence[Mapping[str, str]],
     by_match_cutoff: Mapping[int, object],
     core: ModuleType,
-) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+) -> tuple[
+    list[dict[str, object]],
+    list[dict[str, object]],
+    list[dict[str, object]],
+]:
     source_by_match = {int(row["match_id"]): row for row in source_probabilities}
     targets_by_cutoff: dict[object, list[int]] = defaultdict(list)
     for match_id, cutoff in by_match_cutoff.items():
         targets_by_cutoff[cutoff].append(match_id)
     state = core.TeamMatchupState()
-    history = iter(historical_rows(db, max(targets_by_cutoff).isoformat(sep=" ")))
+    maximum_cutoff = max(targets_by_cutoff)
+    history = iter(historical_rows(db, maximum_cutoff.isoformat(sep=" ")))
+    timeline = historical_timeline(db, maximum_cutoff.isoformat(sep=" "), core)
     pending = next(history, None)
     output: list[dict[str, object]] = []
     state_rows: list[dict[str, object]] = []
+    embargo_rows: list[dict[str, object]] = []
     for cutoff in sorted(targets_by_cutoff):
-        while pending is not None and core.parse_ts(pending["kickoff_ts"]) < cutoff:
+        availability_cutoff = history_available_through(cutoff)
+        while pending is not None and history_row_is_available(
+            core.parse_ts(pending["kickoff_ts"]), cutoff
+        ):
             state.update(pending)
             pending = next(history, None)
+        safe_count = bisect_right(timeline, availability_cutoff)
+        old_rule_count = bisect_left(timeline, cutoff)
+        excluded_count = old_rule_count - safe_count
+        nearest_gap = (
+            (cutoff - timeline[old_rule_count - 1]).total_seconds() / 60.0
+            if excluded_count
+            else None
+        )
+        embargo_rows.append(
+            {
+                "feature_cutoff_ts": cutoff.isoformat(sep=" "),
+                "score_available_through_ts": availability_cutoff.isoformat(sep=" "),
+                "embargo_minutes": COMPLETION_EMBARGO_MINUTES,
+                "inclusive_boundary": 1,
+                "cumulative_safe_history_rows": safe_count,
+                "cumulative_old_kickoff_lt_rows": old_rule_count,
+                "excluded_near_cutoff_rows": excluded_count,
+                "nearest_excluded_kickoff_gap_minutes": compact(nearest_gap)
+                if nearest_gap is not None
+                else "",
+                "completion_timestamp_source": "UNAVAILABLE_FIXED_EMBARGO",
+                "history_rule": "kickoff <= cutoff - 180 minutes",
+                "outcome_boundary": OUTCOME_BOUNDARY,
+            }
+        )
         summary = state.summary()
+        if int(summary["training_rows"]) != safe_count:
+            raise RuntimeError(
+                "completion-embargo history denominator drift: "
+                f"state={summary['training_rows']} audit={safe_count} cutoff={cutoff}"
+            )
         state_rows.append(
             {
                 "feature_cutoff_ts": cutoff.isoformat(sep=" "),
                 **summary,
                 "state_summary_sha256": canonical_hash(summary),
-                "history_rule": "completed kickoff strictly less than feature_cutoff_ts",
+                "score_available_through_ts": availability_cutoff.isoformat(sep=" "),
+                "history_rule": "kickoff <= feature_cutoff_ts - 180 minutes (inclusive)",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             }
         )
@@ -506,7 +581,11 @@ def probability_freeze(
             output.append(row)
     if len(output) != 1558 or {int(row["match_id"]) for row in output} != set(targets):
         raise RuntimeError("probability target denominator drift")
-    return sorted(output, key=lambda row: int(row["match_id"])), state_rows
+    return (
+        sorted(output, key=lambda row: int(row["match_id"])),
+        state_rows,
+        embargo_rows,
+    )
 
 
 def score_candidates(
@@ -801,7 +880,7 @@ def outer_year_registry(
                 "first_state_event_sha256": states[0]["history_event_sha256"],
                 "last_state_event_sha256": states[-1]["history_event_sha256"],
                 "parameter_rule": "FIXED_PREOUTCOME_HYPERPARAMETERS_ALL_FOLDS",
-                "state_rule": "EXPANDING_CHRONOLOGICAL_HISTORY_STRICTLY_BEFORE_EACH_ISSUE_CUTOFF",
+                "state_rule": "EXPANDING_HISTORY_KICKOFF_LE_CUTOFF_MINUS_180_MINUTES",
                 "gate_b_evaluation": "YEAR|FOLD|LOYO|EX_LARGEST_YEAR|EX_LARGEST_ISSUE",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             }
@@ -835,7 +914,7 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
         source = load_sources()
         cutoffs, by_match_cutoff = issue_cutoffs(source["roles"], core)
         targets = read_target_rows(db, set(by_match_cutoff))
-        probabilities, state_rows = probability_freeze(
+        probabilities, state_rows, embargo_rows = probability_freeze(
             db, targets, source["probabilities"], by_match_cutoff, core
         )
         scores = score_candidates(source["candidates"], source["roles"], probabilities)
@@ -844,6 +923,22 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
         overlap = build_overlap(selection)
         coverage = feature_coverage(probabilities)
         outer_year = outer_year_registry(probabilities, state_rows)
+        excluded_cutoffs = [
+            row for row in embargo_rows if int(row["excluded_near_cutoff_rows"]) > 0
+        ]
+        embargo_summary = {
+            "cutoff_count": len(embargo_rows),
+            "cutoffs_with_excluded_rows": len(excluded_cutoffs),
+            "sum_cutoff_level_excluded_rows": sum(
+                int(row["excluded_near_cutoff_rows"]) for row in embargo_rows
+            ),
+            "minimum_nearest_excluded_kickoff_gap_minutes": min(
+                float(row["nearest_excluded_kickoff_gap_minutes"])
+                for row in excluded_cutoffs
+            )
+            if excluded_cutoffs
+            else None,
+        }
         counts = Counter(row["policy_status"] for row in selection)
         selected_by_arm = Counter(
             row["arm"]
@@ -868,6 +963,11 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
         )
         write_csv(stage / "identity_overlap.csv", list(overlap[0]), overlap)
         write_csv(stage / "team_state_registry.csv", list(state_rows[0]), state_rows)
+        write_csv(
+            stage / "completion_embargo_audit.csv",
+            list(embargo_rows[0]),
+            embargo_rows,
+        )
         write_csv(stage / "feature_coverage.csv", list(coverage[0]), coverage)
         write_csv(stage / "outer_year_registry.csv", list(outer_year[0]), outer_year)
         cutoff_rows = [
@@ -875,7 +975,10 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
                 "issue_instance": issue,
                 "feature_cutoff_ts": cutoff.isoformat(sep=" "),
                 "rule": "minimum kickoff across frozen issue candidate-role union",
-                "history_rule": "completed kickoff strictly less than cutoff",
+                "score_available_through_ts": history_available_through(
+                    cutoff
+                ).isoformat(sep=" "),
+                "history_rule": "kickoff <= cutoff - 180 minutes (inclusive)",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             }
             for issue, cutoff in sorted(cutoffs.items())
@@ -913,7 +1016,7 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
                     "TEAM_INITIALIZATION": "new-team league prior and 75/25 prior/destination shrink on league transition",
                     "H2H_PRIOR": "prior meetings only, alpha-12 shrink, primary weight 0.03",
                 }[family],
-                "timing": "STRICT_KICKOFF_LT_COMMON_ISSUE_CUTOFF",
+                "timing": "KICKOFF_LE_COMMON_ISSUE_CUTOFF_MINUS_180_MINUTES",
                 "missingness": "retain match; neutral league/team prior with explicit history depth",
                 "controlling": 1,
                 "outcome_boundary": OUTCOME_BOUNDARY,
@@ -981,6 +1084,15 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
                     "fthg",
                     "ftag",
                 ],
+                "completion_timestamp_field": None,
+                "completion_timestamp_status": "UNAVAILABLE_IN_SOURCE_SCHEMA",
+            },
+            "completion_embargo": {
+                "minutes": COMPLETION_EMBARGO_MINUTES,
+                "boundary": "inclusive",
+                "rule": "kickoff <= common issue cutoff - 180 minutes",
+                "audit_file": "completion_embargo_audit.csv",
+                **embargo_summary,
             },
             "core": {
                 "path": str(CORE_SOURCE_PATH),
@@ -1021,7 +1133,16 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
                 {"arm": arm, "score": score, "definition": definition, "role": role}
                 for arm, score, definition, role in ARMS
             ],
-            "chronology": "single sequential state; before each common issue cutoff consume only completed kickoff < cutoff; tie by match_id",
+            "chronology": "single sequential state; source has no completion timestamp, so before each common issue cutoff consume scores only when kickoff <= cutoff - 180 minutes (inclusive); tie by match_id",
+            "completion_embargo": {
+                "timestamp_source": "UNAVAILABLE_IN_SOURCE_SCHEMA",
+                "fallback": "FIXED_180_MINUTE_EMBARGO",
+                "minutes": COMPLETION_EMBARGO_MINUTES,
+                "boundary": "inclusive",
+                "rule": "kickoff <= common issue cutoff - 180 minutes",
+                "audit_file": "completion_embargo_audit.csv",
+                **embargo_summary,
+            },
             "outer_year_evaluation": "target folds OOS_2020..OOS_2025 remain unchanged; hyperparameters fixed across folds; YEAR/FOLD/LOYO and ex-largest are Gate-B requirements",
             "h2h": "prior-only, ordered home/away pair, maximum 12 meetings, alpha 12, primary weight 0.03; explicit minus-H2H ablation",
             "settlement": "not read or produced in Gate A; Gate B requires PI authorization",
@@ -1039,7 +1160,13 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
         }
         (stage / "gate_a_card.json").write_text(dump_json(card), encoding="utf-8")
         (stage / "README.md").write_text(
-            "# #180 Gate A v1\n\nOutcome-unexposed chronological deep team/matchup freeze over the exact #179 candidate denominator. B0 remains controlling; Gate B is not authorized.\n",
+            "# #180 Gate A v2\n\n"
+            "Outcome-unexposed chronological deep team/matchup freeze over the exact "
+            "#179 candidate denominator. The source database has no authoritative "
+            "completion timestamp, so a final score enters state only when its kickoff "
+            "is at or before the common issue cutoff minus the fixed 180-minute embargo. "
+            "The boundary is inclusive and `completion_embargo_audit.csv` records the "
+            "cutoff-level exclusions. B0 remains controlling; Gate B is not authorized.\n",
             encoding="utf-8",
         )
         shutil.copyfile(ROOT / CORE_SOURCE_PATH, stage / "bj180_team_matchup_core.py")

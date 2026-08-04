@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import datetime as dt
 import gzip
 import hashlib
 import importlib.util
@@ -15,7 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "freeze_bj180_team_matchup_gate_a.py"
 CORE_SCRIPT = ROOT / "scripts" / "bj180_team_matchup_core.py"
-PACKAGE = ROOT / "results" / "bj180_gate_a_preoutcome_v1"
+PACKAGE = ROOT / "results" / "bj180_gate_a_preoutcome_v2"
 
 
 def load(path: Path, name: str):
@@ -138,6 +139,21 @@ def test_target_projection_never_reads_result_or_settlement_fields():
     assert "ORDER BY m.kickoff_ts, m.match_id" in historical
 
 
+def test_completion_embargo_excludes_recent_scores_and_includes_exact_boundary():
+    runner = load(SCRIPT, "bj180_completion_embargo")
+    cutoff = dt.datetime.fromisoformat("2025-08-01 12:00:00")
+    boundary = cutoff - dt.timedelta(minutes=180)
+    assert runner.COMPLETION_EMBARGO_MINUTES == 180
+    assert runner.history_available_through(cutoff) == boundary
+    assert runner.history_row_is_available(boundary, cutoff)
+    assert not runner.history_row_is_available(
+        boundary + dt.timedelta(microseconds=1), cutoff
+    )
+    assert not runner.history_row_is_available(
+        cutoff - dt.timedelta(minutes=120), cutoff
+    )
+
+
 def test_baseline_reproduction_requires_exact_identity_sets():
     runner = load(SCRIPT, "bj180_baselines")
     source = []
@@ -213,6 +229,34 @@ def test_generated_package_is_complete_outcome_unexposed_and_immutable_if_presen
         "participating": 189,
         "roles": 2968,
     }
+    assert card["version"] == "bj180-gate-a-v2"
+    embargo = card["completion_embargo"]
+    assert embargo["minutes"] == 180
+    assert embargo["boundary"] == "inclusive"
+    assert embargo["timestamp_source"] == "UNAVAILABLE_IN_SOURCE_SCHEMA"
+    audit = list(
+        csv.DictReader(
+            (PACKAGE / "completion_embargo_audit.csv").open(
+                newline="", encoding="utf-8"
+            )
+        )
+    )
+    assert len(audit) == embargo["cutoff_count"]
+    assert (
+        sum(int(item["excluded_near_cutoff_rows"]) > 0 for item in audit)
+        == embargo["cutoffs_with_excluded_rows"]
+    )
+    assert (
+        sum(int(item["excluded_near_cutoff_rows"]) for item in audit)
+        == embargo["sum_cutoff_level_excluded_rows"]
+    )
+    assert all(item["embargo_minutes"] == "180" for item in audit)
+    assert all(item["inclusive_boundary"] == "1" for item in audit)
+    assert all(
+        int(item["cumulative_safe_history_rows"])
+        <= int(item["cumulative_old_kickoff_lt_rows"])
+        for item in audit
+    )
     with gzip.open(
         PACKAGE / "match_probability_freeze.csv.gz", "rt", newline="", encoding="utf-8"
     ) as handle:

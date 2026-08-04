@@ -1,11 +1,23 @@
 {
   "base_main_commit": "210a791b0793e99e72358e02c8484458c900a98b",
+  "completion_embargo": {
+    "audit_file": "completion_embargo_audit.csv",
+    "boundary": "inclusive",
+    "cutoff_count": 189,
+    "cutoffs_with_excluded_rows": 152,
+    "minimum_nearest_excluded_kickoff_gap_minutes": 10.983333333333,
+    "minutes": 180,
+    "rule": "kickoff <= common issue cutoff - 180 minutes",
+    "sum_cutoff_level_excluded_rows": 1252
+  },
   "contract": "BJ-HIST-TEAM-MODEL-N7-001",
   "core": {
     "path": "scripts/bj180_team_matchup_core.py",
     "sha256": "4d65b08609162644394dfe83e632073ad092b9bfd058dc74368b9ceef4908890"
   },
   "database": {
+    "completion_timestamp_field": null,
+    "completion_timestamp_status": "UNAVAILABLE_IN_SOURCE_SCHEMA",
     "history_projection": [
       "match_id",
       "kickoff_ts",
@@ -31,7 +43,7 @@
     ]
   },
   "issue": 180,
-  "outcome_boundary": "Gate A outcome-unexposed: target rows expose no score/result/final-SP/payout/tax/ROI; team state consumes only completed matches with kickoff strictly before the common issue cutoff",
+  "outcome_boundary": "Gate A outcome-unexposed: target rows expose no score/result/final-SP/payout/tax/ROI; because the source has no completion timestamp, historical scores are available only when kickoff <= common issue cutoff minus the fixed 180-minute completion embargo",
   "source_134_gate_a": {
     "access": "candidate role vectors only",
     "content": "3fe014f3decdbd589cdded52d8a9b2bac0f3cb988c2ae8e15cf79314a02eede1",
@@ -45,5 +57,5 @@
     "package": "bj179_gate_a_preoutcome_v2",
     "payload_count": 19
   },
-  "version": "bj180-gate-a-v1"
+  "version": "bj180-gate-a-v2"
 }

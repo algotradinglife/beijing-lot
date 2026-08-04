@@ -93,12 +93,24 @@
     "participating": 189,
     "roles": 2968
   },
-  "chronology": "single sequential state; before each common issue cutoff consume only completed kickoff < cutoff; tie by match_id",
+  "chronology": "single sequential state; source has no completion timestamp, so before each common issue cutoff consume scores only when kickoff <= cutoff - 180 minutes (inclusive); tie by match_id",
   "comparators": [
     "B0_BEST_FULL controlling economic",
     "L0_QUICK_LEAGUE accepted quick comparator",
     "H0_LEAGUE_DIAGNOSTIC probability diagnostic only"
   ],
+  "completion_embargo": {
+    "audit_file": "completion_embargo_audit.csv",
+    "boundary": "inclusive",
+    "cutoff_count": 189,
+    "cutoffs_with_excluded_rows": 152,
+    "fallback": "FIXED_180_MINUTE_EMBARGO",
+    "minimum_nearest_excluded_kickoff_gap_minutes": 10.983333333333,
+    "minutes": 180,
+    "rule": "kickoff <= common issue cutoff - 180 minutes",
+    "sum_cutoff_level_excluded_rows": 1252,
+    "timestamp_source": "UNAVAILABLE_IN_SOURCE_SCHEMA"
+  },
   "contract": "BJ-HIST-TEAM-MODEL-N7-001",
   "denominator": {
     "no_bet_rows": 2226,
@@ -134,10 +146,10 @@
     "tickets": 2187
   },
   "issue": 180,
-  "outcome_boundary": "Gate A outcome-unexposed: target rows expose no score/result/final-SP/payout/tax/ROI; team state consumes only completed matches with kickoff strictly before the common issue cutoff",
+  "outcome_boundary": "Gate A outcome-unexposed: target rows expose no score/result/final-SP/payout/tax/ROI; because the source has no completion timestamp, historical scores are available only when kickoff <= common issue cutoff minus the fixed 180-minute completion embargo",
   "outer_year_evaluation": "target folds OOS_2020..OOS_2025 remain unchanged; hyperparameters fixed across folds; YEAR/FOLD/LOYO and ex-largest are Gate-B requirements",
   "promotion_boundary": "B0 remains controlling; H_MINUS_RAW_HDA diagnostic only; no selector threshold/M/allocation/pruning/ticket change",
   "settlement": "not read or produced in Gate A; Gate B requires PI authorization",
   "stage": "GATE_A_OUTCOME_UNEXPOSED_TEAM_MATCHUP_FREEZE",
-  "version": "bj180-gate-a-v1"
+  "version": "bj180-gate-a-v2"
 }

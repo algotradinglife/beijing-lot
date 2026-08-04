@@ -1,0 +1,21 @@
+{
+  "CONTENT_IDENTITY.json": "6a0abe9cb36198dae11a5da06679d22b786cdf49f3619e6e34d7782f29915288",
+  "README.md": "88577fbc17036cc36e1f35d7a43d59bf9ee45de99ff57fd61cecf1c20be09ecd",
+  "arm_registry.csv": "43245208e33868501017dcf6db5f54881d3eb9525d65a429c2f6640264509175",
+  "baseline_reproduction.csv": "4adca754fdae56193b7052639586303d7abd6d60603e397ae1e633e0495120b7",
+  "bj180_team_matchup_core.py": "4d65b08609162644394dfe83e632073ad092b9bfd058dc74368b9ceef4908890",
+  "candidate_universe_scores.csv.gz": "73c99bdd812656a63563566f53c238d916e9221a9f43b7e22ee6f05ede894a10",
+  "completion_embargo_audit.csv": "1692f39aa0460b02ebf1f8615f53c9a294e46b64fd2aec39f6b20b22936438fa",
+  "configuration_registry.csv": "bb02b681371ccf6de1c91b6af4027dd8422e2ae605a74c5fb5a2f877b36e8d9a",
+  "feature_coverage.csv": "c9d2b5ff958528f96f45f1e5d12f631f8438f9cfd725a14a4d1d1cf34e77b891",
+  "feature_manifest.csv": "482ccb127dffcfe73d0cc3d3cb972e78ee47ac873a7645ca98170081bf0aa6df",
+  "freeze_runner.py": "f715dfb3ea976cc311fea6aacf79c648fce0209d79b071cd9233e769978994fc",
+  "gate_a_card.json": "e56ff70ea00ea318506b6146d0224f491a4032ef96b8b6c727f073a656ca29b9",
+  "identity_overlap.csv": "473e648b669ae9de051189a7d069bc08b2e007d3e900aa7c734b1998eab0a817",
+  "issue_cutoff_registry.csv": "e8521e306af6df476abff497d2cc71d28d11202fffc46c4a7c3df6e675143e9f",
+  "match_probability_freeze.csv.gz": "b7f3341c704140cb1565d115e9e35186d644ecc5f8d8e240f41144b8f6eef39d",
+  "outer_year_registry.csv": "7822f94feb75c1a94af390526d8f7f84d226e7ff6fdf64dfd9a64a287723fa0f",
+  "selection_freeze.csv": "8cd4dfd3ba3e85456855ba4d818a8f8c0e7a65fb3c3e09805cd3ef79fa94d31f",
+  "source_binding.json": "8d0832d5e92f391d1f6246155eb4f4eb634d8f556fe1f5611b25a993f0f707c7",
+  "team_state_registry.csv": "fd13dea9e684cfe40bcec514dc863042eef3b52e1d29db8c5f2cfb08edfbfa38"
+}
