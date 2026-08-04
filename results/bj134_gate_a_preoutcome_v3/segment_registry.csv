@@ -1,0 +1,5 @@
+segment,definition,issue_count,controlling,outcome_boundary
+ALL_189,all matched participating issues,189,1,Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking
+CHOICE_113,issues with 2-7 frozen candidates,113,1,Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking
+INVARIANT_76,issues with one frozen candidate,76,0,Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking
+LOYO,leave one target year out; preserve complete issues,189,0,Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking

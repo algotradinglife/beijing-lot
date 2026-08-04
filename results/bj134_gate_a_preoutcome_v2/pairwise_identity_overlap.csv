@@ -1,0 +1,7 @@
+left_arm,right_arm,comparable_issue_count,same_identity_issue_count,different_identity_issue_count,identity_overlap_rate,comparison_unit,outcome_boundary
+MARKET_BEST_FULL,FUNDAMENTALS_ONLY,189,117,72,0.619047619048,complete issue; one K1 FULL identity per arm,Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted
+MARKET_BEST_FULL,DECISION_CHAIN_ONLY,189,110,79,0.582010582011,complete issue; one K1 FULL identity per arm,Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted
+MARKET_BEST_FULL,FUNDAMENTALS_PLUS_DECISION,189,168,21,0.888888888889,complete issue; one K1 FULL identity per arm,Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted
+FUNDAMENTALS_ONLY,DECISION_CHAIN_ONLY,189,116,73,0.613756613757,complete issue; one K1 FULL identity per arm,Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted
+FUNDAMENTALS_ONLY,FUNDAMENTALS_PLUS_DECISION,189,132,57,0.698412698413,complete issue; one K1 FULL identity per arm,Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted
+DECISION_CHAIN_ONLY,FUNDAMENTALS_PLUS_DECISION,189,120,69,0.634920634921,complete issue; one K1 FULL identity per arm,Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted
