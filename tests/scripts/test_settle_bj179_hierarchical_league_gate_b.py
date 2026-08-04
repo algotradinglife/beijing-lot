@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "settle_bj179_hierarchical_league_gate_b.py"
 SPEC = importlib.util.spec_from_file_location("bj179_gate_b", SCRIPT)
@@ -61,9 +60,7 @@ def test_frozen_contract_and_source_hashes_are_exact() -> None:
 def test_full_ticket_tax_is_per_ticket_at_boundary() -> None:
     factor = (10_000.0 / (RUNNER.STAKE_PER_TICKET * RUNNER.PAYOUT_FACTOR)) ** (1 / 7)
     below = RUNNER.full_ticket_settlement([factor * (1 - 1e-8)] + [factor] * 6, True)
-    boundary = RUNNER.full_ticket_settlement(
-        [factor * (1 + 1e-8)] + [factor] * 6, True
-    )
+    boundary = RUNNER.full_ticket_settlement([factor * (1 + 1e-8)] + [factor] * 6, True)
     missing = RUNNER.full_ticket_settlement([], False)
     assert float(below["gross_pre_tax_yuan"]) < 10_000.0
     assert below["tax_yuan"] == 0.0
@@ -164,7 +161,9 @@ def test_parameter_frontier_preserves_all_frozen_arms() -> None:
     frontier = RUNNER.complete_parameter_frontier(probability_summary)
     assert len(frontier) == len(RUNNER.ARMS)
     assert {row["arm"] for row in frontier} == set(RUNNER.ARMS)
-    assert all(row["selection_authority"] == "NONE_FROZEN_FRONTIER_ONLY" for row in frontier)
+    assert all(
+        row["selection_authority"] == "NONE_FROZEN_FRONTIER_ONLY" for row in frontier
+    )
 
 
 def test_b0_and_q1_selection_bridges_match_accepted_134_controls() -> None:
@@ -199,11 +198,19 @@ def test_bootstrap_is_paired_and_deterministic(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(RUNNER, "BOOTSTRAP_REPLICATES", 200)
-    first, first_meta = RUNNER.build_draw_matrix(tmp_path / "a.gz", 3, 0)
-    second, second_meta = RUNNER.build_draw_matrix(tmp_path / "b.gz", 3, 0)
+    first, first_meta = RUNNER.build_draw_matrix(3, 0)
+    second, second_meta = RUNNER.build_draw_matrix(3, 0)
     assert isinstance(first, array.array)
     assert first == second
     assert first_meta["sha256"] == second_meta["sha256"]
+    assert first_meta["seed_offset"] == 0
+    assert first_meta["seed"] == RUNNER.BOOTSTRAP_SEED
+    assert first_meta["issue_count"] == 3
+    assert first_meta["replicates"] == 200
+    assert (
+        first_meta["persistence"] == "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED"
+    )
+    assert not list(tmp_path.iterdir())
     candidate = [
         {
             "pre_tax_net_yuan": str(x),
@@ -330,5 +337,6 @@ def test_committed_package_is_complete_if_present() -> None:
         if path.is_file() and path.name != "SHA256SUMS.json"
     )
     assert sorted(manifest) == actual
+    assert not any(name.startswith("bootstrap_draws_") for name in manifest)
     for name, digest in manifest.items():
         assert RUNNER.sha256_file(package / name) == digest

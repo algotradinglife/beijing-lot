@@ -24,10 +24,9 @@ import shutil
 import statistics
 import tempfile
 from collections import defaultdict
+from collections.abc import Iterable, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Sequence
-
 
 CONTRACT = "BJ-HIST-LEAGUE-MODEL-N7-001"
 VERSION = "bj179-gate-b-v1"
@@ -197,16 +196,18 @@ def write_csv(
 def write_gzip(
     path: Path, fields: Sequence[str], rows: Iterable[dict[str, object]]
 ) -> None:
-    with path.open("wb") as raw:
-        with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as zipped:
-            text = io.TextIOWrapper(zipped, encoding="utf-8", newline="")
-            writer = csv.DictWriter(
-                text, fieldnames=fields, lineterminator="\n", extrasaction="raise"
-            )
-            writer.writeheader()
-            writer.writerows(rows)
-            text.flush()
-            text.detach()
+    with (
+        path.open("wb") as raw,
+        gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as zipped,
+    ):
+        text = io.TextIOWrapper(zipped, encoding="utf-8", newline="")
+        writer = csv.DictWriter(
+            text, fieldnames=fields, lineterminator="\n", extrasaction="raise"
+        )
+        writer.writeheader()
+        writer.writerows(rows)
+        text.flush()
+        text.detach()
 
 
 def fmt_money(value: float) -> str:
@@ -250,7 +251,9 @@ def load_inputs() -> tuple[
     if outcome_manifest.get("canonical_outcome_join.csv") != EXPECTED_OUTCOME_PAYLOAD:
         raise RuntimeError("canonical outcome payload drift")
     selections = read_csv(GATE_A / "selection_freeze.csv")
-    active = [row for row in selections if row["policy_status"] == "SELECTED_PREOUTCOME"]
+    active = [
+        row for row in selections if row["policy_status"] == "SELECTED_PREOUTCOME"
+    ]
     if len(selections) != 348 * len(ARMS) or len(active) != 189 * len(ARMS):
         raise RuntimeError("Gate-A selection denominator drift")
     if tuple(dict.fromkeys(row["arm"] for row in active)) != ARMS:
@@ -268,7 +271,10 @@ def load_inputs() -> tuple[
         (row["issue_instance"], row["portfolio_id"]): row for row in candidates
     }
     probabilities = read_gzip(GATE_A / "match_probability_freeze.csv.gz")
-    if len(probabilities) != 1558 or len({row["match_id"] for row in probabilities}) != 1558:
+    if (
+        len(probabilities) != 1558
+        or len({row["match_id"] for row in probabilities}) != 1558
+    ):
         raise RuntimeError("probability frontier denominator drift")
     if any(
         abs(sum(float(row[f"{vector}_p{code}"]) for code in ("3", "1", "0")) - 1)
@@ -330,7 +336,9 @@ def probability_rows(
         truth = outcome["result_code"] if outcome else ""
         for arm in ARMS:
             vector = ARM_VECTOR_FIELDS[arm]
-            probs = {code: float(source[f"{vector}_p{code}"]) for code in ("3", "1", "0")}
+            probs = {
+                code: float(source[f"{vector}_p{code}"]) for code in ("3", "1", "0")
+            }
             available = truth in probs
             log_loss = -math.log(max(1e-15, probs[truth])) if available else None
             brier = (
@@ -350,15 +358,21 @@ def probability_rows(
                     "arm": arm,
                     "arm_label": ARM_LABELS[arm],
                     "vector_name": vector,
-                    "outcome_status": "SETTLED" if available else "MISSING_CANONICAL_OUTCOME",
+                    "outcome_status": "SETTLED"
+                    if available
+                    else "MISSING_CANONICAL_OUTCOME",
                     "result_code": truth,
                     "p3": fmt_ratio(probs["3"]),
                     "p1": fmt_ratio(probs["1"]),
                     "p0": fmt_ratio(probs["0"]),
                     "log_loss": fmt_ratio(log_loss),
                     "brier": fmt_ratio(brier),
-                    "target_euro_source_complete": source["target_euro_source_complete"],
-                    "target_asian_source_complete": source["target_asian_source_complete"],
+                    "target_euro_source_complete": source[
+                        "target_euro_source_complete"
+                    ],
+                    "target_asian_source_complete": source[
+                        "target_asian_source_complete"
+                    ],
                     "target_beijing_pred_sp_source_complete": source[
                         "target_beijing_pred_sp_source_complete"
                     ],
@@ -389,7 +403,9 @@ def reliability_rows(
                     else None
                 )
                 observed = (
-                    statistics.fmean(float(row["result_code"] == code) for row in selected)
+                    statistics.fmean(
+                        float(row["result_code"] == code) for row in selected
+                    )
                     if selected
                     else None
                 )
@@ -424,9 +440,7 @@ def probability_frontier(
         denominator = sum(int(row["support"]) for row in bins)
         ece_by_arm[arm] = (
             sum(
-                int(row["support"])
-                * abs(float(row["calibration_gap"]))
-                for row in bins
+                int(row["support"]) * abs(float(row["calibration_gap"])) for row in bins
             )
             / denominator
         )
@@ -496,9 +510,7 @@ def complete_parameter_frontier(
         for row in summary
         if row["view"] == "ALL" and row["value"] == "ALL"
     }
-    frozen = {
-        row["arm"]: row for row in read_csv(GATE_A / "parameter_frontier.csv")
-    }
+    frozen = {row["arm"]: row for row in read_csv(GATE_A / "parameter_frontier.csv")}
     output = []
     for arm in ARMS:
         row = frozen.get(arm, {})
@@ -510,14 +522,8 @@ def complete_parameter_frontier(
                 "configuration": row.get("configuration", "BASELINE"),
                 "excluded_family": row.get("excluded_family", ""),
                 "shrinkage_multiplier": row.get("shrinkage_multiplier", ""),
-                "residual_scale_multiplier": row.get(
-                    "residual_scale_multiplier", ""
-                ),
-                **{
-                    key: row.get(key, "")
-                    for key in row
-                    if key.startswith("weight_")
-                },
+                "residual_scale_multiplier": row.get("residual_scale_multiplier", ""),
+                **{key: row.get(key, "") for key in row if key.startswith("weight_")},
                 "settled_match_count": metric[arm]["settled_match_count"],
                 "multiclass_log_loss": metric[arm]["multiclass_log_loss"],
                 "multiclass_brier": metric[arm]["multiclass_brier"],
@@ -591,9 +597,7 @@ def settle_rows(
                 "pre_tax_net_yuan": fmt_money(gross - stake),
                 "tax_adjusted_net_yuan": fmt_money(gross - tax - stake),
                 "hit_ticket_count": int(economics["hit_ticket_count"]),
-                "gm_expected_sp": candidate[
-                    ARM_SCORE_FIELDS[selection["arm"]]
-                ],
+                "gm_expected_sp": candidate[ARM_SCORE_FIELDS[selection["arm"]]],
                 "realized_winning_ticket_payout_yuan": fmt_money(gross),
             }
         )
@@ -635,21 +639,23 @@ def quantile(values: Sequence[float], q: float) -> float:
 
 
 def build_draw_matrix(
-    path: Path, issue_count: int, seed_offset: int
+    issue_count: int, seed_offset: int
 ) -> tuple[array.array, dict[str, object]]:
     rng = random.Random(BOOTSTRAP_SEED + seed_offset)
     draws = array.array(
         "H",
         (rng.randrange(issue_count) for _ in range(BOOTSTRAP_REPLICATES * issue_count)),
     )
-    with path.open("wb") as raw:
-        with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as zipped:
-            zipped.write(draws.tobytes())
+    payload = io.BytesIO()
+    with gzip.GzipFile(filename="", mode="wb", fileobj=payload, mtime=0) as zipped:
+        zipped.write(draws.tobytes())
     return draws, {
         "replicates": BOOTSTRAP_REPLICATES,
         "issue_count": issue_count,
+        "seed_offset": seed_offset,
         "seed": BOOTSTRAP_SEED + seed_offset,
-        "sha256": sha256_file(path),
+        "sha256": hashlib.sha256(payload.getvalue()).hexdigest(),
+        "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
     }
 
 
@@ -697,7 +703,7 @@ def choose_segment(
 
 
 def primary_tables(
-    rows: Sequence[dict[str, object]], stage: Path
+    rows: Sequence[dict[str, object]],
 ) -> tuple[list[dict[str, object]], list[dict[str, object]], dict[str, object]]:
     by_arm = {arm: [row for row in rows if row["arm"] == arm] for arm in ARMS}
     summaries: list[dict[str, object]] = []
@@ -839,18 +845,11 @@ def primary_tables(
                     ),
                 }
             )
-            draw_path = (
-                stage / f"bootstrap_draws_{segment.lower()}_{arm.lower()}.u16.gz"
-            )
             draws, meta = build_draw_matrix(
-                draw_path, len(paired), segment_index * 100 + ARMS.index(arm)
+                len(paired), segment_index * 100 + ARMS.index(arm)
             )
             result = bootstrap_pair(paired, base_paired, draws)
-            q1_draw_path = stage / (
-                f"bootstrap_draws_q1_{segment.lower()}_{arm.lower()}.u16.gz"
-            )
             q1_draws, q1_meta = build_draw_matrix(
-                q1_draw_path,
                 len(paired_q1),
                 10_000 + segment_index * 100 + ARMS.index(arm),
             )
@@ -912,13 +911,12 @@ def identity_attribution(rows: Sequence[dict[str, object]]) -> list[dict[str, ob
                     )
                     lift += delta
                     counts[
-                        "WIN"
-                        if delta > 1e-9
-                        else "LOSS"
-                        if delta < -1e-9
-                        else "TIE"
+                        "WIN" if delta > 1e-9 else "LOSS" if delta < -1e-9 else "TIE"
                     ] += 1
-            if row["selected_identity_fingerprint"] == q1["selected_identity_fingerprint"]:
+            if (
+                row["selected_identity_fingerprint"]
+                == q1["selected_identity_fingerprint"]
+            ):
                 q1_counts["SAME_IDENTITY"] += 1
             else:
                 q1_changed += 1
@@ -1437,7 +1435,9 @@ def build(output: Path = DEFAULT_OUTPUT) -> dict[str, object]:
     output.parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=f".{output.name}.stage.", dir=output.parent))
     try:
-        active, candidates, frozen_probabilities, chronology, source_binding = load_inputs()
+        active, candidates, frozen_probabilities, chronology, source_binding = (
+            load_inputs()
+        )
         outcomes = {row["match_id"]: row for row in read_csv(OUTCOME_PATH)}
 
         # The contract is probability-first: materialize the complete frozen match
@@ -1498,7 +1498,7 @@ def build(output: Path = DEFAULT_OUTPUT) -> dict[str, object]:
             raise RuntimeError(
                 f"Q1 accepted incumbent reproduction drift: settled={len(q1)} stake={q1_totals['stake_yuan']} gross={q1_totals['gross_pre_tax_yuan']} roi={q1_roi}"
             )
-        summary, bootstraps, draw_meta = primary_tables(contributions, stage)
+        summary, bootstraps, draw_meta = primary_tables(contributions)
         attribution = identity_attribution(contributions)
         stability, risk, time_series = stability_and_risk(contributions)
         write_gzip(
@@ -1517,7 +1517,16 @@ def build(output: Path = DEFAULT_OUTPUT) -> dict[str, object]:
             stage / "issue_time_series.csv.gz", list(time_series[0]), time_series
         )
         source_bridge = []
-        for control, expected_settled, expected_stake, expected_gross, expected_roi, actual_rows, actual_totals, actual_roi in (
+        for (
+            control,
+            expected_settled,
+            expected_stake,
+            expected_gross,
+            expected_roi,
+            actual_rows,
+            actual_totals,
+            actual_roi,
+        ) in (
             (
                 "B0_BEST_FULL",
                 EXPECTED_B0_SETTLED,
@@ -1547,9 +1556,7 @@ def build(output: Path = DEFAULT_OUTPUT) -> dict[str, object]:
                     "expected_stake_yuan": fmt_money(expected_stake),
                     "actual_stake_yuan": fmt_money(actual_totals["stake_yuan"]),
                     "expected_gross_yuan": fmt_money(expected_gross),
-                    "actual_gross_yuan": fmt_money(
-                        actual_totals["gross_pre_tax_yuan"]
-                    ),
+                    "actual_gross_yuan": fmt_money(actual_totals["gross_pre_tax_yuan"]),
                     "expected_no_tax_roi": fmt_ratio(expected_roi),
                     "actual_no_tax_roi": fmt_ratio(actual_roi),
                     "reconciliation_status": "PASS",

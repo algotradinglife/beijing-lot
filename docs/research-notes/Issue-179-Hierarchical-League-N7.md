@@ -67,9 +67,11 @@ season-by-source interaction。Gate B 没有根据目标 outcomes 调 selector�
 - Gate A manifest：`5839f5c03c94ef903472b64fffa3ad1462ec006717875d0a3903ecdfdc2aa056`
 - Gate A content identity：`2e8314f00b8774501ecf0ed2cb6ede73a9e7a60c7422dd5dc0d464e1470b740b`
 - canonical outcome manifest：`fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc`
-- Gate B manifest：`f802629bc0f174d0c9bfe388ddde86056d3be272a3abc0016508caddd1667811`
-- Gate B content identity：`5d00a3fbb7ee474951271e1a6f1ab7e06a67745588539400ab9a17594d171946`
-- 109/109 manifest payload hashes 复算通过；概率 ledger 21,812 行、经济 ledger 2,646
+- Gate B manifest：`7005e78ae132bea4231ba245cb23d5480a387215c441d237299668c36d305a30`
+- Gate B content identity：`23bf54cc47f036bae11a1bbbcade49fdd34b32ca42cbce5aa15c52d51c21297a`
+- 25/25 manifest payload hashes 复算通过；84 个确定性 bootstrap draw matrices 不作为
+  durable payload，seed/offset/issue-count/replicate/hash 元数据保存在 settlement card；概率
+  ledger 21,812 行、经济 ledger 2,646
   行、概率 frontier 126 行、可靠性 bins 420 行、经济主表 42 行、稳健性 756 行。
 - B0 桥接为 163 期、stake `¥712,962`、gross `¥645,459.393811`（与接受值的逐行
   序列化差 `¥0.000002`）、税前 ROI `-9.4679107988%`；Q1 桥接为 159 期、stake
