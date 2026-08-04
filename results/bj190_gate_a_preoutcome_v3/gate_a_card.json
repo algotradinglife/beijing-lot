@@ -1,0 +1,86 @@
+{
+  "accounting": {
+    "all_selected_arms_stake_yuan": 4374,
+    "all_selected_arms_ticket_count": 2187,
+    "directional_max_multiplicity": 2,
+    "directional_repeated_ticket_count": 729,
+    "directional_unique_ticket_count": 1458,
+    "no_bet_stake_yuan": 0,
+    "no_bet_ticket_count": 0,
+    "pre_tax_primary": true,
+    "tax_reference_only": true
+  },
+  "arms": [
+    "B0_BEST_FULL",
+    "D_MATCH_ONLY_FULL",
+    "D_DIRECTION_ONLY",
+    "D_JOINT_SPARSE"
+  ],
+  "chronological_market_model": {
+    "binding_file": "market_model_training_freeze.csv",
+    "snapshot_count": 344,
+    "target_issue_overlap_zero": true,
+    "training_rule": "kickoff <= feature cutoff - 180 minutes (inclusive)"
+  },
+  "cohort": {
+    "canonical_numeric_issue_count": 344,
+    "eligible_match_count": 101970,
+    "excluded_missing_native_line_match_count": 252,
+    "source_b0_no_bet_issue_count": 155,
+    "source_b0_participating_issue_count": 189,
+    "source_issue_instance_count": 348
+  },
+  "contract": "BJ-HIST-SPARSE-DIVERGENCE-N7-001",
+  "detector_grid": {
+    "available_policy_count": 2364,
+    "maximum_selected_issue_count": 344,
+    "minimum_selected_issue_count": 0,
+    "policy_count": 2424,
+    "policy_issue_selection_row_count": 833856,
+    "unavailable_delta_mu_policy_count": 60,
+    "zero_candidate_policy_count": 480
+  },
+  "expected_margin_resolution": {
+    "consensus_margin_status": "UNAVAILABLE_NON_IDENTIFIABLE",
+    "controlling_probability_and_margin_identity": "ONE_T1_GROUP_MASS_RECONCILED_SCORE_DIFFERENCE_DISTRIBUTION",
+    "delta_mu_status": "DIAGNOSTIC_UNAVAILABLE_ALL_MATCHES",
+    "delta_p_status": "CONTROLLING",
+    "fundamental_source": "#180 T1_DEEP_TEAM / TEAM_PRIMARY pure-team branch",
+    "line_residual_definition": "same-distribution expected raw margin + native handicap",
+    "line_residual_mu_status": "CONTROLLING_SEPARATE_AXIS",
+    "max_abs_probability_reconciliation_error": "0.000000000001",
+    "weighted_component_lambda_proxy_status": "DIAGNOSTIC_DOES_NOT_CONTROL_DIRECTION",
+    "weighted_proxy_sign_disagreement_count": 1591
+  },
+  "gate_b_authorized": false,
+  "issue": 190,
+  "native_line_coverage": {
+    "+1": 9357,
+    "+2": 1467,
+    "-1": 24561,
+    "-2": 4877,
+    "0": 61275,
+    "OTHER": 433
+  },
+  "outcome_access": false,
+  "outcome_boundary": "Gate A outcome-unexposed: target score/result/final-or-winning SP/payout/tax/ROI/settlement fields are forbidden; historical scores enter the accepted #180 state only under its frozen kickoff <= issue cutoff - 180 minute embargo",
+  "production_authority": false,
+  "stage": "GATE_A_OUTCOME_UNEXPOSED",
+  "status": "READY_FOR_PI_REVIEW_NO_GATE_B_AUTHORITY",
+  "ticket_identity_freeze": {
+    "allocation_input_count": 4338,
+    "arm_ledger_row_count_each": 833856,
+    "full_vector_sha256": "ea173936f013beddef4c63c889e3f5a1fd9a54fb55a5efa4543daa7630b62f2b",
+    "identity_count": 3179,
+    "multiplicity_vector_count": 3560,
+    "selection_row_count": 833856,
+    "selection_shard_count": 4,
+    "selection_shard_row_counts": [
+      208464,
+      208464,
+      208464,
+      208464
+    ]
+  },
+  "version": "bj190-gate-a-preoutcome-v3"
+}
