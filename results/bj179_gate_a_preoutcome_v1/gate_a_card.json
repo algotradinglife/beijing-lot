@@ -1,0 +1,111 @@
+{
+  "arms": [
+    {
+      "arm": "B0_BEST_FULL",
+      "definition": "accepted BEST_FULL rank-one identity",
+      "role": "BASELINE",
+      "score": "market_gm_e_sp"
+    },
+    {
+      "arm": "Q1_QUICK_LEAGUE",
+      "definition": "accepted #134 quick league component",
+      "role": "BASELINE",
+      "score": "quick_league_gm_e_sp"
+    },
+    {
+      "arm": "H1_DEEP_ALL",
+      "definition": "fixed four-family hierarchical league model",
+      "role": "PRIMARY",
+      "score": "deep_all_gm_e_sp"
+    },
+    {
+      "arm": "H_MINUS_BASE",
+      "definition": "deep model without BASE_SEASON",
+      "role": "ABLATION",
+      "score": "deep_minus_base_gm_e_sp"
+    },
+    {
+      "arm": "H_MINUS_GOAL",
+      "definition": "deep model without GOAL_HANDICAP",
+      "role": "ABLATION",
+      "score": "deep_minus_goal_gm_e_sp"
+    },
+    {
+      "arm": "H_MINUS_PRICING",
+      "definition": "deep model without PRICING_CALIBRATION",
+      "role": "ABLATION",
+      "score": "deep_minus_pricing_gm_e_sp"
+    },
+    {
+      "arm": "H_MINUS_LIQUIDITY",
+      "definition": "deep model without LIQUIDITY_DRIFT",
+      "role": "ABLATION",
+      "score": "deep_minus_liquidity_gm_e_sp"
+    }
+  ],
+  "baseline_reproduction": [
+    {
+      "identity_set_sha256": "cc50e351dfb6aeea0f72cfefa29b3356e38cfcfea76bc54d284fa1a0457523c3",
+      "outcome_boundary": "Gate A outcome-unexposed: target match result/final-SP/payout/tax/ROI/settlement fields are never read by target probability construction or identity ranking",
+      "reproduction_status": "PASS",
+      "selected_identity_count": 189,
+      "source_arm": "B0_BEST_FULL",
+      "target_arm": "B0_BEST_FULL"
+    },
+    {
+      "identity_set_sha256": "0e296d3e8c445b0a3017eddc2c59a874d9a57570292d0554a2679d1d257612bb",
+      "outcome_boundary": "Gate A outcome-unexposed: target match result/final-SP/payout/tax/ROI/settlement fields are never read by target probability construction or identity ranking",
+      "reproduction_status": "PASS",
+      "selected_identity_count": 189,
+      "source_arm": "L1_LEAGUE_CORE",
+      "target_arm": "Q1_QUICK_LEAGUE"
+    }
+  ],
+  "candidate_universe": {
+    "choice": 113,
+    "identities": 424,
+    "invariant": 76,
+    "issue_census": 348,
+    "matches": 1558,
+    "no_bet": 159,
+    "participating": 189,
+    "roles": 2968
+  },
+  "contract": "BJ-HIST-LEAGUE-MODEL-N7-001",
+  "denominator": {
+    "no_bet_rows": 1113,
+    "planned_stake_per_arm_yuan": 826686,
+    "selected_by_arm": {
+      "B0_BEST_FULL": 189,
+      "H1_DEEP_ALL": 189,
+      "H_MINUS_BASE": 189,
+      "H_MINUS_GOAL": 189,
+      "H_MINUS_LIQUIDITY": 189,
+      "H_MINUS_PRICING": 189,
+      "Q1_QUICK_LEAGUE": 189
+    },
+    "selected_rows": 1323,
+    "selection_rows": 2436
+  },
+  "economics_second_gate_b": [
+    "matched FULL N7 pre-tax ROI/lift",
+    "tax sensitivity",
+    "LOYO",
+    "ex-largest",
+    "risk diagnostics"
+  ],
+  "gate_b_status": "NOT_AUTHORIZED_PENDING_PI_GATE_A_REVIEW",
+  "issue": 179,
+  "outcome_boundary": "Gate A outcome-unexposed: target match result/final-SP/payout/tax/ROI/settlement fields are never read by target probability construction or identity ranking",
+  "outer_year": "training kickoff year strictly less than target year; no same-year target outcome/history enters probability fit",
+  "probability_first_gate_b": [
+    "multiclass log loss",
+    "multiclass Brier",
+    "calibration by probability bin",
+    "support/unknown league"
+  ],
+  "promotion_boundary": "paper research; positive claim requires strict independent EV; negative deep model cannot demote inherited B0",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_HIERARCHICAL_LEAGUE_FREEZE",
+  "thresholds": "descriptive raw cross-issue Q00/Q25/Q50/Q75 only; no participation/filter/selector retuning",
+  "version": "bj179-gate-a-v1"
+}

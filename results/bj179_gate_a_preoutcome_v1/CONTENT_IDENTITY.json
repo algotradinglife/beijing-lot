@@ -1,0 +1,52 @@
+{
+  "contract_version": "bj179-gate-a-v1",
+  "controls": {
+    "all_arm_identity_sha256": "c97813b665cd966efcb7d377357c332bcad324393687c4462850af45131306d4",
+    "base_main_commit": "9ec5cf4856f546861e20fad76d110807576903c7",
+    "baseline_identity_sha256": "cc50e351dfb6aeea0f72cfefa29b3356e38cfcfea76bc54d284fa1a0457523c3",
+    "database_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "family_weights": {
+      "BASE_SEASON": 0.25,
+      "GOAL_HANDICAP": 0.2,
+      "LIQUIDITY_DRIFT": 0.2,
+      "PRICING_CALIBRATION": 0.35
+    },
+    "outer_year_parameter_sha256": "a0c6764c689882d33a0b0f7944f1848a24599074cc18a7e05d04c592404f36d5",
+    "quick_identity_sha256": "0e296d3e8c445b0a3017eddc2c59a874d9a57570292d0554a2679d1d257612bb",
+    "source_134_manifest": "0a7e4d673e7fc5fd4832c91e3b519afe5a2bc3211b99f4c95f57c691921b65fd"
+  },
+  "denominator": {
+    "no_bet_rows": 1113,
+    "planned_stake_per_arm_yuan": 826686,
+    "selected_by_arm": {
+      "B0_BEST_FULL": 189,
+      "H1_DEEP_ALL": 189,
+      "H_MINUS_BASE": 189,
+      "H_MINUS_GOAL": 189,
+      "H_MINUS_LIQUIDITY": 189,
+      "H_MINUS_PRICING": 189,
+      "Q1_QUICK_LEAGUE": 189
+    },
+    "selected_rows": 1323,
+    "selection_rows": 2436
+  },
+  "payloads": {
+    "README.md": "e14e09c6d13dfc32d2d07e3ed218933b2fc61a26b288070775c94a6284c78b87",
+    "arm_registry.csv": "448bfd1aa7e54dd613770775becb29cca61c886622e84a577c49638214bd9c90",
+    "baseline_reproduction.csv": "1298939f813cc93b757acd7d92a69fdf57e318ed192104b03dcc64aae2beef13",
+    "bj179_hierarchical_league_core.py": "c30d8ea82fd90e17dcb9e4153f9fc257a418e8e69881764104896a09dfacd5ee",
+    "candidate_universe_scores.csv.gz": "7cd80c781bab58609b362e9c47f5f3ba075b27b3aeddf497b5a67ecf5bc03afe",
+    "feature_manifest.csv": "5156b635c930940b77a2b1a91d2ff5ea629f2398f738f31acf613628a4ea1e0f",
+    "freeze_runner.py": "1989e48b78e3cd6a07a1f2b282d00bfe658490dc002eb58b0a6a4c70e3ed22a8",
+    "gate_a_card.json": "9db71071c309881451dfc3ab2469a0775d07681534e2ddd9e18f8899de51632f",
+    "identity_overlap.csv": "18b122ddcb2c047e9649ac7ac7c428aa989f0e01cc040bc34709231b86bc9e2e",
+    "match_probability_freeze.csv.gz": "9b5a5a60ed9eeca06f99c8476af3805481cb11da51ef77ea320f4514348d0c72",
+    "missingness_registry.csv": "6021a822a2b0480b892eaa7d596981f98cf1fa49cd95fefdbc71804343c0b086",
+    "outer_year_parameter_freeze.json.gz": "537873a0fd35eb165bf7fcf34b8b5728cd64bcab85dac7fd83a180f6664ad8db",
+    "outer_year_training_registry.csv": "081b6c629d6ff125f2acfbb0428859954a4e704bd5ffbaebb4cb0103979882ee",
+    "selection_freeze.csv": "9a13ad26588851532d0d263f0bc705bc64c7ee5691832c30731e3d59e9a3443c",
+    "source_binding.json": "9966595175c48c9d2d725e36a8f4e43a330a1b9aeabe3e96b878b13aab9c584f",
+    "source_census.csv": "a3956916fb226a8c6c4b2eecdf1b5c382f19277bb537d585850d0dca6ad052d3",
+    "threshold_registry.csv": "23a1a0785f5c40c629f1aec81003298dd5b7c921222d4bbf0bc27bf9031b8136"
+  }
+}

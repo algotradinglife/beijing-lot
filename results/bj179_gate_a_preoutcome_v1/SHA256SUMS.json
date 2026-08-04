@@ -1,0 +1,20 @@
+{
+  "CONTENT_IDENTITY.json": "325b2c184bc24edf4bd89fb3915c99c7ec8533d6d6d0afc5820d0fddfa068a75",
+  "README.md": "e14e09c6d13dfc32d2d07e3ed218933b2fc61a26b288070775c94a6284c78b87",
+  "arm_registry.csv": "448bfd1aa7e54dd613770775becb29cca61c886622e84a577c49638214bd9c90",
+  "baseline_reproduction.csv": "1298939f813cc93b757acd7d92a69fdf57e318ed192104b03dcc64aae2beef13",
+  "bj179_hierarchical_league_core.py": "c30d8ea82fd90e17dcb9e4153f9fc257a418e8e69881764104896a09dfacd5ee",
+  "candidate_universe_scores.csv.gz": "7cd80c781bab58609b362e9c47f5f3ba075b27b3aeddf497b5a67ecf5bc03afe",
+  "feature_manifest.csv": "5156b635c930940b77a2b1a91d2ff5ea629f2398f738f31acf613628a4ea1e0f",
+  "freeze_runner.py": "1989e48b78e3cd6a07a1f2b282d00bfe658490dc002eb58b0a6a4c70e3ed22a8",
+  "gate_a_card.json": "9db71071c309881451dfc3ab2469a0775d07681534e2ddd9e18f8899de51632f",
+  "identity_overlap.csv": "18b122ddcb2c047e9649ac7ac7c428aa989f0e01cc040bc34709231b86bc9e2e",
+  "match_probability_freeze.csv.gz": "9b5a5a60ed9eeca06f99c8476af3805481cb11da51ef77ea320f4514348d0c72",
+  "missingness_registry.csv": "6021a822a2b0480b892eaa7d596981f98cf1fa49cd95fefdbc71804343c0b086",
+  "outer_year_parameter_freeze.json.gz": "537873a0fd35eb165bf7fcf34b8b5728cd64bcab85dac7fd83a180f6664ad8db",
+  "outer_year_training_registry.csv": "081b6c629d6ff125f2acfbb0428859954a4e704bd5ffbaebb4cb0103979882ee",
+  "selection_freeze.csv": "9a13ad26588851532d0d263f0bc705bc64c7ee5691832c30731e3d59e9a3443c",
+  "source_binding.json": "9966595175c48c9d2d725e36a8f4e43a330a1b9aeabe3e96b878b13aab9c584f",
+  "source_census.csv": "a3956916fb226a8c6c4b2eecdf1b5c382f19277bb537d585850d0dca6ad052d3",
+  "threshold_registry.csv": "23a1a0785f5c40c629f1aec81003298dd5b7c921222d4bbf0bc27bf9031b8136"
+}
