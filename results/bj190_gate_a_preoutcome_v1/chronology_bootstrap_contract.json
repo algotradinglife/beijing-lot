@@ -1,0 +1,43 @@
+{
+  "bootstrap": {
+    "draws": 20000,
+    "master_draw_matrix_sha256": "87f975f6b9b98517e18bfb941c29a13c67e44ea913bebc4d96da0e104360c5c1",
+    "master_issue_count": 348,
+    "method": "paired issue-level nonparametric resample on each pairwise-common support",
+    "rng": "Python random.Random MT19937",
+    "seed": 190001,
+    "support_mapping": "for support size n, map each common uint64 u to floor(u*n/2^64); same u matrix for every target and both candidate/matched B0"
+  },
+  "chronology": {
+    "folds": [
+      "OOS_2019",
+      "OOS_2020",
+      "OOS_2021",
+      "OOS_2022",
+      "OOS_2023",
+      "OOS_2024",
+      "OOS_2025"
+    ],
+    "issue_order": "year asc, integer issue asc, issue_instance asc",
+    "loyo": [
+      "EXCLUDE_2019",
+      "EXCLUDE_2020",
+      "EXCLUDE_2021",
+      "EXCLUDE_2022",
+      "EXCLUDE_2023",
+      "EXCLUDE_2024",
+      "EXCLUDE_2025"
+    ],
+    "target_history_boundary": "accepted #180 expanding history with inclusive 180-minute completion embargo"
+  },
+  "outcome_boundary": "Gate A outcome-unexposed: target score/result/final-or-winning SP/payout/tax/ROI/settlement fields are forbidden; historical scores enter the accepted #180 state only under its frozen kickoff <= issue cutoff - 180 minute embargo",
+  "stability": [
+    "YEAR",
+    "FOLD",
+    "LOYO",
+    "EX_LARGEST_ISSUE",
+    "EX_LARGEST_YEAR",
+    "DRAWDOWN",
+    "ISSUE_GROSS_HHI"
+  ]
+}
