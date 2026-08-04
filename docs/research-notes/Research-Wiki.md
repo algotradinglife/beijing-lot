@@ -7,7 +7,7 @@ tags:
   - research
   - moc
 status: active
-updated: 2026-08-04
+updated: 2026-08-05
 ---
 
 # Beijing-lot Research Wiki
@@ -849,6 +849,30 @@ B0 `1.066377` 和 #179 diagnostic `1.064101`；保守 team+league 改善到 `1.0
 计税继续按每张独立 ¥2 票，不跨票或跨期汇总。详细概率、经济、消融、风险、图与
 不可变哈希见
 [`Issue-180-Team-Matchup-N7`](Issue-180-Team-Matchup-N7.md)。
+
+## #190 稀疏独立模型—盘口分歧 N7（2026-08-05）
+
+#190 使用 Gate-A SHA 绑定的 SQLite `match_features` 建立新的 canonical ledger，
+而不是沿用 #95 的 46,802 行旧分母。101,970 个 eligible matches 中有 100,906 个
+trusted settlements；1,064 个 unavailable 保持 0 stake、绝不记作亏损。#95 重叠
+46,802 行全部一致，fully settled N7 identities 为 2,946 / 3,181。
+
+完整 2,424-policy × 四臂 attribution 显示：B0 的 expanded-support 税前 ROI 为
+`-8.52%`；match-only 中位数 `-22.27%`，joint sparse 中位数 `-16.24%`，
+direction-only 中位数 `-1.89%`。475 个描述性正 screen rows 中有 18 个通过内部严格
+稳定性筛选的旧结论已被 #195 独立复验纠正：旧 coverage 错误继承 match-only 支持，
+而这 18 个 direction-only cells 的自身身份都只覆盖盘口 `0`。因此严格候选数为 `0`，
+最终为 `NO_PROMOTION_FROM_GATE_B`；475 行仍作为描述性 line-0 正信号保留。接受的 #95
+共同支持 baseline `-9.47%` 未被替换或降级。
+
+同时保留一层非晋级的 `performance-stable but coverage-limited` 证据：18 个 policy
+aliases 折叠为 10 个不同 issue-economic identities；其中 Z100/K1 的 52/60/75/85 期
+簇共有 12 aliases、6 个经济身份，税前 ROI 为 +8.78% 至 +20.48%，matched lift 为
++21.19pp 至 +28.62pp，但全部只有 1 个 line stratum，因此不改变严格候选数 0。
+
+税仍按每张命中的 ¥2 票分别计算，不做跨票/跨期汇总。完整四臂结果、概率校准、
+20k paired bootstrap、YEAR/FOLD/LOYO、风险集中度、图与不可变哈希见
+[`Issue-190-Sparse-Divergence-N7`](Issue-190-Sparse-Divergence-N7.md)。
 
 ## 相关笔记
 
