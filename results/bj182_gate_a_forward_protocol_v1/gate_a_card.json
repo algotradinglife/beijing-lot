@@ -1,6 +1,8 @@
 {
   "arm_count": 3,
   "contract": "BJ-FWD-MESSAGE-CHAIN-N7-001",
+  "cross_field_validator": "decision_core.validate_decision_trace",
+  "decision_schema_version": "bj182-message-decision-v1",
   "decision_trace_schema": "decision_trace.schema.json",
   "existing_issue_count_excluded": 2,
   "full_stake_yuan": 4374,

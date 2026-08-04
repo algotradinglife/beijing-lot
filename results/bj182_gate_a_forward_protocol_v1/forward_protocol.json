@@ -21,6 +21,7 @@
     "required_identity": [
       "request_id",
       "package_id",
+      "package_created_at_utc",
       "input_as_of_utc",
       "candidate_universe_sha256",
       "candidate_order",
@@ -36,6 +37,8 @@
   "decision_chain": {
     "aggregation": "scan the exact frozen B0 candidate order and select the first fully covered identity without HIGH risk",
     "confidence": "consumer HIGH/MEDIUM/LOW/NOT_ACTIONABLE from active state, contradiction state, producer confidence and provenance eligibility",
+    "cross_field_validator": "decision_core.validate_decision_trace must pass before a decision trace is frozen",
+    "decision_id": "SHA-256 of canonical trace JSON after removing only decision_id",
     "fact_extraction": "strict schema: availability, role_class, severity, direction; immutable fact/raw IDs retained",
     "forbidden": [
       "probability retuning",
@@ -60,6 +63,7 @@
     "direct_sql_access_permitted": false,
     "incomplete_entity_or_collection_action": "ABSTAIN",
     "late_or_stale_action": "ABSTAIN",
+    "latest_receipt_recorded_at_required": true,
     "optional_kinds": [
       "confirmed_lineup",
       "schedule",

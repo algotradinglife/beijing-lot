@@ -1,5 +1,5 @@
 {
-  "availability_checked_at_utc": "2026-08-04T11:18:50Z",
+  "availability_checked_at_utc": "2026-08-04T11:41:30Z",
   "database_mode": "READ_ONLY_WAL_SNAPSHOT",
   "database_path": "data/beidan_live.db",
   "detail": "The accepted #181 ledger contract exists, but no operational message ledger or valid post-activation B0 package exists. Existing issues are excluded; no decision or outcome is fabricated.",

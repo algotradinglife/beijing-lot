@@ -95,7 +95,14 @@ def normalize_timestamp(value: str) -> str:
 
 def write_json(path: Path, value: object) -> None:
     path.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        json.dumps(
+            value,
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+            allow_nan=False,
+        )
+        + "\n",
         encoding="utf-8",
     )
 
@@ -229,7 +236,7 @@ def forward_protocol(minimum_issue_exclusive: int) -> dict[str, object]:
             "source": "externally supplied accepted outcome-unexposed B0 package for the target issue",
             "candidate_order": "frozen B0 score descending, portfolio_id ascending tie break",
             "required_identity": [
-                "request_id", "package_id", "input_as_of_utc",
+                "request_id", "package_id", "package_created_at_utc", "input_as_of_utc",
                 "candidate_universe_sha256", "candidate_order",
                 "selected_portfolio_id", "selected_identity_fingerprint",
                 "selected_match_ids",
@@ -251,6 +258,7 @@ def forward_protocol(minimum_issue_exclusive: int) -> dict[str, object]:
             "late_or_stale_action": "ABSTAIN",
             "incomplete_entity_or_collection_action": "ABSTAIN",
             "direct_sql_access_permitted": False,
+            "latest_receipt_recorded_at_required": True,
         },
         "decision_chain": {
             "fact_extraction": "strict schema: availability, role_class, severity, direction; immutable fact/raw IDs retained",
@@ -258,6 +266,8 @@ def forward_protocol(minimum_issue_exclusive: int) -> dict[str, object]:
             "handicap_translation": "diagnostic direction only; probabilities and handicap line remain unchanged",
             "risk_rule": "HIGH rejects identities containing that match; MEDIUM annotates only; CLEAR keeps B0 order",
             "aggregation": "scan the exact frozen B0 candidate order and select the first fully covered identity without HIGH risk",
+            "cross_field_validator": "decision_core.validate_decision_trace must pass before a decision trace is frozen",
+            "decision_id": "SHA-256 of canonical trace JSON after removing only decision_id",
             "forbidden": [
                 "probability retuning", "selector threshold retuning", "new candidates",
                 "M changes", "allocator changes", "ticket changes", "stake scaling",
@@ -394,6 +404,11 @@ def build(*, output: Path, runtime_db: Path, availability_checked_at_utc: str) -
             ("PRE_PROTOCOL_ISSUE", "ISSUE", "NO_SAMPLE"),
             ("CUTOFF_NOT_BEFORE_KICKOFF", "MATCH", "ABSTAIN"),
             ("COVERAGE_REPORT_MISSING", "MATCH", "ABSTAIN"),
+            ("COVERAGE_REPORT_IDENTITY_MISMATCH", "MATCH", "ABSTAIN"),
+            ("COVERAGE_POLICY_MISMATCH", "MATCH", "ABSTAIN"),
+            ("COVERAGE_KICKOFF_MISMATCH", "MATCH", "ABSTAIN"),
+            ("COVERAGE_INELIGIBLE_OTHER", "MATCH", "ABSTAIN"),
+            ("MATCH_KICKOFF_INVALID", "MATCH", "ABSTAIN"),
             ("MISSING_REQUIRED_FACT", "MATCH", "ABSTAIN"),
             ("INCOMPLETE_COLLECTION", "MATCH", "ABSTAIN"),
             ("STALE_EVIDENCE", "MATCH", "ABSTAIN"),
@@ -459,6 +474,8 @@ def build(*, output: Path, runtime_db: Path, availability_checked_at_utc: str) -
             "minimum_issue_exclusive": minimum_issue,
             "existing_issue_count_excluded": len(runtime["existing_post_26079_issues"]),
             "decision_trace_schema": "decision_trace.schema.json",
+            "decision_schema_version": SCHEMA_VERSION,
+            "cross_field_validator": "decision_core.validate_decision_trace",
             "arm_count": len(arms),
             "required_fact_kinds": list(REQUIRED_KIND_MAX_AGE_SECONDS),
             "optional_fact_kinds": list(OPTIONAL_FACT_KINDS),

@@ -122,6 +122,7 @@
         "selector",
         "request_id",
         "package_id",
+        "package_created_at_utc",
         "input_as_of_utc",
         "candidate_universe_sha256",
         "candidate_order",
@@ -135,6 +136,7 @@
         "selector": {"const": "B0_BEST_FULL"},
         "request_id": {"$ref": "#/$defs/nonempty"},
         "package_id": {"$ref": "#/$defs/sha256"},
+        "package_created_at_utc": {"$ref": "#/$defs/timestamp"},
         "input_as_of_utc": {"$ref": "#/$defs/timestamp"},
         "candidate_universe_sha256": {"$ref": "#/$defs/sha256"},
         "candidate_order": {
@@ -164,6 +166,7 @@
         "coverage_report_sha256_by_kind",
         "cutoff_ts_utc",
         "max_receipt_sequence",
+        "latest_receipt_recorded_at_utc",
         "allowed_provenance_tiers",
         "required_kind_max_age_seconds"
       ],
@@ -177,6 +180,7 @@
         },
         "cutoff_ts_utc": {"$ref": "#/$defs/timestamp"},
         "max_receipt_sequence": {"type": "integer", "minimum": 1},
+        "latest_receipt_recorded_at_utc": {"$ref": "#/$defs/timestamp"},
         "allowed_provenance_tiers": {
           "const": ["TIER_0_OFFICIAL", "TIER_1_PRIMARY", "TIER_2_RELIABLE"]
         },
@@ -222,11 +226,12 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "match_id", "decision_status", "risk_flag", "protection_action",
+        "match_id", "kickoff_ts_utc", "decision_status", "risk_flag", "protection_action",
         "handicap_translation", "error_codes", "fact_ids", "extractions"
       ],
       "properties": {
         "match_id": {"$ref": "#/$defs/nonempty"},
+        "kickoff_ts_utc": {"$ref": "#/$defs/timestamp"},
         "decision_status": {"enum": ["ELIGIBLE", "ABSTAIN"]},
         "risk_flag": {"enum": ["CLEAR", "MEDIUM", "HIGH", "NOT_EVALUATED"]},
         "protection_action": {"enum": ["KEEP_BASELINE_ORDER", "ANNOTATE_ONLY", "REJECT_IDENTITY", "NO_MESSAGE_DECISION"]},
@@ -247,7 +252,7 @@
       "properties": {
         "arm": {"enum": ["B0_BASELINE_SHADOW", "M0_MESSAGE_ANNOTATION", "M1_MESSAGE_RISK_RERANK"]},
         "role": {"enum": ["CONTROLLING_BASELINE", "DIAGNOSTIC", "PRIMARY_CHALLENGER"]},
-        "policy_status": {"enum": ["SELECTED_PREOUTCOME", "ABSTAIN_BASELINE_UNAVAILABLE", "ABSTAIN_NO_ELIGIBLE_IDENTITY"]},
+        "policy_status": {"enum": ["SELECTED_PREOUTCOME", "ABSTAIN_NO_ELIGIBLE_IDENTITY"]},
         "selected_portfolio_id": {"type": "string"},
         "selected_identity_fingerprint": {"type": "string"},
         "selected_match_ids": {"type": "array", "maxItems": 7, "uniqueItems": true, "items": {"type": "string"}},
