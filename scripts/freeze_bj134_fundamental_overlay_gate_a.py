@@ -223,16 +223,30 @@ class TeamState:
         elo_diff = (home_elo + 50.0) - away_elo
         form_diff = self.form_value(home) - self.form_value(away)
         rank_component = max(-3.0, min(3.0, rank_diff / 10.0))
-        margin = 0.70 * (elo_diff / 400.0) + 0.20 * (form_diff / 3.0) + 0.10 * rank_component + 0.05 * rest_diff
-        exp_values = [math.exp(max(-40.0, min(40.0, value))) for value in (margin, 0.0, -margin)]
-        total = sum(exp_values)
-        probs = [value / total for value in exp_values]
-        entropy = -sum(p * math.log(p) for p in probs if p > 0) / math.log(3.0)
+        # Target-period rank has no independent observation timestamp in the
+        # historical source.  Keep it out of the controlling score and expose
+        # the old rank-augmented construction only as an explicit timing-proxy
+        # diagnostic.  The remaining inputs are frozen prior-year state plus
+        # the known target kickoff used to derive capped rest.
+        asof_margin = 0.70 * (elo_diff / 400.0) + 0.20 * (form_diff / 3.0) + 0.05 * rest_diff
+        proxy_margin = asof_margin + 0.10 * rank_component
+
+        def probabilities(margin: float) -> tuple[list[float], float]:
+            exp_values = [math.exp(max(-40.0, min(40.0, value))) for value in (margin, 0.0, -margin)]
+            total = sum(exp_values)
+            probs = [value / total for value in exp_values]
+            entropy = -sum(p * math.log(p) for p in probs if p > 0) / math.log(3.0)
+            return probs, entropy
+
+        probs, entropy = probabilities(asof_margin)
+        proxy_probs, proxy_entropy = probabilities(proxy_margin)
         return {
             "elo_diff": elo_diff, "form_diff": form_diff, "rank_diff": rank_diff,
             "rest_diff": rest_diff, "history_depth": float(depth),
             "fundamental_p3": probs[0], "fundamental_p1": probs[1], "fundamental_p0": probs[2],
             "fundamental_confidence": max(probs), "fundamental_entropy": entropy,
+            "rank_proxy_p3": proxy_probs[0], "rank_proxy_p1": proxy_probs[1], "rank_proxy_p0": proxy_probs[2],
+            "rank_proxy_confidence": max(proxy_probs), "rank_proxy_entropy": proxy_entropy,
             "fundamental_missing": 1.0 if not home or not away or depth == 0 else 0.0,
         }
 
@@ -386,6 +400,7 @@ def build_portfolio_scores(
         if len(frozen_roles) != 7 or [row["match_id"] for row in frozen_roles] != selected_ids:
             raise RuntimeError(f"identity/role drift: {key}")
         fundamental = [float(features[int(role["match_id"])]["fundamental_confidence"]) for role in frozen_roles]
+        rank_proxy = [float(features[int(role["match_id"])]["rank_proxy_confidence"]) for role in frozen_roles]
         decision = [max(float(role["q_weight3"]), float(role["q_weight1"]), float(role["q_weight0"])) for role in frozen_roles]
         missing = [float(features[int(role["match_id"])]["fundamental_missing"]) for role in frozen_roles]
         depths = [float(features[int(role["match_id"])]["history_depth"]) for role in frozen_roles]
@@ -393,6 +408,7 @@ def build_portfolio_scores(
             **identity,
             "market_raw": -float(identity["selector_rank"]),
             "fundamental_raw": geometric(fundamental),
+            "rank_proxy_raw": geometric(rank_proxy),
             "decision_raw": geometric(decision),
             "fundamental_missing_fraction": sum(missing) / 7.0,
             "mean_history_depth": sum(depths) / 7.0,
@@ -404,12 +420,14 @@ def build_portfolio_scores(
         ranks = {
             "market_percentile": percentile([(str(row["portfolio_id"]), float(row["market_raw"])) for row in candidates]),
             "fundamental_percentile": percentile([(str(row["portfolio_id"]), float(row["fundamental_raw"])) for row in candidates]),
+            "rank_proxy_percentile": percentile([(str(row["portfolio_id"]), float(row["rank_proxy_raw"])) for row in candidates]),
             "decision_percentile": percentile([(str(row["portfolio_id"]), float(row["decision_raw"])) for row in candidates]),
         }
         for row in candidates:
             pid = str(row["portfolio_id"])
             market = ranks["market_percentile"][pid]
             fundamental = ranks["fundamental_percentile"][pid]
+            rank_proxy = ranks["rank_proxy_percentile"][pid]
             decision = ranks["decision_percentile"][pid]
             output.append({
                 "issue": row["issue"], "year": row["year"], "fold": row["fold"], "issue_instance": issue_instance,
@@ -417,10 +435,12 @@ def build_portfolio_scores(
                 "candidate_match_id": row["candidate_match_id"], "selected_match_ids": row["selected_match_ids"],
                 "identity_fingerprint": row["identity_fingerprint"], "candidate_count_complete_issue": len(candidates),
                 "market_rank_raw": int(row["selector_rank"]), "fundamental_gm_confidence": compact(float(row["fundamental_raw"])),
+                "rank_proxy_gm_confidence": compact(float(row["rank_proxy_raw"])),
                 "decision_gm_q_max": compact(float(row["decision_raw"])),
                 "fundamental_missing_fraction": compact(float(row["fundamental_missing_fraction"])),
                 "mean_history_depth": compact(float(row["mean_history_depth"])), "min_history_depth": compact(float(row["min_history_depth"])),
                 "market_percentile": compact(market), "fundamental_percentile": compact(fundamental),
+                "rank_proxy_percentile": compact(rank_proxy),
                 "decision_percentile": compact(decision), "combined_percentile": compact(0.50 * market + 0.25 * fundamental + 0.25 * decision),
                 "full_ticket_count": FULL_TICKETS, "full_stake_yuan": FULL_STAKE_YUAN,
                 "outcome_boundary": OUTCOME_BOUNDARY,
@@ -537,7 +557,9 @@ def threshold_registry(selection: Sequence[dict[str, object]], scores: Sequence[
 def build_match_feature_rows(features: dict[int, dict[str, object]]) -> list[dict[str, object]]:
     fields = (
         "elo_diff", "form_diff", "rank_diff", "rest_diff", "history_depth", "fundamental_p3",
-        "fundamental_p1", "fundamental_p0", "fundamental_confidence", "fundamental_entropy", "fundamental_missing",
+        "fundamental_p1", "fundamental_p0", "fundamental_confidence", "fundamental_entropy",
+        "rank_proxy_p3", "rank_proxy_p1", "rank_proxy_p0", "rank_proxy_confidence", "rank_proxy_entropy",
+        "fundamental_missing",
     )
     return [{
         "match_id": match_id, "issue": row["issue"], "match_idx": row["match_idx"], "kickoff_ts": row["kickoff_ts"],
@@ -599,11 +621,39 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
         } for arm, field, definition in ARMS]
         write_csv(stage / "arm_registry.csv", list(selector_rows[0]), selector_rows)
 
+        feature_manifest_rows = [
+            {"feature_family": "MARKET_SELECTOR", "feature": "COLD_FIRST_RANK", "source_fields": "#167 selector_rank / MARKET_WF_CAL_MIN / E_SP / GM_E_SP", "availability_rule": "accepted outcome-unexposed #167 Gate A", "timing_grade": "FROZEN_ASOF", "primary_use": "MARKET_BEST_FULL and combined overlay", "missing_rule": "issue remains NO_BET when frozen candidate count is zero"},
+            {"feature_family": "TEAM_STRENGTH", "feature": "PRIOR_YEAR_ELO", "source_fields": "prior-year team ids, kickoff, fthg, ftag", "availability_rule": "season_year < target_year", "timing_grade": "STRICT_PRIOR_HISTORY", "primary_use": "fundamental score", "missing_rule": "neutral 1500 state; explicit missing flag"},
+            {"feature_family": "TEAM_FORM", "feature": "PRIOR_YEAR_FORM_GOAL_DIFF", "source_fields": "last 10 prior-year points and clipped goal difference", "availability_rule": "season_year < target_year", "timing_grade": "STRICT_PRIOR_HISTORY", "primary_use": "fundamental score", "missing_rule": "neutral zero form; explicit history depth"},
+            {"feature_family": "SCHEDULE_REST", "feature": "CAPPED_REST_DIFF", "source_fields": "target kickoff minus last strictly-prior history timestamp", "availability_rule": "target kickoff is frozen; state match is from season_year < target_year", "timing_grade": "STRICT_PRIOR_HISTORY", "primary_use": "fundamental score", "missing_rule": "720-hour neutral cap"},
+            {"feature_family": "TEAM_RANK", "feature": "TARGET_HOME_AWAY_RANK", "source_fields": "matches.home_rank / matches.away_rank", "availability_rule": "no independent observation timestamp in source", "timing_grade": "HISTORICAL_TIMING_PROXY", "primary_use": "diagnostic rank_proxy fields only; excluded from all four controlling arms", "missing_rule": "zero rank component"},
+            {"feature_family": "DECISION_CHAIN", "feature": "Q_WEIGHT_ROLE_PRODUCT", "source_fields": "#167 q_weight3/q_weight1/q_weight0", "availability_rule": "accepted outcome-unexposed #167 role vectors", "timing_grade": "FROZEN_ASOF", "primary_use": "decision and combined overlay", "missing_rule": "fail closed on absent/nonpositive seven-role vector"},
+            {"feature_family": "LINEUP_AVAILABILITY", "feature": "NOT_AVAILABLE", "source_fields": "none", "availability_rule": "no verifiable as-of field in frozen sources", "timing_grade": "UNAVAILABLE_NOT_USED", "primary_use": "none", "missing_rule": "family excluded rather than imputed"},
+            {"feature_family": "TRAVEL_CONTEXT", "feature": "NOT_AVAILABLE", "source_fields": "none", "availability_rule": "no verifiable as-of field in frozen sources", "timing_grade": "UNAVAILABLE_NOT_USED", "primary_use": "none", "missing_rule": "family excluded rather than imputed"},
+            {"feature_family": "MOTIVATION_NEWS", "feature": "NOT_AVAILABLE", "source_fields": "none", "availability_rule": "no verifiable as-of field in frozen sources", "timing_grade": "UNAVAILABLE_NOT_USED", "primary_use": "none", "missing_rule": "family excluded rather than imputed"},
+        ]
+        for row in feature_manifest_rows:
+            row["outcome_boundary"] = OUTCOME_BOUNDARY
+        write_csv(stage / "feature_manifest.csv", list(feature_manifest_rows[0]), feature_manifest_rows)
+
+        ablation_rows = [
+            {"ablation_id": "A0_MARKET_ONLY", "score_field": "market_percentile", "market": "1", "strict_prior_fundamental": "0", "decision_chain": "0", "rank_timing_proxy": "0", "controlling": "1", "definition": "exact BEST_FULL incumbent"},
+            {"ablation_id": "A1_FUNDAMENTAL_ONLY", "score_field": "fundamental_percentile", "market": "0", "strict_prior_fundamental": "1", "decision_chain": "0", "rank_timing_proxy": "0", "controlling": "1", "definition": "strict prior-history fundamental arm"},
+            {"ablation_id": "A2_DECISION_ONLY", "score_field": "decision_percentile", "market": "0", "strict_prior_fundamental": "0", "decision_chain": "1", "rank_timing_proxy": "0", "controlling": "1", "definition": "documented q decision-chain arm"},
+            {"ablation_id": "A3_COMBINED", "score_field": "combined_percentile", "market": "1", "strict_prior_fundamental": "1", "decision_chain": "1", "rank_timing_proxy": "0", "controlling": "1", "definition": "0.50 market + 0.25 fundamental + 0.25 decision"},
+            {"ablation_id": "D1_RANK_PROXY_ONLY", "score_field": "rank_proxy_percentile", "market": "0", "strict_prior_fundamental": "1", "decision_chain": "0", "rank_timing_proxy": "1", "controlling": "0", "definition": "historical timing-proxy diagnostic; never eligible for promotion"},
+        ]
+        for row in ablation_rows:
+            row["selection_rule"] = "within complete issue K1; score descending then portfolio_id ascending"
+            row["outcome_boundary"] = OUTCOME_BOUNDARY
+        write_csv(stage / "ablation_registry.csv", list(ablation_rows[0]), ablation_rows)
+
         segment_rows = [
             {"segment_id": "YEAR", "definition": "target calendar year 2020..2025", "controlling": "0", "use": "Gate B stability"},
             {"segment_id": "FOLD", "definition": "frozen OOS fold from #167", "controlling": "0", "use": "Gate B stability"},
             {"segment_id": "CANDIDATE_COUNT", "definition": "1 versus 2+ complete-issue candidates", "controlling": "0", "use": "selection opportunity sensitivity"},
             {"segment_id": "FUNDAMENTAL_MISSING", "definition": "selected identity missing fraction 0 versus >0", "controlling": "0", "use": "missing-data bias"},
+            {"segment_id": "LOYO", "definition": "leave one target year out while preserving every issue intact; no row-level split", "controlling": "0", "use": "Gate B stability and signed lift"},
             {"segment_id": "PRIMARY", "definition": "all 348 frozen issues; 189 selected and 159 no-bet", "controlling": "1", "use": "primary matched comparison"},
         ]
         for row in segment_rows:
@@ -638,7 +688,7 @@ def atomic_generate(output: Path, db: Path) -> dict[str, object]:
             "incumbent": {"alias": "BEST_FULL", "selector_id": K1_SELECTOR, "allocation": "FULL_ENUMERATED", "tickets": FULL_TICKETS, "stake_yuan": FULL_STAKE_YUAN, "selected_issue_count": 189, "frozen_no_bet_issue_count": 159, "controlling_baseline_no_tax_roi": -0.0947, "attribution_only_common_full_roi": -0.0909},
             "candidate_universe": {"selector_id": KALL_SELECTOR, "issue_census": 348, "participating_issues": 189, "frozen_no_bet_issues": 159, "identity_count": 424, "candidate_count_range": [0, 7], "fixed_participation": True},
             "arms": [{"arm": arm, "score_field": field, "definition": definition} for arm, field, definition in ARMS],
-            "scoring": {"market": "exact #167 K_ALL COLD_FIRST rank", "fundamental": "geometric mean of seven past-only fundamental confidences", "decision": "geometric mean of seven max(q_weight3,q_weight1,q_weight0)", "combined": "within-issue 0.50 market + 0.25 fundamental + 0.25 decision percentile", "tie_break": "score descending then portfolio_id ascending"},
+            "scoring": {"market": "exact #167 K_ALL COLD_FIRST rank", "fundamental": "geometric mean of seven strictly-prior-year Elo/form/rest confidences; target rank excluded", "rank_proxy_diagnostic": "old fundamental construction with target home/away rank; timing proxy only and excluded from controlling arms", "decision": "geometric mean of seven max(q_weight3,q_weight1,q_weight0)", "combined": "within-issue 0.50 market + 0.25 fundamental + 0.25 decision percentile", "tie_break": "score descending then portfolio_id ascending"},
             "missing_data": "retain identity; neutral default team state and explicit missing fraction; no silent drop",
             "thresholds": "primary K1 has no post-score rejection; secondary pre-registered score-quantile and fundamental data-quality thresholds are diagnostic only",
             "segments": "primary complete-issue denominator; year/fold/candidate-count/missingness are non-controlling diagnostics",

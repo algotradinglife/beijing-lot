@@ -3,4 +3,5 @@ YEAR,target calendar year 2020..2025,0,Gate B stability,Gate A outcome-unexposed
 FOLD,frozen OOS fold from #167,0,Gate B stability,Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted
 CANDIDATE_COUNT,1 versus 2+ complete-issue candidates,0,selection opportunity sensitivity,Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted
 FUNDAMENTAL_MISSING,selected identity missing fraction 0 versus >0,0,missing-data bias,Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted
+LOYO,leave one target year out while preserving every issue intact; no row-level split,0,Gate B stability and signed lift,Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted
 PRIMARY,all 348 frozen issues; 189 selected and 159 no-bet,1,primary matched comparison,Gate A outcome-unexposed: target result/final-SP/payout/tax/ROI/settlement fields are neither selected nor emitted

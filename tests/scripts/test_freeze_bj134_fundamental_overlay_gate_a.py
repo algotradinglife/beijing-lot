@@ -51,6 +51,20 @@ def test_target_feature_query_is_outcome_unexposed_and_gate_b_is_hash_only():
     assert "gzip.open(GATE_B_170" not in source
 
 
+def test_unstamped_target_rank_is_separate_from_controlling_fundamental_score():
+    module = load_module()
+    state = module.TeamState()
+    base = {
+        "home_team_id": "H", "away_team_id": "A", "kickoff_ts": "2025-01-01 12:00:00",
+        "home_rank": "1", "away_rank": "20",
+    }
+    reversed_rank = {**base, "home_rank": "20", "away_rank": "1"}
+    left = state.snapshot(base)
+    right = state.snapshot(reversed_rank)
+    assert left["fundamental_confidence"] == right["fundamental_confidence"]
+    assert left["rank_proxy_confidence"] != right["rank_proxy_confidence"]
+
+
 def test_market_arm_reproduces_rank_one_on_fixed_348_issue_denominator():
     module = load_module()
     census = []
@@ -91,6 +105,7 @@ def test_market_arm_reproduces_rank_one_on_fixed_348_issue_denominator():
 
 def test_generated_package_manifest_and_denominators():
     assert PACKAGE.is_dir()
+    assert (PACKAGE / "freeze_runner.py").read_bytes() == SCRIPT.read_bytes()
     declared = json.loads((PACKAGE / "SHA256SUMS.json").read_text(encoding="utf-8"))
     actual = {path.name for path in PACKAGE.iterdir() if path.is_file() and path.name != "SHA256SUMS.json"}
     assert set(declared) == actual
@@ -118,3 +133,11 @@ def test_generated_package_manifest_and_denominators():
     market = [row for row in rows if row["arm"] == "MARKET_BEST_FULL" and row["policy_status"] == "SELECTED_PREOUTCOME"]
     rank_by_key = {(row["issue_instance"], row["portfolio_id"]): row["source_selector_rank"] for row in candidates}
     assert all(rank_by_key[(row["issue_instance"], row["selected_portfolio_id"])] == "1" for row in market)
+    with (PACKAGE / "feature_manifest.csv").open(newline="", encoding="utf-8") as handle:
+        feature_manifest = list(csv.DictReader(handle))
+    rank = next(row for row in feature_manifest if row["feature"] == "TARGET_HOME_AWAY_RANK")
+    assert rank["timing_grade"] == "HISTORICAL_TIMING_PROXY"
+    assert "excluded from all four controlling arms" in rank["primary_use"]
+    assert {row["ablation_id"] for row in csv.DictReader((PACKAGE / "ablation_registry.csv").open())} == {
+        "A0_MARKET_ONLY", "A1_FUNDAMENTAL_ONLY", "A2_DECISION_ONLY", "A3_COMBINED", "D1_RANK_PROXY_ONLY"
+    }

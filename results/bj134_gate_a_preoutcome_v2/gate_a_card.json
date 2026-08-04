@@ -80,8 +80,9 @@
   "scoring": {
     "combined": "within-issue 0.50 market + 0.25 fundamental + 0.25 decision percentile",
     "decision": "geometric mean of seven max(q_weight3,q_weight1,q_weight0)",
-    "fundamental": "geometric mean of seven past-only fundamental confidences",
+    "fundamental": "geometric mean of seven strictly-prior-year Elo/form/rest confidences; target rank excluded",
     "market": "exact #167 K_ALL COLD_FIRST rank",
+    "rank_proxy_diagnostic": "old fundamental construction with target home/away rank; timing proxy only and excluded from controlling arms",
     "tie_break": "score descending then portfolio_id ascending"
   },
   "segments": "primary complete-issue denominator; year/fold/candidate-count/missingness are non-controlling diagnostics",

@@ -34,7 +34,7 @@ Four issue-level arms select exactly one identity on that same candidate pool:
 
 1. `MARKET_BEST_FULL`: exact frozen COLD_FIRST order;
 2. `FUNDAMENTALS_ONLY`: seven-leg geometric mean of strictly-prior-year
-   Elo/form/rank/rest fundamental confidence;
+   Elo/form/rest fundamental confidence;
 3. `DECISION_CHAIN_ONLY`: seven-leg geometric mean of the existing maximum
    `q_weight` outcome score;
 4. `FUNDAMENTALS_PLUS_DECISION`: fixed within-issue blend of 0.50 market,
@@ -43,21 +43,25 @@ Four issue-level arms select exactly one identity on that same candidate pool:
 Each selected identity remains `FULL_ENUMERATED`: 2,187 distinct ¥2 tickets,
 ¥4,374 per issue, and ¥826,686 per arm. Missing fundamentals are retained with
 a neutral state and explicit missingness; no candidate is silently dropped.
+Target-period home/away rank has no independent observation timestamp in the
+source. It is graded `HISTORICAL_TIMING_PROXY`, excluded from all four
+controlling arms, and retained only in explicitly named diagnostic fields.
 
 ## Frozen evidence
 
 - package: `results/bj134_gate_a_preoutcome_v2`;
 - manifest SHA-256:
-  `1001ab87115302480306f6b4e44b0d409fc5078b630eab09662b979238eef38a`;
+  `cbd8e612ec4de26b7b927757e9c836af5f8a97a133ddaae67b27bfe9e4b92675`;
 - content identity SHA-256:
-  `6ee0ef358ca6230621a8972dd52dbd92eaeaa210218fa6bd7c22859758f3d285`;
+  `956ab00df8f12938145c0ec9250de7d62c7b274fbaaae8eedf7f0ee54692f805`;
 - rows: 424 candidate identities, 2,968 role vectors, 1,558 target-safe match
   feature rows, and 1,392 issue-arm decisions;
 - participation per arm: 189 selected / 159 frozen no-bet;
-- tests: `pytest -q tests/scripts/test_freeze_bj134_fundamental_overlay_gate_a.py`.
+- tests: `pytest -q tests/scripts/test_freeze_bj134_fundamental_overlay_gate_a.py`
+  (`5 passed`).
 
-Pre-outcome identity overlap against BEST_FULL is 116/189 for fundamentals,
-125/189 for decision-chain, and 169/189 for the combined overlay. These are
+Pre-outcome identity overlap against BEST_FULL is 112/189 for fundamentals,
+125/189 for decision-chain, and 171/189 for the combined overlay. These are
 selection diagnostics only, not performance findings.
 
 ## Gate-B boundary
