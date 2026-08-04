@@ -79,10 +79,27 @@ def test_support_views_freeze_native_pairwise_and_three_way_without_outcomes():
         {"support_key_sha256": "same", "selector_alias": alias, "issue_instance": "A@F", "selected_match_ids": "m1|m2|m3|m4|m5|m6|m7"}
         for alias, _, _ in module.SELECTORS
     ]
-    registry, membership, exact = module.support_views(participation, identities)
+    registry, membership, exact, contrasts = module.support_views(participation, identities)
     three = next(row for row in registry if row["support_view_id"] == "THREE_WAY_ALL")
     assert three["eligible_issue_count"] == 1
+    assert three["year_count"] == 1 and three["fold_count"] == 1
+    assert json.loads(three["selector_identity_counts_json"]) == {
+        "BEST_FULL": 1, "Q_SOURCE": 1, "MODEL_SOURCE": 1
+    }
+    three_stakes = json.loads(three["planned_stake_yuan_by_selector_arm_json"])
+    assert three_stakes["BEST_FULL/FULL_ENUMERATED"] == 4374
+    assert three_stakes["Q_SOURCE/Q_TOP_MASS_M192"] == 384
     assert next(row for row in membership if row["support_view_id"] == "THREE_WAY_ALL")["issue_instance"] == "A@F"
+    assert len(contrasts) == 27
+    best_q_full_model = next(
+        row for row in contrasts
+        if row["support_view_id"] == "PAIRWISE_BEST_FULL__Q_SOURCE"
+        and row["left_allocation_arm"] == "FULL_ENUMERATED"
+        and row["right_allocation_arm"] == "MODEL_CAP1_M512"
+    )
+    assert best_q_full_model["eligible_issue_count"] == 2
+    assert best_q_full_model["left_planned_stake_yuan"] == 8748
+    assert best_q_full_model["right_planned_stake_yuan"] == 2048
     assert exact == [{
         "support_key_sha256": "same",
         "issue_instance": "A@F",
@@ -108,7 +125,7 @@ def test_gate_a_runner_has_no_outcome_or_settlement_loader():
 
 def test_generated_package_is_complete_and_internally_reconciled():
     module = load_module()
-    package = ROOT / "results" / "bj170_gate_a_preoutcome_v1"
+    package = ROOT / "results" / "bj170_gate_a_preoutcome_v2"
     declared = json.loads((package / "SHA256SUMS.json").read_text(encoding="utf-8"))
     actual_files = {path.name for path in package.iterdir() if path.is_file() and path.name != "SHA256SUMS.json"}
     assert set(declared) == actual_files
@@ -127,6 +144,7 @@ def test_generated_package_is_complete_and_internally_reconciled():
         "role_rows": 12453,
         "selector_count": 3,
         "support_issue_rows": 1539,
+        "support_contrast_rows": 27,
         "support_view_count": 7,
         "unique_issue_instances": 348,
     }

@@ -27,7 +27,7 @@ from typing import Iterable, Sequence
 
 
 CONTRACT = "BJ-HIST-N7-SELECTOR-ALLOCATOR-STACK-001"
-VERSION = "bj170-gate-a-v1"
+VERSION = "bj170-gate-a-v2"
 OUTCOME_BOUNDARY = (
     "Gate A: outcome-unexposed; no score, result, final/winning SP, payout, "
     "tax realization, ROI, or settlement payload is parsed"
@@ -111,7 +111,7 @@ def repo_root() -> Path:
 ROOT = repo_root()
 GATE_A = ROOT / "results" / "bj167_gate_a_strategy_atlas_v3r1"
 GATE_B = ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1"
-DEFAULT_OUTPUT = ROOT / "results" / "bj170_gate_a_preoutcome_v1"
+DEFAULT_OUTPUT = ROOT / "results" / "bj170_gate_a_preoutcome_v2"
 
 
 def sha256_file(path: Path) -> str:
@@ -474,7 +474,12 @@ def planned_stakes(participation: Sequence[dict[str, object]]) -> list[dict[str,
 
 def support_views(
     participation: Sequence[dict[str, object]], identity_rows: Sequence[dict[str, object]]
-) -> tuple[list[dict[str, object]], list[dict[str, object]], list[dict[str, object]]]:
+) -> tuple[
+    list[dict[str, object]],
+    list[dict[str, object]],
+    list[dict[str, object]],
+    list[dict[str, object]],
+]:
     aliases = tuple(alias for alias, _, _ in SELECTORS)
     selector_ids = {alias: selector_id for alias, selector_id, _ in SELECTORS}
     issue_counts: dict[tuple[str, str], int] = {
@@ -495,6 +500,7 @@ def support_views(
 
     membership: list[dict[str, object]] = []
     registry: list[dict[str, object]] = []
+    contrasts: list[dict[str, object]] = []
     for view_id, members, view_type in definitions:
         eligible = [issue_instance for issue_instance in all_issues if all(issue_counts.get((member, issue_instance), 0) > 0 for member in members)]
         member_rows = []
@@ -517,6 +523,17 @@ def support_views(
             }
             membership.append(row)
             member_rows.append(row["support_issue_row_sha256"])
+        identity_counts = {
+            member: sum(issue_counts[(member, issue_instance)] for issue_instance in eligible)
+            for member in members
+        }
+        years = sorted({issue_meta[issue_instance][1] for issue_instance in eligible})
+        folds = sorted({issue_meta[issue_instance][2] for issue_instance in eligible})
+        planned_stake_by_selector_arm = {
+            f"{member}/{arm}": identity_counts[member] * m * STAKE_YUAN
+            for member in members
+            for arm, _, _, _, m, _ in ARMS
+        }
         registry.append({
             "support_view_id": view_id,
             "support_view_type": view_type,
@@ -524,10 +541,43 @@ def support_views(
             "selector_ids": "|".join(selector_ids[member] for member in members),
             "eligible_issue_count": len(eligible),
             "identity_occurrence_count": sum(int(row["identity_occurrence_count"]) for row in membership if row["support_view_id"] == view_id),
+            "selector_identity_counts_json": json.dumps(identity_counts, sort_keys=True, separators=(",", ":")),
+            "year_count": len(years),
+            "years": "|".join(years),
+            "fold_count": len(folds),
+            "folds": "|".join(folds),
+            "planned_stake_yuan_by_selector_arm_json": json.dumps(
+                planned_stake_by_selector_arm, sort_keys=True, separators=(",", ":")
+            ),
+            "planned_stake_yuan_total_all_arms": sum(planned_stake_by_selector_arm.values()),
             "support_view_sha256": canonical_hash(member_rows),
             "eligibility_rule": "all listed selectors have >=1 frozen pre-outcome identity in the issue",
             "outcome_boundary": OUTCOME_BOUNDARY,
         })
+        if view_type == "PAIRWISE_COMMON_SUPPORT":
+            left, right = members
+            support_hash = canonical_hash(member_rows)
+            for left_arm, _, _, _, left_m, _ in ARMS:
+                for right_arm, _, _, _, right_m, _ in ARMS:
+                    contrasts.append({
+                        "support_view_id": view_id,
+                        "left_selector_alias": left,
+                        "right_selector_alias": right,
+                        "left_allocation_arm": left_arm,
+                        "right_allocation_arm": right_arm,
+                        "eligible_issue_count": len(eligible),
+                        "year_count": len(years),
+                        "years": "|".join(years),
+                        "fold_count": len(folds),
+                        "folds": "|".join(folds),
+                        "left_identity_count": identity_counts[left],
+                        "right_identity_count": identity_counts[right],
+                        "left_planned_stake_yuan": identity_counts[left] * left_m * STAKE_YUAN,
+                        "right_planned_stake_yuan": identity_counts[right] * right_m * STAKE_YUAN,
+                        "support_view_sha256": support_hash,
+                        "eligibility_rule": "same issue intersection for all fixed arms because each selected identity has strictly positive planned stake in every arm; settled-outcome availability remains Gate-B fail-closed",
+                        "outcome_boundary": OUTCOME_BOUNDARY,
+                    })
 
     support_members: dict[str, list[dict[str, object]]] = defaultdict(list)
     for row in identity_rows:
@@ -546,7 +596,7 @@ def support_views(
             "three_way_common": "1" if len(present_aliases) == 3 else "0",
             "outcome_boundary": OUTCOME_BOUNDARY,
         })
-    return registry, membership, exact_rows
+    return registry, membership, exact_rows, contrasts
 
 
 def package_identity(stage: Path, controls: dict[str, object]) -> tuple[str, str]:
@@ -581,7 +631,7 @@ def build(output: Path = DEFAULT_OUTPUT) -> dict[str, object]:
         allocator = FrozenAllocator()
         allocation_rows = freeze_allocations(identity_rows, role_rows, allocation_grid, allocator)
         stake_rows = planned_stakes(participation)
-        support_registry, support_membership, exact_support = support_views(participation, identity_rows)
+        support_registry, support_membership, exact_support, support_contrasts = support_views(participation, identity_rows)
 
         selector_by_id = {row["selector_id"]: row for row in selector_grid}
         selector_rows = []
@@ -614,6 +664,7 @@ def build(output: Path = DEFAULT_OUTPUT) -> dict[str, object]:
         write_gzip(stage / "identity_allocation_digest.csv.gz", tuple(allocation_rows[0]), allocation_rows)
         write_csv(stage / "support_view_registry.csv", tuple(support_registry[0]), support_registry)
         write_csv(stage / "support_issue_membership.csv", tuple(support_membership[0]), support_membership)
+        write_csv(stage / "support_contrast_registry.csv", tuple(support_contrasts[0]), support_contrasts)
         write_gzip(stage / "exact_identity_support_membership.csv.gz", tuple(exact_support[0]), exact_support)
 
         bridge_rows = [{
@@ -642,6 +693,7 @@ def build(output: Path = DEFAULT_OUTPUT) -> dict[str, object]:
             "planned_stake_rows": len(stake_rows),
             "support_view_count": len(support_registry),
             "support_issue_rows": len(support_membership),
+            "support_contrast_rows": len(support_contrasts),
             "exact_identity_support_rows": len(exact_support),
         }
         source_binding = {
