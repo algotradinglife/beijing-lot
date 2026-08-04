@@ -46,12 +46,22 @@ STAKE_PER_TICKET_YUAN = 2
 FULL_STAKE_YUAN = 4374
 
 SOURCE_181_MERGE = "4e186db4f293e04429898d4077f823e0d0efa62a"
-SOURCE_181_LEDGER_SHA = "3c065be028c4022d33487095f08b9838c284853614f6617646dabe5e08c31229"
-SOURCE_181_ASOF_SCHEMA_SHA = "e763428d703197ec08eb2c4955ee45bc9925c84941bed8f3a9ac253edec161bd"
-SOURCE_181_COVERAGE_SCHEMA_SHA = "22ffbaf6ef79eb484425c48307a29c08ba73d6a0bbf743e4023b37838ed9181d"
+SOURCE_181_LEDGER_SHA = (
+    "3c065be028c4022d33487095f08b9838c284853614f6617646dabe5e08c31229"
+)
+SOURCE_181_ASOF_SCHEMA_SHA = (
+    "e763428d703197ec08eb2c4955ee45bc9925c84941bed8f3a9ac253edec161bd"
+)
+SOURCE_181_COVERAGE_SCHEMA_SHA = (
+    "22ffbaf6ef79eb484425c48307a29c08ba73d6a0bbf743e4023b37838ed9181d"
+)
 SOURCE_180_MERGE = "a662a6efaeed1f9fdbee95575a346dd6813cdb12"
-SOURCE_180_GATE_B_MANIFEST = "9f48b29325d817ce873bd1430be459c9e70ad052064f8e03e02ccbc1d8bc6fcf"
-SOURCE_180_GATE_B_CONTENT = "d9b41dec45c1c6215755d9dad8774e00fc0f19f564ee6ef8bf2387cb8d309108"
+SOURCE_180_GATE_B_MANIFEST = (
+    "9f48b29325d817ce873bd1430be459c9e70ad052064f8e03e02ccbc1d8bc6fcf"
+)
+SOURCE_180_GATE_B_CONTENT = (
+    "d9b41dec45c1c6215755d9dad8774e00fc0f19f564ee6ef8bf2387cb8d309108"
+)
 
 
 def repo_root() -> Path:
@@ -88,8 +98,10 @@ def normalize_timestamp(value: str) -> str:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("availability timestamp must be timezone-aware")
-    return parsed.astimezone(timezone.utc).isoformat(timespec="seconds").replace(
-        "+00:00", "Z"
+    return (
+        parsed.astimezone(timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
     )
 
 
@@ -107,7 +119,9 @@ def write_json(path: Path, value: object) -> None:
     )
 
 
-def write_csv(path: Path, fieldnames: list[str], rows: Iterable[dict[str, object]]) -> None:
+def write_csv(
+    path: Path, fieldnames: list[str], rows: Iterable[dict[str, object]]
+) -> None:
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
@@ -152,11 +166,20 @@ def snapshot_runtime(database: Path) -> dict[str, object]:
         connection.execute("BEGIN")
         columns = {row[1] for row in connection.execute("PRAGMA table_info(matches)")}
         required = {
-            "issue", "match_id", "match_idx", "kickoff_ts", "league", "home",
-            "away", "handicap_line", "created_ts",
+            "issue",
+            "match_id",
+            "match_idx",
+            "kickoff_ts",
+            "league",
+            "home",
+            "away",
+            "handicap_line",
+            "created_ts",
         }
         if not required <= columns:
-            raise RuntimeError(f"runtime matches projection drift: {sorted(required-columns)}")
+            raise RuntimeError(
+                f"runtime matches projection drift: {sorted(required - columns)}"
+            )
         rows = [
             dict(row)
             for row in connection.execute(
@@ -201,8 +224,15 @@ def snapshot_runtime(database: Path) -> dict[str, object]:
         "database_mode": "READ_ONLY_WAL_SNAPSHOT",
         "sqlite_data_version": data_version,
         "projection": [
-            "issue", "match_id", "match_idx", "kickoff_ts", "league", "home",
-            "away", "handicap_line", "created_ts",
+            "issue",
+            "match_id",
+            "match_idx",
+            "kickoff_ts",
+            "league",
+            "home",
+            "away",
+            "handicap_line",
+            "created_ts",
         ],
         "projection_row_count": len(rows),
         "projection_sha256": hashlib.sha256(canonical_json(rows)).hexdigest(),
@@ -235,9 +265,14 @@ def forward_protocol(minimum_issue_exclusive: int) -> dict[str, object]:
             "source": "externally supplied accepted outcome-unexposed B0 package for the target issue",
             "candidate_order": "frozen B0 score descending, portfolio_id ascending tie break",
             "required_identity": [
-                "request_id", "package_id", "package_created_at_utc", "input_as_of_utc",
-                "candidate_universe_sha256", "candidate_order",
-                "selected_portfolio_id", "selected_identity_fingerprint",
+                "request_id",
+                "package_id",
+                "package_created_at_utc",
+                "input_as_of_utc",
+                "candidate_universe_sha256",
+                "candidate_order",
+                "selected_portfolio_id",
+                "selected_identity_fingerprint",
                 "selected_match_ids",
             ],
             "n": 7,
@@ -269,8 +304,13 @@ def forward_protocol(minimum_issue_exclusive: int) -> dict[str, object]:
             "cross_field_validator": "decision_core.validate_decision_trace must pass before a decision trace is frozen",
             "decision_id": "SHA-256 of canonical trace JSON after removing only decision_id",
             "forbidden": [
-                "probability retuning", "selector threshold retuning", "new candidates",
-                "M changes", "allocator changes", "ticket changes", "stake scaling",
+                "probability retuning",
+                "selector threshold retuning",
+                "new candidates",
+                "M changes",
+                "allocator changes",
+                "ticket changes",
+                "stake scaling",
             ],
         },
         "arms": [
@@ -298,9 +338,18 @@ def forward_protocol(minimum_issue_exclusive: int) -> dict[str, object]:
             "tax_reference_only": True,
             "tax_rule": "per winning CNY2 ticket; no issue/person aggregation",
             "metrics": [
-                "coverage", "abstention", "identity changes", "calibration",
-                "stake", "gross payout", "pre-tax ROI", "matched lift",
-                "YEAR/time block", "ex-largest issue", "HHI", "drawdown",
+                "coverage",
+                "abstention",
+                "identity changes",
+                "calibration",
+                "stake",
+                "gross payout",
+                "pre-tax ROI",
+                "matched lift",
+                "YEAR/time block",
+                "ex-largest issue",
+                "HHI",
+                "drawdown",
             ],
             "positive_claim": "strict independent EV plus further forward evidence required",
         },
@@ -313,7 +362,8 @@ def package_identity(stage: Path, controls: dict[str, object]) -> tuple[str, str
     payloads = {
         path.name: sha256_file(path)
         for path in sorted(stage.iterdir())
-        if path.is_file() and path.name not in {"CONTENT_IDENTITY.json", "SHA256SUMS.json"}
+        if path.is_file()
+        and path.name not in {"CONTENT_IDENTITY.json", "SHA256SUMS.json"}
     }
     write_json(
         stage / "CONTENT_IDENTITY.json",
@@ -325,10 +375,14 @@ def package_identity(stage: Path, controls: dict[str, object]) -> tuple[str, str
         if path.is_file() and path.name != "SHA256SUMS.json"
     }
     write_json(stage / "SHA256SUMS.json", sums)
-    return sha256_file(stage / "SHA256SUMS.json"), sha256_file(stage / "CONTENT_IDENTITY.json")
+    return sha256_file(stage / "SHA256SUMS.json"), sha256_file(
+        stage / "CONTENT_IDENTITY.json"
+    )
 
 
-def build(*, output: Path, runtime_db: Path, availability_checked_at_utc: str) -> dict[str, object]:
+def build(
+    *, output: Path, runtime_db: Path, availability_checked_at_utc: str
+) -> dict[str, object]:
     checked_at = normalize_timestamp(availability_checked_at_utc)
     verify_accepted_sources()
     output = output.resolve()
@@ -354,25 +408,33 @@ def build(*, output: Path, runtime_db: Path, availability_checked_at_utc: str) -
 
         arms = [
             {
-                "arm": "B0_BASELINE_SHADOW", "role": "CONTROLLING_BASELINE",
+                "arm": "B0_BASELINE_SHADOW",
+                "role": "CONTROLLING_BASELINE",
                 "participation": "ALL_VALID_BASELINE_ISSUES",
-                "identity_rule": "exact B0 selected identity", "risk_action": "NONE",
-                "allocation": "FULL_ENUMERATED", "tickets": FULL_TICKETS,
+                "identity_rule": "exact B0 selected identity",
+                "risk_action": "NONE",
+                "allocation": "FULL_ENUMERATED",
+                "tickets": FULL_TICKETS,
                 "stake_yuan": FULL_STAKE_YUAN,
             },
             {
-                "arm": "M0_MESSAGE_ANNOTATION", "role": "DIAGNOSTIC",
+                "arm": "M0_MESSAGE_ANNOTATION",
+                "role": "DIAGNOSTIC",
                 "participation": "MESSAGE_COVERAGE_ELIGIBLE",
-                "identity_rule": "exact B0 identity; annotations only", "risk_action": "ANNOTATE_ONLY",
-                "allocation": "FULL_ENUMERATED", "tickets": FULL_TICKETS,
+                "identity_rule": "exact B0 identity; annotations only",
+                "risk_action": "ANNOTATE_ONLY",
+                "allocation": "FULL_ENUMERATED",
+                "tickets": FULL_TICKETS,
                 "stake_yuan": FULL_STAKE_YUAN,
             },
             {
-                "arm": "M1_MESSAGE_RISK_RERANK", "role": "PRIMARY_CHALLENGER",
+                "arm": "M1_MESSAGE_RISK_RERANK",
+                "role": "PRIMARY_CHALLENGER",
                 "participation": "MESSAGE_COVERAGE_ELIGIBLE",
                 "identity_rule": "first exact B0-ranked candidate with complete evidence and no HIGH risk match",
                 "risk_action": "FILTER_ONLY_NO_RESCORING",
-                "allocation": "FULL_ENUMERATED", "tickets": FULL_TICKETS,
+                "allocation": "FULL_ENUMERATED",
+                "tickets": FULL_TICKETS,
                 "stake_yuan": FULL_STAKE_YUAN,
             },
         ]
@@ -419,23 +481,58 @@ def build(*, output: Path, runtime_db: Path, availability_checked_at_utc: str) -
             ("NO_ELIGIBLE_IDENTITY", "ISSUE", "ABSTAIN"),
             ("LATE_CAPTURE", "FACT", "AUDIT_ONLY"),
         ]
-        error_rows = [{"code": code, "scope": scope, "action": action} for code, scope, action in errors]
+        error_rows = [
+            {"code": code, "scope": scope, "action": action}
+            for code, scope, action in errors
+        ]
         write_csv(stage / "error_taxonomy.csv", list(error_rows[0]), error_rows)
         metrics = [
-            ("coverage", "NATIVE", "coverage/eligible/abstain counts and reasons", "PREOUTCOME"),
-            ("identity_change", "MATCHED", "M1 versus B0 identity changed", "PREOUTCOME"),
-            ("probability_calibration", "MATCHED", "B0 probability LogLoss/Brier/reliability on selected legs", "POSTOUTCOME"),
-            ("pre_tax_roi", "NATIVE_AND_MATCHED", "stake/gross/net/stake; B0 versus M1", "POSTOUTCOME"),
-            ("risk", "NATIVE_AND_MATCHED", "HHI/ex-largest/drawdown/time blocks", "POSTOUTCOME"),
+            (
+                "coverage",
+                "NATIVE",
+                "coverage/eligible/abstain counts and reasons",
+                "PREOUTCOME",
+            ),
+            (
+                "identity_change",
+                "MATCHED",
+                "M1 versus B0 identity changed",
+                "PREOUTCOME",
+            ),
+            (
+                "probability_calibration",
+                "MATCHED",
+                "B0 probability LogLoss/Brier/reliability on selected legs",
+                "POSTOUTCOME",
+            ),
+            (
+                "pre_tax_roi",
+                "NATIVE_AND_MATCHED",
+                "stake/gross/net/stake; B0 versus M1",
+                "POSTOUTCOME",
+            ),
+            (
+                "risk",
+                "NATIVE_AND_MATCHED",
+                "HHI/ex-largest/drawdown/time blocks",
+                "POSTOUTCOME",
+            ),
         ]
-        metric_rows = [{"metric": a, "denominator": b, "definition": c, "stage": d} for a,b,c,d in metrics]
+        metric_rows = [
+            {"metric": a, "denominator": b, "definition": c, "stage": d}
+            for a, b, c, d in metrics
+        ]
         write_csv(stage / "metric_contract.csv", list(metric_rows[0]), metric_rows)
-        sample_rows = [{
-            "sample_id": "SAMPLE_1", "status": "WAITING_FOR_POST_ACTIVATION_INPUT",
-            "minimum_issue_exclusive": minimum_issue,
-            "selector": "first valid issue after PI acceptance",
-            "decision_count": 0, "outcome_count": 0,
-        }]
+        sample_rows = [
+            {
+                "sample_id": "SAMPLE_1",
+                "status": "WAITING_FOR_POST_ACTIVATION_INPUT",
+                "minimum_issue_exclusive": minimum_issue,
+                "selector": "first valid issue after PI acceptance",
+                "decision_count": 0,
+                "outcome_count": 0,
+            }
+        ]
         write_csv(stage / "sample_registry.csv", list(sample_rows[0]), sample_rows)
 
         source_binding = {
@@ -526,7 +623,17 @@ def main() -> None:
     parser.add_argument("--availability-checked-at", required=True)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     args = parser.parse_args()
-    print(json.dumps(build(output=args.output, runtime_db=args.runtime_db, availability_checked_at_utc=args.availability_checked_at), indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            build(
+                output=args.output,
+                runtime_db=args.runtime_db,
+                availability_checked_at_utc=args.availability_checked_at,
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":

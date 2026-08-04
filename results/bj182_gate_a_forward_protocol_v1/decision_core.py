@@ -37,6 +37,14 @@ FROZEN_SOURCE_HASHES = {
 TRACE_SOURCE_HASH_KEYS = frozenset(
     (*FROZEN_SOURCE_HASHES, "baseline_package_sha256", "as_of_export_sha256")
 )
+FROZEN_MINIMUM_ISSUE_EXCLUSIVE = 26082
+FROZEN_FALSE_AUDIT_FIELDS = (
+    "outcome_accessed",
+    "probability_retuned",
+    "selector_retuned",
+    "allocator_changed",
+    "ticket_economics_changed",
+)
 
 AVAILABILITY_STATES = ("AVAILABLE", "DOUBTFUL", "UNAVAILABLE", "UNKNOWN")
 ROLE_CLASSES = (
@@ -86,8 +94,47 @@ def build_decision_trace(trace_without_id: Mapping[str, Any]) -> dict[str, Any]:
     trace = json.loads(canonical_json(trace_without_id))
     trace.pop("decision_id", None)
     trace["decision_id"] = compute_decision_id(trace)
+    validate_frozen_constants(trace)
     validate_decision_trace(trace)
     return trace
+
+
+def validate_frozen_constants(trace: Mapping[str, Any]) -> None:
+    """Enforce declarative schema constants without a runtime JSON-Schema dependency."""
+
+    if trace.get("schema_version") != SCHEMA_VERSION:
+        raise DecisionContractError("schema_version does not match the frozen contract")
+    if trace.get("contract") != CONTRACT:
+        raise DecisionContractError("contract does not match the frozen contract")
+    activation = trace.get("activation")
+    if not isinstance(activation, Mapping) or (
+        activation.get("minimum_issue_exclusive") != FROZEN_MINIMUM_ISSUE_EXCLUSIVE
+    ):
+        raise DecisionContractError("minimum_issue_exclusive must equal 26082")
+    baseline = trace.get("baseline")
+    if not isinstance(baseline, Mapping) or baseline.get("selector") != "B0_BEST_FULL":
+        raise DecisionContractError("baseline selector does not match B0_BEST_FULL")
+    evidence = trace.get("evidence")
+    if not isinstance(evidence, Mapping):
+        raise DecisionContractError("evidence section is missing")
+    if evidence.get("ledger_schema_version") != "message_evidence_ledger_v1":
+        raise DecisionContractError(
+            "ledger schema version does not match the frozen contract"
+        )
+    if evidence.get("allowed_provenance_tiers") != list(ALLOWED_PROVENANCE_TIERS):
+        raise DecisionContractError(
+            "allowed provenance tiers do not match the frozen contract"
+        )
+    if evidence.get("required_kind_max_age_seconds") != REQUIRED_KIND_MAX_AGE_SECONDS:
+        raise DecisionContractError(
+            "evidence freshness limits do not match the frozen contract"
+        )
+    audit = trace.get("audit")
+    if not isinstance(audit, Mapping):
+        raise DecisionContractError("audit section is missing")
+    for field in FROZEN_FALSE_AUDIT_FIELDS:
+        if audit.get(field) is not False:
+            raise DecisionContractError(f"audit.{field} must be false")
 
 
 def _choice(value: object, allowed: Sequence[str], field: str) -> str:
@@ -130,9 +177,7 @@ def consumer_confidence_band(fact: Mapping[str, Any]) -> str:
         return "LOW"
     if tier in {"TIER_0_OFFICIAL", "TIER_1_PRIMARY"} and score >= 0.75:
         return "HIGH"
-    if (
-        tier == "TIER_2_RELIABLE" and score >= 0.75
-    ) or (
+    if (tier == "TIER_2_RELIABLE" and score >= 0.75) or (
         tier in {"TIER_0_OFFICIAL", "TIER_1_PRIMARY"} and score >= 0.50
     ):
         return "MEDIUM"
@@ -258,9 +303,7 @@ def assess_match(
     normalized: list[dict[str, object]] = []
     try:
         normalized = [
-            normalize_fact(
-                fact, home_team_id=home_team_id, away_team_id=away_team_id
-            )
+            normalize_fact(fact, home_team_id=home_team_id, away_team_id=away_team_id)
             for fact in active
         ]
     except (DecisionContractError, KeyError, TypeError, ValueError):
@@ -323,8 +366,10 @@ def assess_match(
             if row["direction"] != "NO_DIRECTION"
         }
     )
-    translation = directions[0] if len(directions) == 1 else (
-        "SYMMETRIC_UNCERTAINTY" if directions else "NO_CHANGE"
+    translation = (
+        directions[0]
+        if len(directions) == 1
+        else ("SYMMETRIC_UNCERTAINTY" if directions else "NO_CHANGE")
     )
     return {
         "match_id": match_id,
@@ -358,7 +403,9 @@ def select_message_identity(
     for rank, candidate in enumerate(baseline_candidates, start=1):
         match_ids = list(candidate["selected_match_ids"])
         if len(match_ids) != 7 or len(set(match_ids)) != 7:
-            raise DecisionContractError("every candidate must contain seven unique matches")
+            raise DecisionContractError(
+                "every candidate must contain seven unique matches"
+            )
         rows = [assessments.get(str(match_id)) for match_id in match_ids]
         if any(row is None or row.get("decision_status") != "ELIGIBLE" for row in rows):
             continue
@@ -392,7 +439,9 @@ def validate_frozen_candidate_order(
     fingerprints: set[str] = set()
     for expected_rank, candidate in enumerate(candidates, start=1):
         if candidate.get("source_rank") != expected_rank:
-            raise DecisionContractError("candidate source_rank must equal list position")
+            raise DecisionContractError(
+                "candidate source_rank must equal list position"
+            )
         try:
             score = float(candidate["b0_score"])
         except (KeyError, TypeError, ValueError) as exc:
@@ -402,14 +451,18 @@ def validate_frozen_candidate_order(
         portfolio_id = str(candidate.get("portfolio_id") or "")
         fingerprint = str(candidate.get("identity_fingerprint") or "")
         if not portfolio_id or portfolio_id in portfolio_ids:
-            raise DecisionContractError("candidate portfolio_id must be nonempty and unique")
+            raise DecisionContractError(
+                "candidate portfolio_id must be nonempty and unique"
+            )
         if not fingerprint or fingerprint in fingerprints:
             raise DecisionContractError(
                 "candidate identity_fingerprint must be nonempty and unique"
             )
         match_ids = [str(value) for value in candidate.get("selected_match_ids", [])]
         if len(match_ids) != 7 or len(set(match_ids)) != 7 or not all(match_ids):
-            raise DecisionContractError("every candidate must contain seven unique matches")
+            raise DecisionContractError(
+                "every candidate must contain seven unique matches"
+            )
         portfolio_ids.add(portfolio_id)
         fingerprints.add(fingerprint)
         keys.append((-score, portfolio_id))
@@ -463,10 +516,16 @@ def validate_decision_trace(trace: Mapping[str, Any]) -> None:
         assessments = trace["match_assessments"]
         arms = trace["arms"]
     except (KeyError, TypeError) as exc:
-        raise DecisionContractError("decision trace is missing a required section") from exc
-    if not all(
-        isinstance(value, Mapping) for value in (activation, baseline, evidence)
-    ) or not isinstance(candidates, Sequence) or isinstance(candidates, (str, bytes)):
+        raise DecisionContractError(
+            "decision trace is missing a required section"
+        ) from exc
+    if (
+        not all(
+            isinstance(value, Mapping) for value in (activation, baseline, evidence)
+        )
+        or not isinstance(candidates, Sequence)
+        or isinstance(candidates, (str, bytes))
+    ):
         raise DecisionContractError("decision trace sections have invalid shapes")
     if not isinstance(assessments, Sequence) or isinstance(assessments, (str, bytes)):
         raise DecisionContractError("match_assessments must be an array")
@@ -479,8 +538,12 @@ def validate_decision_trace(trace: Mapping[str, Any]) -> None:
         minimum_issue = int(activation["minimum_issue_exclusive"])
     except (KeyError, TypeError, ValueError) as exc:
         raise DecisionContractError("issue boundaries must be integers") from exc
+    if minimum_issue != FROZEN_MINIMUM_ISSUE_EXCLUSIVE:
+        raise DecisionContractError("minimum_issue_exclusive must equal 26082")
     if issue <= minimum_issue:
-        raise DecisionContractError("issue must be strictly after the activation boundary")
+        raise DecisionContractError(
+            "issue must be strictly after the activation boundary"
+        )
 
     accepted_at = _timestamp(
         activation["gate_a_acceptance_recorded_at_utc"], "Gate-A acceptance"
@@ -503,7 +566,9 @@ def validate_decision_trace(trace: Mapping[str, Any]) -> None:
             "evidence receipt/cutoff chronology must be bounded by activation and freeze"
         )
     if input_as_of > cutoff:
-        raise DecisionContractError("baseline input as-of cannot follow evidence cutoff")
+        raise DecisionContractError(
+            "baseline input as-of cannot follow evidence cutoff"
+        )
 
     coverage_hashes = evidence.get("coverage_report_sha256_by_kind")
     if not isinstance(coverage_hashes, Mapping) or set(coverage_hashes) != set(
@@ -515,13 +580,20 @@ def validate_decision_trace(trace: Mapping[str, Any]) -> None:
 
     audit = trace.get("audit")
     source_hashes = audit.get("source_hashes") if isinstance(audit, Mapping) else None
-    if not isinstance(source_hashes, Mapping) or set(source_hashes) != TRACE_SOURCE_HASH_KEYS:
-        raise DecisionContractError("audit source hashes must use exactly the frozen keys")
+    if (
+        not isinstance(source_hashes, Mapping)
+        or set(source_hashes) != TRACE_SOURCE_HASH_KEYS
+    ):
+        raise DecisionContractError(
+            "audit source hashes must use exactly the frozen keys"
+        )
     for key, expected_hash in FROZEN_SOURCE_HASHES.items():
         if source_hashes.get(key) != expected_hash:
             raise DecisionContractError(f"audit source hash mismatch: {key}")
     if source_hashes.get("baseline_package_sha256") != baseline.get("package_id"):
-        raise DecisionContractError("baseline package source hash is not bound to package_id")
+        raise DecisionContractError(
+            "baseline package source hash is not bound to package_id"
+        )
     if source_hashes.get("as_of_export_sha256") != evidence.get("as_of_export_sha256"):
         raise DecisionContractError("as-of export source hash is not bound to evidence")
 
@@ -547,7 +619,9 @@ def validate_decision_trace(trace: Mapping[str, Any]) -> None:
             raise DecisionContractError("match assessment must be an object")
         match_id = str(row.get("match_id") or "")
         if not match_id or match_id in assessment_by_match:
-            raise DecisionContractError("match assessment IDs must be nonempty and unique")
+            raise DecisionContractError(
+                "match assessment IDs must be nonempty and unique"
+            )
         assessment_by_match[match_id] = row
 
     candidate_match_ids = {
@@ -569,19 +643,10 @@ def validate_decision_trace(trace: Mapping[str, Any]) -> None:
                 "decision freeze must be strictly before every candidate kickoff"
             )
 
-    baseline_rows = [assessment_by_match.get(match_id) for match_id in baseline_identity[2]]
-    annotation_eligible = all(
-        row is not None and row.get("decision_status") == "ELIGIBLE"
-        for row in baseline_rows
-    )
-    m0 = (
-        _selected_arm(
-            arm="M0_MESSAGE_ANNOTATION",
-            role="DIAGNOSTIC",
-            identity=baseline_identity,
-        )
-        if annotation_eligible
-        else _abstain_arm(arm="M0_MESSAGE_ANNOTATION", role="DIAGNOSTIC")
+    m0 = _selected_arm(
+        arm="M0_MESSAGE_ANNOTATION",
+        role="DIAGNOSTIC",
+        identity=baseline_identity,
     )
     m1_selection = select_message_identity(candidates, assessment_by_match)
     m1 = {
@@ -613,7 +678,9 @@ def validate_decision_trace(trace: Mapping[str, Any]) -> None:
             raise DecisionContractError("arm names must be unique")
         actual[arm] = row
     if set(actual) != set(expected):
-        raise DecisionContractError("decision trace must contain exactly the frozen arms")
+        raise DecisionContractError(
+            "decision trace must contain exactly the frozen arms"
+        )
     for arm, expected_row in expected.items():
         if dict(actual[arm]) != expected_row:
             raise DecisionContractError(f"{arm} does not match frozen policy output")

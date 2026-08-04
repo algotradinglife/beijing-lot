@@ -1,7 +1,7 @@
 {
   "contract": "BJ-FWD-MESSAGE-CHAIN-N7-001",
-  "decision_core_sha256": "dfa848683ad5b878b555a7a1659465385629c7b9d29d75d7c556b23e02252843",
-  "decision_schema_sha256": "3a3e9b0bb00f5e54898d6e28f789a30d3022d457398a901c8ee1702d000795aa",
+  "decision_core_sha256": "0b5591c562b3da71b7eb14a410e4666badcbfd3b1f2e54cab30fa59eebc16fc9",
+  "decision_schema_sha256": "be85ee3b4f2c08a4cc3b5b95d7d287dd68af64b7c6461b5fdb87f67b8792eb44",
   "runtime_availability": {
     "boundary": "OUTCOME_UNEXPOSED_ALLOWLIST_PROJECTION_ONLY",
     "database_path": "data/beidan_live.db",

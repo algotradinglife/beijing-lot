@@ -158,7 +158,8 @@ def test_fail_closed_coverage_and_symmetric_risk_translation():
     missing = all_coverage()
     missing["expected_lineup"] = coverage(
         required_fact_kinds=["expected_lineup"],
-        missing_fact_kinds=["expected_lineup"], decision_chain_eligible=False
+        missing_fact_kinds=["expected_lineup"],
+        decision_chain_eligible=False,
     )
     blocked = CORE.assess_match(
         match_id="m1",
@@ -341,9 +342,7 @@ def test_package_build_is_atomic_deterministic_and_manifest_complete(tmp_path):
         capture_output=True,
         text=True,
     )
-    assert json.loads(completed.stdout)["manifest_sha256"] == receipt[
-        "manifest_sha256"
-    ]
+    assert json.loads(completed.stdout)["manifest_sha256"] == receipt["manifest_sha256"]
     assert not (first / "__pycache__").exists()
     assert all(
         (first / path.name).read_bytes() == (replay / path.name).read_bytes()
@@ -377,9 +376,7 @@ def test_package_build_is_atomic_deterministic_and_manifest_complete(tmp_path):
     } <= taxonomy
     manifest = json.loads((first / "SHA256SUMS.json").read_text())
     assert sorted(manifest) == sorted(
-        path.name
-        for path in first.iterdir()
-        if path.name != "SHA256SUMS.json"
+        path.name for path in first.iterdir() if path.name != "SHA256SUMS.json"
     )
     assert all(
         hashlib.sha256((first / name).read_bytes()).hexdigest() == expected
@@ -539,8 +536,43 @@ def test_decision_trace_schema_requires_all_three_distinct_arms():
 
     arbitrary_id = json.loads(json.dumps(trace))
     arbitrary_id["decision_id"] = "a" * 64
-    with pytest.raises(CORE.DecisionContractError, match="canonical trace content hash"):
+    with pytest.raises(
+        CORE.DecisionContractError, match="canonical trace content hash"
+    ):
         CORE.validate_decision_trace(arbitrary_id)
+
+    wrong_contract = json.loads(json.dumps(trace))
+    wrong_contract["contract"] = "WRONG"
+    with pytest.raises(CORE.DecisionContractError, match="contract does not match"):
+        CORE.build_decision_trace(wrong_contract)
+
+    outcome_accessed = json.loads(json.dumps(trace))
+    outcome_accessed["audit"]["outcome_accessed"] = True
+    with pytest.raises(
+        CORE.DecisionContractError, match="outcome_accessed must be false"
+    ):
+        CORE.build_decision_trace(outcome_accessed)
+
+    mutable_boundary = json.loads(json.dumps(trace))
+    mutable_boundary["activation"]["minimum_issue_exclusive"] = 26083
+    mutable_boundary["issue"] = "26084"
+    with pytest.raises(CORE.DecisionContractError, match="must equal 26082"):
+        CORE.build_decision_trace(mutable_boundary)
+
+    m0_drift = json.loads(json.dumps(trace))
+    m0_drift["arms"][1] = {
+        "arm": "M0_MESSAGE_ANNOTATION",
+        "role": "DIAGNOSTIC",
+        "policy_status": "ABSTAIN_NO_ELIGIBLE_IDENTITY",
+        "selected_portfolio_id": "",
+        "selected_identity_fingerprint": "",
+        "selected_match_ids": [],
+        "source_rank": None,
+        "planned_ticket_count": 0,
+        "planned_stake_yuan": 0,
+    }
+    with pytest.raises(CORE.DecisionContractError, match="frozen policy output"):
+        CORE.build_decision_trace(m0_drift)
 
     early = json.loads(json.dumps(trace))
     early["baseline"]["package_created_at_utc"] = "2026-08-04T11:59:59Z"

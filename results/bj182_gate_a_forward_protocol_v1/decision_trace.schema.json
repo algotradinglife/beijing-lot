@@ -84,7 +84,7 @@
       "properties": {
         "gate_a_acceptance_url": {"type": "string", "format": "uri"},
         "gate_a_acceptance_recorded_at_utc": {"$ref": "#/$defs/timestamp"},
-        "minimum_issue_exclusive": {"type": "integer", "minimum": 26082}
+        "minimum_issue_exclusive": {"const": 26082}
       }
     },
     "candidate": {
