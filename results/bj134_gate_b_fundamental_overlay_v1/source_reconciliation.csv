@@ -1,0 +1,2 @@
+control,expected_settled_issue_count,actual_settled_issue_count,expected_stake_yuan,actual_stake_yuan,expected_gross_yuan,actual_gross_yuan,expected_no_tax_roi,actual_no_tax_roi,reconciliation_status
+B0_BEST_FULL,163,163,712962.000000,712962.000000,645459.393809,645459.393811,-0.094679107990,-0.094679107988,PASS

@@ -800,6 +800,21 @@ sleeve，而非稳定 edge。
 不跨票或跨期汇总。完整定义、表格、三张图和不可变包见
 [`Issue-176-N7-Equity-Risk`](Issue-176-N7-Equity-Risk.md)。
 
+## #134 FULL N7 基本面与决策链 overlay（2026-08-04）
+
+#134 在 #170 的 BEST_FULL/FULL controlling baseline 上冻结比较 L1/T1/M1/F1/D1 与
+三个 leave-one-factor-out arms。结果为 `NO_OVERLAY_PROMOTION / RETAIN_B0`：B0 native
+税前 ROI `-9.47%`；全部 8 个 overlay 的 ALL_189 paired lift 均为负。F−M 最接近，
+也仍为 `-0.86pp`（20k bootstrap 95% CI `[-8.82pp,+7.80pp]`）；M1 为 `-7.58pp`，
+区间上界仍略低于 0。
+
+CHOICE_113 中 T1 的 changed identities 恰好 27 胜/27 负，但金额加权 lift 仍
+`-6.78pp`，说明不能用简单胜负数替代利润幅度。INVARIANT_76 完全相同；冻结的
+handicap-contradiction stage 在全部 424 candidates 上为零，没有 ranking power。
+所有 arm 去最大 issue/year 后仍负，因此没有触发 strict independent EV，也没有重置
+接受的负 B0 incumbent。详细表格、逐期 equity/drawdown、YEAR/FOLD/LOYO 与不可变绑定见
+[`Issue-134-Fundamental-Overlay-N7`](Issue-134-Fundamental-Overlay-N7.md)。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
