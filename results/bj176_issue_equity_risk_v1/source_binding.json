@@ -1,0 +1,35 @@
+{
+  "allocator_sha256": "5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93",
+  "bj167_terminal": {
+    "content_identity_sha256": "bfe29083b74d5d212555c261e888d6f5d4d5fd163b56e1876944d1f5d04aa5c7",
+    "manifest_sha256": "b3fa02f5cc2722932ff55fffb0bd9672508f6e78104cfb2458ad81c826f3b313",
+    "package": "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1",
+    "payload_count": 24
+  },
+  "bj170_gate_a": {
+    "content_identity_sha256": "adc4d0f96628c784149da998a20e8830cde26db4001fe457eaf9ca4b7bb74223",
+    "manifest_sha256": "bb60ac5638d29674ad8c1c05f1ffe3ab9cdf12acb70ebdae6cea679743136d87",
+    "package": "bj170_gate_a_preoutcome_v2",
+    "payload_count": 17
+  },
+  "bj170_gate_b": {
+    "content_identity_sha256": "75325aa0f60e277ad3fbf9d90116450833106bc3863b412ea3efcad9948a47b2",
+    "manifest_sha256": "08e83353ad483e5d75911116a413186f007385f5dd37b8c4b757ac903221e512",
+    "package": "bj170_gate_b_selector_allocator_stack_v1",
+    "payload_count": 25
+  },
+  "canonical_outcomes": {
+    "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+    "package": "bj95_gate_b_outcome_settlement_v2r8",
+    "payload_count": 16
+  },
+  "chronology": {
+    "content_identity_sha256": "36d6afcc33a5b5ceb3e4a990bfe6ec05503be115270c3489f4973dc3a59dd236",
+    "issue_census_sha256": "69d7463b6f83af4127059d6ea34095292646ec2a98abc39d56551b76d6ea6dd5",
+    "manifest_sha256": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
+    "package": "bj137_gate_a_preoutcome_v2",
+    "payload_count": 14,
+    "role": "transitively bound #167 source; kickoff timestamps only"
+  }
+}
