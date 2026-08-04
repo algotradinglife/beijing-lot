@@ -1,0 +1,43 @@
+{
+  "availability_checked_at_utc": "2026-08-04T11:18:50Z",
+  "database_mode": "READ_ONLY_WAL_SNAPSHOT",
+  "database_path": "data/beidan_live.db",
+  "detail": "The accepted #181 ledger contract exists, but no operational message ledger or valid post-activation B0 package exists. Existing issues are excluded; no decision or outcome is fabricated.",
+  "existing_post_26079_issues": [
+    {
+      "disposition": "EXCLUDED_PRE_PROTOCOL",
+      "first_created_ts": "2026-07-31 05:37:09",
+      "first_kickoff_ts": "2026-07-31T00:00:00",
+      "issue": "26081",
+      "last_created_ts": "2026-07-31 05:37:09",
+      "last_kickoff_ts": "2026-08-04T08:15:00",
+      "match_count": 202
+    },
+    {
+      "disposition": "EXCLUDED_PRE_PROTOCOL",
+      "first_created_ts": "2026-08-04 03:11:28",
+      "first_kickoff_ts": "2026-08-04T00:00:00",
+      "issue": "26082",
+      "last_created_ts": "2026-08-04 03:11:28",
+      "last_kickoff_ts": "2026-08-07T07:00:00",
+      "match_count": 42
+    }
+  ],
+  "message_ledger_database_status": "ABSENT_AT_GATE_A_FREEZE",
+  "minimum_issue_exclusive": 26082,
+  "projection": [
+    "issue",
+    "match_id",
+    "match_idx",
+    "kickoff_ts",
+    "league",
+    "home",
+    "away",
+    "handicap_line",
+    "created_ts"
+  ],
+  "projection_row_count": 244,
+  "projection_sha256": "6b2d839e514a885c1b72d0b8c580f5c733eb606cca95a42d1c09cb35265f9900",
+  "sample_status": "WAITING_FOR_POST_ACTIVATION_INPUT",
+  "sqlite_data_version": 2
+}

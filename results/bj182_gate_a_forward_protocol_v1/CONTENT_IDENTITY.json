@@ -1,0 +1,31 @@
+{
+  "contract_version": "bj182-gate-a-forward-protocol-v1",
+  "controls": {
+    "arms": [
+      "B0_BASELINE_SHADOW",
+      "M0_MESSAGE_ANNOTATION",
+      "M1_MESSAGE_RISK_RERANK"
+    ],
+    "availability_checked_at_utc": "2026-08-04T11:18:50Z",
+    "minimum_issue_exclusive": 26082,
+    "outcome_accessed": false,
+    "retuning_permitted": false,
+    "source_180_merge": "a662a6efaeed1f9fdbee95575a346dd6813cdb12",
+    "source_181_merge": "4e186db4f293e04429898d4077f823e0d0efa62a"
+  },
+  "payloads": {
+    "README.md": "eb9391aa3e53e55a66b41863fee517bb0c6ed67d1ce11eead16330f02a490d58",
+    "arm_registry.csv": "c005c00c52392a4d943ae6b8c41ecaa215f61311e896d9eff44098486f20bdf4",
+    "availability_receipt.json": "c79f758a7b4f84955d74ebb1c558d212e48c0a28b7d4bc9d6bbbfb3c12149d77",
+    "decision_core.py": "4e8370160c5a90747531a2968229786b91589687ae79e49a7f51b195091c7b56",
+    "decision_trace.schema.json": "6d0f447e8098103c377db52c17cecc5e17ef73fed0ae918f3510332ff356461c",
+    "error_taxonomy.csv": "4ed241d09811e86ceb1833d9e0c044b78d75f2a6bf07d68d3ebf6bfd250c4488",
+    "evidence_policy.csv": "281cf79d695c2330a931a92d4fb2cb10b9b94ebb354a2a71aaa101688138296c",
+    "forward_protocol.json": "779b84ce929bd5a47c151ec19339892a85611f6c6600d4dcb9ba2a4a801b2278",
+    "freeze_runner.py": "f5ab448b060166d1fc2e70648be41e34678ea2180c963b0358b871de0a1e2159",
+    "gate_a_card.json": "09e4bcccd23b1815420e4e3d85db10d240ee909ff79b21d85c2efe9509d09320",
+    "metric_contract.csv": "4daf45038e0d74a02b5d0c83c6f8f1c53d0757351fb4d920022f2753e878de67",
+    "sample_registry.csv": "f5c40563b243e2cb2ee003ccd0a5222dc5856157a769bd56fbb9e8d04304edb5",
+    "source_binding.json": "67d943d8edde5ec35d67f258e2b40d2276058063f4d1c609d2dcd01bd497480d"
+  }
+}

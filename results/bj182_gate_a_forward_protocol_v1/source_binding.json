@@ -1,0 +1,27 @@
+{
+  "contract": "BJ-FWD-MESSAGE-CHAIN-N7-001",
+  "decision_core_sha256": "4e8370160c5a90747531a2968229786b91589687ae79e49a7f51b195091c7b56",
+  "decision_schema_sha256": "6d0f447e8098103c377db52c17cecc5e17ef73fed0ae918f3510332ff356461c",
+  "runtime_availability": {
+    "boundary": "OUTCOME_UNEXPOSED_ALLOWLIST_PROJECTION_ONLY",
+    "database_path": "data/beidan_live.db",
+    "projection_row_count": 244,
+    "projection_sha256": "6b2d839e514a885c1b72d0b8c580f5c733eb606cca95a42d1c09cb35265f9900"
+  },
+  "source_180": {
+    "disposition": "NO_TEAM_MODEL_PROMOTION_RETAIN_B0",
+    "gate_b_content_identity_sha256": "d9b41dec45c1c6215755d9dad8774e00fc0f19f564ee6ef8bf2387cb8d309108",
+    "gate_b_manifest_sha256": "9f48b29325d817ce873bd1430be459c9e70ad052064f8e03e02ccbc1d8bc6fcf",
+    "gate_b_package": "results/bj180_gate_b_team_matchup_v1",
+    "merge_commit": "a662a6efaeed1f9fdbee95575a346dd6813cdb12"
+  },
+  "source_181": {
+    "asof_schema_sha256": "e763428d703197ec08eb2c4955ee45bc9925c84941bed8f3a9ac253edec161bd",
+    "coverage_schema_sha256": "22ffbaf6ef79eb484425c48307a29c08ba73d6a0bbf743e4023b37838ed9181d",
+    "disposition": "ACCEPTED_DATA_CONTRACT_ONLY",
+    "ledger_path": "src/message_evidence/ledger.py",
+    "ledger_sha256": "3c065be028c4022d33487095f08b9838c284853614f6617646dabe5e08c31229",
+    "merge_commit": "4e186db4f293e04429898d4077f823e0d0efa62a"
+  },
+  "version": "bj182-gate-a-forward-protocol-v1"
+}
