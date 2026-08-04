@@ -166,6 +166,10 @@ def test_detector_grid_preserves_probability_line_and_unidentified_mu_axes():
         ("DELTA_MU", "DIAGNOSTIC_UNAVAILABLE"): 60,
     }
     assert {row["top_k"] for row in rows} == {"1", "2", "4", "ALL"}
+    available = [row for row in rows if row["availability"] == "AVAILABLE"]
+    assert all("inherited source rank" not in row["tie_break"] for row in available)
+    assert all("first seven" in row["tie_break"] for row in available)
+    assert all("fewer than seven" in row["no_bet_rule"] for row in available)
 
 
 def test_independent_registry_excludes_market_and_tl_feature_paths():
@@ -222,7 +226,7 @@ def test_union_and_agreement_freeze_explicit_per_leg_probability_sources():
         consensus_p=(0.35, 0.3, 0.35),
         fundamental_delta=(0.25, -0.05, -0.20),
         calibrated_delta=(0.15, 0.0, -0.15),
-        fundamental_z=(2.5, -0.5, -2.0),
+        fundamental_z=(1.25, -0.5, -99.0),
         calibrated_z=(1.5, 0.0, -1.5),
         t1_expected_margin=0.3,
         line_residual_mu=0.3,
@@ -233,6 +237,7 @@ def test_union_and_agreement_freeze_explicit_per_leg_probability_sources():
     assert union is not None and agreement is not None
     assert union.estimator_source == "FUNDAMENTAL_T1_SCORE_DISTRIBUTION"
     assert union.allocation_p == record.fundamental_p
+    assert union.abs_z == 1.25
     assert agreement.estimator_source == (
         "STRICT_AGREEMENT_WEAKER::CALIBRATED_MARKET_ESTIMATOR"
     )

@@ -1509,8 +1509,8 @@ def build_detector_grid() -> list[dict[str, object]]:
                                     "abs_line_residual_mu_min": "",
                                     "availability": "AVAILABLE",
                                     "unavailable_reason": "",
-                                    "tie_break": "identity mean retained magnitude desc, retained count desc, inherited source rank asc, portfolio_id asc; match magnitude desc, match_id asc",
-                                    "no_bet_rule": "zero qualifying frozen identity => zero tickets and zero stake",
+                                    "tie_break": "direct eligible-match divergence magnitude desc, match_idx asc, match_id asc; exact first seven form N7; UNION exact source tie fundamental first; MODEL_AGREEMENT exact weaker-source tie fundamental first",
+                                    "no_bet_rule": "fewer than seven base-gated metrics OR threshold failure => zero tickets/stake; K1/K2/K4 require the strongest K of the selected seven to pass; ALL requires all seven",
                                     "outcome_boundary": OUTCOME_BOUNDARY,
                                 }
                             )
@@ -1536,8 +1536,8 @@ def build_detector_grid() -> list[dict[str, object]]:
                         **descriptor,
                         "availability": "AVAILABLE",
                         "unavailable_reason": "",
-                        "tie_break": "identity mean retained absolute line residual desc, retained count desc, inherited source rank asc, portfolio_id asc; match magnitude desc, match_id asc",
-                        "no_bet_rule": "zero qualifying frozen identity => zero tickets and zero stake",
+                        "tie_break": "direct eligible-match absolute line residual desc, match_idx asc, match_id asc; exact first seven form N7",
+                        "no_bet_rule": "fewer than seven base-gated line-residual metrics OR threshold failure => zero tickets/stake; K1/K2/K4 require the strongest K of the selected seven to pass; ALL requires all seven",
                         "outcome_boundary": OUTCOME_BOUNDARY,
                     }
                 )
@@ -1742,10 +1742,16 @@ def metric_for_record(
 
     fundamental_features = tuple_features(record.fundamental_delta)
     calibrated_features = tuple_features(record.calibrated_delta)
+    fundamental_extreme_index = CODE_ORDER.index(
+        str(fundamental_features["extreme_code"])
+    )
+    calibrated_extreme_index = CODE_ORDER.index(
+        str(calibrated_features["extreme_code"])
+    )
     fundamental = DetectorMetric(
         record=record,
         magnitude=float(fundamental_features["magnitude"]),
-        abs_z=max(abs(value) for value in record.fundamental_z),
+        abs_z=abs(record.fundamental_z[fundamental_extreme_index]),
         favored_code=str(fundamental_features["favored_code"]),
         omitted_code=str(fundamental_features["omitted_code"]),
         estimator_source="FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
@@ -1754,7 +1760,7 @@ def metric_for_record(
     calibrated = DetectorMetric(
         record=record,
         magnitude=float(calibrated_features["magnitude"]),
-        abs_z=max(abs(value) for value in record.calibrated_z),
+        abs_z=abs(record.calibrated_z[calibrated_extreme_index]),
         favored_code=str(calibrated_features["favored_code"]),
         omitted_code=str(calibrated_features["omitted_code"]),
         estimator_source="CALIBRATED_MARKET_ESTIMATOR",
