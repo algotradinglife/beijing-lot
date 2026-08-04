@@ -1,0 +1,67 @@
+{
+  "absolute_positive_cells": [
+    "MODEL_SOURCE/MODEL_CAP1_M512"
+  ],
+  "bootstrap": {
+    "compressed_sha256": "6c6a250b948afa044f138412866235d3a079a93afff5e2c71c7ee9dfa1eaa834",
+    "dtype": "uint16_le",
+    "generator": "random.Random(seed).randrange(issue_count), row-major replicate \u00d7 issue draw",
+    "issue_count": 177,
+    "replicates": 20000,
+    "seed": 170177,
+    "uncompressed_bytes": 7080000,
+    "uncompressed_sha256": "961e433f426d402cb201eb820c3beaeb5f5af6b1560e424514387ead0edb465b"
+  },
+  "contract": "BJ-HIST-N7-SELECTOR-ALLOCATOR-STACK-001",
+  "decision": {
+    "decision": "SELECTION_ONLY",
+    "inheritance_panel": "BEST_FULL \u00d7 FULL_ENUMERATED",
+    "rationale": "Both fixed sleeves have non-positive matched lift on controlling common support; the frozen -9.47% native selection baseline is not demoted."
+  },
+  "economics": {
+    "primary": "pre-tax ROI",
+    "secondary": "tax-adjusted ROI",
+    "stake": "\u00a52 per independent ticket",
+    "tax": "20% per winning ticket when that ticket payout >= \u00a510,000; no pooling"
+  },
+  "issue": 170,
+  "primary_support": {
+    "frozen_issue_count": 177,
+    "settled_common_issue_count": 141,
+    "support_hash": "d4b6bed20db88c9f153c7ecff2a02dcc050f511fa0475b75b8fa8118c6f61be7",
+    "unavailable_common_issue_count": 36
+  },
+  "promotion_boundary": "same-history post-selection transfer study; no point estimate alone grants production/purchase/betting authority",
+  "source_binding": {
+    "allocator_sha256": "5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93",
+    "bj167_terminal": {
+      "content_identity_sha256": "bfe29083b74d5d212555c261e888d6f5d4d5fd163b56e1876944d1f5d04aa5c7",
+      "manifest_sha256": "b3fa02f5cc2722932ff55fffb0bd9672508f6e78104cfb2458ad81c826f3b313",
+      "payload_count": 24
+    },
+    "gate_a": {
+      "content_identity_sha256": "adc4d0f96628c784149da998a20e8830cde26db4001fe457eaf9ca4b7bb74223",
+      "manifest_sha256": "bb60ac5638d29674ad8c1c05f1ffe3ab9cdf12acb70ebdae6cea679743136d87",
+      "payload_count": 17
+    },
+    "gate_a_merge": "29d34610bae2d3ed0bf68bdba1a339edfd54152b",
+    "outcome_package": {
+      "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+      "manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+      "payload_count": 16
+    }
+  },
+  "source_row_reproduction": {
+    "all_pass": true,
+    "row_count": 5
+  },
+  "stage": "GATE_B_ONE_SHOT_CANONICAL_SETTLEMENT",
+  "strict_independent_ev_required": true,
+  "surface": {
+    "allocation_arm_count": 3,
+    "cell_count": 9,
+    "new_parameter_scan": false,
+    "selector_count": 3
+  },
+  "version": "bj170-gate-b-v1"
+}
