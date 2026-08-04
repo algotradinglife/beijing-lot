@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RUNNER = ROOT / "scripts" / "freeze_bj190_sparse_divergence_gate_a.py"
 CORE = ROOT / "scripts" / "bj190_sparse_divergence_core.py"
 ACCEPTED_CORE = ROOT / "scripts" / "bj180_team_matchup_core.py"
-PACKAGE = ROOT / "results" / "bj190_gate_a_preoutcome_v2"
+PACKAGE = ROOT / "results" / "bj190_gate_a_preoutcome_v3"
 
 
 def load(path: Path, name: str):
@@ -195,7 +195,7 @@ def test_complete_issue_universe_census_and_native_line_coverage():
         runner.locate_database(), source_runner.load_sources()
     )
     assert len(issues) == 344
-    assert sum(issue.eligible_match_count for issue in issues) == 102_222
+    assert sum(issue.eligible_match_count for issue in issues) == 101_970
     assert min(issue.eligible_match_count for issue in issues) >= 7
     assert sum(bool(issue.b0_match_ids) for issue in issues) == 189
     assert lines["-2.000000000000"] == 4877
@@ -203,6 +203,22 @@ def test_complete_issue_universe_census_and_native_line_coverage():
     assert lines["0.000000000000"] == 61275
     assert lines["1.000000000000"] == 9357
     assert lines["2.000000000000"] == 1467
+    assert lines["MISSING_EXCLUDED"] == 252
+
+
+def test_database_path_contract_supports_detached_replay_and_verifies_hash(
+    monkeypatch, tmp_path
+):
+    runner = load(RUNNER, "bj190_database_contract")
+    canonical = runner.locate_database()
+    monkeypatch.setenv(runner.DB_ENVIRONMENT_VARIABLE, str(canonical))
+    monkeypatch.setattr(runner, "ROOT", tmp_path / "detached-checkout")
+    assert runner.locate_database() == canonical
+    assert runner.locate_database(canonical) == canonical
+    assert runner.sha256_file(canonical) == runner.SOURCE_DB_SHA256
+    missing = tmp_path / "missing.sqlite"
+    with pytest.raises(RuntimeError, match="explicit source database unavailable"):
+        runner.locate_database(missing)
 
 
 def test_union_and_agreement_freeze_explicit_per_leg_probability_sources():
@@ -255,11 +271,12 @@ def test_generated_gate_a_package_is_complete_and_outcome_unexposed():
     content = json.loads(
         (PACKAGE / "CONTENT_IDENTITY.json").read_text(encoding="utf-8")
     )
-    assert content["package"] == "bj190_gate_a_preoutcome_v2"
+    assert content["package"] == "bj190_gate_a_preoutcome_v3"
     card = json.loads((PACKAGE / "gate_a_card.json").read_text(encoding="utf-8"))
     assert card["cohort"] == {
         "canonical_numeric_issue_count": 344,
-        "eligible_match_count": 102222,
+        "eligible_match_count": 101970,
+        "excluded_missing_native_line_match_count": 252,
         "source_b0_no_bet_issue_count": 155,
         "source_b0_participating_issue_count": 189,
         "source_issue_instance_count": 348,
@@ -272,7 +289,7 @@ def test_generated_gate_a_package_is_complete_and_outcome_unexposed():
     strata = read_gzip(PACKAGE / "line_direction_forecast.csv.gz")
     vectors = read_gzip(PACKAGE / "ticket_multiplicity_vector_catalog.csv.gz")
     allocations = read_gzip(PACKAGE / "directional_allocation_input_catalog.csv.gz")
-    assert len(estimators) == 102222
+    assert len(estimators) == 101970
     assert len(forecasts) == 2424
     assert len(strata) == 2424 * 24
     assert {row["line_stratum"] for row in estimators} == {
@@ -286,6 +303,32 @@ def test_generated_gate_a_package_is_complete_and_outcome_unexposed():
     assert allocations
     assert all(row["per_leg_probability_source_json"] for row in allocations)
     assert any(int(row["zero_count"]) == 729 for row in vectors)
+    assert all(row["native_handicap_line"] for row in estimators)
+    training = read_gzip(PACKAGE / "estimator_match_freeze.csv.gz")
+    assert len(training) == 101970
+    with (PACKAGE / "market_model_training_freeze.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        market_training = list(csv.DictReader(handle))
+    assert len(market_training) == 344
+    assert all(int(row["target_issue_overlap_count"]) == 0 for row in market_training)
+    assert all(
+        int(row["post_available_cutoff_row_count"]) == 0 for row in market_training
+    )
+    assert all(row["history_identity_sha256"] for row in market_training)
+    cross_year = {
+        "190101",
+        "20011",
+        "21011",
+        "22011",
+        "23011",
+        "24011",
+        "25011",
+    }
+    assert cross_year.issubset({row["issue"] for row in market_training})
+    for row in market_training:
+        if row["training_max_kickoff_ts"]:
+            assert row["training_max_kickoff_ts"] <= row["score_available_through_ts"]
     forbidden = {"fthg", "ftag", "result_code", "winning_sp", "payout", "tax", "roi"}
     for name in (
         "poisson_latent_reconciliation.csv.gz",

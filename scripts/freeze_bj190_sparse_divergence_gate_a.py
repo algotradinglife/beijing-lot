@@ -26,15 +26,16 @@ from types import ModuleType
 
 ISSUE = 190
 CONTRACT = "BJ-HIST-SPARSE-DIVERGENCE-N7-001"
-VERSION = "bj190-gate-a-preoutcome-v2"
-PACKAGE_NAME = "bj190_gate_a_preoutcome_v2"
+VERSION = "bj190-gate-a-preoutcome-v3"
+PACKAGE_NAME = "bj190_gate_a_preoutcome_v3"
 BASE_MAIN_COMMIT = "7b3c55fd6a490a3e4147b94b7df944535b80b88f"
 FULL_TICKETS = 3**7
 FULL_STAKE_YUAN = 2 * FULL_TICKETS
 SOURCE_ISSUE_INSTANCES = 348
 CANONICAL_ISSUES = 344
 SOURCE_B0_PARTICIPATING_ISSUES = 189
-ELIGIBLE_MATCHES = 102_222
+ELIGIBLE_MATCHES = 101_970
+EXCLUDED_MISSING_NATIVE_LINE_MATCHES = 252
 # Retained only by superseded v1 read helpers; the executable v2 path below
 # binds the full 344-issue / 102,222-match universe instead.
 COHORT_ISSUES = 348
@@ -162,6 +163,7 @@ def repo_root() -> Path:
 ROOT = repo_root()
 DEFAULT_OUTPUT = ROOT / "results" / PACKAGE_NAME
 DB_REPOSITORY_PATH = Path("data/derived/beidan_xlsm/beidan_xlsm.sqlite")
+DB_ENVIRONMENT_VARIABLE = "BJ190_SOURCE_DATABASE"
 
 if str(ROOT / "scripts") not in sys.path:
     sys.path.insert(0, str(ROOT / "scripts"))
@@ -244,12 +246,36 @@ def load_module(name: str, path: Path) -> ModuleType:
     return module
 
 
-def locate_database() -> Path:
+def locate_database(explicit: Path | None = None) -> Path:
+    """Resolve the canonical DB without binding replay to checkout placement.
+
+    ``--database`` is authoritative when supplied, followed by the documented
+    environment variable.  Repository-ancestry discovery remains a local
+    convenience only.  ``atomic_generate`` verifies the frozen SHA-256 before
+    any source read regardless of which path resolved.
+    """
+
+    if explicit is not None:
+        candidate = explicit.expanduser().resolve()
+        if not candidate.is_file():
+            raise RuntimeError(f"explicit source database unavailable: {candidate}")
+        return candidate
+    environment_path = os.environ.get(DB_ENVIRONMENT_VARIABLE)
+    if environment_path:
+        candidate = Path(environment_path).expanduser().resolve()
+        if not candidate.is_file():
+            raise RuntimeError(
+                f"{DB_ENVIRONMENT_VARIABLE} source database unavailable: {candidate}"
+            )
+        return candidate
     for base in (ROOT, *ROOT.parents):
         candidate = base / DB_REPOSITORY_PATH
         if candidate.is_file():
             return candidate.resolve()
-    raise RuntimeError("canonical source database unavailable")
+    raise RuntimeError(
+        "canonical source database unavailable; pass --database or set "
+        f"{DB_ENVIRONMENT_VARIABLE}"
+    )
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -506,8 +532,11 @@ def build_canonical_issue_specs(
     placeholders = ",".join("?" for _ in issue_ids)
     query = f"""
         SELECT CAST(m.issue AS TEXT) AS issue,
-               MIN(m.kickoff_ts) AS cutoff_ts,
-               COUNT(*) AS eligible_match_count
+               (SELECT MIN(mx.kickoff_ts)
+                  FROM matches mx
+                 WHERE mx.issue=m.issue AND mx.kickoff_ts IS NOT NULL) AS cutoff_ts,
+               SUM(CASE WHEN m.handicap_line_norm IS NOT NULL THEN 1 ELSE 0 END)
+                   AS eligible_match_count
           FROM matches m
           JOIN market_consensus e1
             ON e1.match_id=m.match_id
@@ -538,6 +567,7 @@ def build_canonical_issue_specs(
                AND m.kickoff_ts IS NOT NULL
                AND m.home_team_id IS NOT NULL
                AND m.away_team_id IS NOT NULL
+               AND m.handicap_line_norm IS NOT NULL
                AND e1.n_complete > 0
                AND e1.v1_avg > 1 AND e1.v2_avg > 1 AND e1.v3_avg > 1
              GROUP BY m.handicap_line_norm
@@ -546,6 +576,24 @@ def build_canonical_issue_specs(
             "MISSING" if row[0] is None else compact(float(row[0])): int(row[1])
             for row in connection.execute(line_query, issue_ids)
         }
+        missing_line_query = f"""
+            SELECT COUNT(*)
+              FROM matches m
+              JOIN market_consensus e1
+                ON e1.match_id=m.match_id
+               AND e1.market='euro_1x2'
+               AND e1.snapshot='1h'
+             WHERE m.issue IN ({placeholders})
+               AND m.kickoff_ts IS NOT NULL
+               AND m.home_team_id IS NOT NULL
+               AND m.away_team_id IS NOT NULL
+               AND m.handicap_line_norm IS NULL
+               AND e1.n_complete > 0
+               AND e1.v1_avg > 1 AND e1.v2_avg > 1 AND e1.v3_avg > 1
+        """
+        excluded_missing_line_count = int(
+            connection.execute(missing_line_query, issue_ids).fetchone()[0]
+        )
     finally:
         connection.close()
     if set(census) != set(issue_ids):
@@ -557,6 +605,11 @@ def build_canonical_issue_specs(
         raise RuntimeError("eligible full-issue match denominator drift")
     if min(int(row["eligible_match_count"]) for row in census.values()) < 7:
         raise RuntimeError("full issue has fewer than seven target-safe matches")
+    if excluded_missing_line_count != EXCLUDED_MISSING_NATIVE_LINE_MATCHES:
+        raise RuntimeError(
+            "missing native-line exclusion denominator drift: "
+            f"{excluded_missing_line_count}"
+        )
     expected_lines = {
         "-2.000000000000": 4_877,
         "-1.000000000000": 24_561,
@@ -566,6 +619,7 @@ def build_canonical_issue_specs(
     }
     if any(line_counts.get(key) != value for key, value in expected_lines.items()):
         raise RuntimeError(f"native line census drift: {line_counts}")
+    line_counts["MISSING_EXCLUDED"] = excluded_missing_line_count
 
     output: list[IssueSpec] = []
     participating = 0
@@ -635,6 +689,7 @@ def iter_eligible_issue_targets(
            AND m.kickoff_ts IS NOT NULL
            AND m.home_team_id IS NOT NULL
            AND m.away_team_id IS NOT NULL
+           AND m.handicap_line_norm IS NOT NULL
            AND e1.n_complete > 0
            AND e1.v1_avg > 1 AND e1.v2_avg > 1 AND e1.v3_avg > 1
          ORDER BY m.match_idx, m.match_id
@@ -654,11 +709,37 @@ def iter_eligible_issue_targets(
         raise RuntimeError(f"eligible issue row-count drift: {issue.issue}")
 
 
+def read_issue_match_id_sets(
+    database: Path, issues: Sequence[IssueSpec]
+) -> dict[str, set[str]]:
+    """Return all target-issue match IDs for chronological leakage assertions."""
+
+    issue_ids = [issue.issue for issue in issues]
+    placeholders = ",".join("?" for _ in issue_ids)
+    query = f"""
+        SELECT CAST(issue AS TEXT) AS issue, CAST(match_id AS TEXT) AS match_id
+          FROM matches
+         WHERE issue IN ({placeholders})
+         ORDER BY CAST(issue AS INTEGER), match_id
+    """
+    output: dict[str, set[str]] = {issue: set() for issue in issue_ids}
+    connection = ro_connection(database)
+    try:
+        for row in connection.execute(query, issue_ids):
+            output[str(row["issue"])].add(str(row["match_id"]))
+    finally:
+        connection.close()
+    if any(not output[issue] for issue in issue_ids):
+        raise RuntimeError("target issue match-ID census unavailable")
+    return output
+
+
 def build_full_estimator_freeze(
     database: Path,
     issues: Sequence[IssueSpec],
     latent_output: Path,
     estimator_output: Path,
+    market_training_output: Path,
 ) -> tuple[dict[str, tuple[MatchRecord, ...]], dict[str, object]]:
     runner180 = load_module(
         "bj190_v2_accepted_180_runner",
@@ -670,13 +751,18 @@ def build_full_estimator_freeze(
         ROOT / "scripts" / "freeze_bj179_hierarchical_league_gate_a.py",
     )
     accepted179 = runner179.load_core()
-    years = sorted({issue.year for issue in issues})
-    market_models = runner179.fit_outer_year_models(database, years, accepted179)
-
     state = accepted180.TeamMatchupState()
     maximum_cutoff = max(issue.cutoff_ts for issue in issues)
     history = iter(runner180.historical_rows(database, maximum_cutoff))
     pending = next(history, None)
+    market_state = accepted179.HierarchicalLeagueModel(9999)
+    market_history = iter(runner179.historical_rows(database, maximum_cutoff))
+    pending_market = next(market_history, None)
+    market_history_digest = hashlib.sha256()
+    market_history_match_ids: set[str] = set()
+    market_training_max_ts = ""
+    issue_match_ids = read_issue_match_id_sets(database, issues)
+    market_training_rows: list[dict[str, object]] = []
     latent_sink = GzipRowSink(latent_output)
     estimator_sink = GzipRowSink(estimator_output)
     pools: dict[str, tuple[MatchRecord, ...]] = {}
@@ -693,7 +779,75 @@ def build_full_estimator_freeze(
             state.update(pending)
             pending = next(history, None)
         state_summary = state.summary()
-        market_model = market_models[issue.year]
+        while pending_market is not None and runner180.history_row_is_available(
+            accepted180.parse_ts(pending_market["kickoff_ts"]), cutoff
+        ):
+            pending_match_id = str(pending_market["match_id"])
+            if pending_match_id in market_history_match_ids:
+                raise RuntimeError(
+                    f"duplicate market-model history match: {pending_match_id}"
+                )
+            if pending_match_id in issue_match_ids[issue.issue]:
+                raise RuntimeError(
+                    f"target issue leaked into market model: {issue.issue} / "
+                    f"{pending_match_id}"
+                )
+            market_state.update(pending_market)
+            market_history_digest.update(core190.canonical_json(pending_market))
+            market_history_digest.update(b"\n")
+            market_history_match_ids.add(pending_match_id)
+            market_training_max_ts = str(pending_market["kickoff_ts"])
+            pending_market = next(market_history, None)
+        available_through = runner180.history_available_through(cutoff)
+        target_overlap = market_history_match_ids.intersection(
+            issue_match_ids[issue.issue]
+        )
+        if target_overlap:
+            raise RuntimeError(
+                f"market-model target overlap after snapshot: {issue.issue}"
+            )
+        if market_training_max_ts and (
+            accepted180.parse_ts(market_training_max_ts) > available_through
+        ):
+            raise RuntimeError(
+                f"market-model row after frozen cutoff: {issue.issue} / "
+                f"{market_training_max_ts}"
+            )
+        market_model = market_state.frozen_copy(issue.year)
+        if market_model.training_rows != len(market_history_match_ids):
+            raise RuntimeError(
+                f"market-model training denominator drift: {issue.issue}"
+            )
+        market_summary = {
+            key: value
+            for key, value in market_model.summary().items()
+            if key != "training_rule"
+        }
+        market_training_rows.append(
+            {
+                "issue": issue.issue,
+                "issue_instance": issue.issue_instance,
+                "reporting_year": issue.year,
+                "feature_cutoff_ts": issue.cutoff_ts,
+                "score_available_through_ts": available_through.isoformat(sep=" "),
+                "training_max_kickoff_ts": market_training_max_ts,
+                "training_row_count": market_model.training_rows,
+                "model_state_identity_sha256": core190.canonical_hash(
+                    {
+                        "history_identity_sha256": market_history_digest.hexdigest(),
+                        "reporting_year": issue.year,
+                        "summary": market_summary,
+                    }
+                ),
+                "history_identity_sha256": market_history_digest.hexdigest(),
+                "target_issue_match_count": len(issue_match_ids[issue.issue]),
+                "target_issue_overlap_count": len(target_overlap),
+                "post_available_cutoff_row_count": 0,
+                "history_rule": "kickoff <= feature_cutoff_ts - 180 minutes (inclusive)",
+                "reporting_year_separate_from_training_cutoff": 1,
+                "outcome_boundary": OUTCOME_BOUNDARY,
+            }
+        )
         records: list[MatchRecord] = []
         for target in iter_eligible_issue_targets(database, issue, runner179):
             if FORBIDDEN_TARGET_FIELDS.intersection(target):
@@ -704,7 +858,11 @@ def build_full_estimator_freeze(
             family_distributions: dict[str, dict[int, float]] = {}
             component_errors: dict[str, float] = {}
             component_lambdas: dict[str, dict[str, float]] = {}
-            handicap = float(target["handicap_line_norm"] or 0.0)
+            if target["handicap_line_norm"] in (None, ""):
+                raise RuntimeError(
+                    "missing native handicap entered executable universe"
+                )
+            handicap = float(target["handicap_line_norm"])
             for family in core190.FAMILY_ORDER:
                 raw_home, raw_away, captured_handicap, max_goals = captured[family]
                 effective_home = min(6.0, max(0.08, raw_home))
@@ -759,12 +917,9 @@ def build_full_estimator_freeze(
             margin_uncertainty = math.sqrt(
                 variance / (int(diagnostics["min_history_n"]) + 12.0)
             )
-            raw_line = target["handicap_line_norm"]
-            line = None if raw_line in (None, "") else float(raw_line)
-            residual = math.nan if line is None else t1_expected_margin + line
-            residual_z = (
-                math.nan if line is None else residual / max(1e-12, margin_uncertainty)
-            )
+            line = handicap
+            residual = t1_expected_margin + line
+            residual_z = residual / max(1e-12, margin_uncertainty)
 
             euro = accepted179.no_vig(
                 [target[f"euro_1h_v{index}"] for index in (1, 2, 3)]
@@ -888,10 +1043,8 @@ def build_full_estimator_freeze(
                         weighted_margin_proxy
                     ),
                     "weighted_proxy_controls_direction": 0,
-                    "handicap_line_norm": compact(line) if line is not None else "",
-                    "line_residual_mu": compact(residual)
-                    if math.isfinite(residual)
-                    else "",
+                    "handicap_line_norm": compact(line),
+                    "line_residual_mu": compact(residual),
                     "max_goals_inclusive": core190.MAX_GOALS,
                     "tail_policy": "Poisson components exclude joint cells where either score exceeds 12 and normalize retained mass; H2H empirical differences outside [-12,12] clamp to the same-code edge; T1 within-code shape is reconciled to accepted p3/p1/p0",
                     "max_abs_reconciliation_error": compact(reconciliation_error),
@@ -912,7 +1065,7 @@ def build_full_estimator_freeze(
                     "league": record.league,
                     "home_team_id": target["home_team_id"],
                     "away_team_id": target["away_team_id"],
-                    "native_handicap_line": compact(line) if line is not None else "",
+                    "native_handicap_line": compact(line),
                     "line_stratum": stratum,
                     "history_training_rows": state_summary["training_rows"],
                     "min_history_n": history_n,
@@ -969,15 +1122,9 @@ def build_full_estimator_freeze(
                         weighted_margin_proxy
                     ),
                     "weighted_proxy_controls_direction": 0,
-                    "line_residual_mu": compact(residual)
-                    if math.isfinite(residual)
-                    else "",
-                    "line_residual_z": compact(residual_z)
-                    if math.isfinite(residual_z)
-                    else "",
-                    "line_residual_status": "AVAILABLE"
-                    if line is not None
-                    else "UNAVAILABLE_NATIVE_LINE_MISSING",
+                    "line_residual_mu": compact(residual),
+                    "line_residual_z": compact(residual_z),
+                    "line_residual_status": "AVAILABLE",
                     "delta_mu": "",
                     "delta_mu_status": "UNAVAILABLE_MARKET_3WAY_DOES_NOT_IDENTIFY_RAW_MARGIN",
                     "fundamental_expected_margin_method": "T1_SCORE_DISTRIBUTION_MEAN_SAME_IDENTITY_AS_P_VECTOR",
@@ -990,6 +1137,7 @@ def build_full_estimator_freeze(
         pools[issue.issue] = tuple(records)
     latent_sink.close()
     estimator_sink.close()
+    write_csv(market_training_output, market_training_rows)
     expected_match_count = sum(issue.eligible_match_count for issue in issues)
     if (
         latent_sink.count != expected_match_count
@@ -1002,6 +1150,16 @@ def build_full_estimator_freeze(
         "max_abs_reconciliation_error": max_reconciliation_error,
         "weighted_proxy_sign_disagreement_count": sign_proxy_disagreement_count,
         "line_strata": dict(sorted(line_counts.items())),
+        "market_training_issue_count": len(market_training_rows),
+        "market_training_min_rows": min(
+            int(row["training_row_count"]) for row in market_training_rows
+        ),
+        "market_training_max_rows": max(
+            int(row["training_row_count"]) for row in market_training_rows
+        ),
+        "market_training_all_target_overlap_zero": all(
+            int(row["target_issue_overlap_count"]) == 0 for row in market_training_rows
+        ),
     }
 
 
@@ -3132,6 +3290,7 @@ def output_schema_contract() -> dict[str, object]:
             "n7_identity_catalog": "n7_identity_catalog.csv.gz",
             "directional_allocation_catalog": "directional_allocation_input_catalog.csv.gz",
             "multiplicity_vector_catalog": "ticket_multiplicity_vector_catalog.csv.gz",
+            "market_model_training_freeze": "market_model_training_freeze.csv",
         },
         "native_support_metrics": [
             "selected_issue_count",
@@ -3174,6 +3333,10 @@ def source_binding(source_rows: Sequence[Mapping[str, object]]) -> dict[str, obj
         "database": {
             "path": str(DB_REPOSITORY_PATH),
             "sha256": SOURCE_DB_SHA256,
+            "cli_contract": "--database PATH",
+            "environment_contract": DB_ENVIRONMENT_VARIABLE,
+            "resolution_order": "explicit CLI, environment, local repository ancestry",
+            "hash_verification": "mandatory before any generation source read",
             "target_projection": [
                 "match_id",
                 "issue",
@@ -3227,18 +3390,31 @@ def source_binding_v2(
     binding["database"]["target_projection"] = [  # type: ignore[index]
         "every match in each canonical numeric issue with kickoff/team IDs",
         "complete target-safe 1h EURO consensus",
-        "native handicap line (missing retained as explicit OTHER/unavailable line residual)",
+        "non-null native handicap line; missing lines are excluded from executable policies",
         "#179 target-safe market feature projection",
     ]
     binding["eligible_universe"] = {
         "source_issue_instance_count": SOURCE_ISSUE_INSTANCES,
         "canonical_numeric_issue_count": CANONICAL_ISSUES,
         "eligible_match_count": ELIGIBLE_MATCHES,
+        "excluded_missing_native_line_match_count": EXCLUDED_MISSING_NATIVE_LINE_MATCHES,
         "minimum_matches_per_issue": 7,
         "canonicalization": "duplicate cross-year issue instances collapse by numeric issue; canonical year=max source outer year; source instances retained",
         "universe_identity_sha256": estimator_meta["universe_identity_sha256"],
         "native_line_exact_counts": dict(sorted(line_counts.items())),
         "selection_boundary": "challenger chooses exact seven directly from every issue target-safe pool; inherited B0 is comparator only",
+    }
+    binding["chronological_market_model"] = {
+        "source": "accepted #179 HierarchicalLeagueModel",
+        "snapshot_count": estimator_meta["market_training_issue_count"],
+        "training_rule": "kickoff <= feature cutoff - 180 minutes (inclusive)",
+        "training_min_rows": estimator_meta["market_training_min_rows"],
+        "training_max_rows": estimator_meta["market_training_max_rows"],
+        "target_issue_overlap_zero": estimator_meta[
+            "market_training_all_target_overlap_zero"
+        ],
+        "binding_file": "market_model_training_freeze.csv",
+        "reporting_year": "retained separately; never used as the training cutoff",
     }
     binding["coherent_t1_estimator"] = {
         "probability_source": "mapped p3/p1/p0 of group-mass-reconciled T1 score-difference distribution",
@@ -3391,6 +3567,7 @@ def gate_a_card_v2(
             "source_issue_instance_count": SOURCE_ISSUE_INSTANCES,
             "canonical_numeric_issue_count": CANONICAL_ISSUES,
             "eligible_match_count": ELIGIBLE_MATCHES,
+            "excluded_missing_native_line_match_count": EXCLUDED_MISSING_NATIVE_LINE_MATCHES,
             "source_b0_participating_issue_count": SOURCE_B0_PARTICIPATING_ISSUES,
             "source_b0_no_bet_issue_count": CANONICAL_ISSUES
             - SOURCE_B0_PARTICIPATING_ISSUES,
@@ -3412,6 +3589,14 @@ def gate_a_card_v2(
             "line_residual_mu_status": "CONTROLLING_SEPARATE_AXIS",
         },
         "native_line_coverage": estimator_meta["line_strata"],
+        "chronological_market_model": {
+            "snapshot_count": estimator_meta["market_training_issue_count"],
+            "training_rule": "kickoff <= feature cutoff - 180 minutes (inclusive)",
+            "target_issue_overlap_zero": estimator_meta[
+                "market_training_all_target_overlap_zero"
+            ],
+            "binding_file": "market_model_training_freeze.csv",
+        },
         "detector_grid": {
             "policy_count": len(detector_grid),
             "available_policy_count": len(available),
@@ -3511,6 +3696,7 @@ def atomic_generate(output: Path, database: Path) -> dict[str, object]:
             issues,
             stage / "poisson_latent_reconciliation.csv.gz",
             stage / "estimator_match_freeze.csv.gz",
+            stage / "market_model_training_freeze.csv",
         )
         detector_grid = build_detector_grid()
         forecasts, strata, policy_meta = build_full_policy_freeze(
@@ -3559,9 +3745,15 @@ def atomic_generate(output: Path, database: Path) -> dict[str, object]:
         write_json(stage / "gate_a_card.json", card)
         (stage / "README.md").write_text(
             "# #190 Gate A — sparse independent-model vs handicap divergence\n\n"
-            "This immutable package freezes all 102,222 target-safe matches in 344 canonical numeric "
+            "This immutable package freezes all 101,970 target-safe matches with an observed native "
+            "handicap in 344 canonical numeric "
             "issues (348 source issue instances). Every divergence policy selects its exact seven "
             "matches directly from that issue pool; inherited B0 is a comparator only.\n\n"
+            "The 252 otherwise target-safe rows with missing native handicap are excluded from every "
+            "executable selector and ticket. The #179 market model is snapshotted separately at each "
+            "issue's cutoff using only score rows available through cutoff minus 180 minutes; each "
+            "snapshot binds its maximum training time, row count, cumulative history hash and zero "
+            "target-issue overlap. Reporting year never defines the training cutoff.\n\n"
             "The controlling independent estimator is exact #180 `T1_DEEP_TEAM` / `TEAM_PRIMARY`. "
             "One reconciled score-difference distribution supplies both p3/p1/p0 and expected margin. "
             "The weighted component-lambda margin is diagnostic only and never controls direction. "
@@ -3611,6 +3803,9 @@ def atomic_generate(output: Path, database: Path) -> dict[str, object]:
             "estimator_match_freeze_sha256": sha256_file(
                 stage / "estimator_match_freeze.csv.gz"
             ),
+            "market_model_training_freeze_sha256": sha256_file(
+                stage / "market_model_training_freeze.csv"
+            ),
             "poisson_latent_reconciliation_sha256": sha256_file(
                 stage / "poisson_latent_reconciliation.csv.gz"
             ),
@@ -3644,14 +3839,22 @@ def atomic_generate(output: Path, database: Path) -> dict[str, object]:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--database", type=Path, default=locate_database())
+    parser.add_argument(
+        "--database",
+        type=Path,
+        default=None,
+        help=(
+            "canonical SQLite source; alternatively set "
+            f"{DB_ENVIRONMENT_VARIABLE}; SHA-256 is always verified"
+        ),
+    )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
-    receipt = atomic_generate(args.output, args.database.resolve())
+    receipt = atomic_generate(args.output, locate_database(args.database))
     print(json.dumps(receipt, sort_keys=True))
     return 0
 
