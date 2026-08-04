@@ -39,13 +39,15 @@
 - 冻结 allocator SHA-256：
   `5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93`
 - #176 manifest：
-  `bd253f95d0d9973af08c1e8f582b312b927ee20291669ffbe9423cd63be30080`
+  `39316952296c2349f5da2f963d43c0baf0d812fba4eea967536a8b80bd57d5ee`
 - #176 content identity：
-  `ff68ecca65dee813cbca5ef40bb5c81d1fd0ce558ee8afb137e92cea74fdd311`
+  `94188354baf01c68cb0ec0791248d3f8f03e31d4a7011db7b6b68e9797720f5c`
 
 #170 的 177 期共同支持逐期账本直接读取，不重算。native support 为补齐逐期税额，
-用 #170 已接受 runner、Gate-A identities、byte-frozen allocator 和 canonical outcome
-做确定性重放。3 个 required arms 在 native/common 两种支持下的 stake、gross、税前/
+用 #170 manifest 覆盖的 package runner（SHA-256
+`f593dd92c1b2afcc81ce50c65d61c9511070190c95b5cef98a13b05843ce2713`）、
+Gate-A identities、byte-frozen allocator 和 canonical outcome 做确定性重放。3 个
+required arms 在 native/common 两种支持下的 stake、gross、税前/
 税后 ROI 和 policy census 共 6 个桥接全部 PASS。
 
 独立重放到 repo 内 `.scratch` 后，正式包与重放包逐文件 byte-identical；manifest 与
@@ -137,6 +139,10 @@ Calmar。例如 native：
 bankroll-independent 的 P&L Calmar、金额回撤与集中度。
 
 ## 图表与完整数据
+
+三张图都使用同一条实际 `first_kickoff_ts` 日期轴；348 期 native 与 177 期 common
+序列不会再按各自长度拉伸成看似对齐的期次轴。图内显示可读年月 tick，图源仍保留每行
+精确 kickoff timestamp。
 
 ![税前累计盈亏](../../results/bj176_issue_equity_risk_v1/equity_curves_pre_tax.svg)
 

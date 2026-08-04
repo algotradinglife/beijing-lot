@@ -5,7 +5,11 @@ import gzip
 import hashlib
 import importlib.util
 import json
+import xml.etree.ElementTree as ET
+from datetime import datetime
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -68,6 +72,17 @@ def test_source_contract_and_calendar_are_exact() -> None:
     assert len(calendar) == 348
     assert calendar["20031@OOS_2020"]["first_kickoff_ts"] == "2020-03-17 01:00:00"
     assert calendar["25011@OOS_2024"]["first_kickoff_ts"] == "2024-12-31 16:00:00"
+
+
+def test_native_replay_runner_is_manifest_bound() -> None:
+    manifest = json.loads((RUNNER.BJ170 / "SHA256SUMS.json").read_text(encoding="utf-8"))
+    path = RUNNER.manifest_bound_settler_path(manifest)
+    assert path == RUNNER.BJ170 / "settlement_runner.py"
+    assert RUNNER.sha256_file(path) == RUNNER.EXPECTED_BJ170_SETTLEMENT_RUNNER_SHA256
+
+    drifted = dict(manifest, **{"settlement_runner.py": "0" * 64})
+    with pytest.raises(RuntimeError, match="manifest settlement runner binding drift"):
+        RUNNER.manifest_bound_settler_path(drifted)
 
 
 def test_common_bankroll_keeps_half_scale_positive() -> None:
@@ -134,6 +149,35 @@ def test_no_bet_calendar_row_is_explicit_zero_flow() -> None:
     assert series[1]["cumulative_pre_tax_profit_yuan"] == "-10.000000"
 
 
+def test_svg_uses_one_shared_actual_kickoff_date_axis(tmp_path: Path) -> None:
+    output = tmp_path / "shared-date.svg"
+    RUNNER.svg_line_chart(
+        output,
+        "fixture",
+        "value",
+        (
+            (
+                "native",
+                (
+                    (datetime(2020, 1, 1), 0.0),
+                    (datetime(2020, 1, 3), 1.0),
+                ),
+                "#000000",
+            ),
+            ("common", ((datetime(2020, 1, 2), 0.5),), "#ffffff"),
+        ),
+    )
+    root = ET.fromstring(output.read_text(encoding="utf-8"))
+    assert root.attrib["data-x-axis-contract"] == "SHARED_FIRST_KICKOFF_DATE"
+    namespace = {"svg": "http://www.w3.org/2000/svg"}
+    polylines = root.findall("svg:polyline", namespace)
+    first_x = [float(point.split(",")[0]) for point in polylines[0].attrib["points"].split()]
+    second_x = [float(point.split(",")[0]) for point in polylines[1].attrib["points"].split()]
+    assert first_x == [100.0, 1170.0]
+    assert second_x == [635.0]
+    assert "First kickoff date (shared calendar)" in output.read_text(encoding="utf-8")
+
+
 def test_committed_package_is_manifest_complete_and_reconciled() -> None:
     package = ROOT / "results" / "bj176_issue_equity_risk_v1"
     if not package.exists():
@@ -151,6 +195,13 @@ def test_committed_package_is_manifest_complete_and_reconciled() -> None:
         reconciliation = list(csv.DictReader(handle))
     assert len(reconciliation) == 6
     assert {row["reconciliation_status"] for row in reconciliation} == {"PASS"}
+    binding = json.loads((package / "source_binding.json").read_text(encoding="utf-8"))
+    assert binding["bj170_gate_b"]["settlement_runner_sha256"] == (
+        RUNNER.EXPECTED_BJ170_SETTLEMENT_RUNNER_SHA256
+    )
+    assert binding["bj170_gate_b"]["settlement_runner_binding"] == (
+        "MANIFEST_COVERED_BYTE_FROZEN_REPLAY"
+    )
     with gzip.open(
         package / "issue_time_series.csv.gz", "rt", newline="", encoding="utf-8"
     ) as handle:

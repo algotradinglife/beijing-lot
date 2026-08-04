@@ -16,7 +16,10 @@
     "content_identity_sha256": "75325aa0f60e277ad3fbf9d90116450833106bc3863b412ea3efcad9948a47b2",
     "manifest_sha256": "08e83353ad483e5d75911116a413186f007385f5dd37b8c4b757ac903221e512",
     "package": "bj170_gate_b_selector_allocator_stack_v1",
-    "payload_count": 25
+    "payload_count": 25,
+    "settlement_runner_binding": "MANIFEST_COVERED_BYTE_FROZEN_REPLAY",
+    "settlement_runner_path": "results/bj170_gate_b_selector_allocator_stack_v1/settlement_runner.py",
+    "settlement_runner_sha256": "f593dd92c1b2afcc81ce50c65d61c9511070190c95b5cef98a13b05843ce2713"
   },
   "canonical_outcomes": {
     "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",

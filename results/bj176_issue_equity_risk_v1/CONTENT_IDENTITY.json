@@ -34,7 +34,10 @@
         "content_identity_sha256": "75325aa0f60e277ad3fbf9d90116450833106bc3863b412ea3efcad9948a47b2",
         "manifest_sha256": "08e83353ad483e5d75911116a413186f007385f5dd37b8c4b757ac903221e512",
         "package": "bj170_gate_b_selector_allocator_stack_v1",
-        "payload_count": 25
+        "payload_count": 25,
+        "settlement_runner_binding": "MANIFEST_COVERED_BYTE_FROZEN_REPLAY",
+        "settlement_runner_path": "results/bj170_gate_b_selector_allocator_stack_v1/settlement_runner.py",
+        "settlement_runner_sha256": "f593dd92c1b2afcc81ce50c65d61c9511070190c95b5cef98a13b05843ce2713"
       },
       "canonical_outcomes": {
         "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
@@ -56,19 +59,19 @@
   "payloads": {
     "README.md": "b1b82304d89b291597813cb3fbb5532f717aec3d3604864d3476e73d06314ae5",
     "REPORT.md": "8cea8e0233197816966c683d8b6d6240692e6943125cb635f832e6d0316f1d59",
-    "analysis_runner.py": "a955fb73b8850070fa51323ca171f8cda1114ad8c6da588c89fe2f90273e2981",
+    "analysis_runner.py": "52f6abfd8efa5178bc45f978753069ab517e9e9dcc0d174745195c3a5caba558",
     "bankroll_sensitivity.csv": "d9a458d11f0c2cb6f9d2a1b339b8d0da5eeadaae02639cafb25fe5e9cf9d0551",
     "chart_source_bankroll_sensitivity.csv": "d9a458d11f0c2cb6f9d2a1b339b8d0da5eeadaae02639cafb25fe5e9cf9d0551",
     "chart_source_equity_drawdown.csv.gz": "1bcd92af1251f4342c26d9753d8be1e036d826879bdfcd829d0781a05048904c",
     "chart_source_risk_metrics.csv": "5c77f36315bea2d0e10ec1203bdf530d6aea0f0a0e2ffaa46bfa8a2d723560d1",
-    "drawdown_curves_pre_tax.svg": "cc9922542126a62772871fa55953f4a16512e07a96cdae9f538a29705b0badfb",
-    "equity_curves_pre_tax.svg": "080eb90365e6b2e75b4165a6c46a672a9437bc4c62b76e832b44e7ba4918b2e3",
-    "equity_curves_tax_adjusted.svg": "8c5bbf53939f3fca0562736234f95e6c28955e3d4bbbf456202a7e4e44be74ea",
+    "drawdown_curves_pre_tax.svg": "2be5bad27555a4c11254c29827c1660ef6f513d3d8065dc10adb60c7c072b54e",
+    "equity_curves_pre_tax.svg": "e898584dcf9f022639e11411fc55acfca22af0e4e4ca53d47c68d0619c8dbcce",
+    "equity_curves_tax_adjusted.svg": "6116583554f0900d9e47ebe991f431e4e0a5597d7e9fa0ebc7b40ec448807b37",
     "issue_contributions.csv.gz": "fcc2cfd6e83a8be35b3a069898acef60968c3a5baea21d83160b5b30db387a70",
     "issue_time_series.csv.gz": "1bcd92af1251f4342c26d9753d8be1e036d826879bdfcd829d0781a05048904c",
     "risk_metrics.csv": "5c77f36315bea2d0e10ec1203bdf530d6aea0f0a0e2ffaa46bfa8a2d723560d1",
-    "settlement_card.json": "66140fcfd95c0b7ccb5de14e0e3d96c61e65495e36f640e56785510519e45dc7",
-    "source_binding.json": "4f281ab0ecad69e75b35c0f32a965027e7d8d6d33c40738dcc5a27eb6d5a00c0",
+    "settlement_card.json": "be5dedef89181d4e7f215c6953ff88bfe28bfbd978427c26f04fc70e721126ff",
+    "source_binding.json": "89426eaa69a3588d760ebb310021b74fdb0451a9f237165ec47168d0a66d0c2b",
     "source_reconciliation.csv": "c1201f3f71d0a7a8ecf2f7287da24b1fdbf150adf7a33002476e60d8e7f8b4d5",
     "stability_year_fold_loyo.csv": "f687009bdacd85cc4d811ef009f25c9dd62265a59222730bfe882e76905f1160"
   }

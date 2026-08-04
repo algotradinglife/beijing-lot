@@ -22,7 +22,7 @@ import shutil
 import statistics
 import tempfile
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -43,6 +43,9 @@ EXPECTED_BJ137_GATE_A_CONTENT = (
 )
 EXPECTED_ISSUE_CENSUS_SHA256 = (
     "69d7463b6f83af4127059d6ea34095292646ec2a98abc39d56551b76d6ea6dd5"
+)
+EXPECTED_BJ170_SETTLEMENT_RUNNER_SHA256 = (
+    "f593dd92c1b2afcc81ce50c65d61c9511070190c95b5cef98a13b05843ce2713"
 )
 REQUIRED_ARMS = (
     ("BEST_FULL", "FULL_ENUMERATED", "BEST_FULL_FULL"),
@@ -169,6 +172,17 @@ def verify_package(
     return manifest
 
 
+def manifest_bound_settler_path(manifest: dict[str, str]) -> Path:
+    """Resolve the only #170 runner authorized for issue-path replay."""
+    expected = manifest.get("settlement_runner.py")
+    if expected != EXPECTED_BJ170_SETTLEMENT_RUNNER_SHA256:
+        raise RuntimeError("#170 manifest settlement runner binding drift")
+    path = BJ170 / "settlement_runner.py"
+    if sha256_file(path) != EXPECTED_BJ170_SETTLEMENT_RUNNER_SHA256:
+        raise RuntimeError("#170 settlement runner payload drift")
+    return path
+
+
 def source_modules_and_bindings() -> tuple[object, dict[str, object]]:
     bj170_manifest = verify_package(
         BJ170, EXPECTED_BJ170_GATE_B_MANIFEST, EXPECTED_BJ170_GATE_B_CONTENT
@@ -178,7 +192,7 @@ def source_modules_and_bindings() -> tuple[object, dict[str, object]]:
     )
     if sha256_file(BJ137 / "issue_census.csv") != EXPECTED_ISSUE_CENSUS_SHA256:
         raise RuntimeError("#137 chronology census drift")
-    settler_path = ROOT / "scripts" / "settle_bj170_selector_allocator_stack_gate_b.py"
+    settler_path = manifest_bound_settler_path(bj170_manifest)
     settler = load_module(settler_path, "bj176_frozen_bj170_settler")
     gate_a_manifest = settler.verify_package(
         settler.GATE_A, settler.EXPECTED_GATE_A_MANIFEST, settler.EXPECTED_GATE_A_CONTENT
@@ -197,6 +211,11 @@ def source_modules_and_bindings() -> tuple[object, dict[str, object]]:
             "manifest_sha256": EXPECTED_BJ170_GATE_B_MANIFEST,
             "content_identity_sha256": EXPECTED_BJ170_GATE_B_CONTENT,
             "payload_count": len(bj170_manifest),
+            "settlement_runner_path": (
+                "results/bj170_gate_b_selector_allocator_stack_v1/settlement_runner.py"
+            ),
+            "settlement_runner_sha256": EXPECTED_BJ170_SETTLEMENT_RUNNER_SHA256,
+            "settlement_runner_binding": "MANIFEST_COVERED_BYTE_FROZEN_REPLAY",
         },
         "bj170_gate_a": {
             "package": settler.GATE_A.name,
@@ -816,12 +835,15 @@ def svg_line_chart(
     path: Path,
     title: str,
     y_label: str,
-    series: Sequence[tuple[str, Sequence[float], str]],
+    series: Sequence[tuple[str, Sequence[tuple[datetime, float]], str]],
 ) -> None:
     width, height = 1200, 650
     left, right, top, bottom = 100, 30, 70, 90
     plot_w, plot_h = width - left - right, height - top - bottom
-    values = [value for _, data, _ in series for value in data]
+    values = [value for _, data, _ in series for _, value in data]
+    dates = [date for _, data, _ in series for date, _ in data]
+    date_start, date_end = min(dates), max(dates)
+    date_span_seconds = max((date_end - date_start).total_seconds(), 1.0)
     lo, hi = min(values + [0.0]), max(values + [0.0])
     if math.isclose(lo, hi):
         lo -= 1.0
@@ -830,25 +852,39 @@ def svg_line_chart(
     lo -= pad
     hi += pad
 
-    def x_at(index: int, count: int) -> float:
-        return left + (plot_w * index / max(count - 1, 1))
+    def x_at(date: datetime) -> float:
+        offset = (date - date_start).total_seconds()
+        return left + plot_w * offset / date_span_seconds
 
     def y_at(value: float) -> float:
         return top + plot_h * (hi - value) / (hi - lo)
 
     parts = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" data-x-axis-contract="SHARED_FIRST_KICKOFF_DATE">',
         '<rect width="100%" height="100%" fill="#ffffff"/>',
         f'<text x="{width / 2}" y="36" text-anchor="middle" font-size="22" font-family="sans-serif">{title}</text>',
         f'<text x="22" y="{height / 2}" transform="rotate(-90 22 {height / 2})" text-anchor="middle" font-size="14" font-family="sans-serif">{y_label}</text>',
+        f'<text x="{left + plot_w / 2}" y="{height - 12}" text-anchor="middle" font-size="14" font-family="sans-serif">First kickoff date (shared calendar)</text>',
     ]
     for tick in range(6):
         value = lo + (hi - lo) * tick / 5
         y = y_at(value)
         parts.append(f'<line x1="{left}" y1="{y:.2f}" x2="{width-right}" y2="{y:.2f}" stroke="#e5e7eb"/>')
         parts.append(f'<text x="{left-8}" y="{y+5:.2f}" text-anchor="end" font-size="12" font-family="monospace">{value:,.2f}</text>')
+    for tick in range(7):
+        fraction = tick / 6
+        tick_date = date_start + timedelta(seconds=date_span_seconds * fraction)
+        x = left + plot_w * fraction
+        parts.append(
+            f'<line x1="{x:.2f}" y1="{top}" x2="{x:.2f}" y2="{top + plot_h}" stroke="#f3f4f6"/>'
+        )
+        parts.append(
+            f'<text x="{x:.2f}" y="{top + plot_h + 24}" text-anchor="middle" font-size="12" font-family="monospace">{tick_date:%Y-%m}</text>'
+        )
     for label, data, color in series:
-        points = " ".join(f"{x_at(i, len(data)):.2f},{y_at(value):.2f}" for i, value in enumerate(data))
+        points = " ".join(
+            f"{x_at(date):.2f},{y_at(value):.2f}" for date, value in data
+        )
         parts.append(f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{points}"/>')
     legend_y = height - 48
     for index, (label, _, color) in enumerate(series):
@@ -862,7 +898,7 @@ def svg_line_chart(
 
 def chart_series(
     time_rows: Sequence[dict[str, object]], field: str
-) -> list[tuple[str, list[float], str]]:
+) -> list[tuple[str, list[tuple[datetime, float]], str]]:
     colors = {
         (SUPPORT_NATIVE, "BEST_FULL_FULL"): "#1d4ed8",
         (SUPPORT_NATIVE, "MODEL_SOURCE_MODEL_CAP1_M512"): "#059669",
@@ -877,7 +913,16 @@ def chart_series(
     output = []
     for key, values in sorted(grouped.items()):
         values.sort(key=lambda row: int(row["issue_index"]))
-        output.append((f"{key[0]} / {key[1]}", [float(row[field]) for row in values], colors[key]))
+        output.append(
+            (
+                f"{key[0]} / {key[1]}",
+                [
+                    (datetime.fromisoformat(str(row["first_kickoff_ts"])), float(row[field]))
+                    for row in values
+                ],
+                colors[key],
+            )
+        )
     return output
 
 
