@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://algotradinglife.github.io/beijing-lot/schemas/message_evidence_coverage_v1.schema.json",
+  "title": "Message evidence coverage and freshness report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "as_of_utc",
+    "required_fact_kinds",
+    "allowed_provenance_tiers",
+    "max_age_seconds",
+    "issues",
+    "matches"
+  ],
+  "properties": {
+    "schema_version": {"const": "message_evidence_coverage_v1"},
+    "as_of_utc": {"type": "string", "format": "date-time", "pattern": "\\.[0-9]{6}Z$"},
+    "required_fact_kinds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/factKind"}
+    },
+    "allowed_provenance_tiers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "TIER_0_OFFICIAL",
+          "TIER_1_PRIMARY",
+          "TIER_2_RELIABLE",
+          "TIER_3_UNVERIFIED"
+        ]
+      }
+    },
+    "max_age_seconds": {"type": "integer", "minimum": 0},
+    "issues": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["match_count", "eligible_match_count", "eligible_rate"],
+        "properties": {
+          "match_count": {"type": "integer", "minimum": 0},
+          "eligible_match_count": {"type": "integer", "minimum": 0},
+          "eligible_rate": {"type": "number", "minimum": 0, "maximum": 1}
+        }
+      }
+    },
+    "matches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issue",
+          "match_idx",
+          "match_id",
+          "kickoff_at_utc",
+          "required_fact_kinds",
+          "available_fact_kinds",
+          "missing_fact_kinds",
+          "complete_observation_fact_kinds",
+          "incomplete_observation_fact_kinds",
+          "stale_observation_fact_kinds",
+          "observation_age_seconds_by_kind",
+          "uncovered_entity_ids_by_kind",
+          "explicit_missing_fact_kinds",
+          "stale_fact_kinds",
+          "stale_entity_ids_by_kind",
+          "age_seconds_by_kind",
+          "unresolved_conflict_fact_ids",
+          "cutoff_strictly_before_kickoff",
+          "decision_chain_eligible"
+        ],
+        "properties": {
+          "issue": {"type": "string", "minLength": 1},
+          "match_idx": {"type": "integer", "minimum": 1},
+          "match_id": {"type": "string", "minLength": 1},
+          "kickoff_at_utc": {"type": "string", "format": "date-time", "pattern": "\\.[0-9]{6}Z$"},
+          "required_fact_kinds": {"type": "array", "items": {"$ref": "#/$defs/factKind"}},
+          "available_fact_kinds": {"type": "array", "items": {"$ref": "#/$defs/factKind"}},
+          "missing_fact_kinds": {"type": "array", "items": {"$ref": "#/$defs/factKind"}},
+          "complete_observation_fact_kinds": {"type": "array", "items": {"$ref": "#/$defs/factKind"}},
+          "incomplete_observation_fact_kinds": {"type": "array", "items": {"$ref": "#/$defs/factKind"}},
+          "stale_observation_fact_kinds": {"type": "array", "items": {"$ref": "#/$defs/factKind"}},
+          "observation_age_seconds_by_kind": {
+            "type": "object",
+            "propertyNames": {"$ref": "#/$defs/factKind"},
+            "additionalProperties": {"type": "number", "minimum": 0}
+          },
+          "uncovered_entity_ids_by_kind": {
+            "type": "object",
+            "propertyNames": {"$ref": "#/$defs/factKind"},
+            "additionalProperties": {
+              "type": "array",
+              "items": {"type": "string", "minLength": 1}
+            }
+          },
+          "explicit_missing_fact_kinds": {"type": "array", "items": {"$ref": "#/$defs/factKind"}},
+          "stale_fact_kinds": {"type": "array", "items": {"$ref": "#/$defs/factKind"}},
+          "stale_entity_ids_by_kind": {
+            "type": "object",
+            "propertyNames": {"$ref": "#/$defs/factKind"},
+            "additionalProperties": {
+              "type": "array",
+              "items": {"type": "string", "minLength": 1}
+            }
+          },
+          "age_seconds_by_kind": {
+            "type": "object",
+            "propertyNames": {"$ref": "#/$defs/factKind"},
+            "additionalProperties": {"type": "number", "minimum": 0}
+          },
+          "unresolved_conflict_fact_ids": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          },
+          "cutoff_strictly_before_kickoff": {"type": "boolean"},
+          "decision_chain_eligible": {"type": "boolean"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "factKind": {
+      "enum": [
+        "injury",
+        "suspension",
+        "expected_lineup",
+        "confirmed_lineup",
+        "coach_change",
+        "schedule",
+        "travel",
+        "motivation"
+      ]
+    }
+  }
+}
