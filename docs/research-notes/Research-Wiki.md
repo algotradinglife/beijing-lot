@@ -7,7 +7,7 @@ tags:
   - research
   - moc
 status: active
-updated: 2026-08-02
+updated: 2026-08-04
 ---
 
 # Beijing-lot Research Wiki
@@ -814,6 +814,24 @@ handicap-contradiction stage 在全部 424 candidates 上为零，没有 ranking
 所有 arm 去最大 issue/year 后仍负，因此没有触发 strict independent EV，也没有重置
 接受的负 B0 incumbent。详细表格、逐期 equity/drawdown、YEAR/FOLD/LOYO 与不可变绑定见
 [`Issue-134-Fundamental-Overlay-N7`](Issue-134-Fundamental-Overlay-N7.md)。
+
+## #179 分层联赛—状态概率模型（2026-08-04）
+
+#179 先在 1,558 场冻结概率面上比较 B0/Q1、6 个 hierarchical configs 和 6 个
+leave-one-family-out，再结算 matched FULL N7。`H_MINUS_RAW_HDA` 的 log loss
+`1.064101`，比 B0 的 `1.066377` 好 `0.002276`，并在 6 个 OOS folds 中赢 4 个、
+另 2 个由 B0 最优；这是小幅概率信号，不是收益晋级。
+
+经济结论为 `NO_HIERARCHICAL_PROMOTION / RETAIN_B0`。B0 税前 ROI `-9.47%`；
+hierarchical arms 中最好的 pricing-conservative 仍为 `-12.16%`，matched B0 lift
+`-3.13pp`（20k 95% CI `[-8.28pp,+1.75pp]`）。概率最好的 H−raw-HDA 为
+`-13.12%`，matched lift `-4.21pp`。所有 challenger 的 absolute ROI 与 matched
+B0 lift 点估计均为负，去最大 issue/year 和 LOYO 也不支持晋级。
+
+因此 #180 只继承 B0 作为 controlling economic baseline；H−raw-HDA 最多保留为概率
+diagnostic。`LIQUIDITY_DRIFT` 仅是 prior-season EURO residual proxy，不代表完整
+season-by-source interaction。详见
+[`Issue-179-Hierarchical-League-N7`](Issue-179-Hierarchical-League-N7.md)。
 
 ## 相关笔记
 
