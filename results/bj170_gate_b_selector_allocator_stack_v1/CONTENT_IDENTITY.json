@@ -1,0 +1,45 @@
+{
+  "contract_version": "bj170-gate-b-v1",
+  "controls": {
+    "absolute_positive_cells": [
+      "MODEL_SOURCE/MODEL_CAP1_M512"
+    ],
+    "bootstrap_matrix_sha256": "6c6a250b948afa044f138412866235d3a079a93afff5e2c71c7ee9dfa1eaa834",
+    "contributions_sha256": "bb6ada80ccd4ae0caa66399265259d6e0d8f9ec98d1a9c2153f4cae5bf436551",
+    "decision": {
+      "decision": "SELECTION_ONLY",
+      "inheritance_panel": "BEST_FULL \u00d7 FULL_ENUMERATED",
+      "rationale": "Both fixed sleeves have non-positive matched lift on controlling common support; the frozen -9.47% native selection baseline is not demoted."
+    },
+    "gate_a_manifest": "bb60ac5638d29674ad8c1c05f1ffe3ab9cdf12acb70ebdae6cea679743136d87",
+    "nine_cell_sha256": "07f7fcd06881bf40c8a012a1f47a06251a10e30145c1f669ffe1cf23574cf3d1",
+    "outcome_manifest": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+    "source_reproduction_sha256": "176671a8a3b4594c4008a761ce9cad03a1a56e4b9037735bea2d448293a064b8"
+  },
+  "payloads": {
+    "README.md": "31f245142c69e29f7a2b3ec458e30217c4fff4eea91204acf2ed1d588c4f2447",
+    "REPORT.md": "0855fed60062bb8f55b5a327a5092d85176eb1d04b319103c644350bf1439d1f",
+    "allocation_sleeve_lift.csv": "36ebdc04d2b3210f59cb0f0278286ef060c55194aa7c3c26cb6ac80621924b9c",
+    "bootstrap_draw_matrix.json": "457aa611fccbf11f2463c27cab541b6538e0fbf227bda5d647fb5bbb3b624911",
+    "bootstrap_draw_matrix.uint16.gz": "6c6a250b948afa044f138412866235d3a079a93afff5e2c71c7ee9dfa1eaa834",
+    "chart_source_interaction.csv": "ed0fa99a594b72344129f41599d57e39f1efc3593449d79855dc984cc3d3c05c",
+    "chart_source_roi_lift.csv": "07f7fcd06881bf40c8a012a1f47a06251a10e30145c1f669ffe1cf23574cf3d1",
+    "chart_source_stability.csv": "0da6ddd38c5f88dfdbb7597429b63a35bce414b2730e3abceaeba7741d34abc2",
+    "chart_source_support_overlap.csv": "d671d2a905aaa7f16724080348bc92690a76cc988e7482f65047cac261cf24c7",
+    "interaction_attribution.svg": "1adfdf4c88c7a9826991ab64a6ca16e9b62e4b41adbe2ae68dee7d06b29a991a",
+    "interaction_decomposition.csv": "ed0fa99a594b72344129f41599d57e39f1efc3593449d79855dc984cc3d3c05c",
+    "nine_cell_bootstrap_20000.csv": "7db43eccc97c0302c206d07b52b52539e70458f1c7415a07ffaa5c36d80b197c",
+    "nine_cell_primary.csv": "07f7fcd06881bf40c8a012a1f47a06251a10e30145c1f669ffe1cf23574cf3d1",
+    "risk_diagnostics.csv": "47f35825fe4e26e0b00e14cf57a9f7fa2c8c99fa932a9fe6d2ceb7b5bfaa0e9d",
+    "roi_lift_grouped.svg": "4c6220df5e0554c41064deb3162acf842387508453050a3639a60148852ae6a0",
+    "seed_dispersion.csv": "db0692836bd360658b6bb5f1f549e3a09b47bd268c70fa5d8ea0ae695914c456",
+    "selector_lift_fixed_arm.csv": "0695878dcc0cc91952518d11e00719a888159886ea7820fc8df786eda8ee731f",
+    "settlement_card.json": "87ae34430b8f4c6cada0a8db7cf0724f3dc4795449175e7f4959d8ff1e35e501",
+    "settlement_runner.py": "f593dd92c1b2afcc81ce50c65d61c9511070190c95b5cef98a13b05843ce2713",
+    "source_binding.json": "74aaba3526fd3d1c1d7b218007ebd54c347091fee547ed1f6cd0afaba9ce5392",
+    "source_row_reproduction.csv": "176671a8a3b4594c4008a761ce9cad03a1a56e4b9037735bea2d448293a064b8",
+    "stability_year_fold_loyo.csv": "0da6ddd38c5f88dfdbb7597429b63a35bce414b2730e3abceaeba7741d34abc2",
+    "support_overlap.svg": "7641e726d897f74ac1aa1acf155f0c9e68026b017da13088827b0eec7b724451",
+    "three_way_issue_contributions.csv.gz": "bb6ada80ccd4ae0caa66399265259d6e0d8f9ec98d1a9c2153f4cae5bf436551"
+  }
+}

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="620" viewBox="0 0 1200 620">
+<rect width="100%" height="100%" fill="white"/>
+<text x="600.0" y="35" text-anchor="middle" font-size="22" font-family="sans-serif">#170 THREE_WAY_ALL pre-tax ROI</text>
+<line x1="100" y1="169.06" x2="1160" y2="169.06" stroke="#333"/>
+<text x="20" y="270.0" transform="rotate(-90 20 270.0)" text-anchor="middle" font-size="14" font-family="sans-serif">Pre-tax ROI</text>
+<text x="276.67" y="505" text-anchor="middle" font-size="12" font-family="sans-serif">FULL</text>
+<rect x="212.77" y="169.06" width="37.80" height="63.95" fill="#2563eb"/>
+<text x="231.67" y="249.01" text-anchor="middle" font-size="10" font-family="sans-serif">-9.1%</text>
+<rect x="257.77" y="169.06" width="37.80" height="163.69" fill="#f59e0b"/>
+<text x="276.67" y="348.76" text-anchor="middle" font-size="10" font-family="sans-serif">-23.3%</text>
+<rect x="302.77" y="169.06" width="37.80" height="146.85" fill="#10b981"/>
+<text x="321.67" y="331.91" text-anchor="middle" font-size="10" font-family="sans-serif">-20.9%</text>
+<text x="630.00" y="505" text-anchor="middle" font-size="12" font-family="sans-serif">Q/M192</text>
+<rect x="566.10" y="169.06" width="37.80" height="94.00" fill="#2563eb"/>
+<text x="585.00" y="279.07" text-anchor="middle" font-size="10" font-family="sans-serif">-13.4%</text>
+<rect x="611.10" y="169.06" width="37.80" height="264.82" fill="#f59e0b"/>
+<text x="630.00" y="449.89" text-anchor="middle" font-size="10" font-family="sans-serif">-37.7%</text>
+<rect x="656.10" y="169.06" width="37.80" height="300.94" fill="#10b981"/>
+<text x="675.00" y="486.00" text-anchor="middle" font-size="10" font-family="sans-serif">-42.8%</text>
+<text x="983.33" y="505" text-anchor="middle" font-size="12" font-family="sans-serif">MODEL/M512</text>
+<rect x="919.43" y="169.06" width="37.80" height="117.16" fill="#2563eb"/>
+<text x="938.33" y="302.22" text-anchor="middle" font-size="10" font-family="sans-serif">-16.7%</text>
+<rect x="964.43" y="169.06" width="37.80" height="75.22" fill="#f59e0b"/>
+<text x="983.33" y="260.28" text-anchor="middle" font-size="10" font-family="sans-serif">-10.7%</text>
+<rect x="1009.43" y="70.00" width="37.80" height="99.06" fill="#10b981"/>
+<text x="1028.33" y="64.00" text-anchor="middle" font-size="10" font-family="sans-serif">14.1%</text>
+<rect x="100" y="575" width="16" height="16" fill="#2563eb"/><text x="122" y="588" font-size="13" font-family="sans-serif">BEST_FULL</text>
+<rect x="360" y="575" width="16" height="16" fill="#f59e0b"/><text x="382" y="588" font-size="13" font-family="sans-serif">Q_SOURCE</text>
+<rect x="620" y="575" width="16" height="16" fill="#10b981"/><text x="642" y="588" font-size="13" font-family="sans-serif">MODEL_SOURCE</text>
+</svg>

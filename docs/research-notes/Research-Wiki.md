@@ -755,6 +755,31 @@ incumbent。负结果只淘汰新增 lever，不能把研究基线重置到更�
 broad FULL、Q-WOR/M64、Q top-mass/M192 和 strict MODEL_P cap1/M512；新 lever 只能是
 基本面或决策链 overlay，不得根据同批 outcomes 再调 selector/M/allocator。
 
+## #170 固定选场器 × 分配 sleeve 叠加桥接（2026-08-04）
+
+#170 把 #167 的最佳 broad-support FULL selector 与两个局部正点估计 sleeve 固定成
+3×3 factorial，并在预先冻结的 177 期三方共同支持上一次性结算。141 期三方结果完整，
+36 期九格共同 fail closed。结果是 `SELECTION_ONLY`：BEST_FULL/FULL 税前 ROI
+`-9.09%`；Q top-mass/M192 与 MODEL cap1/M512 迁移到 BEST_FULL 后分别为
+`-13.37%/-16.66%`，matched lift `-4.27pp/-7.57pp`。
+
+MODEL sleeve 的 source-context lift 为 `+34.97pp`，但转移交互为 `-42.54pp`
+（95% CI `[-74.13pp,-11.13pp]`），说明 #167 的 MODEL sleeve 价值不能与最佳 selector
+直接相加。唯一绝对正格仍是原 MODEL_SOURCE/MODEL-cap1 控制格 `+14.09%`，它是同历史
+post-selection 结果，按合同需 strict independent EV，不能自行推广。
+
+### 2026-08-04 baseline ladder 增量
+
+| 层级 | 共同支持税前 ROI | matched lift | #134 继承状态 |
+|---|---:|---:|---|
+| BEST_FULL/FULL | -9.09% | 0.00pp | controlling inheritance |
+| BEST_FULL/Q top-mass M192 | -13.37% | -4.27pp | 不继承；diagnostic |
+| BEST_FULL/MODEL cap1 M512 | -16.66% | -7.57pp | 不继承；diagnostic |
+| MODEL_SOURCE/MODEL cap1 M512 | +14.09% | +34.97pp | source-context control；strict EV required |
+
+详细方法、完整九格、bootstrap、交互与集中度见
+[`Issue-170-N7-Selector-Allocator-Stack`](Issue-170-N7-Selector-Allocator-Stack.md)。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
