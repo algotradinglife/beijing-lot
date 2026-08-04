@@ -1,0 +1,78 @@
+---
+aliases:
+  - Issue 190 Sparse Divergence N7
+tags:
+  - beijing-lot
+  - research
+  - n7
+status: gate-b-complete
+updated: 2026-08-05
+---
+
+# Issue #190：稀疏独立模型—盘口分歧 N7
+
+## 结论
+
+完整冻结的 2,424 个 detector policies × 4 个 attribution arms 已一次性结算。
+Gate B 得到 `475` 个“绝对税前 ROI > 0 且相对 matched B0 lift > 0”的描述性
+screen rows，其中 `18` 个同时通过正 bootstrap 下界、去最大期、去最大年份和跨年
+检查。结论是 `STRICT_INDEPENDENT_EV_REQUIRED`：这些身份必须按冻结定义做独立复验，
+不能直接晋级、下注或回写阈值。
+
+接受的 BEST_FULL baseline ladder 保持不变。在 #95 的 163 期共同支持上，税前 ROI
+仍为 `-9.47%`；扩大到 #190 的 189 期 SHA-bound SQLite 支持后，描述性 ROI 为
+`-8.52%`。新增支持不替代或降级旧 baseline。
+
+## 结算来源和 fail-closed 边界
+
+- Gate-A eligible matches：`101,970`；
+- SQLite `match_features` trusted settlements：`100,906`；
+- unavailable：`1,064`，对应身份执行 0 张票、0 stake，不计为亏损；
+- fully settled N7 identities：`2,946 / 3,181`；
+- 与 #95 canonical ledger 重叠 `46,802` 行，result code/SP 差异 `0`。
+
+控制源是 Gate A 已绑定的 SQLite，SHA-256 为
+`7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f`。
+#95 只作为重叠一致性 oracle，不作为结算分母。
+
+## 四臂 attribution
+
+| Arm | 有 stake 的 policy rows | 中位 native ROI | 正 native ROI rows | 正 matched lift rows |
+|---|---:|---:|---:|---:|
+| B0_BEST_FULL | 2,424 | -8.52% | 0 | 0 |
+| D_MATCH_ONLY_FULL | 1,884 | -22.27% | 48 | 142 |
+| D_DIRECTION_ONLY | 861 | -1.89% | 369 | 662 |
+| D_JOINT_SPARSE | 1,884 | -16.24% | 128 | 201 |
+
+整体上，match-only 与 joint sparse 没有形成可直接晋级的稳定方案；较强信号主要出现在
+direction-only。18 个严格 screen rows 也全部属于 `D_DIRECTION_ONLY`，其中较有信息量的
+冻结支持包含 52、60、75、85 期的 cells，而不只是 1–2 期的偶然高 ROI cells。仍需
+独立 EV 才能判断是否存在可迁移增量。
+
+## 概率诊断
+
+在 100,906 个 trusted outcomes 上：
+
+| Probability source | Log loss | Brier | ECE |
+|---|---:|---:|---:|
+| HANDICAP_CONSENSUS | 1.126232 | 0.683754 | 0.081892 |
+| FUNDAMENTAL_INDEPENDENT | 1.116766 | 0.677073 | 0.073369 |
+| CALIBRATED_MARKET_ESTIMATOR | 1.114387 | 0.677845 | 0.067176 |
+
+因此独立基本面概率相对 handicap consensus 有小幅总体改善，但 calibrated market
+estimator 的 log loss 更低；不能把少数 direction-only 正收益 cells 解释成独立模型已
+普遍优于市场。
+
+## 账务和耐久性
+
+税前 ROI 是主口径。税只按每一张命中的 ¥2 票分别计算，不跨票、跨期或跨人汇总。
+完整包含 42 个 manifest payload，所有 SHA 已通过只读复核：
+
+- package manifest：`642464aeb9be0a20fa37e6c5a2a01c459bbb5fe45ad330ea4dffd99aa302243b`；
+- content identity：`b33393860827352d7f81baadb0cc7d0385383c089c4c2fe496c167130f197585`；
+- canonical ledger：`c939b7825ba9e720624e56812000fec692213ea48d5cc5934095c59ec286c818`。
+
+不可变包：`results/bj190_gate_b_sparse_divergence_v1`。其中包含完整四臂 settlement、
+20,000 次 paired bootstrap、YEAR/FOLD/LOYO、风险与集中度、failure attribution、
+chart-source tables、SVG 图和 exact candidate freeze。
+

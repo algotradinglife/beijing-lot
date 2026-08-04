@@ -1,0 +1,14 @@
+{
+  "accepted_baseline_ladder_demoted": false,
+  "contract": "BJ-HIST-SPARSE-DIVERGENCE-N7-001",
+  "decision": "STRICT_INDEPENDENT_EV_REQUIRED",
+  "interpretation": "complete frozen frontier settled; match, direction and joint interaction remain separately attributable",
+  "paper_research_only": true,
+  "positive_screen_count": 475,
+  "pre_tax_primary": true,
+  "promotion_authority": false,
+  "strict_independent_ev_required": true,
+  "strict_stability_candidate_count": 18,
+  "tax_reference_only": true,
+  "version": "bj190-gate-b-v1"
+}
