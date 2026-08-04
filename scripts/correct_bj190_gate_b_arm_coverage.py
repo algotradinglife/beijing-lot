@@ -21,12 +21,12 @@ import settle_bj190_sparse_divergence_gate_b as R
 
 
 BASE_MANIFEST_SHA256 = (
-    "642464aeb9be0a20fa37e6c5a2a01c459bbb5fe45ad330ea4dffd99aa302243b"
+    "4fc585769f3dc20dcb29b18421190288c03bb4e6e9f0db9a826b5c2d69b9acf7"
 )
 BASE_CONTENT_IDENTITY_SHA256 = (
-    "b33393860827352d7f81baadb0cc7d0385383c089c4c2fe496c167130f197585"
+    "20afd2c5e018186bd7dc1ea68db5c22ae99c69d9236c17e6f4035cf36c9d69c3"
 )
-CORRECTION_ID = "BJ190_ARM_SPECIFIC_COVERAGE_V1"
+CORRECTION_ID = "BJ190_ARM_SPECIFIC_COVERAGE_V2_PERFORMANCE_SCREEN"
 MUTABLE_FILES = {
     "CONTENT_IDENTITY.json",
     "README.md",
@@ -67,7 +67,7 @@ def load_canonical_outcomes(package: Path) -> dict[str, R.Outcome]:
 def recompute_arm_diagnostics(
     package: Path,
     gate: Mapping[str, object],
-) -> list[dict[str, object]]:
+) -> tuple[list[dict[str, object]], dict[tuple[str, str], str]]:
     grid_by_policy = gate["grid_by_policy"]
     identities = gate["identities"]
     estimator_by_match = gate["estimator_by_match"]
@@ -76,6 +76,7 @@ def recompute_arm_diagnostics(
     assert isinstance(estimator_by_match, dict)
     expected_policy_order = [str(row["policy_id"]) for row in gate["grid"]]
     coverage: list[dict[str, object]] = []
+    economic_identities: dict[tuple[str, str], str] = {}
 
     for arm in R.ARMS:
         path = package / f"issue_arm_settlement_{arm.lower()}.csv.gz"
@@ -94,6 +95,9 @@ def recompute_arm_diagnostics(
                 estimator_by_match,
             )
             coverage.extend(policy_coverage)
+            economic_identities[(current_policy, arm)] = R.issue_economic_identity(
+                records
+            )
             observed.append(current_policy)
 
         with gzip.open(path, "rt", newline="", encoding="utf-8") as handle:
@@ -119,7 +123,7 @@ def recompute_arm_diagnostics(
 
     if not coverage or {str(row["arm"]) for row in coverage} != set(R.ARMS):
         raise RuntimeError("arm coverage diagnostic census drift")
-    return coverage
+    return coverage, economic_identities
 
 
 def write_corrected_dependents(
@@ -128,7 +132,7 @@ def write_corrected_dependents(
     gate: Mapping[str, object],
 ) -> dict[str, object]:
     load_canonical_outcomes(package)
-    coverage = recompute_arm_diagnostics(package, gate)
+    coverage, economic_identities = recompute_arm_diagnostics(package, gate)
     R.write_gzip(
         stage / "candidate_coverage_breakdown.csv.gz", tuple(coverage[0]), coverage
     )
@@ -140,7 +144,9 @@ def write_corrected_dependents(
     risk = R.read_gzip(package / "risk_concentration.csv.gz")
     stability = R.read_gzip(package / "stability_year_fold_loyo.csv.gz")
     bootstrap = R.read_csv(package / "bootstrap_paired_lift_20000.csv")
-    freeze = R.candidate_freeze(frontier, risk, stability, coverage, bootstrap)
+    freeze = R.candidate_freeze(
+        frontier, risk, stability, coverage, bootstrap, economic_identities
+    )
     if freeze["positive_screen_count"] != 475:
         raise RuntimeError(
             "descriptive positive screen changed during coverage correction"
@@ -150,22 +156,17 @@ def write_corrected_dependents(
             "arm-specific correction must produce zero strict candidates"
         )
 
-    old_freeze = json.loads(
-        (package / "strict_ev_candidate_freeze.json").read_text(encoding="utf-8")
-    )
-    old_strict = {
-        (str(row["policy_id"]), str(row["arm"]))
-        for row in old_freeze["strict_stability_rows"]
+    if freeze["performance_stable_coverage_limited_alias_count"] != 18:
+        raise RuntimeError("performance-stable alias count drift")
+    if freeze["performance_stable_coverage_limited_economic_identity_count"] != 10:
+        raise RuntimeError("performance-stable economic identity count drift")
+    performance_rows = {
+        str(row["policy_id"]): row
+        for row in freeze["performance_stable_coverage_limited_alias_rows"]
     }
-    new_positive = {
-        (str(row["policy_id"]), str(row["arm"])): row
-        for row in freeze["positive_screen_rows"]
-    }
-    if len(old_strict) != 18 or any(
-        key not in new_positive or new_positive[key]["line_stratum_count"] != 1
-        for key in old_strict
-    ):
-        raise RuntimeError("formal #195 line-0 correction reconciliation failed")
+    anchor = performance_rows.get("DP_6934f2994db62c6ff893")
+    if anchor is None or anchor["line_stratum_count"] != 1:
+        raise RuntimeError("DP_6934 arm-specific line-stratum anchor drift")
 
     decision = json.loads((package / "decision.json").read_text(encoding="utf-8"))
     decision.update(
@@ -174,6 +175,8 @@ def write_corrected_dependents(
             "positive_screen_count": freeze["positive_screen_count"],
             "strict_stability_candidate_count": 0,
             "strict_independent_ev_required": False,
+            "performance_stable_coverage_limited_alias_count": 18,
+            "performance_stable_coverage_limited_economic_identity_count": 10,
             "interpretation": (
                 "475 descriptive positive screen rows remain; candidate-arm-own coverage "
                 "leaves the former direction-only strict cluster on line stratum 0 only, "
@@ -208,6 +211,8 @@ def write_corrected_dependents(
             "coverage_correction": CORRECTION_ID,
             "coverage_semantics": "candidate-arm-own selected N7 identities",
             "descriptive_positive_screen_count": 475,
+            "performance_stable_coverage_limited_alias_count": 18,
+            "performance_stable_coverage_limited_economic_identity_count": 10,
             "strict_stability_candidate_count": 0,
             "issue_level_economics_replayed": False,
         }
@@ -243,8 +248,10 @@ def write_corrected_dependents(
             "- Decision: `NO_PROMOTION_FROM_GATE_B`.",
             "- Canonical settlement/economics were not replayed and remain byte-identical.",
             "- Positive screen rows: 475 descriptive rows; strict-stability candidates: 0.",
+            "- Performance-stable but coverage-limited: 18 policy aliases / 10 distinct issue-economic identities.",
             "- Coverage is derived separately from each arm's own selected N7 identities.",
             "- The former 18 direction-only strict aliases cover line stratum `0` only; they remain descriptive evidence but fail the frozen >=2-line coverage rule.",
+            "- The informative Z100 K1 cluster spans 52/60/75/85 selected issues; it remains non-promotable pending genuinely cross-line evidence.",
             "- Performance checks (bootstrap, ex-largest, positive years) are distinct from coverage checks (league and line counts).",
             "- Paper research only; no promotion, betting or production authority.",
             "",
@@ -307,6 +314,8 @@ def correct(package: Path = R.DEFAULT_OUTPUT) -> dict[str, object]:
                 "prior_content_identity_sha256": BASE_CONTENT_IDENTITY_SHA256,
                 "arm_specific_coverage": True,
                 "strict_stability_candidate_count": 0,
+                "performance_stable_coverage_limited_alias_count": 18,
+                "performance_stable_coverage_limited_economic_identity_count": 10,
                 "ticket_or_bootstrap_replay": False,
             }
         )

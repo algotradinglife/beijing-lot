@@ -20,6 +20,11 @@ screen rows。经 #195 独立复验纠正 coverage 口径后，严格候选数�
 正收益年份至少 2 个；coverage 条件则独立要求候选 arm 自身至少覆盖 2 个联赛和 2 个
 盘口 strata。两者不再混写。
 
+为避免丢失有效的科学信息，另冻结一层 `performance-stable but coverage-limited`
+screen：`18` 个 policy aliases 在 bootstrap、去最大期/年份和正收益年份条件上通过，
+但因只覆盖 line `0` 而不能晋级；它们折叠为 `10` 个不同的 344 期 issue-economic
+identities。最有信息量的是 Z100/K1 的 52/60/75/85 期簇（12 aliases、6 个经济身份）。
+
 接受的 BEST_FULL baseline ladder 保持不变。在 #95 的 163 期共同支持上，税前 ROI
 仍为 `-9.47%`；扩大到 #190 的 189 期 SHA-bound SQLite 支持后，描述性 ROI 为
 `-8.52%`。新增支持不替代或降级旧 baseline。
@@ -50,6 +55,15 @@ direction-only。原先标作严格候选的 18 个 `D_DIRECTION_ONLY` cells，�
 都只覆盖盘口 `0` 这一层，而不是误继承自 `D_MATCH_ONLY_FULL` 的 6 层。它们仍保留为
 描述性正 ROI/bootstrap 证据，但不能支持跨盘口稳定性，也不具备晋级资格。
 
+| Z100/K1 distinct economic support | Native ROI | Matched lift | Bootstrap low | Line strata |
+|---:|---:|---:|---:|---:|
+| 52 issues | +14.89% | +27.92% | +0.37% | 1 |
+| 60 issues (identity A) | +19.83% | +27.97% | +1.19% | 1 |
+| 60 issues (identity B) | +20.48% | +28.62% | +1.79% | 1 |
+| 75 issues (identity A) | +14.83% | +26.96% | +4.27% | 1 |
+| 75 issues (identity B) | +15.35% | +27.48% | +4.67% | 1 |
+| 85 issues | +8.78% | +21.19% | +0.13% | 1 |
+
 ## 概率诊断
 
 在 100,906 个 trusted outcomes 上：
@@ -71,8 +85,8 @@ arm-specific correction 后完整包含 43 个 manifest payload；canonical ledg
 issue-level settlement、bootstrap contributions/results 和所有其他 economics payload
 逐字节不变：
 
-- corrected package manifest：`4fc585769f3dc20dcb29b18421190288c03bb4e6e9f0db9a826b5c2d69b9acf7`；
-- corrected content identity：`20afd2c5e018186bd7dc1ea68db5c22ae99c69d9236c17e6f4035cf36c9d69c3`；
+- corrected package manifest：`5685f25d9ce70a66b38b283f668d258d97dfe2e356c5bd45d9666400c6ab4554`；
+- corrected content identity：`5112dc652277a234fcb36687d59e2bd96bf8daeaaa1c9ddd06481923de909ce6`；
 - canonical ledger：`c939b7825ba9e720624e56812000fec692213ea48d5cc5934095c59ec286c818`。
 
 不可变包：`results/bj190_gate_b_sparse_divergence_v1`。其中包含完整四臂 settlement、

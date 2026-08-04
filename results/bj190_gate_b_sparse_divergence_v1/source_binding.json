@@ -13,10 +13,10 @@
   },
   "contract": "BJ-HIST-SPARSE-DIVERGENCE-N7-001",
   "coverage_correction": {
-    "correction_id": "BJ190_ARM_SPECIFIC_COVERAGE_V1",
+    "correction_id": "BJ190_ARM_SPECIFIC_COVERAGE_V2_PERFORMANCE_SCREEN",
     "independent_validation_issue": 195,
-    "prior_content_identity_sha256": "b33393860827352d7f81baadb0cc7d0385383c089c4c2fe496c167130f197585",
-    "prior_manifest_sha256": "642464aeb9be0a20fa37e6c5a2a01c459bbb5fe45ad330ea4dffd99aa302243b",
+    "prior_content_identity_sha256": "20afd2c5e018186bd7dc1ea68db5c22ae99c69d9236c17e6f4035cf36c9d69c3",
+    "prior_manifest_sha256": "4fc585769f3dc20dcb29b18421190288c03bb4e6e9f0db9a826b5c2d69b9acf7",
     "semantics": "coverage derives separately from each arm own selected N7 identities",
     "ticket_or_outcome_replay": false
   },

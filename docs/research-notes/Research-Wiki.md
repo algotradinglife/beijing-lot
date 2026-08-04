@@ -865,6 +865,11 @@ direction-only 中位数 `-1.89%`。475 个描述性正 screen rows 中有 18 �
 最终为 `NO_PROMOTION_FROM_GATE_B`；475 行仍作为描述性 line-0 正信号保留。接受的 #95
 共同支持 baseline `-9.47%` 未被替换或降级。
 
+同时保留一层非晋级的 `performance-stable but coverage-limited` 证据：18 个 policy
+aliases 折叠为 10 个不同 issue-economic identities；其中 Z100/K1 的 52/60/75/85 期
+簇共有 12 aliases、6 个经济身份，税前 ROI 为 +8.78% 至 +20.48%，matched lift 为
++21.19pp 至 +28.62pp，但全部只有 1 个 line stratum，因此不改变严格候选数 0。
+
 税仍按每张命中的 ¥2 票分别计算，不做跨票/跨期汇总。完整四臂结果、概率校准、
 20k paired bootstrap、YEAR/FOLD/LOYO、风险集中度、图与不可变哈希见
 [`Issue-190-Sparse-Divergence-N7`](Issue-190-Sparse-Divergence-N7.md)。

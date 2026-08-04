@@ -768,6 +768,27 @@ SETTLEMENT_FIELDS = (
     "winning_ticket_payout_yuan",
 )
 
+ECONOMIC_IDENTITY_FIELDS = (
+    "issue",
+    "settlement_status",
+    "n7_identity_sha256",
+    "multiplicity_vector_sha256",
+    "stake_yuan",
+    "gross_pre_tax_yuan",
+    "tax_yuan",
+    "pre_tax_net_yuan",
+    "tax_adjusted_net_yuan",
+    "hit_ticket_count",
+)
+
+
+def issue_economic_identity(
+    records: Sequence[Mapping[str, object]],
+) -> str:
+    return canonical_hash(
+        [[str(row[field]) for field in ECONOMIC_IDENTITY_FIELDS] for row in records]
+    )
+
 
 def settle_ledger_row(
     source: Mapping[str, str],
@@ -1422,6 +1443,7 @@ def settle_surface(
     selected_probability: list[dict[str, object]] = []
     bootstrap_targets: list[dict[str, object]] = []
     bridge: list[dict[str, object]] = []
+    economic_identities: dict[tuple[str, str], str] = {}
     economics_cache: dict[
         tuple[str, str], tuple[dict[str, float | int], int, float]
     ] = {}
@@ -1445,6 +1467,9 @@ def settle_surface(
             native.append(native_summary(policy_id, arm, records[arm]))
             stability.extend(stability_rows(policy_id, arm, records[arm]))
             risk.extend(risk_rows(policy_id, arm, records[arm]))
+            economic_identities[(policy_id, arm)] = issue_economic_identity(
+                records[arm]
+            )
         for arm in ARMS[1:]:
             summary, candidate_common, baseline_common = pairwise_summary(
                 policy_id, arm, records[arm], records["B0_BEST_FULL"]
@@ -1572,6 +1597,7 @@ def settle_surface(
         "selected_probability": selected_probability,
         "bootstrap_targets": bootstrap_targets,
         "baseline_bridge": bridge,
+        "economic_identities": economic_identities,
         "row_count_each_arm": row_count,
         "economics_cache_count": len(economics_cache),
     }
@@ -1925,6 +1951,7 @@ def candidate_freeze(
     stability: Sequence[Mapping[str, object]],
     coverage: Sequence[Mapping[str, object]],
     bootstrap_rows: Sequence[Mapping[str, str]],
+    economic_identities: Mapping[tuple[str, str], str] | None = None,
 ) -> dict[str, object]:
     risk_map = {
         (str(row["policy_id"]), str(row["arm"])): row
@@ -1954,6 +1981,7 @@ def candidate_freeze(
                 )
             ].add(str(row["value"]))
     positives: list[dict[str, object]] = []
+    performance_stable: list[dict[str, object]] = []
     promotable: list[dict[str, object]] = []
     for row in frontier:
         if (
@@ -1990,6 +2018,9 @@ def candidate_freeze(
             "line_stratum_count": len(
                 strata[(str(row["policy_id"]), str(row["arm"]), "LINE_STRATUM")]
             ),
+            "economic_identity_sha256": (
+                economic_identities.get(key, "") if economic_identities else ""
+            ),
             "exact_surface_identity": canonical_hash(
                 {
                     "gate_a_manifest": EXPECTED_GATE_A_MANIFEST,
@@ -2000,7 +2031,7 @@ def candidate_freeze(
             "strict_independent_ev_status": "REQUIRED_BEFORE_ANY_PROMOTION",
         }
         positives.append(record)
-        robust = (
+        performance_stable_flag = (
             bootstrap["lift_ci_low"] not in ("", None)
             and float(bootstrap["lift_ci_low"]) > 0
             and risk["ex_largest_issue_roi"] not in ("", None)
@@ -2008,11 +2039,37 @@ def candidate_freeze(
             and risk["ex_largest_year_roi"] not in ("", None)
             and float(risk["ex_largest_year_roi"]) > 0
             and years_positive[key] >= 2
-            and record["league_count"] >= 2
-            and record["line_stratum_count"] >= 2
         )
-        if robust:
+        coverage_pass = (
+            record["league_count"] >= 2 and record["line_stratum_count"] >= 2
+        )
+        if performance_stable_flag and not coverage_pass:
+            performance_stable.append(record)
+        if performance_stable_flag and coverage_pass:
             promotable.append(record)
+
+    economic_groups: defaultdict[str, list[dict[str, object]]] = defaultdict(list)
+    for record in performance_stable:
+        identity = str(record["economic_identity_sha256"])
+        if not identity:
+            identity = canonical_hash(
+                {
+                    "policy_id": record["policy_id"],
+                    "arm": record["arm"],
+                    "fallback": "NO_ISSUE_ECONOMIC_LEDGER",
+                }
+            )
+            record["economic_identity_sha256"] = identity
+        economic_groups[identity].append(record)
+    economic_rows: list[dict[str, object]] = []
+    for identity, aliases in sorted(economic_groups.items()):
+        alias_ids = sorted(str(row["policy_id"]) for row in aliases)
+        representative = min(aliases, key=lambda row: str(row["policy_id"]))
+        for row in aliases:
+            row["economic_alias_count"] = len(alias_ids)
+            row["economic_aliases"] = alias_ids
+            row["economic_representative"] = row is representative
+        economic_rows.append(dict(representative))
     return {
         "screen_rule": "absolute pre-tax ROI > 0 and pairwise-common matched-B0 lift > 0",
         "strict_stability_rule": (
@@ -2020,12 +2077,26 @@ def candidate_freeze(
             "positive-year count >=2; coverage: candidate-arm own covered league count >=2 "
             "and line-stratum count >=2"
         ),
+        "performance_stable_coverage_limited_rule": (
+            "performance: paired bootstrap lift low > 0, ex-largest issue/year ROI > 0, "
+            "positive-year count >=2; coverage limitation: candidate-arm own league count "
+            "or line-stratum count is below 2; no promotion authority"
+        ),
         "positive_screen_count": len(positives),
+        "performance_stable_coverage_limited_alias_count": len(performance_stable),
+        "performance_stable_coverage_limited_economic_identity_count": len(
+            economic_rows
+        ),
+        "performance_stable_coverage_limited_alias_rows": performance_stable,
+        "performance_stable_coverage_limited_economic_rows": economic_rows,
         "strict_stability_candidate_count": len(promotable),
         "positive_screen_rows": positives,
         "strict_stability_rows": promotable,
         "promotion_authority": False,
-        "strict_independent_ev_required": bool(positives),
+        "strict_independent_ev_required": bool(promotable),
+        "independent_ev_required_for_performance_stable_claim": bool(
+            performance_stable
+        ),
     }
 
 
@@ -2173,6 +2244,19 @@ def report_markdown(
             str(row["arm"]),
         ),
     )
+    performance_economic_rows = sorted(
+        freeze.get("performance_stable_coverage_limited_economic_rows", []),
+        key=lambda row: (
+            int(row["selected_issue_count"]),
+            str(row["economic_identity_sha256"]),
+        ),
+    )
+    z100_cluster = [
+        row
+        for row in performance_economic_rows
+        if str(row["top_k"]) == "1"
+        and int(row["selected_issue_count"]) in {52, 60, 75, 85}
+    ]
     lines = [
         "# #190 Gate B — sparse independent-model divergence for N7",
         "",
@@ -2184,6 +2268,12 @@ def report_markdown(
             f"**{freeze['strict_stability_candidate_count']}** rows passing both the stricter performance screen "
             "(bootstrap, ex-largest and positive-year checks) and candidate-arm-own coverage screen "
             "(at least two leagues and two line strata). Every positive row remains retrospective research only."
+        ),
+        (
+            f"A distinct performance-stable but coverage-limited screen retains "
+            f"**{freeze.get('performance_stable_coverage_limited_alias_count', 0)} policy aliases / "
+            f"{freeze.get('performance_stable_coverage_limited_economic_identity_count', 0)} distinct issue-economic identities**. "
+            "These rows pass the frozen performance checks but not cross-line coverage, so they do not change the zero strict-promotion count."
         ),
         "",
         "Pre-tax ROI is controlling. Tax-adjusted results are reference-only and apply tax per individual winning ¥2 ticket, never after issue/person aggregation. The accepted -9.47% baseline ladder is retained unchanged.",
@@ -2258,7 +2348,18 @@ def report_markdown(
         )
     lines += [
         "",
-        "The direction-only positive cluster is line-0-only evidence when coverage is derived from each candidate arm's own selected N7 identities. It therefore does not pass the declared cross-line coverage requirement and is not a strict-stability candidate.",
+        "## Performance-stable but coverage-limited Z100 K1 cluster",
+        "",
+        "| Economic identity | Frozen rule | Selected issues | Native ROI | Matched lift | Bootstrap low | Aliases | Line strata |",
+        "|---|---|---:|---:|---:|---:|---:|---:|",
+    ]
+    for row in z100_cluster:
+        lines.append(
+            f"| `{str(row['economic_identity_sha256'])[:16]}` | {row['threshold_rule']} / K{row['top_k']} | {row['selected_issue_count']} | {float(row['native_pre_tax_roi']):+.2%} | {float(row['matched_b0_lift']):+.2%} | {float(row['bootstrap_lift_ci_low']):+.2%} | {row['economic_alias_count']} | {row['line_stratum_count']} |"
+        )
+    lines += [
+        "",
+        "The 52/60/75/85-issue Z100 K1 cluster is the most informative part of the former strict set. It remains line-0-only evidence when coverage is derived from each candidate arm's own selected N7 identities. It therefore does not pass the declared cross-line coverage requirement and is not a strict-stability candidate.",
         "",
         "## Stability, risk and failure attribution",
         "",
@@ -2377,6 +2478,7 @@ def build(
             surface["stability"],
             surface["coverage"],
             bootstrap_rows,
+            surface["economic_identities"],
         )
 
         tables: tuple[tuple[str, Sequence[Mapping[str, object]], bool], ...] = (

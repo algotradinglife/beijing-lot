@@ -3,6 +3,7 @@
 ## Executive decision
 
 The complete preregistered 2,424-policy × four-arm surface was settled once. There are **475** positive absolute-ROI plus matched-B0-lift screen rows and **0** rows passing both the stricter performance screen (bootstrap, ex-largest and positive-year checks) and candidate-arm-own coverage screen (at least two leagues and two line strata). Every positive row remains retrospective research only.
+A distinct performance-stable but coverage-limited screen retains **18 policy aliases / 10 distinct issue-economic identities**. These rows pass the frozen performance checks but not cross-line coverage, so they do not change the zero strict-promotion count.
 
 Pre-tax ROI is controlling. Tax-adjusted results are reference-only and apply tax per individual winning ¥2 ticket, never after issue/person aggregation. The accepted -9.47% baseline ladder is retained unchanged.
 
@@ -73,7 +74,18 @@ The manifest-covered selected-region table compares every frozen policy's sparse
 
 Only the first 20 of 475 screen rows are rendered here; the exact full freeze is machine-readable.
 
-The direction-only positive cluster is line-0-only evidence when coverage is derived from each candidate arm's own selected N7 identities. It therefore does not pass the declared cross-line coverage requirement and is not a strict-stability candidate.
+## Performance-stable but coverage-limited Z100 K1 cluster
+
+| Economic identity | Frozen rule | Selected issues | Native ROI | Matched lift | Bootstrap low | Aliases | Line strata |
+|---|---|---:|---:|---:|---:|---:|---:|
+| `ad7ab0b665324240` | DP050_Z100 / K1 | 52 | +14.89% | +27.92% | +0.37% | 2 | 1 |
+| `177ac7f82fe65a8b` | Z_100 / K1 | 60 | +19.83% | +27.97% | +1.19% | 2 | 1 |
+| `db2a66f423b3b694` | DP050_Z100 / K1 | 60 | +20.48% | +28.62% | +1.79% | 2 | 1 |
+| `4c468ed3f19f632e` | DP050_Z100 / K1 | 75 | +14.83% | +26.96% | +4.27% | 2 | 1 |
+| `7fe30c9f6b63326b` | DP050_Z100 / K1 | 75 | +15.35% | +27.48% | +4.67% | 2 | 1 |
+| `047f1906e3624153` | DP050_Z100 / K1 | 85 | +8.78% | +21.19% | +0.13% | 2 | 1 |
+
+The 52/60/75/85-issue Z100 K1 cluster is the most informative part of the former strict set. It remains line-0-only evidence when coverage is derived from each candidate arm's own selected N7 identities. It therefore does not pass the declared cross-line coverage requirement and is not a strict-stability candidate.
 
 ## Stability, risk and failure attribution
 

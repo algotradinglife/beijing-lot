@@ -356,6 +356,8 @@ def test_candidate_coverage_is_arm_specific_and_cannot_leak() -> None:
     )
     assert freeze["positive_screen_count"] == 1
     assert freeze["strict_stability_candidate_count"] == 0
+    assert freeze["performance_stable_coverage_limited_alias_count"] == 1
+    assert freeze["performance_stable_coverage_limited_economic_identity_count"] == 1
     assert freeze["positive_screen_rows"][0]["league_count"] == 1
     assert freeze["positive_screen_rows"][0]["line_stratum_count"] == 1
     assert "positive-year count" in freeze["strict_stability_rule"]
@@ -365,10 +367,10 @@ def test_candidate_coverage_is_arm_specific_and_cannot_leak() -> None:
 def test_generated_immutable_package_manifest_and_decision() -> None:
     package = ROOT / "results" / RUNNER.PACKAGE_NAME
     assert RUNNER.sha256_file(package / "SHA256SUMS.json") == (
-        "4fc585769f3dc20dcb29b18421190288c03bb4e6e9f0db9a826b5c2d69b9acf7"
+        "5685f25d9ce70a66b38b283f668d258d97dfe2e356c5bd45d9666400c6ab4554"
     )
     assert RUNNER.sha256_file(package / "CONTENT_IDENTITY.json") == (
-        "20afd2c5e018186bd7dc1ea68db5c22ae99c69d9236c17e6f4035cf36c9d69c3"
+        "5112dc652277a234fcb36687d59e2bd96bf8daeaaa1c9ddd06481923de909ce6"
     )
     manifest = json.loads((package / "SHA256SUMS.json").read_text())
     assert len(manifest) == 43
@@ -408,5 +410,17 @@ def test_generated_immutable_package_manifest_and_decision() -> None:
     assert freeze["positive_screen_count"] == 475
     assert freeze["strict_stability_candidate_count"] == 0
     assert freeze["strict_stability_rows"] == []
+    assert freeze["performance_stable_coverage_limited_alias_count"] == 18
+    assert freeze["performance_stable_coverage_limited_economic_identity_count"] == 10
+    performance_rows = {
+        row["policy_id"]: row
+        for row in freeze["performance_stable_coverage_limited_alias_rows"]
+    }
+    assert performance_rows["DP_6934f2994db62c6ff893"]["line_stratum_count"] == 1
+    assert {
+        int(row["selected_issue_count"])
+        for row in freeze["performance_stable_coverage_limited_economic_rows"]
+        if row["top_k"] == "1" and int(row["selected_issue_count"]) in {52, 60, 75, 85}
+    } == {52, 60, 75, 85}
     assert "positive-year count" in freeze["strict_stability_rule"]
     assert "candidate-arm own" in freeze["strict_stability_rule"]
