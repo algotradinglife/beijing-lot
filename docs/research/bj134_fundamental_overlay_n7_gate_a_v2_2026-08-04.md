@@ -19,7 +19,11 @@ surface in closed PR #158. Gate B remains unauthorized pending PI review.
 - Historical SQLite SHA-256:
   `7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f`.
   Target rows use identity/rank/handicap-safe columns only. Team-state inputs
-  use results from calendar years strictly earlier than each target year.
+  use only matches whose kickoff is strictly earlier than the common frozen
+  cutoff for that issue.
+- The documented `active_v3.3.3` decision core is byte-bound at
+  `50c523ae5441a3018fcc5a175b884a0d887416c99f6b34f9dc72903695adcf92`
+  and copied into the immutable package.
 
 ## Frozen comparison
 
@@ -33,10 +37,12 @@ identity freeze.
 Four issue-level arms select exactly one identity on that same candidate pool:
 
 1. `MARKET_BEST_FULL`: exact frozen COLD_FIRST order;
-2. `FUNDAMENTALS_ONLY`: seven-leg geometric mean of strictly-prior-year
-   Elo/form/rest fundamental confidence;
-3. `DECISION_CHAIN_ONLY`: seven-leg geometric mean of the existing maximum
-   `q_weight` outcome score;
+2. `FUNDAMENTALS_ONLY`: seven-leg geometric mean of rolling Elo/form/rest
+   confidence at the issue's common pre-kickoff cutoff;
+3. `DECISION_CHAIN_ONLY`: seven-leg geometric mean of the exact
+   `active_v3.3.3` confidence output. Each frozen role reconstructs
+   `q=E_SP×q_weight` and `predicted_SP=q/p_model` before invoking the shared
+   decision core; this is not a q-max proxy;
 4. `FUNDAMENTALS_PLUS_DECISION`: fixed within-issue blend of 0.50 market,
    0.25 fundamental, and 0.25 decision percentiles.
 
@@ -46,22 +52,32 @@ a neutral state and explicit missingness; no candidate is silently dropped.
 Target-period home/away rank has no independent observation timestamp in the
 source. It is graded `HISTORICAL_TIMING_PROXY`, excluded from all four
 controlling arms, and retained only in explicitly named diagnostic fields.
+The source has no historical text/intelligence payload, so the decision trace
+retains those inputs explicitly unavailable rather than imputing them. The
+package emits every reconstructed input, primary/protection decision, advisory
+stop and confidence in `decision_chain_trace.csv.gz`.
+
+The freeze also contains 11 exact ablation policies and their 3,828 issue-level
+selection rows. They include leave-one-family-out variants for Elo strength,
+form and rest in both the fundamental-only and combined views. Gate B therefore
+cannot define ablations after outcomes are opened.
 
 ## Frozen evidence
 
 - package: `results/bj134_gate_a_preoutcome_v2`;
 - manifest SHA-256:
-  `cbd8e612ec4de26b7b927757e9c836af5f8a97a133ddaae67b27bfe9e4b92675`;
+  `ed8ae73827a759ef50e3ca07309b8bf8eb13475ef0e186105b7b9c576ef5ff44`;
 - content identity SHA-256:
-  `956ab00df8f12938145c0ec9250de7d62c7b274fbaaae8eedf7f0ee54692f805`;
+  `c99334985c22a465a241b37f5718bcab271fe17c9c88e96d300a67f934237e86`;
 - rows: 424 candidate identities, 2,968 role vectors, 1,558 target-safe match
-  feature rows, and 1,392 issue-arm decisions;
+  feature rows, 1,558 decision-chain traces, 1,392 primary issue-arm decisions,
+  3,828 ablation decisions and 189 issue cutoffs;
 - participation per arm: 189 selected / 159 frozen no-bet;
 - tests: `pytest -q tests/scripts/test_freeze_bj134_fundamental_overlay_gate_a.py`
-  (`5 passed`).
+  (`7 passed`).
 
-Pre-outcome identity overlap against BEST_FULL is 112/189 for fundamentals,
-125/189 for decision-chain, and 171/189 for the combined overlay. These are
+Pre-outcome identity overlap against BEST_FULL is 117/189 for fundamentals,
+110/189 for decision-chain, and 168/189 for the combined overlay. These are
 selection diagnostics only, not performance findings.
 
 ## Gate-B boundary

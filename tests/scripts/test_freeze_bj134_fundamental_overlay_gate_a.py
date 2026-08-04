@@ -7,6 +7,7 @@ import importlib.util
 import inspect
 import json
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 
 
@@ -59,10 +60,53 @@ def test_unstamped_target_rank_is_separate_from_controlling_fundamental_score():
         "home_rank": "1", "away_rank": "20",
     }
     reversed_rank = {**base, "home_rank": "20", "away_rank": "1"}
-    left = state.snapshot(base)
-    right = state.snapshot(reversed_rank)
+    cutoff = datetime.fromisoformat(base["kickoff_ts"])
+    left = state.snapshot(base, cutoff)
+    right = state.snapshot(reversed_rank, cutoff)
     assert left["fundamental_confidence"] == right["fundamental_confidence"]
     assert left["rank_proxy_confidence"] != right["rank_proxy_confidence"]
+
+
+def test_rolling_state_uses_strict_common_issue_cutoff_and_advances_in_year():
+    module = load_module()
+    state = module.TeamState()
+    history = {
+        "home_team_id": "H", "away_team_id": "A", "kickoff_ts": "2025-01-02 12:00:00",
+        "fthg": 3, "ftag": 0,
+    }
+    target = {
+        "home_team_id": "H", "away_team_id": "A", "kickoff_ts": "2025-02-01 20:00:00",
+        "home_rank": "", "away_rank": "",
+    }
+    cutoff = datetime.fromisoformat("2025-02-01 10:00:00")
+    before = state.snapshot(target, cutoff)
+    state.update(history)
+    after = state.snapshot(target, cutoff)
+    assert before["history_depth"] == 0
+    assert after["history_depth"] == 1
+    assert after["elo_diff"] > before["elo_diff"]
+    assert after["feature_cutoff_ts"] == "2025-02-01 10:00:00"
+
+
+def test_decision_chain_reconstructs_q_and_uses_byte_bound_active_core():
+    module = load_module()
+    core = module.load_decision_chain()
+    role = {
+        "match_id": "1", "match_idx": "1", "issue_instance": "X@F", "e_sp": "3.0",
+        "p_model3": "0.50", "p_model1": "0.30", "p_model0": "0.20",
+        "p_market_cal3": "0.45", "p_market_cal1": "0.30", "p_market_cal0": "0.25",
+        "q_weight3": "0.40", "q_weight1": "0.35", "q_weight0": "0.25",
+    }
+    feature = {
+        "home_team_id": "H", "away_team_id": "A", "handicap_line_norm": -1,
+        "feature_cutoff_ts": "2025-01-01 10:00:00",
+    }
+    trace = module.role_decision_trace(role, feature, core)
+    assert trace["decision_version"] == "active_v3.3.3"
+    assert trace["q_reconstructed3"] == "1.200000000000"
+    assert trace["predicted_sp3"] == "2.400000000000"
+    assert trace["primary_pick"] in {"3", "1", "0"}
+    assert float(trace["decision_confidence"]) > 0
 
 
 def test_market_arm_reproduces_rank_one_on_fixed_348_issue_denominator():
@@ -118,6 +162,9 @@ def test_generated_package_manifest_and_denominators():
     assert denominator["candidate_identity_rows"] == 424
     assert denominator["candidate_role_rows"] == 424 * 7
     assert denominator["issue_rows"] == 348 * 4
+    assert denominator["decision_trace_rows"] == 1558
+    assert denominator["issue_cutoff_rows"] == 189
+    assert denominator["ablation_issue_rows"] == 348 * 11
     assert set(denominator["selected_by_arm"].values()) == {189}
     assert set(denominator["no_bet_by_arm"].values()) == {159}
     assert denominator["planned_stake_per_arm_yuan"] == 189 * 4374
@@ -133,11 +180,55 @@ def test_generated_package_manifest_and_denominators():
     market = [row for row in rows if row["arm"] == "MARKET_BEST_FULL" and row["policy_status"] == "SELECTED_PREOUTCOME"]
     rank_by_key = {(row["issue_instance"], row["portfolio_id"]): row["source_selector_rank"] for row in candidates}
     assert all(rank_by_key[(row["issue_instance"], row["selected_portfolio_id"])] == "1" for row in market)
+    with gzip.open(PACKAGE / "match_feature_scores.csv.gz", "rt", newline="", encoding="utf-8") as handle:
+        features = list(csv.DictReader(handle))
+    assert len(features) == 1558
+    assert sum(abs(float(row["rest_diff"])) > 1e-12 for row in features) > 1000
+    assert all(datetime.fromisoformat(row["feature_cutoff_ts"]) <= datetime.fromisoformat(row["kickoff_ts"]) for row in features)
+    with gzip.open(PACKAGE / "decision_chain_trace.csv.gz", "rt", newline="", encoding="utf-8") as handle:
+        decision_trace = list(csv.DictReader(handle))
+    assert len(decision_trace) == 1558
+    assert {row["decision_version"] for row in decision_trace} == {"active_v3.3.3"}
+    assert all(abs(sum(float(row[f"q_reconstructed{code}"]) for code in ("3", "1", "0")) - sum(
+        float(row[f"p_model{code}"]) * float(row[f"predicted_sp{code}"]) for code in ("3", "1", "0")
+    )) < 1e-9 for row in decision_trace)
     with (PACKAGE / "feature_manifest.csv").open(newline="", encoding="utf-8") as handle:
         feature_manifest = list(csv.DictReader(handle))
     rank = next(row for row in feature_manifest if row["feature"] == "TARGET_HOME_AWAY_RANK")
     assert rank["timing_grade"] == "HISTORICAL_TIMING_PROXY"
     assert "excluded from all four controlling arms" in rank["primary_use"]
-    assert {row["ablation_id"] for row in csv.DictReader((PACKAGE / "ablation_registry.csv").open())} == {
-        "A0_MARKET_ONLY", "A1_FUNDAMENTAL_ONLY", "A2_DECISION_ONLY", "A3_COMBINED", "D1_RANK_PROXY_ONLY"
+    expected_ablations = {
+        "A0_MARKET_ONLY", "A1_FUNDAMENTALS_FULL", "A2_DECISION_ONLY", "A3_COMBINED_FULL",
+        "A4_FUND_MINUS_STRENGTH", "A5_FUND_MINUS_FORM", "A6_FUND_MINUS_REST",
+        "A7_COMBINED_MINUS_STRENGTH", "A8_COMBINED_MINUS_FORM", "A9_COMBINED_MINUS_REST",
+        "D1_RANK_PROXY_ONLY",
     }
+    assert {row["ablation_id"] for row in csv.DictReader((PACKAGE / "ablation_registry.csv").open())} == expected_ablations
+    ablation_selection = list(csv.DictReader((PACKAGE / "ablation_selection_freeze.csv").open()))
+    assert len(ablation_selection) == 348 * len(expected_ablations)
+    assert {
+        row["ablation_id"] for row in ablation_selection if row["policy_status"] == "SELECTED_PREOUTCOME"
+    } == expected_ablations
+    assert all(
+        Counter(row["policy_status"] for row in ablation_selection if row["ablation_id"] == ablation_id)
+        == {"SELECTED_PREOUTCOME": 189, "NO_BET_FROZEN": 159}
+        for ablation_id in expected_ablations
+    )
+    thresholds = list(csv.DictReader((PACKAGE / "threshold_registry.csv").open()))
+    fundamental = [
+        row for row in thresholds
+        if row["threshold_family"] == "SELECTED_RAW_SCORE_QUANTILE" and row["arm"] == "FUNDAMENTALS_ONLY"
+    ]
+    assert len({row["threshold_value"] for row in fundamental}) > 1
+    assert next(row for row in fundamental if row["threshold_label"] == "Q00")["eligible_selected_issue_count"] == "189"
+    assert 0 < int(next(row for row in fundamental if row["threshold_label"] == "Q75")["eligible_selected_issue_count"]) < 189
+    for arm in {row["arm"] for row in thresholds if row["threshold_family"] == "SELECTED_RAW_SCORE_QUANTILE"}:
+        arm_rows = [
+            row for row in thresholds
+            if row["threshold_family"] == "SELECTED_RAW_SCORE_QUANTILE" and row["arm"] == arm
+        ]
+        assert len({row["threshold_value"] for row in arm_rows}) == 4
+    quality_arms = {
+        row["arm"] for row in thresholds if row["threshold_family"] == "FUNDAMENTAL_DATA_QUALITY"
+    }
+    assert quality_arms == {"FUNDAMENTALS_ONLY", "FUNDAMENTALS_PLUS_DECISION"}

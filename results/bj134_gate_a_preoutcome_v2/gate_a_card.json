@@ -7,17 +7,17 @@
     },
     {
       "arm": "FUNDAMENTALS_ONLY",
-      "definition": "strictly-prior-year Elo/form/rank/rest confidence",
+      "definition": "strict pre-issue-cutoff rolling Elo/form/rest confidence",
       "score_field": "fundamental_percentile"
     },
     {
       "arm": "DECISION_CHAIN_ONLY",
-      "definition": "existing q=p×predicted_SP role-product confidence",
+      "definition": "exact active_v3.3.3 core over frozen MODEL_P_CAL and reconstructed predicted-SP",
       "score_field": "decision_percentile"
     },
     {
       "arm": "FUNDAMENTALS_PLUS_DECISION",
-      "definition": "fixed 0.50 market + 0.25 fundamental + 0.25 decision percentile overlay",
+      "definition": "fixed 0.50 market + 0.25 rolling fundamental + 0.25 active_v3.3.3 percentile overlay",
       "score_field": "combined_percentile"
     }
   ],
@@ -35,9 +35,13 @@
   },
   "contract": "BJ-HIST-FUNDAMENTAL-OVERLAY-N7-001",
   "denominator": {
+    "ablation_count": 11,
+    "ablation_issue_rows": 3828,
     "candidate_identity_rows": 424,
     "candidate_role_rows": 2968,
+    "decision_trace_rows": 1558,
     "issue_census": 348,
+    "issue_cutoff_rows": 189,
     "issue_rows": 1392,
     "no_bet_by_arm": {
       "DECISION_CHAIN_ONLY": 159,
@@ -79,10 +83,11 @@
   "promotion_boundary": "historical research only; a positive result requires strict independent EV and held-out/forward validation; a negative result cannot demote BEST_FULL",
   "scoring": {
     "combined": "within-issue 0.50 market + 0.25 fundamental + 0.25 decision percentile",
-    "decision": "geometric mean of seven max(q_weight3,q_weight1,q_weight0)",
-    "fundamental": "geometric mean of seven strictly-prior-year Elo/form/rest confidences; target rank excluded",
+    "decision": "geometric mean of seven exact active_v3.3.3 decision confidence outputs using frozen reduced inputs",
+    "decision_input_reconstruction": "q=E_SP×q_weight and predicted_SP=q/p_model; exact core hash bound",
+    "fundamental": "geometric mean of seven strict pre-issue-cutoff rolling Elo/form/rest confidences; target rank excluded",
     "market": "exact #167 K_ALL COLD_FIRST rank",
-    "rank_proxy_diagnostic": "old fundamental construction with target home/away rank; timing proxy only and excluded from controlling arms",
+    "rank_proxy_diagnostic": "rank-augmented construction with unstamped target home/away rank; timing proxy only and excluded from controlling arms",
     "tie_break": "score descending then portfolio_id ascending"
   },
   "segments": "primary complete-issue denominator; year/fold/candidate-count/missingness are non-controlling diagnostics",
@@ -93,5 +98,5 @@
     "reason": "obsolete #132 threshold surface; historical evidence only"
   },
   "thresholds": "primary K1 has no post-score rejection; secondary pre-registered score-quantile and fundamental data-quality thresholds are diagnostic only",
-  "version": "bj134-gate-a-v2"
+  "version": "bj134-gate-a-v2r2"
 }
