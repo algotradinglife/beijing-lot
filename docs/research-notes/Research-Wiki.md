@@ -780,6 +780,26 @@ post-selection 结果，按合同需 strict independent EV，不能自行推广�
 详细方法、完整九格、bootstrap、交互与集中度见
 [`Issue-170-N7-Selector-Allocator-Stack`](Issue-170-N7-Selector-Allocator-Stack.md)。
 
+## #176 逐期权益曲线与风险调整指标（2026-08-04）
+
+#176 用 #167/#170 已接受的三个 reference arms 重建了完整逐期 P&L。native support
+保留 348 期日历，三方共同支持保留 177 期日历；no-bet/unavailable 都是显式零流量，
+不记作亏损。统一研究 bankroll 为 ¥220,000，并发布 0.5×/1×/2×、calendar/active
+returns、Sharpe、Sortino、Calmar、金额/百分比回撤、P&L Calmar、HHI、ex-largest、
+YEAR/FOLD/LOYO。
+
+风险路径没有改变 #170 的 `SELECTION_ONLY` 结论。BEST_FULL/FULL native 税前 ROI
+`-9.47%`、Sharpe `-0.539`、最大回撤 `33.99%`，仍是 #134 selection control，
+不是正收益方案。MODEL source-context cap1/M512 为 `+8.14%`、Sharpe `+0.356`、
+最大回撤 `4.39%`，但去最大 payout year 后 `-0.21%`，且不能迁移命名为
+BEST_FULL stack。Q top-mass/M192 native `+20.37%`，但 HHI `0.0833`、去最大 year
+`-14.99%`，在共同支持上变为 `-37.66%`、最大回撤 `50.74%`，属于高集中压力
+sleeve，而非稳定 edge。
+
+税后 Q native ROI 仅 `+5.23%`，最大回撤 `31.15%`。计税继续按每张独立 ¥2 票，
+不跨票或跨期汇总。完整定义、表格、三张图和不可变包见
+[`Issue-176-N7-Equity-Risk`](Issue-176-N7-Equity-Risk.md)。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
