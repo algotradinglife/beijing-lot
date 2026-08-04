@@ -26,8 +26,8 @@ from types import ModuleType
 
 ISSUE = 190
 CONTRACT = "BJ-HIST-SPARSE-DIVERGENCE-N7-001"
-VERSION = "bj190-gate-a-preoutcome-v3"
-PACKAGE_NAME = "bj190_gate_a_preoutcome_v3"
+VERSION = "bj190-gate-a-preoutcome-v3r1"
+PACKAGE_NAME = "bj190_gate_a_preoutcome_v3r1"
 BASE_MAIN_COMMIT = "7b3c55fd6a490a3e4147b94b7df944535b80b88f"
 FULL_TICKETS = 3**7
 FULL_STAKE_YUAN = 2 * FULL_TICKETS
@@ -36,6 +36,33 @@ CANONICAL_ISSUES = 344
 SOURCE_B0_PARTICIPATING_ISSUES = 189
 ELIGIBLE_MATCHES = 101_970
 EXCLUDED_MISSING_NATIVE_LINE_MATCHES = 252
+CUTOFF_REGRESSION_ANCHORS = {
+    "21062": {
+        "reporting_year": 2021,
+        "cutoff_ts": "2021-06-08 23:59:00",
+        "market_training_rows": 126_468,
+        "market_training_max_ts": "2021-06-08 08:30:00",
+    },
+    "24121": {
+        "reporting_year": 2024,
+        "cutoff_ts": "2024-11-29 16:35:00",
+        "market_training_rows": 183_741,
+        "market_training_max_ts": "2024-11-29 09:00:00",
+    },
+}
+CLEAN_HISTORY_REBUILD_ISSUES = {
+    "20122": {
+        "market_training_rows": 116_389,
+        "market_training_max_ts": "2020-12-01 07:00:00",
+    },
+    **{
+        issue: {
+            "market_training_rows": values["market_training_rows"],
+            "market_training_max_ts": values["market_training_max_ts"],
+        }
+        for issue, values in CUTOFF_REGRESSION_ANCHORS.items()
+    },
+}
 # Retained only by superseded v1 read helpers; the executable v2 path below
 # binds the full 344-issue / 102,222-match universe instead.
 COHORT_ISSUES = 348
@@ -532,9 +559,7 @@ def build_canonical_issue_specs(
     placeholders = ",".join("?" for _ in issue_ids)
     query = f"""
         SELECT CAST(m.issue AS TEXT) AS issue,
-               (SELECT MIN(mx.kickoff_ts)
-                  FROM matches mx
-                 WHERE mx.issue=m.issue AND mx.kickoff_ts IS NOT NULL) AS cutoff_ts,
+               MIN(m.kickoff_ts) AS cutoff_ts,
                SUM(CASE WHEN m.handicap_line_norm IS NOT NULL THEN 1 ELSE 0 END)
                    AS eligible_match_count
           FROM matches m
@@ -669,6 +694,24 @@ def build_canonical_issue_specs(
     if participating != SOURCE_B0_PARTICIPATING_ISSUES:
         raise RuntimeError("B0 comparator participation drift")
     output.sort(key=lambda row: (row.cutoff_ts, int(row.issue)))
+    for issue in output:
+        cutoff_year = int(issue.cutoff_ts[:4])
+        if issue.year - cutoff_year not in (0, 1):
+            raise RuntimeError(
+                "target-safe cutoff/reporting-year plausibility drift: "
+                f"{issue.issue} / {issue.cutoff_ts} / {issue.year}"
+            )
+    by_output_issue = {issue.issue: issue for issue in output}
+    for issue, expected in CUTOFF_REGRESSION_ANCHORS.items():
+        actual = by_output_issue[issue]
+        if (
+            actual.year != expected["reporting_year"]
+            or actual.cutoff_ts != expected["cutoff_ts"]
+        ):
+            raise RuntimeError(
+                f"target-safe cutoff regression anchor drift: {issue} / "
+                f"{actual.cutoff_ts} / {actual.year}"
+            )
     return output, line_counts
 
 
@@ -734,6 +777,76 @@ def read_issue_match_id_sets(
     return output
 
 
+def rebuild_issue_history_states_without_target(
+    database: Path,
+    issue: IssueSpec,
+    target_match_ids: set[str],
+    runner179: ModuleType,
+    accepted179: ModuleType,
+    runner180: ModuleType,
+    accepted180: ModuleType,
+) -> tuple[object, object, set[str], set[str], str, str]:
+    """Build exact cutoff states while excluding every match in the target issue.
+
+    Most issue snapshots reuse the expanding accumulators.  A small number of
+    issues have non-target-safe rows at least 180 minutes before the eligible
+    pool's first kickoff.  Those rows are valid history for later issues but
+    must not enter their own issue snapshot, so only those snapshots are
+    rebuilt from the same accepted historical iterators with an explicit
+    target-identity exclusion.
+    """
+
+    cutoff = accepted180.parse_ts(issue.cutoff_ts)
+    team_state = accepted180.TeamMatchupState()
+    team_ids: set[str] = set()
+    for row in runner180.historical_rows(database, issue.cutoff_ts):
+        if not runner180.history_row_is_available(
+            accepted180.parse_ts(row["kickoff_ts"]), cutoff
+        ):
+            break
+        match_id = str(row["match_id"])
+        if match_id in target_match_ids:
+            continue
+        if match_id in team_ids:
+            raise RuntimeError(f"duplicate rebuilt team-history match: {match_id}")
+        team_state.update(row)
+        team_ids.add(match_id)
+
+    market_state = accepted179.HierarchicalLeagueModel(9999)
+    market_ids: set[str] = set()
+    market_digest = hashlib.sha256()
+    market_max_ts = ""
+    for row in runner179.historical_rows(database, issue.cutoff_ts):
+        if not runner180.history_row_is_available(
+            accepted180.parse_ts(row["kickoff_ts"]), cutoff
+        ):
+            break
+        match_id = str(row["match_id"])
+        if match_id in target_match_ids:
+            continue
+        if match_id in market_ids:
+            raise RuntimeError(f"duplicate rebuilt market-history match: {match_id}")
+        market_state.update(row)
+        market_digest.update(core190.canonical_json(row))
+        market_digest.update(b"\n")
+        market_ids.add(match_id)
+        market_max_ts = str(row["kickoff_ts"])
+    if target_match_ids.intersection(team_ids) or target_match_ids.intersection(
+        market_ids
+    ):
+        raise RuntimeError(
+            f"target issue survived clean history rebuild: {issue.issue}"
+        )
+    return (
+        team_state,
+        market_state,
+        team_ids,
+        market_ids,
+        market_digest.hexdigest(),
+        market_max_ts,
+    )
+
+
 def build_full_estimator_freeze(
     database: Path,
     issues: Sequence[IssueSpec],
@@ -755,6 +868,7 @@ def build_full_estimator_freeze(
     maximum_cutoff = max(issue.cutoff_ts for issue in issues)
     history = iter(runner180.historical_rows(database, maximum_cutoff))
     pending = next(history, None)
+    team_history_match_ids: set[str] = set()
     market_state = accepted179.HierarchicalLeagueModel(9999)
     market_history = iter(runner179.historical_rows(database, maximum_cutoff))
     pending_market = next(market_history, None)
@@ -770,15 +884,19 @@ def build_full_estimator_freeze(
     max_reconciliation_error = 0.0
     sign_proxy_disagreement_count = 0
     line_counts: Counter[str] = Counter()
+    clean_rebuild_issues: set[str] = set()
 
     for issue in issues:
         cutoff = accepted180.parse_ts(issue.cutoff_ts)
         while pending is not None and runner180.history_row_is_available(
             accepted180.parse_ts(pending["kickoff_ts"]), cutoff
         ):
+            pending_match_id = str(pending["match_id"])
+            if pending_match_id in team_history_match_ids:
+                raise RuntimeError(f"duplicate team-history match: {pending_match_id}")
             state.update(pending)
+            team_history_match_ids.add(pending_match_id)
             pending = next(history, None)
-        state_summary = state.summary()
         while pending_market is not None and runner180.history_row_is_available(
             accepted180.parse_ts(pending_market["kickoff_ts"]), cutoff
         ):
@@ -787,11 +905,6 @@ def build_full_estimator_freeze(
                 raise RuntimeError(
                     f"duplicate market-model history match: {pending_match_id}"
                 )
-            if pending_match_id in issue_match_ids[issue.issue]:
-                raise RuntimeError(
-                    f"target issue leaked into market model: {issue.issue} / "
-                    f"{pending_match_id}"
-                )
             market_state.update(pending_market)
             market_history_digest.update(core190.canonical_json(pending_market))
             market_history_digest.update(b"\n")
@@ -799,22 +912,54 @@ def build_full_estimator_freeze(
             market_training_max_ts = str(pending_market["kickoff_ts"])
             pending_market = next(market_history, None)
         available_through = runner180.history_available_through(cutoff)
-        target_overlap = market_history_match_ids.intersection(
-            issue_match_ids[issue.issue]
-        )
+        target_ids = issue_match_ids[issue.issue]
+        raw_team_overlap = team_history_match_ids.intersection(target_ids)
+        raw_market_overlap = market_history_match_ids.intersection(target_ids)
+        if raw_team_overlap or raw_market_overlap:
+            (
+                effective_state,
+                effective_market_state,
+                effective_team_ids,
+                effective_market_ids,
+                effective_market_digest,
+                effective_market_max_ts,
+            ) = rebuild_issue_history_states_without_target(
+                database,
+                issue,
+                target_ids,
+                runner179,
+                accepted179,
+                runner180,
+                accepted180,
+            )
+            clean_rebuild_issues.add(issue.issue)
+            clean_rebuild_used = 1
+        else:
+            effective_state = state
+            effective_market_state = market_state
+            effective_team_ids = team_history_match_ids
+            effective_market_ids = market_history_match_ids
+            effective_market_digest = market_history_digest.hexdigest()
+            effective_market_max_ts = market_training_max_ts
+            clean_rebuild_used = 0
+        team_target_overlap = effective_team_ids.intersection(target_ids)
+        target_overlap = effective_market_ids.intersection(target_ids)
+        if team_target_overlap:
+            raise RuntimeError(f"team target overlap after snapshot: {issue.issue}")
         if target_overlap:
             raise RuntimeError(
                 f"market-model target overlap after snapshot: {issue.issue}"
             )
-        if market_training_max_ts and (
-            accepted180.parse_ts(market_training_max_ts) > available_through
+        if effective_market_max_ts and (
+            accepted180.parse_ts(effective_market_max_ts) > available_through
         ):
             raise RuntimeError(
                 f"market-model row after frozen cutoff: {issue.issue} / "
-                f"{market_training_max_ts}"
+                f"{effective_market_max_ts}"
             )
-        market_model = market_state.frozen_copy(issue.year)
-        if market_model.training_rows != len(market_history_match_ids):
+        state_summary = effective_state.summary()
+        market_model = effective_market_state.frozen_copy(issue.year)
+        if market_model.training_rows != len(effective_market_ids):
             raise RuntimeError(
                 f"market-model training denominator drift: {issue.issue}"
             )
@@ -830,19 +975,24 @@ def build_full_estimator_freeze(
                 "reporting_year": issue.year,
                 "feature_cutoff_ts": issue.cutoff_ts,
                 "score_available_through_ts": available_through.isoformat(sep=" "),
-                "training_max_kickoff_ts": market_training_max_ts,
+                "training_max_kickoff_ts": effective_market_max_ts,
                 "training_row_count": market_model.training_rows,
+                "team_history_training_row_count": state_summary["training_rows"],
                 "model_state_identity_sha256": core190.canonical_hash(
                     {
-                        "history_identity_sha256": market_history_digest.hexdigest(),
+                        "history_identity_sha256": effective_market_digest,
                         "reporting_year": issue.year,
                         "summary": market_summary,
                     }
                 ),
-                "history_identity_sha256": market_history_digest.hexdigest(),
-                "target_issue_match_count": len(issue_match_ids[issue.issue]),
+                "history_identity_sha256": effective_market_digest,
+                "target_issue_match_count": len(target_ids),
+                "raw_team_target_overlap_count": len(raw_team_overlap),
+                "raw_market_target_overlap_count": len(raw_market_overlap),
+                "team_target_issue_overlap_count": len(team_target_overlap),
                 "target_issue_overlap_count": len(target_overlap),
                 "post_available_cutoff_row_count": 0,
+                "clean_target_exclusion_rebuild_used": clean_rebuild_used,
                 "history_rule": "kickoff <= feature_cutoff_ts - 180 minutes (inclusive)",
                 "reporting_year_separate_from_training_cutoff": 1,
                 "outcome_boundary": OUTCOME_BOUNDARY,
@@ -853,7 +1003,7 @@ def build_full_estimator_freeze(
             if FORBIDDEN_TARGET_FIELDS.intersection(target):
                 raise RuntimeError("full-universe target projection exposes outcome")
             families, diagnostics, captured = core190.capture_family_latents(
-                state, target, cutoff, accepted180
+                effective_state, target, cutoff, accepted180
             )
             family_distributions: dict[str, dict[int, float]] = {}
             component_errors: dict[str, float] = {}
@@ -871,7 +1021,7 @@ def build_full_estimator_freeze(
                     effective_home, effective_away, max_goals=max_goals
                 )
                 distribution = (
-                    core190.h2h_difference_distribution(state, target, prior)
+                    core190.h2h_difference_distribution(effective_state, target, prior)
                     if family == "H2H_PRIOR"
                     else prior
                 )
@@ -1138,6 +1288,22 @@ def build_full_estimator_freeze(
     latent_sink.close()
     estimator_sink.close()
     write_csv(market_training_output, market_training_rows)
+    training_by_issue = {str(row["issue"]): row for row in market_training_rows}
+    if clean_rebuild_issues != set(CLEAN_HISTORY_REBUILD_ISSUES):
+        raise RuntimeError(
+            "clean target-exclusion rebuild issue-set drift: "
+            f"{sorted(clean_rebuild_issues)}"
+        )
+    for issue, expected in CLEAN_HISTORY_REBUILD_ISSUES.items():
+        row = training_by_issue[issue]
+        if (
+            int(row["training_row_count"]) != expected["market_training_rows"]
+            or row["training_max_kickoff_ts"] != expected["market_training_max_ts"]
+            or int(row["clean_target_exclusion_rebuild_used"]) != 1
+        ):
+            raise RuntimeError(
+                f"market-training plausibility regression anchor drift: {issue}"
+            )
     expected_match_count = sum(issue.eligible_match_count for issue in issues)
     if (
         latent_sink.count != expected_match_count
@@ -1160,6 +1326,11 @@ def build_full_estimator_freeze(
         "market_training_all_target_overlap_zero": all(
             int(row["target_issue_overlap_count"]) == 0 for row in market_training_rows
         ),
+        "team_training_all_target_overlap_zero": all(
+            int(row["team_target_issue_overlap_count"]) == 0
+            for row in market_training_rows
+        ),
+        "clean_target_exclusion_rebuild_issues": sorted(clean_rebuild_issues),
     }
 
 
@@ -3403,6 +3574,9 @@ def source_binding_v2(
         "universe_identity_sha256": estimator_meta["universe_identity_sha256"],
         "native_line_exact_counts": dict(sorted(line_counts.items())),
         "selection_boundary": "challenger chooses exact seven directly from every issue target-safe pool; inherited B0 is comparator only",
+        "cutoff_rule": "minimum kickoff timestamp in the target-safe outer issue pool; non-eligible raw placeholders cannot define cutoff",
+        "cutoff_reporting_year_plausibility": "reporting_year - cutoff_calendar_year must be 0 or 1",
+        "cutoff_regression_anchors": CUTOFF_REGRESSION_ANCHORS,
     }
     binding["chronological_market_model"] = {
         "source": "accepted #179 HierarchicalLeagueModel",
@@ -3412,6 +3586,12 @@ def source_binding_v2(
         "training_max_rows": estimator_meta["market_training_max_rows"],
         "target_issue_overlap_zero": estimator_meta[
             "market_training_all_target_overlap_zero"
+        ],
+        "team_target_issue_overlap_zero": estimator_meta[
+            "team_training_all_target_overlap_zero"
+        ],
+        "clean_target_exclusion_rebuild_issues": estimator_meta[
+            "clean_target_exclusion_rebuild_issues"
         ],
         "binding_file": "market_model_training_freeze.csv",
         "reporting_year": "retained separately; never used as the training cutoff",
@@ -3595,7 +3775,15 @@ def gate_a_card_v2(
             "target_issue_overlap_zero": estimator_meta[
                 "market_training_all_target_overlap_zero"
             ],
+            "team_target_issue_overlap_zero": estimator_meta[
+                "team_training_all_target_overlap_zero"
+            ],
+            "clean_target_exclusion_rebuild_issues": estimator_meta[
+                "clean_target_exclusion_rebuild_issues"
+            ],
             "binding_file": "market_model_training_freeze.csv",
+            "cutoff_rule": "minimum kickoff timestamp in the target-safe outer issue pool",
+            "cutoff_regression_anchors": CUTOFF_REGRESSION_ANCHORS,
         },
         "detector_grid": {
             "policy_count": len(detector_grid),
@@ -3749,7 +3937,9 @@ def atomic_generate(output: Path, database: Path) -> dict[str, object]:
             "handicap in 344 canonical numeric "
             "issues (348 source issue instances). Every divergence policy selects its exact seven "
             "matches directly from that issue pool; inherited B0 is a comparator only.\n\n"
-            "The 252 otherwise target-safe rows with missing native handicap are excluded from every "
+            "Issue cutoff is the minimum kickoff in the same target-safe outer source pool; raw "
+            "non-eligible placeholders cannot define chronology. The 252 otherwise target-safe rows "
+            "with missing native handicap are excluded from every "
             "executable selector and ticket. The #179 market model is snapshotted separately at each "
             "issue's cutoff using only score rows available through cutoff minus 180 minutes; each "
             "snapshot binds its maximum training time, row count, cumulative history hash and zero "

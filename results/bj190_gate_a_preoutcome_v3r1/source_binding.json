@@ -1,0 +1,190 @@
+{
+  "accepted_180_core": {
+    "derivation": "instrument exact existing T1_DEEP_TEAM component poisson_handicap call sites; accepted file remains unmodified",
+    "excluded_market_derived_branches": [
+      "#179 hierarchical league configurations",
+      "#180 TL1_TEAM_LEAGUE",
+      "#180 TL_CFG_CONSERVATIVE",
+      "#180 TL_CFG_RESPONSIVE",
+      "all TL ablations"
+    ],
+    "independent_branch": "T1_DEEP_TEAM / TEAM_PRIMARY only",
+    "path": "scripts/bj180_team_matchup_core.py",
+    "sha256": "4d65b08609162644394dfe83e632073ad092b9bfd058dc74368b9ceef4908890"
+  },
+  "accepted_180_runner": {
+    "path": "scripts/freeze_bj180_team_matchup_gate_a.py",
+    "sha256": "f715dfb3ea976cc311fea6aacf79c648fce0209d79b071cd9233e769978994fc"
+  },
+  "base_main_commit": "7b3c55fd6a490a3e4147b94b7df944535b80b88f",
+  "chronological_market_model": {
+    "binding_file": "market_model_training_freeze.csv",
+    "clean_target_exclusion_rebuild_issues": [
+      "20122",
+      "21062",
+      "24121"
+    ],
+    "reporting_year": "retained separately; never used as the training cutoff",
+    "snapshot_count": 344,
+    "source": "accepted #179 HierarchicalLeagueModel",
+    "target_issue_overlap_zero": true,
+    "team_target_issue_overlap_zero": true,
+    "training_max_rows": 189450,
+    "training_min_rows": 88803,
+    "training_rule": "kickoff <= feature cutoff - 180 minutes (inclusive)"
+  },
+  "coherent_t1_estimator": {
+    "expected_margin_source": "mean of the identical score-difference distribution",
+    "line_residual": "same-distribution expected margin + native handicap",
+    "max_abs_probability_reconciliation_error": "0.000000000001",
+    "probability_source": "mapped p3/p1/p0 of group-mass-reconciled T1 score-difference distribution",
+    "weighted_lambda_proxy": "diagnostic only; controls_direction=false",
+    "weighted_proxy_sign_disagreement_count": 1600
+  },
+  "contract": "BJ-HIST-SPARSE-DIVERGENCE-N7-001",
+  "database": {
+    "cli_contract": "--database PATH",
+    "environment_contract": "BJ190_SOURCE_DATABASE",
+    "forbidden_target_fields": [
+      "final_sp",
+      "ftag",
+      "fthg",
+      "official_sp_0",
+      "official_sp_1",
+      "official_sp_3",
+      "payout",
+      "result",
+      "result_code",
+      "result_label",
+      "roi",
+      "score",
+      "settlement",
+      "tax",
+      "winning_sp"
+    ],
+    "hash_verification": "mandatory before any generation source read",
+    "path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+    "resolution_order": "explicit CLI, environment, local repository ancestry",
+    "sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "target_projection": [
+      "every match in each canonical numeric issue with kickoff/team IDs",
+      "complete target-safe 1h EURO consensus",
+      "non-null native handicap line; missing lines are excluded from executable policies",
+      "#179 target-safe market feature projection"
+    ]
+  },
+  "eligible_universe": {
+    "canonical_numeric_issue_count": 344,
+    "canonicalization": "duplicate cross-year issue instances collapse by numeric issue; canonical year=max source outer year; source instances retained",
+    "cutoff_regression_anchors": {
+      "21062": {
+        "cutoff_ts": "2021-06-08 23:59:00",
+        "market_training_max_ts": "2021-06-08 08:30:00",
+        "market_training_rows": 126468,
+        "reporting_year": 2021
+      },
+      "24121": {
+        "cutoff_ts": "2024-11-29 16:35:00",
+        "market_training_max_ts": "2024-11-29 09:00:00",
+        "market_training_rows": 183741,
+        "reporting_year": 2024
+      }
+    },
+    "cutoff_reporting_year_plausibility": "reporting_year - cutoff_calendar_year must be 0 or 1",
+    "cutoff_rule": "minimum kickoff timestamp in the target-safe outer issue pool; non-eligible raw placeholders cannot define cutoff",
+    "eligible_match_count": 101970,
+    "excluded_missing_native_line_match_count": 252,
+    "minimum_matches_per_issue": 7,
+    "native_line_exact_counts": {
+      "-0.500000000000": 1,
+      "-1.000000000000": 24561,
+      "-2.000000000000": 4877,
+      "-3.000000000000": 351,
+      "0.000000000000": 61275,
+      "1.000000000000": 9357,
+      "1.500000000000": 1,
+      "2.000000000000": 1467,
+      "3.000000000000": 80,
+      "MISSING_EXCLUDED": 252
+    },
+    "selection_boundary": "challenger chooses exact seven directly from every issue target-safe pool; inherited B0 is comparator only",
+    "source_issue_instance_count": 348,
+    "universe_identity_sha256": "8651377ffe0549452662df1c350c3492ff812aacce86adc8a076f17ecb551a19"
+  },
+  "issue": 190,
+  "outcome_boundary": "Gate A outcome-unexposed: target score/result/final-or-winning SP/payout/tax/ROI/settlement fields are forbidden; historical scores enter the accepted #180 state only under its frozen kickoff <= issue cutoff - 180 minute embargo",
+  "packages": {
+    "134_gate_a": {
+      "access": "NUMERIC_OUTCOME_UNEXPOSED_INPUT",
+      "content_identity_sha256": "3fe014f3decdbd589cdded52d8a9b2bac0f3cb988c2ae8e15cf79314a02eede1",
+      "manifest_sha256": "0a7e4d673e7fc5fd4832c91e3b519afe5a2bc3211b99f4c95f57c691921b65fd",
+      "package": "bj134_gate_a_preoutcome_v3"
+    },
+    "134_gate_b": {
+      "access": "TERMINAL_IDENTITY_HASH_ONLY",
+      "content_identity_sha256": "f92e7b8a14814f2d665da03c3ab7ca0ddea790773ddb0d28ed562ca177a3eb05",
+      "manifest_sha256": "6a08c310cd5999a8c615d85ac85cdce55f584a19a4b263dd638b682018975e44",
+      "package": "bj134_gate_b_fundamental_overlay_v1"
+    },
+    "167_gate_a": {
+      "access": "INCUMBENT_CONTRACT_HASH_ONLY",
+      "content_identity_sha256": "0806185a7a68b99fd2a6a465308d11e2886995f992bfa722adb287a4e6a4d147",
+      "manifest_sha256": "5a82422755723453638d25c90f91213da046a9e7bed87a851b2e5700faa9c724",
+      "package": "bj167_gate_a_strategy_atlas_v3r1"
+    },
+    "167_gate_b": {
+      "access": "TERMINAL_IDENTITY_HASH_ONLY",
+      "content_identity_sha256": "bfe29083b74d5d212555c261e888d6f5d4d5fd163b56e1876944d1f5d04aa5c7",
+      "manifest_sha256": "b3fa02f5cc2722932ff55fffb0bd9672508f6e78104cfb2458ad81c826f3b313",
+      "package": "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1"
+    },
+    "170_gate_a": {
+      "access": "INCUMBENT_IDENTITY_HASH_ONLY",
+      "content_identity_sha256": "adc4d0f96628c784149da998a20e8830cde26db4001fe457eaf9ca4b7bb74223",
+      "manifest_sha256": "bb60ac5638d29674ad8c1c05f1ffe3ab9cdf12acb70ebdae6cea679743136d87",
+      "package": "bj170_gate_a_preoutcome_v2"
+    },
+    "170_gate_b": {
+      "access": "TERMINAL_IDENTITY_HASH_ONLY",
+      "content_identity_sha256": "75325aa0f60e277ad3fbf9d90116450833106bc3863b412ea3efcad9948a47b2",
+      "manifest_sha256": "08e83353ad483e5d75911116a413186f007385f5dd37b8c4b757ac903221e512",
+      "package": "bj170_gate_b_selector_allocator_stack_v1"
+    },
+    "179_gate_a": {
+      "access": "NUMERIC_OUTCOME_UNEXPOSED_INPUT",
+      "content_identity_sha256": "2e8314f00b8774501ecf0ed2cb6ede73a9e7a60c7422dd5dc0d464e1470b740b",
+      "manifest_sha256": "5839f5c03c94ef903472b64fffa3ad1462ec006717875d0a3903ecdfdc2aa056",
+      "package": "bj179_gate_a_preoutcome_v2"
+    },
+    "179_gate_b": {
+      "access": "TERMINAL_IDENTITY_HASH_ONLY",
+      "content_identity_sha256": "23bf54cc47f036bae11a1bbbcade49fdd34b32ca42cbce5aa15c52d51c21297a",
+      "manifest_sha256": "7005e78ae132bea4231ba245cb23d5480a387215c441d237299668c36d305a30",
+      "package": "bj179_gate_b_hierarchical_league_v1"
+    },
+    "180_gate_a": {
+      "access": "NUMERIC_OUTCOME_UNEXPOSED_INPUT",
+      "content_identity_sha256": "6a0abe9cb36198dae11a5da06679d22b786cdf49f3619e6e34d7782f29915288",
+      "manifest_sha256": "96cbd2565f5d1f837700e476d7a7412225677581b5e4448a4f9bfac4c9220835",
+      "package": "bj180_gate_a_preoutcome_v2"
+    },
+    "180_gate_b": {
+      "access": "TERMINAL_IDENTITY_HASH_ONLY",
+      "content_identity_sha256": "d9b41dec45c1c6215755d9dad8774e00fc0f19f564ee6ef8bf2387cb8d309108",
+      "manifest_sha256": "9f48b29325d817ce873bd1430be459c9e70ad052064f8e03e02ccbc1d8bc6fcf",
+      "package": "bj180_gate_b_team_matchup_v1"
+    }
+  },
+  "source_86": {
+    "accepted_head": "ecc545359a392cee344cf2161ba382ef697c1767",
+    "access": "HASH_BINDING_AND_NONDUPLICATION_PRIOR_ONLY",
+    "durability": "large prediction package intentionally external; exact manifest receipts retained",
+    "gate_a_manifest_sha256": "1c3fd6148001c42efe2c33c9f1b7f592f4ed11cbe903ca8546c4c9571aeaef64",
+    "gate_a_package": "bj86_gate_a_preoutcome_v3_1",
+    "gate_a_runner_sha256": "dcc5912c0e8040a829367e3bcc559a82e08a632e5bdc1a833b5ee9380e1ffb26",
+    "gate_b_recovery_manifest_sha256": "0dee918ddcf67ee441abe6ff9387418ca92b4c1e587b8595cf4ebbaec9d898b2",
+    "gate_b_recovery_package": "bj86_gate_b_streaming_summary_recovery_v1",
+    "merge_commit": "8af13de640101d3cf64f663e5689a0db52d1d0d2"
+  },
+  "version": "bj190-gate-a-preoutcome-v3r1"
+}

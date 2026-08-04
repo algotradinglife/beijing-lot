@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RUNNER = ROOT / "scripts" / "freeze_bj190_sparse_divergence_gate_a.py"
 CORE = ROOT / "scripts" / "bj190_sparse_divergence_core.py"
 ACCEPTED_CORE = ROOT / "scripts" / "bj180_team_matchup_core.py"
-PACKAGE = ROOT / "results" / "bj190_gate_a_preoutcome_v3"
+PACKAGE = ROOT / "results" / "bj190_gate_a_preoutcome_v3r1"
 
 
 def load(path: Path, name: str):
@@ -204,6 +204,45 @@ def test_complete_issue_universe_census_and_native_line_coverage():
     assert lines["1.000000000000"] == 9357
     assert lines["2.000000000000"] == 1467
     assert lines["MISSING_EXCLUDED"] == 252
+    assert all(issue.year - int(issue.cutoff_ts[:4]) in (0, 1) for issue in issues)
+
+
+def test_target_safe_cutoff_ignores_noneligible_1899_placeholders():
+    runner = load(RUNNER, "bj190_cutoff_placeholders")
+    source_runner = runner.load_module(
+        "bj190_cutoff_source_180",
+        ROOT / "scripts" / "freeze_bj180_team_matchup_gate_a.py",
+    )
+    database = runner.locate_database()
+    issues, _ = runner.build_canonical_issue_specs(
+        database, source_runner.load_sources()
+    )
+    by_issue = {issue.issue: issue for issue in issues}
+    assert by_issue["21062"].cutoff_ts == "2021-06-08 23:59:00"
+    assert by_issue["24121"].cutoff_ts == "2024-11-29 16:35:00"
+    assert by_issue["21062"].eligible_match_count == 13
+    assert by_issue["24121"].eligible_match_count == 282
+
+    connection = runner.ro_connection(database)
+    try:
+        placeholders = list(
+            connection.execute(
+                """
+                SELECT CAST(match_id AS TEXT), CAST(issue AS TEXT), kickoff_ts,
+                       home_team_id, away_team_id
+                  FROM matches
+                 WHERE match_id IN ('128635', '186622')
+                 ORDER BY match_id
+                """
+            )
+        )
+    finally:
+        connection.close()
+    assert [(row[0], row[1], row[2]) for row in placeholders] == [
+        ("128635", "21062", "1899-12-30 08:00:00"),
+        ("186622", "24121", "1899-12-30 08:00:00"),
+    ]
+    assert all(row[3] is None and row[4] is None for row in placeholders)
 
 
 def test_database_path_contract_supports_detached_replay_and_verifies_hash(
@@ -271,7 +310,7 @@ def test_generated_gate_a_package_is_complete_and_outcome_unexposed():
     content = json.loads(
         (PACKAGE / "CONTENT_IDENTITY.json").read_text(encoding="utf-8")
     )
-    assert content["package"] == "bj190_gate_a_preoutcome_v3"
+    assert content["package"] == "bj190_gate_a_preoutcome_v3r1"
     card = json.loads((PACKAGE / "gate_a_card.json").read_text(encoding="utf-8"))
     assert card["cohort"] == {
         "canonical_numeric_issue_count": 344,
@@ -313,6 +352,9 @@ def test_generated_gate_a_package_is_complete_and_outcome_unexposed():
     assert len(market_training) == 344
     assert all(int(row["target_issue_overlap_count"]) == 0 for row in market_training)
     assert all(
+        int(row["team_target_issue_overlap_count"]) == 0 for row in market_training
+    )
+    assert all(
         int(row["post_available_cutoff_row_count"]) == 0 for row in market_training
     )
     assert all(row["history_identity_sha256"] for row in market_training)
@@ -329,6 +371,26 @@ def test_generated_gate_a_package_is_complete_and_outcome_unexposed():
     for row in market_training:
         if row["training_max_kickoff_ts"]:
             assert row["training_max_kickoff_ts"] <= row["score_available_through_ts"]
+    training_by_issue = {row["issue"]: row for row in market_training}
+    assert {
+        row["issue"]
+        for row in market_training
+        if row["clean_target_exclusion_rebuild_used"] == "1"
+    } == {"20122", "21062", "24121"}
+    assert training_by_issue["20122"]["training_row_count"] == "116389"
+    assert training_by_issue["20122"]["training_max_kickoff_ts"] == (
+        "2020-12-01 07:00:00"
+    )
+    assert training_by_issue["21062"]["feature_cutoff_ts"] == ("2021-06-08 23:59:00")
+    assert training_by_issue["21062"]["training_row_count"] == "126468"
+    assert training_by_issue["21062"]["training_max_kickoff_ts"] == (
+        "2021-06-08 08:30:00"
+    )
+    assert training_by_issue["24121"]["feature_cutoff_ts"] == ("2024-11-29 16:35:00")
+    assert training_by_issue["24121"]["training_row_count"] == "183741"
+    assert training_by_issue["24121"]["training_max_kickoff_ts"] == (
+        "2024-11-29 09:00:00"
+    )
     forbidden = {"fthg", "ftag", "result_code", "winning_sp", "payout", "tax", "roi"}
     for name in (
         "poisson_latent_reconciliation.csv.gz",
