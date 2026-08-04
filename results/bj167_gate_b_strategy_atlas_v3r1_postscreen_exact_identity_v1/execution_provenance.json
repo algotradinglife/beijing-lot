@@ -1,0 +1,83 @@
+{
+  "contract": "bj167-gate-b-v3r1-postscreen-exact",
+  "current_companion_dependency_hashes": {
+    "frozen_allocator_sha256": "5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93",
+    "native_wrapper_path": "scripts/bj167_exact_atlas.cpp",
+    "native_wrapper_sha256": "eff00fdc251208c1acb9998db04e60405691f5d18abe23fce0b5d5b6a9adc970",
+    "screen_runner_path": "scripts/settle_bj167_strategy_atlas_gate_b_exact.py",
+    "screen_runner_sha256": "808040df4c5f43296639aa871a5be64875cc9f529947fa65f348e174bab348cd"
+  },
+  "historical_screen_execution": {
+    "git_head": "d1717395a2ca5fc5e16554756723f296ec6053e8",
+    "native_wrapper_sha256": "db6960d5a81ccde49f0bcb62a7c4424174feae1a4e754e64ef01de88a8b47829",
+    "runner_sha256": "4d9ee1313ac66df5cf5f41d8db12a39352c626459c7c4d55af3d5074cc560f32"
+  },
+  "postscreen_execution_end": {
+    "frozen_allocator_path": "scripts/bj145_fast_alloc.cpp",
+    "frozen_allocator_sha256": "5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93",
+    "git_head": "12af2564dad1546764c9660ed88f13b76efab786",
+    "native_wrapper_path": "scripts/bj167_exact_atlas.cpp",
+    "native_wrapper_sha256": "eff00fdc251208c1acb9998db04e60405691f5d18abe23fce0b5d5b6a9adc970",
+    "runner_path": "scripts/settle_bj167_atlas_postscreen_exact.py",
+    "runner_sha256": "2db0a2b26dd297781530771db1da959aa3773391eb76ca6249787c04c82ad538"
+  },
+  "postscreen_execution_start": {
+    "frozen_allocator_path": "scripts/bj145_fast_alloc.cpp",
+    "frozen_allocator_sha256": "5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93",
+    "git_head": "12af2564dad1546764c9660ed88f13b76efab786",
+    "native_wrapper_path": "scripts/bj167_exact_atlas.cpp",
+    "native_wrapper_sha256": "eff00fdc251208c1acb9998db04e60405691f5d18abe23fce0b5d5b6a9adc970",
+    "runner_path": "scripts/settle_bj167_atlas_postscreen_exact.py",
+    "runner_sha256": "2db0a2b26dd297781530771db1da959aa3773391eb76ca6249787c04c82ad538"
+  },
+  "recovered_screening_package": {
+    "candidate_freeze_count": 17135,
+    "candidate_freeze_sha256": "56d77536807e1d8ab0e71caf547685820db68b71755becf336aafe84969dc15a",
+    "candidate_total_screen_stake_yuan": "7033958580.000000",
+    "content_identity_sha256": "8750986f5112cb3bfac8385be958bca0e906717c1ed7c6b6804108b19ad5d9aa",
+    "manifest_sha256": "6c71760e23bd670098e364cb89ed26aaea556359eb9ab84a883e88b408d527a1",
+    "package": "bj167_gate_b_strategy_atlas_v3r1_recovered_final_v1",
+    "recovery_finalizer_execution_end": {
+      "frozen_allocator_path": "scripts/bj145_fast_alloc.cpp",
+      "frozen_allocator_sha256": "5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93",
+      "git_head": "e2b2dfce40446626a2ccc5e0f0f233b6d6345d46",
+      "native_wrapper_path": "scripts/bj167_exact_atlas.cpp",
+      "native_wrapper_sha256": "dd104a02f796dc245f9f5000473b5da83240853d18dbbfa537368272e55eed30",
+      "recovery_runner_path": "scripts/recover_bj167_gate_b_exact.py",
+      "recovery_runner_sha256": "febaffceb68b4ac846ae360a1debc06b964505477c97aaf3cb37f100c6eceae3",
+      "screen_runner_path": "scripts/settle_bj167_strategy_atlas_gate_b_exact.py",
+      "screen_runner_sha256": "808040df4c5f43296639aa871a5be64875cc9f529947fa65f348e174bab348cd"
+    },
+    "recovery_finalizer_execution_start": {
+      "frozen_allocator_path": "scripts/bj145_fast_alloc.cpp",
+      "frozen_allocator_sha256": "5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93",
+      "git_head": "e2b2dfce40446626a2ccc5e0f0f233b6d6345d46",
+      "native_wrapper_path": "scripts/bj167_exact_atlas.cpp",
+      "native_wrapper_sha256": "dd104a02f796dc245f9f5000473b5da83240853d18dbbfa537368272e55eed30",
+      "recovery_runner_path": "scripts/recover_bj167_gate_b_exact.py",
+      "recovery_runner_sha256": "febaffceb68b4ac846ae360a1debc06b964505477c97aaf3cb37f100c6eceae3",
+      "screen_runner_path": "scripts/settle_bj167_strategy_atlas_gate_b_exact.py",
+      "screen_runner_sha256": "808040df4c5f43296639aa871a5be64875cc9f529947fa65f348e174bab348cd"
+    },
+    "recovery_provenance_sha256": "b37c51cc361efb7e25607bc7849a8e968b906b0675fd633da29c3743db8ce79e"
+  },
+  "screen_vs_replay_adaptive_tolerance": {
+    "boundary_rule": "absolute delta <= metric-specific tolerance; outside fails closed",
+    "candidate_roi": "money_quantum_per_seed * seed_count / exact_candidate_stake + ratio_quantum",
+    "matched_full_lift": "candidate_roi_tolerance + matched_full_roi_tolerance + ratio_quantum",
+    "matched_full_roi": "money_quantum_per_seed * seed_count / exact_matched_full_stake + ratio_quantum",
+    "money_quantum_per_seed_yuan": "0.000001",
+    "per_candidate_evidence": "candidate_checkpoint_reconciliation.csv",
+    "ratio_serialization_quantum": "1E-12",
+    "seed_scope_multiplier": {
+      "DETERMINISTIC": 1,
+      "ENSEMBLE_100": 100
+    },
+    "stake_rule": "candidate stake must equal frozen screen stake at six decimals; both ROI denominators must be positive and finite"
+  },
+  "shared_science_checkpoint": {
+    "manifest_sha256": "95d22dc1ad5fd9a3f221d9178775d585f4e28076cd70941390a6c760e94c810f",
+    "mode": "BOOTSTRAP_FINALIZER_NO_TICKET_REPLAY",
+    "package": "bj167_gate_b_strategy_atlas_v3r1_shared_science_checkpoint_v1"
+  }
+}
