@@ -1,0 +1,143 @@
+{
+  "arms": [
+    {
+      "arm": "B0_BEST_FULL",
+      "definition": "controlling accepted BEST_FULL identity",
+      "role": "BASELINE",
+      "score": "market_gm_e_sp"
+    },
+    {
+      "arm": "L0_QUICK_LEAGUE",
+      "definition": "accepted quick league comparator",
+      "role": "BASELINE",
+      "score": "quick_league_gm_e_sp"
+    },
+    {
+      "arm": "H0_LEAGUE_DIAGNOSTIC",
+      "definition": "#179 H_MINUS_RAW_HDA diagnostic only",
+      "role": "DIAGNOSTIC",
+      "score": "league_diagnostic_gm_e_sp"
+    },
+    {
+      "arm": "T1_DEEP_TEAM",
+      "definition": "deep team-only primary",
+      "role": "PRIMARY",
+      "score": "team_primary_gm_e_sp"
+    },
+    {
+      "arm": "TL1_TEAM_LEAGUE",
+      "definition": "70% league diagnostic plus 30% deep team",
+      "role": "PRIMARY",
+      "score": "team_league_primary_gm_e_sp"
+    },
+    {
+      "arm": "TL_CFG_CONSERVATIVE",
+      "definition": "80% league plus 20% conservative team",
+      "role": "SENSITIVITY",
+      "score": "team_league_conservative_gm_e_sp"
+    },
+    {
+      "arm": "TL_CFG_RESPONSIVE",
+      "definition": "60% league plus 40% responsive team",
+      "role": "SENSITIVITY",
+      "score": "team_league_responsive_gm_e_sp"
+    },
+    {
+      "arm": "TL_MINUS_LATENT",
+      "definition": "primary without latent strength",
+      "role": "ABLATION",
+      "score": "team_league_minus_latent_gm_e_sp"
+    },
+    {
+      "arm": "TL_MINUS_HOME_AWAY",
+      "definition": "primary without home/away splits",
+      "role": "ABLATION",
+      "score": "team_league_minus_home_away_gm_e_sp"
+    },
+    {
+      "arm": "TL_MINUS_FORM",
+      "definition": "primary without rolling form",
+      "role": "ABLATION",
+      "score": "team_league_minus_form_gm_e_sp"
+    },
+    {
+      "arm": "TL_MINUS_REST",
+      "definition": "primary without rest/congestion",
+      "role": "ABLATION",
+      "score": "team_league_minus_rest_gm_e_sp"
+    },
+    {
+      "arm": "TL_MINUS_OPPONENT",
+      "definition": "primary without opponent adjustment",
+      "role": "ABLATION",
+      "score": "team_league_minus_opponent_gm_e_sp"
+    },
+    {
+      "arm": "TL_MINUS_INITIALIZATION",
+      "definition": "primary without promoted/relegated/new-team initialization",
+      "role": "ABLATION",
+      "score": "team_league_minus_initialization_gm_e_sp"
+    },
+    {
+      "arm": "TL_MINUS_H2H",
+      "definition": "primary without low-weight prior-only H2H",
+      "role": "ABLATION",
+      "score": "team_league_minus_h2h_gm_e_sp"
+    }
+  ],
+  "candidate_universe": {
+    "identities": 424,
+    "issues": 348,
+    "matches": 1558,
+    "no_bet": 159,
+    "participating": 189,
+    "roles": 2968
+  },
+  "chronology": "single sequential state; before each common issue cutoff consume only completed kickoff < cutoff; tie by match_id",
+  "comparators": [
+    "B0_BEST_FULL controlling economic",
+    "L0_QUICK_LEAGUE accepted quick comparator",
+    "H0_LEAGUE_DIAGNOSTIC probability diagnostic only"
+  ],
+  "contract": "BJ-HIST-TEAM-MODEL-N7-001",
+  "denominator": {
+    "no_bet_rows": 2226,
+    "planned_stake_per_arm_yuan": 826686,
+    "selected_by_arm": {
+      "B0_BEST_FULL": 189,
+      "H0_LEAGUE_DIAGNOSTIC": 189,
+      "L0_QUICK_LEAGUE": 189,
+      "T1_DEEP_TEAM": 189,
+      "TL1_TEAM_LEAGUE": 189,
+      "TL_CFG_CONSERVATIVE": 189,
+      "TL_CFG_RESPONSIVE": 189,
+      "TL_MINUS_FORM": 189,
+      "TL_MINUS_H2H": 189,
+      "TL_MINUS_HOME_AWAY": 189,
+      "TL_MINUS_INITIALIZATION": 189,
+      "TL_MINUS_LATENT": 189,
+      "TL_MINUS_OPPONENT": 189,
+      "TL_MINUS_REST": 189
+    },
+    "selected_rows": 2646,
+    "selection_rows": 4872
+  },
+  "gate_b_required": "LogLoss/Brier/calibration/coverage then matched FULL-N7 pre-tax ROI lift, LOYO, ex-largest, concentration and risk-adjusted diagnostics; positive claims require strict independent EV",
+  "gate_b_status": "NOT_AUTHORIZED_PENDING_PI_GATE_A_REVIEW",
+  "h2h": "prior-only, ordered home/away pair, maximum 12 meetings, alpha 12, primary weight 0.03; explicit minus-H2H ablation",
+  "incumbent": {
+    "allocation": "FULL_ENUMERATED",
+    "arm": "B0_BEST_FULL",
+    "no_bet": 159,
+    "selected": 189,
+    "stake_yuan": 4374,
+    "tickets": 2187
+  },
+  "issue": 180,
+  "outcome_boundary": "Gate A outcome-unexposed: target rows expose no score/result/final-SP/payout/tax/ROI; team state consumes only completed matches with kickoff strictly before the common issue cutoff",
+  "outer_year_evaluation": "target folds OOS_2020..OOS_2025 remain unchanged; hyperparameters fixed across folds; YEAR/FOLD/LOYO and ex-largest are Gate-B requirements",
+  "promotion_boundary": "B0 remains controlling; H_MINUS_RAW_HDA diagnostic only; no selector threshold/M/allocation/pruning/ticket change",
+  "settlement": "not read or produced in Gate A; Gate B requires PI authorization",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_TEAM_MATCHUP_FREEZE",
+  "version": "bj180-gate-a-v1"
+}

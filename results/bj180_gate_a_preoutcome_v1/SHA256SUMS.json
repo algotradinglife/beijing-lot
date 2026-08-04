@@ -1,0 +1,20 @@
+{
+  "CONTENT_IDENTITY.json": "5b85cc177e07bba69c342445853d3bb3b543253701cb058c711ba7a3b9396fd1",
+  "README.md": "183d84a6da1bc6aff7e915547629cc1c69096699e22fd0b8fda404a150600586",
+  "arm_registry.csv": "58bcac23c309f0f4bfeb159430bf40d318f589e83a6ddc3a3eff7a4ba6b5014d",
+  "baseline_reproduction.csv": "b6f6d55cb2f231516985ecd9d1736437a5177edc17e47c7cd2961e8867f64789",
+  "bj180_team_matchup_core.py": "4d65b08609162644394dfe83e632073ad092b9bfd058dc74368b9ceef4908890",
+  "candidate_universe_scores.csv.gz": "a9215c4c247b9d5c9187edde90e976fe7a2ef44445828f2dc0242a763b2c6c19",
+  "configuration_registry.csv": "ed51f6e67cda21ae368d94fe2d5e95f7a9314c818bdb0c764cab578c8951640d",
+  "feature_coverage.csv": "623f87f39ee2a3b7b2ea648f1bdbe35c5ef17deb6b2655b2ccd28977a44ce0d3",
+  "feature_manifest.csv": "673e2f42c0ebc09a315a546a3879fef78a0681f7400f6f0472268c5abd01254d",
+  "freeze_runner.py": "549c51ddb25b0e15cf732068a944d3410ca84fa466569b70aadb861c85473175",
+  "gate_a_card.json": "fc3e9cf8b91212f49db95a75a7a3ca7087e52d479a6a38f05d4a673e14f6dc3e",
+  "identity_overlap.csv": "5393e12493e5c042536b1d42ed9d688202be90491b85e06faa51a7596781f047",
+  "issue_cutoff_registry.csv": "3f79b6295ed75d8a2d812e7c8211f86b6b78823cdad730ed608b93ad24c52914",
+  "match_probability_freeze.csv.gz": "6cc0e94e51acde56216289008abd3fab5bedea740c09679e80e3abd1e9bf9f6d",
+  "outer_year_registry.csv": "08879c555987072024f94db2f5fc3e9a44ff26ea2afa99c7764ac704572238f3",
+  "selection_freeze.csv": "3ea45c5aedb606072f2afde6ca41b17adddfeea7623f9fc4b7426b5614b9fbfd",
+  "source_binding.json": "226dddf3a7e20ca57a09362149095b1aeab9e05ee4cdd5e6a43d7135952ef8cf",
+  "team_state_registry.csv": "b41e2fecc99a4095dce746c94912a0ad037b561e6e5dc07ee960e0d33dccb890"
+}

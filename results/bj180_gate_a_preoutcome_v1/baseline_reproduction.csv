@@ -1,0 +1,4 @@
+target_arm,source_arm,selected_identity_count,identity_set_sha256,reproduction_status,outcome_boundary
+B0_BEST_FULL,B0_BEST_FULL,189,cc50e351dfb6aeea0f72cfefa29b3356e38cfcfea76bc54d284fa1a0457523c3,PASS,Gate A outcome-unexposed: target rows expose no score/result/final-SP/payout/tax/ROI; team state consumes only completed matches with kickoff strictly before the common issue cutoff
+L0_QUICK_LEAGUE,Q1_QUICK_LEAGUE,189,0e296d3e8c445b0a3017eddc2c59a874d9a57570292d0554a2679d1d257612bb,PASS,Gate A outcome-unexposed: target rows expose no score/result/final-SP/payout/tax/ROI; team state consumes only completed matches with kickoff strictly before the common issue cutoff
+H0_LEAGUE_DIAGNOSTIC,H_MINUS_RAW_HDA,189,1dad453ad9e72a041eb94f85b21c55b61221f506ecfcc3ed917a7164f24fcb7a,PASS,Gate A outcome-unexposed: target rows expose no score/result/final-SP/payout/tax/ROI; team state consumes only completed matches with kickoff strictly before the common issue cutoff
