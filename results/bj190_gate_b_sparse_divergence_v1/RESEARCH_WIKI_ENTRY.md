@@ -1,8 +1,9 @@
-# #190 sparse divergence Gate B
+# #190 sparse divergence Gate B — arm-specific coverage correction
 
-- Decision: `STRICT_INDEPENDENT_EV_REQUIRED`.
-- Canonical support: 100,906/101,970 trusted matches; 2,946/3,181 fully settled N7 identities.
-- Positive screen rows: 475; strict-stability candidates: 18.
-- The accepted BEST_FULL baseline ladder is retained. Pre-tax ROI controls; tax is per winning ¥2 ticket and reference-only.
-- Match-selection, direction and factorial interaction remain separate. No threshold was retuned after outcomes.
-- See the immutable Gate-B package REPORT and chart-source tables for the complete frontier and failure analysis.
+- Decision: `NO_PROMOTION_FROM_GATE_B`.
+- Canonical settlement/economics were not replayed and remain byte-identical.
+- Positive screen rows: 475 descriptive rows; strict-stability candidates: 0.
+- Coverage is derived separately from each arm's own selected N7 identities.
+- The former 18 direction-only strict aliases cover line stratum `0` only; they remain descriptive evidence but fail the frozen >=2-line coverage rule.
+- Performance checks (bootstrap, ex-largest, positive years) are distinct from coverage checks (league and line counts).
+- Paper research only; no promotion, betting or production authority.

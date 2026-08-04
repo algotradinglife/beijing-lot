@@ -1,3 +1,3 @@
 # #190 Gate B immutable sparse-divergence settlement
 
-The package contains the hash-bound SQLite outcome ledger, complete four-arm surface, full frontier, paired bootstrap/stability/risk diagnostics, figures, decision report and Wiki entry.
+This corrected package preserves the canonical ledger and every issue-level economic payload byte-for-byte. Candidate coverage is arm-specific; deterministic dependent summaries, report, Wiki entry and manifest were re-frozen without ticket or bootstrap replay.

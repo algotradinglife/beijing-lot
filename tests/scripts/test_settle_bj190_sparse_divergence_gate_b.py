@@ -244,16 +244,134 @@ def test_four_arm_factorial_interaction_is_not_pooled() -> None:
     assert float(result["joint_interaction"]) == pytest.approx(0.05)
 
 
+def test_candidate_coverage_is_arm_specific_and_cannot_leak() -> None:
+    policy = {
+        "policy_id": "p",
+        "estimator_variant": "FUNDAMENTAL_INDEPENDENT",
+        "detector_family": "DELTA_P",
+    }
+    identities = {
+        "wide": ("1", tuple(f"w{i}" for i in range(7))),
+        "line0": ("2", tuple(f"z{i}" for i in range(7))),
+    }
+
+    def estimator(match_id: str, league: str, line: str) -> dict[str, str]:
+        return {
+            "match_id": match_id,
+            "year": "2025",
+            "league": league,
+            "line_stratum": line,
+            "fundamental_delta_p3": "0.2",
+            "fundamental_delta_p1": "-0.05",
+            "fundamental_delta_p0": "-0.15",
+            "calibrated_delta_p3": "0.1",
+            "calibrated_delta_p1": "-0.01",
+            "calibrated_delta_p0": "-0.09",
+            "fundamental_p3": "0.6",
+            "fundamental_p1": "0.25",
+            "fundamental_p0": "0.15",
+            "calibrated_p3": "0.5",
+            "calibrated_p1": "0.31",
+            "calibrated_p0": "0.19",
+            "line_residual_mu": "0.1",
+        }
+
+    estimators = {
+        **{f"w{i}": estimator(f"w{i}", f"L{i}", str(i % 2)) for i in range(7)},
+        **{f"z{i}": estimator(f"z{i}", "L0", "0") for i in range(7)},
+    }
+    match_rows = [{"n7_identity_sha256": "wide", "year": "2025"}]
+    direction_rows = [{"n7_identity_sha256": "line0", "year": "2025"}]
+    match_coverage, _ = RUNNER.candidate_diagnostics(
+        policy,
+        "D_MATCH_ONLY_FULL",
+        match_rows,
+        identities,
+        estimators,
+        {},
+    )
+    direction_coverage, _ = RUNNER.candidate_diagnostics(
+        policy,
+        "D_DIRECTION_ONLY",
+        direction_rows,
+        identities,
+        estimators,
+        {},
+    )
+    assert {row["arm"] for row in match_coverage} == {"D_MATCH_ONLY_FULL"}
+    assert {row["arm"] for row in direction_coverage} == {"D_DIRECTION_ONLY"}
+
+    frontier = [
+        {
+            "policy_id": "p",
+            "arm": "D_DIRECTION_ONLY",
+            "pre_tax_roi": "0.20",
+            "candidate_minus_b0_lift": "0.10",
+            "detector_family": "DELTA_P",
+            "estimator_variant": "FUNDAMENTAL_INDEPENDENT",
+            "threshold_rule": "DP_100",
+            "top_k": "1",
+            "selected_issue_count": 2,
+            "settled_issue_count": 2,
+            "common_issue_count": 2,
+        }
+    ]
+    risk = [
+        {
+            "policy_id": "p",
+            "arm": "D_DIRECTION_ONLY",
+            "basis": "PRE_TAX",
+            "ex_largest_issue_roi": "0.10",
+            "ex_largest_year_roi": "0.10",
+        }
+    ]
+    stability = [
+        {
+            "policy_id": "p",
+            "arm": "D_DIRECTION_ONLY",
+            "view": "YEAR",
+            "pre_tax_roi": "0.10",
+        },
+        {
+            "policy_id": "p",
+            "arm": "D_DIRECTION_ONLY",
+            "view": "YEAR",
+            "pre_tax_roi": "0.20",
+        },
+    ]
+    bootstrap = [
+        {
+            "policy_id": "p",
+            "arm": "D_DIRECTION_ONLY",
+            "lift_ci_low": "0.01",
+            "lift_ci_high": "0.20",
+        }
+    ]
+    freeze = RUNNER.candidate_freeze(
+        frontier,
+        risk,
+        stability,
+        match_coverage + direction_coverage,
+        bootstrap,
+    )
+    assert freeze["positive_screen_count"] == 1
+    assert freeze["strict_stability_candidate_count"] == 0
+    assert freeze["positive_screen_rows"][0]["league_count"] == 1
+    assert freeze["positive_screen_rows"][0]["line_stratum_count"] == 1
+    assert "positive-year count" in freeze["strict_stability_rule"]
+    assert "coverage:" in freeze["strict_stability_rule"]
+
+
 def test_generated_immutable_package_manifest_and_decision() -> None:
     package = ROOT / "results" / RUNNER.PACKAGE_NAME
     assert RUNNER.sha256_file(package / "SHA256SUMS.json") == (
-        "642464aeb9be0a20fa37e6c5a2a01c459bbb5fe45ad330ea4dffd99aa302243b"
+        "4fc585769f3dc20dcb29b18421190288c03bb4e6e9f0db9a826b5c2d69b9acf7"
     )
     assert RUNNER.sha256_file(package / "CONTENT_IDENTITY.json") == (
-        "b33393860827352d7f81baadb0cc7d0385383c089c4c2fe496c167130f197585"
+        "20afd2c5e018186bd7dc1ea68db5c22ae99c69d9236c17e6f4035cf36c9d69c3"
     )
     manifest = json.loads((package / "SHA256SUMS.json").read_text())
-    assert len(manifest) == 42
+    assert len(manifest) == 43
     assert set(manifest) == {
         path.name
         for path in package.iterdir()
@@ -276,7 +394,19 @@ def test_generated_immutable_package_manifest_and_decision() -> None:
         "7": 2_946,
     }
     decision = json.loads((package / "decision.json").read_text())
-    assert decision["decision"] == "STRICT_INDEPENDENT_EV_REQUIRED"
+    assert decision["decision"] == "NO_PROMOTION_FROM_GATE_B"
     assert decision["positive_screen_count"] == 475
-    assert decision["strict_stability_candidate_count"] == 18
+    assert decision["strict_stability_candidate_count"] == 0
     assert decision["promotion_authority"] is False
+    assert manifest["canonical_outcome_ledger.csv.gz"] == (
+        "c939b7825ba9e720624e56812000fec692213ea48d5cc5934095c59ec286c818"
+    )
+    assert manifest["issue_arm_settlement_d_direction_only.csv.gz"] == (
+        "36d9bae84a4b7071ffc9d3ffa7d181b2653ff9646a900e2ddea7d52b56c69da5"
+    )
+    freeze = json.loads((package / "strict_ev_candidate_freeze.json").read_text())
+    assert freeze["positive_screen_count"] == 475
+    assert freeze["strict_stability_candidate_count"] == 0
+    assert freeze["strict_stability_rows"] == []
+    assert "positive-year count" in freeze["strict_stability_rule"]
+    assert "candidate-arm own" in freeze["strict_stability_rule"]

@@ -15,9 +15,10 @@ updated: 2026-08-05
 
 完整冻结的 2,424 个 detector policies × 4 个 attribution arms 已一次性结算。
 Gate B 得到 `475` 个“绝对税前 ROI > 0 且相对 matched B0 lift > 0”的描述性
-screen rows，其中 `18` 个同时通过正 bootstrap 下界、去最大期、去最大年份和跨年
-检查。结论是 `STRICT_INDEPENDENT_EV_REQUIRED`：这些身份必须按冻结定义做独立复验，
-不能直接晋级、下注或回写阈值。
+screen rows。经 #195 独立复验纠正 coverage 口径后，严格候选数为 `0`，结论为
+`NO_PROMOTION_FROM_GATE_B`。性能条件是正 bootstrap 下界、去最大期/年份 ROI 为正且
+正收益年份至少 2 个；coverage 条件则独立要求候选 arm 自身至少覆盖 2 个联赛和 2 个
+盘口 strata。两者不再混写。
 
 接受的 BEST_FULL baseline ladder 保持不变。在 #95 的 163 期共同支持上，税前 ROI
 仍为 `-9.47%`；扩大到 #190 的 189 期 SHA-bound SQLite 支持后，描述性 ROI 为
@@ -45,9 +46,9 @@ screen rows，其中 `18` 个同时通过正 bootstrap 下界、去最大期、�
 | D_JOINT_SPARSE | 1,884 | -16.24% | 128 | 201 |
 
 整体上，match-only 与 joint sparse 没有形成可直接晋级的稳定方案；较强信号主要出现在
-direction-only。18 个严格 screen rows 也全部属于 `D_DIRECTION_ONLY`，其中较有信息量的
-冻结支持包含 52、60、75、85 期的 cells，而不只是 1–2 期的偶然高 ROI cells。仍需
-独立 EV 才能判断是否存在可迁移增量。
+direction-only。原先标作严格候选的 18 个 `D_DIRECTION_ONLY` cells，在各自冻结身份上
+都只覆盖盘口 `0` 这一层，而不是误继承自 `D_MATCH_ONLY_FULL` 的 6 层。它们仍保留为
+描述性正 ROI/bootstrap 证据，但不能支持跨盘口稳定性，也不具备晋级资格。
 
 ## 概率诊断
 
@@ -66,13 +67,14 @@ estimator 的 log loss 更低；不能把少数 direction-only 正收益 cells �
 ## 账务和耐久性
 
 税前 ROI 是主口径。税只按每一张命中的 ¥2 票分别计算，不跨票、跨期或跨人汇总。
-完整包含 42 个 manifest payload，所有 SHA 已通过只读复核：
+arm-specific correction 后完整包含 43 个 manifest payload；canonical ledger、四臂
+issue-level settlement、bootstrap contributions/results 和所有其他 economics payload
+逐字节不变：
 
-- package manifest：`642464aeb9be0a20fa37e6c5a2a01c459bbb5fe45ad330ea4dffd99aa302243b`；
-- content identity：`b33393860827352d7f81baadb0cc7d0385383c089c4c2fe496c167130f197585`；
+- corrected package manifest：`4fc585769f3dc20dcb29b18421190288c03bb4e6e9f0db9a826b5c2d69b9acf7`；
+- corrected content identity：`20afd2c5e018186bd7dc1ea68db5c22ae99c69d9236c17e6f4035cf36c9d69c3`；
 - canonical ledger：`c939b7825ba9e720624e56812000fec692213ea48d5cc5934095c59ec286c818`。
 
 不可变包：`results/bj190_gate_b_sparse_divergence_v1`。其中包含完整四臂 settlement、
 20,000 次 paired bootstrap、YEAR/FOLD/LOYO、风险与集中度、failure attribution、
 chart-source tables、SVG 图和 exact candidate freeze。
-

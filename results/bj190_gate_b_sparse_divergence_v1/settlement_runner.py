@@ -1245,19 +1245,57 @@ def write_probability_settlement(
     return population_rows, bucket_rows
 
 
+def candidate_coverage(
+    policy: Mapping[str, str],
+    arm: str,
+    match_records: Sequence[Mapping[str, object]],
+    identities: Mapping[str, tuple[str, tuple[str, ...]]],
+    estimator_by_match: Mapping[str, Mapping[str, str]],
+) -> list[dict[str, object]]:
+    coverage: Counter[tuple[str, str]] = Counter()
+    selected = [row for row in match_records if row["n7_identity_sha256"]]
+    for record in selected:
+        coverage[("ISSUE_YEAR", str(record["year"]))] += 1
+        identity = str(record["n7_identity_sha256"])
+        for match_id in identities[identity][1]:
+            estimator = estimator_by_match[match_id]
+            coverage[("MATCH_YEAR", estimator["year"])] += 1
+            coverage[("LEAGUE", estimator["league"])] += 1
+            coverage[("LINE_STRATUM", estimator["line_stratum"])] += 1
+            view = selected_probability_view(estimator, policy)
+            if view is None:
+                continue
+            source, _, favored, omitted, _ = view
+            coverage[("FAVORED_CODE", favored)] += 1
+            coverage[("OMITTED_CODE", omitted)] += 1
+            coverage[("PROBABILITY_SOURCE", source)] += 1
+    return [
+        {
+            "policy_id": policy["policy_id"],
+            "arm": arm,
+            "dimension": dimension,
+            "value": value,
+            "selected_count": count,
+        }
+        for (dimension, value), count in sorted(coverage.items())
+    ]
+
+
 def candidate_diagnostics(
     policy: Mapping[str, str],
+    arm: str,
     match_records: Sequence[Mapping[str, object]],
     identities: Mapping[str, tuple[str, tuple[str, ...]]],
     estimator_by_match: Mapping[str, Mapping[str, str]],
     outcomes: Mapping[str, Outcome],
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
-    coverage: Counter[tuple[str, str]] = Counter()
+    rows = candidate_coverage(
+        policy, arm, match_records, identities, estimator_by_match
+    )
     selected = [row for row in match_records if row["n7_identity_sha256"]]
     accumulator = ProbabilityAccumulator()
     missing_outcomes = selected_legs = 0
     for record in selected:
-        coverage[("ISSUE_YEAR", str(record["year"]))] += 1
         identity = str(record["n7_identity_sha256"])
         for match_id in identities[identity][1]:
             selected_legs += 1
@@ -1267,29 +1305,15 @@ def candidate_diagnostics(
                 raise RuntimeError(
                     f"selected match has no frozen estimator view: {policy['policy_id']} {match_id}"
                 )
-            source, probabilities, favored, omitted, _ = view
-            coverage[("MATCH_YEAR", estimator["year"])] += 1
-            coverage[("LEAGUE", estimator["league"])] += 1
-            coverage[("LINE_STRATUM", estimator["line_stratum"])] += 1
-            coverage[("FAVORED_CODE", favored)] += 1
-            coverage[("OMITTED_CODE", omitted)] += 1
-            coverage[("PROBABILITY_SOURCE", source)] += 1
+            _, probabilities, _, _, _ = view
             outcome = outcomes.get(match_id)
             if outcome:
                 accumulator.add(probabilities, outcome.result_code)
             else:
                 missing_outcomes += 1
-    rows = [
-        {
-            "policy_id": policy["policy_id"],
-            "dimension": dimension,
-            "value": value,
-            "selected_count": count,
-        }
-        for (dimension, value), count in sorted(coverage.items())
-    ]
     return rows, {
         "policy_id": policy["policy_id"],
+        "arm": arm,
         "estimator_variant": policy["estimator_variant"],
         "detector_family": policy["detector_family"],
         "selected_issue_count": len(selected),
@@ -1446,14 +1470,23 @@ def settle_surface(
                 }
             )
         factorial.append(factorial_summary(policy_id, records))
-        policy_coverage, probability = candidate_diagnostics(
+        for arm in ARMS:
+            policy_coverage = candidate_coverage(
+                policy,
+                arm,
+                records[arm],
+                identities,
+                estimator_by_match,
+            )
+            coverage.extend(policy_coverage)
+        _, probability = candidate_diagnostics(
             policy,
+            "D_MATCH_ONLY_FULL",
             records["D_MATCH_ONLY_FULL"],
             identities,
             estimator_by_match,
             outcomes,
         )
-        coverage.extend(policy_coverage)
         selected_probability.append(probability)
 
         signature = tuple(
@@ -1907,15 +1940,19 @@ def candidate_freeze(
             and float(row["pre_tax_roi"]) > 0
         ):
             years_positive[(str(row["policy_id"]), str(row["arm"]))] += 1
-    strata: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
+    strata: defaultdict[tuple[str, str, str], set[str]] = defaultdict(set)
     for row in coverage:
         if (
             row["dimension"] in {"LEAGUE", "LINE_STRATUM"}
             and int(row["selected_count"]) > 0
         ):
-            strata[(str(row["policy_id"]), str(row["dimension"]))].add(
-                str(row["value"])
-            )
+            strata[
+                (
+                    str(row["policy_id"]),
+                    str(row["arm"]),
+                    str(row["dimension"]),
+                )
+            ].add(str(row["value"]))
     positives: list[dict[str, object]] = []
     promotable: list[dict[str, object]] = []
     for row in frontier:
@@ -1947,8 +1984,12 @@ def candidate_freeze(
             "ex_largest_issue_roi": risk["ex_largest_issue_roi"],
             "ex_largest_year_roi": risk["ex_largest_year_roi"],
             "positive_year_count": years_positive[key],
-            "league_count": len(strata[(str(row["policy_id"]), "LEAGUE")]),
-            "line_stratum_count": len(strata[(str(row["policy_id"]), "LINE_STRATUM")]),
+            "league_count": len(
+                strata[(str(row["policy_id"]), str(row["arm"]), "LEAGUE")]
+            ),
+            "line_stratum_count": len(
+                strata[(str(row["policy_id"]), str(row["arm"]), "LINE_STRATUM")]
+            ),
             "exact_surface_identity": canonical_hash(
                 {
                     "gate_a_manifest": EXPECTED_GATE_A_MANIFEST,
@@ -1974,7 +2015,11 @@ def candidate_freeze(
             promotable.append(record)
     return {
         "screen_rule": "absolute pre-tax ROI > 0 and pairwise-common matched-B0 lift > 0",
-        "strict_stability_rule": "paired bootstrap lift low > 0; ex-largest issue/year ROI > 0; >=2 positive years/leagues/line strata",
+        "strict_stability_rule": (
+            "performance: paired bootstrap lift low > 0, ex-largest issue/year ROI > 0, "
+            "positive-year count >=2; coverage: candidate-arm own covered league count >=2 "
+            "and line-stratum count >=2"
+        ),
         "positive_screen_count": len(positives),
         "strict_stability_candidate_count": len(promotable),
         "positive_screen_rows": positives,
@@ -2136,8 +2181,9 @@ def report_markdown(
         (
             "The complete preregistered 2,424-policy × four-arm surface was settled once. "
             f"There are **{freeze['positive_screen_count']}** positive absolute-ROI plus matched-B0-lift screen rows and "
-            f"**{freeze['strict_stability_candidate_count']}** rows passing the stricter multi-year/ex-largest/bootstrap screen. "
-            "Every positive row remains retrospective research and requires exact independent EV before any promotion."
+            f"**{freeze['strict_stability_candidate_count']}** rows passing both the stricter performance screen "
+            "(bootstrap, ex-largest and positive-year checks) and candidate-arm-own coverage screen "
+            "(at least two leagues and two line strata). Every positive row remains retrospective research only."
         ),
         "",
         "Pre-tax ROI is controlling. Tax-adjusted results are reference-only and apply tax per individual winning ¥2 ticket, never after issue/person aggregation. The accepted -9.47% baseline ladder is retained unchanged.",
@@ -2212,6 +2258,8 @@ def report_markdown(
         )
     lines += [
         "",
+        "The direction-only positive cluster is line-0-only evidence when coverage is derived from each candidate arm's own selected N7 identities. It therefore does not pass the declared cross-line coverage requirement and is not a strict-stability candidate.",
+        "",
         "## Stability, risk and failure attribution",
         "",
         "The package includes YEAR/FOLD/LOYO rows for every policy×arm, 20,000 paired issue bootstraps on each pairwise-common support, ex-largest issue/year ROI, drawdown, payout concentration, miss streak, coverage by line/direction/league/year, and a row-level failure taxonomy. Blank ROI always means zero executed stake; it is never encoded as zero or a loss.",
@@ -2220,12 +2268,7 @@ def report_markdown(
         "",
         "## Recommendation",
         "",
-        (
-            "Freeze and independently validate the exact positive-screen identities before any claim. "
-            if positive
-            else "Do not promote any sparse-divergence policy from this surface. "
-        )
-        + "Keep BEST_FULL as the accepted baseline ladder. Treat match selection and direction as separate research mechanisms; do not rescue a weak joint row by blending the estimators or retuning thresholds on these outcomes.",
+        "Keep the positive-screen rows as descriptive line-0 evidence, with zero strict-stability candidates. Any future claim needs new cross-line evidence under an outcome-unexposed freeze. Keep BEST_FULL as the accepted baseline ladder, and do not rescue a weak joint row by blending estimators or retuning thresholds on these outcomes.",
         "",
         "Paper research only; no betting, production or selector-release authority.",
         "",

@@ -2,7 +2,7 @@
 
 ## Executive decision
 
-The complete preregistered 2,424-policy × four-arm surface was settled once. There are **475** positive absolute-ROI plus matched-B0-lift screen rows and **18** rows passing the stricter multi-year/ex-largest/bootstrap screen. Every positive row remains retrospective research and requires exact independent EV before any promotion.
+The complete preregistered 2,424-policy × four-arm surface was settled once. There are **475** positive absolute-ROI plus matched-B0-lift screen rows and **0** rows passing both the stricter performance screen (bootstrap, ex-largest and positive-year checks) and candidate-arm-own coverage screen (at least two leagues and two line strata). Every positive row remains retrospective research only.
 
 Pre-tax ROI is controlling. Tax-adjusted results are reference-only and apply tax per individual winning ¥2 ticket, never after issue/person aggregation. The accepted -9.47% baseline ladder is retained unchanged.
 
@@ -73,6 +73,8 @@ The manifest-covered selected-region table compares every frozen policy's sparse
 
 Only the first 20 of 475 screen rows are rendered here; the exact full freeze is machine-readable.
 
+The direction-only positive cluster is line-0-only evidence when coverage is derived from each candidate arm's own selected N7 identities. It therefore does not pass the declared cross-line coverage requirement and is not a strict-stability candidate.
+
 ## Stability, risk and failure attribution
 
 The package includes YEAR/FOLD/LOYO rows for every policy×arm, 20,000 paired issue bootstraps on each pairwise-common support, ex-largest issue/year ROI, drawdown, payout concentration, miss streak, coverage by line/direction/league/year, and a row-level failure taxonomy. Blank ROI always means zero executed stake; it is never encoded as zero or a loss.
@@ -81,6 +83,6 @@ Main limitations are separated rather than pooled: unavailable DELTA_MU mapping,
 
 ## Recommendation
 
-Freeze and independently validate the exact positive-screen identities before any claim. Keep BEST_FULL as the accepted baseline ladder. Treat match selection and direction as separate research mechanisms; do not rescue a weak joint row by blending the estimators or retuning thresholds on these outcomes.
+Keep the positive-screen rows as descriptive line-0 evidence, with zero strict-stability candidates. Any future claim needs new cross-line evidence under an outcome-unexposed freeze. Keep BEST_FULL as the accepted baseline ladder, and do not rescue a weak joint row by blending estimators or retuning thresholds on these outcomes.
 
 Paper research only; no betting, production or selector-release authority.

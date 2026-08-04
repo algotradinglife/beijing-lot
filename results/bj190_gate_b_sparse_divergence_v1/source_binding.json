@@ -12,6 +12,14 @@
     "unavailable_match_count": 1064
   },
   "contract": "BJ-HIST-SPARSE-DIVERGENCE-N7-001",
+  "coverage_correction": {
+    "correction_id": "BJ190_ARM_SPECIFIC_COVERAGE_V1",
+    "independent_validation_issue": 195,
+    "prior_content_identity_sha256": "b33393860827352d7f81baadb0cc7d0385383c089c4c2fe496c167130f197585",
+    "prior_manifest_sha256": "642464aeb9be0a20fa37e6c5a2a01c459bbb5fe45ad330ea4dffd99aa302243b",
+    "semantics": "coverage derives separately from each arm own selected N7 identities",
+    "ticket_or_outcome_replay": false
+  },
   "gate_a": {
     "content_identity_sha256": "f88a3dc7d010c69e5a1e50274f979f62e95cec47702f0aa842e30d7ffb024cb8",
     "manifest_sha256": "490579f7813d260d11965377462f7aa3b20161dd4672e2b42b600b493d24f1bc",

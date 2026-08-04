@@ -860,8 +860,10 @@ trusted settlements；1,064 个 unavailable 保持 0 stake、绝不记作亏损�
 完整 2,424-policy × 四臂 attribution 显示：B0 的 expanded-support 税前 ROI 为
 `-8.52%`；match-only 中位数 `-22.27%`，joint sparse 中位数 `-16.24%`，
 direction-only 中位数 `-1.89%`。475 个描述性正 screen rows 中有 18 个通过内部严格
-稳定性筛选，并且全部来自 direction-only；这只触发 `STRICT_INDEPENDENT_EV_REQUIRED`，
-不构成 promotion。接受的 #95 共同支持 baseline `-9.47%` 未被替换或降级。
+稳定性筛选的旧结论已被 #195 独立复验纠正：旧 coverage 错误继承 match-only 支持，
+而这 18 个 direction-only cells 的自身身份都只覆盖盘口 `0`。因此严格候选数为 `0`，
+最终为 `NO_PROMOTION_FROM_GATE_B`；475 行仍作为描述性 line-0 正信号保留。接受的 #95
+共同支持 baseline `-9.47%` 未被替换或降级。
 
 税仍按每张命中的 ¥2 票分别计算，不做跨票/跨期汇总。完整四臂结果、概率校准、
 20k paired bootstrap、YEAR/FOLD/LOYO、风险集中度、图与不可变哈希见
