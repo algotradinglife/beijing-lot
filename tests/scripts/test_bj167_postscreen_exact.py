@@ -293,7 +293,9 @@ def test_actual_scientific_finalizer_reads_disk_checkpoint_without_outcomes_or_s
     fields = ["selector_id", "weight_source", "mechanism", "cap", "M", "seed_scope", "stake_yuan", "gross_pre_tax_yuan", "no_tax_roi", "matched_full_no_tax_roi", "matched_full_lift"]
     with gzip.open(screen / "ensemble_metrics.csv.gz", "wt", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields); w.writeheader()
-        for src, mechanism, cap, m, scope in cells: w.writerow({"selector_id":"S0", "weight_source":src, "mechanism":mechanism, "cap":cap, "M":m, "seed_scope":scope, "stake_yuan":"0.000000", "gross_pre_tax_yuan":"0.000000", "no_tax_roi":"", "matched_full_no_tax_roi":"", "matched_full_lift":""})
+        for cell in cells:
+            src, mechanism, cap, m, scope = SCIENCE.reporting_science_cell(cell)
+            w.writerow({"selector_id":"S0", "weight_source":src, "mechanism":mechanism, "cap":cap, "M":m, "seed_scope":scope, "stake_yuan":"0.000000", "gross_pre_tax_yuan":"0.000000", "no_tax_roi":"", "matched_full_no_tax_roi":"", "matched_full_lift":""})
     mapping = [{"candidate_index":0,"selector_id":"S0","weight_source":"Q_WEIGHT","mechanism":"WOR_DISTINCT","cap":"NA","M":"64","science_M":"64","seed_scope":"ENSEMBLE_100","screen_global_cell":"1","global_science_cell":39,"candidate_inclusion":"FIXTURE","screen_stake_yuan":"0.000000","screen_no_tax_roi":"","screen_matched_full_lift":""}]
     candidate = {name:array.array("d", [0.0]) for name in ("net","stake","gross","tax","hit","tax_line_hit","full_net","full_stake","full_gross","full_tax","full_hit")}
     d = lambda: array.array("d", [0.0]) * total
