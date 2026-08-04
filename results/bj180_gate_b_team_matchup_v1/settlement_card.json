@@ -1,0 +1,704 @@
+{
+  "active_issue_count": 189,
+  "arm_count": 14,
+  "bootstrap_draws": {
+    "ALL_189/B0_BEST_FULL": {
+      "issue_count": 163,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180189,
+      "seed_offset": 0,
+      "sha256": "58ec343d92f341293694ad45f8fb94834679beac7c86f5ee751507118c09e71d"
+    },
+    "ALL_189/H0_LEAGUE_DIAGNOSTIC": {
+      "issue_count": 160,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180191,
+      "seed_offset": 2,
+      "sha256": "78b877cb54e02afd00d96bfa69b0e380b1048c42523f21a3ab5379c643258b5b"
+    },
+    "ALL_189/L0_QUICK_LEAGUE": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180190,
+      "seed_offset": 1,
+      "sha256": "be48f6591fa19de08abd2543b1dc4650e48fc06728ec365d78134d0dbcaace02"
+    },
+    "ALL_189/T1_DEEP_TEAM": {
+      "issue_count": 159,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180192,
+      "seed_offset": 3,
+      "sha256": "6b3dd05f57ef612778cb37f06e134fa42051a5172dadc7baffcd1d34a764706a"
+    },
+    "ALL_189/TL1_TEAM_LEAGUE": {
+      "issue_count": 159,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180193,
+      "seed_offset": 4,
+      "sha256": "f685586134f64866abb6d77b671a9981f2dbd883d508ae06a67b642270e26995"
+    },
+    "ALL_189/TL_CFG_CONSERVATIVE": {
+      "issue_count": 159,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180194,
+      "seed_offset": 5,
+      "sha256": "faf5dfae2c5655974946d6e78bd2d31b71eda58ab4c8b173ab90566f4c69e7ad"
+    },
+    "ALL_189/TL_CFG_RESPONSIVE": {
+      "issue_count": 159,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180195,
+      "seed_offset": 6,
+      "sha256": "b824f4f65bc16c309062ba60c43cb5d57ffd39b1b8c673337cd83be9cf261020"
+    },
+    "ALL_189/TL_MINUS_FORM": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180198,
+      "seed_offset": 9,
+      "sha256": "7a706606b15ebd08af03040868c8cae66a7da851fa6ad4d024c81ca6fdd13b93"
+    },
+    "ALL_189/TL_MINUS_H2H": {
+      "issue_count": 159,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180202,
+      "seed_offset": 13,
+      "sha256": "410f293b3319a8b0e8cef162b16316fb792c2deb30b450fef367a387a2cfae46"
+    },
+    "ALL_189/TL_MINUS_HOME_AWAY": {
+      "issue_count": 159,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180197,
+      "seed_offset": 8,
+      "sha256": "e912f4d7cc68c88a5c9e329368b87f654c47bfc0043abeb6a613df9f24af0b2f"
+    },
+    "ALL_189/TL_MINUS_INITIALIZATION": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180201,
+      "seed_offset": 12,
+      "sha256": "ec01f051e69fece5c0ac20f5983c986df53d51fc16440a31e303ebcbaf7aa7fe"
+    },
+    "ALL_189/TL_MINUS_LATENT": {
+      "issue_count": 159,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180196,
+      "seed_offset": 7,
+      "sha256": "962b3ce78c8f6f90c22e0871b37aff34af823fe6060034a908c79155fa50cc26"
+    },
+    "ALL_189/TL_MINUS_OPPONENT": {
+      "issue_count": 159,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180200,
+      "seed_offset": 11,
+      "sha256": "513233c3f83b8a74ee5dfd24059d0df937cbda72a2ec7f71f75ffaa32dd6519f"
+    },
+    "ALL_189/TL_MINUS_REST": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180199,
+      "seed_offset": 10,
+      "sha256": "002de5f39ce4d97ee88fc081eb5a7391db688bf5059d2ed02a7e8b664752e3bc"
+    },
+    "CHOICE_113/B0_BEST_FULL": {
+      "issue_count": 106,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180289,
+      "seed_offset": 100,
+      "sha256": "9ef288201088202f6b91267138e341a1e7107f68fed6acc63db3c0b0d3993a91"
+    },
+    "CHOICE_113/H0_LEAGUE_DIAGNOSTIC": {
+      "issue_count": 103,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180291,
+      "seed_offset": 102,
+      "sha256": "8a45d057a225980d5900e74d6a05239fff532e07181aa3f5442af6d7712ca711"
+    },
+    "CHOICE_113/L0_QUICK_LEAGUE": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180290,
+      "seed_offset": 101,
+      "sha256": "6cd9feb2bb233ced929bc0cfc509ae0713c394ab1e814bfc3065b3dc0c8f7448"
+    },
+    "CHOICE_113/T1_DEEP_TEAM": {
+      "issue_count": 102,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180292,
+      "seed_offset": 103,
+      "sha256": "c88f45d9a33b596672df635d682e7312afa4d8083644c5fa26fd2410c9bb7b08"
+    },
+    "CHOICE_113/TL1_TEAM_LEAGUE": {
+      "issue_count": 102,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180293,
+      "seed_offset": 104,
+      "sha256": "978ca3e6f5617961660ceb7fb8a9a797e9a88e783d14c825089d34a5843313fc"
+    },
+    "CHOICE_113/TL_CFG_CONSERVATIVE": {
+      "issue_count": 102,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180294,
+      "seed_offset": 105,
+      "sha256": "ec09bf4fc94738625479fc8703dd926873a6056d63da240eebe6c5510cefe9b8"
+    },
+    "CHOICE_113/TL_CFG_RESPONSIVE": {
+      "issue_count": 102,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180295,
+      "seed_offset": 106,
+      "sha256": "1e21496fdc30220ab756d557a9230ee45469a21aa7dd838d6595024832b7eadd"
+    },
+    "CHOICE_113/TL_MINUS_FORM": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180298,
+      "seed_offset": 109,
+      "sha256": "57f27d8956acff8fc80cb82c62e4b3c0841ac82578c8507ba56d4eb324e24350"
+    },
+    "CHOICE_113/TL_MINUS_H2H": {
+      "issue_count": 102,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180302,
+      "seed_offset": 113,
+      "sha256": "48fcd7286d96604e0110a93bff74bb2d3abe88072edae3892412b446622fb116"
+    },
+    "CHOICE_113/TL_MINUS_HOME_AWAY": {
+      "issue_count": 102,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180297,
+      "seed_offset": 108,
+      "sha256": "9d10310ad344c7af813f19abcf3925fd3e187c3eda9c6a6a116079d1ba32af31"
+    },
+    "CHOICE_113/TL_MINUS_INITIALIZATION": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180301,
+      "seed_offset": 112,
+      "sha256": "62e721a01aff9aba5b53426e912152febb18ff60fa3006b0ff4cfdac90219e8b"
+    },
+    "CHOICE_113/TL_MINUS_LATENT": {
+      "issue_count": 102,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180296,
+      "seed_offset": 107,
+      "sha256": "1ae692ce874911e4525042ee293cf04b7ee02c2431deb141b6bc67f7932a6893"
+    },
+    "CHOICE_113/TL_MINUS_OPPONENT": {
+      "issue_count": 102,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180300,
+      "seed_offset": 111,
+      "sha256": "203c797fb4e948a989b5b8bf3b5695f2baeb191ff121bbc11e7cba5a882e7a07"
+    },
+    "CHOICE_113/TL_MINUS_REST": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180299,
+      "seed_offset": 110,
+      "sha256": "7b7f14da00ca29595c8cd3c9e32275b4878a115b13b88cbf6c520a10497011f1"
+    },
+    "INVARIANT_76/B0_BEST_FULL": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180389,
+      "seed_offset": 200,
+      "sha256": "e728a121bdfc29f87755d87e73475cd2de3ca74ac4b46286c7c9e573da97968d"
+    },
+    "INVARIANT_76/H0_LEAGUE_DIAGNOSTIC": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180391,
+      "seed_offset": 202,
+      "sha256": "ae9975496358a37fac0d82ba680ec40c6cc81e186af22939fcabf4dd005e0f53"
+    },
+    "INVARIANT_76/L0_QUICK_LEAGUE": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180390,
+      "seed_offset": 201,
+      "sha256": "99ca89d7c2b6eef06ea4d2312b2602f16449fd6d7cc5d26bed27d3d4317ae580"
+    },
+    "INVARIANT_76/T1_DEEP_TEAM": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180392,
+      "seed_offset": 203,
+      "sha256": "7cae44b69fd5e7e9f39a495a21d15e6b93f4408b6a4169ce9c358635004bbaeb"
+    },
+    "INVARIANT_76/TL1_TEAM_LEAGUE": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180393,
+      "seed_offset": 204,
+      "sha256": "561571b58f4900a4cf24148449f829f32e0e504fca87c8315ee89a1ba75c5b08"
+    },
+    "INVARIANT_76/TL_CFG_CONSERVATIVE": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180394,
+      "seed_offset": 205,
+      "sha256": "867913790ef271a610c7e69e9381b24ba44555014c0e928ba919e725ef68adf6"
+    },
+    "INVARIANT_76/TL_CFG_RESPONSIVE": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180395,
+      "seed_offset": 206,
+      "sha256": "cc96f9002217f99f66d46fd3797d7e3b33457ef7cdf7c072e424c52fa3c6ce9e"
+    },
+    "INVARIANT_76/TL_MINUS_FORM": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180398,
+      "seed_offset": 209,
+      "sha256": "1896a7ad954566ae007b762e7edadddf1e212610bc73fda466a9828c20469864"
+    },
+    "INVARIANT_76/TL_MINUS_H2H": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180402,
+      "seed_offset": 213,
+      "sha256": "488133e34b0c4b12a0e00313f1bac050bf8fa70a4a805ffba0197a7505db4c19"
+    },
+    "INVARIANT_76/TL_MINUS_HOME_AWAY": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180397,
+      "seed_offset": 208,
+      "sha256": "4ace4a27a74d62c58bb82d2c12fa05962f8d288c384715e79390cd26a6cfe01f"
+    },
+    "INVARIANT_76/TL_MINUS_INITIALIZATION": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180401,
+      "seed_offset": 212,
+      "sha256": "8420acc74c0a57c99e68c287bc904a1d7e3d29d7e41532d05a356298e23603f6"
+    },
+    "INVARIANT_76/TL_MINUS_LATENT": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180396,
+      "seed_offset": 207,
+      "sha256": "bc013a8afb8421e19ed950852e9c8589f6f291e9aca53dadbcf2b67a02edc53a"
+    },
+    "INVARIANT_76/TL_MINUS_OPPONENT": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180400,
+      "seed_offset": 211,
+      "sha256": "9fe1ed06979dae87b5712d318880c705f1a719e478dff8126bb6ff93faf28dd8"
+    },
+    "INVARIANT_76/TL_MINUS_REST": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 180399,
+      "seed_offset": 210,
+      "sha256": "8e079f6b7760d6e86dc55a2ef3145797636e60a134c5d7e0954fbfde3dc9a320"
+    },
+    "L0/ALL_189/B0_BEST_FULL": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190189,
+      "seed_offset": 10000,
+      "sha256": "299ebd03969dab27818e5214cbbfc8c4211b787d104e1450bb7ebbfa5726d85c"
+    },
+    "L0/ALL_189/H0_LEAGUE_DIAGNOSTIC": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190191,
+      "seed_offset": 10002,
+      "sha256": "8996d6ca9d5cf0d3bacf8327614c8caa08eced8475cd878f6f614dddad451511"
+    },
+    "L0/ALL_189/L0_QUICK_LEAGUE": {
+      "issue_count": 159,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190190,
+      "seed_offset": 10001,
+      "sha256": "6d970815d8946ae27bc578418316ffa0d0447735122ee9ab3b5fd6466d382578"
+    },
+    "L0/ALL_189/T1_DEEP_TEAM": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190192,
+      "seed_offset": 10003,
+      "sha256": "54b61ba565533f439c84e01bdf88034b57f0ecd463ada75715693abf2bc411ff"
+    },
+    "L0/ALL_189/TL1_TEAM_LEAGUE": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190193,
+      "seed_offset": 10004,
+      "sha256": "4242bed73a5612bebdb9791bcedce31b07fe5b312755c9881932fe9d58e53eca"
+    },
+    "L0/ALL_189/TL_CFG_CONSERVATIVE": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190194,
+      "seed_offset": 10005,
+      "sha256": "67785b04e86a84524e630cc315cfed1d9be373617bc74f9b306aa89597d9658c"
+    },
+    "L0/ALL_189/TL_CFG_RESPONSIVE": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190195,
+      "seed_offset": 10006,
+      "sha256": "f745e11c5a936043ab88cc2ae6d1c88e1c83c5ce289f63743ff7d0e4ba0f1e27"
+    },
+    "L0/ALL_189/TL_MINUS_FORM": {
+      "issue_count": 157,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190198,
+      "seed_offset": 10009,
+      "sha256": "69fc2c2b5db8cff2cc0409c1e8998c7eb7107e8f2f9f697ab95af4e7fd802877"
+    },
+    "L0/ALL_189/TL_MINUS_H2H": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190202,
+      "seed_offset": 10013,
+      "sha256": "47f988a3448478bd380ac528a09db3953013ded49795d3dfdfc0135d0303f65a"
+    },
+    "L0/ALL_189/TL_MINUS_HOME_AWAY": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190197,
+      "seed_offset": 10008,
+      "sha256": "573a4d8455e68fcb719aa9446ae2f3b97f8d15037347f5ea59d5005045f12643"
+    },
+    "L0/ALL_189/TL_MINUS_INITIALIZATION": {
+      "issue_count": 157,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190201,
+      "seed_offset": 10012,
+      "sha256": "423f4646879dcb9445e31f5b7a659528a8d8c03a6e8e2d6440ec94ef19abf1d2"
+    },
+    "L0/ALL_189/TL_MINUS_LATENT": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190196,
+      "seed_offset": 10007,
+      "sha256": "62f600b0b462531b820e079594bc37bfbcc5e3e32b932b76876130ff0aabf689"
+    },
+    "L0/ALL_189/TL_MINUS_OPPONENT": {
+      "issue_count": 158,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190200,
+      "seed_offset": 10011,
+      "sha256": "c77a2afe07da304965af8d2f04fd2560c6f5f28221524370dee95c4a98e34953"
+    },
+    "L0/ALL_189/TL_MINUS_REST": {
+      "issue_count": 157,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190199,
+      "seed_offset": 10010,
+      "sha256": "9b06f38c53798c8d7f70ae7c8bcf448c17079b2d12c7c0b88aa0f58bfaa605da"
+    },
+    "L0/CHOICE_113/B0_BEST_FULL": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190289,
+      "seed_offset": 10100,
+      "sha256": "2e73f5c4303f6307820a7479d78f4608ada5aa94bf2ffc0c925452f06cc88c54"
+    },
+    "L0/CHOICE_113/H0_LEAGUE_DIAGNOSTIC": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190291,
+      "seed_offset": 10102,
+      "sha256": "d7e418ac7d692d216910d349121da26bf447ec12c2a969108ac5bf6c17945922"
+    },
+    "L0/CHOICE_113/L0_QUICK_LEAGUE": {
+      "issue_count": 102,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190290,
+      "seed_offset": 10101,
+      "sha256": "4e48b177c611f8f0d799c519f2c0beddb122d22bbdb5009e6ddbb46570f08f18"
+    },
+    "L0/CHOICE_113/T1_DEEP_TEAM": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190292,
+      "seed_offset": 10103,
+      "sha256": "28d95394ad8fc6c993bb0a6ecddce10db25f5f308c6c5a4434b6522d1ac65b0d"
+    },
+    "L0/CHOICE_113/TL1_TEAM_LEAGUE": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190293,
+      "seed_offset": 10104,
+      "sha256": "26f815d33c932ad90821ba44b3dcd19da4ea75f7513d853451c9d203aced1813"
+    },
+    "L0/CHOICE_113/TL_CFG_CONSERVATIVE": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190294,
+      "seed_offset": 10105,
+      "sha256": "ae22ebcb8e3385c3c7d8a9c9364cba5c2a88a5ed5b53ad7815cccb5d772b3cef"
+    },
+    "L0/CHOICE_113/TL_CFG_RESPONSIVE": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190295,
+      "seed_offset": 10106,
+      "sha256": "b433aee579c8daeb23792f104cd66d1f66492dd4b440474dc8e9608e80c61419"
+    },
+    "L0/CHOICE_113/TL_MINUS_FORM": {
+      "issue_count": 100,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190298,
+      "seed_offset": 10109,
+      "sha256": "0a219b91eda0b9b4fe29d433f428b58a2a64d46bb26dde82628d428d088e51a3"
+    },
+    "L0/CHOICE_113/TL_MINUS_H2H": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190302,
+      "seed_offset": 10113,
+      "sha256": "2a274d151a4e88895a260ab0eff98a6e9d8d5c3b0af076685616e463bddcabad"
+    },
+    "L0/CHOICE_113/TL_MINUS_HOME_AWAY": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190297,
+      "seed_offset": 10108,
+      "sha256": "b821c5fb3ffe5c37279fa604f6ed47775266ada5c55b949218c61a7bfd8d9523"
+    },
+    "L0/CHOICE_113/TL_MINUS_INITIALIZATION": {
+      "issue_count": 100,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190301,
+      "seed_offset": 10112,
+      "sha256": "c317c830a44f7dcb5d03e3d881992509ab7c91bc2b5e5491acb0cbfa0f886996"
+    },
+    "L0/CHOICE_113/TL_MINUS_LATENT": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190296,
+      "seed_offset": 10107,
+      "sha256": "d9085ddb769cb38c27b14476431fcc3fbb4b33083f4d69421ec3f99d1ab7de65"
+    },
+    "L0/CHOICE_113/TL_MINUS_OPPONENT": {
+      "issue_count": 101,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190300,
+      "seed_offset": 10111,
+      "sha256": "b213a4feebc64b361ff6010fcbc0ca109953e196220e093e127503e782e3c14d"
+    },
+    "L0/CHOICE_113/TL_MINUS_REST": {
+      "issue_count": 100,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190299,
+      "seed_offset": 10110,
+      "sha256": "5a5ec28564249308b8f680a0543269c29e7ab06dcef7e5e0f34269a4921641f3"
+    },
+    "L0/INVARIANT_76/B0_BEST_FULL": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190389,
+      "seed_offset": 10200,
+      "sha256": "32e0bd6bcfbadd2bf70776e2fd090079734fe46d0818196acae88156b6a366fc"
+    },
+    "L0/INVARIANT_76/H0_LEAGUE_DIAGNOSTIC": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190391,
+      "seed_offset": 10202,
+      "sha256": "fd9249d47141983a85b5d8869da33e748fb9380782b7716520ede15bba5eeeec"
+    },
+    "L0/INVARIANT_76/L0_QUICK_LEAGUE": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190390,
+      "seed_offset": 10201,
+      "sha256": "2673b2e3f9f1641149703927847c9f28dfbe84901a977609fde2e04866854ce3"
+    },
+    "L0/INVARIANT_76/T1_DEEP_TEAM": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190392,
+      "seed_offset": 10203,
+      "sha256": "363fcf746be6b41dc2a5134e668cf1f8b3c0ae66c3a468c8f75b0a575071dd82"
+    },
+    "L0/INVARIANT_76/TL1_TEAM_LEAGUE": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190393,
+      "seed_offset": 10204,
+      "sha256": "d1fceb173073b8cebb02eaad46498edaf1416c1f231260c6d50704003329c03e"
+    },
+    "L0/INVARIANT_76/TL_CFG_CONSERVATIVE": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190394,
+      "seed_offset": 10205,
+      "sha256": "74c5c8bcc0acac287638d0b6029787dbc11d73027a13c5c481759be364dc3266"
+    },
+    "L0/INVARIANT_76/TL_CFG_RESPONSIVE": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190395,
+      "seed_offset": 10206,
+      "sha256": "c70d10438263e8e003e494b833c4933506924012c7d4b004843d6096f898f4d5"
+    },
+    "L0/INVARIANT_76/TL_MINUS_FORM": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190398,
+      "seed_offset": 10209,
+      "sha256": "884bd01179932f38d470e68d19ea17a6349d6016efe9600a098bcb18569e42d3"
+    },
+    "L0/INVARIANT_76/TL_MINUS_H2H": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190402,
+      "seed_offset": 10213,
+      "sha256": "d0da22eb3c43ac9a8f5f36ec7064c713fe64f53e806ef8554aab59465d91cdb4"
+    },
+    "L0/INVARIANT_76/TL_MINUS_HOME_AWAY": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190397,
+      "seed_offset": 10208,
+      "sha256": "05053e5b082d390966cd7f28341625f45d90899d2d7bd1de74c76ec0e5cadd8e"
+    },
+    "L0/INVARIANT_76/TL_MINUS_INITIALIZATION": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190401,
+      "seed_offset": 10212,
+      "sha256": "c4fca0ebd2b75184d16b1297baec1053eef586e8f72ba3ad75d9f6270c997bea"
+    },
+    "L0/INVARIANT_76/TL_MINUS_LATENT": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190396,
+      "seed_offset": 10207,
+      "sha256": "6d2bff131ca634fc2a632a0e6f084fb0996aaab4ea1a586627fe109cdc46cb23"
+    },
+    "L0/INVARIANT_76/TL_MINUS_OPPONENT": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190400,
+      "seed_offset": 10211,
+      "sha256": "44523e57a253307d230e077113c322dec1b81b4ec34cd21c6f7ea4dca0723cae"
+    },
+    "L0/INVARIANT_76/TL_MINUS_REST": {
+      "issue_count": 57,
+      "persistence": "IN_MEMORY_DETERMINISTIC_DERIVATIVE_NOT_COMMITTED",
+      "replicates": 20000,
+      "seed": 190399,
+      "seed_offset": 10210,
+      "sha256": "f1b191b80654fd30bfb269938864be74cd98188ea6347d3138f94d34c749a42b"
+    }
+  },
+  "bootstrap_replicates": 20000,
+  "canonical_outcome_join_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+  "canonical_outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+  "choice_issue_count": 113,
+  "completion_embargo_minutes": 180,
+  "contract": "BJ-HIST-TEAM-MODEL-N7-001",
+  "contribution_row_count": 2646,
+  "frozen_full_surface": true,
+  "frozen_probability_match_count": 1558,
+  "full_stake_per_issue_yuan": 4374.0,
+  "full_ticket_count": 2187,
+  "gate_a_content_identity_sha256": "6a0abe9cb36198dae11a5da06679d22b786cdf49f3619e6e34d7782f29915288",
+  "gate_a_manifest_sha256": "96cbd2565f5d1f837700e476d7a7412225677581b5e4448a4f9bfac4c9220835",
+  "invariant_issue_count": 76,
+  "payout_factor": 0.65,
+  "probability_first_evaluation": true,
+  "probability_frontier_row_count": 98,
+  "probability_settlement_row_count": 21812,
+  "promotion_authority": false,
+  "reliability_bin_row_count": 420,
+  "retuning_permitted": false,
+  "stake_per_ticket_yuan": 2.0,
+  "strict_independent_ev_required_for_positive_claim": true,
+  "tax_line_yuan_per_winning_ticket": 10000.0,
+  "tax_rate": 0.2,
+  "version": "bj180-gate-b-v1"
+}
