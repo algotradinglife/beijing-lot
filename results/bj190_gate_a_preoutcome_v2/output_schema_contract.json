@@ -1,8 +1,15 @@
 {
   "baseline_rule": "do not demote accepted -9.47% ladder unless replacement is proven on required support",
+  "gate_a_exact_identity_sources": {
+    "directional_allocation_catalog": "directional_allocation_input_catalog.csv.gz",
+    "four_arm_ticket_ledgers": "ticket_arm_<arm>.csv.gz",
+    "multiplicity_vector_catalog": "ticket_multiplicity_vector_catalog.csv.gz",
+    "n7_identity_catalog": "n7_identity_catalog.csv.gz",
+    "policy_issue_selection": "policy_issue_selection_freeze_part_XX_of_04.csv.gz (four policy-contiguous shards)"
+  },
   "gate_b_row_keys": [
     "policy_id",
-    "issue_instance",
+    "issue",
     "arm"
   ],
   "matched_support_metrics": [

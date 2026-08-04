@@ -14,28 +14,40 @@ import math
 import os
 import random
 import shutil
+import sqlite3
 import sys
 import tempfile
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Any
 
 
 ISSUE = 190
 CONTRACT = "BJ-HIST-SPARSE-DIVERGENCE-N7-001"
-VERSION = "bj190-gate-a-preoutcome-v1"
+VERSION = "bj190-gate-a-preoutcome-v2"
+PACKAGE_NAME = "bj190_gate_a_preoutcome_v2"
 BASE_MAIN_COMMIT = "7b3c55fd6a490a3e4147b94b7df944535b80b88f"
 FULL_TICKETS = 3**7
 FULL_STAKE_YUAN = 2 * FULL_TICKETS
+SOURCE_ISSUE_INSTANCES = 348
+CANONICAL_ISSUES = 344
+SOURCE_B0_PARTICIPATING_ISSUES = 189
+ELIGIBLE_MATCHES = 102_222
+# Retained only by superseded v1 read helpers; the executable v2 path below
+# binds the full 344-issue / 102,222-match universe instead.
 COHORT_ISSUES = 348
 PARTICIPATING_ISSUES = 189
 CANDIDATE_IDENTITIES = 424
-UNIQUE_MATCHES = 1558
+UNIQUE_MATCHES = 1_558
 SOURCE_DB_SHA256 = "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
-SOURCE_180_CORE_SHA256 = "4d65b08609162644394dfe83e632073ad092b9bfd058dc74368b9ceef4908890"
-SOURCE_180_RUNNER_SHA256 = "f715dfb3ea976cc311fea6aacf79c648fce0209d79b071cd9233e769978994fc"
+SOURCE_180_CORE_SHA256 = (
+    "4d65b08609162644394dfe83e632073ad092b9bfd058dc74368b9ceef4908890"
+)
+SOURCE_180_RUNNER_SHA256 = (
+    "f715dfb3ea976cc311fea6aacf79c648fce0209d79b071cd9233e769978994fc"
+)
 OUTCOME_BOUNDARY = (
     "Gate A outcome-unexposed: target score/result/final-or-winning SP/payout/tax/ROI/"
     "settlement fields are forbidden; historical scores enter the accepted #180 state only "
@@ -148,7 +160,7 @@ def repo_root() -> Path:
 
 
 ROOT = repo_root()
-DEFAULT_OUTPUT = ROOT / "results" / "bj190_gate_a_preoutcome_v1"
+DEFAULT_OUTPUT = ROOT / "results" / PACKAGE_NAME
 DB_REPOSITORY_PATH = Path("data/derived/beidan_xlsm/beidan_xlsm.sqlite")
 
 if str(ROOT / "scripts") not in sys.path:
@@ -159,6 +171,59 @@ try:
 except ModuleNotFoundError:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import bj190_sparse_core as core190  # type: ignore[no-redef]
+
+
+@dataclass(frozen=True, slots=True)
+class IssueSpec:
+    issue: str
+    year: int
+    fold: str
+    issue_instance: str
+    source_issue_instances: tuple[str, ...]
+    cutoff_ts: str
+    eligible_match_count: int
+    b0_status: str
+    b0_portfolio_id: str
+    b0_identity_fingerprint: str
+    b0_match_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class MatchRecord:
+    match_id: str
+    issue: str
+    issue_instance: str
+    match_idx: int
+    kickoff_ts: str
+    year: int
+    league: str
+    line: float | None
+    line_stratum: str
+    min_history_n: int
+    market_breadth: str
+    market_dispersion: str
+    market_uncertainty: float
+    fundamental_p: tuple[float, float, float]
+    calibrated_p: tuple[float, float, float]
+    consensus_p: tuple[float, float, float]
+    fundamental_delta: tuple[float, float, float]
+    calibrated_delta: tuple[float, float, float]
+    fundamental_z: tuple[float, float, float]
+    calibrated_z: tuple[float, float, float]
+    t1_expected_margin: float
+    line_residual_mu: float
+    line_residual_z: float
+
+
+@dataclass(frozen=True, slots=True)
+class DetectorMetric:
+    record: MatchRecord
+    magnitude: float
+    abs_z: float
+    favored_code: str
+    omitted_code: str
+    estimator_source: str
+    allocation_p: tuple[float, float, float]
 
 
 def sha256_file(path: Path) -> str:
@@ -303,9 +368,15 @@ def verify_sources() -> list[dict[str, object]]:
                 "outcome_boundary": OUTCOME_BOUNDARY,
             }
         )
-    if sha256_file(ROOT / "scripts" / "bj180_team_matchup_core.py") != SOURCE_180_CORE_SHA256:
+    if (
+        sha256_file(ROOT / "scripts" / "bj180_team_matchup_core.py")
+        != SOURCE_180_CORE_SHA256
+    ):
         raise RuntimeError("accepted #180 core hash drift")
-    if sha256_file(ROOT / "scripts" / "freeze_bj180_team_matchup_gate_a.py") != SOURCE_180_RUNNER_SHA256:
+    if (
+        sha256_file(ROOT / "scripts" / "freeze_bj180_team_matchup_gate_a.py")
+        != SOURCE_180_RUNNER_SHA256
+    ):
         raise RuntimeError("accepted #180 runner hash drift")
     return rows
 
@@ -314,7 +385,9 @@ def verify_external_86_if_present() -> None:
     candidates = [
         ROOT / "results",
         ROOT.parent.parent / "results",
-        Path("/home/drwho1985/workspace/soccer/beijing-lot/.worktrees/strategy/results"),
+        Path(
+            "/home/drwho1985/workspace/soccer/beijing-lot/.worktrees/strategy/results"
+        ),
     ]
     for base in candidates:
         gate_a = base / str(SOURCE_86["gate_a_package"]) / "SHA256SUMS.json"
@@ -327,7 +400,11 @@ def verify_external_86_if_present() -> None:
             return
 
 
-def canonical_role_by_match(rows: Sequence[Mapping[str, str]]) -> dict[str, Mapping[str, str]]:
+# Superseded v1 read/replay helpers remain only to explain the rejected artifact's
+# provenance.  atomic_generate() cannot call any `_superseded_v1_*` function.
+def _superseded_v1_canonical_role_by_match(
+    rows: Sequence[Mapping[str, str]],
+) -> dict[str, Mapping[str, str]]:
     fields = (
         "p_model3",
         "p_model1",
@@ -343,7 +420,9 @@ def canonical_role_by_match(rows: Sequence[Mapping[str, str]]) -> dict[str, Mapp
     output: dict[str, Mapping[str, str]] = {}
     for row in rows:
         match_id = row["match_id"]
-        if match_id in output and any(output[match_id][field] != row[field] for field in fields):
+        if match_id in output and any(
+            output[match_id][field] != row[field] for field in fields
+        ):
             raise RuntimeError(f"role-vector probability drift: {match_id}")
         output.setdefault(match_id, row)
     if len(output) != UNIQUE_MATCHES:
@@ -351,16 +430,24 @@ def canonical_role_by_match(rows: Sequence[Mapping[str, str]]) -> dict[str, Mapp
     return output
 
 
-def predicted_prices(role: Mapping[str, str]) -> tuple[float, float, float]:
+def _superseded_v1_predicted_prices(
+    role: Mapping[str, str],
+) -> tuple[float, float, float]:
     probability = [float(role[f"p_model{code}"]) for code in CODE_ORDER]
     q = [float(role["e_sp"]) * float(role[f"q_weight{code}"]) for code in CODE_ORDER]
     return tuple(q[index] / probability[index] for index in range(3))  # type: ignore[return-value]
 
 
 def code_features(delta: Mapping[str, float]) -> dict[str, object]:
-    favored = min(CODE_ORDER, key=lambda code: (-float(delta[code]), CODE_ORDER.index(code)))
-    omitted = min(CODE_ORDER, key=lambda code: (float(delta[code]), CODE_ORDER.index(code)))
-    extreme = min(CODE_ORDER, key=lambda code: (-abs(float(delta[code])), CODE_ORDER.index(code)))
+    favored = min(
+        CODE_ORDER, key=lambda code: (-float(delta[code]), CODE_ORDER.index(code))
+    )
+    omitted = min(
+        CODE_ORDER, key=lambda code: (float(delta[code]), CODE_ORDER.index(code))
+    )
+    extreme = min(
+        CODE_ORDER, key=lambda code: (-abs(float(delta[code])), CODE_ORDER.index(code))
+    )
     return {
         "favored_code": favored,
         "omitted_code": omitted,
@@ -375,6 +462,8 @@ def dispersion_se(bucket: str) -> float:
 
 
 def line_stratum(value: object) -> str:
+    if value in (None, ""):
+        return "OTHER"
     number = float(value)
     rounded = round(number)
     if abs(number - rounded) <= 1e-9 and rounded in {-2, -1, 0, 1, 2}:
@@ -382,7 +471,541 @@ def line_stratum(value: object) -> str:
     return "OTHER"
 
 
-def build_latent_and_estimator_freeze(
+def ro_connection(database: Path) -> sqlite3.Connection:
+    connection = sqlite3.connect(f"file:{database}?mode=ro&immutable=1", uri=True)
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA query_only=ON")
+    return connection
+
+
+def build_canonical_issue_specs(
+    database: Path,
+    source: Mapping[str, object],
+) -> tuple[list[IssueSpec], dict[str, int]]:
+    selections = [
+        row
+        for row in source["selection"]  # type: ignore[index]
+        if row["arm"] == "B0_BEST_FULL"
+    ]
+    roles = list(source["roles"])  # type: ignore[arg-type]
+    if len(selections) != SOURCE_ISSUE_INSTANCES:
+        raise RuntimeError("source issue-instance denominator drift")
+    by_issue: dict[str, list[Mapping[str, str]]] = defaultdict(list)
+    for row in selections:
+        by_issue[str(row["issue"])].append(row)
+    if len(by_issue) != CANONICAL_ISSUES:
+        raise RuntimeError("canonical numeric issue denominator drift")
+
+    roles_by_identity: dict[tuple[str, str], list[Mapping[str, str]]] = defaultdict(
+        list
+    )
+    for row in roles:
+        roles_by_identity[(row["issue_instance"], row["portfolio_id"])].append(row)
+
+    issue_ids = sorted(by_issue, key=lambda value: int(value))
+    placeholders = ",".join("?" for _ in issue_ids)
+    query = f"""
+        SELECT CAST(m.issue AS TEXT) AS issue,
+               MIN(m.kickoff_ts) AS cutoff_ts,
+               COUNT(*) AS eligible_match_count
+          FROM matches m
+          JOIN market_consensus e1
+            ON e1.match_id=m.match_id
+           AND e1.market='euro_1x2'
+           AND e1.snapshot='1h'
+         WHERE m.issue IN ({placeholders})
+           AND m.kickoff_ts IS NOT NULL
+           AND m.home_team_id IS NOT NULL
+           AND m.away_team_id IS NOT NULL
+           AND e1.n_complete > 0
+           AND e1.v1_avg > 1 AND e1.v2_avg > 1 AND e1.v3_avg > 1
+         GROUP BY m.issue
+         ORDER BY CAST(m.issue AS INTEGER)
+    """
+    connection = ro_connection(database)
+    try:
+        census = {
+            str(row["issue"]): row for row in connection.execute(query, issue_ids)
+        }
+        line_query = f"""
+            SELECT m.handicap_line_norm, COUNT(*) AS n
+              FROM matches m
+              JOIN market_consensus e1
+                ON e1.match_id=m.match_id
+               AND e1.market='euro_1x2'
+               AND e1.snapshot='1h'
+             WHERE m.issue IN ({placeholders})
+               AND m.kickoff_ts IS NOT NULL
+               AND m.home_team_id IS NOT NULL
+               AND m.away_team_id IS NOT NULL
+               AND e1.n_complete > 0
+               AND e1.v1_avg > 1 AND e1.v2_avg > 1 AND e1.v3_avg > 1
+             GROUP BY m.handicap_line_norm
+        """
+        line_counts = {
+            "MISSING" if row[0] is None else compact(float(row[0])): int(row[1])
+            for row in connection.execute(line_query, issue_ids)
+        }
+    finally:
+        connection.close()
+    if set(census) != set(issue_ids):
+        raise RuntimeError("eligible full-issue census coverage drift")
+    if (
+        sum(int(row["eligible_match_count"]) for row in census.values())
+        != ELIGIBLE_MATCHES
+    ):
+        raise RuntimeError("eligible full-issue match denominator drift")
+    if min(int(row["eligible_match_count"]) for row in census.values()) < 7:
+        raise RuntimeError("full issue has fewer than seven target-safe matches")
+    expected_lines = {
+        "-2.000000000000": 4_877,
+        "-1.000000000000": 24_561,
+        "0.000000000000": 61_275,
+        "1.000000000000": 9_357,
+        "2.000000000000": 1_467,
+    }
+    if any(line_counts.get(key) != value for key, value in expected_lines.items()):
+        raise RuntimeError(f"native line census drift: {line_counts}")
+
+    output: list[IssueSpec] = []
+    participating = 0
+    for issue in issue_ids:
+        source_rows = by_issue[issue]
+        selected = [
+            row for row in source_rows if row["policy_status"] == "SELECTED_PREOUTCOME"
+        ]
+        if len(selected) > 1:
+            raise RuntimeError(f"ambiguous inherited B0 comparator: {issue}")
+        canonical_year = max(int(row["year"]) for row in source_rows)
+        if selected:
+            participating += 1
+            row = selected[0]
+            key = (row["issue_instance"], row["selected_portfolio_id"])
+            frozen_roles = sorted(
+                roles_by_identity[key], key=lambda value: int(value["selection_rank"])
+            )
+            if len(frozen_roles) != 7:
+                raise RuntimeError(f"B0 role-count drift: {issue}")
+            b0_match_ids = tuple(str(role["match_id"]) for role in frozen_roles)
+            status = "SELECTED_PREOUTCOME"
+            portfolio = str(row["selected_portfolio_id"])
+            fingerprint = str(row["selected_identity_fingerprint"])
+        else:
+            b0_match_ids = ()
+            status = "NO_BET_FROZEN"
+            portfolio = ""
+            fingerprint = ""
+        output.append(
+            IssueSpec(
+                issue=issue,
+                year=canonical_year,
+                fold=f"OOS_{canonical_year}",
+                issue_instance=f"{issue}@CANONICAL_{canonical_year}",
+                source_issue_instances=tuple(
+                    sorted(str(row["issue_instance"]) for row in source_rows)
+                ),
+                cutoff_ts=str(census[issue]["cutoff_ts"]),
+                eligible_match_count=int(census[issue]["eligible_match_count"]),
+                b0_status=status,
+                b0_portfolio_id=portfolio,
+                b0_identity_fingerprint=fingerprint,
+                b0_match_ids=b0_match_ids,
+            )
+        )
+    if participating != SOURCE_B0_PARTICIPATING_ISSUES:
+        raise RuntimeError("B0 comparator participation drift")
+    output.sort(key=lambda row: (row.cutoff_ts, int(row.issue)))
+    return output, line_counts
+
+
+def iter_eligible_issue_targets(
+    database: Path,
+    issue: IssueSpec,
+    runner179: ModuleType,
+) -> Iterator[dict[str, object]]:
+    query = f"""
+        SELECT m.match_id, CAST(m.issue AS TEXT) AS issue, m.match_idx,
+               m.kickoff_ts, m.league, m.home_team_id, m.away_team_id,
+               m.handicap_line_norm,
+               {runner179.market_select()}
+          FROM matches m
+          JOIN match_features mf ON mf.match_id=m.match_id
+          {runner179.market_joins()}
+         WHERE m.issue=?
+           AND m.kickoff_ts IS NOT NULL
+           AND m.home_team_id IS NOT NULL
+           AND m.away_team_id IS NOT NULL
+           AND e1.n_complete > 0
+           AND e1.v1_avg > 1 AND e1.v2_avg > 1 AND e1.v3_avg > 1
+         ORDER BY m.match_idx, m.match_id
+    """
+    connection = ro_connection(database)
+    try:
+        count = 0
+        for row in connection.execute(query, (issue.issue,)):
+            target = dict(row)
+            target["year"] = issue.year
+            target["issue_instance"] = issue.issue_instance
+            count += 1
+            yield target
+    finally:
+        connection.close()
+    if count != issue.eligible_match_count:
+        raise RuntimeError(f"eligible issue row-count drift: {issue.issue}")
+
+
+def build_full_estimator_freeze(
+    database: Path,
+    issues: Sequence[IssueSpec],
+    latent_output: Path,
+    estimator_output: Path,
+) -> tuple[dict[str, tuple[MatchRecord, ...]], dict[str, object]]:
+    runner180 = load_module(
+        "bj190_v2_accepted_180_runner",
+        ROOT / "scripts" / "freeze_bj180_team_matchup_gate_a.py",
+    )
+    accepted180 = runner180.load_core()
+    runner179 = load_module(
+        "bj190_v2_accepted_179_runner",
+        ROOT / "scripts" / "freeze_bj179_hierarchical_league_gate_a.py",
+    )
+    accepted179 = runner179.load_core()
+    years = sorted({issue.year for issue in issues})
+    market_models = runner179.fit_outer_year_models(database, years, accepted179)
+
+    state = accepted180.TeamMatchupState()
+    maximum_cutoff = max(issue.cutoff_ts for issue in issues)
+    history = iter(runner180.historical_rows(database, maximum_cutoff))
+    pending = next(history, None)
+    latent_sink = GzipRowSink(latent_output)
+    estimator_sink = GzipRowSink(estimator_output)
+    pools: dict[str, tuple[MatchRecord, ...]] = {}
+    universe_digest = hashlib.sha256()
+    max_reconciliation_error = 0.0
+    sign_proxy_disagreement_count = 0
+    line_counts: Counter[str] = Counter()
+
+    for issue in issues:
+        cutoff = accepted180.parse_ts(issue.cutoff_ts)
+        while pending is not None and runner180.history_row_is_available(
+            accepted180.parse_ts(pending["kickoff_ts"]), cutoff
+        ):
+            state.update(pending)
+            pending = next(history, None)
+        state_summary = state.summary()
+        market_model = market_models[issue.year]
+        records: list[MatchRecord] = []
+        for target in iter_eligible_issue_targets(database, issue, runner179):
+            if FORBIDDEN_TARGET_FIELDS.intersection(target):
+                raise RuntimeError("full-universe target projection exposes outcome")
+            families, diagnostics, captured = core190.capture_family_latents(
+                state, target, cutoff, accepted180
+            )
+            family_distributions: dict[str, dict[int, float]] = {}
+            component_errors: dict[str, float] = {}
+            component_lambdas: dict[str, dict[str, float]] = {}
+            handicap = float(target["handicap_line_norm"] or 0.0)
+            for family in core190.FAMILY_ORDER:
+                raw_home, raw_away, captured_handicap, max_goals = captured[family]
+                effective_home = min(6.0, max(0.08, raw_home))
+                effective_away = min(6.0, max(0.08, raw_away))
+                prior = core190.poisson_difference_distribution(
+                    effective_home, effective_away, max_goals=max_goals
+                )
+                distribution = (
+                    core190.h2h_difference_distribution(state, target, prior)
+                    if family == "H2H_PRIOR"
+                    else prior
+                )
+                mapped = core190.mapped_probabilities(distribution, captured_handicap)
+                component_errors[family] = core190.probability_reconciliation_error(
+                    mapped, families[family]
+                )
+                family_distributions[family] = distribution
+                component_lambdas[family] = {
+                    "home": effective_home,
+                    "away": effective_away,
+                }
+            primary_weights = accepted180.CONFIGURATIONS[accepted180.PRIMARY_CONFIG][
+                "weights"
+            ]
+            fundamental = accepted180.log_pool(families, primary_weights)
+            t1_distribution = core190.group_mass_calibrated_distribution(
+                family_distributions, primary_weights, fundamental, handicap
+            )
+            mapped_fundamental = core190.mapped_probabilities(t1_distribution, handicap)
+            reconciliation_error = core190.probability_reconciliation_error(
+                mapped_fundamental, fundamental
+            )
+            max_reconciliation_error = max(
+                max_reconciliation_error,
+                reconciliation_error,
+                max(component_errors.values()),
+            )
+            if max_reconciliation_error > core190.RECONCILIATION_TOLERANCE:
+                raise RuntimeError("T1 score-distribution reconciliation drift")
+            t1_expected_margin = core190.expected_margin(t1_distribution)
+            weighted_home, weighted_away = core190.weighted_family_intensities(
+                captured, primary_weights
+            )
+            weighted_margin_proxy = weighted_home - weighted_away
+            sign_proxy_disagreement_count += int(
+                t1_expected_margin * weighted_margin_proxy < 0
+            )
+            variance = math.fsum(
+                (difference - t1_expected_margin) ** 2 * probability
+                for difference, probability in t1_distribution.items()
+            )
+            margin_uncertainty = math.sqrt(
+                variance / (int(diagnostics["min_history_n"]) + 12.0)
+            )
+            raw_line = target["handicap_line_norm"]
+            line = None if raw_line in (None, "") else float(raw_line)
+            residual = math.nan if line is None else t1_expected_margin + line
+            residual_z = (
+                math.nan if line is None else residual / max(1e-12, margin_uncertainty)
+            )
+
+            euro = accepted179.no_vig(
+                [target[f"euro_1h_v{index}"] for index in (1, 2, 3)]
+            )
+            if euro is None:
+                raise RuntimeError("target-safe EURO consensus unexpectedly missing")
+            market_families = market_model.family_vectors(target, euro)
+            consensus = market_families["EURO_CALIBRATION"]
+            calibrated = market_model.probabilities(target, euro)
+            signature = accepted179.market_signature(target)
+            market_uncertainty = dispersion_se(signature["dispersion"])
+            history_n = int(diagnostics["min_history_n"])
+            market_n = int(market_model.training_rows)
+            fund_delta = tuple(
+                fundamental[index] - consensus[index] for index in range(3)
+            )
+            calibrated_delta = tuple(
+                calibrated[index] - consensus[index] for index in range(3)
+            )
+            fundamental_z = tuple(
+                fund_delta[index]
+                / math.hypot(
+                    math.sqrt(
+                        fundamental[index]
+                        * (1.0 - fundamental[index])
+                        / (history_n + 12.0)
+                    ),
+                    market_uncertainty,
+                )
+                for index in range(3)
+            )
+            calibrated_z = tuple(
+                calibrated_delta[index]
+                / math.hypot(
+                    math.sqrt(
+                        calibrated[index]
+                        * (1.0 - calibrated[index])
+                        / (market_n + 24.0)
+                    ),
+                    market_uncertainty,
+                )
+                for index in range(3)
+            )
+            stratum = line_stratum(line)
+            line_counts[stratum] += 1
+            match_id = str(target["match_id"])
+            record = MatchRecord(
+                match_id=match_id,
+                issue=issue.issue,
+                issue_instance=issue.issue_instance,
+                match_idx=int(target["match_idx"]),
+                kickoff_ts=str(target["kickoff_ts"]),
+                year=issue.year,
+                league=str(target["league"] or "__UNKNOWN__"),
+                line=line,
+                line_stratum=stratum,
+                min_history_n=history_n,
+                market_breadth=signature["breadth"],
+                market_dispersion=signature["dispersion"],
+                market_uncertainty=market_uncertainty,
+                fundamental_p=tuple(fundamental),
+                calibrated_p=tuple(calibrated),
+                consensus_p=tuple(consensus),
+                fundamental_delta=fund_delta,
+                calibrated_delta=calibrated_delta,
+                fundamental_z=fundamental_z,
+                calibrated_z=calibrated_z,
+                t1_expected_margin=t1_expected_margin,
+                line_residual_mu=residual,
+                line_residual_z=residual_z,
+            )
+            records.append(record)
+            universe_digest.update(
+                core190.canonical_json(
+                    {
+                        "issue": issue.issue,
+                        "match_id": match_id,
+                        "match_idx": record.match_idx,
+                        "kickoff_ts": record.kickoff_ts,
+                        "line": compact(line) if line is not None else "",
+                    }
+                )
+            )
+            universe_digest.update(b"\n")
+            score_identity = core190.canonical_hash(
+                {
+                    "estimator": "T1_DEEP_TEAM_COHERENT_SCORE_DISTRIBUTION",
+                    "distribution": core190.distribution_payload(t1_distribution),
+                    "p": [compact(value) for value in fundamental],
+                    "expected_margin": compact(t1_expected_margin),
+                }
+            )
+            latent_sink.emit(
+                {
+                    "match_id": match_id,
+                    "issue": issue.issue,
+                    "issue_instance": issue.issue_instance,
+                    "feature_cutoff_ts": issue.cutoff_ts,
+                    "estimator_identity_sha256": score_identity,
+                    "component_effective_lambdas_json": core190.canonical_json(
+                        component_lambdas
+                    ).decode(),
+                    "component_max_abs_reconciliation_error": compact(
+                        max(component_errors.values())
+                    ),
+                    "t1_score_difference_distribution_json": core190.canonical_json(
+                        core190.distribution_payload(t1_distribution)
+                    ).decode(),
+                    "t1_mapped_p3": compact(mapped_fundamental[0]),
+                    "t1_mapped_p1": compact(mapped_fundamental[1]),
+                    "t1_mapped_p0": compact(mapped_fundamental[2]),
+                    "t1_accepted_p3": compact(fundamental[0]),
+                    "t1_accepted_p1": compact(fundamental[1]),
+                    "t1_accepted_p0": compact(fundamental[2]),
+                    "t1_expected_raw_margin_from_same_distribution": compact(
+                        t1_expected_margin
+                    ),
+                    "weighted_component_lambda_home_proxy": compact(weighted_home),
+                    "weighted_component_lambda_away_proxy": compact(weighted_away),
+                    "weighted_component_margin_proxy_diagnostic": compact(
+                        weighted_margin_proxy
+                    ),
+                    "weighted_proxy_controls_direction": 0,
+                    "handicap_line_norm": compact(line) if line is not None else "",
+                    "line_residual_mu": compact(residual)
+                    if math.isfinite(residual)
+                    else "",
+                    "max_goals_inclusive": core190.MAX_GOALS,
+                    "tail_policy": "Poisson components exclude joint cells where either score exceeds 12 and normalize retained mass; H2H empirical differences outside [-12,12] clamp to the same-code edge; T1 within-code shape is reconciled to accepted p3/p1/p0",
+                    "max_abs_reconciliation_error": compact(reconciliation_error),
+                    "reconciliation_status": "PASS",
+                    "outcome_boundary": OUTCOME_BOUNDARY,
+                }
+            )
+            estimator_sink.emit(
+                {
+                    "match_id": match_id,
+                    "issue": issue.issue,
+                    "issue_instance": issue.issue_instance,
+                    "year": issue.year,
+                    "fold": issue.fold,
+                    "match_idx": record.match_idx,
+                    "kickoff_ts": record.kickoff_ts,
+                    "feature_cutoff_ts": issue.cutoff_ts,
+                    "league": record.league,
+                    "home_team_id": target["home_team_id"],
+                    "away_team_id": target["away_team_id"],
+                    "native_handicap_line": compact(line) if line is not None else "",
+                    "line_stratum": stratum,
+                    "history_training_rows": state_summary["training_rows"],
+                    "min_history_n": history_n,
+                    "market_signature_breadth": record.market_breadth,
+                    "market_signature_dispersion": record.market_dispersion,
+                    "market_uncertainty_proxy": compact(market_uncertainty),
+                    "target_safe_consensus_status": "AVAILABLE",
+                    "target_safe_consensus_identity_sha256": core190.canonical_hash(
+                        {
+                            "match_id": match_id,
+                            "euro_1h": [
+                                compact(float(target[f"euro_1h_v{index}"]))
+                                for index in (1, 2, 3)
+                            ],
+                            "consensus": [compact(value) for value in consensus],
+                        }
+                    ),
+                    "euro_1h_odds3": compact(float(target["euro_1h_v1"])),
+                    "euro_1h_odds1": compact(float(target["euro_1h_v2"])),
+                    "euro_1h_odds0": compact(float(target["euro_1h_v3"])),
+                    **{
+                        f"consensus_p{code}": compact(consensus[index])
+                        for index, code in enumerate(CODE_ORDER)
+                    },
+                    **{
+                        f"fundamental_p{code}": compact(fundamental[index])
+                        for index, code in enumerate(CODE_ORDER)
+                    },
+                    **{
+                        f"calibrated_p{code}": compact(calibrated[index])
+                        for index, code in enumerate(CODE_ORDER)
+                    },
+                    **{
+                        f"fundamental_delta_p{code}": compact(fund_delta[index])
+                        for index, code in enumerate(CODE_ORDER)
+                    },
+                    **{
+                        f"calibrated_delta_p{code}": compact(calibrated_delta[index])
+                        for index, code in enumerate(CODE_ORDER)
+                    },
+                    **{
+                        f"fundamental_z{code}": compact(fundamental_z[index])
+                        for index, code in enumerate(CODE_ORDER)
+                    },
+                    **{
+                        f"calibrated_z{code}": compact(calibrated_z[index])
+                        for index, code in enumerate(CODE_ORDER)
+                    },
+                    "t1_score_estimator_identity_sha256": score_identity,
+                    "t1_expected_raw_margin_from_same_distribution": compact(
+                        t1_expected_margin
+                    ),
+                    "weighted_component_margin_proxy_diagnostic": compact(
+                        weighted_margin_proxy
+                    ),
+                    "weighted_proxy_controls_direction": 0,
+                    "line_residual_mu": compact(residual)
+                    if math.isfinite(residual)
+                    else "",
+                    "line_residual_z": compact(residual_z)
+                    if math.isfinite(residual_z)
+                    else "",
+                    "line_residual_status": "AVAILABLE"
+                    if line is not None
+                    else "UNAVAILABLE_NATIVE_LINE_MISSING",
+                    "delta_mu": "",
+                    "delta_mu_status": "UNAVAILABLE_MARKET_3WAY_DOES_NOT_IDENTIFY_RAW_MARGIN",
+                    "fundamental_expected_margin_method": "T1_SCORE_DISTRIBUTION_MEAN_SAME_IDENTITY_AS_P_VECTOR",
+                    "consensus_mapping": "#179 EURO_CALIBRATION_NATIVE_LINE_ALIGNED_FROM_TARGET_SAFE_1H_EURO",
+                    "outcome_boundary": OUTCOME_BOUNDARY,
+                }
+            )
+        if len(records) != issue.eligible_match_count:
+            raise RuntimeError(f"issue estimator count drift: {issue.issue}")
+        pools[issue.issue] = tuple(records)
+    latent_sink.close()
+    estimator_sink.close()
+    expected_match_count = sum(issue.eligible_match_count for issue in issues)
+    if (
+        latent_sink.count != expected_match_count
+        or estimator_sink.count != expected_match_count
+    ):
+        raise RuntimeError("full estimator freeze denominator drift")
+    return pools, {
+        "eligible_match_count": expected_match_count,
+        "universe_identity_sha256": universe_digest.hexdigest(),
+        "max_abs_reconciliation_error": max_reconciliation_error,
+        "weighted_proxy_sign_disagreement_count": sign_proxy_disagreement_count,
+        "line_strata": dict(sorted(line_counts.items())),
+    }
+
+
+def _superseded_v1_build_latent_and_estimator_freeze(
     database: Path,
 ) -> tuple[
     list[dict[str, object]],
@@ -407,16 +1030,22 @@ def build_latent_and_estimator_freeze(
     accepted180 = {
         row["match_id"]: row
         for row in read_gzip(
-            ROOT / "results" / "bj180_gate_a_preoutcome_v2" / "match_probability_freeze.csv.gz"
+            ROOT
+            / "results"
+            / "bj180_gate_a_preoutcome_v2"
+            / "match_probability_freeze.csv.gz"
         )
     }
     accepted179 = {
         row["match_id"]: row
         for row in read_gzip(
-            ROOT / "results" / "bj179_gate_a_preoutcome_v2" / "match_probability_freeze.csv.gz"
+            ROOT
+            / "results"
+            / "bj179_gate_a_preoutcome_v2"
+            / "match_probability_freeze.csv.gz"
         )
     }
-    canonical_roles = canonical_role_by_match(roles)
+    canonical_roles = _superseded_v1_canonical_role_by_match(roles)
     if not (
         len(accepted180)
         == len(accepted179)
@@ -431,7 +1060,9 @@ def build_latent_and_estimator_freeze(
         targets_by_cutoff[cutoff].append(match_id)
     state = accepted_core.TeamMatchupState()
     maximum_cutoff = max(targets_by_cutoff)
-    history = iter(runner180.historical_rows(database, maximum_cutoff.isoformat(sep=" ")))
+    history = iter(
+        runner180.historical_rows(database, maximum_cutoff.isoformat(sep=" "))
+    )
     pending = next(history, None)
     latent_rows: list[dict[str, object]] = []
     estimator_rows: list[dict[str, object]] = []
@@ -449,7 +1080,9 @@ def build_latent_and_estimator_freeze(
             market_row = accepted179[str(match_id)]
             role = canonical_roles[str(match_id)]
             if FORBIDDEN_TARGET_FIELDS.intersection(target):
-                raise RuntimeError(f"target projection exposes forbidden field: {match_id}")
+                raise RuntimeError(
+                    f"target projection exposes forbidden field: {match_id}"
+                )
 
             families, diagnostics, captured = core190.capture_family_latents(
                 state, target, cutoff, accepted_core
@@ -528,9 +1161,7 @@ def build_latent_and_estimator_freeze(
                 captured, t1_weights
             )
             raw_expected_margin = t1_lambda_home - t1_lambda_away
-            line_residual_mu = raw_expected_margin + float(
-                target["handicap_line_norm"]
-            )
+            line_residual_mu = raw_expected_margin + float(target["handicap_line_norm"])
             component_margins = {
                 family: min(6.0, max(0.08, float(captured[family][0])))
                 - min(6.0, max(0.08, float(captured[family][1])))
@@ -615,7 +1246,7 @@ def build_latent_and_estimator_freeze(
             price_values: tuple[float, float, float] | None = None
             consensus: dict[str, float] | None = None
             if price_complete:
-                price_values = predicted_prices(role)
+                price_values = _superseded_v1_predicted_prices(role)
                 consensus_vector = core190.no_vig_from_prices(price_values)
                 consensus = dict(zip(CODE_ORDER, consensus_vector, strict=True))
             fund_delta = (
@@ -636,17 +1267,25 @@ def build_latent_and_estimator_freeze(
             if consensus and fund_delta and calibrated_delta:
                 for code in CODE_ORDER:
                     fund_model_se = math.sqrt(
-                        fundamental[code] * (1.0 - fundamental[code]) / (history_n + 12.0)
+                        fundamental[code]
+                        * (1.0 - fundamental[code])
+                        / (history_n + 12.0)
                     )
                     calibrated_model_se = math.sqrt(
-                        calibrated[code] * (1.0 - calibrated[code]) / (training_n + 24.0)
+                        calibrated[code]
+                        * (1.0 - calibrated[code])
+                        / (training_n + 24.0)
                     )
-                    fund_z[code] = fund_delta[code] / math.hypot(fund_model_se, market_se)
+                    fund_z[code] = fund_delta[code] / math.hypot(
+                        fund_model_se, market_se
+                    )
                     calibrated_z[code] = calibrated_delta[code] / math.hypot(
                         calibrated_model_se, market_se
                     )
             fund_features = code_features(fund_delta) if fund_delta else {}
-            calibrated_features = code_features(calibrated_delta) if calibrated_delta else {}
+            calibrated_features = (
+                code_features(calibrated_delta) if calibrated_delta else {}
+            )
             price_identity = (
                 core190.canonical_hash(
                     {
@@ -672,14 +1311,20 @@ def build_latent_and_estimator_freeze(
                     "league": target["league"],
                     "home_team_id": target["home_team_id"],
                     "away_team_id": target["away_team_id"],
-                    "native_handicap_line": compact(float(target["handicap_line_norm"])),
+                    "native_handicap_line": compact(
+                        float(target["handicap_line_norm"])
+                    ),
                     "line_stratum": line_stratum(target["handicap_line_norm"]),
                     "history_training_rows": summary["training_rows"],
                     "min_history_n": history_n,
                     "market_signature_breadth": market_row["market_signature_breadth"],
-                    "market_signature_dispersion": market_row["market_signature_dispersion"],
+                    "market_signature_dispersion": market_row[
+                        "market_signature_dispersion"
+                    ],
                     "market_uncertainty_proxy": compact(market_se),
-                    "target_safe_price_status": "AVAILABLE" if consensus else "UNAVAILABLE",
+                    "target_safe_price_status": "AVAILABLE"
+                    if consensus
+                    else "UNAVAILABLE",
                     "target_safe_price_unavailable_reason": ""
                     if consensus
                     else "FROZEN_BJ_PREDICTED_SP_SOURCE_INCOMPLETE",
@@ -688,13 +1333,23 @@ def build_latent_and_estimator_freeze(
                     "predicted_sp1": compact(price_values[1]) if price_values else "",
                     "predicted_sp0": compact(price_values[2]) if price_values else "",
                     **{
-                        f"consensus_p{code}": compact(consensus[code]) if consensus else ""
+                        f"consensus_p{code}": compact(consensus[code])
+                        if consensus
+                        else ""
                         for code in CODE_ORDER
                     },
-                    **{f"fundamental_p{code}": compact(fundamental[code]) for code in CODE_ORDER},
-                    **{f"calibrated_p{code}": compact(calibrated[code]) for code in CODE_ORDER},
                     **{
-                        f"fundamental_delta_p{code}": compact(fund_delta[code]) if fund_delta else ""
+                        f"fundamental_p{code}": compact(fundamental[code])
+                        for code in CODE_ORDER
+                    },
+                    **{
+                        f"calibrated_p{code}": compact(calibrated[code])
+                        for code in CODE_ORDER
+                    },
+                    **{
+                        f"fundamental_delta_p{code}": compact(fund_delta[code])
+                        if fund_delta
+                        else ""
                         for code in CODE_ORDER
                     },
                     **{
@@ -725,15 +1380,28 @@ def build_latent_and_estimator_freeze(
                     )
                     if fund_z
                     else "",
-                    "calibrated_favored_code": calibrated_features.get("favored_code", ""),
-                    "calibrated_omitted_code": calibrated_features.get("omitted_code", ""),
-                    "calibrated_extreme_code": calibrated_features.get("extreme_code", ""),
-                    "calibrated_extreme_sign": calibrated_features.get("extreme_sign", ""),
-                    "calibrated_abs_delta_p": compact(calibrated_features.get("magnitude"))
+                    "calibrated_favored_code": calibrated_features.get(
+                        "favored_code", ""
+                    ),
+                    "calibrated_omitted_code": calibrated_features.get(
+                        "omitted_code", ""
+                    ),
+                    "calibrated_extreme_code": calibrated_features.get(
+                        "extreme_code", ""
+                    ),
+                    "calibrated_extreme_sign": calibrated_features.get(
+                        "extreme_sign", ""
+                    ),
+                    "calibrated_abs_delta_p": compact(
+                        calibrated_features.get("magnitude")
+                    )
                     if calibrated_features
                     else "",
                     "calibrated_abs_z": compact(
-                        max((abs(value) for value in calibrated_z.values()), default=math.nan)
+                        max(
+                            (abs(value) for value in calibrated_z.values()),
+                            default=math.nan,
+                        )
                     )
                     if calibrated_z
                     else "",
@@ -747,9 +1415,7 @@ def build_latent_and_estimator_freeze(
                     if line_residual_mu < -1e-15
                     else "ON_LINE",
                     "abs_line_residual_mu": compact(abs(line_residual_mu)),
-                    "fundamental_margin_uncertainty_proxy": compact(
-                        margin_uncertainty
-                    ),
+                    "fundamental_margin_uncertainty_proxy": compact(margin_uncertainty),
                     "line_residual_z": compact(line_residual_z),
                     "consensus_expected_raw_margin": "",
                     "delta_mu": "",
@@ -766,7 +1432,10 @@ def build_latent_and_estimator_freeze(
         raise RuntimeError(f"estimator denominator drift: {len(estimator_rows)}")
     if len(latent_rows) != UNIQUE_MATCHES * (len(core190.FAMILY_ORDER) + 1):
         raise RuntimeError(f"latent denominator drift: {len(latent_rows)}")
-    if any(float(row["max_abs_reconciliation_error"]) > core190.RECONCILIATION_TOLERANCE for row in latent_rows):
+    if any(
+        float(row["max_abs_reconciliation_error"]) > core190.RECONCILIATION_TOLERANCE
+        for row in latent_rows
+    ):
         raise RuntimeError("latent reconciliation tolerance failure")
     return latent_rows, estimator_rows, roles, candidates, source_selection
 
@@ -833,7 +1502,8 @@ def build_detector_grid() -> list[dict[str, object]]:
                             }
                             rows.append(
                                 {
-                                    "policy_id": "DP_" + core190.canonical_hash(descriptor)[:20],
+                                    "policy_id": "DP_"
+                                    + core190.canonical_hash(descriptor)[:20],
                                     **descriptor,
                                     "abs_delta_mu_min": "",
                                     "abs_line_residual_mu_min": "",
@@ -908,7 +1578,7 @@ def _float(row: Mapping[str, object], field: str) -> float | None:
     return None if value in (None, "") else float(value)
 
 
-def detector_metric(
+def _superseded_v1_detector_metric(
     row: Mapping[str, object], variant: str, detector_family: str
 ) -> dict[str, object] | None:
     if row["target_safe_price_status"] != "AVAILABLE":
@@ -975,23 +1645,21 @@ def detector_metric(
         features["magnitude"] = min(
             float(fundamental["magnitude"]), float(calibrated["magnitude"])
         )
-        features["abs_z"] = min(
-            float(fundamental["abs_z"]), float(calibrated["abs_z"])
-        )
+        features["abs_z"] = min(float(fundamental["abs_z"]), float(calibrated["abs_z"]))
         features["estimator_source"] = "STRICT_MODEL_AGREEMENT_NO_BLEND"
         return features
     raise RuntimeError(f"unknown estimator variant: {variant}")
 
 
-def metric_passes(
-    row: Mapping[str, object], metric: Mapping[str, object], policy: Mapping[str, object]
+def _superseded_v1_metric_passes(
+    row: Mapping[str, object],
+    metric: Mapping[str, object],
+    policy: Mapping[str, object],
 ) -> bool:
     if float(metric["magnitude"]) <= 1e-15:
         return False
     if policy["detector_family"] == "DELTA_P":
-        if float(metric["magnitude"]) + 1e-15 < float(
-            policy["abs_delta_p_min"]
-        ):
+        if float(metric["magnitude"]) + 1e-15 < float(policy["abs_delta_p_min"]):
             return False
     elif policy["detector_family"] == "LINE_RESIDUAL_MU":
         if float(metric["magnitude"]) + 1e-15 < float(
@@ -999,7 +1667,9 @@ def metric_passes(
         ):
             return False
     else:
-        raise RuntimeError(f"unavailable policy reached execution: {policy['policy_id']}")
+        raise RuntimeError(
+            f"unavailable policy reached execution: {policy['policy_id']}"
+        )
     if float(metric["abs_z"]) + 1e-15 < float(policy["abs_z_min"]):
         return False
     if int(row["min_history_n"]) < int(policy["min_history_n"]):
@@ -1009,14 +1679,15 @@ def metric_passes(
         and row["market_signature_breadth"] != "B05_19"
     ):
         return False
-    if policy["uncertainty_gate"] == "MAX_0.12" and float(
-        row["market_uncertainty_proxy"]
-    ) > 0.12:
+    if (
+        policy["uncertainty_gate"] == "MAX_0.12"
+        and float(row["market_uncertainty_proxy"]) > 0.12
+    ):
         return False
     return True
 
 
-def retained_metrics(
+def _superseded_v1_retained_metrics(
     match_ids: Sequence[str],
     estimator_by_match: Mapping[str, Mapping[str, object]],
     policy: Mapping[str, object],
@@ -1024,12 +1695,12 @@ def retained_metrics(
     rows = []
     for match_id in match_ids:
         source = estimator_by_match[match_id]
-        metric = detector_metric(
+        metric = _superseded_v1_detector_metric(
             source,
             str(policy["estimator_variant"]),
             str(policy["detector_family"]),
         )
-        if metric is not None and metric_passes(source, metric, policy):
+        if metric is not None and _superseded_v1_metric_passes(source, metric, policy):
             rows.append({"match_id": match_id, "match_row": source, **metric})
     rows.sort(key=lambda row: (-float(row["magnitude"]), int(row["match_id"])))
     if policy["top_k"] == "ALL":
@@ -1038,7 +1709,778 @@ def retained_metrics(
     return rows[:required] if len(rows) >= required else None
 
 
-def build_candidate_membership(
+def tuple_features(delta: Sequence[float]) -> dict[str, object]:
+    return code_features(
+        {code: float(delta[index]) for index, code in enumerate(CODE_ORDER)}
+    )
+
+
+def metric_for_record(
+    record: MatchRecord,
+    detector_family: str,
+    variant: str,
+) -> DetectorMetric | None:
+    if detector_family == "LINE_RESIDUAL_MU":
+        if (
+            not math.isfinite(record.line_residual_mu)
+            or abs(record.line_residual_mu) <= 1e-15
+        ):
+            return None
+        favored = "3" if record.line_residual_mu > 0 else "0"
+        omitted = "0" if record.line_residual_mu > 0 else "3"
+        return DetectorMetric(
+            record=record,
+            magnitude=abs(record.line_residual_mu),
+            abs_z=abs(record.line_residual_z),
+            favored_code=favored,
+            omitted_code=omitted,
+            estimator_source="FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
+            allocation_p=record.fundamental_p,
+        )
+    if detector_family != "DELTA_P":
+        return None
+
+    fundamental_features = tuple_features(record.fundamental_delta)
+    calibrated_features = tuple_features(record.calibrated_delta)
+    fundamental = DetectorMetric(
+        record=record,
+        magnitude=float(fundamental_features["magnitude"]),
+        abs_z=max(abs(value) for value in record.fundamental_z),
+        favored_code=str(fundamental_features["favored_code"]),
+        omitted_code=str(fundamental_features["omitted_code"]),
+        estimator_source="FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
+        allocation_p=record.fundamental_p,
+    )
+    calibrated = DetectorMetric(
+        record=record,
+        magnitude=float(calibrated_features["magnitude"]),
+        abs_z=max(abs(value) for value in record.calibrated_z),
+        favored_code=str(calibrated_features["favored_code"]),
+        omitted_code=str(calibrated_features["omitted_code"]),
+        estimator_source="CALIBRATED_MARKET_ESTIMATOR",
+        allocation_p=record.calibrated_p,
+    )
+    if variant == "FUNDAMENTAL_INDEPENDENT":
+        return fundamental
+    if variant == "CALIBRATED_MARKET_ESTIMATOR":
+        return calibrated
+    if variant == "UNION":
+        return min(
+            (fundamental, calibrated),
+            key=lambda metric: (
+                -metric.magnitude,
+                0
+                if metric.estimator_source == "FUNDAMENTAL_T1_SCORE_DISTRIBUTION"
+                else 1,
+            ),
+        )
+    if variant == "MODEL_AGREEMENT":
+        if (
+            fundamental.favored_code != calibrated.favored_code
+            or fundamental.omitted_code != calibrated.omitted_code
+        ):
+            return None
+        weaker = min(
+            (fundamental, calibrated),
+            key=lambda metric: (
+                metric.magnitude,
+                0
+                if metric.estimator_source == "FUNDAMENTAL_T1_SCORE_DISTRIBUTION"
+                else 1,
+            ),
+        )
+        return DetectorMetric(
+            record=record,
+            magnitude=min(fundamental.magnitude, calibrated.magnitude),
+            abs_z=min(fundamental.abs_z, calibrated.abs_z),
+            favored_code=weaker.favored_code,
+            omitted_code=weaker.omitted_code,
+            estimator_source=f"STRICT_AGREEMENT_WEAKER::{weaker.estimator_source}",
+            allocation_p=weaker.allocation_p,
+        )
+    raise RuntimeError(f"unknown estimator variant: {variant}")
+
+
+def passes_base_gate(record: MatchRecord, policy: Mapping[str, object]) -> bool:
+    if record.min_history_n < int(policy["min_history_n"]):
+        return False
+    if (
+        policy["coverage_gate"] == "BROAD_MARKET_AND_TARGET_SAFE_PRICE"
+        and record.market_breadth != "B05_19"
+    ):
+        return False
+    if policy["uncertainty_gate"] == "MAX_0.12" and record.market_uncertainty > 0.12:
+        return False
+    return True
+
+
+def metric_passes_threshold(
+    metric: DetectorMetric,
+    policy: Mapping[str, object],
+) -> bool:
+    if metric.magnitude <= 1e-15:
+        return False
+    if policy["detector_family"] == "DELTA_P":
+        if metric.magnitude + 1e-15 < float(policy["abs_delta_p_min"]):
+            return False
+    elif policy["detector_family"] == "LINE_RESIDUAL_MU":
+        if metric.magnitude + 1e-15 < float(policy["abs_line_residual_mu_min"]):
+            return False
+    else:
+        return False
+    return metric.abs_z + 1e-15 >= float(policy["abs_z_min"])
+
+
+def base_metric_key(policy: Mapping[str, object]) -> tuple[object, ...]:
+    return (
+        policy["detector_family"],
+        policy["estimator_variant"],
+        policy["min_history_n"],
+        policy["coverage_gate"],
+        policy["uncertainty_gate"],
+    )
+
+
+def sorted_base_metrics(
+    pool: Sequence[MatchRecord],
+    policy: Mapping[str, object],
+) -> tuple[DetectorMetric, ...]:
+    metrics = []
+    for record in pool:
+        if not passes_base_gate(record, policy):
+            continue
+        metric = metric_for_record(
+            record,
+            str(policy["detector_family"]),
+            str(policy["estimator_variant"]),
+        )
+        if metric is not None:
+            metrics.append(metric)
+    metrics.sort(
+        key=lambda metric: (
+            -metric.magnitude,
+            metric.record.match_idx,
+            int(metric.record.match_id),
+        )
+    )
+    return tuple(metrics)
+
+
+def threshold_gated_n7(
+    metrics: Sequence[DetectorMetric],
+    policy: Mapping[str, object],
+) -> tuple[DetectorMetric, ...] | None:
+    if len(metrics) < 7:
+        return None
+    selected = tuple(metrics[:7])
+    required = 7 if policy["top_k"] == "ALL" else int(policy["top_k"])
+    if not all(
+        metric_passes_threshold(metric, policy) for metric in selected[:required]
+    ):
+        return None
+    return selected
+
+
+def identity_payload(
+    issue: str,
+    match_ids: Sequence[str],
+) -> dict[str, object]:
+    return {
+        "issue": issue,
+        "ordered_match_ids": list(match_ids),
+    }
+
+
+def register_identity(
+    issue: str,
+    match_ids: Sequence[str],
+    identity_catalog: dict[str, dict[str, object]],
+    selection_rule: str = "DIRECT_TOP7_DIVERGENCE_FROM_COMPLETE_ISSUE_POOL",
+) -> str:
+    payload = identity_payload(issue, match_ids)
+    identity = core190.canonical_hash(payload)
+    identity_catalog.setdefault(
+        identity,
+        {
+            "identity_sha256": identity,
+            "issue": issue,
+            "selection_rule": selection_rule,
+            "ordered_match_ids_json": core190.canonical_json(list(match_ids)).decode(),
+            "match_count": len(match_ids),
+            "outcome_boundary": OUTCOME_BOUNDARY,
+        },
+    )
+    return identity
+
+
+def vector_sha256(vector: bytes) -> str:
+    return hashlib.sha256(vector).hexdigest()
+
+
+def register_vector(
+    vector: bytes,
+    vector_catalog: dict[str, bytes],
+) -> str:
+    vector_hash = vector_sha256(vector)
+    existing = vector_catalog.setdefault(vector_hash, vector)
+    if existing != vector:
+        raise RuntimeError("ticket vector SHA collision")
+    return vector_hash
+
+
+def register_directional_allocation(
+    issue: str,
+    ordered_records: Sequence[MatchRecord],
+    metrics_by_match: Mapping[str, DetectorMetric],
+    identity_catalog: dict[str, dict[str, object]],
+    allocation_catalog: dict[str, dict[str, object]],
+    vector_catalog: dict[str, bytes],
+) -> dict[str, object]:
+    if len(ordered_records) != 7 or set(metrics_by_match) != {
+        record.match_id for record in ordered_records
+    }:
+        raise RuntimeError("directional allocation identity mismatch")
+    ranked = sorted(
+        metrics_by_match.values(),
+        key=lambda metric: (
+            -metric.magnitude,
+            metric.record.match_idx,
+            int(metric.record.match_id),
+        ),
+    )
+    strongest = ranked[0]
+    match_ids = tuple(record.match_id for record in ordered_records)
+    delete_leg = match_ids.index(strongest.record.match_id)
+    probabilities = [
+        metrics_by_match[record.match_id].allocation_p for record in ordered_records
+    ]
+    sources = [
+        metrics_by_match[record.match_id].estimator_source for record in ordered_records
+    ]
+    allocation_input = {
+        "issue": issue,
+        "ordered_match_ids": list(match_ids),
+        "per_leg_probability_source": sources,
+        "per_leg_p3_p1_p0": [
+            [compact(value) for value in probability] for probability in probabilities
+        ],
+        "delete_leg_index_zero_based": delete_leg,
+        "omitted_code": strongest.omitted_code,
+        "strongest_match_id": strongest.record.match_id,
+        "base3_code_order": list(CODE_ORDER),
+        "repeat_rank": "joint log probability desc, base-3 ordinal asc",
+    }
+    allocation_hash = core190.canonical_hash(allocation_input)
+    if allocation_hash not in allocation_catalog:
+        vector = core190.directional_ticket_multiplicity_vector(
+            probabilities,
+            delete_leg,
+            strongest.omitted_code,
+        )
+        stats = core190.validate_ticket_multiplicity_vector(
+            vector,
+            strongest.omitted_code,
+            delete_leg,
+        )
+        vector_hash = register_vector(vector, vector_catalog)
+        identity = register_identity(issue, match_ids, identity_catalog)
+        ticket_identity = core190.canonical_hash(
+            {
+                "n7_identity_sha256": identity,
+                "multiplicity_vector_sha256": vector_hash,
+            }
+        )
+        allocation_catalog[allocation_hash] = {
+            "allocation_input_sha256": allocation_hash,
+            "n7_identity_sha256": identity,
+            "ticket_identity_sha256": ticket_identity,
+            "multiplicity_vector_sha256": vector_hash,
+            "ordered_match_ids_json": core190.canonical_json(list(match_ids)).decode(),
+            "per_leg_probability_source_json": core190.canonical_json(sources).decode(),
+            "per_leg_p3_p1_p0_json": core190.canonical_json(
+                allocation_input["per_leg_p3_p1_p0"]
+            ).decode(),
+            "delete_leg_index_zero_based": delete_leg,
+            "strongest_match_id": strongest.record.match_id,
+            "omitted_code": strongest.omitted_code,
+            **stats,
+            "outcome_boundary": OUTCOME_BOUNDARY,
+        }
+    return allocation_catalog[allocation_hash]
+
+
+def ticket_ledger_row(
+    policy: Mapping[str, object],
+    issue: IssueSpec,
+    arm: str,
+    status: str,
+    identity: str = "",
+    ticket_identity: str = "",
+    vector_hash: str = "",
+    allocation_hash: str = "",
+) -> dict[str, object]:
+    executed = status == "FROZEN_EXECUTABLE"
+    directional = arm in {"D_DIRECTION_ONLY", "D_JOINT_SPARSE"}
+    return {
+        "policy_id": policy["policy_id"],
+        "issue": issue.issue,
+        "year": issue.year,
+        "fold": issue.fold,
+        "issue_instance": issue.issue_instance,
+        "arm": arm,
+        "policy_status": status,
+        "n7_identity_sha256": identity,
+        "allocation_input_sha256": allocation_hash,
+        "multiplicity_vector_sha256": vector_hash,
+        "ticket_identity_sha256": ticket_identity,
+        "ticket_construction": "ONE_CODE_DELETE_PLUS_729_REPEATS"
+        if directional and executed
+        else "FULL_ENUMERATED"
+        if executed
+        else "NO_BET",
+        "unique_ticket_count": 1458
+        if directional and executed
+        else FULL_TICKETS
+        if executed
+        else 0,
+        "executed_ticket_count": FULL_TICKETS if executed else 0,
+        "planned_stake_yuan": FULL_STAKE_YUAN if executed else 0,
+        "outcome_boundary": OUTCOME_BOUNDARY,
+    }
+
+
+def full_ticket_identity(
+    identity: str,
+    full_vector_hash: str,
+) -> str:
+    return core190.canonical_hash(
+        {
+            "n7_identity_sha256": identity,
+            "multiplicity_vector_sha256": full_vector_hash,
+        }
+    )
+
+
+def build_full_policy_freeze(
+    issues: Sequence[IssueSpec],
+    pools: Mapping[str, Sequence[MatchRecord]],
+    detector_grid: Sequence[Mapping[str, object]],
+    stage: Path,
+) -> tuple[list[dict[str, object]], list[dict[str, object]], dict[str, object]]:
+    """Freeze direct issue-level N7 selections and every exact arm ticket identity."""
+
+    selection_sinks = [
+        GzipRowSink(
+            stage / f"policy_issue_selection_freeze_part_{index + 1:02d}_of_04.csv.gz"
+        )
+        for index in range(4)
+    ]
+    ledger_sinks = {
+        arm: GzipRowSink(stage / f"ticket_arm_{arm.lower()}.csv.gz")
+        for arm in (
+            "B0_BEST_FULL",
+            "D_MATCH_ONLY_FULL",
+            "D_DIRECTION_ONLY",
+            "D_JOINT_SPARSE",
+        )
+    }
+    identity_catalog: dict[str, dict[str, object]] = {}
+    allocation_catalog: dict[str, dict[str, object]] = {}
+    vector_catalog: dict[str, bytes] = {}
+    full_vector = core190.full_ticket_multiplicity_vector()
+    full_vector_hash = register_vector(full_vector, vector_catalog)
+    records_by_issue = {
+        issue.issue: {record.match_id: record for record in pools[issue.issue]}
+        for issue in issues
+    }
+    b0_frozen: dict[str, dict[str, object] | None] = {}
+    for issue in issues:
+        if not issue.b0_match_ids:
+            b0_frozen[issue.issue] = None
+            continue
+        records = records_by_issue[issue.issue]
+        if any(match_id not in records for match_id in issue.b0_match_ids):
+            raise RuntimeError(
+                f"B0 identity outside target-safe issue pool: {issue.issue}"
+            )
+        identity = register_identity(
+            issue.issue,
+            issue.b0_match_ids,
+            identity_catalog,
+            "INHERITED_B0_COMPARATOR",
+        )
+        b0_frozen[issue.issue] = {
+            "identity": identity,
+            "ticket_identity": full_ticket_identity(identity, full_vector_hash),
+        }
+
+    base_cache: dict[tuple[str, tuple[object, ...]], tuple[DetectorMetric, ...]] = {}
+    directional_cache: dict[str, dict[str, object]] = {}
+    forecast_rows: list[dict[str, object]] = []
+    strata_rows: list[dict[str, object]] = []
+
+    def frozen_directional(
+        issue: IssueSpec,
+        ordered_records: Sequence[MatchRecord],
+        metrics: Sequence[DetectorMetric],
+    ) -> dict[str, object]:
+        metrics_by_match = {metric.record.match_id: metric for metric in metrics}
+        cache_payload = {
+            "issue": issue.issue,
+            "ordered_match_ids": [record.match_id for record in ordered_records],
+            "metrics": [
+                {
+                    "match_id": record.match_id,
+                    "source": metrics_by_match[record.match_id].estimator_source,
+                    "p": [
+                        compact(value)
+                        for value in metrics_by_match[record.match_id].allocation_p
+                    ],
+                    "magnitude": compact(metrics_by_match[record.match_id].magnitude),
+                    "omitted": metrics_by_match[record.match_id].omitted_code,
+                }
+                for record in ordered_records
+            ],
+        }
+        cache_key = core190.canonical_hash(cache_payload)
+        if cache_key not in directional_cache:
+            directional_cache[cache_key] = register_directional_allocation(
+                issue.issue,
+                ordered_records,
+                metrics_by_match,
+                identity_catalog,
+                allocation_catalog,
+                vector_catalog,
+            )
+        return directional_cache[cache_key]
+
+    for policy_index, policy in enumerate(detector_grid):
+        selection_sink = selection_sinks[
+            min(3, policy_index * len(selection_sinks) // len(detector_grid))
+        ]
+        available = policy["availability"] == "AVAILABLE"
+        selected_issue_count = 0
+        selected_match_count = 0
+        changed_from_b0_count = 0
+        b0_direction_count = 0
+        common_count = 0
+        line_direction_matches: Counter[tuple[str, str]] = Counter()
+        line_direction_issues: dict[tuple[str, str], set[str]] = defaultdict(set)
+
+        for issue in issues:
+            b0 = b0_frozen[issue.issue]
+            selection_status = (
+                "NO_BET_FROZEN" if available else "DIAGNOSTIC_UNAVAILABLE"
+            )
+            b0_full_row = (
+                ticket_ledger_row(
+                    policy,
+                    issue,
+                    "B0_BEST_FULL",
+                    "FROZEN_EXECUTABLE",
+                    str(b0["identity"]),
+                    str(b0["ticket_identity"]),
+                    full_vector_hash,
+                )
+                if b0 is not None
+                else ticket_ledger_row(
+                    policy, issue, "B0_BEST_FULL", "NO_BET_INHERITED_B0"
+                )
+            )
+            ledger_sinks["B0_BEST_FULL"].emit(b0_full_row)
+
+            selected: tuple[DetectorMetric, ...] | None = None
+            b0_directional: dict[str, object] | None = None
+            if available:
+                cache_key = (issue.issue, base_metric_key(policy))
+                if cache_key not in base_cache:
+                    base_cache[cache_key] = sorted_base_metrics(
+                        pools[issue.issue], policy
+                    )
+                selected = threshold_gated_n7(base_cache[cache_key], policy)
+
+                if issue.b0_match_ids:
+                    b0_records = tuple(
+                        records_by_issue[issue.issue][match_id]
+                        for match_id in issue.b0_match_ids
+                    )
+                    b0_metrics = tuple(
+                        metric
+                        for record in b0_records
+                        if passes_base_gate(record, policy)
+                        for metric in [
+                            metric_for_record(
+                                record,
+                                str(policy["detector_family"]),
+                                str(policy["estimator_variant"]),
+                            )
+                        ]
+                        if metric is not None
+                    )
+                    ranked_b0 = tuple(
+                        sorted(
+                            b0_metrics,
+                            key=lambda metric: (
+                                -metric.magnitude,
+                                metric.record.match_idx,
+                                int(metric.record.match_id),
+                            ),
+                        )
+                    )
+                    gated_b0 = threshold_gated_n7(ranked_b0, policy)
+                    if gated_b0 is not None and len(b0_metrics) == 7:
+                        b0_directional = frozen_directional(
+                            issue, b0_records, b0_metrics
+                        )
+                        b0_direction_count += 1
+
+            if selected is None:
+                selected_identity = ""
+                selected_ticket_identity = ""
+                joint = None
+            else:
+                selected_records = tuple(metric.record for metric in selected)
+                selected_ids = tuple(record.match_id for record in selected_records)
+                selected_identity = register_identity(
+                    issue.issue, selected_ids, identity_catalog
+                )
+                selected_ticket_identity = full_ticket_identity(
+                    selected_identity, full_vector_hash
+                )
+                joint = frozen_directional(issue, selected_records, selected)
+                selected_issue_count += 1
+                selected_match_count += 7
+                if tuple(issue.b0_match_ids) != selected_ids:
+                    changed_from_b0_count += 1
+                if b0 is not None and b0_directional is not None:
+                    common_count += 1
+                for metric in selected:
+                    key = (metric.record.line_stratum, metric.favored_code)
+                    line_direction_matches[key] += 1
+                    line_direction_issues[key].add(issue.issue)
+
+            selection_sink.emit(
+                {
+                    "policy_id": policy["policy_id"],
+                    "issue": issue.issue,
+                    "year": issue.year,
+                    "fold": issue.fold,
+                    "issue_instance": issue.issue_instance,
+                    "source_issue_instances_json": core190.canonical_json(
+                        list(issue.source_issue_instances)
+                    ).decode(),
+                    "eligible_match_count": issue.eligible_match_count,
+                    "policy_status": selection_status
+                    if selected is None
+                    else "SELECTED_PREOUTCOME",
+                    "selected_n7_identity_sha256": selected_identity,
+                    "selected_match_ids_json": core190.canonical_json(
+                        [metric.record.match_id for metric in selected]
+                    ).decode()
+                    if selected
+                    else "[]",
+                    "strongest_match_id": selected[0].record.match_id
+                    if selected
+                    else "",
+                    "strongest_magnitude": compact(selected[0].magnitude)
+                    if selected
+                    else "",
+                    "strongest_abs_z": compact(selected[0].abs_z) if selected else "",
+                    "strongest_favored_code": selected[0].favored_code
+                    if selected
+                    else "",
+                    "strongest_omitted_code": selected[0].omitted_code
+                    if selected
+                    else "",
+                    "strongest_estimator_source": selected[0].estimator_source
+                    if selected
+                    else "",
+                    "joint_allocation_input_sha256": joint["allocation_input_sha256"]
+                    if joint
+                    else "",
+                    "joint_multiplicity_vector_sha256": joint[
+                        "multiplicity_vector_sha256"
+                    ]
+                    if joint
+                    else "",
+                    "inherited_b0_status": issue.b0_status,
+                    "inherited_b0_identity_sha256": str(b0["identity"]) if b0 else "",
+                    "identity_changed_from_b0": int(
+                        bool(selected)
+                        and tuple(metric.record.match_id for metric in selected)
+                        != tuple(issue.b0_match_ids)
+                    ),
+                    "b0_direction_status": "AVAILABLE"
+                    if b0_directional
+                    else "NO_SIGNAL_OR_NO_B0",
+                    "planned_stake_yuan": FULL_STAKE_YUAN if selected else 0,
+                    "outcome_boundary": OUTCOME_BOUNDARY,
+                }
+            )
+
+            ledger_sinks["D_MATCH_ONLY_FULL"].emit(
+                ticket_ledger_row(
+                    policy,
+                    issue,
+                    "D_MATCH_ONLY_FULL",
+                    "FROZEN_EXECUTABLE" if selected else selection_status,
+                    selected_identity,
+                    selected_ticket_identity,
+                    full_vector_hash if selected else "",
+                )
+            )
+            ledger_sinks["D_DIRECTION_ONLY"].emit(
+                ticket_ledger_row(
+                    policy,
+                    issue,
+                    "D_DIRECTION_ONLY",
+                    "FROZEN_EXECUTABLE"
+                    if b0_directional
+                    else selection_status
+                    if not available
+                    else "NO_BET_DIRECTION_SIGNAL",
+                    str(b0_directional["n7_identity_sha256"]) if b0_directional else "",
+                    str(b0_directional["ticket_identity_sha256"])
+                    if b0_directional
+                    else "",
+                    str(b0_directional["multiplicity_vector_sha256"])
+                    if b0_directional
+                    else "",
+                    str(b0_directional["allocation_input_sha256"])
+                    if b0_directional
+                    else "",
+                )
+            )
+            ledger_sinks["D_JOINT_SPARSE"].emit(
+                ticket_ledger_row(
+                    policy,
+                    issue,
+                    "D_JOINT_SPARSE",
+                    "FROZEN_EXECUTABLE" if joint else selection_status,
+                    str(joint["n7_identity_sha256"]) if joint else "",
+                    str(joint["ticket_identity_sha256"]) if joint else "",
+                    str(joint["multiplicity_vector_sha256"]) if joint else "",
+                    str(joint["allocation_input_sha256"]) if joint else "",
+                )
+            )
+
+        forecast_rows.append(
+            {
+                "policy_id": policy["policy_id"],
+                "detector_family": policy["detector_family"],
+                "estimator_variant": policy["estimator_variant"],
+                "threshold_rule": policy["threshold_rule"],
+                "top_k": policy["top_k"],
+                "min_history_n": policy["min_history_n"],
+                "coverage_gate": policy["coverage_gate"],
+                "uncertainty_gate": policy["uncertainty_gate"],
+                "cohort_issue_count": CANONICAL_ISSUES,
+                "source_issue_instance_count": SOURCE_ISSUE_INSTANCES,
+                "source_b0_participating_issue_count": SOURCE_B0_PARTICIPATING_ISSUES,
+                "selected_issue_count": selected_issue_count,
+                "no_bet_issue_count": CANONICAL_ISSUES - selected_issue_count,
+                "selected_identity_count": selected_issue_count,
+                "selected_match_count": selected_match_count,
+                "identity_changed_from_b0_count": changed_from_b0_count,
+                "b0_direction_available_issue_count": b0_direction_count,
+                "factorial_common_issue_count": common_count,
+                "native_planned_stake_yuan": selected_issue_count * FULL_STAKE_YUAN,
+                "matched_equal_budget_stake_yuan": common_count * FULL_STAKE_YUAN,
+                "forecast_status": "AVAILABLE"
+                if available
+                else "DIAGNOSTIC_UNAVAILABLE",
+                "unavailable_reason": policy["unavailable_reason"],
+                "outcome_boundary": OUTCOME_BOUNDARY,
+            }
+        )
+        for line in LINE_STRATA:
+            for direction in DIRECTION_STRATA:
+                key = (line, direction)
+                strata_rows.append(
+                    {
+                        "policy_id": policy["policy_id"],
+                        "line_stratum": line,
+                        "direction_stratum": direction,
+                        "selected_match_count": line_direction_matches[key],
+                        "selected_issue_count": len(line_direction_issues[key]),
+                        "forecast_status": "AVAILABLE"
+                        if available
+                        else "DIAGNOSTIC_UNAVAILABLE",
+                        "outcome_boundary": OUTCOME_BOUNDARY,
+                    }
+                )
+
+    for sink in selection_sinks:
+        sink.close()
+    for sink in ledger_sinks.values():
+        sink.close()
+    expected_rows = len(detector_grid) * len(issues)
+    if sum(sink.count for sink in selection_sinks) != expected_rows or any(
+        sink.count != expected_rows for sink in ledger_sinks.values()
+    ):
+        raise RuntimeError("policy/arm ledger denominator drift")
+    if len(forecast_rows) != len(detector_grid):
+        raise RuntimeError("coverage forecast denominator drift")
+    if len(strata_rows) != len(detector_grid) * len(LINE_STRATA) * len(
+        DIRECTION_STRATA
+    ):
+        raise RuntimeError("line-direction forecast denominator drift")
+
+    identity_rows = sorted(
+        identity_catalog.values(), key=lambda row: row["identity_sha256"]
+    )
+    allocation_rows = sorted(
+        allocation_catalog.values(), key=lambda row: row["allocation_input_sha256"]
+    )
+    vector_rows = []
+    for vector_hash, vector in sorted(vector_catalog.items()):
+        if vector_hash == full_vector_hash:
+            stats = core190.validate_ticket_multiplicity_vector(vector)
+        else:
+            stats = core190.validate_ticket_multiplicity_vector(
+                vector,
+                next(
+                    str(row["omitted_code"])
+                    for row in allocation_rows
+                    if row["multiplicity_vector_sha256"] == vector_hash
+                ),
+                next(
+                    int(row["delete_leg_index_zero_based"])
+                    for row in allocation_rows
+                    if row["multiplicity_vector_sha256"] == vector_hash
+                ),
+            )
+        vector_rows.append(
+            {
+                "multiplicity_vector_sha256": vector_hash,
+                "encoding": "U8_HEX_BASE3_ORDINAL_3_1_0",
+                "multiplicity_vector_hex": vector.hex(),
+                **stats,
+                "outcome_boundary": OUTCOME_BOUNDARY,
+            }
+        )
+    write_gzip(stage / "n7_identity_catalog.csv.gz", identity_rows)
+    write_gzip(stage / "directional_allocation_input_catalog.csv.gz", allocation_rows)
+    write_gzip(stage / "ticket_multiplicity_vector_catalog.csv.gz", vector_rows)
+    return (
+        forecast_rows,
+        strata_rows,
+        {
+            "selection_row_count": expected_rows,
+            "selection_shard_count": len(selection_sinks),
+            "selection_shard_row_counts": [sink.count for sink in selection_sinks],
+            "arm_ledger_row_count_each": expected_rows,
+            "identity_count": len(identity_rows),
+            "allocation_input_count": len(allocation_rows),
+            "multiplicity_vector_count": len(vector_rows),
+            "full_vector_sha256": full_vector_hash,
+        },
+    )
+
+
+# Superseded inherited-candidate selector.  The executable v2 path is
+# build_full_policy_freeze(), which selects seven matches from each full issue.
+def _superseded_v1_build_candidate_membership(
     roles: Sequence[Mapping[str, str]],
     candidates: Sequence[Mapping[str, str]],
 ) -> tuple[
@@ -1105,11 +2547,13 @@ def build_candidate_membership(
     if len(output) != CANDIDATE_IDENTITIES * 7 or len(by_issue) != PARTICIPATING_ISSUES:
         raise RuntimeError("candidate membership denominator drift")
     for values in by_issue.values():
-        values.sort(key=lambda row: (int(row["source_selector_rank"]), row["portfolio_id"]))
+        values.sort(
+            key=lambda row: (int(row["source_selector_rank"]), row["portfolio_id"])
+        )
     return output, by_issue, membership
 
 
-def build_policy_forecasts(
+def _superseded_v1_build_policy_forecasts(
     detector_grid: Sequence[Mapping[str, object]],
     estimator_rows: Sequence[Mapping[str, object]],
     candidates_by_issue: Mapping[str, Sequence[Mapping[str, object]]],
@@ -1194,15 +2638,15 @@ def build_policy_forecasts(
                 tuple[Mapping[str, object], list[dict[str, object]], float]
             ] = []
             for candidate in candidates:
-                retained = retained_metrics(
+                retained = _superseded_v1_retained_metrics(
                     membership[(issue_instance, str(candidate["portfolio_id"]))],
                     estimator_by_match,
                     policy,
                 )
                 if retained:
-                    score = math.fsum(float(row["magnitude"]) for row in retained) / len(
-                        retained
-                    )
+                    score = math.fsum(
+                        float(row["magnitude"]) for row in retained
+                    ) / len(retained)
                     evaluated.append((candidate, retained, score))
             selected: Mapping[str, object] | None = None
             selected_retained: list[dict[str, object]] = []
@@ -1218,7 +2662,7 @@ def build_policy_forecasts(
                     ),
                 )
             b0_portfolio = b0_selected[issue_instance]
-            b0_retained = retained_metrics(
+            b0_retained = _superseded_v1_retained_metrics(
                 membership[(issue_instance, b0_portfolio)], estimator_by_match, policy
             )
             if b0_retained:
@@ -1248,7 +2692,9 @@ def build_policy_forecasts(
                         "issue_instance": issue_instance,
                         "policy_status": "SELECTED_PREOUTCOME",
                         "selected_portfolio_id": selected["portfolio_id"],
-                        "selected_identity_fingerprint": selected["identity_fingerprint"],
+                        "selected_identity_fingerprint": selected[
+                            "identity_fingerprint"
+                        ],
                         "inherited_b0_portfolio_id": b0_portfolio,
                         "identity_changed_from_b0": int(
                             str(selected["portfolio_id"]) != b0_portfolio
@@ -1265,7 +2711,9 @@ def build_policy_forecasts(
                         "strongest_favored_code": strongest["favored_code"],
                         "strongest_omitted_code": strongest["omitted_code"],
                         "strongest_estimator_source": strongest["estimator_source"],
-                        "b0_direction_status": "AVAILABLE" if b0_retained else "NO_SIGNAL",
+                        "b0_direction_status": "AVAILABLE"
+                        if b0_retained
+                        else "NO_SIGNAL",
                         "b0_direction_match_id": b0_retained[0]["match_id"]
                         if b0_retained
                         else "",
@@ -1305,7 +2753,9 @@ def build_policy_forecasts(
                         "strongest_favored_code": "",
                         "strongest_omitted_code": "",
                         "strongest_estimator_source": "",
-                        "b0_direction_status": "AVAILABLE" if b0_retained else "NO_SIGNAL",
+                        "b0_direction_status": "AVAILABLE"
+                        if b0_retained
+                        else "NO_SIGNAL",
                         "b0_direction_match_id": b0_retained[0]["match_id"]
                         if b0_retained
                         else "",
@@ -1363,18 +2813,26 @@ def build_policy_forecasts(
                     }
                 )
 
-    available_policy_count = sum(row["availability"] == "AVAILABLE" for row in detector_grid)
+    available_policy_count = sum(
+        row["availability"] == "AVAILABLE" for row in detector_grid
+    )
     selection_sink.close()
     if selection_sink.count != available_policy_count * PARTICIPATING_ISSUES:
-        raise RuntimeError(f"policy selection denominator drift: {selection_sink.count}")
+        raise RuntimeError(
+            f"policy selection denominator drift: {selection_sink.count}"
+        )
     if len(forecast_rows) != len(detector_grid):
         raise RuntimeError("policy forecast denominator drift")
-    if len(strata_rows) != len(detector_grid) * len(LINE_STRATA) * len(DIRECTION_STRATA):
+    if len(strata_rows) != len(detector_grid) * len(LINE_STRATA) * len(
+        DIRECTION_STRATA
+    ):
         raise RuntimeError("line-direction forecast denominator drift")
     return forecast_rows, strata_rows, selection_sink.count
 
 
-def build_issue_census(source_selection: Sequence[Mapping[str, str]]) -> list[dict[str, object]]:
+def _superseded_v1_build_issue_census(
+    source_selection: Sequence[Mapping[str, str]],
+) -> list[dict[str, object]]:
     rows = []
     for source in sorted(
         (row for row in source_selection if row["arm"] == "B0_BEST_FULL"),
@@ -1389,7 +2847,9 @@ def build_issue_census(source_selection: Sequence[Mapping[str, str]]) -> list[di
                 "source_candidate_identity_count": source["candidate_identity_count"],
                 "source_b0_status": source["policy_status"],
                 "source_b0_portfolio_id": source["selected_portfolio_id"],
-                "source_b0_identity_fingerprint": source["selected_identity_fingerprint"],
+                "source_b0_identity_fingerprint": source[
+                    "selected_identity_fingerprint"
+                ],
                 "full_ticket_count": source["ticket_count"],
                 "full_planned_stake_yuan": source["planned_stake_yuan"],
                 "sparse_no_bet_semantics": "zero qualifying policy => 0 tickets, 0 stake, not a loss",
@@ -1401,14 +2861,46 @@ def build_issue_census(source_selection: Sequence[Mapping[str, str]]) -> list[di
     return rows
 
 
+def build_full_issue_census(issues: Sequence[IssueSpec]) -> list[dict[str, object]]:
+    rows = []
+    for issue in issues:
+        rows.append(
+            {
+                "issue": issue.issue,
+                "year": issue.year,
+                "fold": issue.fold,
+                "issue_instance": issue.issue_instance,
+                "source_issue_instances_json": core190.canonical_json(
+                    list(issue.source_issue_instances)
+                ).decode(),
+                "source_issue_instance_count": len(issue.source_issue_instances),
+                "feature_cutoff_ts": issue.cutoff_ts,
+                "eligible_target_safe_match_count": issue.eligible_match_count,
+                "source_b0_status": issue.b0_status,
+                "source_b0_portfolio_id": issue.b0_portfolio_id,
+                "source_b0_identity_fingerprint": issue.b0_identity_fingerprint,
+                "source_b0_match_ids_json": core190.canonical_json(
+                    list(issue.b0_match_ids)
+                ).decode(),
+                "full_ticket_count": FULL_TICKETS if issue.b0_match_ids else 0,
+                "full_planned_stake_yuan": FULL_STAKE_YUAN if issue.b0_match_ids else 0,
+                "sparse_no_bet_semantics": "zero qualifying direct N7 => 0 tickets, 0 stake, not a loss",
+                "outcome_boundary": OUTCOME_BOUNDARY,
+            }
+        )
+    if len(rows) != CANONICAL_ISSUES:
+        raise RuntimeError("full issue census denominator drift")
+    return rows
+
+
 def build_estimator_registry() -> list[dict[str, object]]:
     return [
         {
             "estimator": "FUNDAMENTAL_INDEPENDENT",
             "frozen_source": "#180 T1_DEEP_TEAM / TEAM_PRIMARY",
-            "p_vector": "team_primary_p3/p1/p0",
-            "expected_margin": "TEAM_PRIMARY-weighted mean of seven accepted effective lambda_home minus weighted lambda_away",
-            "score_distribution": "family score-difference log-pool shape with within-code masses reconciled exactly to T1_DEEP_TEAM p3/p1/p0",
+            "p_vector": "p3/p1/p0 mapped from one group-mass-reconciled T1 score-difference distribution",
+            "expected_margin": "mean of that exact same T1 score-difference distribution",
+            "score_distribution": "family score-difference log-pool shape with within-code masses reconciled exactly to T1_DEEP_TEAM p3/p1/p0; this distribution controls both p and margin",
             "independence_status": "STRICT_PAST_TEAM_MATCH_STATE_ONLY",
             "detector_role": "CONTROLLING",
             "outcome_boundary": OUTCOME_BOUNDARY,
@@ -1425,8 +2917,8 @@ def build_estimator_registry() -> list[dict[str, object]]:
         },
         {
             "estimator": "CALIBRATED_MARKET_ESTIMATOR",
-            "frozen_source": "#179 market_p = accepted calibrated market vector",
-            "p_vector": "market_p3/p1/p0",
+            "frozen_source": "#179 accepted primary hierarchical market model from target-safe 1h market features",
+            "p_vector": "calibrated_p3/p1/p0",
             "expected_margin": "UNAVAILABLE_MARKET_DERIVED_THREE_WAY_VECTOR",
             "score_distribution": "UNAVAILABLE",
             "independence_status": "MARKET_DERIVED_NOT_INDEPENDENT",
@@ -1435,8 +2927,8 @@ def build_estimator_registry() -> list[dict[str, object]]:
         },
         {
             "estimator": "HANDICAP_CONSENSUS",
-            "frozen_source": "#179 target-safe predicted BJ SP identity plus native handicap",
-            "p_vector": "normalized inverse predicted_sp3/predicted_sp1/predicted_sp0",
+            "frozen_source": "#179 EURO_CALIBRATION family aligned to the native handicap from target-safe 1h EURO",
+            "p_vector": "consensus_p3/p1/p0",
             "expected_margin": "UNAVAILABLE_THREE_WAY_PRICES_DO_NOT_IDENTIFY_RAW_MARGIN",
             "score_distribution": "UNAVAILABLE_NON_IDENTIFIABLE_WITHOUT_EXTRA_MODEL",
             "independence_status": "CONSENSUS_PRICE_VIEW",
@@ -1514,9 +3006,7 @@ def build_estimator_provenance_registry() -> list[dict[str, object]]:
             "outcome_boundary": OUTCOME_BOUNDARY,
         }
     )
-    independent = [
-        row for row in rows if row["estimator"] == "FUNDAMENTAL_INDEPENDENT"
-    ]
+    independent = [row for row in rows if row["estimator"] == "FUNDAMENTAL_INDEPENDENT"]
     forbidden = ("EURO", "ASIAN", "BJ_SP", "LIQUIDITY", "MARKET", "TL_")
     if len(independent) != len(core190.FAMILY_ORDER):
         raise RuntimeError("independent feature-family denominator drift")
@@ -1525,8 +3015,12 @@ def build_estimator_provenance_registry() -> list[dict[str, object]]:
             str(row[field])
             for field in ("source_branch", "feature_family", "feature_definition")
         ).upper()
-        if int(row["uses_market_input"]) or any(token in serialized for token in forbidden):
-            raise RuntimeError("market-derived feature leaked into independent estimator")
+        if int(row["uses_market_input"]) or any(
+            token in serialized for token in forbidden
+        ):
+            raise RuntimeError(
+                "market-derived feature leaked into independent estimator"
+            )
     return rows
 
 
@@ -1590,7 +3084,9 @@ def bootstrap_matrix_sha256(issue_count: int) -> str:
     return digest.hexdigest()
 
 
-def chronology_bootstrap_contract(issue_census: Sequence[Mapping[str, object]]) -> dict[str, object]:
+def chronology_bootstrap_contract(
+    issue_census: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
     years = sorted({int(row["year"]) for row in issue_census})
     return {
         "chronology": {
@@ -1623,7 +3119,14 @@ def chronology_bootstrap_contract(issue_census: Sequence[Mapping[str, object]]) 
 
 def output_schema_contract() -> dict[str, object]:
     return {
-        "gate_b_row_keys": ["policy_id", "issue_instance", "arm"],
+        "gate_b_row_keys": ["policy_id", "issue", "arm"],
+        "gate_a_exact_identity_sources": {
+            "policy_issue_selection": "policy_issue_selection_freeze_part_XX_of_04.csv.gz (four policy-contiguous shards)",
+            "four_arm_ticket_ledgers": "ticket_arm_<arm>.csv.gz",
+            "n7_identity_catalog": "n7_identity_catalog.csv.gz",
+            "directional_allocation_catalog": "directional_allocation_input_catalog.csv.gz",
+            "multiplicity_vector_catalog": "ticket_multiplicity_vector_catalog.csv.gz",
+        },
         "native_support_metrics": [
             "selected_issue_count",
             "ticket_count",
@@ -1709,7 +3212,76 @@ def source_binding(source_rows: Sequence[Mapping[str, object]]) -> dict[str, obj
     }
 
 
-def gate_a_card(
+def source_binding_v2(
+    source_rows: Sequence[Mapping[str, object]],
+    estimator_meta: Mapping[str, object],
+    line_counts: Mapping[str, int],
+) -> dict[str, object]:
+    binding = source_binding(source_rows)
+    binding["database"]["target_projection"] = [  # type: ignore[index]
+        "every match in each canonical numeric issue with kickoff/team IDs",
+        "complete target-safe 1h EURO consensus",
+        "native handicap line (missing retained as explicit OTHER/unavailable line residual)",
+        "#179 target-safe market feature projection",
+    ]
+    binding["eligible_universe"] = {
+        "source_issue_instance_count": SOURCE_ISSUE_INSTANCES,
+        "canonical_numeric_issue_count": CANONICAL_ISSUES,
+        "eligible_match_count": ELIGIBLE_MATCHES,
+        "minimum_matches_per_issue": 7,
+        "canonicalization": "duplicate cross-year issue instances collapse by numeric issue; canonical year=max source outer year; source instances retained",
+        "universe_identity_sha256": estimator_meta["universe_identity_sha256"],
+        "native_line_exact_counts": dict(sorted(line_counts.items())),
+        "selection_boundary": "challenger chooses exact seven directly from every issue target-safe pool; inherited B0 is comparator only",
+    }
+    binding["coherent_t1_estimator"] = {
+        "probability_source": "mapped p3/p1/p0 of group-mass-reconciled T1 score-difference distribution",
+        "expected_margin_source": "mean of the identical score-difference distribution",
+        "line_residual": "same-distribution expected margin + native handicap",
+        "weighted_lambda_proxy": "diagnostic only; controls_direction=false",
+        "weighted_proxy_sign_disagreement_count": estimator_meta[
+            "weighted_proxy_sign_disagreement_count"
+        ],
+        "max_abs_probability_reconciliation_error": compact(
+            float(estimator_meta["max_abs_reconciliation_error"])
+        ),
+    }
+    return binding
+
+
+def directional_ticket_contract_v2(
+    policy_meta: Mapping[str, object],
+) -> dict[str, object]:
+    contract = core190.directional_ticket_accounting()
+    contract.update(
+        {
+            "ticket_ordinal": "base-3 code order 3,1,0; ascending ordinal is the deterministic tie break",
+            "delete_leg": "strongest divergence magnitude; ties match_idx then match_id",
+            "per_leg_probability_sources": {
+                "FUNDAMENTAL_INDEPENDENT": "T1 coherent score-distribution p",
+                "CALIBRATED_MARKET_ESTIMATOR": "#179 primary calibrated market p",
+                "UNION": "per match, larger-magnitude source; exact tie fundamental first; never blended",
+                "MODEL_AGREEMENT": "per match, weaker agreeing source; exact tie fundamental first; never blended",
+                "LINE_RESIDUAL_MU": "T1 coherent score-distribution p",
+            },
+            "identity_layers": [
+                "ordered seven-match N7 identity",
+                "directional allocation input identity",
+                "2187-byte u8 multiplicity-vector SHA-256",
+                "combined ticket identity",
+            ],
+            "ledger_scope": "every frozen policy x canonical issue x each of four arms",
+            "ledger_row_count_each": policy_meta["arm_ledger_row_count_each"],
+            "allocation_input_count": policy_meta["allocation_input_count"],
+            "multiplicity_vector_count": policy_meta["multiplicity_vector_count"],
+            "full_vector_sha256": policy_meta["full_vector_sha256"],
+            "outcome_boundary": OUTCOME_BOUNDARY,
+        }
+    )
+    return contract
+
+
+def _superseded_v1_gate_a_card(
     estimator_rows: Sequence[Mapping[str, object]],
     latent_rows: Sequence[Mapping[str, object]],
     detector_grid: Sequence[Mapping[str, object]],
@@ -1795,8 +3367,81 @@ def gate_a_card(
     }
 
 
+def gate_a_card_v2(
+    detector_grid: Sequence[Mapping[str, object]],
+    forecasts: Sequence[Mapping[str, object]],
+    estimator_meta: Mapping[str, object],
+    policy_meta: Mapping[str, object],
+) -> dict[str, object]:
+    available = [row for row in forecasts if row["forecast_status"] == "AVAILABLE"]
+    selected_counts = [int(row["selected_issue_count"]) for row in available]
+    return {
+        "issue": ISSUE,
+        "contract": CONTRACT,
+        "version": VERSION,
+        "stage": "GATE_A_OUTCOME_UNEXPOSED",
+        "status": "READY_FOR_PI_REVIEW_NO_GATE_B_AUTHORITY",
+        "cohort": {
+            "source_issue_instance_count": SOURCE_ISSUE_INSTANCES,
+            "canonical_numeric_issue_count": CANONICAL_ISSUES,
+            "eligible_match_count": ELIGIBLE_MATCHES,
+            "source_b0_participating_issue_count": SOURCE_B0_PARTICIPATING_ISSUES,
+            "source_b0_no_bet_issue_count": CANONICAL_ISSUES
+            - SOURCE_B0_PARTICIPATING_ISSUES,
+        },
+        "expected_margin_resolution": {
+            "fundamental_source": "#180 T1_DEEP_TEAM / TEAM_PRIMARY pure-team branch",
+            "controlling_probability_and_margin_identity": "ONE_T1_GROUP_MASS_RECONCILED_SCORE_DIFFERENCE_DISTRIBUTION",
+            "line_residual_definition": "same-distribution expected raw margin + native handicap",
+            "weighted_component_lambda_proxy_status": "DIAGNOSTIC_DOES_NOT_CONTROL_DIRECTION",
+            "weighted_proxy_sign_disagreement_count": estimator_meta[
+                "weighted_proxy_sign_disagreement_count"
+            ],
+            "max_abs_probability_reconciliation_error": compact(
+                float(estimator_meta["max_abs_reconciliation_error"])
+            ),
+            "consensus_margin_status": "UNAVAILABLE_NON_IDENTIFIABLE",
+            "delta_mu_status": "DIAGNOSTIC_UNAVAILABLE_ALL_MATCHES",
+            "delta_p_status": "CONTROLLING",
+            "line_residual_mu_status": "CONTROLLING_SEPARATE_AXIS",
+        },
+        "native_line_coverage": estimator_meta["line_strata"],
+        "detector_grid": {
+            "policy_count": len(detector_grid),
+            "available_policy_count": len(available),
+            "unavailable_delta_mu_policy_count": len(detector_grid) - len(available),
+            "policy_issue_selection_row_count": policy_meta["selection_row_count"],
+            "minimum_selected_issue_count": min(selected_counts),
+            "maximum_selected_issue_count": max(selected_counts),
+            "zero_candidate_policy_count": sum(value == 0 for value in selected_counts),
+        },
+        "ticket_identity_freeze": dict(policy_meta),
+        "arms": [
+            "B0_BEST_FULL",
+            "D_MATCH_ONLY_FULL",
+            "D_DIRECTION_ONLY",
+            "D_JOINT_SPARSE",
+        ],
+        "accounting": {
+            "all_selected_arms_ticket_count": FULL_TICKETS,
+            "all_selected_arms_stake_yuan": FULL_STAKE_YUAN,
+            "directional_unique_ticket_count": 1458,
+            "directional_repeated_ticket_count": 729,
+            "directional_max_multiplicity": 2,
+            "no_bet_ticket_count": 0,
+            "no_bet_stake_yuan": 0,
+            "pre_tax_primary": True,
+            "tax_reference_only": True,
+        },
+        "outcome_access": False,
+        "gate_b_authorized": False,
+        "production_authority": False,
+        "outcome_boundary": OUTCOME_BOUNDARY,
+    }
+
+
 def assert_gate_a_schema(
-    named_rows: Mapping[str, Sequence[Mapping[str, object]]]
+    named_rows: Mapping[str, Sequence[Mapping[str, object]]],
 ) -> None:
     for name, rows in named_rows.items():
         if not rows:
@@ -1804,7 +3449,9 @@ def assert_gate_a_schema(
         fields = {str(field).lower() for field in rows[0]}
         forbidden = fields.intersection(FORBIDDEN_TARGET_FIELDS)
         if forbidden:
-            raise RuntimeError(f"Gate-A table {name} exposes forbidden fields: {forbidden}")
+            raise RuntimeError(
+                f"Gate-A table {name} exposes forbidden fields: {forbidden}"
+            )
         for row in rows:
             if set(row) != set(rows[0]):
                 raise RuntimeError(f"Gate-A table schema drift: {name}")
@@ -1819,6 +3466,23 @@ def manifest_for(directory: Path) -> dict[str, str]:
     }
 
 
+def assert_file_header_outcome_safe(path: Path) -> None:
+    opener = gzip.open if path.suffix == ".gz" else Path.open
+    if path.suffix == ".gz":
+        handle = opener(path, "rt", encoding="utf-8", newline="")
+    else:
+        handle = opener(path, "r", encoding="utf-8", newline="")
+    with handle:
+        header = next(csv.reader(handle))
+    forbidden = {field.lower() for field in header}.intersection(
+        FORBIDDEN_TARGET_FIELDS
+    )
+    if forbidden:
+        raise RuntimeError(
+            f"Gate-A file {path.name} exposes forbidden fields: {forbidden}"
+        )
+
+
 def atomic_generate(output: Path, database: Path) -> dict[str, object]:
     output = output.resolve()
     if output.exists():
@@ -1830,30 +3494,31 @@ def atomic_generate(output: Path, database: Path) -> dict[str, object]:
             raise RuntimeError("source database hash drift")
         source_rows = verify_sources()
         verify_external_86_if_present()
-        latent_rows, estimator_rows, roles, candidates, source_selection = (
-            build_latent_and_estimator_freeze(database)
+        runner180 = load_module(
+            "bj190_v2_source_180_runner",
+            ROOT / "scripts" / "freeze_bj180_team_matchup_gate_a.py",
         )
-        membership_rows, candidates_by_issue, membership = build_candidate_membership(
-            roles, candidates
+        source = runner180.load_sources()
+        issues, line_counts = build_canonical_issue_specs(database, source)
+        pools, estimator_meta = build_full_estimator_freeze(
+            database,
+            issues,
+            stage / "poisson_latent_reconciliation.csv.gz",
+            stage / "estimator_match_freeze.csv.gz",
         )
         detector_grid = build_detector_grid()
-        forecasts, strata, selection_count = build_policy_forecasts(
+        forecasts, strata, policy_meta = build_full_policy_freeze(
+            issues,
+            pools,
             detector_grid,
-            estimator_rows,
-            candidates_by_issue,
-            membership,
-            source_selection,
-            stage / "policy_issue_selection_freeze.csv.gz",
+            stage,
         )
-        issue_census = build_issue_census(source_selection)
+        issue_census = build_full_issue_census(issues)
         estimators = build_estimator_registry()
         estimator_provenance = build_estimator_provenance_registry()
         arms = build_attribution_arms()
         assert_gate_a_schema(
             {
-                "latent": latent_rows,
-                "estimator": estimator_rows,
-                "membership": membership_rows,
                 "grid": detector_grid,
                 "forecast": forecasts,
                 "strata": strata,
@@ -1865,48 +3530,46 @@ def atomic_generate(output: Path, database: Path) -> dict[str, object]:
             }
         )
 
-        write_gzip(stage / "poisson_latent_reconciliation.csv.gz", latent_rows)
-        write_gzip(stage / "estimator_match_freeze.csv.gz", estimator_rows)
-        write_gzip(stage / "candidate_membership_freeze.csv.gz", membership_rows)
         write_csv(stage / "detector_grid.csv", detector_grid)
         write_gzip(stage / "coverage_forecast.csv.gz", forecasts)
         write_gzip(stage / "line_direction_forecast.csv.gz", strata)
         write_csv(stage / "issue_census.csv", issue_census)
         write_csv(stage / "estimator_registry.csv", estimators)
-        write_csv(
-            stage / "estimator_provenance_registry.csv", estimator_provenance
-        )
+        write_csv(stage / "estimator_provenance_registry.csv", estimator_provenance)
         write_csv(stage / "attribution_arm_registry.csv", arms)
         write_csv(stage / "source_census.csv", source_rows)
-        write_json(stage / "directional_ticket_contract.json", core190.directional_ticket_accounting())
+        write_json(
+            stage / "directional_ticket_contract.json",
+            directional_ticket_contract_v2(policy_meta),
+        )
         write_json(
             stage / "chronology_bootstrap_contract.json",
             chronology_bootstrap_contract(issue_census),
         )
         write_json(stage / "output_schema_contract.json", output_schema_contract())
-        binding = source_binding(source_rows)
+        binding = source_binding_v2(source_rows, estimator_meta, line_counts)
         write_json(stage / "source_binding.json", binding)
-        card = gate_a_card(
-            estimator_rows, latent_rows, detector_grid, forecasts, selection_count
-        )
+        card = gate_a_card_v2(detector_grid, forecasts, estimator_meta, policy_meta)
         write_json(stage / "gate_a_card.json", card)
         (stage / "README.md").write_text(
             "# #190 Gate A — sparse independent-model vs handicap divergence\n\n"
-            "This immutable package freezes the full outcome-unexposed sparse detector frontier. "
+            "This immutable package freezes all 102,222 target-safe matches in 344 canonical numeric "
+            "issues (348 source issue instances). Every divergence policy selects its exact seven "
+            "matches directly from that issue pool; inherited B0 is a comparator only.\n\n"
             "The controlling independent estimator is exact #180 `T1_DEEP_TEAM` / `TEAM_PRIMARY`. "
-            "Its seven pure-team component intensities and score-difference distributions, plus the "
-            "reconciled T1 log-pool distribution, reproduce every accepted p3/p1/p0 row. #179 and all "
-            "#180 TL market-derived branches are explicitly excluded from independent evidence.\n\n"
-            "`HANDICAP_CONSENSUS` is the no-vig inverse of the frozen target-safe predicted BJ SP vector. "
+            "One reconciled score-difference distribution supplies both p3/p1/p0 and expected margin. "
+            "The weighted component-lambda margin is diagnostic only and never controls direction. "
+            "#179 and all #180 TL market-derived branches remain excluded from independent evidence.\n\n"
+            "`HANDICAP_CONSENSUS` is #179's EURO-calibration family on the native handicap using only "
+            "target-safe 1h EURO inputs. "
             "Three-way prices do not identify a unique raw expected margin, so `delta_mu` is explicitly "
             "unavailable and executes no policies. `delta_p` and model-vs-line `line_residual_mu` are "
             "separate controlling axes and are never blended.\n\n"
-            "The exact complete-issue N7 candidate universe contains 348 issues, 189 participating issues, "
-            "424 candidate identities and 1,558 unique matches. All frozen candidate matches have native line "
-            "0; the -2/-1/+1/+2 report strata are retained with zero forecast coverage.\n\n"
+            "Each policy×issue×arm row binds an exact ordered N7 identity and an exact 2,187-byte "
+            "ticket multiplicity vector. Directional arms delete one code at the strongest leg, retain "
+            "1,458 unique tickets and repeat exactly 729 by joint probability with base-3 ties.\n\n"
             "No target outcome, final/winning SP, payout, tax, ROI or settlement data is present. Gate B, "
-            "production and betting are not authorized.\n"
-            ,
+            "production and betting are not authorized.\n",
             encoding="utf-8",
         )
         shutil.copy2(Path(__file__).resolve(), stage / "freeze_runner.py")
@@ -1919,28 +3582,41 @@ def atomic_generate(output: Path, database: Path) -> dict[str, object]:
             stage / "accepted_bj180_team_matchup_core.py",
         )
 
+        for path in stage.iterdir():
+            if path.suffix in {".csv", ".gz"}:
+                assert_file_header_outcome_safe(path)
+
         manifest = manifest_for(stage)
         write_json(stage / "SHA256SUMS.json", manifest)
         content_identity = {
-            "package": output.name,
+            "package": PACKAGE_NAME,
             "contract": CONTRACT,
             "version": VERSION,
             "manifest_sha256": sha256_file(stage / "SHA256SUMS.json"),
             "source_binding_sha256": sha256_file(stage / "source_binding.json"),
             "gate_a_card_sha256": sha256_file(stage / "gate_a_card.json"),
             "detector_grid_sha256": sha256_file(stage / "detector_grid.csv"),
-            "policy_issue_selection_sha256": sha256_file(
-                stage / "policy_issue_selection_freeze.csv.gz"
-            ),
+            "policy_issue_selection_shards": {
+                path.name: sha256_file(path)
+                for path in sorted(
+                    stage.glob("policy_issue_selection_freeze_part_*_of_04.csv.gz")
+                )
+            },
             "estimator_match_freeze_sha256": sha256_file(
                 stage / "estimator_match_freeze.csv.gz"
             ),
             "poisson_latent_reconciliation_sha256": sha256_file(
                 stage / "poisson_latent_reconciliation.csv.gz"
             ),
+            "ticket_multiplicity_vector_catalog_sha256": sha256_file(
+                stage / "ticket_multiplicity_vector_catalog.csv.gz"
+            ),
+            "directional_allocation_input_catalog_sha256": sha256_file(
+                stage / "directional_allocation_input_catalog.csv.gz"
+            ),
             "counts": card["cohort"],
             "policy_count": len(detector_grid),
-            "selection_row_count": selection_count,
+            "selection_row_count": policy_meta["selection_row_count"],
             "outcome_access": False,
         }
         write_json(stage / "CONTENT_IDENTITY.json", content_identity)
@@ -1951,7 +3627,7 @@ def atomic_generate(output: Path, database: Path) -> dict[str, object]:
             "content_identity_sha256": sha256_file(output / "CONTENT_IDENTITY.json"),
             "payload_count": len(manifest),
             "policy_count": len(detector_grid),
-            "selection_row_count": selection_count,
+            "selection_row_count": policy_meta["selection_row_count"],
             "coverage_min": card["detector_grid"]["minimum_selected_issue_count"],
             "coverage_max": card["detector_grid"]["maximum_selected_issue_count"],
         }

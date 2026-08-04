@@ -17,6 +17,14 @@
     "sha256": "f715dfb3ea976cc311fea6aacf79c648fce0209d79b071cd9233e769978994fc"
   },
   "base_main_commit": "7b3c55fd6a490a3e4147b94b7df944535b80b88f",
+  "coherent_t1_estimator": {
+    "expected_margin_source": "mean of the identical score-difference distribution",
+    "line_residual": "same-distribution expected margin + native handicap",
+    "max_abs_probability_reconciliation_error": "0.000000000001",
+    "probability_source": "mapped p3/p1/p0 of group-mass-reconciled T1 score-difference distribution",
+    "weighted_lambda_proxy": "diagnostic only; controls_direction=false",
+    "weighted_proxy_sign_disagreement_count": 1605
+  },
   "contract": "BJ-HIST-SPARSE-DIVERGENCE-N7-001",
   "database": {
     "forbidden_target_fields": [
@@ -39,16 +47,32 @@
     "path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
     "sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
     "target_projection": [
-      "match_id",
-      "issue",
-      "match_idx",
-      "kickoff_ts",
-      "year",
-      "league",
-      "home_team_id",
-      "away_team_id",
-      "handicap_line_norm"
+      "every match in each canonical numeric issue with kickoff/team IDs",
+      "complete target-safe 1h EURO consensus",
+      "native handicap line (missing retained as explicit OTHER/unavailable line residual)",
+      "#179 target-safe market feature projection"
     ]
+  },
+  "eligible_universe": {
+    "canonical_numeric_issue_count": 344,
+    "canonicalization": "duplicate cross-year issue instances collapse by numeric issue; canonical year=max source outer year; source instances retained",
+    "eligible_match_count": 102222,
+    "minimum_matches_per_issue": 7,
+    "native_line_exact_counts": {
+      "-0.500000000000": 1,
+      "-1.000000000000": 24561,
+      "-2.000000000000": 4877,
+      "-3.000000000000": 351,
+      "0.000000000000": 61275,
+      "1.000000000000": 9357,
+      "1.500000000000": 1,
+      "2.000000000000": 1467,
+      "3.000000000000": 80,
+      "MISSING": 252
+    },
+    "selection_boundary": "challenger chooses exact seven directly from every issue target-safe pool; inherited B0 is comparator only",
+    "source_issue_instance_count": 348,
+    "universe_identity_sha256": "c08c469915f0b2f8dd8c55d1b635682df0c718f73b89b6461937b3ac14cc18dd"
   },
   "issue": 190,
   "outcome_boundary": "Gate A outcome-unexposed: target score/result/final-or-winning SP/payout/tax/ROI/settlement fields are forbidden; historical scores enter the accepted #180 state only under its frozen kickoff <= issue cutoff - 180 minute embargo",
@@ -125,5 +149,5 @@
     "gate_b_recovery_package": "bj86_gate_b_streaming_summary_recovery_v1",
     "merge_commit": "8af13de640101d3cf64f663e5689a0db52d1d0d2"
   },
-  "version": "bj190-gate-a-preoutcome-v1"
+  "version": "bj190-gate-a-preoutcome-v2"
 }

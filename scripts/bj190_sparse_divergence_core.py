@@ -84,7 +84,9 @@ def poisson_difference_distribution(
     for home_goals, home_p in enumerate(pmf(lambda_home)):
         for away_goals, away_p in enumerate(pmf(lambda_away)):
             mass[home_goals - away_goals] += home_p * away_p
-    values = normalize([mass[difference] for difference in range(-max_goals, max_goals + 1)])
+    values = normalize(
+        [mass[difference] for difference in range(-max_goals, max_goals + 1)]
+    )
     return {
         difference: values[difference + max_goals]
         for difference in range(-max_goals, max_goals + 1)
@@ -101,7 +103,10 @@ def mapped_probabilities(
 
 
 def expected_margin(distribution: Mapping[int, float]) -> float:
-    return math.fsum(int(difference) * float(probability) for difference, probability in distribution.items())
+    return math.fsum(
+        int(difference) * float(probability)
+        for difference, probability in distribution.items()
+    )
 
 
 def distribution_payload(distribution: Mapping[int, float]) -> list[dict[str, object]]:
@@ -112,7 +117,9 @@ def distribution_payload(distribution: Mapping[int, float]) -> list[dict[str, ob
 
 
 def no_vig_from_prices(prices: Sequence[float]) -> tuple[float, float, float]:
-    if len(prices) != 3 or any(not math.isfinite(float(price)) or float(price) <= 1 for price in prices):
+    if len(prices) != 3 or any(
+        not math.isfinite(float(price)) or float(price) <= 1 for price in prices
+    ):
         raise RuntimeError("target-safe price vector is incomplete or invalid")
     inverse = [1.0 / float(price) for price in prices]
     return normalize(inverse)  # type: ignore[return-value]
@@ -139,7 +146,9 @@ def capture_family_latents(
         handicap: float,
         max_goals: int = MAX_GOALS,
     ) -> tuple[float, float, float]:
-        calls.append((float(lambda_home), float(lambda_away), float(handicap), int(max_goals)))
+        calls.append(
+            (float(lambda_home), float(lambda_away), float(handicap), int(max_goals))
+        )
         return original(lambda_home, lambda_away, handicap, max_goals)
 
     accepted_core.poisson_handicap = recorder
@@ -174,13 +183,11 @@ def weighted_family_intensities(
     if abs(total - 1.0) > 1e-12:
         raise RuntimeError("T1_DEEP_TEAM family weights do not sum to one")
     home = math.fsum(
-        float(family_weights[name])
-        * min(6.0, max(0.08, float(captured[name][0])))
+        float(family_weights[name]) * min(6.0, max(0.08, float(captured[name][0])))
         for name in FAMILY_ORDER
     )
     away = math.fsum(
-        float(family_weights[name])
-        * min(6.0, max(0.08, float(captured[name][1])))
+        float(family_weights[name]) * min(6.0, max(0.08, float(captured[name][1])))
         for name in FAMILY_ORDER
     )
     return home, away
@@ -201,14 +208,22 @@ def h2h_difference_distribution(
         for home_goals, away_goals in state.h2h.get((away, home), ())
     )
     mass: Counter[int] = Counter(
-        {int(difference): 12.0 * float(probability) for difference, probability in prior_distribution.items()}
+        {
+            int(difference): 12.0 * float(probability)
+            for difference, probability in prior_distribution.items()
+        }
     )
     for home_goals, away_goals in h2h_rows:
         difference = int(round(float(home_goals) - float(away_goals)))
-        if difference < -MAX_GOALS or difference > MAX_GOALS:
-            raise RuntimeError("H2H score difference exceeds frozen support")
+        # The accepted #180 branch consumes only the resulting 3/1/0 code and
+        # therefore admits historical score differences outside the bounded
+        # Poisson support.  Clamp those empirical tails to the matching edge;
+        # this preserves their code and keeps the exposed distribution finite.
+        difference = min(MAX_GOALS, max(-MAX_GOALS, difference))
         mass[difference] += 1.0
-    values = normalize([mass[difference] for difference in range(-MAX_GOALS, MAX_GOALS + 1)])
+    values = normalize(
+        [mass[difference] for difference in range(-MAX_GOALS, MAX_GOALS + 1)]
+    )
     return {
         difference: values[difference + MAX_GOALS]
         for difference in range(-MAX_GOALS, MAX_GOALS + 1)
@@ -221,16 +236,21 @@ def group_mass_calibrated_distribution(
     target_probabilities: Sequence[float],
     handicap: float,
 ) -> dict[int, float]:
-    """Create a p-only diagnostic distribution for #180's log-pooled primary.
+    """Create one coherent score distribution for #180's log-pooled primary.
 
     A log pool of three-way aggregates is not a single Poisson model.  We first
     construct a weighted log-pool shape over score differences, then rescale the
     within-code shapes so their three group masses equal the accepted primary
-    p3/p1/p0 exactly.  This distribution is diagnostic and must not be presented
-    as latent intensities or as the controlling expected-margin estimator.
+    p3/p1/p0 exactly.  Both the controlling probability vector and expected raw
+    margin are read from this same frozen distribution.  Component-weighted
+    Poisson intensities remain a separately named diagnostic proxy only.
     """
 
-    active = {name: float(weight) for name, weight in family_weights.items() if float(weight) > 0}
+    active = {
+        name: float(weight)
+        for name, weight in family_weights.items()
+        if float(weight) > 0
+    }
     total_weight = math.fsum(active.values())
     if set(active) - set(family_distributions) or total_weight <= 0:
         raise RuntimeError("invalid family distribution pool")
@@ -238,7 +258,8 @@ def group_mass_calibrated_distribution(
     for difference in range(-MAX_GOALS, MAX_GOALS + 1):
         shape[difference] = math.exp(
             math.fsum(
-                weight / total_weight
+                weight
+                / total_weight
                 * math.log(max(1e-300, float(family_distributions[name][difference])))
                 for name, weight in active.items()
             )
@@ -249,6 +270,12 @@ def group_mass_calibrated_distribution(
     target = normalize([float(value) for value in target_probabilities])
     output: dict[int, float] = {}
     for index, code in enumerate(CODES):
+        if not groups[code]:
+            if target[index] > RECONCILIATION_TOLERANCE:
+                raise RuntimeError(
+                    "empty score-difference outcome group with nonzero target mass"
+                )
+            continue
         group_total = math.fsum(shape[difference] for difference in groups[code])
         if group_total <= 0:
             raise RuntimeError("empty score-difference outcome group")
@@ -262,7 +289,10 @@ def probability_reconciliation_error(
 ) -> float:
     if len(actual) != 3 or len(expected) != 3:
         raise RuntimeError("probability vector must contain exactly three values")
-    return max(abs(float(left) - float(right)) for left, right in zip(actual, expected, strict=True))
+    return max(
+        abs(float(left) - float(right))
+        for left, right in zip(actual, expected, strict=True)
+    )
 
 
 def directional_ticket_accounting(n: int = 7) -> dict[str, object]:
@@ -283,4 +313,104 @@ def directional_ticket_accounting(n: int = 7) -> dict[str, object]:
         "planned_stake_yuan": 2 * full,
         "max_ticket_multiplicity": 2,
         "rule": "enumerate the 1458 tickets excluding the most-negative-delta code at the strongest eligible leg; repeat the 729 highest joint-estimator-probability tickets once; ties by base-3 ordinal",
+    }
+
+
+def decode_ticket_ordinal(ordinal: int, n: int = 7) -> tuple[str, ...]:
+    """Decode the frozen base-3 ordinal using code order 3, 1, 0."""
+
+    if ordinal < 0 or ordinal >= 3**n:
+        raise RuntimeError("ticket ordinal outside frozen support")
+    digits = [0] * n
+    value = ordinal
+    for index in range(n - 1, -1, -1):
+        digits[index] = value % 3
+        value //= 3
+    return tuple(CODES[digit] for digit in digits)
+
+
+def full_ticket_multiplicity_vector(n: int = 7) -> bytes:
+    """Return the FULL one-copy vector in base-3 ordinal order."""
+
+    return bytes([1]) * (3**n)
+
+
+def directional_ticket_multiplicity_vector(
+    probabilities_by_leg: Sequence[Sequence[float]],
+    delete_leg_index: int,
+    omitted_code: str,
+) -> bytes:
+    """Build the exact equal-budget directional multiplicity vector.
+
+    Every admissible ticket starts with multiplicity one.  The 729 admissible
+    tickets with the greatest product of the explicitly supplied per-leg
+    probabilities receive one additional copy.  Equal products are resolved by
+    ascending base-3 ordinal.  The result is a 2,187-byte u8 vector whose byte
+    offset is the ticket ordinal and whose value is 0, 1, or 2.
+    """
+
+    n = len(probabilities_by_leg)
+    if n != 7 or not 0 <= delete_leg_index < n or omitted_code not in CODES:
+        raise RuntimeError("invalid directional ticket input")
+    normalized: list[tuple[float, float, float]] = []
+    for values in probabilities_by_leg:
+        if len(values) != 3:
+            raise RuntimeError("allocation probability vector must have three values")
+        parsed = tuple(float(value) for value in values)
+        if any(not math.isfinite(value) or value <= 0 for value in parsed):
+            raise RuntimeError("allocation probabilities must be finite and positive")
+        normalized.append(normalize(parsed))  # type: ignore[arg-type]
+
+    vector = bytearray(3**n)
+    scored: list[tuple[float, int]] = []
+    for ordinal in range(3**n):
+        ticket = decode_ticket_ordinal(ordinal, n)
+        if ticket[delete_leg_index] == omitted_code:
+            continue
+        vector[ordinal] = 1
+        log_probability = math.fsum(
+            math.log(normalized[index][CODES.index(code)])
+            for index, code in enumerate(ticket)
+        )
+        scored.append((log_probability, ordinal))
+    if len(scored) != 2 * 3 ** (n - 1):
+        raise RuntimeError("one-code deletion support drift")
+    scored.sort(key=lambda row: (-row[0], row[1]))
+    repeat_count = 3**n - len(scored)
+    for _, ordinal in scored[:repeat_count]:
+        vector[ordinal] += 1
+    validate_ticket_multiplicity_vector(bytes(vector), omitted_code, delete_leg_index)
+    return bytes(vector)
+
+
+def validate_ticket_multiplicity_vector(
+    vector: bytes,
+    omitted_code: str | None = None,
+    delete_leg_index: int | None = None,
+) -> dict[str, int]:
+    """Validate and summarize a FULL or directional u8 multiplicity vector."""
+
+    if len(vector) != 3**7 or any(value not in (0, 1, 2) for value in vector):
+        raise RuntimeError("invalid ticket multiplicity vector")
+    counts = Counter(vector)
+    if omitted_code is None:
+        expected = {1: 3**7}
+    else:
+        if delete_leg_index is None:
+            raise RuntimeError("delete leg is required with omitted code")
+        for ordinal, multiplicity in enumerate(vector):
+            deleted = decode_ticket_ordinal(ordinal)[delete_leg_index] == omitted_code
+            if deleted != (multiplicity == 0):
+                raise RuntimeError("omitted-code multiplicity violation")
+        expected = {0: 3**6, 1: 3**6, 2: 3**6}
+    actual = {value: count for value, count in counts.items() if count}
+    if actual != expected or sum(vector) != 3**7:
+        raise RuntimeError(f"ticket multiplicity census drift: {actual}")
+    return {
+        "zero_count": counts[0],
+        "one_count": counts[1],
+        "two_count": counts[2],
+        "executed_ticket_count": sum(vector),
+        "unique_ticket_count": counts[1] + counts[2],
+        "max_multiplicity": max(vector),
     }
