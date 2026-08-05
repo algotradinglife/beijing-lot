@@ -778,14 +778,14 @@ def test_policy_rows_common_support_and_oracle_use_frozen_causal_screen():
         {
             "issue": "1",
             "year": "2021",
-            "outer_fold": "TEST_2021",
-            "issue_instance": "1@TEST_2021",
+            "outer_fold": "OOS_2021",
+            "issue_instance": "1@CANONICAL_2021",
         },
         {
             "issue": "2",
             "year": "2021",
-            "outer_fold": "TEST_2021",
-            "issue_instance": "2@TEST_2021",
+            "outer_fold": "OOS_2021",
+            "issue_instance": "2@CANONICAL_2021",
         },
     ]
     status = np.asarray(
@@ -840,6 +840,72 @@ def test_policy_rows_common_support_and_oracle_use_frozen_causal_screen():
     assert V2.strict_common_issue_indices(
         {"STATIC": static_rows, "CAUSAL": causal_rows}
     ) == [0]
+
+
+def test_oracle_fold_namespace_fails_closed_on_unknown_or_malformed_values():
+    assert V2.oracle_screen_fold("OOS_2022") == "TEST_2022"
+    assert V2.oracle_screen_fold("TEST_2022") == "TEST_2022"
+    for value in ("2022", "TRAIN_2022", "OOS_22", "OOS_20A2", ""):
+        try:
+            V2.oracle_screen_fold(value)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"oracle fold must fail closed: {value!r}")
+
+
+def test_oracle_correction_reconstructs_checkpoint_store_without_replay():
+    actions = [
+        {"interface_action_key": "A_STATIC"},
+        {"interface_action_key": "B_BETTER"},
+    ]
+    issues = [
+        {
+            "issue": "1",
+            "year": "2022",
+            "outer_fold": "OOS_2022",
+            "issue_instance": "1@CANONICAL_2022",
+        }
+    ]
+    rows = []
+    for action, net in (("A_STATIC", 0.0), ("B_BETTER", 20.0)):
+        rows.append(
+            {
+                "source_action_identity": action,
+                "issue": "1",
+                "status": "ACTIVE",
+                "stake_yuan": "100",
+                "gross_pre_tax_yuan": str(100 + net),
+                "tax_yuan": "0",
+                "pre_tax_net_yuan": str(net),
+                "hit": "1",
+            }
+        )
+    store = R.stage_store_from_settlement_rows(actions, issues, rows)
+    causal = V2.StagePath(
+        stage="STAGE_3_BET",
+        choices=np.asarray([0], dtype=np.int32),
+        model_by_issue=["CAUSAL"],
+        fallback_by_issue=np.asarray([False]),
+        model_receipts=[],
+        screen_receipts=[
+            {
+                "outer_fold": "TEST_2022",
+                "screen_phase": "OUTER_TRAIN",
+                "action_identity": "A_STATIC",
+            },
+            {
+                "outer_fold": "TEST_2022",
+                "screen_phase": "OUTER_TRAIN",
+                "action_identity": "B_BETTER",
+            },
+        ],
+    )
+    corrected = V2.oracle_path_on_causal_screen(store, causal)
+    assert corrected.choices.tolist() == [1]
+    corrected_rows = V2.issue_policy_rows("ORACLE", store, corrected)
+    assert corrected_rows[0]["chosen_action_identity"] == "B_BETTER"
+    assert corrected_rows[0]["pre_tax_net_yuan"] == 20.0
 
 
 def test_prior_only_paths_use_outer_train_without_validation_selection(

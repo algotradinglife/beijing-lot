@@ -1059,7 +1059,7 @@ def oracle_path_on_causal_screen(
     model_by_issue: list[str] = []
     fallback = np.zeros(len(store.issues), dtype=bool)
     for issue_index, issue in enumerate(store.issues):
-        fold = str(issue["outer_fold"])
+        fold = oracle_screen_fold(str(issue["outer_fold"]))
         available_actions = sorted(by_fold.get(fold, ()))
         eligible = [
             action
@@ -1088,6 +1088,20 @@ def oracle_path_on_causal_screen(
         model_receipts=[],
         screen_receipts=causal_path.screen_receipts,
     )
+
+
+def oracle_screen_fold(issue_fold: str) -> str:
+    """Map a canonical OOS issue fold to its frozen TEST screen namespace."""
+
+    if issue_fold.startswith("OOS_"):
+        year = issue_fold.removeprefix("OOS_")
+    elif issue_fold.startswith("TEST_"):
+        year = issue_fold.removeprefix("TEST_")
+    else:
+        raise ValueError(f"unknown oracle issue-fold namespace: {issue_fold!r}")
+    if len(year) != 4 or not year.isascii() or not year.isdigit():
+        raise ValueError(f"malformed oracle issue fold: {issue_fold!r}")
+    return f"TEST_{year}"
 
 
 def _stage1_candidate_score_lookup() -> dict[tuple[str, str, str], list[float]]:

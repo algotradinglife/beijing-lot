@@ -25,7 +25,7 @@ import sys
 import uuid
 from collections import defaultdict
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Mapping, Sequence
 
 import numpy as np
 
@@ -35,6 +35,13 @@ GATE_A_V2 = ROOT / "results" / "bj193_gate_a_chain_interface_v2"
 GATE_A_V21 = ROOT / "results" / "bj193_gate_a_chain_interface_v21"
 DEFAULT_CHECKPOINT = ROOT / ".scratch" / "bj193_gate_b_chain_checkpoint_v2"
 DEFAULT_OUTPUT = ROOT / "results" / "bj193_gate_b_regime_meta_policy_v2"
+DEFAULT_ORACLE_CORRECTION = (
+    ROOT / "results" / "bj193_gate_b_oracle_correction_v1"
+)
+EXPECTED_CHECKPOINT_MANIFEST = (
+    "4015ca353dff957a79958bf3e7aa73b8824f685c967a73e544d59bc437a3ca15"
+)
+ORACLE_CORRECTION_CONTRACT = "bj193-gate-b-oracle-fold-join-correction-v1"
 EXPECTED_GATE_A_MANIFEST = (
     "408e8aa69cf2d336f8b3b65b1c94b30a3456864af01517a78fc27b3f2bab0c45"
 )
@@ -1264,6 +1271,306 @@ def build_replay_checkpoint(target: Path) -> None:
         raise
 
 
+def stage_store_from_settlement_rows(
+    action_rows: Sequence[dict[str, str]],
+    issue_rows: Sequence[dict[str, str]],
+    settlement_rows: Sequence[dict[str, str]],
+) -> object:
+    """Reconstruct one exact checkpoint StageStore without ticket replay."""
+
+    action_lookup = {
+        row["interface_action_key"]: index
+        for index, row in enumerate(action_rows)
+    }
+    issue_lookup = {
+        row["issue"]: index for index, row in enumerate(issue_rows)
+    }
+    if len(action_lookup) != len(action_rows):
+        raise RuntimeError("oracle correction action identities are not unique")
+    if len(issue_lookup) != len(issue_rows):
+        raise RuntimeError("oracle correction issue identities are not unique")
+    shape = (len(action_rows), len(issue_rows))
+    status = np.empty(shape, dtype=np.uint8)
+    stake = np.empty(shape, dtype=np.float64)
+    gross = np.empty(shape, dtype=np.float64)
+    tax = np.empty(shape, dtype=np.float64)
+    net = np.empty(shape, dtype=np.float64)
+    hit = np.empty(shape, dtype=np.float64)
+    seen = np.zeros(shape, dtype=bool)
+    status_lookup = {
+        "NO_BET": V2.STATUS_NO_BET,
+        "ACTIVE": V2.STATUS_ACTIVE,
+        "UNAVAILABLE": V2.STATUS_UNAVAILABLE,
+    }
+    for row in settlement_rows:
+        action_key = row["source_action_identity"]
+        issue_key = row["issue"]
+        if action_key not in action_lookup or issue_key not in issue_lookup:
+            raise RuntimeError("oracle correction settlement identity drift")
+        ai = action_lookup[action_key]
+        ii = issue_lookup[issue_key]
+        if seen[ai, ii]:
+            raise RuntimeError("oracle correction duplicate action/issue row")
+        try:
+            status[ai, ii] = status_lookup[row["status"]]
+        except KeyError as exc:
+            raise RuntimeError("oracle correction unknown settlement status") from exc
+        stake[ai, ii] = float(row["stake_yuan"])
+        gross[ai, ii] = float(row["gross_pre_tax_yuan"])
+        tax[ai, ii] = float(row["tax_yuan"])
+        net[ai, ii] = float(row["pre_tax_net_yuan"])
+        hit[ai, ii] = float(row["hit"])
+        seen[ai, ii] = True
+    if not seen.all():
+        raise RuntimeError(
+            "oracle correction settlement matrix is incomplete: "
+            f"{int(seen.sum())}/{seen.size}"
+        )
+    return V2.StageStore(
+        action_rows=list(action_rows),
+        issues=list(issue_rows),
+        supports={},
+        status=status,
+        stake=stake,
+        gross=gross,
+        tax=tax,
+        net=net,
+        hit=hit,
+    )
+
+
+def _canonical_rows_sha256(rows: Sequence[Mapping[str, object]]) -> str:
+    payload = json.dumps(
+        list(rows), sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def build_oracle_correction(checkpoint: Path, target: Path) -> None:
+    """Correct only the leaky-oracle fold join from the immutable checkpoint."""
+
+    checkpoint = checkpoint.resolve()
+    target = target.resolve()
+    checkpoint_payload = verify_package(
+        checkpoint, EXPECTED_CHECKPOINT_MANIFEST
+    )
+    if target.exists():
+        raise RuntimeError(f"refusing to replace immutable target: {target}")
+    flows = read_csv(checkpoint / "issue_policy_flows.csv.gz")
+    policy_order = (
+        "ALL_STATIC",
+        "DYNAMIC_SELECTION_ONLY",
+        "DYNAMIC_SELECTION_DIRECTION",
+        "PRIOR_ONLY_BEST_FIXED",
+        "FULL_DYNAMIC_CHAIN",
+        "LEAKY_ORACLE_CEILING",
+    )
+    by_policy = {
+        policy: [row for row in flows if row["policy_id"] == policy]
+        for policy in policy_order
+    }
+    if any(len(rows) != CANONICAL_ISSUE_COUNT for rows in by_policy.values()):
+        raise RuntimeError("oracle correction policy denominator drift")
+    issue_rows = [
+        {
+            "issue": row["issue"],
+            "year": row["year"],
+            "outer_fold": row["outer_fold"],
+            "issue_instance": row["issue_instance"],
+        }
+        for row in by_policy["ALL_STATIC"]
+    ]
+    action_rows = read_csv(GATE_A_V2 / "stage3_bet_catalog.csv.gz")
+    settlement_rows = read_csv(
+        checkpoint
+        / "issue_action_settlement-STAGE3_DIRECTION_UPSTREAM.csv.gz"
+    )
+    store = stage_store_from_settlement_rows(
+        action_rows, issue_rows, settlement_rows
+    )
+    causal_path = V2.read_stage_path(
+        checkpoint / "stage_path-stage3_dynamic.json", store
+    )
+    corrected_path = V2.oracle_path_on_causal_screen(store, causal_path)
+    corrected_rows = V2.issue_policy_rows(
+        "LEAKY_ORACLE_CEILING", store, corrected_path
+    )
+    superseded_rows = by_policy["LEAKY_ORACLE_CEILING"]
+    causal_rows = by_policy["FULL_DYNAMIC_CHAIN"]
+    checkpoint_sha_before = sha(checkpoint / "SHA256SUMS.json")
+    if checkpoint_sha_before != EXPECTED_CHECKPOINT_MANIFEST:
+        raise RuntimeError("oracle correction checkpoint changed before publish")
+    stage = unique_stage(target)
+    try:
+        flow_fields = list(superseded_rows[0])
+        write_gzip(
+            stage / "superseded_oracle_policy_flow.csv.gz",
+            flow_fields,
+            superseded_rows,
+        )
+        write_gzip(
+            stage / "corrected_oracle_policy_flow.csv.gz",
+            flow_fields,
+            corrected_rows,
+        )
+        V2.write_stage_path(
+            corrected_path,
+            store,
+            stage / "corrected_stage_path-stage3_oracle.json",
+        )
+        identity_rows = []
+        for policy in policy_order[:-1]:
+            digest = _canonical_rows_sha256(by_policy[policy])
+            identity_rows.append(
+                {
+                    "policy_id": policy,
+                    "row_count": len(by_policy[policy]),
+                    "checkpoint_rows_sha256": digest,
+                    "correction_input_rows_sha256": digest,
+                    "byte_identity_status": "PASS_UNCHANGED_SOURCE_ROWS",
+                }
+            )
+        write_csv(
+            stage / "causal_policy_byte_identity.csv",
+            list(identity_rows[0]),
+            identity_rows,
+        )
+        payload_audit = []
+        for name, expected in sorted(checkpoint_payload.items()):
+            observed = sha(checkpoint / name)
+            payload_audit.append(
+                {
+                    "payload": name,
+                    "expected_sha256": expected,
+                    "observed_sha256": observed,
+                    "status": "PASS" if expected == observed else "FAIL",
+                }
+            )
+        if any(row["status"] != "PASS" for row in payload_audit):
+            raise RuntimeError("oracle correction checkpoint payload drift")
+        write_csv(
+            stage / "checkpoint_payload_audit.csv",
+            list(payload_audit[0]),
+            payload_audit,
+        )
+        economic_fields = (
+            "status",
+            "chosen_action_identity",
+            "stake_yuan",
+            "gross_pre_tax_yuan",
+            "tax_yuan",
+            "pre_tax_net_yuan",
+            "tax_adjusted_net_yuan",
+            "hit",
+        )
+        changed_action = sum(
+            old["chosen_action_identity"] != new["chosen_action_identity"]
+            for old, new in zip(superseded_rows, corrected_rows, strict=True)
+        )
+        changed_economics = sum(
+            any(str(old[field]) != str(new[field]) for field in economic_fields)
+            for old, new in zip(superseded_rows, corrected_rows, strict=True)
+        )
+        better_than_causal = sum(
+            new["status"] == "ACTIVE"
+            and causal["status"] == "ACTIVE"
+            and float(new["stake_yuan"]) > 0
+            and float(causal["stake_yuan"]) > 0
+            and float(new["pre_tax_net_yuan"]) / float(new["stake_yuan"])
+            > float(causal["pre_tax_net_yuan"])
+            / float(causal["stake_yuan"])
+            for new, causal in zip(corrected_rows, causal_rows, strict=True)
+        )
+        corrected_fallback = sum(
+            model == "ORACLE_NO_AVAILABLE_ACTION_CAUSAL_FALLBACK"
+            for model in corrected_path.model_by_issue
+        )
+        superseded_fallback = sum(
+            row["model_id"] == "ORACLE_NO_AVAILABLE_ACTION_CAUSAL_FALLBACK"
+            for row in superseded_rows
+        )
+        receipt = {
+            "contract": ORACLE_CORRECTION_CONTRACT,
+            "checkpoint_manifest_sha256": EXPECTED_CHECKPOINT_MANIFEST,
+            "checkpoint_payload_count": len(checkpoint_payload),
+            "canonical_issue_count": CANONICAL_ISSUE_COUNT,
+            "stage3_action_count": len(action_rows),
+            "stage3_action_issue_row_count": len(settlement_rows),
+            "fold_mapping": "OOS_YYYY_TO_TEST_YYYY_FAIL_CLOSED",
+            "superseded_oracle_fallback_count": superseded_fallback,
+            "corrected_oracle_fallback_count": corrected_fallback,
+            "corrected_oracle_selected_count": (
+                CANONICAL_ISSUE_COUNT - corrected_fallback
+            ),
+            "changed_action_issue_count": changed_action,
+            "changed_economic_issue_count": changed_economics,
+            "oracle_better_than_causal_issue_count": better_than_causal,
+            "causal_policy_count": len(identity_rows),
+            "causal_policy_rows_unchanged": all(
+                row["byte_identity_status"] == "PASS_UNCHANGED_SOURCE_ROWS"
+                for row in identity_rows
+            ),
+            "superseded_oracle_disposition": "SUPERSEDED_FOLD_JOIN_DEFECT",
+            "scientific_scope": "ORACLE_DIAGNOSTIC_ONLY_NO_CAUSAL_REPLAY",
+        }
+        write_json(stage / "oracle_correction_receipt.json", receipt)
+        source_binding = {
+            "contract": ORACLE_CORRECTION_CONTRACT,
+            "checkpoint": str(checkpoint.relative_to(ROOT)),
+            "checkpoint_manifest_sha256": EXPECTED_CHECKPOINT_MANIFEST,
+            "checkpoint_issue_policy_flows_sha256": checkpoint_payload[
+                "issue_policy_flows.csv.gz"
+            ],
+            "checkpoint_stage3_direction_settlement_sha256": (
+                checkpoint_payload[
+                    "issue_action_settlement-STAGE3_DIRECTION_UPSTREAM.csv.gz"
+                ]
+            ),
+            "checkpoint_stage3_dynamic_path_sha256": checkpoint_payload[
+                "stage_path-stage3_dynamic.json"
+            ],
+            "correction_chain_sha256": sha(
+                ROOT / "scripts" / "bj193_chain_gate_b_v2.py"
+            ),
+            "correction_runner_sha256": sha(Path(__file__)),
+            "correction_git_head": subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+            ).strip(),
+        }
+        write_json(stage / "source_binding.json", source_binding)
+        checkpoint_sha_after = sha(checkpoint / "SHA256SUMS.json")
+        if checkpoint_sha_after != checkpoint_sha_before:
+            raise RuntimeError("oracle correction mutated checkpoint")
+        package_manifest(
+            stage,
+            ORACLE_CORRECTION_CONTRACT,
+            {
+                "checkpoint_manifest_sha256": EXPECTED_CHECKPOINT_MANIFEST,
+                "canonical_issue_count": CANONICAL_ISSUE_COUNT,
+                "corrected_oracle_selected_count": (
+                    CANONICAL_ISSUE_COUNT - corrected_fallback
+                ),
+                "changed_economic_issue_count": changed_economics,
+                "causal_policy_rows_unchanged": True,
+            },
+        )
+        atomic_publish(stage, target)
+        print(
+            json.dumps(
+                {
+                    "oracle_correction": str(target),
+                    "manifest_sha256": sha(target / "SHA256SUMS.json"),
+                    **receipt,
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+    except Exception:
+        print(f"FAILED_STAGE={stage}", flush=True)
+        raise
+
+
 def preflight() -> None:
     manifests = verify_gate_a()
     store = V2.build_stage1_store()
@@ -1296,15 +1603,25 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument(
+        "--oracle-correction-output",
+        type=Path,
+        default=DEFAULT_ORACLE_CORRECTION,
+    )
     modes = parser.add_mutually_exclusive_group(required=True)
     modes.add_argument("--preflight", action="store_true")
     modes.add_argument("--replay-checkpoint", action="store_true")
+    modes.add_argument("--correct-oracle", action="store_true")
     modes.add_argument("--finalize", action="store_true")
     args = parser.parse_args()
     if args.preflight:
         preflight()
     elif args.replay_checkpoint:
         build_chain_checkpoint(args.checkpoint.resolve())
+    elif args.correct_oracle:
+        build_oracle_correction(
+            args.checkpoint, args.oracle_correction_output
+        )
     else:
         raise RuntimeError("finalizer implementation not yet available")
 
