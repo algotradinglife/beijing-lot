@@ -1,0 +1,176 @@
+{
+  "blank_rules": "ROI is blank for zero stake; no-bet/unavailable remain explicit zero-flow rows; no missing value is encoded as zero loss",
+  "failure_code_enum": [
+    "NO_ORACLE_OPPORTUNITY",
+    "UNSTABLE_REGIME_TO_ACTION_MAPPING",
+    "INSUFFICIENT_SUPPORT",
+    "EXCESSIVE_ACTION_SPACE_NOISE",
+    "CAUSAL_GENERALIZATION_FAILURE",
+    "NO_FAILURE"
+  ],
+  "holding": {
+    "drawdown_episodes.csv": [
+      "policy_id",
+      "sequence_basis",
+      "peak_issue",
+      "onset_issue",
+      "trough_issue",
+      "recovery_issue",
+      "drawdown_yuan",
+      "drawdown_pct",
+      "peak_sequence_index",
+      "onset_sequence_index",
+      "trough_sequence_index",
+      "recovery_sequence_index",
+      "drawdown_duration_to_trough_issues",
+      "time_under_water_issues",
+      "recovery_issues",
+      "recovered_flag"
+    ],
+    "holding_feasibility_scorecard.csv": [
+      "candidate_policy",
+      "comparator",
+      "support",
+      "roi",
+      "max_loss_streak",
+      "max_miss_streak",
+      "rolling_5_loss_probability",
+      "rolling_10_loss_probability",
+      "rolling_20_loss_probability",
+      "max_drawdown_yuan",
+      "max_drawdown_pct",
+      "max_drawdown_duration_issues",
+      "max_recovery_issues",
+      "tradeoff_disposition"
+    ],
+    "recovery_summary.csv": [
+      "policy_id",
+      "sequence_basis",
+      "episode_count",
+      "recovered_count",
+      "unrecovered_count",
+      "median_recovery_issues",
+      "p90_recovery_issues",
+      "max_recovery_issues"
+    ],
+    "rolling_loss_windows.csv": [
+      "policy_id",
+      "fold",
+      "sequence_basis",
+      "window_length",
+      "window_count",
+      "negative_pnl_probability",
+      "worst_net_yuan",
+      "worst_roi",
+      "worst_start_issue",
+      "worst_end_issue"
+    ],
+    "streak_metrics.csv": [
+      "policy_id",
+      "fold",
+      "sequence_basis",
+      "max_negative_pnl_streak",
+      "max_zero_payout_miss_streak"
+    ]
+  },
+  "outcome_boundary": "Gate A outcome-unexposed: no target result, final/winning SP, payout, tax realization, ROI, settlement, or post-cutoff evidence enters Tier-C features, transforms, action ranking, or tie-breaks",
+  "raw": {
+    "issue_action_settlement.csv.gz": [
+      "action_identity",
+      "issue",
+      "status",
+      "stake_yuan",
+      "gross_pre_tax_yuan",
+      "tax_yuan",
+      "pre_tax_net_yuan",
+      "tax_adjusted_net_yuan"
+    ],
+    "issue_equity_timeseries.csv.gz": [
+      "policy_id",
+      "sequence_basis",
+      "issue",
+      "chronology_index",
+      "status",
+      "stake_yuan",
+      "gross_pre_tax_yuan",
+      "pre_tax_net_yuan",
+      "cumulative_equity_yuan",
+      "running_peak_yuan",
+      "drawdown_yuan",
+      "drawdown_pct",
+      "negative_pnl_flag",
+      "zero_payout_miss_flag"
+    ],
+    "issue_policy_choice.csv.gz": [
+      "policy_id",
+      "issue",
+      "chosen_action_identity",
+      "choice_as_of_ts",
+      "train_end_issue",
+      "fallback_reason"
+    ]
+  },
+  "science": {
+    "bootstrap_paired_20000.csv": [
+      "candidate",
+      "comparator",
+      "metric",
+      "mean",
+      "ci_low",
+      "ci_high",
+      "probability_improvement"
+    ],
+    "failure_attribution.csv": [
+      "policy_id",
+      "failure_code",
+      "oracle_opportunity_present",
+      "causal_mapping_stable",
+      "support_sufficient",
+      "action_noise_excessive",
+      "causal_outperformance_present",
+      "evidence",
+      "disposition"
+    ],
+    "handoff_dynamic_sleeves.csv": [
+      "sleeve_id",
+      "action_namespace",
+      "nested_rule",
+      "native_support",
+      "common_support",
+      "holding_disposition",
+      "eligibility_for_192",
+      "independent_ev_required"
+    ],
+    "oracle_regret.csv.gz": [
+      "issue",
+      "oracle_action",
+      "causal_action",
+      "oracle_utility",
+      "causal_utility",
+      "regret",
+      "namespace"
+    ],
+    "performance_summary.csv": [
+      "policy_id",
+      "support",
+      "stake_yuan",
+      "pre_tax_roi",
+      "tax_adjusted_roi",
+      "sharpe",
+      "sortino",
+      "calmar",
+      "turnover",
+      "action_switch_count"
+    ],
+    "stability_year_fold_loyo.csv": [
+      "policy_id",
+      "view",
+      "included_value",
+      "excluded_value",
+      "stake_yuan",
+      "pre_tax_roi",
+      "max_drawdown_yuan",
+      "max_loss_streak"
+    ]
+  }
+}

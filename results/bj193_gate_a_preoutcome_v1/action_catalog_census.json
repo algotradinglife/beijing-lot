@@ -1,0 +1,20 @@
+{
+  "allocation_factor_count": 24730,
+  "contract": "BJ-HIST-N7-REGIME-META-POLICY-001",
+  "cross_namespace_recombination": false,
+  "expanded_action_count": 12173421,
+  "expanded_action_stream_sha256": "ac30a19c6e2d70dca029e4771d4dde2c6aeea5f6e5d2585ba4812f858d0243c8",
+  "factorized_not_shrunk": true,
+  "namespace_counts": {
+    "ATLAS167": 12163716,
+    "DIVERGENCE190": 9696,
+    "STACK170": 9
+  },
+  "outcome_boundary": "Gate A outcome-unexposed: no target result, final/winning SP, payout, tax realization, ROI, settlement, or post-cutoff evidence enters Tier-C features, transforms, action ranking, or tie-breaks",
+  "postselection_exploratory_alias_count": 18,
+  "postselection_focus_cluster_alias_count": 12,
+  "postselection_focus_cluster_primary_economic_identity_count": 6,
+  "postselection_primary_economic_identity_count": 10,
+  "selector_factor_count": 2919,
+  "version": "bj193-gate-a-preoutcome-v1"
+}

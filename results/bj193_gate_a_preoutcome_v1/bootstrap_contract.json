@@ -1,0 +1,17 @@
+{
+  "draw_sharing": "one deterministic draw matrix per support; identical indices for every candidate-comparator target",
+  "draws": 20000,
+  "economics_bootstrap": "shared iid issue-index resample for additive ROI/lift metrics",
+  "exclusions": "ex-largest payout issue and year, signed largest positive issue/year, and all year/regime exclusions",
+  "interval": "two-sided percentile 2.5/97.5; one-sided promotion lower bound reported separately",
+  "loyo": "exact leave-one-calendar-year-out; no bootstrap substitution",
+  "outcome_boundary": "Gate A outcome-unexposed: no target result, final/winning SP, payout, tax realization, ROI, settlement, or post-cutoff evidence enters Tier-C features, transforms, action ranking, or tie-breaks",
+  "paired_unit": "canonical issue on matched support",
+  "path_block_lengths": [
+    5,
+    10,
+    20
+  ],
+  "path_bootstrap": "shared circular moving-block resample preserving within-block chronology",
+  "seed": 193001
+}

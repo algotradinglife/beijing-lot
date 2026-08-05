@@ -1,0 +1,19 @@
+{
+  "authority": "paper research only; no betting, purchase, production, portfolio-weight or selector-release authority",
+  "causal_action": "maximum outer-train-fitted predicted utility; require predicted improvement >0 over strongest prior-only comparator or use fallback",
+  "fallback": "STATIC_BEST_FULL_FULL when history/support is insufficient; otherwise PRIOR_ONLY_BEST_FIXED; a weak namespace cannot force action",
+  "minimum_history": "60 prior canonical issues, at least two prior calendar years, and 20 active training rows per candidate action",
+  "oracle_action": "maximum realized utility on same available action support; tie lower native stake, then lexical action identity",
+  "oracle_restriction": "ORACLE_DIAGNOSTIC_ONLY: post-selection identities and future realized outcomes may measure ceiling/regret only; they grant no Edge, promotion, portfolio-weight, betting, or production authority",
+  "promotion": "causal candidate must beat strongest matched prior-only comparator, survive YEAR/LOYO/regime and ex-largest exclusions, avoid one-payout dependence, and improve at least one holding metric without unacceptable deterioration",
+  "regret": "oracle utility minus selected causal utility on identical issue/action availability",
+  "strict_independent_ev": "required only for materially positive/promotable causal candidate",
+  "tie_breaks": [
+    "higher predicted utility",
+    "lower outer-train downside deviation",
+    "lower native stake",
+    "lower complexity",
+    "lexical action identity"
+  ],
+  "utility": "pre_tax_net_yuan/stake_yuan for active issue; NO_BET and UNAVAILABLE utility=0; tax-adjusted is reference only"
+}

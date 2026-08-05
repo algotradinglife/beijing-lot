@@ -1,0 +1,82 @@
+{
+  "active_negative_streak": 2,
+  "active_zero_payout_miss_streak": 2,
+  "calendar_negative_streak": 1,
+  "calendar_zero_payout_miss_streak": 1,
+  "ending_equity_yuan": 219930.0,
+  "expected": {
+    "active_negative_streak": 2,
+    "active_zero_payout_miss_streak": 2,
+    "calendar_negative_streak": 1,
+    "calendar_zero_payout_miss_streak": 1,
+    "ending_equity_yuan": 219930,
+    "max_drawdown_yuan": 170.0
+  },
+  "flows": [
+    {
+      "gross": 80.0,
+      "issue": "A",
+      "net": -20.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 0.0,
+      "issue": "B",
+      "net": 0.0,
+      "stake": 0.0,
+      "status": "NO_BET"
+    },
+    {
+      "gross": 0.0,
+      "issue": "C",
+      "net": -100.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 150.0,
+      "issue": "D",
+      "net": 50.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 0.0,
+      "issue": "E",
+      "net": 0.0,
+      "stake": 0.0,
+      "status": "UNAVAILABLE"
+    },
+    {
+      "gross": 0.0,
+      "issue": "F",
+      "net": -50.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 0.0,
+      "issue": "G",
+      "net": 0.0,
+      "stake": 0.0,
+      "status": "NO_BET"
+    },
+    {
+      "gross": 0.0,
+      "issue": "H",
+      "net": -50.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 200.0,
+      "issue": "I",
+      "net": 100.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    }
+  ],
+  "max_drawdown_yuan": 170.0,
+  "synthetic_only": true
+}
