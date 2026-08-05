@@ -1,0 +1,41 @@
+{
+  "challenger_case": [
+    "survivor/winner catalog selection",
+    "parameter-search/multiple-comparison luck",
+    "outcome/oracle leakage",
+    "native versus exact-common support",
+    "fewer bets/turnover/retained cash",
+    "ex-post covariance/weight fitting",
+    "single issue/year/payout cluster",
+    "simpler-control explanation",
+    "descriptive frontier overstated as Edge"
+  ],
+  "multiplicity": {
+    "families": [
+      "catalog_sleeve_family",
+      "portfolio_membership",
+      "weight_method",
+      "capital_mode",
+      "position_fraction"
+    ],
+    "frontier_status": "the locked three-sleeve retrospective reproduction and every parameter cell are descriptive/hypothesis-generating; raw Pareto or best-cell rank is never Edge evidence",
+    "negative_rule": "negative/no-promotion results report full frontier and may use proportionate descriptive evidence",
+    "positive_inference": "20,000 paired stationary-block bootstrap max-T family-wise adjusted lower bounds at alpha=0.05; test all candidate-minus-control lifts within each frozen family",
+    "winner_rule": "screen all cells, but no same-window result advances the ladder; a future genuinely held-out/forward candidate must pass the frozen family-wise rule and strict matched PI review"
+  },
+  "primary_hypothesis": {
+    "candidate": "#170 BEST_FULL_FULL + MODEL_SOURCE_MODEL_CAP1_M512 + Q_SOURCE_Q_TOP_MASS_M192",
+    "comparison": "absolute pre-tax \u00a5100k path plus matched lift versus B170 BEST_FULL/FULL on exact common support and actual funding convention",
+    "decision": "retrospective reproduction only: same-window positive or max-T-adjusted results are hypothesis-generating and cannot advance the accepted ladder; advancement requires genuinely held-out or forward validation plus strict PI review",
+    "id": "RETROSPECTIVE_REPRODUCTION_R1_FIXED_THREE_SLEEVE_EQUAL_NATIVE",
+    "mode": "NATIVE_REQUEST_CONTROL",
+    "position_fraction": 1.0,
+    "weights": "EQUAL_WEIGHT"
+  },
+  "sequential_inference": {
+    "iid_diagnostic": "IID issue bootstrap is ROI-only diagnostic and must not support bankroll, drawdown, recovery, dynamic-weight or compounded-growth claims",
+    "moving_block_sensitivity": "paired moving block bootstrap, block lengths 6, 12 and 20 chronological issues; full state replay",
+    "path_bootstrap": "paired stationary block bootstrap, 20,000 replicates, expected block length 12 issues, seed 192001, each candidate/control shares exact resampled blocks and replays the complete state machine",
+    "primary_estimand": "original strict chronological walk-forward replay; recompute weights, funding, cash, equity, drawdown and all state inside every replay"
+  }
+}

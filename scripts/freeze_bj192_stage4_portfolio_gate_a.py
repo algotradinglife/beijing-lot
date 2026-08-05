@@ -10,6 +10,8 @@ from historical returns.
 from __future__ import annotations
 
 import argparse
+import array
+import ctypes
 import csv
 import gzip
 import hashlib
@@ -18,12 +20,14 @@ import json
 import math
 import os
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
+from typing import Sequence
 
 
 CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
-VERSION = "bj192-gate-a-v3"
+VERSION = "bj192-gate-a-v5"
 OUTCOME_BOUNDARY = (
     "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, "
     "tax realization, ROI, net, gross, or settlement payload is read."
@@ -52,7 +56,6 @@ def repo_root() -> Path:
 
 
 ROOT = repo_root()
-MODEL_NESTED_AUDIT = ROOT / ".scratch" / "bj192_model_cap1_nested_audit.json"
 SOURCE_170 = ROOT / "results" / "bj170_gate_a_preoutcome_v2"
 SOURCE_137 = ROOT / "results" / "bj137_gate_a_preoutcome_v2"
 SOURCE_176 = ROOT / "results" / "bj176_issue_equity_risk_v1"
@@ -67,7 +70,7 @@ SOURCE_167B = (
     ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1"
 )
 SOURCE_170B = ROOT / "results" / "bj170_gate_b_selector_allocator_stack_v1"
-DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v1"
+DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v4"
 SETTLED_IDENTITY_ONLY_PACKAGES = {
     "bj176_issue_equity_risk_v1",
     "bj190_gate_b_sparse_divergence_v1",
@@ -172,6 +175,89 @@ SLEEVES = (
     ),
 )
 
+# These are complete pre-outcome Stage-1→3 pipelines rather than a reopening
+# of the #167 outcome surface.  The family-level M paths stay unresolved until
+# Gate B's frozen strictly-prior selector runs; each row binds the exact source
+# identities, role vectors, sampler and seed aggregation needed to construct
+# the ticket multiset on that path.
+EXPANDED_FAMILY_SPECS = (
+    {
+        "candidate_id": "BJ148_NOGATE_WR_DENSE_M",
+        "source_package": "bj148_gate_a_preoutcome_v1",
+        "identity_file": "common_support_identities.csv.gz",
+        "role_file": "common_support_role_vectors.csv.gz",
+        "plan_file": "sampling_plan.csv",
+        "source_selector": "NO_GATE/RANK32_COMPLETE_ISSUE",
+        "mechanism": "WR_DUPLICATE_STAKE",
+        "weight_source": "Q_WEIGHT",
+        "seed_aggregation": "ARITHMETIC_MEAN_OF_133001_133002_133003",
+        "m_grid_file": "dense_m_grid.csv",
+        "fixed_m_comparator": "16",
+        "ticket_prefix_rule": "stable_uniform(bj137,WR,seed,exact identity signature,draw_index); draw positions 1..M are immutable ¥2 tax lots",
+        "frontier_role": "COMPLETE_EXECUTABLE_DENSE_M_FAMILY",
+    },
+    {
+        "candidate_id": "BJ148_NOGATE_WOR_DENSE_M",
+        "source_package": "bj148_gate_a_preoutcome_v1",
+        "identity_file": "common_support_identities.csv.gz",
+        "role_file": "common_support_role_vectors.csv.gz",
+        "plan_file": "sampling_plan.csv",
+        "source_selector": "NO_GATE/RANK32_COMPLETE_ISSUE",
+        "mechanism": "WOR_DISTINCT",
+        "weight_source": "Q_WEIGHT",
+        "seed_aggregation": "ARITHMETIC_MEAN_OF_133001_133002_133003",
+        "m_grid_file": "dense_m_grid.csv",
+        "fixed_m_comparator": "16",
+        "ticket_prefix_rule": "exponential-key WOR rank under frozen bj137 stable_uniform; ranks 1..M are immutable ¥2 tax lots",
+        "frontier_role": "COMPLETE_EXECUTABLE_DENSE_M_FAMILY",
+    },
+    {
+        "candidate_id": "BJ151_NOGATE_K4_WR_DENSE_M",
+        "source_package": "bj151_gate_a_preoutcome_v1",
+        "identity_file": "candidate_identities.csv.gz",
+        "role_file": "candidate_role_vectors.csv.gz",
+        "plan_file": "sampling_plan.csv",
+        "source_selector": "NO_GATE/K4_COMPLETE_ISSUE",
+        "mechanism": "WR_DUPLICATE_STAKE",
+        "weight_source": "Q_WEIGHT",
+        "seed_aggregation": "ARITHMETIC_MEAN_OF_137001_137002_137003",
+        "m_grid_file": "dense_m_grid.csv",
+        "fixed_m_comparator": "16",
+        "ticket_prefix_rule": "stable_uniform(bj137,WR,seed,exact identity signature,draw_index); draw positions 1..M are immutable ¥2 tax lots",
+        "frontier_role": "COMPLETE_EXECUTABLE_DENSE_M_FAMILY",
+    },
+    {
+        "candidate_id": "BJ151_NOGATE_K4_WOR_DENSE_M",
+        "source_package": "bj151_gate_a_preoutcome_v1",
+        "identity_file": "candidate_identities.csv.gz",
+        "role_file": "candidate_role_vectors.csv.gz",
+        "plan_file": "sampling_plan.csv",
+        "source_selector": "NO_GATE/K4_COMPLETE_ISSUE",
+        "mechanism": "WOR_DISTINCT",
+        "weight_source": "Q_WEIGHT",
+        "seed_aggregation": "ARITHMETIC_MEAN_OF_137001_137002_137003",
+        "m_grid_file": "dense_m_grid.csv",
+        "fixed_m_comparator": "16",
+        "ticket_prefix_rule": "exponential-key WOR rank under frozen bj137 stable_uniform; ranks 1..M are immutable ¥2 tax lots",
+        "frontier_role": "COMPLETE_EXECUTABLE_DENSE_M_FAMILY",
+    },
+    {
+        "candidate_id": "BJ159_SELECTED_N7_WOR_M_CURVE",
+        "source_package": "bj159_gate_a_preoutcome_v2r1",
+        "identity_file": "identity_catalog.csv.gz[n=7]",
+        "role_file": "role_vectors.csv.gz[n=7]",
+        "plan_file": "sampling_plan.csv[n=7]",
+        "source_selector": "ESP300_GM305_LOWP20_COMPLETE_ISSUE/N7",
+        "mechanism": "WOR_DISTINCT",
+        "weight_source": "Q_WEIGHT",
+        "seed_aggregation": "ARITHMETIC_MEAN_OF_137001_137002_137003",
+        "m_grid_file": "sampling_plan.csv nominal_M={32,64,128}",
+        "fixed_m_comparator": "32",
+        "ticket_prefix_rule": "exponential-key WOR rank under frozen bj137 stable_uniform; ranks 1..effective_M are immutable ¥2 tax lots",
+        "frontier_role": "COMPLETE_EXECUTABLE_M_CURVE_FAMILY",
+    },
+)
+
 
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
@@ -179,6 +265,94 @@ def sha256_file(path: Path) -> str:
         for block in iter(lambda: f.read(1 << 20), b""):
             h.update(block)
     return h.hexdigest()
+
+
+class FrozenAllocator:
+    """Run the byte-frozen #145 C++ allocator without persistent build state.
+
+    The allocation engine is authoritative for production tie cases.  The
+    short-lived shared object is built under repository ``.scratch`` (never
+    system ``/tmp``) and is not an input to, or retained by, the Gate-A
+    package.  This lets a detached clone regenerate the MODEL all-M proof.
+    """
+
+    def __init__(self, root: Path = ROOT) -> None:
+        source = root / "scripts" / "bj145_fast_alloc.cpp"
+        if sha256_file(source) != FROZEN_ALLOCATOR_SHA256:
+            raise RuntimeError("frozen allocator source hash drift")
+        scratch = root / ".scratch"
+        scratch.mkdir(exist_ok=True)
+        self._build = tempfile.TemporaryDirectory(prefix="bj192-allocator-", dir=scratch)
+        build = Path(self._build.name)
+        library = build / "bj192_capped_prefix.so"
+        wrapper = build / "bj192_capped_prefix.cpp"
+        wrapper.write_text(
+            "#include " + json.dumps(str(source)) + "\n"
+            "extern \"C\" int bj192_capped_prefix_ranks_batch("
+            "const double* weights_flat, int n_identity, int k, int maximum_m, int cap, int* ranks_flat) {\n"
+            "  int failure = 0;\n"
+            "  #pragma omp parallel for schedule(static)\n"
+            "  for (int identity = 0; identity < n_identity; ++identity) {\n"
+            "    int local_failure = 0;\n"
+            "    const double* weights = weights_flat + static_cast<std::size_t>(identity) * k;\n"
+            "    int* ranks = ranks_flat + static_cast<std::size_t>(identity) * k;\n"
+            "    std::vector<int> prior(k, 0), counts;\n"
+            "    std::fill(ranks, ranks + k, 0);\n"
+            "    for (int m = 1; m <= maximum_m; ++m) {\n"
+            "      capped_hamilton(weights, k, m, cap, counts);\n"
+            "      int additions = 0;\n"
+            "      for (int ordinal = 0; ordinal < k; ++ordinal) {\n"
+            "        const int delta = counts[ordinal] - prior[ordinal];\n"
+            "        if (delta < 0 || delta > 1) { local_failure = 1; continue; }\n"
+            "        if (delta == 1) { ranks[ordinal] = m; ++additions; }\n"
+            "      }\n"
+            "      if (additions != 1) { local_failure = 2; continue; }\n"
+            "      prior.swap(counts);\n"
+            "    }\n"
+            "    if (local_failure) {\n"
+            "      #pragma omp critical\n"
+            "      { if (failure < local_failure) failure = local_failure; }\n"
+            "    }\n"
+            "  }\n"
+            "  return failure;\n"
+            "}\n"
+        )
+        env = dict(os.environ, TMPDIR=self._build.name, TEMP=self._build.name, TMP=self._build.name)
+        subprocess.run(
+            ["g++", "-O3", "-std=c++17", "-fopenmp", "-shared", "-fPIC", str(wrapper), "-o", str(library)],
+            check=True,
+            env=env,
+        )
+        self.lib = ctypes.CDLL(str(library))
+        self.lib.bj192_capped_prefix_ranks_batch.argtypes = [
+            ctypes.POINTER(ctypes.c_double), ctypes.c_int, ctypes.c_int,
+            ctypes.c_int, ctypes.c_int, ctypes.POINTER(ctypes.c_int),
+        ]
+
+    @staticmethod
+    def _pointer(values: array.array, c_type: object):
+        return ctypes.cast(
+            (c_type * len(values)).from_buffer(values), ctypes.POINTER(c_type)
+        )
+
+    def capped_prefix_ranks_batch(
+        self, vectors: Sequence[Sequence[float]], maximum_m: int, cap: int
+    ) -> list[list[int]]:
+        if not vectors or any(len(weights) != 2187 for weights in vectors):
+            raise RuntimeError("allocator weights must cover the canonical N7 space")
+        weight_buffer = array.array("d", (weight for row in vectors for weight in row))
+        ranks = array.array("i", [0]) * (len(vectors) * 2187)
+        status = self.lib.bj192_capped_prefix_ranks_batch(
+            self._pointer(weight_buffer, ctypes.c_double),
+            len(vectors),
+            2187,
+            maximum_m,
+            cap,
+            self._pointer(ranks, ctypes.c_int),
+        )
+        if status:
+            raise RuntimeError(f"native capped-prefix nesting failed: status={status}")
+        return [list(ranks[offset : offset + 2187]) for offset in range(0, len(ranks), 2187)]
 
 
 def canonical_hash(value: object) -> str:
@@ -565,13 +739,16 @@ def allocate_integer_tickets(
     preissue_bankroll_yuan: int,
     native_ticket_caps: dict[str, int],
     weights: dict[str, float],
+    atomic_ticket_blocks: dict[str, bool] | None = None,
 ) -> dict[str, object]:
     """Freeze the simultaneous, capped integer ticket allocator.
 
-    It uses a deterministic weighted water-fill: repeatedly distribute the
-    remaining whole-ticket budget over uncapped sleeves by normalized weights;
-    floor, then award fractional remainders in sleeve-id order.  Sleeves that
-    hit their native cap are removed and the residual is re-water-filled.
+    Atomic sleeves (currently ``FULL_ENUMERATED``) are whole-native blocks.
+    We first derive the ordinary capped continuous target over *all* sleeves.
+    We then enumerate feasible atomic subsets and choose the one whose
+    resulting executable integer allocation is closest to that target.  This
+    makes whole-FULL safety compatible with the declared portfolio weights:
+    affordability alone can never cause FULL to consume the budget first.
     """
     if mode not in FUNDING_MODES:
         raise ValueError(f"unknown funding mode: {mode}")
@@ -590,43 +767,63 @@ def allocate_integer_tickets(
         mode_notional = fraction * preissue_bankroll_yuan
     budget_yuan = min(mode_notional, float(preissue_bankroll_yuan))
     budget_tickets = int(math.floor(budget_yuan / TICKET_STAKE_YUAN))
-    assigned = {s: 0 for s in sorted(native_ticket_caps)}
+    caps = {sleeve: max(0, value) for sleeve, value in native_ticket_caps.items()}
+    assigned = {s: 0 for s in sorted(caps)}
+    atomic_ticket_blocks = atomic_ticket_blocks or {}
+    if set(atomic_ticket_blocks) - set(native_ticket_caps):
+        raise ValueError("atomic policy supplied for an unknown sleeve")
     reasons: set[str] = set()
     if cap_total == 0:
         reasons.add("NO_BET_NATIVE_ZERO_REQUEST")
     if budget_tickets == 0 and cap_total:
         reasons.add("NO_BET_BUDGET_LT_TICKET")
-    remaining = min(budget_tickets, cap_total)
+    requested = min(budget_tickets, cap_total)
     if budget_tickets < int(math.ceil(mode_notional / TICKET_STAKE_YUAN)):
         reasons.add("SCALED_BY_PREISSUE_BANKROLL")
-    if remaining < cap_total and cap_total:
+    if requested < cap_total and cap_total:
         reasons.add("SCALED_BY_MODE_NOTIONAL")
-    while remaining:
-        free = [
-            s for s in sorted(assigned) if assigned[s] < max(0, native_ticket_caps[s])
-        ]
-        if not free:
-            break
-        free_weights = normalize({s: weights.get(s, 0.0) for s in free})
-        quotas = {
-            s: min(native_ticket_caps[s] - assigned[s], remaining * free_weights[s])
-            for s in free
+    atomic = [
+        sleeve
+        for sleeve in sorted(assigned)
+        if atomic_ticket_blocks.get(sleeve, False) and caps[sleeve] > 0
+    ]
+    target = capped_continuous_targets(requested, caps, weights)
+    feasible: list[tuple[tuple[object, ...], dict[str, int], tuple[str, ...]]] = []
+    for mask in range(1 << len(atomic)):
+        selected = tuple(atomic[index] for index in range(len(atomic)) if mask & (1 << index))
+        atomic_total = sum(caps[sleeve] for sleeve in selected)
+        if atomic_total > requested:
+            continue
+        candidate = {sleeve: (caps[sleeve] if sleeve in selected else 0) for sleeve in assigned}
+        flexible_caps = {
+            sleeve: caps[sleeve]
+            for sleeve in assigned
+            if sleeve not in atomic
         }
-        increments = {
-            s: min(native_ticket_caps[s] - assigned[s], int(math.floor(quotas[s])))
-            for s in free
-        }
-        placed = sum(increments.values())
-        if placed == 0:
-            # One-ticket residual round.  Ties are always sleeve_id ascending.
-            winner = sorted(
-                free, key=lambda s: (-(quotas[s] - math.floor(quotas[s])), s)
-            )[0]
-            increments[winner] = 1
-            placed = 1
-        for s, count in increments.items():
-            assigned[s] += count
-        remaining -= placed
+        candidate.update(
+            capped_integer_waterfill(
+                requested - atomic_total, flexible_caps, weights
+            )
+        )
+        actual = sum(candidate.values())
+        # The primary objective is distance from the declared continuous
+        # portfolio target; retained cash and a lexical subset signature make
+        # otherwise indistinguishable choices deterministic.
+        objective = (
+            round(sum(abs(candidate[sleeve] - target[sleeve]) for sleeve in candidate), 12),
+            requested - actual,
+            tuple(selected),
+        )
+        feasible.append((objective, candidate, selected))
+    if not feasible:
+        raise RuntimeError("no feasible atomic funding subset")
+    _, assigned, selected_atomic = min(feasible, key=lambda item: item[0])
+    for sleeve in atomic:
+        if sleeve not in selected_atomic:
+            if caps[sleeve] > requested:
+                reasons.add("ATOMIC_BLOCK_UNFUNDED_RETAIN_OR_REALLOCATE_CASH")
+            else:
+                reasons.add("ATOMIC_BLOCK_EXCLUDED_BY_TARGET_OBJECTIVE")
     actual_tickets = sum(assigned.values())
     if actual_tickets < min(budget_tickets, cap_total) and cap_total:
         reasons.add("CAPACITY_EXHAUSTED_RETAIN_CASH")
@@ -643,11 +840,79 @@ def allocate_integer_tickets(
         "mode_notional_yuan": mode_notional,
         "issue_budget_yuan": budget_yuan,
         "requested_ticket_count": cap_total,
+        "continuous_target_ticket_count_by_sleeve": target,
         "actual_ticket_count_by_sleeve": assigned,
+        "selected_atomic_blocks": list(selected_atomic),
+        "allocation_distance_l1_tickets": sum(
+            abs(assigned[sleeve] - target[sleeve]) for sleeve in assigned
+        ),
         "actual_total_stake_yuan": actual_stake,
         "retained_cash_yuan": preissue_bankroll_yuan - actual_stake,
         "reason_codes": "|".join(sorted(reasons)) or "FUNDED_AS_REQUESTED",
     }
+
+
+def capped_continuous_targets(
+    ticket_budget: int, caps: dict[str, int], weights: dict[str, float]
+) -> dict[str, float]:
+    """Continuous capped-water-fill reference for the atomic subset objective."""
+    result = {sleeve: 0.0 for sleeve in sorted(caps)}
+    remaining = float(min(ticket_budget, sum(caps.values())))
+    while remaining > 1e-12:
+        free = [
+            sleeve
+            for sleeve in sorted(result)
+            if result[sleeve] < caps[sleeve] - 1e-12
+        ]
+        if not free:
+            break
+        normalized = normalize({sleeve: weights.get(sleeve, 0.0) for sleeve in free})
+        proposed = {
+            sleeve: min(caps[sleeve] - result[sleeve], remaining * normalized[sleeve])
+            for sleeve in free
+        }
+        placed = sum(proposed.values())
+        if placed <= 1e-12:
+            break
+        for sleeve, increment in proposed.items():
+            result[sleeve] += increment
+        remaining -= placed
+    return result
+
+
+def capped_integer_waterfill(
+    ticket_budget: int, caps: dict[str, int], weights: dict[str, float]
+) -> dict[str, int]:
+    """Deterministic integer capped water-fill over the supplied sleeves only."""
+    assigned = {sleeve: 0 for sleeve in sorted(caps)}
+    remaining = min(ticket_budget, sum(caps.values()))
+    while remaining:
+        free = [sleeve for sleeve in sorted(assigned) if assigned[sleeve] < caps[sleeve]]
+        if not free:
+            break
+        normalized = normalize({sleeve: weights.get(sleeve, 0.0) for sleeve in free})
+        quotas = {
+            sleeve: min(caps[sleeve] - assigned[sleeve], remaining * normalized[sleeve])
+            for sleeve in free
+        }
+        increments = {
+            sleeve: min(caps[sleeve] - assigned[sleeve], int(math.floor(quotas[sleeve])))
+            for sleeve in free
+        }
+        placed = sum(increments.values())
+        if placed == 0:
+            winner = sorted(
+                free,
+                key=lambda sleeve: (
+                    -(quotas[sleeve] - math.floor(quotas[sleeve])), sleeve
+                ),
+            )[0]
+            increments[winner] = 1
+            placed = 1
+        for sleeve, count in increments.items():
+            assigned[sleeve] += count
+        remaining -= placed
+    return assigned
 
 
 def funding_contract() -> dict[str, object]:
@@ -664,6 +929,7 @@ def funding_contract() -> dict[str, object]:
         "integer_allocator": {
             "universal_budget": "issue_budget=min(mode_notional, preissue_bankroll); ticket_budget=floor(issue_budget/¥2)",
             "raw_ticket_target": "iterative normalized sleeve weight × remaining ticket budget, hard-capped at native requested tickets",
+            "atomic_blocks": "FULL_ENUMERATED is funded only as its complete native ticket block. First derive capped continuous targets across every sleeve. Enumerate feasible whole-atomic subsets; for each, water-fill only prefix-executable sleeves, then select the allocation minimizing (L1 distance from the continuous target, retained tickets, lexical included-block tuple). An excluded atomic block is NO_BET; residual is reallocated only to executable prefixes or retained as cash. Affordability alone never gives FULL priority over its target weight.",
             "rounding": "each water-fill pass floors capped quotas, then gives one residual ticket to largest fractional quota; ties sleeve_id ascending",
             "cap_bound_leftover": "remove sleeves at native cap and repeat weighted water-fill until no ticket budget or no capacity; retain any unspendable cash",
             "minimum": "budget under ¥2 or all native requests zero is NO_BET, zero flow not a loss",
@@ -681,6 +947,8 @@ def funding_contract() -> dict[str, object]:
                 "CAPACITY_EXHAUSTED_RETAIN_CASH",
                 "NO_BET_NATIVE_ZERO_REQUEST",
                 "NO_BET_BUDGET_LT_TICKET",
+                "ATOMIC_BLOCK_UNFUNDED_RETAIN_OR_REALLOCATE_CASH",
+                "ATOMIC_BLOCK_EXCLUDED_BY_TARGET_OBJECTIVE",
             ],
             "gate_b_requirement": "settle each allocated ticket with native per-ticket tax; fail closed if no exact ticket-level settlement bridge exists",
         },
@@ -689,7 +957,7 @@ def funding_contract() -> dict[str, object]:
 
 def methodology_contract() -> dict[str, object]:
     return {
-        "membership": "all seven nonempty subsets of the three exhaustive ELIGIBLE_COMPLETE_NONREDUNDANT sleeves; historic grids are lineage evidence, not new Stage-4 sleeves; no Stage 1–3 selection, direction, ticket, M, seed, or support construction changes",
+        "membership": "all pairs across the full eligible complete catalog; all nonempty subsets of the locked three-sleeve H1 panel and of the preregistered robust higher-order shortlist. Every dynamic family retains its exact source M curve and strictly-prior selector; no Stage 1–3 selection, direction, ticket, seed, or support construction changes",
         "attribution": {
             "upstream": "report each inherited Stage-1→3 sleeve path unchanged at native request alongside its actual Stage-4 funded flow",
             "stage4": "attribute size/downscale/cash/weight lift against the same-sleeve native-request and equal-weight controls; do not mislabel it as selection, direction, or ticket-construction lift",
@@ -717,7 +985,7 @@ def methodology_contract() -> dict[str, object]:
             "PRIOR_ERC",
             "PRIOR_DRAWDOWN_AWARE",
         ],
-        "M_rule": "UPSTREAM_FROZEN_FIXED: FULL=2187, MODEL=512, Q=192. No new M scan or post-outcome M choice. FULL is an indivisible whole-native block; partial Q/MODEL funding must use the prefix registry or abstain.",
+        "M_rule": "H1 retains upstream fixed FULL=2187, MODEL=512 and Q=192. Expanded #148/#151/#159 families use only their materialized source M grids and the separate strictly-prior M-selection contract; no full-sample or test-period outcome can choose M. FULL is indivisible; every partial allocation requires its family prefix rule or abstains.",
         "primary_hypothesis": {
             "id": "RETROSPECTIVE_REPRODUCTION_R1_FIXED_THREE_SLEEVE_EQUAL_NATIVE",
             "candidate": "#170 BEST_FULL_FULL + MODEL_SOURCE_MODEL_CAP1_M512 + Q_SOURCE_Q_TOP_MASS_M192",
@@ -787,6 +1055,148 @@ def methodology_contract() -> dict[str, object]:
     }
 
 
+def expanded_sleeve_catalog() -> list[dict[str, object]]:
+    """Materialize the non-H1 executable Stage-1→3 sleeve families.
+
+    The catalog deliberately stores all available source M values, rather than
+    a historical winner.  Gate B chooses a per-issue M only through the frozen
+    strictly-prior rule in :func:`m_selection_contract`.
+    """
+    catalog: list[dict[str, object]] = []
+    for spec in EXPANDED_FAMILY_SPECS:
+        source = Path(EXPECTED_SOURCES[spec["source_package"]]["path"])
+        identity_name = str(spec["identity_file"]).split("[")[0]
+        role_name = str(spec["role_file"]).split("[")[0]
+        plan_name = str(spec["plan_file"]).split("[")[0]
+        identities = read_csv_gzip(source / identity_name)
+        roles = read_csv_gzip(source / role_name)
+        plans = read_csv(source / plan_name)
+        if spec["source_package"] == "bj159_gate_a_preoutcome_v2r1":
+            identities = [row for row in identities if row["n"] == "7"]
+            roles = [row for row in roles if row["n"] == "7"]
+            plans = [row for row in plans if row["n"] == "7"]
+            m_grid = sorted({int(row["nominal_M"]) for row in plans})
+        else:
+            mechanism = str(spec["mechanism"])
+            target = (
+                "Q_INFORMED_WR_DUPLICATE_STAKE"
+                if mechanism == "WR_DUPLICATE_STAKE"
+                else "Q_INFORMED_WOR_DISTINCT"
+            )
+            plans = [
+                row
+                for row in plans
+                if row.get("ticket_mechanism") == target
+            ]
+            m_grid = sorted({int(row["M"]) for row in plans})
+        if not identities or len(roles) != len(identities) * 7 or not m_grid:
+            raise RuntimeError(f"incomplete executable sleeve family: {spec['candidate_id']}")
+        catalog.append(
+            {
+                **spec,
+                "source_identity_payload_sha256": sha256_file(source / identity_name),
+                "source_role_payload_sha256": sha256_file(source / role_name),
+                "source_plan_payload_sha256": sha256_file(source / plan_name),
+                "identity_count": len(identities),
+                "role_row_count": len(roles),
+                "available_M_grid": ";".join(str(value) for value in m_grid),
+                "available_M_grid_sha256": canonical_hash(m_grid),
+                "native_ticket_identity": "exact source identity + frozen seed/replicate + ordinal or draw rank under ticket_prefix_rule",
+                "tax_lot_identity": "candidate_id:issue_instance:portfolio_or_identity_id:seed_or_aggregate_replica:draw_or_rank",
+                "outcome_boundary": OUTCOME_BOUNDARY,
+            }
+        )
+    return catalog
+
+
+def bj145_allocation_candidate_registry() -> list[dict[str, object]]:
+    """Deduplicate #145's complete selector×allocator candidates pre-outcome.
+
+    #145 does carry the #151 selection trace in every plan row, so it is not
+    an allocator-only splice.  A candidate is a frozen (arm, weight source,
+    mechanism, repeat cap) family; M and nuisance seed remain a declared
+    within-family curve selected only by :func:`m_selection_contract`.
+    """
+    source = SOURCE_145
+    groups: dict[tuple[str, str, str, str], list[dict[str, str]]] = {}
+    for row in read_csv_gzip(source / "allocation_plan.csv.gz"):
+        if row["selection_status"] != "AVAILABLE":
+            continue
+        key = (row["arm_id"], row["weight_source"], row["mechanism"], row["cap"])
+        groups.setdefault(key, []).append(row)
+    result: list[dict[str, object]] = []
+    for key, rows in sorted(groups.items()):
+        arm, weight_source, mechanism, cap = key
+        candidate_id = "BJ145_" + "_".join(
+            value.replace("_", "-") for value in key
+        )
+        m_grid = sorted({int(row["M"]) for row in rows})
+        seeds = sorted({row["seed"] for row in rows})
+        issues = sorted({row["issue_instance"] for row in rows})
+        plan_ids = sorted(row["plan_id"] for row in rows)
+        # FULL does not depend on an upstream weight vector.  Retain one
+        # canonical family and label the remaining weight-source aliases, so
+        # the Stage-4 frontier never manufactures duplicate FULL controls.
+        economic_key = (arm, "FULL_ENUMERATED", "NA") if mechanism == "FULL_ENUMERATED" else key
+        result.append(
+            {
+                "candidate_id": candidate_id,
+                "economic_key": "|".join(economic_key),
+                "source_package": "bj145_gate_a_preoutcome_v8",
+                "source_plan_file": "allocation_plan.csv.gz",
+                "source_identity_file": "identity_catalog.csv.gz",
+                "source_plan_payload_sha256": sha256_file(source / "allocation_plan.csv.gz"),
+                "source_identity_payload_sha256": sha256_file(source / "identity_catalog.csv.gz"),
+                "arm_id": arm,
+                "weight_source": weight_source,
+                "mechanism": mechanism,
+                "cap": cap,
+                "available_M_grid": ";".join(str(value) for value in m_grid),
+                "available_M_grid_sha256": canonical_hash(m_grid),
+                "fixed_m_comparator": min(m_grid),
+                "seed_scope": ";".join(seeds),
+                "issue_instance_count": len(issues),
+                "plan_row_count": len(rows),
+                "plan_id_set_sha256": canonical_hash(plan_ids),
+                "support_adapter": "allocation_plan rows join #151 frozen identity by (arm_id, issue_instance, selected_portfolio_ids_sha256); Gate B must fail closed on any nonunique/missing join",
+                "native_ticket_identity": "#145 accepted frozen allocation engine + plan_id + selected_portfolio_ids_sha256 + mechanism/cap/M/seed; repeats are independent ¥2 tax lots",
+                "ticket_prefix_rule": "frozen #145 plan order; partial Stage-4 funding requires a nested-prefix proof for that exact mechanism, otherwise whole-native-or-NO_BET",
+                "outcome_boundary": OUTCOME_BOUNDARY,
+            }
+        )
+    canonical: dict[str, str] = {}
+    for row in result:
+        canonical.setdefault(str(row["economic_key"]), str(row["candidate_id"]))
+        row["economic_decision"] = (
+            "ELIGIBLE_COMPLETE_NONREDUNDANT"
+            if canonical[str(row["economic_key"])] == row["candidate_id"]
+            else "DUPLICATE_ECONOMIC_IDENTITY"
+        )
+        row["canonical_candidate_id"] = canonical[str(row["economic_key"])]
+    return result
+
+
+def m_selection_contract(expanded: list[dict[str, object]]) -> dict[str, object]:
+    return {
+        "selection_scope": "each family independently; complete chronological calendar; current issue and all future outcomes forbidden",
+        "minimum_prior_active_issues": 52,
+        "training_score": "prior-only aggregate pre-tax net / prior-only aggregate actual stake on the family native support; blank/zero-stake M values cannot win",
+        "tie_break": "higher score, then lower M, then candidate_id lexicographic, then frozen seed-aggregate id",
+        "fallback": "before 52 active observations use fixed_m_comparator; never select by full-sample ROI, winning year, payout, or test-period result",
+        "seed_rule": "arithmetic mean of replicate net/stake before M scoring and before capital allocation; replicate draws are nuisance simulations, not multiplied purchased exposure",
+        "fixed_m_comparator": [
+            {
+                "candidate_id": row["candidate_id"],
+                "M": row["fixed_m_comparator"],
+                "available_M_grid": row["available_M_grid"],
+            }
+            for row in expanded
+        ],
+        "all_M_curve": "publish every available M in available_M_grid on the exact source support; dynamic path and fixed-M comparator are both mandatory",
+        "nested_loyo_sensitivity": "for each held-out year, re-run the same selector on earlier years only; if no earlier 52-active history exists use fixed_m_comparator",
+    }
+
+
 def eligibility_ledger() -> list[dict[str, str]]:
     rows = [
         {
@@ -802,55 +1212,71 @@ def eligibility_ledger() -> list[dict[str, str]]:
         for sleeve, _, _, _ in SLEEVES
     ]
     rows.extend(
+        {
+            "candidate_id": str(family["candidate_id"]),
+            "source_package": str(family["source_package"]),
+            "identity_source": f"{family['identity_file']} + {family['role_file']} + {family['plan_file']}",
+            "inherited_M_seed_support": f"M={family['available_M_grid']}; {family['seed_aggregation']}",
+            "decision": "ELIGIBLE_COMPLETE_NONREDUNDANT",
+            "frontier_role": str(family["frontier_role"]),
+            "reason": "complete outcome-unexposed identity, seven-role vector, sampler plan, M grid, replicate aggregation and deterministic ticket/tax-lot identity rule are materialized in executable_sleeve_family_catalog.csv",
+            "outcome_boundary": OUTCOME_BOUNDARY,
+        }
+        for family in expanded_sleeve_catalog()
+    )
+    rows.extend(
+        {
+            "candidate_id": str(candidate["candidate_id"]),
+            "source_package": "bj145_gate_a_preoutcome_v8 + bj151_gate_a_preoutcome_v1",
+            "identity_source": "allocation_plan.csv.gz + identity_catalog.csv.gz; #151 selector adapter",
+            "inherited_M_seed_support": f"M={candidate['available_M_grid']}; seed={candidate['seed_scope']}",
+            "decision": str(candidate["economic_decision"]),
+            "frontier_role": "COMPLETE_ALLOCATION_FAMILY" if candidate["economic_decision"] == "ELIGIBLE_COMPLETE_NONREDUNDANT" else "DUPLICATE_ALLOCATION_ALIAS",
+            "reason": "complete outcome-unexposed #151 selector trace is referenced by every #145 plan row; candidate is deduplicated only by exact pre-outcome economic ticket identity",
+            "outcome_boundary": OUTCOME_BOUNDARY,
+        }
+        for candidate in bj145_allocation_candidate_registry()
+    )
+    rows.extend(
         [
             {
                 "candidate_id": "BJ137_COMPLETE_ISSUE_Q_SAMPLING",
                 "source_package": "bj137_gate_a_preoutcome_v2",
                 "identity_source": "n7_identities.csv.gz + sampler_plan.csv",
                 "inherited_M_seed_support": "frozen complete-issue sampling M/seed plan",
-                "decision": "SUPERSEDED_BY_167_ATLAS",
+                "decision": "DUPLICATE_ECONOMIC_IDENTITY",
                 "frontier_role": "LINEAGE_ONLY",
-                "reason": "complete source sampling surface is represented by the accepted #167 atlas; reopening it would recreate upstream search rather than add a nonredundant Stage-4 sleeve",
+                "reason": "the full #137 primitive surface is represented by the materialized #148/#151 exact descendant pipeline families; it is not independently re-spliced into Stage 4",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             },
             {
-                "candidate_id": "BJ145_ALLOCATION_MECHANISMS",
-                "source_package": "bj145_gate_a_preoutcome_v8",
-                "identity_source": "identity_catalog.csv.gz + allocation_plan.csv.gz",
-                "inherited_M_seed_support": "frozen M grid/mechanism/cap/repeat plans",
-                "decision": "SEMANTICS_OR_M_CURVE_ONLY",
-                "frontier_role": "LINEAGE_ONLY",
-                "reason": "allocation engine and M/cap semantics are inherited evidence, not an independent complete Stage-1→3 sleeve",
-                "outcome_boundary": OUTCOME_BOUNDARY,
-            },
-            {
-                "candidate_id": "BJ148_DENSE_M_COMMON_SUPPORT",
+                "candidate_id": "BJ148_DENSE_M_COMMON_SUPPORT_SOURCE",
                 "source_package": "bj148_gate_a_preoutcome_v1",
                 "identity_source": "common_support_identities.csv.gz + sampling_plan.csv",
                 "inherited_M_seed_support": "dense M grid and frozen three-seed sampling plan",
-                "decision": "SEMANTICS_OR_M_CURVE_ONLY",
+                "decision": "DUPLICATE_ECONOMIC_IDENTITY",
                 "frontier_role": "LINEAGE_ONLY",
-                "reason": "dense M curve is upstream descriptive evidence with no stable sweet spot; it does not supply a nonredundant Stage-4 sleeve",
+                "reason": "materialized as BJ148_NOGATE_WR_DENSE_M and BJ148_NOGATE_WOR_DENSE_M; this source row remains provenance, not a duplicate sleeve",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             },
             {
-                "candidate_id": "BJ151_FIXED_CANDIDATE_REPRODUCTION",
+                "candidate_id": "BJ151_FIXED_CANDIDATE_REPRODUCTION_SOURCE",
                 "source_package": "bj151_gate_a_preoutcome_v1",
                 "identity_source": "candidate_identities.csv.gz + sampling_plan.csv",
                 "inherited_M_seed_support": "fixed candidate dense-M plus frozen seed plan",
                 "decision": "DUPLICATE_ECONOMIC_IDENTITY",
                 "frontier_role": "LINEAGE_ONLY",
-                "reason": "fixed candidate reproduction is economically represented in the accepted #167/#170 lineage and is not an independent Stage-4 sleeve",
+                "reason": "materialized as BJ151_NOGATE_K4_WR_DENSE_M and BJ151_NOGATE_K4_WOR_DENSE_M; this source row remains provenance, not a duplicate sleeve",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             },
             {
-                "candidate_id": "BJ159_SELECTED_WOR_N2_N10",
+                "candidate_id": "BJ159_SELECTED_WOR_N2_N10_SOURCE",
                 "source_package": "bj159_gate_a_preoutcome_v2r1",
                 "identity_source": "identity_catalog.csv.gz + sampling_plan.csv",
                 "inherited_M_seed_support": "N2–N10, M={32,64,128}, seeds 137001–137003",
                 "decision": "DUPLICATE_ECONOMIC_IDENTITY",
                 "frontier_role": "LINEAGE_ONLY",
-                "reason": "selected WOR cross-N result is a historical duplicate/control lineage, not a nonredundant complete Stage-4 sleeve",
+                "reason": "N=7 is materialized as BJ159_SELECTED_N7_WOR_M_CURVE; N≠7 has a different ticket space and is outside the N7-only issue contract",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             },
             {
@@ -858,9 +1284,9 @@ def eligibility_ledger() -> list[dict[str, str]]:
                 "source_package": "bj167_gate_a_strategy_atlas_v3r1",
                 "identity_source": "selector_identities shards + allocation_grid.csv",
                 "inherited_M_seed_support": "full frozen selector/allocation M/seed/support surface",
-                "decision": "SUPERSEDED_BY_167_ATLAS",
+                "decision": "SEMANTICS_OR_M_CURVE_ONLY",
                 "frontier_role": "AUTHORITATIVE_SHORTLIST_SOURCE",
-                "reason": "authoritative corrected atlas is the source from which the three nonredundant #170 retained sleeves were selected; its remaining cells are upstream search lineage, not additional Stage-4 sleeves",
+                "reason": "the broad atlas supplies selector/allocation semantics, while Gate A retains only complete trace descendants listed in the executable catalog; no outcome-ranked atlas cell becomes eligible by default",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             },
             {
@@ -878,9 +1304,9 @@ def eligibility_ledger() -> list[dict[str, str]]:
                 "source_package": "bj190_gate_b_sparse_divergence_v1",
                 "identity_source": "terminal identity only",
                 "inherited_M_seed_support": "as terminal package",
-                "decision": "EXCLUDED_TERMINAL_EVIDENCE",
+                "decision": "INCOMPLETE_STAGE1_3_TRACE",
                 "frontier_role": "EXCLUDED",
-                "reason": "terminal strict promotion count is zero; coverage-limited diagnostic is not an eligible complete capital sleeve",
+                "reason": "the Gate-A sparse selector/direction records do not include an accepted complete ticket-construction trace on the #192 common calendar; terminal return is not used as an eligibility reason",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             },
             {
@@ -888,9 +1314,9 @@ def eligibility_ledger() -> list[dict[str, str]]:
                 "source_package": "bj193_gate_b_regime_meta_policy_v2",
                 "identity_source": "terminal identity only",
                 "inherited_M_seed_support": "as terminal package",
-                "decision": "EXCLUDED_TERMINAL_EVIDENCE",
+                "decision": "INCOMPLETE_STAGE1_3_TRACE",
                 "frontier_role": "EXCLUDED",
-                "reason": "PI excludes negative non-promoted FULL_DYNAMIC_CHAIN; package supplies interface/accounting lessons only",
+                "reason": "the accepted interface package records action compatibility but does not provide an immutable per-issue executable ticket/tax-lot trace for one fixed Stage-1→3 sleeve; terminal return is not used as an eligibility reason",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             },
         ]
@@ -951,8 +1377,9 @@ def frontier_contract(eligibility: list[dict[str, str]]) -> dict[str, object]:
     """Define the complete, immutable Gate-B sleeve frontier without settling it.
 
     A historical source-family row is lineage evidence, not permission to reopen
-    an upstream search.  The registry proves exactly three nonredundant complete
-    Stage-1→3 retained sleeves and preserves explicit dispositions for the rest.
+    an upstream search.  The three #170 paths remain the locked retrospective
+    H1 panel; independently complete #148/#151/#159 families add their full
+    predeclared M curves without selecting an outcome-ranked atlas cell.
     """
     complete = [
         row["candidate_id"]
@@ -963,14 +1390,15 @@ def frontier_contract(eligibility: list[dict[str, str]]) -> dict[str, object]:
         "eligible_candidate_sources": complete,
         "eligible_source_count": len(complete),
         "materialization_rule": (
-            "Gate B enumerates the seven nonempty combinations of the three immutable "
-            "nonredundant sleeves only, retaining exact selector, support, M, mechanism, "
-            "cap, weight source and ticket multiplicity. Historic source grids are "
-            "lineage evidence and cannot be reopened as Stage-4 sleeves."
+            "Gate B materializes every eligible candidate's frozen M curve and "
+            "strictly-prior M-selection path, then enumerates all pairs across the "
+            "subsets. Higher-order combinations are exhaustive for the preregistered "
+            "robust shortlist and descriptive elsewhere; no outcome-ranked source cell "
+            "may enter after Gate A."
         ),
         "component_rule": (
-            "BJ145 is allocation-engine lineage only; it cannot create a new Stage-4 "
-            "selector or overwrite a retained sleeve tuple."
+            "BJ145 is an allocation-engine contract only; it cannot create a new "
+            "Stage-4 selector or overwrite a retained complete pipeline tuple."
         ),
         "comparison_rule": (
             "Each portfolio row includes absolute pre-tax capital/path results and "
@@ -983,6 +1411,16 @@ def frontier_contract(eligibility: list[dict[str, str]]) -> dict[str, object]:
             "Edge; a positive same-window result is hypothesis-generating and needs "
             "genuinely held-out/forward validation before any ladder review."
         ),
+        "pairwise_surface": [
+            [left, right]
+            for index, left in enumerate(complete)
+            for right in complete[index + 1 :]
+        ],
+        "robust_higher_order_shortlist": [
+            "BEST_FULL_FULL|MODEL_SOURCE_MODEL_CAP1_M512|Q_SOURCE_Q_TOP_MASS_M192",
+            "BJ148_NOGATE_WR_DENSE_M|BJ148_NOGATE_WOR_DENSE_M|BJ151_NOGATE_K4_WR_DENSE_M|BJ151_NOGATE_K4_WOR_DENSE_M|BJ159_SELECTED_N7_WOR_M_CURVE",
+        ],
+        "higher_order_rule": "all nonempty subsets of the H1 panel; all nonempty subsets of each robust-shortlist row after prior-only M selection; no post-outcome membership choice",
         "excluded_source_records": [
             {
                 "candidate_id": row["candidate_id"],
@@ -1011,7 +1449,62 @@ def role_product_weights(rows: list[dict[str, str]], source: str) -> list[float]
     return values
 
 
-def prefix_registry() -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+def model_nested_prefix_audit(
+    chosen: dict[tuple[str, str, str], dict[str, str]],
+    role_by_key: dict[tuple[str, str, str], list[dict[str, str]]],
+) -> dict[str, object]:
+    """Regenerate MODEL/cap=1 prefixes with the byte-frozen native engine."""
+    model_keys = sorted(
+        key
+        for key, allocation in chosen.items()
+        if key[0] == "MODEL_SOURCE"
+        and allocation["allocation_arm"] == "MODEL_CAP1_M512"
+    )
+    allocator = FrozenAllocator()
+    try:
+        vectors = [role_product_weights(role_by_key[key], "p_model") for key in model_keys]
+        try:
+            all_ranks = allocator.capped_prefix_ranks_batch(vectors, 512, 1)
+        except RuntimeError as error:
+            raise RuntimeError(f"MODEL all-M native prefix proof failed: {error}") from error
+        rows: list[dict[str, object]] = []
+        for key, ranks in zip(model_keys, all_ranks):
+            nested = True
+            first_failure = ""
+            allocation = chosen[key]
+            if nested:
+                prior = [1 if rank else 0 for rank in ranks]
+                digest = hashlib.sha256(
+                    json.dumps(prior, separators=(",", ":")).encode()
+                ).hexdigest()
+                if digest != allocation["counts_sha256"]:
+                    raise RuntimeError(
+                        "MODEL all-M native digest mismatch: "
+                        f"{key[1]}/{key[2]}"
+                    )
+            rows.append(
+                {
+                    "issue_instance": key[1],
+                    "portfolio_id": key[2],
+                    "nested": nested,
+                    "first_failure": first_failure,
+                    "rank_by_ordinal": ranks,
+                    "M512_counts_sha256": allocation["counts_sha256"],
+                }
+            )
+    finally:
+        allocator._build.cleanup()
+    return {
+        "engine_sha256": FROZEN_ALLOCATOR_SHA256,
+        "maximum_M": 512,
+        "rows": rows,
+        "generation": "detached-clone reproducible frozen C++ replay",
+    }
+
+
+def prefix_registry() -> tuple[
+    list[dict[str, object]], list[dict[str, object]], dict[str, object]
+]:
     """Create executable pre-outcome ticket-prefix and global tax-lot bindings.
 
     Q's accepted deterministic top-mass source has a nested priority order. FULL
@@ -1037,24 +1530,22 @@ def prefix_registry() -> tuple[list[dict[str, object]], list[dict[str, object]]]
         if (row["selector_alias"], row["allocation_arm"])
         in {(alias, arm) for _, alias, arm, _ in SLEEVES}
     }
-    model_audit: dict[tuple[str, str], dict[str, object]] = {}
-    if MODEL_NESTED_AUDIT.is_file():
-        audit = json.loads(MODEL_NESTED_AUDIT.read_text())
-        if (
-            audit.get("engine_sha256") != FROZEN_ALLOCATOR_SHA256
-            or audit.get("maximum_M") != 512
-        ):
-            raise RuntimeError("MODEL nested-prefix audit binding drift")
-        model_audit = {
-            (row["issue_instance"], row["portfolio_id"]): row for row in audit["rows"]
-        }
-        expected_model_keys = {
-            (issue_instance, portfolio_id)
-            for (alias, issue_instance, portfolio_id), row in chosen.items()
-            if alias == "MODEL_SOURCE" and row["allocation_arm"] == "MODEL_CAP1_M512"
-        }
-        if set(model_audit) != expected_model_keys:
-            raise RuntimeError("MODEL nested-prefix audit identity coverage drift")
+    audit = model_nested_prefix_audit(chosen, role_by_key)
+    if (
+        audit.get("engine_sha256") != FROZEN_ALLOCATOR_SHA256
+        or audit.get("maximum_M") != 512
+    ):
+        raise RuntimeError("MODEL nested-prefix audit binding drift")
+    model_audit = {
+        (row["issue_instance"], row["portfolio_id"]): row for row in audit["rows"]
+    }
+    expected_model_keys = {
+        (issue_instance, portfolio_id)
+        for (alias, issue_instance, portfolio_id), row in chosen.items()
+        if alias == "MODEL_SOURCE" and row["allocation_arm"] == "MODEL_CAP1_M512"
+    }
+    if set(model_audit) != expected_model_keys:
+        raise RuntimeError("MODEL nested-prefix audit identity coverage drift")
     policy_rows: list[dict[str, object]] = []
     q_orders: dict[str, list[tuple[dict[str, str], list[int], str]]] = {}
     model_orders: dict[str, list[tuple[dict[str, str], list[int], str]]] = {}
@@ -1200,7 +1691,7 @@ def prefix_registry() -> tuple[list[dict[str, object]], list[dict[str, object]]]
         if row["sleeve_id"] == "Q_SOURCE_Q_TOP_MASS_M192"
     ):
         raise RuntimeError("Q global prefix reconciliation failed")
-    return policy_rows, global_rows
+    return policy_rows, global_rows, audit
 
 
 def output_schema() -> dict[str, object]:
@@ -1225,6 +1716,13 @@ def output_schema() -> dict[str, object]:
                 "skipped_stake_yuan",
                 "retained_cash_yuan",
                 "reason_codes",
+                "sleeve_id",
+                "native_ticket_count",
+                "funded_prefix_length",
+                "funded_global_rank_start",
+                "funded_global_rank_end",
+                "funded_tax_lot_sha256",
+                "prefix_execution_status",
                 "pre_tax_gross_yuan",
                 "pre_tax_net_yuan",
                 "tax_yuan",
@@ -1233,6 +1731,8 @@ def output_schema() -> dict[str, object]:
             ],
             "formulas": [
                 "actual_stake=sum(actual ticket count)×¥2",
+                "for a prefix-executable sleeve, funded_prefix_length is the actual allocated global ticket count and funded_tax_lot_sha256=SHA256(canonical ordered tax_lot_id list for ranks 1..length); for WHOLE_NATIVE_OR_NO_BET, length is native ticket count or zero and digest binds the entire inherited native allocation digest or an empty canonical list",
+                "a nonzero FULL_ENUMERATED allocation must equal its complete native count; partial FULL is a Gate-B fail-closed error",
                 "postissue_bankroll=preissue_bankroll+pre_tax_net",
                 "turnover=cumulative actual_stake",
                 "all sleeve flows in an issue fund concurrently",
@@ -1404,15 +1904,84 @@ def output_schema() -> dict[str, object]:
     }
 
 
+def funded_prefix_ledger_contract(
+    expanded: list[dict[str, object]]
+) -> dict[str, object]:
+    """Bind Gate-B's exact funded ticket subset before any outcome join."""
+    records = [
+        {
+            "sleeve_or_family_id": "BEST_FULL_FULL",
+            "prefix_policy": "WHOLE_NATIVE_OR_NO_BET",
+            "native_ticket_identity_source": "bj170 identity_allocation_digest.csv.gz",
+            "funded_tax_lot_rule": "zero lots or all 2187 canonical ordinals for every inherited identity; partial allocation is forbidden",
+        },
+        {
+            "sleeve_or_family_id": "MODEL_SOURCE_MODEL_CAP1_M512",
+            "prefix_policy": "NESTED_PREFIX_VERIFIED_M1_TO_M512",
+            "native_ticket_identity_source": "ticket_prefix_registry.csv.gz + model_cap1_nested_prefix_audit.json.gz",
+            "funded_tax_lot_rule": "take global ranks 1..funded_prefix_length and hash their ordered tax_lot_id values",
+        },
+        {
+            "sleeve_or_family_id": "Q_SOURCE_Q_TOP_MASS_M192",
+            "prefix_policy": "NESTED_PREFIX_VERIFIED_GLOBAL_ROUND_ROBIN",
+            "native_ticket_identity_source": "ticket_prefix_registry.csv.gz",
+            "funded_tax_lot_rule": "take global ranks 1..funded_prefix_length and hash their ordered tax_lot_id values",
+        },
+    ]
+    for row in expanded:
+        source = (
+            f"{row['source_package']}/{row['identity_file']} + "
+            f"{row['role_file']} + {row['plan_file']}"
+            if "identity_file" in row
+            else f"{row['source_package']}/{row['source_identity_file']} + {row['source_plan_file']}"
+        )
+        records.append(
+            {
+                "sleeve_or_family_id": row["candidate_id"],
+                "prefix_policy": row["ticket_prefix_rule"],
+                "native_ticket_identity_source": source,
+                "funded_tax_lot_rule": (
+                    "materialize every frozen draw/rank up to selected M; a funded "
+                    "prefix uses the first funded_prefix_length positions and hashes "
+                    "the canonical tax_lot_identity sequence"
+                ),
+            }
+        )
+    return {
+        "key": [
+            "portfolio_id",
+            "mode",
+            "position_fraction",
+            "weight_method",
+            "calendar_index",
+            "issue_instance",
+            "sleeve_or_family_id",
+        ],
+        "fields": [
+            "native_ticket_count",
+            "funded_prefix_length",
+            "funded_global_rank_start",
+            "funded_global_rank_end",
+            "funded_tax_lot_sha256",
+            "prefix_execution_status",
+        ],
+        "atomic_funding_rule": "BEST_FULL_FULL is atomic; all other records may fund only their stated deterministic prefix. Gate B must fail closed if any output ticket sequence is not reproduced by this contract.",
+        "records": records,
+    }
+
+
 def write_package(output: Path) -> None:
     bindings = {name: verify_source(spec) for name, spec in EXPECTED_SOURCES.items()}
     rows, calendar, _ = source_inputs()
     traces = sleeve_trace_registry(rows)
+    expanded = expanded_sleeve_catalog()
+    allocation_candidates = bj145_allocation_candidate_registry()
     eligibility = eligibility_ledger()
+    m_selector = m_selection_contract(expanded + allocation_candidates)
+    funded_prefix_contract = funded_prefix_ledger_contract(expanded + allocation_candidates)
     baselines = baseline_registry()
     frontier = frontier_contract(eligibility)
-    prefix_policies, prefix_rows = prefix_registry()
-    model_audit_payload = json.loads(MODEL_NESTED_AUDIT.read_text())
+    prefix_policies, prefix_rows, model_audit_payload = prefix_registry()
     if not all(row["nested"] for row in model_audit_payload["rows"]):
         raise RuntimeError("MODEL partial-prefix audit did not pass every identity")
     schemas = output_schema()
@@ -1464,6 +2033,22 @@ def write_package(output: Path) -> None:
                 | {"rationale": rationale, "outcome_boundary": OUTCOME_BOUNDARY}
             )
         write_csv(stage / "sleeve_catalog.csv", list(catalog[0]), catalog)
+        write_csv(
+            stage / "executable_sleeve_family_catalog.csv",
+            list(expanded[0]),
+            expanded,
+        )
+        write_csv(
+            stage / "bj145_allocation_candidate_registry.csv",
+            list(allocation_candidates[0]),
+            allocation_candidates,
+        )
+        (stage / "m_selection_contract.json").write_text(
+            json.dumps(m_selector, indent=2, sort_keys=True) + "\n"
+        )
+        (stage / "funded_prefix_ledger_contract.json").write_text(
+            json.dumps(funded_prefix_contract, indent=2, sort_keys=True) + "\n"
+        )
         write_csv(stage / "sleeve_trace_registry.csv", list(traces[0]), traces)
         write_csv(
             stage / "sleeve_eligibility_ledger.csv", list(eligibility[0]), eligibility
@@ -1514,6 +2099,10 @@ def write_package(output: Path) -> None:
             "outcome_boundary": OUTCOME_BOUNDARY,
             "source_binding": bindings,
             "sleeve_catalog": catalog,
+            "executable_sleeve_family_catalog": expanded,
+            "bj145_allocation_candidate_registry": allocation_candidates,
+            "m_selection_contract": m_selector,
+            "funded_prefix_ledger_contract": funded_prefix_contract,
             "sleeve_trace_registry": traces,
             "eligibility_ledger": eligibility,
             "frontier_contract": frontier,
@@ -1557,9 +2146,11 @@ def write_package(output: Path) -> None:
                     r["strict_three_way_common"] == "1" for r in calendar
                 ),
                 "native_sleeve_request_rows": len(rows),
-                "fixed_sleeve_count": len(catalog),
+                "locked_h1_sleeve_count": len(catalog),
+                "expanded_complete_family_count": len(expanded),
+                "bj145_complete_allocation_candidate_count": len(allocation_candidates),
                 "catalog_identity_count": len(eligibility),
-                "eligible_exploratory_family_count": 0,
+                "eligible_exploratory_family_count": len(expanded),
                 "eligible_complete_source_count": frontier["eligible_source_count"],
                 "ticket_prefix_policy_rows": len(prefix_policies),
                 "Q_global_tax_lot_rows": len(prefix_rows),

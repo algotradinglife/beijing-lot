@@ -21,7 +21,7 @@ def module():
     return value
 
 
-def test_frozen_source_hashes_and_fixed_primary_catalog():
+def test_frozen_source_hashes_and_complete_primary_catalog():
     m = module()
     assert [x[0] for x in m.SLEEVES] == [
         "BEST_FULL_FULL",
@@ -50,6 +50,28 @@ def test_frozen_source_hashes_and_fixed_primary_catalog():
         "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1",
         "bj170_gate_b_selector_allocator_stack_v1",
     }
+    expanded = m.expanded_sleeve_catalog()
+    assert [row["candidate_id"] for row in expanded] == [
+        "BJ148_NOGATE_WR_DENSE_M",
+        "BJ148_NOGATE_WOR_DENSE_M",
+        "BJ151_NOGATE_K4_WR_DENSE_M",
+        "BJ151_NOGATE_K4_WOR_DENSE_M",
+        "BJ159_SELECTED_N7_WOR_M_CURVE",
+    ]
+    assert all(row["identity_count"] > 0 for row in expanded)
+    assert all(row["role_row_count"] == row["identity_count"] * 7 for row in expanded)
+    contract = m.m_selection_contract(expanded)
+    assert contract["minimum_prior_active_issues"] == 52
+    assert len(contract["fixed_m_comparator"]) == len(expanded)
+    allocation = m.bj145_allocation_candidate_registry()
+    assert len(allocation) == 108
+    assert sum(
+        row["economic_decision"] == "ELIGIBLE_COMPLETE_NONREDUNDANT"
+        for row in allocation
+    ) == 98
+    assert {
+        row["mechanism"] for row in allocation
+    } >= {"WR_DUPLICATE_STAKE", "WOR_DISTINCT", "CAPPED_REPEAT"}
 
 
 def test_settled_sources_are_identity_only_and_never_open_payloads(monkeypatch):
@@ -174,6 +196,48 @@ def test_integer_allocator_covers_bankroll_cap_remainder_and_no_bet_edges():
     assert native["actual_ticket_count_by_sleeve"] == caps
     with pytest.raises(ValueError, match="fraction=1.0"):
         m.allocate_integer_tickets("NATIVE_REQUEST_CONTROL", 0.5, 1_000, caps, weights)
+    atomic = {"BEST_FULL_FULL": 2187, "MODEL": 512, "Q": 768}
+    atomic_weights = {"BEST_FULL_FULL": 0.6, "MODEL": 0.3, "Q": 0.1}
+    short = m.allocate_integer_tickets(
+        "NATIVE_REQUEST_CONTROL",
+        1.0,
+        4_000,
+        atomic,
+        atomic_weights,
+        {"BEST_FULL_FULL": True},
+    )
+    assert short["actual_ticket_count_by_sleeve"]["BEST_FULL_FULL"] == 0
+    assert short["actual_ticket_count_by_sleeve"]["MODEL"] == 512
+    assert short["actual_ticket_count_by_sleeve"]["Q"] == 768
+    assert "ATOMIC_BLOCK_UNFUNDED_RETAIN_OR_REALLOCATE_CASH" in short["reason_codes"]
+    funded = m.allocate_integer_tickets(
+        "NATIVE_REQUEST_CONTROL",
+        1.0,
+        10_000,
+        atomic,
+        atomic_weights,
+        {"BEST_FULL_FULL": True},
+    )
+    assert funded["actual_ticket_count_by_sleeve"]["BEST_FULL_FULL"] == 2187
+    # Affordability cannot turn an equal-weight portfolio into a mostly-FULL
+    # one.  The whole FULL block is feasible at 2,500 tickets, but its capped
+    # continuous target is only 1,220 tickets, so the frozen objective omits
+    # it and spends on the two valid prefix sleeves instead.
+    target_preserving = m.allocate_integer_tickets(
+        "FIXED_100K_NOTIONAL",
+        0.05,
+        5_000,
+        atomic,
+        {"BEST_FULL_FULL": 1 / 3, "MODEL": 1 / 3, "Q": 1 / 3},
+        {"BEST_FULL_FULL": True},
+    )
+    assert target_preserving["actual_ticket_count_by_sleeve"] == {
+        "BEST_FULL_FULL": 0,
+        "MODEL": 512,
+        "Q": 768,
+    }
+    assert target_preserving["selected_atomic_blocks"] == []
+    assert "ATOMIC_BLOCK_EXCLUDED_BY_TARGET_OBJECTIVE" in target_preserving["reason_codes"]
 
 
 def test_dynamic_weight_models_are_prior_only_and_have_deterministic_fallbacks():
@@ -247,25 +311,18 @@ def test_baseline_and_sequential_inference_contracts_are_frozen():
     assert "max-T" in method["multiplicity"]["positive_inference"]
     eligibility = m.eligibility_ledger()
     frontier = m.frontier_contract(eligibility)
-    assert frontier["eligible_source_count"] == 3
-    assert frontier["eligible_candidate_sources"] == [x[0] for x in m.SLEEVES]
-    assert frontier["excluded_source_records"] == [
-        {
-            "candidate_id": "BJ190_SPARSE_DIVERGENCE",
-            "decision": "EXCLUDED_TERMINAL_EVIDENCE",
-            "reason": "terminal strict promotion count is zero; coverage-limited diagnostic is not an eligible complete capital sleeve",
-        },
-        {
-            "candidate_id": "BJ193_FULL_DYNAMIC_CHAIN",
-            "decision": "EXCLUDED_TERMINAL_EVIDENCE",
-            "reason": "PI excludes negative non-promoted FULL_DYNAMIC_CHAIN; package supplies interface/accounting lessons only",
-        },
-    ]
+    assert frontier["eligible_source_count"] == 106
+    assert frontier["eligible_candidate_sources"][:3] == [x[0] for x in m.SLEEVES]
+    assert "BJ151_NOGATE_K4_WR_DENSE_M" in frontier["eligible_candidate_sources"]
+    assert len(frontier["pairwise_surface"]) == 5565
+    excluded = {row["candidate_id"]: row for row in frontier["excluded_source_records"]}
+    assert excluded["BJ190_SPARSE_DIVERGENCE"]["decision"] == "INCOMPLETE_STAGE1_3_TRACE"
+    assert excluded["BJ193_FULL_DYNAMIC_CHAIN"]["decision"] == "INCOMPLETE_STAGE1_3_TRACE"
 
 
 def test_q_prefixes_are_exact_global_tax_lots_and_full_model_fail_closed():
     m = module()
-    policies, global_rows = m.prefix_registry()
+    policies, global_rows, audit = m.prefix_registry()
     q = [row for row in policies if row["sleeve_id"] == "Q_SOURCE_Q_TOP_MASS_M192"]
     model = [
         row for row in policies if row["sleeve_id"] == "MODEL_SOURCE_MODEL_CAP1_M512"
@@ -286,6 +343,8 @@ def test_q_prefixes_are_exact_global_tax_lots_and_full_model_fail_closed():
         for rows in by_issue.values()
     )
     assert all(row["native_multiplicity_unit"] == 1 for row in global_rows)
+    assert audit["engine_sha256"] == m.FROZEN_ALLOCATOR_SHA256
+    assert len(audit["rows"]) == 234
 
 
 def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
@@ -302,6 +361,10 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
         "gate_a_card.json",
         "sleeve_catalog.csv",
         "sleeve_trace_registry.csv",
+        "executable_sleeve_family_catalog.csv",
+        "bj145_allocation_candidate_registry.csv",
+        "m_selection_contract.json",
+        "funded_prefix_ledger_contract.json",
         "sleeve_eligibility_ledger.csv",
         "baseline_registry.csv",
         "frontier_contract.json",
@@ -326,10 +389,10 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
         __import__("csv").DictReader((output / "sleeve_eligibility_ledger.csv").open())
     )
     assert [row["decision"] for row in eligibility[-2:]] == [
-        "EXCLUDED_TERMINAL_EVIDENCE",
-        "EXCLUDED_TERMINAL_EVIDENCE",
+        "INCOMPLETE_STAGE1_3_TRACE",
+        "INCOMPLETE_STAGE1_3_TRACE",
     ]
-    assert len(eligibility) == 12
+    assert len(eligibility) == 124
     baselines = list(
         __import__("csv").DictReader((output / "baseline_registry.csv").open())
     )
@@ -338,12 +401,20 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
         "B170_BEST_FULL_THREE_WAY_BRIDGE",
     ]
     assert "output_schema" in card and "holding_metrics" in card["output_schema"]
-    assert card["frontier_contract"]["eligible_source_count"] == 3
+    assert card["frontier_contract"]["eligible_source_count"] == 106
+    assert len(card["executable_sleeve_family_catalog"]) == 5
+    assert len(card["bj145_allocation_candidate_registry"]) == 108
     assert card["ticket_prefix_contract"]["Q_global_tax_lot_rows"] > 0
     with gzip.open(output / "model_cap1_nested_prefix_audit.json.gz", "rt") as handle:
         model_audit = json.load(handle)
     assert len(model_audit["rows"]) == 234 and all(
         row["nested"] for row in model_audit["rows"]
     )
+    issue_schema = card["output_schema"]["issue_ledger"]
+    assert "funded_tax_lot_sha256" in issue_schema["fields"]
+    assert "funded_prefix_length" in issue_schema["fields"]
+    prefix_contract = json.loads((output / "funded_prefix_ledger_contract.json").read_text())
+    assert prefix_contract["records"][0]["prefix_policy"] == "WHOLE_NATIVE_OR_NO_BET"
+    assert len(prefix_contract["records"]) == 116
     source = SCRIPT.read_text()
     assert "result_code" not in source and "winning_sp" not in source

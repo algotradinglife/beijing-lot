@@ -1,0 +1,206 @@
+{
+  "baseline_lift": {
+    "fields": [
+      "candidate_id",
+      "control_id",
+      "support_hash",
+      "capital_mode",
+      "position_fraction",
+      "actual_funding_hash",
+      "absolute_ending_bankroll_yuan",
+      "absolute_pre_tax_roi",
+      "candidate_minus_control_bankroll_yuan",
+      "candidate_minus_control_pre_tax_roi",
+      "ladder_decision"
+    ],
+    "formulas": [
+      "all comparisons require identical issue support, mode, fraction, starting capital, available bankroll and actual funding convention",
+      "publish absolute path and lift together; blank lift if exact matching is impossible",
+      "ladder_decision=ADVANCES only after strict matched PI terminal review"
+    ]
+  },
+  "bootstrap_stability": {
+    "fields": [
+      "target_id",
+      "paired_control_id",
+      "bootstrap_replicates",
+      "bootstrap_seed",
+      "paired_growth_delta_low",
+      "YEAR",
+      "FOLD",
+      "LOYO",
+      "EX_LARGEST_ISSUE",
+      "EX_LARGEST_YEAR",
+      "fallback_rate"
+    ],
+    "formulas": [
+      "YEAR/FOLD replays retain chronological order within subset; LOYO removes every issue from one year then recomputes state; ex-largest issue/year removes the largest signed pre-tax-net contributor (year aggregates first); decision panels use same full-calendar zero-flow convention"
+    ]
+  },
+  "capital_summary": {
+    "fields": [
+      "starting_bankroll_yuan",
+      "ending_bankroll_yuan",
+      "minimum_bankroll_yuan",
+      "minimum_required_start_yuan",
+      "fundable_issue_count",
+      "first_unfundable_issue",
+      "scaled_stake_yuan",
+      "skipped_stake_yuan",
+      "cash_yuan",
+      "turnover_yuan",
+      "pre_tax_roi",
+      "tax_adjusted_roi",
+      "ruin_flag"
+    ],
+    "formulas": [
+      "minimum_bankroll=min(preissue_bankroll,postissue_bankroll) over full 348 calendar",
+      "minimum_required_start is smallest b found by deterministic integer-yuan bisection only for NATIVE_REQUEST_CONTROL and FIXED_100K_NOTIONAL, whose requested ticket capacities are independent of b; blank/NOT_MONOTONE for COMPOUNDING_BANKROLL",
+      "ruin_flag=1 iff any postissue_bankroll < \u00a52 while a positive native request exists",
+      "pre_tax_roi=sum(pre_tax_net)/sum(actual_stake); blank if zero actual stake"
+    ]
+  },
+  "challenger_case": {
+    "fields": [
+      "candidate_id",
+      "alternative_explanation",
+      "test_id",
+      "result",
+      "decision_impact"
+    ],
+    "formulas": [
+      "each headline candidate receives survivor/search, leakage, support, turnover/cash, covariance fitting, largest issue/year, payout cluster and simple-control tests",
+      "cash-only smoothing is separately labeled risk reduction, never diversification edge"
+    ]
+  },
+  "chart_sources": [
+    "chart_source_issue_equity.csv.gz",
+    "chart_source_capital_frontier.csv",
+    "chart_source_risk_return.csv",
+    "chart_source_dependence.csv",
+    "chart_source_weight_history.csv.gz",
+    "chart_source_fundability.csv",
+    "chart_source_bootstrap_stability.csv"
+  ],
+  "dependence": {
+    "fields": [
+      "portfolio_id",
+      "sleeve_left",
+      "sleeve_right",
+      "prior_covariance",
+      "prior_correlation",
+      "downside_correlation",
+      "tail_co_loss_count",
+      "full_calendar_zero_flow_count",
+      "union_active_count",
+      "intersection_active_count",
+      "full_calendar_joint_loss_rate",
+      "union_active_joint_loss_rate",
+      "intersection_active_joint_loss_rate",
+      "concurrent_issue_count",
+      "diversification_attribution_yuan"
+    ],
+    "formulas": [
+      "full-calendar denominator is all 348 chronological rows with zero flow retained; union-active has either sleeve actual stake>0; intersection-active has both actual stake>0. Publish all three counts and joint-loss rates; never infer diversification from the intersection alone",
+      "downside_correlation=corr(min(r_left,0),min(r_right,0)) is reported separately for full-calendar-zero-flow, union-active and intersection-active; blank for <2/nonpositive variance",
+      "tail_co_loss_count=count both returns in their own prior 10% lower tail on each declared denominator",
+      "diversification_attribution=portfolio pre-tax net minus sum(weighted matched standalone nets), reported separately from retained cash"
+    ]
+  },
+  "holding_metrics": {
+    "fields": [
+      "portfolio_id",
+      "mode",
+      "position_fraction",
+      "ending_bankroll_yuan",
+      "max_drawdown_yuan",
+      "max_drawdown_fraction",
+      "drawdown_duration_issues",
+      "time_under_water_issues",
+      "recovery_issue",
+      "loss_streak_calendar",
+      "loss_streak_active",
+      "miss_streak_calendar",
+      "miss_streak_active",
+      "rolling_pnl_5_yuan",
+      "rolling_pnl_10_yuan",
+      "rolling_pnl_20_yuan",
+      "rolling_negative_probability_5",
+      "rolling_negative_probability_10",
+      "rolling_negative_probability_20",
+      "worst_rolling_window_id",
+      "worst_rolling_pnl_yuan",
+      "worst_rolling_roi",
+      "ruin_flag",
+      "near_ruin_flag",
+      "sharpe",
+      "sortino",
+      "calmar"
+    ],
+    "formulas": [
+      "loss=pre_tax_net<0; miss=actual_stake>0 and pre_tax_gross=0; calendar streak includes zero-flow rows, active streak skips zero-flow rows",
+      "rolling P&L W=sum(pre_tax_net) over every trailing full-calendar W={5,10,20}; report count/total windows with P&L<0, their probability, the worst P&L, its ROI=sum(net)/sum(actual stake), and its chronological window identity. Never discard winning issues inside a window",
+      "drawdown=running equity peak minus postissue bankroll; duration/time-under-water count chronological issues below peak; recovery is first later issue reaching former peak, blank if absent",
+      "near_ruin_flag=1 iff min bankroll < \u00a52\u00d7max native issue ticket count; sharpe=mean calendar bank return/sample sd\u00d7sqrt(issue frequency/year), sortino divides by downside RMS, calmar=annualized compounded bank return/max drawdown fraction; blank where denominator zero"
+    ]
+  },
+  "issue_ledger": {
+    "fields": [
+      "preissue_bankroll_yuan",
+      "mode_notional_yuan",
+      "issue_budget_yuan",
+      "requested_stake_yuan",
+      "actual_stake_yuan",
+      "scaled_stake_yuan",
+      "skipped_stake_yuan",
+      "retained_cash_yuan",
+      "reason_codes",
+      "sleeve_id",
+      "native_ticket_count",
+      "funded_prefix_length",
+      "funded_global_rank_start",
+      "funded_global_rank_end",
+      "funded_tax_lot_sha256",
+      "prefix_execution_status",
+      "pre_tax_gross_yuan",
+      "pre_tax_net_yuan",
+      "tax_yuan",
+      "postissue_bankroll_yuan",
+      "ruin_flag"
+    ],
+    "formulas": [
+      "actual_stake=sum(actual ticket count)\u00d7\u00a52",
+      "for a prefix-executable sleeve, funded_prefix_length is the actual allocated global ticket count and funded_tax_lot_sha256=SHA256(canonical ordered tax_lot_id list for ranks 1..length); for WHOLE_NATIVE_OR_NO_BET, length is native ticket count or zero and digest binds the entire inherited native allocation digest or an empty canonical list",
+      "a nonzero FULL_ENUMERATED allocation must equal its complete native count; partial FULL is a Gate-B fail-closed error",
+      "postissue_bankroll=preissue_bankroll+pre_tax_net",
+      "turnover=cumulative actual_stake",
+      "all sleeve flows in an issue fund concurrently"
+    ],
+    "key": [
+      "portfolio_id",
+      "mode",
+      "position_fraction",
+      "weight_method",
+      "calendar_index",
+      "issue_instance"
+    ]
+  },
+  "weight_history": {
+    "fields": [
+      "portfolio_id",
+      "issue_instance",
+      "weight_method",
+      "sleeve_id",
+      "weight",
+      "history_active_observation_count",
+      "estimator_status",
+      "fallback_reason",
+      "covariance_hash"
+    ],
+    "formulas": [
+      "weights use only issues strictly before issue_instance",
+      "fallback_rate=count(non-primary estimator_status)/348",
+      "NO_BET/unavailable excluded from active observation but retained as capital zero flow"
+    ]
+  }
+}
