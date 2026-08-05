@@ -32,6 +32,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 GATE_A = ROOT / "results" / "bj193_gate_a_preoutcome_v1"
 GATE_A_V2 = ROOT / "results" / "bj193_gate_a_chain_interface_v2"
+GATE_A_V21 = ROOT / "results" / "bj193_gate_a_chain_interface_v21"
 DEFAULT_CHECKPOINT = ROOT / ".scratch" / "bj193_gate_b_chain_checkpoint_v2"
 DEFAULT_OUTPUT = ROOT / "results" / "bj193_gate_b_regime_meta_policy_v2"
 EXPECTED_GATE_A_MANIFEST = (
@@ -48,6 +49,15 @@ EXPECTED_GATE_A_V2_CONTENT = (
 )
 EXPECTED_GATE_A_V2_PORTABLE = (
     "2bd83000fabf0a4817a31964a02c881562489651cc98143c716aa09ac8dd92bd"
+)
+EXPECTED_GATE_A_V21_MANIFEST = (
+    "021f6ba4a85096f28608e162f7e920df7b66f7a31dcc5c81c13a1a9171a78283"
+)
+EXPECTED_GATE_A_V21_CONTENT = (
+    "58db4ff2aedd733463777ada4d03cda160944515c5ecadf05151228619e8443f"
+)
+EXPECTED_GATE_A_V21_PORTABLE = (
+    "e9f581009d15a5a24b34b865544cf1d690f2ef2848a2b5d227767245095c2e11"
 )
 CHECKPOINT_CONTRACT = "bj193-gate-b-three-stage-checkpoint-v2"
 OUTPUT_CONTRACT = "bj193-gate-b-three-stage-regime-meta-policy-v2"
@@ -140,7 +150,16 @@ def verify_gate_a() -> dict[str, str]:
     for field, value in expected.items():
         if int(counts[field]) != value:
             raise RuntimeError(f"#193 Gate-A v2 denominator drift: {field}")
-    return {**payload, **{f"v2::{name}": digest for name, digest in v2.items()}}
+    v21 = verify_package(GATE_A_V21, EXPECTED_GATE_A_V21_MANIFEST)
+    if sha(GATE_A_V21 / "CONTENT_IDENTITY.json") != EXPECTED_GATE_A_V21_CONTENT:
+        raise RuntimeError("#193 Gate-A v2.1 content identity drift")
+    if sha(GATE_A_V21 / "PORTABLE_SHA256SUMS.json") != EXPECTED_GATE_A_V21_PORTABLE:
+        raise RuntimeError("#193 Gate-A v2.1 portable identity drift")
+    return {
+        **payload,
+        **{f"v2::{name}": digest for name, digest in v2.items()},
+        **{f"v2.1::{name}": digest for name, digest in v21.items()},
+    }
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -770,6 +789,7 @@ def preflight() -> None:
                 "mode": "THREE_STAGE_V2_PREFLIGHT_NO_STAGE2_OR_STAGE3_REPLAY",
                 "gate_a_v1_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
                 "gate_a_v2_manifest_sha256": EXPECTED_GATE_A_V2_MANIFEST,
+                "gate_a_v21_manifest_sha256": EXPECTED_GATE_A_V21_MANIFEST,
                 "verified_payload_count": len(manifests),
                 "canonical_issue_count": len(store.issues),
                 "stage1_action_count": len(store.action_rows),

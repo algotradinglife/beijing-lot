@@ -29,6 +29,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 GATE_A_V1 = ROOT / "results" / "bj193_gate_a_preoutcome_v1"
 GATE_A_V2 = ROOT / "results" / "bj193_gate_a_chain_interface_v2"
+GATE_A_V21 = ROOT / "results" / "bj193_gate_a_chain_interface_v21"
 OUTCOME_LEDGER = (
     ROOT / "results" / "bj190_gate_b_sparse_divergence_v1"
     / "canonical_outcome_ledger.csv.gz"
@@ -953,6 +954,13 @@ def _direction_adapter() -> object:
     )
 
 
+def _structural_delete_adapter() -> object:
+    return load_module(
+        "bj193_frozen_structural_delete_adapter",
+        GATE_A_V21 / "structural_delete_adapter.py",
+    )
+
+
 def _load_needed_estimators(
     decisions: Sequence[Stage1Decision],
 ) -> dict[str, dict[str, str]]:
@@ -1547,8 +1555,46 @@ def _load_stage3_weights(
     return output
 
 
+def _load_structural_delete_registry(
+    stage1_decisions: Sequence[Stage1Decision],
+) -> dict[str, dict[str, str]]:
+    needed = {
+        match_id
+        for decision in stage1_decisions
+        for support in decision.supports
+        for match_id in support.ordered_match_ids
+    }
+    output: dict[str, dict[str, str]] = {}
+    source = GATE_A_V21 / "stage3_complete_structural_delete_registry.csv.gz"
+    with gzip.open(source, "rt", newline="") as handle:
+        for row in csv.DictReader(handle):
+            match_id = row["match_id"]
+            if match_id in needed:
+                if match_id in output:
+                    raise RuntimeError("duplicate complete structural-delete row")
+                output[match_id] = row
+    return output
+
+
+def _stage3_effective_class_keys() -> dict[str, str]:
+    rows = read_csv(
+        GATE_A_V21 / "stage3_effective_compatibility_mapping_v21.csv.gz"
+    )
+    output = {
+        row["stage3_interface_action_key"]: row[
+            "effective_v21_compatibility_class_key"
+        ]
+        for row in rows
+    }
+    if len(rows) != 963 or len(output) != 963:
+        raise RuntimeError("Stage-3 v2.1 effective action mapping drift")
+    return output
+
+
 def _stage3_compatibility() -> dict[tuple[str, str], dict[str, str]]:
-    rows = read_csv(GATE_A_V2 / "stage1_stage3_coverage_registry.csv.gz")
+    rows = read_csv(
+        GATE_A_V21 / "stage1_stage3_coverage_registry_v21.csv.gz"
+    )
     output = {
         (
             row["stage1_interface_action_key"],
@@ -1556,8 +1602,8 @@ def _stage3_compatibility() -> dict[tuple[str, str], dict[str, str]]:
         ): row
         for row in rows
     }
-    if len(output) != 17_283:
-        raise RuntimeError("Stage1xStage3 compatibility registry drift")
+    if len(output) != 19_752:
+        raise RuntimeError("Stage1xStage3 v2.1 compatibility registry drift")
     return output
 
 
@@ -1665,6 +1711,74 @@ def _original_structural_delete_truth(
     return int(digits[p_leg] != p_code), int(digits[q_leg] != q_code)
 
 
+def _compose_structural_stage3_profiles(
+    actions: Sequence[Mapping[str, str]],
+    support: DirectionSupport,
+    stage1: Stage1Decision,
+    stage2: Stage2Decision,
+    structural_by_match: Mapping[str, Mapping[str, str]],
+    truth: int,
+) -> tuple[int, int, int, int, dict[str, dict[str, object]]]:
+    """Compose exact v2.1 P/Q masks and expose native money inputs."""
+
+    adapter = _structural_delete_adapter()
+    registry = {
+        match_id: structural_by_match[match_id]
+        for match_id in support.support.ordered_match_ids
+        if match_id in structural_by_match
+    }
+    by_mechanism = {
+        json.loads(action["parameters_json"])["mechanism"]: action
+        for action in actions
+        if json.loads(action["parameters_json"])["mechanism"]
+        in {"P_MIN_GLOBAL_DELETE", "Q_MIN_GLOBAL_DELETE"}
+    }
+    if set(by_mechanism) != {
+        "P_MIN_GLOBAL_DELETE",
+        "Q_MIN_GLOBAL_DELETE",
+    }:
+        raise RuntimeError("structural Stage-3 action census drift")
+    outputs: dict[str, dict[str, object]] = {}
+    native_inputs: dict[str, tuple[int, int]] = {}
+    for mechanism, action in by_mechanism.items():
+        parameters = json.loads(action["parameters_json"])
+        output = adapter.compose_structural_delete(
+            mechanism,
+            support.support.ordered_match_ids,
+            support.output,
+            registry,
+            issue=support.support.issue,
+            stage1_output_sha256=str(stage1.output["output_sha256"]),
+            stage2_output_sha256=str(stage2.output["output_sha256"]),
+            derived_stage3_action_sha256=str(
+                parameters["derived_bet_action_sha256"]
+            ),
+        )
+        expected_signature = _direction_adapter().stage3_replay_signature(
+            issue=support.support.issue,
+            stage1_output_sha256=str(stage1.output["output_sha256"]),
+            stage2_output_sha256=str(stage2.output["output_sha256"]),
+            derived_stage3_action_sha256=str(
+                parameters["derived_bet_action_sha256"]
+            ),
+        )
+        if output["stage3_replay_signature_sha256"] != expected_signature:
+            raise RuntimeError("structural Stage-3 replay signature drift")
+        outputs[mechanism] = output
+        if output["status"] == "ACTIVE":
+            counts = output["counts"]
+            if len(counts) != FULL_TICKETS:
+                raise RuntimeError("structural ticket vector size drift")
+            native_inputs[mechanism] = (
+                int(counts[truth]), int(output["requested_ticket_count"])
+            )
+        else:
+            native_inputs[mechanism] = (0, 0)
+    p_hit, p_tickets = native_inputs["P_MIN_GLOBAL_DELETE"]
+    q_hit, q_tickets = native_inputs["Q_MIN_GLOBAL_DELETE"]
+    return p_hit, p_tickets, q_hit, q_tickets, outputs
+
+
 def _stage3_native_action_arrays(
     actions: Sequence[Mapping[str, str]],
     issue: str,
@@ -1679,7 +1793,6 @@ def _stage3_native_action_arrays(
     requested_m = np.zeros(len(actions), dtype=np.int32)
     caps = np.zeros(len(actions), dtype=np.int32)
     signatures: list[bytes] = []
-    class_keys: list[str] = []
     for index, action in enumerate(actions):
         parameters = json.loads(action["parameters_json"])
         weight_source = str(parameters["weight_source"])
@@ -1701,7 +1814,6 @@ def _stage3_native_action_arrays(
                 ],
             ).encode()
         )
-        class_keys.append(str(parameters["compatibility_class_key"]))
     encoded = (ctypes.c_char_p * len(signatures))(*signatures)
     return source, mechanism, requested_m, caps, signatures, encoded
 
@@ -1713,8 +1825,10 @@ def _profile_stage3_support(
     stage1: Stage1Decision,
     stage2: Stage2Decision,
     role_by_match: Mapping[str, Mapping[str, str]],
+    structural_by_match: Mapping[str, Mapping[str, str]],
     outcomes: Mapping[str, Outcome],
     compatibility: Mapping[tuple[str, str], Mapping[str, str]],
+    effective_class_keys: Mapping[str, str],
 ) -> tuple[np.ndarray, dict[str, np.ndarray]]:
     count = len(actions)
     status = np.full(count, STATUS_UNAVAILABLE, dtype=np.uint8)
@@ -1730,7 +1844,7 @@ def _profile_stage3_support(
             row = compatibility[
                 (
                     str(stage1.output["source_action_identity"]),
-                    str(parameters["compatibility_class_key"]),
+                    effective_class_keys[action["interface_action_key"]],
                 )
             ]
             if row["compatibility_status"] == "COMPATIBLE":
@@ -1759,10 +1873,20 @@ def _profile_stage3_support(
         )
         weights[source_index] = np.asarray(vector, dtype=np.float64)
         vector_available[weight_source] = True
-    structural = _original_structural_delete_truth(
-        support.support, role_by_match, truth
+    (
+        p_allowed,
+        p_tickets,
+        q_allowed,
+        q_tickets,
+        structural_outputs,
+    ) = _compose_structural_stage3_profiles(
+        actions,
+        support,
+        stage1,
+        stage2,
+        structural_by_match,
+        truth,
     )
-    p_allowed, q_allowed = structural if structural is not None else (0, 0)
     source, mechanism, requested_m, caps, _signature_bytes, encoded = (
         _stage3_native_action_arrays(
             actions,
@@ -1779,7 +1903,7 @@ def _profile_stage3_support(
         _np_pointer(mechanism, ctypes.c_int),
         _np_pointer(requested_m, ctypes.c_int),
         _np_pointer(caps, ctypes.c_int),
-        encoded, count, p_allowed, 1458, q_allowed, 1458,
+        encoded, count, p_allowed, p_tickets, q_allowed, q_tickets,
         _np_pointer(native_status, ctypes.c_ubyte),
         *(_np_pointer(values[name], ctypes.c_double) for name in (
             "gross", "stake", "tax", "net", "hit"
@@ -1790,17 +1914,17 @@ def _profile_stage3_support(
         row = compatibility[
             (
                 str(stage1.output["source_action_identity"]),
-                str(parameters["compatibility_class_key"]),
+                effective_class_keys[action["interface_action_key"]],
             )
         ]
         weight_source = str(parameters["weight_source"])
         mechanism_name = str(parameters["mechanism"])
         if row["compatibility_status"] != "COMPATIBLE":
             continue
-        if not vector_available.get(weight_source, False):
-            continue
-        if mechanism_name in {"P_MIN_GLOBAL_DELETE", "Q_MIN_GLOBAL_DELETE"} and structural is None:
-            # Fail closed pending the PI correction requested on #193.
+        if mechanism_name in structural_outputs:
+            if structural_outputs[mechanism_name]["status"] != "ACTIVE":
+                continue
+        elif not vector_available.get(weight_source, False):
             continue
         status[action_index] = (
             STATUS_ACTIVE if native_status[action_index] else STATUS_NO_BET
@@ -1824,8 +1948,10 @@ def build_stage3_store(
         raise RuntimeError("Stage-3 FULL fallback identity drift")
     fallback_index = fallback[0]
     role_by_match = _load_stage3_weights(stage1_decisions)
+    structural_by_match = _load_structural_delete_registry(stage1_decisions)
     outcomes = load_outcomes()
     compatibility = _stage3_compatibility()
+    effective_class_keys = _stage3_effective_class_keys()
     native = _compile_stage3_native()
     shape = (len(actions), len(stage1_decisions))
     arrays = {
@@ -1841,7 +1967,8 @@ def build_stage3_store(
         support_results = [
             _profile_stage3_support(
                 native, actions, support, stage1, stage2, role_by_match,
-                outcomes, compatibility,
+                structural_by_match, outcomes, compatibility,
+                effective_class_keys,
             )
             for support in stage2.supports
         ]

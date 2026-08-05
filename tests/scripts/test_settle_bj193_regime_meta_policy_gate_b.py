@@ -297,6 +297,7 @@ def test_native_production_path_captures_issue_and_exact_seed_pool(tmp_path):
 def test_v2_gate_a_layers_and_stage1_static_store_are_bound():
     payload = R.verify_gate_a()
     assert len([name for name in payload if name.startswith("v2::")]) == 35
+    assert len([name for name in payload if name.startswith("v2.1::")]) == 16
     store = V2.build_stage1_store()
     assert store.status.shape == (2469, 344)
     assert int(np.count_nonzero(store.status == V2.STATUS_ACTIVE)) == 513_697
@@ -467,3 +468,123 @@ def test_structural_delete_fails_closed_without_all_seven_role_rows():
         tuple(str(value) for value in range(1, 8)), "portfolio",
     )
     assert V2._original_structural_delete_truth(support, {}, 0) is None
+
+
+def test_v21_structural_composition_preserves_same_and_distinct_ticket_counts():
+    golden = json.loads(
+        (
+            V2.GATE_A_V21 / "structural_delete_golden_vectors.json"
+        ).read_text()
+    )
+    anchor = golden["native_137_anchor"]
+    support = V2.Support(
+        str(anchor["issue"]),
+        str(anchor["fold"]),
+        "2019",
+        "v21-structural-fixture",
+        tuple(str(value) for value in anchor["ordered_match_ids"]),
+        str(anchor["portfolio_id"]),
+    )
+    stage1 = V2.Stage1Decision(
+        0,
+        0,
+        (support,),
+        {"output_sha256": "1" * 64},
+    )
+    actions = [
+        row
+        for row in V2.load_stage_catalog(3)
+        if json.loads(row["parameters_json"])["mechanism"]
+        in {"P_MIN_GLOBAL_DELETE", "Q_MIN_GLOBAL_DELETE"}
+    ]
+    registry = V2._load_structural_delete_registry([stage1])
+    p_replay = anchor["p_replay"]
+    p_leg = int(p_replay["delete_leg_index_zero_based"])
+    p_code = int(p_replay["delete_code_index_zero_based"])
+
+    def profile(removed_leg: int, removed_code: int):
+        per_match = []
+        for index, match_id in enumerate(support.ordered_match_ids):
+            weights = ["0.400000000000", "0.350000000000", "0.250000000000"]
+            if index == removed_leg:
+                weights[removed_code] = "0"
+            per_match.append(
+                {
+                    "match_id": match_id,
+                    "direction_weight_3_1_0": weights,
+                }
+            )
+        direction = V2.DirectionSupport(
+            support,
+            {"status": "ACTIVE", "per_match": per_match},
+        )
+        stage2 = V2.Stage2Decision(
+            0,
+            0,
+            (direction,),
+            {"output_sha256": "2" * 64},
+        )
+        return V2._compose_structural_stage3_profiles(
+            actions, direction, stage1, stage2, registry, 0
+        )
+
+    same = profile(p_leg, p_code)
+    assert same[1] == 1458
+    assert same[4]["P_MIN_GLOBAL_DELETE"]["reason_code"] == (
+        "STRUCTURAL_DELETE_ALREADY_ABSENT"
+    )
+    distinct = profile((p_leg + 1) % 7, (p_code + 1) % 3)
+    assert distinct[1] == 972
+    assert distinct[4]["P_MIN_GLOBAL_DELETE"]["reason_code"] == (
+        "STRUCTURAL_DELETE_ADDITIONAL_ZERO_MASK"
+    )
+    assert distinct[4]["P_MIN_GLOBAL_DELETE"][
+        "stage3_replay_signature_sha256"
+    ] == V2._direction_adapter().stage3_replay_signature(
+        issue=support.issue,
+        stage1_output_sha256="1" * 64,
+        stage2_output_sha256="2" * 64,
+        derived_stage3_action_sha256=json.loads(
+            next(
+                row["parameters_json"]
+                for row in actions
+                if json.loads(row["parameters_json"])["mechanism"]
+                == "P_MIN_GLOBAL_DELETE"
+            )
+        )["derived_bet_action_sha256"],
+    )
+
+
+def test_v21_effective_compatibility_replaces_only_structural_action_class():
+    effective = V2._stage3_effective_class_keys()
+    compatibility = V2._stage3_compatibility()
+    actions = V2.load_stage_catalog(3)
+    changed = []
+    for action in actions:
+        parameters = json.loads(action["parameters_json"])
+        original = parameters["compatibility_class_key"]
+        replacement = effective[action["interface_action_key"]]
+        if replacement != original:
+            changed.append((parameters["mechanism"], replacement))
+    assert {mechanism for mechanism, _key in changed} == {
+        "P_MIN_GLOBAL_DELETE",
+        "Q_MIN_GLOBAL_DELETE",
+    }
+    assert len({key for _mechanism, key in changed}) == 1
+    structural_key = changed[0][1]
+    rows = [
+        row
+        for (stage1_key, class_key), row in compatibility.items()
+        if class_key == structural_key
+    ]
+    assert len(rows) == 2469
+    assert {
+        row["compatibility_status"]
+        for row in rows
+        if row["stage1_upstream_issue"] in {"127", "134"}
+    } == {"COMPATIBLE"}
+    assert "COMPATIBLE" not in {
+        row["compatibility_status"]
+        for row in rows
+        if row["stage1_upstream_issue"] == "190"
+    }
