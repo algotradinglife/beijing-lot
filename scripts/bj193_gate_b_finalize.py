@@ -206,13 +206,16 @@ def _metrics(rows: Sequence[dict[str, str]]) -> dict[str, object]:
         "tax_adjusted_net_yuan": tax_net,
         "pre_tax_roi": roi,
         "tax_adjusted_roi": tax_net / stake if stake else None,
+        "hit_rate": sum(float(row["hit"]) > 0 for row in active) / len(active) if active else None,
         "hit_issue_rate": sum(float(row["hit"]) > 0 for row in active) / len(active) if active else None,
         "sharpe": mean / sd * math.sqrt(len(net_values)) if sd else None,
         "sortino": mean / downside_sd * math.sqrt(len(net_values)) if downside_sd else None,
         "max_drawdown_yuan": max_dd,
         "max_drawdown_pct": max_dd_pct,
         "calmar": roi / max_dd_pct if roi is not None and max_dd_pct else None,
+        "payout_hhi": float(np.square(gross_share).sum()),
         "gross_issue_hhi": float(np.square(gross_share).sum()),
+        "largest_issue_share": float(gross_share.max(initial=0.0)),
         "largest_issue_gross_share": float(gross_share.max(initial=0.0)),
         "turnover": switches / max(1, len(rows) - 1),
         "action_switch_count": switches,
@@ -279,6 +282,10 @@ def _holding_tables(by_policy: Mapping[str, Sequence[dict[str, str]]], holding) 
                     "max_zero_payout_miss_streak": result["max_zero_payout_miss_streak"],
                 })
                 for value in result["rolling_windows"]:
+                    value = dict(value)
+                    value["negative_pnl_probability"] = value.pop(
+                        "negative_sum_frequency"
+                    )
                     rolling.append({
                         "policy_id": policy, "fold": fold, "sequence_basis": basis,
                         **value,
@@ -333,6 +340,14 @@ def _stability(policy: str, support: str, rows: Sequence[dict[str, str]]) -> tup
     ]
     for view, included, selected, excluded in views:
         metrics = _metrics(selected)
+        max_loss_streak = 0
+        current_loss_streak = 0
+        for row in selected:
+            if float(row["pre_tax_net_yuan"]) < 0:
+                current_loss_streak += 1
+                max_loss_streak = max(max_loss_streak, current_loss_streak)
+            else:
+                current_loss_streak = 0
         output.append({
             "policy_id": policy, "support": support, "view": view,
             "included_value": included, "excluded_value": excluded,
@@ -340,6 +355,7 @@ def _stability(policy: str, support: str, rows: Sequence[dict[str, str]]) -> tup
             "stake_yuan": fmt(metrics["stake_yuan"]), "pre_tax_roi": fmt(metrics["pre_tax_roi"]),
             "max_drawdown_yuan": fmt(metrics["max_drawdown_yuan"]),
             "max_drawdown_pct": fmt(metrics["max_drawdown_pct"]),
+            "max_loss_streak": max_loss_streak,
         })
     metrics = _metrics(rows)
     concentration = [{
@@ -374,6 +390,13 @@ def _bootstrap_row(stage: str, candidate: str, comparator: str, metric: str, val
         "ci_high": fmt(np.quantile(values, .975)),
         "probability_improvement": fmt(np.mean(values > 0)),
     }
+
+
+def _bootstrap_max_drawdown(net_paths: np.ndarray) -> np.ndarray:
+    equity = REFERENCE_CAPITAL + np.cumsum(net_paths, axis=1)
+    initial = np.full((len(net_paths), 1), REFERENCE_CAPITAL)
+    peaks = np.maximum.accumulate(np.concatenate((initial, equity), axis=1), axis=1)[:, 1:]
+    return np.max(peaks - equity, axis=1)
 
 
 def _bootstrap(
@@ -418,8 +441,8 @@ def _bootstrap(
             for block, indices in block_matrices.items():
                 cpaths = cn[indices]
                 bpaths = bn[indices]
-                cdd = np.max(np.maximum.accumulate(REFERENCE_CAPITAL + np.cumsum(cpaths, axis=1), axis=1) - (REFERENCE_CAPITAL + np.cumsum(cpaths, axis=1)), axis=1)
-                bdd = np.max(np.maximum.accumulate(REFERENCE_CAPITAL + np.cumsum(bpaths, axis=1), axis=1) - (REFERENCE_CAPITAL + np.cumsum(bpaths, axis=1)), axis=1)
+                cdd = _bootstrap_max_drawdown(cpaths)
+                bdd = _bootstrap_max_drawdown(bpaths)
                 output.append(_bootstrap_row(stage_name, candidate, comparator, f"COMPARATOR_MINUS_CANDIDATE_MAX_DRAWDOWN_BLOCK_{block}", bdd - cdd))
     return output, hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()
 
@@ -441,6 +464,9 @@ def _seed_dispersion(rows: Sequence[dict[str, str]]) -> list[dict[str, object]]:
                 rois.append(net / stake)
         arr = np.asarray(rois)
         output.append({
+            "namespace": policy,
+            "selector_factor_id": "",
+            "causal_allocation_factor_id": action,
             "policy_id": policy, "chosen_action_identity": action,
             "mechanism": mechanism, "fold": fold,
             "active_issue_count": len({r["issue"] for r in values}),
@@ -659,14 +685,14 @@ def finalize(checkpoint: Path, target: Path) -> None:
         oracle_rows = []
         for causal, oracle in zip(by_policy["FULL_DYNAMIC_CHAIN"], by_policy["LEAKY_ORACLE_CEILING"], strict=True):
             cstake, ostake = float(causal["stake_yuan"]), float(oracle["stake_yuan"])
-            cu = float(causal["pre_tax_net_yuan"]) / cstake if cstake else None
-            ou = float(oracle["pre_tax_net_yuan"]) / ostake if ostake else None
+            cu = float(causal["pre_tax_net_yuan"]) / cstake if cstake else 0.0
+            ou = float(oracle["pre_tax_net_yuan"]) / ostake if ostake else 0.0
             oracle_rows.append({
                 "issue": causal["issue"], "year": causal["year"],
                 "oracle_action": oracle["chosen_action_identity"],
                 "causal_action": causal["chosen_action_identity"],
                 "oracle_utility": fmt(ou), "causal_utility": fmt(cu),
-                "regret": fmt(ou - cu if ou is not None and cu is not None else None),
+                "regret": fmt(ou - cu),
                 "namespace": "STAGE_3_BET", "oracle_status": oracle["status"],
                 "causal_status": causal["status"],
             })
@@ -711,6 +737,7 @@ def finalize(checkpoint: Path, target: Path) -> None:
                     "issue": row["issue"], "year": row["year"], "feature": feature,
                     "feature_value": row[feature], "chosen_action_identity": flow["chosen_action_identity"],
                     "status": flow["status"], "pre_tax_net_yuan": flow["pre_tax_net_yuan"],
+                    "chart_semantics": "RAW_ISSUE_RESPONSE_NOT_ESTIMATED_PARTIAL_DEPENDENCE",
                 })
         write_gzip(stage / "feature_partial_dependence.csv.gz", list(response[0]), response)
 
@@ -772,9 +799,9 @@ def finalize(checkpoint: Path, target: Path) -> None:
                     "support": support, "roi": fmt(cm["pre_tax_roi"]), "comparator_roi": fmt(bm["pre_tax_roi"]),
                     "max_loss_streak": streak_index[("FULL_DYNAMIC_CHAIN", "ALL", "CALENDAR")]["max_negative_pnl_streak"],
                     "max_miss_streak": streak_index[("FULL_DYNAMIC_CHAIN", "ALL", "ACTIVE_BET")]["max_zero_payout_miss_streak"],
-                    "rolling_5_loss_probability": rolling_index[("FULL_DYNAMIC_CHAIN", "ALL", "CALENDAR", 5)]["negative_sum_frequency"],
-                    "rolling_10_loss_probability": rolling_index[("FULL_DYNAMIC_CHAIN", "ALL", "CALENDAR", 10)]["negative_sum_frequency"],
-                    "rolling_20_loss_probability": rolling_index[("FULL_DYNAMIC_CHAIN", "ALL", "CALENDAR", 20)]["negative_sum_frequency"],
+                    "rolling_5_loss_probability": rolling_index[("FULL_DYNAMIC_CHAIN", "ALL", "CALENDAR", 5)]["negative_pnl_probability"],
+                    "rolling_10_loss_probability": rolling_index[("FULL_DYNAMIC_CHAIN", "ALL", "CALENDAR", 10)]["negative_pnl_probability"],
+                    "rolling_20_loss_probability": rolling_index[("FULL_DYNAMIC_CHAIN", "ALL", "CALENDAR", 20)]["negative_pnl_probability"],
                     "max_drawdown_yuan": fmt(cm["max_drawdown_yuan"]), "max_drawdown_pct": fmt(cm["max_drawdown_pct"]),
                     "max_drawdown_duration_issues": max((int(e["drawdown_duration_to_trough_issues"]) for e in episodes if e["policy_id"] == "FULL_DYNAMIC_CHAIN" and e["sequence_basis"] == "CALENDAR"), default=0),
                     "max_recovery_issues": holding_index[("FULL_DYNAMIC_CHAIN", "CALENDAR")]["max_recovery_issues"],
@@ -950,12 +977,12 @@ def finalize(checkpoint: Path, target: Path) -> None:
                 "test_settle_bj193_regime_meta_policy_gate_b.py "
                 "-k 'finalizer or oracle or correction_json or path_receipts'"
             ),
-            "focused_result": "7 passed, 23 deselected",
+            "focused_result": "8 passed, 23 deselected",
             "full_command": (
                 "pytest -q tests/scripts/"
                 "test_settle_bj193_regime_meta_policy_gate_b.py"
             ),
-            "full_result": "30 passed in 40.89s",
+            "full_result": "31 passed in 41.03s",
             "py_compile": "PASS",
             "git_diff_check": "PASS",
         }

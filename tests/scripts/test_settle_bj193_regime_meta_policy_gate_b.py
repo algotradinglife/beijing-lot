@@ -984,6 +984,30 @@ def test_finalizer_verifies_committed_oracle_correction_package():
     assert len(payload) == 8
 
 
+def test_finalizer_drawdown_includes_initial_capital_and_metric_aliases():
+    paths = np.asarray([[-100.0, 200.0], [100.0, -50.0]])
+    assert F._bootstrap_max_drawdown(paths).tolist() == [100.0, 50.0]
+    rows = [
+        {
+            "status": "ACTIVE",
+            "stake_yuan": "100",
+            "gross_pre_tax_yuan": "120",
+            "tax_yuan": "0",
+            "pre_tax_net_yuan": "20",
+            "tax_adjusted_net_yuan": "20",
+            "hit": "1",
+            "chosen_action_identity": "A",
+            "issue": "1",
+            "year": "2022",
+            "outer_fold": "OOS_2022",
+        }
+    ]
+    metrics = F._metrics(rows)
+    assert metrics["hit_rate"] == metrics["hit_issue_rate"] == 1.0
+    assert metrics["payout_hhi"] == metrics["gross_issue_hhi"] == 1.0
+    assert metrics["largest_issue_share"] == 1.0
+
+
 def test_prior_only_paths_use_outer_train_without_validation_selection(
     monkeypatch,
 ):
