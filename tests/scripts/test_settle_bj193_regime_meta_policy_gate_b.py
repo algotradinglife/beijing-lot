@@ -588,3 +588,84 @@ def test_v21_effective_compatibility_replaces_only_structural_action_class():
         for row in rows
         if row["stage1_upstream_issue"] == "190"
     }
+
+
+def test_policy_rows_common_support_and_oracle_use_frozen_causal_screen():
+    action_rows = [
+        {
+            "interface_action_key": "A_STATIC",
+            "upstream_issue": "134",
+            "source_identity": "MARKET_BEST_FULL",
+        },
+        {
+            "interface_action_key": "B_CHALLENGER",
+            "upstream_issue": "127",
+            "source_identity": "B",
+        },
+    ]
+    issues = [
+        {
+            "issue": "1",
+            "year": "2021",
+            "outer_fold": "TEST_2021",
+            "issue_instance": "1@TEST_2021",
+        },
+        {
+            "issue": "2",
+            "year": "2021",
+            "outer_fold": "TEST_2021",
+            "issue_instance": "2@TEST_2021",
+        },
+    ]
+    status = np.asarray(
+        [
+            [V2.STATUS_ACTIVE, V2.STATUS_ACTIVE],
+            [V2.STATUS_ACTIVE, V2.STATUS_NO_BET],
+        ],
+        dtype=np.uint8,
+    )
+    stake = np.asarray([[100.0, 100.0], [50.0, 0.0]])
+    net = np.asarray([[10.0, -10.0], [10.0, 0.0]])
+    gross = stake + net
+    zeros = np.zeros_like(stake)
+    store = V2.StageStore(
+        action_rows=action_rows,
+        issues=issues,
+        supports={},
+        status=status,
+        stake=stake,
+        gross=gross,
+        tax=zeros.copy(),
+        net=net,
+        hit=zeros.copy(),
+    )
+    static = V2.static_stage1_path(store)
+    assert static.choices.tolist() == [0, 0]
+    causal = V2.StagePath(
+        stage="STAGE_1_SELECTION",
+        choices=np.asarray([0, 1], dtype=np.int32),
+        model_by_issue=["MODEL", "MODEL"],
+        fallback_by_issue=np.zeros(2, dtype=bool),
+        model_receipts=[],
+        screen_receipts=[
+            {
+                "outer_fold": "TEST_2021",
+                "screen_phase": "OUTER_TRAIN",
+                "action_identity": "A_STATIC",
+            },
+            {
+                "outer_fold": "TEST_2021",
+                "screen_phase": "OUTER_TRAIN",
+                "action_identity": "B_CHALLENGER",
+            },
+        ],
+    )
+    oracle = V2.oracle_path_on_causal_screen(store, causal)
+    assert oracle.choices.tolist() == [1, 0]
+    static_rows = V2.issue_policy_rows("STATIC", store, static)
+    causal_rows = V2.issue_policy_rows("CAUSAL", store, causal)
+    assert causal_rows[1]["status"] == "NO_BET"
+    assert causal_rows[1]["stake_yuan"] == 0.0
+    assert V2.strict_common_issue_indices(
+        {"STATIC": static_rows, "CAUSAL": causal_rows}
+    ) == [0]

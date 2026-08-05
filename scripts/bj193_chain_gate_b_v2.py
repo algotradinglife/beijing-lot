@@ -860,6 +860,175 @@ def read_stage_path(target: Path, store: StageStore) -> StagePath:
     return path
 
 
+def static_stage1_path(store: StageStore) -> StagePath:
+    candidates = [
+        index
+        for index, row in enumerate(store.action_rows)
+        if row["upstream_issue"] == "134"
+        and row["source_identity"] == "MARKET_BEST_FULL"
+    ]
+    if len(candidates) != 1:
+        raise RuntimeError("#193 Stage-1 static fallback identity drift")
+    fallback = candidates[0]
+    return StagePath(
+        stage="STAGE_1_SELECTION",
+        choices=np.full(len(store.issues), fallback, dtype=np.int32),
+        model_by_issue=["STATIC_BEST_FULL_FULL"] * len(store.issues),
+        fallback_by_issue=np.ones(len(store.issues), dtype=bool),
+        model_receipts=[],
+        screen_receipts=[],
+    )
+
+
+def static_conditional_path(store: ConditionalStore, stage: str) -> StagePath:
+    if stage not in {"STAGE_2_DIRECTION", "STAGE_3_BET"}:
+        raise ValueError("static conditional path requires Stage 2 or Stage 3")
+    return StagePath(
+        stage=stage,
+        choices=np.full(
+            len(store.issues), store.fallback_index, dtype=np.int32
+        ),
+        model_by_issue=["STATIC_BEST_FULL_FULL"] * len(store.issues),
+        fallback_by_issue=np.ones(len(store.issues), dtype=bool),
+        model_receipts=[],
+        screen_receipts=[],
+    )
+
+
+def issue_policy_rows(
+    policy_id: str,
+    store: StageStore,
+    path: StagePath,
+) -> list[dict[str, object]]:
+    if len(path.choices) != len(store.issues):
+        raise ValueError("path/store issue denominator mismatch")
+    status_name = {
+        int(STATUS_NO_BET): "NO_BET",
+        int(STATUS_ACTIVE): "ACTIVE",
+        int(STATUS_UNAVAILABLE): "UNAVAILABLE",
+    }
+    rows: list[dict[str, object]] = []
+    for issue_index, (issue, action_value) in enumerate(
+        zip(store.issues, path.choices, strict=True)
+    ):
+        action = int(action_value)
+        status = status_name[int(store.status[action, issue_index])]
+        active = status == "ACTIVE" and store.stake[action, issue_index] > 0.0
+        rows.append(
+            {
+                "policy_id": policy_id,
+                "issue_index": issue_index,
+                "issue": issue["issue"],
+                "year": issue["year"],
+                "outer_fold": issue["outer_fold"],
+                "issue_instance": issue["issue_instance"],
+                "status": status,
+                "chosen_action_identity": store.action_rows[action][
+                    "interface_action_key"
+                ],
+                "model_id": path.model_by_issue[issue_index],
+                "fallback_flag": bool(path.fallback_by_issue[issue_index]),
+                "stake_yuan": (
+                    float(store.stake[action, issue_index]) if active else 0.0
+                ),
+                "gross_pre_tax_yuan": (
+                    float(store.gross[action, issue_index]) if active else 0.0
+                ),
+                "tax_yuan": (
+                    float(store.tax[action, issue_index]) if active else 0.0
+                ),
+                "pre_tax_net_yuan": (
+                    float(store.net[action, issue_index]) if active else 0.0
+                ),
+                "tax_adjusted_net_yuan": (
+                    float(store.net[action, issue_index] - store.tax[action, issue_index])
+                    if active
+                    else 0.0
+                ),
+                "hit": (
+                    float(store.hit[action, issue_index]) if active else 0.0
+                ),
+            }
+        )
+    return rows
+
+
+def strict_common_issue_indices(
+    rows_by_policy: Mapping[str, Sequence[Mapping[str, object]]],
+) -> list[int]:
+    if not rows_by_policy:
+        return []
+    lengths = {len(rows) for rows in rows_by_policy.values()}
+    if len(lengths) != 1:
+        raise ValueError("policy issue denominators differ")
+    count = next(iter(lengths))
+    common: list[int] = []
+    for index in range(count):
+        issues = {
+            str(rows[index]["issue"]) for rows in rows_by_policy.values()
+        }
+        if len(issues) != 1:
+            raise ValueError("policy issue order differs")
+        if all(
+            row[index]["status"] == "ACTIVE"
+            and float(row[index]["stake_yuan"]) > 0.0
+            for row in rows_by_policy.values()
+        ):
+            common.append(index)
+    return common
+
+
+def oracle_path_on_causal_screen(
+    store: StageStore,
+    causal_path: StagePath,
+) -> StagePath:
+    """Leaky Tier-O ceiling over each fold's frozen causal action set."""
+
+    by_fold: dict[str, set[int]] = defaultdict(set)
+    action_lookup = {
+        row["interface_action_key"]: index
+        for index, row in enumerate(store.action_rows)
+    }
+    for receipt in causal_path.screen_receipts:
+        if receipt["screen_phase"] == "OUTER_TRAIN":
+            by_fold[str(receipt["outer_fold"])].add(
+                action_lookup[str(receipt["action_identity"])]
+            )
+    choices = causal_path.choices.copy()
+    model_by_issue: list[str] = []
+    fallback = np.zeros(len(store.issues), dtype=bool)
+    for issue_index, issue in enumerate(store.issues):
+        fold = str(issue["outer_fold"])
+        available_actions = sorted(by_fold.get(fold, ()))
+        eligible = [
+            action
+            for action in available_actions
+            if store.status[action, issue_index] == STATUS_ACTIVE
+            and store.stake[action, issue_index] > 0.0
+        ]
+        if eligible:
+            eligible.sort(
+                key=lambda action: (
+                    -float(store.net[action, issue_index] / store.stake[action, issue_index]),
+                    float(store.stake[action, issue_index]),
+                    store.action_rows[action]["interface_action_key"],
+                )
+            )
+            choices[issue_index] = eligible[0]
+            model_by_issue.append("LEAKY_ORACLE_CEILING")
+        else:
+            fallback[issue_index] = True
+            model_by_issue.append("ORACLE_NO_AVAILABLE_ACTION_CAUSAL_FALLBACK")
+    return StagePath(
+        stage=causal_path.stage,
+        choices=choices,
+        model_by_issue=model_by_issue,
+        fallback_by_issue=fallback,
+        model_receipts=[],
+        screen_receipts=causal_path.screen_receipts,
+    )
+
+
 def _stage1_candidate_score_lookup() -> dict[tuple[str, str, str], list[float]]:
     """Outcome-unexposed selected-support score summaries for Stage-2 X_i."""
     output: dict[tuple[str, str, str], list[float]] = defaultdict(list)
