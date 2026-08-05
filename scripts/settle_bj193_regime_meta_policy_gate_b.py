@@ -1,10 +1,11 @@
 #!/usr/bin/python3
-"""Settle #193's frozen regime-conditioned N7 meta-policy.
+"""Settle #193's frozen three-stage regime-conditioned N7 meta-policy.
 
-Execution is split at an immutable replay checkpoint.  The replay phase opens
-the accepted upstream outcome ledgers and runs the exact #167 ticket allocator
-only for the union of selectors retained by the frozen per-fold FULL screen.
-The finalizer is disk-only and cannot invoke a football/ticket replay.
+Execution is split at an immutable replay checkpoint.  Gate-B v2 binds both
+accepted Gate-A layers and executes selection, conditional direction and
+conditional allocation as three separately screened/fitted chronological
+models.  The historical flattened checkpoint code remains below only as
+auditable implementation provenance and is not an executable v2 path.
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ import math
 import os
 import shutil
 import subprocess
+import sys
 import uuid
 from collections import defaultdict
 from pathlib import Path
@@ -29,16 +31,26 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 GATE_A = ROOT / "results" / "bj193_gate_a_preoutcome_v1"
-DEFAULT_CHECKPOINT = ROOT / ".scratch" / "bj193_gate_b_replay_checkpoint_v1"
-DEFAULT_OUTPUT = ROOT / "results" / "bj193_gate_b_regime_meta_policy_v1"
+GATE_A_V2 = ROOT / "results" / "bj193_gate_a_chain_interface_v2"
+DEFAULT_CHECKPOINT = ROOT / ".scratch" / "bj193_gate_b_chain_checkpoint_v2"
+DEFAULT_OUTPUT = ROOT / "results" / "bj193_gate_b_regime_meta_policy_v2"
 EXPECTED_GATE_A_MANIFEST = (
     "408e8aa69cf2d336f8b3b65b1c94b30a3456864af01517a78fc27b3f2bab0c45"
 )
 EXPECTED_GATE_A_CONTENT = (
     "9bf90d1553613cbb50770ea51deece1fb40cfb05a0ace9103ab62194faff3131"
 )
-CHECKPOINT_CONTRACT = "bj193-gate-b-exact-replay-checkpoint-v1"
-OUTPUT_CONTRACT = "bj193-gate-b-regime-meta-policy-v1"
+EXPECTED_GATE_A_V2_MANIFEST = (
+    "6a44f4b1b355f5476328424bc8d92271d61d585643d40ca42bb56ffda1c43933"
+)
+EXPECTED_GATE_A_V2_CONTENT = (
+    "a5f274f92edbff194be9ce60fa707196d20d255b608b08bf22c3f0d924bb7425"
+)
+EXPECTED_GATE_A_V2_PORTABLE = (
+    "2bd83000fabf0a4817a31964a02c881562489651cc98143c716aa09ac8dd92bd"
+)
+CHECKPOINT_CONTRACT = "bj193-gate-b-three-stage-checkpoint-v2"
+OUTPUT_CONTRACT = "bj193-gate-b-three-stage-regime-meta-policy-v2"
 SCIENCE_CELLS = 963
 ATLAS_SELECTOR_COUNT = 492
 CANONICAL_ISSUE_COUNT = 344
@@ -53,11 +65,13 @@ def load_module(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
 
 C = load_module("bj193_core", ROOT / "scripts" / "bj193_gate_b_core.py")
+V2 = load_module("bj193_chain_v2", ROOT / "scripts" / "bj193_chain_gate_b_v2.py")
 R167 = load_module(
     "bj167_exact", ROOT / "scripts" / "settle_bj167_strategy_atlas_gate_b_exact.py"
 )
@@ -111,7 +125,22 @@ def verify_gate_a() -> dict[str, str]:
         raise RuntimeError("#193 frozen action denominator drift")
     if card["denominator"]["canonical_issue_count"] != CANONICAL_ISSUE_COUNT:
         raise RuntimeError("#193 canonical issue denominator drift")
-    return payload
+    v2 = verify_package(GATE_A_V2, EXPECTED_GATE_A_V2_MANIFEST)
+    if sha(GATE_A_V2 / "CONTENT_IDENTITY.json") != EXPECTED_GATE_A_V2_CONTENT:
+        raise RuntimeError("#193 Gate-A v2 content identity drift")
+    if sha(GATE_A_V2 / "PORTABLE_SHA256SUMS.json") != EXPECTED_GATE_A_V2_PORTABLE:
+        raise RuntimeError("#193 Gate-A v2 portable identity drift")
+    v2_card = json.loads((GATE_A_V2 / "gate_a_card.json").read_text())
+    counts = v2_card["denominator"]
+    expected = {
+        "stage1_action_count": 2_469,
+        "stage2_action_count": 2_425,
+        "stage3_seed_agnostic_action_count": 963,
+    }
+    for field, value in expected.items():
+        if int(counts[field]) != value:
+            raise RuntimeError(f"#193 Gate-A v2 denominator drift: {field}")
+    return {**payload, **{f"v2::{name}": digest for name, digest in v2.items()}}
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -733,37 +762,26 @@ def build_replay_checkpoint(target: Path) -> None:
 
 
 def preflight() -> None:
-    verify_gate_a()
-    sources = verify_gate_b_sources()
-    features = load_feature_rows()
-    (
-        selectors,
-        _selector_idx,
-        _by_canonical,
-        _canonical_status,
-        full_net,
-        full_stake,
-        _full_gross,
-        _full_tax,
-    ) = build_atlas_full_screen(features)
-    union, rows = frozen_selector_union(features, selectors, full_net, full_stake)
+    manifests = verify_gate_a()
+    store = V2.build_stage1_store()
     print(
         json.dumps(
             {
-                "mode": "PREFLIGHT_NO_TICKET_REPLAY",
-                "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
-                "source_package_count": len(sources),
-                "canonical_issue_count": len(features),
-                "atlas_selector_count": len(selectors),
-                "selector_screen_rows": len(rows),
-                "selector_union_count": len(union),
-                "science_cells_per_selector": SCIENCE_CELLS,
-                "checkpoint_action_issue_rows": (
-                    len(union) * SCIENCE_CELLS * len(features)
+                "mode": "THREE_STAGE_V2_PREFLIGHT_NO_STAGE2_OR_STAGE3_REPLAY",
+                "gate_a_v1_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+                "gate_a_v2_manifest_sha256": EXPECTED_GATE_A_V2_MANIFEST,
+                "verified_payload_count": len(manifests),
+                "canonical_issue_count": len(store.issues),
+                "stage1_action_count": len(store.action_rows),
+                "stage1_action_issue_count": int(store.status.size),
+                "stage1_active_action_issue_count": int(
+                    np.count_nonzero(store.status == V2.STATUS_ACTIVE)
                 ),
-                "checkpoint_issue_array_bytes": (
-                    len(union) * SCIENCE_CELLS * len(features) * 6 * 8
+                "stage1_unavailable_action_issue_count": int(
+                    np.count_nonzero(store.status == V2.STATUS_UNAVAILABLE)
                 ),
+                "stage1_static_full_settlement_sha256": V2.stage1_store_identity(store),
+                "next_boundary": "IMPLEMENT_HONEST_STAGE1_PATH_BEFORE_STAGE2_REPLAY",
             },
             sort_keys=True,
         )
@@ -782,7 +800,9 @@ def main() -> None:
     if args.preflight:
         preflight()
     elif args.replay_checkpoint:
-        build_replay_checkpoint(args.checkpoint.resolve())
+        raise RuntimeError(
+            "superseded flattened replay disabled; v2 chained checkpoint is not complete"
+        )
     else:
         raise RuntimeError("finalizer implementation not yet available")
 

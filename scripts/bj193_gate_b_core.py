@@ -96,19 +96,32 @@ class FeatureTransform:
         missing = np.isnan(raw).astype(np.float64)
         filled = np.where(np.isnan(raw), self.medians, raw)
         standardized = (np.clip(filled, self.low, self.high) - self.means) / self.scales
-        return np.concatenate([standardized, missing], axis=1)
+        # Gate-A v2 freezes feature-ordinal order with every numeric column
+        # immediately followed by its missingness indicator.
+        return np.stack((standardized, missing), axis=2).reshape(len(raw), -1)
 
 
-def _masked_mean(y: np.ndarray, active: np.ndarray) -> np.ndarray:
-    count = active.sum(axis=0)
-    total = np.where(active, y, 0.0).sum(axis=0)
-    return np.divide(total, count, out=np.full(y.shape[1], np.nan), where=count > 0)
+def _masked_weighted_mean(
+    y: np.ndarray, active: np.ndarray, weight: np.ndarray
+) -> np.ndarray:
+    effective = np.where(active, weight, 0.0)
+    total_weight = effective.sum(axis=0)
+    total = (np.where(active, y, 0.0) * effective).sum(axis=0)
+    return np.divide(
+        total, total_weight, out=np.full(y.shape[1], np.nan),
+        where=total_weight > 0,
+    )
 
 
 def prior_predictions(
-    train_y: np.ndarray, train_active: np.ndarray, query_count: int
+    train_y: np.ndarray,
+    train_active: np.ndarray,
+    query_count: int,
+    train_weight: np.ndarray | None = None,
 ) -> np.ndarray:
-    means = _masked_mean(train_y, train_active)
+    if train_weight is None:
+        train_weight = np.ones_like(train_y)
+    means = _masked_weighted_mean(train_y, train_active, train_weight)
     means[train_active.sum(axis=0) < MIN_ACTION_SUPPORT] = np.nan
     return np.repeat(means[None, :], query_count, axis=0)
 
@@ -156,15 +169,19 @@ def binned_predictions(
     train_active: np.ndarray,
     bins: int,
     min_leaf: int,
+    train_weight: np.ndarray | None = None,
 ) -> np.ndarray:
     """Best action-specific univariate quantile regime rule."""
     nquery, naction = len(query_x), train_y.shape[1]
     output = np.full((nquery, naction), np.nan)
+    if train_weight is None:
+        train_weight = np.ones_like(train_y)
     supports = train_active.sum(axis=0)
     for action in np.flatnonzero(supports >= MIN_ACTION_SUPPORT):
         mask = train_active[:, action]
         y = train_y[mask, action]
-        fallback = float(y.mean())
+        weights = train_weight[mask, action]
+        fallback = float(np.dot(y, weights) / weights.sum())
         best: tuple[float, int, np.ndarray, np.ndarray] | None = None
         for feature in range(train_x.shape[1]):
             values = train_x[mask, feature]
@@ -175,7 +192,10 @@ def binned_predictions(
             for li in range(len(means)):
                 take = leaf == li
                 if int(take.sum()) >= min_leaf:
-                    means[li] = float(y[take].mean())
+                    leaf_weight = weights[take]
+                    means[li] = float(
+                        np.dot(y[take], leaf_weight) / leaf_weight.sum()
+                    )
                 error += float(((y[take] - means[li]) ** 2).sum())
             key = (error, feature)
             if best is None or key < (best[0], best[1]):
@@ -189,30 +209,35 @@ def binned_predictions(
 def _tree_fit(
     x: np.ndarray,
     y: np.ndarray,
+    weight: np.ndarray,
     rows: np.ndarray,
     depth: int,
     max_depth: int,
     min_leaf: int,
 ) -> tuple:
-    mean = float(y[rows].mean())
+    mean = float(np.dot(y[rows], weight[rows]) / weight[rows].sum())
     if depth >= max_depth or len(rows) < 2 * min_leaf:
         return ("leaf", mean)
     best: tuple[float, int, float, np.ndarray, np.ndarray] | None = None
     for feature in range(x.shape[1]):
         order = rows[np.argsort(x[rows, feature], kind="stable")]
         values = x[order, feature]
-        yy = y[order]
-        csum = np.cumsum(yy)
-        csq = np.cumsum(yy * yy)
-        total, total_sq = csum[-1], csq[-1]
         for split in range(min_leaf, len(order) - min_leaf + 1):
             if values[split - 1] == values[split]:
                 continue
-            ln = split
-            rn = len(order) - split
-            lsum, lsq = csum[split - 1], csq[split - 1]
-            rsum, rsq = total - lsum, total_sq - lsq
-            sse = float(lsq - lsum * lsum / ln + rsq - rsum * rsum / rn)
+            left, right = order[:split], order[split:]
+            left_mean = float(
+                np.dot(y[left], weight[left]) / weight[left].sum()
+            )
+            right_mean = float(
+                np.dot(y[right], weight[right]) / weight[right].sum()
+            )
+            # Loss is unweighted issue utility MSE; terminal predictions are
+            # the contract's aggregate net/stake values.
+            sse = float(
+                ((y[left] - left_mean) ** 2).sum()
+                + ((y[right] - right_mean) ** 2).sum()
+            )
             threshold = float((values[split - 1] + values[split]) / 2.0)
             key = (sse, feature, threshold)
             if best is None or key < (best[0], best[1], best[2]):
@@ -223,8 +248,8 @@ def _tree_fit(
         "node",
         best[1],
         best[2],
-        _tree_fit(x, y, best[3], depth + 1, max_depth, min_leaf),
-        _tree_fit(x, y, best[4], depth + 1, max_depth, min_leaf),
+        _tree_fit(x, y, weight, best[3], depth + 1, max_depth, min_leaf),
+        _tree_fit(x, y, weight, best[4], depth + 1, max_depth, min_leaf),
     )
 
 
@@ -241,11 +266,17 @@ def shallow_tree_predictions(
     train_active: np.ndarray,
     max_depth: int,
     min_leaf: int,
+    train_weight: np.ndarray | None = None,
 ) -> np.ndarray:
     output = np.full((len(query_x), train_y.shape[1]), np.nan)
+    if train_weight is None:
+        train_weight = np.ones_like(train_y)
     for action in np.flatnonzero(train_active.sum(axis=0) >= MIN_ACTION_SUPPORT):
         rows = np.flatnonzero(train_active[:, action])
-        tree = _tree_fit(train_x, train_y[:, action], rows, 0, max_depth, min_leaf)
+        tree = _tree_fit(
+            train_x, train_y[:, action], train_weight[:, action], rows,
+            0, max_depth, min_leaf,
+        )
         output[:, action] = [_tree_predict_one(tree, row) for row in query_x]
     return output
 
@@ -255,19 +286,64 @@ def ridge_score_predictions(
     query_x: np.ndarray,
     train_y: np.ndarray,
     train_active: np.ndarray,
-    feature_indices: Sequence[int],
+    positive_indices: Sequence[int],
+    negative_indices: Sequence[int],
     l2: float,
 ) -> np.ndarray:
-    """Regularized action-specific score; deterministic ridge implementation."""
-    cols = np.asarray(feature_indices, dtype=np.int64)
+    """Frozen projected-ridge action score.
+
+    Gate-A v2 does not authorize an unconstrained ridge under the historical
+    ``MONOTONE_REGULARIZED_SCORE`` label.  POOL_VALUE coefficients are
+    non-negative, UNCERTAINTY_DIVERGENCE coefficients are non-positive, and
+    every other projected feature is unconstrained.  Coordinate order is the
+    exact feature-column order and the intercept is unpenalized.
+    """
+    if l2 < 0:
+        raise ValueError("ridge penalty must be non-negative")
+    positive = {int(index) for index in positive_indices}
+    negative = {int(index) for index in negative_indices}
+    if positive & negative:
+        raise ValueError("a monotone feature cannot have both signs")
+    if any(index < 0 or index >= train_x.shape[1] for index in positive | negative):
+        raise ValueError("monotone feature index out of range")
     output = np.full((len(query_x), train_y.shape[1]), np.nan)
-    q = np.column_stack([np.ones(len(query_x)), query_x[:, cols]])
+    x_all = np.column_stack([np.ones(len(train_x)), train_x])
+    q = np.column_stack([np.ones(len(query_x)), query_x])
     for action in np.flatnonzero(train_active.sum(axis=0) >= MIN_ACTION_SUPPORT):
         mask = train_active[:, action]
-        x = np.column_stack([np.ones(int(mask.sum())), train_x[mask][:, cols]])
-        penalty = np.eye(x.shape[1]) * l2
-        penalty[0, 0] = 0.0
-        beta = np.linalg.solve(x.T @ x + penalty, x.T @ train_y[mask, action])
+        x = x_all[mask]
+        y = train_y[mask, action]
+        beta = np.zeros(x.shape[1], dtype=np.float64)
+        residual = y.copy()
+        sum_squares = np.sum(x * x, axis=0)
+        denominators = sum_squares.copy()
+        denominators[1:] += l2
+        for _iteration in range(10_000):
+            largest_change = 0.0
+            for column in range(x.shape[1]):
+                if denominators[column] <= 0.0:
+                    continue
+                old = beta[column]
+                candidate = (
+                    old * float(sum_squares[column])
+                    + float(np.dot(x[:, column], residual))
+                ) / float(denominators[column])
+                feature = column - 1
+                if feature in positive:
+                    candidate = max(0.0, candidate)
+                elif feature in negative:
+                    candidate = min(0.0, candidate)
+                delta = candidate - old
+                if delta:
+                    beta[column] = candidate
+                    residual -= x[:, column] * delta
+                    largest_change = max(largest_change, abs(delta))
+            if largest_change <= 1e-12:
+                break
+        # The frozen estimator has an exact 10,000-sweep ceiling.  If the
+        # 1e-12 coefficient tolerance is not reached (highly collinear
+        # missingness indicators can do this), the deterministic last sweep
+        # is the defined output; the grid must not adapt its iteration budget.
         output[:, action] = q @ beta
     return output
 
@@ -280,24 +356,37 @@ def predict_model(
     train_y: np.ndarray,
     train_active: np.ndarray,
     group_columns: Mapping[str, Sequence[int]],
+    train_weight: np.ndarray | None = None,
 ) -> np.ndarray:
     if family == "PRIOR_ONLY_FIXED":
-        return prior_predictions(train_y, train_active, len(query_x))
+        return prior_predictions(
+            train_y, train_active, len(query_x), train_weight
+        )
     if family == "BINNED_REGIME_RULE":
         return binned_predictions(
             train_x, query_x, train_y, train_active,
-            int(parameters["quantile_bins"]), int(parameters["min_leaf"])
+            int(parameters["quantile_bins"]), int(parameters["min_leaf"]),
+            train_weight,
         )
     if family == "SHALLOW_TREE":
         return shallow_tree_predictions(
             train_x, query_x, train_y, train_active,
-            int(parameters["max_depth"]), int(parameters["min_leaf"])
+            int(parameters["max_depth"]), int(parameters["min_leaf"]),
+            train_weight,
         )
     if family == "MONOTONE_REGULARIZED_SCORE":
-        name = str(parameters["monotone_feature_group"])
+        # The grid retains either historical group name for action identity,
+        # while the v2 estimator contract fixes both monotone directions for
+        # every row.  The label does not switch one constraint off.
+        if str(parameters["monotone_feature_group"]) not in {
+            "POOL_VALUE", "UNCERTAINTY_DIVERGENCE"
+        }:
+            raise ValueError("unknown monotone feature group")
         return ridge_score_predictions(
             train_x, query_x, train_y, train_active,
-            group_columns[name], float(parameters["l2"])
+            group_columns.get("POOL_VALUE", ()),
+            group_columns.get("UNCERTAINTY_DIVERGENCE", ()),
+            float(parameters["l2"]),
         )
     if family == "NEAREST_HISTORICAL_REGIME":
         return nearest_predictions(

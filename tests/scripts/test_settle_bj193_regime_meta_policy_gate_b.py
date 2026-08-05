@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import ctypes
+import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -13,6 +15,7 @@ def load(name: str, path: Path):
     spec = importlib.util.spec_from_file_location(name, path)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
+    sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
 
@@ -22,6 +25,7 @@ R = load(
     "bj193_runner_test",
     ROOT / "scripts" / "settle_bj193_regime_meta_policy_gate_b.py",
 )
+V2 = load("bj193_chain_v2_test", ROOT / "scripts" / "bj193_chain_gate_b_v2.py")
 
 
 def test_selector_screen_uses_roi_support_stake_and_lexical_ties():
@@ -43,6 +47,18 @@ def test_seed_economics_are_mean_not_summed_exposure():
         C.normalize_seed_aggregated(values, "ENSEMBLE_100"),
         np.array([80.0, 1.0]),
     )
+
+
+def test_prior_prediction_is_aggregate_net_over_stake_not_mean_issue_roi():
+    utility = np.asarray([[1.0], [-1.0]] * 10)
+    stake = np.asarray([[100.0], [1.0]] * 10)
+    active = np.ones_like(utility, dtype=bool)
+    predicted = C.prior_predictions(
+        utility, active, query_count=1, train_weight=stake
+    )
+    expected = (10 * 100.0 - 10 * 1.0) / (10 * 100.0 + 10 * 1.0)
+    assert abs(float(predicted[0, 0]) - expected) < 1e-15
+    values = np.array([8000.0, 100.0])
     assert np.array_equal(
         C.normalize_seed_aggregated(values, "DETERMINISTIC"), values
     )
@@ -58,6 +74,17 @@ def test_train_only_transform_does_not_refit_on_query_extreme():
         transform.high[1] - transform.means[1]
     ) / transform.scales[1] + 1e-12
     assert transformed[0, 3] == 1.0
+
+
+def test_numeric_projection_interleaves_each_missing_indicator():
+    train = np.asarray([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]])
+    transformed = C.FeatureTransform.fit(train).apply(
+        np.asarray([[np.nan, 20.0]])
+    )
+    assert transformed.shape == (1, 4)
+    assert transformed[0, 0] == 0.0
+    assert transformed[0, 1] == 1.0
+    assert transformed[0, 3] == 0.0
 
 
 def test_model_families_are_deterministic_and_min_support_is_enforced():
@@ -82,6 +109,72 @@ def test_model_families_are_deterministic_and_min_support_is_enforced():
         assert np.array_equal(one, two, equal_nan=True)
         assert np.isfinite(one[:, 0]).all()
         assert np.isnan(one[:, 1]).all()
+
+
+def test_monotone_score_projects_frozen_positive_and_negative_signs():
+    # Outcome utility is intentionally anti-correlated with POOL_VALUE and
+    # positively correlated with UNCERTAINTY.  The frozen estimator must not
+    # express either forbidden direction.
+    pool = np.linspace(-2.0, 2.0, 40)
+    uncertainty = np.linspace(2.0, -2.0, 40)
+    nuisance = np.sin(np.arange(40, dtype=float))
+    x = np.column_stack([pool, uncertainty, nuisance])
+    y = (-3.0 * pool + 4.0 * uncertainty + nuisance)[:, None]
+    active = np.ones_like(y, dtype=bool)
+    prediction = C.ridge_score_predictions(
+        x,
+        np.asarray([[2.0, -2.0, 0.0], [-2.0, 2.0, 0.0]]),
+        y,
+        active,
+        positive_indices=[0],
+        negative_indices=[1],
+        l2=0.01,
+    )
+    # Both prohibited slopes are projected to zero; only the unconstrained
+    # nuisance/intercept can remain, so swapping the two constrained fields
+    # cannot change the prediction.
+    assert abs(float(prediction[0, 0] - prediction[1, 0])) < 1e-10
+
+
+def test_monotone_score_keeps_allowed_directions():
+    pool = np.linspace(-2.0, 2.0, 40)
+    uncertainty = np.linspace(2.0, -2.0, 40)
+    x = np.column_stack([pool, uncertainty])
+    y = (2.0 * pool - 3.0 * uncertainty)[:, None]
+    active = np.ones_like(y, dtype=bool)
+    prediction = C.ridge_score_predictions(
+        x,
+        np.asarray([[2.0, -2.0], [-2.0, 2.0]]),
+        y,
+        active,
+        positive_indices=[0],
+        negative_indices=[1],
+        l2=0.01,
+    )
+    assert prediction[0, 0] > prediction[1, 0]
+
+
+def test_monotone_grid_identity_label_does_not_disable_joint_constraints():
+    train_x = np.asarray(
+        [[-1.0, -1.0], [0.0, 0.0], [1.0, 1.0]] * 10,
+        dtype=np.float64,
+    )
+    query_x = np.asarray([[2.0, 2.0]], dtype=np.float64)
+    train_y = (train_x[:, 0] - train_x[:, 1])[:, None]
+    active = np.ones_like(train_y, dtype=bool)
+    groups = {"POOL_VALUE": [0], "UNCERTAINTY_DIVERGENCE": [1]}
+    for label in ("POOL_VALUE", "UNCERTAINTY_DIVERGENCE"):
+        predicted = C.predict_model(
+            "MONOTONE_REGULARIZED_SCORE",
+            {"l2": 0.1, "monotone_feature_group": label},
+            train_x,
+            query_x,
+            train_y,
+            active,
+            groups,
+        )
+        assert predicted.shape == (1, 1)
+        assert np.isfinite(predicted[0, 0])
 
 
 def test_canonical_status_fails_closed_across_split_instances():
@@ -199,3 +292,178 @@ def test_native_production_path_captures_issue_and_exact_seed_pool(tmp_path):
     # The frozen M2187 WOR profile equals 100 identical FULL exposures.
     assert issue[1][39, 0] / 100 == issue[1][960, 0]
     assert issue[2][39, 0] / 100 == issue[2][960, 0]
+
+
+def test_v2_gate_a_layers_and_stage1_static_store_are_bound():
+    payload = R.verify_gate_a()
+    assert len([name for name in payload if name.startswith("v2::")]) == 35
+    store = V2.build_stage1_store()
+    assert store.status.shape == (2469, 344)
+    assert int(np.count_nonzero(store.status == V2.STATUS_ACTIVE)) == 513_697
+    assert int(np.count_nonzero(store.status == V2.STATUS_UNAVAILABLE)) == 43_169
+    assert len(store.supports) == 556_866
+    assert V2.stage1_store_identity(store) == (
+        "ad04f4777f3fd223e60ba043135d6b0b8d74d22eb41e275a9bdc58dc8965413f"
+    )
+
+
+def test_stage2_adapter_is_conditional_on_exact_stage1_support():
+    store = V2.build_stage1_store()
+    fallback = next(
+        index for index, row in enumerate(store.action_rows)
+        if row["upstream_issue"] == "134"
+        and row["source_identity"] == "MARKET_BEST_FULL"
+    )
+    path = V2.StagePath(
+        "STAGE_1_SELECTION",
+        np.full(len(store.issues), fallback, dtype=np.int32),
+        ["STATIC"] * len(store.issues),
+        np.ones(len(store.issues), dtype=bool), [], [],
+    )
+    decisions = V2.build_stage1_decisions(store, path)
+    decision = next(value for value in decisions if value.supports)
+    estimators = V2._load_needed_estimators([decision])
+    adapter_sha = V2.hashlib.sha256(
+        (V2.GATE_A_V2 / "conditional_chain_adapter.py").read_bytes()
+    ).hexdigest()
+    actions = V2.load_stage_catalog(2)
+    allow = next(
+        row for row in actions
+        if row["scientific_role"] == "STATIC_ALLOW_ALL_OUTCOME_CODES_CONTROL"
+    )
+    allow_rows = V2._apply_stage2_action(
+        allow, decision, estimators, adapter_sha
+    )
+    assert [row.support.ordered_match_ids for row in allow_rows] == [
+        row.ordered_match_ids for row in decision.supports
+    ]
+    assert all(row.output["ticket_support_size"] == 2187 for row in allow_rows)
+    active = None
+    for action in actions:
+        rows = V2._apply_stage2_action(action, decision, estimators, adapter_sha)
+        if rows and all(row.output["status"] == "ACTIVE" for row in rows):
+            if action["scientific_role"] != "STATIC_ALLOW_ALL_OUTCOME_CODES_CONTROL":
+                active = rows
+                break
+    assert active is not None
+    assert all(row.output["ticket_support_size"] == 1458 for row in active)
+    assert all(
+        row.output["ordered_match_ids"] == list(row.support.ordered_match_ids)
+        for row in active
+    )
+
+
+def test_mixed_feature_encoder_uses_train_only_lexical_unknown_last():
+    projections = [
+        {"projection_field": "x", "source_field": "x", "source_scope": "COMMON_X_I", "dtype": "FLOAT64"},
+        {"projection_field": "flag", "source_field": "flag", "source_scope": "STAGE1", "dtype": "BOOLEAN"},
+        {"projection_field": "kind", "source_field": "kind", "source_scope": "STAGE1", "dtype": "CATEGORY"},
+    ]
+    rows = [
+        {"x": 1.0, "flag": True, "kind": "B"},
+        {"x": 2.0, "flag": False, "kind": "A"},
+        {"x": None, "flag": None, "kind": "UNSEEN"},
+    ]
+    encoder = V2.MixedFeatureEncoder.fit(projections, rows, [0, 1])
+    encoded = encoder.apply(rows, [2])
+    # x,value+missing; flag,value+missing; A,B,__UNKNOWN__.
+    assert encoded.shape == (1, 7)
+    assert encoded[0, 1] == 1.0
+    assert encoded[0, 3] == 1.0
+    assert np.array_equal(encoded[0, 4:], [0.0, 0.0, 1.0])
+
+
+def test_stage3_native_profiles_exact_action_signatures_and_seed_mean(monkeypatch):
+    monkeypatch.setenv("OMP_NUM_THREADS", "2")
+    rows = V2.load_stage_catalog(3)
+    wanted = {
+        ("WR_DUPLICATE_STAKE", "16", "NA"),
+        ("WOR_DISTINCT", "16", "NA"),
+        ("RESIDUAL_SYSTEMATIC", "64", "NA"),
+        ("CAPPED_REPEAT", "64", "2"),
+        ("DETERMINISTIC_TOP_MASS", "64", "NA"),
+        ("FULL_ENUMERATED", "2187", "NA"),
+        ("P_MIN_GLOBAL_DELETE", "NA", "NA"),
+        ("Q_MIN_GLOBAL_DELETE", "NA", "NA"),
+    }
+    actions = []
+    for row in rows:
+        parameters = json.loads(row["parameters_json"])
+        key = (parameters["mechanism"], parameters["M"], parameters["cap"])
+        if key in wanted and parameters["weight_source"] in {"Q_WEIGHT", "NA"}:
+            actions.append(row)
+            wanted.remove(key)
+    assert not wanted and len(actions) == 8
+    engine = V2.load_module(
+        "bj193_allocator_test", V2.GATE_A_V2 / "bj145_allocation_engine.py"
+    )
+    weights = np.asarray(engine.golden_weights(), dtype=np.float64)
+    matrix = np.ascontiguousarray(
+        np.tile(weights, (len(V2.STAGE3_WEIGHT_SOURCES), 1))
+    )
+    source, mechanism, requested_m, caps, signatures, encoded = (
+        V2._stage3_native_action_arrays(actions, "26080", "a" * 64, "b" * 64)
+    )
+    status = np.zeros(len(actions), dtype=np.uint8)
+    output = {
+        name: np.zeros(len(actions), dtype=np.float64)
+        for name in ("gross", "stake", "tax", "net", "hit")
+    }
+    native = V2._compile_stage3_native()
+    native.bj193_chain_profile_actions(
+        V2._np_pointer(matrix, ctypes.c_double),
+        len(V2.STAGE3_WEIGHT_SOURCES), V2.FULL_TICKETS, 0, 100.0,
+        V2._np_pointer(source, ctypes.c_int),
+        V2._np_pointer(mechanism, ctypes.c_int),
+        V2._np_pointer(requested_m, ctypes.c_int),
+        V2._np_pointer(caps, ctypes.c_int), encoded, len(actions),
+        1, 972, 0, 1458,
+        V2._np_pointer(status, ctypes.c_ubyte),
+        *(V2._np_pointer(output[name], ctypes.c_double) for name in (
+            "gross", "stake", "tax", "net", "hit"
+        )),
+    )
+    assert np.all(status == V2.STATUS_ACTIVE)
+    for index, row in enumerate(actions):
+        parameters = json.loads(row["parameters_json"])
+        mechanism_name = parameters["mechanism"]
+        if mechanism_name == "P_MIN_GLOBAL_DELETE":
+            assert output["hit"][index] == 1.0
+            assert output["stake"][index] == 1944.0
+            assert output["gross"][index] == 100.0
+            continue
+        if mechanism_name == "Q_MIN_GLOBAL_DELETE":
+            assert output["hit"][index] == 0.0
+            assert output["stake"][index] == 2916.0
+            assert output["gross"][index] == 0.0
+            continue
+        if mechanism_name == "FULL_ENUMERATED":
+            expected_counts = [tuple(1 for _ in weights)]
+        else:
+            seeds = (
+                [str(value) for value in range(137001, 137101)]
+                if mechanism_name in {"WR_DUPLICATE_STAKE", "WOR_DISTINCT"}
+                else ["NA"]
+            )
+            expected_counts = [
+                engine.allocate(
+                    mechanism_name, weights, int(parameters["M"]), seed=seed,
+                    identity_signature=signatures[index].decode(),
+                    cap=None if parameters["cap"] == "NA" else int(parameters["cap"]),
+                )
+                for seed in seeds
+            ]
+        expected_hit = sum(values[0] for values in expected_counts) / len(expected_counts)
+        expected_stake = 2 * sum(sum(values) for values in expected_counts) / len(expected_counts)
+        assert abs(output["hit"][index] - expected_hit) < 1e-12
+        assert abs(output["stake"][index] - expected_stake) < 1e-12
+        assert abs(output["gross"][index] - 100.0 * expected_hit) < 1e-10
+        assert output["tax"][index] == 0.0
+
+
+def test_structural_delete_fails_closed_without_all_seven_role_rows():
+    support = V2.Support(
+        "26080", "OOS_2026", "2026", "identity",
+        tuple(str(value) for value in range(1, 8)), "portfolio",
+    )
+    assert V2._original_structural_delete_truth(support, {}, 0) is None
