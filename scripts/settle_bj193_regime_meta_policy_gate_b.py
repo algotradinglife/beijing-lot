@@ -1627,7 +1627,11 @@ def main() -> None:
             args.checkpoint, args.oracle_correction_output
         )
     else:
-        raise RuntimeError("finalizer implementation not yet available")
+        finalizer = load_module(
+            "bj193_checkpoint_finalizer",
+            ROOT / "scripts" / "bj193_gate_b_finalize.py",
+        )
+        finalizer.finalize(args.checkpoint, args.output)
 
 
 if __name__ == "__main__":

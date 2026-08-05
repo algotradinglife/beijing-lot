@@ -28,6 +28,10 @@ R = load(
     ROOT / "scripts" / "settle_bj193_regime_meta_policy_gate_b.py",
 )
 V2 = load("bj193_chain_v2_test", ROOT / "scripts" / "bj193_chain_gate_b_v2.py")
+F = load(
+    "bj193_finalizer_test",
+    ROOT / "scripts" / "bj193_gate_b_finalize.py",
+)
 
 
 def test_path_receipts_use_deterministic_union_schema(tmp_path):
@@ -915,6 +919,69 @@ def test_oracle_correction_reconstructs_checkpoint_store_without_replay():
     corrected_rows = V2.issue_policy_rows("ORACLE", store, corrected)
     assert corrected_rows[0]["chosen_action_identity"] == "B_BETTER"
     assert corrected_rows[0]["pre_tax_net_yuan"] == 20.0
+
+
+def test_finalizer_replaces_only_oracle_rows_and_choices():
+    causal = {
+        "policy_id": "FULL_DYNAMIC_CHAIN",
+        "issue": "1",
+        "chosen_action_identity": "CAUSAL",
+    }
+    original_oracle = [
+        {
+            "policy_id": "LEAKY_ORACLE_CEILING",
+            "issue": str(index),
+            "chosen_action_identity": "OLD",
+            "model_id": "ORACLE_NO_AVAILABLE_ACTION_CAUSAL_FALLBACK",
+            "fallback_flag": "True",
+        }
+        for index in range(344)
+    ]
+    corrected = [
+        {
+            **row,
+            "chosen_action_identity": "NEW",
+            "model_id": "LEAKY_ORACLE_CEILING",
+            "fallback_flag": "False",
+        }
+        for row in original_oracle
+    ]
+    choices = [
+        {
+            "path_name": "stage3_oracle",
+            "stage": "STAGE_3_BET",
+            "issue": str(index),
+            "chosen_action_identity": "OLD",
+            "model_id": "ORACLE_NO_AVAILABLE_ACTION_CAUSAL_FALLBACK",
+            "fallback_flag": "True",
+        }
+        for index in range(344)
+    ] + [
+        {
+            "path_name": "stage3_dynamic",
+            "stage": "STAGE_3_BET",
+            "issue": "1",
+            "chosen_action_identity": "CAUSAL",
+            "model_id": "MODEL",
+            "fallback_flag": "False",
+        }
+    ]
+    flows, corrected_choices = F._apply_oracle_correction(
+        [causal, *original_oracle], choices, corrected
+    )
+    assert flows[0] == causal
+    assert sum(row["policy_id"] == "LEAKY_ORACLE_CEILING" for row in flows) == 344
+    assert corrected_choices[0]["chosen_action_identity"] == "NEW"
+    assert corrected_choices[-1] == choices[-1]
+
+
+def test_finalizer_verifies_committed_oracle_correction_package():
+    payload, manifest_sha = F.verify_package(
+        ROOT / "results" / "bj193_gate_b_oracle_correction_v1",
+        F.ORACLE_CORRECTION_CONTRACT,
+    )
+    assert manifest_sha == F.EXPECTED_ORACLE_CORRECTION_MANIFEST
+    assert len(payload) == 8
 
 
 def test_prior_only_paths_use_outer_train_without_validation_selection(
