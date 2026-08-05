@@ -1,0 +1,426 @@
+{
+  "contract": "BJ-HIST-N7-STRATEGY-ENSEMBLE-001",
+  "denominator": {
+    "calendar_issue_count": 348,
+    "native_sleeve_request_rows": 1044,
+    "portfolio_membership_count": 7,
+    "position_fraction_count": 20,
+    "sleeve_count": 3,
+    "strict_three_way_issue_count": 177
+  },
+  "eligibility_ledger": [
+    {
+      "candidate_id": "BEST_FULL_FULL",
+      "decision": "ELIGIBLE_COMPLETE_TRACE",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "complete frozen Stage-1\u21923 selection/direction/ticket trace; exact requested tickets and M bound",
+      "source_package": "bj170_gate_a_preoutcome_v2"
+    },
+    {
+      "candidate_id": "MODEL_SOURCE_MODEL_CAP1_M512",
+      "decision": "ELIGIBLE_COMPLETE_TRACE",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "complete frozen Stage-1\u21923 selection/direction/ticket trace; exact requested tickets and M bound",
+      "source_package": "bj170_gate_a_preoutcome_v2"
+    },
+    {
+      "candidate_id": "Q_SOURCE_Q_TOP_MASS_M192",
+      "decision": "ELIGIBLE_COMPLETE_TRACE",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "complete frozen Stage-1\u21923 selection/direction/ticket trace; exact requested tickets and M bound",
+      "source_package": "bj170_gate_a_preoutcome_v2"
+    },
+    {
+      "candidate_id": "BJ190_SPARSE_DIVERGENCE",
+      "decision": "EXCLUDED_NOT_SLEEVE",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "terminal strict promotion count is zero; coverage-limited diagnostic is not an eligible complete capital sleeve",
+      "source_package": "bj190_gate_b_sparse_divergence_v1"
+    },
+    {
+      "candidate_id": "BJ193_FULL_DYNAMIC_CHAIN",
+      "decision": "EXCLUDED_NEGATIVE_NON_PROMOTED",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "PI excludes negative non-promoted FULL_DYNAMIC_CHAIN; package supplies interface/accounting lessons only",
+      "source_package": "bj193_gate_b_regime_meta_policy_v2"
+    }
+  ],
+  "full_calendar": {
+    "chronological_sort": "first_kickoff_ts, issue_instance",
+    "issue_count": 348,
+    "source": "#137 canonical census/#170 all three frozen request rows",
+    "zero_flow": "retain NO_BET and Gate-B unavailable rows as zero flow; neither is a loss"
+  },
+  "funding_contract": {
+    "initial_bankroll_yuan": 100000,
+    "integer_allocator": {
+      "cap_bound_leftover": "remove sleeves at native cap and repeat weighted water-fill until no ticket budget or no capacity; retain any unspendable cash",
+      "concurrency": "all sleeve tickets for an issue are funded before that issue's outcomes; no payout recycling, deposit, loan, or top-up",
+      "gate_b_requirement": "settle each allocated ticket with native per-ticket tax; fail closed if no exact ticket-level settlement bridge exists",
+      "invariants": [
+        "actual_total_stake <= preissue_bankroll",
+        "actual_ticket_count_by_sleeve <= native_requested_ticket_count",
+        "retained_cash=preissue_bankroll-actual_total_stake >= 0"
+      ],
+      "minimum": "budget under \u00a52 or all native requests zero is NO_BET, zero flow not a loss",
+      "raw_ticket_target": "iterative normalized sleeve weight \u00d7 remaining ticket budget, hard-capped at native requested tickets",
+      "reason_codes": [
+        "FUNDED_AS_REQUESTED",
+        "SCALED_BY_MODE_NOTIONAL",
+        "SCALED_BY_PREISSUE_BANKROLL",
+        "CAP_BOUND_WATERFILL",
+        "CAPACITY_EXHAUSTED_RETAIN_CASH",
+        "NO_BET_NATIVE_ZERO_REQUEST",
+        "NO_BET_BUDGET_LT_TICKET"
+      ],
+      "rounding": "each water-fill pass floors capped quotas, then gives one residual ticket to largest fractional quota; ties sleeve_id ascending",
+      "universal_budget": "issue_budget=min(mode_notional, preissue_bankroll); ticket_budget=floor(issue_budget/\u00a52)"
+    },
+    "modes": {
+      "COMPOUNDING_BANKROLL": "mode_notional=fraction \u00d7 preissue bankroll",
+      "FIXED_100K_NOTIONAL": "mode_notional=fraction \u00d7 \u00a5100,000; notional does not reinvest",
+      "NATIVE_REQUEST_CONTROL": "mode_notional=fraction \u00d7 sum(native requested ticket caps) \u00d7 \u00a52"
+    },
+    "position_budget_fractions": [
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3,
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75,
+      0.8,
+      0.85,
+      0.9,
+      0.95,
+      1.0
+    ],
+    "ticket_stake_yuan": 2
+  },
+  "gate_b_status": "NOT_RUN_AND_NOT_AUTHORIZED_PENDING_PI_GATE_A_ACCEPTANCE",
+  "issue": 192,
+  "methodology_contract": {
+    "M_rule": "UPSTREAM_FROZEN_FIXED: FULL=2187, MODEL=512, Q=192. No new M scan or post-outcome M choice.",
+    "attribution": {
+      "covariance": "report cross-sleeve concurrent issue covariance and diversification attribution separately from within-sleeve ticket outcomes",
+      "stage4": "attribute size/downscale/cash/weight lift against the same-sleeve native-request and equal-weight controls; do not mislabel it as selection, direction, or ticket-construction lift",
+      "upstream": "report each inherited Stage-1\u21923 sleeve path unchanged at native request alongside its actual Stage-4 funded flow"
+    },
+    "bootstrap": {
+      "draw": "common deterministic issue-resample matrix paired across every portfolio",
+      "replicates": 20000,
+      "seed": 192001
+    },
+    "chart_sources": [
+      "issue_equity_paths",
+      "capital_utilization_frontier",
+      "risk_return_frontier",
+      "pairwise_covariance",
+      "weight_history",
+      "fundability_waterfall",
+      "bootstrap_and_stability"
+    ],
+    "gate_b_outputs": [
+      "per_issue_paths",
+      "ending_capital",
+      "fundability",
+      "first_unfundable",
+      "drawdown",
+      "time_under_water",
+      "recovery",
+      "ruin",
+      "covariance_attribution",
+      "pre_tax_primary_tax_reference"
+    ],
+    "membership": "all nonempty subsets of the three fixed sleeves (7 portfolios); no Stage 1\u20133 selection, direction, ticket, or M construction changes",
+    "stability": [
+      "YEAR",
+      "FOLD",
+      "LOYO",
+      "EX_LARGEST_ISSUE",
+      "EX_LARGEST_YEAR"
+    ],
+    "weight_methods": [
+      "EQUAL_WEIGHT",
+      "PRIOR_INVERSE_VOL",
+      "PRIOR_ERC",
+      "PRIOR_DRAWDOWN_AWARE"
+    ],
+    "weight_model": {
+      "PRIOR_DRAWDOWN_AWARE": "w_i \u221d 1/(vol_i\u00d7(1+max prior common-active compounded drawdown_i))",
+      "PRIOR_ERC": "start equal; multiplicative risk-contribution iteration w_i\u2190normalize(w_i\u00d7target_RC/RC_i), max 5000 iterations, convergence max|RC-target|<=1e-12",
+      "PRIOR_INVERSE_VOL": "w_i \u221d 1/vol_i, vol_i=sqrt(shrunk covariance_ii); vol floor 1e-12",
+      "constraints": "long-only weights, each >=0, sum exactly 1; current issue is never in history",
+      "covariance": "unbiased sample covariance of 52 common active issue returns, then 10% diagonal shrinkage",
+      "fallback_action": "EQUAL_WEIGHT with explicit per-issue fallback reason",
+      "fallbacks": [
+        "under 52 common active observations",
+        "zero/nonfinite volatility",
+        "singular/nonpositive ERC risk contributions",
+        "ERC no convergence"
+      ],
+      "history": "strictly prior chronological full-calendar issues. NO_BET/unavailable stays a zero-flow path row but is absent from active-return samples. Dynamic methods require 52 most-recent common active observations for every participating sleeve.",
+      "issue_return": "pre-tax sleeve net / actual sleeve stake; only actual stake > \u00a50 produces an active observation"
+    }
+  },
+  "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+  "output_schema": {
+    "bootstrap_stability": {
+      "fields": [
+        "target_id",
+        "paired_control_id",
+        "bootstrap_replicates",
+        "bootstrap_seed",
+        "paired_growth_delta_low",
+        "YEAR",
+        "FOLD",
+        "LOYO",
+        "EX_LARGEST_ISSUE",
+        "EX_LARGEST_YEAR"
+      ]
+    },
+    "capital_summary": {
+      "fields": [
+        "starting_bankroll_yuan",
+        "ending_bankroll_yuan",
+        "minimum_bankroll_yuan",
+        "minimum_required_start_yuan",
+        "fundable_issue_count",
+        "first_unfundable_issue",
+        "scaled_stake_yuan",
+        "skipped_stake_yuan",
+        "cash_yuan",
+        "turnover_yuan",
+        "pre_tax_roi",
+        "tax_adjusted_roi",
+        "ruin_flag"
+      ]
+    },
+    "chart_sources": [
+      "chart_source_issue_equity.csv.gz",
+      "chart_source_capital_frontier.csv",
+      "chart_source_risk_return.csv",
+      "chart_source_dependence.csv",
+      "chart_source_weight_history.csv.gz",
+      "chart_source_fundability.csv",
+      "chart_source_bootstrap_stability.csv"
+    ],
+    "dependence": {
+      "fields": [
+        "portfolio_id",
+        "sleeve_left",
+        "sleeve_right",
+        "prior_covariance",
+        "prior_correlation",
+        "downside_correlation",
+        "tail_co_loss_count",
+        "concurrent_issue_count",
+        "diversification_attribution_yuan"
+      ]
+    },
+    "holding_metrics": {
+      "fields": [
+        "portfolio_id",
+        "mode",
+        "position_fraction",
+        "ending_bankroll_yuan",
+        "max_drawdown_yuan",
+        "max_drawdown_fraction",
+        "drawdown_duration_issues",
+        "time_under_water_issues",
+        "recovery_issue",
+        "loss_streak_calendar",
+        "loss_streak_active",
+        "miss_streak_calendar",
+        "miss_streak_active",
+        "rolling_loss_5_yuan",
+        "rolling_loss_10_yuan",
+        "rolling_loss_20_yuan",
+        "ruin_flag",
+        "sharpe",
+        "sortino",
+        "calmar"
+      ]
+    },
+    "issue_ledger": {
+      "fields": [
+        "preissue_bankroll_yuan",
+        "mode_notional_yuan",
+        "issue_budget_yuan",
+        "requested_stake_yuan",
+        "actual_stake_yuan",
+        "scaled_stake_yuan",
+        "skipped_stake_yuan",
+        "retained_cash_yuan",
+        "reason_codes",
+        "pre_tax_gross_yuan",
+        "pre_tax_net_yuan",
+        "tax_yuan",
+        "postissue_bankroll_yuan",
+        "ruin_flag"
+      ],
+      "formulas": [
+        "actual_stake=sum(actual ticket count)\u00d7\u00a52",
+        "postissue_bankroll=preissue_bankroll+pre_tax_net",
+        "turnover=cumulative actual_stake",
+        "all sleeve flows in an issue fund concurrently"
+      ],
+      "key": [
+        "portfolio_id",
+        "mode",
+        "position_fraction",
+        "weight_method",
+        "calendar_index",
+        "issue_instance"
+      ]
+    },
+    "weight_history": {
+      "fields": [
+        "portfolio_id",
+        "issue_instance",
+        "weight_method",
+        "sleeve_id",
+        "weight",
+        "history_active_observation_count",
+        "estimator_status",
+        "fallback_reason",
+        "covariance_hash"
+      ]
+    }
+  },
+  "promotion_boundary": "Historical results cannot authorize purchase, betting, production or promotion. Any candidate requires PI review plus independent held-out/forward validation.",
+  "sleeve_catalog": [
+    {
+      "M": "2187",
+      "allocation_arm": "FULL_ENUMERATED",
+      "cap": "NA",
+      "mechanism": "FULL_ENUMERATED",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "rationale": "primary fixed upstream FULL control",
+      "selector_alias": "BEST_FULL",
+      "selector_id": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K1",
+      "sleeve_id": "BEST_FULL_FULL",
+      "weight_source": "NA"
+    },
+    {
+      "M": "512",
+      "allocation_arm": "MODEL_CAP1_M512",
+      "cap": "1",
+      "mechanism": "CAPPED_REPEAT",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "rationale": "primary fixed upstream model sleeve",
+      "selector_alias": "MODEL_SOURCE",
+      "selector_id": "S2_ESP300_GM305_P_MIN_LOWP20_VALUE_FIRST_K1",
+      "sleeve_id": "MODEL_SOURCE_MODEL_CAP1_M512",
+      "weight_source": "MODEL_P_CAL"
+    },
+    {
+      "M": "192",
+      "allocation_arm": "Q_TOP_MASS_M192",
+      "cap": "NA",
+      "mechanism": "DETERMINISTIC_TOP_MASS",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "rationale": "primary fixed upstream Q sleeve",
+      "selector_alias": "Q_SOURCE",
+      "selector_id": "S1_NO_GATE_K4",
+      "sleeve_id": "Q_SOURCE_Q_TOP_MASS_M192",
+      "weight_source": "Q_WEIGHT"
+    }
+  ],
+  "sleeve_trace_registry": [
+    {
+      "allocation_arm": "FULL_ENUMERATED",
+      "native_requested_stake_yuan": 826686,
+      "native_requested_ticket_count": 413343,
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "selector_alias": "BEST_FULL",
+      "sleeve_id": "BEST_FULL_FULL",
+      "source_allocation_count": 189,
+      "source_identity_count": 189,
+      "source_identity_trace_sha256": "065ed6ac48d11db7dcc3f3cfd30744b5d88c22e797a09ef127362c143369a804",
+      "source_ticket_trace_sha256": "195163a15bd46c630d03668c1969b8a94ce6fac97b25ec9aae5203b2518ce67d",
+      "stage_1_3_trace_status": "COMPLETE_INHERITED_FROZEN",
+      "trace_rule": "Stage 4 may only size down/abstain from these inherited selection\u2192direction\u2192ticket traces."
+    },
+    {
+      "allocation_arm": "MODEL_CAP1_M512",
+      "native_requested_stake_yuan": 239616,
+      "native_requested_ticket_count": 119808,
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "selector_alias": "MODEL_SOURCE",
+      "sleeve_id": "MODEL_SOURCE_MODEL_CAP1_M512",
+      "source_allocation_count": 234,
+      "source_identity_count": 234,
+      "source_identity_trace_sha256": "9b400563dbfafb3a95a93459c9d4a4ce3a34c87f1d236415349b09fab153c870",
+      "source_ticket_trace_sha256": "61233db6fe40b1f7c26c03ea247edab5fa24bb5c146d5da0828fcda60c037fe1",
+      "stage_1_3_trace_status": "COMPLETE_INHERITED_FROZEN",
+      "trace_rule": "Stage 4 may only size down/abstain from these inherited selection\u2192direction\u2192ticket traces."
+    },
+    {
+      "allocation_arm": "Q_TOP_MASS_M192",
+      "native_requested_stake_yuan": 520704,
+      "native_requested_ticket_count": 260352,
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "selector_alias": "Q_SOURCE",
+      "sleeve_id": "Q_SOURCE_Q_TOP_MASS_M192",
+      "source_allocation_count": 1356,
+      "source_identity_count": 1356,
+      "source_identity_trace_sha256": "fa110ca8f0d4a79f1307dd6fce19365dfc0aa1e8fd86de227ef56ba778451a3b",
+      "source_ticket_trace_sha256": "bc34310a22ec935d3f9b552e3cf3ad9205222bc87e0f58be7864e3aaa6a3061b",
+      "stage_1_3_trace_status": "COMPLETE_INHERITED_FROZEN",
+      "trace_rule": "Stage 4 may only size down/abstain from these inherited selection\u2192direction\u2192ticket traces."
+    }
+  ],
+  "source_binding": {
+    "bj137_gate_a_preoutcome_v2": {
+      "content_identity_sha256": "36d6afcc33a5b5ceb3e4a990bfe6ec05503be115270c3489f4973dc3a59dd236",
+      "manifest_sha256": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
+      "package": "bj137_gate_a_preoutcome_v2",
+      "payload_count": 14,
+      "role": "accepted outcome-unexposed chronological issue census"
+    },
+    "bj170_gate_a_preoutcome_v2": {
+      "content_identity_sha256": "adc4d0f96628c784149da998a20e8830cde26db4001fe457eaf9ca4b7bb74223",
+      "manifest_sha256": "bb60ac5638d29674ad8c1c05f1ffe3ab9cdf12acb70ebdae6cea679743136d87",
+      "package": "bj170_gate_a_preoutcome_v2",
+      "payload_count": 17,
+      "role": "accepted outcome-unexposed sleeve identity, ticket and support freeze"
+    },
+    "bj176_issue_equity_risk_v1": {
+      "content_identity_sha256": "94188354baf01c68cb0ec0791248d3f8f03e31d4a7011db7b6b68e9797720f5c",
+      "manifest_sha256": "39316952296c2349f5da2f963d43c0baf0d812fba4eea967536a8b80bd57d5ee",
+      "package": "bj176_issue_equity_risk_v1",
+      "payload_count": 18,
+      "role": "accepted terminal three-sleeve settlement and holding-risk convention bridge; hash-only during Gate A"
+    },
+    "bj190_gate_b_sparse_divergence_v1": {
+      "content_identity_sha256": "5112dc652277a234fcb36687d59e2bd96bf8daeaaa1c9ddd06481923de909ce6",
+      "manifest_sha256": "5685f25d9ce70a66b38b283f668d258d97dfe2e356c5bd45d9666400c6ab4554",
+      "package": "bj190_gate_b_sparse_divergence_v1",
+      "payload_count": 43,
+      "role": "terminal eligibility decision only; excluded from sleeve catalog; hash-only during Gate A"
+    },
+    "bj193_gate_b_regime_meta_policy_v2": {
+      "content_identity_sha256": "0c3a68e75dba540127ec5304e5b28aea73bc9dc191573682de9029efffc30e40",
+      "manifest_sha256": "83b6c67fc91f59fcbf90895413c570225bbc34b18bf8d1d1c0f89634e9fce4d5",
+      "package": "bj193_gate_b_regime_meta_policy_v2",
+      "payload_count": 75,
+      "role": "terminal interface/accounting lessons only; FULL_DYNAMIC_CHAIN excluded; hash-only during Gate A"
+    }
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_STAGE4_CAPITAL_PORTFOLIO_FREEZE",
+  "strict_three_way_calendar": {
+    "issue_count": 177,
+    "source": "#170 THREE_WAY_ALL",
+    "usage": "matched attribution only; never truncate capital/holding paths"
+  },
+  "version": "bj192-gate-a-v2"
+}

@@ -1,0 +1,17 @@
+{
+  "content_identity_sha256": "c9124f5dbfb327a383fc3e3b7c096637b6cf7191fac99c29a57f8accf87aa580",
+  "contract": "BJ-HIST-N7-STRATEGY-ENSEMBLE-001",
+  "payload_sha256": {
+    "README.md": "7466fb1b35a4ae5320486314e56a503bb512e656028edf5bec7c2d225c5de56e",
+    "frozen_native_sleeve_requests.csv": "b642d94def8a201d77812a1d49e1ca5c18b05d3c868687be7f107f2b4dfdcdbb",
+    "full_calendar.csv": "3782c9789d3e1565a45f0c950f715da0084fd9a38223ddfe6bceca2deb7db3c0",
+    "funding_algorithm.json": "4283fae796d610d0988fb03f82d3bd180c24e2acf8f72dc2a45d2ab70fcc22fa",
+    "gate_a_card.json": "5363f623eb85a42cc22cab4d8ebb5721fd23e1f5b6e92d4ce52d99829d254959",
+    "output_schema.json": "fddf52fc9b03a6b8fe8938f2efbb92cfb90482b81a81ba329580b3bf86cd06ca",
+    "sleeve_catalog.csv": "e9b7b99da34e60be352b7d20bfed430e5add651a0a1abbaac7abbdaecf85f14e",
+    "sleeve_eligibility_ledger.csv": "a9f334c3652e76738c7e598a1389e37d4d5200a9bba26de5b406e7d379cb47c3",
+    "sleeve_trace_registry.csv": "4001c133545d093a414281729eaf857ea52975a84f288f10fc4ba4c1aa8f3e3f",
+    "strict_three_way_calendar.csv": "7e20cbef65dfd20aea9dccb66f0b1d8418497a06709214d4acbaffd4c314a092"
+  },
+  "version": "bj192-gate-a-v2"
+}
