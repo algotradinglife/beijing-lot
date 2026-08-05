@@ -41,6 +41,7 @@ def test_frozen_source_hashes_and_complete_primary_catalog():
         "bj137_gate_a_preoutcome_v2",
         "bj176_issue_equity_risk_v1",
         "bj190_gate_b_sparse_divergence_v1",
+        "bj193_gate_a_preoutcome_v1",
         "bj193_gate_b_regime_meta_policy_v2",
         "bj145_gate_a_preoutcome_v8",
         "bj148_gate_a_preoutcome_v1",
@@ -82,8 +83,30 @@ def test_frozen_source_hashes_and_complete_primary_catalog():
         == "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF"
         for row in allocation
     )
+    families = m.economic_family_registry(expanded, allocation)
+    aliases = [
+        row
+        for row in families
+        if row["family_status"] == "EXACT_CROSS_CATALOG_ALIAS_EXCLUDED"
+    ]
+    assert {
+        (row["candidate_id"], row["canonical_candidate_id"])
+        for row in aliases
+    } == {
+        (
+            "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_WR-DUPLICATE-STAKE_NA",
+            "BJ151_NOGATE_K4_WR_DENSE_M",
+        ),
+        (
+            "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_WOR-DISTINCT_NA",
+            "BJ151_NOGATE_K4_WOR_DENSE_M",
+        ),
+    }
+    assert all(row["exact_overlap_record_count"] > 0 for row in aliases)
+    assert all(len(row["exact_overlap_evidence_sha256"]) == 64 for row in aliases)
     eligibility = {
-        row["candidate_id"]: row for row in m.eligibility_ledger()
+        row["candidate_id"]: row
+        for row in m.eligibility_ledger(expanded, allocation, families)
     }
     primary = next(
         row for row in allocation if row["arm_id"] == "PRIMARY_NO_GATE_K4"
@@ -360,12 +383,37 @@ def test_baseline_and_sequential_inference_contracts_are_frozen():
     assert "max-T" in method["multiplicity"]["positive_inference"]
     assert "PRIOR_MINIMUM_VARIANCE" in method["weight_methods"]
     assert "separate complete bankroll state machine" in m.m_selection_contract([])["seed_rule"]
-    eligibility = m.eligibility_ledger()
-    frontier = m.frontier_contract(eligibility)
+    expanded = m.expanded_sleeve_catalog()
+    allocation = m.bj145_allocation_candidate_registry()
+    families = m.economic_family_registry(expanded, allocation)
+    eligibility = m.eligibility_ledger(expanded, allocation, families)
+    frontier = m.frontier_contract(eligibility, families)
     assert frontier["eligible_source_count"] == 106
+    assert frontier["eligible_economic_family_count"] == 104
     assert frontier["eligible_candidate_sources"][:3] == [x[0] for x in m.SLEEVES]
     assert "BJ151_NOGATE_K4_WR_DENSE_M" in frontier["eligible_candidate_sources"]
-    assert len(frontier["pairwise_surface"]) == 5565
+    assert len(frontier["pairwise_surface"]) == 5356
+    family_by_canonical = {
+        row["canonical_candidate_id"]: row["economic_family_id"]
+        for row in families
+        if row["candidate_id"] == row["canonical_candidate_id"]
+    }
+    assert all(
+        family_by_canonical[left] != family_by_canonical[right]
+        for left, right in frontier["pairwise_surface"]
+    )
+    normalization = m.normalization_contract()
+    assert normalization["ordering"] == [
+        "frozen native request/capacity",
+        "portfolio-level normalization multiplier",
+        "sleeve portfolio weights",
+        "mode/bankroll issue budget and integer ticket funding",
+    ]
+    assert normalization["leverage"]["maximum_multiplier"] == 1.0
+    assert "UNIT_EX_ANTE_VOL" in normalization["methods"]
+    assert "INAPPLICABLE_METHOD_WEIGHT_COMBINATION" in normalization["methods"][
+        "EQUAL_CAPITAL"
+    ]
     excluded = {row["candidate_id"]: row for row in frontier["excluded_source_records"]}
     assert excluded["BJ190_SPARSE_DIVERGENCE"]["decision"] == "INCOMPLETE_STAGE1_3_TRACE"
     assert excluded["BJ193_FULL_DYNAMIC_CHAIN"]["decision"] == "INCOMPLETE_STAGE1_3_TRACE"
@@ -408,12 +456,17 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
         "README.md",
         "full_calendar.csv",
         "strict_three_way_calendar.csv",
+        "regime_map.csv",
+        "regime_binding.json",
+        "stage_attribution_contract.json",
+        "normalization_contract.json",
         "frozen_native_sleeve_requests.csv",
         "gate_a_card.json",
         "sleeve_catalog.csv",
         "sleeve_trace_registry.csv",
         "executable_sleeve_family_catalog.csv",
         "bj145_allocation_candidate_registry.csv",
+        "economic_family_registry.csv",
         "m_selection_contract.json",
         "funded_prefix_ledger_contract.json",
         "sleeve_eligibility_ledger.csv",
@@ -428,9 +481,25 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     }
     for name, value in manifest.items():
         assert hashlib.sha256((output / name).read_bytes()).hexdigest() == value
+    identity = json.loads((output / "CONTENT_IDENTITY.json").read_text())
+    scientific = identity["canonical_scientific_payload_sha256"]
+    transport = identity["archive_transport_payload_sha256"]
+    gzip_name = "ticket_prefix_registry.csv.gz"
+    assert scientific[gzip_name] == m.canonical_scientific_sha256(output / gzip_name)
+    assert transport[gzip_name] == hashlib.sha256(
+        (output / gzip_name).read_bytes()
+    ).hexdigest()
+    assert identity["canonical_scientific_identity_sha256"] == m.canonical_hash(
+        scientific
+    )
+    assert identity["archive_transport_contract"]["scientific_identity"].startswith(
+        "gzip payloads"
+    )
     card = json.loads((output / "gate_a_card.json").read_text())
     assert card["denominator"]["calendar_issue_count"] == 348
     assert card["denominator"]["strict_three_way_issue_count"] == 177
+    assert card["denominator"]["regime_feature_available_issue_count"] == 344
+    assert card["denominator"]["regime_feature_missing_issue_count"] == 4
     assert card["gate_b_status"].startswith("NOT_RUN")
     assert card["funding_contract"]["initial_bankroll_yuan"] == 100_000
     assert len(card["sleeve_trace_registry"]) == 3
@@ -453,6 +522,7 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     ]
     assert "output_schema" in card and "holding_metrics" in card["output_schema"]
     assert card["frontier_contract"]["eligible_source_count"] == 106
+    assert card["frontier_contract"]["eligible_economic_family_count"] == 104
     assert len(card["executable_sleeve_family_catalog"]) == 5
     assert len(card["bj145_allocation_candidate_registry"]) == 108
     assert card["ticket_prefix_contract"]["Q_global_tax_lot_rows"] > 0
@@ -473,5 +543,34 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
         == "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF"
         for row in prefix_contract["records"][3:]
     )
+    assert all(
+        "must not take a first prefix" in row["funded_tax_lot_rule"]
+        for row in prefix_contract["records"][3:]
+    )
+    schemas = card["output_schema"]
+    for table in (
+        "standalone_m_curve",
+        "selected_m_path",
+        "dependence_panel",
+        "portfolio_k_saturation",
+        "intrinsic_native_dependence",
+        "realized_funded_flow_dependence",
+        "risk_decomposition",
+        "stage_attribution",
+        "regime_map",
+    ):
+        assert schemas[table]["key"] and schemas[table]["formulas"]
+    assert "REGIME" in schemas["bootstrap_stability"]["fields"]
+    assert "chart_source_standalone_m_curve.csv.gz" in schemas["chart_sources"]
+    assert "portfolio_pnl_reconciliation_yuan" in schemas["dependence"]["fields"]
+    assert "diversification_attribution_yuan" not in schemas["dependence"]["fields"]
+    regime_rows = list(__import__("csv").DictReader((output / "regime_map.csv").open()))
+    assert len(regime_rows) == 348
+    assert sum(row["regime_status"] == "PRE_EVENT_FEATURE_VECTOR_AVAILABLE" for row in regime_rows) == 344
+    assert sum(row["regime_status"] == "MISSING_PRE_EVENT_FEATURE_VECTOR" for row in regime_rows) == 4
+    regime = json.loads((output / "regime_binding.json").read_text())
+    assert regime["map_sha256"] == m.canonical_hash(regime_rows)
+    attribution = json.loads((output / "stage_attribution_contract.json").read_text())
+    assert "NOT_IDENTIFIABLE_WITHOUT_SPLICE" in attribution["stages"]["STAGE_1_SELECTION"]
     source = SCRIPT.read_text()
     assert "result_code" not in source and "winning_sp" not in source

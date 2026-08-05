@@ -1,0 +1,14 @@
+{
+  "available_feature_count": 344,
+  "calendar_issue_count": 348,
+  "join_key": "(issue,year) exact; #137 OOS and #193 canonical instance suffixes are intentionally non-identical",
+  "map_sha256": "c786068c4e79ab3f91f921772069c2d5490a4cc060a89c128735089cd3ffe7fc",
+  "missing_fallback": "MISSING_PRE_EVENT_FEATURE_VECTOR is its own panel id; no label, return, loss or pseudo-feature is imputed",
+  "missing_feature_count": 4,
+  "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+  "regime_definition": "#193 TIER_C_PRE_EVENT feature vector; any learned regime bin/label is fit only on strictly-prior training observations and is recorded with its training-input hash",
+  "source_content_identity_sha256": "9bf90d1553613cbb50770ea51deece1fb40cfb05a0ace9103ab62194faff3131",
+  "source_file": "issue_regime_features.csv.gz",
+  "source_file_sha256": "df42ef811560cf867029dffc8931f738c6050a6e6413c012bd7a250eaa01959c",
+  "source_package": "bj193_gate_a_preoutcome_v1"
+}

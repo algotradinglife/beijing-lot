@@ -1,0 +1,495 @@
+{
+  "baseline_lift": {
+    "fields": [
+      "candidate_id",
+      "control_id",
+      "support_hash",
+      "capital_mode",
+      "position_fraction",
+      "actual_funding_hash",
+      "absolute_ending_bankroll_yuan",
+      "absolute_pre_tax_roi",
+      "candidate_minus_control_bankroll_yuan",
+      "candidate_minus_control_pre_tax_roi",
+      "ladder_decision"
+    ],
+    "formulas": [
+      "all comparisons require identical issue support, mode, fraction, starting capital, available bankroll and actual funding convention",
+      "publish absolute path and lift together; blank lift if exact matching is impossible",
+      "ladder_decision=ADVANCES only after strict matched PI terminal review"
+    ]
+  },
+  "bootstrap_stability": {
+    "fields": [
+      "target_id",
+      "paired_control_id",
+      "economic_family_id",
+      "bootstrap_replicates",
+      "bootstrap_seed",
+      "paired_growth_delta_low",
+      "denominator_id",
+      "panel_type",
+      "panel_id",
+      "metric",
+      "value",
+      "YEAR",
+      "FOLD",
+      "LOYO",
+      "EX_LARGEST_ISSUE",
+      "EX_LARGEST_YEAR",
+      "REGIME",
+      "fallback_rate"
+    ],
+    "formulas": [
+      "YEAR/FOLD replays retain chronological order within subset; LOYO removes every issue from one year then recomputes state; ex-largest issue/year removes the largest signed pre-tax-net contributor (year aggregates first); decision panels use same full-calendar zero-flow convention"
+    ],
+    "key": [
+      "target_id",
+      "paired_control_id",
+      "economic_family_id",
+      "denominator_id",
+      "panel_type",
+      "panel_id",
+      "metric"
+    ]
+  },
+  "capital_summary": {
+    "fields": [
+      "starting_bankroll_yuan",
+      "ending_bankroll_yuan",
+      "minimum_bankroll_yuan",
+      "minimum_required_start_yuan",
+      "fundable_issue_count",
+      "first_unfundable_issue",
+      "scaled_stake_yuan",
+      "skipped_stake_yuan",
+      "cash_yuan",
+      "turnover_yuan",
+      "pre_tax_roi",
+      "tax_adjusted_roi",
+      "ruin_flag"
+    ],
+    "formulas": [
+      "minimum_bankroll=min(preissue_bankroll,postissue_bankroll) over full 348 calendar",
+      "minimum_required_start is smallest b found by deterministic integer-yuan bisection only for NATIVE_REQUEST_CONTROL and FIXED_100K_NOTIONAL, whose requested ticket capacities are independent of b; blank/NOT_MONOTONE for COMPOUNDING_BANKROLL",
+      "ruin_flag=1 iff any postissue_bankroll < \u00a52 while a positive native request exists",
+      "pre_tax_roi=sum(pre_tax_net)/sum(actual_stake); blank if zero actual stake"
+    ]
+  },
+  "challenger_case": {
+    "fields": [
+      "candidate_id",
+      "alternative_explanation",
+      "test_id",
+      "result",
+      "decision_impact"
+    ],
+    "formulas": [
+      "each headline candidate receives survivor/search, leakage, support, turnover/cash, covariance fitting, largest issue/year, payout cluster and simple-control tests",
+      "cash-only smoothing is separately labeled risk reduction, never diversification edge"
+    ]
+  },
+  "chart_sources": [
+    "chart_source_issue_equity_paths.csv.gz",
+    "chart_source_capital_frontier.csv",
+    "chart_source_risk_return.csv",
+    "chart_source_dependence.csv",
+    "chart_source_dependence_panel.csv",
+    "chart_source_intrinsic_native_dependence.csv",
+    "chart_source_realized_funded_flow_dependence.csv",
+    "chart_source_risk_decomposition.csv",
+    "chart_source_stage_attribution.csv",
+    "chart_source_weight_history.csv.gz",
+    "chart_source_fundability.csv",
+    "chart_source_bootstrap_stability.csv",
+    "chart_source_standalone_m_curve.csv.gz",
+    "chart_source_selected_m_path.csv.gz",
+    "chart_source_portfolio_k_saturation.csv"
+  ],
+  "dependence": {
+    "fields": [
+      "portfolio_id",
+      "sleeve_left",
+      "sleeve_right",
+      "prior_covariance",
+      "prior_correlation",
+      "pearson_correlation",
+      "spearman_rank_correlation",
+      "rolling_correlation_20",
+      "payout_overlap_count",
+      "hit_overlap_count",
+      "contribution_hhi",
+      "downside_correlation",
+      "tail_co_loss_count",
+      "full_calendar_zero_flow_count",
+      "union_active_count",
+      "intersection_active_count",
+      "full_calendar_joint_loss_rate",
+      "union_active_joint_loss_rate",
+      "intersection_active_joint_loss_rate",
+      "concurrent_issue_count",
+      "portfolio_pnl_reconciliation_yuan"
+    ],
+    "formulas": [
+      "full-calendar denominator is all 348 chronological rows with zero flow retained; union-active has either sleeve actual stake>0; intersection-active has both actual stake>0. Publish all three counts and joint-loss rates; never infer diversification from the intersection alone",
+      "downside_correlation=corr(min(r_left,0),min(r_right,0)) is reported separately for full-calendar-zero-flow, union-active and intersection-active; blank for <2/nonpositive variance",
+      "tail_co_loss_count=count both returns in their own prior 10% lower tail on each declared denominator",
+      "portfolio_pnl_reconciliation_yuan=portfolio pre-tax net-sum(actual funded sleeve pre-tax nets) and must equal zero within numerical tolerance; covariance never contributes additional P&L",
+      "Pearson/rank/rolling metrics are computed on each declared full-calendar, union-active, and intersection-active denominator; blank for fewer than two observations or zero variance. HHI=sum(issue contribution share\u00b2), blank when gross contribution is zero."
+    ]
+  },
+  "dependence_panel": {
+    "fields": [
+      "value",
+      "observation_count",
+      "active_observation_count",
+      "undefined_reason",
+      "first_calendar_index",
+      "last_calendar_index"
+    ],
+    "formulas": [
+      "denominator_id is one of FULL_CALENDAR_ZERO_FLOW, UNION_ACTIVE or INTERSECTION_ACTIVE; no denominator is implied by a blank value",
+      "panel_type is OVERALL, ROLLING, YEAR, REGIME, LOYO, EX_LARGEST_ISSUE or EX_LARGEST_YEAR; panel_id identifies the exact window/year/regime/exclusion set",
+      "metric includes Pearson, Spearman, downside correlation, payout overlap, hit overlap, contribution HHI, tail co-loss and joint loss rate; blank/undefined fields carry an explicit undefined_reason",
+      "same economic_family_id is prohibited from a primary diversification panel; alias comparisons are separately labeled LINEAGE_REPRODUCTION_ONLY"
+    ],
+    "key": [
+      "portfolio_id",
+      "economic_family_left",
+      "economic_family_right",
+      "denominator_id",
+      "panel_type",
+      "panel_id",
+      "window_issues",
+      "exclusion_id",
+      "metric"
+    ]
+  },
+  "holding_metrics": {
+    "fields": [
+      "portfolio_id",
+      "mode",
+      "position_fraction",
+      "ending_bankroll_yuan",
+      "max_drawdown_yuan",
+      "max_drawdown_fraction",
+      "drawdown_duration_issues",
+      "time_under_water_issues",
+      "recovery_issue",
+      "recovery_episode_count",
+      "recovery_duration_median_issues",
+      "recovery_duration_tail_95_issues",
+      "recovery_duration_max_issues",
+      "unrecovered_episode_count",
+      "loss_streak_calendar",
+      "loss_streak_active",
+      "miss_streak_calendar",
+      "miss_streak_active",
+      "rolling_pnl_5_yuan",
+      "rolling_pnl_10_yuan",
+      "rolling_pnl_20_yuan",
+      "rolling_negative_probability_5",
+      "rolling_negative_probability_10",
+      "rolling_negative_probability_20",
+      "worst_rolling_window_id",
+      "worst_rolling_pnl_yuan",
+      "worst_rolling_roi",
+      "ruin_flag",
+      "near_ruin_flag",
+      "sharpe",
+      "sortino",
+      "calmar"
+    ],
+    "formulas": [
+      "loss=pre_tax_net<0; miss=actual_stake>0 and pre_tax_gross=0; calendar streak includes zero-flow rows, active streak skips zero-flow rows",
+      "rolling P&L W=sum(pre_tax_net) over every trailing full-calendar W={5,10,20}; report count/total windows with P&L<0, their probability, the worst P&L, its ROI=sum(net)/sum(actual stake), and its chronological window identity. Never discard winning issues inside a window",
+      "drawdown=running equity peak minus postissue bankroll; duration/time-under-water count chronological issues below peak; recovery is first later issue reaching former peak, blank if absent",
+      "near_ruin_flag=1 iff min bankroll < \u00a52\u00d7max native issue ticket count; sharpe=mean calendar bank return/sample sd\u00d7sqrt(issue frequency/year), sortino divides by downside RMS, calmar=annualized compounded bank return/max drawdown fraction; blank where denominator zero",
+      "recovery episodes begin on a new running-peak breach and end at first later recovery to that peak; report median, 95th percentile, maximum, and unrecovered count on full chronology"
+    ]
+  },
+  "intrinsic_native_dependence": {
+    "fields": [
+      "native_return_basis",
+      "value",
+      "observation_count",
+      "undefined_reason",
+      "matched_support_hash"
+    ],
+    "formulas": [
+      "uses unchanged Stage-1\u21923 native/fixed-capital matched-support returns before any Stage-4 funding, abstention or retained cash",
+      "must be labeled INTRINSIC_NATIVE only; blank when an exact native return bridge is unavailable"
+    ],
+    "key": [
+      "portfolio_id",
+      "economic_family_left",
+      "economic_family_right",
+      "denominator_id",
+      "panel_type",
+      "panel_id",
+      "window_issues",
+      "exclusion_id",
+      "metric"
+    ]
+  },
+  "issue_ledger": {
+    "fields": [
+      "preissue_bankroll_yuan",
+      "normalization_method",
+      "normalization_status",
+      "ex_ante_volatility",
+      "target_volatility",
+      "realized_capital_multiplier",
+      "risk_budget_yuan",
+      "pre_normalization_mode_notional_yuan",
+      "normalized_mode_notional_yuan",
+      "mode_notional_yuan",
+      "issue_budget_yuan",
+      "requested_stake_yuan",
+      "actual_stake_yuan",
+      "scaled_stake_yuan",
+      "skipped_stake_yuan",
+      "retained_cash_yuan",
+      "reason_codes",
+      "pre_tax_gross_yuan",
+      "pre_tax_net_yuan",
+      "tax_yuan",
+      "postissue_bankroll_yuan",
+      "ruin_flag"
+    ],
+    "formulas": [
+      "actual_stake=sum(actual ticket count)\u00d7\u00a52",
+      "normalization follows normalization_contract.json before weights/budget/integer funding; multiplier is <=1 and all fallbacks are explicit",
+      "for a prefix-executable sleeve, funded_prefix_length is the actual allocated global ticket count and funded_tax_lot_sha256=SHA256(canonical ordered tax_lot_id list for ranks 1..length); for WHOLE_NATIVE_OR_NO_BET, length is native ticket count or zero and digest binds the entire inherited native allocation digest or an empty canonical list",
+      "a nonzero FULL_ENUMERATED allocation must equal its complete native count; partial FULL is a Gate-B fail-closed error",
+      "postissue_bankroll=preissue_bankroll+pre_tax_net",
+      "turnover=cumulative actual_stake",
+      "all sleeve flows in an issue fund concurrently"
+    ],
+    "key": [
+      "portfolio_id",
+      "mode",
+      "position_fraction",
+      "weight_method",
+      "calendar_index",
+      "issue_instance"
+    ]
+  },
+  "portfolio_k_saturation": {
+    "fields": [
+      "candidate_aliases_sha256",
+      "ending_bankroll_yuan",
+      "pre_tax_roi",
+      "max_drawdown_yuan",
+      "contribution_hhi",
+      "retained_cash_yuan",
+      "marginal_vs_K_minus_1_yuan",
+      "undefined_reason"
+    ],
+    "formulas": [
+      "ordered_shortlist_id is frozen in frontier_contract; K uses the first K distinct economic families only",
+      "same-family aliases may not increase K, stake, multiplicity, diversification attribution or marginal contribution",
+      "every available K/method/mode/fraction/seed row is written even if no-bet or negative"
+    ],
+    "key": [
+      "ordered_shortlist_id",
+      "K",
+      "economic_family_set_sha256",
+      "weight_method",
+      "capital_mode",
+      "position_fraction",
+      "deployment_seed"
+    ]
+  },
+  "realized_funded_flow_dependence": {
+    "fields": [
+      "value",
+      "observation_count",
+      "cash_flow_count",
+      "no_bet_flow_count",
+      "undefined_reason"
+    ],
+    "formulas": [
+      "uses actual Stage-4 funded yuan flows including retained cash and NO_BET zero-flow rows",
+      "never label this layer intrinsic diversification or use its correlation change as an Edge claim"
+    ],
+    "key": [
+      "portfolio_id",
+      "economic_family_left",
+      "economic_family_right",
+      "denominator_id",
+      "panel_type",
+      "panel_id",
+      "window_issues",
+      "exclusion_id",
+      "metric"
+    ]
+  },
+  "regime_map": {
+    "fields": [
+      "source_issue_instance",
+      "regime_source_key",
+      "regime_panel_id",
+      "feature_row_sha256",
+      "feature_cutoff_ts",
+      "regime_status",
+      "missing_rule"
+    ],
+    "formulas": [
+      "exact (issue,year) bridge from #192 OOS issue namespace to #193 canonical pre-event feature namespace",
+      "learned regime labels/bins must be fitted strictly-prior and recorded in selected_m_path/dependence panels with their training-input hash; missing rows remain their own explicit panel"
+    ],
+    "key": [
+      "calendar_index",
+      "issue_instance"
+    ]
+  },
+  "risk_decomposition": {
+    "fields": [
+      "marginal_variance_contribution",
+      "euler_variance_contribution",
+      "matched_drawdown_delta_yuan",
+      "matched_tail_loss_delta_yuan",
+      "capital_utilization_yuan",
+      "retained_cash_yuan",
+      "rounding_delta_yuan",
+      "exposure_size_delta_yuan",
+      "portfolio_pnl_reconciliation_yuan",
+      "undefined_reason"
+    ],
+    "formulas": [
+      "Euler contribution=w_i*(Sigma*w)_i on the same strictly-prior covariance as the weight estimator; blank when covariance is unavailable",
+      "matched drawdown/tail deltas are risk diagnostics, not P&L attribution; portfolio P&L reconciliation is exact funded-sleeve sum"
+    ],
+    "key": [
+      "portfolio_id",
+      "mode",
+      "position_fraction",
+      "weight_method",
+      "normalization_method",
+      "calendar_index",
+      "issue_instance",
+      "economic_family_id"
+    ]
+  },
+  "selected_m_path": {
+    "fields": [
+      "support_hash",
+      "prior_training_start_calendar_index",
+      "prior_training_end_calendar_index",
+      "prior_active_issue_count",
+      "prior_training_input_sha256",
+      "selected_M",
+      "fixed_M_comparator",
+      "fallback_reason",
+      "nested_loyo_held_out_year"
+    ],
+    "formulas": [
+      "selection_variant is WALK_FORWARD or NESTED_LOYO; every selection uses only chronological prior outcomes inside the Gate-B replay and never current/future issue data",
+      "before 52 active observations selected_M=fixed_M_comparator with explicit fallback_reason"
+    ],
+    "key": [
+      "economic_family_id",
+      "deployment_seed",
+      "calendar_index",
+      "issue_instance",
+      "selection_variant"
+    ]
+  },
+  "sleeve_funding_ledger": {
+    "fields": [
+      "requested_native_ticket_count",
+      "actual_ticket_count",
+      "funded_prefix_length",
+      "funded_global_rank_start",
+      "funded_global_rank_end",
+      "funded_ticket_list_sha256",
+      "funded_tax_lot_sha256",
+      "prefix_execution_status",
+      "atomic_or_no_bet_reason",
+      "actual_stake_yuan"
+    ],
+    "formulas": [
+      "one row per sleeve; (portfolio issue actual_stake)=sum(sleeve funding actual_stake) exactly",
+      "WHOLE_NATIVE_OR_NO_BET requires actual_ticket_count in {0, requested_native_ticket_count}; otherwise fail closed",
+      "a prefix row must reference its manifest-covered issue-global ordered tax-lot stream"
+    ],
+    "key": [
+      "portfolio_id",
+      "mode",
+      "position_fraction",
+      "weight_method",
+      "calendar_index",
+      "issue_instance",
+      "sleeve_id"
+    ]
+  },
+  "stage_attribution": {
+    "fields": [
+      "attribution_status",
+      "upstream_trace_sha256",
+      "native_requested_ticket_count",
+      "normalization_multiplier",
+      "portfolio_weight",
+      "actual_ticket_count",
+      "retained_cash_yuan",
+      "same_ticket_stage4_funding_delta_yuan",
+      "undefined_reason"
+    ],
+    "formulas": [
+      "STAGE_1_SELECTION/STAGE_2_DIRECTION/STAGE_3_TICKET_CONSTRUCTION are NOT_IDENTIFIABLE_WITHOUT_SPLICE unless immutable upstream contribution evidence is named",
+      "STAGE_4_POSITIONING is exact only for the same frozen tickets and attributes sizing, normalization, weighting, integer rounding and cash"
+    ],
+    "key": [
+      "portfolio_id",
+      "mode",
+      "position_fraction",
+      "weight_method",
+      "normalization_method",
+      "calendar_index",
+      "issue_instance",
+      "sleeve_id",
+      "stage_id"
+    ]
+  },
+  "standalone_m_curve": {
+    "fields": [
+      "candidate_aliases_sha256",
+      "requested_ticket_count",
+      "actual_ticket_count",
+      "pre_tax_net_yuan",
+      "pre_tax_roi",
+      "selection_eligible",
+      "undefined_reason"
+    ],
+    "formulas": [
+      "one row for every frozen union-M value and deployment seed on its exact support; aliases sharing an economic_family_id write one canonical row and are not separately purchased",
+      "pre_tax_roi=sum(net)/sum(actual stake), blank with explicit undefined_reason when actual stake is zero"
+    ],
+    "key": [
+      "economic_family_id",
+      "canonical_candidate_id",
+      "M",
+      "deployment_seed",
+      "support_hash"
+    ]
+  },
+  "weight_history": {
+    "fields": [
+      "portfolio_id",
+      "issue_instance",
+      "weight_method",
+      "sleeve_id",
+      "weight",
+      "history_active_observation_count",
+      "estimator_status",
+      "fallback_reason",
+      "covariance_hash"
+    ],
+    "formulas": [
+      "weights use only issues strictly before issue_instance",
+      "fallback_rate=count(non-primary estimator_status)/348",
+      "NO_BET/unavailable excluded from active observation but retained as capital zero flow"
+    ]
+  }
+}
