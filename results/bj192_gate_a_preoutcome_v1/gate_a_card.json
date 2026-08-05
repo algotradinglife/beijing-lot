@@ -47,19 +47,21 @@
   ],
   "contract": "BJ-HIST-N7-STRATEGY-ENSEMBLE-001",
   "denominator": {
+    "Q_global_tax_lot_rows": 380160,
     "calendar_issue_count": 348,
     "catalog_identity_count": 12,
-    "eligible_complete_source_count": 8,
-    "eligible_exploratory_family_count": 5,
+    "eligible_complete_source_count": 3,
+    "eligible_exploratory_family_count": 0,
     "fixed_sleeve_count": 3,
     "native_sleeve_request_rows": 1044,
     "position_fraction_count": 20,
-    "strict_three_way_issue_count": 177
+    "strict_three_way_issue_count": 177,
+    "ticket_prefix_policy_rows": 1779
   },
   "eligibility_ledger": [
     {
       "candidate_id": "BEST_FULL_FULL",
-      "decision": "ELIGIBLE_COMPLETE_TRACE",
+      "decision": "ELIGIBLE_COMPLETE_NONREDUNDANT",
       "frontier_role": "CONFIRMATORY_FIXED_SLEEVE",
       "identity_source": "identity_freeze.csv.gz + identity_allocation_digest.csv.gz",
       "inherited_M_seed_support": "M fixed by arm; deterministic/no-seed as declared",
@@ -69,7 +71,7 @@
     },
     {
       "candidate_id": "MODEL_SOURCE_MODEL_CAP1_M512",
-      "decision": "ELIGIBLE_COMPLETE_TRACE",
+      "decision": "ELIGIBLE_COMPLETE_NONREDUNDANT",
       "frontier_role": "CONFIRMATORY_FIXED_SLEEVE",
       "identity_source": "identity_freeze.csv.gz + identity_allocation_digest.csv.gz",
       "inherited_M_seed_support": "M fixed by arm; deterministic/no-seed as declared",
@@ -79,7 +81,7 @@
     },
     {
       "candidate_id": "Q_SOURCE_Q_TOP_MASS_M192",
-      "decision": "ELIGIBLE_COMPLETE_TRACE",
+      "decision": "ELIGIBLE_COMPLETE_NONREDUNDANT",
       "frontier_role": "CONFIRMATORY_FIXED_SLEEVE",
       "identity_source": "identity_freeze.csv.gz + identity_allocation_digest.csv.gz",
       "inherited_M_seed_support": "M fixed by arm; deterministic/no-seed as declared",
@@ -89,67 +91,67 @@
     },
     {
       "candidate_id": "BJ137_COMPLETE_ISSUE_Q_SAMPLING",
-      "decision": "ELIGIBLE_EXPLORATORY_FAMILY",
-      "frontier_role": "EXPLORATORY_SOURCE_FAMILY",
+      "decision": "SUPERSEDED_BY_167_ATLAS",
+      "frontier_role": "LINEAGE_ONLY",
       "identity_source": "n7_identities.csv.gz + sampler_plan.csv",
       "inherited_M_seed_support": "frozen complete-issue sampling M/seed plan",
       "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
-      "reason": "complete pre-outcome selection/direction/ticket source; every raw cell remains multiplicity-controlled",
+      "reason": "complete source sampling surface is represented by the accepted #167 atlas; reopening it would recreate upstream search rather than add a nonredundant Stage-4 sleeve",
       "source_package": "bj137_gate_a_preoutcome_v2"
     },
     {
       "candidate_id": "BJ145_ALLOCATION_MECHANISMS",
-      "decision": "COMPOSABLE_NOT_STANDALONE",
-      "frontier_role": "ALLOCATION_COMPONENT_ONLY",
+      "decision": "SEMANTICS_OR_M_CURVE_ONLY",
+      "frontier_role": "LINEAGE_ONLY",
       "identity_source": "identity_catalog.csv.gz + allocation_plan.csv.gz",
       "inherited_M_seed_support": "frozen M grid/mechanism/cap/repeat plans",
       "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
-      "reason": "allocation source has no independent selector chain; may only pair with an eligible frozen Stage-1\u21923 source",
+      "reason": "allocation engine and M/cap semantics are inherited evidence, not an independent complete Stage-1\u21923 sleeve",
       "source_package": "bj145_gate_a_preoutcome_v8"
     },
     {
       "candidate_id": "BJ148_DENSE_M_COMMON_SUPPORT",
-      "decision": "ELIGIBLE_EXPLORATORY_FAMILY",
-      "frontier_role": "EXPLORATORY_DENSE_M",
+      "decision": "SEMANTICS_OR_M_CURVE_ONLY",
+      "frontier_role": "LINEAGE_ONLY",
       "identity_source": "common_support_identities.csv.gz + sampling_plan.csv",
       "inherited_M_seed_support": "dense M grid and frozen three-seed sampling plan",
       "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
-      "reason": "accepted dense-M evidence; terminal no-stable-sweet-spot makes it descriptive, never ladder replacement",
+      "reason": "dense M curve is upstream descriptive evidence with no stable sweet spot; it does not supply a nonredundant Stage-4 sleeve",
       "source_package": "bj148_gate_a_preoutcome_v1"
     },
     {
       "candidate_id": "BJ151_FIXED_CANDIDATE_REPRODUCTION",
-      "decision": "ELIGIBLE_EXPLORATORY_FAMILY",
-      "frontier_role": "EXPLORATORY_FIXED_REPRODUCTION",
+      "decision": "DUPLICATE_ECONOMIC_IDENTITY",
+      "frontier_role": "LINEAGE_ONLY",
       "identity_source": "candidate_identities.csv.gz + sampling_plan.csv",
       "inherited_M_seed_support": "fixed candidate dense-M plus frozen seed plan",
       "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
-      "reason": "complete fixed reproduction; not independent validation and cannot become an accepted ladder head",
+      "reason": "fixed candidate reproduction is economically represented in the accepted #167/#170 lineage and is not an independent Stage-4 sleeve",
       "source_package": "bj151_gate_a_preoutcome_v1"
     },
     {
       "candidate_id": "BJ159_SELECTED_WOR_N2_N10",
-      "decision": "ELIGIBLE_EXPLORATORY_FAMILY",
-      "frontier_role": "EXPLORATORY_COMPLETE_CHAIN",
+      "decision": "DUPLICATE_ECONOMIC_IDENTITY",
+      "frontier_role": "LINEAGE_ONLY",
       "identity_source": "identity_catalog.csv.gz + sampling_plan.csv",
       "inherited_M_seed_support": "N2\u2013N10, M={32,64,128}, seeds 137001\u2013137003",
       "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
-      "reason": "complete issue-level chain but same-window positives require independent validation",
+      "reason": "selected WOR cross-N result is a historical duplicate/control lineage, not a nonredundant complete Stage-4 sleeve",
       "source_package": "bj159_gate_a_preoutcome_v2r1"
     },
     {
       "candidate_id": "BJ167_SELECTOR_ALLOCATION_ATLAS",
-      "decision": "ELIGIBLE_EXPLORATORY_FAMILY",
-      "frontier_role": "EXPLORATORY_ATLAS",
+      "decision": "SUPERSEDED_BY_167_ATLAS",
+      "frontier_role": "AUTHORITATIVE_SHORTLIST_SOURCE",
       "identity_source": "selector_identities shards + allocation_grid.csv",
       "inherited_M_seed_support": "full frozen selector/allocation M/seed/support surface",
       "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
-      "reason": "complete Stage-1\u21923 atlas; search family is preserved and must receive multiplicity control",
+      "reason": "authoritative corrected atlas is the source from which the three nonredundant #170 retained sleeves were selected; its remaining cells are upstream search lineage, not additional Stage-4 sleeves",
       "source_package": "bj167_gate_a_strategy_atlas_v3r1"
     },
     {
       "candidate_id": "BJ176_THREE_SLEEVE_RISK_BRIDGE",
-      "decision": "CONTROL_AND_CONVENTION_ONLY",
+      "decision": "DUPLICATE_ECONOMIC_IDENTITY",
       "frontier_role": "RISK_BASELINE_BRIDGE",
       "identity_source": "three fixed #170 sleeves only",
       "inherited_M_seed_support": "BEST_FULL/FULL, MODEL/M512, Q/M192",
@@ -159,7 +161,7 @@
     },
     {
       "candidate_id": "BJ190_SPARSE_DIVERGENCE",
-      "decision": "EXCLUDED_NOT_SLEEVE",
+      "decision": "EXCLUDED_TERMINAL_EVIDENCE",
       "frontier_role": "EXCLUDED",
       "identity_source": "terminal identity only",
       "inherited_M_seed_support": "as terminal package",
@@ -169,7 +171,7 @@
     },
     {
       "candidate_id": "BJ193_FULL_DYNAMIC_CHAIN",
-      "decision": "EXCLUDED_NEGATIVE_NON_PROMOTED",
+      "decision": "EXCLUDED_TERMINAL_EVIDENCE",
       "frontier_role": "EXCLUDED",
       "identity_source": "terminal identity only",
       "inherited_M_seed_support": "as terminal package",
@@ -180,31 +182,26 @@
   ],
   "frontier_contract": {
     "comparison_rule": "Each portfolio row includes absolute pre-tax capital/path results and matched lifts to B167/B170 where exact support and funding permit, strongest standalone on its exact support, and equal-weight same sleeves.",
-    "component_rule": "BJ145_ALLOCATION_MECHANISMS is composable only: pair each frozen allocation tuple with an eligible complete selector identity; never invent a selector or overwrite its inherited tuple.",
+    "component_rule": "BJ145 is allocation-engine lineage only; it cannot create a new Stage-4 selector or overwrite a retained sleeve tuple.",
     "eligible_candidate_sources": [
       "BEST_FULL_FULL",
       "MODEL_SOURCE_MODEL_CAP1_M512",
-      "Q_SOURCE_Q_TOP_MASS_M192",
-      "BJ137_COMPLETE_ISSUE_Q_SAMPLING",
-      "BJ148_DENSE_M_COMMON_SUPPORT",
-      "BJ151_FIXED_CANDIDATE_REPRODUCTION",
-      "BJ159_SELECTED_WOR_N2_N10",
-      "BJ167_SELECTOR_ALLOCATION_ATLAS"
+      "Q_SOURCE_Q_TOP_MASS_M192"
     ],
-    "eligible_source_count": 8,
+    "eligible_source_count": 3,
     "excluded_source_records": [
       {
         "candidate_id": "BJ190_SPARSE_DIVERGENCE",
-        "decision": "EXCLUDED_NOT_SLEEVE",
+        "decision": "EXCLUDED_TERMINAL_EVIDENCE",
         "reason": "terminal strict promotion count is zero; coverage-limited diagnostic is not an eligible complete capital sleeve"
       },
       {
         "candidate_id": "BJ193_FULL_DYNAMIC_CHAIN",
-        "decision": "EXCLUDED_NEGATIVE_NON_PROMOTED",
+        "decision": "EXCLUDED_TERMINAL_EVIDENCE",
         "reason": "PI excludes negative non-promoted FULL_DYNAMIC_CHAIN; package supplies interface/accounting lessons only"
       }
     ],
-    "materialization_rule": "Gate B enumerates every immutable source-plan/grid identity from each eligible source, retaining exact selector, support, M, seed, mechanism, cap, weight source and ticket multiplicity. It writes every nonempty same-support portfolio combination permitted by those identities.",
+    "materialization_rule": "Gate B enumerates the seven nonempty combinations of the three immutable nonredundant sleeves only, retaining exact selector, support, M, mechanism, cap, weight source and ticket multiplicity. Historic source grids are lineage evidence and cannot be reopened as Stage-4 sleeves.",
     "screening_rule": "The full materialized frontier is exploratory except the fixed H1. Raw rank, raw Pareto membership or a best descriptive cell cannot be reported as Edge; all positive claims require the frozen family-wise sequential inference and later independent validation."
   },
   "full_calendar": {
@@ -241,7 +238,8 @@
     "modes": {
       "COMPOUNDING_BANKROLL": "mode_notional=fraction \u00d7 preissue bankroll",
       "FIXED_100K_NOTIONAL": "mode_notional=fraction \u00d7 \u00a5100,000; notional does not reinvest",
-      "NATIVE_REQUEST_CONTROL": "mode_notional=fraction \u00d7 sum(native requested ticket caps) \u00d7 \u00a52"
+      "NATIVE_REQUEST_CONTROL": "fraction must equal 1; mode_notional=sum(native requested ticket caps) \u00d7 \u00a52, reduced only for a current-bankroll shortfall",
+      "SCALED_NATIVE_REQUEST": "exploratory only: mode_notional=fraction \u00d7 sum(native requested ticket caps) \u00d7 \u00a52; never an accepted native baseline"
     },
     "position_budget_fractions": [
       0.05,
@@ -270,7 +268,7 @@
   "gate_b_status": "NOT_RUN_AND_NOT_AUTHORIZED_PENDING_PI_GATE_A_ACCEPTANCE",
   "issue": 192,
   "methodology_contract": {
-    "M_rule": "UPSTREAM_FROZEN_FIXED: FULL=2187, MODEL=512, Q=192. No new M scan or post-outcome M choice.",
+    "M_rule": "UPSTREAM_FROZEN_FIXED: FULL=2187, MODEL=512, Q=192. No new M scan or post-outcome M choice. FULL is an indivisible whole-native block; partial Q/MODEL funding must use the prefix registry or abstain.",
     "attribution": {
       "covariance": "report cross-sleeve concurrent issue covariance and diversification attribution separately from within-sleeve ticket outcomes",
       "stage4": "attribute size/downscale/cash/weight lift against the same-sleeve native-request and equal-weight controls; do not mislabel it as selection, direction, or ticket-construction lift",
@@ -313,7 +311,7 @@
       "covariance_attribution",
       "pre_tax_primary_tax_reference"
     ],
-    "membership": "all nonempty subsets of every ELIGIBLE_COMPLETE_TRACE or ELIGIBLE_EXPLORATORY_FAMILY frozen sleeve family; no Stage 1\u20133 selection, direction, ticket, M, seed, or support construction changes",
+    "membership": "all seven nonempty subsets of the three exhaustive ELIGIBLE_COMPLETE_NONREDUNDANT sleeves; historic grids are lineage evidence, not new Stage-4 sleeves; no Stage 1\u20133 selection, direction, ticket, M, seed, or support construction changes",
     "multiplicity": {
       "families": [
         "catalog_sleeve_family",
@@ -731,6 +729,17 @@
     "issue_count": 177,
     "source": "#170 THREE_WAY_ALL",
     "usage": "matched attribution only; never truncate capital/holding paths"
+  },
+  "ticket_prefix_contract": {
+    "FULL_partial_rule": "whole-native or NO_BET; no partial FULL identity",
+    "MODEL_audit": "model_cap1_nested_prefix_audit.json.gz; all 234 frozen identities replayed against accepted allocator for M=1..512",
+    "MODEL_global_tax_lot_rows": 119808,
+    "MODEL_partial_rule": "whole-native or NO_BET unless the policy registry carries a verified all-M nested-prefix proof",
+    "Q_global_interleave": "round_robin by frozen selector_rank then portfolio_id; every Q identity retains deterministic top-mass priority",
+    "Q_global_tax_lot_rows": 260352,
+    "global_tax_lot_count": 380160,
+    "global_tax_lot_registry": "ticket_prefix_registry.csv.gz",
+    "policy_registry": "ticket_prefix_policy_registry.csv"
   },
   "version": "bj192-gate-a-v3"
 }

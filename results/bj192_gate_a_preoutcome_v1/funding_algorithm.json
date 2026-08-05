@@ -26,7 +26,8 @@
   "modes": {
     "COMPOUNDING_BANKROLL": "mode_notional=fraction \u00d7 preissue bankroll",
     "FIXED_100K_NOTIONAL": "mode_notional=fraction \u00d7 \u00a5100,000; notional does not reinvest",
-    "NATIVE_REQUEST_CONTROL": "mode_notional=fraction \u00d7 sum(native requested ticket caps) \u00d7 \u00a52"
+    "NATIVE_REQUEST_CONTROL": "fraction must equal 1; mode_notional=sum(native requested ticket caps) \u00d7 \u00a52, reduced only for a current-bankroll shortfall",
+    "SCALED_NATIVE_REQUEST": "exploratory only: mode_notional=fraction \u00d7 sum(native requested ticket caps) \u00d7 \u00a52; never an accepted native baseline"
   },
   "position_budget_fractions": [
     0.05,

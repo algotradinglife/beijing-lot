@@ -1,29 +1,24 @@
 {
   "comparison_rule": "Each portfolio row includes absolute pre-tax capital/path results and matched lifts to B167/B170 where exact support and funding permit, strongest standalone on its exact support, and equal-weight same sleeves.",
-  "component_rule": "BJ145_ALLOCATION_MECHANISMS is composable only: pair each frozen allocation tuple with an eligible complete selector identity; never invent a selector or overwrite its inherited tuple.",
+  "component_rule": "BJ145 is allocation-engine lineage only; it cannot create a new Stage-4 selector or overwrite a retained sleeve tuple.",
   "eligible_candidate_sources": [
     "BEST_FULL_FULL",
     "MODEL_SOURCE_MODEL_CAP1_M512",
-    "Q_SOURCE_Q_TOP_MASS_M192",
-    "BJ137_COMPLETE_ISSUE_Q_SAMPLING",
-    "BJ148_DENSE_M_COMMON_SUPPORT",
-    "BJ151_FIXED_CANDIDATE_REPRODUCTION",
-    "BJ159_SELECTED_WOR_N2_N10",
-    "BJ167_SELECTOR_ALLOCATION_ATLAS"
+    "Q_SOURCE_Q_TOP_MASS_M192"
   ],
-  "eligible_source_count": 8,
+  "eligible_source_count": 3,
   "excluded_source_records": [
     {
       "candidate_id": "BJ190_SPARSE_DIVERGENCE",
-      "decision": "EXCLUDED_NOT_SLEEVE",
+      "decision": "EXCLUDED_TERMINAL_EVIDENCE",
       "reason": "terminal strict promotion count is zero; coverage-limited diagnostic is not an eligible complete capital sleeve"
     },
     {
       "candidate_id": "BJ193_FULL_DYNAMIC_CHAIN",
-      "decision": "EXCLUDED_NEGATIVE_NON_PROMOTED",
+      "decision": "EXCLUDED_TERMINAL_EVIDENCE",
       "reason": "PI excludes negative non-promoted FULL_DYNAMIC_CHAIN; package supplies interface/accounting lessons only"
     }
   ],
-  "materialization_rule": "Gate B enumerates every immutable source-plan/grid identity from each eligible source, retaining exact selector, support, M, seed, mechanism, cap, weight source and ticket multiplicity. It writes every nonempty same-support portfolio combination permitted by those identities.",
+  "materialization_rule": "Gate B enumerates the seven nonempty combinations of the three immutable nonredundant sleeves only, retaining exact selector, support, M, mechanism, cap, weight source and ticket multiplicity. Historic source grids are lineage evidence and cannot be reopened as Stage-4 sleeves.",
   "screening_rule": "The full materialized frontier is exploratory except the fixed H1. Raw rank, raw Pareto membership or a best descriptive cell cannot be reported as Edge; all positive claims require the frozen family-wise sequential inference and later independent validation."
 }
