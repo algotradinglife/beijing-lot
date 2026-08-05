@@ -1,0 +1,1450 @@
+{
+  "adapter_sha256": "dcb2c236fbc327a325024713e2d5cc7cf9c1d64b5df696b89ec4e3963a728ed4",
+  "allocation_engine_sha256": "5b1ac6631ce22a447d883d514ed73e6795584c89d514e6be7562b2fd91bfa4ce",
+  "cases": [
+    {
+      "case": "ALLOW_ALL_FULL",
+      "expected": {
+        "counts_sha256": "2a07555f67e421922f06431ffbc21faf15f0c378b4628d43a3bf65c9c11af947",
+        "draw_count": 2187,
+        "duplicate_count": 0,
+        "effective_M": 2187,
+        "max_multiplicity": 1,
+        "positive_support_count": 2187,
+        "reason_code": "FULL_ALLOW_ALL",
+        "requested_M": 2187,
+        "requested_stake_yuan": 4374,
+        "requested_ticket_count": 2187,
+        "status": "ACTIVE",
+        "ticket_weight_sha256": "9b86efc984ab238794a6d3a02cb368ef94b48b534604431cfc3f1065af0bbda7",
+        "unique_count": 2187
+      },
+      "input": {
+        "M": 2187,
+        "cap": null,
+        "identity_signature": "BJ193_GOLDEN_N7",
+        "mechanism": "FULL_ENUMERATED",
+        "per_match_weight_3_1_0": [
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ]
+        ],
+        "seed": "NA"
+      }
+    },
+    {
+      "case": "ONE_DELETE_WOR_M64",
+      "expected": {
+        "counts_sha256": "316fbb71942d3535ec447dd27c20c8b4e23595e60c98ac4579449255252df331",
+        "draw_count": 64,
+        "duplicate_count": 0,
+        "effective_M": 64,
+        "max_multiplicity": 1,
+        "positive_support_count": 1458,
+        "reason_code": "ALLOCATED_ON_POSITIVE_UPSTREAM_SUPPORT",
+        "requested_M": 64,
+        "requested_stake_yuan": 128,
+        "requested_ticket_count": 64,
+        "status": "ACTIVE",
+        "ticket_weight_sha256": "0137219d743a2aaf01c92a2ce2018efe702a261e22136ef0b2f503429b6db6d5",
+        "unique_count": 64
+      },
+      "input": {
+        "M": 64,
+        "cap": null,
+        "identity_signature": "BJ193_GOLDEN_N7",
+        "mechanism": "WOR_DISTINCT",
+        "per_match_weight_3_1_0": [
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.0
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ]
+        ],
+        "seed": "137001"
+      }
+    },
+    {
+      "case": "ONE_DELETE_WR_M2187",
+      "expected": {
+        "counts_sha256": "cdcb0aa691e68cdaee8bbd4c2d22b466e923772bcbed20cfd022407a35daf1c7",
+        "draw_count": 2187,
+        "duplicate_count": 1346,
+        "effective_M": 2187,
+        "max_multiplicity": 21,
+        "positive_support_count": 1458,
+        "reason_code": "ALLOCATED_ON_POSITIVE_UPSTREAM_SUPPORT",
+        "requested_M": 2187,
+        "requested_stake_yuan": 4374,
+        "requested_ticket_count": 2187,
+        "status": "ACTIVE",
+        "ticket_weight_sha256": "0137219d743a2aaf01c92a2ce2018efe702a261e22136ef0b2f503429b6db6d5",
+        "unique_count": 841
+      },
+      "input": {
+        "M": 2187,
+        "cap": null,
+        "identity_signature": "BJ193_GOLDEN_N7",
+        "mechanism": "WR_DUPLICATE_STAKE",
+        "per_match_weight_3_1_0": [
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.0
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ]
+        ],
+        "seed": "137001"
+      }
+    },
+    {
+      "case": "WEIGHTED_RESIDUAL_M64",
+      "expected": {
+        "counts_sha256": "d2026da7d68d8414475076ee3712d480cf223a9d0c4cecb69d92adbbf059ce7a",
+        "draw_count": 64,
+        "duplicate_count": 0,
+        "effective_M": 64,
+        "max_multiplicity": 1,
+        "positive_support_count": 2187,
+        "reason_code": "ALLOCATED_ON_POSITIVE_UPSTREAM_SUPPORT",
+        "requested_M": 64,
+        "requested_stake_yuan": 128,
+        "requested_ticket_count": 64,
+        "status": "ACTIVE",
+        "ticket_weight_sha256": "8e3c644dc53eeda937a1925f7a0eb40173ca720332bfe7da9d16a3fdeac8cfb8",
+        "unique_count": 64
+      },
+      "input": {
+        "M": 64,
+        "cap": null,
+        "identity_signature": "BJ193_GOLDEN_N7",
+        "mechanism": "RESIDUAL_SYSTEMATIC",
+        "per_match_weight_3_1_0": [
+          [
+            0.55,
+            0.3,
+            0.15
+          ],
+          [
+            0.2,
+            0.35,
+            0.45
+          ],
+          [
+            0.48,
+            0.22,
+            0.3
+          ],
+          [
+            0.33,
+            0.34,
+            0.33
+          ],
+          [
+            0.62,
+            0.18,
+            0.2
+          ],
+          [
+            0.27,
+            0.41,
+            0.32
+          ],
+          [
+            0.45,
+            0.25,
+            0.3
+          ]
+        ],
+        "seed": "NA"
+      }
+    },
+    {
+      "case": "WEIGHTED_CAPPED_M128_CAP2",
+      "expected": {
+        "counts_sha256": "acd7d97016783683d669fb3017b16c4f3213b5c2ae1c2fec334a6cf7b7c6f813",
+        "draw_count": 128,
+        "duplicate_count": 64,
+        "effective_M": 128,
+        "max_multiplicity": 2,
+        "positive_support_count": 2187,
+        "reason_code": "ALLOCATED_ON_POSITIVE_UPSTREAM_SUPPORT",
+        "requested_M": 128,
+        "requested_stake_yuan": 256,
+        "requested_ticket_count": 128,
+        "status": "ACTIVE",
+        "ticket_weight_sha256": "8e3c644dc53eeda937a1925f7a0eb40173ca720332bfe7da9d16a3fdeac8cfb8",
+        "unique_count": 64
+      },
+      "input": {
+        "M": 128,
+        "cap": 2,
+        "identity_signature": "BJ193_GOLDEN_N7",
+        "mechanism": "CAPPED_REPEAT",
+        "per_match_weight_3_1_0": [
+          [
+            0.55,
+            0.3,
+            0.15
+          ],
+          [
+            0.2,
+            0.35,
+            0.45
+          ],
+          [
+            0.48,
+            0.22,
+            0.3
+          ],
+          [
+            0.33,
+            0.34,
+            0.33
+          ],
+          [
+            0.62,
+            0.18,
+            0.2
+          ],
+          [
+            0.27,
+            0.41,
+            0.32
+          ],
+          [
+            0.45,
+            0.25,
+            0.3
+          ]
+        ],
+        "seed": "NA"
+      }
+    },
+    {
+      "case": "WEIGHTED_TOP_MASS_M64",
+      "expected": {
+        "counts_sha256": "d2026da7d68d8414475076ee3712d480cf223a9d0c4cecb69d92adbbf059ce7a",
+        "draw_count": 64,
+        "duplicate_count": 0,
+        "effective_M": 64,
+        "max_multiplicity": 1,
+        "positive_support_count": 2187,
+        "reason_code": "ALLOCATED_ON_POSITIVE_UPSTREAM_SUPPORT",
+        "requested_M": 64,
+        "requested_stake_yuan": 128,
+        "requested_ticket_count": 64,
+        "status": "ACTIVE",
+        "ticket_weight_sha256": "8e3c644dc53eeda937a1925f7a0eb40173ca720332bfe7da9d16a3fdeac8cfb8",
+        "unique_count": 64
+      },
+      "input": {
+        "M": 64,
+        "cap": null,
+        "identity_signature": "BJ193_GOLDEN_N7",
+        "mechanism": "DETERMINISTIC_TOP_MASS",
+        "per_match_weight_3_1_0": [
+          [
+            0.55,
+            0.3,
+            0.15
+          ],
+          [
+            0.2,
+            0.35,
+            0.45
+          ],
+          [
+            0.48,
+            0.22,
+            0.3
+          ],
+          [
+            0.33,
+            0.34,
+            0.33
+          ],
+          [
+            0.62,
+            0.18,
+            0.2
+          ],
+          [
+            0.27,
+            0.41,
+            0.32
+          ],
+          [
+            0.45,
+            0.25,
+            0.3
+          ]
+        ],
+        "seed": "NA"
+      }
+    },
+    {
+      "case": "ZERO_SUPPORT",
+      "expected": {
+        "counts_sha256": "",
+        "detail": "direction output has no positive ticket support",
+        "effective_M": 0,
+        "positive_support_count": 0,
+        "reason_code": "NO_POSITIVE_TICKET_SUPPORT",
+        "requested_M": 2187,
+        "requested_stake_yuan": 0,
+        "requested_ticket_count": 0,
+        "status": "NO_BET",
+        "ticket_weight_sha256": ""
+      },
+      "input": {
+        "M": 2187,
+        "cap": null,
+        "identity_signature": "BJ193_GOLDEN_N7",
+        "mechanism": "FULL_ENUMERATED",
+        "per_match_weight_3_1_0": [
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ]
+        ],
+        "seed": "NA"
+      }
+    },
+    {
+      "case": "INSUFFICIENT_WOR_M2187",
+      "expected": {
+        "counts_sha256": "",
+        "draw_count": 0,
+        "duplicate_count": 0,
+        "effective_M": 0,
+        "max_multiplicity": 0,
+        "positive_support_count": 1458,
+        "reason_code": "M_EXCEEDS_DISTINCT_POSITIVE_SUPPORT",
+        "requested_M": 2187,
+        "requested_stake_yuan": 0,
+        "requested_ticket_count": 0,
+        "status": "NO_BET",
+        "ticket_weight_sha256": "0137219d743a2aaf01c92a2ce2018efe702a261e22136ef0b2f503429b6db6d5",
+        "unique_count": 0
+      },
+      "input": {
+        "M": 2187,
+        "cap": null,
+        "identity_signature": "BJ193_GOLDEN_N7",
+        "mechanism": "WOR_DISTINCT",
+        "per_match_weight_3_1_0": [
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.0
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ]
+        ],
+        "seed": "137001"
+      }
+    },
+    {
+      "case": "REDUCED_FULL_FALLBACK",
+      "expected": {
+        "counts_sha256": "ed86002a8cb020acc84ff719f60c12e557b45be86fcc131cbc65ae9160d257ab",
+        "draw_count": 1458,
+        "duplicate_count": 0,
+        "effective_M": 1458,
+        "max_multiplicity": 1,
+        "positive_support_count": 1458,
+        "reason_code": "ENUMERATE_UPSTREAM_SUPPORT_FALLBACK",
+        "requested_M": 2187,
+        "requested_stake_yuan": 2916,
+        "requested_ticket_count": 1458,
+        "status": "ACTIVE",
+        "ticket_weight_sha256": "0137219d743a2aaf01c92a2ce2018efe702a261e22136ef0b2f503429b6db6d5",
+        "unique_count": 1458
+      },
+      "input": {
+        "M": 2187,
+        "cap": null,
+        "identity_signature": "BJ193_GOLDEN_N7",
+        "mechanism": "FULL_ENUMERATED",
+        "per_match_weight_3_1_0": [
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.0
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ],
+          [
+            0.52,
+            0.28,
+            0.2
+          ]
+        ],
+        "seed": "NA"
+      }
+    }
+  ],
+  "contract": "BJ193_CONDITIONAL_BUILDER_GOLDEN_V4",
+  "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+  "role_vector_mapping_golden": {
+    "mapping_cases": [
+      {
+        "expected_output": {
+          "combined_weight_input_sha256": "9eb5a68f26020dbd87e39972472809a11bd8cf32d3ebfc40293d559ee73d5bc1",
+          "ordered_match_ids": [
+            "90503",
+            "90500",
+            "90501",
+            "90505",
+            "90497",
+            "90496",
+            "90520"
+          ],
+          "per_match_weight_3_1_0": [
+            [
+              "0.156326482686",
+              "0.088158030638",
+              "0.000000000000"
+            ],
+            [
+              "0.167140873490",
+              "0.084807671837",
+              "0.076605202713"
+            ],
+            [
+              "0.153631961991",
+              "0.084524766891",
+              "0.082197370609"
+            ],
+            [
+              "0.208637727125",
+              "0.090028359538",
+              "0.056526002792"
+            ],
+            [
+              "0.217946433149",
+              "0.085897956745",
+              "0.055556122244"
+            ],
+            [
+              "0.130556202768",
+              "0.081635459139",
+              "0.093353879467"
+            ],
+            [
+              "0.234602337391",
+              "0.088385066645",
+              "0.047235687280"
+            ]
+          ],
+          "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
+          "role_identity_sha256_by_match": {
+            "90496": "30055b448159d02f51527bcaf6ef6853f43af97919f3d250a32805c5ed285ac5",
+            "90497": "68e016371a4949e8f4ea05874a30b3ce234598814cb6324ee744fdd42ec779d5",
+            "90500": "1282357589e6d86d3bd4ae214eaf8bf2ceaca0a4427e5e0db85865bb39f682d3",
+            "90501": "cd363db5e123d175d3601c61c3f08cb24cb2af9dfc145cd01910b79fe102cb1c",
+            "90503": "1e5a736d921a311e4e7f59f3ae0ca30a0b09c83d0da91263427ae5157835126c",
+            "90505": "d94dbade581bd078137fa0596572ebf5dec79158dfb0cbe5989068de87c96fae",
+            "90520": "526e9e60eaf8a725f3888efb666986a81523c1034cdd1547a48860041e6dd500"
+          },
+          "source_issue": "190101",
+          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "status": "ACTIVE",
+          "weight_source": "MODEL_P_CAL"
+        },
+        "weight_source": "MODEL_P_CAL"
+      },
+      {
+        "expected_output": {
+          "combined_weight_input_sha256": "af47cfb7597572678729d8c8c4be60e0ba9978a24bb0d675498cb6dbbf6b5a17",
+          "ordered_match_ids": [
+            "90503",
+            "90500",
+            "90501",
+            "90505",
+            "90497",
+            "90496",
+            "90520"
+          ],
+          "per_match_weight_3_1_0": [
+            [
+              "0.176371980123",
+              "0.085612188070",
+              "0.000000000000"
+            ],
+            [
+              "0.176371980123",
+              "0.085612188070",
+              "0.072376415904"
+            ],
+            [
+              "0.158005820784",
+              "0.076697126356",
+              "0.085666254116"
+            ],
+            [
+              "0.211836416561",
+              "0.096063228649",
+              "0.051223280943"
+            ],
+            [
+              "0.222438841250",
+              "0.085856181652",
+              "0.053787009066"
+            ],
+            [
+              "0.126250002177",
+              "0.083818826608",
+              "0.093620781391"
+            ],
+            [
+              "0.222438841250",
+              "0.085856181652",
+              "0.053787009066"
+            ]
+          ],
+          "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
+          "role_identity_sha256_by_match": {
+            "90496": "b22170d4004f414a9f9bf55039f83050996dfe860b1621c01db93c157a53a66e",
+            "90497": "2e82e18d36719ec7da5d3e138245e10fbdf248fd162195a541715e14502a8149",
+            "90500": "72c056063bc4a572ad88d0439390535e832de6f515b0d555c1a2c90ee838fa89",
+            "90501": "1f5911ac11d787fe7ef384fcbe1886686649030ed1643a572840fd2d0fce12e8",
+            "90503": "ff5757ae5b51f5cc9a3826c9c9ef454bccb7da67c982329c9c73f05cbdaea320",
+            "90505": "4d3b11051afc2aa38ae3733cbcd4daa3d022b3c446aaa284e26c2e130defc35a",
+            "90520": "525266a5ba25e1bda20cc679d5add78ea7311bbe23ff3901c2d4ece9228f2c62"
+          },
+          "source_issue": "190101",
+          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "status": "ACTIVE",
+          "weight_source": "MARKET_WF_CAL"
+        },
+        "weight_source": "MARKET_WF_CAL"
+      },
+      {
+        "expected_output": {
+          "combined_weight_input_sha256": "aa83b177394df7752eb1157dc6d128749cf4e0392cc1b730a93c8eb994991098",
+          "ordered_match_ids": [
+            "90503",
+            "90500",
+            "90501",
+            "90505",
+            "90497",
+            "90496",
+            "90520"
+          ],
+          "per_match_weight_3_1_0": [
+            [
+              "0.171360605764",
+              "0.086248648712",
+              "0.000000000000"
+            ],
+            [
+              "0.174064203465",
+              "0.085411059012",
+              "0.073433612606"
+            ],
+            [
+              "0.156912356085",
+              "0.078654036490",
+              "0.084799033239"
+            ],
+            [
+              "0.211036744202",
+              "0.094554511372",
+              "0.052548961405"
+            ],
+            [
+              "0.221315739225",
+              "0.085866625425",
+              "0.054229287360"
+            ],
+            [
+              "0.127326552325",
+              "0.083272984740",
+              "0.093554055910"
+            ],
+            [
+              "0.225479715285",
+              "0.086488402900",
+              "0.052149178619"
+            ]
+          ],
+          "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
+          "role_identity_sha256_by_match": {
+            "90496": "a5090e5e2ede4947b28590c6431fd1e9162930801299bc86537649db5a2329f2",
+            "90497": "b8d46d6e21b034f682fa6b4a2ecd5fef824c941a8589fb76db2246844be245ba",
+            "90500": "72241a3a04a27ff81af0ee4229b5d600043a9d9f6da852b50784b9ffef672ba3",
+            "90501": "a783f694fc43d8cf9554463ca62bab4f1f982ff0c27abb4f7e68ac3187ce7b7a",
+            "90503": "fb8a56ce892113b74a70f5936087444a4b9b2a8606ca44d41431661888704c83",
+            "90505": "e2af1a0851e0e56e7282fecd7b0ce0d6a4c98c03ca3fe491bf8b0e9abefcf250",
+            "90520": "e6cf8a764d3d5aaf8ba3f041c3899365e898df01a4208ee711fcf167ae47a94c"
+          },
+          "source_issue": "190101",
+          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "status": "ACTIVE",
+          "weight_source": "BLEND_A25"
+        },
+        "weight_source": "BLEND_A25"
+      },
+      {
+        "expected_output": {
+          "combined_weight_input_sha256": "ecfa5a80e278a3f5b0f7a686b0eb9a7934ac17ae25e025fd01a1f16f4e99e6c6",
+          "ordered_match_ids": [
+            "90503",
+            "90500",
+            "90501",
+            "90505",
+            "90497",
+            "90496",
+            "90520"
+          ],
+          "per_match_weight_3_1_0": [
+            [
+              "0.166349231405",
+              "0.086885109354",
+              "0.000000000000"
+            ],
+            [
+              "0.171756426806",
+              "0.085209929954",
+              "0.074490809308"
+            ],
+            [
+              "0.155818891387",
+              "0.080610946624",
+              "0.083931812363"
+            ],
+            [
+              "0.210237071843",
+              "0.093045794093",
+              "0.053874641867"
+            ],
+            [
+              "0.220192637199",
+              "0.085877069199",
+              "0.054671565655"
+            ],
+            [
+              "0.128403102473",
+              "0.082727142873",
+              "0.093487330429"
+            ],
+            [
+              "0.228520589321",
+              "0.087120624148",
+              "0.050511348173"
+            ]
+          ],
+          "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
+          "role_identity_sha256_by_match": {
+            "90496": "6361afe701fbf614140475abbc0c87c4a7632174927e2c69cf9a8b3e75e091d7",
+            "90497": "3b7b3de20cd7107837a6a68ad18d0f2a3a228e7e34f40e182c5cc5ac9d9ddf04",
+            "90500": "6626f5ffb9467668b9a5391deaad1d69b9a23b0775ea6cf384a16a3857144932",
+            "90501": "915b1b47be0d414ebbc01b3a840bdbe0b2367bc89103f30c86662bfed2f249b1",
+            "90503": "5fc82ed05246431801018c97d6114099769ec6145c2e8374594fc3b16cc395f0",
+            "90505": "b93d524b6c053f7f906b7a4bf38137523acba44b0d7049f7b2dddfce49b1b5df",
+            "90520": "6d519b462fe2a68adc7839247511fc3cd1bc42f4f13ee1e89c1a562701ea4120"
+          },
+          "source_issue": "190101",
+          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "status": "ACTIVE",
+          "weight_source": "BLEND_A50"
+        },
+        "weight_source": "BLEND_A50"
+      },
+      {
+        "expected_output": {
+          "combined_weight_input_sha256": "dde53f96a0b7ff3e73d7c5b45bd2ec4c64250b432f230067718f6370b50ed71e",
+          "ordered_match_ids": [
+            "90503",
+            "90500",
+            "90501",
+            "90505",
+            "90497",
+            "90496",
+            "90520"
+          ],
+          "per_match_weight_3_1_0": [
+            [
+              "0.161337857045",
+              "0.087521569996",
+              "0.000000000000"
+            ],
+            [
+              "0.169448650148",
+              "0.085008800895",
+              "0.075548006011"
+            ],
+            [
+              "0.154725426689",
+              "0.082567856757",
+              "0.083064591486"
+            ],
+            [
+              "0.209437399484",
+              "0.091537076815",
+              "0.055200322329"
+            ],
+            [
+              "0.219069535174",
+              "0.085887512972",
+              "0.055113843949"
+            ],
+            [
+              "0.129479652621",
+              "0.082181301006",
+              "0.093420604948"
+            ],
+            [
+              "0.231561463356",
+              "0.087752845397",
+              "0.048873517726"
+            ]
+          ],
+          "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
+          "role_identity_sha256_by_match": {
+            "90496": "8f3cef53e290ba137f31586bfd513dc7c2a31dea6880974eca56f593d66f5e90",
+            "90497": "87be611b399dbf39b0047dc3927e8895753278a53b7af61044813c123322c375",
+            "90500": "47584a94362a49ebd385bb279783f47464c370ba9723150315d17787890a91ff",
+            "90501": "f53e16b8b4ee072c1af4f21aa22bde80f5ba1659e7ab4279c066f3fea339a165",
+            "90503": "a44a3867cb4fe961866d528ac74afa922d2f84c19d472938e85c8c48e6be3cc5",
+            "90505": "40bc47c7a310dcba8c529317b44fb7e97ef607af33852dd6c26fb64b867df3fe",
+            "90520": "405a1c3ccce2a6d7ed7cb5aa9bc091f75d0e3f9653219e7df75ea6cf5201e0e4"
+          },
+          "source_issue": "190101",
+          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "status": "ACTIVE",
+          "weight_source": "BLEND_A75"
+        },
+        "weight_source": "BLEND_A75"
+      },
+      {
+        "expected_output": {
+          "combined_weight_input_sha256": "fdd1202cbdd649a09dea3997feb6e057a2d46eedabdba5e440bb09ef1f4b2599",
+          "ordered_match_ids": [
+            "90503",
+            "90500",
+            "90501",
+            "90505",
+            "90497",
+            "90496",
+            "90520"
+          ],
+          "per_match_weight_3_1_0": [
+            [
+              "0.166666666667",
+              "0.100000000000",
+              "0.000000000000"
+            ],
+            [
+              "0.166666666667",
+              "0.100000000000",
+              "0.066666666667"
+            ],
+            [
+              "0.166666666667",
+              "0.100000000000",
+              "0.066666666667"
+            ],
+            [
+              "0.166666666667",
+              "0.100000000000",
+              "0.066666666667"
+            ],
+            [
+              "0.166666666667",
+              "0.100000000000",
+              "0.066666666667"
+            ],
+            [
+              "0.166666666667",
+              "0.100000000000",
+              "0.066666666667"
+            ],
+            [
+              "0.166666666667",
+              "0.100000000000",
+              "0.066666666667"
+            ]
+          ],
+          "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
+          "role_identity_sha256_by_match": {
+            "90496": "f926926556f199bbc949142df03391a0d7e4e0801489152997cf58116246d649",
+            "90497": "49dbccf9154f344eafc13f3971689bad510f614e4d93ce105907456ed2f939b7",
+            "90500": "917bbfefbbe80700d8a31c801bda0b037a1d6705732385321ce7ce874e3ff46c",
+            "90501": "3edbc6c995fd46ee15b83e7ebd6cc1333c0b577f12fae1a055beca54967a2520",
+            "90503": "2255bf0ada81da232a9f04d28dd4760bfd7cdf6ca5cae3188f099f49e9781227",
+            "90505": "503e7411b458dd20baa1aedc7b69102f4a570b9cfadbb1c776ae3f85baf198e4",
+            "90520": "9f762d1d0999be514aa449efd82b4857296f531ba68a59e4dd41fbbc1393ea61"
+          },
+          "source_issue": "190101",
+          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "status": "ACTIVE",
+          "weight_source": "Q_WEIGHT"
+        },
+        "weight_source": "Q_WEIGHT"
+      },
+      {
+        "expected_output": {
+          "combined_weight_input_sha256": "ecfdc2029ac8e0809217a26bb350feee72c09bce2376e39407fbbe242a938151",
+          "ordered_match_ids": [
+            "90503",
+            "90500",
+            "90501",
+            "90505",
+            "90497",
+            "90496",
+            "90520"
+          ],
+          "per_match_weight_3_1_0": [
+            [
+              "0.500000000000",
+              "0.300000000000",
+              "0.000000000000"
+            ],
+            [
+              "0.500000000000",
+              "0.300000000000",
+              "0.200000000000"
+            ],
+            [
+              "0.500000000000",
+              "0.300000000000",
+              "0.200000000000"
+            ],
+            [
+              "0.500000000000",
+              "0.300000000000",
+              "0.200000000000"
+            ],
+            [
+              "0.500000000000",
+              "0.300000000000",
+              "0.200000000000"
+            ],
+            [
+              "0.500000000000",
+              "0.300000000000",
+              "0.200000000000"
+            ],
+            [
+              "0.500000000000",
+              "0.300000000000",
+              "0.200000000000"
+            ]
+          ],
+          "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
+          "role_identity_sha256_by_match": {
+            "90496": "80f8c0953c6aef665753eee38dc68dac0243b77cc7e58791cd1fa6e82843ed9d",
+            "90497": "246eecac5561f8ce3ec2f4869adaf7ae1e3f57ac40d39ce8ea2cb27b8e65183a",
+            "90500": "583de82463a5111cb5847bc247c42b900460c9c4d41ca7caf01826d96ee949dd",
+            "90501": "4207236dc811f5c82a0c68f33275b7c6edf63099e4e44f280e9229f794b93fb0",
+            "90503": "6368c84f05a6bc0bb1ffdb624ef29ddd9324c71a29e0029f27bd69337520e6d1",
+            "90505": "5e52641bf0d3921bd72bea6471beabc9f96b994f832e8ce1b4b78e014feef044",
+            "90520": "c2b3c439635cd731993a16c63cabf52204f80c24e685c0458cc05faab02a75ac"
+          },
+          "source_issue": "NA",
+          "source_portfolio_id": "NA",
+          "status": "ACTIVE",
+          "weight_source": "NA"
+        },
+        "weight_source": "NA"
+      }
+    ],
+    "ordered_match_ids": [
+      "90503",
+      "90500",
+      "90501",
+      "90505",
+      "90497",
+      "90496",
+      "90520"
+    ],
+    "q_weight_wor_m64_expected": {
+      "counts_sha256": "581642cc8f567abd58fd8d1a5c254f70e139f8c1ee0110a42d64c25c4c5daed6",
+      "draw_count": 64,
+      "duplicate_count": 0,
+      "effective_M": 64,
+      "max_multiplicity": 1,
+      "positive_support_count": 1458,
+      "reason_code": "ALLOCATED_ON_POSITIVE_UPSTREAM_SUPPORT",
+      "requested_M": 64,
+      "requested_stake_yuan": 128,
+      "requested_ticket_count": 64,
+      "status": "ACTIVE",
+      "ticket_weight_sha256": "2dcad43a292b48c7a20b7c64d5ee514d02035d7da7bc65b767f49847715a6920",
+      "unique_count": 64
+    },
+    "role_rows": [
+      {
+        "e_sp": "2.826667036926",
+        "fold": "OOS_2019",
+        "gate_id": "NO_GATE",
+        "is_candidate": "1",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90503",
+        "match_idx": "39",
+        "p_blend_a25_0": "0.369783292765",
+        "p_blend_a25_1": "0.287495495707",
+        "p_blend_a25_3": "0.342721211527",
+        "p_blend_a50_0": "0.377684506010",
+        "p_blend_a50_1": "0.289617031181",
+        "p_blend_a50_3": "0.332698462809",
+        "p_blend_a75_0": "0.385585719255",
+        "p_blend_a75_1": "0.291738566655",
+        "p_blend_a75_3": "0.322675714090",
+        "p_market_cal0": "0.361882079520",
+        "p_market_cal1": "0.285373960234",
+        "p_market_cal3": "0.352743960246",
+        "p_market_raw0": "0.393486932500",
+        "p_market_raw1": "0.293860102128",
+        "p_market_raw3": "0.312652965371",
+        "p_min": "0.293860102128",
+        "p_min_delete_code": "0",
+        "p_min_delete_match_id": "90520",
+        "p_model0": "0.393486932500",
+        "p_model1": "0.293860102128",
+        "p_model3": "0.312652965371",
+        "portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+        "predicted_sp0": "2.394545454545",
+        "predicted_sp1": "3.206363636364",
+        "predicted_sp3": "3.013636363636",
+        "q_min_delete_code": "1",
+        "q_min_delete_match_id": "90500",
+        "q_weight0": "0.333333333333",
+        "q_weight1": "0.333333333334",
+        "q_weight3": "0.333333333333",
+        "selection_rank": "1",
+        "year": "2019"
+      },
+      {
+        "e_sp": "2.822553514499",
+        "fold": "OOS_2019",
+        "gate_id": "NO_GATE",
+        "is_candidate": "0",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90500",
+        "match_idx": "36",
+        "p_blend_a25_0": "0.367168063031",
+        "p_blend_a25_1": "0.284703530039",
+        "p_blend_a25_3": "0.348128406930",
+        "p_blend_a50_0": "0.372454046542",
+        "p_blend_a50_1": "0.284033099845",
+        "p_blend_a50_3": "0.343512853613",
+        "p_blend_a75_0": "0.377740030053",
+        "p_blend_a75_1": "0.283362669650",
+        "p_blend_a75_3": "0.338897300297",
+        "p_market_cal0": "0.361882079520",
+        "p_market_cal1": "0.285373960234",
+        "p_market_cal3": "0.352743960246",
+        "p_market_raw0": "0.383026013564",
+        "p_market_raw1": "0.282692239456",
+        "p_market_raw3": "0.334281746980",
+        "p_min": "0.282692239456",
+        "p_min_delete_code": "0",
+        "p_min_delete_match_id": "90520",
+        "p_model0": "0.383026013564",
+        "p_model1": "0.282692239456",
+        "p_model3": "0.334281746980",
+        "portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+        "predicted_sp0": "2.456363636364",
+        "predicted_sp1": "3.328181818182",
+        "predicted_sp3": "2.814545454545",
+        "q_min_delete_code": "1",
+        "q_min_delete_match_id": "90500",
+        "q_weight0": "0.333333333334",
+        "q_weight1": "0.333333333333",
+        "q_weight3": "0.333333333333",
+        "selection_rank": "2",
+        "year": "2019"
+      },
+      {
+        "e_sp": "2.822358807197",
+        "fold": "OOS_2019",
+        "gate_id": "NO_GATE",
+        "is_candidate": "0",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90501",
+        "match_idx": "37",
+        "p_blend_a25_0": "0.423995166196",
+        "p_blend_a25_1": "0.262180121632",
+        "p_blend_a25_3": "0.313824712171",
+        "p_blend_a50_0": "0.419659061813",
+        "p_blend_a50_1": "0.268703155412",
+        "p_blend_a50_3": "0.311637782775",
+        "p_blend_a75_0": "0.415322957430",
+        "p_blend_a75_1": "0.275226189191",
+        "p_blend_a75_3": "0.309450853378",
+        "p_market_cal0": "0.428331270579",
+        "p_market_cal1": "0.255657087853",
+        "p_market_cal3": "0.316011641568",
+        "p_market_raw0": "0.410986853047",
+        "p_market_raw1": "0.281749222971",
+        "p_market_raw3": "0.307263923982",
+        "p_min": "0.281749222971",
+        "p_min_delete_code": "0",
+        "p_min_delete_match_id": "90520",
+        "p_model0": "0.410986853047",
+        "p_model1": "0.281749222971",
+        "p_model3": "0.307263923982",
+        "portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+        "predicted_sp0": "2.289090909091",
+        "predicted_sp1": "3.339090909091",
+        "predicted_sp3": "3.061818181818",
+        "q_min_delete_code": "1",
+        "q_min_delete_match_id": "90500",
+        "q_weight0": "0.333333333333",
+        "q_weight1": "0.333333333333",
+        "q_weight3": "0.333333333333",
+        "selection_rank": "3",
+        "year": "2019"
+      },
+      {
+        "e_sp": "2.821161412053",
+        "fold": "OOS_2019",
+        "gate_id": "NO_GATE",
+        "is_candidate": "0",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90505",
+        "match_idx": "41",
+        "p_blend_a25_0": "0.262744807025",
+        "p_blend_a25_1": "0.315181704572",
+        "p_blend_a25_3": "0.422073488403",
+        "p_blend_a50_0": "0.269373209336",
+        "p_blend_a50_1": "0.310152646978",
+        "p_blend_a50_3": "0.420474143685",
+        "p_blend_a75_0": "0.276001611647",
+        "p_blend_a75_1": "0.305123589385",
+        "p_blend_a75_3": "0.418874798968",
+        "p_market_cal0": "0.256116404714",
+        "p_market_cal1": "0.320210762165",
+        "p_market_cal3": "0.423672833121",
+        "p_market_raw0": "0.282630013958",
+        "p_market_raw1": "0.300094531792",
+        "p_market_raw3": "0.417275454250",
+        "p_min": "0.282630013958",
+        "p_min_delete_code": "0",
+        "p_min_delete_match_id": "90520",
+        "p_model0": "0.282630013958",
+        "p_model1": "0.300094531792",
+        "p_model3": "0.417275454250",
+        "portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+        "predicted_sp0": "3.327272727273",
+        "predicted_sp1": "3.133636363636",
+        "predicted_sp3": "2.253636363636",
+        "q_min_delete_code": "1",
+        "q_min_delete_match_id": "90500",
+        "q_weight0": "0.333333333333",
+        "q_weight1": "0.333333333334",
+        "q_weight3": "0.333333333333",
+        "selection_rank": "4",
+        "year": "2019"
+      },
+      {
+        "e_sp": "2.817452981245",
+        "fold": "OOS_2019",
+        "gate_id": "NO_GATE",
+        "is_candidate": "0",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90497",
+        "match_idx": "33",
+        "p_blend_a25_0": "0.271146436801",
+        "p_blend_a25_1": "0.286222084751",
+        "p_blend_a25_3": "0.442631478449",
+        "p_blend_a50_0": "0.273357828273",
+        "p_blend_a50_1": "0.286256897329",
+        "p_blend_a50_3": "0.440385274398",
+        "p_blend_a75_0": "0.275569219746",
+        "p_blend_a75_1": "0.286291709906",
+        "p_blend_a75_3": "0.438139070348",
+        "p_market_cal0": "0.268935045328",
+        "p_market_cal1": "0.286187272173",
+        "p_market_cal3": "0.444877682499",
+        "p_market_raw0": "0.277780611219",
+        "p_market_raw1": "0.286326522484",
+        "p_market_raw3": "0.435892866297",
+        "p_min": "0.277780611219",
+        "p_min_delete_code": "0",
+        "p_min_delete_match_id": "90520",
+        "p_model0": "0.277780611219",
+        "p_model1": "0.286326522484",
+        "p_model3": "0.435892866297",
+        "portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+        "predicted_sp0": "3.380909090909",
+        "predicted_sp1": "3.280000000000",
+        "predicted_sp3": "2.154545454545",
+        "q_min_delete_code": "1",
+        "q_min_delete_match_id": "90500",
+        "q_weight0": "0.333333333333",
+        "q_weight1": "0.333333333333",
+        "q_weight3": "0.333333333334",
+        "selection_rank": "5",
+        "year": "2019"
+      },
+      {
+        "e_sp": "2.817165480823",
+        "fold": "OOS_2019",
+        "gate_id": "NO_GATE",
+        "is_candidate": "0",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90496",
+        "match_idx": "32",
+        "p_blend_a25_0": "0.467770279549",
+        "p_blend_a25_1": "0.277576615801",
+        "p_blend_a25_3": "0.254653104650",
+        "p_blend_a50_0": "0.467436652144",
+        "p_blend_a50_1": "0.275757142910",
+        "p_blend_a50_3": "0.256806204945",
+        "p_blend_a75_0": "0.467103024740",
+        "p_blend_a75_1": "0.273937670020",
+        "p_blend_a75_3": "0.258959305241",
+        "p_market_cal0": "0.468103906953",
+        "p_market_cal1": "0.279396088692",
+        "p_market_cal3": "0.252500004355",
+        "p_market_raw0": "0.466769397335",
+        "p_market_raw1": "0.272118197129",
+        "p_market_raw3": "0.261112405536",
+        "p_min": "0.261112405536",
+        "p_min_delete_code": "0",
+        "p_min_delete_match_id": "90520",
+        "p_model0": "0.466769397335",
+        "p_model1": "0.272118197129",
+        "p_model3": "0.261112405536",
+        "portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+        "predicted_sp0": "2.011818181818",
+        "predicted_sp1": "3.450909090909",
+        "predicted_sp3": "3.596363636364",
+        "q_min_delete_code": "1",
+        "q_min_delete_match_id": "90500",
+        "q_weight0": "0.333333333334",
+        "q_weight1": "0.333333333333",
+        "q_weight3": "0.333333333333",
+        "selection_rank": "6",
+        "year": "2019"
+      },
+      {
+        "e_sp": "2.812412820649",
+        "fold": "OOS_2019",
+        "gate_id": "NO_GATE",
+        "is_candidate": "0",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-03 03:45:00",
+        "match_id": "90520",
+        "match_idx": "56",
+        "p_blend_a25_0": "0.260745893096",
+        "p_blend_a25_1": "0.288294676334",
+        "p_blend_a25_3": "0.450959430570",
+        "p_blend_a50_0": "0.252556740864",
+        "p_blend_a50_1": "0.290402080495",
+        "p_blend_a50_3": "0.457041178641",
+        "p_blend_a75_0": "0.244367588632",
+        "p_blend_a75_1": "0.292509484656",
+        "p_blend_a75_3": "0.463122926712",
+        "p_market_cal0": "0.268935045328",
+        "p_market_cal1": "0.286187272173",
+        "p_market_cal3": "0.444877682499",
+        "p_market_raw0": "0.236178436400",
+        "p_market_raw1": "0.294616888817",
+        "p_market_raw3": "0.469204674783",
+        "p_min": "0.236178436400",
+        "p_min_delete_code": "0",
+        "p_min_delete_match_id": "90520",
+        "p_model0": "0.236178436400",
+        "p_model1": "0.294616888817",
+        "p_model3": "0.469204674783",
+        "portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+        "predicted_sp0": "3.969333333333",
+        "predicted_sp1": "3.182000000000",
+        "predicted_sp3": "1.998000000000",
+        "q_min_delete_code": "1",
+        "q_min_delete_match_id": "90500",
+        "q_weight0": "0.333333333334",
+        "q_weight1": "0.333333333333",
+        "q_weight3": "0.333333333333",
+        "selection_rank": "7",
+        "year": "2019"
+      }
+    ],
+    "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+    "stage2_direction_rows": [
+      {
+        "allowed_codes": [
+          "3",
+          "1"
+        ],
+        "direction_weight_3_1_0": [
+          "0.500000000000",
+          "0.300000000000",
+          "0.000000000000"
+        ],
+        "match_id": "90503"
+      },
+      {
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.500000000000",
+          "0.300000000000",
+          "0.200000000000"
+        ],
+        "match_id": "90500"
+      },
+      {
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.500000000000",
+          "0.300000000000",
+          "0.200000000000"
+        ],
+        "match_id": "90501"
+      },
+      {
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.500000000000",
+          "0.300000000000",
+          "0.200000000000"
+        ],
+        "match_id": "90505"
+      },
+      {
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.500000000000",
+          "0.300000000000",
+          "0.200000000000"
+        ],
+        "match_id": "90497"
+      },
+      {
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.500000000000",
+          "0.300000000000",
+          "0.200000000000"
+        ],
+        "match_id": "90496"
+      },
+      {
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.500000000000",
+          "0.300000000000",
+          "0.200000000000"
+        ],
+        "match_id": "90520"
+      }
+    ]
+  },
+  "role_vector_source_sha256": "1a6ac41e5e34c400c5c2a62f9799e2f76d56f4aaa3d13b67b88505443788cdaa"
+}

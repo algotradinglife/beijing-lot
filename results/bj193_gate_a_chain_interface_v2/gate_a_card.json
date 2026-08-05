@@ -12,6 +12,7 @@
     "stage2_available_action_count": 2365,
     "stage3_seed_agnostic_action_count": 963,
     "stage_count": 3,
+    "stage_feature_projection_row_count": 237,
     "stage_model_grid_count": 90
   },
   "gate_b_authorized": false,
@@ -25,6 +26,7 @@
   "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
   "parent_192_authority": false,
   "parent_issue": 192,
+  "portable_identity_rule": "CONTENT_IDENTITY and PORTABLE_SHA256SUMS hash decompressed gzip payload content; byte SHA256SUMS separately binds the committed transport/runtime bytes",
   "production_authority": false,
   "seed_rule": "exact accepted seeds are nuisance replicates averaged before Stage-3 screen/fit/choice; never summed purchased exposure",
   "stage": "GATE_A_OUTCOME_UNEXPOSED_INTERFACE_AMENDMENT",

@@ -1,0 +1,73 @@
+{
+  "M_semantics": "requested M is the frozen action output, not a rejection gate or budget cap; infeasible distinct/capped action becomes explicit zero-flow rather than selecting zero-weight tickets",
+  "accepted_allocator_module": "bj145_allocation_engine.py",
+  "accepted_allocator_sha256": "5b1ac6631ce22a447d883d514ed73e6795584c89d514e6be7562b2fd91bfa4ce",
+  "accounting": "one realized multiplicity is one independent \u00a52 ticket/tax unit; requested stake = 2*sum multiplicities; no aggregation",
+  "contract": "BJ193_STAGE2_TO_STAGE3_CONDITIONAL_BUILDER_V3",
+  "input_order": {
+    "codes": [
+      "3",
+      "1",
+      "0"
+    ],
+    "matches": "exact Stage-2 ordered_match_ids, unchanged from Stage 1",
+    "tickets": "full seven-leg base-3 ordinal 0..2186"
+  },
+  "mechanisms": {
+    "CAPPED_REPEAT": "accepted #145 capped Hamilton only when M <= positive_support*cap; otherwise NO_BET",
+    "DETERMINISTIC_TOP_MASS": "accepted #145 weight-desc/ordinal-asc only when M <= positive support; otherwise NO_BET",
+    "FULL_ENUMERATED": "enumerate each positive Stage-2 ticket exactly once; ALLOW_ALL gives 2187, reduced support gives explicit ENUMERATE_UPSTREAM_SUPPORT_FALLBACK",
+    "RESIDUAL_SYSTEMATIC": "accepted #145 Hamilton allocation; repeats allowed on positive support",
+    "WOR_DISTINCT": "accepted #145 exponential keys only when M <= positive support; otherwise NO_BET",
+    "WR_DUPLICATE_STAKE": "accepted #145 inverse-CDF on normalized vector; duplicates retained; zero weights forbidden from realized counts"
+  },
+  "module": "conditional_chain_adapter.py",
+  "module_sha256": "dcb2c236fbc327a325024713e2d5cc7cf9c1d64b5df696b89ec4e3963a728ed4",
+  "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+  "stage3_role_vector_source": {
+    "identity_rule": "all seven role rows must share exact nonblank portfolio_id and issue and match the ordered Stage-1 support by match_id; missing row/field or mixed identity is UNAVAILABLE with zero flow",
+    "source_file": "n7_role_vectors.csv.gz",
+    "source_file_sha256": "1a6ac41e5e34c400c5c2a62f9799e2f76d56f4aaa3d13b67b88505443788cdaa",
+    "source_gate_a_manifest_sha256": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
+    "source_package": "bj137_gate_a_preoutcome_v2",
+    "weight_source_fields_3_1_0": {
+      "BLEND_A25": [
+        "p_blend_a25_3",
+        "p_blend_a25_1",
+        "p_blend_a25_0"
+      ],
+      "BLEND_A50": [
+        "p_blend_a50_3",
+        "p_blend_a50_1",
+        "p_blend_a50_0"
+      ],
+      "BLEND_A75": [
+        "p_blend_a75_3",
+        "p_blend_a75_1",
+        "p_blend_a75_0"
+      ],
+      "MARKET_WF_CAL": [
+        "p_market_cal3",
+        "p_market_cal1",
+        "p_market_cal0"
+      ],
+      "MODEL_P_CAL": [
+        "p_model3",
+        "p_model1",
+        "p_model0"
+      ],
+      "NA": [],
+      "Q_WEIGHT": [
+        "q_weight3",
+        "q_weight1",
+        "q_weight0"
+      ]
+    }
+  },
+  "weight_vector": {
+    "identity": "SHA-256 of canonical 17-digit float strings in ordinal order",
+    "normalization": "math.fsum raw total; divide each raw weight; apply residual 1-math.fsum to the last positive ordinal",
+    "rule": "for each ordered match/code multiply the bound #137 Stage-3 source weight by the Stage-2 estimator direction weight when the code is allowed, otherwise exact zero; NA control source is unit weight; retain a length-2187 vector with explicit zeros",
+    "zero_support": "NO_BET with zero tickets/stake"
+  }
+}

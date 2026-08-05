@@ -1,0 +1,245 @@
+{
+  "accepted_190_joint_allocation_input_sha256": "718d8a51151c07f1bba89c0075953183f7cf09120318514980ac9dcf77151dd2",
+  "contract": "BJ193_DIRECTION_ADAPTER_GOLDEN_V3",
+  "expected_output": {
+    "adapter_sha256": "dcb2c236fbc327a325024713e2d5cc7cf9c1d64b5df696b89ec4e3963a728ed4",
+    "adapter_version": "bj193-conditional-chain-adapter-v3",
+    "delete_leg_index_zero_based": 0,
+    "derived_direction_action_sha256": "cc87fa6a68b15656993731ca55434a6c153e0260ca0ecbd9d548358c1a404583",
+    "direction_output_sha256": "1390562609cc3579240bb22e5956ec6a2c545a5435411b175bff58ff9d5d7f20",
+    "estimator_registry_source": "bj190_gate_a_preoutcome_v3r1/estimator_match_freeze.csv.gz",
+    "omitted_code": "0",
+    "ordered_match_ids": [
+      "90622",
+      "90585",
+      "90637",
+      "90608",
+      "90587",
+      "90632",
+      "90646"
+    ],
+    "per_match": [
+      {
+        "abs_z": "4.941464056411",
+        "allowed_codes": [
+          "3",
+          "1"
+        ],
+        "direction_weight_3_1_0": [
+          "0.872963681894",
+          "0.089510440442",
+          "0.000000000000"
+        ],
+        "estimator_identity_sha256": "1e985226da17ba84994aa5d875b807874a3860c3d6bb2041d69cbe685ada6bb5",
+        "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
+        "favored_code": "3",
+        "magnitude": "0.798045154168",
+        "match_id": "90622",
+        "match_idx": 158,
+        "omitted_code": "0",
+        "probability_3_1_0": [
+          "0.872963681894",
+          "0.089510440442",
+          "0.037525877664"
+        ],
+        "protection_flag": false,
+        "threshold_pass": true
+      },
+      {
+        "abs_z": "4.860486372203",
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.844933189922",
+          "0.103856973911",
+          "0.051209836168"
+        ],
+        "estimator_identity_sha256": "77278233b0968f79e18023fc16da09e8d7e7ef8e675125e753cd9fb0457fa61f",
+        "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
+        "favored_code": "3",
+        "magnitude": "0.785443291828",
+        "match_id": "90585",
+        "match_idx": 121,
+        "omitted_code": "0",
+        "probability_3_1_0": [
+          "0.844933189922",
+          "0.103856973911",
+          "0.051209836168"
+        ],
+        "protection_flag": false,
+        "threshold_pass": true
+      },
+      {
+        "abs_z": "4.458207895094",
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.096758849356",
+          "0.146276652680",
+          "0.756964497964"
+        ],
+        "estimator_identity_sha256": "4140c5a00b632c541a16d72d0a44a6ffb4378574f84dded25717772eb10e7beb",
+        "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
+        "favored_code": "0",
+        "magnitude": "0.771795864383",
+        "match_id": "90637",
+        "match_idx": 173,
+        "omitted_code": "3",
+        "probability_3_1_0": [
+          "0.096758849356",
+          "0.146276652680",
+          "0.756964497964"
+        ],
+        "protection_flag": false,
+        "threshold_pass": true
+      },
+      {
+        "abs_z": "4.659023351030",
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.124392971689",
+          "0.138467940546",
+          "0.737139087766"
+        ],
+        "estimator_identity_sha256": "f8343b34778558d8b0da5078a253bd2a13a2036e8eebb38ed9c0891053efc177",
+        "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
+        "favored_code": "0",
+        "magnitude": "0.751785458488",
+        "match_id": "90608",
+        "match_idx": 144,
+        "omitted_code": "3",
+        "probability_3_1_0": [
+          "0.124392971689",
+          "0.138467940546",
+          "0.737139087766"
+        ],
+        "protection_flag": false,
+        "threshold_pass": true
+      },
+      {
+        "abs_z": "4.471416018507",
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.056852701094",
+          "0.119604711947",
+          "0.823542586959"
+        ],
+        "estimator_identity_sha256": "fbb924324a9d1b78249514a957584d9158fd461adeedb11f37d7c093d5efa535",
+        "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
+        "favored_code": "0",
+        "magnitude": "0.732722530475",
+        "match_id": "90587",
+        "match_idx": 123,
+        "omitted_code": "3",
+        "probability_3_1_0": [
+          "0.056852701094",
+          "0.119604711947",
+          "0.823542586959"
+        ],
+        "protection_flag": false,
+        "threshold_pass": true
+      },
+      {
+        "abs_z": "4.414577161270",
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.055112299446",
+          "0.124712623099",
+          "0.820175077455"
+        ],
+        "estimator_identity_sha256": "2abbf296e344be53db119894d0de33556b19d255eb51a4ae0e740204aae08b12",
+        "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
+        "favored_code": "0",
+        "magnitude": "0.724758762713",
+        "match_id": "90632",
+        "match_idx": 168,
+        "omitted_code": "3",
+        "probability_3_1_0": [
+          "0.055112299446",
+          "0.124712623099",
+          "0.820175077455"
+        ],
+        "protection_flag": false,
+        "threshold_pass": true
+      },
+      {
+        "abs_z": "4.432344785235",
+        "allowed_codes": [
+          "3",
+          "1",
+          "0"
+        ],
+        "direction_weight_3_1_0": [
+          "0.101326814158",
+          "0.123227703050",
+          "0.775445482792"
+        ],
+        "estimator_identity_sha256": "486791a524c2fd6dad4ebf6021bbc9edad423eb2ecca4917e4f6351e7e2891fa",
+        "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
+        "favored_code": "0",
+        "magnitude": "0.721500458037",
+        "match_id": "90646",
+        "match_idx": 182,
+        "omitted_code": "3",
+        "probability_3_1_0": [
+          "0.101326814158",
+          "0.123227703050",
+          "0.775445482792"
+        ],
+        "protection_flag": false,
+        "threshold_pass": true
+      }
+    ],
+    "protection_rule": "NO_ADDITIONAL_PROTECTION; exact #190 target-safe, history, breadth, uncertainty and threshold gates only",
+    "ranked_direction_match_ids": [
+      "90622",
+      "90585",
+      "90637",
+      "90608",
+      "90587",
+      "90632",
+      "90646"
+    ],
+    "reason_code": "DERIVED_STAGE1_CONDITIONAL_DIRECTION",
+    "stage1_output_sha256": "43d01f46dd50b3d0397add651adfc84fc2c345f5a9ae0a6418d4679b0d2297df",
+    "status": "ACTIVE",
+    "strongest_match_id": "90622",
+    "ticket_support_size": 1458,
+    "upstream_policy_id": "DP_59d1464347f9845f8cd5"
+  },
+  "input": {
+    "estimator_row_identity_sha256": "70237eb07bace496ee360afec4e373b7c673a0be25bab9e37b71c7e5799388f3",
+    "policy_id": "DP_59d1464347f9845f8cd5",
+    "selected_match_ids": [
+      "90622",
+      "90585",
+      "90637",
+      "90608",
+      "90587",
+      "90632",
+      "90646"
+    ],
+    "stage1_output_sha256": "43d01f46dd50b3d0397add651adfc84fc2c345f5a9ae0a6418d4679b0d2297df"
+  },
+  "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+  "reconstructed_190_joint_allocation_input_sha256": "718d8a51151c07f1bba89c0075953183f7cf09120318514980ac9dcf77151dd2",
+  "source": "#190 exact pre-event DP_59d... issue 190101 selected support"
+}

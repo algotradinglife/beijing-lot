@@ -1,0 +1,66 @@
+{
+  "adapter_version": "bj193-conditional-chain-adapter-v3",
+  "construction": {
+    "delete": "set the strongest leg's most-negative code weight to zero; no other code or match is removed",
+    "match_order": "unchanged Stage-1 order",
+    "protection": "no additional protection beyond frozen base and threshold gates",
+    "strongest": "first ranked direction metric",
+    "tie_break": "magnitude desc, match_idx asc, numeric match_id asc; code ties 3 then 1 then 0; source ties fundamental first",
+    "weights": "exact selected estimator p3/p1/p0 per match, formatted to 12 decimals in output; deleted code zero"
+  },
+  "contract": "BJ193_STAGE1_CONDITIONAL_DIRECTION_ADAPTER_V3",
+  "eligibility_order": [
+    "exact N7 and complete estimator row lookup",
+    "target_safe_consensus AVAILABLE",
+    "minimum history",
+    "optional broad-market B05_19",
+    "optional uncertainty <= 0.12",
+    "estimator direction availability",
+    "rank all seven by magnitude desc, match_idx asc, numeric match_id asc",
+    "frozen K1/K2/K4/ALL threshold on the ranked prefix"
+  ],
+  "estimator_mapping": {
+    "CALIBRATED_MARKET_ESTIMATOR": "calibrated p/delta/z and target-safe consensus identity",
+    "FUNDAMENTAL_INDEPENDENT": "fundamental p/delta/z and T1 estimator identity",
+    "LINE_RESIDUAL_MU": "same T1 score-distribution probability and signed line residual",
+    "MODEL_AGREEMENT": "require identical favored and omitted codes; weaker magnitude per match; exact tie fundamental first; selected weaker source supplies probability",
+    "UNION": "larger magnitude per match; exact tie fundamental first; selected source supplies probability"
+  },
+  "forbidden_inputs": [
+    "final_sp",
+    "payout",
+    "pre_tax_net_yuan",
+    "result_code",
+    "roi",
+    "settlement",
+    "target_result",
+    "tax",
+    "tax_net_yuan",
+    "winning_sp"
+  ],
+  "input": {
+    "estimator_rows": "one exact estimator_match_freeze row per selected match",
+    "policy": "one exact detector_grid row; DIAGNOSTIC_UNAVAILABLE stays UNAVAILABLE",
+    "selected_match_ids": "exactly seven unique IDs in immutable Stage-1 order",
+    "stage1_output_sha256": "required and copied into every direction output"
+  },
+  "module": "conditional_chain_adapter.py",
+  "module_sha256": "dcb2c236fbc327a325024713e2d5cc7cf9c1d64b5df696b89ec4e3963a728ed4",
+  "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+  "source_bindings": {
+    "detector_grid.csv": "8cf1e752a9deba48857cfb1c532d41d6f49abbc2e41daa8134fb64b4ccbfd382",
+    "directional_ticket_contract.json": "a99e56f42c5c5bb1eedc67eb39fa1005eb80275397ceb540c4f54477f23535e4",
+    "estimator_match_freeze.csv.gz": "fd0ee672ab8a98b64cf4e84f9352cd089a68fefe34130b19b46f970595953bb1",
+    "estimator_registry.csv": "47b56de40298f5e954413935144e723ba37570da2c9e0b4ed909cda309b7db59"
+  },
+  "upstream_semantics": {
+    "derived_action": "each #193 action is a new Stage-1-conditional identity hash over the adapter, exact #190 policy parameters and support rule",
+    "source": "#190 D_DIRECTION_ONLY is defined only on accepted B0 support",
+    "status": "BOUND_REFERENCE_NOT_RENAMED"
+  },
+  "zero_flow": {
+    "NO_BET": "non-N7, failed base/threshold, or unavailable selected-match direction; zero tickets and stake",
+    "UNAVAILABLE": "upstream policy or estimator row unavailable; zero tickets and stake",
+    "never": "missing/failed direction is never converted to losing stake or ALLOW_ALL after model choice"
+  }
+}
