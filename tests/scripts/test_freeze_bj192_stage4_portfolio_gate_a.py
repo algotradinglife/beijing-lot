@@ -82,6 +82,23 @@ def test_frozen_source_hashes_and_complete_primary_catalog():
         == "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF"
         for row in allocation
     )
+    eligibility = {
+        row["candidate_id"]: row for row in m.eligibility_ledger()
+    }
+    primary = next(
+        row for row in allocation if row["arm_id"] == "PRIMARY_NO_GATE_K4"
+    )
+    secondary = next(
+        row for row in allocation if row["arm_id"] == "SECONDARY_ESP300_GM290_K8"
+    )
+    assert (
+        eligibility[primary["candidate_id"]]["source_package"]
+        == "bj145_gate_a_preoutcome_v8 + bj151_gate_a_preoutcome_v1"
+    )
+    assert (
+        eligibility[secondary["candidate_id"]]["source_package"]
+        == "bj145_gate_a_preoutcome_v8 + bj137_gate_a_preoutcome_v2"
+    )
 
 
 def test_settled_sources_are_identity_only_and_never_open_payloads(monkeypatch):

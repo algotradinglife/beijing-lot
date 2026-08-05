@@ -27,7 +27,7 @@ from typing import Sequence
 
 
 CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
-VERSION = "bj192-gate-a-v5"
+VERSION = "bj192-gate-a-v6r1"
 OUTCOME_BOUNDARY = (
     "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, "
     "tax realization, ROI, net, gross, or settlement payload is read."
@@ -70,7 +70,7 @@ SOURCE_167B = (
     ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1"
 )
 SOURCE_170B = ROOT / "results" / "bj170_gate_b_selector_allocator_stack_v1"
-DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v5"
+DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v6r1"
 SETTLED_IDENTITY_ONLY_PACKAGES = {
     "bj176_issue_equity_risk_v1",
     "bj190_gate_b_sparse_divergence_v1",
@@ -1273,12 +1273,25 @@ def eligibility_ledger() -> list[dict[str, str]]:
     rows.extend(
         {
             "candidate_id": str(candidate["candidate_id"]),
-            "source_package": "bj145_gate_a_preoutcome_v8 + bj151_gate_a_preoutcome_v1",
-            "identity_source": "allocation_plan.csv.gz + identity_catalog.csv.gz; #151 selector adapter",
+            "source_package": (
+                "bj145_gate_a_preoutcome_v8 + "
+                f"{candidate['selector_source_package']}"
+            ),
+            "identity_source": (
+                "allocation_plan.csv.gz + identity_catalog.csv.gz; "
+                f"{candidate['selector_source_package']}/"
+                f"{candidate['selector_identity_file']} selector adapter"
+            ),
             "inherited_M_seed_support": f"M={candidate['available_M_grid']}; seed={candidate['seed_scope']}",
             "decision": str(candidate["economic_decision"]),
             "frontier_role": "COMPLETE_ALLOCATION_FAMILY" if candidate["economic_decision"] == "ELIGIBLE_COMPLETE_NONREDUNDANT" else "DUPLICATE_ALLOCATION_ALIAS",
-            "reason": "complete outcome-unexposed #151 selector trace is referenced by every #145 plan row; candidate is deduplicated only by exact pre-outcome economic ticket identity",
+            "reason": (
+                "complete outcome-unexposed arm-specific selector trace is "
+                "referenced by every #145 plan row and exact-joined on "
+                "(arm_id, issue_instance, gate_id, participation_rank<=top_k); "
+                "candidate is deduplicated only by exact pre-outcome economic "
+                "ticket identity"
+            ),
             "outcome_boundary": OUTCOME_BOUNDARY,
         }
         for candidate in bj145_allocation_candidate_registry()
