@@ -799,6 +799,67 @@ def build_honest_stage1_path(store: StageStore) -> StagePath:
     )
 
 
+def build_prior_only_stage1_path(store: StageStore) -> StagePath:
+    model = _prior_only_model("STAGE_1_SELECTION")
+    raw, groups = _stage1_raw_features(store.issues)
+    static = static_stage1_path(store)
+    fallback = int(static.choices[0])
+    choices = static.choices.copy()
+    fallback_flags = static.fallback_by_issue.copy()
+    model_by_issue = ["INSUFFICIENT_HISTORY_STATIC_FALLBACK"] * len(store.issues)
+    model_receipts: list[dict[str, object]] = []
+    screen_receipts: list[dict[str, object]] = []
+    years = np.asarray([int(row["year"]) for row in store.issues])
+    for test_year in range(2021, 2026):
+        outer_train = np.flatnonzero(years < test_year).tolist()
+        outer_test = np.flatnonzero(years == test_year).tolist()
+        actions = _action_screen(store, outer_train, 16, fallback)
+        predicted, prior = _stage_predictions(
+            store, raw, groups, model, actions, outer_train, outer_test
+        )
+        selected, flags = _choose_stage_actions(
+            store, actions, outer_test, predicted, prior, fallback,
+            model["family"],
+        )
+        for issue, action, flag in zip(outer_test, selected, flags, strict=True):
+            choices[issue] = action
+            fallback_flags[issue] = flag
+            model_by_issue[issue] = model["stage_model_id"]
+        for rank, action in enumerate(actions, 1):
+            screen_receipts.append(
+                {
+                    "outer_fold": f"TEST_{test_year}",
+                    "stage": "STAGE_1_SELECTION",
+                    "screen_phase": "OUTER_TRAIN",
+                    "rank": rank,
+                    "action_identity": store.action_rows[action][
+                        "interface_action_key"
+                    ],
+                    "mandatory_fallback": action == fallback,
+                }
+            )
+        model_receipts.append(
+            {
+                "outer_fold": f"TEST_{test_year}",
+                "stage": "STAGE_1_SELECTION",
+                "selected_model_id": model["stage_model_id"],
+                "selected_family": model["family"],
+                "outer_train_issue_count": len(outer_train),
+                "outer_test_issue_count": len(outer_test),
+                "outer_screen_action_count": len(actions),
+                "comparator": "PRIOR_ONLY_BEST_FIXED",
+            }
+        )
+    return StagePath(
+        stage="STAGE_1_SELECTION",
+        choices=choices,
+        model_by_issue=model_by_issue,
+        fallback_by_issue=fallback_flags,
+        model_receipts=model_receipts,
+        screen_receipts=screen_receipts,
+    )
+
+
 def stage_path_identity(path: StagePath, store: StageStore) -> str:
     return canonical_hash(
         {
@@ -1538,6 +1599,96 @@ def _conditional_validation_key(
     return (
         -lift, float(holding["max_drawdown_yuan"]), selected_stake,
         int(model["complexity_rank"]), model["stage_model_id"],
+    )
+
+
+def _prior_only_model(stage: str) -> dict[str, str]:
+    models = [
+        row
+        for row in read_csv(GATE_A_V2 / "stage_model_grid.csv")
+        if row["stage"] == stage and row["family"] == "PRIOR_ONLY_FIXED"
+    ]
+    if len(models) != 1:
+        raise RuntimeError(f"#193 {stage} prior-only model identity drift")
+    return models[0]
+
+
+def _build_prior_only_conditional_path(
+    store: ConditionalStore,
+    stage: str,
+    feature_rows: Sequence[Mapping[str, object]],
+) -> StagePath:
+    model = _prior_only_model(stage)
+    projections = _stage_feature_projections(stage)
+    static = static_conditional_path(store, stage)
+    choices = static.choices.copy()
+    fallback_flags = static.fallback_by_issue.copy()
+    model_by_issue = [
+        f"INSUFFICIENT_HISTORY_{'ALLOW_ALL' if stage == 'STAGE_2_DIRECTION' else 'FULL'}_FALLBACK"
+    ] * len(store.issues)
+    model_receipts: list[dict[str, object]] = []
+    screen_receipts: list[dict[str, object]] = []
+    years = np.asarray([int(row["year"]) for row in store.issues])
+    for test_year in range(2021, 2026):
+        outer_train = np.flatnonzero(years < test_year).tolist()
+        outer_test = np.flatnonzero(years == test_year).tolist()
+        actions = _conditional_screen(store, outer_train, 64)
+        predicted, prior = _conditional_predictions(
+            store, feature_rows, projections, model, actions,
+            outer_train, outer_test,
+        )
+        selected, flags = _conditional_choice(
+            store, actions, outer_test, predicted, prior, model["family"]
+        )
+        for issue, action, flag in zip(
+            outer_test, selected, flags, strict=True
+        ):
+            choices[issue] = action
+            fallback_flags[issue] = flag
+            model_by_issue[issue] = model["stage_model_id"]
+        for rank, action in enumerate(actions, 1):
+            screen_receipts.append(
+                {
+                    "outer_fold": f"TEST_{test_year}",
+                    "stage": stage,
+                    "screen_phase": "OUTER_TRAIN",
+                    "rank": rank,
+                    "action_identity": store.action_rows[action][
+                        "interface_action_key"
+                    ],
+                    "mandatory_fallback": action == store.fallback_index,
+                }
+            )
+        model_receipts.append(
+            {
+                "outer_fold": f"TEST_{test_year}",
+                "stage": stage,
+                "selected_model_id": model["stage_model_id"],
+                "selected_family": model["family"],
+                "outer_train_issue_count": len(outer_train),
+                "outer_test_issue_count": len(outer_test),
+                "outer_screen_action_count": len(actions),
+                "comparator": "PRIOR_ONLY_BEST_FIXED",
+            }
+        )
+    return StagePath(
+        stage=stage,
+        choices=choices,
+        model_by_issue=model_by_issue,
+        fallback_by_issue=fallback_flags,
+        model_receipts=model_receipts,
+        screen_receipts=screen_receipts,
+    )
+
+
+def build_prior_only_stage2_path(
+    store: ConditionalStore,
+    decisions: Sequence[Stage1Decision],
+) -> StagePath:
+    return _build_prior_only_conditional_path(
+        store,
+        "STAGE_2_DIRECTION",
+        stage2_feature_rows(store.issues, decisions),
     )
 
 
@@ -2337,4 +2488,16 @@ def build_honest_stage3_path(
         stage=stage, choices=choices, model_by_issue=model_by_issue,
         fallback_by_issue=fallback_flags, model_receipts=model_receipts,
         screen_receipts=screen_receipts,
+    )
+
+
+def build_prior_only_stage3_path(
+    store: ConditionalStore,
+    stage1_decisions: Sequence[Stage1Decision],
+    stage2_decisions: Sequence[Stage2Decision],
+) -> StagePath:
+    return _build_prior_only_conditional_path(
+        store,
+        "STAGE_3_BET",
+        stage3_feature_rows(store.issues, stage1_decisions, stage2_decisions),
     )

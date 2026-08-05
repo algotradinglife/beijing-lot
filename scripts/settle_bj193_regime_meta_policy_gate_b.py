@@ -176,11 +176,16 @@ def write_csv(path: Path, fields: Sequence[str], rows: Iterable[dict]) -> None:
 
 
 def write_gzip(path: Path, fields: Sequence[str], rows: Iterable[dict]) -> None:
-    with gzip.GzipFile(filename=str(path), mode="wb", mtime=0) as binary:
-        with __import__("io").TextIOWrapper(binary, newline="") as handle:
-            writer = csv.DictWriter(handle, fieldnames=fields)
-            writer.writeheader()
-            writer.writerows(rows)
+    with path.open("wb") as raw:
+        with gzip.GzipFile(
+            filename="", mode="wb", fileobj=raw, compresslevel=9, mtime=0
+        ) as binary:
+            with __import__("io").TextIOWrapper(binary, newline="") as handle:
+                writer = csv.DictWriter(
+                    handle, fieldnames=fields, lineterminator="\n"
+                )
+                writer.writeheader()
+                writer.writerows(rows)
 
 
 def science_cells() -> list[tuple[str, str, str, str, str]]:
@@ -615,6 +620,428 @@ def execution_snapshot() -> dict[str, str]:
     }
 
 
+def _status_name(value: object) -> str:
+    return {
+        int(V2.STATUS_NO_BET): "NO_BET",
+        int(V2.STATUS_ACTIVE): "ACTIVE",
+        int(V2.STATUS_UNAVAILABLE): "UNAVAILABLE",
+    }[int(value)]
+
+
+def iter_store_settlement_rows(
+    context: str, store: object
+) -> Iterable[dict[str, object]]:
+    for action_index, action in enumerate(store.action_rows):
+        parameters = json.loads(action.get("parameters_json", "{}"))
+        replicates = int(parameters.get("replicate_count", 1))
+        aggregation = (
+            "MEAN_NUISANCE_REPLICATES"
+            if replicates > 1
+            else "DETERMINISTIC_SINGLETON"
+        )
+        action_identity = (
+            f"{context}::{action['interface_action_key']}"
+        )
+        for issue_index, issue in enumerate(store.issues):
+            status = _status_name(store.status[action_index, issue_index])
+            active = (
+                status == "ACTIVE"
+                and float(store.stake[action_index, issue_index]) > 0.0
+            )
+            yield {
+                "context": context,
+                "action_identity": action_identity,
+                "source_action_identity": action["interface_action_key"],
+                "issue": issue["issue"],
+                "issue_instance": issue["issue_instance"],
+                "year": issue["year"],
+                "outer_fold": issue["outer_fold"],
+                "status": status,
+                "required_replicate_count": replicates,
+                "settled_replicate_count": replicates if active else 0,
+                "aggregation_rule": aggregation,
+                "stake_yuan": (
+                    float(store.stake[action_index, issue_index])
+                    if active
+                    else 0.0
+                ),
+                "gross_pre_tax_yuan": (
+                    float(store.gross[action_index, issue_index])
+                    if active
+                    else 0.0
+                ),
+                "tax_yuan": (
+                    float(store.tax[action_index, issue_index])
+                    if active
+                    else 0.0
+                ),
+                "pre_tax_net_yuan": (
+                    float(store.net[action_index, issue_index])
+                    if active
+                    else 0.0
+                ),
+                "tax_adjusted_net_yuan": (
+                    float(
+                        store.net[action_index, issue_index]
+                        - store.tax[action_index, issue_index]
+                    )
+                    if active
+                    else 0.0
+                ),
+                "hit": (
+                    float(store.hit[action_index, issue_index])
+                    if active
+                    else 0.0
+                ),
+            }
+
+
+def _write_store_settlement(
+    stage: Path, context: str, store: object
+) -> int:
+    fields = [
+        "context",
+        "action_identity",
+        "source_action_identity",
+        "issue",
+        "issue_instance",
+        "year",
+        "outer_fold",
+        "status",
+        "required_replicate_count",
+        "settled_replicate_count",
+        "aggregation_rule",
+        "stake_yuan",
+        "gross_pre_tax_yuan",
+        "tax_yuan",
+        "pre_tax_net_yuan",
+        "tax_adjusted_net_yuan",
+        "hit",
+    ]
+    row_count = len(store.action_rows) * len(store.issues)
+    write_gzip(
+        stage / f"issue_action_settlement-{context}.csv.gz",
+        fields,
+        iter_store_settlement_rows(context, store),
+    )
+    return row_count
+
+
+def _write_path_receipts(
+    stage: Path, paths: Mapping[str, tuple[object, object]]
+) -> None:
+    choice_rows: list[dict[str, object]] = []
+    model_rows: list[dict[str, object]] = []
+    screen_rows: list[dict[str, object]] = []
+    for path_name, (path, store) in paths.items():
+        V2.write_stage_path(
+            path, store, stage / f"stage_path-{path_name}.json"
+        )
+        for issue_index, action_value in enumerate(path.choices):
+            issue = store.issues[issue_index]
+            choice_rows.append(
+                {
+                    "path_name": path_name,
+                    "stage": path.stage,
+                    "issue": issue["issue"],
+                    "issue_instance": issue["issue_instance"],
+                    "chosen_action_identity": store.action_rows[
+                        int(action_value)
+                    ]["interface_action_key"],
+                    "model_id": path.model_by_issue[issue_index],
+                    "fallback_flag": bool(path.fallback_by_issue[issue_index]),
+                    "choice_as_of_ts": issue["feature_cutoff_ts"],
+                }
+            )
+        model_rows.extend(
+            {"path_name": path_name, **row}
+            for row in path.model_receipts
+        )
+        screen_rows.extend(
+            {"path_name": path_name, **row}
+            for row in path.screen_receipts
+        )
+    write_gzip(
+        stage / "issue_policy_choice.csv.gz",
+        list(choice_rows[0]),
+        choice_rows,
+    )
+    if model_rows:
+        write_csv(
+            stage / "stage_model_receipts.csv",
+            list(model_rows[0]),
+            model_rows,
+        )
+    if screen_rows:
+        write_gzip(
+            stage / "stage_screen_receipts.csv.gz",
+            list(screen_rows[0]),
+            screen_rows,
+        )
+
+
+def build_chain_checkpoint(target: Path) -> None:
+    """Run the authorized exact chain once and persist a disk-only boundary."""
+
+    manifests = verify_gate_a()
+    source_bindings = verify_gate_b_sources()
+    start = execution_snapshot()
+    stage = unique_stage(target)
+    try:
+        stage1_store = V2.build_stage1_store()
+        static_stage1 = V2.static_stage1_path(stage1_store)
+        prior_stage1 = V2.build_prior_only_stage1_path(stage1_store)
+        dynamic_stage1 = V2.build_honest_stage1_path(stage1_store)
+
+        stage2_static_store, static_stage1_decisions = V2.build_stage2_store(
+            stage1_store, static_stage1
+        )
+        static_stage2_on_static = V2.static_conditional_path(
+            stage2_static_store, "STAGE_2_DIRECTION"
+        )
+        static_stage2_decisions = V2.build_stage2_decisions(
+            stage2_static_store,
+            static_stage2_on_static,
+            static_stage1_decisions,
+        )
+
+        stage2_prior_store, prior_stage1_decisions = V2.build_stage2_store(
+            stage1_store, prior_stage1
+        )
+        prior_stage2 = V2.build_prior_only_stage2_path(
+            stage2_prior_store, prior_stage1_decisions
+        )
+        prior_stage2_decisions = V2.build_stage2_decisions(
+            stage2_prior_store,
+            prior_stage2,
+            prior_stage1_decisions,
+        )
+
+        stage2_dynamic_store, dynamic_stage1_decisions = V2.build_stage2_store(
+            stage1_store, dynamic_stage1
+        )
+        static_stage2_on_dynamic = V2.static_conditional_path(
+            stage2_dynamic_store, "STAGE_2_DIRECTION"
+        )
+        dynamic_stage2 = V2.build_honest_stage2_path(
+            stage2_dynamic_store, dynamic_stage1_decisions
+        )
+        static_stage2_dynamic_decisions = V2.build_stage2_decisions(
+            stage2_dynamic_store,
+            static_stage2_on_dynamic,
+            dynamic_stage1_decisions,
+        )
+        dynamic_stage2_decisions = V2.build_stage2_decisions(
+            stage2_dynamic_store,
+            dynamic_stage2,
+            dynamic_stage1_decisions,
+        )
+
+        stage3_static_store = V2.build_stage3_store(
+            stage1_store,
+            static_stage1_decisions,
+            static_stage2_decisions,
+        )
+        static_stage3_on_static = V2.static_conditional_path(
+            stage3_static_store, "STAGE_3_BET"
+        )
+        stage3_prior_store = V2.build_stage3_store(
+            stage1_store,
+            prior_stage1_decisions,
+            prior_stage2_decisions,
+        )
+        prior_stage3 = V2.build_prior_only_stage3_path(
+            stage3_prior_store,
+            prior_stage1_decisions,
+            prior_stage2_decisions,
+        )
+        stage3_selection_store = V2.build_stage3_store(
+            stage1_store,
+            dynamic_stage1_decisions,
+            static_stage2_dynamic_decisions,
+        )
+        static_stage3_on_selection = V2.static_conditional_path(
+            stage3_selection_store, "STAGE_3_BET"
+        )
+        stage3_direction_store = V2.build_stage3_store(
+            stage1_store,
+            dynamic_stage1_decisions,
+            dynamic_stage2_decisions,
+        )
+        static_stage3_on_direction = V2.static_conditional_path(
+            stage3_direction_store, "STAGE_3_BET"
+        )
+        dynamic_stage3 = V2.build_honest_stage3_path(
+            stage3_direction_store,
+            dynamic_stage1_decisions,
+            dynamic_stage2_decisions,
+        )
+        oracle_stage3 = V2.oracle_path_on_causal_screen(
+            stage3_direction_store, dynamic_stage3
+        )
+
+        paths = {
+            "stage1_static": (static_stage1, stage1_store),
+            "stage1_prior_only": (prior_stage1, stage1_store),
+            "stage1_dynamic": (dynamic_stage1, stage1_store),
+            "stage2_static_on_static": (
+                static_stage2_on_static,
+                stage2_static_store,
+            ),
+            "stage2_static_on_dynamic": (
+                static_stage2_on_dynamic,
+                stage2_dynamic_store,
+            ),
+            "stage2_prior_only": (prior_stage2, stage2_prior_store),
+            "stage2_dynamic": (dynamic_stage2, stage2_dynamic_store),
+            "stage3_static_on_static": (
+                static_stage3_on_static,
+                stage3_static_store,
+            ),
+            "stage3_prior_only": (prior_stage3, stage3_prior_store),
+            "stage3_static_on_selection": (
+                static_stage3_on_selection,
+                stage3_selection_store,
+            ),
+            "stage3_static_on_direction": (
+                static_stage3_on_direction,
+                stage3_direction_store,
+            ),
+            "stage3_dynamic": (dynamic_stage3, stage3_direction_store),
+            "stage3_oracle": (oracle_stage3, stage3_direction_store),
+        }
+        _write_path_receipts(stage, paths)
+
+        policies = {
+            "ALL_STATIC": V2.issue_policy_rows(
+                "ALL_STATIC", stage3_static_store, static_stage3_on_static
+            ),
+            "DYNAMIC_SELECTION_ONLY": V2.issue_policy_rows(
+                "DYNAMIC_SELECTION_ONLY",
+                stage3_selection_store,
+                static_stage3_on_selection,
+            ),
+            "DYNAMIC_SELECTION_DIRECTION": V2.issue_policy_rows(
+                "DYNAMIC_SELECTION_DIRECTION",
+                stage3_direction_store,
+                static_stage3_on_direction,
+            ),
+            "PRIOR_ONLY_BEST_FIXED": V2.issue_policy_rows(
+                "PRIOR_ONLY_BEST_FIXED", stage3_prior_store, prior_stage3
+            ),
+            "FULL_DYNAMIC_CHAIN": V2.issue_policy_rows(
+                "FULL_DYNAMIC_CHAIN", stage3_direction_store, dynamic_stage3
+            ),
+            "LEAKY_ORACLE_CEILING": V2.issue_policy_rows(
+                "LEAKY_ORACLE_CEILING",
+                stage3_direction_store,
+                oracle_stage3,
+            ),
+        }
+        policy_rows = [
+            row for policy in policies.values() for row in policy
+        ]
+        write_gzip(
+            stage / "issue_policy_flows.csv.gz",
+            list(policy_rows[0]),
+            policy_rows,
+        )
+        controlling = {
+            key: value
+            for key, value in policies.items()
+            if key
+            in {
+                "ALL_STATIC",
+                "DYNAMIC_SELECTION_ONLY",
+                "DYNAMIC_SELECTION_DIRECTION",
+                "FULL_DYNAMIC_CHAIN",
+            }
+        }
+        common = V2.strict_common_issue_indices(controlling)
+        write_json = lambda path, value: path.write_text(
+            json.dumps(value, sort_keys=True, indent=2) + "\n"
+        )
+        write_json(
+            stage / "strict_common_support.json",
+            {
+                "contract": "BJ193_FOUR_ARM_STRICT_COMMON_SUPPORT_V1",
+                "policy_ids": list(controlling),
+                "issue_indices": common,
+                "issue_ids": [stage1_store.issues[index]["issue"] for index in common],
+                "issue_count": len(common),
+                "definition": (
+                    "all four causal attribution arms ACTIVE with positive stake "
+                    "on identical canonical issue order"
+                ),
+            },
+        )
+
+        store_contexts = {
+            "STAGE1_ALL_ACTIONS": stage1_store,
+            "STAGE2_STATIC_UPSTREAM": stage2_static_store,
+            "STAGE2_PRIOR_UPSTREAM": stage2_prior_store,
+            "STAGE2_DYNAMIC_UPSTREAM": stage2_dynamic_store,
+            "STAGE3_STATIC_UPSTREAM": stage3_static_store,
+            "STAGE3_PRIOR_UPSTREAM": stage3_prior_store,
+            "STAGE3_SELECTION_UPSTREAM": stage3_selection_store,
+            "STAGE3_DIRECTION_UPSTREAM": stage3_direction_store,
+        }
+        row_census = {
+            name: _write_store_settlement(stage, name, store)
+            for name, store in store_contexts.items()
+        }
+        end = execution_snapshot()
+        if start != end:
+            raise RuntimeError("#193 chain executable identity changed in flight")
+        metadata = {
+            "contract": CHECKPOINT_CONTRACT,
+            "gate_a_manifests": {
+                "v1": EXPECTED_GATE_A_MANIFEST,
+                "v2": EXPECTED_GATE_A_V2_MANIFEST,
+                "v2.1": EXPECTED_GATE_A_V21_MANIFEST,
+            },
+            "verified_gate_a_payload_count": len(manifests),
+            "source_bindings": source_bindings,
+            "execution_start": start,
+            "execution_end": end,
+            "canonical_issue_count": len(stage1_store.issues),
+            "policy_ids": list(policies),
+            "strict_common_issue_count": len(common),
+            "issue_action_row_census": row_census,
+            "oracle_boundary": "LEAKY_ORACLE_DIAGNOSTIC_ONLY",
+            "tax_boundary": "PRE_TAX_CONTROLLING_TAX_REFERENCE_ONLY",
+        }
+        write_json(stage / "checkpoint_metadata.json", metadata)
+        payload = package_manifest(
+            stage,
+            CHECKPOINT_CONTRACT,
+            {
+                "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+                "gate_a_v2_manifest_sha256": EXPECTED_GATE_A_V2_MANIFEST,
+                "gate_a_v21_manifest_sha256": EXPECTED_GATE_A_V21_MANIFEST,
+                "canonical_issue_count": len(stage1_store.issues),
+                "strict_common_issue_count": len(common),
+                "issue_action_row_census": row_census,
+            },
+        )
+        atomic_publish(stage, target)
+        print(
+            json.dumps(
+                {
+                    "checkpoint": str(target),
+                    "manifest_sha256": sha(target / "SHA256SUMS.json"),
+                    "payload_count": len(payload),
+                    "strict_common_issue_count": len(common),
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+    except Exception:
+        print(f"FAILED_STAGE={stage}", flush=True)
+        raise
+
+
 def package_manifest(stage: Path, contract: str, identity: dict) -> dict[str, str]:
     identity = {"contract": contract, **identity}
     (stage / "CONTENT_IDENTITY.json").write_text(
@@ -829,9 +1256,7 @@ def main() -> None:
     if args.preflight:
         preflight()
     elif args.replay_checkpoint:
-        raise RuntimeError(
-            "superseded flattened replay disabled; v2 chained checkpoint is not complete"
-        )
+        build_chain_checkpoint(args.checkpoint.resolve())
     else:
         raise RuntimeError("finalizer implementation not yet available")
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import ctypes
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -669,3 +670,237 @@ def test_policy_rows_common_support_and_oracle_use_frozen_causal_screen():
     assert V2.strict_common_issue_indices(
         {"STATIC": static_rows, "CAUSAL": causal_rows}
     ) == [0]
+
+
+def test_prior_only_paths_use_outer_train_without_validation_selection(
+    monkeypatch,
+):
+    action_rows = [
+        {
+            "interface_action_key": "STATIC",
+            "upstream_issue": "134",
+            "source_identity": "MARKET_BEST_FULL",
+        }
+    ]
+    issues = [
+        {
+            "issue": "1",
+            "year": "2020",
+            "outer_fold": "TRAIN",
+            "issue_instance": "1@TRAIN",
+            "feature_cutoff_ts": "2020-01-01T00:00:00Z",
+        },
+        {
+            "issue": "2",
+            "year": "2021",
+            "outer_fold": "TEST_2021",
+            "issue_instance": "2@TEST_2021",
+            "feature_cutoff_ts": "2021-01-01T00:00:00Z",
+        },
+    ]
+    one = np.ones((1, 2), dtype=float)
+    stage1 = V2.StageStore(
+        action_rows=action_rows,
+        issues=issues,
+        supports={},
+        status=np.full((1, 2), V2.STATUS_ACTIVE, dtype=np.uint8),
+        stake=one.copy(),
+        gross=one.copy(),
+        tax=np.zeros_like(one),
+        net=np.zeros_like(one),
+        hit=np.zeros_like(one),
+    )
+    conditional = V2.ConditionalStore(
+        **stage1.__dict__,
+        conditional_supports={},
+        fallback_index=0,
+        comparator_net=np.zeros(2),
+        comparator_stake=np.ones(2),
+        utility=np.zeros((1, 2)),
+        utility_active=np.ones((1, 2), dtype=bool),
+        target_mode="ABSOLUTE_UTILITY",
+    )
+    monkeypatch.setattr(V2, "_stage1_raw_features", lambda _issues: ([{}] * 2, {}))
+    monkeypatch.setattr(V2, "_action_screen", lambda *_args: [0])
+    monkeypatch.setattr(
+        V2,
+        "_stage_predictions",
+        lambda *_args: (np.zeros((1, 1)), np.zeros((1, 1))),
+    )
+    monkeypatch.setattr(
+        V2,
+        "_choose_stage_actions",
+        lambda _store, _actions, query, *_args: ([0] * len(query), [True] * len(query)),
+    )
+    monkeypatch.setattr(V2, "_conditional_screen", lambda *_args: [0])
+    monkeypatch.setattr(
+        V2,
+        "_conditional_predictions",
+        lambda *_args: (np.zeros((1, 1)), np.zeros((1, 1))),
+    )
+    monkeypatch.setattr(
+        V2,
+        "_conditional_choice",
+        lambda _store, _actions, query, *_args: ([0] * len(query), [True] * len(query)),
+    )
+    monkeypatch.setattr(
+        V2,
+        "_validation_key",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("validation used")),
+    )
+    monkeypatch.setattr(
+        V2,
+        "_conditional_validation_key",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("validation used")),
+    )
+    stage1_path = V2.build_prior_only_stage1_path(stage1)
+    stage2_path = V2._build_prior_only_conditional_path(
+        conditional, "STAGE_2_DIRECTION", [{}, {}]
+    )
+    stage3_path = V2._build_prior_only_conditional_path(
+        conditional, "STAGE_3_BET", [{}, {}]
+    )
+    for path in (stage1_path, stage2_path, stage3_path):
+        assert path.model_receipts[0]["selected_family"] == "PRIOR_ONLY_FIXED"
+        assert path.model_receipts[0]["comparator"] == "PRIOR_ONLY_BEST_FIXED"
+        assert {row["screen_phase"] for row in path.screen_receipts} == {
+            "OUTER_TRAIN"
+        }
+
+
+def test_chain_checkpoint_fixture_is_atomic_deterministic_and_four_arm(
+    monkeypatch, tmp_path
+):
+    chain = R.V2
+    action_rows = [
+        {
+            "interface_action_key": "STATIC",
+            "upstream_issue": "134",
+            "source_identity": "MARKET_BEST_FULL",
+            "parameters_json": json.dumps({"replicate_count": 1}),
+        }
+    ]
+    issues = [
+        {
+            "issue": str(index + 1),
+            "year": "2021",
+            "outer_fold": "TEST_2021",
+            "issue_instance": f"{index + 1}@TEST_2021",
+            "feature_cutoff_ts": f"2021-01-0{index + 1}T00:00:00Z",
+        }
+        for index in range(2)
+    ]
+    status = np.asarray(
+        [[chain.STATUS_ACTIVE, chain.STATUS_NO_BET]], dtype=np.uint8
+    )
+    stake = np.asarray([[100.0, 0.0]])
+    gross = np.asarray([[120.0, 0.0]])
+    tax = np.zeros_like(stake)
+    net = gross - stake
+    hit = np.asarray([[1.0, 0.0]])
+    stage1 = chain.StageStore(
+        action_rows=action_rows,
+        issues=issues,
+        supports={},
+        status=status,
+        stake=stake,
+        gross=gross,
+        tax=tax,
+        net=net,
+        hit=hit,
+    )
+    conditional = chain.ConditionalStore(
+        action_rows=action_rows,
+        issues=issues,
+        supports={},
+        status=status,
+        stake=stake,
+        gross=gross,
+        tax=tax,
+        net=net,
+        hit=hit,
+        conditional_supports={},
+        fallback_index=0,
+        comparator_net=net[0].copy(),
+        comparator_stake=stake[0].copy(),
+        utility=np.asarray([[0.2, np.nan]]),
+        utility_active=np.asarray([[True, False]]),
+        target_mode="ABSOLUTE_UTILITY",
+    )
+    static_stage1 = chain.static_stage1_path(stage1)
+    static_conditional = chain.static_conditional_path(
+        conditional, "STAGE_2_DIRECTION"
+    )
+    static_bet = chain.static_conditional_path(conditional, "STAGE_3_BET")
+    monkeypatch.setattr(R, "verify_gate_a", lambda: {"payload": "hash"})
+    monkeypatch.setattr(R, "verify_gate_b_sources", lambda: {"source": "hash"})
+    monkeypatch.setattr(R, "execution_snapshot", lambda: {"head": "fixture"})
+    monkeypatch.setattr(chain, "build_stage1_store", lambda: stage1)
+    monkeypatch.setattr(
+        chain, "build_honest_stage1_path", lambda _store: static_stage1
+    )
+    monkeypatch.setattr(
+        chain, "build_prior_only_stage1_path", lambda _store: static_stage1
+    )
+    monkeypatch.setattr(
+        chain,
+        "build_stage2_store",
+        lambda _store, _path: (conditional, [object(), object()]),
+    )
+    monkeypatch.setattr(
+        chain,
+        "build_stage2_decisions",
+        lambda _store, _path, _decisions: [object(), object()],
+    )
+    monkeypatch.setattr(
+        chain,
+        "build_honest_stage2_path",
+        lambda _store, _decisions: static_conditional,
+    )
+    monkeypatch.setattr(
+        chain,
+        "build_prior_only_stage2_path",
+        lambda _store, _decisions: static_conditional,
+    )
+    monkeypatch.setattr(
+        chain,
+        "build_stage3_store",
+        lambda _store, _stage1, _stage2: conditional,
+    )
+    monkeypatch.setattr(
+        chain,
+        "build_honest_stage3_path",
+        lambda _store, _stage1, _stage2: static_bet,
+    )
+    monkeypatch.setattr(
+        chain,
+        "build_prior_only_stage3_path",
+        lambda _store, _stage1, _stage2: static_bet,
+    )
+    first = tmp_path / "checkpoint-a"
+    second = tmp_path / "checkpoint-b"
+    R.build_chain_checkpoint(first)
+    R.build_chain_checkpoint(second)
+    assert first.is_dir() and second.is_dir()
+    first_files = {
+        str(path.relative_to(first)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in first.rglob("*")
+        if path.is_file()
+    }
+    second_files = {
+        str(path.relative_to(second)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in second.rglob("*")
+        if path.is_file()
+    }
+    assert first_files == second_files
+    flows = R.read_csv(first / "issue_policy_flows.csv.gz")
+    assert {row["policy_id"] for row in flows} == {
+        "ALL_STATIC",
+        "DYNAMIC_SELECTION_ONLY",
+        "DYNAMIC_SELECTION_DIRECTION",
+        "PRIOR_ONLY_BEST_FIXED",
+        "FULL_DYNAMIC_CHAIN",
+        "LEAKY_ORACLE_CEILING",
+    }
+    common = json.loads((first / "strict_common_support.json").read_text())
+    assert common["issue_ids"] == ["1"]
