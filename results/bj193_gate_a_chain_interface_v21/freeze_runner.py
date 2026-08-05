@@ -677,6 +677,10 @@ def _comparable(output: Mapping[str, object]) -> dict[str, object]:
 
 def golden_vectors(native: Mapping[str, object]) -> dict[str, object]:
     adapter = load_module(ADAPTER_PATH, "bj193_v21_golden_adapter")
+    accepted_v2_adapter = load_module(
+        ROOT / "results" / V2_PACKAGE / "conditional_chain_adapter.py",
+        "bj193_v21_accepted_v2_signature_adapter",
+    )
     rows = [dict(row) for row in native["registry_rows"]]
     ordered = [str(value) for value in native["ordered_match_ids"]]
     registry = {str(row["match_id"]): row for row in rows}
@@ -702,7 +706,7 @@ def golden_vectors(native: Mapping[str, object]) -> dict[str, object]:
         }
 
     def run(mechanism: str, stage2: Mapping[str, object]) -> dict[str, object]:
-        return _comparable(
+        result = _comparable(
             adapter.compose_structural_delete(
                 mechanism,
                 ordered,
@@ -716,6 +720,17 @@ def golden_vectors(native: Mapping[str, object]) -> dict[str, object]:
                 ),
             )
         )
+        expected_signature = accepted_v2_adapter.stage3_replay_signature(
+            issue=str(native["issue"]),
+            stage1_output_sha256="1" * 64,
+            stage2_output_sha256="2" * 64,
+            derived_stage3_action_sha256=str(
+                actions[mechanism]["derived_interface_identity_sha256"]
+            ),
+        )
+        if result["stage3_replay_signature_sha256"] != expected_signature:
+            raise RuntimeError("v2.1 structural replay signature drift from accepted v2")
+        return result
 
     p_base = run("P_MIN_GLOBAL_DELETE", active_weights())
     q_base = run("Q_MIN_GLOBAL_DELETE", active_weights())
@@ -729,6 +744,8 @@ def golden_vectors(native: Mapping[str, object]) -> dict[str, object]:
     distinct_code = (same_code + 1) % 3
     distinct["per_match"][distinct_leg]["direction_weight_3_1_0"][distinct_code] = "0"
     p_distinct = run("P_MIN_GLOBAL_DELETE", distinct)
+    p_no_bet = run("P_MIN_GLOBAL_DELETE", {"status": "NO_BET"})
+    p_unavailable = run("P_MIN_GLOBAL_DELETE", {"status": "UNAVAILABLE"})
     missing = dict(registry)
     missing.pop(ordered[-1])
     missing_result = _comparable(
@@ -738,6 +755,20 @@ def golden_vectors(native: Mapping[str, object]) -> dict[str, object]:
             active_weights(),
             missing,
             issue=str(native["issue"]),
+            stage1_output_sha256="1" * 64,
+            stage2_output_sha256="2" * 64,
+            derived_stage3_action_sha256=str(
+                actions["Q_MIN_GLOBAL_DELETE"]["derived_interface_identity_sha256"]
+            ),
+        )
+    )
+    issue_mismatch_result = _comparable(
+        adapter.compose_structural_delete(
+            "Q_MIN_GLOBAL_DELETE",
+            ordered,
+            active_weights(),
+            registry,
+            issue=str(int(str(native["issue"])) + 1),
             stage1_output_sha256="1" * 64,
             stage2_output_sha256="2" * 64,
             derived_stage3_action_sha256=str(
@@ -786,7 +817,10 @@ def golden_vectors(native: Mapping[str, object]) -> dict[str, object]:
         "composition": {
             "same_code_already_absent": p_same,
             "distinct_additional_delete": p_distinct,
+            "stage2_no_bet": p_no_bet,
+            "stage2_unavailable": p_unavailable,
             "missing_registry_row": missing_result,
+            "registry_trace_issue_mismatch": issue_mismatch_result,
         },
         "tie_fixture": {
             "rows": tie_rows,
@@ -806,6 +840,10 @@ def golden_vectors(native: Mapping[str, object]) -> dict[str, object]:
             "distinct_delete_stake_yuan": 1944,
             "missing_status": "UNAVAILABLE",
             "missing_ticket_count": 0,
+            "stage2_no_bet_status": "NO_BET",
+            "stage2_unavailable_status": "UNAVAILABLE",
+            "issue_mismatch_status": "UNAVAILABLE",
+            "issue_mismatch_reason": "STRUCTURAL_REGISTRY_TRACE_ISSUE_MISMATCH",
             "tie_delete_leg_index_zero_based": 0,
             "tie_delete_code": "3",
         },

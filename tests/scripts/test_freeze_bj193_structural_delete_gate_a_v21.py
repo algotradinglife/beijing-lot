@@ -8,11 +8,19 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "freeze_bj193_structural_delete_gate_a_v21.py"
 ADAPTER = ROOT / "scripts" / "bj193_structural_delete_adapter.py"
 PACKAGE = ROOT / "results" / "bj193_gate_a_chain_interface_v21"
+V2_ADAPTER = (
+    ROOT
+    / "results"
+    / "bj193_gate_a_chain_interface_v2"
+    / "conditional_chain_adapter.py"
+)
 
 
 def load(path: Path, name: str):
@@ -110,6 +118,7 @@ def test_structural_coverage_is_complete_for_127_134_and_fails_closed_for_190():
 
 def test_structural_adapter_native_same_distinct_missing_mixed_and_ties():
     adapter = load(ADAPTER, "bj193_v21_test_adapter")
+    accepted_v2 = load(V2_ADAPTER, "bj193_v21_test_accepted_v2_adapter")
     golden = json.loads(
         (PACKAGE / "structural_delete_golden_vectors.json").read_text()
     )
@@ -122,6 +131,8 @@ def test_structural_adapter_native_same_distinct_missing_mixed_and_ties():
     ]["delete_match_id"]
     assert anchor["p_replay"]["requested_ticket_count"] == 1458
     assert anchor["q_replay"]["requested_ticket_count"] == 1458
+    assert anchor["p_replay"]["status"] == "ACTIVE"
+    assert anchor["q_replay"]["status"] == "ACTIVE"
     composition = golden["composition"]
     assert composition["same_code_already_absent"]["reason_code"] == (
         "STRUCTURAL_DELETE_ALREADY_ABSENT"
@@ -131,6 +142,71 @@ def test_structural_adapter_native_same_distinct_missing_mixed_and_ties():
     assert composition["distinct_additional_delete"]["requested_stake_yuan"] == 1944
     assert composition["missing_registry_row"]["status"] == "UNAVAILABLE"
     assert composition["missing_registry_row"]["requested_stake_yuan"] == 0
+    assert composition["stage2_no_bet"]["status"] == "NO_BET"
+    assert composition["stage2_no_bet"]["reason_code"] == (
+        "STAGE2_NO_BET_ZERO_FLOW"
+    )
+    assert composition["stage2_no_bet"]["requested_ticket_count"] == 0
+    assert composition["stage2_no_bet"]["requested_stake_yuan"] == 0
+    assert composition["stage2_unavailable"]["status"] == "UNAVAILABLE"
+    assert composition["stage2_unavailable"]["reason_code"] == (
+        "STAGE2_UNAVAILABLE_ZERO_FLOW"
+    )
+    assert composition["stage2_unavailable"]["requested_ticket_count"] == 0
+    assert composition["stage2_unavailable"]["requested_stake_yuan"] == 0
+    mismatch = composition["registry_trace_issue_mismatch"]
+    assert mismatch["status"] == "UNAVAILABLE"
+    assert mismatch["reason_code"] == "STRUCTURAL_REGISTRY_TRACE_ISSUE_MISMATCH"
+    assert mismatch["requested_ticket_count"] == 0
+    assert mismatch["requested_stake_yuan"] == 0
+
+    expected_by_action = {}
+    catalog = rows(
+        ROOT
+        / "results"
+        / "bj193_gate_a_chain_interface_v2"
+        / "stage3_bet_catalog.csv.gz"
+    )
+    for row in catalog:
+        parameters = json.loads(row["parameters_json"])
+        mechanism = parameters["mechanism"]
+        if mechanism in {"P_MIN_GLOBAL_DELETE", "Q_MIN_GLOBAL_DELETE"}:
+            expected_by_action[mechanism] = accepted_v2.stage3_replay_signature(
+                issue=anchor["issue"],
+                stage1_output_sha256="1" * 64,
+                stage2_output_sha256="2" * 64,
+                derived_stage3_action_sha256=row[
+                    "derived_interface_identity_sha256"
+                ],
+            )
+    for key in (
+        "same_code_already_absent",
+        "distinct_additional_delete",
+        "stage2_no_bet",
+        "stage2_unavailable",
+    ):
+        assert composition[key]["stage3_replay_signature_sha256"] == (
+            expected_by_action["P_MIN_GLOBAL_DELETE"]
+        )
+    assert anchor["p_replay"]["stage3_replay_signature_sha256"] == (
+        expected_by_action["P_MIN_GLOBAL_DELETE"]
+    )
+    assert anchor["q_replay"]["stage3_replay_signature_sha256"] == (
+        expected_by_action["Q_MIN_GLOBAL_DELETE"]
+    )
+    assert mismatch["stage3_replay_signature_sha256"] == (
+        accepted_v2.stage3_replay_signature(
+            issue=str(int(str(anchor["issue"])) + 1),
+            stage1_output_sha256="1" * 64,
+            stage2_output_sha256="2" * 64,
+            derived_stage3_action_sha256=next(
+                row["derived_interface_identity_sha256"]
+                for row in catalog
+                if json.loads(row["parameters_json"])["mechanism"]
+                == "Q_MIN_GLOBAL_DELETE"
+            ),
+        )
+    )
     assert golden["tie_fixture"]["expected_p"]["delete_leg_index_zero_based"] == 0
     assert golden["tie_fixture"]["expected_p"]["delete_code"] == "3"
     assert golden["tie_fixture"]["expected_q"]["delete_leg_index_zero_based"] == 0
@@ -149,6 +225,21 @@ def test_structural_adapter_native_same_distinct_missing_mixed_and_ties():
     )
     assert valid == []
     assert reason == "STRUCTURAL_REGISTRY_MIXED_ISSUE_OR_FOLD"
+
+
+def test_structural_adapter_rejects_malformed_chain_digest():
+    adapter = load(ADAPTER, "bj193_v21_test_malformed_digest")
+    with pytest.raises(ValueError, match="invalid SHA-256 identity"):
+        adapter.compose_structural_delete(
+            "P_MIN_GLOBAL_DELETE",
+            [str(index) for index in range(7)],
+            {"status": "NO_BET"},
+            {},
+            issue="999999",
+            stage1_output_sha256="not-a-digest",
+            stage2_output_sha256="2" * 64,
+            derived_stage3_action_sha256="3" * 64,
+        )
 
 
 def test_native_reconciliation_and_package_manifest_are_exact():

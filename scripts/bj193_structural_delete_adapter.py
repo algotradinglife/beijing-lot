@@ -64,6 +64,45 @@ def canonical_hash(value: object) -> str:
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
 
 
+def _require_sha256(value: object, field: str) -> str:
+    identity = str(value)
+    if len(identity) != 64 or any(
+        character not in "0123456789abcdef" for character in identity.lower()
+    ):
+        raise ValueError(f"invalid SHA-256 identity: {field}")
+    return identity.lower()
+
+
+def stage3_replay_signature(
+    *,
+    issue: object,
+    stage1_output_sha256: object,
+    stage2_output_sha256: object,
+    derived_stage3_action_sha256: object,
+) -> str:
+    """Exact accepted v2 `BJ193_STAGE3_REPLAY_SIGNATURE_V1`."""
+
+    issue_text = str(issue)
+    if not issue_text or not issue_text.isdigit():
+        raise ValueError("issue must be a nonblank numeric canonical identity")
+    return canonical_hash(
+        {
+            "contract": "BJ193_STAGE3_REPLAY_SIGNATURE_V1",
+            "issue": issue_text,
+            "stage1_output_sha256": _require_sha256(
+                stage1_output_sha256, "stage1_output_sha256"
+            ),
+            "stage2_output_sha256": _require_sha256(
+                stage2_output_sha256, "stage2_output_sha256"
+            ),
+            "derived_stage3_action_sha256": _require_sha256(
+                derived_stage3_action_sha256,
+                "derived_stage3_action_sha256",
+            ),
+        }
+    )
+
+
 def _assert_outcome_unexposed(row: Mapping[str, object]) -> None:
     exposed = sorted(FORBIDDEN_FIELDS & set(row))
     if exposed:
@@ -204,28 +243,33 @@ def derive_structural_delete(
 
 def _stage2_rows(
     ordered_match_ids: Sequence[str], stage2_output: Mapping[str, object]
-) -> tuple[list[list[float]], str | None]:
+) -> tuple[list[list[float]], str | None, str]:
     _assert_outcome_unexposed(stage2_output)
-    if str(stage2_output.get("status")) != "ACTIVE":
-        return [], "STAGE2_NOT_ACTIVE_ZERO_FLOW"
+    upstream_status = str(stage2_output.get("status"))
+    if upstream_status == "NO_BET":
+        return [], "STAGE2_NO_BET_ZERO_FLOW", "NO_BET"
+    if upstream_status == "UNAVAILABLE":
+        return [], "STAGE2_UNAVAILABLE_ZERO_FLOW", "UNAVAILABLE"
+    if upstream_status != "ACTIVE":
+        return [], "INVALID_STAGE2_STATUS", "UNAVAILABLE"
     supplied = stage2_output.get("per_match")
     if not isinstance(supplied, list) or len(supplied) != LEGS:
-        return [], "INVALID_STAGE2_PER_MATCH_ROWS"
+        return [], "INVALID_STAGE2_PER_MATCH_ROWS", "UNAVAILABLE"
     weights: list[list[float]] = []
     for expected_match, raw in zip(ordered_match_ids, supplied, strict=True):
         if not isinstance(raw, Mapping) or str(raw.get("match_id")) != str(expected_match):
-            return [], "STAGE2_MATCH_ORDER_MISMATCH"
+            return [], "STAGE2_MATCH_ORDER_MISMATCH", "UNAVAILABLE"
         values = raw.get("direction_weight_3_1_0")
         if not isinstance(values, (list, tuple)) or len(values) != 3:
-            return [], "INVALID_STAGE2_WEIGHT_VECTOR"
+            return [], "INVALID_STAGE2_WEIGHT_VECTOR", "UNAVAILABLE"
         try:
             parsed = [_finite(value, "direction_weight") for value in values]
         except ValueError:
-            return [], "INVALID_STAGE2_WEIGHT_VECTOR"
+            return [], "INVALID_STAGE2_WEIGHT_VECTOR", "UNAVAILABLE"
         if any(value < 0 for value in parsed) or not any(value > 0 for value in parsed):
-            return [], "INVALID_STAGE2_WEIGHT_VECTOR"
+            return [], "INVALID_STAGE2_WEIGHT_VECTOR", "UNAVAILABLE"
         weights.append(parsed)
-    return weights, None
+    return weights, None, "ACTIVE"
 
 
 def _normalized(values: Sequence[float]) -> list[str]:
@@ -261,6 +305,22 @@ def compose_structural_delete(
 ) -> dict[str, object]:
     """Compose one exact structural zero mask and enumerate positive tickets."""
 
+    issue_text = str(issue)
+    stage1_identity = _require_sha256(
+        stage1_output_sha256, "stage1_output_sha256"
+    )
+    stage2_identity = _require_sha256(
+        stage2_output_sha256, "stage2_output_sha256"
+    )
+    action_identity = _require_sha256(
+        derived_stage3_action_sha256, "derived_stage3_action_sha256"
+    )
+    replay_signature = stage3_replay_signature(
+        issue=issue_text,
+        stage1_output_sha256=stage1_identity,
+        stage2_output_sha256=stage2_identity,
+        derived_stage3_action_sha256=action_identity,
+    )
     base = {
         "adapter_version": ADAPTER_VERSION,
         "mechanism": mechanism,
@@ -268,10 +328,10 @@ def compose_structural_delete(
         "repeat_mode": mechanism,
         "replicate_mode": "DETERMINISTIC_SINGLETON",
         "native_M": NATIVE_STRUCTURAL_M,
-        "issue": str(issue),
-        "stage1_output_sha256": str(stage1_output_sha256),
-        "stage2_output_sha256": str(stage2_output_sha256),
-        "derived_stage3_action_sha256": str(derived_stage3_action_sha256),
+        "issue": issue_text,
+        "stage1_output_sha256": stage1_identity,
+        "stage2_output_sha256": stage2_identity,
+        "derived_stage3_action_sha256": action_identity,
         "ordered_match_ids": [str(value) for value in ordered_match_ids],
     }
     if mechanism not in MECHANISMS:
@@ -279,12 +339,17 @@ def compose_structural_delete(
     rows, registry_reason = validate_structural_rows(
         ordered_match_ids, registry_by_match
     )
-    weights, stage2_reason = _stage2_rows(ordered_match_ids, stage2_output)
+    if rows and str(rows[0]["issue"]) != issue_text:
+        rows = []
+        registry_reason = "STRUCTURAL_REGISTRY_TRACE_ISSUE_MISMATCH"
+    weights, stage2_reason, stage2_status = _stage2_rows(
+        ordered_match_ids, stage2_output
+    )
     reason = registry_reason or stage2_reason
     if reason is not None:
         output = {
             **base,
-            "status": "UNAVAILABLE",
+            "status": "UNAVAILABLE" if registry_reason else stage2_status,
             "reason_code": reason,
             "requested_ticket_count": 0,
             "requested_stake_yuan": 0,
@@ -292,8 +357,13 @@ def compose_structural_delete(
             "per_match": [],
             "counts": tuple([0] * (3**LEGS)),
         }
-        output["stage3_replay_signature_sha256"] = canonical_hash(
-            {key: value for key, value in output.items() if key != "counts"}
+        output["stage3_replay_signature_sha256"] = replay_signature
+        output["structural_output_identity_sha256"] = canonical_hash(
+            {
+                key: value
+                for key, value in output.items()
+                if key not in {"counts", "structural_output_identity_sha256"}
+            }
         )
         return output
 
@@ -340,7 +410,12 @@ def compose_structural_delete(
         "per_match": per_match,
         "counts": tuple(counts),
     }
-    output["stage3_replay_signature_sha256"] = canonical_hash(
-        {key: value for key, value in output.items() if key != "counts"}
+    output["stage3_replay_signature_sha256"] = replay_signature
+    output["structural_output_identity_sha256"] = canonical_hash(
+        {
+            key: value
+            for key, value in output.items()
+            if key not in {"counts", "structural_output_identity_sha256"}
+        }
     )
     return output

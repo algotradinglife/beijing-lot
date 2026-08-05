@@ -17,6 +17,6 @@
   "v2_1_adapter": {
     "execution": "copied into the immutable package and preferred by packaged replay",
     "file": "structural_delete_adapter.py",
-    "sha256": "06361afeaef3fd260399df07fdd0c90a893701aea5d212aef04f5f9e0993afbc"
+    "sha256": "45e19d79c4753afb33e77139dd8828e5d8b80bbc2b9b7eefb7fab6c9a18b7a65"
   }
 }
