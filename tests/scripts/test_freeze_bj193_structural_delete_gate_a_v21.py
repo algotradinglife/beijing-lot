@@ -3,9 +3,9 @@ from __future__ import annotations
 import csv
 import gzip
 import hashlib
-import importlib.util
 import json
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -24,12 +24,29 @@ V2_ADAPTER = (
 
 
 def load(path: Path, name: str):
-    spec = importlib.util.spec_from_file_location(name, path)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
+    module = types.ModuleType(name)
+    module.__file__ = str(path)
+    module.__package__ = name.rpartition(".")[0]
     sys.modules[name] = module
-    spec.loader.exec_module(module)
+    exec(compile(path.read_bytes(), str(path), "exec"), module.__dict__)
     return module
+
+
+def assert_no_package_bytecode() -> None:
+    for package in (
+        PACKAGE,
+        ROOT / "results" / "bj193_gate_a_chain_interface_v2",
+    ):
+        assert not list(package.rglob("__pycache__"))
+        assert not list(package.rglob("*.pyc"))
+
+
+def test_frozen_source_loaders_do_not_mutate_immutable_packages():
+    assert_no_package_bytecode()
+    freeze = load(SCRIPT, "bj193_v21_test_bytecode_free_freeze")
+    freeze.load_module(V2_ADAPTER, "bj193_v21_test_bytecode_free_runner_loader")
+    load(V2_ADAPTER, "bj193_v21_test_bytecode_free_test_loader")
+    assert_no_package_bytecode()
 
 
 def rows(path: Path) -> list[dict[str, str]]:
@@ -119,6 +136,7 @@ def test_structural_coverage_is_complete_for_127_134_and_fails_closed_for_190():
 def test_structural_adapter_native_same_distinct_missing_mixed_and_ties():
     adapter = load(ADAPTER, "bj193_v21_test_adapter")
     accepted_v2 = load(V2_ADAPTER, "bj193_v21_test_accepted_v2_adapter")
+    assert_no_package_bytecode()
     golden = json.loads(
         (PACKAGE / "structural_delete_golden_vectors.json").read_text()
     )
