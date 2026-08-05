@@ -21,14 +21,13 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 GATE_A = ROOT / "results" / "bj193_gate_a_preoutcome_v1"
 GATE_A_V2 = ROOT / "results" / "bj193_gate_a_chain_interface_v2"
-ORACLE_CORRECTION = ROOT / "results" / "bj193_gate_b_oracle_correction_v1"
+ORACLE_CORRECTION = ROOT / "results" / "bj193_gate_b_oracle_correction_v1r1"
 CONTRACT = "bj193-gate-b-three-stage-regime-meta-policy-v2"
 CHECKPOINT_CONTRACT = "bj193-gate-b-three-stage-checkpoint-v2"
-ORACLE_CORRECTION_CONTRACT = "bj193-gate-b-oracle-fold-join-correction-v1"
-EXPECTED_ORACLE_CORRECTION_MANIFEST = (
-    "f0ded040b50bc80d1d84ec63b3463c55f1765b6dbcfaf81f9a9cf4a6767a1eeb"
-)
+ORACLE_CORRECTION_CONTRACT = "bj193-gate-b-oracle-fold-join-correction-v1r1"
+EXPECTED_ORACLE_CORRECTION_MANIFEST = "PENDING_V1R1_MANIFEST"
 REFERENCE_CAPITAL = 220_000.0
+BANKROLL_START = 100_000.0
 BOOTSTRAP_DRAWS = 20_000
 BOOTSTRAP_SEED = 193_001
 CAUSAL = (
@@ -38,6 +37,14 @@ CAUSAL = (
     "FULL_DYNAMIC_CHAIN",
 )
 POLICIES = CAUSAL + ("PRIOR_ONLY_BEST_FIXED", "LEAKY_ORACLE_CEILING")
+EXPECTED_BANKROLL_100K = {
+    "ALL_STATIC": (0.29558, 8.2669, True, "", 83722.21),
+    "DYNAMIC_SELECTION_ONLY": (-0.4971515, 10.5413, False, "23034", 159668.25),
+    "DYNAMIC_SELECTION_DIRECTION": (0.0825413, 8.0627, False, "23104", 114385.97),
+    "PRIOR_ONLY_BEST_FIXED": (0.412151, 2.8954, True, "", 58784.90),
+    "FULL_DYNAMIC_CHAIN": (0.0758962, 3.6127, True, "", 92410.38),
+    "LEAKY_ORACLE_CEILING": (4.5542578, 4.1700, True, "", 15931.53),
+}
 CONTRASTS = (
     ("STAGE_1_SELECTION", "DYNAMIC_SELECTION_ONLY", "ALL_STATIC"),
     ("STAGE_2_DIRECTION", "DYNAMIC_SELECTION_DIRECTION", "DYNAMIC_SELECTION_ONLY"),
@@ -217,9 +224,227 @@ def _metrics(rows: Sequence[dict[str, str]]) -> dict[str, object]:
         "gross_issue_hhi": float(np.square(gross_share).sum()),
         "largest_issue_share": float(gross_share.max(initial=0.0)),
         "largest_issue_gross_share": float(gross_share.max(initial=0.0)),
-        "turnover": switches / max(1, len(rows) - 1),
+        "action_switch_rate": switches / max(1, len(rows) - 1),
         "action_switch_count": switches,
     }
+
+
+def _bankroll_100k(
+    policy: str, rows: Sequence[dict[str, str]]
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    """Replay frozen native stake against one finite 100k cash account.
+
+    Stake is never resized or compounded and no top-up is injected.  The
+    required-top-up columns are diagnostics only; once the cash account cannot
+    fund a same-issue stake the complete frozen path is marked infeasible.
+    """
+
+    capital = BANKROLL_START
+    cumulative_stake = 0.0
+    cumulative_net_before = 0.0
+    running_peak = BANKROLL_START
+    minimum_required_start = 0.0
+    first_unfundable = ""
+    maximum_required_top_up = 0.0
+    output: list[dict[str, object]] = []
+    for index, row in enumerate(rows):
+        stake = float(row["stake_yuan"])
+        gross = float(row["gross_pre_tax_yuan"])
+        net = float(row["pre_tax_net_yuan"])
+        tax = float(row["tax_yuan"])
+        tax_net = float(row["tax_adjusted_net_yuan"])
+        capital_before = capital
+        fundable = capital_before + 1e-9 >= stake
+        required_top_up = max(0.0, stake - capital_before)
+        if not fundable and not first_unfundable:
+            first_unfundable = row["issue"]
+        maximum_required_top_up = max(maximum_required_top_up, required_top_up)
+        minimum_required_start = max(
+            minimum_required_start, stake - cumulative_net_before
+        )
+        cumulative_stake += stake
+        capital = capital_before + net
+        cumulative_net_before += net
+        running_peak = max(running_peak, capital)
+        drawdown = running_peak - capital
+        output.append(
+            {
+                "policy_id": policy,
+                "issue": row["issue"],
+                "issue_index": row["issue_index"],
+                "year": row["year"],
+                "outer_fold": row["outer_fold"],
+                "chronology_index": index,
+                "status": row["status"],
+                "capital_before_yuan": fmt(capital_before),
+                "native_stake_yuan": fmt(stake),
+                "gross_pre_tax_yuan": fmt(gross),
+                "pre_tax_pnl_yuan": fmt(net),
+                "tax_yuan": fmt(tax),
+                "tax_adjusted_pnl_yuan": fmt(tax_net),
+                "capital_after_yuan": fmt(capital),
+                "cumulative_stake_yuan": fmt(cumulative_stake),
+                "capital_turnover_multiple": fmt(
+                    cumulative_stake / BANKROLL_START
+                ),
+                "running_peak_yuan": fmt(running_peak),
+                "drawdown_yuan": fmt(drawdown),
+                "drawdown_pct": fmt(
+                    drawdown / running_peak if running_peak else None
+                ),
+                "fundable_flag": fundable,
+                "required_top_up_yuan": fmt(required_top_up),
+            }
+        )
+    capital_values = [BANKROLL_START] + [
+        float(row["capital_after_yuan"]) for row in output
+    ]
+    tax_adjusted_end = BANKROLL_START + sum(
+        float(row["tax_adjusted_net_yuan"]) for row in rows
+    )
+    summary = {
+        "policy_id": policy,
+        "starting_bankroll_yuan": fmt(BANKROLL_START),
+        "ending_bankroll_yuan": fmt(capital),
+        "bankroll_growth_yuan": fmt(capital - BANKROLL_START),
+        "bankroll_growth_rate": fmt((capital - BANKROLL_START) / BANKROLL_START),
+        "total_native_stake_yuan": fmt(cumulative_stake),
+        "capital_turnover_multiple": fmt(cumulative_stake / BANKROLL_START),
+        "minimum_capital_yuan": fmt(min(capital_values)),
+        "fundable_all_issues_flag": not bool(first_unfundable),
+        "first_unfundable_issue": first_unfundable,
+        "maximum_required_top_up_yuan": fmt(maximum_required_top_up),
+        "minimum_starting_bankroll_required_yuan": fmt(
+            max(0.0, minimum_required_start)
+        ),
+        "tax_adjusted_ending_bankroll_yuan": fmt(tax_adjusted_end),
+        "tax_adjusted_growth_rate": fmt(
+            (tax_adjusted_end - BANKROLL_START) / BANKROLL_START
+        ),
+        "stake_rule": "FROZEN_NATIVE_STAKE_NO_RESIZING_NO_COMPOUNDING",
+        "funding_rule": "SAME_ISSUE_STAKE_MUST_BE_CASH_FUNDED_NO_TOPUPS",
+    }
+    return output, summary
+
+
+def _assert_bankroll_100k_anchors(
+    summaries: Sequence[Mapping[str, object]], *, tolerance_yuan: float = 0.02
+) -> None:
+    index = {str(row["policy_id"]): row for row in summaries}
+    if set(index) != set(EXPECTED_BANKROLL_100K):
+        raise RuntimeError("100k bankroll policy census drift")
+    for policy, (
+        expected_end_multiple,
+        expected_turnover,
+        expected_fundable,
+        expected_first,
+        expected_minimum_start,
+    ) in EXPECTED_BANKROLL_100K.items():
+        row = index[policy]
+        observed_end = float(row["ending_bankroll_yuan"])
+        observed_turnover = float(row["capital_turnover_multiple"])
+        observed_minimum_start = float(
+            row["minimum_starting_bankroll_required_yuan"]
+        )
+        if abs(observed_end - expected_end_multiple * BANKROLL_START) > tolerance_yuan:
+            raise RuntimeError(f"100k ending bankroll anchor drift: {policy}")
+        if abs(observed_turnover - expected_turnover) > 5e-5:
+            raise RuntimeError(f"100k capital turnover anchor drift: {policy}")
+        if bool(row["fundable_all_issues_flag"]) != expected_fundable:
+            raise RuntimeError(f"100k fundability anchor drift: {policy}")
+        if str(row["first_unfundable_issue"]) != expected_first:
+            raise RuntimeError(f"100k first-unfundable anchor drift: {policy}")
+        if abs(observed_minimum_start - expected_minimum_start) > tolerance_yuan:
+            raise RuntimeError(f"100k minimum-start anchor drift: {policy}")
+
+
+def _svg_line_chart(
+    path: Path,
+    title: str,
+    series: Sequence[tuple[str, Sequence[float]]],
+    *,
+    width: int = 1100,
+    height: int = 620,
+) -> None:
+    """Write a dependency-free deterministic SVG line chart."""
+
+    colors = ("#2563eb", "#dc2626", "#059669", "#7c3aed", "#d97706", "#111827")
+    values = [value for _, items in series for value in items]
+    lo, hi = min(values), max(values)
+    if math.isclose(lo, hi):
+        lo, hi = lo - 1.0, hi + 1.0
+    left, top, right, bottom = 90, 55, 30, 75
+    plot_w, plot_h = width - left - right, height - top - bottom
+    count = max((len(items) for _, items in series), default=1)
+    x = lambda i: left + (plot_w * i / max(1, count - 1))
+    y = lambda value: top + plot_h * (hi - value) / (hi - lo)
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
+        '<rect width="100%" height="100%" fill="white"/>',
+        f'<text x="{left}" y="30" font-family="sans-serif" font-size="20" font-weight="bold">{title}</text>',
+        f'<line x1="{left}" y1="{top}" x2="{left}" y2="{top + plot_h}" stroke="#777"/>',
+        f'<line x1="{left}" y1="{top + plot_h}" x2="{left + plot_w}" y2="{top + plot_h}" stroke="#777"/>',
+    ]
+    for tick in range(5):
+        value = lo + (hi - lo) * tick / 4
+        yy = y(value)
+        parts += [
+            f'<line x1="{left}" y1="{yy:.2f}" x2="{left + plot_w}" y2="{yy:.2f}" stroke="#e5e7eb"/>',
+            f'<text x="{left - 8}" y="{yy + 4:.2f}" text-anchor="end" font-family="sans-serif" font-size="11">{value:,.0f}</text>',
+        ]
+    for series_index, (label, items) in enumerate(series):
+        color = colors[series_index % len(colors)]
+        points = " ".join(
+            f"{x(i):.2f},{y(value):.2f}" for i, value in enumerate(items)
+        )
+        parts.append(
+            f'<polyline fill="none" stroke="{color}" stroke-width="2" points="{points}"/>'
+        )
+        legend_x = left + (series_index % 3) * 320
+        legend_y = height - 42 + (series_index // 3) * 18
+        parts += [
+            f'<line x1="{legend_x}" y1="{legend_y - 4}" x2="{legend_x + 24}" y2="{legend_y - 4}" stroke="{color}" stroke-width="3"/>',
+            f'<text x="{legend_x + 30}" y="{legend_y}" font-family="sans-serif" font-size="11">{label}</text>',
+        ]
+    parts += [
+        f'<text x="{left + plot_w / 2:.2f}" y="{height - 8}" text-anchor="middle" font-family="sans-serif" font-size="12">Chronological issue index</text>',
+        "</svg>",
+    ]
+    path.write_text("\n".join(parts) + "\n")
+
+
+def _svg_bar_chart(
+    path: Path, title: str, rows: Sequence[tuple[str, float]], ylabel: str
+) -> None:
+    width, height = 1100, 620
+    left, top, right, bottom = 90, 55, 30, 145
+    plot_w, plot_h = width - left - right, height - top - bottom
+    values = [value for _, value in rows] + [0.0]
+    lo, hi = min(values), max(values)
+    pad = max(1.0, (hi - lo) * 0.08)
+    lo, hi = min(0.0, lo - pad), max(0.0, hi + pad)
+    y = lambda value: top + plot_h * (hi - value) / (hi - lo)
+    bar_w = plot_w / max(1, len(rows)) * 0.65
+    zero = y(0.0)
+    parts = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
+        '<rect width="100%" height="100%" fill="white"/>',
+        f'<text x="{left}" y="30" font-family="sans-serif" font-size="20" font-weight="bold">{title}</text>',
+        f'<line x1="{left}" y1="{zero:.2f}" x2="{left + plot_w}" y2="{zero:.2f}" stroke="#555"/>',
+        f'<text x="18" y="{top + plot_h / 2:.2f}" transform="rotate(-90 18 {top + plot_h / 2:.2f})" text-anchor="middle" font-family="sans-serif" font-size="12">{ylabel}</text>',
+    ]
+    for index, (label, value) in enumerate(rows):
+        center = left + plot_w * (index + 0.5) / len(rows)
+        yy = y(value)
+        rect_y, rect_h = min(zero, yy), abs(zero - yy)
+        color = "#059669" if value >= 0 else "#dc2626"
+        parts += [
+            f'<rect x="{center - bar_w / 2:.2f}" y="{rect_y:.2f}" width="{bar_w:.2f}" height="{max(rect_h, 1):.2f}" fill="{color}"/>',
+            f'<text x="{center:.2f}" y="{height - bottom + 18}" text-anchor="end" transform="rotate(-35 {center:.2f} {height - bottom + 18})" font-family="sans-serif" font-size="10">{label}</text>',
+            f'<text x="{center:.2f}" y="{yy - 6 if value >= 0 else yy + 14:.2f}" text-anchor="middle" font-family="sans-serif" font-size="10">{value:.3f}</text>',
+        ]
+    parts.append("</svg>")
+    path.write_text("\n".join(parts) + "\n")
 
 
 def _metric_row(policy: str, support: str, rows: Sequence[dict[str, str]]) -> dict[str, object]:
@@ -572,6 +797,19 @@ def finalize(checkpoint: Path, target: Path) -> None:
     correction_receipt = json.loads(
         (ORACLE_CORRECTION / "oracle_correction_receipt.json").read_text()
     )
+    correction_expected = {
+        "changed_action_issue_count": 151,
+        "changed_cashflow_or_status_issue_count": 148,
+        "corrected_oracle_selected_count": 181,
+        "corrected_oracle_fallback_count": 163,
+        "oracle_better_than_causal_issue_count": 107,
+    }
+    for field, expected in correction_expected.items():
+        if correction_receipt.get(field) != expected:
+            raise RuntimeError(
+                f"oracle correction v1r1 anchor drift: {field}="
+                f"{correction_receipt.get(field)!r}, expected={expected!r}"
+            )
     if correction_binding["checkpoint_manifest_sha256"] != checkpoint_manifest_sha:
         raise RuntimeError("oracle correction checkpoint binding drift")
     if target.exists():
@@ -600,6 +838,39 @@ def finalize(checkpoint: Path, target: Path) -> None:
         perf_fields = list(performance[0])
         write_csv(stage / "performance_summary.csv", perf_fields, performance)
         write_csv(stage / "native_and_strict_common_performance.csv", perf_fields, performance)
+        bankroll_rows: list[dict[str, object]] = []
+        bankroll_summary: list[dict[str, object]] = []
+        for policy in POLICIES:
+            issue_rows, summary = _bankroll_100k(policy, by_policy[policy])
+            bankroll_rows.extend(issue_rows)
+            bankroll_summary.append(summary)
+        _assert_bankroll_100k_anchors(bankroll_summary)
+        write_gzip(
+            stage / "bankroll_100k_issue_path.csv.gz",
+            list(bankroll_rows[0]),
+            bankroll_rows,
+        )
+        write_csv(
+            stage / "bankroll_100k_summary.csv",
+            list(bankroll_summary[0]),
+            bankroll_summary,
+        )
+        bankroll_by_policy = {
+            policy: [
+                BANKROLL_START,
+                *[
+                    float(row["capital_after_yuan"])
+                    for row in bankroll_rows
+                    if row["policy_id"] == policy
+                ],
+            ]
+            for policy in POLICIES
+        }
+        _svg_line_chart(
+            stage / "bankroll_100k_capital_curves.svg",
+            "#193 fixed-stake capital reuse from ¥100,000",
+            [(policy, bankroll_by_policy[policy]) for policy in POLICIES],
+        )
         support_census = [
             {
                 "policy_id": row["policy_id"],
@@ -651,6 +922,38 @@ def finalize(checkpoint: Path, target: Path) -> None:
         write_csv(stage / "rolling_loss_windows.csv", list(rolling[0]), rolling)
         write_csv(stage / "drawdown_episodes.csv", list(episodes[0]), episodes)
         write_csv(stage / "recovery_summary.csv", list(recovery[0]), recovery)
+        drawdown_chart = []
+        recovery_index = {
+            (row["policy_id"], row["sequence_basis"]): row
+            for row in recovery
+        }
+        for policy in POLICIES:
+            metrics = _metrics(by_policy[policy])
+            drawdown_chart.append(
+                {
+                    "policy_id": policy,
+                    "support": "NATIVE",
+                    "max_drawdown_yuan": fmt(metrics["max_drawdown_yuan"]),
+                    "max_drawdown_pct": fmt(metrics["max_drawdown_pct"]),
+                    "max_recovery_issues": recovery_index[
+                        (policy, "CALENDAR")
+                    ]["max_recovery_issues"],
+                }
+            )
+        write_csv(
+            stage / "drawdown_holding_chart_source.csv",
+            list(drawdown_chart[0]),
+            drawdown_chart,
+        )
+        _svg_bar_chart(
+            stage / "drawdown_holding.svg",
+            "#193 native-support maximum drawdown",
+            [
+                (row["policy_id"], -float(row["max_drawdown_yuan"]))
+                for row in drawdown_chart
+            ],
+            "Negative max drawdown (yuan)",
+        )
 
         stability, concentration = [], []
         for policy, rows in by_policy.items():
@@ -681,6 +984,24 @@ def finalize(checkpoint: Path, target: Path) -> None:
                 })
         write_csv(stage / "incremental_attribution_summary.csv", list(increments[0]), increments)
         write_csv(stage / "incremental_roi_holding_bridge.csv", list(increments[0]), increments)
+        stage_chart = [
+            row for row in increments
+            if row["support"] == "STRICT_FOUR_ARM_COMMON"
+        ]
+        write_csv(
+            stage / "stage_attribution_chart_source.csv",
+            list(stage_chart[0]),
+            stage_chart,
+        )
+        _svg_bar_chart(
+            stage / "stage_attribution_waterfall.svg",
+            "#193 strict-common incremental ROI attribution",
+            [
+                (row["stage"], float(row["pre_tax_roi_lift"]))
+                for row in stage_chart
+            ],
+            "Pre-tax ROI lift",
+        )
 
         oracle_rows = []
         for causal, oracle in zip(by_policy["FULL_DYNAMIC_CHAIN"], by_policy["LEAKY_ORACLE_CEILING"], strict=True):
@@ -710,6 +1031,37 @@ def finalize(checkpoint: Path, target: Path) -> None:
             })
         write_csv(stage / "stage_regret_decomposition.csv", list(stage_regret[0]), stage_regret)
         write_gzip(stage / "oracle_ceiling_and_stage_regret.csv.gz", list(stage_regret[0]), stage_regret)
+        causal_oracle_chart = [
+            {
+                "policy_id": policy,
+                "support": "STRICT_FOUR_ARM_COMMON",
+                "pre_tax_roi": fmt(
+                    _metrics(
+                        [by_policy[policy][i] for i in common_indices]
+                    )["pre_tax_roi"]
+                ),
+                "diagnostic_role": (
+                    "LEAKY_DIAGNOSTIC_ONLY"
+                    if policy == "LEAKY_ORACLE_CEILING"
+                    else "CAUSAL_OR_BASELINE"
+                ),
+            }
+            for policy in POLICIES
+        ]
+        write_csv(
+            stage / "causal_vs_oracle_chart_source.csv",
+            list(causal_oracle_chart[0]),
+            causal_oracle_chart,
+        )
+        _svg_bar_chart(
+            stage / "causal_vs_oracle_comparison.svg",
+            "#193 causal policies versus corrected leaky oracle",
+            [
+                (row["policy_id"], float(row["pre_tax_roi"]))
+                for row in causal_oracle_chart
+            ],
+            "Strict-common pre-tax ROI",
+        )
 
         seed_rows = read_csv(checkpoint / "selected_policy_seed_settlement.csv.gz")
         seed_dispersion = _seed_dispersion(seed_rows)
@@ -859,6 +1211,14 @@ def finalize(checkpoint: Path, target: Path) -> None:
             "corrected_oracle_fallback_count": correction_receipt[
                 "corrected_oracle_fallback_count"
             ],
+            "corrected_oracle_changed_action_issue_count": correction_receipt[
+                "changed_action_issue_count"
+            ],
+            "corrected_oracle_changed_cashflow_or_status_issue_count": (
+                correction_receipt[
+                    "changed_cashflow_or_status_issue_count"
+                ]
+            ),
             "gate_a_v1_manifest_sha256": "408e8aa69cf2d336f8b3b65b1c94b30a3456864af01517a78fc27b3f2bab0c45",
             "gate_a_v2_manifest_sha256": "6a44f4b1b355f5476328424bc8d92271d61d585643d40ca42bb56ffda1c43933",
             "gate_a_v21_manifest_sha256": "b5456cd62c8d22cce6e1bc5f1bb76abee8154fcf547664c62e4793d36864e5dd",
@@ -882,6 +1242,24 @@ def finalize(checkpoint: Path, target: Path) -> None:
             "bootstrap_draws": BOOTSTRAP_DRAWS, "bootstrap_seed": BOOTSTRAP_SEED,
             "bootstrap_draw_bundle_sha256": draw_hash,
             "pre_tax_controlling": True, "tax_reference_only": True,
+            "bankroll_start_yuan": BANKROLL_START,
+            "bankroll_execution": (
+                "FIXED_NATIVE_STAKE_REUSE_NO_RESIZING_NO_COMPOUNDING_NO_TOPUPS"
+            ),
+            "bankroll_issue_path_row_count": len(bankroll_rows),
+            "bankroll_summary_row_count": len(bankroll_summary),
+            "chart_sources": [
+                "bankroll_100k_issue_path.csv.gz",
+                "stage_attribution_chart_source.csv",
+                "causal_vs_oracle_chart_source.csv",
+                "drawdown_holding_chart_source.csv",
+            ],
+            "rendered_charts": [
+                "bankroll_100k_capital_curves.svg",
+                "stage_attribution_waterfall.svg",
+                "causal_vs_oracle_comparison.svg",
+                "drawdown_holding.svg",
+            ],
             "candidate_count": candidate["candidate_count"], "decision": candidate["decision"],
             "promotion_authority": False, "parent_192_unblock_authority": False,
             "policy_flow_row_count": len(flows),
@@ -923,38 +1301,137 @@ def finalize(checkpoint: Path, target: Path) -> None:
         bottleneck = min(
             causal_stage_rows, key=lambda row: float(row["pre_tax_roi_lift"])
         )
+        bankroll_lookup = {
+            row["policy_id"]: row for row in bankroll_summary
+        }
+        choice_rows = {
+            "STAGE_1_SELECTION": s1,
+            "STAGE_2_DIRECTION": s2,
+            "STAGE_3_BET": s3,
+        }
+        dominant_choices = []
+        for stage_name, rows in choice_rows.items():
+            counts: dict[tuple[str, str, str], int] = defaultdict(int)
+            for row in rows:
+                counts[(row["source_identity"], row["mechanism"], row["M"])] += 1
+            key, count = max(counts.items(), key=lambda value: (value[1], value[0]))
+            dominant_choices.append((stage_name, *key, count))
         report = [
             "# #193 Gate-B v2 — three-stage regime meta-policy settlement",
-            "", f"Decision: **{candidate['decision']}**.", "",
-            "Pre-tax ROI controls; tax-adjusted values are reference-only. The leaky oracle is diagnostic-only.", "",
-            "## Strict four-arm common support", "",
-            "| Policy | Active issues | Stake (yuan) | Pre-tax ROI | Max drawdown (yuan) |",
-            "|---|---:|---:|---:|---:|",
+            "",
+            f"Decision: **{candidate['decision']}**. The controlling result is pre-tax; tax-adjusted values are reference-only. The corrected leaky oracle is a diagnostic ceiling, never a deployable policy.",
+            "",
+            "## Native and strict-common baseline ladder",
+            "",
+            "| Policy | Native active | Native stake | Native ROI | Common active | Common stake | Common ROI |",
+            "|---|---:|---:|---:|---:|---:|---:|",
         ]
         for policy in POLICIES:
-            row = perf_lookup[(policy, "STRICT_FOUR_ARM_COMMON")]
-            report.append(f"| {policy} | {row['active_issue_count']} | {row['stake_yuan']} | {row['pre_tax_roi']} | {row['max_drawdown_yuan']} |")
+            native = perf_lookup[(policy, "NATIVE")]
+            common_row = perf_lookup[(policy, "STRICT_FOUR_ARM_COMMON")]
+            report.append(
+                f"| {policy} | {native['active_issue_count']} | {native['stake_yuan']} | {native['pre_tax_roi']} | "
+                f"{common_row['active_issue_count']} | {common_row['stake_yuan']} | {common_row['pre_tax_roi']} |"
+            )
         report += [
-            "", "## Interpretation", "",
-            f"- Strict common support contains {len(common_indices)} canonical issues.",
-            f"- Failure attribution: `{failure_code}`.",
-            f"- Strict independent EV required: `{candidate['strict_independent_ev_required']}`.",
-            f"- Strongest surviving matched baseline: `{strongest_baseline}`.",
-            f"- Largest incremental bottleneck: `{bottleneck['stage']}` lift `{bottleneck['pre_tax_roi_lift']}`.",
-            "- Next positive-search direction: explain the corrected oracle opportunity regimes using only frozen pre-event features in a separately preregistered study; do not backfit this negative causal chain or pass it to #192.",
-            "- No seed identity was selected; seed rows remain nuisance-replicate diagnostics.",
-            "- NO_BET and UNAVAILABLE are explicit zero flows, never fake losses.",
-            "- Detailed chart-source tables, YEAR/FOLD/LOYO, exclusions, paired 20k bootstrap, equity, streak, rolling-window, drawdown and recovery tables are manifest-covered.",
-            "", "## Durability boundary", "",
-            "The atomic checkpoint persisted exact issue/action economics and path/model receipts, but not per-ticket ledger rows. This finalizer does not fabricate them; `trace_and_ticket_ledger_boundary.json` records the limitation for PI review.",
-            "", "Paper research only. No betting, production, promotion, or #192-unblock authority is implied.",
+            "",
+            f"The strict four-arm common support contains {len(common_indices)} canonical issues. `{strongest_baseline}` is the strongest surviving matched causal/prior baseline. The oracle's positive ROI diagnoses foregone information, not causal generalization.",
+            "",
+            "## Stage attribution and paired uncertainty",
+            "",
+            "| Stage | Candidate − comparator ROI | 95% paired IID CI | P(lift>0) |",
+            "|---|---:|---:|---:|",
+        ]
+        for row in causal_stage_rows:
+            boot = boot_index[(row["candidate"], row["comparator"], "PRE_TAX_ROI_LIFT_IID")]
+            report.append(
+                f"| {row['stage']} | {row['pre_tax_roi_lift']} | [{boot['ci_low']}, {boot['ci_high']}] | {boot['probability_improvement']} |"
+            )
+        report += [
+            "",
+            f"The largest incremental bottleneck is `{bottleneck['stage']}` with strict-common lift `{bottleneck['pre_tax_roi_lift']}`. End-to-end causal mapping does not clear positivity, matched comparators and the paired bootstrap screen, so the failure code is `{failure_code}`.",
+            "",
+            "![Stage attribution](stage_attribution_waterfall.svg)",
+            "",
+            "![Causal versus oracle](causal_vs_oracle_comparison.svg)",
+            "",
+            "## Fixed-stake capital reuse from ¥100,000",
+            "",
+            "This is a cash-account diagnostic using the frozen native stake schedule. Stakes are not resized or compounded; no top-up is injected. Capital turnover is cumulative stake divided by ¥100,000 and is distinct from both cumulative ROI and bankroll growth.",
+            "",
+            "| Policy | Ending bankroll | Growth | Stake | Capital turnover | Fundable | First unfundable | Minimum start required |",
+            "|---|---:|---:|---:|---:|---|---:|---:|",
+        ]
+        for policy in POLICIES:
+            row = bankroll_lookup[policy]
+            report.append(
+                f"| {policy} | {row['ending_bankroll_yuan']} | {row['bankroll_growth_rate']} | "
+                f"{row['total_native_stake_yuan']} | {row['capital_turnover_multiple']}× | "
+                f"{row['fundable_all_issues_flag']} | {row['first_unfundable_issue'] or '—'} | "
+                f"{row['minimum_starting_bankroll_required_yuan']} |"
+            )
+        report += [
+            "",
+            "Capital reuse amplifies whatever edge is present: it cannot rescue negative expectation. `DYNAMIC_SELECTION_ONLY` and `DYNAMIC_SELECTION_DIRECTION` become infeasible under the exact ¥100,000 schedule; the negative causal policies finish far below the start even when technically fundable. The oracle remains strongly positive but is leaky and diagnostic-only.",
+            "",
+            "![100k capital curves](bankroll_100k_capital_curves.svg)",
+            "",
+            "## Holding risk and recoverability",
+            "",
+            f"For `FULL_DYNAMIC_CHAIN`, the native maximum drawdown is {perf_lookup[('FULL_DYNAMIC_CHAIN', 'NATIVE')]['max_drawdown_yuan']} yuan ({perf_lookup[('FULL_DYNAMIC_CHAIN', 'NATIVE')]['max_drawdown_pct']}); the maximum calendar recovery is {holding_index[('FULL_DYNAMIC_CHAIN', 'CALENDAR')]['max_recovery_issues']} issues. Its maximum negative-PnL streak is {streak_index[('FULL_DYNAMIC_CHAIN', 'ALL', 'CALENDAR')]['max_negative_pnl_streak']} and maximum active-bet zero-payout miss streak is {streak_index[('FULL_DYNAMIC_CHAIN', 'ALL', 'ACTIVE_BET')]['max_zero_payout_miss_streak']}.",
+            "",
+            "![Drawdown and holding](drawdown_holding.svg)",
+            "",
+            "## Choice and regime findings",
+            "",
+        ]
+        for stage_name, source, mechanism, m_value, count in dominant_choices:
+            report.append(
+                f"- `{stage_name}` most often chose source `{source}` / mechanism `{mechanism or 'NA'}` / M `{m_value or 'NA'}` on {count} of 344 issues. The complete issue/regime mapping, fallback flags and feature values are retained in the three stage choice tables."
+            )
+        report += [
+            "- Seed identities remain nuisance replicates; no seed identity was selected.",
+            "- NO_BET and UNAVAILABLE are explicit zero flows and are never converted to fake losses.",
+            "",
+            "## Scientific interpretation",
+            "",
+            f"The corrected oracle selected an available action on {correction_receipt['corrected_oracle_selected_count']} issues, fell back on {correction_receipt['corrected_oracle_fallback_count']}, changed action on {correction_receipt['changed_action_issue_count']}, changed status/cash flow on {correction_receipt['changed_cashflow_or_status_issue_count']}, and beat the causal chain on {correction_receipt['oracle_better_than_causal_issue_count']} issues. This gap plus negative causal performance is precisely `CAUSAL_GENERALIZATION_FAILURE`: profitable ex-post choices exist, but the frozen pre-event mapping did not identify them robustly.",
+            f"The strongest surviving baseline is `{strongest_baseline}`; the bottleneck is `{bottleneck['stage']}`. A concrete next hypothesis is to explain corrected-oracle opportunity regimes with separately preregistered frozen pre-event features, without backfitting this chain or handing it to #192.",
+            "",
+            "## Durability boundary",
+            "",
+            "The immutable checkpoint persisted exact issue/action economics and path/model receipts but not per-ticket ledger rows. This finalizer does not reconstruct or fabricate tickets; `trace_and_ticket_ledger_boundary.json` records that limitation. YEAR/FOLD/LOYO, exclusions, 20,000-draw paired bootstrap, equity, streak, rolling-window, drawdown, recovery, chart-source and rendered SVG artifacts are manifest-covered.",
+            "",
+            "Paper research only. No betting, production, promotion, strict-EV escalation or #192-unblock authority is implied.",
         ]
         (stage / "REPORT.md").write_text("\n".join(report) + "\n")
         wiki = [
-            "# Issue 193 — Regime-conditioned N7 meta-policy", "",
-            f"Terminal research disposition candidate: **{candidate['decision']}**.", "",
-            "The study evaluates selection, direction and allocation as a chronological three-stage chain against matched static and prior-only baselines. Consult the manifest-covered report and tables for exact economics and holdability.", "",
-            "This is historical paper research, not an operational betting rule.",
+            "# Issue 193 — Regime-conditioned N7 meta-policy",
+            "",
+            f"Terminal research disposition candidate: **{candidate['decision']}**.",
+            "",
+            "The frozen chronological chain separately learns match selection, direction and allocation/M. On the 189-issue strict common support it does not beat the strongest matched baseline with a positive paired-bootstrap lower bound. The corrected oracle is positive, but because it uses outcome information it is only a ceiling: the result is `CAUSAL_GENERALIZATION_FAILURE`, not a deployable edge.",
+            "",
+            "## Decision readout",
+            "",
+            f"- Strongest surviving baseline: `{strongest_baseline}`.",
+            f"- Largest incremental bottleneck: `{bottleneck['stage']}` with lift `{bottleneck['pre_tax_roi_lift']}`.",
+            "- Controlling economics: pre-tax; tax-adjusted values are reference-only.",
+            "- No strict EV escalation and no handoff to #192.",
+            "",
+            "## Capital and risk",
+            "",
+            "The ¥100,000 view reuses cash across issues with the native frozen stakes and no compounding or top-ups. Capital turnover is stake/start-capital, not ROI and not bankroll growth. Two dynamic chains are unfundable; all negative causal policies lose substantial bankroll. The leaky oracle grows capital but remains diagnostic-only.",
+            "",
+            "![100k capital curves](bankroll_100k_capital_curves.svg)",
+            "",
+            "![Stage attribution](stage_attribution_waterfall.svg)",
+            "",
+            "![Causal versus oracle](causal_vs_oracle_comparison.svg)",
+            "",
+            "![Drawdown and holding](drawdown_holding.svg)",
+            "",
+            "The complete report, source tables, 20,000-draw paired bootstrap, stability and durability boundaries are in the immutable Gate-B package. This is historical paper research, not an operational betting rule.",
         ]
         (stage / "RESEARCH_WIKI_ENTRY.md").write_text("\n".join(wiki) + "\n")
         report_wiki_sync = {

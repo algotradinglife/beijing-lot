@@ -978,10 +978,52 @@ def test_finalizer_replaces_only_oracle_rows_and_choices():
 def test_finalizer_verifies_committed_oracle_correction_package():
     payload, manifest_sha = F.verify_package(
         ROOT / "results" / "bj193_gate_b_oracle_correction_v1",
-        F.ORACLE_CORRECTION_CONTRACT,
+        "bj193-gate-b-oracle-fold-join-correction-v1",
     )
-    assert manifest_sha == F.EXPECTED_ORACLE_CORRECTION_MANIFEST
+    assert manifest_sha == (
+        "f0ded040b50bc80d1d84ec63b3463c55f1765b6dbcfaf81f9a9cf4a6767a1eeb"
+    )
     assert len(payload) == 8
+
+
+def test_finalizer_bankroll_path_is_fixed_stake_cash_account():
+    rows = [
+        {
+            "issue": "1",
+            "issue_index": "0",
+            "year": "2022",
+            "outer_fold": "OOS_2022",
+            "status": "ACTIVE",
+            "stake_yuan": "90000",
+            "gross_pre_tax_yuan": "0",
+            "tax_yuan": "0",
+            "pre_tax_net_yuan": "-90000",
+            "tax_adjusted_net_yuan": "-90000",
+        },
+        {
+            "issue": "2",
+            "issue_index": "1",
+            "year": "2022",
+            "outer_fold": "OOS_2022",
+            "status": "ACTIVE",
+            "stake_yuan": "20000",
+            "gross_pre_tax_yuan": "30000",
+            "tax_yuan": "0",
+            "pre_tax_net_yuan": "10000",
+            "tax_adjusted_net_yuan": "10000",
+        },
+    ]
+    path, summary = F._bankroll_100k("TEST", rows)
+    assert path[0]["capital_before_yuan"] == "100000.000000000000"
+    assert path[0]["capital_after_yuan"] == "10000.000000000000"
+    assert path[1]["fundable_flag"] is False
+    assert path[1]["required_top_up_yuan"] == "10000.000000000000"
+    assert summary["ending_bankroll_yuan"] == "20000.000000000000"
+    assert summary["capital_turnover_multiple"] == "1.100000000000"
+    assert summary["first_unfundable_issue"] == "2"
+    assert summary["minimum_starting_bankroll_required_yuan"] == (
+        "110000.000000000000"
+    )
 
 
 def test_finalizer_drawdown_includes_initial_capital_and_metric_aliases():

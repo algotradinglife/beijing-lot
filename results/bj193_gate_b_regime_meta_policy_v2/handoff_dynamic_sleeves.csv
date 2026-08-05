@@ -1,2 +1,0 @@
-sleeve_id,action_namespace,nested_rule,native_support,common_support,holding_disposition,eligibility_for_192,independent_ev_required
-BJ193_FULL_DYNAMIC_CHAIN,THREE_STAGE_CAUSAL_CHAIN,f_selection -> f_direction -> f_bet,207,189,REVIEW_SCORECARD,INELIGIBLE_NO_PROMOTION,False

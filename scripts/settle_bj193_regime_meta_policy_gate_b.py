@@ -36,12 +36,25 @@ GATE_A_V21 = ROOT / "results" / "bj193_gate_a_chain_interface_v21"
 DEFAULT_CHECKPOINT = ROOT / ".scratch" / "bj193_gate_b_chain_checkpoint_v2"
 DEFAULT_OUTPUT = ROOT / "results" / "bj193_gate_b_regime_meta_policy_v2"
 DEFAULT_ORACLE_CORRECTION = (
-    ROOT / "results" / "bj193_gate_b_oracle_correction_v1"
+    ROOT / "results" / "bj193_gate_b_oracle_correction_v1r1"
 )
 EXPECTED_CHECKPOINT_MANIFEST = (
     "4015ca353dff957a79958bf3e7aa73b8824f685c967a73e544d59bc437a3ca15"
 )
-ORACLE_CORRECTION_CONTRACT = "bj193-gate-b-oracle-fold-join-correction-v1"
+ORACLE_CORRECTION_CONTRACT = "bj193-gate-b-oracle-fold-join-correction-v1r1"
+EXPECTED_ORACLE_CORRECTION_COUNTS = {
+    "selected": 181,
+    "fallback": 163,
+    "changed_action": 151,
+    "changed_cashflow_or_status": 148,
+    "better_than_causal": 107,
+}
+EXPECTED_ORACLE_ROI = {
+    "native_pre_tax_roi": 0.8523440870432248,
+    "strict_common_pre_tax_roi": 1.0467441964375988,
+    "native_tax_adjusted_roi": 0.7749281443336524,
+    "strict_common_tax_adjusted_roi": 0.9497432791469224,
+}
 EXPECTED_GATE_A_MANIFEST = (
     "408e8aa69cf2d336f8b3b65b1c94b30a3456864af01517a78fc27b3f2bab0c45"
 )
@@ -1457,9 +1470,8 @@ def build_oracle_correction(checkpoint: Path, target: Path) -> None:
             list(payload_audit[0]),
             payload_audit,
         )
-        economic_fields = (
+        cashflow_or_status_fields = (
             "status",
-            "chosen_action_identity",
             "stake_yuan",
             "gross_pre_tax_yuan",
             "tax_yuan",
@@ -1471,8 +1483,11 @@ def build_oracle_correction(checkpoint: Path, target: Path) -> None:
             old["chosen_action_identity"] != new["chosen_action_identity"]
             for old, new in zip(superseded_rows, corrected_rows, strict=True)
         )
-        changed_economics = sum(
-            any(str(old[field]) != str(new[field]) for field in economic_fields)
+        changed_cashflow_or_status = sum(
+            any(
+                str(old[field]) != str(new[field])
+                for field in cashflow_or_status_fields
+            )
             for old, new in zip(superseded_rows, corrected_rows, strict=True)
         )
         better_than_causal = sum(
@@ -1493,6 +1508,52 @@ def build_oracle_correction(checkpoint: Path, target: Path) -> None:
             row["model_id"] == "ORACLE_NO_AVAILABLE_ACTION_CAUSAL_FALLBACK"
             for row in superseded_rows
         )
+        strict_support = json.loads(
+            (checkpoint / "strict_common_support.json").read_text()
+        )
+        strict_indices = set(strict_support["issue_indices"])
+
+        def roi_summary(rows: Sequence[Mapping[str, object]]) -> tuple[float, float]:
+            stake = sum(float(row["stake_yuan"]) for row in rows)
+            if stake <= 0:
+                raise RuntimeError("oracle correction has zero settled stake")
+            return (
+                sum(float(row["pre_tax_net_yuan"]) for row in rows) / stake,
+                sum(float(row["tax_adjusted_net_yuan"]) for row in rows) / stake,
+            )
+
+        native_pre_tax_roi, native_tax_adjusted_roi = roi_summary(corrected_rows)
+        strict_rows = [
+            row
+            for row in corrected_rows
+            if int(row["issue_index"]) in strict_indices
+        ]
+        strict_pre_tax_roi, strict_tax_adjusted_roi = roi_summary(strict_rows)
+        observed_counts = {
+            "selected": CANONICAL_ISSUE_COUNT - corrected_fallback,
+            "fallback": corrected_fallback,
+            "changed_action": changed_action,
+            "changed_cashflow_or_status": changed_cashflow_or_status,
+            "better_than_causal": better_than_causal,
+        }
+        if observed_counts != EXPECTED_ORACLE_CORRECTION_COUNTS:
+            raise RuntimeError(
+                "oracle correction count anchor drift: "
+                f"expected={EXPECTED_ORACLE_CORRECTION_COUNTS} "
+                f"observed={observed_counts}"
+            )
+        observed_roi = {
+            "native_pre_tax_roi": native_pre_tax_roi,
+            "strict_common_pre_tax_roi": strict_pre_tax_roi,
+            "native_tax_adjusted_roi": native_tax_adjusted_roi,
+            "strict_common_tax_adjusted_roi": strict_tax_adjusted_roi,
+        }
+        for key, expected in EXPECTED_ORACLE_ROI.items():
+            if not math.isclose(observed_roi[key], expected, rel_tol=0, abs_tol=5e-13):
+                raise RuntimeError(
+                    f"oracle correction ROI anchor drift for {key}: "
+                    f"expected={expected!r} observed={observed_roi[key]!r}"
+                )
         receipt = {
             "contract": ORACLE_CORRECTION_CONTRACT,
             "checkpoint_manifest_sha256": EXPECTED_CHECKPOINT_MANIFEST,
@@ -1507,8 +1568,12 @@ def build_oracle_correction(checkpoint: Path, target: Path) -> None:
                 CANONICAL_ISSUE_COUNT - corrected_fallback
             ),
             "changed_action_issue_count": changed_action,
-            "changed_economic_issue_count": changed_economics,
+            "changed_cashflow_or_status_issue_count": changed_cashflow_or_status,
             "oracle_better_than_causal_issue_count": better_than_causal,
+            **observed_roi,
+            "identity_sensitive_csv_parse_contract": (
+                "STRING_FIRST_OR_PANDAS_FLOAT_PRECISION_ROUND_TRIP"
+            ),
             "causal_policy_count": len(identity_rows),
             "causal_policy_rows_unchanged": all(
                 row["byte_identity_status"] == "PASS_UNCHANGED_SOURCE_ROWS"
@@ -1554,7 +1619,11 @@ def build_oracle_correction(checkpoint: Path, target: Path) -> None:
                 "corrected_oracle_selected_count": (
                     CANONICAL_ISSUE_COUNT - corrected_fallback
                 ),
-                "changed_economic_issue_count": changed_economics,
+                "changed_action_issue_count": changed_action,
+                "changed_cashflow_or_status_issue_count": (
+                    changed_cashflow_or_status
+                ),
+                **observed_roi,
                 "causal_policy_rows_unchanged": True,
             },
         )
