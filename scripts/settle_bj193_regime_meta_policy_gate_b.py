@@ -650,6 +650,24 @@ def build_replay_checkpoint(target: Path) -> None:
             ("gross", full_gross), ("tax", full_tax),
         ):
             np.save(controls / f"{name}.npy", values, allow_pickle=False)
+        status_codes = {"NO_BET": 0, "ACTIVE": 1, "UNAVAILABLE": 2}
+        selected_status = np.asarray(
+            [
+                [
+                    status_codes[
+                        canonical_status.get((global_i, feature["issue"]), "NO_BET")
+                    ]
+                    for feature in features
+                ]
+                for global_i in selector_union
+            ],
+            dtype=np.uint8,
+        )
+        np.save(
+            controls / "selected_selector_status.npy",
+            selected_status,
+            allow_pickle=False,
+        )
         replay_meta = replay_atlas_selected(
             stage, features, selectors, selector_union, by_canonical,
             canonical_status,
