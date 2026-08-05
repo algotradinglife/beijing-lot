@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -986,6 +987,31 @@ def test_finalizer_verifies_committed_oracle_correction_package():
     assert len(payload) == 8
 
 
+def test_finalizer_verifies_v1r1_oracle_correction_production_anchors():
+    root = ROOT / "results" / "bj193_gate_b_oracle_correction_v1r1"
+    payload, manifest_sha = F.verify_package(
+        root, F.ORACLE_CORRECTION_CONTRACT
+    )
+    assert manifest_sha == F.EXPECTED_ORACLE_CORRECTION_MANIFEST
+    assert len(payload) == 8
+    receipt = json.loads((root / "oracle_correction_receipt.json").read_text())
+    assert receipt["changed_action_issue_count"] == 151
+    assert receipt["changed_cashflow_or_status_issue_count"] == 148
+    assert receipt["corrected_oracle_selected_count"] == 181
+    assert receipt["corrected_oracle_fallback_count"] == 163
+    assert receipt["oracle_better_than_causal_issue_count"] == 107
+    assert receipt["native_pre_tax_roi"] == pytest.approx(0.8523440870432248)
+    assert receipt["strict_common_pre_tax_roi"] == pytest.approx(
+        1.0467441964375988
+    )
+    assert receipt["native_tax_adjusted_roi"] == pytest.approx(
+        0.7749281443336524
+    )
+    assert receipt["strict_common_tax_adjusted_roi"] == pytest.approx(
+        0.9497432791469224
+    )
+
+
 def test_finalizer_bankroll_path_is_fixed_stake_cash_account():
     rows = [
         {
@@ -1024,6 +1050,40 @@ def test_finalizer_bankroll_path_is_fixed_stake_cash_account():
     assert summary["minimum_starting_bankroll_required_yuan"] == (
         "110000.000000000000"
     )
+
+
+def test_finalizer_bankroll_100k_production_anchors():
+    checkpoint = ROOT / ".scratch" / "bj193_gate_b_chain_checkpoint_v2"
+    flows = F.read_csv(checkpoint / "issue_policy_flows.csv.gz")
+    choices = F.read_csv(checkpoint / "issue_policy_choice.csv.gz")
+    corrected = F.read_csv(
+        ROOT
+        / "results/bj193_gate_b_oracle_correction_v1r1"
+        / "corrected_oracle_policy_flow.csv.gz"
+    )
+    corrected_flows, _ = F._apply_oracle_correction(flows, choices, corrected)
+    by_policy = F._rows_by_policy(corrected_flows)
+    summaries = [
+        F._bankroll_100k(policy, by_policy[policy])[1]
+        for policy in F.POLICIES
+    ]
+    F._assert_bankroll_100k_anchors(summaries)
+    index = {row["policy_id"]: row for row in summaries}
+    assert float(index["ALL_STATIC"]["ending_bankroll_yuan"]) == pytest.approx(
+        29558.00
+    )
+    assert index["DYNAMIC_SELECTION_ONLY"][
+        "first_unfundable_issue"
+    ] == "23034"
+    assert index["DYNAMIC_SELECTION_DIRECTION"][
+        "first_unfundable_issue"
+    ] == "23104"
+    assert float(index["FULL_DYNAMIC_CHAIN"][
+        "minimum_starting_bankroll_required_yuan"
+    ]) == pytest.approx(92410.38)
+    assert float(index["LEAKY_ORACLE_CEILING"][
+        "ending_bankroll_yuan"
+    ]) == pytest.approx(455425.78)
 
 
 def test_finalizer_drawdown_includes_initial_capital_and_metric_aliases():
