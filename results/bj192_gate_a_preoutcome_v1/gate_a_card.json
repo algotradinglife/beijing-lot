@@ -1,17 +1,68 @@
 {
+  "baseline_registry": [
+    {
+      "baseline_id": "B167_BEST_FULL_NATIVE_LADDER_HEAD",
+      "comparison_rule": "context only; never substitute for exact matched-support lift",
+      "identity": "BEST_FULL/FULL_ENUMERATED",
+      "pre_tax_roi": -0.0947,
+      "role": "ACCEPTED_LADDER_HEAD_CONTEXT",
+      "source_gate_a_binding": "bj167_gate_a_strategy_atlas_v3r1",
+      "source_gate_b_binding": "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1",
+      "source_package": "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1",
+      "support_context": "NATIVE_BEST_FULL"
+    },
+    {
+      "baseline_id": "B170_BEST_FULL_THREE_WAY_BRIDGE",
+      "comparison_rule": "candidate and control must share exact issue support, capital mode, fraction, preissue bankroll and actual funding convention",
+      "identity": "BEST_FULL/FULL_ENUMERATED",
+      "pre_tax_roi": -0.0909,
+      "role": "EXACT_THREE_WAY_MATCHED_BRIDGE",
+      "source_gate_a_binding": "bj170_gate_a_preoutcome_v2",
+      "source_gate_b_binding": "bj170_gate_b_selector_allocator_stack_v1",
+      "source_package": "bj170_gate_b_selector_allocator_stack_v1",
+      "support_context": "THREE_WAY_ALL"
+    },
+    {
+      "baseline_id": "MATCHED_STRONGEST_STANDALONE",
+      "comparison_rule": "candidate-minus-control published with absolute metrics",
+      "identity": "max standalone on candidate exact support",
+      "pre_tax_roi": "DERIVED_GATE_B",
+      "role": "MANDATORY_MATCHED_CONTROL",
+      "source_gate_a_binding": "GATE_A_FROZEN_SOURCE_BINDINGS",
+      "source_gate_b_binding": "GATE_B_DERIVED",
+      "source_package": "GATE_B_DERIVED",
+      "support_context": "CANDIDATE_EXACT_SUPPORT"
+    },
+    {
+      "baseline_id": "MATCHED_EQUAL_WEIGHT",
+      "comparison_rule": "candidate-minus-control published with absolute metrics",
+      "identity": "same sleeves, equal weights",
+      "pre_tax_roi": "DERIVED_GATE_B",
+      "role": "MANDATORY_MATCHED_CONTROL",
+      "source_gate_a_binding": "GATE_A_FROZEN_SOURCE_BINDINGS",
+      "source_gate_b_binding": "GATE_B_DERIVED",
+      "source_package": "GATE_B_DERIVED",
+      "support_context": "CANDIDATE_EXACT_SUPPORT"
+    }
+  ],
   "contract": "BJ-HIST-N7-STRATEGY-ENSEMBLE-001",
   "denominator": {
     "calendar_issue_count": 348,
+    "catalog_identity_count": 12,
+    "eligible_complete_source_count": 8,
+    "eligible_exploratory_family_count": 5,
+    "fixed_sleeve_count": 3,
     "native_sleeve_request_rows": 1044,
-    "portfolio_membership_count": 7,
     "position_fraction_count": 20,
-    "sleeve_count": 3,
     "strict_three_way_issue_count": 177
   },
   "eligibility_ledger": [
     {
       "candidate_id": "BEST_FULL_FULL",
       "decision": "ELIGIBLE_COMPLETE_TRACE",
+      "frontier_role": "CONFIRMATORY_FIXED_SLEEVE",
+      "identity_source": "identity_freeze.csv.gz + identity_allocation_digest.csv.gz",
+      "inherited_M_seed_support": "M fixed by arm; deterministic/no-seed as declared",
       "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
       "reason": "complete frozen Stage-1\u21923 selection/direction/ticket trace; exact requested tickets and M bound",
       "source_package": "bj170_gate_a_preoutcome_v2"
@@ -19,6 +70,9 @@
     {
       "candidate_id": "MODEL_SOURCE_MODEL_CAP1_M512",
       "decision": "ELIGIBLE_COMPLETE_TRACE",
+      "frontier_role": "CONFIRMATORY_FIXED_SLEEVE",
+      "identity_source": "identity_freeze.csv.gz + identity_allocation_digest.csv.gz",
+      "inherited_M_seed_support": "M fixed by arm; deterministic/no-seed as declared",
       "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
       "reason": "complete frozen Stage-1\u21923 selection/direction/ticket trace; exact requested tickets and M bound",
       "source_package": "bj170_gate_a_preoutcome_v2"
@@ -26,13 +80,89 @@
     {
       "candidate_id": "Q_SOURCE_Q_TOP_MASS_M192",
       "decision": "ELIGIBLE_COMPLETE_TRACE",
+      "frontier_role": "CONFIRMATORY_FIXED_SLEEVE",
+      "identity_source": "identity_freeze.csv.gz + identity_allocation_digest.csv.gz",
+      "inherited_M_seed_support": "M fixed by arm; deterministic/no-seed as declared",
       "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
       "reason": "complete frozen Stage-1\u21923 selection/direction/ticket trace; exact requested tickets and M bound",
       "source_package": "bj170_gate_a_preoutcome_v2"
     },
     {
+      "candidate_id": "BJ137_COMPLETE_ISSUE_Q_SAMPLING",
+      "decision": "ELIGIBLE_EXPLORATORY_FAMILY",
+      "frontier_role": "EXPLORATORY_SOURCE_FAMILY",
+      "identity_source": "n7_identities.csv.gz + sampler_plan.csv",
+      "inherited_M_seed_support": "frozen complete-issue sampling M/seed plan",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "complete pre-outcome selection/direction/ticket source; every raw cell remains multiplicity-controlled",
+      "source_package": "bj137_gate_a_preoutcome_v2"
+    },
+    {
+      "candidate_id": "BJ145_ALLOCATION_MECHANISMS",
+      "decision": "COMPOSABLE_NOT_STANDALONE",
+      "frontier_role": "ALLOCATION_COMPONENT_ONLY",
+      "identity_source": "identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "inherited_M_seed_support": "frozen M grid/mechanism/cap/repeat plans",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "allocation source has no independent selector chain; may only pair with an eligible frozen Stage-1\u21923 source",
+      "source_package": "bj145_gate_a_preoutcome_v8"
+    },
+    {
+      "candidate_id": "BJ148_DENSE_M_COMMON_SUPPORT",
+      "decision": "ELIGIBLE_EXPLORATORY_FAMILY",
+      "frontier_role": "EXPLORATORY_DENSE_M",
+      "identity_source": "common_support_identities.csv.gz + sampling_plan.csv",
+      "inherited_M_seed_support": "dense M grid and frozen three-seed sampling plan",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "accepted dense-M evidence; terminal no-stable-sweet-spot makes it descriptive, never ladder replacement",
+      "source_package": "bj148_gate_a_preoutcome_v1"
+    },
+    {
+      "candidate_id": "BJ151_FIXED_CANDIDATE_REPRODUCTION",
+      "decision": "ELIGIBLE_EXPLORATORY_FAMILY",
+      "frontier_role": "EXPLORATORY_FIXED_REPRODUCTION",
+      "identity_source": "candidate_identities.csv.gz + sampling_plan.csv",
+      "inherited_M_seed_support": "fixed candidate dense-M plus frozen seed plan",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "complete fixed reproduction; not independent validation and cannot become an accepted ladder head",
+      "source_package": "bj151_gate_a_preoutcome_v1"
+    },
+    {
+      "candidate_id": "BJ159_SELECTED_WOR_N2_N10",
+      "decision": "ELIGIBLE_EXPLORATORY_FAMILY",
+      "frontier_role": "EXPLORATORY_COMPLETE_CHAIN",
+      "identity_source": "identity_catalog.csv.gz + sampling_plan.csv",
+      "inherited_M_seed_support": "N2\u2013N10, M={32,64,128}, seeds 137001\u2013137003",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "complete issue-level chain but same-window positives require independent validation",
+      "source_package": "bj159_gate_a_preoutcome_v2r1"
+    },
+    {
+      "candidate_id": "BJ167_SELECTOR_ALLOCATION_ATLAS",
+      "decision": "ELIGIBLE_EXPLORATORY_FAMILY",
+      "frontier_role": "EXPLORATORY_ATLAS",
+      "identity_source": "selector_identities shards + allocation_grid.csv",
+      "inherited_M_seed_support": "full frozen selector/allocation M/seed/support surface",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "complete Stage-1\u21923 atlas; search family is preserved and must receive multiplicity control",
+      "source_package": "bj167_gate_a_strategy_atlas_v3r1"
+    },
+    {
+      "candidate_id": "BJ176_THREE_SLEEVE_RISK_BRIDGE",
+      "decision": "CONTROL_AND_CONVENTION_ONLY",
+      "frontier_role": "RISK_BASELINE_BRIDGE",
+      "identity_source": "three fixed #170 sleeves only",
+      "inherited_M_seed_support": "BEST_FULL/FULL, MODEL/M512, Q/M192",
+      "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
+      "reason": "accepted settled risk convention bridge, not an independently selected sleeve",
+      "source_package": "bj176_issue_equity_risk_v1"
+    },
+    {
       "candidate_id": "BJ190_SPARSE_DIVERGENCE",
       "decision": "EXCLUDED_NOT_SLEEVE",
+      "frontier_role": "EXCLUDED",
+      "identity_source": "terminal identity only",
+      "inherited_M_seed_support": "as terminal package",
       "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
       "reason": "terminal strict promotion count is zero; coverage-limited diagnostic is not an eligible complete capital sleeve",
       "source_package": "bj190_gate_b_sparse_divergence_v1"
@@ -40,11 +170,43 @@
     {
       "candidate_id": "BJ193_FULL_DYNAMIC_CHAIN",
       "decision": "EXCLUDED_NEGATIVE_NON_PROMOTED",
+      "frontier_role": "EXCLUDED",
+      "identity_source": "terminal identity only",
+      "inherited_M_seed_support": "as terminal package",
       "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
       "reason": "PI excludes negative non-promoted FULL_DYNAMIC_CHAIN; package supplies interface/accounting lessons only",
       "source_package": "bj193_gate_b_regime_meta_policy_v2"
     }
   ],
+  "frontier_contract": {
+    "comparison_rule": "Each portfolio row includes absolute pre-tax capital/path results and matched lifts to B167/B170 where exact support and funding permit, strongest standalone on its exact support, and equal-weight same sleeves.",
+    "component_rule": "BJ145_ALLOCATION_MECHANISMS is composable only: pair each frozen allocation tuple with an eligible complete selector identity; never invent a selector or overwrite its inherited tuple.",
+    "eligible_candidate_sources": [
+      "BEST_FULL_FULL",
+      "MODEL_SOURCE_MODEL_CAP1_M512",
+      "Q_SOURCE_Q_TOP_MASS_M192",
+      "BJ137_COMPLETE_ISSUE_Q_SAMPLING",
+      "BJ148_DENSE_M_COMMON_SUPPORT",
+      "BJ151_FIXED_CANDIDATE_REPRODUCTION",
+      "BJ159_SELECTED_WOR_N2_N10",
+      "BJ167_SELECTOR_ALLOCATION_ATLAS"
+    ],
+    "eligible_source_count": 8,
+    "excluded_source_records": [
+      {
+        "candidate_id": "BJ190_SPARSE_DIVERGENCE",
+        "decision": "EXCLUDED_NOT_SLEEVE",
+        "reason": "terminal strict promotion count is zero; coverage-limited diagnostic is not an eligible complete capital sleeve"
+      },
+      {
+        "candidate_id": "BJ193_FULL_DYNAMIC_CHAIN",
+        "decision": "EXCLUDED_NEGATIVE_NON_PROMOTED",
+        "reason": "PI excludes negative non-promoted FULL_DYNAMIC_CHAIN; package supplies interface/accounting lessons only"
+      }
+    ],
+    "materialization_rule": "Gate B enumerates every immutable source-plan/grid identity from each eligible source, retaining exact selector, support, M, seed, mechanism, cap, weight source and ticket multiplicity. It writes every nonempty same-support portfolio combination permitted by those identities.",
+    "screening_rule": "The full materialized frontier is exploratory except the fixed H1. Raw rank, raw Pareto membership or a best descriptive cell cannot be reported as Edge; all positive claims require the frozen family-wise sequential inference and later independent validation."
+  },
   "full_calendar": {
     "chronological_sort": "first_kickoff_ts, issue_instance",
     "issue_count": 348,
@@ -119,6 +281,17 @@
       "replicates": 20000,
       "seed": 192001
     },
+    "challenger_case": [
+      "survivor/winner catalog selection",
+      "parameter-search/multiple-comparison luck",
+      "outcome/oracle leakage",
+      "native versus exact-common support",
+      "fewer bets/turnover/retained cash",
+      "ex-post covariance/weight fitting",
+      "single issue/year/payout cluster",
+      "simpler-control explanation",
+      "descriptive frontier overstated as Edge"
+    ],
     "chart_sources": [
       "issue_equity_paths",
       "capital_utilization_frontier",
@@ -140,7 +313,35 @@
       "covariance_attribution",
       "pre_tax_primary_tax_reference"
     ],
-    "membership": "all nonempty subsets of the three fixed sleeves (7 portfolios); no Stage 1\u20133 selection, direction, ticket, or M construction changes",
+    "membership": "all nonempty subsets of every ELIGIBLE_COMPLETE_TRACE or ELIGIBLE_EXPLORATORY_FAMILY frozen sleeve family; no Stage 1\u20133 selection, direction, ticket, M, seed, or support construction changes",
+    "multiplicity": {
+      "families": [
+        "catalog_sleeve_family",
+        "portfolio_membership",
+        "weight_method",
+        "capital_mode",
+        "position_fraction"
+      ],
+      "frontier_status": "all non-primary catalog combinations are exploratory/descriptive; raw Pareto or best-cell rank is never Edge evidence",
+      "negative_rule": "negative/no-promotion results report full frontier and may use proportionate descriptive evidence",
+      "positive_inference": "20,000 paired stationary-block bootstrap max-T family-wise adjusted lower bounds at alpha=0.05; test all candidate-minus-control lifts within each frozen family",
+      "winner_rule": "screen all cells, but no ladder advancement unless the preregistered H1 or a family-wise adjusted candidate passes strict matched PI review"
+    },
+    "primary_hypothesis": {
+      "candidate": "#170 BEST_FULL_FULL + MODEL_SOURCE_MODEL_CAP1_M512 + Q_SOURCE_Q_TOP_MASS_M192",
+      "comparison": "absolute pre-tax \u00a5100k path plus matched lift versus B170 BEST_FULL/FULL on exact common support and actual funding convention",
+      "decision": "a positive claim requires paired sequential lower bound >0, all primary support/capital controls, and later independent held-out/forward validation",
+      "id": "H1_STAGE4_FIXED_THREE_SLEEVE_EQUAL_NATIVE",
+      "mode": "NATIVE_REQUEST_CONTROL",
+      "position_fraction": 1.0,
+      "weights": "EQUAL_WEIGHT"
+    },
+    "sequential_inference": {
+      "iid_diagnostic": "IID issue bootstrap is ROI-only diagnostic and must not support bankroll, drawdown, recovery, dynamic-weight or compounded-growth claims",
+      "moving_block_sensitivity": "paired moving block bootstrap, block lengths 6, 12 and 20 chronological issues; full state replay",
+      "path_bootstrap": "paired stationary block bootstrap, 20,000 replicates, expected block length 12 issues, seed 192001, each candidate/control shares exact resampled blocks and replays the complete state machine",
+      "primary_estimand": "original strict chronological walk-forward replay; recompute weights, funding, cash, equity, drawdown and all state inside every replay"
+    },
     "stability": [
       "YEAR",
       "FOLD",
@@ -173,6 +374,26 @@
   },
   "outcome_boundary": "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, tax realization, ROI, net, gross, or settlement payload is read.",
   "output_schema": {
+    "baseline_lift": {
+      "fields": [
+        "candidate_id",
+        "control_id",
+        "support_hash",
+        "capital_mode",
+        "position_fraction",
+        "actual_funding_hash",
+        "absolute_ending_bankroll_yuan",
+        "absolute_pre_tax_roi",
+        "candidate_minus_control_bankroll_yuan",
+        "candidate_minus_control_pre_tax_roi",
+        "ladder_decision"
+      ],
+      "formulas": [
+        "all comparisons require identical issue support, mode, fraction, starting capital, available bankroll and actual funding convention",
+        "publish absolute path and lift together; blank lift if exact matching is impossible",
+        "ladder_decision=ADVANCES only after strict matched PI terminal review"
+      ]
+    },
     "bootstrap_stability": {
       "fields": [
         "target_id",
@@ -184,7 +405,11 @@
         "FOLD",
         "LOYO",
         "EX_LARGEST_ISSUE",
-        "EX_LARGEST_YEAR"
+        "EX_LARGEST_YEAR",
+        "fallback_rate"
+      ],
+      "formulas": [
+        "YEAR/FOLD replays retain chronological order within subset; LOYO removes every issue from one year then recomputes state; ex-largest issue/year removes the largest signed pre-tax-net contributor (year aggregates first); decision panels use same full-calendar zero-flow convention"
       ]
     },
     "capital_summary": {
@@ -202,6 +427,25 @@
         "pre_tax_roi",
         "tax_adjusted_roi",
         "ruin_flag"
+      ],
+      "formulas": [
+        "minimum_bankroll=min(preissue_bankroll,postissue_bankroll) over full 348 calendar",
+        "minimum_required_start is smallest b found by deterministic integer-yuan bisection for zero unfundable non-NO_BET requests under same policy",
+        "ruin_flag=1 iff any postissue_bankroll < \u00a52 while a positive native request exists",
+        "pre_tax_roi=sum(pre_tax_net)/sum(actual_stake); blank if zero actual stake"
+      ]
+    },
+    "challenger_case": {
+      "fields": [
+        "candidate_id",
+        "alternative_explanation",
+        "test_id",
+        "result",
+        "decision_impact"
+      ],
+      "formulas": [
+        "each headline candidate receives survivor/search, leakage, support, turnover/cash, covariance fitting, largest issue/year, payout cluster and simple-control tests",
+        "cash-only smoothing is separately labeled risk reduction, never diversification edge"
       ]
     },
     "chart_sources": [
@@ -224,6 +468,11 @@
         "tail_co_loss_count",
         "concurrent_issue_count",
         "diversification_attribution_yuan"
+      ],
+      "formulas": [
+        "downside_correlation=corr(min(r_left,0),min(r_right,0)) over common active returns; blank for <2/nonpositive variance",
+        "tail_co_loss_count=count both returns in their own prior 10% lower tail",
+        "diversification_attribution=portfolio pre-tax net minus sum(weighted matched standalone nets), reported separately from retained cash"
       ]
     },
     "holding_metrics": {
@@ -245,9 +494,16 @@
         "rolling_loss_10_yuan",
         "rolling_loss_20_yuan",
         "ruin_flag",
+        "near_ruin_flag",
         "sharpe",
         "sortino",
         "calmar"
+      ],
+      "formulas": [
+        "loss=pre_tax_net<0; miss=actual_stake>0 and pre_tax_gross=0; calendar streak includes zero-flow rows, active streak skips zero-flow rows",
+        "rolling loss W=sum(min(pre_tax_net,0)) over trailing calendar W={5,10,20}; report worst and frequency",
+        "drawdown=running equity peak minus postissue bankroll; duration/time-under-water count chronological issues below peak; recovery is first later issue reaching former peak, blank if absent",
+        "near_ruin_flag=1 iff min bankroll < \u00a52\u00d7max native issue ticket count; sharpe=mean calendar bank return/sample sd\u00d7sqrt(issue frequency/year), sortino divides by downside RMS, calmar=annualized compounded bank return/max drawdown fraction; blank where denominator zero"
       ]
     },
     "issue_ledger": {
@@ -293,6 +549,11 @@
         "estimator_status",
         "fallback_reason",
         "covariance_hash"
+      ],
+      "formulas": [
+        "weights use only issues strictly before issue_instance",
+        "fallback_rate=count(non-primary estimator_status)/348",
+        "NO_BET/unavailable excluded from active observation but retained as capital zero flow"
       ]
     }
   },
@@ -387,12 +648,61 @@
       "payload_count": 14,
       "role": "accepted outcome-unexposed chronological issue census"
     },
+    "bj145_gate_a_preoutcome_v8": {
+      "content_identity_sha256": "074c9b06c024a1db80b5b53cfc99a1bc164001b205fcd94a0c159daf445dab7f",
+      "manifest_sha256": "da1165d3d2be49deac85a494443ba04606d176ca059c265857573ce24360114c",
+      "package": "bj145_gate_a_preoutcome_v8",
+      "payload_count": 14,
+      "role": "accepted allocation mechanism/M/seed evidence; composable only with a complete selector trace"
+    },
+    "bj148_gate_a_preoutcome_v1": {
+      "content_identity_sha256": "dfd3ac234f95f28185a09a6bb2f69c3ff66ddb696ce1fe45a6a1215d932dcd0a",
+      "manifest_sha256": "fd4a0f4dc0ab5ef97f3c260a082515aa7874a60a1ac1e5e0ecd865fdb1eeafd6",
+      "package": "bj148_gate_a_preoutcome_v1",
+      "payload_count": 10,
+      "role": "accepted dense-M support/seed evidence; no stable sweet spot, descriptive frontier only"
+    },
+    "bj151_gate_a_preoutcome_v1": {
+      "content_identity_sha256": "ac36bc2422d1afd22c3bb4bd680568401cbaec30e0d2006d13afcdfa141b89a5",
+      "manifest_sha256": "3605278bd6067fc7aa279a0625f4c4cab91603d8a1490c8608381e8fca997ac6",
+      "package": "bj151_gate_a_preoutcome_v1",
+      "payload_count": 10,
+      "role": "accepted fixed-candidate reproduction identity/M/seed evidence; descriptive only"
+    },
+    "bj159_gate_a_preoutcome_v2r1": {
+      "content_identity_sha256": "4ec52432ec6c1779bab33b0c4bdc4e381b0ae7434228637c509970291ed7361e",
+      "manifest_sha256": "a15c585fc1836da4f558d07ce19c925561bfd1c240e834b7e3e0da22701cd325",
+      "package": "bj159_gate_a_preoutcome_v2r1",
+      "payload_count": 11,
+      "role": "accepted complete selected WOR N2\u2013N10 chain identity/M/seed evidence"
+    },
+    "bj167_gate_a_strategy_atlas_v3r1": {
+      "content_identity_sha256": "0806185a7a68b99fd2a6a465308d11e2886995f992bfa722adb287a4e6a4d147",
+      "manifest_sha256": "5a82422755723453638d25c90f91213da046a9e7bed87a851b2e5700faa9c724",
+      "package": "bj167_gate_a_strategy_atlas_v3r1",
+      "payload_count": 64,
+      "role": "accepted complete selector\u00d7allocation atlas identity/M/seed/support evidence"
+    },
+    "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1": {
+      "content_identity_sha256": "bfe29083b74d5d212555c261e888d6f5d4d5fd163b56e1876944d1f5d04aa5c7",
+      "manifest_sha256": "b3fa02f5cc2722932ff55fffb0bd9672508f6e78104cfb2458ad81c826f3b313",
+      "package": "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1",
+      "payload_count": 24,
+      "role": "accepted terminal atlas baseline ladder/evidence; hash-only during Gate A"
+    },
     "bj170_gate_a_preoutcome_v2": {
       "content_identity_sha256": "adc4d0f96628c784149da998a20e8830cde26db4001fe457eaf9ca4b7bb74223",
       "manifest_sha256": "bb60ac5638d29674ad8c1c05f1ffe3ab9cdf12acb70ebdae6cea679743136d87",
       "package": "bj170_gate_a_preoutcome_v2",
       "payload_count": 17,
       "role": "accepted outcome-unexposed sleeve identity, ticket and support freeze"
+    },
+    "bj170_gate_b_selector_allocator_stack_v1": {
+      "content_identity_sha256": "75325aa0f60e277ad3fbf9d90116450833106bc3863b412ea3efcad9948a47b2",
+      "manifest_sha256": "08e83353ad483e5d75911116a413186f007385f5dd37b8c4b757ac903221e512",
+      "package": "bj170_gate_b_selector_allocator_stack_v1",
+      "payload_count": 25,
+      "role": "accepted exact three-way matched baseline bridge; hash-only during Gate A"
     },
     "bj176_issue_equity_risk_v1": {
       "content_identity_sha256": "94188354baf01c68cb0ec0791248d3f8f03e31d4a7011db7b6b68e9797720f5c",
@@ -422,5 +732,5 @@
     "source": "#170 THREE_WAY_ALL",
     "usage": "matched attribution only; never truncate capital/holding paths"
   },
-  "version": "bj192-gate-a-v2"
+  "version": "bj192-gate-a-v3"
 }

@@ -1,13 +1,16 @@
 {
-  "CONTENT_IDENTITY.json": "45bdfd19eb75d3671eb4bf30d97ec97c1b3062ba3ea551bf8930e91ac11b97be",
+  "CONTENT_IDENTITY.json": "64203ab15d735affe8964f3deb4639dc00dc7ad4a8d731cc42ae9e9c9bb73112",
   "README.md": "7466fb1b35a4ae5320486314e56a503bb512e656028edf5bec7c2d225c5de56e",
+  "baseline_registry.csv": "a57128a8708591598897cc94f38cbbb35662a281e43859a314fe5a4bc2241fd0",
+  "frontier_contract.json": "dc64f4116e02328b9108ccf112eeedd23df9083f1fdd476796580be9643b83bd",
   "frozen_native_sleeve_requests.csv": "b642d94def8a201d77812a1d49e1ca5c18b05d3c868687be7f107f2b4dfdcdbb",
   "full_calendar.csv": "3782c9789d3e1565a45f0c950f715da0084fd9a38223ddfe6bceca2deb7db3c0",
   "funding_algorithm.json": "4283fae796d610d0988fb03f82d3bd180c24e2acf8f72dc2a45d2ab70fcc22fa",
-  "gate_a_card.json": "5363f623eb85a42cc22cab4d8ebb5721fd23e1f5b6e92d4ce52d99829d254959",
-  "output_schema.json": "fddf52fc9b03a6b8fe8938f2efbb92cfb90482b81a81ba329580b3bf86cd06ca",
+  "gate_a_card.json": "892d948f20cc46c6f093cabcb55eb2e19728f3d7e20cf599c8f7ce55ac22e8fc",
+  "inference_contract.json": "2a2350469763c35e6636f5848a9d5effaf6dcc2272f53d3dc66a536d4d59fcb0",
+  "output_schema.json": "57439147df3374dd7acdd9976bf39288dae359a6029da293b3108be5e810230a",
   "sleeve_catalog.csv": "e9b7b99da34e60be352b7d20bfed430e5add651a0a1abbaac7abbdaecf85f14e",
-  "sleeve_eligibility_ledger.csv": "a9f334c3652e76738c7e598a1389e37d4d5200a9bba26de5b406e7d379cb47c3",
+  "sleeve_eligibility_ledger.csv": "1cce5b5db1b3455075e9381caa78051db69b2dfbfaf0cdc54873ef2c0abf4a51",
   "sleeve_trace_registry.csv": "4001c133545d093a414281729eaf857ea52975a84f288f10fc4ba4c1aa8f3e3f",
   "strict_three_way_calendar.csv": "7e20cbef65dfd20aea9dccb66f0b1d8418497a06709214d4acbaffd4c314a092"
 }

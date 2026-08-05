@@ -11,79 +11,235 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "freeze_bj192_stage4_portfolio_gate_a.py"
 
+
 def module():
     spec = importlib.util.spec_from_file_location("bj192_gate_a", SCRIPT)
-    value = importlib.util.module_from_spec(spec); assert spec.loader
-    spec.loader.exec_module(value); return value
+    value = importlib.util.module_from_spec(spec)
+    assert spec.loader
+    spec.loader.exec_module(value)
+    return value
+
 
 def test_frozen_source_hashes_and_fixed_primary_catalog():
     m = module()
-    assert [x[0] for x in m.SLEEVES] == ["BEST_FULL_FULL", "MODEL_SOURCE_MODEL_CAP1_M512", "Q_SOURCE_Q_TOP_MASS_M192"]
+    assert [x[0] for x in m.SLEEVES] == [
+        "BEST_FULL_FULL",
+        "MODEL_SOURCE_MODEL_CAP1_M512",
+        "Q_SOURCE_Q_TOP_MASS_M192",
+    ]
     assert m.POSITION_FRACTIONS == tuple(range(5, 101, 5))
     assert m.BOOTSTRAP_REPLICATES == 20_000
     for spec in m.EXPECTED_SOURCES.values():
         bound = m.verify_source(spec)
         assert bound["payload_count"] > 0
     assert {x["path"].name for x in m.EXPECTED_SOURCES.values()} >= {
-        "bj170_gate_a_preoutcome_v2", "bj137_gate_a_preoutcome_v2", "bj176_issue_equity_risk_v1",
-        "bj190_gate_b_sparse_divergence_v1", "bj193_gate_b_regime_meta_policy_v2"}
+        "bj170_gate_a_preoutcome_v2",
+        "bj137_gate_a_preoutcome_v2",
+        "bj176_issue_equity_risk_v1",
+        "bj190_gate_b_sparse_divergence_v1",
+        "bj193_gate_b_regime_meta_policy_v2",
+        "bj145_gate_a_preoutcome_v8",
+        "bj148_gate_a_preoutcome_v1",
+        "bj151_gate_a_preoutcome_v1",
+        "bj159_gate_a_preoutcome_v2r1",
+        "bj167_gate_a_strategy_atlas_v3r1",
+        "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1",
+        "bj170_gate_b_selector_allocator_stack_v1",
+    }
+
 
 def test_source_rows_use_full_calendar_and_separate_strict_common_view():
-    m = module(); rows, calendar, _ = m.source_inputs(); traces = m.sleeve_trace_registry(rows)
+    m = module()
+    rows, calendar, _ = m.source_inputs()
+    traces = m.sleeve_trace_registry(rows)
     assert len(calendar) == 348 and len(rows) == 1044
     assert [(x["sleeve_id"], x["M"]) for x in (rows[0], rows[1], rows[2])] == [
-        ("BEST_FULL_FULL", "2187"), ("MODEL_SOURCE_MODEL_CAP1_M512", "512"), ("Q_SOURCE_Q_TOP_MASS_M192", "192")]
+        ("BEST_FULL_FULL", "2187"),
+        ("MODEL_SOURCE_MODEL_CAP1_M512", "512"),
+        ("Q_SOURCE_Q_TOP_MASS_M192", "192"),
+    ]
     assert all(x["outcome_boundary"] == m.OUTCOME_BOUNDARY for x in rows)
     assert [x["calendar_index"] for x in calendar] == list(range(348))
     assert sum(x["strict_three_way_common"] == "1" for x in calendar) == 177
     assert all(int(x["native_requested_stake_yuan"]) % 2 == 0 for x in rows)
-    assert {x["native_policy_status"] for x in rows} == {"SELECTED_PREOUTCOME", "NO_BET_FROZEN"}
-    assert {x["settlement_availability_state"] for x in rows} == {"OUTCOME_UNEXPOSED_PENDING_GATE_B"}
+    assert {x["native_policy_status"] for x in rows} == {
+        "SELECTED_PREOUTCOME",
+        "NO_BET_FROZEN",
+    }
+    assert {x["settlement_availability_state"] for x in rows} == {
+        "OUTCOME_UNEXPOSED_PENDING_GATE_B"
+    }
     assert [x["sleeve_id"] for x in traces] == [x[0] for x in m.SLEEVES]
-    assert all(x["stage_1_3_trace_status"] == "COMPLETE_INHERITED_FROZEN" for x in traces)
-    assert all(int(x["source_identity_count"]) == int(x["source_allocation_count"]) for x in traces)
+    assert all(
+        x["stage_1_3_trace_status"] == "COMPLETE_INHERITED_FROZEN" for x in traces
+    )
+    assert all(
+        int(x["source_identity_count"]) == int(x["source_allocation_count"])
+        for x in traces
+    )
+
 
 def test_integer_allocator_covers_bankroll_cap_remainder_and_no_bet_edges():
     m = module()
-    caps = {"A": 4, "B": 4, "C": 4}; weights = {"A": 1/3, "B": 1/3, "C": 1/3}
-    low = m.allocate_integer_tickets("FIXED_100K_NOTIONAL", .05, 1, caps, weights)
-    assert low["actual_total_stake_yuan"] == 0 and "NO_BET_BUDGET_LT_TICKET" in low["reason_codes"]
-    equal = m.allocate_integer_tickets("NATIVE_REQUEST_CONTROL", .5, 100, caps, weights)
+    caps = {"A": 4, "B": 4, "C": 4}
+    weights = {"A": 1 / 3, "B": 1 / 3, "C": 1 / 3}
+    low = m.allocate_integer_tickets("FIXED_100K_NOTIONAL", 0.05, 1, caps, weights)
+    assert (
+        low["actual_total_stake_yuan"] == 0
+        and "NO_BET_BUDGET_LT_TICKET" in low["reason_codes"]
+    )
+    equal = m.allocate_integer_tickets(
+        "NATIVE_REQUEST_CONTROL", 0.5, 100, caps, weights
+    )
     assert equal["actual_ticket_count_by_sleeve"] == {"A": 2, "B": 2, "C": 2}
-    tie = m.allocate_integer_tickets("NATIVE_REQUEST_CONTROL", 1 / 3, 100, caps, weights)
-    assert tie["actual_ticket_count_by_sleeve"] == {"A": 2, "B": 1, "C": 1}  # A wins exact remainder tie
-    fully_fundable = m.allocate_integer_tickets("NATIVE_REQUEST_CONTROL", 1, 24, caps, weights)
-    assert fully_fundable["actual_total_stake_yuan"] == 24 and fully_fundable["retained_cash_yuan"] == 0
-    constrained = m.allocate_integer_tickets("NATIVE_REQUEST_CONTROL", 1, 10, caps, weights)
-    assert constrained["actual_total_stake_yuan"] == 10 and "SCALED_BY_PREISSUE_BANKROLL" in constrained["reason_codes"]
-    capped = m.allocate_integer_tickets("FIXED_100K_NOTIONAL", 1, 10, {"A": 1, "B": 5}, {"A": .9, "B": .1})
+    tie = m.allocate_integer_tickets(
+        "NATIVE_REQUEST_CONTROL", 1 / 3, 100, caps, weights
+    )
+    assert tie["actual_ticket_count_by_sleeve"] == {
+        "A": 2,
+        "B": 1,
+        "C": 1,
+    }  # A wins exact remainder tie
+    fully_fundable = m.allocate_integer_tickets(
+        "NATIVE_REQUEST_CONTROL", 1, 24, caps, weights
+    )
+    assert (
+        fully_fundable["actual_total_stake_yuan"] == 24
+        and fully_fundable["retained_cash_yuan"] == 0
+    )
+    constrained = m.allocate_integer_tickets(
+        "NATIVE_REQUEST_CONTROL", 1, 10, caps, weights
+    )
+    assert (
+        constrained["actual_total_stake_yuan"] == 10
+        and "SCALED_BY_PREISSUE_BANKROLL" in constrained["reason_codes"]
+    )
+    capped = m.allocate_integer_tickets(
+        "FIXED_100K_NOTIONAL", 1, 10, {"A": 1, "B": 5}, {"A": 0.9, "B": 0.1}
+    )
     assert capped["actual_total_stake_yuan"] == 10
     assert capped["actual_ticket_count_by_sleeve"] == {"A": 1, "B": 4}
     assert capped["retained_cash_yuan"] == 0
     assert capped["actual_total_stake_yuan"] <= 10
-    no_native = m.allocate_integer_tickets("COMPOUNDING_BANKROLL", 1, 100, {"A": 0}, {"A": 1})
-    assert no_native["actual_total_stake_yuan"] == 0 and "NO_BET_NATIVE_ZERO_REQUEST" in no_native["reason_codes"]
+    no_native = m.allocate_integer_tickets(
+        "COMPOUNDING_BANKROLL", 1, 100, {"A": 0}, {"A": 1}
+    )
+    assert (
+        no_native["actual_total_stake_yuan"] == 0
+        and "NO_BET_NATIVE_ZERO_REQUEST" in no_native["reason_codes"]
+    )
+
 
 def test_dynamic_weight_models_are_prior_only_and_have_deterministic_fallbacks():
-    m = module(); sleeves = ["A", "B"]
-    short = [{"A": .1, "B": .2}] * 51
+    m = module()
+    sleeves = ["A", "B"]
+    short = [{"A": 0.1, "B": 0.2}] * 51
     w, status = m.dynamic_weights("PRIOR_INVERSE_VOL", short, sleeves)
-    assert w == {"A": .5, "B": .5} and status == "FALLBACK_INSUFFICIENT_52_COMMON_ACTIVE"
-    singular = [{"A": .1, "B": .1}] * 52
+    assert (
+        w == {"A": 0.5, "B": 0.5} and status == "FALLBACK_INSUFFICIENT_52_COMMON_ACTIVE"
+    )
+    singular = [{"A": 0.1, "B": 0.1}] * 52
     w, status = m.dynamic_weights("PRIOR_ERC", singular, sleeves)
-    assert w == {"A": .5, "B": .5} and status == "FALLBACK_ZERO_OR_NONFINITE_VOL"
+    assert w == {"A": 0.5, "B": 0.5} and status == "FALLBACK_ZERO_OR_NONFINITE_VOL"
     history = [{"A": (i % 7 - 3) / 100, "B": (i % 5 - 2) / 80} for i in range(52)]
     for model in ("PRIOR_INVERSE_VOL", "PRIOR_ERC", "PRIOR_DRAWDOWN_AWARE"):
         w, status = m.dynamic_weights(model, history, sleeves)
-        assert math.isclose(sum(w.values()), 1.0) and all(value >= 0 for value in w.values())
-        assert status in {model, "FALLBACK_ERC_NONPOSITIVE_RISK", "FALLBACK_ERC_NO_CONVERGENCE"}
+        assert math.isclose(sum(w.values()), 1.0) and all(
+            value >= 0 for value in w.values()
+        )
+        assert status in {
+            model,
+            "FALLBACK_ERC_NONPOSITIVE_RISK",
+            "FALLBACK_ERC_NO_CONVERGENCE",
+        }
+
+
+def test_trace_validator_rejects_equal_count_key_mismatch():
+    m = module()
+    identities = [
+        {
+            "issue_instance": "A",
+            "portfolio_id": "1",
+            "selector_alias": "S",
+            "support_key_sha256": "x",
+        },
+        {
+            "issue_instance": "B",
+            "portfolio_id": "2",
+            "selector_alias": "S",
+            "support_key_sha256": "y",
+        },
+    ]
+    allocations = [
+        {
+            "issue_instance": "A",
+            "portfolio_id": "1",
+            "selector_alias": "S",
+            "support_key_sha256": "x",
+        },
+        {
+            "issue_instance": "C",
+            "portfolio_id": "3",
+            "selector_alias": "S",
+            "support_key_sha256": "y",
+        },
+    ]
+    with pytest.raises(RuntimeError, match="key mismatch"):
+        m.validate_trace_keys(identities, allocations, "TEST")
+
+
+def test_baseline_and_sequential_inference_contracts_are_frozen():
+    m = module()
+    baselines = m.baseline_registry()
+    assert baselines[0]["pre_tax_roi"] == -0.0947
+    assert baselines[1]["pre_tax_roi"] == -0.0909
+    method = m.methodology_contract()
+    assert method["primary_hypothesis"]["position_fraction"] == 1.0
+    assert method["sequential_inference"]["path_bootstrap"].startswith(
+        "paired stationary"
+    )
+    assert "max-T" in method["multiplicity"]["positive_inference"]
+    eligibility = m.eligibility_ledger()
+    frontier = m.frontier_contract(eligibility)
+    assert frontier["eligible_source_count"] == 8
+    assert "BJ167_SELECTOR_ALLOCATION_ATLAS" in frontier["eligible_candidate_sources"]
+    assert frontier["excluded_source_records"] == [
+        {
+            "candidate_id": "BJ190_SPARSE_DIVERGENCE",
+            "decision": "EXCLUDED_NOT_SLEEVE",
+            "reason": "terminal strict promotion count is zero; coverage-limited diagnostic is not an eligible complete capital sleeve",
+        },
+        {
+            "candidate_id": "BJ193_FULL_DYNAMIC_CHAIN",
+            "decision": "EXCLUDED_NEGATIVE_NON_PROMOTED",
+            "reason": "PI excludes negative non-promoted FULL_DYNAMIC_CHAIN; package supplies interface/accounting lessons only",
+        },
+    ]
+
 
 def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
-    m = module(); output = tmp_path / "package"
+    m = module()
+    output = tmp_path / "package"
     m.write_package(output)
     manifest = json.loads((output / "SHA256SUMS.json").read_text())
-    assert set(manifest) == {"CONTENT_IDENTITY.json", "README.md", "full_calendar.csv", "strict_three_way_calendar.csv", "frozen_native_sleeve_requests.csv", "gate_a_card.json", "sleeve_catalog.csv", "sleeve_trace_registry.csv", "sleeve_eligibility_ledger.csv", "funding_algorithm.json", "output_schema.json"}
-    for name, value in manifest.items(): assert hashlib.sha256((output / name).read_bytes()).hexdigest() == value
+    assert set(manifest) == {
+        "CONTENT_IDENTITY.json",
+        "README.md",
+        "full_calendar.csv",
+        "strict_three_way_calendar.csv",
+        "frozen_native_sleeve_requests.csv",
+        "gate_a_card.json",
+        "sleeve_catalog.csv",
+        "sleeve_trace_registry.csv",
+        "sleeve_eligibility_ledger.csv",
+        "baseline_registry.csv",
+        "frontier_contract.json",
+        "funding_algorithm.json",
+        "inference_contract.json",
+        "output_schema.json",
+    }
+    for name, value in manifest.items():
+        assert hashlib.sha256((output / name).read_bytes()).hexdigest() == value
     card = json.loads((output / "gate_a_card.json").read_text())
     assert card["denominator"]["calendar_issue_count"] == 348
     assert card["denominator"]["strict_three_way_issue_count"] == 177
@@ -92,8 +248,22 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     assert len(card["sleeve_trace_registry"]) == 3
     assert "attribution" in card["methodology_contract"]
     assert not output.with_name("package.stage").exists()
-    eligibility = list(__import__("csv").DictReader((output / "sleeve_eligibility_ledger.csv").open()))
-    assert [row["decision"] for row in eligibility[-2:]] == ["EXCLUDED_NOT_SLEEVE", "EXCLUDED_NEGATIVE_NON_PROMOTED"]
+    eligibility = list(
+        __import__("csv").DictReader((output / "sleeve_eligibility_ledger.csv").open())
+    )
+    assert [row["decision"] for row in eligibility[-2:]] == [
+        "EXCLUDED_NOT_SLEEVE",
+        "EXCLUDED_NEGATIVE_NON_PROMOTED",
+    ]
+    assert len(eligibility) == 12
+    baselines = list(
+        __import__("csv").DictReader((output / "baseline_registry.csv").open())
+    )
+    assert [row["baseline_id"] for row in baselines[:2]] == [
+        "B167_BEST_FULL_NATIVE_LADDER_HEAD",
+        "B170_BEST_FULL_THREE_WAY_BRIDGE",
+    ]
     assert "output_schema" in card and "holding_metrics" in card["output_schema"]
+    assert card["frontier_contract"]["eligible_source_count"] == 8
     source = SCRIPT.read_text()
     assert "result_code" not in source and "winning_sp" not in source

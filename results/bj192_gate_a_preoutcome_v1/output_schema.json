@@ -1,4 +1,24 @@
 {
+  "baseline_lift": {
+    "fields": [
+      "candidate_id",
+      "control_id",
+      "support_hash",
+      "capital_mode",
+      "position_fraction",
+      "actual_funding_hash",
+      "absolute_ending_bankroll_yuan",
+      "absolute_pre_tax_roi",
+      "candidate_minus_control_bankroll_yuan",
+      "candidate_minus_control_pre_tax_roi",
+      "ladder_decision"
+    ],
+    "formulas": [
+      "all comparisons require identical issue support, mode, fraction, starting capital, available bankroll and actual funding convention",
+      "publish absolute path and lift together; blank lift if exact matching is impossible",
+      "ladder_decision=ADVANCES only after strict matched PI terminal review"
+    ]
+  },
   "bootstrap_stability": {
     "fields": [
       "target_id",
@@ -10,7 +30,11 @@
       "FOLD",
       "LOYO",
       "EX_LARGEST_ISSUE",
-      "EX_LARGEST_YEAR"
+      "EX_LARGEST_YEAR",
+      "fallback_rate"
+    ],
+    "formulas": [
+      "YEAR/FOLD replays retain chronological order within subset; LOYO removes every issue from one year then recomputes state; ex-largest issue/year removes the largest signed pre-tax-net contributor (year aggregates first); decision panels use same full-calendar zero-flow convention"
     ]
   },
   "capital_summary": {
@@ -28,6 +52,25 @@
       "pre_tax_roi",
       "tax_adjusted_roi",
       "ruin_flag"
+    ],
+    "formulas": [
+      "minimum_bankroll=min(preissue_bankroll,postissue_bankroll) over full 348 calendar",
+      "minimum_required_start is smallest b found by deterministic integer-yuan bisection for zero unfundable non-NO_BET requests under same policy",
+      "ruin_flag=1 iff any postissue_bankroll < \u00a52 while a positive native request exists",
+      "pre_tax_roi=sum(pre_tax_net)/sum(actual_stake); blank if zero actual stake"
+    ]
+  },
+  "challenger_case": {
+    "fields": [
+      "candidate_id",
+      "alternative_explanation",
+      "test_id",
+      "result",
+      "decision_impact"
+    ],
+    "formulas": [
+      "each headline candidate receives survivor/search, leakage, support, turnover/cash, covariance fitting, largest issue/year, payout cluster and simple-control tests",
+      "cash-only smoothing is separately labeled risk reduction, never diversification edge"
     ]
   },
   "chart_sources": [
@@ -50,6 +93,11 @@
       "tail_co_loss_count",
       "concurrent_issue_count",
       "diversification_attribution_yuan"
+    ],
+    "formulas": [
+      "downside_correlation=corr(min(r_left,0),min(r_right,0)) over common active returns; blank for <2/nonpositive variance",
+      "tail_co_loss_count=count both returns in their own prior 10% lower tail",
+      "diversification_attribution=portfolio pre-tax net minus sum(weighted matched standalone nets), reported separately from retained cash"
     ]
   },
   "holding_metrics": {
@@ -71,9 +119,16 @@
       "rolling_loss_10_yuan",
       "rolling_loss_20_yuan",
       "ruin_flag",
+      "near_ruin_flag",
       "sharpe",
       "sortino",
       "calmar"
+    ],
+    "formulas": [
+      "loss=pre_tax_net<0; miss=actual_stake>0 and pre_tax_gross=0; calendar streak includes zero-flow rows, active streak skips zero-flow rows",
+      "rolling loss W=sum(min(pre_tax_net,0)) over trailing calendar W={5,10,20}; report worst and frequency",
+      "drawdown=running equity peak minus postissue bankroll; duration/time-under-water count chronological issues below peak; recovery is first later issue reaching former peak, blank if absent",
+      "near_ruin_flag=1 iff min bankroll < \u00a52\u00d7max native issue ticket count; sharpe=mean calendar bank return/sample sd\u00d7sqrt(issue frequency/year), sortino divides by downside RMS, calmar=annualized compounded bank return/max drawdown fraction; blank where denominator zero"
     ]
   },
   "issue_ledger": {
@@ -119,6 +174,11 @@
       "estimator_status",
       "fallback_reason",
       "covariance_hash"
+    ],
+    "formulas": [
+      "weights use only issues strictly before issue_instance",
+      "fallback_rate=count(non-primary estimator_status)/348",
+      "NO_BET/unavailable excluded from active observation but retained as capital zero flow"
     ]
   }
 }
