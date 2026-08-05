@@ -110,6 +110,7 @@
         "per_match_value_json",
         "per_match_estimator_source_json",
         "per_match_estimator_identity_sha256_json",
+        "per_match_estimator_component_identity_sha256_json",
         "direction_thresholds_json",
         "protection_flags_json",
         "ranked_direction_match_ids_json",

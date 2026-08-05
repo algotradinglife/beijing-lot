@@ -107,6 +107,10 @@ def test_conditional_direction_adapter_binds_exact_stage1_support_and_190_estima
     assert strongest["allowed_codes"] == ["3", "1"]
     assert strongest["direction_weight_3_1_0"][2] == "0.000000000000"
     assert all(len(row["estimator_identity_sha256"]) == 64 for row in output["per_match"])
+    assert all(
+        row["estimator_component_identity_sha256"]
+        for row in output["per_match"]
+    )
 
     package = ROOT / "results" / "bj190_gate_a_preoutcome_v3r1"
     policy = next(
@@ -154,6 +158,38 @@ def test_conditional_direction_adapter_binds_exact_stage1_support_and_190_estima
             stage1_output_sha256="3" * 64,
             adapter_sha256=module.sha256_file(module.ADAPTER_PATH),
         )
+
+
+def test_composite_direction_identity_binds_every_compared_estimator_component():
+    module = load_module()
+    adapter = module.load_module(module.ADAPTER_PATH, "bj193_test_composite_identity")
+    package = ROOT / "results" / "bj190_gate_a_preoutcome_v3r1"
+    policy = next(
+        row
+        for row in module.read_csv(package / "detector_grid.csv")
+        if row["detector_family"] == "DELTA_P"
+        and row["estimator_variant"] == "UNION"
+        and row["availability"] == "AVAILABLE"
+    )
+    row = next(
+        row
+        for row in module.read_csv(package / "estimator_match_freeze.csv.gz")
+        if row["target_safe_consensus_status"] == "AVAILABLE"
+    )
+    metric = adapter.metric_for_match(row, policy)
+    assert metric is not None
+    binding = adapter.estimator_identity_binding(row, policy, metric)
+    assert set(binding["components"]) == {
+        "t1_score_estimator_identity_sha256",
+        "target_safe_consensus_identity_sha256",
+    }
+    changed = dict(row, target_safe_consensus_identity_sha256="f" * 64)
+    changed_metric = adapter.metric_for_match(changed, policy)
+    assert changed_metric is not None
+    changed_binding = adapter.estimator_identity_binding(
+        changed, policy, changed_metric
+    )
+    assert changed_binding["binding_sha256"] != binding["binding_sha256"]
 
 
 def test_conditional_builder_executes_all_golden_mechanisms_and_zero_flow_edges():
@@ -234,6 +270,13 @@ def test_stage2_stage3_weight_mapping_binds_real_137_role_vectors_and_masks():
     assert unavailable["status"] == "UNAVAILABLE"
     assert unavailable["reason_code"] == "STAGE3_ROLE_VECTOR_MISSING"
     assert unavailable["per_match_weight_3_1_0"] == []
+    mismatched = {key: dict(value) for key, value in roles.items()}
+    mismatched[ordered[-1]]["match_id"] = "NOT_THE_MAPPED_MATCH"
+    identity_failure = adapter.combine_stage2_and_stage3_weights(
+        ordered, directions, mismatched, "Q_WEIGHT"
+    )
+    assert identity_failure["status"] == "UNAVAILABLE"
+    assert identity_failure["reason_code"] == "STAGE3_MATCH_IDENTITY_MISMATCH"
     # Unit-weight controls do not depend on a #137 role row.
     control = adapter.combine_stage2_and_stage3_weights(
         ordered, directions, {}, "NA"

@@ -2,11 +2,11 @@
   "accepted_190_joint_allocation_input_sha256": "718d8a51151c07f1bba89c0075953183f7cf09120318514980ac9dcf77151dd2",
   "contract": "BJ193_DIRECTION_ADAPTER_GOLDEN_V3",
   "expected_output": {
-    "adapter_sha256": "dcb2c236fbc327a325024713e2d5cc7cf9c1d64b5df696b89ec4e3963a728ed4",
+    "adapter_sha256": "f30881f6d45fc271814e8f02e97a297dfa63ecd530df6cecad3a41a693c5e077",
     "adapter_version": "bj193-conditional-chain-adapter-v3",
     "delete_leg_index_zero_based": 0,
-    "derived_direction_action_sha256": "cc87fa6a68b15656993731ca55434a6c153e0260ca0ecbd9d548358c1a404583",
-    "direction_output_sha256": "1390562609cc3579240bb22e5956ec6a2c545a5435411b175bff58ff9d5d7f20",
+    "derived_direction_action_sha256": "da533e7315f7ecca4cfcbabb2cbf2409aa14925db45a6c8dc647e116386b8737",
+    "direction_output_sha256": "29b2d45e61615b23c54871364e2dbd3a03f73459d197eb415f9688fe2f744c40",
     "estimator_registry_source": "bj190_gate_a_preoutcome_v3r1/estimator_match_freeze.csv.gz",
     "omitted_code": "0",
     "ordered_match_ids": [
@@ -30,7 +30,10 @@
           "0.089510440442",
           "0.000000000000"
         ],
-        "estimator_identity_sha256": "1e985226da17ba84994aa5d875b807874a3860c3d6bb2041d69cbe685ada6bb5",
+        "estimator_component_identity_sha256": {
+          "t1_score_estimator_identity_sha256": "1e985226da17ba84994aa5d875b807874a3860c3d6bb2041d69cbe685ada6bb5"
+        },
+        "estimator_identity_sha256": "1bd27415d748bd5a6c6251b0cf017418494c46966706e5caa8e8ccc3bd3a35de",
         "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
         "favored_code": "3",
         "magnitude": "0.798045154168",
@@ -57,7 +60,10 @@
           "0.103856973911",
           "0.051209836168"
         ],
-        "estimator_identity_sha256": "77278233b0968f79e18023fc16da09e8d7e7ef8e675125e753cd9fb0457fa61f",
+        "estimator_component_identity_sha256": {
+          "t1_score_estimator_identity_sha256": "77278233b0968f79e18023fc16da09e8d7e7ef8e675125e753cd9fb0457fa61f"
+        },
+        "estimator_identity_sha256": "fb7ef999be995c1f6025e6a5c1d2ea8cc5d76cca4e1084e448baff0f3ca3a9af",
         "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
         "favored_code": "3",
         "magnitude": "0.785443291828",
@@ -84,7 +90,10 @@
           "0.146276652680",
           "0.756964497964"
         ],
-        "estimator_identity_sha256": "4140c5a00b632c541a16d72d0a44a6ffb4378574f84dded25717772eb10e7beb",
+        "estimator_component_identity_sha256": {
+          "t1_score_estimator_identity_sha256": "4140c5a00b632c541a16d72d0a44a6ffb4378574f84dded25717772eb10e7beb"
+        },
+        "estimator_identity_sha256": "2e8e7908b8790b54553732b00abb8405a4cd415e872c3dc2b596ed2b785ad777",
         "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
         "favored_code": "0",
         "magnitude": "0.771795864383",
@@ -111,7 +120,10 @@
           "0.138467940546",
           "0.737139087766"
         ],
-        "estimator_identity_sha256": "f8343b34778558d8b0da5078a253bd2a13a2036e8eebb38ed9c0891053efc177",
+        "estimator_component_identity_sha256": {
+          "t1_score_estimator_identity_sha256": "f8343b34778558d8b0da5078a253bd2a13a2036e8eebb38ed9c0891053efc177"
+        },
+        "estimator_identity_sha256": "22e41599c7faee26c26e8d7a07b94af6b284158a1a61a55a51dc542677240de4",
         "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
         "favored_code": "0",
         "magnitude": "0.751785458488",
@@ -138,7 +150,10 @@
           "0.119604711947",
           "0.823542586959"
         ],
-        "estimator_identity_sha256": "fbb924324a9d1b78249514a957584d9158fd461adeedb11f37d7c093d5efa535",
+        "estimator_component_identity_sha256": {
+          "t1_score_estimator_identity_sha256": "fbb924324a9d1b78249514a957584d9158fd461adeedb11f37d7c093d5efa535"
+        },
+        "estimator_identity_sha256": "86b2db7098bd869c0fe9ee1cc4c58800acaef97a48ed6c754098a1070540f1e9",
         "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
         "favored_code": "0",
         "magnitude": "0.732722530475",
@@ -165,7 +180,10 @@
           "0.124712623099",
           "0.820175077455"
         ],
-        "estimator_identity_sha256": "2abbf296e344be53db119894d0de33556b19d255eb51a4ae0e740204aae08b12",
+        "estimator_component_identity_sha256": {
+          "t1_score_estimator_identity_sha256": "2abbf296e344be53db119894d0de33556b19d255eb51a4ae0e740204aae08b12"
+        },
+        "estimator_identity_sha256": "462424fb72be0f5953ac872dffb4748083ac01d7e35fb870d8ba4a490edddf70",
         "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
         "favored_code": "0",
         "magnitude": "0.724758762713",
@@ -192,7 +210,10 @@
           "0.123227703050",
           "0.775445482792"
         ],
-        "estimator_identity_sha256": "486791a524c2fd6dad4ebf6021bbc9edad423eb2ecca4917e4f6351e7e2891fa",
+        "estimator_component_identity_sha256": {
+          "t1_score_estimator_identity_sha256": "486791a524c2fd6dad4ebf6021bbc9edad423eb2ecca4917e4f6351e7e2891fa"
+        },
+        "estimator_identity_sha256": "acf13dff838fd6fb5313db5de4d55663070d7bd446ec2ddbc10769552850c7ab",
         "estimator_source": "FUNDAMENTAL_T1_SCORE_DISTRIBUTION",
         "favored_code": "0",
         "magnitude": "0.721500458037",

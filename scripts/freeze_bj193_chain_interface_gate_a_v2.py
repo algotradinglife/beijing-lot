@@ -559,13 +559,14 @@ def direction_adapter_contract() -> dict[str, object]:
             "stage1_output_sha256": "required and copied into every direction output",
             "policy": "one exact detector_grid row; DIAGNOSTIC_UNAVAILABLE stays UNAVAILABLE",
             "estimator_rows": "one exact estimator_match_freeze row per selected match",
+            "estimator_identity": "canonical hash of detector/variant, selected source and every immutable estimator component used; UNION/MODEL_AGREEMENT bind both T1 and target-safe consensus identities",
         },
         "estimator_mapping": {
-            "FUNDAMENTAL_INDEPENDENT": "fundamental p/delta/z and T1 estimator identity",
-            "CALIBRATED_MARKET_ESTIMATOR": "calibrated p/delta/z and target-safe consensus identity",
-            "UNION": "larger magnitude per match; exact tie fundamental first; selected source supplies probability",
-            "MODEL_AGREEMENT": "require identical favored and omitted codes; weaker magnitude per match; exact tie fundamental first; selected weaker source supplies probability",
-            "LINE_RESIDUAL_MU": "same T1 score-distribution probability and signed line residual",
+            "FUNDAMENTAL_INDEPENDENT": "fundamental p/delta/z; derived identity binds T1 estimator identity",
+            "CALIBRATED_MARKET_ESTIMATOR": "calibrated p/delta/z; derived identity binds target-safe consensus identity",
+            "UNION": "larger magnitude per match; exact tie fundamental first; selected source supplies probability; derived identity binds both compared component identities",
+            "MODEL_AGREEMENT": "require identical favored and omitted codes; weaker magnitude per match; exact tie fundamental first; selected weaker source supplies probability; derived identity binds both agreement components",
+            "LINE_RESIDUAL_MU": "same T1 score-distribution probability and signed line residual; derived identity binds T1 estimator identity",
         },
         "eligibility_order": [
             "exact N7 and complete estimator row lookup",
@@ -1164,6 +1165,7 @@ def stage_interface_contract() -> dict[str, object]:
                     "per_match_outcome_weight_json", "per_match_probability_json",
                     "per_match_value_json", "per_match_estimator_source_json",
                     "per_match_estimator_identity_sha256_json",
+                    "per_match_estimator_component_identity_sha256_json",
                     "direction_thresholds_json", "protection_flags_json",
                     "ranked_direction_match_ids_json", "strongest_match_id",
                     "delete_leg_index_zero_based", "omitted_code",
@@ -1305,6 +1307,9 @@ def chain_fixture() -> dict[str, object]:
         ),
         "per_match_estimator_identity_sha256_json": canonical_json(
             {match_id: canonical_hash(["STATIC_ALLOW_ALL", match_id]) for match_id in match_ids}
+        ),
+        "per_match_estimator_component_identity_sha256_json": canonical_json(
+            {match_id: {} for match_id in match_ids}
         ),
         "direction_thresholds_json": canonical_json({"rule": "ALLOW_ALL"}),
         "protection_flags_json": canonical_json({match_id: False for match_id in match_ids}),

@@ -22,7 +22,7 @@
     "WR_DUPLICATE_STAKE": "accepted #145 inverse-CDF on normalized vector; duplicates retained; zero weights forbidden from realized counts"
   },
   "module": "conditional_chain_adapter.py",
-  "module_sha256": "dcb2c236fbc327a325024713e2d5cc7cf9c1d64b5df696b89ec4e3963a728ed4",
+  "module_sha256": "f30881f6d45fc271814e8f02e97a297dfa63ecd530df6cecad3a41a693c5e077",
   "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
   "stage3_role_vector_source": {
     "identity_rule": "all seven role rows must share exact nonblank portfolio_id and issue and match the ordered Stage-1 support by match_id; missing row/field or mixed identity is UNAVAILABLE with zero flow",

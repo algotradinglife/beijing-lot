@@ -20,11 +20,11 @@
     "frozen K1/K2/K4/ALL threshold on the ranked prefix"
   ],
   "estimator_mapping": {
-    "CALIBRATED_MARKET_ESTIMATOR": "calibrated p/delta/z and target-safe consensus identity",
-    "FUNDAMENTAL_INDEPENDENT": "fundamental p/delta/z and T1 estimator identity",
-    "LINE_RESIDUAL_MU": "same T1 score-distribution probability and signed line residual",
-    "MODEL_AGREEMENT": "require identical favored and omitted codes; weaker magnitude per match; exact tie fundamental first; selected weaker source supplies probability",
-    "UNION": "larger magnitude per match; exact tie fundamental first; selected source supplies probability"
+    "CALIBRATED_MARKET_ESTIMATOR": "calibrated p/delta/z; derived identity binds target-safe consensus identity",
+    "FUNDAMENTAL_INDEPENDENT": "fundamental p/delta/z; derived identity binds T1 estimator identity",
+    "LINE_RESIDUAL_MU": "same T1 score-distribution probability and signed line residual; derived identity binds T1 estimator identity",
+    "MODEL_AGREEMENT": "require identical favored and omitted codes; weaker magnitude per match; exact tie fundamental first; selected weaker source supplies probability; derived identity binds both agreement components",
+    "UNION": "larger magnitude per match; exact tie fundamental first; selected source supplies probability; derived identity binds both compared component identities"
   },
   "forbidden_inputs": [
     "final_sp",
@@ -39,13 +39,14 @@
     "winning_sp"
   ],
   "input": {
+    "estimator_identity": "canonical hash of detector/variant, selected source and every immutable estimator component used; UNION/MODEL_AGREEMENT bind both T1 and target-safe consensus identities",
     "estimator_rows": "one exact estimator_match_freeze row per selected match",
     "policy": "one exact detector_grid row; DIAGNOSTIC_UNAVAILABLE stays UNAVAILABLE",
     "selected_match_ids": "exactly seven unique IDs in immutable Stage-1 order",
     "stage1_output_sha256": "required and copied into every direction output"
   },
   "module": "conditional_chain_adapter.py",
-  "module_sha256": "dcb2c236fbc327a325024713e2d5cc7cf9c1d64b5df696b89ec4e3963a728ed4",
+  "module_sha256": "f30881f6d45fc271814e8f02e97a297dfa63ecd530df6cecad3a41a693c5e077",
   "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
   "source_bindings": {
     "detector_grid.csv": "8cf1e752a9deba48857cfb1c532d41d6f49abbc2e41daa8134fb64b4ccbfd382",

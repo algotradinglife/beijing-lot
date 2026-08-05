@@ -188,6 +188,50 @@ def metric_for_match(
     raise ValueError(f"unknown estimator variant: {variant}")
 
 
+def estimator_identity_binding(
+    row: Mapping[str, object],
+    policy: Mapping[str, object],
+    metric: Mapping[str, object],
+) -> dict[str, object]:
+    """Bind every immutable estimator component used to derive a direction."""
+
+    _assert_outcome_unexposed(row)
+    _assert_outcome_unexposed(policy)
+    detector = str(policy["detector_family"])
+    variant = str(policy["estimator_variant"])
+    if detector == "LINE_RESIDUAL_MU" or variant == "FUNDAMENTAL_INDEPENDENT":
+        component_names = ("t1_score_estimator_identity_sha256",)
+    elif variant == "CALIBRATED_MARKET_ESTIMATOR":
+        component_names = ("target_safe_consensus_identity_sha256",)
+    elif variant in {"UNION", "MODEL_AGREEMENT"}:
+        # Both components affect source choice/agreement, even though only one
+        # component supplies the eventual probability vector.
+        component_names = (
+            "t1_score_estimator_identity_sha256",
+            "target_safe_consensus_identity_sha256",
+        )
+    else:
+        raise ValueError("unknown estimator identity topology")
+    components: dict[str, str] = {}
+    for name in component_names:
+        identity = str(row.get(name, ""))
+        if len(identity) != 64 or any(
+            character not in "0123456789abcdef" for character in identity.lower()
+        ):
+            raise ValueError(f"invalid estimator component identity: {name}")
+        components[name] = identity
+    payload = {
+        "detector_family": detector,
+        "estimator_variant": variant,
+        "selected_estimator_source": str(metric["estimator_source"]),
+        "components": components,
+    }
+    return {
+        "binding_sha256": canonical_hash(payload),
+        "components": components,
+    }
+
+
 def _passes_base_gate(
     row: Mapping[str, object], policy: Mapping[str, object]
 ) -> tuple[bool, str]:
@@ -317,16 +361,20 @@ def apply_direction_adapter(
         metric = metric_for_match(source, policy)
         if metric is None:
             return zero("NO_BET", "ESTIMATOR_DIRECTION_UNAVAILABLE")
+        try:
+            identity_binding = estimator_identity_binding(source, policy, metric)
+        except (KeyError, ValueError):
+            return zero("UNAVAILABLE", "ESTIMATOR_IDENTITY_MISSING_OR_INVALID")
         metrics.append(
             {
                 "match_id": match_id,
                 "match_idx": int(source["match_idx"]),
-                "estimator_identity_sha256": (
-                    source["t1_score_estimator_identity_sha256"]
-                    if "FUNDAMENTAL_T1_SCORE_DISTRIBUTION"
-                    in str(metric["estimator_source"])
-                    else source["target_safe_consensus_identity_sha256"]
-                ),
+                "estimator_identity_sha256": identity_binding[
+                    "binding_sha256"
+                ],
+                "estimator_component_identity_sha256": identity_binding[
+                    "components"
+                ],
                 **metric,
             }
         )
@@ -361,6 +409,9 @@ def apply_direction_adapter(
                 "estimator_source": metric["estimator_source"],
                 "estimator_identity_sha256": metric[
                     "estimator_identity_sha256"
+                ],
+                "estimator_component_identity_sha256": metric[
+                    "estimator_component_identity_sha256"
                 ],
                 "probability_3_1_0": [format(value, ".12f") for value in probabilities],
                 "allowed_codes": allowed,
@@ -460,6 +511,11 @@ def combine_stage2_and_stage3_weights(
     fields = WEIGHT_SOURCE_FIELDS[weight_source]
     if weight_source != "NA":
         source_rows = [role_by_match[match_id] for match_id in ordered]
+        if any(
+            str(row.get("match_id", "")) != match_id
+            for match_id, row in zip(ordered, source_rows, strict=True)
+        ):
+            return unavailable("STAGE3_MATCH_IDENTITY_MISMATCH")
         if any(any(field not in row for field in fields) for row in source_rows):
             return unavailable("STAGE3_WEIGHT_SOURCE_FIELD_MISSING")
         portfolio_ids = {str(row.get("portfolio_id", "")) for row in source_rows}
