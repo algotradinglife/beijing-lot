@@ -55,13 +55,30 @@ def test_frozen_source_hashes_and_fixed_primary_catalog():
 def test_settled_sources_are_identity_only_and_never_open_payloads(monkeypatch):
     m = module()
     original = m.sha256_file
+    original_open = Path.open
+    original_iterdir = Path.iterdir
     opened = []
 
     def tracked(path):
         opened.append(path)
         return original(path)
 
+    def guarded_open(path, *args, **kwargs):
+        if path.parent.name in m.SETTLED_IDENTITY_ONLY_PACKAGES and path.name not in {
+            "SHA256SUMS.json",
+            "CONTENT_IDENTITY.json",
+        }:
+            raise AssertionError(f"settled payload opened: {path}")
+        return original_open(path, *args, **kwargs)
+
+    def guarded_iterdir(path):
+        if path.name in m.SETTLED_IDENTITY_ONLY_PACKAGES:
+            raise AssertionError(f"settled package directory walked: {path}")
+        return original_iterdir(path)
+
     monkeypatch.setattr(m, "sha256_file", tracked)
+    monkeypatch.setattr(Path, "open", guarded_open)
+    monkeypatch.setattr(Path, "iterdir", guarded_iterdir)
     for spec in m.EXPECTED_SOURCES.values():
         bound = m.verify_source(spec)
         if spec["path"].name in m.SETTLED_IDENTITY_ONLY_PACKAGES:
