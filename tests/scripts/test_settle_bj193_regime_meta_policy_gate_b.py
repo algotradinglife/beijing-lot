@@ -1068,6 +1068,25 @@ def test_finalizer_bankroll_100k_production_anchors():
         for policy in F.POLICIES
     ]
     F._assert_bankroll_100k_anchors(summaries)
+    common = {
+        int(value)
+        for value in json.loads(
+            (checkpoint / "strict_common_support.json").read_text()
+        )["issue_indices"]
+    }
+    performance = [
+        F._metric_row(
+            policy,
+            support,
+            F._support_rows(by_policy[policy], support, common),
+        )
+        for policy in F.POLICIES
+        for support in ("NATIVE", "STRICT_FOUR_ARM_COMMON")
+    ]
+    assert F._decision_leaders(performance, summaries) == (
+        "PRIOR_ONLY_BEST_FIXED",
+        "ALL_STATIC",
+    )
     index = {row["policy_id"]: row for row in summaries}
     assert float(index["ALL_STATIC"]["ending_bankroll_yuan"]) == pytest.approx(
         29558.00

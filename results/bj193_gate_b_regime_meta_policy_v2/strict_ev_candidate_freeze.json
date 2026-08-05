@@ -1,8 +1,0 @@
-{
-  "candidate_count": 0,
-  "candidate_policy": "",
-  "contract": "BJ193_CAUSAL_CANDIDATE_FREEZE_V2",
-  "decision": "NO_PROMOTION",
-  "reason": "no causal chain clears the complete frozen promotion screen",
-  "strict_independent_ev_required": false
-}

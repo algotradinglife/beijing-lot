@@ -360,6 +360,44 @@ def _assert_bankroll_100k_anchors(
             raise RuntimeError(f"100k minimum-start anchor drift: {policy}")
 
 
+def _decision_leaders(
+    performance: Sequence[Mapping[str, object]],
+    bankroll_summary: Sequence[Mapping[str, object]],
+) -> tuple[str, str]:
+    """Return primary capital and secondary matched-ROI leaders."""
+
+    perf = {
+        (str(row["policy_id"]), str(row["support"])): row
+        for row in performance
+    }
+    bankroll = {str(row["policy_id"]): row for row in bankroll_summary}
+    causal = tuple(
+        policy for policy in POLICIES if policy != "LEAKY_ORACLE_CEILING"
+    )
+    fundable = tuple(
+        policy for policy in causal
+        if bool(bankroll[policy]["fundable_all_issues_flag"])
+    )
+    if not fundable:
+        raise RuntimeError("no fundable causal 100k capital path")
+    best_capital = max(
+        fundable,
+        key=lambda policy: float(bankroll[policy]["ending_bankroll_yuan"]),
+    )
+    best_matched_roi = max(
+        (
+            "ALL_STATIC",
+            "DYNAMIC_SELECTION_ONLY",
+            "DYNAMIC_SELECTION_DIRECTION",
+            "PRIOR_ONLY_BEST_FIXED",
+        ),
+        key=lambda policy: float(
+            perf[(policy, "STRICT_FOUR_ARM_COMMON")]["pre_tax_roi"]
+        ),
+    )
+    return best_capital, best_matched_roi
+
+
 def _svg_line_chart(
     path: Path,
     title: str,
@@ -840,6 +878,7 @@ def finalize(checkpoint: Path, target: Path) -> None:
         perf_fields = list(performance[0])
         write_csv(stage / "performance_summary.csv", perf_fields, performance)
         write_csv(stage / "native_and_strict_common_performance.csv", perf_fields, performance)
+        perf_lookup = {(r["policy_id"], r["support"]): r for r in performance}
         bankroll_rows: list[dict[str, object]] = []
         bankroll_summary: list[dict[str, object]] = []
         for policy in POLICIES:
@@ -847,6 +886,16 @@ def finalize(checkpoint: Path, target: Path) -> None:
             bankroll_rows.extend(issue_rows)
             bankroll_summary.append(summary)
         _assert_bankroll_100k_anchors(bankroll_summary)
+        bankroll_lookup = {
+            row["policy_id"]: row for row in bankroll_summary
+        }
+        (
+            best_fundable_100k_capital_path,
+            best_matched_pre_tax_roi_per_stake,
+        ) = _decision_leaders(
+            performance,
+            bankroll_summary,
+        )
         write_gzip(
             stage / "bankroll_100k_issue_path.csv.gz",
             list(bankroll_rows[0]),
@@ -1250,6 +1299,20 @@ def finalize(checkpoint: Path, target: Path) -> None:
             ),
             "bankroll_issue_path_row_count": len(bankroll_rows),
             "bankroll_summary_row_count": len(bankroll_summary),
+            "decision_objective_primary": (
+                "PRE_TAX_FINITE_BANKROLL_GROWTH_AND_FUNDABILITY_NATIVE_SUPPORT"
+            ),
+            "best_fundable_100k_capital_path": best_fundable_100k_capital_path,
+            "best_fundable_100k_capital_path_support": "NATIVE_EXECUTION_SUPPORT",
+            "decision_objective_secondary": (
+                "PRE_TAX_ROI_PER_STAKE_STRICT_FOUR_ARM_COMMON"
+            ),
+            "best_matched_pre_tax_roi_per_stake": (
+                best_matched_pre_tax_roi_per_stake
+            ),
+            "best_matched_pre_tax_roi_per_stake_support": (
+                "STRICT_FOUR_ARM_COMMON"
+            ),
             "chart_sources": [
                 "bankroll_100k_issue_path.csv.gz",
                 "stage_attribution_chart_source.csv",
@@ -1279,19 +1342,6 @@ def finalize(checkpoint: Path, target: Path) -> None:
         }
         (stage / "settlement_card.json").write_text(json.dumps(card, sort_keys=True, indent=2) + "\n")
 
-        perf_lookup = {(r["policy_id"], r["support"]): r for r in performance}
-        baseline_policies = (
-            "ALL_STATIC",
-            "DYNAMIC_SELECTION_ONLY",
-            "DYNAMIC_SELECTION_DIRECTION",
-            "PRIOR_ONLY_BEST_FIXED",
-        )
-        strongest_baseline = max(
-            baseline_policies,
-            key=lambda policy: float(
-                perf_lookup[(policy, "STRICT_FOUR_ARM_COMMON")]["pre_tax_roi"]
-            ),
-        )
         causal_stage_rows = [
             row
             for row in increments
@@ -1303,9 +1353,6 @@ def finalize(checkpoint: Path, target: Path) -> None:
         bottleneck = min(
             causal_stage_rows, key=lambda row: float(row["pre_tax_roi_lift"])
         )
-        bankroll_lookup = {
-            row["policy_id"]: row for row in bankroll_summary
-        }
         choice_rows = {
             "STAGE_1_SELECTION": s1,
             "STAGE_2_DIRECTION": s2,
@@ -1321,7 +1368,9 @@ def finalize(checkpoint: Path, target: Path) -> None:
         report = [
             "# #193 Gate-B v2 — three-stage regime meta-policy settlement",
             "",
-            f"Decision: **{candidate['decision']}**. The controlling result is pre-tax; tax-adjusted values are reference-only. The corrected leaky oracle is a diagnostic ceiling, never a deployable policy.",
+            f"Decision: **{candidate['decision']}**. The primary decision objective is pre-tax finite-bankroll growth and fundability on native execution support; ROI per stake on strict common support is secondary. Tax-adjusted values are reference-only, and the corrected leaky oracle is a diagnostic ceiling, never a deployable policy.",
+            "",
+            f"Two distinct leaders must not be conflated: `{best_fundable_100k_capital_path}` is the best fundable causal ¥100,000 capital path on native execution support, while `{best_matched_pre_tax_roi_per_stake}` is the best matched pre-tax ROI-per-stake baseline on strict-four-arm common support. They answer different questions.",
             "",
             "## Native and strict-common baseline ladder",
             "",
@@ -1337,7 +1386,7 @@ def finalize(checkpoint: Path, target: Path) -> None:
             )
         report += [
             "",
-            f"The strict four-arm common support contains {len(common_indices)} canonical issues. `{strongest_baseline}` is the strongest surviving matched causal/prior baseline. The oracle's positive ROI diagnoses foregone information, not causal generalization.",
+            f"The strict four-arm common support contains {len(common_indices)} canonical issues. `{best_matched_pre_tax_roi_per_stake}` leads this secondary matched ROI-per-stake comparison. The oracle's positive ROI diagnoses foregone information, not causal generalization.",
             "",
             "## Stage attribution and paired uncertainty",
             "",
@@ -1359,7 +1408,7 @@ def finalize(checkpoint: Path, target: Path) -> None:
             "",
             "## Fixed-stake capital reuse from ¥100,000",
             "",
-            "This is a cash-account diagnostic using the frozen native stake schedule. Stakes are not resized or compounded; no top-up is injected. Capital turnover is cumulative stake divided by ¥100,000 and is distinct from both cumulative ROI and bankroll growth.",
+            "This is the controlling capital objective using the frozen native stake schedule. Stakes are not resized or compounded; no top-up is injected. Capital turnover is cumulative stake divided by ¥100,000 and is distinct from both cumulative ROI and bankroll growth. Once a path first becomes unfundable, later rows and the displayed ending balance are counterfactual fixed-stake continuations, not executable cash-account outcomes.",
             "",
             "| Policy | Ending bankroll | Growth | Stake | Capital turnover | Fundable | First unfundable | Minimum start required |",
             "|---|---:|---:|---:|---:|---|---:|---:|",
@@ -1374,7 +1423,7 @@ def finalize(checkpoint: Path, target: Path) -> None:
             )
         report += [
             "",
-            "Capital reuse amplifies whatever edge is present: it cannot rescue negative expectation. `DYNAMIC_SELECTION_ONLY` and `DYNAMIC_SELECTION_DIRECTION` become infeasible under the exact ¥100,000 schedule; the negative causal policies finish far below the start even when technically fundable. The oracle remains strongly positive but is leaky and diagnostic-only.",
+            f"`{best_fundable_100k_capital_path}` is the best fundable causal path, ending at ¥{bankroll_lookup[best_fundable_100k_capital_path]['ending_bankroll_yuan']} (growth {bankroll_lookup[best_fundable_100k_capital_path]['bankroll_growth_rate']}, turnover {bankroll_lookup[best_fundable_100k_capital_path]['capital_turnover_multiple']}×). `ALL_STATIC` ends at ¥{bankroll_lookup['ALL_STATIC']['ending_bankroll_yuan']} (growth {bankroll_lookup['ALL_STATIC']['bankroll_growth_rate']}, turnover {bankroll_lookup['ALL_STATIC']['capital_turnover_multiple']}×). Capital reuse amplifies the underlying edge and cannot rescue negative expectation. `DYNAMIC_SELECTION_ONLY` and `DYNAMIC_SELECTION_DIRECTION` become infeasible; their later balances are counterfactual continuations. The oracle remains strongly positive but is leaky and diagnostic-only.",
             "",
             "![100k capital curves](bankroll_100k_capital_curves.svg)",
             "",
@@ -1398,7 +1447,7 @@ def finalize(checkpoint: Path, target: Path) -> None:
             "## Scientific interpretation",
             "",
             f"The corrected oracle selected an available action on {correction_receipt['corrected_oracle_selected_count']} issues, fell back on {correction_receipt['corrected_oracle_fallback_count']}, changed action on {correction_receipt['changed_action_issue_count']}, changed status/cash flow on {correction_receipt['changed_cashflow_or_status_issue_count']}, and beat the causal chain on {correction_receipt['oracle_better_than_causal_issue_count']} issues. This gap plus negative causal performance is precisely `CAUSAL_GENERALIZATION_FAILURE`: profitable ex-post choices exist, but the frozen pre-event mapping did not identify them robustly.",
-            f"The strongest surviving baseline is `{strongest_baseline}`; the bottleneck is `{bottleneck['stage']}`. A concrete next hypothesis is to explain corrected-oracle opportunity regimes with separately preregistered frozen pre-event features, without backfitting this chain or handing it to #192.",
+            f"The primary capital leader is `{best_fundable_100k_capital_path}` on native execution support; the secondary matched ROI-per-stake leader is `{best_matched_pre_tax_roi_per_stake}` on strict common support. The bottleneck is `{bottleneck['stage']}`. A concrete next hypothesis is to explain corrected-oracle opportunity regimes with separately preregistered frozen pre-event features, without backfitting this chain or handing it to #192.",
             "",
             "## Durability boundary",
             "",
@@ -1412,18 +1461,19 @@ def finalize(checkpoint: Path, target: Path) -> None:
             "",
             f"Terminal research disposition candidate: **{candidate['decision']}**.",
             "",
-            "The frozen chronological chain separately learns match selection, direction and allocation/M. On the 189-issue strict common support it does not beat the strongest matched baseline with a positive paired-bootstrap lower bound. The corrected oracle is positive, but because it uses outcome information it is only a ceiling: the result is `CAUSAL_GENERALIZATION_FAILURE`, not a deployable edge.",
+            "The frozen chronological chain separately learns match selection, direction and allocation/M. On the 189-issue strict common support it does not clear the matched ROI-per-stake comparator and positive paired-bootstrap lower-bound screen. The corrected oracle is positive, but because it uses outcome information it is only a ceiling: the result is `CAUSAL_GENERALIZATION_FAILURE`, not a deployable edge.",
             "",
             "## Decision readout",
             "",
-            f"- Strongest surviving baseline: `{strongest_baseline}`.",
+            f"- Best fundable ¥100,000 capital path on native execution support: `{best_fundable_100k_capital_path}`.",
+            f"- Best matched pre-tax ROI per stake on strict common support: `{best_matched_pre_tax_roi_per_stake}`.",
             f"- Largest incremental bottleneck: `{bottleneck['stage']}` with lift `{bottleneck['pre_tax_roi_lift']}`.",
             "- Controlling economics: pre-tax; tax-adjusted values are reference-only.",
             "- No strict EV escalation and no handoff to #192.",
             "",
             "## Capital and risk",
             "",
-            "The ¥100,000 view reuses cash across issues with the native frozen stakes and no compounding or top-ups. Capital turnover is stake/start-capital, not ROI and not bankroll growth. Two dynamic chains are unfundable; all negative causal policies lose substantial bankroll. The leaky oracle grows capital but remains diagnostic-only.",
+            f"The ¥100,000 view is the primary decision objective and reuses cash across issues with native frozen stakes and no compounding or top-ups. `{best_fundable_100k_capital_path}` is the best fundable causal path. Capital turnover is stake/start-capital, not ROI and not bankroll growth. `ALL_STATIC` leads only the secondary strict-common ROI-per-stake comparison. Two dynamic chains are unfundable; all rows after their first funding failure are counterfactual continuations rather than executable cash accounts. The leaky oracle grows capital but remains diagnostic-only.",
             "",
             "![100k capital curves](bankroll_100k_capital_curves.svg)",
             "",
@@ -1461,7 +1511,7 @@ def finalize(checkpoint: Path, target: Path) -> None:
                 "pytest -q tests/scripts/"
                 "test_settle_bj193_regime_meta_policy_gate_b.py"
             ),
-            "full_result": "34 passed in 41.19s",
+            "full_result": "34 passed in 40.46s",
             "py_compile": "PASS",
             "git_diff_check": "PASS",
         }
@@ -1473,6 +1523,10 @@ def finalize(checkpoint: Path, target: Path) -> None:
             "contract": CONTRACT, "checkpoint_manifest_sha256": checkpoint_manifest_sha,
             "canonical_issue_count": 344, "strict_common_issue_count": len(common_indices),
             "candidate_count": candidate["candidate_count"], "decision": candidate["decision"],
+            "decision_objective_primary": "PRE_TAX_FINITE_BANKROLL_GROWTH_AND_FUNDABILITY_NATIVE_SUPPORT",
+            "best_fundable_100k_capital_path": best_fundable_100k_capital_path,
+            "decision_objective_secondary": "PRE_TAX_ROI_PER_STAKE_STRICT_FOUR_ARM_COMMON",
+            "best_matched_pre_tax_roi_per_stake": best_matched_pre_tax_roi_per_stake,
         }
         (stage / "CONTENT_IDENTITY.json").write_text(json.dumps(identity, sort_keys=True, indent=2) + "\n")
         payload = {}
