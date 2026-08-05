@@ -1,0 +1,22 @@
+{
+  "accepted_v2": {
+    "content_identity_sha256": "a5f274f92edbff194be9ce60fa707196d20d255b608b08bf22c3f0d924bb7425",
+    "manifest_sha256": "6a44f4b1b355f5476328424bc8d92271d61d585643d40ca42bb56ffda1c43933",
+    "package": "bj193_gate_a_chain_interface_v2",
+    "payload_count": 35,
+    "portable_manifest_sha256": "2bd83000fabf0a4817a31964a02c881562489651cc98143c716aa09ac8dd92bd"
+  },
+  "access": "OUTCOME_UNEXPOSED_GATE_A_ONLY",
+  "structural_source": {
+    "match_vector_file": "match_vectors.csv",
+    "match_vector_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+    "package": "bj137_gate_a_preoutcome_v2",
+    "role_vector_file": "n7_role_vectors.csv.gz",
+    "role_vector_sha256": "1a6ac41e5e34c400c5c2a62f9799e2f76d56f4aaa3d13b67b88505443788cdaa"
+  },
+  "v2_1_adapter": {
+    "execution": "copied into the immutable package and preferred by packaged replay",
+    "file": "structural_delete_adapter.py",
+    "sha256": "45e19d79c4753afb33e77139dd8828e5d8b80bbc2b9b7eefb7fab6c9a18b7a65"
+  }
+}

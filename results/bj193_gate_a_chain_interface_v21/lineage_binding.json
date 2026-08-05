@@ -1,0 +1,15 @@
+{
+  "contract": "BJ-HIST-N7-REGIME-META-POLICY-001",
+  "gate_b_authorized_by_this_package": false,
+  "outcome_access": false,
+  "parent_192_authority": false,
+  "v1_plus_v2": {
+    "content_identity_sha256": "a5f274f92edbff194be9ce60fa707196d20d255b608b08bf22c3f0d924bb7425",
+    "manifest_sha256": "6a44f4b1b355f5476328424bc8d92271d61d585643d40ca42bb56ffda1c43933",
+    "package": "bj193_gate_a_chain_interface_v2",
+    "payload_count": 35,
+    "portable_manifest_sha256": "2bd83000fabf0a4817a31964a02c881562489651cc98143c716aa09ac8dd92bd"
+  },
+  "v2_1_amendment": "P/Q exact #167 structural-delete registry, compatibility, conditional composition and fail-closed replay",
+  "version": "bj193-gate-a-chain-interface-v2.1"
+}
