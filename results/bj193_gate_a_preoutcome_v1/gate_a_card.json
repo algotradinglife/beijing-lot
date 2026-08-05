@@ -1,0 +1,62 @@
+{
+  "action_identity": {
+    "M_boundary": "use only each accepted upstream namespace's frozen M grid; M=2187 is the accepted N7 full-ticket-space identity, not an arbitrary bankroll cap or rejection gate; no new M extrapolation in Gate A",
+    "cross_namespace_recombination": false,
+    "expanded_action_stream_sha256": "2bda1f41fdf35dc330194b6c27aa4ec9980afbf6112c5e5aee0545841a149e0b",
+    "factorized_not_shrunk": true,
+    "seed_aggregation_economics": "arithmetic mean replicate stake/gross/tax/net represents one randomized strategy; never summed seed exposure",
+    "seed_selectable": false
+  },
+  "contract": "BJ-HIST-N7-REGIME-META-POLICY-001",
+  "denominator": {
+    "atlas167_action_count": 473796,
+    "atlas167_deterministic_allocation_count": 723,
+    "atlas167_seed_agnostic_allocation_count": 963,
+    "atlas167_stochastic_allocation_count": 240,
+    "canonical_issue_count": 344,
+    "causal_allocation_factor_count": 970,
+    "chart_schema_count": 13,
+    "chronological_outer_fold_count": 5,
+    "comparator_count": 8,
+    "divergence190_action_count": 9696,
+    "expanded_action_count": 483501,
+    "feature_matrix_column_count": 75,
+    "feature_missingness_row_count": 73,
+    "model_grid_count": 30,
+    "postselection_alias_count": 18,
+    "postselection_focus_cluster_alias_count": 12,
+    "postselection_focus_cluster_primary_economic_identity_count": 6,
+    "postselection_primary_economic_identity_count": 10,
+    "replay_allocation_row_count": 24730,
+    "selector_factor_count": 2919,
+    "source_package_count": 20,
+    "stack170_action_count": 9,
+    "tier_c_feature_count": 68
+  },
+  "evidence_tiers": {
+    "TIER_C": "causal pre-event nested chronological only",
+    "TIER_O": "ORACLE_DIAGNOSTIC_ONLY: post-selection identities and future realized outcomes may measure ceiling/regret only; they grant no Edge, promotion, portfolio-weight, betting, or production authority"
+  },
+  "gate_b_authorized": false,
+  "holding_feasibility": {
+    "controlling_unit": "issue",
+    "hard_deliverable": true,
+    "rolling_windows": [
+      5,
+      10,
+      20
+    ],
+    "sequence_bases": [
+      "CALENDAR",
+      "ACTIVE_BET"
+    ]
+  },
+  "issue": 193,
+  "outcome_access": false,
+  "outcome_boundary": "Gate A outcome-unexposed: no target result, final/winning SP, payout, tax realization, ROI, settlement, or post-cutoff evidence enters Tier-C features, transforms, action ranking, or tie-breaks",
+  "parent_issue": 192,
+  "production_authority": false,
+  "stage": "GATE_A_OUTCOME_UNEXPOSED",
+  "status": "READY_FOR_PI_REVIEW_NO_GATE_B_AUTHORITY",
+  "version": "bj193-gate-a-preoutcome-v1"
+}

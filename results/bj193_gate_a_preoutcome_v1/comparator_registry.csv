@@ -1,0 +1,9 @@
+comparator_id,ordinal,definition,role,support,selection_boundary
+STATIC_BEST_FULL_FULL,1,#170 BEST_FULL selector S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K1 x FULL_ENUMERATED M2187,controlling accepted static selection baseline; weak namespaces cannot demote it,native and strict matched,fixed before #193
+PRIOR_ONLY_BEST_FIXED,2,best fixed factorized action on outer-train utility; min 20 active training issues,strongest matched prior-only comparator,native and strict matched,outer-train only
+DYNAMIC_M_ONLY,3,freeze selector/allocator/repeat mode to static baseline and vary M only,M attribution,matched,nested chronological
+DYNAMIC_REPEAT_ONLY,4,freeze selector/weight/M and vary WR/WOR/residual/cap/top-mass only,repeat-mode attribution,matched,nested chronological
+DYNAMIC_SELECTOR_ONLY,5,freeze allocator/repeat/M and vary selector only,selector attribution,matched,nested chronological
+DYNAMIC_ALLOCATOR_ONLY,6,freeze selector/M and vary weight/allocator only,allocator attribution,matched,nested chronological
+FULL_REGIME_TUPLE,7,nested regime-conditioned selector x allocator x repeat_mode x M,full causal Tier-C candidate,native and strict common,nested chronological with fallback
+LEAKY_ORACLE_CEILING,8,best realized per-issue utility over identical action set,ceiling and regret only,same available action support,"ORACLE_DIAGNOSTIC_ONLY: post-selection identities and future realized outcomes may measure ceiling/regret only; they grant no Edge, promotion, portfolio-weight, betting, or production authority"
