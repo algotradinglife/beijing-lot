@@ -1,0 +1,21 @@
+{
+  "CONTENT_IDENTITY.json": "eb5cdea255fb987462cb1a6974dbcac12f4a9c7418aef50c1e4ecc4f8a7ebc8c",
+  "README.md": "ebe397f366cadde8e032aefe5c9fe02a48eff600898e21c6ae238d9782d2ef40",
+  "attribution_control_registry.csv": "3c166c7fefbf422797b24667285575fdcb13f36df396ebe34588f1844282cdb2",
+  "chain_decision_trace_fixture.json": "c5d57e5f7cac2ac9f53255566613ab3a64a4020f87b76535507c49fda1493339",
+  "decision_trace_schema.json": "07ea5f18e723bf00df61ac93db567fcb6117acbb154789a574a56a2e5a4e2dc5",
+  "freeze_runner.py": "6b4782349940225d3c8cfe4a1f922ed978d0288137eefe2a4cc9001852b14a43",
+  "gate_a_card.json": "0fcb069a0802dda15a703647771cfa057986d38e5ad653918944e6eccacee783",
+  "gate_b_output_schema_contract.json": "5039e213f6da2e05f40e0f494647a00202e082cde50f8dcb63ad473e2f3eac04",
+  "incremental_reporting_contract.json": "52479baf08770789d41eb85c7acb4f15d3396b70515b295e9ceb378889d3394d",
+  "lineage_binding.json": "dec0a647b74e92eb285c5eb8f7163b1509ecabd651c11141f610c1c3436bbc82",
+  "seed_aggregation_contract.json": "7e0afdb456e489e6744944b264607d13f206a317016eeaa543c00b81c87213b7",
+  "source_binding.csv": "dc7bd8a6e1b4652e98516ec28d0fc0ef58c176cb859dec58a5fe1ac36f83482e",
+  "stage1_selection_catalog.csv.gz": "e3166b204cb95913dfd6fd95eb079eea8727c77d4041e18d1c07d2b4e5777e86",
+  "stage2_direction_catalog.csv.gz": "7c040a7d5531b15a8fcda1cf57a7fe8625d8ddd91e004d9310e319168d79a3f8",
+  "stage3_bet_catalog.csv.gz": "1a886d6587e178576e0d87941243ff17bcc2719681c8e88f1c84d037b5af5dea",
+  "stage_interface_contract.json": "7281118d6180b557139a61ab823e161815f27b89148a836bec100e252fe6dd99",
+  "stage_model_grid.csv": "b1fecdfeaba0f62f1ffc781c68972a24588e191e940287e1d091340b111f36b7",
+  "stage_training_contract.csv": "f357fa9e81810152ff8296cc6372df7d55d53d8e0f571b92e9eece339174251f",
+  "stagewise_chronology_contract.json": "09c0cf6a07a7401e353799e5c40fe4088f5f7862ed593c29aa92f4b538ab1ba6"
+}

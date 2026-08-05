@@ -1,0 +1,14 @@
+{
+  "availability": "if any required replicate is missing/unavailable, the entire issue-action is UNAVAILABLE; never convert it to losing stake",
+  "contract": "BJ193_STAGE3_NUISANCE_SEED_AGGREGATION_V2",
+  "economics": "arithmetic mean replicate stake/gross/tax/net represents one randomized strategy; never sum seed stake as purchased exposure",
+  "ordering": "exact numeric seed then replay row identity before accumulation",
+  "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+  "ranking_boundary": "average before every Stage-3 screen, target, fit, choice, oracle, regret, bootstrap, and promotion decision",
+  "required_replicates": "exact frozen_seed_set_sha256 and replay_row_set_sha256 from every Stage-3 catalog row",
+  "selection_identity": "namespace + selector_factor_id + causal_allocation_factor_id; seed and replay row are forbidden",
+  "source_file": "bj193_gate_a_preoutcome_v1/action_learning_execution_contract.json",
+  "source_file_sha256": "19a7c4cddca434ecd1968b7c325a708623aff9793994ba6e4d7588be5be6278f",
+  "tax": "each exact \u00a52 ticket is an independent tax unit; no ticket/issue/policy aggregation",
+  "within_seed_reporting": "replicate ROI distribution/SD/MCSE/quantiles/positive fraction is diagnostic only and never a selectable action dimension"
+}

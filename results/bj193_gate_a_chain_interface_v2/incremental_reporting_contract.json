@@ -1,0 +1,51 @@
+{
+  "contract": "BJ193_STAGEWISE_INCREMENTAL_REPORTING_V2",
+  "contrasts": [
+    {
+      "candidate": "DYNAMIC_SELECTION_ONLY",
+      "comparator": "ALL_STATIC",
+      "interpretation": "selection lift with direction and bet construction static",
+      "stage": "STAGE_1_SELECTION"
+    },
+    {
+      "candidate": "DYNAMIC_SELECTION_DIRECTION",
+      "comparator": "DYNAMIC_SELECTION_ONLY",
+      "interpretation": "direction lift conditional on the identical dynamic Stage-1 path",
+      "stage": "STAGE_2_DIRECTION"
+    },
+    {
+      "candidate": "FULL_DYNAMIC_CHAIN",
+      "comparator": "DYNAMIC_SELECTION_DIRECTION",
+      "interpretation": "allocator/repeat/M lift conditional on identical Stage-1/2 paths",
+      "stage": "STAGE_3_BET"
+    },
+    {
+      "candidate": "FULL_DYNAMIC_CHAIN",
+      "comparator": "ALL_STATIC",
+      "interpretation": "complete causal chain versus controlling static baseline",
+      "stage": "END_TO_END"
+    }
+  ],
+  "decision": "a causal sleeve must beat the strongest matched prior/static comparator, survive exclusions, avoid one-payout dependence, and not have unacceptable holding deterioration",
+  "metrics": [
+    "support",
+    "stake_yuan",
+    "pre_tax_roi",
+    "tax_adjusted_roi",
+    "hit_rate",
+    "payout_hhi",
+    "largest_issue_share",
+    "turnover",
+    "max_loss_streak_calendar",
+    "max_loss_streak_active",
+    "rolling_5_10_20_loss_probability",
+    "max_drawdown_yuan",
+    "max_drawdown_pct",
+    "drawdown_duration",
+    "time_under_water",
+    "recovery_time"
+  ],
+  "parent_192": "no sleeve or portfolio allocation authority until #193 Gate B is PI accepted and the native graph unblocks #192",
+  "stability": "paired 20,000 issue bootstrap; YEAR/FOLD/LOYO; ex-largest issue/year; payout concentration; same draw indices for every matched contrast",
+  "strict_ev": "request independent EV only if a causal candidate is materially positive/promotable; oracle positivity never qualifies"
+}

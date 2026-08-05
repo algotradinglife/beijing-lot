@@ -1,0 +1,42 @@
+{
+  "M_rule": "exact accepted M grid including FULL=2187; M is an output, never a budget rejection gate",
+  "contract": "BJ-HIST-N7-REGIME-META-POLICY-001",
+  "denominator": {
+    "canonical_issue_count": 344,
+    "model_grid_count_per_stage": 30,
+    "outer_fold_count": 5,
+    "required_attribution_control_count": 4,
+    "source_package_count": 7,
+    "stage1_action_count": 2469,
+    "stage2_action_count": 2425,
+    "stage2_available_action_count": 2365,
+    "stage3_seed_agnostic_action_count": 963,
+    "stage_count": 3,
+    "stage_model_grid_count": 90
+  },
+  "gate_b_authorized": false,
+  "interfaces": [
+    "f_selection(X_i,H_<i)",
+    "f_direction(X_i,selection_output_i,theta_selection_i,H_<i)",
+    "f_bet(X_i,selection_output_i,theta_selection_i,direction_output_i,theta_direction_i,H_<i)"
+  ],
+  "issue": 193,
+  "outcome_access": false,
+  "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+  "parent_192_authority": false,
+  "parent_issue": 192,
+  "production_authority": false,
+  "seed_rule": "exact accepted seeds are nuisance replicates averaged before Stage-3 screen/fit/choice; never summed purchased exposure",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_INTERFACE_AMENDMENT",
+  "status": "READY_FOR_PI_REVIEW_NO_GATE_B_AUTHORITY",
+  "v1_lineage": {
+    "action_stream_sha256": "2bda1f41fdf35dc330194b6c27aa4ec9980afbf6112c5e5aee0545841a149e0b",
+    "content_identity_sha256": "9bf90d1553613cbb50770ea51deece1fb40cfb05a0ace9103ab62194faff3131",
+    "immutable_status": "ACCEPTED_LINEAGE_UNCHANGED",
+    "manifest_sha256": "408e8aa69cf2d336f8b3b65b1c94b30a3456864af01517a78fc27b3f2bab0c45",
+    "package": "bj193_gate_a_preoutcome_v1",
+    "payload_count": 25,
+    "superseded_scope_only": "one-model-per-joint-action topology; all sources/features/chronology/seed/path-risk definitions remain bound"
+  },
+  "version": "bj193-gate-a-chain-interface-v2"
+}
