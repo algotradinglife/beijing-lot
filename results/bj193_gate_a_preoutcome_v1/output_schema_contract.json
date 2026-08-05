@@ -1,4 +1,5 @@
 {
+  "aggregate_economics_rule": "stochastic seed rows are nuisance replicates: publish arithmetic mean replicate stake/gross/tax/net as one action; never sum seed stakes as purchased exposure",
   "blank_rules": "ROI is blank for zero stake; no-bet/unavailable remain explicit zero-flow rows; no missing value is encoded as zero loss",
   "failure_code_enum": [
     "NO_ORACLE_OPPORTUNITY",
@@ -79,6 +80,9 @@
       "action_identity",
       "issue",
       "status",
+      "required_replicate_count",
+      "settled_replicate_count",
+      "aggregation_rule",
       "stake_yuan",
       "gross_pre_tax_yuan",
       "tax_yuan",
@@ -108,6 +112,18 @@
       "choice_as_of_ts",
       "train_end_issue",
       "fallback_reason"
+    ],
+    "issue_seed_replay_settlement.csv.gz": [
+      "namespace",
+      "selector_factor_id",
+      "replay_allocation_row_id",
+      "causal_allocation_factor_id",
+      "seed",
+      "issue",
+      "status",
+      "stake_yuan",
+      "gross_pre_tax_yuan",
+      "pre_tax_net_yuan"
     ]
   },
   "science": {
@@ -171,6 +187,23 @@
       "pre_tax_roi",
       "max_drawdown_yuan",
       "max_loss_streak"
+    ],
+    "within_seed_dispersion.csv": [
+      "namespace",
+      "selector_factor_id",
+      "causal_allocation_factor_id",
+      "fold",
+      "active_issue_count",
+      "replicate_count",
+      "seed_roi_mean",
+      "seed_roi_sample_sd",
+      "seed_roi_mcse",
+      "seed_roi_q05",
+      "seed_roi_q50",
+      "seed_roi_q95",
+      "seed_roi_min",
+      "seed_roi_max",
+      "positive_seed_fraction"
     ]
   }
 }

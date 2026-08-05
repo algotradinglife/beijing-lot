@@ -1,12 +1,20 @@
 {
-  "allocation_factor_count": 24730,
+  "action_identity_fields": [
+    "namespace",
+    "selector_factor_id",
+    "causal_allocation_factor_id"
+  ],
+  "atlas167_deterministic_allocation_count": 723,
+  "atlas167_seed_agnostic_allocation_count": 963,
+  "atlas167_stochastic_allocation_count": 240,
+  "causal_allocation_factor_count": 970,
   "contract": "BJ-HIST-N7-REGIME-META-POLICY-001",
   "cross_namespace_recombination": false,
-  "expanded_action_count": 12173421,
-  "expanded_action_stream_sha256": "ac30a19c6e2d70dca029e4771d4dde2c6aeea5f6e5d2585ba4812f858d0243c8",
+  "expanded_action_count": 483501,
+  "expanded_action_stream_sha256": "2bda1f41fdf35dc330194b6c27aa4ec9980afbf6112c5e5aee0545841a149e0b",
   "factorized_not_shrunk": true,
   "namespace_counts": {
-    "ATLAS167": 12163716,
+    "ATLAS167": 473796,
     "DIVERGENCE190": 9696,
     "STACK170": 9
   },
@@ -15,6 +23,8 @@
   "postselection_focus_cluster_alias_count": 12,
   "postselection_focus_cluster_primary_economic_identity_count": 6,
   "postselection_primary_economic_identity_count": 10,
+  "replay_allocation_row_count": 24730,
+  "seed_selectable": false,
   "selector_factor_count": 2919,
   "version": "bj193-gate-a-preoutcome-v1"
 }

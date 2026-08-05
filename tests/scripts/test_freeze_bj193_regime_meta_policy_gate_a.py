@@ -65,19 +65,52 @@ def test_live_contract_sources_are_exact_and_outcome_access_is_namespaced():
 
 def test_complete_factorized_action_surface_and_190_identity_handoff():
     module = load_module()
-    selectors, allocations, compositions, census, exploratory = (
-        module.build_action_catalogs()
-    )
+    (
+        selectors,
+        replay_allocations,
+        causal_allocations,
+        compositions,
+        census,
+        exploratory,
+    ) = module.build_action_catalogs()
     assert census["namespace_counts"] == {
-        "ATLAS167": 12_163_716,
+        "ATLAS167": 473_796,
         "STACK170": 9,
         "DIVERGENCE190": 9_696,
     }
-    assert census["expanded_action_count"] == 12_173_421
+    assert census["expanded_action_count"] == 483_501
     assert census["factorized_not_shrunk"] is True
     assert census["cross_namespace_recombination"] is False
+    assert census["seed_selectable"] is False
+    assert census["action_identity_fields"] == [
+        "namespace",
+        "selector_factor_id",
+        "causal_allocation_factor_id",
+    ]
     assert len(selectors) == 492 + 3 + 2_424
-    assert len(allocations) == 24_723 + 3 + 4
+    assert len(replay_allocations) == 24_723 + 3 + 4
+    assert len(causal_allocations) == 963 + 3 + 4
+    assert all(row["seed_selectable"] is False for row in replay_allocations)
+    assert all(
+        row["selection_identity_includes_seed"] is False for row in replay_allocations
+    )
+    causal_ids = {
+        (row["namespace"], row["causal_allocation_factor_id"])
+        for row in causal_allocations
+    }
+    assert all(
+        (row["namespace"], row["causal_allocation_factor_id"]) in causal_ids
+        for row in replay_allocations
+    )
+    atlas_choices = [
+        row for row in causal_allocations if row["namespace"] == "ATLAS167"
+    ]
+    assert sum(row["replicate_count"] == 100 for row in atlas_choices) == 240
+    assert sum(row["replicate_count"] == 1 for row in atlas_choices) == 723
+    assert all(
+        "seed" not in json.loads(row["selection_identity_json"])
+        for row in atlas_choices
+    )
     assert len(compositions) == 3
     assert {row["scientific_role"] for row in compositions} == set(
         module.NAMESPACE_SCIENTIFIC_ROLES.values()
@@ -113,10 +146,10 @@ def test_complete_factorized_action_surface_and_190_identity_handoff():
     assert len(focus) == 12
     assert len({row["economic_identity_sha256"] for row in focus}) == 6
     divergence_allocations = [
-        row for row in allocations if row["namespace"] == "DIVERGENCE190"
+        row for row in causal_allocations if row["namespace"] == "DIVERGENCE190"
     ]
     assert {
-        row["allocation_factor_id"]: row["scientific_role"]
+        row["causal_allocation_factor_id"]: row["scientific_role"]
         for row in divergence_allocations
     } == module.DIVERGENCE_ARM_SCIENTIFIC_ROLES
 
@@ -177,11 +210,30 @@ def test_holding_feasibility_definitions_cover_calendar_and_active_paths():
     assert "last_sequence_index" in contract["time_under_water_issues"]
     assert "CALENDAR and ACTIVE_BET" in contract["duration_sequence_boundary"]
     fixture = module.holding_fixture()
-    assert {key: fixture[key] for key in fixture["expected"]} == fixture["expected"]
-    assert fixture["calendar_negative_streak"] == 1
-    assert fixture["active_negative_streak"] == 2
-    assert fixture["calendar_zero_payout_miss_streak"] == 1
-    assert fixture["active_zero_payout_miss_streak"] == 2
+    assert fixture["computed"] == fixture["expected"]
+    calendar = fixture["computed"]["CALENDAR"]
+    active = fixture["computed"]["ACTIVE_BET"]
+    assert calendar["row_count"] == 25
+    assert active["row_count"] == 20
+    assert calendar["max_negative_pnl_streak"] == 2
+    assert active["max_negative_pnl_streak"] == 2
+    assert calendar["max_zero_payout_miss_streak"] == 1
+    assert active["max_zero_payout_miss_streak"] == 2
+    assert [row["window_length"] for row in calendar["rolling_windows"]] == [5, 10, 20]
+    assert [row["window_count"] for row in calendar["rolling_windows"]] == [21, 16, 6]
+    assert [row["window_count"] for row in active["rolling_windows"]] == [16, 11, 1]
+    assert [row["recovered_flag"] for row in calendar["drawdown_episodes"]] == [
+        True,
+        True,
+        False,
+    ]
+    assert [row["recovered_flag"] for row in active["drawdown_episodes"]] == [
+        True,
+        True,
+        False,
+    ]
+    assert calendar["drawdown_episodes"][-1]["time_under_water_issues"] == 17
+    assert active["drawdown_episodes"][-1]["time_under_water_issues"] == 14
     schemas = module.output_schema()
     assert {
         "streak_metrics.csv",
@@ -191,6 +243,8 @@ def test_holding_feasibility_definitions_cover_calendar_and_active_paths():
         "holding_feasibility_scorecard.csv",
     } <= set(schemas["holding"])
     assert "failure_attribution.csv" in schemas["science"]
+    assert "within_seed_dispersion.csv" in schemas["science"]
+    assert "seed" not in schemas["raw"]["issue_policy_choice.csv.gz"]
     assert set(schemas["failure_code_enum"]) == {
         "NO_ORACLE_OPPORTUNITY",
         "UNSTABLE_REGIME_TO_ACTION_MAPPING",
@@ -221,6 +275,35 @@ def test_nested_model_and_comparator_contracts_have_fail_closed_fallback():
     decision = module.decision_contract()
     assert "STATIC_BEST_FULL_FULL" in decision["fallback"]
     assert "ORACLE_DIAGNOSTIC_ONLY" in decision["oracle_restriction"]
+    assert "never seed" in decision["selectable_action_identity"]
+    assert "forbidden" in decision["seed_identity_prohibition"]
+
+    execution = module.action_learning_execution_contract()
+    assert execution["model_topology"]["kind"] == (
+        "ONE_ACTION_SPECIFIC_MODEL_PER_RETAINED_SEED_AGNOSTIC_ACTION"
+    )
+    assert execution["hierarchical_screen"]["ATLAS167"]["selector_keep"] == 16
+    assert (
+        execution["hierarchical_screen"]["ATLAS167"]["allocator_keep_per_selector"]
+        == 64
+    )
+    assert execution["nested_fit"]["random_state"] == 193_001
+    assert execution["nested_fit"]["randomized_subsampling"] is False
+    assert execution["choice_and_oracle"]["seed_identity_allowed"] is False
+    assert (
+        "exact same causal support" in execution["choice_and_oracle"]["paired_oracle"]
+    )
+    assert execution["hierarchical_screen"]["no_early_stop"] is True
+    assert any("seed" in value for value in execution["forbidden_choice_inputs"])
+    assert "never sum seed stakes" in execution["seed_aggregation"]["economics"]
+    reference = execution["hierarchical_screen"]["ATLAS167"][
+        "selector_reference_allocator"
+    ]
+    assert any(
+        all(str(row[field]) == expected for field, expected in reference.items())
+        for row in module.build_action_catalogs()[2]
+        if row["namespace"] == "ATLAS167"
+    )
 
     baselines = module.accepted_baseline_rows()
     assert [row["baseline_id"] for row in baselines] == [
@@ -254,7 +337,12 @@ def test_committed_package_manifest_and_censuses_reconcile():
     assert card["gate_b_authorized"] is False
     assert card["outcome_access"] is False
     assert card["denominator"]["canonical_issue_count"] == 344
-    assert card["denominator"]["expanded_action_count"] == 12_173_421
+    assert card["denominator"]["expanded_action_count"] == 483_501
+    assert card["denominator"]["replay_allocation_row_count"] == 24_730
+    assert card["denominator"]["causal_allocation_factor_count"] == 970
+    assert card["denominator"]["atlas167_seed_agnostic_allocation_count"] == 963
+    assert card["denominator"]["atlas167_stochastic_allocation_count"] == 240
+    assert card["denominator"]["atlas167_deterministic_allocation_count"] == 723
     assert card["denominator"]["postselection_alias_count"] == 18
     assert card["denominator"]["postselection_primary_economic_identity_count"] == 10
     assert card["denominator"]["postselection_focus_cluster_alias_count"] == 12
@@ -268,6 +356,30 @@ def test_committed_package_manifest_and_censuses_reconcile():
     assert "feature_count" not in card["denominator"]
     assert card["denominator"]["tier_c_feature_count"] > 0
     assert "not an arbitrary bankroll cap" in card["action_identity"]["M_boundary"]
+    assert card["action_identity"]["seed_selectable"] is False
+    assert (
+        "never summed seed exposure"
+        in card["action_identity"]["seed_aggregation_economics"]
+    )
+    action_census = json.loads(
+        (PACKAGE / "action_catalog_census.json").read_text(encoding="utf-8")
+    )
+    assert action_census["seed_selectable"] is False
+    assert action_census["expanded_action_count"] == 483_501
+    execution = json.loads(
+        (PACKAGE / "action_learning_execution_contract.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert execution["choice_and_oracle"]["seed_identity_allowed"] is False
+    fixture = json.loads(
+        (PACKAGE / "holding_definition_fixture.json").read_text(encoding="utf-8")
+    )
+    assert fixture["computed"] == fixture["expected"]
+    with (PACKAGE / "causal_allocation_catalog.csv").open(
+        newline="", encoding="utf-8"
+    ) as handle:
+        assert sum(1 for _ in csv.DictReader(handle)) == 970
     with gzip.open(
         PACKAGE / "issue_regime_features.csv.gz", "rt", newline="", encoding="utf-8"
     ) as handle:

@@ -1,16 +1,363 @@
 {
-  "active_negative_streak": 2,
-  "active_zero_payout_miss_streak": 2,
-  "calendar_negative_streak": 1,
-  "calendar_zero_payout_miss_streak": 1,
-  "ending_equity_yuan": 219930.0,
+  "computed": {
+    "ACTIVE_BET": {
+      "drawdown_episodes": [
+        {
+          "drawdown_duration_to_trough_issues": 2,
+          "drawdown_yuan": 120.0,
+          "onset_issue": "A",
+          "onset_sequence_index": 0,
+          "peak_issue": "INITIAL_CAPITAL",
+          "peak_sequence_index": -1,
+          "recovered_flag": true,
+          "recovery_issue": "D",
+          "recovery_issues": 1,
+          "recovery_sequence_index": 2,
+          "sequence_basis": "ACTIVE_BET",
+          "time_under_water_issues": 3,
+          "trough_issue": "C",
+          "trough_sequence_index": 1
+        },
+        {
+          "drawdown_duration_to_trough_issues": 1,
+          "drawdown_yuan": 30.0,
+          "onset_issue": "G",
+          "onset_sequence_index": 4,
+          "peak_issue": "E",
+          "peak_sequence_index": 3,
+          "recovered_flag": true,
+          "recovery_issue": "H",
+          "recovery_issues": 1,
+          "recovery_sequence_index": 5,
+          "sequence_basis": "ACTIVE_BET",
+          "time_under_water_issues": 2,
+          "trough_issue": "G",
+          "trough_sequence_index": 4
+        },
+        {
+          "drawdown_duration_to_trough_issues": 10,
+          "drawdown_yuan": 270.0,
+          "onset_issue": "K",
+          "onset_sequence_index": 7,
+          "peak_issue": "I",
+          "peak_sequence_index": 6,
+          "recovered_flag": false,
+          "recovery_issue": "",
+          "recovery_issues": "",
+          "recovery_sequence_index": "",
+          "sequence_basis": "ACTIVE_BET",
+          "time_under_water_issues": 14,
+          "trough_issue": "V",
+          "trough_sequence_index": 16
+        }
+      ],
+      "ending_equity_yuan": 219800.0,
+      "max_negative_pnl_streak": 2,
+      "max_zero_payout_miss_streak": 2,
+      "rolling_windows": [
+        {
+          "negative_sum_count": 11,
+          "negative_sum_frequency": "0.687500000000",
+          "window_count": 16,
+          "window_length": 5,
+          "worst_end_issue": "W",
+          "worst_net_yuan": "-215.000000000000",
+          "worst_roi": "-0.430000000000",
+          "worst_start_issue": "R"
+        },
+        {
+          "negative_sum_count": 7,
+          "negative_sum_frequency": "0.636363636364",
+          "window_count": 11,
+          "window_length": 10,
+          "worst_end_issue": "V",
+          "worst_net_yuan": "-270.000000000000",
+          "worst_roi": "-0.270000000000",
+          "worst_start_issue": "K"
+        },
+        {
+          "negative_sum_count": 1,
+          "negative_sum_frequency": "1.000000000000",
+          "window_count": 1,
+          "window_length": 20,
+          "worst_end_issue": "Y",
+          "worst_net_yuan": "-200.000000000000",
+          "worst_roi": "-0.100000000000",
+          "worst_start_issue": "A"
+        }
+      ],
+      "row_count": 20,
+      "sequence_basis": "ACTIVE_BET"
+    },
+    "CALENDAR": {
+      "drawdown_episodes": [
+        {
+          "drawdown_duration_to_trough_issues": 3,
+          "drawdown_yuan": 120.0,
+          "onset_issue": "A",
+          "onset_sequence_index": 0,
+          "peak_issue": "INITIAL_CAPITAL",
+          "peak_sequence_index": -1,
+          "recovered_flag": true,
+          "recovery_issue": "D",
+          "recovery_issues": 1,
+          "recovery_sequence_index": 3,
+          "sequence_basis": "CALENDAR",
+          "time_under_water_issues": 4,
+          "trough_issue": "C",
+          "trough_sequence_index": 2
+        },
+        {
+          "drawdown_duration_to_trough_issues": 2,
+          "drawdown_yuan": 30.0,
+          "onset_issue": "G",
+          "onset_sequence_index": 6,
+          "peak_issue": "E",
+          "peak_sequence_index": 4,
+          "recovered_flag": true,
+          "recovery_issue": "H",
+          "recovery_issues": 1,
+          "recovery_sequence_index": 7,
+          "sequence_basis": "CALENDAR",
+          "time_under_water_issues": 3,
+          "trough_issue": "G",
+          "trough_sequence_index": 6
+        },
+        {
+          "drawdown_duration_to_trough_issues": 13,
+          "drawdown_yuan": 270.0,
+          "onset_issue": "K",
+          "onset_sequence_index": 10,
+          "peak_issue": "I",
+          "peak_sequence_index": 8,
+          "recovered_flag": false,
+          "recovery_issue": "",
+          "recovery_issues": "",
+          "recovery_sequence_index": "",
+          "sequence_basis": "CALENDAR",
+          "time_under_water_issues": 17,
+          "trough_issue": "V",
+          "trough_sequence_index": 21
+        }
+      ],
+      "ending_equity_yuan": 219800.0,
+      "max_negative_pnl_streak": 2,
+      "max_zero_payout_miss_streak": 1,
+      "rolling_windows": [
+        {
+          "negative_sum_count": 14,
+          "negative_sum_frequency": "0.666666666667",
+          "window_count": 21,
+          "window_length": 5,
+          "worst_end_issue": "V",
+          "worst_net_yuan": "-220.000000000000",
+          "worst_roi": "-0.550000000000",
+          "worst_start_issue": "R"
+        },
+        {
+          "negative_sum_count": 10,
+          "negative_sum_frequency": "0.625000000000",
+          "window_count": 16,
+          "window_length": 10,
+          "worst_end_issue": "X",
+          "worst_net_yuan": "-225.000000000000",
+          "worst_roi": "-0.281250000000",
+          "worst_start_issue": "O"
+        },
+        {
+          "negative_sum_count": 6,
+          "negative_sum_frequency": "1.000000000000",
+          "window_count": 6,
+          "window_length": 20,
+          "worst_end_issue": "Y",
+          "worst_net_yuan": "-250.000000000000",
+          "worst_roi": "-0.156250000000",
+          "worst_start_issue": "F"
+        }
+      ],
+      "row_count": 25,
+      "sequence_basis": "CALENDAR"
+    }
+  },
   "expected": {
-    "active_negative_streak": 2,
-    "active_zero_payout_miss_streak": 2,
-    "calendar_negative_streak": 1,
-    "calendar_zero_payout_miss_streak": 1,
-    "ending_equity_yuan": 219930,
-    "max_drawdown_yuan": 170.0
+    "ACTIVE_BET": {
+      "drawdown_episodes": [
+        {
+          "drawdown_duration_to_trough_issues": 2,
+          "drawdown_yuan": 120.0,
+          "onset_issue": "A",
+          "onset_sequence_index": 0,
+          "peak_issue": "INITIAL_CAPITAL",
+          "peak_sequence_index": -1,
+          "recovered_flag": true,
+          "recovery_issue": "D",
+          "recovery_issues": 1,
+          "recovery_sequence_index": 2,
+          "sequence_basis": "ACTIVE_BET",
+          "time_under_water_issues": 3,
+          "trough_issue": "C",
+          "trough_sequence_index": 1
+        },
+        {
+          "drawdown_duration_to_trough_issues": 1,
+          "drawdown_yuan": 30.0,
+          "onset_issue": "G",
+          "onset_sequence_index": 4,
+          "peak_issue": "E",
+          "peak_sequence_index": 3,
+          "recovered_flag": true,
+          "recovery_issue": "H",
+          "recovery_issues": 1,
+          "recovery_sequence_index": 5,
+          "sequence_basis": "ACTIVE_BET",
+          "time_under_water_issues": 2,
+          "trough_issue": "G",
+          "trough_sequence_index": 4
+        },
+        {
+          "drawdown_duration_to_trough_issues": 10,
+          "drawdown_yuan": 270.0,
+          "onset_issue": "K",
+          "onset_sequence_index": 7,
+          "peak_issue": "I",
+          "peak_sequence_index": 6,
+          "recovered_flag": false,
+          "recovery_issue": "",
+          "recovery_issues": "",
+          "recovery_sequence_index": "",
+          "sequence_basis": "ACTIVE_BET",
+          "time_under_water_issues": 14,
+          "trough_issue": "V",
+          "trough_sequence_index": 16
+        }
+      ],
+      "ending_equity_yuan": 219800.0,
+      "max_negative_pnl_streak": 2,
+      "max_zero_payout_miss_streak": 2,
+      "rolling_windows": [
+        {
+          "negative_sum_count": 11,
+          "negative_sum_frequency": "0.687500000000",
+          "window_count": 16,
+          "window_length": 5,
+          "worst_end_issue": "W",
+          "worst_net_yuan": "-215.000000000000",
+          "worst_roi": "-0.430000000000",
+          "worst_start_issue": "R"
+        },
+        {
+          "negative_sum_count": 7,
+          "negative_sum_frequency": "0.636363636364",
+          "window_count": 11,
+          "window_length": 10,
+          "worst_end_issue": "V",
+          "worst_net_yuan": "-270.000000000000",
+          "worst_roi": "-0.270000000000",
+          "worst_start_issue": "K"
+        },
+        {
+          "negative_sum_count": 1,
+          "negative_sum_frequency": "1.000000000000",
+          "window_count": 1,
+          "window_length": 20,
+          "worst_end_issue": "Y",
+          "worst_net_yuan": "-200.000000000000",
+          "worst_roi": "-0.100000000000",
+          "worst_start_issue": "A"
+        }
+      ],
+      "row_count": 20,
+      "sequence_basis": "ACTIVE_BET"
+    },
+    "CALENDAR": {
+      "drawdown_episodes": [
+        {
+          "drawdown_duration_to_trough_issues": 3,
+          "drawdown_yuan": 120.0,
+          "onset_issue": "A",
+          "onset_sequence_index": 0,
+          "peak_issue": "INITIAL_CAPITAL",
+          "peak_sequence_index": -1,
+          "recovered_flag": true,
+          "recovery_issue": "D",
+          "recovery_issues": 1,
+          "recovery_sequence_index": 3,
+          "sequence_basis": "CALENDAR",
+          "time_under_water_issues": 4,
+          "trough_issue": "C",
+          "trough_sequence_index": 2
+        },
+        {
+          "drawdown_duration_to_trough_issues": 2,
+          "drawdown_yuan": 30.0,
+          "onset_issue": "G",
+          "onset_sequence_index": 6,
+          "peak_issue": "E",
+          "peak_sequence_index": 4,
+          "recovered_flag": true,
+          "recovery_issue": "H",
+          "recovery_issues": 1,
+          "recovery_sequence_index": 7,
+          "sequence_basis": "CALENDAR",
+          "time_under_water_issues": 3,
+          "trough_issue": "G",
+          "trough_sequence_index": 6
+        },
+        {
+          "drawdown_duration_to_trough_issues": 13,
+          "drawdown_yuan": 270.0,
+          "onset_issue": "K",
+          "onset_sequence_index": 10,
+          "peak_issue": "I",
+          "peak_sequence_index": 8,
+          "recovered_flag": false,
+          "recovery_issue": "",
+          "recovery_issues": "",
+          "recovery_sequence_index": "",
+          "sequence_basis": "CALENDAR",
+          "time_under_water_issues": 17,
+          "trough_issue": "V",
+          "trough_sequence_index": 21
+        }
+      ],
+      "ending_equity_yuan": 219800.0,
+      "max_negative_pnl_streak": 2,
+      "max_zero_payout_miss_streak": 1,
+      "rolling_windows": [
+        {
+          "negative_sum_count": 14,
+          "negative_sum_frequency": "0.666666666667",
+          "window_count": 21,
+          "window_length": 5,
+          "worst_end_issue": "V",
+          "worst_net_yuan": "-220.000000000000",
+          "worst_roi": "-0.550000000000",
+          "worst_start_issue": "R"
+        },
+        {
+          "negative_sum_count": 10,
+          "negative_sum_frequency": "0.625000000000",
+          "window_count": 16,
+          "window_length": 10,
+          "worst_end_issue": "X",
+          "worst_net_yuan": "-225.000000000000",
+          "worst_roi": "-0.281250000000",
+          "worst_start_issue": "O"
+        },
+        {
+          "negative_sum_count": 6,
+          "negative_sum_frequency": "1.000000000000",
+          "window_count": 6,
+          "window_length": 20,
+          "worst_end_issue": "Y",
+          "worst_net_yuan": "-250.000000000000",
+          "worst_roi": "-0.156250000000",
+          "worst_start_issue": "F"
+        }
+      ],
+      "row_count": 25,
+      "sequence_basis": "CALENDAR"
+    }
   },
   "flows": [
     {
@@ -35,48 +382,159 @@
       "status": "ACTIVE"
     },
     {
-      "gross": 150.0,
+      "gross": 220.0,
       "issue": "D",
+      "net": 120.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 150.0,
+      "issue": "E",
       "net": 50.0,
       "stake": 100.0,
       "status": "ACTIVE"
     },
     {
       "gross": 0.0,
-      "issue": "E",
+      "issue": "F",
       "net": 0.0,
       "stake": 0.0,
       "status": "UNAVAILABLE"
     },
     {
-      "gross": 0.0,
-      "issue": "F",
-      "net": -50.0,
+      "gross": 70.0,
+      "issue": "G",
+      "net": -30.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 130.0,
+      "issue": "H",
+      "net": 30.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 120.0,
+      "issue": "I",
+      "net": 20.0,
       "stake": 100.0,
       "status": "ACTIVE"
     },
     {
       "gross": 0.0,
-      "issue": "G",
+      "issue": "J",
+      "net": 0.0,
+      "stake": 0.0,
+      "status": "NO_BET"
+    },
+    {
+      "gross": 60.0,
+      "issue": "K",
+      "net": -40.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 80.0,
+      "issue": "L",
+      "net": -20.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 110.0,
+      "issue": "M",
+      "net": 10.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 105.0,
+      "issue": "N",
+      "net": 5.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 85.0,
+      "issue": "O",
+      "net": -15.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 0.0,
+      "issue": "P",
+      "net": 0.0,
+      "stake": 0.0,
+      "status": "UNAVAILABLE"
+    },
+    {
+      "gross": 110.0,
+      "issue": "Q",
+      "net": 10.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 75.0,
+      "issue": "R",
+      "net": -25.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 105.0,
+      "issue": "S",
+      "net": 5.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 0.0,
+      "issue": "T",
+      "net": -100.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 0.0,
+      "issue": "U",
       "net": 0.0,
       "stake": 0.0,
       "status": "NO_BET"
     },
     {
       "gross": 0.0,
-      "issue": "H",
-      "net": -50.0,
+      "issue": "V",
+      "net": -100.0,
       "stake": 100.0,
       "status": "ACTIVE"
     },
     {
-      "gross": 200.0,
-      "issue": "I",
-      "net": 100.0,
+      "gross": 105.0,
+      "issue": "W",
+      "net": 5.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 95.0,
+      "issue": "X",
+      "net": -5.0,
+      "stake": 100.0,
+      "status": "ACTIVE"
+    },
+    {
+      "gross": 100.0,
+      "issue": "Y",
+      "net": 0.0,
       "stake": 100.0,
       "status": "ACTIVE"
     }
   ],
-  "max_drawdown_yuan": 170.0,
   "synthetic_only": true
 }
