@@ -12,13 +12,13 @@ import argparse
 import csv
 import gzip
 import hashlib
-import importlib.util
 import io
 import itertools
 import json
 import os
 import shutil
 import sys
+import types
 import uuid
 import zlib
 from collections import defaultdict
@@ -111,12 +111,12 @@ def canonical_hash(value: object) -> str:
 
 
 def load_module(path: Path, name: str):
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"cannot load module: {path}")
-    module = importlib.util.module_from_spec(spec)
+    """Execute a frozen source module without creating import bytecode."""
+    module = types.ModuleType(name)
+    module.__file__ = str(path)
+    module.__package__ = name.rpartition(".")[0]
     sys.modules[name] = module
-    spec.loader.exec_module(module)
+    exec(compile(path.read_bytes(), str(path), "exec"), module.__dict__)
     return module
 
 
