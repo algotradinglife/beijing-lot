@@ -599,6 +599,15 @@ def execution_snapshot() -> dict[str, str]:
         "runner_sha256": sha(Path(__file__)),
         "core_path": "scripts/bj193_gate_b_core.py",
         "core_sha256": sha(ROOT / "scripts" / "bj193_gate_b_core.py"),
+        "chain_path": "scripts/bj193_chain_gate_b_v2.py",
+        "chain_sha256": sha(ROOT / "scripts" / "bj193_chain_gate_b_v2.py"),
+        "structural_adapter_path": (
+            "results/bj193_gate_a_chain_interface_v21/"
+            "structural_delete_adapter.py"
+        ),
+        "structural_adapter_sha256": sha(
+            GATE_A_V21 / "structural_delete_adapter.py"
+        ),
         "native_wrapper_path": str(REPLAY_CPP.relative_to(ROOT)),
         "native_wrapper_sha256": sha(REPLAY_CPP),
         "frozen_allocator_path": str(FROZEN_ALLOCATOR.relative_to(ROOT)),
