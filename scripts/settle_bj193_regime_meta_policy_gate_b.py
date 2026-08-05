@@ -946,6 +946,39 @@ def build_chain_checkpoint(target: Path) -> None:
             list(policy_rows[0]),
             policy_rows,
         )
+        seed_rows = [
+            row
+            for arguments in (
+                (
+                    "PRIOR_ONLY_BEST_FIXED",
+                    stage3_prior_store,
+                    prior_stage3,
+                    prior_stage1_decisions,
+                    prior_stage2_decisions,
+                ),
+                (
+                    "FULL_DYNAMIC_CHAIN",
+                    stage3_direction_store,
+                    dynamic_stage3,
+                    dynamic_stage1_decisions,
+                    dynamic_stage2_decisions,
+                ),
+                (
+                    "LEAKY_ORACLE_CEILING",
+                    stage3_direction_store,
+                    oracle_stage3,
+                    dynamic_stage1_decisions,
+                    dynamic_stage2_decisions,
+                ),
+            )
+            for row in V2.selected_stage3_seed_rows(*arguments)
+        ]
+        if seed_rows:
+            write_gzip(
+                stage / "selected_policy_seed_settlement.csv.gz",
+                list(seed_rows[0]),
+                seed_rows,
+            )
         controlling = {
             key: value
             for key, value in policies.items()
@@ -1008,6 +1041,11 @@ def build_chain_checkpoint(target: Path) -> None:
             "policy_ids": list(policies),
             "strict_common_issue_count": len(common),
             "issue_action_row_census": row_census,
+            "selected_policy_seed_row_count": len(seed_rows),
+            "seed_identity_selection_boundary": (
+                "diagnostic replay after aggregate path freeze; seed identity "
+                "is forbidden from model fitting, screening and choice"
+            ),
             "oracle_boundary": "LEAKY_ORACLE_DIAGNOSTIC_ONLY",
             "tax_boundary": "PRE_TAX_CONTROLLING_TAX_REFERENCE_ONLY",
         }
@@ -1022,6 +1060,7 @@ def build_chain_checkpoint(target: Path) -> None:
                 "canonical_issue_count": len(stage1_store.issues),
                 "strict_common_issue_count": len(common),
                 "issue_action_row_census": row_census,
+                "selected_policy_seed_row_count": len(seed_rows),
             },
         )
         atomic_publish(stage, target)

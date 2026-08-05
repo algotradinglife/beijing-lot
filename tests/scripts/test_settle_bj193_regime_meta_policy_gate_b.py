@@ -463,6 +463,80 @@ def test_stage3_native_profiles_exact_action_signatures_and_seed_mean(monkeypatc
         assert output["tax"][index] == 0.0
 
 
+def test_stage3_native_seed_diagnostic_reconciles_frozen_action_mean(
+    monkeypatch,
+):
+    monkeypatch.setenv("OMP_NUM_THREADS", "2")
+    action = next(
+        row
+        for row in V2.load_stage_catalog(3)
+        if json.loads(row["parameters_json"])["mechanism"]
+        == "WR_DUPLICATE_STAKE"
+        and json.loads(row["parameters_json"])["weight_source"] == "Q_WEIGHT"
+        and json.loads(row["parameters_json"])["M"] == "16"
+    )
+    engine = V2.load_module(
+        "bj193_seed_diag_allocator_test",
+        V2.GATE_A_V2 / "bj145_allocation_engine.py",
+    )
+    weights = np.asarray(engine.golden_weights(), dtype=np.float64)
+    matrix = np.ascontiguousarray(
+        np.tile(weights, (len(V2.STAGE3_WEIGHT_SOURCES), 1))
+    )
+    source, mechanism, requested_m, caps, signatures, encoded = (
+        V2._stage3_native_action_arrays([action], "26080", "a" * 64, "b" * 64)
+    )
+    aggregate = {
+        name: np.zeros(1, dtype=np.float64)
+        for name in ("gross", "stake", "tax", "net", "hit")
+    }
+    status = np.zeros(1, dtype=np.uint8)
+    native = V2._compile_stage3_native()
+    native.bj193_chain_profile_actions(
+        V2._np_pointer(matrix, ctypes.c_double),
+        len(V2.STAGE3_WEIGHT_SOURCES),
+        V2.FULL_TICKETS,
+        0,
+        100.0,
+        V2._np_pointer(source, ctypes.c_int),
+        V2._np_pointer(mechanism, ctypes.c_int),
+        V2._np_pointer(requested_m, ctypes.c_int),
+        V2._np_pointer(caps, ctypes.c_int),
+        encoded,
+        1,
+        0,
+        0,
+        0,
+        0,
+        V2._np_pointer(status, ctypes.c_ubyte),
+        *(
+            V2._np_pointer(aggregate[name], ctypes.c_double)
+            for name in ("gross", "stake", "tax", "net", "hit")
+        ),
+    )
+    seed = {
+        name: np.zeros(100, dtype=np.float64)
+        for name in ("gross", "stake", "tax", "net", "hit")
+    }
+    native.bj193_chain_profile_seed_action(
+        V2._np_pointer(matrix[int(source[0])], ctypes.c_double),
+        V2.FULL_TICKETS,
+        0,
+        100.0,
+        int(mechanism[0]),
+        int(requested_m[0]),
+        signatures[0],
+        *(
+            V2._np_pointer(seed[name], ctypes.c_double)
+            for name in ("gross", "stake", "tax", "net", "hit")
+        ),
+    )
+    assert status[0] == V2.STATUS_ACTIVE
+    for name in seed:
+        assert abs(float(seed[name].mean()) - aggregate[name][0]) < 1e-12
+    assert np.all(seed["stake"] == 32.0)
+
+
 def test_structural_delete_fails_closed_without_all_seven_role_rows():
     support = V2.Support(
         "26080", "OOS_2026", "2026", "identity",
@@ -876,6 +950,9 @@ def test_chain_checkpoint_fixture_is_atomic_deterministic_and_four_arm(
         chain,
         "build_prior_only_stage3_path",
         lambda _store, _stage1, _stage2: static_bet,
+    )
+    monkeypatch.setattr(
+        chain, "selected_stage3_seed_rows", lambda *_args: []
     )
     first = tmp_path / "checkpoint-a"
     second = tmp_path / "checkpoint-b"

@@ -1967,6 +1967,12 @@ def _compile_stage3_native() -> ctypes.CDLL:
         pb, pd, pd, pd, pd, pd,
     ]
     module.bj193_chain_profile_actions.restype = None
+    module.bj193_chain_profile_seed_action.argtypes = [
+        pd, ctypes.c_int, ctypes.c_int, ctypes.c_double,
+        ctypes.c_int, ctypes.c_int, ctypes.c_char_p,
+        pd, pd, pd, pd, pd,
+    ]
+    module.bj193_chain_profile_seed_action.restype = None
     return module
 
 
@@ -2321,6 +2327,128 @@ def build_stage3_store(
         utility=utility, utility_active=utility_active,
         target_mode="ABSOLUTE_UTILITY",
     )
+
+
+def selected_stage3_seed_rows(
+    policy_id: str,
+    store: ConditionalStore,
+    path: StagePath,
+    stage1_decisions: Sequence[Stage1Decision],
+    stage2_decisions: Sequence[Stage2Decision],
+) -> list[dict[str, object]]:
+    """Replay only chosen WR/WOR actions for nuisance-seed diagnostics.
+
+    Seed identity is never exposed to any action screen or model choice.  This
+    diagnostic runs only after the seed-mean path is frozen and must reconcile
+    back to the chosen aggregate economics before its rows are returned.
+    """
+
+    role_by_match = _load_stage3_weights(stage1_decisions)
+    outcomes = load_outcomes()
+    adapter = _direction_adapter()
+    native = _compile_stage3_native()
+    rows: list[dict[str, object]] = []
+    metrics = ("gross", "stake", "tax", "net", "hit")
+    for issue_index, (stage1, stage2, action_value) in enumerate(
+        zip(stage1_decisions, stage2_decisions, path.choices, strict=True)
+    ):
+        action_index = int(action_value)
+        action = store.action_rows[action_index]
+        parameters = json.loads(action["parameters_json"])
+        mechanism = str(parameters["mechanism"])
+        if mechanism not in {"WR_DUPLICATE_STAKE", "WOR_DISTINCT"}:
+            continue
+        if (
+            store.status[action_index, issue_index] != STATUS_ACTIVE
+            or store.stake[action_index, issue_index] <= 0.0
+        ):
+            continue
+        totals = {
+            name: np.zeros(100, dtype=np.float64) for name in metrics
+        }
+        settled_supports = 0
+        signature = _stage3_native_action_arrays(
+            [action],
+            str(store.issues[issue_index]["issue"]),
+            str(stage1.output["output_sha256"]),
+            str(stage2.output["output_sha256"]),
+        )[4][0]
+        for support in stage2.supports:
+            if support.output["status"] != "ACTIVE":
+                continue
+            truth_payout = _truth_and_payout(support.support, outcomes)
+            if truth_payout is None:
+                continue
+            truth, payout = truth_payout
+            combined = adapter.combine_stage2_and_stage3_weights(
+                support.support.ordered_match_ids,
+                support.output["per_match"],
+                role_by_match,
+                str(parameters["weight_source"]),
+            )
+            if combined["status"] != "ACTIVE":
+                continue
+            weights = np.ascontiguousarray(
+                adapter.canonical_ticket_weight_vector(
+                    combined["per_match_weight_3_1_0"]
+                ),
+                dtype=np.float64,
+            )
+            values = {
+                name: np.zeros(100, dtype=np.float64) for name in metrics
+            }
+            native.bj193_chain_profile_seed_action(
+                _np_pointer(weights, ctypes.c_double),
+                FULL_TICKETS,
+                truth,
+                payout,
+                STAGE3_MECHANISM_CODE[mechanism],
+                int(parameters["M"]),
+                signature,
+                *(
+                    _np_pointer(values[name], ctypes.c_double)
+                    for name in metrics
+                ),
+            )
+            for name in metrics:
+                totals[name] += values[name]
+            settled_supports += 1
+        if settled_supports == 0:
+            raise RuntimeError("chosen stochastic action has no settled support")
+        aggregate = {
+            name: float(totals[name].mean()) for name in metrics
+        }
+        for name in metrics:
+            expected = float(getattr(store, name)[action_index, issue_index])
+            if not math.isclose(
+                aggregate[name], expected, rel_tol=1e-12, abs_tol=1e-8
+            ):
+                raise RuntimeError(
+                    f"chosen seed mean does not reconcile: {policy_id}/{name}"
+                )
+        for replicate in range(100):
+            rows.append(
+                {
+                    "policy_id": policy_id,
+                    "issue": store.issues[issue_index]["issue"],
+                    "issue_instance": store.issues[issue_index]["issue_instance"],
+                    "year": store.issues[issue_index]["year"],
+                    "outer_fold": store.issues[issue_index]["outer_fold"],
+                    "chosen_action_identity": action["interface_action_key"],
+                    "mechanism": mechanism,
+                    "seed": 137001 + replicate,
+                    "settled_support_count": settled_supports,
+                    "stake_yuan": float(totals["stake"][replicate]),
+                    "gross_pre_tax_yuan": float(totals["gross"][replicate]),
+                    "tax_yuan": float(totals["tax"][replicate]),
+                    "pre_tax_net_yuan": float(totals["net"][replicate]),
+                    "tax_adjusted_net_yuan": float(
+                        totals["net"][replicate] - totals["tax"][replicate]
+                    ),
+                    "hit": float(totals["hit"][replicate]),
+                }
+            )
+    return rows
 
 
 def stage3_feature_rows(

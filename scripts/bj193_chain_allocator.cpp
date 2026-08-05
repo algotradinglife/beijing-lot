@@ -129,4 +129,34 @@ void bj193_chain_profile_actions(
     }
 }
 
+void bj193_chain_profile_seed_action(
+    const double* weights, int ticket_count, int truth, double payout,
+    int mechanism, int requested_m, const char* signature,
+    double* gross, double* stake, double* tax, double* net, double* hit) {
+    if (mechanism != BJ193_WR && mechanism != BJ193_WOR) return;
+    int positive = 0;
+    for (int ordinal = 0; ordinal < ticket_count; ++ordinal) {
+        if (weights[ordinal] > 0.0) ++positive;
+    }
+    if (positive == 0 || (mechanism == BJ193_WOR && requested_m > positive)) {
+        return;
+    }
+    #pragma omp parallel for schedule(static)
+    for (int replicate = 0; replicate < 100; ++replicate) {
+        char seed[16];
+        std::snprintf(seed, sizeof(seed), "%d", 137001 + replicate);
+        int metrics[4] = {0, 0, 0, 0};
+        if (mechanism == BJ193_WR) {
+            bj145_wr_profile(weights, ticket_count, truth, seed, signature,
+                             &requested_m, 1, metrics);
+        } else {
+            bj145_wor_profile(weights, ticket_count, truth, seed, signature,
+                              &requested_m, 1, metrics);
+        }
+        bj193_write_money(metrics[0], metrics[1] + metrics[2], payout, 1.0,
+                          gross + replicate, stake + replicate,
+                          tax + replicate, net + replicate, hit + replicate);
+    }
+}
+
 }  // extern "C"
