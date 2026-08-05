@@ -70,7 +70,7 @@ SOURCE_167B = (
     ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1"
 )
 SOURCE_170B = ROOT / "results" / "bj170_gate_b_selector_allocator_stack_v1"
-DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v4"
+DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v5"
 SETTLED_IDENTITY_ONLY_PACKAGES = {
     "bj176_issue_equity_risk_v1",
     "bj190_gate_b_sparse_divergence_v1",
@@ -984,7 +984,13 @@ def methodology_contract() -> dict[str, object]:
             "PRIOR_INVERSE_VOL",
             "PRIOR_ERC",
             "PRIOR_DRAWDOWN_AWARE",
+            "PRIOR_MINIMUM_VARIANCE",
+            "PRIOR_MAXIMUM_DIVERSIFICATION",
         ],
+        "additional_prior_allocators": {
+            "PRIOR_MINIMUM_VARIANCE": "long-only minimum w'Σw on the same 52 strictly-prior common-active observations and 10% shrunk covariance; deterministic projected-gradient tolerance 1e-12, max 5000; fallback EQUAL_WEIGHT on nonfinite/nonconvergence",
+            "PRIOR_MAXIMUM_DIVERSIFICATION": "maximize (w'vol)/sqrt(w'Σw) under long-only simplex constraints using the same strictly-prior covariance; deterministic projected-gradient tolerance 1e-12, max 5000; fallback EQUAL_WEIGHT on nonfinite/nonconvergence",
+        },
         "M_rule": "H1 retains upstream fixed FULL=2187, MODEL=512 and Q=192. Expanded #148/#151/#159 families use only their materialized source M grids and the separate strictly-prior M-selection contract; no full-sample or test-period outcome can choose M. FULL is indivisible; every partial allocation requires its family prefix rule or abstains.",
         "primary_hypothesis": {
             "id": "RETROSPECTIVE_REPRODUCTION_R1_FIXED_THREE_SLEEVE_EQUAL_NATIVE",
@@ -1019,7 +1025,7 @@ def methodology_contract() -> dict[str, object]:
             "seed": BOOTSTRAP_SEED,
             "draw": "common deterministic issue-resample matrix paired across every portfolio",
         },
-        "stability": ["YEAR", "FOLD", "LOYO", "EX_LARGEST_ISSUE", "EX_LARGEST_YEAR"],
+        "stability": ["YEAR", "FOLD", "LOYO", "EX_LARGEST_ISSUE", "EX_LARGEST_YEAR", "REGIME"],
         "gate_b_outputs": [
             "per_issue_paths",
             "ending_capital",
@@ -1118,12 +1124,46 @@ def bj145_allocation_candidate_registry() -> list[dict[str, object]]:
     within-family curve selected only by :func:`m_selection_contract`.
     """
     source = SOURCE_145
+    arm_sources = {
+        "PRIMARY_NO_GATE_K4": (SOURCE_151, "bj151_gate_a_preoutcome_v1", "candidate_identities.csv.gz", "NO_GATE", 4),
+        "SECONDARY_ESP300_GM290_K8": (SOURCE_137, "bj137_gate_a_preoutcome_v2", "n7_identities.csv.gz", "ESP300_GM290", 8),
+    }
+    selector_rows: dict[str, dict[tuple[str, str], list[dict[str, str]]]] = {}
+    for arm, (path, _, identity_file, _, _) in arm_sources.items():
+        grouped: dict[tuple[str, str], list[dict[str, str]]] = {}
+        for identity in read_csv_gzip(path / identity_file):
+            grouped.setdefault((identity["issue_instance"], identity["gate_id"]), []).append(identity)
+        selector_rows[arm] = grouped
+    plans = read_csv_gzip(source / "allocation_plan.csv.gz")
+    support_rows: dict[str, list[dict[str, str]]] = {arm: [] for arm in arm_sources}
     groups: dict[tuple[str, str, str, str], list[dict[str, str]]] = {}
-    for row in read_csv_gzip(source / "allocation_plan.csv.gz"):
+    for row in plans:
+        arm = row["arm_id"]
+        if arm not in arm_sources:
+            raise RuntimeError(f"unknown #145 arm: {arm}")
+        _, expected_package, _, gate_id, top_k = arm_sources[arm]
+        if row["source_package"] != f"results/{expected_package}" or row["gate_id"] != gate_id:
+            raise RuntimeError(f"#145 arm/source mismatch: {arm} {row['plan_id']}")
+        if row["selection_status"] == "AVAILABLE":
+            identities = selector_rows[arm].get((row["issue_instance"], gate_id), [])
+            identities = sorted(identities, key=lambda identity: int(identity["participation_rank"]))[:top_k]
+            selected = [identity["portfolio_id"] for identity in identities]
+            if len(selected) != int(row["selected_identity_count"]) or canonical_hash(selected) != row["selected_portfolio_ids_sha256"]:
+                raise RuntimeError(f"#145 selector identity join failed: {arm} {row['plan_id']}")
+        support_rows[arm].append({
+            "issue_instance": row["issue_instance"],
+            "selection_status": row["selection_status"],
+            "selected_identity_count": row["selected_identity_count"],
+            "selected_portfolio_ids_sha256": row["selected_portfolio_ids_sha256"],
+        })
         if row["selection_status"] != "AVAILABLE":
             continue
         key = (row["arm_id"], row["weight_source"], row["mechanism"], row["cap"])
         groups.setdefault(key, []).append(row)
+    support_hashes = {
+        arm: canonical_hash(sorted({canonical_hash(row) for row in arm_rows}))
+        for arm, arm_rows in support_rows.items()
+    }
     result: list[dict[str, object]] = []
     for key, rows in sorted(groups.items()):
         arm, weight_source, mechanism, cap = key
@@ -1138,11 +1178,16 @@ def bj145_allocation_candidate_registry() -> list[dict[str, object]]:
         # canonical family and label the remaining weight-source aliases, so
         # the Stage-4 frontier never manufactures duplicate FULL controls.
         economic_key = (arm, "FULL_ENUMERATED", "NA") if mechanism == "FULL_ENUMERATED" else key
+        _, source_name, identity_file, gate_id, top_k = arm_sources[arm]
         result.append(
             {
                 "candidate_id": candidate_id,
                 "economic_key": "|".join(economic_key),
                 "source_package": "bj145_gate_a_preoutcome_v8",
+                "selector_source_package": source_name,
+                "selector_identity_file": identity_file,
+                "selector_gate_id": gate_id,
+                "selector_top_k": top_k,
                 "source_plan_file": "allocation_plan.csv.gz",
                 "source_identity_file": "identity_catalog.csv.gz",
                 "source_plan_payload_sha256": sha256_file(source / "allocation_plan.csv.gz"),
@@ -1156,11 +1201,12 @@ def bj145_allocation_candidate_registry() -> list[dict[str, object]]:
                 "fixed_m_comparator": min(m_grid),
                 "seed_scope": ";".join(seeds),
                 "issue_instance_count": len(issues),
+                "support_348_hash": support_hashes[arm],
                 "plan_row_count": len(rows),
                 "plan_id_set_sha256": canonical_hash(plan_ids),
-                "support_adapter": "allocation_plan rows join #151 frozen identity by (arm_id, issue_instance, selected_portfolio_ids_sha256); Gate B must fail closed on any nonunique/missing join",
+                "support_adapter": "unique exact arm-specific selector join validated at Gate A by (arm_id, issue_instance, gate_id, participation_rank<=top_k, selected_portfolio_ids_sha256); Gate B must fail closed on any mismatch",
                 "native_ticket_identity": "#145 accepted frozen allocation engine + plan_id + selected_portfolio_ids_sha256 + mechanism/cap/M/seed; repeats are independent ¥2 tax lots",
-                "ticket_prefix_rule": "frozen #145 plan order; partial Stage-4 funding requires a nested-prefix proof for that exact mechanism, otherwise whole-native-or-NO_BET",
+                "ticket_prefix_rule": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             }
         )
@@ -1183,7 +1229,7 @@ def m_selection_contract(expanded: list[dict[str, object]]) -> dict[str, object]
         "training_score": "prior-only aggregate pre-tax net / prior-only aggregate actual stake on the family native support; blank/zero-stake M values cannot win",
         "tie_break": "higher score, then lower M, then candidate_id lexicographic, then frozen seed-aggregate id",
         "fallback": "before 52 active observations use fixed_m_comparator; never select by full-sample ROI, winning year, payout, or test-period result",
-        "seed_rule": "arithmetic mean of replicate net/stake before M scoring and before capital allocation; replicate draws are nuisance simulations, not multiplied purchased exposure",
+        "seed_rule": "arithmetic seed mean is permitted only in strictly-prior training to select M. Gate-B deployment never averages payouts/stakes before capital allocation: it replays each frozen seed path as a separate complete bankroll state machine and reports the across-seed distribution. No seed may be selected from outcomes; an all-seed purchase is allowed only with explicit multiplied stake.",
         "fixed_m_comparator": [
             {
                 "candidate_id": row["candidate_id"],
@@ -1421,6 +1467,8 @@ def frontier_contract(eligibility: list[dict[str, str]]) -> dict[str, object]:
             "BJ148_NOGATE_WR_DENSE_M|BJ148_NOGATE_WOR_DENSE_M|BJ151_NOGATE_K4_WR_DENSE_M|BJ151_NOGATE_K4_WOR_DENSE_M|BJ159_SELECTED_N7_WOR_M_CURVE",
         ],
         "higher_order_rule": "all nonempty subsets of the H1 panel; all nonempty subsets of each robust-shortlist row after prior-only M selection; no post-outcome membership choice",
+        "portfolio_k_saturation": "for every ordered robust shortlist, publish K=1..len(shortlist) equal-weight and each prior-only allocator path; report marginal candidate-minus-K-1 capital, risk, covariance, HHI and retained-cash changes. K is never selected by same-window outcomes.",
+        "m_curve_and_path_tables": "for each family publish the full frozen M curve, fixed-M comparator, strictly-prior selected-M path, and nested-LOYO selected-M path, separately for each deployment seed path.",
         "excluded_source_records": [
             {
                 "candidate_id": row["candidate_id"],
@@ -1716,13 +1764,6 @@ def output_schema() -> dict[str, object]:
                 "skipped_stake_yuan",
                 "retained_cash_yuan",
                 "reason_codes",
-                "sleeve_id",
-                "native_ticket_count",
-                "funded_prefix_length",
-                "funded_global_rank_start",
-                "funded_global_rank_end",
-                "funded_tax_lot_sha256",
-                "prefix_execution_status",
                 "pre_tax_gross_yuan",
                 "pre_tax_net_yuan",
                 "tax_yuan",
@@ -1737,6 +1778,11 @@ def output_schema() -> dict[str, object]:
                 "turnover=cumulative actual_stake",
                 "all sleeve flows in an issue fund concurrently",
             ],
+        },
+        "sleeve_funding_ledger": {
+            "key": ["portfolio_id", "mode", "position_fraction", "weight_method", "calendar_index", "issue_instance", "sleeve_id"],
+            "fields": ["requested_native_ticket_count", "actual_ticket_count", "funded_prefix_length", "funded_global_rank_start", "funded_global_rank_end", "funded_ticket_list_sha256", "funded_tax_lot_sha256", "prefix_execution_status", "atomic_or_no_bet_reason", "actual_stake_yuan"],
+            "formulas": ["one row per sleeve; (portfolio issue actual_stake)=sum(sleeve funding actual_stake) exactly", "WHOLE_NATIVE_OR_NO_BET requires actual_ticket_count in {0, requested_native_ticket_count}; otherwise fail closed", "a prefix row must reference its manifest-covered issue-global ordered tax-lot stream"],
         },
         "capital_summary": {
             "fields": [
@@ -1786,6 +1832,12 @@ def output_schema() -> dict[str, object]:
                 "sleeve_right",
                 "prior_covariance",
                 "prior_correlation",
+                "pearson_correlation",
+                "spearman_rank_correlation",
+                "rolling_correlation_20",
+                "payout_overlap_count",
+                "hit_overlap_count",
+                "contribution_hhi",
                 "downside_correlation",
                 "tail_co_loss_count",
                 "full_calendar_zero_flow_count",
@@ -1802,6 +1854,7 @@ def output_schema() -> dict[str, object]:
                 "downside_correlation=corr(min(r_left,0),min(r_right,0)) is reported separately for full-calendar-zero-flow, union-active and intersection-active; blank for <2/nonpositive variance",
                 "tail_co_loss_count=count both returns in their own prior 10% lower tail on each declared denominator",
                 "diversification_attribution=portfolio pre-tax net minus sum(weighted matched standalone nets), reported separately from retained cash",
+                "Pearson/rank/rolling metrics are computed on each declared full-calendar, union-active, and intersection-active denominator; blank for fewer than two observations or zero variance. HHI=sum(issue contribution share²), blank when gross contribution is zero.",
             ],
         },
         "holding_metrics": {
@@ -1815,6 +1868,11 @@ def output_schema() -> dict[str, object]:
                 "drawdown_duration_issues",
                 "time_under_water_issues",
                 "recovery_issue",
+                "recovery_episode_count",
+                "recovery_duration_median_issues",
+                "recovery_duration_tail_95_issues",
+                "recovery_duration_max_issues",
+                "unrecovered_episode_count",
                 "loss_streak_calendar",
                 "loss_streak_active",
                 "miss_streak_calendar",
@@ -1839,6 +1897,7 @@ def output_schema() -> dict[str, object]:
                 "rolling P&L W=sum(pre_tax_net) over every trailing full-calendar W={5,10,20}; report count/total windows with P&L<0, their probability, the worst P&L, its ROI=sum(net)/sum(actual stake), and its chronological window identity. Never discard winning issues inside a window",
                 "drawdown=running equity peak minus postissue bankroll; duration/time-under-water count chronological issues below peak; recovery is first later issue reaching former peak, blank if absent",
                 "near_ruin_flag=1 iff min bankroll < ¥2×max native issue ticket count; sharpe=mean calendar bank return/sample sd×sqrt(issue frequency/year), sortino divides by downside RMS, calmar=annualized compounded bank return/max drawdown fraction; blank where denominator zero",
+                "recovery episodes begin on a new running-peak breach and end at first later recovery to that peak; report median, 95th percentile, maximum, and unrecovered count on full chronology",
             ],
         },
         "bootstrap_stability": {
@@ -1938,7 +1997,7 @@ def funded_prefix_ledger_contract(
         records.append(
             {
                 "sleeve_or_family_id": row["candidate_id"],
-                "prefix_policy": row["ticket_prefix_rule"],
+                "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
                 "native_ticket_identity_source": source,
                 "funded_tax_lot_rule": (
                     "materialize every frozen draw/rank up to selected M; a funded "
@@ -1965,7 +2024,7 @@ def funded_prefix_ledger_contract(
             "funded_tax_lot_sha256",
             "prefix_execution_status",
         ],
-        "atomic_funding_rule": "BEST_FULL_FULL is atomic; all other records may fund only their stated deterministic prefix. Gate B must fail closed if any output ticket sequence is not reproduced by this contract.",
+        "atomic_funding_rule": "BEST_FULL_FULL is atomic. Any expanded record with WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF is also atomic until this exact family/issue/M has a manifest-covered global ticket/tax-lot stream and nested-prefix proof. Gate B must fail closed rather than infer an order or split a nonnested allocation.",
         "records": records,
     }
 
@@ -2153,7 +2212,11 @@ def write_package(output: Path) -> None:
                 "eligible_exploratory_family_count": len(expanded),
                 "eligible_complete_source_count": frontier["eligible_source_count"],
                 "ticket_prefix_policy_rows": len(prefix_policies),
-                "Q_global_tax_lot_rows": len(prefix_rows),
+                "all_global_tax_lot_rows": len(prefix_rows),
+                "Q_global_tax_lot_rows": sum(
+                    row["sleeve_id"] == "Q_SOURCE_Q_TOP_MASS_M192"
+                    for row in prefix_rows
+                ),
                 "position_fraction_count": len(POSITION_FRACTIONS),
             },
             "gate_b_status": "NOT_RUN_AND_NOT_AUTHORIZED_PENDING_PI_GATE_A_ACCEPTANCE",

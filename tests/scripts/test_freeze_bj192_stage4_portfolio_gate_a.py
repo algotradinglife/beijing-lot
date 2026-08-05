@@ -72,6 +72,16 @@ def test_frozen_source_hashes_and_complete_primary_catalog():
     assert {
         row["mechanism"] for row in allocation
     } >= {"WR_DUPLICATE_STAKE", "WOR_DISTINCT", "CAPPED_REPEAT"}
+    assert {row["selector_source_package"] for row in allocation} == {
+        "bj151_gate_a_preoutcome_v1",
+        "bj137_gate_a_preoutcome_v2",
+    }
+    assert all(len(row["support_348_hash"]) == 64 for row in allocation)
+    assert all(
+        row["ticket_prefix_rule"]
+        == "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF"
+        for row in allocation
+    )
 
 
 def test_settled_sources_are_identity_only_and_never_open_payloads(monkeypatch):
@@ -309,6 +319,8 @@ def test_baseline_and_sequential_inference_contracts_are_frozen():
         "paired stationary"
     )
     assert "max-T" in method["multiplicity"]["positive_inference"]
+    assert "PRIOR_MINIMUM_VARIANCE" in method["weight_methods"]
+    assert "separate complete bankroll state machine" in m.m_selection_contract([])["seed_rule"]
     eligibility = m.eligibility_ledger()
     frontier = m.frontier_contract(eligibility)
     assert frontier["eligible_source_count"] == 106
@@ -411,10 +423,16 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
         row["nested"] for row in model_audit["rows"]
     )
     issue_schema = card["output_schema"]["issue_ledger"]
-    assert "funded_tax_lot_sha256" in issue_schema["fields"]
-    assert "funded_prefix_length" in issue_schema["fields"]
+    assert "sleeve_id" not in issue_schema["key"]
+    sleeve_schema = card["output_schema"]["sleeve_funding_ledger"]
+    assert sleeve_schema["key"][-1] == "sleeve_id"
     prefix_contract = json.loads((output / "funded_prefix_ledger_contract.json").read_text())
     assert prefix_contract["records"][0]["prefix_policy"] == "WHOLE_NATIVE_OR_NO_BET"
     assert len(prefix_contract["records"]) == 116
+    assert all(
+        row["prefix_policy"]
+        == "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF"
+        for row in prefix_contract["records"][3:]
+    )
     source = SCRIPT.read_text()
     assert "result_code" not in source and "winning_sp" not in source
