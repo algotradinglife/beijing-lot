@@ -872,7 +872,9 @@ aliases 折叠为 10 个不同 issue-economic identities；其中 Z100/K1 的 52
 
 税仍按每张命中的 ¥2 票分别计算，不做跨票/跨期汇总。完整四臂结果、概率校准、
 20k paired bootstrap、YEAR/FOLD/LOYO、风险集中度、图与不可变哈希见
-[`Issue-190-Sparse-Divergence-N7`](Issue-190-Sparse-Divergence-N7.md)。
+[`Issue-190-Sparse-Divergence-N7`](Issue-190-Sparse-Divergence-N7.md)。面向路线决策的
+证据漏斗、Z100/K1 正向簇、`NO_PROMOTION` 双层解释以及对 #193/#192 的继承建议，见
+[`Issue-190-Sparse-Divergence-N7-Decision-Report`](Issue-190-Sparse-Divergence-N7-Decision-Report.md)。
 
 ## 相关笔记
 
