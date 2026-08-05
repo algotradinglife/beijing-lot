@@ -1456,12 +1456,12 @@ def finalize(checkpoint: Path, target: Path) -> None:
                 "test_settle_bj193_regime_meta_policy_gate_b.py "
                 "-k 'finalizer or oracle or correction_json or path_receipts'"
             ),
-            "focused_result": "8 passed, 23 deselected",
+            "focused_result": "11 passed, 23 deselected",
             "full_command": (
                 "pytest -q tests/scripts/"
                 "test_settle_bj193_regime_meta_policy_gate_b.py"
             ),
-            "full_result": "31 passed in 41.03s",
+            "full_result": "34 passed in 41.19s",
             "py_compile": "PASS",
             "git_diff_check": "PASS",
         }
