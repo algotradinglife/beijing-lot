@@ -1,0 +1,58 @@
+{
+  "initial_bankroll_yuan": 100000,
+  "integer_allocator": {
+    "atomic_blocks": "FULL_ENUMERATED is funded only as its complete native ticket block. First derive capped continuous targets across every sleeve. Enumerate feasible whole-atomic subsets; for each, water-fill only prefix-executable sleeves, then select the allocation minimizing (L1 distance from the continuous target, retained tickets, lexical included-block tuple). An excluded atomic block is NO_BET; residual is reallocated only to executable prefixes or retained as cash. Affordability alone never gives FULL priority over its target weight.",
+    "cap_bound_leftover": "remove sleeves at native cap and repeat weighted water-fill until no ticket budget or no capacity; retain any unspendable cash",
+    "concurrency": "all sleeve tickets for an issue are funded before that issue's outcomes; no payout recycling, deposit, loan, or top-up",
+    "gate_b_requirement": "settle each allocated ticket with native per-ticket tax; fail closed if no exact ticket-level settlement bridge exists",
+    "invariants": [
+      "actual_total_stake <= preissue_bankroll",
+      "actual_ticket_count_by_sleeve <= native_requested_ticket_count",
+      "retained_cash=preissue_bankroll-actual_total_stake >= 0"
+    ],
+    "minimum": "budget under \u00a52 or all native requests zero is NO_BET, zero flow not a loss",
+    "raw_ticket_target": "iterative normalized sleeve weight \u00d7 remaining ticket budget, hard-capped at native requested tickets",
+    "reason_codes": [
+      "FUNDED_AS_REQUESTED",
+      "SCALED_BY_MODE_NOTIONAL",
+      "SCALED_BY_PREISSUE_BANKROLL",
+      "CAP_BOUND_WATERFILL",
+      "CAPACITY_EXHAUSTED_RETAIN_CASH",
+      "NO_BET_NATIVE_ZERO_REQUEST",
+      "NO_BET_BUDGET_LT_TICKET",
+      "ATOMIC_BLOCK_UNFUNDED_RETAIN_OR_REALLOCATE_CASH",
+      "ATOMIC_BLOCK_EXCLUDED_BY_TARGET_OBJECTIVE"
+    ],
+    "rounding": "each water-fill pass floors capped quotas, then gives one residual ticket to largest fractional quota; ties sleeve_id ascending",
+    "universal_budget": "issue_budget=min(mode_notional, preissue_bankroll); ticket_budget=floor(issue_budget/\u00a52)"
+  },
+  "modes": {
+    "COMPOUNDING_BANKROLL": "mode_notional=fraction \u00d7 preissue bankroll",
+    "FIXED_100K_NOTIONAL": "mode_notional=fraction \u00d7 \u00a5100,000; notional does not reinvest",
+    "NATIVE_REQUEST_CONTROL": "fraction must equal 1; mode_notional=sum(native requested ticket caps) \u00d7 \u00a52, reduced only for a current-bankroll shortfall",
+    "SCALED_NATIVE_REQUEST": "exploratory only: mode_notional=fraction \u00d7 sum(native requested ticket caps) \u00d7 \u00a52; never an accepted native baseline"
+  },
+  "position_budget_fractions": [
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3,
+    0.35,
+    0.4,
+    0.45,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    1.0
+  ],
+  "ticket_stake_yuan": 2
+}

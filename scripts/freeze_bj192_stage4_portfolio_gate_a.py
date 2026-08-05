@@ -27,7 +27,7 @@ from typing import Sequence
 
 
 CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
-VERSION = "bj192-gate-a-v6r1"
+VERSION = "bj192-gate-a-v6r2"
 OUTCOME_BOUNDARY = (
     "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, "
     "tax realization, ROI, net, gross, or settlement payload is read."
@@ -70,7 +70,7 @@ SOURCE_167B = (
     ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1"
 )
 SOURCE_170B = ROOT / "results" / "bj170_gate_b_selector_allocator_stack_v1"
-DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v6r1"
+DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v6r2"
 SETTLED_IDENTITY_ONLY_PACKAGES = {
     "bj176_issue_equity_risk_v1",
     "bj190_gate_b_sparse_divergence_v1",
@@ -674,6 +674,131 @@ def covariance_matrix(
     ]
 
 
+def project_simplex(values: list[float]) -> list[float]:
+    """Project a finite vector onto the long-only unit simplex.
+
+    This is the deterministic Duchi et al. threshold projection.  Keeping it
+    here (rather than relying on a platform optimiser) freezes both the
+    long-only constraint and the tie behaviour of the two covariance-based
+    allocation methods.
+    """
+    if not values or any(not math.isfinite(value) for value in values):
+        raise ValueError("nonfinite simplex input")
+    ordered = sorted(values, reverse=True)
+    running = 0.0
+    rho = -1
+    for index, value in enumerate(ordered, 1):
+        running += value
+        if value - (running - 1.0) / index > 0.0:
+            rho = index
+    if rho < 1:
+        raise ValueError("simplex projection has no positive support")
+    theta = (sum(ordered[:rho]) - 1.0) / rho
+    projected = [max(0.0, value - theta) for value in values]
+    total = sum(projected)
+    if total <= 0.0 or not math.isfinite(total):
+        raise ValueError("invalid simplex projection")
+    return [value / total for value in projected]
+
+
+def covariance_times(
+    covariance: list[list[float]], weights: list[float]
+) -> list[float]:
+    return [
+        sum(covariance[row][column] * weights[column] for column in range(len(weights)))
+        for row in range(len(weights))
+    ]
+
+
+def projected_covariance_weights(
+    method: str, covariance: list[list[float]], vols: list[float]
+) -> tuple[list[float], bool]:
+    """Return the contract's deterministic long-only covariance allocation.
+
+    Both objectives use fixed-order projected-gradient descent, a declared
+    1e-12 L1 convergence tolerance and at most 5,000 iterations.  The
+    backtracking schedule is deterministic and rejects a non-improving step;
+    callers then use the frozen equal-weight fallback.
+    """
+    n = len(vols)
+    weights = [1.0 / n] * n
+
+    def objective(candidate: list[float]) -> float:
+        sigma_w = covariance_times(covariance, candidate)
+        variance = sum(candidate[index] * sigma_w[index] for index in range(n))
+        if variance <= 1e-24 or not math.isfinite(variance):
+            return math.inf
+        if method == "PRIOR_MINIMUM_VARIANCE":
+            return variance
+        numerator = sum(candidate[index] * vols[index] for index in range(n))
+        if numerator <= 1e-24 or not math.isfinite(numerator):
+            return math.inf
+        # Minimising log(volatility) - log(weighted individual volatility)
+        # is exactly maximum diversification under the simplex constraint.
+        return 0.5 * math.log(variance) - math.log(numerator)
+
+    previous = objective(weights)
+    if not math.isfinite(previous):
+        return weights, False
+    # Covariance entries are issue-return variances, typically far below one.
+    # Scale the initial projected-gradient step to the actual matrix norm;
+    # an absolute floor of one would make a 1e-12 convergence contract
+    # unattainably slow for ordinary return units.
+    scale = max(
+        1e-12,
+        max(sum(abs(value) for value in row) for row in covariance),
+    )
+    for _ in range(5000):
+        sigma_w = covariance_times(covariance, weights)
+        variance = sum(weights[index] * sigma_w[index] for index in range(n))
+        if variance <= 1e-24 or not math.isfinite(variance):
+            return weights, False
+        if method == "PRIOR_MINIMUM_VARIANCE":
+            gradient = [2.0 * value for value in sigma_w]
+        elif method == "PRIOR_MAXIMUM_DIVERSIFICATION":
+            numerator = sum(weights[index] * vols[index] for index in range(n))
+            if numerator <= 1e-24 or not math.isfinite(numerator):
+                return weights, False
+            gradient = [
+                sigma_w[index] / variance - vols[index] / numerator
+                for index in range(n)
+            ]
+        else:
+            raise ValueError(f"unknown covariance allocator: {method}")
+        # The diversification-ratio gradient is dimensionless and can be
+        # much larger than the covariance entries.  Scale that objective by
+        # its current infinity norm; minimum variance retains matrix-norm
+        # scaling.  Both choices are deterministic and are only initial
+        # steps for the fixed backtracking schedule below.
+        step = (
+            1.0 / max(1e-12, max(abs(value) for value in gradient))
+            if method == "PRIOR_MAXIMUM_DIVERSIFICATION"
+            else 1.0 / scale
+        )
+        candidate = weights
+        candidate_objective = previous
+        for _ in range(60):
+            trial = project_simplex(
+                [weights[index] - step * gradient[index] for index in range(n)]
+            )
+            trial_objective = objective(trial)
+            if math.isfinite(trial_objective) and trial_objective <= previous + 1e-15:
+                candidate = trial
+                candidate_objective = trial_objective
+                break
+            step *= 0.5
+        else:
+            return weights, False
+        if (
+            sum(abs(candidate[index] - weights[index]) for index in range(n))
+            <= 1e-12
+            or abs(candidate_objective - previous) <= 1e-12
+        ):
+            return candidate, True
+        weights, previous = candidate, candidate_objective
+    return weights, False
+
+
 def dynamic_weights(
     method: str, history: list[dict[str, float | None]], sleeves: list[str]
 ) -> tuple[dict[str, float], str]:
@@ -703,6 +828,16 @@ def dynamic_weights(
             return normalize(
                 {s: 1.0 / (vols[s] * (1.0 + penalties[s])) for s in sleeves}
             ), "PRIOR_DRAWDOWN_AWARE"
+        if method in {
+            "PRIOR_MINIMUM_VARIANCE",
+            "PRIOR_MAXIMUM_DIVERSIFICATION",
+        }:
+            weights, converged = projected_covariance_weights(
+                method, covariance, [vols[s] for s in sleeves]
+            )
+            if not converged:
+                return (*equal_weights(sleeves)[0:1], "FALLBACK_COVARIANCE_NO_CONVERGENCE")
+            return normalize(dict(zip(sleeves, weights))), method
         if method != "PRIOR_ERC":
             raise ValueError(f"unknown weight method: {method}")
         weights = [1.0 / len(sleeves)] * len(sleeves)

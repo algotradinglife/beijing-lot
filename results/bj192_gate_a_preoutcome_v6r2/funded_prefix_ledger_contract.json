@@ -1,0 +1,718 @@
+{
+  "atomic_funding_rule": "BEST_FULL_FULL is atomic. Any expanded record with WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF is also atomic until this exact family/issue/M has a manifest-covered global ticket/tax-lot stream and nested-prefix proof. Gate B must fail closed rather than infer an order or split a nonnested allocation.",
+  "fields": [
+    "native_ticket_count",
+    "funded_prefix_length",
+    "funded_global_rank_start",
+    "funded_global_rank_end",
+    "funded_tax_lot_sha256",
+    "prefix_execution_status"
+  ],
+  "key": [
+    "portfolio_id",
+    "mode",
+    "position_fraction",
+    "weight_method",
+    "calendar_index",
+    "issue_instance",
+    "sleeve_or_family_id"
+  ],
+  "records": [
+    {
+      "funded_tax_lot_rule": "zero lots or all 2187 canonical ordinals for every inherited identity; partial allocation is forbidden",
+      "native_ticket_identity_source": "bj170 identity_allocation_digest.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET",
+      "sleeve_or_family_id": "BEST_FULL_FULL"
+    },
+    {
+      "funded_tax_lot_rule": "take global ranks 1..funded_prefix_length and hash their ordered tax_lot_id values",
+      "native_ticket_identity_source": "ticket_prefix_registry.csv.gz + model_cap1_nested_prefix_audit.json.gz",
+      "prefix_policy": "NESTED_PREFIX_VERIFIED_M1_TO_M512",
+      "sleeve_or_family_id": "MODEL_SOURCE_MODEL_CAP1_M512"
+    },
+    {
+      "funded_tax_lot_rule": "take global ranks 1..funded_prefix_length and hash their ordered tax_lot_id values",
+      "native_ticket_identity_source": "ticket_prefix_registry.csv.gz",
+      "prefix_policy": "NESTED_PREFIX_VERIFIED_GLOBAL_ROUND_ROBIN",
+      "sleeve_or_family_id": "Q_SOURCE_Q_TOP_MASS_M192"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj148_gate_a_preoutcome_v1/common_support_identities.csv.gz + common_support_role_vectors.csv.gz + sampling_plan.csv",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ148_NOGATE_WR_DENSE_M"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj148_gate_a_preoutcome_v1/common_support_identities.csv.gz + common_support_role_vectors.csv.gz + sampling_plan.csv",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ148_NOGATE_WOR_DENSE_M"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj151_gate_a_preoutcome_v1/candidate_identities.csv.gz + candidate_role_vectors.csv.gz + sampling_plan.csv",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ151_NOGATE_K4_WR_DENSE_M"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj151_gate_a_preoutcome_v1/candidate_identities.csv.gz + candidate_role_vectors.csv.gz + sampling_plan.csv",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ151_NOGATE_K4_WOR_DENSE_M"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj159_gate_a_preoutcome_v2r1/identity_catalog.csv.gz[n=7] + role_vectors.csv.gz[n=7] + sampling_plan.csv[n=7]",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ159_SELECTED_N7_WOR_M_CURVE"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_CAPPED-REPEAT_1"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_CAPPED-REPEAT_2"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_CAPPED-REPEAT_4"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_CAPPED-REPEAT_8"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_FULL-ENUMERATED_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_WOR-DISTINCT_NA"
+    },
+    {
+      "funded_tax_lot_rule": "materialize every frozen draw/rank up to selected M; a funded prefix uses the first funded_prefix_length positions and hashes the canonical tax_lot_identity sequence",
+      "native_ticket_identity_source": "bj145_gate_a_preoutcome_v8/identity_catalog.csv.gz + allocation_plan.csv.gz",
+      "prefix_policy": "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF",
+      "sleeve_or_family_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_WR-DUPLICATE-STAKE_NA"
+    }
+  ]
+}

@@ -279,7 +279,13 @@ def test_dynamic_weight_models_are_prior_only_and_have_deterministic_fallbacks()
     w, status = m.dynamic_weights("PRIOR_ERC", singular, sleeves)
     assert w == {"A": 0.5, "B": 0.5} and status == "FALLBACK_ZERO_OR_NONFINITE_VOL"
     history = [{"A": (i % 7 - 3) / 100, "B": (i % 5 - 2) / 80} for i in range(52)]
-    for model in ("PRIOR_INVERSE_VOL", "PRIOR_ERC", "PRIOR_DRAWDOWN_AWARE"):
+    for model in (
+        "PRIOR_INVERSE_VOL",
+        "PRIOR_ERC",
+        "PRIOR_DRAWDOWN_AWARE",
+        "PRIOR_MINIMUM_VARIANCE",
+        "PRIOR_MAXIMUM_DIVERSIFICATION",
+    ):
         w, status = m.dynamic_weights(model, history, sleeves)
         assert math.isclose(sum(w.values()), 1.0) and all(
             value >= 0 for value in w.values()
@@ -288,7 +294,23 @@ def test_dynamic_weight_models_are_prior_only_and_have_deterministic_fallbacks()
             model,
             "FALLBACK_ERC_NONPOSITIVE_RISK",
             "FALLBACK_ERC_NO_CONVERGENCE",
+            "FALLBACK_COVARIANCE_NO_CONVERGENCE",
         }
+
+
+def test_prior_covariance_allocators_are_long_only_and_deterministic():
+    m = module()
+    history = [
+        {"A": (index % 5 - 2) / 100, "B": (index % 7 - 3) / 80}
+        for index in range(52)
+    ]
+    for method in ("PRIOR_MINIMUM_VARIANCE", "PRIOR_MAXIMUM_DIVERSIFICATION"):
+        left, left_status = m.dynamic_weights(method, history, ["A", "B"])
+        right, right_status = m.dynamic_weights(method, history, ["A", "B"])
+        assert left_status == right_status == method
+        assert left == right
+        assert math.isclose(sum(left.values()), 1.0)
+        assert all(value >= 0.0 for value in left.values())
 
 
 def test_trace_validator_rejects_equal_count_key_mismatch():
