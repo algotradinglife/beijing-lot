@@ -125,6 +125,15 @@ def test_path_receipts_use_deterministic_union_schema(tmp_path):
     assert R.receipt_fields(list(reversed(model_rows))) == list(model_rows[0])
 
 
+def test_correction_json_writer_is_deterministic(tmp_path):
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    R.write_json(first, {"z": 1, "a": {"b": True}})
+    R.write_json(second, {"a": {"b": True}, "z": 1})
+    assert first.read_bytes() == second.read_bytes()
+    assert first.read_text().endswith("\n")
+
+
 def test_selector_screen_uses_roi_support_stake_and_lexical_ties():
     selector = ["B", "A", "C", "D"]
     stake = np.full((4, 20), 2.0)

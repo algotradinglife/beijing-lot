@@ -195,6 +195,10 @@ def write_gzip(path: Path, fields: Sequence[str], rows: Iterable[dict]) -> None:
                 writer.writerows(rows)
 
 
+def write_json(path: Path, value: object) -> None:
+    path.write_text(json.dumps(value, sort_keys=True, indent=2) + "\n")
+
+
 def receipt_fields(rows: Sequence[Mapping[str, object]]) -> list[str]:
     """Return a row-order-independent schema for heterogeneous receipts."""
 
