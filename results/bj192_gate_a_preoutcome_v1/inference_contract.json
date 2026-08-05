@@ -18,16 +18,16 @@
       "capital_mode",
       "position_fraction"
     ],
-    "frontier_status": "all non-primary catalog combinations are exploratory/descriptive; raw Pareto or best-cell rank is never Edge evidence",
+    "frontier_status": "the locked three-sleeve retrospective reproduction and every parameter cell are descriptive/hypothesis-generating; raw Pareto or best-cell rank is never Edge evidence",
     "negative_rule": "negative/no-promotion results report full frontier and may use proportionate descriptive evidence",
     "positive_inference": "20,000 paired stationary-block bootstrap max-T family-wise adjusted lower bounds at alpha=0.05; test all candidate-minus-control lifts within each frozen family",
-    "winner_rule": "screen all cells, but no ladder advancement unless the preregistered H1 or a family-wise adjusted candidate passes strict matched PI review"
+    "winner_rule": "screen all cells, but no same-window result advances the ladder; a future genuinely held-out/forward candidate must pass the frozen family-wise rule and strict matched PI review"
   },
   "primary_hypothesis": {
     "candidate": "#170 BEST_FULL_FULL + MODEL_SOURCE_MODEL_CAP1_M512 + Q_SOURCE_Q_TOP_MASS_M192",
     "comparison": "absolute pre-tax \u00a5100k path plus matched lift versus B170 BEST_FULL/FULL on exact common support and actual funding convention",
-    "decision": "a positive claim requires paired sequential lower bound >0, all primary support/capital controls, and later independent held-out/forward validation",
-    "id": "H1_STAGE4_FIXED_THREE_SLEEVE_EQUAL_NATIVE",
+    "decision": "retrospective reproduction only: same-window positive or max-T-adjusted results are hypothesis-generating and cannot advance the accepted ladder; advancement requires genuinely held-out or forward validation plus strict PI review",
+    "id": "RETROSPECTIVE_REPRODUCTION_R1_FIXED_THREE_SLEEVE_EQUAL_NATIVE",
     "mode": "NATIVE_REQUEST_CONTROL",
     "position_fraction": 1.0,
     "weights": "EQUAL_WEIGHT"

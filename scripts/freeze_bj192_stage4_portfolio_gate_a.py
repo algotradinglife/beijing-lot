@@ -68,6 +68,13 @@ SOURCE_167B = (
 )
 SOURCE_170B = ROOT / "results" / "bj170_gate_b_selector_allocator_stack_v1"
 DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v1"
+SETTLED_IDENTITY_ONLY_PACKAGES = {
+    "bj176_issue_equity_risk_v1",
+    "bj190_gate_b_sparse_divergence_v1",
+    "bj193_gate_b_regime_meta_policy_v2",
+    "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1",
+    "bj170_gate_b_selector_allocator_stack_v1",
+}
 
 EXPECTED_SOURCES = {
     "bj170_gate_a_preoutcome_v2": {
@@ -227,6 +234,19 @@ def verify_source(spec: dict[str, object]) -> dict[str, object]:
         or sha256_file(content_path) != spec["content"]
     ):
         raise RuntimeError(f"source hash drift: {path.name}")
+    identity_only = path.name in SETTLED_IDENTITY_ONLY_PACKAGES
+    if identity_only:
+        # These prior accepted settlement packages are evidence bindings only.
+        # Their identity/manifest documents are safe metadata; deliberately do
+        # not enumerate, open, or hash a single outcome-bearing payload here.
+        return {
+            "package": path.name,
+            "manifest_sha256": spec["manifest"],
+            "content_identity_sha256": spec["content"],
+            "payload_count": "NOT_READ_IDENTITY_BINDING_ONLY",
+            "verification_mode": "SETTLED_IDENTITY_BINDING_ONLY",
+            "role": spec["role"],
+        }
     manifest = json.loads(manifest_path.read_text())
     actual = {
         p.name for p in path.iterdir() if p.is_file() and p.name != "SHA256SUMS.json"
@@ -241,6 +261,7 @@ def verify_source(spec: dict[str, object]) -> dict[str, object]:
         "manifest_sha256": spec["manifest"],
         "content_identity_sha256": spec["content"],
         "payload_count": len(manifest),
+        "verification_mode": "PREOUTCOME_FULL_PAYLOAD_VERIFICATION",
         "role": spec["role"],
     }
 
@@ -698,16 +719,16 @@ def methodology_contract() -> dict[str, object]:
         ],
         "M_rule": "UPSTREAM_FROZEN_FIXED: FULL=2187, MODEL=512, Q=192. No new M scan or post-outcome M choice. FULL is an indivisible whole-native block; partial Q/MODEL funding must use the prefix registry or abstain.",
         "primary_hypothesis": {
-            "id": "H1_STAGE4_FIXED_THREE_SLEEVE_EQUAL_NATIVE",
+            "id": "RETROSPECTIVE_REPRODUCTION_R1_FIXED_THREE_SLEEVE_EQUAL_NATIVE",
             "candidate": "#170 BEST_FULL_FULL + MODEL_SOURCE_MODEL_CAP1_M512 + Q_SOURCE_Q_TOP_MASS_M192",
             "mode": "NATIVE_REQUEST_CONTROL",
             "position_fraction": 1.0,
             "weights": "EQUAL_WEIGHT",
             "comparison": "absolute pre-tax ¥100k path plus matched lift versus B170 BEST_FULL/FULL on exact common support and actual funding convention",
-            "decision": "a positive claim requires paired sequential lower bound >0, all primary support/capital controls, and later independent held-out/forward validation",
+            "decision": "retrospective reproduction only: same-window positive or max-T-adjusted results are hypothesis-generating and cannot advance the accepted ladder; advancement requires genuinely held-out or forward validation plus strict PI review",
         },
         "multiplicity": {
-            "frontier_status": "all non-primary catalog combinations are exploratory/descriptive; raw Pareto or best-cell rank is never Edge evidence",
+            "frontier_status": "the locked three-sleeve retrospective reproduction and every parameter cell are descriptive/hypothesis-generating; raw Pareto or best-cell rank is never Edge evidence",
             "families": [
                 "catalog_sleeve_family",
                 "portfolio_membership",
@@ -716,7 +737,7 @@ def methodology_contract() -> dict[str, object]:
                 "position_fraction",
             ],
             "positive_inference": "20,000 paired stationary-block bootstrap max-T family-wise adjusted lower bounds at alpha=0.05; test all candidate-minus-control lifts within each frozen family",
-            "winner_rule": "screen all cells, but no ladder advancement unless the preregistered H1 or a family-wise adjusted candidate passes strict matched PI review",
+            "winner_rule": "screen all cells, but no same-window result advances the ladder; a future genuinely held-out/forward candidate must pass the frozen family-wise rule and strict matched PI review",
             "negative_rule": "negative/no-promotion results report full frontier and may use proportionate descriptive evidence",
         },
         "sequential_inference": {
@@ -774,7 +795,7 @@ def eligibility_ledger() -> list[dict[str, str]]:
             "identity_source": "identity_freeze.csv.gz + identity_allocation_digest.csv.gz",
             "inherited_M_seed_support": "M fixed by arm; deterministic/no-seed as declared",
             "decision": "ELIGIBLE_COMPLETE_NONREDUNDANT",
-            "frontier_role": "CONFIRMATORY_FIXED_SLEEVE",
+            "frontier_role": "LOCKED_RETROSPECTIVE_REPRODUCTION_SLEEVE",
             "reason": "complete frozen Stage-1→3 selection/direction/ticket trace; exact requested tickets and M bound",
             "outcome_boundary": OUTCOME_BOUNDARY,
         }
@@ -957,10 +978,10 @@ def frontier_contract(eligibility: list[dict[str, str]]) -> dict[str, object]:
             "strongest standalone on its exact support, and equal-weight same sleeves."
         ),
         "screening_rule": (
-            "The full materialized frontier is exploratory except the fixed H1. "
-            "Raw rank, raw Pareto membership or a best descriptive cell cannot be "
-            "reported as Edge; all positive claims require the frozen family-wise "
-            "sequential inference and later independent validation."
+            "The full materialized frontier is retrospective/descriptive. Raw rank, "
+            "raw Pareto membership or a best descriptive cell cannot be reported as "
+            "Edge; a positive same-window result is hypothesis-generating and needs "
+            "genuinely held-out/forward validation before any ladder review."
         ),
         "excluded_source_records": [
             {
@@ -1235,7 +1256,7 @@ def output_schema() -> dict[str, object]:
             ],
             "formulas": [
                 "minimum_bankroll=min(preissue_bankroll,postissue_bankroll) over full 348 calendar",
-                "minimum_required_start is smallest b found by deterministic integer-yuan bisection for zero unfundable non-NO_BET requests under same policy",
+                "minimum_required_start is smallest b found by deterministic integer-yuan bisection only for NATIVE_REQUEST_CONTROL and FIXED_100K_NOTIONAL, whose requested ticket capacities are independent of b; blank/NOT_MONOTONE for COMPOUNDING_BANKROLL",
                 "ruin_flag=1 iff any postissue_bankroll < ¥2 while a positive native request exists",
                 "pre_tax_roi=sum(pre_tax_net)/sum(actual_stake); blank if zero actual stake",
             ],
@@ -1267,12 +1288,19 @@ def output_schema() -> dict[str, object]:
                 "prior_correlation",
                 "downside_correlation",
                 "tail_co_loss_count",
+                "full_calendar_zero_flow_count",
+                "union_active_count",
+                "intersection_active_count",
+                "full_calendar_joint_loss_rate",
+                "union_active_joint_loss_rate",
+                "intersection_active_joint_loss_rate",
                 "concurrent_issue_count",
                 "diversification_attribution_yuan",
             ],
             "formulas": [
-                "downside_correlation=corr(min(r_left,0),min(r_right,0)) over common active returns; blank for <2/nonpositive variance",
-                "tail_co_loss_count=count both returns in their own prior 10% lower tail",
+                "full-calendar denominator is all 348 chronological rows with zero flow retained; union-active has either sleeve actual stake>0; intersection-active has both actual stake>0. Publish all three counts and joint-loss rates; never infer diversification from the intersection alone",
+                "downside_correlation=corr(min(r_left,0),min(r_right,0)) is reported separately for full-calendar-zero-flow, union-active and intersection-active; blank for <2/nonpositive variance",
+                "tail_co_loss_count=count both returns in their own prior 10% lower tail on each declared denominator",
                 "diversification_attribution=portfolio pre-tax net minus sum(weighted matched standalone nets), reported separately from retained cash",
             ],
         },
@@ -1291,9 +1319,15 @@ def output_schema() -> dict[str, object]:
                 "loss_streak_active",
                 "miss_streak_calendar",
                 "miss_streak_active",
-                "rolling_loss_5_yuan",
-                "rolling_loss_10_yuan",
-                "rolling_loss_20_yuan",
+                "rolling_pnl_5_yuan",
+                "rolling_pnl_10_yuan",
+                "rolling_pnl_20_yuan",
+                "rolling_negative_probability_5",
+                "rolling_negative_probability_10",
+                "rolling_negative_probability_20",
+                "worst_rolling_window_id",
+                "worst_rolling_pnl_yuan",
+                "worst_rolling_roi",
                 "ruin_flag",
                 "near_ruin_flag",
                 "sharpe",
@@ -1302,7 +1336,7 @@ def output_schema() -> dict[str, object]:
             ],
             "formulas": [
                 "loss=pre_tax_net<0; miss=actual_stake>0 and pre_tax_gross=0; calendar streak includes zero-flow rows, active streak skips zero-flow rows",
-                "rolling loss W=sum(min(pre_tax_net,0)) over trailing calendar W={5,10,20}; report worst and frequency",
+                "rolling P&L W=sum(pre_tax_net) over every trailing full-calendar W={5,10,20}; report count/total windows with P&L<0, their probability, the worst P&L, its ROI=sum(net)/sum(actual stake), and its chronological window identity. Never discard winning issues inside a window",
                 "drawdown=running equity peak minus postissue bankroll; duration/time-under-water count chronological issues below peak; recovery is first later issue reaching former peak, blank if absent",
                 "near_ruin_flag=1 iff min bankroll < ¥2×max native issue ticket count; sharpe=mean calendar bank return/sample sd×sqrt(issue frequency/year), sortino divides by downside RMS, calmar=annualized compounded bank return/max drawdown fraction; blank where denominator zero",
             ],

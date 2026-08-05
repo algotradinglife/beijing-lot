@@ -55,7 +55,7 @@
     ],
     "formulas": [
       "minimum_bankroll=min(preissue_bankroll,postissue_bankroll) over full 348 calendar",
-      "minimum_required_start is smallest b found by deterministic integer-yuan bisection for zero unfundable non-NO_BET requests under same policy",
+      "minimum_required_start is smallest b found by deterministic integer-yuan bisection only for NATIVE_REQUEST_CONTROL and FIXED_100K_NOTIONAL, whose requested ticket capacities are independent of b; blank/NOT_MONOTONE for COMPOUNDING_BANKROLL",
       "ruin_flag=1 iff any postissue_bankroll < \u00a52 while a positive native request exists",
       "pre_tax_roi=sum(pre_tax_net)/sum(actual_stake); blank if zero actual stake"
     ]
@@ -91,12 +91,19 @@
       "prior_correlation",
       "downside_correlation",
       "tail_co_loss_count",
+      "full_calendar_zero_flow_count",
+      "union_active_count",
+      "intersection_active_count",
+      "full_calendar_joint_loss_rate",
+      "union_active_joint_loss_rate",
+      "intersection_active_joint_loss_rate",
       "concurrent_issue_count",
       "diversification_attribution_yuan"
     ],
     "formulas": [
-      "downside_correlation=corr(min(r_left,0),min(r_right,0)) over common active returns; blank for <2/nonpositive variance",
-      "tail_co_loss_count=count both returns in their own prior 10% lower tail",
+      "full-calendar denominator is all 348 chronological rows with zero flow retained; union-active has either sleeve actual stake>0; intersection-active has both actual stake>0. Publish all three counts and joint-loss rates; never infer diversification from the intersection alone",
+      "downside_correlation=corr(min(r_left,0),min(r_right,0)) is reported separately for full-calendar-zero-flow, union-active and intersection-active; blank for <2/nonpositive variance",
+      "tail_co_loss_count=count both returns in their own prior 10% lower tail on each declared denominator",
       "diversification_attribution=portfolio pre-tax net minus sum(weighted matched standalone nets), reported separately from retained cash"
     ]
   },
@@ -115,9 +122,15 @@
       "loss_streak_active",
       "miss_streak_calendar",
       "miss_streak_active",
-      "rolling_loss_5_yuan",
-      "rolling_loss_10_yuan",
-      "rolling_loss_20_yuan",
+      "rolling_pnl_5_yuan",
+      "rolling_pnl_10_yuan",
+      "rolling_pnl_20_yuan",
+      "rolling_negative_probability_5",
+      "rolling_negative_probability_10",
+      "rolling_negative_probability_20",
+      "worst_rolling_window_id",
+      "worst_rolling_pnl_yuan",
+      "worst_rolling_roi",
       "ruin_flag",
       "near_ruin_flag",
       "sharpe",
@@ -126,7 +139,7 @@
     ],
     "formulas": [
       "loss=pre_tax_net<0; miss=actual_stake>0 and pre_tax_gross=0; calendar streak includes zero-flow rows, active streak skips zero-flow rows",
-      "rolling loss W=sum(min(pre_tax_net,0)) over trailing calendar W={5,10,20}; report worst and frequency",
+      "rolling P&L W=sum(pre_tax_net) over every trailing full-calendar W={5,10,20}; report count/total windows with P&L<0, their probability, the worst P&L, its ROI=sum(net)/sum(actual stake), and its chronological window identity. Never discard winning issues inside a window",
       "drawdown=running equity peak minus postissue bankroll; duration/time-under-water count chronological issues below peak; recovery is first later issue reaching former peak, blank if absent",
       "near_ruin_flag=1 iff min bankroll < \u00a52\u00d7max native issue ticket count; sharpe=mean calendar bank return/sample sd\u00d7sqrt(issue frequency/year), sortino divides by downside RMS, calmar=annualized compounded bank return/max drawdown fraction; blank where denominator zero"
     ]

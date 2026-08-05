@@ -32,7 +32,10 @@ def test_frozen_source_hashes_and_fixed_primary_catalog():
     assert m.BOOTSTRAP_REPLICATES == 20_000
     for spec in m.EXPECTED_SOURCES.values():
         bound = m.verify_source(spec)
-        assert bound["payload_count"] > 0
+        if spec["path"].name in m.SETTLED_IDENTITY_ONLY_PACKAGES:
+            assert bound["payload_count"] == "NOT_READ_IDENTITY_BINDING_ONLY"
+        else:
+            assert bound["payload_count"] > 0
     assert {x["path"].name for x in m.EXPECTED_SOURCES.values()} >= {
         "bj170_gate_a_preoutcome_v2",
         "bj137_gate_a_preoutcome_v2",
@@ -47,6 +50,29 @@ def test_frozen_source_hashes_and_fixed_primary_catalog():
         "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1",
         "bj170_gate_b_selector_allocator_stack_v1",
     }
+
+
+def test_settled_sources_are_identity_only_and_never_open_payloads(monkeypatch):
+    m = module()
+    original = m.sha256_file
+    opened = []
+
+    def tracked(path):
+        opened.append(path)
+        return original(path)
+
+    monkeypatch.setattr(m, "sha256_file", tracked)
+    for spec in m.EXPECTED_SOURCES.values():
+        bound = m.verify_source(spec)
+        if spec["path"].name in m.SETTLED_IDENTITY_ONLY_PACKAGES:
+            assert bound["verification_mode"] == "SETTLED_IDENTITY_BINDING_ONLY"
+    payload_paths = [
+        path
+        for path in opened
+        if path.parent.name in m.SETTLED_IDENTITY_ONLY_PACKAGES
+        and path.name not in {"SHA256SUMS.json", "CONTENT_IDENTITY.json"}
+    ]
+    assert not payload_paths
 
 
 def test_source_rows_use_full_calendar_and_separate_strict_common_view():
