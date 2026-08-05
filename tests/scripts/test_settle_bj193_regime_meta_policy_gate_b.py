@@ -6,6 +6,7 @@ import hashlib
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -27,6 +28,101 @@ R = load(
     ROOT / "scripts" / "settle_bj193_regime_meta_policy_gate_b.py",
 )
 V2 = load("bj193_chain_v2_test", ROOT / "scripts" / "bj193_chain_gate_b_v2.py")
+
+
+def test_path_receipts_use_deterministic_union_schema(tmp_path):
+    store = SimpleNamespace(
+        action_rows=[{"interface_action_key": "STATIC"}],
+        issues=[
+            {
+                "issue": "1",
+                "issue_instance": "1@TEST_2021",
+                "feature_cutoff_ts": "2021-01-01T00:00:00Z",
+            }
+        ],
+    )
+
+    def make_path(stage, model_receipt, screen_receipt):
+        return V2.StagePath(
+            stage=stage,
+            choices=np.asarray([0], dtype=np.int32),
+            model_by_issue=["MODEL"],
+            fallback_by_issue=np.asarray([False]),
+            model_receipts=[model_receipt],
+            screen_receipts=[screen_receipt],
+        )
+
+    paths = {
+        "stage1": (
+            make_path(
+                "STAGE_1_SELECTION",
+                {"outer_fold": "A", "selected_family": "PRIOR_ONLY_FIXED"},
+                {"outer_fold": "A", "screen_phase": "OUTER_TRAIN"},
+            ),
+            store,
+        ),
+        "stage2": (
+            make_path(
+                "STAGE_2_DIRECTION",
+                {
+                    "outer_fold": "B",
+                    "selected_family": "SHALLOW_TREE",
+                    "inner_train_issue_count": 20,
+                    "inner_validation_issue_count": 5,
+                },
+                {
+                    "outer_fold": "B",
+                    "screen_phase": "INNER_TRAIN",
+                    "eligible_action_count": 3,
+                },
+            ),
+            store,
+        ),
+        "stage3": (
+            make_path(
+                "STAGE_3_BET",
+                {
+                    "outer_fold": "C",
+                    "selected_family": "NEAREST_HISTORICAL_REGIME",
+                    "inner_screen_action_count": 3,
+                    "validation_pre_tax_roi": 0.125,
+                },
+                {"outer_fold": "C", "screen_phase": "INNER_VALIDATION"},
+            ),
+            store,
+        ),
+    }
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    R._write_path_receipts(first, paths)
+    R._write_path_receipts(second, paths)
+
+    model_rows = R.read_csv(first / "stage_model_receipts.csv")
+    assert list(model_rows[0]) == [
+        "path_name",
+        "inner_screen_action_count",
+        "inner_train_issue_count",
+        "inner_validation_issue_count",
+        "outer_fold",
+        "selected_family",
+        "validation_pre_tax_roi",
+    ]
+    assert model_rows[0]["inner_train_issue_count"] == ""
+    assert model_rows[2]["validation_pre_tax_roi"] == "0.125"
+    screen_rows = R.read_csv(first / "stage_screen_receipts.csv.gz")
+    assert list(screen_rows[0]) == [
+        "path_name",
+        "eligible_action_count",
+        "outer_fold",
+        "screen_phase",
+    ]
+    assert screen_rows[0]["eligible_action_count"] == ""
+    assert screen_rows[1]["eligible_action_count"] == "3"
+    for path in first.iterdir():
+        assert path.read_bytes() == (second / path.name).read_bytes()
+    assert R.receipt_fields(list(reversed(model_rows))) == list(model_rows[0])
 
 
 def test_selector_screen_uses_roi_support_stake_and_lexical_ties():

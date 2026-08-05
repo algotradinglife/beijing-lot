@@ -170,7 +170,7 @@ def read_csv(path: Path) -> list[dict[str, str]]:
 
 def write_csv(path: Path, fields: Sequence[str], rows: Iterable[dict]) -> None:
     with path.open("w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer = csv.DictWriter(handle, fieldnames=fields, restval="")
         writer.writeheader()
         writer.writerows(rows)
 
@@ -182,10 +182,19 @@ def write_gzip(path: Path, fields: Sequence[str], rows: Iterable[dict]) -> None:
         ) as binary:
             with __import__("io").TextIOWrapper(binary, newline="") as handle:
                 writer = csv.DictWriter(
-                    handle, fieldnames=fields, lineterminator="\n"
+                    handle, fieldnames=fields, restval="", lineterminator="\n"
                 )
                 writer.writeheader()
                 writer.writerows(rows)
+
+
+def receipt_fields(rows: Sequence[Mapping[str, object]]) -> list[str]:
+    """Return a row-order-independent schema for heterogeneous receipts."""
+
+    fields = {field for row in rows for field in row}
+    return (["path_name"] if "path_name" in fields else []) + sorted(
+        fields - {"path_name"}
+    )
 
 
 def science_cells() -> list[tuple[str, str, str, str, str]]:
@@ -769,13 +778,13 @@ def _write_path_receipts(
     if model_rows:
         write_csv(
             stage / "stage_model_receipts.csv",
-            list(model_rows[0]),
+            receipt_fields(model_rows),
             model_rows,
         )
     if screen_rows:
         write_gzip(
             stage / "stage_screen_receipts.csv.gz",
-            list(screen_rows[0]),
+            receipt_fields(screen_rows),
             screen_rows,
         )
 
