@@ -1,0 +1,810 @@
+{
+  "assertions": {
+    "distinct_delete_stake_yuan": 1944,
+    "distinct_delete_ticket_count": 972,
+    "missing_status": "UNAVAILABLE",
+    "missing_ticket_count": 0,
+    "native_p_ticket_count": 1458,
+    "native_q_ticket_count": 1458,
+    "same_code_reason": "STRUCTURAL_DELETE_ALREADY_ABSENT",
+    "same_code_ticket_count": 1458,
+    "tie_delete_code": "3",
+    "tie_delete_leg_index_zero_based": 0
+  },
+  "composition": {
+    "distinct_additional_delete": {
+      "adapter_version": "bj193-structural-delete-adapter-v2.1",
+      "code_ranking_value": "0.236178436400",
+      "delete_code": "0",
+      "delete_code_index_zero_based": 2,
+      "delete_leg_index_zero_based": 6,
+      "delete_match_id": "90520",
+      "derived_stage3_action_sha256": "e073b7992c5b21161145cf02ee4b2dfe9ae9505db5cb8152b53a571301818bf7",
+      "issue": "190101",
+      "mechanism": "P_MIN_GLOBAL_DELETE",
+      "native_M": 1458,
+      "ordered_match_ids": [
+        "90503",
+        "90500",
+        "90501",
+        "90505",
+        "90497",
+        "90496",
+        "90520"
+      ],
+      "per_match": [
+        {
+          "allowed_codes": [
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.000000000000",
+            "0.583333333333",
+            "0.416666666667"
+          ],
+          "leg_index_zero_based": 0,
+          "match_id": "90503",
+          "structural_registry_row_sha256": "07aad8cc5c186f2c306c2be24b618570ea4740deaa58adaa5f3d7a864ceaa04f"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 1,
+          "match_id": "90500",
+          "structural_registry_row_sha256": "f923b72ba3b544700a4dc8f0384915fafdc3242e66c6ab7229efa3e132264aed"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 2,
+          "match_id": "90501",
+          "structural_registry_row_sha256": "7e0bb83b8618bf42de8cd1ddde8b1f5c6a8642d7a59c1217251671c527021dc4"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 3,
+          "match_id": "90505",
+          "structural_registry_row_sha256": "8f8cde110302dd1206e55e56db843ae23191bc31fcc0ed4c15bccb6b5cc1afac"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 4,
+          "match_id": "90497",
+          "structural_registry_row_sha256": "7e21462184608baf3c2fa5c3a79dbce176c004da39d55055269ed47438abda11"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 5,
+          "match_id": "90496",
+          "structural_registry_row_sha256": "469685e4a5348cdefcb29f74e146203fe1029c96f594a657464e4a8c20fc67de"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1"
+          ],
+          "final_weight_3_1_0": [
+            "0.533333333333",
+            "0.466666666667",
+            "0.000000000000"
+          ],
+          "leg_index_zero_based": 6,
+          "match_id": "90520",
+          "structural_registry_row_sha256": "2b8222ad91b70d9d252284950cf3098f7dbd91c54742ea2156d88b2826ff96c9"
+        }
+      ],
+      "ranking_value": "0.236178436400",
+      "reason_code": "STRUCTURAL_DELETE_ADDITIONAL_ZERO_MASK",
+      "repeat_mode": "P_MIN_GLOBAL_DELETE",
+      "replicate_mode": "DETERMINISTIC_SINGLETON",
+      "requested_stake_yuan": 1944,
+      "requested_ticket_count": 972,
+      "stage1_output_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "stage2_output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "stage3_replay_signature_sha256": "107ea06b257868f2a5e5b20b4828ac4f5d38a7807426f63cf322686d7e17a1e9",
+      "status": "ACTIVE",
+      "ticket_ordinal_set_sha256": "52b5118c4a02036bac8ffcb6fba46792b6630a8d6772c7f3f7e44492155531e8",
+      "tie_rule": "P=(p_min,leg_index)->(model_p,code_index); Q=(q_weight,leg_index,code_index); code order 3,1,0",
+      "weight_source": "NA"
+    },
+    "missing_registry_row": {
+      "adapter_version": "bj193-structural-delete-adapter-v2.1",
+      "derived_stage3_action_sha256": "a1db40b9bab3efe54d57904878cf5d5498c5d02e9c928c022fb914e3d670b0c9",
+      "issue": "190101",
+      "mechanism": "Q_MIN_GLOBAL_DELETE",
+      "native_M": 1458,
+      "ordered_match_ids": [
+        "90503",
+        "90500",
+        "90501",
+        "90505",
+        "90497",
+        "90496",
+        "90520"
+      ],
+      "per_match": [],
+      "reason_code": "STRUCTURAL_REGISTRY_ROW_MISSING",
+      "repeat_mode": "Q_MIN_GLOBAL_DELETE",
+      "replicate_mode": "DETERMINISTIC_SINGLETON",
+      "requested_stake_yuan": 0,
+      "requested_ticket_count": 0,
+      "stage1_output_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "stage2_output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "stage3_replay_signature_sha256": "d3cc3e821c61e6e3dd71954860b9a331beed5467f4832954cede55d80585f856",
+      "status": "UNAVAILABLE",
+      "ticket_ordinal_set_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "weight_source": "NA"
+    },
+    "same_code_already_absent": {
+      "adapter_version": "bj193-structural-delete-adapter-v2.1",
+      "code_ranking_value": "0.236178436400",
+      "delete_code": "0",
+      "delete_code_index_zero_based": 2,
+      "delete_leg_index_zero_based": 6,
+      "delete_match_id": "90520",
+      "derived_stage3_action_sha256": "e073b7992c5b21161145cf02ee4b2dfe9ae9505db5cb8152b53a571301818bf7",
+      "issue": "190101",
+      "mechanism": "P_MIN_GLOBAL_DELETE",
+      "native_M": 1458,
+      "ordered_match_ids": [
+        "90503",
+        "90500",
+        "90501",
+        "90505",
+        "90497",
+        "90496",
+        "90520"
+      ],
+      "per_match": [
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 0,
+          "match_id": "90503",
+          "structural_registry_row_sha256": "07aad8cc5c186f2c306c2be24b618570ea4740deaa58adaa5f3d7a864ceaa04f"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 1,
+          "match_id": "90500",
+          "structural_registry_row_sha256": "f923b72ba3b544700a4dc8f0384915fafdc3242e66c6ab7229efa3e132264aed"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 2,
+          "match_id": "90501",
+          "structural_registry_row_sha256": "7e0bb83b8618bf42de8cd1ddde8b1f5c6a8642d7a59c1217251671c527021dc4"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 3,
+          "match_id": "90505",
+          "structural_registry_row_sha256": "8f8cde110302dd1206e55e56db843ae23191bc31fcc0ed4c15bccb6b5cc1afac"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 4,
+          "match_id": "90497",
+          "structural_registry_row_sha256": "7e21462184608baf3c2fa5c3a79dbce176c004da39d55055269ed47438abda11"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 5,
+          "match_id": "90496",
+          "structural_registry_row_sha256": "469685e4a5348cdefcb29f74e146203fe1029c96f594a657464e4a8c20fc67de"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1"
+          ],
+          "final_weight_3_1_0": [
+            "0.533333333333",
+            "0.466666666667",
+            "0.000000000000"
+          ],
+          "leg_index_zero_based": 6,
+          "match_id": "90520",
+          "structural_registry_row_sha256": "2b8222ad91b70d9d252284950cf3098f7dbd91c54742ea2156d88b2826ff96c9"
+        }
+      ],
+      "ranking_value": "0.236178436400",
+      "reason_code": "STRUCTURAL_DELETE_ALREADY_ABSENT",
+      "repeat_mode": "P_MIN_GLOBAL_DELETE",
+      "replicate_mode": "DETERMINISTIC_SINGLETON",
+      "requested_stake_yuan": 2916,
+      "requested_ticket_count": 1458,
+      "stage1_output_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "stage2_output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "stage3_replay_signature_sha256": "f4a053ca8a4f48cb8fbf4bddb15a6e4f125590dda68bbadb4e8829a155fa2af7",
+      "status": "ACTIVE",
+      "ticket_ordinal_set_sha256": "bd3a4e775a0bf134efb4b2f3964361407943da6b5550db4d03a4ba5f33d54f0b",
+      "tie_rule": "P=(p_min,leg_index)->(model_p,code_index); Q=(q_weight,leg_index,code_index); code order 3,1,0",
+      "weight_source": "NA"
+    }
+  },
+  "contract": "BJ193_STRUCTURAL_DELETE_GOLDEN_VECTORS_V2_1",
+  "native_137_anchor": {
+    "accepted_p_delete": {
+      "code_ranking_value": "0.236178436400",
+      "delete_code": "0",
+      "delete_code_index_zero_based": 2,
+      "delete_leg_index_zero_based": 6,
+      "delete_match_id": "90520",
+      "mechanism": "P_MIN_GLOBAL_DELETE",
+      "ranking_value": "0.236178436400",
+      "tie_rule": "P=(p_min,leg_index)->(model_p,code_index); Q=(q_weight,leg_index,code_index); code order 3,1,0"
+    },
+    "accepted_q_delete": {
+      "code_ranking_value": "0.333333333333",
+      "delete_code": "3",
+      "delete_code_index_zero_based": 0,
+      "delete_leg_index_zero_based": 0,
+      "delete_match_id": "90503",
+      "mechanism": "Q_MIN_GLOBAL_DELETE",
+      "ranking_value": "0.333333333333",
+      "tie_rule": "P=(p_min,leg_index)->(model_p,code_index); Q=(q_weight,leg_index,code_index); code order 3,1,0"
+    },
+    "fold": "OOS_2019",
+    "issue": "190101",
+    "ordered_match_ids": [
+      "90503",
+      "90500",
+      "90501",
+      "90505",
+      "90497",
+      "90496",
+      "90520"
+    ],
+    "p_replay": {
+      "adapter_version": "bj193-structural-delete-adapter-v2.1",
+      "code_ranking_value": "0.236178436400",
+      "delete_code": "0",
+      "delete_code_index_zero_based": 2,
+      "delete_leg_index_zero_based": 6,
+      "delete_match_id": "90520",
+      "derived_stage3_action_sha256": "e073b7992c5b21161145cf02ee4b2dfe9ae9505db5cb8152b53a571301818bf7",
+      "issue": "190101",
+      "mechanism": "P_MIN_GLOBAL_DELETE",
+      "native_M": 1458,
+      "ordered_match_ids": [
+        "90503",
+        "90500",
+        "90501",
+        "90505",
+        "90497",
+        "90496",
+        "90520"
+      ],
+      "per_match": [
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 0,
+          "match_id": "90503",
+          "structural_registry_row_sha256": "07aad8cc5c186f2c306c2be24b618570ea4740deaa58adaa5f3d7a864ceaa04f"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 1,
+          "match_id": "90500",
+          "structural_registry_row_sha256": "f923b72ba3b544700a4dc8f0384915fafdc3242e66c6ab7229efa3e132264aed"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 2,
+          "match_id": "90501",
+          "structural_registry_row_sha256": "7e0bb83b8618bf42de8cd1ddde8b1f5c6a8642d7a59c1217251671c527021dc4"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 3,
+          "match_id": "90505",
+          "structural_registry_row_sha256": "8f8cde110302dd1206e55e56db843ae23191bc31fcc0ed4c15bccb6b5cc1afac"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 4,
+          "match_id": "90497",
+          "structural_registry_row_sha256": "7e21462184608baf3c2fa5c3a79dbce176c004da39d55055269ed47438abda11"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 5,
+          "match_id": "90496",
+          "structural_registry_row_sha256": "469685e4a5348cdefcb29f74e146203fe1029c96f594a657464e4a8c20fc67de"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1"
+          ],
+          "final_weight_3_1_0": [
+            "0.533333333333",
+            "0.466666666667",
+            "0.000000000000"
+          ],
+          "leg_index_zero_based": 6,
+          "match_id": "90520",
+          "structural_registry_row_sha256": "2b8222ad91b70d9d252284950cf3098f7dbd91c54742ea2156d88b2826ff96c9"
+        }
+      ],
+      "ranking_value": "0.236178436400",
+      "reason_code": "STRUCTURAL_DELETE_ADDITIONAL_ZERO_MASK",
+      "repeat_mode": "P_MIN_GLOBAL_DELETE",
+      "replicate_mode": "DETERMINISTIC_SINGLETON",
+      "requested_stake_yuan": 2916,
+      "requested_ticket_count": 1458,
+      "stage1_output_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "stage2_output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "stage3_replay_signature_sha256": "bd10c0acf92916f927dde2d98b6f3d67c093e28d2c8059a3e106a301c8e97b38",
+      "status": "ACTIVE",
+      "ticket_ordinal_set_sha256": "bd3a4e775a0bf134efb4b2f3964361407943da6b5550db4d03a4ba5f33d54f0b",
+      "tie_rule": "P=(p_min,leg_index)->(model_p,code_index); Q=(q_weight,leg_index,code_index); code order 3,1,0",
+      "weight_source": "NA"
+    },
+    "portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+    "q_replay": {
+      "adapter_version": "bj193-structural-delete-adapter-v2.1",
+      "code_ranking_value": "0.333333333333",
+      "delete_code": "3",
+      "delete_code_index_zero_based": 0,
+      "delete_leg_index_zero_based": 0,
+      "delete_match_id": "90503",
+      "derived_stage3_action_sha256": "a1db40b9bab3efe54d57904878cf5d5498c5d02e9c928c022fb914e3d670b0c9",
+      "issue": "190101",
+      "mechanism": "Q_MIN_GLOBAL_DELETE",
+      "native_M": 1458,
+      "ordered_match_ids": [
+        "90503",
+        "90500",
+        "90501",
+        "90505",
+        "90497",
+        "90496",
+        "90520"
+      ],
+      "per_match": [
+        {
+          "allowed_codes": [
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.000000000000",
+            "0.583333333333",
+            "0.416666666667"
+          ],
+          "leg_index_zero_based": 0,
+          "match_id": "90503",
+          "structural_registry_row_sha256": "07aad8cc5c186f2c306c2be24b618570ea4740deaa58adaa5f3d7a864ceaa04f"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 1,
+          "match_id": "90500",
+          "structural_registry_row_sha256": "f923b72ba3b544700a4dc8f0384915fafdc3242e66c6ab7229efa3e132264aed"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 2,
+          "match_id": "90501",
+          "structural_registry_row_sha256": "7e0bb83b8618bf42de8cd1ddde8b1f5c6a8642d7a59c1217251671c527021dc4"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 3,
+          "match_id": "90505",
+          "structural_registry_row_sha256": "8f8cde110302dd1206e55e56db843ae23191bc31fcc0ed4c15bccb6b5cc1afac"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 4,
+          "match_id": "90497",
+          "structural_registry_row_sha256": "7e21462184608baf3c2fa5c3a79dbce176c004da39d55055269ed47438abda11"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 5,
+          "match_id": "90496",
+          "structural_registry_row_sha256": "469685e4a5348cdefcb29f74e146203fe1029c96f594a657464e4a8c20fc67de"
+        },
+        {
+          "allowed_codes": [
+            "3",
+            "1",
+            "0"
+          ],
+          "final_weight_3_1_0": [
+            "0.400000000000",
+            "0.350000000000",
+            "0.250000000000"
+          ],
+          "leg_index_zero_based": 6,
+          "match_id": "90520",
+          "structural_registry_row_sha256": "2b8222ad91b70d9d252284950cf3098f7dbd91c54742ea2156d88b2826ff96c9"
+        }
+      ],
+      "ranking_value": "0.333333333333",
+      "reason_code": "STRUCTURAL_DELETE_ADDITIONAL_ZERO_MASK",
+      "repeat_mode": "Q_MIN_GLOBAL_DELETE",
+      "replicate_mode": "DETERMINISTIC_SINGLETON",
+      "requested_stake_yuan": 2916,
+      "requested_ticket_count": 1458,
+      "stage1_output_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "stage2_output_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "stage3_replay_signature_sha256": "6b36058bbe50c1c69bdd306ca4e8c92b8af01e8fc8d578b7787438ee61b76cea",
+      "status": "ACTIVE",
+      "ticket_ordinal_set_sha256": "5bf902434dcd23e338215f667d3c862e7a4600611244a4d6d17e3a0415fb14b7",
+      "tie_rule": "P=(p_min,leg_index)->(model_p,code_index); Q=(q_weight,leg_index,code_index); code order 3,1,0",
+      "weight_source": "NA"
+    }
+  },
+  "outcome_boundary": "Gate A outcome-unexposed: no result, final/winning SP, payout, tax realization, ROI, settlement, or post-cutoff evidence is read or emitted",
+  "tie_fixture": {
+    "expected_p": {
+      "code_ranking_value": "0.200000000000",
+      "delete_code": "3",
+      "delete_code_index_zero_based": 0,
+      "delete_leg_index_zero_based": 0,
+      "delete_match_id": "900000",
+      "mechanism": "P_MIN_GLOBAL_DELETE",
+      "ranking_value": "0.100000000000",
+      "tie_rule": "P=(p_min,leg_index)->(model_p,code_index); Q=(q_weight,leg_index,code_index); code order 3,1,0"
+    },
+    "expected_q": {
+      "code_ranking_value": "0.300000000000",
+      "delete_code": "3",
+      "delete_code_index_zero_based": 0,
+      "delete_leg_index_zero_based": 0,
+      "delete_match_id": "900000",
+      "mechanism": "Q_MIN_GLOBAL_DELETE",
+      "ranking_value": "0.300000000000",
+      "tie_rule": "P=(p_min,leg_index)->(model_p,code_index); Q=(q_weight,leg_index,code_index); code order 3,1,0"
+    },
+    "rows": [
+      {
+        "fold": "OOS_TEST",
+        "issue": "999999",
+        "issue_instance": "999999@OOS_TEST",
+        "kickoff_ts": "2099-01-01 00:00:00",
+        "match_id": "900000",
+        "match_idx": "0",
+        "p_min": "0.1",
+        "p_model0": "0.2",
+        "p_model1": "0.2",
+        "p_model3": "0.2",
+        "q_weight0": "0.3",
+        "q_weight1": "0.3",
+        "q_weight3": "0.3",
+        "registry_kind": "BJ137_COMPLETE_STRUCTURAL_DELETE_REGISTRY_V2_1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "structural_registry_row_sha256": "c603bf2d318c966c0883b572d3c671ef7df9d5438aba78e1ed29b5d53b9e6b6a",
+        "year": "2099"
+      },
+      {
+        "fold": "OOS_TEST",
+        "issue": "999999",
+        "issue_instance": "999999@OOS_TEST",
+        "kickoff_ts": "2099-01-01 01:00:00",
+        "match_id": "900001",
+        "match_idx": "1",
+        "p_min": "0.1",
+        "p_model0": "0.2",
+        "p_model1": "0.2",
+        "p_model3": "0.2",
+        "q_weight0": "0.3",
+        "q_weight1": "0.3",
+        "q_weight3": "0.3",
+        "registry_kind": "BJ137_COMPLETE_STRUCTURAL_DELETE_REGISTRY_V2_1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "structural_registry_row_sha256": "d723276d4440344a4a84fb3b872f6185cf659e73e440ade04e7aa4769be0f190",
+        "year": "2099"
+      },
+      {
+        "fold": "OOS_TEST",
+        "issue": "999999",
+        "issue_instance": "999999@OOS_TEST",
+        "kickoff_ts": "2099-01-01 02:00:00",
+        "match_id": "900002",
+        "match_idx": "2",
+        "p_min": "0.1",
+        "p_model0": "0.2",
+        "p_model1": "0.2",
+        "p_model3": "0.2",
+        "q_weight0": "0.3",
+        "q_weight1": "0.3",
+        "q_weight3": "0.3",
+        "registry_kind": "BJ137_COMPLETE_STRUCTURAL_DELETE_REGISTRY_V2_1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "structural_registry_row_sha256": "a69833c238663c7c7c147c0eee145c8c9daf564bfd4c4ef059d6ced984abed52",
+        "year": "2099"
+      },
+      {
+        "fold": "OOS_TEST",
+        "issue": "999999",
+        "issue_instance": "999999@OOS_TEST",
+        "kickoff_ts": "2099-01-01 03:00:00",
+        "match_id": "900003",
+        "match_idx": "3",
+        "p_min": "0.1",
+        "p_model0": "0.2",
+        "p_model1": "0.2",
+        "p_model3": "0.2",
+        "q_weight0": "0.3",
+        "q_weight1": "0.3",
+        "q_weight3": "0.3",
+        "registry_kind": "BJ137_COMPLETE_STRUCTURAL_DELETE_REGISTRY_V2_1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "structural_registry_row_sha256": "9a6cab43702993a3345781a4a57b62219f43628920327d7d19fc77148235279a",
+        "year": "2099"
+      },
+      {
+        "fold": "OOS_TEST",
+        "issue": "999999",
+        "issue_instance": "999999@OOS_TEST",
+        "kickoff_ts": "2099-01-01 04:00:00",
+        "match_id": "900004",
+        "match_idx": "4",
+        "p_min": "0.1",
+        "p_model0": "0.2",
+        "p_model1": "0.2",
+        "p_model3": "0.2",
+        "q_weight0": "0.3",
+        "q_weight1": "0.3",
+        "q_weight3": "0.3",
+        "registry_kind": "BJ137_COMPLETE_STRUCTURAL_DELETE_REGISTRY_V2_1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "structural_registry_row_sha256": "0189bc0793876678761457cd5b39f41bef78b41a35e9426fdff1a0603d9dbcc9",
+        "year": "2099"
+      },
+      {
+        "fold": "OOS_TEST",
+        "issue": "999999",
+        "issue_instance": "999999@OOS_TEST",
+        "kickoff_ts": "2099-01-01 05:00:00",
+        "match_id": "900005",
+        "match_idx": "5",
+        "p_min": "0.1",
+        "p_model0": "0.2",
+        "p_model1": "0.2",
+        "p_model3": "0.2",
+        "q_weight0": "0.3",
+        "q_weight1": "0.3",
+        "q_weight3": "0.3",
+        "registry_kind": "BJ137_COMPLETE_STRUCTURAL_DELETE_REGISTRY_V2_1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "structural_registry_row_sha256": "fa91e1619db169157747d58878a1454de12f9f19ae2f760e68c586609efb7fd3",
+        "year": "2099"
+      },
+      {
+        "fold": "OOS_TEST",
+        "issue": "999999",
+        "issue_instance": "999999@OOS_TEST",
+        "kickoff_ts": "2099-01-01 06:00:00",
+        "match_id": "900006",
+        "match_idx": "6",
+        "p_min": "0.1",
+        "p_model0": "0.2",
+        "p_model1": "0.2",
+        "p_model3": "0.2",
+        "q_weight0": "0.3",
+        "q_weight1": "0.3",
+        "q_weight3": "0.3",
+        "registry_kind": "BJ137_COMPLETE_STRUCTURAL_DELETE_REGISTRY_V2_1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "structural_registry_row_sha256": "2d5403c22298099e3703aebc7b6e03f0afa2c38b32d61ddfd10f546f30ac85bf",
+        "year": "2099"
+      }
+    ]
+  }
+}

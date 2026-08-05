@@ -1,0 +1,18 @@
+{
+  "CONTENT_IDENTITY.json": "11598d3ae6c70285a63b27ace4f82f6e5a0afc94ed7ee1d539aa53389484c100",
+  "PORTABLE_SHA256SUMS.json": "fd25ac8c076f6161a5e8fdb04a687b9503bb66ac2669c4c2ea90e846bc64e331",
+  "README.md": "0131d2763cf86d3f0f03437411518eba37cb186e91994a5388071fd523f999e8",
+  "freeze_runner.py": "0e30084cc34710b83992b2c54a56bac07e2bb3ccdc832f219ec6a6278de2af3a",
+  "gate_a_card.json": "54fda0d81e8fa7648a310a48fc0bcbfcb18e2838adf4fc8c5ce0a974bff49fa8",
+  "lineage_binding.json": "09e1e3ad8e6b1641fd3ef6f9c97e303157a67b0768a8be6d0a6b88bd0b83f157",
+  "native_137_structural_delete_reconciliation.json": "defb9b5428868f08fd17ebf37f133e1c169663b889a96a88528e2dec81abe567",
+  "runtime_transport_binding.json": "40a39f056af2ac06c4d29129deefa185fbe978ff6096326db2b3e8db17066929",
+  "source_binding.json": "0bf80adca2e7d8f3a60a525db70525cf225a24300bfcc460057d9f29f9710795",
+  "stage1_stage3_compatibility_contract_v21.json": "c314522d4b7454fac180475355f71f7a27ee10d5be85a87e52b8cd8e3cf5aa4e",
+  "stage1_stage3_coverage_registry_v21.csv.gz": "55b92208000b7dd98233389e0658458fef308cc527ced72c02f7f8008df77e95",
+  "stage3_compatibility_class_registry_v21.csv": "d45066048c097932757c8a4f86f57098babcf1d054b13afaf6de77030b3ebe42",
+  "stage3_complete_structural_delete_registry.csv.gz": "ae3010f3ee016ed05edb7113803b6512e445d6d7afbea54b2b53ebce58e64901",
+  "stage3_effective_compatibility_mapping_v21.csv.gz": "8c37796d1d22d606a493072e8e43e73d3f0e82935336e4e2e44403e8e970151b",
+  "structural_delete_adapter.py": "06361afeaef3fd260399df07fdd0c90a893701aea5d212aef04f5f9e0993afbc",
+  "structural_delete_golden_vectors.json": "57ea85a165e894863a0dcbc8211eb5a3d47e2d0c4a0226b4cb54eeaaa9bbf0f3"
+}

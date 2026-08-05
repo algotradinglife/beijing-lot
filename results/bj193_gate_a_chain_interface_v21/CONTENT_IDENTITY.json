@@ -1,0 +1,33 @@
+{
+  "contract": "BJ-HIST-N7-REGIME-META-POLICY-001",
+  "controls": {
+    "actions": 963,
+    "classes": 8,
+    "coverage_rows": 19752,
+    "native_portfolios": 71704,
+    "outcome_access": false,
+    "pairs": 2377647,
+    "registry_rows": 47819,
+    "v2_content_identity_sha256": "a5f274f92edbff194be9ce60fa707196d20d255b608b08bf22c3f0d924bb7425",
+    "v2_manifest_sha256": "6a44f4b1b355f5476328424bc8d92271d61d585643d40ca42bb56ffda1c43933",
+    "v2_portable_manifest_sha256": "2bd83000fabf0a4817a31964a02c881562489651cc98143c716aa09ac8dd92bd"
+  },
+  "identity_rule": "SHA-256 over canonical decompressed .gz payload bytes and raw bytes otherwise; runtime/identity/manifest files excluded",
+  "portable_manifest_sha256": "fd25ac8c076f6161a5e8fdb04a687b9503bb66ac2669c4c2ea90e846bc64e331",
+  "portable_payloads": {
+    "README.md": "0131d2763cf86d3f0f03437411518eba37cb186e91994a5388071fd523f999e8",
+    "freeze_runner.py": "0e30084cc34710b83992b2c54a56bac07e2bb3ccdc832f219ec6a6278de2af3a",
+    "gate_a_card.json": "54fda0d81e8fa7648a310a48fc0bcbfcb18e2838adf4fc8c5ce0a974bff49fa8",
+    "lineage_binding.json": "09e1e3ad8e6b1641fd3ef6f9c97e303157a67b0768a8be6d0a6b88bd0b83f157",
+    "native_137_structural_delete_reconciliation.json": "defb9b5428868f08fd17ebf37f133e1c169663b889a96a88528e2dec81abe567",
+    "source_binding.json": "0bf80adca2e7d8f3a60a525db70525cf225a24300bfcc460057d9f29f9710795",
+    "stage1_stage3_compatibility_contract_v21.json": "c314522d4b7454fac180475355f71f7a27ee10d5be85a87e52b8cd8e3cf5aa4e",
+    "stage1_stage3_coverage_registry_v21.csv.gz": "f511f67fd6838bff67ee805f76238a81203e41cd5a88d5bdad657d14d9a004a8",
+    "stage3_compatibility_class_registry_v21.csv": "d45066048c097932757c8a4f86f57098babcf1d054b13afaf6de77030b3ebe42",
+    "stage3_complete_structural_delete_registry.csv.gz": "a7db8d483ed2217ae5d09807c2582551ecd92d980091a72d0b14612ea77abf44",
+    "stage3_effective_compatibility_mapping_v21.csv.gz": "7d4e2c079eade236dc2dee085859ce47f3e117cbedd9b646cba4ee332c6e8e0d",
+    "structural_delete_adapter.py": "06361afeaef3fd260399df07fdd0c90a893701aea5d212aef04f5f9e0993afbc",
+    "structural_delete_golden_vectors.json": "57ea85a165e894863a0dcbc8211eb5a3d47e2d0c4a0226b4cb54eeaaa9bbf0f3"
+  },
+  "version": "bj193-gate-a-chain-interface-v2.1"
+}
