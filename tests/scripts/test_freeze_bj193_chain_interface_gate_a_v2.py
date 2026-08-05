@@ -4,6 +4,7 @@ import csv
 import gzip
 import hashlib
 import importlib.util
+import inspect
 import json
 import sys
 from pathlib import Path
@@ -208,8 +209,13 @@ def test_conditional_builder_executes_all_golden_mechanisms_and_zero_flow_edges(
             spec["per_match_weight_3_1_0"],
             spec["M"],
             allocation_engine=engine,
+            issue=spec["issue"],
+            stage1_output_sha256=spec["stage1_output_sha256"],
+            stage2_output_sha256=spec["stage2_output_sha256"],
+            derived_stage3_action_sha256=spec[
+                "derived_stage3_action_sha256"
+            ],
             seed=spec["seed"],
-            identity_signature=spec["identity_signature"],
             cap=spec["cap"],
         )
         comparable = {key: value for key, value in result.items() if key != "counts"}
@@ -234,6 +240,50 @@ def test_conditional_builder_executes_all_golden_mechanisms_and_zero_flow_edges(
     assert actual["REDUCED_FULL_FALLBACK"]["reason_code"] == (
         "ENUMERATE_UPSTREAM_SUPPORT_FALLBACK"
     )
+    assert "identity_signature" not in inspect.signature(
+        adapter.allocate_conditional_tickets
+    ).parameters
+
+
+def test_stage3_replay_signature_is_internal_deterministic_and_upstream_sensitive():
+    module = load_module()
+    adapter = module.load_module(module.ADAPTER_PATH, "bj193_test_replay_signature")
+    engine = adapter.load_frozen_allocation_engine(module.ALLOCATION_ENGINE_PATH)
+    weights = [[0.52, 0.28, 0.20] for _ in range(7)]
+    base = {
+        "issue": "26080",
+        "stage1_output_sha256": "1" * 64,
+        "stage2_output_sha256": "2" * 64,
+        "derived_stage3_action_sha256": "3" * 64,
+    }
+
+    def allocate(context):
+        return adapter.allocate_conditional_tickets(
+            "WR_DUPLICATE_STAKE",
+            weights,
+            128,
+            allocation_engine=engine,
+            seed="137001",
+            **context,
+        )
+
+    first = allocate(base)
+    replay = allocate(base)
+    assert first["stage3_replay_signature_sha256"] == replay[
+        "stage3_replay_signature_sha256"
+    ]
+    assert first["counts_sha256"] == replay["counts_sha256"]
+    for field, replacement in (
+        ("issue", "26081"),
+        ("stage1_output_sha256", "4" * 64),
+        ("stage2_output_sha256", "5" * 64),
+        ("derived_stage3_action_sha256", "6" * 64),
+    ):
+        changed = allocate({**base, field: replacement})
+        assert changed["stage3_replay_signature_sha256"] != first[
+            "stage3_replay_signature_sha256"
+        ]
+        assert changed["counts_sha256"] != first["counts_sha256"]
 
 
 def test_stage2_stage3_weight_mapping_binds_real_137_role_vectors_and_masks():
@@ -243,7 +293,7 @@ def test_stage2_stage3_weight_mapping_binds_real_137_role_vectors_and_masks():
         "role_vector_mapping_golden"
     ]
     ordered = golden["ordered_match_ids"]
-    roles = {row["match_id"]: row for row in golden["role_rows"]}
+    roles = {row["match_id"]: row for row in golden["complete_match_rows"]}
     directions = golden["stage2_direction_rows"]
     assert module.sha256_file(module.ROLE_VECTOR_PATH) == module.ROLE_VECTOR_SHA256
     for case in golden["mapping_cases"]:
@@ -277,12 +327,90 @@ def test_stage2_stage3_weight_mapping_binds_real_137_role_vectors_and_masks():
     )
     assert identity_failure["status"] == "UNAVAILABLE"
     assert identity_failure["reason_code"] == "STAGE3_MATCH_IDENTITY_MISMATCH"
+    legacy_roles = {
+        row["match_id"]: row for row in golden["role_rows"]
+    }
+    no_legacy_fallback = adapter.combine_stage2_and_stage3_weights(
+        ordered, directions, legacy_roles, "Q_WEIGHT"
+    )
+    assert no_legacy_fallback["status"] == "UNAVAILABLE"
+    assert no_legacy_fallback["reason_code"] == (
+        "STAGE3_WEIGHT_REGISTRY_KIND_MISMATCH"
+    )
     # Unit-weight controls do not depend on a #137 role row.
     control = adapter.combine_stage2_and_stage3_weights(
         ordered, directions, {}, "NA"
     )
     assert control["status"] == "ACTIVE"
     assert control["source_portfolio_id"] == "NA"
+
+
+def test_complete_match_registry_and_stage1_stage3_coverage_fail_closed():
+    module = load_module()
+    stage1 = module.stage1_catalog()
+    stage3 = module.stage3_catalog()
+    weights = module.complete_match_weight_registry()
+    assert len(weights) == 47_819
+    assert {row["registry_kind"] for row in weights} == {
+        "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1"
+    }
+    assert all(len(row["weight_registry_row_sha256"]) == 64 for row in weights)
+    native = module.native_137_weight_reconciliation(weights)
+    assert native["role_row_count"] == native["matched_role_row_count"]
+    assert native["missing_role_row_count"] == 0
+    assert native["mismatched_role_row_count"] == 0
+
+    classes = module.stage3_compatibility_class_registry(stage3)
+    assert len(classes) == 7
+    assert sum(int(row["stage3_action_count"]) for row in classes) == 963
+    coverage = module.stage1_stage3_coverage_registry(stage1, weights, classes)
+    assert len(coverage) == 2_469 * 7
+    assert sum(int(row["stage3_action_count"]) for row in coverage) == (
+        2_469 * 963
+    )
+    non_na_127 = [
+        row
+        for row in coverage
+        if row["stage1_upstream_issue"] == 127
+        and row["stage3_weight_source"] != "NA"
+    ]
+    non_na_134 = [
+        row
+        for row in coverage
+        if row["stage1_upstream_issue"] == 134
+        and row["stage3_weight_source"] != "NA"
+    ]
+    non_na_190 = [
+        row
+        for row in coverage
+        if row["stage1_upstream_issue"] == 190
+        and row["stage3_weight_source"] != "NA"
+    ]
+    assert non_na_127 and non_na_134 and non_na_190
+    assert {row["compatibility_status"] for row in non_na_127} == {
+        "COMPATIBLE"
+    }
+    assert {row["complete_registry_coverage_fraction"] for row in non_na_127} == {
+        "1.000000000000"
+    }
+    assert {row["compatibility_status"] for row in non_na_134} == {
+        "COMPATIBLE"
+    }
+    assert {row["complete_registry_coverage_fraction"] for row in non_na_134} == {
+        "1.000000000000"
+    }
+    assert "COMPATIBLE" not in {
+        row["compatibility_status"] for row in non_na_190
+    }
+    assert all("NONE" in row["fallback_rule"] for row in coverage)
+    assert all(
+        row["reason_code"] == "INCOMPLETE_PRE_EVENT_WEIGHT_COVERAGE_NO_FALLBACK"
+        for row in non_na_190
+        if row["selected_output_count"]
+        and int(row["selected_output_count"]) >= module.MIN_CHRONOLOGICAL_SUPPORT
+        and int(row["supported_fold_count"]) >= module.MIN_CHRONOLOGICAL_FOLDS
+        and row["compatibility_status"] == "INCOMPATIBLE"
+    )
 
 
 def test_chain_interfaces_bind_every_upstream_digest_and_match_support():
@@ -295,6 +423,17 @@ def test_chain_interfaces_bind_every_upstream_digest_and_match_support():
     assert trace["stage1"]["selected_match_ids_json"] == trace["stage2"]["ordered_match_ids_json"]
     assert trace["stage2"]["ordered_match_ids_json"] == trace["stage3"]["ordered_match_ids_json"]
     assert trace["stage2"]["per_match_outcome_weight_json"] == trace["stage3"]["per_match_outcome_weight_json"]
+    adapter = module.load_module(module.ADAPTER_PATH, "bj193_test_trace_signature")
+    assert trace["stage3"]["stage3_replay_signature_sha256"] == (
+        adapter.stage3_replay_signature(
+            issue=trace["stage3"]["issue"],
+            stage1_output_sha256=trace["stage1"]["output_sha256"],
+            stage2_output_sha256=trace["stage2"]["output_sha256"],
+            derived_stage3_action_sha256=trace["stage3"][
+                "derived_stage3_action_sha256"
+            ],
+        )
+    )
 
     changed = json.loads(json.dumps(trace))
     changed["stage1"]["selected_match_ids_json"] = module.canonical_json(
@@ -318,6 +457,16 @@ def test_chain_interfaces_bind_every_upstream_digest_and_match_support():
     replaced["stage3"]["stage2_output_sha256"] = replaced["stage2"][
         "output_sha256"
     ]
+    replaced["stage3"]["stage3_replay_signature_sha256"] = (
+        adapter.stage3_replay_signature(
+            issue=replaced["stage3"]["issue"],
+            stage1_output_sha256=replaced["stage1"]["output_sha256"],
+            stage2_output_sha256=replaced["stage2"]["output_sha256"],
+            derived_stage3_action_sha256=replaced["stage3"][
+                "derived_stage3_action_sha256"
+            ],
+        )
+    )
     replaced["stage3"]["output_sha256"] = module.digest_stage_output(
         replaced["stage3"]
     )
@@ -383,6 +532,9 @@ def test_stagewise_learner_projection_topology_screens_and_ties_are_executable()
     assert learner["stage_screen"]["STAGE_1_SELECTION"]["keep"] == 16
     assert learner["stage_screen"]["STAGE_2_DIRECTION"]["keep"] == 64
     assert learner["stage_screen"]["STAGE_3_BET"]["keep"] == 64
+    assert "compatibility_status==COMPATIBLE" in learner[
+        "stage1_stage3_compatibility_gate"
+    ]["screen_order"]
     fixture = module.learner_execution_fixture()
     assert fixture["screen"]["expected_action_order"] == ["A", "B"]
     assert fixture["validation"]["expected_model_id"] == "M1"
@@ -480,11 +632,18 @@ def test_committed_v2_package_manifest_and_contract_censuses():
     assert card["denominator"]["stage1_action_count"] == 2469
     assert card["denominator"]["stage2_action_count"] == 2425
     assert card["denominator"]["stage3_seed_agnostic_action_count"] == 963
+    assert card["denominator"]["stage3_complete_match_weight_row_count"] == 47_819
+    assert card["denominator"]["stage3_compatibility_class_count"] == 7
+    assert card["denominator"]["stage1_stage3_coverage_row_count"] == 2_469 * 7
+    assert card["denominator"]["stage1_stage3_pair_count"] == 2_469 * 963
     assert card["denominator"]["stage_model_grid_count"] == 90
     assert card["denominator"]["stage_feature_projection_row_count"] == 237
     assert csv_count(PACKAGE / "stage1_selection_catalog.csv.gz") == 2469
     assert csv_count(PACKAGE / "stage2_direction_catalog.csv.gz") == 2425
     assert csv_count(PACKAGE / "stage3_bet_catalog.csv.gz") == 963
+    assert csv_count(PACKAGE / "stage3_complete_match_weight_registry.csv.gz") == 47_819
+    assert csv_count(PACKAGE / "stage3_compatibility_class_registry.csv") == 7
+    assert csv_count(PACKAGE / "stage1_stage3_coverage_registry.csv.gz") == 2_469 * 7
     fixture = json.loads((PACKAGE / "chain_decision_trace_fixture.json").read_text())
     assert fixture["expected"]["match_support_preserved"] is True
     assert (PACKAGE / "conditional_chain_adapter.py").is_file()
@@ -492,3 +651,5 @@ def test_committed_v2_package_manifest_and_contract_censuses():
     assert (PACKAGE / "direction_adapter_golden_fixture.json").is_file()
     assert (PACKAGE / "conditional_builder_golden_vectors.json").is_file()
     assert (PACKAGE / "stagewise_learner_execution_contract.json").is_file()
+    assert (PACKAGE / "stage1_stage3_compatibility_contract.json").is_file()
+    assert (PACKAGE / "native_137_weight_reconciliation.json").is_file()

@@ -1,6 +1,6 @@
 {
   "action_choice": {
-    "availability": "only exact pre-event ACTIVE actions; NO_BET remains selectable zero flow only when it is the explicit fallback; UNAVAILABLE excluded",
+    "availability": "only exact pre-event ACTIVE actions whose Stage1\u00d7Stage3 pair is COMPATIBLE; NO_BET remains selectable zero flow only when it is the explicit fallback; UNAVAILABLE and INCOMPATIBLE excluded",
     "rule": "highest predicted utility strictly > strongest matched prior-only comparator; otherwise exact stage fallback",
     "tie_order": [
       "predicted utility desc",
@@ -28,6 +28,13 @@
     "registry": "stage_feature_projection.csv"
   },
   "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+  "stage1_stage3_compatibility_gate": {
+    "class_registry": "stage3_compatibility_class_registry.csv",
+    "contract": "stage1_stage3_compatibility_contract.json",
+    "coverage_registry": "stage1_stage3_coverage_registry.csv.gz",
+    "incompatible": "excluded with explicit zero flow; never substitute legacy role-vector weights, unit weights, ALLOW_ALL, partial match weights, or losing stake",
+    "screen_order": "join the exact Stage-1 interface action and Stage-3 compatibility class; retain only compatibility_status==COMPATIBLE before any Stage-3 outcome screen, model fit, validation, or action choice"
+  },
   "stage_screen": {
     "STAGE_1_SELECTION": {
       "keep": 16,

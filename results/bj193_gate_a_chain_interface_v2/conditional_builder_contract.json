@@ -3,7 +3,7 @@
   "accepted_allocator_module": "bj145_allocation_engine.py",
   "accepted_allocator_sha256": "5b1ac6631ce22a447d883d514ed73e6795584c89d514e6be7562b2fd91bfa4ce",
   "accounting": "one realized multiplicity is one independent \u00a52 ticket/tax unit; requested stake = 2*sum multiplicities; no aggregation",
-  "contract": "BJ193_STAGE2_TO_STAGE3_CONDITIONAL_BUILDER_V3",
+  "contract": "BJ193_STAGE2_TO_STAGE3_CONDITIONAL_BUILDER_V4",
   "input_order": {
     "codes": [
       "3",
@@ -22,12 +22,38 @@
     "WR_DUPLICATE_STAKE": "accepted #145 inverse-CDF on normalized vector; duplicates retained; zero weights forbidden from realized counts"
   },
   "module": "conditional_chain_adapter.py",
-  "module_sha256": "f30881f6d45fc271814e8f02e97a297dfa63ecd530df6cecad3a41a693c5e077",
+  "module_sha256": "f6a14858cc37de44f6dba60ac6eac7dc43fa4ca26eb22699e885a7980142cd58",
   "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
-  "stage3_role_vector_source": {
-    "identity_rule": "all seven role rows must share exact nonblank portfolio_id and issue and match the ordered Stage-1 support by match_id; missing row/field or mixed identity is UNAVAILABLE with zero flow",
-    "source_file": "n7_role_vectors.csv.gz",
-    "source_file_sha256": "1a6ac41e5e34c400c5c2a62f9799e2f76d56f4aaa3d13b67b88505443788cdaa",
+  "replay_signature": {
+    "caller_selected_signature": false,
+    "output_field": "stage3_replay_signature_sha256",
+    "rule": "computed internally as SHA-256 over contract, canonical issue, Stage-1 output digest, Stage-2 output digest and derived Stage-3 action digest"
+  },
+  "stage3_complete_match_weight_source": {
+    "accepted_source_field_mapping": {
+      "p_blend_a25_0": "blend_a25_0",
+      "p_blend_a25_1": "blend_a25_1",
+      "p_blend_a25_3": "blend_a25_3",
+      "p_blend_a50_0": "blend_a50_0",
+      "p_blend_a50_1": "blend_a50_1",
+      "p_blend_a50_3": "blend_a50_3",
+      "p_blend_a75_0": "blend_a75_0",
+      "p_blend_a75_1": "blend_a75_1",
+      "p_blend_a75_3": "blend_a75_3",
+      "p_market_cal0": "market_cal0",
+      "p_market_cal1": "market_cal1",
+      "p_market_cal3": "market_cal3",
+      "p_model0": "p0",
+      "p_model1": "p1",
+      "p_model3": "p3",
+      "q_weight0": "q_weight0",
+      "q_weight1": "q_weight1",
+      "q_weight3": "q_weight3"
+    },
+    "derived_registry": "stage3_complete_match_weight_registry.csv.gz",
+    "identity_rule": "all seven rows must share exact nonblank issue/fold, carry a valid complete_match_weight_row_identity, and match the ordered Stage-1 support by internal match_id; missing row/field or mixed identity is UNAVAILABLE with zero flow; legacy portfolio-role rows are reconciliation evidence only and are rejected by the controlling builder",
+    "source_file": "match_vectors.csv",
+    "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
     "source_gate_a_manifest_sha256": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
     "source_package": "bj137_gate_a_preoutcome_v2",
     "weight_source_fields_3_1_0": {

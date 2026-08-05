@@ -2,11 +2,11 @@
   "accepted_190_joint_allocation_input_sha256": "718d8a51151c07f1bba89c0075953183f7cf09120318514980ac9dcf77151dd2",
   "contract": "BJ193_DIRECTION_ADAPTER_GOLDEN_V3",
   "expected_output": {
-    "adapter_sha256": "f30881f6d45fc271814e8f02e97a297dfa63ecd530df6cecad3a41a693c5e077",
-    "adapter_version": "bj193-conditional-chain-adapter-v3",
+    "adapter_sha256": "f6a14858cc37de44f6dba60ac6eac7dc43fa4ca26eb22699e885a7980142cd58",
+    "adapter_version": "bj193-conditional-chain-adapter-v4",
     "delete_leg_index_zero_based": 0,
-    "derived_direction_action_sha256": "da533e7315f7ecca4cfcbabb2cbf2409aa14925db45a6c8dc647e116386b8737",
-    "direction_output_sha256": "29b2d45e61615b23c54871364e2dbd3a03f73459d197eb415f9688fe2f744c40",
+    "derived_direction_action_sha256": "5fadc96b9e7c00d22061f212097723f8beee78783c638623da14b92df34e52a3",
+    "direction_output_sha256": "b4e6557caffbaf6272d9a842b52380e09c00f0dd21f282b965acd28a10299e9d",
     "estimator_registry_source": "bj190_gate_a_preoutcome_v3r1/estimator_match_freeze.csv.gz",
     "omitted_code": "0",
     "ordered_match_ids": [

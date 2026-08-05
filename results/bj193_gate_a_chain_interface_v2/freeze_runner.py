@@ -21,6 +21,7 @@ import shutil
 import sys
 import uuid
 import zlib
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
@@ -67,6 +68,14 @@ ROLE_VECTOR_PATH = (
 ROLE_VECTOR_SHA256 = (
     "1a6ac41e5e34c400c5c2a62f9799e2f76d56f4aaa3d13b67b88505443788cdaa"
 )
+MATCH_VECTOR_PATH = (
+    ROOT / "results" / "bj137_gate_a_preoutcome_v2" / "match_vectors.csv"
+)
+MATCH_VECTOR_SHA256 = (
+    "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56"
+)
+MIN_CHRONOLOGICAL_SUPPORT = 20
+MIN_CHRONOLOGICAL_FOLDS = 5
 
 
 @dataclass(frozen=True)
@@ -105,7 +114,7 @@ SOURCES = (
         "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
         "36d6afcc33a5b5ceb3e4a990bfe6ec05503be115270c3489f4973dc3a59dd236",
         "STAGE_3_BET",
-        ("sampler_plan.csv", "n7_role_vectors.csv.gz"),
+        ("sampler_plan.csv", "match_vectors.csv", "n7_role_vectors.csv.gz"),
     ),
     Source(
         145,
@@ -190,6 +199,12 @@ def read_csv(path: Path) -> list[dict[str, str]]:
     opener = gzip.open if path.suffix == ".gz" else open
     with opener(path, "rt", newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def iter_csv(path: Path) -> Iterable[dict[str, str]]:
+    opener = gzip.open if path.suffix == ".gz" else open
+    with opener(path, "rt", newline="", encoding="utf-8") as handle:
+        yield from csv.DictReader(handle)
 
 
 def write_csv(path: Path, fields: Sequence[str], rows: Iterable[Mapping[str, object]]) -> None:
@@ -471,6 +486,20 @@ def stage2_catalog() -> list[dict[str, object]]:
     return rows
 
 
+def stage3_compatibility_class_key(weight_source: str) -> str:
+    return canonical_hash(
+        {
+            "contract": "BJ193_STAGE1_STAGE3_COMPATIBILITY_CLASS_V1",
+            "weight_source": weight_source,
+            "registry": (
+                "CONTROL_UNIT_WEIGHT"
+                if weight_source == "NA"
+                else "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1"
+            ),
+        }
+    )
+
+
 def stage3_catalog() -> list[dict[str, object]]:
     v1 = ROOT / "results" / V1_PACKAGE / "causal_allocation_catalog.csv"
     rows: list[dict[str, object]] = []
@@ -498,7 +527,7 @@ def stage3_catalog() -> list[dict[str, object]]:
         ]
         derived_identity = canonical_hash(
             {
-                "adapter_version": "BJ193_STAGE2_TO_STAGE3_BUILDER_V3",
+                "adapter_version": "BJ193_STAGE2_TO_STAGE3_BUILDER_V4",
                 "adapter_sha256": adapter_sha,
                 "allocation_engine_sha256": engine_sha,
                 "upstream_causal_allocation_factor_id": identity,
@@ -508,9 +537,17 @@ def stage3_catalog() -> list[dict[str, object]]:
         params.update(
             {
                 "derived_bet_action_sha256": derived_identity,
-                "conditional_builder_version": "BJ193_STAGE2_TO_STAGE3_BUILDER_V3",
+                "conditional_builder_version": "BJ193_STAGE2_TO_STAGE3_BUILDER_V4",
                 "conditional_builder_sha256": adapter_sha,
                 "accepted_allocation_engine_sha256": engine_sha,
+                "compatibility_class_key": stage3_compatibility_class_key(
+                    str(source["weight_source"])
+                ),
+                "weight_registry": (
+                    "CONTROL_UNIT_WEIGHT"
+                    if source["weight_source"] == "NA"
+                    else "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1"
+                ),
             }
         )
         rows.append(
@@ -530,13 +567,444 @@ def stage3_catalog() -> list[dict[str, object]]:
     return rows
 
 
+COMPLETE_WEIGHT_SOURCE_MAP = {
+    "p_model3": "p3",
+    "p_model1": "p1",
+    "p_model0": "p0",
+    "p_market_cal3": "market_cal3",
+    "p_market_cal1": "market_cal1",
+    "p_market_cal0": "market_cal0",
+    "p_blend_a25_3": "blend_a25_3",
+    "p_blend_a25_1": "blend_a25_1",
+    "p_blend_a25_0": "blend_a25_0",
+    "p_blend_a50_3": "blend_a50_3",
+    "p_blend_a50_1": "blend_a50_1",
+    "p_blend_a50_0": "blend_a50_0",
+    "p_blend_a75_3": "blend_a75_3",
+    "p_blend_a75_1": "blend_a75_1",
+    "p_blend_a75_0": "blend_a75_0",
+    "q_weight3": "q_weight3",
+    "q_weight1": "q_weight1",
+    "q_weight0": "q_weight0",
+}
+
+COMPLETE_MATCH_WEIGHT_FIELDS = (
+    "registry_kind",
+    "source_package",
+    "source_file",
+    "source_file_sha256",
+    "issue",
+    "fold",
+    "year",
+    "issue_instance",
+    "match_id",
+    "match_idx",
+    "kickoff_ts",
+    *COMPLETE_WEIGHT_SOURCE_MAP,
+    "weight_registry_row_sha256",
+    "outcome_boundary",
+)
+
+
+def complete_match_weight_registry() -> list[dict[str, object]]:
+    if sha256_file(MATCH_VECTOR_PATH) != MATCH_VECTOR_SHA256:
+        raise RuntimeError("#137 complete match-vector source drift")
+    adapter = load_module(ADAPTER_PATH, "bj193_complete_match_registry")
+    rows: list[dict[str, object]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for source in iter_csv(MATCH_VECTOR_PATH):
+        key = (source["issue"], source["fold"], source["match_id"])
+        if key in seen:
+            raise RuntimeError("duplicate #137 complete match-vector key")
+        seen.add(key)
+        row: dict[str, object] = {
+            "registry_kind": adapter.COMPLETE_MATCH_REGISTRY_KIND,
+            "source_package": "bj137_gate_a_preoutcome_v2",
+            "source_file": "match_vectors.csv",
+            "source_file_sha256": MATCH_VECTOR_SHA256,
+            "issue": source["issue"],
+            "fold": source["fold"],
+            "year": source["year"],
+            "issue_instance": source["issue_instance"],
+            "match_id": source["match_id"],
+            "match_idx": source["match_idx"],
+            "kickoff_ts": source["kickoff_ts"],
+            "outcome_boundary": OUTCOME_BOUNDARY,
+        }
+        for target, origin in COMPLETE_WEIGHT_SOURCE_MAP.items():
+            row[target] = source[origin]
+        row["weight_registry_row_sha256"] = (
+            adapter.complete_match_weight_row_identity(row)
+        )
+        rows.append(row)
+    rows.sort(
+        key=lambda row: (
+            int(str(row["issue"])),
+            str(row["fold"]),
+            int(str(row["match_idx"])),
+            int(str(row["match_id"])),
+        )
+    )
+    if len(rows) != 47_819:
+        raise RuntimeError("#137 complete match-vector row census drift")
+    return rows
+
+
+def native_137_weight_reconciliation(
+    registry_rows: Sequence[Mapping[str, object]],
+) -> dict[str, object]:
+    registry = {
+        (str(row["issue"]), str(row["fold"]), str(row["match_id"])): row
+        for row in registry_rows
+    }
+    digest = hashlib.sha256()
+    role_count = matched_count = missing_count = mismatch_count = 0
+    for role in iter_csv(ROLE_VECTOR_PATH):
+        role_count += 1
+        key = (role["issue"], role["fold"], role["match_id"])
+        complete = registry.get(key)
+        if complete is None:
+            missing_count += 1
+            continue
+        mismatched_fields = [
+            field
+            for field in COMPLETE_WEIGHT_SOURCE_MAP
+            if str(complete[field]) != str(role[field])
+        ]
+        if mismatched_fields:
+            mismatch_count += 1
+            continue
+        matched_count += 1
+        digest.update(
+            (
+                canonical_json(
+                    {
+                        "issue": role["issue"],
+                        "fold": role["fold"],
+                        "portfolio_id": role["portfolio_id"],
+                        "match_id": role["match_id"],
+                        "registry_row": complete["weight_registry_row_sha256"],
+                    }
+                )
+                + "\n"
+            ).encode("utf-8")
+        )
+    if missing_count or mismatch_count or matched_count != role_count:
+        raise RuntimeError("#137 native role-vector reconciliation failed")
+    return {
+        "contract": "BJ193_NATIVE_137_COMPLETE_MATCH_RECONCILIATION_V1",
+        "source_role_vector_sha256": ROLE_VECTOR_SHA256,
+        "source_match_vector_sha256": MATCH_VECTOR_SHA256,
+        "role_row_count": role_count,
+        "matched_role_row_count": matched_count,
+        "missing_role_row_count": missing_count,
+        "mismatched_role_row_count": mismatch_count,
+        "complete_match_registry_row_count": len(registry_rows),
+        "reconciliation_stream_sha256": digest.hexdigest(),
+        "outcome_boundary": OUTCOME_BOUNDARY,
+    }
+
+
+def _support_record(
+    *,
+    issue: str,
+    fold: str,
+    year: str,
+    identity: str,
+    match_ids: Sequence[str],
+) -> dict[str, object]:
+    ordered = tuple(str(match_id) for match_id in match_ids)
+    if len(ordered) != 7 or len(set(ordered)) != 7:
+        raise RuntimeError("Stage-1 coverage record is not exact N7")
+    return {
+        "issue": str(issue),
+        "fold": str(fold),
+        "year": str(year),
+        "identity": str(identity),
+        "match_ids": ordered,
+    }
+
+
+def stage1_support_records() -> dict[tuple[int, str], list[dict[str, object]]]:
+    records: dict[tuple[int, str], list[dict[str, object]]] = defaultdict(list)
+
+    grouped: dict[tuple[str, str, str, str, str], dict[int, str]] = defaultdict(
+        dict
+    )
+    for row in iter_csv(
+        ROOT
+        / "results"
+        / "bj127_gate_a_preoutcome_v2"
+        / "portfolio_role_assignments.csv.gz"
+    ):
+        key = (
+            row["variant_id"],
+            row["portfolio_id"],
+            row["issue"],
+            row["fold"],
+            row["year"],
+        )
+        rank = int(row["selection_rank"])
+        if rank in grouped[key]:
+            raise RuntimeError("duplicate #127 selection rank")
+        grouped[key][rank] = row["match_id"]
+    for (variant, portfolio, issue, fold, year), ranked_matches in grouped.items():
+        if sorted(ranked_matches) != list(range(1, 8)):
+            raise RuntimeError("#127 selection rank coverage drift")
+        records[(127, variant)].append(
+            _support_record(
+                issue=issue,
+                fold=fold,
+                year=year,
+                identity=portfolio,
+                match_ids=[ranked_matches[rank] for rank in range(1, 8)],
+            )
+        )
+
+    for row in iter_csv(
+        ROOT
+        / "results"
+        / "bj134_gate_a_preoutcome_v2"
+        / "selection_freeze.csv"
+    ):
+        if row["policy_status"] != "SELECTED_PREOUTCOME":
+            continue
+        records[(134, row["arm"])].append(
+            _support_record(
+                issue=row["issue"],
+                fold=row["fold"],
+                year=row["year"],
+                identity=row["selected_identity_fingerprint"],
+                match_ids=row["selected_match_ids"].split("|"),
+            )
+        )
+
+    package = ROOT / "results" / "bj190_gate_a_preoutcome_v3r1"
+    for shard in range(1, 5):
+        for row in iter_csv(
+            package
+            / f"policy_issue_selection_freeze_part_{shard:02d}_of_04.csv.gz"
+        ):
+            if row["policy_status"] != "SELECTED_PREOUTCOME":
+                continue
+            records[(190, row["policy_id"])].append(
+                _support_record(
+                    issue=row["issue"],
+                    fold=row["fold"],
+                    year=row["year"],
+                    identity=row["selected_n7_identity_sha256"],
+                    match_ids=json.loads(row["selected_match_ids_json"]),
+                )
+            )
+    for rows in records.values():
+        rows.sort(
+            key=lambda row: (
+                int(str(row["issue"])),
+                str(row["fold"]),
+                str(row["identity"]),
+            )
+        )
+    return records
+
+
+def stage3_compatibility_class_registry(
+    stage3: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    grouped: dict[str, list[str]] = defaultdict(list)
+    for action in stage3:
+        parameters = json.loads(str(action["parameters_json"]))
+        grouped[str(parameters["weight_source"])].append(
+            str(action["interface_action_key"])
+        )
+    rows = []
+    for weight_source in sorted(grouped):
+        actions = sorted(grouped[weight_source])
+        rows.append(
+            {
+                "compatibility_class_key": stage3_compatibility_class_key(
+                    weight_source
+                ),
+                "weight_source": weight_source,
+                "weight_registry": (
+                    "CONTROL_UNIT_WEIGHT"
+                    if weight_source == "NA"
+                    else "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1"
+                ),
+                "stage3_action_count": len(actions),
+                "stage3_action_set_sha256": canonical_hash(actions),
+                "outcome_boundary": OUTCOME_BOUNDARY,
+            }
+        )
+    if sum(int(row["stage3_action_count"]) for row in rows) != 963:
+        raise RuntimeError("Stage-3 compatibility class census drift")
+    return rows
+
+
+def stage1_stage3_coverage_registry(
+    stage1: Sequence[Mapping[str, object]],
+    registry_rows: Sequence[Mapping[str, object]],
+    class_rows: Sequence[Mapping[str, object]],
+) -> list[dict[str, object]]:
+    match_keys = {
+        (str(row["issue"]), str(row["fold"]), str(row["match_id"]))
+        for row in registry_rows
+    }
+    source_records = stage1_support_records()
+    rows: list[dict[str, object]] = []
+    for action in stage1:
+        issue = int(action["upstream_issue"])
+        source_identity = str(action["source_identity"])
+        parameters = json.loads(str(action["parameters_json"]))
+        record_identity = (
+            str(parameters["arm"])
+            if issue == 134 and action["source_file"] == "threshold_registry.csv"
+            else source_identity
+        )
+        supports = source_records.get((issue, record_identity), [])
+        supported = [
+            support
+            for support in supports
+            if all(
+                (str(support["issue"]), str(support["fold"]), match_id)
+                in match_keys
+                for match_id in support["match_ids"]
+            )
+        ]
+        total = len(supports)
+        supported_count = len(supported)
+        supported_keys = {
+            (str(row["issue"]), str(row["fold"]), str(row["identity"]))
+            for row in supported
+        }
+        supported_folds = sorted({str(row["fold"]) for row in supported})
+        supported_years = sorted({str(row["year"]) for row in supported})
+        selected_folds = sorted({str(row["fold"]) for row in supports})
+        selected_years = sorted({str(row["year"]) for row in supports})
+        support_sha = canonical_hash(
+            [
+                {
+                    "issue": row["issue"],
+                    "fold": row["fold"],
+                    "identity": row["identity"],
+                    "match_ids": list(row["match_ids"]),
+                    "complete_match_registry": (
+                        str(row["issue"]),
+                        str(row["fold"]),
+                        str(row["identity"]),
+                    )
+                    in supported_keys,
+                }
+                for row in supports
+            ]
+        )
+        adequate = (
+            total >= MIN_CHRONOLOGICAL_SUPPORT
+            and len(selected_folds) >= MIN_CHRONOLOGICAL_FOLDS
+        )
+        for class_row in class_rows:
+            weight_source = str(class_row["weight_source"])
+            if action["availability"] != "AVAILABLE":
+                status = "STAGE1_UNAVAILABLE_ZERO_FLOW"
+                reason = "UPSTREAM_STAGE1_ACTION_UNAVAILABLE"
+            elif not adequate:
+                status = "INCOMPATIBLE"
+                reason = "INSUFFICIENT_CHRONOLOGICAL_STAGE1_SUPPORT"
+            elif weight_source == "NA":
+                status = "COMPATIBLE"
+                reason = "UNIT_WEIGHT_CONTROL_NO_MATCH_REGISTRY_REQUIRED"
+            elif supported_count == total:
+                status = "COMPATIBLE"
+                reason = "COMPLETE_MATCH_WEIGHT_REGISTRY_FULL_COVERAGE"
+            else:
+                status = "INCOMPATIBLE"
+                reason = "INCOMPLETE_PRE_EVENT_WEIGHT_COVERAGE_NO_FALLBACK"
+            rows.append(
+                {
+                    "stage1_interface_action_key": action[
+                        "interface_action_key"
+                    ],
+                    "stage1_upstream_issue": issue,
+                    "stage1_source_identity": source_identity,
+                    "stage3_compatibility_class_key": class_row[
+                        "compatibility_class_key"
+                    ],
+                    "stage3_weight_source": weight_source,
+                    "stage3_action_count": class_row["stage3_action_count"],
+                    "selected_output_count": total,
+                    "complete_registry_output_count": supported_count,
+                    "complete_registry_coverage_fraction": (
+                        "" if total == 0 else format(supported_count / total, ".12f")
+                    ),
+                    "selected_fold_count": len(selected_folds),
+                    "selected_year_count": len(selected_years),
+                    "selected_folds_json": canonical_json(selected_folds),
+                    "selected_years_json": canonical_json(selected_years),
+                    "supported_fold_count": len(supported_folds),
+                    "supported_year_count": len(supported_years),
+                    "supported_folds_json": canonical_json(supported_folds),
+                    "supported_years_json": canonical_json(supported_years),
+                    "stage1_support_set_sha256": support_sha,
+                    "compatibility_status": status,
+                    "reason_code": reason,
+                    "fallback_rule": "NONE; incompatible pairs are removed before Stage-3 screening and emit no fabricated stake",
+                    "outcome_boundary": OUTCOME_BOUNDARY,
+                }
+            )
+    rows.sort(
+        key=lambda row: (
+            str(row["stage1_interface_action_key"]),
+            str(row["stage3_compatibility_class_key"]),
+        )
+    )
+    if len(rows) != 2_469 * 7:
+        raise RuntimeError("Stage1×Stage3 normalized compatibility census drift")
+    return rows
+
+
+def stage1_stage3_compatibility_contract(
+    class_rows: Sequence[Mapping[str, object]],
+    coverage_rows: Sequence[Mapping[str, object]],
+    native_reconciliation: Mapping[str, object],
+) -> dict[str, object]:
+    return {
+        "contract": "BJ193_STAGE1_STAGE3_COMPATIBILITY_V1",
+        "normalized_join": {
+            "stage3_action_to_class": "stage3_compatibility_class_registry.csv",
+            "stage1_action_to_class_coverage": "stage1_stage3_coverage_registry.csv.gz",
+            "complete_pair_rule": "join Stage-3 action compatibility_class_key to the exact Stage-1 action/class row; this covers every 2,377,647 action pair without denormalized duplication",
+            "pair_count": 2_469 * 963,
+        },
+        "complete_match_weight_registry": {
+            "artifact": "stage3_complete_match_weight_registry.csv.gz",
+            "source_package": "bj137_gate_a_preoutcome_v2",
+            "source_file": "match_vectors.csv",
+            "source_file_sha256": MATCH_VECTOR_SHA256,
+            "row_count": 47_819,
+            "field_mapping": COMPLETE_WEIGHT_SOURCE_MAP,
+            "row_identity": "conditional_chain_adapter.complete_match_weight_row_identity",
+        },
+        "adequacy": {
+            "minimum_selected_outputs": MIN_CHRONOLOGICAL_SUPPORT,
+            "minimum_folds": MIN_CHRONOLOGICAL_FOLDS,
+            "non_na": "requires 100% exact seven-match coverage by the complete-match registry",
+            "na": "unit weight needs no registry but still requires chronological Stage-1 support",
+        },
+        "screen_order": "compatibility_status==COMPATIBLE before Stage-3 outcome screen/model fit/action choice",
+        "unsupported": "no silent role-vector lookup, probability substitution, ALLOW_ALL conversion, losing stake, or partial-match fallback",
+        "native_137_reconciliation": dict(native_reconciliation),
+        "class_count": len(class_rows),
+        "coverage_row_count": len(coverage_rows),
+        "outcome_boundary": OUTCOME_BOUNDARY,
+    }
+
+
 def direction_adapter_contract() -> dict[str, object]:
     package = ROOT / "results" / "bj190_gate_a_preoutcome_v3r1"
     return {
         "contract": "BJ193_STAGE1_CONDITIONAL_DIRECTION_ADAPTER_V3",
         "module": "conditional_chain_adapter.py",
         "module_sha256": sha256_file(ADAPTER_PATH),
-        "adapter_version": "bj193-conditional-chain-adapter-v3",
+        "adapter_version": "bj193-conditional-chain-adapter-v4",
         "upstream_semantics": {
             "status": "BOUND_REFERENCE_NOT_RENAMED",
             "source": "#190 D_DIRECTION_ONLY is defined only on accepted B0 support",
@@ -601,24 +1069,29 @@ def direction_adapter_contract() -> dict[str, object]:
 def conditional_builder_contract() -> dict[str, object]:
     adapter = load_module(ADAPTER_PATH, "bj193_adapter_builder_contract")
     return {
-        "contract": "BJ193_STAGE2_TO_STAGE3_CONDITIONAL_BUILDER_V3",
+        "contract": "BJ193_STAGE2_TO_STAGE3_CONDITIONAL_BUILDER_V4",
         "module": "conditional_chain_adapter.py",
         "module_sha256": sha256_file(ADAPTER_PATH),
         "accepted_allocator_module": "bj145_allocation_engine.py",
         "accepted_allocator_sha256": ALLOCATION_ENGINE_SHA256,
-        "stage3_role_vector_source": {
+        "stage3_complete_match_weight_source": {
             "source_package": "bj137_gate_a_preoutcome_v2",
             "source_gate_a_manifest_sha256": SOURCES[2].manifest_sha256,
-            "source_file": "n7_role_vectors.csv.gz",
-            "source_file_sha256": ROLE_VECTOR_SHA256,
+            "source_file": "match_vectors.csv",
+            "source_file_sha256": MATCH_VECTOR_SHA256,
+            "derived_registry": "stage3_complete_match_weight_registry.csv.gz",
             "weight_source_fields_3_1_0": {
                 key: list(value)
                 for key, value in adapter.WEIGHT_SOURCE_FIELDS.items()
             },
+            "accepted_source_field_mapping": COMPLETE_WEIGHT_SOURCE_MAP,
             "identity_rule": (
-                "all seven role rows must share exact nonblank portfolio_id and "
-                "issue and match the ordered Stage-1 support by match_id; missing "
-                "row/field or mixed identity is UNAVAILABLE with zero flow"
+                "all seven rows must share exact nonblank issue/fold, carry a "
+                "valid complete_match_weight_row_identity, and match the ordered "
+                "Stage-1 support by internal match_id; missing row/field or mixed "
+                "identity is UNAVAILABLE with zero flow; legacy portfolio-role "
+                "rows are reconciliation evidence only and are rejected by the "
+                "controlling builder"
             ),
         },
         "input_order": {
@@ -642,6 +1115,11 @@ def conditional_builder_contract() -> dict[str, object]:
         },
         "M_semantics": "requested M is the frozen action output, not a rejection gate or budget cap; infeasible distinct/capped action becomes explicit zero-flow rather than selecting zero-weight tickets",
         "accounting": "one realized multiplicity is one independent ¥2 ticket/tax unit; requested stake = 2*sum multiplicities; no aggregation",
+        "replay_signature": {
+            "rule": "computed internally as SHA-256 over contract, canonical issue, Stage-1 output digest, Stage-2 output digest and derived Stage-3 action digest",
+            "caller_selected_signature": False,
+            "output_field": "stage3_replay_signature_sha256",
+        },
         "outcome_boundary": OUTCOME_BOUNDARY,
     }
 
@@ -731,7 +1209,9 @@ def direction_adapter_golden_fixture() -> dict[str, object]:
     }
 
 
-def conditional_builder_golden_vectors() -> dict[str, object]:
+def conditional_builder_golden_vectors(
+    registry_rows: Sequence[Mapping[str, object]] | None = None,
+) -> dict[str, object]:
     adapter = load_module(ADAPTER_PATH, "bj193_adapter_builder_golden")
     engine = adapter.load_frozen_allocation_engine(ALLOCATION_ENGINE_PATH)
     allow_all = [[0.52, 0.28, 0.20] for _ in range(7)]
@@ -757,13 +1237,30 @@ def conditional_builder_golden_vectors() -> dict[str, object]:
     ]
     rows = []
     for name, mechanism, weights, m, seed, cap in cases:
+        context = {
+            "issue": "190101",
+            "stage1_output_sha256": canonical_hash(
+                {"golden": "stage1", "case": name}
+            ),
+            "stage2_output_sha256": canonical_hash(
+                {"golden": "stage2", "case": name}
+            ),
+            "derived_stage3_action_sha256": canonical_hash(
+                {
+                    "mechanism": mechanism,
+                    "M": m,
+                    "cap": cap,
+                    "case": name,
+                }
+            ),
+        }
         result = adapter.allocate_conditional_tickets(
             mechanism,
             weights,
             m,
             allocation_engine=engine,
+            **context,
             seed=seed,
-            identity_signature="BJ193_GOLDEN_N7",
             cap=cap,
         )
         result = {key: value for key, value in result.items() if key != "counts"}
@@ -776,7 +1273,7 @@ def conditional_builder_golden_vectors() -> dict[str, object]:
                     "M": m,
                     "seed": seed,
                     "cap": cap,
-                    "identity_signature": "BJ193_GOLDEN_N7",
+                    **context,
                 },
                 "expected": result,
             }
@@ -807,14 +1304,27 @@ def conditional_builder_golden_vectors() -> dict[str, object]:
                 ),
             }
         )
-    role_by_match = {row["match_id"]: row for row in role_rows}
+    complete_registry_rows = (
+        list(registry_rows)
+        if registry_rows is not None
+        else complete_match_weight_registry()
+    )
+    registry = {
+        (str(row["issue"]), str(row["fold"]), str(row["match_id"])): row
+        for row in complete_registry_rows
+    }
+    complete_rows = [
+        registry[(row["issue"], row["fold"], row["match_id"])]
+        for row in role_rows
+    ]
+    role_by_match = {str(row["match_id"]): row for row in complete_rows}
     mapping_cases = []
     for weight_source in adapter.WEIGHT_SOURCE_FIELDS:
         mapped = adapter.combine_stage2_and_stage3_weights(
             ordered, direction_rows, role_by_match, weight_source
         )
         if mapped["status"] != "ACTIVE":
-            raise RuntimeError("#137 production role-vector mapping golden failed")
+            raise RuntimeError("#137 complete-match mapping golden failed")
         mapping_cases.append(
             {
                 "weight_source": weight_source,
@@ -831,21 +1341,32 @@ def conditional_builder_golden_vectors() -> dict[str, object]:
         q_mapping["per_match_weight_3_1_0"],
         64,
         allocation_engine=engine,
+        issue=role_rows[0]["issue"],
+        stage1_output_sha256=canonical_hash(
+            {"golden": "role_mapping_stage1", "ordered": ordered}
+        ),
+        stage2_output_sha256=canonical_hash(
+            {"golden": "role_mapping_stage2", "mapped": q_mapping}
+        ),
+        derived_stage3_action_sha256=canonical_hash(
+            {"golden": "role_mapping_stage3", "mechanism": "WOR", "M": 64}
+        ),
         seed="137001",
-        identity_signature="BJ193_ROLE_MAPPING_GOLDEN_N7",
     )
     if q_allocation["status"] != "ACTIVE":
         raise RuntimeError("#137 mapped production allocation golden failed")
     return {
-        "contract": "BJ193_CONDITIONAL_BUILDER_GOLDEN_V4",
+        "contract": "BJ193_CONDITIONAL_BUILDER_GOLDEN_V5",
         "adapter_sha256": sha256_file(ADAPTER_PATH),
         "allocation_engine_sha256": sha256_file(ALLOCATION_ENGINE_PATH),
         "role_vector_source_sha256": sha256_file(ROLE_VECTOR_PATH),
+        "complete_match_source_sha256": sha256_file(MATCH_VECTOR_PATH),
         "cases": rows,
         "role_vector_mapping_golden": {
             "source_portfolio_id": first_portfolio,
             "ordered_match_ids": ordered,
             "role_rows": role_rows,
+            "complete_match_rows": complete_rows,
             "stage2_direction_rows": direction_rows,
             "mapping_cases": mapping_cases,
             "q_weight_wor_m64_expected": {
@@ -1051,6 +1572,13 @@ def stagewise_learner_execution_contract() -> dict[str, object]:
             "order": ["score desc", "active support desc", "native stake asc", "stage action identity lexical"],
             "streaming": "complete pass, exact fixed-size heap using the full order tuple; chunk invariant for 1/17/256/4096; no sampling/adaptive early stop",
         },
+        "stage1_stage3_compatibility_gate": {
+            "contract": "stage1_stage3_compatibility_contract.json",
+            "class_registry": "stage3_compatibility_class_registry.csv",
+            "coverage_registry": "stage1_stage3_coverage_registry.csv.gz",
+            "screen_order": "join the exact Stage-1 interface action and Stage-3 compatibility class; retain only compatibility_status==COMPATIBLE before any Stage-3 outcome screen, model fit, validation, or action choice",
+            "incompatible": "excluded with explicit zero flow; never substitute legacy role-vector weights, unit weights, ALLOW_ALL, partial match weights, or losing stake",
+        },
         "validation": {
             "primary": "complete-chain sum selected pre-tax net / sum selected stake; blank when stake zero",
             "tie_order": ["ROI desc", "max issue drawdown yuan asc", "native stake asc", "complexity rank asc", "model_id lexical"],
@@ -1060,7 +1588,7 @@ def stagewise_learner_execution_contract() -> dict[str, object]:
         "action_choice": {
             "rule": "highest predicted utility strictly > strongest matched prior-only comparator; otherwise exact stage fallback",
             "tie_order": ["predicted utility desc", "native stake asc", "complexity rank asc", "stage action identity lexical"],
-            "availability": "only exact pre-event ACTIVE actions; NO_BET remains selectable zero flow only when it is the explicit fallback; UNAVAILABLE excluded",
+            "availability": "only exact pre-event ACTIVE actions whose Stage1×Stage3 pair is COMPATIBLE; NO_BET remains selectable zero flow only when it is the explicit fallback; UNAVAILABLE and INCOMPATIBLE excluded",
         },
         "targets": {
             "STAGE_1_SELECTION": "utility of selector with ALLOW_ALL and FULL downstream controls",
@@ -1188,6 +1716,11 @@ def stage_interface_contract() -> dict[str, object]:
                 "required_fields": common + [
                     "stage1_output_sha256", "stage2_output_sha256",
                     "derived_direction_action_sha256",
+                    "derived_stage3_action_sha256",
+                    "stage3_replay_signature_sha256",
+                    "stage3_compatibility_class_key",
+                    "stage1_stage3_compatibility_status",
+                    "stage1_stage3_compatibility_reason_code",
                     "ordered_match_ids_json", "per_match_outcome_identity_json",
                     "per_match_outcome_weight_json", "allocator", "weight_source",
                     "mechanism", "repeat_mode", "cap", "M",
@@ -1239,6 +1772,17 @@ def validate_chain_trace(trace: Mapping[str, Mapping[str, object]]) -> None:
         "derived_direction_action_sha256"
     ]:
         raise RuntimeError("Stage-3 direction-adapter identity drift")
+    adapter = load_module(ADAPTER_PATH, "bj193_trace_signature_validator")
+    expected_signature = adapter.stage3_replay_signature(
+        issue=stage3["issue"],
+        stage1_output_sha256=stage1["output_sha256"],
+        stage2_output_sha256=stage2["output_sha256"],
+        derived_stage3_action_sha256=stage3["derived_stage3_action_sha256"],
+    )
+    if stage3["stage3_replay_signature_sha256"] != expected_signature:
+        raise RuntimeError("Stage-3 replay signature identity drift")
+    if stage3["stage1_stage3_compatibility_status"] != "COMPATIBLE":
+        raise RuntimeError("Stage-3 trace bypassed compatibility gate")
     if stage2["ordered_match_ids_json"] != stage1["selected_match_ids_json"]:
         raise RuntimeError("Stage-2 replaced Stage-1 match support")
     if stage3["ordered_match_ids_json"] != stage2["ordered_match_ids_json"]:
@@ -1256,8 +1800,9 @@ def validate_chain_trace(trace: Mapping[str, Mapping[str, object]]) -> None:
 
 
 def chain_fixture() -> dict[str, object]:
+    adapter = load_module(ADAPTER_PATH, "bj193_chain_fixture_adapter")
     common = {
-        "issue": "FIXTURE_26080",
+        "issue": "26080",
         "issue_instance": "FIXTURE_26080@PRE_EVENT",
         "cutoff_ts": "2026-08-05T10:00:00+08:00",
         "public_state_sha256": canonical_hash("fixture-public-state"),
@@ -1321,6 +1866,14 @@ def chain_fixture() -> dict[str, object]:
         "support_count": 7,
     }
     stage2["output_sha256"] = digest_stage_output(stage2)
+    derived_stage3_action_sha256 = canonical_hash(
+        {
+            "source_action_identity": "FULL_ENUMERATED_M2187",
+            "weight_source": "NA",
+            "mechanism": "FULL_ENUMERATED",
+            "M": 2187,
+        }
+    )
     stage3 = {
         **common,
         "stage_id": "STAGE_3_BET",
@@ -1330,6 +1883,18 @@ def chain_fixture() -> dict[str, object]:
         "derived_direction_action_sha256": stage2[
             "derived_direction_action_sha256"
         ],
+        "derived_stage3_action_sha256": derived_stage3_action_sha256,
+        "stage3_replay_signature_sha256": adapter.stage3_replay_signature(
+            issue=common["issue"],
+            stage1_output_sha256=stage1["output_sha256"],
+            stage2_output_sha256=stage2["output_sha256"],
+            derived_stage3_action_sha256=derived_stage3_action_sha256,
+        ),
+        "stage3_compatibility_class_key": stage3_compatibility_class_key("NA"),
+        "stage1_stage3_compatibility_status": "COMPATIBLE",
+        "stage1_stage3_compatibility_reason_code": (
+            "UNIT_WEIGHT_CONTROL_NO_MATCH_REGISTRY_REQUIRED"
+        ),
         "ordered_match_ids_json": stage2["ordered_match_ids_json"],
         "per_match_outcome_identity_json": stage2["per_match_outcome_identity_json"],
         "per_match_outcome_weight_json": stage2["per_match_outcome_weight_json"],
@@ -1346,7 +1911,7 @@ def chain_fixture() -> dict[str, object]:
         "requested_ticket_count": 2187,
         "requested_stake_yuan": 4374,
         "ticket_ledger_sha256": canonical_hash(list(range(2187))),
-        "ticket_builder_version": "BJ193_STAGE2_TO_STAGE3_BUILDER_V3",
+        "ticket_builder_version": "BJ193_STAGE2_TO_STAGE3_BUILDER_V4",
         "ticket_builder_sha256": sha256_file(ADAPTER_PATH),
         "normalized_ticket_weight_sha256": canonical_hash(
             [format(1 / 2187, ".17g")] * 2187
@@ -1563,7 +2128,12 @@ def output_contract() -> dict[str, object]:
                 "stage2_direction_adapter_sha256", "stage2_output_sha256",
                 "stage2_availability", "stage2_fallback", "stage2_reason_code",
                 "stage3_model_id", "stage3_model_version",
-                "stage3_source_action_identity", "stage3_output_sha256",
+                "stage3_source_action_identity", "stage3_derived_action_sha256",
+                "stage3_replay_signature_sha256",
+                "stage3_compatibility_class_key",
+                "stage1_stage3_compatibility_status",
+                "stage1_stage3_compatibility_reason_code",
+                "stage3_output_sha256",
                 "stage3_availability", "stage3_fallback", "stage3_reason_code",
                 "ticket_builder_version", "ticket_builder_sha256",
                 "normalized_ticket_weight_sha256", "allocator_engine_sha256",
@@ -1619,6 +2189,7 @@ def output_contract() -> dict[str, object]:
             "direction_adapter": "direction_adapter_contract.json + direction_adapter_golden_fixture.json + conditional_chain_adapter.py",
             "ticket_builder": "conditional_builder_contract.json + conditional_builder_golden_vectors.json + byte-bound bj145_allocation_engine.py",
             "stagewise_learner": "stagewise_learner_execution_contract.json + stage_feature_projection.csv + learner_execution_fixture.json",
+            "stage1_stage3_compatibility": "stage3_complete_match_weight_registry.csv.gz + stage3_compatibility_class_registry.csv + stage1_stage3_coverage_registry.csv.gz + stage1_stage3_compatibility_contract.json + native_137_weight_reconciliation.json",
         },
         "economics": "pre-tax ROI controls; tax is reference-only and applied per exact ¥2 ticket without aggregation",
         "holding_unit": "chronologically ordered canonical issue; v1 holding contract and fixture remain byte-bound",
@@ -1661,6 +2232,8 @@ def decision_trace_schema() -> dict[str, object]:
             "Stage-2 row binds exact Stage-1 output_sha256 and ordered selected match IDs",
             "Stage-2 row binds its derived conditional action identity, adapter hash and every selected-match estimator identity/source",
             "Stage-3 row binds exact Stage-1 and Stage-2 output_sha256 plus derived direction identity, outcome identities/weights, normalized full-ordinal vector and accepted allocator hash",
+            "Stage-3 row binds a canonical internal replay signature over issue, ordered Stage-1 output digest, Stage-2 output digest and derived Stage-3 action; no caller-selected RNG namespace exists",
+            "Stage-3 row binds the normalized Stage1×Stage3 compatibility class/status/reason before any screen or economic flow",
             "chain_trace_sha256 binds the three complete stage outputs and final ticket ledger SHA-256",
             "final ticket ledger must be byte-reproducible from Stage-3 output, frozen builder version/hash and ordered base-3 ticket rule",
         ],
@@ -1725,6 +2298,12 @@ outcome or Gate-B settlement payload is opened.
 Stage 2 actions are explicitly derived Stage-1-conditional adapters; they are
 not renamed #190 B0-only actions. Stage 3 actions bind accepted #167 parameters
 to the exact Stage-2 mask/weight-to-ordinal builder and byte-bound #145 engine.
+The complete #137 match-vector registry supplies hash-bound pre-event weights
+for every supported #127/#134 N7. A normalized Stage1×Stage3 registry screens
+all {counts['stage1_stage3_pairs']:,} action pairs before learning: incompatible
+#190/non-NA pairs are explicit zero-flow and never fall back to partial, unit,
+or fabricated weights. The allocator replay signature is derived internally
+from the issue and complete upstream/action digests.
 The stagewise learner registry fixes projection columns, encoding, per-action
 topology, screening and every validation/action tie.
 
@@ -1733,6 +2312,8 @@ Catalog census:
 - Stage 1 selection actions: {counts['stage1']:,}
 - Stage 2 direction actions: {counts['stage2']:,}
 - Stage 3 seed-agnostic allocator/M actions: {counts['stage3']:,}
+- Complete pre-event Stage-3 match-weight rows: {counts['complete_match_weights']:,}
+- Normalized Stage1×Stage3 coverage rows/classes: {counts['compatibility_coverage']:,}/{counts['compatibility_classes']:,}
 - stage-specific model configurations: {counts['models']:,}
 - required matched attribution controls: 4
 
@@ -1759,6 +2340,15 @@ def publish(output: Path) -> None:
     stage1 = stage1_catalog()
     stage2 = stage2_catalog()
     stage3 = stage3_catalog()
+    complete_weights = complete_match_weight_registry()
+    native_reconciliation = native_137_weight_reconciliation(complete_weights)
+    compatibility_classes = stage3_compatibility_class_registry(stage3)
+    compatibility_coverage = stage1_stage3_coverage_registry(
+        stage1, complete_weights, compatibility_classes
+    )
+    compatibility_contract = stage1_stage3_compatibility_contract(
+        compatibility_classes, compatibility_coverage, native_reconciliation
+    )
     models = stage_model_grid()
     fixture = chain_fixture()
     counts = {
@@ -1766,6 +2356,17 @@ def publish(output: Path) -> None:
         "stage2": len(stage2),
         "stage3": len(stage3),
         "models": len(models),
+        "complete_match_weights": len(complete_weights),
+        "compatibility_classes": len(compatibility_classes),
+        "compatibility_coverage": len(compatibility_coverage),
+        "stage1_stage3_pairs": sum(
+            int(row["stage3_action_count"])
+            for row in compatibility_coverage
+        ),
+        "compatible_coverage_rows": sum(
+            row["compatibility_status"] == "COMPATIBLE"
+            for row in compatibility_coverage
+        ),
     }
     output = output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -1778,6 +2379,29 @@ def publish(output: Path) -> None:
         write_gzip(stage / "stage1_selection_catalog.csv.gz", CATALOG_FIELDS, stage1)
         write_gzip(stage / "stage2_direction_catalog.csv.gz", CATALOG_FIELDS, stage2)
         write_gzip(stage / "stage3_bet_catalog.csv.gz", CATALOG_FIELDS, stage3)
+        write_gzip(
+            stage / "stage3_complete_match_weight_registry.csv.gz",
+            COMPLETE_MATCH_WEIGHT_FIELDS,
+            complete_weights,
+        )
+        write_csv(
+            stage / "stage3_compatibility_class_registry.csv",
+            list(compatibility_classes[0]),
+            compatibility_classes,
+        )
+        write_gzip(
+            stage / "stage1_stage3_coverage_registry.csv.gz",
+            list(compatibility_coverage[0]),
+            compatibility_coverage,
+        )
+        write_json(
+            stage / "stage1_stage3_compatibility_contract.json",
+            compatibility_contract,
+        )
+        write_json(
+            stage / "native_137_weight_reconciliation.json",
+            native_reconciliation,
+        )
         training = stage_training_rows()
         write_csv(stage / "stage_training_contract.csv", list(training[0]), training)
         write_csv(stage / "stage_model_grid.csv", list(models[0]), models)
@@ -1812,7 +2436,7 @@ def publish(output: Path) -> None:
         )
         write_json(
             stage / "conditional_builder_golden_vectors.json",
-            conditional_builder_golden_vectors(),
+            conditional_builder_golden_vectors(complete_weights),
         )
         write_json(
             stage / "stagewise_learner_execution_contract.json",
@@ -1846,7 +2470,7 @@ def publish(output: Path) -> None:
                 "immutable_status": "ACCEPTED_LINEAGE_UNCHANGED",
                 "superseded_scope_only": "one-model-per-joint-action topology; all sources/features/chronology/seed/path-risk definitions remain bound",
             },
-            "v2_amendment": "three separately parameterized stage interfaces; derived Stage-1-conditional direction identities; exact Stage-2-to-ticket-vector allocator builder; executable stagewise feature/topology/screen/tie contract; portable decompressed-content identity; honest upstream training outputs; decision trace; matched incremental controls",
+            "v2_amendment": "three separately parameterized stage interfaces; derived Stage-1-conditional direction identities; hash-bound complete-match Stage-3 weight registry plus normalized Stage1×Stage3 compatibility gate with no fallback; internally derived replay signature; exact Stage-2-to-ticket-vector allocator builder; executable stagewise feature/topology/screen/tie contract; portable decompressed-content identity; honest upstream training outputs; decision trace; matched incremental controls",
             "outcome_access": False,
             "gate_b_authorized": False,
         }
@@ -1872,6 +2496,19 @@ def publish(output: Path) -> None:
                     row["availability"] == "AVAILABLE" for row in stage2
                 ),
                 "stage3_seed_agnostic_action_count": counts["stage3"],
+                "stage3_complete_match_weight_row_count": counts[
+                    "complete_match_weights"
+                ],
+                "stage3_compatibility_class_count": counts[
+                    "compatibility_classes"
+                ],
+                "stage1_stage3_coverage_row_count": counts[
+                    "compatibility_coverage"
+                ],
+                "stage1_stage3_pair_count": counts["stage1_stage3_pairs"],
+                "compatible_coverage_row_count": counts[
+                    "compatible_coverage_rows"
+                ],
                 "stage_model_grid_count": counts["models"],
                 "stage_feature_projection_row_count": len(projection),
                 "model_grid_count_per_stage": 30,

@@ -1,5 +1,5 @@
 {
-  "adapter_sha256": "f30881f6d45fc271814e8f02e97a297dfa63ecd530df6cecad3a41a693c5e077",
+  "adapter_sha256": "f6a14858cc37de44f6dba60ac6eac7dc43fa4ca26eb22699e885a7980142cd58",
   "allocation_engine_sha256": "5b1ac6631ce22a447d883d514ed73e6795584c89d514e6be7562b2fd91bfa4ce",
   "cases": [
     {
@@ -15,6 +15,7 @@
         "requested_M": 2187,
         "requested_stake_yuan": 4374,
         "requested_ticket_count": 2187,
+        "stage3_replay_signature_sha256": "639f5f9f1b86cf0663ad8727a152871a6c87c9b073b42ac018f8b29cb49b3257",
         "status": "ACTIVE",
         "ticket_weight_sha256": "9b86efc984ab238794a6d3a02cb368ef94b48b534604431cfc3f1065af0bbda7",
         "unique_count": 2187
@@ -22,7 +23,8 @@
       "input": {
         "M": 2187,
         "cap": null,
-        "identity_signature": "BJ193_GOLDEN_N7",
+        "derived_stage3_action_sha256": "11f3d4fd3743298a1e56583170d1f75f4b1f39cdd3ebcaef539e430c4287fc00",
+        "issue": "190101",
         "mechanism": "FULL_ENUMERATED",
         "per_match_weight_3_1_0": [
           [
@@ -61,13 +63,15 @@
             0.2
           ]
         ],
-        "seed": "NA"
+        "seed": "NA",
+        "stage1_output_sha256": "1e88b40036d959c1e2a6d036902196ef78736f52973158ce53aa036a0e24aae0",
+        "stage2_output_sha256": "6735263abe80eec16b94d8aa444a449035ea4b94abb86db58c72a6894f6722f0"
       }
     },
     {
       "case": "ONE_DELETE_WOR_M64",
       "expected": {
-        "counts_sha256": "316fbb71942d3535ec447dd27c20c8b4e23595e60c98ac4579449255252df331",
+        "counts_sha256": "a3bb296077c0b12a9f04ebfcf1f795dcb94d8c7adab284a2b336cb26f2235384",
         "draw_count": 64,
         "duplicate_count": 0,
         "effective_M": 64,
@@ -77,6 +81,7 @@
         "requested_M": 64,
         "requested_stake_yuan": 128,
         "requested_ticket_count": 64,
+        "stage3_replay_signature_sha256": "df8e8e0ea2e0125926c3afba15733bd66ac625367f33e1de8adb83af7cf51db4",
         "status": "ACTIVE",
         "ticket_weight_sha256": "0137219d743a2aaf01c92a2ce2018efe702a261e22136ef0b2f503429b6db6d5",
         "unique_count": 64
@@ -84,7 +89,8 @@
       "input": {
         "M": 64,
         "cap": null,
-        "identity_signature": "BJ193_GOLDEN_N7",
+        "derived_stage3_action_sha256": "ed1772f5d3d5a6113f716c4ce5f27f8cdd7e385e8fc7e12c79df15612c5e92d4",
+        "issue": "190101",
         "mechanism": "WOR_DISTINCT",
         "per_match_weight_3_1_0": [
           [
@@ -123,30 +129,34 @@
             0.2
           ]
         ],
-        "seed": "137001"
+        "seed": "137001",
+        "stage1_output_sha256": "e0d265e323209c3fef5a93e87311c579f48e5c2d75f9bc5ae39bcd1bdd713859",
+        "stage2_output_sha256": "cf994f76fb22280a7c477d5d117a41214b51688d20dc016d7675cc0de5a2c371"
       }
     },
     {
       "case": "ONE_DELETE_WR_M2187",
       "expected": {
-        "counts_sha256": "cdcb0aa691e68cdaee8bbd4c2d22b466e923772bcbed20cfd022407a35daf1c7",
+        "counts_sha256": "d48e157f44e02231759ac878d58716b583d36c39cf2f6fc503405c32c71df0a8",
         "draw_count": 2187,
-        "duplicate_count": 1346,
+        "duplicate_count": 1358,
         "effective_M": 2187,
-        "max_multiplicity": 21,
+        "max_multiplicity": 33,
         "positive_support_count": 1458,
         "reason_code": "ALLOCATED_ON_POSITIVE_UPSTREAM_SUPPORT",
         "requested_M": 2187,
         "requested_stake_yuan": 4374,
         "requested_ticket_count": 2187,
+        "stage3_replay_signature_sha256": "0597bf8872406d784f68a5607c32618fed683043e591c2c30f87f7a1f0a96da0",
         "status": "ACTIVE",
         "ticket_weight_sha256": "0137219d743a2aaf01c92a2ce2018efe702a261e22136ef0b2f503429b6db6d5",
-        "unique_count": 841
+        "unique_count": 829
       },
       "input": {
         "M": 2187,
         "cap": null,
-        "identity_signature": "BJ193_GOLDEN_N7",
+        "derived_stage3_action_sha256": "3f7a5fd955f1d12a700e19c9788770186935fbadec6401092785bdab7df0e2c6",
+        "issue": "190101",
         "mechanism": "WR_DUPLICATE_STAKE",
         "per_match_weight_3_1_0": [
           [
@@ -185,7 +195,9 @@
             0.2
           ]
         ],
-        "seed": "137001"
+        "seed": "137001",
+        "stage1_output_sha256": "c26e45095d9e594414e0ae4e714f7362a02ec8ec3612cba231e69155bd698b14",
+        "stage2_output_sha256": "9d486190420c28c1e33f30815819f4bc3cb8d1c72074fc548dba3d2fc344c8a4"
       }
     },
     {
@@ -201,6 +213,7 @@
         "requested_M": 64,
         "requested_stake_yuan": 128,
         "requested_ticket_count": 64,
+        "stage3_replay_signature_sha256": "42407886e1ad379a24a7a08500718e152de2f3784cd891a0f3f1777d567989ee",
         "status": "ACTIVE",
         "ticket_weight_sha256": "8e3c644dc53eeda937a1925f7a0eb40173ca720332bfe7da9d16a3fdeac8cfb8",
         "unique_count": 64
@@ -208,7 +221,8 @@
       "input": {
         "M": 64,
         "cap": null,
-        "identity_signature": "BJ193_GOLDEN_N7",
+        "derived_stage3_action_sha256": "7f92f594e8e588d30264b88ca006a753c79d216a195e3587f5fe9d640d5d48d8",
+        "issue": "190101",
         "mechanism": "RESIDUAL_SYSTEMATIC",
         "per_match_weight_3_1_0": [
           [
@@ -247,7 +261,9 @@
             0.3
           ]
         ],
-        "seed": "NA"
+        "seed": "NA",
+        "stage1_output_sha256": "d5957fda8a8b61b431fcdadc43c31112e37ddbb9fe1e8d0ae91c59484f0c2f59",
+        "stage2_output_sha256": "bc3ae9efe4523dcd24f68cee00b79390f9db969e8d81e3b3df4d56032d7d55e9"
       }
     },
     {
@@ -263,6 +279,7 @@
         "requested_M": 128,
         "requested_stake_yuan": 256,
         "requested_ticket_count": 128,
+        "stage3_replay_signature_sha256": "dcca8065122b35a41431048fa9ed230d8584a0306c2138a69cb2e6040350878b",
         "status": "ACTIVE",
         "ticket_weight_sha256": "8e3c644dc53eeda937a1925f7a0eb40173ca720332bfe7da9d16a3fdeac8cfb8",
         "unique_count": 64
@@ -270,7 +287,8 @@
       "input": {
         "M": 128,
         "cap": 2,
-        "identity_signature": "BJ193_GOLDEN_N7",
+        "derived_stage3_action_sha256": "0b1ab306fe9be57199ed9b1446129c65cb1a4f719bfff5d32dd10824e009a9e7",
+        "issue": "190101",
         "mechanism": "CAPPED_REPEAT",
         "per_match_weight_3_1_0": [
           [
@@ -309,7 +327,9 @@
             0.3
           ]
         ],
-        "seed": "NA"
+        "seed": "NA",
+        "stage1_output_sha256": "75e8bc6c580f5cabb992459f558dab439ea876d9531e8301009c6bcf84e383f9",
+        "stage2_output_sha256": "4165d69aeaadf9a4fc2984b45fd4e0867ec30afb668c67459c868b167f31cd4a"
       }
     },
     {
@@ -325,6 +345,7 @@
         "requested_M": 64,
         "requested_stake_yuan": 128,
         "requested_ticket_count": 64,
+        "stage3_replay_signature_sha256": "ea28413c535988e09f06db4c0bcfbea9d6bf84d2ad41f054d27c36757a002e27",
         "status": "ACTIVE",
         "ticket_weight_sha256": "8e3c644dc53eeda937a1925f7a0eb40173ca720332bfe7da9d16a3fdeac8cfb8",
         "unique_count": 64
@@ -332,7 +353,8 @@
       "input": {
         "M": 64,
         "cap": null,
-        "identity_signature": "BJ193_GOLDEN_N7",
+        "derived_stage3_action_sha256": "1cac32f990024bbc879eaabec0b7c5fa1e3859dd0dd80f944384c42dbc3da61b",
+        "issue": "190101",
         "mechanism": "DETERMINISTIC_TOP_MASS",
         "per_match_weight_3_1_0": [
           [
@@ -371,7 +393,9 @@
             0.3
           ]
         ],
-        "seed": "NA"
+        "seed": "NA",
+        "stage1_output_sha256": "bcd538d061c46f7c2e8dd9b328a2dc92a85610e1f6757795db8cf7c9bcc2affa",
+        "stage2_output_sha256": "5aaddf911f68f1fe59a8a09390ad8068b7433ff1e2fd9590d6be7111ec2ea679"
       }
     },
     {
@@ -385,13 +409,15 @@
         "requested_M": 2187,
         "requested_stake_yuan": 0,
         "requested_ticket_count": 0,
+        "stage3_replay_signature_sha256": "570268e832616bb54de906379b0d44a2245d5ff695cdb556e58c02d8e1686590",
         "status": "NO_BET",
         "ticket_weight_sha256": ""
       },
       "input": {
         "M": 2187,
         "cap": null,
-        "identity_signature": "BJ193_GOLDEN_N7",
+        "derived_stage3_action_sha256": "ccb72cfd2811151303e6954db937c9a37e991d80dd541e4867c308aa6455f548",
+        "issue": "190101",
         "mechanism": "FULL_ENUMERATED",
         "per_match_weight_3_1_0": [
           [
@@ -430,7 +456,9 @@
             0.2
           ]
         ],
-        "seed": "NA"
+        "seed": "NA",
+        "stage1_output_sha256": "9f2eed5d21a6a6e9b019fd548ce39c14000c7f047b6dac163573d2a63468b738",
+        "stage2_output_sha256": "6a5ba35982130f8eaf3920b5c2c2b84debfe54f0be55614ddb5ae91be8c454df"
       }
     },
     {
@@ -446,6 +474,7 @@
         "requested_M": 2187,
         "requested_stake_yuan": 0,
         "requested_ticket_count": 0,
+        "stage3_replay_signature_sha256": "d35915b88c2375cbe20b1aec134235ece03a35375173363dffb5b6d56c3752bc",
         "status": "NO_BET",
         "ticket_weight_sha256": "0137219d743a2aaf01c92a2ce2018efe702a261e22136ef0b2f503429b6db6d5",
         "unique_count": 0
@@ -453,7 +482,8 @@
       "input": {
         "M": 2187,
         "cap": null,
-        "identity_signature": "BJ193_GOLDEN_N7",
+        "derived_stage3_action_sha256": "1018b07dd6277a73254ab6a89e2a0cf8e768e971e32ab12f53e5e9080906718f",
+        "issue": "190101",
         "mechanism": "WOR_DISTINCT",
         "per_match_weight_3_1_0": [
           [
@@ -492,7 +522,9 @@
             0.2
           ]
         ],
-        "seed": "137001"
+        "seed": "137001",
+        "stage1_output_sha256": "521e9e484ef4cbe30229ff10cbe03b18d2da4211c817e028fd0451e7e78983ae",
+        "stage2_output_sha256": "502806fd1cc028efc37ff2c85dc3521f2e4f7a783c4fd60da13429c09fec06a0"
       }
     },
     {
@@ -508,6 +540,7 @@
         "requested_M": 2187,
         "requested_stake_yuan": 2916,
         "requested_ticket_count": 1458,
+        "stage3_replay_signature_sha256": "93732c912f9c699c0f0248c31066ecb24f622d2eb2a49f1ce4633e9f3da9684c",
         "status": "ACTIVE",
         "ticket_weight_sha256": "0137219d743a2aaf01c92a2ce2018efe702a261e22136ef0b2f503429b6db6d5",
         "unique_count": 1458
@@ -515,7 +548,8 @@
       "input": {
         "M": 2187,
         "cap": null,
-        "identity_signature": "BJ193_GOLDEN_N7",
+        "derived_stage3_action_sha256": "19d45c42a2bdfd5be1201d3af819b19b55ed7d5c15d8e0584a6ba895f1fc4cb1",
+        "issue": "190101",
         "mechanism": "FULL_ENUMERATED",
         "per_match_weight_3_1_0": [
           [
@@ -554,17 +588,253 @@
             0.2
           ]
         ],
-        "seed": "NA"
+        "seed": "NA",
+        "stage1_output_sha256": "0eeab9b42ecc35fb743a137e9a1b3faebb8fbc68f4e99ac71e99fac7229cb548",
+        "stage2_output_sha256": "027f8a64b4a358a0a00f9e6023960bdb5e8a8810ae10e6c567ef6d315f80c6eb"
       }
     }
   ],
-  "contract": "BJ193_CONDITIONAL_BUILDER_GOLDEN_V4",
+  "complete_match_source_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+  "contract": "BJ193_CONDITIONAL_BUILDER_GOLDEN_V5",
   "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
   "role_vector_mapping_golden": {
+    "complete_match_rows": [
+      {
+        "fold": "OOS_2019",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90503",
+        "match_idx": "39",
+        "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+        "p_blend_a25_0": "0.369783292765",
+        "p_blend_a25_1": "0.287495495707",
+        "p_blend_a25_3": "0.342721211527",
+        "p_blend_a50_0": "0.377684506010",
+        "p_blend_a50_1": "0.289617031181",
+        "p_blend_a50_3": "0.332698462809",
+        "p_blend_a75_0": "0.385585719255",
+        "p_blend_a75_1": "0.291738566655",
+        "p_blend_a75_3": "0.322675714090",
+        "p_market_cal0": "0.361882079520",
+        "p_market_cal1": "0.285373960234",
+        "p_market_cal3": "0.352743960246",
+        "p_model0": "0.393486932500",
+        "p_model1": "0.293860102128",
+        "p_model3": "0.312652965371",
+        "q_weight0": "0.333333333333",
+        "q_weight1": "0.333333333334",
+        "q_weight3": "0.333333333333",
+        "registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "weight_registry_row_sha256": "905709e57dd99ceff6e1d7e671c798d4c55c45db0ddad3e37862516579d44491",
+        "year": "2019"
+      },
+      {
+        "fold": "OOS_2019",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90500",
+        "match_idx": "36",
+        "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+        "p_blend_a25_0": "0.367168063031",
+        "p_blend_a25_1": "0.284703530039",
+        "p_blend_a25_3": "0.348128406930",
+        "p_blend_a50_0": "0.372454046542",
+        "p_blend_a50_1": "0.284033099845",
+        "p_blend_a50_3": "0.343512853613",
+        "p_blend_a75_0": "0.377740030053",
+        "p_blend_a75_1": "0.283362669650",
+        "p_blend_a75_3": "0.338897300297",
+        "p_market_cal0": "0.361882079520",
+        "p_market_cal1": "0.285373960234",
+        "p_market_cal3": "0.352743960246",
+        "p_model0": "0.383026013564",
+        "p_model1": "0.282692239456",
+        "p_model3": "0.334281746980",
+        "q_weight0": "0.333333333334",
+        "q_weight1": "0.333333333333",
+        "q_weight3": "0.333333333333",
+        "registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "weight_registry_row_sha256": "44817126f19eefe677ec2db33a758afab1a1f92a96a3e9899c5437eda96f591c",
+        "year": "2019"
+      },
+      {
+        "fold": "OOS_2019",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90501",
+        "match_idx": "37",
+        "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+        "p_blend_a25_0": "0.423995166196",
+        "p_blend_a25_1": "0.262180121632",
+        "p_blend_a25_3": "0.313824712171",
+        "p_blend_a50_0": "0.419659061813",
+        "p_blend_a50_1": "0.268703155412",
+        "p_blend_a50_3": "0.311637782775",
+        "p_blend_a75_0": "0.415322957430",
+        "p_blend_a75_1": "0.275226189191",
+        "p_blend_a75_3": "0.309450853378",
+        "p_market_cal0": "0.428331270579",
+        "p_market_cal1": "0.255657087853",
+        "p_market_cal3": "0.316011641568",
+        "p_model0": "0.410986853047",
+        "p_model1": "0.281749222971",
+        "p_model3": "0.307263923982",
+        "q_weight0": "0.333333333333",
+        "q_weight1": "0.333333333333",
+        "q_weight3": "0.333333333333",
+        "registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "weight_registry_row_sha256": "d475180f575ebd51d8a03f87ae5828897e04c7d5e4d9d647d4a539b571b90653",
+        "year": "2019"
+      },
+      {
+        "fold": "OOS_2019",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90505",
+        "match_idx": "41",
+        "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+        "p_blend_a25_0": "0.262744807025",
+        "p_blend_a25_1": "0.315181704572",
+        "p_blend_a25_3": "0.422073488403",
+        "p_blend_a50_0": "0.269373209336",
+        "p_blend_a50_1": "0.310152646978",
+        "p_blend_a50_3": "0.420474143685",
+        "p_blend_a75_0": "0.276001611647",
+        "p_blend_a75_1": "0.305123589385",
+        "p_blend_a75_3": "0.418874798968",
+        "p_market_cal0": "0.256116404714",
+        "p_market_cal1": "0.320210762165",
+        "p_market_cal3": "0.423672833121",
+        "p_model0": "0.282630013958",
+        "p_model1": "0.300094531792",
+        "p_model3": "0.417275454250",
+        "q_weight0": "0.333333333333",
+        "q_weight1": "0.333333333334",
+        "q_weight3": "0.333333333333",
+        "registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "weight_registry_row_sha256": "b62f6bd4f690d215c9d3a79ab3de953bb13daa31e944e592cf52d95e3b2e5213",
+        "year": "2019"
+      },
+      {
+        "fold": "OOS_2019",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90497",
+        "match_idx": "33",
+        "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+        "p_blend_a25_0": "0.271146436801",
+        "p_blend_a25_1": "0.286222084751",
+        "p_blend_a25_3": "0.442631478449",
+        "p_blend_a50_0": "0.273357828273",
+        "p_blend_a50_1": "0.286256897329",
+        "p_blend_a50_3": "0.440385274398",
+        "p_blend_a75_0": "0.275569219746",
+        "p_blend_a75_1": "0.286291709906",
+        "p_blend_a75_3": "0.438139070348",
+        "p_market_cal0": "0.268935045328",
+        "p_market_cal1": "0.286187272173",
+        "p_market_cal3": "0.444877682499",
+        "p_model0": "0.277780611219",
+        "p_model1": "0.286326522484",
+        "p_model3": "0.435892866297",
+        "q_weight0": "0.333333333333",
+        "q_weight1": "0.333333333333",
+        "q_weight3": "0.333333333334",
+        "registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "weight_registry_row_sha256": "5962f582f37a04a22168e784e1e363750201d96faf1a236d488ce818b7da2fae",
+        "year": "2019"
+      },
+      {
+        "fold": "OOS_2019",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-01 22:59:59",
+        "match_id": "90496",
+        "match_idx": "32",
+        "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+        "p_blend_a25_0": "0.467770279549",
+        "p_blend_a25_1": "0.277576615801",
+        "p_blend_a25_3": "0.254653104650",
+        "p_blend_a50_0": "0.467436652144",
+        "p_blend_a50_1": "0.275757142910",
+        "p_blend_a50_3": "0.256806204945",
+        "p_blend_a75_0": "0.467103024740",
+        "p_blend_a75_1": "0.273937670020",
+        "p_blend_a75_3": "0.258959305241",
+        "p_market_cal0": "0.468103906953",
+        "p_market_cal1": "0.279396088692",
+        "p_market_cal3": "0.252500004355",
+        "p_model0": "0.466769397335",
+        "p_model1": "0.272118197129",
+        "p_model3": "0.261112405536",
+        "q_weight0": "0.333333333334",
+        "q_weight1": "0.333333333333",
+        "q_weight3": "0.333333333333",
+        "registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "weight_registry_row_sha256": "0ee9853da965c494ae51522e00e8172930f6076d80c1964423a10db2fda761a4",
+        "year": "2019"
+      },
+      {
+        "fold": "OOS_2019",
+        "issue": "190101",
+        "issue_instance": "190101@OOS_2019",
+        "kickoff_ts": "2019-01-03 03:45:00",
+        "match_id": "90520",
+        "match_idx": "56",
+        "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+        "p_blend_a25_0": "0.260745893096",
+        "p_blend_a25_1": "0.288294676334",
+        "p_blend_a25_3": "0.450959430570",
+        "p_blend_a50_0": "0.252556740864",
+        "p_blend_a50_1": "0.290402080495",
+        "p_blend_a50_3": "0.457041178641",
+        "p_blend_a75_0": "0.244367588632",
+        "p_blend_a75_1": "0.292509484656",
+        "p_blend_a75_3": "0.463122926712",
+        "p_market_cal0": "0.268935045328",
+        "p_market_cal1": "0.286187272173",
+        "p_market_cal3": "0.444877682499",
+        "p_model0": "0.236178436400",
+        "p_model1": "0.294616888817",
+        "p_model3": "0.469204674783",
+        "q_weight0": "0.333333333334",
+        "q_weight1": "0.333333333333",
+        "q_weight3": "0.333333333333",
+        "registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
+        "source_file": "match_vectors.csv",
+        "source_file_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+        "source_package": "bj137_gate_a_preoutcome_v2",
+        "weight_registry_row_sha256": "fd431d33f63b0d752ae2852c1d642910c89008c88f8ca4fb9b0076e6ec1adc06",
+        "year": "2019"
+      }
+    ],
     "mapping_cases": [
       {
         "expected_output": {
-          "combined_weight_input_sha256": "9eb5a68f26020dbd87e39972472809a11bd8cf32d3ebfc40293d559ee73d5bc1",
+          "combined_weight_input_sha256": "9d2df353dd13d6ff906b13d736fcf6b19a23be36b75871a024b87974f17ee5ce",
           "ordered_match_ids": [
             "90503",
             "90500",
@@ -613,16 +883,18 @@
           ],
           "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
           "role_identity_sha256_by_match": {
-            "90496": "30055b448159d02f51527bcaf6ef6853f43af97919f3d250a32805c5ed285ac5",
-            "90497": "68e016371a4949e8f4ea05874a30b3ce234598814cb6324ee744fdd42ec779d5",
-            "90500": "1282357589e6d86d3bd4ae214eaf8bf2ceaca0a4427e5e0db85865bb39f682d3",
-            "90501": "cd363db5e123d175d3601c61c3f08cb24cb2af9dfc145cd01910b79fe102cb1c",
-            "90503": "1e5a736d921a311e4e7f59f3ae0ca30a0b09c83d0da91263427ae5157835126c",
-            "90505": "d94dbade581bd078137fa0596572ebf5dec79158dfb0cbe5989068de87c96fae",
-            "90520": "526e9e60eaf8a725f3888efb666986a81523c1034cdd1547a48860041e6dd500"
+            "90496": "14aa8a9be054f8d434d0dad2b1c36dc36ffd19e68933ffb5b2f4efd7f053d587",
+            "90497": "005d23095bdf75719a7e2b1f46f7d7d6afddcba0e8fb69a57133eb63ca506c45",
+            "90500": "64825311e860a5dee6dbe5e38aa0a9b4a74f6239187b2ff9c9436b107b97d6ca",
+            "90501": "af8054f3ad1ee3096a3184ff781b31a32b6fa900d6650b5991c3511b0cb784d8",
+            "90503": "8ca38df0723c1cd20e0e4f5492252056e3809113935e994a8eeac82899004bf9",
+            "90505": "7202e75b98130ee0bae278a36e964408ac5aafc16ae2ead0825714c00376bc2a",
+            "90520": "ae1b0ee0804bb03e1c716a3c8991cd9ff091258ae560dac5482a13ab12d5ee6f"
           },
+          "source_fold": "OOS_2019",
           "source_issue": "190101",
-          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "source_portfolio_id": "NA",
+          "source_registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
           "status": "ACTIVE",
           "weight_source": "MODEL_P_CAL"
         },
@@ -630,7 +902,7 @@
       },
       {
         "expected_output": {
-          "combined_weight_input_sha256": "af47cfb7597572678729d8c8c4be60e0ba9978a24bb0d675498cb6dbbf6b5a17",
+          "combined_weight_input_sha256": "d950dd081aa65590fbb20e68288842545773a198aeb4a6679cdea46a6e0c6f18",
           "ordered_match_ids": [
             "90503",
             "90500",
@@ -679,16 +951,18 @@
           ],
           "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
           "role_identity_sha256_by_match": {
-            "90496": "b22170d4004f414a9f9bf55039f83050996dfe860b1621c01db93c157a53a66e",
-            "90497": "2e82e18d36719ec7da5d3e138245e10fbdf248fd162195a541715e14502a8149",
-            "90500": "72c056063bc4a572ad88d0439390535e832de6f515b0d555c1a2c90ee838fa89",
-            "90501": "1f5911ac11d787fe7ef384fcbe1886686649030ed1643a572840fd2d0fce12e8",
-            "90503": "ff5757ae5b51f5cc9a3826c9c9ef454bccb7da67c982329c9c73f05cbdaea320",
-            "90505": "4d3b11051afc2aa38ae3733cbcd4daa3d022b3c446aaa284e26c2e130defc35a",
-            "90520": "525266a5ba25e1bda20cc679d5add78ea7311bbe23ff3901c2d4ece9228f2c62"
+            "90496": "ced1ba37f58ffaa09016ffc1513a0a5a40de833794a03b0259b7cde4f4b00827",
+            "90497": "6d51407f9cc2836916a462595a03249522c38a962f3e783344e68e8a44c54bfc",
+            "90500": "681723cff2f4236e01f54191541b4d06037e4e7a1ed1cb01ee1cb2aa43dbe8d6",
+            "90501": "811fedcf983d8425154d6643034e2ee95dbecab3688f94c46b2c115fb1aefafa",
+            "90503": "23ed6cde022f1584ff53d107cd956af26b880b6c07aedffac4db233d61131e7d",
+            "90505": "e2f4d0f388208a46f3997e54f706bbd85b070e4dd29c8e98465d0ee96fabe28f",
+            "90520": "68f3cfdfe5acddcb864a2451c7d7f4e12ee825016ba6c92f70149d316452d119"
           },
+          "source_fold": "OOS_2019",
           "source_issue": "190101",
-          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "source_portfolio_id": "NA",
+          "source_registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
           "status": "ACTIVE",
           "weight_source": "MARKET_WF_CAL"
         },
@@ -696,7 +970,7 @@
       },
       {
         "expected_output": {
-          "combined_weight_input_sha256": "aa83b177394df7752eb1157dc6d128749cf4e0392cc1b730a93c8eb994991098",
+          "combined_weight_input_sha256": "734236a922d82e586ab1d59c9168ac713d2d67306370c61119aa29ea388353db",
           "ordered_match_ids": [
             "90503",
             "90500",
@@ -745,16 +1019,18 @@
           ],
           "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
           "role_identity_sha256_by_match": {
-            "90496": "a5090e5e2ede4947b28590c6431fd1e9162930801299bc86537649db5a2329f2",
-            "90497": "b8d46d6e21b034f682fa6b4a2ecd5fef824c941a8589fb76db2246844be245ba",
-            "90500": "72241a3a04a27ff81af0ee4229b5d600043a9d9f6da852b50784b9ffef672ba3",
-            "90501": "a783f694fc43d8cf9554463ca62bab4f1f982ff0c27abb4f7e68ac3187ce7b7a",
-            "90503": "fb8a56ce892113b74a70f5936087444a4b9b2a8606ca44d41431661888704c83",
-            "90505": "e2af1a0851e0e56e7282fecd7b0ce0d6a4c98c03ca3fe491bf8b0e9abefcf250",
-            "90520": "e6cf8a764d3d5aaf8ba3f041c3899365e898df01a4208ee711fcf167ae47a94c"
+            "90496": "e0165c8b8eb9ae492c99941377171c0ad57b48028f9a7cc8b333ffddd1e0ace2",
+            "90497": "5796553b999072e2e96a23f5d4e35150e6a2597ef2018745a53220eac4c8489f",
+            "90500": "ed31ca0cccd62f324880e84d6c02fbd5bcfdc588e5da036f38fac79076d29d6b",
+            "90501": "b8e2a0786350d5c801042276f86d59622c2166e06876a54f1b016838ebe9bc30",
+            "90503": "73e97d859b683d06c3073871ae052c6d2c2c0f8d70c0d3f5f8039d01ce766e8e",
+            "90505": "ec902fc38cbcb4e7faf302b2adf100d703b098a153edc1b4e02e232946d5b551",
+            "90520": "e43c2e708aef56c9031e0e26f325b0555997519abbea2ebcda1a4ff26918aa28"
           },
+          "source_fold": "OOS_2019",
           "source_issue": "190101",
-          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "source_portfolio_id": "NA",
+          "source_registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
           "status": "ACTIVE",
           "weight_source": "BLEND_A25"
         },
@@ -762,7 +1038,7 @@
       },
       {
         "expected_output": {
-          "combined_weight_input_sha256": "ecfa5a80e278a3f5b0f7a686b0eb9a7934ac17ae25e025fd01a1f16f4e99e6c6",
+          "combined_weight_input_sha256": "9dd808b4f4d9d00770dacb4d756c66bb130710d4b2bc47d69b17a1c5841b2630",
           "ordered_match_ids": [
             "90503",
             "90500",
@@ -811,16 +1087,18 @@
           ],
           "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
           "role_identity_sha256_by_match": {
-            "90496": "6361afe701fbf614140475abbc0c87c4a7632174927e2c69cf9a8b3e75e091d7",
-            "90497": "3b7b3de20cd7107837a6a68ad18d0f2a3a228e7e34f40e182c5cc5ac9d9ddf04",
-            "90500": "6626f5ffb9467668b9a5391deaad1d69b9a23b0775ea6cf384a16a3857144932",
-            "90501": "915b1b47be0d414ebbc01b3a840bdbe0b2367bc89103f30c86662bfed2f249b1",
-            "90503": "5fc82ed05246431801018c97d6114099769ec6145c2e8374594fc3b16cc395f0",
-            "90505": "b93d524b6c053f7f906b7a4bf38137523acba44b0d7049f7b2dddfce49b1b5df",
-            "90520": "6d519b462fe2a68adc7839247511fc3cd1bc42f4f13ee1e89c1a562701ea4120"
+            "90496": "5f09d755a5dc3fdf04ca83e204cb6bbfd63f297714001f3cd903159b1c50ebe0",
+            "90497": "5042fe956859341d8880fb78e6a506eb26d56d3ea4fbdc92c9739f158b13280e",
+            "90500": "3d13f4d6f9b004bfb9d6173946296c7eb6068643e72649d93a21c02a49f8cba8",
+            "90501": "e86929fac2b1a9ea4ae7438a0891303ab6e87ee26cab53fb6a9a8d63f114673c",
+            "90503": "c63b0ee51717577ad1f2873f46650455ab15a8bd19fbbd2967ff71cae6a8b3d1",
+            "90505": "79a4f40120e3172eae9fe9eec7d53c0ec08de72c56affadeed5a1b98cef7119e",
+            "90520": "b5b30e7c69982a17d3602cf77bcf2917b7d0d21eb9272b004f77963837504973"
           },
+          "source_fold": "OOS_2019",
           "source_issue": "190101",
-          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "source_portfolio_id": "NA",
+          "source_registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
           "status": "ACTIVE",
           "weight_source": "BLEND_A50"
         },
@@ -828,7 +1106,7 @@
       },
       {
         "expected_output": {
-          "combined_weight_input_sha256": "dde53f96a0b7ff3e73d7c5b45bd2ec4c64250b432f230067718f6370b50ed71e",
+          "combined_weight_input_sha256": "9cce882718d87b061661cd8873255b961897587f4c64e00f7223b9503f2a9def",
           "ordered_match_ids": [
             "90503",
             "90500",
@@ -877,16 +1155,18 @@
           ],
           "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
           "role_identity_sha256_by_match": {
-            "90496": "8f3cef53e290ba137f31586bfd513dc7c2a31dea6880974eca56f593d66f5e90",
-            "90497": "87be611b399dbf39b0047dc3927e8895753278a53b7af61044813c123322c375",
-            "90500": "47584a94362a49ebd385bb279783f47464c370ba9723150315d17787890a91ff",
-            "90501": "f53e16b8b4ee072c1af4f21aa22bde80f5ba1659e7ab4279c066f3fea339a165",
-            "90503": "a44a3867cb4fe961866d528ac74afa922d2f84c19d472938e85c8c48e6be3cc5",
-            "90505": "40bc47c7a310dcba8c529317b44fb7e97ef607af33852dd6c26fb64b867df3fe",
-            "90520": "405a1c3ccce2a6d7ed7cb5aa9bc091f75d0e3f9653219e7df75ea6cf5201e0e4"
+            "90496": "8c8e53c7819aa8c7e2fbe6396574d031c3cea3bfb53dd8190b2269b057a9be54",
+            "90497": "58a1911f60d7bf40eeb2bf1281359322f7f6df2f882745f9501fb493d1b36bcd",
+            "90500": "673d7bb2ae13c223abb87c5c838d4ec3c27c906ff17eadff03dda35f4a03a4a9",
+            "90501": "d3cc7b7179a387ab10654b0519bf43e71d073deb7aec2b6b8dd7789c9212d18a",
+            "90503": "5d0d59321a4525fd81070008b1058f7d4b473226f4bd2ffa0e8ce49bee0ebbde",
+            "90505": "3299cb170ff2145a34178c9103ca3727e7fe5d1fec8a162976425b80293e9c1b",
+            "90520": "99a28593a1d47f71b114791065446313ceb549cb1bbb01f6f3f872e432f19f0c"
           },
+          "source_fold": "OOS_2019",
           "source_issue": "190101",
-          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "source_portfolio_id": "NA",
+          "source_registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
           "status": "ACTIVE",
           "weight_source": "BLEND_A75"
         },
@@ -894,7 +1174,7 @@
       },
       {
         "expected_output": {
-          "combined_weight_input_sha256": "fdd1202cbdd649a09dea3997feb6e057a2d46eedabdba5e440bb09ef1f4b2599",
+          "combined_weight_input_sha256": "650eb96c1ab808d6be8bbd43bb18b3fa0a6caf082d4a6c5a8964995344164d14",
           "ordered_match_ids": [
             "90503",
             "90500",
@@ -943,16 +1223,18 @@
           ],
           "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
           "role_identity_sha256_by_match": {
-            "90496": "f926926556f199bbc949142df03391a0d7e4e0801489152997cf58116246d649",
-            "90497": "49dbccf9154f344eafc13f3971689bad510f614e4d93ce105907456ed2f939b7",
-            "90500": "917bbfefbbe80700d8a31c801bda0b037a1d6705732385321ce7ce874e3ff46c",
-            "90501": "3edbc6c995fd46ee15b83e7ebd6cc1333c0b577f12fae1a055beca54967a2520",
-            "90503": "2255bf0ada81da232a9f04d28dd4760bfd7cdf6ca5cae3188f099f49e9781227",
-            "90505": "503e7411b458dd20baa1aedc7b69102f4a570b9cfadbb1c776ae3f85baf198e4",
-            "90520": "9f762d1d0999be514aa449efd82b4857296f531ba68a59e4dd41fbbc1393ea61"
+            "90496": "108ff4b1de6f77bb638345f70cb4c46508f1e928b748405643c664b585f1ec71",
+            "90497": "93305e0a05f9888c688528c2e878cd0fc94a50e5a50b847445141b6526ddc2d9",
+            "90500": "41300efea9ffea7982f9654d919a175fdaadeeb00785ef9557cd9aaa25e2d440",
+            "90501": "9035d3a1de342bca10e3c7f439490ffbcd18e005e022b0cbabc79a3b7c625d04",
+            "90503": "522a9266e770d3f3dc33d4a4825caf191c021bb4856857acce78f80a43ac6a28",
+            "90505": "232ea7a7ccfc59c267a470103c4412a9caf58fbd0b62b614f1f9f59863239bdc",
+            "90520": "015b2b30cda49e5f141186c6947ff59b55ee0c8d3486dc71b211853180586c64"
           },
+          "source_fold": "OOS_2019",
           "source_issue": "190101",
-          "source_portfolio_id": "3e4c75d7b06a89a7aabc6ff1d93d952d4378778982af99bd230501f7c9caa30b",
+          "source_portfolio_id": "NA",
+          "source_registry_kind": "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1",
           "status": "ACTIVE",
           "weight_source": "Q_WEIGHT"
         },
@@ -960,7 +1242,7 @@
       },
       {
         "expected_output": {
-          "combined_weight_input_sha256": "ecfdc2029ac8e0809217a26bb350feee72c09bce2376e39407fbbe242a938151",
+          "combined_weight_input_sha256": "61153414981d5aec79041f4f5f097e7e14b6017b64dadf6b0cf5eb554e35dcf9",
           "ordered_match_ids": [
             "90503",
             "90500",
@@ -1009,16 +1291,18 @@
           ],
           "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
           "role_identity_sha256_by_match": {
-            "90496": "80f8c0953c6aef665753eee38dc68dac0243b77cc7e58791cd1fa6e82843ed9d",
-            "90497": "246eecac5561f8ce3ec2f4869adaf7ae1e3f57ac40d39ce8ea2cb27b8e65183a",
-            "90500": "583de82463a5111cb5847bc247c42b900460c9c4d41ca7caf01826d96ee949dd",
-            "90501": "4207236dc811f5c82a0c68f33275b7c6edf63099e4e44f280e9229f794b93fb0",
-            "90503": "6368c84f05a6bc0bb1ffdb624ef29ddd9324c71a29e0029f27bd69337520e6d1",
-            "90505": "5e52641bf0d3921bd72bea6471beabc9f96b994f832e8ce1b4b78e014feef044",
-            "90520": "c2b3c439635cd731993a16c63cabf52204f80c24e685c0458cc05faab02a75ac"
+            "90496": "2cef19d3c67a0dc8b7a17d677b165d50f84e729468b9f8e238701be629d4aad0",
+            "90497": "1461e9588c4f396701dda8bc4d65a53586fa56fbcc488e61f75662b759d14150",
+            "90500": "b49bded8cfa963a6b76e2f61e45fb83a8f601c7edec7652ad2f14ed42b66e86e",
+            "90501": "acb82265aaa5b3bd735c94130fe46428834fb0e7ddc2623587d658af72dc6120",
+            "90503": "f8453910b5f454e1b43c8ab7e8d1b5ec6c94b60d246c25da0023638fbf77cf06",
+            "90505": "6a5c2f7bc2cfb6eca89f05b23d6fb59438f8a1ea704837154349c9cd37cec363",
+            "90520": "afd473421a6cd5cf8af2261bfa87146320f52fa9b78189b03bc26f9d59ff0a6e"
           },
+          "source_fold": "NA",
           "source_issue": "NA",
           "source_portfolio_id": "NA",
+          "source_registry_kind": "CONTROL_UNIT_WEIGHT",
           "status": "ACTIVE",
           "weight_source": "NA"
         },
@@ -1035,7 +1319,7 @@
       "90520"
     ],
     "q_weight_wor_m64_expected": {
-      "counts_sha256": "581642cc8f567abd58fd8d1a5c254f70e139f8c1ee0110a42d64c25c4c5daed6",
+      "counts_sha256": "6d2ae848501950b2acca65f1d4a01b15d98a3eb404b15af1429fd7dba6cabbcc",
       "draw_count": 64,
       "duplicate_count": 0,
       "effective_M": 64,
@@ -1045,6 +1329,7 @@
       "requested_M": 64,
       "requested_stake_yuan": 128,
       "requested_ticket_count": 64,
+      "stage3_replay_signature_sha256": "fd1965c968b6a4630c6a7937fde621e775331bca3025d54530ef48f7067c13f4",
       "status": "ACTIVE",
       "ticket_weight_sha256": "2dcad43a292b48c7a20b7c64d5ee514d02035d7da7bc65b767f49847715a6920",
       "unique_count": 64

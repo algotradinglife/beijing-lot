@@ -18,10 +18,14 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 
-ADAPTER_VERSION = "bj193-conditional-chain-adapter-v3"
+ADAPTER_VERSION = "bj193-conditional-chain-adapter-v4"
 CODES = ("3", "1", "0")
 LEGS = 7
 FULL_TICKET_COUNT = 3**LEGS
+COMPLETE_MATCH_REGISTRY_KIND = "BJ137_COMPLETE_MATCH_WEIGHT_REGISTRY_V1"
+BJ137_MATCH_VECTORS_SHA256 = (
+    "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56"
+)
 WEIGHT_SOURCE_FIELDS = {
     "MODEL_P_CAL": ("p_model3", "p_model1", "p_model0"),
     "MARKET_WF_CAL": ("p_market_cal3", "p_market_cal1", "p_market_cal0"),
@@ -55,6 +59,41 @@ def canonical_json(value: object) -> str:
 
 def canonical_hash(value: object) -> str:
     return hashlib.sha256(canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _require_sha256(value: object, field: str) -> str:
+    identity = str(value)
+    if len(identity) != 64 or any(
+        character not in "0123456789abcdef" for character in identity.lower()
+    ):
+        raise ValueError(f"invalid SHA-256 identity: {field}")
+    return identity.lower()
+
+
+def complete_match_weight_row_identity(row: Mapping[str, object]) -> str:
+    """Identity for a derived alias row from accepted #137 match_vectors."""
+
+    fields = sorted(
+        {
+            field
+            for names in WEIGHT_SOURCE_FIELDS.values()
+            for field in names
+        }
+    )
+    return canonical_hash(
+        {
+            "registry_kind": COMPLETE_MATCH_REGISTRY_KIND,
+            "source_package": "bj137_gate_a_preoutcome_v2",
+            "source_file": "match_vectors.csv",
+            "source_file_sha256": BJ137_MATCH_VECTORS_SHA256,
+            "issue": str(row["issue"]),
+            "fold": str(row["fold"]),
+            "issue_instance": str(row["issue_instance"]),
+            "match_id": str(row["match_id"]),
+            "match_idx": str(row["match_idx"]),
+            "weights": {field: str(row[field]) for field in fields},
+        }
+    )
 
 
 def _assert_outcome_unexposed(row: Mapping[str, object]) -> None:
@@ -509,6 +548,8 @@ def combine_stage2_and_stage3_weights(
     ):
         return unavailable("STAGE3_ROLE_VECTOR_MISSING")
     fields = WEIGHT_SOURCE_FIELDS[weight_source]
+    registry_kind = "CONTROL_UNIT_WEIGHT"
+    registry_fold = "NA"
     if weight_source != "NA":
         source_rows = [role_by_match[match_id] for match_id in ordered]
         if any(
@@ -518,12 +559,24 @@ def combine_stage2_and_stage3_weights(
             return unavailable("STAGE3_MATCH_IDENTITY_MISMATCH")
         if any(any(field not in row for field in fields) for row in source_rows):
             return unavailable("STAGE3_WEIGHT_SOURCE_FIELD_MISSING")
-        portfolio_ids = {str(row.get("portfolio_id", "")) for row in source_rows}
+        registry_kinds = {str(row.get("registry_kind", "")) for row in source_rows}
         issues = {str(row.get("issue", "")) for row in source_rows}
-        if "" in portfolio_ids or len(portfolio_ids) != 1:
-            return unavailable("STAGE3_PORTFOLIO_IDENTITY_MISMATCH")
         if "" in issues or len(issues) != 1:
             return unavailable("STAGE3_ISSUE_IDENTITY_MISMATCH")
+        if registry_kinds == {COMPLETE_MATCH_REGISTRY_KIND}:
+            registry_kind = COMPLETE_MATCH_REGISTRY_KIND
+            folds = {str(row.get("fold", "")) for row in source_rows}
+            if "" in folds or len(folds) != 1:
+                return unavailable("STAGE3_FOLD_IDENTITY_MISMATCH")
+            registry_fold = next(iter(folds))
+            if any(
+                str(row.get("weight_registry_row_sha256", ""))
+                != complete_match_weight_row_identity(row)
+                for row in source_rows
+            ):
+                return unavailable("STAGE3_WEIGHT_REGISTRY_IDENTITY_MISMATCH")
+        else:
+            return unavailable("STAGE3_WEIGHT_REGISTRY_KIND_MISMATCH")
     combined: list[list[float]] = []
     identities: dict[str, str] = {}
     for match_id in ordered:
@@ -562,7 +615,13 @@ def combine_stage2_and_stage3_weights(
                 else "bj137_gate_a_preoutcome_v2"
             ),
             "source_file": (
-                "NA" if weight_source == "NA" else "n7_role_vectors.csv.gz"
+                "NA"
+                if weight_source == "NA"
+                else "match_vectors.csv"
+            ),
+            "registry_kind": registry_kind,
+            "weight_registry_row_sha256": role.get(
+                "weight_registry_row_sha256", "NA"
             ),
             "portfolio_id": role.get("portfolio_id", "NA"),
             "issue": role.get("issue", "NA"),
@@ -577,14 +636,17 @@ def combine_stage2_and_stage3_weights(
         "reason_code": "STAGE2_MASK_TIMES_BOUND_STAGE3_WEIGHT_SOURCE",
         "ordered_match_ids": list(ordered),
         "weight_source": weight_source,
+        "source_registry_kind": registry_kind,
         "source_portfolio_id": (
-            "NA" if weight_source == "NA"
+            "NA"
+            if weight_source == "NA" or registry_kind == COMPLETE_MATCH_REGISTRY_KIND
             else str(role_by_match[ordered[0]]["portfolio_id"])
         ),
         "source_issue": (
             "NA" if weight_source == "NA"
             else str(role_by_match[ordered[0]]["issue"])
         ),
+        "source_fold": registry_fold,
         "per_match_weight_3_1_0": [
             [format(value, ".12f") for value in row] for row in combined
         ],
@@ -598,17 +660,57 @@ def ticket_weight_sha256(weights: Sequence[float]) -> str:
     return canonical_hash([format(float(value), ".17g") for value in weights])
 
 
+def stage3_replay_signature(
+    *,
+    issue: object,
+    stage1_output_sha256: object,
+    stage2_output_sha256: object,
+    derived_stage3_action_sha256: object,
+) -> str:
+    """Derive the allocator RNG namespace solely from frozen chain identity."""
+
+    issue_text = str(issue)
+    if not issue_text or not issue_text.isdigit():
+        raise ValueError("issue must be a nonblank numeric canonical identity")
+    return canonical_hash(
+        {
+            "contract": "BJ193_STAGE3_REPLAY_SIGNATURE_V1",
+            "issue": issue_text,
+            "stage1_output_sha256": _require_sha256(
+                stage1_output_sha256, "stage1_output_sha256"
+            ),
+            "stage2_output_sha256": _require_sha256(
+                stage2_output_sha256, "stage2_output_sha256"
+            ),
+            "derived_stage3_action_sha256": _require_sha256(
+                derived_stage3_action_sha256,
+                "derived_stage3_action_sha256",
+            ),
+        }
+    )
+
+
 def allocate_conditional_tickets(
     mechanism: str,
     per_match_weights: Sequence[Sequence[float]],
     m: int,
     *,
     allocation_engine: object,
+    issue: object,
+    stage1_output_sha256: object,
+    stage2_output_sha256: object,
+    derived_stage3_action_sha256: object,
     seed: str = "NA",
-    identity_signature: str = "",
     cap: int | None = None,
 ) -> dict[str, object]:
     """Freeze reduced-support behavior before calling the accepted engine."""
+
+    replay_signature = stage3_replay_signature(
+        issue=issue,
+        stage1_output_sha256=stage1_output_sha256,
+        stage2_output_sha256=stage2_output_sha256,
+        derived_stage3_action_sha256=derived_stage3_action_sha256,
+    )
 
     try:
         weights = canonical_ticket_weight_vector(per_match_weights)
@@ -622,6 +724,7 @@ def allocate_conditional_tickets(
             "requested_ticket_count": 0,
             "requested_stake_yuan": 0,
             "ticket_weight_sha256": "",
+            "stage3_replay_signature_sha256": replay_signature,
             "counts_sha256": "",
             "counts": (),
             "detail": str(error),
@@ -656,7 +759,7 @@ def allocate_conditional_tickets(
             weights,
             int(m),
             seed=str(seed),
-            identity_signature=identity_signature,
+            identity_signature=replay_signature,
             cap=cap,
         )
         if any(count and weights[index] <= 0 for index, count in enumerate(counts)):
@@ -683,6 +786,7 @@ def allocate_conditional_tickets(
         "requested_ticket_count": int(fingerprint["draw_count"]),
         "requested_stake_yuan": 2 * int(fingerprint["draw_count"]),
         "ticket_weight_sha256": ticket_weight_sha256(weights),
+        "stage3_replay_signature_sha256": replay_signature,
         **fingerprint,
         "counts": counts,
     }

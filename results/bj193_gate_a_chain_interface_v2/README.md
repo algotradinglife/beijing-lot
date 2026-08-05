@@ -8,6 +8,12 @@ outcome or Gate-B settlement payload is opened.
 Stage 2 actions are explicitly derived Stage-1-conditional adapters; they are
 not renamed #190 B0-only actions. Stage 3 actions bind accepted #167 parameters
 to the exact Stage-2 mask/weight-to-ordinal builder and byte-bound #145 engine.
+The complete #137 match-vector registry supplies hash-bound pre-event weights
+for every supported #127/#134 N7. A normalized Stage1×Stage3 registry screens
+all 2,377,647 action pairs before learning: incompatible
+#190/non-NA pairs are explicit zero-flow and never fall back to partial, unit,
+or fabricated weights. The allocator replay signature is derived internally
+from the issue and complete upstream/action digests.
 The stagewise learner registry fixes projection columns, encoding, per-action
 topology, screening and every validation/action tie.
 
@@ -16,6 +22,8 @@ Catalog census:
 - Stage 1 selection actions: 2,469
 - Stage 2 direction actions: 2,425
 - Stage 3 seed-agnostic allocator/M actions: 963
+- Complete pre-event Stage-3 match-weight rows: 47,819
+- Normalized Stage1×Stage3 coverage rows/classes: 17,283/7
 - stage-specific model configurations: 90
 - required matched attribution controls: 4
 
