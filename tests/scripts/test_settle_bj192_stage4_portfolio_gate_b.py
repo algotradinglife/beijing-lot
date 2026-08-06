@@ -533,6 +533,11 @@ def test_minimal_stage4_fixture_is_separately_bound_from_superseded_surface_chec
         assert len(tables["weight_history"]) == 348
         assert all(len(value["support_hash"]) == 64 for value in identities.values())
         assert all(len(value["actual_funding_hash"]) == 64 for value in identities.values())
+        comparison = RUNNER.minimal_stage4_comparison_tables(checkpoint)
+        assert len(comparison["baseline_lift"]) == 1
+        assert comparison["baseline_lift"][0]["candidate_minus_control_bankroll_yuan"] == pytest.approx(0.0)
+        assert comparison["all_pairs_risk_return_surface"] == []
+        assert len(comparison["portfolio_k_saturation"]) == 1
     finally:
         checkpoint.unlink(missing_ok=True)
 

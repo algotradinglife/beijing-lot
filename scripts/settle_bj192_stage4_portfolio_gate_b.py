@@ -1744,6 +1744,104 @@ def minimal_stage4_core_tables(
     return tables, identities
 
 
+def minimal_stage4_comparison_tables(
+    checkpoint: Path,
+) -> dict[str, list[dict[str, object]]]:
+    """Build matched FULL lifts and the bounded pair/K/pareto decision views.
+
+    This is deliberately a reporting transformation over saved outcome paths.
+    It does not choose an action from seed noise and it does not create a
+    cash-only comparison: every lift is matched by mode, fraction, weighting,
+    normalization, bundle, starting bankroll and complete calendar.
+    """
+    core, identities = minimal_stage4_core_tables(checkpoint)
+    capital_by_identity = {
+        tuple(row[field] for field in PATH_IDENTITY): row for row in core["capital_summary"]
+    }
+    holdings_by_identity = {
+        tuple(row[field] for field in PATH_IDENTITY): row for row in core["holding_metrics"]
+    }
+    outputs = {name: [] for name in (
+        "baseline_lift", "all_pairs_risk_return_surface", "portfolio_k_saturation",
+        "higher_order_pareto_frontier",
+    )}
+    funding_by_identity: dict[tuple[object, ...], list[dict[str, object]]] = defaultdict(list)
+    for row in core["sleeve_funding_ledger"]:
+        funding_by_identity[tuple(row[field] for field in PATH_IDENTITY)].append(row)
+    full_by_axis = {
+        identity[1:]: capital_by_identity[identity]
+        for identity, rows in funding_by_identity.items()
+        if tuple(sorted({row["sleeve_or_family_id"] for row in rows})) == ("BEST_FULL_FULL",)
+    }
+    for identity, capital in sorted(capital_by_identity.items(), key=lambda item: canonical_hash(item[0])):
+        portfolio_id, mode, fraction, weight, normalization, bundle = identity
+        membership = tuple(sorted({row["sleeve_or_family_id"] for row in funding_by_identity[identity]}))
+        support = identities[identity]["support_hash"]
+        funding = identities[identity]["actual_funding_hash"]
+        control = full_by_axis.get(identity[1:])
+        if control is None:
+            raise RuntimeError("minimal Stage-4 matched FULL control unavailable")
+        control_identity = (
+            control["portfolio_id"], control["mode"], control["position_fraction"],
+            control["weight_method"], control["normalization_method"],
+            control["deployment_replicate_bundle_id"],
+        )
+        if support != identities[control_identity]["support_hash"]:
+            raise RuntimeError("minimal Stage-4 matched support drift")
+        outputs["baseline_lift"].append({
+            **{field: capital[field] for field in PATH_IDENTITY},
+            "candidate_id": portfolio_id, "control_id": control["portfolio_id"],
+            "support_hash": support, "actual_funding_hash": funding,
+            "absolute_ending_bankroll_yuan": capital["ending_bankroll_yuan"],
+            "absolute_pre_tax_roi": capital["pre_tax_roi"],
+            "candidate_minus_control_bankroll_yuan": float(capital["ending_bankroll_yuan"]) - float(control["ending_bankroll_yuan"]),
+            "candidate_minus_control_pre_tax_roi": (
+                float(capital["pre_tax_roi"]) - float(control["pre_tax_roi"])
+                if capital["pre_tax_roi"] is not None and control["pre_tax_roi"] is not None else None
+            ),
+            "ladder_decision": "NOT_ADVANCED_PENDING_STRICT_EV_IF_MATERIALLY_POSITIVE",
+        })
+        shares = defaultdict(float)
+        total_stake = 0.0
+        for row in funding_by_identity[identity]:
+            shares[str(row["sleeve_or_family_id"])] += float(row["actual_stake_yuan"])
+            total_stake += float(row["actual_stake_yuan"])
+        hhi = sum((value / total_stake) ** 2 for value in shares.values()) if total_stake else None
+        family_set = canonical_hash([
+            canonical_economic_catalog()[sleeve]["economic_family_id"] for sleeve in membership
+        ])
+        if len(membership) == 2:
+            outputs["all_pairs_risk_return_surface"].append({
+                **{field: capital[field] for field in PATH_IDENTITY},
+                "economic_family_set_sha256": family_set, "pair_id": "|".join(membership),
+                "pre_tax_roi": capital["pre_tax_roi"], "sharpe": holdings_by_identity[identity]["sharpe"],
+                "sortino": holdings_by_identity[identity]["sortino"], "calmar": holdings_by_identity[identity]["calmar"],
+                "max_drawdown_yuan": holdings_by_identity[identity]["max_drawdown_yuan"],
+                "capital_growth": capital["capital_growth"], "capital_turnover": capital["capital_turnover"],
+                "tax_adjusted_roi": capital["tax_adjusted_roi"], "support_hash": support,
+                "undefined_reason": "" if capital["pre_tax_roi"] is not None else "ZERO_STAKE",
+            })
+        outputs["portfolio_k_saturation"].append({
+            **{field: capital[field] for field in PATH_IDENTITY},
+            "ordered_shortlist_id": "MINIMAL_H1_DETERMINISTIC", "K": len(membership),
+            "economic_family_set_sha256": family_set,
+            "candidate_aliases_sha256": canonical_hash(membership),
+            "ending_bankroll_yuan": capital["ending_bankroll_yuan"], "pre_tax_roi": capital["pre_tax_roi"],
+            "max_drawdown_yuan": holdings_by_identity[identity]["max_drawdown_yuan"],
+            "contribution_hhi": hhi, "retained_cash_yuan": capital["cash_yuan"],
+            "marginal_vs_K_minus_1_yuan": "", "undefined_reason": "",
+        })
+        outputs["higher_order_pareto_frontier"].append({
+            **{field: capital[field] for field in PATH_IDENTITY},
+            "economic_family_set_sha256": family_set, "frontier_id": "MINIMAL_STAGE4_RAW",
+            "pre_tax_roi": capital["pre_tax_roi"], "capital_growth": capital["capital_growth"],
+            "max_drawdown_yuan": holdings_by_identity[identity]["max_drawdown_yuan"],
+            "contribution_hhi": hhi, "tax_adjusted_roi": capital["tax_adjusted_roi"],
+            "dominance_status": "UNSCREENED_MINIMAL_CLOSURE", "support_hash": support,
+        })
+    return outputs
+
+
 def _realized_stability_rows(path: Sequence[dict[str, object]], membership_id: str) -> list[dict[str, object]]:
     """Subset diagnostics on one realized path; they never re-fit prior state."""
     rows: list[dict[str, object]] = []
