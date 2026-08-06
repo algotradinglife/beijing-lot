@@ -1229,6 +1229,13 @@ def replay_path(
                 weights,
                 {sleeve: item.atomic for sleeve, item in issue_sleeves.items()},
             )
+            # Allocation is invoked through the frozen scaled-native primitive
+            # only to express the already-computed normalized budget in whole
+            # tickets.  Preserve the original capital-mode accounting in the
+            # ledger: a FIXED/COMPOUNDING/NATIVE request did not become a new
+            # Stage-4 mode merely because normalization scaled it down.
+            funding["mode_notional_yuan"] = raw_notional
+            funding["issue_budget_yuan"] = capped_budget
         else:
             funding = {"actual_ticket_count_by_sleeve": {s: 0 for s in sleeves}, "reason_codes": str(normalization["normalization_status"]), "mode_notional_yuan": raw_notional, "issue_budget_yuan": 0.0, "retained_cash_yuan": bankroll, "actual_total_stake_yuan": 0.0}
         settlements = {sleeve: issue_sleeves[sleeve].settle_prefix(int(funding["actual_ticket_count_by_sleeve"][sleeve])) for sleeve in sleeves}

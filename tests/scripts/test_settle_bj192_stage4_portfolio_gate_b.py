@@ -149,6 +149,8 @@ def test_path_state_machine_uses_strictly_prior_history_and_concurrent_budget() 
     assert rows[1]["preissue_bankroll_yuan"] == pytest.approx(rows[0]["postissue_bankroll_yuan"])
     for row in rows:
         assert sum(float(x["actual_stake_yuan"]) for x in row["sleeve_settlements"].values()) == pytest.approx(row["actual_stake_yuan"])
+        assert row["mode_notional_yuan"] == pytest.approx(5_000.0)
+        assert row["issue_budget_yuan"] <= row["mode_notional_yuan"]
 
 
 def test_holding_summary_retains_zero_flow_windows_and_drawdown_path() -> None:
