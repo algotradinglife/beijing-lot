@@ -187,17 +187,10 @@ def test_holding_summary_retains_zero_flow_windows_and_drawdown_path() -> None:
     assert windows[0]["window_pre_tax_roi"] == pytest.approx(0.0)
 
 
-def test_paired_stationary_max_t_shares_draws_and_controls_familywise_error() -> None:
-    contrasts = {
-        "A": [10.0 + (index % 3) for index in range(60)],
-        "B": [5.0 + (index % 2) for index in range(60)],
-    }
-    first = RUNNER.paired_stationary_max_t(contrasts, replicates=200, seed=7, mean_block_length=5.0)
-    second = RUNNER.paired_stationary_max_t(contrasts, replicates=200, seed=7, mean_block_length=5.0)
-    assert first == second
-    assert {row["target_id"] for row in first} == {"A", "B"}
-    assert all(row["bootstrap_replicates"] == 200 for row in first)
-    assert all(row["paired_growth_delta_low"] > 0.0 for row in first)
+def test_report_quantiles_use_the_frozen_inclusive_percentile_convention() -> None:
+    assert RUNNER._quantile([0.0, 100.0], 0.025) == pytest.approx(2.5)
+    assert RUNNER._quantile([0.0, 100.0], 0.5) == pytest.approx(50.0)
+    assert RUNNER._quantile([0.0, 100.0], 0.95) == pytest.approx(95.0)
 
 
 def test_replay_path_fails_closed_to_full_or_zero_for_expanded_atomic_sleeve() -> None:
@@ -322,6 +315,17 @@ def test_sleeve_funding_ledger_and_capital_summary_reconcile_exactly() -> None:
     holding = RUNNER.summarize_holding_path(rows)["summary"]
     summary = RUNNER.capital_summary(rows, holding)
     assert summary["turnover_yuan"] == pytest.approx(sum(float(row["actual_stake_yuan"]) for row in rows))
+    assert isinstance(summary["minimum_required_start_yuan"], int)
+
+
+def test_minimum_required_start_bisects_the_exact_saved_funding_boundary() -> None:
+    rows = [
+        {"calendar_index": 0, "actual_stake_yuan": 10.0, "pre_tax_net_yuan": -4.0},
+        {"calendar_index": 1, "actual_stake_yuan": 12.0, "pre_tax_net_yuan": 0.0},
+    ]
+    assert not RUNNER.is_fundable_from_start(rows, 15)
+    assert RUNNER.is_fundable_from_start(rows, 16)
+    assert RUNNER.minimum_required_start_yuan(rows) == 16
 
 
 def test_candidate_bridge_merge_rejects_duplicate_and_keeps_trace_identity() -> None:
@@ -367,6 +371,38 @@ def test_path_output_tables_have_complete_path_keys_and_exact_sleeve_rows() -> N
     assert all("portfolio_id" in row and "issue_instance" in row for row in tables["issue_ledger"])
     assert tables["capital_summary"][0]["ending_bankroll_yuan"] == pytest.approx(path[-1]["postissue_bankroll_yuan"])
     assert all(float(row["portfolio_pnl_reconciliation_yuan"]) == 0.0 for row in tables["risk_decomposition"])
+
+
+def test_risk_attribution_reconstructs_prior_covariance_and_matched_full_deltas() -> None:
+    source = RUNNER.h1_ticket_bridge()
+    # Use the actual full frozen calendar: early years include genuine
+    # unavailable/no-bet rows, so a 60-row artificial prefix is not a valid
+    # production assertion of the 52-common-active covariance condition.
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")
+    candidate_sleeves = ("MODEL_SOURCE_MODEL_CAP1_M512", "Q_SOURCE_Q_TOP_MASS_M192")
+    candidate_bridge = {
+        (sleeve, row["issue_instance"]): source[(sleeve, row["issue_instance"])]
+        for sleeve in candidate_sleeves for row in calendar
+    }
+    full_bridge = {
+        ("BEST_FULL_FULL", row["issue_instance"]): source[("BEST_FULL_FULL", row["issue_instance"])]
+        for row in calendar
+    }
+    candidate = RUNNER.replay_path(
+        sleeves=candidate_sleeves, mode="NATIVE_REQUEST_CONTROL", fraction=1.0,
+        weight_method="EQUAL_WEIGHT", normalization_method="UNIT_CAPITAL",
+        bridge=candidate_bridge, calendar=calendar,
+    )
+    full = RUNNER.replay_path(
+        sleeves=["BEST_FULL_FULL"], mode="NATIVE_REQUEST_CONTROL", fraction=1.0,
+        weight_method="EQUAL_WEIGHT", normalization_method="UNIT_CAPITAL",
+        bridge=full_bridge, calendar=calendar,
+    )
+    rows = RUNNER.risk_decomposition_rows(candidate, candidate_bridge, matched_control_rows=full)
+    assert all(row["matched_drawdown_delta_yuan"] != "" for row in rows)
+    assert all(row["matched_tail_loss_delta_yuan"] != "" for row in rows)
+    assert any(row["euler_variance_contribution"] != "" for row in rows)
+    assert all("COVARIANCE_MATRIX_NOT_RETAINED" not in str(row["undefined_reason"]) for row in rows)
 
 
 def test_walk_forward_candidate_paths_preserve_each_frozen_seed_as_own_path() -> None:
@@ -456,14 +492,6 @@ def test_native_m_curve_and_fixed_comparator_are_exact_source_aggregates() -> No
     assert all(sleeve.sleeve_id.endswith("@M32@137001") for sleeve in fixed.values())
 
 
-def test_frozen_portfolio_enumeration_covers_every_canonical_pair_and_shortlist_subset() -> None:
-    sets = RUNNER.frozen_portfolio_sets()
-    assert len(sets["standalone"]) == 104
-    assert len(sets["pairwise"]) == 5356
-    assert len(sets["higher_order"]) == 7 + 31
-    assert ("BEST_FULL_FULL", "MODEL_SOURCE_MODEL_CAP1_M512") in sets["pairwise"]
-
-
 def test_execution_axes_are_read_from_gate_a_and_preserve_legality_rules() -> None:
     axes = RUNNER.frozen_execution_axes()
     assert len(axes) == 1_159
@@ -472,21 +500,6 @@ def test_execution_axes_are_read_from_gate_a_and_preserve_legality_rules() -> No
         row["weight_method"] == "EQUAL_WEIGHT"
         for row in axes if row["normalization_method"] == "EQUAL_CAPITAL"
     )
-
-
-def test_bounded_core_contract_has_only_authorized_memberships_and_landmarks() -> None:
-    groups = RUNNER.bounded_core_memberships()
-    assert {key: len(value) for key, value in groups.items()} == {
-        "STANDALONE": 8, "PAIR": 28, "H1_TRIPLE": 1, "ROBUST_PREFIX": 3,
-    }
-    assert groups["H1_TRIPLE"] == (tuple(sorted(RUNNER.H1_SLEEVES)),)
-    assert groups["ROBUST_PREFIX"][-1] == tuple(sorted(RUNNER.ROBUST_SLEEVES))
-    axes = RUNNER.bounded_core_execution_axes()
-    assert len(axes) == 72
-    assert {row["mode"] for row in axes} == {
-        "NATIVE_REQUEST_CONTROL", "FIXED_100K_NOTIONAL", "COMPOUNDING_BANKROLL"
-    }
-    assert {row["position_fraction"] for row in axes if row["mode"] != "NATIVE_REQUEST_CONTROL"} == {0.10, 0.25, 0.50, 1.0}
 
 
 def test_minimal_stage4_closure_contract_has_three_sleeves_seven_memberships_and_36_axes() -> None:
@@ -507,9 +520,6 @@ def test_minimal_stage4_closure_contract_has_three_sleeves_seven_memberships_and
         "UNIT_CAPITAL", "UNIT_EX_ANTE_VOL_CAPPED_5PCT",
     }
     assert {row["position_fraction"] for row in axes if row["mode"] == "NATIVE_REQUEST_CONTROL"} == {1.0}
-    selected = RUNNER.minimal_stage4_selected_m_rows()
-    assert len(selected) == 3 * 348
-    assert {row["selected_M"] for row in selected if row["economic_family_id"] == "ECON_Q_SOURCE_Q_TOP_MASS_M192"} == {192}
 
 
 def test_minimal_stage4_fixture_is_separately_bound_from_superseded_surface_checkpoints() -> None:
@@ -559,11 +569,19 @@ def test_minimal_stage4_fixture_is_separately_bound_from_superseded_surface_chec
 
 
 def test_final_minimal_checkpoint_collapses_equivalent_deterministic_bundles() -> None:
-    binding, paths = RUNNER.load_minimal_stage4_checkpoint(
-        ROOT / ".scratch" / "bj192_minimal_stage4_checkpoint.json"
-    )
-    assert binding["bundle_count"] == 3
-    assert len(paths) == 7 * 36
+    base = {
+        "portfolio_id": "portfolio", "mode": "NATIVE_REQUEST_CONTROL",
+        "position_fraction": "1.00", "weight_method": "EQUAL_WEIGHT",
+        "normalization_method": "UNIT_CAPITAL", "calendar_index": 0,
+        "issue_instance": "I1@OOS_2019",
+        "sleeve_settlements": {"BEST_FULL_FULL": {"actual_stake_yuan": 2.0}},
+    }
+    groups = {}
+    for bundle in RUNNER.frozen_replicate_bundles():
+        identity = ("portfolio", "NATIVE_REQUEST_CONTROL", "1.00", "EQUAL_WEIGHT", "UNIT_CAPITAL", bundle)
+        groups[identity] = [{**base, "deployment_replicate_bundle_id": bundle}]
+    paths = RUNNER.collapse_minimal_stage4_deterministic_paths(groups)
+    assert len(paths) == 1
     assert {identity[-1] for identity in paths} == {"BUNDLE_ORDINAL_001"}
 
 
@@ -599,110 +617,44 @@ def test_minimal_stage4_comparison_reuses_prebuilt_core_ledgers(monkeypatch: pyt
     assert len(result["baseline_lift"]) == 1
 
 
-def test_minimal_stage4_finalizer_is_atomic_and_checkpoint_only(monkeypatch: pytest.MonkeyPatch) -> None:
-    output = ROOT / ".scratch" / "bj192_minimal_finalizer_fixture"
-    stage = output.with_name(f".{output.name}.stage")
+def test_decision_artifacts_are_package_derived_and_manifest_ready() -> None:
+    package = ROOT / "results" / "bj192_gate_b_minimal_stage4_v2"
+    manifest = __import__("json").load(open(package / "table_manifest.json"))
+    names = ("issue_ledger", "sleeve_funding_ledger", "capital_summary", "holding_metrics", "baseline_lift")
+    tables = {}
+    for name in names:
+        filename = manifest[name]["filename"]
+        tables[name] = RUNNER.read_gzip(package / filename) if filename.endswith(".gz") else RUNNER.read_csv(package / filename)
+    output = ROOT / ".scratch" / "bj192_decision_artifacts_fixture"
     if output.exists():
         shutil.rmtree(output)
-    if stage.exists():
-        shutil.rmtree(stage)
-    schema = __import__("json").load(open(RUNNER.GATE_A / "output_schema.json"))
-    tables = {name: [] for name, spec in schema.items() if isinstance(spec, dict) and "key" in spec}
-    for name in ("issue_ledger", "sleeve_funding_ledger", "capital_summary", "holding_metrics", "baseline_lift", "bootstrap_stability", "terminal_decision", "regime_map", "selected_m_path"):
-        tables[name] = [{field: "fixture" for field in [*schema[name]["key"], *schema[name]["fields"]]}]
-    checkpoint = ROOT / ".scratch" / "bj192_finalizer_fixture_checkpoint.json"
-    checkpoint.write_text(
-        '{"completed_path_keys":[],"payload_sha256":"fixture-payload"}\n',
-        encoding="utf-8",
+    output.mkdir()
+    try:
+        receipt = RUNNER.minimal_stage4_decision_artifacts(output, tables)
+        assert receipt["decision_path_summary"]["row_count"] == 5
+        assert receipt["decision_chart_source"]["row_count"] == 5 * 348
+        assert (output / "charts" / "decision_paths.svg").read_text(encoding="utf-8").startswith("<svg")
+        assert (output / "charts" / "decision_paths.png").read_bytes().startswith(b"\x89PNG")
+        assert (output / "charts" / "decision_paths.pdf").read_bytes().startswith(b"%PDF")
+    finally:
+        shutil.rmtree(output)
+
+
+def test_committed_v3_delivery_is_clean_clone_verifiable_without_author_checkpoint() -> None:
+    package = ROOT / "results" / "bj192_gate_b_minimal_stage4_v3"
+    assert RUNNER.verify_package(
+        package, RUNNER.sha256_file(package / "SHA256SUMS.json"), RUNNER.sha256_file(package / "CONTENT_IDENTITY.json"),
     )
-    monkeypatch.setattr(RUNNER, "load_minimal_stage4_checkpoint", lambda _checkpoint: ({"phase": "fixture"}, {}))
-    monkeypatch.setattr(RUNNER, "minimal_stage4_package_tables", lambda _checkpoint: tables)
-    try:
-        receipt = RUNNER.finalize_minimal_stage4_package(checkpoint, output)
-        assert output.exists() and not stage.exists()
-        assert RUNNER.verify_package(output, receipt["manifest_sha256"], receipt["content_sha256"])
-        source = __import__("json").load(open(output / "source_binding.json"))
-        assert source["settlement_boundary"] == "CHECKPOINT_ONLY_NO_TICKET_REPLAY"
-    finally:
-        checkpoint.unlink(missing_ok=True)
-        if output.exists():
-            shutil.rmtree(output)
-
-
-def test_bounded_core_fixture_writes_summary_and_realized_stability() -> None:
-    checkpoint = ROOT / ".scratch" / "bj192_core_fixture.json"
-    checkpoint.unlink(missing_ok=True)
-    try:
-        receipt = RUNNER.phase_one_core_replay(
-            checkpoint,
-            memberships=[("BEST_FULL_FULL",)],
-            axes=[{"mode": "NATIVE_REQUEST_CONTROL", "position_fraction": 1.0,
-                   "weight_method": "EQUAL_WEIGHT", "normalization_method": "UNIT_CAPITAL"}],
-            bundles=["BUNDLE_ORDINAL_001"],
-        )
-        rows = RUNNER.load_surface_checkpoint(checkpoint, binding=receipt["binding"])
-        assert sum(row["record_type"] == "CORE_PATH_SUMMARY" for row in rows) == 1
-        assert {row["panel_type"] for row in rows if row["record_type"] == "CORE_REALIZED_STABILITY"} >= {"YEAR", "LOYO", "EX_LARGEST_ISSUE", "EX_LARGEST_YEAR"}
-    finally:
-        checkpoint.unlink(missing_ok=True)
-
-
-def test_phase_two_selection_keeps_mandatory_controls_and_jointly_ranked_nondominated_extras() -> None:
-    checkpoint = ROOT / ".scratch" / "bj192_phase1_core_checkpoint.json"
-    if not checkpoint.exists():
-        pytest.skip("Phase-1 production core checkpoint is not available")
-    rows = RUNNER.select_phase_two_memberships(checkpoint)
-    selected = {row["membership_json"] for row in rows if row["phase2_selected"]}
-    assert len(selected) <= 6
-    assert __import__("json").dumps(tuple(sorted(RUNNER.H1_SLEEVES)), separators=(",", ":")) in selected
-    assert __import__("json").dumps(tuple(sorted(RUNNER.ROBUST_SLEEVES)), separators=(",", ":")) in selected
-    extras = [row for row in rows if row["selection_status"] == "NONDOMINATED_JOINT_PATH_TOP4"]
-    assert len(extras) <= 4
-    assert all("ENDING_LIFT_DRAWDOWN_RECOVERY_TURNOVER" in row["selection_rule"] for row in extras)
-
-
-def test_phase_two_axes_are_exact_complete_frozen_capital_grid() -> None:
-    axes = RUNNER.phase_two_execution_axes()
-    assert len(axes) == 760
-    assert {row["mode"] for row in axes} == {"FIXED_100K_NOTIONAL", "COMPOUNDING_BANKROLL"}
-    assert {row["position_fraction"] for row in axes} == {
-        row["position_fraction"] for row in RUNNER.frozen_execution_axes()
-        if row["mode"] == "FIXED_100K_NOTIONAL"
-    }
-
-
-def test_phase_two_fixture_writes_bound_summary_and_stability() -> None:
-    core = ROOT / ".scratch" / "bj192_phase1_core_checkpoint.json"
-    if not core.exists():
-        pytest.skip("Phase-1 production core checkpoint is not available")
-    checkpoint = ROOT / ".scratch" / "bj192_phase2_fixture.json"
-    checkpoint.unlink(missing_ok=True)
-    try:
-        receipt = RUNNER.phase_two_replay(
-            checkpoint,
-            core_checkpoint=core,
-            memberships=[tuple(sorted(RUNNER.H1_SLEEVES))],
-            axes=[{
-                "mode": "FIXED_100K_NOTIONAL", "position_fraction": 0.10,
-                "weight_method": "EQUAL_WEIGHT", "normalization_method": "UNIT_CAPITAL",
-            }],
-            bundles=["BUNDLE_ORDINAL_001"],
-        )
-        rows = RUNNER.load_surface_checkpoint(checkpoint, binding=receipt["binding"])
-        assert sum(row["record_type"] == "PHASE2_PATH_SUMMARY" for row in rows) == 1
-        assert {row["panel_type"] for row in rows if row["record_type"] == "PHASE2_REALIZED_STABILITY"} >= {
-            "YEAR", "LOYO", "EX_LARGEST_ISSUE", "EX_LARGEST_YEAR",
-        }
-    finally:
-        checkpoint.unlink(missing_ok=True)
-
-
-def test_surface_preflight_reports_full_frozen_cartesian_scope_without_reduction() -> None:
-    receipt = RUNNER.surface_preflight_receipt()
-    assert receipt["status"] == "PREFLIGHT_REQUIRES_EXPLICIT_EXECUTION_PLAN"
-    assert receipt["surface"]["pairwise"]["portfolio_set_count"] == 5_356
-    assert receipt["total_capital_path_count"] == 19_116_546
-    assert receipt["total_issue_path_row_count"] == 6_652_558_008
+    source = __import__("json").load(open(package / "source_binding.json"))
+    assert source["settlement_boundary"] == "COMMITTED_V2_PACKAGE_ONLY_NO_TICKET_REPLAY_NO_BOOTSTRAP_RERUN"
+    assert "checkpoint" not in source
+    capital = RUNNER.read_csv(package / "capital_summary.csv")
+    assert len(capital) == 252
+    assert all(row["minimum_required_start_yuan"] != "PENDING_BISECTION" for row in capital)
+    risk = RUNNER.read_gzip(package / "risk_decomposition.csv.gz")
+    assert sum(row["euler_variance_contribution"] != "" for row in risk) > 0
+    assert all(row["matched_drawdown_delta_yuan"] != "" for row in risk)
+    assert (package / "charts" / "decision_paths.svg").exists()
 
 
 def test_realized_dependence_uses_explicit_zero_flow_and_active_denominators() -> None:

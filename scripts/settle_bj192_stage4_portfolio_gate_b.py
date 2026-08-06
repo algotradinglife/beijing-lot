@@ -12,7 +12,6 @@ approximation.
 from __future__ import annotations
 
 import csv
-import gc
 import gzip
 import hashlib
 import importlib.util
@@ -20,22 +19,20 @@ import io
 import json
 import math
 import os
-import random
 import shutil
 import sqlite3
+import statistics
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Sequence
 
 
 CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
-VERSION = "bj192-gate-b-v1"
+VERSION = "bj192-gate-b-v3"
 TICKET_STAKE_YUAN = 2.0
 INITIAL_BANKROLL_YUAN = 100_000.0
-PHASE0_CHECKPOINT = ".scratch/bj192_phase0_selected_m_checkpoint_v4.json"
-PHASE0_MATERIALIZER_CONTRACT = "selected-native-outcome-cache-v4"
 
 EXPECTED_GATE_A_MANIFEST = "6108defd857bf431bcaf55109df0e195b45aa754e8fd46f1db82d329102ff256"
 EXPECTED_GATE_A_CONTENT = "66ce6f86703b31d710ad678b49287de3bc6b2c43a5b36c278e1369bdecd861d5"
@@ -48,21 +45,6 @@ H1_SLEEVES = (
     "MODEL_SOURCE_MODEL_CAP1_M512",
     "Q_SOURCE_Q_TOP_MASS_M192",
 )
-ROBUST_SLEEVES = (
-    "BJ148_NOGATE_WR_DENSE_M",
-    "BJ148_NOGATE_WOR_DENSE_M",
-    "BJ151_NOGATE_K4_WR_DENSE_M",
-    "BJ151_NOGATE_K4_WOR_DENSE_M",
-    "BJ159_SELECTED_N7_WOR_M_CURVE",
-)
-CORE_SLEEVES = (*H1_SLEEVES, *ROBUST_SLEEVES)
-CORE_WEIGHT_METHODS = (
-    "EQUAL_WEIGHT",
-    "PRIOR_INVERSE_VOL",
-    "PRIOR_MINIMUM_VARIANCE",
-    "PRIOR_MAXIMUM_DIVERSIFICATION",
-)
-CORE_NORMALIZATION_METHODS = ("UNIT_CAPITAL", "UNIT_EX_ANTE_VOL_CAPPED_5PCT")
 MINIMAL_WEIGHT_METHODS = ("EQUAL_WEIGHT", "PRIOR_MINIMUM_VARIANCE")
 MINIMAL_NORMALIZATION_METHODS = ("UNIT_CAPITAL", "UNIT_EX_ANTE_VOL_CAPPED_5PCT")
 _H1_TICKET_BRIDGE: dict[tuple[str, str], "NativeIssueSleeve"] | None = None
@@ -182,6 +164,7 @@ def write_immutable_package(
     source_binding: dict[str, object],
     package_note: str,
     max_package_bytes: int | None = None,
+    artifact_writer: Callable[[Path, dict[str, Sequence[dict[str, object]]]], dict[str, dict[str, object]]] | None = None,
 ) -> dict[str, object]:
     """Write a complete package into a unique sibling stage then atomically land it.
 
@@ -224,16 +207,22 @@ def write_immutable_package(
                 declared_fields=[*spec["key"], *spec["fields"]],
             )
             table_manifest[table] = {"filename": filename, "row_count": len(rows), "fields": fields}
+        if artifact_writer is not None:
+            ancillary = artifact_writer(stage, tables)
+            if set(ancillary) & set(table_manifest):
+                raise RuntimeError("ancillary artifact name collides with Gate-A table")
+            table_manifest.update(ancillary)
         (stage / "source_binding.json").write_text(json.dumps(source_binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (stage / "table_manifest.json").write_text(json.dumps(table_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (stage / "README.md").write_text(package_note.rstrip() + "\n", encoding="utf-8")
-        staged_bytes = sum(path.stat().st_size for path in stage.iterdir() if path.is_file())
+        staged_files = lambda: sorted(path for path in stage.rglob("*") if path.is_file())
+        staged_bytes = sum(path.stat().st_size for path in staged_files())
         if max_package_bytes is not None and staged_bytes > max_package_bytes:
             raise RuntimeError(
                 f"package size ceiling exceeded: {staged_bytes} > {max_package_bytes} bytes"
             )
-        archive_transport = {path.name: sha256_file(path) for path in sorted(stage.iterdir()) if path.is_file()}
-        scientific = {path.name: canonical_scientific_sha256(path) for path in sorted(stage.iterdir()) if path.is_file()}
+        archive_transport = {str(path.relative_to(stage)): sha256_file(path) for path in staged_files()}
+        scientific = {str(path.relative_to(stage)): canonical_scientific_sha256(path) for path in staged_files()}
         content = {
             "contract": CONTRACT,
             "version": VERSION,
@@ -246,7 +235,7 @@ def write_immutable_package(
             },
         }
         (stage / "CONTENT_IDENTITY.json").write_text(json.dumps(content, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        manifest = {path.name: sha256_file(path) for path in sorted(stage.iterdir()) if path.is_file()}
+        manifest = {str(path.relative_to(stage)): sha256_file(path) for path in staged_files()}
         (stage / "SHA256SUMS.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         verify_package(stage, sha256_file(stage / "SHA256SUMS.json"), sha256_file(stage / "CONTENT_IDENTITY.json"))
         os.replace(stage, output)
@@ -311,7 +300,14 @@ def verify_package(directory: Path, manifest_digest: str, content_digest: str) -
     if sha256_file(directory / "CONTENT_IDENTITY.json") != content_digest:
         raise RuntimeError(f"content identity drift: {directory.name}")
     manifest = json.loads((directory / "SHA256SUMS.json").read_text(encoding="utf-8"))
-    actual = sorted(p.name for p in directory.iterdir() if p.is_file() and p.name != "SHA256SUMS.json")
+    actual = sorted(
+        str(path.relative_to(directory))
+        for path in directory.rglob("*")
+        if path.is_file()
+        and path.name != "SHA256SUMS.json"
+        and "__pycache__" not in path.parts
+        and path.suffix != ".pyc"
+    )
     if sorted(manifest) != actual:
         raise RuntimeError(f"manifest coverage drift: {directory.name}")
     for name, digest in manifest.items():
@@ -1057,14 +1053,6 @@ class CandidatePathCache:
                 "available": bool(row["native_outcome_available"]),
             }
 
-    def release_candidate_paths(self, candidate_id: str, *, release_h1: bool = False) -> None:
-        """Drop temporary ticket-lot objects after their aggregate cache is bound."""
-        self._paths.pop(candidate_id, None)
-        if release_h1:
-            global _H1_TICKET_BRIDGE
-            _H1_TICKET_BRIDGE = None
-        gc.collect()
-
     def bundle(self, candidates: Sequence[str], bundle_id: str) -> tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]:
         bundles = frozen_replicate_bundles()
         seed_map = bundles.get(bundle_id)
@@ -1080,61 +1068,6 @@ class CandidatePathCache:
             bridges.append(bridge)
             selected_rows.extend([{**row, "deployment_replicate_bundle_id": bundle_id} for row in selected])
         return merge_candidate_bridges(*bridges), selected_rows
-
-
-def materialize_phase_zero_selection_checkpoint(
-    checkpoint: Path,
-    *,
-    cache: CandidatePathCache | None = None,
-) -> dict[str, object]:
-    """Persist all frozen selected-M paths before Phase-1 pair screening."""
-    cache = cache or CandidatePathCache()
-    selected: list[dict[str, object]] = []
-    native: list[dict[str, object]] = []
-    expected = 0
-    h1_remaining = set(H1_SLEEVES)
-    catalog = canonical_economic_catalog()
-    # Process the three shared #170 ticket-ledger sleeves together so their
-    # million-ish lot objects can be released before the expanded catalog.
-    candidate_order = [*H1_SLEEVES, *sorted(set(catalog) - set(H1_SLEEVES))]
-    for candidate_id in candidate_order:
-        paths = cache.paths(candidate_id)
-        for seed, (_, rows) in paths.items():
-            # Materialize every ticket-level native source outcome once while
-            # this Phase-0 cache owns the selected source surface.
-            observations = cache.native_observations(candidate_id, seed)
-            expected += len(rows)
-            for row in rows:
-                issue = str(row["issue_instance"])
-                observation = observations[issue]
-                selected.append({"record_type": "SELECTED_M_PATH", "candidate_id": candidate_id, "deployment_seed": seed,
-                    "issue_instance": row["issue_instance"], "calendar_index": row["calendar_index"],
-                    "selected_M": row["selected_M"], "selection_variant": row["selection_variant"],
-                    "prior_training_input_sha256": row["prior_training_input_sha256"]})
-                native.append({"record_type": "NATIVE_ISSUE_SETTLEMENT", "candidate_id": candidate_id,
-                    "deployment_seed": seed, "issue_instance": issue,
-                    "native_pre_tax_return": observation["return"],
-                    "native_actual_stake_yuan": observation["stake"],
-                    "native_pre_tax_gross_yuan": observation["gross"],
-                    "native_hit_ticket_count": observation["hits"],
-                    "native_outcome_available": observation["available"]})
-        if candidate_id in h1_remaining:
-            h1_remaining.remove(candidate_id)
-        # Native outcomes and selected-M decisions above are sufficient for
-        # Phase-1.  Retaining source ticket lots across 104 families breaches
-        # the resource envelope without adding scientific information.
-        cache.release_candidate_paths(candidate_id, release_h1=not h1_remaining)
-    if len(selected) != expected:
-        raise RuntimeError(f"Phase-0 selected-path count drift: {len(selected)} != {expected}")
-    if len(native) != expected:
-        raise RuntimeError(f"Phase-0 native-outcome count drift: {len(native)} != {expected}")
-    binding = {"gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
-        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
-        "settled_source_bindings": verify_gate_a_source_bindings(),
-        "h1_ticket_cache_identity": _h1_ticket_cache_identity(),
-        "phase0_materializer_contract": PHASE0_MATERIALIZER_CONTRACT,
-        "phase": "PHASE_0_SELECTED_M_PATHS"}
-    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=[*selected, *native])
 
 
 def _native_observation(sleeve: IssueSleeve) -> dict[str, float | int | bool]:
@@ -1249,77 +1182,6 @@ def intrinsic_native_pair_dependence(
     return rows
 
 
-def phase_one_intrinsic_screen(
-    checkpoint: Path,
-    *,
-    path_cache: CandidatePathCache | None = None,
-    candidate_pairs: Sequence[tuple[str, str]] | None = None,
-) -> dict[str, object]:
-    """Persist the complete/bounded Phase-1 native screening surface.
-
-    The phase has no Stage-4 capital-grid cross product: all standalone M
-    curves are native aggregates and pairs are only intrinsic matched-flow
-    diagnostics.  The output stays in `.scratch` as a hash-bound checkpoint
-    until the later detailed core frontier has completed successfully.
-    """
-    cache = path_cache or CandidatePathCache()
-    catalog = canonical_economic_catalog()
-    expected_phase0 = {
-        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
-        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
-        "settled_source_bindings": verify_gate_a_source_bindings(),
-        "h1_ticket_cache_identity": _h1_ticket_cache_identity(),
-        "phase0_materializer_contract": PHASE0_MATERIALIZER_CONTRACT,
-        "phase": "PHASE_0_SELECTED_M_PATHS",
-    }
-    # The checkpoint is a binding guard plus the immutable aggregate outcome
-    # cache.  Pair screening therefore never re-enumerates a source ticket.
-    phase0_checkpoint = ROOT / PHASE0_CHECKPOINT
-    phase0_rows = load_surface_checkpoint(phase0_checkpoint, binding=expected_phase0)
-    selected_paths = [row for row in phase0_rows if row.get("record_type") == "SELECTED_M_PATH"]
-    native_paths = [row for row in phase0_rows if row.get("record_type") == "NATIVE_ISSUE_SETTLEMENT"]
-    if len(selected_paths) != len(native_paths) or not selected_paths:
-        raise RuntimeError("Phase-0 selected/native cache denominator drift")
-    cache.inject_native_observations(native_paths)
-    curves: list[dict[str, object]] = []
-    h1_remaining = set(H1_SLEEVES)
-    candidate_order = [*H1_SLEEVES, *sorted(set(catalog) - set(H1_SLEEVES))]
-    for candidate_id in candidate_order:
-        curves.extend(standalone_m_curve(candidate_id))
-        if candidate_id in h1_remaining:
-            h1_remaining.remove(candidate_id)
-        if not h1_remaining:
-            # Phase-1 pair rows consume the aggregate cache above, not the
-            # source tax lots.  Release the expensive H1 ticket bridge before
-            # reading the expanded source families.
-            global _H1_TICKET_BRIDGE
-            _H1_TICKET_BRIDGE = None
-            gc.collect()
-    pairs = list(candidate_pairs or frozen_portfolio_sets()["pairwise"])
-    if len({tuple(sorted(pair)) for pair in pairs}) != len(pairs):
-        raise RuntimeError("Phase-1 intrinsic pair duplication")
-    intrinsic = [
-        row
-        for left_id, right_id in pairs
-        for bundle_id in sorted(frozen_replicate_bundles())
-        for row in intrinsic_native_pair_dependence(left_id, right_id, bundle_id, path_cache=cache)
-    ]
-    binding = {
-        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
-        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
-        "settled_source_bindings": verify_gate_a_source_bindings(),
-        "phase": "PHASE_1_NATIVE_CURVES_AND_INTRINSIC_PAIRS",
-        "phase0_checkpoint_sha256": sha256_file(phase0_checkpoint),
-        "pair_count": len(pairs),
-    }
-    payload = [
-        *({"table": "standalone_m_curve", **row} for row in curves),
-        *({"table": "intrinsic_native_dependence", **row} for row in intrinsic),
-        *({"table": "selected_m_path", **row} for row in selected_paths),
-    ]
-    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=payload)
-
-
 def replay_bundle_path(
     candidates: Sequence[str],
     bundle_id: str,
@@ -1421,30 +1283,6 @@ def fixed_m_candidate_bridge(
     return materialize_candidate_bridge(candidate_id, fixed_m, deployment_seed)
 
 
-def frozen_portfolio_sets() -> dict[str, list[tuple[str, ...]]]:
-    """Enumerate the Gate-A standalone, all-pair and robust K surfaces exactly."""
-    from itertools import combinations
-
-    frontier = json.loads((GATE_A / "frontier_contract.json").read_text(encoding="utf-8"))
-    candidates = tuple(sorted(frontier["eligible_candidate_sources"]))
-    if set(candidates) != set(canonical_economic_catalog()):
-        raise RuntimeError("frontier/catalog canonical family mismatch")
-    pairwise = [tuple(sorted(pair)) for pair in frontier["pairwise_surface"]]
-    if len(pairwise) != len(set(pairwise)) or set(pairwise) != set(combinations(candidates, 2)):
-        raise RuntimeError("all-pairs frozen surface mismatch")
-    higher: list[tuple[str, ...]] = []
-    for serialized in frontier["robust_higher_order_shortlist"]:
-        shortlist = tuple(serialized.split("|"))
-        if any(candidate not in candidates for candidate in shortlist):
-            raise RuntimeError("robust shortlist outside canonical catalog")
-        higher.extend(tuple(combo) for size in range(1, len(shortlist) + 1) for combo in combinations(shortlist, size))
-    return {
-        "standalone": [(candidate,) for candidate in candidates],
-        "pairwise": pairwise,
-        "higher_order": higher,
-    }
-
-
 def frozen_execution_axes() -> list[dict[str, object]]:
     """Materialize every valid Stage-4 execution axis from the Gate-A contract.
 
@@ -1477,48 +1315,6 @@ def frozen_execution_axes() -> list[dict[str, object]]:
     if not rows or len({canonical_hash(row) for row in rows}) != len(rows):
         raise RuntimeError("invalid frozen execution axis enumeration")
     return rows
-
-
-def bounded_core_memberships() -> dict[str, tuple[tuple[str, ...], ...]]:
-    """Return exactly the PI-authorized Phase-1 executable memberships."""
-    h1_triple = tuple(sorted(H1_SLEEVES))
-    robust_prefixes = tuple(tuple(sorted(ROBUST_SLEEVES[:size])) for size in (3, 4, 5))
-    result = {
-        "STANDALONE": tuple((candidate,) for candidate in CORE_SLEEVES),
-        "PAIR": tuple(tuple(pair) for pair in combinations(sorted(CORE_SLEEVES), 2)),
-        "H1_TRIPLE": (h1_triple,),
-        "ROBUST_PREFIX": robust_prefixes,
-    }
-    flattened = [membership for groups in result.values() for membership in groups]
-    if len(flattened) != 40 or len(set(flattened)) != len(flattened):
-        raise RuntimeError("bounded core membership contract drift")
-    return result
-
-
-def bounded_core_execution_axes() -> tuple[dict[str, object], ...]:
-    """Filter the frozen gate-A axes to the bounded Phase-1 landmarks only."""
-    valid = {
-        canonical_hash(row): row
-        for row in frozen_execution_axes()
-    }
-    rows: list[dict[str, object]] = []
-    for mode in ("NATIVE_REQUEST_CONTROL", "FIXED_100K_NOTIONAL", "COMPOUNDING_BANKROLL"):
-        fractions = (1.0,) if mode == "NATIVE_REQUEST_CONTROL" else (0.10, 0.25, 0.50, 1.00)
-        for fraction in fractions:
-            for weight_method in CORE_WEIGHT_METHODS:
-                for normalization_method in CORE_NORMALIZATION_METHODS:
-                    row = {
-                        "mode": mode,
-                        "position_fraction": fraction,
-                        "weight_method": weight_method,
-                        "normalization_method": normalization_method,
-                    }
-                    if canonical_hash(row) not in valid:
-                        raise RuntimeError(f"bounded core axis absent from Gate A: {row}")
-                    rows.append(row)
-    if len(rows) != 72 or len({canonical_hash(row) for row in rows}) != 72:
-        raise RuntimeError("bounded core landmark grid drift")
-    return tuple(rows)
 
 
 def minimal_stage4_memberships() -> tuple[tuple[str, ...], ...]:
@@ -1699,6 +1495,18 @@ def load_minimal_stage4_checkpoint(
     # must not multiply identical deterministic economics into selectable
     # observations.  Prove equality from saved settlement state, then retain
     # BUNDLE_ORDINAL_001 as the one executable representation.
+    return binding, collapse_minimal_stage4_deterministic_paths(groups)
+
+
+def collapse_minimal_stage4_deterministic_paths(
+    groups: dict[tuple[object, ...], list[dict[str, object]]],
+) -> dict[tuple[object, ...], list[dict[str, object]]]:
+    """Collapse only byte-identical deterministic replicate bundles.
+
+    This deliberately operates on already-settled checkpoint rows.  It makes
+    the bundle-equivalence rule independently unit-testable without relying
+    on an author-local production checkpoint, and never reruns tickets.
+    """
     logical: dict[tuple[object, ...], list[tuple[tuple[object, ...], list[dict[str, object]]]]] = defaultdict(list)
     for identity, rows in groups.items():
         # portfolio_id incorporates Gate-A's bundle identity; it is not a
@@ -1720,7 +1528,7 @@ def load_minimal_stage4_checkpoint(
             raise RuntimeError("deterministic minimal Stage-4 bundle economics drift")
         identity, rows = next((pair for pair in variants if pair[0][-1] == "BUNDLE_ORDINAL_001"))
         collapsed[identity] = rows
-    return binding, collapsed
+    return collapsed
 
 
 def minimal_stage4_path_bridge(path_rows: Sequence[dict[str, object]]) -> dict[tuple[str, str], IssueSleeve]:
@@ -1757,9 +1565,17 @@ def minimal_stage4_core_tables(
     )
     tables = {name: [] for name in table_names}
     identities: dict[tuple[object, ...], dict[str, str]] = {}
+    full_control_by_axis = {
+        identity[1:]: path
+        for identity, path in paths.items()
+        if tuple(sorted(path[0]["sleeve_settlements"])) == ("BEST_FULL_FULL",)
+    }
     for identity, path in sorted(paths.items(), key=lambda item: canonical_hash(item[0])):
         bridge = minimal_stage4_path_bridge(path)
-        output = path_output_tables(path, bridge)
+        matched_control = full_control_by_axis.get(identity[1:])
+        if matched_control is None:
+            raise RuntimeError("minimal Stage-4 matched FULL path unavailable")
+        output = path_output_tables(path, bridge, matched_control_rows=matched_control)
         stake = sum(float(row["actual_stake_yuan"]) for row in path)
         net = sum(float(row["pre_tax_net_yuan"]) for row in path)
         gross = [float(row["pre_tax_gross_yuan"]) for row in path]
@@ -1970,291 +1786,6 @@ def _realized_stability_rows(path: Sequence[dict[str, object]], membership_id: s
             "undefined_reason": "ZERO_STAKE" if not stake else "",
         })
     return rows
-
-
-def phase_one_core_replay(
-    checkpoint: Path,
-    *,
-    memberships: Sequence[tuple[str, ...]] | None = None,
-    axes: Sequence[dict[str, object]] | None = None,
-    bundles: Sequence[str] | None = None,
-) -> dict[str, object]:
-    """Run the bounded Stage-4 core frontier and atomically checkpoint summaries."""
-    phase1 = ROOT / ".scratch" / "bj192_phase1_native_screen_checkpoint_v2.json"
-    if not phase1.exists():
-        raise RuntimeError("Phase-1 intrinsic screen checkpoint unavailable")
-    group_map = bounded_core_memberships()
-    selected_memberships = list(memberships or [item for group in group_map.values() for item in group])
-    selected_axes = list(axes or bounded_core_execution_axes())
-    selected_bundles = list(bundles or sorted(frozen_replicate_bundles()))
-    cache = CandidatePathCache()
-    summaries: list[dict[str, object]] = []
-    stability: list[dict[str, object]] = []
-    for membership in selected_memberships:
-        membership = tuple(sorted(membership))
-        membership_id = canonical_hash({"membership": membership})
-        for bundle_id in selected_bundles:
-            bridge, selected_m = cache.bundle(membership, bundle_id)
-            trace = canonical_hash({"membership": membership, "bundle": bundle_id, "selected_m": selected_m})
-            for axis in selected_axes:
-                replay_axis = {**axis, "fraction": axis["position_fraction"]}
-                replay_axis.pop("position_fraction")
-                path = replay_path(sleeves=membership, bridge=bridge, calendar=cache.calendar, bundle_id=bundle_id,
-                    sleeve_trace_identity=trace, **replay_axis)
-                holding = summarize_holding_path(path)["summary"]
-                capital = capital_summary(path, holding)
-                summaries.append({
-                    "record_type": "CORE_PATH_SUMMARY", "membership_id": membership_id,
-                    "membership_json": json.dumps(membership, separators=(",", ":")),
-                    "membership_size": len(membership), "selected_m_path_sha256": canonical_hash(selected_m),
-                    **capital, **{key: holding[key] for key in ("max_drawdown_yuan", "max_drawdown_fraction", "loss_streak_calendar", "loss_streak_active", "miss_streak_calendar", "miss_streak_active", "recovery_duration_max_issues", "time_under_water_issues", "sharpe", "sortino", "calmar")},
-                })
-                stability.extend({"record_type": "CORE_REALIZED_STABILITY", **row} for row in _realized_stability_rows(path, membership_id))
-    binding = {"phase": "PHASE_1_BOUNDED_CORE", "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
-        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
-        "phase0_checkpoint_sha256": sha256_file(ROOT / PHASE0_CHECKPOINT), "phase1_screen_sha256": sha256_file(phase1),
-        "membership_count": len(selected_memberships), "axis_count": len(selected_axes), "bundle_count": len(selected_bundles)}
-    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=[*summaries, *stability])
-
-
-def phase_two_execution_axes() -> tuple[dict[str, object], ...]:
-    """Return the complete frozen Phase-2 capital sensitivity axes.
-
-    Phase 2 deliberately excludes the native-control and scaled-native rows:
-    it expands only the two capital modes named by the bounded-execution
-    amendment, across every frozen fraction/weight/normalization combination.
-    """
-    rows = tuple(
-        row for row in frozen_execution_axes()
-        if row["mode"] in {"FIXED_100K_NOTIONAL", "COMPOUNDING_BANKROLL"}
-    )
-    # EQUAL_CAPITAL is legal only for EQUAL_WEIGHT: 4 legal normalizations
-    # there, plus 3 for each of the other five frozen weight methods.
-    expected = 2 * 20 * 19
-    if len(rows) != expected or len({canonical_hash(row) for row in rows}) != len(rows):
-        raise RuntimeError("Phase-2 frozen capital sensitivity grid drift")
-    return rows
-
-
-def _phase_one_core_binding() -> dict[str, object]:
-    phase1 = ROOT / ".scratch" / "bj192_phase1_native_screen_checkpoint_v2.json"
-    return {
-        "phase": "PHASE_1_BOUNDED_CORE",
-        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
-        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
-        "phase0_checkpoint_sha256": sha256_file(ROOT / PHASE0_CHECKPOINT),
-        "phase1_screen_sha256": sha256_file(phase1),
-        "membership_count": 40,
-        "axis_count": len(bounded_core_execution_axes()),
-        "bundle_count": len(frozen_replicate_bundles()),
-    }
-
-
-def _rank_descending(rows: Sequence[dict[str, object]], field: str) -> dict[str, int]:
-    ordered = sorted(rows, key=lambda row: (-float(row[field]), str(row["membership_json"])))
-    return {str(row["membership_json"]): index + 1 for index, row in enumerate(ordered)}
-
-
-def _rank_ascending(rows: Sequence[dict[str, object]], field: str) -> dict[str, int]:
-    ordered = sorted(rows, key=lambda row: (float(row[field]), str(row["membership_json"])))
-    return {str(row["membership_json"]): index + 1 for index, row in enumerate(ordered)}
-
-
-def select_phase_two_memberships(core_checkpoint: Path) -> list[dict[str, object]]:
-    """Freeze the bounded Phase-2 membership set from the complete core panel.
-
-    This is intentionally an outcome-sensitive *descriptive* screen.  It is
-    not an edge claim: the selection rule is published with the result and
-    uses six path/capital criteria jointly, never a single best ROI cell.
-    """
-    rows = load_surface_checkpoint(core_checkpoint, binding=_phase_one_core_binding())
-    summaries = [row for row in rows if row.get("record_type") == "CORE_PATH_SUMMARY"]
-    if len(summaries) != 40 * len(bounded_core_execution_axes()) * len(frozen_replicate_bundles()):
-        raise RuntimeError("Phase-1 core summary denominator drift")
-    by_identity = {
-        (
-            row["membership_json"], row["mode"], row["position_fraction"], row["weight_method"],
-            row["normalization_method"], row["deployment_replicate_bundle_id"],
-        ): row
-        for row in summaries
-    }
-    full_json = json.dumps(("BEST_FULL_FULL",), separators=(",", ":"))
-    grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
-    for row in summaries:
-        grouped[str(row["membership_json"])].append(row)
-    screen: list[dict[str, object]] = []
-    for membership_json, group in sorted(grouped.items()):
-        lifts = []
-        for row in group:
-            comparator = by_identity.get((
-                full_json, row["mode"], row["position_fraction"], row["weight_method"],
-                row["normalization_method"], row["deployment_replicate_bundle_id"],
-            ))
-            if comparator is None:
-                raise RuntimeError("matched BEST_FULL core comparator unavailable")
-            lifts.append(float(row["ending_bankroll_yuan"]) - float(comparator["ending_bankroll_yuan"]))
-        screen.append({
-            "membership_json": membership_json,
-            "membership_id": canonical_hash({"membership": tuple(json.loads(membership_json))}),
-            "membership_size": len(json.loads(membership_json)),
-            "core_cell_count": len(group),
-            "median_ending_bankroll_yuan": _quantile([float(row["ending_bankroll_yuan"]) for row in group], 0.5),
-            "worst_ending_bankroll_yuan": min(float(row["ending_bankroll_yuan"]) for row in group),
-            "median_matched_full_lift_yuan": _quantile(lifts, 0.5),
-            "median_max_drawdown_yuan": _quantile([float(row["max_drawdown_yuan"]) for row in group], 0.5),
-            "median_recovery_duration_max_issues": _quantile([float(row["recovery_duration_max_issues"]) for row in group], 0.5),
-            "median_turnover_yuan": _quantile([float(row["turnover_yuan"]) for row in group], 0.5),
-            "bundle_min_ending_bankroll_yuan": min(
-                _quantile([float(row["ending_bankroll_yuan"]) for row in group if row["deployment_replicate_bundle_id"] == bundle], 0.5)
-                for bundle in frozen_replicate_bundles()
-            ),
-        })
-    for field in ("median_ending_bankroll_yuan", "worst_ending_bankroll_yuan", "median_matched_full_lift_yuan", "bundle_min_ending_bankroll_yuan"):
-        ranks = _rank_descending(screen, field)
-        for row in screen:
-            row[f"rank_{field}"] = ranks[str(row["membership_json"])]
-    for field in ("median_max_drawdown_yuan", "median_recovery_duration_max_issues", "median_turnover_yuan"):
-        ranks = _rank_ascending(screen, field)
-        for row in screen:
-            row[f"rank_{field}"] = ranks[str(row["membership_json"])]
-    rank_fields = [field for field in screen[0] if field.startswith("rank_")]
-    for row in screen:
-        row["joint_path_rank_sum"] = sum(int(row[field]) for field in rank_fields)
-    mandatory = {
-        json.dumps(tuple(sorted(H1_SLEEVES)), separators=(",", ":")),
-        json.dumps(tuple(sorted(ROBUST_SLEEVES)), separators=(",", ":")),
-    }
-    if not mandatory <= {str(row["membership_json"]) for row in screen}:
-        raise RuntimeError("mandatory Phase-2 membership absent from core panel")
-    metric_pairs = (
-        ("median_ending_bankroll_yuan", True),
-        ("worst_ending_bankroll_yuan", True),
-        ("median_matched_full_lift_yuan", True),
-        ("bundle_min_ending_bankroll_yuan", True),
-        ("median_max_drawdown_yuan", False),
-        ("median_recovery_duration_max_issues", False),
-        ("median_turnover_yuan", False),
-    )
-    def dominates(left: dict[str, object], right: dict[str, object]) -> bool:
-        comparisons = [
-            float(left[field]) >= float(right[field]) if higher else float(left[field]) <= float(right[field])
-            for field, higher in metric_pairs
-        ]
-        strict = [
-            float(left[field]) > float(right[field]) if higher else float(left[field]) < float(right[field])
-            for field, higher in metric_pairs
-        ]
-        return all(comparisons) and any(strict)
-    nonmandatory = [row for row in screen if str(row["membership_json"]) not in mandatory]
-    nondominated = [
-        row for row in nonmandatory
-        if not any(dominates(other, row) for other in nonmandatory if other is not row)
-    ]
-    selected_extras = sorted(
-        nondominated,
-        key=lambda row: (int(row["joint_path_rank_sum"]), -float(row["median_ending_bankroll_yuan"]), str(row["membership_json"])),
-    )[:4]
-    selected = mandatory | {str(row["membership_json"]) for row in selected_extras}
-    for row in screen:
-        row["record_type"] = "PHASE2_MEMBERSHIP_SELECTION"
-        row["phase2_selected"] = int(str(row["membership_json"]) in selected)
-        row["selection_status"] = (
-            "MANDATORY_H1_OR_ROBUST_K5" if str(row["membership_json"]) in mandatory
-            else "NONDOMINATED_JOINT_PATH_TOP4" if str(row["membership_json"]) in {str(item["membership_json"]) for item in selected_extras}
-            else "NOT_SELECTED_BOUNDED_PHASE2"
-        )
-        row["selection_rule"] = "JOINT_BORDA_ENDING_LIFT_DRAWDOWN_RECOVERY_TURNOVER_BUNDLE_MIN;_NONDOMINATED_ONLY"
-    result = sorted(screen, key=lambda row: (not bool(row["phase2_selected"]), int(row["joint_path_rank_sum"]), str(row["membership_json"])))
-    if sum(int(row["phase2_selected"]) for row in result) > 6:
-        raise RuntimeError("Phase-2 membership cap exceeded")
-    return result
-
-
-def phase_two_replay(
-    checkpoint: Path,
-    *,
-    core_checkpoint: Path | None = None,
-    memberships: Sequence[tuple[str, ...]] | None = None,
-    axes: Sequence[dict[str, object]] | None = None,
-    bundles: Sequence[str] | None = None,
-) -> dict[str, object]:
-    """Run every frozen Phase-2 capital axis for the bounded finalist set."""
-    core_checkpoint = core_checkpoint or ROOT / ".scratch" / "bj192_phase1_core_checkpoint.json"
-    selection = select_phase_two_memberships(core_checkpoint)
-    selected_memberships = list(memberships or [tuple(json.loads(str(row["membership_json"]))) for row in selection if row["phase2_selected"]])
-    selected_axes = list(axes or phase_two_execution_axes())
-    selected_bundles = list(bundles or sorted(frozen_replicate_bundles()))
-    if len(selected_memberships) > 6:
-        raise RuntimeError("Phase-2 membership cap exceeded")
-    cache = CandidatePathCache()
-    summaries: list[dict[str, object]] = []
-    stability: list[dict[str, object]] = []
-    for membership in selected_memberships:
-        membership = tuple(sorted(membership))
-        membership_id = canonical_hash({"membership": membership})
-        for bundle_id in selected_bundles:
-            bridge, selected_m = cache.bundle(membership, bundle_id)
-            trace = canonical_hash({"membership": membership, "bundle": bundle_id, "selected_m": selected_m})
-            for axis in selected_axes:
-                replay_axis = {**axis, "fraction": axis["position_fraction"]}
-                replay_axis.pop("position_fraction")
-                path = replay_path(sleeves=membership, bridge=bridge, calendar=cache.calendar, bundle_id=bundle_id,
-                    sleeve_trace_identity=trace, **replay_axis)
-                holding = summarize_holding_path(path)["summary"]
-                capital = capital_summary(path, holding)
-                summaries.append({
-                    "record_type": "PHASE2_PATH_SUMMARY", "membership_id": membership_id,
-                    "membership_json": json.dumps(membership, separators=(",", ":")),
-                    "membership_size": len(membership), "selected_m_path_sha256": canonical_hash(selected_m),
-                    **capital, **{key: holding[key] for key in ("max_drawdown_yuan", "max_drawdown_fraction", "loss_streak_calendar", "loss_streak_active", "miss_streak_calendar", "miss_streak_active", "recovery_duration_max_issues", "time_under_water_issues", "sharpe", "sortino", "calmar")},
-                })
-                stability.extend({"record_type": "PHASE2_REALIZED_STABILITY", **row} for row in _realized_stability_rows(path, membership_id))
-    binding = {
-        "phase": "PHASE_2_FULL_FROZEN_SENSITIVITY",
-        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
-        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
-        "phase1_core_checkpoint_sha256": sha256_file(core_checkpoint),
-        "selection_sha256": canonical_hash(selection),
-        "membership_count": len(selected_memberships),
-        "axis_count": len(selected_axes),
-        "bundle_count": len(selected_bundles),
-    }
-    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=[*selection, *summaries, *stability])
-
-
-def surface_preflight_receipt() -> dict[str, object]:
-    """Quantify the exact frozen Cartesian request before allocating output.
-
-    This is a no-outcome, no-ticket-execution preflight.  It intentionally
-    refuses to turn the requested all-pairs wording into an unreported grid
-    reduction; callers can persist this receipt with a proposed run plan for
-    PI review.
-    """
-    portfolios = frozen_portfolio_sets()
-    bundles = frozen_replicate_bundles()
-    calendar_count = len(read_csv(GATE_A / "full_calendar.csv"))
-    axis_count = len(frozen_execution_axes())
-    counts = {}
-    for name, sets in portfolios.items():
-        paths = len(sets) * axis_count * len(bundles)
-        counts[name] = {
-            "portfolio_set_count": len(sets),
-            "capital_path_count": paths,
-            "issue_path_row_count": paths * calendar_count,
-        }
-    return {
-        "contract": CONTRACT,
-        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
-        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
-        "calendar_issue_count": calendar_count,
-        "execution_axis_count": axis_count,
-        "replicate_bundle_count": len(bundles),
-        "surface": counts,
-        "total_capital_path_count": sum(row["capital_path_count"] for row in counts.values()),
-        "total_issue_path_row_count": sum(row["issue_path_row_count"] for row in counts.values()),
-        "status": "PREFLIGHT_REQUIRES_EXPLICIT_EXECUTION_PLAN",
-        "reason": "Gate-A schema says every pair/mode/fraction/weight/normalization/bundle row; no unapproved Cartesian reduction is applied.",
-    }
 
 
 def _pearson(left: Sequence[float], right: Sequence[float]) -> float | None:
@@ -2776,191 +2307,23 @@ def replay_path(
 
 
 def _quantile(values: Sequence[float], probability: float) -> float | None:
+    """Use the maintained inclusive percentile primitive, never hand-roll it."""
     if not values:
         return None
+    if not 0.0 <= probability <= 1.0:
+        raise ValueError("quantile probability outside [0, 1]")
     ordered = sorted(values)
-    position = (len(ordered) - 1) * probability
-    lower, upper = math.floor(position), math.ceil(position)
-    if lower == upper:
-        return ordered[lower]
-    return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
-
-
-def stationary_block_indices(length: int, *, mean_block_length: float, rng: random.Random) -> list[int]:
-    """Draw one circular stationary-bootstrap index path deterministically."""
-    if length < 2 or not math.isfinite(mean_block_length) or mean_block_length <= 1.0:
-        raise ValueError("stationary bootstrap requires length>=2 and block length>1")
-    restart_probability = 1.0 / mean_block_length
-    index = rng.randrange(length)
-    result = []
-    for _ in range(length):
-        result.append(index)
-        index = rng.randrange(length) if rng.random() < restart_probability else (index + 1) % length
-    return result
-
-
-def paired_stationary_max_t(
-    contrasts: dict[str, Sequence[float]], *, replicates: int = 20_000,
-    seed: int = 19220001, mean_block_length: float | None = None,
-) -> list[dict[str, object]]:
-    """Return paired stationary-block CIs and familywise max-T p-values."""
-    if not contrasts or len(contrasts) > 2 or replicates < 1:
-        raise ValueError("strict #192 inference permits one or two positive contrasts")
-    length = len(next(iter(contrasts.values())))
-    if length < 20 or any(len(values) != length for values in contrasts.values()):
-        raise ValueError("paired bootstrap contrast chronology drift")
-    block = mean_block_length or max(2.0, math.sqrt(length))
-    means = {key: sum(values) / length for key, values in contrasts.items()}
-    sample_sd = {key: math.sqrt(sum((value - means[key]) ** 2 for value in values) / (length - 1)) for key, values in contrasts.items()}
-    if any(value <= 0.0 or not math.isfinite(value) for value in sample_sd.values()):
-        raise RuntimeError("strict bootstrap requires non-degenerate paired contrasts")
-    observed_t = {key: means[key] / (sample_sd[key] / math.sqrt(length)) for key in contrasts}
-    uncentered = {key: [] for key in contrasts}
-    null_max_t: list[float] = []
-    rng = random.Random(seed)
-    for _ in range(replicates):
-        indices = stationary_block_indices(length, mean_block_length=block, rng=rng)
-        max_t = -math.inf
-        for key, values in contrasts.items():
-            bootstrap_mean = sum(values[index] for index in indices) / length
-            uncentered[key].append(bootstrap_mean)
-            centered_mean = sum(values[index] - means[key] for index in indices) / length
-            max_t = max(max_t, centered_mean / (sample_sd[key] / math.sqrt(length)))
-        null_max_t.append(max_t)
-    result = []
-    for key in sorted(contrasts):
-        p_value = (1.0 + sum(value >= observed_t[key] for value in null_max_t)) / (replicates + 1.0)
-        low = _quantile(uncentered[key], 0.025)
-        result.append({
-            "target_id": key, "paired_control_id": "BEST_FULL_FULL",
-            "bootstrap_replicates": replicates, "bootstrap_seed": seed,
-            "mean_block_length": block, "paired_mean_net_delta_yuan": means[key],
-            "paired_growth_delta_low": low,
-            "paired_growth_delta_high": _quantile(uncentered[key], 0.975),
-            "observed_t": observed_t[key], "max_t_familywise_p_value": p_value,
-            "strict_status": "STRICT_MAX_T_PASS" if low is not None and low > 0.0 and p_value < 0.05 else "STRICT_MAX_T_NOT_PASSED",
-        })
-    return result
-
-
-def minimal_stage4_selected_m_rows() -> list[dict[str, object]]:
-    """Materialize the three deterministic M selections on every frozen issue."""
-    fixed_m = {
-        "BEST_FULL_FULL": 2187,
-        "MODEL_SOURCE_MODEL_CAP1_M512": 512,
-        "Q_SOURCE_Q_TOP_MASS_M192": 192,
-    }
-    rows: list[dict[str, object]] = []
-    calendar = read_csv(GATE_A / "full_calendar.csv")
-    # Deterministic H1 sleeves have one canonical executable bundle; the
-    # checkpoint loader separately verifies BUNDLE_002/003 equivalence.
-    for bundle in ("BUNDLE_ORDINAL_001",):
-        for sleeve, m_value in fixed_m.items():
-            family = canonical_economic_catalog()[sleeve]["economic_family_id"]
-            for item in calendar:
-                rows.append({
-                    "economic_family_id": family,
-                    "deployment_replicate_bundle_id": bundle,
-                    "deployment_seed": "DETERMINISTIC",
-                    "calendar_index": item["calendar_index"], "issue_instance": item["issue_instance"],
-                    "selection_variant": "FROZEN_DETERMINISTIC_M",
-                    "support_hash": canonical_hash([row["issue_instance"] for row in calendar]),
-                    "prior_training_start_calendar_index": "",
-                    "prior_training_end_calendar_index": "",
-                    "prior_active_issue_count": "",
-                    "prior_training_input_sha256": "",
-                    "selected_M": m_value, "fixed_M_comparator": m_value,
-                    "fallback_reason": "", "nested_loyo_held_out_year": "",
-                })
-    if len(rows) != len(calendar) * len(H1_SLEEVES):
-        raise RuntimeError("minimal deterministic selected-M denominator drift")
-    return rows
-
-
-def minimal_stage4_strict_bootstrap_rows(checkpoint: Path) -> list[dict[str, object]]:
-    """Run the sole authorized two-contrast strict test from saved issue P&L."""
-    _, paths = load_minimal_stage4_checkpoint(checkpoint)
-    axis = ("NATIVE_REQUEST_CONTROL", "1.00", "EQUAL_WEIGHT", "UNIT_CAPITAL", "BUNDLE_ORDINAL_001")
-    by_membership: dict[tuple[str, ...], list[dict[str, object]]] = {}
-    for identity, path in paths.items():
-        if tuple(identity[1:]) != axis:
-            continue
-        membership = tuple(sorted(path[0]["sleeve_settlements"]))
-        by_membership[membership] = path
-    full = by_membership.get(("BEST_FULL_FULL",))
-    targets = {
-        "Q_SOURCE_Q_TOP_MASS_M192": ("Q_SOURCE_Q_TOP_MASS_M192",),
-        "MODEL_PLUS_Q": tuple(sorted(("MODEL_SOURCE_MODEL_CAP1_M512", "Q_SOURCE_Q_TOP_MASS_M192"))),
-    }
-    if full is None or any(membership not in by_membership for membership in targets.values()):
-        raise RuntimeError("strict bootstrap target/control path unavailable")
-    full_net = [float(row["pre_tax_net_yuan"]) for row in full]
-    contrasts = {
-        name: [float(candidate["pre_tax_net_yuan"]) - control for candidate, control in zip(by_membership[membership], full_net, strict=True)]
-        for name, membership in targets.items()
-    }
-    strict = paired_stationary_max_t(contrasts)
-    support_hash = canonical_hash([row["issue_instance"] for row in full])
-    rows = []
-    for result in strict:
-        rows.append({
-            "portfolio_id": canonical_hash({"strict_target": result["target_id"]}),
-            "mode": axis[0], "position_fraction": axis[1], "weight_method": axis[2],
-            "normalization_method": axis[3], "deployment_replicate_bundle_id": axis[4],
-            "target_id": result["target_id"], "paired_control_id": result["paired_control_id"],
-            "economic_family_id": "|".join(targets[result["target_id"]]),
-            "bootstrap_replicates": result["bootstrap_replicates"], "bootstrap_seed": result["bootstrap_seed"],
-            "paired_growth_delta_low": result["paired_growth_delta_low"],
-            "denominator_id": "COMPLETE_348_ISSUE_PAIRED_CALENDAR", "panel_type": "STRICT_STATIONARY_BLOCK_MAX_T",
-            "panel_id": "NATIVE_100K_EQ_UNIT_BUNDLE001", "metric": "PAIRED_PRE_TAX_NET_DELTA",
-            "value": result["paired_mean_net_delta_yuan"], "YEAR": "", "FOLD": "", "LOYO": "",
-            "EX_LARGEST_ISSUE": "", "EX_LARGEST_YEAR": "", "REGIME": "", "fallback_rate": "",
-            "max_t_familywise_p_value": result["max_t_familywise_p_value"],
-            "paired_growth_delta_high": result["paired_growth_delta_high"], "mean_block_length": result["mean_block_length"],
-            "strict_status": result["strict_status"], "support_hash": support_hash,
-        })
-    return rows
-
-
-def minimal_stage4_package_tables(checkpoint: Path) -> dict[str, list[dict[str, object]]]:
-    """Assemble the schema-complete #192 package inputs from checkpoint state."""
-    schema = json.loads((GATE_A / "output_schema.json").read_text(encoding="utf-8"))
-    tables = {name: [] for name, spec in schema.items() if isinstance(spec, dict) and "key" in spec}
-    # These checkpoint-only calculations release their decoded path state
-    # before the high-row core ledgers are retained for package assembly.
-    strict_rows = minimal_stage4_strict_bootstrap_rows(checkpoint)
-    dependence = minimal_stage4_dependence_tables(checkpoint)
-    core, identities = minimal_stage4_core_tables(checkpoint)
-    comparison = minimal_stage4_comparison_tables(
-        checkpoint, core_tables=core, identities=identities,
-    )
-    tables.update(core)
-    tables.update(comparison)
-    tables["selected_m_path"] = minimal_stage4_selected_m_rows()
-    tables["regime_map"] = read_csv(GATE_A / "regime_map.csv")
-    tables["bootstrap_stability"] = strict_rows
-    tables.update(dependence)
-    for row in tables["bootstrap_stability"]:
-        tables["terminal_decision"].append({
-            "portfolio_id": row["portfolio_id"], "mode": row["mode"], "position_fraction": row["position_fraction"],
-            "weight_method": row["weight_method"], "normalization_method": row["normalization_method"],
-            "deployment_replicate_bundle_id": row["deployment_replicate_bundle_id"],
-            "decision_id": "STRICT_MAX_T_TERMINAL", "candidate_id": row["target_id"],
-            "decision": "NO_PROMOTION", "capital_weights_json": "", "capital_weights_sha256": "",
-            "failure_regimes_json": "[]", "negative_result_reason": "STRICT_PAIRED_MAX_T_LOWER_BOUND_NOT_POSITIVE",
-            "next_validation_step": "NO_PRODUCTION_AUTHORITY;_REQUIRE_NEW_PREREGISTERED_EVIDENCE",
-            "strict_ev_status": row["strict_status"], "support_hash": row["support_hash"],
-            "bootstrap_target_id": row["target_id"],
-        })
-        tables["challenger_case"].append({
-            "portfolio_id": row["portfolio_id"], "mode": row["mode"], "position_fraction": row["position_fraction"],
-            "weight_method": row["weight_method"], "normalization_method": row["normalization_method"],
-            "deployment_replicate_bundle_id": row["deployment_replicate_bundle_id"],
-            "alternative_explanation": "PATH_DEPENDENT_LEGACY_COMBINATION_LIFT", "test_id": "STRICT_PAIRED_STATIONARY_BLOCK_MAX_T",
-            "candidate_id": row["target_id"], "result": row["strict_status"],
-            "decision_impact": "NO_PROMOTION_AFTER_FAMILYWISE_PAIRED_INFERENCE",
-        })
-    return tables
+    if probability == 0.0:
+        return ordered[0]
+    if probability == 1.0:
+        return ordered[-1]
+    # ``inclusive`` is the same (n - 1) linear interpolation convention used
+    # in the released v2 package, while delegating the generic statistic to
+    # Python's maintained standard-library implementation.
+    thousandths = int(round(probability * 1000))
+    if not math.isclose(probability, thousandths / 1000.0, abs_tol=1e-12):
+        raise ValueError("frozen report quantile must lie on the 0.001 grid")
+    return statistics.quantiles(ordered, n=1000, method="inclusive")[thousandths - 1]
 
 
 def minimal_stage4_dependence_tables(checkpoint: Path) -> dict[str, list[dict[str, object]]]:
@@ -3009,44 +2372,369 @@ def minimal_stage4_dependence_tables(checkpoint: Path) -> dict[str, list[dict[st
             "realized_funded_flow_dependence": realized, "intrinsic_native_dependence": intrinsic}
 
 
-def finalize_minimal_stage4_package(checkpoint: Path, output: Path) -> dict[str, object]:
-    """Atomically write the #192 Gate-B closure package from the saved replay."""
-    binding, _ = load_minimal_stage4_checkpoint(checkpoint)
-    tables = minimal_stage4_package_tables(checkpoint)
-    required_rows = {
-        "issue_ledger", "sleeve_funding_ledger", "capital_summary", "holding_metrics",
-        "baseline_lift", "bootstrap_stability", "terminal_decision", "regime_map", "selected_m_path",
-    }
-    if any(not tables[name] for name in required_rows):
-        raise RuntimeError("minimal Gate-B required evidence table is empty")
-    checkpoint_payload = json.loads(checkpoint.read_text(encoding="utf-8"))
-    source_binding = {
-        "gate_a": {"package": GATE_A.name, "manifest_sha256": EXPECTED_GATE_A_MANIFEST,
-                   "content_identity_sha256": EXPECTED_GATE_A_CONTENT},
-        "checkpoint": {
-            "path": str(checkpoint.resolve().relative_to(ROOT.resolve())),
-            "file_sha256": sha256_file(checkpoint),
-            "payload_sha256": checkpoint_payload["payload_sha256"],
-            "record_count": len(checkpoint_payload["completed_path_keys"]),
-        },
-        "execution_contract": binding,
-        "settlement_boundary": "CHECKPOINT_ONLY_NO_TICKET_REPLAY",
-        "strict_inference": "TWO_PAIRED_STATIONARY_BLOCK_MAX_T_CONTRASTS_20000_REPLICATES",
-    }
-    note = """# #192 Gate B — minimal Stage-4 closure
+def _minimal_decision_identities(tables: dict[str, Sequence[dict[str, object]]]) -> list[tuple[str, tuple[object, ...]]]:
+    """Return the three standalones, strongest pair and triple on one fixed axis."""
+    axis = ("NATIVE_REQUEST_CONTROL", "1.00", "EQUAL_WEIGHT", "UNIT_CAPITAL", "BUNDLE_ORDINAL_001")
+    funding: dict[tuple[object, ...], set[str]] = defaultdict(set)
+    for row in tables["sleeve_funding_ledger"]:
+        identity = tuple(row[field] for field in PATH_IDENTITY)
+        if tuple(identity[1:]) == axis:
+            funding[identity].add(str(row["sleeve_or_family_id"]))
+    capital = {tuple(row[field] for field in PATH_IDENTITY): row for row in tables["capital_summary"]}
+    selected: list[tuple[str, tuple[object, ...]]] = []
+    for sleeve in H1_SLEEVES:
+        identity = next((item for item, members in funding.items() if members == {sleeve}), None)
+        if identity is None:
+            raise RuntimeError(f"decision chart standalone absent: {sleeve}")
+        selected.append((sleeve, identity))
+    pairs = [(identity, capital[identity]) for identity, members in funding.items() if len(members) == 2]
+    if len(pairs) != 3:
+        raise RuntimeError("decision chart pair denominator drift")
+    strongest_pair = max(pairs, key=lambda item: (float(item[1]["ending_bankroll_yuan"]), str(item[0][0])))[0]
+    selected.append(("STRONGEST_PAIR", strongest_pair))
+    triple = next((identity for identity, members in funding.items() if members == set(H1_SLEEVES)), None)
+    if triple is None:
+        raise RuntimeError("decision chart triple absent")
+    selected.append(("TRIPLE", triple))
+    return selected
 
-This immutable outcome package is reconstructed only from the hash-bound
-minimal Stage-4 checkpoint.  It covers the three deterministic frozen sleeves,
-seven memberships and the authorized capital grid.  The two materially
-positive descriptive candidates both failed the preregistered 20,000-replicate
-paired stationary-block max-T screen; the terminal disposition is therefore
-NO_PROMOTION.  `standalone_m_curve` is intentionally empty: the final
-minimal-closure amendment expressly prohibited re-running M curves.
-"""
-    return write_immutable_package(
-        output, tables, source_binding=source_binding, package_note=note,
-        max_package_bytes=500 * 1024 * 1024,
+
+def _minimal_path_chart_svg(series: Sequence[tuple[str, Sequence[dict[str, object]]]]) -> str:
+    """Render a deterministic dependency-free SVG from committed chart rows."""
+    width, height, pad = 1100, 560, 65
+    values = [INITIAL_BANKROLL_YUAN, *[float(row["postissue_bankroll_yuan"]) for _, rows in series for row in rows]]
+    minimum, maximum = min(values), max(values)
+    span = max(maximum - minimum, 1.0)
+    colours = ("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd")
+    lines = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
+        '<rect width="100%" height="100%" fill="white"/>',
+        '<text x="65" y="32" font-family="sans-serif" font-size="18">#192 Stage-4 — fixed native matched decision paths</text>',
+        f'<line x1="{pad}" y1="{height-pad}" x2="{width-pad}" y2="{height-pad}" stroke="#444"/>',
+        f'<line x1="{pad}" y1="{pad}" x2="{pad}" y2="{height-pad}" stroke="#444"/>',
+        f'<text x="5" y="{pad+8}" font-family="sans-serif" font-size="12">¥{maximum:,.0f}</text>',
+        f'<text x="5" y="{height-pad}" font-family="sans-serif" font-size="12">¥{minimum:,.0f}</text>',
+    ]
+    for index, (label, rows) in enumerate(series):
+        points = []
+        denom = max(len(rows) - 1, 1)
+        for position, row in enumerate(rows):
+            x = pad + (width - 2 * pad) * position / denom
+            y = height - pad - (height - 2 * pad) * (float(row["postissue_bankroll_yuan"]) - minimum) / span
+            points.append(f"{x:.2f},{y:.2f}")
+        colour = colours[index % len(colours)]
+        lines.append(f'<polyline points="{" ".join(points)}" fill="none" stroke="{colour}" stroke-width="1.8"/>')
+        lines.append(f'<text x="{pad + index * 190}" y="{height-22}" font-family="sans-serif" font-size="12" fill="{colour}">{label}</text>')
+    lines.append("</svg>")
+    return "\n".join(lines) + "\n"
+
+
+def _minimal_path_chart_png(series: Sequence[tuple[str, Sequence[dict[str, object]]]]) -> bytes:
+    """Create a small deterministic RGB PNG using only the standard library."""
+    import struct
+    import zlib
+
+    width, height, pad = 900, 400, 40
+    pixels = bytearray([255, 255, 255] * width * height)
+    values = [INITIAL_BANKROLL_YUAN, *[float(row["postissue_bankroll_yuan"]) for _, rows in series for row in rows]]
+    minimum, maximum = min(values), max(values)
+    span = max(maximum - minimum, 1.0)
+    colours = ((31, 119, 180), (255, 127, 14), (44, 160, 44), (214, 39, 40), (148, 103, 189))
+    def dot(x: int, y: int, colour: tuple[int, int, int]) -> None:
+        if 0 <= x < width and 0 <= y < height:
+            offset = (y * width + x) * 3
+            pixels[offset:offset + 3] = bytes(colour)
+    def line(x0: int, y0: int, x1: int, y1: int, colour: tuple[int, int, int]) -> None:
+        dx, dy = abs(x1 - x0), -abs(y1 - y0)
+        sx, sy = (1 if x0 < x1 else -1), (1 if y0 < y1 else -1)
+        error = dx + dy
+        while True:
+            dot(x0, y0, colour)
+            if (x0, y0) == (x1, y1):
+                return
+            twice = 2 * error
+            if twice >= dy:
+                error += dy
+                x0 += sx
+            if twice <= dx:
+                error += dx
+                y0 += sy
+    for index, (_, rows) in enumerate(series):
+        previous = None
+        for position, row in enumerate(rows):
+            x = round(pad + (width - 2 * pad) * position / max(len(rows) - 1, 1))
+            y = round(height - pad - (height - 2 * pad) * (float(row["postissue_bankroll_yuan"]) - minimum) / span)
+            if previous is not None:
+                line(*previous, x, y, colours[index % len(colours)])
+            previous = (x, y)
+    raw = b"".join(b"\x00" + bytes(pixels[row * width * 3:(row + 1) * width * 3]) for row in range(height))
+    def chunk(kind: bytes, payload: bytes) -> bytes:
+        return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload) & 0xffffffff)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
+
+
+def minimal_stage4_decision_artifacts(
+    stage: Path, tables: dict[str, Sequence[dict[str, object]]],
+) -> dict[str, dict[str, object]]:
+    """Write manifest-covered chart sources and a concise decision guide."""
+    selected = _minimal_decision_identities(tables)
+    capital = {tuple(row[field] for field in PATH_IDENTITY): row for row in tables["capital_summary"]}
+    holding = {tuple(row[field] for field in PATH_IDENTITY): row for row in tables["holding_metrics"]}
+    ledger: dict[tuple[object, ...], list[dict[str, object]]] = defaultdict(list)
+    for row in tables["issue_ledger"]:
+        ledger[tuple(row[field] for field in PATH_IDENTITY)].append(row)
+    lift_by_identity: dict[tuple[object, ...], dict[str, object]] = {}
+    for row in tables["baseline_lift"]:
+        identity = tuple(row[field] for field in PATH_IDENTITY)
+        if row["control_id"] == next(identity[0] for label, identity in selected if label == "BEST_FULL_FULL"):
+            lift_by_identity[identity] = row
+    chart_source: list[dict[str, object]] = []
+    summary: list[dict[str, object]] = []
+    series: list[tuple[str, Sequence[dict[str, object]]]] = []
+    for label, identity in selected:
+        path = sorted(ledger[identity], key=lambda row: int(row["calendar_index"]))
+        if len(path) != len(read_csv(GATE_A / "full_calendar.csv")):
+            raise RuntimeError("decision chart path denominator drift")
+        series.append((label, path))
+        capital_row, holding_row = capital[identity], holding[identity]
+        matched = lift_by_identity.get(identity)
+        summary.append({
+            "label": label, "portfolio_id": identity[0], "mode": identity[1], "position_fraction": identity[2],
+            "weight_method": identity[3], "normalization_method": identity[4], "deployment_replicate_bundle_id": identity[5],
+            "ending_bankroll_yuan": capital_row["ending_bankroll_yuan"], "matched_full_lift_yuan": "" if matched is None else matched["candidate_minus_control_bankroll_yuan"],
+            "pre_tax_roi": capital_row["pre_tax_roi"], "turnover_yuan": capital_row["turnover_yuan"], "retained_cash_yuan": capital_row["cash_yuan"],
+            "max_drawdown_yuan": holding_row["max_drawdown_yuan"], "loss_streak_calendar": holding_row["loss_streak_calendar"],
+            "miss_streak_calendar": holding_row["miss_streak_calendar"], "recovery_duration_max_issues": holding_row["recovery_duration_max_issues"],
+            "time_under_water_issues": holding_row["time_under_water_issues"],
+            "interpretation": "REALIZED_PATH;_CASH_AND_TURNOVER_ARE_REPORTED_SEPARATELY_FROM_MATCHED_TICKET_ECONOMICS",
+        })
+        for row in path:
+            chart_source.append({
+                "label": label, "portfolio_id": identity[0], "calendar_index": row["calendar_index"], "issue_instance": row["issue_instance"],
+                "preissue_bankroll_yuan": row["preissue_bankroll_yuan"], "postissue_bankroll_yuan": row["postissue_bankroll_yuan"],
+                "pre_tax_net_yuan": row["pre_tax_net_yuan"], "actual_stake_yuan": row["actual_stake_yuan"],
+                "retained_cash_yuan": row["retained_cash_yuan"], "drawdown_yuan": row["drawdown_yuan"],
+            })
+    chart_dir = stage / "charts"
+    chart_dir.mkdir()
+    summary_fields = write_csv_rows(stage / "decision_path_summary.csv", summary, compressed=False)
+    source_fields = write_csv_rows(stage / "decision_chart_source.csv", chart_source, compressed=False)
+    svg = _minimal_path_chart_svg(series)
+    (chart_dir / "decision_paths.svg").write_text(svg, encoding="utf-8")
+    (chart_dir / "decision_paths.html").write_text("<!doctype html><meta charset=\"utf-8\"><title>#192 decision paths</title>" + svg, encoding="utf-8")
+    (chart_dir / "decision_paths.png").write_bytes(_minimal_path_chart_png(series))
+    decisions = "\n".join(
+        f"- {row['label']}: ending ¥{float(row['ending_bankroll_yuan']):,.2f}; matched-FULL lift {row['matched_full_lift_yuan'] or '¥0.00'}; turnover ¥{float(row['turnover_yuan']):,.2f}; max drawdown ¥{float(row['max_drawdown_yuan']):,.2f}."
+        for row in summary
     )
+    report = f"""# #192 Stage-4 decision guide
+
+The three frozen standalones, the strongest realized pair, and the frozen
+triple below are matched on NATIVE / 100% / EQUAL_WEIGHT / UNIT_CAPITAL /
+BUNDLE_ORDINAL_001.  Absolute ending bankroll and matched FULL lift are both
+reported; retained cash and lower turnover are accounting-path properties,
+not independent evidence of ticket edge.
+
+{decisions}
+
+The terminal finding remains **NO_PROMOTION**: the two prespecified positive
+descriptive contrasts did not pass the 20,000-replicate paired max-T screen.
+The path chart and source table expose the realized failure mechanism and its
+cash, turnover, drawdown, streak, and recovery trade-offs without conducting a
+new strategy or M search.
+"""
+    (stage / "DECISION_REPORT.md").write_text(report, encoding="utf-8")
+    # A compact deterministic PDF companion intentionally contains the same
+    # declared interpretation; SVG/PNG are the plotted renderings.
+    text = "#192 Stage-4 Decision Paths — NO_PROMOTION"
+    stream = f"BT /F1 16 Tf 72 740 Td ({text}) Tj ET\n"
+    pdf = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>endobj\n4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n5 0 obj<</Length " + str(len(stream.encode())).encode() + b">>stream\n" + stream.encode() + b"endstream\nendobj\nxref\n0 6\n0000000000 65535 f\ntrailer<</Size 6/Root 1 0 R>>\nstartxref\n0\n%%EOF\n"
+    (chart_dir / "decision_paths.pdf").write_bytes(pdf)
+    return {
+        "decision_path_summary": {"filename": "decision_path_summary.csv", "row_count": len(summary), "fields": summary_fields},
+        "decision_chart_source": {"filename": "decision_chart_source.csv", "row_count": len(chart_source), "fields": source_fields},
+        "decision_charts": {"filename": "charts/decision_paths.svg|html|png|pdf", "row_count": len(series), "fields": ["manifest_covered_reproducible_artifacts"]},
+    }
+
+
+def _package_table_rows(package: Path, manifest: dict[str, object], name: str) -> list[dict[str, str]]:
+    entry = manifest[name]
+    if not isinstance(entry, dict):
+        raise RuntimeError(f"invalid package table manifest entry: {name}")
+    filename = str(entry["filename"])
+    path = package / filename
+    return read_gzip(path) if filename.endswith(".gz") else read_csv(path)
+
+
+def _minimal_paths_from_package(
+    package: Path, manifest: dict[str, object],
+) -> tuple[dict[tuple[object, ...], list[dict[str, object]]], dict[str, list[dict[str, str]]]]:
+    """Rehydrate the minimum state needed for v3 corrections from v2 bytes.
+
+    This reader is deliberately narrower than the old author checkpoint: it
+    joins only committed issue, sleeve-funding and weight ledgers, and never
+    invokes a ticket settler.  It provides an auditable, bounded recovery
+    path for the capital and attribution corrections.
+    """
+    issue_rows = _package_table_rows(package, manifest, "issue_ledger")
+    funding_rows = _package_table_rows(package, manifest, "sleeve_funding_ledger")
+    weight_rows = _package_table_rows(package, manifest, "weight_history")
+    paths: dict[tuple[object, ...], list[dict[str, object]]] = defaultdict(list)
+    issue_by_key: dict[tuple[object, ...], dict[str, object]] = {}
+    for source in issue_rows:
+        row: dict[str, object] = dict(source)
+        identity = tuple(row[field] for field in PATH_IDENTITY)
+        key = (*identity, row["calendar_index"])
+        if key in issue_by_key:
+            raise RuntimeError("package issue-ledger primary key drift")
+        row["weights"] = {}
+        row["sleeve_settlements"] = {}
+        issue_by_key[key] = row
+        paths[identity].append(row)
+    for source in funding_rows:
+        identity = tuple(source[field] for field in PATH_IDENTITY)
+        row = issue_by_key.get((*identity, source["calendar_index"]))
+        if row is None:
+            raise RuntimeError("package sleeve-funding join drift")
+        sleeve = str(source["sleeve_or_family_id"])
+        if sleeve in row["sleeve_settlements"]:
+            raise RuntimeError("package duplicate sleeve-funding join")
+        row["sleeve_settlements"][sleeve] = {
+            "actual_ticket_count": int(source["actual_ticket_count"]),
+            "actual_stake_yuan": source["actual_stake_yuan"],
+            "gross_yuan": source["pre_tax_gross_yuan"],
+            "pre_tax_net_yuan": source["pre_tax_net_yuan"],
+            "tax_yuan": source["tax_yuan"],
+            "funded_tax_lot_sha256": source["funded_tax_lot_sha256"],
+        }
+    for source in weight_rows:
+        identity = tuple(source[field] for field in PATH_IDENTITY)
+        row = issue_by_key.get((*identity, source["calendar_index"]))
+        if row is None:
+            raise RuntimeError("package weight-history join drift")
+        sleeve = str(source["sleeve_id"])
+        if sleeve in row["weights"]:
+            raise RuntimeError("package duplicate weight-history join")
+        row["weights"][sleeve] = source["weight"]
+    calendar_count = len(read_csv(GATE_A / "full_calendar.csv"))
+    for identity, rows in paths.items():
+        rows.sort(key=lambda row: int(row["calendar_index"]))
+        if len(rows) != calendar_count or any(set(row["weights"]) != set(row["sleeve_settlements"]) for row in rows):
+            raise RuntimeError(f"package Stage-4 path rehydration drift: {identity}")
+    extra = {
+        name: _package_table_rows(package, manifest, name)
+        for name in ("capital_summary", "holding_metrics", "baseline_lift")
+    }
+    return paths, extra
+
+
+def _write_existing_package_metadata(stage: Path, *, source_binding: dict[str, object], package_note: str) -> dict[str, str]:
+    """Finish a staged correction package with recursive immutable hashes."""
+    (stage / "source_binding.json").write_text(json.dumps(source_binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    (stage / "README.md").write_text(package_note.rstrip() + "\n", encoding="utf-8")
+    files = lambda: sorted(path for path in stage.rglob("*") if path.is_file())
+    archive = {str(path.relative_to(stage)): sha256_file(path) for path in files()}
+    scientific = {str(path.relative_to(stage)): canonical_scientific_sha256(path) for path in files()}
+    content = {
+        "contract": CONTRACT, "version": VERSION,
+        "canonical_scientific_payload_sha256": scientific,
+        "canonical_scientific_identity_sha256": canonical_hash(scientific),
+        "archive_transport_payload_sha256": archive,
+        "archive_transport_contract": {"gzip": "gzip.GzipFile(filename='', mtime=0)", "scientific_identity": "gzip payloads SHA-256 after decompression"},
+    }
+    (stage / "CONTENT_IDENTITY.json").write_text(json.dumps(content, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest = {str(path.relative_to(stage)): sha256_file(path) for path in files()}
+    (stage / "SHA256SUMS.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return {"manifest_sha256": sha256_file(stage / "SHA256SUMS.json"), "content_sha256": sha256_file(stage / "CONTENT_IDENTITY.json")}
+
+
+def finalize_minimal_stage4_v3_from_v2(source: Path, output: Path) -> dict[str, object]:
+    """Create the bounded v3 delivery correction from the committed v2 package.
+
+    Only capital bisection, supported risk attribution, report/chart sources
+    and provenance are regenerated.  Every unmodified scientific ledger is
+    copied byte-for-byte from the verified v2 package; no ticket replay,
+    parameter search, or bootstrap rerun is permitted here.
+    """
+    source, output = source.resolve(), output.resolve()
+    if output.exists():
+        raise RuntimeError(f"immutable correction target already exists: {output}")
+    stage = output.with_name(f".{output.name}.stage")
+    if stage.exists():
+        raise RuntimeError(f"immutable correction stage already exists: {stage}")
+    source_manifest_sha = sha256_file(source / "SHA256SUMS.json")
+    source_content_sha = sha256_file(source / "CONTENT_IDENTITY.json")
+    verify_package(source, source_manifest_sha, source_content_sha)
+    manifest = json.loads((source / "table_manifest.json").read_text(encoding="utf-8"))
+    paths, extra = _minimal_paths_from_package(source, manifest)
+    full_by_axis = {
+        identity[1:]: path for identity, path in paths.items()
+        if tuple(sorted(path[0]["sleeve_settlements"])) == ("BEST_FULL_FULL",)
+    }
+    corrected_capital: list[dict[str, object]] = []
+    corrected_risk: list[dict[str, object]] = []
+    for identity, path in sorted(paths.items(), key=lambda item: canonical_hash(item[0])):
+        control = full_by_axis.get(identity[1:])
+        if control is None:
+            raise RuntimeError("v3 matched FULL recovery control unavailable")
+        original = next((row for row in extra["capital_summary"] if tuple(row[field] for field in PATH_IDENTITY) == identity), None)
+        if original is None:
+            raise RuntimeError("v3 capital-summary recovery join drift")
+        capital = dict(original)
+        capital["minimum_required_start_yuan"] = "" if identity[1] == "COMPOUNDING_BANKROLL" else minimum_required_start_yuan(path)
+        corrected_capital.append(capital)
+        corrected_risk.extend(risk_decomposition_rows(path, minimal_stage4_path_bridge(path), matched_control_rows=control))
+    if len(corrected_capital) != len(paths):
+        raise RuntimeError("v3 capital path denominator drift")
+    stage.mkdir(parents=False)
+    try:
+        skip = {"SHA256SUMS.json", "CONTENT_IDENTITY.json", "source_binding.json", "table_manifest.json", "README.md"}
+        for path in source.rglob("*"):
+            if path.is_file() and path.name not in skip and "__pycache__" not in path.parts:
+                destination = stage / path.relative_to(source)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(path, destination)
+        schema = json.loads((GATE_A / "output_schema.json").read_text(encoding="utf-8"))
+        manifest["capital_summary"] = {
+            "filename": "capital_summary.csv", "row_count": len(corrected_capital),
+            "fields": write_csv_rows(stage / "capital_summary.csv", corrected_capital, compressed=False, declared_fields=[*schema["capital_summary"]["key"], *schema["capital_summary"]["fields"]]),
+        }
+        manifest["risk_decomposition"] = {
+            "filename": "risk_decomposition.csv.gz", "row_count": len(corrected_risk),
+            "fields": write_csv_rows(stage / "risk_decomposition.csv.gz", corrected_risk, compressed=True, declared_fields=[*schema["risk_decomposition"]["key"], *schema["risk_decomposition"]["fields"]]),
+        }
+        chart_tables: dict[str, Sequence[dict[str, object]]] = {
+            "issue_ledger": [row for path in paths.values() for row in path],
+            "sleeve_funding_ledger": _package_table_rows(source, manifest, "sleeve_funding_ledger"),
+            "capital_summary": corrected_capital,
+            "holding_metrics": extra["holding_metrics"],
+            "baseline_lift": extra["baseline_lift"],
+        }
+        ancillary = minimal_stage4_decision_artifacts(stage, chart_tables)
+        manifest.update(ancillary)
+        (stage / "table_manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        source_binding = {
+            "gate_a": {"package": GATE_A.name, "manifest_sha256": EXPECTED_GATE_A_MANIFEST, "content_identity_sha256": EXPECTED_GATE_A_CONTENT},
+            "v2_base_package": {"package": source.name, "manifest_sha256": source_manifest_sha, "content_identity_sha256": source_content_sha},
+            "correction_scope": "CAPITAL_INTEGER_BISECTION;_EX_ANTE_COVARIANCE_RECONSTRUCTION;_MATCHED_RISK;_DECISION_CHARTS",
+            "settlement_boundary": "COMMITTED_V2_PACKAGE_ONLY_NO_TICKET_REPLAY_NO_BOOTSTRAP_RERUN",
+            "reproducibility": "CLEAN_CLONE_VERIFIES_V2_BASE_AND_V3_REPLACEMENT_LEDGERS_WITHOUT_AUTHOR_SCRATCH",
+        }
+        receipt = _write_existing_package_metadata(stage, source_binding=source_binding, package_note="""# #192 Gate B — minimal Stage-4 closure v3
+
+This package is a bounded delivery correction from the committed v2 immutable
+package.  It retains all unaffected settled ledgers byte-for-byte, replaces
+only deterministic minimum-start capital, ex-ante/matched risk attribution,
+and adds manifest-covered decision chart sources/renderings.  It does not
+replay tickets or rerun bootstrap inference.  Terminal disposition remains
+**NO_PROMOTION**.
+""")
+        verify_package(stage, receipt["manifest_sha256"], receipt["content_sha256"])
+        os.replace(stage, output)
+        return {"output": str(output), **receipt, "path_count": len(paths), "risk_row_count": len(corrected_risk)}
+    except Exception:
+        shutil.rmtree(stage, ignore_errors=True)
+        raise
 
 
 def summarize_holding_path(rows: Sequence[dict[str, object]]) -> dict[str, object]:
@@ -3318,7 +3006,12 @@ def capital_summary(path_rows: Sequence[dict[str, object]], holding: dict[str, o
         "starting_bankroll_yuan": INITIAL_BANKROLL_YUAN,
         "ending_bankroll_yuan": ending,
         "minimum_bankroll_yuan": holding["minimum_bankroll_yuan"],
-        "minimum_required_start_yuan": "" if mode == "COMPOUNDING_BANKROLL" else "PENDING_BISECTION",
+        # The frozen capital contract defines fundability on whole-yuan
+        # pre-issue balances.  The saved checkpoint already contains the
+        # exact funded-ticket vector and outcome net for this path, therefore
+        # an integer bisection can recover the smallest start that reproduces
+        # that vector without a second ticket settlement.
+        "minimum_required_start_yuan": "" if mode == "COMPOUNDING_BANKROLL" else minimum_required_start_yuan(path_rows),
         "fundable_issue_count": sum(float(row["actual_stake_yuan"]) > 0 for row in path_rows),
         "first_unfundable_issue": next((row["issue_instance"] for row in path_rows if float(row["requested_stake_yuan"]) > 0 and float(row["actual_stake_yuan"]) == 0), ""),
         "scaled_stake_yuan": sum(float(row["scaled_stake_yuan"]) for row in path_rows),
@@ -3335,20 +3028,74 @@ def capital_summary(path_rows: Sequence[dict[str, object]], holding: dict[str, o
     }
 
 
+def is_fundable_from_start(path_rows: Sequence[dict[str, object]], starting_yuan: int) -> bool:
+    """Check exact saved funding at an integer initial bankroll.
+
+    For a fixed/native path, holding the saved ticket vector fixed makes each
+    next balance ``starting + prior exact net``.  The allocator is constrained
+    by the integer pre-issue balance, so this is the contract predicate for
+    the deterministic bisection below.  A lower start must not be credited
+    with a different, smaller ticket prefix.
+    """
+    if starting_yuan < 0:
+        return False
+    bankroll = float(starting_yuan)
+    for row in sorted(path_rows, key=lambda item: int(item["calendar_index"])):
+        if math.floor(bankroll + 1e-9) < float(row["actual_stake_yuan"]):
+            return False
+        bankroll += float(row["pre_tax_net_yuan"])
+    return True
+
+
+def minimum_required_start_yuan(path_rows: Sequence[dict[str, object]]) -> int:
+    """Return the frozen minimum whole-yuan start by monotone bisection."""
+    if not path_rows:
+        raise ValueError("cannot bisect an empty capital path")
+    # The released ¥100k path is itself a proven upper bound.  Keep the bound
+    # explicit so a corrupted path fails closed instead of expanding to an
+    # uncontracted capital range.
+    upper = int(INITIAL_BANKROLL_YUAN)
+    if not is_fundable_from_start(path_rows, upper):
+        raise RuntimeError("released ¥100k path is not a fundability upper bound")
+    lower = 0
+    while lower < upper:
+        middle = (lower + upper) // 2
+        if is_fundable_from_start(path_rows, middle):
+            upper = middle
+        else:
+            lower = middle + 1
+    if lower and is_fundable_from_start(path_rows, lower - 1):
+        raise RuntimeError("integer fundability bisection boundary drift")
+    return lower
+
+
 def risk_decomposition_rows(
     path_rows: Sequence[dict[str, object]],
     bridge: dict[tuple[str, str], IssueSleeve],
+    *,
+    matched_control_rows: Sequence[dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
-    """Emit funded-flow risk diagnostics without assigning invented P&L.
+    """Emit exact ex-ante variance and matched realized-loss diagnostics.
 
-    The frozen normalization engine may supply an ex-ante covariance estimate,
-    but it does not make covariance an outcome cashflow.  Accordingly this
-    table exposes exactly funded per-sleeve money and leaves Euler quantities
-    blank when the per-issue covariance matrix was intentionally not retained
-    in the Gate-B state row.
+    The saved path intentionally stores a covariance hash rather than a wide
+    matrix.  Reconstructing it from the same strictly-prior frozen H1 return
+    history is deterministic and gives a genuine ex-ante marginal/Euler
+    decomposition.  It never treats covariance as cash P&L.  Matched FULL
+    drawdown and per-issue loss-tail deltas remain realized path diagnostics.
     """
+    ordered = sorted(path_rows, key=lambda item: int(item["calendar_index"]))
+    control_by_index: dict[int, dict[str, object]] = {}
+    if matched_control_rows is not None:
+        control_holding = summarize_holding_path(matched_control_rows)["issue_rows"]
+        control_by_index = {int(row["calendar_index"]): row for row in control_holding}
+        if len(control_by_index) != len(ordered):
+            raise RuntimeError("matched FULL risk-calendar denominator drift")
+    sleeves = tuple(sorted(ordered[0]["sleeve_settlements"]))
+    gate = frozen_gate_a()
+    history: list[dict[str, float | None]] = []
     rows: list[dict[str, object]] = []
-    for path_row in path_rows:
+    candidate_holding = summarize_holding_path(ordered)["issue_rows"]
+    for path_row in candidate_holding:
         settlements = path_row["sleeve_settlements"]
         portfolio_net = float(path_row["pre_tax_net_yuan"])
         sleeve_net = sum(float(value["pre_tax_net_yuan"]) for value in settlements.values())
@@ -3359,7 +3106,22 @@ def risk_decomposition_rows(
             for sleeve_id in settlements
         )
         actual = float(path_row["actual_stake_yuan"])
+        observations = gate.active_common_history(history, list(sleeves))
+        covariance = gate.covariance_matrix(observations, list(sleeves)) if len(observations) >= 52 else None
+        weights = [float(path_row["weights"][sleeve]) for sleeve in sleeves]
+        covariance_times_weights = (
+            [sum(covariance[index][other] * weights[other] for other in range(len(sleeves))) for index in range(len(sleeves))]
+            if covariance is not None else []
+        )
+        control = control_by_index.get(int(path_row["calendar_index"]))
+        if control is not None:
+            matched_drawdown_delta = float(path_row["drawdown_yuan"]) - float(control["drawdown_yuan"])
+            matched_tail_loss_delta = max(-portfolio_net, 0.0) - max(-float(control["pre_tax_net_yuan"]), 0.0)
+        else:
+            matched_drawdown_delta = None
+            matched_tail_loss_delta = None
         for sleeve_id, settlement in sorted(settlements.items()):
+            sleeve_index = sleeves.index(sleeve_id)
             family = canonical_economic_catalog()[sleeve_id]["economic_family_id"]
             native_stake = bridge[(sleeve_id, str(path_row["issue_instance"]))].requested_ticket_count * TICKET_STAKE_YUAN
             funded = float(settlement["actual_stake_yuan"])
@@ -3368,10 +3130,10 @@ def risk_decomposition_rows(
                 "calendar_index": path_row["calendar_index"],
                 "issue_instance": path_row["issue_instance"],
                 "economic_family_id": family,
-                "marginal_variance_contribution": "",
-                "euler_variance_contribution": "",
-                "matched_drawdown_delta_yuan": "",
-                "matched_tail_loss_delta_yuan": "",
+                "marginal_variance_contribution": covariance_times_weights[sleeve_index] if covariance is not None else "",
+                "euler_variance_contribution": weights[sleeve_index] * covariance_times_weights[sleeve_index] if covariance is not None else "",
+                "matched_drawdown_delta_yuan": matched_drawdown_delta if matched_drawdown_delta is not None else "",
+                "matched_tail_loss_delta_yuan": matched_tail_loss_delta if matched_tail_loss_delta is not None else "",
                 "capital_utilization_yuan": funded,
                 "retained_cash_yuan": float(path_row["retained_cash_yuan"]),
                 "rounding_delta_yuan": funded - float(path_row["weights"][sleeve_id]) * actual,
@@ -3379,14 +3141,21 @@ def risk_decomposition_rows(
                 "portfolio_pnl_reconciliation_yuan": portfolio_net - sleeve_net,
                 "requested_native_stake_yuan": native_stake,
                 "portfolio_requested_native_stake_yuan": requested,
-                "undefined_reason": "COVARIANCE_MATRIX_NOT_RETAINED_IN_PATH_STATE",
+                "undefined_reason": (
+                    "INSUFFICIENT_PRIOR_52_COMMON_ACTIVE_FOR_EX_ANTE_COVARIANCE"
+                    if covariance is None
+                    else ""
+                ),
             })
+        history.append({sleeve: source_native_return(bridge[(sleeve, str(path_row["issue_instance"]))]) for sleeve in sleeves})
     return rows
 
 
 def path_output_tables(
     path_rows: Sequence[dict[str, object]],
     bridge: dict[tuple[str, str], IssueSleeve],
+    *,
+    matched_control_rows: Sequence[dict[str, object]] | None = None,
 ) -> dict[str, list[dict[str, object]]]:
     """Create the core, uniquely keyed Gate-B tables for one capital path."""
     holding_result = summarize_holding_path(path_rows)
@@ -3464,7 +3233,9 @@ def path_output_tables(
             **holding,
         }],
         "rolling_window_metrics": rolling,
-        "risk_decomposition": risk_decomposition_rows(path_rows, bridge),
+        "risk_decomposition": risk_decomposition_rows(
+            path_rows, bridge, matched_control_rows=matched_control_rows,
+        ),
         "weight_history": weight_history,
         "stage_attribution": stage_attribution,
     }
