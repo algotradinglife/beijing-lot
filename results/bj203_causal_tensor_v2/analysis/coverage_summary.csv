@@ -1,0 +1,3 @@
+split,total_cells,feature_count,fully_covered_features,fully_masked_features,mean_feature_coverage
+development,303663,24,4,2,0.547432515651
+heldout,29055,24,3,2,0.201157287902
