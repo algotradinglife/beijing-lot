@@ -2040,14 +2040,29 @@ def replay_path(
             # or ticket ordering.
             capped_budget = min(float(funding["issue_budget_yuan"]), float(normalization["normalized_mode_notional_yuan"]))
             capped_tickets = int(math.floor(capped_budget / TICKET_STAKE_YUAN))
-            funding = gate.allocate_integer_tickets(
-                "SCALED_NATIVE_REQUEST",
-                1.0 if native_stake == 0 else min(1.0, capped_tickets * TICKET_STAKE_YUAN / native_stake),
-                int(math.floor(bankroll)),
-                requested_caps,
-                weights,
-                {sleeve: item.atomic for sleeve, item in issue_sleeves.items()},
-            )
+            if capped_tickets <= 0:
+                # The frozen allocator intentionally rejects a zero fraction.
+                # A positive native request can nevertheless be reduced below
+                # one ¥2 ticket by the pre-outcome normalization cap.  This is
+                # an executable cash row, not an allocator error or a hidden
+                # fractional ticket.
+                funding = {
+                    "actual_ticket_count_by_sleeve": {s: 0 for s in sleeves},
+                    "reason_codes": "NO_BET_NORMALIZED_BUDGET_LT_TICKET",
+                    "mode_notional_yuan": raw_notional,
+                    "issue_budget_yuan": 0.0,
+                    "retained_cash_yuan": bankroll,
+                    "actual_total_stake_yuan": 0.0,
+                }
+            else:
+                funding = gate.allocate_integer_tickets(
+                    "SCALED_NATIVE_REQUEST",
+                    min(1.0, capped_tickets * TICKET_STAKE_YUAN / native_stake),
+                    int(math.floor(bankroll)),
+                    requested_caps,
+                    weights,
+                    {sleeve: item.atomic for sleeve, item in issue_sleeves.items()},
+                )
             # Allocation is invoked through the frozen scaled-native primitive
             # only to express the already-computed normalized budget in whole
             # tickets.  Preserve the original capital-mode accounting in the

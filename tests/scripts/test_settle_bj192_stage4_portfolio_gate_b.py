@@ -206,6 +206,65 @@ def test_replay_path_fails_closed_to_full_or_zero_for_expanded_atomic_sleeve() -
         assert settlement["actual_ticket_count"] in (0, requested)
 
 
+def test_replay_path_keeps_cash_when_normalization_is_below_one_ticket(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A normalization cap cannot be represented by a zero allocator fraction."""
+    class Gate:
+        calls = 0
+
+        def dynamic_weights(self, _method, _history, sleeves):
+            return {sleeve: 1.0 / len(sleeves) for sleeve in sleeves}, "FIXTURE_EQUAL"
+
+        def active_common_history(self, _history, _sleeves):
+            return []
+
+        def covariance_matrix(self, _observations, _sleeves):
+            raise AssertionError("covariance is not available in the fixture")
+
+        def normalization_state(self, *_args):
+            return {
+                "normalization_status": "FIXTURE_NORMALIZED",
+                "normalization_executable": True,
+                "covariance_sleeve_order_json": "[]",
+                "covariance_input_sha256": "fixture",
+                "ex_ante_volatility": 0.0,
+                "target_volatility": 0.05,
+                "realized_capital_multiplier": 0.0,
+                "risk_budget_yuan": 0.0,
+                "pre_normalization_mode_notional_yuan": 1.0,
+                "normalized_mode_notional_yuan": 1.0,
+            }
+
+        def allocate_integer_tickets(self, *_args):
+            self.calls += 1
+            if self.calls != 1:
+                raise AssertionError("zero-ticket normalization must not re-enter frozen allocator")
+            return {
+                "actual_ticket_count_by_sleeve": {"S": 1},
+                "reason_codes": "FIXTURE_NATIVE",
+                "mode_notional_yuan": 2.0,
+                "issue_budget_yuan": 2.0,
+                "retained_cash_yuan": 99_998.0,
+                "actual_total_stake_yuan": 2.0,
+            }
+
+    gate = Gate()
+    monkeypatch.setattr(RUNNER, "frozen_gate_a", lambda: gate)
+    sleeve = RUNNER.NativeIssueSleeve(
+        sleeve_id="S", issue_instance="I@OOS_2019", status="SETTLED", requested_ticket_count=1,
+        atomic=False,
+        lots=(RUNNER.TicketLot(1, "lot", "p", 0, True, 0, 0.0),),
+    )
+    rows = RUNNER.replay_path(
+        sleeves=["S"], mode="FIXED_100K_NOTIONAL", fraction=0.10,
+        weight_method="EQUAL_WEIGHT", normalization_method="UNIT_CAPITAL",
+        bridge={("S", "I@OOS_2019"): sleeve},
+        calendar=[{"issue_instance": "I@OOS_2019", "calendar_index": "0", "year": "2019", "fold": "F1", "first_kickoff_ts": "2019-01-01T00:00:00Z"}],
+    )
+    assert gate.calls == 1
+    assert rows[0]["actual_stake_yuan"] == 0.0
+    assert "NO_BET_NORMALIZED_BUDGET_LT_TICKET" in rows[0]["reason_codes"]
+
+
 def test_prior_m_selection_uses_seed_training_only_and_lower_m_tie_break() -> None:
     candidate = "BJ151_NOGATE_K4_WR_DENSE_M"
     history = {
