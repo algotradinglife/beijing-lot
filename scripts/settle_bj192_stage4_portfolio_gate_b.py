@@ -17,6 +17,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -60,6 +61,31 @@ def repo_root() -> Path:
 ROOT = repo_root()
 GATE_A = ROOT / "results" / "bj192_gate_a_preoutcome_v8r1r2"
 BJ170 = ROOT / "results" / "bj170_gate_b_selector_allocator_stack_v1"
+
+SETTLED_SOURCE_PACKAGES = {
+    "BJ145": (
+        ROOT / "results" / "bj145_gate_b_outcome_settlement_v2",
+        "10d5a5082a175ddc965b01fb257e8e5c7e91a844d7ee823fd6d2ad5aeff84cc9",
+        "e5ebb462028b3abc9979656de37138c5674b52f1830d1ab6ee093c670236cf5b",
+    ),
+    "BJ148": (
+        ROOT / "results" / "bj148_gate_b_outcome_settlement_v1",
+        "a60389f27f0373ea03300db5edf28aebb3a0e567e47e78ade860094413756467",
+        "38c3325fba0eb02f8701e96ac7cdee4fe9d1aabf146a48b954a0cacf08764b5b",
+    ),
+    "BJ151": (
+        ROOT / "results" / "bj151_gate_b_outcome_settlement_v1",
+        "7b88be8af887674875f831f2da0951a1bf7664041f40c10be00d09194ce6fbe2",
+        "3214868b35b74c7ebdefeea5041dc30af86caeaced6a2a877db46e6c7e63508e",
+    ),
+    "BJ159": (
+        ROOT / "results" / "bj159_gate_b_outcome_settlement_v2r1",
+        "17b42f65b834f2b5afff0e52795588f95340d76810f7faec75b193b6eecc4cc8",
+        "7ba60fcc8fa99c620c019f6098e3d9e8b5bb112f6622799baffa9c6f2422cbaf",
+    ),
+}
+
+BJ145_CACHE_SCHEMA = "bj192-bj145-atomic-cache-v1"
 
 
 def sha256_file(path: Path) -> str:
@@ -209,6 +235,395 @@ class NativeIssueSleeve:
         }
 
 
+@dataclass(frozen=True)
+class AtomicIssueSleeve:
+    """An exact source-settled sleeve that lacks a Gate-A prefix stream.
+
+    The accepted Gate-A funded-prefix contract explicitly declares every
+    expanded #145/#148/#151/#159 record whole-native-or-no-bet until a new
+    immutable global order is supplied.  This class makes that restriction a
+    runtime invariant while retaining the upstream's exact ticket-level gross
+    and per-ticket-tax total for all-or-zero funding.
+    """
+
+    sleeve_id: str
+    issue_instance: str
+    status: str
+    requested_ticket_count: int
+    gross_yuan: float
+    tax_yuan: float
+    hit_ticket_count: int
+    tax_lot_source_identity: str
+    atomic: bool = True
+
+    def settle_prefix(self, count: int) -> dict[str, float | int | str]:
+        if count not in (0, self.requested_ticket_count):
+            raise RuntimeError(f"partial atomic expanded funding: {self.sleeve_id}/{self.issue_instance}")
+        if count and self.status != "SETTLED":
+            raise RuntimeError(f"funding unavailable sleeve: {self.sleeve_id}/{self.issue_instance}")
+        if not count:
+            return {
+                "actual_ticket_count": 0,
+                "actual_stake_yuan": 0.0,
+                "gross_yuan": 0.0,
+                "tax_yuan": 0.0,
+                "pre_tax_net_yuan": 0.0,
+                "tax_adjusted_net_yuan": 0.0,
+                "hit_ticket_count": 0,
+                "funded_tax_lot_sha256": canonical_hash([]),
+            }
+        stake = count * TICKET_STAKE_YUAN
+        return {
+            "actual_ticket_count": count,
+            "actual_stake_yuan": stake,
+            "gross_yuan": self.gross_yuan,
+            "tax_yuan": self.tax_yuan,
+            "pre_tax_net_yuan": self.gross_yuan - stake,
+            "tax_adjusted_net_yuan": self.gross_yuan - self.tax_yuan - stake,
+            "hit_ticket_count": self.hit_ticket_count,
+            "funded_tax_lot_sha256": canonical_hash(
+                {"source": self.tax_lot_source_identity, "ticket_count": count}
+            ),
+        }
+
+
+IssueSleeve = NativeIssueSleeve | AtomicIssueSleeve
+
+
+def atomic_from_settled_row(
+    *,
+    sleeve_id: str,
+    row: dict[str, str],
+    source_identity: str,
+    ticket_count_field: str = "executed_ticket_count",
+    stake_field: str = "stake_yuan",
+) -> AtomicIssueSleeve:
+    """Turn a manifest-bound upstream issue row into a whole-native sleeve."""
+    status = "SETTLED" if row.get("settlement_status") == "SETTLED" else row.get("settlement_status", "NO_BET_FROZEN")
+    requested = int(row.get(ticket_count_field, "0")) if status == "SETTLED" else 0
+    stake = float(row.get(stake_field, row.get("planned_stake_yuan", "0")))
+    if requested and not math.isclose(stake, requested * TICKET_STAKE_YUAN, abs_tol=1e-6):
+        raise RuntimeError(f"source ticket/stake drift: {sleeve_id}/{row.get('issue_instance', '')}")
+    return AtomicIssueSleeve(
+        sleeve_id=sleeve_id,
+        issue_instance=row["issue_instance"],
+        status=status,
+        requested_ticket_count=requested,
+        gross_yuan=float(row.get("gross_pre_tax_yuan", "0")),
+        tax_yuan=float(row.get("tax_yuan", "0")),
+        hit_ticket_count=int(row.get("hit_ticket_count", row.get("winning_ticket_count", "0"))),
+        tax_lot_source_identity=source_identity,
+    )
+
+
+def load_bj145_atomic_surface(
+    candidate_ids: Iterable[str],
+) -> dict[tuple[str, int, str, str], AtomicIssueSleeve]:
+    """Load selected canonical #145 arms as whole-native issue sleeves.
+
+    #145 has exact outcome and per-ticket-tax settlement, but its accepted
+    #192 prefix contract has no issue-global prefix proof.  It is therefore
+    #192-executable only at its inherited full issue request.  Candidate
+    #identity is resolved from the accepted Gate-A registry before any settled
+    payload is read; source rows are required to match exactly one candidate.
+    """
+    selected = set(candidate_ids)
+    registry = {
+        row["candidate_id"]: row
+        for row in read_csv(GATE_A / "bj145_allocation_candidate_registry.csv")
+        if row["candidate_id"] in selected
+    }
+    if registry.keys() != selected:
+        raise RuntimeError("unknown #145 Gate-A candidate")
+    config_to_candidate: dict[tuple[str, str, str, str, str, str], str] = {}
+    for candidate, row in registry.items():
+        for m_value in row["available_M_grid"].split(";"):
+            for seed in row["seed_scope"].split(";"):
+                key = (
+                    row["arm_id"], row["weight_source"], row["mechanism"],
+                    row["cap"], m_value, seed,
+                )
+                if key in config_to_candidate:
+                    raise RuntimeError(f"ambiguous #145 source configuration: {key}")
+                config_to_candidate[key] = candidate
+
+    directory, manifest, content = SETTLED_SOURCE_PACKAGES["BJ145"]
+    cache = prepare_bj145_source_cache(directory, manifest, content)
+    result: dict[tuple[str, int, str, str], AtomicIssueSleeve] = {}
+    try:
+        for source_key, candidate in config_to_candidate.items():
+            rows = cache.execute(
+                """SELECT issue_instance, settlement_status, frozen_planned_draw_count,
+                          frozen_planned_stake_yuan, gross_pre_tax_yuan, tax_yuan,
+                          hit_ticket_count
+                   FROM issue_rows
+                   WHERE arm_id=? AND weight_source=? AND mechanism=? AND cap=? AND m=? AND seed=?
+                   ORDER BY issue_instance""",
+                source_key,
+            ).fetchall()
+            for values in rows:
+                row = dict(zip(
+                    ("issue_instance", "settlement_status", "frozen_planned_draw_count",
+                     "frozen_planned_stake_yuan", "gross_pre_tax_yuan", "tax_yuan",
+                     "hit_ticket_count"), values, strict=True,
+                ))
+                key = candidate, int(source_key[4]), source_key[5], row["issue_instance"]
+                if key in result:
+                    raise RuntimeError(f"duplicate #145 source issue row: {key}")
+                result[key] = atomic_from_settled_row(
+                    sleeve_id=f"{candidate}@M{key[1]}@{key[2]}",
+                    row=row,
+                    source_identity=canonical_hash({
+                        "package": directory.name,
+                        "candidate": candidate,
+                        "source_key": source_key,
+                        "issue": key[3],
+                    }),
+                    ticket_count_field="frozen_planned_draw_count",
+                    stake_field="frozen_planned_stake_yuan",
+                )
+    finally:
+        cache.close()
+    config_counts: dict[tuple[str, int, str], int] = defaultdict(int)
+    for candidate, m_value, seed, _ in result:
+        config_counts[(candidate, m_value, seed)] += 1
+    if set(config_counts) != {
+        (candidate, int(m_value), seed)
+        for key, candidate in config_to_candidate.items()
+        for m_value, seed in [(key[4], key[5])]
+    } or any(count != 348 for count in config_counts.values()):
+        raise RuntimeError("incomplete #145 source surface")
+    return result
+
+
+def prepare_bj145_source_cache(directory: Path, manifest: str, content: str) -> sqlite3.Connection:
+    """Build a hash-bound local index for the 1M-row #145 source only once.
+
+    This is an execution cache, not a research artifact: it is regenerated
+    solely from the manifest-verified source inside this worktree's `.scratch`
+    area.  Its explicit source binding prevents an old cache from silently
+    serving a changed ledger and avoids serially decompressing the source once
+    per frozen candidate/M path.
+    """
+    verify_package(directory, manifest, content)
+    cache_dir = ROOT / ".scratch" / "bj192_gate_b_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    path = cache_dir / "bj145_issue_rows.sqlite"
+    source_hash = sha256_file(directory / "issue_allocation_settlement.csv.gz")
+    expected = canonical_hash({
+        "schema": BJ145_CACHE_SCHEMA,
+        "package": directory.name,
+        "manifest": manifest,
+        "content": content,
+        "source_file_sha256": source_hash,
+    })
+    if path.exists():
+        connection = sqlite3.connect(path)
+        try:
+            meta = dict(connection.execute("SELECT key, value FROM cache_meta"))
+            if meta.get("identity") == expected:
+                return connection
+        except sqlite3.DatabaseError:
+            pass
+        connection.close()
+        path.unlink()
+    connection = sqlite3.connect(path)
+    connection.execute("PRAGMA journal_mode=OFF")
+    connection.execute("PRAGMA synchronous=OFF")
+    connection.execute("PRAGMA temp_store=MEMORY")
+    connection.execute("CREATE TABLE cache_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+    connection.execute(
+        """CREATE TABLE issue_rows (
+            arm_id TEXT NOT NULL, weight_source TEXT NOT NULL, mechanism TEXT NOT NULL,
+            cap TEXT NOT NULL, m TEXT NOT NULL, seed TEXT NOT NULL,
+            issue_instance TEXT NOT NULL, settlement_status TEXT NOT NULL,
+            frozen_planned_draw_count TEXT NOT NULL, frozen_planned_stake_yuan TEXT NOT NULL,
+            gross_pre_tax_yuan TEXT NOT NULL, tax_yuan TEXT NOT NULL, hit_ticket_count TEXT NOT NULL,
+            PRIMARY KEY (arm_id, weight_source, mechanism, cap, m, seed, issue_instance)
+        ) WITHOUT ROWID"""
+    )
+    fields = (
+        "arm_id", "weight_source", "mechanism", "cap", "M", "seed", "issue_instance",
+        "settlement_status", "frozen_planned_draw_count", "frozen_planned_stake_yuan",
+        "gross_pre_tax_yuan", "tax_yuan", "hit_ticket_count",
+    )
+    batch: list[tuple[str, ...]] = []
+    with gzip.open(directory / "issue_allocation_settlement.csv.gz", "rt", newline="", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            batch.append(tuple(row[field] for field in fields))
+            if len(batch) >= 10_000:
+                connection.executemany("INSERT INTO issue_rows VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
+                batch.clear()
+    if batch:
+        connection.executemany("INSERT INTO issue_rows VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", batch)
+    count = connection.execute("SELECT COUNT(*) FROM issue_rows").fetchone()[0]
+    if count != 1_006_416:
+        raise RuntimeError(f"#145 cache source row count drift: {count}")
+    connection.executemany(
+        "INSERT INTO cache_meta VALUES (?, ?)",
+        [("identity", expected), ("source_rows", str(count))],
+    )
+    connection.commit()
+    return connection
+
+
+def load_dense_atomic_surface(
+    source_key: str,
+    candidate_specs: dict[str, tuple[str, str]],
+) -> dict[tuple[str, int, str, str], AtomicIssueSleeve]:
+    """Load complete #148/#151 issue×M×seed rows as atomic sleeves.
+
+    The source packages contain exact per-ticket settlement and tax ledgers;
+    #192 is allowed to consume the entire native issue request but the Gate-A
+    prefix contract forbids a new cross-identity ticket ordering.  ``M`` and
+    seed therefore remain part of the sleeve identity rather than being
+    averaged or selected after the fact.
+    """
+    directory, manifest, content = SETTLED_SOURCE_PACKAGES[source_key]
+    verify_package(directory, manifest, content)
+    rows = read_gzip(directory / "issue_m_grid_settlement.csv.gz")
+    result: dict[tuple[str, int, str, str], AtomicIssueSleeve] = {}
+    expected_configs = set(candidate_specs.values())
+    seen_configs: set[tuple[str, str, int, str]] = set()
+    for row in rows:
+        spec = (row["sampling_role"], row["ticket_mechanism"])
+        if spec not in expected_configs:
+            continue
+        candidate_id = next(key for key, value in candidate_specs.items() if value == spec)
+        m_value, seed = int(row["M"]), row["seed"]
+        key = candidate_id, m_value, seed, row["issue_instance"]
+        if key in result:
+            raise RuntimeError(f"duplicate dense source issue row: {key}")
+        result[key] = atomic_from_settled_row(
+            sleeve_id=f"{candidate_id}@M{m_value}@{seed}",
+            row=row,
+            source_identity=canonical_hash(
+                {"package": directory.name, "candidate": candidate_id, "M": m_value, "seed": seed, "issue": row["issue_instance"]}
+            ),
+        )
+        seen_configs.add((spec[0], spec[1], m_value, seed))
+    # Each frozen dense configuration has the canonical 348-issue calendar,
+    # including no-bet and unavailable zero-flow records.
+    config_counts: dict[tuple[str, int, str], int] = defaultdict(int)
+    for candidate, m_value, seed, _ in result:
+        config_counts[(candidate, m_value, seed)] += 1
+    if not config_counts or any(count != 348 for count in config_counts.values()):
+        raise RuntimeError(f"incomplete dense source surface: {source_key}")
+    return result
+
+
+def load_bj159_n7_atomic_surface() -> dict[tuple[int, str, str], AtomicIssueSleeve]:
+    """Load the frozen N=7 #159 WOR M curve, retaining saturation semantics."""
+    directory, manifest, content = SETTLED_SOURCE_PACKAGES["BJ159"]
+    verify_package(directory, manifest, content)
+    rows = read_gzip(directory / "issue_settlement.csv.gz")
+    result: dict[tuple[int, str, str], AtomicIssueSleeve] = {}
+    for row in rows:
+        if int(row["n"]) != 7:
+            continue
+        key = int(row["M"]), row["seed"], row["issue_instance"]
+        if key in result:
+            raise RuntimeError(f"duplicate #159 N7 issue row: {key}")
+        result[key] = atomic_from_settled_row(
+            sleeve_id=f"BJ159_SELECTED_N7_WOR_M_CURVE@M{key[0]}@{key[1]}",
+            row=row,
+            source_identity=canonical_hash(
+                {"package": directory.name, "n": 7, "M": key[0], "seed": key[1], "issue": key[2], "saturation": row["saturation_status"]}
+            ),
+        )
+    config_counts: dict[tuple[int, str], int] = defaultdict(int)
+    for m_value, seed, _ in result:
+        config_counts[(m_value, seed)] += 1
+    if not config_counts or any(count != 348 for count in config_counts.values()):
+        raise RuntimeError("incomplete #159 N7 source surface")
+    return result
+
+
+def canonical_economic_catalog() -> dict[str, dict[str, str]]:
+    """Read the immutable, alias-deduplicated Gate-A family catalog."""
+    rows = read_csv(GATE_A / "economic_family_registry.csv")
+    result = {
+        row["candidate_id"]: row
+        for row in rows
+        if row["candidate_id"] == row["canonical_candidate_id"]
+        and row["family_status"] == "CANONICAL_PRIMARY_FRONTIER"
+    }
+    if len(result) != 104 or set(result) - {row["candidate_id"] for row in rows}:
+        raise RuntimeError("canonical economic family denominator drift")
+    return result
+
+
+def frozen_m_grid(candidate_id: str) -> tuple[int, ...]:
+    row = canonical_economic_catalog().get(candidate_id)
+    if row is None:
+        raise RuntimeError(f"unknown canonical candidate: {candidate_id}")
+    return tuple(int(value) for value in row["available_M_grid"].split(";"))
+
+
+def materialize_candidate_bridge(
+    candidate_id: str,
+    m_value: int,
+    seed: str = "NA",
+) -> dict[tuple[str, str], IssueSleeve]:
+    """Materialize one immutable candidate/M/seed path on all 348 issues.
+
+    The function deliberately returns only one frozen economic identity at a
+    time.  This keeps the million-row #145 source in its verified local index
+    rather than treating an in-memory aggregate as a substitute for the source
+    ledger.  Pairwise/higher-order runs compose these exact 348-row bridges.
+    """
+    catalog = canonical_economic_catalog()
+    family = catalog.get(candidate_id)
+    if family is None or m_value not in frozen_m_grid(candidate_id):
+        raise RuntimeError(f"candidate/M outside Gate-A catalog: {candidate_id}@{m_value}")
+    if family["source_kind"] == "H1_FIXED":
+        if seed != "NA":
+            raise RuntimeError("H1 sleeves have no deployment seed")
+        bridge = h1_ticket_bridge()
+        return {(candidate_id, issue): sleeve for (sleeve_id, issue), sleeve in bridge.items() if sleeve_id == candidate_id}
+    if family["source_kind"] == "BJ145_ALLOCATION":
+        surface = load_bj145_atomic_surface([candidate_id])
+        result = {
+            (candidate_id, issue): sleeve
+            for (candidate, m_item, seed_item, issue), sleeve in surface.items()
+            if candidate == candidate_id and m_item == m_value and seed_item == seed
+        }
+    elif candidate_id.startswith("BJ148_"):
+        specs = {
+            "BJ148_NOGATE_WR_DENSE_M": ("PRIMARY_WR_NATURAL_BASELINE", "Q_INFORMED_WR_DUPLICATE_STAKE"),
+            "BJ148_NOGATE_WOR_DENSE_M": ("SENSITIVITY_WOR_DISTINCT", "Q_INFORMED_WOR_DISTINCT"),
+        }
+        surface = load_dense_atomic_surface("BJ148", {candidate_id: specs[candidate_id]})
+        result = {
+            (candidate_id, issue): sleeve
+            for (candidate, m_item, seed_item, issue), sleeve in surface.items()
+            if m_item == m_value and seed_item == seed
+        }
+    elif candidate_id.startswith("BJ151_"):
+        specs = {
+            "BJ151_NOGATE_K4_WR_DENSE_M": ("PRIMARY_WR_NATURAL_BASELINE", "Q_INFORMED_WR_DUPLICATE_STAKE"),
+            "BJ151_NOGATE_K4_WOR_DENSE_M": ("SENSITIVITY_WOR_FIXED_CANDIDATE", "Q_INFORMED_WOR_DISTINCT"),
+        }
+        surface = load_dense_atomic_surface("BJ151", {candidate_id: specs[candidate_id]})
+        result = {
+            (candidate_id, issue): sleeve
+            for (candidate, m_item, seed_item, issue), sleeve in surface.items()
+            if m_item == m_value and seed_item == seed
+        }
+    elif candidate_id == "BJ159_SELECTED_N7_WOR_M_CURVE":
+        surface = load_bj159_n7_atomic_surface()
+        result = {
+            (candidate_id, issue): sleeve
+            for (m_item, seed_item, issue), sleeve in surface.items()
+            if m_item == m_value and seed_item == seed
+        }
+    else:
+        raise RuntimeError(f"unimplemented source adapter: {candidate_id}")
+    if len(result) != 348:
+        raise RuntimeError(f"incomplete candidate path: {candidate_id}@{m_value}@{seed}: {len(result)}")
+    return result
+
+
 def h1_ticket_bridge() -> dict[tuple[str, str], NativeIssueSleeve]:
     """Recreate Gate-A's H1 prefix ledger from the accepted #170 ticket replay.
 
@@ -308,7 +723,7 @@ def h1_ticket_bridge() -> dict[tuple[str, str], NativeIssueSleeve]:
     return bridge
 
 
-def source_native_return(sleeve: NativeIssueSleeve) -> float | None:
+def source_native_return(sleeve: IssueSleeve) -> float | None:
     """Return only an active native observation for the prior weight estimator."""
     if sleeve.status != "SETTLED" or not sleeve.requested_ticket_count:
         return None
@@ -323,15 +738,17 @@ def replay_path(
     fraction: float,
     weight_method: str,
     normalization_method: str,
-    bridge: dict[tuple[str, str], NativeIssueSleeve],
+    bridge: dict[tuple[str, str], IssueSleeve],
     calendar: Sequence[dict[str, str]],
     bundle_id: str = "DETERMINISTIC_H1",
 ) -> list[dict[str, object]]:
-    """Run one strictly-prior, concurrent, capital-limited H1 state machine."""
+    """Run one strictly-prior, concurrent, capital-limited Stage-4 path."""
     gate = frozen_gate_a()
     sleeves = tuple(sorted(sleeves))
-    if not sleeves or set(sleeves) - set(H1_SLEEVES):
-        raise ValueError("unknown or empty H1 sleeve subset")
+    if not sleeves:
+        raise ValueError("empty sleeve subset")
+    if any((sleeve, row["issue_instance"]) not in bridge for sleeve in sleeves for row in calendar):
+        raise ValueError("incomplete frozen sleeve/calendar bridge")
     if mode == "NATIVE_REQUEST_CONTROL" and fraction != 1.0:
         raise ValueError("NATIVE_REQUEST_CONTROL requires a 100% fraction")
     portfolio_id = canonical_hash({"sleeves": sleeves, "stage": "H1_STAGE4"})

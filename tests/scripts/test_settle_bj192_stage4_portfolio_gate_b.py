@@ -38,6 +38,75 @@ def test_all_gate_a_source_bindings_are_verified_before_adapter_execution() -> N
     assert bindings["bj176_issue_equity_risk_v1"]["manifest_sha256"] == RUNNER.EXPECTED_BJ176_MANIFEST
 
 
+def test_expanded_source_rows_are_atomic_until_a_global_prefix_is_frozen() -> None:
+    sleeve = RUNNER.atomic_from_settled_row(
+        sleeve_id="BJ151_NOGATE_K4_WR_DENSE_M@64",
+        row={
+            "issue_instance": "26001@OOS_2026",
+            "settlement_status": "SETTLED",
+            "executed_ticket_count": "4",
+            "stake_yuan": "8.0",
+            "gross_pre_tax_yuan": "12.0",
+            "tax_yuan": "0.0",
+            "hit_ticket_count": "1",
+        },
+        source_identity="fixture-source",
+    )
+    with pytest.raises(RuntimeError, match="partial atomic expanded funding"):
+        sleeve.settle_prefix(2)
+    assert sleeve.settle_prefix(4)["pre_tax_net_yuan"] == pytest.approx(4.0)
+    assert sleeve.settle_prefix(0)["gross_yuan"] == 0.0
+
+
+def test_dense_and_n7_source_adapters_preserve_full_atomic_issue_surfaces() -> None:
+    dense = RUNNER.load_dense_atomic_surface(
+        "BJ151",
+        {
+            "BJ151_NOGATE_K4_WR_DENSE_M": (
+                "PRIMARY_WR_NATURAL_BASELINE",
+                "Q_INFORMED_WR_DUPLICATE_STAKE",
+            ),
+            "BJ151_NOGATE_K4_WOR_DENSE_M": (
+                "SENSITIVITY_WOR_FIXED_CANDIDATE",
+                "Q_INFORMED_WOR_DISTINCT",
+            ),
+        },
+    )
+    # M=2187 is represented by the separate FULL control, leaving 57 dense
+    # stochastic M values for each mechanism/seed family.
+    assert len(dense) == 2 * 3 * 57 * 348
+    assert all(item.atomic for item in dense.values())
+    n7 = RUNNER.load_bj159_n7_atomic_surface()
+    assert {(m, seed) for m, seed, _ in n7} == {
+        (m, seed) for m in (32, 64, 128) for seed in ("137001", "137002", "137003")
+    }
+    assert len(n7) == 3 * 3 * 348
+
+
+def test_bj145_adapter_uses_frozen_full_issue_request_not_a_new_prefix() -> None:
+    candidate = "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_1"
+    surface = RUNNER.load_bj145_atomic_surface([candidate])
+    assert len(surface) == 20 * 348
+    row = surface[(candidate, 64, "NA", "190101@OOS_2019")]
+    assert row.requested_ticket_count == 256
+    with pytest.raises(RuntimeError, match="partial atomic expanded funding"):
+        row.settle_prefix(255)
+
+
+def test_canonical_catalog_is_alias_deduplicated_and_materializes_exact_paths() -> None:
+    catalog = RUNNER.canonical_economic_catalog()
+    assert len(catalog) == 104
+    assert catalog["BJ151_NOGATE_K4_WR_DENSE_M"]["source_kind"] == "EXPANDED_COMPLETE"
+    h1 = RUNNER.materialize_candidate_bridge("MODEL_SOURCE_MODEL_CAP1_M512", 512)
+    assert len(h1) == 348
+    assert all(not sleeve.atomic for sleeve in h1.values())
+    atomic = RUNNER.materialize_candidate_bridge(
+        "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_1", 64
+    )
+    assert len(atomic) == 348
+    assert all(sleeve.atomic for sleeve in atomic.values())
+
+
 def test_full_native_h1_ticket_bridge_reproduces_accepted_issue_level_ledger() -> None:
     bridge = RUNNER.h1_ticket_bridge()
     totals = defaultdict(lambda: defaultdict(float))
