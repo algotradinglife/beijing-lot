@@ -20,6 +20,7 @@ import io
 import json
 import math
 import os
+import random
 import shutil
 import sqlite3
 from collections import defaultdict
@@ -2677,6 +2678,63 @@ def _quantile(values: Sequence[float], probability: float) -> float | None:
     if lower == upper:
         return ordered[lower]
     return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
+
+
+def stationary_block_indices(length: int, *, mean_block_length: float, rng: random.Random) -> list[int]:
+    """Draw one circular stationary-bootstrap index path deterministically."""
+    if length < 2 or not math.isfinite(mean_block_length) or mean_block_length <= 1.0:
+        raise ValueError("stationary bootstrap requires length>=2 and block length>1")
+    restart_probability = 1.0 / mean_block_length
+    index = rng.randrange(length)
+    result = []
+    for _ in range(length):
+        result.append(index)
+        index = rng.randrange(length) if rng.random() < restart_probability else (index + 1) % length
+    return result
+
+
+def paired_stationary_max_t(
+    contrasts: dict[str, Sequence[float]], *, replicates: int = 20_000,
+    seed: int = 19220001, mean_block_length: float | None = None,
+) -> list[dict[str, object]]:
+    """Return paired stationary-block CIs and familywise max-T p-values."""
+    if not contrasts or len(contrasts) > 2 or replicates < 1:
+        raise ValueError("strict #192 inference permits one or two positive contrasts")
+    length = len(next(iter(contrasts.values())))
+    if length < 20 or any(len(values) != length for values in contrasts.values()):
+        raise ValueError("paired bootstrap contrast chronology drift")
+    block = mean_block_length or max(2.0, math.sqrt(length))
+    means = {key: sum(values) / length for key, values in contrasts.items()}
+    sample_sd = {key: math.sqrt(sum((value - means[key]) ** 2 for value in values) / (length - 1)) for key, values in contrasts.items()}
+    if any(value <= 0.0 or not math.isfinite(value) for value in sample_sd.values()):
+        raise RuntimeError("strict bootstrap requires non-degenerate paired contrasts")
+    observed_t = {key: means[key] / (sample_sd[key] / math.sqrt(length)) for key in contrasts}
+    uncentered = {key: [] for key in contrasts}
+    null_max_t: list[float] = []
+    rng = random.Random(seed)
+    for _ in range(replicates):
+        indices = stationary_block_indices(length, mean_block_length=block, rng=rng)
+        max_t = -math.inf
+        for key, values in contrasts.items():
+            bootstrap_mean = sum(values[index] for index in indices) / length
+            uncentered[key].append(bootstrap_mean)
+            centered_mean = sum(values[index] - means[key] for index in indices) / length
+            max_t = max(max_t, centered_mean / (sample_sd[key] / math.sqrt(length)))
+        null_max_t.append(max_t)
+    result = []
+    for key in sorted(contrasts):
+        p_value = (1.0 + sum(value >= observed_t[key] for value in null_max_t)) / (replicates + 1.0)
+        low = _quantile(uncentered[key], 0.025)
+        result.append({
+            "target_id": key, "paired_control_id": "BEST_FULL_FULL",
+            "bootstrap_replicates": replicates, "bootstrap_seed": seed,
+            "mean_block_length": block, "paired_mean_net_delta_yuan": means[key],
+            "paired_growth_delta_low": low,
+            "paired_growth_delta_high": _quantile(uncentered[key], 0.975),
+            "observed_t": observed_t[key], "max_t_familywise_p_value": p_value,
+            "strict_status": "STRICT_MAX_T_PASS" if low is not None and low > 0.0 and p_value < 0.05 else "STRICT_MAX_T_NOT_PASSED",
+        })
+    return result
 
 
 def summarize_holding_path(rows: Sequence[dict[str, object]]) -> dict[str, object]:

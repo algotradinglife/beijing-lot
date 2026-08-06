@@ -187,6 +187,19 @@ def test_holding_summary_retains_zero_flow_windows_and_drawdown_path() -> None:
     assert windows[0]["window_pre_tax_roi"] == pytest.approx(0.0)
 
 
+def test_paired_stationary_max_t_shares_draws_and_controls_familywise_error() -> None:
+    contrasts = {
+        "A": [10.0 + (index % 3) for index in range(60)],
+        "B": [5.0 + (index % 2) for index in range(60)],
+    }
+    first = RUNNER.paired_stationary_max_t(contrasts, replicates=200, seed=7, mean_block_length=5.0)
+    second = RUNNER.paired_stationary_max_t(contrasts, replicates=200, seed=7, mean_block_length=5.0)
+    assert first == second
+    assert {row["target_id"] for row in first} == {"A", "B"}
+    assert all(row["bootstrap_replicates"] == 200 for row in first)
+    assert all(row["paired_growth_delta_low"] > 0.0 for row in first)
+
+
 def test_replay_path_fails_closed_to_full_or_zero_for_expanded_atomic_sleeve() -> None:
     candidate = "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_1"
     bridge = RUNNER.materialize_candidate_bridge(candidate, 16)
