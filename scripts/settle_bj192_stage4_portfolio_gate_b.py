@@ -30,7 +30,8 @@ INITIAL_BANKROLL_YUAN = 100_000.0
 
 EXPECTED_GATE_A_MANIFEST = "6108defd857bf431bcaf55109df0e195b45aa754e8fd46f1db82d329102ff256"
 EXPECTED_GATE_A_CONTENT = "66ce6f86703b31d710ad678b49287de3bc6b2c43a5b36c278e1369bdecd861d5"
-EXPECTED_BJ176_MANIFEST = ""  # Filled only by the complete Gate-B publisher.
+EXPECTED_BJ176_MANIFEST = "39316952296c2349f5da2f963d43c0baf0d812fba4eea967536a8b80bd57d5ee"
+EXPECTED_BJ176_CONTENT = "94188354baf01c68cb0ec0791248d3f8f03e31d4a7011db7b6b68e9797720f5c"
 EXPECTED_BJ170_RUNNER = "f593dd92c1b2afcc81ce50c65d61c9511070190c95b5cef98a13b05843ce2713"
 
 H1_SLEEVES = (
@@ -114,6 +115,37 @@ def frozen_gate_a() -> Any:
     """Load source utilities only after the exact Gate-A identity verifies."""
     verify_package(GATE_A, EXPECTED_GATE_A_MANIFEST, EXPECTED_GATE_A_CONTENT)
     return load_module(ROOT / "scripts" / "freeze_bj192_stage4_portfolio_gate_a.py", "bj192_gate_a")
+
+
+def verify_gate_a_source_bindings() -> dict[str, dict[str, str]]:
+    """Verify every full-payload predecessor declared by the accepted freeze.
+
+    Gate A intentionally marks settled reference packages ``hash-only``.  They
+    remain identity-bound here, while each outcome-consuming adapter must add
+    its own exact ticket-ledger verification before it can execute a prefix.
+    """
+    verify_package(GATE_A, EXPECTED_GATE_A_MANIFEST, EXPECTED_GATE_A_CONTENT)
+    card = json.loads((GATE_A / "gate_a_card.json").read_text(encoding="utf-8"))
+    result: dict[str, dict[str, str]] = {}
+    for name, binding in sorted(card["source_binding"].items()):
+        directory = ROOT / "results" / binding["package"]
+        if binding["verification_mode"] == "PREOUTCOME_FULL_PAYLOAD_VERIFICATION":
+            verify_package(directory, binding["manifest_sha256"], binding["content_identity_sha256"])
+        else:
+            if sha256_file(directory / "SHA256SUMS.json") != binding["manifest_sha256"]:
+                raise RuntimeError(f"settled identity manifest drift: {name}")
+            if sha256_file(directory / "CONTENT_IDENTITY.json") != binding["content_identity_sha256"]:
+                raise RuntimeError(f"settled identity content drift: {name}")
+        result[name] = {
+            "manifest_sha256": binding["manifest_sha256"],
+            "content_identity_sha256": binding["content_identity_sha256"],
+            "verification_mode": binding["verification_mode"],
+        }
+    if result["bj176_issue_equity_risk_v1"]["manifest_sha256"] != EXPECTED_BJ176_MANIFEST:
+        raise RuntimeError("#176 manifest source contract drift")
+    if result["bj176_issue_equity_risk_v1"]["content_identity_sha256"] != EXPECTED_BJ176_CONTENT:
+        raise RuntimeError("#176 content source contract drift")
+    return result
 
 
 def frozen_bj170_runner() -> Any:

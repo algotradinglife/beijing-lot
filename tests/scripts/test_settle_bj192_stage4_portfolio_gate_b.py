@@ -31,6 +31,13 @@ def test_h1_prefix_bridge_is_exactly_complete_and_full_is_atomic() -> None:
         assert [lot.rank for lot in value.lots] == list(range(1, value.requested_ticket_count + 1))
 
 
+def test_all_gate_a_source_bindings_are_verified_before_adapter_execution() -> None:
+    bindings = RUNNER.verify_gate_a_source_bindings()
+    assert len(bindings) == 13
+    assert bindings["bj145_gate_a_preoutcome_v8"]["verification_mode"] == "PREOUTCOME_FULL_PAYLOAD_VERIFICATION"
+    assert bindings["bj176_issue_equity_risk_v1"]["manifest_sha256"] == RUNNER.EXPECTED_BJ176_MANIFEST
+
+
 def test_full_native_h1_ticket_bridge_reproduces_accepted_issue_level_ledger() -> None:
     bridge = RUNNER.h1_ticket_bridge()
     totals = defaultdict(lambda: defaultdict(float))
