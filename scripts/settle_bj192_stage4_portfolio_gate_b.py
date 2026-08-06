@@ -2825,6 +2825,7 @@ def minimal_stage4_package_tables(checkpoint: Path) -> dict[str, list[dict[str, 
     tables["selected_m_path"] = minimal_stage4_selected_m_rows()
     tables["regime_map"] = read_csv(GATE_A / "regime_map.csv")
     tables["bootstrap_stability"] = minimal_stage4_strict_bootstrap_rows(checkpoint)
+    tables.update(minimal_stage4_dependence_tables(checkpoint))
     for row in tables["bootstrap_stability"]:
         tables["terminal_decision"].append({
             "portfolio_id": row["portfolio_id"], "mode": row["mode"], "position_fraction": row["position_fraction"],
@@ -2846,6 +2847,52 @@ def minimal_stage4_package_tables(checkpoint: Path) -> dict[str, list[dict[str, 
             "decision_impact": "NO_PROMOTION_AFTER_FAMILYWISE_PAIRED_INFERENCE",
         })
     return tables
+
+
+def minimal_stage4_dependence_tables(checkpoint: Path) -> dict[str, list[dict[str, object]]]:
+    """Emit non-duplicative realized dependence on the common native baseline."""
+    _, paths = load_minimal_stage4_checkpoint(checkpoint)
+    axis = ("NATIVE_REQUEST_CONTROL", "1.00", "EQUAL_WEIGHT", "UNIT_CAPITAL", "BUNDLE_ORDINAL_001")
+    realized: list[dict[str, object]] = []
+    for identity, path in paths.items():
+        if tuple(identity[1:]) != axis or len(path[0]["sleeve_settlements"]) < 2:
+            continue
+        realized.extend(realized_funded_flow_dependence(path))
+    panels = list(realized)
+    wide: dict[tuple[object, ...], dict[str, object]] = {}
+    metric_map = {
+        "PEARSON": "pearson_correlation", "SPEARMAN": "spearman_rank_correlation",
+        "DOWNSIDE_CORRELATION": "downside_correlation", "PAYOUT_OVERLAP_COUNT": "payout_overlap_count",
+        "HIT_OVERLAP_COUNT": "hit_overlap_count", "JOINT_LOSS_RATE": "full_calendar_joint_loss_rate",
+    }
+    for row in realized:
+        if row["panel_type"] != "OVERALL" or row["denominator_id"] != "FULL_CALENDAR_ZERO_FLOW":
+            continue
+        key = tuple(row[field] for field in PATH_IDENTITY) + (row["economic_family_left"], row["economic_family_right"])
+        target = wide.setdefault(key, {
+            **{field: row[field] for field in PATH_IDENTITY},
+            "sleeve_left": row["economic_family_left"], "sleeve_right": row["economic_family_right"],
+            "prior_covariance": "", "prior_correlation": "", "pearson_correlation": "", "spearman_rank_correlation": "",
+            "rolling_correlation_20": "", "payout_overlap_count": "", "hit_overlap_count": "", "contribution_hhi": "",
+            "downside_correlation": "", "tail_co_loss_count": "", "full_calendar_zero_flow_count": row["observation_count"],
+            "union_active_count": "", "intersection_active_count": "", "full_calendar_joint_loss_rate": "",
+            "union_active_joint_loss_rate": "", "intersection_active_joint_loss_rate": "",
+            "concurrent_issue_count": row["observation_count"], "portfolio_pnl_reconciliation_yuan": 0.0,
+        })
+        field = metric_map.get(str(row["metric"]))
+        if field:
+            target[field] = row["value"]
+    intrinsic = [{
+        **{field: row[field] for field in PATH_IDENTITY},
+        "economic_family_left": row["economic_family_left"], "economic_family_right": row["economic_family_right"],
+        "denominator_id": row["denominator_id"], "panel_type": row["panel_type"], "panel_id": row["panel_id"],
+        "window_issues": row["window_issues"], "exclusion_id": row["exclusion_id"], "metric": row["metric"],
+        "native_return_basis": "FROZEN_NATIVE_TICKET_PNL", "value": row["value"],
+        "observation_count": row["observation_count"], "undefined_reason": row["undefined_reason"],
+        "matched_support_hash": canonical_hash(["COMPLETE_348_ISSUE_CALENDAR"]),
+    } for row in realized]
+    return {"dependence": list(wide.values()), "dependence_panel": panels,
+            "realized_funded_flow_dependence": realized, "intrinsic_native_dependence": intrinsic}
 
 
 def summarize_holding_path(rows: Sequence[dict[str, object]]) -> dict[str, object]:
