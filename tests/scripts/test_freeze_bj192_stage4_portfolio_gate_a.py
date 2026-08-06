@@ -333,34 +333,66 @@ def test_normalization_state_is_strictly_prior_capped_and_fail_closed():
     m = module()
     weights = {"A": 0.5, "B": 0.5}
     warmup = m.normalization_state(
-        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, weights,
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"],
         [[1.0, 0.0], [0.0, 1.0]], 51,
     )
     assert warmup["normalization_status"] == "FALLBACK_UNIT_CAPITAL_INSUFFICIENT_PRIOR_RISK_HISTORY"
     assert warmup["risk_budget_yuan"] == 100
     high = m.normalization_state(
-        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, weights,
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"],
         [[1.0, 0.0], [0.0, 1.0]], 52,
     )
     assert high["normalization_status"] == "TARGET_SCALED_DOWN"
     assert high["ex_ante_volatility"] == pytest.approx(math.sqrt(0.5))
     assert high["realized_capital_multiplier"] == pytest.approx(0.05 / math.sqrt(0.5))
     low = m.normalization_state(
-        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, weights,
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"],
         [[0.0004, 0.0], [0.0, 0.0004]], 52,
     )
     assert low["normalization_status"] == "TARGET_CAPPED_NO_LEVERAGE"
     assert low["realized_capital_multiplier"] == 1.0
     zero = m.normalization_state(
-        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, weights,
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"],
         [[0.0, 0.0], [0.0, 0.0]], 52,
     )
     assert zero["normalization_status"] == "FALLBACK_UNIT_CAPITAL_ZERO_OR_NONFINITE_VOLATILITY"
     bad = m.normalization_state(
-        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, weights,
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"],
         [[float("nan"), 0.0], [0.0, 1.0]], 52,
     )
     assert bad["normalization_status"] == "FALLBACK_UNIT_CAPITAL_NONFINITE_COVARIANCE"
+    unequal_equal_capital = m.normalization_state(
+        "EQUAL_CAPITAL", 100, 1_000, 500, "PRIOR_ERC", {"A": 0.9, "B": 0.1},
+        ["A", "B"], [[1.0, 0.0], [0.0, 1.0]], 52,
+    )
+    assert unequal_equal_capital["normalization_status"] == "INAPPLICABLE_METHOD_WEIGHT_COMBINATION"
+    assert not unequal_equal_capital["normalization_executable"]
+    assert unequal_equal_capital["risk_budget_yuan"] == 0.0
+    equal_capital = m.normalization_state(
+        "EQUAL_CAPITAL", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"], [[1.0, 0.0], [0.0, 1.0]], 52,
+    )
+    assert equal_capital["normalization_status"] == "EQUAL_CAPITAL_EQUAL_ACTIVE_WEIGHTS"
+    left = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "PRIOR_ERC",
+        {"A": 0.9, "B": 0.1}, ["A", "B"], [[0.01, 0.0], [0.0, 1.0]], 52,
+    )
+    right = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "PRIOR_ERC",
+        {"A": 0.9, "B": 0.1}, ["B", "A"], [[1.0, 0.0], [0.0, 0.01]], 52,
+    )
+    assert left["ex_ante_volatility"] == pytest.approx(right["ex_ante_volatility"])
+    assert left["realized_capital_multiplier"] == pytest.approx(right["realized_capital_multiplier"])
+    invalid_order = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "PRIOR_ERC",
+        {"A": 0.9, "B": 0.1}, ["A", "C"], [[0.01, 0.0], [0.0, 1.0]], 52,
+    )
+    assert invalid_order["normalization_status"] == "INAPPLICABLE_COVARIANCE_SLEEVE_ORDER"
 
 
 def test_prior_covariance_allocators_are_long_only_and_deterministic():
@@ -419,10 +451,12 @@ def test_baseline_and_sequential_inference_contracts_are_frozen():
     assert baselines[1]["pre_tax_roi"] == -0.0909
     method = m.methodology_contract()
     assert method["primary_hypothesis"]["position_fraction"] == 1.0
+    assert method["primary_hypothesis"]["normalization_method"] == "UNIT_CAPITAL"
     assert method["sequential_inference"]["path_bootstrap"].startswith(
         "paired stationary"
     )
     assert "max-T" in method["multiplicity"]["positive_inference"]
+    assert "normalization_method" in method["multiplicity"]["families"]
     assert "PRIOR_MINIMUM_VARIANCE" in method["weight_methods"]
     assert "separate complete bankroll state machine" in m.m_selection_contract([])["seed_rule"]
     expanded = m.expanded_sleeve_catalog()
@@ -596,10 +630,14 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     for table in (
         "issue_ledger", "sleeve_funding_ledger", "capital_summary", "weight_history",
         "dependence", "holding_metrics", "risk_decomposition", "stage_attribution",
+        "portfolio_k_saturation", "baseline_lift", "bootstrap_stability", "challenger_case",
+        "all_pairs_risk_return_surface", "higher_order_pareto_frontier", "terminal_decision",
     ):
         assert all(field in schemas[table]["key"] for field in m.PATH_IDENTITY)
     assert "capital_growth_audit_delta" in schemas["capital_summary"]["fields"]
     assert schemas["chart_source_contract"]["path_identity"] == list(m.PATH_IDENTITY)
+    for columns in schemas["chart_source_contract"]["columns"].values():
+        assert all(field in columns for field in m.PATH_IDENTITY)
     for table in (
         "all_pairs_risk_return_surface", "higher_order_pareto_frontier", "terminal_decision",
     ):
@@ -620,6 +658,20 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     assert "chart_source_standalone_m_curve.csv.gz" in schemas["chart_sources"]
     assert "portfolio_pnl_reconciliation_yuan" in schemas["dependence"]["fields"]
     assert "diversification_attribution_yuan" not in schemas["dependence"]["fields"]
+    assert "sharpe" in schemas["all_pairs_risk_return_surface"]["fields"]
+    assert "sortino" in schemas["all_pairs_risk_return_surface"]["fields"]
+    assert "calmar" in schemas["all_pairs_risk_return_surface"]["fields"]
+    assert "capital_weights_json" in schemas["terminal_decision"]["fields"]
+    assert "failure_regimes_json" in schemas["terminal_decision"]["fields"]
+    assert "next_validation_step" in schemas["terminal_decision"]["fields"]
+    assert schemas["rolling_window_metrics"]["key"]
+    assert "window_size_issues" in schemas["rolling_window_metrics"]["key"]
+    assert "chart_source_rolling_windows.csv" in schemas["chart_sources"]
+    assert "portfolio_id" in schemas["portfolio_k_saturation"]["key"]
+    assert "mode" in schemas["portfolio_k_saturation"]["key"]
+    assert "deployment_seed" not in schemas["portfolio_k_saturation"]["key"]
+    assert "mode" in schemas["baseline_lift"]["key"]
+    assert "capital_mode" not in schemas["baseline_lift"]["key"]
     regime_rows = list(__import__("csv").DictReader((output / "regime_map.csv").open()))
     assert len(regime_rows) == 348
     assert sum(row["regime_status"] == "PRE_EVENT_FEATURE_VECTOR_AVAILABLE" for row in regime_rows) == 344

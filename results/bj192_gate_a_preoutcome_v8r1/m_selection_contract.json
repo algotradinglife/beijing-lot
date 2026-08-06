@@ -1,0 +1,577 @@
+{
+  "all_M_curve": "publish every available M in available_M_grid on the exact source support; dynamic path and fixed-M comparator are both mandatory",
+  "fallback": "before 52 active observations use fixed_m_comparator; never select by full-sample ROI, winning year, payout, or test-period result",
+  "fixed_m_comparator": [
+    {
+      "M": "16",
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;272;288;304;320;336;352;368;384;400;416;432;448;464;480;496;512;576;640;704;768;832;896;960;1024;1088;1152;1216;1280;1344;1408;1472;1536;1600;1664;1728;1792;1856;1920;1984;2048;2112",
+      "candidate_id": "BJ148_NOGATE_WR_DENSE_M"
+    },
+    {
+      "M": "16",
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;272;288;304;320;336;352;368;384;400;416;432;448;464;480;496;512;576;640;704;768;832;896;960;1024;1088;1152;1216;1280;1344;1408;1472;1536;1600;1664;1728;1792;1856;1920;1984;2048;2112",
+      "candidate_id": "BJ148_NOGATE_WOR_DENSE_M"
+    },
+    {
+      "M": "16",
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;272;288;304;320;336;352;368;384;400;416;432;448;464;480;496;512;576;640;704;768;832;896;960;1024;1088;1152;1216;1280;1344;1408;1472;1536;1600;1664;1728;1792;1856;1920;1984;2048;2112",
+      "candidate_id": "BJ151_NOGATE_K4_WR_DENSE_M"
+    },
+    {
+      "M": "16",
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;272;288;304;320;336;352;368;384;400;416;432;448;464;480;496;512;576;640;704;768;832;896;960;1024;1088;1152;1216;1280;1344;1408;1472;1536;1600;1664;1728;1792;1856;1920;1984;2048;2112",
+      "candidate_id": "BJ151_NOGATE_K4_WOR_DENSE_M"
+    },
+    {
+      "M": "32",
+      "available_M_grid": "32;64;128",
+      "candidate_id": "BJ159_SELECTED_N7_WOR_M_CURVE"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A50_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_BLEND-A75_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MARKET-WF-CAL_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_MODEL-P-CAL_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A25_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A50_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_BLEND-A75_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MARKET-WF-CAL_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_MODEL-P-CAL_WR-DUPLICATE-STAKE_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_CAPPED-REPEAT_1"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_CAPPED-REPEAT_2"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_CAPPED-REPEAT_4"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_CAPPED-REPEAT_8"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_DETERMINISTIC-TOP-MASS_NA"
+    },
+    {
+      "M": 2187,
+      "available_M_grid": "2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_FULL-ENUMERATED_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_RESIDUAL-SYSTEMATIC_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_WOR-DISTINCT_NA"
+    },
+    {
+      "M": 16,
+      "available_M_grid": "16;32;48;64;80;96;112;128;144;160;176;192;208;224;240;256;512;1024;1458;2187",
+      "candidate_id": "BJ145_SECONDARY-ESP300-GM290-K8_Q-WEIGHT_WR-DUPLICATE-STAKE_NA"
+    }
+  ],
+  "minimum_prior_active_issues": 52,
+  "nested_loyo_sensitivity": "for each held-out year, re-run the same selector on earlier years only; if no earlier 52-active history exists use fixed_m_comparator",
+  "seed_rule": "arithmetic seed mean is permitted only in strictly-prior training to select M. Gate-B deployment never averages payouts/stakes before capital allocation: it replays each frozen seed path as a separate complete bankroll state machine and reports the across-seed distribution. No seed may be selected from outcomes; an all-seed purchase is allowed only with explicit multiplied stake.",
+  "selection_scope": "each family independently; complete chronological calendar; current issue and all future outcomes forbidden",
+  "tie_break": "higher score, then lower M, then candidate_id lexicographic, then frozen seed-aggregate id",
+  "training_score": "prior-only aggregate pre-tax net / prior-only aggregate actual stake on the family native support; blank/zero-stake M values cannot win"
+}

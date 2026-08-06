@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Create #192's outcome-unexposed Stage-4 capital-portfolio Gate-A freeze.
 
-The script reads only #170's pre-outcome allocation package and #137's
-pre-outcome chronology census.  Accepted settled packages are bound by hash in
-the card but deliberately never parsed here: Stage 4 cannot choose a sleeve
-from historical returns.
+The runner reads only hash-bound, outcome-unexposed lineage inputs: #170/#137
+calendar and trace evidence, #145/#148/#151/#159/#167A allocation lineage, and
+#193A pre-event regime features.  Accepted settled packages are bound by hash
+only and are deliberately never parsed: Stage 4 cannot choose a sleeve from
+historical returns.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from typing import Sequence
 
 
 CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
-VERSION = "bj192-gate-a-v8"
+VERSION = "bj192-gate-a-v8r1"
 OUTCOME_BOUNDARY = (
     "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, "
     "tax realization, ROI, net, gross, or settlement payload is read."
@@ -83,7 +84,7 @@ SOURCE_167B = (
     ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1"
 )
 SOURCE_170B = ROOT / "results" / "bj170_gate_b_selector_allocator_stack_v1"
-DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v8"
+DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v8r1"
 SETTLED_IDENTITY_ONLY_PACKAGES = {
     "bj176_issue_equity_risk_v1",
     "bj190_gate_b_sparse_divergence_v1",
@@ -1261,6 +1262,7 @@ def normalization_contract() -> dict[str, object]:
             "covariance": "unbiased sample covariance then 10% diagonal shrinkage",
             "portfolio_volatility": "sqrt(w' Sigma w)",
             "volatility_floor": 1e-12,
+            "input_identity": "weight_method, covariance_sleeve_order and covariance_input_sha256 are persisted on every executable normalization row; covariance is interpreted only in that declared sleeve order",
         },
         "methods": {
             "UNIT_CAPITAL": "multiplier=1; issue risk_budget_yuan=pre-normalization mode/bankroll budget; executable reference",
@@ -1277,7 +1279,11 @@ def normalization_contract() -> dict[str, object]:
         "gate_b_ledger": {
             "required_issue_fields": [
                 "normalization_method",
+                "weight_method",
                 "normalization_status",
+                "normalization_executable",
+                "covariance_sleeve_order_json",
+                "covariance_input_sha256",
                 "ex_ante_volatility",
                 "target_volatility",
                 "realized_capital_multiplier",
@@ -1295,7 +1301,9 @@ def normalization_state(
     native_requested_stake_yuan: float,
     preissue_bankroll_yuan: float,
     mode_notional_yuan: float,
+    weight_method: str,
     provisional_weights: dict[str, float],
+    covariance_sleeve_order: Sequence[str],
     covariance: list[list[float]] | None,
     prior_common_active_observation_count: int,
 ) -> dict[str, object]:
@@ -1317,34 +1325,62 @@ def normalization_state(
         "RAW_UNNORMALIZED_CONTROL",
     }:
         raise ValueError(f"unknown normalization method: {method}")
-    ordered = sorted(provisional_weights)
+    ordered = list(covariance_sleeve_order)
+    covariance_identity = canonical_hash(
+        {
+            "covariance_sleeve_order": ordered,
+            "covariance": covariance,
+        }
+    )
+
+    def result(
+        status: str,
+        volatility: float | None,
+        multiplier: float,
+        executable: bool = True,
+    ) -> dict[str, object]:
+        return {
+            "normalization_method": method,
+            "weight_method": weight_method,
+            "normalization_status": status,
+            "normalization_executable": executable,
+            "covariance_sleeve_order_json": json.dumps(ordered, separators=(",", ":")),
+            "covariance_input_sha256": covariance_identity,
+            "ex_ante_volatility": volatility,
+            "target_volatility": TARGET_EX_ANTE_VOLATILITY,
+            "realized_capital_multiplier": multiplier,
+            "pre_normalization_mode_notional_yuan": base_notional,
+            "risk_budget_yuan": base_notional * multiplier,
+            "normalized_mode_notional_yuan": base_notional * multiplier,
+        }
+
+    if (
+        len(ordered) != len(set(ordered))
+        or set(ordered) != set(provisional_weights)
+    ):
+        return result("INAPPLICABLE_COVARIANCE_SLEEVE_ORDER", None, 0.0, False)
     values = [float(provisional_weights[name]) for name in ordered]
     if (
         not values
         or any(not math.isfinite(value) or value < 0.0 for value in values)
         or not math.isclose(sum(values), 1.0, rel_tol=0.0, abs_tol=1e-12)
     ):
-        return {
-            "normalization_method": method,
-            "normalization_status": "FALLBACK_UNIT_CAPITAL_INVALID_PROVISIONAL_WEIGHTS",
-            "ex_ante_volatility": None,
-            "target_volatility": TARGET_EX_ANTE_VOLATILITY,
-            "realized_capital_multiplier": 1.0,
-            "pre_normalization_mode_notional_yuan": base_notional,
-            "risk_budget_yuan": base_notional,
-            "normalized_mode_notional_yuan": base_notional,
-        }
+        return result("FALLBACK_UNIT_CAPITAL_INVALID_PROVISIONAL_WEIGHTS", None, 1.0)
+    equal_active = all(
+        math.isclose(value, values[0], rel_tol=0.0, abs_tol=1e-12)
+        for value in values
+    )
+    if method == "EQUAL_CAPITAL" and (
+        weight_method != "EQUAL_WEIGHT" or not equal_active
+    ):
+        return result("INAPPLICABLE_METHOD_WEIGHT_COMBINATION", None, 0.0, False)
     if method != "UNIT_EX_ANTE_VOL_CAPPED_5PCT":
-        return {
-            "normalization_method": method,
-            "normalization_status": "UNIT_CAPITAL_MULTIPLIER_ONE",
-            "ex_ante_volatility": None,
-            "target_volatility": TARGET_EX_ANTE_VOLATILITY,
-            "realized_capital_multiplier": 1.0,
-            "pre_normalization_mode_notional_yuan": base_notional,
-            "risk_budget_yuan": base_notional,
-            "normalized_mode_notional_yuan": base_notional,
-        }
+        status = (
+            "EQUAL_CAPITAL_EQUAL_ACTIVE_WEIGHTS"
+            if method == "EQUAL_CAPITAL"
+            else "UNIT_CAPITAL_MULTIPLIER_ONE"
+        )
+        return result(status, None, 1.0)
     if prior_common_active_observation_count < 52:
         status = "FALLBACK_UNIT_CAPITAL_INSUFFICIENT_PRIOR_RISK_HISTORY"
         volatility = None
@@ -1368,30 +1404,14 @@ def normalization_state(
         else:
             volatility = math.sqrt(variance)
             multiplier = min(1.0, TARGET_EX_ANTE_VOLATILITY / volatility)
-            return {
-                "normalization_method": method,
-                "normalization_status": (
-                    "TARGET_CAPPED_NO_LEVERAGE"
-                    if multiplier == 1.0
-                    else "TARGET_SCALED_DOWN"
-                ),
-                "ex_ante_volatility": volatility,
-                "target_volatility": TARGET_EX_ANTE_VOLATILITY,
-                "realized_capital_multiplier": multiplier,
-                "pre_normalization_mode_notional_yuan": base_notional,
-                "risk_budget_yuan": base_notional * multiplier,
-                "normalized_mode_notional_yuan": base_notional * multiplier,
-            }
-    return {
-        "normalization_method": method,
-        "normalization_status": status,
-        "ex_ante_volatility": volatility,
-        "target_volatility": TARGET_EX_ANTE_VOLATILITY,
-        "realized_capital_multiplier": 1.0,
-        "pre_normalization_mode_notional_yuan": base_notional,
-        "risk_budget_yuan": base_notional,
-        "normalized_mode_notional_yuan": base_notional,
-    }
+            return result(
+                "TARGET_CAPPED_NO_LEVERAGE"
+                if multiplier == 1.0
+                else "TARGET_SCALED_DOWN",
+                volatility,
+                multiplier,
+            )
+    return result(status, volatility, 1.0)
 
 
 def funding_contract() -> dict[str, object]:
@@ -1489,6 +1509,7 @@ def methodology_contract() -> dict[str, object]:
             "mode": "NATIVE_REQUEST_CONTROL",
             "position_fraction": 1.0,
             "weights": "EQUAL_WEIGHT",
+            "normalization_method": "UNIT_CAPITAL",
             "comparison": "absolute pre-tax ¥100k path plus matched lift versus B170 BEST_FULL/FULL on exact common support and actual funding convention",
             "decision": "retrospective reproduction only: same-window positive or max-T-adjusted results are hypothesis-generating and cannot advance the accepted ladder; advancement requires genuinely held-out or forward validation plus strict PI review",
         },
@@ -1498,6 +1519,7 @@ def methodology_contract() -> dict[str, object]:
                 "catalog_sleeve_family",
                 "portfolio_membership",
                 "weight_method",
+                "normalization_method",
                 "capital_mode",
                 "position_fraction",
             ],
@@ -2632,7 +2654,8 @@ def prefix_registry() -> tuple[
 
 def output_schema() -> dict[str, object]:
     """Manifest-covered Gate-B deliverable schema and equations."""
-    path_key = lambda *suffix: [*PATH_IDENTITY, *suffix]
+    def path_key(*suffix: str) -> list[str]:
+        return [*PATH_IDENTITY, *suffix]
     return {
         "issue_ledger": {
             "key": path_key("calendar_index", "issue_instance"),
@@ -2902,17 +2925,9 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "portfolio_k_saturation": {
-            "key": [
-                "ordered_shortlist_id",
-                "K",
-                "economic_family_set_sha256",
-                "weight_method",
-                "capital_mode",
-                "position_fraction",
-                "normalization_method",
-                "deployment_replicate_bundle_id",
-                "deployment_seed",
-            ],
+            "key": path_key(
+                "ordered_shortlist_id", "K", "economic_family_set_sha256"
+            ),
             "fields": [
                 "candidate_aliases_sha256",
                 "ending_bankroll_yuan",
@@ -2926,7 +2941,7 @@ def output_schema() -> dict[str, object]:
             "formulas": [
                 "ordered_shortlist_id is frozen in frontier_contract; K uses the first K distinct economic families only",
                 "same-family aliases may not increase K, stake, multiplicity, diversification attribution or marginal contribution",
-                "every available K/method/mode/fraction/seed row is written even if no-bet or negative",
+                "every available K/method/mode/fraction/bundle row is written even if no-bet or negative; a multi-sleeve portfolio uses only deployment_replicate_bundle_id plus its frozen candidate_seed_map_sha256, never a fabricated singular deployment seed",
             ],
         },
         "holding_metrics": {
@@ -2950,15 +2965,7 @@ def output_schema() -> dict[str, object]:
                 "loss_streak_active",
                 "miss_streak_calendar",
                 "miss_streak_active",
-                "rolling_pnl_5_yuan",
-                "rolling_pnl_10_yuan",
-                "rolling_pnl_20_yuan",
-                "rolling_negative_probability_5",
-                "rolling_negative_probability_10",
-                "rolling_negative_probability_20",
-                "worst_rolling_window_id",
-                "worst_rolling_pnl_yuan",
-                "worst_rolling_roi",
+                "rolling_window_metrics_sha256",
                 "ruin_flag",
                 "near_ruin_flag",
                 "sharpe",
@@ -2967,10 +2974,27 @@ def output_schema() -> dict[str, object]:
             ],
             "formulas": [
                 "loss=pre_tax_net<0; miss=actual_stake>0 and pre_tax_gross=0; calendar streak includes zero-flow rows, active streak skips zero-flow rows",
-                "rolling P&L W=sum(pre_tax_net) over every trailing full-calendar W={5,10,20}; report count/total windows with P&L<0, their probability, the worst P&L, its ROI=sum(net)/sum(actual stake), and its chronological window identity. Never discard winning issues inside a window",
+                "W=5/10/20 rolling results are emitted exclusively through rolling_window_metrics, which carries each window identity/P&L/ROI and separately keyed count, probability, worst-window and distribution records. Never discard winning issues inside a window",
                 "drawdown=running equity peak minus postissue bankroll; duration/time-under-water count chronological issues below peak; recovery is first later issue reaching former peak, blank if absent",
                 "near_ruin_flag=1 iff min bankroll < ¥2×max native issue ticket count; sharpe=mean calendar bank return/sample sd×sqrt(issue frequency/year), sortino divides by downside RMS, calmar=annualized compounded bank return/max drawdown fraction; blank where denominator zero",
                 "recovery episodes begin on a new running-peak breach and end at first later recovery to that peak; report median, 95th percentile, maximum, and unrecovered count on full chronology",
+            ],
+        },
+        "rolling_window_metrics": {
+            "key": path_key(
+                "window_size_issues", "record_type", "window_start_calendar_index",
+                "window_end_calendar_index", "distribution_statistic"
+            ),
+            "fields": [
+                "window_pre_tax_net_yuan", "window_actual_stake_yuan",
+                "window_pre_tax_roi", "is_negative", "window_count",
+                "negative_window_count", "negative_window_probability",
+                "worst_window_id", "worst_window_pre_tax_net_yuan",
+                "worst_window_pre_tax_roi", "distribution_value", "undefined_reason",
+            ],
+            "formulas": [
+                "record_type=WINDOW writes every trailing full-calendar window; record_type=SUMMARY writes count, negative probability and worst identity/P&L/ROI; record_type=DISTRIBUTION writes each frozen statistic such as MIN/P05/P50/P95/MAX. W is exactly one of 5, 10 or 20 and zero-flow issues remain chronological observations.",
+                "window_pre_tax_roi=sum(window pre-tax net)/sum(window actual stake), blank with undefined_reason when window stake is zero; no later outcome can select the reported worst window or distribution statistic.",
             ],
         },
         "bootstrap_stability": {
@@ -3013,16 +3037,14 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "baseline_lift": {
-            "key": [
-                "candidate_id", "control_id", "support_hash", "capital_mode",
-                "position_fraction", "weight_method", "normalization_method",
-                "deployment_replicate_bundle_id",
-            ],
+            "key": path_key(
+                "candidate_id", "control_id", "support_hash", "actual_funding_hash"
+            ),
             "fields": [
                 "candidate_id",
                 "control_id",
                 "support_hash",
-                "capital_mode",
+                "mode",
                 "position_fraction",
                 "actual_funding_hash",
                 "absolute_ending_bankroll_yuan",
@@ -3053,8 +3075,8 @@ def output_schema() -> dict[str, object]:
         },
         "all_pairs_risk_return_surface": {
             "key": path_key("economic_family_set_sha256", "pair_id"),
-            "fields": ["pre_tax_roi", "max_drawdown_yuan", "capital_growth", "capital_turnover", "tax_adjusted_roi", "support_hash", "undefined_reason"],
-            "formulas": ["write every frozen pair/mode/fraction/weight/normalization/bundle row; zero stake retains blank ROI and an explicit reason"],
+            "fields": ["pre_tax_roi", "sharpe", "sortino", "calmar", "max_drawdown_yuan", "capital_growth", "capital_turnover", "tax_adjusted_roi", "support_hash", "undefined_reason"],
+            "formulas": ["write every frozen pair/mode/fraction/weight/normalization/bundle row; zero stake retains blank ROI and an explicit reason; Sharpe/Sortino/Calmar use exactly holding_metrics full-calendar definitions and retain their undefined reason"],
         },
         "higher_order_pareto_frontier": {
             "key": path_key("economic_family_set_sha256", "frontier_id"),
@@ -3063,13 +3085,19 @@ def output_schema() -> dict[str, object]:
         },
         "terminal_decision": {
             "key": path_key("decision_id"),
-            "fields": ["candidate_id", "decision", "negative_result_reason", "strict_ev_status", "support_hash", "bootstrap_target_id"],
-            "formulas": ["every primary path writes a terminal decision; an absent row is a Gate-B completeness failure rather than an implicit no-bet"],
+            "fields": ["candidate_id", "decision", "capital_weights_json", "capital_weights_sha256", "failure_regimes_json", "negative_result_reason", "next_validation_step", "strict_ev_status", "support_hash", "bootstrap_target_id"],
+            "formulas": ["every primary path writes a terminal decision, the actual frozen capital weights, all failed regimes and a next validation step; an absent row is a Gate-B completeness failure rather than an implicit no-bet"],
         },
         "chart_source_contract": {
             "path_identity": list(PATH_IDENTITY),
             "rule": "every portfolio-level chart source propagates the complete path identity; seed-local curve charts additionally carry deployment_seed and family-level charts carry economic_family_id/support_hash",
             "completeness": "a missing required chart-source row, a duplicate complete key, or a chart row without a matching ledger key is a Gate-B fail-closed schema error",
+            "columns": {
+                "chart_source_issue_equity_paths.csv.gz": path_key("calendar_index", "issue_instance", "preissue_bankroll_yuan", "postissue_bankroll_yuan", "pre_tax_net_yuan", "actual_stake_yuan"),
+                "chart_source_rolling_windows.csv": path_key("window_size_issues", "record_type", "window_start_calendar_index", "window_end_calendar_index", "distribution_statistic", "window_pre_tax_net_yuan", "window_pre_tax_roi"),
+                "chart_source_all_pairs_risk_return.csv": path_key("economic_family_set_sha256", "pair_id", "pre_tax_roi", "sharpe", "sortino", "calmar", "max_drawdown_yuan"),
+                "chart_source_terminal_decision.csv": path_key("decision_id", "candidate_id", "decision", "capital_weights_sha256", "next_validation_step"),
+            },
         },
         "chart_sources": [
             "chart_source_issue_equity_paths.csv.gz",
@@ -3087,6 +3115,7 @@ def output_schema() -> dict[str, object]:
             "chart_source_standalone_m_curve.csv.gz",
             "chart_source_selected_m_path.csv.gz",
             "chart_source_portfolio_k_saturation.csv",
+            "chart_source_rolling_windows.csv",
             "chart_source_all_pairs_risk_return.csv",
             "chart_source_higher_order_pareto.csv",
             "chart_source_terminal_decision.csv",
