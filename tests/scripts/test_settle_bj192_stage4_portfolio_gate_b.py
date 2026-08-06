@@ -174,3 +174,37 @@ def test_holding_summary_retains_zero_flow_windows_and_drawdown_path() -> None:
     windows = [x for x in result["rolling_rows"] if x["record_type"] == "WINDOW" and x["window_size_issues"] == 5]
     assert len(windows) == 1
     assert windows[0]["window_pre_tax_roi"] == pytest.approx(0.0)
+
+
+def test_replay_path_fails_closed_to_full_or_zero_for_expanded_atomic_sleeve() -> None:
+    candidate = "BJ145_PRIMARY-NO-GATE-K4_BLEND-A25_CAPPED-REPEAT_1"
+    bridge = RUNNER.materialize_candidate_bridge(candidate, 16)
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:3]
+    rows = RUNNER.replay_path(
+        sleeves=[candidate],
+        mode="FIXED_100K_NOTIONAL",
+        fraction=0.01,
+        weight_method="EQUAL_WEIGHT",
+        normalization_method="UNIT_CAPITAL",
+        bridge=bridge,
+        calendar=calendar,
+    )
+    for row in rows:
+        settlement = row["sleeve_settlements"][candidate]
+        requested = bridge[(candidate, row["issue_instance"])].requested_ticket_count
+        assert settlement["actual_ticket_count"] in (0, requested)
+
+
+def test_prior_m_selection_uses_seed_training_only_and_lower_m_tie_break() -> None:
+    candidate = "BJ151_NOGATE_K4_WR_DENSE_M"
+    history = {
+        16: {seed: [(2.0, 2.0)] * 52 for seed in ("137001", "137002", "137003")},
+        32: {seed: [(4.0, 2.0)] * 52 for seed in ("137001", "137002", "137003")},
+        64: {seed: [(4.0, 2.0)] * 52 for seed in ("137001", "137002", "137003")},
+    }
+    selected = RUNNER.choose_prior_m(candidate, history)
+    assert selected["selected_M"] == 32
+    assert selected["fallback_reason"] == ""
+    insufficient = RUNNER.choose_prior_m(candidate, {16: {"137001": [(1.0, 2.0)] * 51}})
+    assert insufficient["selected_M"] == 16
+    assert insufficient["fallback_reason"] == "INSUFFICIENT_PRIOR_52_ACTIVE"

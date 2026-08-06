@@ -1019,3 +1019,63 @@ def summarize_holding_path(rows: Sequence[dict[str, object]]) -> dict[str, objec
             "active_issue_count": len(active),
         },
     }
+
+
+def fixed_m_comparator(candidate_id: str) -> int:
+    """Return the exact Gate-A fallback M for one economic family."""
+    contract = json.loads((GATE_A / "m_selection_contract.json").read_text(encoding="utf-8"))
+    matches = [row for row in contract["fixed_m_comparator"] if row["candidate_id"] == candidate_id]
+    if len(matches) != 1:
+        raise RuntimeError(f"missing fixed-M contract row: {candidate_id}")
+    return int(matches[0]["M"])
+
+
+def choose_prior_m(
+    candidate_id: str,
+    history_by_m_seed: dict[int, dict[str, Sequence[tuple[float, float]]]],
+) -> dict[str, object]:
+    """Apply the frozen expanding-window M rule to strictly prior observations.
+
+    ``history_by_m_seed`` stores `(pre_tax_net, actual_stake)` in chronological
+    order through *the previous issue only*.  Seed arithmetic is used here
+    solely to score an M during training; it is never a capital-path payout
+    average or deployable action.
+    """
+    minimum = 52
+    scores: dict[int, float] = {}
+    active_counts: dict[int, int] = {}
+    for m_value, seed_rows in history_by_m_seed.items():
+        seed_scores: list[float] = []
+        active_counts[m_value] = 0
+        for records in seed_rows.values():
+            stake = sum(value[1] for value in records)
+            net = sum(value[0] for value in records)
+            active = sum(value[1] > 0 for value in records)
+            active_counts[m_value] += active
+            if stake > 0:
+                seed_scores.append(net / stake)
+        if seed_scores:
+            scores[m_value] = sum(seed_scores) / len(seed_scores)
+    # A family support is not eligible merely because another M or another
+    # seed has history.  The required 52 active observations must exist for
+    # every deployable replica of the candidate M being considered.
+    eligible = [
+        m_value for m_value, seed_rows in history_by_m_seed.items()
+        if len(seed_rows) > 0
+        and all(sum(stake > 0 for _, stake in rows) >= minimum for rows in seed_rows.values())
+        and m_value in scores
+    ]
+    if not eligible:
+        return {
+            "selected_M": fixed_m_comparator(candidate_id),
+            "fallback_reason": "INSUFFICIENT_PRIOR_52_ACTIVE",
+            "prior_active_issue_count": max(active_counts.values(), default=0),
+            "training_scores": scores,
+        }
+    selected = min(eligible, key=lambda m_value: (-scores[m_value], m_value, candidate_id))
+    return {
+        "selected_M": selected,
+        "fallback_reason": "",
+        "prior_active_issue_count": min(active_counts[m_value] for m_value in eligible),
+        "training_scores": scores,
+    }
