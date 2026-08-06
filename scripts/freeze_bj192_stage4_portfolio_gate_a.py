@@ -28,7 +28,7 @@ from typing import Sequence
 
 
 CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
-VERSION = "bj192-gate-a-v8r1r1"
+VERSION = "bj192-gate-a-v8r1r2"
 OUTCOME_BOUNDARY = (
     "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, "
     "tax realization, ROI, net, gross, or settlement payload is read."
@@ -93,7 +93,7 @@ SOURCE_167B = (
     ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1"
 )
 SOURCE_170B = ROOT / "results" / "bj170_gate_b_selector_allocator_stack_v1"
-DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v8r1r1"
+DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v8r1r2"
 SETTLED_IDENTITY_ONLY_PACKAGES = {
     "bj176_issue_equity_risk_v1",
     "bj190_gate_b_sparse_divergence_v1",
@@ -2672,6 +2672,9 @@ def output_schema() -> dict[str, object]:
                 "preissue_bankroll_yuan",
                 "normalization_method",
                 "normalization_status",
+                "normalization_executable",
+                "covariance_sleeve_order_json",
+                "covariance_input_sha256",
                 "ex_ante_volatility",
                 "target_volatility",
                 "realized_capital_multiplier",
@@ -3103,7 +3106,7 @@ def output_schema() -> dict[str, object]:
             "rule": "every portfolio-level chart source propagates the complete path identity; seed-local curve charts additionally carry deployment_seed and family-level charts carry economic_family_id/support_hash",
             "completeness": "a missing required chart-source row, a duplicate complete key, or a chart row without a matching ledger key is a Gate-B fail-closed schema error",
             "columns": {
-                "chart_source_issue_equity_paths.csv.gz": path_key("calendar_index", "issue_instance", "preissue_bankroll_yuan", "postissue_bankroll_yuan", "pre_tax_net_yuan", "actual_stake_yuan"),
+                "chart_source_issue_equity_paths.csv.gz": path_key("calendar_index", "issue_instance", "preissue_bankroll_yuan", "postissue_bankroll_yuan", "running_peak_yuan", "drawdown_yuan", "drawdown_fraction", "pre_tax_net_yuan", "actual_stake_yuan"),
                 "chart_source_rolling_windows.csv": path_key("window_size_issues", "record_type", "window_start_calendar_index", "window_end_calendar_index", "distribution_statistic", "window_pre_tax_net_yuan", "window_pre_tax_roi"),
                 "chart_source_all_pairs_risk_return.csv": path_key("economic_family_set_sha256", "pair_id", "pre_tax_roi", "sharpe", "sortino", "calmar", "max_drawdown_yuan"),
                 "chart_source_terminal_decision.csv": path_key("decision_id", "candidate_id", "decision", "capital_weights_sha256", "next_validation_step"),
@@ -3189,10 +3192,34 @@ def validate_portfolio_schema(schema: dict[str, object]) -> None:
         raise RuntimeError("terminal decision schema incomplete")
     if "window_size_issues" not in schema["rolling_window_metrics"]["key"]:
         raise RuntimeError("rolling windows need an explicit W key")
+    normalization_required = normalization_contract()["gate_b_ledger"][
+        "required_issue_fields"
+    ]
+    issue_schema = schema["issue_ledger"]
+    issue_columns = set(issue_schema["key"]) | set(issue_schema["fields"])
+    missing_normalization_fields = set(normalization_required) - issue_columns
+    if missing_normalization_fields:
+        raise RuntimeError(
+            "issue ledger cannot persist required normalization evidence: "
+            + ", ".join(sorted(missing_normalization_fields))
+        )
     chart_contract = schema["chart_source_contract"]
     for name, columns in chart_contract["columns"].items():
         if any(field not in columns for field in PATH_IDENTITY):
             raise RuntimeError(f"chart path identity missing: {name}")
+    issue_equity_columns = chart_contract["columns"][
+        "chart_source_issue_equity_paths.csv.gz"
+    ]
+    missing_equity_risk_fields = {
+        "running_peak_yuan",
+        "drawdown_yuan",
+        "drawdown_fraction",
+    } - set(issue_equity_columns)
+    if missing_equity_risk_fields:
+        raise RuntimeError(
+            "issue-equity chart risk columns missing: "
+            + ", ".join(sorted(missing_equity_risk_fields))
+        )
     joins = schema["portfolio_cross_table_join_contract"]["joins"]
     if not joins or any(join["key"][: len(PATH_IDENTITY)] != list(PATH_IDENTITY) for join in joins):
         raise RuntimeError("cross-table path joins incomplete")

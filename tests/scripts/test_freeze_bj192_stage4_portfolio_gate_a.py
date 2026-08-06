@@ -613,6 +613,12 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     )
     issue_schema = card["output_schema"]["issue_ledger"]
     assert "sleeve_id" not in issue_schema["key"]
+    normalization_required = card["normalization_contract"]["gate_b_ledger"][
+        "required_issue_fields"
+    ]
+    assert set(normalization_required) <= set(issue_schema["key"]) | set(
+        issue_schema["fields"]
+    )
     sleeve_schema = card["output_schema"]["sleeve_funding_ledger"]
     assert sleeve_schema["key"][-1] == "sleeve_id"
     prefix_contract = json.loads((output / "funded_prefix_ledger_contract.json").read_text())
@@ -639,6 +645,12 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     assert schemas["chart_source_contract"]["path_identity"] == list(m.PATH_IDENTITY)
     for columns in schemas["chart_source_contract"]["columns"].values():
         assert all(field in columns for field in m.PATH_IDENTITY)
+    issue_equity_columns = schemas["chart_source_contract"]["columns"][
+        "chart_source_issue_equity_paths.csv.gz"
+    ]
+    assert {"running_peak_yuan", "drawdown_yuan", "drawdown_fraction"} <= set(
+        issue_equity_columns
+    )
     for table in (
         "all_pairs_risk_return_surface", "higher_order_pareto_frontier", "terminal_decision",
     ):
@@ -682,6 +694,16 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     broken = copy.deepcopy(schemas)
     broken["baseline_lift"]["key"].remove("mode")
     with pytest.raises(RuntimeError, match="path identity missing"):
+        m.validate_portfolio_schema(broken)
+    broken = copy.deepcopy(schemas)
+    broken["issue_ledger"]["fields"].remove("covariance_input_sha256")
+    with pytest.raises(RuntimeError, match="normalization evidence"):
+        m.validate_portfolio_schema(broken)
+    broken = copy.deepcopy(schemas)
+    broken["chart_source_contract"]["columns"][
+        "chart_source_issue_equity_paths.csv.gz"
+    ].remove("drawdown_fraction")
+    with pytest.raises(RuntimeError, match="chart risk columns"):
         m.validate_portfolio_schema(broken)
     regime_rows = list(__import__("csv").DictReader((output / "regime_map.csv").open()))
     assert len(regime_rows) == 348

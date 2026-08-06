@@ -30966,6 +30966,9 @@
           "issue_instance",
           "preissue_bankroll_yuan",
           "postissue_bankroll_yuan",
+          "running_peak_yuan",
+          "drawdown_yuan",
+          "drawdown_fraction",
           "pre_tax_net_yuan",
           "actual_stake_yuan"
         ],
@@ -31205,6 +31208,9 @@
         "preissue_bankroll_yuan",
         "normalization_method",
         "normalization_status",
+        "normalization_executable",
+        "covariance_sleeve_order_json",
+        "covariance_input_sha256",
         "ex_ante_volatility",
         "target_volatility",
         "realized_capital_multiplier",
@@ -31925,5 +31931,5 @@
     "global_tax_lot_registry": "ticket_prefix_registry.csv.gz",
     "policy_registry": "ticket_prefix_policy_registry.csv"
   },
-  "version": "bj192-gate-a-v8r1r1"
+  "version": "bj192-gate-a-v8r1r2"
 }
