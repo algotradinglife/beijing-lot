@@ -62,6 +62,8 @@ CORE_WEIGHT_METHODS = (
     "PRIOR_MAXIMUM_DIVERSIFICATION",
 )
 CORE_NORMALIZATION_METHODS = ("UNIT_CAPITAL", "UNIT_EX_ANTE_VOL_CAPPED_5PCT")
+MINIMAL_WEIGHT_METHODS = ("EQUAL_WEIGHT", "PRIOR_MINIMUM_VARIANCE")
+MINIMAL_NORMALIZATION_METHODS = ("UNIT_CAPITAL", "UNIT_EX_ANTE_VOL_CAPPED_5PCT")
 _H1_TICKET_BRIDGE: dict[tuple[str, str], "NativeIssueSleeve"] | None = None
 PATH_IDENTITY = (
     "portfolio_id",
@@ -1502,6 +1504,121 @@ def bounded_core_execution_axes() -> tuple[dict[str, object], ...]:
     if len(rows) != 72 or len({canonical_hash(row) for row in rows}) != 72:
         raise RuntimeError("bounded core landmark grid drift")
     return tuple(rows)
+
+
+def minimal_stage4_memberships() -> tuple[tuple[str, ...], ...]:
+    """Return the seven and only seven memberships of the final #192 closure.
+
+    The 2026-08-06 minimal-closure amendment supersedes the earlier broad
+    catalog screen.  These are not a post-outcome shortlist: every member is
+    a deterministic H1 sleeve already frozen in the accepted Gate-A package.
+    """
+    members = tuple((sleeve,) for sleeve in H1_SLEEVES) + tuple(
+        tuple(pair) for pair in combinations(sorted(H1_SLEEVES), 2)
+    ) + (tuple(sorted(H1_SLEEVES)),)
+    if len(members) != 7 or len(set(members)) != 7:
+        raise RuntimeError("minimal Stage-4 membership contract drift")
+    return members
+
+
+def minimal_stage4_execution_axes() -> tuple[dict[str, object], ...]:
+    """Read the final minimal capital grid from the immutable Gate-A axes.
+
+    NATIVE remains at 1.0.  FIXED and COMPOUNDING retain only the four
+    authorized fractions.  Both declared weighting and normalization methods
+    are exercised; no historical search or additional normalization branch is
+    admitted here.
+    """
+    valid = {canonical_hash(row): row for row in frozen_execution_axes()}
+    rows: list[dict[str, object]] = []
+    for mode in ("NATIVE_REQUEST_CONTROL", "FIXED_100K_NOTIONAL", "COMPOUNDING_BANKROLL"):
+        fractions = (1.0,) if mode == "NATIVE_REQUEST_CONTROL" else (0.10, 0.25, 0.50, 1.00)
+        for fraction in fractions:
+            for weight_method in MINIMAL_WEIGHT_METHODS:
+                for normalization_method in MINIMAL_NORMALIZATION_METHODS:
+                    row = {
+                        "mode": mode,
+                        "position_fraction": fraction,
+                        "weight_method": weight_method,
+                        "normalization_method": normalization_method,
+                    }
+                    if canonical_hash(row) not in valid:
+                        raise RuntimeError(f"minimal Stage-4 axis absent from Gate A: {row}")
+                    rows.append(row)
+    if len(rows) != 36 or len({canonical_hash(row) for row in rows}) != 36:
+        raise RuntimeError("minimal Stage-4 capital grid drift")
+    return tuple(rows)
+
+
+def minimal_stage4_replay(
+    checkpoint: Path,
+    *,
+    memberships: Sequence[tuple[str, ...]] | None = None,
+    axes: Sequence[dict[str, object]] | None = None,
+    bundles: Sequence[str] | None = None,
+) -> dict[str, object]:
+    """Settle the amended #192 Stage-4 closure once, exactly and atomically.
+
+    This deliberately has no relationship to the earlier exploratory Phase-1
+    or Phase-2 checkpoints.  It starts from immutable Gate-A ticket inputs,
+    writes only its own resumable checkpoint and retains all per-issue path
+    state necessary for the package finalizer.
+    """
+    selected_memberships = list(memberships or minimal_stage4_memberships())
+    selected_axes = list(axes or minimal_stage4_execution_axes())
+    selected_bundles = list(bundles or sorted(frozen_replicate_bundles()))
+    if set(selected_memberships) - set(minimal_stage4_memberships()):
+        raise RuntimeError("minimal Stage-4 contains an unauthorized membership")
+    valid_axes = {canonical_hash(row) for row in minimal_stage4_execution_axes()}
+    if any(canonical_hash(row) not in valid_axes for row in selected_axes):
+        raise RuntimeError("minimal Stage-4 contains an unauthorized execution axis")
+    if set(selected_bundles) - set(frozen_replicate_bundles()):
+        raise RuntimeError("minimal Stage-4 contains an unknown replicate bundle")
+    cache = CandidatePathCache()
+    summaries: list[dict[str, object]] = []
+    stability: list[dict[str, object]] = []
+    for membership in selected_memberships:
+        membership = tuple(sorted(membership))
+        membership_id = canonical_hash({"membership": membership})
+        for bundle_id in selected_bundles:
+            bridge, selected_m = cache.bundle(membership, bundle_id)
+            trace = canonical_hash({"membership": membership, "bundle": bundle_id, "selected_m": selected_m})
+            for axis in selected_axes:
+                replay_axis = {**axis, "fraction": axis["position_fraction"]}
+                replay_axis.pop("position_fraction")
+                path = replay_path(
+                    sleeves=membership, bridge=bridge, calendar=cache.calendar,
+                    bundle_id=bundle_id, sleeve_trace_identity=trace, **replay_axis,
+                )
+                holding = summarize_holding_path(path)["summary"]
+                capital = capital_summary(path, holding)
+                summaries.append({
+                    "record_type": "MINIMAL_STAGE4_PATH_SUMMARY", "membership_id": membership_id,
+                    "membership_json": json.dumps(membership, separators=(",", ":")),
+                    "membership_size": len(membership),
+                    "selected_m_path_sha256": canonical_hash(selected_m),
+                    **capital,
+                    **{key: holding[key] for key in (
+                        "max_drawdown_yuan", "max_drawdown_fraction", "loss_streak_calendar",
+                        "loss_streak_active", "miss_streak_calendar", "miss_streak_active",
+                        "recovery_duration_max_issues", "time_under_water_issues", "sharpe",
+                        "sortino", "calmar",
+                    )},
+                })
+                stability.extend({
+                    "record_type": "MINIMAL_STAGE4_REALIZED_STABILITY", **row,
+                } for row in _realized_stability_rows(path, membership_id))
+    binding = {
+        "phase": "FINAL_GATE_B_MINIMAL_STAGE4_CLOSURE",
+        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
+        "membership_count": len(selected_memberships),
+        "axis_count": len(selected_axes),
+        "bundle_count": len(selected_bundles),
+        "membership_contract_sha256": canonical_hash(minimal_stage4_memberships()),
+        "axis_contract_sha256": canonical_hash(minimal_stage4_execution_axes()),
+    }
+    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=[*summaries, *stability])
 
 
 def _realized_stability_rows(path: Sequence[dict[str, object]], membership_id: str) -> list[dict[str, object]]:

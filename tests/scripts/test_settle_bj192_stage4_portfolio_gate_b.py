@@ -476,6 +476,48 @@ def test_bounded_core_contract_has_only_authorized_memberships_and_landmarks() -
     assert {row["position_fraction"] for row in axes if row["mode"] != "NATIVE_REQUEST_CONTROL"} == {0.10, 0.25, 0.50, 1.0}
 
 
+def test_minimal_stage4_closure_contract_has_three_sleeves_seven_memberships_and_36_axes() -> None:
+    memberships = RUNNER.minimal_stage4_memberships()
+    assert memberships == (
+        ("BEST_FULL_FULL",),
+        ("MODEL_SOURCE_MODEL_CAP1_M512",),
+        ("Q_SOURCE_Q_TOP_MASS_M192",),
+        ("BEST_FULL_FULL", "MODEL_SOURCE_MODEL_CAP1_M512"),
+        ("BEST_FULL_FULL", "Q_SOURCE_Q_TOP_MASS_M192"),
+        ("MODEL_SOURCE_MODEL_CAP1_M512", "Q_SOURCE_Q_TOP_MASS_M192"),
+        tuple(sorted(RUNNER.H1_SLEEVES)),
+    )
+    axes = RUNNER.minimal_stage4_execution_axes()
+    assert len(axes) == 36
+    assert {row["weight_method"] for row in axes} == {"EQUAL_WEIGHT", "PRIOR_MINIMUM_VARIANCE"}
+    assert {row["normalization_method"] for row in axes} == {
+        "UNIT_CAPITAL", "UNIT_EX_ANTE_VOL_CAPPED_5PCT",
+    }
+    assert {row["position_fraction"] for row in axes if row["mode"] == "NATIVE_REQUEST_CONTROL"} == {1.0}
+
+
+def test_minimal_stage4_fixture_is_separately_bound_from_superseded_surface_checkpoints() -> None:
+    checkpoint = ROOT / ".scratch" / "bj192_minimal_stage4_fixture.json"
+    checkpoint.unlink(missing_ok=True)
+    try:
+        axis = {
+            "mode": "FIXED_100K_NOTIONAL", "position_fraction": 0.10,
+            "weight_method": "EQUAL_WEIGHT", "normalization_method": "UNIT_CAPITAL",
+        }
+        receipt = RUNNER.minimal_stage4_replay(
+            checkpoint,
+            memberships=[("BEST_FULL_FULL",)], axes=[axis], bundles=["BUNDLE_ORDINAL_001"],
+        )
+        rows = RUNNER.load_surface_checkpoint(checkpoint, binding=receipt["binding"])
+        assert receipt["binding"]["phase"] == "FINAL_GATE_B_MINIMAL_STAGE4_CLOSURE"
+        assert sum(row["record_type"] == "MINIMAL_STAGE4_PATH_SUMMARY" for row in rows) == 1
+        assert {row["panel_type"] for row in rows if row["record_type"] == "MINIMAL_STAGE4_REALIZED_STABILITY"} >= {
+            "YEAR", "LOYO", "EX_LARGEST_ISSUE", "EX_LARGEST_YEAR",
+        }
+    finally:
+        checkpoint.unlink(missing_ok=True)
+
+
 def test_bounded_core_fixture_writes_summary_and_realized_stability() -> None:
     checkpoint = ROOT / ".scratch" / "bj192_core_fixture.json"
     checkpoint.unlink(missing_ok=True)
