@@ -125,9 +125,15 @@ def canonical_scientific_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def write_csv_rows(path: Path, rows: Sequence[dict[str, object]], *, compressed: bool) -> list[str]:
+def write_csv_rows(
+    path: Path,
+    rows: Sequence[dict[str, object]],
+    *,
+    compressed: bool,
+    declared_fields: Sequence[str] = (),
+) -> list[str]:
     """Write stable CSV bytes without a system temporary file."""
-    fields = sorted({field for row in rows for field in row})
+    fields = list(dict.fromkeys([*declared_fields, *sorted({field for row in rows for field in row})]))
     if not fields:
         raise RuntimeError(f"cannot write fieldless table: {path.name}")
     normalized = [{field: row.get(field, "") for field in fields} for row in rows]
@@ -164,8 +170,9 @@ def write_immutable_package(
     stage = output.with_name(f".{output.name}.stage")
     if output.exists() or stage.exists():
         raise RuntimeError(f"immutable output or active stage already exists: {output}")
+    schema = json.loads((GATE_A / "output_schema.json").read_text(encoding="utf-8"))
     required = {
-        key for key, spec in json.loads((GATE_A / "output_schema.json").read_text(encoding="utf-8")).items()
+        key for key, spec in schema.items()
         if isinstance(spec, dict) and "key" in spec
     }
     missing = required - set(tables)
@@ -177,7 +184,13 @@ def write_immutable_package(
         for table, rows in sorted(tables.items()):
             compressed = table in {"issue_ledger", "weight_history", "selected_m_path", "standalone_m_curve"}
             filename = f"{table}.csv.gz" if compressed else f"{table}.csv"
-            fields = write_csv_rows(stage / filename, list(rows), compressed=compressed)
+            spec = schema[table]
+            fields = write_csv_rows(
+                stage / filename,
+                list(rows),
+                compressed=compressed,
+                declared_fields=[*spec["key"], *spec["fields"]],
+            )
             table_manifest[table] = {"filename": filename, "row_count": len(rows), "fields": fields}
         (stage / "source_binding.json").write_text(json.dumps(source_binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (stage / "table_manifest.json").write_text(json.dumps(table_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")

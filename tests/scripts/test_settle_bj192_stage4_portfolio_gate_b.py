@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import gzip
 import importlib.util
+import shutil
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -317,3 +318,27 @@ def test_bundle_replay_emits_m_path_and_capital_tables_under_one_identity() -> N
     assert len(result["path"]) == 3
     assert len(result["tables"]["selected_m_path"]) == 6
     assert len(result["tables"]["issue_ledger"]) == 3
+
+
+def test_immutable_writer_stages_locally_and_covers_declared_empty_tables() -> None:
+    output = ROOT / ".scratch" / "bj192_writer_fixture"
+    stage = output.with_name(f".{output.name}.stage")
+    if output.exists():
+        shutil.rmtree(output)
+    if stage.exists():
+        shutil.rmtree(stage)
+    schema = __import__("json").load(open(RUNNER.GATE_A / "output_schema.json"))
+    tables = {name: [] for name, spec in schema.items() if isinstance(spec, dict) and "key" in spec}
+    try:
+        receipt = RUNNER.write_immutable_package(
+            output,
+            tables,
+            source_binding={"fixture": "hash-bound"},
+            package_note="# fixture",
+        )
+        assert output.exists() and not stage.exists()
+        assert len(receipt["manifest_sha256"]) == 64
+        assert RUNNER.verify_package(output, receipt["manifest_sha256"], receipt["content_sha256"])
+    finally:
+        if output.exists():
+            shutil.rmtree(output)
