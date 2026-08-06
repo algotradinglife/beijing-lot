@@ -289,10 +289,12 @@ def test_path_output_tables_have_complete_path_keys_and_exact_sleeve_rows() -> N
     tables = RUNNER.path_output_tables(path, bridge)
     assert len(tables["issue_ledger"]) == 3
     assert len(tables["sleeve_funding_ledger"]) == 9
+    assert len(tables["risk_decomposition"]) == 9
     assert len(tables["weight_history"]) == 9
     assert len(tables["stage_attribution"]) == 36
     assert all("portfolio_id" in row and "issue_instance" in row for row in tables["issue_ledger"])
     assert tables["capital_summary"][0]["ending_bankroll_yuan"] == pytest.approx(path[-1]["postissue_bankroll_yuan"])
+    assert all(float(row["portfolio_pnl_reconciliation_yuan"]) == 0.0 for row in tables["risk_decomposition"])
 
 
 def test_walk_forward_candidate_paths_preserve_each_frozen_seed_as_own_path() -> None:

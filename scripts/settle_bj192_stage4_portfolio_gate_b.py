@@ -1770,6 +1770,55 @@ def capital_summary(path_rows: Sequence[dict[str, object]], holding: dict[str, o
     }
 
 
+def risk_decomposition_rows(
+    path_rows: Sequence[dict[str, object]],
+    bridge: dict[tuple[str, str], IssueSleeve],
+) -> list[dict[str, object]]:
+    """Emit funded-flow risk diagnostics without assigning invented P&L.
+
+    The frozen normalization engine may supply an ex-ante covariance estimate,
+    but it does not make covariance an outcome cashflow.  Accordingly this
+    table exposes exactly funded per-sleeve money and leaves Euler quantities
+    blank when the per-issue covariance matrix was intentionally not retained
+    in the Gate-B state row.
+    """
+    rows: list[dict[str, object]] = []
+    for path_row in path_rows:
+        settlements = path_row["sleeve_settlements"]
+        portfolio_net = float(path_row["pre_tax_net_yuan"])
+        sleeve_net = sum(float(value["pre_tax_net_yuan"]) for value in settlements.values())
+        if not math.isclose(portfolio_net, sleeve_net, abs_tol=1e-9):
+            raise RuntimeError(f"funded sleeve P&L mismatch: {path_row['issue_instance']}")
+        requested = sum(
+            bridge[(sleeve_id, str(path_row["issue_instance"]))].requested_ticket_count * TICKET_STAKE_YUAN
+            for sleeve_id in settlements
+        )
+        actual = float(path_row["actual_stake_yuan"])
+        for sleeve_id, settlement in sorted(settlements.items()):
+            family = canonical_economic_catalog()[sleeve_id]["economic_family_id"]
+            native_stake = bridge[(sleeve_id, str(path_row["issue_instance"]))].requested_ticket_count * TICKET_STAKE_YUAN
+            funded = float(settlement["actual_stake_yuan"])
+            rows.append({
+                **{field: path_row[field] for field in PATH_IDENTITY},
+                "calendar_index": path_row["calendar_index"],
+                "issue_instance": path_row["issue_instance"],
+                "economic_family_id": family,
+                "marginal_variance_contribution": "",
+                "euler_variance_contribution": "",
+                "matched_drawdown_delta_yuan": "",
+                "matched_tail_loss_delta_yuan": "",
+                "capital_utilization_yuan": funded,
+                "retained_cash_yuan": float(path_row["retained_cash_yuan"]),
+                "rounding_delta_yuan": funded - float(path_row["weights"][sleeve_id]) * actual,
+                "exposure_size_delta_yuan": funded - native_stake,
+                "portfolio_pnl_reconciliation_yuan": portfolio_net - sleeve_net,
+                "requested_native_stake_yuan": native_stake,
+                "portfolio_requested_native_stake_yuan": requested,
+                "undefined_reason": "COVARIANCE_MATRIX_NOT_RETAINED_IN_PATH_STATE",
+            })
+    return rows
+
+
 def path_output_tables(
     path_rows: Sequence[dict[str, object]],
     bridge: dict[tuple[str, str], IssueSleeve],
@@ -1850,6 +1899,7 @@ def path_output_tables(
             **holding,
         }],
         "rolling_window_metrics": rolling,
+        "risk_decomposition": risk_decomposition_rows(path_rows, bridge),
         "weight_history": weight_history,
         "stage_attribution": stage_attribution,
     }
