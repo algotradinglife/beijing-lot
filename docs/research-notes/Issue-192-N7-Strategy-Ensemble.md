@@ -12,15 +12,16 @@
 
 - Gate-A manifest：`6108defd857bf431bcaf55109df0e195b45aa754e8fd46f1db82d329102ff256`
 - Gate-A content identity：`66ce6f86703b31d710ad678b49287de3bc6b2c43a5b36c278e1369bdecd861d5`
-- Gate-B manifest：`ae5f62b9103fc942329bf5e7d361b68be926de94cb38f2b7a1e3f26cef0d28d7`
-- Gate-B content identity：`a139c571cc61599c23b1a592efaeb21832915d9e5d466c9ef8d02f76abbe4571`
+- Gate-B manifest：`e028c54d7826e6c48eff2090538ac404f6b250f2c9f334e74bcc6acb4f6cf421`
+- Gate-B content identity：`cad3fc655d06e1fbb94128652d083c5b8dee729b0c10b1736548473a13ccd585`
 - checkpoint：`.scratch/bj192_minimal_stage4_checkpoint.json`，payload
   `4e531ef6d2897321ff493442b769e18f94ec59e3a39068ae7b9f84668f0bfd50`
 
 冻结的 sleeve 是 `BEST_FULL_FULL`、`MODEL_SOURCE_MODEL_CAP1_M512` 和
 `Q_SOURCE_Q_TOP_MASS_M192`。交付覆盖 3 个 singleton、3 个 pair 和 1 个 triple，
-以及 36 个已冻结的 mode/fraction/weight/normalization 轴和 3 个 bundle：共 756 条
-完整 348-期资金路径。`NATIVE_REQUEST_CONTROL` 仅为 1.0；FIXED 与 COMPOUNDING
+以及 36 个已冻结的 mode/fraction/weight/normalization 轴：共 252 条
+完整 348-期资金路径。三个 Gate-A ordinal bundle 已逐期验证经济等价，仅保留
+`BUNDLE_ORDINAL_001` 作为唯一可执行表示。`NATIVE_REQUEST_CONTROL` 仅为 1.0；FIXED 与 COMPOUNDING
 分别保留 0.10/0.25/0.50/1.00；权重仅为 EQUAL_WEIGHT 与 PRIOR_MINIMUM_VARIANCE，
 资金规范化仅为 UNIT_CAPITAL 与 UNIT_EX_ANTE_VOL_CAPPED_5PCT。
 
@@ -38,15 +39,15 @@ ROI、正 bankroll 终值或较低 drawdown 当作独立发现。
 
 ## 交付账本与图源
 
-[`bj192_gate_b_minimal_stage4_v1`](../../results/bj192_gate_b_minimal_stage4_v1/README.md)
+[`bj192_gate_b_minimal_stage4_v2`](../../results/bj192_gate_b_minimal_stage4_v2/README.md)
 是唯一 Gate-B 数据包（约 100 MiB）。其 manifest 覆盖 26 个 payload：
 
-- `issue_ledger`：263,088 条按 `first_kickoff_ts` 排序的逐期资金路径；
-- `sleeve_funding_ledger`、`risk_decomposition`、`weight_history`：各 451,008 条；
-- `stage_attribution`：1,804,032 条，不把上游不可识别步骤伪装成 splice attribution；
-- `rolling_window_metrics`：778,680 条；
-- `capital_summary`、`holding_metrics`、`baseline_lift`、`portfolio_k_saturation`：各 756 条；
-- `all_pairs_risk_return_surface`：324 条；`bootstrap_stability`、`terminal_decision`：各 2 条。
+- `issue_ledger`：87,696 条按 `first_kickoff_ts` 排序的逐期资金路径；
+- `sleeve_funding_ledger`、`risk_decomposition`、`weight_history`：各 150,336 条；
+- `stage_attribution`：601,344 条，不把上游不可识别步骤伪装成 splice attribution；
+- `rolling_window_metrics`：259,560 条；
+- `capital_summary`、`holding_metrics`、`portfolio_k_saturation`：各 252 条；`baseline_lift`：324 条；
+- `all_pairs_risk_return_surface`：108 条；`bootstrap_stability`、`terminal_decision`：各 2 条。
 
 图表应直接由包内的 `issue_ledger.csv.gz`（权益与回撤）、
 `rolling_window_metrics.csv.gz`（滚动风险）、`capital_summary.csv`/

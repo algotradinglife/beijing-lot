@@ -21,7 +21,7 @@
       "undefined_reason"
     ],
     "filename": "all_pairs_risk_return_surface.csv",
-    "row_count": 324
+    "row_count": 108
   },
   "baseline_lift": {
     "fields": [
@@ -42,7 +42,7 @@
       "ladder_decision"
     ],
     "filename": "baseline_lift.csv",
-    "row_count": 756
+    "row_count": 324
   },
   "bootstrap_stability": {
     "fields": [
@@ -106,7 +106,7 @@
       "ruin_flag"
     ],
     "filename": "capital_summary.csv",
-    "row_count": 756
+    "row_count": 252
   },
   "challenger_case": {
     "fields": [
@@ -202,7 +202,7 @@
       "support_hash"
     ],
     "filename": "higher_order_pareto_frontier.csv",
-    "row_count": 756
+    "row_count": 252
   },
   "holding_metrics": {
     "fields": [
@@ -234,10 +234,16 @@
       "sortino",
       "calmar",
       "active_issue_count",
+      "ex_largest_issue_pre_tax_roi",
+      "ex_largest_year_pre_tax_roi",
+      "gross_issue_hhi",
+      "gross_top_issue_share",
+      "largest_signed_issue",
+      "largest_signed_year",
       "minimum_bankroll_yuan"
     ],
     "filename": "holding_metrics.csv",
-    "row_count": 756
+    "row_count": 252
   },
   "intrinsic_native_dependence": {
     "fields": [
@@ -306,7 +312,7 @@
       "year"
     ],
     "filename": "issue_ledger.csv.gz",
-    "row_count": 263088
+    "row_count": 87696
   },
   "portfolio_k_saturation": {
     "fields": [
@@ -329,7 +335,7 @@
       "undefined_reason"
     ],
     "filename": "portfolio_k_saturation.csv",
-    "row_count": 756
+    "row_count": 252
   },
   "realized_funded_flow_dependence": {
     "fields": [
@@ -410,7 +416,7 @@
       "requested_native_stake_yuan"
     ],
     "filename": "risk_decomposition.csv.gz",
-    "row_count": 451008
+    "row_count": 150336
   },
   "rolling_window_metrics": {
     "fields": [
@@ -439,7 +445,7 @@
       "undefined_reason"
     ],
     "filename": "rolling_window_metrics.csv.gz",
-    "row_count": 778680
+    "row_count": 259560
   },
   "selected_m_path": {
     "fields": [
@@ -460,7 +466,7 @@
       "nested_loyo_held_out_year"
     ],
     "filename": "selected_m_path.csv.gz",
-    "row_count": 3132
+    "row_count": 1044
   },
   "sleeve_funding_ledger": {
     "fields": [
@@ -489,7 +495,7 @@
       "tax_yuan"
     ],
     "filename": "sleeve_funding_ledger.csv.gz",
-    "row_count": 451008
+    "row_count": 150336
   },
   "stage_attribution": {
     "fields": [
@@ -514,7 +520,7 @@
       "undefined_reason"
     ],
     "filename": "stage_attribution.csv.gz",
-    "row_count": 1804032
+    "row_count": 601344
   },
   "standalone_m_curve": {
     "fields": [
@@ -576,6 +582,6 @@
       "covariance_hash"
     ],
     "filename": "weight_history.csv.gz",
-    "row_count": 451008
+    "row_count": 150336
   }
 }
