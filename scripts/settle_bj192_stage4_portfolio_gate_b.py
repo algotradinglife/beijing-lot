@@ -31,6 +31,8 @@ CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
 VERSION = "bj192-gate-b-v1"
 TICKET_STAKE_YUAN = 2.0
 INITIAL_BANKROLL_YUAN = 100_000.0
+PHASE0_CHECKPOINT = ".scratch/bj192_phase0_selected_m_checkpoint_v2.json"
+PHASE0_MATERIALIZER_CONTRACT = "selected-native-outcome-cache-v2"
 
 EXPECTED_GATE_A_MANIFEST = "6108defd857bf431bcaf55109df0e195b45aa754e8fd46f1db82d329102ff256"
 EXPECTED_GATE_A_CONTENT = "66ce6f86703b31d710ad678b49287de3bc6b2c43a5b36c278e1369bdecd861d5"
@@ -1046,7 +1048,9 @@ def materialize_phase_zero_selection_checkpoint(
         raise RuntimeError(f"Phase-0 selected-path count drift: {len(selected)} != {expected}")
     binding = {"gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
         "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
-        "settled_source_bindings": verify_gate_a_source_bindings(), "phase": "PHASE_0_SELECTED_M_PATHS"}
+        "settled_source_bindings": verify_gate_a_source_bindings(),
+        "phase0_materializer_contract": PHASE0_MATERIALIZER_CONTRACT,
+        "phase": "PHASE_0_SELECTED_M_PATHS"}
     return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=selected)
 
 
@@ -1181,10 +1185,12 @@ def phase_one_intrinsic_screen(
         "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
         "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
         "settled_source_bindings": verify_gate_a_source_bindings(),
+        "phase0_materializer_contract": PHASE0_MATERIALIZER_CONTRACT,
         "phase": "PHASE_0_SELECTED_M_PATHS",
     }
     # The checkpoint is a binding guard, not a source of mutable outcomes.
-    load_surface_checkpoint(ROOT / ".scratch" / "bj192_phase0_selected_m_checkpoint.json", binding=expected_phase0)
+    phase0_checkpoint = ROOT / PHASE0_CHECKPOINT
+    load_surface_checkpoint(phase0_checkpoint, binding=expected_phase0)
     curves = [row for candidate_id in sorted(catalog) for row in standalone_m_curve(candidate_id)]
     pairs = list(candidate_pairs or frozen_portfolio_sets()["pairwise"])
     if len({tuple(sorted(pair)) for pair in pairs}) != len(pairs):
@@ -1206,7 +1212,7 @@ def phase_one_intrinsic_screen(
         "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
         "settled_source_bindings": verify_gate_a_source_bindings(),
         "phase": "PHASE_1_NATIVE_CURVES_AND_INTRINSIC_PAIRS",
-        "phase0_checkpoint_sha256": sha256_file(ROOT / ".scratch" / "bj192_phase0_selected_m_checkpoint.json"),
+        "phase0_checkpoint_sha256": sha256_file(phase0_checkpoint),
         "pair_count": len(pairs),
     }
     payload = [
