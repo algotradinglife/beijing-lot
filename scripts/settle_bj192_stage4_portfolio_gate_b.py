@@ -108,6 +108,7 @@ SETTLED_SOURCE_PACKAGES = {
 }
 
 BJ145_CACHE_SCHEMA = "bj192-bj145-atomic-cache-v1"
+H1_TICKET_CACHE_SCHEMA = "bj192-h1-ticket-lot-cache-v1"
 
 
 def sha256_file(path: Path) -> str:
@@ -1677,6 +1678,106 @@ def merge_candidate_bridges(
     return result
 
 
+def _h1_ticket_cache_path() -> Path:
+    return ROOT / ".scratch" / "bj192_h1_ticket_lots_v1.sqlite"
+
+
+def _h1_ticket_cache_identity() -> str:
+    return canonical_hash({
+        "schema": H1_TICKET_CACHE_SCHEMA,
+        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
+        "bj170_runner_sha256": EXPECTED_BJ170_RUNNER,
+        "source_binding": verify_gate_a_source_bindings()["bj170_gate_b_selector_allocator_stack_v1"],
+    })
+
+
+def _load_h1_ticket_cache() -> dict[tuple[str, str], NativeIssueSleeve] | None:
+    """Rehydrate ordered H1 tax lots without invoking the #170 settler again."""
+    path = _h1_ticket_cache_path()
+    if not path.exists():
+        return None
+    connection = sqlite3.connect(path)
+    try:
+        meta = dict(connection.execute("SELECT key, value FROM cache_meta"))
+        if meta.get("identity") != _h1_ticket_cache_identity():
+            raise RuntimeError("H1 ticket cache binding drift")
+        requests = {
+            (row["sleeve_id"], row["issue_instance"]): row
+            for row in read_csv(GATE_A / "frozen_native_sleeve_requests.csv")
+            if row["sleeve_id"] in H1_SLEEVES
+        }
+        policy = {
+            (row["sleeve_id"], row["issue_instance"]): row
+            for row in read_csv(GATE_A / "ticket_prefix_policy_registry.csv")
+            if row["sleeve_id"] in H1_SLEEVES
+        }
+        lots: dict[tuple[str, str], list[TicketLot]] = defaultdict(list)
+        for sleeve, issue, rank, tax_lot_id, portfolio_id, ticket_ordinal, available, truth, payout in connection.execute(
+            "SELECT sleeve_id, issue_instance, rank, tax_lot_id, portfolio_id, ticket_ordinal, outcome_available, truth_ordinal, payout_yuan FROM ticket_lots ORDER BY sleeve_id, issue_instance, rank"
+        ):
+            lots[(sleeve, issue)].append(TicketLot(
+                rank=int(rank), tax_lot_id=tax_lot_id, portfolio_id=portfolio_id,
+                ticket_ordinal=int(ticket_ordinal), outcome_available=bool(available),
+                truth_ordinal=int(truth), payout_yuan=float(payout),
+            ))
+        bridge: dict[tuple[str, str], NativeIssueSleeve] = {}
+        for key, request in requests.items():
+            ordered = tuple(lots.get(key, ()))
+            requested = int(request["native_requested_ticket_count"])
+            if len(ordered) != requested or [lot.rank for lot in ordered] != list(range(1, requested + 1)):
+                raise RuntimeError(f"H1 cached tax-lot denominator drift: {key}")
+            status = request["native_policy_status"]
+            if any(not lot.outcome_available for lot in ordered) and status == "SELECTED_PREOUTCOME":
+                status = "UNAVAILABLE_CANONICAL_OUTCOME"
+            bridge[key] = NativeIssueSleeve(
+                sleeve_id=key[0], issue_instance=key[1], status="SETTLED" if status == "SELECTED_PREOUTCOME" else status,
+                requested_ticket_count=requested,
+                atomic=any(item["prefix_status"] == "WHOLE_NATIVE_OR_NO_BET" for pkey, item in policy.items() if pkey[:2] == key),
+                lots=ordered,
+            )
+        if len(bridge) != 3 * 348:
+            raise RuntimeError("H1 cached bridge denominator drift")
+        return bridge
+    finally:
+        connection.close()
+
+
+def _write_h1_ticket_cache(bridge: dict[tuple[str, str], NativeIssueSleeve]) -> None:
+    """Atomically retain the exact #170-settled H1 ticket lots in `.scratch`."""
+    path = _h1_ticket_cache_path()
+    stage = path.with_name(f".{path.name}.stage")
+    if path.exists():
+        return
+    if stage.exists():
+        raise RuntimeError(f"H1 ticket cache stage already exists: {stage}")
+    connection = sqlite3.connect(stage)
+    try:
+        connection.execute("CREATE TABLE cache_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        connection.execute("CREATE TABLE ticket_lots (sleeve_id TEXT, issue_instance TEXT, rank INTEGER, tax_lot_id TEXT, portfolio_id TEXT, ticket_ordinal INTEGER, outcome_available INTEGER, truth_ordinal INTEGER, payout_yuan REAL, PRIMARY KEY(sleeve_id, issue_instance, rank))")
+        connection.executemany("INSERT INTO cache_meta(key, value) VALUES (?, ?)", [
+            ("identity", _h1_ticket_cache_identity()),
+            ("schema", H1_TICKET_CACHE_SCHEMA),
+            ("ticket_lot_count", str(sum(len(item.lots) for item in bridge.values()))),
+        ])
+        connection.executemany(
+            "INSERT INTO ticket_lots VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                (sleeve_id, issue, lot.rank, lot.tax_lot_id, lot.portfolio_id, lot.ticket_ordinal,
+                 int(lot.outcome_available), lot.truth_ordinal, lot.payout_yuan)
+                for (sleeve_id, issue), sleeve in sorted(bridge.items())
+                for lot in sleeve.lots
+            ),
+        )
+        connection.commit()
+        connection.close()
+        os.replace(stage, path)
+    except Exception:
+        connection.close()
+        stage.unlink(missing_ok=True)
+        raise
+
+
 def h1_ticket_bridge() -> dict[tuple[str, str], NativeIssueSleeve]:
     """Recreate Gate-A's H1 prefix ledger from the accepted #170 ticket replay.
 
@@ -1687,6 +1788,10 @@ def h1_ticket_bridge() -> dict[tuple[str, str], NativeIssueSleeve]:
     global _H1_TICKET_BRIDGE
     if _H1_TICKET_BRIDGE is not None:
         return _H1_TICKET_BRIDGE
+    cached = _load_h1_ticket_cache()
+    if cached is not None:
+        _H1_TICKET_BRIDGE = cached
+        return cached
     gate = frozen_gate_a()
     runner = frozen_bj170_runner()
     frozen = runner.load_frozen_data()
@@ -1772,6 +1877,7 @@ def h1_ticket_bridge() -> dict[tuple[str, str], NativeIssueSleeve]:
         )
     if len(bridge) != 3 * 348:
         raise RuntimeError(f"H1 bridge denominator drift: {len(bridge)}")
+    _write_h1_ticket_cache(bridge)
     _H1_TICKET_BRIDGE = bridge
     return bridge
 
