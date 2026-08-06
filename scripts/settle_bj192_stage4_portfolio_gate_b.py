@@ -2021,7 +2021,9 @@ def replay_path(
             covariance,
             len(observations),
         )
-        if normalization["normalization_executable"]:
+        if bankroll < TICKET_STAKE_YUAN:
+            funding = {"actual_ticket_count_by_sleeve": {s: 0 for s in sleeves}, "reason_codes": "RUIN_NO_BET", "mode_notional_yuan": raw_notional, "issue_budget_yuan": 0.0, "retained_cash_yuan": bankroll, "actual_total_stake_yuan": 0.0}
+        elif normalization["normalization_executable"]:
             funding = gate.allocate_integer_tickets(
                 mode,
                 fraction,
