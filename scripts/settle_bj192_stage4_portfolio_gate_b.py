@@ -24,6 +24,7 @@ import shutil
 import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass
+from itertools import combinations
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -46,6 +47,21 @@ H1_SLEEVES = (
     "MODEL_SOURCE_MODEL_CAP1_M512",
     "Q_SOURCE_Q_TOP_MASS_M192",
 )
+ROBUST_SLEEVES = (
+    "BJ148_NOGATE_WR_DENSE_M",
+    "BJ148_NOGATE_WOR_DENSE_M",
+    "BJ151_NOGATE_K4_WR_DENSE_M",
+    "BJ151_NOGATE_K4_WOR_DENSE_M",
+    "BJ159_SELECTED_N7_WOR_M_CURVE",
+)
+CORE_SLEEVES = (*H1_SLEEVES, *ROBUST_SLEEVES)
+CORE_WEIGHT_METHODS = (
+    "EQUAL_WEIGHT",
+    "PRIOR_INVERSE_VOL",
+    "PRIOR_MINIMUM_VARIANCE",
+    "PRIOR_MAXIMUM_DIVERSIFICATION",
+)
+CORE_NORMALIZATION_METHODS = ("UNIT_CAPITAL", "UNIT_EX_ANTE_VOL_CAPPED_5PCT")
 _H1_TICKET_BRIDGE: dict[tuple[str, str], "NativeIssueSleeve"] | None = None
 PATH_IDENTITY = (
     "portfolio_id",
@@ -1441,6 +1457,48 @@ def frozen_execution_axes() -> list[dict[str, object]]:
     if not rows or len({canonical_hash(row) for row in rows}) != len(rows):
         raise RuntimeError("invalid frozen execution axis enumeration")
     return rows
+
+
+def bounded_core_memberships() -> dict[str, tuple[tuple[str, ...], ...]]:
+    """Return exactly the PI-authorized Phase-1 executable memberships."""
+    h1_triple = tuple(sorted(H1_SLEEVES))
+    robust_prefixes = tuple(tuple(sorted(ROBUST_SLEEVES[:size])) for size in (3, 4, 5))
+    result = {
+        "STANDALONE": tuple((candidate,) for candidate in CORE_SLEEVES),
+        "PAIR": tuple(tuple(pair) for pair in combinations(sorted(CORE_SLEEVES), 2)),
+        "H1_TRIPLE": (h1_triple,),
+        "ROBUST_PREFIX": robust_prefixes,
+    }
+    flattened = [membership for groups in result.values() for membership in groups]
+    if len(flattened) != 40 or len(set(flattened)) != len(flattened):
+        raise RuntimeError("bounded core membership contract drift")
+    return result
+
+
+def bounded_core_execution_axes() -> tuple[dict[str, object], ...]:
+    """Filter the frozen gate-A axes to the bounded Phase-1 landmarks only."""
+    valid = {
+        canonical_hash(row): row
+        for row in frozen_execution_axes()
+    }
+    rows: list[dict[str, object]] = []
+    for mode in ("NATIVE_REQUEST_CONTROL", "FIXED_100K_NOTIONAL", "COMPOUNDING_BANKROLL"):
+        fractions = (1.0,) if mode == "NATIVE_REQUEST_CONTROL" else (0.10, 0.25, 0.50, 1.00)
+        for fraction in fractions:
+            for weight_method in CORE_WEIGHT_METHODS:
+                for normalization_method in CORE_NORMALIZATION_METHODS:
+                    row = {
+                        "mode": mode,
+                        "position_fraction": fraction,
+                        "weight_method": weight_method,
+                        "normalization_method": normalization_method,
+                    }
+                    if canonical_hash(row) not in valid:
+                        raise RuntimeError(f"bounded core axis absent from Gate A: {row}")
+                    rows.append(row)
+    if len(rows) != 72 or len({canonical_hash(row) for row in rows}) != 72:
+        raise RuntimeError("bounded core landmark grid drift")
+    return tuple(rows)
 
 
 def surface_preflight_receipt() -> dict[str, object]:

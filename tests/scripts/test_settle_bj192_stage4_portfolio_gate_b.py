@@ -402,6 +402,21 @@ def test_execution_axes_are_read_from_gate_a_and_preserve_legality_rules() -> No
     )
 
 
+def test_bounded_core_contract_has_only_authorized_memberships_and_landmarks() -> None:
+    groups = RUNNER.bounded_core_memberships()
+    assert {key: len(value) for key, value in groups.items()} == {
+        "STANDALONE": 8, "PAIR": 28, "H1_TRIPLE": 1, "ROBUST_PREFIX": 3,
+    }
+    assert groups["H1_TRIPLE"] == (tuple(sorted(RUNNER.H1_SLEEVES)),)
+    assert groups["ROBUST_PREFIX"][-1] == tuple(sorted(RUNNER.ROBUST_SLEEVES))
+    axes = RUNNER.bounded_core_execution_axes()
+    assert len(axes) == 72
+    assert {row["mode"] for row in axes} == {
+        "NATIVE_REQUEST_CONTROL", "FIXED_100K_NOTIONAL", "COMPOUNDING_BANKROLL"
+    }
+    assert {row["position_fraction"] for row in axes if row["mode"] != "NATIVE_REQUEST_CONTROL"} == {0.10, 0.25, 0.50, 1.0}
+
+
 def test_surface_preflight_reports_full_frozen_cartesian_scope_without_reduction() -> None:
     receipt = RUNNER.surface_preflight_receipt()
     assert receipt["status"] == "PREFLIGHT_REQUIRES_EXPLICIT_EXECUTION_PLAN"
