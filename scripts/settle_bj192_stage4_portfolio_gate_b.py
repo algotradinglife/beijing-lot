@@ -15,8 +15,11 @@ import csv
 import gzip
 import hashlib
 import importlib.util
+import io
 import json
 import math
+import os
+import shutil
 import sqlite3
 from collections import defaultdict
 from dataclasses import dataclass
@@ -110,6 +113,97 @@ def read_csv(path: Path) -> list[dict[str, str]]:
 def read_gzip(path: Path) -> list[dict[str, str]]:
     with gzip.open(path, "rt", newline="", encoding="utf-8") as handle:
         return list(csv.DictReader(handle))
+
+
+def canonical_scientific_sha256(path: Path) -> str:
+    """Hash uncompressed science bytes while retaining transport hashes too."""
+    digest = hashlib.sha256()
+    opener = gzip.open if path.suffix == ".gz" else Path.open
+    with opener(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def write_csv_rows(path: Path, rows: Sequence[dict[str, object]], *, compressed: bool) -> list[str]:
+    """Write stable CSV bytes without a system temporary file."""
+    fields = sorted({field for row in rows for field in row})
+    if not fields:
+        raise RuntimeError(f"cannot write fieldless table: {path.name}")
+    normalized = [{field: row.get(field, "") for field in fields} for row in rows]
+    if compressed:
+        with path.open("wb") as raw:
+            with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as zipped:
+                with io.TextIOWrapper(zipped, newline="", encoding="utf-8") as text:
+                    writer = csv.DictWriter(text, fieldnames=fields, lineterminator="\n", extrasaction="raise")
+                    writer.writeheader()
+                    writer.writerows(normalized)
+    else:
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n", extrasaction="raise")
+            writer.writeheader()
+            writer.writerows(normalized)
+    return fields
+
+
+def write_immutable_package(
+    output: Path,
+    tables: dict[str, Sequence[dict[str, object]]],
+    *,
+    source_binding: dict[str, object],
+    package_note: str,
+) -> dict[str, object]:
+    """Write a complete package into a unique sibling stage then atomically land it.
+
+    This helper is intentionally output-only: no output or stage is treated as
+    input, and it refuses to overwrite an immutable target.  The caller must
+    provide every table required by the accepted Gate-A schema before this
+    function is used for a canonical Gate-B run.
+    """
+    output = output.resolve()
+    stage = output.with_name(f".{output.name}.stage")
+    if output.exists() or stage.exists():
+        raise RuntimeError(f"immutable output or active stage already exists: {output}")
+    required = {
+        key for key, spec in json.loads((GATE_A / "output_schema.json").read_text(encoding="utf-8")).items()
+        if isinstance(spec, dict) and "key" in spec
+    }
+    missing = required - set(tables)
+    if missing:
+        raise RuntimeError(f"missing Gate-B output tables: {sorted(missing)}")
+    stage.mkdir(parents=False)
+    try:
+        table_manifest: dict[str, dict[str, object]] = {}
+        for table, rows in sorted(tables.items()):
+            compressed = table in {"issue_ledger", "weight_history", "selected_m_path", "standalone_m_curve"}
+            filename = f"{table}.csv.gz" if compressed else f"{table}.csv"
+            fields = write_csv_rows(stage / filename, list(rows), compressed=compressed)
+            table_manifest[table] = {"filename": filename, "row_count": len(rows), "fields": fields}
+        (stage / "source_binding.json").write_text(json.dumps(source_binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (stage / "table_manifest.json").write_text(json.dumps(table_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        (stage / "README.md").write_text(package_note.rstrip() + "\n", encoding="utf-8")
+        archive_transport = {path.name: sha256_file(path) for path in sorted(stage.iterdir()) if path.is_file()}
+        scientific = {path.name: canonical_scientific_sha256(path) for path in sorted(stage.iterdir()) if path.is_file()}
+        content = {
+            "contract": CONTRACT,
+            "version": VERSION,
+            "canonical_scientific_payload_sha256": scientific,
+            "canonical_scientific_identity_sha256": canonical_hash(scientific),
+            "archive_transport_payload_sha256": archive_transport,
+            "archive_transport_contract": {
+                "gzip": "gzip.GzipFile(filename='', mtime=0)",
+                "scientific_identity": "gzip payloads SHA-256 after decompression",
+            },
+        }
+        (stage / "CONTENT_IDENTITY.json").write_text(json.dumps(content, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        manifest = {path.name: sha256_file(path) for path in sorted(stage.iterdir()) if path.is_file()}
+        (stage / "SHA256SUMS.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        verify_package(stage, sha256_file(stage / "SHA256SUMS.json"), sha256_file(stage / "CONTENT_IDENTITY.json"))
+        os.replace(stage, output)
+        return {"output": str(output), "manifest_sha256": sha256_file(output / "SHA256SUMS.json"), "content_sha256": sha256_file(output / "CONTENT_IDENTITY.json"), "tables": table_manifest}
+    except Exception:
+        shutil.rmtree(stage, ignore_errors=True)
+        raise
 
 
 def verify_package(directory: Path, manifest_digest: str, content_digest: str) -> dict[str, str]:
