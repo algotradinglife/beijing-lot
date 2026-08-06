@@ -1,7 +1,7 @@
 {
-  "CONTENT_IDENTITY.json": "23d089a96569ad26dac140af02241f3e1db8139874dcb2e5d8641495f786cf6c",
-  "DECISION_REPORT.md": "1f5aa2cac3812ebc9aae6902b6a261ba5f9c599cb458464eaf7d1becb4d4080e",
-  "README.md": "a7618080cae7f605631d92038684af505623bc774245d65eef72f39429f9dd43",
+  "CONTENT_IDENTITY.json": "b3ec5764903402b35208bb3ee1ad9d1854274bf19b45fd4f3a89ee943385ed7e",
+  "DECISION_REPORT.md": "3fca765fe01e863fa522e8f3c8e33fb11121e92523db89b4a517aa16854c8e10",
+  "README.md": "5ea0580819a92b5d7c0065a9ac939eb11747873e9d85bdd256fa516517cdc507",
   "all_pairs_risk_return_surface.csv": "c5650e8df3e1f64f89aec85ac0a366af2f71ee7688978464253be3a51482ea37",
   "baseline_lift.csv": "6423bb2c8c204bd8ad370e27f5175addf7307e208ad281e0bdcbde8a9cf8f891",
   "bootstrap_stability.csv": "b24ed9d11b543ed14388235606d7e0a534fb6e6045909903ba9592a8e9c83716",
@@ -19,7 +19,7 @@
   "holding_metrics.csv": "a35f94203be2ac3959268093b65dd495e24ff2f1847f5f1baaf5689ae54abac9",
   "intrinsic_native_dependence.csv.gz": "6b8c484048f1ad0f05b006c0e07451c10cd84b3945b54e73217a9cb8d50611ed",
   "issue_ledger.csv.gz": "3ef6d814abde6f53e49b54438f7bdaabdaed0ec4f4bc3cdc9f66eea0ec3d4ce7",
-  "matched_capital_comparisons.csv": "927f510bc427fa387192bad9a4946d1d89b6958e1340a191c3d34682e79ff1ce",
+  "matched_capital_comparisons.csv": "5fc3e4797dc6a6aea83b7c4a8f3fcd2c33990739d5f828fc4b23edab65b2916a",
   "matched_capital_issue_ledger.csv": "bf2e6552d2e2363662d57ab49f2c82129a9c6ca366da34a8263dbaec39c5a0de",
   "matched_capital_unavailable_issues.csv": "afe3eee0181d124f5ae89745c35a406b17b1123cfa690dd9cfd8071b298c62f6",
   "portfolio_k_saturation.csv": "ea5b15acd945bfe2bf0690fac49f40236fcb5a69ebb6f1c0483d23859f17381a",
@@ -29,10 +29,10 @@
   "rolling_window_metrics.csv.gz": "5005913e4f10d1d1b6bba2999ac6bf98ada7350d649ab873f646cfa8494fa246",
   "selected_m_path.csv.gz": "8ee53c4b198a585f184ea727877559a236c0eda6fcf071c26fa99256e6c6d357",
   "sleeve_funding_ledger.csv.gz": "0bf559123025b4ba9a6995ecb2c4af38a3563b4e9130395030063ed27fcb0ebf",
-  "source_binding.json": "15018219b5fc68814722bb3bfec02e79806320f59df1dfe767cad4ac84a85b2c",
+  "source_binding.json": "26d9b6a5b0bcead592f490ae197c7735b35172b279a38cdf5589967d49c88685",
   "stage_attribution.csv.gz": "64e18f2d019c59a023d9c6411b29335b90d12d300df0a62faa1b7ccf1e0edd84",
   "standalone_m_curve.csv.gz": "2fb274abd01e6cea43c68de333749ed2d25c8928a88558c531891273927605a2",
-  "table_manifest.json": "5f6686fdc875ee5c21c8c3b2e7996b305c8621b3bd378aab5adc666ff1ceb67c",
+  "table_manifest.json": "b00c0eb8c670dc96362779f43820df0436402a9580c9649d597bc5d80918acf5",
   "terminal_decision.csv": "78f207c6d250cf01494efec3f05841cbbbed8aab5a71138d58534e0712951235",
   "weight_history.csv.gz": "dfafa2a7b0681de7f57a0737f4fa97e4a51abbd0c78a2a7dbdb24df14bc29bae"
 }

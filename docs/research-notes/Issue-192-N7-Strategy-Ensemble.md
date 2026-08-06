@@ -14,24 +14,24 @@ matched-FULL lift；资金不可执行仅在 allocator 的缩放或破产约束�
 
 - Gate-A manifest：`6108defd857bf431bcaf55109df0e195b45aa754e8fd46f1db82d329102ff256`
 - Gate-A content identity：`66ce6f86703b31d710ad678b49287de3bc6b2c43a5b36c278e1369bdecd861d5`
-- 最终 Gate-B manifest：`b5cb318cf1facee72f821793e86cc275e6dd6175cbb5730179f2d16e9e337ca4`
-- 最终 Gate-B content identity：`23d089a96569ad26dac140af02241f3e1db8139874dcb2e5d8641495f786cf6c`
+- 最终 Gate-B manifest：`3159431d91dda7dfb23ea7dbe4daa42a5411f7e52616e50bb31f04722c17ebe4`
+- 最终 Gate-B content identity：`b3ec5764903402b35208bb3ee1ad9d1854274bf19b45fd4f3a89ee943385ed7e`
 
 交付包覆盖 252 条冻结的完整 348 期路径：三个 singleton、三个 pair 和一个
 triple，跨既定 mode/fraction/weight/normalization 轴。Gate-A 的三个 ordinal bundle
 逐期经济等价，仅 `BUNDLE_ORDINAL_001` 是可执行表示。原始 20,000 次 paired
 stationary-block max-T 推断未重新运行；本次修正不扩展研究搜索空间。
 
-## 严格推断（税前主口径）
+## 冻结的未匹配 bootstrap 诊断（税前）
 
-| 原生候选（相对 BEST_FULL_FULL） | 配对平均净额增量 | 95% 配对下界 | max-T FWER p | 结论 |
+| 原生候选（相对 BEST_FULL_FULL） | 原始配对净额差 | 95% 配对下界 | max-T FWER p | 诊断结论 |
 |---|---:|---:|---:|---|
 | MODEL + Q | ¥469.58 | -¥157.49 | 0.10019 | `STRICT_MAX_T_NOT_PASSED` |
 | Q top-mass M192 | ¥422.38 | -¥194.17 | 0.12559 | `STRICT_MAX_T_NOT_PASSED` |
 
-这两个候选共享完整 348 期日历、¥100,000 native control、EQUAL_WEIGHT、
-UNIT_CAPITAL、BUNDLE_ORDINAL_001、seed `19220001` 和相同的 block-resample
-设计。因此单一路径的 ROI、终值或回撤不能取代严格的共同推断。
+这些数字是冻结的原始 candidate-vs-FULL 路径差；资金审计已证明两侧实际 funding
+不同，因此它们只保留为未匹配 bootstrap 诊断，**不能**确立 candidate lift 或严格的
+matched-capital 证据。
 
 ## 受限的 matched-capital 复放
 
@@ -43,10 +43,11 @@ ticket-prefix 复放：每侧仍使用自己的冻结 ticket prefix，但每期�
 | 对照 | 共同可执行期数 | 共同 stake | 结果 |
 |---|---:|---:|---|
 | MODEL+Q vs Q | 180 / 348 | ¥276,480 | MODEL+Q ROI -15.91%，Q -3.64%，matched-capital lift **-¥33,910.53**；其余 168 期因一侧不可执行或原子取整不可共用。 |
-| Q vs FULL | 0 / 348 | ¥0 | FULL 的 2,187-ticket 原子前缀与 Q 的可用容量从无共同整数 schedule；全部 348 期逐期记录为 unavailable。 |
+| Q vs FULL | 0 / 348 | ¥0 | `NOT_IDENTIFIABLE_NO_COMMON_EXECUTABLE_SCHEDULE`：FULL 的 2,187-ticket 原子前缀与 Q 的可用容量从无共同整数 schedule；全部 348 期逐期记录为 unavailable，不是零 lift。 |
 
-这两项对照没有 bootstrap 重跑，也没有产生新的候选或推广结论；所有 unavailable
-期、共同 support 和原子取整规则均写入机器可读账本。
+这两项对照没有 bootstrap 重跑，也没有产生新的候选或推广结论；只有 MODEL+Q vs Q
+是有效 matched-capital 对照，且结果为负。所有 unavailable 期、共同 support 和原子
+取整规则均写入机器可读账本。
 
 ## 交付账本与图源
 

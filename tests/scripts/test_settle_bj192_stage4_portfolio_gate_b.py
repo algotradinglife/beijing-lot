@@ -638,6 +638,11 @@ def test_decision_artifacts_are_package_derived_and_manifest_ready() -> None:
         assert "<svg" in (output / "charts" / "decision_paths.svg").read_text(encoding="utf-8")
         assert (output / "charts" / "decision_paths.png").read_bytes().startswith(b"\x89PNG")
         assert (output / "charts" / "decision_paths.pdf").read_bytes().startswith(b"%PDF")
+        report = (output / "DECISION_REPORT.md").read_text(encoding="utf-8")
+        # CSV readers return booleans as strings: only the FULL self-control
+        # is matched, while the four non-FULL paths remain unmatched.
+        assert report.count("(unmatched funding)") == 4
+        assert report.count("(matched funding)") == 1
     finally:
         shutil.rmtree(output)
 
@@ -657,6 +662,42 @@ def test_committed_final_delivery_is_clean_clone_verifiable_without_author_check
     assert sum(row["euler_variance_contribution"] != "" for row in risk) > 0
     assert all(row["matched_drawdown_delta_yuan"] != "" for row in risk)
     assert (package / "charts" / "decision_paths.svg").exists()
+
+
+def test_committed_matched_capital_summary_distinguishes_measurement_from_no_schedule() -> None:
+    """Production package: one positive schedule and one non-identifiable contrast."""
+    package = ROOT / "results" / "bj192_gate_b_minimal_stage4"
+    rows = {
+        row["contrast_id"]: row
+        for row in RUNNER.read_csv(package / "matched_capital_comparisons.csv")
+    }
+    positive = rows["MODEL_PLUS_Q_VS_Q"]
+    assert positive["comparison_identifiability_status"] == "MATCHED_CAPITAL_IDENTIFIABLE"
+    assert positive["capital_schedule_equal"] == "True"
+    assert float(positive["common_stake_yuan"]) == pytest.approx(276_480.0)
+    assert float(positive["matched_lift_yuan"]) == pytest.approx(-33_910.52871485186)
+    assert positive["candidate_ticket_funding_hash"] != positive["control_ticket_funding_hash"]
+    ledger = [
+        row for row in RUNNER.read_csv(package / "matched_capital_issue_ledger.csv")
+        if row["contrast_id"] == "MODEL_PLUS_Q_VS_Q"
+    ]
+    by_issue: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for row in ledger:
+        by_issue[row["issue_instance"]].append(row)
+    assert len(by_issue) == 348
+    assert all(
+        len(rows_for_issue) == 2
+        and rows_for_issue[0]["actual_stake_yuan"] == rows_for_issue[1]["actual_stake_yuan"]
+        for rows_for_issue in by_issue.values()
+    )
+
+    no_schedule = rows["Q_VS_FULL"]
+    assert no_schedule["comparison_identifiability_status"] == "NOT_IDENTIFIABLE_NO_COMMON_EXECUTABLE_SCHEDULE"
+    assert no_schedule["strict_inference_status"] == "NOT_IDENTIFIABLE_NO_COMMON_EXECUTABLE_SCHEDULE"
+    assert no_schedule["capital_schedule_equal"] == ""
+    assert no_schedule["capital_schedule_hash"] == ""
+    assert no_schedule["candidate_pre_tax_roi"] == no_schedule["control_pre_tax_roi"] == ""
+    assert no_schedule["matched_lift_yuan"] == no_schedule["matched_lift_pre_tax_roi"] == ""
 
 
 def test_realized_dependence_uses_explicit_zero_flow_and_active_denominators() -> None:

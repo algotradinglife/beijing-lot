@@ -2030,6 +2030,75 @@ def _maximum_common_ticket_count(
     return 0, "ATOMIC_FULL_NOT_COMMONLY_EXECUTABLE"
 
 
+def common_capital_comparison_summary(
+    *,
+    contrast_id: str,
+    candidate_id: object,
+    control_id: object,
+    schedule_hash: str,
+    candidate_ticket_hash: str,
+    control_ticket_hash: str,
+    active_issues: Sequence[dict[str, object]],
+    unavailable_issue_count: int,
+    common_stake_yuan: float,
+    candidate_ending_bankroll_yuan: float,
+    control_ending_bankroll_yuan: float,
+) -> dict[str, object]:
+    """Classify a bounded replay only when it has executable common capital.
+
+    An all-zero schedule proves a frozen atomic incompatibility; it does not
+    measure a zero candidate effect.  Retain the separate ticket identities
+    for audit, but blank every outcome/lift field and the schedule comparison
+    identity when no positive common stake was executed.
+    """
+    if not active_issues or common_stake_yuan <= 0:
+        return {
+            "contrast_id": contrast_id,
+            "candidate_id": candidate_id,
+            "control_id": control_id,
+            "capital_schedule_hash": "",
+            "candidate_ticket_funding_hash": candidate_ticket_hash,
+            "control_ticket_funding_hash": control_ticket_hash,
+            "capital_schedule_equal": "",
+            "comparison_identifiability_status": "NOT_IDENTIFIABLE_NO_COMMON_EXECUTABLE_SCHEDULE",
+            "common_executable_support_hash": "",
+            "common_executable_issue_count": 0,
+            "unavailable_issue_count": unavailable_issue_count,
+            "common_stake_yuan": 0.0,
+            "candidate_ending_bankroll_yuan": "",
+            "control_ending_bankroll_yuan": "",
+            "matched_lift_yuan": "",
+            "candidate_pre_tax_roi": "",
+            "control_pre_tax_roi": "",
+            "matched_lift_pre_tax_roi": "",
+            "strict_inference_status": "NOT_IDENTIFIABLE_NO_COMMON_EXECUTABLE_SCHEDULE",
+            "atomic_rounding_contract": "MAXIMAL_COMMON_EXECUTABLE_WHOLE_TICKET_SCHEDULE",
+        }
+    lift = candidate_ending_bankroll_yuan - control_ending_bankroll_yuan
+    return {
+        "contrast_id": contrast_id,
+        "candidate_id": candidate_id,
+        "control_id": control_id,
+        "capital_schedule_hash": schedule_hash,
+        "candidate_ticket_funding_hash": candidate_ticket_hash,
+        "control_ticket_funding_hash": control_ticket_hash,
+        "capital_schedule_equal": True,
+        "comparison_identifiability_status": "MATCHED_CAPITAL_IDENTIFIABLE",
+        "common_executable_support_hash": canonical_hash([row["issue_instance"] for row in active_issues]),
+        "common_executable_issue_count": len(active_issues),
+        "unavailable_issue_count": unavailable_issue_count,
+        "common_stake_yuan": common_stake_yuan,
+        "candidate_ending_bankroll_yuan": candidate_ending_bankroll_yuan,
+        "control_ending_bankroll_yuan": control_ending_bankroll_yuan,
+        "matched_lift_yuan": lift,
+        "candidate_pre_tax_roi": (candidate_ending_bankroll_yuan - INITIAL_BANKROLL_YUAN) / common_stake_yuan,
+        "control_pre_tax_roi": (control_ending_bankroll_yuan - INITIAL_BANKROLL_YUAN) / common_stake_yuan,
+        "matched_lift_pre_tax_roi": lift / common_stake_yuan,
+        "strict_inference_status": "DESCRIPTIVE_MATCHED_CAPITAL_NO_BOOTSTRAP_RERUN",
+        "atomic_rounding_contract": "MAXIMAL_COMMON_EXECUTABLE_WHOLE_TICKET_SCHEDULE",
+    }
+
+
 def replay_common_capital_contrast(
     *,
     contrast_id: str,
@@ -2126,27 +2195,19 @@ def replay_common_capital_contrast(
         row["capital_schedule_hash"] = schedule_hash
     stake = sum(float(row["common_schedule_yuan"]) for row in schedule)
     active = [row for row in schedule if float(row["common_schedule_yuan"]) > 0]
-    summary = {
-        "contrast_id": contrast_id,
-        "candidate_id": candidate_identity[0],
-        "control_id": control_identity[0],
-        "capital_schedule_hash": schedule_hash,
-        "candidate_ticket_funding_hash": canonical_hash(candidate_ticket_identity),
-        "control_ticket_funding_hash": canonical_hash(control_ticket_identity),
-        "capital_schedule_equal": True,
-        "common_executable_support_hash": canonical_hash([row["issue_instance"] for row in active]),
-        "common_executable_issue_count": len(active),
-        "unavailable_issue_count": len(unavailable),
-        "common_stake_yuan": stake,
-        "candidate_ending_bankroll_yuan": candidate_bankroll,
-        "control_ending_bankroll_yuan": control_bankroll,
-        "matched_lift_yuan": candidate_bankroll - control_bankroll,
-        "candidate_pre_tax_roi": (candidate_bankroll - INITIAL_BANKROLL_YUAN) / stake if stake else "",
-        "control_pre_tax_roi": (control_bankroll - INITIAL_BANKROLL_YUAN) / stake if stake else "",
-        "matched_lift_pre_tax_roi": (candidate_bankroll - control_bankroll) / stake if stake else "",
-        "strict_inference_status": "DESCRIPTIVE_MATCHED_CAPITAL_NO_BOOTSTRAP_RERUN",
-        "atomic_rounding_contract": "MAXIMAL_COMMON_EXECUTABLE_WHOLE_TICKET_SCHEDULE",
-    }
+    summary = common_capital_comparison_summary(
+        contrast_id=contrast_id,
+        candidate_id=candidate_identity[0],
+        control_id=control_identity[0],
+        schedule_hash=schedule_hash,
+        candidate_ticket_hash=canonical_hash(candidate_ticket_identity),
+        control_ticket_hash=canonical_hash(control_ticket_identity),
+        active_issues=active,
+        unavailable_issue_count=len(unavailable),
+        common_stake_yuan=stake,
+        candidate_ending_bankroll_yuan=candidate_bankroll,
+        control_ending_bankroll_yuan=control_bankroll,
+    )
     if any(float(row["actual_stake_yuan"]) != float(row["common_schedule_yuan"]) for row in rows):
         raise RuntimeError("common schedule ledger equality assertion failed")
     return rows, summary, unavailable
@@ -2873,6 +2934,15 @@ def render_minimal_stage4_charts(
     plt.close(figure)
 
 
+def csv_serialized_bool(value: object) -> bool:
+    """Decode the only boolean encodings emitted by ``write_csv_rows``."""
+    if value is True or value == "True":
+        return True
+    if value is False or value == "False":
+        return False
+    raise ValueError(f"invalid serialized boolean: {value!r}")
+
+
 def minimal_stage4_decision_artifacts(
     stage: Path,
     tables: dict[str, Sequence[dict[str, object]]],
@@ -2929,7 +2999,7 @@ def minimal_stage4_decision_artifacts(
     svg = (chart_dir / "decision_paths.svg").read_text(encoding="utf-8")
     (chart_dir / "decision_paths.html").write_text("<!doctype html><meta charset=\"utf-8\"><title>#192 decision paths</title>" + svg, encoding="utf-8")
     decisions = "\n".join(
-        f"- {row['label']}: ending ¥{float(row['ending_bankroll_yuan']):,.2f}; ROI {float(row['pre_tax_roi']):.2%}; turnover ¥{float(row['turnover_yuan']):,.2f}; max drawdown ¥{float(row['max_drawdown_yuan']):,.2f}; FULL raw-path difference {('¥' + format(float(row['unmatched_full_raw_path_difference_yuan']), ',.2f')) if row['unmatched_full_raw_path_difference_yuan'] not in ('', None) else 'not applicable'} ({'matched funding' if row['full_actual_funding_equal'] else 'unmatched funding'})."
+        f"- {row['label']}: ending ¥{float(row['ending_bankroll_yuan']):,.2f}; ROI {float(row['pre_tax_roi']):.2%}; turnover ¥{float(row['turnover_yuan']):,.2f}; max drawdown ¥{float(row['max_drawdown_yuan']):,.2f}; FULL raw-path difference {('¥' + format(float(row['unmatched_full_raw_path_difference_yuan']), ',.2f')) if row['unmatched_full_raw_path_difference_yuan'] not in ('', None) else 'not applicable'} ({'matched funding' if csv_serialized_bool(row['full_actual_funding_equal']) else 'unmatched funding'})."
         for row in summary
     )
     matched_capital_text = "\n".join(
@@ -2937,8 +3007,8 @@ def minimal_stage4_decision_artifacts(
         f"¥{float(row['common_stake_yuan']):,.2f} identical schedule; candidate ROI {float(row['candidate_pre_tax_roi']):.2%}; "
         f"control ROI {float(row['control_pre_tax_roi']):.2%}; matched-capital lift ¥{float(row['matched_lift_yuan']):,.2f}; "
         f"{int(row['unavailable_issue_count'])} unavailable/atomic-rounding issues."
-        if float(row["common_stake_yuan"] or 0) > 0 else
-        f"- {row['contrast_id']}: no common executable capital schedule; {int(row['unavailable_issue_count'])} unavailable issues."
+        if row["comparison_identifiability_status"] == "MATCHED_CAPITAL_IDENTIFIABLE" else
+        f"- {row['contrast_id']}: not identifiable — no common executable capital schedule; {int(row['unavailable_issue_count'])} unavailable issues."
         for row in matched_capital_comparisons
     ) or "- No matched-capital comparison was materialized."
     report = f"""# #192 Stage-4 decision guide
@@ -2962,7 +3032,9 @@ raw FULL comparisons have unequal actual funding, they remain descriptive.
 
 These use the same deterministic issue-level yuan schedule on both sides, but
 retain each side's own frozen ticket-prefix identity.  They are not a new
-strategy search or a bootstrap rerun.  The terminal finding remains
+strategy search or a bootstrap rerun.  The historical candidate-vs-FULL
+bootstrap is an unmatched-funding diagnostic only and cannot establish
+candidate lift.  The terminal finding remains
 **NO_PROMOTION**.
 """
     (stage / "DECISION_REPORT.md").write_text(report, encoding="utf-8")
