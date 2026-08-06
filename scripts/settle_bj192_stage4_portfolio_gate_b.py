@@ -2737,6 +2737,83 @@ def paired_stationary_max_t(
     return result
 
 
+def minimal_stage4_selected_m_rows() -> list[dict[str, object]]:
+    """Materialize the three deterministic M selections on every frozen issue."""
+    fixed_m = {
+        "BEST_FULL_FULL": 2187,
+        "MODEL_SOURCE_MODEL_CAP1_M512": 512,
+        "Q_SOURCE_Q_TOP_MASS_M192": 192,
+    }
+    rows: list[dict[str, object]] = []
+    calendar = read_csv(GATE_A / "full_calendar.csv")
+    for bundle in sorted(frozen_replicate_bundles()):
+        for sleeve, m_value in fixed_m.items():
+            family = canonical_economic_catalog()[sleeve]["economic_family_id"]
+            for item in calendar:
+                rows.append({
+                    "economic_family_id": family,
+                    "deployment_replicate_bundle_id": bundle,
+                    "deployment_seed": "DETERMINISTIC",
+                    "calendar_index": item["calendar_index"], "issue_instance": item["issue_instance"],
+                    "selection_variant": "FROZEN_DETERMINISTIC_M",
+                    "support_hash": canonical_hash([row["issue_instance"] for row in calendar]),
+                    "prior_training_start_calendar_index": "",
+                    "prior_training_end_calendar_index": "",
+                    "prior_active_issue_count": "",
+                    "prior_training_input_sha256": "",
+                    "selected_M": m_value, "fixed_M_comparator": m_value,
+                    "fallback_reason": "", "nested_loyo_held_out_year": "",
+                })
+    if len(rows) != len(calendar) * len(H1_SLEEVES) * len(frozen_replicate_bundles()):
+        raise RuntimeError("minimal deterministic selected-M denominator drift")
+    return rows
+
+
+def minimal_stage4_strict_bootstrap_rows(checkpoint: Path) -> list[dict[str, object]]:
+    """Run the sole authorized two-contrast strict test from saved issue P&L."""
+    _, paths = load_minimal_stage4_checkpoint(checkpoint)
+    axis = ("NATIVE_REQUEST_CONTROL", "1.00", "EQUAL_WEIGHT", "UNIT_CAPITAL", "BUNDLE_ORDINAL_001")
+    by_membership: dict[tuple[str, ...], list[dict[str, object]]] = {}
+    for identity, path in paths.items():
+        if tuple(identity[1:]) != axis:
+            continue
+        membership = tuple(sorted(path[0]["sleeve_settlements"]))
+        by_membership[membership] = path
+    full = by_membership.get(("BEST_FULL_FULL",))
+    targets = {
+        "Q_SOURCE_Q_TOP_MASS_M192": ("Q_SOURCE_Q_TOP_MASS_M192",),
+        "MODEL_PLUS_Q": tuple(sorted(("MODEL_SOURCE_MODEL_CAP1_M512", "Q_SOURCE_Q_TOP_MASS_M192"))),
+    }
+    if full is None or any(membership not in by_membership for membership in targets.values()):
+        raise RuntimeError("strict bootstrap target/control path unavailable")
+    full_net = [float(row["pre_tax_net_yuan"]) for row in full]
+    contrasts = {
+        name: [float(candidate["pre_tax_net_yuan"]) - control for candidate, control in zip(by_membership[membership], full_net, strict=True)]
+        for name, membership in targets.items()
+    }
+    strict = paired_stationary_max_t(contrasts)
+    support_hash = canonical_hash([row["issue_instance"] for row in full])
+    rows = []
+    for result in strict:
+        rows.append({
+            "portfolio_id": canonical_hash({"strict_target": result["target_id"]}),
+            "mode": axis[0], "position_fraction": axis[1], "weight_method": axis[2],
+            "normalization_method": axis[3], "deployment_replicate_bundle_id": axis[4],
+            "target_id": result["target_id"], "paired_control_id": result["paired_control_id"],
+            "economic_family_id": "|".join(targets[result["target_id"]]),
+            "bootstrap_replicates": result["bootstrap_replicates"], "bootstrap_seed": result["bootstrap_seed"],
+            "paired_growth_delta_low": result["paired_growth_delta_low"],
+            "denominator_id": "COMPLETE_348_ISSUE_PAIRED_CALENDAR", "panel_type": "STRICT_STATIONARY_BLOCK_MAX_T",
+            "panel_id": "NATIVE_100K_EQ_UNIT_BUNDLE001", "metric": "PAIRED_PRE_TAX_NET_DELTA",
+            "value": result["paired_mean_net_delta_yuan"], "YEAR": "", "FOLD": "", "LOYO": "",
+            "EX_LARGEST_ISSUE": "", "EX_LARGEST_YEAR": "", "REGIME": "", "fallback_rate": "",
+            "max_t_familywise_p_value": result["max_t_familywise_p_value"],
+            "paired_growth_delta_high": result["paired_growth_delta_high"], "mean_block_length": result["mean_block_length"],
+            "strict_status": result["strict_status"], "support_hash": support_hash,
+        })
+    return rows
+
+
 def summarize_holding_path(rows: Sequence[dict[str, object]]) -> dict[str, object]:
     """Compute the frozen issue-level holding metrics without dropping cash rows."""
     if not rows:
