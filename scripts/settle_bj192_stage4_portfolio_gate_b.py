@@ -1079,6 +1079,40 @@ def frozen_portfolio_sets() -> dict[str, list[tuple[str, ...]]]:
     }
 
 
+def frozen_execution_axes() -> list[dict[str, object]]:
+    """Materialize every valid Stage-4 execution axis from the Gate-A contract.
+
+    This is intentionally a contract reader rather than a hand-written grid:
+    adding or dropping a mode, fraction, weight, or normalization requires a
+    new immutable Gate-A package.  ``EQUAL_CAPITAL`` is valid only for the
+    equal-weight branch, as specified by the normalization contract.
+    """
+    card = json.loads((GATE_A / "gate_a_card.json").read_text(encoding="utf-8"))
+    funding = json.loads((GATE_A / "funding_algorithm.json").read_text(encoding="utf-8"))
+    normalization = json.loads((GATE_A / "normalization_contract.json").read_text(encoding="utf-8"))
+    weights = tuple(card["methodology_contract"]["weight_methods"])
+    modes = tuple(sorted(funding["modes"]))
+    fractions = tuple(float(value) for value in funding["position_budget_fractions"])
+    methods = tuple(sorted(normalization["methods"]))
+    rows: list[dict[str, object]] = []
+    for mode in modes:
+        allowed_fractions = (1.0,) if mode == "NATIVE_REQUEST_CONTROL" else fractions
+        for fraction in allowed_fractions:
+            for weight_method in weights:
+                for normalization_method in methods:
+                    if normalization_method == "EQUAL_CAPITAL" and weight_method != "EQUAL_WEIGHT":
+                        continue
+                    rows.append({
+                        "mode": mode,
+                        "position_fraction": fraction,
+                        "weight_method": weight_method,
+                        "normalization_method": normalization_method,
+                    })
+    if not rows or len({canonical_hash(row) for row in rows}) != len(rows):
+        raise RuntimeError("invalid frozen execution axis enumeration")
+    return rows
+
+
 def _pearson(left: Sequence[float], right: Sequence[float]) -> float | None:
     if len(left) < 2 or len(left) != len(right):
         return None

@@ -375,6 +375,16 @@ def test_frozen_portfolio_enumeration_covers_every_canonical_pair_and_shortlist_
     assert ("BEST_FULL_FULL", "MODEL_SOURCE_MODEL_CAP1_M512") in sets["pairwise"]
 
 
+def test_execution_axes_are_read_from_gate_a_and_preserve_legality_rules() -> None:
+    axes = RUNNER.frozen_execution_axes()
+    assert len(axes) == 1_159
+    assert all(row["position_fraction"] == 1.0 for row in axes if row["mode"] == "NATIVE_REQUEST_CONTROL")
+    assert all(
+        row["weight_method"] == "EQUAL_WEIGHT"
+        for row in axes if row["normalization_method"] == "EQUAL_CAPITAL"
+    )
+
+
 def test_realized_dependence_uses_explicit_zero_flow_and_active_denominators() -> None:
     bridge = RUNNER.h1_ticket_bridge()
     calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:3]
