@@ -7,7 +7,7 @@ tags:
   - research
   - moc
 status: active
-updated: 2026-08-05
+updated: 2026-08-06
 ---
 
 # Beijing-lot Research Wiki
@@ -46,6 +46,11 @@ updated: 2026-08-05
    `NO_BET` 与 canonical outcome 不可用分别报告；这两项报告修正不改变任何
    stake、gross、tax、net 或 ROI。结果正在等待窄范围独立复验，不能用于购买或生产。详见
    [[Issue-119-Candidate-Sensitivity|Issue #119 候选标准敏感性]]。
+8. **N7 多策略资金组合没有通过严格筛选。** #192 将 FULL、MODEL M512、Q top-mass
+   M192 的 7 个 sleeve 组合与完整资本路径结算；两条材料性正点估计在共同 20,000 次
+   配对 stationary-block max-T 检验中的下界均为负（MODEL+Q `-¥157.49`，Q `-¥194.17`），
+   所以终局是 `NO_PROMOTION`。正 ROI 或较低回撤均不能单独构成策略授权。详见
+   [[Issue-192-N7-Strategy-Ensemble|Issue #192 N7 多策略组合与资金分配]]。
 
 ## 近期 N7 策略结论（2026-08-02）
 
