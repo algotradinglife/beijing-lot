@@ -671,6 +671,7 @@ def build_walk_forward_candidate_bridge(
     candidate_id: str,
     deployment_seed: str,
     calendar: Sequence[dict[str, str]] | None = None,
+    m_surface: dict[tuple[int, str, str], IssueSleeve] | None = None,
 ) -> tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]:
     """Select each M from prior native source outcomes, then return one seed path.
 
@@ -679,13 +680,33 @@ def build_walk_forward_candidate_bridge(
     the selected source sleeve remains an unchanged upstream ticket allocation.
     """
     calendar = list(calendar or read_csv(GATE_A / "full_calendar.csv"))
-    surface = materialize_candidate_m_surface(candidate_id)
+    surface = m_surface if m_surface is not None else materialize_candidate_m_surface(candidate_id)
     available_m = frozen_m_grid(candidate_id)
     seeds = sorted({seed for _, seed, _ in surface})
     if deployment_seed not in seeds:
         raise RuntimeError(f"deployment seed outside frozen source: {candidate_id}/{deployment_seed}")
     if any((m_value, seed, row["issue_instance"]) not in surface for m_value in available_m for seed in seeds for row in calendar):
         raise RuntimeError(f"incomplete M surface: {candidate_id}")
+    if canonical_economic_catalog()[candidate_id]["source_kind"] == "H1_FIXED":
+        m_value = available_m[0]
+        bridge = {
+            (candidate_id, row["issue_instance"]): surface[(m_value, deployment_seed, row["issue_instance"])]
+            for row in calendar
+        }
+        return bridge, [{
+            "economic_family_id": canonical_economic_catalog()[candidate_id]["economic_family_id"],
+            "deployment_seed": deployment_seed,
+            "calendar_index": int(row["calendar_index"]),
+            "issue_instance": row["issue_instance"],
+            "selection_variant": "FIXED_FROZEN_M",
+            "prior_training_start_calendar_index": "",
+            "prior_training_end_calendar_index": "",
+            "prior_active_issue_count": "",
+            "prior_training_input_sha256": canonical_hash({"candidate_id": candidate_id, "M": m_value}),
+            "selected_M": m_value,
+            "fixed_M_comparator": m_value,
+            "fallback_reason": "FROZEN_FIXED_M_NO_SELECTION",
+        } for row in calendar]
     history: dict[int, dict[str, list[tuple[float, float]]]] = {
         m_value: {seed: [] for seed in seeds} for m_value in available_m
     }
@@ -725,6 +746,56 @@ def build_walk_forward_candidate_bridge(
                     full = sleeve.settle_prefix(sleeve.requested_ticket_count)
                     history[history_m][history_seed].append((float(full["pre_tax_net_yuan"]), float(full["actual_stake_yuan"])))
     return bridge, selected_path
+
+
+def walk_forward_candidate_paths(
+    candidate_id: str,
+    calendar: Sequence[dict[str, str]] | None = None,
+) -> dict[str, tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]]:
+    """Create one separate executable capital path per frozen deployment seed."""
+    surface = materialize_candidate_m_surface(candidate_id)
+    return {
+        seed: build_walk_forward_candidate_bridge(candidate_id, seed, calendar, surface)
+        for seed in sorted({seed for _, seed, _ in surface})
+    }
+
+
+def frozen_replicate_bundles() -> dict[str, dict[str, str]]:
+    """Read Gate-A's ordinal seed pairings; no source seed may be substituted."""
+    result: dict[str, dict[str, str]] = {}
+    for row in read_csv(GATE_A / "replicate_bundle_registry.csv"):
+        members = json.loads(row["candidate_seed_map_json"])
+        if canonical_hash(members) != row["candidate_seed_map_sha256"]:
+            raise RuntimeError(f"replicate bundle hash drift: {row['deployment_replicate_bundle_id']}")
+        result[row["deployment_replicate_bundle_id"]] = members
+    if set(result) != {"BUNDLE_ORDINAL_001", "BUNDLE_ORDINAL_002", "BUNDLE_ORDINAL_003"}:
+        raise RuntimeError("replicate bundle denominator drift")
+    return result
+
+
+def build_bundle_bridges(
+    candidates: Sequence[str],
+    bundle_id: str,
+    calendar: Sequence[dict[str, str]] | None = None,
+) -> tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]:
+    """Materialize the exact Gate-A paired-seed path for one portfolio bundle."""
+    bundles = frozen_replicate_bundles()
+    seed_map = bundles.get(bundle_id)
+    if seed_map is None or any(candidate not in seed_map for candidate in candidates):
+        raise RuntimeError(f"candidate absent from frozen bundle: {bundle_id}")
+    bridges: list[dict[tuple[str, str], IssueSleeve]] = []
+    selected_rows: list[dict[str, object]] = []
+    for candidate in candidates:
+        source_seed = "NA" if seed_map[candidate] == "DETERMINISTIC" else seed_map[candidate]
+        paths = walk_forward_candidate_paths(candidate, calendar)
+        bridge, selected = paths.get(source_seed, (None, None))
+        if bridge is None or selected is None:
+            raise RuntimeError(f"frozen bundle seed unavailable: {candidate}/{source_seed}")
+        for row in selected:
+            row["deployment_replicate_bundle_id"] = bundle_id
+        bridges.append(bridge)
+        selected_rows.extend(selected)
+    return merge_candidate_bridges(*bridges), selected_rows
 
 
 def merge_candidate_bridges(

@@ -282,3 +282,22 @@ def test_path_output_tables_have_complete_path_keys_and_exact_sleeve_rows() -> N
     assert len(tables["stage_attribution"]) == 36
     assert all("portfolio_id" in row and "issue_instance" in row for row in tables["issue_ledger"])
     assert tables["capital_summary"][0]["ending_bankroll_yuan"] == pytest.approx(path[-1]["postissue_bankroll_yuan"])
+
+
+def test_walk_forward_candidate_paths_preserve_each_frozen_seed_as_own_path() -> None:
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:3]
+    paths = RUNNER.walk_forward_candidate_paths("BJ159_SELECTED_N7_WOR_M_CURVE", calendar)
+    assert set(paths) == {"137001", "137002", "137003"}
+    assert all(len(bridge) == len(selected) == 3 for bridge, selected in paths.values())
+
+
+def test_frozen_bundle_uses_ordinal_seed_pairing_without_substitution() -> None:
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:2]
+    bridge, selected = RUNNER.build_bundle_bridges(
+        ["BEST_FULL_FULL", "BJ159_SELECTED_N7_WOR_M_CURVE"],
+        "BUNDLE_ORDINAL_002",
+        calendar,
+    )
+    assert len(bridge) == 4
+    assert {row["deployment_seed"] for row in selected if row["economic_family_id"] == "ECON_BJ159_SELECTED_N7_WOR_M_CURVE"} == {"137002"}
+    assert {row["deployment_replicate_bundle_id"] for row in selected} == {"BUNDLE_ORDINAL_002"}
