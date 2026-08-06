@@ -84,6 +84,12 @@ def test_frozen_source_hashes_and_complete_primary_catalog():
         for row in allocation
     )
     families = m.economic_family_registry(expanded, allocation)
+    bundles = m.replicate_bundle_registry(expanded, allocation, families)
+    assert len(bundles) == 3
+    assert bundles[0]["deployment_replicate_bundle_id"] == "BUNDLE_ORDINAL_001"
+    assert bundles[-1]["deployment_replicate_bundle_id"] == "BUNDLE_ORDINAL_003"
+    assert all(row["economic_family_count"] == 104 for row in bundles)
+    assert all(len(row["candidate_seed_map_sha256"]) == 64 for row in bundles)
     aliases = [
         row
         for row in families
@@ -104,6 +110,8 @@ def test_frozen_source_hashes_and_complete_primary_catalog():
     }
     assert all(row["exact_overlap_record_count"] > 0 for row in aliases)
     assert all(len(row["exact_overlap_evidence_sha256"]) == 64 for row in aliases)
+    assert all(len(row["source_role_vector_evidence_sha256"]) == 64 for row in aliases)
+    assert all(len(row["allocator_rng_identity_sha256"]) == 64 for row in aliases)
     eligibility = {
         row["candidate_id"]: row
         for row in m.eligibility_ledger(expanded, allocation, families)
@@ -321,6 +329,40 @@ def test_dynamic_weight_models_are_prior_only_and_have_deterministic_fallbacks()
         }
 
 
+def test_normalization_state_is_strictly_prior_capped_and_fail_closed():
+    m = module()
+    weights = {"A": 0.5, "B": 0.5}
+    warmup = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, weights,
+        [[1.0, 0.0], [0.0, 1.0]], 51,
+    )
+    assert warmup["normalization_status"] == "FALLBACK_UNIT_CAPITAL_INSUFFICIENT_PRIOR_RISK_HISTORY"
+    assert warmup["risk_budget_yuan"] == 100
+    high = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, weights,
+        [[1.0, 0.0], [0.0, 1.0]], 52,
+    )
+    assert high["normalization_status"] == "TARGET_SCALED_DOWN"
+    assert high["ex_ante_volatility"] == pytest.approx(math.sqrt(0.5))
+    assert high["realized_capital_multiplier"] == pytest.approx(0.05 / math.sqrt(0.5))
+    low = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, weights,
+        [[0.0004, 0.0], [0.0, 0.0004]], 52,
+    )
+    assert low["normalization_status"] == "TARGET_CAPPED_NO_LEVERAGE"
+    assert low["realized_capital_multiplier"] == 1.0
+    zero = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, weights,
+        [[0.0, 0.0], [0.0, 0.0]], 52,
+    )
+    assert zero["normalization_status"] == "FALLBACK_UNIT_CAPITAL_ZERO_OR_NONFINITE_VOLATILITY"
+    bad = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, weights,
+        [[float("nan"), 0.0], [0.0, 1.0]], 52,
+    )
+    assert bad["normalization_status"] == "FALLBACK_UNIT_CAPITAL_NONFINITE_COVARIANCE"
+
+
 def test_prior_covariance_allocators_are_long_only_and_deterministic():
     m = module()
     history = [
@@ -405,12 +447,13 @@ def test_baseline_and_sequential_inference_contracts_are_frozen():
     normalization = m.normalization_contract()
     assert normalization["ordering"] == [
         "frozen native request/capacity",
+        "strictly-prior provisional target weights",
+        "strictly-prior covariance and portfolio volatility",
         "portfolio-level normalization multiplier",
-        "sleeve portfolio weights",
         "mode/bankroll issue budget and integer ticket funding",
     ]
     assert normalization["leverage"]["maximum_multiplier"] == 1.0
-    assert "UNIT_EX_ANTE_VOL" in normalization["methods"]
+    assert "UNIT_EX_ANTE_VOL_CAPPED_5PCT" in normalization["methods"]
     assert "INAPPLICABLE_METHOD_WEIGHT_COMBINATION" in normalization["methods"][
         "EQUAL_CAPITAL"
     ]
@@ -467,6 +510,7 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
         "executable_sleeve_family_catalog.csv",
         "bj145_allocation_candidate_registry.csv",
         "economic_family_registry.csv",
+        "replicate_bundle_registry.csv",
         "m_selection_contract.json",
         "funded_prefix_ledger_contract.json",
         "sleeve_eligibility_ledger.csv",
@@ -525,6 +569,7 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     assert card["frontier_contract"]["eligible_economic_family_count"] == 104
     assert len(card["executable_sleeve_family_catalog"]) == 5
     assert len(card["bj145_allocation_candidate_registry"]) == 108
+    assert len(card["replicate_bundle_registry"]) == 3
     assert card["ticket_prefix_contract"]["Q_global_tax_lot_rows"] > 0
     with gzip.open(output / "model_cap1_nested_prefix_audit.json.gz", "rt") as handle:
         model_audit = json.load(handle)
@@ -549,6 +594,17 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     )
     schemas = card["output_schema"]
     for table in (
+        "issue_ledger", "sleeve_funding_ledger", "capital_summary", "weight_history",
+        "dependence", "holding_metrics", "risk_decomposition", "stage_attribution",
+    ):
+        assert all(field in schemas[table]["key"] for field in m.PATH_IDENTITY)
+    assert "capital_growth_audit_delta" in schemas["capital_summary"]["fields"]
+    assert schemas["chart_source_contract"]["path_identity"] == list(m.PATH_IDENTITY)
+    for table in (
+        "all_pairs_risk_return_surface", "higher_order_pareto_frontier", "terminal_decision",
+    ):
+        assert schemas[table]["key"] and schemas[table]["fields"] and schemas[table]["formulas"]
+    for table in (
         "standalone_m_curve",
         "selected_m_path",
         "dependence_panel",
@@ -568,9 +624,24 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     assert len(regime_rows) == 348
     assert sum(row["regime_status"] == "PRE_EVENT_FEATURE_VECTOR_AVAILABLE" for row in regime_rows) == 344
     assert sum(row["regime_status"] == "MISSING_PRE_EVENT_FEATURE_VECTOR" for row in regime_rows) == 4
+    available_regimes = [row for row in regime_rows if row["regime_status"] == "PRE_EVENT_FEATURE_VECTOR_AVAILABLE"]
+    assert any(row["regime_label"] == "LOW" for row in available_regimes)
+    assert any(row["regime_label"] == "HIGH" for row in available_regimes)
+    assert all(row["prior_training_feature_sha256"] for row in available_regimes)
     regime = json.loads((output / "regime_binding.json").read_text())
     assert regime["map_sha256"] == m.canonical_hash(regime_rows)
     attribution = json.loads((output / "stage_attribution_contract.json").read_text())
     assert "NOT_IDENTIFIABLE_WITHOUT_SPLICE" in attribution["stages"]["STAGE_1_SELECTION"]
     source = SCRIPT.read_text()
     assert "result_code" not in source and "winning_sp" not in source
+
+
+def test_primary_alias_role_vector_proof_rejects_probability_drift():
+    m = module()
+    left = [{field: "0" for field in m.ROLE_VECTOR_FIELDS} for _ in range(7)]
+    for index, row in enumerate(left, 1):
+        row.update({"selection_rank": str(index), "portfolio_id": "P", "issue_instance": "I"})
+    right = [dict(row) for row in left]
+    assert m.role_vector_digest(left) == m.role_vector_digest(right)
+    right[3]["q_weight1"] = "0.123"
+    assert m.role_vector_digest(left) != m.role_vector_digest(right)

@@ -27,7 +27,7 @@ from typing import Sequence
 
 
 CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
-VERSION = "bj192-gate-a-v7r1"
+VERSION = "bj192-gate-a-v8"
 OUTCOME_BOUNDARY = (
     "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, "
     "tax realization, ROI, net, gross, or settlement payload is read."
@@ -37,6 +37,7 @@ TICKET_STAKE_YUAN = 2
 POSITION_FRACTIONS = tuple(range(5, 101, 5))
 BOOTSTRAP_REPLICATES = 20_000
 BOOTSTRAP_SEED = 192001
+TARGET_EX_ANTE_VOLATILITY = 0.05
 FROZEN_ALLOCATOR_SHA256 = (
     "5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93"
 )
@@ -45,6 +46,17 @@ FUNDING_MODES = (
     "SCALED_NATIVE_REQUEST",
     "FIXED_100K_NOTIONAL",
     "COMPOUNDING_BANKROLL",
+)
+
+# A seed is local to one sleeve.  The bundle fixes the exact cross-sleeve
+# pairing, so both identities are mandatory in every dynamic Gate-B table.
+PATH_IDENTITY = (
+    "portfolio_id",
+    "mode",
+    "position_fraction",
+    "weight_method",
+    "normalization_method",
+    "deployment_replicate_bundle_id",
 )
 
 
@@ -71,7 +83,7 @@ SOURCE_167B = (
     ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1"
 )
 SOURCE_170B = ROOT / "results" / "bj170_gate_b_selector_allocator_stack_v1"
-DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v7r1"
+DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v8"
 SETTLED_IDENTITY_ONLY_PACKAGES = {
     "bj176_issue_equity_risk_v1",
     "bj190_gate_b_sparse_divergence_v1",
@@ -569,15 +581,28 @@ def regime_binding(calendar: list[dict[str, str]]) -> tuple[list[dict[str, objec
                     "issue_instance": row["issue_instance"],
                     "source_issue_instance": "",
                     "regime_source_key": "MISSING_PRE_EVENT_FEATURE_VECTOR",
-                    "regime_panel_id": "MISSING_PRE_EVENT_FEATURE_VECTOR",
+                    "regime_panel_id": "REGIME_FALLBACK_MISSING_FEATURE_VECTOR",
                     "feature_row_sha256": "",
                     "feature_cutoff_ts": "",
+                    "regime_score": "",
+                    "regime_algorithm_id": "REGIME_WF_PRE_EVENT_TERCILES_V1",
+                    "regime_label": "FALLBACK_MISSING",
+                    "prior_training_feature_count": 0,
+                    "prior_training_feature_sha256": "",
+                    "regime_bin_lower": "",
+                    "regime_bin_upper": "",
+                    "regime_fallback": "MISSING_PRE_EVENT_FEATURE_VECTOR",
                     "regime_status": "MISSING_PRE_EVENT_FEATURE_VECTOR",
                     "missing_rule": "retain zero-flow calendar row; do not impute a regime label or reuse a future/fold-wide value",
                     "outcome_boundary": OUTCOME_BOUNDARY,
                 }
             )
             continue
+        score = (
+            float(feature["league_entropy"])
+            + float(feature["line_entropy"])
+            + float(feature["market_uncertainty_mean"])
+        )
         rows.append(
             {
                 "calendar_index": row["calendar_index"],
@@ -586,14 +611,52 @@ def regime_binding(calendar: list[dict[str, str]]) -> tuple[list[dict[str, objec
                 "issue_instance": row["issue_instance"],
                 "source_issue_instance": feature["issue_instance"],
                 "regime_source_key": feature["feature_row_sha256"],
-                "regime_panel_id": "BJ193_TIER_C_PRE_EVENT_FEATURE_VECTOR",
+                "regime_panel_id": "PENDING_STRICTLY_PRIOR_REGIME_LABEL",
                 "feature_row_sha256": feature["feature_row_sha256"],
                 "feature_cutoff_ts": feature["feature_cutoff_ts"],
+                "regime_score": f"{score:.12f}",
+                "regime_algorithm_id": "REGIME_WF_PRE_EVENT_TERCILES_V1",
+                "regime_label": "PENDING",
+                "prior_training_feature_count": 0,
+                "prior_training_feature_sha256": "",
+                "regime_bin_lower": "",
+                "regime_bin_upper": "",
+                "regime_fallback": "",
                 "regime_status": "PRE_EVENT_FEATURE_VECTOR_AVAILABLE",
                 "missing_rule": "#193 nested fit may use only prior-train transforms/bins; no current/future/fold-wide bin fit",
                 "outcome_boundary": OUTCOME_BOUNDARY,
             }
         )
+    prior: list[dict[str, object]] = []
+    for row in rows:
+        if row["regime_status"] != "PRE_EVENT_FEATURE_VECTOR_AVAILABLE":
+            continue
+        row["prior_training_feature_count"] = len(prior)
+        row["prior_training_feature_sha256"] = canonical_hash(
+            [
+                {
+                    "issue_instance": str(item["issue_instance"]),
+                    "feature_row_sha256": str(item["feature_row_sha256"]),
+                    "regime_score": str(item["regime_score"]),
+                }
+                for item in prior
+            ]
+        )
+        if len(prior) < 52:
+            row["regime_label"] = "FALLBACK_INSUFFICIENT_PRIOR_52"
+            row["regime_panel_id"] = "REGIME_FALLBACK_INSUFFICIENT_PRIOR_52"
+            row["regime_fallback"] = "INSUFFICIENT_PRIOR_PRE_EVENT_FEATURES"
+        else:
+            scores = sorted(float(item["regime_score"]) for item in prior)
+            low_cut = scores[(len(scores) - 1) // 3]
+            high_cut = scores[(2 * (len(scores) - 1)) // 3]
+            score = float(row["regime_score"])
+            label = "LOW" if score <= low_cut else "MID" if score <= high_cut else "HIGH"
+            row["regime_label"] = label
+            row["regime_panel_id"] = f"REGIME_WF_PRE_EVENT_TERCILES_V1_{label}"
+            row["regime_bin_lower"] = "-inf" if label == "LOW" else f"{low_cut:.12f}"
+            row["regime_bin_upper"] = f"{low_cut:.12f}" if label == "LOW" else f"{high_cut:.12f}" if label == "MID" else "+inf"
+        prior.append(row)
     if len(rows) != len(calendar) or len({row["issue_instance"] for row in rows}) != len(calendar):
         raise RuntimeError("#193 regime map calendar coverage drift")
     available = [row for row in rows if row["regime_status"] == "PRE_EVENT_FEATURE_VECTOR_AVAILABLE"]
@@ -609,7 +672,7 @@ def regime_binding(calendar: list[dict[str, str]]) -> tuple[list[dict[str, objec
         "map_sha256": canonical_hash(
             [{key: str(value) for key, value in row.items()} for row in rows]
         ),
-        "regime_definition": "#193 TIER_C_PRE_EVENT feature vector; any learned regime bin/label is fit only on strictly-prior training observations and is recorded with its training-input hash",
+        "regime_definition": "REGIME_WF_PRE_EVENT_TERCILES_V1: score=league_entropy+line_entropy+market_uncertainty_mean from #193 Tier-C pre-event feature rows; exact expanding-prior terciles after 52 available prior feature rows, otherwise explicit fallback. No outcome is used for transform, bin, tie-break or label.",
         "missing_fallback": "MISSING_PRE_EVENT_FEATURE_VECTOR is its own panel id; no label, return, loss or pseudo-feature is imputed",
         "outcome_boundary": OUTCOME_BOUNDARY,
     }
@@ -620,11 +683,7 @@ def stage_attribution_contract(traces: list[dict[str, object]]) -> dict[str, obj
     """Freeze what may be attributed without re-splicing upstream stages."""
     return {
         "key": [
-            "portfolio_id",
-            "mode",
-            "position_fraction",
-            "weight_method",
-            "normalization_method",
+            *PATH_IDENTITY,
             "calendar_index",
             "issue_instance",
             "sleeve_id",
@@ -1186,8 +1245,9 @@ def normalization_contract() -> dict[str, object]:
     return {
         "ordering": [
             "frozen native request/capacity",
+            "strictly-prior provisional target weights",
+            "strictly-prior covariance and portfolio volatility",
             "portfolio-level normalization multiplier",
-            "sleeve portfolio weights",
             "mode/bankroll issue budget and integer ticket funding",
         ],
         "leverage": {
@@ -1205,7 +1265,7 @@ def normalization_contract() -> dict[str, object]:
         "methods": {
             "UNIT_CAPITAL": "multiplier=1; issue risk_budget_yuan=pre-normalization mode/bankroll budget; executable reference",
             "EQUAL_CAPITAL": "multiplier=1; equal target capital across currently active sleeves before capped integer water-fill; executable only with EQUAL_WEIGHT, otherwise explicit INAPPLICABLE_METHOD_WEIGHT_COMBINATION",
-            "UNIT_EX_ANTE_VOL": "multiplier=min(1, 0.05/ex_ante_portfolio_volatility); 5% per-issue target is a frozen scale, no leverage; executable after 52 valid prior common-active observations",
+            "UNIT_EX_ANTE_VOL_CAPPED_5PCT": "multiplier=min(1, 0.05/ex_ante_portfolio_volatility); this is a 5% target capped at one, not unconstrained unit-vol scaling; executable after 52 valid prior common-active observations",
             "RAW_UNNORMALIZED_CONTROL": "multiplier=1; reports frozen native-capital exposure without volatility targeting; diagnostic/control, not an Edge or risk-adjusted promotion claim",
         },
         "fallback": {
@@ -1227,6 +1287,110 @@ def normalization_contract() -> dict[str, object]:
             ],
             "reconciliation": "normalized_mode_notional=min(pre_normalization_mode_notional×realized_capital_multiplier, frozen native requested stake, preissue bankroll); actual funded stake is then exact integer water-fill and may be lower only from caps/atomicity/rounding/cash",
         },
+    }
+
+
+def normalization_state(
+    method: str,
+    native_requested_stake_yuan: float,
+    preissue_bankroll_yuan: float,
+    mode_notional_yuan: float,
+    provisional_weights: dict[str, float],
+    covariance: list[list[float]] | None,
+    prior_common_active_observation_count: int,
+) -> dict[str, object]:
+    """Execute the frozen pre-funding normalization pipeline.
+
+    Weights are deliberately inputs: they must be produced by the strictly
+    prior allocator before portfolio volatility can be defined.  The function
+    returns only a capped-down capital budget, never leverage or a hidden
+    post-outcome weight optimisation.
+    """
+    base_notional = max(
+        0.0,
+        min(float(native_requested_stake_yuan), float(preissue_bankroll_yuan), float(mode_notional_yuan)),
+    )
+    if method not in {
+        "UNIT_CAPITAL",
+        "EQUAL_CAPITAL",
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT",
+        "RAW_UNNORMALIZED_CONTROL",
+    }:
+        raise ValueError(f"unknown normalization method: {method}")
+    ordered = sorted(provisional_weights)
+    values = [float(provisional_weights[name]) for name in ordered]
+    if (
+        not values
+        or any(not math.isfinite(value) or value < 0.0 for value in values)
+        or not math.isclose(sum(values), 1.0, rel_tol=0.0, abs_tol=1e-12)
+    ):
+        return {
+            "normalization_method": method,
+            "normalization_status": "FALLBACK_UNIT_CAPITAL_INVALID_PROVISIONAL_WEIGHTS",
+            "ex_ante_volatility": None,
+            "target_volatility": TARGET_EX_ANTE_VOLATILITY,
+            "realized_capital_multiplier": 1.0,
+            "pre_normalization_mode_notional_yuan": base_notional,
+            "risk_budget_yuan": base_notional,
+            "normalized_mode_notional_yuan": base_notional,
+        }
+    if method != "UNIT_EX_ANTE_VOL_CAPPED_5PCT":
+        return {
+            "normalization_method": method,
+            "normalization_status": "UNIT_CAPITAL_MULTIPLIER_ONE",
+            "ex_ante_volatility": None,
+            "target_volatility": TARGET_EX_ANTE_VOLATILITY,
+            "realized_capital_multiplier": 1.0,
+            "pre_normalization_mode_notional_yuan": base_notional,
+            "risk_budget_yuan": base_notional,
+            "normalized_mode_notional_yuan": base_notional,
+        }
+    if prior_common_active_observation_count < 52:
+        status = "FALLBACK_UNIT_CAPITAL_INSUFFICIENT_PRIOR_RISK_HISTORY"
+        volatility = None
+    elif (
+        covariance is None
+        or len(covariance) != len(values)
+        or any(len(row) != len(values) for row in covariance)
+        or any(not math.isfinite(value) for row in covariance for value in row)
+    ):
+        status = "FALLBACK_UNIT_CAPITAL_NONFINITE_COVARIANCE"
+        volatility = None
+    else:
+        variance = sum(
+            values[i] * covariance[i][j] * values[j]
+            for i in range(len(values))
+            for j in range(len(values))
+        )
+        if not math.isfinite(variance) or variance <= 1e-24:
+            status = "FALLBACK_UNIT_CAPITAL_ZERO_OR_NONFINITE_VOLATILITY"
+            volatility = None
+        else:
+            volatility = math.sqrt(variance)
+            multiplier = min(1.0, TARGET_EX_ANTE_VOLATILITY / volatility)
+            return {
+                "normalization_method": method,
+                "normalization_status": (
+                    "TARGET_CAPPED_NO_LEVERAGE"
+                    if multiplier == 1.0
+                    else "TARGET_SCALED_DOWN"
+                ),
+                "ex_ante_volatility": volatility,
+                "target_volatility": TARGET_EX_ANTE_VOLATILITY,
+                "realized_capital_multiplier": multiplier,
+                "pre_normalization_mode_notional_yuan": base_notional,
+                "risk_budget_yuan": base_notional * multiplier,
+                "normalized_mode_notional_yuan": base_notional * multiplier,
+            }
+    return {
+        "normalization_method": method,
+        "normalization_status": status,
+        "ex_ante_volatility": volatility,
+        "target_volatility": TARGET_EX_ANTE_VOLATILITY,
+        "realized_capital_multiplier": 1.0,
+        "pre_normalization_mode_notional_yuan": base_notional,
+        "risk_budget_yuan": base_notional,
+        "normalized_mode_notional_yuan": base_notional,
     }
 
 
@@ -1431,6 +1595,7 @@ def expanded_sleeve_catalog() -> list[dict[str, object]]:
             m_grid = sorted({int(row["M"]) for row in plans})
         if not identities or len(roles) != len(identities) * 7 or not m_grid:
             raise RuntimeError(f"incomplete executable sleeve family: {spec['candidate_id']}")
+        seed_scope = sorted({str(row.get("seed", "NA")) for row in plans})
         catalog.append(
             {
                 **spec,
@@ -1441,6 +1606,7 @@ def expanded_sleeve_catalog() -> list[dict[str, object]]:
                 "role_row_count": len(roles),
                 "available_M_grid": ";".join(str(value) for value in m_grid),
                 "available_M_grid_sha256": canonical_hash(m_grid),
+                "seed_scope": ";".join(seed_scope),
                 "native_ticket_identity": "exact source identity + frozen seed/replicate + ordinal or draw rank under ticket_prefix_rule",
                 "tax_lot_identity": "candidate_id:issue_instance:portfolio_or_identity_id:seed_or_aggregate_replica:draw_or_rank",
                 "outcome_boundary": OUTCOME_BOUNDARY,
@@ -1561,9 +1727,86 @@ def _m_values(value: object) -> set[int]:
     return {int(item) for item in str(value).split(";") if item}
 
 
+ROLE_VECTOR_FIELDS = (
+    "gate_id", "portfolio_id", "issue", "fold", "year", "issue_instance",
+    "match_id", "match_idx", "kickoff_ts", "selection_rank", "is_candidate",
+    "e_sp", "p_min", "predicted_sp3", "predicted_sp1", "predicted_sp0",
+    "p_model3", "p_model1", "p_model0", "p_market_raw3", "p_market_raw1",
+    "p_market_raw0", "p_market_cal3", "p_market_cal1", "p_market_cal0",
+    "p_blend_a25_3", "p_blend_a25_1", "p_blend_a25_0", "p_blend_a50_3",
+    "p_blend_a50_1", "p_blend_a50_0", "p_blend_a75_3", "p_blend_a75_1",
+    "p_blend_a75_0", "q_weight3", "q_weight1", "q_weight0",
+    "p_min_delete_match_id", "p_min_delete_code", "q_min_delete_match_id",
+    "q_min_delete_code",
+)
+
+
+def role_vector_digest(rows: Sequence[dict[str, str]]) -> str:
+    """Digest the source-role namespace and all purchase-relevant values."""
+    if len(rows) != 7:
+        raise RuntimeError(f"expected seven role rows, got {len(rows)}")
+    canonical_rows: list[dict[str, str]] = []
+    for row in sorted(rows, key=lambda value: int(value["selection_rank"])):
+        missing = [field for field in ROLE_VECTOR_FIELDS if field not in row]
+        if missing:
+            raise RuntimeError(f"role vector missing fields: {missing}")
+        canonical_rows.append({field: row[field] for field in ROLE_VECTOR_FIELDS})
+    return canonical_hash(canonical_rows)
+
+
+def primary_k4_role_evidence() -> tuple[int, str, str, str]:
+    """Prove #145 PRIMARY Q uses #151's exact role namespace/vector.
+
+    A sampler plan can agree while the underlying probability role vector
+    drifts.  This check binds each seven-leg vector and the frozen #145
+    allocation/RNG implementation before cross-catalog aliasing is allowed.
+    """
+    b151: dict[tuple[str, str], list[dict[str, str]]] = {}
+    for row in read_csv_gzip(SOURCE_151 / "candidate_role_vectors.csv.gz"):
+        if row["gate_id"] == "NO_GATE":
+            b151.setdefault((row["issue_instance"], row["portfolio_id"]), []).append(row)
+    b145: dict[tuple[str, str], list[dict[str, str]]] = {}
+    for row in read_csv_gzip(SOURCE_145 / "role_vectors.csv.gz"):
+        if (
+            row["arm_id"] == "PRIMARY_NO_GATE_K4"
+            and row["source_package"] == "results/bj151_gate_a_preoutcome_v1"
+            and row["gate_id"] == "NO_GATE"
+            and row["top_k_id"] == "K4"
+        ):
+            b145.setdefault((row["issue_instance"], row["portfolio_id"]), []).append(row)
+    evidence: list[dict[str, str]] = []
+    for key, b145_rows in sorted(b145.items()):
+        b151_rows = b151.get(key)
+        if b151_rows is None:
+            raise RuntimeError(f"#145 role vector absent from #151: {key}")
+        left, right = role_vector_digest(b145_rows), role_vector_digest(b151_rows)
+        if left != right:
+            raise RuntimeError(f"#145/#151 role vector mismatch: {key}")
+        evidence.append({
+            "issue_instance": key[0],
+            "portfolio_id": key[1],
+            "role_vector_sha256": left,
+            "bj145_source_role_sha256": canonical_hash(
+                sorted(row["source_role_sha256"] for row in b145_rows)
+            ),
+        })
+    if not evidence:
+        raise RuntimeError("empty #145/#151 role-vector overlap")
+    binding = json.loads((SOURCE_145 / "allocation_binding.json").read_text())
+    engine_sha = sha256_file(SOURCE_145 / str(binding["module_file"]))
+    if engine_sha != str(binding["module_sha256"]):
+        raise RuntimeError("#145 allocation/RNG implementation hash drift")
+    return (
+        len(evidence),
+        canonical_hash(evidence),
+        engine_sha,
+        sha256_file(SOURCE_145 / "allocation_binding.json"),
+    )
+
+
 def _primary_k4_overlap_evidence(
     allocation: dict[str, object], b151_candidate: str
-) -> tuple[int, str, list[int]]:
+) -> tuple[int, str, list[int], str, str]:
     """Prove the #145 PRIMARY Q rows are #151 ticket-stream aliases.
 
     The two Gate-A packages have different plan identifiers, so plan-id
@@ -1624,12 +1867,19 @@ def _primary_k4_overlap_evidence(
         })
     if not evidence:
         raise RuntimeError(f"empty #145/#151 overlap evidence: {b151_candidate}")
+    role_count, role_digest, engine_sha, binding_sha = primary_k4_role_evidence()
     return len(evidence), canonical_hash(
         sorted(
             evidence,
             key=lambda record: json.dumps(record, sort_keys=True, separators=(",", ":")),
         )
-    ), common_m
+    ), common_m, role_digest, canonical_hash(
+        {
+            "role_vector_record_count": role_count,
+            "allocator_engine_sha256": engine_sha,
+            "allocator_rng_binding_sha256": binding_sha,
+        }
+    )
 
 
 def economic_family_registry(
@@ -1694,7 +1944,7 @@ def economic_family_registry(
         if len(aliases) != 1:
             raise RuntimeError(f"expected one #145 primary Q overlap alias: {mechanism}")
         alias = aliases[0]
-        count, digest, common_m = _primary_k4_overlap_evidence(alias, b151_candidate)
+        count, digest, common_m, role_digest, allocator_digest = _primary_k4_overlap_evidence(alias, b151_candidate)
         canonical_record = by_candidate[b151_candidate]
         family_id = str(canonical_record["economic_family_id"])
         alias_record = by_candidate[str(alias["candidate_id"])]
@@ -1706,11 +1956,15 @@ def economic_family_registry(
             "exact_overlap_evidence_sha256": digest,
             "exact_overlap_record_count": count,
             "common_M_grid": ";".join(str(value) for value in common_m),
+            "source_role_vector_evidence_sha256": role_digest,
+            "allocator_rng_identity_sha256": allocator_digest,
         })
         canonical_record.update({
             "exact_overlap_status": "CANONICAL_WITH_BJ145_PRIMARY_Q_K4_ALIAS",
             "exact_overlap_evidence_sha256": digest,
             "exact_overlap_record_count": count,
+            "source_role_vector_evidence_sha256": role_digest,
+            "allocator_rng_identity_sha256": allocator_digest,
         })
     grouped: dict[str, list[dict[str, object]]] = {}
     for row in records:
@@ -1732,6 +1986,8 @@ def economic_family_registry(
             )
             row["canonical_candidate_id"] = canonical["candidate_id"]
             row.setdefault("common_M_grid", "")
+            row.setdefault("source_role_vector_evidence_sha256", "")
+            row.setdefault("allocator_rng_identity_sha256", "")
     return sorted(records, key=lambda row: str(row["candidate_id"]))
 
 
@@ -1754,6 +2010,57 @@ def m_selection_contract(expanded: list[dict[str, object]]) -> dict[str, object]
         "all_M_curve": "publish every available M in available_M_grid on the exact source support; dynamic path and fixed-M comparator are both mandatory",
         "nested_loyo_sensitivity": "for each held-out year, re-run the same selector on earlier years only; if no earlier 52-active history exists use fixed_m_comparator",
     }
+
+
+def replicate_bundle_registry(
+    expanded: list[dict[str, object]],
+    allocation_candidates: list[dict[str, object]],
+    economic_families: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Freeze cross-sleeve stochastic deployment pairing before outcomes.
+
+    Bundle ordinal is an ex ante nuisance replicate, never an optimisation
+    dimension.  Each stochastic family cycles through its own sorted frozen
+    seed scope; deterministic families use the literal DETERMINISTIC token.
+    A portfolio must replay every selected bundle separately and only then
+    report a nonselectable bundle distribution.
+    """
+    sources = {
+        str(row["candidate_id"]): row for row in expanded + allocation_candidates
+    }
+    canonical = sorted(
+        {
+            str(row["canonical_candidate_id"])
+            for row in economic_families
+            if row["family_status"] != "EXACT_CROSS_CATALOG_ALIAS_EXCLUDED"
+        }
+    )
+    seed_scopes: dict[str, list[str]] = {}
+    for candidate_id in canonical:
+        source = sources.get(candidate_id)
+        raw = str(source.get("seed_scope", "NA")) if source else "NA"
+        values = sorted(value for value in raw.split(";") if value and value != "NA")
+        seed_scopes[candidate_id] = values or ["DETERMINISTIC"]
+    count = max(len(values) for values in seed_scopes.values())
+    rows: list[dict[str, object]] = []
+    for ordinal in range(1, count + 1):
+        mapping = {
+            candidate_id: seeds[(ordinal - 1) % len(seeds)]
+            for candidate_id, seeds in sorted(seed_scopes.items())
+        }
+        rows.append(
+            {
+                "deployment_replicate_bundle_id": f"BUNDLE_ORDINAL_{ordinal:03d}",
+                "bundle_ordinal": ordinal,
+                "candidate_seed_map_json": json.dumps(mapping, sort_keys=True, separators=(",", ":")),
+                "candidate_seed_map_sha256": canonical_hash(mapping),
+                "economic_family_count": len(mapping),
+                "composition_rule": "ordinal pairing over each family sorted frozen seed scope; deterministic sleeves map to DETERMINISTIC",
+                "support_rule": "a portfolio uses exactly this map for all included stochastic sleeves; missing/unavailable member makes that bundle issue row explicit NO_BET/UNAVAILABLE, never a loss or substituted seed",
+                "aggregation_rule": "all bundle paths are replayed separately; distributions are reported after complete state-machine replay and no bundle is selectable",
+            }
+        )
+    return rows
 
 
 def eligibility_ledger(
@@ -2325,16 +2632,10 @@ def prefix_registry() -> tuple[
 
 def output_schema() -> dict[str, object]:
     """Manifest-covered Gate-B deliverable schema and equations."""
+    path_key = lambda *suffix: [*PATH_IDENTITY, *suffix]
     return {
         "issue_ledger": {
-            "key": [
-                "portfolio_id",
-                "mode",
-                "position_fraction",
-                "weight_method",
-                "calendar_index",
-                "issue_instance",
-            ],
+            "key": path_key("calendar_index", "issue_instance"),
             "fields": [
                 "preissue_bankroll_yuan",
                 "normalization_method",
@@ -2370,11 +2671,12 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "sleeve_funding_ledger": {
-            "key": ["portfolio_id", "mode", "position_fraction", "weight_method", "calendar_index", "issue_instance", "sleeve_id"],
+            "key": path_key("calendar_index", "issue_instance", "sleeve_id"),
             "fields": ["requested_native_ticket_count", "actual_ticket_count", "funded_prefix_length", "funded_global_rank_start", "funded_global_rank_end", "funded_ticket_list_sha256", "funded_tax_lot_sha256", "prefix_execution_status", "atomic_or_no_bet_reason", "actual_stake_yuan"],
             "formulas": ["one row per sleeve; (portfolio issue actual_stake)=sum(sleeve funding actual_stake) exactly", "WHOLE_NATIVE_OR_NO_BET requires actual_ticket_count in {0, requested_native_ticket_count}; otherwise fail closed", "a prefix row must reference its manifest-covered issue-global ordered tax-lot stream"],
         },
         "capital_summary": {
+            "key": path_key(),
             "fields": [
                 "starting_bankroll_yuan",
                 "ending_bankroll_yuan",
@@ -2388,6 +2690,10 @@ def output_schema() -> dict[str, object]:
                 "turnover_yuan",
                 "pre_tax_roi",
                 "tax_adjusted_roi",
+                "cumulative_pre_tax_roi",
+                "capital_growth",
+                "capital_turnover",
+                "capital_growth_audit_delta",
                 "ruin_flag",
             ],
             "formulas": [
@@ -2395,9 +2701,11 @@ def output_schema() -> dict[str, object]:
                 "minimum_required_start is smallest b found by deterministic integer-yuan bisection only for NATIVE_REQUEST_CONTROL and FIXED_100K_NOTIONAL, whose requested ticket capacities are independent of b; blank/NOT_MONOTONE for COMPOUNDING_BANKROLL",
                 "ruin_flag=1 iff any postissue_bankroll < ¥2 while a positive native request exists",
                 "pre_tax_roi=sum(pre_tax_net)/sum(actual_stake); blank if zero actual stake",
+                "capital_growth=ending_bankroll_yuan/100000-1; capital_turnover=turnover_yuan/100000; for FIXED_100K_NOTIONAL capital_growth=cumulative_pre_tax_roi×capital_turnover and capital_growth_audit_delta is that difference",
             ],
         },
         "weight_history": {
+            "key": path_key("calendar_index", "issue_instance", "sleeve_id"),
             "fields": [
                 "portfolio_id",
                 "issue_instance",
@@ -2416,6 +2724,7 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "dependence": {
+            "key": path_key("sleeve_left", "sleeve_right"),
             "fields": [
                 "portfolio_id",
                 "sleeve_left",
@@ -2448,8 +2757,7 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "dependence_panel": {
-            "key": [
-                "portfolio_id",
+            "key": path_key(
                 "economic_family_left",
                 "economic_family_right",
                 "denominator_id",
@@ -2458,7 +2766,7 @@ def output_schema() -> dict[str, object]:
                 "window_issues",
                 "exclusion_id",
                 "metric",
-            ],
+            ),
             "fields": [
                 "value",
                 "observation_count",
@@ -2475,11 +2783,11 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "intrinsic_native_dependence": {
-            "key": [
-                "portfolio_id", "economic_family_left", "economic_family_right",
+            "key": path_key(
+                "economic_family_left", "economic_family_right",
                 "denominator_id", "panel_type", "panel_id", "window_issues",
                 "exclusion_id", "metric",
-            ],
+            ),
             "fields": [
                 "native_return_basis", "value", "observation_count",
                 "undefined_reason", "matched_support_hash",
@@ -2490,11 +2798,11 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "realized_funded_flow_dependence": {
-            "key": [
-                "portfolio_id", "economic_family_left", "economic_family_right",
+            "key": path_key(
+                "economic_family_left", "economic_family_right",
                 "denominator_id", "panel_type", "panel_id", "window_issues",
                 "exclusion_id", "metric",
-            ],
+            ),
             "fields": [
                 "value", "observation_count", "cash_flow_count",
                 "no_bet_flow_count", "undefined_reason",
@@ -2505,11 +2813,7 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "risk_decomposition": {
-            "key": [
-                "portfolio_id", "mode", "position_fraction", "weight_method",
-                "normalization_method", "calendar_index", "issue_instance",
-                "economic_family_id",
-            ],
+            "key": path_key("calendar_index", "issue_instance", "economic_family_id"),
             "fields": [
                 "marginal_variance_contribution", "euler_variance_contribution",
                 "matched_drawdown_delta_yuan", "matched_tail_loss_delta_yuan",
@@ -2523,11 +2827,7 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "stage_attribution": {
-            "key": [
-                "portfolio_id", "mode", "position_fraction", "weight_method",
-                "normalization_method", "calendar_index", "issue_instance",
-                "sleeve_id", "stage_id",
-            ],
+            "key": path_key("calendar_index", "issue_instance", "sleeve_id", "stage_id"),
             "fields": [
                 "attribution_status", "upstream_trace_sha256",
                 "native_requested_ticket_count", "normalization_multiplier",
@@ -2543,7 +2843,10 @@ def output_schema() -> dict[str, object]:
             "key": ["calendar_index", "issue_instance"],
             "fields": [
                 "source_issue_instance", "regime_source_key", "regime_panel_id",
-                "feature_row_sha256", "feature_cutoff_ts", "regime_status", "missing_rule",
+                "feature_row_sha256", "feature_cutoff_ts", "regime_score",
+                "regime_algorithm_id", "regime_label", "prior_training_feature_count",
+                "prior_training_feature_sha256", "regime_bin_lower", "regime_bin_upper",
+                "regime_fallback", "regime_status", "missing_rule",
             ],
             "formulas": [
                 "exact (issue,year) bridge from #192 OOS issue namespace to #193 canonical pre-event feature namespace",
@@ -2555,6 +2858,7 @@ def output_schema() -> dict[str, object]:
                 "economic_family_id",
                 "canonical_candidate_id",
                 "M",
+                "deployment_replicate_bundle_id",
                 "deployment_seed",
                 "support_hash",
             ],
@@ -2575,6 +2879,7 @@ def output_schema() -> dict[str, object]:
         "selected_m_path": {
             "key": [
                 "economic_family_id",
+                "deployment_replicate_bundle_id",
                 "deployment_seed",
                 "calendar_index",
                 "issue_instance",
@@ -2604,6 +2909,8 @@ def output_schema() -> dict[str, object]:
                 "weight_method",
                 "capital_mode",
                 "position_fraction",
+                "normalization_method",
+                "deployment_replicate_bundle_id",
                 "deployment_seed",
             ],
             "fields": [
@@ -2623,6 +2930,7 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "holding_metrics": {
+            "key": path_key(),
             "fields": [
                 "portfolio_id",
                 "mode",
@@ -2670,6 +2978,11 @@ def output_schema() -> dict[str, object]:
                 "target_id",
                 "paired_control_id",
                 "economic_family_id",
+                "mode",
+                "position_fraction",
+                "weight_method",
+                "normalization_method",
+                "deployment_replicate_bundle_id",
                 "denominator_id",
                 "panel_type",
                 "panel_id",
@@ -2700,6 +3013,11 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "baseline_lift": {
+            "key": [
+                "candidate_id", "control_id", "support_hash", "capital_mode",
+                "position_fraction", "weight_method", "normalization_method",
+                "deployment_replicate_bundle_id",
+            ],
             "fields": [
                 "candidate_id",
                 "control_id",
@@ -2720,6 +3038,7 @@ def output_schema() -> dict[str, object]:
             ],
         },
         "challenger_case": {
+            "key": path_key("alternative_explanation", "test_id"),
             "fields": [
                 "candidate_id",
                 "alternative_explanation",
@@ -2731,6 +3050,26 @@ def output_schema() -> dict[str, object]:
                 "each headline candidate receives survivor/search, leakage, support, turnover/cash, covariance fitting, largest issue/year, payout cluster and simple-control tests",
                 "cash-only smoothing is separately labeled risk reduction, never diversification edge",
             ],
+        },
+        "all_pairs_risk_return_surface": {
+            "key": path_key("economic_family_set_sha256", "pair_id"),
+            "fields": ["pre_tax_roi", "max_drawdown_yuan", "capital_growth", "capital_turnover", "tax_adjusted_roi", "support_hash", "undefined_reason"],
+            "formulas": ["write every frozen pair/mode/fraction/weight/normalization/bundle row; zero stake retains blank ROI and an explicit reason"],
+        },
+        "higher_order_pareto_frontier": {
+            "key": path_key("economic_family_set_sha256", "frontier_id"),
+            "fields": ["pre_tax_roi", "capital_growth", "max_drawdown_yuan", "contribution_hhi", "tax_adjusted_roi", "dominance_status", "support_hash"],
+            "formulas": ["frontier is computed only from the manifest-covered all-pairs/higher-order surface; aliases cannot create an additional point"],
+        },
+        "terminal_decision": {
+            "key": path_key("decision_id"),
+            "fields": ["candidate_id", "decision", "negative_result_reason", "strict_ev_status", "support_hash", "bootstrap_target_id"],
+            "formulas": ["every primary path writes a terminal decision; an absent row is a Gate-B completeness failure rather than an implicit no-bet"],
+        },
+        "chart_source_contract": {
+            "path_identity": list(PATH_IDENTITY),
+            "rule": "every portfolio-level chart source propagates the complete path identity; seed-local curve charts additionally carry deployment_seed and family-level charts carry economic_family_id/support_hash",
+            "completeness": "a missing required chart-source row, a duplicate complete key, or a chart row without a matching ledger key is a Gate-B fail-closed schema error",
         },
         "chart_sources": [
             "chart_source_issue_equity_paths.csv.gz",
@@ -2748,6 +3087,9 @@ def output_schema() -> dict[str, object]:
             "chart_source_standalone_m_curve.csv.gz",
             "chart_source_selected_m_path.csv.gz",
             "chart_source_portfolio_k_saturation.csv",
+            "chart_source_all_pairs_risk_return.csv",
+            "chart_source_higher_order_pareto.csv",
+            "chart_source_terminal_decision.csv",
         ],
     }
 
@@ -2807,10 +3149,7 @@ def funded_prefix_ledger_contract(
         )
     return {
         "key": [
-            "portfolio_id",
-            "mode",
-            "position_fraction",
-            "weight_method",
+            *PATH_IDENTITY,
             "calendar_index",
             "issue_instance",
             "sleeve_or_family_id",
@@ -2837,6 +3176,7 @@ def write_package(output: Path) -> None:
     expanded = expanded_sleeve_catalog()
     allocation_candidates = bj145_allocation_candidate_registry()
     economic_families = economic_family_registry(expanded, allocation_candidates)
+    bundles = replicate_bundle_registry(expanded, allocation_candidates, economic_families)
     eligibility = eligibility_ledger(expanded, allocation_candidates, economic_families)
     m_selector = m_selection_contract(expanded + allocation_candidates)
     funded_prefix_contract = funded_prefix_ledger_contract(
@@ -2921,6 +3261,11 @@ def write_package(output: Path) -> None:
             list(economic_families[0]),
             economic_families,
         )
+        write_csv(
+            stage / "replicate_bundle_registry.csv",
+            list(bundles[0]),
+            bundles,
+        )
         (stage / "m_selection_contract.json").write_text(
             json.dumps(m_selector, indent=2, sort_keys=True) + "\n"
         )
@@ -2983,6 +3328,7 @@ def write_package(output: Path) -> None:
             "executable_sleeve_family_catalog": expanded,
             "bj145_allocation_candidate_registry": allocation_candidates,
             "economic_family_registry": economic_families,
+            "replicate_bundle_registry": bundles,
             "m_selection_contract": m_selector,
             "funded_prefix_ledger_contract": funded_prefix_contract,
             "sleeve_trace_registry": traces,
@@ -3040,6 +3386,7 @@ def write_package(output: Path) -> None:
                 "eligible_economic_family_count": frontier[
                     "eligible_economic_family_count"
                 ],
+                "deployment_replicate_bundle_count": len(bundles),
                 "catalog_identity_count": len(eligibility),
                 "eligible_exploratory_family_count": len(expanded),
                 "eligible_complete_source_count": frontier["eligible_source_count"],
