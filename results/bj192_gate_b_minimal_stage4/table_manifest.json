@@ -25,24 +25,36 @@
   },
   "baseline_lift": {
     "fields": [
-      "portfolio_id",
-      "mode",
-      "position_fraction",
-      "weight_method",
-      "normalization_method",
-      "deployment_replicate_bundle_id",
-      "candidate_id",
-      "control_id",
-      "support_hash",
-      "actual_funding_hash",
       "absolute_ending_bankroll_yuan",
       "absolute_pre_tax_roi",
+      "actual_funding_equal",
+      "actual_funding_hash",
+      "candidate_actual_funding_hash",
+      "candidate_id",
       "candidate_minus_control_bankroll_yuan",
       "candidate_minus_control_pre_tax_roi",
-      "ladder_decision"
+      "candidate_support_hash",
+      "comparison_semantics",
+      "control_actual_funding_hash",
+      "control_id",
+      "control_support_hash",
+      "deployment_replicate_bundle_id",
+      "ladder_decision",
+      "matched_lift_pre_tax_roi",
+      "matched_lift_yuan",
+      "mode",
+      "normalization_method",
+      "portfolio_id",
+      "position_fraction",
+      "strict_inference_status",
+      "support_equal",
+      "support_hash",
+      "unmatched_raw_path_difference_yuan",
+      "unmatched_raw_path_roi_difference",
+      "weight_method"
     ],
     "filename": "baseline_lift.csv",
-    "row_count": 324
+    "row_count": 468
   },
   "bootstrap_stability": {
     "fields": [
@@ -103,7 +115,8 @@
       "capital_growth",
       "capital_turnover",
       "capital_growth_audit_delta",
-      "ruin_flag"
+      "ruin_flag",
+      "minimum_required_start_definition"
     ],
     "filename": "capital_summary.csv",
     "row_count": 252
@@ -152,6 +165,7 @@
     "fields": [
       "deployment_replicate_bundle_id",
       "ending_bankroll_yuan",
+      "full_actual_funding_equal",
       "interpretation",
       "label",
       "loss_streak_calendar",
@@ -167,6 +181,7 @@
       "retained_cash_yuan",
       "time_under_water_issues",
       "turnover_yuan",
+      "unmatched_full_raw_path_difference_yuan",
       "weight_method"
     ],
     "filename": "decision_path_summary.csv",
@@ -360,6 +375,75 @@
     ],
     "filename": "issue_ledger.csv.gz",
     "row_count": 87696
+  },
+  "matched_capital_comparisons": {
+    "fields": [
+      "atomic_rounding_contract",
+      "candidate_ending_bankroll_yuan",
+      "candidate_id",
+      "candidate_pre_tax_roi",
+      "candidate_ticket_funding_hash",
+      "capital_schedule_equal",
+      "capital_schedule_hash",
+      "common_executable_issue_count",
+      "common_executable_support_hash",
+      "common_stake_yuan",
+      "contrast_id",
+      "control_ending_bankroll_yuan",
+      "control_id",
+      "control_pre_tax_roi",
+      "control_ticket_funding_hash",
+      "matched_lift_pre_tax_roi",
+      "matched_lift_yuan",
+      "strict_inference_status",
+      "unavailable_issue_count"
+    ],
+    "filename": "matched_capital_comparisons.csv",
+    "row_count": 2
+  },
+  "matched_capital_issue_ledger": {
+    "fields": [
+      "actual_stake_yuan",
+      "atomic_rounding_reason",
+      "calendar_index",
+      "capital_schedule_hash",
+      "common_schedule_ticket_count",
+      "common_schedule_yuan",
+      "contrast_id",
+      "deployment_replicate_bundle_id",
+      "first_kickoff_ts",
+      "issue_instance",
+      "mode",
+      "normalization_method",
+      "portfolio_id",
+      "position_fraction",
+      "postissue_bankroll_yuan",
+      "pre_tax_net_yuan",
+      "preissue_bankroll_yuan",
+      "side",
+      "ticket_prefix_counts_json",
+      "ticket_prefix_identity_sha256",
+      "weight_method",
+      "year"
+    ],
+    "filename": "matched_capital_issue_ledger.csv",
+    "row_count": 1392
+  },
+  "matched_capital_unavailable_issues": {
+    "fields": [
+      "atomic_rounding_reason",
+      "calendar_index",
+      "capital_schedule_hash",
+      "common_schedule_ticket_count",
+      "common_schedule_yuan",
+      "contrast_id",
+      "first_kickoff_ts",
+      "issue_instance",
+      "unavailable_reason",
+      "year"
+    ],
+    "filename": "matched_capital_unavailable_issues.csv",
+    "row_count": 516
   },
   "portfolio_k_saturation": {
     "fields": [

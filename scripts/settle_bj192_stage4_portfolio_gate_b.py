@@ -12,6 +12,7 @@ approximation.
 from __future__ import annotations
 
 import csv
+import datetime
 import gzip
 import hashlib
 import importlib.util
@@ -30,7 +31,7 @@ from typing import Any, Callable, Iterable, Sequence
 
 
 CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
-VERSION = "bj192-gate-b-v3"
+VERSION = "bj192-gate-b-v4"
 TICKET_STAKE_YUAN = 2.0
 INITIAL_BANKROLL_YUAN = 100_000.0
 
@@ -215,14 +216,14 @@ def write_immutable_package(
         (stage / "source_binding.json").write_text(json.dumps(source_binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (stage / "table_manifest.json").write_text(json.dumps(table_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (stage / "README.md").write_text(package_note.rstrip() + "\n", encoding="utf-8")
-        staged_files = lambda: sorted(path for path in stage.rglob("*") if path.is_file())
-        staged_bytes = sum(path.stat().st_size for path in staged_files())
+        staged_files = sorted(path for path in stage.rglob("*") if path.is_file())
+        staged_bytes = sum(path.stat().st_size for path in staged_files)
         if max_package_bytes is not None and staged_bytes > max_package_bytes:
             raise RuntimeError(
                 f"package size ceiling exceeded: {staged_bytes} > {max_package_bytes} bytes"
             )
-        archive_transport = {str(path.relative_to(stage)): sha256_file(path) for path in staged_files()}
-        scientific = {str(path.relative_to(stage)): canonical_scientific_sha256(path) for path in staged_files()}
+        archive_transport = {str(path.relative_to(stage)): sha256_file(path) for path in staged_files}
+        scientific = {str(path.relative_to(stage)): canonical_scientific_sha256(path) for path in staged_files}
         content = {
             "contract": CONTRACT,
             "version": VERSION,
@@ -235,7 +236,8 @@ def write_immutable_package(
             },
         }
         (stage / "CONTENT_IDENTITY.json").write_text(json.dumps(content, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        manifest = {str(path.relative_to(stage)): sha256_file(path) for path in staged_files()}
+        manifest_files = sorted(path for path in stage.rglob("*") if path.is_file())
+        manifest = {str(path.relative_to(stage)): sha256_file(path) for path in manifest_files}
         (stage / "SHA256SUMS.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         verify_package(stage, sha256_file(stage / "SHA256SUMS.json"), sha256_file(stage / "CONTENT_IDENTITY.json"))
         os.replace(stage, output)
@@ -1738,7 +1740,17 @@ def minimal_stage4_comparison_tables(
             continue
         candidates = []
         for sleeve in membership:
-            candidate = next((other for other in capital_by_identity if other[0] == sleeve and other[1:] == identity[1:]), None)
+            # ``portfolio_id`` hashes the complete membership, so it can
+            # never equal a sleeve name.  Join the single-sleeve component by
+            # its actual frozen membership on the same execution axis.
+            candidate = next(
+                (
+                    other
+                    for other, other_membership in membership_by_identity.items()
+                    if other_membership == (sleeve,) and other[1:] == identity[1:]
+                ),
+                None,
+            )
             if candidate is not None:
                 candidates.append(candidate)
         controls = []
@@ -1762,6 +1774,420 @@ def minimal_stage4_comparison_tables(
                 "candidate_minus_control_pre_tax_roi": float(capital["pre_tax_roi"]) - float(control["pre_tax_roi"]),
                 "ladder_decision": "DESCRIPTIVE_MATCHED_COMPONENT_OR_EQUAL_WEIGHT_CONTROL",
             })
+    return outputs
+
+
+def path_support_and_funding_identities(path: Sequence[dict[str, object]]) -> dict[str, str]:
+    """Return distinct immutable support and actual-funding identities.
+
+    A common issue calendar does not make two realised capital paths funding
+    comparable.  The funding hash binds every issue's executed stake and the
+    exact sleeve/tax-lot funding identities; it therefore distinguishes cash,
+    turnover, caps, and atomic NO_BET behaviour from ticket economics.
+    """
+    ordered = sorted(path, key=lambda row: int(row["calendar_index"]))
+    return {
+        "support_hash": canonical_hash([
+            {"calendar_index": row["calendar_index"], "issue_instance": row["issue_instance"]}
+            for row in ordered
+        ]),
+        "actual_funding_hash": canonical_hash([
+            {
+                "calendar_index": row["calendar_index"],
+                "issue_instance": row["issue_instance"],
+                "actual_stake_yuan": row["actual_stake_yuan"],
+                "sleeves": {
+                    sleeve: {
+                        "actual_ticket_count": value["actual_ticket_count"],
+                        "actual_stake_yuan": value["actual_stake_yuan"],
+                        "funded_tax_lot_sha256": value["funded_tax_lot_sha256"],
+                    }
+                    for sleeve, value in sorted(row["sleeve_settlements"].items())
+                },
+            }
+            for row in ordered
+        ]),
+    }
+
+
+def comparison_row(
+    *,
+    candidate_identity: tuple[object, ...],
+    control_identity: tuple[object, ...],
+    control_id: str,
+    capital_by_identity: dict[tuple[object, ...], dict[str, object]],
+    identities: dict[tuple[object, ...], dict[str, str]],
+) -> dict[str, object]:
+    """Make a funding-aware comparison without manufacturing a matched lift."""
+    candidate = capital_by_identity[candidate_identity]
+    control = capital_by_identity[control_identity]
+    candidate_ids = identities[candidate_identity]
+    control_ids = identities[control_identity]
+    support_equal = candidate_ids["support_hash"] == control_ids["support_hash"]
+    if not support_equal:
+        raise RuntimeError("minimal Stage-4 comparison support mismatch")
+    funding_equal = candidate_ids["actual_funding_hash"] == control_ids["actual_funding_hash"]
+    raw_yuan = float(candidate["ending_bankroll_yuan"]) - float(control["ending_bankroll_yuan"])
+    candidate_roi = candidate["pre_tax_roi"]
+    control_roi = control["pre_tax_roi"]
+    raw_roi = (
+        float(candidate_roi) - float(control_roi)
+        if candidate_roi not in (None, "") and control_roi not in (None, "")
+        else ""
+    )
+    semantics = "MATCHED_ACTUAL_FUNDING" if funding_equal else "UNMATCHED_RAW_PATH_DIFFERENCE"
+    return {
+        **{field: candidate[field] for field in PATH_IDENTITY},
+        "candidate_id": candidate_identity[0],
+        "control_id": control_id,
+        "support_hash": candidate_ids["support_hash"],
+        "actual_funding_hash": candidate_ids["actual_funding_hash"],
+        "candidate_support_hash": candidate_ids["support_hash"],
+        "control_support_hash": control_ids["support_hash"],
+        "support_equal": support_equal,
+        "candidate_actual_funding_hash": candidate_ids["actual_funding_hash"],
+        "control_actual_funding_hash": control_ids["actual_funding_hash"],
+        "actual_funding_equal": funding_equal,
+        "comparison_semantics": semantics,
+        "absolute_ending_bankroll_yuan": candidate["ending_bankroll_yuan"],
+        "absolute_pre_tax_roi": candidate_roi,
+        "matched_lift_yuan": raw_yuan if funding_equal else "",
+        "matched_lift_pre_tax_roi": raw_roi if funding_equal else "",
+        "candidate_minus_control_bankroll_yuan": raw_yuan if funding_equal else "",
+        "candidate_minus_control_pre_tax_roi": raw_roi if funding_equal else "",
+        "unmatched_raw_path_difference_yuan": raw_yuan if not funding_equal else "",
+        "unmatched_raw_path_roi_difference": raw_roi if not funding_equal else "",
+        "strict_inference_status": (
+            "ELIGIBLE_MATCHED_ACTUAL_FUNDING" if funding_equal
+            else "NOT_ELIGIBLE_UNMATCHED_ACTUAL_FUNDING"
+        ),
+        "ladder_decision": (
+            "DESCRIPTIVE_MATCHED_CONTROL_NO_PROMOTION" if funding_equal
+            else "DESCRIPTIVE_UNMATCHED_RAW_PATH_DIAGNOSTIC_NO_PROMOTION"
+        ),
+    }
+
+
+def minimal_stage4_comparisons_from_paths(
+    paths: dict[tuple[object, ...], list[dict[str, object]]],
+    capital_rows: Sequence[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Rebuild all minimal comparison rows using real membership joins.
+
+    This package-derived reducer never replays tickets.  It preserves the
+    frozen 252 realised paths, publishes all control identities separately,
+    and leaves any non-identical-funding contrast explicitly unmatched.
+    """
+    capital_by_identity = {
+        tuple(row[field] for field in PATH_IDENTITY): dict(row) for row in capital_rows
+    }
+    if set(capital_by_identity) != set(paths):
+        raise RuntimeError("minimal Stage-4 comparison/capital path set drift")
+    memberships = {
+        identity: tuple(sorted(path[0]["sleeve_settlements"]))
+        for identity, path in paths.items()
+    }
+    identities = {identity: path_support_and_funding_identities(path) for identity, path in paths.items()}
+    full_by_axis = {
+        identity[1:]: identity
+        for identity, membership in memberships.items()
+        if membership == ("BEST_FULL_FULL",)
+    }
+    rows: list[dict[str, object]] = []
+    for identity in sorted(paths, key=canonical_hash):
+        full_identity = full_by_axis.get(identity[1:])
+        if full_identity is None:
+            raise RuntimeError("minimal Stage-4 matched FULL control unavailable")
+        rows.append(comparison_row(
+            candidate_identity=identity,
+            control_identity=full_identity,
+            control_id=str(full_identity[0]),
+            capital_by_identity=capital_by_identity,
+            identities=identities,
+        ))
+    for identity in sorted(paths, key=canonical_hash):
+        membership = memberships[identity]
+        if len(membership) < 2:
+            continue
+        components = [
+            other for other, other_membership in memberships.items()
+            if len(other_membership) == 1 and other_membership[0] in membership and other[1:] == identity[1:]
+        ]
+        if len(components) != len(membership):
+            raise RuntimeError("minimal Stage-4 strongest-component membership join drift")
+        strongest = max(
+            components,
+            key=lambda other: (float(capital_by_identity[other]["ending_bankroll_yuan"]), str(other[0])),
+        )
+        rows.append(comparison_row(
+            candidate_identity=identity,
+            control_identity=strongest,
+            control_id=f"STRONGEST_COMPONENT:{strongest[0]}",
+            capital_by_identity=capital_by_identity,
+            identities=identities,
+        ))
+        if identity[3] != "EQUAL_WEIGHT":
+            equal_identity = (identity[0], identity[1], identity[2], "EQUAL_WEIGHT", identity[4], identity[5])
+            if equal_identity not in paths:
+                raise RuntimeError("minimal Stage-4 equal-weight control unavailable")
+            rows.append(comparison_row(
+                candidate_identity=identity,
+                control_identity=equal_identity,
+                control_id="EQUAL_WEIGHT_SAME_MEMBERSHIP",
+                capital_by_identity=capital_by_identity,
+                identities=identities,
+            ))
+    if sum(row["control_id"].startswith("STRONGEST_COMPONENT:") for row in rows) != 144:
+        raise RuntimeError("minimal Stage-4 strongest-component row denominator drift")
+    return rows
+
+
+def _common_schedule_ticket_counts(
+    sleeves: Sequence[str],
+    issue: str,
+    count: int,
+    weights: dict[str, object],
+    bridge: dict[tuple[str, str], NativeIssueSleeve],
+) -> dict[str, int]:
+    """Allocate one fixed common schedule count to frozen sleeve prefixes."""
+    available = {sleeve: bridge[(sleeve, issue)] for sleeve in sleeves}
+    if any(value.status != "SETTLED" for value in available.values()):
+        if count:
+            raise RuntimeError("common schedule requests unavailable ticket prefix")
+        return {sleeve: 0 for sleeve in sleeves}
+    capacities = {sleeve: value.requested_ticket_count for sleeve, value in available.items()}
+    if len(sleeves) == 1:
+        sleeve = sleeves[0]
+        if available[sleeve].atomic and count not in (0, capacities[sleeve]):
+            raise RuntimeError("common schedule attempts partial atomic ticket stream")
+        if count > capacities[sleeve]:
+            raise RuntimeError("common schedule exceeds frozen ticket capacity")
+        return {sleeve: count}
+    if any(value.atomic for value in available.values()):
+        raise RuntimeError("minimal matched-capital pair contains unsupported atomic mix")
+    if count > sum(capacities.values()):
+        raise RuntimeError("common schedule aggregate capacity drift")
+    raw_weights = {sleeve: max(float(weights.get(sleeve, 0.0)), 0.0) for sleeve in sleeves}
+    denominator = sum(raw_weights.values())
+    if denominator <= 0:
+        raw_weights = {sleeve: 1.0 for sleeve in sleeves}
+        denominator = float(len(sleeves))
+    allocation = {
+        sleeve: min(capacities[sleeve], int(math.floor(count * raw_weights[sleeve] / denominator)))
+        for sleeve in sleeves
+    }
+    while sum(allocation.values()) < count:
+        choices = [
+            sleeve for sleeve in sleeves if allocation[sleeve] < capacities[sleeve]
+        ]
+        if not choices:
+            raise RuntimeError("common schedule allocation rounding drift")
+        sleeve = max(
+            choices,
+            key=lambda item: (
+                count * raw_weights[item] / denominator - allocation[item],
+                -ord(item[0]),
+                item,
+            ),
+        )
+        allocation[sleeve] += 1
+    return allocation
+
+
+def _maximum_common_ticket_count(
+    candidate_sleeves: Sequence[str],
+    control_sleeves: Sequence[str],
+    issue: str,
+    candidate_cash: float,
+    control_cash: float,
+    bridge: dict[tuple[str, str], NativeIssueSleeve],
+) -> tuple[int, str]:
+    """Find the maximal equal-yuan executable schedule for a single issue."""
+    candidate_values = [bridge[(sleeve, issue)] for sleeve in candidate_sleeves]
+    control_values = [bridge[(sleeve, issue)] for sleeve in control_sleeves]
+    if any(value.status != "SETTLED" for value in (*candidate_values, *control_values)):
+        return 0, "UNAVAILABLE_FROZEN_TICKET_PREFIX"
+    upper = min(
+        sum(value.requested_ticket_count for value in candidate_values),
+        sum(value.requested_ticket_count for value in control_values),
+        int(math.floor(min(candidate_cash, control_cash) / TICKET_STAKE_YUAN)),
+    )
+    atomic_counts = {
+        value.requested_ticket_count
+        for value in (*candidate_values, *control_values)
+        if value.atomic
+    }
+    if not atomic_counts:
+        return upper, "" if upper else "ZERO_COMMON_CAPITAL"
+    # The only frozen atomic member in this bounded comparison is FULL.  It
+    # can participate only at its full issue request, never at a proportional
+    # synthetic prefix.
+    if len(atomic_counts) != 1:
+        raise RuntimeError("incompatible atomic common schedule")
+    atomic_count = next(iter(atomic_counts))
+    if upper >= atomic_count:
+        return atomic_count, ""
+    return 0, "ATOMIC_FULL_NOT_COMMONLY_EXECUTABLE"
+
+
+def replay_common_capital_contrast(
+    *,
+    contrast_id: str,
+    candidate_identity: tuple[object, ...],
+    control_identity: tuple[object, ...],
+    paths: dict[tuple[object, ...], list[dict[str, object]]],
+) -> tuple[list[dict[str, object]], dict[str, object], list[dict[str, object]]]:
+    """Replay one frozen pair under a common chronological yuan schedule.
+
+    The schedule is selected only from frozen per-issue capacity and the two
+    pre-issue bankrolls, then both sides settle their own immutable prefixes.
+    It is intentionally a two-contrast bounded replay, not a new policy grid.
+    """
+    candidate_path = sorted(paths[candidate_identity], key=lambda row: int(row["calendar_index"]))
+    control_path = sorted(paths[control_identity], key=lambda row: int(row["calendar_index"]))
+    if [row["issue_instance"] for row in candidate_path] != [row["issue_instance"] for row in control_path]:
+        raise RuntimeError("common capital contrast calendar mismatch")
+    candidate_sleeves = tuple(sorted(candidate_path[0]["sleeve_settlements"]))
+    control_sleeves = tuple(sorted(control_path[0]["sleeve_settlements"]))
+    bridge = h1_ticket_bridge()
+    candidate_bankroll = control_bankroll = INITIAL_BANKROLL_YUAN
+    schedule: list[dict[str, object]] = []
+    rows: list[dict[str, object]] = []
+    unavailable: list[dict[str, object]] = []
+    candidate_ticket_identity: list[dict[str, object]] = []
+    control_ticket_identity: list[dict[str, object]] = []
+    for candidate_row, control_row in zip(candidate_path, control_path, strict=True):
+        issue = str(candidate_row["issue_instance"])
+        target_count, unavailable_reason = _maximum_common_ticket_count(
+            candidate_sleeves, control_sleeves, issue, candidate_bankroll, control_bankroll, bridge,
+        )
+        candidate_counts = _common_schedule_ticket_counts(
+            candidate_sleeves, issue, target_count, candidate_row["weights"], bridge,
+        )
+        control_counts = _common_schedule_ticket_counts(
+            control_sleeves, issue, target_count, control_row["weights"], bridge,
+        )
+        candidate_settlements = {
+            sleeve: bridge[(sleeve, issue)].settle_prefix(count)
+            for sleeve, count in candidate_counts.items()
+        }
+        control_settlements = {
+            sleeve: bridge[(sleeve, issue)].settle_prefix(count)
+            for sleeve, count in control_counts.items()
+        }
+        target_stake = target_count * TICKET_STAKE_YUAN
+        candidate_stake = sum(float(value["actual_stake_yuan"]) for value in candidate_settlements.values())
+        control_stake = sum(float(value["actual_stake_yuan"]) for value in control_settlements.values())
+        if not (math.isclose(candidate_stake, target_stake, abs_tol=1e-9) and math.isclose(control_stake, target_stake, abs_tol=1e-9)):
+            raise RuntimeError("common capital schedule stake equality drift")
+        candidate_net = sum(float(value["pre_tax_net_yuan"]) for value in candidate_settlements.values())
+        control_net = sum(float(value["pre_tax_net_yuan"]) for value in control_settlements.values())
+        base = {
+            "contrast_id": contrast_id,
+            "calendar_index": candidate_row["calendar_index"],
+            "issue_instance": issue,
+            "year": candidate_row["year"],
+            "first_kickoff_ts": candidate_row["first_kickoff_ts"],
+            "common_schedule_ticket_count": target_count,
+            "common_schedule_yuan": target_stake,
+            "atomic_rounding_reason": unavailable_reason,
+        }
+        schedule.append(dict(base))
+        if not target_count:
+            unavailable.append({**base, "unavailable_reason": unavailable_reason})
+        for side, identity, preissue, settlement, counts, net in (
+            ("CANDIDATE", candidate_identity, candidate_bankroll, candidate_settlements, candidate_counts, candidate_net),
+            ("CONTROL", control_identity, control_bankroll, control_settlements, control_counts, control_net),
+        ):
+            ticket_identity = {
+                "calendar_index": candidate_row["calendar_index"],
+                "issue_instance": issue,
+                "counts": counts,
+                "funded_tax_lot_sha256": {sleeve: value["funded_tax_lot_sha256"] for sleeve, value in sorted(settlement.items())},
+            }
+            (candidate_ticket_identity if side == "CANDIDATE" else control_ticket_identity).append(ticket_identity)
+            rows.append({
+                **base,
+                "side": side,
+                **{field: identity[index] for index, field in enumerate(PATH_IDENTITY)},
+                "preissue_bankroll_yuan": preissue,
+                "actual_stake_yuan": target_stake,
+                "pre_tax_net_yuan": net,
+                "postissue_bankroll_yuan": preissue + net,
+                "ticket_prefix_identity_sha256": canonical_hash(ticket_identity),
+                "ticket_prefix_counts_json": json.dumps(counts, sort_keys=True, separators=(",", ":")),
+            })
+        candidate_bankroll += candidate_net
+        control_bankroll += control_net
+    schedule_hash = canonical_hash(schedule)
+    for row in rows:
+        row["capital_schedule_hash"] = schedule_hash
+    for row in unavailable:
+        row["capital_schedule_hash"] = schedule_hash
+    stake = sum(float(row["common_schedule_yuan"]) for row in schedule)
+    active = [row for row in schedule if float(row["common_schedule_yuan"]) > 0]
+    summary = {
+        "contrast_id": contrast_id,
+        "candidate_id": candidate_identity[0],
+        "control_id": control_identity[0],
+        "capital_schedule_hash": schedule_hash,
+        "candidate_ticket_funding_hash": canonical_hash(candidate_ticket_identity),
+        "control_ticket_funding_hash": canonical_hash(control_ticket_identity),
+        "capital_schedule_equal": True,
+        "common_executable_support_hash": canonical_hash([row["issue_instance"] for row in active]),
+        "common_executable_issue_count": len(active),
+        "unavailable_issue_count": len(unavailable),
+        "common_stake_yuan": stake,
+        "candidate_ending_bankroll_yuan": candidate_bankroll,
+        "control_ending_bankroll_yuan": control_bankroll,
+        "matched_lift_yuan": candidate_bankroll - control_bankroll,
+        "candidate_pre_tax_roi": (candidate_bankroll - INITIAL_BANKROLL_YUAN) / stake if stake else "",
+        "control_pre_tax_roi": (control_bankroll - INITIAL_BANKROLL_YUAN) / stake if stake else "",
+        "matched_lift_pre_tax_roi": (candidate_bankroll - control_bankroll) / stake if stake else "",
+        "strict_inference_status": "DESCRIPTIVE_MATCHED_CAPITAL_NO_BOOTSTRAP_RERUN",
+        "atomic_rounding_contract": "MAXIMAL_COMMON_EXECUTABLE_WHOLE_TICKET_SCHEDULE",
+    }
+    if any(float(row["actual_stake_yuan"]) != float(row["common_schedule_yuan"]) for row in rows):
+        raise RuntimeError("common schedule ledger equality assertion failed")
+    return rows, summary, unavailable
+
+
+def minimal_stage4_matched_capital_tables(
+    paths: dict[tuple[object, ...], list[dict[str, object]]],
+) -> dict[str, list[dict[str, object]]]:
+    """Run exactly the two PI-authorized common-capital contrasts."""
+    selected = _minimal_decision_identities({
+        "sleeve_funding_ledger": [
+            {
+                **{field: identity[index] for index, field in enumerate(PATH_IDENTITY)},
+                "sleeve_or_family_id": sleeve,
+            }
+            for identity, path in paths.items()
+            for sleeve in path[0]["sleeve_settlements"]
+        ],
+        "capital_summary": [
+            {
+                **{field: identity[index] for index, field in enumerate(PATH_IDENTITY)},
+                "ending_bankroll_yuan": path[-1]["postissue_bankroll_yuan"],
+            }
+            for identity, path in paths.items()
+        ],
+    })
+    by_label = dict(selected)
+    model_q = by_label["STRONGEST_PAIR"]
+    q = by_label["Q_SOURCE_Q_TOP_MASS_M192"]
+    full = by_label["BEST_FULL_FULL"]
+    outputs = {"matched_capital_issue_ledger": [], "matched_capital_comparisons": [], "matched_capital_unavailable_issues": []}
+    for contrast_id, candidate, control in (
+        ("MODEL_PLUS_Q_VS_Q", model_q, q),
+        ("Q_VS_FULL", q, full),
+    ):
+        rows, summary, unavailable = replay_common_capital_contrast(
+            contrast_id=contrast_id, candidate_identity=candidate, control_identity=control, paths=paths,
+        )
+        outputs["matched_capital_issue_ledger"].extend(rows)
+        outputs["matched_capital_comparisons"].append(summary)
+        outputs["matched_capital_unavailable_issues"].extend(unavailable)
     return outputs
 
 
@@ -2399,82 +2825,59 @@ def _minimal_decision_identities(tables: dict[str, Sequence[dict[str, object]]])
     return selected
 
 
-def _minimal_path_chart_svg(series: Sequence[tuple[str, Sequence[dict[str, object]]]]) -> str:
-    """Render a deterministic dependency-free SVG from committed chart rows."""
-    width, height, pad = 1100, 560, 65
-    values = [INITIAL_BANKROLL_YUAN, *[float(row["postissue_bankroll_yuan"]) for _, rows in series for row in rows]]
-    minimum, maximum = min(values), max(values)
-    span = max(maximum - minimum, 1.0)
-    colours = ("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd")
-    lines = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
-        '<rect width="100%" height="100%" fill="white"/>',
-        '<text x="65" y="32" font-family="sans-serif" font-size="18">#192 Stage-4 — fixed native matched decision paths</text>',
-        f'<line x1="{pad}" y1="{height-pad}" x2="{width-pad}" y2="{height-pad}" stroke="#444"/>',
-        f'<line x1="{pad}" y1="{pad}" x2="{pad}" y2="{height-pad}" stroke="#444"/>',
-        f'<text x="5" y="{pad+8}" font-family="sans-serif" font-size="12">¥{maximum:,.0f}</text>',
-        f'<text x="5" y="{height-pad}" font-family="sans-serif" font-size="12">¥{minimum:,.0f}</text>',
-    ]
-    for index, (label, rows) in enumerate(series):
-        points = []
-        denom = max(len(rows) - 1, 1)
-        for position, row in enumerate(rows):
-            x = pad + (width - 2 * pad) * position / denom
-            y = height - pad - (height - 2 * pad) * (float(row["postissue_bankroll_yuan"]) - minimum) / span
-            points.append(f"{x:.2f},{y:.2f}")
-        colour = colours[index % len(colours)]
-        lines.append(f'<polyline points="{" ".join(points)}" fill="none" stroke="{colour}" stroke-width="1.8"/>')
-        lines.append(f'<text x="{pad + index * 190}" y="{height-22}" font-family="sans-serif" font-size="12" fill="{colour}">{label}</text>')
-    lines.append("</svg>")
-    return "\n".join(lines) + "\n"
+def render_minimal_stage4_charts(
+    chart_dir: Path, series: Sequence[tuple[str, Sequence[dict[str, object]]]],
+) -> None:
+    """Render the one source table with the pinned matplotlib backend.
 
-
-def _minimal_path_chart_png(series: Sequence[tuple[str, Sequence[dict[str, object]]]]) -> bytes:
-    """Create a small deterministic RGB PNG using only the standard library."""
-    import struct
-    import zlib
-
-    width, height, pad = 900, 400, 40
-    pixels = bytearray([255, 255, 255] * width * height)
-    values = [INITIAL_BANKROLL_YUAN, *[float(row["postissue_bankroll_yuan"]) for _, rows in series for row in rows]]
-    minimum, maximum = min(values), max(values)
-    span = max(maximum - minimum, 1.0)
-    colours = ((31, 119, 180), (255, 127, 14), (44, 160, 44), (214, 39, 40), (148, 103, 189))
-    def dot(x: int, y: int, colour: tuple[int, int, int]) -> None:
-        if 0 <= x < width and 0 <= y < height:
-            offset = (y * width + x) * 3
-            pixels[offset:offset + 3] = bytes(colour)
-    def line(x0: int, y0: int, x1: int, y1: int, colour: tuple[int, int, int]) -> None:
-        dx, dy = abs(x1 - x0), -abs(y1 - y0)
-        sx, sy = (1 if x0 < x1 else -1), (1 if y0 < y1 else -1)
-        error = dx + dy
-        while True:
-            dot(x0, y0, colour)
-            if (x0, y0) == (x1, y1):
-                return
-            twice = 2 * error
-            if twice >= dy:
-                error += dy
-                x0 += sx
-            if twice <= dx:
-                error += dx
-                y0 += sy
-    for index, (_, rows) in enumerate(series):
-        previous = None
-        for position, row in enumerate(rows):
-            x = round(pad + (width - 2 * pad) * position / max(len(rows) - 1, 1))
-            y = round(height - pad - (height - 2 * pad) * (float(row["postissue_bankroll_yuan"]) - minimum) / span)
-            if previous is not None:
-                line(*previous, x, y, colours[index % len(colours)])
-            previous = (x, y)
-    raw = b"".join(b"\x00" + bytes(pixels[row * width * 3:(row + 1) * width * 3]) for row in range(height))
-    def chunk(kind: bytes, payload: bytes) -> bytes:
-        return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload) & 0xffffffff)
-    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
+    SVG, PNG, and PDF must be actual charts with the same title, axes, and
+    legend.  The library import is deliberately lazy so package verification
+    remains dependency-free; rendering requires the repository-pinned
+    ``matplotlib==3.10.9`` environment.
+    """
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        from matplotlib import pyplot as plt
+    except ImportError as exc:  # pragma: no cover - exercised in clean envs
+        raise RuntimeError("matplotlib==3.10.9 is required to render #192 charts") from exc
+    matplotlib.rcParams.update({"svg.hashsalt": "bj192-stage4-v4", "font.family": "DejaVu Sans"})
+    figure, axis = plt.subplots(figsize=(11, 5.6), layout="constrained")
+    for label, rows in series:
+        axis.plot(
+            [int(row["calendar_index"]) for row in rows],
+            [float(row["postissue_bankroll_yuan"]) for row in rows],
+            linewidth=1.4,
+            label=label,
+        )
+    axis.axhline(INITIAL_BANKROLL_YUAN, color="#555555", linestyle="--", linewidth=0.8, label="START ¥100,000")
+    axis.set_title("#192 Stage-4 fixed native decision paths — descriptive, unmatched funding")
+    axis.set_xlabel("Chronological issue index")
+    axis.set_ylabel("Ending bankroll (¥)")
+    axis.grid(alpha=0.25)
+    axis.legend(ncol=2, fontsize=8)
+    metadata = {"Creator": "beijing-lot #192", "Title": "#192 Stage-4 decision paths"}
+    for suffix in ("svg", "png", "pdf"):
+        format_metadata = dict(metadata)
+        if suffix == "svg":
+            format_metadata["Date"] = "2026-08-06T00:00:00Z"
+        elif suffix == "pdf":
+            fixed_date = datetime.datetime(2026, 8, 6, tzinfo=datetime.UTC)
+            format_metadata["CreationDate"] = fixed_date
+            format_metadata["ModDate"] = fixed_date
+        figure.savefig(
+            chart_dir / f"decision_paths.{suffix}",
+            dpi=160 if suffix == "png" else None,
+            metadata=format_metadata,
+        )
+    plt.close(figure)
 
 
 def minimal_stage4_decision_artifacts(
-    stage: Path, tables: dict[str, Sequence[dict[str, object]]],
+    stage: Path,
+    tables: dict[str, Sequence[dict[str, object]]],
+    *,
+    matched_capital_comparisons: Sequence[dict[str, object]] = (),
 ) -> dict[str, dict[str, object]]:
     """Write manifest-covered chart sources and a concise decision guide."""
     selected = _minimal_decision_identities(tables)
@@ -2483,11 +2886,11 @@ def minimal_stage4_decision_artifacts(
     ledger: dict[tuple[object, ...], list[dict[str, object]]] = defaultdict(list)
     for row in tables["issue_ledger"]:
         ledger[tuple(row[field] for field in PATH_IDENTITY)].append(row)
-    lift_by_identity: dict[tuple[object, ...], dict[str, object]] = {}
+    full_raw_comparison_by_identity: dict[tuple[object, ...], dict[str, object]] = {}
     for row in tables["baseline_lift"]:
         identity = tuple(row[field] for field in PATH_IDENTITY)
         if row["control_id"] == next(identity[0] for label, identity in selected if label == "BEST_FULL_FULL"):
-            lift_by_identity[identity] = row
+            full_raw_comparison_by_identity[identity] = row
     chart_source: list[dict[str, object]] = []
     summary: list[dict[str, object]] = []
     series: list[tuple[str, Sequence[dict[str, object]]]] = []
@@ -2497,16 +2900,19 @@ def minimal_stage4_decision_artifacts(
             raise RuntimeError("decision chart path denominator drift")
         series.append((label, path))
         capital_row, holding_row = capital[identity], holding[identity]
-        matched = lift_by_identity.get(identity)
+        comparison = full_raw_comparison_by_identity.get(identity)
         summary.append({
             "label": label, "portfolio_id": identity[0], "mode": identity[1], "position_fraction": identity[2],
             "weight_method": identity[3], "normalization_method": identity[4], "deployment_replicate_bundle_id": identity[5],
-            "ending_bankroll_yuan": capital_row["ending_bankroll_yuan"], "matched_full_lift_yuan": "" if matched is None else matched["candidate_minus_control_bankroll_yuan"],
+            "ending_bankroll_yuan": capital_row["ending_bankroll_yuan"],
+            "matched_full_lift_yuan": "" if comparison is None else comparison["matched_lift_yuan"],
+            "unmatched_full_raw_path_difference_yuan": "" if comparison is None else comparison["unmatched_raw_path_difference_yuan"],
+            "full_actual_funding_equal": "" if comparison is None else comparison["actual_funding_equal"],
             "pre_tax_roi": capital_row["pre_tax_roi"], "turnover_yuan": capital_row["turnover_yuan"], "retained_cash_yuan": capital_row["cash_yuan"],
             "max_drawdown_yuan": holding_row["max_drawdown_yuan"], "loss_streak_calendar": holding_row["loss_streak_calendar"],
             "miss_streak_calendar": holding_row["miss_streak_calendar"], "recovery_duration_max_issues": holding_row["recovery_duration_max_issues"],
             "time_under_water_issues": holding_row["time_under_water_issues"],
-            "interpretation": "REALIZED_PATH;_CASH_AND_TURNOVER_ARE_REPORTED_SEPARATELY_FROM_MATCHED_TICKET_ECONOMICS",
+            "interpretation": "REALIZED_PATH;_FULL_COMPARISON_IS_UNMATCHED_UNLESS_ACTUAL_FUNDING_EQUAL;_CASH_AND_TURNOVER_ARE_NOT_TICKET_EDGE",
         })
         for row in path:
             chart_source.append({
@@ -2516,40 +2922,50 @@ def minimal_stage4_decision_artifacts(
                 "retained_cash_yuan": row["retained_cash_yuan"], "drawdown_yuan": row["drawdown_yuan"],
             })
     chart_dir = stage / "charts"
-    chart_dir.mkdir()
+    chart_dir.mkdir(exist_ok=True)
     summary_fields = write_csv_rows(stage / "decision_path_summary.csv", summary, compressed=False)
     source_fields = write_csv_rows(stage / "decision_chart_source.csv", chart_source, compressed=False)
-    svg = _minimal_path_chart_svg(series)
-    (chart_dir / "decision_paths.svg").write_text(svg, encoding="utf-8")
+    render_minimal_stage4_charts(chart_dir, series)
+    svg = (chart_dir / "decision_paths.svg").read_text(encoding="utf-8")
     (chart_dir / "decision_paths.html").write_text("<!doctype html><meta charset=\"utf-8\"><title>#192 decision paths</title>" + svg, encoding="utf-8")
-    (chart_dir / "decision_paths.png").write_bytes(_minimal_path_chart_png(series))
     decisions = "\n".join(
-        f"- {row['label']}: ending ¥{float(row['ending_bankroll_yuan']):,.2f}; matched-FULL lift {row['matched_full_lift_yuan'] or '¥0.00'}; turnover ¥{float(row['turnover_yuan']):,.2f}; max drawdown ¥{float(row['max_drawdown_yuan']):,.2f}."
+        f"- {row['label']}: ending ¥{float(row['ending_bankroll_yuan']):,.2f}; ROI {float(row['pre_tax_roi']):.2%}; turnover ¥{float(row['turnover_yuan']):,.2f}; max drawdown ¥{float(row['max_drawdown_yuan']):,.2f}; FULL raw-path difference {('¥' + format(float(row['unmatched_full_raw_path_difference_yuan']), ',.2f')) if row['unmatched_full_raw_path_difference_yuan'] not in ('', None) else 'not applicable'} ({'matched funding' if row['full_actual_funding_equal'] else 'unmatched funding'})."
         for row in summary
     )
+    matched_capital_text = "\n".join(
+        f"- {row['contrast_id']}: {int(row['common_executable_issue_count'])} common executable issues; "
+        f"¥{float(row['common_stake_yuan']):,.2f} identical schedule; candidate ROI {float(row['candidate_pre_tax_roi']):.2%}; "
+        f"control ROI {float(row['control_pre_tax_roi']):.2%}; matched-capital lift ¥{float(row['matched_lift_yuan']):,.2f}; "
+        f"{int(row['unavailable_issue_count'])} unavailable/atomic-rounding issues."
+        if float(row["common_stake_yuan"] or 0) > 0 else
+        f"- {row['contrast_id']}: no common executable capital schedule; {int(row['unavailable_issue_count'])} unavailable issues."
+        for row in matched_capital_comparisons
+    ) or "- No matched-capital comparison was materialized."
     report = f"""# #192 Stage-4 decision guide
 
 The three frozen standalones, the strongest realized pair, and the frozen
-triple below are matched on NATIVE / 100% / EQUAL_WEIGHT / UNIT_CAPITAL /
-BUNDLE_ORDINAL_001.  Absolute ending bankroll and matched FULL lift are both
-reported; retained cash and lower turnover are accounting-path properties,
-not independent evidence of ticket edge.
+triple below share the NATIVE / 100% / EQUAL_WEIGHT / UNIT_CAPITAL /
+BUNDLE_ORDINAL_001 execution axis.  They do **not** generally share realised
+funding with FULL.  Their raw path differences are therefore explicitly
+unmatched diagnostics, not matched-FULL lift or strict inference.
 
 {decisions}
 
-The terminal finding remains **NO_PROMOTION**: the two prespecified positive
-descriptive contrasts did not pass the 20,000-replicate paired max-T screen.
-The path chart and source table expose the realized failure mechanism and its
-cash, turnover, drawdown, streak, and recovery trade-offs without conducting a
-new strategy or M search.
+The Q sleeve has the strongest standalone ROI.  MODEL+Q can raise ending
+capital by taking more turnover but lowers ROI relative to Q; the triple adds
+substantially more turnover and worsens both ROI and drawdown.  Because the
+raw FULL comparisons have unequal actual funding, they remain descriptive.
+
+## Bounded matched-capital replays
+
+{matched_capital_text}
+
+These use the same deterministic issue-level yuan schedule on both sides, but
+retain each side's own frozen ticket-prefix identity.  They are not a new
+strategy search or a bootstrap rerun.  The terminal finding remains
+**NO_PROMOTION**.
 """
     (stage / "DECISION_REPORT.md").write_text(report, encoding="utf-8")
-    # A compact deterministic PDF companion intentionally contains the same
-    # declared interpretation; SVG/PNG are the plotted renderings.
-    text = "#192 Stage-4 Decision Paths — NO_PROMOTION"
-    stream = f"BT /F1 16 Tf 72 740 Td ({text}) Tj ET\n"
-    pdf = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 4 0 R>>>>/Contents 5 0 R>>endobj\n4 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\n5 0 obj<</Length " + str(len(stream.encode())).encode() + b">>stream\n" + stream.encode() + b"endstream\nendobj\nxref\n0 6\n0000000000 65535 f\ntrailer<</Size 6/Root 1 0 R>>\nstartxref\n0\n%%EOF\n"
-    (chart_dir / "decision_paths.pdf").write_bytes(pdf)
     return {
         "decision_path_summary": {"filename": "decision_path_summary.csv", "row_count": len(summary), "fields": summary_fields},
         "decision_chart_source": {"filename": "decision_chart_source.csv", "row_count": len(chart_source), "fields": source_fields},
@@ -2632,9 +3048,9 @@ def _write_existing_package_metadata(stage: Path, *, source_binding: dict[str, o
     """Finish a staged correction package with recursive immutable hashes."""
     (stage / "source_binding.json").write_text(json.dumps(source_binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (stage / "README.md").write_text(package_note.rstrip() + "\n", encoding="utf-8")
-    files = lambda: sorted(path for path in stage.rglob("*") if path.is_file())
-    archive = {str(path.relative_to(stage)): sha256_file(path) for path in files()}
-    scientific = {str(path.relative_to(stage)): canonical_scientific_sha256(path) for path in files()}
+    files = sorted(path for path in stage.rglob("*") if path.is_file())
+    archive = {str(path.relative_to(stage)): sha256_file(path) for path in files}
+    scientific = {str(path.relative_to(stage)): canonical_scientific_sha256(path) for path in files}
     content = {
         "contract": CONTRACT, "version": VERSION,
         "canonical_scientific_payload_sha256": scientific,
@@ -2643,18 +3059,20 @@ def _write_existing_package_metadata(stage: Path, *, source_binding: dict[str, o
         "archive_transport_contract": {"gzip": "gzip.GzipFile(filename='', mtime=0)", "scientific_identity": "gzip payloads SHA-256 after decompression"},
     }
     (stage / "CONTENT_IDENTITY.json").write_text(json.dumps(content, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    manifest = {str(path.relative_to(stage)): sha256_file(path) for path in files()}
+    manifest_files = sorted(path for path in stage.rglob("*") if path.is_file())
+    manifest = {str(path.relative_to(stage)): sha256_file(path) for path in manifest_files}
     (stage / "SHA256SUMS.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return {"manifest_sha256": sha256_file(stage / "SHA256SUMS.json"), "content_sha256": sha256_file(stage / "CONTENT_IDENTITY.json")}
 
 
-def finalize_minimal_stage4_v3_from_v2(source: Path, output: Path) -> dict[str, object]:
-    """Create the bounded v3 delivery correction from the committed v2 package.
+def finalize_minimal_stage4_authoritative_from_package(source: Path, output: Path) -> dict[str, object]:
+    """Create one final package from a verified prior delivery package.
 
-    Only capital bisection, supported risk attribution, report/chart sources
-    and provenance are regenerated.  Every unmodified scientific ledger is
-    copied byte-for-byte from the verified v2 package; no ticket replay,
-    parameter search, or bootstrap rerun is permitted here.
+    This bounded delivery reducer does not replay tickets, bootstrap, or
+    search.  It only corrects comparison labels, capital semantics, and chart
+    rendering while retaining the settled ledgers that are scientifically
+    unaffected.  The source hash is retained as provenance; only ``output``
+    is intended to be shipped in the final tree.
     """
     source, output = source.resolve(), output.resolve()
     if output.exists():
@@ -2672,20 +3090,23 @@ def finalize_minimal_stage4_v3_from_v2(source: Path, output: Path) -> dict[str, 
         if tuple(sorted(path[0]["sleeve_settlements"])) == ("BEST_FULL_FULL",)
     }
     corrected_capital: list[dict[str, object]] = []
-    corrected_risk: list[dict[str, object]] = []
     for identity, path in sorted(paths.items(), key=lambda item: canonical_hash(item[0])):
         control = full_by_axis.get(identity[1:])
         if control is None:
-            raise RuntimeError("v3 matched FULL recovery control unavailable")
+            raise RuntimeError("authoritative matched FULL recovery control unavailable")
         original = next((row for row in extra["capital_summary"] if tuple(row[field] for field in PATH_IDENTITY) == identity), None)
         if original is None:
-            raise RuntimeError("v3 capital-summary recovery join drift")
+            raise RuntimeError("authoritative capital-summary recovery join drift")
         capital = dict(original)
         capital["minimum_required_start_yuan"] = "" if identity[1] == "COMPOUNDING_BANKROLL" else minimum_required_start_yuan(path)
+        capital["minimum_required_start_definition"] = (
+            "SMALLEST_WHOLE_YUAN_START_REPRODUCING_SAVED_EXACT_FUNDED_SCHEDULE"
+            if identity[1] != "COMPOUNDING_BANKROLL" else "NOT_MONOTONE_COMPOUNDING_BANKROLL"
+        )
+        capital["first_unfundable_issue"] = first_capital_unfundable_issue(path)
         corrected_capital.append(capital)
-        corrected_risk.extend(risk_decomposition_rows(path, minimal_stage4_path_bridge(path), matched_control_rows=control))
     if len(corrected_capital) != len(paths):
-        raise RuntimeError("v3 capital path denominator drift")
+        raise RuntimeError("authoritative capital path denominator drift")
     stage.mkdir(parents=False)
     try:
         skip = {"SHA256SUMS.json", "CONTENT_IDENTITY.json", "source_binding.json", "table_manifest.json", "README.md"}
@@ -2699,39 +3120,57 @@ def finalize_minimal_stage4_v3_from_v2(source: Path, output: Path) -> dict[str, 
             "filename": "capital_summary.csv", "row_count": len(corrected_capital),
             "fields": write_csv_rows(stage / "capital_summary.csv", corrected_capital, compressed=False, declared_fields=[*schema["capital_summary"]["key"], *schema["capital_summary"]["fields"]]),
         }
-        manifest["risk_decomposition"] = {
-            "filename": "risk_decomposition.csv.gz", "row_count": len(corrected_risk),
-            "fields": write_csv_rows(stage / "risk_decomposition.csv.gz", corrected_risk, compressed=True, declared_fields=[*schema["risk_decomposition"]["key"], *schema["risk_decomposition"]["fields"]]),
+        # v3's 150,336-row ex-ante covariance and matched-risk ledger already
+        # passed PI audit and is scientifically unaffected by this bounded
+        # capital-comparison correction.  It was byte-copied with the other
+        # protected settlement ledgers above; do not rehydrate it in memory.
+        corrected_baseline = minimal_stage4_comparisons_from_paths(paths, corrected_capital)
+        manifest["baseline_lift"] = {
+            "filename": "baseline_lift.csv", "row_count": len(corrected_baseline),
+            "fields": write_csv_rows(stage / "baseline_lift.csv", corrected_baseline, compressed=False),
         }
+        matched_capital = minimal_stage4_matched_capital_tables(paths)
+        for name, rows in matched_capital.items():
+            filename = f"{name}.csv"
+            manifest[name] = {
+                "filename": filename,
+                "row_count": len(rows),
+                "fields": write_csv_rows(stage / filename, rows, compressed=False),
+            }
         chart_tables: dict[str, Sequence[dict[str, object]]] = {
             "issue_ledger": [row for path in paths.values() for row in path],
             "sleeve_funding_ledger": _package_table_rows(source, manifest, "sleeve_funding_ledger"),
             "capital_summary": corrected_capital,
             "holding_metrics": extra["holding_metrics"],
-            "baseline_lift": extra["baseline_lift"],
+            "baseline_lift": corrected_baseline,
         }
-        ancillary = minimal_stage4_decision_artifacts(stage, chart_tables)
+        ancillary = minimal_stage4_decision_artifacts(
+            stage,
+            chart_tables,
+            matched_capital_comparisons=matched_capital["matched_capital_comparisons"],
+        )
         manifest.update(ancillary)
         (stage / "table_manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         source_binding = {
             "gate_a": {"package": GATE_A.name, "manifest_sha256": EXPECTED_GATE_A_MANIFEST, "content_identity_sha256": EXPECTED_GATE_A_CONTENT},
-            "v2_base_package": {"package": source.name, "manifest_sha256": source_manifest_sha, "content_identity_sha256": source_content_sha},
-            "correction_scope": "CAPITAL_INTEGER_BISECTION;_EX_ANTE_COVARIANCE_RECONSTRUCTION;_MATCHED_RISK;_DECISION_CHARTS",
-            "settlement_boundary": "COMMITTED_V2_PACKAGE_ONLY_NO_TICKET_REPLAY_NO_BOOTSTRAP_RERUN",
-            "reproducibility": "CLEAN_CLONE_VERIFIES_V2_BASE_AND_V3_REPLACEMENT_LEDGERS_WITHOUT_AUTHOR_SCRATCH",
+            "prior_delivery_package": {"package": source.name, "manifest_sha256": source_manifest_sha, "content_identity_sha256": source_content_sha},
+            "correction_scope": "ACTUAL_FUNDING_COMPARISON_SEMANTICS;_TWO_COMMON_CAPITAL_PREFIX_REPLAYS;_CAPITAL_CONSTRAINT_LABEL;_MATPLOTLIB_DECISION_CHARTS",
+            "settlement_boundary": "VERIFIED_PRIOR_PACKAGE_PLUS_TWO_348_ISSUE_COMMON_CAPITAL_PREFIX_REPLAYS_NO_BOOTSTRAP_RERUN",
+            "reproducibility": "CLEAN_CLONE_VERIFIES_THE_SINGLE_AUTHORITATIVE_PACKAGE_WITHOUT_AUTHOR_SCRATCH_OR_PRIOR_PACKAGE",
         }
-        receipt = _write_existing_package_metadata(stage, source_binding=source_binding, package_note="""# #192 Gate B — minimal Stage-4 closure v3
+        receipt = _write_existing_package_metadata(stage, source_binding=source_binding, package_note="""# #192 Gate B — minimal Stage-4 final package
 
-This package is a bounded delivery correction from the committed v2 immutable
-package.  It retains all unaffected settled ledgers byte-for-byte, replaces
-only deterministic minimum-start capital, ex-ante/matched risk attribution,
-and adds manifest-covered decision chart sources/renderings.  It does not
-replay tickets or rerun bootstrap inference.  Terminal disposition remains
+This is the one authoritative #192 Gate-B delivery package.  It preserves
+unaffected settled ledgers from a verified prior package, corrects comparison
+semantics so unequal actual funding is never called matched lift, derives
+capital failure labels from allocator constraints, and renders all decision
+charts with the repository-pinned matplotlib version.  It does not replay
+tickets or rerun bootstrap inference.  Terminal disposition remains
 **NO_PROMOTION**.
 """)
         verify_package(stage, receipt["manifest_sha256"], receipt["content_sha256"])
         os.replace(stage, output)
-        return {"output": str(output), **receipt, "path_count": len(paths), "risk_row_count": len(corrected_risk)}
+        return {"output": str(output), **receipt, "path_count": len(paths), "risk_row_count": manifest["risk_decomposition"]["row_count"]}
     except Exception:
         shutil.rmtree(stage, ignore_errors=True)
         raise
@@ -3007,13 +3446,16 @@ def capital_summary(path_rows: Sequence[dict[str, object]], holding: dict[str, o
         "ending_bankroll_yuan": ending,
         "minimum_bankroll_yuan": holding["minimum_bankroll_yuan"],
         # The frozen capital contract defines fundability on whole-yuan
-        # pre-issue balances.  The saved checkpoint already contains the
-        # exact funded-ticket vector and outcome net for this path, therefore
-        # an integer bisection can recover the smallest start that reproduces
-        # that vector without a second ticket settlement.
+        # pre-issue balances.  The saved path is the exact executable
+        # schedule: this bisection reproduces its funded ticket vector, not a
+        # hypothetical smaller allocation or a fresh ticket replay.
         "minimum_required_start_yuan": "" if mode == "COMPOUNDING_BANKROLL" else minimum_required_start_yuan(path_rows),
+        "minimum_required_start_definition": (
+            "SMALLEST_WHOLE_YUAN_START_REPRODUCING_SAVED_EXACT_FUNDED_SCHEDULE"
+            if mode != "COMPOUNDING_BANKROLL" else "NOT_MONOTONE_COMPOUNDING_BANKROLL"
+        ),
         "fundable_issue_count": sum(float(row["actual_stake_yuan"]) > 0 for row in path_rows),
-        "first_unfundable_issue": next((row["issue_instance"] for row in path_rows if float(row["requested_stake_yuan"]) > 0 and float(row["actual_stake_yuan"]) == 0), ""),
+        "first_unfundable_issue": first_capital_unfundable_issue(path_rows),
         "scaled_stake_yuan": sum(float(row["scaled_stake_yuan"]) for row in path_rows),
         "skipped_stake_yuan": sum(float(row["skipped_stake_yuan"]) for row in path_rows),
         "cash_yuan": float(path_rows[-1]["retained_cash_yuan"]),
@@ -3026,6 +3468,24 @@ def capital_summary(path_rows: Sequence[dict[str, object]], holding: dict[str, o
         "capital_growth_audit_delta": growth - (net / stake * turnover) if mode == "FIXED_100K_NOTIONAL" and stake else None,
         "ruin_flag": holding["ruin_flag"],
     }
+
+
+def first_capital_unfundable_issue(path_rows: Sequence[dict[str, object]]) -> str:
+    """Return only genuine bankroll-constrained NO_BET, not risk/cap NO_BET.
+
+    An atomic block can be intentionally excluded because the ex-ante risk
+    budget is smaller than its executable stake while the account has ample
+    cash.  That is a policy NO_BET, not a failure of bankroll fundability.
+    The frozen allocator records a genuine balance constraint with
+    ``SCALED_BY_PREISSUE_BANKROLL`` (or ``RUIN_NO_BET``).
+    """
+    for row in sorted(path_rows, key=lambda item: int(item["calendar_index"])):
+        if float(row["requested_stake_yuan"]) <= 0 or float(row["actual_stake_yuan"]) > 0:
+            continue
+        reasons = str(row.get("reason_codes", ""))
+        if "SCALED_BY_PREISSUE_BANKROLL" in reasons or "RUIN_NO_BET" in reasons:
+            return str(row["issue_instance"])
+    return ""
 
 
 def is_fundable_from_start(path_rows: Sequence[dict[str, object]], starting_yuan: int) -> bool:

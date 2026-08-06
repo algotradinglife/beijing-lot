@@ -2,28 +2,25 @@
 
 ## 结论
 
-本次 Gate B 从已结算、hash-bound 的最小 Stage-4 checkpoint 重建了完整的
-组合层交付包；没有再次回放任何 ticket，也没有新增 M 曲线或事后搜索。虽然若干
-历史路径有正的点估计，两个达到“材料性正值”门槛的原生控制候选都没有通过预先
-规定的 20,000 次配对 stationary-block max-T 推断。因此终局是 **`NO_PROMOTION`**：
-不得把任何路径用作生产、购买或下注授权。
+Gate B 的唯一权威交付是
+[`bj192_gate_b_minimal_stage4`](../../results/bj192_gate_b_minimal_stage4/README.md)。
+它保留了已审计账本，并修正了两类解释错误：实际资金不同的路径不再被称为
+matched-FULL lift；资金不可执行仅在 allocator 的缩放或破产约束实际触发时才标记。
+
+结论仍是 **`NO_PROMOTION`**。历史正点估计、终值或回撤改善都不是购买、下注或生产
+授权。
 
 ## 不可变身份与范围
 
 - Gate-A manifest：`6108defd857bf431bcaf55109df0e195b45aa754e8fd46f1db82d329102ff256`
 - Gate-A content identity：`66ce6f86703b31d710ad678b49287de3bc6b2c43a5b36c278e1369bdecd861d5`
-- Gate-B manifest：`e028c54d7826e6c48eff2090538ac404f6b250f2c9f334e74bcc6acb4f6cf421`
-- Gate-B content identity：`cad3fc655d06e1fbb94128652d083c5b8dee729b0c10b1736548473a13ccd585`
-- checkpoint：`.scratch/bj192_minimal_stage4_checkpoint.json`，payload
-  `4e531ef6d2897321ff493442b769e18f94ec59e3a39068ae7b9f84668f0bfd50`
+- 最终 Gate-B manifest：`b5cb318cf1facee72f821793e86cc275e6dd6175cbb5730179f2d16e9e337ca4`
+- 最终 Gate-B content identity：`23d089a96569ad26dac140af02241f3e1db8139874dcb2e5d8641495f786cf6c`
 
-冻结的 sleeve 是 `BEST_FULL_FULL`、`MODEL_SOURCE_MODEL_CAP1_M512` 和
-`Q_SOURCE_Q_TOP_MASS_M192`。交付覆盖 3 个 singleton、3 个 pair 和 1 个 triple，
-以及 36 个已冻结的 mode/fraction/weight/normalization 轴：共 252 条
-完整 348-期资金路径。三个 Gate-A ordinal bundle 已逐期验证经济等价，仅保留
-`BUNDLE_ORDINAL_001` 作为唯一可执行表示。`NATIVE_REQUEST_CONTROL` 仅为 1.0；FIXED 与 COMPOUNDING
-分别保留 0.10/0.25/0.50/1.00；权重仅为 EQUAL_WEIGHT 与 PRIOR_MINIMUM_VARIANCE，
-资金规范化仅为 UNIT_CAPITAL 与 UNIT_EX_ANTE_VOL_CAPPED_5PCT。
+交付包覆盖 252 条冻结的完整 348 期路径：三个 singleton、三个 pair 和一个
+triple，跨既定 mode/fraction/weight/normalization 轴。Gate-A 的三个 ordinal bundle
+逐期经济等价，仅 `BUNDLE_ORDINAL_001` 是可执行表示。原始 20,000 次 paired
+stationary-block max-T 推断未重新运行；本次修正不扩展研究搜索空间。
 
 ## 严格推断（税前主口径）
 
@@ -32,32 +29,44 @@
 | MODEL + Q | ¥469.58 | -¥157.49 | 0.10019 | `STRICT_MAX_T_NOT_PASSED` |
 | Q top-mass M192 | ¥422.38 | -¥194.17 | 0.12559 | `STRICT_MAX_T_NOT_PASSED` |
 
-两个比较共享相同的 348 期完整日历、¥100,000 native control、EQUAL_WEIGHT、
-UNIT_CAPITAL、BUNDLE_ORDINAL_001、seed `19220001` 和平均 block length
-`18.65475810617763`。显著性判断使用两比较共同的 resample，故不能把单路径的正
-ROI、正 bankroll 终值或较低 drawdown 当作独立发现。
+这两个候选共享完整 348 期日历、¥100,000 native control、EQUAL_WEIGHT、
+UNIT_CAPITAL、BUNDLE_ORDINAL_001、seed `19220001` 和相同的 block-resample
+设计。因此单一路径的 ROI、终值或回撤不能取代严格的共同推断。
+
+## 受限的 matched-capital 复放
+
+为回答“同一笔逐期资本下”的控制问题，包额外进行了两项预先限定、非搜索性的
+ticket-prefix 复放：每侧仍使用自己的冻结 ticket prefix，但每期都使用同一整数元、
+整张 ¥2 ticket 的最大共同可执行 schedule。两个侧的
+`capital_schedule_hash` 完全相同，ticket funding hash 则刻意独立保留。
+
+| 对照 | 共同可执行期数 | 共同 stake | 结果 |
+|---|---:|---:|---|
+| MODEL+Q vs Q | 180 / 348 | ¥276,480 | MODEL+Q ROI -15.91%，Q -3.64%，matched-capital lift **-¥33,910.53**；其余 168 期因一侧不可执行或原子取整不可共用。 |
+| Q vs FULL | 0 / 348 | ¥0 | FULL 的 2,187-ticket 原子前缀与 Q 的可用容量从无共同整数 schedule；全部 348 期逐期记录为 unavailable。 |
+
+这两项对照没有 bootstrap 重跑，也没有产生新的候选或推广结论；所有 unavailable
+期、共同 support 和原子取整规则均写入机器可读账本。
 
 ## 交付账本与图源
 
-[`bj192_gate_b_minimal_stage4_v2`](../../results/bj192_gate_b_minimal_stage4_v2/README.md)
-是唯一 Gate-B 数据包（约 100 MiB）。其 manifest 覆盖 26 个 payload：
+最终包有 36 个 manifest 覆盖 payload（约 39 MiB），包括：
 
-- `issue_ledger`：87,696 条按 `first_kickoff_ts` 排序的逐期资金路径；
-- `sleeve_funding_ledger`、`risk_decomposition`、`weight_history`：各 150,336 条；
-- `stage_attribution`：601,344 条，不把上游不可识别步骤伪装成 splice attribution；
-- `rolling_window_metrics`：259,560 条；
-- `capital_summary`、`holding_metrics`、`portfolio_k_saturation`：各 252 条；`baseline_lift`：324 条；
-- `all_pairs_risk_return_surface`：108 条；`bootstrap_stability`、`terminal_decision`：各 2 条。
+- `issue_ledger.csv.gz`：87,696 条逐期资金路径，按 `first_kickoff_ts` 排序；
+- `sleeve_funding_ledger.csv.gz`、`risk_decomposition.csv.gz`、`weight_history.csv.gz`：
+  各 150,336 条；
+- `capital_summary.csv`（252）与 `baseline_lift.csv`（468）：分别保留 allocator
+  不可执行定义及 candidate/control 的独立 support、funding hash；
+- `matched_capital_comparisons.csv`、`matched_capital_issue_ledger.csv` 与
+  `matched_capital_unavailable_issues.csv`：上表的完整可复放对照；
+- `charts/decision_paths.svg`、`.png`、`.pdf`：由同一 `decision_chart_source.csv`
+  用仓库固定的 matplotlib 生成，并均由 manifest 覆盖。
 
-图表应直接由包内的 `issue_ledger.csv.gz`（权益与回撤）、
-`rolling_window_metrics.csv.gz`（滚动风险）、`capital_summary.csv`/
-`all_pairs_risk_return_surface.csv`（资本与风险前沿）、`dependence*.csv.gz`（真实
-资金流依赖）和 `bootstrap_stability.csv`（严格筛选）生成。每个来源均保留完整的
-path identity；不要把不同 fraction、bundle 或 selector support 的点连成同一条曲线。
+税始终以每张命中的 ¥2 ticket tax lot 结算，不跨 ticket 或 issue 汇总。图表、滚动
+风险和严格筛选均保留完整 path identity；不得把不同 fraction、bundle 或 selector
+support 的点连成一条可比较曲线。
 
 ## 边界
 
-税务按已冻结的每张 ¥2 ticket tax lot 结算，绝不跨 ticket/issue 汇总计税。包内
-`standalone_m_curve` 刻意为空：最小收尾合约禁止重新运行 M 曲线。上述结果是历史
-组合与资金层诊断，不能反向改写 selector、M、ticket ordering 或上游概率模型；任何
-未来正结果都需要新的预注册独立验证。
+交付仅校正资金比较、资金约束语义和决策图表；不回写 selector、M、ticket ordering
+或上游概率模型。所有未来的正结论仍需新的预注册、独立验证。

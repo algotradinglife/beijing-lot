@@ -48,8 +48,12 @@ updated: 2026-08-06
    [[Issue-119-Candidate-Sensitivity|Issue #119 候选标准敏感性]]。
 8. **N7 多策略资金组合没有通过严格筛选。** #192 将 FULL、MODEL M512、Q top-mass
    M192 的 7 个 sleeve 组合与完整资本路径结算；两条材料性正点估计在共同 20,000 次
-   配对 stationary-block max-T 检验中的下界均为负（MODEL+Q `-¥157.49`，Q `-¥194.17`），
-   所以终局是 `NO_PROMOTION`。正 ROI 或较低回撤均不能单独构成策略授权。详见
+   配对 stationary-block max-T 检验中的下界均为负（MODEL+Q `-¥157.49`，Q `-¥194.17`）。
+   随后的确定性共同资本复放也未改变此结论：MODEL+Q 对 Q 的 180 期共同 ¥276,480
+   schedule 得到 `-¥33,910.53` 的 matched-capital lift；Q 对 FULL 没有可共同执行的
+   整 ticket schedule。最终 immutable package manifest 为
+   `b5cb318cf1facee72f821793e86cc275e6dd6175cbb5730179f2d16e9e337ca4`，终局是
+   `NO_PROMOTION`。正 ROI 或较低回撤均不能单独构成策略授权。详见
    [[Issue-192-N7-Strategy-Ensemble|Issue #192 N7 多策略组合与资金分配]]。
 
 ## 近期 N7 策略结论（2026-08-02）

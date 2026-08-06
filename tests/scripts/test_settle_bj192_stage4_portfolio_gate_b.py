@@ -618,7 +618,7 @@ def test_minimal_stage4_comparison_reuses_prebuilt_core_ledgers(monkeypatch: pyt
 
 
 def test_decision_artifacts_are_package_derived_and_manifest_ready() -> None:
-    package = ROOT / "results" / "bj192_gate_b_minimal_stage4_v2"
+    package = ROOT / "results" / "bj192_gate_b_minimal_stage4"
     manifest = __import__("json").load(open(package / "table_manifest.json"))
     names = ("issue_ledger", "sleeve_funding_ledger", "capital_summary", "holding_metrics", "baseline_lift")
     tables = {}
@@ -633,20 +633,22 @@ def test_decision_artifacts_are_package_derived_and_manifest_ready() -> None:
         receipt = RUNNER.minimal_stage4_decision_artifacts(output, tables)
         assert receipt["decision_path_summary"]["row_count"] == 5
         assert receipt["decision_chart_source"]["row_count"] == 5 * 348
-        assert (output / "charts" / "decision_paths.svg").read_text(encoding="utf-8").startswith("<svg")
+        # Matplotlib SVGs legitimately begin with an XML declaration / DOCTYPE.
+        # Assert the rendered SVG root rather than a byte-zero ``<svg`` prefix.
+        assert "<svg" in (output / "charts" / "decision_paths.svg").read_text(encoding="utf-8")
         assert (output / "charts" / "decision_paths.png").read_bytes().startswith(b"\x89PNG")
         assert (output / "charts" / "decision_paths.pdf").read_bytes().startswith(b"%PDF")
     finally:
         shutil.rmtree(output)
 
 
-def test_committed_v3_delivery_is_clean_clone_verifiable_without_author_checkpoint() -> None:
-    package = ROOT / "results" / "bj192_gate_b_minimal_stage4_v3"
+def test_committed_final_delivery_is_clean_clone_verifiable_without_author_checkpoint() -> None:
+    package = ROOT / "results" / "bj192_gate_b_minimal_stage4"
     assert RUNNER.verify_package(
         package, RUNNER.sha256_file(package / "SHA256SUMS.json"), RUNNER.sha256_file(package / "CONTENT_IDENTITY.json"),
     )
     source = __import__("json").load(open(package / "source_binding.json"))
-    assert source["settlement_boundary"] == "COMMITTED_V2_PACKAGE_ONLY_NO_TICKET_REPLAY_NO_BOOTSTRAP_RERUN"
+    assert source["settlement_boundary"] == "VERIFIED_PRIOR_PACKAGE_PLUS_TWO_348_ISSUE_COMMON_CAPITAL_PREFIX_REPLAYS_NO_BOOTSTRAP_RERUN"
     assert "checkpoint" not in source
     capital = RUNNER.read_csv(package / "capital_summary.csv")
     assert len(capital) == 252
