@@ -391,6 +391,12 @@ def test_realized_dependence_uses_explicit_zero_flow_and_active_denominators() -
     rows = RUNNER.realized_funded_flow_dependence(path)
     assert {row["denominator_id"] for row in rows} == {"FULL_CALENDAR_ZERO_FLOW", "UNION_ACTIVE", "INTERSECTION_ACTIVE"}
     assert any(row["metric"] == "PEARSON" for row in rows)
+    overall = [row for row in rows if row["panel_type"] == "OVERALL"]
+    assert {row["panel_id"] for row in overall} == {"FULL_PATH"}
+    assert any(row["panel_type"] == "YEAR" and row["panel_id"] == "2019" for row in rows)
+    assert any(row["panel_type"] == "LOYO" and row["exclusion_id"] == "2019" for row in rows)
+    assert any(row["panel_type"] == "EX_LARGEST_ISSUE" for row in rows)
+    assert any(row["panel_type"] == "EX_LARGEST_YEAR" for row in rows)
 
 
 def test_candidate_path_cache_reuses_immutable_selected_seed_paths() -> None:

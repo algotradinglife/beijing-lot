@@ -1106,8 +1106,48 @@ def _average_ranks(values: Sequence[float]) -> list[float]:
     return ranks
 
 
+def _dependence_panel_specs(path_rows: Sequence[dict[str, object]]) -> list[tuple[str, str, str, int | str, list[dict[str, object]]]]:
+    """Return the frozen, denominator-neutral chronology panels for one path.
+
+    These panels deliberately retain zero-flow issues.  The caller applies the
+    requested flow denominator afterwards, so an apparent correlation change
+    cannot silently be caused by filtering out cash/no-bet periods.
+    """
+    ordered = sorted(path_rows, key=lambda row: (row["calendar_index"], row["issue_instance"]))
+    panels: list[tuple[str, str, str, int | str, list[dict[str, object]]]] = [
+        ("OVERALL", "FULL_PATH", "", "", ordered),
+    ]
+    for field, panel_type in (("year", "YEAR"), ("fold", "FOLD")):
+        values = sorted({str(row[field]) for row in ordered})
+        panels.extend((panel_type, value, "", "", [row for row in ordered if str(row[field]) == value]) for value in values)
+
+    regime_by_issue = {
+        row["issue_instance"]: row["regime_panel_id"]
+        for row in read_csv(GATE_A / "regime_map.csv")
+    }
+    regimes = sorted({regime_by_issue.get(str(row["issue_instance"]), "UNMAPPED") for row in ordered})
+    panels.extend(("REGIME", regime, "", "", [row for row in ordered if regime_by_issue.get(str(row["issue_instance"]), "UNMAPPED") == regime]) for regime in regimes)
+
+    for width in (5, 10, 20):
+        for start in range(0, max(0, len(ordered) - width + 1)):
+            selected = ordered[start:start + width]
+            panels.append(("ROLLING", f"{selected[0]['calendar_index']}:{selected[-1]['calendar_index']}", width, "", selected))
+
+    # LOYO and ex-largest panels re-use the original chronological rows and
+    # never reset/re-order capital state.  They are dependence diagnostics,
+    # not a counterfactual funded replay.
+    for year in sorted({str(row["year"]) for row in ordered}):
+        panels.append(("LOYO", year, "", year, [row for row in ordered if str(row["year"]) != year]))
+    largest_issue = max(ordered, key=lambda row: (float(row["pre_tax_net_yuan"]), str(row["issue_instance"])))
+    panels.append(("EX_LARGEST_ISSUE", str(largest_issue["issue_instance"]), "", str(largest_issue["issue_instance"]), [row for row in ordered if row is not largest_issue]))
+    year_net = {year: sum(float(row["pre_tax_net_yuan"]) for row in ordered if str(row["year"]) == year) for year in {str(row["year"]) for row in ordered}}
+    largest_year = max(year_net, key=lambda year: (year_net[year], year))
+    panels.append(("EX_LARGEST_YEAR", largest_year, "", largest_year, [row for row in ordered if str(row["year"]) != largest_year]))
+    return panels
+
+
 def realized_funded_flow_dependence(path_rows: Sequence[dict[str, object]]) -> list[dict[str, object]]:
-    """Emit denominator-explicit funded-flow dependence for each sleeve pair."""
+    """Emit denominator-explicit funded-flow dependence for every frozen panel."""
     if not path_rows:
         return []
     catalog = canonical_economic_catalog()
@@ -1116,56 +1156,54 @@ def realized_funded_flow_dependence(path_rows: Sequence[dict[str, object]]) -> l
     for left_id, right_id in __import__("itertools").combinations(sleeves, 2):
         left_family = catalog[left_id]["economic_family_id"]
         right_family = catalog[right_id]["economic_family_id"]
-        observations: list[dict[str, float]] = []
-        for row in path_rows:
-            left = row["sleeve_settlements"][left_id]
-            right = row["sleeve_settlements"][right_id]
-            left_stake, right_stake = float(left["actual_stake_yuan"]), float(right["actual_stake_yuan"])
-            observations.append({
-                "left_return": float(left["pre_tax_net_yuan"]) / left_stake if left_stake else 0.0,
-                "right_return": float(right["pre_tax_net_yuan"]) / right_stake if right_stake else 0.0,
-                "left_stake": left_stake,
-                "right_stake": right_stake,
-                "left_gross": float(left["gross_yuan"]),
-                "right_gross": float(right["gross_yuan"]),
-                "left_hits": float(left["hit_ticket_count"]),
-                "right_hits": float(right["hit_ticket_count"]),
-            })
-        for denominator, selected in (
-            ("FULL_CALENDAR_ZERO_FLOW", observations),
-            ("UNION_ACTIVE", [row for row in observations if row["left_stake"] > 0 or row["right_stake"] > 0]),
-            ("INTERSECTION_ACTIVE", [row for row in observations if row["left_stake"] > 0 and row["right_stake"] > 0]),
-        ):
-            left_values = [row["left_return"] for row in selected]
-            right_values = [row["right_return"] for row in selected]
-            downside_left = [min(value, 0.0) for value in left_values]
-            downside_right = [min(value, 0.0) for value in right_values]
-            metrics: dict[str, float | None] = {
-                "PEARSON": _pearson(left_values, right_values),
-                "SPEARMAN": _pearson(_average_ranks(left_values), _average_ranks(right_values)) if selected else None,
-                "DOWNSIDE_CORRELATION": _pearson(downside_left, downside_right),
-                "JOINT_LOSS_RATE": sum(a < 0 and b < 0 for a, b in zip(left_values, right_values, strict=True)) / len(selected) if selected else None,
-                "PAYOUT_OVERLAP_COUNT": float(sum(row["left_gross"] > 0 and row["right_gross"] > 0 for row in selected)),
-                "HIT_OVERLAP_COUNT": float(sum(row["left_hits"] > 0 and row["right_hits"] > 0 for row in selected)),
-            }
-            for metric, value in metrics.items():
-                result.append({
-                    **{field: path_rows[0][field] for field in PATH_IDENTITY},
-                    "economic_family_left": left_family,
-                    "economic_family_right": right_family,
-                    "denominator_id": denominator,
-                    "panel_type": "OVERALL",
-                    "panel_id": "FULL_PATH",
-                    "window_issues": "",
-                    "exclusion_id": "",
-                    "metric": metric,
-                    "value": value,
-                    "observation_count": len(selected),
-                    "active_observation_count": len(selected),
-                    "undefined_reason": "" if value is not None else "LT2_OR_ZERO_VARIANCE",
-                    "first_calendar_index": path_rows[0]["calendar_index"] if selected else "",
-                    "last_calendar_index": path_rows[-1]["calendar_index"] if selected else "",
+        for panel_type, panel_id, window_issues, exclusion_id, panel_rows in _dependence_panel_specs(path_rows):
+            observations: list[dict[str, float]] = []
+            for row in panel_rows:
+                left = row["sleeve_settlements"][left_id]
+                right = row["sleeve_settlements"][right_id]
+                left_stake, right_stake = float(left["actual_stake_yuan"]), float(right["actual_stake_yuan"])
+                observations.append({
+                    "left_return": float(left["pre_tax_net_yuan"]) / left_stake if left_stake else 0.0,
+                    "right_return": float(right["pre_tax_net_yuan"]) / right_stake if right_stake else 0.0,
+                    "left_stake": left_stake, "right_stake": right_stake,
+                    "left_gross": float(left["gross_yuan"]), "right_gross": float(right["gross_yuan"]),
+                    "left_hits": float(left["hit_ticket_count"]), "right_hits": float(right["hit_ticket_count"]),
                 })
+            for denominator, selected in (
+                ("FULL_CALENDAR_ZERO_FLOW", observations),
+                ("UNION_ACTIVE", [row for row in observations if row["left_stake"] > 0 or row["right_stake"] > 0]),
+                ("INTERSECTION_ACTIVE", [row for row in observations if row["left_stake"] > 0 and row["right_stake"] > 0]),
+            ):
+                left_values = [row["left_return"] for row in selected]
+                right_values = [row["right_return"] for row in selected]
+                downside_left = [min(value, 0.0) for value in left_values]
+                downside_right = [min(value, 0.0) for value in right_values]
+                metrics: dict[str, float | None] = {
+                    "PEARSON": _pearson(left_values, right_values),
+                    "SPEARMAN": _pearson(_average_ranks(left_values), _average_ranks(right_values)) if selected else None,
+                    "DOWNSIDE_CORRELATION": _pearson(downside_left, downside_right),
+                    "JOINT_LOSS_RATE": sum(a < 0 and b < 0 for a, b in zip(left_values, right_values, strict=True)) / len(selected) if selected else None,
+                    "PAYOUT_OVERLAP_COUNT": float(sum(row["left_gross"] > 0 and row["right_gross"] > 0 for row in selected)),
+                    "HIT_OVERLAP_COUNT": float(sum(row["left_hits"] > 0 and row["right_hits"] > 0 for row in selected)),
+                }
+                for metric, value in metrics.items():
+                    result.append({
+                        **{field: path_rows[0][field] for field in PATH_IDENTITY},
+                        "economic_family_left": left_family,
+                        "economic_family_right": right_family,
+                        "denominator_id": denominator,
+                        "panel_type": panel_type,
+                        "panel_id": panel_id,
+                        "window_issues": window_issues,
+                        "exclusion_id": exclusion_id,
+                        "metric": metric,
+                        "value": value,
+                        "observation_count": len(selected),
+                        "active_observation_count": len(selected),
+                        "undefined_reason": "" if value is not None else "LT2_OR_ZERO_VARIANCE",
+                        "first_calendar_index": panel_rows[0]["calendar_index"] if selected else "",
+                        "last_calendar_index": panel_rows[-1]["calendar_index"] if selected else "",
+                    })
     return result
 
 
