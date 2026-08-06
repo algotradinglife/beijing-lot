@@ -1245,7 +1245,20 @@ def phase_one_intrinsic_screen(
     if len(selected_paths) != len(native_paths) or not selected_paths:
         raise RuntimeError("Phase-0 selected/native cache denominator drift")
     cache.inject_native_observations(native_paths)
-    curves = [row for candidate_id in sorted(catalog) for row in standalone_m_curve(candidate_id)]
+    curves: list[dict[str, object]] = []
+    h1_remaining = set(H1_SLEEVES)
+    candidate_order = [*H1_SLEEVES, *sorted(set(catalog) - set(H1_SLEEVES))]
+    for candidate_id in candidate_order:
+        curves.extend(standalone_m_curve(candidate_id))
+        if candidate_id in h1_remaining:
+            h1_remaining.remove(candidate_id)
+        if not h1_remaining:
+            # Phase-1 pair rows consume the aggregate cache above, not the
+            # source tax lots.  Release the expensive H1 ticket bridge before
+            # reading the expanded source families.
+            global _H1_TICKET_BRIDGE
+            _H1_TICKET_BRIDGE = None
+            gc.collect()
     pairs = list(candidate_pairs or frozen_portfolio_sets()["pairwise"])
     if len({tuple(sorted(pair)) for pair in pairs}) != len(pairs):
         raise RuntimeError("Phase-1 intrinsic pair duplication")
