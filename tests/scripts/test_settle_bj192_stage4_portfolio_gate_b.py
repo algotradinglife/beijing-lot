@@ -558,6 +558,68 @@ def test_minimal_stage4_fixture_is_separately_bound_from_superseded_surface_chec
         checkpoint.unlink(missing_ok=True)
 
 
+def test_minimal_stage4_comparison_reuses_prebuilt_core_ledgers(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Finalization must not expand the saved checkpoint twice."""
+    identity = ("BEST_FULL_FULL", "NATIVE_REQUEST_CONTROL", 1.0, "EQUAL_WEIGHT", "UNIT_CAPITAL", "BUNDLE_ORDINAL_001")
+    core = {
+        "capital_summary": [{
+            "portfolio_id": identity[0], "mode": identity[1], "position_fraction": identity[2],
+            "weight_method": identity[3], "normalization_method": identity[4],
+            "deployment_replicate_bundle_id": identity[5], "ending_bankroll_yuan": 100000.0,
+            "pre_tax_roi": 0.0, "capital_growth": 0.0, "capital_turnover": 0.0,
+            "tax_adjusted_roi": 0.0, "cash_yuan": 100000.0,
+        }],
+        "holding_metrics": [{
+            "portfolio_id": identity[0], "mode": identity[1], "position_fraction": identity[2],
+            "weight_method": identity[3], "normalization_method": identity[4],
+            "deployment_replicate_bundle_id": identity[5], "max_drawdown_yuan": 0.0,
+            "sharpe": 0.0, "sortino": 0.0, "calmar": 0.0,
+        }],
+        "sleeve_funding_ledger": [{
+            "portfolio_id": identity[0], "mode": identity[1], "position_fraction": identity[2],
+            "weight_method": identity[3], "normalization_method": identity[4],
+            "deployment_replicate_bundle_id": identity[5], "sleeve_or_family_id": "BEST_FULL_FULL",
+            "actual_stake_yuan": 2.0,
+        }],
+    }
+    monkeypatch.setattr(RUNNER, "minimal_stage4_core_tables", lambda _checkpoint: (_ for _ in ()).throw(AssertionError("unexpected checkpoint reload")))
+    result = RUNNER.minimal_stage4_comparison_tables(
+        ROOT / ".scratch" / "unused.json", core_tables=core,
+        identities={identity: {"support_hash": "a" * 64, "actual_funding_hash": "b" * 64}},
+    )
+    assert len(result["baseline_lift"]) == 1
+
+
+def test_minimal_stage4_finalizer_is_atomic_and_checkpoint_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    output = ROOT / ".scratch" / "bj192_minimal_finalizer_fixture"
+    stage = output.with_name(f".{output.name}.stage")
+    if output.exists():
+        shutil.rmtree(output)
+    if stage.exists():
+        shutil.rmtree(stage)
+    schema = __import__("json").load(open(RUNNER.GATE_A / "output_schema.json"))
+    tables = {name: [] for name, spec in schema.items() if isinstance(spec, dict) and "key" in spec}
+    for name in ("issue_ledger", "sleeve_funding_ledger", "capital_summary", "holding_metrics", "baseline_lift", "bootstrap_stability", "terminal_decision", "regime_map", "selected_m_path"):
+        tables[name] = [{field: "fixture" for field in [*schema[name]["key"], *schema[name]["fields"]]}]
+    checkpoint = ROOT / ".scratch" / "bj192_finalizer_fixture_checkpoint.json"
+    checkpoint.write_text(
+        '{"completed_path_keys":[],"payload_sha256":"fixture-payload"}\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(RUNNER, "load_minimal_stage4_checkpoint", lambda _checkpoint: ({"phase": "fixture"}, {}))
+    monkeypatch.setattr(RUNNER, "minimal_stage4_package_tables", lambda _checkpoint: tables)
+    try:
+        receipt = RUNNER.finalize_minimal_stage4_package(checkpoint, output)
+        assert output.exists() and not stage.exists()
+        assert RUNNER.verify_package(output, receipt["manifest_sha256"], receipt["content_sha256"])
+        source = __import__("json").load(open(output / "source_binding.json"))
+        assert source["settlement_boundary"] == "CHECKPOINT_ONLY_NO_TICKET_REPLAY"
+    finally:
+        checkpoint.unlink(missing_ok=True)
+        if output.exists():
+            shutil.rmtree(output)
+
+
 def test_bounded_core_fixture_writes_summary_and_realized_stability() -> None:
     checkpoint = ROOT / ".scratch" / "bj192_core_fixture.json"
     checkpoint.unlink(missing_ok=True)

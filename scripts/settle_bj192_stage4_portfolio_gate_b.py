@@ -181,6 +181,7 @@ def write_immutable_package(
     *,
     source_binding: dict[str, object],
     package_note: str,
+    max_package_bytes: int | None = None,
 ) -> dict[str, object]:
     """Write a complete package into a unique sibling stage then atomically land it.
 
@@ -205,7 +206,15 @@ def write_immutable_package(
     try:
         table_manifest: dict[str, dict[str, object]] = {}
         for table, rows in sorted(tables.items()):
-            compressed = table in {"issue_ledger", "weight_history", "selected_m_path", "standalone_m_curve"}
+            # The minimal Stage-4 contract retains every issue-level audit row.
+            # Keep the science bytes intact while compressing the wide ledgers so
+            # the canonical package remains within its committed size ceiling.
+            compressed = table in {
+                "issue_ledger", "sleeve_funding_ledger", "weight_history",
+                "selected_m_path", "standalone_m_curve", "stage_attribution",
+                "rolling_window_metrics", "risk_decomposition", "dependence_panel",
+                "realized_funded_flow_dependence", "intrinsic_native_dependence",
+            }
             filename = f"{table}.csv.gz" if compressed else f"{table}.csv"
             spec = schema[table]
             fields = write_csv_rows(
@@ -218,6 +227,11 @@ def write_immutable_package(
         (stage / "source_binding.json").write_text(json.dumps(source_binding, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (stage / "table_manifest.json").write_text(json.dumps(table_manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         (stage / "README.md").write_text(package_note.rstrip() + "\n", encoding="utf-8")
+        staged_bytes = sum(path.stat().st_size for path in stage.iterdir() if path.is_file())
+        if max_package_bytes is not None and staged_bytes > max_package_bytes:
+            raise RuntimeError(
+                f"package size ceiling exceeded: {staged_bytes} > {max_package_bytes} bytes"
+            )
         archive_transport = {path.name: sha256_file(path) for path in sorted(stage.iterdir()) if path.is_file()}
         scientific = {path.name: canonical_scientific_sha256(path) for path in sorted(stage.iterdir()) if path.is_file()}
         content = {
@@ -1747,6 +1761,9 @@ def minimal_stage4_core_tables(
 
 def minimal_stage4_comparison_tables(
     checkpoint: Path,
+    *,
+    core_tables: dict[str, list[dict[str, object]]] | None = None,
+    identities: dict[tuple[object, ...], dict[str, str]] | None = None,
 ) -> dict[str, list[dict[str, object]]]:
     """Build matched FULL lifts and the bounded pair/K/pareto decision views.
 
@@ -1755,7 +1772,12 @@ def minimal_stage4_comparison_tables(
     cash-only comparison: every lift is matched by mode, fraction, weighting,
     normalization, bundle, starting bankroll and complete calendar.
     """
-    core, identities = minimal_stage4_core_tables(checkpoint)
+    # Package finalization already materializes the large core ledgers.  Reuse
+    # them there rather than retaining a second full checkpoint expansion.
+    if core_tables is None or identities is None:
+        core, identities = minimal_stage4_core_tables(checkpoint)
+    else:
+        core = core_tables
     capital_by_identity = {
         tuple(row[field] for field in PATH_IDENTITY): row for row in core["capital_summary"]
     }
@@ -2818,14 +2840,20 @@ def minimal_stage4_package_tables(checkpoint: Path) -> dict[str, list[dict[str, 
     """Assemble the schema-complete #192 package inputs from checkpoint state."""
     schema = json.loads((GATE_A / "output_schema.json").read_text(encoding="utf-8"))
     tables = {name: [] for name, spec in schema.items() if isinstance(spec, dict) and "key" in spec}
-    core, _ = minimal_stage4_core_tables(checkpoint)
-    comparison = minimal_stage4_comparison_tables(checkpoint)
+    # These checkpoint-only calculations release their decoded path state
+    # before the high-row core ledgers are retained for package assembly.
+    strict_rows = minimal_stage4_strict_bootstrap_rows(checkpoint)
+    dependence = minimal_stage4_dependence_tables(checkpoint)
+    core, identities = minimal_stage4_core_tables(checkpoint)
+    comparison = minimal_stage4_comparison_tables(
+        checkpoint, core_tables=core, identities=identities,
+    )
     tables.update(core)
     tables.update(comparison)
     tables["selected_m_path"] = minimal_stage4_selected_m_rows()
     tables["regime_map"] = read_csv(GATE_A / "regime_map.csv")
-    tables["bootstrap_stability"] = minimal_stage4_strict_bootstrap_rows(checkpoint)
-    tables.update(minimal_stage4_dependence_tables(checkpoint))
+    tables["bootstrap_stability"] = strict_rows
+    tables.update(dependence)
     for row in tables["bootstrap_stability"]:
         tables["terminal_decision"].append({
             "portfolio_id": row["portfolio_id"], "mode": row["mode"], "position_fraction": row["position_fraction"],
@@ -2893,6 +2921,46 @@ def minimal_stage4_dependence_tables(checkpoint: Path) -> dict[str, list[dict[st
     } for row in realized]
     return {"dependence": list(wide.values()), "dependence_panel": panels,
             "realized_funded_flow_dependence": realized, "intrinsic_native_dependence": intrinsic}
+
+
+def finalize_minimal_stage4_package(checkpoint: Path, output: Path) -> dict[str, object]:
+    """Atomically write the #192 Gate-B closure package from the saved replay."""
+    binding, _ = load_minimal_stage4_checkpoint(checkpoint)
+    tables = minimal_stage4_package_tables(checkpoint)
+    required_rows = {
+        "issue_ledger", "sleeve_funding_ledger", "capital_summary", "holding_metrics",
+        "baseline_lift", "bootstrap_stability", "terminal_decision", "regime_map", "selected_m_path",
+    }
+    if any(not tables[name] for name in required_rows):
+        raise RuntimeError("minimal Gate-B required evidence table is empty")
+    checkpoint_payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+    source_binding = {
+        "gate_a": {"package": GATE_A.name, "manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+                   "content_identity_sha256": EXPECTED_GATE_A_CONTENT},
+        "checkpoint": {
+            "path": str(checkpoint.resolve().relative_to(ROOT.resolve())),
+            "file_sha256": sha256_file(checkpoint),
+            "payload_sha256": checkpoint_payload["payload_sha256"],
+            "record_count": len(checkpoint_payload["completed_path_keys"]),
+        },
+        "execution_contract": binding,
+        "settlement_boundary": "CHECKPOINT_ONLY_NO_TICKET_REPLAY",
+        "strict_inference": "TWO_PAIRED_STATIONARY_BLOCK_MAX_T_CONTRASTS_20000_REPLICATES",
+    }
+    note = """# #192 Gate B — minimal Stage-4 closure
+
+This immutable outcome package is reconstructed only from the hash-bound
+minimal Stage-4 checkpoint.  It covers the three deterministic frozen sleeves,
+seven memberships and the authorized capital grid.  The two materially
+positive descriptive candidates both failed the preregistered 20,000-replicate
+paired stationary-block max-T screen; the terminal disposition is therefore
+NO_PROMOTION.  `standalone_m_curve` is intentionally empty: the final
+minimal-closure amendment expressly prohibited re-running M curves.
+"""
+    return write_immutable_package(
+        output, tables, source_binding=source_binding, package_note=note,
+        max_package_bytes=500 * 1024 * 1024,
+    )
 
 
 def summarize_holding_path(rows: Sequence[dict[str, object]]) -> dict[str, object]:
