@@ -905,6 +905,45 @@ def build_bundle_bridges(
     return merge_candidate_bridges(*bridges), selected_rows
 
 
+class CandidatePathCache:
+    """Memoize selected 348-row paths, never an outcome-rescaled aggregate.
+
+    A dense source M surface is materialized once per candidate to derive its
+    frozen walk-forward paths, then only the selected immutable issue sleeves
+    remain referenced.  This makes the all-pair replay practical without
+    retaining the full raw dense grid for every candidate in RAM.
+    """
+
+    def __init__(self, calendar: Sequence[dict[str, str]] | None = None) -> None:
+        self.calendar = list(calendar or read_csv(GATE_A / "full_calendar.csv"))
+        self._paths: dict[str, dict[str, tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]]] = {}
+
+    def paths(self, candidate_id: str) -> dict[str, tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]]:
+        if candidate_id not in self._paths:
+            surface = materialize_candidate_m_surface(candidate_id)
+            self._paths[candidate_id] = {
+                seed: build_walk_forward_candidate_bridge(candidate_id, seed, self.calendar, surface)
+                for seed in sorted({seed for _, seed, _ in surface})
+            }
+        return self._paths[candidate_id]
+
+    def bundle(self, candidates: Sequence[str], bundle_id: str) -> tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]:
+        bundles = frozen_replicate_bundles()
+        seed_map = bundles.get(bundle_id)
+        if seed_map is None or any(candidate not in seed_map for candidate in candidates):
+            raise RuntimeError(f"candidate absent from frozen bundle: {bundle_id}")
+        bridges: list[dict[tuple[str, str], IssueSleeve]] = []
+        selected_rows: list[dict[str, object]] = []
+        for candidate in candidates:
+            seed = "NA" if seed_map[candidate] == "DETERMINISTIC" else seed_map[candidate]
+            bridge, selected = self.paths(candidate).get(seed, (None, None))
+            if bridge is None or selected is None:
+                raise RuntimeError(f"frozen bundle seed unavailable: {candidate}/{seed}")
+            bridges.append(bridge)
+            selected_rows.extend([{**row, "deployment_replicate_bundle_id": bundle_id} for row in selected])
+        return merge_candidate_bridges(*bridges), selected_rows
+
+
 def replay_bundle_path(
     candidates: Sequence[str],
     bundle_id: str,
@@ -914,11 +953,16 @@ def replay_bundle_path(
     weight_method: str,
     normalization_method: str,
     calendar: Sequence[dict[str, str]] | None = None,
+    path_cache: CandidatePathCache | None = None,
 ) -> dict[str, object]:
     """Replay one fixed candidate set under its exact replicate-bundle map."""
     calendar = list(calendar or read_csv(GATE_A / "full_calendar.csv"))
     candidates = tuple(sorted(candidates))
-    bridge, selected_m = build_bundle_bridges(candidates, bundle_id, calendar)
+    bridge, selected_m = (
+        path_cache.bundle(candidates, bundle_id)
+        if path_cache is not None
+        else build_bundle_bridges(candidates, bundle_id, calendar)
+    )
     trace_identity = canonical_hash({
         "candidates": candidates,
         "bundle": bundle_id,

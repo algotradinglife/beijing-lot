@@ -383,3 +383,23 @@ def test_realized_dependence_uses_explicit_zero_flow_and_active_denominators() -
     rows = RUNNER.realized_funded_flow_dependence(path)
     assert {row["denominator_id"] for row in rows} == {"FULL_CALENDAR_ZERO_FLOW", "UNION_ACTIVE", "INTERSECTION_ACTIVE"}
     assert any(row["metric"] == "PEARSON" for row in rows)
+
+
+def test_candidate_path_cache_reuses_immutable_selected_seed_paths() -> None:
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:3]
+    cache = RUNNER.CandidatePathCache(calendar)
+    first_bridge, first_m = cache.bundle(["BEST_FULL_FULL", "BJ159_SELECTED_N7_WOR_M_CURVE"], "BUNDLE_ORDINAL_001")
+    second_bridge, second_m = cache.bundle(["BEST_FULL_FULL", "BJ159_SELECTED_N7_WOR_M_CURVE"], "BUNDLE_ORDINAL_001")
+    assert first_bridge == second_bridge
+    assert first_m == second_m
+    replay = RUNNER.replay_bundle_path(
+        ["BEST_FULL_FULL", "BJ159_SELECTED_N7_WOR_M_CURVE"],
+        "BUNDLE_ORDINAL_001",
+        mode="FIXED_100K_NOTIONAL",
+        fraction=0.05,
+        weight_method="EQUAL_WEIGHT",
+        normalization_method="UNIT_CAPITAL",
+        calendar=calendar,
+        path_cache=cache,
+    )
+    assert len(replay["path"]) == 3
