@@ -1572,6 +1572,211 @@ def phase_one_core_replay(
     return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=[*summaries, *stability])
 
 
+def phase_two_execution_axes() -> tuple[dict[str, object], ...]:
+    """Return the complete frozen Phase-2 capital sensitivity axes.
+
+    Phase 2 deliberately excludes the native-control and scaled-native rows:
+    it expands only the two capital modes named by the bounded-execution
+    amendment, across every frozen fraction/weight/normalization combination.
+    """
+    rows = tuple(
+        row for row in frozen_execution_axes()
+        if row["mode"] in {"FIXED_100K_NOTIONAL", "COMPOUNDING_BANKROLL"}
+    )
+    # EQUAL_CAPITAL is legal only for EQUAL_WEIGHT: 4 legal normalizations
+    # there, plus 3 for each of the other five frozen weight methods.
+    expected = 2 * 20 * 19
+    if len(rows) != expected or len({canonical_hash(row) for row in rows}) != len(rows):
+        raise RuntimeError("Phase-2 frozen capital sensitivity grid drift")
+    return rows
+
+
+def _phase_one_core_binding() -> dict[str, object]:
+    phase1 = ROOT / ".scratch" / "bj192_phase1_native_screen_checkpoint_v2.json"
+    return {
+        "phase": "PHASE_1_BOUNDED_CORE",
+        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
+        "phase0_checkpoint_sha256": sha256_file(ROOT / PHASE0_CHECKPOINT),
+        "phase1_screen_sha256": sha256_file(phase1),
+        "membership_count": 40,
+        "axis_count": len(bounded_core_execution_axes()),
+        "bundle_count": len(frozen_replicate_bundles()),
+    }
+
+
+def _rank_descending(rows: Sequence[dict[str, object]], field: str) -> dict[str, int]:
+    ordered = sorted(rows, key=lambda row: (-float(row[field]), str(row["membership_json"])))
+    return {str(row["membership_json"]): index + 1 for index, row in enumerate(ordered)}
+
+
+def _rank_ascending(rows: Sequence[dict[str, object]], field: str) -> dict[str, int]:
+    ordered = sorted(rows, key=lambda row: (float(row[field]), str(row["membership_json"])))
+    return {str(row["membership_json"]): index + 1 for index, row in enumerate(ordered)}
+
+
+def select_phase_two_memberships(core_checkpoint: Path) -> list[dict[str, object]]:
+    """Freeze the bounded Phase-2 membership set from the complete core panel.
+
+    This is intentionally an outcome-sensitive *descriptive* screen.  It is
+    not an edge claim: the selection rule is published with the result and
+    uses six path/capital criteria jointly, never a single best ROI cell.
+    """
+    rows = load_surface_checkpoint(core_checkpoint, binding=_phase_one_core_binding())
+    summaries = [row for row in rows if row.get("record_type") == "CORE_PATH_SUMMARY"]
+    if len(summaries) != 40 * len(bounded_core_execution_axes()) * len(frozen_replicate_bundles()):
+        raise RuntimeError("Phase-1 core summary denominator drift")
+    by_identity = {
+        (
+            row["membership_json"], row["mode"], row["position_fraction"], row["weight_method"],
+            row["normalization_method"], row["deployment_replicate_bundle_id"],
+        ): row
+        for row in summaries
+    }
+    full_json = json.dumps(("BEST_FULL_FULL",), separators=(",", ":"))
+    grouped: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for row in summaries:
+        grouped[str(row["membership_json"])].append(row)
+    screen: list[dict[str, object]] = []
+    for membership_json, group in sorted(grouped.items()):
+        lifts = []
+        for row in group:
+            comparator = by_identity.get((
+                full_json, row["mode"], row["position_fraction"], row["weight_method"],
+                row["normalization_method"], row["deployment_replicate_bundle_id"],
+            ))
+            if comparator is None:
+                raise RuntimeError("matched BEST_FULL core comparator unavailable")
+            lifts.append(float(row["ending_bankroll_yuan"]) - float(comparator["ending_bankroll_yuan"]))
+        screen.append({
+            "membership_json": membership_json,
+            "membership_id": canonical_hash({"membership": tuple(json.loads(membership_json))}),
+            "membership_size": len(json.loads(membership_json)),
+            "core_cell_count": len(group),
+            "median_ending_bankroll_yuan": _quantile([float(row["ending_bankroll_yuan"]) for row in group], 0.5),
+            "worst_ending_bankroll_yuan": min(float(row["ending_bankroll_yuan"]) for row in group),
+            "median_matched_full_lift_yuan": _quantile(lifts, 0.5),
+            "median_max_drawdown_yuan": _quantile([float(row["max_drawdown_yuan"]) for row in group], 0.5),
+            "median_recovery_duration_max_issues": _quantile([float(row["recovery_duration_max_issues"]) for row in group], 0.5),
+            "median_turnover_yuan": _quantile([float(row["turnover_yuan"]) for row in group], 0.5),
+            "bundle_min_ending_bankroll_yuan": min(
+                _quantile([float(row["ending_bankroll_yuan"]) for row in group if row["deployment_replicate_bundle_id"] == bundle], 0.5)
+                for bundle in frozen_replicate_bundles()
+            ),
+        })
+    for field in ("median_ending_bankroll_yuan", "worst_ending_bankroll_yuan", "median_matched_full_lift_yuan", "bundle_min_ending_bankroll_yuan"):
+        ranks = _rank_descending(screen, field)
+        for row in screen:
+            row[f"rank_{field}"] = ranks[str(row["membership_json"])]
+    for field in ("median_max_drawdown_yuan", "median_recovery_duration_max_issues", "median_turnover_yuan"):
+        ranks = _rank_ascending(screen, field)
+        for row in screen:
+            row[f"rank_{field}"] = ranks[str(row["membership_json"])]
+    rank_fields = [field for field in screen[0] if field.startswith("rank_")]
+    for row in screen:
+        row["joint_path_rank_sum"] = sum(int(row[field]) for field in rank_fields)
+    mandatory = {
+        json.dumps(tuple(sorted(H1_SLEEVES)), separators=(",", ":")),
+        json.dumps(tuple(sorted(ROBUST_SLEEVES)), separators=(",", ":")),
+    }
+    if not mandatory <= {str(row["membership_json"]) for row in screen}:
+        raise RuntimeError("mandatory Phase-2 membership absent from core panel")
+    metric_pairs = (
+        ("median_ending_bankroll_yuan", True),
+        ("worst_ending_bankroll_yuan", True),
+        ("median_matched_full_lift_yuan", True),
+        ("bundle_min_ending_bankroll_yuan", True),
+        ("median_max_drawdown_yuan", False),
+        ("median_recovery_duration_max_issues", False),
+        ("median_turnover_yuan", False),
+    )
+    def dominates(left: dict[str, object], right: dict[str, object]) -> bool:
+        comparisons = [
+            float(left[field]) >= float(right[field]) if higher else float(left[field]) <= float(right[field])
+            for field, higher in metric_pairs
+        ]
+        strict = [
+            float(left[field]) > float(right[field]) if higher else float(left[field]) < float(right[field])
+            for field, higher in metric_pairs
+        ]
+        return all(comparisons) and any(strict)
+    nonmandatory = [row for row in screen if str(row["membership_json"]) not in mandatory]
+    nondominated = [
+        row for row in nonmandatory
+        if not any(dominates(other, row) for other in nonmandatory if other is not row)
+    ]
+    selected_extras = sorted(
+        nondominated,
+        key=lambda row: (int(row["joint_path_rank_sum"]), -float(row["median_ending_bankroll_yuan"]), str(row["membership_json"])),
+    )[:4]
+    selected = mandatory | {str(row["membership_json"]) for row in selected_extras}
+    for row in screen:
+        row["record_type"] = "PHASE2_MEMBERSHIP_SELECTION"
+        row["phase2_selected"] = int(str(row["membership_json"]) in selected)
+        row["selection_status"] = (
+            "MANDATORY_H1_OR_ROBUST_K5" if str(row["membership_json"]) in mandatory
+            else "NONDOMINATED_JOINT_PATH_TOP4" if str(row["membership_json"]) in {str(item["membership_json"]) for item in selected_extras}
+            else "NOT_SELECTED_BOUNDED_PHASE2"
+        )
+        row["selection_rule"] = "JOINT_BORDA_ENDING_LIFT_DRAWDOWN_RECOVERY_TURNOVER_BUNDLE_MIN;_NONDOMINATED_ONLY"
+    result = sorted(screen, key=lambda row: (not bool(row["phase2_selected"]), int(row["joint_path_rank_sum"]), str(row["membership_json"])))
+    if sum(int(row["phase2_selected"]) for row in result) > 6:
+        raise RuntimeError("Phase-2 membership cap exceeded")
+    return result
+
+
+def phase_two_replay(
+    checkpoint: Path,
+    *,
+    core_checkpoint: Path | None = None,
+    memberships: Sequence[tuple[str, ...]] | None = None,
+    axes: Sequence[dict[str, object]] | None = None,
+    bundles: Sequence[str] | None = None,
+) -> dict[str, object]:
+    """Run every frozen Phase-2 capital axis for the bounded finalist set."""
+    core_checkpoint = core_checkpoint or ROOT / ".scratch" / "bj192_phase1_core_checkpoint.json"
+    selection = select_phase_two_memberships(core_checkpoint)
+    selected_memberships = list(memberships or [tuple(json.loads(str(row["membership_json"]))) for row in selection if row["phase2_selected"]])
+    selected_axes = list(axes or phase_two_execution_axes())
+    selected_bundles = list(bundles or sorted(frozen_replicate_bundles()))
+    if len(selected_memberships) > 6:
+        raise RuntimeError("Phase-2 membership cap exceeded")
+    cache = CandidatePathCache()
+    summaries: list[dict[str, object]] = []
+    stability: list[dict[str, object]] = []
+    for membership in selected_memberships:
+        membership = tuple(sorted(membership))
+        membership_id = canonical_hash({"membership": membership})
+        for bundle_id in selected_bundles:
+            bridge, selected_m = cache.bundle(membership, bundle_id)
+            trace = canonical_hash({"membership": membership, "bundle": bundle_id, "selected_m": selected_m})
+            for axis in selected_axes:
+                replay_axis = {**axis, "fraction": axis["position_fraction"]}
+                replay_axis.pop("position_fraction")
+                path = replay_path(sleeves=membership, bridge=bridge, calendar=cache.calendar, bundle_id=bundle_id,
+                    sleeve_trace_identity=trace, **replay_axis)
+                holding = summarize_holding_path(path)["summary"]
+                capital = capital_summary(path, holding)
+                summaries.append({
+                    "record_type": "PHASE2_PATH_SUMMARY", "membership_id": membership_id,
+                    "membership_json": json.dumps(membership, separators=(",", ":")),
+                    "membership_size": len(membership), "selected_m_path_sha256": canonical_hash(selected_m),
+                    **capital, **{key: holding[key] for key in ("max_drawdown_yuan", "max_drawdown_fraction", "loss_streak_calendar", "loss_streak_active", "miss_streak_calendar", "miss_streak_active", "recovery_duration_max_issues", "time_under_water_issues", "sharpe", "sortino", "calmar")},
+                })
+                stability.extend({"record_type": "PHASE2_REALIZED_STABILITY", **row} for row in _realized_stability_rows(path, membership_id))
+    binding = {
+        "phase": "PHASE_2_FULL_FROZEN_SENSITIVITY",
+        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
+        "phase1_core_checkpoint_sha256": sha256_file(core_checkpoint),
+        "selection_sha256": canonical_hash(selection),
+        "membership_count": len(selected_memberships),
+        "axis_count": len(selected_axes),
+        "bundle_count": len(selected_bundles),
+    }
+    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=[*selection, *summaries, *stability])
+
+
 def surface_preflight_receipt() -> dict[str, object]:
     """Quantify the exact frozen Cartesian request before allocating output.
 

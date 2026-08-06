@@ -494,6 +494,56 @@ def test_bounded_core_fixture_writes_summary_and_realized_stability() -> None:
         checkpoint.unlink(missing_ok=True)
 
 
+def test_phase_two_selection_keeps_mandatory_controls_and_jointly_ranked_nondominated_extras() -> None:
+    checkpoint = ROOT / ".scratch" / "bj192_phase1_core_checkpoint.json"
+    if not checkpoint.exists():
+        pytest.skip("Phase-1 production core checkpoint is not available")
+    rows = RUNNER.select_phase_two_memberships(checkpoint)
+    selected = {row["membership_json"] for row in rows if row["phase2_selected"]}
+    assert len(selected) <= 6
+    assert __import__("json").dumps(tuple(sorted(RUNNER.H1_SLEEVES)), separators=(",", ":")) in selected
+    assert __import__("json").dumps(tuple(sorted(RUNNER.ROBUST_SLEEVES)), separators=(",", ":")) in selected
+    extras = [row for row in rows if row["selection_status"] == "NONDOMINATED_JOINT_PATH_TOP4"]
+    assert len(extras) <= 4
+    assert all("ENDING_LIFT_DRAWDOWN_RECOVERY_TURNOVER" in row["selection_rule"] for row in extras)
+
+
+def test_phase_two_axes_are_exact_complete_frozen_capital_grid() -> None:
+    axes = RUNNER.phase_two_execution_axes()
+    assert len(axes) == 760
+    assert {row["mode"] for row in axes} == {"FIXED_100K_NOTIONAL", "COMPOUNDING_BANKROLL"}
+    assert {row["position_fraction"] for row in axes} == {
+        row["position_fraction"] for row in RUNNER.frozen_execution_axes()
+        if row["mode"] == "FIXED_100K_NOTIONAL"
+    }
+
+
+def test_phase_two_fixture_writes_bound_summary_and_stability() -> None:
+    core = ROOT / ".scratch" / "bj192_phase1_core_checkpoint.json"
+    if not core.exists():
+        pytest.skip("Phase-1 production core checkpoint is not available")
+    checkpoint = ROOT / ".scratch" / "bj192_phase2_fixture.json"
+    checkpoint.unlink(missing_ok=True)
+    try:
+        receipt = RUNNER.phase_two_replay(
+            checkpoint,
+            core_checkpoint=core,
+            memberships=[tuple(sorted(RUNNER.H1_SLEEVES))],
+            axes=[{
+                "mode": "FIXED_100K_NOTIONAL", "position_fraction": 0.10,
+                "weight_method": "EQUAL_WEIGHT", "normalization_method": "UNIT_CAPITAL",
+            }],
+            bundles=["BUNDLE_ORDINAL_001"],
+        )
+        rows = RUNNER.load_surface_checkpoint(checkpoint, binding=receipt["binding"])
+        assert sum(row["record_type"] == "PHASE2_PATH_SUMMARY" for row in rows) == 1
+        assert {row["panel_type"] for row in rows if row["record_type"] == "PHASE2_REALIZED_STABILITY"} >= {
+            "YEAR", "LOYO", "EX_LARGEST_ISSUE", "EX_LARGEST_YEAR",
+        }
+    finally:
+        checkpoint.unlink(missing_ok=True)
+
+
 def test_surface_preflight_reports_full_frozen_cartesian_scope_without_reduction() -> None:
     receipt = RUNNER.surface_preflight_receipt()
     assert receipt["status"] == "PREFLIGHT_REQUIRES_EXPLICIT_EXECUTION_PLAN"
