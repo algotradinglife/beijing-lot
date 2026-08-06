@@ -1025,6 +1025,96 @@ def frozen_portfolio_sets() -> dict[str, list[tuple[str, ...]]]:
     }
 
 
+def _pearson(left: Sequence[float], right: Sequence[float]) -> float | None:
+    if len(left) < 2 or len(left) != len(right):
+        return None
+    left_mean = sum(left) / len(left)
+    right_mean = sum(right) / len(right)
+    left_ss = sum((value - left_mean) ** 2 for value in left)
+    right_ss = sum((value - right_mean) ** 2 for value in right)
+    if left_ss <= 0 or right_ss <= 0:
+        return None
+    return sum((a - left_mean) * (b - right_mean) for a, b in zip(left, right, strict=True)) / math.sqrt(left_ss * right_ss)
+
+
+def _average_ranks(values: Sequence[float]) -> list[float]:
+    order = sorted(range(len(values)), key=lambda index: (values[index], index))
+    ranks = [0.0] * len(values)
+    offset = 0
+    while offset < len(order):
+        end = offset + 1
+        while end < len(order) and values[order[end]] == values[order[offset]]:
+            end += 1
+        rank = (offset + 1 + end) / 2.0
+        for index in order[offset:end]:
+            ranks[index] = rank
+        offset = end
+    return ranks
+
+
+def realized_funded_flow_dependence(path_rows: Sequence[dict[str, object]]) -> list[dict[str, object]]:
+    """Emit denominator-explicit funded-flow dependence for each sleeve pair."""
+    if not path_rows:
+        return []
+    catalog = canonical_economic_catalog()
+    sleeves = tuple(sorted(path_rows[0]["sleeve_settlements"]))
+    result: list[dict[str, object]] = []
+    for left_id, right_id in __import__("itertools").combinations(sleeves, 2):
+        left_family = catalog[left_id]["economic_family_id"]
+        right_family = catalog[right_id]["economic_family_id"]
+        observations: list[dict[str, float]] = []
+        for row in path_rows:
+            left = row["sleeve_settlements"][left_id]
+            right = row["sleeve_settlements"][right_id]
+            left_stake, right_stake = float(left["actual_stake_yuan"]), float(right["actual_stake_yuan"])
+            observations.append({
+                "left_return": float(left["pre_tax_net_yuan"]) / left_stake if left_stake else 0.0,
+                "right_return": float(right["pre_tax_net_yuan"]) / right_stake if right_stake else 0.0,
+                "left_stake": left_stake,
+                "right_stake": right_stake,
+                "left_gross": float(left["gross_yuan"]),
+                "right_gross": float(right["gross_yuan"]),
+                "left_hits": float(left["hit_ticket_count"]),
+                "right_hits": float(right["hit_ticket_count"]),
+            })
+        for denominator, selected in (
+            ("FULL_CALENDAR_ZERO_FLOW", observations),
+            ("UNION_ACTIVE", [row for row in observations if row["left_stake"] > 0 or row["right_stake"] > 0]),
+            ("INTERSECTION_ACTIVE", [row for row in observations if row["left_stake"] > 0 and row["right_stake"] > 0]),
+        ):
+            left_values = [row["left_return"] for row in selected]
+            right_values = [row["right_return"] for row in selected]
+            downside_left = [min(value, 0.0) for value in left_values]
+            downside_right = [min(value, 0.0) for value in right_values]
+            metrics: dict[str, float | None] = {
+                "PEARSON": _pearson(left_values, right_values),
+                "SPEARMAN": _pearson(_average_ranks(left_values), _average_ranks(right_values)) if selected else None,
+                "DOWNSIDE_CORRELATION": _pearson(downside_left, downside_right),
+                "JOINT_LOSS_RATE": sum(a < 0 and b < 0 for a, b in zip(left_values, right_values, strict=True)) / len(selected) if selected else None,
+                "PAYOUT_OVERLAP_COUNT": float(sum(row["left_gross"] > 0 and row["right_gross"] > 0 for row in selected)),
+                "HIT_OVERLAP_COUNT": float(sum(row["left_hits"] > 0 and row["right_hits"] > 0 for row in selected)),
+            }
+            for metric, value in metrics.items():
+                result.append({
+                    **{field: path_rows[0][field] for field in PATH_IDENTITY},
+                    "economic_family_left": left_family,
+                    "economic_family_right": right_family,
+                    "denominator_id": denominator,
+                    "panel_type": "OVERALL",
+                    "panel_id": "FULL_PATH",
+                    "window_issues": "",
+                    "exclusion_id": "",
+                    "metric": metric,
+                    "value": value,
+                    "observation_count": len(selected),
+                    "active_observation_count": len(selected),
+                    "undefined_reason": "" if value is not None else "LT2_OR_ZERO_VARIANCE",
+                    "first_calendar_index": path_rows[0]["calendar_index"] if selected else "",
+                    "last_calendar_index": path_rows[-1]["calendar_index"] if selected else "",
+                })
+    return result
+
+
 def merge_candidate_bridges(
     *bridges: dict[tuple[str, str], IssueSleeve],
 ) -> dict[tuple[str, str], IssueSleeve]:

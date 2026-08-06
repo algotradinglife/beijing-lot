@@ -363,3 +363,23 @@ def test_frozen_portfolio_enumeration_covers_every_canonical_pair_and_shortlist_
     assert len(sets["pairwise"]) == 5356
     assert len(sets["higher_order"]) == 7 + 31
     assert ("BEST_FULL_FULL", "MODEL_SOURCE_MODEL_CAP1_M512") in sets["pairwise"]
+
+
+def test_realized_dependence_uses_explicit_zero_flow_and_active_denominators() -> None:
+    bridge = RUNNER.h1_ticket_bridge()
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:3]
+    path = RUNNER.replay_path(
+        sleeves=["BEST_FULL_FULL", "MODEL_SOURCE_MODEL_CAP1_M512"],
+        mode="FIXED_100K_NOTIONAL",
+        fraction=0.05,
+        weight_method="EQUAL_WEIGHT",
+        normalization_method="UNIT_CAPITAL",
+        bridge=RUNNER.merge_candidate_bridges(
+            {key: value for key, value in bridge.items() if key[0] == "BEST_FULL_FULL"},
+            {key: value for key, value in bridge.items() if key[0] == "MODEL_SOURCE_MODEL_CAP1_M512"},
+        ),
+        calendar=calendar,
+    )
+    rows = RUNNER.realized_funded_flow_dependence(path)
+    assert {row["denominator_id"] for row in rows} == {"FULL_CALENDAR_ZERO_FLOW", "UNION_ACTIVE", "INTERSECTION_ACTIVE"}
+    assert any(row["metric"] == "PEARSON" for row in rows)
