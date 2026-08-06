@@ -510,6 +510,10 @@ def test_minimal_stage4_fixture_is_separately_bound_from_superseded_surface_chec
         )
         rows = RUNNER.load_surface_checkpoint(checkpoint, binding=receipt["binding"])
         assert receipt["binding"]["phase"] == "FINAL_GATE_B_MINIMAL_STAGE4_CLOSURE"
+        issue_paths = [row for row in rows if row["record_type"] == "MINIMAL_STAGE4_ISSUE_PATH"]
+        assert len(issue_paths) == 348
+        assert issue_paths[0]["sleeve_settlements"]
+        assert issue_paths[0]["weights"]
         assert sum(row["record_type"] == "MINIMAL_STAGE4_PATH_SUMMARY" for row in rows) == 1
         assert {row["panel_type"] for row in rows if row["record_type"] == "MINIMAL_STAGE4_REALIZED_STABILITY"} >= {
             "YEAR", "LOYO", "EX_LARGEST_ISSUE", "EX_LARGEST_YEAR",

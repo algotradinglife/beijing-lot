@@ -1577,6 +1577,7 @@ def minimal_stage4_replay(
     cache = CandidatePathCache()
     summaries: list[dict[str, object]] = []
     stability: list[dict[str, object]] = []
+    issue_paths: list[dict[str, object]] = []
     for membership in selected_memberships:
         membership = tuple(sorted(membership))
         membership_id = canonical_hash({"membership": membership})
@@ -1590,6 +1591,18 @@ def minimal_stage4_replay(
                     sleeves=membership, bridge=bridge, calendar=cache.calendar,
                     bundle_id=bundle_id, sleeve_trace_identity=trace, **replay_axis,
                 )
+                # The checkpoint is the only permitted hand-off between exact
+                # ticket settlement and package finalization.  Retain the
+                # complete per-issue state (including funded tax-lot results
+                # and weights) so the finalizer never replays a ticket just to
+                # reconstruct a report table.
+                issue_paths.extend({
+                    "record_type": "MINIMAL_STAGE4_ISSUE_PATH",
+                    "membership_id": membership_id,
+                    "membership_json": json.dumps(membership, separators=(",", ":")),
+                    "membership_size": len(membership),
+                    **row,
+                } for row in path)
                 holding = summarize_holding_path(path)["summary"]
                 capital = capital_summary(path, holding)
                 summaries.append({
@@ -1618,7 +1631,10 @@ def minimal_stage4_replay(
         "membership_contract_sha256": canonical_hash(minimal_stage4_memberships()),
         "axis_contract_sha256": canonical_hash(minimal_stage4_execution_axes()),
     }
-    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=[*summaries, *stability])
+    return write_surface_checkpoint(
+        checkpoint, binding=binding,
+        completed_path_keys=[*issue_paths, *summaries, *stability],
+    )
 
 
 def _realized_stability_rows(path: Sequence[dict[str, object]], membership_id: str) -> list[dict[str, object]]:
