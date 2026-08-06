@@ -12,6 +12,7 @@ approximation.
 from __future__ import annotations
 
 import csv
+import gc
 import gzip
 import hashlib
 import importlib.util
@@ -31,8 +32,8 @@ CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
 VERSION = "bj192-gate-b-v1"
 TICKET_STAKE_YUAN = 2.0
 INITIAL_BANKROLL_YUAN = 100_000.0
-PHASE0_CHECKPOINT = ".scratch/bj192_phase0_selected_m_checkpoint_v2.json"
-PHASE0_MATERIALIZER_CONTRACT = "selected-native-outcome-cache-v2"
+PHASE0_CHECKPOINT = ".scratch/bj192_phase0_selected_m_checkpoint_v3.json"
+PHASE0_MATERIALIZER_CONTRACT = "selected-native-outcome-cache-v3"
 
 EXPECTED_GATE_A_MANIFEST = "6108defd857bf431bcaf55109df0e195b45aa754e8fd46f1db82d329102ff256"
 EXPECTED_GATE_A_CONTENT = "66ce6f86703b31d710ad678b49287de3bc6b2c43a5b36c278e1369bdecd861d5"
@@ -1008,6 +1009,28 @@ class CandidatePathCache:
             }
         return by_seed[deployment_seed]
 
+    def inject_native_observations(self, rows: Iterable[dict[str, object]]) -> None:
+        """Load the Phase-0 aggregate ticket settlement cache without tickets."""
+        for row in rows:
+            candidate_id = str(row["candidate_id"])
+            seed = str(row["deployment_seed"])
+            issue = str(row["issue_instance"])
+            self._native_observations.setdefault(candidate_id, {}).setdefault(seed, {})[issue] = {
+                "return": float(row["native_pre_tax_return"]),
+                "stake": float(row["native_actual_stake_yuan"]),
+                "gross": float(row["native_pre_tax_gross_yuan"]),
+                "hits": int(row["native_hit_ticket_count"]),
+                "available": bool(row["native_outcome_available"]),
+            }
+
+    def release_candidate_paths(self, candidate_id: str, *, release_h1: bool = False) -> None:
+        """Drop temporary ticket-lot objects after their aggregate cache is bound."""
+        self._paths.pop(candidate_id, None)
+        if release_h1:
+            global _H1_TICKET_BRIDGE
+            _H1_TICKET_BRIDGE = None
+        gc.collect()
+
     def bundle(self, candidates: Sequence[str], bundle_id: str) -> tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]:
         bundles = frozen_replicate_bundles()
         seed_map = bundles.get(bundle_id)
@@ -1033,25 +1056,50 @@ def materialize_phase_zero_selection_checkpoint(
     """Persist all frozen selected-M paths before Phase-1 pair screening."""
     cache = cache or CandidatePathCache()
     selected: list[dict[str, object]] = []
-    for candidate_id in sorted(canonical_economic_catalog()):
-        for seed, (_, rows) in cache.paths(candidate_id).items():
+    native: list[dict[str, object]] = []
+    expected = 0
+    h1_remaining = set(H1_SLEEVES)
+    catalog = canonical_economic_catalog()
+    # Process the three shared #170 ticket-ledger sleeves together so their
+    # million-ish lot objects can be released before the expanded catalog.
+    candidate_order = [*H1_SLEEVES, *sorted(set(catalog) - set(H1_SLEEVES))]
+    for candidate_id in candidate_order:
+        paths = cache.paths(candidate_id)
+        for seed, (_, rows) in paths.items():
             # Materialize every ticket-level native source outcome once while
             # this Phase-0 cache owns the selected source surface.
-            cache.native_observations(candidate_id, seed)
+            observations = cache.native_observations(candidate_id, seed)
+            expected += len(rows)
             for row in rows:
-                selected.append({"candidate_id": candidate_id, "deployment_seed": seed,
+                issue = str(row["issue_instance"])
+                observation = observations[issue]
+                selected.append({"record_type": "SELECTED_M_PATH", "candidate_id": candidate_id, "deployment_seed": seed,
                     "issue_instance": row["issue_instance"], "calendar_index": row["calendar_index"],
                     "selected_M": row["selected_M"], "selection_variant": row["selection_variant"],
                     "prior_training_input_sha256": row["prior_training_input_sha256"]})
-    expected = sum(len(paths) * 348 for paths in cache._paths.values())
+                native.append({"record_type": "NATIVE_ISSUE_SETTLEMENT", "candidate_id": candidate_id,
+                    "deployment_seed": seed, "issue_instance": issue,
+                    "native_pre_tax_return": observation["return"],
+                    "native_actual_stake_yuan": observation["stake"],
+                    "native_pre_tax_gross_yuan": observation["gross"],
+                    "native_hit_ticket_count": observation["hits"],
+                    "native_outcome_available": observation["available"]})
+        if candidate_id in h1_remaining:
+            h1_remaining.remove(candidate_id)
+        # Native outcomes and selected-M decisions above are sufficient for
+        # Phase-1.  Retaining source ticket lots across 104 families breaches
+        # the resource envelope without adding scientific information.
+        cache.release_candidate_paths(candidate_id, release_h1=not h1_remaining)
     if len(selected) != expected:
         raise RuntimeError(f"Phase-0 selected-path count drift: {len(selected)} != {expected}")
+    if len(native) != expected:
+        raise RuntimeError(f"Phase-0 native-outcome count drift: {len(native)} != {expected}")
     binding = {"gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
         "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
         "settled_source_bindings": verify_gate_a_source_bindings(),
         "phase0_materializer_contract": PHASE0_MATERIALIZER_CONTRACT,
         "phase": "PHASE_0_SELECTED_M_PATHS"}
-    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=selected)
+    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=[*selected, *native])
 
 
 def _native_observation(sleeve: IssueSleeve) -> dict[str, float | int | bool]:
@@ -1188,9 +1236,15 @@ def phase_one_intrinsic_screen(
         "phase0_materializer_contract": PHASE0_MATERIALIZER_CONTRACT,
         "phase": "PHASE_0_SELECTED_M_PATHS",
     }
-    # The checkpoint is a binding guard, not a source of mutable outcomes.
+    # The checkpoint is a binding guard plus the immutable aggregate outcome
+    # cache.  Pair screening therefore never re-enumerates a source ticket.
     phase0_checkpoint = ROOT / PHASE0_CHECKPOINT
-    load_surface_checkpoint(phase0_checkpoint, binding=expected_phase0)
+    phase0_rows = load_surface_checkpoint(phase0_checkpoint, binding=expected_phase0)
+    selected_paths = [row for row in phase0_rows if row.get("record_type") == "SELECTED_M_PATH"]
+    native_paths = [row for row in phase0_rows if row.get("record_type") == "NATIVE_ISSUE_SETTLEMENT"]
+    if len(selected_paths) != len(native_paths) or not selected_paths:
+        raise RuntimeError("Phase-0 selected/native cache denominator drift")
+    cache.inject_native_observations(native_paths)
     curves = [row for candidate_id in sorted(catalog) for row in standalone_m_curve(candidate_id)]
     pairs = list(candidate_pairs or frozen_portfolio_sets()["pairwise"])
     if len({tuple(sorted(pair)) for pair in pairs}) != len(pairs):
@@ -1200,12 +1254,6 @@ def phase_one_intrinsic_screen(
         for left_id, right_id in pairs
         for bundle_id in sorted(frozen_replicate_bundles())
         for row in intrinsic_native_pair_dependence(left_id, right_id, bundle_id, path_cache=cache)
-    ]
-    selected_paths = [
-        {"candidate_id": candidate_id, "deployment_seed": seed, **row}
-        for candidate_id in sorted(catalog)
-        for seed, (_, rows) in cache.paths(candidate_id).items()
-        for row in rows
     ]
     binding = {
         "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
