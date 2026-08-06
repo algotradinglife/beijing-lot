@@ -219,3 +219,23 @@ def test_walk_forward_bridge_uses_only_preissue_m_history() -> None:
     assert all(row["selected_M"] == 32 for row in selected[:52])
     assert all(row["prior_training_end_calendar_index"] != row["calendar_index"] for row in selected[1:])
     assert all(len(row["prior_training_input_sha256"]) == 64 for row in selected)
+
+
+def test_sleeve_funding_ledger_and_capital_summary_reconcile_exactly() -> None:
+    bridge = RUNNER.h1_ticket_bridge()
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:3]
+    rows = RUNNER.replay_path(
+        sleeves=RUNNER.H1_SLEEVES,
+        mode="FIXED_100K_NOTIONAL",
+        fraction=0.05,
+        weight_method="PRIOR_INVERSE_VOL",
+        normalization_method="UNIT_CAPITAL",
+        bridge=bridge,
+        calendar=calendar,
+    )
+    funding = RUNNER.sleeve_funding_rows(rows, bridge)
+    assert len(funding) == len(rows) * len(RUNNER.H1_SLEEVES)
+    assert all(row["prefix_execution_status"] in {"GLOBAL_PREFIX", "WHOLE_NATIVE_OR_NO_BET"} for row in funding)
+    holding = RUNNER.summarize_holding_path(rows)["summary"]
+    summary = RUNNER.capital_summary(rows, holding)
+    assert summary["turnover_yuan"] == pytest.approx(sum(float(row["actual_stake_yuan"]) for row in rows))

@@ -1182,3 +1182,79 @@ def choose_prior_m(
         "prior_active_issue_count": min(active_counts[m_value] for m_value in eligible),
         "training_scores": scores,
     }
+
+
+def sleeve_funding_rows(
+    path_rows: Sequence[dict[str, object]],
+    bridge: dict[tuple[str, str], IssueSleeve],
+) -> list[dict[str, object]]:
+    """Expand a portfolio path into the schema-bound per-sleeve funding ledger."""
+    records: list[dict[str, object]] = []
+    for row in path_rows:
+        issue = str(row["issue_instance"])
+        funded_total = 0.0
+        for sleeve_id, settlement in sorted(row["sleeve_settlements"].items()):
+            sleeve = bridge[(sleeve_id, issue)]
+            actual_count = int(settlement["actual_ticket_count"])
+            if sleeve.atomic and actual_count not in (0, sleeve.requested_ticket_count):
+                raise RuntimeError(f"atomic funding invariant broken: {sleeve_id}/{issue}")
+            funded_total += float(settlement["actual_stake_yuan"])
+            if isinstance(sleeve, NativeIssueSleeve) and actual_count:
+                ticket_list = canonical_hash([lot.tax_lot_id for lot in sleeve.lots[:actual_count]])
+            else:
+                ticket_list = str(settlement["funded_tax_lot_sha256"])
+            records.append({
+                **{field: row[field] for field in PATH_IDENTITY},
+                "calendar_index": row["calendar_index"],
+                "issue_instance": issue,
+                "sleeve_or_family_id": sleeve_id,
+                "requested_native_ticket_count": sleeve.requested_ticket_count,
+                "actual_ticket_count": actual_count,
+                "funded_prefix_length": actual_count,
+                "funded_global_rank_start": 1 if actual_count else "",
+                "funded_global_rank_end": actual_count if actual_count else "",
+                "funded_ticket_list_sha256": ticket_list,
+                "funded_tax_lot_sha256": settlement["funded_tax_lot_sha256"],
+                "prefix_execution_status": "WHOLE_NATIVE_OR_NO_BET" if sleeve.atomic else "GLOBAL_PREFIX",
+                "atomic_or_no_bet_reason": "" if actual_count or not sleeve.atomic else "ATOMIC_OR_CASH_NO_BET",
+                "actual_stake_yuan": settlement["actual_stake_yuan"],
+                "pre_tax_gross_yuan": settlement["gross_yuan"],
+                "pre_tax_net_yuan": settlement["pre_tax_net_yuan"],
+                "tax_yuan": settlement["tax_yuan"],
+            })
+        if not math.isclose(funded_total, float(row["actual_stake_yuan"]), abs_tol=1e-9):
+            raise RuntimeError(f"portfolio/sleeve funding reconciliation failed: {issue}")
+    return records
+
+
+def capital_summary(path_rows: Sequence[dict[str, object]], holding: dict[str, object]) -> dict[str, object]:
+    """Return controlling capital and secondary stake-ROI totals for one path."""
+    if not path_rows:
+        raise ValueError("cannot summarize empty capital path")
+    stake = sum(float(row["actual_stake_yuan"]) for row in path_rows)
+    net = sum(float(row["pre_tax_net_yuan"]) for row in path_rows)
+    tax = sum(float(row["tax_yuan"]) for row in path_rows)
+    ending = float(path_rows[-1]["postissue_bankroll_yuan"])
+    growth = ending / INITIAL_BANKROLL_YUAN - 1.0
+    turnover = stake / INITIAL_BANKROLL_YUAN
+    mode = str(path_rows[0]["mode"])
+    return {
+        **{field: path_rows[0][field] for field in PATH_IDENTITY},
+        "starting_bankroll_yuan": INITIAL_BANKROLL_YUAN,
+        "ending_bankroll_yuan": ending,
+        "minimum_bankroll_yuan": holding["minimum_bankroll_yuan"],
+        "minimum_required_start_yuan": "" if mode == "COMPOUNDING_BANKROLL" else "PENDING_BISECTION",
+        "fundable_issue_count": sum(float(row["actual_stake_yuan"]) > 0 for row in path_rows),
+        "first_unfundable_issue": next((row["issue_instance"] for row in path_rows if float(row["requested_stake_yuan"]) > 0 and float(row["actual_stake_yuan"]) == 0), ""),
+        "scaled_stake_yuan": sum(float(row["scaled_stake_yuan"]) for row in path_rows),
+        "skipped_stake_yuan": sum(float(row["skipped_stake_yuan"]) for row in path_rows),
+        "cash_yuan": float(path_rows[-1]["retained_cash_yuan"]),
+        "turnover_yuan": stake,
+        "pre_tax_roi": net / stake if stake else None,
+        "tax_adjusted_roi": (net - tax) / stake if stake else None,
+        "cumulative_pre_tax_roi": net / stake if stake else None,
+        "capital_growth": growth,
+        "capital_turnover": turnover,
+        "capital_growth_audit_delta": growth - (net / stake * turnover) if mode == "FIXED_100K_NOTIONAL" and stake else None,
+        "ruin_flag": holding["ruin_flag"],
+    }
