@@ -1504,6 +1504,74 @@ def bounded_core_execution_axes() -> tuple[dict[str, object], ...]:
     return tuple(rows)
 
 
+def _realized_stability_rows(path: Sequence[dict[str, object]], membership_id: str) -> list[dict[str, object]]:
+    """Subset diagnostics on one realized path; they never re-fit prior state."""
+    rows: list[dict[str, object]] = []
+    years = sorted({str(row["year"]) for row in path})
+    panels = [("YEAR", year, [row for row in path if str(row["year"]) == year]) for year in years]
+    panels += [("LOYO", year, [row for row in path if str(row["year"]) != year]) for year in years]
+    largest = max(path, key=lambda row: (float(row["pre_tax_net_yuan"]), str(row["issue_instance"])))
+    panels.append(("EX_LARGEST_ISSUE", str(largest["issue_instance"]), [row for row in path if row is not largest]))
+    net_by_year = {year: sum(float(row["pre_tax_net_yuan"]) for row in path if str(row["year"]) == year) for year in years}
+    largest_year = max(years, key=lambda year: (net_by_year[year], year))
+    panels.append(("EX_LARGEST_YEAR", largest_year, [row for row in path if str(row["year"]) != largest_year]))
+    for panel_type, panel_id, selected in panels:
+        stake = sum(float(row["actual_stake_yuan"]) for row in selected)
+        net = sum(float(row["pre_tax_net_yuan"]) for row in selected)
+        rows.append({
+            **{field: path[0][field] for field in PATH_IDENTITY}, "membership_id": membership_id,
+            "panel_type": panel_type, "panel_id": panel_id, "issue_count": len(selected),
+            "stake_yuan": stake, "pre_tax_net_yuan": net, "pre_tax_roi": net / stake if stake else None,
+            "undefined_reason": "ZERO_STAKE" if not stake else "",
+        })
+    return rows
+
+
+def phase_one_core_replay(
+    checkpoint: Path,
+    *,
+    memberships: Sequence[tuple[str, ...]] | None = None,
+    axes: Sequence[dict[str, object]] | None = None,
+    bundles: Sequence[str] | None = None,
+) -> dict[str, object]:
+    """Run the bounded Stage-4 core frontier and atomically checkpoint summaries."""
+    phase1 = ROOT / ".scratch" / "bj192_phase1_native_screen_checkpoint_v2.json"
+    if not phase1.exists():
+        raise RuntimeError("Phase-1 intrinsic screen checkpoint unavailable")
+    group_map = bounded_core_memberships()
+    selected_memberships = list(memberships or [item for group in group_map.values() for item in group])
+    selected_axes = list(axes or bounded_core_execution_axes())
+    selected_bundles = list(bundles or sorted(frozen_replicate_bundles()))
+    cache = CandidatePathCache()
+    summaries: list[dict[str, object]] = []
+    stability: list[dict[str, object]] = []
+    for membership in selected_memberships:
+        membership = tuple(sorted(membership))
+        membership_id = canonical_hash({"membership": membership})
+        for bundle_id in selected_bundles:
+            bridge, selected_m = cache.bundle(membership, bundle_id)
+            trace = canonical_hash({"membership": membership, "bundle": bundle_id, "selected_m": selected_m})
+            for axis in selected_axes:
+                replay_axis = {**axis, "fraction": axis["position_fraction"]}
+                replay_axis.pop("position_fraction")
+                path = replay_path(sleeves=membership, bridge=bridge, calendar=cache.calendar, bundle_id=bundle_id,
+                    sleeve_trace_identity=trace, **replay_axis)
+                holding = summarize_holding_path(path)["summary"]
+                capital = capital_summary(path, holding)
+                summaries.append({
+                    "record_type": "CORE_PATH_SUMMARY", "membership_id": membership_id,
+                    "membership_json": json.dumps(membership, separators=(",", ":")),
+                    "membership_size": len(membership), "selected_m_path_sha256": canonical_hash(selected_m),
+                    **capital, **{key: holding[key] for key in ("max_drawdown_yuan", "max_drawdown_fraction", "loss_streak_calendar", "loss_streak_active", "miss_streak_calendar", "miss_streak_active", "recovery_duration_max_issues", "time_under_water_issues", "sharpe", "sortino", "calmar")},
+                })
+                stability.extend({"record_type": "CORE_REALIZED_STABILITY", **row} for row in _realized_stability_rows(path, membership_id))
+    binding = {"phase": "PHASE_1_BOUNDED_CORE", "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
+        "phase0_checkpoint_sha256": sha256_file(ROOT / PHASE0_CHECKPOINT), "phase1_screen_sha256": sha256_file(phase1),
+        "membership_count": len(selected_memberships), "axis_count": len(selected_axes), "bundle_count": len(selected_bundles)}
+    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=[*summaries, *stability])
+
+
 def surface_preflight_receipt() -> dict[str, object]:
     """Quantify the exact frozen Cartesian request before allocating output.
 

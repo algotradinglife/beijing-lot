@@ -417,6 +417,24 @@ def test_bounded_core_contract_has_only_authorized_memberships_and_landmarks() -
     assert {row["position_fraction"] for row in axes if row["mode"] != "NATIVE_REQUEST_CONTROL"} == {0.10, 0.25, 0.50, 1.0}
 
 
+def test_bounded_core_fixture_writes_summary_and_realized_stability() -> None:
+    checkpoint = ROOT / ".scratch" / "bj192_core_fixture.json"
+    checkpoint.unlink(missing_ok=True)
+    try:
+        receipt = RUNNER.phase_one_core_replay(
+            checkpoint,
+            memberships=[("BEST_FULL_FULL",)],
+            axes=[{"mode": "NATIVE_REQUEST_CONTROL", "position_fraction": 1.0,
+                   "weight_method": "EQUAL_WEIGHT", "normalization_method": "UNIT_CAPITAL"}],
+            bundles=["BUNDLE_ORDINAL_001"],
+        )
+        rows = RUNNER.load_surface_checkpoint(checkpoint, binding=receipt["binding"])
+        assert sum(row["record_type"] == "CORE_PATH_SUMMARY" for row in rows) == 1
+        assert {row["panel_type"] for row in rows if row["record_type"] == "CORE_REALIZED_STABILITY"} >= {"YEAR", "LOYO", "EX_LARGEST_ISSUE", "EX_LARGEST_YEAR"}
+    finally:
+        checkpoint.unlink(missing_ok=True)
+
+
 def test_surface_preflight_reports_full_frozen_cartesian_scope_without_reduction() -> None:
     receipt = RUNNER.surface_preflight_receipt()
     assert receipt["status"] == "PREFLIGHT_REQUIRES_EXPLICIT_EXECUTION_PLAN"
