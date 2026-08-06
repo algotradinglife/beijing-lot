@@ -607,6 +607,8 @@ def load_dense_atomic_surface(
             source_identity=canonical_hash(
                 {"package": directory.name, "candidate": candidate_id, "M": m_value, "seed": seed, "issue": row["issue_instance"]}
             ),
+            ticket_count_field="frozen_planned_draw_count",
+            stake_field="frozen_planned_stake_yuan",
         )
         seen_configs.add((spec[0], spec[1], m_value, seed))
     # Each frozen dense configuration has the canonical 348-issue calendar,

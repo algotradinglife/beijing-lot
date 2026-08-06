@@ -77,6 +77,11 @@ def test_dense_and_n7_source_adapters_preserve_full_atomic_issue_surfaces() -> N
     # stochastic M values for each mechanism/seed family.
     assert len(dense) == 2 * 3 * 57 * 348
     assert all(item.atomic for item in dense.values())
+    active_dense = next(
+        sleeve for sleeve in dense.values() if sleeve.requested_ticket_count > 0
+    )
+    assert active_dense.status == "SETTLED"
+    assert active_dense.settle_prefix(active_dense.requested_ticket_count)["actual_stake_yuan"] > 0
     n7 = RUNNER.load_bj159_n7_atomic_surface()
     assert {(m, seed) for m, seed, _ in n7} == {
         (m, seed) for m in (32, 64, 128) for seed in ("137001", "137002", "137003")
