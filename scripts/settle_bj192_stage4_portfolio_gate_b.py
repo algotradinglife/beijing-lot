@@ -1700,6 +1700,50 @@ def minimal_stage4_path_bridge(path_rows: Sequence[dict[str, object]]) -> dict[t
     return result
 
 
+def minimal_stage4_core_tables(
+    checkpoint: Path,
+) -> tuple[dict[str, list[dict[str, object]]], dict[tuple[object, ...], dict[str, str]]]:
+    """Materialize core outcome tables from checkpoint rows, never tickets.
+
+    The returned hashes are used by the comparison/final-decision layer.  A
+    support hash always spans the complete issue calendar; an actual-funding
+    hash binds the issue-by-issue funded tax-lot identities and stakes.
+    """
+    _, paths = load_minimal_stage4_checkpoint(checkpoint)
+    table_names = (
+        "issue_ledger", "sleeve_funding_ledger", "capital_summary", "holding_metrics",
+        "rolling_window_metrics", "risk_decomposition", "weight_history", "stage_attribution",
+    )
+    tables = {name: [] for name in table_names}
+    identities: dict[tuple[object, ...], dict[str, str]] = {}
+    for identity, path in sorted(paths.items(), key=lambda item: canonical_hash(item[0])):
+        bridge = minimal_stage4_path_bridge(path)
+        output = path_output_tables(path, bridge)
+        for name in table_names:
+            tables[name].extend(output[name])
+        identities[identity] = {
+            "support_hash": canonical_hash([row["issue_instance"] for row in path]),
+            "actual_funding_hash": canonical_hash([
+                {
+                    "issue_instance": row["issue_instance"],
+                    "actual_stake_yuan": row["actual_stake_yuan"],
+                    "sleeve_settlements": {
+                        sleeve: {
+                            "actual_ticket_count": item["actual_ticket_count"],
+                            "actual_stake_yuan": item["actual_stake_yuan"],
+                            "funded_tax_lot_sha256": item["funded_tax_lot_sha256"],
+                        }
+                        for sleeve, item in sorted(row["sleeve_settlements"].items())
+                    },
+                }
+                for row in path
+            ]),
+        }
+    if len(tables["capital_summary"]) != len(paths):
+        raise RuntimeError("minimal Stage-4 core table path denominator drift")
+    return tables, identities
+
+
 def _realized_stability_rows(path: Sequence[dict[str, object]], membership_id: str) -> list[dict[str, object]]:
     """Subset diagnostics on one realized path; they never re-fit prior state."""
     rows: list[dict[str, object]] = []

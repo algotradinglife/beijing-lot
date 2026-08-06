@@ -525,6 +525,14 @@ def test_minimal_stage4_fixture_is_separately_bound_from_superseded_surface_chec
         bridge = RUNNER.minimal_stage4_path_bridge(path)
         assert len(bridge) == 348
         assert set(path[0]["sleeve_settlements"]) == {"BEST_FULL_FULL"}
+        tables, identities = RUNNER.minimal_stage4_core_tables(checkpoint)
+        assert len(identities) == 1
+        assert len(tables["issue_ledger"]) == 348
+        assert len(tables["capital_summary"]) == 1
+        assert len(tables["sleeve_funding_ledger"]) == 348
+        assert len(tables["weight_history"]) == 348
+        assert all(len(value["support_hash"]) == 64 for value in identities.values())
+        assert all(len(value["actual_funding_hash"]) == 64 for value in identities.values())
     finally:
         checkpoint.unlink(missing_ok=True)
 
