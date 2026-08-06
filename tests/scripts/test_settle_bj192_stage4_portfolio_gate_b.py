@@ -82,6 +82,9 @@ def test_dense_and_n7_source_adapters_preserve_full_atomic_issue_surfaces() -> N
         (m, seed) for m in (32, 64, 128) for seed in ("137001", "137002", "137003")
     }
     assert len(n7) == 3 * 3 * 348
+    active = next(sleeve for sleeve in n7.values() if sleeve.requested_ticket_count > 0)
+    assert active.status == "SETTLED"
+    assert active.settle_prefix(active.requested_ticket_count)["actual_stake_yuan"] > 0
 
 
 def test_bj145_adapter_uses_frozen_full_issue_request_not_a_new_prefix() -> None:

@@ -628,6 +628,12 @@ def load_bj159_n7_atomic_surface() -> dict[tuple[int, str, str], AtomicIssueSlee
     for row in rows:
         if int(row["n"]) != 7:
             continue
+        # #159's canonical ledger is draw-oriented rather than using the
+        # generic `settlement_status`/`executed_ticket_count` names.  A
+        # positive executed draw count is its exact settled native request;
+        # zero draws remain an explicit no-bet/unavailable zero-flow row.
+        row = dict(row)
+        row["settlement_status"] = "SETTLED" if int(row["executed_draw_count"]) > 0 else "NO_BET_FROZEN"
         key = int(row["M"]), row["seed"], row["issue_instance"]
         if key in result:
             raise RuntimeError(f"duplicate #159 N7 issue row: {key}")
@@ -637,6 +643,8 @@ def load_bj159_n7_atomic_surface() -> dict[tuple[int, str, str], AtomicIssueSlee
             source_identity=canonical_hash(
                 {"package": directory.name, "n": 7, "M": key[0], "seed": key[1], "issue": key[2], "saturation": row["saturation_status"]}
             ),
+            ticket_count_field="executed_draw_count",
+            stake_field="stake_yuan",
         )
     config_counts: dict[tuple[int, str], int] = defaultdict(int)
     for m_value, seed, _ in result:
