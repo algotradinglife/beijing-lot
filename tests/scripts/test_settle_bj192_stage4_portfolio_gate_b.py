@@ -508,7 +508,7 @@ def test_minimal_stage4_closure_contract_has_three_sleeves_seven_memberships_and
     }
     assert {row["position_fraction"] for row in axes if row["mode"] == "NATIVE_REQUEST_CONTROL"} == {1.0}
     selected = RUNNER.minimal_stage4_selected_m_rows()
-    assert len(selected) == 3 * 3 * 348
+    assert len(selected) == 3 * 348
     assert {row["selected_M"] for row in selected if row["economic_family_id"] == "ECON_Q_SOURCE_Q_TOP_MASS_M192"} == {192}
 
 
@@ -556,6 +556,15 @@ def test_minimal_stage4_fixture_is_separately_bound_from_superseded_surface_chec
         assert len(comparison["portfolio_k_saturation"]) == 1
     finally:
         checkpoint.unlink(missing_ok=True)
+
+
+def test_final_minimal_checkpoint_collapses_equivalent_deterministic_bundles() -> None:
+    binding, paths = RUNNER.load_minimal_stage4_checkpoint(
+        ROOT / ".scratch" / "bj192_minimal_stage4_checkpoint.json"
+    )
+    assert binding["bundle_count"] == 3
+    assert len(paths) == 7 * 36
+    assert {identity[-1] for identity in paths} == {"BUNDLE_ORDINAL_001"}
 
 
 def test_minimal_stage4_comparison_reuses_prebuilt_core_ledgers(monkeypatch: pytest.MonkeyPatch) -> None:

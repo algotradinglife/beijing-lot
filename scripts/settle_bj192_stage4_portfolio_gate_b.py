@@ -1694,7 +1694,33 @@ def load_minimal_stage4_checkpoint(
         if len(ordered) != calendar_count or len({row["issue_instance"] for row in ordered}) != calendar_count:
             raise RuntimeError(f"minimal Stage-4 issue-calendar drift: {identity}")
         groups[identity] = ordered
-    return binding, groups
+    # The final amendment declares the three H1 sleeves deterministic.  Gate A
+    # retains ordinal bundle maps for the broader catalogue, but those maps
+    # must not multiply identical deterministic economics into selectable
+    # observations.  Prove equality from saved settlement state, then retain
+    # BUNDLE_ORDINAL_001 as the one executable representation.
+    logical: dict[tuple[object, ...], list[tuple[tuple[object, ...], list[dict[str, object]]]]] = defaultdict(list)
+    for identity, rows in groups.items():
+        # portfolio_id incorporates Gate-A's bundle identity; it is not a
+        # logical path coordinate for the deterministic closure.
+        logical[(tuple(sorted(rows[0]["sleeve_settlements"])), *identity[1:-1])].append((identity, rows))
+    collapsed: dict[tuple[object, ...], list[dict[str, object]]] = {}
+    for logical_identity, variants in logical.items():
+        if len(variants) == 1:
+            identity, rows = variants[0]
+            collapsed[identity] = rows
+            continue
+        if {identity[-1] for identity, _ in variants} != set(frozen_replicate_bundles()):
+            raise RuntimeError("minimal Stage-4 replicate-bundle denominator drift")
+        signatures = {
+            canonical_hash([{key: value for key, value in row.items() if key not in {"portfolio_id", "deployment_replicate_bundle_id"}} for row in rows])
+            for _, rows in variants
+        }
+        if len(signatures) != 1:
+            raise RuntimeError("deterministic minimal Stage-4 bundle economics drift")
+        identity, rows = next((pair for pair in variants if pair[0][-1] == "BUNDLE_ORDINAL_001"))
+        collapsed[identity] = rows
+    return binding, collapsed
 
 
 def minimal_stage4_path_bridge(path_rows: Sequence[dict[str, object]]) -> dict[tuple[str, str], IssueSleeve]:
@@ -1734,6 +1760,27 @@ def minimal_stage4_core_tables(
     for identity, path in sorted(paths.items(), key=lambda item: canonical_hash(item[0])):
         bridge = minimal_stage4_path_bridge(path)
         output = path_output_tables(path, bridge)
+        stake = sum(float(row["actual_stake_yuan"]) for row in path)
+        net = sum(float(row["pre_tax_net_yuan"]) for row in path)
+        gross = [float(row["pre_tax_gross_yuan"]) for row in path]
+        gross_total = sum(gross)
+        largest_index = max(range(len(path)), key=lambda index: float(path[index]["pre_tax_net_yuan"]))
+        year_net: dict[str, float] = defaultdict(float)
+        year_stake: dict[str, float] = defaultdict(float)
+        for row in path:
+            year_net[str(row["year"])] += float(row["pre_tax_net_yuan"])
+            year_stake[str(row["year"])] += float(row["actual_stake_yuan"])
+        largest_year = max(year_net, key=year_net.get)
+        ex_issue_stake = stake - float(path[largest_index]["actual_stake_yuan"])
+        ex_year_stake = stake - year_stake[largest_year]
+        output["holding_metrics"][0].update({
+            "gross_issue_hhi": sum((value / gross_total) ** 2 for value in gross) if gross_total else None,
+            "gross_top_issue_share": max(gross) / gross_total if gross_total else None,
+            "largest_signed_issue": path[largest_index]["issue_instance"],
+            "largest_signed_year": largest_year,
+            "ex_largest_issue_pre_tax_roi": (net - float(path[largest_index]["pre_tax_net_yuan"])) / ex_issue_stake if ex_issue_stake else None,
+            "ex_largest_year_pre_tax_roi": (net - year_net[largest_year]) / ex_year_stake if ex_year_stake else None,
+        })
         for name in table_names:
             tables[name].extend(output[name])
         identities[identity] = {
@@ -1795,6 +1842,10 @@ def minimal_stage4_comparison_tables(
         identity[1:]: capital_by_identity[identity]
         for identity, rows in funding_by_identity.items()
         if tuple(sorted({row["sleeve_or_family_id"] for row in rows})) == ("BEST_FULL_FULL",)
+    }
+    membership_by_identity = {
+        identity: tuple(sorted({row["sleeve_or_family_id"] for row in rows}))
+        for identity, rows in funding_by_identity.items()
     }
     for identity, capital in sorted(capital_by_identity.items(), key=lambda item: canonical_hash(item[0])):
         portfolio_id, mode, fraction, weight, normalization, bundle = identity
@@ -1862,6 +1913,39 @@ def minimal_stage4_comparison_tables(
             "contribution_hhi": hhi, "tax_adjusted_roi": capital["tax_adjusted_roi"],
             "dominance_status": "UNSCREENED_MINIMAL_CLOSURE", "support_hash": support,
         })
+    # The minimal contract requires each combination to be read against its
+    # strongest component and its equal-weight counterpart as well as FULL.
+    # These are descriptive matched controls, never a selection rule.
+    for identity, capital in sorted(capital_by_identity.items(), key=lambda item: canonical_hash(item[0])):
+        membership = membership_by_identity[identity]
+        if len(membership) < 2:
+            continue
+        candidates = []
+        for sleeve in membership:
+            candidate = next((other for other in capital_by_identity if other[0] == sleeve and other[1:] == identity[1:]), None)
+            if candidate is not None:
+                candidates.append(candidate)
+        controls = []
+        if candidates:
+            strongest = max(candidates, key=lambda item: float(capital_by_identity[item]["ending_bankroll_yuan"]))
+            controls.append((f"STRONGEST_COMPONENT:{strongest[0]}", strongest))
+        if identity[3] != "EQUAL_WEIGHT":
+            equal_identity = (identity[0], identity[1], identity[2], "EQUAL_WEIGHT", identity[4], identity[5])
+            if equal_identity in capital_by_identity:
+                controls.append(("EQUAL_WEIGHT_SAME_MEMBERSHIP", equal_identity))
+        for control_id, control_identity in controls:
+            control = capital_by_identity[control_identity]
+            outputs["baseline_lift"].append({
+                **{field: capital[field] for field in PATH_IDENTITY},
+                "candidate_id": identity[0], "control_id": control_id,
+                "support_hash": identities[identity]["support_hash"],
+                "actual_funding_hash": identities[identity]["actual_funding_hash"],
+                "absolute_ending_bankroll_yuan": capital["ending_bankroll_yuan"],
+                "absolute_pre_tax_roi": capital["pre_tax_roi"],
+                "candidate_minus_control_bankroll_yuan": float(capital["ending_bankroll_yuan"]) - float(control["ending_bankroll_yuan"]),
+                "candidate_minus_control_pre_tax_roi": float(capital["pre_tax_roi"]) - float(control["pre_tax_roi"]),
+                "ladder_decision": "DESCRIPTIVE_MATCHED_COMPONENT_OR_EQUAL_WEIGHT_CONTROL",
+            })
     return outputs
 
 
@@ -2768,7 +2852,9 @@ def minimal_stage4_selected_m_rows() -> list[dict[str, object]]:
     }
     rows: list[dict[str, object]] = []
     calendar = read_csv(GATE_A / "full_calendar.csv")
-    for bundle in sorted(frozen_replicate_bundles()):
+    # Deterministic H1 sleeves have one canonical executable bundle; the
+    # checkpoint loader separately verifies BUNDLE_002/003 equivalence.
+    for bundle in ("BUNDLE_ORDINAL_001",):
         for sleeve, m_value in fixed_m.items():
             family = canonical_economic_catalog()[sleeve]["economic_family_id"]
             for item in calendar:
@@ -2786,7 +2872,7 @@ def minimal_stage4_selected_m_rows() -> list[dict[str, object]]:
                     "selected_M": m_value, "fixed_M_comparator": m_value,
                     "fallback_reason": "", "nested_loyo_held_out_year": "",
                 })
-    if len(rows) != len(calendar) * len(H1_SLEEVES) * len(frozen_replicate_bundles()):
+    if len(rows) != len(calendar) * len(H1_SLEEVES):
         raise RuntimeError("minimal deterministic selected-M denominator drift")
     return rows
 
