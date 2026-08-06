@@ -7,14 +7,25 @@ from hashlib import sha256
 from typing import Final
 
 
-CONTRACT_VERSION: Final = "bj203-causal-tensor-v1"
+CONTRACT_VERSION: Final = "bj203-causal-tensor-v2"
 OUTCOME_ORDER: Final = ("3", "1", "0")
 SOURCE_TIMEZONE: Final = "Asia/Hong_Kong"
-HELDOUT_ISSUES: Final = ("25041", "25042")
+HELDOUT_2026_ISSUES: Final = (
+    "26011", "26012", "26013", "26014", "26015", "26016", "26017",
+    "26018", "26019", "26021", "26022", "26023", "26024", "26025",
+    "26026", "26031", "26032", "26033", "26034", "26035", "26036",
+    "26037", "26038", "26039", "26041", "26042", "26043", "26044",
+    "26045", "26046", "26047", "26048", "26049", "26051", "26052",
+    "26053", "26054", "26055", "26056", "26057", "26058", "26061",
+    "26062", "26063", "26064", "26065", "26066", "26067", "26068",
+    "26069",
+)
+HELDOUT_ISSUES: Final = ("25041", "25042", *HELDOUT_2026_ISSUES)
 HELDOUT_POLICY: Final = (
     "Whole-issue embargo beginning with 25041, the first canonical issue whose "
-    "eligible match window begins in 2025-04.  No held-out result, final-SP or "
-    "settlement row is emitted by this package."
+    "eligible match window begins in 2025-04, through the complete frozen local "
+    "post-boundary inventory ending at 26069.  The 2026 extension is identity "
+    "only; no held-out result, final-SP or settlement row is emitted."
 )
 DATABASE_SHA256: Final = (
     "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
@@ -177,7 +188,7 @@ FEATURE_SPECS: Final = (
         _IDENTITY, "inference", "never missing",
     ),
     FeatureSpec(
-        "calendar_year", "float32", 2018, 2025,
+        "calendar_year", "float32", 2018, 2026,
         "canonical reporting year", _IDENTITY, "inference", "never missing",
     ),
 )

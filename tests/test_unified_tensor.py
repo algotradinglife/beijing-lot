@@ -25,6 +25,7 @@ from unified_tensor.contract import (
     CONTRACT_VERSION,
     FEATURE_NAMES,
     FEATURE_SPECS,
+    HELDOUT_ISSUES,
     OUTCOME_ORDER,
     cell_join_key,
     forbidden_inference_names,
@@ -61,6 +62,9 @@ def _identity(split: str = "development", issue: str = "24001") -> pd.DataFrame:
                 "availability_status": "AVAILABLE",
                 "unavailable_reason": "",
                 "source_b0_status": "NO_BET_FROZEN",
+                "identity_source": "fixture",
+                "identity_observed_ts_utc": "",
+                "identity_timing_status": "CUTOFF_BOUND_IDENTITY",
                 "euro_1h_available_ts_utc": "2023-12-31T23:00:00Z",
                 "predicted_sp_available_ts_utc": "2023-12-31T14:00:00Z",
             }
@@ -208,7 +212,7 @@ def _write_labels(root: Path, identity: pd.DataFrame, *, heldout: bool = False) 
     write_parquet(namespace / "development_labels.parquet", labels)
     manifest = _namespace_manifest(namespace, "development_only_settlement_labels")
     manifest["heldout_label_status"] = "ABSENT_BY_CONTRACT"
-    manifest["heldout_issues"] = ["25041", "25042"]
+    manifest["heldout_issues"] = list(HELDOUT_ISSUES)
     write_json(namespace / "MANIFEST.json", manifest)
     return labels
 
@@ -329,7 +333,7 @@ def test_join_key_deletion_or_identity_move_is_detected(tmp_path: Path) -> None:
         tmp_path / "labels", "development_only_settlement_labels"
     )
     manifest["heldout_label_status"] = "ABSENT_BY_CONTRACT"
-    manifest["heldout_issues"] = ["25041", "25042"]
+    manifest["heldout_issues"] = list(HELDOUT_ISSUES)
     write_json(tmp_path / "labels/MANIFEST.json", manifest)
     with pytest.raises(LabelContractError, match="exact identity"):
         load_development_labels(tmp_path)
@@ -344,7 +348,7 @@ def test_label_loader_rejects_double_applied_payout_factor(tmp_path: Path) -> No
         tmp_path / "labels", "development_only_settlement_labels"
     )
     manifest["heldout_label_status"] = "ABSENT_BY_CONTRACT"
-    manifest["heldout_issues"] = ["25041", "25042"]
+    manifest["heldout_issues"] = list(HELDOUT_ISSUES)
     write_json(tmp_path / "labels/MANIFEST.json", manifest)
     with pytest.raises(LabelContractError, match="exactly once"):
         load_development_labels(tmp_path)
@@ -360,7 +364,7 @@ def test_label_loader_rejects_nonzero_trusted_loser_return(tmp_path: Path) -> No
         tmp_path / "labels", "development_only_settlement_labels"
     )
     manifest["heldout_label_status"] = "ABSENT_BY_CONTRACT"
-    manifest["heldout_issues"] = ["25041", "25042"]
+    manifest["heldout_issues"] = list(HELDOUT_ISSUES)
     write_json(tmp_path / "labels/MANIFEST.json", manifest)
     with pytest.raises(LabelContractError, match="losing cells must have zero"):
         load_development_labels(tmp_path)
@@ -377,7 +381,7 @@ def test_label_loader_rejects_targets_on_unavailable_settlement(tmp_path: Path) 
         tmp_path / "labels", "development_only_settlement_labels"
     )
     manifest["heldout_label_status"] = "ABSENT_BY_CONTRACT"
-    manifest["heldout_issues"] = ["25041", "25042"]
+    manifest["heldout_issues"] = list(HELDOUT_ISSUES)
     write_json(tmp_path / "labels/MANIFEST.json", manifest)
     with pytest.raises(LabelContractError, match="must not carry targets"):
         load_development_labels(tmp_path)
@@ -411,6 +415,20 @@ def test_inference_loader_rejects_unmasked_late_snapshot(tmp_path: Path) -> None
         load_issue_tensors(tmp_path)
 
 
+def test_inference_loader_rejects_identity_observed_after_cutoff(
+    tmp_path: Path,
+) -> None:
+    _write_inference(tmp_path)
+    identity_path = tmp_path / "inference/cell_identity.parquet"
+    identity = pd.read_parquet(identity_path)
+    identity["identity_timing_status"] = "TIMESTAMPED_IDENTITY_ONLY"
+    identity["identity_observed_ts_utc"] = "2024-01-01T00:00:01Z"
+    write_parquet(identity_path, identity)
+    _namespace_manifest(tmp_path / "inference", "outcome_unexposed_inference")
+    with pytest.raises(TensorContractError, match="appears after issue cutoff"):
+        load_issue_tensors(tmp_path)
+
+
 def test_inference_loader_rejects_reordered_outcome_axis(tmp_path: Path) -> None:
     _write_inference(tmp_path)
     namespace = tmp_path / "inference"
@@ -430,6 +448,22 @@ def test_inference_loader_enforces_feature_ranges(tmp_path: Path) -> None:
     write_parquet(values_path, values)
     _namespace_manifest(tmp_path / "inference", "outcome_unexposed_inference")
     with pytest.raises(TensorContractError, match="above contract maximum"):
+        load_issue_tensors(tmp_path)
+
+
+def test_inference_loader_rejects_decision_feature_on_identity_only_row(
+    tmp_path: Path,
+) -> None:
+    _write_inference(tmp_path)
+    identity_path = tmp_path / "inference/cell_identity.parquet"
+    identity = pd.read_parquet(identity_path)
+    identity["identity_timing_status"] = "TIMESTAMPED_IDENTITY_ONLY"
+    identity["identity_observed_ts_utc"] = "2024-01-01T00:00:00Z"
+    write_parquet(identity_path, identity)
+    _namespace_manifest(tmp_path / "inference", "outcome_unexposed_inference")
+    with pytest.raises(
+        TensorContractError, match="identity-only held-out row exposes"
+    ):
         load_issue_tensors(tmp_path)
 
 

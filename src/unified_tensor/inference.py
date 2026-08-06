@@ -40,6 +40,9 @@ class MatchProvenance:
     availability_status: str
     unavailable_reason: str
     source_b0_status: str
+    identity_source: str
+    identity_observed_ts_utc: str
+    identity_timing_status: str
     euro_1h_available_ts_utc: str
     predicted_sp_available_ts_utc: str
 
@@ -182,7 +185,8 @@ def _validate_cells(
         "match_id", "match_idx", "match_order", "outcome_code", "outcome_order",
         "feature_cutoff_ts_utc", "kickoff_ts_utc", "availability_status",
         "unavailable_reason", "source_b0_status", "euro_1h_available_ts_utc",
-        "predicted_sp_available_ts_utc",
+        "predicted_sp_available_ts_utc", "identity_source",
+        "identity_observed_ts_utc", "identity_timing_status",
     }
     if set(identity.columns) != identity_fields:
         raise TensorContractError("cell identity schema does not match contract")
@@ -194,6 +198,37 @@ def _validate_cells(
         raise TensorContractError("cell join keys are not unique")
     if not bool(identity["split"].astype(str).isin({"development", "heldout"}).all()):
         raise TensorContractError("inference split is invalid")
+    timing_status = identity["identity_timing_status"].astype(str)
+    if not bool(
+        timing_status.isin(
+            {
+                "CUTOFF_BOUND_IDENTITY",
+                "RETROSPECTIVE_IDENTITY_ONLY",
+                "TIMESTAMPED_IDENTITY_ONLY",
+            }
+        ).all()
+    ) or not bool(identity["identity_source"].astype(str).ne("").all()):
+        raise TensorContractError("identity provenance declaration is invalid")
+    observed = identity["identity_observed_ts_utc"].astype(str)
+    timestamped = timing_status.eq("TIMESTAMPED_IDENTITY_ONLY")
+    if not bool(observed.loc[timestamped].ne("").all()) or bool(
+        observed.loc[timing_status.eq("RETROSPECTIVE_IDENTITY_ONLY")].ne("").any()
+    ):
+        raise TensorContractError("identity observation timestamp contract drift")
+    if pd.to_datetime(
+        observed.loc[timestamped], utc=True, errors="coerce"
+    ).isna().any():
+        raise TensorContractError("timestamped identity observation is invalid")
+    timestamped_observed = pd.to_datetime(
+        observed.loc[timestamped], utc=True, errors="raise"
+    )
+    timestamped_cutoff = pd.to_datetime(
+        identity.loc[timestamped, "feature_cutoff_ts_utc"],
+        utc=True,
+        errors="raise",
+    )
+    if bool(timestamped_observed.gt(timestamped_cutoff).any()):
+        raise TensorContractError("timestamped identity appears after issue cutoff")
     expected_instances = (
         identity["issue"].astype(str)
         + "@CANONICAL_"
@@ -238,6 +273,7 @@ def _validate_cells(
         "issue", "year", "fold", "split", "issue_order", "match_idx",
         "match_order", "feature_cutoff_ts_utc", "kickoff_ts_utc",
         "availability_status", "unavailable_reason", "source_b0_status",
+        "identity_source", "identity_observed_ts_utc", "identity_timing_status",
         "euro_1h_available_ts_utc", "predicted_sp_available_ts_utc",
     ):
         if not bool(cell_groups[field].nunique(dropna=False).eq(1).all()):
@@ -257,7 +293,7 @@ def _validate_cells(
         canonical = (
             issue_rows.assign(
                 _match_idx=pd.to_numeric(issue_rows["match_idx"], errors="raise"),
-                _match_id=pd.to_numeric(issue_rows["match_id"], errors="raise"),
+                _match_id=issue_rows["match_id"].astype(str),
             )
             .sort_values(["_match_idx", "_match_id"], kind="mergesort")
             ["match_id"]
@@ -299,6 +335,23 @@ def _validate_cells(
         raise TensorContractError("unmasked feature values must be finite")
     if np.isfinite(numeric_array[~present]).any():
         raise TensorContractError("masked feature slots must not carry values")
+    registry_only = identity["identity_timing_status"].astype(str).isin(
+        {"RETROSPECTIVE_IDENTITY_ONLY", "TIMESTAMPED_IDENTITY_ONLY"}
+    ).to_numpy()
+    registry_forbidden = [
+        feature
+        for feature in FEATURE_NAMES
+        if feature not in {
+            "outcome_code_numeric",
+            "kickoff_delay_hours",
+            "match_position_fraction",
+            "calendar_year",
+        }
+    ]
+    if bool(mask_values.loc[registry_only, registry_forbidden].to_numpy().any()):
+        raise TensorContractError(
+            "identity-only held-out row exposes a decision feature"
+        )
     for column_index, spec in enumerate(FEATURE_SPECS):
         feature_values = numeric_array[:, column_index]
         feature_present = present[:, column_index]
@@ -481,6 +534,9 @@ def load_issue_tensors(
                         availability_status=str(row.availability_status),
                         unavailable_reason=str(row.unavailable_reason),
                         source_b0_status=str(row.source_b0_status),
+                        identity_source=str(row.identity_source),
+                        identity_observed_ts_utc=str(row.identity_observed_ts_utc),
+                        identity_timing_status=str(row.identity_timing_status),
                         euro_1h_available_ts_utc=str(row.euro_1h_available_ts_utc),
                         predicted_sp_available_ts_utc=str(
                             row.predicted_sp_available_ts_utc

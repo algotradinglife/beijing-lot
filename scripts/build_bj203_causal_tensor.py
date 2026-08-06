@@ -21,6 +21,7 @@ from unified_tensor.builder import (  # noqa: E402
     compare_inference_replay,
     finalize_package,
     verify_package,
+    verify_superseded_package,
 )
 
 
@@ -30,11 +31,22 @@ def parser() -> argparse.ArgumentParser:
     build_all = commands.add_parser("build-all")
     build_all.add_argument("--output", type=Path, required=True)
     build_all.add_argument("--database", type=Path, required=True)
+    build_all.add_argument(
+        "--heldout-historical-database", type=Path, required=True
+    )
+    build_all.add_argument("--heldout-live-database", type=Path, required=True)
     inference = commands.add_parser("build-inference")
     inference.add_argument("--output", type=Path, required=True)
     source = inference.add_mutually_exclusive_group(required=True)
     source.add_argument("--database", type=Path)
     source.add_argument("--identity-extension", type=Path)
+    heldout_source = inference.add_mutually_exclusive_group(required=True)
+    heldout_source.add_argument("--heldout-identity-extension", type=Path)
+    heldout_source.add_argument(
+        "--heldout-source-databases", action="store_true"
+    )
+    inference.add_argument("--heldout-historical-database", type=Path)
+    inference.add_argument("--heldout-live-database", type=Path)
     labels = commands.add_parser("build-labels")
     labels.add_argument("--output", type=Path, required=True)
     labels.add_argument("--database", type=Path, required=True)
@@ -42,6 +54,8 @@ def parser() -> argparse.ArgumentParser:
     finalize.add_argument("--output", type=Path, required=True)
     verify = commands.add_parser("verify")
     verify.add_argument("--package", type=Path, required=True)
+    verify_superseded = commands.add_parser("verify-superseded")
+    verify_superseded.add_argument("--package", type=Path, required=True)
     compare = commands.add_parser("compare-inference")
     compare.add_argument("--frozen", type=Path, required=True)
     compare.add_argument("--replay", type=Path, required=True)
@@ -60,7 +74,14 @@ def main() -> None:
         ).resolve()
         try:
             receipt = {
-                "inference": build_inference(stage, database=arguments.database),
+                "inference": build_inference(
+                    stage,
+                    database=arguments.database,
+                    heldout_historical_database=(
+                        arguments.heldout_historical_database
+                    ),
+                    heldout_live_database=arguments.heldout_live_database,
+                ),
                 "labels": build_development_labels(stage, database=arguments.database),
                 "final": finalize_package(stage),
             }
@@ -69,10 +90,28 @@ def main() -> None:
             shutil.rmtree(stage, ignore_errors=True)
             raise
     elif arguments.command == "build-inference":
+        if arguments.heldout_source_databases and (
+            arguments.heldout_historical_database is None
+            or arguments.heldout_live_database is None
+        ):
+            raise SystemExit(
+                "--heldout-source-databases requires both held-out database paths"
+            )
         receipt = build_inference(
             arguments.output,
             database=arguments.database,
             identity_extension=arguments.identity_extension,
+            heldout_historical_database=(
+                arguments.heldout_historical_database
+                if arguments.heldout_source_databases
+                else None
+            ),
+            heldout_live_database=(
+                arguments.heldout_live_database
+                if arguments.heldout_source_databases
+                else None
+            ),
+            heldout_identity_extension=arguments.heldout_identity_extension,
         )
     elif arguments.command == "build-labels":
         receipt = build_development_labels(
@@ -82,6 +121,8 @@ def main() -> None:
         receipt = finalize_package(arguments.output)
     elif arguments.command == "compare-inference":
         receipt = compare_inference_replay(arguments.frozen, arguments.replay)
+    elif arguments.command == "verify-superseded":
+        receipt = verify_superseded_package(arguments.package)
     else:
         receipt = verify_package(arguments.package)
     print(json.dumps(receipt, indent=2, sort_keys=True))

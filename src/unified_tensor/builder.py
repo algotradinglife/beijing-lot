@@ -22,6 +22,7 @@ from .contract import (
     FEATURE_NAMES,
     FEATURE_SPECS,
     HELDOUT_ISSUES,
+    HELDOUT_2026_ISSUES,
     HELDOUT_POLICY,
     OUTCOME_ORDER,
     SOURCE_TIMEZONE,
@@ -43,13 +44,27 @@ ESTIMATOR = SOURCE_190 / "estimator_match_freeze.csv.gz"
 ISSUE_CENSUS = SOURCE_190 / "issue_census.csv"
 PREDICTED_SP = SOURCE_90 / "oos_prediction_vectors.csv.gz"
 
-EXPECTED_MATCH_ROWS = 102_245
+EXPECTED_MATCH_ROWS = 110_906
 EXPECTED_ESTIMATOR_ROWS = 101_970
 EXPECTED_EXTENSION_ROWS = 275
-EXPECTED_ISSUES = 344
-EXPECTED_HELDOUT_ISSUES = 2
+EXPECTED_HELDOUT_EXTENSION_ROWS = 8_661
+EXPECTED_HISTORICAL_HELDOUT_ROWS = 5_608
+EXPECTED_LIVE_HELDOUT_ROWS = 3_053
+EXPECTED_BASE_ISSUES = 344
+EXPECTED_ISSUES = 394
+EXPECTED_HELDOUT_ISSUES = 52
 EXPECTED_IDENTITY_EXTENSION_SHA256 = (
     "0f45f442e60c4dd35950053ef7fb76b519352ef2123db4d7a54a0277fcc5caa0"
+)
+EXPECTED_HELDOUT_IDENTITY_EXTENSION_SHA256 = (
+    "af628c9a2974e31f59b64b17dccad4546f1400844916ae21315c1eab469c3fc1"
+)
+SUPERSEDED_V1_HEAD = "38dc5ae1223a96cf361db851215143bd73afb05d"
+SUPERSEDED_V1_MANIFEST_SHA256 = (
+    "48011ec58013cc8ed8c8e46e6e89c4844c104937e6c01787817b64b246798510"
+)
+SUPERSEDED_V1_SHA256SUMS_SHA256 = (
+    "dfb6ffeb977423f7e71064771949361c0105ceaa124f2ca9447dafaa0859ffbc"
 )
 EXPECTED_SOURCE_HASHES = {
     "bj190_estimator_match_freeze": (
@@ -95,6 +110,61 @@ def write_json(path: Path, value: Any) -> None:
 def write_csv(path: Path, frame: pd.DataFrame) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(path, index=False, lineterminator="\n", float_format="%.12g")
+
+
+def _feature_coverage(identity: pd.DataFrame, masks: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for split in ("development", "heldout"):
+        selected = identity["split"].eq(split).to_numpy()
+        for feature in FEATURE_NAMES:
+            present = int(masks.loc[selected, feature].sum())
+            total = int(selected.sum())
+            rows.append(
+                {
+                    "split": split,
+                    "feature": feature,
+                    "present_cells": present,
+                    "total_cells": total,
+                    "coverage_rate": present / total if total else np.nan,
+                }
+            )
+    coverage = pd.DataFrame(rows)
+    coverage["coverage_rate"] = coverage["coverage_rate"].map(
+        lambda value: float(f"{value:.12g}")
+    )
+    return coverage
+
+
+def _assert_feature_coverage(actual: pd.DataFrame, expected: pd.DataFrame) -> None:
+    columns = [
+        "split",
+        "feature",
+        "present_cells",
+        "total_cells",
+        "coverage_rate",
+    ]
+    if list(actual.columns) != columns or len(actual) != len(expected):
+        raise TensorBuildError("feature coverage does not match inference masks")
+    if not actual.loc[:, ["split", "feature"]].astype(str).equals(
+        expected.loc[:, ["split", "feature"]].astype(str)
+    ):
+        raise TensorBuildError("feature coverage does not match inference masks")
+    for column in ("present_cells", "total_cells"):
+        if not np.array_equal(
+            pd.to_numeric(actual[column], errors="coerce").to_numpy(),
+            expected[column].to_numpy(),
+        ):
+            raise TensorBuildError("feature coverage does not match inference masks")
+    if not bool(
+        np.isclose(
+            pd.to_numeric(actual["coverage_rate"], errors="coerce").to_numpy(),
+            expected["coverage_rate"].to_numpy(),
+            rtol=0.0,
+            atol=0.0,
+            equal_nan=True,
+        ).all()
+    ):
+        raise TensorBuildError("feature coverage does not match inference masks")
 
 
 def write_parquet(path: Path, frame: pd.DataFrame) -> None:
@@ -275,15 +345,186 @@ def extract_unavailable_identity(
     return extension.loc[:, columns]
 
 
+def _sqlite_snapshot_ro(database: Path) -> sqlite3.Connection:
+    """Open a WAL-aware read transaction for a mutable source database."""
+
+    if not database.is_file():
+        raise TensorBuildError(f"source database is unavailable: {database}")
+    connection = sqlite3.connect(
+        f"{database.resolve().as_uri()}?mode=ro", uri=True
+    )
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA query_only=ON")
+    connection.execute("BEGIN")
+    return connection
+
+
+def extract_heldout_identity(
+    historical_database: Path, live_database: Path
+) -> pd.DataFrame:
+    """Freeze the complete local post-boundary sequence without target fields.
+
+    The historical 2026 workbook has no trustworthy observation timestamp, so
+    it contributes retrospective identity only.  The live database contributes
+    its per-row ``created_ts`` observation time.  Neither source contributes a
+    market-price or settlement feature through this adapter.
+    """
+
+    historical_issues = HELDOUT_2026_ISSUES[:33]
+    live_issues = HELDOUT_2026_ISSUES[33:]
+    historical_placeholders = ",".join("?" for _ in historical_issues)
+    live_placeholders = ",".join("?" for _ in live_issues)
+    historical_query = f"""
+        SELECT CAST(match_id AS TEXT) AS match_id,
+               CAST(issue AS TEXT) AS issue,
+               CAST(match_idx AS INTEGER) AS match_idx,
+               kickoff_ts,
+               league,
+               CAST(home_team_id AS TEXT) AS home_team_id,
+               CAST(away_team_id AS TEXT) AS away_team_id
+          FROM matches
+         WHERE issue IN ({historical_placeholders})
+         ORDER BY CAST(issue AS INTEGER), match_idx, match_id
+    """
+    live_query = f"""
+        SELECT CAST(match_id AS TEXT) AS match_id,
+               CAST(issue AS TEXT) AS issue,
+               CAST(match_idx AS INTEGER) AS match_idx,
+               kickoff_ts,
+               league,
+               home,
+               away,
+               created_ts
+          FROM matches
+         WHERE issue IN ({live_placeholders})
+         ORDER BY CAST(issue AS INTEGER), match_idx, match_id
+    """
+    with _sqlite_ro(historical_database) as connection:
+        historical_inventory = tuple(
+            str(row["issue"])
+            for row in connection.execute(
+                """
+                SELECT DISTINCT CAST(issue AS TEXT) AS issue
+                  FROM matches
+                 WHERE CAST(issue AS TEXT) LIKE '26%'
+                   AND CAST(issue AS INTEGER) <= 26051
+                 ORDER BY CAST(issue AS INTEGER)
+                """
+            )
+        )
+        historical = pd.DataFrame(
+            [dict(row) for row in connection.execute(
+                historical_query, historical_issues
+            )]
+        )
+    with _sqlite_snapshot_ro(live_database) as connection:
+        live_inventory = tuple(
+            str(row["issue"])
+            for row in connection.execute(
+                """
+                SELECT DISTINCT CAST(issue AS TEXT) AS issue
+                  FROM matches
+                 WHERE CAST(issue AS INTEGER) BETWEEN 26051 AND 26069
+                 ORDER BY CAST(issue AS INTEGER)
+                """
+            )
+        )
+        live = pd.DataFrame(
+            [dict(row) for row in connection.execute(live_query, live_issues)]
+        )
+    if historical_inventory != HELDOUT_2026_ISSUES[:34]:
+        raise TensorBuildError("historical held-out source inventory drift")
+    if live_inventory != live_issues:
+        raise TensorBuildError("live held-out source inventory drift")
+    if len(historical) != EXPECTED_HISTORICAL_HELDOUT_ROWS:
+        raise TensorBuildError("historical held-out identity denominator drift")
+    if len(live) != EXPECTED_LIVE_HELDOUT_ROWS:
+        raise TensorBuildError("live held-out identity denominator drift")
+    if tuple(historical["issue"].drop_duplicates()) != historical_issues:
+        raise TensorBuildError("historical held-out issue sequence drift")
+    if tuple(live["issue"].drop_duplicates()) != live_issues:
+        raise TensorBuildError("live held-out issue sequence drift")
+    if historical["match_id"].duplicated().any() or live["match_id"].duplicated().any():
+        raise TensorBuildError("held-out match identity is not unique")
+    required_historical = (
+        historical["kickoff_ts"].astype(str).ne("")
+        & historical["match_idx"].notna()
+    )
+    required_live = (
+        live["kickoff_ts"].astype(str).ne("")
+        & live["created_ts"].astype(str).ne("")
+        & live["match_idx"].notna()
+    )
+    if not bool(required_historical.all()) or not bool(required_live.all()):
+        raise TensorBuildError("held-out identity lacks required timestamp/order")
+
+    historical_cutoffs = historical.groupby("issue", sort=False)[
+        "kickoff_ts"
+    ].transform("min")
+    historical = historical.assign(
+        issue_instance=historical["issue"] + "@CANONICAL_2026",
+        year="2026",
+        fold="OOS_2026",
+        feature_cutoff_ts=historical_cutoffs,
+        native_handicap_line="",
+        extension_status="HELDOUT_RETROSPECTIVE_IDENTITY_ONLY",
+        identity_source="modeling_plus_2026.matches",
+        identity_observed_ts_utc="",
+        identity_timing_status="RETROSPECTIVE_IDENTITY_ONLY",
+    )
+    live_created_utc = pd.to_datetime(
+        live["created_ts"], utc=True, errors="raise"
+    )
+    live_created_hkt = live_created_utc.dt.tz_convert(SOURCE_TIMEZONE)
+    live["identity_observed_ts_utc"] = live_created_utc.dt.strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+    live["feature_cutoff_ts"] = (
+        live_created_hkt.groupby(live["issue"], sort=False)
+        .transform("max")
+        .dt.tz_localize(None)
+        .dt.strftime("%Y-%m-%d %H:%M:%S")
+    )
+    live = live.assign(
+        issue_instance=live["issue"] + "@CANONICAL_2026",
+        year="2026",
+        fold="OOS_2026",
+        home_team_id="NAME:" + live["home"].fillna("").astype(str).str.strip(),
+        away_team_id="NAME:" + live["away"].fillna("").astype(str).str.strip(),
+        native_handicap_line="",
+        extension_status="HELDOUT_TIMESTAMPED_IDENTITY_ONLY",
+        identity_source="beidan_live.matches",
+        identity_timing_status="TIMESTAMPED_IDENTITY_ONLY",
+    )
+    columns = [
+        "match_id", "issue", "issue_instance", "year", "fold", "match_idx",
+        "kickoff_ts", "feature_cutoff_ts", "league", "home_team_id",
+        "away_team_id", "native_handicap_line", "extension_status",
+        "identity_source", "identity_observed_ts_utc", "identity_timing_status",
+    ]
+    extension = pd.concat(
+        [historical.loc[:, columns], live.loc[:, columns]], ignore_index=True
+    )
+    if len(extension) != EXPECTED_HELDOUT_EXTENSION_ROWS:
+        raise TensorBuildError("held-out identity extension denominator drift")
+    if forbidden_inference_names(extension.columns):
+        raise TensorBuildError("held-out identity whitelist crosses target boundary")
+    return extension
+
+
 def _load_inputs(
-    database: Path | None, identity_extension: Path | None
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    database: Path | None,
+    identity_extension: Path | None,
+    heldout_historical_database: Path | None = None,
+    heldout_live_database: Path | None = None,
+    heldout_identity_extension: Path | None = None,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     estimator = _verified_source(ESTIMATOR)
     issue_census = _verified_source(ISSUE_CENSUS)
     predictions = _verified_source(PREDICTED_SP)
     if len(estimator) != EXPECTED_ESTIMATOR_ROWS:
         raise TensorBuildError("#190 estimator denominator drift")
-    if len(issue_census) != EXPECTED_ISSUES:
+    if len(issue_census) != EXPECTED_BASE_ISSUES:
         raise TensorBuildError("#190 issue census denominator drift")
     if database is not None:
         extension = extract_unavailable_identity(database, issue_census)
@@ -295,7 +536,23 @@ def _load_inputs(
         raise TensorBuildError("database or frozen identity extension is required")
     if len(extension) != EXPECTED_EXTENSION_ROWS:
         raise TensorBuildError("identity extension denominator drift")
-    return estimator, issue_census, predictions, extension
+    if heldout_historical_database is not None and heldout_live_database is not None:
+        heldout_extension = extract_heldout_identity(
+            heldout_historical_database, heldout_live_database
+        )
+    elif heldout_identity_extension is not None:
+        if digest(heldout_identity_extension) != (
+            EXPECTED_HELDOUT_IDENTITY_EXTENSION_SHA256
+        ):
+            raise TensorBuildError("frozen held-out identity extension hash mismatch")
+        heldout_extension = pd.read_parquet(heldout_identity_extension)
+    else:
+        raise TensorBuildError(
+            "held-out source databases or frozen held-out identity extension are required"
+        )
+    if len(heldout_extension) != EXPECTED_HELDOUT_EXTENSION_ROWS:
+        raise TensorBuildError("held-out identity extension denominator drift")
+    return estimator, issue_census, predictions, extension, heldout_extension
 
 
 def _prepare_matches(
@@ -303,15 +560,29 @@ def _prepare_matches(
     issue_census: pd.DataFrame,
     predictions: pd.DataFrame,
     extension: pd.DataFrame,
+    heldout_extension: pd.DataFrame,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     if forbidden_inference_names(estimator.columns):
         raise TensorBuildError("#190 inference source contains forbidden fields")
     estimator["extension_status"] = ""
+    estimator["identity_source"] = "bj190.frozen_match_identity"
+    estimator["identity_observed_ts_utc"] = ""
+    estimator["identity_timing_status"] = "CUTOFF_BOUND_IDENTITY"
+    extension["identity_source"] = "canonical_database.unavailable_identity"
+    extension["identity_observed_ts_utc"] = ""
+    extension["identity_timing_status"] = "CUTOFF_BOUND_IDENTITY"
     common = set(estimator.columns)
     for column in common.difference(extension.columns):
         extension[column] = ""
+    for column in common.difference(heldout_extension.columns):
+        heldout_extension[column] = ""
     matches = pd.concat(
-        [estimator, extension.loc[:, estimator.columns]], ignore_index=True
+        [
+            estimator,
+            extension.loc[:, estimator.columns],
+            heldout_extension.loc[:, estimator.columns],
+        ],
+        ignore_index=True,
     )
     for column in (
         "euro_1h_odds3", "euro_1h_odds1", "euro_1h_odds0",
@@ -328,7 +599,7 @@ def _prepare_matches(
     issue_meta = issue_census.set_index("issue")
     matches["source_b0_status"] = matches["issue"].map(
         issue_meta["source_b0_status"]
-    )
+    ).fillna("HELDOUT_IDENTITY_ONLY")
     predictions = predictions.rename(
         columns={
             "deployed_sp_3": "predicted_sp3",
@@ -359,7 +630,7 @@ def _prepare_matches(
     issue_order["issue_order"] = np.arange(len(issue_order), dtype=np.int32)
     matches = matches.merge(issue_order, on=["issue", "feature_cutoff_ts_utc"])
     matches["match_idx"] = pd.to_numeric(matches["match_idx"], errors="raise").astype(int)
-    matches["match_id_sort"] = pd.to_numeric(matches["match_id"], errors="raise")
+    matches["match_id_sort"] = matches["match_id"].astype(str)
     matches = matches.sort_values(
         ["issue_order", "match_idx", "match_id_sort"], kind="mergesort"
     ).reset_index(drop=True)
@@ -475,8 +746,9 @@ def _cell_tables(matches: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.
         "issue_order",
         "match_id", "match_idx", "match_order", "outcome_code", "outcome_order",
         "feature_cutoff_ts_utc", "kickoff_ts_utc", "availability_status",
-        "unavailable_reason", "source_b0_status", "euro_1h_available_ts_utc",
-        "predicted_sp_available_ts_utc",
+        "unavailable_reason", "source_b0_status", "identity_source",
+        "identity_observed_ts_utc", "identity_timing_status",
+        "euro_1h_available_ts_utc", "predicted_sp_available_ts_utc",
     ]
     identity = cells.loc[:, identity_columns].reset_index(drop=True)
 
@@ -547,6 +819,18 @@ def _cell_tables(matches: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, pd.
         _numeric(cells["match_order"]).to_numpy() / denominator
     )
     values["calendar_year"] = _numeric(cells["year"]).to_numpy()
+    registry_only = cells["identity_timing_status"].astype(str).isin(
+        {"RETROSPECTIVE_IDENTITY_ONLY", "TIMESTAMPED_IDENTITY_ONLY"}
+    )
+    registry_features = set(FEATURE_NAMES).difference(
+        {
+            "outcome_code_numeric",
+            "kickoff_delay_hours",
+            "match_position_fraction",
+            "calendar_year",
+        }
+    )
+    values.loc[registry_only, sorted(registry_features)] = np.nan
     values = values.loc[:, ["cell_join_key", *FEATURE_NAMES]]
     for feature in FEATURE_NAMES:
         values[feature] = values[feature].astype(np.float32)
@@ -582,6 +866,28 @@ def _heldout_registry(identity: pd.DataFrame) -> pd.DataFrame:
                 "issue": issue,
                 "issue_instance": scoped.iloc[0]["issue_instance"],
                 "feature_cutoff_ts_utc": scoped.iloc[0]["feature_cutoff_ts_utc"],
+                "identity_sources": ";".join(
+                    sorted(scoped["identity_source"].astype(str).unique())
+                ),
+                "identity_timing_statuses": ";".join(
+                    sorted(scoped["identity_timing_status"].astype(str).unique())
+                ),
+                "first_identity_observed_ts_utc": min(
+                    (
+                        value
+                        for value in scoped["identity_observed_ts_utc"].astype(str)
+                        if value
+                    ),
+                    default="",
+                ),
+                "last_identity_observed_ts_utc": max(
+                    (
+                        value
+                        for value in scoped["identity_observed_ts_utc"].astype(str)
+                        if value
+                    ),
+                    default="",
+                ),
                 "match_count": scoped["match_id"].nunique(),
                 "cell_count": len(scoped),
                 "ordered_identity_sha256": sha256(
@@ -598,6 +904,9 @@ def build_inference(
     *,
     database: Path | None = None,
     identity_extension: Path | None = None,
+    heldout_historical_database: Path | None = None,
+    heldout_live_database: Path | None = None,
+    heldout_identity_extension: Path | None = None,
 ) -> dict[str, Any]:
     output = output.resolve()
     if output.exists() and any(output.iterdir()):
@@ -607,12 +916,17 @@ def build_inference(
     audit = output / "audit"
     for directory in (inference, sources, audit):
         directory.mkdir(parents=True, exist_ok=True)
-    estimator, issue_census, predictions, extension = _load_inputs(
-        database, identity_extension
+    estimator, issue_census, predictions, extension, heldout_extension = _load_inputs(
+        database,
+        identity_extension,
+        heldout_historical_database,
+        heldout_live_database,
+        heldout_identity_extension,
     )
     write_parquet(sources / "unavailable_match_identity.parquet", extension)
+    write_parquet(sources / "heldout_match_identity.parquet", heldout_extension)
     matches, league_dict, team_dict, breadth_dict = _prepare_matches(
-        estimator, issue_census, predictions, extension
+        estimator, issue_census, predictions, extension, heldout_extension
     )
     identity, values, masks = _cell_tables(matches)
     forbidden = forbidden_inference_names(
@@ -656,22 +970,7 @@ def build_inference(
         ]
     )
     write_csv(output / "feature_dictionary.csv", feature_dictionary)
-    coverage_rows: list[dict[str, Any]] = []
-    for split in ("development", "heldout"):
-        selected = identity["split"].eq(split).to_numpy()
-        for feature in FEATURE_NAMES:
-            present = int(masks.loc[selected, feature].sum())
-            total = int(selected.sum())
-            coverage_rows.append(
-                {
-                    "split": split,
-                    "feature": feature,
-                    "present_cells": present,
-                    "total_cells": total,
-                    "coverage_rate": present / total if total else np.nan,
-                }
-            )
-    write_csv(audit / "feature_coverage.csv", pd.DataFrame(coverage_rows))
+    write_csv(audit / "feature_coverage.csv", _feature_coverage(identity, masks))
     write_csv(
         audit / "year_distribution.csv",
         matches.groupby(["split", "year"], sort=True).size().rename("match_rows").reset_index(),
@@ -728,6 +1027,9 @@ def build_inference(
     source_hashes = _source_hashes()
     source_hashes["causal_identity_extension"] = digest(
         sources / "unavailable_match_identity.parquet"
+    )
+    source_hashes["heldout_identity_extension"] = digest(
+        sources / "heldout_match_identity.parquet"
     )
     write_csv(
         audit / "source_census.csv",
@@ -877,6 +1179,83 @@ def build_development_labels(output: Path, *, database: Path) -> dict[str, Any]:
     }
 
 
+def _downstream_readiness(coverage: pd.DataFrame) -> dict[str, Any]:
+    coverage_lookup = {
+        (str(row.split), str(row.feature)): float(row.coverage_rate)
+        for row in coverage.itertuples(index=False)
+    }
+    core_market_coverage = {
+        feature: coverage_lookup[("development", feature)]
+        for feature in (
+            "calibrated_market_probability",
+            "devig_euro_probability",
+            "euro_1h_odds",
+            "predicted_final_sp",
+            "bj_sp_snapshot",
+        )
+    }
+    return {
+        "decision": "BLOCKED_PENDING_DATA_CAPABILITY",
+        "downstream_issue": 204,
+        "reason": (
+            "The frozen development tensor does not provide representative causal "
+            "market-price support for the contracted market-anchored probability "
+            "and pre-event SP heads. A declared masked feature is not an available "
+            "training input."
+        ),
+        "development_core_market_coverage": core_market_coverage,
+        "required_data_capability": {
+            "proposed_contract_id": "BJ-UNIFIED-MARKET-COVERAGE-001",
+            "project": "BJ Data Platform",
+            "scope": [
+                "extend causally timestamped 1h EURO/market probability over development history",
+                "extend timestamped pre-event Beijing SP snapshots with exact source digests",
+                "publish matched issue/match/outcome coverage and replay evidence",
+                "define a PI-approved representative-support gate before #204 activation",
+            ],
+            "graph_disposition": (
+                "PI must create the native Data issue and make #204 blockedBy it; "
+                "Engineer does not mutate PI-owned graph contracts."
+            ),
+        },
+        "heldout_disposition": (
+            "The complete 2025-04+ local sequence is frozen for identity and label "
+            "embargo only. Its 2026 rows do not repair development feature coverage."
+        ),
+    }
+
+
+def _decision_report(readiness: dict[str, Any]) -> str:
+    core_market_coverage = readiness["development_core_market_coverage"]
+    report_lines = [
+        "# #203 downstream readiness decision",
+        "",
+        "Decision: **#204 remains BLOCKED_PENDING_DATA_CAPABILITY**.",
+        "",
+        "The current development coverage is:",
+        "",
+        "| core input | causal unmasked coverage |",
+        "| --- | ---: |",
+        *[
+            f"| `{feature}` | {rate:.6%} |"
+            for feature, rate in core_market_coverage.items()
+        ],
+        "",
+        "These rates do not support representing #204 as a usable market-anchored "
+        "probability/SP learning capability. The 2026 held-out extension is identity "
+        "only and does not change that conclusion.",
+        "",
+        "Required PI-owned Data capability: `BJ-UNIFIED-MARKET-COVERAGE-001` "
+        "under **BJ Data Platform**, covering causally timestamped development "
+        "1h EURO/market probability and pre-event Beijing SP, exact provenance, "
+        "matched coverage, and a PI-approved representative-support gate. PI must "
+        "create the native Issue and graph edge; this package only records the "
+        "evidence-backed disposition.",
+        "",
+    ]
+    return "\n".join(report_lines)
+
+
 def write_analysis_artifacts(output: Path) -> None:
     """Publish bounded decision tables and a package-versioned coverage figure."""
 
@@ -904,6 +1283,11 @@ def write_analysis_artifacts(output: Path) -> None:
         .reset_index()
     )
     write_csv(analysis / "coverage_summary.csv", summary)
+    readiness = _downstream_readiness(coverage)
+    write_json(analysis / "downstream_readiness.json", readiness)
+    (analysis / "DECISION_REPORT.md").write_text(
+        _decision_report(readiness), encoding="utf-8", newline="\n"
+    )
 
     pivot = coverage.pivot(index="feature", columns="split", values="coverage_rate")
     pivot = pivot.loc[list(FEATURE_NAMES)]
@@ -959,6 +1343,7 @@ def finalize_package(output: Path) -> dict[str, Any]:
     if not inference_manifest.is_file() or not label_manifest.is_file():
         raise TensorBuildError("both physical namespaces are required before finalize")
     source_extension = output / "sources/unavailable_match_identity.parquet"
+    heldout_source_extension = output / "sources/heldout_match_identity.parquet"
     write_analysis_artifacts(output)
     implementation_paths = _implementation_paths()
     write_json(
@@ -970,6 +1355,15 @@ def finalize_package(output: Path) -> dict[str, Any]:
             "inference_namespace_manifest_sha256": digest(inference_manifest),
             "label_namespace_manifest_sha256": digest(label_manifest),
             "identity_extension_sha256": digest(source_extension),
+            "heldout_identity_extension_sha256": digest(
+                heldout_source_extension
+            ),
+            "downstream_readiness_sha256": digest(
+                output / "analysis/downstream_readiness.json"
+            ),
+            "decision_report_sha256": digest(
+                output / "analysis/DECISION_REPORT.md"
+            ),
             "source_hashes": _source_hashes(),
             "implementation_hashes": {
                 name: digest(path) for name, path in implementation_paths.items()
@@ -978,6 +1372,14 @@ def finalize_package(output: Path) -> dict[str, Any]:
                 "issues": list(HELDOUT_ISSUES),
                 "label_status": "ABSENT_BY_CONTRACT",
                 "policy": HELDOUT_POLICY,
+            },
+            "supersedes": {
+                "contract_version": "bj203-causal-tensor-v1",
+                "path": "results/bj203_causal_tensor_v1",
+                "exact_head": SUPERSEDED_V1_HEAD,
+                "manifest_sha256": SUPERSEDED_V1_MANIFEST_SHA256,
+                "sha256sums_sha256": SUPERSEDED_V1_SHA256SUMS_SHA256,
+                "status": "PRESERVED_IMMUTABLE_SUPERSEDED_EVIDENCE",
             },
             "scientific_stack": {
                 "pandas": pd.__version__,
@@ -1004,9 +1406,21 @@ match_id`; issue order is cutoff then numeric issue.
 
 `inference/` is outcome-unexposed and is the only namespace read by the default
 loader. `labels/` is imported explicitly and contains development-only result,
-final-SP and settlement fields. Issues {', '.join(HELDOUT_ISSUES)} are frozen
-whole as 2025-04+ held-out identities; their labels are absent, not encrypted or
-hidden in the same payload.
+final-SP and settlement fields. The exact 52-issue held-out sequence is recorded
+in `audit/heldout_registry.csv`: 25041-25042 plus every locally inventoried 2026
+issue from 26011 through 26069. Their labels are absent, not encrypted or hidden
+in the same payload. The prior `results/bj203_causal_tensor_v1` package is
+preserved unchanged as superseded two-issue evidence; v2 is the operative handoff.
+Its complete byte census remains independently checkable with the
+`verify-superseded` command and is locked to original HEAD `{SUPERSEDED_V1_HEAD}`.
+
+The 8,661 added 2026 matches are deliberately identity only. Rows 26011-26049
+come from the retrospective modelling inventory and carry no asserted observation
+timestamp. Rows 26051-26069 come from the timestamped live match inventory and
+bind `created_ts`, but expose no market, SP, line, league or team decision feature.
+Only the canonical outcome axis, issue/match order, calendar year and nonnegative
+kickoff delay can be unmasked. The loader fails closed if an identity-only row
+exposes any other feature.
 
 Historical official Beijing 3SP has no trustworthy observation timestamp and is
 therefore label-only. The pre-event `bj_sp_snapshot` slots remain present but
@@ -1032,10 +1446,15 @@ coverage figure without opening held-out labels.
 
 The issue-level cutoff makes most match-relative market snapshots causally
 unavailable (roughly 1% coverage for 1h market cells and 8% for 10h predicted
-SP in development). Downstream #204 must honor these masks. Reinterpreting the
-state as a rolling per-match or per-ticket cutoff requires a separate PI
-contract decision and a newly versioned package; it cannot be an implicit
-backfill in this interface.
+SP in development; Beijing SP is 0%). The explicit capability decision is that
+**#204 remains blocked**. See `analysis/downstream_readiness.json` and
+`analysis/DECISION_REPORT.md`. The required PI-owned Data capability is proposed
+as `BJ-UNIFIED-MARKET-COVERAGE-001`: causally timestamped development 1h
+EURO/market probability and pre-event Beijing SP, exact provenance, matched
+coverage, and a PI-approved representative-support gate. PI must create that
+native Issue and make #204 blockedBy it; this Engineer-owned package does not
+mutate Issue Graph contracts. Reinterpreting the cutoff or backfilling terminal
+prices is prohibited.
 
 ## Limitations
 
@@ -1052,16 +1471,19 @@ Create and use the repository's pinned environment:
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 PY=.venv/bin/python
-$PY scripts/build_bj203_causal_tensor.py verify --package results/bj203_causal_tensor_v1
+$PY scripts/build_bj203_causal_tensor.py verify --package results/bj203_causal_tensor_v2
+$PY scripts/build_bj203_causal_tensor.py verify-superseded \
+  --package results/bj203_causal_tensor_v1
 $PY scripts/execute_bj203_notebook.py
 
 # Clean detached inference replay without the 6.8 GB runtime database.
 # Replace the output placeholder with any new empty directory:
 $PY scripts/build_bj203_causal_tensor.py build-inference \\
   --output <empty-replay-directory> \\
-  --identity-extension results/bj203_causal_tensor_v1/sources/unavailable_match_identity.parquet
+  --identity-extension results/bj203_causal_tensor_v2/sources/unavailable_match_identity.parquet \\
+  --heldout-identity-extension results/bj203_causal_tensor_v2/sources/heldout_match_identity.parquet
 $PY scripts/build_bj203_causal_tensor.py compare-inference \\
-  --frozen results/bj203_causal_tensor_v1 \\
+  --frozen results/bj203_causal_tensor_v2 \\
   --replay <empty-replay-directory>
 ```
 
@@ -1078,6 +1500,46 @@ database and excludes held-out issues in its SQL query.
     }
     write_json(output / "SHA256SUMS.json", sums)
     return verify_package(output)
+
+
+def verify_superseded_package(output: Path) -> dict[str, Any]:
+    """Verify preserved v1 bytes without treating v1 as the operative contract."""
+
+    output = output.expanduser().resolve()
+    try:
+        sums_path = output / "SHA256SUMS.json"
+        manifest_path = output / "MANIFEST.json"
+        sums = json.loads(sums_path.read_text(encoding="utf-8"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise TensorBuildError("invalid superseded v1 package") from exc
+    paths = list(output.rglob("*"))
+    if any(path.is_symlink() for path in paths):
+        raise TensorBuildError("superseded v1 package must not contain symlinks")
+    files = {
+        path.relative_to(output).as_posix()
+        for path in paths
+        if path.is_file() and path.name != "SHA256SUMS.json"
+    }
+    if not isinstance(sums, dict) or set(sums) != files:
+        raise TensorBuildError("superseded v1 file census drift")
+    for relative, expected in sums.items():
+        if digest(output / relative) != expected:
+            raise TensorBuildError(f"superseded v1 hash mismatch: {relative}")
+    if digest(sums_path) != SUPERSEDED_V1_SHA256SUMS_SHA256:
+        raise TensorBuildError("superseded v1 root identity drift")
+    if digest(manifest_path) != SUPERSEDED_V1_MANIFEST_SHA256:
+        raise TensorBuildError("superseded v1 manifest identity drift")
+    if manifest.get("contract_version") != "bj203-causal-tensor-v1":
+        raise TensorBuildError("superseded v1 contract declaration drift")
+    if manifest.get("heldout", {}).get("issues") != ["25041", "25042"]:
+        raise TensorBuildError("superseded v1 held-out declaration drift")
+    return {
+        "contract_version": "bj203-causal-tensor-v1",
+        "exact_head": SUPERSEDED_V1_HEAD,
+        "files": len(files),
+        "status": "SUPERSEDED_EVIDENCE_PASS",
+    }
 
 
 def compare_inference_replay(frozen: Path, replay: Path) -> dict[str, Any]:
@@ -1141,6 +1603,22 @@ def _assert_exact_cell_identity(
         raise TensorBuildError("package cell identity differs from frozen sources")
 
 
+def _assert_exact_feature_table(
+    actual: pd.DataFrame,
+    expected: pd.DataFrame,
+    *,
+    name: str,
+) -> None:
+    if list(actual.columns) != list(expected.columns) or not actual[
+        "cell_join_key"
+    ].astype(str).equals(expected["cell_join_key"].astype(str)):
+        raise TensorBuildError(f"package {name} differ from frozen sources")
+    actual_features = actual.loc[:, FEATURE_NAMES].to_numpy()
+    expected_features = expected.loc[:, FEATURE_NAMES].to_numpy()
+    if not np.array_equal(actual_features, expected_features, equal_nan=True):
+        raise TensorBuildError(f"package {name} differ from frozen sources")
+
+
 def _assert_exact_heldout_registry(
     actual: pd.DataFrame, expected: pd.DataFrame
 ) -> None:
@@ -1155,14 +1633,26 @@ def _assert_exact_heldout_registry(
 def _validate_source_bound_identity(output: Path, identity: pd.DataFrame) -> None:
     """Bind every issue and match axis field to the exact frozen upstream sources."""
 
-    estimator, issue_census, predictions, extension = _load_inputs(
-        None, output / "sources/unavailable_match_identity.parquet"
+    estimator, issue_census, predictions, extension, heldout_extension = _load_inputs(
+        None,
+        output / "sources/unavailable_match_identity.parquet",
+        heldout_identity_extension=output / "sources/heldout_match_identity.parquet",
     )
     expected_matches, _, _, _ = _prepare_matches(
-        estimator, issue_census, predictions, extension
+        estimator, issue_census, predictions, extension, heldout_extension
     )
-    expected_identity, _, _ = _cell_tables(expected_matches)
+    expected_identity, expected_values, expected_masks = _cell_tables(expected_matches)
     _assert_exact_cell_identity(identity, expected_identity)
+    _assert_exact_feature_table(
+        pd.read_parquet(output / "inference/feature_values.parquet"),
+        expected_values,
+        name="feature values",
+    )
+    _assert_exact_feature_table(
+        pd.read_parquet(output / "inference/feature_masks.parquet"),
+        expected_masks,
+        name="feature masks",
+    )
     actual_registry = pd.read_csv(
         output / "audit/heldout_registry.csv", dtype=str, keep_default_na=False
     )
@@ -1203,6 +1693,38 @@ def verify_package(output: Path) -> dict[str, Any]:
         "issues"
     ) != list(HELDOUT_ISSUES):
         raise TensorBuildError("root held-out identity declaration drift")
+    expected_supersedes = {
+        "contract_version": "bj203-causal-tensor-v1",
+        "path": "results/bj203_causal_tensor_v1",
+        "exact_head": SUPERSEDED_V1_HEAD,
+        "manifest_sha256": SUPERSEDED_V1_MANIFEST_SHA256,
+        "sha256sums_sha256": SUPERSEDED_V1_SHA256SUMS_SHA256,
+        "status": "PRESERVED_IMMUTABLE_SUPERSEDED_EVIDENCE",
+    }
+    if manifest.get("supersedes") != expected_supersedes:
+        raise TensorBuildError("superseded v1 identity declaration drift")
+    readiness_path = output / "analysis/downstream_readiness.json"
+    report_path = output / "analysis/DECISION_REPORT.md"
+    coverage = pd.read_csv(output / "audit/feature_coverage.csv")
+    coverage_identity = pd.read_parquet(output / "inference/cell_identity.parquet")
+    coverage_masks = pd.read_parquet(output / "inference/feature_masks.parquet")
+    expected_coverage = _feature_coverage(coverage_identity, coverage_masks)
+    _assert_feature_coverage(coverage, expected_coverage)
+    expected_readiness = _downstream_readiness(expected_coverage)
+    try:
+        actual_readiness = json.loads(readiness_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise TensorBuildError("invalid downstream readiness artifact") from exc
+    if actual_readiness != expected_readiness:
+        raise TensorBuildError("downstream readiness does not match frozen coverage")
+    if report_path.read_text(encoding="utf-8") != _decision_report(
+        expected_readiness
+    ):
+        raise TensorBuildError("downstream decision report semantic drift")
+    if manifest.get("downstream_readiness_sha256") != digest(readiness_path):
+        raise TensorBuildError("downstream readiness identity drift")
+    if manifest.get("decision_report_sha256") != digest(report_path):
+        raise TensorBuildError("downstream decision report identity drift")
     current_implementation_hashes = {
         name: digest(path) for name, path in _implementation_paths().items()
     }
@@ -1214,6 +1736,10 @@ def verify_package(output: Path) -> dict[str, Any]:
         output / "sources/unavailable_match_identity.parquet"
     ):
         raise TensorBuildError("package identity extension drift")
+    if manifest.get("heldout_identity_extension_sha256") != digest(
+        output / "sources/heldout_match_identity.parquet"
+    ):
+        raise TensorBuildError("package held-out identity extension drift")
     namespace_manifests = {
         "inference_namespace_manifest_sha256": output / "inference/MANIFEST.json",
         "label_namespace_manifest_sha256": output / "labels/MANIFEST.json",
