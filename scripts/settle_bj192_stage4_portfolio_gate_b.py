@@ -219,6 +219,54 @@ def write_immutable_package(
         raise
 
 
+def write_surface_checkpoint(
+    checkpoint: Path,
+    *,
+    binding: dict[str, object],
+    completed_path_keys: Sequence[dict[str, object]],
+) -> dict[str, object]:
+    """Atomically save a resumable Gate-B surface boundary below ``.scratch``.
+
+    A checkpoint is never a research artifact: it contains no settled output
+    table and is rejected if it is outside the repository scratch hierarchy or
+    its Gate-A/source identities do not match the currently accepted inputs.
+    """
+    scratch = (ROOT / ".scratch").resolve()
+    checkpoint = checkpoint.resolve()
+    if scratch not in checkpoint.parents:
+        raise RuntimeError("checkpoint must remain under repository .scratch")
+    keys = [dict(row) for row in completed_path_keys]
+    if len({canonical_hash(row) for row in keys}) != len(keys):
+        raise RuntimeError("duplicate completed path checkpoint key")
+    required = {"gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST, "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT}
+    if any(binding.get(key) != value for key, value in required.items()):
+        raise RuntimeError("checkpoint Gate-A binding mismatch")
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    stage = checkpoint.with_suffix(checkpoint.suffix + ".stage")
+    if stage.exists():
+        raise RuntimeError(f"active checkpoint stage exists: {stage}")
+    payload = {
+        "contract": CONTRACT,
+        "version": VERSION,
+        "binding": binding,
+        "completed_path_keys": sorted(keys, key=canonical_hash),
+    }
+    payload["payload_sha256"] = canonical_hash(payload)
+    stage.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(stage, checkpoint)
+    return payload
+
+
+def load_surface_checkpoint(checkpoint: Path, *, binding: dict[str, object]) -> list[dict[str, object]]:
+    """Read only a matching complete checkpoint; stale state fails closed."""
+    payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+    expected = dict(payload)
+    digest = expected.pop("payload_sha256", None)
+    if digest != canonical_hash(expected) or payload.get("binding") != binding:
+        raise RuntimeError("checkpoint integrity or binding mismatch")
+    return list(payload["completed_path_keys"])
+
+
 def verify_package(directory: Path, manifest_digest: str, content_digest: str) -> dict[str, str]:
     """Verify both recursive coverage and the authoritative identity bytes."""
     if sha256_file(directory / "SHA256SUMS.json") != manifest_digest:
