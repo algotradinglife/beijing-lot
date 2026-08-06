@@ -1002,6 +1002,30 @@ class CandidatePathCache:
         return merge_candidate_bridges(*bridges), selected_rows
 
 
+def materialize_phase_zero_selection_checkpoint(
+    checkpoint: Path,
+    *,
+    cache: CandidatePathCache | None = None,
+) -> dict[str, object]:
+    """Persist all frozen selected-M paths before Phase-1 pair screening."""
+    cache = cache or CandidatePathCache()
+    selected: list[dict[str, object]] = []
+    for candidate_id in sorted(canonical_economic_catalog()):
+        for seed, (_, rows) in cache.paths(candidate_id).items():
+            for row in rows:
+                selected.append({"candidate_id": candidate_id, "deployment_seed": seed,
+                    "issue_instance": row["issue_instance"], "calendar_index": row["calendar_index"],
+                    "selected_M": row["selected_M"], "selection_variant": row["selection_variant"],
+                    "prior_training_input_sha256": row["prior_training_input_sha256"]})
+    expected = sum(len(paths) * 348 for paths in cache._paths.values())
+    if len(selected) != expected:
+        raise RuntimeError(f"Phase-0 selected-path count drift: {len(selected)} != {expected}")
+    binding = {"gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
+        "settled_source_bindings": verify_gate_a_source_bindings(), "phase": "PHASE_0_SELECTED_M_PATHS"}
+    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=selected)
+
+
 def replay_bundle_path(
     candidates: Sequence[str],
     bundle_id: str,
