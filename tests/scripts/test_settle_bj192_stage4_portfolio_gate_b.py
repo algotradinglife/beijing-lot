@@ -476,3 +476,16 @@ def test_intrinsic_pair_screen_preserves_bundle_and_zero_flow_denominators() -> 
     }
     assert {row["deployment_replicate_bundle_id"] for row in rows} == {"BUNDLE_ORDINAL_001"}
     assert all(row["observation_count"] == 3 for row in rows if row["denominator_id"] == "FULL_CALENDAR_ZERO_FLOW")
+
+
+def test_phase_zero_native_observation_cache_rehydrates_without_ticket_lots() -> None:
+    cache = RUNNER.CandidatePathCache([])
+    cache.inject_native_observations([{
+        "candidate_id": "FIXTURE", "deployment_seed": "NA", "issue_instance": "I1",
+        "native_pre_tax_return": -0.25, "native_actual_stake_yuan": 8.0,
+        "native_pre_tax_gross_yuan": 6.0, "native_hit_ticket_count": 1,
+        "native_outcome_available": True,
+    }])
+    assert cache.native_observations("FIXTURE", "NA") == {
+        "I1": {"return": -0.25, "stake": 8.0, "gross": 6.0, "hits": 1, "available": True}
+    }
