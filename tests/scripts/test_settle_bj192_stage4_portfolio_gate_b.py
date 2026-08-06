@@ -353,3 +353,11 @@ def test_native_m_curve_and_fixed_comparator_are_exact_source_aggregates() -> No
     fixed = RUNNER.fixed_m_candidate_bridge("BJ159_SELECTED_N7_WOR_M_CURVE", "137001")
     assert len(fixed) == 348
     assert all(sleeve.sleeve_id.endswith("@M32@137001") for sleeve in fixed.values())
+
+
+def test_frozen_portfolio_enumeration_covers_every_canonical_pair_and_shortlist_subset() -> None:
+    sets = RUNNER.frozen_portfolio_sets()
+    assert len(sets["standalone"]) == 104
+    assert len(sets["pairwise"]) == 5356
+    assert len(sets["higher_order"]) == 7 + 31
+    assert ("BEST_FULL_FULL", "MODEL_SOURCE_MODEL_CAP1_M512") in sets["pairwise"]

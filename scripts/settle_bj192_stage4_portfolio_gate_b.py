@@ -1001,6 +1001,30 @@ def fixed_m_candidate_bridge(
     return materialize_candidate_bridge(candidate_id, fixed_m, deployment_seed)
 
 
+def frozen_portfolio_sets() -> dict[str, list[tuple[str, ...]]]:
+    """Enumerate the Gate-A standalone, all-pair and robust K surfaces exactly."""
+    from itertools import combinations
+
+    frontier = json.loads((GATE_A / "frontier_contract.json").read_text(encoding="utf-8"))
+    candidates = tuple(sorted(frontier["eligible_candidate_sources"]))
+    if set(candidates) != set(canonical_economic_catalog()):
+        raise RuntimeError("frontier/catalog canonical family mismatch")
+    pairwise = [tuple(sorted(pair)) for pair in frontier["pairwise_surface"]]
+    if len(pairwise) != len(set(pairwise)) or set(pairwise) != set(combinations(candidates, 2)):
+        raise RuntimeError("all-pairs frozen surface mismatch")
+    higher: list[tuple[str, ...]] = []
+    for serialized in frontier["robust_higher_order_shortlist"]:
+        shortlist = tuple(serialized.split("|"))
+        if any(candidate not in candidates for candidate in shortlist):
+            raise RuntimeError("robust shortlist outside canonical catalog")
+        higher.extend(tuple(combo) for size in range(1, len(shortlist) + 1) for combo in combinations(shortlist, size))
+    return {
+        "standalone": [(candidate,) for candidate in candidates],
+        "pairwise": pairwise,
+        "higher_order": higher,
+    }
+
+
 def merge_candidate_bridges(
     *bridges: dict[tuple[str, str], IssueSleeve],
 ) -> dict[tuple[str, str], IssueSleeve]:
