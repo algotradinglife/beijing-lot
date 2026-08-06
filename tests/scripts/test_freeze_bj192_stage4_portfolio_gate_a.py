@@ -5,6 +5,7 @@ import importlib.util
 import json
 import math
 import gzip
+import copy
 from pathlib import Path
 
 import pytest
@@ -672,6 +673,16 @@ def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
     assert "deployment_seed" not in schemas["portfolio_k_saturation"]["key"]
     assert "mode" in schemas["baseline_lift"]["key"]
     assert "capital_mode" not in schemas["baseline_lift"]["key"]
+    joins = schemas["portfolio_cross_table_join_contract"]["joins"]
+    assert joins and all(
+        join["key"][: len(m.PATH_IDENTITY)] == list(m.PATH_IDENTITY)
+        for join in joins
+    )
+    m.validate_portfolio_schema(schemas)
+    broken = copy.deepcopy(schemas)
+    broken["baseline_lift"]["key"].remove("mode")
+    with pytest.raises(RuntimeError, match="path identity missing"):
+        m.validate_portfolio_schema(broken)
     regime_rows = list(__import__("csv").DictReader((output / "regime_map.csv").open()))
     assert len(regime_rows) == 348
     assert sum(row["regime_status"] == "PRE_EVENT_FEATURE_VECTOR_AVAILABLE" for row in regime_rows) == 344

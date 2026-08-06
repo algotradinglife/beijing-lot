@@ -28,7 +28,7 @@ from typing import Sequence
 
 
 CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
-VERSION = "bj192-gate-a-v8r1"
+VERSION = "bj192-gate-a-v8r1r1"
 OUTCOME_BOUNDARY = (
     "Gate A is outcome-unexposed: no score, result, final/winning SP, payout, "
     "tax realization, ROI, net, gross, or settlement payload is read."
@@ -59,6 +59,15 @@ PATH_IDENTITY = (
     "normalization_method",
     "deployment_replicate_bundle_id",
 )
+PORTFOLIO_LEVEL_TABLES = (
+    "issue_ledger", "sleeve_funding_ledger", "capital_summary", "weight_history",
+    "dependence", "dependence_panel", "intrinsic_native_dependence",
+    "realized_funded_flow_dependence", "risk_decomposition", "stage_attribution",
+    "portfolio_k_saturation", "holding_metrics", "rolling_window_metrics",
+    "bootstrap_stability", "baseline_lift", "challenger_case",
+    "all_pairs_risk_return_surface", "higher_order_pareto_frontier",
+    "terminal_decision",
+)
 
 
 def repo_root() -> Path:
@@ -84,7 +93,7 @@ SOURCE_167B = (
     ROOT / "results" / "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1"
 )
 SOURCE_170B = ROOT / "results" / "bj170_gate_b_selector_allocator_stack_v1"
-DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v8r1"
+DEFAULT_OUTPUT = ROOT / "results" / "bj192_gate_a_preoutcome_v8r1r1"
 SETTLED_IDENTITY_ONLY_PACKAGES = {
     "bj176_issue_equity_risk_v1",
     "bj190_gate_b_sparse_divergence_v1",
@@ -2999,6 +3008,7 @@ def output_schema() -> dict[str, object]:
         },
         "bootstrap_stability": {
             "key": [
+                "portfolio_id",
                 "target_id",
                 "paired_control_id",
                 "economic_family_id",
@@ -3099,6 +3109,37 @@ def output_schema() -> dict[str, object]:
                 "chart_source_terminal_decision.csv": path_key("decision_id", "candidate_id", "decision", "capital_weights_sha256", "next_validation_step"),
             },
         },
+        "portfolio_cross_table_join_contract": {
+            "path_identity": list(PATH_IDENTITY),
+            "portfolio_level_tables": list(PORTFOLIO_LEVEL_TABLES),
+            "uniqueness_rule": "each table has exactly one row per complete key; a duplicate is a fail-closed Gate-B error",
+            "joins": [
+                {
+                    "left": "issue_ledger",
+                    "right": "sleeve_funding_ledger",
+                    "key": [*PATH_IDENTITY, "calendar_index", "issue_instance"],
+                    "rule": "every funded sleeve row joins one issue ledger row and sleeve actual stake sums exactly to issue actual stake",
+                },
+                {
+                    "left": "issue_ledger",
+                    "right": "rolling_window_metrics",
+                    "key": list(PATH_IDENTITY),
+                    "rule": "all rolling windows are derived only from the identical complete chronological issue path",
+                },
+                {
+                    "left": "capital_summary",
+                    "right": "baseline_lift",
+                    "key": list(PATH_IDENTITY),
+                    "rule": "each absolute path/control lift shares one exact path identity and actual funding hash",
+                },
+                {
+                    "left": "all_pairs_risk_return_surface",
+                    "right": "terminal_decision",
+                    "key": list(PATH_IDENTITY),
+                    "rule": "terminal decisions cite only cells materialized in the same path identity and exact support",
+                },
+            ],
+        },
         "chart_sources": [
             "chart_source_issue_equity_paths.csv.gz",
             "chart_source_capital_frontier.csv",
@@ -3121,6 +3162,40 @@ def output_schema() -> dict[str, object]:
             "chart_source_terminal_decision.csv",
         ],
     }
+
+
+def validate_portfolio_schema(schema: dict[str, object]) -> None:
+    """Fail closed if Gate-B tables or chart sources can lose a path identity."""
+    for table in PORTFOLIO_LEVEL_TABLES:
+        table_schema = schema.get(table)
+        if not isinstance(table_schema, dict):
+            raise RuntimeError(f"missing portfolio-level schema: {table}")
+        key = table_schema.get("key")
+        if not isinstance(key, list) or len(key) != len(set(key)):
+            raise RuntimeError(f"non-unique key schema: {table}")
+        if any(field not in key for field in PATH_IDENTITY):
+            raise RuntimeError(f"path identity missing from {table}")
+    if "deployment_seed" in schema["portfolio_k_saturation"]["key"]:
+        raise RuntimeError("portfolio_k_saturation cannot invent a singular seed")
+    if "capital_mode" in schema["baseline_lift"]["key"]:
+        raise RuntimeError("baseline_lift must use declared mode path identity")
+    if not {"sharpe", "sortino", "calmar"} <= set(
+        schema["all_pairs_risk_return_surface"]["fields"]
+    ):
+        raise RuntimeError("all-pairs risk metrics incomplete")
+    if not {
+        "capital_weights_json", "failure_regimes_json", "next_validation_step"
+    } <= set(schema["terminal_decision"]["fields"]):
+        raise RuntimeError("terminal decision schema incomplete")
+    if "window_size_issues" not in schema["rolling_window_metrics"]["key"]:
+        raise RuntimeError("rolling windows need an explicit W key")
+    chart_contract = schema["chart_source_contract"]
+    for name, columns in chart_contract["columns"].items():
+        if any(field not in columns for field in PATH_IDENTITY):
+            raise RuntimeError(f"chart path identity missing: {name}")
+    joins = schema["portfolio_cross_table_join_contract"]["joins"]
+    if not joins or any(join["key"][: len(PATH_IDENTITY)] != list(PATH_IDENTITY) for join in joins):
+        raise RuntimeError("cross-table path joins incomplete")
 
 
 def funded_prefix_ledger_contract(
@@ -3217,6 +3292,7 @@ def write_package(output: Path) -> None:
     if not all(row["nested"] for row in model_audit_payload["rows"]):
         raise RuntimeError("MODEL partial-prefix audit did not pass every identity")
     schemas = output_schema()
+    validate_portfolio_schema(schemas)
     stage = Path(tempfile.mkdtemp(prefix=f".{output.name}.stage-", dir=output.parent))
     try:
         fields = list(rows[0])
