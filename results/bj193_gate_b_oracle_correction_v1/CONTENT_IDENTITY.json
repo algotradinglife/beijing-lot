@@ -1,0 +1,8 @@
+{
+  "canonical_issue_count": 344,
+  "causal_policy_rows_unchanged": true,
+  "changed_economic_issue_count": 151,
+  "checkpoint_manifest_sha256": "4015ca353dff957a79958bf3e7aa73b8824f685c967a73e544d59bc437a3ca15",
+  "contract": "bj193-gate-b-oracle-fold-join-correction-v1",
+  "corrected_oracle_selected_count": 181
+}

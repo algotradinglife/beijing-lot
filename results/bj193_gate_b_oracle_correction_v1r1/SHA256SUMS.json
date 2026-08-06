@@ -1,0 +1,10 @@
+{
+  "CONTENT_IDENTITY.json": "bb89dc345302dd899d4bddb01fcf399feff8d22ff0e4a609ec68b52db90c4fb4",
+  "causal_policy_byte_identity.csv": "60f73683b4ded4f9ca7e06857dc76b245f5ef60537dd88e934e87f784b29f576",
+  "checkpoint_payload_audit.csv": "6fc5e2b82bb203577ab5ae85f89ee9f1a4cf386b96f760199b8117e4aa62cdff",
+  "corrected_oracle_policy_flow.csv.gz": "0ef03ac1f0958db577732bb8e4e4ed3f7003a0331772b57901b613c859e3aff9",
+  "corrected_stage_path-stage3_oracle.json": "c3bad13dc7f23fd51167de5378df146b92270dc98a408b0663b251e1393a1544",
+  "oracle_correction_receipt.json": "8aeb6639aec4c469b93e978c4a8825c0ec3a065f2b2f1f4da07a6df7273f73c2",
+  "source_binding.json": "e5c366066c789d3d6837385a4908ddfe17a514fa242d21a15acf621f4309e3a4",
+  "superseded_oracle_policy_flow.csv.gz": "b187b07bc7a23db4802d789ac854ec7aa6ef3a7ce727ea66d8c5c3370f64a1d2"
+}

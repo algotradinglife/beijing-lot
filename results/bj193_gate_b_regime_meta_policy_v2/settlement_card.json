@@ -1,0 +1,62 @@
+{
+  "bankroll_execution": "FIXED_NATIVE_STAKE_REUSE_NO_RESIZING_NO_COMPOUNDING_NO_TOPUPS",
+  "bankroll_issue_path_row_count": 2064,
+  "bankroll_start_yuan": 100000.0,
+  "bankroll_summary_row_count": 6,
+  "best_fundable_100k_capital_path": "PRIOR_ONLY_BEST_FIXED",
+  "best_fundable_100k_capital_path_support": "NATIVE_EXECUTION_SUPPORT",
+  "best_matched_pre_tax_roi_per_stake": "ALL_STATIC",
+  "best_matched_pre_tax_roi_per_stake_support": "STRICT_FOUR_ARM_COMMON",
+  "bootstrap_draw_bundle_sha256": "7c8b52db1f99b841f0d9069037c1e85aaf8105eb92bd1620bfad84739fa5aa6f",
+  "bootstrap_draws": 20000,
+  "bootstrap_seed": 193001,
+  "candidate_count": 0,
+  "canonical_issue_count": 344,
+  "chart_sources": [
+    "bankroll_100k_issue_path.csv.gz",
+    "stage_attribution_chart_source.csv",
+    "causal_vs_oracle_chart_source.csv",
+    "drawdown_holding_chart_source.csv"
+  ],
+  "checkpoint_manifest_sha256": "4015ca353dff957a79958bf3e7aa73b8824f685c967a73e544d59bc437a3ca15",
+  "checkpoint_payload_count": 29,
+  "contract": "bj193-gate-b-three-stage-regime-meta-policy-v2",
+  "decision": "NO_PROMOTION",
+  "decision_objective_primary": "PRE_TAX_FINITE_BANKROLL_GROWTH_AND_FUNDABILITY_NATIVE_SUPPORT",
+  "decision_objective_secondary": "PRE_TAX_ROI_PER_STAKE_STRICT_FOUR_ARM_COMMON",
+  "issue_action_row_census": {
+    "STAGE1_ALL_ACTIONS": 849336,
+    "STAGE2_DYNAMIC_UPSTREAM": 834200,
+    "STAGE2_PRIOR_UPSTREAM": 834200,
+    "STAGE2_STATIC_UPSTREAM": 834200,
+    "STAGE3_DIRECTION_UPSTREAM": 331272,
+    "STAGE3_PRIOR_UPSTREAM": 331272,
+    "STAGE3_SELECTION_UPSTREAM": 331272,
+    "STAGE3_STATIC_UPSTREAM": 331272
+  },
+  "oracle_correction_manifest_sha256": "568fc5b4b72673ed796d94a61251d95ed8286a167a0727e7c6ac4716e02a80f1",
+  "oracle_correction_payload_count": 8,
+  "parent_192_unblock_authority": false,
+  "policy_count": 6,
+  "policy_flow_row_count": 2064,
+  "pre_tax_controlling": true,
+  "promotion_authority": false,
+  "rendered_charts": [
+    "bankroll_100k_capital_curves.svg",
+    "stage_attribution_waterfall.svg",
+    "causal_vs_oracle_comparison.svg",
+    "drawdown_holding.svg"
+  ],
+  "selected_policy_seed_row_count": 6500,
+  "stage_model_receipt_row_count": 30,
+  "stage_screen_receipt_row_count": 2849,
+  "strict_common_issue_count": 189,
+  "tax_reference_only": true,
+  "trace_boundary": {
+    "authoritative_economics": "issue_policy_flows.csv.gz and eight checkpoint stage-context settlement tables",
+    "contract": "BJ193_CHECKPOINT_TRACE_BOUNDARY_V1",
+    "decision_trace_status": "PATH_ACTION_MODEL_FALLBACK_RECEIPTS_ONLY",
+    "scientific_interpretation": "no ticket row is reconstructed or fabricated during checkpoint-only finalization",
+    "ticket_ledger_status": "NOT_PERSISTED_IN_ATOMIC_CHECKPOINT"
+  }
+}

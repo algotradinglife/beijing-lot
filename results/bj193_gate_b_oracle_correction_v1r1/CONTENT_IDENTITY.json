@@ -1,0 +1,13 @@
+{
+  "canonical_issue_count": 344,
+  "causal_policy_rows_unchanged": true,
+  "changed_action_issue_count": 151,
+  "changed_cashflow_or_status_issue_count": 148,
+  "checkpoint_manifest_sha256": "4015ca353dff957a79958bf3e7aa73b8824f685c967a73e544d59bc437a3ca15",
+  "contract": "bj193-gate-b-oracle-fold-join-correction-v1r1",
+  "corrected_oracle_selected_count": 181,
+  "native_pre_tax_roi": 0.8523440870432248,
+  "native_tax_adjusted_roi": 0.7749281443336524,
+  "strict_common_pre_tax_roi": 1.0467441964375988,
+  "strict_common_tax_adjusted_roi": 0.9497432791469224
+}

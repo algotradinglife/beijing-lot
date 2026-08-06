@@ -1,0 +1,61 @@
+{
+  "base_main_commit": "210a791b0793e99e72358e02c8484458c900a98b",
+  "completion_embargo": {
+    "audit_file": "completion_embargo_audit.csv",
+    "boundary": "inclusive",
+    "cutoff_count": 189,
+    "cutoffs_with_excluded_rows": 152,
+    "minimum_nearest_excluded_kickoff_gap_minutes": 10.983333333333,
+    "minutes": 180,
+    "rule": "kickoff <= common issue cutoff - 180 minutes",
+    "sum_cutoff_level_excluded_rows": 1252
+  },
+  "contract": "BJ-HIST-TEAM-MODEL-N7-001",
+  "core": {
+    "path": "scripts/bj180_team_matchup_core.py",
+    "sha256": "4d65b08609162644394dfe83e632073ad092b9bfd058dc74368b9ceef4908890"
+  },
+  "database": {
+    "completion_timestamp_field": null,
+    "completion_timestamp_status": "UNAVAILABLE_IN_SOURCE_SCHEMA",
+    "history_projection": [
+      "match_id",
+      "kickoff_ts",
+      "league",
+      "home_team_id",
+      "away_team_id",
+      "handicap_line_norm",
+      "fthg",
+      "ftag"
+    ],
+    "path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+    "sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "target_projection": [
+      "match_id",
+      "issue",
+      "match_idx",
+      "kickoff_ts",
+      "year",
+      "league",
+      "home_team_id",
+      "away_team_id",
+      "handicap_line_norm"
+    ]
+  },
+  "issue": 180,
+  "outcome_boundary": "Gate A outcome-unexposed: target rows expose no score/result/final-SP/payout/tax/ROI; because the source has no completion timestamp, historical scores are available only when kickoff <= common issue cutoff minus the fixed 180-minute completion embargo",
+  "source_134_gate_a": {
+    "access": "candidate role vectors only",
+    "content": "3fe014f3decdbd589cdded52d8a9b2bac0f3cb988c2ae8e15cf79314a02eede1",
+    "manifest": "0a7e4d673e7fc5fd4832c91e3b519afe5a2bc3211b99f4c95f57c691921b65fd",
+    "package": "bj134_gate_a_preoutcome_v3",
+    "payload_count": 21
+  },
+  "source_179_gate_a": {
+    "content": "2e8314f00b8774501ecf0ed2cb6ede73a9e7a60c7422dd5dc0d464e1470b740b",
+    "manifest": "5839f5c03c94ef903472b64fffa3ad1462ec006717875d0a3903ecdfdc2aa056",
+    "package": "bj179_gate_a_preoutcome_v2",
+    "payload_count": 19
+  },
+  "version": "bj180-gate-a-v2"
+}

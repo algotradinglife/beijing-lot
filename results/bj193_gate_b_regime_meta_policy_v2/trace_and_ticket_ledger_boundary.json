@@ -1,0 +1,7 @@
+{
+  "authoritative_economics": "issue_policy_flows.csv.gz and eight checkpoint stage-context settlement tables",
+  "contract": "BJ193_CHECKPOINT_TRACE_BOUNDARY_V1",
+  "decision_trace_status": "PATH_ACTION_MODEL_FALLBACK_RECEIPTS_ONLY",
+  "scientific_interpretation": "no ticket row is reconstructed or fabricated during checkpoint-only finalization",
+  "ticket_ledger_status": "NOT_PERSISTED_IN_ATOMIC_CHECKPOINT"
+}

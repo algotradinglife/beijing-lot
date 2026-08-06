@@ -1,0 +1,16 @@
+{
+  "CONTENT_IDENTITY.json": "645afe4e0a86ef888b1e3094d4218147a09dd26fca9279ece78bcd21edcae81d",
+  "README.md": "eb9391aa3e53e55a66b41863fee517bb0c6ed67d1ce11eead16330f02a490d58",
+  "arm_registry.csv": "c005c00c52392a4d943ae6b8c41ecaa215f61311e896d9eff44098486f20bdf4",
+  "availability_receipt.json": "884eef18708626816b273abc3351b0247710cc8794c2acbaf4a09c8881acae39",
+  "decision_core.py": "0b5591c562b3da71b7eb14a410e4666badcbfd3b1f2e54cab30fa59eebc16fc9",
+  "decision_trace.schema.json": "be85ee3b4f2c08a4cc3b5b95d7d287dd68af64b7c6461b5fdb87f67b8792eb44",
+  "error_taxonomy.csv": "4a0bb0d717644f0535827323e2f62c36daf6343138316ac02cbb93f36c63cefc",
+  "evidence_policy.csv": "281cf79d695c2330a931a92d4fb2cb10b9b94ebb354a2a71aaa101688138296c",
+  "forward_protocol.json": "ca52e61ddf3610451acbb03fb0e4e9a0dcff2a7b886ec25239acffaa3051a098",
+  "freeze_runner.py": "00c73c30705763ce58222318d21a198d9bfa9e0bd93a5b93dcb1e44a3a03a74b",
+  "gate_a_card.json": "6df4581fd9c5825206ca84fee708843b1acf5c152dd6413cc8b1d5828f36e171",
+  "metric_contract.csv": "4daf45038e0d74a02b5d0c83c6f8f1c53d0757351fb4d920022f2753e878de67",
+  "sample_registry.csv": "f5c40563b243e2cb2ee003ccd0a5222dc5856157a769bd56fbb9e8d04304edb5",
+  "source_binding.json": "a03d84bd79088be90cf6cd004aebc53cde5c62f12fdcdff3d76ec1c37b64d985"
+}

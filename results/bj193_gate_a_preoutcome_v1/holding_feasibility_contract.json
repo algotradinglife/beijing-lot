@@ -1,0 +1,35 @@
+{
+  "bootstrap": "paired common circular moving-block issue bootstrap; block lengths 5/10/20; shared draws across actions; no row permutation inside a block",
+  "capital_convention": "fixed reporting capital; no reinvestment; not a stake cap or action eligibility gate",
+  "contract": "BJ193_ISSUE_LEVEL_HOLDING_FEASIBILITY_V1",
+  "controlling_unit": "chronologically ordered canonical issue",
+  "drawdown": "drawdown_yuan = running_peak-equity; drawdown_pct=drawdown_yuan/running_peak",
+  "drawdown_duration_to_trough_issues": "trough_sequence_index - peak_sequence_index",
+  "drawdown_episode": "peak_sequence_index is the earliest index establishing the episode peak; onset is the first later index with equity below that peak; trough is the earliest maximum-drawdown index; recovery is the first later index with equity >= the episode peak",
+  "duration_sequence_boundary": "derive indices independently after constructing CALENDAR and ACTIVE_BET sequences; never reuse calendar indices for active-bet metrics",
+  "equity": "equity_t = reference_capital + cumulative sum(pre_tax_net_yuan); running_peak includes initial capital",
+  "flow_status": {
+    "ACTIVE": "use frozen native stake/gross/net",
+    "NO_BET": "explicit zero stake/gross/net",
+    "UNAVAILABLE": "explicit zero stake/gross/net; never a loss"
+  },
+  "major_episode": "every positive-drawdown episode; chart labels top ten by drawdown_yuan plus all unrecovered",
+  "negative_pnl": "pre_tax_net_yuan < 0 exactly; zero is not negative",
+  "outcome_boundary": "Gate A outcome-unexposed: no target result, final/winning SP, payout, tax realization, ROI, settlement, or post-cutoff evidence enters Tier-C features, transforms, action ranking, or tie-breaks",
+  "recovery": "report median, p90 and maximum recovery_issues over recovered episodes plus unrecovered count",
+  "recovery_issues": "recovery_sequence_index - trough_sequence_index when recovered; blank when unrecovered",
+  "reference_capital_yuan": 220000,
+  "rolling_metrics": "evaluate every contiguous 5/10/20 window; report negative-sum frequency, worst net, worst ROI=sum(net)/sum(stake) with blank if zero stake, and exact start/end issue; choose earliest chronology window on ties; compute separately for CALENDAR and ACTIVE_BET",
+  "rolling_windows": [
+    5,
+    10,
+    20
+  ],
+  "scorecard_rule": "compare causal policy to STATIC_BEST_FULL_FULL and PRIOR_ONLY_BEST_FIXED on ROI, loss/miss streaks, rolling losses, drawdown magnitude/duration, and recovery; any deterioration is an explicit trade-off",
+  "sequences": {
+    "ACTIVE_BET": "drop NO_BET/UNAVAILABLE before streak and rolling-window calculations",
+    "CALENDAR": "retain every canonical issue; zero-flow rows break negative-P&L and calendar miss streaks"
+  },
+  "time_under_water_issues": "recovery_sequence_index - peak_sequence_index when recovered; otherwise last_sequence_index - peak_sequence_index + 1",
+  "zero_payout_miss": "ACTIVE row with gross_pre_tax_yuan == 0; zero-flow rows are not misses"
+}

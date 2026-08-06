@@ -1,0 +1,44 @@
+{
+  "baseline_rule": "do not demote accepted -9.47% ladder unless replacement is proven on required support",
+  "gate_a_exact_identity_sources": {
+    "directional_allocation_catalog": "directional_allocation_input_catalog.csv.gz",
+    "four_arm_ticket_ledgers": "ticket_arm_<arm>.csv.gz",
+    "market_model_training_freeze": "market_model_training_freeze.csv",
+    "multiplicity_vector_catalog": "ticket_multiplicity_vector_catalog.csv.gz",
+    "n7_identity_catalog": "n7_identity_catalog.csv.gz",
+    "policy_issue_selection": "policy_issue_selection_freeze_part_XX_of_04.csv.gz (four policy-contiguous shards)"
+  },
+  "gate_b_row_keys": [
+    "policy_id",
+    "issue",
+    "arm"
+  ],
+  "matched_support_metrics": [
+    "common_issue_count",
+    "equal_budget_stake_yuan",
+    "candidate_pre_tax_roi",
+    "matched_b0_pre_tax_roi",
+    "candidate_minus_b0_lift"
+  ],
+  "native_support_metrics": [
+    "selected_issue_count",
+    "ticket_count",
+    "stake_yuan",
+    "gross_payout_yuan",
+    "net_pre_tax_yuan",
+    "pre_tax_roi",
+    "tax_reference_yuan"
+  ],
+  "outcome_boundary": "Gate A outcome-unexposed: target score/result/final-or-winning SP/payout/tax/ROI/settlement fields are forbidden; historical scores enter the accepted #180 state only under its frozen kickoff <= issue cutoff - 180 minute embargo",
+  "promotion_rule": "positive absolute pre-tax ROI AND positive matched-B0 lift AND multi-year/league/line stability AND strict independent EV",
+  "required_reports": [
+    "full threshold-to-coverage-to-performance curve",
+    "delta scatter/density and divergence calibration buckets",
+    "line/direction/league/year coverage",
+    "four-arm factorial decomposition",
+    "YEAR/FOLD/LOYO/ex-largest/bootstrap/drawdown/HHI",
+    "failure taxonomy and concrete next-step recommendation"
+  ],
+  "tax": "reference only; per winning CNY2 ticket, no issue/person aggregation",
+  "zero_stake_roi": "blank, never zero and never a loss"
+}

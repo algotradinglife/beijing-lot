@@ -7,7 +7,7 @@ tags:
   - research
   - moc
 status: active
-updated: 2026-08-04
+updated: 2026-08-06
 ---
 
 # Beijing-lot Research Wiki
@@ -46,6 +46,16 @@ updated: 2026-08-04
    `NO_BET` 与 canonical outcome 不可用分别报告；这两项报告修正不改变任何
    stake、gross、tax、net 或 ROI。结果正在等待窄范围独立复验，不能用于购买或生产。详见
    [[Issue-119-Candidate-Sensitivity|Issue #119 候选标准敏感性]]。
+8. **N7 多策略资金组合没有获得可推广证据。** #192 将 FULL、MODEL M512、Q top-mass
+   M192 的 7 个 sleeve 组合与完整资本路径结算。此前的两条 candidate-vs-FULL 20,000 次
+   bootstrap 数字（MODEL+Q `-¥157.49`，Q `-¥194.17` 下界）现明确仅为**未匹配 funding
+   诊断**，不能建立 lift。确定性的共同资本复放也未改变结论：MODEL+Q 对 Q 的 180 期共同 ¥276,480
+   schedule 得到 `-¥33,910.53` 的 matched-capital lift；Q 对 FULL 没有可共同执行的
+   整 ticket schedule，故为 `NOT_IDENTIFIABLE_NO_COMMON_EXECUTABLE_SCHEDULE` 而不是零
+   效果。最终 immutable package manifest 为
+   `3159431d91dda7dfb23ea7dbe4daa42a5411f7e52616e50bb31f04722c17ebe4`，终局是
+   `NO_PROMOTION`。正 ROI 或较低回撤均不能单独构成策略授权。详见
+   [[Issue-192-N7-Strategy-Ensemble|Issue #192 N7 多策略组合与资金分配]]。
 
 ## 近期 N7 策略结论（2026-08-02）
 
@@ -832,6 +842,49 @@ B0 lift 点估计均为负，去最大 issue/year 和 LOYO 也不支持晋级。
 diagnostic。`LIQUIDITY_DRIFT` 仅是 prior-season EURO residual proxy，不代表完整
 season-by-source interaction。详见
 [`Issue-179-Hierarchical-League-N7`](Issue-179-Hierarchical-League-N7.md)。
+
+## #180 联赛感知的球队与对阵模型（2026-08-04）
+
+#180 在同一 1,558 场冻结概率面上比较 team-only、team+league 三配置与 7 个消融，
+再以 matched FULL N7 结算冻结 identity。结论为
+`NO_TEAM_MODEL_PROMOTION / RETAIN_B0`：team-only 的 log loss `1.080644`，明显弱于
+B0 `1.066377` 和 #179 diagnostic `1.064101`；保守 team+league 改善到 `1.064937`，
+但仍未超过 #179 diagnostic。
+
+经济上没有绝对正 ROI。`TL_MINUS_OPPONENT` 是唯一 matched B0 lift 为正的点估计：
+税前 ROI `-8.29%`、lift `+0.46pp`，但 20k bootstrap 95% CI
+`[-6.70pp,+8.18pp]`，6 个 LOYO ROI 全负，去最大 issue/year 后为
+`-12.00%/-9.91%`。它至多是 strict independent-EV 候选，不能晋级或回写调参。
+
+计税继续按每张独立 ¥2 票，不跨票或跨期汇总。详细概率、经济、消融、风险、图与
+不可变哈希见
+[`Issue-180-Team-Matchup-N7`](Issue-180-Team-Matchup-N7.md)。
+
+## #190 稀疏独立模型—盘口分歧 N7（2026-08-05）
+
+#190 使用 Gate-A SHA 绑定的 SQLite `match_features` 建立新的 canonical ledger，
+而不是沿用 #95 的 46,802 行旧分母。101,970 个 eligible matches 中有 100,906 个
+trusted settlements；1,064 个 unavailable 保持 0 stake、绝不记作亏损。#95 重叠
+46,802 行全部一致，fully settled N7 identities 为 2,946 / 3,181。
+
+完整 2,424-policy × 四臂 attribution 显示：B0 的 expanded-support 税前 ROI 为
+`-8.52%`；match-only 中位数 `-22.27%`，joint sparse 中位数 `-16.24%`，
+direction-only 中位数 `-1.89%`。475 个描述性正 screen rows 中有 18 个通过内部严格
+稳定性筛选的旧结论已被 #195 独立复验纠正：旧 coverage 错误继承 match-only 支持，
+而这 18 个 direction-only cells 的自身身份都只覆盖盘口 `0`。因此严格候选数为 `0`，
+最终为 `NO_PROMOTION_FROM_GATE_B`；475 行仍作为描述性 line-0 正信号保留。接受的 #95
+共同支持 baseline `-9.47%` 未被替换或降级。
+
+同时保留一层非晋级的 `performance-stable but coverage-limited` 证据：18 个 policy
+aliases 折叠为 10 个不同 issue-economic identities；其中 Z100/K1 的 52/60/75/85 期
+簇共有 12 aliases、6 个经济身份，税前 ROI 为 +8.78% 至 +20.48%，matched lift 为
++21.19pp 至 +28.62pp，但全部只有 1 个 line stratum，因此不改变严格候选数 0。
+
+税仍按每张命中的 ¥2 票分别计算，不做跨票/跨期汇总。完整四臂结果、概率校准、
+20k paired bootstrap、YEAR/FOLD/LOYO、风险集中度、图与不可变哈希见
+[`Issue-190-Sparse-Divergence-N7`](Issue-190-Sparse-Divergence-N7.md)。面向路线决策的
+证据漏斗、Z100/K1 正向簇、`NO_PROMOTION` 双层解释以及对 #193/#192 的继承建议，见
+[`Issue-190-Sparse-Divergence-N7-Decision-Report`](Issue-190-Sparse-Divergence-N7-Decision-Report.md)。
 
 ## 相关笔记
 
