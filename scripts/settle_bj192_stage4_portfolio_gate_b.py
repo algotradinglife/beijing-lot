@@ -33,8 +33,8 @@ CONTRACT = "BJ-HIST-N7-STRATEGY-ENSEMBLE-001"
 VERSION = "bj192-gate-b-v1"
 TICKET_STAKE_YUAN = 2.0
 INITIAL_BANKROLL_YUAN = 100_000.0
-PHASE0_CHECKPOINT = ".scratch/bj192_phase0_selected_m_checkpoint_v3.json"
-PHASE0_MATERIALIZER_CONTRACT = "selected-native-outcome-cache-v3"
+PHASE0_CHECKPOINT = ".scratch/bj192_phase0_selected_m_checkpoint_v4.json"
+PHASE0_MATERIALIZER_CONTRACT = "selected-native-outcome-cache-v4"
 
 EXPECTED_GATE_A_MANIFEST = "6108defd857bf431bcaf55109df0e195b45aa754e8fd46f1db82d329102ff256"
 EXPECTED_GATE_A_CONTENT = "66ce6f86703b31d710ad678b49287de3bc6b2c43a5b36c278e1369bdecd861d5"
@@ -1114,6 +1114,7 @@ def materialize_phase_zero_selection_checkpoint(
     binding = {"gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
         "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
         "settled_source_bindings": verify_gate_a_source_bindings(),
+        "h1_ticket_cache_identity": _h1_ticket_cache_identity(),
         "phase0_materializer_contract": PHASE0_MATERIALIZER_CONTRACT,
         "phase": "PHASE_0_SELECTED_M_PATHS"}
     return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=[*selected, *native])
@@ -1250,6 +1251,7 @@ def phase_one_intrinsic_screen(
         "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
         "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
         "settled_source_bindings": verify_gate_a_source_bindings(),
+        "h1_ticket_cache_identity": _h1_ticket_cache_identity(),
         "phase0_materializer_contract": PHASE0_MATERIALIZER_CONTRACT,
         "phase": "PHASE_0_SELECTED_M_PATHS",
     }
