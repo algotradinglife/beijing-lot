@@ -342,3 +342,14 @@ def test_immutable_writer_stages_locally_and_covers_declared_empty_tables() -> N
     finally:
         if output.exists():
             shutil.rmtree(output)
+
+
+def test_native_m_curve_and_fixed_comparator_are_exact_source_aggregates() -> None:
+    curve = RUNNER.standalone_m_curve("BJ159_SELECTED_N7_WOR_M_CURVE")
+    assert len(curve) == 9
+    assert {(row["M"], row["deployment_seed"]) for row in curve} == {
+        (m, seed) for m in (32, 64, 128) for seed in ("137001", "137002", "137003")
+    }
+    fixed = RUNNER.fixed_m_candidate_bridge("BJ159_SELECTED_N7_WOR_M_CURVE", "137001")
+    assert len(fixed) == 348
+    assert all(sleeve.sleeve_id.endswith("@M32@137001") for sleeve in fixed.values())

@@ -940,6 +940,67 @@ def replay_bundle_path(
     return {"bridge": bridge, "path": path, "tables": tables, "sleeve_trace_identity": trace_identity}
 
 
+def candidate_aliases(candidate_id: str) -> tuple[str, ...]:
+    catalog = canonical_economic_catalog()
+    canonical = catalog.get(candidate_id)
+    if canonical is None:
+        raise RuntimeError(f"unknown canonical candidate: {candidate_id}")
+    family = canonical["economic_family_id"]
+    return tuple(sorted(
+        row["candidate_id"]
+        for row in read_csv(GATE_A / "economic_family_registry.csv")
+        if row["economic_family_id"] == family
+    ))
+
+
+def standalone_m_curve(candidate_id: str) -> list[dict[str, object]]:
+    """Aggregate every frozen native M/seed sleeve before Stage-4 positioning."""
+    catalog = canonical_economic_catalog()
+    family = catalog.get(candidate_id)
+    if family is None:
+        raise RuntimeError(f"unknown canonical candidate: {candidate_id}")
+    surface = materialize_candidate_m_surface(candidate_id)
+    groups: dict[tuple[int, str], list[IssueSleeve]] = defaultdict(list)
+    for (m_value, seed, _), sleeve in surface.items():
+        groups[(m_value, seed)].append(sleeve)
+    support = sorted({issue for _, _, issue in surface})
+    alias_hash = canonical_hash(candidate_aliases(candidate_id))
+    rows: list[dict[str, object]] = []
+    for (m_value, seed), sleeves in sorted(groups.items()):
+        if len(sleeves) != 348:
+            raise RuntimeError(f"standalone curve support drift: {candidate_id}@{m_value}@{seed}")
+        settlements = [sleeve.settle_prefix(sleeve.requested_ticket_count if sleeve.status == "SETTLED" else 0) for sleeve in sleeves]
+        stake = sum(float(row["actual_stake_yuan"]) for row in settlements)
+        net = sum(float(row["pre_tax_net_yuan"]) for row in settlements)
+        rows.append({
+            "economic_family_id": family["economic_family_id"],
+            "canonical_candidate_id": candidate_id,
+            "candidate_aliases_sha256": alias_hash,
+            "M": m_value,
+            "deployment_replicate_bundle_id": "NATIVE_SOURCE_CURVE",
+            "deployment_seed": seed,
+            "support_hash": canonical_hash(support),
+            "requested_ticket_count": sum(sleeve.requested_ticket_count for sleeve in sleeves),
+            "actual_ticket_count": sum(int(row["actual_ticket_count"]) for row in settlements),
+            "pre_tax_net_yuan": net,
+            "pre_tax_roi": net / stake if stake else None,
+            "selection_eligible": int(stake > 0),
+            "undefined_reason": "" if stake else "ZERO_NATIVE_STAKE",
+        })
+    return rows
+
+
+def fixed_m_candidate_bridge(
+    candidate_id: str,
+    deployment_seed: str,
+    calendar: Sequence[dict[str, str]] | None = None,
+) -> dict[tuple[str, str], IssueSleeve]:
+    """Return the immutable fixed-M comparator path required alongside WFO M."""
+    calendar = list(calendar or read_csv(GATE_A / "full_calendar.csv"))
+    fixed_m = frozen_m_grid(candidate_id)[0] if canonical_economic_catalog()[candidate_id]["source_kind"] == "H1_FIXED" else fixed_m_comparator(candidate_id)
+    return materialize_candidate_bridge(candidate_id, fixed_m, deployment_seed)
+
+
 def merge_candidate_bridges(
     *bridges: dict[tuple[str, str], IssueSleeve],
 ) -> dict[tuple[str, str], IssueSleeve]:
