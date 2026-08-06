@@ -148,3 +148,29 @@ def test_path_state_machine_uses_strictly_prior_history_and_concurrent_budget() 
     assert rows[1]["preissue_bankroll_yuan"] == pytest.approx(rows[0]["postissue_bankroll_yuan"])
     for row in rows:
         assert sum(float(x["actual_stake_yuan"]) for x in row["sleeve_settlements"].values()) == pytest.approx(row["actual_stake_yuan"])
+
+
+def test_holding_summary_retains_zero_flow_windows_and_drawdown_path() -> None:
+    rows = []
+    bankroll = 100.0
+    for index, net, stake, gross in ((0, 0.0, 0.0, 0.0), (1, -20.0, 20.0, 0.0), (2, -10.0, 10.0, 0.0), (3, 30.0, 10.0, 40.0), (4, 0.0, 0.0, 0.0)):
+        rows.append({
+            "calendar_index": index,
+            "issue_instance": f"I{index}@OOS_2019",
+            "preissue_bankroll_yuan": bankroll,
+            "postissue_bankroll_yuan": bankroll + net,
+            "pre_tax_net_yuan": net,
+            "actual_stake_yuan": stake,
+            "pre_tax_gross_yuan": gross,
+            "ruin_flag": 0,
+            "sleeve_settlements": {"S": {"actual_ticket_count": int(stake / 2)}},
+        })
+        bankroll += net
+    result = RUNNER.summarize_holding_path(rows)
+    issue_rows = result["issue_rows"]
+    assert issue_rows[2]["drawdown_yuan"] == pytest.approx(30.0)
+    assert result["summary"]["loss_streak_calendar"] == 2
+    assert result["summary"]["miss_streak_active"] == 2
+    windows = [x for x in result["rolling_rows"] if x["record_type"] == "WINDOW" and x["window_size_issues"] == 5]
+    assert len(windows) == 1
+    assert windows[0]["window_pre_tax_roi"] == pytest.approx(0.0)

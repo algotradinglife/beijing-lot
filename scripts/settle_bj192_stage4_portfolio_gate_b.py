@@ -858,3 +858,164 @@ def replay_path(
         bankroll += net
         history.append({sleeve: source_native_return(item) for sleeve, item in issue_sleeves.items()})
     return output
+
+
+def _quantile(values: Sequence[float], probability: float) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * probability
+    lower, upper = math.floor(position), math.ceil(position)
+    if lower == upper:
+        return ordered[lower]
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
+
+
+def summarize_holding_path(rows: Sequence[dict[str, object]]) -> dict[str, object]:
+    """Compute the frozen issue-level holding metrics without dropping cash rows."""
+    if not rows:
+        raise ValueError("cannot summarize empty capital path")
+    ordered = sorted(rows, key=lambda row: int(row["calendar_index"]))
+    enriched: list[dict[str, object]] = []
+    rolling: list[dict[str, object]] = []
+    peak = float(ordered[0]["preissue_bankroll_yuan"])
+    loss_calendar = loss_active = miss_calendar = miss_active = 0
+    max_loss_calendar = max_loss_active = max_miss_calendar = max_miss_active = 0
+    drawdown_start: int | None = None
+    recovery_durations: list[int] = []
+    unrecovered = 0
+    for row in ordered:
+        item = dict(row)
+        post = float(item["postissue_bankroll_yuan"])
+        index = int(item["calendar_index"])
+        if post >= peak:
+            if drawdown_start is not None:
+                recovery_durations.append(index - drawdown_start)
+                drawdown_start = None
+            peak = post
+        elif drawdown_start is None:
+            drawdown_start = index
+        drawdown = peak - post
+        item["running_peak_yuan"] = peak
+        item["drawdown_yuan"] = drawdown
+        item["drawdown_fraction"] = drawdown / peak if peak > 0 else None
+        net, stake, gross = (float(item[field]) for field in ("pre_tax_net_yuan", "actual_stake_yuan", "pre_tax_gross_yuan"))
+        if net < 0:
+            loss_calendar += 1
+        else:
+            loss_calendar = 0
+        max_loss_calendar = max(max_loss_calendar, loss_calendar)
+        if stake > 0:
+            loss_active = loss_active + 1 if net < 0 else 0
+            max_loss_active = max(max_loss_active, loss_active)
+        if stake > 0 and gross == 0:
+            miss_calendar += 1
+        else:
+            miss_calendar = 0
+        max_miss_calendar = max(max_miss_calendar, miss_calendar)
+        if stake > 0:
+            miss_active = miss_active + 1 if gross == 0 else 0
+            max_miss_active = max(max_miss_active, miss_active)
+        enriched.append(item)
+    if drawdown_start is not None:
+        unrecovered = 1
+
+    for window_size in (5, 10, 20):
+        windows: list[dict[str, object]] = []
+        for end in range(window_size - 1, len(enriched)):
+            selected = enriched[end + 1 - window_size : end + 1]
+            net = sum(float(row["pre_tax_net_yuan"]) for row in selected)
+            stake = sum(float(row["actual_stake_yuan"]) for row in selected)
+            roi = net / stake if stake else None
+            windows.append({
+                "window_size_issues": window_size,
+                "record_type": "WINDOW",
+                "window_start_calendar_index": selected[0]["calendar_index"],
+                "window_end_calendar_index": selected[-1]["calendar_index"],
+                "window_pre_tax_net_yuan": net,
+                "window_actual_stake_yuan": stake,
+                "window_pre_tax_roi": roi,
+                "is_negative": int(net < 0),
+                "undefined_reason": "ZERO_WINDOW_STAKE" if stake == 0 else "",
+            })
+        if not windows:
+            continue
+        nets = [float(row["window_pre_tax_net_yuan"]) for row in windows]
+        worst = min(windows, key=lambda row: (float(row["window_pre_tax_net_yuan"]), int(row["window_start_calendar_index"])))
+        rolling.extend(windows)
+        rolling.append({
+            "window_size_issues": window_size,
+            "record_type": "SUMMARY",
+            "window_start_calendar_index": "",
+            "window_end_calendar_index": "",
+            "window_pre_tax_net_yuan": "",
+            "window_actual_stake_yuan": "",
+            "window_pre_tax_roi": "",
+            "is_negative": "",
+            "window_count": len(windows),
+            "negative_window_count": sum(int(row["is_negative"]) for row in windows),
+            "negative_window_probability": sum(int(row["is_negative"]) for row in windows) / len(windows),
+            "worst_window_id": f"{worst['window_start_calendar_index']}:{worst['window_end_calendar_index']}",
+            "worst_window_pre_tax_net_yuan": worst["window_pre_tax_net_yuan"],
+            "worst_window_pre_tax_roi": worst["window_pre_tax_roi"],
+            "undefined_reason": "",
+        })
+        for label, probability in (("MIN", 0.0), ("P05", 0.05), ("P50", 0.5), ("P95", 0.95), ("MAX", 1.0)):
+            rolling.append({
+                "window_size_issues": window_size,
+                "record_type": "DISTRIBUTION",
+                "window_start_calendar_index": "",
+                "window_end_calendar_index": "",
+                "distribution_statistic": label,
+                "distribution_value": _quantile(nets, probability),
+                "undefined_reason": "",
+            })
+
+    returns = [
+        float(row["pre_tax_net_yuan"]) / float(row["preissue_bankroll_yuan"])
+        for row in enriched
+        if float(row["preissue_bankroll_yuan"]) > 0
+    ]
+    mean_return = sum(returns) / len(returns)
+    sample_sd = math.sqrt(sum((value - mean_return) ** 2 for value in returns) / (len(returns) - 1)) if len(returns) > 1 else 0.0
+    downside_rms = math.sqrt(sum(min(value, 0.0) ** 2 for value in returns) / len(returns)) if returns else 0.0
+    years = {str(row["issue_instance"]).split("@")[-1] for row in enriched}
+    annualization = math.sqrt(len(enriched) / len(years)) if years else 1.0
+    sharpe = mean_return / sample_sd * annualization if sample_sd > 0 else None
+    sortino = mean_return / downside_rms * annualization if downside_rms > 0 else None
+    starting = float(enriched[0]["preissue_bankroll_yuan"])
+    ending = float(enriched[-1]["postissue_bankroll_yuan"])
+    max_drawdown = max(float(row["drawdown_yuan"]) for row in enriched)
+    max_drawdown_fraction = max(float(row["drawdown_fraction"] or 0.0) for row in enriched)
+    annualized_growth = (ending / starting) ** (1.0 / len(years)) - 1.0 if starting > 0 and ending > 0 and years else None
+    calmar = annualized_growth / max_drawdown_fraction if annualized_growth is not None and max_drawdown_fraction > 0 else None
+    active = [row for row in enriched if float(row["actual_stake_yuan"]) > 0]
+    return {
+        "issue_rows": enriched,
+        "rolling_rows": rolling,
+        "summary": {
+            "ending_bankroll_yuan": ending,
+            "minimum_bankroll_yuan": min(min(float(row["preissue_bankroll_yuan"]), float(row["postissue_bankroll_yuan"])) for row in enriched),
+            "max_drawdown_yuan": max_drawdown,
+            "max_drawdown_fraction": max_drawdown_fraction,
+            "drawdown_duration_issues": max((duration for duration in recovery_durations), default=0),
+            "time_under_water_issues": sum(float(row["drawdown_yuan"]) > 0 for row in enriched),
+            "recovery_issue": next((row["issue_instance"] for row in reversed(enriched) if float(row["drawdown_yuan"]) == 0), None),
+            "recovery_episode_count": len(recovery_durations),
+            "recovery_duration_median_issues": _quantile(recovery_durations, 0.5),
+            "recovery_duration_tail_95_issues": _quantile(recovery_durations, 0.95),
+            "recovery_duration_max_issues": max(recovery_durations, default=0),
+            "unrecovered_episode_count": unrecovered,
+            "loss_streak_calendar": max_loss_calendar,
+            "loss_streak_active": max_loss_active,
+            "miss_streak_calendar": max_miss_calendar,
+            "miss_streak_active": max_miss_active,
+            "rolling_window_metrics_sha256": canonical_hash(rolling),
+            "ruin_flag": int(any(int(row["ruin_flag"]) for row in enriched)),
+            "near_ruin_flag": int(min(float(row["postissue_bankroll_yuan"]) for row in enriched) < TICKET_STAKE_YUAN * max((int(sum(item["actual_ticket_count"] for item in row["sleeve_settlements"].values())) for row in enriched), default=0)),
+            "sharpe": sharpe,
+            "sortino": sortino,
+            "calmar": calmar,
+            "active_issue_count": len(active),
+        },
+    }
