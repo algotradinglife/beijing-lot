@@ -2814,6 +2814,40 @@ def minimal_stage4_strict_bootstrap_rows(checkpoint: Path) -> list[dict[str, obj
     return rows
 
 
+def minimal_stage4_package_tables(checkpoint: Path) -> dict[str, list[dict[str, object]]]:
+    """Assemble the schema-complete #192 package inputs from checkpoint state."""
+    schema = json.loads((GATE_A / "output_schema.json").read_text(encoding="utf-8"))
+    tables = {name: [] for name, spec in schema.items() if isinstance(spec, dict) and "key" in spec}
+    core, _ = minimal_stage4_core_tables(checkpoint)
+    comparison = minimal_stage4_comparison_tables(checkpoint)
+    tables.update(core)
+    tables.update(comparison)
+    tables["selected_m_path"] = minimal_stage4_selected_m_rows()
+    tables["regime_map"] = read_csv(GATE_A / "regime_map.csv")
+    tables["bootstrap_stability"] = minimal_stage4_strict_bootstrap_rows(checkpoint)
+    for row in tables["bootstrap_stability"]:
+        tables["terminal_decision"].append({
+            "portfolio_id": row["portfolio_id"], "mode": row["mode"], "position_fraction": row["position_fraction"],
+            "weight_method": row["weight_method"], "normalization_method": row["normalization_method"],
+            "deployment_replicate_bundle_id": row["deployment_replicate_bundle_id"],
+            "decision_id": "STRICT_MAX_T_TERMINAL", "candidate_id": row["target_id"],
+            "decision": "NO_PROMOTION", "capital_weights_json": "", "capital_weights_sha256": "",
+            "failure_regimes_json": "[]", "negative_result_reason": "STRICT_PAIRED_MAX_T_LOWER_BOUND_NOT_POSITIVE",
+            "next_validation_step": "NO_PRODUCTION_AUTHORITY;_REQUIRE_NEW_PREREGISTERED_EVIDENCE",
+            "strict_ev_status": row["strict_status"], "support_hash": row["support_hash"],
+            "bootstrap_target_id": row["target_id"],
+        })
+        tables["challenger_case"].append({
+            "portfolio_id": row["portfolio_id"], "mode": row["mode"], "position_fraction": row["position_fraction"],
+            "weight_method": row["weight_method"], "normalization_method": row["normalization_method"],
+            "deployment_replicate_bundle_id": row["deployment_replicate_bundle_id"],
+            "alternative_explanation": "PATH_DEPENDENT_LEGACY_COMBINATION_LIFT", "test_id": "STRICT_PAIRED_STATIONARY_BLOCK_MAX_T",
+            "candidate_id": row["target_id"], "result": row["strict_status"],
+            "decision_impact": "NO_PROMOTION_AFTER_FAMILYWISE_PAIRED_INFERENCE",
+        })
+    return tables
+
+
 def summarize_holding_path(rows: Sequence[dict[str, object]]) -> dict[str, object]:
     """Compute the frozen issue-level holding metrics without dropping cash rows."""
     if not rows:
