@@ -624,6 +624,109 @@ def materialize_candidate_bridge(
     return result
 
 
+def materialize_candidate_m_surface(
+    candidate_id: str,
+) -> dict[tuple[int, str, str], IssueSleeve]:
+    """Materialize every frozen M/seed issue row for one canonical family."""
+    catalog = canonical_economic_catalog()
+    family = catalog.get(candidate_id)
+    if family is None:
+        raise RuntimeError(f"unknown canonical candidate: {candidate_id}")
+    if family["source_kind"] == "H1_FIXED":
+        m_value = frozen_m_grid(candidate_id)[0]
+        return {
+            (m_value, "NA", issue): sleeve
+            for (sleeve_id, issue), sleeve in h1_ticket_bridge().items()
+            if sleeve_id == candidate_id
+        }
+    if family["source_kind"] == "BJ145_ALLOCATION":
+        return {
+            (m_value, seed, issue): sleeve
+            for (_, m_value, seed, issue), sleeve in load_bj145_atomic_surface([candidate_id]).items()
+        }
+    if candidate_id.startswith("BJ148_"):
+        specs = {
+            "BJ148_NOGATE_WR_DENSE_M": ("PRIMARY_WR_NATURAL_BASELINE", "Q_INFORMED_WR_DUPLICATE_STAKE"),
+            "BJ148_NOGATE_WOR_DENSE_M": ("SENSITIVITY_WOR_DISTINCT", "Q_INFORMED_WOR_DISTINCT"),
+        }
+        return {
+            (m_value, seed, issue): sleeve
+            for (_, m_value, seed, issue), sleeve in load_dense_atomic_surface("BJ148", {candidate_id: specs[candidate_id]}).items()
+        }
+    if candidate_id.startswith("BJ151_"):
+        specs = {
+            "BJ151_NOGATE_K4_WR_DENSE_M": ("PRIMARY_WR_NATURAL_BASELINE", "Q_INFORMED_WR_DUPLICATE_STAKE"),
+            "BJ151_NOGATE_K4_WOR_DENSE_M": ("SENSITIVITY_WOR_FIXED_CANDIDATE", "Q_INFORMED_WOR_DISTINCT"),
+        }
+        return {
+            (m_value, seed, issue): sleeve
+            for (_, m_value, seed, issue), sleeve in load_dense_atomic_surface("BJ151", {candidate_id: specs[candidate_id]}).items()
+        }
+    if candidate_id == "BJ159_SELECTED_N7_WOR_M_CURVE":
+        return load_bj159_n7_atomic_surface()
+    raise RuntimeError(f"unimplemented source adapter: {candidate_id}")
+
+
+def build_walk_forward_candidate_bridge(
+    candidate_id: str,
+    deployment_seed: str,
+    calendar: Sequence[dict[str, str]] | None = None,
+) -> tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]:
+    """Select each M from prior native source outcomes, then return one seed path.
+
+    This is the Gate-A chronological selection contract in executable form.  It
+    records every issue's selected M and the exact pre-selection training hash;
+    the selected source sleeve remains an unchanged upstream ticket allocation.
+    """
+    calendar = list(calendar or read_csv(GATE_A / "full_calendar.csv"))
+    surface = materialize_candidate_m_surface(candidate_id)
+    available_m = frozen_m_grid(candidate_id)
+    seeds = sorted({seed for _, seed, _ in surface})
+    if deployment_seed not in seeds:
+        raise RuntimeError(f"deployment seed outside frozen source: {candidate_id}/{deployment_seed}")
+    if any((m_value, seed, row["issue_instance"]) not in surface for m_value in available_m for seed in seeds for row in calendar):
+        raise RuntimeError(f"incomplete M surface: {candidate_id}")
+    history: dict[int, dict[str, list[tuple[float, float]]]] = {
+        m_value: {seed: [] for seed in seeds} for m_value in available_m
+    }
+    bridge: dict[tuple[str, str], IssueSleeve] = {}
+    selected_path: list[dict[str, object]] = []
+    for row in sorted(calendar, key=lambda item: (item["first_kickoff_ts"], item["issue_instance"])):
+        decision = choose_prior_m(candidate_id, history)
+        m_value = int(decision["selected_M"])
+        issue = row["issue_instance"]
+        bridge[(candidate_id, issue)] = surface[(m_value, deployment_seed, issue)]
+        training_identity = canonical_hash({
+            "candidate_id": candidate_id,
+            "through_calendar_index": int(row["calendar_index"]) - 1,
+            "history": history,
+        })
+        selected_path.append({
+            "economic_family_id": canonical_economic_catalog()[candidate_id]["economic_family_id"],
+            "deployment_seed": deployment_seed,
+            "calendar_index": int(row["calendar_index"]),
+            "issue_instance": issue,
+            "selection_variant": "WALK_FORWARD",
+            "prior_training_start_calendar_index": 0 if row["calendar_index"] != "0" else "",
+            "prior_training_end_calendar_index": int(row["calendar_index"]) - 1 if row["calendar_index"] != "0" else "",
+            "prior_active_issue_count": decision["prior_active_issue_count"],
+            "prior_training_input_sha256": training_identity,
+            "selected_M": m_value,
+            "fixed_M_comparator": fixed_m_comparator(candidate_id),
+            "fallback_reason": decision["fallback_reason"],
+        })
+        for history_m in available_m:
+            for history_seed in seeds:
+                sleeve = surface[(history_m, history_seed, issue)]
+                result = source_native_return(sleeve)
+                if result is None:
+                    history[history_m][history_seed].append((0.0, 0.0))
+                else:
+                    full = sleeve.settle_prefix(sleeve.requested_ticket_count)
+                    history[history_m][history_seed].append((float(full["pre_tax_net_yuan"]), float(full["actual_stake_yuan"])))
+    return bridge, selected_path
+
+
 def h1_ticket_bridge() -> dict[tuple[str, str], NativeIssueSleeve]:
     """Recreate Gate-A's H1 prefix ledger from the accepted #170 ticket replay.
 

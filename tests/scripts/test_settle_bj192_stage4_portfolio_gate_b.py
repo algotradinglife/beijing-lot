@@ -208,3 +208,14 @@ def test_prior_m_selection_uses_seed_training_only_and_lower_m_tie_break() -> No
     insufficient = RUNNER.choose_prior_m(candidate, {16: {"137001": [(1.0, 2.0)] * 51}})
     assert insufficient["selected_M"] == 16
     assert insufficient["fallback_reason"] == "INSUFFICIENT_PRIOR_52_ACTIVE"
+
+
+def test_walk_forward_bridge_uses_only_preissue_m_history() -> None:
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:55]
+    bridge, selected = RUNNER.build_walk_forward_candidate_bridge(
+        "BJ159_SELECTED_N7_WOR_M_CURVE", "137001", calendar
+    )
+    assert len(bridge) == len(selected) == 55
+    assert all(row["selected_M"] == 32 for row in selected[:52])
+    assert all(row["prior_training_end_calendar_index"] != row["calendar_index"] for row in selected[1:])
+    assert all(len(row["prior_training_input_sha256"]) == 64 for row in selected)
