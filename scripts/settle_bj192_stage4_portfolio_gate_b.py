@@ -727,6 +727,19 @@ def build_walk_forward_candidate_bridge(
     return bridge, selected_path
 
 
+def merge_candidate_bridges(
+    *bridges: dict[tuple[str, str], IssueSleeve],
+) -> dict[tuple[str, str], IssueSleeve]:
+    """Combine disjoint frozen candidate paths without replacing a sleeve."""
+    result: dict[tuple[str, str], IssueSleeve] = {}
+    for bridge in bridges:
+        for key, sleeve in bridge.items():
+            if key in result:
+                raise RuntimeError(f"duplicate candidate bridge key: {key}")
+            result[key] = sleeve
+    return result
+
+
 def h1_ticket_bridge() -> dict[tuple[str, str], NativeIssueSleeve]:
     """Recreate Gate-A's H1 prefix ledger from the accepted #170 ticket replay.
 
@@ -844,6 +857,7 @@ def replay_path(
     bridge: dict[tuple[str, str], IssueSleeve],
     calendar: Sequence[dict[str, str]],
     bundle_id: str = "DETERMINISTIC_H1",
+    sleeve_trace_identity: str | None = None,
 ) -> list[dict[str, object]]:
     """Run one strictly-prior, concurrent, capital-limited Stage-4 path."""
     gate = frozen_gate_a()
@@ -854,7 +868,11 @@ def replay_path(
         raise ValueError("incomplete frozen sleeve/calendar bridge")
     if mode == "NATIVE_REQUEST_CONTROL" and fraction != 1.0:
         raise ValueError("NATIVE_REQUEST_CONTROL requires a 100% fraction")
-    portfolio_id = canonical_hash({"sleeves": sleeves, "stage": "H1_STAGE4"})
+    portfolio_id = canonical_hash({
+        "sleeves": sleeves,
+        "stage": "STAGE4",
+        "sleeve_trace_identity": sleeve_trace_identity or canonical_hash(list(sleeves)),
+    })
     history: list[dict[str, float | None]] = []
     bankroll = INITIAL_BANKROLL_YUAN
     output: list[dict[str, object]] = []
@@ -929,6 +947,9 @@ def replay_path(
             "deployment_replicate_bundle_id": bundle_id,
             "calendar_index": int(calendar_row["calendar_index"]),
             "issue_instance": issue,
+            "year": calendar_row["year"],
+            "fold": calendar_row["fold"],
+            "first_kickoff_ts": calendar_row["first_kickoff_ts"],
             "preissue_bankroll_yuan": bankroll,
             "normalization_status": normalization["normalization_status"],
             "normalization_executable": normalization["normalization_executable"],
@@ -948,6 +969,8 @@ def replay_path(
             "skipped_stake_yuan": max(0.0, native_stake - stake),
             "retained_cash_yuan": bankroll - stake,
             "reason_codes": f"{weight_status}|{funding['reason_codes']}",
+            "weights": weights,
+            "weight_status": weight_status,
             "pre_tax_gross_yuan": gross,
             "pre_tax_net_yuan": net,
             "tax_yuan": tax,
@@ -1257,4 +1280,89 @@ def capital_summary(path_rows: Sequence[dict[str, object]], holding: dict[str, o
         "capital_turnover": turnover,
         "capital_growth_audit_delta": growth - (net / stake * turnover) if mode == "FIXED_100K_NOTIONAL" and stake else None,
         "ruin_flag": holding["ruin_flag"],
+    }
+
+
+def path_output_tables(
+    path_rows: Sequence[dict[str, object]],
+    bridge: dict[tuple[str, str], IssueSleeve],
+) -> dict[str, list[dict[str, object]]]:
+    """Create the core, uniquely keyed Gate-B tables for one capital path."""
+    holding_result = summarize_holding_path(path_rows)
+    enriched = holding_result["issue_rows"]
+    holding = holding_result["summary"]
+    issue_ledger: list[dict[str, object]] = []
+    weight_history: list[dict[str, object]] = []
+    stage_attribution: list[dict[str, object]] = []
+    for row in enriched:
+        path_identity = {field: row[field] for field in PATH_IDENTITY}
+        issue_ledger.append({
+            **path_identity,
+            **{field: row[field] for field in (
+                "calendar_index", "issue_instance", "year", "fold", "first_kickoff_ts",
+                "preissue_bankroll_yuan", "normalization_method", "normalization_status",
+                "normalization_executable", "covariance_sleeve_order_json", "covariance_input_sha256",
+                "ex_ante_volatility", "target_volatility", "realized_capital_multiplier",
+                "risk_budget_yuan", "pre_normalization_mode_notional_yuan",
+                "normalized_mode_notional_yuan", "mode_notional_yuan", "issue_budget_yuan",
+                "requested_stake_yuan", "actual_stake_yuan", "scaled_stake_yuan",
+                "skipped_stake_yuan", "retained_cash_yuan", "reason_codes", "pre_tax_gross_yuan",
+                "pre_tax_net_yuan", "tax_yuan", "postissue_bankroll_yuan", "ruin_flag",
+                "running_peak_yuan", "drawdown_yuan", "drawdown_fraction",
+            )},
+        })
+        for sleeve_id, weight in sorted(row["weights"].items()):
+            sleeve = bridge[(sleeve_id, str(row["issue_instance"]))]
+            settlement = row["sleeve_settlements"][sleeve_id]
+            trace = canonical_hash({
+                "sleeve": sleeve_id,
+                "issue": row["issue_instance"],
+                "native_ticket_count": sleeve.requested_ticket_count,
+                "atomic": sleeve.atomic,
+            })
+            weight_history.append({
+                **path_identity,
+                "calendar_index": row["calendar_index"],
+                "issue_instance": row["issue_instance"],
+                "sleeve_id": sleeve_id,
+                "weight": weight,
+                "history_active_observation_count": "" if "INSUFFICIENT_52" in str(row["weight_status"]) else 52,
+                "estimator_status": row["weight_status"],
+                "fallback_reason": row["weight_status"] if str(row["weight_status"]).startswith("FALLBACK_") else "",
+                "covariance_hash": row["covariance_input_sha256"],
+            })
+            for stage_id in ("STAGE_1_SELECTION", "STAGE_2_DIRECTION", "STAGE_3_TICKET_CONSTRUCTION", "STAGE_4_POSITIONING"):
+                stage_attribution.append({
+                    **path_identity,
+                    "calendar_index": row["calendar_index"],
+                    "issue_instance": row["issue_instance"],
+                    "sleeve_id": sleeve_id,
+                    "stage_id": stage_id,
+                    "attribution_status": "EXACT_SAME_TICKET_FUNDING" if stage_id == "STAGE_4_POSITIONING" else "NOT_IDENTIFIABLE_WITHOUT_SPLICE",
+                    "upstream_trace_sha256": trace,
+                    "native_requested_ticket_count": sleeve.requested_ticket_count,
+                    "normalization_multiplier": row["realized_capital_multiplier"],
+                    "portfolio_weight": weight,
+                    "actual_ticket_count": settlement["actual_ticket_count"],
+                    "retained_cash_yuan": row["retained_cash_yuan"],
+                    "same_ticket_stage4_funding_delta_yuan": float(settlement["actual_stake_yuan"]) - sleeve.requested_ticket_count * TICKET_STAKE_YUAN,
+                    "undefined_reason": "UPSTREAM_STAGE_SPLICE_FORBIDDEN" if stage_id != "STAGE_4_POSITIONING" else "",
+                })
+    rolling = []
+    for row in holding_result["rolling_rows"]:
+        rolling.append({
+            **{field: path_rows[0][field] for field in PATH_IDENTITY},
+            **row,
+        })
+    return {
+        "issue_ledger": issue_ledger,
+        "sleeve_funding_ledger": sleeve_funding_rows(path_rows, bridge),
+        "capital_summary": [capital_summary(path_rows, holding)],
+        "holding_metrics": [{
+            **{field: path_rows[0][field] for field in PATH_IDENTITY},
+            **holding,
+        }],
+        "rolling_window_metrics": rolling,
+        "weight_history": weight_history,
+        "stage_attribution": stage_attribution,
     }

@@ -239,3 +239,46 @@ def test_sleeve_funding_ledger_and_capital_summary_reconcile_exactly() -> None:
     holding = RUNNER.summarize_holding_path(rows)["summary"]
     summary = RUNNER.capital_summary(rows, holding)
     assert summary["turnover_yuan"] == pytest.approx(sum(float(row["actual_stake_yuan"]) for row in rows))
+
+
+def test_candidate_bridge_merge_rejects_duplicate_and_keeps_trace_identity() -> None:
+    full = RUNNER.materialize_candidate_bridge("BEST_FULL_FULL", 2187)
+    model = RUNNER.materialize_candidate_bridge("MODEL_SOURCE_MODEL_CAP1_M512", 512)
+    merged = RUNNER.merge_candidate_bridges(full, model)
+    assert len(merged) == 2 * 348
+    with pytest.raises(RuntimeError, match="duplicate candidate bridge key"):
+        RUNNER.merge_candidate_bridges(full, full)
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:1]
+    row = RUNNER.replay_path(
+        sleeves=["BEST_FULL_FULL", "MODEL_SOURCE_MODEL_CAP1_M512"],
+        mode="FIXED_100K_NOTIONAL",
+        fraction=0.05,
+        weight_method="EQUAL_WEIGHT",
+        normalization_method="UNIT_CAPITAL",
+        bridge=merged,
+        calendar=calendar,
+        sleeve_trace_identity="fixture-selected-m-path",
+    )[0]
+    assert row["year"] == "2019"
+    assert row["weights"] == {"BEST_FULL_FULL": 0.5, "MODEL_SOURCE_MODEL_CAP1_M512": 0.5}
+
+
+def test_path_output_tables_have_complete_path_keys_and_exact_sleeve_rows() -> None:
+    bridge = RUNNER.h1_ticket_bridge()
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:3]
+    path = RUNNER.replay_path(
+        sleeves=RUNNER.H1_SLEEVES,
+        mode="FIXED_100K_NOTIONAL",
+        fraction=0.05,
+        weight_method="EQUAL_WEIGHT",
+        normalization_method="UNIT_CAPITAL",
+        bridge=bridge,
+        calendar=calendar,
+    )
+    tables = RUNNER.path_output_tables(path, bridge)
+    assert len(tables["issue_ledger"]) == 3
+    assert len(tables["sleeve_funding_ledger"]) == 9
+    assert len(tables["weight_history"]) == 9
+    assert len(tables["stage_attribution"]) == 36
+    assert all("portfolio_id" in row and "issue_instance" in row for row in tables["issue_ledger"])
+    assert tables["capital_summary"][0]["ending_bankroll_yuan"] == pytest.approx(path[-1]["postissue_bankroll_yuan"])
