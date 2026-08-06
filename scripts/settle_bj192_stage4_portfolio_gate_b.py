@@ -975,6 +975,7 @@ class CandidatePathCache:
     def __init__(self, calendar: Sequence[dict[str, str]] | None = None) -> None:
         self.calendar = list(calendar or read_csv(GATE_A / "full_calendar.csv"))
         self._paths: dict[str, dict[str, tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]]] = {}
+        self._native_observations: dict[str, dict[str, dict[str, dict[str, float | int | bool]]]] = {}
 
     def paths(self, candidate_id: str) -> dict[str, tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]]:
         if candidate_id not in self._paths:
@@ -984,6 +985,26 @@ class CandidatePathCache:
                 for seed in sorted({seed for _, seed, _ in surface})
             }
         return self._paths[candidate_id]
+
+    def native_observations(self, candidate_id: str, deployment_seed: str) -> dict[str, dict[str, float | int | bool]]:
+        """Memoize every selected native issue settlement for the full pair screen.
+
+        The native lots are settled once per canonical family/replica and then
+        reused by all pair combinations.  This is especially material for the
+        2,187-ticket FULL sleeve: repeatedly summing its tax lots per pair
+        would be both wasteful and a hidden re-settlement of an identical
+        frozen ticket outcome.
+        """
+        by_seed = self._native_observations.setdefault(candidate_id, {})
+        if deployment_seed not in by_seed:
+            bridge, _ = self.paths(candidate_id).get(deployment_seed, (None, None))
+            if bridge is None:
+                raise RuntimeError(f"selected-M path unavailable for native observation: {candidate_id}/{deployment_seed}")
+            by_seed[deployment_seed] = {
+                row["issue_instance"]: _native_observation(bridge[(candidate_id, row["issue_instance"])])
+                for row in self.calendar
+            }
+        return by_seed[deployment_seed]
 
     def bundle(self, candidates: Sequence[str], bundle_id: str) -> tuple[dict[tuple[str, str], IssueSleeve], list[dict[str, object]]]:
         bundles = frozen_replicate_bundles()
@@ -1012,6 +1033,9 @@ def materialize_phase_zero_selection_checkpoint(
     selected: list[dict[str, object]] = []
     for candidate_id in sorted(canonical_economic_catalog()):
         for seed, (_, rows) in cache.paths(candidate_id).items():
+            # Materialize every ticket-level native source outcome once while
+            # this Phase-0 cache owns the selected source surface.
+            cache.native_observations(candidate_id, seed)
             for row in rows:
                 selected.append({"candidate_id": candidate_id, "deployment_seed": seed,
                     "issue_instance": row["issue_instance"], "calendar_index": row["calendar_index"],
@@ -1024,6 +1048,173 @@ def materialize_phase_zero_selection_checkpoint(
         "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
         "settled_source_bindings": verify_gate_a_source_bindings(), "phase": "PHASE_0_SELECTED_M_PATHS"}
     return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=selected)
+
+
+def _native_observation(sleeve: IssueSleeve) -> dict[str, float | int | bool]:
+    """Return one immutable native-flow observation without rescaling a ticket.
+
+    A zero-flow issue remains an observation.  This is important for the
+    complete holding calendar: dropping it would turn an abstention or an
+    unavailable source outcome into an apparent correlation improvement.
+    """
+    executable = sleeve.status == "SETTLED" and sleeve.requested_ticket_count > 0
+    settled = sleeve.settle_prefix(sleeve.requested_ticket_count) if executable else sleeve.settle_prefix(0)
+    stake = float(settled["actual_stake_yuan"])
+    return {
+        "return": float(settled["pre_tax_net_yuan"]) / stake if stake else 0.0,
+        "stake": stake,
+        "gross": float(settled["gross_yuan"]),
+        "hits": int(settled["hit_ticket_count"]),
+        "available": sleeve.status == "SETTLED",
+    }
+
+
+def _worst_decile_overlap(left: Sequence[float], right: Sequence[float]) -> float | None:
+    """Jaccard overlap of deterministic lower-return deciles for one panel."""
+    if not left or len(left) != len(right):
+        return None
+    count = max(1, math.ceil(len(left) * 0.10))
+    left_bottom = set(sorted(range(len(left)), key=lambda idx: (left[idx], idx))[:count])
+    right_bottom = set(sorted(range(len(right)), key=lambda idx: (right[idx], idx))[:count])
+    union = left_bottom | right_bottom
+    return len(left_bottom & right_bottom) / len(union) if union else None
+
+
+def intrinsic_native_pair_dependence(
+    left_id: str,
+    right_id: str,
+    bundle_id: str,
+    *,
+    path_cache: CandidatePathCache,
+) -> list[dict[str, object]]:
+    """Compute the bounded Phase-1 intrinsic native-flow pair screen.
+
+    This is deliberately not a Stage-4 capital replay.  Each family supplies
+    the outcome-settled, strictly-prior selected-M sleeve frozen in Phase 0;
+    the output simply describes its matched native issue flows under one
+    frozen ordinal replicate bundle.  The bundle is retained in every key so
+    stochastic seed replicas never become a selectable mean path.
+    """
+    if left_id == right_id:
+        raise ValueError("intrinsic pair needs two distinct economic families")
+    catalog = canonical_economic_catalog()
+    left_family = catalog[left_id]["economic_family_id"]
+    right_family = catalog[right_id]["economic_family_id"]
+    bundles = frozen_replicate_bundles()
+    seed_map = bundles.get(bundle_id)
+    if seed_map is None:
+        raise RuntimeError(f"unknown frozen replicate bundle: {bundle_id}")
+    left_seed = "NA" if seed_map[left_id] == "DETERMINISTIC" else seed_map[left_id]
+    right_seed = "NA" if seed_map[right_id] == "DETERMINISTIC" else seed_map[right_id]
+    left_observations = path_cache.native_observations(left_id, left_seed)
+    right_observations = path_cache.native_observations(right_id, right_seed)
+    observations: list[dict[str, object]] = []
+    for row in sorted(path_cache.calendar, key=lambda item: (item["first_kickoff_ts"], item["issue_instance"])):
+        issue = row["issue_instance"]
+        left = left_observations[issue]
+        right = right_observations[issue]
+        observations.append({"issue_instance": issue, "left": left, "right": right})
+    pair_id = canonical_hash({"left": left_id, "right": right_id})
+    base = {
+        "portfolio_id": pair_id,
+        "mode": "NATIVE_REQUEST_CONTROL",
+        "position_fraction": "1.00",
+        "weight_method": "NOT_APPLICABLE_INTRINSIC_NATIVE_FLOW",
+        "normalization_method": "NOT_APPLICABLE_INTRINSIC_NATIVE_FLOW",
+        "deployment_replicate_bundle_id": bundle_id,
+        "economic_family_left": left_family,
+        "economic_family_right": right_family,
+        "native_return_basis": "PRE_TAX_NET_OVER_NATIVE_STAKE;ZERO_FOR_CALENDAR_NO_BET_OR_UNAVAILABLE",
+    }
+    rows: list[dict[str, object]] = []
+    denominators = (
+        ("FULL_CALENDAR_ZERO_FLOW", observations),
+        ("UNION_ACTIVE", [item for item in observations if item["left"]["stake"] > 0 or item["right"]["stake"] > 0]),
+        ("INTERSECTION_ACTIVE", [item for item in observations if item["left"]["stake"] > 0 and item["right"]["stake"] > 0]),
+    )
+    for denominator_id, selected in denominators:
+        left_values = [float(item["left"]["return"]) for item in selected]
+        right_values = [float(item["right"]["return"]) for item in selected]
+        metrics: dict[str, float | None] = {
+            "PEARSON_RETURN": _pearson(left_values, right_values),
+            "SPEARMAN_RETURN": _pearson(_average_ranks(left_values), _average_ranks(right_values)) if selected else None,
+            "DOWNSIDE_CORRELATION": _pearson([min(value, 0.0) for value in left_values], [min(value, 0.0) for value in right_values]),
+            "JOINT_LOSS_RATE": sum(a < 0.0 and b < 0.0 for a, b in zip(left_values, right_values, strict=True)) / len(selected) if selected else None,
+            "WORST_DECILE_OVERLAP_RATE": _worst_decile_overlap(left_values, right_values),
+            "PAYOUT_OVERLAP_RATE": sum(item["left"]["gross"] > 0.0 and item["right"]["gross"] > 0.0 for item in selected) / len(selected) if selected else None,
+            "HIT_OVERLAP_RATE": sum(item["left"]["hits"] > 0 and item["right"]["hits"] > 0 for item in selected) / len(selected) if selected else None,
+        }
+        support_hash = canonical_hash([item["issue_instance"] for item in selected])
+        for metric, value in metrics.items():
+            rows.append({
+                **base,
+                "denominator_id": denominator_id,
+                "panel_type": "OVERALL",
+                "panel_id": "STRICTLY_PRIOR_SELECTED_M",
+                "window_issues": "",
+                "exclusion_id": "",
+                "metric": metric,
+                "value": value,
+                "observation_count": len(selected),
+                "undefined_reason": "LT2_OR_ZERO_VARIANCE" if value is None else "",
+                "matched_support_hash": support_hash,
+            })
+    return rows
+
+
+def phase_one_intrinsic_screen(
+    checkpoint: Path,
+    *,
+    path_cache: CandidatePathCache | None = None,
+    candidate_pairs: Sequence[tuple[str, str]] | None = None,
+) -> dict[str, object]:
+    """Persist the complete/bounded Phase-1 native screening surface.
+
+    The phase has no Stage-4 capital-grid cross product: all standalone M
+    curves are native aggregates and pairs are only intrinsic matched-flow
+    diagnostics.  The output stays in `.scratch` as a hash-bound checkpoint
+    until the later detailed core frontier has completed successfully.
+    """
+    cache = path_cache or CandidatePathCache()
+    catalog = canonical_economic_catalog()
+    expected_phase0 = {
+        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
+        "settled_source_bindings": verify_gate_a_source_bindings(),
+        "phase": "PHASE_0_SELECTED_M_PATHS",
+    }
+    # The checkpoint is a binding guard, not a source of mutable outcomes.
+    load_surface_checkpoint(ROOT / ".scratch" / "bj192_phase0_selected_m_checkpoint.json", binding=expected_phase0)
+    curves = [row for candidate_id in sorted(catalog) for row in standalone_m_curve(candidate_id)]
+    pairs = list(candidate_pairs or frozen_portfolio_sets()["pairwise"])
+    if len({tuple(sorted(pair)) for pair in pairs}) != len(pairs):
+        raise RuntimeError("Phase-1 intrinsic pair duplication")
+    intrinsic = [
+        row
+        for left_id, right_id in pairs
+        for bundle_id in sorted(frozen_replicate_bundles())
+        for row in intrinsic_native_pair_dependence(left_id, right_id, bundle_id, path_cache=cache)
+    ]
+    selected_paths = [
+        {"candidate_id": candidate_id, "deployment_seed": seed, **row}
+        for candidate_id in sorted(catalog)
+        for seed, (_, rows) in cache.paths(candidate_id).items()
+        for row in rows
+    ]
+    binding = {
+        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
+        "settled_source_bindings": verify_gate_a_source_bindings(),
+        "phase": "PHASE_1_NATIVE_CURVES_AND_INTRINSIC_PAIRS",
+        "phase0_checkpoint_sha256": sha256_file(ROOT / ".scratch" / "bj192_phase0_selected_m_checkpoint.json"),
+        "pair_count": len(pairs),
+    }
+    payload = [
+        *({"table": "standalone_m_curve", **row} for row in curves),
+        *({"table": "intrinsic_native_dependence", **row} for row in intrinsic),
+        *({"table": "selected_m_path", **row} for row in selected_paths),
+    ]
+    return write_surface_checkpoint(checkpoint, binding=binding, completed_path_keys=payload)
 
 
 def replay_bundle_path(

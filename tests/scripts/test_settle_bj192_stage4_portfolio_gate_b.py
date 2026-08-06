@@ -454,3 +454,25 @@ def test_candidate_path_cache_reuses_immutable_selected_seed_paths() -> None:
         path_cache=cache,
     )
     assert len(replay["path"]) == 3
+
+
+def test_intrinsic_pair_screen_preserves_bundle_and_zero_flow_denominators() -> None:
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:3]
+    cache = RUNNER.CandidatePathCache(calendar)
+    rows = RUNNER.intrinsic_native_pair_dependence(
+        "BEST_FULL_FULL",
+        "MODEL_SOURCE_MODEL_CAP1_M512",
+        "BUNDLE_ORDINAL_001",
+        path_cache=cache,
+    )
+    assert len(rows) == 3 * 7
+    assert {row["denominator_id"] for row in rows} == {
+        "FULL_CALENDAR_ZERO_FLOW", "UNION_ACTIVE", "INTERSECTION_ACTIVE"
+    }
+    assert {row["metric"] for row in rows} == {
+        "PEARSON_RETURN", "SPEARMAN_RETURN", "DOWNSIDE_CORRELATION",
+        "JOINT_LOSS_RATE", "WORST_DECILE_OVERLAP_RATE", "PAYOUT_OVERLAP_RATE",
+        "HIT_OVERLAP_RATE",
+    }
+    assert {row["deployment_replicate_bundle_id"] for row in rows} == {"BUNDLE_ORDINAL_001"}
+    assert all(row["observation_count"] == 3 for row in rows if row["denominator_id"] == "FULL_CALENDAR_ZERO_FLOW")
