@@ -798,6 +798,41 @@ def build_bundle_bridges(
     return merge_candidate_bridges(*bridges), selected_rows
 
 
+def replay_bundle_path(
+    candidates: Sequence[str],
+    bundle_id: str,
+    *,
+    mode: str,
+    fraction: float,
+    weight_method: str,
+    normalization_method: str,
+    calendar: Sequence[dict[str, str]] | None = None,
+) -> dict[str, object]:
+    """Replay one fixed candidate set under its exact replicate-bundle map."""
+    calendar = list(calendar or read_csv(GATE_A / "full_calendar.csv"))
+    candidates = tuple(sorted(candidates))
+    bridge, selected_m = build_bundle_bridges(candidates, bundle_id, calendar)
+    trace_identity = canonical_hash({
+        "candidates": candidates,
+        "bundle": bundle_id,
+        "selected_m_path": selected_m,
+    })
+    path = replay_path(
+        sleeves=candidates,
+        mode=mode,
+        fraction=fraction,
+        weight_method=weight_method,
+        normalization_method=normalization_method,
+        bridge=bridge,
+        calendar=calendar,
+        bundle_id=bundle_id,
+        sleeve_trace_identity=trace_identity,
+    )
+    tables = path_output_tables(path, bridge)
+    tables["selected_m_path"] = selected_m
+    return {"bridge": bridge, "path": path, "tables": tables, "sleeve_trace_identity": trace_identity}
+
+
 def merge_candidate_bridges(
     *bridges: dict[tuple[str, str], IssueSleeve],
 ) -> dict[tuple[str, str], IssueSleeve]:

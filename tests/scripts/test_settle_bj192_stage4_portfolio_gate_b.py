@@ -301,3 +301,19 @@ def test_frozen_bundle_uses_ordinal_seed_pairing_without_substitution() -> None:
     assert len(bridge) == 4
     assert {row["deployment_seed"] for row in selected if row["economic_family_id"] == "ECON_BJ159_SELECTED_N7_WOR_M_CURVE"} == {"137002"}
     assert {row["deployment_replicate_bundle_id"] for row in selected} == {"BUNDLE_ORDINAL_002"}
+
+
+def test_bundle_replay_emits_m_path_and_capital_tables_under_one_identity() -> None:
+    calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:3]
+    result = RUNNER.replay_bundle_path(
+        ["BEST_FULL_FULL", "BJ159_SELECTED_N7_WOR_M_CURVE"],
+        "BUNDLE_ORDINAL_001",
+        mode="FIXED_100K_NOTIONAL",
+        fraction=0.05,
+        weight_method="EQUAL_WEIGHT",
+        normalization_method="UNIT_CAPITAL",
+        calendar=calendar,
+    )
+    assert len(result["path"]) == 3
+    assert len(result["tables"]["selected_m_path"]) == 6
+    assert len(result["tables"]["issue_ledger"]) == 3
