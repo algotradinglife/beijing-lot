@@ -402,6 +402,14 @@ def test_execution_axes_are_read_from_gate_a_and_preserve_legality_rules() -> No
     )
 
 
+def test_surface_preflight_reports_full_frozen_cartesian_scope_without_reduction() -> None:
+    receipt = RUNNER.surface_preflight_receipt()
+    assert receipt["status"] == "PREFLIGHT_REQUIRES_EXPLICIT_EXECUTION_PLAN"
+    assert receipt["surface"]["pairwise"]["portfolio_set_count"] == 5_356
+    assert receipt["total_capital_path_count"] == 19_116_546
+    assert receipt["total_issue_path_row_count"] == 6_652_558_008
+
+
 def test_realized_dependence_uses_explicit_zero_flow_and_active_denominators() -> None:
     bridge = RUNNER.h1_ticket_bridge()
     calendar = RUNNER.read_csv(RUNNER.GATE_A / "full_calendar.csv")[:3]

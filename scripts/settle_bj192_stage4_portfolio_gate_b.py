@@ -1161,6 +1161,41 @@ def frozen_execution_axes() -> list[dict[str, object]]:
     return rows
 
 
+def surface_preflight_receipt() -> dict[str, object]:
+    """Quantify the exact frozen Cartesian request before allocating output.
+
+    This is a no-outcome, no-ticket-execution preflight.  It intentionally
+    refuses to turn the requested all-pairs wording into an unreported grid
+    reduction; callers can persist this receipt with a proposed run plan for
+    PI review.
+    """
+    portfolios = frozen_portfolio_sets()
+    bundles = frozen_replicate_bundles()
+    calendar_count = len(read_csv(GATE_A / "full_calendar.csv"))
+    axis_count = len(frozen_execution_axes())
+    counts = {}
+    for name, sets in portfolios.items():
+        paths = len(sets) * axis_count * len(bundles)
+        counts[name] = {
+            "portfolio_set_count": len(sets),
+            "capital_path_count": paths,
+            "issue_path_row_count": paths * calendar_count,
+        }
+    return {
+        "contract": CONTRACT,
+        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
+        "calendar_issue_count": calendar_count,
+        "execution_axis_count": axis_count,
+        "replicate_bundle_count": len(bundles),
+        "surface": counts,
+        "total_capital_path_count": sum(row["capital_path_count"] for row in counts.values()),
+        "total_issue_path_row_count": sum(row["issue_path_row_count"] for row in counts.values()),
+        "status": "PREFLIGHT_REQUIRES_EXPLICIT_EXECUTION_PLAN",
+        "reason": "Gate-A schema says every pair/mode/fraction/weight/normalization/bundle row; no unapproved Cartesian reduction is applied.",
+    }
+
+
 def _pearson(left: Sequence[float], right: Sequence[float]) -> float | None:
     if len(left) < 2 or len(left) != len(right):
         return None
