@@ -518,6 +518,13 @@ def test_minimal_stage4_fixture_is_separately_bound_from_superseded_surface_chec
         assert {row["panel_type"] for row in rows if row["record_type"] == "MINIMAL_STAGE4_REALIZED_STABILITY"} >= {
             "YEAR", "LOYO", "EX_LARGEST_ISSUE", "EX_LARGEST_YEAR",
         }
+        binding, paths = RUNNER.load_minimal_stage4_checkpoint(checkpoint)
+        assert binding == receipt["binding"]
+        assert len(paths) == 1
+        path = next(iter(paths.values()))
+        bridge = RUNNER.minimal_stage4_path_bridge(path)
+        assert len(bridge) == 348
+        assert set(path[0]["sleeve_settlements"]) == {"BEST_FULL_FULL"}
     finally:
         checkpoint.unlink(missing_ok=True)
 

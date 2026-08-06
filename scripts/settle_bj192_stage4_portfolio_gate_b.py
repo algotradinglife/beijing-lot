@@ -1637,6 +1637,69 @@ def minimal_stage4_replay(
     )
 
 
+def load_minimal_stage4_checkpoint(
+    checkpoint: Path,
+) -> tuple[dict[str, object], dict[tuple[object, ...], list[dict[str, object]]]]:
+    """Load the finalizable #192 closure checkpoint without ticket replay.
+
+    Only the H1 deterministic sleeves are legal in the minimal closure, so a
+    finalizer can use the saved issue state together with immutable prefix
+    metadata.  It must never invoke a settlement runner or reconstruct an
+    outcome from a scalar return.
+    """
+    payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+    expected = dict(payload)
+    digest = expected.pop("payload_sha256", None)
+    if digest != canonical_hash(expected):
+        raise RuntimeError("minimal Stage-4 checkpoint payload digest drift")
+    binding = dict(payload.get("binding", {}))
+    required = {
+        "phase": "FINAL_GATE_B_MINIMAL_STAGE4_CLOSURE",
+        "gate_a_manifest_sha256": EXPECTED_GATE_A_MANIFEST,
+        "gate_a_content_sha256": EXPECTED_GATE_A_CONTENT,
+        "membership_contract_sha256": canonical_hash(minimal_stage4_memberships()),
+        "axis_contract_sha256": canonical_hash(minimal_stage4_execution_axes()),
+    }
+    if any(binding.get(key) != value for key, value in required.items()):
+        raise RuntimeError("minimal Stage-4 checkpoint binding drift")
+    groups: dict[tuple[object, ...], list[dict[str, object]]] = defaultdict(list)
+    for record in payload["completed_path_keys"]:
+        if record.get("record_type") != "MINIMAL_STAGE4_ISSUE_PATH":
+            continue
+        identity = tuple(record[field] for field in PATH_IDENTITY)
+        groups[identity].append({key: value for key, value in record.items() if key not in {
+            "record_type", "membership_id", "membership_json", "membership_size",
+        }})
+    expected_path_count = int(binding["membership_count"]) * int(binding["axis_count"]) * int(binding["bundle_count"])
+    calendar_count = len(read_csv(GATE_A / "full_calendar.csv"))
+    if len(groups) != expected_path_count:
+        raise RuntimeError("minimal Stage-4 checkpoint path denominator drift")
+    for identity, rows in groups.items():
+        ordered = sorted(rows, key=lambda row: (int(row["calendar_index"]), str(row["issue_instance"])))
+        if len(ordered) != calendar_count or len({row["issue_instance"] for row in ordered}) != calendar_count:
+            raise RuntimeError(f"minimal Stage-4 issue-calendar drift: {identity}")
+        groups[identity] = ordered
+    return binding, groups
+
+
+def minimal_stage4_path_bridge(path_rows: Sequence[dict[str, object]]) -> dict[tuple[str, str], IssueSleeve]:
+    """Bind saved minimal path state to immutable H1 prefix metadata only."""
+    if not path_rows:
+        raise ValueError("empty minimal Stage-4 path")
+    sleeves = tuple(sorted(path_rows[0]["sleeve_settlements"]))
+    if sleeves not in minimal_stage4_memberships():
+        raise RuntimeError("checkpoint path contains an unauthorized minimal sleeve set")
+    source = h1_ticket_bridge()
+    result = {
+        (sleeve, str(row["issue_instance"])): source[(sleeve, str(row["issue_instance"]))]
+        for sleeve in sleeves
+        for row in path_rows
+    }
+    if len(result) != len(sleeves) * len(path_rows):
+        raise RuntimeError("minimal Stage-4 bridge denominator drift")
+    return result
+
+
 def _realized_stability_rows(path: Sequence[dict[str, object]], membership_id: str) -> list[dict[str, object]]:
     """Subset diagnostics on one realized path; they never re-fit prior state."""
     rows: list[dict[str, object]] = []
