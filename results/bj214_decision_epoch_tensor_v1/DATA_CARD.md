@@ -16,6 +16,12 @@ retrospective held-out cohort preserves the #203 model-unseen/label-embargoed cl
 it is not described as organization-wide untouched. The prospective cohort begins
 at `2026-08-07T09:35:01Z` and contains no outcome namespace.
 
+The controlling representative rule is `MEDIAN_KICKOFF_MINUS_10H`, selected by
+a schedule-only ten-hour planning criterion. Other epoch rules are sensitivity
+evidence only. Model-learning support and ticket operability are separate gates:
+sale/parlay recovery cannot substitute for missing timestamped historical training
+support.
+
 Disposition: **BLOCKED_INSUFFICIENT_CAUSAL_SUPPORT**. #204 remains blocked unless
 PI accepts `READY_FOR_204`. This package trains no model, ranks no bet, computes no
 ROI, and grants no release or execution authority.

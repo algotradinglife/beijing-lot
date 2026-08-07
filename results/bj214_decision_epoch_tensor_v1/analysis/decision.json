@@ -1,63 +1,104 @@
 {
   "authority": "Data capability only; no model training, betting, ROI, release or execution authority. #204 remains blocked until PI accepts READY_FOR_204.",
-  "blocking_facts": [
-    "No source supplies verified p34 sale-open and parlay-allowed state at decision epochs.",
-    "Historical named 1h/10h fields lack observation timestamps and remain diagnostic-only.",
-    "The prospective post-activation cohort has fewer than two evaluated issues."
-  ],
-  "cohort_results": [
-    {
-      "candidate_matches": 227504,
-      "cohort": "development",
-      "cohort_gate_pass": false,
-      "evaluated_epochs": 2394,
-      "evaluated_issues": 342,
-      "n7_epoch_pass_rate": 0.0,
-      "n7_passing_epochs": 0,
-      "required_core_coverage": 0.8,
-      "required_epoch_pass_rate": 0.8,
-      "required_issues": 30,
-      "strict_complete_eligible_matches": 0,
-      "strict_core_coverage": 0.0
-    },
-    {
-      "candidate_matches": 7073,
-      "cohort": "historical_model_unseen",
-      "cohort_gate_pass": false,
-      "evaluated_epochs": 364,
-      "evaluated_issues": 52,
-      "n7_epoch_pass_rate": 0.0,
-      "n7_passing_epochs": 0,
-      "required_core_coverage": 0.8,
-      "required_epoch_pass_rate": 0.8,
-      "required_issues": 5,
-      "strict_complete_eligible_matches": 0,
-      "strict_core_coverage": 0.0
-    },
-    {
-      "candidate_matches": 578,
-      "cohort": "prospective_post_activation",
-      "cohort_gate_pass": false,
-      "evaluated_epochs": 2,
-      "evaluated_issues": 1,
-      "n7_epoch_pass_rate": 0.0,
-      "n7_passing_epochs": 0,
-      "required_core_coverage": 0.8,
-      "required_epoch_pass_rate": 0.8,
-      "required_issues": 2,
-      "strict_complete_eligible_matches": 0,
-      "strict_core_coverage": 0.0
-    }
-  ],
+  "blocking_facts": {
+    "model_learning": [
+      "Development has no timestamped causal EURO plus Beijing-SP core support at the representative epoch rule.",
+      "Historical named 1h/10h fields lack observation timestamps and remain diagnostic-only.",
+      "The prospective cohort is below the predeclared issue minimum at the representative rule.",
+      "Remediation alternatives are: obtain timestamped historical development support; accumulate a sufficient prospective training panel; or formally narrow #204 to a simpler or prospective-only design."
+    ],
+    "ticket_operability": [
+      "No source supplies verified p34 sale-open and parlay-allowed state at decision epochs.",
+      "Sale/parlay recovery can repair ticket operability, but cannot by itself create a causal historical model-learning panel."
+    ]
+  },
   "disposition": "BLOCKED_INSUFFICIENT_CAUSAL_SUPPORT",
-  "gate": {
-    "gate_id": "BJ214_REPRESENTATIVE_N7_SUPPORT_V1",
+  "model_learning_gate": {
+    "gate_id": "BJ214_MODEL_LEARNING_N7_SUPPORT_V2",
     "minimum_complete_matches_per_epoch": 7,
     "minimum_core_cell_coverage": 0.8,
     "minimum_epoch_pass_rate": 0.8,
     "minimum_evaluated_issues_development": 30,
     "minimum_evaluated_issues_historical_model_unseen": 5,
     "minimum_evaluated_issues_prospective_post_activation": 2,
+    "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+    "require_all_three_bj_sp_and_euro": true,
+    "require_no_post_epoch_observations": true,
+    "require_no_started_matches": true,
+    "require_timestamped_identity": true
+  },
+  "model_learning_gate_pass": false,
+  "model_learning_results": [
+    {
+      "candidate_matches": 67651,
+      "causal_core_complete_matches": 0,
+      "cohort": "development",
+      "cohort_model_gate_pass": false,
+      "evaluated_epochs": 342,
+      "evaluated_issues": 342,
+      "model_core_coverage": 0.0,
+      "model_n7_epoch_pass_rate": 0.0,
+      "model_n7_passing_epochs": 0,
+      "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+      "required_epoch_pass_rate": 0.8,
+      "required_issues": 30,
+      "required_model_core_coverage": 0.8
+    },
+    {
+      "candidate_matches": 2087,
+      "causal_core_complete_matches": 1153,
+      "cohort": "historical_model_unseen",
+      "cohort_model_gate_pass": false,
+      "evaluated_epochs": 52,
+      "evaluated_issues": 52,
+      "model_core_coverage": 0.552467656923814,
+      "model_n7_epoch_pass_rate": 0.23076923076923078,
+      "model_n7_passing_epochs": 12,
+      "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+      "required_epoch_pass_rate": 0.8,
+      "required_issues": 5,
+      "required_model_core_coverage": 0.8
+    },
+    {
+      "candidate_matches": 0,
+      "causal_core_complete_matches": 0,
+      "cohort": "prospective_post_activation",
+      "cohort_model_gate_pass": false,
+      "evaluated_epochs": 0,
+      "evaluated_issues": 0,
+      "model_core_coverage": 0.0,
+      "model_n7_epoch_pass_rate": 0.0,
+      "model_n7_passing_epochs": 0,
+      "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+      "required_epoch_pass_rate": 0.8,
+      "required_issues": 2,
+      "required_model_core_coverage": 0.8
+    }
+  ],
+  "prospective_activation_sensitivity": {
+    "candidate_matches": 289,
+    "causal_core_complete_matches": 269,
+    "evaluated_epochs": 1,
+    "issues": 1,
+    "model_core_coverage": 0.9307958477508651,
+    "strict_complete_eligible_matches": 0,
+    "ticket_eligible_coverage": 0.0
+  },
+  "representative_rule": {
+    "controlling": true,
+    "epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+    "selection_rationale": "Schedule-only median-kickoff anchor with a ten-hour operational planning lead; common to every cohort and frozen without using outcomes or observed coverage. All other epoch rules are sensitivity evidence only.",
+    "sensitivity_rules_do_not_vote": true
+  },
+  "ticket_operability_gate": {
+    "gate_id": "BJ214_TICKET_OPERABILITY_N7_V1",
+    "minimum_complete_matches_per_epoch": 7,
+    "minimum_epoch_pass_rate": 0.8,
+    "minimum_evaluated_issues_development": 30,
+    "minimum_evaluated_issues_historical_model_unseen": 5,
+    "minimum_evaluated_issues_prospective_post_activation": 2,
+    "minimum_ticket_eligible_coverage": 0.8,
+    "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
     "require_all_three_bj_sp_and_euro": true,
     "require_no_post_epoch_observations": true,
     "require_no_started_matches": true,
@@ -65,7 +106,54 @@
     "require_parlay_allowed_evidence": true,
     "require_timestamped_identity": true
   },
-  "gate_id": "BJ214_REPRESENTATIVE_N7_SUPPORT_V1",
+  "ticket_operability_gate_pass": false,
+  "ticket_operability_results": [
+    {
+      "candidate_matches": 67651,
+      "cohort": "development",
+      "cohort_ticket_gate_pass": false,
+      "evaluated_epochs": 342,
+      "evaluated_issues": 342,
+      "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+      "required_epoch_pass_rate": 0.8,
+      "required_issues": 30,
+      "required_ticket_eligible_coverage": 0.8,
+      "strict_complete_eligible_matches": 0,
+      "ticket_eligible_coverage": 0.0,
+      "ticket_n7_epoch_pass_rate": 0.0,
+      "ticket_n7_passing_epochs": 0
+    },
+    {
+      "candidate_matches": 2087,
+      "cohort": "historical_model_unseen",
+      "cohort_ticket_gate_pass": false,
+      "evaluated_epochs": 52,
+      "evaluated_issues": 52,
+      "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+      "required_epoch_pass_rate": 0.8,
+      "required_issues": 5,
+      "required_ticket_eligible_coverage": 0.8,
+      "strict_complete_eligible_matches": 0,
+      "ticket_eligible_coverage": 0.0,
+      "ticket_n7_epoch_pass_rate": 0.0,
+      "ticket_n7_passing_epochs": 0
+    },
+    {
+      "candidate_matches": 0,
+      "cohort": "prospective_post_activation",
+      "cohort_ticket_gate_pass": false,
+      "evaluated_epochs": 0,
+      "evaluated_issues": 0,
+      "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+      "required_epoch_pass_rate": 0.8,
+      "required_issues": 2,
+      "required_ticket_eligible_coverage": 0.8,
+      "strict_complete_eligible_matches": 0,
+      "ticket_eligible_coverage": 0.0,
+      "ticket_n7_epoch_pass_rate": 0.0,
+      "ticket_n7_passing_epochs": 0
+    }
+  ],
   "violations": {
     "heldout_outcome_columns": 0,
     "post_epoch_market_observations": 0,

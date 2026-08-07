@@ -32,8 +32,11 @@ from .contract import (
     FEATURE_DICTIONARY,
     FEATURE_NAMES,
     OUTCOME_ORDER,
-    REPRESENTATIVE_GATE,
+    MODEL_SUPPORT_GATE,
+    REPRESENTATIVE_EPOCH_RULE,
+    REPRESENTATIVE_RULE_RATIONALE,
     SOURCE_TIMEZONE,
+    TICKET_OPERABILITY_GATE,
     UPSTREAM_CONTRACT_VERSION,
     epoch_cell_key,
     epoch_id,
@@ -845,7 +848,13 @@ def _strict_inference_tables(
 def _coverage_tables(
     roster: pd.DataFrame,
     epochs: pd.DataFrame,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
+) -> tuple[
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.DataFrame,
+    pd.DataFrame,
+    dict[str, Any],
+]:
     grouped = roster.groupby("epoch_id", sort=False)
     epoch_diagnostics = grouped.agg(
         issue=("issue", "first"),
@@ -868,16 +877,19 @@ def _coverage_tables(
         post_epoch_market_violations=("post_epoch_market_violation", "sum"),
         started_match_violations=("started_match_in_strict_roster", "sum"),
     ).reset_index()
-    epoch_diagnostics["n7_gate_pass"] = epoch_diagnostics[
+    epoch_diagnostics["model_n7_gate_pass"] = epoch_diagnostics[
+        "causal_core_complete_matches"
+    ].ge(MODEL_SUPPORT_GATE.minimum_complete_matches_per_epoch)
+    epoch_diagnostics["ticket_n7_gate_pass"] = epoch_diagnostics[
         "strict_complete_eligible_matches"
-    ].ge(REPRESENTATIVE_GATE.minimum_complete_matches_per_epoch)
-    epoch_diagnostics["potential_core_rate"] = np.where(
+    ].ge(TICKET_OPERABILITY_GATE.minimum_complete_matches_per_epoch)
+    epoch_diagnostics["model_core_coverage"] = np.where(
         epoch_diagnostics["candidate_matches"].gt(0),
         epoch_diagnostics["causal_core_complete_matches"]
         / epoch_diagnostics["candidate_matches"],
         0.0,
     )
-    epoch_diagnostics["strict_core_rate"] = np.where(
+    epoch_diagnostics["ticket_eligible_coverage"] = np.where(
         epoch_diagnostics["candidate_matches"].gt(0),
         epoch_diagnostics["strict_complete_eligible_matches"]
         / epoch_diagnostics["candidate_matches"],
@@ -898,79 +910,124 @@ def _coverage_tables(
                 "strict_complete_eligible_matches",
                 "sum",
             ),
-            n7_passing_epochs=("n7_gate_pass", "sum"),
+            model_n7_passing_epochs=("model_n7_gate_pass", "sum"),
+            ticket_n7_passing_epochs=("ticket_n7_gate_pass", "sum"),
         )
         .reset_index()
     )
-    coverage["potential_core_rate"] = np.where(
+    coverage["model_core_coverage"] = np.where(
         coverage["candidate_matches"].gt(0),
         coverage["causal_core_complete_matches"] / coverage["candidate_matches"],
         0.0,
     )
-    coverage["strict_core_rate"] = np.where(
+    coverage["ticket_eligible_coverage"] = np.where(
         coverage["candidate_matches"].gt(0),
         coverage["strict_complete_eligible_matches"]
         / coverage["candidate_matches"],
         0.0,
     )
-    coverage["n7_epoch_pass_rate"] = np.where(
+    coverage["model_n7_epoch_pass_rate"] = np.where(
         coverage["evaluated_epochs"].gt(0),
-        coverage["n7_passing_epochs"] / coverage["evaluated_epochs"],
+        coverage["model_n7_passing_epochs"] / coverage["evaluated_epochs"],
         0.0,
+    )
+    coverage["ticket_n7_epoch_pass_rate"] = np.where(
+        coverage["evaluated_epochs"].gt(0),
+        coverage["ticket_n7_passing_epochs"] / coverage["evaluated_epochs"],
+        0.0,
+    )
+    coverage["controlling_representative_rule"] = coverage["epoch_rule"].eq(
+        REPRESENTATIVE_EPOCH_RULE
     )
     required_cohorts = (
         "development",
         "historical_model_unseen",
         "prospective_post_activation",
     )
-    gate_rows: list[dict[str, Any]] = []
     minimum_issues = {
-        "development": REPRESENTATIVE_GATE.minimum_evaluated_issues_development,
+        "development": MODEL_SUPPORT_GATE.minimum_evaluated_issues_development,
         "historical_model_unseen": (
-            REPRESENTATIVE_GATE.minimum_evaluated_issues_historical_model_unseen
+            MODEL_SUPPORT_GATE.minimum_evaluated_issues_historical_model_unseen
         ),
         "prospective_post_activation": (
-            REPRESENTATIVE_GATE.minimum_evaluated_issues_prospective_post_activation
+            MODEL_SUPPORT_GATE.minimum_evaluated_issues_prospective_post_activation
         ),
     }
+    model_rows: list[dict[str, Any]] = []
+    ticket_rows: list[dict[str, Any]] = []
     for cohort in required_cohorts:
         scoped = epoch_diagnostics[
             epoch_diagnostics["cohort"].eq(cohort)
             & epoch_diagnostics["evaluation_status"].eq("EVALUATED")
+            & epoch_diagnostics["epoch_rule"].eq(REPRESENTATIVE_EPOCH_RULE)
         ]
         candidate = int(scoped["candidate_matches"].sum())
+        core = int(scoped["causal_core_complete_matches"].sum())
         strict = int(scoped["strict_complete_eligible_matches"].sum())
         issue_count = int(scoped["issue"].nunique())
         epoch_count = len(scoped)
-        n7_pass = int(scoped["n7_gate_pass"].sum())
-        pass_rate = n7_pass / epoch_count if epoch_count else 0.0
-        core_rate = strict / candidate if candidate else 0.0
-        cohort_pass = (
+        model_n7_pass = int(scoped["model_n7_gate_pass"].sum())
+        ticket_n7_pass = int(scoped["ticket_n7_gate_pass"].sum())
+        model_pass_rate = model_n7_pass / epoch_count if epoch_count else 0.0
+        ticket_pass_rate = ticket_n7_pass / epoch_count if epoch_count else 0.0
+        model_coverage = core / candidate if candidate else 0.0
+        ticket_coverage = strict / candidate if candidate else 0.0
+        model_pass = (
             issue_count >= minimum_issues[cohort]
-            and pass_rate >= REPRESENTATIVE_GATE.minimum_epoch_pass_rate
-            and core_rate >= REPRESENTATIVE_GATE.minimum_core_cell_coverage
+            and model_pass_rate >= MODEL_SUPPORT_GATE.minimum_epoch_pass_rate
+            and model_coverage >= MODEL_SUPPORT_GATE.minimum_core_cell_coverage
         )
-        gate_rows.append(
+        ticket_pass = (
+            issue_count >= minimum_issues[cohort]
+            and ticket_pass_rate
+            >= TICKET_OPERABILITY_GATE.minimum_epoch_pass_rate
+            and ticket_coverage
+            >= TICKET_OPERABILITY_GATE.minimum_ticket_eligible_coverage
+        )
+        model_rows.append(
             {
                 "cohort": cohort,
+                "representative_epoch_rule": REPRESENTATIVE_EPOCH_RULE,
                 "evaluated_issues": issue_count,
                 "required_issues": minimum_issues[cohort],
                 "evaluated_epochs": epoch_count,
-                "n7_passing_epochs": n7_pass,
-                "n7_epoch_pass_rate": pass_rate,
+                "model_n7_passing_epochs": model_n7_pass,
+                "model_n7_epoch_pass_rate": model_pass_rate,
                 "required_epoch_pass_rate": (
-                    REPRESENTATIVE_GATE.minimum_epoch_pass_rate
+                    MODEL_SUPPORT_GATE.minimum_epoch_pass_rate
+                ),
+                "candidate_matches": candidate,
+                "causal_core_complete_matches": core,
+                "model_core_coverage": model_coverage,
+                "required_model_core_coverage": (
+                    MODEL_SUPPORT_GATE.minimum_core_cell_coverage
+                ),
+                "cohort_model_gate_pass": model_pass,
+            }
+        )
+        ticket_rows.append(
+            {
+                "cohort": cohort,
+                "representative_epoch_rule": REPRESENTATIVE_EPOCH_RULE,
+                "evaluated_issues": issue_count,
+                "required_issues": minimum_issues[cohort],
+                "evaluated_epochs": epoch_count,
+                "ticket_n7_passing_epochs": ticket_n7_pass,
+                "ticket_n7_epoch_pass_rate": ticket_pass_rate,
+                "required_epoch_pass_rate": (
+                    TICKET_OPERABILITY_GATE.minimum_epoch_pass_rate
                 ),
                 "candidate_matches": candidate,
                 "strict_complete_eligible_matches": strict,
-                "strict_core_coverage": core_rate,
-                "required_core_coverage": (
-                    REPRESENTATIVE_GATE.minimum_core_cell_coverage
+                "ticket_eligible_coverage": ticket_coverage,
+                "required_ticket_eligible_coverage": (
+                    TICKET_OPERABILITY_GATE.minimum_ticket_eligible_coverage
                 ),
-                "cohort_gate_pass": cohort_pass,
+                "cohort_ticket_gate_pass": ticket_pass,
             }
         )
-    gate = pd.DataFrame(gate_rows)
+    model_gate = pd.DataFrame(model_rows)
+    ticket_gate = pd.DataFrame(ticket_rows)
     violations = {
         "post_epoch_market_observations": int(
             roster["post_epoch_market_violation"].sum()
@@ -980,26 +1037,76 @@ def _coverage_tables(
         ),
         "heldout_outcome_columns": 0,
     }
-    ready = bool(gate["cohort_gate_pass"].all()) and not any(violations.values())
+    model_gate_pass = bool(model_gate["cohort_model_gate_pass"].all())
+    ticket_gate_pass = bool(ticket_gate["cohort_ticket_gate_pass"].all())
+    ready = model_gate_pass and ticket_gate_pass and not any(violations.values())
+    activation = coverage[
+        coverage["cohort"].eq("prospective_post_activation")
+        & coverage["epoch_rule"].eq("PROSPECTIVE_ACTIVATION")
+    ]
+    if activation.empty:
+        prospective_activation = {
+            "issues": 0,
+            "evaluated_epochs": 0,
+            "candidate_matches": 0,
+            "causal_core_complete_matches": 0,
+            "model_core_coverage": 0.0,
+            "strict_complete_eligible_matches": 0,
+            "ticket_eligible_coverage": 0.0,
+        }
+    else:
+        row = activation.iloc[0]
+        prospective_activation = {
+            "issues": int(row["issues"]),
+            "evaluated_epochs": int(row["evaluated_epochs"]),
+            "candidate_matches": int(row["candidate_matches"]),
+            "causal_core_complete_matches": int(
+                row["causal_core_complete_matches"]
+            ),
+            "model_core_coverage": float(row["model_core_coverage"]),
+            "strict_complete_eligible_matches": int(
+                row["strict_complete_eligible_matches"]
+            ),
+            "ticket_eligible_coverage": float(
+                row["ticket_eligible_coverage"]
+            ),
+        }
     decision = {
         "disposition": (
             "READY_FOR_204" if ready else "BLOCKED_INSUFFICIENT_CAUSAL_SUPPORT"
         ),
-        "gate_id": REPRESENTATIVE_GATE.gate_id,
-        "gate": REPRESENTATIVE_GATE.as_dict(),
-        "cohort_results": gate.to_dict(orient="records"),
+        "representative_rule": {
+            "epoch_rule": REPRESENTATIVE_EPOCH_RULE,
+            "selection_rationale": REPRESENTATIVE_RULE_RATIONALE,
+            "controlling": True,
+            "sensitivity_rules_do_not_vote": True,
+        },
+        "model_learning_gate": MODEL_SUPPORT_GATE.as_dict(),
+        "ticket_operability_gate": TICKET_OPERABILITY_GATE.as_dict(),
+        "model_learning_results": model_gate.to_dict(orient="records"),
+        "ticket_operability_results": ticket_gate.to_dict(orient="records"),
+        "model_learning_gate_pass": model_gate_pass,
+        "ticket_operability_gate_pass": ticket_gate_pass,
+        "prospective_activation_sensitivity": prospective_activation,
         "violations": violations,
-        "blocking_facts": [] if ready else [
-            "No source supplies verified p34 sale-open and parlay-allowed state at decision epochs.",
-            "Historical named 1h/10h fields lack observation timestamps and remain diagnostic-only.",
-            "The prospective post-activation cohort has fewer than two evaluated issues.",
-        ],
+        "blocking_facts": {
+            "model_learning": [] if model_gate_pass else [
+                "Development has no timestamped causal EURO plus Beijing-SP core support at the representative epoch rule.",
+                "Historical named 1h/10h fields lack observation timestamps and remain diagnostic-only.",
+                "The prospective cohort is below the predeclared issue minimum at the representative rule.",
+                "Remediation alternatives are: obtain timestamped historical development support; accumulate a sufficient prospective training panel; or formally narrow #204 to a simpler or prospective-only design.",
+            ],
+            "ticket_operability": [] if ticket_gate_pass else [
+                "No source supplies verified p34 sale-open and parlay-allowed state at decision epochs.",
+                "Sale/parlay recovery can repair ticket operability, but cannot by itself create a causal historical model-learning panel.",
+            ],
+        },
         "authority": (
             "Data capability only; no model training, betting, ROI, release or "
             "execution authority. #204 remains blocked until PI accepts READY_FOR_204."
         ),
     }
-    return epoch_diagnostics, coverage, gate, decision
+    return epoch_diagnostics, coverage, model_gate, ticket_gate, decision
 
 
 def _assemble_frames(
@@ -1099,7 +1206,13 @@ def _assemble_frames(
     ].apply(_source_row_sha256, axis=1)
     roster["rejection_reason"] = roster.apply(_rejection_reason, axis=1)
     inference = _strict_inference_tables(roster, epochs)
-    epoch_diagnostics, coverage, gate, decision = _coverage_tables(roster, epochs)
+    (
+        epoch_diagnostics,
+        coverage,
+        model_gate,
+        ticket_gate,
+        decision,
+    ) = _coverage_tables(roster, epochs)
     selected_market_ids = set(
         roster.loc[selected_market, "market_snapshot_id"].astype("int64")
     )
@@ -1170,7 +1283,8 @@ def _assemble_frames(
         "inference": inference,
         "epoch_diagnostics": epoch_diagnostics,
         "coverage": coverage,
-        "gate": gate,
+        "model_gate": model_gate,
+        "ticket_gate": ticket_gate,
         "decision": decision,
     }
 
@@ -1366,7 +1480,12 @@ def _write_frozen_sources(
     _namespace_manifest(directory, "frozen_source_whitelists")
 
 
-def _write_analysis_figure(coverage: pd.DataFrame, path: Path) -> None:
+def _write_analysis_figure(
+    coverage: pd.DataFrame,
+    model_gate: pd.DataFrame,
+    ticket_gate: pd.DataFrame,
+    path: Path,
+) -> None:
     import matplotlib
 
     matplotlib.use("Agg")
@@ -1384,66 +1503,129 @@ def _write_analysis_figure(coverage: pd.DataFrame, path: Path) -> None:
         )
     ].copy()
     plotted["label"] = plotted["cohort"] + "\n" + plotted["epoch_rule"]
-    figure, axis = plt.subplots(figsize=(12, 6), constrained_layout=True)
+    figure, axes = plt.subplots(2, 1, figsize=(12, 10), constrained_layout=True)
+    axis = axes[0]
     positions = np.arange(len(plotted), dtype=float)
     axis.bar(
         positions - 0.18,
-        plotted["potential_core_rate"],
+        plotted["model_core_coverage"],
         width=0.36,
-        label="timestamped EURO+BJ-SP potential",
+        label="model-learning: timestamped EURO+BJ-SP core",
     )
     axis.bar(
         positions + 0.18,
-        plotted["strict_core_rate"],
+        plotted["ticket_eligible_coverage"],
         width=0.36,
-        label="strict sale+parlay eligible",
+        label="ticket-operability: strict sale+parlay eligible",
     )
     axis.axhline(
-        REPRESENTATIVE_GATE.minimum_core_cell_coverage,
+        MODEL_SUPPORT_GATE.minimum_core_cell_coverage,
         color="black",
         linestyle="--",
         linewidth=1,
-        label="predeclared support threshold",
+        label="predeclared 80% threshold",
     )
     axis.set_ylim(0, 1.05)
     axis.set_ylabel("matched causal core coverage")
     axis.set_xticks(positions, plotted["label"], rotation=65, ha="right", fontsize=7)
-    axis.set_title("#214 decision-epoch market/SP capability")
+    axis.set_title("Sensitivity by epoch rule (does not vote in controlling gate)")
     axis.legend(loc="upper left")
+    gate_axis = axes[1]
+    positions = np.arange(len(model_gate), dtype=float)
+    gate_axis.bar(
+        positions - 0.18,
+        model_gate["model_core_coverage"],
+        width=0.36,
+        label="model-learning support",
+    )
+    gate_axis.bar(
+        positions + 0.18,
+        ticket_gate["ticket_eligible_coverage"],
+        width=0.36,
+        label="ticket operability",
+    )
+    gate_axis.axhline(
+        MODEL_SUPPORT_GATE.minimum_core_cell_coverage,
+        color="black",
+        linestyle="--",
+        linewidth=1,
+        label="predeclared 80% threshold",
+    )
+    gate_axis.set_ylim(0, 1.05)
+    gate_axis.set_ylabel("representative-rule coverage")
+    gate_axis.set_xticks(positions, model_gate["cohort"], rotation=15, ha="right")
+    gate_axis.set_title(
+        f"Controlling rule: {REPRESENTATIVE_EPOCH_RULE} (one vote per issue)"
+    )
+    gate_axis.legend(loc="upper left")
     path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(path, dpi=150, metadata={"Software": "matplotlib"})
     plt.close(figure)
 
 
 def _decision_report(decision: dict[str, Any]) -> str:
-    rows = decision["cohort_results"]
+    model_rows = decision["model_learning_results"]
+    ticket_rows = decision["ticket_operability_results"]
+    sensitivity = decision["prospective_activation_sensitivity"]
     lines = [
         "# #214 decision-epoch market/SP capability",
         "",
         f"Disposition: **{decision['disposition']}**.",
         "",
-        "| cohort | evaluated issues | evaluated epochs | N7 epoch pass rate | strict core coverage | gate |",
+        f"Controlling representative rule: `{decision['representative_rule']['epoch_rule']}`.",
+        "All other rules are sensitivity evidence and do not vote in the gate.",
+        "",
+        "## Model-learning support gate",
+        "",
+        "| cohort | evaluated issues | evaluated epochs | N7 epoch pass rate | causal core coverage | gate |",
         "| --- | ---: | ---: | ---: | ---: | --- |",
     ]
-    for row in rows:
+    for row in model_rows:
         lines.append(
             "| {cohort} | {evaluated_issues} / {required_issues} | "
-            "{evaluated_epochs} | {n7_epoch_pass_rate:.2%} | "
-            "{strict_core_coverage:.2%} | {gate} |".format(
+            "{evaluated_epochs} | {model_n7_epoch_pass_rate:.2%} | "
+            "{model_core_coverage:.2%} | {gate} |".format(
                 **row,
-                gate="PASS" if row["cohort_gate_pass"] else "FAIL",
+                gate="PASS" if row["cohort_model_gate_pass"] else "FAIL",
             )
         )
     lines.extend(
         [
             "",
-            "The package distinguishes timestamped price availability from strict ticket eligibility. "
-            "p34 price observations exist, but the frozen source exposes neither verified sale-open "
-            "nor parlay-allowed state. Named historical 1h/10h fields are diagnostic-only because "
-            "they do not carry observation timestamps.",
+            "## Ticket-operability gate",
+            "",
+            "| cohort | evaluated issues | evaluated epochs | N7 epoch pass rate | ticket-eligible coverage | gate |",
+            "| --- | ---: | ---: | ---: | ---: | --- |",
+        ]
+    )
+    for row in ticket_rows:
+        lines.append(
+            "| {cohort} | {evaluated_issues} / {required_issues} | "
+            "{evaluated_epochs} | {ticket_n7_epoch_pass_rate:.2%} | "
+            "{ticket_eligible_coverage:.2%} | {gate} |".format(
+                **row,
+                gate="PASS" if row["cohort_ticket_gate_pass"] else "FAIL",
+            )
+        )
+    lines.extend(
+        [
+            "",
+            "The prospective activation sensitivity has "
+            f"{sensitivity['causal_core_complete_matches']} / "
+            f"{sensitivity['candidate_matches']} causal core matches "
+            f"({sensitivity['model_core_coverage']:.2%}); it is not the controlling rule.",
+            "",
+            "Model-learning is blocked independently: development lacks timestamped historical "
+            "EURO plus Beijing-SP support. The valid alternatives are to obtain timestamped "
+            "historical development support, accumulate a sufficient prospective training panel, "
+            "or formally narrow #204 to a simpler or prospective-only design.",
+            "",
+            "Ticket operability is also blocked because the frozen p34 source exposes neither "
+            "verified sale-open nor parlay-allowed state. Repairing sale/parlay evidence alone "
+            "does not create a causal historical training panel.",
             "",
             "#204 remains blocked. A future Data capability must capture p34 sale/parlay state and "
-            "immutable raw provenance at the same decision epochs, then satisfy the predeclared gate. "
+            "separately repair model-learning support under the controlling rule. "
             "This negative result grants no model, betting, ROI, release or execution authority.",
             "",
         ]
@@ -1464,7 +1646,12 @@ def _write_package_outputs(output: Path, assembled: dict[str, Any]) -> None:
     write_parquet(audit / "roster_capability.parquet", assembled["roster_capability"])
     write_csv(audit / "epoch_roster_diagnostics.csv", assembled["epoch_diagnostics"])
     write_csv(audit / "coverage_by_cohort_rule.csv", assembled["coverage"])
-    write_csv(audit / "representative_support_gate.csv", assembled["gate"])
+    write_csv(
+        audit / "representative_model_support_gate.csv", assembled["model_gate"]
+    )
+    write_csv(
+        audit / "ticket_operability_gate.csv", assembled["ticket_gate"]
+    )
     rejections = (
         assembled["roster_capability"]
         .groupby(
@@ -1505,13 +1692,23 @@ def _write_package_outputs(output: Path, assembled: dict[str, Any]) -> None:
     write_csv(audit / "source_census.csv", source_census)
     write_csv(output / "feature_dictionary.csv", _feature_dictionary())
     write_csv(output / "source_dictionary.csv", _source_dictionary())
-    write_json(output / "representative_support_gate.json", REPRESENTATIVE_GATE.as_dict())
+    write_json(
+        output / "representative_model_support_gate.json",
+        MODEL_SUPPORT_GATE.as_dict(),
+    )
+    write_json(
+        output / "ticket_operability_gate.json",
+        TICKET_OPERABILITY_GATE.as_dict(),
+    )
     write_json(analysis / "decision.json", assembled["decision"])
     (analysis / "DECISION_REPORT.md").write_text(
         _decision_report(assembled["decision"]), encoding="utf-8", newline="\n"
     )
     _write_analysis_figure(
-        assembled["coverage"], analysis / "decision_epoch_coverage.png"
+        assembled["coverage"],
+        assembled["model_gate"],
+        assembled["ticket_gate"],
+        analysis / "decision_epoch_coverage.png",
     )
     schema = {
         "contract_version": CONTRACT_VERSION,
@@ -1520,6 +1717,8 @@ def _write_package_outputs(output: Path, assembled: dict[str, Any]) -> None:
         "outcome_order": list(OUTCOME_ORDER),
         "feature_order": list(FEATURE_NAMES),
         "epoch_rules": list(EPOCH_RULES),
+        "controlling_representative_epoch_rule": REPRESENTATIVE_EPOCH_RULE,
+        "representative_rule_rationale": REPRESENTATIVE_RULE_RATIONALE,
         "cohorts": list(COHORTS),
         "strict_roster_definition": (
             "identity observed by t AND kickoff after t AND sale_status=open "
@@ -1546,6 +1745,12 @@ they lack observation timestamps. They are not unmasked by this package. The
 retrospective held-out cohort preserves the #203 model-unseen/label-embargoed claim;
 it is not described as organization-wide untouched. The prospective cohort begins
 at `{ACTIVATION_UTC}` and contains no outcome namespace.
+
+The controlling representative rule is `{REPRESENTATIVE_EPOCH_RULE}`, selected by
+a schedule-only ten-hour planning criterion. Other epoch rules are sensitivity
+evidence only. Model-learning support and ticket operability are separate gates:
+sale/parlay recovery cannot substitute for missing timestamped historical training
+support.
 
 Disposition: **{assembled['decision']['disposition']}**. #204 remains blocked unless
 PI accepts `READY_FOR_204`. This package trains no model, ranks no bet, computes no
@@ -1717,7 +1922,11 @@ def _verify_source_bound_outputs(output: Path) -> dict[str, Any]:
     for relative, frame in (
         ("audit/epoch_roster_diagnostics.csv", expected["epoch_diagnostics"]),
         ("audit/coverage_by_cohort_rule.csv", expected["coverage"]),
-        ("audit/representative_support_gate.csv", expected["gate"]),
+        (
+            "audit/representative_model_support_gate.csv",
+            expected["model_gate"],
+        ),
+        ("audit/ticket_operability_gate.csv", expected["ticket_gate"]),
     ):
         actual = pd.read_csv(output / relative, keep_default_na=False)
         expected_csv = pd.read_csv(
