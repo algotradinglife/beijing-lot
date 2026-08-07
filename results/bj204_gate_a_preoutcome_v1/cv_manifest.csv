@@ -1,0 +1,4 @@
+fold_id,train_years,validation_year,test_year,test_labels_opened,selection_rule
+EXPANDING_OOS_2021,2019;2020,2021,2024,False,select only from development expanding folds
+EXPANDING_OOS_2022,2019;2020;2021,2022,2024,False,select only from development expanding folds
+EXPANDING_OOS_2023,2019;2020;2021;2022,2023,2024,False,select only from development expanding folds

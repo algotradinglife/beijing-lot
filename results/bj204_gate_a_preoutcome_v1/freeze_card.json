@@ -1,0 +1,143 @@
+{
+  "chronology": {
+    "cv_validation_years": [
+      2021,
+      2022,
+      2023
+    ],
+    "development_issue_count": 270,
+    "development_years": [
+      2019,
+      2020,
+      2021,
+      2022,
+      2023
+    ],
+    "embargoed_issue_count": 65,
+    "embargoed_start_year": 2025,
+    "retrospective_test_issue_count": 59,
+    "retrospective_test_year": 2024,
+    "test_boundary": "2024-01-01 through the exact issue preceding #203's 2025-04 embargo"
+  },
+  "contract_version": "bj204-market-anchored-model-gate-a-v1",
+  "environment": {
+    "matplotlib": "3.10.9",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "pyarrow": "24.0.0",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.17.1"
+  },
+  "fallback": {
+    "acceptance": "all three finite unmasked values sum to one within 2e-6",
+    "fallback_metric_reporting": "report pure baseline, model-only and fallback-mixed separately",
+    "market_vector": "calibrated_market_probability",
+    "on_acceptance": "emit the frozen market vector byte-for-byte after float32 load",
+    "on_rejection": "emit explicit NO_BET_FROZEN; never emit a learned vector",
+    "rule_id": "BJ204_MARKET_OR_NO_BET_V1"
+  },
+  "issue": 204,
+  "metrics": [
+    "multiclass_log_loss",
+    "brier_score",
+    "ece_equal_mass",
+    "top1_coverage",
+    "top2_coverage",
+    "predicted_sp_mae",
+    "fallback_coverage",
+    "ood_coverage"
+  ],
+  "models": [
+    {
+      "id": "MARKET_ONLY",
+      "implementation": "frozen calibrated_market_probability",
+      "role": "incumbent and exact safe fallback"
+    },
+    {
+      "id": "LOGISTIC_RESIDUAL",
+      "implementation": "sklearn.linear_model.LogisticRegression",
+      "role": "complexity-matched multinomial residual control"
+    },
+    {
+      "id": "HIST_GRADIENT_RESIDUAL",
+      "implementation": "sklearn.ensemble.HistGradientBoostingClassifier",
+      "role": "shallow nonlinear residual control"
+    },
+    {
+      "id": "SET_ENCODER_RESIDUAL",
+      "implementation": "PyTorch Deep Sets / Set Transformer only after controls",
+      "role": "candidate issue-context residual; not trained in Gate A"
+    }
+  ],
+  "promotion_authorized": false,
+  "schema": {
+    "market_baseline_feature": "calibrated_market_probability",
+    "mask_features": [
+      "calibrated_market_probability",
+      "devig_euro_probability",
+      "euro_1h_odds",
+      "fundamental_probability",
+      "probability_residual",
+      "probability_residual_z",
+      "predicted_final_sp",
+      "native_handicap_line",
+      "line_residual_mu",
+      "line_residual_z",
+      "market_uncertainty",
+      "market_signature_breadth",
+      "market_signature_dispersion",
+      "history_training_rows_log1p",
+      "min_history_n_log1p",
+      "league_index",
+      "home_team_index",
+      "away_team_index",
+      "kickoff_delay_hours",
+      "match_position_fraction"
+    ],
+    "model_features": [
+      "calibrated_market_probability",
+      "devig_euro_probability",
+      "euro_1h_odds",
+      "fundamental_probability",
+      "probability_residual",
+      "probability_residual_z",
+      "predicted_final_sp",
+      "native_handicap_line",
+      "line_residual_mu",
+      "line_residual_z",
+      "market_uncertainty",
+      "market_signature_breadth",
+      "market_signature_dispersion",
+      "history_training_rows_log1p",
+      "min_history_n_log1p",
+      "league_index",
+      "home_team_index",
+      "away_team_index",
+      "kickoff_delay_hours",
+      "match_position_fraction"
+    ],
+    "outcome_axis": [
+      "3",
+      "1",
+      "0"
+    ],
+    "ragged_shape": "X_i[J_i,3,F]",
+    "sp_target": "pre-event predicted_final_sp only; no observed/final SP feature"
+  },
+  "scope": "Historical exploratory PoC only; no ticket, ROI, betting, release, production, #205, or #210 action.",
+  "seeds": [
+    204001,
+    204002,
+    204003
+  ],
+  "source": {
+    "inference_manifest_sha256": "c915c6e628b4ebfe389ab31fd3709561440892ede711f2c4472395454dfb28ef",
+    "labels_opened": false,
+    "package": "results/bj203_causal_tensor_v2",
+    "package_sha256s": "b65182310cc19d5fc682c757aebc6de764a1cf98662fd559aaedf4db25a10090",
+    "source_contract": "bj203-causal-tensor-v2",
+    "source_manifest_files": 28
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_PREREGISTRATION",
+  "test_opening_rule": "The 2024 label namespace may be opened exactly once only by a Gate-B runner after this Gate-A package is accepted unchanged."
+}

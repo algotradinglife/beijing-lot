@@ -7,7 +7,7 @@ tags:
   - research
   - moc
 status: active
-updated: 2026-08-06
+updated: 2026-08-07
 ---
 
 # Beijing-lot Research Wiki
@@ -56,6 +56,10 @@ updated: 2026-08-06
    `3159431d91dda7dfb23ea7dbe4daa42a5411f7e52616e50bb31f04722c17ebe4`，终局是
    `NO_PROMOTION`。正 ROI 或较低回撤均不能单独构成策略授权。详见
    [[Issue-192-N7-Strategy-Ensemble|Issue #192 N7 多策略组合与资金分配]]。
+9. **统一概率模型进入受限的历史 PoC 预注册阶段。** #204 Gate A 只冻结 2019–2023
+   开发、逐年 expanding CV 与 2024 一次性 retrospective test；2025-04+ 继续保留给
+   #210，不能被本实验读取。市场概率是强制的 byte-stable fallback；缺失、OOD 或校准失败时
+   只能回退至该基线或 `NO_BET_FROZEN`。Gate A 不读取任何标签，因此没有模型优越性或策略授权结论。
 
 ## 近期 N7 策略结论（2026-08-02）
 
