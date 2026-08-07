@@ -1,8 +1,9 @@
 """Outcome-unexposed Track-A contract for Issue #204.
 
-The contract deliberately separates a preregistered 2024 retrospective test
-from the 2025-04+ namespace reserved for #210.  It contains no label-loading
-helpers: opening labels is a separate, explicit Gate-B operation.
+The contract is ordered by BJ issue identity, rather than calendar year.  That
+is material here: 25043--25125 and 26011--26049 are the one-shot retrospective
+window, while 26051+ remains reserved for #210.  This module intentionally has
+no label-loading helper; official final-SP is a Gate-B-only target.
 """
 
 from __future__ import annotations
@@ -10,13 +11,15 @@ from __future__ import annotations
 from typing import Final
 
 
-CONTRACT_VERSION: Final = "bj204-market-anchored-model-gate-a-v1"
+CONTRACT_VERSION: Final = "bj204-market-anchored-model-gate-a-v2"
 UPSTREAM_CONTRACT_VERSION: Final = "bj203-causal-tensor-v2"
 SOURCE_PACKAGE: Final = "results/bj203_causal_tensor_v2"
 
-DEVELOPMENT_YEARS: Final = (2019, 2020, 2021, 2022, 2023)
-RETROSPECTIVE_TEST_YEAR: Final = 2024
-EMBARGO_START_YEAR: Final = 2025
+# The prior year-based wording incorrectly treated early 2025 development
+# issues as embargoed and omitted the 75-issue retrospective archive.
+DEVELOPMENT_ISSUE_MAX: Final = 25042
+RETROSPECTIVE_TEST_RANGES: Final = ((25043, 25125), (26011, 26049))
+RESERVE_ISSUE_MIN: Final = 26051
 CV_VALIDATION_YEARS: Final = (2021, 2022, 2023)
 SEEDS: Final = (204001, 204002, 204003)
 
@@ -45,6 +48,19 @@ MODEL_FEATURES: Final = (
     "kickoff_delay_hours",
     "match_position_fraction",
 )
+
+# ``predicted_final_sp`` is an outcome-unexposed input proxy.  It is never the
+# supervised SP target.  The actual target is official final SP (3/1/0) and is
+# unavailable to Gate A behind this target-only quality mask.
+SP_TARGET: Final = {
+    "target_id": "OFFICIAL_FINAL_SP_3_1_0",
+    "field": "final_sp",
+    "outcome_axis": ["3", "1", "0"],
+    "quality_mask": "TARGET_ONLY_OFFICIAL_3SP_NOT_OPENED_GATE_A",
+    "availability": "Gate-B only; no target values or target masks are loaded in Gate A",
+}
+
+PROXY_GRADE: Final = "RETROSPECTIVE_PROXY"
 
 MARKET_BASELINE_FEATURE: Final = "calibrated_market_probability"
 FALLBACK_RULE: Final = {

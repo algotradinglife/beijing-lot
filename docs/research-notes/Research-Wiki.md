@@ -56,10 +56,13 @@ updated: 2026-08-07
    `3159431d91dda7dfb23ea7dbe4daa42a5411f7e52616e50bb31f04722c17ebe4`，终局是
    `NO_PROMOTION`。正 ROI 或较低回撤均不能单独构成策略授权。详见
    [[Issue-192-N7-Strategy-Ensemble|Issue #192 N7 多策略组合与资金分配]]。
-9. **统一概率模型进入受限的历史 PoC 预注册阶段。** #204 Gate A 只冻结 2019–2023
-   开发、逐年 expanding CV 与 2024 一次性 retrospective test；2025-04+ 继续保留给
-   #210，不能被本实验读取。市场概率是强制的 byte-stable fallback；缺失、OOD 或校准失败时
-   只能回退至该基线或 `NO_BET_FROZEN`。Gate A 不读取任何标签，因此没有模型优越性或策略授权结论。
+9. **统一概率模型的历史 PoC 采用按期次冻结的边界。** #204 Gate A v2 的开发／CV 止于
+   `25042`；一次性回顾测试是 `25043–25125` 与 `26011–26049` 共 75 期，使用明确标为
+   `RETROSPECTIVE_PROXY` 的赛前欧赔面板；`26051+` 完整保留给 #210。`predicted_final_sp`
+   只是赛前输入代理，监督目标必须是官方 3/1/0 `final_sp`，且该标签与其更新时间均未在 Gate A
+   读取。官方全 3SP 覆盖／赛后更新时间只作为 target-only 质量普查保存，不能把代理面板描述成
+   live snapshot。市场概率仍是强制 fallback：缺失、OOD 或校准失败时只能回退至有效市场向量或
+   `NO_BET_FROZEN`。Gate A 不产生模型优越性或策略授权结论。
 
 ## 近期 N7 策略结论（2026-08-02）
 

@@ -6,8 +6,10 @@ from hashlib import sha256
 import importlib.metadata
 import json
 from pathlib import Path
+import sqlite3
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
 from unified_tensor.contract import FEATURE_NAMES
@@ -16,22 +18,38 @@ from unified_tensor.inference import TensorContractError, load_issue_tensors
 from .contract import (
     CONTRACT_VERSION,
     CV_VALIDATION_YEARS,
-    DEVELOPMENT_YEARS,
-    EMBARGO_START_YEAR,
+    DEVELOPMENT_ISSUE_MAX,
     FALLBACK_RULE,
     MARKET_BASELINE_FEATURE,
     METRICS,
     MODEL_FAMILIES,
     MODEL_FEATURES,
-    RETROSPECTIVE_TEST_YEAR,
+    PROXY_GRADE,
+    RESERVE_ISSUE_MIN,
+    RETROSPECTIVE_TEST_RANGES,
     SEEDS,
     SOURCE_PACKAGE,
+    SP_TARGET,
     UPSTREAM_CONTRACT_VERSION,
 )
 
 
 class GateAError(RuntimeError):
     """Raised if an input boundary or frozen Gate-A output is invalid."""
+
+
+HISTORY_COLUMNS = (
+    "issue", "match_idx", "league", "kickoff_ts", "handicap_line",
+    "avg_eu_home", "avg_eu_draw", "avg_eu_away",
+)
+LABEL_ONLY_QUALITY = (
+    # Counts are source-census metadata independently supplied by the PI.  They
+    # are deliberately not read from the official settlement source in Gate A.
+    {"period": "25043-25125", "history_rows": 11382, "official_3sp_rows": 11314,
+     "post_kickoff_updates": 8247},
+    {"period": "26011-26049", "history_rows": 5608, "official_3sp_rows": 5539,
+     "post_kickoff_updates": 4516},
+)
 
 
 def digest(path: Path) -> str:
@@ -56,6 +74,17 @@ def write_csv(path: Path, frame: pd.DataFrame) -> None:
     frame.to_csv(path, index=False, lineterminator="\n", float_format="%.12g")
 
 
+def _issue_number(values: pd.Series) -> pd.Series:
+    parsed = pd.to_numeric(values.astype(str), errors="raise").astype(int)
+    if (parsed <= 0).any():
+        raise GateAError("issue identity must be a positive integer")
+    return parsed
+
+
+def _is_test_issue(issue: int) -> bool:
+    return any(lower <= issue <= upper for lower, upper in RETROSPECTIVE_TEST_RANGES)
+
+
 def _package_source_manifest(package: Path) -> dict[str, Any]:
     manifest_path = package / "SHA256SUMS.json"
     if not manifest_path.is_file():
@@ -70,85 +99,228 @@ def _package_source_manifest(package: Path) -> dict[str, Any]:
 
 
 def _validate_source(package: Path) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """Verify #203 inference through its public outcome-unexposed loader."""
+    """Verify only the public #203 inference namespace, never labels."""
 
     if package.name != "bj203_causal_tensor_v2":
         raise GateAError("Gate A only accepts the frozen #203 v2 source package")
     try:
-        # This validates the complete inference manifest without importing the
-        # label loader.  One issue keeps the bounded Gate-A validation small.
         tensors = load_issue_tensors(package, issues=("190101",))
     except TensorContractError as exc:
         raise GateAError(f"#203 inference verification failed: {exc}") from exc
     if len(tensors) != 1:
         raise GateAError("#203 source sentinel issue is unavailable")
-    inference = package / "inference"
-    identity = pd.read_parquet(inference / "cell_identity.parquet")
     if set(MODEL_FEATURES).difference(FEATURE_NAMES):
         raise GateAError("frozen model schema requests a non-#203 feature")
+    identity = pd.read_parquet(
+        package / "inference" / "cell_identity.parquet",
+        columns=["issue_instance", "issue", "year", "issue_order",
+                 "feature_cutoff_ts_utc", "kickoff_ts_utc"],
+    )
     return identity, _package_source_manifest(package)
 
 
-def _split_rows(identity: pd.DataFrame) -> pd.DataFrame:
-    columns = [
-        "issue_instance", "issue", "year", "issue_order",
-        "feature_cutoff_ts_utc", "kickoff_ts_utc", "split",
-    ]
+def _read_history_proxy(history_source: Path) -> pd.DataFrame:
+    """Read an explicit allow-list of pre-event proxy columns only.
+
+    The history database contains outcome fields, but this query does not
+    select, predicate on, or derive any of them.  It is therefore safe for
+    Gate A while honestly grading the retained odds as retrospective proxies.
+    """
+
+    if not history_source.is_file():
+        raise GateAError(f"history proxy source is absent: {history_source}")
+    ranges = " OR ".join(
+        f"(CAST(issue AS INTEGER) BETWEEN {lower} AND {upper})"
+        for lower, upper in RETROSPECTIVE_TEST_RANGES
+    )
+    query = (
+        "SELECT issue, match_idx, league, kickoff_ts, handicap_line, "
+        "avg_eu_home, avg_eu_draw, avg_eu_away FROM historical_matches WHERE " + ranges
+    )
+    with sqlite3.connect(f"file:{history_source.resolve()}?mode=ro", uri=True) as connection:
+        frame = pd.read_sql_query(query, connection)
+    if tuple(frame.columns) != HISTORY_COLUMNS:
+        raise GateAError("history proxy schema drift")
+    frame["issue"] = frame["issue"].astype(str)
+    frame["issue_num"] = _issue_number(frame["issue"])
+    frame["match_idx"] = pd.to_numeric(frame["match_idx"], errors="raise").astype(int)
+    if bool(frame[["issue", "match_idx"]].duplicated().any()):
+        raise GateAError("history proxy identities are not unique")
+    if not frame["issue_num"].map(_is_test_issue).all():
+        raise GateAError("history proxy escaped frozen test ranges")
+    return frame.sort_values(["issue_num", "match_idx"], kind="mergesort").reset_index(drop=True)
+
+
+def _proxy_panel(history: pd.DataFrame) -> pd.DataFrame:
+    values = history.loc[:, list(HISTORY_COLUMNS)].copy()
+    odds = values[["avg_eu_home", "avg_eu_draw", "avg_eu_away"]].apply(
+        pd.to_numeric, errors="coerce"
+    )
+    inverse = 1.0 / odds
+    complete = odds.gt(0).all(axis=1) & np.isfinite(inverse).all(axis=1)
+    normalizer = inverse.sum(axis=1)
+    probabilities = inverse.div(normalizer.where(complete), axis=0)
+    values["source_grade"] = PROXY_GRADE
+    values["market_proxy_complete"] = complete.astype(bool)
+    values["baseline_proxy_eligible"] = complete.astype(bool)
+    values["model_proxy_eligible"] = complete.astype(bool)
+    values["fallback_no_bet"] = (~complete).astype(bool)
+    values["proxy_probability_3"] = probabilities.iloc[:, 0]
+    values["proxy_probability_1"] = probabilities.iloc[:, 1]
+    values["proxy_probability_0"] = probabilities.iloc[:, 2]
+    values["target_available_gate_a"] = False
+    values["target_quality_mask"] = SP_TARGET["quality_mask"]
+    return values
+
+
+def _issue_reconciliation(identity: pd.DataFrame, history: pd.DataFrame, proxy: pd.DataFrame) -> pd.DataFrame:
+    """Publish source identity and missing-source reasons for every frozen issue."""
+
+    inference = identity.copy()
+    inference["issue"] = inference["issue"].astype(str)
+    inference["issue_num"] = _issue_number(inference["issue"])
+    inference_counts = inference.groupby("issue", sort=True).size().rename("inference_cell_rows")
+    history_counts = history.groupby("issue", sort=True).size().rename("history_rows")
+    proxy_counts = proxy.groupby("issue", sort=True)["market_proxy_complete"].sum().rename("complete_proxy_rows")
+    issues = sorted(set(history_counts.index) | set(
+        inference.loc[inference["issue_num"].le(DEVELOPMENT_ISSUE_MAX), "issue"].unique()
+    ), key=int)
+    rows: list[dict[str, Any]] = []
+    for issue in issues:
+        issue_num = int(issue)
+        historical = int(history_counts.get(issue, 0))
+        if issue_num <= DEVELOPMENT_ISSUE_MAX:
+            role = "DEVELOPMENT_CV"
+            source_status = "UPSTREAM_203_INFERENCE"
+            missing_reason = ""
+        elif _is_test_issue(issue_num):
+            role = "RETROSPECTIVE_TEST_LOCKED"
+            source_status = "RETROSPECTIVE_PROXY_HISTORY"
+            if issue_num <= 25125:
+                missing_reason = "UPSTREAM_203_INFERENCE_ABSENT; HISTORY_PROXY_ONLY"
+            else:
+                missing_reason = "RETROSPECTIVE_PROXY_REQUIRED; INFERENCE_AUXILIARY_ONLY"
+        else:  # Defensive; the issue union above must not produce this branch.
+            raise GateAError(f"reconciliation issue outside frozen boundary: {issue}")
+        rows.append({
+            "issue": issue,
+            "role": role,
+            "history_rows": historical,
+            "complete_proxy_rows": int(proxy_counts.get(issue, 0)),
+            "inference_cell_rows": int(inference_counts.get(issue, 0)),
+            "source_status": source_status,
+            "missing_reason": missing_reason,
+            "labels_opened": False,
+            "target_quality_mask": SP_TARGET["quality_mask"],
+        })
+    result = pd.DataFrame(rows)
+    if int(result.loc[result["role"].eq("RETROSPECTIVE_TEST_LOCKED"), "history_rows"].sum()) != 16990:
+        raise GateAError("frozen 75-issue retrospective history census drift")
+    if int(result["role"].eq("RETROSPECTIVE_TEST_LOCKED").sum()) != 75:
+        raise GateAError("frozen retrospective issue census drift")
+    return result
+
+
+def _split_rows(identity: pd.DataFrame, history: pd.DataFrame) -> pd.DataFrame:
+    inference = identity.copy()
+    inference["issue"] = inference["issue"].astype(str)
+    inference["issue_num"] = _issue_number(inference["issue"])
+    development = inference.loc[inference["issue_num"].le(DEVELOPMENT_ISSUE_MAX)].copy()
     matches = (
-        identity.loc[:, columns]
+        development.loc[:, ["issue_instance", "issue", "year", "issue_order",
+                            "feature_cutoff_ts_utc", "kickoff_ts_utc"]]
         .drop_duplicates("issue_instance")
-        .sort_values(["year", "issue_order", "issue_instance"], kind="mergesort")
+        .sort_values(["issue_order", "issue_instance"], kind="mergesort")
         .reset_index(drop=True)
     )
-    matches["year"] = pd.to_numeric(matches["year"], errors="raise").astype(int)
     if not matches["issue_instance"].is_unique:
         raise GateAError("#203 issue identity is not unique")
-
-    def role(year: int) -> str:
-        if year in DEVELOPMENT_YEARS:
-            return "DEVELOPMENT"
-        if year == RETROSPECTIVE_TEST_YEAR:
-            return "RETROSPECTIVE_TEST_LOCKED"
-        if year >= EMBARGO_START_YEAR:
-            return "EMBARGOED_FOR_210"
-        raise GateAError(f"unexpected source year {year}")
-
-    matches["role"] = matches["year"].map(role)
+    matches["role"] = "DEVELOPMENT_CV"
     matches["labels_permitted_gate_a"] = False
-    matches["labels_permitted_gate_b"] = matches["role"].eq("RETROSPECTIVE_TEST_LOCKED")
+    matches["labels_permitted_gate_b"] = False
     matches["feature_namespace"] = "outcome_unexposed_inference"
-    return matches
+    test = (
+        history[["issue", "issue_num", "kickoff_ts"]].drop_duplicates("issue")
+        .sort_values("issue_num", kind="mergesort")
+        .reset_index(drop=True)
+    )
+    test_rows = pd.DataFrame({
+        "issue_instance": "RETROSPECTIVE_PROXY_" + test["issue"].astype(str),
+        "issue": test["issue"].astype(str),
+        "year": pd.to_datetime(test["kickoff_ts"], errors="coerce", utc=True).dt.year.astype("Int64"),
+        "issue_order": np.arange(len(matches), len(matches) + len(test), dtype=int),
+        "feature_cutoff_ts_utc": pd.NA,
+        "kickoff_ts_utc": test["kickoff_ts"],
+        "role": "RETROSPECTIVE_TEST_LOCKED",
+        "labels_permitted_gate_a": False,
+        "labels_permitted_gate_b": True,
+        "feature_namespace": "retrospective_proxy_outcome_unexposed",
+    })
+    result = pd.concat([matches, test_rows], ignore_index=True)
+    if not result["labels_permitted_gate_a"].eq(False).all():
+        raise GateAError("Gate A split leaks labels")
+    return result
 
 
 def _cv_manifest(splits: pd.DataFrame) -> pd.DataFrame:
+    development = splits.loc[splits["role"].eq("DEVELOPMENT_CV")].copy()
+    years = sorted(pd.to_numeric(development["year"], errors="raise").astype(int).unique())
     rows: list[dict[str, Any]] = []
     for validation_year in CV_VALIDATION_YEARS:
-        train_years = [year for year in DEVELOPMENT_YEARS if year < validation_year]
-        if len(train_years) < 2:
-            raise GateAError("expanding CV requires at least two prior years")
+        train_years = [year for year in years if year < validation_year]
+        if len(train_years) < 2 or validation_year not in years:
+            continue
         rows.append({
             "fold_id": f"EXPANDING_OOS_{validation_year}",
             "train_years": ";".join(map(str, train_years)),
             "validation_year": validation_year,
-            "test_year": RETROSPECTIVE_TEST_YEAR,
+            "test_issue_boundary": "25043-26049",
             "test_labels_opened": False,
-            "selection_rule": "select only from development expanding folds",
+            "selection_rule": "select only from development expanding folds through issue 25042",
         })
+    if not rows:
+        raise GateAError("no valid development expanding folds")
     return pd.DataFrame(rows)
 
 
 def _environment() -> dict[str, str]:
     packages = ("numpy", "pandas", "pyarrow", "scikit-learn", "scipy", "matplotlib")
-    return {
-        package: importlib.metadata.version(package)
-        for package in packages
-    }
+    return {package: importlib.metadata.version(package) for package in packages}
 
 
-def _build_card(source: Path, source_manifest: dict[str, Any], splits: pd.DataFrame) -> dict[str, Any]:
-    development = splits.loc[splits["role"].eq("DEVELOPMENT")]
+def _coverage(proxy: pd.DataFrame) -> pd.DataFrame:
+    proxy = proxy.copy()
+    issue_num = _issue_number(proxy["issue"])
+    period = np.where(issue_num.le(25125), "25043-25125", "26011-26049")
+    proxy["period"] = period
+    result = (
+        proxy.groupby("period", sort=True)
+        .agg(
+            issues=("issue", "nunique"),
+            rows=("issue", "size"),
+            baseline_proxy_rows=("baseline_proxy_eligible", "sum"),
+            model_proxy_rows=("model_proxy_eligible", "sum"),
+            fallback_no_bet_rows=("fallback_no_bet", "sum"),
+        )
+        .reset_index()
+    )
+    for prefix in ("baseline_proxy", "model_proxy", "fallback_no_bet"):
+        result[f"{prefix}_coverage"] = result[f"{prefix}_rows"] / result["rows"]
+    result["source_grade"] = PROXY_GRADE
+    result["labels_opened"] = False
+    return result
+
+
+def _build_card(
+    source: Path,
+    source_manifest: dict[str, Any],
+    history_source: Path,
+    splits: pd.DataFrame,
+    reconciliation: pd.DataFrame,
+    coverage: pd.DataFrame,
+) -> dict[str, Any]:
+    development = splits.loc[splits["role"].eq("DEVELOPMENT_CV")]
     test = splits.loc[splits["role"].eq("RETROSPECTIVE_TEST_LOCKED")]
-    embargoed = splits.loc[splits["role"].eq("EMBARGOED_FOR_210")]
     return {
         "issue": 204,
         "stage": "GATE_A_OUTCOME_UNEXPOSED_PREREGISTRATION",
@@ -159,16 +331,20 @@ def _build_card(source: Path, source_manifest: dict[str, Any], splits: pd.DataFr
             "inference_manifest_sha256": digest(source / "inference" / "MANIFEST.json"),
             "source_manifest_files": len(source_manifest),
             "source_contract": UPSTREAM_CONTRACT_VERSION,
+            "history_proxy_source": "data/beidan_history.db",
+            "history_proxy_sha256": digest(history_source),
+            "history_proxy_columns_allowlist": list(HISTORY_COLUMNS),
             "labels_opened": False,
         },
         "chronology": {
-            "development_years": list(DEVELOPMENT_YEARS),
-            "retrospective_test_year": RETROSPECTIVE_TEST_YEAR,
-            "test_boundary": "2024-01-01 through the exact issue preceding #203's 2025-04 embargo",
-            "embargoed_start_year": EMBARGO_START_YEAR,
-            "embargoed_issue_count": int(len(embargoed)),
-            "development_issue_count": int(len(development)),
-            "retrospective_test_issue_count": int(len(test)),
+            "development_cv_through_issue": DEVELOPMENT_ISSUE_MAX,
+            "retrospective_test_issue_ranges": [list(item) for item in RETROSPECTIVE_TEST_RANGES],
+            "reserve_for_210_from_issue": RESERVE_ISSUE_MIN,
+            "development_issue_count": int(development["issue"].nunique()),
+            "retrospective_test_issue_count": int(test["issue"].nunique()),
+            "retrospective_test_history_rows": int(reconciliation.loc[
+                reconciliation["role"].eq("RETROSPECTIVE_TEST_LOCKED"), "history_rows"
+            ].sum()),
             "cv_validation_years": list(CV_VALIDATION_YEARS),
         },
         "schema": {
@@ -177,14 +353,27 @@ def _build_card(source: Path, source_manifest: dict[str, Any], splits: pd.DataFr
             "model_features": list(MODEL_FEATURES),
             "mask_features": list(MODEL_FEATURES),
             "market_baseline_feature": MARKET_BASELINE_FEATURE,
-            "sp_target": "pre-event predicted_final_sp only; no observed/final SP feature",
+            "predicted_final_sp_semantics": "outcome-unexposed pre-event proxy input only",
+            "sp_target": SP_TARGET,
+        },
+        "proxy_panel": {
+            "grade": PROXY_GRADE,
+            "coverage_file": "proxy_coverage_by_period.csv",
+            "panel_file": "retrospective_proxy_panel.csv",
+            "baseline_model_fallback_coverage": coverage.to_dict(orient="records"),
+            "limitation": "retrospective proxy only; no source timestamp proves a live pre-event capture",
+        },
+        "target_only_quality": {
+            "file": "target_only_quality_mask.csv",
+            "rows": list(LABEL_ONLY_QUALITY),
+            "rule": "official final-SP values and update timestamps are never read in Gate A",
         },
         "models": list(MODEL_FAMILIES),
         "fallback": FALLBACK_RULE,
         "metrics": list(METRICS),
         "seeds": list(SEEDS),
         "environment": _environment(),
-        "test_opening_rule": "The 2024 label namespace may be opened exactly once only by a Gate-B runner after this Gate-A package is accepted unchanged.",
+        "test_opening_rule": "The 25043-26049 target namespace may be opened exactly once only by a Gate-B runner after PI accepts this exact package unchanged.",
         "promotion_authorized": False,
         "scope": "Historical exploratory PoC only; no ticket, ROI, betting, release, production, #205, or #210 action.",
     }
@@ -192,45 +381,47 @@ def _build_card(source: Path, source_manifest: dict[str, Any], splits: pd.DataFr
 
 def _readme(card: dict[str, Any]) -> str:
     chronology = card["chronology"]
-    return f"""# #204 Gate A — market-anchored residual model preregistration
+    return f"""# #204 Gate A v2 — market-anchored residual model preregistration
 
-This is an immutable **outcome-unexposed** Track-A contract.  It verifies and
-uses only the #203 inference namespace.  It does not import, open, copy or
-emit development or retrospective settlement labels.
+This immutable package is **outcome-unexposed**.  It uses the #203 inference
+namespace only for development/CV through issue `{chronology['development_cv_through_issue']}`.
+The one-shot retrospective window is `25043–25125` plus `26011–26049`; it is
+represented by a clearly graded `{PROXY_GRADE}` market panel.  Issues `26051+`
+remain reserved for #210.
 
-* Development: {chronology['development_years']}
-* Frozen one-shot retrospective test: {chronology['retrospective_test_year']}
-* Embargoed for #210: {chronology['embargoed_start_year']} onward
-* Candidate models: market-only, logistic residual, shallow gradient residual,
-  then a set-context residual only if the controls justify it.
+`predicted_final_sp` is a pre-event proxy input, not a target.  The supervised
+SP target is the official 3/1/0 final-SP vector under
+`{SP_TARGET['quality_mask']}` and is not opened here.  The target-only census
+records the known post-kickoff update prevalence precisely to prevent a
+retrospective proxy from being misrepresented as a live capture.
 
-The hard action gate is `{FALLBACK_RULE['rule_id']}`: an incomplete, nonfinite,
-out-of-distribution or failed-calibration row reproduces the frozen market
-baseline where it is valid, otherwise it is `NO_BET_FROZEN`.
-
-No historical result authorizes betting, production, release or downstream
-#205 work.  Gate B requires PI acceptance of this exact package.
+The hard action gate is `{FALLBACK_RULE['rule_id']}`: an incomplete/nonfinite
+proxy row uses a valid frozen market vector if one exists; otherwise it is
+`NO_BET_FROZEN`.  Gate B requires PI acceptance of this exact package.
 """
 
 
 def _replay_markdown() -> str:
-    return """# Deterministic Gate-A replay
+    return """# Deterministic Gate-A v2 replay
 
-Run from the repository root with the pinned existing environment:
+Run from the repository root with the pinned existing environment.  The
+history source is read-only and queried with the documented eight-column
+pre-event allow-list; no official-SP or result field is selected.
 
 ```bash
 PY=.venv/bin/python
 PYTHONPATH=src $PY scripts/freeze_bj204_model_gate_a.py verify \\
-  --package results/bj204_gate_a_preoutcome_v1
-PYTHONPATH=src $PY scripts/execute_bj204_notebook.py
+  --package results/bj204_gate_a_preoutcome_v2
 
-# Detached rebuild: use a new, empty directory.
 PYTHONPATH=src $PY scripts/freeze_bj204_model_gate_a.py freeze \\
-  --source results/bj203_causal_tensor_v2 --output <new-empty-directory>
+  --source results/bj203_causal_tensor_v2 \\
+  --history-source data/beidan_history.db --output <new-empty-directory>
+
+PYTHONPATH=src $PY scripts/execute_bj204_notebook.py
 ```
 
-The Gate-A builder validates only #203's `inference/` namespace.  It never
-imports `unified_tensor.settlement_labels` and never opens 2024 test labels.
+The package and notebook never import `unified_tensor.settlement_labels` and
+never read target values, target timestamps, results, or winning SP.
 """
 
 
@@ -246,26 +437,35 @@ def _write_manifest(output: Path) -> dict[str, str]:
     return files
 
 
-def build_package(output: str | Path, *, source_package: str | Path) -> dict[str, Any]:
+def build_package(
+    output: str | Path, *, source_package: str | Path, history_source: str | Path
+) -> dict[str, Any]:
     output = Path(output)
     if output.exists() and any(output.iterdir()):
         raise GateAError(f"refusing to replace output package: {output}")
     output.mkdir(parents=True, exist_ok=True)
     source = Path(source_package).resolve()
+    history_path = Path(history_source).resolve()
     identity, source_manifest = _validate_source(source)
-    splits = _split_rows(identity)
+    history = _read_history_proxy(history_path)
+    proxy = _proxy_panel(history)
+    reconciliation = _issue_reconciliation(identity, history, proxy)
+    splits = _split_rows(identity, history)
     cv = _cv_manifest(splits)
-    card = _build_card(source, source_manifest, splits)
+    coverage = _coverage(proxy)
+    card = _build_card(source, source_manifest, history_path, splits, reconciliation, coverage)
     write_csv(output / "split_manifest.csv", splits)
     write_csv(output / "cv_manifest.csv", cv)
+    write_csv(output / "identity_reconciliation.csv", reconciliation)
+    write_csv(output / "retrospective_proxy_panel.csv", proxy)
+    write_csv(output / "proxy_coverage_by_period.csv", coverage)
+    write_csv(output / "target_only_quality_mask.csv", pd.DataFrame(LABEL_ONLY_QUALITY))
     write_json(output / "freeze_card.json", card)
     write_json(output / "inference_schema.json", card["schema"])
     write_json(output / "model_config.json", {
         "contract_version": CONTRACT_VERSION,
-        "models": card["models"],
-        "fallback": card["fallback"],
-        "metrics": card["metrics"],
-        "seeds": card["seeds"],
+        "models": card["models"], "fallback": card["fallback"],
+        "metrics": card["metrics"], "seeds": card["seeds"],
         "environment": card["environment"],
     })
     write_json(output / "source_binding.json", card["source"])
@@ -273,12 +473,10 @@ def build_package(output: str | Path, *, source_package: str | Path) -> dict[str
     (output / "REPLAY.md").write_text(_replay_markdown(), encoding="utf-8", newline="\n")
     files = _write_manifest(output)
     return {
-        "contract_version": CONTRACT_VERSION,
-        "package": output.name,
-        "files": len(files),
-        "development_issues": int(splits["role"].eq("DEVELOPMENT").sum()),
-        "retrospective_test_issues": int(splits["role"].eq("RETROSPECTIVE_TEST_LOCKED").sum()),
-        "embargoed_issues": int(splits["role"].eq("EMBARGOED_FOR_210").sum()),
+        "contract_version": CONTRACT_VERSION, "package": output.name, "files": len(files),
+        "development_issues": int(splits.loc[splits["role"].eq("DEVELOPMENT_CV"), "issue"].nunique()),
+        "retrospective_test_issues": int(splits.loc[splits["role"].eq("RETROSPECTIVE_TEST_LOCKED"), "issue"].nunique()),
+        "reserve_from_issue": RESERVE_ISSUE_MIN,
         "status": "GATE_A_OUTCOME_UNEXPOSED_PASS",
     }
 
@@ -305,14 +503,16 @@ def verify_package(package: str | Path) -> dict[str, Any]:
     if content != {"sha256": sha256(canonical_json(sums).encode("utf-8")).hexdigest()}:
         raise GateAError("Gate-A content identity mismatch")
     splits = pd.read_csv(root / "split_manifest.csv", dtype={"issue": str})
-    if bool(
-        splits["labels_permitted_gate_a"].astype(str).str.lower().eq("true").any()
-    ):
+    if not splits["labels_permitted_gate_a"].astype(str).str.lower().eq("false").all():
         raise GateAError("Gate-A split manifest permits labels")
-    if set(splits.loc[splits["role"].eq("DEVELOPMENT"), "year"].astype(int)) != set(DEVELOPMENT_YEARS):
-        raise GateAError("development chronology drift")
-    if set(splits.loc[splits["role"].eq("RETROSPECTIVE_TEST_LOCKED"), "year"].astype(int)) != {RETROSPECTIVE_TEST_YEAR}:
+    test = splits.loc[splits["role"].eq("RETROSPECTIVE_TEST_LOCKED")]
+    if test["issue"].nunique() != 75 or not test["issue"].astype(int).map(_is_test_issue).all():
         raise GateAError("retrospective test chronology drift")
-    if not bool(splits.loc[splits["role"].eq("EMBARGOED_FOR_210"), "year"].astype(int).ge(EMBARGO_START_YEAR).all()):
-        raise GateAError("embargo chronology drift")
+    reconciliation = pd.read_csv(root / "identity_reconciliation.csv", dtype={"issue": str})
+    test_reconciliation = reconciliation.loc[reconciliation["role"].eq("RETROSPECTIVE_TEST_LOCKED")]
+    if len(test_reconciliation) != 75 or int(test_reconciliation["history_rows"].sum()) != 16990:
+        raise GateAError("retrospective source reconciliation drift")
+    quality = pd.read_csv(root / "target_only_quality_mask.csv")
+    if quality["official_3sp_rows"].tolist() != [11314, 5539]:
+        raise GateAError("target-only official-SP census drift")
     return {"contract_version": CONTRACT_VERSION, "files": len(actual), "status": "PASS"}

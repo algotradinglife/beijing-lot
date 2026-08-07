@@ -1,0 +1,20 @@
+{
+  "history_proxy_columns_allowlist": [
+    "issue",
+    "match_idx",
+    "league",
+    "kickoff_ts",
+    "handicap_line",
+    "avg_eu_home",
+    "avg_eu_draw",
+    "avg_eu_away"
+  ],
+  "history_proxy_sha256": "867e11452306c29e7b64b97af82f730ab0d96f7519d9950dc33ef1cd64f9ceaa",
+  "history_proxy_source": "data/beidan_history.db",
+  "inference_manifest_sha256": "c915c6e628b4ebfe389ab31fd3709561440892ede711f2c4472395454dfb28ef",
+  "labels_opened": false,
+  "package": "results/bj203_causal_tensor_v2",
+  "package_sha256s": "b65182310cc19d5fc682c757aebc6de764a1cf98662fd559aaedf4db25a10090",
+  "source_contract": "bj203-causal-tensor-v2",
+  "source_manifest_files": 28
+}
