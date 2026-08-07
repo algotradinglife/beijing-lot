@@ -1,0 +1,14 @@
+{
+  "contract_version": "bj216-causal-p34-model-support-v1",
+  "files": {
+    "issue_epochs.parquet": {
+      "bytes": 5806,
+      "sha256": "51440901ffec2886e2f64b5c57c0309c3b94e93ac639c0c6f683e4bc17e4cfd9"
+    },
+    "model_support_panel.parquet": {
+      "bytes": 293917,
+      "sha256": "2cd2b1dd705ae0a26902840bf69a877f8d2837ce139500121c1609a2a833f236"
+    }
+  },
+  "namespace": "outcome_unexposed_model_support"
+}

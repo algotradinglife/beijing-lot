@@ -6,7 +6,6 @@ from contextlib import closing
 from hashlib import sha256
 import json
 from pathlib import Path
-import shutil
 import sqlite3
 from typing import Any, Iterable, Mapping
 
@@ -910,6 +909,38 @@ def verify_package(package: Path) -> dict[str, Any]:
     issue_support = pd.read_csv(
         package / "audit/issue_support.csv", dtype={"issue": str}
     )
+    source_matches = pd.read_parquet(package / "sources/matches.parquet")
+    source_snapshots = pd.read_parquet(
+        package / "sources/selected_snapshots.parquet"
+    )
+    recomputed = assemble_panel(
+        source_matches,
+        source_snapshots,
+        source_freeze_cutoff_utc=str(source_freeze["source_freeze_cutoff_utc"]),
+    )
+    expected_frames = {
+        "issue support": (recomputed["issue_support"], issue_support),
+        "candidate roster": (
+            recomputed["candidate_roster"],
+            pd.read_parquet(package / "audit/candidate_roster.parquet"),
+        ),
+        "inference panel": (recomputed["panel"], panel),
+        "selected source": (recomputed["selected_source"], source_snapshots),
+    }
+    for name, (expected_frame, observed_frame) in expected_frames.items():
+        try:
+            pd.testing.assert_frame_equal(
+                expected_frame.reset_index(drop=True),
+                observed_frame.reset_index(drop=True),
+                check_dtype=False,
+                check_exact=False,
+                rtol=1e-10,
+                atol=1e-12,
+            )
+        except AssertionError as error:
+            raise ModelSupportBuildError(
+                f"{name} is not derivable from frozen sources"
+            ) from error
     forbidden = sorted(
         column
         for column in panel.columns
@@ -943,7 +974,7 @@ def verify_package(package: Path) -> dict[str, Any]:
         ].sum()
         if not np.allclose(probabilities.to_numpy(dtype=float), 1.0, atol=1e-8):
             raise ModelSupportBuildError("de-vigged probabilities do not sum to one")
-    coverage = _coverage_by_role(issue_support)
+    coverage = _coverage_by_role(recomputed["issue_support"])
     expected_decision = _decision(issue_support, coverage)
     if decision != expected_decision:
         raise ModelSupportBuildError("decision is not derivable from frozen audit")

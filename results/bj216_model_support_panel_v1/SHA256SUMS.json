@@ -1,0 +1,66 @@
+{
+  "DATA_CARD.md": {
+    "bytes": 763,
+    "sha256": "3bdf6e92ae5e2a298491e55d74fa7b0aed8e79b8d99c5eeb5d7858f889610f4e"
+  },
+  "MANIFEST.json": {
+    "bytes": 1390,
+    "sha256": "a321ec7623e864c15a8def5d166a7be982ba865af11a13622e375a8572732c2d"
+  },
+  "REPLAY.md": {
+    "bytes": 635,
+    "sha256": "ea29ca1d8aba943afdc913979e2c9f86d6ab83e0eeceb2965f845bf497ccbc13"
+  },
+  "analysis/DECISION_REPORT.md": {
+    "bytes": 491,
+    "sha256": "911b716bae128c267ca78fb2fe1500a0988040f83dd0f37869b0e2ede3d962ab"
+  },
+  "analysis/decision.json": {
+    "bytes": 3065,
+    "sha256": "e315649c32c6a73daeba741b9f647284ef5610f8c87ad987fabb180834dacaa7"
+  },
+  "audit/candidate_roster.parquet": {
+    "bytes": 63367,
+    "sha256": "d98b04c43eaa7ef4194c9e4e9fe6338e8c508a0713a6d5697b1bd6dd98f7cbc2"
+  },
+  "audit/coverage_by_role.csv": {
+    "bytes": 402,
+    "sha256": "8680a8c6f6ac4ca0cb7e5234b593b7ded1451c36a6ceedbf9df348765bc5a868"
+  },
+  "audit/issue_support.csv": {
+    "bytes": 8000,
+    "sha256": "57f2e82b6a3e7542c1bbc586fc829762e8bd4cde951e3694f4b0599d16093d90"
+  },
+  "inference/MANIFEST.json": {
+    "bytes": 420,
+    "sha256": "5104ca7cc501a1d813fbb713b988158ef97badf0d8307333a43cbc5ba0adeebb"
+  },
+  "inference/issue_epochs.parquet": {
+    "bytes": 5806,
+    "sha256": "51440901ffec2886e2f64b5c57c0309c3b94e93ac639c0c6f683e4bc17e4cfd9"
+  },
+  "inference/model_support_panel.parquet": {
+    "bytes": 293917,
+    "sha256": "2cd2b1dd705ae0a26902840bf69a877f8d2837ce139500121c1609a2a833f236"
+  },
+  "sources/MANIFEST.json": {
+    "bytes": 692,
+    "sha256": "b69d7e3f8ec409897b685760772316097ae7e2f5e82ecc4a92e8d2f54dfa0df7"
+  },
+  "sources/matches.parquet": {
+    "bytes": 28941,
+    "sha256": "66d75136662dfed4e29b706e733405bd698dc7d78abfcbee8f55eb6d40a9746b"
+  },
+  "sources/selected_snapshots.parquet": {
+    "bytes": 41697,
+    "sha256": "df969bad90121b7970a3e948cc843ef5b5d85c4b86663f06e5244cf82b25248b"
+  },
+  "sources/source_freeze.json": {
+    "bytes": 2153,
+    "sha256": "7a1da8a42e1c22a9d96434f00e647890a4c26e2e4e33f073c965ccf87c7d3776"
+  },
+  "sources/source_inventory.csv": {
+    "bytes": 10030,
+    "sha256": "d511db29a8e0bf1079412a566c658083df58b257f237cdb2f2f890134f1115f7"
+  }
+}
