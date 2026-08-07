@@ -1,0 +1,42 @@
+{
+  "activation_utc": "2026-08-07T09:35:01Z",
+  "frozen_source_census": {
+    "base_matches": 110906,
+    "live_matches": 4526,
+    "segment_windows": 12,
+    "selected_eligibility_observations": 3824,
+    "selected_market_observations": 16496
+  },
+  "logical_sources": {
+    "500_bjdc": [
+      "live_market_sp_snapshots(playid=34,outcome_code=3)",
+      "segment_decision_windows"
+    ],
+    "beidan_live": [
+      "matches",
+      "snapshots"
+    ]
+  },
+  "outcome_namespace_read": false,
+  "prohibited_tables_not_read": [
+    "beidan_live.settlements",
+    "500_bjdc.matches result/final fields",
+    "multimarket_settlement_truth"
+  ],
+  "runtime_input_census": {
+    "eligibility_observations": 778137,
+    "live_matches": 4526,
+    "live_snapshots": 1274817,
+    "segment_windows": 12
+  },
+  "runtime_schema_sha256": {
+    "500_bjdc": "967b25acb869f198cc2c432d773d6fce7b8a2c78c4f14b54ffd8b84df6aeffec",
+    "beidan_live": "e53cbf874fae69dc5e1a17810e69110dda8230c5c9da89565cdc9f492fdfa0c5"
+  },
+  "source_freeze_cutoff_utc": "2026-08-07T09:59:02Z",
+  "upstream_package": {
+    "contract_version": "bj203-causal-tensor-v2",
+    "manifest_sha256": "52051e510f29194727950a561d16c65ba376bd4b45c4bd1fb09bf9672a975804",
+    "sha256sums_sha256": "b65182310cc19d5fc682c757aebc6de764a1cf98662fd559aaedf4db25a10090"
+  }
+}

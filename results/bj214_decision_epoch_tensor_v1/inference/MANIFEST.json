@@ -1,0 +1,11 @@
+{
+  "contract_version": "bj214-decision-epoch-tensor-v1",
+  "files": {
+    "cell_identity.parquet": "b2506856561330d9af4a6595b3b23e3a60d7ab2b80c866f478f91b5903e6139b",
+    "epoch_identity.parquet": "3438578bf1ac661dc99e2c855e69b3ae6d8705896f657b8558e7f1c12c531f44",
+    "feature_masks.parquet": "5748ca8ff6f1ea4833073183b4d6fccae33c3ce6aab8e124d6ffc04e5ad816a9",
+    "feature_values.parquet": "38ce0c8efb374d26b8c80d7d47d27913892f27d34f45807efaa8496829c8256f",
+    "roster.parquet": "a218548043e8fed673624e91ba7a4d00fdc6c800eb1b548dcd9e26b6f6b890dc"
+  },
+  "namespace": "decision_epoch_outcome_unexposed_inference"
+}
