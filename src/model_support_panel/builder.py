@@ -33,6 +33,9 @@ from .contract import (
 ROOT = Path(__file__).resolve().parents[2]
 ENVIRONMENT_LOCK = ROOT / "requirements.txt"
 SOURCE_BOUNDARY_COMMIT = "23db9d207b2b1d98772f18ae0762a904cb64e9d2"
+EXPECTED_SOURCE_MANIFEST_SHA256 = (
+    "ad1060fdee801277b00e6a40c5e28722d9df8fae025e163c4c15ed7b0d32f76b"
+)
 
 FORBIDDEN_INFERENCE_PARTS = (
     "result",
@@ -51,6 +54,44 @@ FORBIDDEN_INFERENCE_PARTS = (
 
 class ModelSupportBuildError(RuntimeError):
     """Raised when the #216 package cannot be built or verified safely."""
+
+
+def _inventory_exclusion_reason(logical_name: str) -> str:
+    reasons = {
+        "500_bjdc": EXCLUDED_SOURCE_CLASSES["500_live_p34_sp_only"],
+        "xlsm_canonical": EXCLUDED_SOURCE_CLASSES["xlsm_named_snapshots"],
+        "modeling_plus": EXCLUDED_SOURCE_CLASSES["xlsm_named_snapshots"],
+        "nowscore_update": EXCLUDED_SOURCE_CLASSES["xlsm_named_snapshots"],
+        "history_proxy": EXCLUDED_SOURCE_CLASSES["history_average_or_final_odds"],
+        "feature_proxy": EXCLUDED_SOURCE_CLASSES["feature_open_close_proxies"],
+    }
+    return reasons.get(
+        logical_name,
+        "schema inventoried without reading values; source is outside the frozen v1 boundary",
+    )
+
+
+def _normalize_source_inventory(frame: pd.DataFrame) -> pd.DataFrame:
+    result = frame.copy()
+    result["logical_source"] = result["logical_source"].astype(str)
+    result["exclusion_reason"] = np.where(
+        result["classification"].eq("ADMITTED_TIMESTAMPED_SAME_ROW_CORE"),
+        "",
+        result["logical_source"].map(_inventory_exclusion_reason),
+    )
+    columns = [
+        "logical_source",
+        "filename",
+        "bytes",
+        "table_name",
+        "schema_sha256",
+        "value_rows_read",
+        "classification",
+        "exclusion_reason",
+    ]
+    return result.loc[:, columns].sort_values(
+        ["logical_source", "table_name"], kind="mergesort"
+    ).reset_index(drop=True)
 
 
 def digest(path: Path) -> str:
@@ -139,18 +180,7 @@ def _inventory_database(logical_name: str, database: Path) -> list[dict[str, Any
 
     with closing(_sqlite_snapshot(database)) as connection:
         rows = _schema_rows(connection)
-    exclusion_reasons = {
-        "500_bjdc": EXCLUDED_SOURCE_CLASSES["500_live_p34_sp_only"],
-        "xlsm_canonical": EXCLUDED_SOURCE_CLASSES["xlsm_named_snapshots"],
-        "modeling_plus": EXCLUDED_SOURCE_CLASSES["xlsm_named_snapshots"],
-        "nowscore_update": EXCLUDED_SOURCE_CLASSES["xlsm_named_snapshots"],
-        "history_proxy": EXCLUDED_SOURCE_CLASSES["history_average_or_final_odds"],
-        "feature_proxy": EXCLUDED_SOURCE_CLASSES["feature_open_close_proxies"],
-    }
-    reason = exclusion_reasons.get(
-        logical_name,
-        "schema inventoried without reading values; source is outside the frozen v1 boundary",
-    )
+    reason = _inventory_exclusion_reason(logical_name)
     return [
         {
             "logical_source": logical_name,
@@ -703,6 +733,7 @@ def _build_from_frozen_sources(
     source_inventory: pd.DataFrame,
 ) -> dict[str, Any]:
     source_freeze = dict(source_freeze)
+    source_inventory = _normalize_source_inventory(source_inventory)
     assembled = assemble_panel(
         source_matches,
         source_snapshots,
@@ -903,6 +934,12 @@ def verify_package(package: Path) -> dict[str, Any]:
         package / "sources/MANIFEST.json"
     ):
         raise ModelSupportBuildError("source manifest lock mismatch")
+    if manifest.get("source_manifest_sha256") != EXPECTED_SOURCE_MANIFEST_SHA256:
+        raise ModelSupportBuildError(
+            "source identity differs from exact package lock"
+        )
+    if manifest.get("environment_lock_sha256") != digest(ENVIRONMENT_LOCK):
+        raise ModelSupportBuildError("environment lock mismatch")
     if source_freeze.get("outcome_namespace_read") is not False:
         raise ModelSupportBuildError("outcome namespace read flag is not false")
     panel = pd.read_parquet(package / "inference/model_support_panel.parquet")
@@ -913,6 +950,58 @@ def verify_package(package: Path) -> dict[str, Any]:
     source_snapshots = pd.read_parquet(
         package / "sources/selected_snapshots.parquet"
     )
+    source_inventory = pd.read_csv(
+        package / "sources/source_inventory.csv",
+        dtype={"logical_source": str},
+        keep_default_na=False,
+    )
+    expected_inventory_columns = [
+        "logical_source",
+        "filename",
+        "bytes",
+        "table_name",
+        "schema_sha256",
+        "value_rows_read",
+        "classification",
+        "exclusion_reason",
+    ]
+    if source_inventory.columns.tolist() != expected_inventory_columns:
+        raise ModelSupportBuildError("source inventory schema mismatch")
+    admitted_inventory = source_inventory[
+        source_inventory["classification"].eq(
+            "ADMITTED_TIMESTAMPED_SAME_ROW_CORE"
+        )
+    ]
+    excluded_inventory = source_inventory[
+        source_inventory["classification"].eq(
+            "SCHEMA_ONLY_EXCLUDED_SOURCE"
+        )
+    ]
+    if len(admitted_inventory) != 1 or admitted_inventory.iloc[0][
+        "logical_source"
+    ] != "beidan_live":
+        raise ModelSupportBuildError("admitted source inventory mismatch")
+    if admitted_inventory.iloc[0]["exclusion_reason"] != "":
+        raise ModelSupportBuildError("admitted source has an exclusion reason")
+    if len(excluded_inventory) != len(source_inventory) - 1:
+        raise ModelSupportBuildError("source inventory classification mismatch")
+    if not pd.to_numeric(
+        excluded_inventory["value_rows_read"], errors="raise"
+    ).eq(0).all():
+        raise ModelSupportBuildError("excluded source values were read")
+    expected_reasons = excluded_inventory["logical_source"].map(
+        _inventory_exclusion_reason
+    )
+    if not excluded_inventory["exclusion_reason"].eq(expected_reasons).all():
+        raise ModelSupportBuildError("source exclusion reason mismatch")
+    if source_inventory["filename"].str.contains(r"[/\\]", regex=True).any():
+        raise ModelSupportBuildError("source inventory exposes a local path")
+    frozen_census = source_freeze.get("frozen_source_census", {})
+    if frozen_census != {
+        "matches": len(source_matches),
+        "selected_snapshots": len(source_snapshots),
+    }:
+        raise ModelSupportBuildError("frozen source census mismatch")
     recomputed = assemble_panel(
         source_matches,
         source_snapshots,
@@ -1005,6 +1094,7 @@ def compare_packages(frozen: Path, replay: Path) -> dict[str, Any]:
 
 
 __all__ = [
+    "EXPECTED_SOURCE_MANIFEST_SHA256",
     "ModelSupportBuildError",
     "assemble_panel",
     "build_package",

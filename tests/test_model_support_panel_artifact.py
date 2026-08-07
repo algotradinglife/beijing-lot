@@ -11,7 +11,9 @@ import pandas as pd
 import pytest
 
 from model_support_panel.builder import (
+    EXPECTED_SOURCE_MANIFEST_SHA256,
     ModelSupportBuildError,
+    _build_from_frozen_sources,
     _root_checksums,
     compare_packages,
     verify_package,
@@ -24,11 +26,12 @@ from model_support_panel.contract import CONTRACT_VERSION
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "results/bj216_model_support_panel_v1"
 EXPECTED_SOURCE_MANIFEST = (
-    "b69d7e3f8ec409897b685760772316097ae7e2f5e82ecc4a92e8d2f54dfa0df7"
+    "ad1060fdee801277b00e6a40c5e28722d9df8fae025e163c4c15ed7b0d32f76b"
 )
 
 
 def test_frozen_artifact_is_outcome_blind_and_negative() -> None:
+    assert EXPECTED_SOURCE_MANIFEST_SHA256 == EXPECTED_SOURCE_MANIFEST
     assert verify_package(PACKAGE) == {
         "status": "PASS",
         "contract_version": CONTRACT_VERSION,
@@ -56,6 +59,24 @@ def test_frozen_artifact_is_outcome_blind_and_negative() -> None:
     assert development["n7_issue_pass_rate"] == pytest.approx(20 / 24)
     assert development["core_match_coverage"] == pytest.approx(1695 / 2156)
     assert not (PACKAGE / "labels").exists()
+    inventory = pd.read_csv(
+        PACKAGE / "sources/source_inventory.csv", keep_default_na=False
+    )
+    assert inventory.columns.tolist() == [
+        "logical_source",
+        "filename",
+        "bytes",
+        "table_name",
+        "schema_sha256",
+        "value_rows_read",
+        "classification",
+        "exclusion_reason",
+    ]
+    excluded = inventory[
+        inventory["classification"].eq("SCHEMA_ONLY_EXCLUDED_SOURCE")
+    ]
+    assert excluded["exclusion_reason"].str.len().gt(0).all()
+    assert excluded["value_rows_read"].eq(0).all()
 
 
 def test_frozen_source_replay_is_byte_identical(tmp_path: Path) -> None:
@@ -99,6 +120,31 @@ def test_verifier_rejects_rehashed_source_attack(tmp_path: Path) -> None:
     write_json(attacked / "SHA256SUMS.json", _root_checksums(attacked))
     with pytest.raises(ModelSupportBuildError):
         verify_package(attacked)
+
+
+def test_verifier_rejects_coherent_full_rehash_source_attack(
+    tmp_path: Path,
+) -> None:
+    matches = pd.read_parquet(PACKAGE / "sources/matches.parquet")
+    snapshots = pd.read_parquet(PACKAGE / "sources/selected_snapshots.parquet")
+    snapshots.loc[0, "sp_3"] = float(snapshots.loc[0, "sp_3"]) + 0.25
+    source_freeze = json.loads(
+        (PACKAGE / "sources/source_freeze.json").read_text(encoding="utf-8")
+    )
+    source_inventory = pd.read_csv(
+        PACKAGE / "sources/source_inventory.csv", keep_default_na=False
+    )
+    with pytest.raises(
+        ModelSupportBuildError,
+        match="source identity differs from exact package lock",
+    ):
+        _build_from_frozen_sources(
+            tmp_path / "coherent-forgery",
+            source_matches=matches,
+            source_snapshots=snapshots,
+            source_freeze=source_freeze,
+            source_inventory=source_inventory,
+        )
 
 
 def test_verifier_rejects_rehashed_decision_attack(tmp_path: Path) -> None:

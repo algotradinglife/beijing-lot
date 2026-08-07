@@ -24,12 +24,12 @@
         "sha256": "7a1da8a42e1c22a9d96434f00e647890a4c26e2e4e33f073c965ccf87c7d3776"
       },
       "source_inventory.csv": {
-        "bytes": 10030,
-        "sha256": "d511db29a8e0bf1079412a566c658083df58b257f237cdb2f2f890134f1115f7"
+        "bytes": 17522,
+        "sha256": "5fd333e41a0f7d90de657a2f77ba6afe9b912740ddfd7e5e2672e3fe7fb88cc3"
       }
     },
     "namespace": "outcome_blind_frozen_sources"
   },
-  "source_manifest_sha256": "b69d7e3f8ec409897b685760772316097ae7e2f5e82ecc4a92e8d2f54dfa0df7",
+  "source_manifest_sha256": "ad1060fdee801277b00e6a40c5e28722d9df8fae025e163c4c15ed7b0d32f76b",
   "upstream_contract_version": "bj214-decision-epoch-tensor-v1"
 }
