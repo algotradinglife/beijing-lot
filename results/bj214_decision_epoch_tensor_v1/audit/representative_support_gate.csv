@@ -1,0 +1,4 @@
+cohort,evaluated_issues,required_issues,evaluated_epochs,n7_passing_epochs,n7_epoch_pass_rate,required_epoch_pass_rate,candidate_matches,strict_complete_eligible_matches,strict_core_coverage,required_core_coverage,cohort_gate_pass
+development,342,30,2394,0,0,0.8,227504,0,0,0.8,False
+historical_model_unseen,52,5,364,0,0,0.8,7073,0,0,0.8,False
+prospective_post_activation,1,2,2,0,0,0.8,578,0,0,0.8,False

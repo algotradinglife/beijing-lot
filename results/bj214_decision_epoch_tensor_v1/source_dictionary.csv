@@ -1,0 +1,5 @@
+logical_source,fields,timestamp_rule,provenance_grade,admissible_use,limitation
+bj203_causal_tensor_v2,"identity, schedule, static feature capability",preserve #203 identity timing status,IMMUTABLE_PACKAGE,identity and named-field presence diagnostics,named 1h/10h fields lack observation clocks for #214
+beidan_live.snapshots,timestamped p34 BJ SP and EURO odds,snapshot_ts_utc <= decision_epoch_utc,TIMESTAMPED_APPEND_ONLY_NO_RAW_BUNDLE,potential causal market/SP coverage,source=merged; no sale/parlay evidence
+500_bjdc.live_market_sp_snapshots:p34,sale/parlay/capture classification,fetched_at_utc and source_updated_at_utc <= decision_epoch_utc,TIMESTAMPED_UNPUBLISHED_NO_CAPTURE_BATCH,eligibility evidence only when explicit,all frozen p34 rows report unknown/unknown
+500_bjdc.segment_decision_windows,published operational segment epochs and membership,manual_frozen_at else freeze_at,PUBLISHED_OPERATIONAL_CONTRACT,epoch identity and denominator,available only for recent operational issues

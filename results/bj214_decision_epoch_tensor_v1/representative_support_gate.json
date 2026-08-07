@@ -1,0 +1,15 @@
+{
+  "gate_id": "BJ214_REPRESENTATIVE_N7_SUPPORT_V1",
+  "minimum_complete_matches_per_epoch": 7,
+  "minimum_core_cell_coverage": 0.8,
+  "minimum_epoch_pass_rate": 0.8,
+  "minimum_evaluated_issues_development": 30,
+  "minimum_evaluated_issues_historical_model_unseen": 5,
+  "minimum_evaluated_issues_prospective_post_activation": 2,
+  "require_all_three_bj_sp_and_euro": true,
+  "require_no_post_epoch_observations": true,
+  "require_no_started_matches": true,
+  "require_open_sale_evidence": true,
+  "require_parlay_allowed_evidence": true,
+  "require_timestamped_identity": true
+}

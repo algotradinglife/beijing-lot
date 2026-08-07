@@ -1,0 +1,31 @@
+{
+  "authority": {
+    "betting": false,
+    "execution": false,
+    "model_training": false,
+    "release": false,
+    "roi": false
+  },
+  "census": {
+    "epochs": 2855,
+    "roster_capability_rows": 787335,
+    "strict_cells": 0,
+    "strict_roster_rows": 0
+  },
+  "contract_version": "bj214-decision-epoch-tensor-v1",
+  "decision_report_sha256": "d8c76785125249ef946571147b6053800b13963a943d9e5ca1e2bb388453e1e0",
+  "decision_sha256": "440801dff1b1d5037e92cebe38901e4ea20a03d199b5898a95146735ce320801",
+  "disposition": "BLOCKED_INSUFFICIENT_CAUSAL_SUPPORT",
+  "implementation_hashes": {
+    "builder": "2c8921c8d1b554e1d30580fd274453d6c18cfbeded5a50ce5e52fe81209ccb9c",
+    "cli": "740bbe9cc636af9bc3dd12e38ce444dffcde177a825464f43e8b9e43b3fe4ad1",
+    "contract": "ac8e99db04c22b46b15bc663985d559279dc1955c14c77ac242159886d6043e2",
+    "environment_lock": "acf0b168cadb2956e7e4937901d067ef65cda1783016ec92bea7b5743d1add1c",
+    "loader": "7eef36499b40bb3e2374ec92e5318c06702b9ed71dc06c462b18216786be5306",
+    "notebook_executor": "16165771e7e0b5dccbf56a7700349877217f47ccd9d801c223753735537ca7a4"
+  },
+  "inference_manifest_sha256": "58dff13a94c5a16398d3aaed0dbc4ed334e2e75a558fc8f6834039e1389d4749",
+  "outcome_namespace": "PHYSICALLY_ABSENT",
+  "source_manifest_sha256": "f05e02404a91bb63d2a40c55bbe572964cf681057df72f7c69c6145c4c78572d",
+  "upstream_contract_version": "bj203-causal-tensor-v2"
+}
