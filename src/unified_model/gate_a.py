@@ -42,6 +42,12 @@ HISTORY_COLUMNS = (
     "issue", "match_idx", "league", "kickoff_ts", "handicap_line",
     "avg_eu_home", "avg_eu_draw", "avg_eu_away",
 )
+FULL_3SP_IDENTITY_COLUMNS = ("expect", "match_no", "match_uid")
+PCLOSE_COLUMNS = (
+    "match_id", "issue", "p_close_3", "p_close_1", "p_close_0", "beidan_hcap",
+)
+BRIDGE_ISSUE_RANGE = (24011, 25042)
+BRIDGE_OUTLIER_MAX_ABS_DELTA = 0.10
 LABEL_ONLY_QUALITY = (
     # Counts are source-census metadata independently supplied by the PI.  They
     # are deliberately not read from the official settlement source in Gate A.
@@ -119,7 +125,7 @@ def _validate_source(package: Path) -> tuple[pd.DataFrame, dict[str, Any]]:
     return identity, _package_source_manifest(package)
 
 
-def _read_history_proxy(history_source: Path) -> pd.DataFrame:
+def _read_history_rows(history_source: Path, ranges: tuple[tuple[int, int], ...]) -> pd.DataFrame:
     """Read an explicit allow-list of pre-event proxy columns only.
 
     The history database contains outcome fields, but this query does not
@@ -129,13 +135,13 @@ def _read_history_proxy(history_source: Path) -> pd.DataFrame:
 
     if not history_source.is_file():
         raise GateAError(f"history proxy source is absent: {history_source}")
-    ranges = " OR ".join(
+    where = " OR ".join(
         f"(CAST(issue AS INTEGER) BETWEEN {lower} AND {upper})"
-        for lower, upper in RETROSPECTIVE_TEST_RANGES
+        for lower, upper in ranges
     )
     query = (
         "SELECT issue, match_idx, league, kickoff_ts, handicap_line, "
-        "avg_eu_home, avg_eu_draw, avg_eu_away FROM historical_matches WHERE " + ranges
+        "avg_eu_home, avg_eu_draw, avg_eu_away FROM historical_matches WHERE " + where
     )
     with sqlite3.connect(f"file:{history_source.resolve()}?mode=ro", uri=True) as connection:
         frame = pd.read_sql_query(query, connection)
@@ -146,9 +152,51 @@ def _read_history_proxy(history_source: Path) -> pd.DataFrame:
     frame["match_idx"] = pd.to_numeric(frame["match_idx"], errors="raise").astype(int)
     if bool(frame[["issue", "match_idx"]].duplicated().any()):
         raise GateAError("history proxy identities are not unique")
-    if not frame["issue_num"].map(_is_test_issue).all():
-        raise GateAError("history proxy escaped frozen test ranges")
     return frame.sort_values(["issue_num", "match_idx"], kind="mergesort").reset_index(drop=True)
+
+
+def _read_history_proxy(history_source: Path) -> pd.DataFrame:
+    history = _read_history_rows(history_source, RETROSPECTIVE_TEST_RANGES)
+    if not history["issue_num"].map(_is_test_issue).all():
+        raise GateAError("history proxy escaped frozen test ranges")
+    return history
+
+
+def _read_full_3sp_identity(full_3sp_source: Path) -> pd.DataFrame:
+    """Read only the official-source identity namespace, never targets."""
+
+    if not full_3sp_source.is_file():
+        raise GateAError(f"full-3SP identity source is absent: {full_3sp_source}")
+    frame = pd.read_csv(full_3sp_source, usecols=list(FULL_3SP_IDENTITY_COLUMNS))
+    if tuple(frame.columns) != FULL_3SP_IDENTITY_COLUMNS:
+        raise GateAError("full-3SP identity schema drift")
+    frame["expect"] = frame["expect"].astype(str)
+    frame["match_no"] = pd.to_numeric(frame["match_no"], errors="raise").astype(int)
+    frame["match_uid"] = pd.to_numeric(frame["match_uid"], errors="raise").astype("Int64")
+    frame["issue_num"] = _issue_number(frame["expect"])
+    if bool(frame[["expect", "match_no"]].duplicated().any()):
+        raise GateAError("full-3SP identity keys are not unique")
+    return frame
+
+
+def _read_pclose_proxy(pclose_source: Path) -> pd.DataFrame:
+    """Read only pre-event market-reference fields from the frozen bridge source."""
+
+    if not pclose_source.is_file():
+        raise GateAError(f"p_close bridge source is absent: {pclose_source}")
+    query = (
+        "SELECT match_id, issue, p_close_3, p_close_1, p_close_0, beidan_hcap "
+        "FROM matches WHERE CAST(issue AS INTEGER) BETWEEN ? AND ?"
+    )
+    with sqlite3.connect(f"file:{pclose_source.resolve()}?mode=ro", uri=True) as connection:
+        frame = pd.read_sql_query(query, connection, params=BRIDGE_ISSUE_RANGE)
+    if tuple(frame.columns) != PCLOSE_COLUMNS:
+        raise GateAError("p_close bridge schema drift")
+    frame["match_id"] = frame["match_id"].astype(str)
+    frame["issue"] = frame["issue"].astype(str)
+    if bool(frame["match_id"].duplicated().any()):
+        raise GateAError("p_close match_uid bridge is not unique")
+    return frame
 
 
 def _proxy_panel(history: pd.DataFrame) -> pd.DataFrame:
@@ -173,7 +221,130 @@ def _proxy_panel(history: pd.DataFrame) -> pd.DataFrame:
     return values
 
 
-def _issue_reconciliation(identity: pd.DataFrame, history: pd.DataFrame, proxy: pd.DataFrame) -> pd.DataFrame:
+def _test_identity_reconciliation(history: pd.DataFrame, full_3sp_identity: pd.DataFrame) -> pd.DataFrame:
+    """Freeze test-set alignment using identifiers only, never target values."""
+
+    target = full_3sp_identity.loc[
+        full_3sp_identity["issue_num"].map(_is_test_issue),
+        ["expect", "match_no", "match_uid"],
+    ].copy()
+    result = history[["issue", "match_idx"]].merge(
+        target,
+        left_on=["issue", "match_idx"], right_on=["expect", "match_no"],
+        how="left", validate="one_to_one",
+    )
+    result["official_target_identity_available"] = result["match_uid"].notna()
+    result["target_identity_reason"] = np.where(
+        result["official_target_identity_available"],
+        "MATCHED_OFFICIAL_3SP_TARGET_NOT_OPENED",
+        "HISTORY_ONLY_NO_OFFICIAL_3SP_TARGET",
+    )
+    result["labels_opened"] = False
+    result["target_quality_mask"] = SP_TARGET["quality_mask"]
+    result = result.drop(columns=["expect", "match_no"])
+    if len(result) != 16990:
+        raise GateAError("test identity reconciliation history census drift")
+    if int(result["official_target_identity_available"].sum()) != 16853:
+        raise GateAError("test identity reconciliation target census drift")
+    return result.sort_values(["issue", "match_idx"], key=lambda s: _issue_number(s) if s.name == "issue" else s,
+                              kind="mergesort").reset_index(drop=True)
+
+
+def _market_bridge(
+    history_source: Path, full_3sp_identity: pd.DataFrame, pclose_source: Path
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Freeze the source bridge without reading settlement columns.
+
+    ``match_uid`` is obtained from the CSV's identity-only projection and is
+    used to join the historical average-EU source to the pre-event p_close
+    source.  Team/league names are never used as join keys.
+    """
+
+    history = _read_history_rows(history_source, (BRIDGE_ISSUE_RANGE,))
+    target = full_3sp_identity.loc[
+        full_3sp_identity["issue_num"].between(*BRIDGE_ISSUE_RANGE),
+        ["expect", "match_no", "match_uid"],
+    ]
+    joined = history.merge(
+        target, left_on=["issue", "match_idx"], right_on=["expect", "match_no"],
+        how="left", validate="one_to_one",
+    )
+    joined = joined.loc[joined["match_uid"].notna()].copy()
+    joined["match_uid"] = joined["match_uid"].astype(int).astype(str)
+    pclose = _read_pclose_proxy(pclose_source)
+    joined = joined.merge(
+        pclose, left_on="match_uid", right_on="match_id", how="left",
+        validate="one_to_one", suffixes=("", "_pclose"),
+    )
+    odds = joined[["avg_eu_home", "avg_eu_draw", "avg_eu_away"]].apply(pd.to_numeric, errors="coerce")
+    inverse = 1.0 / odds
+    historical_complete = odds.gt(0).all(axis=1) & np.isfinite(inverse).all(axis=1)
+    normalized = inverse.div(inverse.sum(axis=1).where(historical_complete), axis=0)
+    pclose_values = joined[["p_close_3", "p_close_1", "p_close_0"]].apply(pd.to_numeric, errors="coerce")
+    pclose_complete = pclose_values.notna().all(axis=1) & np.isfinite(pclose_values).all(axis=1)
+    comparable = historical_complete & pclose_complete
+    bridge = pd.DataFrame({
+        "issue": joined["issue"].astype(str), "match_idx": joined["match_idx"].astype(int),
+        "match_uid": joined["match_uid"], "history_source_grade": PROXY_GRADE,
+        "p_close_source_grade": "RETROSPECTIVE_PROXY_REFERENCE",
+        "market_probability_3": normalized.iloc[:, 0],
+        "market_probability_1": normalized.iloc[:, 1],
+        "market_probability_0": normalized.iloc[:, 2],
+        "p_close_3": pclose_values.iloc[:, 0], "p_close_1": pclose_values.iloc[:, 1],
+        "p_close_0": pclose_values.iloc[:, 2],
+        "handicap_line_history": joined["handicap_line"],
+        "handicap_line_p_close": joined["beidan_hcap"],
+        "historical_market_complete": historical_complete,
+        "p_close_complete": pclose_complete,
+    })
+    deltas = np.abs(
+        bridge[["market_probability_3", "market_probability_1", "market_probability_0"]].to_numpy()
+        - bridge[["p_close_3", "p_close_1", "p_close_0"]].to_numpy()
+    )
+    bridge["max_abs_probability_delta"] = np.where(comparable, deltas.max(axis=1), np.nan)
+    bridge["bridge_outlier_gt_005"] = bridge["max_abs_probability_delta"].gt(0.05)
+    bridge["bridge_outlier_gt_010"] = bridge["max_abs_probability_delta"].gt(BRIDGE_OUTLIER_MAX_ABS_DELTA)
+    bridge["bridge_fallback_reason"] = np.select(
+        [~bridge["historical_market_complete"], ~bridge["p_close_complete"], bridge["bridge_outlier_gt_010"]],
+        ["NO_BET_FROZEN_HISTORY_MARKET_MISSING", "HISTORY_PROXY_ONLY_PCLOSE_REFERENCE_MISSING",
+         "HISTORY_PROXY_RETAINED_PCLOSE_NOT_SUBSTITUTED_OUTLIER"],
+        default="BRIDGE_COMPARABLE",
+    )
+    observed = bridge.loc[comparable]
+    if len(observed) != 20837:
+        raise GateAError("market bridge complete-support census drift")
+    correlations = [float(np.corrcoef(
+        observed[f"market_probability_{code}"], observed[f"p_close_{code}"]
+    )[0, 1]) for code in ("3", "1", "0")]
+    summary = {
+        "issue_range": list(BRIDGE_ISSUE_RANGE),
+        "join_key": "history.issue+history.match_idx -> official_identity.expect+match_no -> match_uid -> p_close.match_id",
+        "history_rows": int(len(history)),
+        "official_identity_matched_rows": int(len(joined)),
+        "history_without_official_identity_rows": int(len(history) - len(joined)),
+        "p_close_match_rows": int(bridge["p_close_complete"].sum()),
+        "complete_comparable_rows": int(len(observed)),
+        "mean_absolute_error": float(np.abs(
+            observed[["market_probability_3", "market_probability_1", "market_probability_0"]].to_numpy()
+            - observed[["p_close_3", "p_close_1", "p_close_0"]].to_numpy()
+        ).mean()),
+        "outcome_correlations": dict(zip(("3", "1", "0"), correlations, strict=True)),
+        "max_delta_gt_005_rows": int(observed["bridge_outlier_gt_005"].sum()),
+        "max_delta_gt_010_rows": int(observed["bridge_outlier_gt_010"].sum()),
+        "handicap_exact_rows": int((
+            observed["handicap_line_history"] == observed["handicap_line_p_close"]
+        ).sum()),
+        "labels_opened": False,
+        "outlier_policy": "do not substitute p_close; retain normalized average-EU proxy with explicit source grade",
+        "missing_policy": "missing history triplet -> NO_BET_FROZEN; missing p_close reference -> history-proxy-only grade",
+    }
+    return bridge.sort_values(["issue", "match_idx"], key=lambda s: _issue_number(s) if s.name == "issue" else s,
+                               kind="mergesort").reset_index(drop=True), summary
+
+
+def _issue_reconciliation(
+    identity: pd.DataFrame, history: pd.DataFrame, proxy: pd.DataFrame, test_identities: pd.DataFrame
+) -> pd.DataFrame:
     """Publish source identity and missing-source reasons for every frozen issue."""
 
     inference = identity.copy()
@@ -182,6 +353,7 @@ def _issue_reconciliation(identity: pd.DataFrame, history: pd.DataFrame, proxy: 
     inference_counts = inference.groupby("issue", sort=True).size().rename("inference_cell_rows")
     history_counts = history.groupby("issue", sort=True).size().rename("history_rows")
     proxy_counts = proxy.groupby("issue", sort=True)["market_proxy_complete"].sum().rename("complete_proxy_rows")
+    target_counts = test_identities.groupby("issue", sort=True)["official_target_identity_available"].sum()
     issues = sorted(set(history_counts.index) | set(
         inference.loc[inference["issue_num"].le(DEVELOPMENT_ISSUE_MAX), "issue"].unique()
     ), key=int)
@@ -206,6 +378,8 @@ def _issue_reconciliation(identity: pd.DataFrame, history: pd.DataFrame, proxy: 
             "issue": issue,
             "role": role,
             "history_rows": historical,
+            "official_3sp_target_identity_rows": int(target_counts.get(issue, 0)),
+            "history_only_no_target_rows": int(historical - target_counts.get(issue, 0)),
             "complete_proxy_rows": int(proxy_counts.get(issue, 0)),
             "inference_cell_rows": int(inference_counts.get(issue, 0)),
             "source_status": source_status,
@@ -214,10 +388,13 @@ def _issue_reconciliation(identity: pd.DataFrame, history: pd.DataFrame, proxy: 
             "target_quality_mask": SP_TARGET["quality_mask"],
         })
     result = pd.DataFrame(rows)
-    if int(result.loc[result["role"].eq("RETROSPECTIVE_TEST_LOCKED"), "history_rows"].sum()) != 16990:
+    test_rows = result["role"].eq("RETROSPECTIVE_TEST_LOCKED")
+    if int(result.loc[test_rows, "history_rows"].sum()) != 16990:
         raise GateAError("frozen 75-issue retrospective history census drift")
-    if int(result["role"].eq("RETROSPECTIVE_TEST_LOCKED").sum()) != 75:
+    if int(result[test_rows].shape[0]) != 75:
         raise GateAError("frozen retrospective issue census drift")
+    if int(result.loc[test_rows, "official_3sp_target_identity_rows"].sum()) != 16853:
+        raise GateAError("frozen retrospective target identity census drift")
     return result
 
 
@@ -315,9 +492,12 @@ def _build_card(
     source: Path,
     source_manifest: dict[str, Any],
     history_source: Path,
+    full_3sp_source: Path,
+    pclose_source: Path,
     splits: pd.DataFrame,
     reconciliation: pd.DataFrame,
     coverage: pd.DataFrame,
+    bridge_summary: dict[str, Any],
 ) -> dict[str, Any]:
     development = splits.loc[splits["role"].eq("DEVELOPMENT_CV")]
     test = splits.loc[splits["role"].eq("RETROSPECTIVE_TEST_LOCKED")]
@@ -334,6 +514,12 @@ def _build_card(
             "history_proxy_source": "data/beidan_history.db",
             "history_proxy_sha256": digest(history_source),
             "history_proxy_columns_allowlist": list(HISTORY_COLUMNS),
+            "official_3sp_identity_source": "data/raw/beidan_full_3sp.csv",
+            "official_3sp_identity_sha256": digest(full_3sp_source),
+            "official_3sp_identity_columns_allowlist": list(FULL_3SP_IDENTITY_COLUMNS),
+            "p_close_bridge_source": "data/beidan_features.db",
+            "p_close_bridge_sha256": digest(pclose_source),
+            "p_close_columns_allowlist": list(PCLOSE_COLUMNS),
             "labels_opened": False,
         },
         "chronology": {
@@ -363,6 +549,14 @@ def _build_card(
             "baseline_model_fallback_coverage": coverage.to_dict(orient="records"),
             "limitation": "retrospective proxy only; no source timestamp proves a live pre-event capture",
         },
+        "market_source_bridge": {
+            "table": "market_proxy_pclose_bridge.csv",
+            "summary": "market_proxy_pclose_bridge_summary.json",
+            "summary_values": bridge_summary,
+            "transform": "normalized_inverse(avg_eu_home,avg_eu_draw,avg_eu_away)",
+            "source_grade": PROXY_GRADE,
+            "outlier_max_abs_probability_delta": BRIDGE_OUTLIER_MAX_ABS_DELTA,
+        },
         "target_only_quality": {
             "file": "target_only_quality_mask.csv",
             "rows": list(LABEL_ONLY_QUALITY),
@@ -381,7 +575,7 @@ def _build_card(
 
 def _readme(card: dict[str, Any]) -> str:
     chronology = card["chronology"]
-    return f"""# #204 Gate A v2 — market-anchored residual model preregistration
+    return f"""# #204 Gate A v3 — market-anchored residual model preregistration
 
 This immutable package is **outcome-unexposed**.  It uses the #203 inference
 namespace only for development/CV through issue `{chronology['development_cv_through_issue']}`.
@@ -395,6 +589,13 @@ SP target is the official 3/1/0 final-SP vector under
 records the known post-kickoff update prevalence precisely to prevent a
 retrospective proxy from being misrepresented as a live capture.
 
+`market_proxy_pclose_bridge.csv` freezes the normalized-inverse-average-EU to
+`p_close` source transition on 20,837 complete historical overlaps. It joins
+only `issue + match_idx` and official `match_uid` identifiers, retains source
+grades, publishes the delta distribution, and never treats the vendors as
+byte-identical. Missing/reference-outlier handling is preregistered in the
+bridge summary; no official result or SP value is read.
+
 The hard action gate is `{FALLBACK_RULE['rule_id']}`: an incomplete/nonfinite
 proxy row uses a valid frozen market vector if one exists; otherwise it is
 `NO_BET_FROZEN`.  Gate B requires PI acceptance of this exact package.
@@ -402,7 +603,7 @@ proxy row uses a valid frozen market vector if one exists; otherwise it is
 
 
 def _replay_markdown() -> str:
-    return """# Deterministic Gate-A v2 replay
+    return """# Deterministic Gate-A v3 replay
 
 Run from the repository root with the pinned existing environment.  The
 history source is read-only and queried with the documented eight-column
@@ -411,11 +612,13 @@ pre-event allow-list; no official-SP or result field is selected.
 ```bash
 PY=.venv/bin/python
 PYTHONPATH=src $PY scripts/freeze_bj204_model_gate_a.py verify \\
-  --package results/bj204_gate_a_preoutcome_v2
+  --package results/bj204_gate_a_preoutcome_v3
 
 PYTHONPATH=src $PY scripts/freeze_bj204_model_gate_a.py freeze \\
   --source results/bj203_causal_tensor_v2 \\
-  --history-source data/beidan_history.db --output <new-empty-directory>
+  --history-source data/beidan_history.db \\
+  --full-3sp-identity-source data/raw/beidan_full_3sp.csv \\
+  --pclose-source data/beidan_features.db --output <new-empty-directory>
 
 PYTHONPATH=src $PY scripts/execute_bj204_notebook.py
 ```
@@ -438,7 +641,8 @@ def _write_manifest(output: Path) -> dict[str, str]:
 
 
 def build_package(
-    output: str | Path, *, source_package: str | Path, history_source: str | Path
+    output: str | Path, *, source_package: str | Path, history_source: str | Path,
+    full_3sp_identity_source: str | Path, pclose_source: str | Path,
 ) -> dict[str, Any]:
     output = Path(output)
     if output.exists() and any(output.iterdir()):
@@ -446,19 +650,30 @@ def build_package(
     output.mkdir(parents=True, exist_ok=True)
     source = Path(source_package).resolve()
     history_path = Path(history_source).resolve()
+    full_3sp_path = Path(full_3sp_identity_source).resolve()
+    pclose_path = Path(pclose_source).resolve()
     identity, source_manifest = _validate_source(source)
     history = _read_history_proxy(history_path)
+    full_3sp_identity = _read_full_3sp_identity(full_3sp_path)
     proxy = _proxy_panel(history)
-    reconciliation = _issue_reconciliation(identity, history, proxy)
+    test_identities = _test_identity_reconciliation(history, full_3sp_identity)
+    reconciliation = _issue_reconciliation(identity, history, proxy, test_identities)
+    bridge, bridge_summary = _market_bridge(history_path, full_3sp_identity, pclose_path)
     splits = _split_rows(identity, history)
     cv = _cv_manifest(splits)
     coverage = _coverage(proxy)
-    card = _build_card(source, source_manifest, history_path, splits, reconciliation, coverage)
+    card = _build_card(
+        source, source_manifest, history_path, full_3sp_path, pclose_path, splits,
+        reconciliation, coverage, bridge_summary,
+    )
     write_csv(output / "split_manifest.csv", splits)
     write_csv(output / "cv_manifest.csv", cv)
     write_csv(output / "identity_reconciliation.csv", reconciliation)
+    write_csv(output / "test_identity_reconciliation.csv", test_identities)
     write_csv(output / "retrospective_proxy_panel.csv", proxy)
     write_csv(output / "proxy_coverage_by_period.csv", coverage)
+    write_csv(output / "market_proxy_pclose_bridge.csv", bridge)
+    write_json(output / "market_proxy_pclose_bridge_summary.json", bridge_summary)
     write_csv(output / "target_only_quality_mask.csv", pd.DataFrame(LABEL_ONLY_QUALITY))
     write_json(output / "freeze_card.json", card)
     write_json(output / "inference_schema.json", card["schema"])
@@ -476,6 +691,7 @@ def build_package(
         "contract_version": CONTRACT_VERSION, "package": output.name, "files": len(files),
         "development_issues": int(splits.loc[splits["role"].eq("DEVELOPMENT_CV"), "issue"].nunique()),
         "retrospective_test_issues": int(splits.loc[splits["role"].eq("RETROSPECTIVE_TEST_LOCKED"), "issue"].nunique()),
+        "target_bearing_test_identities": int(test_identities["official_target_identity_available"].sum()),
         "reserve_from_issue": RESERVE_ISSUE_MIN,
         "status": "GATE_A_OUTCOME_UNEXPOSED_PASS",
     }
@@ -512,6 +728,14 @@ def verify_package(package: str | Path) -> dict[str, Any]:
     test_reconciliation = reconciliation.loc[reconciliation["role"].eq("RETROSPECTIVE_TEST_LOCKED")]
     if len(test_reconciliation) != 75 or int(test_reconciliation["history_rows"].sum()) != 16990:
         raise GateAError("retrospective source reconciliation drift")
+    if int(test_reconciliation["official_3sp_target_identity_rows"].sum()) != 16853:
+        raise GateAError("retrospective target identity reconciliation drift")
+    test_identities = pd.read_csv(root / "test_identity_reconciliation.csv", dtype={"issue": str})
+    if len(test_identities) != 16990 or int(test_identities["official_target_identity_available"].sum()) != 16853:
+        raise GateAError("test identity detail reconciliation drift")
+    bridge_summary = json.loads((root / "market_proxy_pclose_bridge_summary.json").read_text(encoding="utf-8"))
+    if bridge_summary.get("complete_comparable_rows") != 20837:
+        raise GateAError("market bridge support census drift")
     quality = pd.read_csv(root / "target_only_quality_mask.csv")
     if quality["official_3sp_rows"].tolist() != [11314, 5539]:
         raise GateAError("target-only official-SP census drift")

@@ -1,0 +1,17 @@
+{
+  "README.md": "9d12e53fd8b4e6647e21d0fdf1b3963d275c2fe9f887bf6534e8e8a8fcea0def",
+  "REPLAY.md": "6529fabeda231836ab69e4e019c7d27d1c64ad9401e95f7e2c54e7258e7578e1",
+  "cv_manifest.csv": "3896bb4196484d3b221df41f742314b0540f69471e95f9c9e78e3334f78f656f",
+  "freeze_card.json": "26290eed59e80575e117d45214a1fbaef3913f72cb0d757ba4a2f5e5c10d52bd",
+  "identity_reconciliation.csv": "162020b74f8b04b6602356e5be5ece476e4a80abc4ffbcb74ec4c96097a1a479",
+  "inference_schema.json": "4105b778baa415ee5b5bdd635572b48c14bf031b290f5385791d1eae76943b73",
+  "market_proxy_pclose_bridge.csv": "d28bb4f6f6384c524c0e2043d970c015a32eb12593e20c9e39340ab87174debd",
+  "market_proxy_pclose_bridge_summary.json": "89d6d1aa1056b9e0c2d87e82047d7b7e709e206c55589b0484be4a10618e53f2",
+  "model_config.json": "f0ef93aeda81c52e0fc3e18ed53bc871275dcb20c535e708ccc4b9ee78b070ee",
+  "proxy_coverage_by_period.csv": "5488b3d1060876f55b1d63f749be5317287a2024f335fdfd2a46ba5a0e743b95",
+  "retrospective_proxy_panel.csv": "b216d66656683764c2c4cdbb94589274041d09c252f031fc6b1e2bb324c65bd2",
+  "source_binding.json": "643ca56a065d77ae0cf77a1ecdb600169464f0bba8eedd43ef9c8a9c8b974aef",
+  "split_manifest.csv": "a495b0153a56c420897155bef552ec6f0705bde53b69ab43f05f8f0c151b864b",
+  "target_only_quality_mask.csv": "b62cdf42b920c272b8abb2a3483d47057ce9660bc133bbc68657c7d6da480ac3",
+  "test_identity_reconciliation.csv": "41993a05d1322a7f242a6d539758ded5be5b4587e77b7b14414550928a1df993"
+}

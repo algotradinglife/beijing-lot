@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Final
 
 
-CONTRACT_VERSION: Final = "bj204-market-anchored-model-gate-a-v2"
+CONTRACT_VERSION: Final = "bj204-market-anchored-model-gate-a-v3"
 UPSTREAM_CONTRACT_VERSION: Final = "bj203-causal-tensor-v2"
 SOURCE_PACKAGE: Final = "results/bj203_causal_tensor_v2"
 

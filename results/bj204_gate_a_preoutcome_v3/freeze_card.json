@@ -1,0 +1,268 @@
+{
+  "chronology": {
+    "cv_validation_years": [
+      2021,
+      2022,
+      2023
+    ],
+    "development_cv_through_issue": 25042,
+    "development_issue_count": 289,
+    "reserve_for_210_from_issue": 26051,
+    "retrospective_test_history_rows": 16990,
+    "retrospective_test_issue_count": 75,
+    "retrospective_test_issue_ranges": [
+      [
+        25043,
+        25125
+      ],
+      [
+        26011,
+        26049
+      ]
+    ]
+  },
+  "contract_version": "bj204-market-anchored-model-gate-a-v3",
+  "environment": {
+    "matplotlib": "3.10.9",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "pyarrow": "24.0.0",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.17.1"
+  },
+  "fallback": {
+    "acceptance": "all three finite unmasked values sum to one within 2e-6",
+    "fallback_metric_reporting": "report pure baseline, model-only and fallback-mixed separately",
+    "market_vector": "calibrated_market_probability",
+    "on_acceptance": "emit the frozen market vector byte-for-byte after float32 load",
+    "on_rejection": "emit explicit NO_BET_FROZEN; never emit a learned vector",
+    "rule_id": "BJ204_MARKET_OR_NO_BET_V1"
+  },
+  "issue": 204,
+  "market_source_bridge": {
+    "outlier_max_abs_probability_delta": 0.1,
+    "source_grade": "RETROSPECTIVE_PROXY",
+    "summary": "market_proxy_pclose_bridge_summary.json",
+    "summary_values": {
+      "complete_comparable_rows": 20837,
+      "handicap_exact_rows": 20837,
+      "history_rows": 21091,
+      "history_without_official_identity_rows": 225,
+      "issue_range": [
+        24011,
+        25042
+      ],
+      "join_key": "history.issue+history.match_idx -> official_identity.expect+match_no -> match_uid -> p_close.match_id",
+      "labels_opened": false,
+      "max_delta_gt_005_rows": 85,
+      "max_delta_gt_010_rows": 22,
+      "mean_absolute_error": 0.005532865897294611,
+      "missing_policy": "missing history triplet -> NO_BET_FROZEN; missing p_close reference -> history-proxy-only grade",
+      "official_identity_matched_rows": 20866,
+      "outcome_correlations": {
+        "0": 0.994467825471939,
+        "1": 0.9963315352646837,
+        "3": 0.99505270243424
+      },
+      "outlier_policy": "do not substitute p_close; retain normalized average-EU proxy with explicit source grade",
+      "p_close_match_rows": 20851
+    },
+    "table": "market_proxy_pclose_bridge.csv",
+    "transform": "normalized_inverse(avg_eu_home,avg_eu_draw,avg_eu_away)"
+  },
+  "metrics": [
+    "multiclass_log_loss",
+    "brier_score",
+    "ece_equal_mass",
+    "top1_coverage",
+    "top2_coverage",
+    "predicted_sp_mae",
+    "fallback_coverage",
+    "ood_coverage"
+  ],
+  "models": [
+    {
+      "id": "MARKET_ONLY",
+      "implementation": "frozen calibrated_market_probability",
+      "role": "incumbent and exact safe fallback"
+    },
+    {
+      "id": "LOGISTIC_RESIDUAL",
+      "implementation": "sklearn.linear_model.LogisticRegression",
+      "role": "complexity-matched multinomial residual control"
+    },
+    {
+      "id": "HIST_GRADIENT_RESIDUAL",
+      "implementation": "sklearn.ensemble.HistGradientBoostingClassifier",
+      "role": "shallow nonlinear residual control"
+    },
+    {
+      "id": "SET_ENCODER_RESIDUAL",
+      "implementation": "PyTorch Deep Sets / Set Transformer only after controls",
+      "role": "candidate issue-context residual; not trained in Gate A"
+    }
+  ],
+  "promotion_authorized": false,
+  "proxy_panel": {
+    "baseline_model_fallback_coverage": [
+      {
+        "baseline_proxy_coverage": 0.9985942716570023,
+        "baseline_proxy_rows": 11366,
+        "fallback_no_bet_coverage": 0.0014057283429977157,
+        "fallback_no_bet_rows": 16,
+        "issues": 42,
+        "labels_opened": false,
+        "model_proxy_coverage": 0.9985942716570023,
+        "model_proxy_rows": 11366,
+        "period": "25043-25125",
+        "rows": 11382,
+        "source_grade": "RETROSPECTIVE_PROXY"
+      },
+      {
+        "baseline_proxy_coverage": 0.9989300998573466,
+        "baseline_proxy_rows": 5602,
+        "fallback_no_bet_coverage": 0.0010699001426533524,
+        "fallback_no_bet_rows": 6,
+        "issues": 33,
+        "labels_opened": false,
+        "model_proxy_coverage": 0.9989300998573466,
+        "model_proxy_rows": 5602,
+        "period": "26011-26049",
+        "rows": 5608,
+        "source_grade": "RETROSPECTIVE_PROXY"
+      }
+    ],
+    "coverage_file": "proxy_coverage_by_period.csv",
+    "grade": "RETROSPECTIVE_PROXY",
+    "limitation": "retrospective proxy only; no source timestamp proves a live pre-event capture",
+    "panel_file": "retrospective_proxy_panel.csv"
+  },
+  "schema": {
+    "market_baseline_feature": "calibrated_market_probability",
+    "mask_features": [
+      "calibrated_market_probability",
+      "devig_euro_probability",
+      "euro_1h_odds",
+      "fundamental_probability",
+      "probability_residual",
+      "probability_residual_z",
+      "predicted_final_sp",
+      "native_handicap_line",
+      "line_residual_mu",
+      "line_residual_z",
+      "market_uncertainty",
+      "market_signature_breadth",
+      "market_signature_dispersion",
+      "history_training_rows_log1p",
+      "min_history_n_log1p",
+      "league_index",
+      "home_team_index",
+      "away_team_index",
+      "kickoff_delay_hours",
+      "match_position_fraction"
+    ],
+    "model_features": [
+      "calibrated_market_probability",
+      "devig_euro_probability",
+      "euro_1h_odds",
+      "fundamental_probability",
+      "probability_residual",
+      "probability_residual_z",
+      "predicted_final_sp",
+      "native_handicap_line",
+      "line_residual_mu",
+      "line_residual_z",
+      "market_uncertainty",
+      "market_signature_breadth",
+      "market_signature_dispersion",
+      "history_training_rows_log1p",
+      "min_history_n_log1p",
+      "league_index",
+      "home_team_index",
+      "away_team_index",
+      "kickoff_delay_hours",
+      "match_position_fraction"
+    ],
+    "outcome_axis": [
+      "3",
+      "1",
+      "0"
+    ],
+    "predicted_final_sp_semantics": "outcome-unexposed pre-event proxy input only",
+    "ragged_shape": "X_i[J_i,3,F]",
+    "sp_target": {
+      "availability": "Gate-B only; no target values or target masks are loaded in Gate A",
+      "field": "final_sp",
+      "outcome_axis": [
+        "3",
+        "1",
+        "0"
+      ],
+      "quality_mask": "TARGET_ONLY_OFFICIAL_3SP_NOT_OPENED_GATE_A",
+      "target_id": "OFFICIAL_FINAL_SP_3_1_0"
+    }
+  },
+  "scope": "Historical exploratory PoC only; no ticket, ROI, betting, release, production, #205, or #210 action.",
+  "seeds": [
+    204001,
+    204002,
+    204003
+  ],
+  "source": {
+    "history_proxy_columns_allowlist": [
+      "issue",
+      "match_idx",
+      "league",
+      "kickoff_ts",
+      "handicap_line",
+      "avg_eu_home",
+      "avg_eu_draw",
+      "avg_eu_away"
+    ],
+    "history_proxy_sha256": "867e11452306c29e7b64b97af82f730ab0d96f7519d9950dc33ef1cd64f9ceaa",
+    "history_proxy_source": "data/beidan_history.db",
+    "inference_manifest_sha256": "c915c6e628b4ebfe389ab31fd3709561440892ede711f2c4472395454dfb28ef",
+    "labels_opened": false,
+    "official_3sp_identity_columns_allowlist": [
+      "expect",
+      "match_no",
+      "match_uid"
+    ],
+    "official_3sp_identity_sha256": "e7256d96a34c2f41ede349c87b9cd1efc7a61b104657a657367daf9dd54ee8e2",
+    "official_3sp_identity_source": "data/raw/beidan_full_3sp.csv",
+    "p_close_bridge_sha256": "48d73b868235a78d73ea2587d5a2cd9094a861b605bfcd6447604bb90a650bf7",
+    "p_close_bridge_source": "data/beidan_features.db",
+    "p_close_columns_allowlist": [
+      "match_id",
+      "issue",
+      "p_close_3",
+      "p_close_1",
+      "p_close_0",
+      "beidan_hcap"
+    ],
+    "package": "results/bj203_causal_tensor_v2",
+    "package_sha256s": "b65182310cc19d5fc682c757aebc6de764a1cf98662fd559aaedf4db25a10090",
+    "source_contract": "bj203-causal-tensor-v2",
+    "source_manifest_files": 28
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_PREREGISTRATION",
+  "target_only_quality": {
+    "file": "target_only_quality_mask.csv",
+    "rows": [
+      {
+        "history_rows": 11382,
+        "official_3sp_rows": 11314,
+        "period": "25043-25125",
+        "post_kickoff_updates": 8247
+      },
+      {
+        "history_rows": 5608,
+        "official_3sp_rows": 5539,
+        "period": "26011-26049",
+        "post_kickoff_updates": 4516
+      }
+    ],
+    "rule": "official final-SP values and update timestamps are never read in Gate A"
+  },
+  "test_opening_rule": "The 25043-26049 target namespace may be opened exactly once only by a Gate-B runner after PI accepts this exact package unchanged."
+}

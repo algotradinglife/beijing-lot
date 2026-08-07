@@ -16,19 +16,35 @@ from unified_model.contract import (
     RETROSPECTIVE_TEST_RANGES,
     SP_TARGET,
 )
-from unified_model.gate_a import HISTORY_COLUMNS, build_package, verify_package
-from scripts.freeze_bj204_model_gate_a import _atomic_build, _default_history_source
+from unified_model.gate_a import (
+    FULL_3SP_IDENTITY_COLUMNS,
+    HISTORY_COLUMNS,
+    PCLOSE_COLUMNS,
+    build_package,
+    verify_package,
+)
+from scripts.freeze_bj204_model_gate_a import (
+    _atomic_build,
+    _default_full_3sp_identity_source,
+    _default_history_source,
+    _default_pclose_source,
+)
 from scripts.execute_bj204_notebook import execute_notebook
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "results/bj203_causal_tensor_v2"
 HISTORY = _default_history_source()
-FROZEN = ROOT / "results/bj204_gate_a_preoutcome_v2"
+FULL_3SP_IDENTITY = _default_full_3sp_identity_source()
+PCLOSE = _default_pclose_source()
+FROZEN = ROOT / "results/bj204_gate_a_preoutcome_v3"
 
 
 def _build(package: Path) -> dict[str, object]:
-    return build_package(package, source_package=SOURCE, history_source=HISTORY)
+    return build_package(
+        package, source_package=SOURCE, history_source=HISTORY,
+        full_3sp_identity_source=FULL_3SP_IDENTITY, pclose_source=PCLOSE,
+    )
 
 
 def test_bj204_history_proxy_has_an_explicit_pre_event_column_allowlist() -> None:
@@ -37,6 +53,8 @@ def test_bj204_history_proxy_has_an_explicit_pre_event_column_allowlist() -> Non
         "avg_eu_home", "avg_eu_draw", "avg_eu_away",
     )
     assert not {"score", "result_code", "winning_sp", "final_sp"}.intersection(HISTORY_COLUMNS)
+    assert FULL_3SP_IDENTITY_COLUMNS == ("expect", "match_no", "match_uid")
+    assert PCLOSE_COLUMNS == ("match_id", "issue", "p_close_3", "p_close_1", "p_close_0", "beidan_hcap")
 
 
 def test_bj204_gate_a_freezes_correct_issue_chronology_without_opening_labels(tmp_path: Path) -> None:
@@ -70,12 +88,19 @@ def test_bj204_gate_a_reconciles_all_75_proxy_identities_and_missing_reasons(tmp
     test = reconciliation.loc[reconciliation.role.eq("RETROSPECTIVE_TEST_LOCKED")]
     assert len(test) == 75
     assert int(test["history_rows"].sum()) == 11382 + 5608
+    assert int(test["official_3sp_target_identity_rows"].sum()) == 11314 + 5539
+    assert int(test["history_only_no_target_rows"].sum()) == 68 + 69
     early = test.loc[test["issue"].astype(int).between(25043, 25125)]
     late = test.loc[test["issue"].astype(int).between(26011, 26049)]
     assert len(early) == 42 and len(late) == 33
     assert early["missing_reason"].eq("UPSTREAM_203_INFERENCE_ABSENT; HISTORY_PROXY_ONLY").all()
     assert late["missing_reason"].eq("RETROSPECTIVE_PROXY_REQUIRED; INFERENCE_AUXILIARY_ONLY").all()
     assert test["labels_opened"].astype(str).str.lower().eq("false").all()
+    identity_rows = pd.read_csv(package / "test_identity_reconciliation.csv", dtype={"issue": str})
+    assert len(identity_rows) == 16990
+    assert int(identity_rows["official_target_identity_available"].sum()) == 16853
+    assert int((~identity_rows["official_target_identity_available"]).sum()) == 137
+    assert identity_rows["match_uid"].notna().sum() == 16853
 
 
 def test_bj204_gate_a_target_is_official_final_sp_and_proxy_is_only_an_input(tmp_path: Path) -> None:
@@ -107,6 +132,23 @@ def test_bj204_gate_a_proxy_coverage_is_explicit_and_not_a_live_claim(tmp_path: 
     assert (coverage["fallback_no_bet_rows"] >= 0).all()
 
 
+def test_bj204_gate_a_freezes_average_eu_to_pclose_bridge_and_outlier_policy(tmp_path: Path) -> None:
+    package = tmp_path / "gate-a"
+    _build(package)
+    summary = json.loads((package / "market_proxy_pclose_bridge_summary.json").read_text(encoding="utf-8"))
+    assert summary["join_key"].startswith("history.issue+history.match_idx")
+    assert summary["history_rows"] == 21091
+    assert summary["complete_comparable_rows"] == 20837
+    assert abs(summary["mean_absolute_error"] - 0.0055328658972946115) < 1e-14
+    assert summary["max_delta_gt_005_rows"] == 85
+    assert summary["max_delta_gt_010_rows"] == 22
+    assert summary["handicap_exact_rows"] == 20837
+    assert summary["labels_opened"] is False
+    bridge = pd.read_csv(package / "market_proxy_pclose_bridge.csv", dtype={"issue": str})
+    assert len(bridge.loc[bridge["historical_market_complete"] & bridge["p_close_complete"]]) == 20837
+    assert bridge["bridge_fallback_reason"].eq("HISTORY_PROXY_RETAINED_PCLOSE_NOT_SUBSTITUTED_OUTLIER").sum() == 22
+
+
 def test_bj204_gate_a_is_deterministic_and_matches_authoritative_package(tmp_path: Path) -> None:
     first = tmp_path / "first"
     second = tmp_path / "second"
@@ -122,7 +164,7 @@ def test_bj204_gate_a_is_deterministic_and_matches_authoritative_package(tmp_pat
 
 def test_bj204_atomic_wrapper_accepts_an_empty_stage_directory(tmp_path: Path) -> None:
     output = tmp_path / "immutable-package"
-    receipt = _atomic_build(output, SOURCE, HISTORY)
+    receipt = _atomic_build(output, SOURCE, HISTORY, FULL_3SP_IDENTITY, PCLOSE)
     assert receipt["package"] == output.name
     assert verify_package(output)["status"] == "PASS"
 

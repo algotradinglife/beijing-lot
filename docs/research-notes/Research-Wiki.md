@@ -62,7 +62,11 @@ updated: 2026-08-07
    只是赛前输入代理，监督目标必须是官方 3/1/0 `final_sp`，且该标签与其更新时间均未在 Gate A
    读取。官方全 3SP 覆盖／赛后更新时间只作为 target-only 质量普查保存，不能把代理面板描述成
    live snapshot。市场概率仍是强制 fallback：缺失、OOD 或校准失败时只能回退至有效市场向量或
-   `NO_BET_FROZEN`。Gate A 不产生模型优越性或策略授权结论。
+   `NO_BET_FROZEN`。v3 还冻结了历史平均欧赔标准化概率与 `p_close` 的桥接：使用
+   `issue+match_idx → match_uid → p_close.match_id`，在 20,837 个完整重叠上 MAE 为
+   0.005533，超过 0.05／0.10 的最大单格差异分别为 85／22 条；二者不会被当成
+   byte-identical。缺失 reference 或超过阈值时保留显式 source grade／fallback 理由。
+   Gate A 不产生模型优越性或策略授权结论。
 
 ## 近期 N7 策略结论（2026-08-02）
 
