@@ -26,7 +26,7 @@ from model_support_panel.contract import CONTRACT_VERSION
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "results/bj216_model_support_panel_v1"
 EXPECTED_SOURCE_MANIFEST = (
-    "ad1060fdee801277b00e6a40c5e28722d9df8fae025e163c4c15ed7b0d32f76b"
+    "3b00b1b5b5ac50d0eff9c86714b25b61e16bf70710309d3396640b5e68ecc651"
 )
 
 
@@ -59,6 +59,36 @@ def test_frozen_artifact_is_outcome_blind_and_negative() -> None:
     assert development["n7_issue_pass_rate"] == pytest.approx(20 / 24)
     assert development["core_match_coverage"] == pytest.approx(1695 / 2156)
     assert not (PACKAGE / "labels").exists()
+    assert (PACKAGE / "analysis/time_ordered_coverage.png").stat().st_size > 0
+    source_matches = pd.read_parquet(PACKAGE / "sources/matches.parquet")
+    issue_support = pd.read_csv(
+        PACKAGE / "audit/issue_support.csv", dtype={"issue": str}
+    )
+    panel = pd.read_parquet(PACKAGE / "inference/model_support_panel.parquet")
+    expected_cohorts = {
+        "post_203_operational_observational",
+        "prospective_post_activation",
+    }
+    assert set(source_matches["upstream_cohort"]) == expected_cohorts
+    assert set(issue_support["upstream_cohort"]) == expected_cohorts
+    assert "upstream_cohort" in panel.columns
+    assert set(panel["upstream_cohort"]).issubset(expected_cohorts)
+    issue_epochs = pd.read_parquet(PACKAGE / "inference/issue_epochs.parquet")
+    assert set(issue_epochs["upstream_cohort"]) == expected_cohorts
+    assert not issue_support["upstream_cohort"].eq(
+        issue_support["chronological_role"]
+    ).any()
+    sensitivity = pd.read_csv(
+        PACKAGE / "audit/epoch_sensitivity.csv", dtype={"issue": str}
+    )
+    assert len(sensitivity) == 29 * 6
+    assert sensitivity["controlling_readiness_vote"].sum() == 29
+    assert sensitivity.loc[
+        sensitivity["controlling_readiness_vote"], "epoch_rule"
+    ].eq("MEDIAN_KICKOFF_MINUS_10H").all()
+    assert sensitivity.loc[
+        ~sensitivity["controlling_readiness_vote"], "sensitivity_only"
+    ].all()
     inventory = pd.read_csv(
         PACKAGE / "sources/source_inventory.csv", keep_default_na=False
     )
@@ -176,3 +206,6 @@ def test_notebook_is_clean_executed_and_bounded() -> None:
     source = "\n".join("".join(cell.source) for cell in code).lower()
     assert "fit(" not in source
     assert "settlement" not in source
+    assert "time_ordered_coverage.png" in source
+    assert "epoch_sensitivity.csv" in source
+    assert "upstream_cohort" in source

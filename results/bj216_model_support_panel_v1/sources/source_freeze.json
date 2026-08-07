@@ -33,7 +33,7 @@
   "filename": "beidan_live.db",
   "frozen_source_census": {
     "matches": 4526,
-    "selected_snapshots": 2156
+    "selected_snapshots": 3785
   },
   "logical_source": "beidan_live",
   "outcome_namespace_read": false,
@@ -56,5 +56,11 @@
   "schema_sha256": "e53cbf874fae69dc5e1a17810e69110dda8230c5c9da89565cdc9f492fdfa0c5",
   "source_boundary_commit": "23db9d207b2b1d98772f18ae0762a904cb64e9d2",
   "source_boundary_preregistered_at_utc": "2026-08-07T11:59:52Z",
-  "source_freeze_cutoff_utc": "2026-08-07T12:06:27Z"
+  "source_freeze_cutoff_utc": "2026-08-07T12:06:27Z",
+  "upstream_package": {
+    "contract_version": "bj214-decision-epoch-tensor-v1",
+    "live_match_identity_sha256": "97adedee27da34f316abd631ee71c3dca33876bcc9c7649d508bcb965999d172",
+    "manifest_sha256": "d529dfbbe1a1aadab8f8135962cca8075ab255df26856fa78c3f9fee27112432",
+    "sha256sums_sha256": "1327476a193c1dafcc9c311ff9b5aba241346a88b44fd3d28197f337e36875e7"
+  }
 }

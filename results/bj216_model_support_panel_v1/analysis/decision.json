@@ -8,6 +8,20 @@
   "authority": "Data support only. No model training, betting, ROI, release or execution authority; #204 remains blocked until PI accepts a positive handoff.",
   "contract_version": "bj216-causal-p34-model-support-v1",
   "disposition": "BLOCKED_ACCUMULATE_CAUSAL_SUPPORT",
+  "epoch_sensitivity": {
+    "non_controlling_rules_do_not_vote": true,
+    "readiness_votes": [
+      "MEDIAN_KICKOFF_MINUS_10H"
+    ],
+    "rules": [
+      "FIRST_KICKOFF_MINUS_10H",
+      "MEDIAN_KICKOFF_MINUS_10H",
+      "LAST_KICKOFF_MINUS_10H",
+      "FIRST_KICKOFF_MINUS_1H",
+      "MEDIAN_KICKOFF_MINUS_1H",
+      "LAST_KICKOFF_MINUS_1H"
+    ]
+  },
   "model_ready_for_204": false,
   "outcome_namespace": "PHYSICALLY_ABSENT",
   "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",

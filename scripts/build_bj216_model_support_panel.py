@@ -41,6 +41,7 @@ def _parser() -> argparse.ArgumentParser:
     build.add_argument("--output", type=Path, required=True)
     build.add_argument("--live-database", type=Path, required=True)
     build.add_argument("--source-freeze-cutoff-utc", required=True)
+    build.add_argument("--upstream-package", type=Path, required=True)
     build.add_argument("--inventory-database", action="append", default=[])
     replay = commands.add_parser("replay")
     replay.add_argument("--source-package", type=Path, required=True)
@@ -75,6 +76,7 @@ def main() -> None:
             arguments.output,
             live_database=arguments.live_database,
             source_freeze_cutoff_utc=arguments.source_freeze_cutoff_utc,
+            upstream_package=arguments.upstream_package,
             inventory_databases=_inventory(arguments.inventory_database),
         )
     elif arguments.command == "replay":

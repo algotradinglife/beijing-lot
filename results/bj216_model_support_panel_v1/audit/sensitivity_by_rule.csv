@@ -1,0 +1,7 @@
+epoch_rule,evaluated_issue_epochs,eligible_issue_epochs,candidate_matches,core_complete_matches,core_match_coverage,required_core_match_coverage,n7_passing_issue_epochs,n7_issue_pass_rate,required_n7_issue_pass_rate,controlling_readiness_vote,sensitivity_only
+FIRST_KICKOFF_MINUS_10H,29,3,153,141,0.921568627451,0.8,3,1,0.8,False,True
+MEDIAN_KICKOFF_MINUS_10H,28,24,2156,1695,0.786178107607,0.8,20,0.833333333333,0.8,True,False
+LAST_KICKOFF_MINUS_10H,28,28,323,246,0.761609907121,0.8,15,0.535714285714,0.8,False,True
+FIRST_KICKOFF_MINUS_1H,29,3,153,153,1,0.8,3,1,0.8,False,True
+MEDIAN_KICKOFF_MINUS_1H,28,24,1706,1287,0.754396248535,0.8,20,0.833333333333,0.8,False,True
+LAST_KICKOFF_MINUS_1H,28,28,62,48,0.774193548387,0.8,1,0.0357142857143,0.8,False,True

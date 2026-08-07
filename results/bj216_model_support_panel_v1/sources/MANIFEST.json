@@ -2,16 +2,16 @@
   "contract_version": "bj216-causal-p34-model-support-v1",
   "files": {
     "matches.parquet": {
-      "bytes": 28941,
-      "sha256": "66d75136662dfed4e29b706e733405bd698dc7d78abfcbee8f55eb6d40a9746b"
+      "bytes": 29676,
+      "sha256": "7c5638fd3050558aac41778b4c890ee510ba98e3f29c6d4d4028d5c289491182"
     },
     "selected_snapshots.parquet": {
-      "bytes": 41697,
-      "sha256": "df969bad90121b7970a3e948cc843ef5b5d85c4b86663f06e5244cf82b25248b"
+      "bytes": 63277,
+      "sha256": "d0fe22400ebcaad6f409f8b6581bde6e8a38d9a5ba7cfc6025d110f98e8e71f7"
     },
     "source_freeze.json": {
-      "bytes": 2153,
-      "sha256": "7a1da8a42e1c22a9d96434f00e647890a4c26e2e4e33f073c965ccf87c7d3776"
+      "bytes": 2525,
+      "sha256": "7c6f67655eff1f89d3e43803c57fcb28b773d1f0b32c0a9adced36bc1b0c1eca"
     },
     "source_inventory.csv": {
       "bytes": 17522,

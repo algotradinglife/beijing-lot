@@ -6,6 +6,9 @@ Controlling rule: `MEDIAN_KICKOFF_MINUS_10H`. Only same-row,
 timestamped three-way Beijing SP and EURO observations at or before the
 decision epoch enter the panel. Outcome and settlement namespaces are absent.
 Sale/parlay metadata is non-controlling and was not read.
+The other five #214 schedule rules are retained as sensitivity-only
+diagnostics and never vote on readiness. Exact #214 upstream cohorts
+are preserved separately from the 30/5/2 chronological roles.
 
 Disposition: **BLOCKED_ACCUMULATE_CAUSAL_SUPPORT**.
 Eligible issue epochs: **24**;

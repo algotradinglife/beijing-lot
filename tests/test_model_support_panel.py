@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import pandas as pd
 
-from model_support_panel.builder import assemble_panel
+from model_support_panel.builder import SCHEDULE_EPOCH_RULES, assemble_panel
 from model_support_panel.contract import (
     CONTRACT_VERSION,
     SUPPORT_GATE,
@@ -45,6 +45,11 @@ def _causal_fixture(issue_count: int = 37) -> tuple[pd.DataFrame, pd.DataFrame]:
                         epoch - timedelta(hours=2)
                     ).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     "handicap_line": 0.0,
+                    "upstream_cohort": (
+                        "post_203_operational_observational"
+                        if issue_offset < 35
+                        else "prospective_post_activation"
+                    ),
                 }
             )
             snapshots.append(
@@ -94,6 +99,20 @@ def test_panel_is_outcome_blind_causal_and_three_way() -> None:
         "devig_euro_probability"
     ].sum()
     assert sums.sub(1.0).abs().max() < 1e-12
+    sensitivity = assembled["epoch_sensitivity"]
+    assert len(sensitivity) == 37 * len(SCHEDULE_EPOCH_RULES)
+    assert set(sensitivity["epoch_rule"]) == set(SCHEDULE_EPOCH_RULES)
+    assert sensitivity["controlling_readiness_vote"].sum() == 37
+    controlling = sensitivity[sensitivity["controlling_readiness_vote"]]
+    assert controlling["epoch_rule"].eq("MEDIAN_KICKOFF_MINUS_10H").all()
+    assert sensitivity.loc[
+        ~sensitivity["controlling_readiness_vote"], "sensitivity_only"
+    ].all()
+    assert set(panel["upstream_cohort"]) == {
+        "post_203_operational_observational",
+        "prospective_post_activation",
+    }
+    assert not panel["upstream_cohort"].eq(panel["chronological_role"]).any()
 
 
 def test_post_epoch_snapshot_is_not_selected() -> None:

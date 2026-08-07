@@ -34,7 +34,20 @@ ROOT = Path(__file__).resolve().parents[2]
 ENVIRONMENT_LOCK = ROOT / "requirements.txt"
 SOURCE_BOUNDARY_COMMIT = "23db9d207b2b1d98772f18ae0762a904cb64e9d2"
 EXPECTED_SOURCE_MANIFEST_SHA256 = (
-    "ad1060fdee801277b00e6a40c5e28722d9df8fae025e163c4c15ed7b0d32f76b"
+    "3b00b1b5b5ac50d0eff9c86714b25b61e16bf70710309d3396640b5e68ecc651"
+)
+
+SCHEDULE_EPOCH_RULES = (
+    "FIRST_KICKOFF_MINUS_10H",
+    "MEDIAN_KICKOFF_MINUS_10H",
+    "LAST_KICKOFF_MINUS_10H",
+    "FIRST_KICKOFF_MINUS_1H",
+    "MEDIAN_KICKOFF_MINUS_1H",
+    "LAST_KICKOFF_MINUS_1H",
+)
+UPSTREAM_COHORTS = (
+    "post_203_operational_observational",
+    "prospective_post_activation",
 )
 
 FORBIDDEN_INFERENCE_PARTS = (
@@ -287,10 +300,20 @@ def _complete_triplet(frame: pd.DataFrame, columns: Iterable[str]) -> pd.Series:
     ).all(axis=1)
 
 
-def _epoch_id(issue: str, decision_epoch_utc: str) -> str:
-    return _row_digest(
-        (CONTRACT_VERSION, issue, REPRESENTATIVE_EPOCH_RULE, decision_epoch_utc)
-    )
+def _epoch_id(issue: str, epoch_rule: str, decision_epoch_utc: str) -> str:
+    return _row_digest((CONTRACT_VERSION, issue, epoch_rule, decision_epoch_utc))
+
+
+def _schedule_epoch(kickoffs: pd.Series, rule: str) -> pd.Timestamp:
+    anchor_name, _, lead_text = rule.partition("_KICKOFF_MINUS_")
+    anchors = {
+        "FIRST": kickoffs.iloc[0],
+        "MEDIAN": kickoffs.iloc[(len(kickoffs) - 1) // 2],
+        "LAST": kickoffs.iloc[-1],
+    }
+    if anchor_name not in anchors or lead_text not in {"10H", "1H"}:
+        raise ModelSupportBuildError(f"unsupported schedule epoch rule: {rule}")
+    return anchors[anchor_name] - pd.Timedelta(hours=int(lead_text[:-1]))
 
 
 def _panel_row_id(epoch_id: str, match_id: str, outcome_code: str) -> str:
@@ -303,7 +326,7 @@ def assemble_panel(
     *,
     source_freeze_cutoff_utc: str,
 ) -> dict[str, Any]:
-    """Create the controlling issue audit and feature panel from frozen rows."""
+    """Create the controlling panel plus non-voting schedule sensitivity evidence."""
 
     required_matches = {
         "match_id",
@@ -312,6 +335,7 @@ def assemble_panel(
         "kickoff_ts_utc",
         "identity_observed_ts_utc",
         "handicap_line",
+        "upstream_cohort",
     }
     required_snapshots = {
         "id",
@@ -336,6 +360,11 @@ def assemble_panel(
     snapshots["match_id"] = snapshots["match_id"].astype(str)
     if matches["match_id"].duplicated().any():
         raise ModelSupportBuildError("duplicate match identity")
+    if not matches["upstream_cohort"].isin(UPSTREAM_COHORTS).all():
+        raise ModelSupportBuildError("upstream cohort violates the #214 contract")
+    cohort_counts = matches.groupby("issue", sort=False)["upstream_cohort"].nunique()
+    if not cohort_counts.eq(1).all():
+        raise ModelSupportBuildError("an issue crosses immutable upstream cohorts")
     cutoff = pd.Timestamp(source_freeze_cutoff_utc)
     if cutoff.tzinfo is None:
         raise ModelSupportBuildError("source freeze cutoff must include timezone")
@@ -346,6 +375,7 @@ def assemble_panel(
     if snapshot_time.gt(cutoff).any():
         raise ModelSupportBuildError("frozen source contains post-cutoff snapshot")
     records: list[dict[str, Any]] = []
+    sensitivity_records: list[dict[str, Any]] = []
     selected_source_parts: list[pd.DataFrame] = []
     candidate_parts: list[pd.DataFrame] = []
     for issue, scoped in matches.groupby("issue", sort=False):
@@ -353,98 +383,114 @@ def assemble_panel(
             ["kickoff_ts_utc", "match_idx", "match_id"], kind="mergesort"
         )
         kickoffs = pd.to_datetime(scoped["kickoff_ts_utc"], utc=True, errors="raise")
-        anchor = kickoffs.iloc[(len(scoped) - 1) // 2]
-        epoch = anchor - pd.Timedelta(hours=10)
-        epoch_text = epoch.strftime("%Y-%m-%dT%H:%M:%SZ")
+        denominator = sorted(scoped["match_idx"].astype(int).tolist())
+        upstream_cohort = str(scoped.iloc[0]["upstream_cohort"])
         identity_time = pd.to_datetime(
             scoped["identity_observed_ts_utc"], utc=True, errors="raise"
         )
-        candidate_mask = identity_time.le(epoch) & kickoffs.gt(epoch)
-        candidates = scoped.loc[candidate_mask].copy()
-        candidates["epoch_id"] = _epoch_id(str(issue), epoch_text)
-        candidates["decision_epoch_utc"] = epoch_text
-        candidates["issue_evaluation_status"] = (
-            "EVALUATED" if epoch <= cutoff else "FUTURE_AT_SOURCE_FREEZE"
-        )
-        candidates["identity_known_at_epoch"] = True
-        candidates["not_started_at_epoch"] = True
-        if epoch <= cutoff and not candidates.empty:
-            scoped_snapshots = snapshots[
-                snapshots["match_id"].isin(candidates["match_id"])
-                & pd.to_datetime(
-                    snapshots["market_observed_ts_utc"], utc=True, errors="raise"
-                ).le(epoch)
-            ].sort_values(
-                ["market_observed_ts_utc", "id", "match_id"], kind="mergesort"
+        for epoch_rule in SCHEDULE_EPOCH_RULES:
+            epoch = _schedule_epoch(kickoffs, epoch_rule)
+            epoch_text = epoch.strftime("%Y-%m-%dT%H:%M:%SZ")
+            evaluated = bool(epoch <= cutoff)
+            candidate_mask = identity_time.le(epoch) & kickoffs.gt(epoch)
+            candidates = scoped.loc[candidate_mask].copy()
+            candidates["epoch_id"] = _epoch_id(
+                str(issue), epoch_rule, epoch_text
             )
-            latest = scoped_snapshots.groupby("match_id", sort=False).tail(1)
-            selected_source_parts.append(latest.copy())
-            candidates = candidates.merge(
-                latest,
-                on="match_id",
-                how="left",
-                validate="one_to_one",
+            candidates["epoch_rule"] = epoch_rule
+            candidates["decision_epoch_utc"] = epoch_text
+            candidates["issue_evaluation_status"] = (
+                "EVALUATED" if evaluated else "FUTURE_AT_SOURCE_FREEZE"
             )
-        else:
-            for column in required_snapshots - {"match_id"}:
-                candidates[column] = np.nan
-        market_time = pd.to_datetime(
-            candidates["market_observed_ts_utc"], utc=True, errors="coerce"
-        )
-        candidates["market_clock_safe"] = market_time.notna() & market_time.le(epoch)
-        candidates["snapshot_age_hours"] = (
-            epoch - market_time
-        ).dt.total_seconds() / 3600.0
-        candidates["bj_sp_complete"] = _complete_triplet(
-            candidates, ("sp_3", "sp_1", "sp_0")
-        )
-        candidates["euro_complete"] = _complete_triplet(
-            candidates, ("eu_h", "eu_d", "eu_a")
-        )
-        candidates["core_complete"] = (
-            candidates["market_clock_safe"]
-            & candidates["bj_sp_complete"]
-            & candidates["euro_complete"]
-        )
-        candidate_parts.append(candidates)
-        candidate_count = len(candidates) if epoch <= cutoff else 0
-        core_count = (
-            int(candidates["core_complete"].sum()) if epoch <= cutoff else 0
-        )
-        denominator = sorted(scoped["match_idx"].astype(int).tolist())
-        records.append(
-            {
-                "epoch_id": _epoch_id(str(issue), epoch_text),
+            candidates["identity_known_at_epoch"] = True
+            candidates["not_started_at_epoch"] = True
+            if evaluated and not candidates.empty:
+                scoped_snapshots = snapshots[
+                    snapshots["match_id"].isin(candidates["match_id"])
+                    & snapshot_time.le(epoch)
+                ].sort_values(
+                    ["market_observed_ts_utc", "id", "match_id"],
+                    kind="mergesort",
+                )
+                latest = scoped_snapshots.groupby("match_id", sort=False).tail(1)
+                selected_source_parts.append(latest.copy())
+                candidates = candidates.merge(
+                    latest,
+                    on="match_id",
+                    how="left",
+                    validate="one_to_one",
+                )
+            else:
+                for column in required_snapshots - {"match_id"}:
+                    candidates[column] = np.nan
+            market_time = pd.to_datetime(
+                candidates["market_observed_ts_utc"], utc=True, errors="coerce"
+            )
+            candidates["market_clock_safe"] = (
+                market_time.notna() & market_time.le(epoch)
+            )
+            candidates["snapshot_age_hours"] = (
+                epoch - market_time
+            ).dt.total_seconds() / 3600.0
+            candidates["bj_sp_complete"] = _complete_triplet(
+                candidates, ("sp_3", "sp_1", "sp_0")
+            )
+            candidates["euro_complete"] = _complete_triplet(
+                candidates, ("eu_h", "eu_d", "eu_a")
+            )
+            candidates["core_complete"] = (
+                candidates["market_clock_safe"]
+                & candidates["bj_sp_complete"]
+                & candidates["euro_complete"]
+            )
+            candidate_count = len(candidates) if evaluated else 0
+            core_count = int(candidates["core_complete"].sum()) if evaluated else 0
+            snapshot_count = (
+                int(candidates["market_clock_safe"].sum()) if evaluated else 0
+            )
+            sensitivity_row = {
+                "epoch_id": _epoch_id(str(issue), epoch_rule, epoch_text),
                 "issue": str(issue),
+                "upstream_cohort": upstream_cohort,
+                "epoch_rule": epoch_rule,
                 "decision_epoch_utc": epoch_text,
                 "source_freeze_cutoff_utc": cutoff.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                "representative_epoch_rule": REPRESENTATIVE_EPOCH_RULE,
                 "evaluation_status": (
-                    "EVALUATED" if epoch <= cutoff else "FUTURE_AT_SOURCE_FREEZE"
+                    "EVALUATED" if evaluated else "FUTURE_AT_SOURCE_FREEZE"
                 ),
                 "denominator_matches": len(scoped),
                 "denominator_sha256": _row_digest(denominator),
                 "candidate_matches": candidate_count,
-                "timestamped_snapshot_matches": (
-                    int(candidates["market_clock_safe"].sum())
-                    if epoch <= cutoff
-                    else 0
-                ),
+                "timestamped_snapshot_matches": snapshot_count,
                 "core_complete_matches": core_count,
                 "core_match_coverage": (
                     core_count / candidate_count if candidate_count else 0.0
                 ),
                 "n7_issue_pass": core_count
                 >= SUPPORT_GATE.minimum_complete_matches_per_issue_epoch,
-                "eligible_issue_epoch": bool(epoch <= cutoff and candidate_count > 0),
+                "eligible_issue_epoch": bool(evaluated and candidate_count > 0),
+                "controlling_readiness_vote": epoch_rule
+                == REPRESENTATIVE_EPOCH_RULE,
+                "sensitivity_only": epoch_rule != REPRESENTATIVE_EPOCH_RULE,
                 "prospective_after_activation": bool(
                     epoch >= pd.Timestamp(PROSPECTIVE_ACTIVATION_UTC)
                 ),
             }
-        )
+            sensitivity_records.append(sensitivity_row)
+            if epoch_rule == REPRESENTATIVE_EPOCH_RULE:
+                records.append(
+                    {
+                        **sensitivity_row,
+                        "representative_epoch_rule": REPRESENTATIVE_EPOCH_RULE,
+                    }
+                )
+                candidate_parts.append(candidates)
     issue_support = pd.DataFrame(records).sort_values(
         ["decision_epoch_utc", "issue"], kind="mergesort"
     ).reset_index(drop=True)
+    issue_support["issue_sequence_position"] = np.arange(
+        len(issue_support), dtype=np.int32
+    )
     issue_support["chronological_position"] = -1
     issue_support["chronological_role"] = "not_eligible"
     eligible_index = issue_support.index[issue_support["eligible_issue_epoch"]]
@@ -457,7 +503,12 @@ def assemble_panel(
         else pd.DataFrame()
     )
     role_lookup = issue_support.set_index("issue")[
-        ["chronological_position", "chronological_role", "eligible_issue_epoch"]
+        [
+            "issue_sequence_position",
+            "chronological_position",
+            "chronological_role",
+            "eligible_issue_epoch",
+        ]
     ]
     candidate_roster = candidate_roster.join(role_lookup, on="issue")
     admitted = candidate_roster[
@@ -478,6 +529,8 @@ def assemble_panel(
                     ),
                     "epoch_id": str(row.epoch_id),
                     "issue": str(row.issue),
+                    "upstream_cohort": str(row.upstream_cohort),
+                    "issue_sequence_position": int(row.issue_sequence_position),
                     "chronological_position": int(row.chronological_position),
                     "chronological_role": str(row.chronological_role),
                     "match_id": str(row.match_id),
@@ -514,8 +567,17 @@ def assemble_panel(
         if selected_source_parts
         else snapshots.iloc[0:0].copy()
     )
+    rule_order = {rule: index for index, rule in enumerate(SCHEDULE_EPOCH_RULES)}
+    epoch_sensitivity = pd.DataFrame(sensitivity_records)
+    epoch_sensitivity["epoch_rule_order"] = epoch_sensitivity["epoch_rule"].map(
+        rule_order
+    )
+    epoch_sensitivity = epoch_sensitivity.sort_values(
+        ["decision_epoch_utc", "issue", "epoch_rule_order"], kind="mergesort"
+    ).drop(columns="epoch_rule_order").reset_index(drop=True)
     return {
         "issue_support": issue_support,
+        "epoch_sensitivity": epoch_sensitivity,
         "candidate_roster": candidate_roster,
         "panel": panel,
         "selected_source": selected_source,
@@ -567,6 +629,174 @@ def _coverage_by_role(issue_support: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _sensitivity_by_rule(epoch_sensitivity: pd.DataFrame) -> pd.DataFrame:
+    evaluated = epoch_sensitivity[
+        epoch_sensitivity["evaluation_status"].eq("EVALUATED")
+    ]
+    rows: list[dict[str, Any]] = []
+    for rule in SCHEDULE_EPOCH_RULES:
+        scoped = evaluated[evaluated["epoch_rule"].eq(rule)]
+        eligible = scoped[scoped["eligible_issue_epoch"]]
+        candidates = int(scoped["candidate_matches"].sum())
+        complete = int(scoped["core_complete_matches"].sum())
+        eligible_count = len(eligible)
+        n7_pass = int(eligible["n7_issue_pass"].sum())
+        rows.append(
+            {
+                "epoch_rule": rule,
+                "evaluated_issue_epochs": len(scoped),
+                "eligible_issue_epochs": eligible_count,
+                "candidate_matches": candidates,
+                "core_complete_matches": complete,
+                "core_match_coverage": complete / candidates if candidates else 0.0,
+                "required_core_match_coverage": SUPPORT_GATE.minimum_core_match_coverage,
+                "n7_passing_issue_epochs": n7_pass,
+                "n7_issue_pass_rate": (
+                    n7_pass / eligible_count if eligible_count else 0.0
+                ),
+                "required_n7_issue_pass_rate": SUPPORT_GATE.minimum_n7_issue_pass_rate,
+                "controlling_readiness_vote": rule == REPRESENTATIVE_EPOCH_RULE,
+                "sensitivity_only": rule != REPRESENTATIVE_EPOCH_RULE,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _time_ordered_coverage(issue_support: pd.DataFrame) -> pd.DataFrame:
+    curve = issue_support.sort_values(
+        ["issue_sequence_position", "issue"], kind="mergesort"
+    ).loc[
+        :,
+        [
+            "issue",
+            "upstream_cohort",
+            "issue_sequence_position",
+            "chronological_position",
+            "chronological_role",
+            "decision_epoch_utc",
+            "eligible_issue_epoch",
+            "candidate_matches",
+            "core_complete_matches",
+            "n7_issue_pass",
+        ],
+    ].reset_index(drop=True)
+    eligible = curve["eligible_issue_epoch"].astype(bool)
+    curve["cumulative_eligible_issue_epochs"] = eligible.astype(int).cumsum()
+    curve["cumulative_candidate_matches"] = (
+        curve["candidate_matches"].where(eligible, 0).astype(int).cumsum()
+    )
+    curve["cumulative_core_complete_matches"] = (
+        curve["core_complete_matches"].where(eligible, 0).astype(int).cumsum()
+    )
+    curve["cumulative_n7_passing_issue_epochs"] = (
+        curve["n7_issue_pass"].where(eligible, False).astype(int).cumsum()
+    )
+    curve["cumulative_core_match_coverage"] = np.where(
+        curve["cumulative_candidate_matches"].gt(0),
+        curve["cumulative_core_complete_matches"]
+        / curve["cumulative_candidate_matches"],
+        0.0,
+    )
+    curve["cumulative_n7_issue_pass_rate"] = np.where(
+        curve["cumulative_eligible_issue_epochs"].gt(0),
+        curve["cumulative_n7_passing_issue_epochs"]
+        / curve["cumulative_eligible_issue_epochs"],
+        0.0,
+    )
+    return curve
+
+
+def _write_analysis_figure(
+    curve: pd.DataFrame,
+    sensitivity: pd.DataFrame,
+    path: Path,
+) -> None:
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from matplotlib import pyplot as plt
+
+    figure, axes = plt.subplots(2, 1, figsize=(12, 9), constrained_layout=True)
+    axis = axes[0]
+    eligible = curve[curve["eligible_issue_epoch"]]
+    x = eligible["chronological_position"].to_numpy(dtype=float) + 1
+    axis.plot(
+        x,
+        eligible["cumulative_core_match_coverage"],
+        marker="o",
+        markersize=3,
+        label="cumulative causal core coverage",
+    )
+    axis.plot(
+        x,
+        eligible["cumulative_n7_issue_pass_rate"],
+        marker="s",
+        markersize=3,
+        label="cumulative N7 issue pass rate",
+    )
+    axis.axhline(0.80, color="black", linestyle="--", linewidth=1, label="frozen 80% threshold")
+    for offset, boundary in enumerate((30.5, 35.5, 37.5)):
+        axis.axvline(
+            boundary,
+            color="gray",
+            linestyle=":",
+            linewidth=1,
+            label="frozen 30 / 5 / 2 role boundaries" if offset == 0 else None,
+        )
+    cohort_changes = np.flatnonzero(
+        curve["upstream_cohort"].ne(curve["upstream_cohort"].shift()).to_numpy()
+    )
+    for offset, row_index in enumerate(cohort_changes[1:]):
+        prior_eligible = int(
+            curve.iloc[:row_index]["eligible_issue_epoch"].astype(bool).sum()
+        )
+        axis.axvline(
+            prior_eligible + 0.5,
+            color="#7b3294",
+            linestyle="-.",
+            linewidth=1,
+            label="upstream #214 cohort boundary" if offset == 0 else None,
+        )
+    axis.set_xlim(0.5, max(37.5, float(x.max()) + 0.5 if len(x) else 37.5))
+    axis.set_ylim(0, 1.05)
+    axis.set_xlabel("eligible issue epoch (time ordered)")
+    axis.set_ylabel("coverage / pass rate")
+    axis.set_title("Controlling epoch coverage with 30 / 5 / 2 role boundaries")
+    axis.legend(loc="lower right", fontsize=8)
+
+    sensitivity_axis = axes[1]
+    positions = np.arange(len(sensitivity), dtype=float)
+    sensitivity_axis.bar(
+        positions - 0.18,
+        sensitivity["core_match_coverage"],
+        width=0.36,
+        label="causal core coverage",
+    )
+    sensitivity_axis.bar(
+        positions + 0.18,
+        sensitivity["n7_issue_pass_rate"],
+        width=0.36,
+        label="N7 issue pass rate",
+    )
+    sensitivity_axis.axhline(0.80, color="black", linestyle="--", linewidth=1)
+    sensitivity_axis.set_ylim(0, 1.05)
+    sensitivity_axis.set_ylabel("coverage / pass rate")
+    sensitivity_axis.set_xticks(
+        positions,
+        sensitivity["epoch_rule"].str.replace("_KICKOFF_", "\nKICKOFF_"),
+        rotation=20,
+        ha="right",
+        fontsize=8,
+    )
+    sensitivity_axis.set_title(
+        "Schedule-epoch sensitivity (only MEDIAN -10H votes on readiness)"
+    )
+    sensitivity_axis.legend(loc="lower right", fontsize=8)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(path, dpi=150, metadata={"Software": "matplotlib"})
+    plt.close(figure)
+
+
 def _decision(issue_support: pd.DataFrame, coverage: pd.DataFrame) -> dict[str, Any]:
     eligible = issue_support[issue_support["eligible_issue_epoch"]]
     eligible_count = len(eligible)
@@ -584,6 +814,11 @@ def _decision(issue_support: pd.DataFrame, coverage: pd.DataFrame) -> dict[str, 
     return {
         "contract_version": CONTRACT_VERSION,
         "representative_epoch_rule": REPRESENTATIVE_EPOCH_RULE,
+        "epoch_sensitivity": {
+            "rules": list(SCHEDULE_EPOCH_RULES),
+            "readiness_votes": [REPRESENTATIVE_EPOCH_RULE],
+            "non_controlling_rules_do_not_vote": True,
+        },
         "source_boundary_preregistered_at_utc": (
             SOURCE_BOUNDARY_PREREGISTERED_AT_UTC
         ),
@@ -663,6 +898,9 @@ def _write_reports(
                 "timestamped three-way Beijing SP and EURO observations at or before the",
                 "decision epoch enter the panel. Outcome and settlement namespaces are absent.",
                 "Sale/parlay metadata is non-controlling and was not read.",
+                "The other five #214 schedule rules are retained as sensitivity-only",
+                "diagnostics and never vote on readiness. Exact #214 upstream cohorts",
+                "are preserved separately from the 30/5/2 chronological roles.",
                 "",
                 f"Disposition: **{decision['disposition']}**.",
                 f"Eligible issue epochs: **{accumulation['eligible_issue_epochs']}**;",
@@ -707,6 +945,8 @@ def _write_reports(
                 "",
                 f"- Source freeze: `{source_freeze['source_freeze_cutoff_utc']}`",
                 f"- Representative rule: `{REPRESENTATIVE_EPOCH_RULE}`",
+                "- Schedule sensitivity rules: `6` (only the representative votes)",
+                "- Frozen thresholds shown in plot: `80%` core coverage and `80%` N7 pass rate",
                 f"- Eligible issue epochs: `{accumulation['eligible_issue_epochs']}`",
                 f"- Development deficit: `{accumulation['issues_needed_before_development_horizon']}` issues",
                 f"- Full readiness deficit: `{accumulation['issues_needed_before_full_readiness_horizon']}` issues",
@@ -740,6 +980,7 @@ def _build_from_frozen_sources(
         source_freeze_cutoff_utc=str(source_freeze["source_freeze_cutoff_utc"]),
     )
     issue_support = assembled["issue_support"]
+    epoch_sensitivity = assembled["epoch_sensitivity"]
     candidate_roster = assembled["candidate_roster"]
     panel = assembled["panel"]
     selected_source = assembled["selected_source"]
@@ -748,6 +989,8 @@ def _build_from_frozen_sources(
         "selected_snapshots": len(selected_source),
     }
     coverage = _coverage_by_role(issue_support)
+    sensitivity = _sensitivity_by_rule(epoch_sensitivity)
+    curve = _time_ordered_coverage(issue_support)
     decision = _decision(issue_support, coverage)
     sources = package / "sources"
     audit = package / "audit"
@@ -762,6 +1005,9 @@ def _build_from_frozen_sources(
     source_manifest = _namespace_manifest(sources, "outcome_blind_frozen_sources")
     write_csv(audit / "issue_support.csv", issue_support)
     write_csv(audit / "coverage_by_role.csv", coverage)
+    write_csv(audit / "epoch_sensitivity.csv", epoch_sensitivity)
+    write_csv(audit / "sensitivity_by_rule.csv", sensitivity)
+    write_csv(audit / "time_ordered_coverage.csv", curve)
     write_parquet(audit / "candidate_roster.parquet", candidate_roster)
     write_parquet(inference / "model_support_panel.parquet", panel)
     write_parquet(
@@ -771,7 +1017,9 @@ def _build_from_frozen_sources(
             [
                 "epoch_id",
                 "issue",
+                "upstream_cohort",
                 "decision_epoch_utc",
+                "issue_sequence_position",
                 "chronological_position",
                 "chronological_role",
                 "eligible_issue_epoch",
@@ -780,6 +1028,11 @@ def _build_from_frozen_sources(
     )
     _namespace_manifest(inference, "outcome_unexposed_model_support")
     write_json(analysis / "decision.json", decision)
+    _write_analysis_figure(
+        curve,
+        sensitivity,
+        analysis / "time_ordered_coverage.png",
+    )
     _write_reports(package, decision=decision, source_freeze=source_freeze)
     manifest = {
         "contract_version": CONTRACT_VERSION,
@@ -802,12 +1055,80 @@ def _build_from_frozen_sources(
     return verify_package(package)
 
 
+def _bind_upstream_cohort(
+    matches: pd.DataFrame,
+    upstream_package: Path,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    upstream_package = upstream_package.expanduser().resolve()
+    manifest_path = upstream_package / "MANIFEST.json"
+    sums_path = upstream_package / "SHA256SUMS.json"
+    identity_path = upstream_package / "sources/live_match_identity.parquet"
+    if not all(path.is_file() for path in (manifest_path, sums_path, identity_path)):
+        raise ModelSupportBuildError("upstream #214 package is incomplete")
+    upstream_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if upstream_manifest.get("contract_version") != UPSTREAM_CONTRACT_VERSION:
+        raise ModelSupportBuildError("upstream #214 contract mismatch")
+    identity = pd.read_parquet(identity_path).loc[
+        :,
+        [
+            "match_id",
+            "issue",
+            "match_idx",
+            "kickoff_ts_utc",
+            "identity_observed_ts_utc",
+            "native_handicap_line",
+            "cohort",
+        ],
+    ]
+    identity["match_id"] = identity["match_id"].astype(str)
+    if identity["match_id"].duplicated().any():
+        raise ModelSupportBuildError("upstream #214 identity is not unique")
+    bound = matches.merge(
+        identity,
+        on="match_id",
+        how="left",
+        suffixes=("", "_upstream"),
+        validate="one_to_one",
+    )
+    if bound["cohort"].isna().any():
+        raise ModelSupportBuildError("runtime identity is absent from upstream #214")
+    for column in ("issue", "match_idx", "kickoff_ts_utc", "identity_observed_ts_utc"):
+        upstream_column = f"{column}_upstream"
+        if not bound[column].astype(str).eq(bound[upstream_column].astype(str)).all():
+            raise ModelSupportBuildError(f"runtime identity differs from #214: {column}")
+    current_handicap = pd.to_numeric(bound["handicap_line"], errors="coerce")
+    upstream_handicap = pd.to_numeric(
+        bound["native_handicap_line"], errors="coerce"
+    )
+    handicap_equal = current_handicap.isna().eq(upstream_handicap.isna()) & np.isclose(
+        current_handicap.fillna(0.0), upstream_handicap.fillna(0.0)
+    )
+    if not handicap_equal.all():
+        raise ModelSupportBuildError("runtime handicap identity differs from #214")
+    bound = bound.drop(
+        columns=[
+            "issue_upstream",
+            "match_idx_upstream",
+            "kickoff_ts_utc_upstream",
+            "identity_observed_ts_utc_upstream",
+            "native_handicap_line",
+        ]
+    ).rename(columns={"cohort": "upstream_cohort"})
+    return bound, {
+        "contract_version": UPSTREAM_CONTRACT_VERSION,
+        "manifest_sha256": digest(manifest_path),
+        "sha256sums_sha256": digest(sums_path),
+        "live_match_identity_sha256": digest(identity_path),
+    }
+
+
 def build_package(
     package: Path,
     *,
     live_database: Path | None = None,
     source_freeze_cutoff_utc: str | None = None,
     inventory_databases: Mapping[str, Path] | None = None,
+    upstream_package: Path | None = None,
     source_package: Path | None = None,
 ) -> dict[str, Any]:
     package = package.expanduser().resolve()
@@ -839,9 +1160,14 @@ def build_package(
         )
     if live_database is None or source_freeze_cutoff_utc is None:
         raise ModelSupportBuildError("runtime build requires live database and cutoff")
+    if upstream_package is None:
+        raise ModelSupportBuildError("runtime build requires the immutable #214 package")
     source_matches, runtime_snapshots, runtime = _extract_runtime_source(
         live_database,
         source_freeze_cutoff_utc=source_freeze_cutoff_utc,
+    )
+    source_matches, upstream_binding = _bind_upstream_cohort(
+        source_matches, upstream_package
     )
     inventory_rows = [
         {
@@ -873,6 +1199,7 @@ def build_package(
         "excluded_source_classes": EXCLUDED_SOURCE_CLASSES,
         "prohibited_namespaces": list(PROHIBITED_NAMESPACES),
         "outcome_namespace_read": False,
+        "upstream_package": upstream_binding,
     }
     return _build_from_frozen_sources(
         package,
@@ -914,6 +1241,8 @@ def _verify_namespace(namespace: Path, expected_name: str) -> None:
 
 def verify_package(package: Path) -> dict[str, Any]:
     package = package.expanduser().resolve()
+    if not (package / "analysis/time_ordered_coverage.png").is_file():
+        raise ModelSupportBuildError("time-ordered coverage plot is absent")
     _verify_checksums(package)
     _verify_namespace(package / "sources", "outcome_blind_frozen_sources")
     _verify_namespace(package / "inference", "outcome_unexposed_model_support")
@@ -942,6 +1271,9 @@ def verify_package(package: Path) -> dict[str, Any]:
         raise ModelSupportBuildError("environment lock mismatch")
     if source_freeze.get("outcome_namespace_read") is not False:
         raise ModelSupportBuildError("outcome namespace read flag is not false")
+    upstream_binding = source_freeze.get("upstream_package", {})
+    if upstream_binding.get("contract_version") != UPSTREAM_CONTRACT_VERSION:
+        raise ModelSupportBuildError("upstream #214 binding is absent or invalid")
     panel = pd.read_parquet(package / "inference/model_support_panel.parquet")
     issue_support = pd.read_csv(
         package / "audit/issue_support.csv", dtype={"issue": str}
@@ -1007,6 +1339,11 @@ def verify_package(package: Path) -> dict[str, Any]:
         source_snapshots,
         source_freeze_cutoff_utc=str(source_freeze["source_freeze_cutoff_utc"]),
     )
+    recomputed_coverage = _coverage_by_role(recomputed["issue_support"])
+    recomputed_sensitivity = _sensitivity_by_rule(
+        recomputed["epoch_sensitivity"]
+    )
+    recomputed_curve = _time_ordered_coverage(recomputed["issue_support"])
     expected_frames = {
         "issue support": (recomputed["issue_support"], issue_support),
         "candidate roster": (
@@ -1015,6 +1352,42 @@ def verify_package(package: Path) -> dict[str, Any]:
         ),
         "inference panel": (recomputed["panel"], panel),
         "selected source": (recomputed["selected_source"], source_snapshots),
+        "coverage by role": (
+            recomputed_coverage,
+            pd.read_csv(package / "audit/coverage_by_role.csv"),
+        ),
+        "epoch sensitivity": (
+            recomputed["epoch_sensitivity"],
+            pd.read_csv(
+                package / "audit/epoch_sensitivity.csv", dtype={"issue": str}
+            ),
+        ),
+        "sensitivity by rule": (
+            recomputed_sensitivity,
+            pd.read_csv(package / "audit/sensitivity_by_rule.csv"),
+        ),
+        "time ordered coverage": (
+            recomputed_curve,
+            pd.read_csv(
+                package / "audit/time_ordered_coverage.csv", dtype={"issue": str}
+            ),
+        ),
+        "issue epochs": (
+            recomputed["issue_support"].loc[
+                :,
+                [
+                    "epoch_id",
+                    "issue",
+                    "upstream_cohort",
+                    "decision_epoch_utc",
+                    "issue_sequence_position",
+                    "chronological_position",
+                    "chronological_role",
+                    "eligible_issue_epoch",
+                ],
+            ],
+            pd.read_parquet(package / "inference/issue_epochs.parquet"),
+        ),
     }
     for name, (expected_frame, observed_frame) in expected_frames.items():
         try:
@@ -1037,6 +1410,16 @@ def verify_package(package: Path) -> dict[str, Any]:
     )
     if forbidden:
         raise ModelSupportBuildError(f"forbidden inference columns: {forbidden}")
+    if not source_matches["upstream_cohort"].isin(UPSTREAM_COHORTS).all():
+        raise ModelSupportBuildError("source upstream cohort drift")
+    if not panel.empty and not panel["upstream_cohort"].isin(UPSTREAM_COHORTS).all():
+        raise ModelSupportBuildError("panel upstream cohort drift")
+    epoch_sensitivity = recomputed["epoch_sensitivity"]
+    votes = epoch_sensitivity["controlling_readiness_vote"]
+    if not epoch_sensitivity.loc[votes, "epoch_rule"].eq(
+        REPRESENTATIVE_EPOCH_RULE
+    ).all() or not epoch_sensitivity.loc[~votes, "sensitivity_only"].all():
+        raise ModelSupportBuildError("sensitivity rules can vote on readiness")
     if panel["panel_row_id"].duplicated().any():
         raise ModelSupportBuildError("duplicate panel row identity")
     if not panel.empty:
@@ -1063,8 +1446,7 @@ def verify_package(package: Path) -> dict[str, Any]:
         ].sum()
         if not np.allclose(probabilities.to_numpy(dtype=float), 1.0, atol=1e-8):
             raise ModelSupportBuildError("de-vigged probabilities do not sum to one")
-    coverage = _coverage_by_role(recomputed["issue_support"])
-    expected_decision = _decision(issue_support, coverage)
+    expected_decision = _decision(recomputed["issue_support"], recomputed_coverage)
     if decision != expected_decision:
         raise ModelSupportBuildError("decision is not derivable from frozen audit")
     if manifest.get("disposition") != decision["disposition"]:
