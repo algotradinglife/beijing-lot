@@ -20,7 +20,8 @@ The controlling representative rule is `MEDIAN_KICKOFF_MINUS_10H`, selected by
 a schedule-only ten-hour planning criterion. Other epoch rules are sensitivity
 evidence only. Model-learning support and ticket operability are separate gates:
 sale/parlay recovery cannot substitute for missing timestamped historical training
-support.
+support. `model_ready_for_204` depends only on model-learning support and causal
+safety. Ticket operability gates only a later ticket/operational stage.
 
 Disposition: **BLOCKED_INSUFFICIENT_CAUSAL_SUPPORT**. #204 remains blocked unless
 PI accepts `READY_FOR_204`. This package trains no model, ranks no bet, computes no

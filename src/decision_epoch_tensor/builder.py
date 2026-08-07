@@ -845,6 +845,33 @@ def _strict_inference_tables(
     }
 
 
+def _readiness_dispositions(
+    *,
+    model_gate_pass: bool,
+    ticket_gate_pass: bool,
+    causal_violations: dict[str, int],
+) -> dict[str, object]:
+    """Keep #204 model readiness independent from later ticket operability."""
+
+    causal_safe = not any(causal_violations.values())
+    model_ready_for_204 = bool(model_gate_pass and causal_safe)
+    ticket_operability_ready = bool(ticket_gate_pass and causal_safe)
+    return {
+        "model_ready_for_204": model_ready_for_204,
+        "disposition": (
+            "READY_FOR_204"
+            if model_ready_for_204
+            else "BLOCKED_INSUFFICIENT_CAUSAL_SUPPORT"
+        ),
+        "ticket_operability_ready": ticket_operability_ready,
+        "ticket_operability_disposition": (
+            "READY_FOR_LATER_TICKET_STAGE"
+            if ticket_operability_ready
+            else "BLOCKED_TICKET_OPERABILITY"
+        ),
+    }
+
+
 def _coverage_tables(
     roster: pd.DataFrame,
     epochs: pd.DataFrame,
@@ -1039,7 +1066,11 @@ def _coverage_tables(
     }
     model_gate_pass = bool(model_gate["cohort_model_gate_pass"].all())
     ticket_gate_pass = bool(ticket_gate["cohort_ticket_gate_pass"].all())
-    ready = model_gate_pass and ticket_gate_pass and not any(violations.values())
+    dispositions = _readiness_dispositions(
+        model_gate_pass=model_gate_pass,
+        ticket_gate_pass=ticket_gate_pass,
+        causal_violations=violations,
+    )
     activation = coverage[
         coverage["cohort"].eq("prospective_post_activation")
         & coverage["epoch_rule"].eq("PROSPECTIVE_ACTIVATION")
@@ -1072,9 +1103,7 @@ def _coverage_tables(
             ),
         }
     decision = {
-        "disposition": (
-            "READY_FOR_204" if ready else "BLOCKED_INSUFFICIENT_CAUSAL_SUPPORT"
-        ),
+        **dispositions,
         "representative_rule": {
             "epoch_rule": REPRESENTATIVE_EPOCH_RULE,
             "selection_rationale": REPRESENTATIVE_RULE_RATIONALE,
@@ -1087,6 +1116,14 @@ def _coverage_tables(
         "ticket_operability_results": ticket_gate.to_dict(orient="records"),
         "model_learning_gate_pass": model_gate_pass,
         "ticket_operability_gate_pass": ticket_gate_pass,
+        "readiness_dependency": {
+            "model_ready_for_204": (
+                "model_learning_gate_pass AND no causal violations"
+            ),
+            "ticket_operability": (
+                "separate later-stage gate; does not suppress model_ready_for_204"
+            ),
+        },
         "prospective_activation_sensitivity": prospective_activation,
         "violations": violations,
         "blocking_facts": {
@@ -1571,6 +1608,10 @@ def _decision_report(decision: dict[str, Any]) -> str:
         "# #214 decision-epoch market/SP capability",
         "",
         f"Disposition: **{decision['disposition']}**.",
+        f"Model ready for #204: **{decision['model_ready_for_204']}**.",
+        "This depends only on model-learning support and causal safety.",
+        f"Ticket operability: **{decision['ticket_operability_disposition']}**.",
+        "This gates only a later ticket/operational stage and does not gate #204.",
         "",
         f"Controlling representative rule: `{decision['representative_rule']['epoch_rule']}`.",
         "All other rules are sensitivity evidence and do not vote in the gate.",
@@ -1624,8 +1665,8 @@ def _decision_report(decision: dict[str, Any]) -> str:
             "verified sale-open nor parlay-allowed state. Repairing sale/parlay evidence alone "
             "does not create a causal historical training panel.",
             "",
-            "#204 remains blocked. A future Data capability must capture p34 sale/parlay state and "
-            "separately repair model-learning support under the controlling rule. "
+            "#204 remains blocked solely because model-learning support fails under the "
+            "controlling rule. Sale/parlay evidence gates only the later ticket stage. "
             "This negative result grants no model, betting, ROI, release or execution authority.",
             "",
         ]
@@ -1719,6 +1760,12 @@ def _write_package_outputs(output: Path, assembled: dict[str, Any]) -> None:
         "epoch_rules": list(EPOCH_RULES),
         "controlling_representative_epoch_rule": REPRESENTATIVE_EPOCH_RULE,
         "representative_rule_rationale": REPRESENTATIVE_RULE_RATIONALE,
+        "model_readiness_dependency": (
+            "model_learning_gate_pass AND no causal violations"
+        ),
+        "ticket_operability_dependency": (
+            "separate later-stage gate; never gates model_ready_for_204"
+        ),
         "cohorts": list(COHORTS),
         "strict_roster_definition": (
             "identity observed by t AND kickoff after t AND sale_status=open "
@@ -1750,7 +1797,8 @@ The controlling representative rule is `{REPRESENTATIVE_EPOCH_RULE}`, selected b
 a schedule-only ten-hour planning criterion. Other epoch rules are sensitivity
 evidence only. Model-learning support and ticket operability are separate gates:
 sale/parlay recovery cannot substitute for missing timestamped historical training
-support.
+support. `model_ready_for_204` depends only on model-learning support and causal
+safety. Ticket operability gates only a later ticket/operational stage.
 
 Disposition: **{assembled['decision']['disposition']}**. #204 remains blocked unless
 PI accepts `READY_FOR_204`. This package trains no model, ranks no bet, computes no

@@ -1,6 +1,10 @@
 # #214 decision-epoch market/SP capability
 
 Disposition: **BLOCKED_INSUFFICIENT_CAUSAL_SUPPORT**.
+Model ready for #204: **False**.
+This depends only on model-learning support and causal safety.
+Ticket operability: **BLOCKED_TICKET_OPERABILITY**.
+This gates only a later ticket/operational stage and does not gate #204.
 
 Controlling representative rule: `MEDIAN_KICKOFF_MINUS_10H`.
 All other rules are sensitivity evidence and do not vote in the gate.
@@ -27,4 +31,4 @@ Model-learning is blocked independently: development lacks timestamped historica
 
 Ticket operability is also blocked because the frozen p34 source exposes neither verified sale-open nor parlay-allowed state. Repairing sale/parlay evidence alone does not create a causal historical training panel.
 
-#204 remains blocked. A future Data capability must capture p34 sale/parlay state and separately repair model-learning support under the controlling rule. This negative result grants no model, betting, ROI, release or execution authority.
+#204 remains blocked solely because model-learning support fails under the controlling rule. Sale/parlay evidence gates only the later ticket stage. This negative result grants no model, betting, ROI, release or execution authority.

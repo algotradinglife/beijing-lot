@@ -75,6 +75,7 @@
       "required_model_core_coverage": 0.8
     }
   ],
+  "model_ready_for_204": false,
   "prospective_activation_sensitivity": {
     "candidate_matches": 289,
     "causal_core_complete_matches": 269,
@@ -84,12 +85,17 @@
     "strict_complete_eligible_matches": 0,
     "ticket_eligible_coverage": 0.0
   },
+  "readiness_dependency": {
+    "model_ready_for_204": "model_learning_gate_pass AND no causal violations",
+    "ticket_operability": "separate later-stage gate; does not suppress model_ready_for_204"
+  },
   "representative_rule": {
     "controlling": true,
     "epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
     "selection_rationale": "Schedule-only median-kickoff anchor with a ten-hour operational planning lead; common to every cohort and frozen without using outcomes or observed coverage. All other epoch rules are sensitivity evidence only.",
     "sensitivity_rules_do_not_vote": true
   },
+  "ticket_operability_disposition": "BLOCKED_TICKET_OPERABILITY",
   "ticket_operability_gate": {
     "gate_id": "BJ214_TICKET_OPERABILITY_N7_V1",
     "minimum_complete_matches_per_epoch": 7,
@@ -107,6 +113,7 @@
     "require_timestamped_identity": true
   },
   "ticket_operability_gate_pass": false,
+  "ticket_operability_ready": false,
   "ticket_operability_results": [
     {
       "candidate_matches": 67651,

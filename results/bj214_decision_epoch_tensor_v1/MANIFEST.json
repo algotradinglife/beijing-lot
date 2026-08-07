@@ -13,11 +13,11 @@
     "strict_roster_rows": 0
   },
   "contract_version": "bj214-decision-epoch-tensor-v1",
-  "decision_report_sha256": "e0d1ad1ae0cd41c9b72600c9e42dee98ad7d203042875825725361b232170550",
-  "decision_sha256": "32e4806b9fbd94a223caf7f25218499180472807817cb38e114018ba82f9aa43",
+  "decision_report_sha256": "384ea447c1f64a3de9a5eada66a56c3779e468e61c67c00e36696f900078be6e",
+  "decision_sha256": "07867ae204a629d1b5e7fd37b2f01cbe898ecbae0dacc5c2c4ff4fce8cbe37b6",
   "disposition": "BLOCKED_INSUFFICIENT_CAUSAL_SUPPORT",
   "implementation_hashes": {
-    "builder": "859947d885b022dc4718e3230dd2e3d7f0b0a9948f3fb49fb32a037a74034bfe",
+    "builder": "ac660bd8300573d436f4d70dde6846f03fdeddcd66e8c1a5be251e7fb8e29c29",
     "cli": "740bbe9cc636af9bc3dd12e38ce444dffcde177a825464f43e8b9e43b3fe4ad1",
     "contract": "4566ef5fb8c9affd76c6526357c325528c580bbcbe342b3d035fa0e09e56ee2c",
     "environment_lock": "acf0b168cadb2956e7e4937901d067ef65cda1783016ec92bea7b5743d1add1c",

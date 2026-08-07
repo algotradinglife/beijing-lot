@@ -46,6 +46,7 @@
   ],
   "labels": "PHYSICALLY_ABSENT",
   "masked_value": "NaN with mask=false",
+  "model_readiness_dependency": "model_learning_gate_pass AND no causal violations",
   "object": "X_i,t[J_i,t x 3 x F]",
   "outcome_order": [
     "3",
@@ -54,5 +55,6 @@
   ],
   "representative_rule_rationale": "Schedule-only median-kickoff anchor with a ten-hour operational planning lead; common to every cohort and frozen without using outcomes or observed coverage. All other epoch rules are sensitivity evidence only.",
   "strict_roster_definition": "identity observed by t AND kickoff after t AND sale_status=open AND parlay_allowed=allowed AND complete timestamped 3-way EURO/BJ SP",
+  "ticket_operability_dependency": "separate later-stage gate; never gates model_ready_for_204",
   "upstream_contract_version": "bj203-causal-tensor-v2"
 }

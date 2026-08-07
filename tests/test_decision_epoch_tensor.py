@@ -10,6 +10,7 @@ import pytest
 from decision_epoch_tensor.builder import (
     _assemble_frames,
     _namespace_manifest,
+    _readiness_dispositions,
     DecisionEpochBuildError,
     verify_package,
     write_parquet,
@@ -46,6 +47,32 @@ def test_forbidden_inference_names_fail_closed() -> None:
         "settlement_label",
     ]
     assert forbidden_inference_names(["predicted_final_sp"]) == []
+
+
+def test_model_readiness_is_not_suppressed_by_ticket_operability() -> None:
+    decision = _readiness_dispositions(
+        model_gate_pass=True,
+        ticket_gate_pass=False,
+        causal_violations={
+            "post_epoch_market_observations": 0,
+            "started_matches_in_strict_roster": 0,
+            "heldout_outcome_columns": 0,
+        },
+    )
+    assert decision == {
+        "model_ready_for_204": True,
+        "disposition": "READY_FOR_204",
+        "ticket_operability_ready": False,
+        "ticket_operability_disposition": "BLOCKED_TICKET_OPERABILITY",
+    }
+
+    unsafe = _readiness_dispositions(
+        model_gate_pass=True,
+        ticket_gate_pass=True,
+        causal_violations={"post_epoch_market_observations": 1},
+    )
+    assert unsafe["model_ready_for_204"] is False
+    assert unsafe["ticket_operability_ready"] is False
 
 
 def _positive_n7_fixture() -> dict[str, object]:
@@ -213,6 +240,14 @@ def test_frozen_package_has_no_outcome_namespace_and_no_strict_false_positive() 
     assert decision["representative_rule"]["sensitivity_rules_do_not_vote"] is True
     assert decision["model_learning_gate_pass"] is False
     assert decision["ticket_operability_gate_pass"] is False
+    assert decision["model_ready_for_204"] is False
+    assert decision["ticket_operability_ready"] is False
+    assert decision["ticket_operability_disposition"] == (
+        "BLOCKED_TICKET_OPERABILITY"
+    )
+    assert "does not suppress model_ready_for_204" in decision[
+        "readiness_dependency"
+    ]["ticket_operability"]
     activation = decision["prospective_activation_sensitivity"]
     assert activation["causal_core_complete_matches"] == 269
     assert activation["candidate_matches"] == 289
