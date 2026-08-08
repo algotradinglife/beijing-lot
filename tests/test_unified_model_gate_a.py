@@ -34,7 +34,7 @@ def test_bj204_gate_a_v4_manifest_is_canonical_and_outcome_unexposed() -> None:
     receipt = verify_package(FROZEN)
     assert receipt == {
         "contract_version": CONTRACT_VERSION,
-        "files": 22,
+        "files": 23,
         "status": "PASS",
     }
     card = json.loads((FROZEN / "freeze_card.json").read_text(encoding="utf-8"))
@@ -66,6 +66,8 @@ def test_bj204_common_schema_coverage_and_target_identity_censuses() -> None:
     assert development.complete_market_rows.sum() == 101029
     assert test.matches.sum() == 16990
     assert test.complete_market_rows.sum() == 16968
+    assert development.fallback_no_bet_rows.sum() == 1216
+    assert test.fallback_no_bet_rows.sum() == 22
     targets = pd.read_csv(FROZEN / "development_target_identity_reconciliation.csv", dtype={"issue": str})
     assert len(targets) == 1024
     assert int(targets.official_target_identity_available.sum()) == 1021
@@ -73,6 +75,9 @@ def test_bj204_common_schema_coverage_and_target_identity_censuses() -> None:
     detail = pd.read_csv(FROZEN / "common_schema_field_coverage.csv")
     assert set(detail.feature) == set(COMMON_FEATURES)
     assert set(detail.outcome_code.astype(str)) == {"0", "1", "3"}
+    validity = pd.read_csv(FROZEN / "common_probability_validity.csv")
+    assert int(validity.market_triplet_valid_rows.sum()) == 101029 + 16968
+    assert int(validity.fallback_no_bet_rows.sum()) == 1216 + 22
 
 
 def test_bj204_common_adapter_loads_development_and_test_through_one_api(tmp_path: Path) -> None:

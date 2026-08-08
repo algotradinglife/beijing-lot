@@ -4,6 +4,7 @@
       {
         "common_schema_coverage": 0.9927093930145812,
         "complete_market_rows": 17565,
+        "fallback_no_bet_rows": 129,
         "issues": 55,
         "matches": 17694,
         "role": "DEVELOPMENT_CV",
@@ -13,6 +14,7 @@
       {
         "common_schema_coverage": 0.9818831546580238,
         "complete_market_rows": 11815,
+        "fallback_no_bet_rows": 218,
         "issues": 44,
         "matches": 12033,
         "role": "DEVELOPMENT_CV",
@@ -22,6 +24,7 @@
       {
         "common_schema_coverage": 0.9863884328160585,
         "complete_market_rows": 18624,
+        "fallback_no_bet_rows": 257,
         "issues": 58,
         "matches": 18881,
         "role": "DEVELOPMENT_CV",
@@ -31,6 +34,7 @@
       {
         "common_schema_coverage": 0.987609459700959,
         "complete_market_rows": 16579,
+        "fallback_no_bet_rows": 208,
         "issues": 58,
         "matches": 16787,
         "role": "DEVELOPMENT_CV",
@@ -40,6 +44,7 @@
       {
         "common_schema_coverage": 0.9895932483025572,
         "complete_market_rows": 15595,
+        "fallback_no_bet_rows": 164,
         "issues": 55,
         "matches": 15759,
         "role": "DEVELOPMENT_CV",
@@ -49,6 +54,7 @@
       {
         "common_schema_coverage": 0.9889751170238975,
         "complete_market_rows": 16057,
+        "fallback_no_bet_rows": 179,
         "issues": 59,
         "matches": 16236,
         "role": "DEVELOPMENT_CV",
@@ -58,6 +64,7 @@
       {
         "common_schema_coverage": 0.9874356333676622,
         "complete_market_rows": 4794,
+        "fallback_no_bet_rows": 61,
         "issues": 15,
         "matches": 4855,
         "role": "DEVELOPMENT_CV",
@@ -67,6 +74,7 @@
       {
         "common_schema_coverage": 0.9985942716570023,
         "complete_market_rows": 11366,
+        "fallback_no_bet_rows": 16,
         "issues": 42,
         "matches": 11382,
         "role": "RETROSPECTIVE_TEST_LOCKED",
@@ -76,6 +84,7 @@
       {
         "common_schema_coverage": 0.9989300998573466,
         "complete_market_rows": 5602,
+        "fallback_no_bet_rows": 6,
         "issues": 33,
         "matches": 5608,
         "role": "RETROSPECTIVE_TEST_LOCKED",
@@ -88,6 +97,99 @@
     "feature_table": "common_cell_features.parquet",
     "field_coverage_table": "common_schema_field_coverage.csv",
     "mask_table": "common_cell_masks.parquet",
+    "probability_validity_by_period": [
+      {
+        "fallback_no_bet_rows": 129,
+        "handicap_complete_rows": 17565,
+        "market_triplet_valid_rows": 17565,
+        "matches": 17694,
+        "predicted_sp_input_complete_rows": 1229,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2019
+      },
+      {
+        "fallback_no_bet_rows": 218,
+        "handicap_complete_rows": 11819,
+        "market_triplet_valid_rows": 11815,
+        "matches": 12033,
+        "predicted_sp_input_complete_rows": 1134,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2020
+      },
+      {
+        "fallback_no_bet_rows": 257,
+        "handicap_complete_rows": 18625,
+        "market_triplet_valid_rows": 18624,
+        "matches": 18881,
+        "predicted_sp_input_complete_rows": 1598,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2021
+      },
+      {
+        "fallback_no_bet_rows": 208,
+        "handicap_complete_rows": 16580,
+        "market_triplet_valid_rows": 16579,
+        "matches": 16787,
+        "predicted_sp_input_complete_rows": 1125,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2022
+      },
+      {
+        "fallback_no_bet_rows": 164,
+        "handicap_complete_rows": 15595,
+        "market_triplet_valid_rows": 15595,
+        "matches": 15759,
+        "predicted_sp_input_complete_rows": 1126,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2023
+      },
+      {
+        "fallback_no_bet_rows": 179,
+        "handicap_complete_rows": 16058,
+        "market_triplet_valid_rows": 16057,
+        "matches": 16236,
+        "predicted_sp_input_complete_rows": 1357,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2024
+      },
+      {
+        "fallback_no_bet_rows": 61,
+        "handicap_complete_rows": 4794,
+        "market_triplet_valid_rows": 4794,
+        "matches": 4855,
+        "predicted_sp_input_complete_rows": 269,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2025
+      },
+      {
+        "fallback_no_bet_rows": 16,
+        "handicap_complete_rows": 11382,
+        "market_triplet_valid_rows": 11366,
+        "matches": 11382,
+        "predicted_sp_input_complete_rows": 0,
+        "role": "RETROSPECTIVE_TEST_LOCKED",
+        "source_grade": "RETROSPECTIVE_PROXY",
+        "year": 2025
+      },
+      {
+        "fallback_no_bet_rows": 6,
+        "handicap_complete_rows": 5608,
+        "market_triplet_valid_rows": 5602,
+        "matches": 5608,
+        "predicted_sp_input_complete_rows": 0,
+        "role": "RETROSPECTIVE_TEST_LOCKED",
+        "source_grade": "RETROSPECTIVE_PROXY",
+        "year": 2026
+      }
+    ],
+    "probability_validity_table": "common_probability_validity.csv",
     "registry_table": "common_issue_registry.csv",
     "test_source_grade": "RETROSPECTIVE_PROXY"
   },

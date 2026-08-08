@@ -477,6 +477,7 @@ def _common_adapter(
     coverage = registry.groupby(["role", "source_grade", "year"], dropna=False, sort=True).agg(
         issues=("issue", "nunique"), matches=("issue", "size"), complete_market_rows=("market_proxy_complete", "sum")
     ).reset_index()
+    coverage["fallback_no_bet_rows"] = coverage["matches"] - coverage["complete_market_rows"]
     coverage["common_schema_coverage"] = coverage["complete_market_rows"] / coverage["matches"]
     return features, feature_masks, registry, coverage, duplicate_census
 
@@ -515,6 +516,41 @@ def _common_field_coverage(features: pd.DataFrame, masks: pd.DataFrame) -> pd.Da
     result["missing_cells"] = result["cells"] - result["available_cells"]
     result["coverage"] = result["available_cells"] / result["cells"]
     return result
+
+
+def _common_probability_validity(features: pd.DataFrame, masks: pd.DataFrame) -> pd.DataFrame:
+    """Audit full probability-triplet, handicap, and SP-input eligibility."""
+
+    identity_columns = ["issue", "match_idx", "role", "source_grade", "year"]
+    joined = features[[*identity_columns, "outcome_code", "cell_key", "market_probability"]].merge(
+        masks[["cell_key", "market_probability", "native_handicap_line", "predicted_final_sp_input"]],
+        on="cell_key", how="left", validate="one_to_one", suffixes=("", "_mask"),
+    )
+    market = joined.pivot(index=identity_columns, columns="outcome_code", values="market_probability")
+    market_mask = joined.pivot(index=identity_columns, columns="outcome_code", values="market_probability_mask")
+    handicap_mask = joined.pivot(index=identity_columns, columns="outcome_code", values="native_handicap_line")
+    sp_input_mask = joined.pivot(index=identity_columns, columns="outcome_code", values="predicted_final_sp_input")
+    expected = ["3", "1", "0"]
+    market = market.reindex(columns=expected)
+    market_mask = market_mask.reindex(columns=expected).fillna(False).astype(bool)
+    handicap_mask = handicap_mask.reindex(columns=expected).fillna(False).astype(bool)
+    sp_input_mask = sp_input_mask.reindex(columns=expected).fillna(False).astype(bool)
+    values = market.to_numpy(dtype=float)
+    valid_market = (
+        market_mask.all(axis=1).to_numpy() & np.isfinite(values).all(axis=1)
+        & (values > 0).all(axis=1) & (np.abs(values.sum(axis=1) - 1.0) <= 2e-6)
+    )
+    detail = market.reset_index()[identity_columns]
+    detail["market_triplet_valid"] = valid_market
+    detail["handicap_complete"] = handicap_mask.all(axis=1).to_numpy()
+    detail["predicted_sp_input_complete"] = sp_input_mask.all(axis=1).to_numpy()
+    return detail.groupby(["role", "source_grade", "year"], sort=True).agg(
+        matches=("issue", "size"),
+        market_triplet_valid_rows=("market_triplet_valid", "sum"),
+        fallback_no_bet_rows=("market_triplet_valid", lambda values: int((~values).sum())),
+        handicap_complete_rows=("handicap_complete", "sum"),
+        predicted_sp_input_complete_rows=("predicted_sp_input_complete", "sum"),
+    ).reset_index()
 
 
 def _issue_reconciliation(
@@ -706,6 +742,7 @@ def _build_card(
     reconciliation: pd.DataFrame,
     coverage: pd.DataFrame,
     common_coverage: pd.DataFrame,
+    common_validity: pd.DataFrame,
     development_targets: pd.DataFrame,
     bridge_summary: dict[str, Any],
 ) -> dict[str, Any]:
@@ -767,9 +804,11 @@ def _build_card(
                 "registry_table": "common_issue_registry.csv",
                 "coverage_table": "common_schema_coverage_by_period.csv",
                 "field_coverage_table": "common_schema_field_coverage.csv",
+                "probability_validity_table": "common_probability_validity.csv",
                 "development_source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
                 "test_source_grade": PROXY_GRADE,
                 "by_period": common_coverage.to_dict(orient="records"),
+                "probability_validity_by_period": common_validity.to_dict(orient="records"),
             },
         },
         "proxy_panel": {
@@ -898,6 +937,7 @@ def build_package(
         source, identity, history, full_3sp_identity, pclose_path,
     )
     common_field_coverage = _common_field_coverage(common_features, common_masks)
+    common_validity = _common_probability_validity(common_features, common_masks)
     reconciliation = _issue_reconciliation(identity, development, history, proxy, test_identities)
     bridge, bridge_summary = _market_bridge(history_path, full_3sp_identity, pclose_path)
     splits = _split_rows(development, history)
@@ -905,7 +945,7 @@ def build_package(
     coverage = _coverage(proxy)
     card = _build_card(
         source, source_manifest, history_path, full_3sp_path, pclose_path, splits,
-        reconciliation, coverage, common_coverage, development_targets, bridge_summary,
+        reconciliation, coverage, common_coverage, common_validity, development_targets, bridge_summary,
     )
     write_csv(output / "split_manifest.csv", splits)
     write_csv(output / "cv_manifest.csv", cv)
@@ -919,6 +959,7 @@ def build_package(
     write_csv(output / "common_issue_registry.csv", common_registry)
     write_csv(output / "common_schema_coverage_by_period.csv", common_coverage)
     write_csv(output / "common_schema_field_coverage.csv", common_field_coverage)
+    write_csv(output / "common_probability_validity.csv", common_validity)
     write_csv(output / "pclose_duplicate_resolution.csv", pclose_duplicates)
     write_csv(output / "market_proxy_pclose_bridge.csv", bridge)
     write_json(output / "market_proxy_pclose_bridge_summary.json", bridge_summary)
@@ -995,6 +1036,9 @@ def verify_package(package: str | Path) -> dict[str, Any]:
         raise GateAError("common M×3 schema drift")
     if features.groupby(["issue", "match_idx"]).size().ne(3).any():
         raise GateAError("common M×3 outcome cardinality drift")
+    validity = pd.read_csv(root / "common_probability_validity.csv")
+    if int(validity["market_triplet_valid_rows"].sum()) != 101029 + 16968:
+        raise GateAError("common market triplet validity drift")
     bridge_summary = json.loads((root / "market_proxy_pclose_bridge_summary.json").read_text(encoding="utf-8"))
     if bridge_summary.get("complete_comparable_rows") != 20837:
         raise GateAError("market bridge support census drift")
