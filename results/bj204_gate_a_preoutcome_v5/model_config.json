@@ -1,5 +1,5 @@
 {
-  "contract_version": "bj204-market-anchored-model-gate-a-v4",
+  "contract_version": "bj204-market-anchored-model-gate-a-v5",
   "environment": {
     "matplotlib": "3.10.9",
     "numpy": "2.4.6",
@@ -9,7 +9,7 @@
     "scipy": "1.17.1"
   },
   "fallback": {
-    "acceptance": "all three finite unmasked values sum to one within 2e-6",
+    "acceptance": "all three finite, strictly positive unmasked values sum to one within 2e-6",
     "fallback_metric_reporting": "report pure baseline, model-only and fallback-mixed separately",
     "market_vector": "market_probability",
     "on_acceptance": "emit the frozen market vector byte-for-byte after float32 load",

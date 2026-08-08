@@ -56,17 +56,18 @@ updated: 2026-08-07
    `3159431d91dda7dfb23ea7dbe4daa42a5411f7e52616e50bb31f04722c17ebe4`，终局是
    `NO_PROMOTION`。正 ROI 或较低回撤均不能单独构成策略授权。详见
    [[Issue-192-N7-Strategy-Ensemble|Issue #192 N7 多策略组合与资金分配]]。
-9. **统一概率模型的历史 PoC 采用按期次冻结的边界。** #204 Gate A v2 的开发／CV 止于
-   `25042`；一次性回顾测试是 `25043–25125` 与 `26011–26049` 共 75 期，使用明确标为
-   `RETROSPECTIVE_PROXY` 的赛前欧赔面板；`26051+` 完整保留给 #210。`predicted_final_sp`
-   只是赛前输入代理，监督目标必须是官方 3/1/0 `final_sp`，且该标签与其更新时间均未在 Gate A
-   读取。官方全 3SP 覆盖／赛后更新时间只作为 target-only 质量普查保存，不能把代理面板描述成
-   live snapshot。市场概率仍是强制 fallback：缺失、OOD 或校准失败时只能回退至有效市场向量或
-   `NO_BET_FROZEN`。v3 还冻结了历史平均欧赔标准化概率与 `p_close` 的桥接：使用
-   `issue+match_idx → match_uid → p_close.match_id`，在 20,837 个完整重叠上 MAE 为
-   0.005533，超过 0.05／0.10 的最大单格差异分别为 85／22 条；二者不会被当成
-   byte-identical。缺失 reference 或超过阈值时保留显式 source grade／fallback 理由。
-   Gate A 不产生模型优越性或策略授权结论。
+9. **统一概率模型的历史 PoC 采用按期次冻结的边界。** #204 Gate A v5 的开发／CV 止于
+   `25042`（344 期、102,245 场）；一次性锁定测试是 `25043–25125` 与 `26011–26049`
+   共 75 期、16,990 场，`26051+` 完整保留给 #210。单一 outcome-unexposed
+   `M×3` 面板包含 357,705 个 cell，并且从持久化表到 `load_common_issue` 均使用严格
+   `3/1/0` 轴。`predicted_final_sp` 只是赛前输入代理；官方 `3/1/0 final_sp` 与更新时间
+   均未在 Gate A 读取。市场向量必须有限、严格为正且和为一（`2e-6` 容差），否则完整 triplet
+   进入 `NO_BET_FROZEN`，而不是把部分概率当作 fallback。开发侧为 identity-bridged
+   `p_close`，锁定测试侧为标准化平均欧赔；复用的 `match_uid` 按 `issue+match_uid`
+   解析并留下审计表。两者在 20,837 个完整重叠上的 MAE 为 0.005533，不能宣称
+   byte-identical。权威包为 `results/bj204_gate_a_preoutcome_v5`，manifest/content identity
+   均为 `dfa14d42410d5513cbb07f832972e47fa1cf819a6f1eece13e1f92106e096ae1`；其只是一份
+   Gate A preregistration，不产生模型优越性、下注或 Gate B 授权。
 
 ## 近期 N7 策略结论（2026-08-02）
 

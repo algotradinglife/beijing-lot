@@ -1,4 +1,4 @@
-# Deterministic Gate-A v4 replay
+# Deterministic Gate-A v5 replay
 
 Run from the repository root with the pinned existing environment.  The
 history source is read-only and queried with the documented eight-column
@@ -7,7 +7,7 @@ pre-event allow-list; no official-SP or result field is selected.
 ```bash
 PY=.venv/bin/python
 PYTHONPATH=src $PY scripts/freeze_bj204_model_gate_a.py verify \
-  --package results/bj204_gate_a_preoutcome_v4
+  --package results/bj204_gate_a_preoutcome_v5
 
 PYTHONPATH=src $PY scripts/freeze_bj204_model_gate_a.py freeze \
   --source results/bj203_causal_tensor_v2 \
@@ -16,6 +16,10 @@ PYTHONPATH=src $PY scripts/freeze_bj204_model_gate_a.py freeze \
   --pclose-source data/beidan_features.db --output <new-empty-directory>
 
 PYTHONPATH=src $PY scripts/execute_bj204_notebook.py
+
+# Pristine fixture-only validation from a clean checkout without data/.
+PYTHON_BIN=/absolute/path/to/repository/.venv/bin/python \
+  bash scripts/test_bj204_gate_a_portable.sh
 ```
 
 The package and notebook never import `unified_tensor.settlement_labels` and

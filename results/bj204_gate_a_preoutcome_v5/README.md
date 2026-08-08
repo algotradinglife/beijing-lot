@@ -1,4 +1,4 @@
-# #204 Gate A v4 — market-anchored residual model preregistration
+# #204 Gate A v5 — market-anchored residual model preregistration
 
 This immutable package is **outcome-unexposed**.  It uses the #203 inference
 namespace only for development/CV through issue `25042`.

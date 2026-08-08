@@ -1,0 +1,7 @@
+pclose_match_uid,source_issue,source_row_ordinal,p_close_3,p_close_1,p_close_0,beidan_hcap,source_rows_for_match_uid,source_issue_count,rows_for_issue_match_uid,probability_values_equal_for_match_uid,handicap_values_equal_for_match_uid,values_equal_within_issue_match_uid,issue_match_uid_resolves,canonical_selected,resolution
+1163202,151004,32313,0.389434902442,0.318007140596,0.292557956962,0,2,2,1,True,True,True,True,True,ISSUE_PLUS_MATCH_UID
+1163202,160201,36733,0.389434902442,0.318007140596,0.292557956962,0,2,2,1,True,True,True,True,True,ISSUE_PLUS_MATCH_UID
+1917703,20104,114696,0.350258423264,0.251329232343,0.398412344393,0,2,1,2,True,True,True,False,True,EQUAL_VALUES_FIRST_SOURCE_ROW_WITHIN_ISSUE
+1917703,20104,115022,0.350258423264,0.251329232343,0.398412344393,0,2,1,2,True,True,True,False,False,EQUAL_VALUES_FIRST_SOURCE_ROW_WITHIN_ISSUE
+2223802,22124,154007,0.463027326698,0.283471401329,0.253501271974,0,2,2,1,True,True,True,True,True,ISSUE_PLUS_MATCH_UID
+2223802,22125,154063,0.463027326698,0.283471401329,0.253501271974,0,2,2,1,True,True,True,True,True,ISSUE_PLUS_MATCH_UID

@@ -7,7 +7,7 @@
     24011,
     25042
   ],
-  "join_key": "history.issue+history.match_idx -> official_identity.expect+match_no -> match_uid -> p_close.match_id",
+  "join_key": "history.issue+history.match_idx -> official_identity.expect+match_no -> match_uid; reused p_close match_uid resolves by issue+match_uid",
   "labels_opened": false,
   "max_delta_gt_005_rows": 85,
   "max_delta_gt_010_rows": 22,
@@ -20,5 +20,7 @@
     "3": 0.99505270243424
   },
   "outlier_policy": "do not substitute p_close; retain normalized average-EU proxy with explicit source grade",
+  "p_close_duplicate_audit_rows": 0,
+  "p_close_duplicate_match_uid_count": 0,
   "p_close_match_rows": 20851
 }

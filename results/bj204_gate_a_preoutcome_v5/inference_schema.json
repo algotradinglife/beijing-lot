@@ -110,7 +110,7 @@
       },
       {
         "fallback_no_bet_rows": 218,
-        "handicap_complete_rows": 11819,
+        "handicap_complete_rows": 11815,
         "market_triplet_valid_rows": 11815,
         "matches": 12033,
         "predicted_sp_input_complete_rows": 1134,
@@ -120,7 +120,7 @@
       },
       {
         "fallback_no_bet_rows": 257,
-        "handicap_complete_rows": 18625,
+        "handicap_complete_rows": 18624,
         "market_triplet_valid_rows": 18624,
         "matches": 18881,
         "predicted_sp_input_complete_rows": 1598,
@@ -130,7 +130,7 @@
       },
       {
         "fallback_no_bet_rows": 208,
-        "handicap_complete_rows": 16580,
+        "handicap_complete_rows": 16579,
         "market_triplet_valid_rows": 16579,
         "matches": 16787,
         "predicted_sp_input_complete_rows": 1125,
@@ -150,7 +150,7 @@
       },
       {
         "fallback_no_bet_rows": 179,
-        "handicap_complete_rows": 16058,
+        "handicap_complete_rows": 16057,
         "market_triplet_valid_rows": 16057,
         "matches": 16236,
         "predicted_sp_input_complete_rows": 1357,

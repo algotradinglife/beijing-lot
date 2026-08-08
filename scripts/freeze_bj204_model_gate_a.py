@@ -51,7 +51,7 @@ def main() -> None:
     freeze.add_argument("--full-3sp-identity-source", type=Path, required=True)
     freeze.add_argument("--pclose-source", type=Path, required=True)
     verify = commands.add_parser("verify")
-    verify.add_argument("--package", type=Path, default=ROOT / "results/bj204_gate_a_preoutcome_v4")
+    verify.add_argument("--package", type=Path, default=ROOT / "results/bj204_gate_a_preoutcome_v5")
     arguments = parser.parse_args()
     receipt = (
         _atomic_build(

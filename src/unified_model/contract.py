@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Final
 
 
-CONTRACT_VERSION: Final = "bj204-market-anchored-model-gate-a-v4"
+CONTRACT_VERSION: Final = "bj204-market-anchored-model-gate-a-v5"
 UPSTREAM_CONTRACT_VERSION: Final = "bj203-causal-tensor-v2"
 SOURCE_PACKAGE: Final = "results/bj203_causal_tensor_v2"
 
@@ -22,6 +22,7 @@ RETROSPECTIVE_TEST_RANGES: Final = ((25043, 25125), (26011, 26049))
 RESERVE_ISSUE_MIN: Final = 26051
 CV_VALIDATION_YEARS: Final = (2021, 2022, 2023)
 SEEDS: Final = (204001, 204002, 204003)
+OUTCOME_ORDER: Final = ("3", "1", "0")
 
 # One common, outcome-unexposed M×3 interface is materialized for development
 # and the locked test period.  Development uses a p_close market proxy after
@@ -43,7 +44,7 @@ MODEL_FEATURES: Final = (
 SP_TARGET: Final = {
     "target_id": "OFFICIAL_FINAL_SP_3_1_0",
     "field": "final_sp",
-    "outcome_axis": ["3", "1", "0"],
+    "outcome_axis": list(OUTCOME_ORDER),
     "quality_mask": "TARGET_ONLY_OFFICIAL_3SP_NOT_OPENED_GATE_A",
     "availability": "Gate-B only; no target values or target masks are loaded in Gate A",
 }
@@ -54,7 +55,7 @@ MARKET_BASELINE_FEATURE: Final = "market_probability"
 FALLBACK_RULE: Final = {
     "rule_id": "BJ204_MARKET_OR_NO_BET_V1",
     "market_vector": MARKET_BASELINE_FEATURE,
-    "acceptance": "all three finite unmasked values sum to one within 2e-6",
+    "acceptance": "all three finite, strictly positive unmasked values sum to one within 2e-6",
     "on_acceptance": "emit the frozen market vector byte-for-byte after float32 load",
     "on_rejection": "emit explicit NO_BET_FROZEN; never emit a learned vector",
     "fallback_metric_reporting": "report pure baseline, model-only and fallback-mixed separately",

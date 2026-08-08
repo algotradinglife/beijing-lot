@@ -25,7 +25,7 @@
       ]
     ]
   },
-  "contract_version": "bj204-market-anchored-model-gate-a-v4",
+  "contract_version": "bj204-market-anchored-model-gate-a-v5",
   "environment": {
     "matplotlib": "3.10.9",
     "numpy": "2.4.6",
@@ -35,7 +35,7 @@
     "scipy": "1.17.1"
   },
   "fallback": {
-    "acceptance": "all three finite unmasked values sum to one within 2e-6",
+    "acceptance": "all three finite, strictly positive unmasked values sum to one within 2e-6",
     "fallback_metric_reporting": "report pure baseline, model-only and fallback-mixed separately",
     "market_vector": "market_probability",
     "on_acceptance": "emit the frozen market vector byte-for-byte after float32 load",
@@ -56,7 +56,7 @@
         24011,
         25042
       ],
-      "join_key": "history.issue+history.match_idx -> official_identity.expect+match_no -> match_uid -> p_close.match_id",
+      "join_key": "history.issue+history.match_idx -> official_identity.expect+match_no -> match_uid; reused p_close match_uid resolves by issue+match_uid",
       "labels_opened": false,
       "max_delta_gt_005_rows": 85,
       "max_delta_gt_010_rows": 22,
@@ -69,6 +69,8 @@
         "3": 0.99505270243424
       },
       "outlier_policy": "do not substitute p_close; retain normalized average-EU proxy with explicit source grade",
+      "p_close_duplicate_audit_rows": 0,
+      "p_close_duplicate_match_uid_count": 0,
       "p_close_match_rows": 20851
     },
     "table": "market_proxy_pclose_bridge.csv",
@@ -253,7 +255,7 @@
         },
         {
           "fallback_no_bet_rows": 218,
-          "handicap_complete_rows": 11819,
+          "handicap_complete_rows": 11815,
           "market_triplet_valid_rows": 11815,
           "matches": 12033,
           "predicted_sp_input_complete_rows": 1134,
@@ -263,7 +265,7 @@
         },
         {
           "fallback_no_bet_rows": 257,
-          "handicap_complete_rows": 18625,
+          "handicap_complete_rows": 18624,
           "market_triplet_valid_rows": 18624,
           "matches": 18881,
           "predicted_sp_input_complete_rows": 1598,
@@ -273,7 +275,7 @@
         },
         {
           "fallback_no_bet_rows": 208,
-          "handicap_complete_rows": 16580,
+          "handicap_complete_rows": 16579,
           "market_triplet_valid_rows": 16579,
           "matches": 16787,
           "predicted_sp_input_complete_rows": 1125,
@@ -293,7 +295,7 @@
         },
         {
           "fallback_no_bet_rows": 179,
-          "handicap_complete_rows": 16058,
+          "handicap_complete_rows": 16057,
           "market_triplet_valid_rows": 16057,
           "matches": 16236,
           "predicted_sp_input_complete_rows": 1357,

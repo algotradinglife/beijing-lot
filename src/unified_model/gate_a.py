@@ -24,6 +24,7 @@ from .contract import (
     METRICS,
     MODEL_FAMILIES,
     MODEL_FEATURES,
+    OUTCOME_ORDER,
     PROXY_GRADE,
     RESERVE_ISSUE_MIN,
     RETROSPECTIVE_TEST_RANGES,
@@ -48,6 +49,7 @@ PCLOSE_COLUMNS = (
 )
 BRIDGE_ISSUE_RANGE = (24011, 25042)
 BRIDGE_OUTLIER_MAX_ABS_DELTA = 0.10
+PROBABILITY_SUM_TOLERANCE = 2e-6
 LABEL_ONLY_QUALITY = (
     # Counts are source-census metadata independently supplied by the PI.  They
     # are deliberately not read from the official settlement source in Gate A.
@@ -56,8 +58,6 @@ LABEL_ONLY_QUALITY = (
     {"period": "26011-26049", "history_rows": 5608, "official_3sp_rows": 5539,
      "post_kickoff_updates": 4516},
 )
-
-
 def digest(path: Path) -> str:
     value = sha256()
     with path.open("rb") as handle:
@@ -89,6 +89,42 @@ def _issue_number(values: pd.Series) -> pd.Series:
 
 def _is_test_issue(issue: int) -> bool:
     return any(lower <= issue <= upper for lower, upper in RETROSPECTIVE_TEST_RANGES)
+
+
+def _valid_probability_triplet(values: pd.DataFrame) -> pd.Series:
+    """Apply the frozen finite, positive, simplex market-eligibility predicate."""
+
+    numeric = values.apply(pd.to_numeric, errors="coerce")
+    valid = _market_eligibility(numeric.to_numpy(dtype=float))
+    return pd.Series(valid, index=values.index, dtype=bool)
+
+
+def _market_eligibility(probabilities: pd.DataFrame | np.ndarray) -> np.ndarray:
+    """Frozen finite/positive/simplex predicate for the market fallback.
+
+    A market vector is eligible only when all 3/1/0 values are finite and
+    strictly positive and their sum is one within the contract tolerance.
+    Missing, negative, or non-simplex rows deterministically become NO_BET.
+    """
+
+    values = np.asarray(probabilities, dtype=float)
+    if values.ndim != 2 or values.shape[1] != len(OUTCOME_ORDER):
+        raise GateAError("market eligibility requires an M×3 probability matrix")
+    return np.isfinite(values).all(axis=1) & (values > 0).all(axis=1) & (
+        np.abs(values.sum(axis=1) - 1.0) <= PROBABILITY_SUM_TOLERANCE
+    )
+
+
+def _canonical_outcome_order(frame: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
+    """Stable persisted ordering: outcome 3, then 1, then 0 (never lexical)."""
+
+    result = frame.copy()
+    result["_outcome_rank"] = pd.Categorical(
+        result["outcome_code"].astype(str), categories=list(OUTCOME_ORDER), ordered=True,
+    )
+    if result["_outcome_rank"].isna().any():
+        raise GateAError("common adapter encountered a noncanonical outcome code")
+    return result.sort_values([*columns, "_outcome_rank"], kind="mergesort").drop(columns="_outcome_rank")
 
 
 def _package_source_manifest(package: Path) -> dict[str, Any]:
@@ -205,14 +241,16 @@ def _read_pclose_proxy(
         if issue_range is not None:
             query += " WHERE CAST(issue AS INTEGER) BETWEEN ? AND ?"
             params = issue_range
+        query += " ORDER BY rowid"
         with sqlite3.connect(f"file:{pclose_source.resolve()}?mode=ro", uri=True) as connection:
             frame = pd.read_sql_query(query, connection, params=params)
     if tuple(frame.columns) != PCLOSE_COLUMNS:
         raise GateAError("p_close bridge schema drift")
     frame["match_id"] = frame["match_id"].astype(str)
     frame["issue"] = frame["issue"].astype(str)
-    if not allow_duplicate_match_id and bool(frame["match_id"].duplicated().any()):
-        raise GateAError("p_close match_uid bridge is not unique")
+    frame["source_row_ordinal"] = np.arange(len(frame), dtype=np.int64)
+    if not allow_duplicate_match_id and bool(frame[["issue", "match_id"]].duplicated().any()):
+        raise GateAError("p_close issue+match_uid bridge is not unique")
     return frame
 
 
@@ -222,9 +260,10 @@ def _proxy_panel(history: pd.DataFrame) -> pd.DataFrame:
         pd.to_numeric, errors="coerce"
     )
     inverse = 1.0 / odds
-    complete = odds.gt(0).all(axis=1) & np.isfinite(inverse).all(axis=1)
+    input_complete = odds.gt(0).all(axis=1) & np.isfinite(inverse).all(axis=1)
     normalizer = inverse.sum(axis=1)
-    probabilities = inverse.div(normalizer.where(complete), axis=0)
+    probabilities = inverse.div(normalizer.where(input_complete), axis=0)
+    complete = input_complete & _valid_probability_triplet(probabilities)
     values["source_grade"] = PROXY_GRADE
     values["market_proxy_complete"] = complete.astype(bool)
     values["baseline_proxy_eligible"] = complete.astype(bool)
@@ -288,9 +327,18 @@ def _market_bridge(
     )
     joined = joined.loc[joined["match_uid"].notna()].copy()
     joined["match_uid"] = joined["match_uid"].astype(int).astype(str)
-    pclose = _read_pclose_proxy(pclose_source, BRIDGE_ISSUE_RANGE)
+    pclose = _read_pclose_proxy(
+        pclose_source, BRIDGE_ISSUE_RANGE, allow_duplicate_match_id=True,
+    ).rename(columns={"match_id": "pclose_match_uid"})
+    pclose["pclose_match_uid"] = pclose["pclose_match_uid"].astype(str)
+    pclose, duplicate_audit, duplicate_ids = _resolve_pclose_identity(pclose)
+    joined["pclose_join_key"] = np.where(
+        joined["match_uid"].isin(duplicate_ids),
+        joined["issue"].astype(str) + ":" + joined["match_uid"].astype(str),
+        joined["match_uid"].astype(str),
+    )
     joined = joined.merge(
-        pclose, left_on="match_uid", right_on="match_id", how="left",
+        pclose.drop(columns=["issue"]), on="pclose_join_key", how="left",
         validate="one_to_one", suffixes=("", "_pclose"),
     )
     odds = joined[["avg_eu_home", "avg_eu_draw", "avg_eu_away"]].apply(pd.to_numeric, errors="coerce")
@@ -298,7 +346,7 @@ def _market_bridge(
     historical_complete = odds.gt(0).all(axis=1) & np.isfinite(inverse).all(axis=1)
     normalized = inverse.div(inverse.sum(axis=1).where(historical_complete), axis=0)
     pclose_values = joined[["p_close_3", "p_close_1", "p_close_0"]].apply(pd.to_numeric, errors="coerce")
-    pclose_complete = pclose_values.notna().all(axis=1) & np.isfinite(pclose_values).all(axis=1)
+    pclose_complete = _valid_probability_triplet(pclose_values)
     comparable = historical_complete & pclose_complete
     bridge = pd.DataFrame({
         "issue": joined["issue"].astype(str), "match_idx": joined["match_idx"].astype(int),
@@ -335,7 +383,10 @@ def _market_bridge(
     )[0, 1]) for code in ("3", "1", "0")]
     summary = {
         "issue_range": list(BRIDGE_ISSUE_RANGE),
-        "join_key": "history.issue+history.match_idx -> official_identity.expect+match_no -> match_uid -> p_close.match_id",
+        "join_key": (
+            "history.issue+history.match_idx -> official_identity.expect+match_no -> "
+            "match_uid; reused p_close match_uid resolves by issue+match_uid"
+        ),
         "history_rows": int(len(history)),
         "official_identity_matched_rows": int(len(joined)),
         "history_without_official_identity_rows": int(len(history) - len(joined)),
@@ -351,6 +402,8 @@ def _market_bridge(
         "handicap_exact_rows": int((
             observed["handicap_line_history"] == observed["handicap_line_p_close"]
         ).sum()),
+        "p_close_duplicate_match_uid_count": int(len(duplicate_ids)),
+        "p_close_duplicate_audit_rows": int(len(duplicate_audit)),
         "labels_opened": False,
         "outlier_policy": "do not substitute p_close; retain normalized average-EU proxy with explicit source grade",
         "missing_policy": "missing history triplet -> NO_BET_FROZEN; missing p_close reference -> history-proxy-only grade",
@@ -360,6 +413,89 @@ def _market_bridge(
 
 
 COMMON_FEATURES = MODEL_FEATURES
+
+
+def _resolve_pclose_identity(
+    pclose: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame, set[str]]:
+    """Resolve reused p_close match IDs with issue-aware, value-audited keys."""
+
+    value_columns = ["p_close_3", "p_close_1", "p_close_0", "beidan_hcap"]
+    duplicated = pclose["pclose_match_uid"].duplicated(keep=False)
+    duplicate_rows = pclose.loc[duplicated].copy()
+    duplicate_ids = set(duplicate_rows["pclose_match_uid"].astype(str))
+    audit_columns = [
+        "pclose_match_uid",
+        "source_issue",
+        "source_row_ordinal",
+        *value_columns,
+        "source_rows_for_match_uid",
+        "source_issue_count",
+        "rows_for_issue_match_uid",
+        "probability_values_equal_for_match_uid",
+        "handicap_values_equal_for_match_uid",
+        "values_equal_within_issue_match_uid",
+        "issue_match_uid_resolves",
+        "canonical_selected",
+        "resolution",
+    ]
+    audit_parts: list[pd.DataFrame] = []
+    for match_uid, group in duplicate_rows.groupby("pclose_match_uid", sort=True):
+        group = group.sort_values("source_row_ordinal", kind="mergesort").copy()
+        within_counts = group.groupby(
+            ["issue", "pclose_match_uid"], sort=True
+        )[value_columns].nunique(dropna=False)
+        if bool(within_counts.gt(1).any(axis=None)):
+            raise GateAError(
+                f"duplicate p_close issue+match identity has unequal values: {match_uid}"
+            )
+        issue_match_counts = group.groupby(
+            ["issue", "pclose_match_uid"], sort=True
+        ).size()
+        group["source_rows_for_match_uid"] = len(group)
+        group["source_issue_count"] = group["issue"].nunique()
+        group["rows_for_issue_match_uid"] = [
+            int(issue_match_counts.loc[(issue, str(match_uid))])
+            for issue in group["issue"]
+        ]
+        group["probability_values_equal_for_match_uid"] = bool(
+            group[["p_close_3", "p_close_1", "p_close_0"]]
+            .nunique(dropna=False)
+            .eq(1)
+            .all()
+        )
+        group["handicap_values_equal_for_match_uid"] = bool(
+            group["beidan_hcap"].nunique(dropna=False) == 1
+        )
+        group["values_equal_within_issue_match_uid"] = True
+        group["issue_match_uid_resolves"] = group[
+            "rows_for_issue_match_uid"
+        ].eq(1)
+        group["canonical_selected"] = ~group.duplicated(
+            ["issue", "pclose_match_uid"], keep="first"
+        )
+        group["resolution"] = np.where(
+            group["issue_match_uid_resolves"],
+            "ISSUE_PLUS_MATCH_UID",
+            "EQUAL_VALUES_FIRST_SOURCE_ROW_WITHIN_ISSUE",
+        )
+        group = group.rename(columns={"issue": "source_issue"})
+        audit_parts.append(group.loc[:, audit_columns])
+    audit = (
+        pd.concat(audit_parts, ignore_index=True)
+        if audit_parts
+        else pd.DataFrame(columns=audit_columns)
+    )
+    resolved = pclose.copy()
+    resolved["pclose_join_key"] = np.where(
+        resolved["pclose_match_uid"].isin(duplicate_ids),
+        resolved["issue"].astype(str)
+        + ":"
+        + resolved["pclose_match_uid"].astype(str),
+        resolved["pclose_match_uid"].astype(str),
+    )
+    resolved = resolved.drop_duplicates("pclose_join_key", keep="first")
+    return resolved, audit, duplicate_ids
 
 
 def _development_registry(identity: pd.DataFrame, *, strict_census: bool = True) -> pd.DataFrame:
@@ -394,25 +530,30 @@ def _common_adapter(
     dev["match_uid_key"] = dev["match_uid"].astype("Int64").astype(str)
     pclose = _read_pclose_proxy(pclose_source, allow_duplicate_match_id=True).rename(columns={"match_id": "pclose_match_uid"})
     pclose["pclose_match_uid"] = pclose["pclose_match_uid"].astype(str)
-    # The raw archive has one documented duplicate key; deterministic first-row
-    # retention is frozen here rather than permitting an accidental one-to-many join.
-    duplicate_census = pclose.groupby("pclose_match_uid", sort=True).size().rename("source_rows").reset_index()
-    duplicate_census = duplicate_census.loc[duplicate_census["source_rows"].gt(1)].copy()
-    duplicate_census["resolution"] = "FIRST_SOURCE_ROW_BY_SQLITE_ROW_ORDER"
-    pclose = pclose.drop_duplicates("pclose_match_uid", keep="first")
-    # The p_close issue field is evidence of the source query, but the frozen
-    # development chronology always comes from #203's issue registry.
-    pclose = pclose.drop(columns=["issue"])
-    dev = dev.merge(pclose, left_on="match_uid_key", right_on="pclose_match_uid", how="left", validate="many_to_one")
-    pclose_complete = dev[["p_close_3", "p_close_1", "p_close_0"]].notna().all(axis=1)
+    pclose, duplicate_census, duplicate_ids = _resolve_pclose_identity(pclose)
+    dev["pclose_join_key"] = np.where(
+        dev["match_uid_key"].isin(duplicate_ids),
+        dev["issue"].astype(str) + ":" + dev["match_uid_key"],
+        dev["match_uid_key"],
+    )
+    dev = dev.merge(
+        pclose,
+        on="pclose_join_key",
+        how="left",
+        validate="many_to_one",
+        suffixes=("", "_pclose_source"),
+    )
+    pclose_values = dev[["p_close_3", "p_close_1", "p_close_0"]]
+    pclose_complete = _valid_probability_triplet(pclose_values)
     if strict_census and (len(dev) != 102245 or int(pclose_complete.sum()) != 101029):
         raise GateAError("development p_close adapter support drift")
 
     test = history.copy()
     odds = test[["avg_eu_home", "avg_eu_draw", "avg_eu_away"]].apply(pd.to_numeric, errors="coerce")
     inverse = 1.0 / odds
-    test_complete = odds.gt(0).all(axis=1) & np.isfinite(inverse).all(axis=1)
-    normalized = inverse.div(inverse.sum(axis=1).where(test_complete), axis=0)
+    test_input_complete = odds.gt(0).all(axis=1) & np.isfinite(inverse).all(axis=1)
+    normalized = inverse.div(inverse.sum(axis=1).where(test_input_complete), axis=0)
+    test_complete = test_input_complete & _valid_probability_triplet(normalized)
     if strict_census and (len(test) != 16990 or int(test_complete.sum()) != 16968):
         raise GateAError("test average-EU adapter support drift")
 
@@ -427,6 +568,15 @@ def _common_adapter(
     # absent; the two frozen blocks are 2025 and 2026 respectively.
     test_base["year"] = np.where(test_base["issue_num"].le(25125), 2025, 2026).astype(int)
     test_base["issue_instance"] = "RETROSPECTIVE_PROXY_" + test_base["issue"].astype(str)
+    # The frozen eligibility decision is triplet-level.  Retain invalid rows
+    # in the registry for the explicit fallback census, but remove their
+    # partial scalar values from the feature/mask adapter so inference cannot
+    # consume a malformed vector as a market fallback.
+    dev_base.loc[
+        ~pclose_complete,
+        ["p_close_3", "p_close_1", "p_close_0", "beidan_hcap"],
+    ] = np.nan
+    normalized = normalized.where(test_complete, np.nan)
 
     rows: list[pd.DataFrame] = []
     masks: list[pd.DataFrame] = []
@@ -458,7 +608,7 @@ def _common_adapter(
             )
             rows.append(part)
             mask = part[["cell_key"]].copy()
-            mask["market_probability"] = part["market_probability"].notna()
+            mask["market_probability"] = part["market_proxy_complete"].astype(bool)
             mask["native_handicap_line"] = part["native_handicap_line"].notna()
             mask["source_is_pclose"] = True
             mask["source_is_average_eu"] = True
@@ -467,8 +617,13 @@ def _common_adapter(
             masks.append(mask)
     features = pd.concat(rows, ignore_index=True).rename(columns={"predicted_final_sp": "predicted_final_sp_input"})
     features = features[["cell_key", "issue", "issue_instance", "year", "issue_order", "match_idx", "outcome_code", "role", "source_grade", *COMMON_FEATURES]]
-    features = features.sort_values(["role", "year", "issue", "match_idx", "outcome_code"], kind="mergesort").reset_index(drop=True)
-    feature_masks = pd.concat(masks, ignore_index=True).sort_values("cell_key", kind="mergesort").reset_index(drop=True)
+    features = _canonical_outcome_order(
+        features, ["role", "year", "issue", "match_idx"],
+    ).reset_index(drop=True)
+    raw_masks = pd.concat(masks, ignore_index=True)
+    feature_masks = features[["cell_key"]].merge(
+        raw_masks, on="cell_key", how="left", validate="one_to_one"
+    )
     registry = pd.concat([
         dev_base.assign(role="DEVELOPMENT_CV", source_grade="RETROSPECTIVE_PROXY_PCLOSE", market_proxy_complete=pclose_complete),
         test_base.assign(role="RETROSPECTIVE_TEST_LOCKED", source_grade=PROXY_GRADE, market_proxy_complete=test_complete),
@@ -491,9 +646,12 @@ def load_common_issue(package: str | Path, issue: str) -> tuple[np.ndarray, np.n
     selected = features.loc[features["issue"].astype(str).eq(str(issue))].copy()
     if selected.empty:
         raise GateAError(f"common adapter issue is absent: {issue}")
-    selected = selected.sort_values(["match_idx", "outcome_code"], kind="mergesort")
     if len(selected) % 3 or set(selected["outcome_code"].unique()) != {"3", "1", "0"}:
         raise GateAError("common adapter does not form M×3")
+    selected = _canonical_outcome_order(selected, ["match_idx"])
+    sequences = selected.groupby("match_idx", sort=False)["outcome_code"].agg(tuple)
+    if not sequences.map(lambda value: value == OUTCOME_ORDER).all():
+        raise GateAError("common adapter outcome axis is not canonical 3/1/0")
     aligned_masks = masks.set_index("cell_key").loc[selected["cell_key"]]
     values = selected.loc[:, list(COMMON_FEATURES)].to_numpy(dtype=float).reshape(-1, 3, len(COMMON_FEATURES))
     mask_values = aligned_masks.loc[:, list(COMMON_FEATURES)].to_numpy(dtype=bool).reshape(-1, 3, len(COMMON_FEATURES))
@@ -530,15 +688,13 @@ def _common_probability_validity(features: pd.DataFrame, masks: pd.DataFrame) ->
     market_mask = joined.pivot(index=identity_columns, columns="outcome_code", values="market_probability_mask")
     handicap_mask = joined.pivot(index=identity_columns, columns="outcome_code", values="native_handicap_line")
     sp_input_mask = joined.pivot(index=identity_columns, columns="outcome_code", values="predicted_final_sp_input")
-    expected = ["3", "1", "0"]
+    expected = list(OUTCOME_ORDER)
     market = market.reindex(columns=expected)
     market_mask = market_mask.reindex(columns=expected).fillna(False).astype(bool)
     handicap_mask = handicap_mask.reindex(columns=expected).fillna(False).astype(bool)
     sp_input_mask = sp_input_mask.reindex(columns=expected).fillna(False).astype(bool)
-    values = market.to_numpy(dtype=float)
-    valid_market = (
-        market_mask.all(axis=1).to_numpy() & np.isfinite(values).all(axis=1)
-        & (values > 0).all(axis=1) & (np.abs(values.sum(axis=1) - 1.0) <= 2e-6)
+    valid_market = market_mask.all(axis=1).to_numpy() & _market_eligibility(
+        market.to_numpy(dtype=float)
     )
     detail = market.reset_index()[identity_columns]
     detail["market_triplet_valid"] = valid_market
@@ -792,7 +948,7 @@ def _build_card(
         },
         "schema": {
             "ragged_shape": "X_i[J_i,3,F]",
-            "outcome_axis": ["3", "1", "0"],
+            "outcome_axis": list(OUTCOME_ORDER),
             "model_features": list(MODEL_FEATURES),
             "mask_features": list(MODEL_FEATURES),
             "market_baseline_feature": MARKET_BASELINE_FEATURE,
@@ -844,7 +1000,7 @@ def _build_card(
 
 def _readme(card: dict[str, Any]) -> str:
     chronology = card["chronology"]
-    return f"""# #204 Gate A v4 — market-anchored residual model preregistration
+    return f"""# #204 Gate A v5 — market-anchored residual model preregistration
 
 This immutable package is **outcome-unexposed**.  It uses the #203 inference
 namespace only for development/CV through issue `{chronology['development_cv_through_issue']}`.
@@ -877,7 +1033,7 @@ proxy row uses a valid frozen market vector if one exists; otherwise it is
 
 
 def _replay_markdown() -> str:
-    return """# Deterministic Gate-A v4 replay
+    return """# Deterministic Gate-A v5 replay
 
 Run from the repository root with the pinned existing environment.  The
 history source is read-only and queried with the documented eight-column
@@ -886,7 +1042,7 @@ pre-event allow-list; no official-SP or result field is selected.
 ```bash
 PY=.venv/bin/python
 PYTHONPATH=src $PY scripts/freeze_bj204_model_gate_a.py verify \\
-  --package results/bj204_gate_a_preoutcome_v4
+  --package results/bj204_gate_a_preoutcome_v5
 
 PYTHONPATH=src $PY scripts/freeze_bj204_model_gate_a.py freeze \\
   --source results/bj203_causal_tensor_v2 \\
@@ -895,6 +1051,10 @@ PYTHONPATH=src $PY scripts/freeze_bj204_model_gate_a.py freeze \\
   --pclose-source data/beidan_features.db --output <new-empty-directory>
 
 PYTHONPATH=src $PY scripts/execute_bj204_notebook.py
+
+# Pristine fixture-only validation from a clean checkout without data/.
+PYTHON_BIN=/absolute/path/to/repository/.venv/bin/python \\
+  bash scripts/test_bj204_gate_a_portable.sh
 ```
 
 The package and notebook never import `unified_tensor.settlement_labels` and
@@ -1036,6 +1196,13 @@ def verify_package(package: str | Path) -> dict[str, Any]:
         raise GateAError("common M×3 schema drift")
     if features.groupby(["issue", "match_idx"]).size().ne(3).any():
         raise GateAError("common M×3 outcome cardinality drift")
+    outcome_sequences = features.groupby(
+        ["issue", "match_idx"], sort=False
+    )["outcome_code"].agg(tuple)
+    if not outcome_sequences.map(lambda value: value == OUTCOME_ORDER).all():
+        raise GateAError("common M×3 outcome axis drift")
+    if card.get("schema", {}).get("outcome_axis") != list(OUTCOME_ORDER):
+        raise GateAError("frozen schema outcome axis drift")
     validity = pd.read_csv(root / "common_probability_validity.csv")
     if int(validity["market_triplet_valid_rows"].sum()) != 101029 + 16968:
         raise GateAError("common market triplet validity drift")
