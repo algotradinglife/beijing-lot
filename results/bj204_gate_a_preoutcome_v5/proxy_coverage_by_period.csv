@@ -1,0 +1,3 @@
+period,issues,rows,baseline_proxy_rows,model_proxy_rows,fallback_no_bet_rows,baseline_proxy_coverage,model_proxy_coverage,fallback_no_bet_coverage,source_grade,labels_opened
+25043-25125,42,11382,11366,11366,16,0.998594271657,0.998594271657,0.001405728343,RETROSPECTIVE_PROXY,False
+26011-26049,33,5608,5602,5602,6,0.998930099857,0.998930099857,0.00106990014265,RETROSPECTIVE_PROXY,False
