@@ -67,7 +67,16 @@ updated: 2026-08-07
    解析并留下审计表。两者在 20,837 个完整重叠上的 MAE 为 0.005533，不能宣称
    byte-identical。权威包为 `results/bj204_gate_a_preoutcome_v5`，manifest/content identity
    均为 `dfa14d42410d5513cbb07f832972e47fa1cf819a6f1eece13e1f92106e096ae1`；其只是一份
-   Gate A preregistration，不产生模型优越性、下注或 Gate B 授权。
+   Gate A preregistration，不产生模型优越性、下注或 Gate B 授权。Gate B 的唯一结果包是
+   `results/bj204_gate_b_retrospective_implementation_recovery_v1`（manifest/content identity
+   `ae18e0146c0375b03b380842cdb43fd7d37a20d1872ae97d5198dda2ba06577c`）：此前 v1 因未实施已公开的
+   residual/fallback/selection 语义而无效，现仅以 `RETROSPECTIVE_IMPLEMENTATION_RECOVERY`
+   身份保留。修正后，所有 residual 均按 `softmax(log(market)+centered delta)` 推断，且 CV
+   选择 `MARKET_ONLY`（CV log loss 1.150530）。在锁定测试的 16,833 个 market/label 交集上，
+   市场 baseline log loss 为 1.147860；Logistic、HGB、issue-summary MLP 的 model-only lift
+   分别为 +0.004147、+0.002154、+0.015964（越低越好，均为恶化）。因此结果为
+   `NO_PROMOTION_PENDING_PI_REVIEW`：保留 market/NO_BET fallback，#210 仍是唯一严格确认。
+   该研究不授权 #205、下注、ROI、票据或生产使用。
 
 ## 近期 N7 策略结论（2026-08-02）
 

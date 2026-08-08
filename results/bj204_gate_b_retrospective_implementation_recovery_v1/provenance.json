@@ -1,0 +1,10 @@
+{
+  "execution_status": "RETROSPECTIVE_IMPLEMENTATION_RECOVERY",
+  "gate_a_manifest_sha256": "dfa14d42410d5513cbb07f832972e47fa1cf819a6f1eece13e1f92106e096ae1",
+  "gate_a_package": "results/bj204_gate_a_preoutcome_v5",
+  "invalid_v1_receipt": "results/bj204_gate_b_invalid_v1_receipt/invalid_run_receipt.json",
+  "official_label_source": "data/raw/beidan_full_3sp.csv",
+  "official_label_source_sha256": "e7256d96a34c2f41ede349c87b9cd1efc7a61b104657a657367daf9dd54ee8e2",
+  "output_atomic": true,
+  "output_contract": "bj204-market-anchored-model-gate-b-retrospective-implementation-recovery-v1"
+}
