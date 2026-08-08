@@ -1,0 +1,56 @@
+{
+  "contract_version": "bj204-market-anchored-model-gate-a-v4",
+  "environment": {
+    "matplotlib": "3.10.9",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "pyarrow": "24.0.0",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.17.1"
+  },
+  "fallback": {
+    "acceptance": "all three finite unmasked values sum to one within 2e-6",
+    "fallback_metric_reporting": "report pure baseline, model-only and fallback-mixed separately",
+    "market_vector": "market_probability",
+    "on_acceptance": "emit the frozen market vector byte-for-byte after float32 load",
+    "on_rejection": "emit explicit NO_BET_FROZEN; never emit a learned vector",
+    "rule_id": "BJ204_MARKET_OR_NO_BET_V1"
+  },
+  "metrics": [
+    "multiclass_log_loss",
+    "brier_score",
+    "ece_equal_mass",
+    "top1_coverage",
+    "top2_coverage",
+    "predicted_sp_mae",
+    "fallback_coverage",
+    "ood_coverage"
+  ],
+  "models": [
+    {
+      "id": "MARKET_ONLY",
+      "implementation": "frozen calibrated_market_probability",
+      "role": "incumbent and exact safe fallback"
+    },
+    {
+      "id": "LOGISTIC_RESIDUAL",
+      "implementation": "sklearn.linear_model.LogisticRegression",
+      "role": "complexity-matched multinomial residual control"
+    },
+    {
+      "id": "HIST_GRADIENT_RESIDUAL",
+      "implementation": "sklearn.ensemble.HistGradientBoostingClassifier",
+      "role": "shallow nonlinear residual control"
+    },
+    {
+      "id": "SET_ENCODER_RESIDUAL",
+      "implementation": "PyTorch Deep Sets / Set Transformer only after controls",
+      "role": "candidate issue-context residual; not trained in Gate A"
+    }
+  ],
+  "seeds": [
+    204001,
+    204002,
+    204003
+  ]
+}
