@@ -125,5 +125,9 @@ def test_bj204_data_build_notebook_is_executed_and_audits_construction() -> None
     assert [cell.execution_count for cell in code] == list(range(1, len(code) + 1))
     assert not [output for cell in code for output in cell.outputs if output.output_type == "error"]
     source = "\n".join("".join(cell.source) for cell in code)
-    for token in ("common_cell_features", "common_schema_coverage", "load_common_issue", "development_target_identity"):
+    for token in (
+        "common_cell_features", "common_schema_coverage", "load_common_issue",
+        "development_target_identity", "FULL_EXPLICIT_IMMUTABLE_SOURCES",
+        "BOUNDED_COMMITTED_FIXTURES", "BJ204_HISTORY_SOURCE",
+    ):
         assert token in source
