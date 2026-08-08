@@ -6,7 +6,11 @@
       2023
     ],
     "development_cv_through_issue": 25042,
-    "development_issue_count": 289,
+    "development_issue_count": 344,
+    "development_match_count": 102245,
+    "development_target_identity_available_rows": 1021,
+    "development_target_identity_rows": 1024,
+    "development_target_identity_scope": "25041-25042",
     "reserve_for_210_from_issue": 26051,
     "retrospective_test_history_rows": 16990,
     "retrospective_test_issue_count": 75,
@@ -21,7 +25,7 @@
       ]
     ]
   },
-  "contract_version": "bj204-market-anchored-model-gate-a-v3",
+  "contract_version": "bj204-market-anchored-model-gate-a-v4",
   "environment": {
     "matplotlib": "3.10.9",
     "numpy": "2.4.6",
@@ -33,7 +37,7 @@
   "fallback": {
     "acceptance": "all three finite unmasked values sum to one within 2e-6",
     "fallback_metric_reporting": "report pure baseline, model-only and fallback-mixed separately",
-    "market_vector": "calibrated_market_probability",
+    "market_vector": "market_probability",
     "on_acceptance": "emit the frozen market vector byte-for-byte after float32 load",
     "on_rejection": "emit explicit NO_BET_FROZEN; never emit a learned vector",
     "rule_id": "BJ204_MARKET_OR_NO_BET_V1"
@@ -138,50 +142,114 @@
     "panel_file": "retrospective_proxy_panel.csv"
   },
   "schema": {
-    "market_baseline_feature": "calibrated_market_probability",
+    "common_adapter": {
+      "by_period": [
+        {
+          "common_schema_coverage": 0.9927093930145812,
+          "complete_market_rows": 17565,
+          "issues": 55,
+          "matches": 17694,
+          "role": "DEVELOPMENT_CV",
+          "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+          "year": 2019
+        },
+        {
+          "common_schema_coverage": 0.9818831546580238,
+          "complete_market_rows": 11815,
+          "issues": 44,
+          "matches": 12033,
+          "role": "DEVELOPMENT_CV",
+          "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+          "year": 2020
+        },
+        {
+          "common_schema_coverage": 0.9863884328160585,
+          "complete_market_rows": 18624,
+          "issues": 58,
+          "matches": 18881,
+          "role": "DEVELOPMENT_CV",
+          "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+          "year": 2021
+        },
+        {
+          "common_schema_coverage": 0.987609459700959,
+          "complete_market_rows": 16579,
+          "issues": 58,
+          "matches": 16787,
+          "role": "DEVELOPMENT_CV",
+          "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+          "year": 2022
+        },
+        {
+          "common_schema_coverage": 0.9895932483025572,
+          "complete_market_rows": 15595,
+          "issues": 55,
+          "matches": 15759,
+          "role": "DEVELOPMENT_CV",
+          "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+          "year": 2023
+        },
+        {
+          "common_schema_coverage": 0.9889751170238975,
+          "complete_market_rows": 16057,
+          "issues": 59,
+          "matches": 16236,
+          "role": "DEVELOPMENT_CV",
+          "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+          "year": 2024
+        },
+        {
+          "common_schema_coverage": 0.9874356333676622,
+          "complete_market_rows": 4794,
+          "issues": 15,
+          "matches": 4855,
+          "role": "DEVELOPMENT_CV",
+          "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+          "year": 2025
+        },
+        {
+          "common_schema_coverage": 0.9985942716570023,
+          "complete_market_rows": 11366,
+          "issues": 42,
+          "matches": 11382,
+          "role": "RETROSPECTIVE_TEST_LOCKED",
+          "source_grade": "RETROSPECTIVE_PROXY",
+          "year": 2025
+        },
+        {
+          "common_schema_coverage": 0.9989300998573466,
+          "complete_market_rows": 5602,
+          "issues": 33,
+          "matches": 5608,
+          "role": "RETROSPECTIVE_TEST_LOCKED",
+          "source_grade": "RETROSPECTIVE_PROXY",
+          "year": 2026
+        }
+      ],
+      "coverage_table": "common_schema_coverage_by_period.csv",
+      "development_source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+      "feature_table": "common_cell_features.parquet",
+      "field_coverage_table": "common_schema_field_coverage.csv",
+      "mask_table": "common_cell_masks.parquet",
+      "registry_table": "common_issue_registry.csv",
+      "test_source_grade": "RETROSPECTIVE_PROXY"
+    },
+    "market_baseline_feature": "market_probability",
     "mask_features": [
-      "calibrated_market_probability",
-      "devig_euro_probability",
-      "euro_1h_odds",
-      "fundamental_probability",
-      "probability_residual",
-      "probability_residual_z",
-      "predicted_final_sp",
+      "market_probability",
       "native_handicap_line",
-      "line_residual_mu",
-      "line_residual_z",
-      "market_uncertainty",
-      "market_signature_breadth",
-      "market_signature_dispersion",
-      "history_training_rows_log1p",
-      "min_history_n_log1p",
-      "league_index",
-      "home_team_index",
-      "away_team_index",
-      "kickoff_delay_hours",
-      "match_position_fraction"
+      "source_is_pclose",
+      "source_is_average_eu",
+      "market_proxy_complete",
+      "predicted_final_sp_input"
     ],
     "model_features": [
-      "calibrated_market_probability",
-      "devig_euro_probability",
-      "euro_1h_odds",
-      "fundamental_probability",
-      "probability_residual",
-      "probability_residual_z",
-      "predicted_final_sp",
+      "market_probability",
       "native_handicap_line",
-      "line_residual_mu",
-      "line_residual_z",
-      "market_uncertainty",
-      "market_signature_breadth",
-      "market_signature_dispersion",
-      "history_training_rows_log1p",
-      "min_history_n_log1p",
-      "league_index",
-      "home_team_index",
-      "away_team_index",
-      "kickoff_delay_hours",
-      "match_position_fraction"
+      "source_is_pclose",
+      "source_is_average_eu",
+      "market_proxy_complete",
+      "predicted_final_sp_input"
     ],
     "outcome_axis": [
       "3",
@@ -209,6 +277,7 @@
     204003
   ],
   "source": {
+    "full_replay_source_location_contract": "freeze requires explicit --history-source, --full-3sp-identity-source, and --pclose-source paths; no parent-worktree discovery is permitted",
     "history_proxy_columns_allowlist": [
       "issue",
       "match_idx",

@@ -1,0 +1,129 @@
+{
+  "common_adapter": {
+    "by_period": [
+      {
+        "common_schema_coverage": 0.9927093930145812,
+        "complete_market_rows": 17565,
+        "issues": 55,
+        "matches": 17694,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2019
+      },
+      {
+        "common_schema_coverage": 0.9818831546580238,
+        "complete_market_rows": 11815,
+        "issues": 44,
+        "matches": 12033,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2020
+      },
+      {
+        "common_schema_coverage": 0.9863884328160585,
+        "complete_market_rows": 18624,
+        "issues": 58,
+        "matches": 18881,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2021
+      },
+      {
+        "common_schema_coverage": 0.987609459700959,
+        "complete_market_rows": 16579,
+        "issues": 58,
+        "matches": 16787,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2022
+      },
+      {
+        "common_schema_coverage": 0.9895932483025572,
+        "complete_market_rows": 15595,
+        "issues": 55,
+        "matches": 15759,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2023
+      },
+      {
+        "common_schema_coverage": 0.9889751170238975,
+        "complete_market_rows": 16057,
+        "issues": 59,
+        "matches": 16236,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2024
+      },
+      {
+        "common_schema_coverage": 0.9874356333676622,
+        "complete_market_rows": 4794,
+        "issues": 15,
+        "matches": 4855,
+        "role": "DEVELOPMENT_CV",
+        "source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+        "year": 2025
+      },
+      {
+        "common_schema_coverage": 0.9985942716570023,
+        "complete_market_rows": 11366,
+        "issues": 42,
+        "matches": 11382,
+        "role": "RETROSPECTIVE_TEST_LOCKED",
+        "source_grade": "RETROSPECTIVE_PROXY",
+        "year": 2025
+      },
+      {
+        "common_schema_coverage": 0.9989300998573466,
+        "complete_market_rows": 5602,
+        "issues": 33,
+        "matches": 5608,
+        "role": "RETROSPECTIVE_TEST_LOCKED",
+        "source_grade": "RETROSPECTIVE_PROXY",
+        "year": 2026
+      }
+    ],
+    "coverage_table": "common_schema_coverage_by_period.csv",
+    "development_source_grade": "RETROSPECTIVE_PROXY_PCLOSE",
+    "feature_table": "common_cell_features.parquet",
+    "field_coverage_table": "common_schema_field_coverage.csv",
+    "mask_table": "common_cell_masks.parquet",
+    "registry_table": "common_issue_registry.csv",
+    "test_source_grade": "RETROSPECTIVE_PROXY"
+  },
+  "market_baseline_feature": "market_probability",
+  "mask_features": [
+    "market_probability",
+    "native_handicap_line",
+    "source_is_pclose",
+    "source_is_average_eu",
+    "market_proxy_complete",
+    "predicted_final_sp_input"
+  ],
+  "model_features": [
+    "market_probability",
+    "native_handicap_line",
+    "source_is_pclose",
+    "source_is_average_eu",
+    "market_proxy_complete",
+    "predicted_final_sp_input"
+  ],
+  "outcome_axis": [
+    "3",
+    "1",
+    "0"
+  ],
+  "predicted_final_sp_semantics": "outcome-unexposed pre-event proxy input only",
+  "ragged_shape": "X_i[J_i,3,F]",
+  "sp_target": {
+    "availability": "Gate-B only; no target values or target masks are loaded in Gate A",
+    "field": "final_sp",
+    "outcome_axis": [
+      "3",
+      "1",
+      "0"
+    ],
+    "quality_mask": "TARGET_ONLY_OFFICIAL_3SP_NOT_OPENED_GATE_A",
+    "target_id": "OFFICIAL_FINAL_SP_3_1_0"
+  }
+}

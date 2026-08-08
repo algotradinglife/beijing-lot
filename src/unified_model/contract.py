@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Final
 
 
-CONTRACT_VERSION: Final = "bj204-market-anchored-model-gate-a-v3"
+CONTRACT_VERSION: Final = "bj204-market-anchored-model-gate-a-v4"
 UPSTREAM_CONTRACT_VERSION: Final = "bj203-causal-tensor-v2"
 SOURCE_PACKAGE: Final = "results/bj203_causal_tensor_v2"
 
@@ -23,30 +23,18 @@ RESERVE_ISSUE_MIN: Final = 26051
 CV_VALIDATION_YEARS: Final = (2021, 2022, 2023)
 SEEDS: Final = (204001, 204002, 204003)
 
-# Inputs are all present in the #203 inference namespace.  The model cannot
-# read a target/settlement column; masks are explicit model inputs so missing
-# data always has a deterministic fallback rather than implicit imputation.
+# One common, outcome-unexposed M×3 interface is materialized for development
+# and the locked test period.  Development uses a p_close market proxy after
+# the official identity bridge; test uses normalized average-EU.  Source-grade
+# indicators and explicit masks make that source transition observable instead
+# of pretending that the two sources are byte-identical.
 MODEL_FEATURES: Final = (
-    "calibrated_market_probability",
-    "devig_euro_probability",
-    "euro_1h_odds",
-    "fundamental_probability",
-    "probability_residual",
-    "probability_residual_z",
-    "predicted_final_sp",
+    "market_probability",
     "native_handicap_line",
-    "line_residual_mu",
-    "line_residual_z",
-    "market_uncertainty",
-    "market_signature_breadth",
-    "market_signature_dispersion",
-    "history_training_rows_log1p",
-    "min_history_n_log1p",
-    "league_index",
-    "home_team_index",
-    "away_team_index",
-    "kickoff_delay_hours",
-    "match_position_fraction",
+    "source_is_pclose",
+    "source_is_average_eu",
+    "market_proxy_complete",
+    "predicted_final_sp_input",
 )
 
 # ``predicted_final_sp`` is an outcome-unexposed input proxy.  It is never the
@@ -62,7 +50,7 @@ SP_TARGET: Final = {
 
 PROXY_GRADE: Final = "RETROSPECTIVE_PROXY"
 
-MARKET_BASELINE_FEATURE: Final = "calibrated_market_probability"
+MARKET_BASELINE_FEATURE: Final = "market_probability"
 FALLBACK_RULE: Final = {
     "rule_id": "BJ204_MARKET_OR_NO_BET_V1",
     "market_vector": MARKET_BASELINE_FEATURE,

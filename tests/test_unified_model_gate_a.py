@@ -1,183 +1,129 @@
-"""Focused outcome-boundary, source-census, and replay tests for #204 Gate A."""
+"""Portable outcome-boundary and common-adapter tests for #204 Gate A v4."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-import shutil
 
 import nbformat
+import numpy as np
 import pandas as pd
 
-from unified_model.contract import (
-    CONTRACT_VERSION,
-    DEVELOPMENT_ISSUE_MAX,
-    RESERVE_ISSUE_MIN,
-    RETROSPECTIVE_TEST_RANGES,
-    SP_TARGET,
-)
+from unified_model.contract import CONTRACT_VERSION, MODEL_FEATURES, SP_TARGET
 from unified_model.gate_a import (
+    COMMON_FEATURES,
     FULL_3SP_IDENTITY_COLUMNS,
     HISTORY_COLUMNS,
     PCLOSE_COLUMNS,
-    build_package,
+    _common_adapter,
+    _read_full_3sp_identity,
+    _read_history_rows,
+    _validate_source,
+    load_common_issue,
     verify_package,
 )
-from scripts.freeze_bj204_model_gate_a import (
-    _atomic_build,
-    _default_full_3sp_identity_source,
-    _default_history_source,
-    _default_pclose_source,
-)
-from scripts.execute_bj204_notebook import execute_notebook
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "results/bj203_causal_tensor_v2"
-HISTORY = _default_history_source()
-FULL_3SP_IDENTITY = _default_full_3sp_identity_source()
-PCLOSE = _default_pclose_source()
-FROZEN = ROOT / "results/bj204_gate_a_preoutcome_v3"
+FROZEN = ROOT / "results/bj204_gate_a_preoutcome_v4"
+FIXTURES = ROOT / "tests/fixtures/bj204"
 
 
-def _build(package: Path) -> dict[str, object]:
-    return build_package(
-        package, source_package=SOURCE, history_source=HISTORY,
-        full_3sp_identity_source=FULL_3SP_IDENTITY, pclose_source=PCLOSE,
+def test_bj204_gate_a_v4_manifest_is_canonical_and_outcome_unexposed() -> None:
+    receipt = verify_package(FROZEN)
+    assert receipt == {
+        "contract_version": CONTRACT_VERSION,
+        "files": 22,
+        "status": "PASS",
+    }
+    card = json.loads((FROZEN / "freeze_card.json").read_text(encoding="utf-8"))
+    assert card["source"]["labels_opened"] is False
+    assert card["schema"]["sp_target"] == SP_TARGET
+    assert card["schema"]["model_features"] == list(MODEL_FEATURES)
+    assert not list(FROZEN.rglob("*settlement*"))
+
+
+def test_bj204_gate_a_v4_restores_full_344_issue_chronology() -> None:
+    splits = pd.read_csv(FROZEN / "split_manifest.csv", dtype={"issue": str})
+    development = splits.loc[splits.role.eq("DEVELOPMENT_CV")]
+    test = splits.loc[splits.role.eq("RETROSPECTIVE_TEST_LOCKED")]
+    assert development.issue.nunique() == 344
+    assert development.groupby("year").issue.nunique().to_dict() == {
+        2019: 55, 2020: 44, 2021: 58, 2022: 58, 2023: 55, 2024: 59, 2025: 15,
+    }
+    assert test.issue.nunique() == 75
+    assert test.issue.astype(int).between(25043, 25125).sum() == 42
+    assert test.issue.astype(int).between(26011, 26049).sum() == 33
+    assert splits.labels_permitted_gate_a.astype(str).str.lower().eq("false").all()
+
+
+def test_bj204_common_schema_coverage_and_target_identity_censuses() -> None:
+    coverage = pd.read_csv(FROZEN / "common_schema_coverage_by_period.csv")
+    development = coverage.loc[coverage.role.eq("DEVELOPMENT_CV")]
+    test = coverage.loc[coverage.role.eq("RETROSPECTIVE_TEST_LOCKED")]
+    assert development.matches.sum() == 102245
+    assert development.complete_market_rows.sum() == 101029
+    assert test.matches.sum() == 16990
+    assert test.complete_market_rows.sum() == 16968
+    targets = pd.read_csv(FROZEN / "development_target_identity_reconciliation.csv", dtype={"issue": str})
+    assert len(targets) == 1024
+    assert int(targets.official_target_identity_available.sum()) == 1021
+    assert targets.labels_opened.astype(str).str.lower().eq("false").all()
+    detail = pd.read_csv(FROZEN / "common_schema_field_coverage.csv")
+    assert set(detail.feature) == set(COMMON_FEATURES)
+    assert set(detail.outcome_code.astype(str)) == {"0", "1", "3"}
+
+
+def test_bj204_common_adapter_loads_development_and_test_through_one_api(tmp_path: Path) -> None:
+    identity, _ = _validate_source(SOURCE)
+    mini = identity.loc[
+        identity.issue.astype(str).eq("190101") & identity.match_idx.isin([1, 2])
+    ].copy()
+    history = _read_history_rows(FIXTURES / "history_proxy.csv", ((25043, 25043),))
+    full = _read_full_3sp_identity(FIXTURES / "full_3sp_identity.csv")
+    features, masks, _registry, _coverage, _duplicates = _common_adapter(
+        SOURCE, mini, history, full, FIXTURES / "pclose_proxy.csv", strict_census=False,
     )
+    package = tmp_path / "adapter"
+    package.mkdir()
+    features.to_parquet(package / "common_cell_features.parquet", index=False)
+    masks.to_parquet(package / "common_cell_masks.parquet", index=False)
+    dev_values, dev_masks, names = load_common_issue(package, "190101")
+    test_values, test_masks, test_names = load_common_issue(package, "25043")
+    assert names == test_names == COMMON_FEATURES == MODEL_FEATURES
+    assert dev_values.shape == test_values.shape == (2, 3, len(COMMON_FEATURES))
+    assert dev_masks.shape == test_masks.shape == dev_values.shape
+    assert np.isfinite(dev_values[:, :, 0]).all()
+    assert np.isfinite(test_values[:, :, 0]).all()
+    assert dev_masks[:, :, 0].all() and test_masks[:, :, 0].all()
+    assert dev_values[:, :, 2].all() and not dev_values[:, :, 3].any()
+    assert test_values[:, :, 3].all() and not test_values[:, :, 2].any()
 
 
-def test_bj204_history_proxy_has_an_explicit_pre_event_column_allowlist() -> None:
+def test_bj204_fixture_sources_use_only_documented_pre_event_columns() -> None:
     assert HISTORY_COLUMNS == (
         "issue", "match_idx", "league", "kickoff_ts", "handicap_line",
         "avg_eu_home", "avg_eu_draw", "avg_eu_away",
     )
-    assert not {"score", "result_code", "winning_sp", "final_sp"}.intersection(HISTORY_COLUMNS)
     assert FULL_3SP_IDENTITY_COLUMNS == ("expect", "match_no", "match_uid")
     assert PCLOSE_COLUMNS == ("match_id", "issue", "p_close_3", "p_close_1", "p_close_0", "beidan_hcap")
+    assert not {"score", "result_code", "winning_sp", "final_sp"}.intersection(HISTORY_COLUMNS)
 
 
-def test_bj204_gate_a_freezes_correct_issue_chronology_without_opening_labels(tmp_path: Path) -> None:
-    package = tmp_path / "gate-a"
-    receipt = _build(package)
-
-    assert receipt["status"] == "GATE_A_OUTCOME_UNEXPOSED_PASS"
-    assert verify_package(package)["status"] == "PASS"
-    assert not list(package.rglob("*settlement*"))
-
-    splits = pd.read_csv(package / "split_manifest.csv", dtype={"issue": str})
-    assert splits["labels_permitted_gate_a"].astype(str).str.lower().eq("false").all()
-    test = splits.loc[splits.role.eq("RETROSPECTIVE_TEST_LOCKED")]
-    assert test["issue"].nunique() == 75
-    assert test["issue"].astype(int).between(25043, 25125).sum() == 42
-    assert test["issue"].astype(int).between(26011, 26049).sum() == 33
-    assert splits.loc[splits.role.eq("DEVELOPMENT_CV"), "issue"].astype(int).max() == DEVELOPMENT_ISSUE_MAX
-    assert not (splits["issue"].astype(int) >= RESERVE_ISSUE_MIN).any()
-    assert test["labels_permitted_gate_b"].all()
-
-    card = json.loads((package / "freeze_card.json").read_text(encoding="utf-8"))
-    assert card["contract_version"] == CONTRACT_VERSION
-    assert card["source"]["labels_opened"] is False
-    assert card["chronology"]["retrospective_test_issue_ranges"] == [list(row) for row in RETROSPECTIVE_TEST_RANGES]
+def test_bj204_full_replay_requires_explicit_sources_without_parent_discovery() -> None:
+    script = (ROOT / "scripts/freeze_bj204_model_gate_a.py").read_text(encoding="utf-8")
+    assert "_default_data_source" not in script
+    assert 'freeze.add_argument("--history-source", type=Path, required=True)' in script
+    assert 'freeze.add_argument("--full-3sp-identity-source", type=Path, required=True)' in script
+    assert 'freeze.add_argument("--pclose-source", type=Path, required=True)' in script
 
 
-def test_bj204_gate_a_reconciles_all_75_proxy_identities_and_missing_reasons(tmp_path: Path) -> None:
-    package = tmp_path / "gate-a"
-    _build(package)
-    reconciliation = pd.read_csv(package / "identity_reconciliation.csv", dtype={"issue": str}).fillna("")
-    test = reconciliation.loc[reconciliation.role.eq("RETROSPECTIVE_TEST_LOCKED")]
-    assert len(test) == 75
-    assert int(test["history_rows"].sum()) == 11382 + 5608
-    assert int(test["official_3sp_target_identity_rows"].sum()) == 11314 + 5539
-    assert int(test["history_only_no_target_rows"].sum()) == 68 + 69
-    early = test.loc[test["issue"].astype(int).between(25043, 25125)]
-    late = test.loc[test["issue"].astype(int).between(26011, 26049)]
-    assert len(early) == 42 and len(late) == 33
-    assert early["missing_reason"].eq("UPSTREAM_203_INFERENCE_ABSENT; HISTORY_PROXY_ONLY").all()
-    assert late["missing_reason"].eq("RETROSPECTIVE_PROXY_REQUIRED; INFERENCE_AUXILIARY_ONLY").all()
-    assert test["labels_opened"].astype(str).str.lower().eq("false").all()
-    identity_rows = pd.read_csv(package / "test_identity_reconciliation.csv", dtype={"issue": str})
-    assert len(identity_rows) == 16990
-    assert int(identity_rows["official_target_identity_available"].sum()) == 16853
-    assert int((~identity_rows["official_target_identity_available"]).sum()) == 137
-    assert identity_rows["match_uid"].notna().sum() == 16853
-
-
-def test_bj204_gate_a_target_is_official_final_sp_and_proxy_is_only_an_input(tmp_path: Path) -> None:
-    package = tmp_path / "gate-a"
-    _build(package)
-    schema = json.loads((package / "inference_schema.json").read_text(encoding="utf-8"))
-    assert schema["sp_target"] == SP_TARGET
-    assert schema["predicted_final_sp_semantics"] == "outcome-unexposed pre-event proxy input only"
-    assert schema["sp_target"]["field"] == "final_sp"
-    assert "predicted_final_sp" in schema["model_features"]
-    assert schema["sp_target"]["field"] not in schema["model_features"]
-    quality = pd.read_csv(package / "target_only_quality_mask.csv")
-    assert quality[["history_rows", "official_3sp_rows", "post_kickoff_updates"]].values.tolist() == [
-        [11382, 11314, 8247], [5608, 5539, 4516]
-    ]
-    assert not list(package.rglob("*final_sp*"))
-
-
-def test_bj204_gate_a_proxy_coverage_is_explicit_and_not_a_live_claim(tmp_path: Path) -> None:
-    package = tmp_path / "gate-a"
-    _build(package)
-    coverage = pd.read_csv(package / "proxy_coverage_by_period.csv")
-    assert coverage["period"].tolist() == ["25043-25125", "26011-26049"]
-    assert coverage["rows"].tolist() == [11382, 5608]
-    assert coverage["source_grade"].eq("RETROSPECTIVE_PROXY").all()
-    assert coverage["labels_opened"].astype(str).str.lower().eq("false").all()
-    assert coverage["baseline_proxy_rows"].gt(0).all()
-    assert coverage["model_proxy_rows"].gt(0).all()
-    assert (coverage["fallback_no_bet_rows"] >= 0).all()
-
-
-def test_bj204_gate_a_freezes_average_eu_to_pclose_bridge_and_outlier_policy(tmp_path: Path) -> None:
-    package = tmp_path / "gate-a"
-    _build(package)
-    summary = json.loads((package / "market_proxy_pclose_bridge_summary.json").read_text(encoding="utf-8"))
-    assert summary["join_key"].startswith("history.issue+history.match_idx")
-    assert summary["history_rows"] == 21091
-    assert summary["complete_comparable_rows"] == 20837
-    assert abs(summary["mean_absolute_error"] - 0.0055328658972946115) < 1e-14
-    assert summary["max_delta_gt_005_rows"] == 85
-    assert summary["max_delta_gt_010_rows"] == 22
-    assert summary["handicap_exact_rows"] == 20837
-    assert summary["labels_opened"] is False
-    bridge = pd.read_csv(package / "market_proxy_pclose_bridge.csv", dtype={"issue": str})
-    assert len(bridge.loc[bridge["historical_market_complete"] & bridge["p_close_complete"]]) == 20837
-    assert bridge["bridge_fallback_reason"].eq("HISTORY_PROXY_RETAINED_PCLOSE_NOT_SUBSTITUTED_OUTLIER").sum() == 22
-
-
-def test_bj204_gate_a_is_deterministic_and_matches_authoritative_package(tmp_path: Path) -> None:
-    first = tmp_path / "first"
-    second = tmp_path / "second"
-    _build(first)
-    _build(second)
-    for name in ("SHA256SUMS.json", "CONTENT_IDENTITY.json"):
-        assert (first / name).read_bytes() == (second / name).read_bytes()
-        assert (first / name).read_bytes() == (FROZEN / name).read_bytes()
-    cv = pd.read_csv(first / "cv_manifest.csv")
-    assert not cv["test_labels_opened"].any()
-    assert set(cv["test_issue_boundary"]) == {"25043-26049"}
-
-
-def test_bj204_atomic_wrapper_accepts_an_empty_stage_directory(tmp_path: Path) -> None:
-    output = tmp_path / "immutable-package"
-    receipt = _atomic_build(output, SOURCE, HISTORY, FULL_3SP_IDENTITY, PCLOSE)
-    assert receipt["package"] == output.name
-    assert verify_package(output)["status"] == "PASS"
-
-
-def test_bj204_notebook_is_path_independent_and_clean_replay_is_deterministic(tmp_path: Path) -> None:
-    frozen = ROOT / "notebooks/research/issue-204/bj204_track_a_gate_a.ipynb"
-    notebook = nbformat.read(frozen, as_version=4)
+def test_bj204_data_build_notebook_is_executed_and_audits_construction() -> None:
+    notebook = nbformat.read(ROOT / "notebooks/research/issue-204/bj204_track_a_gate_a.ipynb", as_version=4)
     code = [cell for cell in notebook.cells if cell.cell_type == "code"]
     assert [cell.execution_count for cell in code] == list(range(1, len(code) + 1))
-    assert not [
-        output for cell in code for output in cell.outputs if output.output_type == "error"
-    ]
-    replay = tmp_path / frozen.name
-    shutil.copyfile(frozen, replay)
-    execute_notebook(replay)
-    assert replay.read_bytes() == frozen.read_bytes()
+    assert not [output for cell in code for output in cell.outputs if output.output_type == "error"]
+    source = "\n".join("".join(cell.source) for cell in code)
+    for token in ("common_cell_features", "common_schema_coverage", "load_common_issue", "development_target_identity"):
+        assert token in source

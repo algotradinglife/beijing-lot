@@ -1,4 +1,5 @@
 {
+  "full_replay_source_location_contract": "freeze requires explicit --history-source, --full-3sp-identity-source, and --pclose-source paths; no parent-worktree discovery is permitted",
   "history_proxy_columns_allowlist": [
     "issue",
     "match_idx",

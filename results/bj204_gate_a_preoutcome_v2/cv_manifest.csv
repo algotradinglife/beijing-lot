@@ -1,3 +1,0 @@
-fold_id,train_years,validation_year,test_issue_boundary,test_labels_opened,selection_rule
-EXPANDING_OOS_2022,2020;2021,2022,25043-26049,False,select only from development expanding folds through issue 25042
-EXPANDING_OOS_2023,2020;2021;2022,2023,25043-26049,False,select only from development expanding folds through issue 25042
