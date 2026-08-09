@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from unified_model.gate_b import (
+    AnchoredResidualEstimator,
     CLASS_CODES,
     FEATURE_COLUMNS,
     MODEL_ORDER,
@@ -13,13 +14,14 @@ from unified_model.gate_b import (
     _anchored_probabilities,
     _assert_matching_market_completeness,
     _evaluate_family,
-    _estimator_delta,
+    _estimator_direction,
     _fallback_predictions,
     _feature_matrix,
     _is_reserved_210_issue,
     _metrics,
     _read_official_labels,
     _selection,
+    _softmax,
     _source_ood,
 )
 
@@ -118,16 +120,78 @@ def test_anchored_zero_delta_is_exact_market_identity() -> None:
     assert np.allclose(actual, market, atol=1e-14, rtol=0)
 
 
-def test_probability_only_package_estimator_becomes_centered_delta() -> None:
+def test_probability_only_package_estimator_becomes_centered_direction() -> None:
     class _ProbabilityOnlyEstimator:
         classes_ = np.array([0, 1, 2])
 
         def predict_proba(self, features):
             return np.tile(np.array([[0.50, 0.30, 0.20]]), (len(features), 1))
 
-    delta = _estimator_delta(_ProbabilityOnlyEstimator(), np.zeros((2, 1)))
-    assert np.allclose(delta.mean(axis=1), 0.0, atol=1e-14)
-    assert np.isfinite(delta).all()
+    direction = _estimator_direction(_ProbabilityOnlyEstimator(), np.zeros((2, 1)))
+    assert np.allclose(direction.mean(axis=1), 0.0, atol=1e-14)
+    assert np.isfinite(direction).all()
+
+
+def test_fitted_anchored_model_optimizes_with_market_offset() -> None:
+    from sklearn.linear_model import LogisticRegression
+
+    rng = np.random.default_rng(204001)
+    target = np.tile(np.arange(3), 60)
+    features = np.column_stack(
+        [target + rng.normal(0.0, 0.35, len(target)), rng.normal(size=len(target))]
+    )
+    market = np.tile(np.array([1 / 3, 1 / 3, 1 / 3]), (len(target), 1))
+    fitted = AnchoredResidualEstimator(
+        LogisticRegression(C=0.5, max_iter=300, random_state=204001)
+    ).fit(features, target, market)
+
+    delta = fitted.predict_delta(features)
+    probabilities = _anchored_probabilities(market, delta)
+    fitted_loss = _metrics(probabilities, target)["log_loss"]
+    market_loss = _metrics(market, target)["log_loss"]
+
+    assert fitted.optimizer_success
+    assert 0.0 <= fitted.residual_scale <= 1.0
+    assert np.isclose(fitted.baseline_loss, market_loss, atol=1e-12, rtol=0)
+    assert np.isclose(fitted.anchored_loss, fitted_loss, atol=1e-12, rtol=0)
+    assert fitted.anchored_loss < fitted.baseline_loss
+
+
+def test_anchored_fit_parameter_changes_with_fixed_market_offset() -> None:
+    class _FixedDirectionEstimator:
+        classes_ = np.arange(3)
+
+        def fit(self, features, target):
+            return self
+
+        def predict_log_proba(self, features):
+            return features
+
+    rng = np.random.default_rng(204002)
+    direction = rng.normal(size=(5_000, 3))
+    direction -= direction.mean(axis=1, keepdims=True)
+    target_probability = _softmax(0.55 * direction)
+    target = np.array([rng.choice(3, p=row) for row in target_probability])
+    uniform_market = np.full((len(target), 3), 1 / 3)
+    informed_market = _softmax(0.40 * direction)
+
+    uniform_fit = AnchoredResidualEstimator(_FixedDirectionEstimator()).fit(
+        direction, target, uniform_market
+    )
+    informed_fit = AnchoredResidualEstimator(_FixedDirectionEstimator()).fit(
+        direction, target, informed_market
+    )
+
+    # The same direction and labels require 0.40 less residual scale when the
+    # fixed market logits already contain that amount.  A post-hoc adapter
+    # whose training ignored market could not satisfy this identity.
+    assert np.isclose(
+        uniform_fit.residual_scale - informed_fit.residual_scale,
+        0.40,
+        atol=2e-8,
+        rtol=0,
+    )
+    assert np.isclose(uniform_fit.anchored_loss, informed_fit.anchored_loss, atol=1e-12, rtol=0)
 
 
 def test_known_grade_and_expected_missingness_do_not_force_ood_or_fallback(monkeypatch) -> None:

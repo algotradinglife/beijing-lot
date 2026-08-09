@@ -19,6 +19,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy.optimize import minimize_scalar
 from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
@@ -37,6 +38,7 @@ from .gate_a import (
 
 
 GATE_B_VERSION = "bj204-market-anchored-model-gate-b-retrospective-implementation-recovery-v1"
+ANCHORED_METHOD_VERSION = "bj204-market-offset-residual-direction-scale-v1"
 CLASS_CODES = tuple(OUTCOME_ORDER)
 CLASS_INDEX = {code: index for index, code in enumerate(CLASS_CODES)}
 FEATURE_COLUMNS = (
@@ -287,12 +289,13 @@ def _softmax(values: np.ndarray) -> np.ndarray:
     return result
 
 
-def _estimator_delta(estimator: Any, features: np.ndarray) -> np.ndarray:
-    """Return a centered 3-way residual logit from a package estimator.
+def _estimator_direction(estimator: Any, features: np.ndarray) -> np.ndarray:
+    """Return a centered package-model direction, never a fitted residual.
 
-    Estimators are allowed to learn a convenient multiclass score, but those
-    scores are *not* the probability prediction.  They are centered residual
-    logits that are composed with the frozen market prior below.
+    The former implementation mislabeled this ordinary classifier score as a
+    market residual.  It is now only a bounded direction input to
+    :class:`AnchoredResidualEstimator`; the executable residual strength is
+    fitted separately with the frozen market logits inside its loss.
     """
 
     if hasattr(estimator, "predict_log_proba"):
@@ -308,6 +311,72 @@ def _estimator_delta(estimator: Any, features: np.ndarray) -> np.ndarray:
     valid = np.isfinite(aligned).all(axis=1)
     aligned[valid] -= aligned[valid].mean(axis=1, keepdims=True)
     return aligned
+
+
+@dataclass
+class AnchoredResidualEstimator:
+    """Package-backed direction model with an exact market-offset fit stage.
+
+    The sklearn estimator supplies a deterministic residual *direction* using
+    the already-frozen family and hyperparameters.  SciPy then fits the sole
+    executable residual-strength parameter against multinomial cross-entropy
+    whose logits are ``log(p_market) + alpha * direction(x)``.  Therefore the
+    market prior participates in optimization and ``alpha == 0`` is the exact
+    incumbent, rather than ordinary classifier probabilities being relabeled
+    post hoc as a residual.
+    """
+
+    direction_estimator: Any
+    residual_scale: float = 0.0
+    baseline_loss: float = float("nan")
+    anchored_loss: float = float("nan")
+    optimizer_success: bool = False
+
+    def fit(
+        self,
+        features: np.ndarray,
+        target: np.ndarray,
+        market: np.ndarray,
+    ) -> AnchoredResidualEstimator:
+        eligible = (target >= 0) & _market_eligibility(market)
+        if int(eligible.sum()) < 3:
+            raise GateBError("anchored residual fit has too few market-eligible labels")
+        fit_features = features[eligible]
+        fit_target = target[eligible]
+        fit_market = market[eligible]
+        self.direction_estimator.fit(fit_features, fit_target)
+        direction = _estimator_direction(self.direction_estimator, fit_features)
+        if not np.isfinite(direction).all():
+            raise GateBError("package direction model emitted nonfinite training scores")
+
+        def objective(scale: float) -> float:
+            probabilities = _anchored_probabilities(fit_market, float(scale) * direction)
+            return float(log_loss(fit_target, probabilities, labels=np.arange(len(CLASS_CODES))))
+
+        self.baseline_loss = objective(0.0)
+        result = minimize_scalar(
+            objective,
+            method="bounded",
+            bounds=(0.0, 1.0),
+            options={"xatol": 1e-10, "maxiter": 100},
+        )
+        if not result.success or not np.isfinite(result.fun):
+            raise GateBError(f"anchored residual optimizer failed: {result.message}")
+        candidates = [(0.0, self.baseline_loss), (float(result.x), float(result.fun)), (1.0, objective(1.0))]
+        scale, loss = min(candidates, key=lambda pair: (pair[1], pair[0]))
+        # Numeric optimizer noise cannot turn the market identity into a
+        # learned correction.  This is a fixed method rule, not a tuned gate.
+        if loss >= self.baseline_loss - 1e-12:
+            scale, loss = 0.0, self.baseline_loss
+        self.residual_scale = scale
+        self.anchored_loss = loss
+        self.optimizer_success = True
+        return self
+
+    def predict_delta(self, features: np.ndarray) -> np.ndarray:
+        if not self.optimizer_success:
+            raise GateBError("anchored residual estimator is not fitted")
+        return self.residual_scale * _estimator_direction(self.direction_estimator, features)
 
 
 def _anchored_probabilities(market: np.ndarray, delta: np.ndarray) -> np.ndarray:
@@ -420,9 +489,13 @@ def _evaluate_family(
     train_eligible = train.market_eligible.to_numpy() & (train_target >= 0)
     if int(train_eligible.sum()) < 100:
         raise GateBError(f"{model_id} has too few labeled eligible train rows")
-    estimator = _make_estimator(model_id, seed)
-    estimator.fit(train_features[train_eligible], train_target[train_eligible])
-    delta = _estimator_delta(estimator, evaluation_features)
+    train_market = train[["market_probability_3", "market_probability_1", "market_probability_0"]].to_numpy(dtype=float)
+    estimator = AnchoredResidualEstimator(_make_estimator(model_id, seed)).fit(
+        train_features[train_eligible],
+        train_target[train_eligible],
+        train_market[train_eligible],
+    )
+    delta = estimator.predict_delta(evaluation_features)
     model = _anchored_probabilities(market, delta)
     ood = _source_ood(train, evaluation, train_features, evaluation_features)
     mixed, use_model = _fallback_predictions(market, model, ood)
@@ -654,6 +727,24 @@ def _decision_report(metrics: pd.DataFrame, selection: pd.DataFrame, deltas: pd.
         fallback_text = (
             f"The frozen OOD rule marked {int(coverage.get('ood_rows', 0))} of {int(coverage.get('eligible_rows', 0))} market-eligible locked-test rows as OOD; model output was used on {int(coverage.get('model_used_rows', 0))} and exact market fallback on {int(coverage.get('fallback_rows', 0))}. The fallback-mixed log loss is {mixed_mean.get('log_loss', float('nan')):.6f}."
         )
+    context_rows = metrics.loc[
+        (metrics.split == "LOCKED_TEST")
+        & (metrics.model_id == "ISSUE_CONTEXT_SUMMARY_MLP_RESIDUAL")
+        & (metrics.view == "FALLBACK_MIXED")
+    ]
+    if context_rows.empty:
+        context_text = "The issue-context arm has no locked-test safe-mixed coverage row."
+    else:
+        context = context_rows[["eligible_rows", "model_used_rows", "fallback_rows", "ood_rows"]].mean(
+            numeric_only=True
+        )
+        context_text = (
+            "The issue-context summary MLP used learned output on "
+            f"{int(context.model_used_rows)} of {int(context.eligible_rows)} market-eligible locked-test rows; "
+            f"{int(context.fallback_rows)} fell back and {int(context.ood_rows)} were OOD. "
+            "When model-used coverage is zero, its raw MODEL_ONLY_COVERED score is diagnostic only and its "
+            "safe-mixed path supplies no learned-model evidence."
+        )
     return "\n".join(
         [
             "# #204 Gate B — bounded market-residual model decision", "",
@@ -672,6 +763,7 @@ def _decision_report(metrics: pd.DataFrame, selection: pd.DataFrame, deltas: pd.
             *residual_table,
             "", "## Safe fallback interpretation", "",
             fallback_text,
+            context_text,
             "Expected missing predicted-SP inputs are median-imputed with indicators and do not become synthetic OOD. This recovery cannot promote a probability or SP model; #210 remains the sole strict confirmation.",
             "", "## Decision", "", "`NO_PROMOTION_PENDING_PI_REVIEW`: retain the frozen market/NO_BET fallback and do not retune against the locked test.", "",
         ]
@@ -844,6 +936,18 @@ def run_gate_b(inputs: GateBInputs) -> dict[str, Any]:
                     "torch_status": "not installed in frozen repository environment; PI authorized no dependency installation",
                 },
                 "SP_HEAD": {"package": "sklearn", "implementation": "three HistGradientBoostingRegressor heads", "max_iter": 60},
+            },
+            "anchored_probability_method": {
+                "version": ANCHORED_METHOD_VERSION,
+                "direction_model_package": "scikit-learn",
+                "offset_optimizer_package": "scipy.optimize.minimize_scalar",
+                "training_logits": "log(frozen_market_probability_3_1_0) + alpha * centered_direction_model_3_1_0",
+                "residual_scale_bounds": [0.0, 1.0],
+                "optimizer_method": "bounded",
+                "optimizer_xatol": 1e-10,
+                "optimizer_maxiter": 100,
+                "zero_improvement_rule": "alpha=0 when anchored training loss does not improve market by more than 1e-12",
+                "selection_grid_changed": False,
             },
             "probability_composition": "softmax(log(frozen_market_probability_3_1_0) + centered_delta_model_3_1_0)",
             "fallback": "model only if market-eligible, finite anchored output, and frozen known-grade/finite-observed OOD test passes; otherwise exact market or NO_BET_FROZEN",
