@@ -76,10 +76,23 @@ updated: 2026-08-07
    Logistic/HGB/issue-summary MLP lift 分别为 +0.004147/+0.002154/+0.015964，仅保留为旧构造的
    描述性结果。issue-summary MLP 在全部 16,968 个 market-eligible locked-test 行均为 OOD fallback，
    model-used coverage 为 0%，其 raw model-only 分数不能代表可执行 safe-mixed evidence。
-   当前待 PI 预执行复审的方法把 scikit-learn 模型输出限定为 residual direction，并由 SciPy
-   直接最小化 logits 为 `log(p_market)+alpha*direction(x)` 的训练交叉熵；`alpha` 固定约束于
-   `[0,1]`，无改善时精确回到 `alpha=0` 的市场基线。该方法尚未重跑任何 outcome；#210 仍是
-   唯一严格确认，也不授权 #205、下注、ROI、票据或生产使用。
+   PI 随后批准一次 `RETROSPECTIVE_METHOD_CORRECTION`：scikit-learn 模型只提供 residual
+   direction，SciPy 直接最小化 logits 为 `log(p_market)+alpha*direction(x)` 的训练交叉熵；
+   `alpha` 固定约束于 `[0,1]`，无改善时精确回到 `alpha=0`。唯一 outcome run 的权威包是
+   `results/bj204_gate_b_retrospective_method_correction_v1`，manifest SHA-256 为
+   `fb28684c3a7ddd11b1e08a1a0fe889cc9ca1ea31e40b718e21137c8d26e68753`，CONTENT_IDENTITY
+   文件 SHA-256 为 `5ec8a3662264a450b7610a232ee284402d9f7a2e1cfa2fda350f4f3c2a9ce685`（27 个 payload、
+   821,004 个 prediction-ledger rows）。开发期 CV 选择 `LOGISTIC_RESIDUAL`：CV log loss
+   1.147751，对照市场 1.150530。锁定测试的 matched 16,833 行上，Logistic log loss 从
+   1.147860 降至 1.143112（-0.004748），Brier 从 0.696426 降至 0.696018，但 ECE 从
+   0.099572 恶化到 0.123924；Top1/Top2 为 0.401770/0.707955，对照
+   0.399513/0.687697。三个锁定训练 seed 的 Logistic `alpha` 均为 0.445156；它在全部
+   16,968 个 market-eligible 行使用模型。HGB 与 context raw log-loss lift 分别为
+   -0.005100/-0.009524，但 context safe path 仍是 0 个 model-used、16,968 个 OOD fallback，
+   不能作为可执行模型证据。SP-head 的 3/1/0 matched MAE 分别为 0.328949/0.322043/0.383442。
+   这只是 one-direction-plus-scalar control，不代表完整 joint/neural residual hypothesis；当前为
+   `RETROSPECTIVE_METHOD_CORRECTION_PENDING_PI_TERMINAL_REVIEW`，#210 仍是唯一严格确认，也不授权
+   #205、下注、ROI、票据或生产使用。
 
 ## 近期 N7 策略结论（2026-08-02）
 
