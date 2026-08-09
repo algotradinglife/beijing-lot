@@ -37,8 +37,11 @@ from .gate_a import (
 )
 
 
-GATE_B_VERSION = "bj204-market-anchored-model-gate-b-retrospective-implementation-recovery-v1"
+GATE_B_VERSION = "bj204-market-anchored-model-gate-b-retrospective-method-correction-v1"
 ANCHORED_METHOD_VERSION = "bj204-market-offset-residual-direction-scale-v1"
+EXECUTION_STATUS = "RETROSPECTIVE_METHOD_CORRECTION"
+OUTPUT_PACKAGE_NAME = "bj204_gate_b_retrospective_method_correction_v1"
+APPROVED_METHOD_HEAD = "adbf65134bbd7223bfea52d1ce453b025e06e3e7"
 CLASS_CODES = tuple(OUTCOME_ORDER)
 CLASS_INDEX = {code: index for index, code in enumerate(CLASS_CODES)}
 FEATURE_COLUMNS = (
@@ -478,10 +481,25 @@ def _evaluate_family(
     train: pd.DataFrame,
     evaluation: pd.DataFrame,
     seed: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, dict[str, Any]]:
     market = evaluation[["market_probability_3", "market_probability_1", "market_probability_0"]].to_numpy(dtype=float)
     if model_id == "MARKET_ONLY":
-        return market.copy(), market.copy(), market.copy(), np.zeros(len(evaluation), dtype=bool), np.zeros_like(market)
+        diagnostics = {
+            "anchored_method_version": ANCHORED_METHOD_VERSION,
+            "residual_scale_alpha": 0.0,
+            "anchored_train_market_log_loss": float("nan"),
+            "anchored_train_fitted_log_loss": float("nan"),
+            "anchored_train_improvement": float("nan"),
+            "anchored_optimizer_success": False,
+        }
+        return (
+            market.copy(),
+            market.copy(),
+            market.copy(),
+            np.zeros(len(evaluation), dtype=bool),
+            np.zeros_like(market),
+            diagnostics,
+        )
     context = model_id == "ISSUE_CONTEXT_SUMMARY_MLP_RESIDUAL"
     train_features = _feature_matrix(train, context=context)
     evaluation_features = _feature_matrix(evaluation, context=context)
@@ -499,7 +517,15 @@ def _evaluate_family(
     model = _anchored_probabilities(market, delta)
     ood = _source_ood(train, evaluation, train_features, evaluation_features)
     mixed, use_model = _fallback_predictions(market, model, ood)
-    return market, model, mixed, use_model, delta
+    diagnostics = {
+        "anchored_method_version": ANCHORED_METHOD_VERSION,
+        "residual_scale_alpha": estimator.residual_scale,
+        "anchored_train_market_log_loss": estimator.baseline_loss,
+        "anchored_train_fitted_log_loss": estimator.anchored_loss,
+        "anchored_train_improvement": estimator.baseline_loss - estimator.anchored_loss,
+        "anchored_optimizer_success": estimator.optimizer_success,
+    }
+    return market, model, mixed, use_model, delta, diagnostics
 
 
 def _fold_split(panel: pd.DataFrame, year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -513,7 +539,9 @@ def _fold_split(panel: pd.DataFrame, year: int) -> tuple[pd.DataFrame, pd.DataFr
 def _evaluation_rows(
     panel: pd.DataFrame, model_id: str, seed: int, split: str, train: pd.DataFrame, evaluation: pd.DataFrame
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    market, model, mixed, use_model, delta = _evaluate_family(model_id, train, evaluation, seed)
+    market, model, mixed, use_model, delta, fit_diagnostics = _evaluate_family(
+        model_id, train, evaluation, seed
+    )
     sp_prediction = _fit_sp_heads(train, evaluation, seed)
     target = _targets(evaluation)
     final_sp = evaluation[["final_sp_3", "final_sp_1", "final_sp_0"]].to_numpy(dtype=float)
@@ -541,6 +569,7 @@ def _evaluation_rows(
                 "ood_rows": int((evaluation.market_eligible.to_numpy() & ~use_model).sum()) if model_id != "MARKET_ONLY" else 0,
                 "mean_delta_logit_l1": float(np.nanmean(np.abs(delta).sum(axis=1))) if model_id != "MARKET_ONLY" else 0.0,
                 "delta_logit_sparsity_le_1e-8": float(np.nanmean(np.abs(delta) <= 1e-8)) if model_id != "MARKET_ONLY" else 1.0,
+                **fit_diagnostics,
                 **result,
             }
         )
@@ -549,6 +578,8 @@ def _evaluation_rows(
     prediction["model_id"] = model_id
     prediction["seed"] = seed
     prediction["model_used"] = use_model
+    for name, value in fit_diagnostics.items():
+        prediction[name] = value
     if model_id == "MARKET_ONLY":
         prediction["fallback_reason"] = np.where(
             evaluation.market_eligible.to_numpy(), "MARKET_BASELINE", "NO_BET_FROZEN"
@@ -619,6 +650,20 @@ def _metrics_from_prediction_group(group: pd.DataFrame) -> pd.DataFrame:
             "FALLBACK_MIXED": (mixed, int(used_model.sum()), int((eligible & ~used_model).sum()), int(ood.sum())),
         }
     rows: list[dict[str, Any]] = []
+    fit_diagnostics = {
+        "anchored_method_version": getattr(first, "anchored_method_version", ANCHORED_METHOD_VERSION),
+        "residual_scale_alpha": float(getattr(first, "residual_scale_alpha", 0.0)),
+        "anchored_train_market_log_loss": float(
+            getattr(first, "anchored_train_market_log_loss", float("nan"))
+        ),
+        "anchored_train_fitted_log_loss": float(
+            getattr(first, "anchored_train_fitted_log_loss", float("nan"))
+        ),
+        "anchored_train_improvement": float(
+            getattr(first, "anchored_train_improvement", float("nan"))
+        ),
+        "anchored_optimizer_success": bool(getattr(first, "anchored_optimizer_success", False)),
+    }
     for view, (probabilities, model_rows, fallback_rows, ood_rows) in views.items():
         scored = (target >= 0) & np.isfinite(probabilities).all(axis=1)
         rows.append(
@@ -634,6 +679,7 @@ def _metrics_from_prediction_group(group: pd.DataFrame) -> pd.DataFrame:
                 "ood_rows": ood_rows,
                 "mean_delta_logit_l1": delta_magnitude,
                 "delta_logit_sparsity_le_1e-8": delta_sparsity,
+                **fit_diagnostics,
                 **_metrics(probabilities, target, final_sp, predicted_sp),
             }
         )
@@ -644,6 +690,73 @@ def _recompute_metrics_from_predictions(predictions: pd.DataFrame) -> pd.DataFra
     keys = ["split", "model_id", "seed"]
     result = [_metrics_from_prediction_group(group) for _, group in predictions.groupby(keys, sort=True)]
     return pd.concat(result, ignore_index=True).sort_values([*keys, "view"], kind="mergesort").reset_index(drop=True)
+
+
+def _fitted_alpha_table(metrics: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "split",
+        "model_id",
+        "seed",
+        "anchored_method_version",
+        "residual_scale_alpha",
+        "anchored_train_market_log_loss",
+        "anchored_train_fitted_log_loss",
+        "anchored_train_improvement",
+        "anchored_optimizer_success",
+    ]
+    table = metrics.loc[:, columns].drop_duplicates().sort_values(
+        ["split", "model_id", "seed"], kind="mergesort"
+    )
+    if table.duplicated(["split", "model_id", "seed"]).any():
+        raise GateBError("fitted alpha is not unique by family/fold/seed")
+    return table.reset_index(drop=True)
+
+
+def _fallback_coverage_table(metrics: pd.DataFrame) -> pd.DataFrame:
+    columns = [
+        "split",
+        "model_id",
+        "seed",
+        "eligible_rows",
+        "model_used_rows",
+        "fallback_rows",
+        "ood_rows",
+    ]
+    table = metrics.loc[metrics.view == "FALLBACK_MIXED", columns].copy()
+    return table.sort_values(["split", "model_id", "seed"], kind="mergesort").reset_index(drop=True)
+
+
+def _sp_head_diagnostics(predictions: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for keys, group in predictions.groupby(["split", "model_id", "seed"], sort=True):
+        split, model_id, seed = keys
+        for code in CLASS_CODES:
+            actual = group[f"official_final_sp_{code}"].to_numpy(dtype=float)
+            predicted = group[f"predicted_final_sp_{code}"].to_numpy(dtype=float)
+            target_available = np.isfinite(actual) & (actual > 0)
+            prediction_available = np.isfinite(predicted) & (predicted > 0)
+            matched = target_available & prediction_available
+            rows.append(
+                {
+                    "split": split,
+                    "model_id": model_id,
+                    "seed": int(seed),
+                    "outcome_code": code,
+                    "target_rows": int(target_available.sum()),
+                    "prediction_rows": int(prediction_available.sum()),
+                    "matched_rows": int(matched.sum()),
+                    "mae": float(np.mean(np.abs(actual[matched] - predicted[matched])))
+                    if matched.any()
+                    else float("nan"),
+                    "mean_actual_sp": float(actual[matched].mean()) if matched.any() else float("nan"),
+                    "mean_predicted_sp": float(predicted[matched].mean())
+                    if matched.any()
+                    else float("nan"),
+                }
+            )
+    return pd.DataFrame(rows).sort_values(
+        ["split", "model_id", "seed", "outcome_code"], kind="mergesort"
+    ).reset_index(drop=True)
 
 
 def _matched_baseline_deltas(metrics: pd.DataFrame) -> pd.DataFrame:
@@ -716,10 +829,23 @@ def _decision_report(metrics: pd.DataFrame, selection: pd.DataFrame, deltas: pd.
     mixed_mean = mixed[list(METRIC_COLUMNS)].mean(numeric_only=True)
     coverage = mixed[["eligible_rows", "model_used_rows", "fallback_rows", "ood_rows"]].mean(numeric_only=True)
     locked_deltas = deltas.loc[deltas.split == "LOCKED_TEST"].groupby("model_id", as_index=False).mean(numeric_only=True)
+    locked_alpha = _fitted_alpha_table(metrics)
+    locked_alpha = locked_alpha.loc[
+        (locked_alpha.split == "LOCKED_TEST") & (locked_alpha.model_id != "MARKET_ONLY")
+    ]
     residual_table = ["| Residual family | log-loss lift vs market | Brier lift | ECE lift | mean delta-logit L1 |", "|---|---:|---:|---:|---:|"]
     for row in locked_deltas.itertuples():
         residual_table.append(
             f"| {row.model_id} | {row.lift_log_loss:+.6f} | {row.lift_brier:+.6f} | {row.lift_ece_equal_mass:+.6f} | {row.mean_delta_logit_l1:.6f} |"
+        )
+    alpha_table = [
+        "| Residual family | Seed | fitted alpha | market train log loss | anchored train log loss |",
+        "|---|---:|---:|---:|---:|",
+    ]
+    for row in locked_alpha.itertuples():
+        alpha_table.append(
+            f"| {row.model_id} | {row.seed} | {row.residual_scale_alpha:.8f} | "
+            f"{row.anchored_train_market_log_loss:.8f} | {row.anchored_train_fitted_log_loss:.8f} |"
         )
     if selected_model == "MARKET_ONLY":
         fallback_text = "The development-only rule selected the frozen MARKET_ONLY baseline. It is not a learned-model fallback event: it has zero model attempts, zero fallback substitutions, and zero OOD classifications."
@@ -749,7 +875,7 @@ def _decision_report(metrics: pd.DataFrame, selection: pd.DataFrame, deltas: pd.
         [
             "# #204 Gate B — bounded market-residual model decision", "",
             "## Scope", "",
-            "This is a RETROSPECTIVE_IMPLEMENTATION_RECOVERY: pre-label residual corrections were frozen before the invalid v1 execution. It is proxy-grade research only and grants no betting, ROI, ticket, production, #205, or #210 authority.", "",
+            "This is the single PI-authorized RETROSPECTIVE_METHOD_CORRECTION. It tests a conservative one-direction-plus-scalar anchored residual control, not a fully joint learned residual encoder and not every possible neural residual hypothesis. It is proxy-grade research only and grants no betting, ROI, ticket, production, #205, or #210 authority.", "",
             "## Frozen selection", "",
             f"The development-only expanding-CV rule selected `{selected_model}`. No locked-test metric selected a model or hyperparameter.", "",
             "## Locked 75-issue result", "",
@@ -759,13 +885,16 @@ def _decision_report(metrics: pd.DataFrame, selection: pd.DataFrame, deltas: pd.
             f"- Model-only ECE: {test_mean.get('ece_equal_mass', float('nan')):.6f}; market: {baseline_mean.get('ece_equal_mass', float('nan')):.6f}.",
             f"- Model-only Top1/Top2: {test_mean.get('top1', float('nan')):.6f} / {test_mean.get('top2', float('nan')):.6f}; market: {baseline_mean.get('top1', float('nan')):.6f} / {baseline_mean.get('top2', float('nan')):.6f}.",
             "", "## Residual ablation versus the matched market baseline", "",
-            "Positive log-loss/Brier/ECE lift is worse; every pre-registered residual is worse on the locked test.",
+            "Negative log-loss/Brier/ECE lift is better. These one-shot retrospective values cannot authorize promotion without #210.",
             *residual_table,
+            "", "## Fitted anchored scale", "",
+            "Alpha is fitted on the corresponding training window only with the frozen market offset inside the loss.",
+            *alpha_table,
             "", "## Safe fallback interpretation", "",
             fallback_text,
             context_text,
-            "Expected missing predicted-SP inputs are median-imputed with indicators and do not become synthetic OOD. This recovery cannot promote a probability or SP model; #210 remains the sole strict confirmation.",
-            "", "## Decision", "", "`NO_PROMOTION_PENDING_PI_REVIEW`: retain the frozen market/NO_BET fallback and do not retune against the locked test.", "",
+            "Expected missing predicted-SP inputs are median-imputed with indicators and do not become synthetic OOD. This retrospective method correction cannot promote a probability or SP model; #210 remains the sole strict confirmation.",
+            "", "## Decision", "", "`RETROSPECTIVE_METHOD_CORRECTION_PENDING_PI_TERMINAL_REVIEW`: retain the frozen market/NO_BET fallback, do not retune or rerun, and submit this one-shot package to PI.", "",
         ]
     )
 
@@ -773,11 +902,11 @@ def _decision_report(metrics: pd.DataFrame, selection: pd.DataFrame, deltas: pd.
 def _package_readme(gate_a_manifest: str) -> str:
     return "\n".join(
         [
-            "# #204 Gate B — market-residual retrospective implementation recovery",
+            "# #204 Gate B — market-residual retrospective method correction",
             "",
             f"Gate-A manifest: `{gate_a_manifest}`",
             "",
-            "The former Gate-B v1 is invalid because the frozen residual/fallback/selection/model-name corrections were not applied. This is the single PI-authorized mechanical RETROSPECTIVE_IMPLEMENTATION_RECOVERY. It contains no ticket, ROI, production, or betting decision.",
+            "The former implementation-recovery package is preserved unchanged as nonconforming product-ensemble diagnostic evidence. This is the single PI-authorized RETROSPECTIVE_METHOD_CORRECTION using a one-direction-plus-scalar anchored residual control. It is not the full joint/neural residual hypothesis and contains no ticket, ROI, production, or betting decision.",
             "",
             "## Replay",
             "",
@@ -785,7 +914,7 @@ def _package_readme(gate_a_manifest: str) -> str:
             "PYTHONPATH=src python scripts/run_bj204_gate_b.py run \\",
             "  --package results/bj204_gate_a_preoutcome_v5 \\",
             "  --full-3sp-source data/raw/beidan_full_3sp.csv \\",
-            "  --output results/bj204_gate_b_retrospective_implementation_recovery_v1",
+            f"  --output results/{OUTPUT_PACKAGE_NAME}",
             "```",
             "",
         ]
@@ -811,7 +940,7 @@ def finalize_gate_b(output: Path) -> dict[str, Any]:
         predictions.to_parquet(predictions_path, index=False)
     config_path = output / "model_config.json"
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    config["execution_status"] = "RETROSPECTIVE_IMPLEMENTATION_RECOVERY"
+    config["execution_status"] = EXECUTION_STATUS
     write_json(config_path, config)
     provenance_path = output / "provenance.json"
     provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
@@ -822,20 +951,29 @@ def finalize_gate_b(output: Path) -> dict[str, Any]:
     metrics = _recompute_metrics_from_predictions(predictions)
     selection = _selection(metrics)
     deltas = _matched_baseline_deltas(metrics)
+    fitted_alpha = _fitted_alpha_table(metrics)
+    fallback_coverage = _fallback_coverage_table(metrics)
+    sp_diagnostics = _sp_head_diagnostics(predictions)
     selected = selection.loc[selection.selected_for_primary] if not selection.empty else pd.DataFrame()
     selected_model = str(selected.iloc[0].model_id) if not selected.empty else "LOGISTIC_RESIDUAL"
     calibration = _calibration_table(predictions, selected_model)
     write_csv(output / "metrics.csv", metrics)
+    write_csv(output / "absolute_metrics.csv", metrics)
     write_csv(output / "model_selection.csv", selection)
     write_csv(output / "matched_baseline_deltas.csv", deltas)
+    write_csv(output / "matched_market_metrics.csv", deltas)
+    write_csv(output / "fitted_alpha.csv", fitted_alpha)
+    write_csv(output / "fallback_ood_coverage.csv", fallback_coverage)
+    write_csv(output / "sp_head_diagnostics.csv", sp_diagnostics)
     write_csv(output / "locked_test_calibration.csv", calibration)
     _plot_final_outputs(metrics, calibration, output)
     (output / "DECISION_REPORT.md").write_text(_decision_report(metrics, selection, deltas), encoding="utf-8", newline="\n")
     write_json(
         output / "decision.json",
         {
-            "decision": "NO_PROMOTION_PENDING_PI_REVIEW",
-            "execution_status": "RETROSPECTIVE_IMPLEMENTATION_RECOVERY",
+            "decision": "RETROSPECTIVE_METHOD_CORRECTION_PENDING_PI_TERMINAL_REVIEW",
+            "execution_status": EXECUTION_STATUS,
+            "approved_method_head": APPROVED_METHOD_HEAD,
             "selection": selection.to_dict(orient="records"),
         },
     )
@@ -917,7 +1055,8 @@ def run_gate_b(inputs: GateBInputs) -> dict[str, Any]:
         write_csv(stage / "locked_test_identity_reconciliation.csv", locked_test[["issue", "match_idx", "label_available", "sp_target_available", "market_eligible"]])
         config = {
             "version": GATE_B_VERSION,
-            "execution_status": "RETROSPECTIVE_IMPLEMENTATION_RECOVERY",
+            "execution_status": EXECUTION_STATUS,
+            "approved_method_head": APPROVED_METHOD_HEAD,
             "gate_a_manifest_sha256": gate_a_manifest,
             "full_3sp_source_sha256": digest(inputs.full_3sp_source),
             "outcome_axis": list(CLASS_CODES),
@@ -962,7 +1101,11 @@ def run_gate_b(inputs: GateBInputs) -> dict[str, Any]:
             "official_label_source_sha256": digest(inputs.full_3sp_source),
             "output_contract": GATE_B_VERSION,
             "output_atomic": True,
-            "execution_status": "RETROSPECTIVE_IMPLEMENTATION_RECOVERY",
+            "execution_status": EXECUTION_STATUS,
+            "approved_method_head": APPROVED_METHOD_HEAD,
+            "outcome_execution_ordinal": 1,
+            "nonconforming_recovery_package": "results/bj204_gate_b_retrospective_implementation_recovery_v1",
+            "nonconforming_recovery_manifest_sha256": "ae18e0146c0375b03b380842cdb43fd7d37a20d1872ae97d5198dda2ba06577c",
             "invalid_v1_receipt": "results/bj204_gate_b_invalid_v1_receipt/invalid_run_receipt.json",
         }
         write_json(stage / "provenance.json", provenance)
@@ -974,7 +1117,7 @@ def run_gate_b(inputs: GateBInputs) -> dict[str, Any]:
             "output": str(output),
             **finalized,
             "prediction_rows": len(predictions_frame),
-            "execution_status": "RETROSPECTIVE_IMPLEMENTATION_RECOVERY",
+            "execution_status": EXECUTION_STATUS,
         }
     except Exception:
         shutil.rmtree(stage, ignore_errors=True)

@@ -8,6 +8,7 @@ import pandas as pd
 from unified_model.gate_b import (
     AnchoredResidualEstimator,
     CLASS_CODES,
+    EXECUTION_STATUS,
     FEATURE_COLUMNS,
     MODEL_ORDER,
     GateBError,
@@ -17,11 +18,14 @@ from unified_model.gate_b import (
     _estimator_direction,
     _fallback_predictions,
     _feature_matrix,
+    _fitted_alpha_table,
+    _fallback_coverage_table,
     _is_reserved_210_issue,
     _metrics,
     _read_official_labels,
     _selection,
     _softmax,
+    _sp_head_diagnostics,
     _source_ood,
 )
 
@@ -107,11 +111,14 @@ def test_market_only_emits_m_by_three_fallback_vectors() -> None:
             "market_probability_0": [0.20, 0.25],
         }
     )
-    market, model, mixed, used_model, delta = _evaluate_family("MARKET_ONLY", panel, panel, 204001)
+    market, model, mixed, used_model, delta, diagnostics = _evaluate_family(
+        "MARKET_ONLY", panel, panel, 204001
+    )
     assert market.shape == model.shape == mixed.shape == (2, 3)
     assert np.allclose(mixed, market)
     assert not used_model.any()
     assert np.allclose(delta, 0.0)
+    assert diagnostics["residual_scale_alpha"] == 0.0
 
 
 def test_anchored_zero_delta_is_exact_market_identity() -> None:
@@ -233,12 +240,14 @@ def test_known_grade_and_expected_missingness_do_not_force_ood_or_fallback(monke
         return frame
 
     monkeypatch.setattr(gate_b, "_make_estimator", lambda model_id, seed: _ZeroDeltaEstimator())
-    _, actual_model, _, actual_used, actual_delta = _evaluate_family(
+    _, actual_model, _, actual_used, actual_delta, diagnostics = _evaluate_family(
         "LOGISTIC_RESIDUAL", _panel(120, "RETROSPECTIVE_PROXY_PCLOSE"), _panel(1, "RETROSPECTIVE_PROXY"), 204001
     )
     assert actual_used.tolist() == [True]
     assert np.allclose(actual_model, np.array([[0.50, 0.30, 0.20]]), atol=1e-14, rtol=0)
     assert np.allclose(actual_delta, 0.0)
+    assert diagnostics["residual_scale_alpha"] == 0.0
+    assert diagnostics["anchored_optimizer_success"]
 
 
 def test_selection_includes_market_and_prefers_it_without_material_residual_gain() -> None:
@@ -258,3 +267,54 @@ def test_selection_includes_market_and_prefers_it_without_material_residual_gain
 def test_only_honest_issue_summary_mlp_identifier_remains() -> None:
     assert "ISSUE_CONTEXT_SUMMARY_MLP_RESIDUAL" in MODEL_ORDER
     assert all("SET_MLP" not in model and "DEEP" not in model for model in MODEL_ORDER)
+
+
+def test_method_correction_reporting_tables_preserve_fit_and_sp_semantics() -> None:
+    metrics = pd.DataFrame(
+        [
+            {
+                "split": "LOCKED_TEST",
+                "model_id": "LOGISTIC_RESIDUAL",
+                "seed": 204001,
+                "view": view,
+                "anchored_method_version": "fixture-method",
+                "residual_scale_alpha": 0.25,
+                "anchored_train_market_log_loss": 1.1,
+                "anchored_train_fitted_log_loss": 1.0,
+                "anchored_train_improvement": 0.1,
+                "anchored_optimizer_success": True,
+                "eligible_rows": 2,
+                "model_used_rows": 1,
+                "fallback_rows": 1,
+                "ood_rows": 1,
+            }
+            for view in ("PURE_MARKET", "MODEL_ONLY_COVERED", "FALLBACK_MIXED")
+        ]
+    )
+    alpha = _fitted_alpha_table(metrics)
+    coverage = _fallback_coverage_table(metrics)
+    assert EXECUTION_STATUS == "RETROSPECTIVE_METHOD_CORRECTION"
+    assert alpha[["model_id", "residual_scale_alpha"]].to_dict("records") == [
+        {"model_id": "LOGISTIC_RESIDUAL", "residual_scale_alpha": 0.25}
+    ]
+    assert coverage[["model_used_rows", "fallback_rows", "ood_rows"]].to_dict("records") == [
+        {"model_used_rows": 1, "fallback_rows": 1, "ood_rows": 1}
+    ]
+
+    predictions = pd.DataFrame(
+        {
+            "split": ["LOCKED_TEST", "LOCKED_TEST"],
+            "model_id": ["LOGISTIC_RESIDUAL", "LOGISTIC_RESIDUAL"],
+            "seed": [204001, 204001],
+            "official_final_sp_3": [2.0, np.nan],
+            "official_final_sp_1": [3.0, 4.0],
+            "official_final_sp_0": [5.0, 6.0],
+            "predicted_final_sp_3": [2.5, 2.5],
+            "predicted_final_sp_1": [2.5, 4.5],
+            "predicted_final_sp_0": [4.0, np.nan],
+        }
+    )
+    sp = _sp_head_diagnostics(predictions).set_index("outcome_code")
+    assert sp.loc["3", ["target_rows", "prediction_rows", "matched_rows"]].tolist() == [1, 2, 1]
+    assert sp.loc["1", ["target_rows", "prediction_rows", "matched_rows"]].tolist() == [2, 2, 2]
+    assert sp.loc["0", ["target_rows", "prediction_rows", "matched_rows"]].tolist() == [2, 1, 1]

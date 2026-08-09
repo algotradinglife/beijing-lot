@@ -11,7 +11,7 @@ from nbclient import NotebookClient
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK = ROOT / "notebooks/research/issue-204/bj204_track_a_gate_b.ipynb"
-PACKAGE = "results/bj204_gate_b_retrospective_implementation_recovery_v1"
+PACKAGE = "results/bj204_gate_b_retrospective_method_correction_v1"
 
 
 def main() -> None:
@@ -23,12 +23,11 @@ def main() -> None:
     )
     notebook.cells = [
         nbformat.v4.new_markdown_cell(
-            "# #204 Track A Gate B — anchored-method correction preflight\n\n"
-            "The immutable `RETROSPECTIVE_IMPLEMENTATION_RECOVERY` package is preserved as a nonconforming "
-            "product-ensemble diagnostic: its ordinary classifier scores were composed with the market only after "
-            "training and therefore cannot establish that market-anchored residual learning failed. This notebook "
-            "audits those frozen bytes and runs a bounded synthetic fixture through the corrected reusable anchored-fit "
-            "path. It does not refit or reopen the locked test, choose parameters, or create a replacement result."
+            "# #204 Track A Gate B — retrospective anchored-method correction\n\n"
+            "This notebook audits the single PI-authorized `RETROSPECTIVE_METHOD_CORRECTION` package and runs a "
+            "bounded synthetic fixture through the same reusable anchored-fit path. It does not refit or reopen the "
+            "locked test or choose parameters. The former implementation-recovery package remains separate, immutable, "
+            "and nonconforming product-ensemble diagnostic evidence."
         ),
         nbformat.v4.new_code_cell(
             "from pathlib import Path\nimport hashlib\nimport json\nimport pandas as pd\nfrom IPython.display import Image, Markdown, display\n\n"
@@ -44,7 +43,9 @@ def main() -> None:
             "config = json.loads((package / 'model_config.json').read_text())\n"
             "provenance = json.loads((package / 'provenance.json').read_text())\n"
             "display(pd.DataFrame([{'version': config['version'], 'execution_status': config['execution_status'], 'composition': config['probability_composition'], 'gate_a_manifest': config['gate_a_manifest_sha256'], 'label_source_sha256': provenance['official_label_source_sha256']}]))\n"
-            "display(pd.DataFrame(config['models']).T)"
+            "display(pd.DataFrame(config['models']).T)\n"
+            "display(pd.DataFrame([config['anchored_probability_method']]))\n"
+            "assert config['execution_status'] == 'RETROSPECTIVE_METHOD_CORRECTION'"
         ),
         nbformat.v4.new_markdown_cell("## Corrected training objective — bounded production-path fixture"),
         nbformat.v4.new_code_cell(
@@ -79,11 +80,14 @@ def main() -> None:
         nbformat.v4.new_code_cell(
             "deltas = pd.read_csv(package / 'matched_baseline_deltas.csv')\n"
             "display(deltas[deltas['split'] == 'LOCKED_TEST'].groupby('model_id', as_index=False)[['lift_log_loss','lift_brier','lift_ece_equal_mass','lift_top1','lift_top2','lift_sp_mae']].mean())\n"
+            "display(pd.read_csv(package / 'fitted_alpha.csv'))\n"
+            "display(pd.read_csv(package / 'fallback_ood_coverage.csv'))\n"
+            "display(pd.read_csv(package / 'sp_head_diagnostics.csv'))\n"
             "display(pd.read_csv(package / 'locked_test_calibration.csv'))\n"
             "for filename in ('locked_test_log_loss.png', 'locked_test_calibration.png', 'locked_test_coverage.png'):\n"
             "    display(Image(filename=str(package / filename)))"
         ),
-        nbformat.v4.new_markdown_cell("## Frozen diagnostic report (superseded as residual evidence)"),
+        nbformat.v4.new_markdown_cell("## Decision"),
         nbformat.v4.new_code_cell("display(Markdown((package / 'DECISION_REPORT.md').read_text()))"),
     ]
     NOTEBOOK.parent.mkdir(parents=True, exist_ok=True)
