@@ -88,7 +88,7 @@ PI interpretation and does not replace those edges or Project states.
 #205 M×3 value matrix + fixed-N7 calibration (Done; market baseline retained)
              |
              v
-#206 fixed-N7 ticket learning (awaiting PI/user activation)
+#206 fixed-N7 ticket learning (research delivered; conservative control inherited)
              |
              v
 #207 ¥100k bankroll + NO_BET policy
@@ -111,7 +111,7 @@ PI interpretation and does not replace those edges or Project states.
 | 1 | [#203] causal issue tensor | Closed / Done | M1 | #192 closed | Versioned issue × match × outcome data contract |
 | 2 | [#204] residual probability and SP heads | Closed / Done | M2 | No open blocker | `MARKET_ONLY` retained as the safe baseline; residual model remains retrospective |
 | 3 | [#205] M×3 value matrix and joint N7 calibration | Closed / Done | M2 | #204 closed | `MARKET_INDEPENDENCE` plus frozen pre-event SP is the safe #206 interface |
-| 4 | [#206] fixed-N7 ticket generator | Open; activation pending | M3 | #205 closed | Constraint-valid ticket policy with exact safe-control fallback |
+| 4 | [#206] fixed-N7 ticket generator | Open; review pending | M3 | #205 closed | MARKET_WR K=8 inherited; learned challenger rejected by uncertainty/matched floor |
 | 5 | [#207] bankroll/NO_BET integration | Open | M3 | Blocked by #206 | ¥100k capital path and safe abstention policy |
 | 6 | [#208] dynamic-N frontier | Open | M3 | Blocked by #207 | Risk-conditioned N and parlay policy comparison |
 | 7 | [#209] full-cycle historical evaluation | Open | M3 | Blocked by #208 | Chronological ablations and accepted baseline ladder |
@@ -139,6 +139,22 @@ absolute performance and matched lift against its inherited frozen control.
 No improvement is accepted when it arises only from lower stake, cash
 retention, fewer tickets, post-outcome parameter choice, or an ungraded
 retrospective feature.
+
+### #206 research decision and Stage-3 handoff
+
+- Every requested identity has exactly seven distinct matches, while each
+  ticket selects its own subset from the complete issue pool. The #205
+  first-seven calibration roster is not reused as the action universe.
+- Chronology is CV-2021 train, CV-2022 policy/K selection and CV-2023 final
+  historical evaluation. LOCKED_TEST 2025/2026 labels remain embargoed; its
+  output is a label-blind requested-ticket ledger only.
+- The matched comparison selected MARKET_WR at K=8 as the strongest frozen
+  control. The same-K LEARNED_MLP challenger had a one-sided 95% paired
+  realized-lift lower bound of -0.914040 and expected lift of -68.685147, so
+  the deterministic gate emitted `INHERIT_STRONGEST_FROZEN_CONTROL`.
+- This negative/conservative result authorizes no bankroll sizing or NO_BET
+  policy. #207 remains the Stage-4 integration owner after #206 review.
+- Evidence: [`issue_206_fixed_n7_ticket_policy.md`](issue_206_fixed_n7_ticket_policy.md).
 
 [#182]: https://github.com/algotradinglife/beijing-lot/issues/182
 [#192]: https://github.com/algotradinglife/beijing-lot/issues/192

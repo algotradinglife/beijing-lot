@@ -1,0 +1,47 @@
+{
+  "alpha": 0.01,
+  "determinism": "fixed NumPy/scikit-learn seeds; single-process fit and generation",
+  "device": "CPU",
+  "draws_per_seed": 64,
+  "experimental_ablation_features": [
+    "log_joint_probability",
+    "log_sp_product",
+    "expected_pre_tax_net",
+    "mean_selected_probability",
+    "min_selected_probability",
+    "mean_selected_sp",
+    "outcome_hhi",
+    "match_rank_mean",
+    "experimental_expected_pre_tax_net",
+    "mean_abs_experimental_residual"
+  ],
+  "features": [
+    "log_joint_probability",
+    "log_sp_product",
+    "expected_pre_tax_net",
+    "mean_selected_probability",
+    "min_selected_probability",
+    "mean_selected_sp",
+    "outcome_hhi",
+    "match_rank_mean"
+  ],
+  "hidden_layer_sizes": [
+    12
+  ],
+  "k_grid": [
+    8,
+    16,
+    32
+  ],
+  "max_iter": 120,
+  "model": "sklearn.pipeline(StandardScaler, MLPClassifier)",
+  "model_seed": 206001,
+  "nuisance_candidate_seeds": [
+    206001,
+    206002,
+    206003
+  ],
+  "stake_per_ticket": 2,
+  "tax_factor_reference": 0.65,
+  "version": "bj206-fixed-n7-ticket-policy-v1"
+}

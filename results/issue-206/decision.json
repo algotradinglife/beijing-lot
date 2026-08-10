@@ -1,0 +1,22 @@
+{
+  "advance_learned_policy": false,
+  "challenger_k": 8,
+  "challenger_policy": "LEARNED_MLP",
+  "disposition": "INHERIT_STRONGEST_FROZEN_CONTROL",
+  "evaluation_split": "CV_2023",
+  "fallback_mixed_k": 8,
+  "fallback_mixed_policy": "MARKET_WR",
+  "fallback_reason": "VALIDATION_UNCERTAINTY_OR_MATCHED_LIFT_FLOOR",
+  "label_embargo": "No LOCKED_TEST (2025/2026) outcome or official-final-SP label enters training, selection, or evaluation",
+  "matched_turnover": 928.0,
+  "paired_validation_issues": 58,
+  "safe_control_k": 8,
+  "safe_control_policy": "MARKET_WR",
+  "selection_split": "CV_2022",
+  "stage_boundary": "requested tickets and requested ¥2 stake only; no bankroll sizing authority",
+  "validation_coverage_lift": 0.0,
+  "validation_expected_lift": -68.68514632958649,
+  "validation_lift_one_sided_95_lcb": -0.9140401351131572,
+  "validation_realized_lift": 0.8752329141926597,
+  "version": "bj206-fixed-n7-ticket-policy-v1"
+}
