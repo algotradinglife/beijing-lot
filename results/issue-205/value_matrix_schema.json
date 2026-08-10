@@ -1,16 +1,47 @@
 {
   "baseline": "#204 frozen market probability plus #204 frozen pre-event SP-head prediction; joint probability is exact product over seven matches",
-  "channels": [
-    "calibrated_true_probability",
-    "predicted_final_sp",
-    "probability_seed_std",
-    "sp_seed_std",
-    "predictive_entropy",
-    "model_market_residual",
-    "expected_gross",
-    "expected_pre_tax_net"
-  ],
-  "displayed_scalar": "expected_pre_tax_net = 0.65 * calibrated_true_probability * predicted_final_sp - 1",
+  "channels": {
+    "control": [
+      "control_probability",
+      "control_probability_source",
+      "control_probability_source_grade",
+      "control_probability_promoted",
+      "predicted_final_sp",
+      "predicted_final_sp_source",
+      "sp_seed_std",
+      "control_expected_gross",
+      "control_expected_pre_tax_net",
+      "control_displayed_scalar_utility"
+    ],
+    "experimental": [
+      "experimental_probability",
+      "experimental_probability_source",
+      "experimental_probability_source_grade",
+      "experimental_probability_promoted",
+      "experimental_confirmation_dependency",
+      "experimental_probability_seed_std",
+      "experimental_predictive_entropy",
+      "experimental_model_market_residual",
+      "experimental_expected_gross",
+      "experimental_expected_pre_tax_net",
+      "experimental_displayed_scalar_utility",
+      "experimental_fallback_applied",
+      "experimental_fallback_reason"
+    ]
+  },
+  "displayed_scalar": "control_displayed_scalar_utility = 0.65 * control_probability * predicted_final_sp - 1",
+  "experimental_interface": {
+    "allowed_use": "ablation_feature_only",
+    "confirmation_dependency": "#210",
+    "displayed_scalar": "experimental_displayed_scalar_utility",
+    "expected_gross": "experimental_expected_gross",
+    "expected_pre_tax_net": "experimental_expected_pre_tax_net",
+    "probability": "experimental_probability",
+    "probability_source": "LOGISTIC_RESIDUAL",
+    "promoted": false,
+    "residual": "experimental_model_market_residual",
+    "source_grade": "RETROSPECTIVE_PROXY_METHOD_CORRECTION"
+  },
   "fallback": "unsupported/nonfinite/OOD joint cases use MARKET_INDEPENDENCE exactly; fewer than seven valid matches emit NO_BET_LT7",
   "n": 7,
   "outcome_axis": [
@@ -18,8 +49,19 @@
     "1",
     "0"
   ],
+  "safe_control_interface": {
+    "displayed_scalar": "control_displayed_scalar_utility",
+    "expected_gross": "control_expected_gross",
+    "expected_pre_tax_net": "control_expected_pre_tax_net",
+    "joint_scorer": "MARKET_INDEPENDENCE",
+    "predicted_sp": "predicted_final_sp",
+    "probability": "control_probability",
+    "probability_source": "MARKET_ONLY",
+    "promoted": true,
+    "source_grade": "FROZEN_SAFE_BASELINE"
+  },
   "tax_factor_reference": 0.65,
   "ticket_formula": "0.65 * P(all seven outcomes hit | issue state) * product(predicted_final_sp) - 1",
   "ticket_roster": "first seven market-eligible labeled matches by match_idx per issue; exhaustive 3^7 outcome identities; no sampling or portfolio optimization",
-  "version": "bj205-joint-n7-value-matrix-v1"
+  "version": "bj205-joint-n7-value-matrix-v2"
 }

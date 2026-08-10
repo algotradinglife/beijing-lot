@@ -22,6 +22,7 @@ from unified_value.joint_n7 import (
     build_value_matrix,
     load_match_panel,
     run,
+    value_matrix_schema,
 )
 
 
@@ -125,8 +126,49 @@ def test_fallback_is_exact_market_bytes() -> None:
 
 def test_zero_residual_cell_matrix_uses_exact_market_probability() -> None:
     value = build_value_matrix(_panel(1))
-    assert value.calibrated_true_probability.to_list() == [0.2, 0.3, 0.5]
-    assert value.fallback_applied.all()
+    assert value.control_probability.to_list() == [0.2, 0.3, 0.5]
+    assert value.experimental_probability.to_list() == [0.2, 0.3, 0.5]
+    assert value.experimental_fallback_applied.all()
+
+
+def test_baseline_inherit_interface_cannot_relabel_experimental_probability() -> None:
+    panel = _panel(1)
+    panel.loc[0, "model_used"] = True
+    for code, probability in zip(OUTCOMES, (0.25, 0.25, 0.5), strict=True):
+        panel.loc[0, f"fallback_mixed_probability_{code}"] = probability
+    value = build_value_matrix(panel)
+    assert "calibrated_true_probability" not in value.columns
+    assert value.control_probability.to_list() == [0.2, 0.3, 0.5]
+    assert value.experimental_probability.to_list() == [0.25, 0.25, 0.5]
+    assert value.control_probability_source.unique().tolist() == ["MARKET_ONLY"]
+    assert value.control_probability_source_grade.unique().tolist() == [
+        "FROZEN_SAFE_BASELINE"
+    ]
+    assert value.control_probability_promoted.all()
+    assert value.experimental_probability_source_grade.unique().tolist() == [
+        "RETROSPECTIVE_PROXY_METHOD_CORRECTION"
+    ]
+    assert not value.experimental_probability_promoted.any()
+    assert value.experimental_confirmation_dependency.unique().tolist() == ["#210"]
+    assert np.isclose(value.loc[0, "control_expected_gross"], 0.2 * 5.0)
+    assert np.isclose(value.loc[0, "experimental_expected_gross"], 0.25 * 5.0)
+
+
+def test_schema_exposes_only_market_lane_as_safe_control() -> None:
+    schema = value_matrix_schema()
+    control = schema["safe_control_interface"]
+    experimental = schema["experimental_interface"]
+    assert schema["version"] == "bj205-joint-n7-value-matrix-v2"
+    assert control["probability"] == "control_probability"
+    assert control["probability_source"] == "MARKET_ONLY"
+    assert control["promoted"] is True
+    assert control["joint_scorer"] == "MARKET_INDEPENDENCE"
+    assert experimental["source_grade"] == (
+        "RETROSPECTIVE_PROXY_METHOD_CORRECTION"
+    )
+    assert experimental["promoted"] is False
+    assert experimental["confirmation_dependency"] == "#210"
+    assert experimental["allowed_use"] == "ablation_feature_only"
 
 
 @pytest.mark.parametrize(

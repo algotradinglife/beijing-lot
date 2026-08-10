@@ -29,11 +29,16 @@ OUTCOME_INDEX = {code: i for i, code in enumerate(OUTCOMES)}
 N = 7
 TAX_FACTOR = 0.65
 CONFIGS = np.asarray(list(itertools.product(range(3), repeat=N)), dtype=np.int8)
-VERSION = "bj205-joint-n7-value-matrix-v1"
+VERSION = "bj205-joint-n7-value-matrix-v2"
 SOURCE_LEDGER_ID = (
     "bj204-market-anchored-model-gate-b-retrospective-method-correction-v1"
 )
 PRIMARY_METRIC = "joint_log_loss"
+CONTROL_PROBABILITY_SOURCE = "MARKET_ONLY"
+CONTROL_SOURCE_GRADE = "FROZEN_SAFE_BASELINE"
+EXPERIMENTAL_PROBABILITY_SOURCE = "LOGISTIC_RESIDUAL"
+EXPERIMENTAL_SOURCE_GRADE = "RETROSPECTIVE_PROXY_METHOD_CORRECTION"
+EXPERIMENTAL_CONFIRMATION_DEPENDENCY = "#210"
 SIMPLEX_ATOL = 1e-10
 SOURCE_UNIQUE_KEY = ("issue", "match_idx", "split", "model_id", "seed")
 SCIENTIFIC_LOCK = Path("requirements.txt")
@@ -296,7 +301,7 @@ def build_value_matrix(panel: pd.DataFrame) -> pd.DataFrame:
             and (sp > 0).all()
         )
         use_model = valid and bool(row.model_used) and np.isfinite(model).all()
-        effective = model if use_model else market
+        experimental = model if use_model else market
         reason = (
             "NONE"
             if use_model
@@ -307,7 +312,8 @@ def build_value_matrix(panel: pd.DataFrame) -> pd.DataFrame:
             )
         )
         for i, code in enumerate(OUTCOMES):
-            p = effective[i] if valid else np.nan
+            control_p = market[i] if valid else np.nan
+            experimental_p = experimental[i] if valid else np.nan
             rows.append(
                 {
                     "issue": row.issue,
@@ -316,27 +322,58 @@ def build_value_matrix(panel: pd.DataFrame) -> pd.DataFrame:
                     "match_idx": int(row.match_idx),
                     "outcome_code": code,
                     "market_probability": market[i],
-                    "calibrated_true_probability": p,
+                    "control_probability": control_p,
+                    "control_probability_source": CONTROL_PROBABILITY_SOURCE,
+                    "control_probability_source_grade": CONTROL_SOURCE_GRADE,
+                    "control_probability_promoted": True,
+                    "experimental_probability": experimental_p,
+                    "experimental_probability_source": EXPERIMENTAL_PROBABILITY_SOURCE,
+                    "experimental_probability_source_grade": EXPERIMENTAL_SOURCE_GRADE,
+                    "experimental_probability_promoted": False,
+                    "experimental_confirmation_dependency": EXPERIMENTAL_CONFIRMATION_DEPENDENCY,
                     "predicted_final_sp": sp[i],
-                    "probability_seed_std": getattr(
+                    "predicted_final_sp_source": "#204_FROZEN_PRE_EVENT_SP_HEAD",
+                    "experimental_probability_seed_std": getattr(
                         row, f"seed_std__fallback_mixed_probability_{code}"
                     ),
                     "sp_seed_std": getattr(row, f"seed_std__predicted_final_sp_{code}"),
-                    "predictive_entropy": float(
-                        -np.sum(effective * np.log(np.clip(effective, 1e-15, 1)))
+                    "experimental_predictive_entropy": float(
+                        -np.sum(
+                            experimental * np.log(np.clip(experimental, 1e-15, 1))
+                        )
                     )
                     if valid
                     else np.nan,
-                    "model_market_residual": p - market[i] if valid else np.nan,
-                    "expected_gross": p * sp[i] if valid else np.nan,
-                    "expected_pre_tax_net": TAX_FACTOR * p * sp[i] - 1
+                    "experimental_model_market_residual": experimental_p - market[i]
                     if valid
                     else np.nan,
-                    "displayed_scalar_utility": TAX_FACTOR * p * sp[i] - 1
+                    "control_expected_gross": control_p * sp[i] if valid else np.nan,
+                    "control_expected_pre_tax_net": TAX_FACTOR * control_p * sp[i] - 1
                     if valid
                     else np.nan,
-                    "fallback_applied": not use_model,
-                    "fallback_reason": reason,
+                    "control_displayed_scalar_utility": TAX_FACTOR
+                    * control_p
+                    * sp[i]
+                    - 1
+                    if valid
+                    else np.nan,
+                    "experimental_expected_gross": experimental_p * sp[i]
+                    if valid
+                    else np.nan,
+                    "experimental_expected_pre_tax_net": TAX_FACTOR
+                    * experimental_p
+                    * sp[i]
+                    - 1
+                    if valid
+                    else np.nan,
+                    "experimental_displayed_scalar_utility": TAX_FACTOR
+                    * experimental_p
+                    * sp[i]
+                    - 1
+                    if valid
+                    else np.nan,
+                    "experimental_fallback_applied": not use_model,
+                    "experimental_fallback_reason": reason,
                     "official_final_sp_label": getattr(
                         row, f"official_final_sp_{code}"
                     ),
@@ -344,6 +381,88 @@ def build_value_matrix(panel: pd.DataFrame) -> pd.DataFrame:
                 }
             )
     return pd.DataFrame(rows)
+
+
+def value_matrix_schema() -> dict[str, Any]:
+    """Return the versioned #206 interface with control/experiment separation."""
+    return {
+        "version": VERSION,
+        "outcome_axis": list(OUTCOMES),
+        "n": N,
+        "tax_factor_reference": TAX_FACTOR,
+        "safe_control_interface": {
+            "probability": "control_probability",
+            "probability_source": CONTROL_PROBABILITY_SOURCE,
+            "source_grade": CONTROL_SOURCE_GRADE,
+            "promoted": True,
+            "predicted_sp": "predicted_final_sp",
+            "expected_gross": "control_expected_gross",
+            "expected_pre_tax_net": "control_expected_pre_tax_net",
+            "displayed_scalar": "control_displayed_scalar_utility",
+            "joint_scorer": "MARKET_INDEPENDENCE",
+        },
+        "experimental_interface": {
+            "probability": "experimental_probability",
+            "probability_source": EXPERIMENTAL_PROBABILITY_SOURCE,
+            "source_grade": EXPERIMENTAL_SOURCE_GRADE,
+            "promoted": False,
+            "confirmation_dependency": EXPERIMENTAL_CONFIRMATION_DEPENDENCY,
+            "residual": "experimental_model_market_residual",
+            "expected_gross": "experimental_expected_gross",
+            "expected_pre_tax_net": "experimental_expected_pre_tax_net",
+            "displayed_scalar": "experimental_displayed_scalar_utility",
+            "allowed_use": "ablation_feature_only",
+        },
+        "displayed_scalar": (
+            "control_displayed_scalar_utility = "
+            "0.65 * control_probability * predicted_final_sp - 1"
+        ),
+        "ticket_formula": (
+            "0.65 * P(all seven outcomes hit | issue state) * "
+            "product(predicted_final_sp) - 1"
+        ),
+        "channels": {
+            "control": [
+                "control_probability",
+                "control_probability_source",
+                "control_probability_source_grade",
+                "control_probability_promoted",
+                "predicted_final_sp",
+                "predicted_final_sp_source",
+                "sp_seed_std",
+                "control_expected_gross",
+                "control_expected_pre_tax_net",
+                "control_displayed_scalar_utility",
+            ],
+            "experimental": [
+                "experimental_probability",
+                "experimental_probability_source",
+                "experimental_probability_source_grade",
+                "experimental_probability_promoted",
+                "experimental_confirmation_dependency",
+                "experimental_probability_seed_std",
+                "experimental_predictive_entropy",
+                "experimental_model_market_residual",
+                "experimental_expected_gross",
+                "experimental_expected_pre_tax_net",
+                "experimental_displayed_scalar_utility",
+                "experimental_fallback_applied",
+                "experimental_fallback_reason",
+            ],
+        },
+        "baseline": (
+            "#204 frozen market probability plus #204 frozen pre-event SP-head "
+            "prediction; joint probability is exact product over seven matches"
+        ),
+        "fallback": (
+            "unsupported/nonfinite/OOD joint cases use MARKET_INDEPENDENCE "
+            "exactly; fewer than seven valid matches emit NO_BET_LT7"
+        ),
+        "ticket_roster": (
+            "first seven market-eligible labeled matches by match_idx per issue; "
+            "exhaustive 3^7 outcome identities; no sampling or portfolio optimization"
+        ),
+    }
 
 
 def _ticket_features(
@@ -682,20 +801,27 @@ def reliability(
 
 
 def _cell_reliability(value: pd.DataFrame) -> pd.DataFrame:
-    source = value.loc[
-        value.split.eq("LOCKED_TEST") & np.isfinite(value.calibrated_true_probability)
-    ].copy()
-    source["bin"] = (
-        pd.qcut(
-            source.calibrated_true_probability.rank(method="first"), 10, labels=False
+    frames = []
+    for lane, column in (
+        ("SAFE_CONTROL_MARKET_ONLY", "control_probability"),
+        ("EXPERIMENTAL_RETROSPECTIVE_PROXY", "experimental_probability"),
+    ):
+        source = value.loc[
+            value.split.eq("LOCKED_TEST") & np.isfinite(value[column])
+        ].copy()
+        source["bin"] = (
+            pd.qcut(source[column].rank(method="first"), 10, labels=False) + 1
         )
-        + 1
-    )
-    return source.groupby("bin", as_index=False).agg(
-        rows=("realized_outcome", "size"),
-        mean_probability=("calibrated_true_probability", "mean"),
-        outcome_rate=("realized_outcome", "mean"),
-    )
+        frames.append(
+            source.groupby("bin", as_index=False)
+            .agg(
+                rows=("realized_outcome", "size"),
+                mean_probability=(column, "mean"),
+                outcome_rate=("realized_outcome", "mean"),
+            )
+            .assign(lane=lane)
+        )
+    return pd.concat(frames, ignore_index=True)
 
 
 def _plots(
@@ -706,12 +832,19 @@ def _plots(
 ) -> None:
     fig, ax = plt.subplots(figsize=(5.5, 5))
     ax.plot([0, 1], [0, 1], "--", color="black")
-    ax.plot(cell_rel.mean_probability, cell_rel.outcome_rate, marker="o")
+    for lane, group in cell_rel.groupby("lane"):
+        ax.plot(
+            group.mean_probability,
+            group.outcome_rate,
+            marker="o",
+            label=lane,
+        )
     ax.set(
         xlabel="Predicted probability",
         ylabel="Observed frequency",
         title="#205 cell reliability",
     )
+    ax.legend(fontsize=7)
     fig.tight_layout()
     fig.savefig(output / "cell_reliability.png", dpi=160)
     plt.close(fig)
@@ -885,6 +1018,13 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 metric_frame[metric] - base,
                 np.nan,
             )
+        selected_locked_brier_lift = float(
+            metric_frame.loc[
+                metric_frame.split.eq("LOCKED_TEST")
+                & metric_frame.model.eq(selected),
+                "matched_lift_joint_brier_vs_market",
+            ].iloc[0]
+        )
         values.to_parquet(stage / "value_matrix.parquet", index=False)
         ticket_frame.to_parquet(
             stage / "locked_ticket_predictions.parquet", index=False
@@ -901,27 +1041,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
             mean_utility=("expected_pre_tax_net", "mean"),
         )
         regime.to_csv(stage / "regime_diagnostics.csv", index=False)
-        schema = {
-            "version": VERSION,
-            "outcome_axis": list(OUTCOMES),
-            "n": N,
-            "tax_factor_reference": TAX_FACTOR,
-            "displayed_scalar": "expected_pre_tax_net = 0.65 * calibrated_true_probability * predicted_final_sp - 1",
-            "ticket_formula": "0.65 * P(all seven outcomes hit | issue state) * product(predicted_final_sp) - 1",
-            "channels": [
-                "calibrated_true_probability",
-                "predicted_final_sp",
-                "probability_seed_std",
-                "sp_seed_std",
-                "predictive_entropy",
-                "model_market_residual",
-                "expected_gross",
-                "expected_pre_tax_net",
-            ],
-            "baseline": "#204 frozen market probability plus #204 frozen pre-event SP-head prediction; joint probability is exact product over seven matches",
-            "fallback": "unsupported/nonfinite/OOD joint cases use MARKET_INDEPENDENCE exactly; fewer than seven valid matches emit NO_BET_LT7",
-            "ticket_roster": "first seven market-eligible labeled matches by match_idx per issue; exhaustive 3^7 outcome identities; no sampling or portfolio optimization",
-        }
+        schema = value_matrix_schema()
         _json(stage / "value_matrix_schema.json", schema)
         decision = {
             "version": VERSION,
@@ -930,6 +1050,17 @@ def run(inputs: Inputs) -> dict[str, Any]:
             "cv_dependence_improves_both_controls": preregistered_advance,
             "locked_dependence_improves_both_controls": locked_advance,
             "inherited_scorer": inherited,
+            "safe_control_probability_column": "control_probability",
+            "safe_control_probability_source": CONTROL_PROBABILITY_SOURCE,
+            "safe_control_source_grade": CONTROL_SOURCE_GRADE,
+            "safe_control_columns_for_206": schema["channels"]["control"],
+            "experimental_probability_column": "experimental_probability",
+            "experimental_source_grade": EXPERIMENTAL_SOURCE_GRADE,
+            "experimental_promoted": False,
+            "experimental_confirmation_dependency": (
+                EXPERIMENTAL_CONFIRMATION_DEPENDENCY
+            ),
+            "experimental_allowed_use": "ablation_feature_only",
             "disposition": "ADVANCE_DEPENDENCE_SCORER"
             if locked_advance
             else "INHERIT_EXACT_MARKET_BASELINE",
@@ -996,6 +1127,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
             "Verify: `PYTHONPATH=src .venv/bin/python scripts/run_bj205_joint_n7.py verify --output results/issue-205`\n\n"
             "Replay to a new output directory: `PYTHONPATH=src .venv/bin/python scripts/run_bj205_joint_n7.py run --output <new-directory>`\n\n"
             "Clean-run notebook: `PYTHONPATH=src .venv/bin/python scripts/execute_bj205_notebook.py --kernel python3` (the installed ipykernel exposes the portable `python3` kernelspec; persistence uses same-directory temporary-file plus atomic replace).\n\n"
+            "#206 may consume only the schema-declared safe-control lane (`control_*`, `MARKET_ONLY`, `FROZEN_SAFE_BASELINE`) with `MARKET_INDEPENDENCE`. Every `experimental_*` probability/residual/utility channel is `RETROSPECTIVE_PROXY_METHOD_CORRECTION`, `promoted=false`, and ablation-only pending #210 confirmation.\n\n"
             "The package includes the value schema/matrix, exact inference trace, exhaustive locked ticket ledger, chronological metrics, reliability and regime diagnostics, plots, decision report, parameters, provenance and SHA-256 manifest.\n",
             encoding="utf-8",
             newline="\n",
@@ -1005,6 +1137,8 @@ def run(inputs: Inputs) -> dict[str, Any]:
 ## Decision
 
 `{decision["disposition"]}`. The preregistered metric is joint log loss (lower is better). The CV-selected challenger was `{selected}`. Locked matched joint log loss was {decision["locked_selected_joint_log_loss"]:.6f} versus {baseline_locked:.6f} for the exact market-independence baseline. The inherited scorer is `{inherited}`.
+
+The challenger did not advance despite its better locked log loss. On chronological CV, `{selected}` scored {float(candidates.iloc[0].joint_log_loss):.6f} versus {independence_cv:.6f} for `MODEL_INDEPENDENCE` ({float(candidates.iloc[0].joint_log_loss) - independence_cv:+.6f}, lower is better). On locked data its Brier score was also worse than market by {selected_locked_brier_lift:+.6f}, although locked log loss and payout MAE improved. This is promising retrospective dependence evidence, not a validated edge and not evidence that dependence has no value.
 
 ## Absolute and matched evidence
 
@@ -1020,7 +1154,7 @@ See `metrics.csv` for absolute joint log loss, Brier, payout error and predicted
 
 ## Value representation inherited by ticket learning
 
-Ticket learning inherits the versioned long-form J×3 schema in `value_matrix_schema.json`: calibrated probability, SP prediction, uncertainty, residual, gross and pre-tax-net remain separate. `displayed_scalar_utility` is only the documented projection `0.65*p*SP-1`, not a replacement for those channels.
+Ticket learning inherits only the schema's safe-control lane: `control_probability` (`MARKET_ONLY`, `FROZEN_SAFE_BASELINE`, promoted) plus the frozen pre-event SP head and `MARKET_INDEPENDENCE`. The logistic-residual probability, residual, gross/net and displayed utility are explicitly named `experimental_*`, graded `RETROSPECTIVE_PROXY_METHOD_CORRECTION`, `promoted=false`, dependent on #210 confirmation, and allowed only as ablation features. Neither displayed scalar replaces its underlying channels.
 
 ## PI 对接块
 
@@ -1032,7 +1166,7 @@ Ticket learning inherits the versioned long-form J×3 schema in `value_matrix_sc
 | Fallback-mixed no worse and dependence lift | `decision.json`, `metrics.csv` | {"PASS" if locked_advance else "FAIL — baseline inherited"} |
 | Notebook/code/artifact layers | issue notebook, `src/unified_value/joint_n7.py`, this package | PASS |
 
-Decision input: accept `{inherited}` as the #206 interface. Known risks: retrospective proxy grade, one fixed N7 roster per issue, sparse realized configurations and frozen #204 SP-head error. Explicit review request: verify identity construction, no-leak SP channel, matched-lift arithmetic, OOD fallback identity, and the conservative advancement decision. Do not merge or close until independent EV and PI review.
+Decision input: accept `{inherited}` and only the safe-control columns as the #206 controlling interface; keep `experimental_*` columns behind an explicitly source-graded ablation boundary. Known risks: retrospective proxy grade, one fixed N7 roster per issue, sparse realized configurations and frozen #204 SP-head error. Explicit review request: verify control/experimental lane provenance, absence of unlabeled accepted “true probability”, unchanged identity/no-leak/matched-lift/fallback mechanics, and the conservative advancement decision. Do not merge or close until independent EV and PI review.
 """
         (stage / "DECISION_REPORT.md").write_text(
             report, encoding="utf-8", newline="\n"
@@ -1072,8 +1206,52 @@ def verify(output: Path) -> dict[str, Any]:
     )
     if schema["n"] != 7 or schema["outcome_axis"] != list(OUTCOMES):
         raise JointN7Error("schema identity mismatch")
+    if schema.get("safe_control_interface") != value_matrix_schema()[
+        "safe_control_interface"
+    ]:
+        raise JointN7Error("safe-control schema mismatch")
+    if schema.get("experimental_interface") != value_matrix_schema()[
+        "experimental_interface"
+    ]:
+        raise JointN7Error("experimental schema mismatch")
+    decision = json.loads((output / "decision.json").read_text(encoding="utf-8"))
+    if decision.get("disposition") == "INHERIT_EXACT_MARKET_BASELINE" and (
+        decision.get("inherited_scorer") != "MARKET_INDEPENDENCE"
+        or decision.get("safe_control_probability_column") != "control_probability"
+        or decision.get("safe_control_probability_source") != CONTROL_PROBABILITY_SOURCE
+        or decision.get("experimental_promoted") is not False
+    ):
+        raise JointN7Error("baseline-inherit decision/interface mismatch")
+    matrix = pd.read_parquet(
+        output / "value_matrix.parquet",
+        columns=[
+            "market_probability",
+            "control_probability",
+            "control_probability_source",
+            "control_probability_source_grade",
+            "experimental_probability_source_grade",
+            "experimental_probability_promoted",
+        ],
+    )
+    if not np.allclose(
+        matrix.market_probability,
+        matrix.control_probability,
+        rtol=0.0,
+        atol=0.0,
+        equal_nan=True,
+    ):
+        raise JointN7Error("safe-control probability differs from market baseline")
+    if set(matrix.control_probability_source) != {CONTROL_PROBABILITY_SOURCE}:
+        raise JointN7Error("safe-control probability source mismatch")
+    if set(matrix.control_probability_source_grade) != {CONTROL_SOURCE_GRADE}:
+        raise JointN7Error("safe-control source grade mismatch")
+    if set(matrix.experimental_probability_source_grade) != {
+        EXPERIMENTAL_SOURCE_GRADE
+    } or matrix.experimental_probability_promoted.astype(bool).any():
+        raise JointN7Error("experimental provenance/promotion mismatch")
     return {
         "status": "PASS",
         "files": len(actual),
         "manifest_sha256": _digest(output / "SHA256SUMS.json"),
+        "control_rows_verified": len(matrix),
     }
