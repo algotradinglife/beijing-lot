@@ -1,0 +1,74 @@
+{
+  "cv_validation_years": [
+    2021,
+    2022,
+    2023
+  ],
+  "environment": {
+    "matplotlib": "3.10.9",
+    "nbclient": "0.10.2",
+    "nbformat": "5.10.4",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "pyarrow": "24.0.0",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.17.1"
+  },
+  "execution_status": "RETROSPECTIVE_IMPLEMENTATION_RECOVERY",
+  "fallback": "model only if market-eligible, finite anchored output, and frozen known-grade/finite-observed OOD test passes; otherwise exact market or NO_BET_FROZEN",
+  "features": [
+    "market_probability_3",
+    "market_probability_1",
+    "market_probability_0",
+    "native_handicap_line",
+    "source_is_pclose",
+    "source_is_average_eu",
+    "market_proxy_complete",
+    "predicted_final_sp_input_3",
+    "predicted_final_sp_input_1",
+    "predicted_final_sp_input_0"
+  ],
+  "full_3sp_source_sha256": "e7256d96a34c2f41ede349c87b9cd1efc7a61b104657a657367daf9dd54ee8e2",
+  "gate_a_manifest_sha256": "dfa14d42410d5513cbb07f832972e47fa1cf819a6f1eece13e1f92106e096ae1",
+  "label_boundary": "parsed only for Gate-A registry identities; 26051+ lines are not parsed into label fields",
+  "models": {
+    "HIST_GRADIENT_RESIDUAL": {
+      "learning_rate": 0.05,
+      "max_iter": 60,
+      "max_leaf_nodes": 8,
+      "package": "sklearn"
+    },
+    "ISSUE_CONTEXT_SUMMARY_MLP_RESIDUAL": {
+      "hidden_layer_sizes": [
+        32
+      ],
+      "max_iter": 50,
+      "package": "sklearn",
+      "representation": "permutation_invariant_issue_mean_std_max_min",
+      "scope": "issue-summary MLP control; not a learned-pooling Deep Sets encoder",
+      "torch_status": "not installed in frozen repository environment; PI authorized no dependency installation"
+    },
+    "LOGISTIC_RESIDUAL": {
+      "C": 0.5,
+      "max_iter": 300,
+      "package": "sklearn"
+    },
+    "SP_HEAD": {
+      "implementation": "three HistGradientBoostingRegressor heads",
+      "max_iter": 60,
+      "package": "sklearn"
+    }
+  },
+  "outcome_axis": [
+    "3",
+    "1",
+    "0"
+  ],
+  "probability_composition": "softmax(log(frozen_market_probability_3_1_0) + centered_delta_model_3_1_0)",
+  "seeds": [
+    204001,
+    204002,
+    204003
+  ],
+  "version": "bj204-market-anchored-model-gate-b-retrospective-implementation-recovery-v1"
+}

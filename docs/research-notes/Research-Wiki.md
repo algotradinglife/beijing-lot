@@ -67,7 +67,32 @@ updated: 2026-08-07
    解析并留下审计表。两者在 20,837 个完整重叠上的 MAE 为 0.005533，不能宣称
    byte-identical。权威包为 `results/bj204_gate_a_preoutcome_v5`，manifest/content identity
    均为 `dfa14d42410d5513cbb07f832972e47fa1cf819a6f1eece13e1f92106e096ae1`；其只是一份
-   Gate A preregistration，不产生模型优越性、下注或 Gate B 授权。
+   Gate A preregistration，不产生模型优越性、下注或 Gate B 授权。现有 Gate B recovery 包
+   `results/bj204_gate_b_retrospective_implementation_recovery_v1`（manifest/content identity
+   `ae18e0146c0375b03b380842cdb43fd7d37a20d1872ae97d5198dda2ba06577c`）必须保持 byte-immutable，
+   但只能作为**不合规 product-ensemble 诊断**：三个普通分类器先用 class loss 训练，之后才把
+   `predict_log_proba` 居中并与 `log(market)` 相加，所以其数值不能证明 market-anchored residual
+   learning 失败。冻结诊断中 CV 选择 `MARKET_ONLY`；16,833 个 matched market/label 行上的
+   Logistic/HGB/issue-summary MLP lift 分别为 +0.004147/+0.002154/+0.015964，仅保留为旧构造的
+   描述性结果。issue-summary MLP 在全部 16,968 个 market-eligible locked-test 行均为 OOD fallback，
+   model-used coverage 为 0%，其 raw model-only 分数不能代表可执行 safe-mixed evidence。
+   PI 随后批准一次 `RETROSPECTIVE_METHOD_CORRECTION`：scikit-learn 模型只提供 residual
+   direction，SciPy 直接最小化 logits 为 `log(p_market)+alpha*direction(x)` 的训练交叉熵；
+   `alpha` 固定约束于 `[0,1]`，无改善时精确回到 `alpha=0`。唯一 outcome run 的权威包是
+   `results/bj204_gate_b_retrospective_method_correction_v1`，manifest SHA-256 为
+   `fb28684c3a7ddd11b1e08a1a0fe889cc9ca1ea31e40b718e21137c8d26e68753`，CONTENT_IDENTITY
+   文件 SHA-256 为 `5ec8a3662264a450b7610a232ee284402d9f7a2e1cfa2fda350f4f3c2a9ce685`（27 个 payload、
+   821,004 个 prediction-ledger rows）。开发期 CV 选择 `LOGISTIC_RESIDUAL`：CV log loss
+   1.147751，对照市场 1.150530。锁定测试的 matched 16,833 行上，Logistic log loss 从
+   1.147860 降至 1.143112（-0.004748），Brier 从 0.696426 降至 0.696018，但 ECE 从
+   0.099572 恶化到 0.123924；Top1/Top2 为 0.401770/0.707955，对照
+   0.399513/0.687697。三个锁定训练 seed 的 Logistic `alpha` 均为 0.445156；它在全部
+   16,968 个 market-eligible 行使用模型。HGB 与 context raw log-loss lift 分别为
+   -0.005100/-0.009524，但 context safe path 仍是 0 个 model-used、16,968 个 OOD fallback，
+   不能作为可执行模型证据。SP-head 的 3/1/0 matched MAE 分别为 0.328949/0.322043/0.383442。
+   这只是 one-direction-plus-scalar control，不代表完整 joint/neural residual hypothesis；当前为
+   `RETROSPECTIVE_METHOD_CORRECTION_PENDING_PI_TERMINAL_REVIEW`，#210 仍是唯一严格确认，也不授权
+   #205、下注、ROI、票据或生产使用。
 
 ## 近期 N7 策略结论（2026-08-02）
 
