@@ -1,27 +1,81 @@
 #!/usr/bin/env python3
-"""Clean-run and persist the Issue #205 notebook."""
+"""Clean-run and atomically persist the Issue #205 notebook."""
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
+import tempfile
 
 import nbformat
 from nbclient import NotebookClient
 
 
+def _atomic_write_notebook(document: nbformat.NotebookNode, notebook: Path) -> None:
+    """Write beside the target, fsync, then atomically replace it."""
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            suffix=".ipynb.tmp",
+            prefix=f".{notebook.name}.",
+            dir=notebook.parent,
+            delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            nbformat.write(document, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, notebook)
+        temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def execute_notebook(notebook: Path, *, kernel_name: str = "python3") -> None:
+    notebook = notebook.resolve()
+    document = nbformat.read(notebook, as_version=4)
+    document.metadata["kernelspec"] = {
+        "display_name": "Python 3",
+        "language": "python",
+        "name": kernel_name,
+    }
+    client = NotebookClient(
+        document,
+        timeout=180,
+        kernel_name=kernel_name,
+        resources={"metadata": {"path": str(notebook.parent)}},
+    )
+    client.execute()
+    code = [cell for cell in document.cells if cell.cell_type == "code"]
+    if any(
+        output.get("output_type") == "error"
+        for cell in code
+        for output in cell.get("outputs", [])
+    ):
+        raise RuntimeError("executed notebook contains an error output")
+    _atomic_write_notebook(document, notebook)
+    print(
+        f"PASS cells={len(code)} "
+        f"executed={sum(cell.execution_count is not None for cell in code)} "
+        f"kernel={kernel_name} path={notebook}"
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--notebook", type=Path, default=Path("notebooks/research/issue-205/bj205_joint_n7_value_matrix.ipynb"))
+    parser.add_argument(
+        "--notebook",
+        type=Path,
+        default=Path(
+            "notebooks/research/issue-205/bj205_joint_n7_value_matrix.ipynb"
+        ),
+    )
+    parser.add_argument("--kernel", default="python3")
     args = parser.parse_args()
-    notebook = args.notebook.resolve()
-    document = nbformat.read(notebook, as_version=4)
-    client = NotebookClient(document, timeout=180, kernel_name="bj205", resources={"metadata": {"path": str(notebook.parent)}})
-    client.execute()
-    nbformat.write(document, notebook)
-    code = [cell for cell in document.cells if cell.cell_type == "code"]
-    if any(output.get("output_type") == "error" for cell in code for output in cell.get("outputs", [])):
-        raise RuntimeError("executed notebook contains an error output")
-    print(f"PASS cells={len(code)} executed={sum(cell.execution_count is not None for cell in code)} path={notebook}")
+    execute_notebook(args.notebook, kernel_name=args.kernel)
 
 
 if __name__ == "__main__":

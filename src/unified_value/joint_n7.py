@@ -34,6 +34,9 @@ SOURCE_LEDGER_ID = (
     "bj204-market-anchored-model-gate-b-retrospective-method-correction-v1"
 )
 PRIMARY_METRIC = "joint_log_loss"
+SIMPLEX_ATOL = 1e-10
+SOURCE_UNIQUE_KEY = ("issue", "match_idx", "split", "model_id", "seed")
+SCIENTIFIC_LOCK = Path("requirements.txt")
 FEATURE_NAMES = (
     "share_3",
     "share_1",
@@ -98,6 +101,56 @@ def _normalize(values: np.ndarray) -> np.ndarray:
     return values / total
 
 
+def _validate_probability_triplets(
+    frame: pd.DataFrame,
+    columns: list[str],
+    *,
+    label: str,
+) -> None:
+    """Fail closed on malformed source probabilities before any aggregation.
+
+    #204's accepted market and fallback-mixed channels are fully supported
+    categorical distributions.  Renormalizing malformed rows here would hide an
+    upstream contract violation and make the value matrix disagree with tickets.
+    """
+    if frame.empty:
+        raise JointN7Error(f"{label} probability input is empty")
+    values = frame[columns].to_numpy(dtype=float)
+    finite = np.isfinite(values).all(axis=1)
+    strictly_supported = (values > 0.0).all(axis=1)
+    simplex = np.isclose(values.sum(axis=1), 1.0, rtol=0.0, atol=SIMPLEX_ATOL)
+    valid = finite & strictly_supported & simplex
+    if not valid.all():
+        examples = frame.index[~valid].astype(str).tolist()[:5]
+        raise JointN7Error(
+            f"{label} probability triplets violate finite/positive/simplex "
+            f"contract at rows {examples} (atol={SIMPLEX_ATOL})"
+        )
+
+
+def _validate_panel_probabilities(panel: pd.DataFrame) -> None:
+    if panel.empty:
+        raise JointN7Error("match panel is empty")
+    eligible = (
+        panel.market_eligible.astype(bool)
+        if "market_eligible" in panel.columns
+        else pd.Series(True, index=panel.index)
+    )
+    supported = panel.loc[eligible]
+    if supported.empty:
+        return
+    _validate_probability_triplets(
+        supported,
+        [f"market_probability_{c}" for c in OUTCOMES],
+        label="market",
+    )
+    _validate_probability_triplets(
+        supported,
+        [f"fallback_mixed_probability_{c}" for c in OUTCOMES],
+        label="fallback-mixed",
+    )
+
+
 def _config_products(matrix: np.ndarray) -> np.ndarray:
     return np.prod(matrix[np.arange(N)[None, :], CONFIGS], axis=1)
 
@@ -137,9 +190,34 @@ def load_match_panel(ledger_path: Path, gate_a_cells_path: Path) -> pd.DataFrame
         raise JointN7Error(
             f"#204 ledger schema missing {sorted(required.difference(ledger.columns))}"
         )
+    if ledger.empty:
+        raise JointN7Error("#204 prediction ledger is empty")
     source = ledger.loc[ledger.model_id.astype(str).eq("LOGISTIC_RESIDUAL")].copy()
     if source.empty:
         raise JointN7Error("accepted #204 LOGISTIC_RESIDUAL rows are absent")
+    duplicate = source.duplicated(list(SOURCE_UNIQUE_KEY), keep=False)
+    if duplicate.any():
+        examples = (
+            source.loc[duplicate, list(SOURCE_UNIQUE_KEY)]
+            .astype(str)
+            .head(5)
+            .to_dict("records")
+        )
+        raise JointN7Error(
+            "#204 source rows are not unique on "
+            f"{list(SOURCE_UNIQUE_KEY)}; examples={examples}"
+        )
+    eligible_source = source.loc[source.market_eligible.astype(bool)]
+    _validate_probability_triplets(
+        eligible_source,
+        [f"market_probability_{c}" for c in OUTCOMES],
+        label="#204 market",
+    )
+    _validate_probability_triplets(
+        eligible_source,
+        [f"fallback_mixed_probability_{c}" for c in OUTCOMES],
+        label="#204 fallback-mixed",
+    )
     keys = ["issue", "year", "issue_order", "match_idx", "split", "result_code"]
     numeric = [
         *[f"market_probability_{c}" for c in OUTCOMES],
@@ -170,8 +248,13 @@ def load_match_panel(ledger_path: Path, gate_a_cells_path: Path) -> pd.DataFrame
         flags, on=keys, validate="one_to_one"
     )
     cells = pd.read_parquet(gate_a_cells_path)
+    if cells.empty:
+        raise JointN7Error("Gate-A common-cell input is empty")
     cells["issue"] = cells.issue.astype(str)
     cells["outcome_code"] = cells.outcome_code.astype(str)
+    cell_key = ["issue", "match_idx", "outcome_code"]
+    if cells.duplicated(cell_key, keep=False).any():
+        raise JointN7Error(f"Gate-A cells are not unique on {cell_key}")
     sp_input = cells.pivot(
         index=["issue", "match_idx"],
         columns="outcome_code",
@@ -193,6 +276,7 @@ def load_match_panel(ledger_path: Path, gate_a_cells_path: Path) -> pd.DataFrame
 
 
 def build_value_matrix(panel: pd.DataFrame) -> pd.DataFrame:
+    _validate_panel_probabilities(panel)
     rows: list[dict[str, Any]] = []
     for row in panel.itertuples(index=False):
         market = np.asarray(
@@ -307,6 +391,7 @@ def _ticket_features(
 def build_issue_tickets(
     panel: pd.DataFrame,
 ) -> tuple[dict[str, list[dict[str, Any]]], pd.DataFrame]:
+    _validate_panel_probabilities(panel)
     by_split: dict[str, list[dict[str, Any]]] = {}
     census: list[dict[str, Any]] = []
     for (split, issue), group in panel.groupby(["split", "issue"], sort=False):
@@ -874,7 +959,11 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 "gate_a_cells_sha256": _digest(inputs.gate_a_cells),
                 "source_contract": SOURCE_LEDGER_ID,
                 "environment": _environment(),
-                "replay": "PYTHONPATH=src python scripts/run_bj205_joint_n7.py run --output results/issue-205",
+                "scientific_environment_lock": SCIENTIFIC_LOCK.as_posix(),
+                "scientific_environment_lock_sha256": _digest(
+                    SCIENTIFIC_LOCK.resolve()
+                ),
+                "replay": "uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements.txt && PYTHONPATH=src .venv/bin/python scripts/run_bj205_joint_n7.py run --output results/issue-205",
             },
         )
         trace_record = locked[0]
@@ -903,8 +992,10 @@ def run(inputs: Inputs) -> dict[str, Any]:
         )
         (stage / "README.md").write_text(
             "# Issue #205 immutable evidence package\n\n"
+            "Clean environment: `uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements.txt`. The exact scientific package versions are frozen in `requirements.txt` and its SHA-256 is bound in `provenance.json`.\n\n"
             "Verify: `PYTHONPATH=src .venv/bin/python scripts/run_bj205_joint_n7.py verify --output results/issue-205`\n\n"
             "Replay to a new output directory: `PYTHONPATH=src .venv/bin/python scripts/run_bj205_joint_n7.py run --output <new-directory>`\n\n"
+            "Clean-run notebook: `PYTHONPATH=src .venv/bin/python scripts/execute_bj205_notebook.py --kernel python3` (the installed ipykernel exposes the portable `python3` kernelspec; persistence uses same-directory temporary-file plus atomic replace).\n\n"
             "The package includes the value schema/matrix, exact inference trace, exhaustive locked ticket ledger, chronological metrics, reliability and regime diagnostics, plots, decision report, parameters, provenance and SHA-256 manifest.\n",
             encoding="utf-8",
             newline="\n",

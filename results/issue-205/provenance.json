@@ -11,7 +11,9 @@
   },
   "gate_a_cells": "results/bj204_gate_a_preoutcome_v5/common_cell_features.parquet",
   "gate_a_cells_sha256": "fe85a432990b758f5f8a07f7c0c7b05230d25d070a4a68ce1009b6d9ef0d25d3",
-  "replay": "PYTHONPATH=src python scripts/run_bj205_joint_n7.py run --output results/issue-205",
+  "replay": "uv venv --python 3.11 .venv && uv pip install --python .venv/bin/python -r requirements.txt && PYTHONPATH=src .venv/bin/python scripts/run_bj205_joint_n7.py run --output results/issue-205",
+  "scientific_environment_lock": "requirements.txt",
+  "scientific_environment_lock_sha256": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
   "source_contract": "bj204-market-anchored-model-gate-b-retrospective-method-correction-v1",
   "source_ledger": "results/bj204_gate_b_retrospective_method_correction_v1/per_match_predictions.parquet",
   "source_ledger_sha256": "79806e818bc26432eb9a190549852d985801b7eb1d99b4a3078300db07a60c01"
