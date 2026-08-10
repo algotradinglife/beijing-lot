@@ -18,5 +18,5 @@
   "validation_expected_lift": -68.68514632958649,
   "validation_lift_one_sided_95_lcb": -0.9140401351131572,
   "validation_realized_lift": 0.8752329141926597,
-  "version": "bj206-fixed-n7-ticket-policy-v1"
+  "version": "bj206-fixed-n7-ticket-policy-v2"
 }

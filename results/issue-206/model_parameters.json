@@ -43,5 +43,5 @@
   ],
   "stake_per_ticket": 2,
   "tax_factor_reference": 0.65,
-  "version": "bj206-fixed-n7-ticket-policy-v1"
+  "version": "bj206-fixed-n7-ticket-policy-v2"
 }

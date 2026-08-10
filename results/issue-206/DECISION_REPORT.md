@@ -12,6 +12,7 @@ The fallback-mixed CV-2023 path delivered absolute realized pre-tax net -1.00000
 - The three fixed nuisance seeds generate a bounded full-issue candidate pool; seed choice is never outcome-ranked.
 - Exact duplicate ticket identity is separately measured from match overlap. Controlling WOR policies request distinct identities; repeat stake remains an explicit, traceable action rather than accidental duplication.
 - Only #205 `MARKET_ONLY` / `FROZEN_SAFE_BASELINE` control probability and frozen pre-event SP enter the controlling policy. Experimental residuals appear only in `EXPERIMENTAL_MLP_ABLATION`.
+- 651 source matches with all three safe-control probabilities missing are explicitly recorded in `input_exclusions.csv`; partial/non-finite, non-positive, non-normalized, incomplete-M×3, and post-exclusion M<7 inputs fail closed.
 - Training uses CV-2021, policy/K selection uses CV-2022, final historical evaluation uses CV-2023. LOCKED_TEST 2025/2026 labels remain embargoed; its Stage-3 handoff is label-blind.
 
 ## Failure regimes and risks

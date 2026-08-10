@@ -4,7 +4,7 @@ Status: retrospective Stage-3 research; requested tickets only. No bankroll, bet
 
 ## Frozen interface and action space
 
-The implementation consumes the complete #205 `J × 3` value matrix. The controlling path reads only `control_probability` (`MARKET_ONLY`, source grade `FROZEN_SAFE_BASELINE`) and the frozen pre-event predicted SP. Every ticket contains exactly seven distinct matches and one 3/1/0 outcome for each selected match. Each ticket chooses its own subset from the issue pool; no shared first-seven roster is inherited from #205.
+The implementation consumes the complete #205 `J × 3` value matrix. The controlling path reads only `control_probability` (`MARKET_ONLY`, source grade `FROZEN_SAFE_BASELINE`) and the frozen pre-event predicted SP. A source match whose complete three-cell safe-control probability row is absent is explicitly recorded in `input_exclusions.csv`; 651 such matches are ledgered across the chronological package. Partial NaN/Inf rows, non-positive or non-normalized probabilities/SP, incomplete M×3 rows, and issues with fewer than seven safe matches fail closed before candidate construction. Every retained ticket contains exactly seven distinct matches and one 3/1/0 outcome for each selected match. Each ticket chooses its own subset from the eligible issue pool; no shared first-seven roster is inherited from #205.
 
 Candidate generation is bounded and reproducible: deterministic top-mass/systematic identities plus NumPy package-backed market-weighted sampling without replacement under three frozen nuisance seeds. Exact identity, subset, outcomes, per-cell control probability/source grade, predicted SP, SP seed uncertainty, expected utility, overlap, repeats, and requested ¥2 stake remain traceable. The experimental #204 residual lane appears only in the explicitly named `EXPERIMENTAL_MLP_ABLATION` and cannot enter the safe control.
 
@@ -33,6 +33,7 @@ On CV-2023 the inherited path recorded absolute realized pre-tax net -1.000000, 
 - Decision report: `results/issue-206/DECISION_REPORT.md`
 - Policy and matched-lift surface: `results/issue-206/policy_surface.csv`
 - Ticket hit/payout calibration: `results/issue-206/ticket_calibration.csv`
+- Enforced source-match exclusion ledger: `results/issue-206/input_exclusions.csv`
 - Stage-3 request ledger: `results/issue-206/ticket_requests.parquet`
 
 ## Replay
@@ -42,5 +43,5 @@ uv venv --python 3.11 .venv
 uv pip install --python .venv/bin/python -r requirements.txt
 PYTHONPATH=src .venv/bin/python scripts/run_bj206_fixed_n7.py verify --output results/issue-206
 PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_bj206_fixed_n7.py
-PYTHONPATH=src:. .venv/bin/python scripts/execute_bj206_notebook.py --kernel python3
+PYTHONPATH=src .venv/bin/python scripts/execute_bj206_notebook.py --kernel python3
 ```

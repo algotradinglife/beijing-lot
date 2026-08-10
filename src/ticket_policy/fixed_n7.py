@@ -32,7 +32,7 @@ TAX_FACTOR = 0.65
 STAKE = 2
 K_GRID = (8, 16, 32)
 NUISANCE_SEEDS = (206001, 206002, 206003)
-VERSION = "bj206-fixed-n7-ticket-policy-v1"
+VERSION = "bj206-fixed-n7-ticket-policy-v2"
 SOURCE_VERSION = "bj205-joint-n7-value-matrix-v2"
 CONTROL_POLICIES = ("BEST_FULL", "MARKET_WOR", "MARKET_WR")
 CHALLENGER_POLICIES = (
@@ -83,6 +83,7 @@ class IssuePanel:
     official_sp: np.ndarray
     realized_index: np.ndarray
     labels_available: np.ndarray
+    excluded_matches: tuple[dict[str, Any], ...] = ()
 
 
 def _digest(path: Path) -> str:
@@ -91,6 +92,18 @@ def _digest(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _resolve_provenance_path(path: str, output: Path) -> Path:
+    """Resolve a committed repo-relative input from root or notebook execution."""
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return candidate
+    candidates = (Path.cwd() / candidate, *(parent / candidate for parent in output.resolve().parents))
+    for resolved in candidates:
+        if resolved.exists():
+            return resolved
+    raise TicketPolicyError(f"provenance input is unavailable: {path}")
 
 
 def _json(path: Path, value: Any) -> None:
@@ -196,6 +209,10 @@ def load_panels(matrix_path: Path, schema_path: Path) -> list[IssuePanel]:
         sizes = group.groupby("match_idx", sort=False).size()
         if not sizes.eq(3).all():
             raise TicketPolicyError(f"issue {issue} does not have complete M×3 rows")
+        if len(sizes) < N:
+            raise TicketPolicyError(
+                f"issue {issue} has M={len(sizes)} eligible matches; fixed N={N} requires M>=N"
+            )
         probability = group.control_probability.to_numpy(dtype=float).reshape(-1, 3)
         experimental_probability = group.experimental_probability.to_numpy(
             dtype=float
@@ -204,22 +221,82 @@ def load_panels(matrix_path: Path, schema_path: Path) -> list[IssuePanel]:
         sp_seed_std = group.sp_seed_std.to_numpy(dtype=float).reshape(-1, 3)
         official_sp = group.official_final_sp_label.to_numpy(dtype=float).reshape(-1, 3)
         realized = group.realized_outcome.to_numpy(dtype=bool).reshape(-1, 3)
-        valid = (
-            np.isfinite(probability).all(axis=1)
-            & np.isfinite(sp).all(axis=1)
-            & (probability > 0).all(axis=1)
-            & (sp > 0).all(axis=1)
-            & np.isclose(probability.sum(axis=1), 1.0, rtol=0.0, atol=1e-10)
+        match_idx = group.match_idx.drop_duplicates().to_numpy(dtype=int)
+
+        # #205 represents a match with no safe market lane as three NaNs. That
+        # complete, deterministic absence is an admissibility exclusion, not a
+        # candidate cell. Any partial NaN/Inf is malformed and fails closed.
+        fully_missing_safe = np.isnan(probability).all(axis=1)
+        malformed_safe = ~np.isfinite(probability) & ~fully_missing_safe[:, None]
+        if malformed_safe.any():
+            raise TicketPolicyError(f"issue {issue} has non-finite control_probability")
+        retained = ~fully_missing_safe
+        if retained.sum() < N:
+            raise TicketPolicyError(
+                f"issue {issue} has only {int(retained.sum())} safe-control matches; "
+                f"fixed N={N} requires M>=N after explicit exclusions"
+            )
+        excluded_matches = tuple(
+            {
+                "split": str(split),
+                "issue": str(issue),
+                "year": int(group.year.iloc[0]),
+                "match_idx": int(match_idx[row]),
+                "exclusion_reason": "SAFE_CONTROL_PROBABILITY_ALL_MISSING",
+                "excluded_cell_count": len(OUTCOMES),
+                "source_cells_json": json.dumps(
+                    [
+                        {
+                            "outcome": outcome,
+                            "control_probability": None,
+                            "control_probability_source": "MARKET_ONLY",
+                            "control_probability_source_grade": "FROZEN_SAFE_BASELINE",
+                            "predicted_final_sp": float(sp[row, outcome_index]),
+                            "predicted_final_sp_seed_std": float(
+                                sp_seed_std[row, outcome_index]
+                            ),
+                        }
+                        for outcome_index, outcome in enumerate(OUTCOMES)
+                    ],
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                ),
+            }
+            for row in np.flatnonzero(fully_missing_safe)
         )
-        if valid.sum() < N:
-            continue
-        probability = probability[valid]
-        experimental_probability = experimental_probability[valid]
-        sp = sp[valid]
-        sp_seed_std = sp_seed_std[valid]
-        official_sp = official_sp[valid]
-        realized = realized[valid]
-        match_idx = group.match_idx.drop_duplicates().to_numpy(dtype=int)[valid]
+        probability = probability[retained]
+        experimental_probability = experimental_probability[retained]
+        sp = sp[retained]
+        sp_seed_std = sp_seed_std[retained]
+        official_sp = official_sp[retained]
+        realized = realized[retained]
+        match_idx = match_idx[retained]
+
+        if not (probability > 0).all():
+            raise TicketPolicyError(f"issue {issue} has non-positive control_probability")
+        if not np.isclose(
+            probability.sum(axis=1), 1.0, rtol=0.0, atol=1e-10
+        ).all():
+            raise TicketPolicyError(
+                f"issue {issue} has non-normalized control_probability rows"
+            )
+        if not np.isfinite(sp).all():
+            raise TicketPolicyError(f"issue {issue} has non-finite predicted_final_sp")
+        if not (sp > 0).all():
+            raise TicketPolicyError(f"issue {issue} has non-positive predicted_final_sp")
+        if not np.isfinite(experimental_probability).all():
+            raise TicketPolicyError(f"issue {issue} has non-finite experimental_probability")
+        if not (experimental_probability > 0).all():
+            raise TicketPolicyError(f"issue {issue} has non-positive experimental_probability")
+        if not np.isclose(
+            experimental_probability.sum(axis=1), 1.0, rtol=0.0, atol=1e-10
+        ).all():
+            raise TicketPolicyError(
+                f"issue {issue} has non-normalized experimental_probability rows"
+            )
+        if not np.isfinite(sp_seed_std).all() or (sp_seed_std < 0).any():
+            raise TicketPolicyError(f"issue {issue} has invalid sp_seed_std")
         if str(split) == "LOCKED_TEST":
             # The source package retains labels for #205 calibration, but #206's
             # post-2023 boundary is stricter: discard them before any ticket,
@@ -243,6 +320,7 @@ def load_panels(matrix_path: Path, schema_path: Path) -> list[IssuePanel]:
                 official_sp=official_sp,
                 realized_index=realized_index,
                 labels_available=labels_available,
+                excluded_matches=excluded_matches,
             )
         )
     if not panels:
@@ -735,7 +813,9 @@ def _plots(surface: pd.DataFrame, output: Path) -> None:
     plt.close(fig)
 
 
-def _decision_report(decision: dict[str, Any], surface: pd.DataFrame) -> str:
+def _decision_report(
+    decision: dict[str, Any], surface: pd.DataFrame, exclusion_count: int
+) -> str:
     evaluation = surface.loc[
         surface.split.eq("CV_2023")
         & surface.policy.eq(decision["fallback_mixed_policy"])
@@ -755,6 +835,7 @@ The fallback-mixed CV-2023 path delivered absolute realized pre-tax net {evaluat
 - The three fixed nuisance seeds generate a bounded full-issue candidate pool; seed choice is never outcome-ranked.
 - Exact duplicate ticket identity is separately measured from match overlap. Controlling WOR policies request distinct identities; repeat stake remains an explicit, traceable action rather than accidental duplication.
 - Only #205 `MARKET_ONLY` / `FROZEN_SAFE_BASELINE` control probability and frozen pre-event SP enter the controlling policy. Experimental residuals appear only in `EXPERIMENTAL_MLP_ABLATION`.
+- {exclusion_count} source matches with all three safe-control probabilities missing are explicitly recorded in `input_exclusions.csv`; partial/non-finite, non-positive, non-normalized, incomplete-M×3, and post-exclusion M<7 inputs fail closed.
 - Training uses CV-2021, policy/K selection uses CV-2022, final historical evaluation uses CV-2023. LOCKED_TEST 2025/2026 labels remain embargoed; its Stage-3 handoff is label-blind.
 
 ## Failure regimes and risks
@@ -785,6 +866,19 @@ def run(inputs: Inputs) -> dict[str, Any]:
     stage.mkdir(parents=True)
     try:
         panels = load_panels(inputs.value_matrix, inputs.value_schema)
+        exclusion_columns = [
+            "split",
+            "issue",
+            "year",
+            "match_idx",
+            "exclusion_reason",
+            "excluded_cell_count",
+            "source_cells_json",
+        ]
+        exclusions = pd.DataFrame(
+            [record for panel in panels for record in panel.excluded_matches],
+            columns=exclusion_columns,
+        )
         candidate_frames = [generate_candidates(panel) for panel in panels]
         candidates = pd.concat(candidate_frames, ignore_index=True)
         train = candidates.loc[candidates.split.eq("CV_2021")].copy()
@@ -849,6 +943,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
         surface.to_csv(stage / "policy_surface.csv", index=False)
         calibration.to_csv(stage / "ticket_calibration.csv", index=False)
         paired.to_csv(stage / "paired_validation_lift.csv", index=False)
+        exclusions.to_csv(stage / "input_exclusions.csv", index=False)
         _json(stage / "decision.json", decision)
         _json(
             stage / "model_parameters.json",
@@ -899,6 +994,8 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 "source_schema": str(inputs.value_schema),
                 "source_schema_sha256": _digest(inputs.value_schema),
                 "source_contract": SOURCE_VERSION,
+                "input_exclusion_policy": "only complete 3-cell safe-control probability absence is ledgered; malformed partial cells and constraint-ineligible issues fail closed",
+                "input_excluded_matches": len(exclusions),
                 "scientific_environment_lock": SCIENTIFIC_LOCK.as_posix(),
                 "scientific_environment_lock_sha256": _digest(SCIENTIFIC_LOCK.resolve()),
                 "environment": _environment(),
@@ -906,7 +1003,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 "label_boundary": "CV_2021 train; CV_2022 select; CV_2023 evaluate; LOCKED_TEST labels unused",
             },
         )
-        report = _decision_report(decision, surface)
+        report = _decision_report(decision, surface, len(exclusions))
         (stage / "DECISION_REPORT.md").write_text(
             report, encoding="utf-8", newline="\n"
         )
@@ -915,7 +1012,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
             "Verify: `PYTHONPATH=src .venv/bin/python scripts/run_bj206_fixed_n7.py verify --output results/issue-206`.\n\n"
             "Replay to a new directory: `PYTHONPATH=src .venv/bin/python scripts/run_bj206_fixed_n7.py run --output <new-directory>`.\n\n"
             "Clean notebook: `PYTHONPATH=src .venv/bin/python scripts/execute_bj206_notebook.py --kernel python3`.\n\n"
-            "The package includes exact source-cell traces, ticket hit/payout calibration, matched policy surfaces, plots, and the label-blind request ledger. It is a Stage-3 requested-ticket handoff only and has no final bankroll, betting, or production authority.\n",
+            "The package includes an enforced input-exclusion ledger, exact source-cell traces, ticket hit/payout calibration, matched policy surfaces, plots, and the label-blind request ledger. It is a Stage-3 requested-ticket handoff only and has no final bankroll, betting, or production authority.\n",
             encoding="utf-8",
             newline="\n",
         )
@@ -970,10 +1067,63 @@ def verify(output: Path) -> dict[str, Any]:
     surface = pd.read_csv(output / "policy_surface.csv")
     if not surface.stake_budget_matched.astype(bool).any():
         raise TicketPolicyError("matched stake surface absent")
+    exclusions = pd.read_csv(output / "input_exclusions.csv")
+    exclusion_columns = {
+        "split",
+        "issue",
+        "match_idx",
+        "exclusion_reason",
+        "excluded_cell_count",
+        "source_cells_json",
+    }
+    if not exclusion_columns.issubset(exclusions.columns):
+        raise TicketPolicyError("input exclusion ledger columns missing")
+    if exclusions.duplicated(["split", "issue", "match_idx"]).any():
+        raise TicketPolicyError("input exclusion ledger has duplicate matches")
+    if not exclusions.exclusion_reason.eq(
+        "SAFE_CONTROL_PROBABILITY_ALL_MISSING"
+    ).all() or not exclusions.excluded_cell_count.eq(len(OUTCOMES)).all():
+        raise TicketPolicyError("input exclusion ledger reason/cell count mismatch")
+    for payload in exclusions.source_cells_json:
+        cells = json.loads(payload)
+        if len(cells) != len(OUTCOMES) or any(
+            cell.get("control_probability") is not None for cell in cells
+        ):
+            raise TicketPolicyError("input exclusion source-cell trace mismatch")
+    excluded_keys = {
+        (str(row.split), str(row.issue), int(row.match_idx))
+        for row in exclusions.itertuples(index=False)
+    }
+    provenance = json.loads(
+        (output / "provenance.json").read_text(encoding="utf-8")
+    )
+    source_matrix = _resolve_provenance_path(provenance["source_value_matrix"], output)
+    source_schema = _resolve_provenance_path(provenance["source_schema"], output)
+    if (
+        _digest(source_matrix) != provenance["source_value_matrix_sha256"]
+        or _digest(source_schema) != provenance["source_schema_sha256"]
+    ):
+        raise TicketPolicyError("source input hash mismatch")
+    source_panels = load_panels(source_matrix, source_schema)
+    expected_excluded_keys = {
+        (str(record["split"]), str(record["issue"]), int(record["match_idx"]))
+        for panel in source_panels
+        for record in panel.excluded_matches
+    }
+    if excluded_keys != expected_excluded_keys:
+        raise TicketPolicyError("input exclusion ledger is incomplete or extraneous")
+    candidates = pd.read_parquet(output / "candidate_ledger.parquet")
+    if any(
+        (str(row.split), str(row.issue), int(match_idx)) in excluded_keys
+        for row in candidates.itertuples(index=False)
+        for match_idx in str(row.match_indices).split("|")
+    ):
+        raise TicketPolicyError("excluded source match entered candidate ledger")
     return {
         "status": "PASS",
         "files": len(actual),
         "manifest_sha256": _digest(output / "SHA256SUMS.json"),
         "request_rows": len(requests),
         "issues": int(requests.issue.nunique()),
+        "excluded_input_matches": len(exclusions),
     }

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 
+import nbformat
 import numpy as np
 import pandas as pd
 import pytest
@@ -69,9 +73,11 @@ def _candidate_frame(rows: int = 40) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-def _write_matrix(tmp_path: Path, *, promote_experimental: bool = False) -> tuple[Path, Path]:
+def _write_matrix(
+    tmp_path: Path, *, promote_experimental: bool = False, matches: int = 8
+) -> tuple[Path, Path]:
     rows = []
-    for match_idx in range(1, 9):
+    for match_idx in range(1, matches + 1):
         for outcome, probability, sp in zip(
             ("3", "1", "0"), (0.45, 0.3, 0.25), (2.2, 3.3, 4.0), strict=True
         ):
@@ -179,6 +185,113 @@ def test_loader_preserves_complete_m_by_3_safe_interface(tmp_path: Path) -> None
     assert len(panels) == 1
     assert panels[0].control_probability.shape == (8, 3)
     assert np.array_equal(panels[0].match_idx, np.arange(1, 9))
+
+
+@pytest.mark.parametrize(
+    ("column", "value", "message"),
+    [
+        ("control_probability", np.nan, "non-finite control_probability"),
+        ("control_probability", np.inf, "non-finite control_probability"),
+        ("control_probability", 0.0, "non-positive control_probability"),
+        ("control_probability", -0.1, "non-positive control_probability"),
+        ("predicted_final_sp", np.nan, "non-finite predicted_final_sp"),
+        ("predicted_final_sp", np.inf, "non-finite predicted_final_sp"),
+        ("predicted_final_sp", 0.0, "non-positive predicted_final_sp"),
+        ("predicted_final_sp", -1.0, "non-positive predicted_final_sp"),
+    ],
+)
+def test_loader_rejects_malformed_safe_control_cells(
+    tmp_path: Path, column: str, value: float, message: str
+) -> None:
+    matrix, schema = _write_matrix(tmp_path)
+    frame = pd.read_parquet(matrix)
+    frame.loc[0, column] = value
+    frame.to_parquet(matrix, index=False)
+    with pytest.raises(TicketPolicyError, match=message):
+        load_panels(matrix, schema)
+
+
+def test_loader_rejects_non_normalized_safe_probability(tmp_path: Path) -> None:
+    matrix, schema = _write_matrix(tmp_path)
+    frame = pd.read_parquet(matrix)
+    frame.loc[0, "control_probability"] = 0.5
+    frame.to_parquet(matrix, index=False)
+    with pytest.raises(TicketPolicyError, match="non-normalized control_probability"):
+        load_panels(matrix, schema)
+
+
+def test_loader_ledgers_only_complete_safe_control_absence(tmp_path: Path) -> None:
+    matrix, schema = _write_matrix(tmp_path)
+    frame = pd.read_parquet(matrix)
+    frame.loc[frame.match_idx.eq(8), "control_probability"] = np.nan
+    frame.loc[frame.match_idx.eq(8), "experimental_probability"] = np.nan
+    frame.to_parquet(matrix, index=False)
+    panel = load_panels(matrix, schema)[0]
+    assert np.array_equal(panel.match_idx, np.arange(1, 8))
+    assert len(panel.excluded_matches) == 1
+    exclusion = panel.excluded_matches[0]
+    assert exclusion["match_idx"] == 8
+    assert exclusion["excluded_cell_count"] == 3
+    assert exclusion["exclusion_reason"] == "SAFE_CONTROL_PROBABILITY_ALL_MISSING"
+    assert all(
+        cell["control_probability"] is None
+        for cell in json.loads(exclusion["source_cells_json"])
+    )
+
+
+def test_loader_rejects_incomplete_m_by_3_interface(tmp_path: Path) -> None:
+    matrix, schema = _write_matrix(tmp_path)
+    frame = pd.read_parquet(matrix).iloc[1:]
+    frame.to_parquet(matrix, index=False)
+    with pytest.raises(TicketPolicyError, match="complete M×3"):
+        load_panels(matrix, schema)
+
+
+def test_loader_rejects_issue_with_fewer_than_n_matches(tmp_path: Path) -> None:
+    matrix, schema = _write_matrix(tmp_path, matches=N - 1)
+    with pytest.raises(TicketPolicyError, match="requires M>=N"):
+        load_panels(matrix, schema)
+
+
+def test_loader_rejects_issue_with_fewer_than_n_safe_matches(tmp_path: Path) -> None:
+    matrix, schema = _write_matrix(tmp_path, matches=N)
+    frame = pd.read_parquet(matrix)
+    frame.loc[frame.match_idx.eq(N), "control_probability"] = np.nan
+    frame.loc[frame.match_idx.eq(N), "experimental_probability"] = np.nan
+    frame.to_parquet(matrix, index=False)
+    with pytest.raises(TicketPolicyError, match="after explicit exclusions"):
+        load_panels(matrix, schema)
+
+
+def test_documented_clean_notebook_entrypoint_runs_from_repo_root(
+    tmp_path: Path,
+) -> None:
+    notebook = tmp_path / "entrypoint-smoke.ipynb"
+    document = nbformat.v4.new_notebook(
+        cells=[nbformat.v4.new_code_cell("print('bj206-entrypoint-ok')")]
+    )
+    nbformat.write(document, notebook)
+    root = Path(__file__).resolve().parents[1]
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = "src"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/execute_bj206_notebook.py",
+            "--notebook",
+            str(notebook),
+            "--kernel",
+            "python3",
+        ],
+        cwd=root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "PASS cells=1 executed=1 kernel=python3" in result.stdout
 
 
 def test_loader_rejects_promoted_experimental_lane(tmp_path: Path) -> None:

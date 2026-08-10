@@ -10,6 +10,8 @@
     "scikit-learn": "1.9.0",
     "scipy": "1.17.1"
   },
+  "input_excluded_matches": 651,
+  "input_exclusion_policy": "only complete 3-cell safe-control probability absence is ledgered; malformed partial cells and constraint-ineligible issues fail closed",
   "label_boundary": "CV_2021 train; CV_2022 select; CV_2023 evaluate; LOCKED_TEST labels unused",
   "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj206_fixed_n7.py run --output results/issue-206",
   "scientific_environment_lock": "requirements.txt",
@@ -19,5 +21,5 @@
   "source_schema_sha256": "2a1ac9ba57306295ba4cdd8d9e0e9720b2148ea0faabf9cab5e3c4270ce2dcf1",
   "source_value_matrix": "results/issue-205/value_matrix.parquet",
   "source_value_matrix_sha256": "8fdace9c7249502456f8990137011847df9addae5ad633e61760c44b7ccde84b",
-  "version": "bj206-fixed-n7-ticket-policy-v1"
+  "version": "bj206-fixed-n7-ticket-policy-v2"
 }

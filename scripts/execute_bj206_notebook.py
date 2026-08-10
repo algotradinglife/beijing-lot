@@ -6,7 +6,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from scripts.execute_bj205_notebook import execute_notebook
+# Direct script execution places ``scripts/`` (not the repository root) on
+# sys.path. Import the sibling runner accordingly so the documented
+# ``python scripts/execute_bj206_notebook.py`` command works from a clean clone.
+from execute_bj205_notebook import execute_notebook
 
 
 def main() -> None:
