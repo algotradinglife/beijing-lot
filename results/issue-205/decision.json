@@ -1,0 +1,13 @@
+{
+  "covered_issues": 75,
+  "cv_dependence_improves_both_controls": false,
+  "disposition": "INHERIT_EXACT_MARKET_BASELINE",
+  "fallback_issues": 0,
+  "inherited_scorer": "MARKET_INDEPENDENCE",
+  "locked_dependence_improves_both_controls": false,
+  "locked_market_joint_log_loss": 8.175456615099998,
+  "locked_selected_joint_log_loss": 8.111345765575312,
+  "primary_metric": "joint_log_loss",
+  "selected_on_cv": "SIMPLE_REGIME_DEPENDENCE",
+  "version": "bj205-joint-n7-value-matrix-v1"
+}

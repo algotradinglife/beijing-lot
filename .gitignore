@@ -23,6 +23,10 @@ log/
 output/
 outputs/
 results/
+!results/
+results/*
+!results/issue-205/
+!results/issue-205/**
 runs/
 .cache/
 tmp/
@@ -32,6 +36,8 @@ temp/
 !docs/research-notes/evidence/issue-83-continuous-market-metrics.csv
 *.tsv
 *.parquet
+!results/issue-205/*.csv
+!results/issue-205/*.parquet
 *.feather
 *.h5
 *.hdf5

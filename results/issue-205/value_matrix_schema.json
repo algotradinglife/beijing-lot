@@ -1,0 +1,25 @@
+{
+  "baseline": "#204 frozen market probability plus #204 frozen pre-event SP-head prediction; joint probability is exact product over seven matches",
+  "channels": [
+    "calibrated_true_probability",
+    "predicted_final_sp",
+    "probability_seed_std",
+    "sp_seed_std",
+    "predictive_entropy",
+    "model_market_residual",
+    "expected_gross",
+    "expected_pre_tax_net"
+  ],
+  "displayed_scalar": "expected_pre_tax_net = 0.65 * calibrated_true_probability * predicted_final_sp - 1",
+  "fallback": "unsupported/nonfinite/OOD joint cases use MARKET_INDEPENDENCE exactly; fewer than seven valid matches emit NO_BET_LT7",
+  "n": 7,
+  "outcome_axis": [
+    "3",
+    "1",
+    "0"
+  ],
+  "tax_factor_reference": 0.65,
+  "ticket_formula": "0.65 * P(all seven outcomes hit | issue state) * product(predicted_final_sp) - 1",
+  "ticket_roster": "first seven market-eligible labeled matches by match_idx per issue; exhaustive 3^7 outcome identities; no sampling or portfolio optimization",
+  "version": "bj205-joint-n7-value-matrix-v1"
+}
