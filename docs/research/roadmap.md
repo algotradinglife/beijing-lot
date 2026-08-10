@@ -68,58 +68,91 @@ for the operating contract and
 [`github_milestone_governance_receipt.md`](github_milestone_governance_receipt.md)
 for the initial live mapping.
 
-## Current strategy evidence roadmap
+## Current unified-model roadmap
 
-Updated: **2026-08-01 20:42 CST (UTC+08:00)**
+Updated: **2026-08-11 01:22 HKT (UTC+08:00)**
 
-The current bottleneck is evidence of durable outcome-level price value, not
-another unconstrained portfolio search. Accepted work already provides rolling
-out-of-sample calibrated probabilities ([#89]) and outcome-safe predicted BJDC
-SP vectors ([#90]). Later N-leg, pruning, and sampling studies ([#91], [#95],
-[#98], and [#101]) showed that stake reduction or isolated positive cells do
-not by themselves overcome the 0.65 factor, tax, and payout concentration.
-
-The active sequence therefore separates source of edge, entry selection, and
-portfolio packaging:
+The active program is [#202], which turns each issue's match × outcome tensor
+into a four-stage decision path: probability/value representation, constrained
+ticket construction, bankroll policy, and forward validation. Native GitHub
+Issue Graph edges below are the execution authority; this section records the
+PI interpretation and does not replace those edges or Project states.
 
 ```text
-#89 calibrated probability + #90 predicted SP (Done)
-                         |
-                         v
-#106 outcome-level q = p x SP value atlas (Ready)
-                /                    \
-               v                      v
-#107 issue-level value gate       #105 joint N7 construction
-             (Inbox)                    (Blocked)
-                \                    /
-                         v
-#108 tax-aware dynamic-N and path frontier (Inbox)
+#203 causal M×3 tensor (Done)
+             |
+             v
+#204 market-anchored probability/SP PoC (Done; market baseline retained)
+             |
+             v
+#205 M×3 value matrix + fixed-N7 calibration (Done; market baseline retained)
+             |
+             v
+#206 fixed-N7 ticket learning (awaiting PI/user activation)
+             |
+             v
+#207 ¥100k bankroll + NO_BET policy
+             |
+             v
+#208 dynamic-N risk-conditioned frontier
+             |
+             v
+#209 full-cycle historical ablation and baseline ladder
+             |
+             v
+#210 held-out/prospective validation  <--- #218 causal support accumulation
+             |
+             v
+#211 timestamped message overlay     <--- #182 message evidence
 ```
 
-| Order | Issue | Project status | Milestone | Native dependency | Intended output |
+| Order | Issue | Live state | Milestone | Native dependency | Accepted or intended output |
 | --- | --- | --- | --- | --- | --- |
-| 1 | [#106] outcome-level probability-SP value atlas | Ready | M2 | #89 and #90 (closed) | At most two robust value pockets, or `NO_PROMOTION` |
-| 2A | [#107] issue-level value-density/no-bet gate | Inbox | M3 | Blocked by #106 | One deterministic issue-entry gate, or `NO_PROMOTION` |
-| 2B | [#105] joint match selection, pruning and GM-SP gate | Blocked | M3 | Blocked by #106 | Fixed-N7 joint construction result |
-| 3 | [#108] tax-aware dynamic-N asymmetric path frontier | Inbox | M3 | Blocked by #105 and #107 | Tax-adjusted dynamic-N comparison |
+| 1 | [#203] causal issue tensor | Closed / Done | M1 | #192 closed | Versioned issue × match × outcome data contract |
+| 2 | [#204] residual probability and SP heads | Closed / Done | M2 | No open blocker | `MARKET_ONLY` retained as the safe baseline; residual model remains retrospective |
+| 3 | [#205] M×3 value matrix and joint N7 calibration | Closed / Done | M2 | #204 closed | `MARKET_INDEPENDENCE` plus frozen pre-event SP is the safe #206 interface |
+| 4 | [#206] fixed-N7 ticket generator | Open; activation pending | M3 | #205 closed | Constraint-valid ticket policy with exact safe-control fallback |
+| 5 | [#207] bankroll/NO_BET integration | Open | M3 | Blocked by #206 | ¥100k capital path and safe abstention policy |
+| 6 | [#208] dynamic-N frontier | Open | M3 | Blocked by #207 | Risk-conditioned N and parlay policy comparison |
+| 7 | [#209] full-cycle historical evaluation | Open | M3 | Blocked by #208 | Chronological ablations and accepted baseline ladder |
+| 8 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
+| 9 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
-Only #106 is executable now. #90 is reused rather than duplicated: it already
-produced an accepted historical predicted-SP candidate. Downstream issues may
-consume accepted immutable artifacts, but may not refit upstream models after
-outcome access. A relative improvement from a still-negative baseline, lower
-stake, or higher hit rate is not promotion evidence; positive tax-adjusted OOS
-EV/ROI and robustness remain required.
+### #205 terminal decision and downstream contract
 
-[#89]: https://github.com/algotradinglife/beijing-lot/issues/89
-[#90]: https://github.com/algotradinglife/beijing-lot/issues/90
-[#91]: https://github.com/algotradinglife/beijing-lot/issues/91
-[#95]: https://github.com/algotradinglife/beijing-lot/issues/95
-[#98]: https://github.com/algotradinglife/beijing-lot/issues/98
-[#101]: https://github.com/algotradinglife/beijing-lot/issues/101
-[#105]: https://github.com/algotradinglife/beijing-lot/issues/105
-[#106]: https://github.com/algotradinglife/beijing-lot/issues/106
-[#107]: https://github.com/algotradinglife/beijing-lot/issues/107
-[#108]: https://github.com/algotradinglife/beijing-lot/issues/108
+- The dependence challenger improved locked joint log loss and payout MAE, but
+  it was slightly worse than model independence on chronological CV and worse
+  than market on locked Brier. It is promising retrospective evidence, not a
+  validated edge.
+- The controlling disposition is `INHERIT_EXACT_MARKET_BASELINE`. #206 may use
+  only `control_probability` (`MARKET_ONLY`, `FROZEN_SAFE_BASELINE`) with the
+  frozen pre-event SP head and `MARKET_INDEPENDENCE` as its safe lane.
+- All `LOGISTIC_RESIDUAL` values are explicitly `experimental_*`,
+  `RETROSPECTIVE_PROXY_METHOD_CORRECTION`, `promoted=false`, and ablation-only
+  until #210 confirmation. They cannot silently replace the safe control.
+- Closing #205 removes the native blocker from #206, but does not itself
+  authorize execution. PI/user review must place #206 into an executable
+  Project state.
+
+The baseline ladder remains mandatory: every downstream model reports both
+absolute performance and matched lift against its inherited frozen control.
+No improvement is accepted when it arises only from lower stake, cash
+retention, fewer tickets, post-outcome parameter choice, or an ungraded
+retrospective feature.
+
+[#182]: https://github.com/algotradinglife/beijing-lot/issues/182
+[#192]: https://github.com/algotradinglife/beijing-lot/issues/192
+[#202]: https://github.com/algotradinglife/beijing-lot/issues/202
+[#203]: https://github.com/algotradinglife/beijing-lot/issues/203
+[#204]: https://github.com/algotradinglife/beijing-lot/issues/204
+[#205]: https://github.com/algotradinglife/beijing-lot/issues/205
+[#206]: https://github.com/algotradinglife/beijing-lot/issues/206
+[#207]: https://github.com/algotradinglife/beijing-lot/issues/207
+[#208]: https://github.com/algotradinglife/beijing-lot/issues/208
+[#209]: https://github.com/algotradinglife/beijing-lot/issues/209
+[#210]: https://github.com/algotradinglife/beijing-lot/issues/210
+[#211]: https://github.com/algotradinglife/beijing-lot/issues/211
+[#218]: https://github.com/algotradinglife/beijing-lot/issues/218
 
 ---
 
