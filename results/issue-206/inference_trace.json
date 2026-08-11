@@ -1,0 +1,17 @@
+{
+  "candidate_expected_roi": -0.1887915998383886,
+  "control_expected_roi": 0.29419702548159526,
+  "fallback_applied": true,
+  "fallback_reason": "VALIDATION_LCB_NOT_POSITIVE",
+  "formula": "0.65 * product(source_probability) * product(predicted_pre_event_sp) - 1",
+  "issue": "22011",
+  "joint_scorer": "MARKET_INDEPENDENCE",
+  "label_fields_used_for_inference": [],
+  "ood_share": 0.0,
+  "requested_K": 64,
+  "safe_probability_source": "MARKET_ONLY",
+  "safe_probability_source_grade": "FROZEN_SAFE_BASELINE",
+  "selected_policy": "LOGIT_Q_WOR",
+  "split": "CV_2022",
+  "ticket_identity_sha256": "7808db075a1871be97214579a853c519162aa08491dd3883cf2038c0221dd670"
+}

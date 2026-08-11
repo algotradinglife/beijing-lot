@@ -1,0 +1,18 @@
+{
+  "DECISION_REPORT.md": "96f49ab2b35c34e1153b3a59f2a6ab9b5c9fb6dfa82b9aeb38e21d8d6b24396c",
+  "README.md": "b81091e191f5332219534ae88514a29287f27ba05b70c3ebaa41a041714062f4",
+  "best_full_full_control.csv": "d2ea2f89ea36b4d5f324da633b3448e2774a30f611a206d3e8b3138bdcab130f",
+  "decision.json": "f106c41247a05ce4b555da445532903975ba9359132f9bcdfa656899804aa458",
+  "fallback_trace.csv": "82c242cc3468e4e5414b22b4cda2391fcd5710119f262f13a53734e8fd2ec611",
+  "feature_support.json": "4aaf85147b96b795207ec67d7ac13c10478182b1ed71d6773441cb83bd1e65e5",
+  "inference_trace.json": "2d358d8de7b29b90b276598082ca7f96ba8cf0f4b197786dab17c4d66fdb1a44",
+  "issue_policy_metrics.parquet": "49569988c61ea96d0ec5c2c40b81451fab4235c67a42583455663491b9410e0b",
+  "model_selection.csv": "719b398a785cbe845c20f4f068af61a8804703328143ca868b8af3a76e5ccf3d",
+  "models.joblib": "15aa1b76ef73a5ff3636dabb51a1908f060ec47b8ae84c5cbd2e3bb34ce27d95",
+  "overlap_concentration.png": "4c833b9ff9895de86d8e9d02ea2d892d40448985b091f40e88b346902a1018c7",
+  "parameter_performance.png": "c9956b3bb28113eaed260bd57d075f7a520e9ac101fd2bc243ea7579c637b6bf",
+  "policy_contract.json": "39cec8da667ce4122de7df50e25cc2a658ba478e2ca5aa21fbf62ebfd683c58e",
+  "policy_surface.csv": "9079386d2d998f0277c74bad754ce896592e8c672d2467bc9981057085220ed3",
+  "provenance.json": "8c9b3c576e1b60ae981e19090b76dc76f8dbfcb25c5872cd20e61870a2fe3b5d",
+  "ticket_ledger.parquet": "10d08f876a9ee87f80c1d51369302fe463b04a7a246e4983a5b3df2a089d3d56"
+}

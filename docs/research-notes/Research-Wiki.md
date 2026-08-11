@@ -923,6 +923,29 @@ aliases 折叠为 10 个不同 issue-economic identities；其中 Z100/K1 的 52
 证据漏斗、Z100/K1 正向簇、`NO_PROMOTION` 双层解释以及对 #193/#192 的继承建议，见
 [`Issue-190-Sparse-Divergence-N7-Decision-Report`](Issue-190-Sparse-Divergence-N7-Decision-Report.md)。
 
+## #206 固定 N7 约束票生成与策略学习（2026-08-11）
+
+#206 从 #205 完整 M×3 安全控制接口出发，明确删除“全期共享七场名单”的旧假设：
+每张票都从当期完整比赛池独立选择七场不同比赛及各自一个赛果。冻结 K 网格为
+`16/32/64`，逐票请求 ¥2；比较 market Q-weighted WR/WOR、确定性 bounded
+top-mass、Hamilton residual、matched-budget overlap cap/penalty、multinomial logistic
+与 scikit-learn MLP。`BEST_FULL/FULL`
+仍作为 2,187 票、¥4,374 的不等资金绝对控制，不能伪装成小 K matched lift。
+
+prior-only CV_2022 选择 `LOGIT_Q_WOR/K64`，但其 issue-block bootstrap realized-ROI
+lift 95% 区间为 `[-0.6908,+1.7170]`，同时 matched expected lift 为 `-0.8700`，
+因此 deterministic learned gate 关闭。held-out CV_2023 的 fallback-mixed 与
+`MARKET_Q_WOR/K64` 完全相同：税前 ROI 均为 `-71.05%`、matched lift `0`、
+distinct-ticket coverage lift `0`。终局为 `INHERIT_MATCHED_MARKET_CONTROL`；没有把
+“少买票/少用现金”当成改进。
+
+2025/2026 行在推理前将赛果和 official final SP 置空，75 个 locked issue 全部只输出
+Stage-3 请求票与 stake，不读 2025-04+ 标签，也不授予 Stage-4 bankroll/final-capital
+权力。完整 notebook、复用代码、逐票 trace、K/收益/覆盖/overlap/HHI/turnover 表面、
+fallback 原因、图与 manifest 见
+[`Issue #206 package`](../../results/issue-206/README.md) 和
+[`Issue #206 decision report`](../../results/issue-206/DECISION_REPORT.md)。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
