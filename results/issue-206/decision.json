@@ -1,0 +1,30 @@
+{
+  "disposition": "INHERIT_MATCHED_MARKET_CONTROL",
+  "evaluation_split": "CV_2023",
+  "fallback_mixed_no_worse": true,
+  "fallback_mixed_test_realized_lift": 0.0,
+  "fallback_mixed_test_realized_roi": -0.7105015072004601,
+  "fallback_mixed_test_ticket_coverage_lift": 0.0,
+  "final_capital_authority": false,
+  "global_fallback_reason": "VALIDATION_LCB_NOT_POSITIVE",
+  "inherited_policy": "MARKET_Q_WOR_K64",
+  "label_boundary": "year < 2025 only; 2025-04+ labels are nulled before inference",
+  "learned_gate_enabled": false,
+  "locked_fallback_issues": 75,
+  "locked_issues": 75,
+  "matched_control_test_realized_roi": -0.7105015072004601,
+  "penalized_utility": -0.14147547736836608,
+  "preregistered_gain_present": false,
+  "selected_K": 64,
+  "selected_policy": "LOGIT_Q_WOR",
+  "selection_seed": 206001,
+  "selection_split": "CV_2022",
+  "stage_3_handoff_only": true,
+  "validation_expected_lift": -0.8700253243709734,
+  "validation_lift_ci95": [
+    -0.6907677806786185,
+    1.7170490452632678
+  ],
+  "validation_realized_lift": 0.8585245226316339,
+  "version": "bj206-fixed-n7-ticket-policy-v1"
+}

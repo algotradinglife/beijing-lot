@@ -1,0 +1,32 @@
+{
+  "action_universe": "each ticket independently selects seven distinct matches from the full issue pool",
+  "control": "MARKET_Q_WOR",
+  "experimental_boundary": "MLP_EXPERIMENTAL_Q_WOR is ablation-only and never a promoted probability source",
+  "gate": "validation issue-bootstrap lower bound > 0, expected lift > 0, OOD share <= 20%, feasible exact K",
+  "k_grid": [
+    16,
+    32,
+    64
+  ],
+  "learned_models": [
+    "LOGIT_Q_WOR",
+    "MLP_Q_WOR",
+    "MLP_EXPERIMENTAL_Q_WOR"
+  ],
+  "legacy_control": "BEST_FULL_FULL (2,187 identities on accepted selector)",
+  "n": 7,
+  "overlap_controls": {
+    "cap": "maximum pair match-overlap share 5/7",
+    "penalty": "0.5 times maximum prior match-overlap share"
+  },
+  "payout_factor": 0.65,
+  "repeat_semantics": "duplicate identity rows are explicit repeat-stake actions",
+  "stage_3_output": "requested tickets and ¥2 stake only; no bankroll or final capital authority",
+  "stake_yuan_per_ticket": 2.0,
+  "temperature_controls": [
+    0.75,
+    1.25
+  ],
+  "ticket_identity": "seven sorted distinct match_idx:outcome_code pairs",
+  "version": "bj206-fixed-n7-ticket-policy-v1"
+}
