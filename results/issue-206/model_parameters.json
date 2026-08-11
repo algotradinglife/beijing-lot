@@ -41,7 +41,31 @@
     206002,
     206003
   ],
+  "ood_model": "sklearn.preprocessing.StandardScaler",
+  "ood_scaler_mean": [
+    -6.338298653961933,
+    7.624100651245455,
+    1.6061308237061531,
+    0.4493960529899822,
+    0.2136925096760087,
+    3.033235848864955,
+    0.4299788881069665,
+    0.35785414291837203
+  ],
+  "ood_scaler_scale": [
+    0.24742597040597505,
+    0.08315030569816229,
+    0.7020863878527803,
+    0.02212673775162191,
+    0.012507245903770708,
+    0.034725851818330294,
+    0.010626086467657633,
+    0.019255715499056525
+  ],
+  "ood_statistic": "max_abs_standardized_issue_feature_median",
+  "ood_threshold": 7.549834435270783,
+  "ood_threshold_quantile": 0.99,
   "stake_per_ticket": 2,
   "tax_factor_reference": 0.65,
-  "version": "bj206-fixed-n7-ticket-policy-v2"
+  "version": "bj206-fixed-n7-ticket-policy-v3"
 }

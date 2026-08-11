@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -16,6 +17,9 @@ from ticket_policy.fixed_n7 import (
     N,
     IssuePanel,
     TicketPolicyError,
+    _build_issue_gate,
+    _digest,
+    _fit_ood_gate,
     _issue_metric,
     _select,
     _ticket_calibration,
@@ -23,6 +27,26 @@ from ticket_policy.fixed_n7 import (
     load_panels,
     verify,
 )
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _refresh_manifest(output: Path) -> None:
+    manifest = {
+        path.relative_to(output).as_posix(): _digest(path)
+        for path in sorted(output.rglob("*"))
+        if path.is_file() and path.name != "SHA256SUMS.json"
+    }
+    (output / "SHA256SUMS.json").write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _copy_evidence(tmp_path: Path) -> Path:
+    output = tmp_path / "issue-206"
+    shutil.copytree(ROOT / "results/issue-206", output)
+    return output
 
 
 def _panel(matches: int = 12) -> IssuePanel:
@@ -312,6 +336,100 @@ def test_loader_scrubs_locked_labels_before_ticket_construction(tmp_path: Path) 
     assert np.isnan(panel.official_sp).all()
 
 
+def test_ood_issue_cannot_advance_when_aggregate_gate_is_positive() -> None:
+    development = pd.concat(
+        [
+            _candidate_frame(40).assign(split="CV_2021", issue="train-a"),
+            _candidate_frame(40).assign(split="CV_2021", issue="train-b"),
+            _candidate_frame(40).assign(split="CV_2022", issue="validation"),
+        ],
+        ignore_index=True,
+    )
+    locked = _candidate_frame(40).assign(split="LOCKED_TEST", issue="locked-ood")
+    locked.loc[:, FEATURES] = locked.loc[:, FEATURES] * 1_000_000.0
+    ood_gate = _fit_ood_gate(development)
+    decision = {
+        "advance_learned_policy": True,
+        "safe_control_policy": "MARKET_WR",
+        "safe_control_k": 8,
+        "challenger_policy": "LEARNED_MLP",
+        "challenger_k": 8,
+        "fallback_reason": "NONE",
+    }
+    issue_gate = _build_issue_gate(locked, decision, ood_gate)
+    row = issue_gate.iloc[0]
+    assert row.ood_flag
+    assert row.learned_only_path == "NO_BET_OOD"
+    assert row.fallback_mixed_path == "MARKET_WR"
+    assert row.fallback_reason == "OOD_SAFE_CONTROL_FALLBACK"
+
+
+@pytest.mark.parametrize(
+    ("tamper", "message"),
+    [
+        ("invalid_outcome", "unsupported ticket outcome"),
+        ("trace_mismatch", "request identity/source trace mismatch"),
+        ("short_trace", "request source-cell count mismatch"),
+        ("fallback_mismatch", "fallback decision/request mismatch"),
+    ],
+)
+def test_verify_rejects_remanifested_request_tampering(
+    tmp_path: Path, tamper: str, message: str
+) -> None:
+    output = _copy_evidence(tmp_path)
+    requests_path = output / "ticket_requests.parquet"
+    requests = pd.read_parquet(requests_path)
+    cells = json.loads(requests.loc[0, "source_cells_json"])
+    if tamper == "invalid_outcome":
+        identity = requests.loc[0, "ticket_identity"].split("|")
+        identity[0] = identity[0].split(":", 1)[0] + ":X"
+        outcomes = requests.loc[0, "outcomes"].split("|")
+        outcomes[0] = "X"
+        cells[0]["outcome"] = "X"
+        requests.loc[0, "ticket_identity"] = "|".join(identity)
+        requests.loc[0, "outcomes"] = "|".join(outcomes)
+    elif tamper == "trace_mismatch":
+        cells[0]["match_idx"] = int(cells[0]["match_idx"]) + 999
+    elif tamper == "short_trace":
+        cells = cells[:-1]
+    else:
+        requests.loc[0, "fallback_applied"] = False
+    requests.loc[0, "source_cells_json"] = json.dumps(
+        cells, ensure_ascii=False, separators=(",", ":")
+    )
+    requests.to_parquet(requests_path, index=False)
+    _refresh_manifest(output)
+    with pytest.raises(TicketPolicyError, match=message):
+        verify(output)
+
+
+def test_verify_rejects_remanifested_matched_budget_tampering(tmp_path: Path) -> None:
+    output = _copy_evidence(tmp_path)
+    surface_path = output / "policy_surface.csv"
+    surface = pd.read_csv(surface_path)
+    matched = surface.index[surface.stake_budget_matched.astype(bool)][0]
+    surface.loc[matched, "control_turnover"] += 2.0
+    surface.to_csv(surface_path, index=False)
+    _refresh_manifest(output)
+    with pytest.raises(TicketPolicyError, match="matched stake surface mismatch"):
+        verify(output)
+
+
+def test_verify_rejects_remanifested_global_fallback_tampering(tmp_path: Path) -> None:
+    output = _copy_evidence(tmp_path)
+    decision_path = output / "decision.json"
+    decision = json.loads(decision_path.read_text(encoding="utf-8"))
+    decision["advance_learned_policy"] = True
+    decision["fallback_mixed_policy"] = "LEARNED_MLP"
+    decision["fallback_reason"] = "NONE"
+    decision_path.write_text(
+        json.dumps(decision, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    _refresh_manifest(output)
+    with pytest.raises(TicketPolicyError, match="global fallback decision evidence mismatch"):
+        verify(output)
+
+
 def test_verify_rejects_locked_label_use(tmp_path: Path) -> None:
     output = tmp_path / "evidence"
     output.mkdir()
@@ -341,8 +459,6 @@ def test_verify_rejects_locked_label_use(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    from ticket_policy.fixed_n7 import _digest
-
     manifest = {
         path.name: _digest(path)
         for path in output.iterdir()

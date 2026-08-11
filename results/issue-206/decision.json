@@ -7,8 +7,25 @@
   "fallback_mixed_k": 8,
   "fallback_mixed_policy": "MARKET_WR",
   "fallback_reason": "VALIDATION_UNCERTAINTY_OR_MATCHED_LIFT_FLOOR",
+  "issue_specific_gate": "issue_gate.csv",
   "label_embargo": "No LOCKED_TEST (2025/2026) outcome or official-final-SP label enters training, selection, or evaluation",
+  "locked_ood_issues": 0,
   "matched_turnover": 928.0,
+  "ood_features": [
+    "log_joint_probability",
+    "log_sp_product",
+    "expected_pre_tax_net",
+    "mean_selected_probability",
+    "min_selected_probability",
+    "mean_selected_sp",
+    "outcome_hhi",
+    "match_rank_mean"
+  ],
+  "ood_fit_split": "CV_2021",
+  "ood_statistic": "max_abs_standardized_issue_feature_median",
+  "ood_threshold": 7.549834435270783,
+  "ood_threshold_quantile": 0.99,
+  "ood_threshold_split": "CV_2022",
   "paired_validation_issues": 58,
   "safe_control_k": 8,
   "safe_control_policy": "MARKET_WR",
@@ -18,5 +35,5 @@
   "validation_expected_lift": -68.68514632958649,
   "validation_lift_one_sided_95_lcb": -0.9140401351131572,
   "validation_realized_lift": 0.8752329141926597,
-  "version": "bj206-fixed-n7-ticket-policy-v2"
+  "version": "bj206-fixed-n7-ticket-policy-v3"
 }

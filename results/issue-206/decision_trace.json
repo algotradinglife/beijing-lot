@@ -4,8 +4,12 @@
   "fallback_applied": true,
   "fallback_reason": "VALIDATION_UNCERTAINTY_OR_MATCHED_LIFT_FLOOR",
   "formula": "0.65 * product(control_probability) * product(predicted_final_sp) - 1",
+  "gate_path": "MARKET_WR",
   "issue": "25043",
   "labels_used": false,
+  "ood_flag": false,
+  "ood_score": 0.7327320420747889,
+  "ood_threshold": 7.549834435270783,
   "predicted_sp_product": 986.7265349756343,
   "requested_stake": 2,
   "selected_match_subset": [
@@ -99,5 +103,5 @@
     }
   ],
   "ticket_identity": "54:3|118:3|212:3|321:3|327:3|351:3|457:3",
-  "version": "bj206-fixed-n7-ticket-policy-v2"
+  "version": "bj206-fixed-n7-ticket-policy-v3"
 }

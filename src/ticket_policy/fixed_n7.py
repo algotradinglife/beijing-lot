@@ -32,8 +32,9 @@ TAX_FACTOR = 0.65
 STAKE = 2
 K_GRID = (8, 16, 32)
 NUISANCE_SEEDS = (206001, 206002, 206003)
-VERSION = "bj206-fixed-n7-ticket-policy-v2"
+VERSION = "bj206-fixed-n7-ticket-policy-v3"
 SOURCE_VERSION = "bj205-joint-n7-value-matrix-v2"
+OOD_QUANTILE = 0.99
 CONTROL_POLICIES = ("BEST_FULL", "MARKET_WOR", "MARKET_WR")
 CHALLENGER_POLICIES = (
     "TEMPERATURE_050",
@@ -84,6 +85,16 @@ class IssuePanel:
     realized_index: np.ndarray
     labels_available: np.ndarray
     excluded_matches: tuple[dict[str, Any], ...] = ()
+
+
+@dataclass(frozen=True)
+class OODGate:
+    """Chronology-frozen issue-level feature support gate."""
+
+    scaler: StandardScaler
+    threshold: float
+    statistic: str = "max_abs_standardized_issue_feature_median"
+    threshold_quantile: float = OOD_QUANTILE
 
 
 def _digest(path: Path) -> str:
@@ -558,6 +569,137 @@ def _score_model(model: Any, candidates: pd.DataFrame, features: tuple[str, ...]
     return np.asarray(model.predict_proba(candidates.loc[:, features])[:, 1], dtype=float)
 
 
+def _issue_feature_summary(candidates: pd.DataFrame) -> pd.DataFrame:
+    """Collapse a bounded candidate pool to one safe-feature vector per issue."""
+    if candidates.empty or not set(FEATURES).issubset(candidates.columns):
+        raise TicketPolicyError("OOD safe-feature candidates are incomplete")
+    values = candidates.loc[:, FEATURES].to_numpy(dtype=float)
+    if not np.isfinite(values).all():
+        raise TicketPolicyError("OOD safe features are non-finite")
+    summary = (
+        candidates.groupby(["split", "issue"], sort=False, as_index=False)[list(FEATURES)]
+        .median()
+        .reset_index(drop=True)
+    )
+    if not isinstance(summary, pd.DataFrame):
+        raise TicketPolicyError("OOD issue summary is not tabular")
+    return summary
+
+
+def _fit_ood_gate(candidates: pd.DataFrame) -> OODGate:
+    """Freeze a package-backed OOD gate using CV-2021/CV-2022 only."""
+    summary = _issue_feature_summary(candidates)
+    train = summary.loc[summary.split.eq("CV_2021"), list(FEATURES)]
+    validation = summary.loc[summary.split.eq("CV_2022"), list(FEATURES)]
+    if len(train) < 2 or validation.empty:
+        raise TicketPolicyError("OOD chronology requires CV-2021 train and CV-2022 validation")
+    scaler = StandardScaler().fit(train)
+    validation_scores = np.max(np.abs(scaler.transform(validation)), axis=1)
+    threshold = float(np.quantile(validation_scores, OOD_QUANTILE, method="higher"))
+    if not np.isfinite(threshold):
+        raise TicketPolicyError("OOD threshold is non-finite")
+    return OODGate(scaler=scaler, threshold=threshold)
+
+
+def _ood_score(candidates: pd.DataFrame, gate: OODGate) -> float:
+    summary = _issue_feature_summary(candidates)
+    if len(summary) != 1:
+        raise TicketPolicyError("OOD score requires exactly one issue")
+    transformed = gate.scaler.transform(summary.loc[:, FEATURES])
+    score = float(np.max(np.abs(transformed)))
+    if not np.isfinite(score):
+        raise TicketPolicyError("OOD score is non-finite")
+    return score
+
+
+def _policy_feasible(policy: str, k: int, candidate_count: int) -> bool:
+    required = 1 if policy == "MARKET_WR" else k
+    return k > 0 and candidate_count >= required
+
+
+def _build_issue_gate(
+    locked: pd.DataFrame, decision: dict[str, Any], ood_gate: OODGate
+) -> pd.DataFrame:
+    """Route each locked issue to learned, frozen control, or NO_BET."""
+    rows: list[dict[str, Any]] = []
+    for issue, group in locked.groupby("issue", sort=False):
+        score = _ood_score(group, ood_gate)
+        ood_flag = bool(score > ood_gate.threshold)
+        candidate_count = len(group)
+        control_feasible = _policy_feasible(
+            str(decision["safe_control_policy"]),
+            int(decision["safe_control_k"]),
+            candidate_count,
+        )
+        challenger_feasible = _policy_feasible(
+            str(decision["challenger_policy"]),
+            int(decision["challenger_k"]),
+            candidate_count,
+        )
+        learned_only_path = (
+            str(decision["challenger_policy"])
+            if challenger_feasible and not ood_flag
+            else "NO_BET_OOD"
+            if ood_flag
+            else "NO_BET_INFEASIBLE"
+        )
+        pure_control_path = (
+            str(decision["safe_control_policy"])
+            if control_feasible
+            else "NO_BET_INFEASIBLE"
+        )
+        if not control_feasible:
+            mixed_path = "NO_BET"
+            mixed_k = 0
+            reason = "SAFE_CONTROL_INFEASIBLE_NO_BET"
+        elif not bool(decision["advance_learned_policy"]):
+            mixed_path = str(decision["safe_control_policy"])
+            mixed_k = int(decision["safe_control_k"])
+            reason = str(decision["fallback_reason"])
+        elif not challenger_feasible:
+            mixed_path = str(decision["safe_control_policy"])
+            mixed_k = int(decision["safe_control_k"])
+            reason = "CHALLENGER_INFEASIBLE_SAFE_CONTROL_FALLBACK"
+        elif ood_flag:
+            mixed_path = str(decision["safe_control_policy"])
+            mixed_k = int(decision["safe_control_k"])
+            reason = "OOD_SAFE_CONTROL_FALLBACK"
+        else:
+            mixed_path = str(decision["challenger_policy"])
+            mixed_k = int(decision["challenger_k"])
+            reason = "NONE"
+        rows.append(
+            {
+                "split": str(group.split.iloc[0]),
+                "issue": str(issue),
+                "year": int(group.year.iloc[0]),
+                "candidate_count": candidate_count,
+                "ood_statistic": ood_gate.statistic,
+                "ood_score": score,
+                "ood_threshold": ood_gate.threshold,
+                "ood_flag": ood_flag,
+                "control_feasible": control_feasible,
+                "challenger_feasible": challenger_feasible,
+                "global_advance_eligible": bool(decision["advance_learned_policy"]),
+                "learned_only_path": learned_only_path,
+                "learned_only_k": int(decision["challenger_k"])
+                if learned_only_path == str(decision["challenger_policy"])
+                else 0,
+                "pure_control_path": pure_control_path,
+                "pure_control_k": int(decision["safe_control_k"])
+                if pure_control_path == str(decision["safe_control_policy"])
+                else 0,
+                "fallback_mixed_path": mixed_path,
+                "fallback_mixed_k": mixed_k,
+                "fallback_applied": mixed_path != str(decision["challenger_policy"]),
+                "fallback_reason": reason,
+            }
+        )
+    if not rows:
+        raise TicketPolicyError("no locked issues available for issue-specific gate")
+    return pd.DataFrame(rows)
+
+
 def _mean_pairwise_overlap(selected: pd.DataFrame) -> tuple[float, float]:
     matches = [set(map(int, value.split("|"))) for value in selected.match_indices]
     identities = selected.ticket_identity.to_list()
@@ -829,6 +971,8 @@ def _decision_report(
 
 The fallback-mixed CV-2023 path delivered absolute realized pre-tax net {evaluation.realized_pre_tax_net:.6f}, expected pre-tax net {evaluation.expected_pre_tax_net:.6f}, coverage {evaluation.coverage:.6f}, and matched realized lift {evaluation.matched_lift_realized_pre_tax_net:+.6f} at exactly ¥{evaluation.turnover:.0f} turnover. No apparent improvement from fewer tickets or cash is accepted.
 
+The issue-specific gate fits scikit-learn `StandardScaler` on CV-2021 issue-level safe-feature medians and freezes the CV-2022 {decision['ood_threshold_quantile']:.2%} maximum-absolute-z threshold at {decision['ood_threshold']:.6f}. It evaluates feasibility and OOD before every locked handoff; {decision['locked_ood_issues']} locked issues exceed the threshold. `issue_gate.csv` reports learned-only, pure-control and fallback-mixed paths separately, including deterministic safe-control and `NO_BET` reasons.
+
 ## Constraint and evidence interpretation
 
 - Every ticket has exactly seven distinct match ids and one 3/1/0 outcome per match. There is no global seven-match roster.
@@ -837,10 +981,11 @@ The fallback-mixed CV-2023 path delivered absolute realized pre-tax net {evaluat
 - Only #205 `MARKET_ONLY` / `FROZEN_SAFE_BASELINE` control probability and frozen pre-event SP enter the controlling policy. Experimental residuals appear only in `EXPERIMENTAL_MLP_ABLATION`.
 - {exclusion_count} source matches with all three safe-control probabilities missing are explicitly recorded in `input_exclusions.csv`; partial/non-finite, non-positive, non-normalized, incomplete-M×3, and post-exclusion M<7 inputs fail closed.
 - Training uses CV-2021, policy/K selection uses CV-2022, final historical evaluation uses CV-2023. LOCKED_TEST 2025/2026 labels remain embargoed; its Stage-3 handoff is label-blind.
+- The semantic verifier recomputes the OOD gate, issue routes, ticket selection, identity/list/source-trace agreement, 3/1/0 outcome domain, joint probability, SP product, expected utility, fallback evidence, and matched-stake surface after manifest validation.
 
 ## Failure regimes and risks
 
-Sparse seven-leg hits make realized utility high variance; this is why the lower-confidence-bound gate fails closed. Bounded generation does not enumerate C(M,7)×3^7, and may miss useful identities. Independence, frozen predicted-SP error, issue-level concentration, and retrospective-only evidence remain material. Stage 4 owns capital sizing and NO_BET integration.
+Sparse seven-leg hits make realized utility high variance; this is why the lower-confidence-bound gate fails closed. Bounded generation does not enumerate C(M,7)×3^7, and may miss useful identities. Independence, frozen predicted-SP error, issue-level concentration, OOD-threshold sensitivity, and retrospective-only evidence remain material. Stage 3 may emit `NO_BET` only for policy infeasibility/OOD safety; Stage 4 retains final capital-sizing authority.
 
 ## PI 对接块
 
@@ -851,10 +996,11 @@ Sparse seven-leg hits make realized utility high variance; this is why the lower
 | Ticket hit and payout calibration | `ticket_calibration.csv` on CV-2022/CV-2023 only | PASS |
 | Absolute plus matched lift on equal ticket/stake budgets | `policy_surface.csv`, this report | PASS |
 | Baseline, simple, learned, stochastic and experimental ablations | `policy_surface.csv`, `model_parameters.json` | PASS |
+| Per-issue OOD/feasibility route to learned, control or NO_BET | `issue_gate.csv`, OOD adversarial test | PASS |
 | Deterministic safe floor | `{decision['disposition']}` and paired LCB | PASS — conservative inheritance |
 | Notebook/code/artifact three-layer replay | executed notebook, reusable module/tests, manifest package | PASS |
 
-Decision input: retain `{decision['safe_control_policy']}` with K={decision['safe_control_k']} as the Stage-3 requested-ticket control; do not claim learned-policy advancement. Known risks: sparse payouts, bounded candidate recall, market-independence assumption, predicted-SP error, and no post-2023 label access. Explicit review request: independently verify no shared roster, exact N7 uniqueness, label embargo, package-backed sampling/model/statistics, matched stake arithmetic, fallback gate, notebook clean-run, and manifest-identical replay. No bankroll sizing, betting, merge, or issue closure is authorized.
+Decision input: retain `{decision['safe_control_policy']}` with K={decision['safe_control_k']} as the Stage-3 requested-ticket control; do not claim learned-policy advancement. Known risks: sparse payouts, bounded candidate recall, market-independence assumption, predicted-SP error, OOD-threshold sensitivity, and no post-2023 label access. Explicit review request: independently verify no shared roster, exact N7 uniqueness, label embargo, package-backed sampling/model/statistics, per-issue OOD/feasibility routing, remanifested semantic tamper rejection, matched stake arithmetic, notebook clean-run, and manifest-identical replay. No bankroll sizing, betting, merge, or issue closure is authorized.
 """
 
 
@@ -897,22 +1043,42 @@ def run(inputs: Inputs) -> dict[str, Any]:
         surface = _matched_surface(surface, decision)
 
         locked = candidates.loc[candidates.split.eq("LOCKED_TEST")]
+        ood_gate = _fit_ood_gate(candidates)
+        issue_gate = _build_issue_gate(locked, decision, ood_gate)
+        decision.update(
+            {
+                "ood_statistic": ood_gate.statistic,
+                "ood_features": list(FEATURES),
+                "ood_fit_split": "CV_2021",
+                "ood_threshold_split": "CV_2022",
+                "ood_threshold_quantile": ood_gate.threshold_quantile,
+                "ood_threshold": ood_gate.threshold,
+                "locked_ood_issues": int(issue_gate.ood_flag.sum()),
+                "issue_specific_gate": "issue_gate.csv",
+            }
+        )
         locked_requests: list[pd.DataFrame] = []
-        for _, group in locked.groupby("issue", sort=False):
-            policy = decision["fallback_mixed_policy"]
+        for gate_row in issue_gate.to_dict(orient="records"):
+            if gate_row["fallback_mixed_path"] == "NO_BET":
+                continue
+            group = locked.loc[locked.issue.astype(str).eq(str(gate_row["issue"]))]
+            policy = str(gate_row["fallback_mixed_path"])
             model_spec = models.get(policy)
             scores = (
                 _score_model(model_spec[0], group, model_spec[1])
                 if model_spec is not None
                 else None
             )
-            selected = _select(group, policy, decision["fallback_mixed_k"], scores=scores)
-            selected["fallback_applied"] = not decision["advance_learned_policy"]
-            selected["fallback_reason"] = decision["fallback_reason"]
+            selected = _select(group, policy, int(gate_row["fallback_mixed_k"]), scores=scores)
+            selected["fallback_applied"] = bool(gate_row["fallback_applied"])
+            selected["fallback_reason"] = str(gate_row["fallback_reason"])
+            selected["gate_path"] = str(gate_row["fallback_mixed_path"])
+            selected["ood_score"] = float(gate_row["ood_score"])
+            selected["ood_threshold"] = float(gate_row["ood_threshold"])
+            selected["ood_flag"] = bool(gate_row["ood_flag"])
             selected["capital_authority"] = "REQUEST_ONLY"
             selected["labels_used"] = False
             locked_requests.append(selected)
-        requests = pd.concat(locked_requests, ignore_index=True)
         request_columns = [
             "split",
             "issue",
@@ -932,9 +1098,18 @@ def run(inputs: Inputs) -> dict[str, Any]:
             "expected_pre_tax_net",
             "fallback_applied",
             "fallback_reason",
+            "gate_path",
+            "ood_score",
+            "ood_threshold",
+            "ood_flag",
             "capital_authority",
             "labels_used",
         ]
+        requests = (
+            pd.concat(locked_requests, ignore_index=True)
+            if locked_requests
+            else pd.DataFrame(columns=request_columns)
+        )
         requests.loc[:, request_columns].to_parquet(
             stage / "ticket_requests.parquet", index=False
         )
@@ -944,6 +1119,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
         calibration.to_csv(stage / "ticket_calibration.csv", index=False)
         paired.to_csv(stage / "paired_validation_lift.csv", index=False)
         exclusions.to_csv(stage / "input_exclusions.csv", index=False)
+        issue_gate.to_csv(stage / "issue_gate.csv", index=False)
         _json(stage / "decision.json", decision)
         _json(
             stage / "model_parameters.json",
@@ -963,24 +1139,43 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 "k_grid": list(K_GRID),
                 "tax_factor_reference": TAX_FACTOR,
                 "stake_per_ticket": STAKE,
+                "ood_model": "sklearn.preprocessing.StandardScaler",
+                "ood_statistic": ood_gate.statistic,
+                "ood_threshold_quantile": ood_gate.threshold_quantile,
+                "ood_threshold": ood_gate.threshold,
+                "ood_scaler_mean": np.asarray(ood_gate.scaler.mean_, dtype=float).tolist(),
+                "ood_scaler_scale": np.asarray(ood_gate.scaler.scale_, dtype=float).tolist(),
             },
         )
-        first = requests.iloc[0]
+        first = requests.iloc[0] if not requests.empty else None
+        first_gate = issue_gate.iloc[0]
         _json(
             stage / "decision_trace.json",
             {
                 "version": VERSION,
-                "issue": first.issue,
-                "ticket_identity": first.ticket_identity,
-                "selected_match_subset": list(map(int, first.match_indices.split("|"))),
-                "selected_outcomes": first.outcomes.split("|"),
-                "source_cells": json.loads(first.source_cells_json),
-                "control_joint_probability": float(first.control_joint_probability),
-                "predicted_sp_product": float(first.predicted_sp_product),
-                "expected_pre_tax_net": float(first.expected_pre_tax_net),
-                "requested_stake": int(first.requested_stake),
-                "fallback_applied": bool(first.fallback_applied),
-                "fallback_reason": first.fallback_reason,
+                "issue": str(first_gate.issue),
+                "ticket_identity": None if first is None else first.ticket_identity,
+                "selected_match_subset": []
+                if first is None
+                else list(map(int, first.match_indices.split("|"))),
+                "selected_outcomes": [] if first is None else first.outcomes.split("|"),
+                "source_cells": [] if first is None else json.loads(first.source_cells_json),
+                "control_joint_probability": None
+                if first is None
+                else float(first.control_joint_probability),
+                "predicted_sp_product": None
+                if first is None
+                else float(first.predicted_sp_product),
+                "expected_pre_tax_net": None
+                if first is None
+                else float(first.expected_pre_tax_net),
+                "requested_stake": 0 if first is None else int(first.requested_stake),
+                "gate_path": str(first_gate.fallback_mixed_path),
+                "ood_score": float(first_gate.ood_score),
+                "ood_threshold": float(first_gate.ood_threshold),
+                "ood_flag": bool(first_gate.ood_flag),
+                "fallback_applied": bool(first_gate.fallback_applied),
+                "fallback_reason": str(first_gate.fallback_reason),
                 "labels_used": False,
                 "formula": "0.65 * product(control_probability) * product(predicted_final_sp) - 1",
             },
@@ -1001,6 +1196,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 "environment": _environment(),
                 "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj206_fixed_n7.py run --output results/issue-206",
                 "label_boundary": "CV_2021 train; CV_2022 select; CV_2023 evaluate; LOCKED_TEST labels unused",
+                "ood_boundary": "StandardScaler fit on CV_2021 issue-safe-feature medians; 0.99 higher-quantile max-absolute-z threshold frozen on CV_2022; evaluated per LOCKED_TEST issue",
             },
         )
         report = _decision_report(decision, surface, len(exclusions))
@@ -1012,7 +1208,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
             "Verify: `PYTHONPATH=src .venv/bin/python scripts/run_bj206_fixed_n7.py verify --output results/issue-206`.\n\n"
             "Replay to a new directory: `PYTHONPATH=src .venv/bin/python scripts/run_bj206_fixed_n7.py run --output <new-directory>`.\n\n"
             "Clean notebook: `PYTHONPATH=src .venv/bin/python scripts/execute_bj206_notebook.py --kernel python3`.\n\n"
-            "The package includes an enforced input-exclusion ledger, exact source-cell traces, ticket hit/payout calibration, matched policy surfaces, plots, and the label-blind request ledger. It is a Stage-3 requested-ticket handoff only and has no final bankroll, betting, or production authority.\n",
+            "The package includes an enforced input-exclusion ledger, per-issue OOD/feasibility paths, exact source-cell traces, ticket hit/payout calibration, matched policy surfaces, plots, and the label-blind request ledger. Its semantic verifier recomputes routes, selection, ticket traces and matched-budget evidence after checking the manifest. It is a Stage-3 requested-ticket/NO_BET handoff only and has no final bankroll, betting, or production authority.\n",
             encoding="utf-8",
             newline="\n",
         )
@@ -1037,6 +1233,92 @@ def run(inputs: Inputs) -> dict[str, Any]:
         raise
 
 
+def _assert_frame_matches(
+    actual: pd.DataFrame, expected: pd.DataFrame, *, label: str
+) -> None:
+    if list(actual.columns) != list(expected.columns) or len(actual) != len(expected):
+        raise TicketPolicyError(f"{label} shape mismatch")
+    for column in expected.columns:
+        left = actual[column]
+        right = expected[column]
+        if pd.api.types.is_numeric_dtype(right):
+            if not np.allclose(
+                left.to_numpy(dtype=float),
+                right.to_numpy(dtype=float),
+                rtol=1e-12,
+                atol=1e-12,
+                equal_nan=True,
+            ):
+                raise TicketPolicyError(f"{label} mismatch")
+        elif left.astype(str).to_list() != right.astype(str).to_list():
+            raise TicketPolicyError(f"{label} mismatch")
+
+
+def _verify_request_trace(row: Any) -> None:
+    identity_legs = str(row.ticket_identity).split("|")
+    matches = str(row.match_indices).split("|")
+    outcomes = str(row.outcomes).split("|")
+    if len(identity_legs) != N:
+        raise TicketPolicyError("ticket identity leg count mismatch")
+    if len(matches) != N or len(outcomes) != N:
+        raise TicketPolicyError("request match/outcome count mismatch")
+    if any(outcome not in OUTCOMES for outcome in outcomes):
+        raise TicketPolicyError("unsupported ticket outcome")
+    try:
+        identity_pairs = [leg.split(":", 1) for leg in identity_legs]
+        if any(len(pair) != 2 for pair in identity_pairs):
+            raise ValueError
+        identity_matches = [str(int(pair[0])) for pair in identity_pairs]
+        identity_outcomes = [pair[1] for pair in identity_pairs]
+        normalized_matches = [str(int(match)) for match in matches]
+    except (TypeError, ValueError) as exc:
+        raise TicketPolicyError("malformed ticket identity") from exc
+    if len(set(normalized_matches)) != N:
+        raise TicketPolicyError("ticket contains repeated match")
+    if identity_matches != normalized_matches or identity_outcomes != outcomes:
+        raise TicketPolicyError("request identity/list mismatch")
+    try:
+        cells = json.loads(row.source_cells_json)
+    except (TypeError, json.JSONDecodeError) as exc:
+        raise TicketPolicyError("malformed request source-cell trace") from exc
+    if not isinstance(cells, list) or len(cells) != N:
+        raise TicketPolicyError("request source-cell count mismatch")
+    try:
+        trace_pairs = [
+            (str(int(cell.get("match_idx"))), str(cell.get("outcome"))) for cell in cells
+        ]
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise TicketPolicyError("malformed request source-cell trace") from exc
+    if trace_pairs != list(zip(normalized_matches, outcomes, strict=True)):
+        raise TicketPolicyError("request identity/source trace mismatch")
+    if any(pair[1] not in OUTCOMES for pair in trace_pairs):
+        raise TicketPolicyError("unsupported ticket outcome")
+    probability = np.asarray([cell.get("control_probability") for cell in cells], dtype=float)
+    predicted_sp = np.asarray([cell.get("predicted_final_sp") for cell in cells], dtype=float)
+    if (
+        not np.isfinite(probability).all()
+        or not (probability > 0).all()
+        or not np.isfinite(predicted_sp).all()
+        or not (predicted_sp > 0).all()
+    ):
+        raise TicketPolicyError("request source-cell value mismatch")
+    if any(
+        cell.get("probability_source") != "MARKET_ONLY"
+        or cell.get("probability_source_grade") != "FROZEN_SAFE_BASELINE"
+        for cell in cells
+    ):
+        raise TicketPolicyError("request source-cell safe-control mismatch")
+    joint = float(np.prod(probability))
+    sp_product = float(np.prod(predicted_sp))
+    expected_utility = TAX_FACTOR * joint * sp_product - 1.0
+    if not (
+        np.isclose(float(row.control_joint_probability), joint, rtol=1e-12, atol=1e-12)
+        and np.isclose(float(row.predicted_sp_product), sp_product, rtol=1e-12, atol=1e-12)
+        and np.isclose(float(row.expected_pre_tax_net), expected_utility, rtol=1e-12, atol=1e-12)
+    ):
+        raise TicketPolicyError("request probability/SP/utility trace mismatch")
+
+
 def verify(output: Path) -> dict[str, Any]:
     expected = json.loads((output / "SHA256SUMS.json").read_text(encoding="utf-8"))
     actual = {
@@ -1048,25 +1330,130 @@ def verify(output: Path) -> dict[str, Any]:
         raise TicketPolicyError("manifest mismatch")
     decision = json.loads((output / "decision.json").read_text(encoding="utf-8"))
     requests = pd.read_parquet(output / "ticket_requests.parquet")
-    if requests.empty or not requests.n.eq(N).all():
+    if not requests.empty and not requests.n.eq(N).all():
         raise TicketPolicyError("fixed-N7 request mismatch")
-    parsed = requests.ticket_identity.str.split("|")
-    if not parsed.map(len).eq(N).all():
-        raise TicketPolicyError("ticket identity leg count mismatch")
-    if not parsed.map(lambda legs: len({leg.split(":", 1)[0] for leg in legs})).eq(N).all():
-        raise TicketPolicyError("ticket contains repeated match")
     if requests.labels_used.astype(bool).any():
         raise TicketPolicyError("locked label entered Stage-3 request")
     if not requests.requested_stake.eq(STAKE).all():
         raise TicketPolicyError("requested stake mismatch")
-    if decision["disposition"] == "INHERIT_STRONGEST_FROZEN_CONTROL" and (
-        not requests.fallback_applied.astype(bool).all()
-        or set(requests.policy) != {decision["safe_control_policy"]}
-    ):
-        raise TicketPolicyError("fallback decision/request mismatch")
+    for row in requests.itertuples(index=False):
+        _verify_request_trace(row)
+
+    issue_metrics = pd.read_csv(output / "issue_metrics.csv")
+    base_surface = _surface(issue_metrics)
+    expected_decision, _ = _select_validation_policy(base_surface, issue_metrics)
+    for key, expected_value in expected_decision.items():
+        actual_value = decision.get(key)
+        if isinstance(expected_value, float):
+            matches = isinstance(actual_value, (int, float)) and np.isclose(
+                float(actual_value), expected_value, rtol=1e-12, atol=1e-12
+            )
+        else:
+            matches = actual_value == expected_value
+        if not matches:
+            raise TicketPolicyError("global fallback decision evidence mismatch")
+
+    candidates = pd.read_parquet(output / "candidate_ledger.parquet")
+    locked = candidates.loc[candidates.split.eq("LOCKED_TEST")]
+    ood_gate = _fit_ood_gate(candidates)
+    expected_issue_gate = _build_issue_gate(locked, decision, ood_gate)
+    expected_ood_metadata = {
+        "ood_statistic": ood_gate.statistic,
+        "ood_features": list(FEATURES),
+        "ood_fit_split": "CV_2021",
+        "ood_threshold_split": "CV_2022",
+        "ood_threshold_quantile": ood_gate.threshold_quantile,
+        "ood_threshold": ood_gate.threshold,
+        "locked_ood_issues": int(expected_issue_gate.ood_flag.sum()),
+        "issue_specific_gate": "issue_gate.csv",
+    }
+    for key, expected_value in expected_ood_metadata.items():
+        actual_value = decision.get(key)
+        if isinstance(expected_value, float):
+            matches = isinstance(actual_value, (int, float)) and np.isclose(
+                float(actual_value), expected_value, rtol=1e-12, atol=1e-12
+            )
+        else:
+            matches = actual_value == expected_value
+        if not matches:
+            raise TicketPolicyError("OOD decision evidence mismatch")
+    issue_gate = pd.read_csv(output / "issue_gate.csv", dtype={"issue": str})
+    _assert_frame_matches(issue_gate, expected_issue_gate, label="issue-specific OOD gate")
+    if requests.empty and not issue_gate.fallback_mixed_path.eq("NO_BET").all():
+        raise TicketPolicyError("feasible issue has no Stage-3 requests")
+
+    safe_model: Any | None = None
+    request_issues = set(requests.issue.astype(str))
+    expected_request_issues: set[str] = set()
+    for gate_row in expected_issue_gate.to_dict(orient="records"):
+        path = str(gate_row["fallback_mixed_path"])
+        if path == "NO_BET":
+            continue
+        issue = str(gate_row["issue"])
+        expected_request_issues.add(issue)
+        group = locked.loc[locked.issue.astype(str).eq(issue)]
+        scores = None
+        if path == str(decision["challenger_policy"]):
+            if safe_model is None:
+                safe_model = _fit_model(
+                    candidates.loc[candidates.split.eq("CV_2021")], FEATURES, seed=206001
+                )
+            scores = _score_model(safe_model, group, FEATURES)
+        expected_selected = _select(
+            group, path, int(gate_row["fallback_mixed_k"]), scores=scores
+        )
+        actual_selected = requests.loc[requests.issue.astype(str).eq(issue)].sort_values(
+            "ticket_order", kind="stable"
+        )
+        expected_selected = expected_selected.reset_index(drop=True)
+        actual_selected = actual_selected.reset_index(drop=True)
+        source_columns = [
+            "match_indices",
+            "outcomes",
+            "candidate_source",
+            "source_cells_json",
+        ]
+        numeric_source_columns = [
+            "control_joint_probability",
+            "predicted_sp_product",
+            "expected_pre_tax_net",
+        ]
+        if (
+            actual_selected.ticket_identity.to_list()
+            != expected_selected.ticket_identity.to_list()
+            or any(
+                actual_selected[column].astype(str).to_list()
+                != expected_selected[column].astype(str).to_list()
+                for column in source_columns
+            )
+            or any(
+                not np.allclose(
+                    actual_selected[column].to_numpy(dtype=float),
+                    expected_selected[column].to_numpy(dtype=float),
+                    rtol=1e-12,
+                    atol=1e-12,
+                )
+                for column in numeric_source_columns
+            )
+            or set(actual_selected.policy.astype(str)) != {path}
+            or not actual_selected.fallback_reason.eq(gate_row["fallback_reason"]).all()
+            or not actual_selected.fallback_applied.astype(bool).eq(
+                bool(gate_row["fallback_applied"])
+            ).all()
+            or not actual_selected.gate_path.eq(path).all()
+            or not np.allclose(actual_selected.ood_score, float(gate_row["ood_score"]))
+            or not np.allclose(
+                actual_selected.ood_threshold, float(gate_row["ood_threshold"])
+            )
+            or not actual_selected.ood_flag.astype(bool).eq(bool(gate_row["ood_flag"])).all()
+        ):
+            raise TicketPolicyError("fallback decision/request mismatch")
+    if request_issues != expected_request_issues:
+        raise TicketPolicyError("fallback decision/request issue mismatch")
+
     surface = pd.read_csv(output / "policy_surface.csv")
-    if not surface.stake_budget_matched.astype(bool).any():
-        raise TicketPolicyError("matched stake surface absent")
+    expected_surface = _matched_surface(base_surface, decision)
+    _assert_frame_matches(surface, expected_surface, label="matched stake surface")
     exclusions = pd.read_csv(output / "input_exclusions.csv")
     exclusion_columns = {
         "split",
@@ -1112,7 +1499,6 @@ def verify(output: Path) -> dict[str, Any]:
     }
     if excluded_keys != expected_excluded_keys:
         raise TicketPolicyError("input exclusion ledger is incomplete or extraneous")
-    candidates = pd.read_parquet(output / "candidate_ledger.parquet")
     if any(
         (str(row.split), str(row.issue), int(match_idx)) in excluded_keys
         for row in candidates.itertuples(index=False)

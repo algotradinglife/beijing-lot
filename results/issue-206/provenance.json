@@ -13,6 +13,7 @@
   "input_excluded_matches": 651,
   "input_exclusion_policy": "only complete 3-cell safe-control probability absence is ledgered; malformed partial cells and constraint-ineligible issues fail closed",
   "label_boundary": "CV_2021 train; CV_2022 select; CV_2023 evaluate; LOCKED_TEST labels unused",
+  "ood_boundary": "StandardScaler fit on CV_2021 issue-safe-feature medians; 0.99 higher-quantile max-absolute-z threshold frozen on CV_2022; evaluated per LOCKED_TEST issue",
   "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj206_fixed_n7.py run --output results/issue-206",
   "scientific_environment_lock": "requirements.txt",
   "scientific_environment_lock_sha256": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
@@ -21,5 +22,5 @@
   "source_schema_sha256": "2a1ac9ba57306295ba4cdd8d9e0e9720b2148ea0faabf9cab5e3c4270ce2dcf1",
   "source_value_matrix": "results/issue-205/value_matrix.parquet",
   "source_value_matrix_sha256": "8fdace9c7249502456f8990137011847df9addae5ad633e61760c44b7ccde84b",
-  "version": "bj206-fixed-n7-ticket-policy-v2"
+  "version": "bj206-fixed-n7-ticket-policy-v3"
 }

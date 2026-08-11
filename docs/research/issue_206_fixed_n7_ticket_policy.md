@@ -17,9 +17,11 @@ Candidate generation is bounded and reproducible: deterministic top-mass/systema
 
 The frozen K grid is 8/16/32. The surface compares BEST_FULL, market-weighted WR and WOR, two temperature rules, overlap-capped and overlap-penalized controls, a safe-feature MLP, and the residual-feature experimental ablation. Absolute utility, expected utility, coverage, turnover, match overlap, ticket overlap, repeat share, and stake HHI are reported together with matched lift versus the selected safe control.
 
+The per-issue safe gate uses scikit-learn `StandardScaler` on CV-2021 issue-level medians of the eight safe candidate features. It freezes the CV-2022 99th-percentile (higher method) maximum-absolute standardized-feature threshold at 7.549834, then evaluates each LOCKED_TEST issue independently. `issue_gate.csv` reports OOD score/threshold, feasibility, learned-only, pure-control and fallback-mixed paths. An OOD learned-only issue is `NO_BET_OOD`; fallback-mixed routing uses the strongest feasible frozen control, or `NO_BET` when no safe control is feasible. None of the 75 current locked issues exceeds the frozen OOD threshold.
+
 ## Decision
 
-`INHERIT_STRONGEST_FROZEN_CONTROL`. CV-2022 selected MARKET_WR at K=8 as the strongest frozen matched control. LEARNED_MLP at the same K had positive point realized lift but expected utility was 68.685147 below control and the paired one-sided 95% realized-lift lower bound was -0.914040. The deterministic uncertainty/matched-floor gate therefore routes every locked request to MARKET_WR with reason `VALIDATION_UNCERTAINTY_OR_MATCHED_LIFT_FLOOR`.
+`INHERIT_STRONGEST_FROZEN_CONTROL`. CV-2022 selected MARKET_WR at K=8 as the strongest frozen matched control. LEARNED_MLP at the same K had positive point realized lift but expected utility was 68.685147 below control and the paired one-sided 95% realized-lift lower bound was -0.914040. The deterministic uncertainty/matched-floor gate therefore routes every locked request to MARKET_WR with reason `VALIDATION_UNCERTAINTY_OR_MATCHED_LIFT_FLOOR`; OOD and feasibility are still evaluated and retained per issue before handoff.
 
 On CV-2023 the inherited path recorded absolute realized pre-tax net -1.000000, expected pre-tax net 78.369429, zero hit coverage, mean match overlap 0.196197, repeat share 0.154545, and matched realized lift 0.000000 at exactly the same K/stake budget. This is a conservative negative result, not a learned-policy advancement claim.
 
@@ -34,7 +36,10 @@ On CV-2023 the inherited path recorded absolute realized pre-tax net -1.000000, 
 - Policy and matched-lift surface: `results/issue-206/policy_surface.csv`
 - Ticket hit/payout calibration: `results/issue-206/ticket_calibration.csv`
 - Enforced source-match exclusion ledger: `results/issue-206/input_exclusions.csv`
+- Per-issue OOD/feasibility and learned/control/NO_BET paths: `results/issue-206/issue_gate.csv`
 - Stage-3 request ledger: `results/issue-206/ticket_requests.parquet`
+
+The verifier does not treat a regenerable manifest as semantic proof. After hash validation it recomputes the chronology-frozen OOD gate, per-issue route, selected ticket identities (including explicit repeats), identity/list/source-trace agreement, 3/1/0 outcome domain, probability/SP/utility arithmetic, fallback evidence, and the matched-stake surface. Regression tests re-manifest invalid-outcome, trace-count, trace-identity, fallback and matched-budget tampering and require semantic rejection.
 
 ## Replay
 
