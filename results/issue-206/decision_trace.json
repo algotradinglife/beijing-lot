@@ -1,107 +1,20 @@
 {
-  "control_joint_probability": 0.12783789128738723,
-  "expected_pre_tax_net": 80.99167568058704,
+  "control_joint_probability": null,
+  "expected_pre_tax_net": null,
   "fallback_applied": true,
-  "fallback_reason": "VALIDATION_UNCERTAINTY_OR_MATCHED_LIFT_FLOOR",
+  "fallback_reason": "ACCEPTED_TICKET_BASELINE_UNRESOLVED_NO_BET",
   "formula": "0.65 * product(control_probability) * product(predicted_final_sp) - 1",
-  "gate_path": "MARKET_WR",
+  "gate_path": "NO_BET",
   "issue": "25043",
   "labels_used": false,
   "ood_flag": false,
   "ood_score": 0.7327320420747889,
   "ood_threshold": 7.549834435270783,
-  "predicted_sp_product": 986.7265349756343,
-  "requested_stake": 2,
-  "selected_match_subset": [
-    54,
-    118,
-    212,
-    321,
-    327,
-    351,
-    457
-  ],
-  "selected_outcomes": [
-    "3",
-    "3",
-    "3",
-    "3",
-    "3",
-    "3",
-    "3"
-  ],
-  "source_cells": [
-    {
-      "control_probability": 0.7917715371471922,
-      "control_probability_uncertainty": 0.0,
-      "match_idx": 54,
-      "outcome": "3",
-      "predicted_final_sp": 2.6246446599299955,
-      "predicted_final_sp_seed_std": 0.009702366702217882,
-      "probability_source": "MARKET_ONLY",
-      "probability_source_grade": "FROZEN_SAFE_BASELINE"
-    },
-    {
-      "control_probability": 0.7596080441834591,
-      "control_probability_uncertainty": 0.0,
-      "match_idx": 118,
-      "outcome": "3",
-      "predicted_final_sp": 2.9561292658481864,
-      "predicted_final_sp_seed_std": 0.019723108432924116,
-      "probability_source": "MARKET_ONLY",
-      "probability_source_grade": "FROZEN_SAFE_BASELINE"
-    },
-    {
-      "control_probability": 0.7630816065312901,
-      "control_probability_uncertainty": 0.0,
-      "match_idx": 212,
-      "outcome": "3",
-      "predicted_final_sp": 2.857033280863743,
-      "predicted_final_sp_seed_std": 0.0030772644154412935,
-      "probability_source": "MARKET_ONLY",
-      "probability_source_grade": "FROZEN_SAFE_BASELINE"
-    },
-    {
-      "control_probability": 0.6728222491540624,
-      "control_probability_uncertainty": 0.0,
-      "match_idx": 321,
-      "outcome": "3",
-      "predicted_final_sp": 3.2491492734087117,
-      "predicted_final_sp_seed_std": 0.021897986502537048,
-      "probability_source": "MARKET_ONLY",
-      "probability_source_grade": "FROZEN_SAFE_BASELINE"
-    },
-    {
-      "control_probability": 0.6998327441050983,
-      "control_probability_uncertainty": 0.0,
-      "match_idx": 327,
-      "outcome": "3",
-      "predicted_final_sp": 2.298220544298186,
-      "predicted_final_sp_seed_std": 0.006249447544136411,
-      "probability_source": "MARKET_ONLY",
-      "probability_source_grade": "FROZEN_SAFE_BASELINE"
-    },
-    {
-      "control_probability": 0.8164668463036278,
-      "control_probability_uncertainty": 0.0,
-      "match_idx": 351,
-      "outcome": "3",
-      "predicted_final_sp": 2.5937881581902382,
-      "predicted_final_sp_seed_std": 0.0025053439692584584,
-      "probability_source": "MARKET_ONLY",
-      "probability_source_grade": "FROZEN_SAFE_BASELINE"
-    },
-    {
-      "control_probability": 0.7245460859953244,
-      "control_probability_uncertainty": 0.0,
-      "match_idx": 457,
-      "outcome": "3",
-      "predicted_final_sp": 2.298220544298186,
-      "predicted_final_sp_seed_std": 0.006249447544136411,
-      "probability_source": "MARKET_ONLY",
-      "probability_source_grade": "FROZEN_SAFE_BASELINE"
-    }
-  ],
-  "ticket_identity": "54:3|118:3|212:3|321:3|327:3|351:3|457:3",
-  "version": "bj206-fixed-n7-ticket-policy-v3"
+  "predicted_sp_product": null,
+  "requested_stake": 0,
+  "selected_match_subset": [],
+  "selected_outcomes": [],
+  "source_cells": [],
+  "ticket_identity": null,
+  "version": "bj206-fixed-n7-ticket-policy-v4"
 }

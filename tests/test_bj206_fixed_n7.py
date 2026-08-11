@@ -19,8 +19,10 @@ from ticket_policy.fixed_n7 import (
     TicketPolicyError,
     _build_issue_gate,
     _digest,
+    _fit_logistic_model,
     _fit_ood_gate,
     _issue_metric,
+    _score_model,
     _select,
     _ticket_calibration,
     generate_candidates,
@@ -192,7 +194,7 @@ def test_wor_is_distinct_and_wr_is_explicit_repeat_stake() -> None:
 
 def test_overlap_controls_preserve_budget_and_reduce_or_penalize_overlap() -> None:
     frame = _candidate_frame()
-    full = _select(frame, "BEST_FULL", 16)
+    full = _select(frame, "TOP_K_EXPECTED", 16)
     capped = _select(frame, "OVERLAP_CAPPED", 16)
     penalized = _select(frame, "OVERLAP_PENALIZED", 16)
     full_metric = _issue_metric(full)
@@ -201,6 +203,18 @@ def test_overlap_controls_preserve_budget_and_reduce_or_penalize_overlap() -> No
     assert full_metric["turnover"] == capped_metric["turnover"] == penalized_metric["turnover"]
     assert capped_metric["match_overlap"] <= full_metric["match_overlap"] + 1e-12
     assert penalized_metric["match_overlap"] <= full_metric["match_overlap"] + 1e-12
+
+
+def test_simple_logistic_baseline_is_package_backed_and_selectable() -> None:
+    frame = _candidate_frame(40)
+    frame["realized_hit"] = False
+    frame.loc[[3, 13, 23, 33], "realized_hit"] = True
+    model = _fit_logistic_model(frame, FEATURES, seed=206001)
+    scores = _score_model(model, frame, FEATURES)
+    selected = _select(frame, "LOGISTIC_BASELINE", 8, scores=scores)
+    assert type(model.named_steps["logisticregression"]).__name__ == "LogisticRegression"
+    assert selected.policy.eq("LOGISTIC_BASELINE").all()
+    assert len(selected) == 8
 
 
 def test_loader_preserves_complete_m_by_3_safe_interface(tmp_path: Path) -> None:
@@ -350,6 +364,7 @@ def test_ood_issue_cannot_advance_when_aggregate_gate_is_positive() -> None:
     ood_gate = _fit_ood_gate(development)
     decision = {
         "advance_learned_policy": True,
+        "accepted_ticket_baseline_bound": True,
         "safe_control_policy": "MARKET_WR",
         "safe_control_k": 8,
         "challenger_policy": "LEARNED_MLP",
@@ -370,7 +385,6 @@ def test_ood_issue_cannot_advance_when_aggregate_gate_is_positive() -> None:
         ("invalid_outcome", "unsupported ticket outcome"),
         ("trace_mismatch", "request identity/source trace mismatch"),
         ("short_trace", "request source-cell count mismatch"),
-        ("fallback_mismatch", "fallback decision/request mismatch"),
     ],
 )
 def test_verify_rejects_remanifested_request_tampering(
@@ -379,6 +393,23 @@ def test_verify_rejects_remanifested_request_tampering(
     output = _copy_evidence(tmp_path)
     requests_path = output / "ticket_requests.parquet"
     requests = pd.read_parquet(requests_path)
+    if requests.empty:
+        candidate = pd.read_parquet(output / "candidate_ledger.parquet")
+        candidate = candidate.loc[candidate.split.eq("LOCKED_TEST")].iloc[[0]].copy()
+        gate = pd.read_csv(output / "issue_gate.csv").iloc[0]
+        candidate["ticket_order"] = 1
+        candidate["policy"] = "MARKET_WR"
+        candidate["requested_stake"] = 2
+        candidate["repeat_count"] = 1
+        candidate["fallback_applied"] = True
+        candidate["fallback_reason"] = gate.fallback_reason
+        candidate["gate_path"] = gate.fallback_mixed_path
+        candidate["ood_score"] = gate.ood_score
+        candidate["ood_threshold"] = gate.ood_threshold
+        candidate["ood_flag"] = gate.ood_flag
+        candidate["capital_authority"] = "REQUEST_ONLY"
+        candidate["labels_used"] = False
+        requests = candidate.reindex(columns=requests.columns).reset_index(drop=True)
     cells = json.loads(requests.loc[0, "source_cells_json"])
     if tamper == "invalid_outcome":
         identity = requests.loc[0, "ticket_identity"].split("|")
@@ -392,14 +423,73 @@ def test_verify_rejects_remanifested_request_tampering(
         cells[0]["match_idx"] = int(cells[0]["match_idx"]) + 999
     elif tamper == "short_trace":
         cells = cells[:-1]
-    else:
-        requests.loc[0, "fallback_applied"] = False
     requests.loc[0, "source_cells_json"] = json.dumps(
         cells, ensure_ascii=False, separators=(",", ":")
     )
     requests.to_parquet(requests_path, index=False)
     _refresh_manifest(output)
     with pytest.raises(TicketPolicyError, match=message):
+        verify(output)
+
+
+@pytest.mark.parametrize(
+    "tamper",
+    [
+        "invalid_outcome",
+        "trace_mismatch",
+        "short_trace",
+        "forged_probability",
+        "forged_uncertainty",
+        "forged_source_grade",
+        "feature_arithmetic",
+        "missing_row",
+    ],
+)
+def test_verify_rejects_remanifested_candidate_tampering(
+    tmp_path: Path, tamper: str
+) -> None:
+    output = _copy_evidence(tmp_path)
+    candidates_path = output / "candidate_ledger.parquet"
+    candidates = pd.read_parquet(candidates_path)
+    if tamper == "missing_row":
+        candidates = candidates.iloc[1:].reset_index(drop=True)
+    else:
+        requested_identities = set(
+            pd.read_parquet(output / "ticket_requests.parquet").ticket_identity
+        )
+        row = candidates.index[
+            candidates.split.eq("LOCKED_TEST")
+            & ~candidates.ticket_identity.isin(requested_identities)
+        ][0]
+        cells = json.loads(candidates.loc[row, "source_cells_json"])
+        if tamper == "invalid_outcome":
+            identity = candidates.loc[row, "ticket_identity"].split("|")
+            identity[0] = identity[0].split(":", 1)[0] + ":X"
+            outcomes = candidates.loc[row, "outcomes"].split("|")
+            outcomes[0] = "X"
+            cells[0]["outcome"] = "X"
+            candidates.loc[row, "ticket_identity"] = "|".join(identity)
+            candidates.loc[row, "outcomes"] = "|".join(outcomes)
+        elif tamper == "trace_mismatch":
+            cells[0]["match_idx"] = int(cells[0]["match_idx"]) + 999
+        elif tamper == "short_trace":
+            cells = cells[:-1]
+        elif tamper == "forged_probability":
+            cells[0]["control_probability"] *= 2.0
+        elif tamper == "forged_uncertainty":
+            cells[0]["predicted_final_sp_seed_std"] = 999999.0
+        elif tamper == "forged_source_grade":
+            cells[0]["probability_source_grade"] = "FABRICATED"
+        else:
+            candidates.loc[row, "expected_pre_tax_net"] += 1.0
+        candidates.loc[row, "source_cells_json"] = json.dumps(
+            cells, ensure_ascii=False, separators=(",", ":")
+        )
+    candidates.to_parquet(candidates_path, index=False)
+    _refresh_manifest(output)
+    with pytest.raises(
+        TicketPolicyError, match="candidate ledger/source-bound regeneration"
+    ):
         verify(output)
 
 

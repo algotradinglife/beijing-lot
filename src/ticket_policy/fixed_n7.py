@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import stats
+from sklearn.linear_model import LogisticRegression
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -32,15 +33,16 @@ TAX_FACTOR = 0.65
 STAKE = 2
 K_GRID = (8, 16, 32)
 NUISANCE_SEEDS = (206001, 206002, 206003)
-VERSION = "bj206-fixed-n7-ticket-policy-v3"
+VERSION = "bj206-fixed-n7-ticket-policy-v4"
 SOURCE_VERSION = "bj205-joint-n7-value-matrix-v2"
 OOD_QUANTILE = 0.99
-CONTROL_POLICIES = ("BEST_FULL", "MARKET_WOR", "MARKET_WR")
+CONTROL_POLICIES = ("TOP_K_EXPECTED", "MARKET_WOR", "MARKET_WR")
 CHALLENGER_POLICIES = (
     "TEMPERATURE_050",
     "TEMPERATURE_100",
     "OVERLAP_CAPPED",
     "OVERLAP_PENALIZED",
+    "LOGISTIC_BASELINE",
     "LEARNED_MLP",
 )
 FEATURES = (
@@ -479,7 +481,7 @@ def _select(
     if k <= 0 or candidates.empty:
         raise TicketPolicyError("invalid ticket-selection request")
     frame = candidates.copy()
-    if policy == "BEST_FULL":
+    if policy == "TOP_K_EXPECTED":
         index = np.argsort(-frame.expected_pre_tax_net.to_numpy(), kind="stable")[:k]
     elif policy == "MARKET_WOR":
         rng = np.random.default_rng(_stable_seed(policy, frame.issue.iloc[0], k))
@@ -494,7 +496,11 @@ def _select(
         rng = np.random.default_rng(_stable_seed(policy, frame.issue.iloc[0], k))
         probability = _softmax(frame.expected_pre_tax_net.to_numpy(), temperature)
         index = rng.choice(len(frame), size=k, replace=False, p=probability)
-    elif policy in {"LEARNED_MLP", "EXPERIMENTAL_MLP_ABLATION"}:
+    elif policy in {
+        "LOGISTIC_BASELINE",
+        "LEARNED_MLP",
+        "EXPERIMENTAL_MLP_ABLATION",
+    }:
         if scores is None or len(scores) != len(frame):
             raise TicketPolicyError("learned policy scores are missing")
         index = np.argsort(-np.asarray(scores), kind="stable")[:k]
@@ -562,6 +568,28 @@ def _fit_model(
         ),
     )
     model.fit(train.loc[:, features], target, mlpclassifier__sample_weight=weights)
+    return model
+
+
+def _fit_logistic_model(
+    candidates: pd.DataFrame, features: tuple[str, ...], *, seed: int
+) -> Any:
+    """Fit the preregistered simple package baseline before the neural ranker."""
+    train = candidates.loc[candidates.labels_available].copy()
+    target = train.realized_hit.astype(int).to_numpy()
+    if target.sum() < 3 or len(np.unique(target)) != 2:
+        raise TicketPolicyError("insufficient realized hits for logistic baseline")
+    model = make_pipeline(
+        StandardScaler(),
+        LogisticRegression(
+            C=1.0,
+            class_weight="balanced",
+            max_iter=1000,
+            random_state=seed,
+            solver="lbfgs",
+        ),
+    )
+    model.fit(train.loc[:, features], target)
     return model
 
 
@@ -648,7 +676,11 @@ def _build_issue_gate(
             if control_feasible
             else "NO_BET_INFEASIBLE"
         )
-        if not control_feasible:
+        if not bool(decision.get("accepted_ticket_baseline_bound", False)):
+            mixed_path = "NO_BET"
+            mixed_k = 0
+            reason = "ACCEPTED_TICKET_BASELINE_UNRESOLVED_NO_BET"
+        elif not control_feasible:
             mixed_path = "NO_BET"
             mixed_k = 0
             reason = "SAFE_CONTROL_INFEASIBLE_NO_BET"
@@ -852,7 +884,12 @@ def _select_validation_policy(
     pair = pair.dropna(subset=[control_key, challenger_key])
     delta = pair[challenger_key] - pair[control_key]
     sem = float(stats.sem(delta.to_numpy(), ddof=1)) if len(delta) > 1 else np.inf
-    critical = float(stats.t.ppf(0.95, df=len(delta) - 1)) if len(delta) > 1 else np.inf
+    selection_comparisons = max(int(len(validation)), 1)
+    critical = (
+        float(stats.t.ppf(1.0 - 0.05 / selection_comparisons, df=len(delta) - 1))
+        if len(delta) > 1
+        else np.inf
+    )
     lower = float(delta.mean() - critical * sem) if np.isfinite(sem) else -np.inf
     expected_lift = float(
         challenger.expected_pre_tax_net - control.expected_pre_tax_net
@@ -860,7 +897,6 @@ def _select_validation_policy(
     coverage_lift = float(challenger.coverage - control.coverage)
     advance = bool(
         lower >= 0.0
-        and expected_lift >= 0.0
         and coverage_lift >= 0.0
         and float(challenger.turnover) == float(control.turnover)
     )
@@ -876,18 +912,24 @@ def _select_validation_policy(
         "paired_validation_issues": int(len(delta)),
         "validation_realized_lift": float(delta.mean()),
         "validation_lift_one_sided_95_lcb": lower,
+        "selection_adjustment": "Bonferroni over all CV-2022 policy/K rows",
+        "selection_comparisons": selection_comparisons,
         "validation_expected_lift": expected_lift,
+        "validation_expected_lift_role": "diagnostic_only_not_a_safety_gate",
         "validation_coverage_lift": coverage_lift,
         "matched_turnover": float(control.turnover),
         "advance_learned_policy": advance,
-        "fallback_mixed_policy": str(challenger.policy) if advance else str(control.policy),
-        "fallback_mixed_k": int(challenger.k) if advance else int(control.k),
+        "accepted_ticket_baseline_bound": False,
+        "accepted_baseline_identity": "#205_MARKET_INDEPENDENCE_PROBABILITY_SCORER_ONLY",
+        "accepted_baseline_comparability": "NO_COMPARABLE_ACCEPTED_TICKET_POLICY_ON_MATCHED_STAGE3_SUPPORT",
+        "fallback_mixed_policy": str(challenger.policy) if advance else "NO_BET",
+        "fallback_mixed_k": int(challenger.k) if advance else 0,
         "disposition": "ADVANCE_FALLBACK_MIXED_POLICY"
         if advance
-        else "INHERIT_STRONGEST_FROZEN_CONTROL",
+        else "LEARNED_POLICY_REJECTED_BASELINE_UNRESOLVED",
         "fallback_reason": "NONE"
         if advance
-        else "VALIDATION_UNCERTAINTY_OR_MATCHED_LIFT_FLOOR",
+        else "ACCEPTED_TICKET_BASELINE_UNRESOLVED_NO_BET",
         "stage_boundary": "requested tickets and requested ¥2 stake only; no bankroll sizing authority",
     }
     return decision, pair.reset_index()
@@ -958,18 +1000,18 @@ def _plots(surface: pd.DataFrame, output: Path) -> None:
 def _decision_report(
     decision: dict[str, Any], surface: pd.DataFrame, exclusion_count: int
 ) -> str:
-    evaluation = surface.loc[
+    local_comparator = surface.loc[
         surface.split.eq("CV_2023")
-        & surface.policy.eq(decision["fallback_mixed_policy"])
-        & surface.k.eq(decision["fallback_mixed_k"])
+        & surface.policy.eq(decision["safe_control_policy"])
+        & surface.k.eq(decision["safe_control_k"])
     ].iloc[0]
     return f"""# Issue #206 decision report — fixed-N7 ticket generation
 
 ## Decision
 
-`{decision['disposition']}`. The validation-selected challenger was `{decision['challenger_policy']}` at K={decision['challenger_k']}; the strongest matched control was `{decision['safe_control_policy']}` at K={decision['safe_control_k']}. The paired validation realized-lift one-sided 95% lower bound was {decision['validation_lift_one_sided_95_lcb']:.6f}. The deterministic gate therefore emitted `{decision['fallback_reason']}`.
+`{decision['disposition']}`. The validation-selected challenger was `{decision['challenger_policy']}` at K={decision['challenger_k']}; the best local matched comparator was `{decision['safe_control_policy']}` at K={decision['safe_control_k']}. The selection-adjusted paired validation realized-lift lower bound was {decision['validation_lift_one_sided_95_lcb']:.6f}. The deterministic gate therefore emitted `{decision['fallback_reason']}`.
 
-The fallback-mixed CV-2023 path delivered absolute realized pre-tax net {evaluation.realized_pre_tax_net:.6f}, expected pre-tax net {evaluation.expected_pre_tax_net:.6f}, coverage {evaluation.coverage:.6f}, and matched realized lift {evaluation.matched_lift_realized_pre_tax_net:+.6f} at exactly ¥{evaluation.turnover:.0f} turnover. No apparent improvement from fewer tickets or cash is accepted.
+The #205 accepted object is a `MARKET_INDEPENDENCE` probability scorer on a fixed first-seven exhaustive calibration roster, not a comparable Stage-3 ticket policy. The row formerly mislabeled `BEST_FULL` is now honestly named `TOP_K_EXPECTED`; it is not FULL coverage. Because no accepted ticket baseline is bound on matched Stage-3 support, the locked fallback-mixed path is `NO_BET` (zero requested tickets/stake). For diagnosis only, the local CV-2023 comparator recorded realized pre-tax net {local_comparator.realized_pre_tax_net:.6f}, raw independence×SP expected pre-tax net {local_comparator.expected_pre_tax_net:.6f}, and coverage {local_comparator.coverage:.6f} at ¥{local_comparator.turnover:.0f} turnover. Raw expected utility is diagnostic and is not a safety gate.
 
 The issue-specific gate fits scikit-learn `StandardScaler` on CV-2021 issue-level safe-feature medians and freezes the CV-2022 {decision['ood_threshold_quantile']:.2%} maximum-absolute-z threshold at {decision['ood_threshold']:.6f}. It evaluates feasibility and OOD before every locked handoff; {decision['locked_ood_issues']} locked issues exceed the threshold. `issue_gate.csv` reports learned-only, pure-control and fallback-mixed paths separately, including deterministic safe-control and `NO_BET` reasons.
 
@@ -981,26 +1023,26 @@ The issue-specific gate fits scikit-learn `StandardScaler` on CV-2021 issue-leve
 - Only #205 `MARKET_ONLY` / `FROZEN_SAFE_BASELINE` control probability and frozen pre-event SP enter the controlling policy. Experimental residuals appear only in `EXPERIMENTAL_MLP_ABLATION`.
 - {exclusion_count} source matches with all three safe-control probabilities missing are explicitly recorded in `input_exclusions.csv`; partial/non-finite, non-positive, non-normalized, incomplete-M×3, and post-exclusion M<7 inputs fail closed.
 - Training uses CV-2021, policy/K selection uses CV-2022, final historical evaluation uses CV-2023. LOCKED_TEST 2025/2026 labels remain embargoed; its Stage-3 handoff is label-blind.
-- The semantic verifier recomputes the OOD gate, issue routes, ticket selection, identity/list/source-trace agreement, 3/1/0 outcome domain, joint probability, SP product, expected utility, fallback evidence, and matched-stake surface after manifest validation.
+- The semantic verifier regenerates every candidate from the frozen #205 matrix, binding identity, source probability/SP/uncertainty/provenance, feature arithmetic and label boundary before recomputing OOD, issue routes, request selection, fallback evidence and matched-stake surfaces.
 
 ## Failure regimes and risks
 
-Sparse seven-leg hits make realized utility high variance; this is why the lower-confidence-bound gate fails closed. Bounded generation does not enumerate C(M,7)×3^7, and may miss useful identities. Independence, frozen predicted-SP error, issue-level concentration, OOD-threshold sensitivity, and retrospective-only evidence remain material. Stage 3 may emit `NO_BET` only for policy infeasibility/OOD safety; Stage 4 retains final capital-sizing authority.
+Sparse seven-leg hits make realized utility high variance; this is why the selection-adjusted lower-confidence-bound gate fails closed. Bounded generation does not enumerate C(M,7)×3^7, and may miss useful identities. Independence, frozen predicted-SP error, issue-level concentration, OOD-threshold sensitivity, and retrospective-only evidence remain material. Stage 3 emits `NO_BET` for unresolved accepted-baseline binding, policy infeasibility, or OOD safety; Stage 4 retains final capital-sizing authority.
 
 ## PI 对接块
 
 | Acceptance criterion | Evidence | Result |
 |---|---|---|
-| Exact fixed-N7 identities over issue-specific subsets | `ticket_requests.parquet`, tests, `decision_trace.json` | PASS |
+| Exact fixed-N7 identities over issue-specific subsets | `candidate_ledger.parquet`, tests, `decision_trace.json` | PASS |
 | K/WR-WOR/repeat/overlap outputs and fallback reasons | `policy_surface.csv`, `issue_metrics.csv`, `decision.json` | PASS |
 | Ticket hit and payout calibration | `ticket_calibration.csv` on CV-2022/CV-2023 only | PASS |
 | Absolute plus matched lift on equal ticket/stake budgets | `policy_surface.csv`, this report | PASS |
 | Baseline, simple, learned, stochastic and experimental ablations | `policy_surface.csv`, `model_parameters.json` | PASS |
 | Per-issue OOD/feasibility route to learned, control or NO_BET | `issue_gate.csv`, OOD adversarial test | PASS |
-| Deterministic safe floor | `{decision['disposition']}` and paired LCB | PASS — conservative inheritance |
+| Deterministic safe floor | `{decision['disposition']}` and per-issue `NO_BET` | PASS — fail closed; baseline unresolved |
 | Notebook/code/artifact three-layer replay | executed notebook, reusable module/tests, manifest package | PASS |
 
-Decision input: retain `{decision['safe_control_policy']}` with K={decision['safe_control_k']} as the Stage-3 requested-ticket control; do not claim learned-policy advancement. Known risks: sparse payouts, bounded candidate recall, market-independence assumption, predicted-SP error, OOD-threshold sensitivity, and no post-2023 label access. Explicit review request: independently verify no shared roster, exact N7 uniqueness, label embargo, package-backed sampling/model/statistics, per-issue OOD/feasibility routing, remanifested semantic tamper rejection, matched stake arithmetic, notebook clean-run, and manifest-identical replay. No bankroll sizing, betting, merge, or issue closure is authorized.
+Decision input: reject learned-policy advancement in this bounded candidate universe and emit per-issue `NO_BET` until PI binds a comparable accepted ticket baseline; do not promote `{decision['safe_control_policy']}` merely because it won the local surface. Known risks: sparse payouts, bounded candidate recall, market-independence assumption, predicted-SP error, OOD-threshold sensitivity, selection multiplicity, and no post-2023 label access. Explicit review request: independently verify no shared roster, exact N7 uniqueness, label embargo, package-backed logistic-before-MLP ordering, full candidate regeneration/source binding, per-issue OOD/feasibility/NO_BET routing, remanifested semantic tamper rejection, matched stake arithmetic, notebook clean-run, and manifest-identical replay. No bankroll sizing, betting, merge, or issue closure is authorized.
 """
 
 
@@ -1028,9 +1070,13 @@ def run(inputs: Inputs) -> dict[str, Any]:
         candidate_frames = [generate_candidates(panel) for panel in panels]
         candidates = pd.concat(candidate_frames, ignore_index=True)
         train = candidates.loc[candidates.split.eq("CV_2021")].copy()
+        # Contract ordering is deliberate: establish the simple package baseline
+        # before fitting or evaluating either neural challenger.
+        logistic_model = _fit_logistic_model(train, FEATURES, seed=206001)
         safe_model = _fit_model(train, FEATURES, seed=206001)
         experimental_model = _fit_model(train, EXPERIMENTAL_FEATURES, seed=206001)
         models = {
+            "LOGISTIC_BASELINE": (logistic_model, FEATURES),
             "LEARNED_MLP": (safe_model, FEATURES),
             "EXPERIMENTAL_MLP_ABLATION": (experimental_model, EXPERIMENTAL_FEATURES),
         }
@@ -1128,6 +1174,15 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 "features": list(FEATURES),
                 "experimental_ablation_features": list(EXPERIMENTAL_FEATURES),
                 "model": "sklearn.pipeline(StandardScaler, MLPClassifier)",
+                "simple_baseline_model": "sklearn.pipeline(StandardScaler, LogisticRegression)",
+                "simple_baseline_policy": "LOGISTIC_BASELINE",
+                "simple_baseline_parameters": {
+                    "C": 1.0,
+                    "class_weight": "balanced",
+                    "max_iter": 1000,
+                    "random_state": 206001,
+                    "solver": "lbfgs",
+                },
                 "hidden_layer_sizes": [12],
                 "alpha": 0.01,
                 "max_iter": 120,
@@ -1354,6 +1409,27 @@ def verify(output: Path) -> dict[str, Any]:
             raise TicketPolicyError("global fallback decision evidence mismatch")
 
     candidates = pd.read_parquet(output / "candidate_ledger.parquet")
+    provenance = json.loads(
+        (output / "provenance.json").read_text(encoding="utf-8")
+    )
+    source_matrix = _resolve_provenance_path(provenance["source_value_matrix"], output)
+    source_schema = _resolve_provenance_path(provenance["source_schema"], output)
+    if (
+        _digest(source_matrix) != provenance["source_value_matrix_sha256"]
+        or _digest(source_schema) != provenance["source_schema_sha256"]
+    ):
+        raise TicketPolicyError("source input hash mismatch")
+    source_panels = load_panels(source_matrix, source_schema)
+    expected_candidates = pd.concat(
+        [generate_candidates(panel) for panel in source_panels], ignore_index=True
+    )
+    _assert_frame_matches(
+        candidates,
+        expected_candidates,
+        label="candidate ledger/source-bound regeneration",
+    )
+    if candidates.duplicated(["split", "issue", "ticket_identity"]).any():
+        raise TicketPolicyError("candidate ledger has duplicate ticket identities")
     locked = candidates.loc[candidates.split.eq("LOCKED_TEST")]
     ood_gate = _fit_ood_gate(candidates)
     expected_issue_gate = _build_issue_gate(locked, decision, ood_gate)
@@ -1393,10 +1469,13 @@ def verify(output: Path) -> dict[str, Any]:
         expected_request_issues.add(issue)
         group = locked.loc[locked.issue.astype(str).eq(issue)]
         scores = None
-        if path == str(decision["challenger_policy"]):
+        if path in {"LOGISTIC_BASELINE", "LEARNED_MLP"}:
             if safe_model is None:
-                safe_model = _fit_model(
-                    candidates.loc[candidates.split.eq("CV_2021")], FEATURES, seed=206001
+                train_candidates = candidates.loc[candidates.split.eq("CV_2021")]
+                safe_model = (
+                    _fit_logistic_model(train_candidates, FEATURES, seed=206001)
+                    if path == "LOGISTIC_BASELINE"
+                    else _fit_model(train_candidates, FEATURES, seed=206001)
                 )
             scores = _score_model(safe_model, group, FEATURES)
         expected_selected = _select(
@@ -1481,17 +1560,6 @@ def verify(output: Path) -> dict[str, Any]:
         (str(row.split), str(row.issue), int(row.match_idx))
         for row in exclusions.itertuples(index=False)
     }
-    provenance = json.loads(
-        (output / "provenance.json").read_text(encoding="utf-8")
-    )
-    source_matrix = _resolve_provenance_path(provenance["source_value_matrix"], output)
-    source_schema = _resolve_provenance_path(provenance["source_schema"], output)
-    if (
-        _digest(source_matrix) != provenance["source_value_matrix_sha256"]
-        or _digest(source_schema) != provenance["source_schema_sha256"]
-    ):
-        raise TicketPolicyError("source input hash mismatch")
-    source_panels = load_panels(source_matrix, source_schema)
     expected_excluded_keys = {
         (str(record["split"]), str(record["issue"]), int(record["match_idx"]))
         for panel in source_panels
@@ -1510,6 +1578,6 @@ def verify(output: Path) -> dict[str, Any]:
         "files": len(actual),
         "manifest_sha256": _digest(output / "SHA256SUMS.json"),
         "request_rows": len(requests),
-        "issues": int(requests.issue.nunique()),
+        "issues": int(issue_gate.issue.nunique()),
         "excluded_input_matches": len(exclusions),
     }

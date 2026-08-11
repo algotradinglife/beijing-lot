@@ -65,7 +65,16 @@
   "ood_statistic": "max_abs_standardized_issue_feature_median",
   "ood_threshold": 7.549834435270783,
   "ood_threshold_quantile": 0.99,
+  "simple_baseline_model": "sklearn.pipeline(StandardScaler, LogisticRegression)",
+  "simple_baseline_parameters": {
+    "C": 1.0,
+    "class_weight": "balanced",
+    "max_iter": 1000,
+    "random_state": 206001,
+    "solver": "lbfgs"
+  },
+  "simple_baseline_policy": "LOGISTIC_BASELINE",
   "stake_per_ticket": 2,
   "tax_factor_reference": 0.65,
-  "version": "bj206-fixed-n7-ticket-policy-v3"
+  "version": "bj206-fixed-n7-ticket-policy-v4"
 }
