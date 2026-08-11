@@ -24,6 +24,7 @@ from ticket_policy.fixed_n7 import (
     _issue_metric,
     _score_model,
     _select,
+    _select_validation_policy,
     _ticket_calibration,
     generate_candidates,
     load_panels,
@@ -377,6 +378,77 @@ def test_ood_issue_cannot_advance_when_aggregate_gate_is_positive() -> None:
     assert row.learned_only_path == "NO_BET_OOD"
     assert row.fallback_mixed_path == "MARKET_WR"
     assert row.fallback_reason == "OOD_SAFE_CONTROL_FALLBACK"
+
+
+def test_unbound_accepted_baseline_blocks_deployable_advancement() -> None:
+    development = pd.concat(
+        [
+            _candidate_frame(40).assign(split="CV_2021", issue="train-a"),
+            _candidate_frame(40).assign(split="CV_2021", issue="train-b"),
+            _candidate_frame(40).assign(split="CV_2022", issue="validation"),
+        ],
+        ignore_index=True,
+    )
+    locked = pd.concat(
+        [
+            _candidate_frame(40).assign(split="LOCKED_TEST", issue="locked-a"),
+            _candidate_frame(40).assign(split="LOCKED_TEST", issue="locked-b"),
+        ],
+        ignore_index=True,
+    )
+    surface = pd.DataFrame(
+        [
+            {
+                "split": "CV_2022",
+                "policy": "MARKET_WR",
+                "k": 8,
+                "realized_pre_tax_net": -1.0,
+                "expected_pre_tax_net": 1.0,
+                "coverage": 0.5,
+                "turnover": 48.0,
+            },
+            {
+                "split": "CV_2022",
+                "policy": "LEARNED_MLP",
+                "k": 8,
+                "realized_pre_tax_net": 1.0,
+                "expected_pre_tax_net": 2.0,
+                "coverage": 0.5,
+                "turnover": 48.0,
+            },
+        ]
+    )
+    issue_metrics = pd.DataFrame(
+        [
+            {
+                "split": "CV_2022",
+                "issue": issue,
+                "labels_available": True,
+                "policy": policy,
+                "k": 8,
+                "realized_pre_tax_net": realized,
+            }
+            for issue in ("a", "b", "c")
+            for policy, realized in (("MARKET_WR", -1.0), ("LEARNED_MLP", 1.0))
+        ]
+    )
+
+    decision, _ = _select_validation_policy(surface, issue_metrics)
+    issue_gate = _build_issue_gate(locked, decision, _fit_ood_gate(development))
+
+    assert decision["local_challenger_evidence_passes"] is True
+    assert decision["accepted_ticket_baseline_bound"] is False
+    assert decision["advance_learned_policy"] is False
+    assert decision["fallback_mixed_policy"] == "NO_BET"
+    assert decision["fallback_mixed_k"] == 0
+    assert decision["disposition"] == "LEARNED_POLICY_REJECTED_BASELINE_UNRESOLVED"
+    assert decision["fallback_reason"] == "ACCEPTED_TICKET_BASELINE_UNRESOLVED_NO_BET"
+    assert not issue_gate.global_advance_eligible.any()
+    assert issue_gate.fallback_mixed_path.eq("NO_BET").all()
+    assert issue_gate.fallback_mixed_k.eq(0).all()
+    assert issue_gate.fallback_reason.eq(
+        "ACCEPTED_TICKET_BASELINE_UNRESOLVED_NO_BET"
+    ).all()
 
 
 @pytest.mark.parametrize(

@@ -12,6 +12,7 @@
   "fallback_reason": "ACCEPTED_TICKET_BASELINE_UNRESOLVED_NO_BET",
   "issue_specific_gate": "issue_gate.csv",
   "label_embargo": "No LOCKED_TEST (2025/2026) outcome or official-final-SP label enters training, selection, or evaluation",
+  "local_challenger_evidence_passes": false,
   "locked_ood_issues": 0,
   "matched_turnover": 928.0,
   "ood_features": [

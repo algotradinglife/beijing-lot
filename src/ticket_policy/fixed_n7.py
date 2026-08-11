@@ -895,10 +895,14 @@ def _select_validation_policy(
         challenger.expected_pre_tax_net - control.expected_pre_tax_net
     )
     coverage_lift = float(challenger.coverage - control.coverage)
-    advance = bool(
+    local_challenger_evidence_passes = bool(
         lower >= 0.0
         and coverage_lift >= 0.0
         and float(challenger.turnover) == float(control.turnover)
+    )
+    accepted_ticket_baseline_bound = False
+    advance = bool(
+        local_challenger_evidence_passes and accepted_ticket_baseline_bound
     )
     decision = {
         "version": VERSION,
@@ -918,8 +922,9 @@ def _select_validation_policy(
         "validation_expected_lift_role": "diagnostic_only_not_a_safety_gate",
         "validation_coverage_lift": coverage_lift,
         "matched_turnover": float(control.turnover),
+        "local_challenger_evidence_passes": local_challenger_evidence_passes,
         "advance_learned_policy": advance,
-        "accepted_ticket_baseline_bound": False,
+        "accepted_ticket_baseline_bound": accepted_ticket_baseline_bound,
         "accepted_baseline_identity": "#205_MARKET_INDEPENDENCE_PROBABILITY_SCORER_ONLY",
         "accepted_baseline_comparability": "NO_COMPARABLE_ACCEPTED_TICKET_POLICY_ON_MATCHED_STAGE3_SUPPORT",
         "fallback_mixed_policy": str(challenger.policy) if advance else "NO_BET",
