@@ -7,7 +7,7 @@ tags:
   - research
   - moc
 status: active
-updated: 2026-08-07
+updated: 2026-08-12
 ---
 
 # Beijing-lot Research Wiki
@@ -922,6 +922,21 @@ aliases 折叠为 10 个不同 issue-economic identities；其中 Z100/K1 的 52
 [`Issue-190-Sparse-Divergence-N7`](Issue-190-Sparse-Divergence-N7.md)。面向路线决策的
 证据漏斗、Z100/K1 正向簇、`NO_PROMOTION` 双层解释以及对 #193/#192 的继承建议，见
 [`Issue-190-Sparse-Divergence-N7-Decision-Report`](Issue-190-Sparse-Divergence-N7-Decision-Report.md)。
+
+## #207 固定-N7 主动资金控制（2026-08-12）
+
+#207 将 #206 的五种固定-N7/K8 研究票身份原样绑定到 ¥100,000 资金路径，并把
+K16/K32 降为敏感性。主动 Lane A 不是 #206 的空 NO_BET 账本；安全 Lane B 则把
+NO_BET 与 cash 单独保留为 `LOWER_EXPOSURE_ONLY`，禁止把少下注或不下注伪装成 Edge。
+
+simple logistic 先于 bounded neural 训练；CV-2021 拟合、CV-2022 冻结 1% 风险偏好、
+CV-2023 一次终局历史结算。MARKET_WOR/K8/simple 在相同可执行人民币资金日程上比
+equal weights 多 ¥4,012.10 终值、少 4.0121pp 最大回撤，也比 score-weighted 多
+¥4,137.48；因此 `ACTIVE_OVERLAY_EVIDENCE=true`，但仅有一格稀疏命中支持。
+绝对最强 K8 仍是 native ¥2 的 MARKET_WOR：终值 ¥99,245.38、收益 -0.7546%、
+最大回撤 0.7546%。由于 Stage-3 可比接受基线未解决且没有独立确认，
+`DEPLOYABLE_POLICY=false`，#208 继续等待 PI 明确激活。详见
+[`issue_207_fixed_n7_bankroll`](../research/issue_207_fixed_n7_bankroll.md)。
 
 ## 相关笔记
 

@@ -1,0 +1,20 @@
+{
+  "ACTIVE_OVERLAY_EVIDENCE": true,
+  "DEPLOYABLE_POLICY": false,
+  "ENGINE_VALID": true,
+  "active_overlay_evidence_rule": "matched K8 active funding; positive ending-capital lift and non-worse max drawdown versus equal-funding control",
+  "controlling_k": 8,
+  "deployable_policy_reason": "NO_COMPARABLE_ACCEPTED_STAGE3_TICKET_BASELINE_AND_HISTORICAL_CONFIRMATION_ONLY",
+  "locked_test_boundary": "2025/2026 outcomes and official-final-SP labels unused",
+  "negative_freeze": null,
+  "next_issue": "#208 receives schema/evidence only; remains blocked pending PI activation",
+  "qualifying_active_rows": 1,
+  "safe_reference_interpretation": "NO_BET/cash are LOWER_EXPOSURE_ONLY and excluded from active lift",
+  "selection_split": "CV_2022",
+  "sensitivity_k": [
+    16,
+    32
+  ],
+  "terminal_historical_evaluation_split": "CV_2023",
+  "version": "bj207-fixed-n7-bankroll-v1"
+}

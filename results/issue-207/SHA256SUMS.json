@@ -1,0 +1,20 @@
+{
+  "DECISION_REPORT.md": "1494f1f2469451b995a339dee473238421f3946872dffb2058288c76e6dd3c8e",
+  "README.md": "f941bf42a50ab4bb93ada886162eb3639db9f891cf70c4739b706d2223790c20",
+  "active_research_ticket_requests.parquet": "197545025a861656e1130d7acaffc9ba2addc790069f6b6b546993add124ce39",
+  "attribution.csv": "140aad4856ed3854bc143bcf6f18ff8bc957fe599384ba415341092f4935dbb1",
+  "capital_summary.csv": "b8ed1bb1246c24b42b930e48639ab4de2bb553a1c083344f81eaa8a794f05bb3",
+  "controller_calibration.csv": "97afaa640d598bcd062a54d0cca0a439649060677259386a7a3ad77253008881",
+  "decision.json": "5db347d400d2e83577c37e16b5be2865d157ef0023614515e09d7206b7decabc",
+  "equity_paths.png": "086236ef5e66f6fd418b49bb9bcb00036d55de90716a26c3730224284137a841",
+  "issue_capital_ledger.parquet": "b125ce8b6b6bbee673197535d11ee07b9dba2ecc28d435e43d23108398f4e3d5",
+  "matched_comparisons.csv": "b9234d3e0e7cfcf1be08c0f96a07e2c96129777db018ea39663be14fe65bf178",
+  "model_parameters.json": "2fa1183c6ef640a30f0765c180100de91a50c7d0785a34f036e862d805def910",
+  "parameter_performance.png": "59f7b6cde684d792801929e65bf64eb696336ab209f5eaa7cf35c2e9f44adb84",
+  "provenance.json": "4b07b45dfc0780977074057331e13a4168bf02ed76f491ba89a81ab19c9f4ce2",
+  "risk_return_frontier.png": "b53176d13a2306688c4e484600abbb72ff573eb9e67a8830cb20f59dd8dd8ae3",
+  "rolling_window_metrics.csv": "46218abf89804e3550dd3e97b5af34f7c4732e9f6bcd7946f2d95a25a3c3c509",
+  "safe_reference_ledger.csv": "dca2bdfff4484e951dff2c15831ea44bb82d0200f42fe52e2ea879338ee7e8e5",
+  "schema.json": "890d14401f399ee1b1da9db2cfe2df7582ec963efec1b361a3d9906876f97d73",
+  "stage4_handoff_schema.json": "d21da9874eb2b9d2be76a2d9e7fcf991f7feebc411894b0d6e0c37c6cfe23445"
+}

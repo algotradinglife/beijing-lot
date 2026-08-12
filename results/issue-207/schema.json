@@ -1,0 +1,29 @@
+{
+  "active_primary_key": [
+    "split",
+    "issue",
+    "policy",
+    "k",
+    "rank"
+  ],
+  "capital_path_key": [
+    "split",
+    "policy",
+    "k",
+    "controller",
+    "issue"
+  ],
+  "forbidden": [
+    "change_n",
+    "change_ticket_identity",
+    "change_policy_or_k",
+    "read_locked_test_labels"
+  ],
+  "stage4_actions": [
+    "issue_risk_fraction",
+    "nonnegative_ticket_weights",
+    "integer_yen2_repeat_counts",
+    "explicit_no_bet"
+  ],
+  "version": "bj207-fixed-n7-bankroll-v1"
+}

@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-11 11:55 HKT (UTC+08:00)**
+Updated: **2026-08-12 (Issue #207 producer evidence)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -91,7 +91,7 @@ PI interpretation and does not replace those edges or Project states.
 #206 fixed-N7 ticket learning (Done; learned policy rejected, baseline unresolved)
              |
              v
-#207 ¥100k bankroll + NO_BET policy
+#207 ¥100k active bankroll + separate NO_BET safety lane (EV Review pending)
              |
              v
 #208 dynamic-N risk-conditioned frontier
@@ -112,7 +112,7 @@ PI interpretation and does not replace those edges or Project states.
 | 2 | [#204] residual probability and SP heads | Closed / Done | M2 | No open blocker | `MARKET_ONLY` retained as the safe baseline; residual model remains retrospective |
 | 3 | [#205] M×3 value matrix and joint N7 calibration | Closed / Done | M2 | #204 closed | `MARKET_INDEPENDENCE` plus frozen pre-event SP is the safe #206 interface |
 | 4 | [#206] fixed-N7 ticket generator | Closed / Done | M3 | #205 closed | Learned challenger rejected; no comparable accepted ticket baseline is bound, so all locked issues route to `NO_BET` |
-| 5 | [#207] bankroll/NO_BET integration | Open; PI contract adjustment pending | M3 | #206 closed | ¥100k capital path and safe abstention policy |
+| 5 | [#207] active bankroll + separate NO_BET safety lane | In Progress; producer evidence complete | M3 | #206 closed | Engine valid; one matched MARKET_WOR/K8 simple-controller signal; deployable policy remains false |
 | 6 | [#208] dynamic-N frontier | Open | M3 | Blocked by #207 | Risk-conditioned N and parlay policy comparison |
 | 7 | [#209] full-cycle historical evaluation | Open | M3 | Blocked by #208 | Chronological ablations and accepted baseline ladder |
 | 8 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
@@ -168,6 +168,26 @@ retrospective feature.
   until PI adjusts its contract so the zero-request handoff does not collapse
   Stage 4 into a cash-only tautology or silently promote the local comparator.
 - Evidence: [`issue_206_fixed_n7_ticket_policy.md`](issue_206_fixed_n7_ticket_policy.md).
+
+### #207 active Stage-4 bankroll decision
+
+- Lane A reconstructs 68,880 exact #206 research-only requests for the frozen
+  five-policy K8 controlling panel plus K16/K32 sensitivities. Lane B retains
+  #206 NO_BET and cash separately as `LOWER_EXPOSURE_ONLY`.
+- CV-2021 fits the simple logistic controller before the bounded neural
+  ablation; CV-2022 freezes both learned risk fractions at 1%; CV-2023 is the
+  sole terminal historical evaluation. LOCKED_TEST labels remain embargoed.
+- The strongest absolute K8 path is MARKET_WOR/native ¥2: ending capital
+  ¥99,245.38 (-0.7546%), turnover ¥880 and maximum drawdown 0.7546%.
+- On the exact MARKET_WOR/K8 simple-controller yuan schedule, equal weights end
+  ¥4,012.10 lower and have 4.0121 percentage points more maximum drawdown; the
+  matched score-weighted component ends ¥4,137.48 lower. This yields one
+  hypothesis-generating `ACTIVE_OVERLAY_EVIDENCE=true` row.
+- `ENGINE_VALID=true`, but `DEPLOYABLE_POLICY=false`: the accepted comparable
+  Stage-3 baseline is unresolved and no strict confirmation exists. Cash does
+  not answer the active question, and #208 remains blocked pending PI terminal
+  review and explicit activation.
+- Evidence: [`issue_207_fixed_n7_bankroll.md`](issue_207_fixed_n7_bankroll.md).
 
 [#182]: https://github.com/algotradinglife/beijing-lot/issues/182
 [#192]: https://github.com/algotradinglife/beijing-lot/issues/192
