@@ -21,6 +21,7 @@ from bankroll_policy.fixed_n7 import (
     _publish_stage,
     _project_counts,
     _rolling_window_rows,
+    _ticket_identity_hhi,
     _validate_candidates,
     reconstruct_active_requests,
     replay_path,
@@ -146,6 +147,59 @@ def test_identified_comparisons_have_exact_common_executable_schedule() -> None:
     primary_key = catalog["matched_ticket_tax_lot_ledger.parquet"]["primary_key"]
     assert "candidate_controller" in primary_key
     assert not ticket.duplicated(primary_key, keep=False).any()
+    summary_keys = [
+        "comparison_role",
+        "split",
+        "policy",
+        "k",
+        "candidate_controller",
+        "comparator_controller",
+    ]
+    identified_keys = identified.loc[:, summary_keys].drop_duplicates()
+    issue_keys = issue.loc[:, summary_keys].drop_duplicates()
+    ticket_keys = ticket.loc[:, summary_keys].drop_duplicates()
+    pd.testing.assert_frame_equal(
+        identified_keys.sort_values(summary_keys).reset_index(drop=True),
+        issue_keys.sort_values(summary_keys).reset_index(drop=True),
+    )
+    pd.testing.assert_frame_equal(
+        identified_keys.sort_values(summary_keys).reset_index(drop=True),
+        ticket_keys.sort_values(summary_keys).reset_index(drop=True),
+    )
+    assert set(issue.comparison_role) == {
+        "EQUAL_FUNDING_CONTROL",
+        "MARKET_WR_K8_REFERENCE",
+        "STRONGEST_ACTIVE_COMPONENT_SCORE_WEIGHTED",
+    }
+
+
+def test_issue_ticket_hhi_aggregates_duplicate_immutable_identities() -> None:
+    identities = ["A", "A", "B"]
+    repeats = np.asarray([1, 1, 2])
+    # Aggregated identity stakes are A=¥4 and B=¥4, so HHI is 0.5.
+    # Treating three ranks as separate would incorrectly return 0.375.
+    assert _ticket_identity_hhi(identities, repeats) == pytest.approx(0.5)
+
+
+def test_schema_units_and_ex_largest_definition_are_complete() -> None:
+    schema = json.loads((ROOT / "results/issue-207/schema.json").read_text())
+    for table in schema["tables"]:
+        assert all(column["unit"] is not None for column in table["columns"]), table["name"]
+    summary = pd.read_csv(ROOT / "results/issue-207/capital_summary.csv")
+    ledger = pd.read_parquet(ROOT / "results/issue-207/issue_capital_ledger.parquet")
+    expected_definition = "REMOVE_MAX_FUNDED_STAKE_YUAN_STABLE_ISSUE_ORDER_TIEBREAK"
+    assert summary.ex_largest_issue_definition.eq(expected_definition).all()
+    for key, path in ledger.groupby(["split", "policy", "k", "controller"], sort=False):
+        ordered = path.sort_values(["year", "issue"], kind="stable")
+        largest = int(np.argmax(ordered.funded_stake_yuan.to_numpy(dtype=float)))
+        expected = 100_000.0 + float(ordered.net_pnl_yuan.sum()) - float(ordered.net_pnl_yuan.iloc[largest])
+        row = summary.loc[
+            summary.split.eq(key[0])
+            & summary.policy.eq(key[1])
+            & summary.k.eq(key[2])
+            & summary.controller.eq(key[3])
+        ].iloc[0]
+        assert row.ex_largest_issue_ending_capital_yuan == pytest.approx(expected)
 
 
 def test_rolling_window_drawdown_is_local_to_window_peak() -> None:

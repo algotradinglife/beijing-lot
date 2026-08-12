@@ -1,85 +1,52 @@
-# HANDOFF — Issue #207
+# HANDOFF — Issue #207 EV round 4
 
-[SESSION] 20260812_170059_68d3d4
+[SESSION] 20260812_185925_8900fb
 
 Current branch: `analyst/bj207-active-n7-bankroll-r3` (push target: `analyst/bj207-issue`)
 
-Current HEAD: resolve locally with `git rev-parse HEAD`.
+Current HEAD: resolve with `git rev-parse HEAD` after commit.
 
-## Completed — EV round 3
+## Completed
 
-- Reworked `src/bankroll_policy/fixed_n7.py` against the independent REJECT at `a8b0443b1cef0d56993706faa7360184e2beddc4`.
-- Made matched reference replay accept an explicit split. SIMPLE/NEURAL selection now uses CV_2022 candidate schedules and CV_2022 comparator outcomes only; CV_2023 remains terminal-only.
-- Materialized decisive matched comparator summary, issue ledger and ticket/tax-lot replay artifacts.
-- Corrected rolling 5/10/20 maximum drawdown to use each window's starting capital and window-local running peak.
-- Added `candidate_controller` to matched ticket/tax-lot identities and schema primary keys. Schema generation fails on every declared non-unique primary key.
-- Replaced cyclic notebook byte binding with a canonical cell-type/source contract digest. Clean execution may update outputs/executor metadata while provenance and package verification remain valid.
-- Added recoverable post-rename parent-directory-fsync failure semantics: a failed publication receipt removes the target and permits retry.
-- Preserved corrected ticket-identity HHI and completed-recovery versus terminal-open-underwater accounting.
-- Preserved complete schema/provenance/handoff/report semantic verification, invalid-state guards, BaseException cleanup and mandatory tamper attacks.
-- Regenerated `results/issue-207/` and clean-executed the notebook.
+- Resumed from the latest independent EV REJECT at audited SHA `11f82eaee6052b492b95cefc4eb915d657b34151`.
+- Metric-semantics full sweep: issue-level `ticket_hhi` now aggregates repeat stake by immutable `ticket_identity` before squaring shares; path-level `mean_issue_ticket_hhi` consumes the corrected values. Added a duplicate-identity golden test and independently recomputed all 13,560 issue rows (0 mismatches).
+- Evidence-completeness full sweep: normalized one materialization helper across every identified comparison role. All 87 identified summary groups now have complete issue and ticket/tax-lot primitives: 45 equal-funding, 32 MARKET_WR/K8 reference, and 10 strongest score-weighted component groups. Summary→issue and summary→ticket anti-joins are both zero.
+- Schema-semantics full sweep: every published column now has a non-null machine unit/category, all named economic/probability/risk fields have explicit units, and HHI/rolling definitions have domains.
+- Froze ex-largest as `REMOVE_MAX_FUNDED_STAKE_YUAN_STABLE_ISSUE_ORDER_TIEBREAK`; recomputed all path rows from primitive issue ledgers and added tests.
+- Regenerated the immutable 22-payload package and clean-executed the notebook.
 
 ## Terminal outcome
 
 - `ENGINE_VALID=true`
 - `ACTIVE_OVERLAY_EVIDENCE=false`
 - `DEPLOYABLE_POLICY=false`
-- `frozen_learned_controller_choice=BOUNDED_NEURAL`
-- `negative_freeze=NATIVE_2_YUAN`
+- CV_2022 frozen learned choice: `BOUNDED_NEURAL`
+- Negative freeze: `NATIVE_2_YUAN`
+- SAFE NO_BET/cash remain `LOWER_EXPOSURE_ONLY`.
 
-The prior positive `MARKET_WOR/SIMPLE_LOGISTIC` matched lift is sensitivity-only and non-evidentiary. Cash/NO_BET remain `LOWER_EXPOSURE_ONLY`.
+## Evidence and receipts
 
-The verified package manifest is:
-
-`661a3a8f57cf7a78d374fa6a8a399c397a27780adc5620a38a9dcebaeaef1ccd`
-
-Artifact counts:
-
-- active request rows: 68,880
-- capital ledger rows: 13,560
-- matched comparator issue rows: 2,475
-- matched ticket/tax-lot rows: 92,400
-- matched tax-lot declared-PK duplicate rows: 0
-
-## Key evidence
-
-- `results/issue-207/frozen_learned_controller_choice.csv`
-- `results/issue-207/matched_comparisons.csv`
-- `results/issue-207/matched_comparator_issue_ledger.parquet`
-- `results/issue-207/matched_ticket_tax_lot_ledger.parquet`
-- `results/issue-207/rolling_window_metrics.csv`
-- `results/issue-207/schema.json`
-- `results/issue-207/provenance.json`
-- `results/issue-207/decision.json`
-- `results/issue-207/DECISION_REPORT.md`
-- `notebooks/research/issue-207/bj207_fixed_n7_bankroll.ipynb` (6/6 code cells, no errors)
-
-## Verification receipts
-
-- Package semantic/hash verifier PASS before and after notebook clean execution; manifest `661a3a8f57cf7a78d374fa6a8a399c397a27780adc5620a38a9dcebaeaef1ccd`.
-- Focused #207: `27 passed in 788.62s (0:13:08)`.
-- #206 + #207 regression: `65 passed in 930.53s (0:15:30)`.
-- Notebook: `PASS cells=6 executed=6 kernel=python3`; package verifier still PASS afterward without restoring notebook bytes.
-- Independent new-directory replay: verifier PASS; 22/22 payload hashes byte-identical.
+- Manifest SHA-256: `f0382738d77d41c18b61b0ef4915a1a20ebb547f7da6e9c676a5d47a889d39cd`.
+- Artifact counts: 68,880 active requests; 13,560 capital rows; 4,785 matched issue rows; 129,360 matched ticket/tax-lot rows.
+- Focused suite: `29 passed in 824.28s (0:13:44)`.
+- Notebook: `PASS cells=6 executed=6 kernel=python3`; package verifier PASS afterward.
+- Independent replay: verifier PASS; `BYTE_IDENTICAL True PAYLOADS 22`.
+- Independent defect probes: 87/87 identified groups materialized in both primitive ledgers; HHI mismatches 0/13,560; schema null units 0.
 - Ruff, compileall and `git diff --check`: PASS.
-- Mandatory tamper coverage: settlement/payout; internally self-consistent ledger; rewritten manifest; source trace/label/future; schema/attribution/provenance/decision/model-choice; KeyboardInterrupt and post-rename fsync failure.
+- Mandatory tamper coverage retained and rerun in the focused suite: payout/settlement; self-consistent ledger mutation; rewritten manifest; source trace/label/future information; plus schema/attribution/provenance/decision/model-choice and atomic interruption attacks.
 
-## Constraints preserved
+## Same-category inspection evidence
 
-- No owner or Project membership changes.
-- #208 remains blocked and receives schema/evidence only.
-- No merge or issue closure performed.
+- Metric semantics: `replay_path`, `_trace_frame`, `_path_metrics`, rolling/recovery consumers, summary/report/schema and tests.
+- Matched evidence: all three `_matched_comparisons` loops, `_matched_reference`, `_comparison_row`, issue/ticket PKs, verifier semantic replay and summary→primitive anti-joins.
+- Schema semantics: all tables emitted by `_schema_catalog`, explicit economic/probability/risk units, fallback categorical/count/boolean/json/hash units, HHI/rolling/ex-largest domains, and ex-largest report semantics.
+
+## Known risks
+
+Sparse N7 payouts, bounded candidate recall, overlap, predicted-SP error, integer allocation, retrospective CV_2022 selection and unresolved accepted Stage-3 baseline. No positive terminal active-overlay evidence was found.
 
 ## Next state
 
 Next state must be `EV Review`.
 
-Independent EV should:
-
-- recompute the split-local CV_2022 learned-choice freeze and ensure CV_2023 never enters model choice;
-- recompute true local-window drawdown, ticket-identity HHI and completed/open recovery semantics;
-- validate declared PK uniqueness and matched tax-lot identity;
-- execute the notebook and re-run package verification without restoring notebook bytes;
-- inject post-rename parent fsync failure and confirm the target remains absent/retryable;
-- rerun all four mandatory tamper classes and immutable replay;
-- confirm #208 remains blocked and receives no activation authority.
+EV should independently recompute identity-aggregated issue HHI, verify all 87 matched summary groups have both primitive paths, check all schema units/domains and the maximum-funded-stake ex-largest definition, then rerun chronology, mandatory tamper classes, notebook clean-run and immutable replay at the exact PR HEAD. #208 remains blocked and receives no activation authority.

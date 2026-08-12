@@ -518,6 +518,7 @@ def replay_path(
                 strict=True,
             )
         ]
+        issue_ticket_hhi = _ticket_identity_hhi(bundle.ticket_identity, counts)
         rows.append(
             {
                 "split": split,
@@ -546,7 +547,9 @@ def replay_path(
                 "unfunded_reason": "NONE" if funded > 0 else "BANKROLL_LT_NATIVE_TICKET",
                 "minimum_fundable_capital_yuan": TICKET_STAKE,
                 "ticket_count": int(counts.sum()),
-                "ticket_hhi": float(np.sum((counts / counts.sum()) ** 2)) if counts.sum() else 0.0,
+                # Aggregate selector ranks by immutable ticket identity before
+                # computing issue-level concentration.
+                "ticket_hhi": issue_ticket_hhi,
                 "mean_pairwise_match_overlap": _mean_overlap(bundle),
                 "decision_trace_json": json.dumps(trace, ensure_ascii=False, separators=(",", ":"), allow_nan=False),
                 "reason_code": "FUNDED_ACTIVE" if funded > 0 else "NO_BET_INSUFFICIENT_CAPITAL",
@@ -566,6 +569,20 @@ def _mean_overlap(bundle: pd.DataFrame) -> float:
         return 0.0
     values = [len(sets[left] & sets[right]) / N for left in range(len(sets)) for right in range(left + 1, len(sets))]
     return float(np.mean(values))
+
+
+def _ticket_identity_hhi(ticket_identities: Any, repeat_counts: Any) -> float:
+    identity_stake: dict[str, float] = {}
+    for ticket_identity, count in zip(ticket_identities, repeat_counts, strict=True):
+        identity_stake[str(ticket_identity)] = identity_stake.get(str(ticket_identity), 0.0) + float(
+            count * TICKET_STAKE
+        )
+    identity_total = sum(identity_stake.values())
+    return (
+        float(sum((stake / identity_total) ** 2 for stake in identity_stake.values()))
+        if identity_total
+        else 0.0
+    )
 
 
 def _calibrate_risk(
@@ -768,7 +785,9 @@ def _path_metrics(ledger: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
             streak = max(streak, current)
         stake = path.funded_stake_yuan.to_numpy(dtype=float)
         stake_share = stake / stake.sum() if stake.sum() else np.zeros(len(stake))
-        largest = int(np.argmax(pnl)) if len(pnl) else 0
+        # Ex-largest is frozen as removing the issue with maximum funded stake;
+        # stable chronological order deterministically breaks ties.
+        largest = int(np.argmax(stake)) if len(stake) else 0
         ticket_slice = ticket_trace.loc[
             ticket_trace.split.eq(identity[0])
             & ticket_trace.policy.eq(identity[1])
@@ -801,6 +820,7 @@ def _path_metrics(ledger: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
                 "ticket_identity_stake_hhi": float(np.sum(ticket_share**2)) if len(ticket_share) else 0.0,
                 "mean_overlap": float(path.mean_pairwise_match_overlap.mean()),
                 "ex_largest_issue_ending_capital_yuan": float(INITIAL_BANKROLL + pnl.sum() - pnl[largest]),
+                "ex_largest_issue_definition": "REMOVE_MAX_FUNDED_STAKE_YUAN_STABLE_ISSUE_ORDER_TIEBREAK",
                 "capital_schedule_hash": str(path.capital_schedule_hash.iloc[0]),
             }
         )
@@ -964,6 +984,75 @@ def _matched_comparisons(
     rows: list[dict[str, Any]] = []
     issue_rows: list[dict[str, Any]] = []
     ticket_rows: list[dict[str, Any]] = []
+
+    def materialize_matched_paths(
+        *,
+        role: str,
+        candidate: Any,
+        comparator_controller: str,
+        reference_ledger: pd.DataFrame | None,
+        terminal_evidentiary: bool,
+    ) -> None:
+        if reference_ledger is None:
+            return
+        candidate_path = ledger.loc[
+            ledger.split.eq("CV_2023")
+            & ledger.policy.eq(candidate.policy)
+            & ledger.k.eq(candidate.k)
+            & ledger.controller.eq(candidate.controller)
+        ].sort_values(["year", "issue"], kind="stable")
+        joined = candidate_path.merge(
+            reference_ledger.sort_values(["year", "issue"], kind="stable"),
+            on=["split", "year", "issue"],
+            how="inner",
+            suffixes=("_candidate", "_comparator"),
+        )
+        for issue_row in joined.itertuples(index=False):
+            issue_rows.append(
+                {
+                    "comparison_role": role,
+                    "split": issue_row.split,
+                    "policy": candidate.policy,
+                    "k": int(candidate.k),
+                    "candidate_controller": candidate.controller,
+                    "comparator_controller": comparator_controller,
+                    "issue": str(issue_row.issue),
+                    "candidate_funded_stake_yuan": float(issue_row.funded_stake_yuan_candidate),
+                    "comparator_funded_stake_yuan": float(issue_row.funded_stake_yuan_comparator),
+                    "candidate_gross_payout_yuan": float(issue_row.gross_payout_yuan_candidate),
+                    "comparator_gross_payout_yuan": float(issue_row.gross_payout_yuan_comparator),
+                    "candidate_post_issue_bankroll_yuan": float(issue_row.post_issue_bankroll_yuan_candidate),
+                    "comparator_post_issue_bankroll_yuan": float(issue_row.post_issue_bankroll_yuan_comparator),
+                    "candidate_ticket_count": int(issue_row.ticket_count_candidate),
+                    "comparator_ticket_count": int(issue_row.ticket_count_comparator),
+                    "candidate_schedule_hash": issue_row.capital_schedule_hash_candidate,
+                    "comparator_schedule_hash": issue_row.capital_schedule_hash_comparator,
+                    "matched_issue_bankroll_lift_yuan": float(
+                        issue_row.post_issue_bankroll_yuan_candidate
+                        - issue_row.post_issue_bankroll_yuan_comparator
+                    ),
+                    "matched_issue_payout_lift_yuan": float(
+                        issue_row.gross_payout_yuan_candidate - issue_row.gross_payout_yuan_comparator
+                    ),
+                    "terminal_evidentiary": terminal_evidentiary,
+                    "frozen_learned_controller_choice": frozen_learned_choice,
+                }
+            )
+        for side, path in (("CANDIDATE", candidate_path), ("COMPARATOR", reference_ledger)):
+            trace_frame = _trace_frame(path)
+            trace_frame["source_policy"] = trace_frame["policy"]
+            trace_frame["policy"] = candidate.policy
+            ticket_rows.extend(
+                trace_frame.assign(
+                    comparison_role=role,
+                    candidate_controller=candidate.controller,
+                    comparator_controller=comparator_controller,
+                    side=side,
+                    terminal_evidentiary=terminal_evidentiary,
+                    frozen_learned_controller_choice=frozen_learned_choice,
+                ).to_dict(orient="records")
+            )
+
     for row in test.itertuples(index=False):
         if row.controller in {"NATIVE_2_YUAN"} or str(row.controller).startswith("EQUAL_"):
             continue
@@ -980,73 +1069,19 @@ def _matched_comparisons(
         )
         terminal_evidentiary = row.controller not in LEARNED_METHODS or row.controller == frozen_learned_choice
         rows.append(_comparison_row(row, reference, role="EQUAL_FUNDING_CONTROL", reference_label=comparator, attribution="STAGE4_WITHIN_ISSUE_ALLOCATION", frozen_choice=frozen_learned_choice, terminal_evidentiary=terminal_evidentiary))
-        if reference is not None:
-            candidate_path = ledger.loc[
-                ledger.split.eq("CV_2023")
-                & ledger.policy.eq(row.policy)
-                & ledger.k.eq(row.k)
-                & ledger.controller.eq(row.controller)
-            ].sort_values(["year", "issue"], kind="stable")
-            joined = candidate_path.merge(
-                reference_ledger.sort_values(["year", "issue"], kind="stable"),
-                on=["split", "year", "issue"],
-                how="inner",
-                suffixes=("_candidate", "_comparator"),
-            )
-            for issue_row in joined.itertuples(index=False):
-                issue_rows.append(
-                    {
-                        "comparison_role": "EQUAL_FUNDING_CONTROL",
-                        "split": issue_row.split,
-                        "policy": row.policy,
-                        "k": int(row.k),
-                        "candidate_controller": row.controller,
-                        "comparator_controller": comparator,
-                        "issue": str(issue_row.issue),
-                        "candidate_funded_stake_yuan": float(issue_row.funded_stake_yuan_candidate),
-                        "comparator_funded_stake_yuan": float(issue_row.funded_stake_yuan_comparator),
-                        "candidate_gross_payout_yuan": float(issue_row.gross_payout_yuan_candidate),
-                        "comparator_gross_payout_yuan": float(issue_row.gross_payout_yuan_comparator),
-                        "candidate_post_issue_bankroll_yuan": float(issue_row.post_issue_bankroll_yuan_candidate),
-                        "comparator_post_issue_bankroll_yuan": float(issue_row.post_issue_bankroll_yuan_comparator),
-                        "candidate_ticket_count": int(issue_row.ticket_count_candidate),
-                        "comparator_ticket_count": int(issue_row.ticket_count_comparator),
-                        "candidate_schedule_hash": issue_row.capital_schedule_hash_candidate,
-                        "comparator_schedule_hash": issue_row.capital_schedule_hash_comparator,
-                        "matched_issue_bankroll_lift_yuan": float(issue_row.post_issue_bankroll_yuan_candidate - issue_row.post_issue_bankroll_yuan_comparator),
-                        "matched_issue_payout_lift_yuan": float(issue_row.gross_payout_yuan_candidate - issue_row.gross_payout_yuan_comparator),
-                        "terminal_evidentiary": terminal_evidentiary,
-                        "frozen_learned_controller_choice": frozen_learned_choice,
-                    }
-                )
-            candidate_tickets = _trace_frame(candidate_path)
-            comparator_tickets = _trace_frame(reference_ledger)
-            ticket_rows.extend(
-                candidate_tickets.assign(
-                    comparison_role="EQUAL_FUNDING_CONTROL",
-                    candidate_controller=row.controller,
-                    comparator_controller=comparator,
-                    side="CANDIDATE",
-                    terminal_evidentiary=terminal_evidentiary,
-                    frozen_learned_controller_choice=frozen_learned_choice,
-                ).to_dict(orient="records")
-            )
-            ticket_rows.extend(
-                comparator_tickets.assign(
-                    comparison_role="EQUAL_FUNDING_CONTROL",
-                    candidate_controller=row.controller,
-                    comparator_controller=comparator,
-                    side="COMPARATOR",
-                    terminal_evidentiary=terminal_evidentiary,
-                    frozen_learned_controller_choice=frozen_learned_choice,
-                ).to_dict(orient="records")
-            )
+        materialize_matched_paths(
+            role="EQUAL_FUNDING_CONTROL",
+            candidate=row,
+            comparator_controller=comparator,
+            reference_ledger=reference_ledger,
+            terminal_evidentiary=terminal_evidentiary,
+        )
     # Cross-policy MARKET_WR/K8 reference on the same controller and executable
     # issue-level schedule. Ticket identities stay distinct and source-bound.
     for row in test.loc[test.k.eq(CONTROLLING_K)].itertuples(index=False):
         if row.policy == "MARKET_WR":
             continue
-        reference, _ = _matched_reference(
+        reference, reference_ledger = _matched_reference(
             row,
             reference_policy="MARKET_WR",
             reference_controller=row.controller,
@@ -1056,7 +1091,16 @@ def _matched_comparisons(
             calibrated=calibrated,
             split="CV_2023",
         )
-        rows.append(_comparison_row(row, reference, role="MARKET_WR_K8_REFERENCE", reference_label=f"MARKET_WR/{row.controller}", attribution="STAGE3_TICKET_POLICY_EFFECT_WITH_STAGE4_HELD", frozen_choice=frozen_learned_choice, terminal_evidentiary=(row.controller not in LEARNED_METHODS or row.controller == frozen_learned_choice)))
+        terminal_evidentiary = row.controller not in LEARNED_METHODS or row.controller == frozen_learned_choice
+        comparator_label = f"MARKET_WR/{row.controller}"
+        rows.append(_comparison_row(row, reference, role="MARKET_WR_K8_REFERENCE", reference_label=comparator_label, attribution="STAGE3_TICKET_POLICY_EFFECT_WITH_STAGE4_HELD", frozen_choice=frozen_learned_choice, terminal_evidentiary=terminal_evidentiary))
+        materialize_matched_paths(
+            role="MARKET_WR_K8_REFERENCE",
+            candidate=row,
+            comparator_controller=comparator_label,
+            reference_ledger=reference_ledger,
+            terminal_evidentiary=terminal_evidentiary,
+        )
     # The score-weighted active component is reported even when the learned
     # controller selected a different CV-2022 risk fraction; that case is
     # explicitly non-identifiable rather than a fabricated zero effect.
@@ -1064,7 +1108,7 @@ def _matched_comparisons(
         test.k.eq(CONTROLLING_K)
         & test.controller.isin(["SIMPLE_LOGISTIC", "BOUNDED_NEURAL"])
     ].itertuples(index=False):
-        reference, _ = _matched_reference(
+        reference, reference_ledger = _matched_reference(
             row,
             reference_policy=row.policy,
             reference_controller="SCORE_WEIGHTED_5PCT",
@@ -1074,7 +1118,15 @@ def _matched_comparisons(
             calibrated=calibrated,
             split="CV_2023",
         )
-        rows.append(_comparison_row(row, reference, role="STRONGEST_ACTIVE_COMPONENT_SCORE_WEIGHTED", reference_label="SCORE_WEIGHTED_5PCT", attribution="STAGE4_CONTROLLER_VS_SCORE_WEIGHTED", frozen_choice=frozen_learned_choice, terminal_evidentiary=(row.controller == frozen_learned_choice)))
+        terminal_evidentiary = row.controller == frozen_learned_choice
+        rows.append(_comparison_row(row, reference, role="STRONGEST_ACTIVE_COMPONENT_SCORE_WEIGHTED", reference_label="SCORE_WEIGHTED_5PCT", attribution="STAGE4_CONTROLLER_VS_SCORE_WEIGHTED", frozen_choice=frozen_learned_choice, terminal_evidentiary=terminal_evidentiary))
+        materialize_matched_paths(
+            role="STRONGEST_ACTIVE_COMPONENT_SCORE_WEIGHTED",
+            candidate=row,
+            comparator_controller="SCORE_WEIGHTED_5PCT",
+            reference_ledger=reference_ledger,
+            terminal_evidentiary=terminal_evidentiary,
+        )
     return pd.DataFrame(rows), pd.DataFrame(issue_rows), pd.DataFrame(ticket_rows)
 
 
@@ -1180,12 +1232,34 @@ def _schema_catalog(
             raise Stage4Error(f"schema primary key is not unique for {name}")
         columns = []
         for column in df.columns:
+            explicit_unit = None if units is None else units.get(column)
+            if explicit_unit is None:
+                if column.endswith("_yuan") or "_yuan_" in column:
+                    explicit_unit = "yuan"
+                elif column.endswith("_pct") or "probability" in column or column.endswith("_fraction"):
+                    explicit_unit = "fraction"
+                elif column.endswith("_hhi") or column in {"weight", "active_support_roi", "window_return", "mean_overlap", "mean_pairwise_match_overlap"}:
+                    explicit_unit = "fraction"
+                elif column.endswith("_multiple"):
+                    explicit_unit = "gross_return_multiple"
+                elif "predicted_sp" in column or "sp_uncertainty" in column:
+                    explicit_unit = "decimal_odds"
+                elif column.endswith("_count") or column in {"n", "k", "rank", "year", "issues", "active_issues", "window_issues", "observation_index", "active_issues_in_window", "max_consecutive_losing_issues", "time_under_water_issues", "completed_recovery_episodes", "max_completed_recovery_issues", "terminal_open_underwater_issues", "qualifying_active_rows"}:
+                    explicit_unit = "count"
+                elif str(df[column].dtype) == "bool":
+                    explicit_unit = "boolean"
+                elif column.endswith("_json"):
+                    explicit_unit = "json_document"
+                elif column.endswith("_hash") or column.endswith("_sha256"):
+                    explicit_unit = "sha256_identifier"
+                else:
+                    explicit_unit = "categorical_or_identifier"
             columns.append(
                 {
                     "name": column,
                     "dtype": str(df[column].dtype),
                     "nullable": bool(df[column].isna().any()),
-                    "unit": None if units is None else units.get(column),
+                    "unit": explicit_unit,
                     "domain": None if domains is None else domains.get(column),
                 }
             )
@@ -1225,17 +1299,46 @@ def _schema_catalog(
         "issue_stake_hhi": "fraction",
         "mean_issue_ticket_hhi": "fraction",
         "ticket_hhi": "fraction",
+        "requested_native_stake_yuan": "yuan",
+        "projection_residual_yuan": "yuan",
+        "minimum_fundable_capital_yuan": "yuan",
+        "max_drawdown_yuan": "yuan",
+        "max_drawdown_pct": "fraction",
+        "minimum_capital_yuan": "yuan",
+        "ex_largest_issue_ending_capital_yuan": "yuan",
+        "window_max_drawdown_pct": "fraction",
+        "candidate_ending_capital_yuan": "yuan",
+        "comparator_ending_capital_yuan": "yuan",
+        "candidate_turnover_yuan": "yuan",
+        "comparator_turnover_yuan": "yuan",
+        "candidate_funded_stake_yuan": "yuan",
+        "comparator_funded_stake_yuan": "yuan",
+        "candidate_gross_payout_yuan": "yuan",
+        "comparator_gross_payout_yuan": "yuan",
+        "candidate_post_issue_bankroll_yuan": "yuan",
+        "comparator_post_issue_bankroll_yuan": "yuan",
+        "matched_issue_bankroll_lift_yuan": "yuan",
+        "matched_issue_payout_lift_yuan": "yuan",
+        "control_joint_probability": "fraction",
+        "predicted_sp_product": "decimal_odds",
+        "sp_uncertainty": "decimal_odds",
+    }
+    metric_domains = {
+        "ex_largest_issue_definition": ["REMOVE_MAX_FUNDED_STAKE_YUAN_STABLE_ISSUE_ORDER_TIEBREAK"],
+        "ticket_hhi": "[0,1]; issue repeats aggregated by immutable ticket_identity before stake-share squaring",
+        "mean_issue_ticket_hhi": "[0,1]; arithmetic mean of identity-aggregated issue ticket_hhi",
+        "window_max_drawdown_pct": "[0,1]; window-start bankroll anchor and window-local running peak",
     }
     return {
         "version": VERSION,
         "primary_economics": "PRE_TAX",
         "reference_economics": "TAX_ADJUSTED_0.65_REFERENCE_ONLY",
         "tables": [
-            table(requests, name="active_research_ticket_requests.parquet", pk=["split", "issue", "policy", "k", "rank"], relationships=["one source ticket row per frozen #206 request"], domains={"panel_role": ["CONTROLLING", "SENSITIVITY_ONLY"]}),
+            table(requests, name="active_research_ticket_requests.parquet", pk=["split", "issue", "policy", "k", "rank"], relationships=["one source ticket row per frozen #206 request"], domains={"panel_role": ["CONTROLLING", "SENSITIVITY_ONLY"]}, units=common_units),
             table(safe, name="safe_reference_ledger.csv", pk=["split", "issue", "reference"], relationships=["separate lower-exposure lane; never active evidence"], domains={"experiment_role": ["SAFE_FALLBACK_MIXED", "CASH"]}, units=common_units),
-            table(ledger, name="issue_capital_ledger.parquet", pk=["split", "policy", "k", "controller", "issue"], relationships=["one bankroll replay row per issue"], units=common_units),
-            table(metrics, name="capital_summary.csv", pk=["split", "policy", "k", "controller"], relationships=["path-level summary derived from issue_capital_ledger"], units=common_units),
-            table(rolling, name="rolling_window_metrics.csv", pk=["split", "policy", "k", "controller", "window_issues", "observation_index"], relationships=["anchored rolling windows derived from issue_capital_ledger"], units=common_units),
+            table(ledger, name="issue_capital_ledger.parquet", pk=["split", "policy", "k", "controller", "issue"], relationships=["one bankroll replay row per issue"], units=common_units, domains=metric_domains),
+            table(metrics, name="capital_summary.csv", pk=["split", "policy", "k", "controller"], relationships=["path-level summary derived from issue_capital_ledger; ex-largest removes maximum funded-stake issue with stable issue-order tie-break"], units=common_units, domains=metric_domains),
+            table(rolling, name="rolling_window_metrics.csv", pk=["split", "policy", "k", "controller", "window_issues", "observation_index"], relationships=["anchored rolling windows derived from issue_capital_ledger"], units=common_units, domains=metric_domains),
             table(matched, name="matched_comparisons.csv", pk=["comparison_role", "split", "policy", "k", "candidate_controller", "comparator_controller"], relationships=["decisive matched comparator summary"], units=common_units),
             table(matched_issue, name="matched_comparator_issue_ledger.parquet", pk=["comparison_role", "split", "policy", "k", "candidate_controller", "comparator_controller", "issue"], relationships=["issue-by-issue replay for matched comparisons"], units=common_units),
             table(matched_ticket, name="matched_ticket_tax_lot_ledger.parquet", pk=["comparison_role", "side", "split", "policy", "k", "candidate_controller", "comparator_controller", "controller", "issue", "rank"], relationships=["ticket/tax-lot replay for matched comparisons"], units=common_units),
