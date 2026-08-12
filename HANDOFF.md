@@ -1,6 +1,6 @@
-# HANDOFF — Issue #207 EV round 4
+# HANDOFF — Issue #207 EV round 5
 
-[SESSION] 20260812_185925_8900fb
+[SESSION] 20260812_204736_734e74
 
 Current branch: `analyst/bj207-active-n7-bankroll-r3` (push target: `analyst/bj207-issue`)
 
@@ -8,39 +8,26 @@ Current HEAD: resolve with `git rev-parse HEAD` after commit.
 
 ## Completed
 
-- Resumed from the latest independent EV REJECT at audited SHA `11f82eaee6052b492b95cefc4eb915d657b34151`.
-- Metric-semantics full sweep: issue-level `ticket_hhi` now aggregates repeat stake by immutable `ticket_identity` before squaring shares; path-level `mean_issue_ticket_hhi` consumes the corrected values. Added a duplicate-identity golden test and independently recomputed all 13,560 issue rows (0 mismatches).
-- Evidence-completeness full sweep: normalized one materialization helper across every identified comparison role. All 87 identified summary groups now have complete issue and ticket/tax-lot primitives: 45 equal-funding, 32 MARKET_WR/K8 reference, and 10 strongest score-weighted component groups. Summary→issue and summary→ticket anti-joins are both zero.
-- Schema-semantics full sweep: every published column now has a non-null machine unit/category, all named economic/probability/risk fields have explicit units, and HHI/rolling definitions have domains.
-- Froze ex-largest as `REMOVE_MAX_FUNDED_STAKE_YUAN_STABLE_ISSUE_ORDER_TIEBREAK`; recomputed all path rows from primitive issue ledgers and added tests.
-- Regenerated the immutable 22-payload package and clean-executed the notebook.
-
-## Terminal outcome
-
-- `ENGINE_VALID=true`
-- `ACTIVE_OVERLAY_EVIDENCE=false`
-- `DEPLOYABLE_POLICY=false`
-- CV_2022 frozen learned choice: `BOUNDED_NEURAL`
-- Negative freeze: `NATIVE_2_YUAN`
-- SAFE NO_BET/cash remain `LOWER_EXPOSURE_ONLY`.
+- Fresh-session rework from the latest independent EV REJECT at audited SHA `ef38855194bdacfc213d751a88243a934092b50d`.
+- Publication-state full sweep: successful immutable packages now replace `_STAGE_RUN_STATE.json` with frozen `COMPLETED` before manifest creation/fsync/publish; verifier rejects any other state, including a re-manifested `IN_PROGRESS` marker.
+- Reason-code full sweep: every zero-funded active branch now distinguishes bankroll below ¥2 (`NO_BET_INSUFFICIENT_CAPITAL`), requested/risk budget below ¥2 (`NO_BET_REQUEST_BUDGET_BELOW_MINIMUM`), and defensive integer-projection infeasibility. Regenerated evidence has 1,665 bankroll-shortfall rows, 524 request-budget-shortfall rows, and zero causal mismatches.
+- Required-metric full sweep: `capital_summary.csv` now publishes independently verified rolling 5/10/20 loss probability and deterministic worst-window return/start/end identity (12 explicit aggregate columns), while preserving primitive windows.
+- Schema full sweep: audited all 242 published columns. Null units = 0; numeric columns classified as categorical/identifier = 0. Corrected the seven EV examples and added units for all new rolling aggregates.
+- Scientific-conclusion full sweep: removed the superseded positive `ACTIVE_OVERLAY_EVIDENCE=true` conclusion and stale values from Research Wiki and roadmap. Current terminal decision remains `ENGINE_VALID=true`, `ACTIVE_OVERLAY_EVIDENCE=false`, `DEPLOYABLE_POLICY=false`; CV_2022 frozen learned choice `BOUNDED_NEURAL`; negative freeze `NATIVE_2_YUAN`.
+- Regenerated the immutable 22-payload package and clean-executed the thin notebook.
 
 ## Evidence and receipts
 
-- Manifest SHA-256: `f0382738d77d41c18b61b0ef4915a1a20ebb547f7da6e9c676a5d47a889d39cd`.
+- Manifest SHA-256: `07e0298bde5390cf9371fabcf28b874890f2f05b88e5525cc3e952c518dc3558`.
 - Artifact counts: 68,880 active requests; 13,560 capital rows; 4,785 matched issue rows; 129,360 matched ticket/tax-lot rows.
-- Focused suite: `29 passed in 824.28s (0:13:44)`.
-- #206 + #207 regression: `67 passed in 932.93s (0:15:32)`.
-- Notebook: `PASS cells=6 executed=6 kernel=python3`; package verifier PASS afterward.
-- Independent replay: verifier PASS; `BYTE_IDENTICAL True PAYLOADS 22`.
-- Independent defect probes: 87/87 identified groups materialized in both primitive ledgers; HHI mismatches 0/13,560; schema null units 0.
-- Ruff, compileall and `git diff --check`: PASS.
-- Mandatory tamper coverage retained and rerun in the focused suite: payout/settlement; self-consistent ledger mutation; rewritten manifest; source trace/label/future information; plus schema/attribution/provenance/decision/model-choice and atomic interruption attacks.
-
-## Same-category inspection evidence
-
-- Metric semantics: `replay_path`, `_trace_frame`, `_path_metrics`, rolling/recovery consumers, summary/report/schema and tests.
-- Matched evidence: all three `_matched_comparisons` loops, `_matched_reference`, `_comparison_row`, issue/ticket PKs, verifier semantic replay and summary→primitive anti-joins.
-- Schema semantics: all tables emitted by `_schema_catalog`, explicit economic/probability/risk units, fallback categorical/count/boolean/json/hash units, HHI/rolling/ex-largest domains, and ex-largest report semantics.
+- Focused suite: `32 passed in 813.55s (0:13:33)`.
+- #206 + #207 regression: `70 passed in 936.33s (0:15:36)`.
+- Notebook: `PASS cells=6 executed=6 kernel=python3`; semantic verifier PASS afterward.
+- Semantic verifier: PASS with run state `COMPLETED`.
+- Independent replay: semantic verifier PASS; `BYTE_IDENTICAL True PAYLOADS 22`.
+- Static validation: Ruff, compileall and `git diff --check` PASS.
+- Same-category probes: zero-funded reason mismatches 0; schema null units 0/242; numeric-as-identifier 0/242; required rolling aggregate columns 12/12; stale positive conclusion token scan 0.
+- Mandatory tamper coverage remains in `tests/test_bj207_bankroll.py`: payout/settlement, accounting-balanced ledger mutation, rewritten manifest/run state, source trace/label/future mutation, plus schema/attribution/provenance/decision/model-choice and atomic interruption attacks.
 
 ## Known risks
 
@@ -48,6 +35,4 @@ Sparse N7 payouts, bounded candidate recall, overlap, predicted-SP error, intege
 
 ## Next state
 
-Next state must be `EV Review`.
-
-EV should independently recompute identity-aggregated issue HHI, verify all 87 matched summary groups have both primitive paths, check all schema units/domains and the maximum-funded-stake ex-largest definition, then rerun chronology, mandatory tamper classes, notebook clean-run and immutable replay at the exact PR HEAD. #208 remains blocked and receives no activation authority.
+Next state must be `EV Review` after final regression and replay receipts are recorded. EV should independently attack publication state, inspect all zero-funded reason classes, recompute rolling loss probabilities/worst-window identities, audit schema units/domains beyond the named examples, and scan every conclusion surface. #208 remains blocked and receives no activation authority.

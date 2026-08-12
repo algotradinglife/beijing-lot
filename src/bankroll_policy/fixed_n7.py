@@ -181,6 +181,15 @@ def _publish_stage(stage: Path, output: Path) -> None:
         raise
 
 
+def _zero_funding_reason(*, pre_bankroll_yuan: float, requested_stake_yuan: float) -> tuple[str, str]:
+    """Return the causal, mutually exclusive reason for a zero-ticket projection."""
+    if pre_bankroll_yuan < TICKET_STAKE:
+        return "BANKROLL_LT_NATIVE_TICKET", "NO_BET_INSUFFICIENT_CAPITAL"
+    if requested_stake_yuan < TICKET_STAKE:
+        return "REQUEST_BUDGET_LT_NATIVE_TICKET", "NO_BET_REQUEST_BUDGET_BELOW_MINIMUM"
+    return "INTEGER_PROJECTION_INFEASIBLE", "NO_BET_INTEGER_PROJECTION_INFEASIBLE"
+
+
 def _validate_nonnegative_finite(name: str, value: float) -> float:
     numeric = float(value)
     if not np.isfinite(numeric) or numeric < 0:
@@ -519,6 +528,11 @@ def replay_path(
             )
         ]
         issue_ticket_hhi = _ticket_identity_hhi(bundle.ticket_identity, counts)
+        unfunded_reason, reason_code = (
+            ("NONE", "FUNDED_ACTIVE")
+            if funded > 0
+            else _zero_funding_reason(pre_bankroll_yuan=pre, requested_stake_yuan=requested)
+        )
         rows.append(
             {
                 "split": split,
@@ -544,7 +558,7 @@ def replay_path(
                 "drawdown_yuan": peak - bankroll,
                 "drawdown_pct": 0.0 if peak == 0 else (peak - bankroll) / peak,
                 "active": funded > 0,
-                "unfunded_reason": "NONE" if funded > 0 else "BANKROLL_LT_NATIVE_TICKET",
+                "unfunded_reason": unfunded_reason,
                 "minimum_fundable_capital_yuan": TICKET_STAKE,
                 "ticket_count": int(counts.sum()),
                 # Aggregate selector ranks by immutable ticket identity before
@@ -552,7 +566,7 @@ def replay_path(
                 "ticket_hhi": issue_ticket_hhi,
                 "mean_pairwise_match_overlap": _mean_overlap(bundle),
                 "decision_trace_json": json.dumps(trace, ensure_ascii=False, separators=(",", ":"), allow_nan=False),
-                "reason_code": "FUNDED_ACTIVE" if funded > 0 else "NO_BET_INSUFFICIENT_CAPITAL",
+                "reason_code": reason_code,
                 "funding_schedule_source": "MATCHED_COMPARATOR_REPLAY" if funding_schedule is not None else "SELF_FUNDED_REPLAY",
             }
         )
@@ -797,6 +811,31 @@ def _path_metrics(ledger: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         by_ticket = ticket_slice.groupby("ticket_identity", sort=False).funded_stake_yuan.sum()
         ticket_share = by_ticket / by_ticket.sum() if by_ticket.sum() else np.zeros(len(by_ticket))
         recovery = _recovery_summary(path)
+        window_rows = _rolling_window_rows(path, dict(zip(keys, identity, strict=True)))
+        rolling_summary: dict[str, Any] = {}
+        for window in (5, 10, 20):
+            window_frame = pd.DataFrame([row for row in window_rows if row["window_issues"] == window])
+            valid = window_frame.loc[window_frame.window_return.notna()].copy()
+            prefix = f"rolling_{window}"
+            if valid.empty:
+                rolling_summary.update(
+                    {
+                        f"{prefix}_loss_probability": np.nan,
+                        f"{prefix}_worst_return": np.nan,
+                        f"{prefix}_worst_start_issue": None,
+                        f"{prefix}_worst_end_issue": None,
+                    }
+                )
+            else:
+                worst = valid.sort_values(["window_return", "observation_index"], kind="stable").iloc[0]
+                rolling_summary.update(
+                    {
+                        f"{prefix}_loss_probability": float(valid.window_loss.astype(bool).mean()),
+                        f"{prefix}_worst_return": float(worst.window_return),
+                        f"{prefix}_worst_start_issue": str(worst.start_issue),
+                        f"{prefix}_worst_end_issue": str(worst.end_issue),
+                    }
+                )
         summaries.append(
             {
                 **dict(zip(keys, identity, strict=True)),
@@ -822,9 +861,10 @@ def _path_metrics(ledger: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
                 "ex_largest_issue_ending_capital_yuan": float(INITIAL_BANKROLL + pnl.sum() - pnl[largest]),
                 "ex_largest_issue_definition": "REMOVE_MAX_FUNDED_STAKE_YUAN_STABLE_ISSUE_ORDER_TIEBREAK",
                 "capital_schedule_hash": str(path.capital_schedule_hash.iloc[0]),
+                **rolling_summary,
             }
         )
-        rolling.extend(_rolling_window_rows(path, dict(zip(keys, identity, strict=True))))
+        rolling.extend(window_rows)
     return pd.DataFrame(summaries), pd.DataFrame(rolling)
 
 
@@ -1322,7 +1362,19 @@ def _schema_catalog(
         "control_joint_probability": "fraction",
         "predicted_sp_product": "decimal_odds",
         "sp_uncertainty": "decimal_odds",
+        "mean_selected_sp_seed_std": "decimal_odds",
+        "max_selected_sp_seed_std": "decimal_odds",
+        "expected_pre_tax_net": "dimensionless_expected_net_return",
+        "log_sp_product": "natural_log_decimal_odds_product",
+        "mean_selected_sp": "decimal_odds",
+        "match_rank_mean": "rank",
+        "realized_gross": "gross_return_multiple",
     }
+    for window in (5, 10, 20):
+        common_units[f"rolling_{window}_loss_probability"] = "fraction"
+        common_units[f"rolling_{window}_worst_return"] = "fraction"
+        common_units[f"rolling_{window}_worst_start_issue"] = "issue_identifier"
+        common_units[f"rolling_{window}_worst_end_issue"] = "issue_identifier"
     metric_domains = {
         "ex_largest_issue_definition": ["REMOVE_MAX_FUNDED_STAKE_YUAN_STABLE_ISSUE_ORDER_TIEBREAK"],
         "ticket_hhi": "[0,1]; issue repeats aggregated by immutable ticket_identity before stake-share squaring",
@@ -1597,6 +1649,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
             encoding="utf-8",
             newline="\n",
         )
+        _json(_stage_marker(stage), {"status": "COMPLETED", "version": VERSION})
         payloads = {
             path.relative_to(stage).as_posix(): _digest(path)
             for path in sorted(stage.rglob("*"))
@@ -1621,6 +1674,9 @@ def run(inputs: Inputs) -> dict[str, Any]:
 
 def verify(output: Path) -> dict[str, Any]:
     output = output.resolve()
+    run_state = json.loads((output / STAGE_MARKER).read_text(encoding="utf-8"))
+    if run_state != {"status": "COMPLETED", "version": VERSION}:
+        raise Stage4Error("published package does not carry the frozen COMPLETED state")
     expected = json.loads((output / "SHA256SUMS.json").read_text(encoding="utf-8"))
     actual = {
         path.relative_to(output).as_posix(): _digest(path)
@@ -1742,7 +1798,14 @@ def verify(output: Path) -> dict[str, Any]:
         matched.loc[identified, "comparator_schedule_hash"]
     ).all():
         raise Stage4Error("matched capital schedule hash mismatch")
-    metrics = pd.read_csv(output / "capital_summary.csv")
+    metrics = pd.read_csv(
+        output / "capital_summary.csv",
+        dtype={
+            f"rolling_{window}_worst_{boundary}_issue": "string"
+            for window in (5, 10, 20)
+            for boundary in ("start", "end")
+        },
+    )
     rolling = pd.read_csv(
         output / "rolling_window_metrics.csv",
         dtype={"start_issue": "string", "end_issue": "string"},

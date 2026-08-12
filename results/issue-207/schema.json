@@ -128,21 +128,21 @@
           "dtype": "float64",
           "name": "mean_selected_sp_seed_std",
           "nullable": false,
-          "unit": "categorical_or_identifier"
+          "unit": "decimal_odds"
         },
         {
           "domain": null,
           "dtype": "float64",
           "name": "max_selected_sp_seed_std",
           "nullable": false,
-          "unit": "categorical_or_identifier"
+          "unit": "decimal_odds"
         },
         {
           "domain": null,
           "dtype": "float64",
           "name": "expected_pre_tax_net",
           "nullable": false,
-          "unit": "categorical_or_identifier"
+          "unit": "dimensionless_expected_net_return"
         },
         {
           "domain": null,
@@ -156,7 +156,7 @@
           "dtype": "float64",
           "name": "log_sp_product",
           "nullable": false,
-          "unit": "categorical_or_identifier"
+          "unit": "natural_log_decimal_odds_product"
         },
         {
           "domain": null,
@@ -177,7 +177,7 @@
           "dtype": "float64",
           "name": "mean_selected_sp",
           "nullable": false,
-          "unit": "categorical_or_identifier"
+          "unit": "decimal_odds"
         },
         {
           "domain": null,
@@ -191,7 +191,7 @@
           "dtype": "float64",
           "name": "match_rank_mean",
           "nullable": false,
-          "unit": "categorical_or_identifier"
+          "unit": "rank"
         },
         {
           "domain": null,
@@ -212,7 +212,7 @@
           "dtype": "float64",
           "name": "realized_gross",
           "nullable": true,
-          "unit": "categorical_or_identifier"
+          "unit": "gross_return_multiple"
         },
         {
           "domain": null,
@@ -834,6 +834,90 @@
           "name": "capital_schedule_hash",
           "nullable": false,
           "unit": "sha256_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_5_loss_probability",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_5_worst_return",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_5_worst_start_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_5_worst_end_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_10_loss_probability",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_10_worst_return",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_10_worst_start_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_10_worst_end_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_20_loss_probability",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_20_worst_return",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_20_worst_start_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_20_worst_end_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
         },
         {
           "domain": null,

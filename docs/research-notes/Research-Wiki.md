@@ -929,13 +929,14 @@ aliases 折叠为 10 个不同 issue-economic identities；其中 Z100/K1 的 52
 K16/K32 降为敏感性。主动 Lane A 不是 #206 的空 NO_BET 账本；安全 Lane B 则把
 NO_BET 与 cash 单独保留为 `LOWER_EXPOSURE_ONLY`，禁止把少下注或不下注伪装成 Edge。
 
-simple logistic 先于 bounded neural 训练；CV-2021 拟合、CV-2022 冻结 1% 风险偏好、
-CV-2023 一次终局历史结算。MARKET_WOR/K8/simple 在相同可执行人民币资金日程上比
-equal weights 多 ¥4,012.10 终值、少 4.0121pp 最大回撤，也比 score-weighted 多
-¥4,137.48；因此 `ACTIVE_OVERLAY_EVIDENCE=true`，但仅有一格稀疏命中支持。
-绝对最强 K8 仍是 native ¥2 的 MARKET_WOR：终值 ¥99,245.38、收益 -0.7546%、
-最大回撤 0.7546%。由于 Stage-3 可比接受基线未解决且没有独立确认，
-`DEPLOYABLE_POLICY=false`，#208 继续等待 PI 明确激活。详见
+simple logistic 先于 bounded neural 训练；CV-2021 拟合，CV-2022 冻结风险偏好并在
+两种 learned controller 中选择 `BOUNDED_NEURAL`，CV-2023 只执行该冻结选择的一次终局
+历史结算。严格 matched-active 判据下没有正向 K8 行，因此
+`ACTIVE_OVERLAY_EVIDENCE=false`；先前 MARKET_WOR/K8/simple 的正向同窗结果仅是
+未通过 split-local 选择边界的历史敏感性，不能作为 Stage-4 证据。绝对最强 K8 路径为
+MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻结最简单的
+`NATIVE_2_YUAN` 主动控制，不把 cash 解释为最优模型。由于 Stage-3 可比接受基线未解决
+且没有独立确认，`DEPLOYABLE_POLICY=false`，#208 继续等待 PI 明确激活。详见
 [`issue_207_fixed_n7_bankroll`](../research/issue_207_fixed_n7_bankroll.md)。
 
 ## 相关笔记

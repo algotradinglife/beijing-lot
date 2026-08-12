@@ -20,9 +20,11 @@ from bankroll_policy.fixed_n7 import (
     _notebook_contract_digest,
     _publish_stage,
     _project_counts,
+    _path_metrics,
     _rolling_window_rows,
     _ticket_identity_hhi,
     _validate_candidates,
+    _zero_funding_reason,
     reconstruct_active_requests,
     replay_path,
     run,
@@ -54,6 +56,21 @@ def test_integer_projection_conserves_budget_with_sub_yen2_residual() -> None:
 def test_projection_rejects_invalid_simplex() -> None:
     with pytest.raises(Stage4Error, match="simplex"):
         _project_counts(np.asarray([0.7, -0.1, 0.4]), 100.0)
+
+
+def test_zero_funding_reasons_distinguish_bankroll_budget_and_projection() -> None:
+    assert _zero_funding_reason(pre_bankroll_yuan=1.5, requested_stake_yuan=1.5) == (
+        "BANKROLL_LT_NATIVE_TICKET",
+        "NO_BET_INSUFFICIENT_CAPITAL",
+    )
+    assert _zero_funding_reason(pre_bankroll_yuan=7.0, requested_stake_yuan=1.75) == (
+        "REQUEST_BUDGET_LT_NATIVE_TICKET",
+        "NO_BET_REQUEST_BUDGET_BELOW_MINIMUM",
+    )
+    assert _zero_funding_reason(pre_bankroll_yuan=7.0, requested_stake_yuan=2.0) == (
+        "INTEGER_PROJECTION_INFEASIBLE",
+        "NO_BET_INTEGER_PROJECTION_INFEASIBLE",
+    )
 
 
 @pytest.mark.parametrize("budget", [-1.0, np.nan, np.inf])
@@ -183,8 +200,26 @@ def test_issue_ticket_hhi_aggregates_duplicate_immutable_identities() -> None:
 
 def test_schema_units_and_ex_largest_definition_are_complete() -> None:
     schema = json.loads((ROOT / "results/issue-207/schema.json").read_text())
+    expected_numeric_units = {
+        "mean_selected_sp_seed_std": "decimal_odds",
+        "max_selected_sp_seed_std": "decimal_odds",
+        "expected_pre_tax_net": "dimensionless_expected_net_return",
+        "log_sp_product": "natural_log_decimal_odds_product",
+        "mean_selected_sp": "decimal_odds",
+        "match_rank_mean": "rank",
+        "realized_gross": "gross_return_multiple",
+    }
+    observed = {}
     for table in schema["tables"]:
         assert all(column["unit"] is not None for column in table["columns"]), table["name"]
+        observed.update({column["name"]: column["unit"] for column in table["columns"]})
+        assert not [
+            column["name"]
+            for column in table["columns"]
+            if column["unit"] == "categorical_or_identifier"
+            and ("int" in column["dtype"] or "float" in column["dtype"])
+        ], table["name"]
+    assert {name: observed[name] for name in expected_numeric_units} == expected_numeric_units
     summary = pd.read_csv(ROOT / "results/issue-207/capital_summary.csv")
     ledger = pd.read_parquet(ROOT / "results/issue-207/issue_capital_ledger.parquet")
     expected_definition = "REMOVE_MAX_FUNDED_STAKE_YUAN_STABLE_ISSUE_ORDER_TIEBREAK"
@@ -235,6 +270,39 @@ def test_rolling_window_drawdown_is_local_to_window_peak() -> None:
     first = next(row for row in rows if row["window_issues"] == 5)
     assert first["time_zero_anchor"] is True
     assert first["window_max_drawdown_pct"] == pytest.approx(0.25, abs=1e-12)
+
+
+def test_path_summary_publishes_rolling_loss_probability_and_worst_window() -> None:
+    ledger = pd.read_parquet(ROOT / "results/issue-207/issue_capital_ledger.parquet")
+    summary, rolling = _path_metrics(ledger)
+    for window in (5, 10, 20):
+        assert f"rolling_{window}_loss_probability" in summary
+        assert f"rolling_{window}_worst_return" in summary
+        assert f"rolling_{window}_worst_start_issue" in summary
+        assert f"rolling_{window}_worst_end_issue" in summary
+    key = ("CV_2023", "MARKET_WR", 8, "NATIVE_2_YUAN")
+    row = summary.loc[
+        summary.split.eq(key[0])
+        & summary.policy.eq(key[1])
+        & summary.k.eq(key[2])
+        & summary.controller.eq(key[3])
+    ].iloc[0]
+    for window in (5, 10, 20):
+        windows = rolling.loc[
+            rolling.split.eq(key[0])
+            & rolling.policy.eq(key[1])
+            & rolling.k.eq(key[2])
+            & rolling.controller.eq(key[3])
+            & rolling.window_issues.eq(window)
+            & rolling.window_return.notna()
+        ]
+        worst = windows.sort_values(["window_return", "observation_index"], kind="stable").iloc[0]
+        assert row[f"rolling_{window}_loss_probability"] == pytest.approx(
+            windows.window_loss.astype(bool).mean()
+        )
+        assert row[f"rolling_{window}_worst_return"] == pytest.approx(worst.window_return)
+        assert str(row[f"rolling_{window}_worst_start_issue"]) == str(worst.start_issue)
+        assert str(row[f"rolling_{window}_worst_end_issue"]) == str(worst.end_issue)
 
 
 def test_notebook_contract_digest_ignores_outputs_but_binds_source(tmp_path: Path) -> None:
@@ -297,6 +365,19 @@ def test_decision_ignores_unmatched_and_lower_exposure_rows() -> None:
     assert decision["ACTIVE_OVERLAY_EVIDENCE"] is False
     assert decision["negative_freeze"] == "NATIVE_2_YUAN"
     assert decision["frozen_learned_controller_choice"] == "SIMPLE_LOGISTIC"
+
+
+def test_semantic_verifier_rejects_nonterminal_run_state_even_after_remanifest(tmp_path: Path) -> None:
+    output = tmp_path / "issue-207"
+    shutil.copytree(ROOT / "results/issue-207", output)
+    marker = output / "_STAGE_RUN_STATE.json"
+    marker.write_text(
+        json.dumps({"status": "IN_PROGRESS", "version": "bj207-fixed-n7-bankroll-v2"}) + "\n",
+        encoding="utf-8",
+    )
+    _refresh_manifest(output)
+    with pytest.raises(Stage4Error, match="COMPLETED state"):
+        verify(output)
 
 
 def test_semantic_verifier_rejects_remanifested_safe_lane_pseudo_edge(tmp_path: Path) -> None:
