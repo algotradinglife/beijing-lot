@@ -9,8 +9,10 @@
     "python": "3.11.15",
     "scikit-learn": "1.9.0"
   },
-  "implementation_sha256": "b2c17732d4b1de07248cf27775d7f26d5650be77852f85cdf05d110b24a187a6",
+  "implementation_sha256": "3a51d68b8f76a9c4b5dc6915274e31b3020fde6255f574b948dc28a3706fdc99",
   "label_boundary": "CV_2021 fit; CV_2022 risk freeze; CV_2023 terminal evaluation; LOCKED_TEST labels unused",
+  "learned_controller_choice_boundary": "SIMPLE_LOGISTIC vs BOUNDED_NEURAL selected on CV_2022 only; only frozen choice is terminal-evidentiary on CV_2023",
+  "notebook_sha256": "f138eb988c8444d3b3039532f4e8349d347c63c5534c67eff1ae8b612dc5a04a",
   "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj207_bankroll.py run --output <new-directory>",
   "requirements_sha256": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
   "runner_sha256": "4edb8c49f506463dfb0cbfe424eb181e466461aab8d7f62eabcec5fa886bddb7",

@@ -3,6 +3,7 @@
   "activation_authority": false,
   "downstream_issue": 208,
   "downstream_state": "BLOCKED_PENDING_PI_TERMINAL_REVIEW_AND_EXPLICIT_ACTIVATION",
+  "frozen_learned_controller_choice": "BOUNDED_NEURAL",
   "identity_fields": [
     "policy",
     "k",
@@ -15,5 +16,6 @@
     "ACTIVE_OVERLAY_EVIDENCE",
     "DEPLOYABLE_POLICY"
   ],
-  "research_only": true
+  "research_only": true,
+  "terminal_evidentiary_split": "CV_2023"
 }

@@ -16,7 +16,9 @@
     "BOUNDED_NEURAL"
   ],
   "fit_split": "CV_2021",
+  "frozen_learned_controller_choice": "BOUNDED_NEURAL",
   "initial_bankroll_yuan": 100000.0,
+  "learned_controller_selection_split": "CV_2022",
   "neural_model": "sklearn.pipeline(StandardScaler, MLPClassifier)",
   "neural_parameters": {
     "alpha": 0.05,
@@ -47,6 +49,7 @@
     "solver": "lbfgs"
   },
   "terminal_evaluation_split": "CV_2023",
+  "terminal_evidentiary_split": "CV_2023",
   "ticket_stake_yuan": 2.0,
   "version": "bj207-fixed-n7-bankroll-v2"
 }

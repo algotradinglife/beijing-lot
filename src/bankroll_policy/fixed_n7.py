@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 import platform
 import shutil
-from typing import Any, Iterable
+from typing import Any
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -57,6 +57,19 @@ SOURCE_PACKAGE = Path("results/issue-206")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SCIENTIFIC_LOCK = REPOSITORY_ROOT / "requirements.txt"
 RUNNER = REPOSITORY_ROOT / "scripts/run_bj207_bankroll.py"
+NOTEBOOK = REPOSITORY_ROOT / "notebooks/research/issue-207/bj207_fixed_n7_bankroll.ipynb"
+ACTIVE_METHODS = (
+    "NATIVE_2_YUAN",
+    "EQUAL_1PCT",
+    "EQUAL_5PCT",
+    "EQUAL_25PCT",
+    "EQUAL_100PCT",
+    "SCORE_WEIGHTED_5PCT",
+    "SIMPLE_LOGISTIC",
+    "BOUNDED_NEURAL",
+)
+LEARNED_METHODS = ("SIMPLE_LOGISTIC", "BOUNDED_NEURAL")
+STAGE_MARKER = "_STAGE_RUN_STATE.json"
 
 
 class Stage4Error(RuntimeError):
@@ -115,12 +128,51 @@ def _fsync_tree(root: Path) -> None:
     _fsync_dir(root)
 
 
+def _stage_marker(stage: Path) -> Path:
+    return stage / STAGE_MARKER
+
+
+def _prepare_output_stage(output: Path) -> Path:
+    stage = output.with_name(f".{output.name}.stage")
+    if output.exists():
+        raise Stage4Error("immutable output path already exists")
+    if stage.exists():
+        shutil.rmtree(stage, ignore_errors=True)
+    stage.mkdir(parents=True)
+    _json(_stage_marker(stage), {"status": "IN_PROGRESS", "version": VERSION})
+    return stage
+
+
+def _remove_stage(stage: Path) -> None:
+    if stage.exists():
+        shutil.rmtree(stage, ignore_errors=True)
+
+
+def _validate_nonnegative_finite(name: str, value: float) -> float:
+    numeric = float(value)
+    if not np.isfinite(numeric) or numeric < 0:
+        raise Stage4Error(f"{name} must be finite and non-negative")
+    return numeric
+
+
 def _experiment_role(method: str) -> str:
     if method in {"SIMPLE_LOGISTIC", "BOUNDED_NEURAL"}:
         return "ACTIVE_LEARNED_ONLY"
     if method == "SCORE_WEIGHTED_5PCT":
         return "ACTIVE_SCORE_WEIGHTED_CONTROL"
     return "ACTIVE_EQUAL_FUNDING_CONTROL"
+
+
+def _method_family(method: str) -> str:
+    if method in LEARNED_METHODS:
+        return "LEARNED_CONTROLLER"
+    if method == "SCORE_WEIGHTED_5PCT":
+        return "SCORE_WEIGHTED_CONTROL"
+    if method == "NATIVE_2_YUAN":
+        return "NATIVE_EQUAL_CONTROL"
+    if method.startswith("EQUAL_"):
+        return "EQUAL_FUNDING_CONTROL"
+    raise Stage4Error(f"unknown method family {method}")
 
 
 def _environment() -> dict[str, str]:
@@ -168,6 +220,10 @@ def _validate_candidates(frame: pd.DataFrame) -> None:
         raise Stage4Error("non-finite Stage-4 pre-event input")
     if not (frame.control_joint_probability > 0).all() or not (frame.predicted_sp_product > 0).all():
         raise Stage4Error("non-positive Stage-4 probability/SP input")
+    if not frame.labels_available.astype(bool).loc[frame.split.isin(["CV_2021", "CV_2022", "CV_2023"])].all():
+        raise Stage4Error("historical candidate ledger has missing labels")
+    if frame.labels_available.astype(bool).loc[frame.split.eq("LOCKED_TEST")].any():
+        raise Stage4Error("future/locked labels leaked into Stage 4")
     if set(frame.split) != {"CV_2021", "CV_2022", "CV_2023", "LOCKED_TEST"}:
         raise Stage4Error("chronology split mismatch")
     for row in frame.itertuples(index=False):
@@ -179,6 +235,23 @@ def _validate_candidates(frame: pd.DataFrame) -> None:
         cells = json.loads(row.source_cells_json)
         if not isinstance(cells, list) or len(cells) != N:
             raise Stage4Error("malformed seven-cell source trace")
+        for cell in cells:
+            if not isinstance(cell, dict):
+                raise Stage4Error("malformed source trace entry")
+            if {
+                "match_idx",
+                "outcome",
+                "control_probability",
+                "predicted_final_sp",
+                "predicted_final_sp_seed_std",
+                "probability_source",
+                "probability_source_grade",
+            } - set(cell):
+                raise Stage4Error("incomplete source trace entry")
+            if not np.isfinite(float(cell["control_probability"])) or float(cell["control_probability"]) <= 0:
+                raise Stage4Error("non-finite source-trace probability")
+            if not np.isfinite(float(cell["predicted_final_sp"])) or float(cell["predicted_final_sp"]) <= 0:
+                raise Stage4Error("non-finite source-trace predicted SP")
 
 
 def _fit_stage3_models(candidates: pd.DataFrame) -> dict[str, Any]:
@@ -326,6 +399,16 @@ def _risk_fraction(method: str, calibrated: dict[str, float]) -> float | None:
     return calibrated[method]
 
 
+def _validate_funding_schedule(selected: pd.DataFrame, funding_schedule: dict[str, float]) -> dict[str, float]:
+    if not funding_schedule:
+        raise Stage4Error("empty matched funding schedule")
+    expected = [str(value) for value in selected.issue.astype(str).tolist()]
+    provided = {str(issue): _validate_nonnegative_finite("schedule stake", stake) for issue, stake in funding_schedule.items()}
+    if set(provided) != set(expected):
+        raise Stage4Error("matched funding schedule issue set mismatch")
+    return {issue: provided[issue] for issue in expected}
+
+
 def replay_path(
     requests: pd.DataFrame,
     *,
@@ -342,16 +425,18 @@ def replay_path(
     ].copy()
     if selected.empty:
         raise Stage4Error("empty active panel cannot become a cash path")
+    if funding_schedule is not None:
+        funding_schedule = _validate_funding_schedule(selected, funding_schedule)
     selected["_issue_num"] = pd.to_numeric(selected.issue, errors="raise")
     selected = selected.sort_values(["year", "_issue_num", "rank"], kind="stable")
-    bankroll = INITIAL_BANKROLL
+    bankroll = _validate_nonnegative_finite("initial bankroll", INITIAL_BANKROLL)
     peak = bankroll
     rows: list[dict[str, Any]] = []
     fraction = _risk_fraction(method, calibrated)
     for (_, issue), bundle in selected.groupby(["year", "issue"], sort=False):
         if not bundle.labels_available.astype(bool).all():
             raise Stage4Error(f"settlement labels unavailable for {split}/{issue}")
-        pre = bankroll
+        pre = _validate_nonnegative_finite("pre-issue bankroll", bankroll)
         weights = _weights(bundle, method, controllers)
         requested = (
             float(funding_schedule[str(issue)])
@@ -360,15 +445,21 @@ def replay_path(
             if fraction is None
             else pre * fraction
         )
+        requested = _validate_nonnegative_finite("requested stake", requested)
         if funding_schedule is not None and requested > pre + 1e-9:
             raise Stage4Error("NOT_IDENTIFIABLE_NO_COMMON_EXECUTABLE_SCHEDULE")
         budget = min(pre, requested)
+        budget = _validate_nonnegative_finite("funding budget", budget)
         counts, residual = _project_counts(weights, budget)
         funded = float(counts.sum() * TICKET_STAKE)
+        if not np.isfinite(funded) or funded < 0:
+            raise Stage4Error("negative or non-finite funded stake")
         pre_tax_multiples = bundle.pre_tax_gross_multiple.to_numpy(dtype=float)
         tax_adjusted_multiples = bundle.tax_adjusted_gross_multiple.to_numpy(dtype=float)
         payout = float(np.sum(counts * TICKET_STAKE * pre_tax_multiples))
         tax_adjusted_payout = float(np.sum(counts * TICKET_STAKE * tax_adjusted_multiples))
+        if not np.isfinite(payout) or not np.isfinite(tax_adjusted_payout):
+            raise Stage4Error("non-finite payout")
         bankroll = pre - funded + payout
         if funded < -1e-9 or funded > pre + 1e-9 or bankroll < -1e-9:
             raise Stage4Error("bankroll conservation/funding violation")
@@ -402,6 +493,7 @@ def replay_path(
                 "k": int(k),
                 "panel_role": "CONTROLLING" if k == CONTROLLING_K else "SENSITIVITY_ONLY",
                 "controller": method,
+                "controller_family": _method_family(method),
                 "experiment_role": _experiment_role(method),
                 "risk_fraction": np.nan if fraction is None else fraction,
                 "pre_issue_bankroll_yuan": pre,
@@ -424,6 +516,7 @@ def replay_path(
                 "mean_pairwise_match_overlap": _mean_overlap(bundle),
                 "decision_trace_json": json.dumps(trace, ensure_ascii=False, separators=(",", ":"), allow_nan=False),
                 "reason_code": "FUNDED_ACTIVE" if funded > 0 else "NO_BET_INSUFFICIENT_CAPITAL",
+                "funding_schedule_source": "MATCHED_COMPARATOR_REPLAY" if funding_schedule is not None else "SELF_FUNDED_REPLAY",
             }
         )
     result = pd.DataFrame(rows)
@@ -485,8 +578,137 @@ def _calibrate_risk(
     return calibrated, surface
 
 
+def _trace_frame(ledger: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    base = [
+        "split",
+        "policy",
+        "k",
+        "controller",
+        "year",
+        "issue",
+        "controller_family",
+        "experiment_role",
+        "risk_fraction",
+        "pre_issue_bankroll_yuan",
+        "funded_stake_yuan",
+        "capital_schedule_hash",
+    ]
+    for row in ledger.loc[:, base + ["decision_trace_json"]].itertuples(index=False):
+        for trace in json.loads(row.decision_trace_json):
+            rows.append(
+                {
+                    "split": row.split,
+                    "policy": row.policy,
+                    "k": int(row.k),
+                    "controller": row.controller,
+                    "year": int(row.year),
+                    "issue": str(row.issue),
+                    "controller_family": row.controller_family,
+                    "experiment_role": row.experiment_role,
+                    "risk_fraction": row.risk_fraction,
+                    "pre_issue_bankroll_yuan": float(row.pre_issue_bankroll_yuan),
+                    "issue_funded_stake_yuan": float(row.funded_stake_yuan),
+                    "capital_schedule_hash": row.capital_schedule_hash,
+                    "rank": int(trace["rank"]),
+                    "ticket_identity": str(trace["ticket_identity"]),
+                    "weight": float(trace["weight"]),
+                    "repeat_count": int(trace["repeat_count"]),
+                    "tax_lot_count": int(trace["repeat_count"]),
+                    "funded_stake_yuan": float(trace["funded_stake_yuan"]),
+                    "pre_tax_gross_multiple": float(trace["pre_tax_gross_multiple"]),
+                    "tax_adjusted_gross_multiple": float(trace["tax_adjusted_gross_multiple"]),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _recovery_summary(path: pd.DataFrame) -> dict[str, int]:
+    longest_completed = 0
+    completed = 0
+    open_terminal = 0
+    current = 0
+    underwater = path.post_issue_bankroll_yuan.lt(path.running_peak_yuan).tolist()
+    for active in underwater:
+        if active:
+            current += 1
+            continue
+        if current:
+            completed += 1
+            longest_completed = max(longest_completed, current)
+            current = 0
+    if current:
+        open_terminal = current
+    return {
+        "completed_recovery_episodes": completed,
+        "max_completed_recovery_issues": longest_completed,
+        "terminal_open_underwater_issues": open_terminal,
+    }
+
+
+def _rolling_window_rows(path: pd.DataFrame, keys: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    ordered = path.sort_values(["year", "issue"], kind="stable").reset_index(drop=True)
+    anchors = pd.DataFrame(
+        [
+            {
+                "issue": "TIME_ZERO_100K",
+                "year": 0,
+                "post_issue_bankroll_yuan": INITIAL_BANKROLL,
+                "drawdown_pct": 0.0,
+                "active": False,
+            }
+        ]
+    )
+    capital = pd.concat([anchors, ordered.loc[:, ["issue", "year", "post_issue_bankroll_yuan", "drawdown_pct", "active"]]], ignore_index=True)
+    for window in (5, 10, 20):
+        if len(capital) <= window:
+            rows.append(
+                {
+                    **keys,
+                    "window_issues": window,
+                    "start_issue": "TIME_ZERO_100K",
+                    "end_issue": None,
+                    "observation_index": 0,
+                    "start_bankroll_yuan": INITIAL_BANKROLL,
+                    "end_bankroll_yuan": np.nan,
+                    "window_return": np.nan,
+                    "window_pnl_yuan": np.nan,
+                    "window_loss": np.nan,
+                    "window_max_drawdown_pct": np.nan,
+                    "active_issues_in_window": 0,
+                    "time_zero_anchor": True,
+                }
+            )
+            continue
+        for end in range(window, len(capital)):
+            start = end - window
+            start_capital = float(capital.loc[start, "post_issue_bankroll_yuan"])
+            end_capital = float(capital.loc[end, "post_issue_bankroll_yuan"])
+            window_slice = ordered.iloc[start:end]
+            rows.append(
+                {
+                    **keys,
+                    "window_issues": window,
+                    "start_issue": str(capital.loc[start, "issue"]),
+                    "end_issue": str(capital.loc[end, "issue"]),
+                    "observation_index": int(end - window + 1),
+                    "start_bankroll_yuan": start_capital,
+                    "end_bankroll_yuan": end_capital,
+                    "window_return": (end_capital / start_capital - 1.0) if start_capital > 0 else np.nan,
+                    "window_pnl_yuan": end_capital - start_capital,
+                    "window_loss": bool(end_capital < start_capital),
+                    "window_max_drawdown_pct": float(window_slice.drawdown_pct.max()) if not window_slice.empty else 0.0,
+                    "active_issues_in_window": int(window_slice.active.sum()) if not window_slice.empty else 0,
+                    "time_zero_anchor": start == 0,
+                }
+            )
+    return rows
+
+
 def _path_metrics(ledger: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
     keys = ["split", "policy", "k", "controller"]
+    ticket_trace = _trace_frame(ledger)
     summaries: list[dict[str, Any]] = []
     rolling: list[dict[str, Any]] = []
     for identity, path in ledger.groupby(keys, sort=False):
@@ -500,6 +722,15 @@ def _path_metrics(ledger: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
         stake = path.funded_stake_yuan.to_numpy(dtype=float)
         stake_share = stake / stake.sum() if stake.sum() else np.zeros(len(stake))
         largest = int(np.argmax(pnl)) if len(pnl) else 0
+        ticket_slice = ticket_trace.loc[
+            ticket_trace.split.eq(identity[0])
+            & ticket_trace.policy.eq(identity[1])
+            & ticket_trace.k.eq(identity[2])
+            & ticket_trace.controller.eq(identity[3])
+        ].copy()
+        by_ticket = ticket_slice.groupby("ticket_identity", sort=False).funded_stake_yuan.sum()
+        ticket_share = by_ticket / by_ticket.sum() if by_ticket.sum() else np.zeros(len(by_ticket))
+        recovery = _recovery_summary(path)
         summaries.append(
             {
                 **dict(zip(keys, identity, strict=True)),
@@ -514,38 +745,20 @@ def _path_metrics(ledger: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
                 "max_drawdown_pct": float(path.drawdown_pct.max()),
                 "max_consecutive_losing_issues": streak,
                 "time_under_water_issues": int((path.post_issue_bankroll_yuan < path.running_peak_yuan).sum()),
-                "recovery_issues_max": _max_recovery(path),
+                **recovery,
                 "ruin": bool(path.post_issue_bankroll_yuan.le(0).any()),
                 "near_ruin": bool(path.post_issue_bankroll_yuan.le(INITIAL_BANKROLL * 0.05).any()),
                 "minimum_capital_yuan": float(path.post_issue_bankroll_yuan.min()),
                 "issue_stake_hhi": float(np.sum(stake_share**2)),
-                "mean_ticket_hhi": float(path.ticket_hhi.mean()),
+                "mean_issue_ticket_hhi": float(path.ticket_hhi.mean()),
+                "ticket_identity_stake_hhi": float(np.sum(ticket_share**2)) if len(ticket_share) else 0.0,
                 "mean_overlap": float(path.mean_pairwise_match_overlap.mean()),
                 "ex_largest_issue_ending_capital_yuan": float(INITIAL_BANKROLL + pnl.sum() - pnl[largest]),
                 "capital_schedule_hash": str(path.capital_schedule_hash.iloc[0]),
             }
         )
-        for window in (5, 10, 20):
-            returns = path.post_issue_bankroll_yuan.pct_change(window).dropna()
-            rolling.append(
-                {
-                    **dict(zip(keys, identity, strict=True)),
-                    "window_issues": window,
-                    "observations": len(returns),
-                    "mean_return": float(returns.mean()) if len(returns) else np.nan,
-                    "loss_probability": float((returns < 0).mean()) if len(returns) else np.nan,
-                    "worst_return": float(returns.min()) if len(returns) else np.nan,
-                }
-            )
+        rolling.extend(_rolling_window_rows(path, dict(zip(keys, identity, strict=True))))
     return pd.DataFrame(summaries), pd.DataFrame(rolling)
-
-
-def _max_recovery(path: pd.DataFrame) -> int:
-    longest = current = 0
-    for underwater in path.post_issue_bankroll_yuan.lt(path.running_peak_yuan):
-        current = current + 1 if underwater else 0
-        longest = max(longest, current)
-    return longest
 
 
 def _matched_reference(
@@ -557,7 +770,7 @@ def _matched_reference(
     requests: pd.DataFrame,
     controllers: dict[str, Any],
     calibrated: dict[str, float],
-) -> pd.Series | None:
+) -> tuple[pd.Series | None, pd.DataFrame | None]:
     candidate_path = ledger.loc[
         ledger.split.eq("CV_2023")
         & ledger.policy.eq(candidate.policy)
@@ -584,10 +797,10 @@ def _matched_reference(
         )
     except Stage4Error as exc:
         if "NOT_IDENTIFIABLE_NO_COMMON_EXECUTABLE_SCHEDULE" in str(exc):
-            return None
+            return None, None
         raise
     reference_metrics, _ = _path_metrics(reference)
-    return reference_metrics.iloc[0]
+    return reference_metrics.iloc[0], reference
 
 
 def _comparison_row(
@@ -597,6 +810,8 @@ def _comparison_row(
     role: str,
     reference_label: str,
     attribution: str,
+    frozen_choice: str,
+    terminal_evidentiary: bool,
 ) -> dict[str, Any]:
     identified = reference is not None
     return {
@@ -619,29 +834,32 @@ def _comparison_row(
         "equal_capital_schedule": identified and str(candidate.capital_schedule_hash) == str(reference.capital_schedule_hash),
         "identifiability": "IDENTIFIED_MATCHED_ACTIVE_FUNDING" if identified else "NOT_IDENTIFIABLE_NO_COMMON_EXECUTABLE_SCHEDULE",
         "attribution": attribution if identified else "NOT_IDENTIFIABLE",
+        "frozen_learned_controller_choice": frozen_choice,
+        "terminal_evidentiary": bool(terminal_evidentiary),
     }
 
 
-def _matched_comparisons(
+def _freeze_learned_controller_choice(
     metrics: pd.DataFrame,
     ledger: pd.DataFrame,
     requests: pd.DataFrame,
     controllers: dict[str, Any],
     calibrated: dict[str, float],
-) -> pd.DataFrame:
-    test = metrics.loc[metrics.split.eq("CV_2023")].copy()
-    equal_by_fraction = {
-        0.01: "EQUAL_1PCT",
-        0.05: "EQUAL_5PCT",
-        0.25: "EQUAL_25PCT",
-        1.0: "EQUAL_100PCT",
-    }
+) -> tuple[str, pd.DataFrame]:
     rows: list[dict[str, Any]] = []
-    for row in test.itertuples(index=False):
-        if row.controller in {"NATIVE_2_YUAN"} or str(row.controller).startswith("EQUAL_"):
-            continue
-        comparator = "EQUAL_5PCT" if row.controller == "SCORE_WEIGHTED_5PCT" else equal_by_fraction[float(row.risk_fraction)]
-        reference = _matched_reference(
+    cv2022 = metrics.loc[
+        metrics.split.eq("CV_2022")
+        & metrics.k.eq(CONTROLLING_K)
+        & metrics.controller.isin(LEARNED_METHODS)
+    ].copy()
+    for row in cv2022.itertuples(index=False):
+        comparator = {
+            0.01: "EQUAL_1PCT",
+            0.05: "EQUAL_5PCT",
+            0.25: "EQUAL_25PCT",
+            1.0: "EQUAL_100PCT",
+        }[float(row.risk_fraction)]
+        reference, _ = _matched_reference(
             row,
             reference_policy=row.policy,
             reference_controller=comparator,
@@ -650,13 +868,133 @@ def _matched_comparisons(
             controllers=controllers,
             calibrated=calibrated,
         )
-        rows.append(_comparison_row(row, reference, role="EQUAL_FUNDING_CONTROL", reference_label=comparator, attribution="STAGE4_WITHIN_ISSUE_ALLOCATION"))
+        rows.append(
+            {
+                "split": "CV_2022",
+                "policy": row.policy,
+                "k": int(row.k),
+                "controller": row.controller,
+                "risk_fraction": float(row.risk_fraction),
+                "equal_funding_comparator": comparator,
+                "ending_capital_yuan": float(row.ending_capital_yuan),
+                "max_drawdown_pct": float(row.max_drawdown_pct),
+                "matched_lift_ending_capital_yuan": np.nan if reference is None else float(row.ending_capital_yuan - reference.ending_capital_yuan),
+                "matched_lift_max_drawdown_pct": np.nan if reference is None else float(reference.max_drawdown_pct - row.max_drawdown_pct),
+                "identifiability": "IDENTIFIED_MATCHED_ACTIVE_FUNDING" if reference is not None else "NOT_IDENTIFIABLE_NO_COMMON_EXECUTABLE_SCHEDULE",
+            }
+        )
+    freeze = pd.DataFrame(rows).sort_values(
+        ["matched_lift_ending_capital_yuan", "matched_lift_max_drawdown_pct", "ending_capital_yuan", "max_drawdown_pct", "controller", "policy"],
+        ascending=[False, False, False, True, True, True],
+        kind="stable",
+    )
+    chosen = str(freeze.controller.iloc[0])
+    freeze["selected_terminal_controller"] = freeze.controller.eq(chosen)
+    freeze["selection_split"] = "CV_2022"
+    freeze["terminal_evaluation_split"] = "CV_2023"
+    freeze["choice_rule"] = "select learned controller on CV_2022 only; prefer larger matched ending-capital lift, then non-worse matched drawdown lift, then higher ending capital, then lower drawdown"
+    return chosen, freeze
+
+
+def _matched_comparisons(
+    metrics: pd.DataFrame,
+    ledger: pd.DataFrame,
+    requests: pd.DataFrame,
+    controllers: dict[str, Any],
+    calibrated: dict[str, float],
+    *,
+    frozen_learned_choice: str,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    test = metrics.loc[metrics.split.eq("CV_2023")].copy()
+    equal_by_fraction = {
+        0.01: "EQUAL_1PCT",
+        0.05: "EQUAL_5PCT",
+        0.25: "EQUAL_25PCT",
+        1.0: "EQUAL_100PCT",
+    }
+    rows: list[dict[str, Any]] = []
+    issue_rows: list[dict[str, Any]] = []
+    ticket_rows: list[dict[str, Any]] = []
+    for row in test.itertuples(index=False):
+        if row.controller in {"NATIVE_2_YUAN"} or str(row.controller).startswith("EQUAL_"):
+            continue
+        comparator = "EQUAL_5PCT" if row.controller == "SCORE_WEIGHTED_5PCT" else equal_by_fraction[float(row.risk_fraction)]
+        reference, reference_ledger = _matched_reference(
+            row,
+            reference_policy=row.policy,
+            reference_controller=comparator,
+            ledger=ledger,
+            requests=requests,
+            controllers=controllers,
+            calibrated=calibrated,
+        )
+        terminal_evidentiary = row.controller not in LEARNED_METHODS or row.controller == frozen_learned_choice
+        rows.append(_comparison_row(row, reference, role="EQUAL_FUNDING_CONTROL", reference_label=comparator, attribution="STAGE4_WITHIN_ISSUE_ALLOCATION", frozen_choice=frozen_learned_choice, terminal_evidentiary=terminal_evidentiary))
+        if reference is not None:
+            candidate_path = ledger.loc[
+                ledger.split.eq("CV_2023")
+                & ledger.policy.eq(row.policy)
+                & ledger.k.eq(row.k)
+                & ledger.controller.eq(row.controller)
+            ].sort_values(["year", "issue"], kind="stable")
+            joined = candidate_path.merge(
+                reference_ledger.sort_values(["year", "issue"], kind="stable"),
+                on=["split", "year", "issue"],
+                how="inner",
+                suffixes=("_candidate", "_comparator"),
+            )
+            for issue_row in joined.itertuples(index=False):
+                issue_rows.append(
+                    {
+                        "comparison_role": "EQUAL_FUNDING_CONTROL",
+                        "split": issue_row.split,
+                        "policy": row.policy,
+                        "k": int(row.k),
+                        "candidate_controller": row.controller,
+                        "comparator_controller": comparator,
+                        "issue": str(issue_row.issue),
+                        "candidate_funded_stake_yuan": float(issue_row.funded_stake_yuan_candidate),
+                        "comparator_funded_stake_yuan": float(issue_row.funded_stake_yuan_comparator),
+                        "candidate_gross_payout_yuan": float(issue_row.gross_payout_yuan_candidate),
+                        "comparator_gross_payout_yuan": float(issue_row.gross_payout_yuan_comparator),
+                        "candidate_post_issue_bankroll_yuan": float(issue_row.post_issue_bankroll_yuan_candidate),
+                        "comparator_post_issue_bankroll_yuan": float(issue_row.post_issue_bankroll_yuan_comparator),
+                        "candidate_ticket_count": int(issue_row.ticket_count_candidate),
+                        "comparator_ticket_count": int(issue_row.ticket_count_comparator),
+                        "candidate_schedule_hash": issue_row.capital_schedule_hash_candidate,
+                        "comparator_schedule_hash": issue_row.capital_schedule_hash_comparator,
+                        "matched_issue_bankroll_lift_yuan": float(issue_row.post_issue_bankroll_yuan_candidate - issue_row.post_issue_bankroll_yuan_comparator),
+                        "matched_issue_payout_lift_yuan": float(issue_row.gross_payout_yuan_candidate - issue_row.gross_payout_yuan_comparator),
+                        "terminal_evidentiary": terminal_evidentiary,
+                        "frozen_learned_controller_choice": frozen_learned_choice,
+                    }
+                )
+            candidate_tickets = _trace_frame(candidate_path)
+            comparator_tickets = _trace_frame(reference_ledger)
+            ticket_rows.extend(
+                candidate_tickets.assign(
+                    comparison_role="EQUAL_FUNDING_CONTROL",
+                    comparator_controller=comparator,
+                    side="CANDIDATE",
+                    terminal_evidentiary=terminal_evidentiary,
+                    frozen_learned_controller_choice=frozen_learned_choice,
+                ).to_dict(orient="records")
+            )
+            ticket_rows.extend(
+                comparator_tickets.assign(
+                    comparison_role="EQUAL_FUNDING_CONTROL",
+                    comparator_controller=comparator,
+                    side="COMPARATOR",
+                    terminal_evidentiary=terminal_evidentiary,
+                    frozen_learned_controller_choice=frozen_learned_choice,
+                ).to_dict(orient="records")
+            )
     # Cross-policy MARKET_WR/K8 reference on the same controller and executable
     # issue-level schedule. Ticket identities stay distinct and source-bound.
     for row in test.loc[test.k.eq(CONTROLLING_K)].itertuples(index=False):
         if row.policy == "MARKET_WR":
             continue
-        reference = _matched_reference(
+        reference, _ = _matched_reference(
             row,
             reference_policy="MARKET_WR",
             reference_controller=row.controller,
@@ -665,7 +1003,7 @@ def _matched_comparisons(
             controllers=controllers,
             calibrated=calibrated,
         )
-        rows.append(_comparison_row(row, reference, role="MARKET_WR_K8_REFERENCE", reference_label=f"MARKET_WR/{row.controller}", attribution="STAGE3_TICKET_POLICY_EFFECT_WITH_STAGE4_HELD"))
+        rows.append(_comparison_row(row, reference, role="MARKET_WR_K8_REFERENCE", reference_label=f"MARKET_WR/{row.controller}", attribution="STAGE3_TICKET_POLICY_EFFECT_WITH_STAGE4_HELD", frozen_choice=frozen_learned_choice, terminal_evidentiary=(row.controller not in LEARNED_METHODS or row.controller == frozen_learned_choice)))
     # The score-weighted active component is reported even when the learned
     # controller selected a different CV-2022 risk fraction; that case is
     # explicitly non-identifiable rather than a fabricated zero effect.
@@ -673,7 +1011,7 @@ def _matched_comparisons(
         test.k.eq(CONTROLLING_K)
         & test.controller.isin(["SIMPLE_LOGISTIC", "BOUNDED_NEURAL"])
     ].itertuples(index=False):
-        reference = _matched_reference(
+        reference, _ = _matched_reference(
             row,
             reference_policy=row.policy,
             reference_controller="SCORE_WEIGHTED_5PCT",
@@ -682,8 +1020,8 @@ def _matched_comparisons(
             controllers=controllers,
             calibrated=calibrated,
         )
-        rows.append(_comparison_row(row, reference, role="STRONGEST_ACTIVE_COMPONENT_SCORE_WEIGHTED", reference_label="SCORE_WEIGHTED_5PCT", attribution="STAGE4_CONTROLLER_VS_SCORE_WEIGHTED"))
-    return pd.DataFrame(rows)
+        rows.append(_comparison_row(row, reference, role="STRONGEST_ACTIVE_COMPONENT_SCORE_WEIGHTED", reference_label="SCORE_WEIGHTED_5PCT", attribution="STAGE4_CONTROLLER_VS_SCORE_WEIGHTED", frozen_choice=frozen_learned_choice, terminal_evidentiary=(row.controller == frozen_learned_choice)))
+    return pd.DataFrame(rows), pd.DataFrame(issue_rows), pd.DataFrame(ticket_rows)
 
 
 def _safe_ledger(source: Path) -> pd.DataFrame:
@@ -712,13 +1050,16 @@ def _safe_ledger(source: Path) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def _decision(metrics: pd.DataFrame, matched: pd.DataFrame) -> dict[str, Any]:
+def _decision(metrics: pd.DataFrame, matched: pd.DataFrame, *, frozen_learned_choice: str) -> dict[str, Any]:
     controlling = matched.loc[
         matched.k.eq(CONTROLLING_K)
         & matched.equal_capital_schedule
         & matched.comparison_role.eq("EQUAL_FUNDING_CONTROL")
     ]
-    candidates = controlling.loc[controlling.candidate_controller.isin(["SIMPLE_LOGISTIC", "BOUNDED_NEURAL"])]
+    candidates = controlling.loc[
+        controlling.candidate_controller.eq(frozen_learned_choice)
+        & controlling.terminal_evidentiary.astype(bool)
+    ]
     evidence_rows = candidates.loc[
         (candidates.matched_lift_ending_capital_yuan > 0)
         & (candidates.matched_lift_max_drawdown_pct >= 0)
@@ -736,6 +1077,8 @@ def _decision(metrics: pd.DataFrame, matched: pd.DataFrame) -> dict[str, Any]:
         "sensitivity_k": [16, 32],
         "selection_split": "CV_2022",
         "terminal_historical_evaluation_split": "CV_2023",
+        "frozen_learned_controller_choice": frozen_learned_choice,
+        "terminal_evidentiary_rows_rule": "only the CV_2022-frozen learned controller may establish terminal CV_2023 active overlay evidence",
         "locked_test_boundary": "2025/2026 outcomes and official-final-SP labels unused",
         "negative_freeze": "NATIVE_2_YUAN" if evidence_rows.empty else None,
         "next_issue": "#208 receives schema/evidence only; remains blocked pending PI activation",
@@ -754,6 +1097,95 @@ def _assert_semantic_frame(actual: pd.DataFrame, expected: pd.DataFrame, label: 
         )
     except AssertionError as exc:
         raise Stage4Error(f"{label} semantic replay mismatch: {exc}") from exc
+
+
+def _json_equal(output: Path, name: str, expected: Any) -> None:
+    actual = json.loads((output / name).read_text(encoding="utf-8"))
+    if actual != expected:
+        raise Stage4Error(f"{name} semantic mismatch")
+
+
+def _schema_catalog(
+    requests: pd.DataFrame,
+    safe: pd.DataFrame,
+    ledger: pd.DataFrame,
+    metrics: pd.DataFrame,
+    rolling: pd.DataFrame,
+    matched: pd.DataFrame,
+    matched_issue: pd.DataFrame,
+    matched_ticket: pd.DataFrame,
+    attribution: pd.DataFrame,
+    calibration: pd.DataFrame,
+    freeze_choice: pd.DataFrame,
+) -> dict[str, Any]:
+    def table(df: pd.DataFrame, *, name: str, pk: list[str], fk: list[dict[str, Any]] | None = None, relationships: list[str] | None = None, units: dict[str, str] | None = None, domains: dict[str, list[Any] | str] | None = None) -> dict[str, Any]:
+        columns = []
+        for column in df.columns:
+            columns.append(
+                {
+                    "name": column,
+                    "dtype": str(df[column].dtype),
+                    "nullable": bool(df[column].isna().any()),
+                    "unit": None if units is None else units.get(column),
+                    "domain": None if domains is None else domains.get(column),
+                }
+            )
+        return {
+            "name": name,
+            "primary_key": pk,
+            "foreign_keys": fk or [],
+            "relationships": relationships or [],
+            "columns": columns,
+        }
+
+    common_units = {
+        "risk_fraction": "fraction",
+        "funded_stake_yuan": "yuan",
+        "requested_stake_yuan": "yuan",
+        "retained_cash_yuan": "yuan",
+        "gross_payout_yuan": "yuan",
+        "tax_adjusted_reference_payout_yuan": "yuan",
+        "net_pnl_yuan": "yuan",
+        "post_issue_bankroll_yuan": "yuan",
+        "pre_issue_bankroll_yuan": "yuan",
+        "running_peak_yuan": "yuan",
+        "drawdown_yuan": "yuan",
+        "drawdown_pct": "fraction",
+        "ending_capital_yuan": "yuan",
+        "capital_growth_yuan": "yuan",
+        "capital_growth_pct": "fraction",
+        "turnover_yuan": "yuan",
+        "active_support_roi": "fraction",
+        "matched_lift_ending_capital_yuan": "yuan",
+        "matched_lift_max_drawdown_pct": "fraction",
+        "window_return": "fraction",
+        "window_pnl_yuan": "yuan",
+        "start_bankroll_yuan": "yuan",
+        "end_bankroll_yuan": "yuan",
+        "ticket_identity_stake_hhi": "fraction",
+        "issue_stake_hhi": "fraction",
+        "mean_issue_ticket_hhi": "fraction",
+        "ticket_hhi": "fraction",
+    }
+    return {
+        "version": VERSION,
+        "primary_economics": "PRE_TAX",
+        "reference_economics": "TAX_ADJUSTED_0.65_REFERENCE_ONLY",
+        "tables": [
+            table(requests, name="active_research_ticket_requests.parquet", pk=["split", "issue", "policy", "k", "rank"], relationships=["one source ticket row per frozen #206 request"], domains={"panel_role": ["CONTROLLING", "SENSITIVITY_ONLY"]}),
+            table(safe, name="safe_reference_ledger.csv", pk=["split", "issue", "reference"], relationships=["separate lower-exposure lane; never active evidence"], domains={"experiment_role": ["SAFE_FALLBACK_MIXED", "CASH"]}, units=common_units),
+            table(ledger, name="issue_capital_ledger.parquet", pk=["split", "policy", "k", "controller", "issue"], relationships=["one bankroll replay row per issue"], units=common_units),
+            table(metrics, name="capital_summary.csv", pk=["split", "policy", "k", "controller"], relationships=["path-level summary derived from issue_capital_ledger"], units=common_units),
+            table(rolling, name="rolling_window_metrics.csv", pk=["split", "policy", "k", "controller", "window_issues", "observation_index"], relationships=["anchored rolling windows derived from issue_capital_ledger"], units=common_units),
+            table(matched, name="matched_comparisons.csv", pk=["comparison_role", "split", "policy", "k", "candidate_controller", "comparator_controller"], relationships=["decisive matched comparator summary"], units=common_units),
+            table(matched_issue, name="matched_comparator_issue_ledger.parquet", pk=["comparison_role", "split", "policy", "k", "candidate_controller", "comparator_controller", "issue"], relationships=["issue-by-issue replay for matched comparisons"], units=common_units),
+            table(matched_ticket, name="matched_ticket_tax_lot_ledger.parquet", pk=["comparison_role", "side", "split", "policy", "k", "controller", "issue", "rank"], relationships=["ticket/tax-lot replay for matched comparisons"], units=common_units),
+            table(attribution, name="attribution.csv", pk=["comparison_role", "split", "policy", "k", "candidate_controller", "comparator_controller"], relationships=["human-readable attribution ledger"], units=common_units),
+            table(calibration, name="controller_calibration.csv", pk=["controller", "risk_fraction"], relationships=["CV_2022 risk-freeze surface"], units=common_units),
+            table(freeze_choice, name="frozen_learned_controller_choice.csv", pk=["split", "policy", "k", "controller"], relationships=["CV_2022-only learned controller freeze"], units=common_units),
+        ],
+        "forbidden": ["change_n", "change_ticket_identity", "change_policy_or_k", "read_locked_test_labels", "terminal_model_choice_from_cv2023"],
+    }
 
 
 def _plots(ledger: pd.DataFrame, metrics: pd.DataFrame, calibration: pd.DataFrame, output: Path) -> None:
@@ -794,6 +1226,23 @@ def _plots(ledger: pd.DataFrame, metrics: pd.DataFrame, calibration: pd.DataFram
 def _report(decision: dict[str, Any], metrics: pd.DataFrame, matched: pd.DataFrame) -> str:
     controlling = metrics.loc[metrics.split.eq("CV_2023") & metrics.k.eq(CONTROLLING_K)]
     best = controlling.sort_values("ending_capital_yuan", ascending=False, kind="stable").iloc[0]
+    evidentiary = matched.loc[
+        matched.comparison_role.eq("EQUAL_FUNDING_CONTROL")
+        & matched.candidate_controller.eq(decision["frozen_learned_controller_choice"])
+        & matched.terminal_evidentiary.astype(bool)
+    ].sort_values(
+        ["matched_lift_ending_capital_yuan", "matched_lift_max_drawdown_pct"],
+        ascending=[False, False],
+        kind="stable",
+    )
+    evidentiary_text = "No positive terminal row qualified."
+    if not evidentiary.empty:
+        top = evidentiary.iloc[0]
+        evidentiary_text = (
+            f"Frozen learned controller `{decision['frozen_learned_controller_choice']}` on `{top.policy}/K{int(top.k)}` "
+            f"had matched ending-capital lift ¥{float(top.matched_lift_ending_capital_yuan):,.2f} and "
+            f"matched drawdown lift {float(top.matched_lift_max_drawdown_pct):.4%} versus `{top.comparator_controller}`."
+        )
     return f"""# Issue #207 decision report — active fixed-N7 bankroll allocation
 
 ## Terminal decisions
@@ -801,8 +1250,10 @@ def _report(decision: dict[str, Any], metrics: pd.DataFrame, matched: pd.DataFra
 - `ENGINE_VALID={str(decision['ENGINE_VALID']).lower()}`: exact ¥2 projection, no-top-up conservation, chronology, source binding and replay checks pass.
 - `ACTIVE_OVERLAY_EVIDENCE={str(decision['ACTIVE_OVERLAY_EVIDENCE']).lower()}` under the preregistered matched-active rule. Qualifying K8 rows: {decision['qualifying_active_rows']}.
 - `DEPLOYABLE_POLICY=false`: no comparable accepted Stage-3 ticket baseline is bound and this is retrospective CV-2023 evidence only.
+- Learned-controller freeze: `{decision['frozen_learned_controller_choice']}` was selected on CV-2022 only and is the only terminal-evidentiary learned controller on CV-2023.
 
 The strongest absolute K8 row was `{best.policy}/{best.controller}` with ending capital ¥{best.ending_capital_yuan:,.2f}, growth {best.capital_growth_pct:.2%}, turnover ¥{best.turnover_yuan:,.2f}, active-support ROI {best.active_support_roi:.2%}, and maximum drawdown {best.max_drawdown_pct:.2%}. Absolute performance is not treated as lift: `matched_comparisons.csv` is controlling and compares each allocator to equal weights on identical issue/ticket support and an identical executable yuan schedule.
+{evidentiary_text}
 
 ## Attribution and failure regimes
 
@@ -824,7 +1275,9 @@ K=16/32 rows are sensitivity-only and do not select the controlling result. The 
 | Exact capital conservation / integer ¥2 | `issue_capital_ledger.parquet`, verifier/tests | PASS |
 | CV-2021 fit / CV-2022 freeze / CV-2023 terminal test | `model_parameters.json`, `provenance.json` | PASS |
 | Native/equal/score/simple/neural ablations | `capital_summary.csv`, `controller_calibration.csv` | PASS |
-| Equity/drawdown/rolling/streak/concentration/ex-largest | ledgers, tables and plots | PASS |
+| Equity/drawdown/rolling/streak/concentration/ex-largest/completed-recovery | ledgers, tables and plots | PASS |
+| Decisive matched comparator issue/ticket-tax-lot replay | `matched_comparator_issue_ledger.parquet`, `matched_ticket_tax_lot_ledger.parquet` | PASS |
+| Full schema / provenance / handoff semantic verifier | `schema.json`, `provenance.json`, `stage4_handoff_schema.json` | PASS |
 | Three separate decisions and #208 boundary | `decision.json`, `stage4_handoff_schema.json` | PASS |
 
 Decision input: preserve the simplest active control when matched evidence is negative; never reinterpret cash as the optimal model. Known risks: high payout variance, bounded Stage-3 candidate recall, overlap, predicted-SP error, retrospective risk calibration and no accepted Stage-3 baseline. Explicit review request: independently recompute K8 identities, controller chronology, schedule hashes, integer projection, payout conservation, holding metrics, lower-exposure attribution, notebook clean-run and immutable replay before moving to PI Review. #208 remains blocked and receives no activation authority.
@@ -834,11 +1287,8 @@ Decision input: preserve the simplest active control when matched evidence is ne
 def run(inputs: Inputs) -> dict[str, Any]:
     source = inputs.source.resolve()
     output = inputs.output.resolve()
-    stage = output.with_name(f".{output.name}.stage")
     output.parent.mkdir(parents=True, exist_ok=True)
-    if output.exists() or stage.exists():
-        raise Stage4Error("immutable output or staging path already exists")
-    stage.mkdir(parents=True)
+    stage = _prepare_output_stage(output)
     try:
         source_receipt = verify_stage3(source)
         candidates = pd.read_parquet(source / "candidate_ledger.parquet")
@@ -849,16 +1299,6 @@ def run(inputs: Inputs) -> dict[str, Any]:
         safe = _safe_ledger(source)
         controllers = _fit_controllers(candidates)
         calibrated, calibration = _calibrate_risk(requests, controllers)
-        methods = (
-            "NATIVE_2_YUAN",
-            "EQUAL_1PCT",
-            "EQUAL_5PCT",
-            "EQUAL_25PCT",
-            "EQUAL_100PCT",
-            "SCORE_WEIGHTED_5PCT",
-            "SIMPLE_LOGISTIC",
-            "BOUNDED_NEURAL",
-        )
         ledgers = [
             replay_path(
                 requests,
@@ -872,7 +1312,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
             for split in ("CV_2022", "CV_2023")
             for policy in POLICIES
             for k in K_GRID
-            for method in methods
+            for method in ACTIVE_METHODS
         ]
         ledger = pd.concat(ledgers, ignore_index=True)
         metrics, rolling = _path_metrics(ledger)
@@ -888,13 +1328,16 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 **calibrated,
             }
         )
-        matched = _matched_comparisons(
+        frozen_learned_choice, freeze_choice = _freeze_learned_controller_choice(
             metrics, ledger, requests, controllers, calibrated
+        )
+        matched, matched_issue, matched_ticket = _matched_comparisons(
+            metrics, ledger, requests, controllers, calibrated, frozen_learned_choice=frozen_learned_choice
         )
         attribution = matched.loc[:, [
             "comparison_role", "split", "policy", "k", "candidate_controller", "comparator_controller",
             "equal_capital_schedule", "identifiability", "attribution",
-            "matched_lift_ending_capital_yuan", "matched_lift_max_drawdown_pct",
+            "matched_lift_ending_capital_yuan", "matched_lift_max_drawdown_pct", "terminal_evidentiary",
         ]].copy()
         attribution["experiment_role"] = attribution.candidate_controller.map(_experiment_role)
         attribution = pd.concat(
@@ -902,13 +1345,13 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 attribution,
                 pd.DataFrame(
                     [
-                        {"comparison_role": "SAFE_REFERENCE", "experiment_role": "SAFE_FALLBACK_MIXED", "split": "LOCKED_TEST", "policy": "SAFE_FALLBACK_MIXED", "k": 0, "candidate_controller": "NO_BET", "comparator_controller": "CASH", "equal_capital_schedule": True, "identifiability": "SAFETY_REFERENCE_ONLY", "attribution": "LOWER_EXPOSURE_ONLY", "matched_lift_ending_capital_yuan": 0.0, "matched_lift_max_drawdown_pct": 0.0}
+                        {"comparison_role": "SAFE_REFERENCE", "experiment_role": "SAFE_FALLBACK_MIXED", "split": "LOCKED_TEST", "policy": "SAFE_FALLBACK_MIXED", "k": 0, "candidate_controller": "NO_BET", "comparator_controller": "CASH", "equal_capital_schedule": True, "identifiability": "SAFETY_REFERENCE_ONLY", "attribution": "LOWER_EXPOSURE_ONLY", "matched_lift_ending_capital_yuan": 0.0, "matched_lift_max_drawdown_pct": 0.0, "terminal_evidentiary": False}
                     ]
                 ),
             ],
             ignore_index=True,
         )
-        decision = _decision(metrics, matched)
+        decision = _decision(metrics, matched, frozen_learned_choice=frozen_learned_choice)
 
         requests.to_parquet(stage / "active_research_ticket_requests.parquet", index=False)
         safe.to_csv(stage / "safe_reference_ledger.csv", index=False)
@@ -916,8 +1359,11 @@ def run(inputs: Inputs) -> dict[str, Any]:
         metrics.to_csv(stage / "capital_summary.csv", index=False)
         rolling.to_csv(stage / "rolling_window_metrics.csv", index=False)
         matched.to_csv(stage / "matched_comparisons.csv", index=False)
+        matched_issue.to_parquet(stage / "matched_comparator_issue_ledger.parquet", index=False)
+        matched_ticket.to_parquet(stage / "matched_ticket_tax_lot_ledger.parquet", index=False)
         attribution.to_csv(stage / "attribution.csv", index=False)
         calibration.to_csv(stage / "controller_calibration.csv", index=False)
+        freeze_choice.to_csv(stage / "frozen_learned_controller_choice.csv", index=False)
         _json(stage / "decision.json", decision)
         _json(
             stage / "model_parameters.json",
@@ -934,25 +1380,16 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 "features": list(CONTROL_FEATURES),
                 "risk_grid": list(RISK_GRID),
                 "selected_risk_fraction": calibrated,
+                "frozen_learned_controller_choice": frozen_learned_choice,
+                "learned_controller_selection_split": "CV_2022",
+                "terminal_evidentiary_split": "CV_2023",
                 "ticket_stake_yuan": TICKET_STAKE,
                 "initial_bankroll_yuan": INITIAL_BANKROLL,
                 "device": "CPU",
                 "seed": 207001,
             },
         )
-        _json(
-            stage / "schema.json",
-            {
-                "version": VERSION,
-                "active_primary_key": ["split", "issue", "policy", "k", "rank"],
-                "capital_path_key": ["split", "policy", "k", "controller", "issue"],
-                "stage4_actions": ["issue_risk_fraction", "nonnegative_ticket_weights", "integer_yen2_repeat_counts", "explicit_no_bet"],
-                "experiment_roles": ["ACTIVE_LEARNED_ONLY", "ACTIVE_EQUAL_FUNDING_CONTROL", "ACTIVE_SCORE_WEIGHTED_CONTROL", "SAFE_FALLBACK_MIXED", "CASH"],
-                "primary_economics": "PRE_TAX",
-                "reference_economics": "TAX_ADJUSTED_0.65",
-                "forbidden": ["change_n", "change_ticket_identity", "change_policy_or_k", "read_locked_test_labels"],
-            },
-        )
+        _json(stage / "schema.json", _schema_catalog(requests, safe, ledger, metrics, rolling, matched, matched_issue, matched_ticket, attribution, calibration, freeze_choice))
         _json(
             stage / "stage4_handoff_schema.json",
             {
@@ -964,6 +1401,8 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 "downstream_issue": 208,
                 "downstream_state": "BLOCKED_PENDING_PI_TERMINAL_REVIEW_AND_EXPLICIT_ACTIVATION",
                 "identity_fields": ["policy", "k", "ticket_identity", "capital_schedule_hash"],
+                "terminal_evidentiary_split": "CV_2023",
+                "frozen_learned_controller_choice": frozen_learned_choice,
             },
         )
         source_manifest = source / "SHA256SUMS.json"
@@ -976,11 +1415,13 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 "source_verify_receipt": source_receipt,
                 "implementation_sha256": _digest(Path(__file__).resolve()),
                 "runner_sha256": _digest(RUNNER),
+                "notebook_sha256": _digest(NOTEBOOK),
                 "requirements_sha256": _digest(SCIENTIFIC_LOCK),
                 "environment": _environment(),
                 "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj207_bankroll.py run --output <new-directory>",
                 "verify": "PYTHONPATH=src .venv/bin/python scripts/run_bj207_bankroll.py verify --output results/issue-207",
                 "label_boundary": "CV_2021 fit; CV_2022 risk freeze; CV_2023 terminal evaluation; LOCKED_TEST labels unused",
+                "learned_controller_choice_boundary": "SIMPLE_LOGISTIC vs BOUNDED_NEURAL selected on CV_2022 only; only frozen choice is terminal-evidentiary on CV_2023",
             },
         )
         _plots(ledger, metrics, calibration, stage)
@@ -1007,10 +1448,12 @@ def run(inputs: Inputs) -> dict[str, Any]:
             "files": len(payloads),
             "active_request_rows": len(requests),
             "capital_ledger_rows": len(ledger),
+            "matched_issue_rows": len(matched_issue),
+            "matched_ticket_rows": len(matched_ticket),
             "decision": decision,
         }
-    except Exception:
-        shutil.rmtree(stage, ignore_errors=True)
+    except BaseException:
+        _remove_stage(stage)
         raise
 
 
@@ -1034,6 +1477,8 @@ def verify(output: Path) -> dict[str, Any]:
         raise Stage4Error("Stage-4 implementation binding mismatch")
     if _digest(RUNNER) != provenance["runner_sha256"]:
         raise Stage4Error("Stage-4 runner binding mismatch")
+    if _digest(NOTEBOOK) != provenance["notebook_sha256"]:
+        raise Stage4Error("Stage-4 notebook binding mismatch")
     verify_stage3(source)
     candidates = pd.read_parquet(source / "candidate_ledger.parquet")
     _validate_candidates(candidates)
@@ -1047,16 +1492,6 @@ def verify(output: Path) -> dict[str, Any]:
 
     controllers = _fit_controllers(candidates)
     calibrated, expected_calibration = _calibrate_risk(expected_requests, controllers)
-    methods = (
-        "NATIVE_2_YUAN",
-        "EQUAL_1PCT",
-        "EQUAL_5PCT",
-        "EQUAL_25PCT",
-        "EQUAL_100PCT",
-        "SCORE_WEIGHTED_5PCT",
-        "SIMPLE_LOGISTIC",
-        "BOUNDED_NEURAL",
-    )
     expected_ledger = pd.concat(
         [
             replay_path(
@@ -1071,7 +1506,7 @@ def verify(output: Path) -> dict[str, Any]:
             for split in ("CV_2022", "CV_2023")
             for policy in POLICIES
             for k in K_GRID
-            for method in methods
+            for method in ACTIVE_METHODS
         ],
         ignore_index=True,
     )
@@ -1119,8 +1554,16 @@ def verify(output: Path) -> dict[str, Any]:
             **calibrated,
         }
     )
-    expected_matched = _matched_comparisons(
+    frozen_learned_choice, expected_freeze_choice = _freeze_learned_controller_choice(
         expected_metrics, expected_ledger, expected_requests, controllers, calibrated
+    )
+    expected_matched, expected_matched_issue, expected_matched_ticket = _matched_comparisons(
+        expected_metrics,
+        expected_ledger,
+        expected_requests,
+        controllers,
+        calibrated,
+        frozen_learned_choice=frozen_learned_choice,
     )
     _assert_semantic_frame(matched, expected_matched, "matched comparisons")
     identified = matched.equal_capital_schedule.astype(bool)
@@ -1138,21 +1581,125 @@ def verify(output: Path) -> dict[str, Any]:
     ).all():
         raise Stage4Error("matched capital schedule hash mismatch")
     metrics = pd.read_csv(output / "capital_summary.csv")
-    rolling = pd.read_csv(output / "rolling_window_metrics.csv")
+    rolling = pd.read_csv(
+        output / "rolling_window_metrics.csv",
+        dtype={"start_issue": "string", "end_issue": "string"},
+    )
     calibration = pd.read_csv(output / "controller_calibration.csv")
+    freeze_choice = pd.read_csv(output / "frozen_learned_controller_choice.csv")
+    matched_issue = pd.read_parquet(output / "matched_comparator_issue_ledger.parquet")
+    matched_ticket = pd.read_parquet(output / "matched_ticket_tax_lot_ledger.parquet")
+    attribution = pd.read_csv(output / "attribution.csv")
     _assert_semantic_frame(metrics, expected_metrics, "capital summary")
     _assert_semantic_frame(rolling, expected_rolling, "rolling window metrics")
     _assert_semantic_frame(calibration, expected_calibration, "controller calibration")
-    recomputed_decision = _decision(metrics, matched)
-    for key in ("ENGINE_VALID", "ACTIVE_OVERLAY_EVIDENCE", "DEPLOYABLE_POLICY", "qualifying_active_rows"):
-        if decision[key] != recomputed_decision[key]:
+    _assert_semantic_frame(freeze_choice, expected_freeze_choice, "frozen learned controller choice")
+    _assert_semantic_frame(matched_issue, expected_matched_issue, "matched comparator issue ledger")
+    _assert_semantic_frame(matched_ticket, expected_matched_ticket, "matched ticket tax-lot ledger")
+    expected_attribution = matched.loc[:, [
+        "comparison_role", "split", "policy", "k", "candidate_controller", "comparator_controller",
+        "equal_capital_schedule", "identifiability", "attribution",
+        "matched_lift_ending_capital_yuan", "matched_lift_max_drawdown_pct", "terminal_evidentiary",
+    ]].copy()
+    expected_attribution["experiment_role"] = expected_attribution.candidate_controller.map(_experiment_role)
+    expected_attribution = pd.concat(
+        [
+            expected_attribution,
+            pd.DataFrame(
+                [
+                    {"comparison_role": "SAFE_REFERENCE", "experiment_role": "SAFE_FALLBACK_MIXED", "split": "LOCKED_TEST", "policy": "SAFE_FALLBACK_MIXED", "k": 0, "candidate_controller": "NO_BET", "comparator_controller": "CASH", "equal_capital_schedule": True, "identifiability": "SAFETY_REFERENCE_ONLY", "attribution": "LOWER_EXPOSURE_ONLY", "matched_lift_ending_capital_yuan": 0.0, "matched_lift_max_drawdown_pct": 0.0, "terminal_evidentiary": False}
+                ]
+            ),
+        ],
+        ignore_index=True,
+    )
+    _assert_semantic_frame(attribution, expected_attribution, "attribution")
+    if matched.loc[matched.candidate_controller.isin(LEARNED_METHODS), "terminal_evidentiary"].astype(bool).any():
+        observed = set(matched.loc[matched.terminal_evidentiary.astype(bool) & matched.candidate_controller.isin(LEARNED_METHODS), "candidate_controller"])
+        if observed != {frozen_learned_choice}:
+            raise Stage4Error("terminal model-choice leakage")
+    expected_decision = _decision(metrics, matched, frozen_learned_choice=frozen_learned_choice)
+    for key in ("ENGINE_VALID", "ACTIVE_OVERLAY_EVIDENCE", "DEPLOYABLE_POLICY", "qualifying_active_rows", "frozen_learned_controller_choice"):
+        if decision[key] != expected_decision[key]:
             raise Stage4Error(f"decision semantic mismatch: {key}")
+    if decision["frozen_learned_controller_choice"] != frozen_learned_choice:
+        raise Stage4Error("decision/model-choice leakage")
+    _json_equal(
+        output,
+        "schema.json",
+        _schema_catalog(expected_requests, _safe_ledger(source), expected_ledger, expected_metrics, expected_rolling, expected_matched, expected_matched_issue, expected_matched_ticket, expected_attribution, expected_calibration, expected_freeze_choice),
+    )
+    _json_equal(
+        output,
+        "model_parameters.json",
+        {
+            "version": VERSION,
+            "fit_split": "CV_2021",
+            "calibration_and_risk_selection_split": "CV_2022",
+            "terminal_evaluation_split": "CV_2023",
+            "simple_model": "sklearn.pipeline(StandardScaler, LogisticRegression)",
+            "simple_parameters": {"C": 0.25, "class_weight": "balanced", "solver": "lbfgs", "max_iter": 1000, "random_state": 207001},
+            "neural_model": "sklearn.pipeline(StandardScaler, MLPClassifier)",
+            "neural_parameters": {"hidden_layer_sizes": [8], "alpha": 0.05, "max_iter": 100, "early_stopping": True, "random_state": 207001},
+            "fit_order": ["SIMPLE_LOGISTIC", "BOUNDED_NEURAL"],
+            "features": list(CONTROL_FEATURES),
+            "risk_grid": list(RISK_GRID),
+            "selected_risk_fraction": calibrated,
+            "frozen_learned_controller_choice": frozen_learned_choice,
+            "learned_controller_selection_split": "CV_2022",
+            "terminal_evidentiary_split": "CV_2023",
+            "ticket_stake_yuan": TICKET_STAKE,
+            "initial_bankroll_yuan": INITIAL_BANKROLL,
+            "device": "CPU",
+            "seed": 207001,
+        },
+    )
+    _json_equal(
+        output,
+        "stage4_handoff_schema.json",
+        {
+            "$id": "BJ-UNIFIED-N7-BANKROLL-LEARNING-001/STAGE4-HANDOFF/v1",
+            "research_only": True,
+            "promoted": False,
+            "activation_authority": False,
+            "required_decisions": ["ENGINE_VALID", "ACTIVE_OVERLAY_EVIDENCE", "DEPLOYABLE_POLICY"],
+            "downstream_issue": 208,
+            "downstream_state": "BLOCKED_PENDING_PI_TERMINAL_REVIEW_AND_EXPLICIT_ACTIVATION",
+            "identity_fields": ["policy", "k", "ticket_identity", "capital_schedule_hash"],
+            "terminal_evidentiary_split": "CV_2023",
+            "frozen_learned_controller_choice": frozen_learned_choice,
+        },
+    )
+    _json_equal(
+        output,
+        "provenance.json",
+        {
+            "version": VERSION,
+            "source_package": provenance["source_package"],
+            "source_manifest_sha256": _digest(source / "SHA256SUMS.json"),
+            "source_verify_receipt": verify_stage3(source),
+            "implementation_sha256": _digest(Path(__file__).resolve()),
+            "runner_sha256": _digest(RUNNER),
+            "notebook_sha256": _digest(NOTEBOOK),
+            "requirements_sha256": _digest(SCIENTIFIC_LOCK),
+            "environment": _environment(),
+            "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj207_bankroll.py run --output <new-directory>",
+            "verify": "PYTHONPATH=src .venv/bin/python scripts/run_bj207_bankroll.py verify --output results/issue-207",
+            "label_boundary": "CV_2021 fit; CV_2022 risk freeze; CV_2023 terminal evaluation; LOCKED_TEST labels unused",
+            "learned_controller_choice_boundary": "SIMPLE_LOGISTIC vs BOUNDED_NEURAL selected on CV_2022 only; only frozen choice is terminal-evidentiary on CV_2023",
+        },
+    )
+    report_text = (output / "DECISION_REPORT.md").read_text(encoding="utf-8")
+    if report_text != _report(decision, metrics, matched):
+        raise Stage4Error("decision report semantic mismatch")
     return {
         "status": "PASS",
         "files": len(actual),
         "manifest_sha256": _digest(output / "SHA256SUMS.json"),
         "active_request_rows": len(requests),
         "capital_ledger_rows": len(ledger),
+        "matched_issue_rows": len(matched_issue),
+        "matched_ticket_rows": len(matched_ticket),
         "engine_valid": decision["ENGINE_VALID"],
         "active_overlay_evidence": decision["ACTIVE_OVERLAY_EVIDENCE"],
         "deployable_policy": decision["DEPLOYABLE_POLICY"],

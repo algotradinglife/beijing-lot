@@ -3,10 +3,12 @@
 ## Terminal decisions
 
 - `ENGINE_VALID=true`: exact ¥2 projection, no-top-up conservation, chronology, source binding and replay checks pass.
-- `ACTIVE_OVERLAY_EVIDENCE=true` under the preregistered matched-active rule. Qualifying K8 rows: 1.
+- `ACTIVE_OVERLAY_EVIDENCE=false` under the preregistered matched-active rule. Qualifying K8 rows: 0.
 - `DEPLOYABLE_POLICY=false`: no comparable accepted Stage-3 ticket baseline is bound and this is retrospective CV-2023 evidence only.
+- Learned-controller freeze: `BOUNDED_NEURAL` was selected on CV-2022 only and is the only terminal-evidentiary learned controller on CV-2023.
 
 The strongest absolute K8 row was `MARKET_WOR/NATIVE_2_YUAN` with ending capital ¥99,312.89, growth -0.69%, turnover ¥880.00, active-support ROI -78.08%, and maximum drawdown 0.69%. Absolute performance is not treated as lift: `matched_comparisons.csv` is controlling and compares each allocator to equal weights on identical issue/ticket support and an identical executable yuan schedule.
+Frozen learned controller `BOUNDED_NEURAL` on `MARKET_WR/K8` had matched ending-capital lift ¥0.00 and matched drawdown lift 0.0000% versus `EQUAL_1PCT`.
 
 ## Attribution and failure regimes
 
@@ -28,7 +30,9 @@ K=16/32 rows are sensitivity-only and do not select the controlling result. The 
 | Exact capital conservation / integer ¥2 | `issue_capital_ledger.parquet`, verifier/tests | PASS |
 | CV-2021 fit / CV-2022 freeze / CV-2023 terminal test | `model_parameters.json`, `provenance.json` | PASS |
 | Native/equal/score/simple/neural ablations | `capital_summary.csv`, `controller_calibration.csv` | PASS |
-| Equity/drawdown/rolling/streak/concentration/ex-largest | ledgers, tables and plots | PASS |
+| Equity/drawdown/rolling/streak/concentration/ex-largest/completed-recovery | ledgers, tables and plots | PASS |
+| Decisive matched comparator issue/ticket-tax-lot replay | `matched_comparator_issue_ledger.parquet`, `matched_ticket_tax_lot_ledger.parquet` | PASS |
+| Full schema / provenance / handoff semantic verifier | `schema.json`, `provenance.json`, `stage4_handoff_schema.json` | PASS |
 | Three separate decisions and #208 boundary | `decision.json`, `stage4_handoff_schema.json` | PASS |
 
 Decision input: preserve the simplest active control when matched evidence is negative; never reinterpret cash as the optimal model. Known risks: high payout variance, bounded Stage-3 candidate recall, overlap, predicted-SP error, retrospective risk calibration and no accepted Stage-3 baseline. Explicit review request: independently recompute K8 identities, controller chronology, schedule hashes, integer projection, payout conservation, holding metrics, lower-exposure attribution, notebook clean-run and immutable replay before moving to PI Review. #208 remains blocked and receives no activation authority.

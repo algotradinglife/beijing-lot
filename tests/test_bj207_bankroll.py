@@ -10,7 +10,7 @@ import pytest
 
 from bankroll_policy.fixed_n7 import (
     CONTROLLING_K,
-    INITIAL_BANKROLL,
+
     N,
     POLICIES,
     SOURCE_VERSION,
@@ -20,7 +20,10 @@ from bankroll_policy.fixed_n7 import (
     _project_counts,
     _validate_candidates,
     reconstruct_active_requests,
+    replay_path,
+    run,
     verify,
+    Inputs,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -98,6 +101,9 @@ def test_capital_ledger_has_exact_conservation_no_topup_and_integer_tickets() ->
         "ACTIVE_EQUAL_FUNDING_CONTROL",
         "ACTIVE_SCORE_WEIGHTED_CONTROL",
     }
+    assert ledger.controller_family.isin(
+        {"LEARNED_CONTROLLER", "SCORE_WEIGHTED_CONTROL", "NATIVE_EQUAL_CONTROL", "EQUAL_FUNDING_CONTROL"}
+    ).all()
 
 
 def test_safe_lane_is_lower_exposure_only_not_active_evidence() -> None:
@@ -121,6 +127,11 @@ def test_identified_comparisons_have_exact_common_executable_schedule() -> None:
         atol=1e-8,
     )
     assert identified.capital_schedule_hash.eq(identified.comparator_schedule_hash).all()
+    issue = pd.read_parquet(ROOT / "results/issue-207/matched_comparator_issue_ledger.parquet")
+    ticket = pd.read_parquet(ROOT / "results/issue-207/matched_ticket_tax_lot_ledger.parquet")
+    assert not issue.empty
+    assert not ticket.empty
+    assert ticket.tax_lot_count.eq(ticket.repeat_count).all()
 
 
 def test_decision_ignores_unmatched_and_lower_exposure_rows() -> None:
@@ -134,12 +145,14 @@ def test_decision_ignores_unmatched_and_lower_exposure_rows() -> None:
                 "candidate_controller": "SIMPLE_LOGISTIC",
                 "matched_lift_ending_capital_yuan": 999_999.0,
                 "matched_lift_max_drawdown_pct": 1.0,
+                "terminal_evidentiary": False,
             }
         ]
     )
-    decision = _decision(metrics, matched)
+    decision = _decision(metrics, matched, frozen_learned_choice="SIMPLE_LOGISTIC")
     assert decision["ACTIVE_OVERLAY_EVIDENCE"] is False
     assert decision["negative_freeze"] == "NATIVE_2_YUAN"
+    assert decision["frozen_learned_controller_choice"] == "SIMPLE_LOGISTIC"
 
 
 def test_semantic_verifier_rejects_remanifested_safe_lane_pseudo_edge(tmp_path: Path) -> None:
@@ -173,6 +186,57 @@ def test_candidate_validation_rejects_duplicate_and_malformed_n7() -> None:
         _validate_candidates(malformed)
 
 
+def test_candidate_validation_rejects_future_labels_and_source_trace_tamper() -> None:
+    candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
+    leaked = candidates.copy()
+    idx = leaked.index[leaked.split.eq("LOCKED_TEST")][0]
+    leaked.loc[idx, "labels_available"] = True
+    with pytest.raises(Stage4Error, match="future/locked labels leaked"):
+        _validate_candidates(leaked)
+    trace = candidates.copy()
+    trace.loc[trace.index[0], "source_cells_json"] = '[{"bad":1}]'
+    with pytest.raises(Stage4Error, match="malformed|incomplete source trace"):
+        _validate_candidates(trace)
+
+
+def test_replay_rejects_negative_or_empty_matched_schedule() -> None:
+    candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
+    requests = reconstruct_active_requests(candidates)
+    issues = (
+        requests.loc[
+            requests.split.eq("CV_2023") & requests.policy.eq("MARKET_WR") & requests.k.eq(8),
+            "issue",
+        ]
+        .astype(str)
+        .unique()
+        .tolist()
+    )
+    with pytest.raises(Stage4Error, match="empty matched funding schedule"):
+        replay_path(
+            requests,
+            split="CV_2023",
+            policy="MARKET_WR",
+            k=8,
+            method="SIMPLE_LOGISTIC",
+            controllers={},
+            calibrated={"SIMPLE_LOGISTIC": 0.01},
+            funding_schedule={},
+        )
+    schedule = {issue: 0.0 for issue in issues}
+    schedule[issues[0]] = -2.0
+    with pytest.raises(Stage4Error, match="non-negative"):
+        replay_path(
+            requests,
+            split="CV_2023",
+            policy="MARKET_WR",
+            k=8,
+            method="SIMPLE_LOGISTIC",
+            controllers={},
+            calibrated={"SIMPLE_LOGISTIC": 0.01},
+            funding_schedule=schedule,
+        )
+
+
 def test_semantic_verifier_rejects_remanifested_active_settlement_tamper(tmp_path: Path) -> None:
     output = tmp_path / "issue-207"
     shutil.copytree(ROOT / "results/issue-207", output)
@@ -200,9 +264,85 @@ def test_semantic_verifier_rejects_remanifested_capital_ledger_tamper(tmp_path: 
         verify(output)
 
 
+def test_semantic_verifier_rejects_remanifested_attribution_schema_and_decision_tamper(tmp_path: Path) -> None:
+    output = tmp_path / "issue-207"
+    shutil.copytree(ROOT / "results/issue-207", output)
+    attribution_path = output / "attribution.csv"
+    attribution = pd.read_csv(attribution_path)
+    attribution.loc[0, "attribution"] = "BAD"
+    attribution.to_csv(attribution_path, index=False)
+    _refresh_manifest(output)
+    with pytest.raises(Stage4Error, match="attribution"):
+        verify(output)
+
+    output2 = tmp_path / "issue-207-schema"
+    shutil.copytree(ROOT / "results/issue-207", output2)
+    schema_path = output2 / "schema.json"
+    schema = json.loads(schema_path.read_text())
+    schema["forbidden"].append("BAD")
+    schema_path.write_text(json.dumps(schema, indent=2, sort_keys=True) + "\n")
+    _refresh_manifest(output2)
+    with pytest.raises(Stage4Error, match="schema.json semantic mismatch"):
+        verify(output2)
+
+    output3 = tmp_path / "issue-207-decision"
+    shutil.copytree(ROOT / "results/issue-207", output3)
+    decision_path = output3 / "decision.json"
+    decision = json.loads(decision_path.read_text())
+    decision["frozen_learned_controller_choice"] = "SIMPLE_LOGISTIC"
+    decision_path.write_text(json.dumps(decision, indent=2, sort_keys=True) + "\n")
+    _refresh_manifest(output3)
+    with pytest.raises(Stage4Error, match="decision semantic mismatch|decision/model-choice leakage"):
+        verify(output3)
+
+
+def test_semantic_verifier_rejects_provenance_and_model_choice_leakage(tmp_path: Path) -> None:
+    output = tmp_path / "issue-207"
+    shutil.copytree(ROOT / "results/issue-207", output)
+    provenance_path = output / "provenance.json"
+    provenance = json.loads(provenance_path.read_text())
+    provenance["learned_controller_choice_boundary"] = "bad"
+    provenance_path.write_text(json.dumps(provenance, indent=2, sort_keys=True) + "\n")
+    _refresh_manifest(output)
+    with pytest.raises(Stage4Error, match="provenance.json semantic mismatch"):
+        verify(output)
+
+    output2 = tmp_path / "issue-207-model-choice"
+    shutil.copytree(ROOT / "results/issue-207", output2)
+    matched_path = output2 / "matched_comparisons.csv"
+    matched = pd.read_csv(matched_path)
+    leaked = matched.candidate_controller.eq("SIMPLE_LOGISTIC")
+    if leaked.any():
+        matched.loc[leaked, "terminal_evidentiary"] = True
+        matched.to_csv(matched_path, index=False)
+        _refresh_manifest(output2)
+        with pytest.raises(Stage4Error, match="matched comparisons semantic replay mismatch|terminal model-choice leakage"):
+            verify(output2)
+
+
+def test_run_cleans_stage_on_keyboard_interrupt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    output = tmp_path / "issue-207"
+    stale = output.with_name(f".{output.name}.stage")
+    stale.mkdir()
+    (stale / "junk.txt").write_text("x", encoding="utf-8")
+
+    import bankroll_policy.fixed_n7 as mod
+
+    def boom(_source: Path) -> dict[str, object]:
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(mod, "verify_stage3", boom)
+    with pytest.raises(KeyboardInterrupt):
+        run(Inputs(ROOT / "results/issue-206", output))
+    assert not stale.exists()
+    assert not output.exists()
+
+
 def test_committed_package_verifies() -> None:
     receipt = verify(ROOT / "results/issue-207")
     assert receipt["status"] == "PASS"
     assert receipt["engine_valid"] is True
     assert receipt["deployable_policy"] is False
     assert receipt["active_request_rows"] > 0
+    assert receipt["matched_issue_rows"] > 0
+    assert receipt["matched_ticket_rows"] > 0
