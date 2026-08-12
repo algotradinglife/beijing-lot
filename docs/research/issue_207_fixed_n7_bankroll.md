@@ -17,11 +17,13 @@ Lane B separately reproduces #206 fallback-mixed NO_BET and pure cash for all 75
 
 The active panel includes native ¥2-per-ticket, equal-weight 1/5/25/100%, score-weighted 5%, simple logistic and bounded neural paths. Projection is deterministic largest remainder in integer ¥2 tax lots; the residual is always in `[0, ¥2)`. Same-issue tickets are funded concurrently from pre-issue capital with no top-up.
 
+Primary accounting is pre-tax. The frozen #206 `realized_gross` field already includes the 0.65 adjustment, so Stage 4 preserves it as `tax_adjusted_gross_multiple` and derives `pre_tax_gross_multiple = realized_gross / 0.65`. Bankroll, PnL, holding metrics and matched lift use only the pre-tax value; the adjusted payout is retained as a reference-only field. Machine-readable roles explicitly separate `ACTIVE_LEARNED_ONLY`, `ACTIVE_EQUAL_FUNDING_CONTROL`, `ACTIVE_SCORE_WEIGHTED_CONTROL`, `SAFE_FALLBACK_MIXED`, and `CASH`.
+
 ## Absolute and matched results
 
-The strongest absolute controlling row was `MARKET_WOR/K8/NATIVE_2_YUAN`: ending capital ¥99,245.38, growth -0.7546%, turnover ¥880, active-support ROI -85.75%, and maximum drawdown 0.7546%. This absolute result is not the Stage-4 conclusion.
+The strongest absolute controlling row was `MARKET_WOR/K8/NATIVE_2_YUAN`: ending capital ¥99,312.89, growth -0.6871%, turnover ¥880, active-support ROI -78.08%, and maximum drawdown 0.6871%. This absolute result is not the Stage-4 conclusion.
 
-On the exact executable yuan schedule of the `MARKET_WOR/K8/SIMPLE_LOGISTIC` candidate, equal ticket weights ended ¥4,012.10 lower and had maximum drawdown 4.0121 percentage points worse. The same simple controller also exceeded the score-weighted active component by ¥4,137.48 on that matched schedule. Other simple/neural K8 rows were zero-lift or negative; the bounded neural `MARKET_WOR` row underperformed equal weights by ¥2,883.70. Thus the preregistered active rule has one qualifying row and emits `ACTIVE_OVERLAY_EVIDENCE=true`.
+On the exact executable yuan schedule of the `MARKET_WOR/K8/SIMPLE_LOGISTIC` candidate, equal ticket weights ended ¥6,172.46 lower and had maximum drawdown 6.0309 percentage points worse. The same simple controller also exceeded the score-weighted active component by ¥6,365.35 on that matched schedule. Thus the preregistered active rule has one qualifying row and emits `ACTIVE_OVERLAY_EVIDENCE=true`.
 
 This is hypothesis-generating retrospective evidence, not a deployable policy. The #206 accepted-baseline comparability gap remains unresolved, sparse N7 hits make the estimate fragile, and no separate strict confirmation has run. The native ¥2 active control remains the operationally simplest reference; no result authorizes replacing a policy.
 

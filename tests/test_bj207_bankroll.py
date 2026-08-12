@@ -18,6 +18,7 @@ from bankroll_policy.fixed_n7 import (
     _decision,
     _digest,
     _project_counts,
+    _validate_candidates,
     reconstruct_active_requests,
     verify,
 )
@@ -62,6 +63,12 @@ def test_committed_active_panel_is_nonempty_exact_and_source_bound() -> None:
     assert requests.loc[requests.k.ne(CONTROLLING_K), "panel_role"].eq("SENSITIVITY_ONLY").all()
     assert requests.ticket_identity.str.split("|").map(len).eq(N).all()
     assert requests.match_indices.str.split("|").map(lambda values: len(set(values))).eq(N).all()
+    np.testing.assert_allclose(
+        requests.pre_tax_gross_multiple,
+        requests.tax_adjusted_gross_multiple / 0.65,
+        rtol=0,
+        atol=1e-12,
+    )
 
 
 def test_exact_k8_identities_recompute_from_frozen_stage3() -> None:
@@ -86,12 +93,18 @@ def test_capital_ledger_has_exact_conservation_no_topup_and_integer_tickets() ->
     assert ledger.funded_stake_yuan.le(ledger.pre_issue_bankroll_yuan + 1e-8).all()
     assert np.isclose((ledger.funded_stake_yuan / 2) % 1, 0).all()
     assert ledger.post_issue_bankroll_yuan.ge(-1e-8).all()
+    assert set(ledger.experiment_role) == {
+        "ACTIVE_LEARNED_ONLY",
+        "ACTIVE_EQUAL_FUNDING_CONTROL",
+        "ACTIVE_SCORE_WEIGHTED_CONTROL",
+    }
 
 
 def test_safe_lane_is_lower_exposure_only_not_active_evidence() -> None:
     safe = pd.read_csv(ROOT / "results/issue-207/safe_reference_ledger.csv")
     assert safe.funded_stake_yuan.eq(0).all()
     assert safe.attribution.eq("LOWER_EXPOSURE_ONLY").all()
+    assert set(safe.experiment_role) == {"SAFE_FALLBACK_MIXED", "CASH"}
     decision = json.loads((ROOT / "results/issue-207/decision.json").read_text())
     assert decision["safe_reference_interpretation"].startswith("NO_BET/cash")
     assert decision["DEPLOYABLE_POLICY"] is False
@@ -137,7 +150,53 @@ def test_semantic_verifier_rejects_remanifested_safe_lane_pseudo_edge(tmp_path: 
     safe.loc[0, "attribution"] = "ACTIVE_OVERLAY_EVIDENCE"
     safe.to_csv(safe_path, index=False)
     _refresh_manifest(output)
-    with pytest.raises(Stage4Error, match="safe lane pseudo-Edge"):
+    with pytest.raises(Stage4Error, match="safe reference ledger|safe lane pseudo-Edge"):
+        verify(output)
+
+
+@pytest.mark.parametrize("column,value", [("control_joint_probability", np.nan), ("predicted_sp_product", np.inf), ("predicted_sp_product", 0.0)])
+def test_candidate_validation_rejects_invalid_pre_event_inputs(column: str, value: float) -> None:
+    candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
+    candidates.loc[candidates.index[0], column] = value
+    with pytest.raises(Stage4Error, match="non-finite|non-positive"):
+        _validate_candidates(candidates)
+
+
+def test_candidate_validation_rejects_duplicate_and_malformed_n7() -> None:
+    candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
+    duplicate = pd.concat([candidates, candidates.iloc[[0]]], ignore_index=True)
+    with pytest.raises(Stage4Error, match="not unique"):
+        _validate_candidates(duplicate)
+    malformed = candidates.copy()
+    malformed.loc[malformed.index[0], "n"] = 6
+    with pytest.raises(Stage4Error, match="non-N7"):
+        _validate_candidates(malformed)
+
+
+def test_semantic_verifier_rejects_remanifested_active_settlement_tamper(tmp_path: Path) -> None:
+    output = tmp_path / "issue-207"
+    shutil.copytree(ROOT / "results/issue-207", output)
+    path = output / "active_research_ticket_requests.parquet"
+    frame = pd.read_parquet(path)
+    frame.loc[frame.index[0], "realized_gross"] = 12345.0
+    frame.to_parquet(path, index=False)
+    _refresh_manifest(output)
+    with pytest.raises(Stage4Error, match="active panel"):
+        verify(output)
+
+
+def test_semantic_verifier_rejects_remanifested_capital_ledger_tamper(tmp_path: Path) -> None:
+    output = tmp_path / "issue-207"
+    shutil.copytree(ROOT / "results/issue-207", output)
+    path = output / "issue_capital_ledger.parquet"
+    frame = pd.read_parquet(path)
+    row = frame.index[0]
+    frame.loc[row, "gross_payout_yuan"] += 100.0
+    frame.loc[row, "net_pnl_yuan"] += 100.0
+    frame.loc[row, "post_issue_bankroll_yuan"] += 100.0
+    frame.to_parquet(path, index=False)
+    _refresh_manifest(output)
+    with pytest.raises(Stage4Error, match="capital ledger"):
         verify(output)
 
 

@@ -1,6 +1,6 @@
 # HANDOFF — Issue #207
 
-[SESSION] 20260812_080952_e25efb
+[SESSION] 20260812_092734_44803f
 
 Current branch: `analyst/bj207-issue`
 
@@ -18,13 +18,13 @@ Current HEAD: the evidence commit containing this document; resolve with `git re
 ## Decisions and rationale
 
 - `ENGINE_VALID=true`: manifest, #206 source binding, exact K8 identity/source-cell reconstruction, capital conservation, integer projection, split boundary and semantic checks pass.
-- `ACTIVE_OVERLAY_EVIDENCE=true`: one preregistered controlling row qualifies. `MARKET_WOR/K8/SIMPLE_LOGISTIC` beats equal weights by ¥4,012.10 ending capital and 4.0121 percentage points maximum drawdown on the exact same executable funding schedule; it beats score-weighted allocation by ¥4,137.48 on the same schedule.
+- `ACTIVE_OVERLAY_EVIDENCE=true`: after correcting primary settlement to pre-tax, one preregistered controlling row qualifies. `MARKET_WOR/K8/SIMPLE_LOGISTIC` beats equal weights by ¥6,172.46 ending capital and 6.0309 percentage points maximum drawdown on the exact same executable funding schedule; it beats score-weighted allocation by ¥6,365.35 on the same schedule.
 - `DEPLOYABLE_POLICY=false`: the accepted comparable Stage-3 ticket baseline remains unresolved, this is retrospective CV-2023 evidence, and there is no strict independent confirmation. The result is hypothesis-generating only.
 - Simple logistic was fitted before the bounded neural ablation to comply with package-first/minimal-controller discipline. Cash is never used to establish active lift.
 
 ## Known risks
 
-Sparse N7 payouts dominate economics; only one learned K8 row qualifies. Results remain sensitive to candidate recall, ticket overlap, predicted SP, integer allocation and retrospective CV-2022 risk calibration. MARKET_WOR/native ¥2 remains the strongest absolute K8 path but still loses 0.7546%. No issue closure, merge, release, frontend selectability or downstream activation is authorized.
+Sparse N7 payouts dominate economics; only one learned K8 row qualifies. Results remain sensitive to candidate recall, ticket overlap, predicted SP, integer allocation and retrospective CV-2022 risk calibration. MARKET_WOR/native ¥2 remains the strongest absolute K8 path but still loses 0.6871%. EV rework corrected the 0.65-adjusted/pre-tax boundary, added complete source-to-ledger semantic replay, fsync publication, explicit role names, and adversarial tamper/input tests. No issue closure, merge, release, frontend selectability or downstream activation is authorized.
 
 ## Verification
 

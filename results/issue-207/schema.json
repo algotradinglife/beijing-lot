@@ -13,17 +13,26 @@
     "controller",
     "issue"
   ],
+  "experiment_roles": [
+    "ACTIVE_LEARNED_ONLY",
+    "ACTIVE_EQUAL_FUNDING_CONTROL",
+    "ACTIVE_SCORE_WEIGHTED_CONTROL",
+    "SAFE_FALLBACK_MIXED",
+    "CASH"
+  ],
   "forbidden": [
     "change_n",
     "change_ticket_identity",
     "change_policy_or_k",
     "read_locked_test_labels"
   ],
+  "primary_economics": "PRE_TAX",
+  "reference_economics": "TAX_ADJUSTED_0.65",
   "stage4_actions": [
     "issue_risk_fraction",
     "nonnegative_ticket_weights",
     "integer_yen2_repeat_counts",
     "explicit_no_bet"
   ],
-  "version": "bj207-fixed-n7-bankroll-v1"
+  "version": "bj207-fixed-n7-bankroll-v2"
 }

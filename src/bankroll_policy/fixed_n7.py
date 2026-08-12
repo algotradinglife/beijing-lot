@@ -13,6 +13,7 @@ from dataclasses import dataclass
 import hashlib
 import importlib.metadata
 import json
+import os
 from pathlib import Path
 import platform
 import shutil
@@ -30,6 +31,7 @@ from ticket_policy.fixed_n7 import (
     FEATURES,
     K_GRID,
     N,
+    TAX_FACTOR,
     _fit_logistic_model,
     _fit_model,
     _score_model,
@@ -37,7 +39,7 @@ from ticket_policy.fixed_n7 import (
     verify as verify_stage3,
 )
 
-VERSION = "bj207-fixed-n7-bankroll-v1"
+VERSION = "bj207-fixed-n7-bankroll-v2"
 SOURCE_VERSION = "bj206-fixed-n7-ticket-policy-v4"
 INITIAL_BANKROLL = 100_000.0
 TICKET_STAKE = 2.0
@@ -87,6 +89,38 @@ def _json(path: Path, value: Any) -> None:
         json.dump(value, stream, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False)
         stream.write("\n")
         stream.flush()
+        os.fsync(stream.fileno())
+
+
+def _fsync_file(path: Path) -> None:
+    with path.open("rb") as stream:
+        os.fsync(stream.fileno())
+
+
+def _fsync_dir(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _fsync_tree(root: Path) -> None:
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            _fsync_file(path)
+    directories = [path for path in root.rglob("*") if path.is_dir()]
+    for path in sorted(directories, key=lambda item: len(item.parts), reverse=True):
+        _fsync_dir(path)
+    _fsync_dir(root)
+
+
+def _experiment_role(method: str) -> str:
+    if method in {"SIMPLE_LOGISTIC", "BOUNDED_NEURAL"}:
+        return "ACTIVE_LEARNED_ONLY"
+    if method == "SCORE_WEIGHTED_5PCT":
+        return "ACTIVE_SCORE_WEIGHTED_CONTROL"
+    return "ACTIVE_EQUAL_FUNDING_CONTROL"
 
 
 def _environment() -> dict[str, str]:
@@ -174,6 +208,8 @@ def reconstruct_active_requests(candidates: pd.DataFrame) -> pd.DataFrame:
                 selected["capital_authority"] = "STAGE4_EXPERIMENT_ONLY"
                 selected["panel_role"] = "CONTROLLING" if k == CONTROLLING_K else "SENSITIVITY_ONLY"
                 selected["labels_used_for_identity"] = False
+                selected["tax_adjusted_gross_multiple"] = selected["realized_gross"]
+                selected["pre_tax_gross_multiple"] = selected["realized_gross"] / TAX_FACTOR
                 outputs.append(selected)
     requests = pd.concat(outputs, ignore_index=True)
     columns = [
@@ -200,6 +236,8 @@ def reconstruct_active_requests(candidates: pd.DataFrame) -> pd.DataFrame:
         "labels_available",
         "realized_hit",
         "realized_gross",
+        "tax_adjusted_gross_multiple",
+        "pre_tax_gross_multiple",
         "source_package",
         "source_package_version",
         "research_only",
@@ -327,7 +365,10 @@ def replay_path(
         budget = min(pre, requested)
         counts, residual = _project_counts(weights, budget)
         funded = float(counts.sum() * TICKET_STAKE)
-        payout = float(np.sum(counts * TICKET_STAKE * bundle.realized_gross.to_numpy(dtype=float)))
+        pre_tax_multiples = bundle.pre_tax_gross_multiple.to_numpy(dtype=float)
+        tax_adjusted_multiples = bundle.tax_adjusted_gross_multiple.to_numpy(dtype=float)
+        payout = float(np.sum(counts * TICKET_STAKE * pre_tax_multiples))
+        tax_adjusted_payout = float(np.sum(counts * TICKET_STAKE * tax_adjusted_multiples))
         bankroll = pre - funded + payout
         if funded < -1e-9 or funded > pre + 1e-9 or bankroll < -1e-9:
             raise Stage4Error("bankroll conservation/funding violation")
@@ -339,14 +380,16 @@ def replay_path(
                 "weight": float(weight),
                 "repeat_count": int(count),
                 "funded_stake_yuan": float(count * TICKET_STAKE),
-                "realized_gross_multiple": float(gross),
+                "pre_tax_gross_multiple": float(pre_tax_gross),
+                "tax_adjusted_gross_multiple": float(tax_adjusted_gross),
             }
-            for rank, identity, weight, count, gross in zip(
+            for rank, identity, weight, count, pre_tax_gross, tax_adjusted_gross in zip(
                 bundle["rank"],
                 bundle.ticket_identity,
                 weights,
                 counts,
-                bundle.realized_gross,
+                bundle.pre_tax_gross_multiple,
+                bundle.tax_adjusted_gross_multiple,
                 strict=True,
             )
         ]
@@ -359,6 +402,7 @@ def replay_path(
                 "k": int(k),
                 "panel_role": "CONTROLLING" if k == CONTROLLING_K else "SENSITIVITY_ONLY",
                 "controller": method,
+                "experiment_role": _experiment_role(method),
                 "risk_fraction": np.nan if fraction is None else fraction,
                 "pre_issue_bankroll_yuan": pre,
                 "requested_stake_yuan": requested,
@@ -366,6 +410,7 @@ def replay_path(
                 "projection_residual_yuan": residual,
                 "retained_cash_yuan": pre - funded,
                 "gross_payout_yuan": payout,
+                "tax_adjusted_reference_payout_yuan": tax_adjusted_payout,
                 "net_pnl_yuan": payout - funded,
                 "post_issue_bankroll_yuan": bankroll,
                 "running_peak_yuan": peak,
@@ -654,6 +699,7 @@ def _safe_ledger(source: Path) -> pd.DataFrame:
                     "issue": row.issue,
                     "year": row.year,
                     "reference": reference,
+                    "experiment_role": reference,
                     "requested_stake_yuan": 0.0,
                     "funded_stake_yuan": 0.0,
                     "retained_cash_yuan": INITIAL_BANKROLL,
@@ -694,6 +740,20 @@ def _decision(metrics: pd.DataFrame, matched: pd.DataFrame) -> dict[str, Any]:
         "negative_freeze": "NATIVE_2_YUAN" if evidence_rows.empty else None,
         "next_issue": "#208 receives schema/evidence only; remains blocked pending PI activation",
     }
+
+
+def _assert_semantic_frame(actual: pd.DataFrame, expected: pd.DataFrame, label: str) -> None:
+    try:
+        pd.testing.assert_frame_equal(
+            actual.reset_index(drop=True),
+            expected.reset_index(drop=True),
+            check_dtype=False,
+            check_exact=False,
+            rtol=1e-12,
+            atol=1e-9,
+        )
+    except AssertionError as exc:
+        raise Stage4Error(f"{label} semantic replay mismatch: {exc}") from exc
 
 
 def _plots(ledger: pd.DataFrame, metrics: pd.DataFrame, calibration: pd.DataFrame, output: Path) -> None:
@@ -748,6 +808,10 @@ The strongest absolute K8 row was `{best.policy}/{best.controller}` with ending 
 
 Ticket identity is frozen by the exact #206 selector. Stage 4 changes only issue risk fraction and non-negative ticket repeat counts. Within-issue reweighting is identified only where `capital_schedule_hash` matches. Any no-common-schedule row is `NOT_IDENTIFIABLE_NO_COMMON_EXECUTABLE_SCHEDULE`, never a zero effect. #206 fallback-mixed NO_BET and cash are a separate SAFE lane and are always `LOWER_EXPOSURE_ONLY`; they cannot establish Edge. Sparse N7 hits, integer residuals below ¥2, bankroll depletion, candidate overlap, retrospective calibration and the unresolved Stage-3 baseline remain material risks.
 
+Primary bankroll accounting is pre-tax. The upstream #206 `realized_gross` is the frozen 0.65-adjusted reference multiple, so Stage 4 preserves it as `tax_adjusted_gross_multiple` and derives `pre_tax_gross_multiple = realized_gross / 0.65`. `gross_payout_yuan`, net PnL, equity, risk metrics and matched lift use only the pre-tax field; `tax_adjusted_reference_payout_yuan` is reference-only.
+
+Machine-readable experiment roles are explicit: `ACTIVE_LEARNED_ONLY`, `ACTIVE_EQUAL_FUNDING_CONTROL`, `ACTIVE_SCORE_WEIGHTED_CONTROL`, `SAFE_FALLBACK_MIXED`, and `CASH`.
+
 K=16/32 rows are sensitivity-only and do not select the controlling result. The bounded neural ablation is fitted only after the simple logistic controller. No 2025/2026 LOCKED_TEST outcome or official-final-SP label is used.
 
 ## PI 对接块
@@ -771,6 +835,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
     source = inputs.source.resolve()
     output = inputs.output.resolve()
     stage = output.with_name(f".{output.name}.stage")
+    output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists() or stage.exists():
         raise Stage4Error("immutable output or staging path already exists")
     stage.mkdir(parents=True)
@@ -831,12 +896,13 @@ def run(inputs: Inputs) -> dict[str, Any]:
             "equal_capital_schedule", "identifiability", "attribution",
             "matched_lift_ending_capital_yuan", "matched_lift_max_drawdown_pct",
         ]].copy()
+        attribution["experiment_role"] = attribution.candidate_controller.map(_experiment_role)
         attribution = pd.concat(
             [
                 attribution,
                 pd.DataFrame(
                     [
-                        {"comparison_role": "SAFE_REFERENCE", "split": "LOCKED_TEST", "policy": "SAFE_FALLBACK_MIXED", "k": 0, "candidate_controller": "NO_BET", "comparator_controller": "CASH", "equal_capital_schedule": True, "identifiability": "SAFETY_REFERENCE_ONLY", "attribution": "LOWER_EXPOSURE_ONLY", "matched_lift_ending_capital_yuan": 0.0, "matched_lift_max_drawdown_pct": 0.0}
+                        {"comparison_role": "SAFE_REFERENCE", "experiment_role": "SAFE_FALLBACK_MIXED", "split": "LOCKED_TEST", "policy": "SAFE_FALLBACK_MIXED", "k": 0, "candidate_controller": "NO_BET", "comparator_controller": "CASH", "equal_capital_schedule": True, "identifiability": "SAFETY_REFERENCE_ONLY", "attribution": "LOWER_EXPOSURE_ONLY", "matched_lift_ending_capital_yuan": 0.0, "matched_lift_max_drawdown_pct": 0.0}
                     ]
                 ),
             ],
@@ -881,6 +947,9 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 "active_primary_key": ["split", "issue", "policy", "k", "rank"],
                 "capital_path_key": ["split", "policy", "k", "controller", "issue"],
                 "stage4_actions": ["issue_risk_fraction", "nonnegative_ticket_weights", "integer_yen2_repeat_counts", "explicit_no_bet"],
+                "experiment_roles": ["ACTIVE_LEARNED_ONLY", "ACTIVE_EQUAL_FUNDING_CONTROL", "ACTIVE_SCORE_WEIGHTED_CONTROL", "SAFE_FALLBACK_MIXED", "CASH"],
+                "primary_economics": "PRE_TAX",
+                "reference_economics": "TAX_ADJUSTED_0.65",
                 "forbidden": ["change_n", "change_ticket_identity", "change_policy_or_k", "read_locked_test_labels"],
             },
         )
@@ -930,8 +999,9 @@ def run(inputs: Inputs) -> dict[str, Any]:
             if path.is_file() and path.name != "SHA256SUMS.json"
         }
         _json(stage / "SHA256SUMS.json", payloads)
-        output.parent.mkdir(parents=True, exist_ok=True)
+        _fsync_tree(stage)
         stage.replace(output)
+        _fsync_dir(output.parent)
         return {
             "output": str(output),
             "files": len(payloads),
@@ -973,10 +1043,40 @@ def verify(output: Path) -> dict[str, Any]:
     if requests.labels_used_for_identity.astype(bool).any():
         raise Stage4Error("label entered ticket identity selection")
     expected_requests = reconstruct_active_requests(candidates)
-    columns = ["split", "issue", "policy", "k", "rank", "ticket_identity", "source_cells_json"]
-    if requests.loc[:, columns].astype(str).to_dict(orient="records") != expected_requests.loc[:, columns].astype(str).to_dict(orient="records"):
-        raise Stage4Error("exact #206 active-panel identity/source trace mismatch")
+    _assert_semantic_frame(requests, expected_requests, "complete #206 active panel")
+
+    controllers = _fit_controllers(candidates)
+    calibrated, expected_calibration = _calibrate_risk(expected_requests, controllers)
+    methods = (
+        "NATIVE_2_YUAN",
+        "EQUAL_1PCT",
+        "EQUAL_5PCT",
+        "EQUAL_25PCT",
+        "EQUAL_100PCT",
+        "SCORE_WEIGHTED_5PCT",
+        "SIMPLE_LOGISTIC",
+        "BOUNDED_NEURAL",
+    )
+    expected_ledger = pd.concat(
+        [
+            replay_path(
+                expected_requests,
+                split=split,
+                policy=policy,
+                k=k,
+                method=method,
+                controllers=controllers,
+                calibrated=calibrated,
+            )
+            for split in ("CV_2022", "CV_2023")
+            for policy in POLICIES
+            for k in K_GRID
+            for method in methods
+        ],
+        ignore_index=True,
+    )
     ledger = pd.read_parquet(output / "issue_capital_ledger.parquet")
+    _assert_semantic_frame(ledger, expected_ledger, "issue capital ledger")
     if not np.allclose(
         ledger.post_issue_bankroll_yuan,
         ledger.pre_issue_bankroll_yuan - ledger.funded_stake_yuan + ledger.gross_payout_yuan,
@@ -993,10 +1093,36 @@ def verify(output: Path) -> dict[str, Any]:
     decision = json.loads((output / "decision.json").read_text(encoding="utf-8"))
     if decision["DEPLOYABLE_POLICY"] is not False or decision["ENGINE_VALID"] is not True:
         raise Stage4Error("decision boundary mismatch")
-    safe = pd.read_csv(output / "safe_reference_ledger.csv")
+    safe = pd.read_csv(output / "safe_reference_ledger.csv", dtype={"issue": str})
+    _assert_semantic_frame(safe, _safe_ledger(source), "safe reference ledger")
     if not safe.funded_stake_yuan.eq(0).all() or not safe.attribution.eq("LOWER_EXPOSURE_ONLY").all():
         raise Stage4Error("safe lane pseudo-Edge boundary mismatch")
+    required_roles = {
+        "ACTIVE_LEARNED_ONLY",
+        "ACTIVE_EQUAL_FUNDING_CONTROL",
+        "ACTIVE_SCORE_WEIGHTED_CONTROL",
+    }
+    if set(ledger.experiment_role) != required_roles:
+        raise Stage4Error("active experiment role boundary mismatch")
+    if set(safe.experiment_role) != {"SAFE_FALLBACK_MIXED", "CASH"}:
+        raise Stage4Error("safe experiment role boundary mismatch")
     matched = pd.read_csv(output / "matched_comparisons.csv")
+    expected_metrics, expected_rolling = _path_metrics(expected_ledger)
+    expected_metrics["risk_fraction"] = expected_metrics.controller.map(
+        {
+            "NATIVE_2_YUAN": np.nan,
+            "EQUAL_1PCT": 0.01,
+            "EQUAL_5PCT": 0.05,
+            "EQUAL_25PCT": 0.25,
+            "EQUAL_100PCT": 1.0,
+            "SCORE_WEIGHTED_5PCT": 0.05,
+            **calibrated,
+        }
+    )
+    expected_matched = _matched_comparisons(
+        expected_metrics, expected_ledger, expected_requests, controllers, calibrated
+    )
+    _assert_semantic_frame(matched, expected_matched, "matched comparisons")
     identified = matched.equal_capital_schedule.astype(bool)
     if not matched.loc[identified, "identifiability"].eq("IDENTIFIED_MATCHED_ACTIVE_FUNDING").all():
         raise Stage4Error("matched active attribution mismatch")
@@ -1012,6 +1138,11 @@ def verify(output: Path) -> dict[str, Any]:
     ).all():
         raise Stage4Error("matched capital schedule hash mismatch")
     metrics = pd.read_csv(output / "capital_summary.csv")
+    rolling = pd.read_csv(output / "rolling_window_metrics.csv")
+    calibration = pd.read_csv(output / "controller_calibration.csv")
+    _assert_semantic_frame(metrics, expected_metrics, "capital summary")
+    _assert_semantic_frame(rolling, expected_rolling, "rolling window metrics")
+    _assert_semantic_frame(calibration, expected_calibration, "controller calibration")
     recomputed_decision = _decision(metrics, matched)
     for key in ("ENGINE_VALID", "ACTIVE_OVERLAY_EVIDENCE", "DEPLOYABLE_POLICY", "qualifying_active_rows"):
         if decision[key] != recomputed_decision[key]:
