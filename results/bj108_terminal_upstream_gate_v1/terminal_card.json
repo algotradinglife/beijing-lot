@@ -1,0 +1,37 @@
+{
+  "contract": "BJ-HIST-DYNAMIC-N-PATH-001",
+  "decision": "NO_PROMOTION",
+  "denominator": {
+    "accepted_periods": 0,
+    "official_issues": 344,
+    "official_pools": 2659
+  },
+  "issue": 108,
+  "not_run": {
+    "candidate_portfolios": 0,
+    "gate_a_n_role_path_optimization": "NOT_REQUIRED",
+    "gate_b_outcome_settlement": "NOT_REQUIRED",
+    "stake_yuan": "0.000000",
+    "tickets": 0
+  },
+  "outcome_boundary": "No outcomes, final SP, payouts, tax, ROI, #105 settlement rows, or optimizer are opened/run. Only exact package manifests and terminal decision metadata are authenticated.",
+  "prerequisite_rule": "Dynamic-N/path optimization operates only where both source-of-edge and issue-entry gates accept a period.",
+  "provenance": {
+    "input_manifests": {
+      "bj105": "0c98ec8506585988a36620a6107ca9cc63d918cf92619930225e0112e05604d1",
+      "bj107": "bc296a7de47b6268f2ffd4fb6d644bd39860376ca0a3d33e00a96252e8bd7fd9"
+    },
+    "input_payloads": {
+      "bj105_decision": "8c3583715c3139a81a381bb9b0c74697a242fe05625eed1a0005865b1c492ff8",
+      "bj107_card": "7970988c38fbc7ad42d7282c3418d29c01533c0cd16c5e38236f587be363ce69",
+      "bj107_decision": "aa40ef0c020f244d29287a04e3dbffe50688e8f058afd80fc0f58da07b6c7c53",
+      "bj107_denominator": "de0111bcb9530a972f4ba94afe13a1c8b25d46c736453e8b5a2d503e6f056eae"
+    }
+  },
+  "scope": "historical paper-only research; no purchase, production, frontend or prospective promotion.",
+  "stage": "TERMINAL_UPSTREAM_GATE_EVALUATION",
+  "upstream_status": {
+    "bj105": "NO_PROMOTION",
+    "bj107": "ALL_NO_BET_UPSTREAM_NO_SIGNAL for every pool"
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "arms": [
+    "NO_BET_CONTROL",
+    "SINGLE_N4",
+    "FULL_COVER_N4",
+    "SINGLE_N7",
+    "FULL_COVER_N7",
+    "SINGLE_DYNAMIC_4_7",
+    "FULL_COVER_DYNAMIC_4_7"
+  ],
+  "baseline_controls": {
+    "bj106_terminal": "NO_PROMOTION / nominated_strata=[]",
+    "bj107": "preserved externally; #119 does not modify it",
+    "bj108": "preserved externally; #119 does not modify it"
+  },
+  "contract": "BJ-HIST-CANDIDATE-SENSITIVITY-001",
+  "gate_b": "AUTHORIZED only for exactly this immutable frontier; no variants added/removed after outcome access",
+  "issue": 119,
+  "provenance": {
+    "a106": "fb45cacccb4c9ab2b52c8a538f489fb3e3197fa138245f0d83cf98a3cbb0db5d",
+    "b106": "d112cc1f1c8b538b7a36e0c4b03de70aa9532f1cd2d9f38598afbd21b7223c86",
+    "m101": "86e37682a95fad2a2a67187f1ee528f665d371583c621dc9d14af58f74302447",
+    "payloads": {
+      "atlas": "b710dd4fe792e69727b898a615e1cb4899175e329c71bcee46788fb859c43b26",
+      "membership": "6b1361797956123eaeb9e2d015eae7bf7ef28ee020a902e710f12284442a7014",
+      "pools": "38c96ac4509801f68dd3e2469be619a8954ef06291faca2e9cd6d04cb7b6332a",
+      "terminal": "d3aa8b10c9193b7302694d7b972614b7f520b662a1314938bfb43d3c69125a05"
+    }
+  },
+  "scope": "paper-only historical research; no purchase, production or promotion.",
+  "selection": "one highest q_lb eligible code per match; pool candidates rank q_lb descending then match_idx/match_id; no outcome fields opened",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_SENSITIVITY_FREEZE",
+  "variants": {
+    "FUNDAMENTAL_DECISION_CHAIN_UNAVAILABLE": "auditable feature unavailable control",
+    "RELAX_Q090_LOW_ENTROPY": {
+      "entropy_max": "1.08",
+      "p_cal_min": "0.20",
+      "persistence_years_min": 3,
+      "pool_code_concentration_max": 0.8,
+      "q_lb_min": "0.90",
+      "q_lb_over_q_hat_min": null,
+      "stratum_support_min": 500
+    },
+    "RELAX_Q090_P20": {
+      "entropy_max": null,
+      "p_cal_min": "0.20",
+      "persistence_years_min": 3,
+      "pool_code_concentration_max": 0.8,
+      "q_lb_min": "0.90",
+      "q_lb_over_q_hat_min": null,
+      "stratum_support_min": 500
+    },
+    "RELAX_Q090_P35": {
+      "entropy_max": null,
+      "p_cal_min": "0.35",
+      "persistence_years_min": 3,
+      "pool_code_concentration_max": 0.8,
+      "q_lb_min": "0.90",
+      "q_lb_over_q_hat_min": null,
+      "stratum_support_min": 500
+    },
+    "RELAX_Q090_STABLE_SP": {
+      "entropy_max": null,
+      "p_cal_min": "0.20",
+      "persistence_years_min": 3,
+      "pool_code_concentration_max": 0.8,
+      "q_lb_min": "0.90",
+      "q_lb_over_q_hat_min": "0.85",
+      "stratum_support_min": 500
+    },
+    "RELAX_Q100_P20": {
+      "entropy_max": null,
+      "p_cal_min": "0.20",
+      "persistence_years_min": 3,
+      "pool_code_concentration_max": 0.8,
+      "q_lb_min": "1.00",
+      "q_lb_over_q_hat_min": null,
+      "stratum_support_min": 500
+    },
+    "RELAX_Q110_P20": {
+      "entropy_max": null,
+      "p_cal_min": "0.20",
+      "persistence_years_min": 3,
+      "pool_code_concentration_max": 0.8,
+      "q_lb_min": "1.10",
+      "q_lb_over_q_hat_min": null,
+      "stratum_support_min": 500
+    },
+    "STRICT_106_PROMOTED": "strict accepted #106 promoted-strata control"
+  }
+}

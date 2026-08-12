@@ -1,0 +1,8 @@
+{
+  "decision.json": "3273122d43d4ba7f36e869ffba869a34123a6e9fab79e0025c0cab97e1aaaa84",
+  "portfolio_settlement.csv": "53e57cf2a6e2aaf2c199b1ae0c63f7a942ea03c21af657c3db282007ae0df495",
+  "robustness_summary.csv": "554ac489eb22244dd32ca7ac1783b316c742fbd4d645922abec7ec7ecdd21b30",
+  "runner.py": "9b20cf4c081daf1ef50e6f24081134decd9b0de1614a7aaa91818d40777bd28f",
+  "settlement_card.json": "86b9d123844bdfe1c0f8ad6ef2db201d7999cf20895f01cde41f6e5aee96008b",
+  "variant_roi_comparison.csv": "5f6b9dccc17abc9e1c985b8107ea4e3c20dbed329ce9be1ab6e139db2c232cd0"
+}

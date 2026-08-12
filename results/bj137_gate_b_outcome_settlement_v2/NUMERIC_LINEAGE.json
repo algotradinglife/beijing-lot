@@ -1,0 +1,15 @@
+{
+  "correction": "v1\u2019s all-positive-row decision predicate was superseded. v2 changes no numeric ledger value; it uses deterministic gzip for large CSVs and the frozen all-seed plus YEAR/FOLD/LOYO persistence rule.",
+  "numeric_payloads": {
+    "calibration_diagnostics.csv": "cc5c23a2f8e171f83b08dee40586d0e20d912f90c815980a3a2df166c7c2da22",
+    "interaction_surface.csv": "00d9f72a087e4731ae160c41ca6c024dbad80e87fff98be7e0c5d56c1e9ecf9e",
+    "issue_policy_settlement.csv.gz": "fbca311077aab73504cb7c38b8cb39653367b316d85be248610c1048ce1a6f2f",
+    "sampler_lift.csv": "686f42ba420de715104edf3a4f87c9bdf1a174db510ab895f18c396f3eb9ba36",
+    "selector_lift.csv": "338aa4ace4ed99721f423f8a05d1b78960de29fb44c394076ecc30f854b8d485",
+    "source_census.csv": "dc9aba43ba3bccaf2d529ce384ae3851ac98e325cb9785424233aa0d53d9fc35",
+    "surface_summary.csv": "af2492bfedc3235f56bcdede3082d2260af1d23683cff1ab7f0ed13dd70cfecc"
+  },
+  "source_content_identity_sha256": "419ec1c34c9a4365e088a792b3a0a56018b4961ef90edfd0d4859c8be13f28bc",
+  "source_manifest_sha256": "be74e5162207f621f212a981f6732da6aeaf8ebc595e76cdfd1e72a8e9537cd8",
+  "source_numeric_bundle": "results/bj137_gate_b_outcome_settlement_v1"
+}

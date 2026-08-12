@@ -1,0 +1,37 @@
+{
+  "accepted_settlement_base": {
+    "script": "scripts/settle_bj179_hierarchical_league_gate_b.py",
+    "sha256": "548ec70e9bee7b4d2bab73dcde767594806a3b3e9cf32e94fc6b781c9d56ada5"
+  },
+  "canonical_outcomes": {
+    "database_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+    "ledger_payload": "canonical_outcome_ledger.csv.gz",
+    "ledger_sha256": "c939b7825ba9e720624e56812000fec692213ea48d5cc5934095c59ec286c818",
+    "source": "hash-bound SQLite match_features",
+    "trusted_match_count": 100906,
+    "unavailable_match_count": 1064
+  },
+  "contract": "BJ-HIST-SPARSE-DIVERGENCE-N7-001",
+  "coverage_correction": {
+    "correction_id": "BJ190_ARM_SPECIFIC_COVERAGE_V2_PERFORMANCE_SCREEN",
+    "independent_validation_issue": 195,
+    "prior_content_identity_sha256": "20afd2c5e018186bd7dc1ea68db5c22ae99c69d9236c17e6f4035cf36c9d69c3",
+    "prior_manifest_sha256": "4fc585769f3dc20dcb29b18421190288c03bb4e6e9f0db9a826b5c2d69b9acf7",
+    "semantics": "coverage derives separately from each arm own selected N7 identities",
+    "ticket_or_outcome_replay": false
+  },
+  "gate_a": {
+    "content_identity_sha256": "f88a3dc7d010c69e5a1e50274f979f62e95cec47702f0aa842e30d7ffb024cb8",
+    "manifest_sha256": "490579f7813d260d11965377462f7aa3b20161dd4672e2b42b600b493d24f1bc",
+    "package": "bj190_gate_a_preoutcome_v3r1",
+    "payload_count": 31
+  },
+  "legacy_overlap_oracle": {
+    "disagreement_count": 0,
+    "manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+    "overlap_count": 46802,
+    "package": "bj95_gate_b_outcome_settlement_v2r8",
+    "payload_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89"
+  },
+  "outcome_access_authorization": "Issue #190 comment 5182419720 after Gate-A merge"
+}

@@ -1,0 +1,10 @@
+split,year,match_rows
+development,2019,17694
+development,2020,12033
+development,2021,18881
+development,2022,16787
+development,2023,15759
+development,2024,16236
+development,2025,3831
+heldout,2025,1024
+heldout,2026,8661

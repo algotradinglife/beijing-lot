@@ -1,0 +1,126 @@
+{
+  "accounting": {
+    "issue_stake": "selected_identity_count \u00d7 M \u00d7 \u00a52",
+    "tax_unit": "each \u00a52 draw/repeat is a separate tax unit; no issue/policy pooling; tax is not computed at Gate A",
+    "unit_stake_yuan": 2
+  },
+  "allocation_contract": {
+    "CAPPED_REPEAT": "Hamilton with caps 1/2/4/8",
+    "DETERMINISTIC_TOP_MASS": "highest-weight distinct ticket codes",
+    "FULL_ENUMERATED": "all 2187 tickets once",
+    "RESIDUAL_SYSTEMATIC": "Hamilton/largest remainder",
+    "WOR_DISTINCT": "weighted exponential-key distinct draws",
+    "WR_DUPLICATE_STAKE": "independent weighted draws, exact duplicates retained"
+  },
+  "caps": [
+    1,
+    2,
+    4,
+    8
+  ],
+  "contract": "BJ-HIST-TICKET-ALLOCATION-001",
+  "controlling_evidence": {
+    "bj151_gate_b_terminal_reference": {
+      "manifest_sha256": "7b88be8af887674875f831f2da0951a1bf7664041f40c10be00d09194ce6fbe2",
+      "use": "contract amendment context only; no settled rows read"
+    },
+    "bj154_independent_ev_reference": {
+      "manifest_sha256": "f81146959fd734c3d15a2579a3921b2afc86d6f633e174c8294763279f9937c5",
+      "use": "contract amendment context only; no settled rows read"
+    }
+  },
+  "denominator": {
+    "allocation_plan_rows": 1006416,
+    "cohort_rows": 696,
+    "identity_rows": 3540,
+    "m_points": 20,
+    "primary_available": 339,
+    "primary_no_bet": 9,
+    "role_rows": 24780,
+    "secondary_available": 273,
+    "secondary_no_bet": 75,
+    "seed_count": 3,
+    "weight_sources": 6
+  },
+  "gate_b_requirements": {
+    "authorization": "NOT_RUN_AND_NOT_AUTHORIZED_PENDING_PI_ACCEPTANCE",
+    "primary_metric": "pre-tax no_tax_roi; tax-adjusted ROI secondary, calculated per winning ticket only",
+    "required": [
+      "mechanism-minus-mechanism at equal weight/M/stake",
+      "FULL deltas",
+      "duplicate multiplicity and coverage",
+      "seed dispersion",
+      "YEAR/FOLD/LOYO/issue bootstrap",
+      "largest-issue exclusion and concentration",
+      "multiple-comparison handling"
+    ]
+  },
+  "generator_version": "bj145-gate-a-v2",
+  "issue": 145,
+  "m_grid": [
+    16,
+    32,
+    48,
+    64,
+    80,
+    96,
+    112,
+    128,
+    144,
+    160,
+    176,
+    192,
+    208,
+    224,
+    240,
+    256,
+    512,
+    1024,
+    1458,
+    2187
+  ],
+  "mechanisms": [
+    "WR_DUPLICATE_STAKE",
+    "WOR_DISTINCT",
+    "RESIDUAL_SYSTEMATIC",
+    "CAPPED_REPEAT",
+    "DETERMINISTIC_TOP_MASS",
+    "FULL_ENUMERATED"
+  ],
+  "outcome_boundary": "No test outcome, score, final/winning SP, settlement, payout, ROI, tax realization, or post-kickoff input is read or emitted. Gate B is unauthorized.",
+  "scope": "historical paper allocation research only; no purchase, production, betting, or promotion authority.",
+  "seeds": [
+    "137001",
+    "137002",
+    "137003"
+  ],
+  "selection_contract": {
+    "no_bet": "retain NO_BET_K_UNSATISFIED with zero planned stake",
+    "primary": "exact #151 NO_GATE/K4 selected identities; no outcome reselection",
+    "secondary": "exact #137 ESP300_GM290/K8 participation list only",
+    "unit": "complete issue \u00d7 gate \u00d7 K; no issue segmentation"
+  },
+  "sources": {
+    "bj137_gate_a_v2": {
+      "manifest_sha256": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
+      "role": "secondary ESP300_GM290/K8 sensitivity"
+    },
+    "bj148_gate_a": {
+      "manifest_sha256": "fd4a0f4dc0ab5ef97f3c260a082515aa7874a60a1ac1e5e0ecd865fdb1eeafd6",
+      "role": "dense-M definition reference only"
+    },
+    "bj151_gate_a": {
+      "manifest_sha256": "3605278bd6067fc7aa279a0625f4c4cab91603d8a1490c8608381e8fca997ac6",
+      "role": "fixed primary NO_GATE/K4 candidate"
+    }
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_TICKET_ALLOCATION_FREEZE",
+  "weights": [
+    "MODEL_P_CAL",
+    "MARKET_WF_CAL",
+    "BLEND_A25",
+    "BLEND_A50",
+    "BLEND_A75",
+    "Q_WEIGHT"
+  ]
+}

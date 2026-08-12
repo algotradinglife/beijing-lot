@@ -1,0 +1,12 @@
+{
+  "CONTENT_IDENTITY.json": "dfd3ac234f95f28185a09a6bb2f69c3ff66ddb696ce1fe45a6a1215d932dcd0a",
+  "README.md": "f09a27ea005b54cd186f800cd1deb688ad64aede87479ac322f883e819bdebb5",
+  "common_support_cohort.csv": "2bfb04194ffe5ac995c479d9d91b92abdfb05e08d2e0e54dfeec8e8731af3bc8",
+  "common_support_identities.csv.gz": "0e5f96ab17ed041dc59fdbbddd1bebec3578d63e03412863c89f693f0060d63e",
+  "common_support_role_vectors.csv.gz": "e08019cb591652ac87e296dc7f7681c7188704e4c7d59bc341d7d70941fbcbdc",
+  "dense_m_grid.csv": "540686d43e689c51f1d4926eeda85080f9b8084be7eb28b0e3c7087a27ade754",
+  "freeze_runner.py": "91f7e8d175b9085453f1cc5a194fd5df5bd2d32bb197f3718353d6e1917bc0dd",
+  "gate_a_card.json": "88c0487048fa7078c63292c3d9c96368345daaa6a3031c4c1b714b5255857876",
+  "sampling_plan.csv": "8523f6340ca13c30a71f76faae8791dc28ae12a6d63632635f109b9af61353e5",
+  "source_census.csv": "0470b048d9ff8734f453cfbac2cdb0db91983a2d53ceff49c555c9dde4882042"
+}

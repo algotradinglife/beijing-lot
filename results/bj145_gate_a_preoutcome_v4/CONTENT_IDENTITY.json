@@ -1,0 +1,23 @@
+{
+  "contract_version": "bj145-gate-a-content-v3",
+  "gzip_payloads": {
+    "allocation_plan.csv.gz": {
+      "canonical_decompressed_sha256": "71715e730568a9a33d81219caeac85446abfece613b5f2b7cd1cc8e7f2cfd2c2"
+    },
+    "identity_catalog.csv.gz": {
+      "canonical_decompressed_sha256": "5fa5f316027a4365bbb383d20f2b4f1082eb5a3782c14921c8873950a995bd23"
+    },
+    "role_vectors.csv.gz": {
+      "canonical_decompressed_sha256": "dcafeddf58813a61abd0077b85cc2678e4db0f688206b9cf57b37cd5de01f7aa"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "adc31b61a70bb25bec92195051438be04cd8850cba2f3bc073d2a817bf08cbac",
+    "freeze_runner.py": "505d32a7025b223d320d3056b6819820f39bc32d6c5fd56d85a651ab1b3c356c",
+    "gate_a_card.json": "003bee612f9fa283b6968c13334dd5b6dc9794fa043a22211e2c2673c773f35c",
+    "m_grid.csv": "42d5ab505e0ad35412e99dffdb91b0a54affc5981d78bf89f154d99500d05f11",
+    "mechanism_contract.csv": "795047e4879bb8056c8c0320d4e0adbfa30768adfc5d5d2a065508cd040e9cfa",
+    "selection_cohort.csv": "a2889c32cd6c706923cdc8ee57a7d29aa9be5866ead4744175eeca26f0156e70",
+    "source_census.csv": "b0ba1dc12facf9c3e1528fe987697e4f27dce893d5c0fd28a093c3bdfbce5ba3"
+  }
+}

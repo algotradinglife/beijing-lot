@@ -1,0 +1,26 @@
+{
+  "contract_version": "bj145-gate-a-content-v4",
+  "gzip_payloads": {
+    "allocation_plan.csv.gz": {
+      "canonical_decompressed_sha256": "71715e730568a9a33d81219caeac85446abfece613b5f2b7cd1cc8e7f2cfd2c2"
+    },
+    "identity_catalog.csv.gz": {
+      "canonical_decompressed_sha256": "5fa5f316027a4365bbb383d20f2b4f1082eb5a3782c14921c8873950a995bd23"
+    },
+    "role_vectors.csv.gz": {
+      "canonical_decompressed_sha256": "dcafeddf58813a61abd0077b85cc2678e4db0f688206b9cf57b37cd5de01f7aa"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "ac5c32efa25906db2a2c99d54fd9e9f40c6706166103e494aa53b2dc1b6163eb",
+    "allocation_binding.json": "77f5e784ca1e4882c0fae553c059c59852e8eef253cb846de69f1d883762194b",
+    "allocation_golden_vectors.json": "8bf47e18bf9db817e20a941380b72c1ee9bbf573f8d6e3ceae5a7a5d0e57d124",
+    "bj145_allocation_engine.py": "02b99044c01381fedd1084a1c11520b16c742a856635b130803c954124dfb281",
+    "freeze_runner.py": "38b9586c5a1b059aac10751f733a45032c70d2c44d8b455e4d43134e304a91e5",
+    "gate_a_card.json": "218ec7bcd02d11e8f78bce7411c77f59632059b3a28069e9640a2e7d9da435fb",
+    "m_grid.csv": "42d5ab505e0ad35412e99dffdb91b0a54affc5981d78bf89f154d99500d05f11",
+    "mechanism_contract.csv": "795047e4879bb8056c8c0320d4e0adbfa30768adfc5d5d2a065508cd040e9cfa",
+    "selection_cohort.csv": "a2889c32cd6c706923cdc8ee57a7d29aa9be5866ead4744175eeca26f0156e70",
+    "source_census.csv": "b0ba1dc12facf9c3e1528fe987697e4f27dce893d5c0fd28a093c3bdfbce5ba3"
+  }
+}

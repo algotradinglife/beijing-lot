@@ -1,0 +1,90 @@
+{
+  "contract_version": "bj145-gate-b-portable-content-v2",
+  "gzip_payloads": {
+    "issue_allocation_settlement.csv.gz": {
+      "canonical_decompressed_bytes": 380060832,
+      "canonical_decompressed_sha256": "2ee73f6d755b649534dacac3018f2b52f9b48093a9ae300ab35d46ce3a9d16cb",
+      "rows": 1006416
+    },
+    "outcome_code_frequency.part-01-of-08.csv.gz": {
+      "canonical_decompressed_bytes": 360705790,
+      "canonical_decompressed_sha256": "c66601fb700a39c44971966591c68431ddd2d83cdb3ed74503e9d5499e771213",
+      "rows": 791694
+    },
+    "outcome_code_frequency.part-02-of-08.csv.gz": {
+      "canonical_decompressed_bytes": 362050389,
+      "canonical_decompressed_sha256": "cc0570a9a77c7b94016b234edfdcfe72770b6c4746e6aeec68d62907d03ed8a9",
+      "rows": 791694
+    },
+    "outcome_code_frequency.part-03-of-08.csv.gz": {
+      "canonical_decompressed_bytes": 363354671,
+      "canonical_decompressed_sha256": "033cde4c199b4211926ae8e3af04fffdbeeba8d7d49dca8566cac940a70b3af2",
+      "rows": 791694
+    },
+    "outcome_code_frequency.part-04-of-08.csv.gz": {
+      "canonical_decompressed_bytes": 362137273,
+      "canonical_decompressed_sha256": "8ca63b8f6286e3dacdf7170107ca83ffaed1b6c6a7620bd76afc9b227e202ee7",
+      "rows": 791694
+    },
+    "outcome_code_frequency.part-05-of-08.csv.gz": {
+      "canonical_decompressed_bytes": 366453425,
+      "canonical_decompressed_sha256": "a08663ba3e95548c5ce5afb76ef96530b414280e70b2f1d559801c4518219628",
+      "rows": 791694
+    },
+    "outcome_code_frequency.part-06-of-08.csv.gz": {
+      "canonical_decompressed_bytes": 367820057,
+      "canonical_decompressed_sha256": "2c40e5970b9625e28979a50e98b8d51698b75cfc205455cd3e169185b1126284",
+      "rows": 791694
+    },
+    "outcome_code_frequency.part-07-of-08.csv.gz": {
+      "canonical_decompressed_bytes": 369095769,
+      "canonical_decompressed_sha256": "f8850e00987e693869ecb7e515fd273da422ec190a28752951fe85d2ec9efc17",
+      "rows": 791694
+    },
+    "outcome_code_frequency.part-08-of-08.csv.gz": {
+      "canonical_decompressed_bytes": 363826292,
+      "canonical_decompressed_sha256": "da193df92a12dea00319520a8a3f3df85ef494f0976ec0fd22c3fdf34473f96c",
+      "rows": 782946
+    },
+    "winning_ticket_tax_ledger.csv.gz": {
+      "canonical_decompressed_bytes": 176131765,
+      "canonical_decompressed_sha256": "7a833626577d718b90744aec0ee616a309d6446c3162ab5936ea6710e30ccae9",
+      "rows": 626782
+    }
+  },
+  "non_compressed_controls": {
+    "allocation_binding.json": "41d0806b544f987feb914d0116c1b2874c2db7da7cb3d356a66a5e55a2b6deff",
+    "allocation_golden_vectors.json": "06038d0f62317f0c5e22ba562eff6baf806f51741668d5ac22cd9266e7365875",
+    "bj145_allocation_engine.py": "5b1ac6631ce22a447d883d514ed73e6795584c89d514e6be7562b2fd91bfa4ce",
+    "bj145_fast_alloc.cpp": "5f8f5d75dd15758e62dd2a05f7b674cb12824b38ccba35cfee772e8904a8bd93",
+    "chart_generator_v2.py": "c08d1b4366d375c48f3aa81e2e87e45aabb6b5ec9dc0ef68cc87937699dd4a41",
+    "decision.json": "1dd566db29240dcb02f67e0d1e4c8867d936e2b090c7f42ddebc5f28559c3af4",
+    "derived_rebuilder.py": "107f67a09eebc1a8131c3309a39ac4afe05f58dc0c27da1be7be44c8e3f212ed",
+    "full_control_deltas.csv": "dd99e73d9b481af67c7b7e6153c006c949bf8abdd4ac241e113604152d492263",
+    "gate_a_card.json": "c8b0ddebeab1537dd0234af2cc8ea40941510f9d307bc06d16b94047ce6ea595",
+    "issue_bootstrap.csv": "bda3febe6912ead0ff4eb8153c8232ae18c8050815c46dbe316475dec3c28e38",
+    "largest_issue_exclusion.csv": "c4319dff72289f5fcf5774c78f161bac4b6b2eff32d1b762ae1ebbbac6a4f500",
+    "leave_one_issue_out_summary.csv": "dcfc6d14dfbac390aa8ab8e849e515fd0054e9c9235fe43c50bce68c1aee43ce",
+    "m_grid.csv": "42d5ab505e0ad35412e99dffdb91b0a54affc5981d78bf89f154d99500d05f11",
+    "matched_pre_tax_comparison.svg": "278afa5c1a49b679bb29f02639d5f190b1773c16b180cbd729028db4a133c24d",
+    "mechanism_contract.csv": "91285c5264c378e08d8622071b2da39bb78e9f34b11d44abadd79d1592e07089",
+    "mechanism_pairwise_deltas.csv": "fb2dbedcd3bf44eefe26e609893c8c94177ef7019d6b5a2faf16f909f77ad396",
+    "mechanism_weight_surface_summary.csv": "09f82a141732640979cd55bda6fd36a31351bd09e30b55279b8d65d99e1dd7f9",
+    "multiple_comparison.csv": "de9c99b8018717cef747febf032e0bf068b17ff5c8b9f709de0000f7ff6aa931",
+    "outcome_code_atlas_splitter.py": "416be43b292427d32bcf827f59f203c0779eb4dd2cb2ef795fd473405043d2b9",
+    "outcome_code_frequency.index.json": "2f570711fb85ae09a610f37f8a44b99920a79f9a67861e77c82864ef520ca960",
+    "outcome_code_marginal_builder.py": "5db34504ac442f7ebb8ad9cb040b557af5fa8879b7ef2edef3d15f0f1e2578e3",
+    "outcome_code_marginal_merger.py": "3d753d9b0070cdee4bce812410d50fecfc286e0ad1e57dded558422f57577386",
+    "report.md": "5a80e3c15876e9a7ec6e5f1d9f21c699f3f6f95dc5b3925dfe0be4f8af5ddb72",
+    "report_generator_v2.py": "93b4651be64d5cf7728687f149810efcc779f99dfaa4ce8d14636b6e7bcff7f8",
+    "roi_vs_m_cap.svg": "a5f6fe5c976d78f3d1998bbbf7b480170bbdf70660e3ef226c083b0d258d10a4",
+    "settlement_card.json": "ca586066cea817f8034b9d9b2786a24a5b26abed2cf867c5c44cf62699169990",
+    "settlement_finalizer_v2.py": "3cc7d644e652e190d2e679632630fe85847d3b17fe354ae5367c50f76cadf293",
+    "settlement_runner.py": "fc35856aaab9cfc6c8f3266168ad14c31b26374d019d655d24a3744ae3fe3c35",
+    "source_census.csv": "0931bfd71f38c10bd9d0e9d901cee2f24d1985fd8717a5b0d7f6d4de2bcd3658",
+    "tax_reconciliation.csv": "f6a2532ce853f6d244cb85942ea48606b27dcc5d4252f353d20619e2a1beb8ea",
+    "uncertainty_stability.svg": "9b84725140ec2d04a9b73ca97cfc30acb4834c6083f53a3c021f863648e11d8e",
+    "weight_pairwise_deltas.csv": "aed11bb1deb05fc7b33fbe074561a256430a8be78b104214e067f944154347f6"
+  },
+  "outcome_boundary": "Gate-A allocations unchanged; v2 corrects only settlement-derived summaries, complete code marginals, analyses, charts and report"
+}

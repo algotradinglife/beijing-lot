@@ -1,0 +1,10 @@
+selector_alias,allocation_arm,seed_scope,seed_count,dispersion_status,reason
+BEST_FULL,FULL_ENUMERATED,DETERMINISTIC,0,NOT_APPLICABLE_DETERMINISTIC_ARM,All three frozen allocation arms are deterministic; issue-cluster bootstrap captures historical issue uncertainty.
+BEST_FULL,Q_TOP_MASS_M192,DETERMINISTIC,0,NOT_APPLICABLE_DETERMINISTIC_ARM,All three frozen allocation arms are deterministic; issue-cluster bootstrap captures historical issue uncertainty.
+BEST_FULL,MODEL_CAP1_M512,DETERMINISTIC,0,NOT_APPLICABLE_DETERMINISTIC_ARM,All three frozen allocation arms are deterministic; issue-cluster bootstrap captures historical issue uncertainty.
+Q_SOURCE,FULL_ENUMERATED,DETERMINISTIC,0,NOT_APPLICABLE_DETERMINISTIC_ARM,All three frozen allocation arms are deterministic; issue-cluster bootstrap captures historical issue uncertainty.
+Q_SOURCE,Q_TOP_MASS_M192,DETERMINISTIC,0,NOT_APPLICABLE_DETERMINISTIC_ARM,All three frozen allocation arms are deterministic; issue-cluster bootstrap captures historical issue uncertainty.
+Q_SOURCE,MODEL_CAP1_M512,DETERMINISTIC,0,NOT_APPLICABLE_DETERMINISTIC_ARM,All three frozen allocation arms are deterministic; issue-cluster bootstrap captures historical issue uncertainty.
+MODEL_SOURCE,FULL_ENUMERATED,DETERMINISTIC,0,NOT_APPLICABLE_DETERMINISTIC_ARM,All three frozen allocation arms are deterministic; issue-cluster bootstrap captures historical issue uncertainty.
+MODEL_SOURCE,Q_TOP_MASS_M192,DETERMINISTIC,0,NOT_APPLICABLE_DETERMINISTIC_ARM,All three frozen allocation arms are deterministic; issue-cluster bootstrap captures historical issue uncertainty.
+MODEL_SOURCE,MODEL_CAP1_M512,DETERMINISTIC,0,NOT_APPLICABLE_DETERMINISTIC_ARM,All three frozen allocation arms are deterministic; issue-cluster bootstrap captures historical issue uncertainty.

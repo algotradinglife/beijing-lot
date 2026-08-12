@@ -1,0 +1,44 @@
+{
+  "arms": [
+    "COLD_PMIN",
+    "HASH_DELETION_CONTROL",
+    "FULL_COVER_CONTROL"
+  ],
+  "gate_b": "UNAUTHORIZED: canonical outcome/final-SP join only after PI accepts this exact Gate-A freeze",
+  "input_manifests": {
+    "bj89": "b22c33bddc71972e3c2a5e7b95955087ece2441b5728da6424d19b3de6f503e2",
+    "bj91": "bd7159715cca84e9d2adb9e089d016ec4e4d72603f8f8d5a8b070eb5027c2c33",
+    "bj95_deferred_control": "10b4d6d274aef53e1e1d4abe30cd9f683cf296865ee131f00f5c1e1d16d0725c",
+    "bj98_deferred_control": "fd142cc2594f2e71b4b81136e91e7ecfcf8623b07c94d92d0b9c1cf6a212b4cb"
+  },
+  "issue": 101,
+  "n7_accounting": {
+    "companion_rule": "all six-match combinations in the same pool excluding deleted match",
+    "full_stake_per_n7_yuan": 4374,
+    "full_tickets_per_n7": 2187,
+    "pruned_stake_per_n7_yuan": 2916,
+    "pruned_tickets_per_n7": 1458
+  },
+  "outcome_boundary": "no result, score, final SP, payout, ROI, or settlement input is read or emitted",
+  "private_snapshot_protocol": "authenticate accepted bundle, copy every parsed payload, verify copied bytes, then read only private copies",
+  "private_snapshot_sha256": {
+    "bj89_preoutcome_rows.csv": "787bf3266403bebdcf3dfa4ae09f3dbc862a6542c04554fc1e37a0ba02296ae8",
+    "bj91_calibrated_probabilities.csv.gz": "d1aa79969682e89a4c593887c706b363c0f5b38fd2171c539f609da5f0b51ffb"
+  },
+  "probability_source": "#91 outcome_safe_common_inputs.csv.gz calibrated p3/p1/p0 joined only to #89 frozen kickoff identity fields",
+  "scope": "historical research only; no purchase or production promotion",
+  "segmentation": "issue/fold only; sort kickoff_ts, match_idx, match_id; 7-24 whole issue; >24 use 12/18/24/36h rolling windows capped at first 24; terminal <7 and terminal no-7-within-36h remainders remain explicitly unavailable",
+  "source_denominators": {
+    "bj89_identity_rows": 71857,
+    "bj91_calibrated_rows": 47819,
+    "joined_eligible_rows": 47819
+  },
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_COLD_PRUNING_FREEZE",
+  "thresholds": [
+    "0.05",
+    "0.10",
+    "0.15",
+    "0.20"
+  ],
+  "tie_break": "deleted code argmin p3,p1,p0 with code order 3,1,0; rank then match_idx"
+}

@@ -1,0 +1,11 @@
+{
+  "README.md": "46664722d31ab12b6c0136f7dd4aa3d7f950b28e1427ad30e197b56c7c7a527b",
+  "candidate_assignments.csv": "e93c22e40b8d8ffd9e3f0fdfee1f7d3ebbdc3eb07f0b2b66588d442042633de7",
+  "candidate_density_summary.csv": "794864def14675793ed119377809be83fa2ad74d764b4e867fe0f7c9e1601726",
+  "candidate_distribution.csv": "2286a7391bac12c20f3a1ac78bf25b8f51097cea2057fc7207588c5755498ab8",
+  "gate_a_card.json": "c23c9227344daf5b57caab26bcf55f138ab9f940f1cf54bf50372bcb2749a593",
+  "missingness_concentration.csv": "d4511532ec9b3a946c14a346cd9f315c5b9bee28db074bdb471d46f6da0a72ab",
+  "portfolio_frontier.csv": "8649efc8a850aebfd947f27cf52b29a173a31494af05425b70256e5efa5d15e6",
+  "reason_census.csv": "e20a282d7ab2100e44554ddffd612da1affd92e65732d8c8c02fe5986d07bcb0",
+  "runner.py": "b38642689b80c6dc2e90f7d33050f5cfb08225fb60d75b7aefcc5945fbe237a9"
+}

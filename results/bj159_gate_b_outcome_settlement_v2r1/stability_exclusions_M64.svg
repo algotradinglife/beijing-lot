@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="470"><rect width="100%" height="100%" fill="white"/><text x="78" y="22" font-size="16">#159 M=64 stability after concentration exclusions</text><line x1="78" y1="408" x2="820" y2="408" stroke="#333"/><line x1="78" y1="35" x2="78" y2="408" stroke="#333"/><text x="8" y="235.0" font-size="12" transform="rotate(-90 8 235.0)">pre-tax ROI</text>
+<text x="73.0" y="426" font-size="11">2</text>
+<text x="165.8" y="426" font-size="11">3</text>
+<text x="258.5" y="426" font-size="11">4</text>
+<text x="351.2" y="426" font-size="11">5</text>
+<text x="444.0" y="426" font-size="11">6</text>
+<text x="536.8" y="426" font-size="11">7</text>
+<text x="629.5" y="426" font-size="11">8</text>
+<text x="722.2" y="426" font-size="11">9</text>
+<text x="815.0" y="426" font-size="11">10</text>
+<line x1="78" y1="197.3" x2="820" y2="197.3" stroke="#999" stroke-dasharray="4,4"/>
+<polyline fill="none" stroke="#1f77b4" stroke-width="2" points="78.0,257.9 170.8,252.4 263.5,244.7 356.2,244.0 449.0,239.9 541.8,239.4 634.5,218.2 727.2,60.7 820.0,370.0"/>
+<text x="730.0" y="370.0" font-size="11" fill="#1f77b4">raw</text>
+<circle cx="78.0" cy="257.9" r="3" fill="#1f77b4"><title>raw, N=2: -0.319760</title></circle>
+<circle cx="170.8" cy="252.4" r="3" fill="#1f77b4"><title>raw, N=3: -0.290905</title></circle>
+<circle cx="263.5" cy="244.7" r="3" fill="#1f77b4"><title>raw, N=4: -0.250022</title></circle>
+<circle cx="356.2" cy="244.0" r="3" fill="#1f77b4"><title>raw, N=5: -0.246416</title></circle>
+<circle cx="449.0" cy="239.9" r="3" fill="#1f77b4"><title>raw, N=6: -0.224595</title></circle>
+<circle cx="541.8" cy="239.4" r="3" fill="#1f77b4"><title>raw, N=7: -0.222262</title></circle>
+<circle cx="634.5" cy="218.2" r="3" fill="#1f77b4"><title>raw, N=8: -0.110475</title></circle>
+<circle cx="727.2" cy="60.7" r="3" fill="#1f77b4"><title>raw, N=9: 0.719670</title></circle>
+<circle cx="820.0" cy="370.0" r="3" fill="#1f77b4"><title>raw, N=10: -0.910543</title></circle>
+<polyline fill="none" stroke="#d62728" stroke-width="2" points="78.0,268.3 170.8,254.7 263.5,247.1 356.2,248.7 449.0,253.9 541.8,269.3 634.5,311.6 727.2,341.5 820.0,382.3"/>
+<text x="730.0" y="382.3" font-size="11" fill="#d62728">ex-largest-issue</text>
+<circle cx="78.0" cy="268.3" r="3" fill="#d62728"><title>ex-largest-issue, N=2: -0.374384</title></circle>
+<circle cx="170.8" cy="254.7" r="3" fill="#d62728"><title>ex-largest-issue, N=3: -0.303034</title></circle>
+<circle cx="263.5" cy="247.1" r="3" fill="#d62728"><title>ex-largest-issue, N=4: -0.262936</title></circle>
+<circle cx="356.2" cy="248.7" r="3" fill="#d62728"><title>ex-largest-issue, N=5: -0.271028</title></circle>
+<circle cx="449.0" cy="253.9" r="3" fill="#d62728"><title>ex-largest-issue, N=6: -0.298546</title></circle>
+<circle cx="541.8" cy="269.3" r="3" fill="#d62728"><title>ex-largest-issue, N=7: -0.379672</title></circle>
+<circle cx="634.5" cy="311.6" r="3" fill="#d62728"><title>ex-largest-issue, N=8: -0.602752</title></circle>
+<circle cx="727.2" cy="341.5" r="3" fill="#d62728"><title>ex-largest-issue, N=9: -0.760547</title></circle>
+<circle cx="820.0" cy="382.3" r="3" fill="#d62728"><title>ex-largest-issue, N=10: -0.975257</title></circle>
+<polyline fill="none" stroke="#2ca02c" stroke-width="2" points="78.0,256.7 170.8,251.7 263.5,245.5 356.2,251.0 449.0,253.7 541.8,272.9 634.5,301.6 727.2,373.9 820.0,381.4"/>
+<text x="730.0" y="381.4" font-size="11" fill="#2ca02c">ex-largest-year</text>
+<circle cx="78.0" cy="256.7" r="3" fill="#2ca02c"><title>ex-largest-year, N=2: -0.313557</title></circle>
+<circle cx="170.8" cy="251.7" r="3" fill="#2ca02c"><title>ex-largest-year, N=3: -0.287014</title></circle>
+<circle cx="263.5" cy="245.5" r="3" fill="#2ca02c"><title>ex-largest-year, N=4: -0.254131</title></circle>
+<circle cx="356.2" cy="251.0" r="3" fill="#2ca02c"><title>ex-largest-year, N=5: -0.283439</title></circle>
+<circle cx="449.0" cy="253.7" r="3" fill="#2ca02c"><title>ex-largest-year, N=6: -0.297379</title></circle>
+<circle cx="541.8" cy="272.9" r="3" fill="#2ca02c"><title>ex-largest-year, N=7: -0.398919</title></circle>
+<circle cx="634.5" cy="301.6" r="3" fill="#2ca02c"><title>ex-largest-year, N=8: -0.549779</title></circle>
+<circle cx="727.2" cy="373.9" r="3" fill="#2ca02c"><title>ex-largest-year, N=9: -0.931159</title></circle>
+<circle cx="820.0" cy="381.4" r="3" fill="#2ca02c"><title>ex-largest-year, N=10: -0.970637</title></circle>
+</svg>

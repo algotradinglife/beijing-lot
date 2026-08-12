@@ -1,0 +1,18 @@
+{
+  "canonical_source": "data/derived/beidan_xlsm/beidan_xlsm.sqlite:match_features",
+  "canonical_source_db_sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f",
+  "diagnostics": "exact binomial and issue-clustered intervals; calibration, stratification, pool failure concentration, issue portfolio paths and ex-best-payout sensitivity",
+  "gate_a_manifest_sha256": "86e37682a95fad2a2a67187f1ee528f665d371583c621dc9d14af58f74302447",
+  "issue": 101,
+  "outcome_fields": [
+    "match_id",
+    "result_code",
+    "winning_sp",
+    "winning_sp_source",
+    "settlement_quality",
+    "has_trusted_settlement"
+  ],
+  "scope": "historical research only; no purchase or production promotion",
+  "settlement_rule": "all frozen six-companion combinations settled analytically using elementary symmetric degree-6 final-SP product; gross=2*0.65*final-SP product; factor exactly once",
+  "stage": "GATE_B_ONE_SHOT_OUTCOME_SETTLEMENT"
+}

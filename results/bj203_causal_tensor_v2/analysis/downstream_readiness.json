@@ -1,0 +1,24 @@
+{
+  "decision": "BLOCKED_PENDING_DATA_CAPABILITY",
+  "development_core_market_coverage": {
+    "bj_sp_snapshot": 0.0,
+    "calibrated_market_probability": 0.00970154414598,
+    "devig_euro_probability": 0.00977069975598,
+    "euro_1h_odds": 0.00977069975598,
+    "predicted_final_sp": 0.0768220033392
+  },
+  "downstream_issue": 204,
+  "heldout_disposition": "The complete 2025-04+ local sequence is frozen for identity and label embargo only. Its 2026 rows do not repair development feature coverage.",
+  "reason": "The frozen development tensor does not provide representative causal market-price support for the contracted market-anchored probability and pre-event SP heads. A declared masked feature is not an available training input.",
+  "required_data_capability": {
+    "graph_disposition": "PI must create the native Data issue and make #204 blockedBy it; Engineer does not mutate PI-owned graph contracts.",
+    "project": "BJ Data Platform",
+    "proposed_contract_id": "BJ-UNIFIED-MARKET-COVERAGE-001",
+    "scope": [
+      "extend causally timestamped 1h EURO/market probability over development history",
+      "extend timestamped pre-event Beijing SP snapshots with exact source digests",
+      "publish matched issue/match/outcome coverage and replay evidence",
+      "define a PI-approved representative-support gate before #204 activation"
+    ]
+  }
+}

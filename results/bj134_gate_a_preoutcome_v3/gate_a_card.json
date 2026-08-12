@@ -1,0 +1,237 @@
+{
+  "analysis_first": {
+    "guide_175_bound": true,
+    "risk_176_bound": true,
+    "selection_influence": "none"
+  },
+  "arms": [
+    {
+      "arm": "B0_BEST_FULL",
+      "definition": "exact accepted COLD_FIRST rank-one identity",
+      "role": "PRIMARY",
+      "score": "market_gm_e_sp"
+    },
+    {
+      "arm": "L1_LEAGUE_CORE",
+      "definition": "outer-year shrunk league/regime probability",
+      "role": "PRIMARY",
+      "score": "league_gm_e_sp"
+    },
+    {
+      "arm": "T1_TEAM_CORE",
+      "definition": "strict rolling team Poisson handicap probability",
+      "role": "PRIMARY",
+      "score": "team_gm_e_sp"
+    },
+    {
+      "arm": "M1_MARKET_DYNAMICS",
+      "definition": "initial-to-10h-to-1h market residual probability",
+      "role": "PRIMARY",
+      "score": "market_dynamics_gm_e_sp"
+    },
+    {
+      "arm": "F1_CORE_ALL",
+      "definition": "fixed L/T/M log pool 0.30/0.30/0.40",
+      "role": "PRIMARY",
+      "score": "combined_gm_e_sp"
+    },
+    {
+      "arm": "D1_DECISION_CHAIN_CORE",
+      "definition": "fixed risk-first FULL-N7 decision chain",
+      "role": "PRIMARY",
+      "score": "decision_lexicographic"
+    },
+    {
+      "arm": "F_MINUS_L",
+      "definition": "combined core leaving out league",
+      "role": "LOFO",
+      "score": "combined_minus_league_gm_e_sp"
+    },
+    {
+      "arm": "F_MINUS_T",
+      "definition": "combined core leaving out team",
+      "role": "LOFO",
+      "score": "combined_minus_team_gm_e_sp"
+    },
+    {
+      "arm": "F_MINUS_M",
+      "definition": "combined core leaving out market dynamics",
+      "role": "LOFO",
+      "score": "combined_minus_market_gm_e_sp"
+    }
+  ],
+  "candidate_universe": {
+    "choice_opportunities": 113,
+    "identities": 424,
+    "invariant": 76,
+    "issue_census": 348,
+    "no_bet": 159,
+    "participating": 189,
+    "selector_id": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K_ALL"
+  },
+  "contract": "BJ-HIST-FUNDAMENTAL-OVERLAY-N7-001",
+  "decision_chain": {
+    "full_constraint": "rerank identity only; never alter codes/tickets/allocation",
+    "lexicographic": [
+      "min missing/timing-risk legs",
+      "min handicap-fit contradictions",
+      "min model-market/q conflict count",
+      "max F1 GM E_SP",
+      "portfolio_id"
+    ],
+    "v4_2": "execution compression excluded"
+  },
+  "denominator": {
+    "arm_count": 9,
+    "candidate_identity_rows": 424,
+    "candidate_role_rows": 2968,
+    "choice_opportunity_issues": 113,
+    "invariant_issues": 76,
+    "issue_census": 348,
+    "no_bet_rows": 1431,
+    "planned_stake_per_arm_yuan": 826686,
+    "selected_by_arm": {
+      "B0_BEST_FULL": 189,
+      "D1_DECISION_CHAIN_CORE": 189,
+      "F1_CORE_ALL": 189,
+      "F_MINUS_L": 189,
+      "F_MINUS_M": 189,
+      "F_MINUS_T": 189,
+      "L1_LEAGUE_CORE": 189,
+      "M1_MARKET_DYNAMICS": 189,
+      "T1_TEAM_CORE": 189
+    },
+    "selected_rows": 1701,
+    "selection_rows": 3132,
+    "unique_match_rows": 1558
+  },
+  "gate_b_status": "NOT_AUTHORIZED_PENDING_PI_GATE_A_REVIEW",
+  "incumbent": {
+    "alias": "BEST_FULL",
+    "allocation": "FULL_ENUMERATED",
+    "baseline_no_tax_roi": -0.0947,
+    "no_bet": 159,
+    "selected": 189,
+    "selector_id": "S2_ESP290_GM300_MARKET_WF_CAL_MIN_LOWP20_COLD_FIRST_K1",
+    "stake_yuan": 4374,
+    "tickets": 2187
+  },
+  "issue": 134,
+  "outcome_boundary": "Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking",
+  "outer_year": "all fold model parameters use training calendar year < target year; same-year football state advances only after earlier kickoff",
+  "pi_plan": "Issue #134 comment 5175086784",
+  "promotion_boundary": "paper research only; positive lift requires strict independent EV; negative overlay cannot demote incumbent",
+  "snapshot_coverage": [
+    {
+      "candidate_match_count": 1558,
+      "complete_vector_count": 1558,
+      "controlling_value": "NO_VIG_VECTOR",
+      "market": "EURO",
+      "missing_match_ids_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "missing_vector_count": 0,
+      "outcome_boundary": "Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking",
+      "required_fields": "euro_initial_n>0|euro_initial_v1|euro_initial_v2|euro_initial_v3",
+      "selection_policy": "RETAIN_IDENTITY_USE_EXPLICIT_MISSING_BUCKET",
+      "snapshot": "INITIAL"
+    },
+    {
+      "candidate_match_count": 1558,
+      "complete_vector_count": 1558,
+      "controlling_value": "NO_VIG_VECTOR",
+      "market": "EURO",
+      "missing_match_ids_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "missing_vector_count": 0,
+      "outcome_boundary": "Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking",
+      "required_fields": "euro_10h_n>0|euro_10h_v1|euro_10h_v2|euro_10h_v3",
+      "selection_policy": "RETAIN_IDENTITY_USE_EXPLICIT_MISSING_BUCKET",
+      "snapshot": "10H"
+    },
+    {
+      "candidate_match_count": 1558,
+      "complete_vector_count": 1558,
+      "controlling_value": "NO_VIG_VECTOR",
+      "market": "EURO",
+      "missing_match_ids_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "missing_vector_count": 0,
+      "outcome_boundary": "Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking",
+      "required_fields": "euro_1h_n>0|euro_1h_v1|euro_1h_v2|euro_1h_v3",
+      "selection_policy": "RETAIN_IDENTITY_USE_EXPLICIT_MISSING_BUCKET",
+      "snapshot": "1H"
+    },
+    {
+      "candidate_match_count": 1558,
+      "complete_vector_count": 1556,
+      "controlling_value": "PUBLISHED_LINE_V2",
+      "market": "ASIAN",
+      "missing_match_ids_sha256": "670286fe2ff09905222d23b2fdabc8e18770cb7422114744c518f5d4ff8dc4c3",
+      "missing_vector_count": 2,
+      "outcome_boundary": "Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking",
+      "required_fields": "asian_initial_n>0|asian_initial_v1|asian_initial_v2|asian_initial_v3",
+      "selection_policy": "RETAIN_IDENTITY_USE_EXPLICIT_MISSING_BUCKET",
+      "snapshot": "INITIAL"
+    },
+    {
+      "candidate_match_count": 1558,
+      "complete_vector_count": 1558,
+      "controlling_value": "PUBLISHED_LINE_V2",
+      "market": "ASIAN",
+      "missing_match_ids_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "missing_vector_count": 0,
+      "outcome_boundary": "Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking",
+      "required_fields": "asian_10h_n>0|asian_10h_v1|asian_10h_v2|asian_10h_v3",
+      "selection_policy": "RETAIN_IDENTITY_USE_EXPLICIT_MISSING_BUCKET",
+      "snapshot": "10H"
+    },
+    {
+      "candidate_match_count": 1558,
+      "complete_vector_count": 1558,
+      "controlling_value": "PUBLISHED_LINE_V2",
+      "market": "ASIAN",
+      "missing_match_ids_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "missing_vector_count": 0,
+      "outcome_boundary": "Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking",
+      "required_fields": "asian_1h_n>0|asian_1h_v1|asian_1h_v2|asian_1h_v3",
+      "selection_policy": "RETAIN_IDENTITY_USE_EXPLICIT_MISSING_BUCKET",
+      "snapshot": "1H"
+    },
+    {
+      "candidate_match_count": 1558,
+      "complete_vector_count": 1557,
+      "controlling_value": "PUBLISHED_LINE_V2",
+      "market": "OU",
+      "missing_match_ids_sha256": "91ff52524ec835413b2d35f9a991abe9f355474ebf40655a3bd3dee2a26ca971",
+      "missing_vector_count": 1,
+      "outcome_boundary": "Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking",
+      "required_fields": "ou_initial_n>0|ou_initial_v1|ou_initial_v2|ou_initial_v3",
+      "selection_policy": "RETAIN_IDENTITY_USE_EXPLICIT_MISSING_BUCKET",
+      "snapshot": "INITIAL"
+    },
+    {
+      "candidate_match_count": 1558,
+      "complete_vector_count": 1558,
+      "controlling_value": "PUBLISHED_LINE_V2",
+      "market": "OU",
+      "missing_match_ids_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "missing_vector_count": 0,
+      "outcome_boundary": "Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking",
+      "required_fields": "ou_10h_n>0|ou_10h_v1|ou_10h_v2|ou_10h_v3",
+      "selection_policy": "RETAIN_IDENTITY_USE_EXPLICIT_MISSING_BUCKET",
+      "snapshot": "10H"
+    },
+    {
+      "candidate_match_count": 1558,
+      "complete_vector_count": 1558,
+      "controlling_value": "PUBLISHED_LINE_V2",
+      "market": "OU",
+      "missing_match_ids_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "missing_vector_count": 0,
+      "outcome_boundary": "Gate A outcome-unexposed: candidate target result/final-SP/payout/tax/ROI/settlement fields are not read by target projection or identity ranking",
+      "required_fields": "ou_1h_n>0|ou_1h_v1|ou_1h_v2|ou_1h_v3",
+      "selection_policy": "RETAIN_IDENTITY_USE_EXPLICIT_MISSING_BUCKET",
+      "snapshot": "1H"
+    }
+  ],
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_QUICK_BACKTESTABLE_CORE",
+  "thresholds": "non-controlling raw cross-issue Q00/Q25/Q50/Q75; no within-issue percentile threshold",
+  "version": "bj134-gate-a-v3"
+}

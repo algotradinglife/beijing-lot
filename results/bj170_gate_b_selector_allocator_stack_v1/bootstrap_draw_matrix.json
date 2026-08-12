@@ -1,0 +1,10 @@
+{
+  "compressed_sha256": "6c6a250b948afa044f138412866235d3a079a93afff5e2c71c7ee9dfa1eaa834",
+  "dtype": "uint16_le",
+  "generator": "random.Random(seed).randrange(issue_count), row-major replicate \u00d7 issue draw",
+  "issue_count": 177,
+  "replicates": 20000,
+  "seed": 170177,
+  "uncompressed_bytes": 7080000,
+  "uncompressed_sha256": "961e433f426d402cb201eb820c3beaeb5f5af6b1560e424514387ead0edb465b"
+}

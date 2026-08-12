@@ -1,0 +1,17 @@
+{
+  "classification": "NONCONFORMING_INVALID_FOR_SCIENTIFIC_DECISION_OR_PROMOTION",
+  "execution_time_hkt": "2026-08-08T12:54:17+08:00",
+  "gate_a_manifest_sha256": "dfa14d42410d5513cbb07f832972e47fa1cf819a6f1eece13e1f92106e096ae1",
+  "invalid_output_path": "results/bj204_gate_b_model_settlement_v1",
+  "invalid_output_content_identity_file_sha256": "51178b826435d14df6b07b5e7c3152be9e1d3103fba1bfc9c6de90deeb4ab0fc",
+  "invalid_output_manifest_sha256": "2153fca6951254f517d1e70f9435d0d6f030510d2bed287162ab387d87eabcb7",
+  "invalid_output_version": "bj204-market-anchored-model-gate-b-v1",
+  "reason_codes": [
+    "DIRECT_CLASSIFIER_PROBABILITIES_NOT_MARKET_ANCHORED_RESIDUALS",
+    "EXPECTED_MISSINGNESS_AND_PROXY_GRADE_CREATED_STRUCTURAL_100_PERCENT_FALLBACK",
+    "MARKET_BASELINE_EXCLUDED_FROM_CV_SELECTION",
+    "SKLEARN_ISSUE_SUMMARY_MLP_MISNAMED_AS_DEEP_SETS_STYLE"
+  ],
+  "recovery_authorization": "RETROSPECTIVE_IMPLEMENTATION_RECOVERY_ONLY",
+  "scientific_use": "PROHIBITED"
+}

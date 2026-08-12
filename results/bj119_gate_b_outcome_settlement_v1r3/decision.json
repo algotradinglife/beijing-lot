@@ -1,0 +1,4 @@
+{
+  "decision": "FROZEN_RESULTS_PENDING_EV_IF_POSITIVE",
+  "rule": "No variant is promotable solely from this table; positive/robust rows require strict independent EV before promotion."
+}

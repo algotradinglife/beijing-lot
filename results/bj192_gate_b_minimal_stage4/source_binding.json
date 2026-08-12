@@ -1,0 +1,15 @@
+{
+  "correction_scope": "ACTUAL_FUNDING_COMPARISON_SEMANTICS;_TWO_COMMON_CAPITAL_PREFIX_REPLAYS;_CAPITAL_CONSTRAINT_LABEL;_MATPLOTLIB_DECISION_CHARTS;_NO_COMMON_SCHEDULE_NOT_IDENTIFIABLE;_CSV_BOOLEAN_REPORT_SEMANTICS",
+  "gate_a": {
+    "content_identity_sha256": "66ce6f86703b31d710ad678b49287de3bc6b2c43a5b36c278e1369bdecd861d5",
+    "manifest_sha256": "6108defd857bf431bcaf55109df0e195b45aa754e8fd46f1db82d329102ff256",
+    "package": "bj192_gate_a_preoutcome_v8r1r2"
+  },
+  "prior_delivery_package": {
+    "content_identity_sha256": "960d76c12c856d8b26adff5d5e5f99bb13f662c62a025dddf4cf3e9c7b810a40",
+    "manifest_sha256": "eedb76b7b3fefa375ded448a2730b878e13ee6bfb9065c5e3d7e2d2d93b66c4f",
+    "package": "bj192_gate_b_minimal_stage4_v3"
+  },
+  "reproducibility": "CLEAN_CLONE_VERIFIES_THE_SINGLE_AUTHORITATIVE_PACKAGE_WITHOUT_AUTHOR_SCRATCH_OR_PRIOR_PACKAGE",
+  "settlement_boundary": "VERIFIED_PRIOR_PACKAGE_PLUS_TWO_348_ISSUE_COMMON_CAPITAL_PREFIX_REPLAYS_NO_BOOTSTRAP_RERUN"
+}

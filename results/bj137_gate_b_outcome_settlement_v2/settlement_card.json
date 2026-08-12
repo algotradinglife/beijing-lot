@@ -1,0 +1,27 @@
+{
+  "contract": "BJ-HIST-PROB-SAMPLING-N7-001",
+  "decision": {
+    "all_seed_and_chronological_positive_sampler_candidates": 0,
+    "all_seed_global_positive_sampler_candidates": 461,
+    "chronologically_positive_selector_candidates": 0,
+    "decision": "NO_PROMOTION",
+    "global_positive_selector_candidates": 4,
+    "promotion_authorized": false,
+    "promotion_candidates": [],
+    "rule": "Promotion requires positive matched no-tax and actual-tax deltas across all three frozen seeds and every YEAR/FOLD/LOYO view. A one-seed, sparse-M, raw-ROI or tax-only maximum is not promotable.",
+    "strict_independent_ev_required": false
+  },
+  "input_boundary": "Only accepted Gate-A v2 and canonical final-SP settlement truth generated the numeric v1 ledger. This v2 package losslessly repacks that ledger and corrects only the terminal-decision predicate; Gate-A v3/post-acceptance material is not read.",
+  "issue": 137,
+  "promotion_rule": "Promotion requires positive matched no-tax and actual-tax deltas across all three frozen seeds and every YEAR/FOLD/LOYO view. A one-seed, sparse-M, raw-ROI or tax-only maximum is not promotable.",
+  "provenance": {
+    "gate_a_manifest_sha256": "0aabeb94cec6d68831d233553e710b425bf02c1a843eae21adad50c4f9fac2df",
+    "outcome_manifest_sha256": "fbbd3b53bd86f4bb0caff8f2587933cd6b0e4e7d04fb0f709bac934ec2a705cc",
+    "outcome_payload_sha256": "13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89",
+    "v1_numeric_manifest_sha256": "be74e5162207f621f212a981f6732da6aeaf8ebc595e76cdfd1e72a8e9537cd8"
+  },
+  "runner_version": "bj137-gate-b-v2-decision-correction",
+  "scope": "historical paper research only; no purchase, production, or promotion authority.",
+  "settlement": "Each selected ticket pays \u00a52\u00d70.65\u00d7product(canonical final winning SP) per hit. Tax is assessed per realised winning ticket: 20% only where that individual ticket gross is at least \u00a510,000. Tickets, identities and issue-policy arms are never aggregated merely to cross the tax threshold; duplicated WR hits are separately assessed tickets.",
+  "stage": "GATE_B_COMPLETE_ISSUE_OUTCOME_SETTLEMENT"
+}

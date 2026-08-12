@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="470"><rect width="100%" height="100%" fill="white"/><text x="78" y="22" font-size="16">#159 matched/common-support pre-tax delta vs N7</text><line x1="78" y1="408" x2="820" y2="408" stroke="#333"/><line x1="78" y1="35" x2="78" y2="408" stroke="#333"/><text x="8" y="235.0" font-size="12" transform="rotate(-90 8 235.0)">ROI delta</text>
+<text x="73.0" y="426" font-size="11">2</text>
+<text x="165.8" y="426" font-size="11">3</text>
+<text x="258.5" y="426" font-size="11">4</text>
+<text x="351.2" y="426" font-size="11">5</text>
+<text x="444.0" y="426" font-size="11">6</text>
+<text x="536.8" y="426" font-size="11">7</text>
+<text x="629.5" y="426" font-size="11">8</text>
+<text x="722.2" y="426" font-size="11">9</text>
+<text x="815.0" y="426" font-size="11">10</text>
+<line x1="78" y1="319.1" x2="820" y2="319.1" stroke="#999" stroke-dasharray="4,4"/>
+<polyline fill="none" stroke="#1f77b4" stroke-width="2" points="78.0,274.6 170.8,318.7 263.5,308.7 356.2,312.7 449.0,302.9 541.8,319.1 634.5,259.1 727.2,60.7 820.0,362.3"/>
+<text x="730.0" y="362.3" font-size="11" fill="#1f77b4">M=32</text>
+<circle cx="78.0" cy="274.6" r="3" fill="#1f77b4"><title>M=32, N=2: 0.489635</title></circle>
+<circle cx="170.8" cy="318.7" r="3" fill="#1f77b4"><title>M=32, N=3: 0.004067</title></circle>
+<circle cx="263.5" cy="308.7" r="3" fill="#1f77b4"><title>M=32, N=4: 0.114922</title></circle>
+<circle cx="356.2" cy="312.7" r="3" fill="#1f77b4"><title>M=32, N=5: 0.069923</title></circle>
+<circle cx="449.0" cy="302.9" r="3" fill="#1f77b4"><title>M=32, N=6: 0.178450</title></circle>
+<circle cx="541.8" cy="319.1" r="3" fill="#1f77b4"><title>M=32, N=7: 0.000000</title></circle>
+<circle cx="634.5" cy="259.1" r="3" fill="#1f77b4"><title>M=32, N=8: 0.660483</title></circle>
+<circle cx="727.2" cy="60.7" r="3" fill="#1f77b4"><title>M=32, N=9: 2.845787</title></circle>
+<circle cx="820.0" cy="362.3" r="3" fill="#1f77b4"><title>M=32, N=10: -0.475728</title></circle>
+<polyline fill="none" stroke="#d62728" stroke-width="2" points="78.0,301.3 170.8,335.1 263.5,323.1 356.2,323.0 449.0,319.7 541.8,319.1 634.5,309.5 727.2,233.6 820.0,382.3"/>
+<text x="730.0" y="382.3" font-size="11" fill="#d62728">M=64</text>
+<circle cx="78.0" cy="301.3" r="3" fill="#d62728"><title>M=64, N=2: 0.195846</title></circle>
+<circle cx="170.8" cy="335.1" r="3" fill="#d62728"><title>M=64, N=3: -0.176563</title></circle>
+<circle cx="263.5" cy="323.1" r="3" fill="#d62728"><title>M=64, N=4: -0.044536</title></circle>
+<circle cx="356.2" cy="323.0" r="3" fill="#d62728"><title>M=64, N=5: -0.042620</title></circle>
+<circle cx="449.0" cy="319.7" r="3" fill="#d62728"><title>M=64, N=6: -0.007102</title></circle>
+<circle cx="541.8" cy="319.1" r="3" fill="#d62728"><title>M=64, N=7: 0.000000</title></circle>
+<circle cx="634.5" cy="309.5" r="3" fill="#d62728"><title>M=64, N=8: 0.105580</title></circle>
+<circle cx="727.2" cy="233.6" r="3" fill="#d62728"><title>M=64, N=9: 0.941113</title></circle>
+<circle cx="820.0" cy="382.3" r="3" fill="#d62728"><title>M=64, N=10: -0.695995</title></circle>
+<polyline fill="none" stroke="#2ca02c" stroke-width="2" points="78.0,319.8 170.8,334.3 263.5,323.4 356.2,320.2 449.0,316.4 541.8,319.1 634.5,315.8 727.2,287.5 820.0,351.4"/>
+<text x="730.0" y="351.4" font-size="11" fill="#2ca02c">M=128</text>
+<circle cx="78.0" cy="319.8" r="3" fill="#2ca02c"><title>M=128, N=2: -0.008191</title></circle>
+<circle cx="170.8" cy="334.3" r="3" fill="#2ca02c"><title>M=128, N=3: -0.167250</title></circle>
+<circle cx="263.5" cy="323.4" r="3" fill="#2ca02c"><title>M=128, N=4: -0.047664</title></circle>
+<circle cx="356.2" cy="320.2" r="3" fill="#2ca02c"><title>M=128, N=5: -0.012146</title></circle>
+<circle cx="449.0" cy="316.4" r="3" fill="#2ca02c"><title>M=128, N=6: 0.029056</title></circle>
+<circle cx="541.8" cy="319.1" r="3" fill="#2ca02c"><title>M=128, N=7: 0.000000</title></circle>
+<circle cx="634.5" cy="315.8" r="3" fill="#2ca02c"><title>M=128, N=8: 0.036559</title></circle>
+<circle cx="727.2" cy="287.5" r="3" fill="#2ca02c"><title>M=128, N=9: 0.348111</title></circle>
+<circle cx="820.0" cy="351.4" r="3" fill="#2ca02c"><title>M=128, N=10: -0.355789</title></circle>
+</svg>

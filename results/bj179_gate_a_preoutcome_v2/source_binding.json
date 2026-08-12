@@ -1,0 +1,21 @@
+{
+  "base_main_commit": "9ec5cf4856f546861e20fad76d110807576903c7",
+  "contract": "BJ-HIST-LEAGUE-MODEL-N7-001",
+  "core": {
+    "path": "scripts/bj179_hierarchical_league_core.py",
+    "sha256": "2c1defef21fb6c1be2353e9e7a6d7e06788a365d3c16824f705feab576e99b71"
+  },
+  "database": {
+    "access": "training rows only where kickoff year < target fold, including raw score, BJ line, official historical BJDC SP and market snapshots; target projection and predicted SP consumed from #134 outcome-unexposed roles",
+    "repository_path": "data/derived/beidan_xlsm/beidan_xlsm.sqlite",
+    "sha256": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
+  },
+  "outcome_boundary": "Gate A outcome-unexposed: target match result/final-SP/payout/tax/ROI/settlement fields are never read by target probability construction or identity ranking",
+  "source_134_gate_a": {
+    "content": "3fe014f3decdbd589cdded52d8a9b2bac0f3cb988c2ae8e15cf79314a02eede1",
+    "manifest": "0a7e4d673e7fc5fd4832c91e3b519afe5a2bc3211b99f4c95f57c691921b65fd",
+    "package": "bj134_gate_a_preoutcome_v3",
+    "payload_count": 21
+  },
+  "version": "bj179-gate-a-v2"
+}

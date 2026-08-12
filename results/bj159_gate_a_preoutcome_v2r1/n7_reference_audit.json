@@ -1,0 +1,14 @@
+{
+  "bridge_status": "LEGACY_SEGMENT_BASELINE_NOT_EQUAL_COMPLETE_ISSUE_SELECTION",
+  "corrected_complete_issue_identity_count": 1005,
+  "corrected_identity_set_sha256": "156f9315de6e2c9b46a2b170dc32b4eefa4521a00cf1bbc30e815e71353ec4ac",
+  "corrected_only_count": 999,
+  "corrected_rule": "#159 candidates, companions, GM filter, and dedup applied once over complete issue_instance",
+  "exact_intersection_count": 6,
+  "legacy_identity_set_sha256": "65f963e6c1246306fecc538db6aebd3e02e14db4a245d6b999681b036640be14",
+  "legacy_only_count": 365,
+  "legacy_rule": "#127 accepted target identities selected within native pool/segment",
+  "legacy_segment_baseline_identity_count": 371,
+  "outcome_boundary": "No outcome/final-SP/payout/tax/ROI/settlement input read or emitted",
+  "source_variant": "ESP300_GM305_LOWP20"
+}

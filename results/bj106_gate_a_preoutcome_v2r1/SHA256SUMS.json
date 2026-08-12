@@ -1,0 +1,8 @@
+{
+  "CONTENT_IDENTITY.json": "306fe9c79ecae8ff4a1a8e4769cf13fbc43aa9da449f6c5f7f5d61986b561d4d",
+  "freeze_runner.py": "741ef765cbfed94b4b0e1736c179be3511f3448581e06d87c9764263f8663d75",
+  "gate_a_card.json": "e1221b203b393c6cf9f9df3d06398298ad16096c423d07e2e426ef66d34c75cc",
+  "q_atlas.csv.gz": "b710dd4fe792e69727b898a615e1cb4899175e329c71bcee46788fb859c43b26",
+  "source_census.csv": "cd48c6b8b4a630b00a4ce7706dcd9c9232836bab0ea53d0aeee9b7605d89a0bf",
+  "stratum_census.csv": "29ecbc2a41abb23617757a9035f7a0745700afce670ccce9599fca47a33eb023"
+}

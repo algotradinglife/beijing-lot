@@ -1,0 +1,31 @@
+{
+  "authority": {
+    "betting": false,
+    "execution": false,
+    "model_training": false,
+    "release": false,
+    "roi": false
+  },
+  "census": {
+    "epochs": 2855,
+    "roster_capability_rows": 787335,
+    "strict_cells": 0,
+    "strict_roster_rows": 0
+  },
+  "contract_version": "bj214-decision-epoch-tensor-v1",
+  "decision_report_sha256": "384ea447c1f64a3de9a5eada66a56c3779e468e61c67c00e36696f900078be6e",
+  "decision_sha256": "07867ae204a629d1b5e7fd37b2f01cbe898ecbae0dacc5c2c4ff4fce8cbe37b6",
+  "disposition": "BLOCKED_INSUFFICIENT_CAUSAL_SUPPORT",
+  "implementation_hashes": {
+    "builder": "ac660bd8300573d436f4d70dde6846f03fdeddcd66e8c1a5be251e7fb8e29c29",
+    "cli": "740bbe9cc636af9bc3dd12e38ce444dffcde177a825464f43e8b9e43b3fe4ad1",
+    "contract": "4566ef5fb8c9affd76c6526357c325528c580bbcbe342b3d035fa0e09e56ee2c",
+    "environment_lock": "acf0b168cadb2956e7e4937901d067ef65cda1783016ec92bea7b5743d1add1c",
+    "loader": "7eef36499b40bb3e2374ec92e5318c06702b9ed71dc06c462b18216786be5306",
+    "notebook_executor": "16165771e7e0b5dccbf56a7700349877217f47ccd9d801c223753735537ca7a4"
+  },
+  "inference_manifest_sha256": "58dff13a94c5a16398d3aaed0dbc4ed334e2e75a558fc8f6834039e1389d4749",
+  "outcome_namespace": "PHYSICALLY_ABSENT",
+  "source_manifest_sha256": "f05e02404a91bb63d2a40c55bbe572964cf681057df72f7c69c6145c4c78572d",
+  "upstream_contract_version": "bj203-causal-tensor-v2"
+}

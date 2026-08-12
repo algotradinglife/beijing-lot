@@ -1,0 +1,2 @@
+sample_id,status,minimum_issue_exclusive,selector,decision_count,outcome_count
+SAMPLE_1,WAITING_FOR_POST_ACTIVATION_INPUT,26082,first valid issue after PI acceptance,0,0

@@ -1,0 +1,14 @@
+{
+  "CONTENT_IDENTITY.json": "d6eac4c45fdf3fa156014aed8062a264be5e8bd7ae9d17090205831f5d784074",
+  "README.md": "58f8bb44f6b973bde284b0ad54bb10621ac739e7ac3c9fc7da99e3b81feb2acb",
+  "candidate_scatter.csv": "ed4cadbbd4fde22d99f05ad8545c53dcdf61e90202efece511da06e6ab44cb1c",
+  "gate_a_card.json": "8d35c8dc664f8665888cb1e9cbc019217347cfcb20eb6a62f1442cfa0599dad4",
+  "issue_accounting.csv": "9c359c6eea291878d480c02e2ece3b15cf586f7b72dc6e8fda88b02883751e10",
+  "issue_census.csv": "69d7463b6f83af4127059d6ea34095292646ec2a98abc39d56551b76d6ea6dd5",
+  "matched_delete_score_frontier.csv.gz": "d26d90275b19a1e32d09d9ddce4ee00d51ca5d58797b4af3fbac0e561b485a23",
+  "portfolio_role_assignments.csv.gz": "3adda4ef18fcbf60b5d38387493e3e237ab3da4c3776d6d99b8fdb18e0cf9a34",
+  "ranker_disagreements.csv.gz": "01553cf4ee970551fc8668edbe4a627c3a7e165467bb44e3dfdab2c26084f0fd",
+  "runner.py": "c13a908cd6109a3b453e2061d4aedc606781f2f7bce28b6c97515669b0f27c63",
+  "source_census.csv": "23bc7b6abfe72940849f5d96218c546f2e9ba872c32d2b82a072f751476c91d7",
+  "threshold_census.csv": "95fb92fbe5c91cb28c3b569115b5c60fdeeeeb32226f4b639f9c16eb14be2d0b"
+}

@@ -1,0 +1,102 @@
+{
+  "accounting": "K=product allowed-code counts; stake=2*K. H=product retained calibrated probability. G_BE=[K/(0.65*H)]^(1/N) is outcome-free pre-tax diagnostic only.",
+  "arms": [
+    "NO_BET_CONTROL",
+    "UNFILTERED_FULL_N4",
+    "UNFILTERED_FULL_N7",
+    "UNFILTERED_FULL_DYNAMIC_4_7",
+    "FULL_N4",
+    "FULL_N7",
+    "FULL_DYNAMIC_4_7",
+    "PRUNE_N4",
+    "PRUNE_N7",
+    "PRUNE_DYNAMIC_4_7",
+    "MIXED_N4",
+    "MIXED_N7",
+    "MIXED_DYNAMIC_4_7"
+  ],
+  "contract": "BJ-HIST-EXPECTED-SP-LOWP-001",
+  "denominator": {
+    "frontier_rows": 311103,
+    "native_issues": 344,
+    "native_pools": 2659
+  },
+  "features": "Per-match E_SP=sum_code(p_cal(code)*predicted_sp(code)); rank descending by E_SP, then p_min ascending, then match_idx.",
+  "gate_b": "NOT_RUN and NOT_AUTHORIZED. Only this exact immutable matrix may later be settled without adding or selecting thresholds after outcomes.",
+  "generator_version": "bj121-gatea-v3",
+  "issue": 121,
+  "outcome_boundary": "No result, actual final SP, payout, tax, ROI, or settlement source is opened or emitted in Gate A.",
+  "portfolio_gate": "Filtered arms require match E_SP>=e_sp_min and GM(selected E_SP)>=gm_e_sp_min. Dynamic N uses N7 when >=7 candidates, else N4 when >=4, else NO_BET.",
+  "provenance": {
+    "bj101_manifest_sha256": "86e37682a95fad2a2a67187f1ee528f665d371583c621dc9d14af58f74302447",
+    "bj101_membership_sha256": "6b1361797956123eaeb9e2d015eae7bf7ef28ee020a902e710f12284442a7014",
+    "bj101_pool_census_sha256": "38c96ac4509801f68dd3e2469be619a8954ef06291faca2e9cd6d04cb7b6332a",
+    "bj106_manifest_sha256": "fb45cacccb4c9ab2b52c8a538f489fb3e3197fa138245f0d83cf98a3cbb0db5d",
+    "bj106_q_atlas_sha256": "b710dd4fe792e69727b898a615e1cb4899175e329c71bcee46788fb859c43b26"
+  },
+  "roles": {
+    "FULL": "all 3/1/0 codes",
+    "MIXED": "SINGLE argmax when p_min<=low_p_max and p_max>=0.50; else DOUBLE after deleting argmin when p_min<=low_p_max; otherwise FULL",
+    "PRUNE": "DOUBLE by deleting argmin p_cal when p_min<=low_p_max; otherwise FULL",
+    "UNFILTERED_FULL_CONTROL": "top E_SP matches without E_SP/GM threshold, all codes retained"
+  },
+  "scope": "historical paper-only research; no purchase, production or promotion",
+  "segmentation": "Reuse #101 pre-outcome native issue/24-hour pool segmentation; every pool is retained, including explicit NO_BET rows.",
+  "stage": "GATE_A_OUTCOME_UNEXPOSED_FREEZE",
+  "variants": {
+    "ESP280_GM290_LOWP20": {
+      "banker_p_max_min": 0.5,
+      "e_sp_min": 2.8,
+      "gm_e_sp_min": 2.9,
+      "low_p_max": 0.2
+    },
+    "ESP280_GM290_LOWP25": {
+      "banker_p_max_min": 0.5,
+      "e_sp_min": 2.8,
+      "gm_e_sp_min": 2.9,
+      "low_p_max": 0.25
+    },
+    "ESP280_GM290_LOWP30": {
+      "banker_p_max_min": 0.5,
+      "e_sp_min": 2.8,
+      "gm_e_sp_min": 2.9,
+      "low_p_max": 0.3
+    },
+    "ESP290_GM300_LOWP20": {
+      "banker_p_max_min": 0.5,
+      "e_sp_min": 2.9,
+      "gm_e_sp_min": 3.0,
+      "low_p_max": 0.2
+    },
+    "ESP290_GM300_LOWP25": {
+      "banker_p_max_min": 0.5,
+      "e_sp_min": 2.9,
+      "gm_e_sp_min": 3.0,
+      "low_p_max": 0.25
+    },
+    "ESP290_GM300_LOWP30": {
+      "banker_p_max_min": 0.5,
+      "e_sp_min": 2.9,
+      "gm_e_sp_min": 3.0,
+      "low_p_max": 0.3
+    },
+    "ESP300_GM305_LOWP20": {
+      "banker_p_max_min": 0.5,
+      "e_sp_min": 3.0,
+      "gm_e_sp_min": 3.05,
+      "low_p_max": 0.2
+    },
+    "ESP300_GM305_LOWP25": {
+      "banker_p_max_min": 0.5,
+      "e_sp_min": 3.0,
+      "gm_e_sp_min": 3.05,
+      "low_p_max": 0.25
+    },
+    "ESP300_GM305_LOWP30": {
+      "banker_p_max_min": 0.5,
+      "e_sp_min": 3.0,
+      "gm_e_sp_min": 3.05,
+      "low_p_max": 0.3
+    }
+  }
+}

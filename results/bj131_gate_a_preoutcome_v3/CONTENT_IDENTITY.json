@@ -1,0 +1,23 @@
+{
+  "contract_version": "bj131-portable-content-v1",
+  "gzip_payloads": {
+    "no_bet_control.csv.gz": {
+      "canonical_decompressed_bytes": 5269528,
+      "canonical_decompressed_sha256": "51dfe60c6eecd45fb8862551e7e6e042725b932060e71b4e96c6684df46dba36"
+    },
+    "portfolio_base.csv.gz": {
+      "canonical_decompressed_bytes": 31497850,
+      "canonical_decompressed_sha256": "92e4829796c9bb638494da661104646eb850ae71c91ae6331568ef714d080d67"
+    },
+    "portfolio_seed_order.csv.gz": {
+      "canonical_decompressed_bytes": 60634816,
+      "canonical_decompressed_sha256": "5c5643205394108186a903933eea4102d2b42dc94b17d5076a6cd3224826a336"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "b19ec4bdf957a6f1f0c073d18363ab2c82235b17dfbe911ffe6e683e30a07979",
+    "gate_a_card.json": "e3003de9d409b48719c9c1ea0008e6c1a72dd1b9427e63b2416315853d02c992",
+    "runner.py": "9aefba2d90a67366ced1df673fb8adec8ae556918b6f397f0d4b2f0d8851ebdc",
+    "sleeve_matrix.csv": "1f13be80c7d882c4dbcdae37bf6bfed5074f275970398c101fb3cb3c95b7a92d"
+  }
+}

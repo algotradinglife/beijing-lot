@@ -1,0 +1,80 @@
+{
+  "alpha": 0.01,
+  "determinism": "fixed NumPy/scikit-learn seeds; single-process fit and generation",
+  "device": "CPU",
+  "draws_per_seed": 64,
+  "experimental_ablation_features": [
+    "log_joint_probability",
+    "log_sp_product",
+    "expected_pre_tax_net",
+    "mean_selected_probability",
+    "min_selected_probability",
+    "mean_selected_sp",
+    "outcome_hhi",
+    "match_rank_mean",
+    "experimental_expected_pre_tax_net",
+    "mean_abs_experimental_residual"
+  ],
+  "features": [
+    "log_joint_probability",
+    "log_sp_product",
+    "expected_pre_tax_net",
+    "mean_selected_probability",
+    "min_selected_probability",
+    "mean_selected_sp",
+    "outcome_hhi",
+    "match_rank_mean"
+  ],
+  "hidden_layer_sizes": [
+    12
+  ],
+  "k_grid": [
+    8,
+    16,
+    32
+  ],
+  "max_iter": 120,
+  "model": "sklearn.pipeline(StandardScaler, MLPClassifier)",
+  "model_seed": 206001,
+  "nuisance_candidate_seeds": [
+    206001,
+    206002,
+    206003
+  ],
+  "ood_model": "sklearn.preprocessing.StandardScaler",
+  "ood_scaler_mean": [
+    -6.338298653961933,
+    7.624100651245455,
+    1.6061308237061531,
+    0.4493960529899822,
+    0.2136925096760087,
+    3.033235848864955,
+    0.4299788881069665,
+    0.35785414291837203
+  ],
+  "ood_scaler_scale": [
+    0.24742597040597505,
+    0.08315030569816229,
+    0.7020863878527803,
+    0.02212673775162191,
+    0.012507245903770708,
+    0.034725851818330294,
+    0.010626086467657633,
+    0.019255715499056525
+  ],
+  "ood_statistic": "max_abs_standardized_issue_feature_median",
+  "ood_threshold": 7.549834435270783,
+  "ood_threshold_quantile": 0.99,
+  "simple_baseline_model": "sklearn.pipeline(StandardScaler, LogisticRegression)",
+  "simple_baseline_parameters": {
+    "C": 1.0,
+    "class_weight": "balanced",
+    "max_iter": 1000,
+    "random_state": 206001,
+    "solver": "lbfgs"
+  },
+  "simple_baseline_policy": "LOGISTIC_BASELINE",
+  "stake_per_ticket": 2,
+  "tax_factor_reference": 0.65,
+  "version": "bj206-fixed-n7-ticket-policy-v4"
+}

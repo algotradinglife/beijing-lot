@@ -1,0 +1,9 @@
+{
+  "decision": "NO_PROMOTION",
+  "primary_effect_comparisons": 12,
+  "primary_metric_tests_for_bonferroni": 24,
+  "promotion_authorized": false,
+  "rule": "Only Q-delete exposure cap 1/2 under the Q_INFORMED_WR_DUPLICATE_STAKE active-cap-versus-WR-baseline comparison are primary. A candidate must have positive no-tax and ticket-tax-adjusted deltas in every frozen seed, ALL/YEAR/FOLD/LOYO view, and Bonferroni-adjusted all-scope issue-bootstrap support before it can request strict independent EV. No result promotes purchase, production, or betting.",
+  "strict_ev_candidates": [],
+  "strict_independent_ev_required": false
+}

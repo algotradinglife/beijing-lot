@@ -1,0 +1,305 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://algotradinglife.github.io/beijing-lot/schemas/bj182_message_decision_trace_v1.schema.json",
+  "title": "BJ #182 outcome-unexposed message decision trace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract",
+    "sample_id",
+    "decision_id",
+    "issue",
+    "freeze_ts_utc",
+    "activation",
+    "baseline",
+    "evidence",
+    "match_assessments",
+    "arms",
+    "audit"
+  ],
+  "properties": {
+    "schema_version": {"const": "bj182-message-decision-v1"},
+    "contract": {"const": "BJ-FWD-MESSAGE-CHAIN-N7-001"},
+    "sample_id": {"$ref": "#/$defs/nonempty"},
+    "decision_id": {"$ref": "#/$defs/sha256"},
+    "issue": {"type": "string", "pattern": "^[0-9]+$"},
+    "freeze_ts_utc": {"$ref": "#/$defs/timestamp"},
+    "activation": {"$ref": "#/$defs/activation"},
+    "baseline": {"$ref": "#/$defs/baseline"},
+    "evidence": {"$ref": "#/$defs/evidence"},
+    "match_assessments": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/matchAssessment"}
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {"$ref": "#/$defs/armDecision"},
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"arm": {"const": "B0_BASELINE_SHADOW"}},
+            "required": ["arm"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"arm": {"const": "M0_MESSAGE_ANNOTATION"}},
+            "required": ["arm"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {"arm": {"const": "M1_MESSAGE_RISK_RERANK"}},
+            "required": ["arm"]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ]
+    },
+    "audit": {"$ref": "#/$defs/audit"}
+  },
+  "$defs": {
+    "nonempty": {"type": "string", "minLength": 1},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "activation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_a_acceptance_url",
+        "gate_a_acceptance_recorded_at_utc",
+        "minimum_issue_exclusive"
+      ],
+      "properties": {
+        "gate_a_acceptance_url": {"type": "string", "format": "uri"},
+        "gate_a_acceptance_recorded_at_utc": {"$ref": "#/$defs/timestamp"},
+        "minimum_issue_exclusive": {"const": 26082}
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_rank",
+        "portfolio_id",
+        "identity_fingerprint",
+        "selected_match_ids",
+        "b0_score"
+      ],
+      "properties": {
+        "source_rank": {"type": "integer", "minimum": 1},
+        "portfolio_id": {"$ref": "#/$defs/sha256"},
+        "identity_fingerprint": {"$ref": "#/$defs/sha256"},
+        "selected_match_ids": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonempty"}
+        },
+        "b0_score": {"type": "number"}
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "selector",
+        "request_id",
+        "package_id",
+        "package_created_at_utc",
+        "input_as_of_utc",
+        "candidate_universe_sha256",
+        "candidate_order",
+        "selected_portfolio_id",
+        "selected_identity_fingerprint",
+        "selected_match_ids",
+        "planned_ticket_count",
+        "planned_stake_yuan"
+      ],
+      "properties": {
+        "selector": {"const": "B0_BEST_FULL"},
+        "request_id": {"$ref": "#/$defs/nonempty"},
+        "package_id": {"$ref": "#/$defs/sha256"},
+        "package_created_at_utc": {"$ref": "#/$defs/timestamp"},
+        "input_as_of_utc": {"$ref": "#/$defs/timestamp"},
+        "candidate_universe_sha256": {"$ref": "#/$defs/sha256"},
+        "candidate_order": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/candidate"}
+        },
+        "selected_portfolio_id": {"$ref": "#/$defs/sha256"},
+        "selected_identity_fingerprint": {"$ref": "#/$defs/sha256"},
+        "selected_match_ids": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonempty"}
+        },
+        "planned_ticket_count": {"const": 2187},
+        "planned_stake_yuan": {"const": 4374}
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ledger_schema_version",
+        "as_of_export_sha256",
+        "coverage_report_sha256_by_kind",
+        "cutoff_ts_utc",
+        "max_receipt_sequence",
+        "latest_receipt_recorded_at_utc",
+        "allowed_provenance_tiers",
+        "required_kind_max_age_seconds"
+      ],
+      "properties": {
+        "ledger_schema_version": {"const": "message_evidence_ledger_v1"},
+        "as_of_export_sha256": {"$ref": "#/$defs/sha256"},
+        "coverage_report_sha256_by_kind": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["injury", "suspension", "expected_lineup", "coach_change", "motivation"],
+          "properties": {
+            "injury": {"$ref": "#/$defs/sha256"},
+            "suspension": {"$ref": "#/$defs/sha256"},
+            "expected_lineup": {"$ref": "#/$defs/sha256"},
+            "coach_change": {"$ref": "#/$defs/sha256"},
+            "motivation": {"$ref": "#/$defs/sha256"}
+          }
+        },
+        "cutoff_ts_utc": {"$ref": "#/$defs/timestamp"},
+        "max_receipt_sequence": {"type": "integer", "minimum": 1},
+        "latest_receipt_recorded_at_utc": {"$ref": "#/$defs/timestamp"},
+        "allowed_provenance_tiers": {
+          "const": ["TIER_0_OFFICIAL", "TIER_1_PRIMARY", "TIER_2_RELIABLE"]
+        },
+        "required_kind_max_age_seconds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["injury", "suspension", "expected_lineup", "coach_change", "motivation"],
+          "properties": {
+            "injury": {"const": 604800},
+            "suspension": {"const": 604800},
+            "expected_lineup": {"const": 86400},
+            "coach_change": {"const": 604800},
+            "motivation": {"const": 259200}
+          }
+        }
+      }
+    },
+    "extraction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fact_id", "fact_kind", "entity_id", "entity_side", "availability",
+        "role_class", "severity", "direction", "consumer_confidence_band",
+        "producer_confidence", "provenance_tier", "raw_sha256", "effective_cutoff_utc"
+      ],
+      "properties": {
+        "fact_id": {"$ref": "#/$defs/sha256"},
+        "fact_kind": {"enum": ["injury", "suspension", "expected_lineup", "confirmed_lineup", "coach_change", "schedule", "travel", "motivation"]},
+        "entity_id": {"type": "string"},
+        "entity_side": {"enum": ["HOME", "AWAY", "RELATED_ENTITY", "MATCH"]},
+        "availability": {"enum": ["AVAILABLE", "DOUBTFUL", "UNAVAILABLE", "UNKNOWN"]},
+        "role_class": {"enum": ["KEY_GOALKEEPER", "KEY_STARTER", "STARTER", "ROTATION", "TEAM_LEVEL", "UNKNOWN"]},
+        "severity": {"enum": ["LOW", "MEDIUM", "HIGH", "UNKNOWN"]},
+        "direction": {"enum": ["HOME_NEGATIVE", "AWAY_NEGATIVE", "SYMMETRIC_UNCERTAINTY", "NO_DIRECTION"]},
+        "consumer_confidence_band": {"enum": ["HIGH", "MEDIUM", "LOW", "NOT_ACTIONABLE"]},
+        "producer_confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1},
+        "provenance_tier": {"type": "string"},
+        "raw_sha256": {"$ref": "#/$defs/sha256"},
+        "effective_cutoff_utc": {"$ref": "#/$defs/timestamp"}
+      }
+    },
+    "matchAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "match_id", "kickoff_ts_utc", "decision_status", "risk_flag", "protection_action",
+        "handicap_translation", "error_codes", "fact_ids", "extractions"
+      ],
+      "properties": {
+        "match_id": {"$ref": "#/$defs/nonempty"},
+        "kickoff_ts_utc": {"$ref": "#/$defs/timestamp"},
+        "decision_status": {"enum": ["ELIGIBLE", "ABSTAIN"]},
+        "risk_flag": {"enum": ["CLEAR", "MEDIUM", "HIGH", "NOT_EVALUATED"]},
+        "protection_action": {"enum": ["KEEP_BASELINE_ORDER", "ANNOTATE_ONLY", "REJECT_IDENTITY", "NO_MESSAGE_DECISION"]},
+        "handicap_translation": {"enum": ["HOME_NEGATIVE", "AWAY_NEGATIVE", "SYMMETRIC_UNCERTAINTY", "NO_DIRECTION", "NO_CHANGE"]},
+        "error_codes": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "fact_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "extractions": {"type": "array", "items": {"$ref": "#/$defs/extraction"}}
+      }
+    },
+    "armDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "arm", "role", "policy_status", "selected_portfolio_id",
+        "selected_identity_fingerprint", "selected_match_ids", "source_rank",
+        "planned_ticket_count", "planned_stake_yuan"
+      ],
+      "properties": {
+        "arm": {"enum": ["B0_BASELINE_SHADOW", "M0_MESSAGE_ANNOTATION", "M1_MESSAGE_RISK_RERANK"]},
+        "role": {"enum": ["CONTROLLING_BASELINE", "DIAGNOSTIC", "PRIMARY_CHALLENGER"]},
+        "policy_status": {"enum": ["SELECTED_PREOUTCOME", "ABSTAIN_NO_ELIGIBLE_IDENTITY"]},
+        "selected_portfolio_id": {"type": "string"},
+        "selected_identity_fingerprint": {"type": "string"},
+        "selected_match_ids": {"type": "array", "maxItems": 7, "uniqueItems": true, "items": {"type": "string"}},
+        "source_rank": {"type": ["integer", "null"], "minimum": 1},
+        "planned_ticket_count": {"enum": [0, 2187]},
+        "planned_stake_yuan": {"enum": [0, 4374]}
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_accessed", "probability_retuned", "selector_retuned",
+        "allocator_changed", "ticket_economics_changed", "source_hashes"
+      ],
+      "properties": {
+        "outcome_accessed": {"const": false},
+        "probability_retuned": {"const": false},
+        "selector_retuned": {"const": false},
+        "allocator_changed": {"const": false},
+        "ticket_economics_changed": {"const": false},
+        "source_hashes": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_181_ledger_sha256",
+            "source_181_asof_schema_sha256",
+            "source_181_coverage_schema_sha256",
+            "source_180_gate_b_manifest_sha256",
+            "source_180_gate_b_content_identity_sha256",
+            "baseline_package_sha256",
+            "as_of_export_sha256"
+          ],
+          "properties": {
+            "source_181_ledger_sha256": {"const": "3c065be028c4022d33487095f08b9838c284853614f6617646dabe5e08c31229"},
+            "source_181_asof_schema_sha256": {"const": "e763428d703197ec08eb2c4955ee45bc9925c84941bed8f3a9ac253edec161bd"},
+            "source_181_coverage_schema_sha256": {"const": "22ffbaf6ef79eb484425c48307a29c08ba73d6a0bbf743e4023b37838ed9181d"},
+            "source_180_gate_b_manifest_sha256": {"const": "9f48b29325d817ce873bd1430be459c9e70ad052064f8e03e02ccbc1d8bc6fcf"},
+            "source_180_gate_b_content_identity_sha256": {"const": "d9b41dec45c1c6215755d9dad8774e00fc0f19f564ee6ef8bf2387cb8d309108"},
+            "baseline_package_sha256": {"$ref": "#/$defs/sha256"},
+            "as_of_export_sha256": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      }
+    }
+  }
+}

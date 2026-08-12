@@ -1,0 +1,60 @@
+{
+  "composition": {
+    "already_absent": "do not reselect; STRUCTURAL_DELETE_ALREADY_ABSENT; unchanged Stage-2 support",
+    "distinct": "additional zero mask; normally 1458 to 972 after one prior Stage-2 deletion",
+    "forbidden_fallbacks": [
+      "ALLOW_ALL",
+      "unit-weight substitution",
+      "partial-row substitution",
+      "alternate-code reselection",
+      "losing stake"
+    ],
+    "invalid": "missing/mixed/invalid registry row is UNAVAILABLE with zero stake",
+    "rule": "apply the exact structural code as one additional zero mask on the unchanged ordered Stage-1/Stage-2 support and enumerate every positive ticket exactly once at CNY 2"
+  },
+  "contract": "BJ193_STAGE1_STAGE3_COMPATIBILITY_V2_1",
+  "effective_join": {
+    "action_count": 963,
+    "action_mapping": "stage3_effective_compatibility_mapping_v21.csv.gz",
+    "class_count": 8,
+    "class_registry": "stage3_compatibility_class_registry_v21.csv",
+    "coverage_registry": "stage1_stage3_coverage_registry_v21.csv.gz",
+    "coverage_row_count": 19752,
+    "pair_count": 2377647
+  },
+  "lineage": {
+    "amendment_scope": [
+      "P_MIN_GLOBAL_DELETE",
+      "Q_MIN_GLOBAL_DELETE"
+    ],
+    "unchanged_source_identity": true,
+    "v2_manifest_sha256": "6a44f4b1b355f5476328424bc8d92271d61d585643d40ca42bb56ffda1c43933",
+    "v2_package": "bj193_gate_a_chain_interface_v2"
+  },
+  "outcome_boundary": "Gate A outcome-unexposed: no result, final/winning SP, payout, tax realization, ROI, settlement, or post-cutoff evidence is read or emitted",
+  "structural_class": {
+    "compatibility_class_key": "2d764c98af337580e3de8918d38eb512f1895781d1fdd222468d169ba2bbd6cf",
+    "coverage_rule": "100% exact seven-match rows plus >=20 outputs across >=5 chronological folds",
+    "fallback": "NONE",
+    "mechanisms": [
+      "P_MIN_GLOBAL_DELETE",
+      "Q_MIN_GLOBAL_DELETE"
+    ],
+    "native_M": 1458,
+    "registry": "stage3_complete_structural_delete_registry.csv.gz",
+    "screen_order": "fail closed before Stage-3 outcome screen/model fit/action choice",
+    "source_weight_source": "NA",
+    "stage1_issue_status_census": {
+      "127": {
+        "COMPATIBLE": 9
+      },
+      "134": {
+        "COMPATIBLE": 36
+      },
+      "190": {
+        "INCOMPATIBLE": 2364,
+        "STAGE1_UNAVAILABLE_ZERO_FLOW": 60
+      }
+    }
+  }
+}

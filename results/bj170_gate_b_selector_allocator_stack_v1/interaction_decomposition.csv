@@ -1,0 +1,3 @@
+source_selector_alias,sleeve_arm,formula,interaction_point,interaction_ci95_low,interaction_ci95_high,interaction_positive_fraction,interaction_mean,interaction_sd,replicates
+Q_SOURCE,Q_TOP_MASS_M192,[(BEST+sleeve)-BEST_FULL]-[(SOURCE+sleeve)-SOURCE_FULL],0.101070884717,-0.450887506705,0.915350895863,0.557150000000,0.097598980642,0.361084942374,20000
+MODEL_SOURCE,MODEL_CAP1_M512,[(BEST+sleeve)-BEST_FULL]-[(SOURCE+sleeve)-SOURCE_FULL],-0.425382392217,-0.741269990552,-0.111328852868,0.003200000000,-0.424127791598,0.160441467144,20000

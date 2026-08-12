@@ -1,0 +1,25 @@
+feature,source,timing_rule,admissible_use,forbidden_name_check,source_after_cutoff_cells,unmasked_after_cutoff_cells,cutoff_check
+outcome_code_numeric,canonical outcome axis,immutable identity known before the issue cutoff,inference,PASS,0,0,PASS
+calibrated_market_probability,#190 calibrated match-safe 1h market estimator,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,PASS,325638,0,PASS
+devig_euro_probability,1h EURO consensus reciprocal odds normalized within match,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,PASS,325638,0,PASS
+euro_1h_odds,1h EURO consensus,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,PASS,325638,0,PASS
+fundamental_probability,#190 independent T1 score-distribution estimator,source observation is available at or before feature_cutoff_ts_utc,inference,PASS,0,0,PASS
+probability_residual,#190 calibrated probability minus its frozen target-safe consensus_p baseline (not package devig_euro_probability),1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,PASS,325638,0,PASS
+probability_residual_z,#190 calibrated residual standardized by frozen uncertainty,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,PASS,325638,0,PASS
+predicted_final_sp,#90 chronological deployed 10h SP predictor,10h predictor input cutoff (kickoff_ts_utc - 10h) is at or before feature_cutoff_ts_utc,inference,PASS,302766,0,PASS
+bj_sp_snapshot,timestamped pre-event Beijing SP snapshot,source observation is available at or before feature_cutoff_ts_utc,inference,PASS,0,0,PASS
+bj_sp_snapshot_age_minutes,cutoff minus timestamped Beijing SP observation,source observation is available at or before feature_cutoff_ts_utc,inference,PASS,0,0,PASS
+native_handicap_line,native Beijing handicap normalized by accepted source,immutable identity known before the issue cutoff,inference,PASS,0,0,PASS
+line_residual_mu,#190 expected raw margin plus native line,source observation is available at or before feature_cutoff_ts_utc,inference,PASS,0,0,PASS
+line_residual_z,#190 line residual standardized by frozen uncertainty,source observation is available at or before feature_cutoff_ts_utc,inference,PASS,0,0,PASS
+market_uncertainty,#190 frozen 1h market uncertainty proxy,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,PASS,325638,0,PASS
+market_signature_breadth,deterministic sorted dictionary index of #190 1h breadth bucket,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,PASS,325638,0,PASS
+market_signature_dispersion,ordinal encoding of #190 1h D_LOW/D_MID/D_HIGH,1h snapshot cutoff (kickoff_ts_utc - 1h) is at or before feature_cutoff_ts_utc,inference,PASS,325638,0,PASS
+history_training_rows_log1p,log1p of #190 strictly prior training-row count,source observation is available at or before feature_cutoff_ts_utc,inference,PASS,0,0,PASS
+min_history_n_log1p,log1p of minimum home/away prior history depth,source observation is available at or before feature_cutoff_ts_utc,inference,PASS,0,0,PASS
+league_index,deterministic sorted league dictionary,immutable identity known before the issue cutoff,inference,PASS,0,0,PASS
+home_team_index,deterministic sorted team dictionary,immutable identity known before the issue cutoff,inference,PASS,0,0,PASS
+away_team_index,deterministic sorted team dictionary,immutable identity known before the issue cutoff,inference,PASS,0,0,PASS
+kickoff_delay_hours,kickoff_ts_utc minus issue feature_cutoff_ts_utc,immutable identity known before the issue cutoff,inference,PASS,0,0,PASS
+match_position_fraction,"zero-based deterministic match order divided by max(J_i-1,1)",immutable identity known before the issue cutoff,inference,PASS,0,0,PASS
+calendar_year,canonical reporting year,immutable identity known before the issue cutoff,inference,PASS,0,0,PASS

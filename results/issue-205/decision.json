@@ -1,0 +1,33 @@
+{
+  "covered_issues": 75,
+  "cv_dependence_improves_both_controls": false,
+  "disposition": "INHERIT_EXACT_MARKET_BASELINE",
+  "experimental_allowed_use": "ablation_feature_only",
+  "experimental_confirmation_dependency": "#210",
+  "experimental_probability_column": "experimental_probability",
+  "experimental_promoted": false,
+  "experimental_source_grade": "RETROSPECTIVE_PROXY_METHOD_CORRECTION",
+  "fallback_issues": 0,
+  "inherited_scorer": "MARKET_INDEPENDENCE",
+  "locked_dependence_improves_both_controls": false,
+  "locked_market_joint_log_loss": 8.175456615099998,
+  "locked_selected_joint_log_loss": 8.111345765575312,
+  "primary_metric": "joint_log_loss",
+  "safe_control_columns_for_206": [
+    "control_probability",
+    "control_probability_source",
+    "control_probability_source_grade",
+    "control_probability_promoted",
+    "predicted_final_sp",
+    "predicted_final_sp_source",
+    "sp_seed_std",
+    "control_expected_gross",
+    "control_expected_pre_tax_net",
+    "control_displayed_scalar_utility"
+  ],
+  "safe_control_probability_column": "control_probability",
+  "safe_control_probability_source": "MARKET_ONLY",
+  "safe_control_source_grade": "FROZEN_SAFE_BASELINE",
+  "selected_on_cv": "SIMPLE_REGIME_DEPENDENCE",
+  "version": "bj205-joint-n7-value-matrix-v2"
+}

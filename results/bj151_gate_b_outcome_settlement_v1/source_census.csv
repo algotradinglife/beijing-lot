@@ -1,0 +1,4 @@
+source,role,identity,sha256,rows,join_status
+bj151_gate_a_preoutcome_v1,"accepted immutable fixed #137 NO_GATE/K4 candidate, Q vectors and dense-M plans",SHA256SUMS.json,3605278bd6067fc7aa279a0625f4c4cab91603d8a1490c8608381e8fca997ac6,119364,"all frozen issue/arm/M/seed rows retained; no candidate, vector, M, seed, stake or sampler rule recomputed"
+bj95_gate_b_outcome_settlement_v2r8,canonical trusted final-SP truth only,canonical_outcome_join.csv,13d709d253c31519734dbf0447e6961ac8a6060772975d7461741224e5251a89,46802,complete issue settlement only; no pre-outcome selection input changed
+bj148_gate_b_outcome_settlement_v1,accepted broader-pool descriptive M-curve comparator,SHA256SUMS.json,a60389f27f0373ea03300db5edf28aebb3a0e567e47e78ade860094413756467,115,side-by-side only; not used to alter #151 candidate or derive a matched causal delta

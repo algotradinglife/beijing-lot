@@ -1,0 +1,6 @@
+{
+  "correction": "Recompute effect attribution on exact common settled complete-issue support; add M=1458 hard-control deltas; evaluate deterministic top-mass without a seed requirement; make no_tax_roi primary with ALL-plus-LOYO stability; treat YEAR/FOLD as diagnostics; correct largest-event tax removal and missing-outcome Brier handling; add candidate concentration, leave-one-issue-out and issue-bootstrap fragility diagnostics.",
+  "parent_issue_policy_ledger_sha256": "382214bc40e60522696e4854b16b34eae69190c7661a090659e60fae0c5cab8c",
+  "parent_manifest_sha256": "f4848d61b7eab31b97077751fdb2f49ad242e483033c6d29524ba4f7b43445fb",
+  "parent_package": "results/bj137_gate_b_outcome_settlement_v2r1"
+}

@@ -1,0 +1,12 @@
+{
+  "annual_summary.csv": "9414ff81f175450a84de2ac5943827997efacd40ba2a40a91dfbb932cd57b491",
+  "arm_overview.csv": "2a071cc3ee949c575f1ed3bf6b36e0315842b83e68b407f7861ea2844f85d914",
+  "group_arm_settlement.csv": "cc2504f4e7809cac5e2111edfdb3ddbed1e62c31c9370cc76d0486431120a023",
+  "leave_one_year_out_summary.csv": "88485fa1e6a72c961c50d66e4504c890ab4c19938ad0c8b6dd45dffb041882f3",
+  "outcome_join.csv": "2516c1c8a7770a7111158d8675e063dfc6966d3be7b1b91c777b21bbd507bca8",
+  "paired79_same_identity_comparison.csv": "ccd78947c1249cb13a6394e85934fb4e9447adf731f482a88cc01d1d6704e743",
+  "predicted_sp_error_sensitivity.csv": "7307847bbef7a7bfccb312f2bb53694244c5342a5c37ba2028333f1352a770b6",
+  "quarterly_summary.csv": "2704b443ea435e08501774cdcff2702f502aeda635f5d2a795f2b750248672c9",
+  "settlement_card.json": "63aed5f32e37ca618a4a79ecb0dff3d8fe997fa9cf47436d9f0be1316582e7ca",
+  "settlement_runner.py": "d893b7346e694e850b26f168d38d39a916385c6a3f2eba6b1fc92f36b457ffac"
+}

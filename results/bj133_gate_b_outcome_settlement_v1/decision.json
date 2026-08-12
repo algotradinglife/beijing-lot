@@ -1,0 +1,9 @@
+{
+  "decision": "NO_PROMOTION",
+  "primary_effect_comparisons": 24,
+  "primary_metric_tests_for_bonferroni": 48,
+  "promotion_authorized": false,
+  "rule": "A candidate must have positive no-tax and ticket-tax-adjusted deltas in every frozen seed, ALL/YEAR/FOLD/LOYO view, and Bonferroni-adjusted all-scope issue-bootstrap support before it can request strict independent EV. No result promotes purchase, production, or betting.",
+  "strict_ev_candidates": [],
+  "strict_independent_ev_required": false
+}

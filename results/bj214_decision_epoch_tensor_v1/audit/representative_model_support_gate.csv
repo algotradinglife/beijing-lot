@@ -1,0 +1,4 @@
+cohort,representative_epoch_rule,evaluated_issues,required_issues,evaluated_epochs,model_n7_passing_epochs,model_n7_epoch_pass_rate,required_epoch_pass_rate,candidate_matches,causal_core_complete_matches,model_core_coverage,required_model_core_coverage,cohort_model_gate_pass
+development,MEDIAN_KICKOFF_MINUS_10H,342,30,342,0,0,0.8,67651,0,0,0.8,False
+historical_model_unseen,MEDIAN_KICKOFF_MINUS_10H,52,5,52,12,0.230769230769,0.8,2087,1153,0.552467656924,0.8,False
+prospective_post_activation,MEDIAN_KICKOFF_MINUS_10H,0,2,0,0,0,0.8,0,0,0,0.8,False

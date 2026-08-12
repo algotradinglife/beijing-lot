@@ -1,0 +1,11 @@
+{
+  "CONTENT_IDENTITY.json": "7a1edb2f9327a37edc2b8733b82bc2b5cc8fe2e869b8ae5957fb3d0459785ae6",
+  "README.md": "002281f97b509c5eef517d0545b6a257f45c7bdfa8536e3d2e7a9ffe2d2747ed",
+  "arm_comparison.csv": "ff8fdbf73fbe71fbc3faf055d2fa3143918afe03736db7624943f1f10aaf687a",
+  "decision.json": "e2cef13a7a4553866f7e8c0b9a76e67e828c63cf16f5c208d08e39659f45e97d",
+  "portfolio_settlement.csv.gz": "87b1d2c3e35b602a7ddc8f8fdfaa9c29e49e3033528fc78b12c4e3207dbf8806",
+  "robustness_summary.csv": "c44f509af58236eccbce8c4f87e17562f5252f1988072332f5b30d4ae9a93f1a",
+  "settlement_card.json": "a4c246f18cd66d502b0d6920e75e88c2b420761867c9d87fae51cd35e5cd90eb",
+  "settlement_runner.py": "a14c0a73677be8a84fd71a04c7892265ae05d2a9bdfd8abf213612ab79b6268c",
+  "threshold_heatmap.csv": "75b56d88c685dec586dc39574926458e1654023e3791395865f2f1543e907e8c"
+}

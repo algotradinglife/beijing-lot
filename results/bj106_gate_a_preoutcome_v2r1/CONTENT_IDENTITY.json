@@ -1,0 +1,17 @@
+{
+  "contract_version": "bj106-portable-content-v1",
+  "gzip_payloads": {
+    "q_atlas.csv.gz": {
+      "canonical_decompressed_bytes": 44208242,
+      "canonical_decompressed_sha256": "ba3c3e1a846466a95376117b0d9ac44650bc1de9cb894ded3d84f0609efa4dbe",
+      "committed_artifact_sha256": "b710dd4fe792e69727b898a615e1cb4899175e329c71bcee46788fb859c43b26",
+      "container_type": "gzip"
+    }
+  },
+  "non_compressed_controls": {
+    "freeze_runner.py": "741ef765cbfed94b4b0e1736c179be3511f3448581e06d87c9764263f8663d75",
+    "gate_a_card.json": "e1221b203b393c6cf9f9df3d06398298ad16096c423d07e2e426ef66d34c75cc",
+    "source_census.csv": "cd48c6b8b4a630b00a4ce7706dcd9c9232836bab0ea53d0aeee9b7605d89a0bf",
+    "stratum_census.csv": "29ecbc2a41abb23617757a9035f7a0745700afce670ccce9599fca47a33eb023"
+  }
+}

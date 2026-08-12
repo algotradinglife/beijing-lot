@@ -1,0 +1,28 @@
+{
+  "contract_version": "bj133-gate-b-portable-content-v2",
+  "gzip_payloads": {
+    "issue_allocator_settlement.csv.gz": {
+      "canonical_decompressed_bytes": 52085567,
+      "canonical_decompressed_sha256": "47b8eb95cbb14e9cfc1ebaaf8d03956ddf31c45a262ba652131bb1c16fdbc96c"
+    },
+    "matched_effects.csv.gz": {
+      "canonical_decompressed_bytes": 2748175,
+      "canonical_decompressed_sha256": "3a298c712d555b3220d52b2089e69cb0a3bb5905285a962d49c84f93453b9b33"
+    },
+    "winning_ticket_tax_ledger.csv.gz": {
+      "canonical_decompressed_bytes": 3679759,
+      "canonical_decompressed_sha256": "2153de3edb69c60ea29357517a19b69881b461291736fd74b8bc1206a0f141d6"
+    }
+  },
+  "non_compressed_controls": {
+    "README.md": "cc599399b7a89f3946fbb150d941d92b5cbd45a0f94b0d03bd2d4bc7ec6932f8",
+    "allocator_frontier_summary.csv": "53b23f7f8a732ed8443d9ad56c8b7d082e232011240ed2bdd16ebe9ae50b4e4b",
+    "decision.json": "777375f073319c320ad49a6ce2e63fe23ef2160a410e298d2c8b309b7501ad80",
+    "issue_bootstrap_diagnostics.csv": "9856ca1447e256543ea2a94b048aa00eb59e94ae594e9d457d15dfce0673bf31",
+    "multiple_comparison_diagnostics.csv": "1034cad6d96c71652bfa7ca18674730c489f76f4e521c1559a960220f923a0f1",
+    "settlement_card.json": "42edac586be08db963a7178a0d21958a6de1c9b29cf6ea1ee62fc2c524d53df6",
+    "settlement_runner.py": "38089d109d6999145b2411cefe2134c9f7eb0c659f597ac444c0294e5daa0684",
+    "source_census.csv": "d569fda8980881c5929ca0ab69c5138914610f1d560ce63cb8e4cb218ab5a65a",
+    "ticket_tax_reconciliation.csv": "90ab170b6d2a06d763734f319335dcf5d6ccc189d6ebab703874e744e1f886d0"
+  }
+}

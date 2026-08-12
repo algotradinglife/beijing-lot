@@ -1,0 +1,732 @@
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import json
+import math
+import gzip
+import copy
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+SCRIPT = ROOT / "scripts" / "freeze_bj192_stage4_portfolio_gate_a.py"
+
+
+def module():
+    spec = importlib.util.spec_from_file_location("bj192_gate_a", SCRIPT)
+    value = importlib.util.module_from_spec(spec)
+    assert spec.loader
+    spec.loader.exec_module(value)
+    return value
+
+
+def test_frozen_source_hashes_and_complete_primary_catalog():
+    m = module()
+    assert [x[0] for x in m.SLEEVES] == [
+        "BEST_FULL_FULL",
+        "MODEL_SOURCE_MODEL_CAP1_M512",
+        "Q_SOURCE_Q_TOP_MASS_M192",
+    ]
+    assert m.POSITION_FRACTIONS == tuple(range(5, 101, 5))
+    assert m.BOOTSTRAP_REPLICATES == 20_000
+    for spec in m.EXPECTED_SOURCES.values():
+        bound = m.verify_source(spec)
+        if spec["path"].name in m.SETTLED_IDENTITY_ONLY_PACKAGES:
+            assert bound["payload_count"] == "NOT_READ_IDENTITY_BINDING_ONLY"
+        else:
+            assert bound["payload_count"] > 0
+    assert {x["path"].name for x in m.EXPECTED_SOURCES.values()} >= {
+        "bj170_gate_a_preoutcome_v2",
+        "bj137_gate_a_preoutcome_v2",
+        "bj176_issue_equity_risk_v1",
+        "bj190_gate_b_sparse_divergence_v1",
+        "bj193_gate_a_preoutcome_v1",
+        "bj193_gate_b_regime_meta_policy_v2",
+        "bj145_gate_a_preoutcome_v8",
+        "bj148_gate_a_preoutcome_v1",
+        "bj151_gate_a_preoutcome_v1",
+        "bj159_gate_a_preoutcome_v2r1",
+        "bj167_gate_a_strategy_atlas_v3r1",
+        "bj167_gate_b_strategy_atlas_v3r1_postscreen_exact_identity_v1",
+        "bj170_gate_b_selector_allocator_stack_v1",
+    }
+    expanded = m.expanded_sleeve_catalog()
+    assert [row["candidate_id"] for row in expanded] == [
+        "BJ148_NOGATE_WR_DENSE_M",
+        "BJ148_NOGATE_WOR_DENSE_M",
+        "BJ151_NOGATE_K4_WR_DENSE_M",
+        "BJ151_NOGATE_K4_WOR_DENSE_M",
+        "BJ159_SELECTED_N7_WOR_M_CURVE",
+    ]
+    assert all(row["identity_count"] > 0 for row in expanded)
+    assert all(row["role_row_count"] == row["identity_count"] * 7 for row in expanded)
+    contract = m.m_selection_contract(expanded)
+    assert contract["minimum_prior_active_issues"] == 52
+    assert len(contract["fixed_m_comparator"]) == len(expanded)
+    allocation = m.bj145_allocation_candidate_registry()
+    assert len(allocation) == 108
+    assert sum(
+        row["economic_decision"] == "ELIGIBLE_COMPLETE_NONREDUNDANT"
+        for row in allocation
+    ) == 98
+    assert {
+        row["mechanism"] for row in allocation
+    } >= {"WR_DUPLICATE_STAKE", "WOR_DISTINCT", "CAPPED_REPEAT"}
+    assert {row["selector_source_package"] for row in allocation} == {
+        "bj151_gate_a_preoutcome_v1",
+        "bj137_gate_a_preoutcome_v2",
+    }
+    assert all(len(row["support_348_hash"]) == 64 for row in allocation)
+    assert all(
+        row["ticket_prefix_rule"]
+        == "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF"
+        for row in allocation
+    )
+    families = m.economic_family_registry(expanded, allocation)
+    bundles = m.replicate_bundle_registry(expanded, allocation, families)
+    assert len(bundles) == 3
+    assert bundles[0]["deployment_replicate_bundle_id"] == "BUNDLE_ORDINAL_001"
+    assert bundles[-1]["deployment_replicate_bundle_id"] == "BUNDLE_ORDINAL_003"
+    assert all(row["economic_family_count"] == 104 for row in bundles)
+    assert all(len(row["candidate_seed_map_sha256"]) == 64 for row in bundles)
+    aliases = [
+        row
+        for row in families
+        if row["family_status"] == "EXACT_CROSS_CATALOG_ALIAS_EXCLUDED"
+    ]
+    assert {
+        (row["candidate_id"], row["canonical_candidate_id"])
+        for row in aliases
+    } == {
+        (
+            "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_WR-DUPLICATE-STAKE_NA",
+            "BJ151_NOGATE_K4_WR_DENSE_M",
+        ),
+        (
+            "BJ145_PRIMARY-NO-GATE-K4_Q-WEIGHT_WOR-DISTINCT_NA",
+            "BJ151_NOGATE_K4_WOR_DENSE_M",
+        ),
+    }
+    assert all(row["exact_overlap_record_count"] > 0 for row in aliases)
+    assert all(len(row["exact_overlap_evidence_sha256"]) == 64 for row in aliases)
+    assert all(len(row["source_role_vector_evidence_sha256"]) == 64 for row in aliases)
+    assert all(len(row["allocator_rng_identity_sha256"]) == 64 for row in aliases)
+    eligibility = {
+        row["candidate_id"]: row
+        for row in m.eligibility_ledger(expanded, allocation, families)
+    }
+    primary = next(
+        row for row in allocation if row["arm_id"] == "PRIMARY_NO_GATE_K4"
+    )
+    secondary = next(
+        row for row in allocation if row["arm_id"] == "SECONDARY_ESP300_GM290_K8"
+    )
+    assert (
+        eligibility[primary["candidate_id"]]["source_package"]
+        == "bj145_gate_a_preoutcome_v8 + bj151_gate_a_preoutcome_v1"
+    )
+    assert (
+        eligibility[secondary["candidate_id"]]["source_package"]
+        == "bj145_gate_a_preoutcome_v8 + bj137_gate_a_preoutcome_v2"
+    )
+
+
+def test_settled_sources_are_identity_only_and_never_open_payloads(monkeypatch):
+    m = module()
+    original = m.sha256_file
+    original_open = Path.open
+    original_iterdir = Path.iterdir
+    opened = []
+
+    def tracked(path):
+        opened.append(path)
+        return original(path)
+
+    def guarded_open(path, *args, **kwargs):
+        if path.parent.name in m.SETTLED_IDENTITY_ONLY_PACKAGES and path.name not in {
+            "SHA256SUMS.json",
+            "CONTENT_IDENTITY.json",
+        }:
+            raise AssertionError(f"settled payload opened: {path}")
+        return original_open(path, *args, **kwargs)
+
+    def guarded_iterdir(path):
+        if path.name in m.SETTLED_IDENTITY_ONLY_PACKAGES:
+            raise AssertionError(f"settled package directory walked: {path}")
+        return original_iterdir(path)
+
+    monkeypatch.setattr(m, "sha256_file", tracked)
+    monkeypatch.setattr(Path, "open", guarded_open)
+    monkeypatch.setattr(Path, "iterdir", guarded_iterdir)
+    for spec in m.EXPECTED_SOURCES.values():
+        bound = m.verify_source(spec)
+        if spec["path"].name in m.SETTLED_IDENTITY_ONLY_PACKAGES:
+            assert bound["verification_mode"] == "SETTLED_IDENTITY_BINDING_ONLY"
+    payload_paths = [
+        path
+        for path in opened
+        if path.parent.name in m.SETTLED_IDENTITY_ONLY_PACKAGES
+        and path.name not in {"SHA256SUMS.json", "CONTENT_IDENTITY.json"}
+    ]
+    assert not payload_paths
+
+
+def test_source_rows_use_full_calendar_and_separate_strict_common_view():
+    m = module()
+    rows, calendar, _ = m.source_inputs()
+    traces = m.sleeve_trace_registry(rows)
+    assert len(calendar) == 348 and len(rows) == 1044
+    assert [(x["sleeve_id"], x["M"]) for x in (rows[0], rows[1], rows[2])] == [
+        ("BEST_FULL_FULL", "2187"),
+        ("MODEL_SOURCE_MODEL_CAP1_M512", "512"),
+        ("Q_SOURCE_Q_TOP_MASS_M192", "192"),
+    ]
+    assert all(x["outcome_boundary"] == m.OUTCOME_BOUNDARY for x in rows)
+    assert [x["calendar_index"] for x in calendar] == list(range(348))
+    assert sum(x["strict_three_way_common"] == "1" for x in calendar) == 177
+    assert all(int(x["native_requested_stake_yuan"]) % 2 == 0 for x in rows)
+    assert {x["native_policy_status"] for x in rows} == {
+        "SELECTED_PREOUTCOME",
+        "NO_BET_FROZEN",
+    }
+    assert {x["settlement_availability_state"] for x in rows} == {
+        "OUTCOME_UNEXPOSED_PENDING_GATE_B"
+    }
+    assert [x["sleeve_id"] for x in traces] == [x[0] for x in m.SLEEVES]
+    assert all(
+        x["stage_1_3_trace_status"] == "COMPLETE_INHERITED_FROZEN" for x in traces
+    )
+    assert all(
+        int(x["source_identity_count"]) == int(x["source_allocation_count"])
+        for x in traces
+    )
+
+
+def test_integer_allocator_covers_bankroll_cap_remainder_and_no_bet_edges():
+    m = module()
+    caps = {"A": 4, "B": 4, "C": 4}
+    weights = {"A": 1 / 3, "B": 1 / 3, "C": 1 / 3}
+    low = m.allocate_integer_tickets("FIXED_100K_NOTIONAL", 0.05, 1, caps, weights)
+    assert (
+        low["actual_total_stake_yuan"] == 0
+        and "NO_BET_BUDGET_LT_TICKET" in low["reason_codes"]
+    )
+    equal = m.allocate_integer_tickets("SCALED_NATIVE_REQUEST", 0.5, 100, caps, weights)
+    assert equal["actual_ticket_count_by_sleeve"] == {"A": 2, "B": 2, "C": 2}
+    tie = m.allocate_integer_tickets("SCALED_NATIVE_REQUEST", 1 / 3, 100, caps, weights)
+    assert tie["actual_ticket_count_by_sleeve"] == {
+        "A": 2,
+        "B": 1,
+        "C": 1,
+    }  # A wins exact remainder tie
+    fully_fundable = m.allocate_integer_tickets(
+        "NATIVE_REQUEST_CONTROL", 1, 24, caps, weights
+    )
+    assert (
+        fully_fundable["actual_total_stake_yuan"] == 24
+        and fully_fundable["retained_cash_yuan"] == 0
+    )
+    constrained = m.allocate_integer_tickets(
+        "NATIVE_REQUEST_CONTROL", 1, 10, caps, weights
+    )
+    assert (
+        constrained["actual_total_stake_yuan"] == 10
+        and "SCALED_BY_PREISSUE_BANKROLL" in constrained["reason_codes"]
+    )
+    capped = m.allocate_integer_tickets(
+        "FIXED_100K_NOTIONAL", 1, 10, {"A": 1, "B": 5}, {"A": 0.9, "B": 0.1}
+    )
+    assert capped["actual_total_stake_yuan"] == 10
+    assert capped["actual_ticket_count_by_sleeve"] == {"A": 1, "B": 4}
+    assert capped["retained_cash_yuan"] == 0
+    assert capped["actual_total_stake_yuan"] <= 10
+    no_native = m.allocate_integer_tickets(
+        "COMPOUNDING_BANKROLL", 1, 100, {"A": 0}, {"A": 1}
+    )
+    assert (
+        no_native["actual_total_stake_yuan"] == 0
+        and "NO_BET_NATIVE_ZERO_REQUEST" in no_native["reason_codes"]
+    )
+    native = m.allocate_integer_tickets(
+        "NATIVE_REQUEST_CONTROL", 1.0, 1_000, caps, weights
+    )
+    assert native["actual_ticket_count_by_sleeve"] == caps
+    with pytest.raises(ValueError, match="fraction=1.0"):
+        m.allocate_integer_tickets("NATIVE_REQUEST_CONTROL", 0.5, 1_000, caps, weights)
+    atomic = {"BEST_FULL_FULL": 2187, "MODEL": 512, "Q": 768}
+    atomic_weights = {"BEST_FULL_FULL": 0.6, "MODEL": 0.3, "Q": 0.1}
+    short = m.allocate_integer_tickets(
+        "NATIVE_REQUEST_CONTROL",
+        1.0,
+        4_000,
+        atomic,
+        atomic_weights,
+        {"BEST_FULL_FULL": True},
+    )
+    assert short["actual_ticket_count_by_sleeve"]["BEST_FULL_FULL"] == 0
+    assert short["actual_ticket_count_by_sleeve"]["MODEL"] == 512
+    assert short["actual_ticket_count_by_sleeve"]["Q"] == 768
+    assert "ATOMIC_BLOCK_UNFUNDED_RETAIN_OR_REALLOCATE_CASH" in short["reason_codes"]
+    funded = m.allocate_integer_tickets(
+        "NATIVE_REQUEST_CONTROL",
+        1.0,
+        10_000,
+        atomic,
+        atomic_weights,
+        {"BEST_FULL_FULL": True},
+    )
+    assert funded["actual_ticket_count_by_sleeve"]["BEST_FULL_FULL"] == 2187
+    # Affordability cannot turn an equal-weight portfolio into a mostly-FULL
+    # one.  The whole FULL block is feasible at 2,500 tickets, but its capped
+    # continuous target is only 1,220 tickets, so the frozen objective omits
+    # it and spends on the two valid prefix sleeves instead.
+    target_preserving = m.allocate_integer_tickets(
+        "FIXED_100K_NOTIONAL",
+        0.05,
+        5_000,
+        atomic,
+        {"BEST_FULL_FULL": 1 / 3, "MODEL": 1 / 3, "Q": 1 / 3},
+        {"BEST_FULL_FULL": True},
+    )
+    assert target_preserving["actual_ticket_count_by_sleeve"] == {
+        "BEST_FULL_FULL": 0,
+        "MODEL": 512,
+        "Q": 768,
+    }
+    assert target_preserving["selected_atomic_blocks"] == []
+    assert "ATOMIC_BLOCK_EXCLUDED_BY_TARGET_OBJECTIVE" in target_preserving["reason_codes"]
+
+
+def test_dynamic_weight_models_are_prior_only_and_have_deterministic_fallbacks():
+    m = module()
+    sleeves = ["A", "B"]
+    short = [{"A": 0.1, "B": 0.2}] * 51
+    w, status = m.dynamic_weights("PRIOR_INVERSE_VOL", short, sleeves)
+    assert (
+        w == {"A": 0.5, "B": 0.5} and status == "FALLBACK_INSUFFICIENT_52_COMMON_ACTIVE"
+    )
+    singular = [{"A": 0.1, "B": 0.1}] * 52
+    w, status = m.dynamic_weights("PRIOR_ERC", singular, sleeves)
+    assert w == {"A": 0.5, "B": 0.5} and status == "FALLBACK_ZERO_OR_NONFINITE_VOL"
+    history = [{"A": (i % 7 - 3) / 100, "B": (i % 5 - 2) / 80} for i in range(52)]
+    for model in (
+        "PRIOR_INVERSE_VOL",
+        "PRIOR_ERC",
+        "PRIOR_DRAWDOWN_AWARE",
+        "PRIOR_MINIMUM_VARIANCE",
+        "PRIOR_MAXIMUM_DIVERSIFICATION",
+    ):
+        w, status = m.dynamic_weights(model, history, sleeves)
+        assert math.isclose(sum(w.values()), 1.0) and all(
+            value >= 0 for value in w.values()
+        )
+        assert status in {
+            model,
+            "FALLBACK_ERC_NONPOSITIVE_RISK",
+            "FALLBACK_ERC_NO_CONVERGENCE",
+            "FALLBACK_COVARIANCE_NO_CONVERGENCE",
+        }
+
+
+def test_normalization_state_is_strictly_prior_capped_and_fail_closed():
+    m = module()
+    weights = {"A": 0.5, "B": 0.5}
+    warmup = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"],
+        [[1.0, 0.0], [0.0, 1.0]], 51,
+    )
+    assert warmup["normalization_status"] == "FALLBACK_UNIT_CAPITAL_INSUFFICIENT_PRIOR_RISK_HISTORY"
+    assert warmup["risk_budget_yuan"] == 100
+    high = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"],
+        [[1.0, 0.0], [0.0, 1.0]], 52,
+    )
+    assert high["normalization_status"] == "TARGET_SCALED_DOWN"
+    assert high["ex_ante_volatility"] == pytest.approx(math.sqrt(0.5))
+    assert high["realized_capital_multiplier"] == pytest.approx(0.05 / math.sqrt(0.5))
+    low = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"],
+        [[0.0004, 0.0], [0.0, 0.0004]], 52,
+    )
+    assert low["normalization_status"] == "TARGET_CAPPED_NO_LEVERAGE"
+    assert low["realized_capital_multiplier"] == 1.0
+    zero = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"],
+        [[0.0, 0.0], [0.0, 0.0]], 52,
+    )
+    assert zero["normalization_status"] == "FALLBACK_UNIT_CAPITAL_ZERO_OR_NONFINITE_VOLATILITY"
+    bad = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"],
+        [[float("nan"), 0.0], [0.0, 1.0]], 52,
+    )
+    assert bad["normalization_status"] == "FALLBACK_UNIT_CAPITAL_NONFINITE_COVARIANCE"
+    unequal_equal_capital = m.normalization_state(
+        "EQUAL_CAPITAL", 100, 1_000, 500, "PRIOR_ERC", {"A": 0.9, "B": 0.1},
+        ["A", "B"], [[1.0, 0.0], [0.0, 1.0]], 52,
+    )
+    assert unequal_equal_capital["normalization_status"] == "INAPPLICABLE_METHOD_WEIGHT_COMBINATION"
+    assert not unequal_equal_capital["normalization_executable"]
+    assert unequal_equal_capital["risk_budget_yuan"] == 0.0
+    equal_capital = m.normalization_state(
+        "EQUAL_CAPITAL", 100, 1_000, 500, "EQUAL_WEIGHT", weights,
+        ["A", "B"], [[1.0, 0.0], [0.0, 1.0]], 52,
+    )
+    assert equal_capital["normalization_status"] == "EQUAL_CAPITAL_EQUAL_ACTIVE_WEIGHTS"
+    left = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "PRIOR_ERC",
+        {"A": 0.9, "B": 0.1}, ["A", "B"], [[0.01, 0.0], [0.0, 1.0]], 52,
+    )
+    right = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "PRIOR_ERC",
+        {"A": 0.9, "B": 0.1}, ["B", "A"], [[1.0, 0.0], [0.0, 0.01]], 52,
+    )
+    assert left["ex_ante_volatility"] == pytest.approx(right["ex_ante_volatility"])
+    assert left["realized_capital_multiplier"] == pytest.approx(right["realized_capital_multiplier"])
+    invalid_order = m.normalization_state(
+        "UNIT_EX_ANTE_VOL_CAPPED_5PCT", 100, 1_000, 500, "PRIOR_ERC",
+        {"A": 0.9, "B": 0.1}, ["A", "C"], [[0.01, 0.0], [0.0, 1.0]], 52,
+    )
+    assert invalid_order["normalization_status"] == "INAPPLICABLE_COVARIANCE_SLEEVE_ORDER"
+
+
+def test_prior_covariance_allocators_are_long_only_and_deterministic():
+    m = module()
+    history = [
+        {"A": (index % 5 - 2) / 100, "B": (index % 7 - 3) / 80}
+        for index in range(52)
+    ]
+    for method in ("PRIOR_MINIMUM_VARIANCE", "PRIOR_MAXIMUM_DIVERSIFICATION"):
+        left, left_status = m.dynamic_weights(method, history, ["A", "B"])
+        right, right_status = m.dynamic_weights(method, history, ["A", "B"])
+        assert left_status == right_status == method
+        assert left == right
+        assert math.isclose(sum(left.values()), 1.0)
+        assert all(value >= 0.0 for value in left.values())
+
+
+def test_trace_validator_rejects_equal_count_key_mismatch():
+    m = module()
+    identities = [
+        {
+            "issue_instance": "A",
+            "portfolio_id": "1",
+            "selector_alias": "S",
+            "support_key_sha256": "x",
+        },
+        {
+            "issue_instance": "B",
+            "portfolio_id": "2",
+            "selector_alias": "S",
+            "support_key_sha256": "y",
+        },
+    ]
+    allocations = [
+        {
+            "issue_instance": "A",
+            "portfolio_id": "1",
+            "selector_alias": "S",
+            "support_key_sha256": "x",
+        },
+        {
+            "issue_instance": "C",
+            "portfolio_id": "3",
+            "selector_alias": "S",
+            "support_key_sha256": "y",
+        },
+    ]
+    with pytest.raises(RuntimeError, match="key mismatch"):
+        m.validate_trace_keys(identities, allocations, "TEST")
+
+
+def test_baseline_and_sequential_inference_contracts_are_frozen():
+    m = module()
+    baselines = m.baseline_registry()
+    assert baselines[0]["pre_tax_roi"] == -0.0947
+    assert baselines[1]["pre_tax_roi"] == -0.0909
+    method = m.methodology_contract()
+    assert method["primary_hypothesis"]["position_fraction"] == 1.0
+    assert method["primary_hypothesis"]["normalization_method"] == "UNIT_CAPITAL"
+    assert method["sequential_inference"]["path_bootstrap"].startswith(
+        "paired stationary"
+    )
+    assert "max-T" in method["multiplicity"]["positive_inference"]
+    assert "normalization_method" in method["multiplicity"]["families"]
+    assert "PRIOR_MINIMUM_VARIANCE" in method["weight_methods"]
+    assert "separate complete bankroll state machine" in m.m_selection_contract([])["seed_rule"]
+    expanded = m.expanded_sleeve_catalog()
+    allocation = m.bj145_allocation_candidate_registry()
+    families = m.economic_family_registry(expanded, allocation)
+    eligibility = m.eligibility_ledger(expanded, allocation, families)
+    frontier = m.frontier_contract(eligibility, families)
+    assert frontier["eligible_source_count"] == 106
+    assert frontier["eligible_economic_family_count"] == 104
+    assert frontier["eligible_candidate_sources"][:3] == [x[0] for x in m.SLEEVES]
+    assert "BJ151_NOGATE_K4_WR_DENSE_M" in frontier["eligible_candidate_sources"]
+    assert len(frontier["pairwise_surface"]) == 5356
+    family_by_canonical = {
+        row["canonical_candidate_id"]: row["economic_family_id"]
+        for row in families
+        if row["candidate_id"] == row["canonical_candidate_id"]
+    }
+    assert all(
+        family_by_canonical[left] != family_by_canonical[right]
+        for left, right in frontier["pairwise_surface"]
+    )
+    normalization = m.normalization_contract()
+    assert normalization["ordering"] == [
+        "frozen native request/capacity",
+        "strictly-prior provisional target weights",
+        "strictly-prior covariance and portfolio volatility",
+        "portfolio-level normalization multiplier",
+        "mode/bankroll issue budget and integer ticket funding",
+    ]
+    assert normalization["leverage"]["maximum_multiplier"] == 1.0
+    assert "UNIT_EX_ANTE_VOL_CAPPED_5PCT" in normalization["methods"]
+    assert "INAPPLICABLE_METHOD_WEIGHT_COMBINATION" in normalization["methods"][
+        "EQUAL_CAPITAL"
+    ]
+    excluded = {row["candidate_id"]: row for row in frontier["excluded_source_records"]}
+    assert excluded["BJ190_SPARSE_DIVERGENCE"]["decision"] == "INCOMPLETE_STAGE1_3_TRACE"
+    assert excluded["BJ193_FULL_DYNAMIC_CHAIN"]["decision"] == "INCOMPLETE_STAGE1_3_TRACE"
+
+
+def test_q_prefixes_are_exact_global_tax_lots_and_full_model_fail_closed():
+    m = module()
+    policies, global_rows, audit = m.prefix_registry()
+    q = [row for row in policies if row["sleeve_id"] == "Q_SOURCE_Q_TOP_MASS_M192"]
+    model = [
+        row for row in policies if row["sleeve_id"] == "MODEL_SOURCE_MODEL_CAP1_M512"
+    ]
+    full = [row for row in policies if row["sleeve_id"] == "BEST_FULL_FULL"]
+    assert q and all(row["prefix_status"] == "NESTED_PREFIX_VERIFIED" for row in q)
+    assert model and all(
+        row["prefix_status"] == "NESTED_PREFIX_VERIFIED_M1_TO_M512" for row in model
+    )
+    assert full and all(
+        row["prefix_status"] == "WHOLE_NATIVE_OR_NO_BET" for row in full
+    )
+    by_issue = {}
+    for row in global_rows:
+        by_issue.setdefault((row["sleeve_id"], row["issue_instance"]), []).append(row)
+    assert all(
+        [row["global_ticket_rank"] for row in rows] == list(range(1, len(rows) + 1))
+        for rows in by_issue.values()
+    )
+    assert all(row["native_multiplicity_unit"] == 1 for row in global_rows)
+    assert audit["engine_sha256"] == m.FROZEN_ALLOCATOR_SHA256
+    assert len(audit["rows"]) == 234
+
+
+def test_atomic_package_manifest_and_no_outcome_payload_reads(tmp_path):
+    m = module()
+    output = tmp_path / "package"
+    m.write_package(output)
+    manifest = json.loads((output / "SHA256SUMS.json").read_text())
+    assert set(manifest) == {
+        "CONTENT_IDENTITY.json",
+        "README.md",
+        "full_calendar.csv",
+        "strict_three_way_calendar.csv",
+        "regime_map.csv",
+        "regime_binding.json",
+        "stage_attribution_contract.json",
+        "normalization_contract.json",
+        "frozen_native_sleeve_requests.csv",
+        "gate_a_card.json",
+        "sleeve_catalog.csv",
+        "sleeve_trace_registry.csv",
+        "executable_sleeve_family_catalog.csv",
+        "bj145_allocation_candidate_registry.csv",
+        "economic_family_registry.csv",
+        "replicate_bundle_registry.csv",
+        "m_selection_contract.json",
+        "funded_prefix_ledger_contract.json",
+        "sleeve_eligibility_ledger.csv",
+        "baseline_registry.csv",
+        "frontier_contract.json",
+        "ticket_prefix_policy_registry.csv",
+        "ticket_prefix_registry.csv.gz",
+        "model_cap1_nested_prefix_audit.json.gz",
+        "funding_algorithm.json",
+        "inference_contract.json",
+        "output_schema.json",
+    }
+    for name, value in manifest.items():
+        assert hashlib.sha256((output / name).read_bytes()).hexdigest() == value
+    identity = json.loads((output / "CONTENT_IDENTITY.json").read_text())
+    scientific = identity["canonical_scientific_payload_sha256"]
+    transport = identity["archive_transport_payload_sha256"]
+    gzip_name = "ticket_prefix_registry.csv.gz"
+    assert scientific[gzip_name] == m.canonical_scientific_sha256(output / gzip_name)
+    assert transport[gzip_name] == hashlib.sha256(
+        (output / gzip_name).read_bytes()
+    ).hexdigest()
+    assert identity["canonical_scientific_identity_sha256"] == m.canonical_hash(
+        scientific
+    )
+    assert identity["archive_transport_contract"]["scientific_identity"].startswith(
+        "gzip payloads"
+    )
+    card = json.loads((output / "gate_a_card.json").read_text())
+    assert card["denominator"]["calendar_issue_count"] == 348
+    assert card["denominator"]["strict_three_way_issue_count"] == 177
+    assert card["denominator"]["regime_feature_available_issue_count"] == 344
+    assert card["denominator"]["regime_feature_missing_issue_count"] == 4
+    assert card["gate_b_status"].startswith("NOT_RUN")
+    assert card["funding_contract"]["initial_bankroll_yuan"] == 100_000
+    assert len(card["sleeve_trace_registry"]) == 3
+    assert "attribution" in card["methodology_contract"]
+    assert not output.with_name("package.stage").exists()
+    eligibility = list(
+        __import__("csv").DictReader((output / "sleeve_eligibility_ledger.csv").open())
+    )
+    assert [row["decision"] for row in eligibility[-2:]] == [
+        "INCOMPLETE_STAGE1_3_TRACE",
+        "INCOMPLETE_STAGE1_3_TRACE",
+    ]
+    assert len(eligibility) == 124
+    baselines = list(
+        __import__("csv").DictReader((output / "baseline_registry.csv").open())
+    )
+    assert [row["baseline_id"] for row in baselines[:2]] == [
+        "B167_BEST_FULL_NATIVE_LADDER_HEAD",
+        "B170_BEST_FULL_THREE_WAY_BRIDGE",
+    ]
+    assert "output_schema" in card and "holding_metrics" in card["output_schema"]
+    assert card["frontier_contract"]["eligible_source_count"] == 106
+    assert card["frontier_contract"]["eligible_economic_family_count"] == 104
+    assert len(card["executable_sleeve_family_catalog"]) == 5
+    assert len(card["bj145_allocation_candidate_registry"]) == 108
+    assert len(card["replicate_bundle_registry"]) == 3
+    assert card["ticket_prefix_contract"]["Q_global_tax_lot_rows"] > 0
+    with gzip.open(output / "model_cap1_nested_prefix_audit.json.gz", "rt") as handle:
+        model_audit = json.load(handle)
+    assert len(model_audit["rows"]) == 234 and all(
+        row["nested"] for row in model_audit["rows"]
+    )
+    issue_schema = card["output_schema"]["issue_ledger"]
+    assert "sleeve_id" not in issue_schema["key"]
+    normalization_required = card["normalization_contract"]["gate_b_ledger"][
+        "required_issue_fields"
+    ]
+    assert set(normalization_required) <= set(issue_schema["key"]) | set(
+        issue_schema["fields"]
+    )
+    sleeve_schema = card["output_schema"]["sleeve_funding_ledger"]
+    assert sleeve_schema["key"][-1] == "sleeve_id"
+    prefix_contract = json.loads((output / "funded_prefix_ledger_contract.json").read_text())
+    assert prefix_contract["records"][0]["prefix_policy"] == "WHOLE_NATIVE_OR_NO_BET"
+    assert len(prefix_contract["records"]) == 116
+    assert all(
+        row["prefix_policy"]
+        == "WHOLE_NATIVE_OR_NO_BET_PENDING_MECHANISM_SPECIFIC_NESTED_PREFIX_PROOF"
+        for row in prefix_contract["records"][3:]
+    )
+    assert all(
+        "must not take a first prefix" in row["funded_tax_lot_rule"]
+        for row in prefix_contract["records"][3:]
+    )
+    schemas = card["output_schema"]
+    for table in (
+        "issue_ledger", "sleeve_funding_ledger", "capital_summary", "weight_history",
+        "dependence", "holding_metrics", "risk_decomposition", "stage_attribution",
+        "portfolio_k_saturation", "baseline_lift", "bootstrap_stability", "challenger_case",
+        "all_pairs_risk_return_surface", "higher_order_pareto_frontier", "terminal_decision",
+    ):
+        assert all(field in schemas[table]["key"] for field in m.PATH_IDENTITY)
+    assert "capital_growth_audit_delta" in schemas["capital_summary"]["fields"]
+    assert schemas["chart_source_contract"]["path_identity"] == list(m.PATH_IDENTITY)
+    for columns in schemas["chart_source_contract"]["columns"].values():
+        assert all(field in columns for field in m.PATH_IDENTITY)
+    issue_equity_columns = schemas["chart_source_contract"]["columns"][
+        "chart_source_issue_equity_paths.csv.gz"
+    ]
+    assert {"running_peak_yuan", "drawdown_yuan", "drawdown_fraction"} <= set(
+        issue_equity_columns
+    )
+    for table in (
+        "all_pairs_risk_return_surface", "higher_order_pareto_frontier", "terminal_decision",
+    ):
+        assert schemas[table]["key"] and schemas[table]["fields"] and schemas[table]["formulas"]
+    for table in (
+        "standalone_m_curve",
+        "selected_m_path",
+        "dependence_panel",
+        "portfolio_k_saturation",
+        "intrinsic_native_dependence",
+        "realized_funded_flow_dependence",
+        "risk_decomposition",
+        "stage_attribution",
+        "regime_map",
+    ):
+        assert schemas[table]["key"] and schemas[table]["formulas"]
+    assert "REGIME" in schemas["bootstrap_stability"]["fields"]
+    assert "chart_source_standalone_m_curve.csv.gz" in schemas["chart_sources"]
+    assert "portfolio_pnl_reconciliation_yuan" in schemas["dependence"]["fields"]
+    assert "diversification_attribution_yuan" not in schemas["dependence"]["fields"]
+    assert "sharpe" in schemas["all_pairs_risk_return_surface"]["fields"]
+    assert "sortino" in schemas["all_pairs_risk_return_surface"]["fields"]
+    assert "calmar" in schemas["all_pairs_risk_return_surface"]["fields"]
+    assert "capital_weights_json" in schemas["terminal_decision"]["fields"]
+    assert "failure_regimes_json" in schemas["terminal_decision"]["fields"]
+    assert "next_validation_step" in schemas["terminal_decision"]["fields"]
+    assert schemas["rolling_window_metrics"]["key"]
+    assert "window_size_issues" in schemas["rolling_window_metrics"]["key"]
+    assert "chart_source_rolling_windows.csv" in schemas["chart_sources"]
+    assert "portfolio_id" in schemas["portfolio_k_saturation"]["key"]
+    assert "mode" in schemas["portfolio_k_saturation"]["key"]
+    assert "deployment_seed" not in schemas["portfolio_k_saturation"]["key"]
+    assert "mode" in schemas["baseline_lift"]["key"]
+    assert "capital_mode" not in schemas["baseline_lift"]["key"]
+    joins = schemas["portfolio_cross_table_join_contract"]["joins"]
+    assert joins and all(
+        join["key"][: len(m.PATH_IDENTITY)] == list(m.PATH_IDENTITY)
+        for join in joins
+    )
+    m.validate_portfolio_schema(schemas)
+    broken = copy.deepcopy(schemas)
+    broken["baseline_lift"]["key"].remove("mode")
+    with pytest.raises(RuntimeError, match="path identity missing"):
+        m.validate_portfolio_schema(broken)
+    broken = copy.deepcopy(schemas)
+    broken["issue_ledger"]["fields"].remove("covariance_input_sha256")
+    with pytest.raises(RuntimeError, match="normalization evidence"):
+        m.validate_portfolio_schema(broken)
+    broken = copy.deepcopy(schemas)
+    broken["chart_source_contract"]["columns"][
+        "chart_source_issue_equity_paths.csv.gz"
+    ].remove("drawdown_fraction")
+    with pytest.raises(RuntimeError, match="chart risk columns"):
+        m.validate_portfolio_schema(broken)
+    regime_rows = list(__import__("csv").DictReader((output / "regime_map.csv").open()))
+    assert len(regime_rows) == 348
+    assert sum(row["regime_status"] == "PRE_EVENT_FEATURE_VECTOR_AVAILABLE" for row in regime_rows) == 344
+    assert sum(row["regime_status"] == "MISSING_PRE_EVENT_FEATURE_VECTOR" for row in regime_rows) == 4
+    available_regimes = [row for row in regime_rows if row["regime_status"] == "PRE_EVENT_FEATURE_VECTOR_AVAILABLE"]
+    assert any(row["regime_label"] == "LOW" for row in available_regimes)
+    assert any(row["regime_label"] == "HIGH" for row in available_regimes)
+    assert all(row["prior_training_feature_sha256"] for row in available_regimes)
+    regime = json.loads((output / "regime_binding.json").read_text())
+    assert regime["map_sha256"] == m.canonical_hash(regime_rows)
+    attribution = json.loads((output / "stage_attribution_contract.json").read_text())
+    assert "NOT_IDENTIFIABLE_WITHOUT_SPLICE" in attribution["stages"]["STAGE_1_SELECTION"]
+    source = SCRIPT.read_text()
+    assert "result_code" not in source and "winning_sp" not in source
+
+
+def test_primary_alias_role_vector_proof_rejects_probability_drift():
+    m = module()
+    left = [{field: "0" for field in m.ROLE_VECTOR_FIELDS} for _ in range(7)]
+    for index, row in enumerate(left, 1):
+        row.update({"selection_rank": str(index), "portfolio_id": "P", "issue_instance": "I"})
+    right = [dict(row) for row in left]
+    assert m.role_vector_digest(left) == m.role_vector_digest(right)
+    right[3]["q_weight1"] = "0.123"
+    assert m.role_vector_digest(left) != m.role_vector_digest(right)

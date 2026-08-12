@@ -1,0 +1,32 @@
+{
+  "allocation_input_count": 4340,
+  "delete_leg": "strongest divergence magnitude; ties match_idx then match_id",
+  "deterministic_residual_repeat_count": 729,
+  "executed_ticket_count": 2187,
+  "full_unique_ticket_count": 2187,
+  "full_vector_sha256": "ea173936f013beddef4c63c889e3f5a1fd9a54fb55a5efa4543daa7630b62f2b",
+  "identity_layers": [
+    "ordered seven-match N7 identity",
+    "directional allocation input identity",
+    "2187-byte u8 multiplicity-vector SHA-256",
+    "combined ticket identity"
+  ],
+  "ledger_row_count_each": 833856,
+  "ledger_scope": "every frozen policy x canonical issue x each of four arms",
+  "max_ticket_multiplicity": 2,
+  "multiplicity_vector_count": 3562,
+  "n": 7,
+  "one_code_deleted_unique_ticket_count": 1458,
+  "outcome_boundary": "Gate A outcome-unexposed: target score/result/final-or-winning SP/payout/tax/ROI/settlement fields are forbidden; historical scores enter the accepted #180 state only under its frozen kickoff <= issue cutoff - 180 minute embargo",
+  "per_leg_probability_sources": {
+    "CALIBRATED_MARKET_ESTIMATOR": "#179 primary calibrated market p",
+    "FUNDAMENTAL_INDEPENDENT": "T1 coherent score-distribution p",
+    "LINE_RESIDUAL_MU": "T1 coherent score-distribution p",
+    "MODEL_AGREEMENT": "per match, weaker agreeing source; exact tie fundamental first; never blended",
+    "UNION": "per match, larger-magnitude source; exact tie fundamental first; never blended"
+  },
+  "per_ticket_stake_yuan": 2,
+  "planned_stake_yuan": 4374,
+  "rule": "enumerate the 1458 tickets excluding the most-negative-delta code at the strongest eligible leg; repeat the 729 highest joint-estimator-probability tickets once; ties by base-3 ordinal",
+  "ticket_ordinal": "base-3 code order 3,1,0; ascending ordinal is the deterministic tie break"
+}

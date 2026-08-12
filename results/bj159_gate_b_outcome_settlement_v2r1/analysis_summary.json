@@ -1,0 +1,2656 @@
+{
+  "analysis_boundary": "derived from copied v2 issue ledger, issue bootstrap and overlap rows only",
+  "bootstrap_interval_semantics": "Each interval is a seed-specific issue bootstrap 95% interval; endpoint envelopes are descriptive and are not a combined CI for the seed mean.",
+  "contract": "BJ-HIST-SELECTED-WOR-CROSS-N-001",
+  "m64_seed_stability": [
+    {
+      "bootstrap_positive_fraction": {
+        "count": 3,
+        "max": "0.002000000000",
+        "mean": "0.000666666667",
+        "min": "0.000000000000",
+        "positive_count": 1,
+        "positive_fraction": "0.333333333333",
+        "sd": "0.000942809042"
+      },
+      "bootstrap_replicates": {
+        "count": 3,
+        "max": 1000,
+        "mean": 1000.0,
+        "min": 1000
+      },
+      "bootstrap_seed_specific_ci95_high": {
+        "count": 3,
+        "max": "-0.135639847222",
+        "mean": "-0.141190390625",
+        "min": "-0.146066644097",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.004283341643"
+      },
+      "bootstrap_seed_specific_ci95_low": {
+        "count": 3,
+        "max": "-0.479841609687",
+        "mean": "-0.481235066641",
+        "min": "-0.483670924925",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.001728364197"
+      },
+      "bootstrap_seed_specific_point_estimate": {
+        "count": 3,
+        "max": "-0.319760391892",
+        "mean": "-0.319760391892",
+        "min": "-0.319760391892",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "bootstrap_support_issue_count": {
+        "count": 3,
+        "max": 22,
+        "mean": 22.0,
+        "min": 22
+      },
+      "n": 2,
+      "seed_coverage_hit_rate": {
+        "count": 3,
+        "max": "1.000000000000",
+        "mean": "1.000000000000",
+        "min": "1.000000000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.000000000000"
+      },
+      "seed_no_tax_roi": {
+        "count": 3,
+        "max": "-0.319760391892",
+        "mean": "-0.319760391892",
+        "min": "-0.319760391892",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "seed_rows": [
+        {
+          "coverage_hit_rate": "1.000000000000",
+          "no_tax_roi": "-0.319760391892",
+          "seed": "137001",
+          "stake_yuan": "666.000000",
+          "tax_adjusted_roi": "-0.319760391892"
+        },
+        {
+          "coverage_hit_rate": "1.000000000000",
+          "no_tax_roi": "-0.319760391892",
+          "seed": "137002",
+          "stake_yuan": "666.000000",
+          "tax_adjusted_roi": "-0.319760391892"
+        },
+        {
+          "coverage_hit_rate": "1.000000000000",
+          "no_tax_roi": "-0.319760391892",
+          "seed": "137003",
+          "stake_yuan": "666.000000",
+          "tax_adjusted_roi": "-0.319760391892"
+        }
+      ],
+      "seed_stake_yuan": {
+        "count": 3,
+        "max": "666.000000",
+        "mean": "666.000000",
+        "min": "666.000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.000000"
+      },
+      "seed_tax_adjusted_roi": {
+        "count": 3,
+        "max": "-0.319760391892",
+        "mean": "-0.319760391892",
+        "min": "-0.319760391892",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      }
+    },
+    {
+      "bootstrap_positive_fraction": {
+        "count": 3,
+        "max": "0.000000000000",
+        "mean": "0.000000000000",
+        "min": "0.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "bootstrap_replicates": {
+        "count": 3,
+        "max": 1000,
+        "mean": 1000.0,
+        "min": 1000
+      },
+      "bootstrap_seed_specific_ci95_high": {
+        "count": 3,
+        "max": "-0.196201852446",
+        "mean": "-0.199846415697",
+        "min": "-0.202080777213",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.002598966564"
+      },
+      "bootstrap_seed_specific_ci95_low": {
+        "count": 3,
+        "max": "-0.371990208601",
+        "mean": "-0.374566281511",
+        "min": "-0.376108762464",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.001833367708"
+      },
+      "bootstrap_seed_specific_point_estimate": {
+        "count": 3,
+        "max": "-0.290905422063",
+        "mean": "-0.290905422063",
+        "min": "-0.290905422063",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "bootstrap_support_issue_count": {
+        "count": 3,
+        "max": 106,
+        "mean": 106.0,
+        "min": 106
+      },
+      "n": 3,
+      "seed_coverage_hit_rate": {
+        "count": 3,
+        "max": "1.000000000000",
+        "mean": "1.000000000000",
+        "min": "1.000000000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.000000000000"
+      },
+      "seed_no_tax_roi": {
+        "count": 3,
+        "max": "-0.290905422063",
+        "mean": "-0.290905422063",
+        "min": "-0.290905422063",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "seed_rows": [
+        {
+          "coverage_hit_rate": "1.000000000000",
+          "no_tax_roi": "-0.290905422063",
+          "seed": "137001",
+          "stake_yuan": "17604.000000",
+          "tax_adjusted_roi": "-0.290905422063"
+        },
+        {
+          "coverage_hit_rate": "1.000000000000",
+          "no_tax_roi": "-0.290905422063",
+          "seed": "137002",
+          "stake_yuan": "17604.000000",
+          "tax_adjusted_roi": "-0.290905422063"
+        },
+        {
+          "coverage_hit_rate": "1.000000000000",
+          "no_tax_roi": "-0.290905422063",
+          "seed": "137003",
+          "stake_yuan": "17604.000000",
+          "tax_adjusted_roi": "-0.290905422063"
+        }
+      ],
+      "seed_stake_yuan": {
+        "count": 3,
+        "max": "17604.000000",
+        "mean": "17604.000000",
+        "min": "17604.000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.000000"
+      },
+      "seed_tax_adjusted_roi": {
+        "count": 3,
+        "max": "-0.290905422063",
+        "mean": "-0.290905422063",
+        "min": "-0.290905422063",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      }
+    },
+    {
+      "bootstrap_positive_fraction": {
+        "count": 3,
+        "max": "0.000000000000",
+        "mean": "0.000000000000",
+        "min": "0.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "bootstrap_replicates": {
+        "count": 3,
+        "max": 1000,
+        "mean": 1000.0,
+        "min": 1000
+      },
+      "bootstrap_seed_specific_ci95_high": {
+        "count": 3,
+        "max": "-0.137850870305",
+        "mean": "-0.174998912382",
+        "min": "-0.195173206591",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.026300109592"
+      },
+      "bootstrap_seed_specific_ci95_low": {
+        "count": 3,
+        "max": "-0.278657941260",
+        "mean": "-0.318756520523",
+        "min": "-0.342329462536",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.028499569240"
+      },
+      "bootstrap_seed_specific_point_estimate": {
+        "count": 3,
+        "max": "-0.211377656326",
+        "mean": "-0.250021761559",
+        "min": "-0.272550363446",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.027450647960"
+      },
+      "bootstrap_support_issue_count": {
+        "count": 3,
+        "max": 156,
+        "mean": 156.0,
+        "min": 156
+      },
+      "n": 4,
+      "seed_coverage_hit_rate": {
+        "count": 3,
+        "max": "0.810679611650",
+        "mean": "0.782092772384",
+        "min": "0.760517799353",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.021070145614"
+      },
+      "seed_no_tax_roi": {
+        "count": 3,
+        "max": "-0.211377656326",
+        "mean": "-0.250021761559",
+        "min": "-0.272550363446",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.027450647960"
+      },
+      "seed_rows": [
+        {
+          "coverage_hit_rate": "0.760517799353",
+          "no_tax_roi": "-0.272550363446",
+          "seed": "137001",
+          "stake_yuan": "79104.000000",
+          "tax_adjusted_roi": "-0.272550363446"
+        },
+        {
+          "coverage_hit_rate": "0.775080906149",
+          "no_tax_roi": "-0.266137264904",
+          "seed": "137002",
+          "stake_yuan": "79104.000000",
+          "tax_adjusted_roi": "-0.266137264904"
+        },
+        {
+          "coverage_hit_rate": "0.810679611650",
+          "no_tax_roi": "-0.211377656326",
+          "seed": "137003",
+          "stake_yuan": "79104.000000",
+          "tax_adjusted_roi": "-0.211377656326"
+        }
+      ],
+      "seed_stake_yuan": {
+        "count": 3,
+        "max": "79104.000000",
+        "mean": "79104.000000",
+        "min": "79104.000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.000000"
+      },
+      "seed_tax_adjusted_roi": {
+        "count": 3,
+        "max": "-0.211377656326",
+        "mean": "-0.250021761559",
+        "min": "-0.272550363446",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.027450647960"
+      }
+    },
+    {
+      "bootstrap_positive_fraction": {
+        "count": 3,
+        "max": "0.002000000000",
+        "mean": "0.001000000000",
+        "min": "0.000000000000",
+        "positive_count": 2,
+        "positive_fraction": "0.666666666667",
+        "sd": "0.000816496581"
+      },
+      "bootstrap_replicates": {
+        "count": 3,
+        "max": 1000,
+        "mean": 1000.0,
+        "min": 1000
+      },
+      "bootstrap_seed_specific_ci95_high": {
+        "count": 3,
+        "max": "-0.062520662349",
+        "mean": "-0.103057271569",
+        "min": "-0.127171573649",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.028835212407"
+      },
+      "bootstrap_seed_specific_ci95_low": {
+        "count": 3,
+        "max": "-0.329089166387",
+        "mean": "-0.375172590172",
+        "min": "-0.402027733115",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.032734321613"
+      },
+      "bootstrap_seed_specific_point_estimate": {
+        "count": 3,
+        "max": "-0.201198685317",
+        "mean": "-0.246415768096",
+        "min": "-0.271732145423",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.032049657375"
+      },
+      "bootstrap_support_issue_count": {
+        "count": 3,
+        "max": 172,
+        "mean": 172.0,
+        "min": 172
+      },
+      "n": 5,
+      "seed_coverage_hit_rate": {
+        "count": 3,
+        "max": "0.264102564103",
+        "mean": "0.260256410256",
+        "min": "0.256410256410",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.003140371465"
+      },
+      "seed_no_tax_roi": {
+        "count": 3,
+        "max": "-0.201198685317",
+        "mean": "-0.246415768096",
+        "min": "-0.271732145423",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.032049657375"
+      },
+      "seed_rows": [
+        {
+          "coverage_hit_rate": "0.260256410256",
+          "no_tax_roi": "-0.271732145423",
+          "seed": "137001",
+          "stake_yuan": "99840.000000",
+          "tax_adjusted_roi": "-0.271732145423"
+        },
+        {
+          "coverage_hit_rate": "0.264102564103",
+          "no_tax_roi": "-0.201198685317",
+          "seed": "137002",
+          "stake_yuan": "99840.000000",
+          "tax_adjusted_roi": "-0.201198685317"
+        },
+        {
+          "coverage_hit_rate": "0.256410256410",
+          "no_tax_roi": "-0.266316473548",
+          "seed": "137003",
+          "stake_yuan": "99840.000000",
+          "tax_adjusted_roi": "-0.266316473548"
+        }
+      ],
+      "seed_stake_yuan": {
+        "count": 3,
+        "max": "99840.000000",
+        "mean": "99840.000000",
+        "min": "99840.000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.000000"
+      },
+      "seed_tax_adjusted_roi": {
+        "count": 3,
+        "max": "-0.201198685317",
+        "mean": "-0.246415768096",
+        "min": "-0.271732145423",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.032049657375"
+      }
+    },
+    {
+      "bootstrap_positive_fraction": {
+        "count": 3,
+        "max": "0.172000000000",
+        "mean": "0.087000000000",
+        "min": "0.002000000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.069402209379"
+      },
+      "bootstrap_replicates": {
+        "count": 3,
+        "max": 1000,
+        "mean": 1000.0,
+        "min": 1000
+      },
+      "bootstrap_seed_specific_ci95_high": {
+        "count": 3,
+        "max": "0.149934725403",
+        "mean": "0.042617164418",
+        "min": "-0.112788703513",
+        "positive_count": 2,
+        "positive_fraction": "0.666666666667",
+        "sd": "0.112517447459"
+      },
+      "bootstrap_seed_specific_ci95_low": {
+        "count": 3,
+        "max": "-0.367125986425",
+        "mean": "-0.445242767664",
+        "min": "-0.510263320746",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.059164784081"
+      },
+      "bootstrap_seed_specific_point_estimate": {
+        "count": 3,
+        "max": "-0.126810064792",
+        "mean": "-0.224595118636",
+        "min": "-0.336047354194",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.085965709098"
+      },
+      "bootstrap_support_issue_count": {
+        "count": 3,
+        "max": 176,
+        "mean": 176.0,
+        "min": 176
+      },
+      "n": 6,
+      "seed_coverage_hit_rate": {
+        "count": 3,
+        "max": "0.093896713615",
+        "mean": "0.083333333333",
+        "min": "0.075117370892",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.007844263559"
+      },
+      "seed_no_tax_roi": {
+        "count": 3,
+        "max": "-0.126810064792",
+        "mean": "-0.224595118636",
+        "min": "-0.336047354194",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.085965709098"
+      },
+      "seed_rows": [
+        {
+          "coverage_hit_rate": "0.080985915493",
+          "no_tax_roi": "-0.210927936922",
+          "seed": "137001",
+          "stake_yuan": "109056.000000",
+          "tax_adjusted_roi": "-0.210927936922"
+        },
+        {
+          "coverage_hit_rate": "0.075117370892",
+          "no_tax_roi": "-0.336047354194",
+          "seed": "137002",
+          "stake_yuan": "109056.000000",
+          "tax_adjusted_roi": "-0.336047354194"
+        },
+        {
+          "coverage_hit_rate": "0.093896713615",
+          "no_tax_roi": "-0.126810064792",
+          "seed": "137003",
+          "stake_yuan": "109056.000000",
+          "tax_adjusted_roi": "-0.126810064792"
+        }
+      ],
+      "seed_stake_yuan": {
+        "count": 3,
+        "max": "109056.000000",
+        "mean": "109056.000000",
+        "min": "109056.000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.000000"
+      },
+      "seed_tax_adjusted_roi": {
+        "count": 3,
+        "max": "-0.126810064792",
+        "mean": "-0.224595118636",
+        "min": "-0.336047354194",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.085965709098"
+      }
+    },
+    {
+      "bootstrap_positive_fraction": {
+        "count": 3,
+        "max": "0.362000000000",
+        "mean": "0.225333333333",
+        "min": "0.029000000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.142343091000"
+      },
+      "bootstrap_replicates": {
+        "count": 3,
+        "max": 1000,
+        "mean": 1000.0,
+        "min": 1000
+      },
+      "bootstrap_seed_specific_ci95_high": {
+        "count": 3,
+        "max": "0.410042399194",
+        "mean": "0.269303114214",
+        "min": "0.006633243822",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.185894302233"
+      },
+      "bootstrap_seed_specific_ci95_low": {
+        "count": 3,
+        "max": "-0.488485499636",
+        "mean": "-0.622174860487",
+        "min": "-0.828561797963",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.148046558907"
+      },
+      "bootstrap_seed_specific_point_estimate": {
+        "count": 3,
+        "max": "-0.075913332982",
+        "mean": "-0.222262319469",
+        "min": "-0.461781475811",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.170751410586"
+      },
+      "bootstrap_support_issue_count": {
+        "count": 3,
+        "max": 177,
+        "mean": 177.0,
+        "min": 177
+      },
+      "n": 7,
+      "seed_coverage_hit_rate": {
+        "count": 3,
+        "max": "0.028761061947",
+        "mean": "0.023598820059",
+        "min": "0.014380530973",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.006533939951"
+      },
+      "seed_no_tax_roi": {
+        "count": 3,
+        "max": "-0.075913332982",
+        "mean": "-0.222262319469",
+        "min": "-0.461781475811",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.170751410586"
+      },
+      "seed_rows": [
+        {
+          "coverage_hit_rate": "0.028761061947",
+          "no_tax_roi": "-0.075913332982",
+          "seed": "137001",
+          "stake_yuan": "115712.000000",
+          "tax_adjusted_roi": "-0.106211794913"
+        },
+        {
+          "coverage_hit_rate": "0.027654867257",
+          "no_tax_roi": "-0.129092149613",
+          "seed": "137002",
+          "stake_yuan": "115712.000000",
+          "tax_adjusted_roi": "-0.165929140988"
+        },
+        {
+          "coverage_hit_rate": "0.014380530973",
+          "no_tax_roi": "-0.461781475811",
+          "seed": "137003",
+          "stake_yuan": "115712.000000",
+          "tax_adjusted_roi": "-0.517283686480"
+        }
+      ],
+      "seed_stake_yuan": {
+        "count": 3,
+        "max": "115712.000000",
+        "mean": "115712.000000",
+        "min": "115712.000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.000000"
+      },
+      "seed_tax_adjusted_roi": {
+        "count": 3,
+        "max": "-0.106211794913",
+        "mean": "-0.263141540794",
+        "min": "-0.517283686480",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.181351799947"
+      }
+    },
+    {
+      "bootstrap_positive_fraction": {
+        "count": 3,
+        "max": "0.678000000000",
+        "mean": "0.313333333333",
+        "min": "0.000000000000",
+        "positive_count": 2,
+        "positive_fraction": "0.666666666667",
+        "sd": "0.279162238771"
+      },
+      "bootstrap_replicates": {
+        "count": 3,
+        "max": 1000,
+        "mean": 1000.0,
+        "min": 1000
+      },
+      "bootstrap_seed_specific_ci95_high": {
+        "count": 3,
+        "max": "3.686409907020",
+        "mean": "1.073490552675",
+        "min": "-1.000000000000",
+        "positive_count": 2,
+        "positive_fraction": "0.666666666667",
+        "sd": "1.950871092308"
+      },
+      "bootstrap_seed_specific_ci95_low": {
+        "count": 3,
+        "max": "-0.727029660105",
+        "mean": "-0.828217619344",
+        "min": "-1.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.122108915501"
+      },
+      "bootstrap_seed_specific_point_estimate": {
+        "count": 3,
+        "max": "0.866499650014",
+        "mean": "-0.110475218459",
+        "min": "-1.000000000000",
+        "positive_count": 1,
+        "positive_fraction": "0.333333333333",
+        "sd": "0.764500217638"
+      },
+      "bootstrap_support_issue_count": {
+        "count": 3,
+        "max": 176,
+        "mean": 176.0,
+        "min": 176
+      },
+      "n": 8,
+      "seed_coverage_hit_rate": {
+        "count": 3,
+        "max": "0.011930585683",
+        "mean": "0.007230657990",
+        "min": "0.000000000000",
+        "positive_count": 2,
+        "positive_fraction": "0.666666666667",
+        "sd": "0.005188973281"
+      },
+      "seed_no_tax_roi": {
+        "count": 3,
+        "max": "0.866499650014",
+        "mean": "-0.110475218459",
+        "min": "-1.000000000000",
+        "positive_count": 1,
+        "positive_fraction": "0.333333333333",
+        "sd": "0.764500217638"
+      },
+      "seed_rows": [
+        {
+          "coverage_hit_rate": "0.009761388286",
+          "no_tax_roi": "-0.197925305391",
+          "seed": "137001",
+          "stake_yuan": "118016.000000",
+          "tax_adjusted_roi": "-0.324854707141"
+        },
+        {
+          "coverage_hit_rate": "0.000000000000",
+          "no_tax_roi": "-1.000000000000",
+          "seed": "137002",
+          "stake_yuan": "118016.000000",
+          "tax_adjusted_roi": "-1.000000000000"
+        },
+        {
+          "coverage_hit_rate": "0.011930585683",
+          "no_tax_roi": "0.866499650014",
+          "seed": "137003",
+          "stake_yuan": "118016.000000",
+          "tax_adjusted_roi": "0.559229703854"
+        }
+      ],
+      "seed_stake_yuan": {
+        "count": 3,
+        "max": "118016.000000",
+        "mean": "118016.000000",
+        "min": "118016.000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.000000"
+      },
+      "seed_tax_adjusted_roi": {
+        "count": 3,
+        "max": "0.559229703854",
+        "mean": "-0.255208334429",
+        "min": "-1.000000000000",
+        "positive_count": 1,
+        "positive_fraction": "0.333333333333",
+        "sd": "0.638455052069"
+      }
+    },
+    {
+      "bootstrap_positive_fraction": {
+        "count": 3,
+        "max": "0.753000000000",
+        "mean": "0.467000000000",
+        "min": "0.017000000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.322072455616"
+      },
+      "bootstrap_replicates": {
+        "count": 3,
+        "max": 1000,
+        "mean": 1000.0,
+        "min": 1000
+      },
+      "bootstrap_seed_specific_ci95_high": {
+        "count": 3,
+        "max": "10.528225814088",
+        "mean": "4.252538908238",
+        "min": "-0.131554738281",
+        "positive_count": 2,
+        "positive_fraction": "0.666666666667",
+        "sd": "4.552751852834"
+      },
+      "bootstrap_seed_specific_ci95_low": {
+        "count": 3,
+        "max": "-1.000000000000",
+        "mean": "-1.000000000000",
+        "min": "-1.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "bootstrap_seed_specific_point_estimate": {
+        "count": 3,
+        "max": "2.799801003939",
+        "mean": "0.719669590861",
+        "min": "-0.730185796253",
+        "positive_count": 2,
+        "positive_fraction": "0.666666666667",
+        "sd": "1.508451215444"
+      },
+      "bootstrap_support_issue_count": {
+        "count": 3,
+        "max": 176,
+        "mean": 176.0,
+        "min": 176
+      },
+      "n": 9,
+      "seed_coverage_hit_rate": {
+        "count": 3,
+        "max": "0.003184713376",
+        "mean": "0.001769285209",
+        "min": "0.001061571125",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.001000858855"
+      },
+      "seed_no_tax_roi": {
+        "count": 3,
+        "max": "2.799801003939",
+        "mean": "0.719669590861",
+        "min": "-0.730185796253",
+        "positive_count": 2,
+        "positive_fraction": "0.666666666667",
+        "sd": "1.508451215444"
+      },
+      "seed_rows": [
+        {
+          "coverage_hit_rate": "0.003184713376",
+          "no_tax_roi": "2.799801003939",
+          "seed": "137001",
+          "stake_yuan": "120576.000000",
+          "tax_adjusted_roi": "2.039840803153"
+        },
+        {
+          "coverage_hit_rate": "0.001061571125",
+          "no_tax_roi": "0.089393564897",
+          "seed": "137002",
+          "stake_yuan": "120576.000000",
+          "tax_adjusted_roi": "-0.128485148081"
+        },
+        {
+          "coverage_hit_rate": "0.001061571125",
+          "no_tax_roi": "-0.730185796253",
+          "seed": "137003",
+          "stake_yuan": "120576.000000",
+          "tax_adjusted_roi": "-0.784148637001"
+        }
+      ],
+      "seed_stake_yuan": {
+        "count": 3,
+        "max": "120576.000000",
+        "mean": "120576.000000",
+        "min": "120576.000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.000000"
+      },
+      "seed_tax_adjusted_roi": {
+        "count": 3,
+        "max": "2.039840803153",
+        "mean": "0.375735672690",
+        "min": "-0.784148637001",
+        "positive_count": 1,
+        "positive_fraction": "0.333333333333",
+        "sd": "1.206760972355"
+      }
+    },
+    {
+      "bootstrap_positive_fraction": {
+        "count": 3,
+        "max": "0.002000000000",
+        "mean": "0.000666666667",
+        "min": "0.000000000000",
+        "positive_count": 1,
+        "positive_fraction": "0.333333333333",
+        "sd": "0.000942809042"
+      },
+      "bootstrap_replicates": {
+        "count": 3,
+        "max": 1000,
+        "mean": 1000.0,
+        "min": 1000
+      },
+      "bootstrap_seed_specific_ci95_high": {
+        "count": 3,
+        "max": "-0.231866347677",
+        "mean": "-0.743955449226",
+        "min": "-1.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.362101676277"
+      },
+      "bootstrap_seed_specific_ci95_low": {
+        "count": 3,
+        "max": "-1.000000000000",
+        "mean": "-1.000000000000",
+        "min": "-1.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "bootstrap_seed_specific_point_estimate": {
+        "count": 3,
+        "max": "-0.731627706674",
+        "mean": "-0.910542568891",
+        "min": "-1.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.126511912329"
+      },
+      "bootstrap_support_issue_count": {
+        "count": 3,
+        "max": 175,
+        "mean": 175.0,
+        "min": 175
+      },
+      "n": 10,
+      "seed_coverage_hit_rate": {
+        "count": 3,
+        "max": "0.002103049422",
+        "mean": "0.000701016474",
+        "min": "0.000000000000",
+        "positive_count": 1,
+        "positive_fraction": "0.333333333333",
+        "sd": "0.000991387005"
+      },
+      "seed_no_tax_roi": {
+        "count": 3,
+        "max": "-0.731627706674",
+        "mean": "-0.910542568891",
+        "min": "-1.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.126511912329"
+      },
+      "seed_rows": [
+        {
+          "coverage_hit_rate": "0.002103049422",
+          "no_tax_roi": "-0.731627706674",
+          "seed": "137001",
+          "stake_yuan": "121728.000000",
+          "tax_adjusted_roi": "-0.770519016200"
+        },
+        {
+          "coverage_hit_rate": "0.000000000000",
+          "no_tax_roi": "-1.000000000000",
+          "seed": "137002",
+          "stake_yuan": "121728.000000",
+          "tax_adjusted_roi": "-1.000000000000"
+        },
+        {
+          "coverage_hit_rate": "0.000000000000",
+          "no_tax_roi": "-1.000000000000",
+          "seed": "137003",
+          "stake_yuan": "121728.000000",
+          "tax_adjusted_roi": "-1.000000000000"
+        }
+      ],
+      "seed_stake_yuan": {
+        "count": 3,
+        "max": "121728.000000",
+        "mean": "121728.000000",
+        "min": "121728.000000",
+        "positive_count": 3,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.000000"
+      },
+      "seed_tax_adjusted_roi": {
+        "count": 3,
+        "max": "-0.770519016200",
+        "mean": "-0.923506338733",
+        "min": "-1.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.108178373199"
+      }
+    }
+  ],
+  "matched_n7": [
+    {
+      "common_issue_count": {
+        "count": 9,
+        "max": 20,
+        "mean": 20.0,
+        "min": 20
+      },
+      "n": 2,
+      "n7_no_tax_roi": {
+        "count": 9,
+        "max": "-0.190585638076",
+        "mean": "-0.608147690824",
+        "min": "-0.964669156361",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.295043711974"
+      },
+      "n_no_tax_roi": {
+        "count": 9,
+        "max": "-0.382384287582",
+        "mean": "-0.382384287582",
+        "min": "-0.382384287582",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "no_tax_roi_delta": {
+        "count": 9,
+        "max": "0.582284868779",
+        "mean": "0.225763403243",
+        "min": "-0.191798649505",
+        "positive_count": 6,
+        "positive_fraction": "0.666666666667",
+        "sd": "0.295043711973"
+      },
+      "positive_delta_rows": 6,
+      "row_count": 9,
+      "tax_adjusted_roi_delta": {
+        "count": 9,
+        "max": "0.582284868779",
+        "mean": "0.225763403243",
+        "min": "-0.191798649505",
+        "positive_count": 6,
+        "positive_fraction": "0.666666666667",
+        "sd": "0.295043711973"
+      }
+    },
+    {
+      "common_issue_count": {
+        "count": 9,
+        "max": 100,
+        "mean": 100.0,
+        "min": 100
+      },
+      "n": 3,
+      "n7_no_tax_roi": {
+        "count": 9,
+        "max": "0.180819647642",
+        "mean": "-0.180943711339",
+        "min": "-0.574227241695",
+        "positive_count": 2,
+        "positive_fraction": "0.222222222222",
+        "sd": "0.225088654980"
+      },
+      "n_no_tax_roi": {
+        "count": 9,
+        "max": "-0.294192686474",
+        "mean": "-0.294192686474",
+        "min": "-0.294192686474",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "no_tax_roi_delta": {
+        "count": 9,
+        "max": "0.280034555221",
+        "mean": "-0.113248975136",
+        "min": "-0.475012334117",
+        "positive_count": 2,
+        "positive_fraction": "0.222222222222",
+        "sd": "0.225088654980"
+      },
+      "positive_delta_rows": 2,
+      "row_count": 9,
+      "tax_adjusted_roi_delta": {
+        "count": 9,
+        "max": "0.295675018973",
+        "mean": "-0.066013696604",
+        "min": "-0.475012334117",
+        "positive_count": 3,
+        "positive_fraction": "0.333333333333",
+        "sd": "0.233340240107"
+      }
+    },
+    {
+      "common_issue_count": {
+        "count": 9,
+        "max": 149,
+        "mean": 149.0,
+        "min": 149
+      },
+      "n": 4,
+      "n7_no_tax_roi": {
+        "count": 9,
+        "max": "0.000677060011",
+        "mean": "-0.246904660138",
+        "min": "-0.555331879061",
+        "positive_count": 1,
+        "positive_fraction": "0.111111111111",
+        "sd": "0.183181279059"
+      },
+      "n_no_tax_roi": {
+        "count": 9,
+        "max": "-0.129077247240",
+        "mean": "-0.239330958133",
+        "min": "-0.305706961224",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.046355735774"
+      },
+      "no_tax_roi_delta": {
+        "count": 9,
+        "max": "0.426254631821",
+        "mean": "0.007573702004",
+        "min": "-0.246476269464",
+        "positive_count": 3,
+        "positive_fraction": "0.333333333333",
+        "sd": "0.208984116120"
+      },
+      "positive_delta_rows": 3,
+      "row_count": 9,
+      "tax_adjusted_roi_delta": {
+        "count": 9,
+        "max": "0.491858966159",
+        "mean": "0.044658636997",
+        "min": "-0.246476269464",
+        "positive_count": 5,
+        "positive_fraction": "0.555555555556",
+        "sd": "0.220124551642"
+      }
+    },
+    {
+      "common_issue_count": {
+        "count": 9,
+        "max": 168,
+        "mean": 168.0,
+        "min": 168
+      },
+      "n": 5,
+      "n7_no_tax_roi": {
+        "count": 9,
+        "max": "-0.055858367108",
+        "mean": "-0.265858447256",
+        "min": "-0.580454371769",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.186901760504"
+      },
+      "n_no_tax_roi": {
+        "count": 9,
+        "max": "-0.186893625805",
+        "mean": "-0.260806236210",
+        "min": "-0.344192658063",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.044942678583"
+      },
+      "no_tax_roi_delta": {
+        "count": 9,
+        "max": "0.268518764655",
+        "mean": "0.005052211046",
+        "min": "-0.288334290955",
+        "positive_count": 5,
+        "positive_fraction": "0.555555555556",
+        "sd": "0.187663823585"
+      },
+      "positive_delta_rows": 5,
+      "row_count": 9,
+      "tax_adjusted_roi_delta": {
+        "count": 9,
+        "max": "0.330416639426",
+        "mean": "0.040041951971",
+        "min": "-0.288334290955",
+        "positive_count": 5,
+        "positive_fraction": "0.555555555556",
+        "sd": "0.196601668242"
+      }
+    },
+    {
+      "common_issue_count": {
+        "count": 9,
+        "max": 174,
+        "mean": 174.0,
+        "min": 174
+      },
+      "n": 6,
+      "n7_no_tax_roi": {
+        "count": 9,
+        "max": "-0.070561351380",
+        "mean": "-0.274700075197",
+        "min": "-0.586987896569",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.184356217084"
+      },
+      "n_no_tax_roi": {
+        "count": 9,
+        "max": "-0.057837014070",
+        "mean": "-0.207898866486",
+        "min": "-0.329753964187",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.091551173208"
+      },
+      "no_tax_roi_delta": {
+        "count": 9,
+        "max": "0.529150882499",
+        "mean": "0.066801208711",
+        "min": "-0.205505573475",
+        "positive_count": 5,
+        "positive_fraction": "0.555555555556",
+        "sd": "0.241646946122"
+      },
+      "positive_delta_rows": 5,
+      "row_count": 9,
+      "tax_adjusted_roi_delta": {
+        "count": 9,
+        "max": "0.590084830410",
+        "mean": "0.101246059344",
+        "min": "-0.195099641455",
+        "positive_count": 5,
+        "positive_fraction": "0.555555555556",
+        "sd": "0.252284164407"
+      }
+    },
+    {
+      "common_issue_count": {
+        "count": 9,
+        "max": 177,
+        "mean": 177.0,
+        "min": 177
+      },
+      "n": 7,
+      "n7_no_tax_roi": {
+        "count": 9,
+        "max": "-0.075702051870",
+        "mean": "-0.278711689825",
+        "min": "-0.589272255548",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.183336547742"
+      },
+      "n_no_tax_roi": {
+        "count": 9,
+        "max": "-0.075702051870",
+        "mean": "-0.278711689825",
+        "min": "-0.589272255548",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.183336547742"
+      },
+      "no_tax_roi_delta": {
+        "count": 9,
+        "max": "0.000000000000",
+        "mean": "0.000000000000",
+        "min": "0.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "positive_delta_rows": 0,
+      "row_count": 9,
+      "tax_adjusted_roi_delta": {
+        "count": 9,
+        "max": "0.000000000000",
+        "mean": "0.000000000000",
+        "min": "0.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      }
+    },
+    {
+      "common_issue_count": {
+        "count": 9,
+        "max": 174,
+        "mean": 174.0,
+        "min": 174
+      },
+      "n": 8,
+      "n7_no_tax_roi": {
+        "count": 9,
+        "max": "-0.062216223222",
+        "mean": "-0.271904244431",
+        "min": "-0.583279594855",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.184854409942"
+      },
+      "n_no_tax_roi": {
+        "count": 9,
+        "max": "2.182607327072",
+        "mean": "-0.004363868611",
+        "min": "-1.000000000000",
+        "positive_count": 3,
+        "positive_fraction": "0.333333333333",
+        "sd": "0.948649702382"
+      },
+      "no_tax_roi_delta": {
+        "count": 9,
+        "max": "2.765886921927",
+        "mean": "0.267540375820",
+        "min": "-0.873994618775",
+        "positive_count": 3,
+        "positive_fraction": "0.333333333333",
+        "sd": "1.068964032163"
+      },
+      "positive_delta_rows": 3,
+      "row_count": 9,
+      "tax_adjusted_roi_delta": {
+        "count": 9,
+        "max": "2.279538005917",
+        "mean": "0.141027307338",
+        "min": "-0.836620162879",
+        "positive_count": 3,
+        "positive_fraction": "0.333333333333",
+        "sd": "0.921622407656"
+      }
+    },
+    {
+      "common_issue_count": {
+        "count": 9,
+        "max": 173,
+        "mean": 173.0,
+        "min": 173
+      },
+      "n": 9,
+      "n7_no_tax_roi": {
+        "count": 9,
+        "max": "-0.053719880963",
+        "mean": "-0.275746813141",
+        "min": "-0.633191066959",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.199921205381"
+      },
+      "n_no_tax_roi": {
+        "count": 9,
+        "max": "6.623881886498",
+        "mean": "1.102590221260",
+        "min": "-0.729323770043",
+        "positive_count": 5,
+        "positive_fraction": "0.555555555556",
+        "sd": "2.220371393013"
+      },
+      "no_tax_roi_delta": {
+        "count": 9,
+        "max": "6.677601767462",
+        "mean": "1.378337034402",
+        "min": "-0.253499024077",
+        "positive_count": 6,
+        "positive_fraction": "0.666666666667",
+        "sd": "2.116164274447"
+      },
+      "positive_delta_rows": 6,
+      "row_count": 9,
+      "tax_adjusted_roi_delta": {
+        "count": 9,
+        "max": "5.152825390165",
+        "mean": "0.994683451307",
+        "min": "-0.250812074772",
+        "positive_count": 6,
+        "positive_fraction": "0.666666666667",
+        "sd": "1.656606479699"
+      }
+    },
+    {
+      "common_issue_count": {
+        "count": 9,
+        "max": 172,
+        "mean": 172.0,
+        "min": 172
+      },
+      "n": 10,
+      "n7_no_tax_roi": {
+        "count": 9,
+        "max": "-0.051571685460",
+        "mean": "-0.274102651537",
+        "min": "-0.632358356555",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.200375056017"
+      },
+      "n_no_tax_roi": {
+        "count": 9,
+        "max": "-0.019208391714",
+        "mean": "-0.783273329488",
+        "min": "-1.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.309172959137"
+      },
+      "no_tax_roi_delta": {
+        "count": 9,
+        "max": "0.175697404602",
+        "mean": "-0.509170677952",
+        "min": "-0.883915102529",
+        "positive_count": 1,
+        "positive_fraction": "0.111111111111",
+        "sd": "0.294131488309"
+      },
+      "positive_delta_rows": 1,
+      "row_count": 9,
+      "tax_adjusted_roi_delta": {
+        "count": 9,
+        "max": "0.021404102937",
+        "mean": "-0.514893142185",
+        "min": "-0.846116418984",
+        "positive_count": 1,
+        "positive_fraction": "0.111111111111",
+        "sd": "0.252140020696"
+      }
+    }
+  ],
+  "overlap": [
+    {
+      "duplicate_ticket_policy": "WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication",
+      "identity_count": 38,
+      "issue_count": 22,
+      "max_jaccard": "0.333333333333",
+      "max_shared_leg_count": 1,
+      "mean_jaccard": "0.333333333333",
+      "mean_shared_leg_count": "1.000000000000",
+      "n": 2,
+      "pair_count": 27
+    },
+    {
+      "duplicate_ticket_policy": "WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication",
+      "identity_count": 335,
+      "issue_count": 108,
+      "max_jaccard": "0.500000000000",
+      "max_shared_leg_count": 2,
+      "mean_jaccard": "0.500000000000",
+      "mean_shared_leg_count": "2.000000000000",
+      "n": 3,
+      "pair_count": 639
+    },
+    {
+      "duplicate_ticket_policy": "WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication",
+      "identity_count": 648,
+      "issue_count": 166,
+      "max_jaccard": "0.600000000000",
+      "max_shared_leg_count": 3,
+      "mean_jaccard": "0.600000000000",
+      "mean_shared_leg_count": "3.000000000000",
+      "n": 4,
+      "pair_count": 1487
+    },
+    {
+      "duplicate_ticket_policy": "WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication",
+      "identity_count": 844,
+      "issue_count": 190,
+      "max_jaccard": "0.666666666667",
+      "max_shared_leg_count": 4,
+      "mean_jaccard": "0.666666666667",
+      "mean_shared_leg_count": "4.000000000000",
+      "n": 5,
+      "pair_count": 2277
+    },
+    {
+      "duplicate_ticket_policy": "WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication",
+      "identity_count": 937,
+      "issue_count": 197,
+      "max_jaccard": "0.714285714286",
+      "max_shared_leg_count": 5,
+      "mean_jaccard": "0.714285714286",
+      "mean_shared_leg_count": "5.000000000000",
+      "n": 6,
+      "pair_count": 2695
+    },
+    {
+      "duplicate_ticket_policy": "WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication",
+      "identity_count": 1005,
+      "issue_count": 201,
+      "max_jaccard": "0.750000000000",
+      "max_shared_leg_count": 6,
+      "mean_jaccard": "0.750000000000",
+      "mean_shared_leg_count": "6.000000000000",
+      "n": 7,
+      "pair_count": 3050
+    },
+    {
+      "duplicate_ticket_policy": "WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication",
+      "identity_count": 1042,
+      "issue_count": 203,
+      "max_jaccard": "0.777777777778",
+      "max_shared_leg_count": 7,
+      "mean_jaccard": "0.777777777778",
+      "mean_shared_leg_count": "7.000000000000",
+      "n": 8,
+      "pair_count": 3203
+    },
+    {
+      "duplicate_ticket_policy": "WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication",
+      "identity_count": 1077,
+      "issue_count": 204,
+      "max_jaccard": "0.800000000000",
+      "max_shared_leg_count": 8,
+      "mean_jaccard": "0.800000000000",
+      "mean_shared_leg_count": "8.000000000000",
+      "n": 9,
+      "pair_count": 3379
+    },
+    {
+      "duplicate_ticket_policy": "WOR distinct within each identity; cross-identity shared legs reported, no ticket deduplication",
+      "identity_count": 1094,
+      "issue_count": 205,
+      "max_jaccard": "0.818181818182",
+      "max_shared_leg_count": 9,
+      "mean_jaccard": "0.818181818182",
+      "mean_shared_leg_count": "9.000000000000",
+      "n": 10,
+      "pair_count": 3471
+    }
+  ],
+  "pre_tax_primary_tax_secondary": true,
+  "robustness": [
+    {
+      "coverage_hit_rate": {
+        "count": 0,
+        "max": "",
+        "mean": "",
+        "min": "",
+        "positive_count": 0,
+        "positive_fraction": "",
+        "sd": ""
+      },
+      "gross_top_issue_share": {
+        "count": 0,
+        "max": "",
+        "mean": "",
+        "min": "",
+        "positive_count": 0,
+        "positive_fraction": "",
+        "sd": ""
+      },
+      "positive_pre_tax_cells": 0,
+      "pre_tax_roi": {
+        "count": 0,
+        "max": "",
+        "mean": "",
+        "min": "",
+        "positive_count": 0,
+        "positive_fraction": "",
+        "sd": ""
+      },
+      "row_count": 81,
+      "scope": "YEAR",
+      "scope_value": "2019",
+      "tax_adjusted_roi": {
+        "count": 0,
+        "max": "",
+        "mean": "",
+        "min": "",
+        "positive_count": 0,
+        "positive_fraction": "",
+        "sd": ""
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.346821116861",
+        "min": "0.000000000000",
+        "positive_count": 60,
+        "positive_fraction": "0.740740740741",
+        "sd": "0.421665392463"
+      },
+      "gross_top_issue_share": {
+        "count": 60,
+        "max": "1.000000000000",
+        "mean": "0.467895848469",
+        "min": "0.112291119186",
+        "positive_count": 60,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.258331868739"
+      },
+      "positive_pre_tax_cells": 7,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "2.054930783081",
+        "mean": "-0.384351876895",
+        "min": "-1.000000000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "0.515036626696"
+      },
+      "row_count": 81,
+      "scope": "YEAR",
+      "scope_value": "2020",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "1.443944626465",
+        "mean": "-0.399768083661",
+        "min": "-1.000000000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "0.469866358207"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.349995182410",
+        "min": "0.000000000000",
+        "positive_count": 69,
+        "positive_fraction": "0.851851851852",
+        "sd": "0.423887690750"
+      },
+      "gross_top_issue_share": {
+        "count": 69,
+        "max": "1.000000000000",
+        "mean": "0.342642445162",
+        "min": "0.051508673302",
+        "positive_count": 69,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.310987001718"
+      },
+      "positive_pre_tax_cells": 12,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "26.065545033034",
+        "mean": "0.181908169057",
+        "min": "-1.000000000000",
+        "positive_count": 12,
+        "positive_fraction": "0.148148148148",
+        "sd": "3.313982985309"
+      },
+      "row_count": 81,
+      "scope": "YEAR",
+      "scope_value": "2021",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "20.652436026452",
+        "mean": "0.037465424613",
+        "min": "-1.000000000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "2.639671099388"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.354187098067",
+        "min": "0.000000000000",
+        "positive_count": 65,
+        "positive_fraction": "0.802469135802",
+        "sd": "0.421501539972"
+      },
+      "gross_top_issue_share": {
+        "count": 65,
+        "max": "1.000000000000",
+        "mean": "0.356644029193",
+        "min": "0.079501289619",
+        "positive_count": 65,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.287265820177"
+      },
+      "positive_pre_tax_cells": 5,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "0.759246368685",
+        "mean": "-0.391378451138",
+        "min": "-1.000000000000",
+        "positive_count": 5,
+        "positive_fraction": "0.061728395062",
+        "sd": "0.386065865186"
+      },
+      "row_count": 81,
+      "scope": "YEAR",
+      "scope_value": "2022",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "0.586100312986",
+        "mean": "-0.400721447526",
+        "min": "-1.000000000000",
+        "positive_count": 5,
+        "positive_fraction": "0.061728395062",
+        "sd": "0.373027704092"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.353413272645",
+        "min": "0.000000000000",
+        "positive_count": 65,
+        "positive_fraction": "0.802469135802",
+        "sd": "0.422045796046"
+      },
+      "gross_top_issue_share": {
+        "count": 65,
+        "max": "1.000000000000",
+        "mean": "0.502701593820",
+        "min": "0.116985838535",
+        "positive_count": 65,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.361786756692"
+      },
+      "positive_pre_tax_cells": 11,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "12.144871053422",
+        "mean": "0.034201167442",
+        "min": "-1.000000000000",
+        "positive_count": 11,
+        "positive_fraction": "0.135802469136",
+        "sd": "2.086265069411"
+      },
+      "row_count": 81,
+      "scope": "YEAR",
+      "scope_value": "2023",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "9.515896842703",
+        "mean": "-0.084525606698",
+        "min": "-1.000000000000",
+        "positive_count": 10,
+        "positive_fraction": "0.123456790123",
+        "sd": "1.661388523289"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.354558733109",
+        "min": "0.000000000000",
+        "positive_count": 63,
+        "positive_fraction": "0.777777777778",
+        "sd": "0.423473176450"
+      },
+      "gross_top_issue_share": {
+        "count": 63,
+        "max": "1.000000000000",
+        "mean": "0.536308074238",
+        "min": "0.106263360584",
+        "positive_count": 63,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.342800859010"
+      },
+      "positive_pre_tax_cells": 12,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "1.417361788194",
+        "mean": "-0.373619230793",
+        "min": "-1.000000000000",
+        "positive_count": 12,
+        "positive_fraction": "0.148148148148",
+        "sd": "0.500686626116"
+      },
+      "row_count": 81,
+      "scope": "YEAR",
+      "scope_value": "2024",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "0.933889430556",
+        "mean": "-0.410503135064",
+        "min": "-1.000000000000",
+        "positive_count": 10,
+        "positive_fraction": "0.123456790123",
+        "sd": "0.436376086822"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 72,
+        "max": "1.000000000000",
+        "mean": "0.270210856496",
+        "min": "0.000000000000",
+        "positive_count": 48,
+        "positive_fraction": "0.666666666667",
+        "sd": "0.379741752840"
+      },
+      "gross_top_issue_share": {
+        "count": 48,
+        "max": "1.000000000000",
+        "mean": "0.540113831909",
+        "min": "0.261091378491",
+        "positive_count": 48,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.252987961406"
+      },
+      "positive_pre_tax_cells": 12,
+      "pre_tax_roi": {
+        "count": 72,
+        "max": "2.860451548295",
+        "mean": "-0.410219067980",
+        "min": "-1.000000000000",
+        "positive_count": 12,
+        "positive_fraction": "0.166666666667",
+        "sd": "0.648878807795"
+      },
+      "row_count": 81,
+      "scope": "YEAR",
+      "scope_value": "2025",
+      "tax_adjusted_roi": {
+        "count": 72,
+        "max": "2.088361238636",
+        "mean": "-0.433877320170",
+        "min": "-1.000000000000",
+        "positive_count": 12,
+        "positive_fraction": "0.166666666667",
+        "sd": "0.581994542156"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 0,
+        "max": "",
+        "mean": "",
+        "min": "",
+        "positive_count": 0,
+        "positive_fraction": "",
+        "sd": ""
+      },
+      "gross_top_issue_share": {
+        "count": 0,
+        "max": "",
+        "mean": "",
+        "min": "",
+        "positive_count": 0,
+        "positive_fraction": "",
+        "sd": ""
+      },
+      "positive_pre_tax_cells": 0,
+      "pre_tax_roi": {
+        "count": 0,
+        "max": "",
+        "mean": "",
+        "min": "",
+        "positive_count": 0,
+        "positive_fraction": "",
+        "sd": ""
+      },
+      "row_count": 81,
+      "scope": "FOLD",
+      "scope_value": "OOS_2019",
+      "tax_adjusted_roi": {
+        "count": 0,
+        "max": "",
+        "mean": "",
+        "min": "",
+        "positive_count": 0,
+        "positive_fraction": "",
+        "sd": ""
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.346821116861",
+        "min": "0.000000000000",
+        "positive_count": 60,
+        "positive_fraction": "0.740740740741",
+        "sd": "0.421665392463"
+      },
+      "gross_top_issue_share": {
+        "count": 60,
+        "max": "1.000000000000",
+        "mean": "0.467895848469",
+        "min": "0.112291119186",
+        "positive_count": 60,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.258331868739"
+      },
+      "positive_pre_tax_cells": 7,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "2.054930783081",
+        "mean": "-0.384351876895",
+        "min": "-1.000000000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "0.515036626696"
+      },
+      "row_count": 81,
+      "scope": "FOLD",
+      "scope_value": "OOS_2020",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "1.443944626465",
+        "mean": "-0.399768083661",
+        "min": "-1.000000000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "0.469866358207"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.349995182410",
+        "min": "0.000000000000",
+        "positive_count": 69,
+        "positive_fraction": "0.851851851852",
+        "sd": "0.423887690750"
+      },
+      "gross_top_issue_share": {
+        "count": 69,
+        "max": "1.000000000000",
+        "mean": "0.342642445162",
+        "min": "0.051508673302",
+        "positive_count": 69,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.310987001718"
+      },
+      "positive_pre_tax_cells": 12,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "26.065545033034",
+        "mean": "0.181908169057",
+        "min": "-1.000000000000",
+        "positive_count": 12,
+        "positive_fraction": "0.148148148148",
+        "sd": "3.313982985309"
+      },
+      "row_count": 81,
+      "scope": "FOLD",
+      "scope_value": "OOS_2021",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "20.652436026452",
+        "mean": "0.037465424613",
+        "min": "-1.000000000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "2.639671099388"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.354187098067",
+        "min": "0.000000000000",
+        "positive_count": 65,
+        "positive_fraction": "0.802469135802",
+        "sd": "0.421501539972"
+      },
+      "gross_top_issue_share": {
+        "count": 65,
+        "max": "1.000000000000",
+        "mean": "0.356644029193",
+        "min": "0.079501289619",
+        "positive_count": 65,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.287265820177"
+      },
+      "positive_pre_tax_cells": 5,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "0.759246368685",
+        "mean": "-0.391378451138",
+        "min": "-1.000000000000",
+        "positive_count": 5,
+        "positive_fraction": "0.061728395062",
+        "sd": "0.386065865186"
+      },
+      "row_count": 81,
+      "scope": "FOLD",
+      "scope_value": "OOS_2022",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "0.586100312986",
+        "mean": "-0.400721447526",
+        "min": "-1.000000000000",
+        "positive_count": 5,
+        "positive_fraction": "0.061728395062",
+        "sd": "0.373027704092"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.353413272645",
+        "min": "0.000000000000",
+        "positive_count": 65,
+        "positive_fraction": "0.802469135802",
+        "sd": "0.422045796046"
+      },
+      "gross_top_issue_share": {
+        "count": 65,
+        "max": "1.000000000000",
+        "mean": "0.502701593820",
+        "min": "0.116985838535",
+        "positive_count": 65,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.361786756692"
+      },
+      "positive_pre_tax_cells": 11,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "12.144871053422",
+        "mean": "0.034201167442",
+        "min": "-1.000000000000",
+        "positive_count": 11,
+        "positive_fraction": "0.135802469136",
+        "sd": "2.086265069411"
+      },
+      "row_count": 81,
+      "scope": "FOLD",
+      "scope_value": "OOS_2023",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "9.515896842703",
+        "mean": "-0.084525606698",
+        "min": "-1.000000000000",
+        "positive_count": 10,
+        "positive_fraction": "0.123456790123",
+        "sd": "1.661388523289"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.354558733109",
+        "min": "0.000000000000",
+        "positive_count": 63,
+        "positive_fraction": "0.777777777778",
+        "sd": "0.423473176450"
+      },
+      "gross_top_issue_share": {
+        "count": 63,
+        "max": "1.000000000000",
+        "mean": "0.536308074238",
+        "min": "0.106263360584",
+        "positive_count": 63,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.342800859010"
+      },
+      "positive_pre_tax_cells": 12,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "1.417361788194",
+        "mean": "-0.373619230793",
+        "min": "-1.000000000000",
+        "positive_count": 12,
+        "positive_fraction": "0.148148148148",
+        "sd": "0.500686626116"
+      },
+      "row_count": 81,
+      "scope": "FOLD",
+      "scope_value": "OOS_2024",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "0.933889430556",
+        "mean": "-0.410503135064",
+        "min": "-1.000000000000",
+        "positive_count": 10,
+        "positive_fraction": "0.123456790123",
+        "sd": "0.436376086822"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 72,
+        "max": "1.000000000000",
+        "mean": "0.270210856496",
+        "min": "0.000000000000",
+        "positive_count": 48,
+        "positive_fraction": "0.666666666667",
+        "sd": "0.379741752840"
+      },
+      "gross_top_issue_share": {
+        "count": 48,
+        "max": "1.000000000000",
+        "mean": "0.540113831909",
+        "min": "0.261091378491",
+        "positive_count": 48,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.252987961406"
+      },
+      "positive_pre_tax_cells": 12,
+      "pre_tax_roi": {
+        "count": 72,
+        "max": "2.860451548295",
+        "mean": "-0.410219067980",
+        "min": "-1.000000000000",
+        "positive_count": 12,
+        "positive_fraction": "0.166666666667",
+        "sd": "0.648878807795"
+      },
+      "row_count": 81,
+      "scope": "FOLD",
+      "scope_value": "OOS_2025",
+      "tax_adjusted_roi": {
+        "count": 72,
+        "max": "2.088361238636",
+        "mean": "-0.433877320170",
+        "min": "-1.000000000000",
+        "positive_count": 12,
+        "positive_fraction": "0.166666666667",
+        "sd": "0.581994542156"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.351783804682",
+        "min": "0.000000000000",
+        "positive_count": 74,
+        "positive_fraction": "0.913580246914",
+        "sd": "0.422414324214"
+      },
+      "gross_top_issue_share": {
+        "count": 74,
+        "max": "1.000000000000",
+        "mean": "0.271270218024",
+        "min": "0.026265684306",
+        "positive_count": 74,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.311726988364"
+      },
+      "positive_pre_tax_cells": 8,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "6.599602007879",
+        "mean": "-0.143295765450",
+        "min": "-1.000000000000",
+        "positive_count": 8,
+        "positive_fraction": "0.098765432099",
+        "sd": "0.942762046957"
+      },
+      "row_count": 81,
+      "scope": "LOYO",
+      "scope_value": "2019",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "5.079681606306",
+        "mean": "-0.215880202196",
+        "min": "-1.000000000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "0.749797592865"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.352470803945",
+        "min": "0.000000000000",
+        "positive_count": 73,
+        "positive_fraction": "0.901234567901",
+        "sd": "0.422600446361"
+      },
+      "gross_top_issue_share": {
+        "count": 73,
+        "max": "1.000000000000",
+        "mean": "0.268484487089",
+        "min": "0.030233625763",
+        "positive_count": 73,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.306907761553"
+      },
+      "positive_pre_tax_cells": 9,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "7.451977675823",
+        "mean": "-0.117416293944",
+        "min": "-1.000000000000",
+        "positive_count": 9,
+        "positive_fraction": "0.111111111111",
+        "sd": "1.053869158317"
+      },
+      "row_count": 81,
+      "scope": "LOYO",
+      "scope_value": "2020",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "5.761582140662",
+        "mean": "-0.196510827822",
+        "min": "-1.000000000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "0.836465675202"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.352466974413",
+        "min": "0.000000000000",
+        "positive_count": 72,
+        "positive_fraction": "0.888888888889",
+        "sd": "0.421815346872"
+      },
+      "gross_top_issue_share": {
+        "count": 72,
+        "max": "1.000000000000",
+        "mean": "0.314339629502",
+        "min": "0.039894827103",
+        "positive_count": 72,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.309842299574"
+      },
+      "positive_pre_tax_cells": 7,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "3.113224011777",
+        "mean": "-0.259307707420",
+        "min": "-1.000000000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "0.581843865024"
+      },
+      "row_count": 81,
+      "scope": "LOYO",
+      "scope_value": "2021",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "2.360979873764",
+        "mean": "-0.305400855270",
+        "min": "-1.000000000000",
+        "positive_count": 6,
+        "positive_fraction": "0.074074074074",
+        "sd": "0.483050971063"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.351113900980",
+        "min": "0.000000000000",
+        "positive_count": 74,
+        "positive_fraction": "0.913580246914",
+        "sd": "0.422765594472"
+      },
+      "gross_top_issue_share": {
+        "count": 74,
+        "max": "1.000000000000",
+        "mean": "0.298270039819",
+        "min": "0.026825684118",
+        "positive_count": 74,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.318871284850"
+      },
+      "positive_pre_tax_cells": 10,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "8.635027040945",
+        "mean": "-0.077554579279",
+        "min": "-1.000000000000",
+        "positive_count": 10,
+        "positive_fraction": "0.123456790123",
+        "sd": "1.199686056261"
+      },
+      "row_count": 81,
+      "scope": "LOYO",
+      "scope_value": "2022",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "6.708021632760",
+        "mean": "-0.167018924766",
+        "min": "-1.000000000000",
+        "positive_count": 9,
+        "positive_fraction": "0.111111111111",
+        "sd": "0.950281704392"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.351397904189",
+        "min": "0.000000000000",
+        "positive_count": 72,
+        "positive_fraction": "0.888888888889",
+        "sd": "0.422600374157"
+      },
+      "gross_top_issue_share": {
+        "count": 72,
+        "max": "1.000000000000",
+        "mean": "0.243580530626",
+        "min": "0.030618046500",
+        "positive_count": 72,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.283844521138"
+      },
+      "positive_pre_tax_cells": 5,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "8.419506699239",
+        "mean": "-0.193444983207",
+        "min": "-1.000000000000",
+        "positive_count": 5,
+        "positive_fraction": "0.061728395062",
+        "sd": "1.114134013112"
+      },
+      "row_count": 81,
+      "scope": "LOYO",
+      "scope_value": "2023",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "6.535605359396",
+        "mean": "-0.254926926713",
+        "min": "-1.000000000000",
+        "positive_count": 5,
+        "positive_fraction": "0.061728395062",
+        "sd": "0.889383279857"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.351413785432",
+        "min": "0.000000000000",
+        "positive_count": 73,
+        "positive_fraction": "0.901234567901",
+        "sd": "0.422358775372"
+      },
+      "gross_top_issue_share": {
+        "count": 73,
+        "max": "1.000000000000",
+        "mean": "0.269150599089",
+        "min": "0.028564503901",
+        "positive_count": 73,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.309703846009"
+      },
+      "positive_pre_tax_cells": 10,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "7.702086630874",
+        "mean": "-0.101158465443",
+        "min": "-1.000000000000",
+        "positive_count": 10,
+        "positive_fraction": "0.123456790123",
+        "sd": "1.102809484745"
+      },
+      "row_count": 81,
+      "scope": "LOYO",
+      "scope_value": "2024",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "5.961669304707",
+        "mean": "-0.180698790982",
+        "min": "-1.000000000000",
+        "positive_count": 9,
+        "positive_fraction": "0.111111111111",
+        "sd": "0.876540407812"
+      }
+    },
+    {
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.351850584256",
+        "min": "0.000000000000",
+        "positive_count": 74,
+        "positive_fraction": "0.913580246914",
+        "sd": "0.422346032256"
+      },
+      "gross_top_issue_share": {
+        "count": 74,
+        "max": "1.000000000000",
+        "mean": "0.280493882935",
+        "min": "0.027527847438",
+        "positive_count": 74,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.316092748216"
+      },
+      "positive_pre_tax_cells": 9,
+      "pre_tax_roi": {
+        "count": 81,
+        "max": "7.116581736306",
+        "mean": "-0.127074653048",
+        "min": "-1.000000000000",
+        "positive_count": 9,
+        "positive_fraction": "0.111111111111",
+        "sd": "1.011150655466"
+      },
+      "row_count": 81,
+      "scope": "LOYO",
+      "scope_value": "2025",
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "5.493265389048",
+        "mean": "-0.203200714251",
+        "min": "-1.000000000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "0.803405851780"
+      }
+    }
+  ],
+  "surface": {
+    "all_cell_count": 81,
+    "metrics": {
+      "actual_winning_sp_product_mean": {
+        "count": 74,
+        "max": "117478.155346666666",
+        "mean": "12058.046509259195",
+        "min": "9.802836213636",
+        "positive_count": 74,
+        "positive_fraction": "1.000000000000",
+        "sd": "27296.955894651739"
+      },
+      "after_tax_gross_yuan": {
+        "count": 81,
+        "max": "398028.231498",
+        "mean": "75202.592043",
+        "min": "0.000000",
+        "positive_count": 74,
+        "positive_fraction": "0.913580246914",
+        "sd": "85402.827324"
+      },
+      "capital_utilization_vs_full": {
+        "count": 81,
+        "max": "0.973684210526",
+        "mean": "0.340421196521",
+        "min": "0.000471086465",
+        "positive_count": 81,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.409340906260"
+      },
+      "coverage_hit_rate": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.351783804682",
+        "min": "0.000000000000",
+        "positive_count": 74,
+        "positive_fraction": "0.913580246914",
+        "sd": "0.422414324214"
+      },
+      "duplicate_ticket_count": {
+        "count": 81,
+        "max": 0,
+        "mean": 0.0,
+        "min": 0
+      },
+      "duplicate_ticket_ratio": {
+        "count": 81,
+        "max": "0.000000000000",
+        "mean": "0.000000000000",
+        "min": "0.000000000000",
+        "positive_count": 0,
+        "positive_fraction": "0.000000000000",
+        "sd": "0.000000000000"
+      },
+      "effective_M": {
+        "count": 81,
+        "max": 128,
+        "mean": 60.333333333333336,
+        "min": 9
+      },
+      "expected_sp_product_q_mean": {
+        "count": 81,
+        "max": "138691.217292683228",
+        "mean": "22336.514401421377",
+        "min": "11.973369686364",
+        "positive_count": 81,
+        "positive_fraction": "1.000000000000",
+        "sd": "43192.773520362345"
+      },
+      "gm_expected_sp_mean": {
+        "count": 81,
+        "max": "3.085258937361",
+        "mean": "3.077592408594",
+        "min": "3.065385205140",
+        "positive_count": 81,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.006331854827"
+      },
+      "gross_issue_hhi": {
+        "count": 81,
+        "max": "1.000000000000",
+        "mean": "0.184181546111",
+        "min": "0.000000000000",
+        "positive_count": 74,
+        "positive_fraction": "0.913580246914",
+        "sd": "0.293309078640"
+      },
+      "gross_pre_tax_yuan": {
+        "count": 81,
+        "max": "496630.687268",
+        "mean": "83830.508493",
+        "min": "0.000000",
+        "positive_count": 74,
+        "positive_fraction": "0.913580246914",
+        "sd": "102343.954758"
+      },
+      "gross_top_issue_share": {
+        "count": 74,
+        "max": "1.000000000000",
+        "mean": "0.271270218024",
+        "min": "0.026265684306",
+        "positive_count": 74,
+        "positive_fraction": "1.000000000000",
+        "sd": "0.311726988364"
+      },
+      "hit_identity_count": {
+        "count": 81,
+        "max": 618,
+        "mean": 129.7530864197531,
+        "min": 0
+      },
+      "longest_executed_miss_streak": {
+        "count": 81,
+        "max": 176,
+        "mean": 39.864197530864196,
+        "min": 0
+      },
+      "max_drawdown_no_tax_yuan": {
+        "count": 81,
+        "max": "243456.000000",
+        "mean": "44049.937741",
+        "min": "212.960421",
+        "positive_count": 81,
+        "positive_fraction": "1.000000000000",
+        "sd": "46552.872120"
+      },
+      "max_drawdown_tax_adjusted_yuan": {
+        "count": 81,
+        "max": "243456.000000",
+        "mean": "45144.782446",
+        "min": "212.960421",
+        "positive_count": 81,
+        "positive_fraction": "1.000000000000",
+        "sd": "47858.561346"
+      },
+      "no_tax_roi": {
+        "count": 81,
+        "max": "6.599602007879",
+        "mean": "-0.143295765450",
+        "min": "-1.000000000000",
+        "positive_count": 8,
+        "positive_fraction": "0.098765432099",
+        "sd": "0.942762046957"
+      },
+      "planned_identity_count": {
+        "count": 81,
+        "max": 1094,
+        "mean": 780.0,
+        "min": 38
+      },
+      "planned_stake_yuan": {
+        "count": 81,
+        "max": "280064.000000",
+        "mean": "110120.962963",
+        "min": "684.000000",
+        "positive_count": 81,
+        "positive_fraction": "1.000000000000",
+        "sd": "88812.408843"
+      },
+      "pre_tax_net_yuan": {
+        "count": 81,
+        "max": "397876.805851",
+        "mean": "-15089.121137",
+        "min": "-243456.000000",
+        "positive_count": 8,
+        "positive_fraction": "0.098765432099",
+        "sd": "84829.048444"
+      },
+      "settled_identity_count": {
+        "count": 81,
+        "max": 951,
+        "mean": 703.5555555555555,
+        "min": 37
+      },
+      "stake_yuan": {
+        "count": 81,
+        "max": "243456.000000",
+        "mean": "98919.629630",
+        "min": "666.000000",
+        "positive_count": 81,
+        "positive_fraction": "1.000000000000",
+        "sd": "78618.856374"
+      },
+      "tax_adjusted_net_yuan": {
+        "count": 81,
+        "max": "306243.844681",
+        "mean": "-23717.037586",
+        "min": "-243456.000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "71440.849364"
+      },
+      "tax_adjusted_roi": {
+        "count": 81,
+        "max": "5.079681606306",
+        "mean": "-0.215880202196",
+        "min": "-1.000000000000",
+        "positive_count": 7,
+        "positive_fraction": "0.086419753086",
+        "sd": "0.749797592865"
+      },
+      "tax_line_share": {
+        "count": 74,
+        "max": "1.000000000000",
+        "mean": "0.204167218713",
+        "min": "0.000000000000",
+        "positive_count": 27,
+        "positive_fraction": "0.364864864865",
+        "sd": "0.352135638884"
+      },
+      "tax_yuan": {
+        "count": 81,
+        "max": "98602.455770",
+        "mean": "8627.916450",
+        "min": "0.000000",
+        "positive_count": 27,
+        "positive_fraction": "0.333333333333",
+        "sd": "19855.869615"
+      },
+      "taxable_winning_ticket_count": {
+        "count": 81,
+        "max": 7,
+        "mean": 0.8641975308641975,
+        "min": 0
+      },
+      "ticket_hit_rate": {
+        "count": 81,
+        "max": "0.111111111111",
+        "mean": "0.018474464289",
+        "min": "0.000000000000",
+        "positive_count": 74,
+        "positive_fraction": "0.913580246914",
+        "sd": "0.034664575070"
+      },
+      "unique_ticket_count": {
+        "count": 81,
+        "max": 121728,
+        "mean": 49459.81481481482,
+        "min": 333
+      },
+      "winning_ticket_count": {
+        "count": 81,
+        "max": 618,
+        "mean": 129.7530864197531,
+        "min": 0
+      }
+    }
+  }
+}

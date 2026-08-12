@@ -1,0 +1,94 @@
+{
+  "accumulation": {
+    "eligible_issue_epochs": 24,
+    "issues_needed_before_development_horizon": 6,
+    "issues_needed_before_full_readiness_horizon": 13,
+    "next_measurable_condition": "At least 37 chronologically assigned eligible issue epochs, with each required role meeting the frozen 80% N7 and 80% core coverage thresholds."
+  },
+  "authority": "Data support only. No model training, betting, ROI, release or execution authority; #204 remains blocked until PI accepts a positive handoff.",
+  "contract_version": "bj216-causal-p34-model-support-v1",
+  "disposition": "BLOCKED_ACCUMULATE_CAUSAL_SUPPORT",
+  "epoch_sensitivity": {
+    "non_controlling_rules_do_not_vote": true,
+    "readiness_votes": [
+      "MEDIAN_KICKOFF_MINUS_10H"
+    ],
+    "rules": [
+      "FIRST_KICKOFF_MINUS_10H",
+      "MEDIAN_KICKOFF_MINUS_10H",
+      "LAST_KICKOFF_MINUS_10H",
+      "FIRST_KICKOFF_MINUS_1H",
+      "MEDIAN_KICKOFF_MINUS_1H",
+      "LAST_KICKOFF_MINUS_1H"
+    ]
+  },
+  "model_ready_for_204": false,
+  "outcome_namespace": "PHYSICALLY_ABSENT",
+  "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+  "role_results": [
+    {
+      "candidate_matches": 2156,
+      "chronological_role": "development",
+      "core_complete_matches": 1695,
+      "core_match_coverage": 0.786178107606679,
+      "evaluated_issues": 24,
+      "n7_issue_pass_rate": 0.8333333333333334,
+      "n7_passing_issues": 20,
+      "required_core_match_coverage": 0.8,
+      "required_issues": 30,
+      "required_n7_issue_pass_rate": 0.8,
+      "role_gate_pass": false
+    },
+    {
+      "candidate_matches": 0,
+      "chronological_role": "chronological_evaluation",
+      "core_complete_matches": 0,
+      "core_match_coverage": 0.0,
+      "evaluated_issues": 0,
+      "n7_issue_pass_rate": 0.0,
+      "n7_passing_issues": 0,
+      "required_core_match_coverage": 0.8,
+      "required_issues": 5,
+      "required_n7_issue_pass_rate": 0.8,
+      "role_gate_pass": false
+    },
+    {
+      "candidate_matches": 0,
+      "chronological_role": "prospective_confirmation",
+      "core_complete_matches": 0,
+      "core_match_coverage": 0.0,
+      "evaluated_issues": 0,
+      "n7_issue_pass_rate": 0.0,
+      "n7_passing_issues": 0,
+      "required_core_match_coverage": 0.8,
+      "required_issues": 2,
+      "required_n7_issue_pass_rate": 0.8,
+      "role_gate_pass": false
+    }
+  ],
+  "source_boundary_commit": "23db9d207b2b1d98772f18ae0762a904cb64e9d2",
+  "source_boundary_preregistered_at_utc": "2026-08-07T11:59:52Z",
+  "support_gate": {
+    "gate_id": "BJ216_CAUSAL_P34_MODEL_SUPPORT_V1",
+    "minimum_chronological_evaluation_issues": 5,
+    "minimum_complete_matches_per_issue_epoch": 7,
+    "minimum_core_match_coverage": 0.8,
+    "minimum_development_issues": 30,
+    "minimum_n7_issue_pass_rate": 0.8,
+    "minimum_prospective_confirmation_issues": 2,
+    "minimum_total_issues": 37,
+    "representative_epoch_rule": "MEDIAN_KICKOFF_MINUS_10H",
+    "require_identity_observed_by_epoch": true,
+    "require_match_not_started_at_epoch": true,
+    "require_same_row_complete_bj_sp_and_euro": true,
+    "require_snapshot_observed_by_epoch": true,
+    "require_zero_outcome_namespace_reads": true
+  },
+  "ticket_operability_metadata": "NON_CONTROLLING_NOT_READ",
+  "violations": {
+    "duplicate_panel_rows": 0,
+    "outcome_namespace_reads": 0,
+    "post_epoch_market_observations": 0,
+    "started_matches_in_admitted_panel": 0
+  }
+}

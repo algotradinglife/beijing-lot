@@ -1,0 +1,8 @@
+fold,test_year,train_years,training_match_rows,training_outcome_rows,mapping_target_boundary,test_outcomes_read,market_rows_in_test_fold
+OOS_2019,2019,2018-2018,17400,52200,strictly calendar-year prior rows only; aggregate hit counts only,0,10134
+OOS_2020,2020,2018-2019,34947,104841,strictly calendar-year prior rows only; aggregate hit counts only,0,5221
+OOS_2021,2021,2018-2020,46711,140133,strictly calendar-year prior rows only; aggregate hit counts only,0,8581
+OOS_2022,2022,2018-2021,65331,195993,strictly calendar-year prior rows only; aggregate hit counts only,0,7520
+OOS_2023,2023,2018-2022,81952,245856,strictly calendar-year prior rows only; aggregate hit counts only,0,7046
+OOS_2024,2024,2018-2023,97596,292788,strictly calendar-year prior rows only; aggregate hit counts only,0,7117
+OOS_2025,2025,2018-2024,113652,340956,strictly calendar-year prior rows only; aggregate hit counts only,0,2200

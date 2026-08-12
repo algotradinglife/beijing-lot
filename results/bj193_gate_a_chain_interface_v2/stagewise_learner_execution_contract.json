@@ -1,0 +1,88 @@
+{
+  "action_choice": {
+    "availability": "only exact pre-event ACTIVE actions whose Stage1\u00d7Stage3 pair is COMPATIBLE; NO_BET remains selectable zero flow only when it is the explicit fallback; UNAVAILABLE and INCOMPATIBLE excluded",
+    "rule": "highest predicted utility strictly > strongest matched prior-only comparator; otherwise exact stage fallback",
+    "tie_order": [
+      "predicted utility desc",
+      "native stake asc",
+      "complexity rank asc",
+      "stage action identity lexical"
+    ]
+  },
+  "contract": "BJ193_STAGEWISE_LEARNER_EXECUTION_V3",
+  "family_implementation": {
+    "BINNED_REGIME_RULE": "per action, evaluate every numeric projection singly; train-only linear-interpolated quantile boundaries for requested bins; leaf prediction aggregate net/stake; require min_leaf; choose feature by training MSE then feature_ordinal",
+    "MONOTONE_REGULARIZED_SCORE": "per-action ridge least squares with intercept unpenalized and L2 grid value; projected POOL_VALUE coefficients constrained >=0, UNCERTAINTY_DIVERGENCE constrained <=0, other coefficients unconstrained; active-set coordinate order feature_ordinal; convergence tol 1e-12, max 10000",
+    "NEAREST_HISTORICAL_REGIME": "per-action Euclidean distance on transformed model columns; distance tie issue chronological ordinal; k from grid; UNIFORM or 1/max(distance,1e-12) weights; prediction weighted aggregate utility",
+    "PRIOR_ONLY_FIXED": "per-action constant = aggregate training net/stake with minimum support 20; blank/unsupported action excluded",
+    "SHALLOW_TREE": "per-action deterministic CART regression; squared error; best split over all numeric/encoded columns; thresholds are adjacent-value midpoints; split tie feature_ordinal then threshold; leaf aggregate net/stake; max_depth/min_leaf from grid"
+  },
+  "feature_projection": {
+    "column_order": "feature_ordinal ascending; each numeric feature followed immediately by its missing indicator; categorical levels lexical with __UNKNOWN__ last",
+    "fit_partition": "inner-train during selection; full outer-train only after selected family; never validation/test/full sample",
+    "projection_sha256_by_stage": {
+      "STAGE_1_SELECTION": "69245de8ce46d49585d93cba6b09f87c9e5033113c5cb10fa0fb28a4328a1ff3",
+      "STAGE_2_DIRECTION": "c32b14b45bb52a65dc50ab195fc90bc5104bf3a341f1fb15e23b5de4dc90fb45",
+      "STAGE_3_BET": "3b055fb88d3c07f29b805cd4d9446260eb23501a293eedce44016fb92cda4222"
+    },
+    "registry": "stage_feature_projection.csv"
+  },
+  "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+  "stage1_stage3_compatibility_gate": {
+    "class_registry": "stage3_compatibility_class_registry.csv",
+    "contract": "stage1_stage3_compatibility_contract.json",
+    "coverage_registry": "stage1_stage3_coverage_registry.csv.gz",
+    "incompatible": "excluded with explicit zero flow; never substitute legacy role-vector weights, unit weights, ALLOW_ALL, partial match weights, or losing stake",
+    "screen_order": "join the exact Stage-1 interface action and Stage-3 compatibility class; retain only compatibility_status==COMPATIBLE before any Stage-3 outcome screen, model fit, validation, or action choice"
+  },
+  "stage_screen": {
+    "STAGE_1_SELECTION": {
+      "keep": 16,
+      "mandatory": "accepted static selector fallback"
+    },
+    "STAGE_2_DIRECTION": {
+      "keep": 64,
+      "mandatory": "ALLOW_ALL on exact Stage-1 support"
+    },
+    "STAGE_3_BET": {
+      "keep": 64,
+      "mandatory": "ENUMERATE_UPSTREAM_SUPPORT fallback and accepted FULL when definitionally supported"
+    },
+    "order": [
+      "score desc",
+      "active support desc",
+      "native stake asc",
+      "stage action identity lexical"
+    ],
+    "score": "aggregate training pre-tax net / aggregate training stake; minimum active support 20",
+    "streaming": "complete pass, exact fixed-size heap using the full order tuple; chunk invariant for 1/17/256/4096; no sampling/adaptive early stop"
+  },
+  "targets": {
+    "STAGE_1_SELECTION": "utility of selector with ALLOW_ALL and FULL downstream controls",
+    "STAGE_2_DIRECTION": "incremental utility vs ALLOW_ALL on identical honest Stage-1 path with enumerate-support downstream control",
+    "STAGE_3_BET": "incremental utility vs enumerate-support on identical honest Stage-1/2 path after nuisance-seed averaging"
+  },
+  "topology": {
+    "kind": "THREE_SEPARATE_STAGE_MODELS_EXECUTED_IN_ORDER",
+    "model_scope": "one action-specific utility model per retained stage action for every non-prior model family; no joint-action model and no shared multiaction estimator",
+    "outer_test": "all three families/transforms/screens/models frozen before first issue of held-out year; no within-year outcome update",
+    "stage_order": [
+      "STAGE_1_SELECTION",
+      "STAGE_2_DIRECTION",
+      "STAGE_3_BET"
+    ],
+    "upstream_training": "Stage-2/3 use honest expanding out-of-fold frozen upstream outputs; full upstream rows/digests are audit-bound and only projection fields marked model_input enter estimators"
+  },
+  "validation": {
+    "primary": "complete-chain sum selected pre-tax net / sum selected stake; blank when stake zero",
+    "random_state": 193001,
+    "randomized_subsampling": false,
+    "tie_order": [
+      "ROI desc",
+      "max issue drawdown yuan asc",
+      "native stake asc",
+      "complexity rank asc",
+      "model_id lexical"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "complete_match_registry_row_count": 47819,
+  "contract": "BJ193_NATIVE_137_COMPLETE_MATCH_RECONCILIATION_V1",
+  "matched_role_row_count": 501928,
+  "mismatched_role_row_count": 0,
+  "missing_role_row_count": 0,
+  "outcome_boundary": "Gate A outcome-unexposed: target result, final/winning SP, payout, tax realization, ROI, settlement, and any post-cutoff evidence are forbidden from X_i, every stage output, fitting inputs, screens, and tie-breaks",
+  "reconciliation_stream_sha256": "1e0431284bc03906752184859ae8e62acae91fe6207f2d3ba63291af2b6ae65f",
+  "role_row_count": 501928,
+  "source_match_vector_sha256": "d80eaedc0062eea6929c00fbfb08eef9a02445edc1f533a394a35c238ccf2b56",
+  "source_role_vector_sha256": "1a6ac41e5e34c400c5c2a62f9799e2f76d56f4aaa3d13b67b88505443788cdaa"
+}
