@@ -1456,6 +1456,13 @@
         {
           "domain": null,
           "dtype": "str",
+          "name": "candidate_controller",
+          "nullable": false,
+          "unit": null
+        },
+        {
+          "domain": null,
+          "dtype": "str",
           "name": "comparator_controller",
           "nullable": false,
           "unit": null
@@ -1490,6 +1497,8 @@
         "split",
         "policy",
         "k",
+        "candidate_controller",
+        "comparator_controller",
         "controller",
         "issue",
         "rank"

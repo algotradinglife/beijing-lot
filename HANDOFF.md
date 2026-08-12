@@ -1,25 +1,25 @@
 # HANDOFF — Issue #207
 
-[SESSION] 20260812_111138_94d772
+[SESSION] 20260812_170059_68d3d4
 
 Current branch: `analyst/bj207-active-n7-bankroll-r3` (push target: `analyst/bj207-issue`)
 
 Current HEAD: resolve locally with `git rev-parse HEAD`.
 
-## Completed
+## Completed — EV round 3
 
-- Reworked `src/bankroll_policy/fixed_n7.py` to the EV round-2 contract.
-- Froze the learned SIMPLE/NEURAL choice strictly on `CV_2022`.
-- Restricted learned terminal evidence strictly to the frozen `CV_2023` choice only.
-- Added decisive matched comparator summary, issue ledger, and ticket/tax-lot replay artifacts.
-- Added ticket-identity stake HHI, anchored rolling 5/10/20 windows, and completed-recovery versus terminal-open-underwater accounting.
-- Added full schema/provenance/handoff/report semantic verification.
-- Added `BaseException` / `KeyboardInterrupt` stage cleanup and stale-stage recovery.
-- Added stricter rejection for non-finite or negative bankroll, budget, and matched schedules, plus empty/overfunded schedules.
-- Expanded tamper coverage for payout, self-consistent ledger, source trace, future/label leakage, attribution/schema/provenance/decision, and learned-choice leakage.
-- Regenerated `results/issue-207/` and re-executed the notebook.
+- Reworked `src/bankroll_policy/fixed_n7.py` against the independent REJECT at `a8b0443b1cef0d56993706faa7360184e2beddc4`.
+- Made matched reference replay accept an explicit split. SIMPLE/NEURAL selection now uses CV_2022 candidate schedules and CV_2022 comparator outcomes only; CV_2023 remains terminal-only.
+- Materialized decisive matched comparator summary, issue ledger and ticket/tax-lot replay artifacts.
+- Corrected rolling 5/10/20 maximum drawdown to use each window's starting capital and window-local running peak.
+- Added `candidate_controller` to matched ticket/tax-lot identities and schema primary keys. Schema generation fails on every declared non-unique primary key.
+- Replaced cyclic notebook byte binding with a canonical cell-type/source contract digest. Clean execution may update outputs/executor metadata while provenance and package verification remain valid.
+- Added recoverable post-rename parent-directory-fsync failure semantics: a failed publication receipt removes the target and permits retry.
+- Preserved corrected ticket-identity HHI and completed-recovery versus terminal-open-underwater accounting.
+- Preserved complete schema/provenance/handoff/report semantic verification, invalid-state guards, BaseException cleanup and mandatory tamper attacks.
+- Regenerated `results/issue-207/` and clean-executed the notebook.
 
-## Actual terminal outcome
+## Terminal outcome
 
 - `ENGINE_VALID=true`
 - `ACTIVE_OVERLAY_EVIDENCE=false`
@@ -27,18 +27,19 @@ Current HEAD: resolve locally with `git rev-parse HEAD`.
 - `frozen_learned_controller_choice=BOUNDED_NEURAL`
 - `negative_freeze=NATIVE_2_YUAN`
 
-The prior positive `MARKET_WOR/SIMPLE_LOGISTIC` matched lift remains present as a non-evidentiary sensitivity row, but it no longer counts because the round-2 contract freezes the learned choice on `CV_2022` and only the frozen learned choice may establish terminal evidence on `CV_2023`.
+The prior positive `MARKET_WOR/SIMPLE_LOGISTIC` matched lift is sensitivity-only and non-evidentiary. Cash/NO_BET remain `LOWER_EXPOSURE_ONLY`.
 
-The regenerated verified package manifest is:
+The verified package manifest is:
 
-`2610071c0c3ec3395ed521f8180c86b2b7fdbf78acff1f4e0ae412e0479f6835`
+`661a3a8f57cf7a78d374fa6a8a399c397a27780adc5620a38a9dcebaeaef1ccd`
 
-Key artifact counts:
+Artifact counts:
 
 - active request rows: 68,880
 - capital ledger rows: 13,560
 - matched comparator issue rows: 2,475
 - matched ticket/tax-lot rows: 92,400
+- matched tax-lot declared-PK duplicate rows: 0
 
 ## Key evidence
 
@@ -46,47 +47,39 @@ Key artifact counts:
 - `results/issue-207/matched_comparisons.csv`
 - `results/issue-207/matched_comparator_issue_ledger.parquet`
 - `results/issue-207/matched_ticket_tax_lot_ledger.parquet`
+- `results/issue-207/rolling_window_metrics.csv`
 - `results/issue-207/schema.json`
 - `results/issue-207/provenance.json`
 - `results/issue-207/decision.json`
 - `results/issue-207/DECISION_REPORT.md`
+- `notebooks/research/issue-207/bj207_fixed_n7_bankroll.ipynb` (6/6 code cells, no errors)
 
-Notebook state:
+## Verification receipts
 
-- `notebooks/research/issue-207/bj207_fixed_n7_bankroll.ipynb`
-- executed code cells: 6 / 6
-- error outputs: none
-
-## Verification
-
-Verified successfully during this session against the final canonical package:
-
-- `PYTHONPATH=src .venv/bin/python scripts/run_bj207_bankroll.py verify --output results/issue-207`
-- PASS: 22 payloads; 68,880 active requests; 13,560 capital rows; 2,475 matched issue rows; 92,400 matched ticket rows; manifest `2610071c0c3ec3395ed521f8180c86b2b7fdbf78acff1f4e0ae412e0479f6835`.
-
-Focused local test receipt:
-
-- `PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_bj207_bankroll.py`
-- `21 passed in 770.06s (0:12:50)`
-
-- `PYTHONPATH=src .venv/bin/python scripts/execute_bj207_notebook.py --kernel python3`
-- `PASS cells=6 executed=6 kernel=python3`
+- Package semantic/hash verifier PASS before and after notebook clean execution; manifest `661a3a8f57cf7a78d374fa6a8a399c397a27780adc5620a38a9dcebaeaef1ccd`.
+- Focused #207: `27 passed in 788.62s (0:13:08)`.
+- #206 + #207 regression: `65 passed in 930.53s (0:15:30)`.
+- Notebook: `PASS cells=6 executed=6 kernel=python3`; package verifier still PASS afterward without restoring notebook bytes.
+- Independent new-directory replay: verifier PASS; 22/22 payload hashes byte-identical.
+- Ruff, compileall and `git diff --check`: PASS.
+- Mandatory tamper coverage: settlement/payout; internally self-consistent ledger; rewritten manifest; source trace/label/future; schema/attribution/provenance/decision/model-choice; KeyboardInterrupt and post-rename fsync failure.
 
 ## Constraints preserved
 
-- Issue #207 was claimed from Ready to In Progress; no owner/Project membership changed.
-- #208 remains blocked.
-- No project files outside this worktree were modified.
+- No owner or Project membership changes.
+- #208 remains blocked and receives schema/evidence only.
+- No merge or issue closure performed.
 
 ## Next state
 
-Next state should be `EV Review`.
+Next state must be `EV Review`.
 
-Review focus:
+Independent EV should:
 
-- confirm the strict `CV_2022` learned-choice freeze and `CV_2023` terminal-evidence rule
-- verify that `SIMPLE_LOGISTIC` positive rows are now sensitivity-only and not evidentiary
-- recompute the matched issue and ticket/tax-lot ledgers
-- confirm the anchored rolling and recovery metrics
-- verify schema/provenance/handoff/decision/report semantic replay
-- confirm that #208 remains blocked and receives schema/evidence only
+- recompute the split-local CV_2022 learned-choice freeze and ensure CV_2023 never enters model choice;
+- recompute true local-window drawdown, ticket-identity HHI and completed/open recovery semantics;
+- validate declared PK uniqueness and matched tax-lot identity;
+- execute the notebook and re-run package verification without restoring notebook bytes;
+- inject post-rename parent fsync failure and confirm the target remains absent/retryable;
+- rerun all four mandatory tamper classes and immutable replay;
+- confirm #208 remains blocked and receives no activation authority.

@@ -97,6 +97,25 @@ def _canonical_hash(value: Any) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _notebook_contract_digest(path: Path) -> str:
+    """Hash stable notebook inputs, excluding execution outputs and metadata.
+
+    The notebook verifies the package and therefore displays its manifest.  A
+    byte hash would create a notebook -> manifest -> provenance -> notebook
+    cycle.  Cell source and type are the executable contract; outputs and
+    executor-mutated metadata are independently reproducible receipts.
+    """
+    notebook = json.loads(path.read_text(encoding="utf-8"))
+    cells = [
+        {
+            "cell_type": cell["cell_type"],
+            "source": cell.get("source", []),
+        }
+        for cell in notebook["cells"]
+    ]
+    return _canonical_hash({"nbformat": notebook["nbformat"], "cells": cells})
+
+
 def _json(path: Path, value: Any) -> None:
     with path.open("w", encoding="utf-8", newline="\n") as stream:
         json.dump(value, stream, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False)
@@ -146,6 +165,20 @@ def _prepare_output_stage(output: Path) -> Path:
 def _remove_stage(stage: Path) -> None:
     if stage.exists():
         shutil.rmtree(stage, ignore_errors=True)
+
+
+def _publish_stage(stage: Path, output: Path) -> None:
+    """Atomically publish a staged package or leave the target retryable."""
+    stage.replace(output)
+    try:
+        _fsync_dir(output.parent)
+    except BaseException:
+        shutil.rmtree(output, ignore_errors=True)
+        try:
+            _fsync_dir(output.parent)
+        except BaseException:
+            pass
+        raise
 
 
 def _validate_nonnegative_finite(name: str, value: float) -> float:
@@ -376,7 +409,8 @@ def _weights(bundle: pd.DataFrame, method: str, controllers: dict[str, Any]) -> 
 def _project_counts(weights: np.ndarray, budget_yuan: float) -> tuple[np.ndarray, float]:
     if not np.isfinite(weights).all() or (weights < 0).any() or not np.isclose(weights.sum(), 1.0):
         raise Stage4Error("invalid simplex weights")
-    units = int(np.floor(max(0.0, budget_yuan) / TICKET_STAKE))
+    budget_yuan = _validate_nonnegative_finite("budget_yuan", budget_yuan)
+    units = int(np.floor(budget_yuan / TICKET_STAKE))
     raw = weights * units
     counts = np.floor(raw).astype(int)
     remainder = units - int(counts.sum())
@@ -686,6 +720,19 @@ def _rolling_window_rows(path: pd.DataFrame, keys: dict[str, Any]) -> list[dict[
             start_capital = float(capital.loc[start, "post_issue_bankroll_yuan"])
             end_capital = float(capital.loc[end, "post_issue_bankroll_yuan"])
             window_slice = ordered.iloc[start:end]
+            # Compute holding-period drawdown locally. Seed the window peak with
+            # capital immediately before its first issue; full-path running
+            # peaks must not contaminate this metric.
+            local_capital = np.concatenate(
+                ([start_capital], window_slice.post_issue_bankroll_yuan.to_numpy(dtype=float))
+            )
+            local_peak = np.maximum.accumulate(local_capital)
+            local_drawdown = np.divide(
+                local_peak - local_capital,
+                local_peak,
+                out=np.zeros_like(local_capital),
+                where=local_peak > 0,
+            )
             rows.append(
                 {
                     **keys,
@@ -698,7 +745,7 @@ def _rolling_window_rows(path: pd.DataFrame, keys: dict[str, Any]) -> list[dict[
                     "window_return": (end_capital / start_capital - 1.0) if start_capital > 0 else np.nan,
                     "window_pnl_yuan": end_capital - start_capital,
                     "window_loss": bool(end_capital < start_capital),
-                    "window_max_drawdown_pct": float(window_slice.drawdown_pct.max()) if not window_slice.empty else 0.0,
+                    "window_max_drawdown_pct": float(local_drawdown.max()),
                     "active_issues_in_window": int(window_slice.active.sum()) if not window_slice.empty else 0,
                     "time_zero_anchor": start == 0,
                 }
@@ -770,9 +817,10 @@ def _matched_reference(
     requests: pd.DataFrame,
     controllers: dict[str, Any],
     calibrated: dict[str, float],
+    split: str,
 ) -> tuple[pd.Series | None, pd.DataFrame | None]:
     candidate_path = ledger.loc[
-        ledger.split.eq("CV_2023")
+        ledger.split.eq(split)
         & ledger.policy.eq(candidate.policy)
         & ledger.k.eq(candidate.k)
         & ledger.controller.eq(candidate.controller)
@@ -787,7 +835,7 @@ def _matched_reference(
     try:
         reference = replay_path(
             requests,
-            split="CV_2023",
+            split=split,
             policy=reference_policy,
             k=int(candidate.k),
             method=reference_controller,
@@ -867,6 +915,7 @@ def _freeze_learned_controller_choice(
             requests=requests,
             controllers=controllers,
             calibrated=calibrated,
+            split="CV_2022",
         )
         rows.append(
             {
@@ -927,6 +976,7 @@ def _matched_comparisons(
             requests=requests,
             controllers=controllers,
             calibrated=calibrated,
+            split="CV_2023",
         )
         terminal_evidentiary = row.controller not in LEARNED_METHODS or row.controller == frozen_learned_choice
         rows.append(_comparison_row(row, reference, role="EQUAL_FUNDING_CONTROL", reference_label=comparator, attribution="STAGE4_WITHIN_ISSUE_ALLOCATION", frozen_choice=frozen_learned_choice, terminal_evidentiary=terminal_evidentiary))
@@ -974,6 +1024,7 @@ def _matched_comparisons(
             ticket_rows.extend(
                 candidate_tickets.assign(
                     comparison_role="EQUAL_FUNDING_CONTROL",
+                    candidate_controller=row.controller,
                     comparator_controller=comparator,
                     side="CANDIDATE",
                     terminal_evidentiary=terminal_evidentiary,
@@ -983,6 +1034,7 @@ def _matched_comparisons(
             ticket_rows.extend(
                 comparator_tickets.assign(
                     comparison_role="EQUAL_FUNDING_CONTROL",
+                    candidate_controller=row.controller,
                     comparator_controller=comparator,
                     side="COMPARATOR",
                     terminal_evidentiary=terminal_evidentiary,
@@ -1002,6 +1054,7 @@ def _matched_comparisons(
             requests=requests,
             controllers=controllers,
             calibrated=calibrated,
+            split="CV_2023",
         )
         rows.append(_comparison_row(row, reference, role="MARKET_WR_K8_REFERENCE", reference_label=f"MARKET_WR/{row.controller}", attribution="STAGE3_TICKET_POLICY_EFFECT_WITH_STAGE4_HELD", frozen_choice=frozen_learned_choice, terminal_evidentiary=(row.controller not in LEARNED_METHODS or row.controller == frozen_learned_choice)))
     # The score-weighted active component is reported even when the learned
@@ -1019,6 +1072,7 @@ def _matched_comparisons(
             requests=requests,
             controllers=controllers,
             calibrated=calibrated,
+            split="CV_2023",
         )
         rows.append(_comparison_row(row, reference, role="STRONGEST_ACTIVE_COMPONENT_SCORE_WEIGHTED", reference_label="SCORE_WEIGHTED_5PCT", attribution="STAGE4_CONTROLLER_VS_SCORE_WEIGHTED", frozen_choice=frozen_learned_choice, terminal_evidentiary=(row.controller == frozen_learned_choice)))
     return pd.DataFrame(rows), pd.DataFrame(issue_rows), pd.DataFrame(ticket_rows)
@@ -1119,6 +1173,11 @@ def _schema_catalog(
     freeze_choice: pd.DataFrame,
 ) -> dict[str, Any]:
     def table(df: pd.DataFrame, *, name: str, pk: list[str], fk: list[dict[str, Any]] | None = None, relationships: list[str] | None = None, units: dict[str, str] | None = None, domains: dict[str, list[Any] | str] | None = None) -> dict[str, Any]:
+        missing = sorted(set(pk) - set(df.columns))
+        if missing:
+            raise Stage4Error(f"schema primary key columns missing for {name}: {missing}")
+        if df.duplicated(pk, keep=False).any():
+            raise Stage4Error(f"schema primary key is not unique for {name}")
         columns = []
         for column in df.columns:
             columns.append(
@@ -1179,7 +1238,7 @@ def _schema_catalog(
             table(rolling, name="rolling_window_metrics.csv", pk=["split", "policy", "k", "controller", "window_issues", "observation_index"], relationships=["anchored rolling windows derived from issue_capital_ledger"], units=common_units),
             table(matched, name="matched_comparisons.csv", pk=["comparison_role", "split", "policy", "k", "candidate_controller", "comparator_controller"], relationships=["decisive matched comparator summary"], units=common_units),
             table(matched_issue, name="matched_comparator_issue_ledger.parquet", pk=["comparison_role", "split", "policy", "k", "candidate_controller", "comparator_controller", "issue"], relationships=["issue-by-issue replay for matched comparisons"], units=common_units),
-            table(matched_ticket, name="matched_ticket_tax_lot_ledger.parquet", pk=["comparison_role", "side", "split", "policy", "k", "controller", "issue", "rank"], relationships=["ticket/tax-lot replay for matched comparisons"], units=common_units),
+            table(matched_ticket, name="matched_ticket_tax_lot_ledger.parquet", pk=["comparison_role", "side", "split", "policy", "k", "candidate_controller", "comparator_controller", "controller", "issue", "rank"], relationships=["ticket/tax-lot replay for matched comparisons"], units=common_units),
             table(attribution, name="attribution.csv", pk=["comparison_role", "split", "policy", "k", "candidate_controller", "comparator_controller"], relationships=["human-readable attribution ledger"], units=common_units),
             table(calibration, name="controller_calibration.csv", pk=["controller", "risk_fraction"], relationships=["CV_2022 risk-freeze surface"], units=common_units),
             table(freeze_choice, name="frozen_learned_controller_choice.csv", pk=["split", "policy", "k", "controller"], relationships=["CV_2022-only learned controller freeze"], units=common_units),
@@ -1415,7 +1474,8 @@ def run(inputs: Inputs) -> dict[str, Any]:
                 "source_verify_receipt": source_receipt,
                 "implementation_sha256": _digest(Path(__file__).resolve()),
                 "runner_sha256": _digest(RUNNER),
-                "notebook_sha256": _digest(NOTEBOOK),
+                "notebook_contract_sha256": _notebook_contract_digest(NOTEBOOK),
+                "notebook_binding": "canonical cell type/source; execution outputs and executor metadata excluded to prevent manifest self-reference",
                 "requirements_sha256": _digest(SCIENTIFIC_LOCK),
                 "environment": _environment(),
                 "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj207_bankroll.py run --output <new-directory>",
@@ -1441,8 +1501,7 @@ def run(inputs: Inputs) -> dict[str, Any]:
         }
         _json(stage / "SHA256SUMS.json", payloads)
         _fsync_tree(stage)
-        stage.replace(output)
-        _fsync_dir(output.parent)
+        _publish_stage(stage, output)
         return {
             "output": str(output),
             "files": len(payloads),
@@ -1477,7 +1536,7 @@ def verify(output: Path) -> dict[str, Any]:
         raise Stage4Error("Stage-4 implementation binding mismatch")
     if _digest(RUNNER) != provenance["runner_sha256"]:
         raise Stage4Error("Stage-4 runner binding mismatch")
-    if _digest(NOTEBOOK) != provenance["notebook_sha256"]:
+    if _notebook_contract_digest(NOTEBOOK) != provenance["notebook_contract_sha256"]:
         raise Stage4Error("Stage-4 notebook binding mismatch")
     verify_stage3(source)
     candidates = pd.read_parquet(source / "candidate_ledger.parquet")
@@ -1680,7 +1739,8 @@ def verify(output: Path) -> dict[str, Any]:
             "source_verify_receipt": verify_stage3(source),
             "implementation_sha256": _digest(Path(__file__).resolve()),
             "runner_sha256": _digest(RUNNER),
-            "notebook_sha256": _digest(NOTEBOOK),
+            "notebook_contract_sha256": _notebook_contract_digest(NOTEBOOK),
+            "notebook_binding": "canonical cell type/source; execution outputs and executor metadata excluded to prevent manifest self-reference",
             "requirements_sha256": _digest(SCIENTIFIC_LOCK),
             "environment": _environment(),
             "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj207_bankroll.py run --output <new-directory>",

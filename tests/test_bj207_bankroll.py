@@ -17,7 +17,10 @@ from bankroll_policy.fixed_n7 import (
     Stage4Error,
     _decision,
     _digest,
+    _notebook_contract_digest,
+    _publish_stage,
     _project_counts,
+    _rolling_window_rows,
     _validate_candidates,
     reconstruct_active_requests,
     replay_path,
@@ -50,6 +53,12 @@ def test_integer_projection_conserves_budget_with_sub_yen2_residual() -> None:
 def test_projection_rejects_invalid_simplex() -> None:
     with pytest.raises(Stage4Error, match="simplex"):
         _project_counts(np.asarray([0.7, -0.1, 0.4]), 100.0)
+
+
+@pytest.mark.parametrize("budget", [-1.0, np.nan, np.inf])
+def test_projection_rejects_invalid_budget(budget: float) -> None:
+    with pytest.raises(Stage4Error, match="budget_yuan"):
+        _project_counts(np.asarray([0.6, 0.3, 0.1]), budget)
 
 
 def test_committed_active_panel_is_nonempty_exact_and_source_bound() -> None:
@@ -132,6 +141,87 @@ def test_identified_comparisons_have_exact_common_executable_schedule() -> None:
     assert not issue.empty
     assert not ticket.empty
     assert ticket.tax_lot_count.eq(ticket.repeat_count).all()
+    schema = json.loads((ROOT / "results/issue-207/schema.json").read_text())
+    catalog = {table["name"]: table for table in schema["tables"]}
+    primary_key = catalog["matched_ticket_tax_lot_ledger.parquet"]["primary_key"]
+    assert "candidate_controller" in primary_key
+    assert not ticket.duplicated(primary_key, keep=False).any()
+
+
+def test_rolling_window_drawdown_is_local_to_window_peak() -> None:
+    # The full-path historical peak is 200 before this window.  The local
+    # window starts at 100, rises to 120, then falls to 90: local MDD is 25%,
+    # not the 55% full-path drawdown encoded in the input column.
+    path = pd.DataFrame(
+        {
+            "year": [2023, 2023],
+            "issue": ["1", "2"],
+            "post_issue_bankroll_yuan": [120_000.0, 90_000.0],
+            "drawdown_pct": [0.40, 0.55],
+            "active": [True, True],
+        }
+    )
+    # Use a direct two-issue variant by extending to the minimum supported five.
+    path = pd.concat(
+        [
+            path,
+            pd.DataFrame(
+                {
+                    "year": [2023, 2023, 2023],
+                    "issue": ["3", "4", "5"],
+                    "post_issue_bankroll_yuan": [90_000.0, 90_000.0, 90_000.0],
+                    "drawdown_pct": [0.55, 0.55, 0.55],
+                    "active": [True, True, True],
+                }
+            ),
+        ],
+        ignore_index=True,
+    )
+    rows = _rolling_window_rows(path, {})
+    first = next(row for row in rows if row["window_issues"] == 5)
+    assert first["time_zero_anchor"] is True
+    assert first["window_max_drawdown_pct"] == pytest.approx(0.25, abs=1e-12)
+
+
+def test_notebook_contract_digest_ignores_outputs_but_binds_source(tmp_path: Path) -> None:
+    original = json.loads((ROOT / "notebooks/research/issue-207/bj207_fixed_n7_bankroll.ipynb").read_text())
+    path = tmp_path / "notebook.ipynb"
+    path.write_text(json.dumps(original), encoding="utf-8")
+    baseline = _notebook_contract_digest(path)
+    original["cells"][1]["execution_count"] = 999
+    original["cells"][1]["outputs"] = [{"output_type": "stream", "name": "stdout", "text": ["changed"]}]
+    path.write_text(json.dumps(original), encoding="utf-8")
+    assert _notebook_contract_digest(path) == baseline
+    original["cells"][1]["source"].append("\n# source mutation")
+    path.write_text(json.dumps(original), encoding="utf-8")
+    assert _notebook_contract_digest(path) != baseline
+
+
+def test_post_rename_parent_fsync_failure_removes_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import bankroll_policy.fixed_n7 as mod
+
+    stage = tmp_path / ".result.stage"
+    output = tmp_path / "result"
+    stage.mkdir()
+    (stage / "payload").write_text("durable", encoding="utf-8")
+    real_fsync = mod._fsync_dir
+    calls = 0
+
+    def fail_once(path: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("INJECT_POST_RENAME_PARENT_FSYNC")
+        real_fsync(path)
+
+    monkeypatch.setattr(mod, "_fsync_dir", fail_once)
+    with pytest.raises(OSError, match="INJECT_POST_RENAME_PARENT_FSYNC"):
+        _publish_stage(stage, output)
+    assert not output.exists()
+    retry_stage = tmp_path / ".result.stage"
+    retry_stage.mkdir()
+    _publish_stage(retry_stage, output)
+    assert output.exists()
 
 
 def test_decision_ignores_unmatched_and_lower_exposure_rows() -> None:

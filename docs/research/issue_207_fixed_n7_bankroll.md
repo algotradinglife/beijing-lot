@@ -23,7 +23,7 @@ The emitted `frozen_learned_controller_choice.csv` shows the CV_2022 freeze surf
 
 The regenerated immutable package is `results/issue-207/` with manifest SHA256:
 
-`2610071c0c3ec3395ed521f8180c86b2b7fdbf78acff1f4e0ae412e0479f6835`
+`661a3a8f57cf7a78d374fa6a8a399c397a27780adc5620a38a9dcebaeaef1ccd`
 
 Key counts:
 
@@ -93,7 +93,9 @@ Focused replay work completed in this worktree:
 - Verified regenerated package under the new semantic verifier
 - Notebook is executed cleanly: 6 of 6 code cells have execution counts and no error outputs
 
-Focused test receipt captured during this session: `21 passed in 770.06s (0:12:50)`. The final canonical package verifier passed with 22 payloads and manifest `2610071c0c3ec3395ed521f8180c86b2b7fdbf78acff1f4e0ae412e0479f6835`.
+EV round-3 receipts: focused #207 `27 passed in 788.62s`; #206+#207 regression `65 passed in 930.53s`; notebook 6/6 clean-run followed by package verifier PASS without restoring notebook bytes; independent new-directory replay produced 22/22 byte-identical payload hashes. The final canonical package verifier passed with 22 payloads and manifest `661a3a8f57cf7a78d374fa6a8a399c397a27780adc5620a38a9dcebaeaef1ccd`.
+
+Round 3 also closes the split-local chronology, local rolling-window drawdown, matched tax-lot primary-key, notebook self-reference and post-rename fsync recovery defects found at audited SHA `a8b0443b1cef0d56993706faa7360184e2beddc4`.
 
 ```bash
 PYTHONPATH=src .venv/bin/python -m pytest -q tests/test_bj207_bankroll.py
