@@ -29,6 +29,7 @@ Current HEAD: resolve with `git rev-parse HEAD` after commit.
 - Manifest SHA-256: `f0382738d77d41c18b61b0ef4915a1a20ebb547f7da6e9c676a5d47a889d39cd`.
 - Artifact counts: 68,880 active requests; 13,560 capital rows; 4,785 matched issue rows; 129,360 matched ticket/tax-lot rows.
 - Focused suite: `29 passed in 824.28s (0:13:44)`.
+- #206 + #207 regression: `67 passed in 932.93s (0:15:32)`.
 - Notebook: `PASS cells=6 executed=6 kernel=python3`; package verifier PASS afterward.
 - Independent replay: verifier PASS; `BYTE_IDENTICAL True PAYLOADS 22`.
 - Independent defect probes: 87/87 identified groups materialized in both primitive ledgers; HHI mismatches 0/13,560; schema null units 0.
