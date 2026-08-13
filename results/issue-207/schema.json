@@ -1,0 +1,1895 @@
+{
+  "forbidden": [
+    "change_n",
+    "change_ticket_identity",
+    "change_policy_or_k",
+    "read_locked_test_labels",
+    "terminal_model_choice_from_cv2023"
+  ],
+  "primary_economics": "PRE_TAX",
+  "reference_economics": "TAX_ADJUSTED_0.65_REFERENCE_ONLY",
+  "tables": [
+    {
+      "columns": [
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "issue",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "year",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "policy",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "k",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "rank",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "ticket_identity",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "match_indices",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "outcomes",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "n",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "source_cells_json",
+          "nullable": false,
+          "unit": "json_document"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "candidate_source",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "requested_native_stake_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "repeat_count",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "control_joint_probability",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "predicted_sp_product",
+          "nullable": false,
+          "unit": "decimal_odds"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "mean_selected_sp_seed_std",
+          "nullable": false,
+          "unit": "decimal_odds"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "max_selected_sp_seed_std",
+          "nullable": false,
+          "unit": "decimal_odds"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "expected_pre_tax_net",
+          "nullable": false,
+          "unit": "dimensionless_expected_net_return"
+        },
+        {
+          "domain": "(-inf, 0]; natural log of control_joint_probability, never a probability fraction",
+          "dtype": "float64",
+          "name": "log_joint_probability",
+          "nullable": false,
+          "unit": "natural_log_dimensionless_probability"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "log_sp_product",
+          "nullable": false,
+          "unit": "natural_log_decimal_odds_product"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "mean_selected_probability",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "min_selected_probability",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "mean_selected_sp",
+          "nullable": false,
+          "unit": "decimal_odds"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "outcome_hhi",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "match_rank_mean",
+          "nullable": false,
+          "unit": "rank"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "labels_available",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "realized_hit",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "realized_gross",
+          "nullable": true,
+          "unit": "gross_return_multiple"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "tax_adjusted_gross_multiple",
+          "nullable": true,
+          "unit": "gross_return_multiple"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "pre_tax_gross_multiple",
+          "nullable": true,
+          "unit": "gross_return_multiple"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "source_package",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "source_package_version",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "research_only",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "promoted",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "capital_authority",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": [
+            "CONTROLLING",
+            "SENSITIVITY_ONLY"
+          ],
+          "dtype": "str",
+          "name": "panel_role",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "labels_used_for_identity",
+          "nullable": false,
+          "unit": "boolean"
+        }
+      ],
+      "foreign_keys": [],
+      "name": "active_research_ticket_requests.parquet",
+      "primary_key": [
+        "split",
+        "issue",
+        "policy",
+        "k",
+        "rank"
+      ],
+      "relationships": [
+        "one source ticket row per frozen #206 request"
+      ]
+    },
+    {
+      "columns": [
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "issue",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "year",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "reference",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": [
+            "SAFE_FALLBACK_MIXED",
+            "CASH"
+          ],
+          "dtype": "str",
+          "name": "experiment_role",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "requested_stake_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "funded_stake_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "retained_cash_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "reason_code",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "attribution",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "research_only",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "promoted",
+          "nullable": false,
+          "unit": "boolean"
+        }
+      ],
+      "foreign_keys": [],
+      "name": "safe_reference_ledger.csv",
+      "primary_key": [
+        "split",
+        "issue",
+        "reference"
+      ],
+      "relationships": [
+        "separate lower-exposure lane; never active evidence"
+      ]
+    },
+    {
+      "columns": [
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "year",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "issue",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "policy",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "k",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "panel_role",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "controller_family",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "experiment_role",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "risk_fraction",
+          "nullable": true,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "pre_issue_bankroll_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "requested_stake_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "funded_stake_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "projection_residual_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "retained_cash_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "gross_payout_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "tax_adjusted_reference_payout_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "net_pnl_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "post_issue_bankroll_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "running_peak_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "drawdown_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "drawdown_pct",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "active",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "unfunded_reason",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "minimum_fundable_capital_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "ticket_count",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": "[0,1]; issue repeats aggregated by immutable ticket_identity before stake-share squaring",
+          "dtype": "float64",
+          "name": "ticket_hhi",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "mean_pairwise_match_overlap",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "decision_trace_json",
+          "nullable": false,
+          "unit": "json_document"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "reason_code",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "funding_schedule_source",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "capital_schedule_hash",
+          "nullable": false,
+          "unit": "sha256_identifier"
+        }
+      ],
+      "foreign_keys": [],
+      "name": "issue_capital_ledger.parquet",
+      "primary_key": [
+        "split",
+        "policy",
+        "k",
+        "controller",
+        "issue"
+      ],
+      "relationships": [
+        "one bankroll replay row per issue"
+      ]
+    },
+    {
+      "columns": [
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "policy",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "k",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "issues",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "active_issues",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "ending_capital_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "capital_growth_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "capital_growth_pct",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "turnover_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "active_support_roi",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "max_drawdown_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "max_drawdown_pct",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "max_consecutive_losing_issues",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "time_under_water_issues",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "completed_recovery_episodes",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "max_completed_recovery_issues",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "terminal_open_underwater_issues",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "ruin",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "near_ruin",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "minimum_capital_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "issue_stake_hhi",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": "[0,1]; arithmetic mean of identity-aggregated issue ticket_hhi",
+          "dtype": "float64",
+          "name": "mean_issue_ticket_hhi",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "ticket_identity_stake_hhi",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "mean_overlap",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "ex_largest_issue_ending_capital_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": [
+            "REMOVE_MAX_FUNDED_STAKE_YUAN_STABLE_ISSUE_ORDER_TIEBREAK"
+          ],
+          "dtype": "str",
+          "name": "ex_largest_issue_definition",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "capital_schedule_hash",
+          "nullable": false,
+          "unit": "sha256_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_5_loss_probability",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_5_worst_return",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_5_worst_start_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_5_worst_end_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_10_loss_probability",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_10_worst_return",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_10_worst_start_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_10_worst_end_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_20_loss_probability",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "rolling_20_worst_return",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_20_worst_start_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "rolling_20_worst_end_issue",
+          "nullable": false,
+          "unit": "issue_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "risk_fraction",
+          "nullable": true,
+          "unit": "fraction"
+        }
+      ],
+      "foreign_keys": [],
+      "name": "capital_summary.csv",
+      "primary_key": [
+        "split",
+        "policy",
+        "k",
+        "controller"
+      ],
+      "relationships": [
+        "path-level summary derived from issue_capital_ledger; ex-largest removes maximum funded-stake issue with stable issue-order tie-break"
+      ]
+    },
+    {
+      "columns": [
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "policy",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "k",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "window_issues",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "start_issue",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "end_issue",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "observation_index",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "start_bankroll_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "end_bankroll_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "window_return",
+          "nullable": true,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "window_pnl_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "window_loss",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": "[0,1]; window-start bankroll anchor and window-local running peak",
+          "dtype": "float64",
+          "name": "window_max_drawdown_pct",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "active_issues_in_window",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "time_zero_anchor",
+          "nullable": false,
+          "unit": "boolean"
+        }
+      ],
+      "foreign_keys": [],
+      "name": "rolling_window_metrics.csv",
+      "primary_key": [
+        "split",
+        "policy",
+        "k",
+        "controller",
+        "window_issues",
+        "observation_index"
+      ],
+      "relationships": [
+        "anchored rolling windows derived from issue_capital_ledger"
+      ]
+    },
+    {
+      "columns": [
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "comparison_role",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "policy",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "k",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "candidate_controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "comparator_controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "candidate_ending_capital_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "comparator_ending_capital_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "matched_lift_ending_capital_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "candidate_max_drawdown_pct",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "comparator_max_drawdown_pct",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "matched_lift_max_drawdown_pct",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "candidate_turnover_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "comparator_turnover_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "capital_schedule_hash",
+          "nullable": false,
+          "unit": "sha256_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "comparator_schedule_hash",
+          "nullable": false,
+          "unit": "sha256_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "equal_capital_schedule",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "identifiability",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "attribution",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "frozen_learned_controller_choice",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "terminal_evidentiary",
+          "nullable": false,
+          "unit": "boolean"
+        }
+      ],
+      "foreign_keys": [],
+      "name": "matched_comparisons.csv",
+      "primary_key": [
+        "comparison_role",
+        "split",
+        "policy",
+        "k",
+        "candidate_controller",
+        "comparator_controller"
+      ],
+      "relationships": [
+        "decisive matched comparator summary"
+      ]
+    },
+    {
+      "columns": [
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "comparison_role",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "policy",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "k",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "candidate_controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "comparator_controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "issue",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "candidate_funded_stake_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "comparator_funded_stake_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "candidate_gross_payout_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "comparator_gross_payout_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "candidate_post_issue_bankroll_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "comparator_post_issue_bankroll_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "candidate_ticket_count",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "comparator_ticket_count",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "candidate_schedule_hash",
+          "nullable": false,
+          "unit": "sha256_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "comparator_schedule_hash",
+          "nullable": false,
+          "unit": "sha256_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "matched_issue_bankroll_lift_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "matched_issue_payout_lift_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "terminal_evidentiary",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "frozen_learned_controller_choice",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        }
+      ],
+      "foreign_keys": [],
+      "name": "matched_comparator_issue_ledger.parquet",
+      "primary_key": [
+        "comparison_role",
+        "split",
+        "policy",
+        "k",
+        "candidate_controller",
+        "comparator_controller",
+        "issue"
+      ],
+      "relationships": [
+        "issue-by-issue replay for matched comparisons"
+      ]
+    },
+    {
+      "columns": [
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "policy",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "k",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "year",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "issue",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "controller_family",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "experiment_role",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "risk_fraction",
+          "nullable": true,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "pre_issue_bankroll_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "issue_funded_stake_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "capital_schedule_hash",
+          "nullable": false,
+          "unit": "sha256_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "rank",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "ticket_identity",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "weight",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "repeat_count",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "tax_lot_count",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "funded_stake_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "pre_tax_gross_multiple",
+          "nullable": false,
+          "unit": "gross_return_multiple"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "tax_adjusted_gross_multiple",
+          "nullable": false,
+          "unit": "gross_return_multiple"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "source_policy",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "comparison_role",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "candidate_controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "comparator_controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "side",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "terminal_evidentiary",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "frozen_learned_controller_choice",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        }
+      ],
+      "foreign_keys": [],
+      "name": "matched_ticket_tax_lot_ledger.parquet",
+      "primary_key": [
+        "comparison_role",
+        "side",
+        "split",
+        "policy",
+        "k",
+        "candidate_controller",
+        "comparator_controller",
+        "controller",
+        "issue",
+        "rank"
+      ],
+      "relationships": [
+        "ticket/tax-lot replay for matched comparisons"
+      ]
+    },
+    {
+      "columns": [
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "comparison_role",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "policy",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "k",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "candidate_controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "comparator_controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "equal_capital_schedule",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "identifiability",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "attribution",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "matched_lift_ending_capital_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "matched_lift_max_drawdown_pct",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "terminal_evidentiary",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "experiment_role",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        }
+      ],
+      "foreign_keys": [],
+      "name": "attribution.csv",
+      "primary_key": [
+        "comparison_role",
+        "split",
+        "policy",
+        "k",
+        "candidate_controller",
+        "comparator_controller"
+      ],
+      "relationships": [
+        "human-readable attribution ledger"
+      ]
+    },
+    {
+      "columns": [
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "risk_fraction",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "mean_ending_capital_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "worst_max_drawdown_pct",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "selection_split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "selected",
+          "nullable": false,
+          "unit": "boolean"
+        }
+      ],
+      "foreign_keys": [],
+      "name": "controller_calibration.csv",
+      "primary_key": [
+        "controller",
+        "risk_fraction"
+      ],
+      "relationships": [
+        "CV_2022 risk-freeze surface"
+      ]
+    },
+    {
+      "columns": [
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "policy",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "int64",
+          "name": "k",
+          "nullable": false,
+          "unit": "count"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "controller",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "risk_fraction",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "equal_funding_comparator",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "ending_capital_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "max_drawdown_pct",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "matched_lift_ending_capital_yuan",
+          "nullable": false,
+          "unit": "yuan"
+        },
+        {
+          "domain": null,
+          "dtype": "float64",
+          "name": "matched_lift_max_drawdown_pct",
+          "nullable": false,
+          "unit": "fraction"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "identifiability",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "bool",
+          "name": "selected_terminal_controller",
+          "nullable": false,
+          "unit": "boolean"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "selection_split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "terminal_evaluation_split",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        },
+        {
+          "domain": null,
+          "dtype": "str",
+          "name": "choice_rule",
+          "nullable": false,
+          "unit": "categorical_or_identifier"
+        }
+      ],
+      "foreign_keys": [],
+      "name": "frozen_learned_controller_choice.csv",
+      "primary_key": [
+        "split",
+        "policy",
+        "k",
+        "controller"
+      ],
+      "relationships": [
+        "CV_2022-only learned controller freeze"
+      ]
+    }
+  ],
+  "version": "bj207-fixed-n7-bankroll-v2"
+}

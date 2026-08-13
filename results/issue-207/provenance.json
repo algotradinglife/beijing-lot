@@ -1,0 +1,32 @@
+{
+  "environment": {
+    "matplotlib": "3.10.9",
+    "nbclient": "0.10.2",
+    "nbformat": "5.10.4",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "pyarrow": "24.0.0",
+    "python": "3.11.15",
+    "scikit-learn": "1.9.0"
+  },
+  "implementation_sha256": "7b891238d59483e25da8817ac302300dc10bd01b80e1e76d9d9e1d8024d4c539",
+  "label_boundary": "CV_2021 fit; CV_2022 risk freeze; CV_2023 terminal evaluation; LOCKED_TEST labels unused",
+  "learned_controller_choice_boundary": "SIMPLE_LOGISTIC vs BOUNDED_NEURAL selected on CV_2022 only; only frozen choice is terminal-evidentiary on CV_2023",
+  "notebook_binding": "canonical cell type/source; execution outputs and executor metadata excluded to prevent manifest self-reference",
+  "notebook_contract_sha256": "ecf2835fb273aaee1d9394a3674814313584ebf18b8c6108cd92d0b0839dcb77",
+  "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj207_bankroll.py run --output <new-directory>",
+  "requirements_sha256": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
+  "runner_sha256": "4edb8c49f506463dfb0cbfe424eb181e466461aab8d7f62eabcec5fa886bddb7",
+  "source_manifest_sha256": "7c6c3ecc016710102c00a3adeba129553eab3f2f54426268ff641ba35db17f1d",
+  "source_package": "results/issue-206",
+  "source_verify_receipt": {
+    "excluded_input_matches": 651,
+    "files": 16,
+    "issues": 75,
+    "manifest_sha256": "7c6c3ecc016710102c00a3adeba129553eab3f2f54426268ff641ba35db17f1d",
+    "request_rows": 0,
+    "status": "PASS"
+  },
+  "verify": "PYTHONPATH=src .venv/bin/python scripts/run_bj207_bankroll.py verify --output results/issue-207",
+  "version": "bj207-fixed-n7-bankroll-v2"
+}

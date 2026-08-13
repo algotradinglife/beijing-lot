@@ -7,7 +7,7 @@ tags:
   - research
   - moc
 status: active
-updated: 2026-08-07
+updated: 2026-08-12
 ---
 
 # Beijing-lot Research Wiki
@@ -922,6 +922,37 @@ aliases 折叠为 10 个不同 issue-economic identities；其中 Z100/K1 的 52
 [`Issue-190-Sparse-Divergence-N7`](Issue-190-Sparse-Divergence-N7.md)。面向路线决策的
 证据漏斗、Z100/K1 正向簇、`NO_PROMOTION` 双层解释以及对 #193/#192 的继承建议，见
 [`Issue-190-Sparse-Divergence-N7-Decision-Report`](Issue-190-Sparse-Divergence-N7-Decision-Report.md)。
+
+## #207 固定-N7 主动资金控制（2026-08-12）
+
+#207 将 #206 的五种固定-N7/K8 研究票身份原样绑定到 ¥100,000 资金路径，并把
+K16/K32 降为敏感性。主动 Lane A 不是 #206 的空 NO_BET 账本；安全 Lane B 则把
+NO_BET 与 cash 单独保留为 `LOWER_EXPOSURE_ONLY`，禁止把少下注或不下注伪装成 Edge。
+
+simple logistic 先于 bounded neural 训练；CV-2021 拟合，CV-2022 冻结风险偏好并在
+两种 learned controller 中选择 `BOUNDED_NEURAL`，CV-2023 只执行该冻结选择的一次终局
+历史结算。严格 matched-active 判据下没有正向 K8 行，因此
+`ACTIVE_OVERLAY_EVIDENCE=false`；先前 MARKET_WOR/K8/simple 的正向同窗结果仅是
+未通过 split-local 选择边界的历史敏感性，不能作为 Stage-4 证据。绝对最强 K8 路径为
+MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻结最简单的
+`NATIVE_2_YUAN` 主动控制，不把 cash 解释为最优模型。由于 Stage-3 可比接受基线未解决
+且没有独立确认，`DEPLOYABLE_POLICY=false`，#208 继续等待 PI 明确激活。详见
+[`issue_207_fixed_n7_bankroll`](../research/issue_207_fixed_n7_bankroll.md)。
+
+### R6 method 返工收据（2026-08-13，EV R5 REJECT at `120022c8`）
+
+- `minimum_fundable_capital_yuan` 按风险分数语义修正：risk-fraction controller 的
+  单张 ¥2 票最小可执行 pre-issue bankroll 为 `2.0 / risk_fraction`
+  （1%→200.0、5%→40.0、25%→8.0、100%→2.0），native/no-fraction 保持 ¥2；
+  13,560 行 ledger 全量符合黄金表，10,170 个错误行清零。
+- `log_joint_probability` schema 单位修正：由 fallback `fraction` 改为显式
+  `natural_log_dimensionless_probability`（domain ≤ 0）；#206 冻结源与
+  `results/issue-206/` 未改动。
+- 全 242 列独立 schema 审计矩阵提交于 `tests/fixtures/bj207_schema_audit_matrix.json`
+  （不复用 `_schema_catalog()` 的 golden test）。
+- 终局决策不变：`ENGINE_VALID=true`、`ACTIVE_OVERLAY_EVIDENCE=false`、
+  `DEPLOYABLE_POLICY=false`；CV_2022 冻结 `BOUNDED_NEURAL`；负向冻结 `NATIVE_2_YUAN`；
+  安全通道 `LOWER_EXPOSURE_ONLY`。
 
 ## 相关笔记
 
