@@ -145,11 +145,11 @@
           "unit": "dimensionless_expected_net_return"
         },
         {
-          "domain": null,
+          "domain": "(-inf, 0]; natural log of control_joint_probability, never a probability fraction",
           "dtype": "float64",
           "name": "log_joint_probability",
           "nullable": false,
-          "unit": "fraction"
+          "unit": "natural_log_dimensionless_probability"
         },
         {
           "domain": null,
