@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-12 (Issue #207 producer evidence)**
+Updated: **2026-08-13 23:43 HKT (Issue #207 terminal review and #208 activation)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -91,10 +91,10 @@ PI interpretation and does not replace those edges or Project states.
 #206 fixed-N7 ticket learning (Done; learned policy rejected, baseline unresolved)
              |
              v
-#207 ¥100k active bankroll + separate NO_BET safety lane (EV Review pending)
+#207 ¥100k active bankroll + separate NO_BET safety lane (Done; no overlay Edge)
              |
              v
-#208 dynamic-N risk-conditioned frontier
+#208 dynamic N×K risk-conditioned frontier (Ready)
              |
              v
 #209 full-cycle historical ablation and baseline ladder
@@ -112,8 +112,8 @@ PI interpretation and does not replace those edges or Project states.
 | 2 | [#204] residual probability and SP heads | Closed / Done | M2 | No open blocker | `MARKET_ONLY` retained as the safe baseline; residual model remains retrospective |
 | 3 | [#205] M×3 value matrix and joint N7 calibration | Closed / Done | M2 | #204 closed | `MARKET_INDEPENDENCE` plus frozen pre-event SP is the safe #206 interface |
 | 4 | [#206] fixed-N7 ticket generator | Closed / Done | M3 | #205 closed | Learned challenger rejected; no comparable accepted ticket baseline is bound, so all locked issues route to `NO_BET` |
-| 5 | [#207] active bankroll + separate NO_BET safety lane | In Progress; round-6 method rework | M3 | #206 closed | Engine valid after complete evidence verification; no positive active-overlay evidence; deployable policy remains false |
-| 6 | [#208] dynamic-N frontier | Open | M3 | Blocked by #207 | Risk-conditioned N and parlay policy comparison |
+| 5 | [#207] active bankroll + separate NO_BET safety lane | Closed / Done | M3 | #206 closed | Engine valid after R7 EV and PI adversarial review; no positive active-overlay evidence; deployable policy remains false |
+| 6 | [#208] dynamic N×K frontier | Open / Ready | M3 | #207 closed | Learn N (legs per ticket), K (tickets per issue), generator lane and safe capital control without assuming fixed N7 is Edge |
 | 7 | [#209] full-cycle historical evaluation | Open | M3 | Blocked by #208 | Chronological ablations and accepted baseline ladder |
 | 8 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
 | 9 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
@@ -187,8 +187,8 @@ retrospective feature.
 - `ENGINE_VALID=true` only after publication state, reason traces, required
   rolling aggregates, schema semantics and all conclusion surfaces verify;
   `DEPLOYABLE_POLICY=false`. The negative freeze is `NATIVE_2_YUAN`; cash does
-  not answer the active question, and #208 remains blocked pending PI terminal
-  review and explicit activation.
+  not answer the active question. After R7 EV and PI terminal review, #207 was
+  closed and #208 was explicitly activated as the dynamic N×K research step.
 - Evidence: [`issue_207_fixed_n7_bankroll.md`](issue_207_fixed_n7_bankroll.md).
 
 [#182]: https://github.com/algotradinglife/beijing-lot/issues/182

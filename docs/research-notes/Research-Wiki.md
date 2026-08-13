@@ -936,7 +936,8 @@ simple logistic 先于 bounded neural 训练；CV-2021 拟合，CV-2022 冻结�
 未通过 split-local 选择边界的历史敏感性，不能作为 Stage-4 证据。绝对最强 K8 路径为
 MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻结最简单的
 `NATIVE_2_YUAN` 主动控制，不把 cash 解释为最优模型。由于 Stage-3 可比接受基线未解决
-且没有独立确认，`DEPLOYABLE_POLICY=false`，#208 继续等待 PI 明确激活。详见
+且没有独立确认，`DEPLOYABLE_POLICY=false`。#207 经 R7 独立 EV 与 PI 对抗性终审后
+关闭；#208 随后由 PI 明确置为 Ready。详见
 [`issue_207_fixed_n7_bankroll`](../research/issue_207_fixed_n7_bankroll.md)。
 
 ### R6 method 返工收据（2026-08-13，EV R5 REJECT at `120022c8`）
@@ -953,6 +954,18 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
 - 终局决策不变：`ENGINE_VALID=true`、`ACTIVE_OVERLAY_EVIDENCE=false`、
   `DEPLOYABLE_POLICY=false`；CV_2022 冻结 `BOUNDED_NEURAL`；负向冻结 `NATIVE_2_YUAN`；
   安全通道 `LOWER_EXPOSURE_ONLY`。
+
+### R7 终局收据（2026-08-13，merged HEAD `90869a959dc1`）
+
+- 修复并独立复核 settlement availability/gross 域、negative payout、七格 source trace
+  逐格一致性以及 malformed JSON fail-closed；这些防御性修复不改变合法输入下的决策。
+- 独立 EV：focused 65/65、12/12 auditor probes、notebook 6/6、semantic verifier
+  PASS、fresh replay 22/22 payloads byte-identical。
+- 终局包：68,880 active requests、13,560 capital rows、4,785 matched issue rows、
+  129,360 matched ticket/tax-lot rows；manifest
+  `48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6`。
+- PI 对抗性结论：SIMPLE/K16 正向路径、低暴露和上游票选择均不能归因于 Stage 4；
+  因此接受负结论并推进 N 与 K 分离学习，而不是把固定 N7 解释为 Edge。
 
 ## 相关笔记
 
