@@ -112,7 +112,7 @@ PI interpretation and does not replace those edges or Project states.
 | 2 | [#204] residual probability and SP heads | Closed / Done | M2 | No open blocker | `MARKET_ONLY` retained as the safe baseline; residual model remains retrospective |
 | 3 | [#205] M×3 value matrix and joint N7 calibration | Closed / Done | M2 | #204 closed | `MARKET_INDEPENDENCE` plus frozen pre-event SP is the safe #206 interface |
 | 4 | [#206] fixed-N7 ticket generator | Closed / Done | M3 | #205 closed | Learned challenger rejected; no comparable accepted ticket baseline is bound, so all locked issues route to `NO_BET` |
-| 5 | [#207] active bankroll + separate NO_BET safety lane | In Progress; round-5 rework | M3 | #206 closed | Engine valid after complete evidence verification; no positive active-overlay evidence; deployable policy remains false |
+| 5 | [#207] active bankroll + separate NO_BET safety lane | In Progress; round-6 method rework | M3 | #206 closed | Engine valid after complete evidence verification; no positive active-overlay evidence; deployable policy remains false |
 | 6 | [#208] dynamic-N frontier | Open | M3 | Blocked by #207 | Risk-conditioned N and parlay policy comparison |
 | 7 | [#209] full-cycle historical evaluation | Open | M3 | Blocked by #208 | Chronological ablations and accepted baseline ladder |
 | 8 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |

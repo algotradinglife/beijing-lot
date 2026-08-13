@@ -939,6 +939,21 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
 且没有独立确认，`DEPLOYABLE_POLICY=false`，#208 继续等待 PI 明确激活。详见
 [`issue_207_fixed_n7_bankroll`](../research/issue_207_fixed_n7_bankroll.md)。
 
+### R6 method 返工收据（2026-08-13，EV R5 REJECT at `120022c8`）
+
+- `minimum_fundable_capital_yuan` 按风险分数语义修正：risk-fraction controller 的
+  单张 ¥2 票最小可执行 pre-issue bankroll 为 `2.0 / risk_fraction`
+  （1%→200.0、5%→40.0、25%→8.0、100%→2.0），native/no-fraction 保持 ¥2；
+  13,560 行 ledger 全量符合黄金表，10,170 个错误行清零。
+- `log_joint_probability` schema 单位修正：由 fallback `fraction` 改为显式
+  `natural_log_dimensionless_probability`（domain ≤ 0）；#206 冻结源与
+  `results/issue-206/` 未改动。
+- 全 242 列独立 schema 审计矩阵提交于 `tests/fixtures/bj207_schema_audit_matrix.json`
+  （不复用 `_schema_catalog()` 的 golden test）。
+- 终局决策不变：`ENGINE_VALID=true`、`ACTIVE_OVERLAY_EVIDENCE=false`、
+  `DEPLOYABLE_POLICY=false`；CV_2022 冻结 `BOUNDED_NEURAL`；负向冻结 `NATIVE_2_YUAN`；
+  安全通道 `LOWER_EXPOSURE_ONLY`。
+
 ## 相关笔记
 
 - [[beidan_vs_euro_divergence|北单与欧赔偏差研究]]
