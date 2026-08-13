@@ -425,6 +425,150 @@ def test_candidate_validation_rejects_future_labels_and_source_trace_tamper() ->
         _validate_candidates(trace)
 
 
+@pytest.mark.parametrize("value", [np.nan, "False", "True", "false", 2, 0.5, "yes"])
+def test_candidate_validation_rejects_non_nullable_boolean_availability(value: object) -> None:
+    # R7 (EV-B207-R6-01): astype(bool) silently coerced NaN/"False" to True.
+    candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
+    frame = candidates.copy()
+    # Force object dtype so NaN/"False" can actually be stored (a bool dtype column
+    # cannot hold NaN, which is exactly why the old astype(bool) never saw them).
+    frame["labels_available"] = frame["labels_available"].astype(object)
+    frame.loc[frame.split.eq("CV_2023").index[0], "labels_available"] = value
+    with pytest.raises(Stage4Error, match="nullable boolean|missing labels"):
+        _validate_candidates(frame)
+
+
+@pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf, -1.0, -0.001])
+def test_candidate_validation_rejects_invalid_realized_gross(value: float) -> None:
+    # R7 (EV-B207-R6-01): gross must be finite and non-negative on settled rows.
+    candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
+    frame = candidates.copy()
+    idx = frame.index[frame.split.eq("CV_2023")][0]
+    frame.loc[idx, "realized_gross"] = value
+    with pytest.raises(Stage4Error, match="realized_gross|settlement gross"):
+        _validate_candidates(frame)
+
+
+def test_candidate_validation_rejects_settlement_gross_on_unavailable_labels() -> None:
+    # R7: LOCKED_TEST rows must not carry a settlement gross.
+    candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
+    frame = candidates.copy()
+    idx = frame.index[frame.split.eq("LOCKED_TEST")][0]
+    frame.loc[idx, "realized_gross"] = 1.0
+    with pytest.raises(Stage4Error, match="settlement gross present"):
+        _validate_candidates(frame)
+
+
+def test_candidate_validation_rejects_ev_probe_all_cv2023_unavailable_negative_gross() -> None:
+    # R7 regression: EV R6 auditor probe — all CV_2023 labels_available=NaN and
+    # realized_gross=-1.0 must fail closed at the public boundary.
+    candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
+    frame = candidates.copy()
+    frame["labels_available"] = frame["labels_available"].astype(object)
+    cv23 = frame.split.eq("CV_2023")
+    frame.loc[cv23, "labels_available"] = np.nan
+    frame.loc[cv23, "realized_gross"] = -1.0
+    with pytest.raises(Stage4Error, match="nullable boolean|realized_gross"):
+        _validate_candidates(frame)
+
+
+def _mutate_trace(candidates: pd.DataFrame, *, kind: str) -> pd.DataFrame:
+    frame = candidates.copy()
+    row_index = frame.index[frame.split.eq("CV_2023")][0]
+    cells = json.loads(frame.loc[row_index, "source_cells_json"])
+    if kind == "match_idx_mismatch":
+        cells[0]["match_idx"] = 999999
+    elif kind == "outcome_tamper":
+        original = str(cells[0]["outcome"])
+        replacement = "1" if original != "1" else "2"
+        cells[0]["outcome"] = replacement
+    elif kind == "duplicated_match":
+        cells[1]["match_idx"] = cells[0]["match_idx"]
+    elif kind == "identity_mismatch":
+        # ticket_identity[i] must equal f"{match}:{outcome}".
+        frame.loc[row_index, "ticket_identity"] = (
+            "999999:0|" + "|".join(str(frame.loc[row_index, "ticket_identity"]).split("|")[1:])
+        )
+    else:  # pragma: no cover
+        raise AssertionError(kind)
+    frame.loc[row_index, "source_cells_json"] = json.dumps(cells)
+    return frame
+
+
+@pytest.mark.parametrize("kind", ["match_idx_mismatch", "outcome_tamper", "duplicated_match", "identity_mismatch"])
+def test_candidate_validation_rejects_per_cell_source_trace_inconsistency(kind: str) -> None:
+    # R7 (EV-B207-R6-02): complete-but-internally-inconsistent seven-cell trace.
+    candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
+    frame = _mutate_trace(candidates, kind=kind)
+    with pytest.raises(Stage4Error, match="source trace cell|ticket_identity"):
+        _validate_candidates(frame)
+
+
+def test_candidate_validation_rejects_malformed_source_cells_json() -> None:
+    # R7 (EV-B207-R6-03): JSONDecodeError must be mapped to Stage4Error.
+    candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
+    frame = candidates.copy()
+    frame.loc[frame.split.eq("CV_2023").index[0], "source_cells_json"] = "{not-json"
+    with pytest.raises(Stage4Error, match="malformed source_cells_json"):
+        _validate_candidates(frame)
+
+
+def test_replay_rejects_negative_payout_from_negative_gross() -> None:
+    # R7 (EV-B207-R6-01): a negative gross multiple must fail at replay.
+    candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
+    requests = reconstruct_active_requests(candidates)
+    requests = requests.loc[requests.split.eq("CV_2023") & requests.policy.eq("MARKET_WR") & requests.k.eq(8)].copy()
+    requests.loc[requests.index[0], "pre_tax_gross_multiple"] = -1.0
+    requests.loc[requests.index[0], "tax_adjusted_gross_multiple"] = -0.65
+    with pytest.raises(Stage4Error, match="negative payout|non-finite payout"):
+        replay_path(
+            requests,
+            split="CV_2023",
+            policy="MARKET_WR",
+            k=8,
+            method="NATIVE_2_YUAN",
+            controllers={},
+            calibrated={},
+        )
+
+
+def test_semantic_verifier_rejects_remanifested_nullable_boolean_and_negative_gross(tmp_path: Path) -> None:
+    # R7 mutation tests: re-manifested settlement tamper must be semantically rejected.
+    output = tmp_path / "issue-207"
+    shutil.copytree(ROOT / "results/issue-207", output)
+    path = output / "active_research_ticket_requests.parquet"
+    frame = pd.read_parquet(path)
+    frame["labels_available"] = frame["labels_available"].astype(object)
+    frame.loc[frame.index[0], "labels_available"] = np.nan
+    frame.loc[frame.index[0], "realized_gross"] = -1.0
+    frame.to_parquet(path, index=False)
+    _refresh_manifest(output)
+    with pytest.raises(Stage4Error, match="active panel"):
+        verify(output)
+
+    output2 = tmp_path / "issue-207-trace"
+    shutil.copytree(ROOT / "results/issue-207", output2)
+    path2 = output2 / "active_research_ticket_requests.parquet"
+    frame2 = pd.read_parquet(path2)
+    cells = json.loads(frame2.loc[frame2.index[0], "source_cells_json"])
+    cells[0]["match_idx"] = 999999
+    frame2.loc[frame2.index[0], "source_cells_json"] = json.dumps(cells)
+    frame2.to_parquet(path2, index=False)
+    _refresh_manifest(output2)
+    with pytest.raises(Stage4Error, match="active panel"):
+        verify(output2)
+
+    output3 = tmp_path / "issue-207-malformed-json"
+    shutil.copytree(ROOT / "results/issue-207", output3)
+    path3 = output3 / "active_research_ticket_requests.parquet"
+    frame3 = pd.read_parquet(path3)
+    frame3.loc[frame3.index[0], "source_cells_json"] = "{not-json"
+    frame3.to_parquet(path3, index=False)
+    _refresh_manifest(output3)
+    with pytest.raises(Stage4Error, match="active panel"):
+        verify(output3)
+
+
 def test_replay_rejects_negative_or_empty_matched_schedule() -> None:
     candidates = pd.read_parquet(ROOT / "results/issue-206/candidate_ledger.parquet")
     requests = reconstruct_active_requests(candidates)

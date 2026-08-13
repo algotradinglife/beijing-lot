@@ -9,7 +9,7 @@
     "python": "3.11.15",
     "scikit-learn": "1.9.0"
   },
-  "implementation_sha256": "1c04269678e9fbffaa67a45ae9cb60729f46c834cab0f1e74e4a383b80ca0183",
+  "implementation_sha256": "7b891238d59483e25da8817ac302300dc10bd01b80e1e76d9d9e1d8024d4c539",
   "label_boundary": "CV_2021 fit; CV_2022 risk freeze; CV_2023 terminal evaluation; LOCKED_TEST labels unused",
   "learned_controller_choice_boundary": "SIMPLE_LOGISTIC vs BOUNDED_NEURAL selected on CV_2022 only; only frozen choice is terminal-evidentiary on CV_2023",
   "notebook_binding": "canonical cell type/source; execution outputs and executor metadata excluded to prevent manifest self-reference",

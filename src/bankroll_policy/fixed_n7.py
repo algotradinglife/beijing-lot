@@ -216,6 +216,45 @@ def _validate_nonnegative_finite(name: str, value: float) -> float:
     return numeric
 
 
+def _coerce_nullable_boolean(value: Any) -> bool | None:
+    """Coerce a nullable-boolean domain value to bool or None.
+
+    The settlement availability flag is a nullable boolean: only ``True``,
+    ``False``, ``0``, ``1`` and null (NaN / pd.NA) are legal.  Strings such as
+    ``"False"`` or ``"True"``, and any other value, are rejected instead of
+    being silently coerced by ``astype(bool)`` (which turns NaN and every
+    non-empty string into True).
+    """
+    if pd.isna(value):
+        return None
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
+    if isinstance(value, (int, np.integer, float, np.floating)) and value in (0, 1):
+        return bool(value)
+    raise Stage4Error(f"labels_available must be nullable boolean, got {value!r}")
+
+
+def _validate_settlement_domain(frame: pd.DataFrame) -> None:
+    """Validate the settlement domain of the #206 candidate ledger.
+
+    Rows whose labels are available (historical splits) must carry a finite,
+    non-negative ``realized_gross``; rows without available labels (LOCKED_TEST)
+    must carry no settlement value at all.  This closes the R6 gap where
+    ``astype(bool)`` accepted NaN/``"False"`` availability and a negative or
+    non-finite gross could propagate into replay and produce a negative payout.
+    """
+    labels = frame.labels_available.map(_coerce_nullable_boolean)
+    settled = labels.eq(True)
+    try:
+        gross = pd.to_numeric(frame.realized_gross, errors="raise")
+    except (TypeError, ValueError) as exc:
+        raise Stage4Error("realized_gross must be numeric") from exc
+    if not np.isfinite(gross.loc[settled]).all() or (gross.loc[settled] < 0).any():
+        raise Stage4Error("non-finite or negative realized_gross on settled candidates")
+    if gross.loc[~settled].notna().any():
+        raise Stage4Error("settlement gross present on unavailable-label candidates")
+
+
 def _experiment_role(method: str) -> str:
     if method in {"SIMPLE_LOGISTIC", "BOUNDED_NEURAL"}:
         return "ACTIVE_LEARNED_ONLY"
@@ -281,10 +320,15 @@ def _validate_candidates(frame: pd.DataFrame) -> None:
         raise Stage4Error("non-finite Stage-4 pre-event input")
     if not (frame.control_joint_probability > 0).all() or not (frame.predicted_sp_product > 0).all():
         raise Stage4Error("non-positive Stage-4 probability/SP input")
-    if not frame.labels_available.astype(bool).loc[frame.split.isin(["CV_2021", "CV_2022", "CV_2023"])].all():
+    labels = frame.labels_available.map(_coerce_nullable_boolean)
+    if labels.isna().any():
+        raise Stage4Error("labels_available must be a nullable boolean without missing values in #206")
+    historical = frame.split.isin(["CV_2021", "CV_2022", "CV_2023"])
+    if not labels.loc[historical].eq(True).all():
         raise Stage4Error("historical candidate ledger has missing labels")
-    if frame.labels_available.astype(bool).loc[frame.split.eq("LOCKED_TEST")].any():
+    if labels.loc[frame.split.eq("LOCKED_TEST")].eq(True).any():
         raise Stage4Error("future/locked labels leaked into Stage 4")
+    _validate_settlement_domain(frame)
     if set(frame.split) != {"CV_2021", "CV_2022", "CV_2023", "LOCKED_TEST"}:
         raise Stage4Error("chronology split mismatch")
     for row in frame.itertuples(index=False):
@@ -293,10 +337,13 @@ def _validate_candidates(frame: pd.DataFrame) -> None:
         outcomes = str(row.outcomes).split("|")
         if len(identity) != N or len(matches) != N or len(set(matches)) != N or len(outcomes) != N:
             raise Stage4Error("malformed exact-N7 ticket trace")
-        cells = json.loads(row.source_cells_json)
+        try:
+            cells = json.loads(row.source_cells_json)
+        except json.JSONDecodeError as exc:
+            raise Stage4Error("malformed source_cells_json: not decodable JSON") from exc
         if not isinstance(cells, list) or len(cells) != N:
             raise Stage4Error("malformed seven-cell source trace")
-        for cell in cells:
+        for cell_index, cell in enumerate(cells):
             if not isinstance(cell, dict):
                 raise Stage4Error("malformed source trace entry")
             if {
@@ -313,6 +360,27 @@ def _validate_candidates(frame: pd.DataFrame) -> None:
                 raise Stage4Error("non-finite source-trace probability")
             if not np.isfinite(float(cell["predicted_final_sp"])) or float(cell["predicted_final_sp"]) <= 0:
                 raise Stage4Error("non-finite source-trace predicted SP")
+            # R7: per-cell consistency with the ticket identity / match / outcome.
+            # cell i must agree with match_indices[i], outcomes[i] and the
+            # ``match:outcome`` encoding carried by ticket_identity[i].
+            expected_match = str(matches[cell_index])
+            expected_outcome = str(outcomes[cell_index])
+            if str(cell["match_idx"]) != expected_match:
+                raise Stage4Error(
+                    f"source trace cell {cell_index} match_idx {cell['match_idx']} "
+                    f"!= match_indices[{cell_index}] {expected_match}"
+                )
+            if str(cell["outcome"]) != expected_outcome:
+                raise Stage4Error(
+                    f"source trace cell {cell_index} outcome {cell['outcome']} "
+                    f"!= outcomes[{cell_index}] {expected_outcome}"
+                )
+            expected_identity = f"{expected_match}:{expected_outcome}"
+            if identity[cell_index] != expected_identity:
+                raise Stage4Error(
+                    f"ticket_identity[{cell_index}] {identity[cell_index]} "
+                    f"!= match:outcome {expected_identity}"
+                )
 
 
 def _fit_stage3_models(candidates: pd.DataFrame) -> dict[str, Any]:
@@ -496,7 +564,7 @@ def replay_path(
     rows: list[dict[str, Any]] = []
     fraction = _risk_fraction(method, calibrated)
     for (_, issue), bundle in selected.groupby(["year", "issue"], sort=False):
-        if not bundle.labels_available.astype(bool).all():
+        if not bundle.labels_available.map(_coerce_nullable_boolean).eq(True).all():
             raise Stage4Error(f"settlement labels unavailable for {split}/{issue}")
         pre = _validate_nonnegative_finite("pre-issue bankroll", bankroll)
         weights = _weights(bundle, method, controllers)
@@ -522,6 +590,8 @@ def replay_path(
         tax_adjusted_payout = float(np.sum(counts * TICKET_STAKE * tax_adjusted_multiples))
         if not np.isfinite(payout) or not np.isfinite(tax_adjusted_payout):
             raise Stage4Error("non-finite payout")
+        if payout < 0 or tax_adjusted_payout < 0:
+            raise Stage4Error("negative payout")
         bankroll = pre - funded + payout
         if funded < -1e-9 or funded > pre + 1e-9 or bankroll < -1e-9:
             raise Stage4Error("bankroll conservation/funding violation")
@@ -681,7 +751,11 @@ def _trace_frame(ledger: pd.DataFrame) -> pd.DataFrame:
         "capital_schedule_hash",
     ]
     for row in ledger.loc[:, base + ["decision_trace_json"]].itertuples(index=False):
-        for trace in json.loads(row.decision_trace_json):
+        try:
+            traces = json.loads(row.decision_trace_json)
+        except json.JSONDecodeError as exc:
+            raise Stage4Error("malformed decision_trace_json: not decodable JSON") from exc
+        for trace in traces:
             rows.append(
                 {
                     "split": row.split,
