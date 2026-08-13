@@ -7,7 +7,7 @@ tags:
   - research
   - moc
 status: active
-updated: 2026-08-12
+updated: 2026-08-14
 ---
 
 # Beijing-lot Research Wiki
@@ -966,6 +966,25 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
   `48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6`。
 - PI 对抗性结论：SIMPLE/K16 正向路径、低暴露和上游票选择均不能归因于 Stage 4；
   因此接受负结论并推进 N 与 K 分离学习，而不是把固定 N7 解释为 Edge。
+
+### Issue #208 动态 N×K 学习策略（2026-08-14，待 EV）
+
+- 契约 BJ-UNIFIED-DYNAMIC-N-001 / v3：主候选为逐期学习的 action-value 策略
+  `Q_theta(x,a)`（`sklearn MLPRegressor`），目标 = matched pre-tax capital lift
+  vs 冻结 N7/K8 incumbent；控制为 Ridge + best fixed action；16 个 hash 种子聚合。
+- 结论：**无合格学习行**。安全门（conservative lift = 预测 − 1×RMSE + 覆盖率/
+  OOD/fundability）在 113 个测试期中仅放行 3 期且三者 realized 均为 0 payout；
+  门控后的学习路径与冻结 incumbent 完全一致（两 fold matched lift = 0.0）。
+  按预注册词典序规则第 5 步，冻结 **N7/K8/MARKET_WOR/native-¥2** incumbent 作为
+  #209 候选，并发布完整 frontier 与失败模式。
+- 诊断要点：calibration 单调（predicted 7.9→80.7 vs realized 63.6→827.3），
+  Q 模型有信号但不足以通过保守门；无门控策略偏好短串（N=4/5）与 LEARNED_MLP
+  通道，但全部被保守门否决 — 与 #207"learned allocation 不自动成为 Edge"一致。
+- 冻结绑定：incumbent 臂精确绑定 #207 CONTROLLING K8 路径（CV_2023 ¥99,312.89、
+  CV_2022 ¥99,072.00，source=FROZEN_INCUMBENT_207）。
+- 工件：`notebooks/research/issue-208/`、`src/parlay_policy/`、
+  `results/issue-208/`（manifest + handoff_209.json）、
+  `docs/research/issue_208_dynamic_nk_policy.md`。
 
 ## 相关笔记
 

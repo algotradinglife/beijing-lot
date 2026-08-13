@@ -1,0 +1,131 @@
+# Issue #208 method protocol — BJ-UNIFIED-DYNAMIC-N-001 / v3
+# Frozen preregistrations; worker must not silently modify.
+# Protocol deltas appended in PROTOCOL-LOG / docs/research/issue_208_protocol_log.md.
+
+protocol_version: bj208-protocol-v1
+
+candidate_pool:
+  description: "per-issue learned policy Q_theta(x,a) on the bounded N×K×lane×capital action catalog"
+  source: "results/issue-205/value_matrix.parquet + results/issue-207 frozen CONTROLLING K8 identities"
+  n_grid: [4, 5, 6, 7, 8, 9, 10]
+  k_grid: [8, 16, 32]
+  lanes: [MARKET_WR, MARKET_WOR, VALUE_WOR, LEARNED_MLP]
+  capital_lanes: [NATIVE_2_YUAN, SIMPLE_ACTIVE]
+  seed_count: 16
+  seed_rule: "hash-derived sha256('bj208-seed-<i>'); aggregate all seeds; seed never a feature"
+
+splits:
+  selection_split: CV_2022
+  terminal_split: CV_2023
+  holdout_isolated: true
+  folds:
+    - train: [CV_2021]
+      test: CV_2022
+    - train: [CV_2021, CV_2022]
+      test: CV_2023
+  protocol_delta_208_1: "no 2020 ticket surface in frozen upstream; fold train<=2020/test 2021 not constructible; CV_2021 is the initial fit block"
+
+terminal_access:
+  model_selection: forbidden
+  terminal_evaluation: exactly_once
+
+selection_algorithm:
+  preregistered: true
+  rule:
+    - "valid replay, causal trace, no ruin, complete fold support"
+    - "positive median matched ending-capital lift vs N7/K8 incumbent"
+    - "positive matched lift in at least 2 of 3 development folds"
+    - "highest median matched lift, then highest worst-fold lift, then smaller issue-level max drawdown, then lower complexity"
+    - "else freeze N7 incumbent and publish full frontier + failure regimes"
+
+metrics:
+  - name: matched_ending_capital_lift
+    definition: "learned path ending capital minus frozen #207 incumbent path ending capital on the same test split"
+    golden_test: "tests/test_bj208_metrics.py::test_matched_lift_definition"
+  - name: median_matched_lift
+    definition: "median of fold matched lifts; >0 required by selection rule 2"
+    golden_test: "tests/test_bj208_metrics.py::test_selection_rule_median"
+  - name: positive_fold_count
+    definition: "number of folds with positive matched lift; >=2 required by rule 3"
+    golden_test: "tests/test_bj208_metrics.py::test_selection_rule_folds"
+  - name: conservative_predicted_lift
+    definition: "Q_theta prediction minus 1*train-fold residual RMSE; >0 + coverage/OOD/fundability = safety gate"
+    golden_test: "tests/test_bj208_metrics.py::test_safety_gate_conservative"
+  - name: max_drawdown_pct
+    definition: "issue-level maximum percentage drawdown from running peak"
+    golden_test: "tests/test_bj208_metrics.py::test_drawdown_definition"
+
+budget:
+  target_hours: 6
+  hard_stop_hours: 12
+  max_cpu_hours: 32
+  max_peak_rss_gib: 16
+  max_temp_gib: 20
+
+required_artifacts:
+  - method.yaml
+  - results/issue-208/decision.json
+  - results/issue-208/SHA256SUMS.json
+  - results/issue-208/handoff_209.json
+  - results/issue-208/selection.json
+  - results/issue-208/issue_capital_ledger.parquet
+  - src/parlay_policy/__init__.py
+  - scripts/run_bj208_policy.py
+  - notebooks/research/issue-208/bj208_dynamic_nk_policy.ipynb
+
+schema_ref: results/issue-208/schema.json
+receipt:
+  bind_to: results/issue-208/receipt.sha256
+
+stages:
+  - name: data_stats
+    deliverable: "results/issue-208/census.csv + eligibility.csv"
+    skill: eda-checklist
+    constraints:
+      - "only frozen upstream (value matrix sha 8fdace9c, #207 manifest 48c11d97)"
+      - "report M per issue, N eligibility, labels availability; 2024/2025/2026 embargoed"
+  - name: preprocessing
+    deliverable: "incumbent_paths.parquet + issue contexts + 1197 candidate pools"
+    skill: data-preprocessing
+    constraints:
+      - "CV_2022/CV_2023 incumbent from #207 ledger; CV_2021 reconstructed from frozen ticket identities"
+      - "M×3 cells complete; malformed cells fail closed; exact N distinct matches per ticket"
+  - name: eda
+    deliverable: "label_surface_fit.parquet (9,744 rows) + action frontier"
+    skill: eda-checklist
+    constraints:
+      - "counterfactual targets from development labels only; outcome fields never enter state x"
+      - "16 seeds aggregated; seed identity never a feature"
+  - name: feature_engineering
+    deliverable: "state x per issue (STATE_FEATURE_NAMES) + training frames"
+    skill: data-preprocessing
+    constraints:
+      - "x from causal pre-event tensor summaries + market/SP summaries + frozen upstream + strictly prior bankroll"
+      - "forbidden-name checker rejects result/score/settlement/payout/hit fields"
+  - name: model_selection
+    deliverable: "fold1 (train CV_2021 -> test CV_2022) MLP/Ridge/fixed-action fits + selection on CV_2022"
+    skill: experiment-tracking
+    constraints:
+      - "chronological issue-block splits only; MLPRegressor + Ridge + best fixed action"
+      - "safety gate: conservative lift > 0 AND coverage/OOD/fundability else frozen incumbent"
+      - "selection_split CV_2022 data never reused for terminal selection"
+  - name: terminal_evaluation
+    deliverable: "fold2 (train CV_2021+CV_2022 -> test CV_2023) learned path + control matrix + selection receipt + handoff_209.json"
+    skill: model-card
+    constraints:
+      - "exactly once; 2024/2025/2026 outcomes never opened"
+      - "lexicographic selection rule applied; freeze N7 incumbent if no eligible row"
+      - "handoff carries model class, feature schema, weights, preprocessing, safety threshold, inference code"
+
+models:
+  primary: "sklearn.neural_network.MLPRegressor (StandardScaler pipeline)"
+  primary_params:
+    hidden_layer_sizes: [32]
+    alpha: 0.001
+    max_iter: 500
+    early_stopping: true
+    random_state: 208001
+  control_linear: "sklearn.linear_model.Ridge (alpha 1.0)"
+  control_fixed_action: "best fixed action by train-fold median matched lift"
+  target: "matched pre-tax capital lift vs frozen N7/K8 incumbent (seed-aggregated)"
+  inference: "argmax Q_theta(x, a) with baseline-residual safety gate"
