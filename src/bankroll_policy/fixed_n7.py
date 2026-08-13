@@ -190,6 +190,25 @@ def _zero_funding_reason(*, pre_bankroll_yuan: float, requested_stake_yuan: floa
     return "INTEGER_PROJECTION_INFEASIBLE", "NO_BET_INTEGER_PROJECTION_INFEASIBLE"
 
 
+def _minimum_fundable_capital_yuan(*, fraction: float | None, exogenous_schedule: bool) -> float:
+    """Return the minimum pre-issue bankroll that funds one ¥2 ticket.
+
+    The field is the pre-bankroll minimum, not the native ticket face value and
+    not the request-budget minimum:
+
+    - Native controller (fraction is None, self-funded): requested = ¥2 per
+      ticket, so any pre-issue bankroll >= ¥2 funds at least one ticket.
+    - Risk-fraction controller (self-funded): requested = pre * fraction, so
+      the first ticket needs pre * fraction >= ¥2, i.e. pre >= ¥2 / fraction.
+    - Exogenous matched schedule: the request is fixed by the schedule; the
+      pre-issue bankroll floor for one ticket is the ticket face value ¥2
+      (a schedule below ¥2 is an infeasible schedule, captured by reason code).
+    """
+    if exogenous_schedule or fraction is None:
+        return TICKET_STAKE
+    return TICKET_STAKE / fraction
+
+
 def _validate_nonnegative_finite(name: str, value: float) -> float:
     numeric = float(value)
     if not np.isfinite(numeric) or numeric < 0:
@@ -559,7 +578,9 @@ def replay_path(
                 "drawdown_pct": 0.0 if peak == 0 else (peak - bankroll) / peak,
                 "active": funded > 0,
                 "unfunded_reason": unfunded_reason,
-                "minimum_fundable_capital_yuan": TICKET_STAKE,
+                "minimum_fundable_capital_yuan": _minimum_fundable_capital_yuan(
+                    fraction=fraction, exogenous_schedule=funding_schedule is not None
+                ),
                 "ticket_count": int(counts.sum()),
                 # Aggregate selector ranks by immutable ticket identity before
                 # computing issue-level concentration.
@@ -1360,6 +1381,7 @@ def _schema_catalog(
         "matched_issue_bankroll_lift_yuan": "yuan",
         "matched_issue_payout_lift_yuan": "yuan",
         "control_joint_probability": "fraction",
+        "log_joint_probability": "natural_log_dimensionless_probability",
         "predicted_sp_product": "decimal_odds",
         "sp_uncertainty": "decimal_odds",
         "mean_selected_sp_seed_std": "decimal_odds",
@@ -1386,7 +1408,7 @@ def _schema_catalog(
         "primary_economics": "PRE_TAX",
         "reference_economics": "TAX_ADJUSTED_0.65_REFERENCE_ONLY",
         "tables": [
-            table(requests, name="active_research_ticket_requests.parquet", pk=["split", "issue", "policy", "k", "rank"], relationships=["one source ticket row per frozen #206 request"], domains={"panel_role": ["CONTROLLING", "SENSITIVITY_ONLY"]}, units=common_units),
+            table(requests, name="active_research_ticket_requests.parquet", pk=["split", "issue", "policy", "k", "rank"], relationships=["one source ticket row per frozen #206 request"], domains={"panel_role": ["CONTROLLING", "SENSITIVITY_ONLY"], "log_joint_probability": "(-inf, 0]; natural log of control_joint_probability, never a probability fraction"}, units=common_units),
             table(safe, name="safe_reference_ledger.csv", pk=["split", "issue", "reference"], relationships=["separate lower-exposure lane; never active evidence"], domains={"experiment_role": ["SAFE_FALLBACK_MIXED", "CASH"]}, units=common_units),
             table(ledger, name="issue_capital_ledger.parquet", pk=["split", "policy", "k", "controller", "issue"], relationships=["one bankroll replay row per issue"], units=common_units, domains=metric_domains),
             table(metrics, name="capital_summary.csv", pk=["split", "policy", "k", "controller"], relationships=["path-level summary derived from issue_capital_ledger; ex-largest removes maximum funded-stake issue with stable issue-order tie-break"], units=common_units, domains=metric_domains),

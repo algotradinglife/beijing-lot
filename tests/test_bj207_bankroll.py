@@ -17,6 +17,7 @@ from bankroll_policy.fixed_n7 import (
     Stage4Error,
     _decision,
     _digest,
+    _minimum_fundable_capital_yuan,
     _notebook_contract_digest,
     _publish_stage,
     _project_counts,
@@ -571,3 +572,170 @@ def test_committed_package_verifies() -> None:
     assert receipt["active_request_rows"] > 0
     assert receipt["matched_issue_rows"] > 0
     assert receipt["matched_ticket_rows"] > 0
+
+
+# --- R6: minimum_fundable_capital_yuan metric semantics (EV R5 §1) ---
+
+
+@pytest.mark.parametrize(
+    "fraction,exogenous,expected",
+    [
+        (None, False, 2.0),   # native/no-fraction keeps ticket face value
+        (0.01, False, 200.0),  # EQUAL_1PCT / calibrated 1%
+        (0.05, False, 40.0),   # EQUAL_5PCT / SCORE_WEIGHTED_5PCT / calibrated 5%
+        (0.25, False, 8.0),    # EQUAL_25PCT
+        (1.0, False, 2.0),     # EQUAL_100PCT
+        (0.01, True, 2.0),     # exogenous matched schedule fixes request
+        (0.25, True, 2.0),     # exogenous matched schedule fixes request
+    ],
+)
+def test_minimum_fundable_capital_yuan_helper_golden(fraction: float | None, exogenous: bool, expected: float) -> None:
+    assert _minimum_fundable_capital_yuan(fraction=fraction, exogenous_schedule=exogenous) == pytest.approx(expected)
+
+
+def test_minimum_fundable_capital_yuan_matches_risk_fraction_in_committed_ledger() -> None:
+    ledger = pd.read_parquet(ROOT / "results/issue-207/issue_capital_ledger.parquet")
+    for fraction, expected in {0.01: 200.0, 0.05: 40.0, 0.25: 8.0, 1.0: 2.0}.items():
+        mask = ledger.risk_fraction.eq(fraction)
+        assert mask.any(), f"risk fraction {fraction} missing from ledger"
+        np.testing.assert_allclose(
+            ledger.loc[mask, "minimum_fundable_capital_yuan"],
+            expected,
+            rtol=0,
+            atol=1e-12,
+        )
+    native = ledger.loc[ledger.risk_fraction.isna()]
+    assert not native.empty
+    np.testing.assert_allclose(
+        native.minimum_fundable_capital_yuan,
+        2.0,
+        rtol=0,
+        atol=1e-12,
+    )
+    # Every risk-fraction row must declare the pre-bankroll minimum for a
+    # single ¥2 ticket: 2.0 / risk_fraction.  This is the EV R5 §1 defect.
+    fraction_rows = ledger.loc[ledger.risk_fraction.notna()]
+    assert not fraction_rows.empty
+    np.testing.assert_allclose(
+        fraction_rows.minimum_fundable_capital_yuan,
+        2.0 / fraction_rows.risk_fraction,
+        rtol=0,
+        atol=1e-12,
+    )
+
+
+def test_minimum_fundable_capital_yuan_threshold_boundary_replay() -> None:
+    """Golden zero/below/exact threshold behavior for risk-fraction funding."""
+    # Below threshold: pre < 2.0 / fraction => requested < ¥2 while bankroll
+    # remains sufficient to pay a ticket => REQUEST_BUDGET_LT_NATIVE_TICKET.
+    reason = _zero_funding_reason(pre_bankroll_yuan=1.9, requested_stake_yuan=1.9)
+    assert reason == ("BANKROLL_LT_NATIVE_TICKET", "NO_BET_INSUFFICIENT_CAPITAL")
+    reason = _zero_funding_reason(pre_bankroll_yuan=7.9, requested_stake_yuan=1.975)
+    assert reason == ("REQUEST_BUDGET_LT_NATIVE_TICKET", "NO_BET_REQUEST_BUDGET_BELOW_MINIMUM")
+    # Exact threshold: pre == 2.0 / fraction => requested == ¥2, fundable.
+    reason = _zero_funding_reason(pre_bankroll_yuan=8.0, requested_stake_yuan=2.0)
+    assert reason == ("INTEGER_PROJECTION_INFEASIBLE", "NO_BET_INTEGER_PROJECTION_INFEASIBLE")
+    # The projection itself succeeds at exactly ¥2.
+    counts, residual = _project_counts(np.asarray([1.0, 0.0, 0.0]), 2.0)
+    assert counts.sum() == 1
+    assert residual == pytest.approx(0.0)
+
+
+# --- R6: independent 242-column schema audit (EV R5 §2, no _schema_catalog reuse) ---
+
+
+def test_independent_242_column_schema_audit_matrix() -> None:
+    """Compare the committed package schema to the committed independent matrix.
+
+    The matrix (tests/fixtures/bj207_schema_audit_matrix.json) is maintained
+    independently of `_schema_catalog()`: it was generated from producer
+    semantics for all 242 published columns (unit, domain, nullability, dtype,
+    primary/foreign keys).  The golden test asserts schema.json == matrix so a
+    catalog drift cannot hide behind the verifier's catalog reuse.
+    """
+    matrix = json.loads((ROOT / "tests/fixtures/bj207_schema_audit_matrix.json").read_text())
+    schema = json.loads((ROOT / "results/issue-207/schema.json").read_text())
+    matrix_tables = {name: table for name, table in matrix.items()}
+    schema_tables = {table["name"]: table for table in schema["tables"]}
+    assert set(matrix_tables) == set(schema_tables)
+    assert sum(len(table["columns"]) for table in matrix.values()) == 242
+    for name, expected in matrix_tables.items():
+        actual = schema_tables[name]
+        assert actual["primary_key"] == expected["primary_key"]
+        assert actual["foreign_keys"] == expected["foreign_keys"]
+        assert actual["relationships"] == expected["relationships"]
+        assert len(actual["columns"]) == len(expected["columns"])
+        for expected_column, actual_column in zip(expected["columns"], actual["columns"], strict=True):
+            assert actual_column["name"] == expected_column["name"]
+            assert actual_column["dtype"] == expected_column["dtype"]
+            assert actual_column["nullable"] == expected_column["nullable"]
+            assert actual_column["unit"] == expected_column["unit"]
+            assert actual_column["domain"] == expected_column["domain"]
+
+
+def test_log_joint_probability_schema_unit_is_natural_log_not_fraction() -> None:
+    """EV R5 §2: log_joint_probability is log(probability), unit must be
+    natural_log_dimensionless_probability with domain <= 0, not fraction."""
+    schema = json.loads((ROOT / "results/issue-207/schema.json").read_text())
+    catalog = {table["name"]: table for table in schema["tables"]}
+    columns = {
+        column["name"]: column
+        for column in catalog["active_research_ticket_requests.parquet"]["columns"]
+    }
+    entry = columns["log_joint_probability"]
+    assert entry["unit"] == "natural_log_dimensionless_probability"
+    assert entry["domain"] == "(-inf, 0]; natural log of control_joint_probability, never a probability fraction"
+    requests = pd.read_parquet(ROOT / "results/issue-207/active_research_ticket_requests.parquet")
+    assert requests.log_joint_probability.notna().all()
+    assert (requests.log_joint_probability <= 0).all()
+    np.testing.assert_allclose(
+        requests.log_joint_probability,
+        np.log(np.clip(requests.control_joint_probability, 1e-300, None)),
+        rtol=0,
+        atol=1e-9,
+    )
+
+
+def test_schema_audit_sweep_catches_probability_log_odds_return_rank_economic_fields() -> None:
+    """Field-level semantic spot-check on every probability/log/odds/return/
+    rank/count/economic column across all published tables (independent of
+    _schema_catalog())."""
+    schema = json.loads((ROOT / "results/issue-207/schema.json").read_text())
+    expected_units = {
+        "control_joint_probability": "fraction",
+        "log_joint_probability": "natural_log_dimensionless_probability",
+        "log_sp_product": "natural_log_decimal_odds_product",
+        "predicted_sp_product": "decimal_odds",
+        "mean_selected_sp": "decimal_odds",
+        "mean_selected_sp_seed_std": "decimal_odds",
+        "max_selected_sp_seed_std": "decimal_odds",
+        "sp_uncertainty": "decimal_odds",
+        "expected_pre_tax_net": "dimensionless_expected_net_return",
+        "mean_selected_probability": "fraction",
+        "min_selected_probability": "fraction",
+        "match_rank_mean": "rank",
+        "realized_gross": "gross_return_multiple",
+        "pre_tax_gross_multiple": "gross_return_multiple",
+        "tax_adjusted_gross_multiple": "gross_return_multiple",
+        "minimum_fundable_capital_yuan": "yuan",
+        "risk_fraction": "fraction",
+        "weight": "fraction",
+        "window_return": "fraction",
+        "active_support_roi": "fraction",
+        "ticket_hhi": "fraction",
+        "issue_stake_hhi": "fraction",
+        "ticket_identity_stake_hhi": "fraction",
+        "mean_issue_ticket_hhi": "fraction",
+        "outcome_hhi": "fraction",
+        "mean_pairwise_match_overlap": "fraction",
+    }
+    for table in schema["tables"]:
+        columns = {column["name"]: column for column in table["columns"]}
+        for name, unit in expected_units.items():
+            if name in columns:
+                assert columns[name]["unit"] == unit, f"{table['name']}.{name}: {columns[name]['unit']} != {unit}"
+        for column in table["columns"]:
+            if column["dtype"] in {"int64", "float64"}:
+                assert column["unit"] != "categorical_or_identifier", (
+                    f"numeric column {table['name']}.{column['name']} misclassified"
+                )
