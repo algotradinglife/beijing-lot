@@ -29,6 +29,8 @@ results/*
 !results/issue-205/**
 !results/issue-206/
 !results/issue-206/**
+!results/issue-208/
+!results/issue-208/**
 runs/
 .cache/
 tmp/
@@ -42,6 +44,13 @@ temp/
 !results/issue-205/*.parquet
 !results/issue-206/*.csv
 !results/issue-206/*.parquet
+!results/issue-208/*.csv
+!results/issue-208/*.parquet
+!results/issue-208/*.json
+!results/issue-208/*.joblib
+!results/issue-208/*.md
+!results/issue-208/*.sha256
+!results/issue-208/**/*.joblib
 *.feather
 *.h5
 *.hdf5

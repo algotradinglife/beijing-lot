@@ -1,0 +1,73 @@
+{
+  "capital_lanes": [
+    "NATIVE_2_YUAN",
+    "SIMPLE_ACTIVE"
+  ],
+  "contract_version": "bj208-dynamic-nk-policy-v2",
+  "folds": [
+    {
+      "test": "CV_2022",
+      "train": [
+        "CV_2021"
+      ]
+    },
+    {
+      "test": "CV_2023",
+      "train": [
+        "CV_2021",
+        "CV_2022"
+      ]
+    }
+  ],
+  "incumbent": {
+    "capital": "NATIVE_2_YUAN",
+    "k": 8,
+    "lane": "MARKET_WOR",
+    "n": 7
+  },
+  "k_grid": [
+    8,
+    16,
+    32
+  ],
+  "lanes": [
+    "MARKET_WR",
+    "MARKET_WOR",
+    "VALUE_WOR",
+    "LEARNED_MLP"
+  ],
+  "n_grid": [
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "seeds": [
+    3491908185978616755,
+    7809893083973147920,
+    1965507356126195483,
+    14395497414499889418,
+    10181107810400773127,
+    1879154897447811523,
+    16968504703213800142,
+    12762485751580171989,
+    15890254821140532956,
+    8669728547529739588,
+    14722795865182431502,
+    5213651890799362747,
+    13479980336092400513,
+    16312757435072778743,
+    17262793945441241458,
+    957918680557920586
+  ],
+  "stochastic_lanes": [
+    "MARKET_WR",
+    "MARKET_WOR"
+  ],
+  "upstream_207_manifest_sha256": "48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6",
+  "upstream_207_sha": "90869a959dc1b972cd872ffe465d1009e29df75e",
+  "value_matrix_sha256": "8fdace9c7249502456f8990137011847df9addae5ad633e61760c44b7ccde84b"
+}

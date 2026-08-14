@@ -173,3 +173,59 @@ ticket identities + identical executable yuan schedule. Impossible → NOT_IDENT
 - `results/issue-208/` immutable package (manifest SHA256, schema, provenance,
   replay commands, #209 handoff)
 - `docs/research/issue_208_dynamic_nk_policy.md` decision report + wiki update
+
+---
+
+## 13. REWORK v2 supersede rows (2026-08-14, EV REJECT 53f67ec, PR #228)
+
+EV rejected the first delivery at SHA `53f67ec` with `REWORK_TYPE=method`.
+The following rows supersede the earlier frozen text. Each defect category is
+traced to its root cause; the same-category full sweep is documented in
+`docs/research/issue_208_dynamic_nk_policy.md` §REWORK-E09.
+
+| Row | Action | Scope | Supersedes | Rationale |
+|---|---|---|---|---|
+| #208-2 | supersede | protocol_version → bj208-protocol-v2, contract_version → bj208-dynamic-nk-policy-v2 | v1 texts | EV R1 rework; all artifacts now carry v2 |
+| #208-3 | supersede | selection rule wording "positive in ≥2 of 3 folds / complete three-fold support" → "positive on ALL constructible development folds (2 of 2)" | §10 rule 3 | Fold 0 (train≤2020/test 2021) is NOT constructible from frozen upstream (DELTA #208-1). The old text claimed three folds while the implementation ran two — internal inconsistency (EV M04). |
+| #208-4 | supersede | model training: `early_stopping=True, validation_fraction=0.1` → `early_stopping=False` + chronological issue-block validation holdout (last 15% of train issues by issue id) | §7 primary_params | sklearn row-level early stopping would split one issue's 168 action rows across train/validation — a chronological-issue-block violation (EV D3). |
+| #208-5 | supersede | SIMPLE_ACTIVE capital semantics: old `bundle_capital_equal1pct` truncated budget to K ticket-count units (funded ¥16 at ¥100k/K8) → exact #207 EQUAL_1PCT: requested=pre*1%, budget=min(pre,requested), integer ¥2-unit projection over K tickets (funded ¥1,000 at ¥100k/K8) | §6 capital lane | EV D2: #207 EQUAL_1PCT first-issue funded ¥1,000; the old implementation funded ¥16, destroying capital attribution and training labels. |
+| #208-6 | supersede | controls: Ridge and best-fixed-action evaluated per fold with full paths, lift and ablation; stochastic execution/controls on the 16 preregistered seeds only (seed=0 removed); capital-change-identical arm binds frozen CONTROLLING identities | §9 controls | EV D3/D4: controls were metadata-only; seed=0 is not a registered seed; capital control re-drew tickets. |
+
+### REWORK v2 evidence chain (EV D1)
+
+- `results/issue-208/**` is now tracked (`.gitignore` exceptions mirror
+  issue-205/206). All immutable artifacts, manifest, receipt, schema,
+  provenance, COMPLETED marker and model artifacts are committed in the PR —
+  a fresh checkout can re-verify without worker-local files.
+- method_preflight hard-gate and package verify run on the committed package.
+
+### REWORK v2 verifier / tamper (EV D4)
+
+- manifest full coverage: every packaged file must be listed; unlisted
+  payloads fail.
+- provenance validated against trusted upstream hashes (not a "FORGED" prefix).
+- capital accounting verifies start ¥100,000, integer ¥2 units,
+  funded ≤ requested/pre, no top-up, path continuity.
+- N/K semantics verifier receives K and checks exactly K tickets per bundle.
+- outcome-triple validation (exactly {3,1,0} per match, ≤1 realized True,
+  official SP non-negative or NaN) added to the census loader.
+- REAL 2024 label-mutation invariance check (development panel surface
+  unchanged after 2024 label mutation) — not a constant test.
+
+### REWORK v2 metrics / drawdown (EV D5)
+
+- `summarize_path` max drawdown now uses the RUNNING peak per issue
+  (path [100, 80, 200] → 0.2, not 0.6). Golden tests call the production
+  function, not free-standing constant arithmetic.
+- holding-feasibility metrics materialized: time under water, recovery
+  issues, max consecutive losing issues, rolling 5/10/20-issue loss
+  probability and worst windows, ex-largest issue.
+
+### REWORK v2 atomicity / durability (EV D6)
+
+- runner builds in `results/issue-208.staging/`, fsyncs files + directory,
+  writes COMPLETED.json, then atomically renames over the final output.
+- manifest written AFTER all artifacts (including tamper results and the
+  receipt) so SHA256SUMS.json has full coverage.
+- NO_BET explicit path for infeasible/OOD/incumbent-infeasible cases —
+  empty action lists no longer crash argmax.

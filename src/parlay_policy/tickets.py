@@ -3,7 +3,18 @@
 Generalizes #206's fixed-N7 generator to arbitrary N. Every ticket has exactly
 N distinct matches; cross-ticket overlap is preserved and measured. Settlement
 uses the frozen official SP labels; capital replay uses native ¥2 or the frozen
-EQUAL_1PCT active control on identical tickets.
+#207 EQUAL_1PCT active control on identical tickets.
+
+REWORK v2 (D2): SIMPLE_ACTIVE capital replicates #207's EQUAL_1PCT exactly:
+  requested = pre * risk_fraction
+  budget    = min(pre, requested)
+  units     = floor(budget / TICKET_STAKE_YUAN)
+  counts    = largest-remainder projection of uniform weights * units over the
+              K selected tickets (identical to #207 _project_counts)
+  funded    = counts.sum() * TICKET_STAKE_YUAN
+  payout    = sum_i counts_i * TICKET_STAKE_YUAN * pre_tax_multiple_i
+The old implementation truncated the budget to `len(settled)` ticket-count
+units (funded ¥16 at K8 instead of ¥1,000) — that bug is removed.
 """
 
 from __future__ import annotations
@@ -26,6 +37,7 @@ from .contract import (
     OUTCOMES,
     RANKER_FEATURES,
     SEED_COUNT,
+    SIMPLE_ACTIVE_RISK_FRACTION,
     STOCHASTIC_LANES,
     TAX_FACTOR,
     TICKET_STAKE_YUAN,
@@ -268,9 +280,17 @@ def select_tickets(
     MARKET_WOR: softmax-weighted sample without replacement.
     VALUE_WOR: deterministic top-K by expected pre-tax net (simple residual).
     LEARNED_MLP: deterministic top-K by learned ranker score.
+
+    REWORK v2 (D3/D4): for stochastic lanes the seed MUST be one of the 16
+    preregistered hash seeds (ALL_SEEDS).  seed=0 is rejected — it was used by
+    the old execution/controls and is not a registered seed.
     """
     if k <= 0 or pool.empty:
         raise TicketBuildError("invalid ticket-selection request")
+    if lane in STOCHASTIC_LANES and seed not in ALL_SEEDS:
+        raise TicketBuildError(
+            f"stochastic lane {lane} requires a preregistered seed; got {seed}"
+        )
     frame = pool.copy()
     if lane == "MARKET_WR":
         rng = _lane_rng(lane, frame.issue.iloc[0], k, seed)
@@ -339,24 +359,59 @@ def bundle_capital(settled: pd.DataFrame, pre_issue_bankroll: float) -> dict[str
         "post_issue_bankroll_yuan": float(post),
         "net_pnl_yuan": float(post - pre_issue_bankroll),
         "turnover_yuan": funded,
+        "funded_ticket_count": int(len(settled)),
     }
+
+
+def _project_counts(weights: np.ndarray, budget_yuan: float) -> tuple[np.ndarray, float]:
+    """Integer ¥2-unit projection with largest-remainder — #207 _project_counts.
+
+    weights: simplex over the K selected tickets.  budget_yuan: total capital
+    budget.  Returns (counts, residual) where counts are integer ¥2 units per
+    ticket and residual = budget - counts.sum()*2 in [0, 2).
+    """
+    if not np.isfinite(weights).all() or (weights < 0).any():
+        raise TicketBuildError("invalid simplex weights")
+    if not np.isclose(weights.sum(), 1.0):
+        raise TicketBuildError("weights do not sum to 1")
+    units = int(np.floor(budget_yuan / TICKET_STAKE_YUAN))
+    raw = weights * units
+    counts = np.floor(raw).astype(int)
+    remainder = units - int(counts.sum())
+    if remainder:
+        order = np.argsort(-(raw - counts), kind="stable")
+        counts[order[:remainder]] += 1
+    residual = float(budget_yuan - counts.sum() * TICKET_STAKE_YUAN)
+    if residual < -1e-9 or residual >= TICKET_STAKE_YUAN + 1e-9:
+        raise TicketBuildError(
+            f"integer projection residual outside [0,2): {residual}"
+        )
+    return counts, residual
 
 
 def bundle_capital_equal1pct(
     settled: pd.DataFrame,
     pre_issue_bankroll: float,
-    risk_fraction: float = 0.01,
+    risk_fraction: float = SIMPLE_ACTIVE_RISK_FRACTION,
 ) -> dict[str, float]:
-    """EQUAL_1PCT active control: identical tickets, risk-fraction funding.
+    """#207 EQUAL_1PCT active control: identical tickets, risk-fraction funding.
 
-    Requested = pre * fraction, projected to integer ¥2 ticket counts.
+    requested = pre * fraction; budget = min(pre, requested); integer ¥2-unit
+    projection over the K selected tickets (uniform weights, largest remainder).
+    funded = units * 2 — matches #207 ledger (pre=100,000, K8 -> ¥1,000).
     """
     requested = pre_issue_bankroll * risk_fraction
-    ticket_count = int(np.floor(requested / TICKET_STAKE_YUAN))
-    ticket_count = min(ticket_count, len(settled))
-    funded = float(ticket_count * TICKET_STAKE_YUAN)
+    budget = min(pre_issue_bankroll, requested)
+    k = len(settled)
+    if k == 0:
+        raise TicketBuildError("cannot fund an empty ticket bundle")
+    weights = np.full(k, 1.0 / k, dtype=float)
+    counts, residual = _project_counts(weights, budget)
+    funded = float(counts.sum() * TICKET_STAKE_YUAN)
+    multiples = settled["pre_tax_gross_multiple"].to_numpy(dtype=float)
+    finite = np.isfinite(multiples)
     payout = float(
-        settled.head(ticket_count)["payout_yuan"].sum()
+        np.sum(np.where(finite, counts * TICKET_STAKE_YUAN * multiples, 0.0))
     )
     post = pre_issue_bankroll - funded + payout
     return {
@@ -366,7 +421,9 @@ def bundle_capital_equal1pct(
         "post_issue_bankroll_yuan": float(post),
         "net_pnl_yuan": float(post - pre_issue_bankroll),
         "turnover_yuan": funded,
-        "funded_ticket_count": ticket_count,
+        "funded_ticket_count": int(counts.sum()),
+        "projection_residual_yuan": residual,
+        "requested_stake_yuan": float(requested),
     }
 
 
@@ -389,6 +446,12 @@ def mean_pairwise_overlap(selected: pd.DataFrame) -> float:
     return total / count if count else 0.0
 
 
+def repeat_exposure(selected: pd.DataFrame) -> float:
+    """Mean number of times a ticket identity repeats within the bundle."""
+    counts = selected["ticket_identity"].value_counts()
+    return float(counts.mean()) if len(counts) else 0.0
+
+
 def ticket_hhi(selected: pd.DataFrame) -> float:
     counts = selected["ticket_identity"].value_counts(normalize=True)
     return float(np.sum(counts**2))
@@ -402,8 +465,9 @@ def fit_learned_ranker(
 ) -> Any:
     """Fit the LEARNED_MLP lane ranker on labeled development tickets.
 
-    Same structure as #206's LEARNED_MLP (StandardScaler + MLPClassifier),
-    fitted only on CV_2021 labels; never on 2024/2025/2026.
+    REWORK v2 (D3): early_stopping is disabled (sklearn row-level validation
+    could leak across tickets); the ranker is fit on chronological issue-block
+    training tickets only, never on 2024/2025/2026.
     """
     from sklearn.neural_network import MLPClassifier
     from sklearn.pipeline import make_pipeline
@@ -423,7 +487,7 @@ def fit_learned_ranker(
             alpha=0.01,
             max_iter=120,
             random_state=seed,
-            early_stopping=True,
+            early_stopping=False,
         ),
     )
     model.fit(x, y)
@@ -438,6 +502,6 @@ def ranker_scores(model: Any, pool: pd.DataFrame, features: tuple[str, ...] = RA
 __all__ = [
     "TicketBuildError", "bundle_capital", "bundle_capital_equal1pct",
     "fit_learned_ranker", "generate_candidate_pool", "match_score",
-    "mean_pairwise_overlap", "ranker_scores", "select_tickets",
-    "settle_tickets", "ticket_hhi",
+    "mean_pairwise_overlap", "ranker_scores", "repeat_exposure",
+    "select_tickets", "settle_tickets", "ticket_hhi",
 ]

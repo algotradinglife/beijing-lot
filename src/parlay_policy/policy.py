@@ -4,12 +4,26 @@ Primary: sklearn MLPRegressor on state x + action encoding a, target = matched
 pre-tax capital lift vs frozen N7/K8 incumbent. Controls: Ridge (regularized
 linear) and best fixed action. Chronological issue-block folds. Safety gate:
 conservative predicted lift > 0 AND coverage/OOD/fundability.
+
+REWORK v2 (D3):
+- early_stopping is DISABLED.  sklearn's validation_fraction splits rows at
+  random, so 168 action rows of one issue could cross train/validation —
+  a chronological-issue-block violation.  Instead the runner fits the model on
+  the full train issue block and reports a separate chronological holdout
+  (last 15% of train issues by issue id) for train/val loss curves.
+- serialize_policy now serializes the FITTED weights (joblib) plus scaler
+  parameters, so handoff_209.json can label-blind replay the model.
+- choose_action handles the empty-action / NO_BET boundary: if no lawful
+  action exists (M < min(N_GRID) or all infeasible) it returns NO_BET instead
+  of crashing on argmax of an empty list.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+import io
 import json
+from pathlib import Path
 from typing import Any, Iterable
 
 import numpy as np
@@ -25,6 +39,7 @@ from .contract import (
     K_GRID,
     LANES,
     N_GRID,
+    NO_BET_KEY,
     action_encoding,
     all_actions,
 )
@@ -46,6 +61,9 @@ class LearnedPolicy:
     ood_scaler: Any = None
     ood_threshold: float | None = None
     fit_fold_years: tuple[str, ...] = ()
+    validation_rmse: float | None = None
+    fit_issue_count: int = 0
+    validation_issue_count: int = 0
 
 
 def _action_columns() -> tuple[str, ...]:
@@ -88,6 +106,12 @@ def fit_mlp(
     *,
     seed: int,
 ) -> Any:
+    """Chronological MLPRegressor pipeline — NO sklearn early stopping.
+
+    REWORK v2 (D3): early_stopping=False.  Any validation must be an
+    issue-block holdout computed by the runner, never a row-level
+    validation_fraction inside sklearn.
+    """
     model = make_pipeline(
         StandardScaler(),
         MLPRegressor(
@@ -95,9 +119,7 @@ def fit_mlp(
             alpha=1e-3,
             max_iter=500,
             random_state=seed,
-            early_stopping=True,
-            validation_fraction=0.1,
-            n_iter_no_change=20,
+            early_stopping=False,
         ),
     )
     model.fit(x_train, y_train)
@@ -145,6 +167,7 @@ def fit_policy(
     kind: str = "MLP",
     seed: int = 208001,
     fixed_action_key: str | None = None,
+    validation_df: pd.DataFrame | None = None,
 ) -> LearnedPolicy:
     """Fit a policy on a training frame with columns from build_design + 'y_lift'."""
     if train_df.empty or "y_lift" not in train_df.columns:
@@ -167,6 +190,12 @@ def fit_policy(
     else:
         raise PolicyError(f"unknown policy kind {kind}")
     rmse = residual_rmse(model, x, y) if model is not None else 0.0
+    validation_rmse = None
+    if validation_df is not None and not validation_df.empty and model is not None:
+        x_val = validation_df.loc[:, features].to_numpy(dtype=float)
+        y_val = validation_df["y_lift"].to_numpy(dtype=float)
+        if np.isfinite(x_val).all() and np.isfinite(y_val).all():
+            validation_rmse = residual_rmse(model, x_val, y_val)
     return LearnedPolicy(
         model=model,
         model_kind=kind,
@@ -174,6 +203,13 @@ def fit_policy(
         fitted_action_keys=tuple(sorted(train_df["action_key"].unique())),
         residual_rmse=rmse,
         fixed_action_key=fixed_action_key,
+        validation_rmse=validation_rmse,
+        fit_issue_count=int(train_df["issue"].nunique()),
+        validation_issue_count=(
+            int(validation_df["issue"].nunique())
+            if validation_df is not None and not validation_df.empty
+            else 0
+        ),
     )
 
 
@@ -203,13 +239,31 @@ def choose_action(
     ood_scaler: Any = None,
     ood_threshold: float | None = None,
     conservative: bool = True,
-) -> tuple[Action, dict[str, Any]]:
+) -> tuple[Action | None, dict[str, Any]]:
     """Argmax over actions with the preregistered safety gate.
 
-    Safety: conservative predicted lift > 0 AND OOD statistic <= threshold AND
-    coverage/fundability (checked by caller-provided state row finite and
-    bankroll >= K * 2). Returns (action, decision_trace).
+    REWORK v2 (D6): if `actions` is empty (no lawful action: M < min N grid,
+    or every action infeasible) returns (None, NO_BET trace) instead of
+    crashing on np.argmax([]).
+
+    Returns (Action | None, trace).  None means NO_BET (explicit).
     """
+    if not actions:
+        return None, {
+            "action_key": NO_BET_KEY,
+            "predicted_lift": float("nan"),
+            "conservative_lift": float("nan"),
+            "residual_rmse": float(policy.residual_rmse),
+            "ood_statistic": float("nan"),
+            "ood_threshold": ood_threshold,
+            "ood_pass": False,
+            "fundable": False,
+            "covered": False,
+            "safety_gate_pass": False,
+            "fallback": "NO_BET",
+            "reason": "NO_LAWFUL_ACTION",
+            "scores": {},
+        }
     if ood_scaler is not None and ood_threshold is not None:
         stat = float(ood_statistic(ood_scaler, [state_row])[0])
         ood_pass = stat <= ood_threshold
@@ -269,31 +323,74 @@ def best_fixed_action_key(train_df: pd.DataFrame) -> str:
     return str(grouped.idxmax())
 
 
-def serialize_policy(policy: LearnedPolicy) -> dict[str, Any]:
-    """Serialize model weights/config for the #209 handoff (label-blind)."""
+def serialize_policy(
+    policy: LearnedPolicy,
+    *,
+    model_path: Path | None = None,
+    scaler_params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Serialize the FITTED policy for the #209 handoff (label-blind).
+
+    REWORK v2 (D3): previously only model params were written with
+    `model_serialized=True` — no weights, no scaler.  Now the fitted pipeline
+    is dumped to `model_path` via joblib (in the runner), and this function
+    records the model file name + scaler mean/scale so handoff_209.json can
+    label-blind replay.
+    """
     payload: dict[str, Any] = {
         "model_kind": policy.model_kind,
         "action_columns": list(policy.action_columns),
         "fitted_action_keys": list(policy.fitted_action_keys),
         "residual_rmse": float(policy.residual_rmse),
+        "validation_rmse": (
+            float(policy.validation_rmse) if policy.validation_rmse is not None else None
+        ),
         "fixed_action_key": policy.fixed_action_key,
         "fit_fold_years": list(policy.fit_fold_years),
         "state_feature_order": list(STATE_FEATURE_NAMES),
+        "fit_issue_count": policy.fit_issue_count,
+        "validation_issue_count": policy.validation_issue_count,
     }
     if policy.model is not None:
-        payload["model_serialized"] = True
-        payload["model_type"] = str(type(policy.model).__name__)
         inner = policy.model.named_steps.get("mlpregressor")
+        scaler = policy.model.named_steps.get("standardscaler")
+        payload["model_serialized"] = True
+        payload["model_file"] = str(model_path.name) if model_path else None
+        payload["model_type"] = str(type(policy.model).__name__)
+        if scaler is not None:
+            payload["scaler_mean"] = (
+                scaler.mean_.tolist() if hasattr(scaler, "mean_") else None
+            )
+            payload["scaler_scale"] = (
+                scaler.scale_.tolist() if hasattr(scaler, "scale_") else None
+            )
         if inner is not None:
             payload["model_params"] = {
                 k: (str(v) if callable(v) else v)
                 for k, v in inner.get_params(deep=False).items()
             }
+            if hasattr(inner, "coefs_"):
+                payload["coefs_shape"] = [
+                    list(c.shape) for c in inner.coefs_
+                ]
+            if hasattr(inner, "loss_curve_"):
+                payload["loss_curve_tail"] = [
+                    float(v) for v in inner.loss_curve_[-5:]
+                ]
     return payload
+
+
+def restore_model(payload: dict[str, Any], model_file: Path) -> Any:
+    """Load the fitted pipeline back for label-blind replay (#209)."""
+    import joblib
+
+    if not model_file.exists():
+        raise PolicyError(f"model artifact missing: {model_file}")
+    return joblib.load(model_file)
 
 
 __all__ = [
     "LearnedPolicy", "PolicyError", "best_fixed_action_key", "build_design",
     "choose_action", "fit_policy", "ood_gate", "ood_statistic", "predict_lift",
-    "residual_rmse", "serialize_policy",
+    "residual_rmse", "restore_model", "serialize_policy",
 ]

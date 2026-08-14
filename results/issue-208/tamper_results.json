@@ -1,0 +1,39 @@
+[
+  {
+    "attack": "mutate_settlement",
+    "detected": true,
+    "failures": [
+      "hash mismatch issue_capital_ledger.parquet: 50916c778a2e2d964eacb611c70954b322f5feab6759c2261deb3edbb11380c9 != 9eb15552ad592cc208dfc148d669e8615f3fb5d692b9a3ad4a9dbb9d0a49d81d",
+      "capital conservation violated on 1 rows"
+    ]
+  },
+  {
+    "attack": "self_consistent_ledger",
+    "detected": true,
+    "failures": [
+      "hash mismatch issue_capital_ledger.parquet: 2c1bdb18f3c7fb570952db041724bf019b975e8f61c1bcbc35a3cb4873721ad5 != 9eb15552ad592cc208dfc148d669e8615f3fb5d692b9a3ad4a9dbb9d0a49d81d",
+      "path continuity broken on 1 row boundary",
+      "path learned_policy starts at 100100.0, not 100000.0"
+    ]
+  },
+  {
+    "attack": "forge_manifest",
+    "detected": true,
+    "failures": [
+      "hash mismatch decision_fold1.parquet: d592e56718bb117f5d3bf81ce8c0fb06a59f5c912ac986a19346c7cc7e4e65f8 != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_fold2.parquet: 7e7b2ff212f0b4b245089ab922ac4eb72f6144c95f4ff0bee2d7c025ab57bbee != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_rows_all.parquet: a934747357796ab235a2350eeb1e5b658f3e99e23b3ba5ef63f2ae2fba54631b != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_ticket_identities.parquet: 07c9d08c41f06073aeb875c45a1c112cf4aa527f137ce9c9ff2247f704921e97 != 0000000000000000000000000000000000000000000000000000000000000000",
+      "missing artifact ghost_payload.parquet"
+    ]
+  },
+  {
+    "attack": "forge_source_trace",
+    "detected": true,
+    "failures": [
+      "hash mismatch provenance.json: 926f494d3f583dde66e98d0d04ca52bfb20ddb1ffb8896819400bb7f5c8e1913 != ab51eadf933b6a8bee64ddf98e518564d73595af6d1f49d30e5e3bc06c38363e",
+      "provenance source_issue_207_manifest_sha256 mismatch: 0000000000000000000000000000000000000000000000000000000000000000",
+      "provenance source_value_matrix_sha256 mismatch: 0000000000000000000000000000000000000000000000000000000000000000"
+    ]
+  }
+]

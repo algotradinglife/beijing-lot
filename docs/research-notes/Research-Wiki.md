@@ -967,24 +967,42 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
 - PI 对抗性结论：SIMPLE/K16 正向路径、低暴露和上游票选择均不能归因于 Stage 4；
   因此接受负结论并推进 N 与 K 分离学习，而不是把固定 N7 解释为 Edge。
 
-### Issue #208 动态 N×K 学习策略（2026-08-14，待 EV）
+### Issue #208 动态 N×K 学习策略（2026-08-14，REWORK v2 待 EV）
 
 - 契约 BJ-UNIFIED-DYNAMIC-N-001 / v3：主候选为逐期学习的 action-value 策略
   `Q_theta(x,a)`（`sklearn MLPRegressor`），目标 = matched pre-tax capital lift
   vs 冻结 N7/K8 incumbent；控制为 Ridge + best fixed action；16 个 hash 种子聚合。
+- REWORK v2（EV REJECT 53f67ec 后 fresh 返工，PR 分支 analyst/bj208-rework-r1）：
+  - 资本语义修复（D2）：SIMPLE_ACTIVE 精确复制 #207 EQUAL_1PCT（requested=pre×1%，
+    整数 ¥2-unit 投影）；`capital_change_identical` 臂与冻结 #207 EQUAL_1PCT
+    ledger 一致到 7 位小数（CV_2023 终值 ¥64,659.136…）。旧交付因 ¥16/期错误资金
+    报 ¥101,425 — 已修正。
+  - 泄漏修复（D3）：MLP/ranker 禁用 sklearn 行级 early stopping，改用时间序
+    issue-block 校验块；Ridge 与 best-fixed 控制逐 fold 产出完整路径与 ablation；
+    模型权重 + scaler 序列化（models/fold*.joblib）支持 label-blind replay。
+  - 验证修复（D4）：manifest 全覆盖率（相对路径 + unlisted 检查）、provenance
+    信任哈希校验、资本起始 ¥100,000/¥2 单位/continuity、N/K 语义带 K 校验、
+    outcome triple 校验、真实 2024 mutation invariance 测试。
+  - 指标修复（D5）：max drawdown 改为 running-peak（[100,80,200]→0.2 而非 0.6），
+    golden tests 绑定生产函数；补充 time-under-water/recovery/max-loss-streak/
+    rolling 5/10/20。
+  - 原子性修复（D6）：staging + fsync + COMPLETED 后写 manifest + 原子 rename。
 - 结论：**无合格学习行**。安全门（conservative lift = 预测 − 1×RMSE + 覆盖率/
-  OOD/fundability）在 113 个测试期中仅放行 3 期且三者 realized 均为 0 payout；
-  门控后的学习路径与冻结 incumbent 完全一致（两 fold matched lift = 0.0）。
-  按预注册词典序规则第 5 步，冻结 **N7/K8/MARKET_WOR/native-¥2** incumbent 作为
-  #209 候选，并发布完整 frontier 与失败模式。
-- 诊断要点：calibration 单调（predicted 7.9→80.7 vs realized 63.6→827.3），
-  Q 模型有信号但不足以通过保守门；无门控策略偏好短串（N=4/5）与 LEARNED_MLP
+  OOD/fundability）在 113 个测试期中放行 0 期；门控后的学习路径与冻结 incumbent
+  完全一致（两 fold matched lift = 0.0）。按预注册词典序规则第 5 步（2 个可构造
+  fold 上均需正 lift，supersede #208-3），冻结 **N7/K8/MARKET_WOR/native-¥2**
+  incumbent 作为 #209 候选，并发布完整 frontier 与失败模式。
+- 诊断要点：calibration 单调（predicted 0.4→444 vs realized 2,415→27,105），
+  Q 模型有信号但不足以通过保守门；无门控策略偏好短串（N=4）与 LEARNED_MLP
   通道，但全部被保守门否决 — 与 #207"learned allocation 不自动成为 Edge"一致。
+- 控制矩阵（CV_2023，¥100,000 起）：static_n8k8 ¥100,810 / n7k16 ¥99,573 /
+  generator_change ¥99,456 / ridge=learned=incumbent ¥99,313 /
+  best_fixed(N4K32) ¥88,604 / capital_change_identical(EQUAL_1PCT) ¥64,659。
 - 冻结绑定：incumbent 臂精确绑定 #207 CONTROLLING K8 路径（CV_2023 ¥99,312.89、
   CV_2022 ¥99,072.00，source=FROZEN_INCUMBENT_207）。
-- 工件：`notebooks/research/issue-208/`、`src/parlay_policy/`、
-  `results/issue-208/`（manifest + handoff_209.json）、
-  `docs/research/issue_208_dynamic_nk_policy.md`。
+- 工件：`notebooks/research/issue-208/`（12/12 cells 已执行）、`src/parlay_policy/`、
+  `results/issue-208/`（61 文件 manifest + handoff_209.json + models/）、
+  `docs/research/issue_208_dynamic_nk_policy.md`；tamper 4/4 检出；method_preflight PASS。
 
 ## 相关笔记
 

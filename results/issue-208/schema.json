@@ -1,0 +1,47 @@
+{
+  "contract_version": "bj208-dynamic-nk-policy-v2",
+  "frames": {
+    "census.csv": {
+      "M": "int",
+      "excluded_matches": "int",
+      "issue": "str",
+      "labels_available": "bool",
+      "split": "str",
+      "year": "int"
+    },
+    "eligibility.csv": {
+      "M": "int",
+      "N": "int",
+      "eligible": "bool",
+      "issue": "str",
+      "labels_available": "bool",
+      "split": "str",
+      "year": "int"
+    },
+    "issue_capital_ledger.parquet": {
+      "action_key": "str",
+      "funded_stake_yuan": "float",
+      "gross_payout_yuan": "float",
+      "issue": "str",
+      "policy": "str",
+      "post_issue_bankroll_yuan": "float",
+      "pre_issue_bankroll_yuan": "float",
+      "split": "str",
+      "year": "int"
+    },
+    "label_surface_fit.parquet": {
+      "action_key": "str",
+      "capital": "str",
+      "funded_yuan": "float",
+      "issue": "str",
+      "k": "int",
+      "lane": "str",
+      "matched_lift_mean": "float",
+      "matched_lift_median": "float",
+      "matched_lift_std": "float",
+      "n": "int",
+      "split": "str",
+      "year": "int"
+    }
+  }
+}

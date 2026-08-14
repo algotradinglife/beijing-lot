@@ -1,0 +1,18 @@
+{
+  "environment": {
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "pyarrow": "24.0.0",
+    "python": "3.11.15",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.17.1"
+  },
+  "label_boundary": "CV_2021 fit; CV_2022/CV_2023 development; 2024/2025/2026 embargoed",
+  "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208",
+  "source_issue_207": "results/issue-207",
+  "source_issue_207_manifest_sha256": "48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6",
+  "source_issue_207_sha": "90869a959dc1b972cd872ffe465d1009e29df75e",
+  "source_value_matrix": "results/issue-205/value_matrix.parquet",
+  "source_value_matrix_sha256": "8fdace9c7249502456f8990137011847df9addae5ad633e61760c44b7ccde84b",
+  "version": "bj208-dynamic-nk-policy-v2"
+}

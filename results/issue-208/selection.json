@@ -1,0 +1,42 @@
+{
+  "candidate": {
+    "capital": "NATIVE_2_YUAN",
+    "k": 8,
+    "lane": "MARKET_WOR",
+    "n": 7,
+    "policy": "FROZEN_N7_INCUMBENT",
+    "reason": "selection rule found no eligible learned row; freeze N7 incumbent"
+  },
+  "constructible_fold_count": 2,
+  "eligible": false,
+  "frozen_candidate": {
+    "capital": "NATIVE_2_YUAN",
+    "k": 8,
+    "lane": "MARKET_WOR",
+    "n": 7,
+    "policy": "FROZEN_N7_INCUMBENT"
+  },
+  "matched_lift_by_fold": [
+    {
+      "fold": "fold1",
+      "frozen_incumbent_end": 99072.0,
+      "learned_end": 99072.0,
+      "matched_lift": 0.0,
+      "test_split": "CV_2022"
+    },
+    {
+      "fold": "fold2",
+      "frozen_incumbent_end": 99312.88946088498,
+      "learned_end": 99312.88946088498,
+      "matched_lift": 0.0,
+      "test_split": "CV_2023"
+    }
+  ],
+  "max_drawdown_pct": 0.009121459433509362,
+  "median_matched_lift_yuan": 0.0,
+  "positive_fold_count": 0,
+  "rule1_valid_replay_complete_support_no_ruin": true,
+  "rule2_positive_median_lift": false,
+  "rule3_positive_on_all_constructible_folds": false,
+  "worst_fold_matched_lift_yuan": 0.0
+}

@@ -1,8 +1,17 @@
 """Issue #208: dynamic N x K risk-conditioned parlay policy frontier.
 
-Contract BJ-UNIFIED-DYNAMIC-N-001 / v3. Frozen preregistrations live in
-docs/research/issue_208_protocol_log.md. This module binds constants,
-action catalog, seeds and chronology.
+Contract BJ-UNIFIED-DYNAMIC-N-001 / v3 (REWORK v2, EV REJECT 53f67ec).
+Frozen preregistrations live in docs/research/issue_208_protocol_log.md.
+This module binds constants, action catalog, seeds and chronology.
+
+REWORK v2 changes (see PROTOCOL-LOG supersede #208-2..#208-6):
+- Stochastic lanes execute ONLY on the 16 preregistered hash seeds; seed=0
+  is never used for execution or controls (was D3/D4).
+- SIMPLE_ACTIVE capital replicates #207 EQUAL_1PCT exactly: requested =
+  pre * 1%, budget = min(pre, requested), integer ¥2-unit projection over
+  the K selected tickets (largest-remainder), funded = units*2 (was D2).
+- MLP early_stopping disabled; validation is a chronological issue-block
+  holdout, never sklearn row-level validation_fraction (was D3).
 """
 
 from __future__ import annotations
@@ -11,8 +20,8 @@ from dataclasses import asdict, dataclass
 from hashlib import sha256
 from typing import Final
 
-CONTRACT_VERSION: Final = "bj208-dynamic-nk-policy-v1"
-PROTOCOL_VERSION: Final = "bj208-protocol-v1"
+CONTRACT_VERSION: Final = "bj208-dynamic-nk-policy-v2"
+PROTOCOL_VERSION: Final = "bj208-protocol-v2"
 UPSTREAM_207_SHA: Final = (
     "90869a959dc1b972cd872ffe465d1009e29df75e"
 )
@@ -67,6 +76,9 @@ SEED_COUNT: Final = 16
 MODEL_SEED: Final = 208001
 NUISANCE_CANDIDATE_SEEDS: Final = (208101, 208102, 208103)
 
+# SIMPLE_ACTIVE capital = #207 EQUAL_1PCT risk fraction
+SIMPLE_ACTIVE_RISK_FRACTION: Final = 0.01
+
 
 def seed_for(seed_index: int) -> int:
     """16 preregistered hash-derived seeds (protocol section 4)."""
@@ -118,6 +130,14 @@ class Action:
     @property
     def key(self) -> str:
         return f"N{self.n}/K{self.k}/{self.lane}/{self.capital}"
+
+    @property
+    def stochastic(self) -> bool:
+        return self.lane in STOCHASTIC_LANES
+
+
+# Explicit NO_BET action (infeasible / OOD / frozen safety-rule cases).
+NO_BET_KEY: Final = "NO_BET"
 
 
 def all_actions() -> tuple[Action, ...]:
@@ -178,9 +198,10 @@ __all__ = [
     "DEVELOPMENT_SPLITS", "DETERMINISTIC_LANES", "EMBARGOED_SPLITS",
     "FIT_SPLIT", "FOLDS", "FORBIDDEN_INFERENCE_PARTS", "INITIAL_BANKROLL_YUAN",
     "INCUMBENT_CAPITAL", "INCUMBENT_K", "INCUMBENT_LANE", "INCUMBENT_N",
-    "K_GRID", "LANES", "MODEL_SEED", "N_GRID", "NUISANCE_CANDIDATE_SEEDS",
-    "OUTCOMES", "PROTOCOL_VERSION", "RANKER_FEATURES", "REFERENCE_LANE",
-    "SELECTION_SPLIT", "SEED_COUNT", "STOCHASTIC_LANES", "TAX_FACTOR",
+    "K_GRID", "LANES", "MODEL_SEED", "N_GRID", "NO_BET_KEY",
+    "NUISANCE_CANDIDATE_SEEDS", "OUTCOMES", "PROTOCOL_VERSION",
+    "RANKER_FEATURES", "REFERENCE_LANE", "SELECTION_SPLIT", "SEED_COUNT",
+    "SIMPLE_ACTIVE_RISK_FRACTION", "STOCHASTIC_LANES", "TAX_FACTOR",
     "TERMINAL_SPLIT", "TICKET_STAKE_YUAN", "UPSTREAM_207_MANIFEST_SHA256",
     "UPSTREAM_207_PACKAGE", "UPSTREAM_207_SHA", "VALUE_MATRIX",
     "VALUE_MATRIX_SHA256", "action_encoding", "all_actions", "as_action_dict",

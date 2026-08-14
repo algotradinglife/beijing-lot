@@ -2,6 +2,17 @@
 
 Generalizes the #206 panel loader to arbitrary N eligibility and exposes the
 pre-event cell surface used for counterfactual ticket construction.
+
+REWORK v2 (D4): panel loading fails closed on malformed outcome triples:
+- every match must have EXACTLY the outcome codes {3,1,0} (no duplicate /
+  missing / extra codes);
+- every match must have EXACTLY ONE realized outcome (nullable boolean
+  domain: NaN means "not the realized outcome"; exactly one non-null True
+  per match when labels are available);
+- official settlement domain: official_final_sp_label must be positive
+  finite when present (or NaN when labels unavailable);
+- the #207 upstream manifest is bound at load time (fail-closed digest
+  check against the frozen manifest, not just path existence).
 """
 
 from __future__ import annotations
@@ -22,6 +33,7 @@ from .contract import (
     N_GRID,
     OUTCOMES,
     TAX_FACTOR,
+    UPSTREAM_207_MANIFEST_SHA256,
     UPSTREAM_207_PACKAGE,
     VALUE_MATRIX,
     VALUE_MATRIX_SHA256,
@@ -78,7 +90,42 @@ def load_value_matrix(root: Path) -> pd.DataFrame:
     frame["_outcome_rank"] = frame.outcome_code.map(outcome_rank)
     if frame._outcome_rank.isna().any():
         raise CensusError("unsupported outcome code")
+    # D4: realized_outcome must be nullable boolean (bool or NaN) — never
+    # silently coerce an int/string to bool via numpy.
+    if not pd.api.types.is_bool_dtype(frame["realized_outcome"].dropna()):
+        raise CensusError("realized_outcome is not boolean/NaN")
     return frame
+
+
+def _validate_outcome_triples(group: pd.DataFrame, issue: str) -> None:
+    """D4: per-match M×3 validation before reshaping.
+
+    The value matrix is long-form (3 rows per match).  For every match:
+      - outcome codes are exactly {3,1,0} (each once);
+      - exactly one realized_outcome is True (non-null boolean);
+      - official_final_sp_label is positive finite or NaN.
+    """
+    matches = group.groupby("match_idx", sort=False)
+    for match_idx, rows in matches:
+        codes = set(rows["outcome_code"].astype(str))
+        if codes != set(OUTCOMES):
+            raise CensusError(
+                f"issue {issue} match {match_idx} outcome codes {sorted(codes)} "
+                f"!= {{3,1,0}}"
+            )
+        realized = rows["realized_outcome"]
+        realized_values = realized.fillna(False).astype(bool)
+        if realized_values.sum() > 1:
+            raise CensusError(
+                f"issue {issue} match {match_idx} realized True count "
+                f"{int(realized_values.sum())} > 1 (duplicate realized outcomes)"
+            )
+        official = rows["official_final_sp_label"].to_numpy(dtype=float)
+        present = official[np.isfinite(official)]
+        if len(present) and (present < 0).any():
+            raise CensusError(
+                f"issue {issue} match {match_idx} negative official SP"
+            )
 
 
 def build_panels(frame: pd.DataFrame) -> dict[tuple[str, str], IssuePanel]:
@@ -89,6 +136,7 @@ def build_panels(frame: pd.DataFrame) -> dict[tuple[str, str], IssuePanel]:
         sizes = group.groupby("match_idx", sort=False).size()
         if not sizes.eq(3).all():
             raise CensusError(f"issue {issue} does not have complete M×3 rows")
+        _validate_outcome_triples(group, issue)
         probability = group.control_probability.to_numpy(dtype=float).reshape(-1, 3)
         experimental_probability = group.experimental_probability.to_numpy(
             dtype=float
@@ -130,6 +178,8 @@ def build_panels(frame: pd.DataFrame) -> dict[tuple[str, str], IssuePanel]:
             raise CensusError(f"issue {issue} has non-finite/non-positive predicted_sp")
         if not np.isfinite(experimental_probability).all():
             raise CensusError(f"issue {issue} non-finite experimental_probability")
+        # D4: nullable boolean domain — labels_available iff realized has any
+        # True, and every True row is a real non-null observation.
         if str(split) in EMBARGOED_SPLITS:
             labels_available = False
         else:
@@ -193,10 +243,38 @@ def census_table(panels: dict[tuple[str, str], IssuePanel]) -> pd.DataFrame:
 
 
 def load_upstream_tickets(root: Path) -> pd.DataFrame:
-    """Bind the exact #207 CONTROLLING K8 ticket identities."""
-    path = root / UPSTREAM_207_PACKAGE / "active_research_ticket_requests.parquet"
+    """Bind the exact #207 CONTROLLING K8 ticket identities.
+
+    REWORK v2 (D1/D4): the #207 package manifest is verified at load time —
+    the active_research_ticket_requests.parquet hash must appear in the
+    frozen #207 SHA256SUMS.json.  Fail-closed on mismatch or missing entry.
+    """
+    pkg = root / UPSTREAM_207_PACKAGE
+    manifest_path = pkg / "SHA256SUMS.json"
+    if not manifest_path.exists():
+        raise CensusError(f"upstream manifest unavailable: {manifest_path}")
+    manifest_json = json.loads(manifest_path.read_text(encoding="utf-8"))
+    actual_manifest_hash = digest(manifest_path)
+    if actual_manifest_hash != UPSTREAM_207_MANIFEST_SHA256:
+        raise CensusError(
+            f"upstream manifest hash mismatch: {actual_manifest_hash} != "
+            f"{UPSTREAM_207_MANIFEST_SHA256}"
+        )
+    path = pkg / "active_research_ticket_requests.parquet"
     if not path.exists():
         raise CensusError(f"upstream tickets unavailable: {path}")
+    name = "active_research_ticket_requests.parquet"
+    entries = manifest_json.get("files", manifest_json)
+    if name not in entries:
+        raise CensusError(f"upstream manifest missing entry {name}")
+    actual = digest(path)
+    expected = entries[name]
+    if isinstance(expected, dict):
+        expected = expected.get("sha256", expected.get("hash"))
+    if not expected or actual != str(expected):
+        raise CensusError(
+            f"upstream ticket file hash mismatch: {actual} != {expected}"
+        )
     frame = pd.read_parquet(path)
     if "panel_role" not in frame.columns:
         raise CensusError("upstream tickets missing panel_role")
@@ -204,9 +282,28 @@ def load_upstream_tickets(root: Path) -> pd.DataFrame:
 
 
 def load_upstream_ledger(root: Path) -> pd.DataFrame:
-    path = root / UPSTREAM_207_PACKAGE / "issue_capital_ledger.parquet"
+    """Bind the #207 issue capital ledger (manifest-verified)."""
+    pkg = root / UPSTREAM_207_PACKAGE
+    manifest_path = pkg / "SHA256SUMS.json"
+    if not manifest_path.exists():
+        raise CensusError(f"upstream manifest unavailable: {manifest_path}")
+    manifest_json = json.loads(manifest_path.read_text(encoding="utf-8"))
+    actual_manifest_hash = digest(manifest_path)
+    if actual_manifest_hash != UPSTREAM_207_MANIFEST_SHA256:
+        raise CensusError(f"upstream manifest hash mismatch")
+    path = pkg / "issue_capital_ledger.parquet"
     if not path.exists():
         raise CensusError(f"upstream ledger unavailable: {path}")
+    name = "issue_capital_ledger.parquet"
+    entries = manifest_json.get("files", manifest_json)
+    if name not in entries:
+        raise CensusError(f"upstream manifest missing entry {name}")
+    actual = digest(path)
+    expected = entries[name]
+    if isinstance(expected, dict):
+        expected = expected.get("sha256", expected.get("hash"))
+    if not expected or actual != str(expected):
+        raise CensusError(f"upstream ledger hash mismatch")
     return pd.read_parquet(path)
 
 

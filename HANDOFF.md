@@ -1,65 +1,70 @@
-# HANDOFF — Issue #208 (analyst/bj208-issue)
+# HANDOFF — Issue #208 REWORK v2 (fresh)
 
-[SESSION] 20260814_003538_ea61b5
-Resume: `hermes --resume 20260814_003538_ea61b5`
+[SESSION] 20260814_233747_be422d
 
-## Current HEAD
+## Current state
 
-Branch `analyst/bj208-issue` (from origin/main @ `2dbcd88`), worktree
-`/home/drwho1985/workspace/soccer/beijing-lot-bj208`.
+- Branch: `analyst/bj208-rework-r1` (worktree `/home/drwho1985/workspace/soccer/beijing-lot-bj208-r1`)
+- Upstream base: 53f67ec (old PR #228 head, contains tracked results/issue-205 + issue-207)
+- This PR supersedes PR #228 (EV REJECT 53f67ec, REWORK_TYPE=method)
 
-## What is done
+## What was done (fresh rework, EV D1-D6 + REQ-E09)
 
-- Contract BJ-UNIFIED-DYNAMIC-N-001 / v3 executed: per-issue learned
-  action-value policy `Q_theta(x,a)` (sklearn MLPRegressor + Ridge +
-  best-fixed-action controls) on the bounded N×K×lane×capital catalog.
-- Frozen upstream bound: #207 (sha `90869a959dc1`), value matrix
-  (sha `8fdace9c…`), incumbent = N7/K8/MARKET_WOR/native-¥2 from #207
-  CONTROLLING K8 identities (CV_2022/23 ledger + CV_2021 reconstruction).
-- Chronological folds: CV_2021→CV_2022, CV_2021+CV_2022→CV_2023
-  (protocol delta #208-1: no 2020 surface in frozen upstream).
-- Safety gate implemented and enforced in replay: conservative lift
-  (pred − 1×RMSE) + coverage/OOD/fundability; failure → frozen incumbent.
-- Results package `results/issue-208/` verified (manifest, accounting,
-  continuity, embargo, tamper 4/4). `method_preflight` PASS.
-- Notebook executed clean (11/11 cells). Tests 16/16 pass.
-- Decision report + wiki updated.
+1. **D1 evidence chain**: `results/issue-208/` fully committed (61 files in
+   manifest incl. models/*.joblib, schema.json, provenance.json, receipt.sha256,
+   COMPLETED.json). `.gitignore` now allows issue-208. Fresh checkout can
+   re-verify without worker-local files.
+2. **D2 capital semantics**: SIMPLE_ACTIVE = exact #207 EQUAL_1PCT
+   (requested=pre*1%, integer ¥2-unit projection over K tickets).
+   `capital_change_identical` binds frozen CONTROLLING identities — verified
+   to match the #207 EQUAL_1PCT ledger to 7 decimals (¥64,659.136… on CV_2023).
+3. **D3 leakage/serialization**: sklearn early_stopping disabled everywhere;
+   chronological issue-block validation (last 15% train issues); Ridge +
+   best-fixed controls evaluated per fold with full paths + ablation;
+   model weights + scaler serialized to models/fold*.joblib (handoff
+   label-blind replayable).
+4. **D4 verifier**: manifest full coverage (relative paths + unlisted check),
+   provenance trusted-hash validation, capital accounting (start ¥100,000,
+   ¥2 units, requested/funded/K, continuity), N/K semantics with K, outcome
+   triple validation, REAL 2024-mutation invariance test. Tamper suite attacks
+   the production verify_package on full package copies — 4/4 detected.
+5. **D5 metrics**: max drawdown = running peak (golden test [100,80,200]→0.2);
+   golden tests bound to production functions; added time-under-water,
+   recovery, max consecutive losses, rolling 5/10/20 loss + worst windows.
+6. **D6 atomicity**: staging dir + fsync + COMPLETED before final manifest +
+   atomic rename; NO_BET explicit for infeasible/OOD/incumbent-infeasible.
 
-## Key decisions and rationale
+## Key decisions
 
-1. **Selection = FROZEN_N7_INCUMBENT** (legal freeze, rule step 5): gate passes
-   on only 3/113 test issues, all with 0 realized payout; gated path ≡ frozen
-   incumbent (matched lift 0.0). Consistent with #207 negative overlay.
-2. **Incumbent binding exact**: control arm and learned fallback use
-   `FROZEN_INCUMBENT_207` rows (not a replay proxy) — CV_2023 ¥99,312.89,
-   CV_2022 ¥99,072.00.
-3. **Fold structure adjusted** (delta #208-1): "train≤2020/test 2021" not
-   constructible; CV_2021 is the initial fit block.
-4. **SIMPLE_ACTIVE capital lane** = #207 EQUAL_1PCT (simplest accepted active
-   controller; contract says do not reopen Stage-4 grid).
+- Selection rule wording superseded (#208-3): "positive on ALL constructible
+  folds (2 of 2)" — fold 0 remains non-constructible (DELTA #208-1).
+- Protocol/contract versions bumped to v2 (PROTOCOL-LOG rows #208-2..#208-6).
+- Terminal result unchanged in direction: safety-gated learned path ≡ frozen
+  incumbent (matched lift 0.0 on both folds) → freeze N7/K8/MARKET_WOR/
+  native-¥2 incumbent for #209. But the corrected capital semantics changed
+  the control evidence materially: capital_change_identical (EQUAL_1PCT)
+  ends ¥64,659 (not ¥101,425), static_n8k8 ends ¥100,810, best_fixed(N4K32)
+  ¥88,604.
 
 ## Known issues
 
-- MLP ConvergenceWarning (max_iter=500) on fold 2 — benign; early stopping
-  active; diagnostics show monotone calibration.
-- `cash_no_bet` control arm reports NO_BET rows (funded 0) — it is a safety
-  reference, excluded from active-Edge attribution.
-- K16 sensitivity underperforms K8 native on both folds (consistent with #207).
+- MLP ConvergenceWarning (max_iter=500) on both folds — benign, early_stopping
+  off, loss curve decreasing; validation RMSE (1,555) < fit RMSE (1,976).
+- 731/68,417 matches have zero realized True (unlabeled matches) — loader
+  treats ≤1 realized True as valid (duplicates still fail).
+- 6 LOCKED_TEST rows have official SP = 0.0 — treated as void sentinel;
+  negative SP still fails.
 
-## Next steps (for rework, if EV rejects)
+## Next step
 
-1. Read EV defect list; classify per REQ-E09 (leakage/verifier-blind-spot/
-   atomicity/metric-semantics/schema/boundary); same-class sweep across all
-   call sites.
-2. Fresh (not resume) unless EV marks REWORK_TYPE=minor.
-3. Re-run `scripts/run_bj208_policy.py run --output results/issue-208`,
-   re-execute notebook, re-run preflight + pytest, then re-deliver.
+- EV independent audit at this PR's HEAD: fresh checkout, re-run
+  notebook/verify/preflight/pytest, tamper probes, REQ-208-01..09 evidence.
+- If REJECT: follow REWORK_TYPE branch (method → fresh / minor → resume).
 
-## Replay commands
+## Replay
 
 ```
 PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208
 PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py verify --output results/issue-208
-PYTHONPATH=src .venv/bin/python -m pytest tests/test_bj208_metrics.py tests/test_bj208_tamper.py -q
-python3 /home/drwho1985/workspace/bot-dispatcher/method_preflight.py --worktree /home/drwho1985/workspace/soccer/beijing-lot-bj208
+PYTHONPATH=src .venv/bin/python -m pytest tests/test_bj208_metrics.py tests/test_bj208_tamper.py
 ```

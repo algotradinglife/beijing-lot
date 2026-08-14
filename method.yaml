@@ -1,8 +1,9 @@
 # Issue #208 method protocol — BJ-UNIFIED-DYNAMIC-N-001 / v3
 # Frozen preregistrations; worker must not silently modify.
 # Protocol deltas appended in PROTOCOL-LOG / docs/research/issue_208_protocol_log.md.
+# REWORK v2 (2026-08-14, EV REJECT 53f67ec): supersede rows #208-2..#208-6.
 
-protocol_version: bj208-protocol-v1
+protocol_version: bj208-protocol-v2
 
 candidate_pool:
   description: "per-issue learned policy Q_theta(x,a) on the bounded N×K×lane×capital action catalog"
@@ -32,28 +33,35 @@ terminal_access:
 selection_algorithm:
   preregistered: true
   rule:
-    - "valid replay, causal trace, no ruin, complete fold support"
+    - "valid replay, causal trace, no ruin, complete fold support on ALL constructible folds (2 of 2)"
     - "positive median matched ending-capital lift vs N7/K8 incumbent"
-    - "positive matched lift in at least 2 of 3 development folds"
+    - "positive matched lift on ALL constructible development folds (2 of 2)"
     - "highest median matched lift, then highest worst-fold lift, then smaller issue-level max drawdown, then lower complexity"
     - "else freeze N7 incumbent and publish full frontier + failure regimes"
+  supersede_208_3: "REWORK v2: rule wording made consistent with the 2-fold constructible reality (was '2 of 3' / 'three-fold support'); fold 0 remains non-constructible per DELTA #208-1"
 
 metrics:
   - name: matched_ending_capital_lift
     definition: "learned path ending capital minus frozen #207 incumbent path ending capital on the same test split"
-    golden_test: "tests/test_bj208_metrics.py::test_matched_lift_definition"
+    golden_test: "tests/test_bj208_metrics.py::test_matched_lift_definition_production"
   - name: median_matched_lift
     definition: "median of fold matched lifts; >0 required by selection rule 2"
-    golden_test: "tests/test_bj208_metrics.py::test_selection_rule_median"
+    golden_test: "tests/test_bj208_metrics.py::test_selection_rule_median_production"
   - name: positive_fold_count
-    definition: "number of folds with positive matched lift; >=2 required by rule 3"
-    golden_test: "tests/test_bj208_metrics.py::test_selection_rule_folds"
+    definition: "number of constructible folds with positive matched lift; = all (2) required by rule 3"
+    golden_test: "tests/test_bj208_metrics.py::test_selection_rule_folds_production"
   - name: conservative_predicted_lift
     definition: "Q_theta prediction minus 1*train-fold residual RMSE; >0 + coverage/OOD/fundability = safety gate"
     golden_test: "tests/test_bj208_metrics.py::test_safety_gate_conservative"
   - name: max_drawdown_pct
-    definition: "issue-level maximum percentage drawdown from running peak"
-    golden_test: "tests/test_bj208_metrics.py::test_drawdown_definition"
+    definition: "issue-level maximum percentage drawdown from running peak (per-issue running peak, not final peak)"
+    golden_test: "tests/test_bj208_metrics.py::test_drawdown_definition_production"
+  - name: time_under_water_issues
+    definition: "consecutive issues from peak before recovery to new peak (holding-feasibility metric)"
+    golden_test: "tests/test_bj208_metrics.py::test_time_under_water"
+  - name: max_consecutive_losing_issues
+    definition: "longest run of issues with zero gross payout"
+    golden_test: "tests/test_bj208_metrics.py::test_max_consecutive_losses"
 
 budget:
   target_hours: 6
@@ -69,6 +77,21 @@ required_artifacts:
   - results/issue-208/handoff_209.json
   - results/issue-208/selection.json
   - results/issue-208/issue_capital_ledger.parquet
+  - results/issue-208/provenance.json
+  - results/issue-208/schema.json
+  - results/issue-208/receipt.sha256
+  - results/issue-208/COMPLETED.json
+  - results/issue-208/census.csv
+  - results/issue-208/eligibility.csv
+  - results/issue-208/label_surface_fit.parquet
+  - results/issue-208/decision_fold1.parquet
+  - results/issue-208/decision_fold2.parquet
+  - results/issue-208/decision_rows_all.parquet
+  - results/issue-208/incumbent_paths.parquet
+  - results/issue-208/path_learned_fold1.parquet
+  - results/issue-208/path_learned_fold2.parquet
+  - results/issue-208/models/fold1_mlp.joblib
+  - results/issue-208/models/fold2_mlp.joblib
   - src/parlay_policy/__init__.py
   - scripts/run_bj208_policy.py
   - notebooks/research/issue-208/bj208_dynamic_nk_policy.ipynb
@@ -84,18 +107,21 @@ stages:
     constraints:
       - "only frozen upstream (value matrix sha 8fdace9c, #207 manifest 48c11d97)"
       - "report M per issue, N eligibility, labels availability; 2024/2025/2026 embargoed"
+      - "fail closed on malformed M×3 cells: every match exactly {3,1,0} outcome codes, exactly one realized outcome"
   - name: preprocessing
-    deliverable: "incumbent_paths.parquet + issue contexts + 1197 candidate pools"
+    deliverable: "incumbent_paths.parquet + issue contexts + candidate pools (cached)"
     skill: data-preprocessing
     constraints:
       - "CV_2022/CV_2023 incumbent from #207 ledger; CV_2021 reconstructed from frozen ticket identities"
       - "M×3 cells complete; malformed cells fail closed; exact N distinct matches per ticket"
+      - "stochastic lanes run ONLY with 16 preregistered seeds; seed=0 never used in execution/controls"
   - name: eda
-    deliverable: "label_surface_fit.parquet (9,744 rows) + action frontier"
+    deliverable: "label_surface_fit.parquet + action frontier"
     skill: eda-checklist
     constraints:
       - "counterfactual targets from development labels only; outcome fields never enter state x"
       - "16 seeds aggregated; seed identity never a feature"
+      - "SIMPLE_ACTIVE capital = #207 EQUAL_1PCT semantics (requested=pre*1%, integer ¥2-unit projection across K tickets)"
   - name: feature_engineering
     deliverable: "state x per issue (STATE_FEATURE_NAMES) + training frames"
     skill: data-preprocessing
@@ -103,10 +129,12 @@ stages:
       - "x from causal pre-event tensor summaries + market/SP summaries + frozen upstream + strictly prior bankroll"
       - "forbidden-name checker rejects result/score/settlement/payout/hit fields"
   - name: model_selection
-    deliverable: "fold1 (train CV_2021 -> test CV_2022) MLP/Ridge/fixed-action fits + selection on CV_2022"
+    deliverable: "fold1 (train CV_2021 -> test CV_2022) MLP/Ridge/fixed-action fits + chronological train/val loss + selection on CV_2022"
     skill: experiment-tracking
     constraints:
-      - "chronological issue-block splits only; MLPRegressor + Ridge + best fixed action"
+      - "chronological issue-block splits only; NO sklearn row-level early-stopping validation"
+      - "validation = chronological issue-block holdout inside train folds (last 15% issues by issue id)"
+      - "MLPRegressor + Ridge + best fixed action; controls evaluated per fold (paths, lift, ablation)"
       - "safety gate: conservative lift > 0 AND coverage/OOD/fundability else frozen incumbent"
       - "selection_split CV_2022 data never reused for terminal selection"
   - name: terminal_evaluation
@@ -114,8 +142,9 @@ stages:
     skill: model-card
     constraints:
       - "exactly once; 2024/2025/2026 outcomes never opened"
-      - "lexicographic selection rule applied; freeze N7 incumbent if no eligible row"
-      - "handoff carries model class, feature schema, weights, preprocessing, safety threshold, inference code"
+      - "lexicographic selection rule applied over 2 constructible folds; freeze N7 incumbent if no eligible row"
+      - "handoff carries model class, feature schema, fitted weights (joblib), preprocessing, safety threshold, inference code"
+      - "handoff label-blind replay verified: inference path never reads outcome fields"
 
 models:
   primary: "sklearn.neural_network.MLPRegressor (StandardScaler pipeline)"
@@ -123,8 +152,9 @@ models:
     hidden_layer_sizes: [32]
     alpha: 0.001
     max_iter: 500
-    early_stopping: true
+    early_stopping: false
     random_state: 208001
+  supersede_208_4: "REWORK v2: early_stopping=false; validation is a chronological issue-block holdout (sklearn row-level validation_fraction would split one issue's action rows across train/val)"
   control_linear: "sklearn.linear_model.Ridge (alpha 1.0)"
   control_fixed_action: "best fixed action by train-fold median matched lift"
   target: "matched pre-tax capital lift vs frozen N7/K8 incumbent (seed-aggregated)"

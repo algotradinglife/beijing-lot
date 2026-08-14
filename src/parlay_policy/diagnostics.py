@@ -5,6 +5,11 @@ lift, action-confusion/frequency tables, permutation importance, per-fold
 learned-policy lift, ablation vs best fixed action, OOD/fallback census and
 an action-variation demonstration (changing only pre-event state can change
 the selected action).
+
+REWORK v2 (D3): `chronological_train_val_loss` fits the SAME model class on a
+chronological issue-block split of the training folds (last 15% of train
+issues by issue id = validation block) and reports train/val loss.  sklearn
+row-level early stopping is not used anywhere.
 """
 
 from __future__ import annotations
@@ -17,7 +22,7 @@ from sklearn.inspection import permutation_importance
 
 from .contract import Action, all_actions
 from .features import STATE_FEATURE_NAMES
-from .policy import LearnedPolicy, _feature_columns, build_design, predict_lift
+from .policy import LearnedPolicy, _feature_columns, build_design, fit_policy, predict_lift
 
 
 class DiagnosticError(RuntimeError):
@@ -84,11 +89,7 @@ def calibration_curve(
     *,
     bins: int = 5,
 ) -> pd.DataFrame:
-    """Binned predicted vs realized matched lift on the training folds.
-
-    context_states keys are either the bare issue id or "split:issue";
-    both are matched against train_df issues.
-    """
+    """Binned predicted vs realized matched lift on the training folds."""
     actions = all_actions()
     rows: list[dict[str, Any]] = []
     train_issues = set(train_df["issue"].astype(str))
@@ -122,6 +123,51 @@ def calibration_curve(
             realized_best_lift=("realized_best_lift", "mean"),
             issues=("issue", "count"),
         )
+    )
+
+
+def chronological_train_val_loss(
+    train_df: pd.DataFrame,
+    *,
+    kind: str = "MLP",
+    seed: int = 208001,
+    validation_fraction: float = 0.15,
+) -> pd.DataFrame:
+    """Chronological issue-block train/validation loss for the model class.
+
+    REWORK v2 (D3): validation block = last `validation_fraction` of train
+    issues by issue id (strictly chronological, never row-random).  Fits the
+    same model class on the fit block, scores both blocks, reports RMSE.
+    """
+    if train_df.empty or "y_lift" not in train_df.columns:
+        return pd.DataFrame()
+    issues = sorted(train_df["issue"].astype(str).unique())
+    if len(issues) < 5:
+        return pd.DataFrame()
+    cut = max(2, int(len(issues) * (1.0 - validation_fraction)))
+    fit_issues = set(issues[:cut])
+    val_issues = set(issues[cut:])
+    fit_df = train_df.loc[train_df["issue"].astype(str).isin(fit_issues)]
+    val_df = train_df.loc[train_df["issue"].astype(str).isin(val_issues)]
+    if fit_df.empty or val_df.empty:
+        return pd.DataFrame()
+    policy = fit_policy(
+        fit_df, kind=kind, seed=seed, validation_df=val_df
+    )
+    return pd.DataFrame(
+        [
+            {
+                "model": kind,
+                "fit_issues": len(fit_issues),
+                "validation_issues": len(val_issues),
+                "fit_rmse": float(policy.residual_rmse),
+                "validation_rmse": (
+                    float(policy.validation_rmse)
+                    if policy.validation_rmse is not None
+                    else float("nan")
+                ),
+            }
+        ]
     )
 
 
@@ -221,8 +267,27 @@ def action_variation_demo(
     return pd.DataFrame(rows)
 
 
+def ablation_vs_best_fixed(
+    summaries: dict[str, dict[str, float]],
+) -> pd.DataFrame:
+    """Ablation table: learned vs ridge vs best-fixed vs incumbent per fold."""
+    rows: list[dict[str, Any]] = []
+    for fold, summary in summaries.items():
+        for name, value in summary.items():
+            if name.endswith("_ending_capital_yuan"):
+                rows.append(
+                    {
+                        "fold": fold,
+                        "arm": name.removesuffix("_ending_capital_yuan"),
+                        "ending_capital_yuan": float(value),
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
 __all__ = [
-    "DiagnosticError", "action_confusion", "action_frequency",
-    "action_variation_demo", "calibration_curve", "ood_fallback_census",
+    "DiagnosticError", "ablation_vs_best_fixed", "action_confusion",
+    "action_frequency", "action_variation_demo", "calibration_curve",
+    "chronological_train_val_loss", "ood_fallback_census",
     "per_fold_lift_summary", "permutation_importance_table",
 ]

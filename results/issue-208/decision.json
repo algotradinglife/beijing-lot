@@ -1,0 +1,15 @@
+{
+  "contract_version": "bj208-dynamic-nk-policy-v2",
+  "elapsed_seconds": 180.2,
+  "incumbent": {
+    "capital": "NATIVE_2_YUAN",
+    "k": 8,
+    "lane": "MARKET_WOR",
+    "n": 7
+  },
+  "initial_bankroll_yuan": 100000.0,
+  "upstream_207": {
+    "manifest_sha256": "48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6",
+    "sha": "90869a959dc1b972cd872ffe465d1009e29df75e"
+  }
+}

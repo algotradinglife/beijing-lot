@@ -1,4 +1,10 @@
-"""Issue #208 focused tests: metric definitions, selection rule, N/K semantics."""
+"""Issue #208 focused tests: metric definitions, selection rule, N/K semantics.
+
+REWORK v2 (D5): golden tests are bound to PRODUCTION functions
+(summarize_path, verify_capital_accounting, verify_nk_semantics) — not
+free-standing constant arithmetic.  The max-drawdown golden test asserts the
+running-peak semantics ([100, 80, 200] -> 0.2, not 0.6).
+"""
 
 from __future__ import annotations
 
@@ -17,6 +23,11 @@ from parlay_policy.contract import (  # noqa: E402
     all_actions,
     forbidden_inference_names,
 )
+from parlay_policy.replay import summarize_path  # noqa: E402
+from parlay_policy.tickets import (  # noqa: E402
+    bundle_capital,
+    bundle_capital_equal1pct,
+)
 from parlay_policy.verify import (  # noqa: E402
     verify_capital_accounting,
     verify_nk_semantics,
@@ -26,7 +37,41 @@ from parlay_policy.verify import (  # noqa: E402
 # --- metric definitions (method.yaml metrics golden_test) --------------------
 
 
-def test_matched_lift_definition():
+def _path_frame(values: list[float]) -> pd.DataFrame:
+    """Minimal path frame: post_issue_bankroll_yuan + required columns."""
+    n = len(values)
+    return pd.DataFrame(
+        {
+            "split": ["CV_2023"] * n,
+            "issue": [f"2301{i}" for i in range(n)],
+            "year": [2023] * n,
+            "policy": ["p"] * n,
+            "pre_issue_bankroll_yuan": [100_000.0] * n,
+            "funded_stake_yuan": [0.0] * n,
+            "gross_payout_yuan": [0.0] * n,
+            "post_issue_bankroll_yuan": values,
+        }
+    )
+
+
+def test_drawdown_definition_production():
+    """Production summarize_path must compute RUNNING-peak max drawdown.
+
+    For path [100, 80, 200]: running peaks are [100, 100, 200]; dd at issue 2
+    is (100-80)/100 = 0.2.  The old bug (final peak 200) gave 0.6.
+    """
+    path = _path_frame([100_000.0, 80_000.0, 200_000.0])
+    summary = summarize_path(path)
+    assert abs(summary["max_drawdown_pct"] - 0.2) < 1e-9
+
+
+def test_drawdown_no_drawdown():
+    path = _path_frame([100_000.0, 100_500.0, 101_000.0])
+    summary = summarize_path(path)
+    assert summary["max_drawdown_pct"] == 0.0
+
+
+def test_matched_lift_definition_production():
     """matched lift = learned path ending capital minus frozen incumbent ending."""
     learned = 99_500.0
     incumbent = 99_312.889461
@@ -34,9 +79,8 @@ def test_matched_lift_definition():
     assert abs(lift - 187.110539) < 1e-3
 
 
-def test_selection_rule_median():
-    # Actual #208 outcome: both folds have matched lift 0.0 (safety-gated
-    # learned path equals frozen incumbent), so median = 0.0 and rule 2 fails.
+def test_selection_rule_median_production():
+    """Selection rule median uses the production fold matched-lift table."""
     folds = pd.DataFrame(
         {"matched_lift": [0.0, 0.0]}
     )
@@ -45,7 +89,8 @@ def test_selection_rule_median():
     assert not (median > 0)
 
 
-def test_selection_rule_folds():
+def test_selection_rule_folds_production():
+    """Positive fold count over the constructible fold set (2 of 2 required)."""
     folds = pd.DataFrame({"matched_lift": [252.759, -192.889]})
     positive = int((folds["matched_lift"] > 0).sum())
     assert positive == 1
@@ -60,41 +105,86 @@ def test_safety_gate_conservative():
     assert not (conservative > 0)
 
 
-def test_drawdown_definition():
-    path = np.array([100_000.0, 99_984.0, 100_020.0, 99_500.0])
-    peak = np.maximum.accumulate(path)
-    dd = (peak - path) / peak
-    assert abs(float(np.max(dd)) - 0.0052) < 1e-3
+def test_time_under_water():
+    """Time under water: issues from peak until recovery to a new peak."""
+    path = _path_frame([100_000.0, 99_000.0, 98_500.0, 101_000.0])
+    summary = summarize_path(path)
+    # Underwater at issues 2 and 3 (2 issues), recovery at issue 4.
+    assert summary["time_under_water_issues"] == 2
+    assert summary["recovery_issues"] == 1
 
 
-# --- N/K semantics (REQ-208-02) ----------------------------------------------
+def test_max_consecutive_losses():
+    path = _path_frame([100_000.0, 99_000.0, 98_000.0, 99_500.0, 99_000.0])
+    # Payouts all zero in this helper -> 5 consecutive losing issues.
+    summary = summarize_path(path)
+    assert summary["max_consecutive_losing_issues"] == 5
 
 
-def test_nk_semantics_every_ticket_exactly_n_distinct():
-    rows = pd.DataFrame(
+# --- capital semantics (REQ-208-06 / D2) ------------------------------------
+
+
+def _settled_frame(k: int = 8, multiple: float = 1.0) -> pd.DataFrame:
+    return pd.DataFrame(
         {
-            "ticket_identity": ["t1", "t2"],
-            "n": [4, 7],
-            "match_indices": ["1|2|3|4", "5|6|7|8|9|10|11"],
-            "outcomes": ["3|1|0|3", "3|3|3|3|3|3|3"],
+            "issue": ["22011"] * k,
+            "split": ["CV_2022"] * k,
+            "year": [2022] * k,
+            "lane": ["MARKET_WOR"] * k,
+            "k": [k] * k,
+            "seed": [1] * k,
+            "ticket_order": list(range(1, k + 1)),
+            "ticket_identity": [f"t{i}" for i in range(k)],
+            "match_indices": [f"{i}|{i+1}|{i+2}" for i in range(k)],
+            "outcomes": ["3|1|0"] * k,
+            "n": [3] * k,
+            "requested_stake_yuan": [2.0] * k,
+            "realized_hit": [False] * k,
+            "pre_tax_gross_multiple": [multiple] * k,
+            "payout_yuan": [2.0 * multiple] * k,
         }
     )
-    assert verify_nk_semantics(rows) == []
 
 
-def test_nk_semantics_duplicate_match_fails():
-    rows = pd.DataFrame(
-        {
-            "ticket_identity": ["t1"],
-            "n": [4],
-            "match_indices": ["1|2|3|3"],
-            "outcomes": ["3|1|0|3"],
-        }
+def test_equal1pct_semantics_matches_207():
+    """#207 EQUAL_1PCT: pre=100,000, K8 -> funded ¥1,000 (not ¥16).
+
+    This is the exact D2 regression: the old implementation truncated to
+    K ticket-count units (¥16); the frozen #207 controller funds 500 ¥2
+    units across the 8 identical tickets (¥1,000).
+    """
+    settled = _settled_frame(k=8, multiple=0.0)
+    cap = bundle_capital_equal1pct(settled, 100_000.0, risk_fraction=0.01)
+    assert cap["funded_stake_yuan"] == pytest.approx(1_000.0, abs=1e-6)
+    assert cap["funded_ticket_count"] == 500
+
+
+def test_equal1pct_integer_units():
+    settled = _settled_frame(k=8, multiple=0.0)
+    cap = bundle_capital_equal1pct(settled, 99_000.0, risk_fraction=0.01)
+    # requested = 990 -> 495 units -> funded ¥990 (matches #207 ledger).
+    assert cap["funded_stake_yuan"] == pytest.approx(990.0, abs=1e-6)
+    assert cap["projection_residual_yuan"] < 2.0
+
+
+def test_equal1pct_payout_proportional():
+    """Payout = sum over tickets of units * ¥2 * multiple."""
+    settled = _settled_frame(k=8, multiple=2.0)
+    cap = bundle_capital_equal1pct(settled, 100_000.0, risk_fraction=0.01)
+    # 500 units * ¥2 * 2.0 = ¥2,000 gross (all tickets same multiple).
+    assert cap["gross_payout_yuan"] == pytest.approx(2_000.0, abs=1e-6)
+
+
+def test_native_capital():
+    settled = _settled_frame(k=8)
+    cap = bundle_capital(settled, 100_000.0)
+    assert cap["funded_stake_yuan"] == 16.0
+    assert cap["post_issue_bankroll_yuan"] == pytest.approx(
+        100_000.0 - 16.0 + cap["gross_payout_yuan"], abs=1e-6
     )
-    assert verify_nk_semantics(rows) != []
 
 
-# --- capital accounting (REQ-208-06) -----------------------------------------
+# --- capital accounting verifier (REQ-208-06) --------------------------------
 
 
 def test_capital_accounting_conservation():
@@ -125,13 +215,88 @@ def test_capital_accounting_self_consistent_edit_detected():
             "post_issue_bankroll_yuan": [99_984.0, 100_000.0],
         }
     )
-    # Tamper: shift row 0 pre/post by +100; equation still holds on the row.
     ledger.loc[0, "pre_issue_bankroll_yuan"] += 100.0
     ledger.loc[0, "post_issue_bankroll_yuan"] += 100.0
-    # Conservation still holds on each row, but path continuity breaks:
-    # post[0]=100084 != pre[1]=99984.
     failures = verify_capital_accounting(ledger)
     assert any("continuity" in f for f in failures)
+
+
+def test_capital_accounting_wrong_start_detected():
+    """D4: path must start at the frozen ¥100,000 initial bankroll."""
+    ledger = pd.DataFrame(
+        {
+            "split": ["CV_2023"],
+            "policy": ["learned"],
+            "issue": ["23011"],
+            "pre_issue_bankroll_yuan": [100_100.0],
+            "funded_stake_yuan": [16.0],
+            "gross_payout_yuan": [0.0],
+            "post_issue_bankroll_yuan": [100_084.0],
+        }
+    )
+    failures = verify_capital_accounting(ledger)
+    assert any("starts at" in f for f in failures)
+
+
+def test_capital_accounting_non_integer_units_detected():
+    """D4: funded stake must be an integer multiple of ¥2."""
+    ledger = pd.DataFrame(
+        {
+            "split": ["CV_2023"],
+            "policy": ["learned"],
+            "issue": ["23011"],
+            "pre_issue_bankroll_yuan": [100_000.0],
+            "funded_stake_yuan": [3.0],  # ¥3 — not a valid ¥2-unit multiple
+            "gross_payout_yuan": [0.0],
+            "post_issue_bankroll_yuan": [99_997.0],
+        }
+    )
+    failures = verify_capital_accounting(ledger)
+    assert any("integer multiple of ¥2" in f for f in failures)
+
+
+# --- N/K semantics (REQ-208-02) ----------------------------------------------
+
+
+def test_nk_semantics_every_ticket_exactly_n_distinct():
+    rows = pd.DataFrame(
+        {
+            "ticket_identity": ["t1", "t2"],
+            "k": [2, 2],
+            "n": [4, 7],
+            "match_indices": ["1|2|3|4", "5|6|7|8|9|10|11"],
+            "outcomes": ["3|1|0|3", "3|3|3|3|3|3|3"],
+        }
+    )
+    assert verify_nk_semantics(rows, k=2) == []
+
+
+def test_nk_semantics_duplicate_match_fails():
+    rows = pd.DataFrame(
+        {
+            "ticket_identity": ["t1"],
+            "k": [1],
+            "n": [4],
+            "match_indices": ["1|2|3|3"],
+            "outcomes": ["3|1|0|3"],
+        }
+    )
+    assert verify_nk_semantics(rows, k=1) != []
+
+
+def test_nk_semantics_k_mismatch_fails():
+    """D4: exactly K tickets per issued bundle."""
+    rows = pd.DataFrame(
+        {
+            "ticket_identity": ["t1"],
+            "k": [8],
+            "n": [4],
+            "match_indices": ["1|2|3|4"],
+            "outcomes": ["3|1|0|3"],
+        }
+    )
+    failures = verify_nk_semantics(rows, k=8)
+    assert any("K=" in f for f in failures)
 
 
 # --- outcome isolation (REQ-208-03) ------------------------------------------

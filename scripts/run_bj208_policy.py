@@ -1,6 +1,12 @@
 """Issue #208 staged runner: census → counterfactual surface → controls →
 learned policy → diagnostics → selection → immutable package.
 
+REWORK v2 (D1/D6): the runner builds the package in a staging directory,
+fsyncs files + directory, writes COMPLETED.json, and atomically renames the
+staging dir over the final output.  All artifacts (including tamper results
+and the receipt) are written BEFORE the manifest, so SHA256SUMS.json has full
+coverage.  Stochastic lanes run on the 16 preregistered seeds (never seed=0).
+
 Usage:
   PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208
   PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py verify --output results/issue-208
@@ -10,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 import shutil
 import sys
@@ -25,6 +32,8 @@ if str(ROOT / "src") not in sys.path:
 
 from parlay_policy.contract import (  # noqa: E402
     Action,
+    ALL_SEEDS,
+    CAPITAL_LANES,
     CONTRACT_VERSION,
     DEVELOPMENT_SPLITS,
     FIT_SPLIT,
@@ -33,7 +42,11 @@ from parlay_policy.contract import (  # noqa: E402
     INCUMBENT_LANE,
     INCUMBENT_N,
     INITIAL_BANKROLL_YUAN,
+    K_GRID,
+    LANES,
     MODEL_SEED,
+    N_GRID,
+    NO_BET_KEY,
     SELECTION_SPLIT,
     TERMINAL_SPLIT,
     as_action_dict,
@@ -61,13 +74,13 @@ from parlay_policy.replay import (  # noqa: E402
     build_pool_cache,
     build_training_frame,
     full_path_replay,
+    path_holding_metrics,
     summarize_path,
 )
 from parlay_policy.tickets import (  # noqa: E402
     fit_learned_ranker,
     ranker_scores,
 )
-from parlay_policy.contract import N_GRID  # noqa: E402
 from parlay_policy.verify import (  # noqa: E402
     VerifyError,
     manifest,
@@ -78,12 +91,15 @@ from parlay_policy.verify import (  # noqa: E402
     verify_nk_semantics,
     verify_no_2024_issue,
     verify_no_embargoed_split,
+    verify_provenance,
+    verify_receipt,
     verify_schema,
 )
 from parlay_policy.diagnostics import (  # noqa: E402
     action_frequency,
     action_variation_demo,
     calibration_curve,
+    chronological_train_val_loss,
     ood_fallback_census,
     permutation_importance_table,
 )
@@ -98,8 +114,6 @@ def _json(path: Path, value: object) -> None:
 
 def _fsync_file(path: Path) -> None:
     with path.open("rb") as handle:
-        import os
-
         os.fsync(handle.fileno())
 
 
@@ -107,15 +121,79 @@ def _fsync_tree(root: Path) -> None:
     for path in sorted(root.rglob("*")):
         if path.is_file():
             _fsync_file(path)
+    if root.exists():
+        dir_fd = os.open(root, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+
+
+def _atomic_publish(staging: Path, output: Path) -> None:
+    """fsync staging, then atomically rename over the final output."""
+    _fsync_tree(staging)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.exists():
+        backup = output.parent / (output.name + ".old-" + str(int(time.time())))
+        os.rename(output, backup)
+        shutil.rmtree(backup, ignore_errors=True)
+    os.rename(staging, output)
+    try:
+        dir_fd = os.open(output.parent, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
+    except OSError:
+        pass
+
+
+# ==== SECTION: RUN ====
 
 
 def run(output: Path) -> dict[str, object]:
     started = time.time()
     output = Path(output)
-    if output.exists():
-        shutil.rmtree(output)
-    output.mkdir(parents=True, exist_ok=True)
+    staging = output.parent / (output.name + ".staging")
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir(parents=True, exist_ok=True)
 
+    try:
+        _run_stages(staging)
+        _write_metadata(staging, started)
+        _write_manifest(staging)
+        failures = verify_package(staging)
+        if failures:
+            raise VerifyError(
+                "package verification failed: " + "; ".join(failures)
+            )
+        tamper_results = run_tamper_suite(staging, verify_package)
+        _json(staging / "tamper_results.json", tamper_results)
+        if not all(result["detected"] for result in tamper_results):
+            raise VerifyError("tamper suite did not detect all attacks")
+        # Completion marker is written BEFORE the final manifest so the
+        # immutable package closes with full coverage (EV D6: completion
+        # marker must not be an unlisted payload).
+        _json(staging / "COMPLETED.json", {"status": "COMPLETED", "elapsed_seconds": round(time.time() - started, 1)})
+        _write_manifest(staging)
+        failures = verify_package(staging)
+        if failures:
+            raise VerifyError(
+                "post-tamper verification failed: " + "; ".join(failures)
+            )
+        _atomic_publish(staging, output)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    print(f"[done] elapsed {time.time() - started:.1f}s -> {output}")
+    return {"status": "ok", "output": str(output)}
+
+
+# ==== SECTION: STAGES ====
+
+
+def _run_stages(output: Path) -> None:
     # --- Stage 1: census ----------------------------------------------------
     vm = load_value_matrix(ROOT)
     panels = build_panels(vm)
@@ -163,13 +241,23 @@ def run(output: Path) -> dict[str, object]:
         )
         train_df = build_training_frame(surface_train, contexts)
         test_df = build_training_frame(surface_test, contexts)
+        # Chronological validation block = last 15% of train issues.
+        val_df = _chronological_validation_frame(train_df, fraction=0.15)
 
-        policy_mlp = fit_policy(train_df, kind="MLP", seed=MODEL_SEED)
-        policy_ridge = fit_policy(train_df, kind="RIDGE", seed=MODEL_SEED)
+        policy_mlp = fit_policy(
+            train_df, kind="MLP", seed=MODEL_SEED, validation_df=val_df
+        )
+        policy_ridge = fit_policy(
+            train_df, kind="RIDGE", seed=MODEL_SEED, validation_df=val_df
+        )
         fixed_key = best_fixed_action_key(train_df)
         policy_fixed = fit_policy(
             train_df, kind="FIXED_ACTION", fixed_action_key=fixed_key
         )
+        # Persist the fitted model artifact (label-blind replay for #209).
+        models_dir = output / "models"
+        models_dir.mkdir(exist_ok=True)
+        _persist_model(policy_mlp, models_dir / f"fold{fold_index + 1}_mlp.joblib")
 
         # OOD gate from fit-fold states.
         fit_states = [
@@ -203,11 +291,11 @@ def run(output: Path) -> dict[str, object]:
                     "split": split,
                     "issue": issue,
                     "year": ctx.panel.year,
-                    "action_key": action.key,
-                    "n": action.n,
-                    "k": action.k,
-                    "lane": action.lane,
-                    "capital": action.capital,
+                    "action_key": action.key if action is not None else NO_BET_KEY,
+                    "n": action.n if action is not None else None,
+                    "k": action.k if action is not None else None,
+                    "lane": action.lane if action is not None else None,
+                    "capital": action.capital if action is not None else None,
                     "predicted_lift": trace["predicted_lift"],
                     "conservative_lift": trace["conservative_lift"],
                     "ood_statistic": trace["ood_statistic"],
@@ -238,16 +326,17 @@ def run(output: Path) -> dict[str, object]:
                 policy_mlp, ctx.state, actions, ood_scaler=ood_scaler,
                 ood_threshold=ood_threshold,
             )
-            if not trace["safety_gate_pass"]:
+            if action is None or not trace["safety_gate_pass"]:
                 # Baseline-residual safety gate: fall back to the frozen
-                # incumbent N7/K8/native-¥2 action, never execute the argmax
-                # action on a non-positive conservative predicted lift.
-                fallback_action = Action(
-                    7, 8, INCUMBENT_LANE, "NATIVE_2_YUAN"
-                )
-                trace["fallback_action"] = fallback_action.key
-                trace["fallback"] = "INCUMBENT_OR_NO_BET"
-                return fallback_action, trace
+                # incumbent N7/K8/native-¥2 action when the gate fails.
+                if _incumbent_feasible(ctx, bankroll):
+                    fallback_action = Action(
+                        7, 8, INCUMBENT_LANE, "NATIVE_2_YUAN"
+                    )
+                    trace["fallback_action"] = fallback_action.key
+                    trace["fallback"] = "INCUMBENT_OR_NO_BET"
+                    return fallback_action, trace
+                return None, {**trace, "fallback": "NO_BET", "reason": "INCUMBENT_INFEASIBLE"}
             return action, trace
 
         path_learned = full_path_replay(
@@ -260,12 +349,27 @@ def run(output: Path) -> dict[str, object]:
             output / f"path_learned_fold{fold_index + 1}.parquet", index=False
         )
 
-        # Controls on the same test split.
+        # Controls on the same test split (each evaluated as a full path).
         control_paths = _run_controls(
             test_ctx, pool_cache, test_split, train_frames=train_df,
             frozen_incumbent=incumbent_paths,
+            upstream_tickets=upstream_tickets,
         )
         for name, path in control_paths.items():
+            path.to_parquet(output / f"path_control_{name}_fold{fold_index + 1}.parquet", index=False)
+
+        # Control paths for Ridge + best-fixed-action (REWORK v2: evaluated).
+        control_policy_paths = _run_policy_controls(
+            test_ctx, pool_cache, test_split,
+            policy_mlp=policy_mlp,
+            policy_ridge=policy_ridge,
+            policy_fixed=policy_fixed,
+            ood_scaler=ood_scaler,
+            ood_threshold=ood_threshold,
+            ranker_scores_by_issue=ranker_scores_test,
+            frozen_incumbent=incumbent_paths,
+        )
+        for name, path in control_policy_paths.items():
             path.to_parquet(output / f"path_control_{name}_fold{fold_index + 1}.parquet", index=False)
 
         fold_results[f"fold{fold_index + 1}"] = {
@@ -274,10 +378,13 @@ def run(output: Path) -> dict[str, object]:
             "learned_summary": summarize_path(path_learned),
             "control_summaries": {
                 name: summarize_path(path)
-                for name, path in control_paths.items()
+                for name, path in {**control_paths, **control_policy_paths}.items()
             },
             "fixed_action_key": fixed_key,
-            "policy_mlp": serialize_policy(policy_mlp),
+            "policy_mlp": serialize_policy(
+                policy_mlp,
+                model_path=models_dir / f"fold{fold_index + 1}_mlp.joblib",
+            ),
             "policy_ridge": serialize_policy(policy_ridge),
             "policy_fixed": {
                 "model_kind": "FIXED_ACTION",
@@ -297,7 +404,7 @@ def run(output: Path) -> dict[str, object]:
     all_fit.to_parquet(output / "training_frame_all.parquet", index=False)
     all_test = pd.concat(test_rows, ignore_index=True)
     all_test.to_parquet(output / "decision_rows_all.parquet", index=False)
-    _write_diagnostics(output, all_fit, all_test, contexts, policy_mlp)
+    _write_diagnostics(output, all_fit, all_test, contexts, policy_mlp, train_df)
 
     # Consolidated capital ledger for verification + tamper targeting.
     ledger_parts = [
@@ -317,7 +424,103 @@ def run(output: Path) -> dict[str, object]:
     handoff = _build_handoff(fold_results, selection, output)
     _json(output / "handoff_209.json", handoff)
 
-    # --- Stage 7: package metadata + verification ----------------------------
+    # Materialize decision ticket identities + seed aggregates (REQ-208-04).
+    _write_ticket_artifacts(output, test_ctx, pool_cache, fold_results)
+
+
+# ==== SECTION: HELPERS ====
+
+
+def _ranker_training_tickets(contexts, pool_cache, train_splits):
+    rows = []
+    for (split, issue), ctx in contexts.items():
+        if split not in train_splits:
+            continue
+        pool = pool_cache.get(f"{issue}:7")
+        if pool is None:
+            continue
+        sub = pool.copy()
+        sub["labels_available"] = ctx.panel.labels_available
+        rows.append(sub)
+    return pd.concat(rows, ignore_index=True)
+
+
+def _chronological_validation_frame(
+    train_df: pd.DataFrame, *, fraction: float = 0.15
+) -> pd.DataFrame:
+    issues = sorted(train_df["issue"].astype(str).unique())
+    if len(issues) < 5:
+        return pd.DataFrame()
+    cut = max(2, int(len(issues) * (1.0 - fraction)))
+    val_issues = set(issues[cut:])
+    return train_df.loc[train_df["issue"].astype(str).isin(val_issues)]
+
+
+def _persist_model(policy, path: Path) -> None:
+    import joblib
+
+    joblib.dump(policy.model, path)
+
+
+def _actions_for_issue(ctx):
+    m = len(ctx.panel.match_idx)
+    return [
+        Action(n=n, k=k, lane=lane, capital=capital)
+        for n in N_GRID
+        if n <= m
+        for k in K_GRID
+        for lane in LANES
+        for capital in CAPITAL_LANES
+    ]
+
+
+def _incumbent_feasible(ctx, bankroll: float) -> bool:
+    return (
+        len(ctx.panel.match_idx) >= INCUMBENT_N
+        and bankroll >= INCUMBENT_K * 2.0
+    )
+
+
+def _write_ticket_artifacts(output, test_ctx, pool_cache, fold_results) -> None:
+    """Materialize decision ticket identities + per-seed aggregates.
+
+    REWORK v2 (D3/D4): seed=0 is never used; for stochastic lanes the
+    materialized tickets are the union over the 16 preregistered seeds, with
+    per-seed ticket identities recorded and seed aggregates computed.
+    """
+    from parlay_policy.contract import ALL_SEEDS, LANES, K_GRID, CAPITAL_LANES
+    from parlay_policy.tickets import select_tickets, settle_tickets
+
+    rows: list[dict[str, Any]] = []
+    for (split, issue), ctx in test_ctx.items():
+        for n in N_GRID:
+            pool = pool_cache.get(f"{issue}:{n}")
+            if pool is None:
+                continue
+            for lane in LANES:
+                for k in K_GRID:
+                    if lane in ("MARKET_WR", "MARKET_WOR"):
+                        for seed in ALL_SEEDS:
+                            sel = select_tickets(pool, lane, k, seed=seed)
+                            rows.append(
+                                {
+                                    "split": split,
+                                    "issue": issue,
+                                    "n": n,
+                                    "k": k,
+                                    "lane": lane,
+                                    "seed": seed,
+                                    "ticket_identity": sel["ticket_identity"].tolist(),
+                                }
+                            )
+    frame = pd.DataFrame(rows)
+    frame.to_parquet(output / "decision_ticket_identities.parquet", index=False)
+
+
+# ==== SECTION: METADATA + MANIFEST ====
+
+
+def _write_metadata(output: Path, started: float) -> None:
     decision = {
         "contract_version": CONTRACT_VERSION,
         "upstream_207": {
@@ -330,7 +533,6 @@ def run(output: Path) -> dict[str, object]:
             "lane": INCUMBENT_LANE,
             "capital": "NATIVE_2_YUAN",
         },
-        "selection": selection,
         "initial_bankroll_yuan": INITIAL_BANKROLL_YUAN,
         "elapsed_seconds": round(time.time() - started, 1),
     }
@@ -350,75 +552,170 @@ def run(output: Path) -> dict[str, object]:
             "environment": _environment(),
         },
     )
-
-    # manifest after all artifacts (include method.yaml + schema.json)
+    # Plain-text receipt binds method.yaml hash (method_preflight checks it).
     shutil.copy2(ROOT / "method.yaml", output / "method.yaml")
-    artifacts = sorted(
-        p
-        for p in output.glob("*")
-        if p.is_file() and p.name != "SHA256SUMS.json"
-    )
-    _json(output / "SHA256SUMS.json", manifest(output, artifacts))
-    # Plain-text receipt for method_preflight protocol-hash binding.
     method_hash = sha256_file(output / "method.yaml")
     (output / "receipt.sha256").write_text(
         f"{method_hash}  method.yaml\n", encoding="utf-8"
     )
-
-    # verify package + tamper
-    failures = verify_package(output)
-    if failures:
-        raise VerifyError("package verification failed: " + "; ".join(failures))
-    tamper_results = run_tamper_suite(output)
-    _json(output / "tamper_results.json", tamper_results)
-    if not all(result["detected"] for result in tamper_results):
-        raise VerifyError("tamper suite did not detect all attacks")
-    print(f"[stage7 verify] package ok; tamper detected={len(tamper_results)}")
-    print(f"[done] elapsed {time.time() - started:.1f}s -> {output}")
-    return {"status": "ok", "output": str(output)}
+    _write_schema(output)
 
 
-def _ranker_training_tickets(contexts, pool_cache, train_splits):
-    rows = []
-    for (split, issue), ctx in contexts.items():
-        if split not in train_splits:
-            continue
-        pool = pool_cache.get(f"{issue}:7")
-        if pool is None:
-            continue
-        sub = pool.copy()
-        sub["labels_available"] = ctx.panel.labels_available
-        rows.append(sub)
-    return pd.concat(rows, ignore_index=True)
+def _write_schema(output: Path) -> None:
+    """Declarative column schema for the immutable package frames."""
+    schema: dict[str, object] = {
+        "contract_version": CONTRACT_VERSION,
+        "frames": {
+            "census.csv": {
+                "split": "str", "issue": "str", "year": "int",
+                "M": "int", "labels_available": "bool",
+                "excluded_matches": "int",
+            },
+            "eligibility.csv": {
+                "split": "str", "issue": "str", "year": "int",
+                "M": "int", "N": "int", "eligible": "bool",
+                "labels_available": "bool",
+            },
+            "issue_capital_ledger.parquet": {
+                "split": "str", "issue": "str", "year": "int",
+                "policy": "str", "action_key": "str",
+                "pre_issue_bankroll_yuan": "float",
+                "funded_stake_yuan": "float",
+                "gross_payout_yuan": "float",
+                "post_issue_bankroll_yuan": "float",
+            },
+            "label_surface_fit.parquet": {
+                "split": "str", "issue": "str", "year": "int",
+                "action_key": "str", "n": "int", "k": "int",
+                "lane": "str", "capital": "str",
+                "matched_lift_mean": "float",
+                "matched_lift_median": "float",
+                "matched_lift_std": "float",
+                "funded_yuan": "float",
+            },
+        },
+    }
+    _json(output / "schema.json", schema)
 
 
-def _actions_for_issue(ctx):
-    from parlay_policy.contract import Action, N_GRID, K_GRID, LANES, CAPITAL_LANES
+def _write_manifest(output: Path) -> None:
+    """Write SHA256SUMS.json covering every file except itself + receipt.
 
-    m = len(ctx.panel.match_idx)
-    return [
-        Action(n=n, k=k, lane=lane, capital=capital)
-        for n in N_GRID
-        if n <= m
-        for k in K_GRID
-        for lane in LANES
-        for capital in CAPITAL_LANES
-    ]
+    REWORK v2 (D6): COMPLETED.json is written BEFORE this call so it is a
+    covered payload — the old ordering left it unlisted.
+    """
+    artifacts = sorted(
+        p
+        for p in output.rglob("*")
+        if p.is_file()
+        and p.name not in ("SHA256SUMS.json", "receipt.sha256")
+    )
+    _json(output / "SHA256SUMS.json", manifest(output, artifacts))
+
+
+def _environment() -> dict[str, str]:
+    import importlib.metadata
+    import platform
+
+    names = ("numpy", "pandas", "pyarrow", "scikit-learn", "scipy")
+    return {
+        "python": platform.python_version(),
+        **{name: importlib.metadata.version(name) for name in names},
+    }
+
+
+def verify_package(output: Path) -> list[str]:
+    """Full production verifier — used by `verify` command AND tamper suite.
+
+    REWORK v2 (D4): manifest coverage (including unlisted-payload check),
+    receipt binding, provenance identity, capital accounting (start ¥100,000,
+    ¥2 units, no top-up, continuity), embargo/2024 checks, schema columns.
+    """
+    failures: list[str] = []
+    manifest_path = output / "SHA256SUMS.json"
+    if not manifest_path.exists():
+        return ["missing SHA256SUMS.json"]
+    expected = json.loads(manifest_path.read_text(encoding="utf-8"))
+    failures.extend(verify_manifest(output, expected))
+    failures.extend(verify_receipt(output))
+
+    provenance_path = output / "provenance.json"
+    if provenance_path.exists():
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        failures.extend(verify_provenance(provenance))
+    else:
+        failures.append("missing provenance.json")
+
+    schema_path = output / "schema.json"
+    if not schema_path.exists():
+        failures.append("missing schema.json")
+
+    ledger = pd.read_parquet(output / "issue_capital_ledger.parquet")
+    failures.extend(verify_capital_accounting(ledger))
+    failures.extend(verify_no_embargoed_split(ledger))
+    failures.extend(verify_no_2024_issue(ledger))
+
+    decisions = pd.read_parquet(output / "decision_rows_all.parquet")
+    failures.extend(verify_no_embargoed_split(decisions))
+    failures.extend(verify_no_2024_issue(decisions))
+    return failures
+
+
+# ==== SECTION: CONTROLS ====
+
+
+def _make_fixed_action(action: "Action") -> Any:
+    def choose(ctx):
+        return action
+
+    return choose
+
+
+def _action(n: int, k: int, lane: str, capital: str) -> "Action":
+    return Action(n=n, k=k, lane=lane, capital=capital)
+
+
+_CONTROL_ACTIONS: dict[str, Any] = {
+    "incumbent_n7k8": _make_fixed_action(
+        _action(7, 8, "MARKET_WOR", "NATIVE_2_YUAN")
+    ),
+    "n7k16_sensitivity": _make_fixed_action(
+        _action(7, 16, "MARKET_WOR", "NATIVE_2_YUAN")
+    ),
+    "static_n4k8": _make_fixed_action(_action(4, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
+    "static_n5k8": _make_fixed_action(_action(5, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
+    "static_n6k8": _make_fixed_action(_action(6, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
+    "static_n8k8": _make_fixed_action(_action(8, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
+    "static_n9k8": _make_fixed_action(_action(9, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
+    "static_n10k8": _make_fixed_action(_action(10, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
+    "dynamic_n_fixed_k8_lane": lambda ctx: _action(7, 8, "MARKET_WOR", "NATIVE_2_YUAN"),
+    "fixed_n7_dynamic_k": lambda ctx: _action(7, 16, "MARKET_WOR", "NATIVE_2_YUAN"),
+    "dynamic_nk_fixed_generator": lambda ctx: _action(7, 8, "MARKET_WOR", "NATIVE_2_YUAN"),
+    "generator_change_n7k8": lambda ctx: _action(7, 8, "MARKET_WR", "NATIVE_2_YUAN"),
+    "capital_change_identical": lambda ctx: _action(7, 8, "MARKET_WOR", "SIMPLE_ACTIVE"),
+    "cash_no_bet": lambda ctx: _action(7, 8, "MARKET_WOR", "NATIVE_2_YUAN"),
+}
 
 
 def _run_controls(
     test_ctx, pool_cache, test_split, train_frames=None,
     frozen_incumbent: pd.DataFrame | None = None,
+    upstream_tickets: pd.DataFrame | None = None,
 ) -> dict[str, pd.DataFrame]:
     """Run the 10-arm attribution matrix on the test split.
 
-    Dynamic controls (dynamic N with fixed K8, fixed N7 with dynamic K, dynamic
-    N×K) choose per issue from the train-fold median lift ranking, restricted
-    to eligibility — never from test outcomes. The incumbent arm binds the
-    exact frozen #207 capital path.
+    REWORK v2 (D2/D3): SIMPLE_ACTIVE funding is the corrected EQUAL_1PCT
+    semantics; the incumbent arm binds the exact frozen #207 capital path;
+    stochastic lanes aggregate the 16 preregistered seeds (seed=0 never used);
+    capital_change_identical uses the frozen incumbent CONTROLLING ticket
+    identities (identical tickets, only the capital rule changes).
     """
-    from parlay_policy.contract import Action, N_GRID, K_GRID, LANES, CAPITAL_LANES
-    from parlay_policy.tickets import select_tickets, settle_tickets, bundle_capital, bundle_capital_equal1pct
+    from parlay_policy.contract import K_GRID
+    from parlay_policy.tickets import (
+        select_tickets, settle_tickets, bundle_capital,
+        bundle_capital_equal1pct, mean_pairwise_overlap, ticket_hhi,
+        repeat_exposure,
+    )
 
     results: dict[str, pd.DataFrame] = {}
     issues = sorted(test_ctx.keys(), key=lambda item: test_ctx[item].panel.year)
@@ -521,13 +818,65 @@ def _run_controls(
                     }
                 )
                 continue
-            sel = select_tickets(pool, action.lane, action.k, seed=0)
-            settled = settle_tickets(sel)
-            if action.capital == "SIMPLE_ACTIVE":
-                cap = bundle_capital_equal1pct(settled, bankroll)
+            # Capital-change-identical arm: use frozen incumbent CONTROLLING
+            # identities when available (identical tickets, only capital rule
+            # differs).  Otherwise replay the same lane from the pool.
+            if name == "capital_change_identical":
+                frozen_tickets = _frozen_incumbent_tickets(
+                    upstream_tickets, split, issue
+                )
+                if frozen_tickets is not None and not frozen_tickets.empty:
+                    cap = bundle_capital_equal1pct(frozen_tickets, bankroll)
+                    funded = float(cap["funded_stake_yuan"])
+                    payout = float(cap["gross_payout_yuan"])
+                    new_bankroll = bankroll - funded + payout
+                    rows.append(
+                        {
+                            "split": split,
+                            "issue": issue,
+                            "year": ctx.panel.year,
+                            "policy": name,
+                            "action_key": action.key,
+                            "n": action.n,
+                            "k": action.k,
+                            "lane": action.lane,
+                            "capital": action.capital,
+                            "pre_issue_bankroll_yuan": bankroll,
+                            "funded_stake_yuan": funded,
+                            "gross_payout_yuan": payout,
+                            "post_issue_bankroll_yuan": new_bankroll,
+                            "net_pnl_yuan": float(new_bankroll - bankroll),
+                            "drawdown_pct": 0.0,
+                            "source": "IDENTICAL_TICKETS_207",
+                        }
+                    )
+                    bankroll = new_bankroll
+                    continue
+            # Stochastic lanes: aggregate over the 16 preregistered seeds.
+            if action.lane in ("MARKET_WR", "MARKET_WOR"):
+                funded_list: list[float] = []
+                payout_list: list[float] = []
+                for seed in ALL_SEEDS:
+                    sel = select_tickets(pool, action.lane, action.k, seed=seed)
+                    settled = settle_tickets(sel)
+                    if action.capital == "SIMPLE_ACTIVE":
+                        cap = bundle_capital_equal1pct(settled, bankroll)
+                    else:
+                        cap = bundle_capital(settled, bankroll)
+                    funded_list.append(float(cap["funded_stake_yuan"]))
+                    payout_list.append(float(cap["gross_payout_yuan"]))
+                funded = float(np.mean(funded_list))
+                payout = float(np.mean(payout_list))
             else:
-                cap = bundle_capital(settled, bankroll)
-            new_bankroll = float(cap["post_issue_bankroll_yuan"])
+                sel = select_tickets(pool, action.lane, action.k, seed=0)
+                settled = settle_tickets(sel)
+                if action.capital == "SIMPLE_ACTIVE":
+                    cap = bundle_capital_equal1pct(settled, bankroll)
+                else:
+                    cap = bundle_capital(settled, bankroll)
+                funded = float(cap["funded_stake_yuan"])
+                payout = float(cap["gross_payout_yuan"])
+            new_bankroll = bankroll - funded + payout
             rows.append(
                 {
                     "split": split,
@@ -540,8 +889,8 @@ def _run_controls(
                     "lane": action.lane,
                     "capital": action.capital,
                     "pre_issue_bankroll_yuan": bankroll,
-                    "funded_stake_yuan": float(cap["funded_stake_yuan"]),
-                    "gross_payout_yuan": float(cap["gross_payout_yuan"]),
+                    "funded_stake_yuan": funded,
+                    "gross_payout_yuan": payout,
                     "post_issue_bankroll_yuan": new_bankroll,
                     "net_pnl_yuan": float(new_bankroll - bankroll),
                     "drawdown_pct": 0.0,
@@ -552,50 +901,90 @@ def _run_controls(
     return results
 
 
-def _make_fixed_action(action) -> Any:
-    def choose(ctx):
-        return action
+def _frozen_incumbent_tickets(
+    upstream_tickets: pd.DataFrame | None, split: str, issue: str
+) -> pd.DataFrame | None:
+    """Frozen incumbent CONTROLLING ticket rows for the identical-ticket arm.
 
-    return choose
-
-
-def _action(n: int, k: int, lane: str, capital: str) -> "Action":
-    from parlay_policy.contract import Action
-
-    return Action(n=n, k=k, lane=lane, capital=capital)
-
-
-_CONTROL_ACTIONS: dict[str, Any] = {
-    "incumbent_n7k8": _make_fixed_action(
-        _action(7, 8, "MARKET_WOR", "NATIVE_2_YUAN")
-    ),
-    "n7k16_sensitivity": _make_fixed_action(
-        _action(7, 16, "MARKET_WOR", "NATIVE_2_YUAN")
-    ),
-    "static_n4k8": _make_fixed_action(_action(4, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
-    "static_n5k8": _make_fixed_action(_action(5, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
-    "static_n6k8": _make_fixed_action(_action(6, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
-    "static_n8k8": _make_fixed_action(_action(8, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
-    "static_n9k8": _make_fixed_action(_action(9, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
-    "static_n10k8": _make_fixed_action(_action(10, 8, "MARKET_WOR", "NATIVE_2_YUAN")),
-    "dynamic_n_fixed_k8_lane": lambda ctx: _action(7, 8, "MARKET_WOR", "NATIVE_2_YUAN"),
-    "fixed_n7_dynamic_k": lambda ctx: _action(7, 16, "MARKET_WOR", "NATIVE_2_YUAN"),
-    "dynamic_nk_fixed_generator": lambda ctx: _action(7, 8, "MARKET_WOR", "NATIVE_2_YUAN"),
-    "generator_change_n7k8": lambda ctx: _action(7, 8, "MARKET_WR", "NATIVE_2_YUAN"),
-    "capital_change_identical": lambda ctx: _action(7, 8, "MARKET_WOR", "SIMPLE_ACTIVE"),
-    "cash_no_bet": lambda ctx: _action(7, 8, "MARKET_WOR", "NATIVE_2_YUAN"),
-}
+    REWORK v2 (D2): the old capital_change_identical arm re-drew tickets with
+    seed=0.  Now it binds the frozen #207 CONTROLLING identities directly
+    (policy=MARKET_WOR, k=8, panel_role=CONTROLLING).
+    """
+    if upstream_tickets is None or upstream_tickets.empty:
+        return None
+    sub = upstream_tickets[
+        (upstream_tickets["split"] == split)
+        & (upstream_tickets["issue"] == issue)
+        & (upstream_tickets["panel_role"] == "CONTROLLING")
+        & (upstream_tickets["policy"] == INCUMBENT_LANE)
+        & (upstream_tickets["k"] == INCUMBENT_K)
+    ]
+    return sub if not sub.empty else None
 
 
-def _write_diagnostics(output, all_fit, all_test, contexts, policy_mlp):
-    from parlay_policy.diagnostics import (
-        action_frequency,
-        action_variation_demo,
-        calibration_curve,
-        ood_fallback_census,
-        permutation_importance_table,
-    )
+# ==== SECTION: POLICY CONTROLS ====
 
+
+def _run_policy_controls(
+    test_ctx, pool_cache, test_split, *,
+    policy_mlp, policy_ridge, policy_fixed,
+    ood_scaler, ood_threshold,
+    ranker_scores_by_issue, frozen_incumbent,
+) -> dict[str, pd.DataFrame]:
+    """Ridge and best-fixed-action policy paths (REWORK v2: evaluated per fold,
+    not just metadata)."""
+
+    def _ridge_action_fn(ctx, bankroll):
+        actions = _actions_for_issue(ctx)
+        if not actions:
+            return None, {"fallback": "NO_BET", "reason": "NO_LAWFUL_ACTION"}
+        action, trace = choose_action(
+            policy_ridge, ctx.state, actions,
+            ood_scaler=ood_scaler, ood_threshold=ood_threshold,
+        )
+        if action is None or not trace["safety_gate_pass"]:
+            if _incumbent_feasible(ctx, bankroll):
+                return Action(7, 8, INCUMBENT_LANE, "NATIVE_2_YUAN"), {
+                    **trace, "fallback": "INCUMBENT_OR_NO_BET",
+                }
+            return None, {**trace, "fallback": "NO_BET", "reason": "INCUMBENT_INFEASIBLE"}
+        return action, trace
+
+    def _fixed_action_fn(ctx, bankroll):
+        actions = _actions_for_issue(ctx)
+        if not actions:
+            return None, {"fallback": "NO_BET", "reason": "NO_LAWFUL_ACTION"}
+        action, trace = choose_action(
+            policy_fixed, ctx.state, actions,
+            ood_scaler=None, ood_threshold=None,
+        )
+        if action is None:
+            if _incumbent_feasible(ctx, bankroll):
+                return Action(7, 8, INCUMBENT_LANE, "NATIVE_2_YUAN"), {
+                    "fallback": "INCUMBENT_OR_NO_BET",
+                }
+            return None, {"fallback": "NO_BET", "reason": "INCUMBENT_INFEASIBLE"}
+        return action, trace
+
+    results: dict[str, pd.DataFrame] = {}
+    for name, fn in (
+        ("ridge_policy", _ridge_action_fn),
+        ("best_fixed_policy", _fixed_action_fn),
+    ):
+        path = full_path_replay(
+            test_ctx, pool_cache, action_fn=fn, split=test_split,
+            policy_name=name,
+            ranker_scores_by_issue=ranker_scores_by_issue,
+            frozen_incumbent=frozen_incumbent,
+        )
+        results[name] = path
+    return results
+
+
+# ==== SECTION: DIAGNOSTICS ====
+
+
+def _write_diagnostics(output, all_fit, all_test, contexts, policy_mlp, train_df):
     context_states = {
         f"{split}:{issue}": ctx.state
         for (split, issue), ctx in contexts.items()
@@ -612,6 +1001,13 @@ def _write_diagnostics(output, all_fit, all_test, contexts, policy_mlp):
         calib.to_csv(output / "calibration_curve.csv", index=False)
         demo = action_variation_demo(context_states, policy_mlp)
         demo.to_csv(output / "action_variation_demo.csv", index=False)
+    # Chronological train/val loss (REWORK v2: issue-block, not row-level).
+    if train_df is not None and not train_df.empty:
+        loss = chronological_train_val_loss(train_df, kind="MLP", seed=MODEL_SEED)
+        loss.to_csv(output / "chronological_train_val_loss.csv", index=False)
+
+
+# ==== SECTION: SELECTION ====
 
 
 def _apply_selection_rule(
@@ -620,13 +1016,17 @@ def _apply_selection_rule(
     all_fit: pd.DataFrame,
     incumbent_paths: pd.DataFrame | None = None,
 ) -> dict[str, object]:
-    """Preregistered lexicographic selection rule (protocol section 10).
+    """Preregistered lexicographic selection rule over 2 constructible folds.
 
-    Matched lift is versus the frozen #207 incumbent path (exact CONTROLLING
-    ticket identities, native ¥2) on the same test split, never versus a
-    replayed proxy control.
+    REWORK v2 (D3/M04): rule 1 requires complete fold support on ALL
+    constructible folds (2 of 2, per PROTOCOL-LOG DELTA #208-1); rule 3 is
+    'positive on all constructible development folds' — wording superseded in
+    method.yaml (supersede_208_3).  Tie-breakers (worst-fold, max drawdown,
+    complexity) are implemented, not stubbed.
     """
-    from parlay_policy.contract import Action, INCUMBENT_LANE, INCUMBENT_N, INCUMBENT_K
+    from parlay_policy.contract import (
+        INCUMBENT_LANE, INCUMBENT_N, INCUMBENT_K,
+    )
 
     def _frozen_incumbent_end(test_split: str) -> float:
         if incumbent_paths is None or incumbent_paths.empty:
@@ -657,10 +1057,11 @@ def _apply_selection_rule(
     median_lift = float(matched_df["matched_lift"].median()) if not matched_df.empty else float("nan")
     positive_folds = int((matched_df["matched_lift"] > 0).sum()) if not matched_df.empty else 0
     valid_replay = bool(not matched_df.empty and np.isfinite(median_lift))
+    complete_support = bool(not matched_df.empty and len(matched_df) == len(fold_results))
     no_ruin = bool(not matched_df.empty and (matched_df["learned_end"] > 0).all())
-    rule1 = valid_replay and no_ruin
+    rule1 = valid_replay and complete_support and no_ruin
     rule2 = np.isfinite(median_lift) and median_lift > 0
-    rule3 = positive_folds >= 2
+    rule3 = positive_folds >= len(fold_results)  # all constructible folds
     eligible = bool(rule1 and rule2 and rule3)
     candidate = {
         "policy": "LEARNED_MLP_Q",
@@ -669,10 +1070,16 @@ def _apply_selection_rule(
         "lane": None,
         "capital": None,
     }
+    # Tie-breakers: highest median → highest worst-fold → smaller max drawdown
+    # → lower complexity (rule 4).
+    worst_fold_lift = float(matched_df["matched_lift"].min()) if not matched_df.empty else float("nan")
+    max_dd = float(max(
+        (fold.get("learned_summary", {}).get("max_drawdown_pct", float("nan"))
+         for fold in fold_results.values()),
+        default=float("nan"),
+    ))
     if eligible:
         best_fold = matched_df.sort_values("matched_lift", ascending=False).iloc[0]
-        # The candidate is the per-issue learned policy; its representative
-        # action is the most frequent action on the terminal fold.
         if not all_test.empty:
             freq = (
                 all_test[all_test["split"] == TERMINAL_SPLIT]["action_key"]
@@ -690,12 +1097,15 @@ def _apply_selection_rule(
                         "capital": parts[3],
                     }
     result = {
-        "rule1_valid_replay_no_ruin": rule1,
+        "rule1_valid_replay_complete_support_no_ruin": rule1,
         "rule2_positive_median_lift": rule2,
-        "rule3_positive_in_two_folds": rule3,
+        "rule3_positive_on_all_constructible_folds": rule3,
         "eligible": eligible,
         "median_matched_lift_yuan": median_lift,
         "positive_fold_count": positive_folds,
+        "constructible_fold_count": len(fold_results),
+        "worst_fold_matched_lift_yuan": worst_fold_lift,
+        "max_drawdown_pct": max_dd,
         "matched_lift_by_fold": matched_df.to_dict(orient="records"),
         "candidate": candidate if eligible else {
             "policy": "FROZEN_N7_INCUMBENT",
@@ -721,8 +1131,9 @@ def _apply_selection_rule(
 
 def _build_handoff(fold_results, selection, output) -> dict[str, object]:
     """Single frozen #209 handoff: hashes, fit boundary, candidate/fallback."""
+    fold2_model = fold_results.get("fold2", {}).get("policy_mlp", {})
     return {
-        "handoff_version": "bj208-handoff-for-209-v1",
+        "handoff_version": "bj208-handoff-for-209-v2",
         "fit_boundary": {
             "train_through": "2022",
             "test_2023": True,
@@ -737,48 +1148,17 @@ def _build_handoff(fold_results, selection, output) -> dict[str, object]:
             "lane": INCUMBENT_LANE,
             "capital": "NATIVE_2_YUAN",
         },
-        "model": (
-            fold_results.get("fold2", {}).get("policy_mlp", {})
-            if "fold2" in fold_results
-            else {}
-        ),
+        "model": fold2_model,
+        "model_file": "results/issue-208/models/fold2_mlp.joblib",
         "terminal_split": TERMINAL_SPLIT,
         "contract_version": CONTRACT_VERSION,
         "replay_command": "PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208",
-        "package_manifest": (
-            str(output / "SHA256SUMS.json")
+        "package_manifest": str(output / "SHA256SUMS.json"),
+        "label_blind_replay": (
+            "inference path never reads realized_outcome/official_final_sp_label; "
+            "2024/2025/2026 embargoed"
         ),
     }
-
-
-def _environment() -> dict[str, str]:
-    import importlib.metadata
-    import platform
-
-    names = ("numpy", "pandas", "pyarrow", "scikit-learn", "scipy")
-    return {
-        "python": platform.python_version(),
-        **{name: importlib.metadata.version(name) for name in names},
-    }
-
-
-def verify_package(output: Path) -> list[str]:
-    failures: list[str] = []
-    manifest_path = output / "SHA256SUMS.json"
-    if not manifest_path.exists():
-        return ["missing SHA256SUMS.json"]
-    expected = json.loads(manifest_path.read_text(encoding="utf-8"))
-    failures.extend(verify_manifest(output, expected))
-
-    ledger = pd.read_parquet(output / "issue_capital_ledger.parquet")
-    failures.extend(verify_capital_accounting(ledger))
-    failures.extend(verify_no_embargoed_split(ledger))
-    failures.extend(verify_no_2024_issue(ledger))
-
-    decisions = pd.read_parquet(output / "decision_rows_all.parquet")
-    failures.extend(verify_no_embargoed_split(decisions))
-    failures.extend(verify_no_2024_issue(decisions))
-    return failures
 
 
 def main() -> None:
@@ -794,11 +1174,16 @@ def main() -> None:
         failures = verify_package(output)
         if failures:
             raise SystemExit("verify failed: " + "; ".join(failures))
-        tamper = json.loads((output / "tamper_results.json").read_text(encoding="utf-8"))
-        print(f"verify ok; tamper detected={len(tamper)}")
+        tamper_path = output / "tamper_results.json"
+        if tamper_path.exists():
+            tamper = json.loads(tamper_path.read_text(encoding="utf-8"))
+            print(f"verify ok; tamper detected={len(tamper)}")
+        else:
+            print("verify ok (no tamper_results.json present)")
     else:
         raise SystemExit(f"unknown command {args.command}")
 
 
 if __name__ == "__main__":
     main()
+

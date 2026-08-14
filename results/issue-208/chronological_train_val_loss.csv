@@ -1,0 +1,2 @@
+model,fit_issues,validation_issues,fit_rmse,validation_rmse
+MLP,98,18,1976.3276790868006,1555.211852914176
