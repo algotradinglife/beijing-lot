@@ -21,9 +21,9 @@
     "detected": true,
     "failures": [
       "hash mismatch chronology_blocks.parquet: d82ba9a17d46deb2e44dde5f22ad011d13b1fd4403054ce767cc1fbf6966dea8 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_fold1.parquet: b1a497d0c81cee459de43e5860794e280f620294ad5c7762fa98207124f80bd6 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_fold2.parquet: 09cf092a810731e6eedeb1f6661893258e986b824c60fe10280790e32dd25d94 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_rows_all.parquet: 3a610c9537010460cb1a53dc65e1b3e3efbe40f99000bedf42c5c526930bdbbf != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_fold1.parquet: 3e6b3b30ef46ae0da950dc6e145d57907b8a195a1463622d678170ef77158470 != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_fold2.parquet: b09467c40671448f040b71f4af5fa781fa3214cc83ee8f5dbe65873b1ef47ccc != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_rows_all.parquet: c2205d1bbfb765869052c5e5a46716b6070b72d5a2cdc27fc20006c428586a32 != 0000000000000000000000000000000000000000000000000000000000000000",
       "hash mismatch decision_ticket_identities.parquet: 6640fa3220c0e94df4fefb9b87228850acbca3cbb37432eed1b6c1784d7fb81e != 0000000000000000000000000000000000000000000000000000000000000000"
     ]
   },
@@ -166,6 +166,17 @@
     "failures": [
       "holdout payload does not bind fold2 model",
       "holdout payload does not bind terminal decisions"
+    ]
+  },
+  {
+    "attack": "training_state_drawdown_shift",
+    "detected": true,
+    "failures": [
+      "training_frame_all.parquet ('CV_2021', '21011') prior_running_drawdown_pct = 0.5 but source-derived value = 0.0",
+      "training_frame_all.parquet ('CV_2021', '21012') prior_running_drawdown_pct = 0.50016 but source-derived value = 0.00016",
+      "training_frame_all.parquet ('CV_2021', '21013') prior_running_drawdown_pct = 0.50032 but source-derived value = 0.00032",
+      "training_frame_all.parquet ('CV_2021', '21014') prior_running_drawdown_pct = 0.50048 but source-derived value = 0.00048",
+      "training_frame_all.parquet ('CV_2021', '21015') prior_running_drawdown_pct = 0.50064 but source-derived value = 0.00064"
     ]
   }
 ]

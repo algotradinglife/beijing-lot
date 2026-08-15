@@ -7,7 +7,7 @@
       "diagnostic_only": false
     }
   },
-  "contract_version": "bj208-dynamic-nk-policy-v5",
+  "contract_version": "bj208-dynamic-nk-policy-v6",
   "frames": {
     "action_frequency.csv": {
       "columns": {
@@ -1251,6 +1251,7 @@
         "minimum_capital_yuan": "float",
         "minimum_retained_cash_yuan": "float",
         "near_ruin": "bool",
+        "open_underwater_issues": "float",
         "policy": "str",
         "recovery_issues": "float",
         "rolling10_loss_prob": "float",
@@ -1626,6 +1627,10 @@
     {
       "name": "complete_code_binding_set",
       "production_verifier": "verify_code_bindings"
+    },
+    {
+      "name": "training_state_source_binding",
+      "production_verifier": "verify_state_semantics"
     }
   ]
 }

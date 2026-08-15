@@ -1,7 +1,7 @@
 # Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier
 
 REWORK v4 (EV REJECT `ea1fc51` fixed), generated from producer-code commit
-`REWORKV4_COMMIT_PLACEHOLDER`. Contract BJ-UNIFIED-DYNAMIC-N-001 / v6.
+`eea005b24f2c38271abbbb74bab8f423832230bc`. Contract BJ-UNIFIED-DYNAMIC-N-001 / v6.
 Research and paper settlement only. No betting, release, or frontend authority
 follows from this result.
 

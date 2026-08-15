@@ -1,4 +1,4 @@
-# Issue #208 method protocol — BJ-UNIFIED-DYNAMIC-N-001 / v5
+# Issue #208 method protocol — BJ-UNIFIED-DYNAMIC-N-001 / v6
 # Frozen preregistrations; worker must not silently modify.
 # Protocol deltas appended in PROTOCOL-LOG / docs/research/issue_208_protocol_log.md.
 # REWORK v2 (2026-08-14, EV REJECT 53f67ec): supersede rows #208-2..#208-6.
@@ -15,8 +15,18 @@
 # per-issue path metrics/exposures independently recomputed; complete frame,
 # JSON, model and receipt content binding; retained-development label/SP
 # domains fail closed; alternate replay output is explicitly supported.
+# REWORK v4 (2026-08-15, EV REJECT ea1fc51): supersede rows #208-27..#208-29.
+#   D1 path-state causality: every selection path scores from ITS OWN
+#   strictly-prior live history (trail5/trail10, drawdown, loss streak); the
+#   running drawdown peak anchors at the time-zero ¥100,000 initial bankroll.
+#   D2 holding semantics: completed recovery duration, open/censored
+#   underwater duration and recovery event count are explicit and separate;
+#   a terminal underwater episode is never a completed recovery.
+#   D3 semantic evidence binding: source-derived recomputation of the five
+#   path-dependent state features + model-scaler binding fail closed on legal
+#   re-manifest tampering of training/validation frames.
 
-protocol_version: bj208-protocol-v5
+protocol_version: bj208-protocol-v6
 
 candidate_pool:
   description: "per-issue learned policy Q_theta(x,a) on the bounded N×K×lane×capital action catalog"
@@ -74,6 +84,15 @@ metrics:
   - name: time_under_water_issues
     definition: "consecutive issues from peak before recovery to new peak (holding-feasibility metric)"
     golden_test: "tests/test_bj208_metrics.py::test_time_under_water"
+  - name: recovery_issues
+    definition: "count of COMPLETED recovery events (episode reached a new running peak)"
+    golden_test: "tests/test_bj208_metrics.py::test_recovery_completed_then_open"
+  - name: max_recovery_issues
+    definition: "longest COMPLETED underwater episode duration; a right-censored terminal episode is never counted here (REWORK v4 EV D2)"
+    golden_test: "tests/test_bj208_metrics.py::test_recovery_terminal_censored_never_recovers"
+  - name: open_underwater_issues
+    definition: "length of the right-censored (open) underwater episode at path end; 0 if the path ends at/above its running peak (REWORK v4 EV D2)"
+    golden_test: "tests/test_bj208_metrics.py::test_recovery_terminal_censored_never_recovers"
   - name: max_consecutive_losing_issues
     definition: "longest run of issues with net P&L < 0 (positive but insufficient gross payout is still a loss)"
     golden_test: "tests/test_bj208_metrics.py::test_max_consecutive_losses"

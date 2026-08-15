@@ -6,7 +6,7 @@
     "n": 7,
     "policy": "FROZEN_N7_INCUMBENT"
   },
-  "contract_version": "bj208-dynamic-nk-policy-v5",
+  "contract_version": "bj208-dynamic-nk-policy-v6",
   "fallback": {
     "capital": "NATIVE_2_YUAN",
     "k": 8,
@@ -20,7 +20,7 @@
     "test_2023": true,
     "train_through": "2022"
   },
-  "handoff_version": "bj208-handoff-for-209-v5",
+  "handoff_version": "bj208-handoff-for-209-v6",
   "label_blind_replay": "inference path never reads realized_outcome/official_final_sp_label; 2024/2025/2026 embargoed",
   "model": {
     "action_columns": [
@@ -213,11 +213,11 @@
     ],
     "fixed_action_key": null,
     "loss_curve_tail": [
-      832604.2509128018,
-      832564.2964715742,
-      832560.9895396204,
-      832531.8389630107,
-      832521.345890281
+      832584.868236988,
+      832557.6985526251,
+      832549.8067726786,
+      832520.7066858902,
+      832519.8493550956
     ],
     "model_file": "fold2_mlp.joblib",
     "model_kind": "MLP",
@@ -251,7 +251,7 @@
     },
     "model_serialized": true,
     "model_type": "Pipeline",
-    "residual_rmse": 1290.2788064892898,
+    "residual_rmse": 1290.275178581431,
     "scaler_mean": [
       315.6530612244898,
       0.49643029176147574,
@@ -272,7 +272,7 @@
       99602.77551020408,
       99662.20408163265,
       99729.14285714286,
-      0.003816120783406978,
+      0.003972244897959183,
       24.8265306122449,
       7.0,
       18.666666666666668,
@@ -299,7 +299,7 @@
       247.77633637948088,
       241.22552574106777,
       225.18926280272035,
-      0.00247302219852505,
+      0.0024777633637948085,
       15.486021023717555,
       2.0,
       9.977753031397176,
@@ -330,7 +330,7 @@
       "prior_consecutive_losses"
     ],
     "validation_issue_count": 18,
-    "validation_rmse": 1012.2217561410822
+    "validation_rmse": 1012.3622885786294
   },
   "model_file": "results/issue-208/models/fold2_mlp.joblib",
   "package_manifest": "results/issue-208/SHA256SUMS.json",

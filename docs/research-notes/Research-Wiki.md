@@ -996,7 +996,7 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
   bins 非单调且量纲失配；fit/validation RMSE 为 1,290/1,012，不能据此宣称可执行信号。
 - 训练边界为 fold1 49 FIT / 9 VALIDATION、fold2 98 FIT / 18 VALIDATION，重叠均为 0；
   retained DEVELOPMENT 行必须恰有一个赛果命中且三个 official SP 均为正。
-- 证据包由 producer-code commit `REWORKV4_COMMIT_PLACEHOLDER`
+- 证据包由 producer-code commit `eea005b24f2c38271abbbb74bab8f423832230bc`
   生成：75 个 focused tests 通过；1,921 行 capital ledger conservation error=0；
   50,970 个 LOCKED_TEST rows 的两次实际复拟合签名一致；production verifier 检出
   23/23 attacks（含新增 training-state drawdown shift）；每帧均有 schema，
