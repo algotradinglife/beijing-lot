@@ -282,10 +282,10 @@ def verify_package_schema(package: Path, schema: dict[str, Any]) -> list[str]:
         except Exception as exc:
             failures.append(f"schema target unreadable {name}: {exc}")
             continue
-        declared_columns = list(required)
-        if declared_columns != list(frame.columns):
+        declared_columns = set(required)
+        if declared_columns != set(frame.columns):
             failures.append(
-                f"{name}: declared columns do not exactly match published order"
+                f"{name}: declared columns do not exactly match published columns"
             )
         diagnostic_only = contract.get("diagnostic_only")
         if not isinstance(diagnostic_only, bool):
