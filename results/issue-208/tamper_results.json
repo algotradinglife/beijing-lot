@@ -4,6 +4,8 @@
     "detected": true,
     "failures": [
       "hash mismatch issue_capital_ledger.parquet: 7d2aab609d2ceaa7be6c5f346ac6c1b154a6f8e531a00b1e6c63c0bd7df713a3 != c7954dc024f4841e91e5696cf31e301b5c26e23cacbf7a91132f9d5ebeee8b67",
+      "handoff package_manifest does not resolve after publish: results/issue-208/SHA256SUMS.json",
+      "handoff model_file does not resolve after publish: results/issue-208/models/fold2_mlp.joblib",
       "capital conservation violated on 1 rows",
       "FROZEN_INCUMBENT_207 ledger row CV_2022/22011 does not match incumbent_paths"
     ]
@@ -13,6 +15,8 @@
     "detected": true,
     "failures": [
       "hash mismatch issue_capital_ledger.parquet: e4270d31fa9508ac9db1dd8b17b1e4967571799147b56f96bf77e40dcaf98556 != c7954dc024f4841e91e5696cf31e301b5c26e23cacbf7a91132f9d5ebeee8b67",
+      "handoff package_manifest does not resolve after publish: results/issue-208/SHA256SUMS.json",
+      "handoff model_file does not resolve after publish: results/issue-208/models/fold2_mlp.joblib",
       "path continuity broken on 1 row boundary",
       "path learned_policy starts at 100100.0, not 100000.0"
     ]
@@ -33,6 +37,8 @@
     "detected": true,
     "failures": [
       "hash mismatch provenance.json: 3aec9b6a5125b194cac7965fa570918d55d0609d070a521cca145f3afea0433c != a37aa29655fe761d9aa74802475ec991862a76aef7424488562c35cc6804647a",
+      "handoff package_manifest does not resolve after publish: results/issue-208/SHA256SUMS.json",
+      "handoff model_file does not resolve after publish: results/issue-208/models/fold2_mlp.joblib",
       "provenance source_issue_207_manifest_sha256 mismatch: 0000000000000000000000000000000000000000000000000000000000000000",
       "provenance source_value_matrix_sha256 mismatch: 0000000000000000000000000000000000000000000000000000000000000000"
     ]
@@ -42,6 +48,8 @@
     "detected": true,
     "failures": [
       "hash mismatch ticket_economics.parquet: ba3985bc9fdc43f7003f0e4ea0c84a9d7281853385d713e64c9c9e1cc5676fe4 != 0469aebf45d6752eb3215ab89b2f51134c9df9f3a989b6df853458e81189c8a3",
+      "handoff package_manifest does not resolve after publish: results/issue-208/SHA256SUMS.json",
+      "handoff model_file does not resolve after publish: results/issue-208/models/fold2_mlp.joblib",
       "payout coefficient violation ticket 1ac98764003b781d765d5f9e533aa7162e0e335578b31541f81d4fa011aa9f41 CV_2023/23011: multiple=27.382471 expected 0.65*prod(SP)=17.798606 (prod(SP)=27.382471)"
     ]
   },
@@ -50,6 +58,8 @@
     "detected": true,
     "failures": [
       "hash mismatch incumbent_paths.parquet: bee4257d68bd75f14aa5a191b304a20bfc0fa2c38eacc3a6c249c077527996c2 != e28afe3684e3c42203fe836af4c8e0e4fa0f5152302fc9800b25238c677c5b82",
+      "handoff package_manifest does not resolve after publish: results/issue-208/SHA256SUMS.json",
+      "handoff model_file does not resolve after publish: results/issue-208/models/fold2_mlp.joblib",
       "incumbent payout division-out at CV_2023/23084: payout=192.8895 expected sum(realized_gross)*2=125.3781",
       "FROZEN_INCUMBENT_207 ledger row CV_2023/23084 does not match incumbent_paths"
     ]
@@ -59,7 +69,18 @@
     "detected": true,
     "failures": [
       "hash mismatch ticket_economics.parquet: 6c2295c8b3aa174421386f3f6304e4cfe04ce8f506e42c81be3a0bf1e11768a8 != 0469aebf45d6752eb3215ab89b2f51134c9df9f3a989b6df853458e81189c8a3",
+      "handoff package_manifest does not resolve after publish: results/issue-208/SHA256SUMS.json",
+      "handoff model_file does not resolve after publish: results/issue-208/models/fold2_mlp.joblib",
       "payout coefficient violation ticket 1ac98764003b781d765d5f9e533aa7162e0e335578b31541f81d4fa011aa9f41 CV_2023/23011: multiple=4.887942 expected 0.65*prod(SP)=17.798606 (prod(SP)=27.382471)"
+    ]
+  },
+  {
+    "attack": "handoff_staging_path",
+    "detected": true,
+    "failures": [
+      "hash mismatch handoff_209.json: 05c464cc063bb99272989b0dbe85f0a9821c7d829c0a4d8ab450767088c65d2b != a322e0cbe74100a22a2174d6ffe378b2bb275c36c4e800ec7ff2c91b00059211",
+      "handoff package_manifest references staging path: results/issue-208.staging/SHA256SUMS.json",
+      "handoff model_file does not resolve after publish: results/issue-208/models/fold2_mlp.joblib"
     ]
   }
 ]

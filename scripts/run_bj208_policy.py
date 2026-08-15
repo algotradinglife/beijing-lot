@@ -87,6 +87,7 @@ from parlay_policy.verify import (  # noqa: E402
     run_tamper_suite,
     sha256_file,
     verify_capital_accounting,
+    verify_handoff_paths,
     verify_manifest,
     verify_nk_semantics,
     verify_no_2024_issue,
@@ -161,7 +162,7 @@ def run(output: Path) -> dict[str, object]:
     staging.mkdir(parents=True, exist_ok=True)
 
     try:
-        _run_stages(staging)
+        _run_stages(staging, published_output=output)
         _write_metadata(staging, started)
         _write_manifest(staging)
         failures = verify_package(staging)
@@ -184,6 +185,14 @@ def run(output: Path) -> dict[str, object]:
                 "post-tamper verification failed: " + "; ".join(failures)
             )
         _atomic_publish(staging, output)
+        # REWORK v3.1 (PI narrow durability): after the atomic rename, verify
+        # the FINAL published package — handoff paths must resolve against the
+        # canonical post-publication location (never .staging).
+        post_failures = verify_package(output)
+        if post_failures:
+            raise VerifyError(
+                "post-publication verification failed: " + "; ".join(post_failures)
+            )
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise
@@ -194,7 +203,9 @@ def run(output: Path) -> dict[str, object]:
 # ==== SECTION: STAGES ====
 
 
-def _run_stages(output: Path) -> None:
+def _run_stages(
+    output: Path, *, published_output: Path | None = None
+) -> None:
     # --- Stage 1: census ----------------------------------------------------
     vm = load_value_matrix(ROOT)
     panels = build_panels(vm)
@@ -422,7 +433,9 @@ def _run_stages(output: Path) -> None:
         fold_results, all_test, all_fit, incumbent_paths=incumbent_paths
     )
     _json(output / "selection.json", selection)
-    handoff = _build_handoff(fold_results, selection, output)
+    handoff = _build_handoff(
+        fold_results, selection, output, published_output=published_output
+    )
     _json(output / "handoff_209.json", handoff)
 
     # Materialize decision ticket identities + seed aggregates (REQ-208-04).
@@ -751,6 +764,9 @@ def verify_package(output: Path) -> list[str]:
     expected = json.loads(manifest_path.read_text(encoding="utf-8"))
     failures.extend(verify_manifest(output, expected))
     failures.extend(verify_receipt(output))
+    # REWORK v3.1 (PI narrow durability): handoff artifact paths must resolve
+    # after publication and must never reference the staging directory.
+    failures.extend(verify_handoff_paths(output))
 
     provenance_path = output / "provenance.json"
     if provenance_path.exists():
@@ -1262,11 +1278,22 @@ def _apply_selection_rule(
     return result
 
 
-def _build_handoff(fold_results, selection, output) -> dict[str, object]:
-    """Single frozen #209 handoff: hashes, fit boundary, candidate/fallback."""
+def _build_handoff(
+    fold_results, selection, output: Path, *, published_output: Path | None = None
+) -> dict[str, object]:
+    """Single frozen #209 handoff: hashes, fit boundary, candidate/fallback.
+
+    REWORK v3.1 (PI narrow durability REJECT 2026-08-15): the handoff must
+    serialize the CANONICAL post-publication manifest path
+    (`results/issue-208/SHA256SUMS.json`), never the transient staging path.
+    `_build_handoff` is called while the package is still in the staging
+    directory, so the caller passes `published_output` (the final output path)
+    to keep handoff paths resolvable after the atomic rename.
+    """
     fold2_model = fold_results.get("fold2", {}).get("policy_mlp", {})
+    published = published_output or output
     return {
-        "handoff_version": "bj208-handoff-for-209-v3",
+        "handoff_version": "bj208-handoff-for-209-v3.1",
         "fit_boundary": {
             "train_through": "2022",
             "test_2023": True,
@@ -1292,7 +1319,7 @@ def _build_handoff(fold_results, selection, output) -> dict[str, object]:
         "terminal_split": TERMINAL_SPLIT,
         "contract_version": CONTRACT_VERSION,
         "replay_command": "PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208",
-        "package_manifest": str(output / "SHA256SUMS.json"),
+        "package_manifest": str(published / "SHA256SUMS.json"),
         "label_blind_replay": (
             "inference path never reads realized_outcome/official_final_sp_label; "
             "2024/2025/2026 embargoed"

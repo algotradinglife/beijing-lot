@@ -105,6 +105,66 @@ def verify_manifest(package: Path, manifest_json: dict[str, str]) -> list[str]:
     return failures
 
 
+def _handoff_ref_in_package(package: Path, ref: str) -> Path | None:
+    """Map a repo-root-relative handoff ref (results/issue-208/...) into the
+    package tree, tolerating a staging or temp package directory name.
+
+    The handoff serializes canonical post-publication paths (e.g.
+    `results/issue-208/SHA256SUMS.json`).  Verification runs on the staging
+    tree before atomic rename AND on the final package afterwards, so the ref
+    is resolved relative to the package root by stripping the canonical
+    package-name segment.  Temp copies used by the tamper suite carry the same
+    relative layout, so the same resolution applies there.
+    """
+    ref_path = Path(ref)
+    if ref_path.is_absolute():
+        return None
+    canonical = package.name.removesuffix(".staging")
+    parts = ref_path.parts
+    if canonical in parts:
+        sub = Path(*parts[parts.index(canonical) + 1:])
+        return package / sub
+    return package / ref_path
+
+
+def verify_handoff_paths(package: Path) -> list[str]:
+    """Every #209 handoff artifact path must resolve inside the published
+    package and must never reference the staging directory (`.staging`).
+
+    REWORK v3.1 (PI narrow durability REJECT 2026-08-15): the v3 handoff
+    serialized `results/issue-208.staging/SHA256SUMS.json` because
+    `_build_handoff` received the staging output path.  This verifier runs on
+    both the staging tree (pre-rename) and the final package (post-rename) and
+    fails closed if any handoff path points at `.staging` or does not resolve
+    after publication.
+    """
+    failures: list[str] = []
+    handoff_path = package / "handoff_209.json"
+    if not handoff_path.exists():
+        return ["missing handoff_209.json"]
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    refs: list[tuple[str, str]] = []
+    if "package_manifest" in handoff:
+        refs.append(("package_manifest", str(handoff["package_manifest"])))
+    if "model_file" in handoff:
+        refs.append(("model_file", str(handoff["model_file"])))
+    for field, ref in refs:
+        if ".staging" in ref:
+            failures.append(
+                f"handoff {field} references staging path: {ref}"
+            )
+            continue
+        target = _handoff_ref_in_package(package, ref)
+        if target is None:
+            failures.append(f"handoff {field} path not under package root: {ref}")
+            continue
+        if not target.exists():
+            failures.append(
+                f"handoff {field} does not resolve after publish: {ref}"
+            )
+    return failures
+
+
 def verify_receipt(package: Path) -> list[str]:
     """receipt.sha256 binds method.yaml (line 'hash  method.yaml')."""
     failures: list[str] = []
@@ -631,6 +691,23 @@ def tamper_compound_coefficient(econ_path: Path, n: int = 4) -> None:
     frame.to_parquet(econ_path, index=False)
 
 
+def tamper_handoff_staging_path(handoff_path: Path) -> None:
+    """Attack 8 (REWORK v3.1): rewrite handoff_209.json to point package_manifest
+    at the transient staging directory.
+
+    The v3 defect serialized `results/issue-208.staging/SHA256SUMS.json`
+    because `_build_handoff` received the staging output path.  A handoff that
+    references `.staging` must FAIL `verify_handoff_paths` (and therefore the
+    production package verifier) even though the path is a valid relative
+    string — the staging directory does not exist after atomic publication.
+    """
+    if not handoff_path.exists():
+        raise VerifyError("tamper target missing")
+    value = json.loads(handoff_path.read_text(encoding="utf-8"))
+    value["package_manifest"] = "results/issue-208.staging/SHA256SUMS.json"
+    _json(handoff_path, value)
+
+
 def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, Any]]:
     """Run the REQ-E06 tamper attacks against the PRODUCTION package verifier.
 
@@ -705,6 +782,10 @@ def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, An
             target / "ticket_economics.parquet", n=4
         ),
     )
+    _run_attack(
+        "handoff_staging_path",
+        lambda target: tamper_handoff_staging_path(target / "handoff_209.json"),
+    )
     return results
 
 
@@ -713,9 +794,10 @@ __all__ = [
     "sha256_file", "tamper_forge_manifest", "tamper_forge_source_trace",
     "tamper_mutate_settlement", "tamper_self_consistent_ledger",
     "tamper_omit_payout_coefficient", "tamper_divide_out_payout",
-    "tamper_compound_coefficient",
+    "tamper_compound_coefficient", "tamper_handoff_staging_path",
     "verify_2024_mutation_invariance", "verify_capital_accounting",
-    "verify_manifest", "verify_nk_semantics", "verify_no_2024_issue",
-    "verify_no_embargoed_split", "verify_payout_economics",
-    "verify_provenance", "verify_receipt", "verify_schema",
+    "verify_handoff_paths", "verify_manifest", "verify_nk_semantics",
+    "verify_no_2024_issue", "verify_no_embargoed_split",
+    "verify_payout_economics", "verify_provenance", "verify_receipt",
+    "verify_schema",
 ]

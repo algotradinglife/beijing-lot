@@ -20,7 +20,7 @@
     "test_2023": true,
     "train_through": "2022"
   },
-  "handoff_version": "bj208-handoff-for-209-v3",
+  "handoff_version": "bj208-handoff-for-209-v3.1",
   "label_blind_replay": "inference path never reads realized_outcome/official_final_sp_label; 2024/2025/2026 embargoed",
   "model": {
     "action_columns": [
@@ -333,7 +333,7 @@
     "validation_rmse": 990.0896517302787
   },
   "model_file": "results/issue-208/models/fold2_mlp.joblib",
-  "package_manifest": "results/issue-208.staging/SHA256SUMS.json",
+  "package_manifest": "results/issue-208/SHA256SUMS.json",
   "payout_semantics": {
     "coefficient_applied": "exactly once per winning N-fold ticket",
     "expected_pre_tax_net": "0.65 * prod(p*SP) - 1",

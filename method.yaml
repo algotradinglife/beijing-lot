@@ -118,7 +118,7 @@ stages:
     deliverable: "incumbent_paths.parquet + issue contexts + candidate pools (cached)"
     skill: data-preprocessing
     constraints:
-      - "CV_2022/CV_2023 incumbent from #207 ledger; CV_2021 reconstructed from frozen ticket identities"
+      - "all CV_2021/22/23 incumbent paths reconstructed from frozen #207 CONTROLLING ticket identities with corrected economics (payout=sum(realized_gross)*2); superseded #207 ledger gross_payout_yuan never read"
       - "M×3 cells complete; malformed cells fail closed; exact N distinct matches per ticket"
       - "stochastic lanes run ONLY with 16 preregistered seeds; seed=0 never used in execution/controls"
   - name: eda

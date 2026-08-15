@@ -270,3 +270,33 @@ leg, and never compounded as 0.65^N.
   `verify_payout_economics`; decision/handoff record the formula.
 - Tests: `tests/test_bj208_payout_economics.py` (golden formula + omission /
   division-out / 0.65^N production-entry tamper detection).
+
+---
+
+## 15. REWORK v3.1 narrow durability supersede rows (2026-08-15, PI narrow durability REJECT 1380d42)
+
+PI read-only adversarial review at SHA `1380d42dadc19bab1af7a405d96b2522040e1ee7`
+(PR #230) accepted the payout-economics correction but rejected one narrow
+#209 handoff durability defect. This is a durability/contract correction only;
+model class, selection rule and scientific conclusion are unchanged.
+
+| Row | Action | Scope | Supersedes | Rationale |
+|---|---|---|---|---|
+| #208-11 | supersede | handoff package_manifest path: canonical post-publication `results/issue-208/SHA256SUMS.json`; never the transient staging path | v3 handoff `package_manifest` field | PI 2026-08-15: v3 serialized `results/issue-208.staging/SHA256SUMS.json` because `_build_handoff` received the staging output path; after atomic rename no `.staging/**` exists. |
+| #208-12 | add | production-entry `verify_handoff_paths` — every handoff artifact path must resolve after atomic rename and must reject `.staging`; wired into `verify_package` + tamper attack 8 (`handoff_staging_path`) | — | PI REQUIRED: package verifier/tests must validate handoff paths against the final published package, not just serialize a plausible string. |
+| #208-13 | revise | method.yaml preprocessing constraint text: ALL CV_2021/22/23 incumbent paths reconstructed from frozen #207 CONTROLLING ticket identities; superseded #207 ledger `gross_payout_yuan` never read | v3 method.yaml wording that said CV_2022/23 come from the #207 ledger | Text alignment with #208-8 / `build_incumbent_paths` implementation (all splits reconstructed since REWORK v3). |
+
+### REWORK v3.1 evidence chain
+
+- `scripts/run_bj208_policy.py`: `_build_handoff(..., published_output=...)`
+  serializes the canonical post-publication manifest path; `run()` passes the
+  final output path while the package is still staged; after `_atomic_publish`
+  the FINAL package is verified again (`verify_package(output)`).
+- `src/parlay_policy/verify.py`: `verify_handoff_paths(package)` resolves every
+  handoff path against the package root, fails on `.staging` references, and
+  fails if any artifact path does not exist post-publication; tamper attack 8
+  rewrites `handoff_209.json` `package_manifest` to a `.staging` path and must
+  be detected by the production verifier.
+- method.yaml preprocessing constraint now matches the v3 implementation.
+- Tests: `tests/test_bj208_handoff_paths.py` (handoff path resolution +
+  `.staging` rejection at the production entry).

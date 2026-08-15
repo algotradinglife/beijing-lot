@@ -1,6 +1,6 @@
 {
   "contract_version": "bj208-dynamic-nk-policy-v3",
-  "elapsed_seconds": 246.5,
+  "elapsed_seconds": 256.0,
   "incumbent": {
     "capital": "NATIVE_2_YUAN",
     "k": 8,

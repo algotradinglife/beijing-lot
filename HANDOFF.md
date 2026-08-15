@@ -1,70 +1,103 @@
-# HANDOFF — Issue #208 REWORK v2 (fresh)
+# HANDOFF — Issue #208 REWORK v3.1 (PI narrow durability REJECT)
 
-[SESSION] 20260814_233747_be422d
+- SESSION: 20260815_103525_4e4eb2
+- PR: #230 (branch `analyst/bj208-rework-r1`)
+- Prior audited HEAD: `1380d42dadc19bab1af7a405d96b2522040e1ee7` (v3, PI narrow REJECT)
 
-## Current state
+## Context
 
-- Branch: `analyst/bj208-rework-r1` (worktree `/home/drwho1985/workspace/soccer/beijing-lot-bj208-r1`)
-- Upstream base: 53f67ec (old PR #228 head, contains tracked results/issue-205 + issue-207)
-- This PR supersedes PR #228 (EV REJECT 53f67ec, REWORK_TYPE=method)
+PI PRE-EV ADVERSARIAL REVIEW at 1380d42 (2026-08-15) accepted the
+payout-economics correction but rejected ONE narrow #209 handoff durability
+defect:
 
-## What was done (fresh rework, EV D1-D6 + REQ-E09)
+1. `results/issue-208/handoff_209.json` serialized
+   `"package_manifest": "results/issue-208.staging/SHA256SUMS.json"`; no
+   `.staging/**` path exists after atomic publication.
+2. Package verifier/tests did not validate that handoff paths resolve in the
+   final published package.
+3. method.yaml preprocessing text still said CV_2022/23 incumbent comes from
+   the superseded #207 ledger (v3 implementation reconstructs ALL splits).
+4. Regenerate receipt/manifest/metadata required by those changes.
 
-1. **D1 evidence chain**: `results/issue-208/` fully committed (61 files in
-   manifest incl. models/*.joblib, schema.json, provenance.json, receipt.sha256,
-   COMPLETED.json). `.gitignore` now allows issue-208. Fresh checkout can
-   re-verify without worker-local files.
-2. **D2 capital semantics**: SIMPLE_ACTIVE = exact #207 EQUAL_1PCT
-   (requested=pre*1%, integer ¥2-unit projection over K tickets).
-   `capital_change_identical` binds frozen CONTROLLING identities — verified
-   to match the #207 EQUAL_1PCT ledger to 7 decimals (¥64,659.136… on CV_2023).
-3. **D3 leakage/serialization**: sklearn early_stopping disabled everywhere;
-   chronological issue-block validation (last 15% train issues); Ridge +
-   best-fixed controls evaluated per fold with full paths + ablation;
-   model weights + scaler serialized to models/fold*.joblib (handoff
-   label-blind replayable).
-4. **D4 verifier**: manifest full coverage (relative paths + unlisted check),
-   provenance trusted-hash validation, capital accounting (start ¥100,000,
-   ¥2 units, requested/funded/K, continuity), N/K semantics with K, outcome
-   triple validation, REAL 2024-mutation invariance test. Tamper suite attacks
-   the production verify_package on full package copies — 4/4 detected.
-5. **D5 metrics**: max drawdown = running peak (golden test [100,80,200]→0.2);
-   golden tests bound to production functions; added time-under-water,
-   recovery, max consecutive losses, rolling 5/10/20 loss + worst windows.
-6. **D6 atomicity**: staging dir + fsync + COMPLETED before final manifest +
-   atomic rename; NO_BET explicit for infeasible/OOD/incumbent-infeasible.
+PI explicitly: narrow durability/contract correction — NOT authorization to
+change the model, selection rule or scientific conclusion.
 
-## Key decisions
+## What was done
 
-- Selection rule wording superseded (#208-3): "positive on ALL constructible
-  folds (2 of 2)" — fold 0 remains non-constructible (DELTA #208-1).
-- Protocol/contract versions bumped to v2 (PROTOCOL-LOG rows #208-2..#208-6).
-- Terminal result unchanged in direction: safety-gated learned path ≡ frozen
-  incumbent (matched lift 0.0 on both folds) → freeze N7/K8/MARKET_WOR/
-  native-¥2 incumbent for #209. But the corrected capital semantics changed
-  the control evidence materially: capital_change_identical (EQUAL_1PCT)
-  ends ¥64,659 (not ¥101,425), static_n8k8 ends ¥100,810, best_fixed(N4K32)
-  ¥88,604.
+- `src/parlay_policy/verify.py`:
+  - new `verify_handoff_paths(package)` — production entry that resolves every
+    handoff artifact path against the package root, fails on `.staging`
+    references, and fails if any path does not exist post-publication;
+  - new tamper attack 8 `tamper_handoff_staging_path` — rewrites handoff
+    package_manifest to `.staging`; must be detected by production verifier;
+  - `_handoff_ref_in_package` maps canonical repo-root refs into staging or
+    final package trees (strips canonical package-name segment).
+- `scripts/run_bj208_policy.py`:
+  - `_build_handoff(..., published_output=...)` serializes the canonical
+    post-publication manifest path (`results/issue-208/SHA256SUMS.json`),
+    never the staging path; handoff_version bumped `bj208-handoff-for-209-v3`
+    → `bj208-handoff-for-209-v3.1`;
+  - `run()` passes `published_output=output` into `_run_stages`;
+  - after `_atomic_publish`, the FINAL published package is verified again
+    (`verify_package(output)`) so handoff resolution is checked post-rename;
+  - `verify_package` now calls `verify_handoff_paths`.
+- `method.yaml`: preprocessing constraint text aligned with v3/#208-8 — ALL
+  CV_2021/22/23 incumbent paths reconstructed from frozen CONTROLLING ticket
+  identities; superseded #207 ledger never read.
+- `docs/research/issue_208_protocol_log.md`: PROTOCOL-LOG section 15 rows
+  #208-11 (supersede handoff path), #208-12 (add verify_handoff_paths +
+  tamper 8), #208-13 (revise method.yaml preprocessing wording).
+- `docs/research/issue_208_dynamic_nk_policy.md`: REQ-208-08 row → v3.1 +
+  canonical manifest path.
+- `tests/test_bj208_handoff_paths.py`: 6 production-entry tests (canonical
+  accept, `.staging` manifest/model reject, missing artifact reject, staging
+  ref mapping, `_build_handoff` canonical serialization contract).
 
-## Known issues
+## Gates
 
-- MLP ConvergenceWarning (max_iter=500) on both folds — benign, early_stopping
-  off, loss curve decreasing; validation RMSE (1,555) < fit RMSE (1,976).
-- 731/68,417 matches have zero realized True (unlabeled matches) — loader
-  treats ≤1 realized True as valid (duplicates still fail).
-- 6 LOCKED_TEST rows have official SP = 0.0 — treated as void sentinel;
-  negative SP still fails.
+- pytest: 49 passed (43 prior + 6 new) — metrics/payout/tamper/handoff_paths.
+- method_preflight: schema/artifacts/holdout PASS (receipt_hash regenerated by
+  rerun — method.yaml changed, expected).
+- Runner rerun: full `run --output results/issue-208` with corrected handoff;
+  `.staging` residue check → NONE; package verify PASS.
+- Tamper: 8/8 attacks detected (incl. new handoff_staging_path).
 
-## Next step
+## Decisions / rationale
 
-- EV independent audit at this PR's HEAD: fresh checkout, re-run
-  notebook/verify/preflight/pytest, tamper probes, REQ-208-01..09 evidence.
-- If REJECT: follow REWORK_TYPE branch (method → fresh / minor → resume).
+1. handoff_version bumped v3 → v3.1 so EV/PI can distinguish the corrected
+   handoff bytes from the rejected v3 at the exact PR HEAD (PI requires "an
+   advanced exact PR HEAD"). CONTRACT_VERSION stays `bj208-dynamic-nk-policy-v3`
+   — no protocol/selection change.
+2. `verify_handoff_paths` resolves refs relative to the package root rather
+   than the repo root so it works on staging (pre-rename), final (post-rename)
+   and tamper temp copies alike; `.staging` substring is rejected before any
+   filesystem lookup (string-level fail-closed).
+3. post-publication `verify_package(output)` after `_atomic_publish` closes the
+   loop the PI identified: the verifier now runs on the exact tree an EV would
+   clone, and the `.staging` failure mode is impossible to ship silently.
 
-## Replay
+## Known issues / risks
 
-```
-PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208
-PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py verify --output results/issue-208
-PYTHONPATH=src .venv/bin/python -m pytest tests/test_bj208_metrics.py tests/test_bj208_tamper.py
-```
+- MLP ConvergenceWarning (max_iter=500) on fold fits — benign, loss decreases,
+  validation RMSE < fit RMSE (unchanged from v3; documented in prior handoffs).
+- 731 unlabeled matches (0 realized True) valid per loader; 6 LOCKED_TEST rows
+  official SP=0 treated as void sentinel (unchanged).
+- ood_fallback_census counts both INCUMBENT and NO_BET from the combined trace
+  string (pre-existing diagnostic cosmetic; unchanged).
+- `.staging` string rejection is literal: any future artifact path legitimately
+  containing that substring would fail — by design (fail-closed).
+
+## Next steps
+
+- EV independent audit at the advanced PR #230 HEAD: fresh checkout, rerun
+  pytest (49), method_preflight, package verify, notebook clean run, tamper
+  probes incl. handoff_staging_path, REQ-208-01..09 evidence rows at exact SHA.
+- Reject → REWORK_TYPE branch (method fresh / minor resume).
+
+## 返工策略记录
+
+PI 裁决为 narrow durability/contract correction（非 method 级）→ 按
+REWORK_TYPE=minor 处理；fresh 上下文（issue 契约 + PI 缺陷清单 + v3 代码
+作为参考）已足够，未 resume 旧会话，但与 v3 HANDOFF 的衔接通过本文件 +
+PROTOCOL-LOG 完成。核心科学输出（parquet/model）不因本次改动变化；
+重新生成的 receipt/manifest/handoff 反映 narrow 修正。

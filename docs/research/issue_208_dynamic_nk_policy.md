@@ -180,7 +180,7 @@ surface was swept (not just the four reported instances):
 | REQ-208-05 matched attribution | control matrix above + identical-ticket capital arm (corrected multiples) |
 | REQ-208-06 capital accounting | `verify_capital_accounting` (start ¥100,000, ¥2 units, continuity) |
 | REQ-208-07 decision evidence | full frontier, equity paths, holding metrics, adversarial arms |
-| REQ-208-08 terminal freeze | `handoff_209.json` v3 (byte-identifiable candidate/fallback + payout semantics) |
+| REQ-208-08 terminal freeze | `handoff_209.json` v3.1 (byte-identifiable candidate/fallback + payout semantics; canonical post-publication manifest path) |
 | REQ-208-09 neural policy | MLPRegressor Q with Ridge + best-fixed controls, joblib weights, label-blind replay |
 
 ## Known risks
