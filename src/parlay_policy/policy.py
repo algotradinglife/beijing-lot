@@ -40,6 +40,8 @@ from .contract import (
     LANES,
     N_GRID,
     NO_BET_KEY,
+    SIMPLE_ACTIVE_RISK_FRACTION,
+    TICKET_STAKE_YUAN,
     action_encoding,
     all_actions,
 )
@@ -221,7 +223,11 @@ def predict_lift(
     """Predict matched lift for each (state, action) pair."""
     design = build_design(state_rows, actions)
     if policy.model_kind == "FIXED_ACTION":
-        results = np.full(len(actions), np.nan, dtype=float)
+        # A fixed-action control is still routed through the common chooser.
+        # Non-fixed actions therefore need a real dominated score rather than
+        # NaN (np.argmax over NaNs is implementation-sensitive and can select
+        # the first catalog entry instead of the frozen control).
+        results = np.full(len(actions), -1.0e300, dtype=float)
         for i, action in enumerate(actions):
             if action.key == policy.fixed_action_key:
                 results[i] = 0.0
@@ -278,7 +284,7 @@ def choose_action(
     gate_pass = (
         float(conservative_lifts[best_index]) > 0.0
         and ood_pass
-        and _fundable(best_action, state_row)
+        and is_action_fundable(best_action, state_row)
         and _covered(best_action, state_row)
     )
     return best_action, {
@@ -289,7 +295,7 @@ def choose_action(
         "ood_statistic": stat,
         "ood_threshold": ood_threshold,
         "ood_pass": bool(ood_pass),
-        "fundable": bool(_fundable(best_action, state_row)),
+        "fundable": bool(is_action_fundable(best_action, state_row)),
         "covered": bool(_covered(best_action, state_row)),
         "safety_gate_pass": bool(gate_pass),
         "fallback": "INCUMBENT_OR_NO_BET" if not gate_pass else "EXECUTE",
@@ -300,13 +306,25 @@ def choose_action(
     }
 
 
-def _fundable(action: Action, state_row: np.ndarray) -> bool:
+def is_action_fundable(action: Action, state_row: np.ndarray) -> bool:
+    """Whether at least one lawful ¥2 unit can be executed for the lane.
+
+    Native capital requires one ¥2 stake for every requested ticket.  The
+    SIMPLE_ACTIVE lane requests one percent of current bankroll and projects
+    that budget to integer ¥2 units, so its actual lower boundary is ¥200
+    (1% × ¥200 = ¥2), not ``K * ¥2``.
+    """
     names = STATE_FEATURE_NAMES
     if "prior_bankroll_yuan" not in names:
         return True
     bankroll = float(state_row[names.index("prior_bankroll_yuan")])
-    required = action.k * 2.0
-    return bankroll >= required - 1e-9
+    if action.capital == "SIMPLE_ACTIVE":
+        units = np.floor(
+            bankroll * SIMPLE_ACTIVE_RISK_FRACTION / TICKET_STAKE_YUAN
+        )
+        return bool(units >= 1.0)
+    required = action.k * TICKET_STAKE_YUAN
+    return bool(bankroll >= required - 1e-9)
 
 
 def _covered(action: Action, state_row: np.ndarray) -> bool:
@@ -392,5 +410,5 @@ def restore_model(payload: dict[str, Any], model_file: Path) -> Any:
 __all__ = [
     "LearnedPolicy", "PolicyError", "best_fixed_action_key", "build_design",
     "choose_action", "fit_policy", "ood_gate", "ood_statistic", "predict_lift",
-    "residual_rmse", "restore_model", "serialize_policy",
+    "is_action_fundable", "residual_rmse", "restore_model", "serialize_policy",
 ]

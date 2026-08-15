@@ -23,7 +23,9 @@ from parlay_policy.contract import (  # noqa: E402
     all_actions,
     forbidden_inference_names,
 )
-from parlay_policy.replay import summarize_path  # noqa: E402
+from parlay_policy.features import STATE_FEATURE_NAMES  # noqa: E402
+from parlay_policy.policy import is_action_fundable  # noqa: E402
+from parlay_policy.replay import apply_issue_settlement, summarize_path  # noqa: E402
 from parlay_policy.tickets import (  # noqa: E402
     bundle_capital,
     bundle_capital_equal1pct,
@@ -46,7 +48,7 @@ def _path_frame(values: list[float]) -> pd.DataFrame:
             "issue": [f"2301{i}" for i in range(n)],
             "year": [2023] * n,
             "policy": ["p"] * n,
-            "pre_issue_bankroll_yuan": [100_000.0] * n,
+            "pre_issue_bankroll_yuan": [100_000.0, *values[:-1]],
             "funded_stake_yuan": [0.0] * n,
             "gross_payout_yuan": [0.0] * n,
             "post_issue_bankroll_yuan": values,
@@ -69,6 +71,11 @@ def test_drawdown_no_drawdown():
     path = _path_frame([100_000.0, 100_500.0, 101_000.0])
     summary = summarize_path(path)
     assert summary["max_drawdown_pct"] == 0.0
+
+
+def test_drawdown_includes_time_zero():
+    path = _path_frame([80_000.0, 200_000.0])
+    assert summarize_path(path)["max_drawdown_pct"] == pytest.approx(0.20)
 
 
 def test_matched_lift_definition_production():
@@ -121,10 +128,33 @@ def test_time_under_water():
 
 
 def test_max_consecutive_losses():
-    path = _path_frame([100_000.0, 99_000.0, 98_000.0, 99_500.0, 99_000.0])
-    # Payouts all zero in this helper -> 5 consecutive losing issues.
+    path = _path_frame([99_999.0, 99_998.0, 99_997.0, 99_996.0, 99_995.0])
+    path["funded_stake_yuan"] = 2.0
+    path["gross_payout_yuan"] = 1.0
+    path["net_pnl_yuan"] = -1.0
+    # Positive gross payout is still a loss when it is below funded stake.
     summary = summarize_path(path)
     assert summary["max_consecutive_losing_issues"] == 5
+    assert summary["rolling5_loss_prob"] == 1.0
+    assert summary["rolling5_worst_net_pnl_yuan"] == -5.0
+
+
+def test_lane_specific_fundability():
+    state = np.zeros(len(STATE_FEATURE_NAMES), dtype=float)
+    state[STATE_FEATURE_NAMES.index("M")] = 20.0
+    state[STATE_FEATURE_NAMES.index("prior_bankroll_yuan")] = 100.0
+    simple = Action(7, 32, "MARKET_WOR", "SIMPLE_ACTIVE")
+    native = Action(7, 32, "MARKET_WOR", "NATIVE_2_YUAN")
+    assert not is_action_fundable(simple, state)
+    assert is_action_fundable(native, state)
+    state[STATE_FEATURE_NAMES.index("prior_bankroll_yuan")] = 200.0
+    assert is_action_fundable(simple, state)
+
+
+def test_fallback_settlement_rebases_on_actual_bankroll():
+    # A prior learned loss must not be erased by copying an absolute frozen
+    # incumbent post-bankroll.  Frozen tickets contribute only funded/payout.
+    assert apply_issue_settlement(99_000.0, 16.0, 0.0) == 98_984.0
 
 
 # --- capital semantics (REQ-208-06 / D2) ------------------------------------
@@ -269,9 +299,9 @@ def test_nk_semantics_every_ticket_exactly_n_distinct():
         {
             "ticket_identity": ["t1", "t2"],
             "k": [2, 2],
-            "n": [4, 7],
-            "match_indices": ["1|2|3|4", "5|6|7|8|9|10|11"],
-            "outcomes": ["3|1|0|3", "3|3|3|3|3|3|3"],
+            "n": [4, 4],
+            "match_indices": ["1|2|3|4", "5|6|7|8"],
+            "outcomes": ["3|1|0|3", "3|3|3|3"],
         }
     )
     assert verify_nk_semantics(rows, k=2) == []

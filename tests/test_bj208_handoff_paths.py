@@ -143,4 +143,4 @@ def test_build_handoff_serializes_canonical_path(tmp_path: Path) -> None:
     )
     assert ".staging" not in str(handoff["package_manifest"]), handoff
     assert handoff["package_manifest"] == str(published / "SHA256SUMS.json")
-    assert handoff["handoff_version"] == "bj208-handoff-for-209-v3.1"
+    assert handoff["handoff_version"] == "bj208-handoff-for-209-v4"

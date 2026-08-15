@@ -1,4 +1,4 @@
-# Issue #208 method protocol — BJ-UNIFIED-DYNAMIC-N-001 / v3
+# Issue #208 method protocol — BJ-UNIFIED-DYNAMIC-N-001 / v4
 # Frozen preregistrations; worker must not silently modify.
 # Protocol deltas appended in PROTOCOL-LOG / docs/research/issue_208_protocol_log.md.
 # REWORK v2 (2026-08-14, EV REJECT 53f67ec): supersede rows #208-2..#208-6.
@@ -8,8 +8,11 @@
 #   0.65 is the Beijing Single Match ticket PAYOUT COEFFICIENT, applied
 #   exactly once per winning N-fold ticket. Never divided out, never per
 #   leg, never compounded as 0.65^N.
+# PI takeover v4 (2026-08-15): genuine per-issue restricted controls,
+# rebased fallback capital, net-P&L holding metrics, actual LOCKED_TEST refit
+# isolation, decision-critical schema verification and transactional publish.
 
-protocol_version: bj208-protocol-v3
+protocol_version: bj208-protocol-v4
 
 candidate_pool:
   description: "per-issue learned policy Q_theta(x,a) on the bounded N×K×lane×capital action catalog"
@@ -60,13 +63,16 @@ metrics:
     definition: "Q_theta prediction minus 1*train-fold residual RMSE; >0 + coverage/OOD/fundability = safety gate"
     golden_test: "tests/test_bj208_metrics.py::test_safety_gate_conservative"
   - name: max_drawdown_pct
-    definition: "issue-level maximum percentage drawdown from running peak (per-issue running peak, not final peak)"
+    definition: "issue-level maximum percentage drawdown from running peak including the time-zero ¥100,000 anchor"
     golden_test: "tests/test_bj208_metrics.py::test_drawdown_definition_production"
   - name: time_under_water_issues
     definition: "consecutive issues from peak before recovery to new peak (holding-feasibility metric)"
     golden_test: "tests/test_bj208_metrics.py::test_time_under_water"
   - name: max_consecutive_losing_issues
-    definition: "longest run of issues with zero gross payout"
+    definition: "longest run of issues with net P&L < 0 (positive but insufficient gross payout is still a loss)"
+    golden_test: "tests/test_bj208_metrics.py::test_max_consecutive_losses"
+  - name: rolling_5_10_20_issue_loss
+    definition: "probability that rolling net-P&L sum is negative and the worst rolling net-P&L sum, for windows 5/10/20"
     golden_test: "tests/test_bj208_metrics.py::test_max_consecutive_losses"
 
 budget:
@@ -83,6 +89,9 @@ required_artifacts:
   - results/issue-208/handoff_209.json
   - results/issue-208/selection.json
   - results/issue-208/issue_capital_ledger.parquet
+  - results/issue-208/dynamic_control_decisions.parquet
+  - results/issue-208/path_holding_metrics.parquet
+  - results/issue-208/holdout_mutation_receipt.json
   - results/issue-208/provenance.json
   - results/issue-208/schema.json
   - results/issue-208/receipt.sha256
@@ -128,6 +137,7 @@ stages:
       - "counterfactual targets from development labels only; outcome fields never enter state x"
       - "16 seeds aggregated; seed identity never a feature"
       - "SIMPLE_ACTIVE capital = #207 EQUAL_1PCT semantics (requested=pre*1%, integer ¥2-unit projection across K tickets)"
+      - "SIMPLE_ACTIVE is fundable only when 1% of current bankroll supports at least one native ¥2 unit (minimum bankroll ¥200)"
   - name: feature_engineering
     deliverable: "state x per issue (STATE_FEATURE_NAMES) + training frames"
     skill: data-preprocessing
@@ -141,6 +151,7 @@ stages:
       - "chronological issue-block splits only; NO sklearn row-level early-stopping validation"
       - "validation = chronological issue-block holdout inside train folds (last 15% issues by issue id)"
       - "MLPRegressor + Ridge + best fixed action; controls evaluated per fold (paths, lift, ablation)"
+      - "dynamic N, dynamic K and dynamic N×K controls fit restricted MLP policies and score their lawful action subsets separately for every issue from causal state; no global-median repeated cell"
       - "safety gate: conservative lift > 0 AND coverage/OOD/fundability else frozen incumbent"
       - "selection_split CV_2022 data never reused for terminal selection"
   - name: terminal_evaluation

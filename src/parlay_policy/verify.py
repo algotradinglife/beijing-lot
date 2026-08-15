@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 import numpy as np
@@ -34,7 +35,6 @@ from .contract import (
     CONTRACT_VERSION,
     EMBARGOED_SPLITS,
     INITIAL_BANKROLL_YUAN,
-    N_GRID,
     TICKET_STAKE_YUAN,
 )
 
@@ -119,10 +119,11 @@ def _handoff_ref_in_package(package: Path, ref: str) -> Path | None:
     ref_path = Path(ref)
     if ref_path.is_absolute():
         return None
-    canonical = package.name.removesuffix(".staging")
     parts = ref_path.parts
-    if canonical in parts:
-        sub = Path(*parts[parts.index(canonical) + 1:])
+    # The package may currently be a unique staging/EV temp directory.  The
+    # handoff itself always names the canonical published package.
+    if "issue-208" in parts:
+        sub = Path(*parts[parts.index("issue-208") + 1:])
         return package / sub
     return package / ref_path
 
@@ -193,12 +194,268 @@ def verify_schema(frame: pd.DataFrame, required: dict[str, Any]) -> list[str]:
         if column not in frame.columns:
             failures.append(f"missing column {column}")
             continue
-        if dtype == "numeric":
+        if dtype in {"numeric", "float", "int"}:
             if not pd.api.types.is_numeric_dtype(frame[column]):
                 failures.append(f"column {column} not numeric")
+            elif dtype == "int" and not pd.api.types.is_integer_dtype(frame[column]):
+                # Nullable integer columns may be represented as floats after
+                # parquet round-trips; accept only if all present values are
+                # mathematically integral.
+                values = frame[column].dropna().to_numpy(dtype=float)
+                if not np.allclose(values, np.round(values), atol=1e-9):
+                    failures.append(f"column {column} not integral")
         elif dtype == "bool":
             if not pd.api.types.is_bool_dtype(frame[column]):
                 failures.append(f"column {column} not boolean")
+        elif dtype == "str":
+            non_null = frame[column].dropna()
+            if not non_null.map(lambda value: isinstance(value, str)).all():
+                failures.append(f"column {column} not string")
+    return failures
+
+
+def verify_package_schema(package: Path, schema: dict[str, Any]) -> list[str]:
+    """Apply declared columns, keys, domains and JSON contracts.
+
+    Auxiliary frames may retain the compact ``{column: dtype}`` form.  The
+    decision/capital/#209 frames use the richer contract form with explicit
+    columns, non-null fields, primary keys, domains and unit declarations.
+    """
+    failures: list[str] = []
+    frames = schema.get("frames")
+    if not isinstance(frames, dict) or not frames:
+        return ["schema.json has no decision-critical frames"]
+    for name, contract in frames.items():
+        if not isinstance(contract, dict):
+            failures.append(f"invalid frame schema: {name}")
+            continue
+        required = contract.get("columns", contract)
+        if not isinstance(required, dict) or not required:
+            failures.append(f"frame schema has no columns: {name}")
+            continue
+        path = package / name
+        if not path.exists():
+            failures.append(f"schema target missing: {name}")
+            continue
+        try:
+            frame = (
+                pd.read_parquet(path)
+                if path.suffix == ".parquet"
+                else pd.read_csv(path)
+            )
+        except Exception as exc:
+            failures.append(f"schema target unreadable {name}: {exc}")
+            continue
+        failures.extend(
+            f"{name}: {failure}"
+            for failure in verify_schema(frame, required)
+        )
+        non_null = contract.get("non_null", [])
+        for column in non_null:
+            if column not in frame.columns:
+                failures.append(f"{name}: non-null column missing {column}")
+            elif frame[column].isna().any():
+                failures.append(f"{name}: null values in {column}")
+        primary_key = contract.get("primary_key", [])
+        if primary_key:
+            missing = [column for column in primary_key if column not in frame]
+            if missing:
+                failures.append(f"{name}: primary-key columns missing {missing}")
+            elif frame.loc[:, primary_key].isna().any(axis=None):
+                failures.append(f"{name}: null value in primary key {primary_key}")
+            elif frame.duplicated(primary_key).any():
+                failures.append(f"{name}: duplicate primary key {primary_key}")
+        for column, allowed in contract.get("domains", {}).items():
+            if column not in frame.columns:
+                failures.append(f"{name}: domain column missing {column}")
+                continue
+            observed = set(frame[column].dropna().tolist())
+            unexpected = observed - set(allowed)
+            if unexpected:
+                failures.append(
+                    f"{name}: values outside {column} domain: "
+                    f"{sorted(map(str, unexpected))[:5]}"
+                )
+        for column, unit in contract.get("units", {}).items():
+            if column not in frame.columns:
+                failures.append(f"{name}: unit column missing {column}")
+            if not isinstance(unit, str) or not unit.strip():
+                failures.append(f"{name}: invalid unit declaration for {column}")
+
+    for name, contract in schema.get("json_artifacts", {}).items():
+        path = package / name
+        if not path.exists():
+            failures.append(f"JSON schema target missing: {name}")
+            continue
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            failures.append(f"JSON schema target unreadable {name}: {exc}")
+            continue
+        for key in contract.get("required_keys", []):
+            current: Any = value
+            for part in str(key).split("."):
+                if not isinstance(current, dict) or part not in current:
+                    failures.append(f"{name}: missing required key {key}")
+                    break
+                current = current[part]
+
+    required_relationships = {
+        "capital_conservation",
+        "ticket_bundle_n_k",
+        "payout_exactly_once",
+        "handoff_resolves_post_publish",
+    }
+    observed_relationships = {
+        str(row.get("name"))
+        for row in schema.get("relationships", [])
+        if isinstance(row, dict) and row.get("production_verifier")
+    }
+    missing_relationships = required_relationships - observed_relationships
+    if missing_relationships:
+        failures.append(
+            f"schema missing verified relationships: {sorted(missing_relationships)}"
+        )
+    return failures
+
+
+def verify_completion(package: Path) -> list[str]:
+    path = package / "COMPLETED.json"
+    if not path.exists():
+        return ["missing COMPLETED.json"]
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [f"invalid COMPLETED.json: {exc}"]
+    if value.get("status") != "COMPLETED":
+        return [f"completion status is {value.get('status')!r}, not COMPLETED"]
+    return []
+
+
+def verify_req_evidence(
+    decision: dict[str, Any], package: Path | None = None
+) -> list[str]:
+    """Require one concrete producer evidence row for REQ-208-01..09.
+
+    The immutable package binds the producing code commit and file evidence.
+    The exact final PR HEAD remains external by necessity (a Git commit cannot
+    contain its own hash) and is supplied by the handoff/EV verdict.
+    """
+    failures: list[str] = []
+    rows = decision.get("req_evidence")
+    if not isinstance(rows, list):
+        return ["decision.json missing req_evidence rows"]
+    expected = {f"REQ-208-{index:02d}" for index in range(1, 10)}
+    observed = {str(row.get("req")) for row in rows if isinstance(row, dict)}
+    if observed != expected:
+        failures.append(
+            f"REQ evidence rows mismatch: missing={sorted(expected-observed)} "
+            f"extra={sorted(observed-expected)}"
+        )
+    for row in rows:
+        if not isinstance(row, dict):
+            failures.append("REQ evidence row is not an object")
+            continue
+        if row.get("status") != "PASS":
+            failures.append(f"{row.get('req')} producer status is not PASS")
+        evidence = row.get("evidence")
+        if not isinstance(evidence, list) or not evidence:
+            failures.append(f"{row.get('req')} has no evidence paths")
+        elif package is not None:
+            for relative in evidence:
+                if not (package / str(relative)).exists():
+                    failures.append(
+                        f"{row.get('req')} evidence path missing: {relative}"
+                    )
+    code_commit = str(decision.get("producer_code_commit", ""))
+    if re.fullmatch(r"[0-9a-f]{40}", code_commit) is None:
+        failures.append("decision producer_code_commit is not a full SHA")
+    return failures
+
+
+def verify_holdout_mutation_receipt(package: Path) -> list[str]:
+    path = package / "holdout_mutation_receipt.json"
+    if not path.exists():
+        return ["missing holdout_mutation_receipt.json"]
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [f"invalid holdout mutation receipt: {exc}"]
+    failures: list[str] = []
+    if receipt.get("probe") != "ACTUAL_TERMINAL_FOLD_REFIT_AFTER_LOCKED_TEST_LABEL_MUTATION":
+        failures.append("holdout receipt is not an actual-refit probe")
+    if int(receipt.get("mutated_rows", 0)) <= 0:
+        failures.append("holdout receipt mutated no rows")
+    if receipt.get("baseline_signature_sha256") != receipt.get("mutated_signature_sha256"):
+        failures.append("holdout mutation changed fitted signature")
+    for key in ("baseline_signature_sha256", "mutated_signature_sha256"):
+        if re.fullmatch(r"[0-9a-f]{64}", str(receipt.get(key, ""))) is None:
+            failures.append(f"holdout receipt {key} is not SHA-256")
+    if receipt.get("model_weights_scaler_fixed_choice_ood_and_decisions_invariant") is not True:
+        failures.append("holdout receipt does not attest full fitted-state invariance")
+    return failures
+
+
+def verify_handoff_contract(package: Path) -> list[str]:
+    """Validate the minimal label-blind #209 inference contract."""
+    failures = verify_handoff_paths(package)
+    if failures:
+        return failures
+    handoff = json.loads((package / "handoff_209.json").read_text(encoding="utf-8"))
+    for key in (
+        "fit_boundary", "candidate", "fallback", "model", "model_file",
+        "contract_version", "package_manifest", "label_blind_replay",
+    ):
+        if key not in handoff:
+            failures.append(f"handoff missing {key}")
+    boundary = handoff.get("fit_boundary", {})
+    if boundary.get("2024_opened") is not False:
+        failures.append("handoff does not keep 2024 closed")
+    if handoff.get("contract_version") != CONTRACT_VERSION:
+        failures.append("handoff contract version mismatch")
+    if handoff.get("handoff_version") != "bj208-handoff-for-209-v4":
+        failures.append("handoff version is not v4")
+    model_ref = handoff.get("model_file")
+    if model_ref:
+        target = _handoff_ref_in_package(package, str(model_ref))
+        if target is None or not target.exists():
+            failures.append(f"handoff model file unresolved: {model_ref}")
+    return failures
+
+
+def verify_dynamic_control_decisions(frame: pd.DataFrame) -> list[str]:
+    """Restricted dynamic controls must be scored per issue from causal state."""
+    failures: list[str] = []
+    required_policies = {
+        "dynamic_n_fixed_k8_lane",
+        "fixed_n7_dynamic_k",
+        "dynamic_nk_fixed_generator",
+    }
+    if frame.empty:
+        return ["empty dynamic control decision table"]
+    if set(frame["policy"].unique()) != required_policies:
+        failures.append("dynamic control table does not contain exactly three controls")
+    for policy, group in frame.groupby("policy"):
+        traces: list[dict[str, Any]] = []
+        for raw in group["decision_trace_json"]:
+            try:
+                traces.append(json.loads(raw))
+            except Exception:
+                failures.append(f"{policy} has invalid decision trace JSON")
+                break
+        if traces and any(
+            trace.get("control_semantics")
+            != "PER_ISSUE_CAUSAL_STATE_CONDITIONED"
+            for trace in traces
+        ):
+            failures.append(f"{policy} is not marked state-conditioned")
+        score_signatures = {
+            json.dumps(trace.get("scores", {}), sort_keys=True)
+            for trace in traces
+            if trace.get("scores")
+        }
+        if len(group) > 1 and len(score_signatures) < 2:
+            failures.append(f"{policy} scores do not respond to issue state")
     return failures
 
 
@@ -212,6 +469,18 @@ def verify_capital_accounting(ledger: pd.DataFrame) -> list[str]:
     failures: list[str] = []
     if ledger.empty:
         return ["empty capital ledger"]
+    required_numeric = (
+        "pre_issue_bankroll_yuan",
+        "funded_stake_yuan",
+        "gross_payout_yuan",
+        "post_issue_bankroll_yuan",
+    )
+    for column in required_numeric:
+        if column not in ledger.columns:
+            failures.append(f"capital ledger missing {column}")
+            return failures
+        if not np.isfinite(ledger[column].to_numpy(dtype=float)).all():
+            failures.append(f"capital ledger {column} contains NaN/Inf")
     expected = (
         ledger["pre_issue_bankroll_yuan"]
         - ledger["funded_stake_yuan"]
@@ -239,6 +508,22 @@ def verify_capital_accounting(ledger: pd.DataFrame) -> list[str]:
             failures.append(
                 f"funded exceeds requested on {int(over_req.sum())} rows"
             )
+        active = ledger[ledger.get("capital", pd.Series(index=ledger.index, dtype=object)).eq("SIMPLE_ACTIVE")]
+        if not active.empty:
+            expected_request = active["pre_issue_bankroll_yuan"] * 0.01
+            bad_request = ~np.isclose(
+                active["requested_stake_yuan"], expected_request, atol=1e-6
+            )
+            if bad_request.any():
+                failures.append(
+                    f"SIMPLE_ACTIVE requested stake mismatch on {int(bad_request.sum())} rows"
+                )
+            unfundable_execution = (
+                active["pre_issue_bankroll_yuan"].lt(200.0 - 1e-9)
+                & active["funded_stake_yuan"].gt(0.0)
+            )
+            if unfundable_execution.any():
+                failures.append("SIMPLE_ACTIVE executed below ¥200 minimum bankroll")
     over_pre = ledger["funded_stake_yuan"] > ledger["pre_issue_bankroll_yuan"] + 1e-6
     if over_pre.any():
         failures.append(f"funded exceeds pre-issue bankroll on {int(over_pre.sum())} rows")
@@ -306,7 +591,10 @@ def verify_nk_semantics(ticket_rows: pd.DataFrame, k: int | None = None) -> list
         return ["empty ticket table"]
     # Per-bundle K check: rows are grouped by (issue, lane, seed) if present,
     # else the caller-provided k applies to the whole table.
-    group_cols = [c for c in ("issue", "lane", "seed") if c in ticket_rows.columns]
+    group_cols = [
+        c for c in ("split", "issue", "n", "k", "lane", "seed")
+        if c in ticket_rows.columns
+    ]
     if group_cols:
         for _, group in ticket_rows.groupby(group_cols, sort=False):
             row_k = int(group["k"].iloc[0]) if "k" in group.columns else (
@@ -332,6 +620,9 @@ def verify_nk_semantics(ticket_rows: pd.DataFrame, k: int | None = None) -> list
             break
         if len(outcomes) != n:
             failures.append(f"ticket {row['ticket_identity']} outcome count mismatch")
+            break
+        if not set(outcomes).issubset({"3", "1", "0"}):
+            failures.append(f"ticket {row['ticket_identity']} has invalid outcome code")
             break
     return failures
 
@@ -364,6 +655,36 @@ def verify_provenance(provenance: dict[str, Any]) -> list[str]:
     return failures
 
 
+def verify_code_bindings(provenance: dict[str, Any], root: Path) -> list[str]:
+    """Bind the decision to its executable code/config and environment lock."""
+    failures: list[str] = []
+    bindings = provenance.get("code_bindings")
+    if not isinstance(bindings, dict) or not bindings:
+        return ["provenance missing code_bindings"]
+    for relative, expected in bindings.items():
+        path = root / str(relative)
+        if not path.exists():
+            failures.append(f"bound code missing: {relative}")
+            continue
+        actual = sha256_file(path)
+        if actual != expected:
+            failures.append(f"bound code hash mismatch: {relative}")
+    environment = provenance.get("environment")
+    if not isinstance(environment, dict):
+        failures.append("provenance missing environment lock")
+    else:
+        payload = json.dumps(
+            environment, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        actual = hashlib.sha256(payload).hexdigest()
+        if actual != provenance.get("environment_lock_sha256"):
+            failures.append("environment lock hash mismatch")
+    commit = str(provenance.get("producer_code_commit", ""))
+    if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+        failures.append("provenance producer_code_commit is not a full SHA")
+    return failures
+
+
 def verify_2024_mutation_invariance(
     fit_fn: Any,
     value_matrix_path: Path,
@@ -383,9 +704,6 @@ def verify_2024_mutation_invariance(
     """
     if fit_fn is None:
         return ["2024 mutation invariance requires a fit_fn"]
-    import copy
-    import tempfile
-
     frame = pd.read_parquet(value_matrix_path)
     baseline = fit_fn(frame, **(fit_kwargs or {}))
     mutated = frame.copy()
@@ -708,6 +1026,60 @@ def tamper_handoff_staging_path(handoff_path: Path) -> None:
     _json(handoff_path, value)
 
 
+def tamper_completion_status(path: Path) -> None:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    value["status"] = "IN_PROGRESS"
+    _json(path, value)
+
+
+def tamper_empty_schema(path: Path) -> None:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    value["frames"] = {}
+    _json(path, value)
+
+
+def tamper_drop_bundle_ticket(path: Path) -> None:
+    frame = pd.read_parquet(path)
+    if frame.empty:
+        raise VerifyError("ticket tamper target empty")
+    keys = ["split", "issue", "n", "k", "lane", "seed"]
+    first_key = tuple(frame.iloc[0][key] for key in keys)
+    mask = np.logical_and.reduce(
+        [frame[key].eq(value).to_numpy() for key, value in zip(keys, first_key)]
+    )
+    indices = frame.index[mask]
+    if len(indices) < 2:
+        raise VerifyError("ticket tamper bundle too small")
+    frame = frame.drop(indices[0])
+    frame.to_parquet(path, index=False)
+
+
+def tamper_req_evidence(path: Path) -> None:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    value["req_evidence"] = value.get("req_evidence", [])[1:]
+    _json(path, value)
+
+
+def tamper_dynamic_control_semantics(path: Path) -> None:
+    frame = pd.read_parquet(path)
+    if frame.empty:
+        raise VerifyError("dynamic control tamper target empty")
+    trace = json.loads(frame.loc[frame.index[0], "decision_trace_json"])
+    trace["control_semantics"] = "GLOBAL_MEDIAN_FIXED_CELL"
+    frame.loc[frame.index[0], "decision_trace_json"] = json.dumps(
+        trace, ensure_ascii=False
+    )
+    frame.to_parquet(path, index=False)
+
+
+def _rewrite_manifest_for_tamper(package: Path) -> None:
+    artifacts = sorted(
+        path for path in package.rglob("*")
+        if path.is_file() and path.name not in MANIFEST_EXCLUDED
+    )
+    _json(package / "SHA256SUMS.json", manifest(package, artifacts))
+
+
 def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, Any]]:
     """Run the REQ-E06 tamper attacks against the PRODUCTION package verifier.
 
@@ -722,7 +1094,9 @@ def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, An
 
     results: list[dict[str, Any]] = []
 
-    def _run_attack(name: str, mutate_fn: Any) -> None:
+    def _run_attack(
+        name: str, mutate_fn: Any, *, re_manifest: bool = True
+    ) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             work = Path(tmp)
             # Full recursive copy (staging tree includes models/ subdir).
@@ -733,6 +1107,8 @@ def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, An
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(item, dest)
             mutate_fn(work)
+            if re_manifest:
+                _rewrite_manifest_for_tamper(work)
             failures = verify_package_fn(work)
             results.append(
                 {
@@ -759,6 +1135,7 @@ def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, An
         lambda target: tamper_forge_manifest(
             target / "SHA256SUMS.json", target
         ),
+        re_manifest=False,
     )
     _run_attack(
         "forge_source_trace",
@@ -786,6 +1163,30 @@ def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, An
         "handoff_staging_path",
         lambda target: tamper_handoff_staging_path(target / "handoff_209.json"),
     )
+    _run_attack(
+        "completion_not_complete",
+        lambda target: tamper_completion_status(target / "COMPLETED.json"),
+    )
+    _run_attack(
+        "empty_decision_schema",
+        lambda target: tamper_empty_schema(target / "schema.json"),
+    )
+    _run_attack(
+        "drop_ticket_from_bundle",
+        lambda target: tamper_drop_bundle_ticket(
+            target / "ticket_economics.parquet"
+        ),
+    )
+    _run_attack(
+        "remove_req_evidence",
+        lambda target: tamper_req_evidence(target / "decision.json"),
+    )
+    _run_attack(
+        "dynamic_control_globalized",
+        lambda target: tamper_dynamic_control_semantics(
+            target / "dynamic_control_decisions.parquet"
+        ),
+    )
     return results
 
 
@@ -795,8 +1196,14 @@ __all__ = [
     "tamper_mutate_settlement", "tamper_self_consistent_ledger",
     "tamper_omit_payout_coefficient", "tamper_divide_out_payout",
     "tamper_compound_coefficient", "tamper_handoff_staging_path",
+    "tamper_completion_status", "tamper_drop_bundle_ticket",
+    "tamper_dynamic_control_semantics", "tamper_empty_schema",
+    "tamper_req_evidence",
     "verify_2024_mutation_invariance", "verify_capital_accounting",
-    "verify_handoff_paths", "verify_manifest", "verify_nk_semantics",
+    "verify_code_bindings", "verify_completion", "verify_dynamic_control_decisions",
+    "verify_handoff_contract", "verify_handoff_paths",
+    "verify_holdout_mutation_receipt", "verify_manifest",
+    "verify_nk_semantics", "verify_package_schema", "verify_req_evidence",
     "verify_no_2024_issue", "verify_no_embargoed_split",
     "verify_payout_economics", "verify_provenance", "verify_receipt",
     "verify_schema",

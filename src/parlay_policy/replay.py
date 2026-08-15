@@ -393,6 +393,23 @@ def _select_for_lane(
     return select_tickets(pool, action.lane, action.k, seed=seed, scores=scores)
 
 
+def apply_issue_settlement(
+    current_bankroll_yuan: float,
+    funded_stake_yuan: float,
+    gross_payout_yuan: float,
+) -> float:
+    """Apply one issue settlement to the actual current path bankroll."""
+    values = np.asarray(
+        [current_bankroll_yuan, funded_stake_yuan, gross_payout_yuan],
+        dtype=float,
+    )
+    if not np.isfinite(values).all() or (values < 0).any():
+        raise ReplayError("invalid bankroll/funding/payout settlement")
+    if funded_stake_yuan > current_bankroll_yuan + 1e-9:
+        raise ReplayError("funded stake exceeds current bankroll")
+    return float(current_bankroll_yuan - funded_stake_yuan + gross_payout_yuan)
+
+
 def full_path_replay(
     contexts: dict[tuple[str, str], IssueContext],
     pool_cache: dict[str, pd.DataFrame],
@@ -422,7 +439,7 @@ def full_path_replay(
         for (s, issue), ctx in contexts.items()
         if s == split
     ]
-    split_contexts.sort(key=lambda item: item[1].panel.year)
+    split_contexts.sort(key=lambda item: (item[1].panel.year, str(item[0])))
     incumbent_key = f"N{INCUMBENT_N}/K{INCUMBENT_K}/{INCUMBENT_LANE}/NATIVE_2_YUAN"
     for issue, ctx in split_contexts:
         pool = pool_cache.get(_pool_cache_key(issue, 7))  # fallback N7 pool
@@ -441,12 +458,16 @@ def full_path_replay(
                     "lane": None,
                     "capital": None,
                     "pre_issue_bankroll_yuan": bankroll,
+                    "requested_stake_yuan": 0.0,
                     "funded_stake_yuan": 0.0,
                     "gross_payout_yuan": 0.0,
                     "post_issue_bankroll_yuan": bankroll,
                     "net_pnl_yuan": 0.0,
                     "drawdown_pct": 0.0,
                     "consecutive_losses": consecutive_losses,
+                    "mean_pairwise_overlap": 0.0,
+                    "ticket_hhi": 0.0,
+                    "repeat_exposure": 0.0,
                     "decision_trace_json": json.dumps(
                         trace, ensure_ascii=False
                     ),
@@ -468,12 +489,15 @@ def full_path_replay(
                 row = frozen_row.iloc[0]
                 payout = float(row["gross_payout_yuan"])
                 funded = float(row["funded_stake_yuan"])
-                new_bankroll = float(row["post_issue_bankroll_yuan"])
+                # Frozen means frozen ticket identities/economics, not a
+                # frozen absolute bankroll.  Rebase those tickets on the
+                # actual path bankroll so a learned action followed by a
+                # fallback cannot inject or remove capital.
+                new_bankroll = apply_issue_settlement(bankroll, funded, payout)
                 peak = max(peak, new_bankroll)
                 drawdown_pct = (peak - new_bankroll) / peak if peak else 0.0
-                consecutive_losses = (
-                    consecutive_losses + 1 if payout == 0 else 0
-                )
+                net_pnl = payout - funded
+                consecutive_losses = consecutive_losses + 1 if net_pnl < 0 else 0
                 rows.append(
                     {
                         "split": split,
@@ -486,12 +510,16 @@ def full_path_replay(
                         "lane": action.lane,
                         "capital": action.capital,
                         "pre_issue_bankroll_yuan": bankroll,
+                        "requested_stake_yuan": funded,
                         "funded_stake_yuan": funded,
                         "gross_payout_yuan": payout,
                         "post_issue_bankroll_yuan": new_bankroll,
-                        "net_pnl_yuan": new_bankroll - bankroll,
+                        "net_pnl_yuan": net_pnl,
                         "drawdown_pct": drawdown_pct,
                         "consecutive_losses": consecutive_losses,
+                        "mean_pairwise_overlap": float("nan"),
+                        "ticket_hhi": float("nan"),
+                        "repeat_exposure": float("nan"),
                         "decision_trace_json": json.dumps(
                             trace, ensure_ascii=False
                         ),
@@ -511,11 +539,17 @@ def full_path_replay(
         if action.lane in STOCHASTIC_LANES and stochastic_lane_aggregate:
             funded_list: list[float] = []
             payout_list: list[float] = []
+            overlap_list: list[float] = []
+            hhi_list: list[float] = []
+            repeat_list: list[float] = []
             for seed in ALL_SEEDS:
                 sel = _select_for_lane(n_pool, action, seed, scores=scores)
                 if sel.empty:
                     funded_list.append(0.0)
                     payout_list.append(0.0)
+                    overlap_list.append(0.0)
+                    hhi_list.append(0.0)
+                    repeat_list.append(0.0)
                     continue
                 settled = settle_tickets(sel)
                 if action.capital == "NATIVE_2_YUAN":
@@ -524,13 +558,22 @@ def full_path_replay(
                     cap = bundle_capital_equal1pct(settled, bankroll)
                 funded_list.append(float(cap["funded_stake_yuan"]))
                 payout_list.append(float(cap["gross_payout_yuan"]))
+                overlap_list.append(mean_pairwise_overlap(sel))
+                hhi_list.append(ticket_hhi(sel))
+                repeat_list.append(repeat_exposure(sel))
             funded = float(np.mean(funded_list))
             payout = float(np.mean(payout_list))
+            overlap = float(np.mean(overlap_list))
+            hhi = float(np.mean(hhi_list))
+            repeat = float(np.mean(repeat_list))
         else:
             sel = _select_for_lane(n_pool, action, seed=0, scores=scores)
             if sel.empty:
                 funded = 0.0
                 payout = 0.0
+                overlap = 0.0
+                hhi = 0.0
+                repeat = 0.0
             else:
                 settled = settle_tickets(sel)
                 if action.capital == "NATIVE_2_YUAN":
@@ -539,10 +582,19 @@ def full_path_replay(
                     cap = bundle_capital_equal1pct(settled, bankroll)
                 funded = float(cap["funded_stake_yuan"])
                 payout = float(cap["gross_payout_yuan"])
-        new_bankroll = bankroll - funded + payout
+                overlap = mean_pairwise_overlap(sel)
+                hhi = ticket_hhi(sel)
+                repeat = repeat_exposure(sel)
+        new_bankroll = apply_issue_settlement(bankroll, funded, payout)
         peak = max(peak, new_bankroll)
         drawdown_pct = (peak - new_bankroll) / peak if peak else 0.0
-        consecutive_losses = consecutive_losses + 1 if payout == 0 else 0
+        net_pnl = payout - funded
+        consecutive_losses = consecutive_losses + 1 if net_pnl < 0 else 0
+        requested = (
+            bankroll * 0.01
+            if action.capital == "SIMPLE_ACTIVE"
+            else action.k * TICKET_STAKE_YUAN
+        )
         rows.append(
             {
                 "split": split,
@@ -555,12 +607,16 @@ def full_path_replay(
                 "lane": action.lane,
                 "capital": action.capital,
                 "pre_issue_bankroll_yuan": bankroll,
+                "requested_stake_yuan": float(requested),
                 "funded_stake_yuan": funded,
                 "gross_payout_yuan": payout,
                 "post_issue_bankroll_yuan": new_bankroll,
-                "net_pnl_yuan": new_bankroll - bankroll,
+                "net_pnl_yuan": net_pnl,
                 "drawdown_pct": drawdown_pct,
                 "consecutive_losses": consecutive_losses,
+                "mean_pairwise_overlap": overlap,
+                "ticket_hhi": hhi,
+                "repeat_exposure": repeat,
                 "decision_trace_json": json.dumps(trace, ensure_ascii=False),
                 "source": "REPLAY",
             }
@@ -580,7 +636,8 @@ def _running_peak_drawdown(path: pd.DataFrame) -> float:
     if path.empty:
         return 0.0
     posts = path["post_issue_bankroll_yuan"].to_numpy(dtype=float)
-    running_peak = np.maximum.accumulate(posts)
+    initial = float(path.iloc[0].get("pre_issue_bankroll_yuan", INITIAL_BANKROLL_YUAN))
+    running_peak = np.maximum.accumulate(np.concatenate(([initial], posts)))[1:]
     dd = np.where(running_peak > 0, (running_peak - posts) / running_peak, 0.0)
     return float(np.max(dd)) if len(dd) else 0.0
 
@@ -597,28 +654,42 @@ def summarize_path(path: pd.DataFrame) -> dict[str, float]:
     ending = float(path.iloc[-1]["post_issue_bankroll_yuan"])
     max_dd = _running_peak_drawdown(path)
     posts = path["post_issue_bankroll_yuan"].to_numpy(dtype=float)
-    payouts = path["gross_payout_yuan"].to_numpy(dtype=float)
+    pnl = (
+        path["net_pnl_yuan"].to_numpy(dtype=float)
+        if "net_pnl_yuan" in path.columns
+        else (
+            path["gross_payout_yuan"].to_numpy(dtype=float)
+            - path["funded_stake_yuan"].to_numpy(dtype=float)
+        )
+    )
 
     # Time under water: consecutive issues from a running peak until recovery
     # to a new peak, summed; recovery issues: count of recovery events.
-    running_peak = np.maximum.accumulate(posts)
+    initial = float(path.iloc[0].get("pre_issue_bankroll_yuan", INITIAL_BANKROLL_YUAN))
+    running_peak = np.maximum.accumulate(np.concatenate(([initial], posts)))[1:]
     underwater = running_peak > posts
     tuw = 0
     recovery = 0
+    current_recovery = 0
+    max_recovery = 0
     in_underwater = False
     for i in range(len(posts)):
         if underwater[i]:
             tuw += 1
+            current_recovery += 1
+            max_recovery = max(max_recovery, current_recovery)
             in_underwater = True
         else:
             if in_underwater and i > 0 and posts[i] >= running_peak[i]:
                 recovery += 1
             in_underwater = False
-    # Max consecutive losing issues (payout == 0).
+            current_recovery = 0
+    # A losing issue is defined economically: net P&L < 0.  A positive gross
+    # payout that is smaller than funded stake remains a loss.
     max_streak = 0
     streak = 0
-    for value in payouts:
-        if value == 0:
+    for value in pnl:
+        if value < 0:
             streak += 1
             max_streak = max(max_streak, streak)
         else:
@@ -626,49 +697,80 @@ def summarize_path(path: pd.DataFrame) -> dict[str, float]:
     # Rolling 5/10/20-issue loss probability and worst windows.
     rolling_metrics: dict[str, float] = {}
     for window in (5, 10, 20):
-        if len(payouts) < window:
+        if len(pnl) < window:
             rolling_metrics[f"rolling{window}_loss_prob"] = float("nan")
-            rolling_metrics[f"rolling{window}_worst_window"] = float("nan")
+            rolling_metrics[f"rolling{window}_worst_net_pnl_yuan"] = float("nan")
             continue
         windows = np.lib.stride_tricks.sliding_window_view(
-            payouts, window
+            pnl, window
         )
-        loss_windows = (windows == 0).all(axis=1)
+        window_pnl = windows.sum(axis=1)
+        loss_windows = window_pnl < 0
         rolling_metrics[f"rolling{window}_loss_prob"] = float(
             loss_windows.mean()
         )
-        window_returns = windows.sum(axis=1)
-        rolling_metrics[f"rolling{window}_worst_window"] = float(
-            window_returns.min()
+        rolling_metrics[f"rolling{window}_worst_net_pnl_yuan"] = float(
+            window_pnl.min()
         )
+    turnover = float(path["funded_stake_yuan"].sum())
+    total_pnl = float(pnl.sum())
+    active_roi = total_pnl / turnover if turnover > 0 else float("nan")
+    min_capital = float(np.min(np.concatenate(([initial], posts))))
     return {
         "ending_capital_yuan": ending,
         "max_drawdown_pct": max_dd,
-        "turnover_yuan": float(path["funded_stake_yuan"].sum()),
+        "turnover_yuan": turnover,
+        "active_support_roi": active_roi,
+        "total_net_pnl_yuan": total_pnl,
+        "minimum_capital_yuan": min_capital,
+        "ruin": bool(min_capital <= 0.0),
+        "near_ruin": bool(min_capital <= INITIAL_BANKROLL_YUAN * 0.10),
+        "minimum_retained_cash_yuan": float(
+            (path["pre_issue_bankroll_yuan"] - path["funded_stake_yuan"]).min()
+        ),
         "issues": int(len(path)),
         "time_under_water_issues": float(tuw),
         "recovery_issues": float(recovery),
+        "max_recovery_issues": float(max_recovery),
         "max_consecutive_losing_issues": float(max_streak),
         **rolling_metrics,
     }
 
 
 def path_holding_metrics(path: pd.DataFrame) -> dict[str, float]:
-    """Additional required metrics: ex-largest issue, HHI, overlap, repeat."""
+    """Concentration and ex-largest issue diagnostics for one path."""
     if path.empty:
         return {}
     funded = path["funded_stake_yuan"].to_numpy(dtype=float)
-    ex_largest = float(np.max(funded)) if len(funded) else 0.0
+    pnl = (
+        path["net_pnl_yuan"].to_numpy(dtype=float)
+        if "net_pnl_yuan" in path.columns
+        else path["gross_payout_yuan"].to_numpy(dtype=float) - funded
+    )
+    largest_index = int(np.argmax(np.abs(pnl))) if len(pnl) else 0
+    ex_largest_pnl = float(pnl.sum() - pnl[largest_index]) if len(pnl) else 0.0
     return {
-        "ex_largest_issue_yuan": ex_largest,
+        "largest_absolute_issue_pnl_yuan": float(np.max(np.abs(pnl))) if len(pnl) else 0.0,
+        "ex_largest_issue_net_pnl_yuan": ex_largest_pnl,
+        "ex_largest_issue_ending_capital_yuan": INITIAL_BANKROLL_YUAN + ex_largest_pnl,
         "hhi_funded": float(np.sum((funded / funded.sum()) ** 2))
         if funded.sum() > 0
         else 0.0,
+        "mean_ticket_overlap": float(path["mean_pairwise_overlap"].dropna().mean())
+        if "mean_pairwise_overlap" in path.columns and path["mean_pairwise_overlap"].notna().any()
+        else float("nan"),
+        "mean_ticket_hhi": float(path["ticket_hhi"].dropna().mean())
+        if "ticket_hhi" in path.columns and path["ticket_hhi"].notna().any()
+        else float("nan"),
+        "mean_repeat_exposure": float(path["repeat_exposure"].dropna().mean())
+        if "repeat_exposure" in path.columns and path["repeat_exposure"].notna().any()
+        else float("nan"),
     }
 
 
 __all__ = [
-    "IssueContext", "ReplayError", "build_issue_contexts", "build_label_surface",
+    "IssueContext", "ReplayError", "apply_issue_settlement",
+    "build_issue_contexts", "build_label_surface",
     "build_pool_cache", "build_training_frame", "full_path_replay",
     "incumbent_issue_ledger", "issue_action_lift", "path_holding_metrics",
     "summarize_path",

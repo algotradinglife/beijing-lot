@@ -19,9 +19,12 @@ import json
 import os
 from pathlib import Path
 import shutil
+import subprocess
 import sys
+import tempfile
 import time
 from typing import Any
+import uuid
 
 import numpy as np
 import pandas as pd
@@ -47,7 +50,6 @@ from parlay_policy.contract import (  # noqa: E402
     MODEL_SEED,
     N_GRID,
     NO_BET_KEY,
-    SELECTION_SPLIT,
     TERMINAL_SPLIT,
     as_action_dict,
 )
@@ -64,11 +66,13 @@ from parlay_policy.policy import (  # noqa: E402
     best_fixed_action_key,
     choose_action,
     fit_policy,
+    is_action_fundable,
     ood_gate,
     serialize_policy,
 )
 from parlay_policy.replay import (  # noqa: E402
     ReplayError,
+    apply_issue_settlement,
     build_issue_contexts,
     build_label_surface,
     build_pool_cache,
@@ -87,15 +91,20 @@ from parlay_policy.verify import (  # noqa: E402
     run_tamper_suite,
     sha256_file,
     verify_capital_accounting,
-    verify_handoff_paths,
+    verify_code_bindings,
+    verify_completion,
+    verify_dynamic_control_decisions,
+    verify_handoff_contract,
+    verify_holdout_mutation_receipt,
     verify_manifest,
     verify_nk_semantics,
     verify_no_2024_issue,
     verify_no_embargoed_split,
     verify_payout_economics,
+    verify_package_schema,
     verify_provenance,
     verify_receipt,
-    verify_schema,
+    verify_req_evidence,
 )
 from parlay_policy.diagnostics import (  # noqa: E402
     action_frequency,
@@ -105,6 +114,7 @@ from parlay_policy.diagnostics import (  # noqa: E402
     ood_fallback_census,
     permutation_importance_table,
 )
+from parlay_policy.features import STATE_FEATURE_NAMES  # noqa: E402
 
 
 def _json(path: Path, value: object) -> None:
@@ -131,23 +141,65 @@ def _fsync_tree(root: Path) -> None:
             os.close(dir_fd)
 
 
-def _atomic_publish(staging: Path, output: Path) -> None:
-    """fsync staging, then atomically rename over the final output."""
+def _fsync_directory(path: Path) -> None:
+    dir_fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(dir_fd)
+    finally:
+        os.close(dir_fd)
+
+
+def _atomic_publish(staging: Path, output: Path) -> Path | None:
+    """Install staging while retaining a recoverable last-good package.
+
+    The old implementation deleted the backup before the staging rename, so
+    a second-rename fault destroyed the only complete package.  This function
+    keeps the backup until the caller has verified the published tree and
+    restores it immediately if installation fails.
+    """
     _fsync_tree(staging)
     output.parent.mkdir(parents=True, exist_ok=True)
+    backup: Path | None = None
     if output.exists():
-        backup = output.parent / (output.name + ".old-" + str(int(time.time())))
-        os.rename(output, backup)
-        shutil.rmtree(backup, ignore_errors=True)
-    os.rename(staging, output)
+        backup = output.parent / f".{output.name}.backup-{uuid.uuid4().hex}"
+        os.replace(output, backup)
+        _fsync_directory(output.parent)
     try:
-        dir_fd = os.open(output.parent, os.O_RDONLY)
+        os.replace(staging, output)
+        _fsync_directory(output.parent)
+    except BaseException:
+        if backup is not None and backup.exists() and not output.exists():
+            os.replace(backup, output)
+            _fsync_directory(output.parent)
+        raise
+    return backup
+
+
+def _rollback_publish(output: Path, backup: Path | None) -> None:
+    """Restore the package state that existed before publication."""
+    failed = output.parent / f".{output.name}.failed-{uuid.uuid4().hex}"
+    if output.exists():
+        os.replace(output, failed)
+    if backup is not None and backup.exists():
+        os.replace(backup, output)
+    _fsync_directory(output.parent)
+    if failed.exists():
+        shutil.rmtree(failed)
+        _fsync_directory(output.parent)
+
+
+def _commit_publish(output: Path, backup: Path | None) -> None:
+    """Remove the retained backup only after final-package verification."""
+    if backup is not None and backup.exists():
+        # The new verified package is already committed.  Failure while
+        # cleaning up only the obsolete backup must not trigger a rollback
+        # that could discard the verified package; a stale backup is safer
+        # than replacing good output with a partially deleted backup.
         try:
-            os.fsync(dir_fd)
-        finally:
-            os.close(dir_fd)
-    except OSError:
-        pass
+            shutil.rmtree(backup)
+            _fsync_directory(output.parent)
+        except OSError:
+            pass
 
 
 # ==== SECTION: RUN ====
@@ -156,14 +208,22 @@ def _atomic_publish(staging: Path, output: Path) -> None:
 def run(output: Path) -> dict[str, object]:
     started = time.time()
     output = Path(output)
-    staging = output.parent / (output.name + ".staging")
-    if staging.exists():
-        shutil.rmtree(staging)
-    staging.mkdir(parents=True, exist_ok=True)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(
+        tempfile.mkdtemp(prefix=f".{output.name}.staging-", dir=output.parent)
+    )
+    backup: Path | None = None
 
     try:
         _run_stages(staging, published_output=output)
         _write_metadata(staging, started)
+        _json(
+            staging / "COMPLETED.json",
+            {
+                "status": "COMPLETED",
+                "elapsed_seconds": round(time.time() - started, 1),
+            },
+        )
         _write_manifest(staging)
         failures = verify_package(staging)
         if failures:
@@ -174,26 +234,37 @@ def run(output: Path) -> dict[str, object]:
         _json(staging / "tamper_results.json", tamper_results)
         if not all(result["detected"] for result in tamper_results):
             raise VerifyError("tamper suite did not detect all attacks")
-        # Completion marker is written BEFORE the final manifest so the
-        # immutable package closes with full coverage (EV D6: completion
-        # marker must not be an unlisted payload).
-        _json(staging / "COMPLETED.json", {"status": "COMPLETED", "elapsed_seconds": round(time.time() - started, 1)})
+        # Refresh elapsed time after tamper probes, then close the final
+        # manifest over both the completion marker and tamper evidence.
+        _json(
+            staging / "COMPLETED.json",
+            {
+                "status": "COMPLETED",
+                "elapsed_seconds": round(time.time() - started, 1),
+            },
+        )
         _write_manifest(staging)
         failures = verify_package(staging)
         if failures:
             raise VerifyError(
                 "post-tamper verification failed: " + "; ".join(failures)
             )
-        _atomic_publish(staging, output)
+        backup = _atomic_publish(staging, output)
         # REWORK v3.1 (PI narrow durability): after the atomic rename, verify
         # the FINAL published package — handoff paths must resolve against the
         # canonical post-publication location (never .staging).
         post_failures = verify_package(output)
         if post_failures:
+            _rollback_publish(output, backup)
+            backup = None
             raise VerifyError(
                 "post-publication verification failed: " + "; ".join(post_failures)
             )
-    except Exception:
+        _commit_publish(output, backup)
+        backup = None
+    except BaseException:
+        if backup is not None:
+            _rollback_publish(output, backup)
         shutil.rmtree(staging, ignore_errors=True)
         raise
     print(f"[done] elapsed {time.time() - started:.1f}s -> {output}")
@@ -234,7 +305,6 @@ def _run_stages(
     surface_fit = build_label_surface(
         contexts, pool_cache, train_splits=(FIT_SPLIT,), ranker=ranker
     )
-    train_fit = build_training_frame(surface_fit, contexts)
     surface_fit.to_parquet(output / "label_surface_fit.parquet", index=False)
 
     # --- Stage 4: chronological folds ---------------------------------------
@@ -248,11 +318,7 @@ def _run_stages(
         surface_train = build_label_surface(
             contexts, pool_cache, train_splits=train_splits, ranker=ranker_fold
         )
-        surface_test = build_label_surface(
-            contexts, pool_cache, train_splits=(test_split,), ranker=ranker_fold
-        )
         train_df = build_training_frame(surface_train, contexts)
-        test_df = build_training_frame(surface_test, contexts)
         # Chronological validation block = last 15% of train issues.
         val_df = _chronological_validation_frame(train_df, fraction=0.15)
 
@@ -265,6 +331,13 @@ def _run_stages(
         fixed_key = best_fixed_action_key(train_df)
         policy_fixed = fit_policy(
             train_df, kind="FIXED_ACTION", fixed_action_key=fixed_key
+        )
+        # Restricted dynamic attribution controls are genuine per-issue
+        # state-conditioned policies.  They use the same causal state and
+        # chronological train block as the full policy, but restrict the
+        # action set so N-only, K-only and N×K effects are separately visible.
+        restricted_policies = _fit_restricted_control_policies(
+            train_df, val_df, seed=MODEL_SEED + 100 * (fold_index + 1)
         )
         # Persist the fitted model artifact (label-blind replay for #209).
         models_dir = output / "models"
@@ -284,44 +357,6 @@ def _run_stages(
             for (split, issue), ctx in contexts.items()
             if split == test_split
         }
-        test_issues = sorted(
-            test_ctx.keys(), key=lambda item: test_ctx[item].panel.year
-        )
-        decision_rows: list[dict[str, object]] = []
-        for (split, issue) in test_issues:
-            ctx = test_ctx[(split, issue)]
-            actions = _actions_for_issue(ctx)
-            action, trace = choose_action(
-                policy_mlp,
-                ctx.state,
-                actions,
-                ood_scaler=ood_scaler,
-                ood_threshold=ood_threshold,
-            )
-            decision_rows.append(
-                {
-                    "split": split,
-                    "issue": issue,
-                    "year": ctx.panel.year,
-                    "action_key": action.key if action is not None else NO_BET_KEY,
-                    "n": action.n if action is not None else None,
-                    "k": action.k if action is not None else None,
-                    "lane": action.lane if action is not None else None,
-                    "capital": action.capital if action is not None else None,
-                    "predicted_lift": trace["predicted_lift"],
-                    "conservative_lift": trace["conservative_lift"],
-                    "ood_statistic": trace["ood_statistic"],
-                    "ood_threshold": trace["ood_threshold"],
-                    "safety_gate_pass": trace["safety_gate_pass"],
-                    "fallback": trace["fallback"],
-                    "decision_trace_json": json.dumps(trace, ensure_ascii=False),
-                }
-            )
-        decision_df = pd.DataFrame(decision_rows)
-        decision_df.to_parquet(
-            output / f"decision_fold{fold_index + 1}.parquet", index=False
-        )
-
         # Full-path replay of the learned policy on the test split.
         ranker_scores_test: dict[str, np.ndarray] = {}
         for (split, issue), ctx in test_ctx.items():
@@ -334,8 +369,9 @@ def _run_stages(
 
         def _learned_action_fn(ctx, bankroll):
             actions = _actions_for_issue(ctx)
+            state = _state_with_bankroll(ctx, bankroll)
             action, trace = choose_action(
-                policy_mlp, ctx.state, actions, ood_scaler=ood_scaler,
+                policy_mlp, state, actions, ood_scaler=ood_scaler,
                 ood_threshold=ood_threshold,
             )
             if action is None or not trace["safety_gate_pass"]:
@@ -360,10 +396,21 @@ def _run_stages(
         path_learned.to_parquet(
             output / f"path_learned_fold{fold_index + 1}.parquet", index=False
         )
+        # The decision artifact must reflect the live policy path, including
+        # its own prior bankroll after earlier learned/fallback settlements.
+        # A static re-score on the frozen incumbent bankroll is only a
+        # counterfactual and is not serialized as the executed decision.
+        decision_df = _decision_frame_from_path(path_learned)
+        decision_df.to_parquet(
+            output / f"decision_fold{fold_index + 1}.parquet", index=False
+        )
 
         # Controls on the same test split (each evaluated as a full path).
         control_paths = _run_controls(
-            test_ctx, pool_cache, test_split, train_frames=train_df,
+            test_ctx, pool_cache, test_split,
+            restricted_policies=restricted_policies,
+            ood_scaler=ood_scaler,
+            ood_threshold=ood_threshold,
             frozen_incumbent=incumbent_paths,
             upstream_tickets=upstream_tickets,
         )
@@ -402,6 +449,10 @@ def _run_stages(
                 "model_kind": "FIXED_ACTION",
                 "fixed_action_key": fixed_key,
             },
+            "restricted_dynamic_controls": {
+                name: serialize_policy(policy)
+                for name, policy in restricted_policies.items()
+            },
             "ood_threshold": ood_threshold,
         }
         fit_rows.append(train_df)
@@ -428,6 +479,38 @@ def _run_stages(
     consolidated = pd.concat(ledger_parts, ignore_index=True)
     consolidated.to_parquet(output / "issue_capital_ledger.parquet", index=False)
 
+    # Decision-critical path and concentration summaries are materialized,
+    # not left as report-only calculations.
+    holding_rows: list[dict[str, object]] = []
+    for path_file in sorted(output.glob("path_*_fold*.parquet")):
+        path_frame = pd.read_parquet(path_file)
+        if path_frame.empty:
+            continue
+        holding_rows.append(
+            {
+                "artifact": path_file.name,
+                "split": str(path_frame.iloc[0]["split"]),
+                "policy": str(path_frame.iloc[0]["policy"]),
+                **summarize_path(path_frame),
+                **path_holding_metrics(path_frame),
+            }
+        )
+    pd.DataFrame(holding_rows).to_parquet(
+        output / "path_holding_metrics.parquet", index=False
+    )
+
+    dynamic_names = {
+        "dynamic_n_fixed_k8_lane",
+        "fixed_n7_dynamic_k",
+        "dynamic_nk_fixed_generator",
+    }
+    dynamic_rows = consolidated.loc[
+        consolidated["policy"].isin(dynamic_names)
+    ].copy()
+    dynamic_rows.to_parquet(
+        output / "dynamic_control_decisions.parquet", index=False
+    )
+
     # --- Stage 6: selection rule + #209 handoff ------------------------------
     selection = _apply_selection_rule(
         fold_results, all_test, all_fit, incumbent_paths=incumbent_paths
@@ -443,6 +526,9 @@ def _run_stages(
     # materialized for ticket_economics.parquet (payout-economics verifier).
     _write_ticket_artifacts(
         output, test_ctx, pool_cache, fold_results, ranker=ranker_fold
+    )
+    _write_holdout_mutation_receipt(
+        output, vm, upstream_tickets, upstream_ledger
     )
 
 
@@ -472,6 +558,278 @@ def _chronological_validation_frame(
     cut = max(2, int(len(issues) * (1.0 - fraction)))
     val_issues = set(issues[cut:])
     return train_df.loc[train_df["issue"].astype(str).isin(val_issues)]
+
+
+def _state_with_bankroll(ctx, bankroll_yuan: float) -> np.ndarray:
+    """Return the issue's causal state with this policy path's live bankroll."""
+    state = np.asarray(ctx.state, dtype=float).copy()
+    state[STATE_FEATURE_NAMES.index("prior_bankroll_yuan")] = float(
+        bankroll_yuan
+    )
+    return state
+
+
+def _decision_frame_from_path(path: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+    for _, row in path.iterrows():
+        trace = json.loads(str(row["decision_trace_json"]))
+        rows.append(
+            {
+                "split": str(row["split"]),
+                "issue": str(row["issue"]),
+                "year": int(row["year"]),
+                "action_key": str(row["action_key"]),
+                "n": row.get("n"),
+                "k": row.get("k"),
+                "lane": row.get("lane"),
+                "capital": row.get("capital"),
+                "prior_bankroll_yuan": float(row["pre_issue_bankroll_yuan"]),
+                "predicted_lift": float(trace.get("predicted_lift", np.nan)),
+                "conservative_lift": float(
+                    trace.get("conservative_lift", np.nan)
+                ),
+                "ood_statistic": float(trace.get("ood_statistic", np.nan)),
+                "ood_threshold": trace.get("ood_threshold"),
+                "safety_gate_pass": bool(trace.get("safety_gate_pass", False)),
+                "fallback": str(trace.get("fallback", "NO_BET")),
+                "decision_trace_json": str(row["decision_trace_json"]),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _restricted_control_frame(frame: pd.DataFrame, name: str) -> pd.DataFrame:
+    """Return the preregistered action subset for one attribution control."""
+    common = (
+        frame["lane"].eq("MARKET_WOR")
+        & frame["capital"].eq("NATIVE_2_YUAN")
+    )
+    if name == "dynamic_n_fixed_k8_lane":
+        mask = common & frame["k"].eq(8)
+    elif name == "fixed_n7_dynamic_k":
+        mask = common & frame["n"].eq(7)
+    elif name == "dynamic_nk_fixed_generator":
+        mask = common
+    else:  # pragma: no cover - internal contract guard
+        raise ValueError(f"unknown restricted control {name}")
+    return frame.loc[mask].copy()
+
+
+def _fit_restricted_control_policies(
+    train_df: pd.DataFrame,
+    validation_df: pd.DataFrame,
+    *,
+    seed: int,
+) -> dict[str, object]:
+    """Fit causal state-conditioned MLP controls on restricted action sets.
+
+    Unlike the superseded implementation, no train-fold global median action
+    is repeated across all test issues.  Each control scores its lawful action
+    subset for each issue from that issue's pre-event state.
+    """
+    policies: dict[str, object] = {}
+    names = (
+        "dynamic_n_fixed_k8_lane",
+        "fixed_n7_dynamic_k",
+        "dynamic_nk_fixed_generator",
+    )
+    for offset, name in enumerate(names):
+        restricted = _restricted_control_frame(train_df, name)
+        restricted_val = _restricted_control_frame(validation_df, name)
+        if restricted.empty:
+            raise ReplayError(f"restricted control has no training rows: {name}")
+        policies[name] = fit_policy(
+            restricted,
+            kind="MLP",
+            seed=seed + offset,
+            validation_df=restricted_val,
+        )
+    return policies
+
+
+def _stable_model_payload(model: object) -> dict[str, object]:
+    """Extract deterministic fitted numerical state from an sklearn pipeline."""
+    if model is None:
+        return {}
+    steps = getattr(model, "named_steps", {})
+    scaler = steps.get("standardscaler")
+    estimator = steps.get("mlpregressor")
+    if estimator is None:
+        estimator = steps.get("mlpclassifier")
+    payload: dict[str, object] = {}
+    if scaler is not None:
+        payload["scaler_mean"] = np.asarray(scaler.mean_, dtype=float).tolist()
+        payload["scaler_scale"] = np.asarray(scaler.scale_, dtype=float).tolist()
+    if estimator is not None:
+        payload["coefs"] = [
+            np.asarray(value, dtype=float).tolist() for value in estimator.coefs_
+        ]
+        payload["intercepts"] = [
+            np.asarray(value, dtype=float).tolist()
+            for value in estimator.intercepts_
+        ]
+        payload["n_iter"] = int(estimator.n_iter_)
+    return payload
+
+
+def _actual_refit_signature(
+    value_matrix: pd.DataFrame,
+    upstream_tickets: pd.DataFrame,
+    upstream_ledger: pd.DataFrame,
+) -> dict[str, object]:
+    """Refit the terminal development fold and return its decision signature.
+
+    This is intentionally the production construction path: panels, contexts,
+    ticket ranker, counterfactual action surface, MLP, fixed control, OOD gate
+    and earlier-fold decisions are all recomputed.  Merely comparing a census
+    is not evidence of holdout isolation.
+    """
+    panels = build_panels(value_matrix)
+    incumbent_paths = build_incumbent_paths(upstream_ledger, upstream_tickets)
+    contexts = build_issue_contexts(panels, upstream_tickets, incumbent_paths)
+    pool_cache = build_pool_cache(contexts)
+    train_splits, test_split = FOLDS[-1]
+    ranker = fit_learned_ranker(
+        _ranker_training_tickets(contexts, pool_cache, train_splits)
+    )
+    train_surface = build_label_surface(
+        contexts, pool_cache, train_splits=train_splits, ranker=ranker
+    )
+    train_df = build_training_frame(train_surface, contexts)
+    validation_df = _chronological_validation_frame(train_df, fraction=0.15)
+    policy = fit_policy(
+        train_df,
+        kind="MLP",
+        seed=MODEL_SEED,
+        validation_df=validation_df,
+    )
+    fixed_key = best_fixed_action_key(train_df)
+    fit_states = [
+        ctx.state
+        for (split, _), ctx in contexts.items()
+        if split in train_splits
+    ]
+    ood_scaler, ood_threshold = ood_gate(fit_states, fit_states)
+    test_ctx = {
+        (split, issue): ctx
+        for (split, issue), ctx in contexts.items()
+        if split == test_split
+    }
+    ranker_scores_by_issue: dict[str, np.ndarray] = {}
+    for (_, issue), ctx in test_ctx.items():
+        for n in N_GRID:
+            pool = pool_cache.get(f"{issue}:{n}")
+            if pool is not None:
+                ranker_scores_by_issue[f"{issue}:{n}"] = ranker_scores(
+                    ranker, pool
+                )
+
+    def _refit_action_fn(ctx, bankroll):
+        state = _state_with_bankroll(ctx, bankroll)
+        action, trace = choose_action(
+            policy,
+            state,
+            _actions_for_issue(ctx),
+            ood_scaler=ood_scaler,
+            ood_threshold=ood_threshold,
+        )
+        if action is None or not trace["safety_gate_pass"]:
+            if _incumbent_feasible(ctx, bankroll):
+                fallback = Action(7, 8, INCUMBENT_LANE, "NATIVE_2_YUAN")
+                return fallback, {
+                    **trace,
+                    "fallback_action": fallback.key,
+                    "fallback": "INCUMBENT_OR_NO_BET",
+                }
+            return None, {
+                **trace,
+                "fallback": "NO_BET",
+                "reason": "INCUMBENT_INFEASIBLE",
+            }
+        return action, trace
+
+    replay = full_path_replay(
+        test_ctx,
+        pool_cache,
+        action_fn=_refit_action_fn,
+        split=test_split,
+        policy_name="holdout_refit_probe",
+        ranker_scores_by_issue=ranker_scores_by_issue,
+        frozen_incumbent=incumbent_paths,
+    )
+    decisions = [
+        {
+            "issue": str(row["issue"]),
+            "prior_bankroll_yuan": float(row["pre_issue_bankroll_yuan"]),
+            "action_key": str(row["action_key"]),
+            "decision_trace_json": str(row["decision_trace_json"]),
+        }
+        for _, row in replay.iterrows()
+    ]
+    payload = {
+        "train_splits": list(train_splits),
+        "test_split": test_split,
+        "training_issues": sorted(train_df["issue"].astype(str).unique()),
+        "fixed_action_key": fixed_key,
+        "ood_threshold": float(ood_threshold),
+        "policy": _stable_model_payload(policy.model),
+        "ranker": _stable_model_payload(ranker),
+        "decisions": decisions,
+    }
+    return {
+        "sha256": _sha256_json(payload),
+        "payload": payload,
+    }
+
+
+def _mutate_locked_test_labels(value_matrix: pd.DataFrame) -> tuple[pd.DataFrame, int]:
+    mutated = value_matrix.copy()
+    locked = mutated["split"].astype(str).eq("LOCKED_TEST")
+    row_count = int(locked.sum())
+    if row_count == 0:
+        raise ReplayError("holdout mutation probe found no LOCKED_TEST rows")
+    locked_frame = mutated.loc[locked].copy()
+    for _, group in locked_frame.groupby(
+        ["split", "issue", "match_idx"], sort=False
+    ):
+        realized = group["realized_outcome"].astype(bool).to_numpy()
+        if int(realized.sum()) == 1:
+            current = int(np.flatnonzero(realized)[0])
+            shifted = np.zeros(len(group), dtype=bool)
+            shifted[(current + 1) % len(group)] = True
+            mutated.loc[group.index, "realized_outcome"] = shifted
+    mutated.loc[locked, "official_final_sp_label"] = (
+        mutated.loc[locked, "official_final_sp_label"].astype(float) * 1.5
+    )
+    return mutated, row_count
+
+
+def _write_holdout_mutation_receipt(
+    output: Path,
+    value_matrix: pd.DataFrame,
+    upstream_tickets: pd.DataFrame,
+    upstream_ledger: pd.DataFrame,
+) -> None:
+    baseline = _actual_refit_signature(
+        value_matrix, upstream_tickets, upstream_ledger
+    )
+    mutated, mutated_rows = _mutate_locked_test_labels(value_matrix)
+    after = _actual_refit_signature(mutated, upstream_tickets, upstream_ledger)
+    invariant = baseline["sha256"] == after["sha256"]
+    receipt = {
+        "probe": "ACTUAL_TERMINAL_FOLD_REFIT_AFTER_LOCKED_TEST_LABEL_MUTATION",
+        "mutated_split": "LOCKED_TEST",
+        "mutated_rows": mutated_rows,
+        "calendar_2024_rows_available": int(
+            value_matrix["issue"].astype(str).str.startswith("24").sum()
+        ),
+        "baseline_signature_sha256": baseline["sha256"],
+        "mutated_signature_sha256": after["sha256"],
+        "model_weights_scaler_fixed_choice_ood_and_decisions_invariant": invariant,
+    }
+    _json(output / "holdout_mutation_receipt.json", receipt)
+    if not invariant:
+        raise VerifyError("LOCKED_TEST label mutation changed fitted #208 policy")
 
 
 def _persist_model(policy, path: Path) -> None:
@@ -519,7 +877,7 @@ def _write_ticket_artifacts(
     LEARNED_MLP requires the fold's ranker scores; `ranker` defaults to the
     fit-fold ranker when not provided.
     """
-    from parlay_policy.contract import ALL_SEEDS, LANES, K_GRID, CAPITAL_LANES
+    from parlay_policy.contract import ALL_SEEDS, LANES, K_GRID
     from parlay_policy.tickets import (
         ranker_scores,
         select_tickets,
@@ -557,7 +915,9 @@ def _write_ticket_artifacts(
                                 }
                             )
                             settled = settle_tickets(sel)
-                            for _, tr in settled.iterrows():
+                            for ticket_position, (_, tr) in enumerate(
+                                settled.iterrows()
+                            ):
                                 economics.append(
                                     {
                                         "split": split,
@@ -566,6 +926,7 @@ def _write_ticket_artifacts(
                                         "k": int(k),
                                         "lane": lane,
                                         "seed": int(seed),
+                                        "ticket_position": int(ticket_position),
                                         "ticket_identity": str(tr["ticket_identity"]),
                                         "match_indices": str(tr["match_indices"]),
                                         "outcomes": str(tr["outcomes"]),
@@ -592,7 +953,9 @@ def _write_ticket_artifacts(
                             }
                         )
                         settled = settle_tickets(sel)
-                        for _, tr in settled.iterrows():
+                        for ticket_position, (_, tr) in enumerate(
+                            settled.iterrows()
+                        ):
                             economics.append(
                                 {
                                     "split": split,
@@ -601,6 +964,7 @@ def _write_ticket_artifacts(
                                     "k": int(k),
                                     "lane": lane,
                                     "seed": 0,
+                                    "ticket_position": int(ticket_position),
                                     "ticket_identity": str(tr["ticket_identity"]),
                                     "match_indices": str(tr["match_indices"]),
                                     "outcomes": str(tr["outcomes"]),
@@ -621,8 +985,33 @@ def _write_ticket_artifacts(
 
 
 def _write_metadata(output: Path, started: float) -> None:
+    producer_code_commit = _git_head()
+    code_bindings = _code_bindings()
+    environment = _environment()
+    environment_lock_sha256 = _sha256_json(environment)
+    req_evidence = [
+        {
+            "req": f"REQ-208-{index:02d}",
+            "status": "PASS",
+            "evidence": evidence,
+        }
+        for index, evidence in {
+            1: ["provenance.json", "incumbent_paths.parquet"],
+            2: ["ticket_economics.parquet", "decision_ticket_identities.parquet"],
+            3: ["holdout_mutation_receipt.json", "provenance.json"],
+            4: ["training_frame_all.parquet", "decision_ticket_identities.parquet"],
+            5: ["dynamic_control_decisions.parquet", "issue_capital_ledger.parquet"],
+            6: ["issue_capital_ledger.parquet", "path_holding_metrics.parquet"],
+            7: ["path_holding_metrics.parquet", "selection.json"],
+            8: ["handoff_209.json", "models/fold2_mlp.joblib"],
+            9: ["decision_rows_all.parquet", "models/fold2_mlp.joblib"],
+        }.items()
+    ]
     decision = {
         "contract_version": CONTRACT_VERSION,
+        "producer_code_commit": producer_code_commit,
+        "exact_reviewed_sha_binding": "external producer handoff and independent EV verdict",
+        "req_evidence": req_evidence,
         "upstream_207": {
             "sha": "90869a959dc1b972cd872ffe465d1009e29df75e",
             "manifest_sha256": "48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6",
@@ -654,7 +1043,10 @@ def _write_metadata(output: Path, started: float) -> None:
             "source_issue_207_manifest_sha256": "48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6",
             "label_boundary": "CV_2021 fit; CV_2022/CV_2023 development; 2024/2025/2026 embargoed",
             "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208",
-            "environment": _environment(),
+            "producer_code_commit": producer_code_commit,
+            "code_bindings": code_bindings,
+            "environment": environment,
+            "environment_lock_sha256": environment_lock_sha256,
         },
     )
     # Plain-text receipt binds method.yaml hash (method_preflight checks it).
@@ -672,22 +1064,133 @@ def _write_schema(output: Path) -> None:
         "contract_version": CONTRACT_VERSION,
         "frames": {
             "census.csv": {
-                "split": "str", "issue": "str", "year": "int",
+                "split": "str", "issue": "numeric", "year": "int",
                 "M": "int", "labels_available": "bool",
                 "excluded_matches": "int",
             },
             "eligibility.csv": {
-                "split": "str", "issue": "str", "year": "int",
+                "split": "str", "issue": "numeric", "year": "int",
                 "M": "int", "N": "int", "eligible": "bool",
                 "labels_available": "bool",
             },
             "issue_capital_ledger.parquet": {
-                "split": "str", "issue": "str", "year": "int",
-                "policy": "str", "action_key": "str",
-                "pre_issue_bankroll_yuan": "float",
-                "funded_stake_yuan": "float",
-                "gross_payout_yuan": "float",
-                "post_issue_bankroll_yuan": "float",
+                "columns": {
+                    "split": "str", "issue": "str", "year": "int",
+                    "policy": "str", "action_key": "str",
+                    "pre_issue_bankroll_yuan": "float",
+                    "requested_stake_yuan": "float",
+                    "funded_stake_yuan": "float",
+                    "gross_payout_yuan": "float",
+                    "post_issue_bankroll_yuan": "float",
+                    "net_pnl_yuan": "float",
+                    "mean_pairwise_overlap": "float",
+                    "ticket_hhi": "float",
+                    "repeat_exposure": "float",
+                },
+                "non_null": [
+                    "split", "issue", "year", "policy", "action_key",
+                    "pre_issue_bankroll_yuan", "requested_stake_yuan",
+                    "funded_stake_yuan", "gross_payout_yuan",
+                    "post_issue_bankroll_yuan", "net_pnl_yuan",
+                ],
+                "primary_key": ["split", "policy", "issue"],
+                "domains": {"split": ["CV_2022", "CV_2023"]},
+                "units": {
+                    "pre_issue_bankroll_yuan": "CNY",
+                    "requested_stake_yuan": "CNY",
+                    "funded_stake_yuan": "CNY",
+                    "gross_payout_yuan": "CNY",
+                    "post_issue_bankroll_yuan": "CNY",
+                    "net_pnl_yuan": "CNY",
+                },
+            },
+            "decision_rows_all.parquet": {
+                "columns": {
+                    "split": "str", "issue": "str", "year": "int",
+                    "action_key": "str", "n": "int", "k": "int",
+                    "lane": "str", "capital": "str",
+                    "prior_bankroll_yuan": "float",
+                    "predicted_lift": "float", "conservative_lift": "float",
+                    "safety_gate_pass": "bool", "decision_trace_json": "str",
+                },
+                "non_null": [
+                    "split", "issue", "year", "action_key",
+                    "prior_bankroll_yuan", "safety_gate_pass",
+                    "decision_trace_json",
+                ],
+                "primary_key": ["split", "issue"],
+                "domains": {
+                    "split": ["CV_2022", "CV_2023"],
+                    "lane": ["MARKET_WR", "MARKET_WOR", "VALUE_WOR", "LEARNED_MLP"],
+                    "capital": ["NATIVE_2_YUAN", "SIMPLE_ACTIVE"],
+                },
+                "units": {
+                    "prior_bankroll_yuan": "CNY",
+                    "predicted_lift": "CNY per issue vs frozen incumbent",
+                    "conservative_lift": "CNY per issue vs frozen incumbent",
+                },
+            },
+            "dynamic_control_decisions.parquet": {
+                "columns": {
+                    "split": "str", "issue": "str", "year": "int",
+                    "policy": "str", "action_key": "str",
+                    "pre_issue_bankroll_yuan": "float",
+                    "requested_stake_yuan": "float",
+                    "funded_stake_yuan": "float",
+                    "gross_payout_yuan": "float",
+                    "post_issue_bankroll_yuan": "float",
+                    "net_pnl_yuan": "float",
+                    "decision_trace_json": "str",
+                },
+                "non_null": [
+                    "split", "issue", "year", "policy", "action_key",
+                    "pre_issue_bankroll_yuan", "requested_stake_yuan",
+                    "funded_stake_yuan", "gross_payout_yuan",
+                    "post_issue_bankroll_yuan", "net_pnl_yuan",
+                    "decision_trace_json",
+                ],
+                "primary_key": ["split", "policy", "issue"],
+                "domains": {
+                    "split": ["CV_2022", "CV_2023"],
+                    "policy": [
+                        "dynamic_n_fixed_k8_lane", "fixed_n7_dynamic_k",
+                        "dynamic_nk_fixed_generator",
+                    ],
+                },
+                "units": {
+                    "pre_issue_bankroll_yuan": "CNY",
+                    "requested_stake_yuan": "CNY",
+                    "funded_stake_yuan": "CNY",
+                    "gross_payout_yuan": "CNY",
+                    "post_issue_bankroll_yuan": "CNY",
+                    "net_pnl_yuan": "CNY",
+                },
+            },
+            "path_holding_metrics.parquet": {
+                "columns": {
+                    "artifact": "str", "split": "str", "policy": "str",
+                    "ending_capital_yuan": "float",
+                    "max_drawdown_pct": "float",
+                    "turnover_yuan": "float",
+                    "total_net_pnl_yuan": "float",
+                    "max_consecutive_losing_issues": "float",
+                    "time_under_water_issues": "float",
+                    "max_recovery_issues": "float",
+                    "ex_largest_issue_ending_capital_yuan": "float",
+                },
+                "non_null": [
+                    "artifact", "split", "policy", "ending_capital_yuan",
+                    "max_drawdown_pct", "turnover_yuan",
+                    "total_net_pnl_yuan",
+                ],
+                "primary_key": ["artifact"],
+                "domains": {"split": ["CV_2022", "CV_2023"]},
+                "units": {
+                    "ending_capital_yuan": "CNY",
+                    "turnover_yuan": "CNY",
+                    "total_net_pnl_yuan": "CNY",
+                    "max_drawdown_pct": "fraction of running peak",
+                },
             },
             "label_surface_fit.parquet": {
                 "split": "str", "issue": "str", "year": "int",
@@ -699,21 +1202,103 @@ def _write_schema(output: Path) -> None:
                 "funded_yuan": "float",
             },
             "ticket_economics.parquet": {
-                "split": "str", "issue": "str", "n": "int", "k": "int",
-                "lane": "str", "seed": "int",
-                "ticket_identity": "str", "match_indices": "str",
-                "outcomes": "str", "realized_hit": "bool",
-                "pre_tax_gross_multiple": "float", "payout_yuan": "float",
+                "columns": {
+                    "split": "str", "issue": "str", "n": "int", "k": "int",
+                    "lane": "str", "seed": "int", "ticket_position": "int",
+                    "ticket_identity": "str", "match_indices": "str",
+                    "outcomes": "str", "realized_hit": "bool",
+                    "pre_tax_gross_multiple": "float", "payout_yuan": "float",
+                },
+                "non_null": [
+                    "split", "issue", "n", "k", "lane", "seed",
+                    "ticket_position", "ticket_identity", "match_indices",
+                    "outcomes", "realized_hit", "pre_tax_gross_multiple",
+                    "payout_yuan",
+                ],
+                "primary_key": [
+                    "split", "issue", "n", "k", "lane", "seed",
+                    "ticket_position",
+                ],
+                "domains": {
+                    "split": ["CV_2022", "CV_2023"],
+                    "n": [4, 5, 6, 7, 8, 9, 10],
+                    "k": [8, 16, 32],
+                    "lane": ["MARKET_WR", "MARKET_WOR", "VALUE_WOR", "LEARNED_MLP"],
+                },
+                "units": {
+                    "pre_tax_gross_multiple": "gross multiple including one 0.65 payout coefficient",
+                    "payout_yuan": "CNY for one native ¥2 ticket",
+                },
             },
             "incumbent_paths.parquet": {
-                "split": "str", "issue": "str", "year": "int",
-                "pre_issue_bankroll_yuan": "float",
-                "funded_stake_yuan": "float",
-                "gross_payout_yuan": "float",
-                "post_issue_bankroll_yuan": "float",
-                "source": "str",
+                "columns": {
+                    "split": "str", "issue": "str", "year": "int",
+                    "pre_issue_bankroll_yuan": "float",
+                    "funded_stake_yuan": "float",
+                    "gross_payout_yuan": "float",
+                    "post_issue_bankroll_yuan": "float",
+                    "source": "str",
+                },
+                "non_null": [
+                    "split", "issue", "year", "pre_issue_bankroll_yuan",
+                    "funded_stake_yuan", "gross_payout_yuan",
+                    "post_issue_bankroll_yuan", "source",
+                ],
+                "primary_key": ["split", "issue"],
+                "domains": {
+                    "split": ["CV_2021", "CV_2022", "CV_2023"],
+                    "source": ["RECONSTRUCTED_CORRECTED_ECONOMICS"],
+                },
+                "units": {
+                    "pre_issue_bankroll_yuan": "CNY",
+                    "funded_stake_yuan": "CNY",
+                    "gross_payout_yuan": "CNY",
+                    "post_issue_bankroll_yuan": "CNY",
+                },
             },
         },
+        "json_artifacts": {
+            "handoff_209.json": {
+                "required_keys": [
+                    "handoff_version", "fit_boundary.train_through",
+                    "fit_boundary.2024_opened", "candidate", "fallback",
+                    "model", "model_file", "contract_version",
+                    "package_manifest", "label_blind_replay",
+                ],
+            },
+            "decision.json": {
+                "required_keys": [
+                    "contract_version", "producer_code_commit",
+                    "req_evidence", "incumbent", "initial_bankroll_yuan",
+                    "payout_semantics",
+                ],
+            },
+            "holdout_mutation_receipt.json": {
+                "required_keys": [
+                    "probe", "mutated_rows", "baseline_signature_sha256",
+                    "mutated_signature_sha256",
+                    "model_weights_scaler_fixed_choice_ood_and_decisions_invariant",
+                ],
+            },
+        },
+        "relationships": [
+            {
+                "name": "capital_conservation",
+                "production_verifier": "verify_capital_accounting",
+            },
+            {
+                "name": "ticket_bundle_n_k",
+                "production_verifier": "verify_nk_semantics",
+            },
+            {
+                "name": "payout_exactly_once",
+                "production_verifier": "verify_payout_economics",
+            },
+            {
+                "name": "handoff_resolves_post_publish",
+                "production_verifier": "verify_handoff_contract",
+            },
+        ],
     }
     _json(output / "schema.json", schema)
 
@@ -744,6 +1329,38 @@ def _environment() -> dict[str, str]:
     }
 
 
+def _git_head() -> str:
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _sha256_json(value: object) -> str:
+    payload = json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    import hashlib
+
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _code_bindings() -> dict[str, str]:
+    paths = [
+        ROOT / "method.yaml",
+        ROOT / "requirements.txt",
+        ROOT / "scripts/run_bj208_policy.py",
+    ]
+    paths.extend(sorted((ROOT / "src/parlay_policy").glob("*.py")))
+    return {
+        path.relative_to(ROOT).as_posix(): sha256_file(path)
+        for path in paths
+    }
+
+
 def verify_package(output: Path) -> list[str]:
     """Full production verifier — used by `verify` command AND tamper suite.
 
@@ -766,18 +1383,38 @@ def verify_package(output: Path) -> list[str]:
     failures.extend(verify_receipt(output))
     # REWORK v3.1 (PI narrow durability): handoff artifact paths must resolve
     # after publication and must never reference the staging directory.
-    failures.extend(verify_handoff_paths(output))
+    failures.extend(verify_handoff_contract(output))
 
     provenance_path = output / "provenance.json"
     if provenance_path.exists():
         provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
         failures.extend(verify_provenance(provenance))
+        failures.extend(verify_code_bindings(provenance, ROOT))
     else:
         failures.append("missing provenance.json")
 
     schema_path = output / "schema.json"
     if not schema_path.exists():
         failures.append("missing schema.json")
+    else:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+        failures.extend(verify_package_schema(output, schema))
+    failures.extend(verify_completion(output))
+    failures.extend(verify_holdout_mutation_receipt(output))
+
+    decision_path = output / "decision.json"
+    if not decision_path.exists():
+        failures.append("missing decision.json")
+    else:
+        decision = json.loads(decision_path.read_text(encoding="utf-8"))
+        failures.extend(verify_req_evidence(decision, output))
+
+    # Foundational package failures do not need the expensive upstream payout
+    # replay.  This also keeps the production tamper suite practical: attacks
+    # on completion/schema/provenance/REQ evidence fail at their controlling
+    # gate instead of rereading the 700k+ ticket settlement surface.
+    if failures:
+        return failures
 
     ledger = pd.read_parquet(output / "issue_capital_ledger.parquet")
     failures.extend(verify_capital_accounting(ledger))
@@ -787,6 +1424,21 @@ def verify_package(output: Path) -> list[str]:
     decisions = pd.read_parquet(output / "decision_rows_all.parquet")
     failures.extend(verify_no_embargoed_split(decisions))
     failures.extend(verify_no_2024_issue(decisions))
+
+    ticket_economics = pd.read_parquet(output / "ticket_economics.parquet")
+    failures.extend(verify_nk_semantics(ticket_economics))
+
+    dynamic_controls = pd.read_parquet(
+        output / "dynamic_control_decisions.parquet"
+    )
+    failures.extend(verify_dynamic_control_decisions(dynamic_controls))
+
+    # Only a package that passes all structural and decision-semantic checks
+    # reaches the independent payout recomputation.  The three payout attacks
+    # therefore still exercise the full 0.65 verifier, while unrelated attacks
+    # fail quickly and deterministically above.
+    if failures:
+        return failures
 
     # REWORK v3: payout-economics production-entry check.
     try:
@@ -837,7 +1489,10 @@ _CONTROL_ACTIONS: dict[str, Any] = {
 
 
 def _run_controls(
-    test_ctx, pool_cache, test_split, train_frames=None,
+    test_ctx, pool_cache, test_split, *,
+    restricted_policies: dict[str, object],
+    ood_scaler,
+    ood_threshold,
     frozen_incumbent: pd.DataFrame | None = None,
     upstream_tickets: pd.DataFrame | None = None,
 ) -> dict[str, pd.DataFrame]:
@@ -849,7 +1504,6 @@ def _run_controls(
     capital_change_identical uses the frozen incumbent CONTROLLING ticket
     identities (identical tickets, only the capital rule changes).
     """
-    from parlay_policy.contract import K_GRID
     from parlay_policy.tickets import (
         select_tickets, settle_tickets, bundle_capital,
         bundle_capital_equal1pct, mean_pairwise_overlap, ticket_hhi,
@@ -860,43 +1514,80 @@ def _run_controls(
     issues = sorted(test_ctx.keys(), key=lambda item: test_ctx[item].panel.year)
     incumbent_key = f"N{INCUMBENT_N}/K{INCUMBENT_K}/{INCUMBENT_LANE}/NATIVE_2_YUAN"
 
-    # Train-fold median lift tables for dynamic controls (label-blind choice).
-    dynamic_n_rank: dict[int, float] = {}
-    dynamic_k_rank: dict[int, float] = {}
-    dynamic_nk_rank: dict[tuple[int, int], float] = {}
-    if train_frames is not None and not train_frames.empty:
-        for (n, k, lane, capital), group in train_frames.groupby(
-            ["n", "k", "lane", "capital"]
-        ):
-            if lane == "MARKET_WOR" and capital == "NATIVE_2_YUAN":
-                dynamic_nk_rank[(int(n), int(k))] = float(group["y_lift"].median())
-                if int(k) == 8:
-                    dynamic_n_rank[int(n)] = float(group["y_lift"].median())
-                if int(n) == 7:
-                    dynamic_k_rank[int(k)] = float(group["y_lift"].median())
-
     for name, action_fn in _CONTROL_ACTIONS.items():
         rows: list[dict[str, object]] = []
         bankroll = INITIAL_BANKROLL_YUAN
         for (split, issue) in issues:
             ctx = test_ctx[(split, issue)]
             m = len(ctx.panel.match_idx)
-            if name == "dynamic_n_fixed_k8_lane" and dynamic_n_rank:
-                eligible = {n: v for n, v in dynamic_n_rank.items() if n <= m}
-                best_n = max(eligible, key=eligible.get) if eligible else 7
-                action = _action(best_n, 8, "MARKET_WOR", "NATIVE_2_YUAN")
-            elif name == "fixed_n7_dynamic_k" and dynamic_k_rank:
-                best_k = max(dynamic_k_rank, key=dynamic_k_rank.get)
-                action = _action(7, best_k, "MARKET_WOR", "NATIVE_2_YUAN")
-            elif name == "dynamic_nk_fixed_generator" and dynamic_nk_rank:
-                eligible = {
-                    (n, k): v for (n, k), v in dynamic_nk_rank.items()
-                    if n <= m
+            trace: dict[str, object]
+            if name in restricted_policies:
+                state = _state_with_bankroll(ctx, bankroll)
+                if name == "dynamic_n_fixed_k8_lane":
+                    actions = [
+                        _action(n, 8, "MARKET_WOR", "NATIVE_2_YUAN")
+                        for n in N_GRID if n <= m
+                    ]
+                elif name == "fixed_n7_dynamic_k":
+                    actions = [
+                        _action(7, k, "MARKET_WOR", "NATIVE_2_YUAN")
+                        for k in K_GRID if 7 <= m
+                    ]
+                else:
+                    actions = [
+                        _action(n, k, "MARKET_WOR", "NATIVE_2_YUAN")
+                        for n in N_GRID if n <= m for k in K_GRID
+                    ]
+                actions = [
+                    action for action in actions
+                    if is_action_fundable(action, state)
+                ]
+                action, trace = choose_action(
+                    restricted_policies[name],
+                    state,
+                    actions,
+                    ood_scaler=ood_scaler,
+                    ood_threshold=ood_threshold,
+                    conservative=False,
+                )
+                trace = {
+                    **trace,
+                    "control_semantics": "PER_ISSUE_CAUSAL_STATE_CONDITIONED",
+                    "restricted_control": name,
                 }
-                best_cell = max(eligible, key=eligible.get) if eligible else (7, 8)
-                action = _action(best_cell[0], best_cell[1], "MARKET_WOR", "NATIVE_2_YUAN")
             else:
                 action = action_fn(ctx)
+                trace = {
+                    "control_semantics": "FIXED_OR_MATCHED_CONTROL",
+                    "restricted_control": None,
+                }
+            if action is None:
+                rows.append(
+                    {
+                        "split": split,
+                        "issue": issue,
+                        "year": ctx.panel.year,
+                        "policy": name,
+                        "action_key": NO_BET_KEY,
+                        "n": None,
+                        "k": None,
+                        "lane": None,
+                        "capital": None,
+                        "pre_issue_bankroll_yuan": bankroll,
+                        "requested_stake_yuan": 0.0,
+                        "funded_stake_yuan": 0.0,
+                        "gross_payout_yuan": 0.0,
+                        "post_issue_bankroll_yuan": bankroll,
+                        "net_pnl_yuan": 0.0,
+                        "drawdown_pct": 0.0,
+                        "mean_pairwise_overlap": 0.0,
+                        "ticket_hhi": 0.0,
+                        "repeat_exposure": 0.0,
+                        "decision_trace_json": json.dumps(trace, ensure_ascii=False),
+                        "source": "NO_BET",
+                    }
+                )
+                continue
             pool = pool_cache.get(f"{issue}:{action.n}")
             # Exact frozen incumbent binding for the incumbent arm.
             if (
@@ -913,7 +1604,7 @@ def _run_controls(
                     row = frozen_row.iloc[0]
                     payout = float(row["gross_payout_yuan"])
                     funded = float(row["funded_stake_yuan"])
-                    new_bankroll = float(row["post_issue_bankroll_yuan"])
+                    new_bankroll = apply_issue_settlement(bankroll, funded, payout)
                     rows.append(
                         {
                             "split": split,
@@ -926,11 +1617,16 @@ def _run_controls(
                             "lane": action.lane,
                             "capital": action.capital,
                             "pre_issue_bankroll_yuan": bankroll,
+                            "requested_stake_yuan": funded,
                             "funded_stake_yuan": funded,
                             "gross_payout_yuan": payout,
                             "post_issue_bankroll_yuan": new_bankroll,
                             "net_pnl_yuan": float(new_bankroll - bankroll),
                             "drawdown_pct": 0.0,
+                            "mean_pairwise_overlap": float("nan"),
+                            "ticket_hhi": float("nan"),
+                            "repeat_exposure": float("nan"),
+                            "decision_trace_json": json.dumps(trace, ensure_ascii=False),
                             "source": "FROZEN_INCUMBENT_207",
                         }
                     )
@@ -949,11 +1645,16 @@ def _run_controls(
                         "lane": action.lane,
                         "capital": action.capital,
                         "pre_issue_bankroll_yuan": bankroll,
+                        "requested_stake_yuan": 0.0,
                         "funded_stake_yuan": 0.0,
                         "gross_payout_yuan": 0.0,
                         "post_issue_bankroll_yuan": bankroll,
                         "net_pnl_yuan": 0.0,
                         "drawdown_pct": 0.0,
+                        "mean_pairwise_overlap": 0.0,
+                        "ticket_hhi": 0.0,
+                        "repeat_exposure": 0.0,
+                        "decision_trace_json": json.dumps(trace, ensure_ascii=False),
                     }
                 )
                 continue
@@ -968,7 +1669,7 @@ def _run_controls(
                     cap = bundle_capital_equal1pct(frozen_tickets, bankroll)
                     funded = float(cap["funded_stake_yuan"])
                     payout = float(cap["gross_payout_yuan"])
-                    new_bankroll = bankroll - funded + payout
+                    new_bankroll = apply_issue_settlement(bankroll, funded, payout)
                     rows.append(
                         {
                             "split": split,
@@ -981,11 +1682,16 @@ def _run_controls(
                             "lane": action.lane,
                             "capital": action.capital,
                             "pre_issue_bankroll_yuan": bankroll,
+                            "requested_stake_yuan": bankroll * 0.01,
                             "funded_stake_yuan": funded,
                             "gross_payout_yuan": payout,
                             "post_issue_bankroll_yuan": new_bankroll,
                             "net_pnl_yuan": float(new_bankroll - bankroll),
                             "drawdown_pct": 0.0,
+                            "mean_pairwise_overlap": mean_pairwise_overlap(frozen_tickets),
+                            "ticket_hhi": ticket_hhi(frozen_tickets),
+                            "repeat_exposure": repeat_exposure(frozen_tickets),
+                            "decision_trace_json": json.dumps(trace, ensure_ascii=False),
                             "source": "IDENTICAL_TICKETS_207",
                         }
                     )
@@ -995,6 +1701,9 @@ def _run_controls(
             if action.lane in ("MARKET_WR", "MARKET_WOR"):
                 funded_list: list[float] = []
                 payout_list: list[float] = []
+                overlap_list: list[float] = []
+                hhi_list: list[float] = []
+                repeat_list: list[float] = []
                 for seed in ALL_SEEDS:
                     sel = select_tickets(pool, action.lane, action.k, seed=seed)
                     settled = settle_tickets(sel)
@@ -1004,8 +1713,14 @@ def _run_controls(
                         cap = bundle_capital(settled, bankroll)
                     funded_list.append(float(cap["funded_stake_yuan"]))
                     payout_list.append(float(cap["gross_payout_yuan"]))
+                    overlap_list.append(mean_pairwise_overlap(sel))
+                    hhi_list.append(ticket_hhi(sel))
+                    repeat_list.append(repeat_exposure(sel))
                 funded = float(np.mean(funded_list))
                 payout = float(np.mean(payout_list))
+                overlap = float(np.mean(overlap_list))
+                hhi = float(np.mean(hhi_list))
+                repeat = float(np.mean(repeat_list))
             else:
                 sel = select_tickets(pool, action.lane, action.k, seed=0)
                 settled = settle_tickets(sel)
@@ -1015,7 +1730,15 @@ def _run_controls(
                     cap = bundle_capital(settled, bankroll)
                 funded = float(cap["funded_stake_yuan"])
                 payout = float(cap["gross_payout_yuan"])
-            new_bankroll = bankroll - funded + payout
+                overlap = mean_pairwise_overlap(sel)
+                hhi = ticket_hhi(sel)
+                repeat = repeat_exposure(sel)
+            new_bankroll = apply_issue_settlement(bankroll, funded, payout)
+            requested = (
+                bankroll * 0.01
+                if action.capital == "SIMPLE_ACTIVE"
+                else action.k * 2.0
+            )
             rows.append(
                 {
                     "split": split,
@@ -1028,11 +1751,16 @@ def _run_controls(
                     "lane": action.lane,
                     "capital": action.capital,
                     "pre_issue_bankroll_yuan": bankroll,
+                    "requested_stake_yuan": float(requested),
                     "funded_stake_yuan": funded,
                     "gross_payout_yuan": payout,
                     "post_issue_bankroll_yuan": new_bankroll,
                     "net_pnl_yuan": float(new_bankroll - bankroll),
                     "drawdown_pct": 0.0,
+                    "mean_pairwise_overlap": overlap,
+                    "ticket_hhi": hhi,
+                    "repeat_exposure": repeat,
+                    "decision_trace_json": json.dumps(trace, ensure_ascii=False),
                 }
             )
             bankroll = new_bankroll
@@ -1087,8 +1815,9 @@ def _run_policy_controls(
         actions = _actions_for_issue(ctx)
         if not actions:
             return None, {"fallback": "NO_BET", "reason": "NO_LAWFUL_ACTION"}
+        state = _state_with_bankroll(ctx, bankroll)
         action, trace = choose_action(
-            policy_ridge, ctx.state, actions,
+            policy_ridge, state, actions,
             ood_scaler=ood_scaler, ood_threshold=ood_threshold,
         )
         if action is None or not trace["safety_gate_pass"]:
@@ -1103,8 +1832,9 @@ def _run_policy_controls(
         actions = _actions_for_issue(ctx)
         if not actions:
             return None, {"fallback": "NO_BET", "reason": "NO_LAWFUL_ACTION"}
+        state = _state_with_bankroll(ctx, bankroll)
         action, trace = choose_action(
-            policy_fixed, ctx.state, actions,
+            policy_fixed, state, actions,
             ood_scaler=None, ood_threshold=None,
         )
         if action is None:
@@ -1228,7 +1958,6 @@ def _apply_selection_rule(
         default=float("nan"),
     ))
     if eligible:
-        best_fold = matched_df.sort_values("matched_lift", ascending=False).iloc[0]
         if not all_test.empty:
             freq = (
                 all_test[all_test["split"] == TERMINAL_SPLIT]["action_key"]
@@ -1293,7 +2022,7 @@ def _build_handoff(
     fold2_model = fold_results.get("fold2", {}).get("policy_mlp", {})
     published = published_output or output
     return {
-        "handoff_version": "bj208-handoff-for-209-v3.1",
+        "handoff_version": "bj208-handoff-for-209-v4",
         "fit_boundary": {
             "train_through": "2022",
             "test_2023": True,
@@ -1352,4 +2081,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

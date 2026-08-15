@@ -37,8 +37,8 @@ from dataclasses import asdict, dataclass
 from hashlib import sha256
 from typing import Final
 
-CONTRACT_VERSION: Final = "bj208-dynamic-nk-policy-v3"
-PROTOCOL_VERSION: Final = "bj208-protocol-v3"
+CONTRACT_VERSION: Final = "bj208-dynamic-nk-policy-v4"
+PROTOCOL_VERSION: Final = "bj208-protocol-v4"
 UPSTREAM_207_SHA: Final = (
     "90869a959dc1b972cd872ffe465d1009e29df75e"
 )

@@ -300,3 +300,39 @@ model class, selection rule and scientific conclusion are unchanged.
 - method.yaml preprocessing constraint now matches the v3 implementation.
 - Tests: `tests/test_bj208_handoff_paths.py` (handoff path resolution +
   `.staging` rejection at the production entry).
+
+---
+
+## 16. PI takeover v4 supersede rows (2026-08-15, EV REJECT e5bb257)
+
+The independent audit at exact PR #230 HEAD
+`e5bb2578710d4f57031bd2180c6a691570524356` accepted the D1 pre-pool
+exclusion, canonical handoff path and corrected 0.65 payout semantics. It
+rejected the remaining executable-method defects D2–D6. At the user's direct
+instruction, the PI took over this bounded rework without changing the model
+family, action catalog or selection rule.
+
+| Row | Action | Scope | Supersedes | Rationale |
+|---|---|---|---|---|
+| #208-14 | supersede | dynamic N, dynamic K and dynamic N×K attribution controls are separately fitted restricted MLP policies and score every lawful action per issue from causal pre-event state plus that policy path's live prior bankroll | v3.1 global train-fold median cells | EV D2: a repeated global winner is a fixed-action control and cannot identify dynamic policy value. |
+| #208-15 | supersede | frozen incumbent fallback preserves ticket identities/economics but applies funded stake and payout to the actual current bankroll; it never copies an absolute frozen post-bankroll | v3.1 absolute post-bankroll fallback | EV D3: copying the frozen post value after a learned loss injected capital and violated path continuity. |
+| #208-16 | supersede | lane-specific fundability: native requires `K × ¥2`; SIMPLE_ACTIVE requires at least one integer ¥2 unit from a 1% request, hence minimum current bankroll ¥200 | common `K × ¥2` test for both lanes | EV D3: SIMPLE_ACTIVE could be selected at bankroll ¥100 despite an unfundable ¥1 request. |
+| #208-17 | supersede | max drawdown includes time-zero ¥100,000; loss means net P&L < 0; rolling 5/10/20 metrics use net-P&L windows; issue holding, recovery, concentration, overlap, repeat and ex-largest diagnostics are materialized in `path_holding_metrics.parquet` | v3.1 gross-payout loss/window semantics and report-only metrics | EV D4: a small gross return can still lose money, and the committed evidence must reflect investor holding feasibility. |
+| #208-18 | supersede | holdout probe performs two real production-path terminal-fold refits after a domain-preserving `LOCKED_TEST` label/SP mutation and compares MLP/ranker weights, scalers, fixed action, OOD threshold and live-path earlier decisions | census-only mutation comparison | EV D5: split filtering alone did not demonstrate fitted-state invariance. |
+| #208-19 | supersede | production verification invokes completion, rich decision/capital/#209 schema, REQ evidence paths, N/K bundle semantics, dynamic-control semantics, capital, payout and handoff checks; provenance binds producer code commit, method, requirements lock, runner and package modules | existence-only schema and partial verifier | EV D5: remanifested semantic corruption previously passed. Exact final PR HEAD remains necessarily external in the producer handoff and independent EV verdict. |
+| #208-20 | supersede | unique staging package; last-good output retained until post-publication verification; failed second rename or final verification restores last-good; `BaseException` cleanup and immediate retry are tested | delete-backup-before-second-rename publisher | EV D6: a replacement fault could destroy the only complete package. |
+
+### PI takeover v4 proportional boundary
+
+- D1 remains closed: all 594 zero-realized development matches also have all
+  control probabilities missing and are excluded before candidate pools and
+  action targets; retained zero-realized matches remain zero.
+- The model family, N/K/lane/capital catalog, 16-seed aggregation, selection
+  rule, corrected 0.65 coefficient and terminal scientific question are
+  unchanged. Output changes are attributable only to D2–D4 corrections.
+- Decision-critical frames carry columns, types, non-null fields, keys,
+  domains and units. Auxiliary diagnostic tables remain manifest-bound under
+  the Issue's proportional schema allowance.
+- Producer evidence records REQ-208-01..09 paths and the producer code commit.
+  The exact final review HEAD is posted externally because a Git commit cannot
+  contain its own hash; independent EV must bind that full 40-character HEAD.

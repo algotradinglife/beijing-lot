@@ -22,7 +22,6 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from parlay_policy.contract import (  # noqa: E402
     CONTRACT_VERSION,
-    INITIAL_BANKROLL_YUAN,
     UPSTREAM_207_MANIFEST_SHA256,
     UPSTREAM_207_SHA,
     VALUE_MATRIX_SHA256,
@@ -32,7 +31,8 @@ from parlay_policy.verify import (  # noqa: E402
     sha256_file,
     verify_capital_accounting,
     verify_manifest,
-    verify_nk_semantics,
+    verify_holdout_mutation_receipt,
+    verify_package_schema,
     verify_provenance,
     verify_receipt,
 )
@@ -68,7 +68,6 @@ def package(tmp_path: Path) -> Path:
         "label_boundary": "CV_2021 fit; CV_2022/CV_2023 development; 2024 embargoed",
     }
     _write_json(tmp_path / "provenance.json", provenance)
-    method_hash = "a" * 64
     (tmp_path / "method.yaml").write_text("protocol_version: test\n", encoding="utf-8")
     (tmp_path / "receipt.sha256").write_text(
         f"{sha256_file(tmp_path / 'method.yaml')}  method.yaml\n", encoding="utf-8"
@@ -184,12 +183,12 @@ def test_outcome_triple_multiple_realized():
         _validate_outcome_triples(rows, "22011")
 
 
-def test_2024_mutation_invariance_real():
-    """REQ-208-03 REAL check: mutating 2024 labels changes no fitted parameter.
+def test_2024_mutation_does_not_change_development_panel_surface():
+    """Light regression for split isolation at the panel-construction layer.
 
-    Uses the production fit path (build_panels + a summary hash of the fitted
-    MLP on development folds).  2024 rows are LOCKED_TEST and are dropped by
-    the census loader before any fit, so a mutation must not change output.
+    The actual model/ranker/scaler/OOD/decision refit probe is executed by the
+    production runner and verified from ``holdout_mutation_receipt.json``.
+    This unit test intentionally checks the earlier data boundary only.
     """
     from parlay_policy.census import build_panels, load_value_matrix
     from parlay_policy.contract import FIT_SPLIT
@@ -239,3 +238,46 @@ def test_2024_mutation_invariance_real():
             if split == FIT_SPLIT
         )
         assert baseline == after, "2024 mutation changed development panel surface"
+
+
+def test_holdout_receipt_requires_actual_refit_invariance(tmp_path: Path):
+    receipt = {
+        "probe": "ACTUAL_TERMINAL_FOLD_REFIT_AFTER_LOCKED_TEST_LABEL_MUTATION",
+        "mutated_rows": 3,
+        "baseline_signature_sha256": "a" * 64,
+        "mutated_signature_sha256": "b" * 64,
+        "model_weights_scaler_fixed_choice_ood_and_decisions_invariant": False,
+    }
+    _write_json(tmp_path / "holdout_mutation_receipt.json", receipt)
+    failures = verify_holdout_mutation_receipt(tmp_path)
+    assert any("changed fitted signature" in failure for failure in failures)
+
+
+def test_rich_schema_rejects_duplicate_decision_key(tmp_path: Path):
+    frame = pd.DataFrame(
+        {
+            "split": ["CV_2023", "CV_2023"],
+            "issue": ["23001", "23001"],
+            "amount": [2.0, 4.0],
+        }
+    )
+    frame.to_parquet(tmp_path / "critical.parquet", index=False)
+    schema = {
+        "frames": {
+            "critical.parquet": {
+                "columns": {"split": "str", "issue": "str", "amount": "float"},
+                "non_null": ["split", "issue", "amount"],
+                "primary_key": ["split", "issue"],
+                "domains": {"split": ["CV_2023"]},
+                "units": {"amount": "CNY"},
+            }
+        },
+        "relationships": [
+            {"name": "capital_conservation", "production_verifier": "v"},
+            {"name": "ticket_bundle_n_k", "production_verifier": "v"},
+            {"name": "payout_exactly_once", "production_verifier": "v"},
+            {"name": "handoff_resolves_post_publish", "production_verifier": "v"},
+        ],
+    }
+    failures = verify_package_schema(tmp_path, schema)
+    assert any("duplicate primary key" in failure for failure in failures)

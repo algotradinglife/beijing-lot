@@ -17,7 +17,6 @@ verify_package path) for the three failure modes named by PI:
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -34,14 +33,11 @@ from parlay_policy.contract import (  # noqa: E402
 )
 from parlay_policy.census import (  # noqa: E402
     IssuePanel,
-    build_panels,
-    load_value_matrix,
 )
 from parlay_policy.incumbent import build_incumbent_paths  # noqa: E402
 from parlay_policy.tickets import (  # noqa: E402
     _rows_to_frame,
     _ticket_row,
-    generate_candidate_pool,
     settle_tickets,
 )
 from parlay_policy.verify import (  # noqa: E402
