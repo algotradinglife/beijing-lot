@@ -96,14 +96,13 @@ def run(nb_path: Path = NOTEBOOK, timeout: int = 1800) -> Path:
         resources={"metadata": {"path": str(ROOT)}},
     )
     client.execute()
-    notebook.metadata["executed_at_utc"] = time.strftime(
-        "%Y-%m-%dT%H:%M:%SZ", time.gmtime()
-    )
-    notebook.metadata["execution_wall_seconds"] = round(time.time() - started, 1)
+    # NO timestamp metadata: executed_at_utc / execution_wall_seconds would
+    # make every replay's notebook byte-different (and therefore MANIFEST
+    # notebook_hash + SHA256SUMS too).  Cell outputs are deterministic.
     content = nbformat.writes(notebook)
     atomic_write_text(nb_path, content)
     finalize_manifest_binding(ROOT)
-    print(f"EXECUTED {nb_path} in {notebook.metadata['execution_wall_seconds']}s")
+    print(f"EXECUTED {nb_path}")
     return nb_path
 
 

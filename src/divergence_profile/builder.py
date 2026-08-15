@@ -741,7 +741,13 @@ def _write_staging(receipt: BuildReceipt, target: Path) -> None:
 
 
 def _build_manifest(receipt: BuildReceipt, cells: pd.DataFrame) -> dict:
-    """Manifest with exact reviewed-SHA binding (REQ-D09)."""
+    """Manifest with exact reviewed-SHA binding (REQ-D09).
+
+    ``built_at_utc`` is derived from the reviewed commit's committer date so
+    a clean replay at the same reviewed SHA produces a byte-identical
+    MANIFEST (the audited package used datetime.now(), which made every
+    replay byte-different).
+    """
     root = receipt.root.resolve()
     commit = _git_head(root)
     code_hash = _dir_hash(root / "src" / "divergence_profile")
@@ -759,7 +765,7 @@ def _build_manifest(receipt: BuildReceipt, cells: pd.DataFrame) -> dict:
         "code_hash": code_hash,
         "notebook_hash": notebook_hash,
         "requirements_hash": requirements_hash,
-        "built_at_utc": datetime.now(timezone.utc).isoformat(),
+        "built_at_utc": _commit_date(root, commit) or datetime.now(timezone.utc).isoformat(),
         "disposition": receipt.disposition,
         "cell_count": len(cells),
         "issue_count": int(cells["issue"].nunique()),
@@ -775,6 +781,22 @@ def _build_manifest(receipt: BuildReceipt, cells: pd.DataFrame) -> dict:
         "source_hashes": receipt.source_hashes,
         "environment": _environment(),
     }
+
+
+def _commit_date(root: Path, commit: str) -> str | None:
+    """Committer ISO date of ``commit`` (deterministic replay anchor)."""
+    try:
+        result = __import__("subprocess").run(
+            ["git", "-C", str(root), "show", "-s", "--format=%cI", commit],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip() or None
+    except Exception:  # noqa: BLE001
+        pass
+    return None
 
 
 def _git_head(root: Path) -> str:
