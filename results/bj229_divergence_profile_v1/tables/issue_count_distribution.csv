@@ -1,0 +1,3 @@
+cohort,issues,min,median,max,mean
+development,342,11,313.5,680,295.96783625730995
+heldout,2,476,512.0,548,512.0

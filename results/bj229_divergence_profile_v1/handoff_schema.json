@@ -1,0 +1,602 @@
+{
+  "package": "bj229_divergence_profile_v1",
+  "schema_version": "1.0",
+  "primary_key": "cell_key",
+  "identity_keys": [
+    "issue",
+    "match_idx",
+    "outcome_code"
+  ],
+  "relationship": {
+    "inference_cells": "cell_key = issue:match_idx:outcome_code",
+    "development_labels": "cell_join_key (issue:match:outcome) -> inference cell_key",
+    "feature_dictionary": "feature name -> inference_cells column"
+  },
+  "columns": [
+    {
+      "name": "cell_key",
+      "dtype": "str",
+      "nullable": false,
+      "domain": "",
+      "key_role": "primary_key",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "issue",
+      "dtype": "str",
+      "nullable": false,
+      "domain": "",
+      "key_role": "identity_key",
+      "source": "derived_or_identity",
+      "admissible_use": "development-label"
+    },
+    {
+      "name": "issue_instance",
+      "dtype": "str",
+      "nullable": false,
+      "domain": "",
+      "key_role": "foreign_key",
+      "source": "derived_or_identity",
+      "admissible_use": "development-label"
+    },
+    {
+      "name": "year",
+      "dtype": "int64",
+      "nullable": false,
+      "domain": "",
+      "key_role": "foreign_key",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "issue_order",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "match_idx",
+      "dtype": "int64",
+      "nullable": false,
+      "domain": "",
+      "key_role": "identity_key",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "outcome_code",
+      "dtype": "str",
+      "nullable": false,
+      "domain": "3|1|0",
+      "key_role": "identity_key",
+      "source": "derived_or_identity",
+      "admissible_use": "development-label"
+    },
+    {
+      "name": "role",
+      "dtype": "str",
+      "nullable": false,
+      "domain": "DEVELOPMENT_CV|RETROSPECTIVE_TEST_LOCKED",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "source_grade",
+      "dtype": "str",
+      "nullable": false,
+      "domain": "RETROSPECTIVE_PROXY_PCLOSE|RETROSPECTIVE_PROXY",
+      "key_role": "",
+      "source": "bj204_gate_a_preoutcome_v5",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "market_probability",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj204_gate_a_preoutcome_v5",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "native_handicap_line",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "source_is_pclose",
+      "dtype": "float64",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "source_is_average_eu",
+      "dtype": "float64",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "market_proxy_complete",
+      "dtype": "float64",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "bj204_gate_a_preoutcome_v5",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "predicted_final_sp_input",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj204_gate_a_preoutcome_v5",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "cohort",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "development|test|heldout",
+      "key_role": "foreign_key",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "feature_cutoff_ts_utc",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj203_causal_tensor_v2",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "kickoff_ts_utc",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj203_causal_tensor_v2",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "identity_observed_ts_utc",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj203_causal_tensor_v2",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "euro_1h_available_ts_utc",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj203_causal_tensor_v2",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "predicted_sp_available_ts_utc",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj203_causal_tensor_v2",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "identity_timing_status",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "CUTOFF_BOUND_IDENTITY|RETROSPECTIVE_IDENTITY_ONLY|TIMESTAMPED_IDENTITY_ONLY",
+      "key_role": "",
+      "source": "bj203_causal_tensor_v2",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "availability_status",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "AVAILABLE|UNAVAILABLE",
+      "key_role": "",
+      "source": "bj203_causal_tensor_v2",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "devig_euro_probability",
+      "dtype": "float32",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj203_causal_tensor_v2",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "market_uncertainty",
+      "dtype": "float32",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj204_gate_a_preoutcome_v5",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "_mask_market_probability",
+      "dtype": "bool",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_BJ_CALIBRATED",
+      "dtype": "object",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj204_gate_a_preoutcome_v5",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "BJ_LINE_BOUNDARY",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj204_gate_a_preoutcome_v5",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "qbj_source_identity",
+      "dtype": "str",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_BJ_SP_DEVIG",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj214_decision_epoch_tensor_v1",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_BJ_SP_DEVIG_observed_at_utc",
+      "dtype": "datetime64[us, UTC]",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj214_decision_epoch_tensor_v1",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "sp_source_identity",
+      "dtype": "str",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_EU_RAW_1X2",
+      "dtype": "object",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj203_devig_euro_probability (+ explicit Poisson translation)",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_EU_RAW_1X2_observed_at_utc",
+      "dtype": "datetime64[us, UTC]",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "eu_source_identity",
+      "dtype": "str",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_EU_BJLINE",
+      "dtype": "object",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj203_devig_euro_probability (+ explicit Poisson translation)",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "eu_bjline_reason",
+      "dtype": "object",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_EU_BJLINE_observed_at_utc",
+      "dtype": "datetime64[us, UTC]",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "P_POWER_BJLINE",
+      "dtype": "object",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj180_gate_a_preoutcome_v2",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "P_POWER_BJLINE_observed_at_utc",
+      "dtype": "datetime64[us, UTC]",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "power_source_identity",
+      "dtype": "str",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_eu_minus_qbj",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_power_minus_qbj",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_eu_logratio",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_power_logratio",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_eu_logodds",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_power_logodds",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_eu_direction",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_power_direction",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_magnitude",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_eu_power_agreement",
+      "dtype": "object",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_eu_uncertainty_std",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "divergence_power_uncertainty_std",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "leg_q_times_sp_pre",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "leg_logq_plus_logsp",
+      "dtype": "float64",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_BJ_SP_DEVIG_available",
+      "dtype": "bool",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "bj214_decision_epoch_tensor_v1",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_BJ_SP_DEVIG_unavailable_reason",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "bj214_decision_epoch_tensor_v1",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_BJ_CALIBRATED_available",
+      "dtype": "bool",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_BJ_CALIBRATED_unavailable_reason",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_EU_RAW_1X2_available",
+      "dtype": "bool",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_EU_RAW_1X2_unavailable_reason",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_EU_BJLINE_available",
+      "dtype": "bool",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "Q_EU_BJLINE_unavailable_reason",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "P_POWER_BJLINE_available",
+      "dtype": "bool",
+      "nullable": false,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    },
+    {
+      "name": "P_POWER_BJLINE_unavailable_reason",
+      "dtype": "str",
+      "nullable": true,
+      "domain": "",
+      "key_role": "",
+      "source": "derived_or_identity",
+      "admissible_use": "inference"
+    }
+  ]
+}

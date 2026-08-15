@@ -1,0 +1,7 @@
+divergence_eu_direction,divergence_power_direction,cells,table,divergence_eu_power_agreement
+-1.0,-1.0,13,direction_matrix,
+-1.0,1.0,6,direction_matrix,
+1.0,-1.0,8,direction_matrix,
+1.0,1.0,12,direction_matrix,
+,,25,agreement,AGREE
+,,14,agreement,CONFLICT
