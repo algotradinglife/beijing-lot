@@ -32,7 +32,7 @@
       "test_split": "CV_2023"
     }
   ],
-  "max_drawdown_pct": 0.009121459433509362,
+  "max_drawdown_pct": 0.00928,
   "median_matched_lift_yuan": 0.0,
   "positive_fold_count": 0,
   "rule1_valid_replay_complete_support_no_ruin": true,

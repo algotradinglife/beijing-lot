@@ -1,9 +1,10 @@
 # Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier
 
-REWORK v3 at HEAD (PI adversarial review of SHA `5e45132` fixed; supersedes
-EV REJECT of `53f67ec` and the v2 delivery). Contract BJ-UNIFIED-DYNAMIC-N-001
-/ v3. Research and paper settlement only. No betting, release, or frontend
-authority follows from this result.
+PI takeover v4, generated from producer-code commit
+`3be8290292482e11db397dacd2b3fbb25026055e` after the independent EV REJECT of
+PR #230 SHA `e5bb2578710d4f57031bd2180c6a691570524356`. Contract
+BJ-UNIFIED-DYNAMIC-N-001 / v4. Research and paper settlement only. No betting,
+release, or frontend authority follows from this result.
 
 ## Payout economics (PI correction 2026-08-15)
 
@@ -55,10 +56,13 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
   (prediction − 1× train-fold residual RMSE) is positive AND coverage/OOD/
   fundability checks pass; otherwise fall back to the frozen incumbent or
   explicit NO_BET.
-- 2024 calendar year and 2025/2026 LOCKED_TEST outcomes are embargoed; a REAL
-  verifier mutates 2024 labels and asserts zero fitted-parameter change.
+- 2024 calendar year and 2025/2026 LOCKED_TEST outcomes are embargoed. The
+  frozen value matrix contains no calendar-2024 rows, so the executable probe
+  mutates all 50,970 available `LOCKED_TEST` rows and performs two actual
+  terminal-fold refits. MLP/ranker weights, scalers, fixed action, OOD
+  threshold and earlier live-path decisions remain byte-signature identical.
 
-## Terminal decisions (REWORK v3)
+## Terminal decisions (PI takeover v4)
 
 - `ELIGIBLE_CANDIDATE=false`: the safety-gated learned policy passes the
   preregistered gate on 0 of 113 test issues, so the gated path equals the
@@ -73,24 +77,26 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
   conclusion (no eligible learned row) is unchanged, but every matched lift,
   control path, safety gate and risk metric was regenerated under the corrected
   economics.
-- The Q model has signal: calibration is monotone (predicted best-lift bins
-  −6.6 → 260.9 realized 2,215 → 17,333), the chronological validation RMSE is
-  lower than fit RMSE, and changing only pre-event state changes the selected
-  action. The ungated model prefers short parlays (N=4) and the LEARNED_MLP
-  lane, but the conservative gate vetoes every execution — consistent with
-  #207's finding that learned allocation does not automatically establish Edge.
+- The Q model shows a coarse ranking tendency, not calibrated actionable
+  signal. Predicted best-lift bins rise from −6.6 to 260.9 while realized bin
+  means are 2,215 / 1,594 / 7,388 / 5,092 / 17,333: the highest bin is strongest,
+  but adjacent bins are not monotone and the scales are badly mismatched.
+  Chronological validation RMSE (1,016) is below fit RMSE (1,283), yet the
+  conservative gate vetoes all 113 executions. This is model diagnostic
+  information, not evidence of Edge.
 
-## Controls / attribution matrix (CV_2023 test split, ¥100,000 start, REWORK v3)
+## Controls / attribution matrix (CV_2023 test split, ¥100,000 start, v4)
 
 | Control | Ending capital ¥ | Note |
 |---|---|---|
 | static_n8k8 | 100,218.21 | static N=8 K8 native ¥2 |
 | cash_no_bet | 100,000.00 | safety reference (funded=0) |
-| fixed_n7_dynamic_k | 99,798.87 | K16 best by train-fold median |
+| fixed_n7_dynamic_k | 99,798.87 | per-issue scorer selects K8 on all 55 issues |
 | static_n5k8 | 99,710.20 | |
-| dynamic_nk_fixed_generator | 99,609.10 | = static_n4k8 (N4 wins train median) |
 | static_n4k8 | 99,609.10 | |
-| dynamic_n_fixed_k8_lane | 99,609.10 | |
+| dynamic_n_fixed_k8_lane | 99,609.10 | scorer varies, selected action collapses to N4 |
+| best_fixed_policy | 99,569.54 | safety-gated fixed control |
+| dynamic_nk_fixed_generator | 99,559.71 | state-conditioned; N varies, K remains 8 |
 | static_n9k8 | 99,403.42 | |
 | static_n6k8 | 99,387.50 | |
 | generator_change_n7k8 | 99,338.59 | MARKET_WR lane at N7/K8 |
@@ -99,17 +105,22 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
 | learned_policy | 99,245.38 | safety-gated = incumbent |
 | static_n10k8 | 99,120.00 | |
 | n7k16_sensitivity | 99,106.12 | K16 native ¥2 |
-| best_fixed_policy | 76,292.89 | N4/K32/LEARNED_MLP/native |
 | capital_change_identical | 62,178.64 | EQUAL_1PCT on identical tickets, corrected multiples |
 
 Key attribution findings (REQ-208-05):
 
-- **N**: the frontier is not monotone; N=8 static (¥100,218) edges the frozen
-  N7 incumbent (¥99,245), but this is development-fold evidence only and is NOT
-  promoted (selection rule freezes the incumbent; the per-issue learned policy
-  is the only candidate class per REQ-208-09).
-- **K**: K16 (n7k16_sensitivity ¥99,106) is below K8 native — consistent with
-  #207's K sensitivity rows.
+- **N**: the frontier is not monotone or stable. Static N=8 reaches ¥100,218
+  on CV_2023 but ends ¥99,072 on CV_2022. The state-conditioned N-only scorer
+  chooses N4 in all 113 issues; joint N×K varies N across 3 values on CV_2022
+  and all 7 values on CV_2023, but ends ¥99,493 / ¥99,560 and does not beat the
+  strongest fixed control. The one-fold N8 gain is therefore a diagnostic
+  sweet spot, not a promotion.
+- **K**: the state-conditioned K-only scorer chooses K8 in every issue, and
+  joint N×K also keeps K8 throughout. N7/K16 ends ¥98,317 / ¥99,106 versus
+  K8's ¥99,072 / ¥99,245, but it also funds twice as much (¥32 vs ¥16 per
+  issue). It is an exposure sensitivity, not a pure ticket-count comparison.
+  Under the frozen native-¥2 minimum, a pure same-yuan K8-vs-K16 attribution is
+  `NOT_IDENTIFIABLE`; no claim that K16 construction itself is worse follows.
 - **Generator**: generator_change_n7k8 (MARKET_WR ¥99,339) is slightly above
   the MARKET_WOR incumbent (¥99,245); lane differences are second-order.
 - **Capital**: capital_change_identical on identical tickets with EQUAL_1PCT
@@ -120,6 +131,9 @@ Key attribution findings (REQ-208-05):
   CONTROLLING identities).
 - **Exposure**: cash/NO_BET reference is flat ¥100,000; lower exposure is the
   only arm that never loses capital, reported outside active-Edge attribution.
+- **Learning**: all 113 primary-policy decisions fall back to the incumbent.
+  This proves the safety layer works, but the observed zero matched lift is a
+  fallback identity, not evidence that the neural head improved the baseline.
 
 ## Required issue-level outputs (REQ-208-07)
 
@@ -130,7 +144,9 @@ All materialized in `results/issue-208/`: `issue_capital_ledger.parquet`,
 `permutation_importance.csv`, `decision_ticket_identities.parquet` (per-seed
 ticket identities for stochastic lanes), `ticket_economics.parquet`
 (REWORK v3: per-ticket pre-tax multiples for the production payout-economics
-verifier), `selection.json`, `handoff_209.json`.
+verifier), `dynamic_control_decisions.parquet` (per-issue scores/actions),
+`path_holding_metrics.parquet`, `holdout_mutation_receipt.json`,
+`selection.json`, `handoff_209.json`.
 
 ## REWORK-E09 same-category sweep evidence (REWORK v3 payout-economics)
 
@@ -158,7 +174,7 @@ surface was swept (not just the four reported instances):
    `verify_payout_economics` recomputes `0.65 × prod(SP)` from frozen
    value-matrix panels and compares against `ticket_economics.parquet` and
    `incumbent_paths.parquet`; three new tamper probes attack omission,
-   division-out and 0.65^N through the production verifier — 7/7 detected.
+   division-out and 0.65^N through the production verifier.
 6. **State features / diagnostics**: `features.py` consumes the upstream
    `expected_pre_tax_net` which upstream already computes as
    `0.65 × cj × sp_product − 1` (correct); no change needed. `diagnostics.py`
@@ -169,18 +185,49 @@ surface was swept (not just the four reported instances):
    frozen (manifest `48c11d97…`); the supersession is recorded in
    PROTOCOL-LOG #208-7/#208-8 and #208 never consumes that field.
 
+## PI takeover v4 same-category sweep evidence
+
+The v4 rework preserves all accepted payout and handoff corrections and closes
+the exact remaining categories from the EV at `e5bb257`:
+
+1. **Dynamic attribution:** global median cell lookup is removed. Three
+   restricted MLP controls score lawful actions separately per issue using the
+   causal state and the live path bankroll. The committed decision table has
+   113 distinct score signatures per control across the two folds; action
+   collapse (N4/K8 or N7/K8) is now a scientific result rather than hard-coded
+   behavior.
+2. **Capital/fallback:** frozen tickets contribute only funded stake and payout
+   to the actual current bankroll. Native and SIMPLE_ACTIVE fundability are
+   lane-specific; the latter has the exact ¥200 minimum. All 1,921 ledger rows
+   have zero conservation error.
+3. **Holding metrics:** time-zero drawdown, net-P&L loss streaks, rolling
+   5/10/20 net-P&L windows, recovery, retained cash, active-support ROI,
+   HHI/overlap/repeat and ex-largest issue are calculated by production code
+   and published in `path_holding_metrics.parquet`.
+4. **Holdout isolation:** `holdout_mutation_receipt.json` records two actual
+   terminal-fold refits around a 50,970-row domain-preserving LOCKED_TEST
+   mutation; signatures are identical (`d7862638…`).
+5. **Verifier/evidence:** decision/capital/#209 schemas include types,
+   nullability, keys, domains and units; code/config/requirements/environment
+   are content-bound. The production verifier detects all 13 remanifested or
+   manifest-level attacks.
+6. **Transactional publication:** last-good output is retained until final
+   post-rename verification. Focused tests cover second-rename restoration,
+   post-publish rollback, successful commit, immediate retry and
+   `KeyboardInterrupt` cleanup.
+
 ## REQ coverage
 
 | Requirement | Evidence at reviewed SHA |
 |---|---|
 | REQ-208-01 upstream binding | `results/issue-208/provenance.json` + loaders fail-closed on manifest hashes |
 | REQ-208-02 N/K semantics | `verify_nk_semantics(tickets, k)` + census triple validation |
-| REQ-208-03 outcome isolation | REAL 2024-mutation invariance test `test_2024_mutation_invariance_real` |
+| REQ-208-03 outcome isolation | actual-refit `holdout_mutation_receipt.json` over 50,970 LOCKED_TEST rows; light panel-boundary unit test is separate |
 | REQ-208-04 bounded frontier | 16 seeds only; `decision_ticket_identities.parquet`; no seed=0 |
-| REQ-208-05 matched attribution | control matrix above + identical-ticket capital arm (corrected multiples) |
+| REQ-208-05 matched attribution | per-issue restricted controls + identical-ticket capital arm; pure same-yuan K8/K16 marked NOT_IDENTIFIABLE |
 | REQ-208-06 capital accounting | `verify_capital_accounting` (start ¥100,000, ¥2 units, continuity) |
 | REQ-208-07 decision evidence | full frontier, equity paths, holding metrics, adversarial arms |
-| REQ-208-08 terminal freeze | `handoff_209.json` v3.1 (byte-identifiable candidate/fallback + payout semantics; canonical post-publication manifest path) |
+| REQ-208-08 terminal freeze | `handoff_209.json` v4 (byte-identifiable candidate/fallback + payout semantics; canonical post-publication manifest path) |
 | REQ-208-09 neural policy | MLPRegressor Q with Ridge + best-fixed controls, joblib weights, label-blind replay |
 
 ## Known risks
@@ -194,14 +241,17 @@ surface was swept (not just the four reported instances):
 - EQUAL_1PCT's deep capital drawdown reflects parlay risk at 1%-per-issue
   funding, consistent with #207's Stage-4 finding; it is reported as a
   risk-conditioned reference, not a recommendation.
-- The corrected payout coefficient lowers every winning payout by 0.65 vs the
+- The corrected payout coefficient sets every winning payout to 65% of the
   superseded interpretation; the frozen #207 CONTROLLING ticket identities are
   unchanged, but the #207 ledger's own economics are superseded for #208.
+- Dynamic score variation does not guarantee decision variation: N-only and
+  K-only controls collapse to fixed choices. Any next model must improve the
+  state representation/target, not merely rerun a denser fixed grid.
 
 ## Replay
 
 ```
 PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208
 PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py verify --output results/issue-208
-PYTHONPATH=src .venv/bin/python -m pytest tests/test_bj208_metrics.py tests/test_bj208_tamper.py tests/test_bj208_payout_economics.py
+PYTHONPATH=src .venv/bin/python -m pytest tests/test_bj208_metrics.py tests/test_bj208_tamper.py tests/test_bj208_payout_economics.py tests/test_bj208_handoff_paths.py tests/test_bj208_publication.py
 ```

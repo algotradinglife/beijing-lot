@@ -6,7 +6,7 @@
     "n": 7,
     "policy": "FROZEN_N7_INCUMBENT"
   },
-  "contract_version": "bj208-dynamic-nk-policy-v3",
+  "contract_version": "bj208-dynamic-nk-policy-v4",
   "fallback": {
     "capital": "NATIVE_2_YUAN",
     "k": 8,
@@ -20,7 +20,7 @@
     "test_2023": true,
     "train_through": "2022"
   },
-  "handoff_version": "bj208-handoff-for-209-v3.1",
+  "handoff_version": "bj208-handoff-for-209-v4",
   "label_blind_replay": "inference path never reads realized_outcome/official_final_sp_label; 2024/2025/2026 embargoed",
   "model": {
     "action_columns": [

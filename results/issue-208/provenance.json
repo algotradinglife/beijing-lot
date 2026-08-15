@@ -1,18 +1,35 @@
 {
+  "code_bindings": {
+    "method.yaml": "50311f46efae4bd3dba147702b5b6988d02367de617b675c1f525f2efa82fba8",
+    "requirements.txt": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
+    "scripts/run_bj208_policy.py": "1bf036073cecad0826fa857ab3fb555b22bd4cce42bb4519be2d115779587e1d",
+    "src/parlay_policy/__init__.py": "dfa9d9829f46c405485807396b8a420bb847149400970a027be697625a938c4d",
+    "src/parlay_policy/census.py": "7ea192b5909aac1799f7510cdb7f50eff54ad1abf652ba05fc4c782f25ecd76f",
+    "src/parlay_policy/contract.py": "cde221acbe19c21bd0e35584154c7bb6a7fd410eb716c6e463a8f11a8a5ccd44",
+    "src/parlay_policy/diagnostics.py": "e71b9bd5503bce0a53fbedd98e9be7dd1f8690d052ac306cca87eef9a9342eac",
+    "src/parlay_policy/features.py": "ff1ab71079e8a8ab80106e0410b6be11f5faad1baedae6ce90a92cfc0411fa82",
+    "src/parlay_policy/incumbent.py": "6e7081fa2e02446167976398f4a8ceb8668d8e29e8b6986cc251fe121ca21611",
+    "src/parlay_policy/policy.py": "5bd0b589e221128ad826ccc5ab04ec69a8c356cac1c1d7c3ce7d88c927d34f24",
+    "src/parlay_policy/replay.py": "ac1d773fd43f6fed4de5e06ff05163274fe3bff19a53d600adbb276fe9e2f2c1",
+    "src/parlay_policy/tickets.py": "718a4a33165f36dc94cb6c1a6675fb0fd9866a2ada8aab02a8ff9804bad1e130",
+    "src/parlay_policy/verify.py": "8ee864d63c0fb4a0f1b798af7c3632f6e130a0f7de45e28245c63734aeabfb46"
+  },
   "environment": {
     "numpy": "2.4.6",
     "pandas": "3.0.3",
     "pyarrow": "24.0.0",
-    "python": "3.11.15",
+    "python": "3.14.4",
     "scikit-learn": "1.9.0",
     "scipy": "1.17.1"
   },
+  "environment_lock_sha256": "e1cef58d570fc754d620beae42bc898a382e59c6293fdd515c4929cefba7eab6",
   "label_boundary": "CV_2021 fit; CV_2022/CV_2023 development; 2024/2025/2026 embargoed",
+  "producer_code_commit": "3be8290292482e11db397dacd2b3fbb25026055e",
   "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208",
   "source_issue_207": "results/issue-207",
   "source_issue_207_manifest_sha256": "48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6",
   "source_issue_207_sha": "90869a959dc1b972cd872ffe465d1009e29df75e",
   "source_value_matrix": "results/issue-205/value_matrix.parquet",
   "source_value_matrix_sha256": "8fdace9c7249502456f8990137011847df9addae5ad633e61760c44b7ccde84b",
-  "version": "bj208-dynamic-nk-policy-v3"
+  "version": "bj208-dynamic-nk-policy-v4"
 }

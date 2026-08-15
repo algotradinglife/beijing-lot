@@ -1,6 +1,7 @@
 {
-  "contract_version": "bj208-dynamic-nk-policy-v3",
-  "elapsed_seconds": 256.0,
+  "contract_version": "bj208-dynamic-nk-policy-v4",
+  "elapsed_seconds": 345.9,
+  "exact_reviewed_sha_binding": "external producer handoff and independent EV verdict",
   "incumbent": {
     "capital": "NATIVE_2_YUAN",
     "k": 8,
@@ -13,6 +14,81 @@
     "pre_tax_gross_multiple": "hit * 0.65 * product(official_final_sp_i)",
     "superseded": "product(SP) as pre-tax gross; division by 0.65; 0.65^N"
   },
+  "producer_code_commit": "3be8290292482e11db397dacd2b3fbb25026055e",
+  "req_evidence": [
+    {
+      "evidence": [
+        "provenance.json",
+        "incumbent_paths.parquet"
+      ],
+      "req": "REQ-208-01",
+      "status": "PASS"
+    },
+    {
+      "evidence": [
+        "ticket_economics.parquet",
+        "decision_ticket_identities.parquet"
+      ],
+      "req": "REQ-208-02",
+      "status": "PASS"
+    },
+    {
+      "evidence": [
+        "holdout_mutation_receipt.json",
+        "provenance.json"
+      ],
+      "req": "REQ-208-03",
+      "status": "PASS"
+    },
+    {
+      "evidence": [
+        "training_frame_all.parquet",
+        "decision_ticket_identities.parquet"
+      ],
+      "req": "REQ-208-04",
+      "status": "PASS"
+    },
+    {
+      "evidence": [
+        "dynamic_control_decisions.parquet",
+        "issue_capital_ledger.parquet"
+      ],
+      "req": "REQ-208-05",
+      "status": "PASS"
+    },
+    {
+      "evidence": [
+        "issue_capital_ledger.parquet",
+        "path_holding_metrics.parquet"
+      ],
+      "req": "REQ-208-06",
+      "status": "PASS"
+    },
+    {
+      "evidence": [
+        "path_holding_metrics.parquet",
+        "selection.json"
+      ],
+      "req": "REQ-208-07",
+      "status": "PASS"
+    },
+    {
+      "evidence": [
+        "handoff_209.json",
+        "models/fold2_mlp.joblib"
+      ],
+      "req": "REQ-208-08",
+      "status": "PASS"
+    },
+    {
+      "evidence": [
+        "decision_rows_all.parquet",
+        "models/fold2_mlp.joblib"
+      ],
+      "req": "REQ-208-09",
+      "status": "PASS"
+    }
+  ],
   "upstream_207": {
     "manifest_sha256": "48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6",
     "sha": "90869a959dc1b972cd872ffe465d1009e29df75e"

@@ -1,0 +1,9 @@
+{
+  "baseline_signature_sha256": "d7862638a2098756ae2ae6af2aff65475bab37a45c4ee55a851beb36a3070c65",
+  "calendar_2024_rows_available": 0,
+  "model_weights_scaler_fixed_choice_ood_and_decisions_invariant": true,
+  "mutated_rows": 50970,
+  "mutated_signature_sha256": "d7862638a2098756ae2ae6af2aff65475bab37a45c4ee55a851beb36a3070c65",
+  "mutated_split": "LOCKED_TEST",
+  "probe": "ACTUAL_TERMINAL_FOLD_REFIT_AFTER_LOCKED_TEST_LABEL_MUTATION"
+}

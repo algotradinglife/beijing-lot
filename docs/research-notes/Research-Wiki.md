@@ -7,7 +7,7 @@ tags:
   - research
   - moc
 status: active
-updated: 2026-08-14
+updated: 2026-08-15
 ---
 
 # Beijing-lot Research Wiki
@@ -967,44 +967,36 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
 - PI 对抗性结论：SIMPLE/K16 正向路径、低暴露和上游票选择均不能归因于 Stage 4；
   因此接受负结论并推进 N 与 K 分离学习，而不是把固定 N7 解释为 Edge。
 
-### Issue #208 动态 N×K 学习策略（2026-08-15，REWORK v3 待 EV）
+### Issue #208 动态 N×K 学习策略（2026-08-15，PI takeover v4）
 
-- 契约 BJ-UNIFIED-DYNAMIC-N-001 / v3：主候选为逐期学习的 action-value 策略
-  `Q_theta(x,a)`（`sklearn MLPRegressor`），目标 = matched pre-tax capital lift
-  vs 冻结 N7/K8 incumbent；控制为 Ridge + best fixed action；16 个 hash 种子聚合。
-- REWORK v3（PI 对抗性终审 2026-08-15 拒 5e45132 后 fresh 返工，PR #230 推进）：
-  **派彩经济学修正** — 控制性税前公式为
-  `pre_tax_gross_multiple = hit × 0.65 × prod(official SP)`：0.65 是北京单场
-  派彩系数，每张中奖 N 串票恰好应用一次；禁止除出、逐腿应用或 0.65^N 复利。
-  `expected_pre_tax_net = 0.65 × prod(p·SP) − 1`。v2 在 tickets.py 漏乘 0.65
-  （multiple=prod(SP)）、在 replay.py:145 把 realized_gross 除 0.65 放大派彩、
-  并把 incumbent 绑定到被膨胀的 #207 ledger — 全部调用点已修正；冻结 #207
-  CONTROLLING 票身份保留，但其资金经济学按修正公式重建
-  （`RECONSTRUCTED_CORRECTED_ECONOMICS`）。
-- REWORK v2（EV REJECT 53f67ec 后 fresh 返工）内容保留：D2 资本语义
-  （SIMPLE_ACTIVE=#207 EQUAL_1PCT 精确复制）；D3 泄漏修复（禁用 sklearn
-  行级 early stopping，时间序 issue-block 校验，Ridge/best-fixed 逐 fold
-  完整路径 + ablation，模型权重+scaler 序列化）；D4 验证修复（manifest
-  全覆盖率、provenance 信任哈希、N/K 带 K 校验、outcome triple、真实 2024
-  mutation invariance）；D5 指标修复（running-peak drawdown、holding 指标）；
-  D6 原子性（staging+fsync+COMPLETED+原子 rename）。
-- 结论：**无合格学习行**。安全门在 113 个测试期中放行 0 期；门控后的学习
-  路径与修正后冻结 incumbent 完全一致（两 fold matched lift = 0.0）。
-  按预注册词典序规则第 5 步，冻结 **N7/K8/MARKET_WOR/native-¥2** incumbent
-  作为 #209 候选，并发布完整 frontier 与失败模式。
-- 修正后的 incumbent 终值低于 v2 报告值：CV_2023 ¥99,245.38（v2 ¥99,312.89；
-  唯一中奖期 23084 派彩由膨胀的 192.89 修正为 125.38）、CV_2022 ¥99,072.00。
-- 控制矩阵（CV_2023，¥100,000 起，修正经济学）：static_n8k8 ¥100,218 /
-  n7k16 ¥99,106 / generator_change ¥99,339 / ridge=learned=incumbent ¥99,245 /
-  best_fixed(N4K32) ¥76,293 / capital_change_identical(EQUAL_1PCT) ¥62,179。
-- 验证：新增生产入口 `verify_payout_economics`（从冻结 value matrix 面板独立
-  重算 0.65×prod(SP) 并对照 `ticket_economics.parquet` + `incumbent_paths`），
-  tamper 7/7 检出（新增 omission / division-out / 0.65^N 三类攻击）；
-  `tests/test_bj208_payout_economics.py` 10 golden/tamper 测试。
-- 工件：`notebooks/research/issue-208/`（已执行）、`src/parlay_policy/`、
-  `results/issue-208/`（62 文件 manifest + handoff_209.json v3 + models/ +
-  ticket_economics.parquet）、`docs/research/issue_208_dynamic_nk_policy.md`；
-  method_preflight PASS、verify 7/7 tamper detected。
+- #208 在四轮返工后由 PI 直接接管。v4 保留 MLPRegressor、168-cell 动作目录、
+  16 seeds、0.65 恰好一次的派彩语义和原选择规则，只关闭独立 EV 的 D2–D6：
+  逐期 restricted N/K/N×K scorer、live-bankroll fallback、SIMPLE_ACTIVE ¥200
+  fundability、净 P&L 期级风险指标、真实 LOCKED_TEST 复拟合、rich schema/REQ
+  证据和可恢复的 transactional publish。
+- **主候选没有提升基线。** 113 个测试期 safety gate 全部拒绝，learned path
+  全部回退到 N7/K8/MARKET_WOR/native-¥2；CV_2022/CV_2023 终值分别为
+  ¥99,072.00 / ¥99,245.38，matched lift 两折均为 0，故冻结 incumbent 给 #209。
+  这证明安全层有效，不证明 neural head 有 Edge。
+- **动态选择出现模型退化。** N-only 虽逐期分数不同，但 113 期全部选 N4；
+  K-only 和 joint N×K 全部选 K8。joint N×K 只在 N 上变化（CV_2022 三个 N、
+  CV_2023 七个 N），终值 ¥99,493 / ¥99,560，未胜过最强 fixed control。
+  当前特征/目标没有学出 dynamic K。
+- **固定 N8 只是一折甜点。** CV_2023 static N8/K8 达 ¥100,218.21，但
+  CV_2022 为 ¥99,072.00，不具跨折稳定性。N7/K16 为 ¥98,317 / ¥99,106，
+  但 native K16 每期投入 ¥32、K8 为 ¥16，所以这只是曝光敏感性；在原生 ¥2
+  最小单位下，纯 same-yuan K8-vs-K16 构造效应记为 `NOT_IDENTIFIABLE`。
+- **风险路径仍不支持加仓。** EQUAL_1PCT 相同票面终值为 ¥55,872 / ¥62,179；
+  CV_2023 cash 为 ¥100,000。资本变大没有创造 edge，只放大负期望和回撤。
+- Q 的 calibration 只有粗趋势：最高 predicted bin 的 realized lift 最大，但相邻
+  bins 非单调且量纲失配；fit/validation RMSE 为 1,283/1,016，不能据此宣称可执行信号。
+- 证据包由 producer-code commit `3be8290292482e11db397dacd2b3fbb25026055e`
+  生成：58 个 focused tests 通过；1,921 行 capital ledger conservation error=0；
+  50,970 个 LOCKED_TEST rows 的两次实际复拟合签名一致；production verifier 检出
+  13/13 attacks。日历 2024 在冻结 value matrix 中为 0 行，因此不虚构 2024 mutation。
+- 详见 [`issue_208_dynamic_nk_policy`](../research/issue_208_dynamic_nk_policy.md)
+  和已执行 notebook
+  [`bj208_dynamic_nk_policy.ipynb`](../../notebooks/research/issue-208/bj208_dynamic_nk_policy.ipynb)。
 
 ## 相关笔记
 

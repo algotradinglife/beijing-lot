@@ -1,43 +1,219 @@
 {
-  "contract_version": "bj208-dynamic-nk-policy-v3",
+  "contract_version": "bj208-dynamic-nk-policy-v4",
   "frames": {
     "census.csv": {
       "M": "int",
       "excluded_matches": "int",
-      "issue": "str",
+      "issue": "numeric",
       "labels_available": "bool",
       "split": "str",
       "year": "int"
+    },
+    "decision_rows_all.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "conservative_lift": "float",
+        "decision_trace_json": "str",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "n": "int",
+        "predicted_lift": "float",
+        "prior_bankroll_yuan": "float",
+        "safety_gate_pass": "bool",
+        "split": "str",
+        "year": "int"
+      },
+      "domains": {
+        "capital": [
+          "NATIVE_2_YUAN",
+          "SIMPLE_ACTIVE"
+        ],
+        "lane": [
+          "MARKET_WR",
+          "MARKET_WOR",
+          "VALUE_WOR",
+          "LEARNED_MLP"
+        ],
+        "split": [
+          "CV_2022",
+          "CV_2023"
+        ]
+      },
+      "non_null": [
+        "split",
+        "issue",
+        "year",
+        "action_key",
+        "prior_bankroll_yuan",
+        "safety_gate_pass",
+        "decision_trace_json"
+      ],
+      "primary_key": [
+        "split",
+        "issue"
+      ],
+      "units": {
+        "conservative_lift": "CNY per issue vs frozen incumbent",
+        "predicted_lift": "CNY per issue vs frozen incumbent",
+        "prior_bankroll_yuan": "CNY"
+      }
+    },
+    "dynamic_control_decisions.parquet": {
+      "columns": {
+        "action_key": "str",
+        "decision_trace_json": "str",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "year": "int"
+      },
+      "domains": {
+        "policy": [
+          "dynamic_n_fixed_k8_lane",
+          "fixed_n7_dynamic_k",
+          "dynamic_nk_fixed_generator"
+        ],
+        "split": [
+          "CV_2022",
+          "CV_2023"
+        ]
+      },
+      "non_null": [
+        "split",
+        "issue",
+        "year",
+        "policy",
+        "action_key",
+        "pre_issue_bankroll_yuan",
+        "requested_stake_yuan",
+        "funded_stake_yuan",
+        "gross_payout_yuan",
+        "post_issue_bankroll_yuan",
+        "net_pnl_yuan",
+        "decision_trace_json"
+      ],
+      "primary_key": [
+        "split",
+        "policy",
+        "issue"
+      ],
+      "units": {
+        "funded_stake_yuan": "CNY",
+        "gross_payout_yuan": "CNY",
+        "net_pnl_yuan": "CNY",
+        "post_issue_bankroll_yuan": "CNY",
+        "pre_issue_bankroll_yuan": "CNY",
+        "requested_stake_yuan": "CNY"
+      }
     },
     "eligibility.csv": {
       "M": "int",
       "N": "int",
       "eligible": "bool",
-      "issue": "str",
+      "issue": "numeric",
       "labels_available": "bool",
       "split": "str",
       "year": "int"
     },
     "incumbent_paths.parquet": {
-      "funded_stake_yuan": "float",
-      "gross_payout_yuan": "float",
-      "issue": "str",
-      "post_issue_bankroll_yuan": "float",
-      "pre_issue_bankroll_yuan": "float",
-      "source": "str",
-      "split": "str",
-      "year": "int"
+      "columns": {
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "source": "str",
+        "split": "str",
+        "year": "int"
+      },
+      "domains": {
+        "source": [
+          "RECONSTRUCTED_CORRECTED_ECONOMICS"
+        ],
+        "split": [
+          "CV_2021",
+          "CV_2022",
+          "CV_2023"
+        ]
+      },
+      "non_null": [
+        "split",
+        "issue",
+        "year",
+        "pre_issue_bankroll_yuan",
+        "funded_stake_yuan",
+        "gross_payout_yuan",
+        "post_issue_bankroll_yuan",
+        "source"
+      ],
+      "primary_key": [
+        "split",
+        "issue"
+      ],
+      "units": {
+        "funded_stake_yuan": "CNY",
+        "gross_payout_yuan": "CNY",
+        "post_issue_bankroll_yuan": "CNY",
+        "pre_issue_bankroll_yuan": "CNY"
+      }
     },
     "issue_capital_ledger.parquet": {
-      "action_key": "str",
-      "funded_stake_yuan": "float",
-      "gross_payout_yuan": "float",
-      "issue": "str",
-      "policy": "str",
-      "post_issue_bankroll_yuan": "float",
-      "pre_issue_bankroll_yuan": "float",
-      "split": "str",
-      "year": "int"
+      "columns": {
+        "action_key": "str",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "mean_pairwise_overlap": "float",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "domains": {
+        "split": [
+          "CV_2022",
+          "CV_2023"
+        ]
+      },
+      "non_null": [
+        "split",
+        "issue",
+        "year",
+        "policy",
+        "action_key",
+        "pre_issue_bankroll_yuan",
+        "requested_stake_yuan",
+        "funded_stake_yuan",
+        "gross_payout_yuan",
+        "post_issue_bankroll_yuan",
+        "net_pnl_yuan"
+      ],
+      "primary_key": [
+        "split",
+        "policy",
+        "issue"
+      ],
+      "units": {
+        "funded_stake_yuan": "CNY",
+        "gross_payout_yuan": "CNY",
+        "net_pnl_yuan": "CNY",
+        "post_issue_bankroll_yuan": "CNY",
+        "pre_issue_bankroll_yuan": "CNY",
+        "requested_stake_yuan": "CNY"
+      }
     },
     "label_surface_fit.parquet": {
       "action_key": "str",
@@ -53,19 +229,168 @@
       "split": "str",
       "year": "int"
     },
+    "path_holding_metrics.parquet": {
+      "columns": {
+        "artifact": "str",
+        "ending_capital_yuan": "float",
+        "ex_largest_issue_ending_capital_yuan": "float",
+        "max_consecutive_losing_issues": "float",
+        "max_drawdown_pct": "float",
+        "max_recovery_issues": "float",
+        "policy": "str",
+        "split": "str",
+        "time_under_water_issues": "float",
+        "total_net_pnl_yuan": "float",
+        "turnover_yuan": "float"
+      },
+      "domains": {
+        "split": [
+          "CV_2022",
+          "CV_2023"
+        ]
+      },
+      "non_null": [
+        "artifact",
+        "split",
+        "policy",
+        "ending_capital_yuan",
+        "max_drawdown_pct",
+        "turnover_yuan",
+        "total_net_pnl_yuan"
+      ],
+      "primary_key": [
+        "artifact"
+      ],
+      "units": {
+        "ending_capital_yuan": "CNY",
+        "max_drawdown_pct": "fraction of running peak",
+        "total_net_pnl_yuan": "CNY",
+        "turnover_yuan": "CNY"
+      }
+    },
     "ticket_economics.parquet": {
-      "issue": "str",
-      "k": "int",
-      "lane": "str",
-      "match_indices": "str",
-      "n": "int",
-      "outcomes": "str",
-      "payout_yuan": "float",
-      "pre_tax_gross_multiple": "float",
-      "realized_hit": "bool",
-      "seed": "int",
-      "split": "str",
-      "ticket_identity": "str"
+      "columns": {
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "match_indices": "str",
+        "n": "int",
+        "outcomes": "str",
+        "payout_yuan": "float",
+        "pre_tax_gross_multiple": "float",
+        "realized_hit": "bool",
+        "seed": "int",
+        "split": "str",
+        "ticket_identity": "str",
+        "ticket_position": "int"
+      },
+      "domains": {
+        "k": [
+          8,
+          16,
+          32
+        ],
+        "lane": [
+          "MARKET_WR",
+          "MARKET_WOR",
+          "VALUE_WOR",
+          "LEARNED_MLP"
+        ],
+        "n": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "split": [
+          "CV_2022",
+          "CV_2023"
+        ]
+      },
+      "non_null": [
+        "split",
+        "issue",
+        "n",
+        "k",
+        "lane",
+        "seed",
+        "ticket_position",
+        "ticket_identity",
+        "match_indices",
+        "outcomes",
+        "realized_hit",
+        "pre_tax_gross_multiple",
+        "payout_yuan"
+      ],
+      "primary_key": [
+        "split",
+        "issue",
+        "n",
+        "k",
+        "lane",
+        "seed",
+        "ticket_position"
+      ],
+      "units": {
+        "payout_yuan": "CNY for one native ¥2 ticket",
+        "pre_tax_gross_multiple": "gross multiple including one 0.65 payout coefficient"
+      }
     }
-  }
+  },
+  "json_artifacts": {
+    "decision.json": {
+      "required_keys": [
+        "contract_version",
+        "producer_code_commit",
+        "req_evidence",
+        "incumbent",
+        "initial_bankroll_yuan",
+        "payout_semantics"
+      ]
+    },
+    "handoff_209.json": {
+      "required_keys": [
+        "handoff_version",
+        "fit_boundary.train_through",
+        "fit_boundary.2024_opened",
+        "candidate",
+        "fallback",
+        "model",
+        "model_file",
+        "contract_version",
+        "package_manifest",
+        "label_blind_replay"
+      ]
+    },
+    "holdout_mutation_receipt.json": {
+      "required_keys": [
+        "probe",
+        "mutated_rows",
+        "baseline_signature_sha256",
+        "mutated_signature_sha256",
+        "model_weights_scaler_fixed_choice_ood_and_decisions_invariant"
+      ]
+    }
+  },
+  "relationships": [
+    {
+      "name": "capital_conservation",
+      "production_verifier": "verify_capital_accounting"
+    },
+    {
+      "name": "ticket_bundle_n_k",
+      "production_verifier": "verify_nk_semantics"
+    },
+    {
+      "name": "payout_exactly_once",
+      "production_verifier": "verify_payout_economics"
+    },
+    {
+      "name": "handoff_resolves_post_publish",
+      "production_verifier": "verify_handoff_contract"
+    }
+  ]
 }
