@@ -30,6 +30,7 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
+CANONICAL_PUBLISHED_OUTPUT = Path("results/issue-208")
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
@@ -78,12 +79,16 @@ from parlay_policy.replay import (  # noqa: E402
     build_pool_cache,
     build_training_frame,
     full_path_replay,
+    materialize_issue_path_metrics,
     path_holding_metrics,
     summarize_path,
 )
 from parlay_policy.tickets import (  # noqa: E402
     fit_learned_ranker,
+    mean_pairwise_overlap,
     ranker_scores,
+    repeat_exposure,
+    ticket_hhi,
 )
 from parlay_policy.verify import (  # noqa: E402
     VerifyError,
@@ -92,6 +97,7 @@ from parlay_policy.verify import (  # noqa: E402
     sha256_file,
     verify_capital_accounting,
     verify_code_bindings,
+    verify_chronology,
     verify_completion,
     verify_dynamic_control_decisions,
     verify_handoff_contract,
@@ -102,6 +108,7 @@ from parlay_policy.verify import (  # noqa: E402
     verify_no_embargoed_split,
     verify_payout_economics,
     verify_package_schema,
+    verify_path_metrics,
     verify_provenance,
     verify_receipt,
     verify_req_evidence,
@@ -215,7 +222,11 @@ def run(output: Path) -> dict[str, object]:
     backup: Path | None = None
 
     try:
-        _run_stages(staging, published_output=output)
+        # The package may be replayed into an arbitrary audit directory, but
+        # its downstream handoff always names the canonical repository path.
+        # This makes alternate-output replay genuinely supported instead of
+        # failing after the expensive scientific stages have completed.
+        _run_stages(staging, published_output=CANONICAL_PUBLISHED_OUTPUT)
         _write_metadata(staging, started)
         _json(
             staging / "COMPLETED.json",
@@ -224,6 +235,11 @@ def run(output: Path) -> dict[str, object]:
                 "elapsed_seconds": round(time.time() - started, 1),
             },
         )
+        # Schema inventory is frozen before the self-attacks run.  Publish an
+        # explicit placeholder so the first structural verification sees the
+        # same artifact inventory as the final package; the executed receipts
+        # replace it before the final manifest is closed.
+        _json(staging / "tamper_results.json", [])
         _write_manifest(staging)
         failures = verify_package(staging)
         if failures:
@@ -286,6 +302,7 @@ def _run_stages(
     elig.to_csv(output / "eligibility.csv", index=False)
     upstream_tickets = load_upstream_tickets(ROOT)
     upstream_ledger = load_upstream_ledger(ROOT)
+    frozen_ticket_metrics = _frozen_incumbent_metric_map(upstream_tickets)
     print(
         f"[stage1 census] panels={len(panels)} "
         f"dev issues={census[census.split.isin(DEVELOPMENT_SPLITS)]['issue'].nunique()}"
@@ -299,8 +316,13 @@ def _run_stages(
     print(f"[stage2 contexts] {len(contexts)} issue contexts; {len(pool_cache)} pools")
 
     # --- Stage 3: label surface on fit fold (CV_2021) -----------------------
+    fit_split_core, _ = _chronological_issue_blocks(
+        contexts, (FIT_SPLIT,), fraction=0.15
+    )
     ranker = fit_learned_ranker(
-        _ranker_training_tickets(contexts, pool_cache, (FIT_SPLIT,))
+        _ranker_training_tickets(
+            contexts, pool_cache, (FIT_SPLIT,), issue_whitelist=fit_split_core
+        )
     )
     surface_fit = build_label_surface(
         contexts, pool_cache, train_splits=(FIT_SPLIT,), ranker=ranker
@@ -310,17 +332,42 @@ def _run_stages(
     # --- Stage 4: chronological folds ---------------------------------------
     fold_results: dict[str, object] = {}
     fit_rows: list[pd.DataFrame] = []
+    validation_rows: list[pd.DataFrame] = []
+    chronology_rows: list[dict[str, object]] = []
     test_rows: list[pd.DataFrame] = []
     for fold_index, (train_splits, test_split) in enumerate(FOLDS):
+        fold_name = f"fold{fold_index + 1}"
+        fit_issues, validation_issues = _chronological_issue_blocks(
+            contexts, train_splits, fraction=0.15
+        )
         ranker_fold = fit_learned_ranker(
-            _ranker_training_tickets(contexts, pool_cache, train_splits)
+            _ranker_training_tickets(
+                contexts,
+                pool_cache,
+                train_splits,
+                issue_whitelist=fit_issues,
+            )
         )
         surface_train = build_label_surface(
             contexts, pool_cache, train_splits=train_splits, ranker=ranker_fold
         )
-        train_df = build_training_frame(surface_train, contexts)
-        # Chronological validation block = last 15% of train issues.
-        val_df = _chronological_validation_frame(train_df, fraction=0.15)
+        train_all_df = build_training_frame(surface_train, contexts)
+        train_df = train_all_df.loc[
+            train_all_df["issue"].astype(str).isin(fit_issues)
+        ].copy()
+        val_df = train_all_df.loc[
+            train_all_df["issue"].astype(str).isin(validation_issues)
+        ].copy()
+        if train_df.empty or val_df.empty:
+            raise ReplayError(f"{fold_name} has empty fit or validation block")
+        overlap = set(train_df["issue"].astype(str)) & set(
+            val_df["issue"].astype(str)
+        )
+        if overlap:
+            raise ReplayError(
+                f"{fold_name} chronological fit/validation overlap: "
+                f"{sorted(overlap)[:5]}"
+            )
 
         policy_mlp = fit_policy(
             train_df, kind="MLP", seed=MODEL_SEED, validation_df=val_df
@@ -348,7 +395,7 @@ def _run_stages(
         fit_states = [
             contexts[(split, issue)].state
             for (split, issue), ctx in contexts.items()
-            if split in train_splits
+            if split in train_splits and str(issue) in fit_issues
         ]
         ood_scaler, ood_threshold = ood_gate(fit_states, fit_states)
 
@@ -392,6 +439,7 @@ def _run_stages(
             policy_name="learned_policy",
             ranker_scores_by_issue=ranker_scores_test,
             frozen_incumbent=incumbent_paths,
+            frozen_ticket_metrics=frozen_ticket_metrics,
         )
         path_learned.to_parquet(
             output / f"path_learned_fold{fold_index + 1}.parquet", index=False
@@ -427,12 +475,15 @@ def _run_stages(
             ood_threshold=ood_threshold,
             ranker_scores_by_issue=ranker_scores_test,
             frozen_incumbent=incumbent_paths,
+            frozen_ticket_metrics=frozen_ticket_metrics,
         )
         for name, path in control_policy_paths.items():
             path.to_parquet(output / f"path_control_{name}_fold{fold_index + 1}.parquet", index=False)
 
-        fold_results[f"fold{fold_index + 1}"] = {
+        fold_results[fold_name] = {
             "train_splits": list(train_splits),
+            "fit_issues": sorted(fit_issues),
+            "validation_issues": sorted(validation_issues),
             "test_split": test_split,
             "learned_summary": summarize_path(path_learned),
             "control_summaries": {
@@ -455,7 +506,34 @@ def _run_stages(
             },
             "ood_threshold": ood_threshold,
         }
-        fit_rows.append(train_df)
+        fit_rows.append(
+            train_df.assign(fold=fold_name, training_role="FIT")
+        )
+        validation_rows.append(
+            val_df.assign(fold=fold_name, training_role="VALIDATION")
+        )
+        chronology_rows.extend(
+            {
+                "fold": fold_name,
+                "issue": issue,
+                "role": "FIT",
+                "used_by_q_fit": True,
+                "used_by_ranker_fit": True,
+                "used_by_ood_fit": True,
+            }
+            for issue in sorted(fit_issues)
+        )
+        chronology_rows.extend(
+            {
+                "fold": fold_name,
+                "issue": issue,
+                "role": "VALIDATION",
+                "used_by_q_fit": False,
+                "used_by_ranker_fit": False,
+                "used_by_ood_fit": False,
+            }
+            for issue in sorted(validation_issues)
+        )
         test_rows.append(decision_df)
         print(
             f"[stage4 fold{fold_index + 1}] train={train_splits} test={test_split} "
@@ -465,9 +543,23 @@ def _run_stages(
     # --- Stage 5: diagnostics -----------------------------------------------
     all_fit = pd.concat(fit_rows, ignore_index=True)
     all_fit.to_parquet(output / "training_frame_all.parquet", index=False)
+    all_validation = pd.concat(validation_rows, ignore_index=True)
+    all_validation.to_parquet(
+        output / "validation_frame_all.parquet", index=False
+    )
+    pd.DataFrame(chronology_rows).to_parquet(
+        output / "chronology_blocks.parquet", index=False
+    )
     all_test = pd.concat(test_rows, ignore_index=True)
     all_test.to_parquet(output / "decision_rows_all.parquet", index=False)
-    _write_diagnostics(output, all_fit, all_test, contexts, policy_mlp, train_df)
+    _write_diagnostics(
+        output,
+        val_df,
+        all_test,
+        contexts,
+        policy_mlp,
+        train_all_df,
+    )
 
     # Consolidated capital ledger for verification + tamper targeting.
     ledger_parts = [
@@ -535,10 +627,18 @@ def _run_stages(
 # ==== SECTION: HELPERS ====
 
 
-def _ranker_training_tickets(contexts, pool_cache, train_splits):
+def _ranker_training_tickets(
+    contexts,
+    pool_cache,
+    train_splits,
+    *,
+    issue_whitelist: set[str] | None = None,
+):
     rows = []
     for (split, issue), ctx in contexts.items():
         if split not in train_splits:
+            continue
+        if issue_whitelist is not None and str(issue) not in issue_whitelist:
             continue
         pool = pool_cache.get(f"{issue}:7")
         if pool is None:
@@ -547,6 +647,35 @@ def _ranker_training_tickets(contexts, pool_cache, train_splits):
         sub["labels_available"] = ctx.panel.labels_available
         rows.append(sub)
     return pd.concat(rows, ignore_index=True)
+
+
+def _chronological_issue_blocks(
+    contexts,
+    train_splits,
+    *,
+    fraction: float = 0.15,
+) -> tuple[set[str], set[str]]:
+    """Return disjoint chronological fit and validation issue sets.
+
+    The issue block is resolved before fitting the ticket ranker, Q models,
+    restricted controls or OOD scaler.  This prevents the prior defect where
+    validation rows were scored separately but still entered every fit API.
+    """
+    issues = sorted(
+        str(issue)
+        for (split, issue) in contexts
+        if split in train_splits
+    )
+    if len(issues) < 5:
+        raise ReplayError("chronological split needs at least five issues")
+    cut = max(2, int(len(issues) * (1.0 - fraction)))
+    fit_issues = set(issues[:cut])
+    validation_issues = set(issues[cut:])
+    if not fit_issues or not validation_issues:
+        raise ReplayError("empty chronological fit or validation issue block")
+    if fit_issues & validation_issues:
+        raise ReplayError("chronological issue blocks overlap")
+    return fit_issues, validation_issues
 
 
 def _chronological_validation_frame(
@@ -689,14 +818,27 @@ def _actual_refit_signature(
     contexts = build_issue_contexts(panels, upstream_tickets, incumbent_paths)
     pool_cache = build_pool_cache(contexts)
     train_splits, test_split = FOLDS[-1]
+    fit_issues, validation_issues = _chronological_issue_blocks(
+        contexts, train_splits, fraction=0.15
+    )
     ranker = fit_learned_ranker(
-        _ranker_training_tickets(contexts, pool_cache, train_splits)
+        _ranker_training_tickets(
+            contexts,
+            pool_cache,
+            train_splits,
+            issue_whitelist=fit_issues,
+        )
     )
     train_surface = build_label_surface(
         contexts, pool_cache, train_splits=train_splits, ranker=ranker
     )
-    train_df = build_training_frame(train_surface, contexts)
-    validation_df = _chronological_validation_frame(train_df, fraction=0.15)
+    train_all_df = build_training_frame(train_surface, contexts)
+    train_df = train_all_df.loc[
+        train_all_df["issue"].astype(str).isin(fit_issues)
+    ].copy()
+    validation_df = train_all_df.loc[
+        train_all_df["issue"].astype(str).isin(validation_issues)
+    ].copy()
     policy = fit_policy(
         train_df,
         kind="MLP",
@@ -706,8 +848,8 @@ def _actual_refit_signature(
     fixed_key = best_fixed_action_key(train_df)
     fit_states = [
         ctx.state
-        for (split, _), ctx in contexts.items()
-        if split in train_splits
+        for (split, issue), ctx in contexts.items()
+        if split in train_splits and str(issue) in fit_issues
     ]
     ood_scaler, ood_threshold = ood_gate(fit_states, fit_states)
     test_ctx = {
@@ -756,6 +898,7 @@ def _actual_refit_signature(
         policy_name="holdout_refit_probe",
         ranker_scores_by_issue=ranker_scores_by_issue,
         frozen_incumbent=incumbent_paths,
+        frozen_ticket_metrics=_frozen_incumbent_metric_map(upstream_tickets),
     )
     decisions = [
         {
@@ -770,6 +913,9 @@ def _actual_refit_signature(
         "train_splits": list(train_splits),
         "test_split": test_split,
         "training_issues": sorted(train_df["issue"].astype(str).unique()),
+        "validation_issues": sorted(
+            validation_df["issue"].astype(str).unique()
+        ),
         "fixed_action_key": fixed_key,
         "ood_threshold": float(ood_threshold),
         "policy": _stable_model_payload(policy.model),
@@ -816,6 +962,10 @@ def _write_holdout_mutation_receipt(
     mutated, mutated_rows = _mutate_locked_test_labels(value_matrix)
     after = _actual_refit_signature(mutated, upstream_tickets, upstream_ledger)
     invariant = baseline["sha256"] == after["sha256"]
+    baseline_file = "holdout_refit_baseline.json"
+    mutated_file = "holdout_refit_mutated.json"
+    _json(output / baseline_file, baseline["payload"])
+    _json(output / mutated_file, after["payload"])
     receipt = {
         "probe": "ACTUAL_TERMINAL_FOLD_REFIT_AFTER_LOCKED_TEST_LABEL_MUTATION",
         "mutated_split": "LOCKED_TEST",
@@ -825,6 +975,8 @@ def _write_holdout_mutation_receipt(
         ),
         "baseline_signature_sha256": baseline["sha256"],
         "mutated_signature_sha256": after["sha256"],
+        "baseline_payload_file": baseline_file,
+        "mutated_payload_file": mutated_file,
         "model_weights_scaler_fixed_choice_ood_and_decisions_invariant": invariant,
     }
     _json(output / "holdout_mutation_receipt.json", receipt)
@@ -1056,6 +1208,35 @@ def _write_metadata(output: Path, started: float) -> None:
         f"{method_hash}  method.yaml\n", encoding="utf-8"
     )
     _write_schema(output)
+
+
+def _series_contract(series: pd.Series) -> str:
+    """Stable portable dtype name for a published frame column."""
+    if pd.api.types.is_bool_dtype(series):
+        return "bool"
+    if pd.api.types.is_integer_dtype(series):
+        return "int"
+    if pd.api.types.is_numeric_dtype(series):
+        return "float"
+    present = series.dropna()
+    if present.map(lambda value: isinstance(value, str)).all():
+        return "str"
+    return "any"
+
+
+def _frame_contract(path: Path, *, diagnostic_only: bool) -> dict[str, object]:
+    frame = (
+        pd.read_parquet(path)
+        if path.suffix == ".parquet"
+        else pd.read_csv(path)
+    )
+    return {
+        "columns": {
+            str(column): _series_contract(frame[column])
+            for column in frame.columns
+        },
+        "diagnostic_only": diagnostic_only,
+    }
 
 
 def _write_schema(output: Path) -> None:
@@ -1298,13 +1479,97 @@ def _write_schema(output: Path) -> None:
                 "name": "handoff_resolves_post_publish",
                 "production_verifier": "verify_handoff_contract",
             },
+            {
+                "name": "chronological_issue_block_isolation",
+                "production_verifier": "verify_chronology",
+            },
+            {
+                "name": "issue_level_path_metrics",
+                "production_verifier": "verify_path_metrics",
+            },
+            {
+                "name": "dynamic_restricted_argmax",
+                "production_verifier": "verify_dynamic_control_decisions",
+            },
+            {
+                "name": "complete_code_binding_set",
+                "production_verifier": "verify_code_bindings",
+            },
         ],
+        "manifest_identity": {
+            "all_delivered_bytes_except_manifest_are_hashed": True,
+            "manifest_external_binding": "exact Git PR HEAD + independent EV",
+        },
+    }
+
+    # Every delivered CSV/Parquet frame is declared.  Decision/capital/#209
+    # inputs are non-diagnostic; auxiliary plots/tables are explicitly marked
+    # diagnostic-only.  Published columns are declared exactly, not as a
+    # permissive subset.
+    critical_frames = set(schema["frames"]) | {
+        "training_frame_all.parquet",
+        "validation_frame_all.parquet",
+        "chronology_blocks.parquet",
+        "decision_ticket_identities.parquet",
+    }
+    declared_frames: dict[str, object] = schema["frames"]  # type: ignore[assignment]
+    for path in sorted(
+        p for p in output.rglob("*")
+        if p.is_file() and p.suffix in {".csv", ".parquet"}
+    ):
+        name = path.relative_to(output).as_posix()
+        inferred = _frame_contract(
+            path, diagnostic_only=name not in critical_frames
+        )
+        existing = declared_frames.get(name)
+        if isinstance(existing, dict):
+            if "columns" not in existing:
+                existing = {"columns": existing}
+            existing["columns"] = inferred["columns"]
+            existing["diagnostic_only"] = False
+            declared_frames[name] = existing
+        else:
+            declared_frames[name] = inferred
+
+    critical_json = {
+        "COMPLETED.json",
+        "decision.json",
+        "handoff_209.json",
+        "holdout_mutation_receipt.json",
+        "holdout_refit_baseline.json",
+        "holdout_refit_mutated.json",
+        "protocol_log.json",
+        "provenance.json",
+        "selection.json",
+        "tamper_results.json",
+    }
+    json_contracts: dict[str, object] = schema["json_artifacts"]  # type: ignore[assignment]
+    for name in sorted(critical_json):
+        json_contracts.setdefault(
+            name, {"required_keys": [], "diagnostic_only": False}
+        )
+    for path in sorted(output.rglob("*.json")):
+        name = path.relative_to(output).as_posix()
+        if name in {"SHA256SUMS.json", "schema.json"}:
+            continue
+        existing = json_contracts.get(name)
+        if isinstance(existing, dict):
+            existing["diagnostic_only"] = False
+        else:
+            json_contracts[name] = {
+                "required_keys": [],
+                "diagnostic_only": name not in critical_json,
+            }
+
+    schema["binary_artifacts"] = {
+        path.relative_to(output).as_posix(): {"diagnostic_only": False}
+        for path in sorted(output.rglob("*.joblib"))
     }
     _json(output / "schema.json", schema)
 
 
 def _write_manifest(output: Path) -> None:
-    """Write SHA256SUMS.json covering every file except itself + receipt.
+    """Write SHA256SUMS.json covering every delivered file except itself.
 
     REWORK v2 (D6): COMPLETED.json is written BEFORE this call so it is a
     covered payload — the old ordering left it unlisted.
@@ -1313,7 +1578,7 @@ def _write_manifest(output: Path) -> None:
         p
         for p in output.rglob("*")
         if p.is_file()
-        and p.name not in ("SHA256SUMS.json", "receipt.sha256")
+        and p.name != "SHA256SUMS.json"
     )
     _json(output / "SHA256SUMS.json", manifest(output, artifacts))
 
@@ -1401,6 +1666,7 @@ def verify_package(output: Path) -> list[str]:
         failures.extend(verify_package_schema(output, schema))
     failures.extend(verify_completion(output))
     failures.extend(verify_holdout_mutation_receipt(output))
+    failures.extend(verify_chronology(output))
 
     decision_path = output / "decision.json"
     if not decision_path.exists():
@@ -1420,6 +1686,8 @@ def verify_package(output: Path) -> list[str]:
     failures.extend(verify_capital_accounting(ledger))
     failures.extend(verify_no_embargoed_split(ledger))
     failures.extend(verify_no_2024_issue(ledger))
+    holding = pd.read_parquet(output / "path_holding_metrics.parquet")
+    failures.extend(verify_path_metrics(ledger, holding))
 
     decisions = pd.read_parquet(output / "decision_rows_all.parquet")
     failures.extend(verify_no_embargoed_split(decisions))
@@ -1602,6 +1870,13 @@ def _run_controls(
                 ]
                 if not frozen_row.empty:
                     row = frozen_row.iloc[0]
+                    frozen_tickets = _frozen_incumbent_tickets(
+                        upstream_tickets, split, issue
+                    )
+                    if frozen_tickets is None or frozen_tickets.empty:
+                        raise ReplayError(
+                            f"missing frozen ticket identities for {split}/{issue}"
+                        )
                     payout = float(row["gross_payout_yuan"])
                     funded = float(row["funded_stake_yuan"])
                     new_bankroll = apply_issue_settlement(bankroll, funded, payout)
@@ -1623,9 +1898,11 @@ def _run_controls(
                             "post_issue_bankroll_yuan": new_bankroll,
                             "net_pnl_yuan": float(new_bankroll - bankroll),
                             "drawdown_pct": 0.0,
-                            "mean_pairwise_overlap": float("nan"),
-                            "ticket_hhi": float("nan"),
-                            "repeat_exposure": float("nan"),
+                            "mean_pairwise_overlap": mean_pairwise_overlap(
+                                frozen_tickets
+                            ),
+                            "ticket_hhi": ticket_hhi(frozen_tickets),
+                            "repeat_exposure": repeat_exposure(frozen_tickets),
                             "decision_trace_json": json.dumps(trace, ensure_ascii=False),
                             "source": "FROZEN_INCUMBENT_207",
                         }
@@ -1764,7 +2041,7 @@ def _run_controls(
                 }
             )
             bankroll = new_bankroll
-        results[name] = pd.DataFrame(rows)
+        results[name] = materialize_issue_path_metrics(pd.DataFrame(rows))
     return results
 
 
@@ -1799,6 +2076,28 @@ def _frozen_incumbent_tickets(
     return sub
 
 
+def _frozen_incumbent_metric_map(
+    upstream_tickets: pd.DataFrame,
+) -> dict[tuple[str, str], dict[str, float]]:
+    """Materialize concentration diagnostics for frozen ticket identities."""
+    metrics: dict[tuple[str, str], dict[str, float]] = {}
+    keys = upstream_tickets[["split", "issue"]].drop_duplicates()
+    for _, key in keys.iterrows():
+        split = str(key["split"])
+        issue = str(key["issue"])
+        tickets = _frozen_incumbent_tickets(
+            upstream_tickets, split, issue
+        )
+        if tickets is None or tickets.empty:
+            continue
+        metrics[(split, issue)] = {
+            "mean_pairwise_overlap": mean_pairwise_overlap(tickets),
+            "ticket_hhi": ticket_hhi(tickets),
+            "repeat_exposure": repeat_exposure(tickets),
+        }
+    return metrics
+
+
 # ==== SECTION: POLICY CONTROLS ====
 
 
@@ -1806,7 +2105,7 @@ def _run_policy_controls(
     test_ctx, pool_cache, test_split, *,
     policy_mlp, policy_ridge, policy_fixed,
     ood_scaler, ood_threshold,
-    ranker_scores_by_issue, frozen_incumbent,
+    ranker_scores_by_issue, frozen_incumbent, frozen_ticket_metrics,
 ) -> dict[str, pd.DataFrame]:
     """Ridge and best-fixed-action policy paths (REWORK v2: evaluated per fold,
     not just metadata)."""
@@ -1855,6 +2154,7 @@ def _run_policy_controls(
             policy_name=name,
             ranker_scores_by_issue=ranker_scores_by_issue,
             frozen_incumbent=frozen_incumbent,
+            frozen_ticket_metrics=frozen_ticket_metrics,
         )
         results[name] = path
     return results
@@ -1863,7 +2163,14 @@ def _run_policy_controls(
 # ==== SECTION: DIAGNOSTICS ====
 
 
-def _write_diagnostics(output, all_fit, all_test, contexts, policy_mlp, train_df):
+def _write_diagnostics(
+    output,
+    terminal_validation,
+    all_test,
+    contexts,
+    policy_mlp,
+    terminal_train_all,
+):
     context_states = {
         f"{split}:{issue}": ctx.state
         for (split, issue), ctx in contexts.items()
@@ -1873,16 +2180,20 @@ def _write_diagnostics(output, all_fit, all_test, contexts, policy_mlp, train_df
         freq.to_csv(output / "action_frequency.csv", index=False)
         fallback = ood_fallback_census(all_test)
         fallback.to_csv(output / "ood_fallback_census.csv", index=False)
-    if not all_fit.empty:
-        perm = permutation_importance_table(all_fit, policy_mlp)
+    # Diagnostics are evaluated on the chronological validation block.  The
+    # model has never fitted these issue rows.
+    if not terminal_validation.empty:
+        perm = permutation_importance_table(terminal_validation, policy_mlp)
         perm.to_csv(output / "permutation_importance.csv", index=False)
-        calib = calibration_curve(all_fit, policy_mlp, context_states)
+        calib = calibration_curve(terminal_validation, policy_mlp, context_states)
         calib.to_csv(output / "calibration_curve.csv", index=False)
         demo = action_variation_demo(context_states, policy_mlp)
         demo.to_csv(output / "action_variation_demo.csv", index=False)
     # Chronological train/val loss (REWORK v2: issue-block, not row-level).
-    if train_df is not None and not train_df.empty:
-        loss = chronological_train_val_loss(train_df, kind="MLP", seed=MODEL_SEED)
+    if terminal_train_all is not None and not terminal_train_all.empty:
+        loss = chronological_train_val_loss(
+            terminal_train_all, kind="MLP", seed=MODEL_SEED
+        )
         loss.to_csv(output / "chronological_train_val_loss.csv", index=False)
 
 
@@ -2022,7 +2333,7 @@ def _build_handoff(
     fold2_model = fold_results.get("fold2", {}).get("policy_mlp", {})
     published = published_output or output
     return {
-        "handoff_version": "bj208-handoff-for-209-v4",
+        "handoff_version": "bj208-handoff-for-209-v5",
         "fit_boundary": {
             "train_through": "2022",
             "test_2023": True,

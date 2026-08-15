@@ -1,4 +1,4 @@
-# Issue #208 method protocol — BJ-UNIFIED-DYNAMIC-N-001 / v4
+# Issue #208 method protocol — BJ-UNIFIED-DYNAMIC-N-001 / v5
 # Frozen preregistrations; worker must not silently modify.
 # Protocol deltas appended in PROTOCOL-LOG / docs/research/issue_208_protocol_log.md.
 # REWORK v2 (2026-08-14, EV REJECT 53f67ec): supersede rows #208-2..#208-6.
@@ -11,8 +11,12 @@
 # PI takeover v4 (2026-08-15): genuine per-issue restricted controls,
 # rebased fallback capital, net-P&L holding metrics, actual LOCKED_TEST refit
 # isolation, decision-critical schema verification and transactional publish.
+# PI takeover v5 (2026-08-15): fit/validation disjoint before every fit API;
+# per-issue path metrics/exposures independently recomputed; complete frame,
+# JSON, model and receipt content binding; retained-development label/SP
+# domains fail closed; alternate replay output is explicitly supported.
 
-protocol_version: bj208-protocol-v4
+protocol_version: bj208-protocol-v5
 
 candidate_pool:
   description: "per-issue learned policy Q_theta(x,a) on the bounded N×K×lane×capital action catalog"
@@ -30,8 +34,10 @@ splits:
   holdout_isolated: true
   folds:
     - train: [CV_2021]
+      validation: "chronological final 15% of train issues; excluded from ranker/Q/Ridge/restricted/OOD fit"
       test: CV_2022
     - train: [CV_2021, CV_2022]
+      validation: "chronological final 15% of train issues; excluded from ranker/Q/Ridge/restricted/OOD fit"
       test: CV_2023
   protocol_delta_208_1: "no 2020 ticket surface in frozen upstream; fold train<=2020/test 2021 not constructible; CV_2021 is the initial fit block"
 
@@ -92,6 +98,11 @@ required_artifacts:
   - results/issue-208/dynamic_control_decisions.parquet
   - results/issue-208/path_holding_metrics.parquet
   - results/issue-208/holdout_mutation_receipt.json
+  - results/issue-208/holdout_refit_baseline.json
+  - results/issue-208/holdout_refit_mutated.json
+  - results/issue-208/training_frame_all.parquet
+  - results/issue-208/validation_frame_all.parquet
+  - results/issue-208/chronology_blocks.parquet
   - results/issue-208/provenance.json
   - results/issue-208/schema.json
   - results/issue-208/receipt.sha256
@@ -122,7 +133,7 @@ stages:
     constraints:
       - "only frozen upstream (value matrix sha 8fdace9c, #207 manifest 48c11d97)"
       - "report M per issue, N eligibility, labels availability; 2024/2025/2026 embargoed"
-      - "fail closed on malformed M×3 cells: every match exactly {3,1,0} outcome codes, exactly one realized outcome"
+      - "after safe-control exclusion, every retained development match has exactly {3,1,0}, exactly one realized outcome, and positive finite official SP in all three cells; embargoed matches remain label-blind"
   - name: preprocessing
     deliverable: "incumbent_paths.parquet + issue contexts + candidate pools (cached)"
     skill: data-preprocessing
@@ -149,7 +160,7 @@ stages:
     skill: experiment-tracking
     constraints:
       - "chronological issue-block splits only; NO sklearn row-level early-stopping validation"
-      - "validation = chronological issue-block holdout inside train folds (last 15% issues by issue id)"
+      - "validation = chronological issue-block holdout inside train folds (last 15% issues by issue id), resolved before and excluded from ranker, Q, Ridge, fixed selection, restricted controls and OOD fitting"
       - "MLPRegressor + Ridge + best fixed action; controls evaluated per fold (paths, lift, ablation)"
       - "dynamic N, dynamic K and dynamic N×K controls fit restricted MLP policies and score their lawful action subsets separately for every issue from causal state; no global-median repeated cell"
       - "safety gate: conservative lift > 0 AND coverage/OOD/fundability else frozen incumbent"

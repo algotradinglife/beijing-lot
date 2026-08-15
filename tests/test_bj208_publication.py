@@ -78,3 +78,19 @@ def test_keyboard_interrupt_during_build_preserves_output(tmp_path, monkeypatch)
         runner.run(output)
     assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
     assert not list(tmp_path.glob(".issue-208.staging-*"))
+
+
+def test_alternate_output_uses_canonical_handoff_before_scientific_stages(
+    tmp_path, monkeypatch
+):
+    seen = {}
+
+    def inspect_boundary(staging, *, published_output):
+        seen["published_output"] = published_output
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(runner, "_run_stages", inspect_boundary)
+    with pytest.raises(KeyboardInterrupt):
+        runner.run(tmp_path / "independent-audit-package")
+    assert seen["published_output"] == runner.CANONICAL_PUBLISHED_OUTPUT
+    assert not list(tmp_path.glob(".independent-audit-package.staging-*"))

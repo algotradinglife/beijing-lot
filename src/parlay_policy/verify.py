@@ -59,10 +59,10 @@ def _json(path: Path, value: Any) -> None:
     )
 
 
-# Files excluded from manifest coverage: the manifest itself and the plaintext
-# receipt (which binds the method.yaml hash and is itself hash-checked by
-# method_preflight).
-MANIFEST_EXCLUDED = {"SHA256SUMS.json", "receipt.sha256"}
+# Only the manifest itself is excluded: it cannot contain its own digest and
+# is externally bound by the exact Git review SHA.  Every other delivered
+# byte, including receipt.sha256, must be covered by the manifest.
+MANIFEST_EXCLUDED = {"SHA256SUMS.json"}
 
 
 def manifest(package: Path, files: list[Path]) -> dict[str, str]:
@@ -167,7 +167,11 @@ def verify_handoff_paths(package: Path) -> list[str]:
 
 
 def verify_receipt(package: Path) -> list[str]:
-    """receipt.sha256 binds method.yaml (line 'hash  method.yaml')."""
+    """Require the canonical one-line method receipt.
+
+    Exact bytes matter: append, duplicate-line and alternate-name variants
+    are rejected even if one valid-looking line remains.
+    """
     failures: list[str] = []
     receipt = package / "receipt.sha256"
     method = package / "method.yaml"
@@ -175,16 +179,14 @@ def verify_receipt(package: Path) -> list[str]:
         return ["missing receipt.sha256"]
     if not method.exists():
         return ["missing method.yaml for receipt check"]
-    text = receipt.read_text(encoding="utf-8")
     expected = sha256_file(method)
-    found = False
-    for line in text.splitlines():
-        if line.strip().endswith("method.yaml"):
-            parts = line.strip().split()
-            if parts and parts[0] == expected:
-                found = True
-    if not found:
-        failures.append("receipt.sha256 does not bind method.yaml hash")
+    expected_text = f"{expected}  method.yaml\n"
+    try:
+        text = receipt.read_text(encoding="utf-8")
+    except Exception as exc:
+        return [f"invalid receipt.sha256: {exc}"]
+    if text != expected_text:
+        failures.append("receipt.sha256 is not the canonical method binding")
     return failures
 
 
@@ -193,6 +195,8 @@ def verify_schema(frame: pd.DataFrame, required: dict[str, Any]) -> list[str]:
     for column, dtype in required.items():
         if column not in frame.columns:
             failures.append(f"missing column {column}")
+            continue
+        if dtype == "any":
             continue
         if dtype in {"numeric", "float", "int"}:
             if not pd.api.types.is_numeric_dtype(frame[column]):
@@ -225,6 +229,38 @@ def verify_package_schema(package: Path, schema: dict[str, Any]) -> list[str]:
     frames = schema.get("frames")
     if not isinstance(frames, dict) or not frames:
         return ["schema.json has no decision-critical frames"]
+    on_disk_frames = {
+        path.relative_to(package).as_posix()
+        for path in package.rglob("*")
+        if path.is_file() and path.suffix in {".csv", ".parquet"}
+    }
+    if set(frames) != on_disk_frames:
+        missing = sorted(on_disk_frames - set(frames))
+        stale = sorted(set(frames) - on_disk_frames)
+        if missing:
+            failures.append(f"schema omits data frames: {missing}")
+        if stale:
+            failures.append(f"schema declares missing data frames: {stale}")
+    critical_frames = {
+        "census.csv",
+        "eligibility.csv",
+        "issue_capital_ledger.parquet",
+        "decision_rows_all.parquet",
+        "dynamic_control_decisions.parquet",
+        "path_holding_metrics.parquet",
+        "label_surface_fit.parquet",
+        "ticket_economics.parquet",
+        "incumbent_paths.parquet",
+        "training_frame_all.parquet",
+        "validation_frame_all.parquet",
+        "chronology_blocks.parquet",
+        "decision_ticket_identities.parquet",
+    }
+    absent_critical = critical_frames - set(frames)
+    if absent_critical:
+        failures.append(
+            f"schema missing critical frames: {sorted(absent_critical)}"
+        )
     for name, contract in frames.items():
         if not isinstance(contract, dict):
             failures.append(f"invalid frame schema: {name}")
@@ -246,6 +282,16 @@ def verify_package_schema(package: Path, schema: dict[str, Any]) -> list[str]:
         except Exception as exc:
             failures.append(f"schema target unreadable {name}: {exc}")
             continue
+        declared_columns = list(required)
+        if declared_columns != list(frame.columns):
+            failures.append(
+                f"{name}: declared columns do not exactly match published order"
+            )
+        diagnostic_only = contract.get("diagnostic_only")
+        if not isinstance(diagnostic_only, bool):
+            failures.append(f"{name}: diagnostic_only must be explicit boolean")
+        elif name in critical_frames and diagnostic_only:
+            failures.append(f"{name}: critical frame marked diagnostic-only")
         failures.extend(
             f"{name}: {failure}"
             for failure in verify_schema(frame, required)
@@ -282,7 +328,23 @@ def verify_package_schema(package: Path, schema: dict[str, Any]) -> list[str]:
             if not isinstance(unit, str) or not unit.strip():
                 failures.append(f"{name}: invalid unit declaration for {column}")
 
-    for name, contract in schema.get("json_artifacts", {}).items():
+    json_contracts = schema.get("json_artifacts", {})
+    if not isinstance(json_contracts, dict):
+        failures.append("json_artifacts must be an object")
+        json_contracts = {}
+    on_disk_json = {
+        path.relative_to(package).as_posix()
+        for path in package.rglob("*.json")
+        if path.name not in {"SHA256SUMS.json", "schema.json"}
+    }
+    if set(json_contracts) != on_disk_json:
+        missing = sorted(on_disk_json - set(json_contracts))
+        stale = sorted(set(json_contracts) - on_disk_json)
+        if missing:
+            failures.append(f"schema omits JSON artifacts: {missing}")
+        if stale:
+            failures.append(f"schema declares missing JSON artifacts: {stale}")
+    for name, contract in json_contracts.items():
         path = package / name
         if not path.exists():
             failures.append(f"JSON schema target missing: {name}")
@@ -292,6 +354,8 @@ def verify_package_schema(package: Path, schema: dict[str, Any]) -> list[str]:
         except Exception as exc:
             failures.append(f"JSON schema target unreadable {name}: {exc}")
             continue
+        if not isinstance(contract.get("diagnostic_only"), bool):
+            failures.append(f"{name}: JSON diagnostic_only must be explicit")
         for key in contract.get("required_keys", []):
             current: Any = value
             for part in str(key).split("."):
@@ -300,11 +364,35 @@ def verify_package_schema(package: Path, schema: dict[str, Any]) -> list[str]:
                     break
                 current = current[part]
 
+    binary_contracts = schema.get("binary_artifacts", {})
+    if not isinstance(binary_contracts, dict):
+        failures.append("binary_artifacts must be an object")
+        binary_contracts = {}
+    on_disk_binary = {
+        path.relative_to(package).as_posix()
+        for path in package.rglob("*.joblib")
+    }
+    if set(binary_contracts) != on_disk_binary:
+        failures.append("binary artifact inventory mismatch")
+    for name in binary_contracts:
+        if not (package / name).is_file():
+            failures.append(f"binary artifact missing: {name}")
+
+    identity = schema.get("manifest_identity", {})
+    if not isinstance(identity, dict) or identity.get(
+        "all_delivered_bytes_except_manifest_are_hashed"
+    ) is not True:
+        failures.append("schema does not declare complete manifest coverage")
+
     required_relationships = {
         "capital_conservation",
         "ticket_bundle_n_k",
         "payout_exactly_once",
         "handoff_resolves_post_publish",
+        "chronological_issue_block_isolation",
+        "issue_level_path_metrics",
+        "dynamic_restricted_argmax",
+        "complete_code_binding_set",
     }
     observed_relationships = {
         str(row.get("name"))
@@ -393,6 +481,220 @@ def verify_holdout_mutation_receipt(package: Path) -> list[str]:
             failures.append(f"holdout receipt {key} is not SHA-256")
     if receipt.get("model_weights_scaler_fixed_choice_ood_and_decisions_invariant") is not True:
         failures.append("holdout receipt does not attest full fitted-state invariance")
+    payloads: dict[str, dict[str, Any]] = {}
+    for side in ("baseline", "mutated"):
+        file_key = f"{side}_payload_file"
+        ref = receipt.get(file_key)
+        if not isinstance(ref, str) or Path(ref).is_absolute() or ".." in Path(ref).parts:
+            failures.append(f"holdout receipt has invalid {file_key}")
+            continue
+        payload_path = package / ref
+        if not payload_path.exists():
+            failures.append(f"holdout payload missing: {ref}")
+            continue
+        try:
+            payloads[side] = json.loads(payload_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            failures.append(f"holdout payload unreadable {ref}: {exc}")
+            continue
+        encoded = json.dumps(
+            payloads[side],
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        actual = hashlib.sha256(encoded).hexdigest()
+        if actual != receipt.get(f"{side}_signature_sha256"):
+            failures.append(f"holdout {side} payload/signature mismatch")
+    if set(payloads) == {"baseline", "mutated"}:
+        if payloads["baseline"] != payloads["mutated"]:
+            failures.append("holdout baseline/mutated fitted payloads differ")
+        baseline = payloads["baseline"]
+        train_issues = set(map(str, baseline.get("training_issues", [])))
+        validation_issues = set(map(str, baseline.get("validation_issues", [])))
+        if not train_issues or not validation_issues:
+            failures.append("holdout payload lacks fit/validation issue blocks")
+        elif train_issues & validation_issues:
+            failures.append("holdout payload fit/validation issues overlap")
+        # Bind the attested terminal model to the actual #209 model bytes by
+        # comparing fitted numerical state, not joblib serialization bytes.
+        model_path = package / "models/fold2_mlp.joblib"
+        if not model_path.exists():
+            failures.append("holdout model binding target missing")
+        else:
+            try:
+                import joblib
+
+                model = joblib.load(model_path)
+                steps = getattr(model, "named_steps", {})
+                scaler = steps.get("standardscaler")
+                estimator = steps.get("mlpregressor")
+                model_payload = {
+                    "scaler_mean": np.asarray(scaler.mean_, dtype=float).tolist(),
+                    "scaler_scale": np.asarray(scaler.scale_, dtype=float).tolist(),
+                    "coefs": [
+                        np.asarray(value, dtype=float).tolist()
+                        for value in estimator.coefs_
+                    ],
+                    "intercepts": [
+                        np.asarray(value, dtype=float).tolist()
+                        for value in estimator.intercepts_
+                    ],
+                    "n_iter": int(estimator.n_iter_),
+                }
+                if baseline.get("policy") != model_payload:
+                    failures.append("holdout payload does not bind fold2 model")
+            except Exception as exc:
+                failures.append(f"holdout model binding failed: {exc}")
+        decisions_path = package / "decision_rows_all.parquet"
+        if decisions_path.exists():
+            decisions = pd.read_parquet(decisions_path)
+            terminal = decisions.loc[decisions["split"].eq("CV_2023")].copy()
+            actual_decisions = [
+                {
+                    "issue": str(row["issue"]),
+                    "prior_bankroll_yuan": float(row["prior_bankroll_yuan"]),
+                    "action_key": str(row["action_key"]),
+                    "decision_trace_json": str(row["decision_trace_json"]),
+                }
+                for _, row in terminal.sort_values("issue").iterrows()
+            ]
+            expected_decisions = sorted(
+                baseline.get("decisions", []),
+                key=lambda row: str(row.get("issue", "")),
+            )
+            if actual_decisions != expected_decisions:
+                failures.append("holdout payload does not bind terminal decisions")
+        else:
+            failures.append("holdout decision binding target missing")
+    return failures
+
+
+def verify_chronology(package: Path) -> list[str]:
+    """Verify fit/validation issue blocks are disjoint and chronological."""
+    failures: list[str] = []
+    paths = {
+        "fit": package / "training_frame_all.parquet",
+        "validation": package / "validation_frame_all.parquet",
+        "blocks": package / "chronology_blocks.parquet",
+    }
+    missing = [name for name, path in paths.items() if not path.exists()]
+    if missing:
+        return [f"chronology artifacts missing: {missing}"]
+    fit = pd.read_parquet(paths["fit"])
+    validation = pd.read_parquet(paths["validation"])
+    blocks = pd.read_parquet(paths["blocks"])
+    for frame_name, frame, role in (
+        ("fit", fit, "FIT"),
+        ("validation", validation, "VALIDATION"),
+    ):
+        for column in ("fold", "issue", "training_role"):
+            if column not in frame:
+                failures.append(f"{frame_name} frame missing {column}")
+        if "training_role" in frame and not frame["training_role"].eq(role).all():
+            failures.append(f"{frame_name} frame has wrong training_role")
+    required_block_columns = {
+        "fold", "issue", "role", "used_by_q_fit",
+        "used_by_ranker_fit", "used_by_ood_fit",
+    }
+    if not required_block_columns.issubset(blocks.columns):
+        failures.append("chronology block receipt missing required columns")
+        return failures
+    for fold in sorted(set(fit.get("fold", [])) | set(validation.get("fold", []))):
+        fit_issues = set(
+            fit.loc[fit["fold"].eq(fold), "issue"].astype(str)
+        )
+        val_issues = set(
+            validation.loc[validation["fold"].eq(fold), "issue"].astype(str)
+        )
+        if not fit_issues or not val_issues:
+            failures.append(f"{fold} has empty fit or validation issue block")
+            continue
+        overlap = fit_issues & val_issues
+        if overlap:
+            failures.append(f"{fold} fit/validation overlap: {sorted(overlap)[:5]}")
+        if max(fit_issues) >= min(val_issues):
+            failures.append(f"{fold} issue blocks are not chronological")
+        fold_blocks = blocks.loc[blocks["fold"].eq(fold)].copy()
+        declared_fit = set(
+            fold_blocks.loc[fold_blocks["role"].eq("FIT"), "issue"].astype(str)
+        )
+        declared_val = set(
+            fold_blocks.loc[
+                fold_blocks["role"].eq("VALIDATION"), "issue"
+            ].astype(str)
+        )
+        if declared_fit != fit_issues or declared_val != val_issues:
+            failures.append(f"{fold} chronology receipt/frame mismatch")
+        fit_flags = fold_blocks[fold_blocks["role"].eq("FIT")]
+        val_flags = fold_blocks[fold_blocks["role"].eq("VALIDATION")]
+        for column in ("used_by_q_fit", "used_by_ranker_fit", "used_by_ood_fit"):
+            if not fit_flags[column].eq(True).all():  # noqa: E712
+                failures.append(f"{fold} fit rows not enabled for {column}")
+            if not val_flags[column].eq(False).all():  # noqa: E712
+                failures.append(f"{fold} validation rows entered {column}")
+    return failures
+
+
+def verify_path_metrics(
+    ledger: pd.DataFrame,
+    holding: pd.DataFrame,
+) -> list[str]:
+    """Recompute issue-level and aggregate path metrics from primitives."""
+    from .replay import (
+        materialize_issue_path_metrics,
+        path_holding_metrics,
+        summarize_path,
+    )
+
+    failures: list[str] = []
+    if ledger.empty or holding.empty:
+        return ["path metric artifacts are empty"]
+    required_issue_columns = {
+        "drawdown_pct", "consecutive_losses", "mean_pairwise_overlap",
+        "ticket_hhi", "repeat_exposure",
+    }
+    missing = required_issue_columns - set(ledger.columns)
+    if missing:
+        return [f"capital ledger missing path metrics: {sorted(missing)}"]
+    for column in required_issue_columns:
+        if ledger[column].isna().any():
+            failures.append(f"capital ledger has null {column}")
+    expected_keys: set[tuple[str, str]] = set()
+    for (split, policy), group in ledger.groupby(["split", "policy"], sort=False):
+        group = group.sort_values(["year", "issue"], kind="mergesort")
+        expected_keys.add((str(split), str(policy)))
+        recomputed = materialize_issue_path_metrics(group)
+        for column in ("drawdown_pct", "consecutive_losses"):
+            observed = group[column].to_numpy(dtype=float)
+            expected = recomputed[column].to_numpy(dtype=float)
+            if not np.allclose(observed, expected, atol=1e-9):
+                failures.append(
+                    f"{split}/{policy} issue-level {column} mismatch"
+                )
+        summary = {**summarize_path(group), **path_holding_metrics(group)}
+        row = holding[
+            holding["split"].astype(str).eq(str(split))
+            & holding["policy"].astype(str).eq(str(policy))
+        ]
+        if len(row) != 1:
+            failures.append(f"{split}/{policy} holding summary cardinality != 1")
+            continue
+        for key, expected in summary.items():
+            if key not in row.columns:
+                failures.append(f"holding summary missing {key}")
+                continue
+            observed = row.iloc[0][key]
+            if isinstance(expected, (bool, np.bool_)):
+                if bool(observed) != bool(expected):
+                    failures.append(f"{split}/{policy} holding {key} mismatch")
+            elif not np.isclose(float(observed), float(expected), equal_nan=True):
+                failures.append(f"{split}/{policy} holding {key} mismatch")
+    observed_keys = set(
+        zip(holding["split"].astype(str), holding["policy"].astype(str))
+    )
+    if observed_keys != expected_keys:
+        failures.append("holding summary path inventory mismatch")
     return failures
 
 
@@ -413,8 +715,8 @@ def verify_handoff_contract(package: Path) -> list[str]:
         failures.append("handoff does not keep 2024 closed")
     if handoff.get("contract_version") != CONTRACT_VERSION:
         failures.append("handoff contract version mismatch")
-    if handoff.get("handoff_version") != "bj208-handoff-for-209-v4":
-        failures.append("handoff version is not v4")
+    if handoff.get("handoff_version") != "bj208-handoff-for-209-v5":
+        failures.append("handoff version is not v5")
     model_ref = handoff.get("model_file")
     if model_ref:
         target = _handoff_ref_in_package(package, str(model_ref))
@@ -456,6 +758,34 @@ def verify_dynamic_control_decisions(frame: pd.DataFrame) -> list[str]:
         }
         if len(group) > 1 and len(score_signatures) < 2:
             failures.append(f"{policy} scores do not respond to issue state")
+        for (_, row), trace in zip(group.iterrows(), traces):
+            scores = trace.get("scores")
+            if not isinstance(scores, dict) or not scores:
+                failures.append(f"{policy} has empty score map")
+                continue
+            try:
+                expected_key = max(scores, key=lambda key: float(scores[key]))
+            except Exception:
+                failures.append(f"{policy} has invalid score values")
+                continue
+            chosen = str(row["action_key"])
+            if chosen != expected_key or trace.get("action_key") != expected_key:
+                failures.append(f"{policy} chosen action is not score argmax")
+            match = re.fullmatch(
+                r"N(?P<n>\d+)/K(?P<k>\d+)/(?P<lane>[^/]+)/(?P<capital>[^/]+)",
+                chosen,
+            )
+            if match is None:
+                failures.append(f"{policy} has malformed action key")
+                continue
+            n = int(match.group("n"))
+            k = int(match.group("k"))
+            if match.group("lane") != "MARKET_WOR" or match.group("capital") != "NATIVE_2_YUAN":
+                failures.append(f"{policy} action outside frozen lane/capital")
+            if policy == "dynamic_n_fixed_k8_lane" and k != 8:
+                failures.append(f"{policy} chose K{k}, expected fixed K8")
+            if policy == "fixed_n7_dynamic_k" and n != 7:
+                failures.append(f"{policy} chose N{n}, expected fixed N7")
     return failures
 
 
@@ -661,6 +991,22 @@ def verify_code_bindings(provenance: dict[str, Any], root: Path) -> list[str]:
     bindings = provenance.get("code_bindings")
     if not isinstance(bindings, dict) or not bindings:
         return ["provenance missing code_bindings"]
+    expected_paths = {
+        "method.yaml",
+        "requirements.txt",
+        "scripts/run_bj208_policy.py",
+        *(
+            path.relative_to(root).as_posix()
+            for path in sorted((root / "src/parlay_policy").glob("*.py"))
+        ),
+    }
+    if set(map(str, bindings)) != expected_paths:
+        missing = sorted(expected_paths - set(map(str, bindings)))
+        extra = sorted(set(map(str, bindings)) - expected_paths)
+        if missing:
+            failures.append(f"code bindings omit expected files: {missing}")
+        if extra:
+            failures.append(f"code bindings contain unexpected files: {extra}")
     for relative, expected in bindings.items():
         path = root / str(relative)
         if not path.exists():
@@ -1072,6 +1418,84 @@ def tamper_dynamic_control_semantics(path: Path) -> None:
     frame.to_parquet(path, index=False)
 
 
+def tamper_dynamic_control_non_argmax(path: Path) -> None:
+    frame = pd.read_parquet(path)
+    trace = json.loads(frame.loc[frame.index[0], "decision_trace_json"])
+    scores = trace.get("scores", {})
+    if len(scores) < 2:
+        raise VerifyError("dynamic control tamper needs two scored actions")
+    chosen = min(scores, key=lambda key: float(scores[key]))
+    frame.loc[frame.index[0], "action_key"] = chosen
+    trace["action_key"] = chosen
+    frame.loc[frame.index[0], "decision_trace_json"] = json.dumps(
+        trace, ensure_ascii=False
+    )
+    frame.to_parquet(path, index=False)
+
+
+def tamper_zero_issue_drawdown(path: Path) -> None:
+    frame = pd.read_parquet(path)
+    frame["drawdown_pct"] = 0.0
+    frame.to_parquet(path, index=False)
+
+
+def tamper_holding_summary(path: Path) -> None:
+    frame = pd.read_parquet(path)
+    if frame.empty:
+        raise VerifyError("holding summary tamper target empty")
+    frame.loc[frame.index[0], "ending_capital_yuan"] = (
+        float(frame.loc[frame.index[0], "ending_capital_yuan"]) + 123.0
+    )
+    if "rolling5_loss_prob" in frame:
+        frame.loc[frame.index[0], "rolling5_loss_prob"] = 0.987654
+    frame.to_parquet(path, index=False)
+
+
+def tamper_omit_code_binding(path: Path) -> None:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    bindings = value.get("code_bindings", {})
+    if not bindings:
+        raise VerifyError("code binding tamper target empty")
+    bindings.pop(next(iter(bindings)))
+    _json(path, value)
+
+
+def tamper_receipt_append(path: Path) -> None:
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write("UNBOUND-DELIVERED-BYTES\n")
+
+
+def tamper_receipt_rewrite(path: Path) -> None:
+    path.write_text(f"{'0' * 64}  method.yaml\n", encoding="utf-8")
+
+
+def tamper_receipt_duplicate(path: Path) -> None:
+    text = path.read_text(encoding="utf-8")
+    path.write_text(text + text, encoding="utf-8")
+
+
+def tamper_forge_holdout_attestation(package: Path) -> None:
+    receipt_path = package / "holdout_mutation_receipt.json"
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    forged = {
+        "training_issues": ["FORGED_FIT"],
+        "validation_issues": ["FORGED_VALIDATION"],
+        "policy": {},
+        "decisions": [],
+    }
+    encoded = json.dumps(
+        forged, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    signature = hashlib.sha256(encoded).hexdigest()
+    for side in ("baseline", "mutated"):
+        ref = str(receipt[f"{side}_payload_file"])
+        _json(package / ref, forged)
+        receipt[f"{side}_signature_sha256"] = signature
+    receipt["mutated_rows"] = 1
+    receipt["model_weights_scaler_fixed_choice_ood_and_decisions_invariant"] = True
+    _json(receipt_path, receipt)
+
+
 def _rewrite_manifest_for_tamper(package: Path) -> None:
     artifacts = sorted(
         path for path in package.rglob("*")
@@ -1187,6 +1611,48 @@ def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, An
             target / "dynamic_control_decisions.parquet"
         ),
     )
+    _run_attack(
+        "dynamic_control_non_argmax",
+        lambda target: tamper_dynamic_control_non_argmax(
+            target / "dynamic_control_decisions.parquet"
+        ),
+    )
+    _run_attack(
+        "zero_issue_drawdown",
+        lambda target: tamper_zero_issue_drawdown(
+            target / "issue_capital_ledger.parquet"
+        ),
+    )
+    _run_attack(
+        "holding_summary_forgery",
+        lambda target: tamper_holding_summary(
+            target / "path_holding_metrics.parquet"
+        ),
+    )
+    _run_attack(
+        "omit_code_binding",
+        lambda target: tamper_omit_code_binding(target / "provenance.json"),
+    )
+    _run_attack(
+        "receipt_append",
+        lambda target: tamper_receipt_append(target / "receipt.sha256"),
+    )
+    _run_attack(
+        "receipt_rewrite",
+        lambda target: tamper_receipt_rewrite(target / "receipt.sha256"),
+    )
+    _run_attack(
+        "receipt_duplicate_line",
+        lambda target: tamper_receipt_duplicate(target / "receipt.sha256"),
+    )
+    _run_attack(
+        "receipt_delete",
+        lambda target: (target / "receipt.sha256").unlink(),
+    )
+    _run_attack(
+        "forged_holdout_attestation",
+        tamper_forge_holdout_attestation,
+    )
     return results
 
 
@@ -1201,9 +1667,11 @@ __all__ = [
     "tamper_req_evidence",
     "verify_2024_mutation_invariance", "verify_capital_accounting",
     "verify_code_bindings", "verify_completion", "verify_dynamic_control_decisions",
+    "verify_chronology",
     "verify_handoff_contract", "verify_handoff_paths",
     "verify_holdout_mutation_receipt", "verify_manifest",
-    "verify_nk_semantics", "verify_package_schema", "verify_req_evidence",
+    "verify_nk_semantics", "verify_package_schema", "verify_path_metrics",
+    "verify_req_evidence",
     "verify_no_2024_issue", "verify_no_embargoed_split",
     "verify_payout_economics", "verify_provenance", "verify_receipt",
     "verify_schema",

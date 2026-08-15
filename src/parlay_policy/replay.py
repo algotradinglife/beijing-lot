@@ -410,6 +410,42 @@ def apply_issue_settlement(
     return float(current_bankroll_yuan - funded_stake_yuan + gross_payout_yuan)
 
 
+def materialize_issue_path_metrics(path: pd.DataFrame) -> pd.DataFrame:
+    """Recompute decision-facing per-issue path metrics from primitive rows.
+
+    This is deliberately applied at the end of every replay path so special
+    branches (NO_BET, frozen incumbent, pool fallback and ordinary actions)
+    cannot publish placeholder drawdown or loss-streak values.
+    """
+    if path.empty:
+        return path.copy()
+    result = path.copy()
+    initial = float(result.iloc[0]["pre_issue_bankroll_yuan"])
+    posts = result["post_issue_bankroll_yuan"].to_numpy(dtype=float)
+    running_peaks = np.maximum.accumulate(
+        np.concatenate(([initial], posts))
+    )[1:]
+    result["drawdown_pct"] = np.divide(
+        running_peaks - posts,
+        running_peaks,
+        out=np.zeros_like(posts),
+        where=running_peaks > 0,
+    )
+    pnl = (
+        result["net_pnl_yuan"].to_numpy(dtype=float)
+        if "net_pnl_yuan" in result
+        else result["gross_payout_yuan"].to_numpy(dtype=float)
+        - result["funded_stake_yuan"].to_numpy(dtype=float)
+    )
+    streak = 0
+    streaks: list[int] = []
+    for value in pnl:
+        streak = streak + 1 if value < 0 else 0
+        streaks.append(streak)
+    result["consecutive_losses"] = streaks
+    return result
+
+
 def full_path_replay(
     contexts: dict[tuple[str, str], IssueContext],
     pool_cache: dict[str, pd.DataFrame],
@@ -419,6 +455,7 @@ def full_path_replay(
     policy_name: str = "learned",
     ranker_scores_by_issue: dict[str, np.ndarray] | None = None,
     frozen_incumbent: pd.DataFrame | None = None,
+    frozen_ticket_metrics: dict[tuple[str, str], dict[str, float]] | None = None,
     stochastic_lane_aggregate: bool = True,
 ) -> pd.DataFrame:
     """Replay a ¥100,000 path over a split's issues with an action chooser.
@@ -498,6 +535,9 @@ def full_path_replay(
                 drawdown_pct = (peak - new_bankroll) / peak if peak else 0.0
                 net_pnl = payout - funded
                 consecutive_losses = consecutive_losses + 1 if net_pnl < 0 else 0
+                exposure = (frozen_ticket_metrics or {}).get(
+                    (str(split), str(issue)), {}
+                )
                 rows.append(
                     {
                         "split": split,
@@ -517,9 +557,15 @@ def full_path_replay(
                         "net_pnl_yuan": net_pnl,
                         "drawdown_pct": drawdown_pct,
                         "consecutive_losses": consecutive_losses,
-                        "mean_pairwise_overlap": float("nan"),
-                        "ticket_hhi": float("nan"),
-                        "repeat_exposure": float("nan"),
+                        "mean_pairwise_overlap": float(
+                            exposure.get("mean_pairwise_overlap", float("nan"))
+                        ),
+                        "ticket_hhi": float(
+                            exposure.get("ticket_hhi", float("nan"))
+                        ),
+                        "repeat_exposure": float(
+                            exposure.get("repeat_exposure", float("nan"))
+                        ),
                         "decision_trace_json": json.dumps(
                             trace, ensure_ascii=False
                         ),
@@ -622,7 +668,7 @@ def full_path_replay(
             }
         )
         bankroll = new_bankroll
-    return pd.DataFrame(rows)
+    return materialize_issue_path_metrics(pd.DataFrame(rows))
 
 
 def _running_peak_drawdown(path: pd.DataFrame) -> float:
@@ -773,5 +819,5 @@ __all__ = [
     "build_issue_contexts", "build_label_surface",
     "build_pool_cache", "build_training_frame", "full_path_replay",
     "incumbent_issue_ledger", "issue_action_lift", "path_holding_metrics",
-    "summarize_path",
+    "materialize_issue_path_metrics", "summarize_path",
 ]

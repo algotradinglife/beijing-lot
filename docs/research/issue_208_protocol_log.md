@@ -336,3 +336,41 @@ family, action catalog or selection rule.
 - Producer evidence records REQ-208-01..09 paths and the producer code commit.
   The exact final review HEAD is posted externally because a Git commit cannot
   contain its own hash; independent EV must bind that full 40-character HEAD.
+
+---
+
+## 17. PI takeover v5 closure rows (2026-08-15, concurrent EV REJECTs at 42b6e386)
+
+Two independent fresh audits bound PR #230 exact HEAD
+`42b6e386cf74bff5e0377314dd9a258712d48430`. They reproduced the scientific
+result and accepted the v4 payout, dynamic-control, live-bankroll, fundability,
+holdout-refit and transactional-publication corrections, but found remaining
+method/evidence boundary failures. These rows do not change the action grid,
+model family, seed aggregation, selection rule or scientific hypothesis.
+
+| Row | Action | Scope | Supersedes | Rationale |
+|---|---|---|---|---|
+| #208-21 | supersede | resolve chronological fit/validation issue blocks before any ticket-ranker, Q-MLP, Ridge, fixed-action, restricted-control or OOD fit; validation issues enter scoring/diagnostics only | v4 fit-all + separately score validation | Concurrent EV A D1: declared validation issue rows still entered the actual fit APIs. |
+| #208-22 | supersede | every replay path materializes issue-level running-peak drawdown and net-P&L loss streak from primitive bankroll rows; frozen incumbent identities provide overlap/HHI/repeat metrics | v4 placeholder issue metrics / null frozen exposure | Concurrent EV A D2: aggregate metrics were correct while 1,460 published issue rows carried zero drawdown and decisive fallback paths had null concentration evidence. |
+| #208-23 | supersede | schema declares every CSV/Parquet column exactly; each auxiliary frame is explicitly diagnostic-only; every JSON/model payload is inventoried; production verification recomputes chronology, issue path metrics, dynamic argmax and the complete code-binding set | v4 nine-frame subset schema | Concurrent EV A D3: 44 data frames were undeclared and remanifested semantic corruption could pass. |
+| #208-24 | supersede | SHA256SUMS covers every delivered byte except itself; `receipt.sha256` is a canonical one-line method binding and is manifest-bound; manifest identity is externally bound by exact Git HEAD + EV | v4 receipt excluded from manifest | Concurrent EV B D1: append/duplicate/rewrite of receipt bytes passed both manifest and receipt verification. |
+| #208-25 | supersede | after safe-control exclusion, every retained development match must have exactly one realized outcome and a positive finite official-SP triple; embargoed rows remain label-blind | v4 accidental current-data safety | Concurrent EV B D2: a future retained zero-realized match would be silently settled as a loss. |
+| #208-26 | supersede | arbitrary audit output directories are supported, but all serialized #209 references remain canonical `results/issue-208/**`; the boundary is resolved before scientific stages | v4 output-dependent handoff ref | Concurrent EV B D3: alternate-output replay failed only after the full expensive computation. |
+
+### v5 executable evidence
+
+- `chronology_blocks.parquet`, `training_frame_all.parquet` and
+  `validation_frame_all.parquet` expose disjoint per-fold roles and fit-use
+  flags; `verify_chronology` checks the issue sets and chronological order.
+- `materialize_issue_path_metrics` is the single path finalizer;
+  `verify_path_metrics` independently recomputes each issue row and every
+  aggregate holding field from primitive funded/payout/bankroll values.
+- `schema.json` carries the exact complete frame/JSON/model inventory;
+  `verify_package_schema` rejects omissions, stale declarations, column drift
+  and critical frames mislabeled diagnostic-only.
+- Holdout refit baseline and mutated fitted payloads are materialized,
+  manifest-bound and linked to the fold2 joblib numerical state plus terminal
+  decisions.
+- Production tamper suite adds receipt append/rewrite/duplicate/delete,
+  non-argmax dynamic action, zeroed issue drawdown, omitted code binding and
+  forged holdout attestation attacks.

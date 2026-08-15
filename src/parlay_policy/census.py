@@ -101,8 +101,10 @@ def _validate_outcome_triples(group: pd.DataFrame, issue: str) -> None:
 
     The value matrix is long-form (3 rows per match).  For every match:
       - outcome codes are exactly {3,1,0} (each once);
-      - exactly one realized_outcome is True (non-null boolean);
-      - official_final_sp_label is positive finite or NaN.
+      - at most one realized_outcome is True before exclusion; the stricter
+        retained-development requirement is enforced after the safe-control
+        exclusion in :func:`build_panels`;
+      - official_final_sp_label is finite and non-negative when present.
     """
     matches = group.groupby("match_idx", sort=False)
     for match_idx, rows in matches:
@@ -143,7 +145,15 @@ def build_panels(frame: pd.DataFrame) -> dict[tuple[str, str], IssuePanel]:
         sp = group.predicted_final_sp.to_numpy(dtype=float).reshape(-1, 3)
         sp_seed_std = group.sp_seed_std.to_numpy(dtype=float).reshape(-1, 3)
         official_sp = group.official_final_sp_label.to_numpy(dtype=float).reshape(-1, 3)
-        realized = group.realized_outcome.to_numpy(dtype=bool).reshape(-1, 3)
+        # Never cast NaN directly to bool (``bool(np.nan) is True``).  Missing
+        # labels remain False and are validated against the split/retention
+        # boundary below.
+        realized = (
+            group.realized_outcome.fillna(False)
+            .astype(bool)
+            .to_numpy()
+            .reshape(-1, 3)
+        )
         match_idx = group.match_idx.drop_duplicates().to_numpy(dtype=int)
 
         fully_missing_safe = np.isnan(probability).all(axis=1)
@@ -169,6 +179,27 @@ def build_panels(frame: pd.DataFrame) -> dict[tuple[str, str], IssuePanel]:
         realized = realized[retained]
         match_idx = match_idx[retained]
 
+        # A retained development match is a supervised observation: it must
+        # have exactly one realized outcome and a complete positive official
+        # SP triple.  Embargoed rows may legitimately be label-unavailable;
+        # they are never admitted to model fitting or settlement.
+        if str(split) in DEVELOPMENT_SPLITS:
+            realized_counts = realized.sum(axis=1)
+            if not np.equal(realized_counts, 1).all():
+                bad = match_idx[~np.equal(realized_counts, 1)][:5].tolist()
+                raise CensusError(
+                    f"issue {issue} retained development matches must have "
+                    f"exactly one realized outcome: {bad}"
+                )
+            valid_official = np.isfinite(official_sp) & (official_sp > 0)
+            if not valid_official.all():
+                bad_rows = np.flatnonzero(~valid_official.all(axis=1))[:5]
+                bad = match_idx[bad_rows].tolist()
+                raise CensusError(
+                    f"issue {issue} retained development matches require "
+                    f"positive finite official SP triples: {bad}"
+                )
+
         if not (probability > 0).all():
             raise CensusError(f"issue {issue} has non-positive control_probability")
         if not np.isclose(probability.sum(axis=1), 1.0, rtol=0.0, atol=1e-10).all():
@@ -177,16 +208,15 @@ def build_panels(frame: pd.DataFrame) -> dict[tuple[str, str], IssuePanel]:
             raise CensusError(f"issue {issue} has non-finite/non-positive predicted_sp")
         if not np.isfinite(experimental_probability).all():
             raise CensusError(f"issue {issue} non-finite experimental_probability")
-        # D4: nullable boolean domain — labels_available iff realized has any
-        # True, and every True row is a real non-null observation.
+        # Development rows passed the per-retained-match exact-one check.
+        # Embargoed rows are deliberately label-blind even if source labels
+        # happen to be physically present.
         if str(split) in EMBARGOED_SPLITS:
             labels_available = False
         else:
-            labels_available = bool(realized.sum(axis=1).sum() > 0)
+            labels_available = bool(len(realized) > 0)
 
-        match_ids = (
-            group["match_idx"].drop_duplicates().astype(str).to_numpy()
-        )
+        match_ids = match_idx.astype(str)
         panels[(str(split), str(issue))] = IssuePanel(
             split=str(split),
             issue=str(issue),

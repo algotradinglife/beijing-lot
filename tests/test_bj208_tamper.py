@@ -74,7 +74,7 @@ def package(tmp_path: Path) -> Path:
     )
     artifacts = sorted(
         p for p in tmp_path.iterdir()
-        if p.is_file() and p.name not in ("SHA256SUMS.json", "receipt.sha256")
+        if p.is_file() and p.name != "SHA256SUMS.json"
     )
     _write_json(tmp_path / "SHA256SUMS.json", manifest(tmp_path, artifacts))
     return tmp_path
@@ -151,6 +151,25 @@ def test_unlisted_payload_detected(package: Path):
     assert any("unlisted" in f for f in failures)
 
 
+@pytest.mark.parametrize("mutation", ["append", "rewrite", "duplicate", "delete"])
+def test_receipt_bytes_are_manifest_bound_and_canonical(package: Path, mutation: str):
+    receipt = package / "receipt.sha256"
+    if mutation == "append":
+        receipt.write_text(
+            receipt.read_text(encoding="utf-8") + "UNBOUND\n",
+            encoding="utf-8",
+        )
+    elif mutation == "rewrite":
+        receipt.write_text(f"{'0' * 64}  method.yaml\n", encoding="utf-8")
+    elif mutation == "duplicate":
+        text = receipt.read_text(encoding="utf-8")
+        receipt.write_text(text + text, encoding="utf-8")
+    else:
+        receipt.unlink()
+    failures = _verify_full(package)
+    assert failures, f"receipt {mutation} must be rejected"
+
+
 def test_outcome_triple_validation():
     """D4: a match with duplicate outcome codes / multiple realized outcomes
     must fail panel construction (production entry)."""
@@ -181,6 +200,65 @@ def test_outcome_triple_multiple_realized():
     )
     with pytest.raises(CensusError):
         _validate_outcome_triples(rows, "22011")
+
+
+def _panel_frame(*, split: str, realized: list[bool], official_sp: list[float]):
+    frame = pd.DataFrame(
+        {
+            "split": [split] * 3,
+            "issue": ["21001"] * 3,
+            "year": [2021] * 3,
+            "match_idx": [0, 0, 0],
+            "outcome_code": ["3", "1", "0"],
+            "control_probability": [0.5, 0.3, 0.2],
+            "experimental_probability": [0.5, 0.3, 0.2],
+            "predicted_final_sp": [2.0, 3.0, 5.0],
+            "sp_seed_std": [0.1, 0.1, 0.1],
+            "official_final_sp_label": official_sp,
+            "realized_outcome": realized,
+        }
+    )
+    frame["_outcome_rank"] = frame["outcome_code"].map({"3": 0, "1": 1, "0": 2})
+    return frame
+
+
+def test_retained_development_zero_realized_fails_closed():
+    from parlay_policy.census import build_panels, CensusError
+
+    with pytest.raises(CensusError, match="exactly one realized"):
+        build_panels(
+            _panel_frame(
+                split="CV_2021",
+                realized=[False, False, False],
+                official_sp=[2.0, 3.0, 5.0],
+            )
+        )
+
+
+def test_retained_development_zero_official_sp_fails_closed():
+    from parlay_policy.census import build_panels, CensusError
+
+    with pytest.raises(CensusError, match="positive finite official SP"):
+        build_panels(
+            _panel_frame(
+                split="CV_2021",
+                realized=[True, False, False],
+                official_sp=[0.0, 3.0, 5.0],
+            )
+        )
+
+
+def test_embargoed_zero_realized_remains_label_blind():
+    from parlay_policy.census import build_panels
+
+    panels = build_panels(
+        _panel_frame(
+            split="LOCKED_TEST",
+            realized=[False, False, False],
+            official_sp=[0.0, np.nan, np.nan],
+        )
+    )
+    assert panels[("LOCKED_TEST", "21001")].labels_available is False
 
 
 def test_2024_mutation_does_not_change_development_panel_surface():
