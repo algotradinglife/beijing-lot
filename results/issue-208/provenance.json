@@ -14,5 +14,5 @@
   "source_issue_207_sha": "90869a959dc1b972cd872ffe465d1009e29df75e",
   "source_value_matrix": "results/issue-205/value_matrix.parquet",
   "source_value_matrix_sha256": "8fdace9c7249502456f8990137011847df9addae5ad633e61760c44b7ccde84b",
-  "version": "bj208-dynamic-nk-policy-v2"
+  "version": "bj208-dynamic-nk-policy-v3"
 }

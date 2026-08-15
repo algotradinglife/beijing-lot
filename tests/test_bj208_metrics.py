@@ -72,11 +72,17 @@ def test_drawdown_no_drawdown():
 
 
 def test_matched_lift_definition_production():
-    """matched lift = learned path ending capital minus frozen incumbent ending."""
+    """matched lift = learned path ending capital minus frozen incumbent ending.
+
+    REWORK v3 (PI payout-economics): the frozen incumbent CV_2023 ending is
+    RECONSTRUCTED under the corrected formula (realized_gross * ¥2, 0.65
+    applied exactly once) = ¥99,245.37815 — NOT the superseded inflated #207
+    ledger value ¥99,312.889461 (which divided the coefficient out).
+    """
     learned = 99_500.0
-    incumbent = 99_312.889461
+    incumbent = 99_245.37815
     lift = learned - incumbent
-    assert abs(lift - 187.110539) < 1e-3
+    assert abs(lift - 254.62185) < 1e-3
 
 
 def test_selection_rule_median_production():

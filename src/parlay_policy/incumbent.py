@@ -1,10 +1,13 @@
 """Issue #208: frozen incumbent N7/K8/native-¥2 capital path.
 
-For CV_2022/CV_2023 the #207 ledger is authoritative. For CV_2021 (the #207
-fit fold, which had no Stage-4 capital replay) the incumbent path is
-reconstructed from the frozen CONTROLLING ticket identities with the identical
-native ¥2 rule. The result is one consistent frozen incumbent path per issue
-for matched-lift accounting and prior bankroll state.
+REWORK v3 (PI payout-economics 2026-08-15): the incumbent path is
+RECONSTRUCTED from the frozen #207 CONTROLLING ticket identities under the
+corrected pre-tax formula for ALL development splits.  Upstream #206
+`realized_gross` already includes the Beijing payout coefficient exactly once
+(realized_gross = 0.65 * prod(official_sp)), so per-ticket native-¥2 payout =
+realized_gross * ¥2.  The superseded #207 ledger `gross_payout_yuan` (which
+derives "pre-tax" by dividing the correct 0.65-adjusted value by 0.65) is NOT
+an admissible baseline and is never read here.
 """
 
 from __future__ import annotations
@@ -15,7 +18,6 @@ import numpy as np
 import pandas as pd
 
 from .contract import (
-    INCUMBENT_CAPITAL,
     INCUMBENT_K,
     INCUMBENT_LANE,
     INCUMBENT_N,
@@ -32,57 +34,48 @@ def build_incumbent_paths(
     upstream_ledger: pd.DataFrame,
     upstream_tickets: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Per-issue frozen incumbent N7/K8/native-¥2 capital rows (all dev splits)."""
+    """Per-issue frozen incumbent N7/K8/native-¥2 capital rows (all dev splits).
+
+    REWORK v3: the #207 ledger is intentionally NOT used as the payout source —
+    its `gross_payout_yuan` was computed under the superseded interpretation
+    (pre-tax = realized_gross / 0.65), which inflates every winning payout.
+    Instead every split is reconstructed from the frozen CONTROLLING ticket
+    identities with the corrected economics: payout = realized_gross * ¥2,
+    funded = K * ¥2, post = pre - funded + payout.
+    """
     rows: list[dict[str, Any]] = []
-    # Authoritative ledger rows first (CV_2022/CV_2023).
-    for _, row in upstream_ledger.iterrows():
-        if (
-            row["policy"] != INCUMBENT_LANE
-            or row["k"] != INCUMBENT_K
-            or row["controller"] != INCUMBENT_CAPITAL
-        ):
-            continue
-        rows.append(
-            {
-                "split": str(row["split"]),
-                "issue": str(row["issue"]),
-                "year": int(row["year"]),
-                "pre_issue_bankroll_yuan": float(row["pre_issue_bankroll_yuan"]),
-                "funded_stake_yuan": float(row["funded_stake_yuan"]),
-                "gross_payout_yuan": float(row["gross_payout_yuan"]),
-                "post_issue_bankroll_yuan": float(row["post_issue_bankroll_yuan"]),
-                "source": "207_LEDGER",
-            }
-        )
-    # CV_2021 reconstruction from frozen CONTROLLING identities.
     tickets = upstream_tickets[
-        (upstream_tickets["split"] == "CV_2021")
-        & (upstream_tickets["panel_role"] == "CONTROLLING")
+        (upstream_tickets["panel_role"] == "CONTROLLING")
         & (upstream_tickets["policy"] == INCUMBENT_LANE)
         & (upstream_tickets["k"] == INCUMBENT_K)
     ].copy()
     if tickets.empty:
-        raise IncumbentError("CV_2021 incumbent CONTROLLING tickets missing")
-    bankroll = INITIAL_BANKROLL_YUAN
-    for issue, group in tickets.groupby("issue", sort=True):
-        funded = float(len(group) * TICKET_STAKE_YUAN)
-        payout = float(
-            group["pre_tax_gross_multiple"].fillna(0.0).sum() * TICKET_STAKE_YUAN
-        )
-        post = bankroll - funded + payout
-        rows.append(
-            {
-                "split": "CV_2021",
-                "issue": str(issue),
-                "year": int(group["year"].iloc[0]),
-                "pre_issue_bankroll_yuan": bankroll,
-                "funded_stake_yuan": funded,
-                "gross_payout_yuan": payout,
-                "post_issue_bankroll_yuan": post,
-                "source": "CV2021_RECONSTRUCTED_FROM_FROZEN_IDENTITIES",
-            }
-        )
-        bankroll = post
+        raise IncumbentError("incumbent CONTROLLING tickets missing")
+    for split, split_tickets in tickets.groupby("split", sort=True):
+        if split not in ("CV_2021", "CV_2022", "CV_2023"):
+            continue
+        bankroll = INITIAL_BANKROLL_YUAN
+        for issue, group in split_tickets.groupby("issue", sort=True):
+            funded = float(len(group) * TICKET_STAKE_YUAN)
+            # Corrected economics: realized_gross already = 0.65*prod(SP);
+            # native ¥2 per ticket. Never divide the coefficient out.
+            payout = float(
+                group["realized_gross"].fillna(0.0).sum() * TICKET_STAKE_YUAN
+            )
+            post = bankroll - funded + payout
+            rows.append(
+                {
+                    "split": str(split),
+                    "issue": str(issue),
+                    "year": int(group["year"].iloc[0]),
+                    "pre_issue_bankroll_yuan": bankroll,
+                    "funded_stake_yuan": funded,
+                    "gross_payout_yuan": payout,
+                    "post_issue_bankroll_yuan": post,
+                    "source": "RECONSTRUCTED_CORRECTED_ECONOMICS",
+                }
+            )
+            bankroll = post
     frame = pd.DataFrame(rows)
     frame = frame.drop_duplicates(subset=["split", "issue"], keep="first")
     return frame.sort_values(["split", "issue"]).reset_index(drop=True)

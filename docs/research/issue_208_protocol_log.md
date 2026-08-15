@@ -229,3 +229,44 @@ traced to its root cause; the same-category full sweep is documented in
   receipt) so SHA256SUMS.json has full coverage.
 - NO_BET explicit path for infeasible/OOD/incumbent-infeasible cases —
   empty action lists no longer crash argmax.
+
+---
+
+## 14. REWORK v3 supersede rows (2026-08-15, PI adversarial review 5e45132)
+
+PI rejected the v2 delivery at SHA `5e4513297783f3dd98eca9a41cf932bdbfb6003e`
+(PR #230) with a blocking scientific defect: the delivery used the superseded
+interpretation that 0.65 is a tax adjustment removable from pre-tax economics.
+The Issue contract now records the controlling formula:
+
+    pre_tax_gross_multiple = hit * 0.65 * product(official_final_sp_i)
+
+0.65 is the Beijing Single Match ticket payout coefficient, applied EXACTLY
+ONCE per winning N-fold ticket. It is never divided out, never applied per
+leg, and never compounded as 0.65^N.
+
+| Row | Action | Scope | Supersedes | Rationale |
+|---|---|---|---|---|
+| #208-7 | supersede | payout semantics: pre-tax gross multiple = hit × 0.65 × prod(official SP); expected_pre_tax_net = 0.65 × prod(p·SP) − 1 | §6 settlement + all v2 artifacts | PI adversarial review 2026-08-15: v2 omitted the Beijing payout coefficient in `tickets.py` (multiple = prod(SP)), divided it out in `replay.py:145` (payout = realized_gross/0.65 × ¥2), and reconstructed the incumbent from the inflated #207 ledger. 0.65 is a payout coefficient, not a tax factor. |
+| #208-8 | supersede | incumbent path: RECONSTRUCTED for ALL development splits from frozen #207 CONTROLLING ticket identities with corrected economics (payout = sum(realized_gross) × ¥2); the superseded #207 ledger `gross_payout_yuan` (pre-tax = realized_gross/0.65) is never read | §2 frozen incumbent binding + v2 incumbent_paths | PI 2026-08-15: #207 accepted ticket identities stay frozen, but their bankroll economics are not an admissible baseline. The v2 incumbent read the inflated #207 ledger (CV_2023 23084 gross_payout 192.89 vs corrected 125.38). |
+| #208-9 | supersede | contract/protocol version → bj208-dynamic-nk-policy-v3 / bj208-protocol-v3; constant renamed TAX_FACTOR → PAYOUT_COEFFICIENT (0.65) with "never divide out / per leg / 0.65^N" semantics | v2 versions + TAX_FACTOR name | The name "tax factor" encoded the superseded interpretation; the constant now states the coefficient semantics. |
+| #208-10 | add | production-entry payout-economics verifier: `verify_payout_economics` recomputes 0.65×prod(SP) from frozen value-matrix panels + upstream CONTROLLING realized_gross and compares against `ticket_economics.parquet` and `incumbent_paths.parquet`; tamper probes for omission, division-out and 0.65^N | — | PI REQUIRED: independent EV must attack omission, division-out and 0.65^N failure modes through production entry points. |
+
+### REWORK v3 evidence chain
+
+- `src/parlay_policy/tickets.py`: `_rows_to_frame` / `_ticket_row` now compute
+  `pre_tax_gross_multiple = hit * 0.65 * prod(official_sp)` and
+  `expected_pre_tax_net = 0.65 * prod(p*SP) - 1`; raw `official_sp_product` is
+  retained as an explicitly named diagnostic only.
+- `src/parlay_policy/replay.py:145` + `incumbent_issue_ledger`: payout =
+  sum(realized_gross) × ¥2 (realized_gross already includes 0.65 exactly
+  once) — the `/TAX_FACTOR` division-out is removed.
+- `src/parlay_policy/incumbent.py`: `build_incumbent_paths` reconstructs ALL
+  splits (CV_2021/22/23) from frozen CONTROLLING identities with corrected
+  economics; source = `RECONSTRUCTED_CORRECTED_ECONOMICS`.
+- `scripts/run_bj208_policy.py`: `_frozen_incumbent_tickets` remaps the
+  multiple column to `realized_gross`; `ticket_economics.parquet` materialized
+  for production-entry verification; `verify_package` runs
+  `verify_payout_economics`; decision/handoff record the formula.
+- Tests: `tests/test_bj208_payout_economics.py` (golden formula + omission /
+  division-out / 0.65^N production-entry tamper detection).

@@ -1,10 +1,27 @@
 """Issue #208: dynamic N x K risk-conditioned parlay policy frontier.
 
-Contract BJ-UNIFIED-DYNAMIC-N-001 / v3 (REWORK v2, EV REJECT 53f67ec).
+Contract BJ-UNIFIED-DYNAMIC-N-001 / v3 (REWORK v3, PI payout-economics
+REJECT 5e45132; supersedes EV REJECT 53f67ec v2 delivery).
 Frozen preregistrations live in docs/research/issue_208_protocol_log.md.
 This module binds constants, action catalog, seeds and chronology.
 
-REWORK v2 changes (see PROTOCOL-LOG supersede #208-2..#208-6):
+REWORK v3 (PI adversarial review 2026-08-15 — payout semantics):
+- The controlling pre-tax convention includes the Beijing Single Match
+  payout coefficient exactly once per winning N-fold ticket:
+
+      pre_tax_gross_multiple = hit * PAYOUT_COEFFICIENT * product(official_sp_i)
+
+  PAYOUT_COEFFICIENT (0.65) is a ticket payout coefficient, NOT a tax
+  factor. It is never divided out, never applied per leg, and never
+  compounded as 0.65^N. Any upstream field that labels product(SP) as
+  pre-tax gross or derives it by division by 0.65 is superseded for #208.
+- Expected ticket economics used as action targets / diagnostics apply the
+  same boundary: expected_pre_tax_net = 0.65 * prod(p*SP) - 1.
+- Frozen incumbent ticket identities are inherited from #207 CONTROLLING
+  panel, but incumbent bankroll economics are reconstructed under the
+  corrected formula (never the inflated #207 ledger payout).
+
+REWORK v2 changes (PROTOCOL-LOG supersede #208-2..#208-6) remain:
 - Stochastic lanes execute ONLY on the 16 preregistered hash seeds; seed=0
   is never used for execution or controls (was D3/D4).
 - SIMPLE_ACTIVE capital replicates #207 EQUAL_1PCT exactly: requested =
@@ -20,8 +37,8 @@ from dataclasses import asdict, dataclass
 from hashlib import sha256
 from typing import Final
 
-CONTRACT_VERSION: Final = "bj208-dynamic-nk-policy-v2"
-PROTOCOL_VERSION: Final = "bj208-protocol-v2"
+CONTRACT_VERSION: Final = "bj208-dynamic-nk-policy-v3"
+PROTOCOL_VERSION: Final = "bj208-protocol-v3"
 UPSTREAM_207_SHA: Final = (
     "90869a959dc1b972cd872ffe465d1009e29df75e"
 )
@@ -38,7 +55,11 @@ CAUSAL_TENSOR_PACKAGE: Final = "results/bj203_causal_tensor_v2"
 N_GRID: Final = (4, 5, 6, 7, 8, 9, 10)
 K_GRID: Final = (8, 16, 32)
 OUTCOMES: Final = ("3", "1", "0")
-TAX_FACTOR: Final = 0.65
+# Beijing Single Match ticket payout coefficient — applied EXACTLY ONCE per
+# winning N-fold ticket (pre_tax_gross_multiple = hit * 0.65 * prod(SP)).
+# This is a ticket payout coefficient, NOT a tax factor: never divided out,
+# never applied per leg, never compounded as 0.65^N (PI 2026-08-15).
+PAYOUT_COEFFICIENT: Final = 0.65
 TICKET_STAKE_YUAN: Final = 2
 INITIAL_BANKROLL_YUAN: Final = 100_000.0
 
@@ -201,7 +222,7 @@ __all__ = [
     "K_GRID", "LANES", "MODEL_SEED", "N_GRID", "NO_BET_KEY",
     "NUISANCE_CANDIDATE_SEEDS", "OUTCOMES", "PROTOCOL_VERSION",
     "RANKER_FEATURES", "REFERENCE_LANE", "SELECTION_SPLIT", "SEED_COUNT",
-    "SIMPLE_ACTIVE_RISK_FRACTION", "STOCHASTIC_LANES", "TAX_FACTOR",
+    "SIMPLE_ACTIVE_RISK_FRACTION", "STOCHASTIC_LANES", "PAYOUT_COEFFICIENT",
     "TERMINAL_SPLIT", "TICKET_STAKE_YUAN", "UPSTREAM_207_MANIFEST_SHA256",
     "UPSTREAM_207_PACKAGE", "UPSTREAM_207_SHA", "VALUE_MATRIX",
     "VALUE_MATRIX_SHA256", "action_encoding", "all_actions", "as_action_dict",

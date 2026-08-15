@@ -91,6 +91,7 @@ from parlay_policy.verify import (  # noqa: E402
     verify_nk_semantics,
     verify_no_2024_issue,
     verify_no_embargoed_split,
+    verify_payout_economics,
     verify_provenance,
     verify_receipt,
     verify_schema,
@@ -425,7 +426,11 @@ def _run_stages(output: Path) -> None:
     _json(output / "handoff_209.json", handoff)
 
     # Materialize decision ticket identities + seed aggregates (REQ-208-04).
-    _write_ticket_artifacts(output, test_ctx, pool_cache, fold_results)
+    # REWORK v3: pass the terminal-fold ranker so the LEARNED_MLP lane can be
+    # materialized for ticket_economics.parquet (payout-economics verifier).
+    _write_ticket_artifacts(
+        output, test_ctx, pool_cache, fold_results, ranker=ranker_fold
+    )
 
 
 # ==== SECTION: HELPERS ====
@@ -481,22 +486,47 @@ def _incumbent_feasible(ctx, bankroll: float) -> bool:
     )
 
 
-def _write_ticket_artifacts(output, test_ctx, pool_cache, fold_results) -> None:
+def _write_ticket_artifacts(
+    output, test_ctx, pool_cache, fold_results, ranker=None
+) -> None:
     """Materialize decision ticket identities + per-seed aggregates.
 
     REWORK v2 (D3/D4): seed=0 is never used; for stochastic lanes the
     materialized tickets are the union over the 16 preregistered seeds, with
     per-seed ticket identities recorded and seed aggregates computed.
+
+    REWORK v3 (PI payout-economics): additionally materializes
+    `ticket_economics.parquet` — per-ticket pre-tax multiples, expected net
+    and raw official-SP products — so the production verifier can independently
+    recompute the corrected payout formula (0.65 applied exactly once) through
+    the immutable package (omission / division-out / 0.65^N detection).
+
+    Deterministic lanes (VALUE_WOR / LEARNED_MLP) are single-evaluation rows
+    (seed=0 is not a stochastic seed; deterministic lanes ignore the seed).
+    LEARNED_MLP requires the fold's ranker scores; `ranker` defaults to the
+    fit-fold ranker when not provided.
     """
     from parlay_policy.contract import ALL_SEEDS, LANES, K_GRID, CAPITAL_LANES
-    from parlay_policy.tickets import select_tickets, settle_tickets
+    from parlay_policy.tickets import (
+        ranker_scores,
+        select_tickets,
+        settle_tickets,
+    )
 
+    if ranker is None:
+        raise ReplayError(
+            "ticket-economics materialization requires a ranker for LEARNED_MLP"
+        )
     rows: list[dict[str, Any]] = []
+    economics: list[dict[str, Any]] = []
     for (split, issue), ctx in test_ctx.items():
         for n in N_GRID:
             pool = pool_cache.get(f"{issue}:{n}")
             if pool is None:
                 continue
+            scores = None
+            if "LEARNED_MLP" in LANES:
+                scores = ranker_scores(ranker, pool)
             for lane in LANES:
                 for k in K_GRID:
                     if lane in ("MARKET_WR", "MARKET_WOR"):
@@ -513,8 +543,65 @@ def _write_ticket_artifacts(output, test_ctx, pool_cache, fold_results) -> None:
                                     "ticket_identity": sel["ticket_identity"].tolist(),
                                 }
                             )
+                            settled = settle_tickets(sel)
+                            for _, tr in settled.iterrows():
+                                economics.append(
+                                    {
+                                        "split": split,
+                                        "issue": issue,
+                                        "n": int(tr["n"]),
+                                        "k": int(k),
+                                        "lane": lane,
+                                        "seed": int(seed),
+                                        "ticket_identity": str(tr["ticket_identity"]),
+                                        "match_indices": str(tr["match_indices"]),
+                                        "outcomes": str(tr["outcomes"]),
+                                        "realized_hit": bool(tr["realized_hit"]),
+                                        "pre_tax_gross_multiple": float(
+                                            tr["pre_tax_gross_multiple"]
+                                        ),
+                                        "payout_yuan": float(tr["payout_yuan"]),
+                                    }
+                                )
+                    else:
+                        sel = select_tickets(
+                            pool, lane, k, seed=0, scores=scores
+                        )
+                        rows.append(
+                            {
+                                "split": split,
+                                "issue": issue,
+                                "n": n,
+                                "k": k,
+                                "lane": lane,
+                                "seed": 0,
+                                "ticket_identity": sel["ticket_identity"].tolist(),
+                            }
+                        )
+                        settled = settle_tickets(sel)
+                        for _, tr in settled.iterrows():
+                            economics.append(
+                                {
+                                    "split": split,
+                                    "issue": issue,
+                                    "n": int(tr["n"]),
+                                    "k": int(k),
+                                    "lane": lane,
+                                    "seed": 0,
+                                    "ticket_identity": str(tr["ticket_identity"]),
+                                    "match_indices": str(tr["match_indices"]),
+                                    "outcomes": str(tr["outcomes"]),
+                                    "realized_hit": bool(tr["realized_hit"]),
+                                    "pre_tax_gross_multiple": float(
+                                        tr["pre_tax_gross_multiple"]
+                                    ),
+                                    "payout_yuan": float(tr["payout_yuan"]),
+                                }
+                            )
     frame = pd.DataFrame(rows)
     frame.to_parquet(output / "decision_ticket_identities.parquet", index=False)
+    econ = pd.DataFrame(economics)
+    econ.to_parquet(output / "ticket_economics.parquet", index=False)
 
 
 # ==== SECTION: METADATA + MANIFEST ====
@@ -534,6 +621,11 @@ def _write_metadata(output: Path, started: float) -> None:
             "capital": "NATIVE_2_YUAN",
         },
         "initial_bankroll_yuan": INITIAL_BANKROLL_YUAN,
+        "payout_semantics": {
+            "pre_tax_gross_multiple": "hit * 0.65 * product(official_final_sp_i)",
+            "coefficient": "Beijing Single Match payout coefficient, applied once",
+            "superseded": "product(SP) as pre-tax gross; division by 0.65; 0.65^N",
+        },
         "elapsed_seconds": round(time.time() - started, 1),
     }
     _json(output / "decision.json", decision)
@@ -593,6 +685,21 @@ def _write_schema(output: Path) -> None:
                 "matched_lift_std": "float",
                 "funded_yuan": "float",
             },
+            "ticket_economics.parquet": {
+                "split": "str", "issue": "str", "n": "int", "k": "int",
+                "lane": "str", "seed": "int",
+                "ticket_identity": "str", "match_indices": "str",
+                "outcomes": "str", "realized_hit": "bool",
+                "pre_tax_gross_multiple": "float", "payout_yuan": "float",
+            },
+            "incumbent_paths.parquet": {
+                "split": "str", "issue": "str", "year": "int",
+                "pre_issue_bankroll_yuan": "float",
+                "funded_stake_yuan": "float",
+                "gross_payout_yuan": "float",
+                "post_issue_bankroll_yuan": "float",
+                "source": "str",
+            },
         },
     }
     _json(output / "schema.json", schema)
@@ -630,6 +737,12 @@ def verify_package(output: Path) -> list[str]:
     REWORK v2 (D4): manifest coverage (including unlisted-payload check),
     receipt binding, provenance identity, capital accounting (start ¥100,000,
     ¥2 units, no top-up, continuity), embargo/2024 checks, schema columns.
+
+    REWORK v3 (PI payout-economics): `verify_payout_economics` recomputes the
+    corrected pre-tax formula (0.65 applied exactly once) from the frozen
+    value-matrix panels + upstream CONTROLLING tickets and compares against
+    the package's ticket_economics + incumbent_paths.  Omission, division-out
+    and 0.65^N tamper attacks all FAIL here.
     """
     failures: list[str] = []
     manifest_path = output / "SHA256SUMS.json"
@@ -658,6 +771,16 @@ def verify_package(output: Path) -> list[str]:
     decisions = pd.read_parquet(output / "decision_rows_all.parquet")
     failures.extend(verify_no_embargoed_split(decisions))
     failures.extend(verify_no_2024_issue(decisions))
+
+    # REWORK v3: payout-economics production-entry check.
+    try:
+        panels = build_panels(load_value_matrix(ROOT))
+        upstream_tickets = load_upstream_tickets(ROOT)
+        failures.extend(
+            verify_payout_economics(output, panels, upstream_tickets, ledger=ledger)
+        )
+    except Exception as exc:  # pragma: no cover — fail closed on any load error
+        failures.append(f"payout-economics check failed: {exc}")
     return failures
 
 
@@ -909,6 +1032,13 @@ def _frozen_incumbent_tickets(
     REWORK v2 (D2): the old capital_change_identical arm re-drew tickets with
     seed=0.  Now it binds the frozen #207 CONTROLLING identities directly
     (policy=MARKET_WOR, k=8, panel_role=CONTROLLING).
+
+    REWORK v3 (PI payout-economics): upstream #206 `realized_gross` is ALREADY
+    the correct 0.65-adjusted pre-tax gross multiple (realized_gross =
+    0.65 * prod(official_sp)).  The upstream `pre_tax_gross_multiple` column is
+    the superseded product(SP) value (derived by division by 0.65) and is never
+    used here.  The multiple column is remapped to `realized_gross` so capital
+    settlement applies the coefficient exactly once.
     """
     if upstream_tickets is None or upstream_tickets.empty:
         return None
@@ -918,8 +1048,11 @@ def _frozen_incumbent_tickets(
         & (upstream_tickets["panel_role"] == "CONTROLLING")
         & (upstream_tickets["policy"] == INCUMBENT_LANE)
         & (upstream_tickets["k"] == INCUMBENT_K)
-    ]
-    return sub if not sub.empty else None
+    ].copy()
+    if sub.empty:
+        return None
+    sub["pre_tax_gross_multiple"] = sub["realized_gross"]
+    return sub
 
 
 # ==== SECTION: POLICY CONTROLS ====
@@ -1133,12 +1266,18 @@ def _build_handoff(fold_results, selection, output) -> dict[str, object]:
     """Single frozen #209 handoff: hashes, fit boundary, candidate/fallback."""
     fold2_model = fold_results.get("fold2", {}).get("policy_mlp", {})
     return {
-        "handoff_version": "bj208-handoff-for-209-v2",
+        "handoff_version": "bj208-handoff-for-209-v3",
         "fit_boundary": {
             "train_through": "2022",
             "test_2023": True,
             "2024_opened": False,
             "2025_2026_opened": False,
+        },
+        "payout_semantics": {
+            "pre_tax_gross_multiple": "hit * 0.65 * product(official_final_sp_i)",
+            "coefficient_applied": "exactly once per winning N-fold ticket",
+            "never": ["division by 0.65", "per-leg 0.65", "0.65^N compounding"],
+            "expected_pre_tax_net": "0.65 * prod(p*SP) - 1",
         },
         "candidate": selection["frozen_candidate"],
         "fallback": {

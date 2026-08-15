@@ -26,8 +26,8 @@
     },
     {
       "fold": "fold2",
-      "frozen_incumbent_end": 99312.88946088498,
-      "learned_end": 99312.88946088498,
+      "frozen_incumbent_end": 99245.37814957523,
+      "learned_end": 99245.37814957523,
       "matched_lift": 0.0,
       "test_split": "CV_2023"
     }

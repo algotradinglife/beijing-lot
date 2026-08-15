@@ -5,6 +5,17 @@ N distinct matches; cross-ticket overlap is preserved and measured. Settlement
 uses the frozen official SP labels; capital replay uses native ¥2 or the frozen
 #207 EQUAL_1PCT active control on identical tickets.
 
+REWORK v3 (PI payout-economics 2026-08-15): the pre-tax gross multiple of a
+winning N-fold ticket includes the Beijing payout coefficient EXACTLY ONCE:
+
+    pre_tax_gross_multiple = hit * PAYOUT_COEFFICIENT * prod(official_sp_i)
+
+It is never divided out, never applied per leg, and never compounded as
+0.65^N.  Expected ticket economics use the same boundary:
+expected_pre_tax_net = PAYOUT_COEFFICIENT * prod(p*SP) - 1.  Raw unadjusted
+products (official_sp_product, log_joint_probability, log_sp_product) are
+retained ONLY as explicitly named diagnostics.
+
 REWORK v2 (D2): SIMPLE_ACTIVE capital replicates #207's EQUAL_1PCT exactly:
   requested = pre * risk_fraction
   budget    = min(pre, requested)
@@ -35,11 +46,11 @@ from .contract import (
     N_GRID,
     NUISANCE_CANDIDATE_SEEDS,
     OUTCOMES,
+    PAYOUT_COEFFICIENT,
     RANKER_FEATURES,
     SEED_COUNT,
     SIMPLE_ACTIVE_RISK_FRACTION,
     STOCHASTIC_LANES,
-    TAX_FACTOR,
     TICKET_STAKE_YUAN,
 )
 from .census import IssuePanel
@@ -169,9 +180,13 @@ def _rows_to_frame(
     )
     rank_mean = match_rank[selected_matrix].mean(axis=1) / max(len(match_rank), 1)
     hit = np.all(chosen_realized, axis=1)
+    # REWORK v3 (PI payout-economics): the pre-tax gross multiple includes the
+    # Beijing payout coefficient EXACTLY ONCE per winning N-fold ticket.
+    # Never divide it out, never apply per leg, never compound as 0.65^N.
+    official_sp_product = np.prod(chosen_official_sp, axis=1)
     if panel.labels_available:
         pre_tax_multiple = np.where(
-            hit, np.prod(chosen_official_sp, axis=1), 0.0
+            hit, PAYOUT_COEFFICIENT * official_sp_product, 0.0
         )
     else:
         pre_tax_multiple = np.full(count, np.nan, dtype=float)
@@ -196,7 +211,10 @@ def _rows_to_frame(
             "candidate_source": source_rows,
             "log_joint_probability": log_joint,
             "log_sp_product": log_sp,
-            "expected_pre_tax_net": exp_gross - 1.0,
+            "official_sp_product": official_sp_product,
+            # REWORK v3: expected executable ticket economics apply the
+            # coefficient once: 0.65 * prod(p*SP) - 1.
+            "expected_pre_tax_net": PAYOUT_COEFFICIENT * exp_gross - 1.0,
             "mean_selected_probability": np.mean(chosen_p, axis=1),
             "min_selected_probability": np.min(chosen_p, axis=1),
             "mean_selected_sp": np.mean(chosen_sp, axis=1),
@@ -219,7 +237,9 @@ def _ticket_row(
     chosen_official_sp = panel.official_sp[selected, outcomes]
     chosen_realized = panel.realized[selected, outcomes]
     exp_gross = float(np.prod(chosen_p * chosen_sp))
-    exp_pre_tax_net = exp_gross - 1.0
+    # REWORK v3 (PI payout-economics): executable expected ticket economics
+    # apply the Beijing payout coefficient exactly once: 0.65*prod(p*SP)-1.
+    exp_pre_tax_net = PAYOUT_COEFFICIENT * exp_gross - 1.0
     log_joint = float(np.sum(np.log(np.clip(chosen_p, 1e-15, 1.0))))
     log_sp = float(np.sum(np.log(np.clip(chosen_sp, 1.0, None))))
     outcome_hhi = float(np.sum(chosen_p**2))
@@ -228,8 +248,12 @@ def _ticket_row(
     )
     rank_mean = float(match_rank[selected].mean() / max(len(match_rank), 1))
     hit = bool(np.all(chosen_realized))
+    # Raw unadjusted diagnostic (explicitly named; not a payout multiple).
+    official_sp_product = float(np.prod(chosen_official_sp))
     if panel.labels_available:
-        pre_tax_multiple = float(np.prod(chosen_official_sp)) if hit else 0.0
+        pre_tax_multiple = (
+            float(PAYOUT_COEFFICIENT * official_sp_product) if hit else 0.0
+        )
     else:
         pre_tax_multiple = float("nan")
     return {
@@ -243,6 +267,7 @@ def _ticket_row(
         "candidate_source": source,
         "log_joint_probability": log_joint,
         "log_sp_product": log_sp,
+        "official_sp_product": official_sp_product,
         "expected_pre_tax_net": exp_pre_tax_net,
         "mean_selected_probability": float(np.mean(chosen_p)),
         "min_selected_probability": float(np.min(chosen_p)),

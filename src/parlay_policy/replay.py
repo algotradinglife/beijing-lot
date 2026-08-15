@@ -46,7 +46,6 @@ from .contract import (
     N_GRID,
     NO_BET_KEY,
     STOCHASTIC_LANES,
-    TAX_FACTOR,
     TICKET_STAKE_YUAN,
     all_actions,
 )
@@ -108,28 +107,14 @@ def incumbent_issue_ledger(
 ) -> dict[str, float]:
     """Frozen incumbent N7/K8/native-¥2 capital row for an issue.
 
-    Prefers the exact #207 ledger path (CV_2022/CV_2023). For CV_2021 (the #207
-    fit fold, which has no Stage-4 capital replay), reconstructs the incumbent
-    path from the frozen CONTROLLING ticket identities with the identical
-    native ¥2 rule — the tickets and their realized pre-tax multiples are the
-    frozen #207 artifacts.
+    REWORK v3 (PI payout-economics): the superseded #207 ledger
+    `gross_payout_yuan` (pre-tax = realized_gross / 0.65) is NOT admissible.
+    Every incumbent issue row is reconstructed from the frozen CONTROLLING
+    ticket identities with the corrected economics: payout per ticket =
+    realized_gross * ¥2 (realized_gross already = 0.65 * prod(official_sp)),
+    funded = K * ¥2.  The `upstream_ledger` argument is accepted only for
+    call-site compatibility and is never used as a payout source.
     """
-    sub = upstream_ledger[
-        (upstream_ledger["split"] == split)
-        & (upstream_ledger["issue"] == issue)
-        & (upstream_ledger["policy"] == policy)
-        & (upstream_ledger["controller"] == controller)
-        & (upstream_ledger["k"] == k)
-    ]
-    if not sub.empty:
-        row = sub.iloc[-1]
-        return {
-            "pre": float(row["pre_issue_bankroll_yuan"]),
-            "post": float(row["post_issue_bankroll_yuan"]),
-            "payout": float(row["gross_payout_yuan"]),
-            "funded": float(row["funded_stake_yuan"]),
-        }
-    # CV_2021 reconstruction from frozen CONTROLLING identities.
     tickets = upstream_tickets[
         (upstream_tickets["split"] == split)
         & (upstream_tickets["issue"] == issue)
@@ -142,9 +127,11 @@ def incumbent_issue_ledger(
             f"incumbent tickets missing: {split}/{issue}/{policy}/{k}"
         )
     funded = float(len(tickets) * TICKET_STAKE_YUAN)
-    payout = float(tickets["realized_gross"].fillna(0.0).sum() / TAX_FACTOR * TICKET_STAKE_YUAN)
+    # Corrected economics: realized_gross already = 0.65*prod(SP); native ¥2
+    # per ticket. Never divide the coefficient out.
+    payout = float(tickets["realized_gross"].fillna(0.0).sum() * TICKET_STAKE_YUAN)
     return {
-        "pre": float("nan"),  # unknown in #207 CV_2021; path replayed separately
+        "pre": float("nan"),  # unknown at this layer; path replayed separately
         "post": float("nan"),
         "payout": payout,
         "funded": funded,

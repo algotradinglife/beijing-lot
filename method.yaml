@@ -2,8 +2,14 @@
 # Frozen preregistrations; worker must not silently modify.
 # Protocol deltas appended in PROTOCOL-LOG / docs/research/issue_208_protocol_log.md.
 # REWORK v2 (2026-08-14, EV REJECT 53f67ec): supersede rows #208-2..#208-6.
+# REWORK v3 (2026-08-15, PI payout-economics 5e45132): supersede rows #208-7..#208-10.
+#   pre_tax_gross_multiple = hit * 0.65 * product(official_final_sp_i)
+#   expected_pre_tax_net   = 0.65 * prod(p*SP) - 1
+#   0.65 is the Beijing Single Match ticket PAYOUT COEFFICIENT, applied
+#   exactly once per winning N-fold ticket. Never divided out, never per
+#   leg, never compounded as 0.65^N.
 
-protocol_version: bj208-protocol-v2
+protocol_version: bj208-protocol-v3
 
 candidate_pool:
   description: "per-issue learned policy Q_theta(x,a) on the bounded N×K×lane×capital action catalog"

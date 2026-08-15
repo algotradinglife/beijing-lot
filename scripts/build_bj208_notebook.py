@@ -27,7 +27,7 @@ def md(text):
 def code(src):
     cells.append({"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": src})
 
-md("# Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier\n\nContract BJ-UNIFIED-DYNAMIC-N-001 / v3 (REWORK v2). Primary candidate: per-issue learned action-value policy Q_theta(x,a) (MLPRegressor) on the bounded N×K×lane×capital catalog; controls = Ridge + best fixed action; 16 preregistered hash seeds aggregated. SIMPLE_ACTIVE capital = frozen #207 EQUAL_1PCT semantics. 2024/2025/2026 outcomes embargoed. This notebook reads the committed immutable package under `results/issue-208/` — no worker-local files.")
+md("# Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier\n\nContract BJ-UNIFIED-DYNAMIC-N-001 / v3 (REWORK v3, PI payout-economics correction 2026-08-15). Primary candidate: per-issue learned action-value policy Q_theta(x,a) (MLPRegressor) on the bounded N×K×lane×capital catalog; controls = Ridge + best fixed action; 16 preregistered hash seeds aggregated. SIMPLE_ACTIVE capital = frozen #207 EQUAL_1PCT semantics. Payout economics: pre-tax gross multiple = hit × 0.65 × product(official SP), coefficient applied exactly once per winning ticket; the superseded division-out/omission/0.65^N interpretations are rejected. 2024/2025/2026 outcomes embargoed. This notebook reads the committed immutable package under `results/issue-208/` — no worker-local files.")
 
 code("""from pathlib import Path
 import json
@@ -48,7 +48,7 @@ if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 print("package:", PACKAGE.resolve(), "exists:", PACKAGE.exists())""")
 
-md("## 1. Data census\n\n171 development issues (CV_2021 58 / CV_2022 58 / CV_2023 55) + 75 LOCKED_TEST (embargoed). Panels built from the frozen #205 value matrix (sha 8fdace9c…); upstream #207 manifest (48c11d97…) bound at load.")
+md("## 1. Data census\n\n171 development issues (CV_2021 58 / CV_2022 58 / CV_2023 55) + 75 LOCKED_TEST (embargoed). Panels built from the frozen #205 value matrix (sha 8fdace9c…); upstream #207 manifest (48c11d97…) bound at load. The frozen incumbent path is reconstructed from #207 CONTROLLING ticket identities under the corrected payout economics: pre-tax gross multiple = hit × 0.65 × product(official SP) — the Beijing payout coefficient applied exactly once per winning N-fold ticket (PI 2026-08-15).")
 
 code("""census = pd.read_csv(PACKAGE / "census.csv")
 census.groupby("split").agg(issues=("issue", "nunique"), mean_M=("M", "mean")).round(1)""")
@@ -64,7 +64,7 @@ md("## 3. N×K performance surface (CV_2021 fit fold)\n\nMedian matched lift ove
 code("""pivot = surface.pivot_table(index="n", columns="k", values="matched_lift_mean", aggfunc="median").round(1)
 pivot""")
 
-md("## 4. Chronological learned policy (safety-gated)\n\nFold 1 (train CV_2021 → test CV_2022) and Fold 2 (train CV_2021+CV_2022 → test CV_2023). Chronological validation block = last 15% of train issues by issue id; sklearn row-level early stopping disabled (REWORK v2 / D3).")
+md("## 4. Chronological learned policy (safety-gated)\n\nFold 1 (train CV_2021 → test CV_2022) and Fold 2 (train CV_2021+CV_2022 → test CV_2023). Chronological validation block = last 15% of train issues by issue id; sklearn row-level early stopping disabled (REWORK v2 / D3). All payouts use the corrected pre-tax economics (0.65 applied exactly once per winning ticket).")
 
 code("""for fold in ("fold1", "fold2"):
     learned = pd.read_parquet(PACKAGE / f"path_learned_{fold}.parquet")
@@ -72,7 +72,7 @@ code("""for fold in ("fold1", "fold2"):
 loss = pd.read_csv(PACKAGE / "chronological_train_val_loss.csv")
 loss""")
 
-md("## 5. Controls / attribution matrix (CV_2023 test split)\n\nAll arms start ¥100,000. capital_change_identical now binds frozen #207 EQUAL_1PCT identities (ends ¥64,659.14 — matches the #207 ledger to 7 decimals; the R1 ¥16-funding bug is fixed, D2).")
+md("## 5. Controls / attribution matrix (CV_2023 test split)\n\nAll arms start ¥100,000. Payout economics corrected (REWORK v3): pre-tax gross multiple = hit × 0.65 × product(official SP), coefficient applied exactly once per winning ticket. capital_change_identical binds frozen #207 EQUAL_1PCT identities with the corrected multiples.")
 
 code("""import glob
 rows = []
@@ -105,7 +105,7 @@ print("handoff model_serialized:", handoff["model"].get("model_serialized"))
 print("handoff scaler_mean present:", handoff["model"].get("scaler_mean") is not None)
 print("handoff model_file:", handoff["model_file"])""")
 
-md("## 8. Package verification + tamper self-tests (REQ-E06)\n\nProduction verifier: manifest full coverage, receipt binding, provenance identity, capital accounting (start ¥100,000, ¥2 units, continuity), embargo/2024 checks. All four tamper attacks (mutate settlement / self-consistent ledger / forged manifest / forged provenance) must be DETECTED by the production verifier.")
+md("## 8. Package verification + tamper self-tests (REQ-E06)\n\nProduction verifier: manifest full coverage, receipt binding, provenance identity, capital accounting (start ¥100,000, ¥2 units, continuity), embargo/2024 checks, and payout-economics recomputation (REWORK v3: 0.65 applied exactly once per winning ticket). All seven tamper attacks (mutate settlement / self-consistent ledger / forged manifest / forged provenance / omit payout coefficient / division-out payout / 0.65^N compounding) must be DETECTED by the production verifier.")
 
 code("""from parlay_policy.verify import verify_manifest, verify_capital_accounting, verify_no_embargoed_split, verify_no_2024_issue, verify_receipt, verify_provenance
 import json

@@ -1,5 +1,5 @@
 {
-  "contract_version": "bj208-dynamic-nk-policy-v2",
+  "contract_version": "bj208-dynamic-nk-policy-v3",
   "frames": {
     "census.csv": {
       "M": "int",
@@ -15,6 +15,16 @@
       "eligible": "bool",
       "issue": "str",
       "labels_available": "bool",
+      "split": "str",
+      "year": "int"
+    },
+    "incumbent_paths.parquet": {
+      "funded_stake_yuan": "float",
+      "gross_payout_yuan": "float",
+      "issue": "str",
+      "post_issue_bankroll_yuan": "float",
+      "pre_issue_bankroll_yuan": "float",
+      "source": "str",
       "split": "str",
       "year": "int"
     },
@@ -42,6 +52,20 @@
       "n": "int",
       "split": "str",
       "year": "int"
+    },
+    "ticket_economics.parquet": {
+      "issue": "str",
+      "k": "int",
+      "lane": "str",
+      "match_indices": "str",
+      "n": "int",
+      "outcomes": "str",
+      "payout_yuan": "float",
+      "pre_tax_gross_multiple": "float",
+      "realized_hit": "bool",
+      "seed": "int",
+      "split": "str",
+      "ticket_identity": "str"
     }
   }
 }

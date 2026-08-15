@@ -6,7 +6,7 @@
     "n": 7,
     "policy": "FROZEN_N7_INCUMBENT"
   },
-  "contract_version": "bj208-dynamic-nk-policy-v2",
+  "contract_version": "bj208-dynamic-nk-policy-v3",
   "fallback": {
     "capital": "NATIVE_2_YUAN",
     "k": 8,
@@ -20,7 +20,7 @@
     "test_2023": true,
     "train_through": "2022"
   },
-  "handoff_version": "bj208-handoff-for-209-v2",
+  "handoff_version": "bj208-handoff-for-209-v3",
   "label_blind_replay": "inference path never reads realized_outcome/official_final_sp_label; 2024/2025/2026 embargoed",
   "model": {
     "action_columns": [
@@ -213,11 +213,11 @@
     ],
     "fixed_action_key": null,
     "loss_curve_tail": [
-      1835163.77379307,
-      1835132.8216670018,
-      1835044.1165831918,
-      1835009.384256182,
-      1834952.8083371806
+      771753.7884612883,
+      771739.6006769212,
+      771703.2672608765,
+      771665.5898630179,
+      771641.8150774938
     ],
     "model_file": "fold2_mlp.joblib",
     "model_kind": "MLP",
@@ -251,7 +251,7 @@
     },
     "model_serialized": true,
     "model_type": "Pipeline",
-    "residual_rmse": 1915.607712434598,
+    "residual_rmse": 1242.209309634856,
     "scaler_mean": [
       303.4741379310345,
       0.49552336904480027,
@@ -330,10 +330,20 @@
       "prior_consecutive_losses"
     ],
     "validation_issue_count": 18,
-    "validation_rmse": 1527.8341476260377
+    "validation_rmse": 990.0896517302787
   },
   "model_file": "results/issue-208/models/fold2_mlp.joblib",
   "package_manifest": "results/issue-208.staging/SHA256SUMS.json",
+  "payout_semantics": {
+    "coefficient_applied": "exactly once per winning N-fold ticket",
+    "expected_pre_tax_net": "0.65 * prod(p*SP) - 1",
+    "never": [
+      "division by 0.65",
+      "per-leg 0.65",
+      "0.65^N compounding"
+    ],
+    "pre_tax_gross_multiple": "hit * 0.65 * product(official_final_sp_i)"
+  },
   "replay_command": "PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208",
   "terminal_split": "CV_2023"
 }

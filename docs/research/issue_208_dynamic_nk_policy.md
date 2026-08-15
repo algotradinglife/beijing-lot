@@ -1,16 +1,39 @@
 # Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier
 
-REWORK v2 at HEAD (see PR; EV REJECT of SHA `53f67ec` fixed). Contract
-BJ-UNIFIED-DYNAMIC-N-001 / v3. Research and paper settlement only. No betting,
-release, or frontend authority follows from this result.
+REWORK v3 at HEAD (PI adversarial review of SHA `5e45132` fixed; supersedes
+EV REJECT of `53f67ec` and the v2 delivery). Contract BJ-UNIFIED-DYNAMIC-N-001
+/ v3. Research and paper settlement only. No betting, release, or frontend
+authority follows from this result.
+
+## Payout economics (PI correction 2026-08-15)
+
+The controlling pre-tax convention includes the Beijing Single Match payout
+coefficient exactly once per winning N-fold ticket:
+
+    pre_tax_gross_multiple = hit * 0.65 * product(official_final_sp_i)
+
+0.65 is a ticket payout coefficient, NOT a tax factor. It is never divided
+out, never applied per leg, and never compounded as 0.65^N. Expected ticket
+economics use the same boundary: `expected_pre_tax_net = 0.65 * prod(p·SP) − 1`.
+
+The v2 delivery at `5e45132` used the superseded interpretation:
+`src/parlay_policy/tickets.py` set the winning multiple to `prod(SP)` (omission),
+`src/parlay_policy/replay.py:145` reconstructed payout as
+`sum(realized_gross)/0.65 × ¥2` (division-out; upstream #206 `realized_gross`
+already equals `0.65 × prod(SP)`), and the incumbent path was bound to the
+inflated #207 ledger `gross_payout_yuan` (192.89 vs corrected 125.38 on
+CV_2023/23084). All of those call sites are corrected; upstream frozen #207
+ticket identities are inherited but their bankroll economics are reconstructed
+under the corrected formula (`RECONSTRUCTED_CORRECTED_ECONOMICS`).
 
 ## Boundary and lanes
 
 The frozen upstream #207 (merged `90869a959dc1b972cd872ffe465d1009e29df75e`,
 manifest `48c11d97…`) is bound before execution. The incumbent is the fixed
-N7/K8/native-¥2 path from #207 CONTROLLING K8 identities; CV_2022/CV_2023 come
-from the #207 capital ledger and CV_2021 is reconstructed from the frozen
-ticket identities with the identical native ¥2 rule.
+N7/K8/native-¥2 path from #207 CONTROLLING K8 identities; ALL development
+splits (CV_2021/CV_2022/CV_2023) are reconstructed from the frozen CONTROLLING
+ticket identities under the corrected economics: payout per ticket =
+`realized_gross × ¥2`, funded = K × ¥2, post = pre − funded + payout.
 
 The primary candidate is a per-issue learned action-value policy `Q_theta(x,a)`
 fitted with `sklearn.neural_network.MLPRegressor` on the residual target
@@ -35,113 +58,116 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
 - 2024 calendar year and 2025/2026 LOCKED_TEST outcomes are embargoed; a REAL
   verifier mutates 2024 labels and asserts zero fitted-parameter change.
 
-## Terminal decisions
+## Terminal decisions (REWORK v3)
 
 - `ELIGIBLE_CANDIDATE=false`: the safety-gated learned policy passes the
   preregistered gate on 0 of 113 test issues, so the gated path equals the
-  frozen incumbent path on both folds (Fold 1 = ¥99,072.00, Fold 2 =
-  ¥99,312.89). Median matched lift = 0.0; positive folds = 0 of 2.
+  corrected frozen incumbent path on both folds (Fold 1 = ¥99,072.00, Fold 2 =
+  ¥99,245.38). Median matched lift = 0.0; positive folds = 0 of 2.
 - Selection rule step 5 therefore freezes the **frozen N7/K8/MARKET_WOR/
   native-¥2 incumbent** as the #209 candidate and publishes the full frontier
   and failure regimes.
+- The corrected incumbent ending capital is LOWER than the v2 reported value
+  (CV_2023 ¥99,245.38 vs ¥99,312.89) because the single CV_2023 winning ticket
+  (23084) now pays ¥125.38 instead of the inflated ¥192.89. The terminal
+  conclusion (no eligible learned row) is unchanged, but every matched lift,
+  control path, safety gate and risk metric was regenerated under the corrected
+  economics.
 - The Q model has signal: calibration is monotone (predicted best-lift bins
-  ¥0.4 → ¥444 realized ¥2,415 → ¥27,105), the chronological validation RMSE is
-  lower than fit RMSE (1,555 vs 1,976), and changing only pre-event state
-  changes the selected action (N4/K32/LEARNED_MLP ↔ N5/K8/MARKET_WR ↔
-  N6/K32/LEARNED_MLP …). The ungated model prefers short parlays (N=4) and the
-  LEARNED_MLP lane, but the conservative gate vetoes every execution —
-  consistent with #207's finding that learned allocation does not automatically
-  establish Edge.
-- The frozen incumbent arm is bound exactly to the #207 CONTROLLING K8 path:
-  CV_2023 ending ¥99,312.89, CV_2022 ending ¥99,072.00 (FROZEN_INCUMBENT_207).
+  −6.6 → 260.9 realized 2,215 → 17,333), the chronological validation RMSE is
+  lower than fit RMSE, and changing only pre-event state changes the selected
+  action. The ungated model prefers short parlays (N=4) and the LEARNED_MLP
+  lane, but the conservative gate vetoes every execution — consistent with
+  #207's finding that learned allocation does not automatically establish Edge.
 
-## Controls / attribution matrix (CV_2023 test split, ¥100,000 start)
+## Controls / attribution matrix (CV_2023 test split, ¥100,000 start, REWORK v3)
 
 | Control | Ending capital ¥ | Note |
 |---|---|---|
-| static_n8k8 | 100,809.55 | static N=8 K8 native ¥2 |
-| fixed_n7_dynamic_k | 100,164.42 | K16 best by train-fold median |
-| static_n5k8 | 100,028.00 | static N=5 K8 native ¥2 |
+| static_n8k8 | 100,218.21 | static N=8 K8 native ¥2 |
 | cash_no_bet | 100,000.00 | safety reference (funded=0) |
-| dynamic_nk_fixed_generator | 99,872.46 | = static_n4k8 (N4 wins train median) |
-| n7k16_sensitivity | 99,572.50 | K16 native ¥2 |
-| static_n9k8 | 99,556.04 | |
-| static_n6k8 | 99,531.54 | |
-| generator_change_n7k8 | 99,456.30 | MARKET_WR lane at N7/K8 |
-| ridge_policy | 99,312.89 | safety-gated = incumbent |
-| incumbent_n7k8 | 99,312.89 | frozen #207 path |
-| learned_policy | 99,312.89 | safety-gated = incumbent |
+| fixed_n7_dynamic_k | 99,798.87 | K16 best by train-fold median |
+| static_n5k8 | 99,710.20 | |
+| dynamic_nk_fixed_generator | 99,609.10 | = static_n4k8 (N4 wins train median) |
+| static_n4k8 | 99,609.10 | |
+| dynamic_n_fixed_k8_lane | 99,609.10 | |
+| static_n9k8 | 99,403.42 | |
+| static_n6k8 | 99,387.50 | |
+| generator_change_n7k8 | 99,338.59 | MARKET_WR lane at N7/K8 |
+| incumbent_n7k8 | 99,245.38 | corrected frozen incumbent path |
+| ridge_policy | 99,245.38 | safety-gated = incumbent |
+| learned_policy | 99,245.38 | safety-gated = incumbent |
 | static_n10k8 | 99,120.00 | |
-| best_fixed_policy | 88,603.98 | N4/K32/LEARNED_MLP/native |
-| capital_change_identical | 64,659.14 | EQUAL_1PCT on identical tickets |
+| n7k16_sensitivity | 99,106.12 | K16 native ¥2 |
+| best_fixed_policy | 76,292.89 | N4/K32/LEARNED_MLP/native |
+| capital_change_identical | 62,178.64 | EQUAL_1PCT on identical tickets, corrected multiples |
 
 Key attribution findings (REQ-208-05):
 
-- **N**: the frontier is not monotone; N=8 static (¥100,810) edges the frozen
-  N7 incumbent (¥99,313), but this is development-fold evidence only and is NOT
+- **N**: the frontier is not monotone; N=8 static (¥100,218) edges the frozen
+  N7 incumbent (¥99,245), but this is development-fold evidence only and is NOT
   promoted (selection rule freezes the incumbent; the per-issue learned policy
   is the only candidate class per REQ-208-09).
-- **K**: K16 (n7k16_sensitivity ¥99,573) is not systematically better than K8
-  native — consistent with #207's K sensitivity rows.
-- **Generator**: generator_change_n7k8 (MARKET_WR ¥99,456) is below the
-  MARKET_WOR incumbent (¥99,313 × close); lane differences are second-order.
+- **K**: K16 (n7k16_sensitivity ¥99,106) is below K8 native — consistent with
+  #207's K sensitivity rows.
+- **Generator**: generator_change_n7k8 (MARKET_WR ¥99,339) is slightly above
+  the MARKET_WOR incumbent (¥99,245); lane differences are second-order.
 - **Capital**: capital_change_identical on identical tickets with EQUAL_1PCT
-  ends ¥64,659 — a 35% drawdown from betting 1% of bankroll per issue on
-  parlays. This is the corrected D2 result: the R1 delivery reported ¥101,425
-  because its SIMPLE_ACTIVE arm funded only ¥16/issue (K8 × ¥2) instead of the
-  frozen EQUAL_1PCT rule. The correction makes the active-capital arm bind the
-  exact #207 EQUAL_1PCT/MARKET_WOR/K8 ledger (ending ¥64,659.136… matches #207
-  to 7 decimals), so the attribution is now causal and identical-ticket.
+  ends ¥62,179 — a ~38% drawdown from betting 1% of bankroll per issue on
+  parlays. Under the corrected economics this is LOWER than the v2 value
+  (¥64,659) because the single winning ticket's EQUAL_1PCT-funded payout drops
+  by the 0.65 factor. The identical-ticket binding is unchanged (frozen #207
+  CONTROLLING identities).
 - **Exposure**: cash/NO_BET reference is flat ¥100,000; lower exposure is the
   only arm that never loses capital, reported outside active-Edge attribution.
 
 ## Required issue-level outputs (REQ-208-07)
 
-All materialized in `results/issue-208/`: `issue_capital_ledger.parquet`
-(1,921 rows × 17 policy arms), `decision_rows_all.parquet`, per-fold learned
-and control paths, `action_frequency.csv`, `action_variation_demo.csv`,
-`calibration_curve.csv`, `chronological_train_val_loss.csv`,
-`ood_fallback_census.csv`, `permutation_importance.csv`,
-`decision_ticket_identities.parquet` (per-seed ticket identities for stochastic
-lanes), `selection.json`, `handoff_209.json`.
+All materialized in `results/issue-208/`: `issue_capital_ledger.parquet`,
+`decision_rows_all.parquet`, per-fold learned and control paths,
+`action_frequency.csv`, `action_variation_demo.csv`, `calibration_curve.csv`,
+`chronological_train_val_loss.csv`, `ood_fallback_census.csv`,
+`permutation_importance.csv`, `decision_ticket_identities.parquet` (per-seed
+ticket identities for stochastic lanes), `ticket_economics.parquet`
+(REWORK v3: per-ticket pre-tax multiples for the production payout-economics
+verifier), `selection.json`, `handoff_209.json`.
 
-## REWORK-E09 same-category sweep evidence
+## REWORK-E09 same-category sweep evidence (REWORK v3 payout-economics)
 
-For each EV defect class, the full call surface was swept (not just the
-reported instance):
+For the PI payout-economics defect class, the FULL payout/expected-value call
+surface was swept (not just the four reported instances):
 
-1. **Evidence chain / schema**: all required artifacts (decision.json,
-   SHA256SUMS.json, handoff_209.json, selection.json, issue_capital_ledger,
-   schema.json, provenance.json, receipt.sha256, COMPLETED.json, model
-   artifacts) are committed under `results/issue-208/` and `.gitignore` now
-   allows issue-208 (D1). Manifest keys are relative paths so nested
-   `models/*.joblib` are covered; verify_manifest enforces full coverage
-   (unlisted payloads fail).
-2. **Capital / attribution / metrics**: `bundle_capital_equal1pct`,
-   `issue_action_lift`, `full_path_replay`, all 17 control arms, selection and
-   handoff now use the corrected EQUAL_1PCT semantics; `capital_change_identical`
-   binds frozen CONTROLLING identities; matched lift, running-peak drawdown,
-   time-under-water, recovery, max consecutive losses, rolling 5/10/20 loss and
-   worst windows are computed in `summarize_path` (D2/D5).
-3. **Leakage / chronology**: `fit_mlp` and `fit_learned_ranker` disable sklearn
-   early stopping; validation is a chronological issue-block holdout; Ridge and
-   best-fixed controls are evaluated per fold with full paths + ablation
-   (`path_control_ridge_policy_*`, `path_control_best_fixed_policy_*`); model
-   weights + scaler are serialized (`models/fold1_mlp.joblib`,
-   `models/fold2_mlp.joblib`) so handoff_209 is label-blind replayable (D3).
-4. **Verification / tamper**: every tamper test attacks the production
-   `verify_package` entry on a full copy of the package; manifest full-coverage,
-   provenance identity (trusted hashes), capital start/¥2-units/requested/K,
-   N/K semantics with K, outcome-triple validation, and a REAL 2024-mutation
-   invariance check (D4).
-5. **Atomicity / durability**: runner builds in `.staging`, fsyncs files +
-   dir, writes COMPLETED.json before the final manifest, atomically renames
-   over the output; manifest is written after all artifacts including tamper
-   results and COMPLETED (D6).
-6. **Boundaries**: empty actions → explicit NO_BET; M<N and pool<K handled;
-   NaN/Inf, duplicate/missing outcome codes, multiple/no realized outcomes,
-   non-negative official SP, missing upstream rows, fundability and incumbent
-   fail-closed paths are covered by loaders + tests (D4/D6).
+1. **`src/parlay_policy/tickets.py` `_rows_to_frame`** (omission): winning
+   multiple was `prod(official_sp)` — now `hit × 0.65 × prod(official_sp)`;
+   `expected_pre_tax_net` was `prod(p·SP) − 1` — now `0.65 × prod(p·SP) − 1`.
+   `_ticket_row` carries the same correction; raw `official_sp_product` is
+   retained as an explicitly named diagnostic only.
+2. **`src/parlay_policy/replay.py:145`** (division-out): incumbent CV_2021
+   reconstruction divided `realized_gross` by 0.65 — now `realized_gross × ¥2`
+   (realized_gross already includes the coefficient exactly once).
+   `incumbent_issue_ledger` no longer reads the inflated #207 ledger.
+3. **`src/parlay_policy/incumbent.py`** (inflated baseline): the #207 ledger
+   `gross_payout_yuan` (pre-tax = realized_gross/0.65) is never read; all
+   splits are reconstructed from frozen CONTROLLING identities with corrected
+   economics.
+4. **`scripts/run_bj208_policy.py` `_frozen_incumbent_tickets`**
+   (division-out in the identical-ticket capital arm): the upstream inflated
+   `pre_tax_gross_multiple` column is remapped to `realized_gross` before
+   `bundle_capital_equal1pct` settlement.
+5. **`src/parlay_policy/verify.py`** (REQ-E06 / PI REQUIRED #3): new
+   `verify_payout_economics` recomputes `0.65 × prod(SP)` from frozen
+   value-matrix panels and compares against `ticket_economics.parquet` and
+   `incumbent_paths.parquet`; three new tamper probes attack omission,
+   division-out and 0.65^N through the production verifier — 7/7 detected.
+6. **State features / diagnostics**: `features.py` consumes the upstream
+   `expected_pre_tax_net` which upstream already computes as
+   `0.65 × cj × sp_product − 1` (correct); no change needed. `diagnostics.py`
+   has no payout arithmetic.
+7. **Upstream root** (`src/bankroll_policy/fixed_n7.py:413-414`): the frozen
+   #207 code labels the correct 0.65-adjusted gross as "tax-adjusted" and
+   derives an inflated "pre-tax" by division. #207's accepted artifacts stay
+   frozen (manifest `48c11d97…`); the supersession is recorded in
+   PROTOCOL-LOG #208-7/#208-8 and #208 never consumes that field.
 
 ## REQ coverage
 
@@ -151,10 +177,10 @@ reported instance):
 | REQ-208-02 N/K semantics | `verify_nk_semantics(tickets, k)` + census triple validation |
 | REQ-208-03 outcome isolation | REAL 2024-mutation invariance test `test_2024_mutation_invariance_real` |
 | REQ-208-04 bounded frontier | 16 seeds only; `decision_ticket_identities.parquet`; no seed=0 |
-| REQ-208-05 matched attribution | control matrix above + identical-ticket capital arm |
+| REQ-208-05 matched attribution | control matrix above + identical-ticket capital arm (corrected multiples) |
 | REQ-208-06 capital accounting | `verify_capital_accounting` (start ¥100,000, ¥2 units, continuity) |
 | REQ-208-07 decision evidence | full frontier, equity paths, holding metrics, adversarial arms |
-| REQ-208-08 terminal freeze | `handoff_209.json` (byte-identifiable candidate/fallback) |
+| REQ-208-08 terminal freeze | `handoff_209.json` v3 (byte-identifiable candidate/fallback + payout semantics) |
 | REQ-208-09 neural policy | MLPRegressor Q with Ridge + best-fixed controls, joblib weights, label-blind replay |
 
 ## Known risks
@@ -168,11 +194,14 @@ reported instance):
 - EQUAL_1PCT's deep capital drawdown reflects parlay risk at 1%-per-issue
   funding, consistent with #207's Stage-4 finding; it is reported as a
   risk-conditioned reference, not a recommendation.
+- The corrected payout coefficient lowers every winning payout by 0.65 vs the
+  superseded interpretation; the frozen #207 CONTROLLING ticket identities are
+  unchanged, but the #207 ledger's own economics are superseded for #208.
 
 ## Replay
 
 ```
 PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208
 PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py verify --output results/issue-208
-PYTHONPATH=src .venv/bin/python -m pytest tests/test_bj208_metrics.py tests/test_bj208_tamper.py
+PYTHONPATH=src .venv/bin/python -m pytest tests/test_bj208_metrics.py tests/test_bj208_tamper.py tests/test_bj208_payout_economics.py
 ```

@@ -343,6 +343,178 @@ def verify_2024_mutation_invariance(
     return []
 
 
+# --- REWORK v3 (PI payout-economics) verifier --------------------------------
+
+# Beijing ticket payout coefficient — applied exactly once per winning N-fold
+# ticket.  Never divided out, never per leg, never compounded as 0.65^N.
+_PAYOUT_COEFFICIENT = 0.65
+_PAYOUT_REL_TOL = 1e-6
+
+
+def _official_sp_for_ticket(
+    panels: dict[tuple[str, str], Any],
+    split: str,
+    issue: str,
+    match_indices: str,
+    outcomes: str,
+) -> float:
+    """Product of official final SP for a ticket's (match, outcome) legs.
+
+    Recomputed independently from the frozen value-matrix panels so the
+    verifier does not trust the worker's `pre_tax_gross_multiple` field.
+    """
+    panel = panels.get((str(split), str(issue)))
+    if panel is None:
+        raise VerifyError(f"payout-economics panel missing: {split}/{issue}")
+    idx = [int(x) for x in str(match_indices).split("|")]
+    out_rank = {"3": 0, "1": 1, "0": 2}
+    oidx = [out_rank[o] for o in str(outcomes).split("|")]
+    if len(idx) != len(oidx):
+        raise VerifyError("ticket leg count mismatch in payout-economics")
+    sp = panel.official_sp[np.asarray(idx, dtype=int), np.asarray(oidx, dtype=int)]
+    return float(np.prod(sp))
+
+
+def verify_payout_economics(
+    package: Path,
+    panels: dict[tuple[str, str], Any],
+    upstream_tickets: pd.DataFrame,
+    ledger: pd.DataFrame | None = None,
+) -> list[str]:
+    """REWORK v3 (PI payout-economics) production-entry verifier.
+
+    Independent checks that the Beijing payout coefficient 0.65 is applied
+    EXACTLY ONCE per winning N-fold ticket and never divided out:
+
+    1. `ticket_economics.parquet` per-ticket pre_tax_gross_multiple must equal
+       0.65 * prod(official_sp) for hit rows (0.0 for miss rows).  This
+       detects BOTH omission (multiple == prod(SP)) AND compounding
+       (multiple == 0.65^N * prod(SP)).
+    2. `incumbent_paths.parquet` gross_payout_yuan must equal the frozen
+       CONTROLLING tickets' sum(realized_gross) * ¥2 (realized_gross already
+       includes 0.65 exactly once).  This detects division-out (payout
+       inflated by /0.65).
+    3. The consolidated ledger's FROZEN_INCUMBENT_207 rows must match the
+       incumbent_paths rows (binding consistency).
+    """
+    failures: list[str] = []
+
+    # 1. Per-ticket economics from the immutable package.
+    econ_path = package / "ticket_economics.parquet"
+    if not econ_path.exists():
+        failures.append("missing ticket_economics.parquet for payout economics")
+        return failures
+    econ = pd.read_parquet(econ_path)
+    if econ.empty:
+        failures.append("empty ticket_economics.parquet")
+        return failures
+    checked = 0
+    for _, row in econ.iterrows():
+        try:
+            sp_prod = _official_sp_for_ticket(
+                panels,
+                str(row["split"]),
+                str(row["issue"]),
+                str(row["match_indices"]),
+                str(row["outcomes"]),
+            )
+        except VerifyError as exc:
+            failures.append(str(exc))
+            continue
+        hit = bool(row["realized_hit"])
+        if hit:
+            expected = _PAYOUT_COEFFICIENT * sp_prod
+            actual = float(row["pre_tax_gross_multiple"])
+            if not np.isclose(actual, expected, rtol=_PAYOUT_REL_TOL, atol=1e-9):
+                failures.append(
+                    f"payout coefficient violation ticket {str(row['ticket_identity'])} "
+                    f"{row['split']}/{row['issue']}: multiple={actual:.6f} "
+                    f"expected 0.65*prod(SP)={expected:.6f} (prod(SP)={sp_prod:.6f})"
+                )
+                if len(failures) >= 5:
+                    break
+        else:
+            actual = float(row["pre_tax_gross_multiple"])
+            if not np.isclose(actual, 0.0, atol=1e-9):
+                failures.append(
+                    f"miss ticket {str(row['ticket_identity'])} has nonzero multiple "
+                    f"{actual}"
+                )
+        checked += 1
+    if checked == 0:
+        failures.append("ticket_economics had no rows with official SP available")
+
+    # 2. Incumbent path payout vs frozen CONTROLLING realized_gross.
+    inc_path = package / "incumbent_paths.parquet"
+    if not inc_path.exists():
+        failures.append("missing incumbent_paths.parquet")
+    else:
+        incumbent = pd.read_parquet(inc_path)
+        if "source" in incumbent.columns:
+            reconstructed = incumbent[
+                incumbent["source"].str.startswith(
+                    "RECONSTRUCTED_CORRECTED_ECONOMICS"
+                )
+            ]
+        else:
+            reconstructed = incumbent
+        for _, row in reconstructed.iterrows():
+            tickets = upstream_tickets[
+                (upstream_tickets["split"] == row["split"])
+                & (upstream_tickets["issue"] == row["issue"])
+                & (upstream_tickets["panel_role"] == "CONTROLLING")
+                & (upstream_tickets["policy"] == "MARKET_WOR")
+                & (upstream_tickets["k"] == 8)
+            ]
+            if tickets.empty:
+                failures.append(
+                    f"incumbent reconstruction missing CONTROLLING tickets "
+                    f"{row['split']}/{row['issue']}"
+                )
+                continue
+            expected_payout = float(
+                tickets["realized_gross"].fillna(0.0).sum() * 2.0
+            )
+            actual_payout = float(row["gross_payout_yuan"])
+            if not np.isclose(
+                actual_payout, expected_payout, rtol=_PAYOUT_REL_TOL, atol=1e-6
+            ):
+                failures.append(
+                    f"incumbent payout division-out at {row['split']}/{row['issue']}: "
+                    f"payout={actual_payout:.4f} expected "
+                    f"sum(realized_gross)*2={expected_payout:.4f}"
+                )
+                if len(failures) >= 5:
+                    break
+
+    # 3. FROZEN_INCUMBENT_207 ledger rows must equal incumbent_paths.
+    if ledger is not None and not ledger.empty:
+        if "source" in ledger.columns:
+            frozen_rows = ledger[ledger["source"] == "FROZEN_INCUMBENT_207"]
+            if not frozen_rows.empty:
+                inc_path2 = package / "incumbent_paths.parquet"
+                if inc_path2.exists():
+                    incumbent = pd.read_parquet(inc_path2)
+                    for _, row in frozen_rows.iterrows():
+                        sub = incumbent[
+                            (incumbent["split"] == row["split"])
+                            & (incumbent["issue"] == row["issue"])
+                        ]
+                        if sub.empty:
+                            continue
+                        if not np.isclose(
+                            float(sub.iloc[0]["gross_payout_yuan"]),
+                            float(row["gross_payout_yuan"]),
+                            rtol=_PAYOUT_REL_TOL, atol=1e-6,
+                        ):
+                            failures.append(
+                                f"FROZEN_INCUMBENT_207 ledger row {row['split']}/"
+                                f"{row['issue']} does not match incumbent_paths"
+                            )
+                            break
+    return failures
+
+
 # --- tamper attacks (attack the PRODUCTION verifier) ------------------------
 
 
@@ -397,6 +569,66 @@ def tamper_forge_source_trace(trace_path: Path) -> None:
     value["source_issue_207_manifest_sha256"] = "0" * 64
     value["source_value_matrix_sha256"] = "0" * 64
     _json(trace_path, value)
+
+
+def tamper_omit_payout_coefficient(econ_path: Path) -> None:
+    """Attack 5 (REWORK v3): drop the 0.65 coefficient from a hit ticket.
+
+    Sets a winning ticket's pre_tax_gross_multiple to the raw product(SP)
+    (the superseded omission defect).  The payout-economics verifier must
+    recompute 0.65*prod(SP) and FAIL the tampered multiple.
+    """
+    frame = pd.read_parquet(econ_path)
+    hits = frame[frame["realized_hit"] == True]  # noqa: E712
+    if hits.empty:
+        raise VerifyError("tamper target has no hit ticket")
+    idx = hits.index[0]
+    # raw product(SP) = pre_tax_gross_multiple / 0.65 (omission).
+    frame.loc[idx, "pre_tax_gross_multiple"] = (
+        float(frame.loc[idx, "pre_tax_gross_multiple"]) / _PAYOUT_COEFFICIENT
+    )
+    frame.to_parquet(econ_path, index=False)
+
+
+def tamper_divide_out_payout(incumbent_paths_path: Path) -> None:
+    """Attack 6 (REWORK v3): divide the payout coefficient back out.
+
+    Inflates an incumbent issue's gross_payout_yuan by /0.65 (the superseded
+    division-out defect: pre-tax = realized_gross / 0.65).  The verifier must
+    recompute payout = sum(realized_gross)*2 and FAIL.  The mutated row is a
+    NONZERO-payout issue (a zero-payout row would make /0.65 a no-op).
+    """
+    frame = pd.read_parquet(incumbent_paths_path)
+    if frame.empty:
+        raise VerifyError("tamper target empty")
+    nonzero = frame[frame["gross_payout_yuan"] > 1e-9]
+    if nonzero.empty:
+        raise VerifyError("tamper target has no nonzero incumbent payout")
+    idx = nonzero.index[0]
+    frame.loc[idx, "gross_payout_yuan"] = (
+        float(frame.loc[idx, "gross_payout_yuan"]) / _PAYOUT_COEFFICIENT
+    )
+    frame.to_parquet(incumbent_paths_path, index=False)
+
+
+def tamper_compound_coefficient(econ_path: Path, n: int = 4) -> None:
+    """Attack 7 (REWORK v3): compound the coefficient per leg (0.65^N).
+
+    Sets a winning ticket's pre_tax_gross_multiple to 0.65^N * prod(SP)
+    (the superseded per-leg compounding defect).  The verifier must recompute
+    0.65*prod(SP) (coefficient exactly once) and FAIL the 0.65^N multiple.
+    """
+    frame = pd.read_parquet(econ_path)
+    hits = frame[frame["realized_hit"] == True]  # noqa: E712
+    if hits.empty:
+        raise VerifyError("tamper target has no hit ticket")
+    idx = hits.index[0]
+    # 0.65^N * prod(SP) = (0.65^N)/0.65 * (0.65*prod(SP)) = 0.65^(N-1)*multiple.
+    frame.loc[idx, "pre_tax_gross_multiple"] = (
+        float(frame.loc[idx, "pre_tax_gross_multiple"])
+        * (_PAYOUT_COEFFICIENT ** (n - 1))
+    )
+    frame.to_parquet(econ_path, index=False)
 
 
 def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, Any]]:
@@ -455,6 +687,24 @@ def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, An
         "forge_source_trace",
         lambda target: tamper_forge_source_trace(target / "provenance.json"),
     )
+    _run_attack(
+        "omit_payout_coefficient",
+        lambda target: tamper_omit_payout_coefficient(
+            target / "ticket_economics.parquet"
+        ),
+    )
+    _run_attack(
+        "divide_out_payout",
+        lambda target: tamper_divide_out_payout(
+            target / "incumbent_paths.parquet"
+        ),
+    )
+    _run_attack(
+        "compound_coefficient_0_65_n",
+        lambda target: tamper_compound_coefficient(
+            target / "ticket_economics.parquet", n=4
+        ),
+    )
     return results
 
 
@@ -462,8 +712,10 @@ __all__ = [
     "MANIFEST_EXCLUDED", "VerifyError", "manifest", "run_tamper_suite",
     "sha256_file", "tamper_forge_manifest", "tamper_forge_source_trace",
     "tamper_mutate_settlement", "tamper_self_consistent_ledger",
+    "tamper_omit_payout_coefficient", "tamper_divide_out_payout",
+    "tamper_compound_coefficient",
     "verify_2024_mutation_invariance", "verify_capital_accounting",
     "verify_manifest", "verify_nk_semantics", "verify_no_2024_issue",
-    "verify_no_embargoed_split", "verify_provenance", "verify_receipt",
-    "verify_schema",
+    "verify_no_embargoed_split", "verify_payout_economics",
+    "verify_provenance", "verify_receipt", "verify_schema",
 ]
