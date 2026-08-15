@@ -967,9 +967,9 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
 - PI 对抗性结论：SIMPLE/K16 正向路径、低暴露和上游票选择均不能归因于 Stage 4；
   因此接受负结论并推进 N 与 K 分离学习，而不是把固定 N7 解释为 Edge。
 
-### Issue #208 动态 N×K 学习策略（2026-08-15，REWORK v4 / v6）
+### Issue #208 动态 N×K 学习策略（2026-08-15，PI takeover v7）
 
-- #208 在五轮返工后由 REWORK v4 交付。v6 保留 MLPRegressor、168-cell 动作目录、
+- #208 在多轮返工后由 PI 接管 v7。v7 保留 MLPRegressor、168-cell 动作目录、
   16 seeds、0.65 恰好一次的派彩语义和原选择规则，只关闭独立 EV 的 D1–D3：
   （D1）每条选择路径都用**自己的**严格先前 live 历史评分——trail5/trail10、
   running drawdown（含 time-zero ¥100,000 anchor）和净 P&L 亏损连击全部来自该
@@ -977,15 +977,17 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
   completed recovery / open (censored) underwater / recovery event，右删失的
   终末水下段不再被记为"已恢复"；（D3）production verifier 从 frozen incumbent
   源重算五个 path-dependent state 特征并与训练/验证帧及 fold2 scaler 绑定，
-  合法 re-manifest（如 drawdown +0.5）也会 fail closed。
+  合法 re-manifest（如 drawdown +0.5）也会 fail closed。新增修复确保 fit/live
+  lag5/lag10 warm-up 完全一致，并把 Ridge、三组 restricted MLP、ranker、OOD、
+  diagnostic fit 全部纳入实际双 refit 与独立 artifact binding。
 - **主候选没有提升基线。** 113 个测试期 safety gate 全部拒绝，learned path
   全部回退到 N7/K8/MARKET_WOR/native-¥2；CV_2022/CV_2023 终值分别为
   ¥99,072.00 / ¥99,245.38，matched lift 两折均为 0，故冻结 incumbent 给 #209。
   这证明安全层有效，不证明 neural head 有 Edge。
-- **动态选择很弱。** N-only 在 111 期选 N4、2 个 CV_2023 期选 N9；
+- **动态选择很弱。** N-only 在 112 期选 N4、1 个 CV_2023 期选 N10；
   K-only 和 joint N×K 全部选 K8。joint N×K 只在 N 上变化（CV_2022 三个 N、
-  CV_2023 六个 N），CV_2023 终值 ¥99,487.45（v6 live-path 评分后低于 v5 的
-  ¥99,632.80），未胜过最强 fixed control。当前特征/目标没有学出 dynamic K。
+  CV_2023 六个 N），CV_2022/CV_2023 终值 ¥99,509.40 / ¥99,491.24，未胜过
+  最强 fixed control。当前特征/目标没有学出 dynamic K。
 - **固定 N8 只是一折甜点。** CV_2023 static N8/K8 达 ¥100,218.21，但
   CV_2022 为 ¥99,072.00，不具跨折稳定性。N7/K16 为 ¥98,317 / ¥99,106，
   但 native K16 每期投入 ¥32、K8 为 ¥16，所以这只是曝光敏感性；在原生 ¥2
@@ -993,14 +995,15 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
 - **风险路径仍不支持加仓。** EQUAL_1PCT 相同票面终值为 ¥55,872 / ¥62,179；
   CV_2023 cash 为 ¥100,000。资本变大没有创造 edge，只放大负期望和回撤。
 - Q 的 calibration 只有粗趋势：最高 predicted bin 的 realized lift 最大，但相邻
-  bins 非单调且量纲失配；fit/validation RMSE 为 1,290/1,012，不能据此宣称可执行信号。
+  bins 非单调且量纲失配；fit/validation RMSE 为 1,290.1/1,012.4，不能据此宣称可执行信号。
 - 训练边界为 fold1 49 FIT / 9 VALIDATION、fold2 98 FIT / 18 VALIDATION，重叠均为 0；
   retained DEVELOPMENT 行必须恰有一个赛果命中且三个 official SP 均为正。
-- 证据包由 producer-code commit `eea005b24f2c38271abbbb74bab8f423832230bc`
-  生成：75 个 focused tests 通过；1,921 行 capital ledger conservation error=0；
+- 证据包由 producer-code commit `7ff62c6b01fc6d24716608e3b45527a578722b26`
+  生成：81 个 focused tests 通过；1,921 行 capital ledger conservation error=0；
   50,970 个 LOCKED_TEST rows 的两次实际复拟合签名一致；production verifier 检出
-  23/23 attacks（含新增 training-state drawdown shift）；每帧均有 schema，
-  交付文件除 manifest 自身外全部内容绑定。日历 2024 在冻结 value matrix 中为
+  25/25 attacks（含 false promotion 与 nested manifest escape）；79 个交付文件中
+  除 root manifest 自身外 78 个全部内容绑定。selection/handoff 权威由路径原语
+  独立重算。日历 2024 在冻结 value matrix 中为
   0 行，因此不虚构 2024 mutation。
 - 详见 [`issue_208_dynamic_nk_policy`](../research/issue_208_dynamic_nk_policy.md)、
   [`issue_208_rework_v4_sweep_evidence`](../research/issue_208_rework_v4_sweep_evidence.md)

@@ -13,7 +13,7 @@ def md(text):
 def code(src):
     cells.append({"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": src})
 
-md("# Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier\n\nContract BJ-UNIFIED-DYNAMIC-N-001 / v6 (REWORK v4, EV REJECT ea1fc51 fixed), generated from producer-code commit `eea005b24f2c38271abbbb74bab8f423832230bc`. Primary candidate: per-issue learned action-value policy Q_theta(x,a) (MLPRegressor) on the bounded N×K×lane×capital catalog; controls = Ridge + best fixed action + state-conditioned restricted N/K/N×K policies; 16 preregistered hash seeds aggregated. Payout economics: pre-tax gross multiple = hit × 0.65 × product(official SP), coefficient applied exactly once per winning ticket. Every policy lane scores from ITS OWN strictly-prior live history (trail5/trail10, time-zero-anchored running drawdown, economic loss streak); recovery metrics separate completed from open/censored episodes; production verification recomputes path-dependent state from the frozen incumbent source and binds the fold2 scaler. 2024/LOCKED_TEST outcomes remain embargoed. This executed notebook reads only the committed immutable package under `results/issue-208/`.")
+md("# Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier\n\nContract BJ-UNIFIED-DYNAMIC-N-001 / v7 (PI takeover of concurrent R7 EV REJECTs), generated from producer-code commit `7ff62c6b01fc6d24716608e3b45527a578722b26`. Primary candidate: per-issue learned action-value policy Q_theta(x,a) (MLPRegressor) on the bounded N×K×lane×capital catalog; controls = Ridge + best fixed action + state-conditioned restricted N/K/N×K policies; 16 preregistered hash seeds aggregated. Payout economics: pre-tax gross multiple = hit × 0.65 × product(official SP), coefficient applied exactly once per winning ticket. Every policy lane scores from its own strictly-prior live history. Exact lag-5/lag-10 use time-zero ¥100,000 until the lag exists in both fit and inference. All terminal fitted objects, selection authority, root-manifest boundary and publication transaction are production-bound. 2024/LOCKED_TEST outcomes remain embargoed. This executed notebook reads only the committed immutable package under `results/issue-208/`.")
 
 code("""from pathlib import Path
 import json
@@ -52,7 +52,7 @@ md("## 3. N×K performance surface (CV_2021 fit fold)\n\nMedian matched lift ove
 code("""pivot = surface.pivot_table(index="n", columns="k", values="matched_lift_mean", aggfunc="median").round(1)
 pivot""")
 
-md("## 4. Chronological learned policy (safety-gated)\n\nFold 1 (train CV_2021 → test CV_2022) and Fold 2 (train CV_2021+CV_2022 → test CV_2023). Chronological validation block = last 15% of train issues by issue id. Validation issues are excluded before every MLP, Ridge, ranker, fixed-action and OOD fit; sklearn row-level early stopping remains disabled. All payouts use the corrected pre-tax economics (0.65 applied exactly once per winning ticket). In v6, learned/control paths score each issue from their own strictly-prior live history (D1), and the running drawdown peak includes the time-zero ¥100,000 anchor.")
+md("## 4. Chronological learned policy (safety-gated)\n\nFold 1 (train CV_2021 → test CV_2022) and Fold 2 (train CV_2021+CV_2022 → test CV_2023). Chronological validation block = last 15% of train issues by issue id. Validation issues are excluded before every MLP, Ridge, ranker, fixed-action and OOD fit; sklearn row-level early stopping remains disabled. In v7, fit and live inference share the same exact lag warm-up: before 5/10 completed issues, the corresponding anchor remains ¥100,000.")
 
 code("""for fold in ("fold1", "fold2"):
     learned = pd.read_parquet(PACKAGE / f"path_learned_{fold}.parquet")
@@ -90,7 +90,7 @@ freq.head(6)""")
 code("""fallback = pd.read_csv(PACKAGE / "ood_fallback_census.csv")
 fallback""")
 
-md("## 7. Genuine dynamic controls\n\nEach restricted control scores lawful actions separately for every issue from causal state. N-only selects N4 on most issues and N9 on two CV_2023 issues; K-only selects K8 throughout; joint N×K varies N but keeps K8. There is slight dynamic N variation, but no learned dynamic K behavior.")
+md("## 7. Genuine dynamic controls\n\nEach restricted control scores lawful actions separately for every issue from causal state. N-only selects N4 on all CV_2022 issues and 54/55 CV_2023 issues (one N10); K-only selects K8 throughout; joint N×K varies N but keeps K8. There is slight dynamic N variation, but no learned dynamic K behavior.")
 
 code("""dynamic = pd.read_parquet(PACKAGE / "dynamic_control_decisions.parquet")
 dynamic.groupby(["split", "policy", "n", "k"]).size().rename("issues").reset_index()""")
@@ -125,7 +125,7 @@ holding.loc[:, [
     "max_recovery_issues", "ex_largest_issue_ending_capital_yuan",
 ]].sort_values(["split", "ending_capital_yuan"], ascending=[True, False])""")
 
-md("## 9. Selection receipt and #209 handoff\n\nLexicographic rule over 2 constructible folds: learned matched lift = 0.0 on both folds (safety-gated to incumbent), so no row qualifies → freeze N7/K8/MARKET_WOR/native-¥2 incumbent. Handoff v6 carries fitted MLP weights + scaler and the canonical post-publication package path.")
+md("## 9. Selection receipt and #209 handoff\n\nLexicographic rule over 2 constructible folds: learned matched lift = 0.0 on both folds (safety-gated to incumbent), so no row qualifies → freeze N7/K8/MARKET_WOR/native-¥2 incumbent. Handoff v7 is relation-bound to independently recomputed path primitives and the fitted primary model.")
 
 code("""selection = json.loads((PACKAGE / "selection.json").read_text())
 print("eligible:", selection["eligible"])
@@ -137,7 +137,7 @@ print("handoff model_serialized:", handoff["model"].get("model_serialized"))
 print("handoff scaler_mean present:", handoff["model"].get("scaler_mean") is not None)
 print("handoff model_file:", handoff["model_file"])""")
 
-md("## 10. Package verification + tamper self-tests\n\nThe production verifier checks manifest/receipt/provenance/code binding, the complete 55-frame schema inventory, chronology, issue-level path metrics, dynamic argmax decisions, completion, actual-refit holdout evidence, capital, N/K bundles, payout economics and final handoff. All 22 attacks must be detected.")
+md("## 10. Package verification + tamper self-tests\n\nThe production verifier checks manifest/receipt/provenance/code binding, the complete 55-frame schema inventory, chronology, issue-level path metrics, dynamic argmax decisions, all fitted objects, selection/handoff authority, capital, N/K bundles and payout economics. All 25 attacks must be detected, including false promotion and nested manifest-name escape.")
 
 code("""from scripts.run_bj208_policy import verify_package
 
@@ -148,9 +148,13 @@ code("""tamper = json.loads((PACKAGE / "tamper_results.json").read_text())
 for res in tamper:
     print(res["attack"], "->", "DETECTED" if res["detected"] else "MISSED", res["failures"][:1])""")
 
-md("## 11. Holdout boundary and decision\n\nThe frozen value matrix contains zero calendar-2024 rows, so no claim of a 2024 mutation is made. The production probe mutates all 50,970 available 2025/2026 `LOCKED_TEST` rows and performs two actual terminal-fold refits; model/ranker/scaler/fixed-choice/OOD/live-decision signatures are identical. Decision: no learned candidate promotes; retain the frozen incumbent for #209. No production betting or release authority follows.")
+md("## 11. Holdout boundary and decision\n\nThe frozen value matrix contains zero calendar-2024 rows, so no claim of a 2024 mutation is made. The production probe mutates all 50,970 available 2025/2026 `LOCKED_TEST` rows and performs two actual terminal-fold refits. Ranker, primary MLP, Ridge, best-fixed, three restricted MLPs, OOD scaler/threshold, diagnostic MLP and decisions are invariant and artifact-bound. Decision: no learned candidate promotes; retain the frozen incumbent for #209.")
 
 code("""json.loads((PACKAGE / "holdout_mutation_receipt.json").read_text())""")
+
+code("""inventory = json.loads((PACKAGE / "fitted_object_inventory.json").read_text())
+print("fitted objects:", sorted(inventory["fitted_objects"]))
+print("restricted MLPs:", sorted(inventory["fitted_objects"]["restricted_mlps"]))""")
 
 # write notebook
 nb = {

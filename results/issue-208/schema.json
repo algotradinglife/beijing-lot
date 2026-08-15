@@ -3,11 +3,32 @@
     "models/fold1_mlp.joblib": {
       "diagnostic_only": false
     },
+    "models/fold2_diagnostic_mlp.joblib": {
+      "diagnostic_only": false
+    },
+    "models/fold2_dynamic_n_fixed_k8_lane.joblib": {
+      "diagnostic_only": false
+    },
+    "models/fold2_dynamic_nk_fixed_generator.joblib": {
+      "diagnostic_only": false
+    },
+    "models/fold2_fixed_n7_dynamic_k.joblib": {
+      "diagnostic_only": false
+    },
     "models/fold2_mlp.joblib": {
+      "diagnostic_only": false
+    },
+    "models/fold2_ood_scaler.joblib": {
+      "diagnostic_only": false
+    },
+    "models/fold2_ranker.joblib": {
+      "diagnostic_only": false
+    },
+    "models/fold2_ridge.joblib": {
       "diagnostic_only": false
     }
   },
-  "contract_version": "bj208-dynamic-nk-policy-v6",
+  "contract_version": "bj208-dynamic-nk-policy-v7",
   "frames": {
     "action_frequency.csv": {
       "columns": {
@@ -1541,6 +1562,10 @@
         "payout_semantics"
       ]
     },
+    "fitted_object_inventory.json": {
+      "diagnostic_only": false,
+      "required_keys": []
+    },
     "handoff_209.json": {
       "diagnostic_only": false,
       "required_keys": [
@@ -1563,7 +1588,7 @@
         "mutated_rows",
         "baseline_signature_sha256",
         "mutated_signature_sha256",
-        "model_weights_scaler_fixed_choice_ood_and_decisions_invariant"
+        "all_fitted_objects_and_decisions_invariant"
       ]
     },
     "holdout_refit_baseline.json": {
@@ -1631,6 +1656,10 @@
     {
       "name": "training_state_source_binding",
       "production_verifier": "verify_state_semantics"
+    },
+    {
+      "name": "selection_handoff_authority",
+      "production_verifier": "verify_selection_authority"
     }
   ]
 }

@@ -1,11 +1,11 @@
 {
+  "all_fitted_objects_and_decisions_invariant": true,
   "baseline_payload_file": "holdout_refit_baseline.json",
-  "baseline_signature_sha256": "b6f8c532c9177cf07bfafcc67327c67a3f9895c7553638df041c757881999a7a",
+  "baseline_signature_sha256": "bb08706ab7adb278f7ca1fa35117837b22212f19e33caf6eb38294d25e6f474a",
   "calendar_2024_rows_available": 0,
-  "model_weights_scaler_fixed_choice_ood_and_decisions_invariant": true,
   "mutated_payload_file": "holdout_refit_mutated.json",
   "mutated_rows": 50970,
-  "mutated_signature_sha256": "b6f8c532c9177cf07bfafcc67327c67a3f9895c7553638df041c757881999a7a",
+  "mutated_signature_sha256": "bb08706ab7adb278f7ca1fa35117837b22212f19e33caf6eb38294d25e6f474a",
   "mutated_split": "LOCKED_TEST",
   "probe": "ACTUAL_TERMINAL_FOLD_REFIT_AFTER_LOCKED_TEST_LABEL_MUTATION"
 }

@@ -1,18 +1,18 @@
 {
   "code_bindings": {
-    "method.yaml": "3a9e4a14f8e186f62c4998f3facd9646b9e2347926e3f4ed4d438e03b09f9d71",
+    "method.yaml": "d2a8c5345d67ecf40c23820744b9032f1a52198f092f7fda9ae01f1f292bb97e",
     "requirements.txt": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
-    "scripts/run_bj208_policy.py": "c8fce2d5ba62c278d3593e3dc4fdcf81c1877a2e0d3b6e11a74dd16fd17ba57a",
+    "scripts/run_bj208_policy.py": "432cde3c5ae334d301b9880dd4fe74fdec74266518e35fa8c706b511bc0aeec5",
     "src/parlay_policy/__init__.py": "dfa9d9829f46c405485807396b8a420bb847149400970a027be697625a938c4d",
     "src/parlay_policy/census.py": "fd16ef854ae66485cc2156e8433ea4c90f454bb4cda5dfcff7c53173e038f4b5",
-    "src/parlay_policy/contract.py": "8daca55c049bd4526b5d1b963bd1300daf27d5f4ac67b817c069bd407c1d5995",
+    "src/parlay_policy/contract.py": "d69acda57d19e3f9a897948f43661bba14d675e8bb1b4c7ef60beded8a9d1b4b",
     "src/parlay_policy/diagnostics.py": "e71b9bd5503bce0a53fbedd98e9be7dd1f8690d052ac306cca87eef9a9342eac",
-    "src/parlay_policy/features.py": "fbacb63ef643eeecb8e493793dfa700eb3729a6370cf36936e62c5a7a8f5c855",
-    "src/parlay_policy/incumbent.py": "1b3bea5363526bc743b0045cee2652ac904a30f3ca37cfcee2af69b4af404996",
+    "src/parlay_policy/features.py": "cc7fcc70c1fd46cdfb2cc608069f4642c2109b8cc49f744de0d5a028c491466d",
+    "src/parlay_policy/incumbent.py": "4c36dbc37162465681442577afab861811808599957e80475abc125e3f76b2ac",
     "src/parlay_policy/policy.py": "5bd0b589e221128ad826ccc5ab04ec69a8c356cac1c1d7c3ce7d88c927d34f24",
     "src/parlay_policy/replay.py": "d01f805ae91e2238c40245498f4feac75288ae46daf4256b3aa099face151eba",
     "src/parlay_policy/tickets.py": "718a4a33165f36dc94cb6c1a6675fb0fd9866a2ada8aab02a8ff9804bad1e130",
-    "src/parlay_policy/verify.py": "9ec397da8af9f423de4a51ba1ee76220a72c0b23fcaa6d3fc0abdf8ce740ec27"
+    "src/parlay_policy/verify.py": "a003ab679392361b51c57512b2adbace781c7ff410eb7be406395c7f792345d0"
   },
   "environment": {
     "numpy": "2.4.6",
@@ -24,12 +24,12 @@
   },
   "environment_lock_sha256": "e1cef58d570fc754d620beae42bc898a382e59c6293fdd515c4929cefba7eab6",
   "label_boundary": "CV_2021 fit; CV_2022/CV_2023 development; 2024/2025/2026 embargoed",
-  "producer_code_commit": "eea005b24f2c38271abbbb74bab8f423832230bc",
+  "producer_code_commit": "7ff62c6b01fc6d24716608e3b45527a578722b26",
   "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208",
   "source_issue_207": "results/issue-207",
   "source_issue_207_manifest_sha256": "48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6",
   "source_issue_207_sha": "90869a959dc1b972cd872ffe465d1009e29df75e",
   "source_value_matrix": "results/issue-205/value_matrix.parquet",
   "source_value_matrix_sha256": "8fdace9c7249502456f8990137011847df9addae5ad633e61760c44b7ccde84b",
-  "version": "bj208-dynamic-nk-policy-v6"
+  "version": "bj208-dynamic-nk-policy-v7"
 }

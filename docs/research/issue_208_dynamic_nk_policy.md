@@ -1,7 +1,7 @@
 # Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier
 
-REWORK v4 (EV REJECT `ea1fc51` fixed), generated from producer-code commit
-`eea005b24f2c38271abbbb74bab8f423832230bc`. Contract BJ-UNIFIED-DYNAMIC-N-001 / v6.
+PI takeover v7 (concurrent EV REJECTs at `feed021a`), generated from producer-code commit
+`7ff62c6b01fc6d24716608e3b45527a578722b26`. Contract BJ-UNIFIED-DYNAMIC-N-001 / v7.
 Research and paper settlement only. No betting, release, or frontend authority
 follows from this result.
 
@@ -61,8 +61,9 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
 - 2024 calendar year and 2025/2026 LOCKED_TEST outcomes are embargoed. The
   frozen value matrix contains no calendar-2024 rows, so the executable probe
   mutates all 50,970 available `LOCKED_TEST` rows and performs two actual
-  terminal-fold refits. MLP/ranker weights, scalers, fixed action, OOD
-  threshold and earlier live-path decisions remain byte-signature identical.
+  terminal-fold refits. Ranker, primary MLP, Ridge, best-fixed choice, three
+  restricted MLPs, OOD scaler/threshold, diagnostic MLP and terminal decisions
+  remain semantic-signature identical and bind separate model artifacts.
 
 ## Path-state causality (REWORK v4, EV D1)
 
@@ -80,6 +81,11 @@ thin first neural layer described in the contract; a later permutation-invariant
 M×3 encoder is deferred until #209 establishes learned dynamic choice adds
 signal.
 
+v7 additionally makes lag warm-up identical at fit and inference: lag-5 and
+lag-10 use time-zero capital until exactly 5/10 completed issues exist. This
+corrects 27 FIT issue states (4,536 action rows) without changing the terminal
+safety-fallback conclusion.
+
 ## Recovery / holding semantics (REWORK v4, EV D2)
 
 `max_recovery_issues` now counts the longest COMPLETED underwater episode only;
@@ -91,7 +97,7 @@ CV_2022 incumbent path, for example, ends underwater and now reports
 `max_recovery_issues=0 / open_underwater_issues=58` (previously the open
 episode was mislabeled as a completed 58-issue recovery).
 
-## Terminal decisions (REWORK v4 / v6)
+## Terminal decisions (PI takeover v7)
 
 - `ELIGIBLE_CANDIDATE=false`: the safety-gated learned policy passes the
   preregistered gate on 0 of 113 test issues, so the gated path equals the
@@ -107,14 +113,14 @@ episode was mislabeled as a completed 58-issue recovery).
   control path, safety gate and risk metric was regenerated under the corrected
   economics.
 - The Q model shows a coarse ranking tendency, not calibrated actionable
-  signal. Predicted best-lift bins rise from −6.6 to 260.9 while realized bin
-  means are 2,608 / 6,608 / 1,197 / 4,019 / 12,148: the highest bin is strongest,
+  signal. Predicted best-lift bins rise from −204.1 to 198.1 while realized bin
+  means are 2,608 / 6,608 / 1,380 / 3,776 / 12,148: the highest bin is strongest,
   but adjacent bins are not monotone and the scales are badly mismatched.
-  Chronological validation RMSE (1,012) is below fit RMSE (1,290), yet the
+  Chronological validation RMSE (1,012.4) is below fit RMSE (1,290.1), yet the
   conservative gate vetoes all 113 executions. This is model diagnostic
   information, not evidence of Edge.
 
-## Controls / attribution matrix (CV_2023 test split, ¥100,000 start, v6)
+## Controls / attribution matrix (CV_2023 test split, ¥100,000 start, v7)
 
 | Control | Ending capital ¥ | Note |
 |---|---|---|
@@ -125,7 +131,7 @@ episode was mislabeled as a completed 58-issue recovery).
 | static_n4k8 | 99,609.10 | |
 | dynamic_n_fixed_k8_lane | 99,609.10 | scorer varies, selected action collapses to N4 |
 | best_fixed_policy | 99,569.54 | best train-fold fixed cell: N4/K8/MARKET_WR/native |
-| dynamic_nk_fixed_generator | 99,487.45 | state-conditioned; N varies, K remains 8 (live-path scoring, v6) |
+| dynamic_nk_fixed_generator | 99,491.24 | state-conditioned; N varies, K remains 8 (v7 lag semantics) |
 | static_n9k8 | 99,403.42 | |
 | static_n6k8 | 99,387.50 | |
 | generator_change_n7k8 | 99,338.59 | MARKET_WR lane at N7/K8 |
@@ -136,17 +142,16 @@ episode was mislabeled as a completed 58-issue recovery).
 | n7k16_sensitivity | 99,106.12 | K16 native ¥2 |
 | capital_change_identical | 62,178.64 | EQUAL_1PCT on identical tickets, corrected multiples |
 
-Note: the v6 dynamic N×K restricted control (¥99,487.45 CV_2023) is lower than
-the v5 value (¥99,632.80) because the control now scores from its own live
-prior path instead of the frozen incumbent counterfactual history (EV D1). The
-terminal conclusion is unchanged.
+Note: v7 changes the dynamic N×K control from v6 ¥99,487.45 to ¥99,491.24 by
+making fit-time lag warm-up identical to live inference. This is a causal-state
+correction, not evidence of Edge; the terminal conclusion is unchanged.
 
 Key attribution findings (REQ-208-05):
 
 - **N**: the frontier is not monotone or stable. Static N=8 reaches ¥100,218
   on CV_2023 but ends ¥99,072 on CV_2022. The state-conditioned N-only scorer
-  chooses N4 on 111 issues and N9 on 2 CV_2023 issues; joint N×K varies N across
-  3 values on CV_2022 and 6 values on CV_2023, but ends ¥99,483 / ¥99,633 and does not beat the
+  chooses N4 on 112 issues and N10 on 1 CV_2023 issue; joint N×K varies N across
+  3 values on CV_2022 and 6 values on CV_2023, but ends ¥99,509 / ¥99,491 and does not beat the
   strongest fixed control. The one-fold N8 gain is therefore a diagnostic
   sweet spot, not a promotion.
 - **K**: the state-conditioned K-only scorer chooses K8 in every issue, and
@@ -181,7 +186,8 @@ ticket identities for stochastic lanes), `ticket_economics.parquet`
 verifier), `dynamic_control_decisions.parquet` (per-issue scores/actions),
 `path_holding_metrics.parquet`, `chronology_blocks.parquet`,
 `training_frame_all.parquet`, `validation_frame_all.parquet`,
-`holdout_refit_baseline.json`, `holdout_refit_mutated.json`, `holdout_mutation_receipt.json`,
+`holdout_refit_baseline.json`, `holdout_refit_mutated.json`,
+`fitted_object_inventory.json`, `holdout_mutation_receipt.json`,
 `selection.json`, `handoff_209.json`.
 
 ## REWORK-E09 same-category sweep evidence (REWORK v3 payout-economics)
@@ -221,7 +227,29 @@ surface was swept (not just the four reported instances):
    frozen (manifest `48c11d97…`); the supersession is recorded in
    PROTOCOL-LOG #208-7/#208-8 and #208 never consumes that field.
 
-## REWORK v4 closure evidence (EV REJECT ea1fc51)
+## PI takeover v7 closure evidence (concurrent EV REJECTs at feed021a)
+
+The v7 rework merges both exact-HEAD audits and closes five categories without
+changing the action grid, model families, seeds, selection rule or payout:
+
+1. Fit/validation and live inference now share exact lag-5/lag-10 warm-up
+   semantics; an independent verifier rebuilds all five state features.
+2. Baseline/mutated actual-refit payloads enumerate all seven fitted-object
+   classes plus decisions. Eight terminal joblib/scaler artifacts and
+   `fitted_object_inventory.json` bind their numerical state.
+3. `verify_selection_authority` rebuilds fold ends/lifts, median/worst lift,
+   positive folds, rules, eligibility and candidate from decisive paths, then
+   binds selection to the #209 handoff and fitted primary model.
+4. Only exact root `SHA256SUMS.json` is excluded. Nested same-name files,
+   unsafe paths and symlinks fail closed.
+5. Atomic publication restores visible last-good on first/second fsync and
+   rename faults; post-verify rollback and cleanup remain independently tested.
+
+Full replay completed in 1,112 seconds; 81 focused tests passed; production
+verification reports 25/25 attacks detected. The package has 79 files: all 78
+non-manifest files are bound. The scientific no-promotion result is unchanged.
+
+## REWORK v4/v6 historical closure evidence (EV REJECT ea1fc51)
 
 The v6 rework preserves all accepted payout, chronology, holdout-refit,
 manifest/receipt and transactional-publication corrections, and closes the
@@ -248,7 +276,8 @@ three method-level blockers from the independent EV REJECT at `ea1fc51`:
    re-manifest of `training_frame_all.parquet` (shift drawdown +0.5) fails
    closed. The production tamper suite now detects 23/23 attacks.
 
-The v5 closure evidence below remains valid and is retained for reference.
+The v5 evidence below is retained as historical trace only; v7 supersedes its
+incomplete fitted-object, terminal-authority and manifest-boundary claims.
 
 ## PI takeover v5 closure evidence
 
@@ -294,7 +323,7 @@ the exact remaining categories from the two EV REJECTs at `42b6e386`:
 | REQ-208-05 matched attribution | per-issue restricted controls + identical-ticket capital arm; pure same-yuan K8/K16 marked NOT_IDENTIFIABLE |
 | REQ-208-06 capital accounting | `verify_capital_accounting` (start ¥100,000, ¥2 units, continuity) |
 | REQ-208-07 decision evidence | full frontier, equity paths, holding metrics, adversarial arms |
-| REQ-208-08 terminal freeze | `handoff_209.json` v6 (byte-identifiable candidate/fallback + payout semantics; canonical post-publication manifest path) |
+| REQ-208-08 terminal freeze | `handoff_209.json` v7; independently recomputed selection↔handoff↔model relation + canonical manifest path |
 | REQ-208-09 neural policy | MLPRegressor Q with Ridge + best-fixed controls, joblib weights, label-blind replay |
 
 ## Known risks
@@ -312,7 +341,7 @@ the exact remaining categories from the two EV REJECTs at `42b6e386`:
   superseded interpretation; the frozen #207 CONTROLLING ticket identities are
   unchanged, but the #207 ledger's own economics are superseded for #208.
 - Dynamic score variation does not guarantee useful decision variation: N-only
-  changes on only two issues and K-only remains fixed. Any next model must improve the
+  changes on only one issue and K-only remains fixed. Any next model must improve the
   state representation/target, not merely rerun a denser fixed grid.
 
 ## Replay

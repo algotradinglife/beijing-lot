@@ -3,7 +3,7 @@
     "NATIVE_2_YUAN",
     "SIMPLE_ACTIVE"
   ],
-  "contract_version": "bj208-dynamic-nk-policy-v6",
+  "contract_version": "bj208-dynamic-nk-policy-v7",
   "folds": [
     {
       "test": "CV_2022",

@@ -21,9 +21,9 @@
     "detected": true,
     "failures": [
       "hash mismatch chronology_blocks.parquet: d82ba9a17d46deb2e44dde5f22ad011d13b1fd4403054ce767cc1fbf6966dea8 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_fold1.parquet: 3e6b3b30ef46ae0da950dc6e145d57907b8a195a1463622d678170ef77158470 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_fold2.parquet: b09467c40671448f040b71f4af5fa781fa3214cc83ee8f5dbe65873b1ef47ccc != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_rows_all.parquet: c2205d1bbfb765869052c5e5a46716b6070b72d5a2cdc27fc20006c428586a32 != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_fold1.parquet: a99c9df6e57f5423b80d493a83a5a682b15adb23954866128e2399c51cd827d8 != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_fold2.parquet: e97acf561173d7ab5f85f41081b85f35a45fff02bd97b4da65314551dd7de29e != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_rows_all.parquet: 9f80c37523cef9277ffbe0cc22c9382eb7a11cc048e9c5e2f5e4d120ef580959 != 0000000000000000000000000000000000000000000000000000000000000000",
       "hash mismatch decision_ticket_identities.parquet: 6640fa3220c0e94df4fefb9b87228850acbca3cbb37432eed1b6c1784d7fb81e != 0000000000000000000000000000000000000000000000000000000000000000"
     ]
   },
@@ -164,8 +164,11 @@
     "attack": "forged_holdout_attestation",
     "detected": true,
     "failures": [
-      "holdout payload does not bind fold2 model",
-      "holdout payload does not bind terminal decisions"
+      "holdout payload fitted-object inventory incomplete",
+      "holdout payload does not bind fitted-object inventory",
+      "fitted-object artifact mismatch: ticket_ranker",
+      "fitted-object artifact mismatch: primary_mlp",
+      "fitted-object artifact mismatch: ridge"
     ]
   },
   {
@@ -177,6 +180,25 @@
       "training_frame_all.parquet ('CV_2021', '21013') prior_running_drawdown_pct = 0.50032 but source-derived value = 0.00032",
       "training_frame_all.parquet ('CV_2021', '21014') prior_running_drawdown_pct = 0.50048 but source-derived value = 0.00048",
       "training_frame_all.parquet ('CV_2021', '21015') prior_running_drawdown_pct = 0.50064 but source-derived value = 0.00064"
+    ]
+  },
+  {
+    "attack": "false_terminal_promotion",
+    "detected": true,
+    "failures": [
+      "selection rule2_positive_median_lift mismatch",
+      "selection rule3_positive_on_all_constructible_folds mismatch",
+      "selection eligible mismatch",
+      "selection median_matched_lift_yuan mismatch",
+      "selection positive_fold_count mismatch"
+    ]
+  },
+  {
+    "attack": "nested_manifest_name_escape",
+    "detected": true,
+    "failures": [
+      "unlisted payload files: ['models/SHA256SUMS.json']",
+      "schema omits JSON artifacts: ['models/SHA256SUMS.json']"
     ]
   }
 ]
