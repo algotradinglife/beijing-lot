@@ -374,3 +374,38 @@ model family, seed aggregation, selection rule or scientific hypothesis.
 - Production tamper suite adds receipt append/rewrite/duplicate/delete,
   non-argmax dynamic action, zeroed issue drawdown, omitted code binding and
   forged holdout attestation attacks.
+
+---
+
+## 18. REWORK v4 closure rows (2026-08-15, EV REJECT ea1fc51)
+
+Independent fresh audit bound PR #230 exact HEAD `ea1fc51bc2e67407cfad59e4034e1e63e33a74f2`.
+The audit reproduced all v5 scientific numbers and accepted payout, chronology,
+holdout-refit, manifest/receipt and transactional-publication corrections, but
+found three method-level blockers. These rows do not change the action grid,
+model family, seed aggregation, selection rule, corrected 0.65 coefficient or
+scientific hypothesis. Output changes are attributable only to D1–D3.
+
+| Row | Action | Scope | Supersedes | Rationale |
+|---|---|---|---|---|
+| #208-27 | supersede | every selection path (primary MLP, Ridge, fixed action, N-only/K-only/N×K restricted controls, actual-refit probe, fallback continuation and NO_BET subsequent issues) scores each issue from ITS OWN strictly-prior live history: trail5/trail10 bankroll, running drawdown and economic loss streak all come from the lane's actual settlements, never from the frozen incumbent counterfactual path; the running drawdown peak includes the time-zero ¥100,000 anchor | v5 `_state_with_bankroll` replaced only `prior_bankroll_yuan`, leaving four path-dependent features from the incumbent path | EV D1: once a learned/control action diverges, the next issue's state was counterfactual; 114/116 states had an unanchored drawdown feature that also entered scaler, MLP and dynamic controls |
+| #208-28 | supersede | recovery metrics distinguish COMPLETED recovery duration (`max_recovery_issues`), open/censored underwater duration (`open_underwater_issues`) and recovery event count (`recovery_issues`); a right-censored terminal underwater episode is never reported as a completed recovery; `verify_path_metrics` recomputes episodes with an independent primitive implementation, not production `summarize_path` | v5 `max_recovery_issues` incremented on every underwater issue including terminal-censored episodes; verifier reused the production summary | EV D2: 25/34 paths had `recovery_issues == 0` while `max_recovery_issues > 0`; CV_2022 learned_policy published 58 recovery issues that never recovered |
+| #208-29 | supersede | production verification recomputes the five path-dependent state features from the frozen incumbent source and binds the fitted model's scaler drawdown mean to the fold2 FIT training mean; a legal re-manifest of `training_frame_all.parquet` (e.g. shifting drawdown +0.5) fails closed even with a fully valid SHA256SUMS.json; tamper suite adds `training_state_drawdown_shift` | v5 manifest-only intra-package hash binding | EV D3: remanifested critical training evidence passed `verify_package` because the manifest cannot prove that training state matches source-derived causal recomputation or the fitted model |
+
+### v6 executable evidence
+
+- `live_prior_state_from_rows` (features.py) rebuilds all five path-dependent
+  state features from a lane's own accumulated rows; `_state_with_prior`
+  (runner) replaces them in the design vector at every call site
+  (learned/refit/restricted/ridge/fixed).
+- `incumbent_prior_state` anchors the running peak at ¥100,000 and defines a
+  loss by net P&L < 0 (payout < funded), consistent with
+  `max_consecutive_losing_issues`.
+- `summarize_path` publishes `open_underwater_issues` and restricts
+  `max_recovery_issues` to completed episodes; golden tests cover
+  never-recovered and completed-then-open paths.
+- `verify_state_semantics` recomputes prior state per (split, issue) from
+  `incumbent_paths.parquet` and compares against training/validation frames,
+  then checks the fold2 scaler drawdown mean against the FIT training mean.
+- Production tamper suite now includes 23 attacks; `training_state_drawdown_shift`
+  is detected by the semantic verifier even after a legal manifest rewrite.

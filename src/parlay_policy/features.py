@@ -119,10 +119,12 @@ def prior_bankroll_state(
     controller: str = "NATIVE_2_YUAN",
     k: int = 8,
 ) -> PriorBankrollState:
-    """Strictly prior bankroll/path state from the frozen incumbent path.
+    """Strictly prior bankroll/path state from a ledger path.
 
-    Rows are strictly before the decision issue (issue_order < current), so
-    the current issue's outcome is never observed.
+    REWORK v4 (EV D1): the running peak anchors at the time-zero ¥100,000
+    initial bankroll.  Rows are strictly before the decision issue
+    (issue_order < current), so the current issue's outcome is never
+    observed.
     """
     sub = ledger[
         (ledger["split"] == split)
@@ -152,9 +154,14 @@ def prior_bankroll_state(
             prior_consecutive_losses=0,
         )
     bankroll = float(prior.iloc[-1]["post_issue_bankroll_yuan"])
-    trail5 = float(prior.tail(5).iloc[-1]["post_issue_bankroll_yuan"])
-    trail10 = float(prior.tail(10).iloc[-1]["post_issue_bankroll_yuan"])
-    running_peak = float(prior["post_issue_bankroll_yuan"].cummax().iloc[-1])
+    trail5 = float(prior.tail(5).iloc[0]["post_issue_bankroll_yuan"])
+    trail10 = float(prior.tail(10).iloc[0]["post_issue_bankroll_yuan"])
+    running_peak = float(
+        max(
+            100_000.0,
+            float(prior["post_issue_bankroll_yuan"].cummax().iloc[-1]),
+        )
+    )
     drawdown_pct = (running_peak - bankroll) / running_peak if running_peak else 0.0
     losses = 0
     for value in reversed(prior["net_pnl_yuan"].tolist()):
@@ -167,6 +174,54 @@ def prior_bankroll_state(
         prior_trail5_bankroll_yuan=trail5,
         prior_trail10_bankroll_yuan=trail10,
         prior_running_drawdown_pct=float(drawdown_pct),
+        prior_consecutive_losses=int(losses),
+    )
+
+
+def live_prior_state_from_rows(
+    rows: list[dict[str, object]],
+    *,
+    initial: float = 100_000.0,
+) -> PriorBankrollState:
+    """Strictly-prior live bankroll/path state from a policy's own rows.
+
+    REWORK v4 (EV D1): every policy lane must be scored from ITS OWN
+    strictly-prior live history, not from the frozen incumbent path.  Once
+    a learned/control action diverges from the incumbent, the next issue's
+    trail5/trail10 bankroll, running drawdown and loss streak come from this
+    lane's actual settlements.  The running peak includes the time-zero
+    ¥100,000 anchor (method.yaml drawdown definition).
+    """
+    posts = np.asarray(
+        [float(row["post_issue_bankroll_yuan"]) for row in rows], dtype=float
+    )
+    pnls = np.asarray(
+        [float(row["net_pnl_yuan"]) for row in rows], dtype=float
+    )
+    if len(posts) == 0:
+        return PriorBankrollState(
+            prior_bankroll_yuan=initial,
+            prior_trail5_bankroll_yuan=initial,
+            prior_trail10_bankroll_yuan=initial,
+            prior_running_drawdown_pct=0.0,
+            prior_consecutive_losses=0,
+        )
+    bankroll = float(posts[-1])
+    trail5 = float(posts[-5]) if len(posts) >= 5 else initial
+    trail10 = float(posts[-10]) if len(posts) >= 10 else initial
+    peak = float(max(initial, float(np.max(np.maximum.accumulate(posts)))))
+    drawdown = (peak - bankroll) / peak if peak else 0.0
+    losses = 0
+    for value in reversed(pnls):
+        if value < 0:
+            losses += 1
+        else:
+            break
+    return PriorBankrollState(
+        prior_bankroll_yuan=bankroll,
+        prior_trail5_bankroll_yuan=trail5,
+        prior_trail10_bankroll_yuan=trail10,
+        prior_running_drawdown_pct=float(drawdown),
         prior_consecutive_losses=int(losses),
     )
 
@@ -203,5 +258,5 @@ def forbidden_field_check(names: Iterable[str]) -> list[str]:
 __all__ = [
     "STATE_FEATURE_NAMES", "StateError", "PriorBankrollState",
     "build_state_vector", "forbidden_field_check", "prior_bankroll_state",
-    "upstream_issue_summary",
+    "live_prior_state_from_rows", "upstream_issue_summary",
 ]

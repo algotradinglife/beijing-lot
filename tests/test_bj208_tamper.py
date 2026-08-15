@@ -26,6 +26,7 @@ from parlay_policy.contract import (  # noqa: E402
     UPSTREAM_207_SHA,
     VALUE_MATRIX_SHA256,
 )
+from parlay_policy.features import STATE_FEATURE_NAMES  # noqa: E402
 from parlay_policy.verify import (  # noqa: E402
     manifest,
     sha256_file,
@@ -359,3 +360,102 @@ def test_rich_schema_rejects_duplicate_decision_key(tmp_path: Path):
     }
     failures = verify_package_schema(tmp_path, schema)
     assert any("duplicate primary key" in failure for failure in failures)
+
+
+def _state_semantics_package(tmp_path: Path) -> Path:
+    """REWORK v4 (EV D3) mini package: incumbent source, training/validation
+    frames and a handoff model payload consistent with the source-derived
+    prior state."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    incumbent = pd.DataFrame(
+        {
+            "split": ["CV_2023", "CV_2023"],
+            "issue": ["23001", "23002"],
+            "year": [2023, 2023],
+            "pre_issue_bankroll_yuan": [100_000.0, 99_984.0],
+            "funded_stake_yuan": [16.0, 16.0],
+            "gross_payout_yuan": [0.0, 0.0],
+            "post_issue_bankroll_yuan": [99_984.0, 99_968.0],
+            "source": ["RECONSTRUCTED_CORRECTED_ECONOMICS"] * 2,
+        }
+    )
+    incumbent.to_parquet(tmp_path / "incumbent_paths.parquet", index=False)
+    # Source-derived prior state for 23001 (cold start) and 23002
+    # (one prior loss of ¥16 => drawdown anchored at 100,000).
+    rows = []
+    for issue, prior_bankroll, trail5, trail10, dd, losses in (
+        ("23001", 100_000.0, 100_000.0, 100_000.0, 0.0, 0),
+        # 23002 has exactly one strictly-prior row (23001 post 99_984), so
+        # trail5 AND trail10 both equal that single prior post (99_984);
+        # running peak anchored at 100,000 => dd = 16/100_000.
+        ("23002", 99_984.0, 99_984.0, 99_984.0, 0.00016, 1),
+    ):
+        rows.append(
+            {
+                "split": "CV_2023",
+                "issue": issue,
+                "year": 2023,
+                "prior_bankroll_yuan": prior_bankroll,
+                "prior_trail5_bankroll_yuan": trail5,
+                "prior_trail10_bankroll_yuan": trail10,
+                "prior_running_drawdown_pct": dd,
+                "prior_consecutive_losses": losses,
+                "fold": "fold2",
+                "training_role": "FIT",
+            }
+        )
+    training = pd.DataFrame(rows)
+    training.to_parquet(
+        tmp_path / "training_frame_all.parquet", index=False
+    )
+    training.to_parquet(
+        tmp_path / "validation_frame_all.parquet", index=False
+    )
+    scaler_mean = [0.0] * (len(STATE_FEATURE_NAMES) + 4)
+    drawdown_idx = STATE_FEATURE_NAMES.index("prior_running_drawdown_pct")
+    scaler_mean[drawdown_idx] = 0.00008  # mean of FIT drawdown (0 + 0.00016)/2
+    _write_json(
+        tmp_path / "handoff_209.json",
+        {
+            "model": {
+                "scaler_mean": scaler_mean,
+            }
+        },
+    )
+    return tmp_path
+
+
+def test_tamper_training_state_shift_detected(tmp_path: Path):
+    """REWORK v4 (EV D3): a LEGAL re-manifest attack that shifts
+    prior_running_drawdown_pct in the training frame (+0.5) and regenerates a
+    valid SHA256SUMS.json must FAIL the production state-semantics verifier.
+
+    Hash-only verification passes because the manifest only proves
+    intra-package self-consistency; verify_state_semantics fails closed on the
+    source-derived recomputation and the model-scaler binding.
+    """
+    from parlay_policy.verify import (
+        tamper_holdout_state_shift,
+        verify_state_semantics,
+    )
+
+    package = _state_semantics_package(tmp_path / "clean")
+    clean = verify_state_semantics(package)
+    assert clean == [], f"clean state semantics failed: {clean}"
+
+    tampered = tmp_path / "tampered"
+    import shutil
+
+    shutil.copytree(package, tampered)
+    tamper_holdout_state_shift(tampered / "training_frame_all.parquet")
+    # Attacker regenerates a fully legal manifest over the tampered tree.
+    artifacts = sorted(
+        p for p in tampered.rglob("*")
+        if p.is_file() and p.name != "SHA256SUMS.json"
+    )
+    _write_json(tampered / "SHA256SUMS.json", manifest(tampered, artifacts))
+    failures = verify_state_semantics(tampered)
+    assert failures, "re-manifested training-state shift was NOT detected"
+    assert any(
+        "prior_running_drawdown_pct" in failure for failure in failures
+    )

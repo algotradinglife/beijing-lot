@@ -53,6 +53,7 @@ from .features import (
     STATE_FEATURE_NAMES,
     PriorBankrollState,
     build_state_vector,
+    live_prior_state_from_rows,
     upstream_issue_summary,
 )
 from .incumbent import incumbent_prior_state, incumbent_row
@@ -479,8 +480,17 @@ def full_path_replay(
     split_contexts.sort(key=lambda item: (item[1].panel.year, str(item[0])))
     incumbent_key = f"N{INCUMBENT_N}/K{INCUMBENT_K}/{INCUMBENT_LANE}/NATIVE_2_YUAN"
     for issue, ctx in split_contexts:
+        # REWORK v4 (EV D1): the policy is scored from ITS OWN strictly-prior
+        # live history (trail5/trail10 bankroll, running drawdown with the
+        # time-zero anchor, economic loss streak), never from the frozen
+        # incumbent counterfactual path.  Once an earlier learned/control
+        # action diverged from the incumbent, the state features follow this
+        # lane's actual settlements.
+        prior = live_prior_state_from_rows(
+            rows, initial=INITIAL_BANKROLL_YUAN
+        )
         pool = pool_cache.get(_pool_cache_key(issue, 7))  # fallback N7 pool
-        action, trace = action_fn(ctx, bankroll)
+        action, trace = action_fn(ctx, prior)
         if action is None:
             # NO_BET: no lawful action, or safety gate with no fallback.
             rows.append(
@@ -710,26 +720,32 @@ def summarize_path(path: pd.DataFrame) -> dict[str, float]:
     )
 
     # Time under water: consecutive issues from a running peak until recovery
-    # to a new peak, summed; recovery issues: count of recovery events.
+    # to a new peak, summed; recovery issues: count of COMPLETED recovery
+    # events.  REWORK v4 (EV D2): a right-censored (open) underwater episode
+    # that never recovers before the path end is NOT a completed recovery —
+    # its duration is reported separately as `open_underwater_issues`; the
+    # published `max_recovery_issues` covers completed episodes only.
     initial = float(path.iloc[0].get("pre_issue_bankroll_yuan", INITIAL_BANKROLL_YUAN))
     running_peak = np.maximum.accumulate(np.concatenate(([initial], posts)))[1:]
     underwater = running_peak > posts
     tuw = 0
     recovery = 0
+    completed_durations: list[int] = []
     current_recovery = 0
-    max_recovery = 0
     in_underwater = False
     for i in range(len(posts)):
         if underwater[i]:
             tuw += 1
             current_recovery += 1
-            max_recovery = max(max_recovery, current_recovery)
             in_underwater = True
         else:
             if in_underwater and i > 0 and posts[i] >= running_peak[i]:
                 recovery += 1
+                completed_durations.append(current_recovery)
             in_underwater = False
             current_recovery = 0
+    max_recovery = max(completed_durations, default=0)
+    open_underwater = current_recovery if in_underwater else 0
     # A losing issue is defined economically: net P&L < 0.  A positive gross
     # payout that is smaller than funded stake remains a loss.
     max_streak = 0
@@ -778,6 +794,7 @@ def summarize_path(path: pd.DataFrame) -> dict[str, float]:
         "time_under_water_issues": float(tuw),
         "recovery_issues": float(recovery),
         "max_recovery_issues": float(max_recovery),
+        "open_underwater_issues": float(open_underwater),
         "max_consecutive_losing_issues": float(max_streak),
         **rolling_metrics,
     }

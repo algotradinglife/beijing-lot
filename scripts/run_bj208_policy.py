@@ -112,6 +112,7 @@ from parlay_policy.verify import (  # noqa: E402
     verify_provenance,
     verify_receipt,
     verify_req_evidence,
+    verify_state_semantics,
 )
 from parlay_policy.diagnostics import (  # noqa: E402
     action_frequency,
@@ -121,7 +122,7 @@ from parlay_policy.diagnostics import (  # noqa: E402
     ood_fallback_census,
     permutation_importance_table,
 )
-from parlay_policy.features import STATE_FEATURE_NAMES  # noqa: E402
+from parlay_policy.features import STATE_FEATURE_NAMES, live_prior_state_from_rows  # noqa: E402
 
 
 def _json(path: Path, value: object) -> None:
@@ -414,9 +415,9 @@ def _run_stages(
                         ranker_fold, pool
                     )
 
-        def _learned_action_fn(ctx, bankroll):
+        def _learned_action_fn(ctx, prior):
             actions = _actions_for_issue(ctx)
-            state = _state_with_bankroll(ctx, bankroll)
+            state = _state_with_prior(ctx, prior)
             action, trace = choose_action(
                 policy_mlp, state, actions, ood_scaler=ood_scaler,
                 ood_threshold=ood_threshold,
@@ -424,7 +425,7 @@ def _run_stages(
             if action is None or not trace["safety_gate_pass"]:
                 # Baseline-residual safety gate: fall back to the frozen
                 # incumbent N7/K8/native-¥2 action when the gate fails.
-                if _incumbent_feasible(ctx, bankroll):
+                if _incumbent_feasible(ctx, prior.prior_bankroll_yuan):
                     fallback_action = Action(
                         7, 8, INCUMBENT_LANE, "NATIVE_2_YUAN"
                     )
@@ -689,12 +690,27 @@ def _chronological_validation_frame(
     return train_df.loc[train_df["issue"].astype(str).isin(val_issues)]
 
 
-def _state_with_bankroll(ctx, bankroll_yuan: float) -> np.ndarray:
-    """Return the issue's causal state with this policy path's live bankroll."""
+def _state_with_prior(ctx, prior) -> np.ndarray:
+    """Return the issue's causal state with this policy path's LIVE prior.
+
+    REWORK v4 (EV D1): replaces ALL FIVE path-dependent state features
+    (prior_bankroll_yuan, prior_trail5_bankroll_yuan,
+    prior_trail10_bankroll_yuan, prior_running_drawdown_pct,
+    prior_consecutive_losses) from the lane's own strictly-prior live
+    history.  The old helper only replaced prior_bankroll_yuan and kept the
+    frozen-incumbent trail/drawdown/loss features, so once a learned/control
+    action diverged from the incumbent the next issue's state was
+    counterfactual.
+    """
     state = np.asarray(ctx.state, dtype=float).copy()
-    state[STATE_FEATURE_NAMES.index("prior_bankroll_yuan")] = float(
-        bankroll_yuan
-    )
+    for name in (
+        "prior_bankroll_yuan",
+        "prior_trail5_bankroll_yuan",
+        "prior_trail10_bankroll_yuan",
+        "prior_running_drawdown_pct",
+        "prior_consecutive_losses",
+    ):
+        state[STATE_FEATURE_NAMES.index(name)] = float(getattr(prior, name))
     return state
 
 
@@ -866,8 +882,8 @@ def _actual_refit_signature(
                     ranker, pool
                 )
 
-    def _refit_action_fn(ctx, bankroll):
-        state = _state_with_bankroll(ctx, bankroll)
+    def _refit_action_fn(ctx, prior):
+        state = _state_with_prior(ctx, prior)
         action, trace = choose_action(
             policy,
             state,
@@ -876,7 +892,7 @@ def _actual_refit_signature(
             ood_threshold=ood_threshold,
         )
         if action is None or not trace["safety_gate_pass"]:
-            if _incumbent_feasible(ctx, bankroll):
+            if _incumbent_feasible(ctx, prior.prior_bankroll_yuan):
                 fallback = Action(7, 8, INCUMBENT_LANE, "NATIVE_2_YUAN")
                 return fallback, {
                     **trace,
@@ -1357,6 +1373,7 @@ def _write_schema(output: Path) -> None:
                     "max_consecutive_losing_issues": "float",
                     "time_under_water_issues": "float",
                     "max_recovery_issues": "float",
+                    "open_underwater_issues": "float",
                     "ex_largest_issue_ending_capital_yuan": "float",
                 },
                 "non_null": [
@@ -1494,6 +1511,10 @@ def _write_schema(output: Path) -> None:
             {
                 "name": "complete_code_binding_set",
                 "production_verifier": "verify_code_bindings",
+            },
+            {
+                "name": "training_state_source_binding",
+                "production_verifier": "verify_state_semantics",
             },
         ],
         "manifest_identity": {
@@ -1675,6 +1696,11 @@ def verify_package(output: Path) -> list[str]:
         decision = json.loads(decision_path.read_text(encoding="utf-8"))
         failures.extend(verify_req_evidence(decision, output))
 
+    # REWORK v4 (EV D3): source-derived binding of critical training-state
+    # evidence.  A legal re-manifest of training_frame_all.parquet that shifts
+    # prior_running_drawdown_pct must FAIL here even with a valid manifest.
+    failures.extend(verify_state_semantics(output))
+
     # Foundational package failures do not need the expensive upstream payout
     # replay.  This also keeps the production tamper suite practical: attacks
     # on completion/schema/provenance/REQ evidence fail at their controlling
@@ -1790,7 +1816,11 @@ def _run_controls(
             m = len(ctx.panel.match_idx)
             trace: dict[str, object]
             if name in restricted_policies:
-                state = _state_with_bankroll(ctx, bankroll)
+                # REWORK v4 (EV D1): restricted dynamic controls are scored
+                # from THEIR OWN live prior history (this arm's accumulated
+                # rows), not from the frozen incumbent counterfactual path.
+                prior = live_prior_state_from_rows(rows)
+                state = _state_with_prior(ctx, prior)
                 if name == "dynamic_n_fixed_k8_lane":
                     actions = [
                         _action(n, 8, "MARKET_WOR", "NATIVE_2_YUAN")
@@ -2110,34 +2140,34 @@ def _run_policy_controls(
     """Ridge and best-fixed-action policy paths (REWORK v2: evaluated per fold,
     not just metadata)."""
 
-    def _ridge_action_fn(ctx, bankroll):
+    def _ridge_action_fn(ctx, prior):
         actions = _actions_for_issue(ctx)
         if not actions:
             return None, {"fallback": "NO_BET", "reason": "NO_LAWFUL_ACTION"}
-        state = _state_with_bankroll(ctx, bankroll)
+        state = _state_with_prior(ctx, prior)
         action, trace = choose_action(
             policy_ridge, state, actions,
             ood_scaler=ood_scaler, ood_threshold=ood_threshold,
         )
         if action is None or not trace["safety_gate_pass"]:
-            if _incumbent_feasible(ctx, bankroll):
+            if _incumbent_feasible(ctx, prior.prior_bankroll_yuan):
                 return Action(7, 8, INCUMBENT_LANE, "NATIVE_2_YUAN"), {
                     **trace, "fallback": "INCUMBENT_OR_NO_BET",
                 }
             return None, {**trace, "fallback": "NO_BET", "reason": "INCUMBENT_INFEASIBLE"}
         return action, trace
 
-    def _fixed_action_fn(ctx, bankroll):
+    def _fixed_action_fn(ctx, prior):
         actions = _actions_for_issue(ctx)
         if not actions:
             return None, {"fallback": "NO_BET", "reason": "NO_LAWFUL_ACTION"}
-        state = _state_with_bankroll(ctx, bankroll)
+        state = _state_with_prior(ctx, prior)
         action, trace = choose_action(
             policy_fixed, state, actions,
             ood_scaler=None, ood_threshold=None,
         )
         if action is None:
-            if _incumbent_feasible(ctx, bankroll):
+            if _incumbent_feasible(ctx, prior.prior_bankroll_yuan):
                 return Action(7, 8, INCUMBENT_LANE, "NATIVE_2_YUAN"), {
                     "fallback": "INCUMBENT_OR_NO_BET",
                 }
@@ -2333,7 +2363,7 @@ def _build_handoff(
     fold2_model = fold_results.get("fold2", {}).get("policy_mlp", {})
     published = published_output or output
     return {
-        "handoff_version": "bj208-handoff-for-209-v5",
+        "handoff_version": "bj208-handoff-for-209-v6",
         "fit_boundary": {
             "train_through": "2022",
             "test_2023": True,

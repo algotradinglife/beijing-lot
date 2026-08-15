@@ -1,10 +1,9 @@
 # Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier
 
-PI takeover v5, generated from producer-code commit
-`7fd2f78d5dfa00d0f958f62b2b53cbcb1ce4a2be` after two independent EV REJECTs of
-PR #230 SHA `42b6e386cf74bff5e0377314dd9a258712d48430`. Contract
-BJ-UNIFIED-DYNAMIC-N-001 / v5. Research and paper settlement only. No betting,
-release, or frontend authority follows from this result.
+REWORK v4 (EV REJECT `ea1fc51` fixed), generated from producer-code commit
+`REWORKV4_COMMIT_PLACEHOLDER`. Contract BJ-UNIFIED-DYNAMIC-N-001 / v6.
+Research and paper settlement only. No betting, release, or frontend authority
+follows from this result.
 
 ## Payout economics (PI correction 2026-08-15)
 
@@ -65,7 +64,34 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
   terminal-fold refits. MLP/ranker weights, scalers, fixed action, OOD
   threshold and earlier live-path decisions remain byte-signature identical.
 
-## Terminal decisions (PI takeover v5)
+## Path-state causality (REWORK v4, EV D1)
+
+Every selection path (primary MLP, Ridge, best-fixed, dynamic N / dynamic K /
+dynamic N×K restricted controls, actual-refit probe, fallback continuation and
+NO_BET subsequent issues) now scores each issue from ITS OWN strictly-prior
+live history. `live_prior_state_from_rows` rebuilds
+`prior_bankroll_yuan`, `prior_trail5_bankroll_yuan`,
+`prior_trail10_bankroll_yuan`, `prior_running_drawdown_pct` and
+`prior_consecutive_losses` from the lane's actual settlements; the running
+drawdown peak anchors at the time-zero ¥100,000 initial bankroll. Once a
+learned/control action diverges from the incumbent, the next issue's state
+follows that lane, never the frozen incumbent counterfactual path. This is the
+thin first neural layer described in the contract; a later permutation-invariant
+M×3 encoder is deferred until #209 establishes learned dynamic choice adds
+signal.
+
+## Recovery / holding semantics (REWORK v4, EV D2)
+
+`max_recovery_issues` now counts the longest COMPLETED underwater episode only;
+a right-censored terminal episode that never recovers is reported separately as
+`open_underwater_issues`. `recovery_issues` counts completed recovery events.
+The verifier recomputes episodes with an independent primitive implementation,
+so the producer and the auditor cannot share the same semantic error. The
+CV_2022 incumbent path, for example, ends underwater and now reports
+`max_recovery_issues=0 / open_underwater_issues=58` (previously the open
+episode was mislabeled as a completed 58-issue recovery).
+
+## Terminal decisions (REWORK v4 / v6)
 
 - `ELIGIBLE_CANDIDATE=false`: the safety-gated learned policy passes the
   preregistered gate on 0 of 113 test issues, so the gated path equals the
@@ -88,7 +114,7 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
   conservative gate vetoes all 113 executions. This is model diagnostic
   information, not evidence of Edge.
 
-## Controls / attribution matrix (CV_2023 test split, ¥100,000 start, v5)
+## Controls / attribution matrix (CV_2023 test split, ¥100,000 start, v6)
 
 | Control | Ending capital ¥ | Note |
 |---|---|---|
@@ -99,7 +125,7 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
 | static_n4k8 | 99,609.10 | |
 | dynamic_n_fixed_k8_lane | 99,609.10 | scorer varies, selected action collapses to N4 |
 | best_fixed_policy | 99,569.54 | best train-fold fixed cell: N4/K8/MARKET_WR/native |
-| dynamic_nk_fixed_generator | 99,632.80 | state-conditioned; N varies, K remains 8 |
+| dynamic_nk_fixed_generator | 99,487.45 | state-conditioned; N varies, K remains 8 (live-path scoring, v6) |
 | static_n9k8 | 99,403.42 | |
 | static_n6k8 | 99,387.50 | |
 | generator_change_n7k8 | 99,338.59 | MARKET_WR lane at N7/K8 |
@@ -109,6 +135,11 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
 | static_n10k8 | 99,120.00 | |
 | n7k16_sensitivity | 99,106.12 | K16 native ¥2 |
 | capital_change_identical | 62,178.64 | EQUAL_1PCT on identical tickets, corrected multiples |
+
+Note: the v6 dynamic N×K restricted control (¥99,487.45 CV_2023) is lower than
+the v5 value (¥99,632.80) because the control now scores from its own live
+prior path instead of the frozen incumbent counterfactual history (EV D1). The
+terminal conclusion is unchanged.
 
 Key attribution findings (REQ-208-05):
 
@@ -190,6 +221,35 @@ surface was swept (not just the four reported instances):
    frozen (manifest `48c11d97…`); the supersession is recorded in
    PROTOCOL-LOG #208-7/#208-8 and #208 never consumes that field.
 
+## REWORK v4 closure evidence (EV REJECT ea1fc51)
+
+The v6 rework preserves all accepted payout, chronology, holdout-refit,
+manifest/receipt and transactional-publication corrections, and closes the
+three method-level blockers from the independent EV REJECT at `ea1fc51`:
+
+1. **Path-state causality (D1):** every executed-policy call site now scores
+   from its own live prior history. `live_prior_state_from_rows` derives all
+   five path-dependent state features from the lane's own rows; the running
+   drawdown peak includes the time-zero ¥100,000 anchor; the incumbent prior
+   loss streak uses net P&L < 0 (payout < funded). Golden tests cover lane-own
+   history and the anchor. Training/OOD/diagnostics intentionally retain the
+   fit-time incumbent reference distribution (the label-surface target is
+   matched lift vs the incumbent) and this choice is recorded in PROTOCOL-LOG
+   #208-27.
+2. **Recovery/holding semantics (D2):** `max_recovery_issues` covers completed
+   episodes only; `open_underwater_issues` reports right-censored terminal
+   episodes; `verify_path_metrics` recomputes episodes with an independent
+   primitive implementation. Golden tests cover never-recovered and
+   completed-then-open paths.
+3. **Semantic evidence binding (D3):** `verify_state_semantics` recomputes the
+   five path-dependent state features from `incumbent_paths.parquet` per
+   (split, issue) and compares against training/validation frames, then binds
+   the fold2 MLP scaler drawdown mean to the FIT training mean. A legal
+   re-manifest of `training_frame_all.parquet` (shift drawdown +0.5) fails
+   closed. The production tamper suite now detects 23/23 attacks.
+
+The v5 closure evidence below remains valid and is retained for reference.
+
 ## PI takeover v5 closure evidence
 
 The v5 rework preserves all accepted payout and handoff corrections, and closes
@@ -234,7 +294,7 @@ the exact remaining categories from the two EV REJECTs at `42b6e386`:
 | REQ-208-05 matched attribution | per-issue restricted controls + identical-ticket capital arm; pure same-yuan K8/K16 marked NOT_IDENTIFIABLE |
 | REQ-208-06 capital accounting | `verify_capital_accounting` (start ¥100,000, ¥2 units, continuity) |
 | REQ-208-07 decision evidence | full frontier, equity paths, holding metrics, adversarial arms |
-| REQ-208-08 terminal freeze | `handoff_209.json` v5 (byte-identifiable candidate/fallback + payout semantics; canonical post-publication manifest path) |
+| REQ-208-08 terminal freeze | `handoff_209.json` v6 (byte-identifiable candidate/fallback + payout semantics; canonical post-publication manifest path) |
 | REQ-208-09 neural policy | MLPRegressor Q with Ridge + best-fixed controls, joblib weights, label-blind replay |
 
 ## Known risks

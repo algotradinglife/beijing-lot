@@ -125,6 +125,41 @@ def test_time_under_water():
     # Underwater at issues 2 and 3 (2 issues), recovery at issue 4.
     assert summary["time_under_water_issues"] == 2
     assert summary["recovery_issues"] == 1
+    assert summary["max_recovery_issues"] == 2
+    assert summary["open_underwater_issues"] == 0
+
+
+def test_recovery_terminal_censored_never_recovers():
+    """REWORK v4 (EV D2): a right-censored underwater episode that never
+    recovers before the path end is an OPEN episode, not a completed recovery.
+
+    Path [100k, 99k, 98.5k]: underwater at issues 2-3 and the path ends
+    underwater.  Old code reported max_recovery_issues == 2 (treating the
+    open episode as recovered); the corrected semantic reports 0 completed
+    recoveries and open_underwater_issues == 2.
+    """
+    path = _path_frame([100_000.0, 99_000.0, 98_500.0])
+    summary = summarize_path(path)
+    assert summary["time_under_water_issues"] == 2
+    assert summary["recovery_issues"] == 0
+    assert summary["max_recovery_issues"] == 0
+    assert summary["open_underwater_issues"] == 2
+
+
+def test_recovery_completed_then_open():
+    """REWORK v4 (EV D2): a completed recovery episode followed by a terminal
+    open episode must be separated.
+
+    Path [100k, 99k, 98.5k, 101k, 100.5k, 100k]: issues 2-3 recover at 4
+    (completed episode length 2); issues 5-6 are underwater and the path ends
+    there (open episode length 2).
+    """
+    path = _path_frame([100_000.0, 99_000.0, 98_500.0, 101_000.0, 100_500.0, 100_000.0])
+    summary = summarize_path(path)
+    assert summary["time_under_water_issues"] == 4
+    assert summary["recovery_issues"] == 1
+    assert summary["max_recovery_issues"] == 2
+    assert summary["open_underwater_issues"] == 2
 
 
 def test_max_consecutive_losses():
@@ -149,6 +184,45 @@ def test_lane_specific_fundability():
     assert is_action_fundable(native, state)
     state[STATE_FEATURE_NAMES.index("prior_bankroll_yuan")] = 200.0
     assert is_action_fundable(simple, state)
+
+
+def test_live_prior_state_uses_lane_own_history():
+    """REWORK v4 (EV D1): live prior state must follow the policy lane's OWN
+    settlements, not the frozen incumbent path.  Changing the live bankroll
+    must also change trail5/trail10, drawdown and the loss streak."""
+    from parlay_policy.features import live_prior_state_from_rows
+
+    rows = [
+        {"post_issue_bankroll_yuan": 100_000.0, "net_pnl_yuan": 0.0},
+        {"post_issue_bankroll_yuan": 95_000.0, "net_pnl_yuan": -5_000.0},
+        {"post_issue_bankroll_yuan": 90_000.0, "net_pnl_yuan": -5_000.0},
+        {"post_issue_bankroll_yuan": 85_000.0, "net_pnl_yuan": -5_000.0},
+        {"post_issue_bankroll_yuan": 80_000.0, "net_pnl_yuan": -5_000.0},
+        {"post_issue_bankroll_yuan": 75_000.0, "net_pnl_yuan": -5_000.0},
+    ]
+    prior = live_prior_state_from_rows(rows)
+    # trail5 = bankroll 5 issues before the decision issue (post of issue i-5)
+    assert prior.prior_bankroll_yuan == pytest.approx(75_000.0)
+    assert prior.prior_trail5_bankroll_yuan == pytest.approx(95_000.0)
+    assert prior.prior_trail10_bankroll_yuan == pytest.approx(100_000.0)
+    # Drawdown anchored at the time-zero ¥100,000: (100k-75k)/100k = 0.25
+    assert prior.prior_running_drawdown_pct == pytest.approx(0.25)
+    assert prior.prior_consecutive_losses == 5
+
+
+def test_live_prior_state_time_zero_anchor():
+    """REWORK v4 (EV D1): the running drawdown peak anchors at the initial
+    ¥100,000 bankroll even when the first prior post is below it."""
+    from parlay_policy.features import live_prior_state_from_rows
+
+    rows = [
+        {"post_issue_bankroll_yuan": 90_000.0, "net_pnl_yuan": -10_000.0},
+        {"post_issue_bankroll_yuan": 95_000.0, "net_pnl_yuan": 5_000.0},
+    ]
+    prior = live_prior_state_from_rows(rows)
+    # Peak = max(100_000, 95_000) = 100_000; drawdown = (100k-95k)/100k
+    assert prior.prior_running_drawdown_pct == pytest.approx(0.05)
+    assert prior.prior_consecutive_losses == 0
 
 
 def test_fallback_settlement_rebases_on_actual_bankroll():

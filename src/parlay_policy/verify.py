@@ -37,6 +37,8 @@ from .contract import (
     INITIAL_BANKROLL_YUAN,
     TICKET_STAKE_YUAN,
 )
+from .features import STATE_FEATURE_NAMES
+from .incumbent import incumbent_prior_state
 
 
 class VerifyError(RuntimeError):
@@ -393,6 +395,7 @@ def verify_package_schema(package: Path, schema: dict[str, Any]) -> list[str]:
         "issue_level_path_metrics",
         "dynamic_restricted_argmax",
         "complete_code_binding_set",
+        "training_state_source_binding",
     }
     observed_relationships = {
         str(row.get("name"))
@@ -636,11 +639,168 @@ def verify_chronology(package: Path) -> list[str]:
     return failures
 
 
+def verify_state_semantics(package: Path) -> list[str]:
+    """REWORK v4 (EV D3): source-derived binding of critical training-state
+    evidence.
+
+    A legal re-manifest attack — shift `prior_running_drawdown_pct` in
+    `training_frame_all.parquet`, regenerate a valid SHA256SUMS.json — passes
+    hash-only verification because the manifest only proves intra-package
+    self-consistency.  This verifier recomputes the five path-dependent state
+    features (prior_bankroll_yuan, trail5/trail10 bankroll, running drawdown
+    with the time-zero ¥100,000 anchor, economic loss streak) from the frozen
+    incumbent source (`incumbent_paths.parquet`, itself bound to the #207
+    CONTROLLING identities and payout economics) and fails closed when the
+    published training/validation frames diverge.  It additionally binds the
+    fitted model's scaler mean for the drawdown feature to the recomputed
+    training-frame mean, so a re-manifested frame cannot be silently
+    substituted without the model metadata also matching.
+    """
+    failures: list[str] = []
+    incumbent_path = package / "incumbent_paths.parquet"
+    if not incumbent_path.exists():
+        return ["missing incumbent_paths.parquet for state semantics"]
+    incumbent = pd.read_parquet(incumbent_path)
+
+    # Recompute the source-derived prior state for every (split, issue) the
+    # frames could legally carry.  This is independent of any frame bytes.
+    recomputed: dict[tuple[str, str], dict[str, float]] = {}
+    for split, group in incumbent.groupby("split", sort=False):
+        split_str = str(split)
+        for issue in group["issue"].astype(str):
+            recomputed[(split_str, issue)] = incumbent_prior_state(
+                incumbent, split_str, issue
+            )
+
+    path_features = (
+        "prior_bankroll_yuan",
+        "prior_trail5_bankroll_yuan",
+        "prior_trail10_bankroll_yuan",
+        "prior_running_drawdown_pct",
+        "prior_consecutive_losses",
+    )
+    for frame_name in (
+        "training_frame_all.parquet",
+        "validation_frame_all.parquet",
+    ):
+        frame_path = package / frame_name
+        if not frame_path.exists():
+            failures.append(f"missing {frame_name} for state semantics")
+            continue
+        frame = pd.read_parquet(frame_path)
+        missing = [
+            column for column in ("split", "issue", *path_features)
+            if column not in frame.columns
+        ]
+        if missing:
+            failures.append(f"{frame_name} missing state columns: {missing}")
+            continue
+        for (split, issue), group in frame.groupby(
+            ["split", "issue"], sort=False
+        ):
+            key = (str(split), str(issue))
+            expected = recomputed.get(key)
+            if expected is None:
+                failures.append(
+                    f"{frame_name} state key {key} has no source-derived prior"
+                )
+                continue
+            row = group.iloc[0]
+            for feature in path_features:
+                observed = float(row[feature])
+                wanted = float(expected[feature])
+                if not np.isclose(observed, wanted, rtol=1e-9, atol=1e-9):
+                    failures.append(
+                        f"{frame_name} {key} {feature} = {observed} "
+                        f"but source-derived value = {wanted}"
+                    )
+
+    # Model↔training binding: the fitted MLP scaler mean for the drawdown
+    # feature must equal the recomputed training-frame mean on FIT rows.
+    handoff_path = package / "handoff_209.json"
+    if not handoff_path.exists():
+        failures.append("missing handoff_209.json for state semantics")
+        return failures
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    model_payload = handoff.get("model") or {}
+    scaler_mean = model_payload.get("scaler_mean")
+    if not isinstance(scaler_mean, list) or len(scaler_mean) != len(STATE_FEATURE_NAMES) + 4:
+        failures.append("handoff model scaler_mean missing or malformed")
+        return failures
+    drawdown_idx = STATE_FEATURE_NAMES.index("prior_running_drawdown_pct")
+    training = pd.read_parquet(package / "training_frame_all.parquet")
+    # The #209 handoff model is the fold2 MLP, so the binding uses the fold2
+    # FIT rows only (fold1 FIT rows never entered the fold2 scaler).
+    fit_rows = training[
+        training.get("fold", pd.Series(dtype=str)).eq("fold2")
+        & training.get("training_role", pd.Series(dtype=str)).eq("FIT")
+    ]
+    if fit_rows.empty:
+        failures.append("training frame has no fold2 FIT rows for scaler binding")
+        return failures
+    fit_mean = float(fit_rows["prior_running_drawdown_pct"].mean())
+    scaler_value = float(scaler_mean[drawdown_idx])
+    if not np.isclose(fit_mean, scaler_value, rtol=1e-6, atol=1e-6):
+        failures.append(
+            f"model scaler drawdown mean {scaler_value} != "
+            f"training fold2 FIT drawdown mean {fit_mean}"
+        )
+    return failures
+
+
+def _independent_recovery_episodes(
+    posts: np.ndarray, initial: float
+) -> dict[str, float]:
+    """REWORK v4 (EV D2): INDEPENDENT episode recomputation for the verifier.
+
+    Deliberately implemented from primitives here (not via production
+    `summarize_path`) so a semantic bug in the production summary cannot be
+    rubber-stamped by a verifier that calls the same function.  Returns the
+    completed-recovery episode count, the longest COMPLETED underwater
+    duration, the right-censored (open) underwater duration at path end, and
+    total underwater issues.  A terminal underwater episode that never
+    recovers is an open episode, never a completed recovery.
+    """
+    running_peak = np.maximum.accumulate(
+        np.concatenate(([initial], posts))
+    )[1:]
+    underwater = running_peak > posts
+    total_underwater = int(np.count_nonzero(underwater))
+    completed_durations: list[int] = []
+    current = 0
+    in_episode = False
+    events = 0
+    for i in range(len(posts)):
+        if underwater[i]:
+            current += 1
+            in_episode = True
+        else:
+            if in_episode and i > 0 and posts[i] >= running_peak[i]:
+                events += 1
+                completed_durations.append(current)
+            in_episode = False
+            current = 0
+    open_duration = current if in_episode else 0
+    return {
+        "time_under_water_issues": float(total_underwater),
+        "recovery_issues": float(events),
+        "max_recovery_issues": float(max(completed_durations, default=0)),
+        "open_underwater_issues": float(open_duration),
+    }
+
+
 def verify_path_metrics(
     ledger: pd.DataFrame,
     holding: pd.DataFrame,
 ) -> list[str]:
-    """Recompute issue-level and aggregate path metrics from primitives."""
+    """Recompute issue-level and aggregate path metrics from primitives.
+
+    REWORK v4 (EV D2): the recovery/time-under-water episode semantics are
+    recomputed here with the INDEPENDENT `_independent_recovery_episodes`
+    primitive implementation, never by calling production `summarize_path`.
+    This closes the blind spot where the verifier and the producer shared the
+    same right-censoring semantic error.
+    """
     from .replay import (
         materialize_issue_path_metrics,
         path_holding_metrics,
@@ -673,6 +833,22 @@ def verify_path_metrics(
                     f"{split}/{policy} issue-level {column} mismatch"
                 )
         summary = {**summarize_path(group), **path_holding_metrics(group)}
+        # REWORK v4 (EV D2): independently recompute the episode semantics and
+        # compare against BOTH the production summary and the published row.
+        posts = group["post_issue_bankroll_yuan"].to_numpy(dtype=float)
+        initial = float(group.iloc[0]["pre_issue_bankroll_yuan"])
+        independent = _independent_recovery_episodes(posts, initial)
+        for key, expected in independent.items():
+            if not np.isclose(
+                float(summary.get(key, float("nan"))),
+                expected,
+                atol=1e-9,
+                equal_nan=True,
+            ):
+                failures.append(
+                    f"{split}/{policy} production summary {key} disagrees "
+                    f"with independent episode recomputation"
+                )
         row = holding[
             holding["split"].astype(str).eq(str(split))
             & holding["policy"].astype(str).eq(str(policy))
@@ -715,8 +891,8 @@ def verify_handoff_contract(package: Path) -> list[str]:
         failures.append("handoff does not keep 2024 closed")
     if handoff.get("contract_version") != CONTRACT_VERSION:
         failures.append("handoff contract version mismatch")
-    if handoff.get("handoff_version") != "bj208-handoff-for-209-v5":
-        failures.append("handoff version is not v5")
+    if handoff.get("handoff_version") != "bj208-handoff-for-209-v6":
+        failures.append("handoff version is not v6")
     model_ref = handoff.get("model_file")
     if model_ref:
         target = _handoff_ref_in_package(package, str(model_ref))
@@ -1460,6 +1636,23 @@ def tamper_omit_code_binding(path: Path) -> None:
     _json(path, value)
 
 
+def tamper_holdout_state_shift(frame_path: Path) -> None:
+    """REWORK v4 (EV D3) attack: shift `prior_running_drawdown_pct` in the
+    training frame by +0.5 and let the attacker regenerate a legal manifest.
+
+    Hash-only verification passes (intra-package self-consistency), so the
+    production `verify_state_semantics` must fail closed on the source-derived
+    recomputation and the model-scaler binding.
+    """
+    frame = pd.read_parquet(frame_path)
+    if "prior_running_drawdown_pct" not in frame.columns:
+        raise VerifyError("training frame missing prior_running_drawdown_pct")
+    frame["prior_running_drawdown_pct"] = (
+        frame["prior_running_drawdown_pct"].astype(float) + 0.5
+    )
+    frame.to_parquet(frame_path, index=False)
+
+
 def tamper_receipt_append(path: Path) -> None:
     with path.open("a", encoding="utf-8") as handle:
         handle.write("UNBOUND-DELIVERED-BYTES\n")
@@ -1653,6 +1846,12 @@ def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, An
         "forged_holdout_attestation",
         tamper_forge_holdout_attestation,
     )
+    _run_attack(
+        "training_state_drawdown_shift",
+        lambda target: tamper_holdout_state_shift(
+            target / "training_frame_all.parquet"
+        ),
+    )
     return results
 
 
@@ -1664,7 +1863,7 @@ __all__ = [
     "tamper_compound_coefficient", "tamper_handoff_staging_path",
     "tamper_completion_status", "tamper_drop_bundle_ticket",
     "tamper_dynamic_control_semantics", "tamper_empty_schema",
-    "tamper_req_evidence",
+    "tamper_holdout_state_shift", "tamper_req_evidence",
     "verify_2024_mutation_invariance", "verify_capital_accounting",
     "verify_code_bindings", "verify_completion", "verify_dynamic_control_decisions",
     "verify_chronology",
@@ -1674,5 +1873,5 @@ __all__ = [
     "verify_req_evidence",
     "verify_no_2024_issue", "verify_no_embargoed_split",
     "verify_payout_economics", "verify_provenance", "verify_receipt",
-    "verify_schema",
+    "verify_schema", "verify_state_semantics",
 ]

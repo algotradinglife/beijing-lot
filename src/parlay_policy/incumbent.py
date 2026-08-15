@@ -101,7 +101,16 @@ def incumbent_row(
 def incumbent_prior_state(
     incumbent_paths: pd.DataFrame, split: str, issue: str
 ) -> dict[str, float]:
-    """Strictly prior bankroll/path state from the incumbent path."""
+    """Strictly prior bankroll/path state from the incumbent path.
+
+    REWORK v4 (EV D1, 2026-08-15): the running peak anchors at the
+    time-zero ¥100,000 initial bankroll (method.yaml `max_drawdown_pct`
+    definition includes the anchor).  The old peak = cummax(prior posts)
+    understated drawdown whenever the first prior post fell below the
+    initial capital.  Loss streaks use the economic definition (net
+    P&L < 0, i.e. payout < funded) rather than gross payout == 0, which
+    misclassified positive-but-insufficient payouts.
+    """
     sub = incumbent_paths[
         (incumbent_paths["split"] == split)
         & (incumbent_paths["issue"] < issue)
@@ -118,11 +127,17 @@ def incumbent_prior_state(
     bankroll = float(sub.iloc[-1]["post_issue_bankroll_yuan"])
     trail5 = float(sub.tail(5).iloc[0]["post_issue_bankroll_yuan"])
     trail10 = float(sub.tail(10).iloc[0]["post_issue_bankroll_yuan"])
-    peak = float(sub["post_issue_bankroll_yuan"].cummax().iloc[-1])
+    peak = float(
+        max(INITIAL_BANKROLL_YUAN, sub["post_issue_bankroll_yuan"].cummax().iloc[-1])
+    )
     drawdown = (peak - bankroll) / peak if peak else 0.0
+    # Economic loss definition: net P&L < 0 (payout < funded).  A positive
+    # gross payout that is smaller than the funded stake is still a loss
+    # (method.yaml `max_consecutive_losing_issues`).
     losses = 0
-    for value in reversed(sub["gross_payout_yuan"].tolist()):
-        if value == 0:
+    for _, row in reversed(list(sub.iterrows())):
+        net = float(row["gross_payout_yuan"]) - float(row["funded_stake_yuan"])
+        if net < 0:
             losses += 1
         else:
             break

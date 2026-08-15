@@ -13,7 +13,7 @@ def md(text):
 def code(src):
     cells.append({"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": src})
 
-md("# Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier\n\nContract BJ-UNIFIED-DYNAMIC-N-001 / v5 (PI takeover 2026-08-15), generated from producer-code commit `7fd2f78d5dfa00d0f958f62b2b53cbcb1ce4a2be`. Primary candidate: per-issue learned action-value policy Q_theta(x,a) (MLPRegressor) on the bounded N×K×lane×capital catalog; controls = Ridge + best fixed action + state-conditioned restricted N/K/N×K policies; 16 preregistered hash seeds aggregated. Payout economics: pre-tax gross multiple = hit × 0.65 × product(official SP), coefficient applied exactly once per winning ticket. 2024/LOCKED_TEST outcomes remain embargoed. This executed notebook reads only the committed immutable package under `results/issue-208/`.")
+md("# Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier\n\nContract BJ-UNIFIED-DYNAMIC-N-001 / v6 (REWORK v4, EV REJECT ea1fc51 fixed), generated from producer-code commit `REWORKV4_COMMIT_PLACEHOLDER`. Primary candidate: per-issue learned action-value policy Q_theta(x,a) (MLPRegressor) on the bounded N×K×lane×capital catalog; controls = Ridge + best fixed action + state-conditioned restricted N/K/N×K policies; 16 preregistered hash seeds aggregated. Payout economics: pre-tax gross multiple = hit × 0.65 × product(official SP), coefficient applied exactly once per winning ticket. Every policy lane scores from ITS OWN strictly-prior live history (trail5/trail10, time-zero-anchored running drawdown, economic loss streak); recovery metrics separate completed from open/censored episodes; production verification recomputes path-dependent state from the frozen incumbent source and binds the fold2 scaler. 2024/LOCKED_TEST outcomes remain embargoed. This executed notebook reads only the committed immutable package under `results/issue-208/`.")
 
 code("""from pathlib import Path
 import json
@@ -52,7 +52,7 @@ md("## 3. N×K performance surface (CV_2021 fit fold)\n\nMedian matched lift ove
 code("""pivot = surface.pivot_table(index="n", columns="k", values="matched_lift_mean", aggfunc="median").round(1)
 pivot""")
 
-md("## 4. Chronological learned policy (safety-gated)\n\nFold 1 (train CV_2021 → test CV_2022) and Fold 2 (train CV_2021+CV_2022 → test CV_2023). Chronological validation block = last 15% of train issues by issue id. In v5, the validation issues are excluded before every MLP, Ridge, ranker, fixed-action and OOD fit; sklearn row-level early stopping remains disabled. All payouts use the corrected pre-tax economics (0.65 applied exactly once per winning ticket).")
+md("## 4. Chronological learned policy (safety-gated)\n\nFold 1 (train CV_2021 → test CV_2022) and Fold 2 (train CV_2021+CV_2022 → test CV_2023). Chronological validation block = last 15% of train issues by issue id. Validation issues are excluded before every MLP, Ridge, ranker, fixed-action and OOD fit; sklearn row-level early stopping remains disabled. All payouts use the corrected pre-tax economics (0.65 applied exactly once per winning ticket). In v6, learned/control paths score each issue from their own strictly-prior live history (D1), and the running drawdown peak includes the time-zero ¥100,000 anchor.")
 
 code("""for fold in ("fold1", "fold2"):
     learned = pd.read_parquet(PACKAGE / f"path_learned_{fold}.parquet")
@@ -125,7 +125,7 @@ holding.loc[:, [
     "max_recovery_issues", "ex_largest_issue_ending_capital_yuan",
 ]].sort_values(["split", "ending_capital_yuan"], ascending=[True, False])""")
 
-md("## 9. Selection receipt and #209 handoff\n\nLexicographic rule over 2 constructible folds: learned matched lift = 0.0 on both folds (safety-gated to incumbent), so no row qualifies → freeze N7/K8/MARKET_WOR/native-¥2 incumbent. Handoff v5 carries fitted MLP weights + scaler and the canonical post-publication package path.")
+md("## 9. Selection receipt and #209 handoff\n\nLexicographic rule over 2 constructible folds: learned matched lift = 0.0 on both folds (safety-gated to incumbent), so no row qualifies → freeze N7/K8/MARKET_WOR/native-¥2 incumbent. Handoff v6 carries fitted MLP weights + scaler and the canonical post-publication package path.")
 
 code("""selection = json.loads((PACKAGE / "selection.json").read_text())
 print("eligible:", selection["eligible"])
