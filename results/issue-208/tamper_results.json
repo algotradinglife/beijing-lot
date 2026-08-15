@@ -11,18 +11,20 @@
     "detected": true,
     "failures": [
       "path continuity broken on 1 row boundary",
-      "path learned_policy starts at 100100.0, not 100000.0"
+      "path learned_policy starts at 100100.0, not 100000.0",
+      "CV_2022/learned_policy issue-level drawdown_pct mismatch",
+      "CV_2022/learned_policy holding max_drawdown_pct mismatch"
     ]
   },
   {
     "attack": "forge_manifest",
     "detected": true,
     "failures": [
-      "hash mismatch decision_fold1.parquet: 362bc3503fbd1a923fd509707892c6e69b364fb017bd7be898f80214d6772608 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_fold2.parquet: 66f30272d5c41013926c1ec39e27db9311a055864440a2f52e1aefcbd0212e98 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_rows_all.parquet: 4fabf6960bf37bdf419a6afcd6b25f13030bf116f5ee5da2c7d286e62e47be25 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_ticket_identities.parquet: ab7effe5399080c4c4c555621f4bc2edb7f97d6282702abdf2cc8f633d7976a8 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch dynamic_control_decisions.parquet: 972397d61bfbcf89100f54ad886a4637106c281a7f57a87d3d066f1013e64c4a != 0000000000000000000000000000000000000000000000000000000000000000"
+      "hash mismatch chronology_blocks.parquet: d82ba9a17d46deb2e44dde5f22ad011d13b1fd4403054ce767cc1fbf6966dea8 != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_fold1.parquet: b1a497d0c81cee459de43e5860794e280f620294ad5c7762fa98207124f80bd6 != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_fold2.parquet: 09cf092a810731e6eedeb1f6661893258e986b824c60fe10280790e32dd25d94 != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_rows_all.parquet: 3a610c9537010460cb1a53dc65e1b3e3efbe40f99000bedf42c5c526930bdbbf != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_ticket_identities.parquet: 6640fa3220c0e94df4fefb9b87228850acbca3cbb37432eed1b6c1784d7fb81e != 0000000000000000000000000000000000000000000000000000000000000000"
     ]
   },
   {
@@ -95,6 +97,75 @@
     "detected": true,
     "failures": [
       "dynamic_n_fixed_k8_lane is not marked state-conditioned"
+    ]
+  },
+  {
+    "attack": "dynamic_control_non_argmax",
+    "detected": true,
+    "failures": [
+      "dynamic_n_fixed_k8_lane chosen action is not score argmax"
+    ]
+  },
+  {
+    "attack": "zero_issue_drawdown",
+    "detected": true,
+    "failures": [
+      "CV_2022/learned_policy issue-level drawdown_pct mismatch",
+      "CV_2023/learned_policy issue-level drawdown_pct mismatch",
+      "CV_2022/best_fixed_policy issue-level drawdown_pct mismatch",
+      "CV_2023/best_fixed_policy issue-level drawdown_pct mismatch",
+      "CV_2022/capital_change_identical issue-level drawdown_pct mismatch"
+    ]
+  },
+  {
+    "attack": "holding_summary_forgery",
+    "detected": true,
+    "failures": [
+      "CV_2022/best_fixed_policy holding ending_capital_yuan mismatch",
+      "CV_2022/best_fixed_policy holding rolling5_loss_prob mismatch"
+    ]
+  },
+  {
+    "attack": "omit_code_binding",
+    "detected": true,
+    "failures": [
+      "code bindings omit expected files: ['method.yaml']"
+    ]
+  },
+  {
+    "attack": "receipt_append",
+    "detected": true,
+    "failures": [
+      "receipt.sha256 is not the canonical method binding"
+    ]
+  },
+  {
+    "attack": "receipt_rewrite",
+    "detected": true,
+    "failures": [
+      "receipt.sha256 is not the canonical method binding"
+    ]
+  },
+  {
+    "attack": "receipt_duplicate_line",
+    "detected": true,
+    "failures": [
+      "receipt.sha256 is not the canonical method binding"
+    ]
+  },
+  {
+    "attack": "receipt_delete",
+    "detected": true,
+    "failures": [
+      "missing receipt.sha256"
+    ]
+  },
+  {
+    "attack": "forged_holdout_attestation",
+    "detected": true,
+    "failures": [
+      "holdout payload does not bind fold2 model",
+      "holdout payload does not bind terminal decisions"
     ]
   }
 ]

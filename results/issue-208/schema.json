@@ -1,13 +1,120 @@
 {
-  "contract_version": "bj208-dynamic-nk-policy-v4",
+  "binary_artifacts": {
+    "models/fold1_mlp.joblib": {
+      "diagnostic_only": false
+    },
+    "models/fold2_mlp.joblib": {
+      "diagnostic_only": false
+    }
+  },
+  "contract_version": "bj208-dynamic-nk-policy-v5",
   "frames": {
+    "action_frequency.csv": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "count": "int",
+        "k": "int",
+        "lane": "str",
+        "n": "int",
+        "share": "float"
+      },
+      "diagnostic_only": true
+    },
+    "action_variation_demo.csv": {
+      "columns": {
+        "chosen_action": "str",
+        "chosen_capital": "str",
+        "chosen_k": "int",
+        "chosen_lane": "str",
+        "chosen_n": "int",
+        "issue": "str",
+        "max_predicted_lift": "float"
+      },
+      "diagnostic_only": true
+    },
+    "calibration_curve.csv": {
+      "columns": {
+        "bin": "int",
+        "issues": "int",
+        "predicted_best_lift": "float",
+        "realized_best_lift": "float"
+      },
+      "diagnostic_only": true
+    },
     "census.csv": {
-      "M": "int",
-      "excluded_matches": "int",
-      "issue": "numeric",
-      "labels_available": "bool",
-      "split": "str",
-      "year": "int"
+      "columns": {
+        "M": "int",
+        "excluded_matches": "int",
+        "issue": "int",
+        "labels_available": "bool",
+        "split": "str",
+        "year": "int"
+      },
+      "diagnostic_only": false
+    },
+    "chronological_train_val_loss.csv": {
+      "columns": {
+        "fit_issues": "int",
+        "fit_rmse": "float",
+        "model": "str",
+        "validation_issues": "int",
+        "validation_rmse": "float"
+      },
+      "diagnostic_only": true
+    },
+    "chronology_blocks.parquet": {
+      "columns": {
+        "fold": "str",
+        "issue": "str",
+        "role": "str",
+        "used_by_ood_fit": "bool",
+        "used_by_q_fit": "bool",
+        "used_by_ranker_fit": "bool"
+      },
+      "diagnostic_only": false
+    },
+    "decision_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "conservative_lift": "float",
+        "decision_trace_json": "str",
+        "fallback": "str",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "n": "int",
+        "ood_statistic": "float",
+        "ood_threshold": "float",
+        "predicted_lift": "float",
+        "prior_bankroll_yuan": "float",
+        "safety_gate_pass": "bool",
+        "split": "str",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "decision_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "conservative_lift": "float",
+        "decision_trace_json": "str",
+        "fallback": "str",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "n": "int",
+        "ood_statistic": "float",
+        "ood_threshold": "float",
+        "predicted_lift": "float",
+        "prior_bankroll_yuan": "float",
+        "safety_gate_pass": "bool",
+        "split": "str",
+        "year": "int"
+      },
+      "diagnostic_only": true
     },
     "decision_rows_all.parquet": {
       "columns": {
@@ -15,16 +122,20 @@
         "capital": "str",
         "conservative_lift": "float",
         "decision_trace_json": "str",
+        "fallback": "str",
         "issue": "str",
         "k": "int",
         "lane": "str",
         "n": "int",
+        "ood_statistic": "float",
+        "ood_threshold": "float",
         "predicted_lift": "float",
         "prior_bankroll_yuan": "float",
         "safety_gate_pass": "bool",
         "split": "str",
         "year": "int"
       },
+      "diagnostic_only": false,
       "domains": {
         "capital": [
           "NATIVE_2_YUAN",
@@ -60,21 +171,44 @@
         "prior_bankroll_yuan": "CNY"
       }
     },
+    "decision_ticket_identities.parquet": {
+      "columns": {
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "n": "int",
+        "seed": "int",
+        "split": "str",
+        "ticket_identity": "any"
+      },
+      "diagnostic_only": false
+    },
     "dynamic_control_decisions.parquet": {
       "columns": {
         "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
         "decision_trace_json": "str",
+        "drawdown_pct": "float",
         "funded_stake_yuan": "float",
         "gross_payout_yuan": "float",
         "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
         "net_pnl_yuan": "float",
         "policy": "str",
         "post_issue_bankroll_yuan": "float",
         "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
         "requested_stake_yuan": "float",
+        "source": "str",
         "split": "str",
+        "ticket_hhi": "float",
         "year": "int"
       },
+      "diagnostic_only": false,
       "domains": {
         "policy": [
           "dynamic_n_fixed_k8_lane",
@@ -115,13 +249,16 @@
       }
     },
     "eligibility.csv": {
-      "M": "int",
-      "N": "int",
-      "eligible": "bool",
-      "issue": "numeric",
-      "labels_available": "bool",
-      "split": "str",
-      "year": "int"
+      "columns": {
+        "M": "int",
+        "N": "int",
+        "eligible": "bool",
+        "issue": "int",
+        "labels_available": "bool",
+        "split": "str",
+        "year": "int"
+      },
+      "diagnostic_only": false
     },
     "incumbent_paths.parquet": {
       "columns": {
@@ -134,6 +271,7 @@
         "split": "str",
         "year": "int"
       },
+      "diagnostic_only": false,
       "domains": {
         "source": [
           "RECONSTRUCTED_CORRECTED_ECONOMICS"
@@ -168,20 +306,29 @@
     "issue_capital_ledger.parquet": {
       "columns": {
         "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
         "funded_stake_yuan": "float",
         "gross_payout_yuan": "float",
         "issue": "str",
+        "k": "int",
+        "lane": "str",
         "mean_pairwise_overlap": "float",
+        "n": "int",
         "net_pnl_yuan": "float",
         "policy": "str",
         "post_issue_bankroll_yuan": "float",
         "pre_issue_bankroll_yuan": "float",
         "repeat_exposure": "float",
         "requested_stake_yuan": "float",
+        "source": "str",
         "split": "str",
         "ticket_hhi": "float",
         "year": "int"
       },
+      "diagnostic_only": false,
       "domains": {
         "split": [
           "CV_2022",
@@ -216,33 +363,909 @@
       }
     },
     "label_surface_fit.parquet": {
-      "action_key": "str",
-      "capital": "str",
-      "funded_yuan": "float",
-      "issue": "str",
-      "k": "int",
-      "lane": "str",
-      "matched_lift_mean": "float",
-      "matched_lift_median": "float",
-      "matched_lift_std": "float",
-      "n": "int",
-      "split": "str",
-      "year": "int"
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "funded_mean": "float",
+        "funded_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "matched_lift_mean": "float",
+        "matched_lift_median": "float",
+        "matched_lift_std": "float",
+        "n": "int",
+        "payout_mean": "float",
+        "seed_count": "int",
+        "split": "str",
+        "year": "int"
+      },
+      "diagnostic_only": false
+    },
+    "ood_fallback_census.csv": {
+      "columns": {
+        "executed": "int",
+        "fallback_incumbent": "int",
+        "issues": "int",
+        "no_bet": "int",
+        "split": "str"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_best_fixed_policy_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "source": "str",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_best_fixed_policy_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "source": "str",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_capital_change_identical_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "source": "str",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_capital_change_identical_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "source": "str",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_cash_no_bet_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_cash_no_bet_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_dynamic_n_fixed_k8_lane_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_dynamic_n_fixed_k8_lane_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_dynamic_nk_fixed_generator_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_dynamic_nk_fixed_generator_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_fixed_n7_dynamic_k_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_fixed_n7_dynamic_k_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_generator_change_n7k8_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_generator_change_n7k8_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_incumbent_n7k8_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "source": "str",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_incumbent_n7k8_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "source": "str",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_n7k16_sensitivity_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_n7k16_sensitivity_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_ridge_policy_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "source": "str",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_ridge_policy_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "source": "str",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n10k8_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n10k8_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n4k8_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n4k8_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n5k8_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n5k8_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n6k8_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n6k8_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n8k8_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n8k8_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n9k8_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_control_static_n9k8_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
     },
     "path_holding_metrics.parquet": {
       "columns": {
+        "active_support_roi": "float",
         "artifact": "str",
         "ending_capital_yuan": "float",
         "ex_largest_issue_ending_capital_yuan": "float",
+        "ex_largest_issue_net_pnl_yuan": "float",
+        "hhi_funded": "float",
+        "issues": "int",
+        "largest_absolute_issue_pnl_yuan": "float",
         "max_consecutive_losing_issues": "float",
         "max_drawdown_pct": "float",
         "max_recovery_issues": "float",
+        "mean_repeat_exposure": "float",
+        "mean_ticket_hhi": "float",
+        "mean_ticket_overlap": "float",
+        "minimum_capital_yuan": "float",
+        "minimum_retained_cash_yuan": "float",
+        "near_ruin": "bool",
         "policy": "str",
+        "recovery_issues": "float",
+        "rolling10_loss_prob": "float",
+        "rolling10_worst_net_pnl_yuan": "float",
+        "rolling20_loss_prob": "float",
+        "rolling20_worst_net_pnl_yuan": "float",
+        "rolling5_loss_prob": "float",
+        "rolling5_worst_net_pnl_yuan": "float",
+        "ruin": "bool",
         "split": "str",
         "time_under_water_issues": "float",
         "total_net_pnl_yuan": "float",
         "turnover_yuan": "float"
       },
+      "diagnostic_only": false,
       "domains": {
         "split": [
           "CV_2022",
@@ -268,6 +1291,68 @@
         "turnover_yuan": "CNY"
       }
     },
+    "path_learned_fold1.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "source": "str",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "path_learned_fold2.parquet": {
+      "columns": {
+        "action_key": "str",
+        "capital": "str",
+        "consecutive_losses": "int",
+        "decision_trace_json": "str",
+        "drawdown_pct": "float",
+        "funded_stake_yuan": "float",
+        "gross_payout_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "mean_pairwise_overlap": "float",
+        "n": "int",
+        "net_pnl_yuan": "float",
+        "policy": "str",
+        "post_issue_bankroll_yuan": "float",
+        "pre_issue_bankroll_yuan": "float",
+        "repeat_exposure": "float",
+        "requested_stake_yuan": "float",
+        "source": "str",
+        "split": "str",
+        "ticket_hhi": "float",
+        "year": "int"
+      },
+      "diagnostic_only": true
+    },
+    "permutation_importance.csv": {
+      "columns": {
+        "feature": "str",
+        "importance_mean": "float",
+        "importance_std": "float"
+      },
+      "diagnostic_only": true
+    },
     "ticket_economics.parquet": {
       "columns": {
         "issue": "str",
@@ -284,6 +1369,7 @@
         "ticket_identity": "str",
         "ticket_position": "int"
       },
+      "diagnostic_only": false,
       "domains": {
         "k": [
           8,
@@ -338,10 +1424,113 @@
         "payout_yuan": "CNY for one native ¥2 ticket",
         "pre_tax_gross_multiple": "gross multiple including one 0.65 payout coefficient"
       }
+    },
+    "training_frame_all.parquet": {
+      "columns": {
+        "M": "float",
+        "a_capital": "float",
+        "a_k": "float",
+        "a_lane": "float",
+        "a_n": "float",
+        "action_key": "str",
+        "capital": "str",
+        "fold": "str",
+        "funded_mean": "float",
+        "funded_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "matched_lift_mean": "float",
+        "matched_lift_median": "float",
+        "matched_lift_std": "float",
+        "max_max_control_prob": "float",
+        "max_predicted_sp": "float",
+        "mean_max_control_prob": "float",
+        "mean_predicted_sp": "float",
+        "mean_probability_hhi": "float",
+        "mean_sp_seed_std": "float",
+        "n": "int",
+        "outcome_hhi": "float",
+        "payout_mean": "float",
+        "prior_bankroll_yuan": "float",
+        "prior_consecutive_losses": "float",
+        "prior_running_drawdown_pct": "float",
+        "prior_trail10_bankroll_yuan": "float",
+        "prior_trail5_bankroll_yuan": "float",
+        "seed_count": "int",
+        "split": "str",
+        "std_max_control_prob": "float",
+        "training_role": "str",
+        "up_mean_expected_pre_tax_net": "float",
+        "up_mean_log_joint_probability": "float",
+        "up_mean_pairwise_overlap": "float",
+        "up_mean_predicted_sp_product": "float",
+        "up_mean_selected_probability": "float",
+        "up_mean_selected_sp": "float",
+        "up_ticket_hhi": "float",
+        "y_lift": "float",
+        "year_x": "int",
+        "year_y": "int"
+      },
+      "diagnostic_only": false
+    },
+    "validation_frame_all.parquet": {
+      "columns": {
+        "M": "float",
+        "a_capital": "float",
+        "a_k": "float",
+        "a_lane": "float",
+        "a_n": "float",
+        "action_key": "str",
+        "capital": "str",
+        "fold": "str",
+        "funded_mean": "float",
+        "funded_yuan": "float",
+        "issue": "str",
+        "k": "int",
+        "lane": "str",
+        "matched_lift_mean": "float",
+        "matched_lift_median": "float",
+        "matched_lift_std": "float",
+        "max_max_control_prob": "float",
+        "max_predicted_sp": "float",
+        "mean_max_control_prob": "float",
+        "mean_predicted_sp": "float",
+        "mean_probability_hhi": "float",
+        "mean_sp_seed_std": "float",
+        "n": "int",
+        "outcome_hhi": "float",
+        "payout_mean": "float",
+        "prior_bankroll_yuan": "float",
+        "prior_consecutive_losses": "float",
+        "prior_running_drawdown_pct": "float",
+        "prior_trail10_bankroll_yuan": "float",
+        "prior_trail5_bankroll_yuan": "float",
+        "seed_count": "int",
+        "split": "str",
+        "std_max_control_prob": "float",
+        "training_role": "str",
+        "up_mean_expected_pre_tax_net": "float",
+        "up_mean_log_joint_probability": "float",
+        "up_mean_pairwise_overlap": "float",
+        "up_mean_predicted_sp_product": "float",
+        "up_mean_selected_probability": "float",
+        "up_mean_selected_sp": "float",
+        "up_ticket_hhi": "float",
+        "y_lift": "float",
+        "year_x": "int",
+        "year_y": "int"
+      },
+      "diagnostic_only": false
     }
   },
   "json_artifacts": {
+    "COMPLETED.json": {
+      "diagnostic_only": false,
+      "required_keys": []
+    },
     "decision.json": {
+      "diagnostic_only": false,
       "required_keys": [
         "contract_version",
         "producer_code_commit",
@@ -352,6 +1541,7 @@
       ]
     },
     "handoff_209.json": {
+      "diagnostic_only": false,
       "required_keys": [
         "handoff_version",
         "fit_boundary.train_through",
@@ -366,6 +1556,7 @@
       ]
     },
     "holdout_mutation_receipt.json": {
+      "diagnostic_only": false,
       "required_keys": [
         "probe",
         "mutated_rows",
@@ -373,7 +1564,35 @@
         "mutated_signature_sha256",
         "model_weights_scaler_fixed_choice_ood_and_decisions_invariant"
       ]
+    },
+    "holdout_refit_baseline.json": {
+      "diagnostic_only": false,
+      "required_keys": []
+    },
+    "holdout_refit_mutated.json": {
+      "diagnostic_only": false,
+      "required_keys": []
+    },
+    "protocol_log.json": {
+      "diagnostic_only": false,
+      "required_keys": []
+    },
+    "provenance.json": {
+      "diagnostic_only": false,
+      "required_keys": []
+    },
+    "selection.json": {
+      "diagnostic_only": false,
+      "required_keys": []
+    },
+    "tamper_results.json": {
+      "diagnostic_only": false,
+      "required_keys": []
     }
+  },
+  "manifest_identity": {
+    "all_delivered_bytes_except_manifest_are_hashed": true,
+    "manifest_external_binding": "exact Git PR HEAD + independent EV"
   },
   "relationships": [
     {
@@ -391,6 +1610,22 @@
     {
       "name": "handoff_resolves_post_publish",
       "production_verifier": "verify_handoff_contract"
+    },
+    {
+      "name": "chronological_issue_block_isolation",
+      "production_verifier": "verify_chronology"
+    },
+    {
+      "name": "issue_level_path_metrics",
+      "production_verifier": "verify_path_metrics"
+    },
+    {
+      "name": "dynamic_restricted_argmax",
+      "production_verifier": "verify_dynamic_control_decisions"
+    },
+    {
+      "name": "complete_code_binding_set",
+      "production_verifier": "verify_code_bindings"
     }
   ]
 }

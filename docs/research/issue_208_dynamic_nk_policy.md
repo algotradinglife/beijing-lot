@@ -1,9 +1,9 @@
 # Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier
 
-PI takeover v4, generated from producer-code commit
-`3be8290292482e11db397dacd2b3fbb25026055e` after the independent EV REJECT of
-PR #230 SHA `e5bb2578710d4f57031bd2180c6a691570524356`. Contract
-BJ-UNIFIED-DYNAMIC-N-001 / v4. Research and paper settlement only. No betting,
+PI takeover v5, generated from producer-code commit
+`7fd2f78d5dfa00d0f958f62b2b53cbcb1ce4a2be` after two independent EV REJECTs of
+PR #230 SHA `42b6e386cf74bff5e0377314dd9a258712d48430`. Contract
+BJ-UNIFIED-DYNAMIC-N-001 / v5. Research and paper settlement only. No betting,
 release, or frontend authority follows from this result.
 
 ## Payout economics (PI correction 2026-08-15)
@@ -51,7 +51,10 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
   no 2020 ticket surface exists in the frozen upstream). Selection rule
   wording superseded (#208-3) to "positive on ALL constructible folds (2 of 2)".
 - Model training uses chronological issue-block validation (last 15% of train
-  issues by issue id); sklearn row-level early stopping is disabled (#208-4).
+  issues by issue id). The split is resolved before every fit: fold 1 has
+  49 FIT / 9 VALIDATION issues and fold 2 has 98 FIT / 18 VALIDATION issues,
+  with zero overlap. MLP, Ridge, ranker, fixed-action and OOD fitting all use
+  FIT only; sklearn row-level early stopping is disabled (#208-4).
 - Safety gate: execute the learned action only when conservative predicted lift
   (prediction − 1× train-fold residual RMSE) is positive AND coverage/OOD/
   fundability checks pass; otherwise fall back to the frozen incumbent or
@@ -62,7 +65,7 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
   terminal-fold refits. MLP/ranker weights, scalers, fixed action, OOD
   threshold and earlier live-path decisions remain byte-signature identical.
 
-## Terminal decisions (PI takeover v4)
+## Terminal decisions (PI takeover v5)
 
 - `ELIGIBLE_CANDIDATE=false`: the safety-gated learned policy passes the
   preregistered gate on 0 of 113 test issues, so the gated path equals the
@@ -79,13 +82,13 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
   economics.
 - The Q model shows a coarse ranking tendency, not calibrated actionable
   signal. Predicted best-lift bins rise from −6.6 to 260.9 while realized bin
-  means are 2,215 / 1,594 / 7,388 / 5,092 / 17,333: the highest bin is strongest,
+  means are 2,608 / 6,608 / 1,197 / 4,019 / 12,148: the highest bin is strongest,
   but adjacent bins are not monotone and the scales are badly mismatched.
-  Chronological validation RMSE (1,016) is below fit RMSE (1,283), yet the
+  Chronological validation RMSE (1,012) is below fit RMSE (1,290), yet the
   conservative gate vetoes all 113 executions. This is model diagnostic
   information, not evidence of Edge.
 
-## Controls / attribution matrix (CV_2023 test split, ¥100,000 start, v4)
+## Controls / attribution matrix (CV_2023 test split, ¥100,000 start, v5)
 
 | Control | Ending capital ¥ | Note |
 |---|---|---|
@@ -96,7 +99,7 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
 | static_n4k8 | 99,609.10 | |
 | dynamic_n_fixed_k8_lane | 99,609.10 | scorer varies, selected action collapses to N4 |
 | best_fixed_policy | 99,569.54 | best train-fold fixed cell: N4/K8/MARKET_WR/native |
-| dynamic_nk_fixed_generator | 99,559.71 | state-conditioned; N varies, K remains 8 |
+| dynamic_nk_fixed_generator | 99,632.80 | state-conditioned; N varies, K remains 8 |
 | static_n9k8 | 99,403.42 | |
 | static_n6k8 | 99,387.50 | |
 | generator_change_n7k8 | 99,338.59 | MARKET_WR lane at N7/K8 |
@@ -111,8 +114,8 @@ Key attribution findings (REQ-208-05):
 
 - **N**: the frontier is not monotone or stable. Static N=8 reaches ¥100,218
   on CV_2023 but ends ¥99,072 on CV_2022. The state-conditioned N-only scorer
-  chooses N4 in all 113 issues; joint N×K varies N across 3 values on CV_2022
-  and all 7 values on CV_2023, but ends ¥99,493 / ¥99,560 and does not beat the
+  chooses N4 on 111 issues and N9 on 2 CV_2023 issues; joint N×K varies N across
+  3 values on CV_2022 and 6 values on CV_2023, but ends ¥99,483 / ¥99,633 and does not beat the
   strongest fixed control. The one-fold N8 gain is therefore a diagnostic
   sweet spot, not a promotion.
 - **K**: the state-conditioned K-only scorer chooses K8 in every issue, and
@@ -145,7 +148,9 @@ All materialized in `results/issue-208/`: `issue_capital_ledger.parquet`,
 ticket identities for stochastic lanes), `ticket_economics.parquet`
 (REWORK v3: per-ticket pre-tax multiples for the production payout-economics
 verifier), `dynamic_control_decisions.parquet` (per-issue scores/actions),
-`path_holding_metrics.parquet`, `holdout_mutation_receipt.json`,
+`path_holding_metrics.parquet`, `chronology_blocks.parquet`,
+`training_frame_all.parquet`, `validation_frame_all.parquet`,
+`holdout_refit_baseline.json`, `holdout_refit_mutated.json`, `holdout_mutation_receipt.json`,
 `selection.json`, `handoff_209.json`.
 
 ## REWORK-E09 same-category sweep evidence (REWORK v3 payout-economics)
@@ -185,32 +190,34 @@ surface was swept (not just the four reported instances):
    frozen (manifest `48c11d97…`); the supersession is recorded in
    PROTOCOL-LOG #208-7/#208-8 and #208 never consumes that field.
 
-## PI takeover v4 same-category sweep evidence
+## PI takeover v5 closure evidence
 
-The v4 rework preserves all accepted payout and handoff corrections and closes
-the exact remaining categories from the EV at `e5bb257`:
+The v5 rework preserves all accepted payout and handoff corrections, and closes
+the exact remaining categories from the two EV REJECTs at `42b6e386`:
 
 1. **Dynamic attribution:** global median cell lookup is removed. Three
    restricted MLP controls score lawful actions separately per issue using the
    causal state and the live path bankroll. The committed decision table has
-   113 distinct score signatures per control across the two folds; action
-   collapse (N4/K8 or N7/K8) is now a scientific result rather than hard-coded
-   behavior.
+   113 distinct score signatures per control across the two folds. N-only now
+   chooses N9 on two CV_2023 issues while K-only remains K8 throughout.
 2. **Capital/fallback:** frozen tickets contribute only funded stake and payout
    to the actual current bankroll. Native and SIMPLE_ACTIVE fundability are
    lane-specific; the latter has the exact ¥200 minimum. All 1,921 ledger rows
    have zero conservation error.
-3. **Holding metrics:** time-zero drawdown, net-P&L loss streaks, rolling
+3. **Chronology and holding metrics:** fit/validation sets are materialized in
+   `chronology_blocks.parquet` before every fit, with zero issue overlap.
+   Time-zero drawdown, net-P&L loss streaks, rolling
    5/10/20 net-P&L windows, recovery, retained cash, active-support ROI,
    HHI/overlap/repeat and ex-largest issue are calculated by production code
    and published in `path_holding_metrics.parquet`.
 4. **Holdout isolation:** `holdout_mutation_receipt.json` records two actual
    terminal-fold refits around a 50,970-row domain-preserving LOCKED_TEST
    mutation; signatures are identical (`d7862638…`).
-5. **Verifier/evidence:** decision/capital/#209 schemas include types,
-   nullability, keys, domains and units; code/config/requirements/environment
-   are content-bound. The production verifier detects all 13 remanifested or
-   manifest-level attacks.
+5. **Verifier/evidence:** every one of 55 delivered CSV/Parquet frames and every
+   JSON/model artifact is inventoried; receipt, chronology, path metrics,
+   dynamic argmax, code bindings and actual-refit payloads are independently
+   recomputed. All 22 semantic/remanifest attacks are detected. The manifest
+   binds all 70 delivered files other than itself.
 6. **Transactional publication:** last-good output is retained until final
    post-rename verification. Focused tests cover second-rename restoration,
    post-publish rollback, successful commit, immediate retry and
@@ -222,12 +229,12 @@ the exact remaining categories from the EV at `e5bb257`:
 |---|---|
 | REQ-208-01 upstream binding | `results/issue-208/provenance.json` + loaders fail-closed on manifest hashes |
 | REQ-208-02 N/K semantics | `verify_nk_semantics(tickets, k)` + census triple validation |
-| REQ-208-03 outcome isolation | actual-refit `holdout_mutation_receipt.json` over 50,970 LOCKED_TEST rows; light panel-boundary unit test is separate |
+| REQ-208-03 outcome isolation | two content-bound actual-refit payloads plus `holdout_mutation_receipt.json` over 50,970 LOCKED_TEST rows; FIT/VALIDATION issue sets are disjoint |
 | REQ-208-04 bounded frontier | 16 seeds only; `decision_ticket_identities.parquet`; no seed=0 |
 | REQ-208-05 matched attribution | per-issue restricted controls + identical-ticket capital arm; pure same-yuan K8/K16 marked NOT_IDENTIFIABLE |
 | REQ-208-06 capital accounting | `verify_capital_accounting` (start ¥100,000, ¥2 units, continuity) |
 | REQ-208-07 decision evidence | full frontier, equity paths, holding metrics, adversarial arms |
-| REQ-208-08 terminal freeze | `handoff_209.json` v4 (byte-identifiable candidate/fallback + payout semantics; canonical post-publication manifest path) |
+| REQ-208-08 terminal freeze | `handoff_209.json` v5 (byte-identifiable candidate/fallback + payout semantics; canonical post-publication manifest path) |
 | REQ-208-09 neural policy | MLPRegressor Q with Ridge + best-fixed controls, joblib weights, label-blind replay |
 
 ## Known risks
@@ -244,8 +251,8 @@ the exact remaining categories from the EV at `e5bb257`:
 - The corrected payout coefficient sets every winning payout to 65% of the
   superseded interpretation; the frozen #207 CONTROLLING ticket identities are
   unchanged, but the #207 ledger's own economics are superseded for #208.
-- Dynamic score variation does not guarantee decision variation: N-only and
-  K-only controls collapse to fixed choices. Any next model must improve the
+- Dynamic score variation does not guarantee useful decision variation: N-only
+  changes on only two issues and K-only remains fixed. Any next model must improve the
   state representation/target, not merely rerun a denser fixed grid.
 
 ## Replay
@@ -253,5 +260,5 @@ the exact remaining categories from the EV at `e5bb257`:
 ```
 PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208
 PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py verify --output results/issue-208
-PYTHONPATH=src .venv/bin/python -m pytest tests/test_bj208_metrics.py tests/test_bj208_tamper.py tests/test_bj208_payout_economics.py tests/test_bj208_handoff_paths.py tests/test_bj208_publication.py
+PYTHONPATH=src .venv/bin/python -m pytest tests/test_bj208_*.py
 ```

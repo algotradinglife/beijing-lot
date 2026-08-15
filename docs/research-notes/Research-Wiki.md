@@ -967,20 +967,21 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
 - PI 对抗性结论：SIMPLE/K16 正向路径、低暴露和上游票选择均不能归因于 Stage 4；
   因此接受负结论并推进 N 与 K 分离学习，而不是把固定 N7 解释为 Edge。
 
-### Issue #208 动态 N×K 学习策略（2026-08-15，PI takeover v4）
+### Issue #208 动态 N×K 学习策略（2026-08-15，PI takeover v5）
 
-- #208 在四轮返工后由 PI 直接接管。v4 保留 MLPRegressor、168-cell 动作目录、
+- #208 在四轮返工后由 PI 直接接管。v5 保留 MLPRegressor、168-cell 动作目录、
   16 seeds、0.65 恰好一次的派彩语义和原选择规则，只关闭独立 EV 的 D2–D6：
   逐期 restricted N/K/N×K scorer、live-bankroll fallback、SIMPLE_ACTIVE ¥200
   fundability、净 P&L 期级风险指标、真实 LOCKED_TEST 复拟合、rich schema/REQ
-  证据和可恢复的 transactional publish。
+  证据和可恢复的 transactional publish；并在两次追加独立 REJECT 后关闭训练/验证
+  污染、期级路径重算、冻结票暴露缺失、证据包不完整和语义重签攻击。
 - **主候选没有提升基线。** 113 个测试期 safety gate 全部拒绝，learned path
   全部回退到 N7/K8/MARKET_WOR/native-¥2；CV_2022/CV_2023 终值分别为
   ¥99,072.00 / ¥99,245.38，matched lift 两折均为 0，故冻结 incumbent 给 #209。
   这证明安全层有效，不证明 neural head 有 Edge。
-- **动态选择出现模型退化。** N-only 虽逐期分数不同，但 113 期全部选 N4；
+- **动态选择很弱。** N-only 在 111 期选 N4、2 个 CV_2023 期选 N9；
   K-only 和 joint N×K 全部选 K8。joint N×K 只在 N 上变化（CV_2022 三个 N、
-  CV_2023 七个 N），终值 ¥99,493 / ¥99,560，未胜过最强 fixed control。
+  CV_2023 六个 N），终值 ¥99,483 / ¥99,633，未胜过最强 fixed control。
   当前特征/目标没有学出 dynamic K。
 - **固定 N8 只是一折甜点。** CV_2023 static N8/K8 达 ¥100,218.21，但
   CV_2022 为 ¥99,072.00，不具跨折稳定性。N7/K16 为 ¥98,317 / ¥99,106，
@@ -989,11 +990,14 @@ MARKET_WOR/native ¥2：终值 ¥99,312.89，仍为负增长。负向结论冻�
 - **风险路径仍不支持加仓。** EQUAL_1PCT 相同票面终值为 ¥55,872 / ¥62,179；
   CV_2023 cash 为 ¥100,000。资本变大没有创造 edge，只放大负期望和回撤。
 - Q 的 calibration 只有粗趋势：最高 predicted bin 的 realized lift 最大，但相邻
-  bins 非单调且量纲失配；fit/validation RMSE 为 1,283/1,016，不能据此宣称可执行信号。
-- 证据包由 producer-code commit `3be8290292482e11db397dacd2b3fbb25026055e`
-  生成：58 个 focused tests 通过；1,921 行 capital ledger conservation error=0；
+  bins 非单调且量纲失配；fit/validation RMSE 为 1,290/1,012，不能据此宣称可执行信号。
+- 训练边界为 fold1 49 FIT / 9 VALIDATION、fold2 98 FIT / 18 VALIDATION，重叠均为 0；
+  retained DEVELOPMENT 行必须恰有一个赛果命中且三个 official SP 均为正。
+- 证据包由 producer-code commit `7fd2f78d5dfa00d0f958f62b2b53cbcb1ce4a2be`
+  生成：70 个 focused tests 通过；1,921 行 capital ledger conservation error=0；
   50,970 个 LOCKED_TEST rows 的两次实际复拟合签名一致；production verifier 检出
-  13/13 attacks。日历 2024 在冻结 value matrix 中为 0 行，因此不虚构 2024 mutation。
+  22/22 attacks；55/55 数据表均有 schema，70 个交付文件除 manifest 自身外全部
+  内容绑定。日历 2024 在冻结 value matrix 中为 0 行，因此不虚构 2024 mutation。
 - 详见 [`issue_208_dynamic_nk_policy`](../research/issue_208_dynamic_nk_policy.md)
   和已执行 notebook
   [`bj208_dynamic_nk_policy.ipynb`](../../notebooks/research/issue-208/bj208_dynamic_nk_policy.ipynb)。

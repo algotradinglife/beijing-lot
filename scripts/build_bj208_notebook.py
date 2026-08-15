@@ -13,7 +13,7 @@ def md(text):
 def code(src):
     cells.append({"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": src})
 
-md("# Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier\n\nContract BJ-UNIFIED-DYNAMIC-N-001 / v4 (PI takeover 2026-08-15), generated from producer-code commit `3be8290292482e11db397dacd2b3fbb25026055e`. Primary candidate: per-issue learned action-value policy Q_theta(x,a) (MLPRegressor) on the bounded N×K×lane×capital catalog; controls = Ridge + best fixed action + state-conditioned restricted N/K/N×K policies; 16 preregistered hash seeds aggregated. Payout economics: pre-tax gross multiple = hit × 0.65 × product(official SP), coefficient applied exactly once per winning ticket. 2024/LOCKED_TEST outcomes remain embargoed. This executed notebook reads only the committed immutable package under `results/issue-208/`.")
+md("# Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier\n\nContract BJ-UNIFIED-DYNAMIC-N-001 / v5 (PI takeover 2026-08-15), generated from producer-code commit `7fd2f78d5dfa00d0f958f62b2b53cbcb1ce4a2be`. Primary candidate: per-issue learned action-value policy Q_theta(x,a) (MLPRegressor) on the bounded N×K×lane×capital catalog; controls = Ridge + best fixed action + state-conditioned restricted N/K/N×K policies; 16 preregistered hash seeds aggregated. Payout economics: pre-tax gross multiple = hit × 0.65 × product(official SP), coefficient applied exactly once per winning ticket. 2024/LOCKED_TEST outcomes remain embargoed. This executed notebook reads only the committed immutable package under `results/issue-208/`.")
 
 code("""from pathlib import Path
 import json
@@ -52,13 +52,22 @@ md("## 3. N×K performance surface (CV_2021 fit fold)\n\nMedian matched lift ove
 code("""pivot = surface.pivot_table(index="n", columns="k", values="matched_lift_mean", aggfunc="median").round(1)
 pivot""")
 
-md("## 4. Chronological learned policy (safety-gated)\n\nFold 1 (train CV_2021 → test CV_2022) and Fold 2 (train CV_2021+CV_2022 → test CV_2023). Chronological validation block = last 15% of train issues by issue id; sklearn row-level early stopping disabled (REWORK v2 / D3). All payouts use the corrected pre-tax economics (0.65 applied exactly once per winning ticket).")
+md("## 4. Chronological learned policy (safety-gated)\n\nFold 1 (train CV_2021 → test CV_2022) and Fold 2 (train CV_2021+CV_2022 → test CV_2023). Chronological validation block = last 15% of train issues by issue id. In v5, the validation issues are excluded before every MLP, Ridge, ranker, fixed-action and OOD fit; sklearn row-level early stopping remains disabled. All payouts use the corrected pre-tax economics (0.65 applied exactly once per winning ticket).")
 
 code("""for fold in ("fold1", "fold2"):
     learned = pd.read_parquet(PACKAGE / f"path_learned_{fold}.parquet")
     print(fold, "ending:", round(float(learned.iloc[-1]["post_issue_bankroll_yuan"]), 2), "issues:", len(learned))
 loss = pd.read_csv(PACKAGE / "chronological_train_val_loss.csv")
 loss""")
+
+code("""chronology = pd.read_parquet(PACKAGE / "chronology_blocks.parquet")
+summary = chronology.groupby(["fold", "role"])["issue"].nunique().unstack(fill_value=0)
+summary["fit_validation_overlap"] = [
+    len(set(chronology.query("fold == @fold and role == 'FIT'")["issue"]) &
+        set(chronology.query("fold == @fold and role == 'VALIDATION'")["issue"]))
+    for fold in summary.index
+]
+summary""")
 
 md("## 5. Controls / attribution matrix (CV_2023 test split)\n\nAll arms start ¥100,000. Payout economics use pre-tax gross multiple = hit × 0.65 × product(official SP), coefficient applied exactly once per winning ticket. `capital_change_identical` binds frozen #207 EQUAL_1PCT identities with the corrected multiples.")
 
@@ -81,7 +90,7 @@ freq.head(6)""")
 code("""fallback = pd.read_csv(PACKAGE / "ood_fallback_census.csv")
 fallback""")
 
-md("## 7. Genuine dynamic controls\n\nEach restricted control scores lawful actions separately for every issue from causal state. The resulting choices reveal model collapse: N-only selects N4 throughout; K-only selects K8 throughout; joint N×K varies N but keeps K8. Score variation therefore exists, but dynamic K behavior does not.")
+md("## 7. Genuine dynamic controls\n\nEach restricted control scores lawful actions separately for every issue from causal state. N-only selects N4 on most issues and N9 on two CV_2023 issues; K-only selects K8 throughout; joint N×K varies N but keeps K8. There is slight dynamic N variation, but no learned dynamic K behavior.")
 
 code("""dynamic = pd.read_parquet(PACKAGE / "dynamic_control_decisions.parquet")
 dynamic.groupby(["split", "policy", "n", "k"]).size().rename("issues").reset_index()""")
@@ -116,7 +125,7 @@ holding.loc[:, [
     "max_recovery_issues", "ex_largest_issue_ending_capital_yuan",
 ]].sort_values(["split", "ending_capital_yuan"], ascending=[True, False])""")
 
-md("## 9. Selection receipt and #209 handoff\n\nLexicographic rule over 2 constructible folds: learned matched lift = 0.0 on both folds (safety-gated to incumbent), so no row qualifies → freeze N7/K8/MARKET_WOR/native-¥2 incumbent. Handoff v4 carries fitted MLP weights + scaler and the canonical post-publication package path.")
+md("## 9. Selection receipt and #209 handoff\n\nLexicographic rule over 2 constructible folds: learned matched lift = 0.0 on both folds (safety-gated to incumbent), so no row qualifies → freeze N7/K8/MARKET_WOR/native-¥2 incumbent. Handoff v5 carries fitted MLP weights + scaler and the canonical post-publication package path.")
 
 code("""selection = json.loads((PACKAGE / "selection.json").read_text())
 print("eligible:", selection["eligible"])
@@ -128,7 +137,7 @@ print("handoff model_serialized:", handoff["model"].get("model_serialized"))
 print("handoff scaler_mean present:", handoff["model"].get("scaler_mean") is not None)
 print("handoff model_file:", handoff["model_file"])""")
 
-md("## 10. Package verification + tamper self-tests\n\nThe production verifier checks manifest/receipt/provenance/code binding, rich decision-critical schema, completion, actual-refit holdout evidence, REQ evidence paths, capital, N/K bundles, dynamic-control semantics, payout economics and final handoff. All 13 attacks must be detected.")
+md("## 10. Package verification + tamper self-tests\n\nThe production verifier checks manifest/receipt/provenance/code binding, the complete 55-frame schema inventory, chronology, issue-level path metrics, dynamic argmax decisions, completion, actual-refit holdout evidence, capital, N/K bundles, payout economics and final handoff. All 22 attacks must be detected.")
 
 code("""from scripts.run_bj208_policy import verify_package
 
