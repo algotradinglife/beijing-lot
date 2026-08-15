@@ -14,13 +14,11 @@ from __future__ import annotations
 
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from .contract import (
     INCUMBENT_K,
     INCUMBENT_LANE,
-    INCUMBENT_N,
     INITIAL_BANKROLL_YUAN,
     TICKET_STAKE_YUAN,
 )
@@ -125,8 +123,15 @@ def incumbent_prior_state(
             "prior_consecutive_losses": 0,
         }
     bankroll = float(sub.iloc[-1]["post_issue_bankroll_yuan"])
-    trail5 = float(sub.tail(5).iloc[0]["post_issue_bankroll_yuan"])
-    trail10 = float(sub.tail(10).iloc[0]["post_issue_bankroll_yuan"])
+    posts = sub["post_issue_bankroll_yuan"].to_numpy(dtype=float)
+    # Match live inference exactly: a lag-N value is available only after N
+    # completed issues; otherwise the causal anchor is time-zero capital.
+    trail5 = (
+        float(posts[-5]) if len(posts) >= 5 else INITIAL_BANKROLL_YUAN
+    )
+    trail10 = (
+        float(posts[-10]) if len(posts) >= 10 else INITIAL_BANKROLL_YUAN
+    )
     peak = float(
         max(INITIAL_BANKROLL_YUAN, sub["post_issue_bankroll_yuan"].cummax().iloc[-1])
     )

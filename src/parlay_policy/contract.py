@@ -33,12 +33,12 @@ REWORK v2 changes (PROTOCOL-LOG supersede #208-2..#208-6) remain:
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from hashlib import sha256
 from typing import Final
 
-CONTRACT_VERSION: Final = "bj208-dynamic-nk-policy-v6"
-PROTOCOL_VERSION: Final = "bj208-protocol-v6"
+CONTRACT_VERSION: Final = "bj208-dynamic-nk-policy-v7"
+PROTOCOL_VERSION: Final = "bj208-protocol-v7"
 UPSTREAM_207_SHA: Final = (
     "90869a959dc1b972cd872ffe465d1009e29df75e"
 )

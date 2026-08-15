@@ -325,7 +325,7 @@ def test_holdout_receipt_requires_actual_refit_invariance(tmp_path: Path):
         "mutated_rows": 3,
         "baseline_signature_sha256": "a" * 64,
         "mutated_signature_sha256": "b" * 64,
-        "model_weights_scaler_fixed_choice_ood_and_decisions_invariant": False,
+        "all_fitted_objects_and_decisions_invariant": False,
     }
     _write_json(tmp_path / "holdout_mutation_receipt.json", receipt)
     failures = verify_holdout_mutation_receipt(tmp_path)
@@ -385,10 +385,10 @@ def _state_semantics_package(tmp_path: Path) -> Path:
     rows = []
     for issue, prior_bankroll, trail5, trail10, dd, losses in (
         ("23001", 100_000.0, 100_000.0, 100_000.0, 0.0, 0),
-        # 23002 has exactly one strictly-prior row (23001 post 99_984), so
-        # trail5 AND trail10 both equal that single prior post (99_984);
+        # 23002 has only one strictly-prior row, so neither exact lag exists;
+        # trail5 and trail10 both remain at the time-zero anchor;
         # running peak anchored at 100,000 => dd = 16/100_000.
-        ("23002", 99_984.0, 99_984.0, 99_984.0, 0.00016, 1),
+        ("23002", 99_984.0, 100_000.0, 100_000.0, 0.00016, 1),
     ):
         rows.append(
             {
@@ -451,7 +451,8 @@ def test_tamper_training_state_shift_detected(tmp_path: Path):
     # Attacker regenerates a fully legal manifest over the tampered tree.
     artifacts = sorted(
         p for p in tampered.rglob("*")
-        if p.is_file() and p.name != "SHA256SUMS.json"
+        if p.is_file()
+        and p.relative_to(tampered).as_posix() != "SHA256SUMS.json"
     )
     _write_json(tampered / "SHA256SUMS.json", manifest(tampered, artifacts))
     failures = verify_state_semantics(tampered)

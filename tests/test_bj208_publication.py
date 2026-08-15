@@ -43,6 +43,88 @@ def test_second_rename_failure_restores_last_good(tmp_path, monkeypatch):
     assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
 
 
+def test_first_parent_fsync_failure_restores_visible_last_good(
+    tmp_path, monkeypatch
+):
+    output = tmp_path / "issue-208"
+    staging = tmp_path / "staging"
+    _payload(output, "old")
+    _payload(staging, "new")
+    real_fsync = runner._fsync_directory
+    calls = 0
+
+    def fail_first_parent_fsync(path):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("injected first parent fsync failure")
+        return real_fsync(path)
+
+    monkeypatch.setattr(runner, "_fsync_directory", fail_first_parent_fsync)
+    with pytest.raises(OSError, match="first parent fsync"):
+        runner._atomic_publish(staging, output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert (staging / "payload.txt").read_text(encoding="utf-8") == "new"
+
+    backup = runner._atomic_publish(staging, output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    runner._commit_publish(output, backup)
+
+
+def test_second_parent_fsync_failure_restores_last_good_and_retry(
+    tmp_path, monkeypatch
+):
+    output = tmp_path / "issue-208"
+    staging = tmp_path / "staging"
+    _payload(output, "old")
+    _payload(staging, "new")
+    real_fsync = runner._fsync_directory
+    calls = 0
+
+    def fail_second_parent_fsync(path):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("injected second parent fsync failure")
+        return real_fsync(path)
+
+    monkeypatch.setattr(runner, "_fsync_directory", fail_second_parent_fsync)
+    with pytest.raises(OSError, match="second parent fsync"):
+        runner._atomic_publish(staging, output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert (staging / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+
+    backup = runner._atomic_publish(staging, output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    runner._commit_publish(output, backup)
+
+
+def test_backup_cleanup_transient_fault_retries_without_rollback(
+    tmp_path, monkeypatch
+):
+    output = tmp_path / "issue-208"
+    staging = tmp_path / "staging"
+    _payload(output, "old")
+    _payload(staging, "new")
+    backup = runner._atomic_publish(staging, output)
+    real_rmtree = runner.shutil.rmtree
+    calls = 0
+
+    def fail_once(path, *args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise OSError("injected backup cleanup failure")
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(runner.shutil, "rmtree", fail_once)
+    runner._commit_publish(output, backup)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+
+
 def test_post_publish_failure_rolls_back(tmp_path):
     output = tmp_path / "issue-208"
     staging = tmp_path / "staging"

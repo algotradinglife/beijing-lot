@@ -112,13 +112,13 @@ from parlay_policy.verify import (  # noqa: E402
     verify_provenance,
     verify_receipt,
     verify_req_evidence,
+    verify_selection_authority,
     verify_state_semantics,
 )
 from parlay_policy.diagnostics import (  # noqa: E402
     action_frequency,
     action_variation_demo,
     calibration_curve,
-    chronological_train_val_loss,
     ood_fallback_census,
     permutation_importance_table,
 )
@@ -170,15 +170,40 @@ def _atomic_publish(staging: Path, output: Path) -> Path | None:
     backup: Path | None = None
     if output.exists():
         backup = output.parent / f".{output.name}.backup-{uuid.uuid4().hex}"
-        os.replace(output, backup)
-        _fsync_directory(output.parent)
+        try:
+            os.replace(output, backup)
+            _fsync_directory(output.parent)
+        except BaseException:
+            # The first parent-fsync is part of the transaction.  If it
+            # fails after output→backup, restore last-good visibility here;
+            # the caller cannot know the local backup path until return.
+            if backup.exists() and not output.exists():
+                os.replace(backup, output)
+                try:
+                    _fsync_directory(output.parent)
+                except OSError:
+                    # Preserve the original boundary error; visibility is
+                    # already restored and retry remains safe.
+                    pass
+            raise
     try:
         os.replace(staging, output)
         _fsync_directory(output.parent)
     except BaseException:
-        if backup is not None and backup.exists() and not output.exists():
+        # Cover both staging→output rename failure (output absent) and the
+        # second parent-fsync failure (new output visible but not durable).
+        # Move a visible candidate back to staging so an immediate retry can
+        # reuse the same complete tree, then restore last-good.
+        if output.exists():
+            if staging.exists():
+                shutil.rmtree(staging)
+            os.replace(output, staging)
+        if backup is not None and backup.exists():
             os.replace(backup, output)
+        try:
             _fsync_directory(output.parent)
+        except OSError:
+            pass
         raise
     return backup
 
@@ -205,9 +230,11 @@ def _commit_publish(output: Path, backup: Path | None) -> None:
         # than replacing good output with a partially deleted backup.
         try:
             shutil.rmtree(backup)
-            _fsync_directory(output.parent)
         except OSError:
-            pass
+            # One bounded retry closes transient cleanup faults while never
+            # rolling a verified new package back to obsolete bytes.
+            shutil.rmtree(backup)
+        _fsync_directory(output.parent)
 
 
 # ==== SECTION: RUN ====
@@ -332,6 +359,8 @@ def _run_stages(
 
     # --- Stage 4: chronological folds ---------------------------------------
     fold_results: dict[str, object] = {}
+    terminal_fitted_inventory: dict[str, object] | None = None
+    terminal_diagnostic_loss = pd.DataFrame()
     fit_rows: list[pd.DataFrame] = []
     validation_rows: list[pd.DataFrame] = []
     chronology_rows: list[dict[str, object]] = []
@@ -399,6 +428,35 @@ def _run_stages(
             if split in train_splits and str(issue) in fit_issues
         ]
         ood_scaler, ood_threshold = ood_gate(fit_states, fit_states)
+
+        if test_split == TERMINAL_SPLIT:
+            diagnostic_policy, terminal_diagnostic_loss = (
+                _fit_chronological_diagnostic(train_all_df)
+            )
+            terminal_fitted_inventory = _fitted_object_inventory(
+                ranker=ranker_fold,
+                primary=policy_mlp,
+                ridge=policy_ridge,
+                fixed=policy_fixed,
+                restricted=restricted_policies,
+                ood_scaler=ood_scaler,
+                ood_threshold=ood_threshold,
+                diagnostic=diagnostic_policy,
+            )
+            _persist_model(policy_ridge, models_dir / "fold2_ridge.joblib")
+            _persist_object(ranker_fold, models_dir / "fold2_ranker.joblib")
+            for name, restricted_policy in restricted_policies.items():
+                _persist_model(
+                    restricted_policy,
+                    models_dir / f"fold2_{name}.joblib",
+                )
+            _persist_object(
+                ood_scaler, models_dir / "fold2_ood_scaler.joblib"
+            )
+            _persist_model(
+                diagnostic_policy,
+                models_dir / "fold2_diagnostic_mlp.joblib",
+            )
 
         test_ctx = {
             (split, issue): ctx
@@ -551,6 +609,12 @@ def _run_stages(
     pd.DataFrame(chronology_rows).to_parquet(
         output / "chronology_blocks.parquet", index=False
     )
+    if terminal_fitted_inventory is None:
+        raise ReplayError("terminal fitted-object inventory was not produced")
+    _json(
+        output / "fitted_object_inventory.json",
+        {"terminal_fold": "fold2", "fitted_objects": terminal_fitted_inventory},
+    )
     all_test = pd.concat(test_rows, ignore_index=True)
     all_test.to_parquet(output / "decision_rows_all.parquet", index=False)
     _write_diagnostics(
@@ -560,6 +624,7 @@ def _run_stages(
         contexts,
         policy_mlp,
         train_all_df,
+        diagnostic_loss=terminal_diagnostic_loss,
     )
 
     # Consolidated capital ledger for verification + tamper targeting.
@@ -798,23 +863,123 @@ def _stable_model_payload(model: object) -> dict[str, object]:
         return {}
     steps = getattr(model, "named_steps", {})
     scaler = steps.get("standardscaler")
-    estimator = steps.get("mlpregressor")
-    if estimator is None:
-        estimator = steps.get("mlpclassifier")
-    payload: dict[str, object] = {}
+    estimator = (
+        steps.get("mlpregressor")
+        or steps.get("mlpclassifier")
+        or steps.get("ridge")
+    )
+    payload: dict[str, object] = {
+        "pipeline_steps": list(steps),
+        "estimator_type": type(estimator).__name__ if estimator is not None else None,
+    }
     if scaler is not None:
         payload["scaler_mean"] = np.asarray(scaler.mean_, dtype=float).tolist()
         payload["scaler_scale"] = np.asarray(scaler.scale_, dtype=float).tolist()
     if estimator is not None:
-        payload["coefs"] = [
-            np.asarray(value, dtype=float).tolist() for value in estimator.coefs_
-        ]
-        payload["intercepts"] = [
-            np.asarray(value, dtype=float).tolist()
-            for value in estimator.intercepts_
-        ]
-        payload["n_iter"] = int(estimator.n_iter_)
+        if hasattr(estimator, "coefs_"):
+            payload["coefs"] = [
+                np.asarray(value, dtype=float).tolist()
+                for value in estimator.coefs_
+            ]
+            payload["intercepts"] = [
+                np.asarray(value, dtype=float).tolist()
+                for value in estimator.intercepts_
+            ]
+        if hasattr(estimator, "coef_"):
+            payload["coef"] = np.asarray(
+                estimator.coef_, dtype=float
+            ).tolist()
+            payload["intercept"] = np.asarray(
+                estimator.intercept_, dtype=float
+            ).tolist()
+        if hasattr(estimator, "classes_"):
+            payload["classes"] = np.asarray(estimator.classes_).tolist()
+        if getattr(estimator, "n_iter_", None) is not None:
+            payload["n_iter"] = int(estimator.n_iter_)
     return payload
+
+
+def _stable_policy_payload(policy: object) -> dict[str, object]:
+    return {
+        "model_kind": str(policy.model_kind),
+        "fixed_action_key": policy.fixed_action_key,
+        "fitted_action_keys": list(policy.fitted_action_keys),
+        "residual_rmse": float(policy.residual_rmse),
+        "validation_rmse": (
+            float(policy.validation_rmse)
+            if policy.validation_rmse is not None
+            else None
+        ),
+        "fit_issue_count": int(policy.fit_issue_count),
+        "validation_issue_count": int(policy.validation_issue_count),
+        "model": _stable_model_payload(policy.model),
+    }
+
+
+def _stable_scaler_payload(scaler: object) -> dict[str, object]:
+    return {
+        "type": type(scaler).__name__,
+        "mean": np.asarray(scaler.mean_, dtype=float).tolist(),
+        "scale": np.asarray(scaler.scale_, dtype=float).tolist(),
+        "n_features_in": int(scaler.n_features_in_),
+    }
+
+
+def _fit_chronological_diagnostic(
+    train_all_df: pd.DataFrame,
+) -> tuple[object, pd.DataFrame]:
+    """Fit the one diagnostic model once and return its bound loss output."""
+    issues = sorted(train_all_df["issue"].astype(str).unique())
+    cut = max(2, int(len(issues) * 0.85))
+    fit_issues = set(issues[:cut])
+    validation_issues = set(issues[cut:])
+    fit_df = train_all_df.loc[
+        train_all_df["issue"].astype(str).isin(fit_issues)
+    ]
+    validation_df = train_all_df.loc[
+        train_all_df["issue"].astype(str).isin(validation_issues)
+    ]
+    policy = fit_policy(
+        fit_df, kind="MLP", seed=MODEL_SEED, validation_df=validation_df
+    )
+    loss = pd.DataFrame(
+        [{
+            "model": "MLP",
+            "fit_issues": len(fit_issues),
+            "validation_issues": len(validation_issues),
+            "fit_rmse": float(policy.residual_rmse),
+            "validation_rmse": float(policy.validation_rmse),
+        }]
+    )
+    return policy, loss
+
+
+def _fitted_object_inventory(
+    *,
+    ranker: object,
+    primary: object,
+    ridge: object,
+    fixed: object,
+    restricted: dict[str, object],
+    ood_scaler: object,
+    ood_threshold: float,
+    diagnostic: object,
+) -> dict[str, object]:
+    return {
+        "ticket_ranker": _stable_model_payload(ranker),
+        "primary_mlp": _stable_policy_payload(primary),
+        "ridge": _stable_policy_payload(ridge),
+        "best_fixed": _stable_policy_payload(fixed),
+        "restricted_mlps": {
+            name: _stable_policy_payload(policy)
+            for name, policy in sorted(restricted.items())
+        },
+        "ood": {
+            "scaler": _stable_scaler_payload(ood_scaler),
+            "threshold": float(ood_threshold),
+        },
+        "diagnostic_mlp": _stable_policy_payload(diagnostic),
+    }
 
 
 def _actual_refit_signature(
@@ -861,7 +1026,22 @@ def _actual_refit_signature(
         seed=MODEL_SEED,
         validation_df=validation_df,
     )
+    ridge = fit_policy(
+        train_df,
+        kind="RIDGE",
+        seed=MODEL_SEED,
+        validation_df=validation_df,
+    )
     fixed_key = best_fixed_action_key(train_df)
+    fixed = fit_policy(
+        train_df,
+        kind="FIXED_ACTION",
+        fixed_action_key=fixed_key,
+    )
+    restricted = _fit_restricted_control_policies(
+        train_df, validation_df, seed=MODEL_SEED + 200
+    )
+    diagnostic, _ = _fit_chronological_diagnostic(train_all_df)
     fit_states = [
         ctx.state
         for (split, issue), ctx in contexts.items()
@@ -932,10 +1112,16 @@ def _actual_refit_signature(
         "validation_issues": sorted(
             validation_df["issue"].astype(str).unique()
         ),
-        "fixed_action_key": fixed_key,
-        "ood_threshold": float(ood_threshold),
-        "policy": _stable_model_payload(policy.model),
-        "ranker": _stable_model_payload(ranker),
+        "fitted_objects": _fitted_object_inventory(
+            ranker=ranker,
+            primary=policy,
+            ridge=ridge,
+            fixed=fixed,
+            restricted=restricted,
+            ood_scaler=ood_scaler,
+            ood_threshold=ood_threshold,
+            diagnostic=diagnostic,
+        ),
         "decisions": decisions,
     }
     return {
@@ -993,7 +1179,7 @@ def _write_holdout_mutation_receipt(
         "mutated_signature_sha256": after["sha256"],
         "baseline_payload_file": baseline_file,
         "mutated_payload_file": mutated_file,
-        "model_weights_scaler_fixed_choice_ood_and_decisions_invariant": invariant,
+        "all_fitted_objects_and_decisions_invariant": invariant,
     }
     _json(output / "holdout_mutation_receipt.json", receipt)
     if not invariant:
@@ -1004,6 +1190,12 @@ def _persist_model(policy, path: Path) -> None:
     import joblib
 
     joblib.dump(policy.model, path)
+
+
+def _persist_object(value: object, path: Path) -> None:
+    import joblib
+
+    joblib.dump(value, path)
 
 
 def _actions_for_issue(ctx):
@@ -1475,7 +1667,7 @@ def _write_schema(output: Path) -> None:
                 "required_keys": [
                     "probe", "mutated_rows", "baseline_signature_sha256",
                     "mutated_signature_sha256",
-                    "model_weights_scaler_fixed_choice_ood_and_decisions_invariant",
+                    "all_fitted_objects_and_decisions_invariant",
                 ],
             },
         },
@@ -1515,6 +1707,10 @@ def _write_schema(output: Path) -> None:
             {
                 "name": "training_state_source_binding",
                 "production_verifier": "verify_state_semantics",
+            },
+            {
+                "name": "selection_handoff_authority",
+                "production_verifier": "verify_selection_authority",
             },
         ],
         "manifest_identity": {
@@ -1559,6 +1755,7 @@ def _write_schema(output: Path) -> None:
         "holdout_mutation_receipt.json",
         "holdout_refit_baseline.json",
         "holdout_refit_mutated.json",
+        "fitted_object_inventory.json",
         "protocol_log.json",
         "provenance.json",
         "selection.json",
@@ -1599,7 +1796,7 @@ def _write_manifest(output: Path) -> None:
         p
         for p in output.rglob("*")
         if p.is_file()
-        and p.name != "SHA256SUMS.json"
+        and p.relative_to(output).as_posix() != "SHA256SUMS.json"
     )
     _json(output / "SHA256SUMS.json", manifest(output, artifacts))
 
@@ -1670,6 +1867,7 @@ def verify_package(output: Path) -> list[str]:
     # REWORK v3.1 (PI narrow durability): handoff artifact paths must resolve
     # after publication and must never reference the staging directory.
     failures.extend(verify_handoff_contract(output))
+    failures.extend(verify_selection_authority(output))
 
     provenance_path = output / "provenance.json"
     if provenance_path.exists():
@@ -2200,6 +2398,8 @@ def _write_diagnostics(
     contexts,
     policy_mlp,
     terminal_train_all,
+    *,
+    diagnostic_loss: pd.DataFrame,
 ):
     context_states = {
         f"{split}:{issue}": ctx.state
@@ -2221,10 +2421,9 @@ def _write_diagnostics(
         demo.to_csv(output / "action_variation_demo.csv", index=False)
     # Chronological train/val loss (REWORK v2: issue-block, not row-level).
     if terminal_train_all is not None and not terminal_train_all.empty:
-        loss = chronological_train_val_loss(
-            terminal_train_all, kind="MLP", seed=MODEL_SEED
+        diagnostic_loss.to_csv(
+            output / "chronological_train_val_loss.csv", index=False
         )
-        loss.to_csv(output / "chronological_train_val_loss.csv", index=False)
 
 
 # ==== SECTION: SELECTION ====
@@ -2363,7 +2562,7 @@ def _build_handoff(
     fold2_model = fold_results.get("fold2", {}).get("policy_mlp", {})
     published = published_output or output
     return {
-        "handoff_version": "bj208-handoff-for-209-v6",
+        "handoff_version": "bj208-handoff-for-209-v7",
         "fit_boundary": {
             "train_through": "2022",
             "test_2023": True,

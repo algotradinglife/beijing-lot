@@ -34,11 +34,13 @@ import pandas as pd
 from .contract import (
     CONTRACT_VERSION,
     EMBARGOED_SPLITS,
+    INCUMBENT_K,
+    INCUMBENT_LANE,
+    INCUMBENT_N,
     INITIAL_BANKROLL_YUAN,
     TICKET_STAKE_YUAN,
 )
 from .features import STATE_FEATURE_NAMES
-from .incumbent import incumbent_prior_state
 
 
 class VerifyError(RuntimeError):
@@ -89,18 +91,27 @@ def verify_manifest(package: Path, manifest_json: dict[str, str]) -> list[str]:
     """
     failures: list[str] = []
     for name, expected in manifest_json.items():
+        relative = Path(name)
+        if relative.is_absolute() or ".." in relative.parts or name == "SHA256SUMS.json":
+            failures.append(f"invalid manifest artifact path {name}")
+            continue
         path = package / name
-        if not path.exists():
+        if path.is_symlink():
+            failures.append(f"manifest artifact is a symlink: {name}")
+            continue
+        if not path.is_file():
             failures.append(f"missing artifact {name}")
             continue
         actual = sha256_file(path)
         if actual != expected:
             failures.append(f"hash mismatch {name}: {actual} != {expected}")
-    on_disk = {
-        p.relative_to(package).as_posix()
-        for p in package.rglob("*")
-        if p.is_file() and p.name not in MANIFEST_EXCLUDED
-    }
+    on_disk: set[str] = set()
+    for path in package.rglob("*"):
+        relative = path.relative_to(package).as_posix()
+        if path.is_symlink():
+            failures.append(f"package contains symlink: {relative}")
+        if path.is_file() and relative not in MANIFEST_EXCLUDED:
+            on_disk.add(relative)
     unlisted = sorted(on_disk - set(manifest_json))
     if unlisted:
         failures.append(f"unlisted payload files: {unlisted}")
@@ -337,7 +348,8 @@ def verify_package_schema(package: Path, schema: dict[str, Any]) -> list[str]:
     on_disk_json = {
         path.relative_to(package).as_posix()
         for path in package.rglob("*.json")
-        if path.name not in {"SHA256SUMS.json", "schema.json"}
+        if path.relative_to(package).as_posix()
+        not in {"SHA256SUMS.json", "schema.json"}
     }
     if set(json_contracts) != on_disk_json:
         missing = sorted(on_disk_json - set(json_contracts))
@@ -464,6 +476,52 @@ def verify_req_evidence(
     return failures
 
 
+def _model_numerical_payload(model: object) -> dict[str, object]:
+    steps = getattr(model, "named_steps", {})
+    scaler = steps.get("standardscaler")
+    estimator = steps.get("mlpregressor")
+    if estimator is None:
+        estimator = steps.get("mlpclassifier")
+    if estimator is None:
+        estimator = steps.get("ridge")
+    payload: dict[str, object] = {
+        "pipeline_steps": list(steps),
+        "estimator_type": type(estimator).__name__ if estimator is not None else None,
+    }
+    if scaler is not None:
+        payload["scaler_mean"] = np.asarray(scaler.mean_, dtype=float).tolist()
+        payload["scaler_scale"] = np.asarray(scaler.scale_, dtype=float).tolist()
+    if estimator is not None:
+        if hasattr(estimator, "coefs_"):
+            payload["coefs"] = [
+                np.asarray(value, dtype=float).tolist()
+                for value in estimator.coefs_
+            ]
+            payload["intercepts"] = [
+                np.asarray(value, dtype=float).tolist()
+                for value in estimator.intercepts_
+            ]
+        if hasattr(estimator, "coef_"):
+            payload["coef"] = np.asarray(estimator.coef_, dtype=float).tolist()
+            payload["intercept"] = np.asarray(
+                estimator.intercept_, dtype=float
+            ).tolist()
+        if hasattr(estimator, "classes_"):
+            payload["classes"] = np.asarray(estimator.classes_).tolist()
+        if getattr(estimator, "n_iter_", None) is not None:
+            payload["n_iter"] = int(estimator.n_iter_)
+    return payload
+
+
+def _scaler_numerical_payload(scaler: object) -> dict[str, object]:
+    return {
+        "type": type(scaler).__name__,
+        "mean": np.asarray(scaler.mean_, dtype=float).tolist(),
+        "scale": np.asarray(scaler.scale_, dtype=float).tolist(),
+        "n_features_in": int(scaler.n_features_in_),
+    }
+
+
 def verify_holdout_mutation_receipt(package: Path) -> list[str]:
     path = package / "holdout_mutation_receipt.json"
     if not path.exists():
@@ -482,7 +540,7 @@ def verify_holdout_mutation_receipt(package: Path) -> list[str]:
     for key in ("baseline_signature_sha256", "mutated_signature_sha256"):
         if re.fullmatch(r"[0-9a-f]{64}", str(receipt.get(key, ""))) is None:
             failures.append(f"holdout receipt {key} is not SHA-256")
-    if receipt.get("model_weights_scaler_fixed_choice_ood_and_decisions_invariant") is not True:
+    if receipt.get("all_fitted_objects_and_decisions_invariant") is not True:
         failures.append("holdout receipt does not attest full fitted-state invariance")
     payloads: dict[str, dict[str, Any]] = {}
     for side in ("baseline", "mutated"):
@@ -519,36 +577,80 @@ def verify_holdout_mutation_receipt(package: Path) -> list[str]:
             failures.append("holdout payload lacks fit/validation issue blocks")
         elif train_issues & validation_issues:
             failures.append("holdout payload fit/validation issues overlap")
-        # Bind the attested terminal model to the actual #209 model bytes by
-        # comparing fitted numerical state, not joblib serialization bytes.
-        model_path = package / "models/fold2_mlp.joblib"
-        if not model_path.exists():
-            failures.append("holdout model binding target missing")
-        else:
-            try:
-                import joblib
+        fitted = baseline.get("fitted_objects")
+        expected_keys = {
+            "ticket_ranker", "primary_mlp", "ridge", "best_fixed",
+            "restricted_mlps", "ood", "diagnostic_mlp",
+        }
+        if not isinstance(fitted, dict) or set(fitted) != expected_keys:
+            failures.append("holdout payload fitted-object inventory incomplete")
+            fitted = {}
+        inventory_path = package / "fitted_object_inventory.json"
+        try:
+            inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+            if inventory.get("terminal_fold") != "fold2":
+                failures.append("published fitted-object inventory fold mismatch")
+            if inventory.get("fitted_objects") != fitted:
+                failures.append("holdout payload does not bind fitted-object inventory")
+        except Exception as exc:
+            failures.append(f"fitted-object inventory binding failed: {exc}")
 
-                model = joblib.load(model_path)
-                steps = getattr(model, "named_steps", {})
-                scaler = steps.get("standardscaler")
-                estimator = steps.get("mlpregressor")
-                model_payload = {
-                    "scaler_mean": np.asarray(scaler.mean_, dtype=float).tolist(),
-                    "scaler_scale": np.asarray(scaler.scale_, dtype=float).tolist(),
-                    "coefs": [
-                        np.asarray(value, dtype=float).tolist()
-                        for value in estimator.coefs_
-                    ],
-                    "intercepts": [
-                        np.asarray(value, dtype=float).tolist()
-                        for value in estimator.intercepts_
-                    ],
-                    "n_iter": int(estimator.n_iter_),
-                }
-                if baseline.get("policy") != model_payload:
-                    failures.append("holdout payload does not bind fold2 model")
-            except Exception as exc:
-                failures.append(f"holdout model binding failed: {exc}")
+        # Bind every fitted numerical object to a separately delivered model
+        # artifact.  This prevents a self-consistent receipt/inventory rewrite
+        # from silently replacing Ridge or a restricted control.
+        try:
+            import joblib
+
+            model_targets = {
+                "ticket_ranker": ("models/fold2_ranker.joblib", fitted.get("ticket_ranker")),
+                "primary_mlp": ("models/fold2_mlp.joblib", (fitted.get("primary_mlp") or {}).get("model")),
+                "ridge": ("models/fold2_ridge.joblib", (fitted.get("ridge") or {}).get("model")),
+                "diagnostic_mlp": ("models/fold2_diagnostic_mlp.joblib", (fitted.get("diagnostic_mlp") or {}).get("model")),
+            }
+            for name, (relative, expected_payload) in model_targets.items():
+                target = package / relative
+                if not target.exists():
+                    failures.append(f"fitted-object artifact missing: {relative}")
+                    continue
+                if _model_numerical_payload(joblib.load(target)) != expected_payload:
+                    failures.append(f"fitted-object artifact mismatch: {name}")
+            restricted = fitted.get("restricted_mlps") or {}
+            expected_restricted = {
+                "dynamic_n_fixed_k8_lane",
+                "fixed_n7_dynamic_k",
+                "dynamic_nk_fixed_generator",
+            }
+            if set(restricted) != expected_restricted:
+                failures.append("restricted fitted-object inventory incomplete")
+            for name in sorted(expected_restricted):
+                target = package / f"models/fold2_{name}.joblib"
+                expected_payload = (restricted.get(name) or {}).get("model")
+                if not target.exists():
+                    failures.append(f"restricted model artifact missing: {name}")
+                elif _model_numerical_payload(joblib.load(target)) != expected_payload:
+                    failures.append(f"restricted model artifact mismatch: {name}")
+            ood_target = package / "models/fold2_ood_scaler.joblib"
+            if not ood_target.exists():
+                failures.append("OOD scaler artifact missing")
+            elif _scaler_numerical_payload(joblib.load(ood_target)) != (
+                (fitted.get("ood") or {}).get("scaler")
+            ):
+                failures.append("OOD scaler artifact mismatch")
+        except Exception as exc:
+            failures.append(f"fitted-object artifact binding failed: {exc}")
+
+        training_path = package / "training_frame_all.parquet"
+        if training_path.exists() and fitted:
+            training = pd.read_parquet(training_path)
+            fold2 = training.loc[
+                training["fold"].eq("fold2")
+                & training["training_role"].eq("FIT")
+            ]
+            expected_fixed = str(
+                fold2.groupby("action_key")["y_lift"].median().idxmax()
+            )
+            if (fitted.get("best_fixed") or {}).get("fixed_action_key") != expected_fixed:
+                failures.append("best-fixed fitted object disagrees with training primitive")
         decisions_path = package / "decision_rows_all.parquet"
         if decisions_path.exists():
             decisions = pd.read_parquet(decisions_path)
@@ -639,6 +741,55 @@ def verify_chronology(package: Path) -> list[str]:
     return failures
 
 
+def _independent_prior_state(
+    incumbent: pd.DataFrame, split: str, issue: str
+) -> dict[str, float]:
+    """Independent causal lag-state reconstruction for verification.
+
+    This intentionally does not call the production feature constructor.  A
+    verifier that shares the same helper would accept a training/inference
+    bug whenever both sides are wrong in the same way.
+    """
+    prior = incumbent.loc[
+        incumbent["split"].astype(str).eq(str(split))
+        & (incumbent["issue"].astype(str) < str(issue))
+    ].sort_values("issue")
+    if prior.empty:
+        return {
+            "prior_bankroll_yuan": INITIAL_BANKROLL_YUAN,
+            "prior_trail5_bankroll_yuan": INITIAL_BANKROLL_YUAN,
+            "prior_trail10_bankroll_yuan": INITIAL_BANKROLL_YUAN,
+            "prior_running_drawdown_pct": 0.0,
+            "prior_consecutive_losses": 0.0,
+        }
+    posts = prior["post_issue_bankroll_yuan"].to_numpy(dtype=float)
+    bankroll = float(posts[-1])
+    peak = float(max(INITIAL_BANKROLL_YUAN, float(np.max(posts))))
+    losses = 0
+    net = (
+        prior["gross_payout_yuan"].to_numpy(dtype=float)
+        - prior["funded_stake_yuan"].to_numpy(dtype=float)
+    )
+    for value in net[::-1]:
+        if value < 0:
+            losses += 1
+        else:
+            break
+    return {
+        "prior_bankroll_yuan": bankroll,
+        "prior_trail5_bankroll_yuan": (
+            float(posts[-5]) if len(posts) >= 5 else INITIAL_BANKROLL_YUAN
+        ),
+        "prior_trail10_bankroll_yuan": (
+            float(posts[-10]) if len(posts) >= 10 else INITIAL_BANKROLL_YUAN
+        ),
+        "prior_running_drawdown_pct": (
+            (peak - bankroll) / peak if peak else 0.0
+        ),
+        "prior_consecutive_losses": float(losses),
+    }
+
+
 def verify_state_semantics(package: Path) -> list[str]:
     """REWORK v4 (EV D3): source-derived binding of critical training-state
     evidence.
@@ -668,7 +819,7 @@ def verify_state_semantics(package: Path) -> list[str]:
     for split, group in incumbent.groupby("split", sort=False):
         split_str = str(split)
         for issue in group["issue"].astype(str):
-            recomputed[(split_str, issue)] = incumbent_prior_state(
+            recomputed[(split_str, issue)] = _independent_prior_state(
                 incumbent, split_str, issue
             )
 
@@ -874,6 +1025,181 @@ def verify_path_metrics(
     return failures
 
 
+def _candidate_from_action_key(action_key: str) -> dict[str, object]:
+    parts = str(action_key).split("/")
+    if len(parts) != 4:
+        raise VerifyError(f"invalid candidate action key: {action_key}")
+    return {
+        "policy": "LEARNED_MLP_Q",
+        "n": int(parts[0][1:]),
+        "k": int(parts[1][1:]),
+        "lane": parts[2],
+        "capital": parts[3],
+    }
+
+
+def _incumbent_candidate(*, reason: bool = False) -> dict[str, object]:
+    value: dict[str, object] = {
+        "policy": "FROZEN_N7_INCUMBENT",
+        "n": INCUMBENT_N,
+        "k": INCUMBENT_K,
+        "lane": INCUMBENT_LANE,
+        "capital": "NATIVE_2_YUAN",
+    }
+    if reason:
+        value["reason"] = (
+            "selection rule found no eligible learned row; freeze N7 incumbent"
+        )
+    return value
+
+
+def verify_selection_authority(package: Path) -> list[str]:
+    """Independently rebuild terminal selection and bind it to #209 handoff."""
+    failures: list[str] = []
+    try:
+        selection = json.loads(
+            (package / "selection.json").read_text(encoding="utf-8")
+        )
+        handoff = json.loads(
+            (package / "handoff_209.json").read_text(encoding="utf-8")
+        )
+        incumbent = pd.read_parquet(package / "incumbent_paths.parquet")
+    except Exception as exc:
+        return [f"selection authority inputs unreadable: {exc}"]
+
+    fold_specs = (("fold1", "CV_2022"), ("fold2", "CV_2023"))
+    expected_rows: list[dict[str, object]] = []
+    learned_drawdowns: list[float] = []
+    for fold, split in fold_specs:
+        path_file = package / f"path_learned_{fold}.parquet"
+        if not path_file.exists():
+            failures.append(f"selection primitive missing: {path_file.name}")
+            continue
+        learned = pd.read_parquet(path_file).sort_values("issue")
+        frozen = incumbent.loc[
+            incumbent["split"].astype(str).eq(split)
+        ].sort_values("issue")
+        if learned.empty or frozen.empty:
+            failures.append(f"selection primitive empty: {fold}/{split}")
+            continue
+        learned_end = float(learned.iloc[-1]["post_issue_bankroll_yuan"])
+        incumbent_end = float(frozen.iloc[-1]["post_issue_bankroll_yuan"])
+        expected_rows.append({
+            "fold": fold,
+            "test_split": split,
+            "learned_end": learned_end,
+            "frozen_incumbent_end": incumbent_end,
+            "matched_lift": learned_end - incumbent_end,
+        })
+        learned_drawdowns.append(float(learned["drawdown_pct"].max()))
+
+    if len(expected_rows) != len(fold_specs):
+        return failures
+    lifts = np.asarray([float(row["matched_lift"]) for row in expected_rows])
+    median_lift = float(np.median(lifts))
+    positive = int(np.sum(lifts > 0))
+    rule1 = bool(
+        np.isfinite(lifts).all()
+        and all(float(row["learned_end"]) > 0 for row in expected_rows)
+    )
+    rule2 = bool(np.isfinite(median_lift) and median_lift > 0)
+    rule3 = positive == len(expected_rows)
+    eligible = bool(rule1 and rule2 and rule3)
+    expected_scalars = {
+        "rule1_valid_replay_complete_support_no_ruin": rule1,
+        "rule2_positive_median_lift": rule2,
+        "rule3_positive_on_all_constructible_folds": rule3,
+        "eligible": eligible,
+        "median_matched_lift_yuan": median_lift,
+        "positive_fold_count": positive,
+        "constructible_fold_count": len(expected_rows),
+        "worst_fold_matched_lift_yuan": float(np.min(lifts)),
+        "max_drawdown_pct": float(max(learned_drawdowns)),
+    }
+    for key, expected in expected_scalars.items():
+        observed = selection.get(key)
+        if isinstance(expected, bool):
+            if observed is not expected:
+                failures.append(f"selection {key} mismatch")
+        else:
+            try:
+                matches = np.isclose(
+                    float(observed), float(expected), equal_nan=True
+                )
+            except (TypeError, ValueError):
+                matches = False
+            if not matches:
+                failures.append(f"selection {key} mismatch")
+
+    observed_rows = selection.get("matched_lift_by_fold")
+    if not isinstance(observed_rows, list) or len(observed_rows) != len(expected_rows):
+        failures.append("selection fold primitive inventory mismatch")
+    else:
+        by_fold = {str(row.get("fold")): row for row in observed_rows}
+        for expected in expected_rows:
+            observed = by_fold.get(str(expected["fold"]))
+            if observed is None:
+                failures.append(f"selection missing {expected['fold']}")
+                continue
+            for key in ("test_split", "learned_end", "frozen_incumbent_end", "matched_lift"):
+                if key == "test_split":
+                    if observed.get(key) != expected[key]:
+                        failures.append(f"selection {expected['fold']} {key} mismatch")
+                else:
+                    try:
+                        matches = np.isclose(
+                            float(observed.get(key)),
+                            float(expected[key]),
+                            equal_nan=True,
+                        )
+                    except (TypeError, ValueError):
+                        matches = False
+                    if not matches:
+                        failures.append(
+                            f"selection {expected['fold']} {key} mismatch"
+                        )
+
+    if eligible:
+        terminal = pd.read_parquet(package / "decision_rows_all.parquet")
+        frequency = terminal.loc[
+            terminal["split"].eq("CV_2023"), "action_key"
+        ].value_counts()
+        expected_candidate = _candidate_from_action_key(str(frequency.index[0]))
+        expected_frozen = expected_candidate
+    else:
+        expected_candidate = _incumbent_candidate(reason=True)
+        expected_frozen = _incumbent_candidate()
+    if selection.get("candidate") != expected_candidate:
+        failures.append("selection candidate disagrees with decisive primitives")
+    if selection.get("frozen_candidate") != expected_frozen:
+        failures.append("selection frozen_candidate disagrees with eligibility")
+    if handoff.get("candidate") != expected_frozen:
+        failures.append("handoff candidate disagrees with selection")
+    if handoff.get("fallback") != _incumbent_candidate():
+        failures.append("handoff fallback is not frozen incumbent")
+
+    try:
+        inventory = json.loads(
+            (package / "fitted_object_inventory.json").read_text(encoding="utf-8")
+        )["fitted_objects"]["primary_mlp"]
+        model = handoff.get("model") or {}
+        for key in (
+            "model_kind", "fixed_action_key", "fitted_action_keys",
+            "residual_rmse", "validation_rmse", "fit_issue_count",
+            "validation_issue_count",
+        ):
+            if model.get(key) != inventory.get(key):
+                failures.append(f"handoff model {key} disagrees with fitted inventory")
+        numerical = inventory.get("model") or {}
+        if model.get("scaler_mean") != numerical.get("scaler_mean"):
+            failures.append("handoff model scaler_mean disagrees with inventory")
+        if model.get("scaler_scale") != numerical.get("scaler_scale"):
+            failures.append("handoff model scaler_scale disagrees with inventory")
+    except Exception as exc:
+        failures.append(f"handoff fitted-model relation unreadable: {exc}")
+    return failures
+
+
 def verify_handoff_contract(package: Path) -> list[str]:
     """Validate the minimal label-blind #209 inference contract."""
     failures = verify_handoff_paths(package)
@@ -891,8 +1217,8 @@ def verify_handoff_contract(package: Path) -> list[str]:
         failures.append("handoff does not keep 2024 closed")
     if handoff.get("contract_version") != CONTRACT_VERSION:
         failures.append("handoff contract version mismatch")
-    if handoff.get("handoff_version") != "bj208-handoff-for-209-v6":
-        failures.append("handoff version is not v6")
+    if handoff.get("handoff_version") != "bj208-handoff-for-209-v7":
+        failures.append("handoff version is not v7")
     model_ref = handoff.get("model_file")
     if model_ref:
         target = _handoff_ref_in_package(package, str(model_ref))
@@ -1685,14 +2011,52 @@ def tamper_forge_holdout_attestation(package: Path) -> None:
         _json(package / ref, forged)
         receipt[f"{side}_signature_sha256"] = signature
     receipt["mutated_rows"] = 1
-    receipt["model_weights_scaler_fixed_choice_ood_and_decisions_invariant"] = True
+    receipt["all_fitted_objects_and_decisions_invariant"] = True
     _json(receipt_path, receipt)
+
+
+def tamper_false_promotion(package: Path) -> None:
+    selection_path = package / "selection.json"
+    selection = json.loads(selection_path.read_text(encoding="utf-8"))
+    for row in selection.get("matched_lift_by_fold", []):
+        row["matched_lift"] = 999_999.0
+        row["learned_end"] = float(row.get("frozen_incumbent_end", 0.0)) + 999_999.0
+    selection.update({
+        "median_matched_lift_yuan": 999_999.0,
+        "worst_fold_matched_lift_yuan": 999_999.0,
+        "positive_fold_count": 2,
+        "rule1_valid_replay_complete_support_no_ruin": True,
+        "rule2_positive_median_lift": True,
+        "rule3_positive_on_all_constructible_folds": True,
+        "eligible": True,
+    })
+    forged = {
+        "policy": "LEARNED_MLP_Q",
+        "n": 9,
+        "k": 32,
+        "lane": "LEARNED_MLP",
+        "capital": "SIMPLE_ACTIVE",
+    }
+    selection["candidate"] = forged
+    selection["frozen_candidate"] = forged
+    _json(selection_path, selection)
+    handoff_path = package / "handoff_209.json"
+    handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+    handoff["candidate"] = forged
+    _json(handoff_path, handoff)
+
+
+def tamper_nested_manifest_name(package: Path) -> None:
+    target = package / "models" / "SHA256SUMS.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    _json(target, {"unbound": "payload"})
 
 
 def _rewrite_manifest_for_tamper(package: Path) -> None:
     artifacts = sorted(
         path for path in package.rglob("*")
-        if path.is_file() and path.name not in MANIFEST_EXCLUDED
+        if path.is_file()
+        and path.relative_to(package).as_posix() not in MANIFEST_EXCLUDED
     )
     _json(package / "SHA256SUMS.json", manifest(package, artifacts))
 
@@ -1852,6 +2216,15 @@ def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, An
             target / "training_frame_all.parquet"
         ),
     )
+    _run_attack(
+        "false_terminal_promotion",
+        tamper_false_promotion,
+    )
+    _run_attack(
+        "nested_manifest_name_escape",
+        tamper_nested_manifest_name,
+        re_manifest=False,
+    )
     return results
 
 
@@ -1870,7 +2243,7 @@ __all__ = [
     "verify_handoff_contract", "verify_handoff_paths",
     "verify_holdout_mutation_receipt", "verify_manifest",
     "verify_nk_semantics", "verify_package_schema", "verify_path_metrics",
-    "verify_req_evidence",
+    "verify_req_evidence", "verify_selection_authority",
     "verify_no_2024_issue", "verify_no_embargoed_split",
     "verify_payout_economics", "verify_provenance", "verify_receipt",
     "verify_schema", "verify_state_semantics",

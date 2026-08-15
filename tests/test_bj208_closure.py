@@ -18,8 +18,10 @@ from parlay_policy.replay import (  # noqa: E402
     summarize_path,
 )
 from parlay_policy.verify import (  # noqa: E402
+    manifest,
     verify_chronology,
     verify_dynamic_control_decisions,
+    verify_manifest,
     verify_path_metrics,
 )
 
@@ -151,3 +153,74 @@ def test_dynamic_control_non_argmax_is_rejected():
     failures = verify_dynamic_control_decisions(pd.DataFrame(rows))
     assert any("not score argmax" in item for item in failures)
 
+
+def test_training_and_live_lag_warmup_are_identical():
+    from parlay_policy.features import (
+        live_prior_state_from_rows,
+        prior_bankroll_state,
+    )
+    from parlay_policy.incumbent import incumbent_prior_state
+
+    rows = []
+    for index in range(1, 12):
+        post = 100_000.0 - 10.0 * index
+        rows.append({
+            "split": "CV_2023",
+            "issue": f"23{index:03d}",
+            "policy": "MARKET_WOR",
+            "controller": "NATIVE_2_YUAN",
+            "k": 8,
+            "post_issue_bankroll_yuan": post,
+            "funded_stake_yuan": 10.0,
+            "gross_payout_yuan": 0.0,
+            "net_pnl_yuan": -10.0,
+        })
+    ledger = pd.DataFrame(rows)
+    for prior_count in (1, 4, 5, 9, 10):
+        issue = f"23{prior_count + 1:03d}"
+        live_rows = [
+            {
+                "post_issue_bankroll_yuan": row["post_issue_bankroll_yuan"],
+                "net_pnl_yuan": row["net_pnl_yuan"],
+            }
+            for row in rows[:prior_count]
+        ]
+        live = live_prior_state_from_rows(live_rows)
+        feature = prior_bankroll_state(ledger, "CV_2023", issue)
+        incumbent = incumbent_prior_state(ledger, "CV_2023", issue)
+        for name in (
+            "prior_bankroll_yuan",
+            "prior_trail5_bankroll_yuan",
+            "prior_trail10_bankroll_yuan",
+            "prior_running_drawdown_pct",
+            "prior_consecutive_losses",
+        ):
+            assert getattr(live, name) == getattr(feature, name)
+            assert getattr(live, name) == incumbent[name]
+
+
+def test_nested_manifest_name_is_not_excluded(tmp_path):
+    payload = tmp_path / "payload.txt"
+    payload.write_text("bound", encoding="utf-8")
+    nested = tmp_path / "models" / "SHA256SUMS.json"
+    nested.parent.mkdir()
+    nested.write_text('{"unbound": true}\n', encoding="utf-8")
+    expected = manifest(tmp_path, [payload])
+    failures = verify_manifest(tmp_path, expected)
+    assert any("models/SHA256SUMS.json" in item for item in failures)
+
+
+def test_fitted_payload_accepts_ridge_none_iteration_count():
+    import numpy as np
+    from sklearn.linear_model import Ridge
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    model = make_pipeline(StandardScaler(), Ridge()).fit(
+        np.asarray([[0.0], [1.0], [2.0]]),
+        np.asarray([0.0, 1.0, 2.0]),
+    )
+    payload = runner._stable_model_payload(model)
+    assert payload["estimator_type"] == "Ridge"
+    assert "coef" in payload
+    assert "n_iter" not in payload

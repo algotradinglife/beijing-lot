@@ -8,7 +8,7 @@ bankroll/path state. Outcome fields are excluded by the forbidden-name checker.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
@@ -154,8 +154,12 @@ def prior_bankroll_state(
             prior_consecutive_losses=0,
         )
     bankroll = float(prior.iloc[-1]["post_issue_bankroll_yuan"])
-    trail5 = float(prior.tail(5).iloc[0]["post_issue_bankroll_yuan"])
-    trail10 = float(prior.tail(10).iloc[0]["post_issue_bankroll_yuan"])
+    posts = prior["post_issue_bankroll_yuan"].to_numpy(dtype=float)
+    # A lag-N anchor means exactly N completed issues ago.  Before N
+    # observations exist, the only causal anchor is time-zero capital.  This
+    # is deliberately identical to live_prior_state_from_rows.
+    trail5 = float(posts[-5]) if len(posts) >= 5 else 100_000.0
+    trail10 = float(posts[-10]) if len(posts) >= 10 else 100_000.0
     running_peak = float(
         max(
             100_000.0,

@@ -409,3 +409,34 @@ scientific hypothesis. Output changes are attributable only to D1–D3.
   then checks the fold2 scaler drawdown mean against the FIT training mean.
 - Production tamper suite now includes 23 attacks; `training_state_drawdown_shift`
   is detected by the semantic verifier even after a legal manifest rewrite.
+
+---
+
+## 19. PI takeover v7 closure rows (2026-08-15, concurrent EV REJECTs at feed021a)
+
+Two independent audits bound PR #230 exact HEAD
+`feed021a0a20ea3e08c8c06a5c0a93bfe0e41f79`. Both reproduced the published
+null result and all accepted payout/chronology/capital/recovery evidence, but
+their union exposed five method/evidence boundaries. These rows preserve the
+action catalog, model families, seeds, selection rule and 0.65 ticket payout
+semantics; all scientific output changes are consequences of the causal
+lag-state correction only.
+
+| Row | Action | Scope | Supersedes | Rationale |
+|---|---|---|---|---|
+| #208-30 | supersede | trail5/trail10 use the exact N-issue lag only when N completed issues exist; otherwise they use time-zero ¥100,000 in training, validation, live inference, controls and actual refit; verifier rebuilds this independently | v6 FIT helper used first observed post during warm-up | R7 D1: 27 FIT issue states / 4,536 action rows had training/inference warm-up drift. |
+| #208-31 | supersede | actual-refit payload and published inventory enumerate ranker, primary MLP, Ridge, best-fixed, three restricted MLPs, OOD scaler/threshold, diagnostic MLP and terminal decisions; every numerical fitted object has a separate joblib binding | v6 primary/ranker/fixed/OOD subset receipt | R7 D2: Ridge and three restricted MLPs were outside outcome-isolation evidence. |
+| #208-32 | supersede | production verifier independently rebuilds fold ends/lifts, median, positive folds, rule1-3, eligibility, candidate and drawdown from decisive path primitives; selection, handoff candidate/fallback and fitted model are relation-bound | v6 minimal handoff shape/path verification | R7 D3: a legal re-manifest could forge a +¥999,999 promotion and learned handoff. |
+| #208-33 | supersede | only exact package-relative root `SHA256SUMS.json` is excluded; nested same-name files, unsafe relative paths and symlinks fail closed in producer/verifier/tamper helpers | v6 basename exclusion | R7 D4: `models/SHA256SUMS.json` bypassed full-delivery binding. |
+| #208-34 | supersede | output→backup rename, first fsync, staging→output rename, second fsync, post-verify rollback and backup cleanup are transaction boundaries; faults restore visible last-good and preserve retryable staging | v6 first-fsync outside rollback boundary | R7 D5: first parent-fsync failure hid last-good in an orphan backup. |
+
+### v7 executable evidence contract
+
+- `fitted_object_inventory.json` plus eight terminal model/scaler artifacts
+  bind every fitted numerical object; baseline and mutated actual-refit payloads
+  must be byte-semantic equals and equal the published inventory.
+- `verify_selection_authority` recomputes terminal authority from learned and
+  incumbent path primitives and binds selection to #209 handoff/model state.
+- Tamper suite adds false terminal promotion and nested manifest-name escape.
+- Golden tests span lag warm-up counts 1/4/5/9/10 and first/second parent-fsync
+  failure plus transient backup-cleanup failure.

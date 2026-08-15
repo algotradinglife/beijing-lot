@@ -1,9 +1,42 @@
-# Issue #208 REWORK v4 — same-category sweep evidence (EV §4 mandatory)
+# Issue #208 PI takeover v7 — merged same-category sweep evidence
 
-Contract BJ-UNIFIED-DYNAMIC-N-001 / v6. This document answers the EV REJECT
+Contract BJ-UNIFIED-DYNAMIC-N-001 / v7. This document answers the EV REJECT
 `ea1fc51` requirement: "返工必须提交'同类问题完整排查'声明与证据". Each defect is
 classified, every category is swept across ALL known call sites, and the actual
 checked paths are listed. EV may re-probe any listed call site.
+
+## R7 merged-root declaration
+
+I checked **all path-state semantics points**: `prior_bankroll_state`,
+`incumbent_prior_state`, `live_prior_state_from_rows`, training/validation
+frame construction, primary/Ridge/fixed/restricted scorers, OOD inputs,
+actual-refit and fallback/NO_BET continuation. Exact lag anchors are covered at
+history counts 1/4/5/9/10 and verified by an implementation independent of the
+production feature helpers.
+
+I checked **all fitted-object evidence points**: ticket ranker, primary MLP,
+Ridge, best-fixed key, dynamic-N MLP, dynamic-K MLP, dynamic-N×K MLP, OOD
+scaler/threshold, chronological diagnostic MLP, serialized #209 model and
+terminal decisions. Each numerical object is present in the actual-refit
+baseline/mutated payload, published inventory and a separate joblib artifact;
+best-fixed is additionally rebuilt from training primitives.
+
+I checked **all terminal-authority points**: fold learned/incumbent ends,
+matched lifts, median/worst/positive-fold metrics, rule1-3, eligibility,
+candidate/frozen candidate, handoff candidate/fallback, model metadata,
+fit boundary, report/Wiki and decision receipt. Production verification now
+rebuilds decisive values from path primitives; the exact R7 false-promotion
+attack is a production regression.
+
+I checked **all manifest exclusion points**: runner `_write_manifest`, verifier
+`verify_manifest`, schema JSON inventory and tamper `_rewrite_manifest_for_tamper`.
+Only exact root relative `SHA256SUMS.json` is excluded; nested names, unsafe
+paths and symlinks fail closed.
+
+I checked **all publication transaction points**: output→backup rename, first
+parent fsync, staging→output rename, second parent fsync, post-publication
+verification rollback and backup cleanup. Fault tests prove visible last-good,
+retryable complete staging, no stale backup and immediate retry.
 
 ---
 
