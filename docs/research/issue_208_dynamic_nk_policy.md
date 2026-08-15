@@ -95,7 +95,7 @@ selects. SIMPLE_ACTIVE capital replicates the frozen #207 EQUAL_1PCT exactly
 | static_n5k8 | 99,710.20 | |
 | static_n4k8 | 99,609.10 | |
 | dynamic_n_fixed_k8_lane | 99,609.10 | scorer varies, selected action collapses to N4 |
-| best_fixed_policy | 99,569.54 | safety-gated fixed control |
+| best_fixed_policy | 99,569.54 | best train-fold fixed cell: N4/K8/MARKET_WR/native |
 | dynamic_nk_fixed_generator | 99,559.71 | state-conditioned; N varies, K remains 8 |
 | static_n9k8 | 99,403.42 | |
 | static_n6k8 | 99,387.50 | |
