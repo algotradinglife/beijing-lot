@@ -1,66 +1,85 @@
 feature,dtype,source,timestamp_rule,admissible_use,units,nullability,domain,key_role
-cell_key,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,,primary_key
-issue,str,derived_or_identity,immutable identity or derived at build,development-label,unitless / categorical,non-null,,identity_key
-issue_instance,str,derived_or_identity,immutable identity or derived at build,development-label,unitless / categorical,non-null,,foreign_key
-year,int64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,,foreign_key
-issue_order,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-match_idx,int64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,,identity_key
+cell_key,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,primary_key
+issue,str,derived_or_identity,immutable identity or derived at build,development-label,unitless / categorical,non-null,UNSPECIFIED,identity_key
+issue_instance,str,derived_or_identity,immutable identity or derived at build,development-label,unitless / categorical,non-null,UNSPECIFIED,foreign_key
+year,int64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,foreign_key
+issue_order,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+match_idx,int64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,identity_key
 outcome_code,str,derived_or_identity,immutable identity or derived at build,development-label,unitless / categorical,non-null,3|1|0,identity_key
-role,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,DEVELOPMENT_CV|RETROSPECTIVE_TEST_LOCKED,
-source_grade,str,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,unitless / categorical,non-null,RETROSPECTIVE_PROXY_PCLOSE|RETROSPECTIVE_PROXY,
-market_probability,float64,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,"probability [0,1]",nullable,,
-native_handicap_line,float64,derived_or_identity,immutable identity or derived at build,inference,goals (integer or half-goal),nullable,,
-source_is_pclose,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,,
-source_is_average_eu,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,,
-market_proxy_complete,float64,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,unitless / categorical,non-null,,
-predicted_final_sp_input,float64,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,decimal odds (>1),nullable,,
-cohort,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,development|test|heldout,foreign_key
-feature_cutoff_ts_utc,str,bj203_causal_tensor_v2,immutable identity or derived at build,inference,UTC timestamp,nullable,,
-kickoff_ts_utc,str,bj203_causal_tensor_v2,immutable identity or derived at build,inference,UTC timestamp,nullable,,
-identity_observed_ts_utc,str,bj203_causal_tensor_v2,observed-at from #203 identity (per match),inference,UTC timestamp,nullable,,
-euro_1h_available_ts_utc,str,bj203_causal_tensor_v2,observed-at from #203 identity (per match),inference,UTC timestamp,nullable,,
-predicted_sp_available_ts_utc,str,bj203_causal_tensor_v2,observed-at from #203 identity (per match),inference,UTC timestamp,nullable,,
-identity_timing_status,str,bj203_causal_tensor_v2,immutable identity or derived at build,inference,unitless / categorical,nullable,CUTOFF_BOUND_IDENTITY|RETROSPECTIVE_IDENTITY_ONLY|TIMESTAMPED_IDENTITY_ONLY,
-availability_status,str,bj203_causal_tensor_v2,immutable identity or derived at build,inference,unitless / categorical,nullable,AVAILABLE|UNAVAILABLE,
-devig_euro_probability,float32,bj203_causal_tensor_v2,immutable identity or derived at build,inference,"probability [0,1]",nullable,,
-market_uncertainty,float32,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,dimensionless uncertainty,nullable,,
-_mask_market_probability,bool,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",non-null,,
-Q_BJ_CALIBRATED,object,bj204_gate_a_preoutcome_v5,frozen #204 Gate A v5 causal window (decision-epoch bound),inference,"probability [0,1]",nullable,,
-BJ_LINE_BOUNDARY,float64,bj204_gate_a_preoutcome_v5,frozen #204 Gate A v5 causal window (decision-epoch bound),inference,goals (integer or half-goal),nullable,,
-qbj_source_identity,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,,
-Q_BJ_SP_DEVIG,float64,bj214_decision_epoch_tensor_v1,decision-epoch snapshot_ts_utc <= decision_epoch,inference,"probability [0,1]",nullable,,
-Q_BJ_SP_DEVIG_observed_at_utc,"datetime64[us, UTC]",bj214_decision_epoch_tensor_v1,decision-epoch snapshot_ts_utc <= decision_epoch,inference,"probability [0,1]",nullable,,
-sp_source_identity,str,derived_or_identity,immutable identity or derived at build,inference,decimal odds (>1),non-null,,
-Q_EU_RAW_1X2,object,bj203_devig_euro_probability (+ explicit Poisson translation),immutable identity or derived at build,inference,"probability [0,1]",nullable,,
-Q_EU_RAW_1X2_observed_at_utc,"datetime64[us, UTC]",derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,,
-eu_source_identity,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,,
-Q_EU_BJLINE,object,bj203_devig_euro_probability (+ explicit Poisson translation),immutable identity or derived at build,inference,"probability [0,1]",nullable,,
-eu_bjline_reason,object,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-Q_EU_BJLINE_observed_at_utc,"datetime64[us, UTC]",derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,,
-P_POWER_BJLINE,object,bj180_gate_a_preoutcome_v2,#180 feature_cutoff_ts (own cutoff); compared to decision epoch,inference,"probability [0,1]",nullable,,
-P_POWER_BJLINE_observed_at_utc,"datetime64[us, UTC]",derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,,
-power_source_identity,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,,
-divergence_eu_minus_qbj,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-divergence_power_minus_qbj,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-divergence_eu_logratio,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-divergence_power_logratio,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-divergence_eu_logodds,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-divergence_power_logodds,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-divergence_eu_direction,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-divergence_power_direction,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-divergence_magnitude,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-divergence_eu_power_agreement,object,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-divergence_eu_uncertainty_std,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-divergence_power_uncertainty_std,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,,
-leg_q_times_sp_pre,float64,derived_or_identity,immutable identity or derived at build,inference,decimal odds (>1),nullable,,
-leg_logq_plus_logsp,float64,derived_or_identity,immutable identity or derived at build,inference,decimal odds (>1),nullable,,
-Q_BJ_SP_DEVIG_available,bool,bj214_decision_epoch_tensor_v1,decision-epoch snapshot_ts_utc <= decision_epoch,inference,"probability [0,1]",non-null,,
-Q_BJ_SP_DEVIG_unavailable_reason,str,bj214_decision_epoch_tensor_v1,decision-epoch snapshot_ts_utc <= decision_epoch,inference,"probability [0,1]",nullable,,
-Q_BJ_CALIBRATED_available,bool,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",non-null,,
-Q_BJ_CALIBRATED_unavailable_reason,str,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,,
-Q_EU_RAW_1X2_available,bool,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",non-null,,
-Q_EU_RAW_1X2_unavailable_reason,str,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,,
-Q_EU_BJLINE_available,bool,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",non-null,,
-Q_EU_BJLINE_unavailable_reason,str,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,,
-P_POWER_BJLINE_available,bool,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",non-null,,
-P_POWER_BJLINE_unavailable_reason,str,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,,
+role,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,DEVELOPMENT_CV|RETROSPECTIVE_TEST_LOCKED,NONE
+source_grade,str,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,unitless / categorical,non-null,RETROSPECTIVE_PROXY_PCLOSE|RETROSPECTIVE_PROXY,NONE
+market_probability,float64,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+native_handicap_line,float64,derived_or_identity,immutable identity or derived at build,inference,goals (integer or half-goal),nullable,UNSPECIFIED,NONE
+source_is_pclose,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,NONE
+source_is_average_eu,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,NONE
+market_proxy_complete,float64,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,NONE
+predicted_final_sp_input,float64,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,decimal odds (>1),nullable,UNSPECIFIED,NONE
+bj203_identity_status,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,NONE
+cohort,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,development|test|heldout,foreign_key
+feature_cutoff_ts_utc,str,bj203_causal_tensor_v2,immutable identity or derived at build,inference,UTC timestamp,nullable,UNSPECIFIED,NONE
+kickoff_ts_utc,str,bj203_causal_tensor_v2,immutable identity or derived at build,inference,UTC timestamp,nullable,UNSPECIFIED,NONE
+identity_observed_ts_utc,str,bj203_causal_tensor_v2,observed-at from #203 identity (per match),inference,UTC timestamp,nullable,UNSPECIFIED,NONE
+euro_1h_available_ts_utc,str,bj203_causal_tensor_v2,observed-at from #203 identity (per match),inference,UTC timestamp,nullable,UNSPECIFIED,NONE
+predicted_sp_available_ts_utc,str,bj203_causal_tensor_v2,observed-at from #203 identity (per match),inference,UTC timestamp,nullable,UNSPECIFIED,NONE
+identity_timing_status,str,bj203_causal_tensor_v2,immutable identity or derived at build,inference,unitless / categorical,nullable,CUTOFF_BOUND_IDENTITY|RETROSPECTIVE_IDENTITY_ONLY|TIMESTAMPED_IDENTITY_ONLY,NONE
+availability_status,str,bj203_causal_tensor_v2,immutable identity or derived at build,inference,unitless / categorical,nullable,AVAILABLE|UNAVAILABLE,NONE
+bj203_match_meta_status,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,NONE
+devig_euro_probability,float32,bj203_causal_tensor_v2,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+market_uncertainty,float32,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,dimensionless uncertainty,nullable,UNSPECIFIED,NONE
+_mask_market_probability,bool,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",non-null,UNSPECIFIED,NONE
+Q_BJ_CALIBRATED,object,bj204_gate_a_preoutcome_v5,frozen #204 Gate A v5 causal window (decision-epoch bound),inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+BJ_LINE_BOUNDARY,float64,bj204_gate_a_preoutcome_v5,frozen #204 Gate A v5 causal window (decision-epoch bound),inference,goals (integer or half-goal),nullable,UNSPECIFIED,NONE
+qbj_source_identity,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,NONE
+bj_line_source_identity,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,NONE
+Q_BJ_CALIBRATED_observed_at_utc,"datetime64[ns, UTC]",derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+BJ_LINE_BOUNDARY_observed_at_utc,"datetime64[ns, UTC]",derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+Q_BJ_CALIBRATED_producer_reason,str,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+BJ_LINE_BOUNDARY_producer_reason,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+Q_BJ_SP_DEVIG,object,bj214_decision_epoch_tensor_v1,decision-epoch snapshot_ts_utc <= decision_epoch,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+Q_BJ_SP_DEVIG_observed_at_utc,"datetime64[ns, UTC]",bj214_decision_epoch_tensor_v1,decision-epoch snapshot_ts_utc <= decision_epoch,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+sp_source_identity,str,derived_or_identity,immutable identity or derived at build,inference,decimal odds (>1),non-null,UNSPECIFIED,NONE
+Q_BJ_SP_DEVIG_producer_reason,str,bj214_decision_epoch_tensor_v1,decision-epoch snapshot_ts_utc <= decision_epoch,inference,"probability [0,1]",non-null,UNSPECIFIED,NONE
+Q_EU_RAW_1X2,object,bj203_devig_euro_probability (+ explicit Poisson translation),immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+Q_EU_RAW_1X2_observed_at_utc,"datetime64[ns, UTC]",derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+eu_source_identity,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,NONE
+Q_EU_RAW_1X2_producer_reason,str,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+Q_EU_BJLINE,object,bj203_devig_euro_probability (+ explicit Poisson translation),immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+eu_bjline_reason,object,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+Q_EU_BJLINE_producer_reason,object,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+Q_EU_BJLINE_observed_at_utc,"datetime64[ns, UTC]",derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+P_POWER_BJLINE,object,bj180_gate_a_preoutcome_v2,#180 feature_cutoff_ts (own cutoff); compared to decision epoch,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+P_POWER_BJLINE_observed_at_utc,"datetime64[us, UTC]",derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+power_source_identity,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,NONE
+P_POWER_BJLINE_producer_reason,str,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+Q_BJ_SP_DEVIG_available,bool,bj214_decision_epoch_tensor_v1,decision-epoch snapshot_ts_utc <= decision_epoch,inference,"probability [0,1]",non-null,UNSPECIFIED,NONE
+Q_BJ_SP_DEVIG_unavailable_reason,str,bj214_decision_epoch_tensor_v1,decision-epoch snapshot_ts_utc <= decision_epoch,inference,"probability [0,1]",non-null,UNSPECIFIED,NONE
+Q_BJ_CALIBRATED_available,bool,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",non-null,UNSPECIFIED,NONE
+Q_BJ_CALIBRATED_unavailable_reason,str,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+Q_EU_RAW_1X2_available,bool,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",non-null,UNSPECIFIED,NONE
+Q_EU_RAW_1X2_unavailable_reason,str,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+Q_EU_BJLINE_available,bool,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",non-null,UNSPECIFIED,NONE
+Q_EU_BJLINE_unavailable_reason,str,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",non-null,UNSPECIFIED,NONE
+P_POWER_BJLINE_available,bool,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",non-null,UNSPECIFIED,NONE
+P_POWER_BJLINE_unavailable_reason,str,derived_or_identity,immutable identity or derived at build,inference,"probability [0,1]",nullable,UNSPECIFIED,NONE
+BJ_LINE_BOUNDARY_available,bool,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,NONE
+BJ_LINE_BOUNDARY_unavailable_reason,str,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+predicted_final_sp_input_observed_at_utc,"datetime64[us, UTC]",derived_or_identity,immutable identity or derived at build,inference,decimal odds (>1),nullable,UNSPECIFIED,NONE
+predicted_final_sp_input_available,bool,derived_or_identity,immutable identity or derived at build,inference,decimal odds (>1),non-null,UNSPECIFIED,NONE
+predicted_final_sp_input_unavailable_reason,str,derived_or_identity,immutable identity or derived at build,inference,decimal odds (>1),nullable,UNSPECIFIED,NONE
+market_uncertainty_observed_at_utc,"datetime64[us, UTC]",bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+market_uncertainty_available,bool,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,unitless / categorical,non-null,UNSPECIFIED,NONE
+market_uncertainty_unavailable_reason,str,bj204_gate_a_preoutcome_v5,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_eu_minus_qbj,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_power_minus_qbj,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_eu_logratio,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_power_logratio,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_eu_logodds,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_power_logodds,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_eu_direction,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_power_direction,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_magnitude,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_eu_power_agreement,object,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_eu_uncertainty_std,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+divergence_power_uncertainty_std,float64,derived_or_identity,immutable identity or derived at build,inference,unitless / categorical,nullable,UNSPECIFIED,NONE
+leg_q_times_sp_pre,float64,derived_or_identity,immutable identity or derived at build,inference,decimal odds (>1),nullable,UNSPECIFIED,NONE
+leg_logq_plus_logsp,float64,derived_or_identity,immutable identity or derived at build,inference,decimal odds (>1),nullable,UNSPECIFIED,NONE

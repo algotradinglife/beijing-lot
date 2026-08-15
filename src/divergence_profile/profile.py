@@ -15,8 +15,6 @@ Rework (2026-08-15, class-5 sweep):
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import numpy as np
 import pandas as pd
 
@@ -45,6 +43,14 @@ def _vector_to_columns(
 
 def _match_pairs(frame: pd.DataFrame) -> pd.DataFrame:
     return frame[["issue", "match_idx"]].drop_duplicates()
+
+
+def _causal_mask(frame: pd.DataFrame, representation: str) -> pd.Series:
+    """The sole availability predicate used by every profiling consumer."""
+    name = contract.available_col(representation)
+    if name not in frame.columns:
+        return pd.Series(False, index=frame.index)
+    return frame[name].fillna(False).astype(bool)
 
 
 def census_by_cohort(cells: pd.DataFrame) -> pd.DataFrame:
@@ -105,13 +111,7 @@ def complete_matches_per_n(
     """Fraction of issues with at least N complete matches (Q_BJ available)."""
     if contract.Q_BJ_CALIBRATED not in cells.columns:
         return pd.DataFrame()
-    complete = cells[contract.Q_BJ_CALIBRATED].apply(
-        lambda v: (
-            v is not None
-            and isinstance(v, (list, tuple, np.ndarray))
-            and len(v) == 3
-        )
-    )
+    complete = _causal_mask(cells, contract.Q_BJ_CALIBRATED)
     issue_matches = (
         cells.loc[complete, ["issue", "cohort", "match_idx"]]
         .groupby(["issue", "cohort"])["match_idx"]
@@ -192,15 +192,31 @@ def sp_and_implied_distribution(
 def probability_distribution(
     cells: pd.DataFrame, representation: str
 ) -> pd.DataFrame:
-    if representation not in cells.columns:
-        return pd.DataFrame()
-    exploded = _vector_to_columns(cells, representation)
+    """Per-outcome distribution on causal support, with empty receipts."""
     parts = []
+    causal = _causal_mask(cells, representation)
+    exploded = _vector_to_columns(cells.loc[causal].copy(), representation)
     for code in contract.OUTCOME_CODES:
         column = f"{representation}_{code}"
-        if column not in exploded.columns:
+        values = (
+            pd.to_numeric(exploded[column], errors="coerce").dropna()
+            if column in exploded.columns
+            else pd.Series(dtype=float)
+        )
+        if values.empty:
+            parts.append(
+                pd.DataFrame(
+                    {
+                        "stat": ["count"],
+                        "value": [np.nan],
+                        "representation": [representation],
+                        "outcome": [code],
+                        "n": [0],
+                        "status": ["UNAVAILABLE_NO_CAUSAL_SUPPORT"],
+                    }
+                )
+            )
             continue
-        values = pd.to_numeric(exploded[column], errors="coerce").dropna()
         stats = values.describe(
             percentiles=[0.01, 0.05, 0.25, 0.5, 0.75, 0.95, 0.99]
         ).reset_index()
@@ -208,9 +224,8 @@ def probability_distribution(
         stats["representation"] = representation
         stats["outcome"] = code
         stats["n"] = len(values)
+        stats["status"] = "AVAILABLE"
         parts.append(stats)
-    if not parts:
-        return pd.DataFrame()
     return pd.concat(parts, ignore_index=True)
 
 
@@ -225,7 +240,12 @@ def bj_raw_vs_calibrated_reconciliation(cells: pd.DataFrame) -> pd.DataFrame:
     for code in contract.OUTCOME_CODES:
         a = pd.to_numeric(devig[f"{contract.Q_BJ_SP_DEVIG}_{code}"], errors="coerce")
         b = pd.to_numeric(calib[f"{contract.Q_BJ_CALIBRATED}_{code}"], errors="coerce")
-        both = a.notna() & b.notna()
+        both = (
+            a.notna()
+            & b.notna()
+            & _causal_mask(cells, contract.Q_BJ_SP_DEVIG)
+            & _causal_mask(cells, contract.Q_BJ_CALIBRATED)
+        )
         rows.append(
             {
                 "outcome": code,
@@ -258,7 +278,14 @@ def eu_vs_bj_scatter_table(
     for code in contract.OUTCOME_CODES:
         a = pd.to_numeric(exploded[f"{representation}_{code}"], errors="coerce")
         b = pd.to_numeric(calib[f"{contract.Q_BJ_CALIBRATED}_{code}"], errors="coerce")
-        both = a.notna() & b.notna() & line.notna()
+        both = (
+            a.notna()
+            & b.notna()
+            & line.notna()
+            & _causal_mask(cells, representation)
+            & _causal_mask(cells, contract.Q_BJ_CALIBRATED)
+            & _causal_mask(cells, contract.BJ_LINE_BOUNDARY)
+        )
         table = pd.DataFrame(
             {
                 "outcome": code,
@@ -308,75 +335,64 @@ def divergence_magnitude_tail(
     cells: pd.DataFrame, column: str = "divergence_magnitude"
 ) -> pd.DataFrame:
     """Divergence magnitude distribution and tail-support table."""
+    empty_receipt = pd.DataFrame(
+        [
+            {
+                "quantile": np.nan,
+                "value": np.nan,
+                "field": column,
+                "status": "UNAVAILABLE_NO_CAUSAL_SUPPORT",
+            }
+        ]
+    )
     if column not in cells.columns:
-        return pd.DataFrame()
+        return empty_receipt
     raw = pd.to_numeric(cells[column], errors="coerce").dropna()
     if raw.empty:
-        return pd.DataFrame()
+        return empty_receipt
     quantiles = raw.quantile([0.5, 0.9, 0.95, 0.99, 1.0]).reset_index()
     quantiles.columns = ["quantile", "value"]
     quantiles["field"] = column
+    quantiles["status"] = "AVAILABLE"
     return quantiles
 
 
 def missingness_matrix(cells: pd.DataFrame) -> pd.DataFrame:
-    """Missingness matrix for the probability representations."""
+    """Raw presence and causal availability for every probability source."""
     rows = []
-    for representation in [
-        contract.Q_BJ_SP_DEVIG,
-        contract.Q_BJ_CALIBRATED,
-        contract.Q_EU_RAW_1X2,
-        contract.Q_EU_BJLINE,
-        contract.P_POWER_BJLINE,
-    ]:
-        if representation not in cells.columns:
-            rows.append(
-                {
-                    "representation": representation,
-                    "available": 0,
-                    "missing": len(cells),
-                    "missing_fraction": 1.0,
-                }
-            )
-            continue
-        raw = cells[representation]
-        available = raw.apply(
-            lambda v: (
-                v is not None
-                and isinstance(v, (list, tuple, np.ndarray))
-                and len(v) == 3
-            )
-        ).sum()
+    for representation in contract.PROBABILITY_REPRESENTATIONS:
+        raw = cells.get(representation, pd.Series(index=cells.index, dtype=object))
+        raw_present = int(
+            raw.apply(
+                lambda value: isinstance(value, (list, tuple, np.ndarray))
+                and len(value) == 3
+            ).sum()
+        )
+        causally_available = int(_causal_mask(cells, representation).sum())
         rows.append(
             {
                 "representation": representation,
-                "available": int(available),
-                "missing": int(len(cells) - available),
-                "missing_fraction": float(1.0 - available / len(cells)),
+                "raw_present": raw_present,
+                "causally_available": causally_available,
+                "unavailable": int(len(cells) - causally_available),
+                "unavailable_fraction": (
+                    float(1.0 - causally_available / len(cells)) if len(cells) else 1.0
+                ),
+                "missing_fraction": (
+                    float(1.0 - causally_available / len(cells)) if len(cells) else 1.0
+                ),
             }
         )
     return pd.DataFrame(rows)
 
 
 def intersection_coverage(cells: pd.DataFrame) -> pd.DataFrame:
-    """BJ/EU/POWER/SP intersection coverage."""
-    def _available(name: str) -> pd.Series:
-        raw = cells.get(name)
-        if raw is None:
-            return pd.Series(False, index=cells.index)
-        return raw.apply(
-            lambda v: (
-                v is not None
-                and isinstance(v, (list, tuple, np.ndarray))
-                and len(v) == 3
-            )
-        )
-
+    """BJ/EU/POWER/SP intersection coverage on causal masks only."""
     rows = []
-    qbj = _available(contract.Q_BJ_CALIBRATED)
-    eu = _available(contract.Q_EU_BJLINE)
-    power = _available(contract.P_POWER_BJLINE)
-    sp = _available(contract.Q_BJ_SP_DEVIG)
+    qbj = _causal_mask(cells, contract.Q_BJ_CALIBRATED)
+    eu = _causal_mask(cells, contract.Q_EU_BJLINE)
+    power = _causal_mask(cells, contract.P_POWER_BJLINE)
+    sp = _causal_mask(cells, contract.Q_BJ_SP_DEVIG)
     for name, mask in [
         ("Q_BJ_CALIBRATED", qbj),
         ("Q_BJ_CALIBRATED & Q_EU_BJLINE", qbj & eu),
@@ -426,32 +442,34 @@ def exclusion_summary(ledger: pd.DataFrame) -> pd.DataFrame:
 
 
 def drift_table(cells: pd.DataFrame) -> pd.DataFrame:
-    """Chronological drift: per-year calibration availability + source mix."""
+    """Chronological drift by probability source × year × cohort."""
     rows = []
-    groups = cells.groupby("year", dropna=False)
-    for year, group in groups:
-        if contract.Q_BJ_CALIBRATED in group.columns:
-            qbj_available = group[contract.Q_BJ_CALIBRATED].apply(
-                lambda v: (
-                    v is not None
-                    and isinstance(v, (list, tuple, np.ndarray))
-                    and len(v) == 3
-                )
-            ).mean()
-        else:
-            qbj_available = np.nan
-        if "source_grade" in group.columns:
-            source_mix = group["source_grade"].value_counts().to_dict()
-        else:
-            source_mix = {}
-        rows.append(
-            {
-                "year": year,
-                "cells": len(group),
-                "qbj_available_fraction": qbj_available,
-                "source_mix": source_mix,
-            }
-        )
+    for (year, cohort), group in cells.groupby(["year", "cohort"], dropna=False):
+        for representation in contract.PROBABILITY_REPRESENTATIONS:
+            available = _causal_mask(group, representation)
+            raw = group.get(representation, pd.Series(index=group.index, dtype=object))
+            raw_present = int(
+                raw.apply(
+                    lambda value: isinstance(value, (list, tuple, np.ndarray))
+                    and len(value) == 3
+                ).sum()
+            )
+            rows.append(
+                {
+                    "year": int(year) if pd.notna(year) else np.nan,
+                    "cohort": cohort,
+                    "representation": representation,
+                    "cells": len(group),
+                    "raw_present_cells": raw_present,
+                    "causally_available_cells": int(available.sum()),
+                    "causal_coverage_fraction": float(available.mean()),
+                    "status": (
+                        "AVAILABLE"
+                        if available.any()
+                        else "UNAVAILABLE_NO_CAUSAL_SUPPORT"
+                    ),
+                }
+            )
     return pd.DataFrame(rows)
 
 
@@ -459,125 +477,103 @@ def drift_table(cells: pd.DataFrame) -> pd.DataFrame:
 # Development-only reliability / calibration (REQ-D06, class-5 sweep)
 # ---------------------------------------------------------------------------
 def development_only_calibration(
-    cells: pd.DataFrame, labels: pd.DataFrame, root: Path | None = None
+    cells: pd.DataFrame, labels: pd.DataFrame
 ) -> pd.DataFrame:
-    """Per-source reliability/calibration on development labels (<=2023).
+    """Reliability for every source × outcome × development cohort.
 
-    For each representation with a valid vector on a development cell, bin
-    the cell's own-outcome probability into deciles and compare against the
-    observed outcome frequency from ``result_code``.  Uses only rows whose
-    issue year is <= LABEL_OPEN_MAX_YEAR.
+    ``labels`` is the physical handoff table and already carries authoritative
+    ``cell_key``/``year``.  This function intentionally has no path to private
+    upstream maps.
+    Empty overlaps are first-class rows rather than vanished analyses.
     """
-    if labels is None or labels.empty or contract.Q_BJ_CALIBRATED not in cells.columns:
+    if labels is None or labels.empty:
         return pd.DataFrame()
-    lab = labels.copy()
-    lab["year"] = lab["issue"].astype(str).str[:4].astype(int)
-    lab = lab[lab["year"] <= contract.LABEL_OPEN_MAX_YEAR].copy()
-    # map raw match_id -> match_idx through #203 identity
-    from . import sources as _sources
-
-    root = root or Path(".").resolve()
-    identity = _sources.load_bj203_identity(root)
-    id_map = (
-        identity[["cell_join_key", "issue", "match_idx"]]
-        .drop_duplicates()
-        .set_index("cell_join_key")["match_idx"]
-    )
-    lab["match_idx"] = lab["cell_join_key"].map(id_map)
-    lab = lab[lab["match_idx"].notna()].copy()
-    lab["match_idx"] = lab["match_idx"].astype(int)
-    lab["cell_key"] = (
-        lab["issue"].astype(str)
-        + ":"
-        + lab["match_idx"].astype(str)
-        + ":"
-        + lab["outcome_code"].astype(str)
-    )
-    # result_code is the native 3/1/0 outcome
-    lab["outcome_matched"] = (
-        lab["result_code"].astype(str).str.strip() == lab["outcome_code"].astype(str).str.strip()
-    )
-
-    exploded = _vector_to_columns(cells, contract.Q_BJ_CALIBRATED)
-    exploded["cell_key"] = (
-        exploded["issue"].astype(str)
-        + ":"
-        + exploded["match_idx"].astype(str)
-        + ":"
-        + exploded["outcome_code"].astype(str)
-    )
-    calib_col = f"{contract.Q_BJ_CALIBRATED}_{'3'}"
-    # build one row per (cell_key, outcome) probability of the cell's own outcome
-    own_prob = exploded.apply(
-        lambda r: (
-            float(r[f"{contract.Q_BJ_CALIBRATED}_{r['outcome_code']}"])
-            if pd.notna(r[f"{contract.Q_BJ_CALIBRATED}_{'3'}"])
-            and r["outcome_code"] in contract.OUTCOME_CODES
-            else np.nan
-        ),
-        axis=1,
-    )
-    exploded["own_probability"] = own_prob
-
-    merged = lab.merge(
-        exploded[["cell_key", "own_probability"]], on="cell_key", how="left"
-    )
-    merged = merged[merged["own_probability"].notna()].copy()
-    if merged.empty:
-        return pd.DataFrame()
-
-    merged["decile"] = pd.qcut(
-        merged["own_probability"], 10, labels=False, duplicates="drop"
-    )
-    table = (
-        merged.groupby("decile", dropna=False)
-        .agg(
-            n=("outcome_matched", "size"),
-            observed_freq=("outcome_matched", "mean"),
-            mean_prob=("own_probability", "mean"),
+    required = {"cell_key", "year", "outcome_code"}
+    if not required.issubset(labels.columns):
+        raise ValueError(f"development labels missing package keys: {sorted(required - set(labels.columns))}")
+    lab = labels[labels["year"].astype(int) <= contract.LABEL_OPEN_MAX_YEAR].copy()
+    if "is_winner" not in lab.columns:
+        if "result_code" not in lab.columns:
+            raise ValueError("development labels require is_winner or result_code")
+        lab["is_winner"] = (
+            lab["result_code"].astype(str).str.strip()
+            == lab["outcome_code"].astype(str).str.strip()
         )
-        .reset_index()
-    )
-    table["reliability_gap"] = table["observed_freq"] - table["mean_prob"]
-    return table
+    cohorts = sorted(cells.get("cohort", pd.Series(["development"])).dropna().astype(str).unique())
+    cohorts = [cohort for cohort in cohorts if cohort == "development"] or ["development"]
+    rows: list[dict[str, object]] = []
+    for representation in contract.PROBABILITY_REPRESENTATIONS:
+        available = _causal_mask(cells, representation)
+        sub_cells = cells.loc[available].copy()
+        for cohort in cohorts:
+            cohort_cells = sub_cells[sub_cells.get("cohort", "development") == cohort]
+            for outcome in contract.OUTCOME_CODES:
+                outcome_cells = cohort_cells[
+                    cohort_cells["outcome_code"].astype(str) == outcome
+                ].copy()
+                if outcome_cells.empty:
+                    merged = pd.DataFrame()
+                else:
+                    outcome_cells["probability"] = outcome_cells[representation].apply(
+                        lambda value: float(value[contract.OUTCOME_ORDER[outcome]])
+                        if isinstance(value, (list, tuple, np.ndarray)) and len(value) == 3
+                        else np.nan
+                    )
+                    merged = outcome_cells[["cell_key", "probability"]].merge(
+                        lab[["cell_key", "is_winner"]], on="cell_key", how="inner", validate="one_to_one"
+                    ).dropna(subset=["probability"])
+                if merged.empty:
+                    rows.append(
+                        {
+                            "representation": representation,
+                            "outcome": outcome,
+                            "cohort": cohort,
+                            "year_namespace": "through_2023",
+                            "bin": np.nan,
+                            "n": 0,
+                            "observed_freq": np.nan,
+                            "mean_prob": np.nan,
+                            "reliability_gap": np.nan,
+                            "status": "UNAVAILABLE_NO_CAUSAL_LABEL_OVERLAP",
+                        }
+                    )
+                    continue
+                merged["bin"] = pd.cut(
+                    merged["probability"], bins=np.linspace(0.0, 1.0, 11),
+                    labels=False, include_lowest=True
+                )
+                grouped = merged.groupby("bin", dropna=False).agg(
+                    n=("is_winner", "size"),
+                    observed_freq=("is_winner", "mean"),
+                    mean_prob=("probability", "mean"),
+                ).reset_index()
+                grouped["reliability_gap"] = grouped["observed_freq"] - grouped["mean_prob"]
+                for record in grouped.to_dict("records"):
+                    rows.append(
+                        {
+                            "representation": representation,
+                            "outcome": outcome,
+                            "cohort": cohort,
+                            "year_namespace": "through_2023",
+                            **record,
+                            "status": "AVAILABLE",
+                        }
+                    )
+    return pd.DataFrame(rows)
 
 
 def predicted_sp_vs_settlement_sp(
-    cells: pd.DataFrame, labels: pd.DataFrame, root: Path | None = None
+    cells: pd.DataFrame, labels: pd.DataFrame
 ) -> pd.DataFrame:
     """Predicted-SP vs settlement-SP diagnostics on development labels only."""
     if labels is None or labels.empty:
         return pd.DataFrame()
-    lab = labels.copy()
-    lab["year"] = lab["issue"].astype(str).str[:4].astype(int)
-    lab = lab[lab["year"] <= contract.LABEL_OPEN_MAX_YEAR].copy()
-    from . import sources as _sources
-
-    root = root or Path(".").resolve()
-    identity = _sources.load_bj203_identity(root)
-    id_map = (
-        identity[["cell_join_key", "issue", "match_idx"]]
-        .drop_duplicates()
-        .set_index("cell_join_key")["match_idx"]
-    )
-    lab["match_idx"] = lab["cell_join_key"].map(id_map)
-    lab = lab[lab["match_idx"].notna()].copy()
-    lab["match_idx"] = lab["match_idx"].astype(int)
-    lab["cell_key"] = (
-        lab["issue"].astype(str)
-        + ":"
-        + lab["match_idx"].astype(str)
-        + ":"
-        + lab["outcome_code"].astype(str)
-    )
+    if not {"cell_key", "year"}.issubset(labels.columns):
+        raise ValueError("development labels require physical cell_key and authoritative year")
+    lab = labels[labels["year"].astype(int) <= contract.LABEL_OPEN_MAX_YEAR].copy()
     cells2 = cells.copy()
-    cells2["cell_key"] = (
-        cells2["issue"].astype(str)
-        + ":"
-        + cells2["match_idx"].astype(str)
-        + ":"
-        + cells2["outcome_code"].astype(str)
-    )
+    if contract.available_col("predicted_final_sp_input") in cells2.columns:
+        cells2 = cells2[cells2[contract.available_col("predicted_final_sp_input")].fillna(False)]
     merged = lab.merge(
         cells2[["cell_key", "predicted_final_sp_input"]], on="cell_key", how="left"
     )
@@ -619,3 +615,22 @@ def outlier_heavy_tail_table(dq10: pd.DataFrame) -> pd.DataFrame:
             {"field": [], "reason_code": [], "detail": []}
         )
     return dq10.copy()
+
+
+def chart_source_mapping() -> pd.DataFrame:
+    """Machine-readable lineage from each committed chart to its source table."""
+    return pd.DataFrame(
+        [
+            ("prob_dist_Q_BJ_CALIBRATED.png", "tables/probability_distribution_qbj_calibrated.csv", "Q_BJ_CALIBRATED"),
+            ("eu_vs_bj_scatter.png", "tables/eu_vs_bj_scatter_table.csv", "Q_EU_BJLINE & Q_BJ_CALIBRATED"),
+            ("power_vs_bj_scatter.png", "tables/power_vs_bj_scatter_table.csv", "P_POWER_BJLINE & Q_BJ_CALIBRATED"),
+            ("direction_agreement.png", "tables/direction_agreement_matrix.csv", "causal divergence directions"),
+            ("divergence_tail.png", "tables/divergence_magnitude_tail.csv", "causal divergence magnitude"),
+            ("missingness_matrix.png", "tables/missingness_matrix.csv", "causal availability masks"),
+            ("drift.png", "tables/drift_table.csv", "all probability representations"),
+            ("intersection_coverage.png", "tables/intersection_coverage.csv", "causal support intersections"),
+            ("development_only_calibration.png", "tables/development_only_calibration.csv", "all sources × outcomes × cohort"),
+            ("predicted_sp_vs_settlement_sp.png", "tables/predicted_sp_vs_settlement_sp.csv", "causal predicted SP × development labels"),
+        ],
+        columns=["figure", "source_table", "scope"],
+    ).assign(status="BOUND")

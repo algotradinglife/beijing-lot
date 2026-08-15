@@ -54,6 +54,23 @@ DIVERGENCE_POWER_UNCERTAINTY_STD = "divergence_power_uncertainty_std"
 LEG_Q_TIMES_SP_PRE = "leg_q_times_sp_pre"
 LEG_LOGQ_PLUS_LOGSP = "leg_logq_plus_logsp"
 
+OUTPUT_COLUMNS = (
+    DIVERGENCE_EU_BJ,
+    DIVERGENCE_POWER_BJ,
+    DIVERGENCE_EU_LOGRATIO,
+    DIVERGENCE_POWER_LOGRATIO,
+    DIVERGENCE_EU_LOGOODS,
+    DIVERGENCE_POWER_LOGOODS,
+    DIVERGENCE_EU_DIRECTION,
+    DIVERGENCE_POWER_DIRECTION,
+    DIVERGENCE_MAGNITUDE,
+    DIVERGENCE_AGREEMENT,
+    DIVERGENCE_EU_UNCERTAINTY_STD,
+    DIVERGENCE_POWER_UNCERTAINTY_STD,
+    LEG_Q_TIMES_SP_PRE,
+    LEG_LOGQ_PLUS_LOGSP,
+)
+
 # Outcome component index of a row given its outcome_code.
 def _outcome_index(row: pd.Series) -> int | None:
     code = str(row.get("outcome_code"))
@@ -63,6 +80,11 @@ def _outcome_index(row: pd.Series) -> int | None:
 
 
 def _vector_value(row: pd.Series, column: str) -> np.ndarray | None:
+    # No raw-presence fallback: every consumer must see the published causal
+    # mask.  Missing masks are unavailable and are rejected by the handoff
+    # validator as a schema defect.
+    if not bool(row.get(contract.available_col(column), False)):
+        return None
     raw = row.get(column)
     if raw is None:
         return None
@@ -163,12 +185,12 @@ def build_divergence_features(
     eu_vectors = [None] * len(out)
     power_vectors = [None] * len(out)
 
-    for index, row in out.iterrows():
-        anchor_vectors[index] = _vector_value(row, anchor)
+    for position, (_, row) in enumerate(out.iterrows()):
+        anchor_vectors[position] = _vector_value(row, anchor)
         if eu_raw is not None:
-            eu_vectors[index] = _vector_value(row, contract.Q_EU_BJLINE)
+            eu_vectors[position] = _vector_value(row, contract.Q_EU_BJLINE)
         if power_raw is not None:
-            power_vectors[index] = _vector_value(row, contract.P_POWER_BJLINE)
+            power_vectors[position] = _vector_value(row, contract.P_POWER_BJLINE)
 
     for index in range(len(out)):
         a = anchor_vectors[index]
@@ -210,7 +232,9 @@ def build_divergence_features(
             if lo is not None and la is not None:
                 out.at[index, DIVERGENCE_EU_LOGOODS] = lo - la
             # uncertainty-standardized divergence (per-cell Q vs anchor)
-            if uncertainty_raw is not None:
+            if uncertainty_raw is not None and bool(
+                row.get(contract.available_col(uncertainty_column), False)
+            ):
                 unc = row.get(uncertainty_column)
                 if unc is not None and np.isfinite(unc) and float(unc) > 0:
                     out.at[index, DIVERGENCE_EU_UNCERTAINTY_STD] = (
@@ -238,7 +262,9 @@ def build_divergence_features(
             la = _logit(float(a[oidx]))
             if lp is not None and la is not None:
                 out.at[index, DIVERGENCE_POWER_LOGOODS] = lp - la
-            if uncertainty_raw is not None:
+            if uncertainty_raw is not None and bool(
+                row.get(contract.available_col(uncertainty_column), False)
+            ):
                 unc = row.get(uncertainty_column)
                 if unc is not None and np.isfinite(unc) and float(unc) > 0:
                     out.at[index, DIVERGENCE_POWER_UNCERTAINTY_STD] = (
@@ -263,7 +289,12 @@ def build_divergence_features(
         sp_pre = None
         if sp_pre_raw is not None:
             sp_pre = sp_pre_raw.iloc[index]
-        if sp_pre is not None and np.isfinite(sp_pre) and sp_pre > 1:
+        if (
+            bool(row.get(contract.available_col(sp_pre_column), False))
+            and sp_pre is not None
+            and np.isfinite(sp_pre)
+            and sp_pre > 1
+        ):
             q_own = float(a[oidx])
             if q_own > 0:
                 out.at[index, LEG_Q_TIMES_SP_PRE] = q_own * float(sp_pre)
@@ -277,19 +308,13 @@ def build_divergence_features(
 def coverage_strata(frame: pd.DataFrame) -> pd.DataFrame:
     """Build the source-coverage stratum table: availability per source."""
     rows = []
-    representations = [
-        contract.Q_BJ_SP_DEVIG,
-        contract.Q_BJ_CALIBRATED,
-        contract.Q_EU_RAW_1X2,
-        contract.Q_EU_BJLINE,
-        contract.P_POWER_BJLINE,
-    ]
+    representations = contract.PROBABILITY_REPRESENTATIONS
     total = len(frame)
     for representation in representations:
         raw = frame.get(representation)
-        available = 0
+        raw_present = 0
         if raw is not None:
-            available = int(
+            raw_present = int(
                 raw.apply(
                     lambda value: (
                         value is not None
@@ -298,12 +323,20 @@ def coverage_strata(frame: pd.DataFrame) -> pd.DataFrame:
                     )
                 ).sum()
             )
+        available_name = contract.available_col(representation)
+        causally_available = int(
+            frame.get(available_name, pd.Series(False, index=frame.index))
+            .fillna(False)
+            .astype(bool)
+            .sum()
+        )
         rows.append(
             {
                 "representation": representation,
-                "available_cells": available,
+                "raw_present_cells": raw_present,
+                "causally_available_cells": causally_available,
                 "total_cells": total,
-                "coverage_fraction": available / total if total else 0.0,
+                "causal_coverage_fraction": causally_available / total if total else 0.0,
             }
         )
     return pd.DataFrame(rows)

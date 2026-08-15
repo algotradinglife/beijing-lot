@@ -27,11 +27,20 @@ def _is_vector(value: object) -> bool:
     return isinstance(value, (list, tuple, np.ndarray)) and len(value) == 3
 
 
-def _available_mask(cells: pd.DataFrame, representation: str) -> pd.Series:
+def _raw_present_mask(cells: pd.DataFrame, representation: str) -> pd.Series:
     raw = cells.get(representation)
     if raw is None:
         return pd.Series(False, index=cells.index)
+    if representation == contract.BJ_LINE_BOUNDARY:
+        return pd.to_numeric(raw, errors="coerce").notna()
     return raw.apply(_is_vector)
+
+
+def _available_mask(cells: pd.DataFrame, representation: str) -> pd.Series:
+    name = contract.available_col(representation)
+    if name not in cells.columns:
+        return pd.Series(False, index=cells.index)
+    return cells[name].fillna(False).astype(bool)
 
 
 # ---------------------------------------------------------------------------
@@ -277,20 +286,15 @@ def dq09_support_drift(cells: pd.DataFrame) -> pd.DataFrame:
     """Table of per-year coverage so drift is observable (not an exclusion)."""
     if contract.BJ_LINE_BOUNDARY not in cells.columns:
         return pd.DataFrame()
+    cells = cells.copy()
+    cells[contract.available_col(contract.Q_BJ_CALIBRATED)] = _available_mask(
+        cells, contract.Q_BJ_CALIBRATED
+    )
     table = (
         cells.groupby("year")
         .agg(
             total_cells=("cell_key", "size"),
-            calibrated_available=(
-                contract.Q_BJ_CALIBRATED,
-                lambda s: s.apply(
-                    lambda v: (
-                        v is not None
-                        and isinstance(v, (list, tuple, np.ndarray))
-                        and len(v) == 3
-                    )
-                ).sum(),
-            ),
+            calibrated_available=(contract.available_col(contract.Q_BJ_CALIBRATED), "sum"),
         )
         .reset_index()
     )
@@ -394,7 +398,6 @@ def dq11_matched_support_loss(cells: pd.DataFrame) -> pd.DataFrame:
 _PAYOUT_NAME_TOKENS = (
     "payout",
     "winning_zero_return",
-    "settlement",
     "tax_",
     "65",
     "0_65",
@@ -486,14 +489,7 @@ def causal_eligibility(cells: pd.DataFrame) -> pd.DataFrame:
     per-feature observed_at columns vs the decision epoch.  Post-decision
     matches are excluded everywhere (REQ-D01 fail closed).
     """
-    rows = []
-    representations = [
-        contract.Q_BJ_SP_DEVIG,
-        contract.Q_BJ_CALIBRATED,
-        contract.Q_EU_RAW_1X2,
-        contract.Q_EU_BJLINE,
-        contract.P_POWER_BJLINE,
-    ]
+    representations = contract.CAUSAL_REPRESENTATIONS
     epoch = pd.to_datetime(
         cells.get(contract.DECISION_EPOCH_COLUMN), errors="coerce", utc=True
     )
@@ -512,7 +508,7 @@ def causal_eligibility(cells: pd.DataFrame) -> pd.DataFrame:
             if observed_col is not None
             else pd.Series(pd.NaT, index=cells.index)
         )
-        present = _available_mask(cells, representation).to_numpy()
+        present = _raw_present_mask(cells, representation).to_numpy()
         post_arr = post_decision.to_numpy()
         epoch_arr = epoch.to_numpy()
         observed_arr = observed.to_numpy()
@@ -521,7 +517,12 @@ def causal_eligibility(cells: pd.DataFrame) -> pd.DataFrame:
                 reason = contract.REASON_POST_DECISION_OBSERVATION
                 available = False
             elif not bool(present[i]):
-                reason = None
+                producer_name = contract.producer_reason_col(representation)
+                reason = (
+                    cells.iloc[i].get(producer_name)
+                    if producer_name in cells.columns
+                    else None
+                )
                 available = False
             elif pd.isna(observed_arr[i]) or pd.isna(epoch_arr[i]):
                 reason = contract.REASON_NO_CAUSAL_EPOCH
@@ -534,12 +535,33 @@ def causal_eligibility(cells: pd.DataFrame) -> pd.DataFrame:
                 available = True
             output_rows.append(
                 {
+                    "cell_key": cells.iloc[i].get("cell_key"),
+                    "issue": cells.iloc[i].get("issue"),
+                    "match_idx": cells.iloc[i].get("match_idx"),
+                    "outcome_code": cells.iloc[i].get("outcome_code"),
                     "representation": representation,
                     "available": available,
                     "unavailable_reason": reason,
                 }
             )
     return pd.DataFrame(output_rows)
+
+
+def apply_causal_availability(cells: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Publish every causal mask/reason on the cell frame by stable cell key."""
+    out = cells.copy()
+    causal = causal_eligibility(out)
+    if causal.duplicated(["cell_key", "representation"]).any():
+        raise ValueError("causal eligibility produced duplicate cell/representation rows")
+    for representation in contract.CAUSAL_REPRESENTATIONS:
+        sub = causal[causal["representation"] == representation].set_index("cell_key")
+        keys = out["cell_key"].astype(str)
+        if not set(keys).issubset(set(sub.index.astype(str))):
+            raise ValueError(f"causal eligibility missing cells for {representation}")
+        sub.index = sub.index.astype(str)
+        out[contract.available_col(representation)] = keys.map(sub["available"]).astype(bool)
+        out[contract.reason_col(representation)] = keys.map(sub["unavailable_reason"])
+    return out, causal
 
 
 def run_all_checks(cells: pd.DataFrame) -> dict[str, pd.DataFrame]:

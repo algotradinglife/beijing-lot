@@ -3,14 +3,5 @@ native_handicap_line,OUTLIER_REFERENCE,outliers(|z|>5)=12 kurtosis=1.41 heavy_ta
 market_proxy_complete,OUTLIER_REFERENCE,outliers(|z|>5)=3714 kurtosis=91.32 heavy_tail=True
 predicted_final_sp_input,OUTLIER_REFERENCE,outliers(|z|>5)=98 kurtosis=457.13 heavy_tail=True
 BJ_LINE_BOUNDARY,OUTLIER_REFERENCE,outliers(|z|>5)=12 kurtosis=1.41 heavy_tail=False
-divergence_power_minus_qbj,OUTLIER_REFERENCE,outliers(|z|>5)=1 kurtosis=1.26 heavy_tail=False
-divergence_power_logratio,OUTLIER_REFERENCE,outliers(|z|>5)=1 kurtosis=1.27 heavy_tail=False
-leg_q_times_sp_pre,OUTLIER_REFERENCE,outliers(|z|>5)=39 kurtosis=4.98 heavy_tail=False
-leg_logq_plus_logsp,OUTLIER_REFERENCE,outliers(|z|>5)=42 kurtosis=5.23 heavy_tail=False
 native_handicap_line~BJ_LINE_BOUNDARY,OUTLIER_REFERENCE,high redundancy |r|=1.0000
 source_is_pclose~source_is_average_eu,OUTLIER_REFERENCE,high redundancy |r|=-1.0000
-divergence_power_minus_qbj~divergence_power_logratio,OUTLIER_REFERENCE,high redundancy |r|=0.9907
-divergence_power_minus_qbj~divergence_power_logodds,OUTLIER_REFERENCE,high redundancy |r|=0.9913
-divergence_power_minus_qbj~divergence_power_uncertainty_std,OUTLIER_REFERENCE,high redundancy |r|=0.9951
-divergence_power_logratio~divergence_power_logodds,OUTLIER_REFERENCE,high redundancy |r|=0.9912
-divergence_power_logratio~divergence_power_uncertainty_std,OUTLIER_REFERENCE,high redundancy |r|=0.9902

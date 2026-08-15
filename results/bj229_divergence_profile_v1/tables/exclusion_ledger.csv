@@ -71960,32 +71960,23 @@ DQ04_invalid_handicap_result_mapping,25042,390.0,MISSING_NATIVE_LINE,native hand
 DQ04_invalid_handicap_result_mapping,25042,438.0,MISSING_NATIVE_LINE,native handicap line missing,,,,,,,,
 DQ04_invalid_handicap_result_mapping,25042,438.0,MISSING_NATIVE_LINE,native handicap line missing,,,,,,,,
 DQ04_invalid_handicap_result_mapping,25042,438.0,MISSING_NATIVE_LINE,native handicap line missing,,,,,,,,
-DQ09_support_drift,,,,,2019.0,53082.0,52695.0,0.9927093930145812,,,,
-DQ09_support_drift,,,,,2020.0,36099.0,35445.0,0.9818831546580238,,,,
-DQ09_support_drift,,,,,2021.0,56643.0,55872.0,0.9863884328160585,,,,
-DQ09_support_drift,,,,,2022.0,50361.0,49737.0,0.987609459700959,,,,
-DQ09_support_drift,,,,,2023.0,47277.0,46785.0,0.9895932483025572,,,,
-DQ09_support_drift,,,,,2024.0,48708.0,48171.0,0.9889751170238975,,,,
-DQ09_support_drift,,,,,2025.0,48711.0,48480.0,0.9952577446572642,,,,
-DQ09_support_drift,,,,,2026.0,16824.0,16806.0,0.9989300998573466,,,,
+DQ09_support_drift,,,,,2019.0,53082.0,0.0,0.0,,,,
+DQ09_support_drift,,,,,2020.0,36099.0,0.0,0.0,,,,
+DQ09_support_drift,,,,,2021.0,56643.0,0.0,0.0,,,,
+DQ09_support_drift,,,,,2022.0,50361.0,0.0,0.0,,,,
+DQ09_support_drift,,,,,2023.0,47277.0,0.0,0.0,,,,
+DQ09_support_drift,,,,,2024.0,48708.0,0.0,0.0,,,,
+DQ09_support_drift,,,,,2025.0,48711.0,0.0,0.0,,,,
+DQ09_support_drift,,,,,2026.0,16824.0,228.0,0.01355206847360913,,,,
 DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,outliers(|z|>5)=12 kurtosis=1.41 heavy_tail=False,,,,,native_handicap_line,,,
 DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,outliers(|z|>5)=3714 kurtosis=91.32 heavy_tail=True,,,,,market_proxy_complete,,,
 DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,outliers(|z|>5)=98 kurtosis=457.13 heavy_tail=True,,,,,predicted_final_sp_input,,,
 DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,outliers(|z|>5)=12 kurtosis=1.41 heavy_tail=False,,,,,BJ_LINE_BOUNDARY,,,
-DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,outliers(|z|>5)=1 kurtosis=1.26 heavy_tail=False,,,,,divergence_power_minus_qbj,,,
-DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,outliers(|z|>5)=1 kurtosis=1.27 heavy_tail=False,,,,,divergence_power_logratio,,,
-DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,outliers(|z|>5)=39 kurtosis=4.98 heavy_tail=False,,,,,leg_q_times_sp_pre,,,
-DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,outliers(|z|>5)=42 kurtosis=5.23 heavy_tail=False,,,,,leg_logq_plus_logsp,,,
 DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,high redundancy |r|=1.0000,,,,,native_handicap_line~BJ_LINE_BOUNDARY,,,
 DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,high redundancy |r|=-1.0000,,,,,source_is_pclose~source_is_average_eu,,,
-DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,high redundancy |r|=0.9907,,,,,divergence_power_minus_qbj~divergence_power_logratio,,,
-DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,high redundancy |r|=0.9913,,,,,divergence_power_minus_qbj~divergence_power_logodds,,,
-DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,high redundancy |r|=0.9951,,,,,divergence_power_minus_qbj~divergence_power_uncertainty_std,,,
-DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,high redundancy |r|=0.9912,,,,,divergence_power_logratio~divergence_power_logodds,,,
-DQ10_outlier_constant_fields,,,OUTLIER_REFERENCE,high redundancy |r|=0.9902,,,,,divergence_power_logratio~divergence_power_uncertainty_std,,,
-DQ11_matched_support_loss,,,,,,,,,,Q_BJ_CALIBRATED only,353991.0,0.98961714261752
-DQ11_matched_support_loss,,,,,,,,,,Q_BJ + EU_BJLINE,2976.0,0.008319704784668931
-DQ11_matched_support_loss,,,,,,,,,,Q_BJ + POWER,4674.0,0.013066633119469954
-DQ11_matched_support_loss,,,,,,,,,,Q_BJ + EU + POWER,39.0,0.00010902838931521784
+DQ11_matched_support_loss,,,,,,,,,,Q_BJ_CALIBRATED only,228.0,0.0006373967375351197
+DQ11_matched_support_loss,,,,,,,,,,Q_BJ + EU_BJLINE,0.0,0.0
+DQ11_matched_support_loss,,,,,,,,,,Q_BJ + POWER,0.0,0.0
+DQ11_matched_support_loss,,,,,,,,,,Q_BJ + EU + POWER,0.0,0.0
 DQ11_matched_support_loss,,,,,,,,,,Q_BJ + SP_DEVIG,0.0,0.0
 DQ11_matched_support_loss,,,,,,,,,,Q_BJ + EU + POWER + SP_DEVIG,0.0,0.0

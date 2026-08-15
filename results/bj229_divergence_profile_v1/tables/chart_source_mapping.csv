@@ -1,0 +1,11 @@
+figure,source_table,scope,status
+prob_dist_Q_BJ_CALIBRATED.png,tables/probability_distribution_qbj_calibrated.csv,Q_BJ_CALIBRATED,BOUND
+eu_vs_bj_scatter.png,tables/eu_vs_bj_scatter_table.csv,Q_EU_BJLINE & Q_BJ_CALIBRATED,BOUND
+power_vs_bj_scatter.png,tables/power_vs_bj_scatter_table.csv,P_POWER_BJLINE & Q_BJ_CALIBRATED,BOUND
+direction_agreement.png,tables/direction_agreement_matrix.csv,causal divergence directions,BOUND
+divergence_tail.png,tables/divergence_magnitude_tail.csv,causal divergence magnitude,BOUND
+missingness_matrix.png,tables/missingness_matrix.csv,causal availability masks,BOUND
+drift.png,tables/drift_table.csv,all probability representations,BOUND
+intersection_coverage.png,tables/intersection_coverage.csv,causal support intersections,BOUND
+development_only_calibration.png,tables/development_only_calibration.csv,all sources × outcomes × cohort,BOUND
+predicted_sp_vs_settlement_sp.png,tables/predicted_sp_vs_settlement_sp.csv,causal predicted SP × development labels,BOUND

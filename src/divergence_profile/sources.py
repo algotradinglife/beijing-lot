@@ -42,15 +42,29 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def package_member(package: Path, relative: str | Path) -> Path:
+    """Resolve a manifest/schema member and require package containment."""
+    root = package.resolve()
+    member = Path(relative)
+    if member.is_absolute():
+        raise UpstreamBindingError(f"absolute package member forbidden: {relative}")
+    target = (root / member).resolve()
+    if not target.is_relative_to(root):
+        raise UpstreamBindingError(f"package member escapes root: {relative}")
+    return target
+
+
 def verify_package_hashes(package: Path) -> dict[str, str]:
     """Verify every file listed in SHA256SUMS.json under ``package``."""
     sums_path = package / "SHA256SUMS.json"
     if not sums_path.exists():
         raise UpstreamBindingError(f"missing SHA256SUMS.json in {package}")
     expected = json.loads(sums_path.read_text(encoding="utf-8"))
+    if not isinstance(expected, dict):
+        raise UpstreamBindingError("SHA256SUMS.json must be an object")
     actual: dict[str, str] = {}
     for relative, wanted in expected.items():
-        target = package / relative
+        target = package_member(package, relative)
         if not target.exists():
             raise UpstreamBindingError(f"manifest file missing: {relative}")
         actual[relative] = sha256_file(target)
@@ -68,6 +82,29 @@ def _require_columns(frame: pd.DataFrame, package_name: str, table: str,
     if missing:
         raise UpstreamBindingError(
             f"{package_name} {table} missing columns: {missing}"
+        )
+
+
+def _validate_three_cell_identity(
+    frame: pd.DataFrame, package_name: str, table: str
+) -> None:
+    """Require one 3/1/0 row per issue-match and no duplicate cell identity."""
+    identity = ["issue", "match_idx", "outcome_code"]
+    _require_columns(frame, package_name, table, tuple(identity))
+    if frame.empty:
+        raise UpstreamBindingError(f"{package_name} {table} empty canonical cell axis")
+    if frame.duplicated(identity, keep=False).any():
+        raise UpstreamBindingError(f"{package_name} {table} duplicate source row")
+    outcomes = (
+        frame.assign(outcome_code=frame["outcome_code"].astype(str))
+        .groupby(["issue", "match_idx"])["outcome_code"]
+        .agg(lambda values: frozenset(values))
+    )
+    if not outcomes.map(
+        lambda values: values == frozenset(contract.OUTCOME_CODES)
+    ).all():
+        raise UpstreamBindingError(
+            f"{package_name} {table} partial triplet or invalid outcome domain"
         )
 
 
@@ -114,6 +151,13 @@ def load_bj204_common_cells(root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
                      COMMON_CELL_FEATURES_COLUMNS)
     _require_columns(masks, "bj204", "common_cell_masks",
                      COMMON_CELL_MASKS_COLUMNS)
+    _validate_three_cell_identity(features, "bj204", "common_cell_features")
+    if features["cell_key"].astype(str).duplicated().any():
+        raise UpstreamBindingError("bj204 common_cell_features duplicate cell_key")
+    if masks["cell_key"].astype(str).duplicated().any():
+        raise UpstreamBindingError("bj204 common_cell_masks duplicate cell_key")
+    if set(features["cell_key"].astype(str)) != set(masks["cell_key"].astype(str)):
+        raise UpstreamBindingError("bj204 feature/mask partial key-set mismatch")
     return features, masks
 
 
@@ -177,6 +221,9 @@ def load_bj203_identity(root: Path) -> pd.DataFrame:
         package / "inference/cell_identity.parquet"
     ).to_pandas()
     _require_columns(identity, "bj203", "cell_identity", CELL_IDENTITY_COLUMNS)
+    _validate_three_cell_identity(identity, "bj203", "cell_identity")
+    if identity["cell_join_key"].astype(str).duplicated().any():
+        raise UpstreamBindingError("bj203 cell_identity duplicate cell_join_key")
     return identity
 
 
@@ -194,6 +241,10 @@ def load_bj203_match_meta(root: Path) -> pd.DataFrame:
         raise UpstreamBindingError(
             "#203 identity does not have exactly 3 rows per match"
         )
+    if meta.duplicated(["issue", "match_idx"], keep=False).any():
+        raise UpstreamBindingError(
+            "#203 match metadata is non-constant within a three-cell match"
+        )
     return meta
 
 
@@ -205,6 +256,8 @@ def load_bj203_feature_values(root: Path) -> pd.DataFrame:
         package / "inference/feature_values.parquet"
     ).to_pandas()
     _require_columns(values, "bj203", "feature_values", FEATURE_VALUE_COLUMNS)
+    if values["cell_join_key"].astype(str).duplicated().any():
+        raise UpstreamBindingError("#203 feature_values duplicate source row")
     return values[list(FEATURE_VALUE_COLUMNS)]
 
 
@@ -219,6 +272,8 @@ def load_bj203_labels(root: Path) -> pd.DataFrame:
                if c not in labels.columns]
     if missing:
         raise UpstreamBindingError(f"#203 labels missing columns: {missing}")
+    if labels["cell_join_key"].astype(str).duplicated().any():
+        raise UpstreamBindingError("#203 development_labels duplicate source row")
     return labels[list(contract.DEV_LABEL_INCLUDE_COLUMNS)]
 
 
@@ -248,6 +303,10 @@ def load_bj214_market_observations(root: Path) -> pd.DataFrame:
     ).to_pandas()
     _require_columns(observations, "bj214", "market_observations",
                      MARKET_OBSERVATION_COLUMNS)
+    if observations["id"].astype(str).duplicated().any():
+        raise UpstreamBindingError("#214 duplicate observation id")
+    if observations.duplicated(["match_id", "snapshot_ts_utc"], keep=False).any():
+        raise UpstreamBindingError("#214 duplicate selected source row at one snapshot")
     return observations
 
 
@@ -300,4 +359,9 @@ def load_bj180_match_probabilities(root: Path) -> pd.DataFrame:
     _require_columns(freeze, "bj180", "match_probability_freeze",
                      MATCH_PROBABILITY_FREEZE_COLUMNS)
     freeze["issue"] = freeze["issue"].astype(str)
+    if freeze.duplicated(["issue", "match_idx"], keep=False).any():
+        raise UpstreamBindingError("#180 duplicate source row")
+    # ``match_id`` is #180's opaque database identity.  The published, explicit
+    # issue/match_idx columns are the join contract; never reverse-engineer the
+    # opaque ID into a synthetic issue key.
     return freeze

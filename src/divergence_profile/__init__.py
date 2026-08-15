@@ -15,9 +15,11 @@ package publication.
 from . import contract  # noqa: F401
 from . import divergence  # noqa: F401
 from . import figures  # noqa: F401
+from . import handoff  # noqa: F401
 from . import manifest  # noqa: F401
 from . import probabilities  # noqa: F401
 from . import profile  # noqa: F401
+from . import publication  # noqa: F401
 from . import quality  # noqa: F401
 from . import sources  # noqa: F401
 from .builder import (  # noqa: F401
@@ -28,6 +30,12 @@ from .builder import (  # noqa: F401
     disposition,
     write_package,
 )
+from .handoff import (  # noqa: F401
+    HandoffValidationError,
+    load_causal_inference_cells,
+    load_package,
+    validate_package,
+)
 
 __all__ = [
     "BuildReceipt",
@@ -37,10 +45,16 @@ __all__ = [
     "contract",
     "disposition",
     "divergence",
+    "handoff",
+    "HandoffValidationError",
+    "load_causal_inference_cells",
+    "load_package",
     "manifest",
     "probabilities",
     "profile",
+    "publication",
     "quality",
     "sources",
+    "validate_package",
     "write_package",
 ]

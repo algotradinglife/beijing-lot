@@ -38,6 +38,7 @@ import pandas as pd
 from scipy.optimize import least_squares
 
 from . import contract
+from .sources import UpstreamBindingError
 
 # Independent-Poisson score grid bound (matches research/handicap_draw_projection).
 _MAX_GOALS = 30
@@ -295,6 +296,67 @@ def _broadcast_vector(
     return out
 
 
+def _is_list_vector(value: object) -> bool:
+    return isinstance(value, (list, tuple, np.ndarray)) and len(value) == 3
+
+
+def _parse_observation_keys(observations: pd.DataFrame) -> pd.DataFrame:
+    """Parse ``issue_match`` identity or raise an explicit source error."""
+    if "match_id" not in observations.columns:
+        raise UpstreamBindingError("#214 observation missing match_id")
+    out = observations.copy()
+    parts = out["match_id"].astype(str).str.extract(
+        r"^(?P<_issue>[^_]+)_(?P<_match_idx>\d+)$"
+    )
+    if parts.isna().any().any():
+        raise UpstreamBindingError("#214 unidentifiable match_id source row")
+    out["_issue"] = parts["_issue"].astype(str)
+    out["_match_idx"] = parts["_match_idx"].astype(int)
+    return out
+
+
+def _latest_causal_observations(
+    cells: pd.DataFrame, observations: pd.DataFrame
+) -> pd.DataFrame:
+    """Select the latest #214 snapshot at/before each exact decision epoch."""
+    obs = _parse_observation_keys(observations)
+    obs["_observed"] = pd.to_datetime(
+        obs["snapshot_ts_utc"], errors="raise", utc=True
+    )
+    identity = ["_issue", "_match_idx", "_observed"]
+    if obs.duplicated(identity, keep=False).any():
+        raise UpstreamBindingError("#214 duplicate source row at one snapshot")
+    epoch_col = contract.DECISION_EPOCH_COLUMN
+    epochs = cells[["issue", "match_idx", epoch_col]].copy()
+    epochs["issue"] = epochs["issue"].astype(str)
+    epochs["match_idx"] = epochs["match_idx"].astype(int)
+    epochs[epoch_col] = pd.to_datetime(epochs[epoch_col], errors="coerce", utc=True)
+    consistency = epochs.groupby(["issue", "match_idx"])[epoch_col].nunique(dropna=False)
+    if (consistency > 1).any():
+        raise UpstreamBindingError("cell axis has multiple decision epochs for one match")
+    epochs = epochs.drop_duplicates(["issue", "match_idx"])
+    selected = obs.merge(
+        epochs,
+        left_on=["_issue", "_match_idx"],
+        right_on=["issue", "match_idx"],
+        how="inner",
+        validate="many_to_one",
+    )
+    selected = selected[
+        selected["_observed"].notna()
+        & selected[epoch_col].notna()
+        & selected["_observed"].le(selected[epoch_col])
+    ]
+    if selected.empty:
+        return selected
+    return (
+        selected.sort_values("_observed", kind="stable")
+        .groupby(["_issue", "_match_idx"], as_index=False, sort=False)
+        .tail(1)
+        .reset_index(drop=True)
+    )
+
+
 # ---------------------------------------------------------------------------
 # Representation materialization on the cell frame
 # ---------------------------------------------------------------------------
@@ -339,6 +401,38 @@ def materialize_calibrated_and_line(
             contract.SRC_NONE,
         ),
     )
+    out[contract.SOURCE_IDENTITY_LINE] = out[contract.SOURCE_IDENTITY_Q_BJ]
+
+    # #204 pclose is explicitly graded RETROSPECTIVE_PROXY and its freeze card
+    # says no source timestamp proves a live pre-event capture.  Never invent
+    # one from the decision epoch.  The avg-EU branch does have #203's
+    # euro_1h observed-at and may therefore become causally available.
+    avg_eu = out.get("source_is_average_eu", pd.Series(0, index=out.index)).fillna(0).astype(float).eq(1.0)
+    euro_observed = pd.to_datetime(
+        out.get("euro_1h_available_ts_utc", pd.Series(pd.NaT, index=out.index)),
+        errors="coerce",
+        utc=True,
+    )
+    qbj_observed = pd.Series(pd.NaT, index=out.index, dtype="datetime64[ns, UTC]")
+    qbj_observed.loc[avg_eu] = euro_observed.loc[avg_eu]
+    out[contract.observed_at_col(contract.Q_BJ_CALIBRATED)] = qbj_observed
+    out[contract.observed_at_col(contract.BJ_LINE_BOUNDARY)] = qbj_observed
+
+    grouped_present = out.groupby(["issue", "match_idx"])["market_probability"].transform("count")
+    qbj_present = out[contract.Q_BJ_CALIBRATED].apply(
+        lambda value: isinstance(value, (list, tuple, np.ndarray)) and len(value) == 3
+    )
+    out[contract.producer_reason_col(contract.Q_BJ_CALIBRATED)] = np.where(
+        qbj_present,
+        None,
+        np.where(grouped_present.between(1, 2), contract.REASON_PARTIAL_SOURCE_TRIPLET, contract.REASON_MISSING_CALIBRATED_Q),
+    )
+    line = pd.to_numeric(out[contract.BJ_LINE_BOUNDARY], errors="coerce")
+    out[contract.producer_reason_col(contract.BJ_LINE_BOUNDARY)] = np.where(
+        line.isna(),
+        contract.REASON_MISSING_NATIVE_LINE,
+        np.where(line.map(is_legal_handicap), None, contract.REASON_INVALID_LINE),
+    )
     return out
 
 
@@ -346,76 +440,62 @@ def materialize_sp_devig(
     cells: pd.DataFrame,
     observations: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Join decision-epoch SP observations and compute Q_BJ_SP_DEVIG.
-
-    ``observations`` carries ``match_id`` of the form ``{issue}_{match_idx}``
-    together with ``sp_3/sp_1/sp_0`` and ``snapshot_ts_utc``.  The observed-at
-    of the representation is the snapshot timestamp; the availability mask is
-    derived from ``observed_at <= decision_epoch`` by the builder.
-    """
+    """Bind decision-epoch SP with source trace and explicit partial receipts."""
     out = cells.copy()
-    out[contract.Q_BJ_SP_DEVIG] = np.nan
-    out[contract.observed_at_col(contract.Q_BJ_SP_DEVIG)] = pd.NaT
+    representation = contract.Q_BJ_SP_DEVIG
+    observed_name = contract.observed_at_col(representation)
+    producer_reason = contract.producer_reason_col(representation)
+    out[representation] = pd.Series([np.nan] * len(out), dtype=object)
+    out[observed_name] = pd.Series(pd.NaT, index=out.index, dtype="datetime64[ns, UTC]")
     out[contract.SOURCE_IDENTITY_SP] = contract.SRC_NONE
+    out[producer_reason] = "NO_SP_SOURCE"
     if observations is None or observations.empty:
         return out
 
-    obs = observations.copy()
-    obs["_issue"] = obs["match_id"].astype(str).str.split("_").str[0]
-    obs["_match_idx"] = (
-        obs["match_id"].astype(str).str.split("_").str[1].astype(int)
-    )
+    obs = _latest_causal_observations(out, observations)
     complete = obs[["sp_3", "sp_1", "sp_0"]].notna().all(axis=1)
-    obs = obs[complete].copy()
-    if obs.empty:
-        return out
-
+    partial_keys = set(
+        zip(obs.loc[~complete, "_issue"].astype(str), obs.loc[~complete, "_match_idx"].astype(int))
+    )
     valid: list[dict[str, object]] = []
-    for _, row in obs.iterrows():
+    for _, row in obs.loc[complete].iterrows():
         try:
-            vec = normalize_sp_triplet(
+            vector = normalize_sp_triplet(
                 float(row["sp_3"]), float(row["sp_1"]), float(row["sp_0"])
             )
-            ok, _ = validate_probability_vector(vec)
-            if not ok:
-                continue
+            ok, _ = validate_probability_vector(vector)
+            timestamp = row["_observed"]
+        except (ValueError, TypeError):
+            continue
+        if ok:
             valid.append(
                 {
                     "issue": str(row["_issue"]),
                     "match_idx": int(row["_match_idx"]),
-                    "_v3": vec[0],
-                    "_v1": vec[1],
-                    "_v0": vec[2],
-                    "sp_source_ts": pd.to_datetime(
-                        row["snapshot_ts_utc"], utc=True
-                    ),
+                    "_vector": vector.tolist(),
+                    "_observed": timestamp,
                 }
             )
-        except (ValueError, TypeError):
-            continue
-    if not valid:
-        return out
-    sp_frame = pd.DataFrame(valid)
-    out = out.merge(
-        sp_frame[["issue", "match_idx", "_v3", "_v1", "_v0", "sp_source_ts"]],
-        on=["issue", "match_idx"],
-        how="left",
-    )
-    out[contract.Q_BJ_SP_DEVIG] = out.apply(
-        lambda row: (
-            [row["_v3"], row["_v1"], row["_v0"]]
-            if pd.notna(row["_v3"]) and pd.notna(row["_v1"]) and pd.notna(row["_v0"])
-            else np.nan
-        ),
-        axis=1,
-    )
-    out[contract.observed_at_col(contract.Q_BJ_SP_DEVIG)] = out["sp_source_ts"]
-    out.loc[out[contract.Q_BJ_SP_DEVIG].notna(), contract.SOURCE_IDENTITY_SP] = (
-        contract.SRC_BJ214_OBSERVATION
-    )
-    out = out.drop(
-        columns=["_v3", "_v1", "_v0", "sp_source_ts"], errors="ignore"
-    )
+    if valid:
+        bound = pd.DataFrame(valid)
+        out = out.merge(
+            bound, on=["issue", "match_idx"], how="left", validate="many_to_one"
+        )
+        out[representation] = pd.Series(
+            [value if _is_list_vector(value) else np.nan for value in out["_vector"]],
+            index=out.index,
+            dtype=object,
+        )
+        out[observed_name] = pd.to_datetime(out["_observed"], errors="coerce", utc=True)
+        out = out.drop(columns=["_vector", "_observed"])
+    present = out[representation].apply(_is_list_vector)
+    out.loc[present, contract.SOURCE_IDENTITY_SP] = contract.SRC_BJ214_OBSERVATION
+    out.loc[present, producer_reason] = None
+    keys = list(zip(out["issue"].astype(str), out["match_idx"].astype(int)))
+    out.loc[
+        ~present & pd.Series([key in partial_keys for key in keys], index=out.index),
+        producer_reason,
+    ] = contract.REASON_PARTIAL_SOURCE_TRIPLET
     return out
 
 
@@ -436,97 +516,76 @@ def materialize_eu_raw(
     are used only where neither #203 nor the alias rule applies.
     """
     out = cells.copy()
-    out[contract.Q_EU_RAW_1X2] = np.nan
-    out[contract.observed_at_col(contract.Q_EU_RAW_1X2)] = pd.NaT
+    representation = contract.Q_EU_RAW_1X2
+    observed_name = contract.observed_at_col(representation)
+    producer_reason = contract.producer_reason_col(representation)
+    out[representation] = pd.Series([np.nan] * len(out), dtype=object)
+    out[observed_name] = pd.Series(pd.NaT, index=out.index, dtype="datetime64[ns, UTC]")
     out[contract.SOURCE_IDENTITY_EU] = contract.SRC_NONE
+    out[producer_reason] = contract.REASON_NO_EU_SOURCE
 
-    # Source 1: #203 devig_euro_probability (independent, causally observed).
-    # assemble_cells already merged the scalar onto the cell frame through
-    # #203's hashed cell_join_key; rebuild the per-match vector from it.
+    # Source 1: #203 devig scalar triplets.  Partial triplets remain three
+    # identity rows with an explicit receipt; nothing is silently dropped.
     if "devig_euro_probability" in out.columns:
-        src_mask = out["devig_euro_probability"].notna()
-        out.loc[src_mask, contract.SOURCE_IDENTITY_EU] = (
-            contract.SRC_BJ203_DEVIG_EURO
-        )
-        vector_frame = _per_match_vector(out, "devig_euro_probability")
-        out = _broadcast_vector(out, vector_frame, contract.Q_EU_RAW_1X2)
-        # observed-at of the EU representation is #203 identity's per-match
-        # euro_1h_available_ts_utc (match-level, merged by the builder).
-        if "euro_1h_available_ts_utc" in out.columns:
-            out[contract.observed_at_col(contract.Q_EU_RAW_1X2)] = pd.to_datetime(
-                out["euro_1h_available_ts_utc"], errors="coerce", utc=True
-            )
+        counts = out.groupby(["issue", "match_idx"])["devig_euro_probability"].transform("count")
+        out.loc[counts.between(1, 2), producer_reason] = contract.REASON_PARTIAL_SOURCE_TRIPLET
+        vectors = _per_match_vector(out, "devig_euro_probability")
+        if not vectors.empty:
+            vector_map = {
+                (str(row["issue"]), int(row["match_idx"])): [
+                    float(row["_v3"]), float(row["_v1"]), float(row["_v0"])
+                ]
+                for _, row in vectors.iterrows()
+            }
+            keys = list(zip(out["issue"].astype(str), out["match_idx"].astype(int)))
+            out[representation] = pd.Series([vector_map.get(key, np.nan) for key in keys], index=out.index, dtype=object)
+            has_203 = out[representation].apply(_is_list_vector)
+            out.loc[has_203, contract.SOURCE_IDENTITY_EU] = contract.SRC_BJ203_DEVIG_EURO
+            out.loc[has_203, producer_reason] = None
+            if "euro_1h_available_ts_utc" in out.columns:
+                observed = pd.to_datetime(out["euro_1h_available_ts_utc"], errors="coerce", utc=True)
+                out.loc[has_203, observed_name] = observed.loc[has_203]
 
-    # Source 2: #214 decision-epoch observations (complete EU odds), only
-    # where no #203 devig vector exists for the match.
+    # Source 2: latest causal #214 snapshot per match.
     if observations is not None and not observations.empty:
-        obs = observations.copy()
-        obs["_issue"] = obs["match_id"].astype(str).str.split("_").str[0]
-        obs["_match_idx"] = (
-            obs["match_id"].astype(str).str.split("_").str[1].astype(int)
+        obs = _latest_causal_observations(out, observations)
+        complete = obs[["eu_h", "eu_d", "eu_a"]].notna().all(axis=1)
+        obs_vectors: dict[tuple[str, int], tuple[list[float], pd.Timestamp]] = {}
+        for _, row in obs.loc[complete].iterrows():
+            try:
+                vector = devig_normalize(
+                    np.asarray([row["eu_h"], row["eu_d"], row["eu_a"]], dtype=np.float64)
+                )
+                ok, _ = validate_probability_vector(vector)
+                timestamp = row["_observed"]
+            except (ValueError, TypeError):
+                continue
+            if ok:
+                obs_vectors[(str(row["_issue"]), int(row["_match_idx"]))] = (
+                    vector.tolist(), timestamp
+                )
+
+        keys = list(zip(out["issue"].astype(str), out["match_idx"].astype(int)))
+        current = out[representation].tolist()
+        for position, key in enumerate(keys):
+            if _is_list_vector(current[position]):
+                continue
+            if key in obs_vectors:
+                vector, timestamp = obs_vectors[key]
+                current[position] = vector
+                out.iat[position, out.columns.get_loc(observed_name)] = timestamp
+                out.iat[position, out.columns.get_loc(contract.SOURCE_IDENTITY_EU)] = contract.SRC_BJ214_OBSERVATION
+                out.iat[position, out.columns.get_loc(producer_reason)] = None
+        out[representation] = pd.Series(current, index=out.index, dtype=object)
+
+        partial_keys = set(
+            zip(obs.loc[~complete, "_issue"].astype(str), obs.loc[~complete, "_match_idx"].astype(int))
         )
-        complete_eu = obs[["eu_h", "eu_d", "eu_a"]].notna().all(axis=1)
-        obs = obs[complete_eu].copy()
-        if not obs.empty:
-            obs_vectors: list[dict[str, object]] = []
-            for _, row in obs.iterrows():
-                try:
-                    vec = devig_normalize(
-                        np.asarray(
-                            [float(row["eu_h"]), float(row["eu_d"]), float(row["eu_a"])],
-                            dtype=np.float64,
-                        )
-                    )
-                    ok, _ = validate_probability_vector(vec)
-                    if not ok:
-                        continue
-                    obs_vectors.append(
-                        {
-                            "issue": str(row["_issue"]),
-                            "match_idx": int(row["_match_idx"]),
-                            "_v3": vec[0],
-                            "_v1": vec[1],
-                            "_v0": vec[2],
-                            "eu_source_ts": pd.to_datetime(
-                                row["snapshot_ts_utc"], utc=True
-                            ),
-                        }
-                    )
-                except (ValueError, TypeError):
-                    continue
-            if obs_vectors:
-                obs_frame = pd.DataFrame(obs_vectors)
-                existing = out[
-                    ["issue", "match_idx", contract.Q_EU_RAW_1X2]
-                ].copy()
-                existing["_has"] = existing[contract.Q_EU_RAW_1X2].apply(
-                    lambda v: isinstance(v, (list, tuple, np.ndarray))
-                    and len(v) == 3
-                )
-                fill = existing[~existing["_has"]][["issue", "match_idx"]]
-                to_merge = fill.merge(
-                    obs_frame, on=["issue", "match_idx"], how="inner"
-                )
-                if not to_merge.empty:
-                    out = out.merge(
-                        to_merge[["issue", "match_idx", "_v3", "_v1", "_v0", "eu_source_ts"]],
-                        on=["issue", "match_idx"],
-                        how="left",
-                        suffixes=("", "_obs"),
-                    )
-                    mask = out["_v3"].notna()
-                    out.loc[mask, contract.Q_EU_RAW_1X2] = out.loc[
-                        mask, ["_v3", "_v1", "_v0"]
-                    ].to_numpy().tolist()
-                    out.loc[
-                        mask, contract.observed_at_col(contract.Q_EU_RAW_1X2)
-                    ] = out.loc[mask, "eu_source_ts"]
-                    out.loc[mask, contract.SOURCE_IDENTITY_EU] = (
-                        contract.SRC_BJ214_OBSERVATION
-                    )
-                    out = out.drop(
-                        columns=["_v3", "_v1", "_v0", "eu_source_ts"], errors="ignore"
-                    )
+        no_vector = ~out[representation].apply(_is_list_vector)
+        out.loc[
+            no_vector & pd.Series([key in partial_keys for key in keys], index=out.index),
+            producer_reason,
+        ] = contract.REASON_PARTIAL_SOURCE_TRIPLET
     return out
 
 
@@ -564,6 +623,7 @@ def materialize_eu_bjline(cells: pd.DataFrame) -> pd.DataFrame:
     out = cells.copy()
     out[contract.Q_EU_BJLINE] = np.nan
     out["eu_bjline_reason"] = None
+    out[contract.producer_reason_col(contract.Q_EU_BJLINE)] = contract.REASON_NO_EU_SOURCE
     out[contract.observed_at_col(contract.Q_EU_BJLINE)] = pd.NaT
 
     raw = out.get(contract.Q_EU_RAW_1X2)
@@ -627,9 +687,26 @@ def materialize_eu_bjline(cells: pd.DataFrame) -> pd.DataFrame:
     )
     out[contract.Q_EU_BJLINE] = out["_translated"]
     out["eu_bjline_reason"] = out["_reason"]
-    out[contract.observed_at_col(contract.Q_EU_BJLINE)] = out[
-        contract.observed_at_col(contract.Q_EU_RAW_1X2) + "_src"
-    ]
+    out[contract.producer_reason_col(contract.Q_EU_BJLINE)] = out["_reason"]
+    raw_observed = pd.to_datetime(
+        out[contract.observed_at_col(contract.Q_EU_RAW_1X2) + "_src"],
+        errors="coerce",
+        utc=True,
+    )
+    line_observed = pd.to_datetime(
+        out.get(
+            contract.observed_at_col(contract.BJ_LINE_BOUNDARY),
+            pd.Series(pd.NaT, index=out.index),
+        ),
+        errors="coerce",
+        utc=True,
+    )
+    translated_observed = pd.Series(pd.NaT, index=out.index, dtype="datetime64[ns, UTC]")
+    both_observed = raw_observed.notna() & line_observed.notna()
+    translated_observed.loc[both_observed] = pd.concat(
+        [raw_observed.loc[both_observed], line_observed.loc[both_observed]], axis=1
+    ).max(axis=1)
+    out[contract.observed_at_col(contract.Q_EU_BJLINE)] = translated_observed
     out = out.drop(
         columns=[
             "_translated",
@@ -656,6 +733,8 @@ def materialize_power_bjline(
     out[contract.P_POWER_BJLINE] = np.nan
     out[contract.observed_at_col(contract.P_POWER_BJLINE)] = pd.NaT
     out[contract.SOURCE_IDENTITY_POWER] = contract.SRC_NONE
+    producer_reason = contract.producer_reason_col(contract.P_POWER_BJLINE)
+    out[producer_reason] = "NO_POWER_SOURCE"
     if power_freeze is None or power_freeze.empty:
         return out
     power = power_freeze[
@@ -670,11 +749,21 @@ def materialize_power_bjline(
     ].copy()
     power["issue"] = power["issue"].astype(str)
     power["match_idx"] = power["match_idx"].astype(int)
+    if power.duplicated(["issue", "match_idx"], keep=False).any():
+        raise UpstreamBindingError("#180 duplicate source row for POWER")
     complete = power[
         ["team_primary_p3", "team_primary_p1", "team_primary_p0"]
     ].notna().all(axis=1)
+    partial_keys = set(
+        zip(power.loc[~complete, "issue"], power.loc[~complete, "match_idx"])
+    )
     power = power[complete].copy()
     if power.empty:
+        keys = list(zip(out["issue"].astype(str), out["match_idx"].astype(int)))
+        out.loc[
+            pd.Series([key in partial_keys for key in keys], index=out.index),
+            producer_reason,
+        ] = contract.REASON_PARTIAL_SOURCE_TRIPLET
         return out
     vectors = np.stack(
         [
@@ -705,6 +794,7 @@ def materialize_power_bjline(
         on=["issue", "match_idx"],
         how="left",
         suffixes=("", "_power"),
+        validate="many_to_one",
     )
     out[contract.P_POWER_BJLINE] = out.apply(
         lambda row: (
@@ -722,6 +812,13 @@ def materialize_power_bjline(
     out.loc[
         out[contract.P_POWER_BJLINE].notna(), contract.SOURCE_IDENTITY_POWER
     ] = contract.SRC_BJ180_TEAM_MODEL
+    present = out[contract.P_POWER_BJLINE].apply(_is_list_vector)
+    out.loc[present, producer_reason] = None
+    keys = list(zip(out["issue"].astype(str), out["match_idx"].astype(int)))
+    out.loc[
+        ~present & pd.Series([key in partial_keys for key in keys], index=out.index),
+        producer_reason,
+    ] = contract.REASON_PARTIAL_SOURCE_TRIPLET
     out = out.drop(
         columns=["_v3", "_v1", "_v0", "feature_cutoff_ts"], errors="ignore"
     )

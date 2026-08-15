@@ -12,11 +12,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime, timezone
 from pathlib import Path
 
 from . import contract
-from . import sources
+from . import publication
 
 
 def sha256_file(path: Path) -> str:
@@ -34,9 +33,7 @@ def write_sha256sums(package: Path) -> Path:
         if path.is_file() and path.name != "SHA256SUMS.json":
             sums[path.relative_to(package).as_posix()] = sha256_file(path)
     target = package / "SHA256SUMS.json"
-    target.write_text(
-        json.dumps(sums, indent=2, sort_keys=True), encoding="utf-8"
-    )
+    publication.atomic_write_json(target, sums)
     return target
 
 
@@ -61,21 +58,29 @@ def resolve_package(root: Path, package: str | Path | None) -> Path:
     return root / "results" / candidate
 
 
-def write_replay(package: Path, receipt, root: Path, manifest: dict | None = None) -> Path:
+def write_replay(
+    package: Path,
+    receipt,
+    root: Path,
+    manifest: dict | None = None,
+    *,
+    package_name: str | None = None,
+) -> Path:
     """Write REPLAY.md with exact replay commands + reviewed-SHA binding."""
     payload = manifest or json.loads((package / "MANIFEST.json").read_text())
+    replay_name = package_name or package.name
     reviewed = payload.get("reviewed_commit_sha", "unknown")
     code_hash = payload.get("code_hash", "unknown")
     notebook_hash = payload.get("notebook_hash", "unknown")
     lines = [
-        "# Deterministic replay — " + package.name,
+        "# Deterministic replay — " + replay_name,
         "",
         "Run from the repository root with the pinned existing environment.",
         "",
         "```bash",
         "PY=.venv/bin/python",
-        f"PYTHONPATH=src $PY scripts/build_bj229_divergence_profile.py verify \\",
-        f"  --package {package.name}",
+        "PYTHONPATH=src $PY scripts/build_bj229_divergence_profile.py verify \\",
+        f"  --package {replay_name}",
         "",
         "PYTHONPATH=src $PY scripts/build_bj229_divergence_profile.py build \\",
         "  --force",
@@ -107,9 +112,9 @@ def write_replay(package: Path, receipt, root: Path, manifest: dict | None = Non
         json.dumps(payload.get("environment", {}), indent=2, sort_keys=True),
         "```",
         "",
-        f"Built at {datetime.now(timezone.utc).isoformat()}.",
+        f"Built at {payload.get('built_at_utc', 'unknown')}.",
         "",
     ]
     target = package / "REPLAY.md"
-    target.write_text("\n".join(lines), encoding="utf-8")
+    publication.atomic_write_text(target, "\n".join(lines))
     return target

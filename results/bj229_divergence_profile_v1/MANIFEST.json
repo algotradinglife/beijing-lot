@@ -1,23 +1,80 @@
 {
-  "package": "bj229_divergence_profile_v1",
-  "contract_version": "BJ-UNIFIED-DIVERGENCE-DATA-PROFILE-001/v1",
-  "rework": "REWORK_TYPE=method (2026-08-15 fresh)",
-  "reviewed_commit_sha": "7a1049eda4c08fb38a798877c8924b50dc3d0aaf",
-  "code_hash": "1d53fe6f15ab33dd70a4f12593feca6a34d9d7f17117859d711cf9d494959bd5",
-  "notebook_hash": "4f416fca4c98cc871965d8dd5d0359ac0066d2d8efccf211d9fc13070ef457db",
-  "requirements_hash": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
-  "built_at_utc": "2026-08-15T12:30:00+08:00",
-  "disposition": "READY_WITH_EXPLICIT_LIMITATIONS",
+  "built_at_utc": "2026-08-15T12:40:27+08:00",
+  "causally_available_cells_by_source": {
+    "BJ_LINE_BOUNDARY": 228,
+    "P_POWER_BJLINE": 234,
+    "Q_BJ_CALIBRATED": 228,
+    "Q_BJ_SP_DEVIG": 0,
+    "Q_EU_BJLINE": 0,
+    "Q_EU_RAW_1X2": 2976
+  },
   "cell_count": 357705,
+  "code_hash": "a401e463ebb528daf53133ff76b52b135a400e388f98e2ae18f33d2751f12496",
+  "commit_binding_mode": "github_pr_231_head_plus_content_hashes",
+  "contract_version": "BJ-UNIFIED-DIVERGENCE-DATA-PROFILE-001/v2",
+  "development_label_rows_through_2023": 243462,
+  "disposition": "READY_WITH_EXPLICIT_LIMITATIONS",
+  "environment": {
+    "matplotlib": "3.10.9",
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "pyarrow": "24.0.0",
+    "scikit-learn": "unavailable",
+    "scipy": "1.17.1"
+  },
   "issue_count": 419,
   "match_count": 119235,
-  "upstream_packages": {
-    "bj203": "results/bj203_causal_tensor_v2",
-    "bj204": "results/bj204_gate_a_preoutcome_v5",
-    "bj214": "results/bj214_decision_epoch_tensor_v1",
-    "bj180": "results/bj180_gate_a_preoutcome_v2"
-  },
+  "notebook_hash": "ed456e4995a070f63d373695028504189f17811404ce9804fd902a70cb851a86",
+  "notebook_hash_mode": "semantic_source_cells_v1",
+  "package": "bj229_divergence_profile_v1",
+  "producer_commit_sha": "6d198fb7f8ebd72c8904ad80d928fb045088c8ac",
+  "report_sha256": "bca0c56d1b2396e3d4a84639ef17a8501336fc4da4a5397b49734780b572a2c8",
+  "requirements_hash": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
+  "reviewed_commit_sha": "PR_HEAD",
+  "rework": "REWORK_TYPE=method (2026-08-15 fresh R3)",
+  "schema_sha256": "5e5bce4a47a6c3ceee04f1615e28296dad3ca214fe964685d18ad538b3cd01ed",
+  "sealed_label_namespaces": [
+    {
+      "handoff_rows": 0,
+      "namespace": "2024_labels",
+      "status": "SEALED_NOT_OPENED",
+      "upstream_rows": 48708
+    },
+    {
+      "handoff_rows": 0,
+      "namespace": "2025_plus_labels",
+      "status": "SEALED_NOT_OPENED",
+      "upstream_rows": 11493
+    },
+    {
+      "handoff_rows": 0,
+      "namespace": "2024_plus_labels",
+      "status": "SEALED_NOT_OPENED",
+      "upstream_rows": 60201
+    }
+  ],
   "source_hashes": {
+    "bj180": {
+      "CONTENT_IDENTITY.json": "6a0abe9cb36198dae11a5da06679d22b786cdf49f3619e6e34d7782f29915288",
+      "README.md": "88577fbc17036cc36e1f35d7a43d59bf9ee45de99ff57fd61cecf1c20be09ecd",
+      "arm_registry.csv": "43245208e33868501017dcf6db5f54881d3eb9525d65a429c2f6640264509175",
+      "baseline_reproduction.csv": "4adca754fdae56193b7052639586303d7abd6d60603e397ae1e633e0495120b7",
+      "bj180_team_matchup_core.py": "4d65b08609162644394dfe83e632073ad092b9bfd058dc74368b9ceef4908890",
+      "candidate_universe_scores.csv.gz": "73c99bdd812656a63563566f53c238d916e9221a9f43b7e22ee6f05ede894a10",
+      "completion_embargo_audit.csv": "1692f39aa0460b02ebf1f8615f53c9a294e46b64fd2aec39f6b20b22936438fa",
+      "configuration_registry.csv": "bb02b681371ccf6de1c91b6af4027dd8422e2ae605a74c5fb5a2f877b36e8d9a",
+      "feature_coverage.csv": "c9d2b5ff958528f96f45f1e5d12f631f8438f9cfd725a14a4d1d1cf34e77b891",
+      "feature_manifest.csv": "482ccb127dffcfe73d0cc3d3cb972e78ee47ac873a7645ca98170081bf0aa6df",
+      "freeze_runner.py": "f715dfb3ea976cc311fea6aacf79c648fce0209d79b071cd9233e769978994fc",
+      "gate_a_card.json": "e56ff70ea00ea318506b6146d0224f491a4032ef96b8b6c727f073a656ca29b9",
+      "identity_overlap.csv": "473e648b669ae9de051189a7d069bc08b2e007d3e900aa7c734b1998eab0a817",
+      "issue_cutoff_registry.csv": "e8521e306af6df476abff497d2cc71d28d11202fffc46c4a7c3df6e675143e9f",
+      "match_probability_freeze.csv.gz": "b7f3341c704140cb1565d115e9e35186d644ecc5f8d8e240f41144b8f6eef39d",
+      "outer_year_registry.csv": "7822f94feb75c1a94af390526d8f7f84d226e7ff6fdf64dfd9a64a287723fa0f",
+      "selection_freeze.csv": "8cd4dfd3ba3e85456855ba4d818a8f8c0e7a65fb3c3e09805cd3ef79fa94d31f",
+      "source_binding.json": "8d0832d5e92f391d1f6246155eb4f4eb634d8f556fe1f5611b25a993f0f707c7",
+      "team_state_registry.csv": "fd13dea9e684cfe40bcec514dc863042eef3b52e1d29db8c5f2cfb08edfbfa38"
+    },
     "bj203": {
       "DATA_CARD.md": "cdc6e527f00a05f07c450db97343f9bb4a9e61e8fc348471f7ef00cc0f68e3b8",
       "MANIFEST.json": "52051e510f29194727950a561d16c65ba376bd4b45c4bd1fb09bf9672a975804",
@@ -105,35 +162,12 @@
       "sources/selected_market_observations.parquet": "d1258d9828e795d668e31d0c96bd8dcf574321983e3005b387de93887b3fffb7",
       "sources/source_freeze.json": "36e3ea22197a9dd2ef21f78ed5bc94db068bfac1d8bf508ceaeb45c67936972a",
       "ticket_operability_gate.json": "f3fb1c178b3b2bda24e500bd2a9061e4d31e06b9a4a255e82303d9d1a599aeae"
-    },
-    "bj180": {
-      "CONTENT_IDENTITY.json": "6a0abe9cb36198dae11a5da06679d22b786cdf49f3619e6e34d7782f29915288",
-      "README.md": "88577fbc17036cc36e1f35d7a43d59bf9ee45de99ff57fd61cecf1c20be09ecd",
-      "arm_registry.csv": "43245208e33868501017dcf6db5f54881d3eb9525d65a429c2f6640264509175",
-      "baseline_reproduction.csv": "4adca754fdae56193b7052639586303d7abd6d60603e397ae1e633e0495120b7",
-      "bj180_team_matchup_core.py": "4d65b08609162644394dfe83e632073ad092b9bfd058dc74368b9ceef4908890",
-      "candidate_universe_scores.csv.gz": "73c99bdd812656a63563566f53c238d916e9221a9f43b7e22ee6f05ede894a10",
-      "completion_embargo_audit.csv": "1692f39aa0460b02ebf1f8615f53c9a294e46b64fd2aec39f6b20b22936438fa",
-      "configuration_registry.csv": "bb02b681371ccf6de1c91b6af4027dd8422e2ae605a74c5fb5a2f877b36e8d9a",
-      "feature_coverage.csv": "c9d2b5ff958528f96f45f1e5d12f631f8438f9cfd725a14a4d1d1cf34e77b891",
-      "feature_manifest.csv": "482ccb127dffcfe73d0cc3d3cb972e78ee47ac873a7645ca98170081bf0aa6df",
-      "freeze_runner.py": "f715dfb3ea976cc311fea6aacf79c648fce0209d79b071cd9233e769978994fc",
-      "gate_a_card.json": "e56ff70ea00ea318506b6146d0224f491a4032ef96b8b6c727f073a656ca29b9",
-      "identity_overlap.csv": "473e648b669ae9de051189a7d069bc08b2e007d3e900aa7c734b1998eab0a817",
-      "issue_cutoff_registry.csv": "e8521e306af6df476abff497d2cc71d28d11202fffc46c4a7c3df6e675143e9f",
-      "match_probability_freeze.csv.gz": "b7f3341c704140cb1565d115e9e35186d644ecc5f8d8e240f41144b8f6eef39d",
-      "outer_year_registry.csv": "7822f94feb75c1a94af390526d8f7f84d226e7ff6fdf64dfd9a64a287723fa0f",
-      "selection_freeze.csv": "8cd4dfd3ba3e85456855ba4d818a8f8c0e7a65fb3c3e09805cd3ef79fa94d31f",
-      "source_binding.json": "8d0832d5e92f391d1f6246155eb4f4eb634d8f556fe1f5611b25a993f0f707c7",
-      "team_state_registry.csv": "fd13dea9e684cfe40bcec514dc863042eef3b52e1d29db8c5f2cfb08edfbfa38"
     }
   },
-  "environment": {
-    "pandas": "3.0.3",
-    "numpy": "2.4.6",
-    "pyarrow": "24.0.0",
-    "scipy": "1.17.1",
-    "matplotlib": "3.10.9",
-    "scikit-learn": "unavailable"
+  "upstream_packages": {
+    "bj180": "results/bj180_gate_a_preoutcome_v2",
+    "bj203": "results/bj203_causal_tensor_v2",
+    "bj204": "results/bj204_gate_a_preoutcome_v5",
+    "bj214": "results/bj214_decision_epoch_tensor_v1"
   }
 }

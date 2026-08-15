@@ -74,6 +74,18 @@ Q_EU_RAW_1X2 = "Q_EU_RAW_1X2"            # de-vigged average European straight-r
 Q_EU_BJLINE = "Q_EU_BJLINE"              # EU probability translated to native BJ space
 P_POWER_BJLINE = "P_POWER_BJLINE"        # power/team model probability in native BJ space
 
+# Central registries are consumed by every producer, profiler, schema builder
+# and #209 loader.  Keeping one registry prevents a new representation from
+# silently missing its observed-at/availability/source trace.
+PROBABILITY_REPRESENTATIONS = (
+    Q_BJ_SP_DEVIG,
+    Q_BJ_CALIBRATED,
+    Q_EU_RAW_1X2,
+    Q_EU_BJLINE,
+    P_POWER_BJLINE,
+)
+CAUSAL_REPRESENTATIONS = PROBABILITY_REPRESENTATIONS + (BJ_LINE_BOUNDARY,)
+
 # Q_BJ used as the divergence anchor: the calibrated market probability is
 # the incumbent per #204's freeze card.
 DIVERGENCE_ANCHOR = Q_BJ_CALIBRATED
@@ -92,6 +104,10 @@ def reason_col(representation: str) -> str:
     return f"{representation}_unavailable_reason"
 
 
+def producer_reason_col(representation: str) -> str:
+    return f"{representation}_producer_reason"
+
+
 # ---------------------------------------------------------------------------
 # Source identity (anti-alias registry, class-3 sweep)
 # ---------------------------------------------------------------------------
@@ -101,6 +117,19 @@ SOURCE_IDENTITY_Q_BJ = "qbj_source_identity"
 SOURCE_IDENTITY_EU = "eu_source_identity"
 SOURCE_IDENTITY_POWER = "power_source_identity"
 SOURCE_IDENTITY_SP = "sp_source_identity"
+SOURCE_IDENTITY_LINE = "bj_line_source_identity"
+
+
+def source_identity_col(representation: str) -> str:
+    mapping = {
+        Q_BJ_SP_DEVIG: SOURCE_IDENTITY_SP,
+        Q_BJ_CALIBRATED: SOURCE_IDENTITY_Q_BJ,
+        Q_EU_RAW_1X2: SOURCE_IDENTITY_EU,
+        Q_EU_BJLINE: SOURCE_IDENTITY_EU,
+        P_POWER_BJLINE: SOURCE_IDENTITY_POWER,
+        BJ_LINE_BOUNDARY: SOURCE_IDENTITY_LINE,
+    }
+    return mapping[representation]
 
 # Accepted source identities (values of the *_source_identity columns).
 SRC_BJ204_PCLOSE = "bj204_retrospective_proxy_pclose"
@@ -201,6 +230,8 @@ REASON_RETROSPECTIVE_PROXY = "RETROSPECTIVE_PROXY"  # 2025-04+ retrospective-pro
 REASON_OBSERVED_AFTER_EPOCH = "OBSERVED_AFTER_DECISION_EPOCH"  # feature observed_at > decision epoch
 REASON_NO_UNCERTAINTY_SOURCE = "NO_UNCERTAINTY_SOURCE"
 REASON_INVALID_LINE = "INVALID_HANDICAP_LINE"
+REASON_PARTIAL_SOURCE_TRIPLET = "PARTIAL_SOURCE_TRIPLET"
+REASON_DUPLICATE_SOURCE_ROW = "DUPLICATE_SOURCE_ROW"
 
 # ---------------------------------------------------------------------------
 # Admissible-use classification (handoff feature dictionary).

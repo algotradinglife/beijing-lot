@@ -25,10 +25,9 @@ Rework (2026-08-15, fresh method rework):
 
 from __future__ import annotations
 
+import hashlib
 import json
-import os
-import shutil
-import tempfile
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,6 +39,7 @@ from . import contract
 from . import divergence
 from . import probabilities as prob
 from . import profile as prof
+from . import publication
 from . import quality
 from . import sources
 
@@ -56,6 +56,8 @@ class BuildReceipt:
     disposition: str = ""
     source_hashes: dict[str, dict[str, str]] = field(default_factory=dict)
     causal: pd.DataFrame = field(default=None)  # type: ignore[assignment]
+    development_labels: pd.DataFrame = field(default=None)  # type: ignore[assignment]
+    sealed_labels: pd.DataFrame = field(default=None)  # type: ignore[assignment]
 
 
 def assemble_cells(root: Path) -> pd.DataFrame:
@@ -73,12 +75,31 @@ def assemble_cells(root: Path) -> pd.DataFrame:
 
     cells = features.copy()
     cohort_map = identity[["issue_instance", "split"]].drop_duplicates()
-    cells = cells.merge(cohort_map, on="issue_instance", how="left")
-    cells = cells.rename(columns={"split": "cohort"})
+    if cohort_map["issue_instance"].duplicated().any():
+        raise sources.UpstreamBindingError("#203 issue_instance maps to multiple cohorts")
+    cells = cells.merge(
+        cohort_map, on="issue_instance", how="left", validate="many_to_one",
+        indicator="_cohort_merge",
+    )
+    cells["bj203_identity_status"] = np.where(
+        cells["_cohort_merge"].eq("both"), "MATCHED", "NO_BJ203_IDENTITY"
+    )
+    # Prospective #204 cells outside #203 remain on the 3-cell axis and retain
+    # #204's explicit role; they are unavailable causally, never silently
+    # dropped or assigned a fabricated #203 cohort.
+    cells["cohort"] = cells["split"].where(cells["split"].notna(), cells["role"])
+    cells = cells.drop(columns=["_cohort_merge", "split"])
 
     # #203 identity match-level timestamps joined on (issue, match_idx) —
     # one row per match, never an issue-level broadcast.
-    cells = cells.merge(meta, on=["issue", "match_idx"], how="left")
+    cells = cells.merge(
+        meta, on=["issue", "match_idx"], how="left", validate="many_to_one",
+        indicator="_meta_merge",
+    )
+    cells["bj203_match_meta_status"] = np.where(
+        cells["_meta_merge"].eq("both"), "MATCHED", "NO_BJ203_MATCH_META"
+    )
+    cells = cells.drop(columns="_meta_merge")
 
     # per-cell #203 feature values for EU/uncertainty (devig_euro_probability)
     # bind via #203's hashed cell_join_key mapped through identity to the
@@ -87,10 +108,11 @@ def assemble_cells(root: Path) -> pd.DataFrame:
     key_map["cell_join_key"] = key_map["cell_join_key"].astype(str)
     fv = feature_values.copy()
     fv["cell_join_key"] = fv["cell_join_key"].astype(str)
-    fv_joined = fv.merge(key_map, on="cell_join_key", how="inner")
-    fv_joined = fv_joined.drop_duplicates(
-        subset=["issue", "match_idx", "outcome_code"]
+    fv_joined = fv.merge(
+        key_map, on="cell_join_key", how="inner", validate="one_to_one"
     )
+    if fv_joined.duplicated(["issue", "match_idx", "outcome_code"]).any():
+        raise sources.UpstreamBindingError("#203 feature value maps to duplicate cell identity")
     cells = cells.merge(
         fv_joined[
             [
@@ -103,6 +125,7 @@ def assemble_cells(root: Path) -> pd.DataFrame:
         ],
         on=["issue", "match_idx", "outcome_code"],
         how="left",
+        validate="one_to_one",
     )
 
     cells["issue"] = cells["issue"].astype(str)
@@ -121,6 +144,122 @@ def assemble_cells(root: Path) -> pd.DataFrame:
         dict(zip(masks["cell_key"], masks["market_probability"]))
     ) if "cell_key" in masks.columns else np.nan
     return cells
+
+
+def _apply_scalar_causal_feature(
+    cells: pd.DataFrame, feature: str, observed_at_source: str
+) -> pd.DataFrame:
+    """Publish source observed-at and causal mask for scalar inference fields."""
+    out = cells.copy()
+    observed_name = contract.observed_at_col(feature)
+    available_name = contract.available_col(feature)
+    reason_name = contract.reason_col(feature)
+    observed = pd.to_datetime(
+        out.get(observed_at_source, pd.Series(pd.NaT, index=out.index)),
+        errors="coerce",
+        utc=True,
+    )
+    epoch = pd.to_datetime(out[contract.DECISION_EPOCH_COLUMN], errors="coerce", utc=True)
+    kickoff = pd.to_datetime(out["kickoff_ts_utc"], errors="coerce", utc=True)
+    present = pd.to_numeric(
+        out.get(feature, pd.Series(np.nan, index=out.index)), errors="coerce"
+    ).notna()
+    available = present & observed.notna() & epoch.notna() & kickoff.ge(epoch) & observed.le(epoch)
+    out[observed_name] = observed
+    out[available_name] = available.astype(bool)
+    out[reason_name] = np.select(
+        [
+            ~present,
+            present & (observed.isna() | epoch.isna()),
+            present & kickoff.lt(epoch),
+            present & observed.gt(epoch),
+        ],
+        [
+            "MISSING_SOURCE_VALUE",
+            contract.REASON_NO_CAUSAL_EPOCH,
+            contract.REASON_POST_DECISION_OBSERVATION,
+            contract.REASON_OBSERVED_AFTER_EPOCH,
+        ],
+        default=None,
+    )
+    return out
+
+
+def prepare_label_namespaces(
+    labels: pd.DataFrame, identity: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Join labels to authoritative #203 identity year and seal future years.
+
+    Issue identifiers such as ``21001`` are opaque IDs, never dates.  All
+    year/cohort/match identity comes from ``cell_identity.year/split``.
+    """
+    required_identity = {
+        "cell_join_key", "issue", "issue_instance", "match_idx",
+        "outcome_code", "year", "split",
+    }
+    if not required_identity.issubset(identity.columns):
+        raise ValueError(
+            f"cell identity missing label-boundary fields: {sorted(required_identity - set(identity.columns))}"
+        )
+    if "cell_join_key" not in labels.columns:
+        raise ValueError("labels missing cell_join_key")
+    if identity["cell_join_key"].astype(str).duplicated().any():
+        raise ValueError("cell identity duplicate cell_join_key")
+    if labels["cell_join_key"].astype(str).duplicated().any():
+        raise ValueError("labels duplicate cell_join_key")
+
+    authoritative = identity[list(required_identity)].copy()
+    authoritative["cell_join_key"] = authoritative["cell_join_key"].astype(str)
+    authoritative["cell_key"] = (
+        authoritative["issue"].astype(str)
+        + ":" + authoritative["match_idx"].astype(int).astype(str)
+        + ":" + authoritative["outcome_code"].astype(str)
+    )
+    lab = labels.copy()
+    lab["cell_join_key"] = lab["cell_join_key"].astype(str)
+    # Source copies are non-authoritative and are discarded before the join.
+    lab = lab.drop(
+        columns=[
+            column for column in (
+                "issue", "issue_instance", "match_idx", "outcome_code",
+                "year", "split", "cohort", "cell_key",
+            ) if column in lab.columns
+        ]
+    )
+    joined = lab.merge(
+        authoritative,
+        on="cell_join_key",
+        how="left",
+        validate="one_to_one",
+        indicator=True,
+    )
+    if joined["_merge"].ne("both").any():
+        raise ValueError("labels contain unidentifiable cell_join_key")
+    joined = joined.drop(columns="_merge").rename(columns={"split": "cohort"})
+    joined["year"] = joined["year"].astype(int)
+    joined["match_idx"] = joined["match_idx"].astype(int)
+    joined["outcome_code"] = joined["outcome_code"].astype(str)
+    if "result_code" in joined.columns:
+        joined["is_winner"] = (
+            joined["result_code"].astype(str).str.strip()
+            == joined["outcome_code"].astype(str).str.strip()
+        )
+    dev = joined[joined["year"] <= contract.LABEL_OPEN_MAX_YEAR].copy()
+    receipts = []
+    for namespace, selector in (
+        ("2024_labels", joined["year"].eq(2024)),
+        ("2025_plus_labels", joined["year"].ge(2025)),
+        ("2024_plus_labels", joined["year"].ge(2024)),
+    ):
+        receipts.append(
+            {
+                "namespace": namespace,
+                "status": "SEALED_NOT_OPENED",
+                "upstream_rows": int(selector.sum()),
+                "handoff_rows": 0,
+            }
+        )
+    return dev.reset_index(drop=True), pd.DataFrame(receipts)
 
 
 def build(root: Path) -> BuildReceipt:
@@ -146,25 +285,17 @@ def build(root: Path) -> BuildReceipt:
     power_freeze = sources.load_bj180_match_probabilities(root)
     cells = prob.materialize_power_bjline(cells, power_freeze)
 
-    # 6. divergence features (per-cell semantics)
-    cells = divergence.build_divergence_features(cells)
+    # 6. publish causal masks BEFORE every divergence/profile consumer.
+    cells, causal = quality.apply_causal_availability(cells)
+    cells = _apply_scalar_causal_feature(
+        cells, "predicted_final_sp_input", "predicted_sp_available_ts_utc"
+    )
+    cells = _apply_scalar_causal_feature(
+        cells, "market_uncertainty", "euro_1h_available_ts_utc"
+    )
 
-    # 7. causal eligibility: per-feature observed_at <= decision epoch
-    causal = quality.causal_eligibility(cells)
-    # broadcast causal masks onto the cell frame
-    for representation in [
-        contract.Q_BJ_SP_DEVIG,
-        contract.Q_BJ_CALIBRATED,
-        contract.Q_EU_RAW_1X2,
-        contract.Q_EU_BJLINE,
-        contract.P_POWER_BJLINE,
-    ]:
-        sub = causal[causal["representation"] == representation]
-        if not sub.empty:
-            cells[contract.available_col(representation)] = sub["available"].tolist()
-            cells[contract.reason_col(representation)] = sub[
-                "unavailable_reason"
-            ].tolist()
+    # 7. divergence features consume causal masks only.
+    cells = divergence.build_divergence_features(cells)
 
     receipt.cells = cells
     receipt.causal = causal
@@ -179,8 +310,18 @@ def build(root: Path) -> BuildReceipt:
         raise RuntimeError(
             f"development-label load failed; build aborted (fail closed): {error}"
         ) from error
-    labels["year"] = labels["issue"].astype(str).str[:4].astype(int)
-    dev_labels = labels[labels["year"] <= contract.LABEL_OPEN_MAX_YEAR].copy()
+    identity = sources.load_bj203_identity(root)
+    dev_labels, sealed_labels = prepare_label_namespaces(labels, identity)
+    receipt.development_labels = dev_labels
+    receipt.sealed_labels = sealed_labels
+    receipt.checks["DQ12_payout_factor_boundary"] = pd.concat(
+        [
+            receipt.checks.get("DQ12_payout_factor_boundary", pd.DataFrame()),
+            quality.dq12_payout_boundary_payload(dev_labels, "development_labels"),
+            quality.dq12_payout_boundary_payload(sealed_labels, "sealed_label_namespaces"),
+        ],
+        ignore_index=True,
+    )
 
     # 10. profiling tables
     receipt.tables = {
@@ -204,6 +345,9 @@ def build(root: Path) -> BuildReceipt:
         "probability_distribution_sp_devig": prof.probability_distribution(
             cells, contract.Q_BJ_SP_DEVIG
         ),
+        "probability_distribution_eu_raw": prof.probability_distribution(
+            cells, contract.Q_EU_RAW_1X2
+        ),
         "bj_raw_vs_calibrated_reconciliation": prof.bj_raw_vs_calibrated_reconciliation(
             cells
         ),
@@ -221,14 +365,15 @@ def build(root: Path) -> BuildReceipt:
         ),
         "supported_issues_per_year": quality.dq09_support_drift(cells),
         "development_only_calibration": prof.development_only_calibration(
-            cells, dev_labels, root
+            cells, dev_labels
         ),
         "predicted_sp_vs_settlement_sp": prof.predicted_sp_vs_settlement_sp(
-            cells, dev_labels, root
+            cells, dev_labels
         ),
         "outlier_heavy_tail": prof.outlier_heavy_tail_table(
             receipt.checks.get("DQ10_outlier_constant_fields", pd.DataFrame())
         ),
+        "chart_source_mapping": prof.chart_source_mapping(),
     }
 
     # 11. REQ-D evidence rows (computed — no hardcoded PASS).
@@ -273,10 +418,14 @@ def build_evidence(receipt: BuildReceipt) -> pd.DataFrame:
     post_decision = _count(checks, "DQ03_started_matches")
     missing_ts = _count(checks, "DQ02_timestamp_checks")
     observed_after = 0
+    no_causal_epoch = 0
     if causal is not None and not causal.empty:
         observed_after = int(
             (causal["unavailable_reason"] == contract.REASON_OBSERVED_AFTER_EPOCH)
             .sum()
+        )
+        no_causal_epoch = int(
+            (causal["unavailable_reason"] == contract.REASON_NO_CAUSAL_EPOCH).sum()
         )
     # available-set closure: 0 available cells may violate (fail closed).
     available_violations = 0
@@ -287,6 +436,7 @@ def build_evidence(receipt: BuildReceipt) -> pd.DataFrame:
     d01_pass = (
         post_decision == 0
         and observed_after == 0
+        and no_causal_epoch == 0
         and available_violations == 0
     )
 
@@ -328,7 +478,23 @@ def build_evidence(receipt: BuildReceipt) -> pd.DataFrame:
         "tax_rate",
         "tax_realized_yuan",
     ]
-    d06_pass = not any(c in cells.columns for c in forbidden)
+    dev_labels = getattr(receipt, "development_labels", None)
+    sealed_labels = getattr(receipt, "sealed_labels", None)
+    label_year_ok = (
+        dev_labels is not None
+        and not dev_labels.empty
+        and "year" in dev_labels
+        and dev_labels["year"].astype(int).le(contract.LABEL_OPEN_MAX_YEAR).all()
+    )
+    sealed_ok = (
+        sealed_labels is not None
+        and not sealed_labels.empty
+        and sealed_labels["handoff_rows"].eq(0).all()
+        and {"2024_labels", "2025_plus_labels", "2024_plus_labels"}.issubset(
+            set(sealed_labels["namespace"])
+        )
+    )
+    d06_pass = not any(c in cells.columns for c in forbidden) and label_year_ok and sealed_ok
 
     # REQ-D07: 0.65 absent from inference cells AND dev labels
     d07_pass = payout_count == 0
@@ -352,7 +518,23 @@ def build_evidence(receipt: BuildReceipt) -> pd.DataFrame:
         "predicted_sp_vs_settlement_sp",
         "outlier_heavy_tail",
     ]
-    d08_pass = all(t in receipt.tables for t in required_tables)
+    calibration = receipt.tables.get("development_only_calibration", pd.DataFrame())
+    expected_calibration = {
+        (representation, outcome, "development")
+        for representation in contract.PROBABILITY_REPRESENTATIONS
+        for outcome in contract.OUTCOME_CODES
+    }
+    actual_calibration = (
+        set(calibration[["representation", "outcome", "cohort"]].itertuples(index=False, name=None))
+        if {"representation", "outcome", "cohort"}.issubset(calibration.columns)
+        else set()
+    )
+    chart_mapping = receipt.tables.get("chart_source_mapping", pd.DataFrame())
+    d08_pass = (
+        all(t in receipt.tables for t in required_tables)
+        and expected_calibration.issubset(actual_calibration)
+        and not chart_mapping.empty
+    )
 
     # REQ-D09: notebook/code/results artifacts actually present at build time
     root = receipt.root
@@ -385,7 +567,8 @@ def build_evidence(receipt: BuildReceipt) -> pd.DataFrame:
                 f"match-level kickoff/decision-epoch join (no issue-level "
                 f"broadcast); post-decision cells={post_decision}; "
                 f"missing timestamps={missing_ts}; observed-after-epoch "
-                f"features={observed_after}; available-set violations="
+                f"features={observed_after}; raw-present/no-causal-epoch="
+                f"{no_causal_epoch}; available-set violations="
                 f"{available_violations}; violations fail closed via "
                 f"availability mask + exclusion ledger with stable reason "
                 f"codes."
@@ -538,90 +721,16 @@ def disposition(receipt: BuildReceipt) -> str:
 # ---------------------------------------------------------------------------
 # Atomic publication (class 6)
 # ---------------------------------------------------------------------------
-def _fsync_file(path: Path) -> None:
-    with open(path, "rb") as handle:
-        os.fsync(handle.fileno())
-
-
-def _fsync_dir(path: Path) -> None:
-    try:
-        descriptor = os.open(path, os.O_RDONLY)
-        try:
-            os.fsync(descriptor)
-        finally:
-            os.close(descriptor)
-    except OSError:
-        # directory fsync is best-effort on some filesystems
-        pass
-
-
 def write_package(receipt: BuildReceipt, *, force: bool = False) -> Path:
-    """Write the immutable package atomically.
-
-    Strategy (class-6 sweep):
-    1. Build the full package inside a same-parent staging directory.
-    2. fsync every file and every directory in the staging tree.
-    3. Atomically replace the target with staging:
-       - no previous package -> ``os.replace(staging, target)`` (single
-         atomic rename);
-       - previous package exists (force=True) -> rename the OLD package to
-         a ``.previous`` sibling first (atomic), then rename staging into
-         place, then remove the ``.previous`` sibling.  The old package is
-         never destroyed before the new one is fully staged and renamed in;
-         if the second rename fails the previous package is restored.
-    4. On ANY failure (including KeyboardInterrupt/SystemExit) the staging
-       tree is removed; the previous package (if any) survives.
-
-    The audited version did ``shutil.rmtree(target)`` first and then wrote
-    files directly into the final directory, so any mid-write failure left a
-    partial target and destroyed the old immutable package.
-    """
+    """Publish the complete package through one crash-durable directory swap."""
     target = contract.package_path(receipt.root)
-    if target.exists() and not force:
-        raise FileExistsError(
-            f"refusing to replace existing package: {target} (use force=True)"
-        )
-
-    parent = target.parent
-    staging = Path(
-        tempfile.mkdtemp(prefix=f".{target.name}.staging-", dir=str(parent))
+    return publication.atomic_publish_directory(
+        target, lambda staging: _write_staging(receipt, staging), force=force
     )
-    previous = parent / f".{target.name}.previous"
-    try:
-        _write_staging(receipt, staging)
-        # fsync every file then every directory (deepest first)
-        for path in sorted(staging.rglob("*"), reverse=True):
-            if path.is_file():
-                _fsync_file(path)
-        for directory in sorted(
-            (p for p in staging.rglob("*") if p.is_dir()), reverse=True
-        ):
-            _fsync_dir(directory)
-        _fsync_dir(staging)
-        if target.exists():
-            # atomic swap: old package -> .previous, staging -> target
-            if previous.exists():
-                shutil.rmtree(previous, ignore_errors=True)
-            os.replace(target, previous)
-            try:
-                os.replace(staging, target)
-            except BaseException:
-                # restore the previous package before re-raising
-                if not target.exists() and previous.exists():
-                    os.replace(previous, target)
-                raise
-            _fsync_dir(parent)
-            shutil.rmtree(previous, ignore_errors=True)
-        else:
-            os.replace(staging, target)
-            _fsync_dir(parent)
-    except BaseException:
-        shutil.rmtree(staging, ignore_errors=True)
-        raise
-    return target
 
 
 def _write_staging(receipt: BuildReceipt, target: Path) -> None:
+    """Populate an unpublished staging tree; no live package is mutated."""
     tables_dir = target / "tables"
     figures_dir = target / "figures"
     ledger_dir = target / "ledger"
@@ -629,149 +738,133 @@ def _write_staging(receipt: BuildReceipt, target: Path) -> None:
     for directory in (tables_dir, figures_dir, ledger_dir, evidence_dir):
         directory.mkdir(parents=True, exist_ok=True)
 
-    for name, table in receipt.tables.items():
-        if table is None:
-            continue
-        table.to_csv(tables_dir / f"{name}.csv", index=False)
-
-    for name, table in receipt.checks.items():
-        if table is None or table.empty:
-            pd.DataFrame({"check": [name], "rows": [0]}).to_csv(
-                ledger_dir / f"{name}.csv", index=False
-            )
-            continue
-        table.to_csv(ledger_dir / f"{name}.csv", index=False)
-
-    from . import figures
-
-    figures.write_all_figures(receipt.tables, receipt.cells, figures_dir)
-
-    receipt.evidence.to_csv(evidence_dir / "req_d_evidence.csv", index=False)
-
-    # canonical handoff inference cells (no settlement columns)
     cells = receipt.cells.copy()
     forbidden = [
-        "result_code",
-        "final_sp",
-        "winning_zero_return_units",
-        "payout_factor",
-        "payout_after_65_units",
-        "tax_rate",
-        "tax_cliff_gross_yuan",
-        "tax_realized_yuan",
-        "settlement_status",
-        "settlement_quality",
+        "result_code", "final_sp", "winning_zero_return_units", "payout_factor",
+        "payout_after_65_units", "tax_rate", "tax_cliff_gross_yuan",
+        "tax_realized_yuan", "settlement_status", "settlement_quality",
         "settlement_source",
     ]
-    cells = cells.drop(columns=[c for c in forbidden if c in cells.columns])
-    cells.to_parquet(target / "inference_cells.parquet", index=False)
-
-    # development-label profiling section (year <= 2023 only) — identity +
-    # label fields only; NO payout/tax columns (REQ-D07).  Fail closed: a
-    # label load failure raises in build() before we get here.
-    try:
-        labels = sources.load_bj203_labels(receipt.root)
-    except Exception as error:  # noqa: BLE001
+    cells = cells.drop(columns=[column for column in forbidden if column in cells.columns])
+    if receipt.development_labels is None or receipt.sealed_labels is None:
         raise RuntimeError(
-            f"development-label load failed during publication: {error}"
-        ) from error
-    labels["year"] = labels["issue"].astype(str).str[:4].astype(int)
-    dev_labels = labels[labels["year"] <= contract.LABEL_OPEN_MAX_YEAR].copy()
-    # strip any payout/tax columns defensively (contract DEV_LABEL_INCLUDE_COLUMNS)
-    drop_payout = [
-        "winning_zero_return_units",
-        "payout_factor",
-        "payout_after_65_units",
-        "tax_rate",
-        "tax_cliff_gross_yuan",
-        "tax_realized_yuan",
-    ]
+            "label namespaces must be prepared from authoritative #203 identity before publication"
+        )
+    dev_labels = receipt.development_labels.copy()
     dev_labels = dev_labels.drop(
-        columns=[c for c in drop_payout if c in dev_labels.columns], errors="ignore"
+        columns=[column for column in forbidden if column in dev_labels.columns and column != "final_sp"],
+        errors="ignore",
     )
-    dev_labels.to_parquet(
-        target / "development_labels_through_2023.parquet", index=False
-    )
-
-    # 2024 sealed label namespace: verify it exists upstream but emit the
-    # verifiable empty label namespace marker for the handoff.
-    sealed = labels[labels["year"] >= contract.SEALED_2024_MIN_YEAR]
-    sealed_info = pd.DataFrame(
-        {
-            "namespace": ["2024_plus_labels"],
-            "status": ["SEALED_NOT_OPENED"],
-            "upstream_rows": [len(sealed)],
-            "handoff_rows": [0],
-        }
-    )
-    sealed_info.to_csv(target / "sealed_2024_label_namespace.csv", index=False)
-
-    # feature dictionary / admissible-use registry
+    sealed = receipt.sealed_labels.copy()
     feature_dictionary = build_feature_dictionary(cells)
-    feature_dictionary.to_csv(target / "feature_dictionary.csv", index=False)
-
-    # machine-readable schema (types, nullability, domains, keys, relations)
-    schema = build_schema(cells)
-    (target / "handoff_schema.json").write_text(
-        json.dumps(schema, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-
-    # probability mapping/reconciliation registry
     mapping = build_probability_mapping_registry(receipt)
-    mapping.to_csv(target / "probability_mapping_registry.csv", index=False)
-
-    # cohort/split registry
     cohort = (
         cells[["issue", "cohort", "year"]]
         .drop_duplicates()
         .sort_values(["year", "issue"])
-    )
-    cohort.to_csv(target / "cohort_registry.csv", index=False)
-
-    # manifest (binds reviewed commit + code/notebook hashes)
-    manifest = _build_manifest(receipt, cells)
-    (target / "MANIFEST.json").write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+        .reset_index(drop=True)
     )
 
-    # replay receipt
+    manifest_payload = _build_manifest(receipt, cells)
+    reviewed_binding = str(manifest_payload["reviewed_commit_sha"])
+    evidence = receipt.evidence.copy()
+    evidence["reviewed_commit_sha"] = reviewed_binding
+
+    payloads: dict[str, tuple[str, pd.DataFrame]] = {
+        "inference_cells": ("inference_cells.parquet", cells),
+        "development_labels": ("development_labels_through_2023.parquet", dev_labels),
+        "sealed_label_namespaces": ("sealed_label_namespaces.csv", sealed),
+        "feature_dictionary": ("feature_dictionary.csv", feature_dictionary),
+        "probability_mapping_registry": ("probability_mapping_registry.csv", mapping),
+        "cohort_registry": ("cohort_registry.csv", cohort),
+        "causal_eligibility": ("causal_eligibility.parquet", receipt.causal),
+        "evidence": ("evidence/req_d_evidence.csv", evidence),
+    }
+    for name, table in sorted(receipt.tables.items()):
+        if table is not None:
+            payloads[name] = (f"tables/{name}.csv", table)
+    for name, table in sorted(receipt.checks.items()):
+        materialized = table
+        if materialized is None or materialized.empty:
+            materialized = pd.DataFrame({"check": [name], "rows": [0]})
+        payloads[f"ledger_{name}"] = (f"ledger/{name}.csv", materialized)
+
+    for _, (relative, frame) in sorted(payloads.items()):
+        destination = target / relative
+        if relative.endswith(".parquet"):
+            publication.atomic_write_parquet(frame, destination)
+        else:
+            publication.atomic_write_csv(frame, destination)
+
+    from . import figures
+    figures.write_all_figures(receipt.tables, cells, figures_dir)
+
+    schema = build_schema(payloads)
+    publication.atomic_write_json(target / "handoff_schema.json", schema)
+
+    from . import handoff as handoff_mod
+    report = handoff_mod.render_data_readiness(
+        cells, dev_labels, sealed, manifest_payload
+    )
+    publication.atomic_write_text(target / "DATA_READINESS.md", report)
+    manifest_payload["report_sha256"] = sources.sha256_file(target / "DATA_READINESS.md")
+    manifest_payload["schema_sha256"] = sources.sha256_file(target / "handoff_schema.json")
+    publication.atomic_write_json(target / "MANIFEST.json", manifest_payload)
+
     from . import manifest as manifest_mod
-
-    manifest_mod.write_replay(target, receipt, receipt.root, manifest)
+    manifest_mod.write_replay(
+        target,
+        receipt,
+        receipt.root,
+        manifest_payload,
+        package_name=contract.PACKAGE_NAME,
+    )
+    manifest_mod.write_sha256sums(target)
 
 
 def _build_manifest(receipt: BuildReceipt, cells: pd.DataFrame) -> dict:
-    """Manifest with exact reviewed-SHA binding (REQ-D09).
+    """Bind PR review symbolically plus exact code/notebook/dependency bytes.
 
-    ``built_at_utc`` is derived from the reviewed commit's committer date so
-    a clean replay at the same reviewed SHA produces a byte-identical
-    MANIFEST (the audited package used datetime.now(), which made every
-    replay byte-different).
+    A Git commit cannot contain its own SHA.  ``PR_HEAD`` is resolved by the
+    verifier and ``post_handoff.py`` against PR #231; unlike R2's stale parent
+    SHA, this binding remains true at the final delivery commit.
     """
     root = receipt.root.resolve()
-    commit = _git_head(root)
+    producer_commit = _git_head(root)
     code_hash = _dir_hash(root / "src" / "divergence_profile")
     notebook = root / "notebooks" / "research" / "issue-229" / "bj229_divergence_profile.ipynb"
-    notebook_hash = sources.sha256_file(notebook) if notebook.exists() else "missing"
+    notebook_hash = _notebook_semantic_hash(notebook) if notebook.exists() else "missing"
     requirements = root / "requirements.txt"
     requirements_hash = (
         sources.sha256_file(requirements) if requirements.exists() else "missing"
     )
     return {
         "package": contract.PACKAGE_NAME,
-        "contract_version": "BJ-UNIFIED-DIVERGENCE-DATA-PROFILE-001/v1",
-        "rework": "REWORK_TYPE=method (2026-08-15 fresh)",
-        "reviewed_commit_sha": commit,
+        "contract_version": "BJ-UNIFIED-DIVERGENCE-DATA-PROFILE-001/v2",
+        "rework": "REWORK_TYPE=method (2026-08-15 fresh R3)",
+        "reviewed_commit_sha": "PR_HEAD",
+        "producer_commit_sha": producer_commit,
+        "commit_binding_mode": "github_pr_231_head_plus_content_hashes",
         "code_hash": code_hash,
         "notebook_hash": notebook_hash,
+        "notebook_hash_mode": "semantic_source_cells_v1",
         "requirements_hash": requirements_hash,
-        "built_at_utc": _commit_date(root, commit) or datetime.now(timezone.utc).isoformat(),
+        "built_at_utc": _commit_date(root, producer_commit) or datetime.now(timezone.utc).isoformat(),
         "disposition": receipt.disposition,
         "cell_count": len(cells),
         "issue_count": int(cells["issue"].nunique()),
-        "match_count": int(
-            cells[["issue", "match_idx"]].drop_duplicates().shape[0]
-        ),
+        "match_count": int(cells[["issue", "match_idx"]].drop_duplicates().shape[0]),
+        "causally_available_cells_by_source": {
+            representation: int(
+                cells.get(
+                    contract.available_col(representation),
+                    pd.Series(False, index=cells.index),
+                ).fillna(False).astype(bool).sum()
+            )
+            for representation in contract.CAUSAL_REPRESENTATIONS
+        },
+        "development_label_rows_through_2023": int(len(receipt.development_labels)),
+        "sealed_label_namespaces": receipt.sealed_labels.to_dict("records"),
         "upstream_packages": {
             key: _relative_to_root(
                 contract.upstream_path(receipt.root, key), receipt.root
@@ -824,6 +917,41 @@ def _dir_hash(directory: Path) -> str:
         digest.update(path.name.encode("utf-8"))
         digest.update(sources.sha256_file(path).encode("utf-8"))
     return digest.hexdigest()
+
+
+def _notebook_semantic_hash(path: Path) -> str:
+    """Hash notebook source/structure while excluding execution outputs.
+
+    The executable notebook builds the package before the executor persists
+    outputs, so a byte hash would be a self-reference.  This hash binds every
+    code/markdown cell, cell id, and notebook/kernel metadata while excluding
+    only execution counts and outputs; the package hash manifest separately
+    binds every generated artifact byte.
+    """
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    normalized = {
+        "nbformat": payload.get("nbformat"),
+        "nbformat_minor": payload.get("nbformat_minor"),
+        "metadata": payload.get("metadata", {}),
+        "cells": [
+            {
+                "cell_type": cell.get("cell_type"),
+                "id": cell.get("id"),
+                "metadata": {
+                    key: value
+                    for key, value in cell.get("metadata", {}).items()
+                    if key != "execution"
+                },
+                "source": cell.get("source", []),
+                "attachments": cell.get("attachments", {}),
+            }
+            for cell in payload.get("cells", [])
+        ],
+    }
+    encoded = json.dumps(
+        normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _relative_to_root(path: Path, root: Path) -> str:
@@ -959,7 +1087,7 @@ def _feature_domain(column: str, raw: pd.Series) -> str:
         return "DEVELOPMENT_CV|RETROSPECTIVE_TEST_LOCKED"
     if column in ("source_grade",):
         return "RETROSPECTIVE_PROXY_PCLOSE|RETROSPECTIVE_PROXY"
-    return ""
+    return "UNSPECIFIED"
 
 def _feature_key_role(column: str) -> str:
     if column == "cell_key":
@@ -968,36 +1096,109 @@ def _feature_key_role(column: str) -> str:
         return "identity_key"
     if column in ("issue_instance", "year", "cohort"):
         return "foreign_key"
-    return ""
+    return "NONE"
 
 
-def build_schema(cells: pd.DataFrame) -> dict:
-    """Machine-readable handoff schema (REQ-D09 / class-5 sweep)."""
-    columns = []
-    for column in cells.columns:
-        raw = cells[column]
-        columns.append(
-            {
-                "name": column,
-                "dtype": str(raw.dtype),
-                "nullable": bool(raw.isna().any()),
-                "domain": _feature_domain(column, raw),
-                "key_role": _feature_key_role(column),
-                "source": _feature_source(column),
-                "admissible_use": _feature_admissible_use(column),
-            }
+def build_schema(
+    payloads: dict[str, tuple[str, pd.DataFrame]] | pd.DataFrame,
+) -> dict:
+    """Describe every physical package table, not only inference columns.
+
+    A DataFrame argument is accepted only for legacy callers and is promoted to
+    the canonical inference table; publication always passes the full payload
+    registry.
+    """
+    if isinstance(payloads, pd.DataFrame):
+        payloads = {"inference_cells": ("inference_cells.parquet", payloads)}
+
+    primary_keys: dict[str, list[str]] = {
+        "inference_cells": ["cell_key"],
+        "development_labels": ["cell_key"],
+        "sealed_labels": ["namespace"],
+        "feature_dictionary": ["feature"],
+        "evidence": ["requirement"],
+        "probability_mapping_registry": ["representation"],
+        "cohort_registry": ["issue"],
+        "causal_eligibility": ["cell_key", "representation"],
+        "chart_source_mapping": ["figure"],
+    }
+    foreign_keys: dict[str, list[dict[str, object]]] = {
+        "development_labels": [
+            {"column": "cell_key", "columns": ["cell_key"], "references": "inference_cells.cell_key", "cardinality": "zero_or_one_to_one"}
+        ],
+        "causal_eligibility": [
+            {"column": "cell_key", "columns": ["cell_key"], "references": "inference_cells.cell_key", "cardinality": "many_to_one"}
+        ],
+        "cohort_registry": [
+            {"column": "issue", "columns": ["issue"], "references": "inference_cells.issue", "cardinality": "one_to_many"}
+        ],
+    }
+    tables: dict[str, object] = {}
+    for table_name, (relative_path, frame) in sorted(payloads.items()):
+        columns = []
+        for column in frame.columns:
+            raw = frame[column]
+            list_shape = [3] if column in contract.PROBABILITY_REPRESENTATIONS else None
+            physical = str(raw.dtype)
+            if relative_path.endswith(".parquet"):
+                try:
+                    import pyarrow as pa
+
+                    physical = str(pa.Schema.from_pandas(frame[[column]], preserve_index=False).field(column).type)
+                except Exception:  # pragma: no cover - pandas dtype remains explicit
+                    physical = str(raw.dtype)
+            columns.append(
+                {
+                    "name": column,
+                    "physical_type": physical,
+                    "logical_type": (
+                        "probability_vector_3"
+                        if list_shape
+                        else "utc_timestamp"
+                        if column.endswith("_utc") or column.endswith("_ts_utc")
+                        else "boolean"
+                        if pd.api.types.is_bool_dtype(raw.dtype)
+                        else "integer"
+                        if pd.api.types.is_integer_dtype(raw.dtype)
+                        else "number"
+                        if pd.api.types.is_float_dtype(raw.dtype)
+                        else "string_or_struct"
+                    ),
+                    "units": _feature_units(column),
+                    "nullable": bool(raw.isna().any()),
+                    "domain": _feature_domain(column, raw),
+                    "list_shape": list_shape,
+                    "source": _feature_source(column),
+                    "admissible_use": _feature_admissible_use(column),
+                }
+            )
+        keys = primary_keys.get(table_name, [])
+        distinct_pk = (
+            int(frame[keys].drop_duplicates().shape[0])
+            if keys and all(key in frame.columns for key in keys)
+            else None
         )
+        tables[table_name] = {
+            "path": relative_path,
+            "format": Path(relative_path).suffix.lstrip("."),
+            "row_count": int(len(frame)),
+            "primary_key": keys,
+            "foreign_keys": foreign_keys.get(table_name, []),
+            "cardinality": {
+                "rows": int(len(frame)),
+                "distinct_primary_keys": distinct_pk,
+            },
+            "columns": columns,
+        }
     return {
         "package": contract.PACKAGE_NAME,
-        "schema_version": "1.0",
-        "primary_key": "cell_key",
-        "identity_keys": ["issue", "match_idx", "outcome_code"],
-        "relationship": {
-            "inference_cells": "cell_key = issue:match_idx:outcome_code",
-            "development_labels": "cell_join_key (issue:match:outcome) -> inference cell_key",
-            "feature_dictionary": "feature name -> inference_cells column",
+        "schema_version": "2.0",
+        "tables": tables,
+        "relationships": {
+            "development_labels_to_inference": "physical cell_key FK; no upstream private map",
+            "feature_dictionary_to_inference": "feature is exactly one inference column",
+            "causal_eligibility_to_inference": "one row per cell_key × representation",
         },
-        "columns": columns,
     }
 
 
@@ -1005,30 +1206,21 @@ def build_probability_mapping_registry(receipt: BuildReceipt) -> pd.DataFrame:
     """Probability mapping/reconciliation registry incl. source identity."""
     cells = receipt.cells
     rows = []
-    for representation in [
-        contract.Q_BJ_SP_DEVIG,
-        contract.Q_BJ_CALIBRATED,
-        contract.Q_EU_RAW_1X2,
-        contract.Q_EU_BJLINE,
-        contract.P_POWER_BJLINE,
-    ]:
+    for representation in contract.PROBABILITY_REPRESENTATIONS:
         if representation not in cells.columns:
             continue
         raw = cells[representation]
-        available = raw.apply(
-            lambda v: (
-                v is not None
-                and isinstance(v, (list, tuple, np.ndarray))
-                and len(v) == 3
-            )
+        raw_present = raw.apply(
+            lambda value: isinstance(value, (list, tuple, np.ndarray))
+            and len(value) == 3
         ).sum()
-        source_col = {
-            contract.Q_BJ_SP_DEVIG: contract.SOURCE_IDENTITY_SP,
-            contract.Q_BJ_CALIBRATED: contract.SOURCE_IDENTITY_Q_BJ,
-            contract.Q_EU_RAW_1X2: contract.SOURCE_IDENTITY_EU,
-            contract.Q_EU_BJLINE: contract.SOURCE_IDENTITY_EU,
-            contract.P_POWER_BJLINE: contract.SOURCE_IDENTITY_POWER,
-        }.get(representation)
+        causal_available = int(
+            cells.get(
+                contract.available_col(representation),
+                pd.Series(False, index=cells.index),
+            ).fillna(False).astype(bool).sum()
+        )
+        source_col = contract.source_identity_col(representation)
         source_values = (
             cells[source_col].value_counts().to_dict()
             if source_col in cells.columns
@@ -1038,9 +1230,10 @@ def build_probability_mapping_registry(receipt: BuildReceipt) -> pd.DataFrame:
             {
                 "representation": representation,
                 "definition": _representation_definition(representation),
-                "available_cells": int(available),
+                "raw_present_cells": int(raw_present),
+                "causally_available_cells": causal_available,
                 "total_cells": len(cells),
-                "coverage_fraction": float(available / len(cells)),
+                "causal_coverage_fraction": float(causal_available / len(cells)),
                 "source_identity": source_values,
                 "kept_separate_from": _separation_note(representation),
             }

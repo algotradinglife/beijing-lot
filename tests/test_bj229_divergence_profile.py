@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import sys
 from pathlib import Path
 
@@ -164,6 +163,23 @@ def test_validate_sp() -> None:
 # ---------------------------------------------------------------------------
 # Per-cell divergence golden (REQ-D05, B3)
 # ---------------------------------------------------------------------------
+def _with_causal_masks(frame: pd.DataFrame) -> pd.DataFrame:
+    out = frame.copy()
+    for representation in (
+        contract.Q_BJ_CALIBRATED,
+        contract.Q_EU_BJLINE,
+        contract.P_POWER_BJLINE,
+    ):
+        out[contract.available_col(representation)] = out[representation].apply(
+            lambda value: isinstance(value, (list, tuple, np.ndarray)) and len(value) == 3
+        )
+    for scalar in ("predicted_final_sp_input", "market_uncertainty"):
+        out[contract.available_col(scalar)] = pd.to_numeric(
+            out[scalar], errors="coerce"
+        ).notna()
+    return out
+
+
 def _ev_example_frame(independent: bool = True) -> pd.DataFrame:
     """The EV's issue 25043/match 8 example with the exact audited vectors.
 
@@ -199,7 +215,7 @@ def _ev_example_frame(independent: bool = True) -> pd.DataFrame:
                 "market_uncertainty": np.nan,
             }
         )
-    return pd.DataFrame(rows)
+    return _with_causal_masks(pd.DataFrame(rows))
 
 
 def test_per_cell_divergence_golden_diff() -> None:
@@ -254,6 +270,7 @@ def test_same_source_alias_is_unavailable() -> None:
 
 def test_independent_source_divergence_materializes() -> None:
     frame = _ev_example_frame(independent=True)
+    frame = _with_causal_masks(frame)
     out = divergence.build_divergence_features(frame)
     assert out.iloc[0]["divergence_eu_minus_qbj"] == pytest.approx(
         -0.2609918585, abs=1e-9
@@ -289,6 +306,7 @@ def test_leg_diagnostics_use_own_outcome_component() -> None:
             "market_uncertainty": [0.16, 0.16, 0.16],
         }
     )
+    frame = _with_causal_masks(frame)
     out = divergence.build_divergence_features(frame)
     # own component per outcome: 0.5*3.5, 0.3*3.5, 0.2*3.5
     assert out.iloc[0][divergence.LEG_Q_TIMES_SP_PRE] == pytest.approx(1.75, abs=1e-9)
@@ -331,6 +349,7 @@ def test_build_divergence_features_agreement_conflict() -> None:
             "market_uncertainty": [0.16, 0.16, 0.16],
         }
     )
+    frame = _with_causal_masks(frame)
     out = divergence.build_divergence_features(frame)
     # EU +1 (0.6 vs 0.5), POWER -1 (0.4 vs 0.5) on outcome '3' => CONFLICT
     assert out.iloc[0][divergence.DIVERGENCE_AGREEMENT] == "CONFLICT"
@@ -364,6 +383,7 @@ def test_build_divergence_features_epsilon_policy() -> None:
             "market_uncertainty": [np.nan] * 3,
         }
     )
+    frame = _with_causal_masks(frame)
     out = divergence.build_divergence_features(frame)
     # outcome '3' component is below floor -> CLR unavailable, diff available
     assert np.isnan(out.iloc[0][divergence.DIVERGENCE_EU_LOGRATIO])
@@ -394,8 +414,9 @@ def test_coverage_strata() -> None:
         contract.P_POWER_BJLINE,
     }
     qbj = strata[strata["representation"] == contract.Q_BJ_CALIBRATED].iloc[0]
-    assert qbj["available_cells"] == 3
-    assert qbj["coverage_fraction"] == 1.0
+    assert qbj["raw_present_cells"] == 3
+    assert qbj["causally_available_cells"] == 0
+    assert qbj["causal_coverage_fraction"] == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -561,6 +582,18 @@ def test_dq12_payload_variant_scans_labels() -> None:
     assert (
         flagged["reason_code"] == contract.REASON_PAYOUT_FACTOR_AT_CELL_LEVEL
     ).any()
+
+
+def test_dq12_allows_nonpayout_settlement_provenance_columns() -> None:
+    labels = pd.DataFrame(
+        {
+            "settlement_status": ["SETTLED"],
+            "settlement_quality": ["TRUSTED"],
+            "settlement_source": ["#203"],
+        }
+    )
+    flagged = quality.dq12_payout_boundary_payload(labels, "dev_labels")
+    assert flagged.empty
 
 
 def test_run_all_checks_returns_all_12() -> None:
@@ -758,6 +791,21 @@ def test_write_package_is_atomic_on_failure() -> None:
         receipt.evidence = pd.DataFrame({"requirement": ["REQ-D01"], "pass": [True]})
         receipt.disposition = "BLOCKED_DATA_DEFECT"
         receipt.source_hashes = {}
+        receipt.development_labels = pd.DataFrame(
+            columns=["cell_key", "issue", "match_idx", "outcome_code", "year"]
+        )
+        receipt.sealed_labels = pd.DataFrame(
+            {
+                "namespace": ["2024_labels", "2025_plus_labels", "2024_plus_labels"],
+                "year_rule": ["year == 2024", "year >= 2025", "year >= 2024"],
+                "upstream_rows": [0, 0, 0],
+                "handoff_rows": [0, 0, 0],
+                "status": ["SEALED_PHYSICALLY_EMPTY"] * 3,
+            }
+        )
+        receipt.causal = pd.DataFrame(
+            columns=["cell_key", "representation", "available", "unavailable_reason"]
+        )
 
         # force a write failure: make evidence un-writable by monkeypatching
         import divergence_profile.builder as builder_mod

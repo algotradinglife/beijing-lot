@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-from . import contract  # noqa: E402
+from . import contract, publication  # noqa: E402
 
 FIG_WIDTH = 10
 FIG_HEIGHT = 5
@@ -28,9 +28,17 @@ FIG_HEIGHT = 5
 
 def _save(figure: plt.Figure, directory: Path, name: str) -> Path:
     target = directory / name
-    figure.savefig(target, dpi=150, bbox_inches="tight")
+    publication.atomic_save_figure(figure, target, dpi=150, bbox_inches="tight")
     plt.close(figure)
     return target
+
+
+def _placeholder(directory: Path, name: str, message: str) -> Path:
+    figure, axis = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
+    axis.text(0.5, 0.5, message, ha="center", va="center", wrap=True)
+    axis.set_axis_off()
+    figure.tight_layout()
+    return _save(figure, directory, name)
 
 
 def _vector_columns(
@@ -102,7 +110,14 @@ def probability_distribution_figure(
         values = pd.to_numeric(table[column], errors="coerce").dropna()
         parts.append(values)
         labels.append(f"outcome {code}")
-    axis.boxplot(parts, labels=labels)
+    if not parts or not any(len(values) for values in parts):
+        plt.close(fig)
+        return _placeholder(
+            directory,
+            f"prob_dist_{representation}.png",
+            f"No causally available {representation} values",
+        )
+    axis.boxplot(parts, tick_labels=labels)
     axis.set_title(f"Distribution of {representation}")
     axis.set_ylabel("probability")
     fig.tight_layout()
@@ -112,7 +127,7 @@ def probability_distribution_figure(
 def eu_vs_bj_scatter_figure(table: pd.DataFrame, directory: Path) -> Path:
     """EU-vs-BJ scatter by native line (from the committed scatter table)."""
     if table.empty:
-        return directory / "eu_vs_bj_scatter.png"
+        return _placeholder(directory, "eu_vs_bj_scatter.png", "No causal EU/Q_BJ overlap")
     fig, axis = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
     for outcome in table["outcome"].unique():
         sub = table[table["outcome"] == outcome]
@@ -132,7 +147,7 @@ def eu_vs_bj_scatter_figure(table: pd.DataFrame, directory: Path) -> Path:
 def power_vs_bj_scatter_figure(table: pd.DataFrame, directory: Path) -> Path:
     """POWER-vs-BJ scatter by native line."""
     if table.empty:
-        return directory / "power_vs_bj_scatter.png"
+        return _placeholder(directory, "power_vs_bj_scatter.png", "No causal POWER/Q_BJ overlap")
     fig, axis = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
     for outcome in table["outcome"].unique():
         sub = table[table["outcome"] == outcome]
@@ -153,7 +168,7 @@ def agreement_figure(table: pd.DataFrame, directory: Path) -> Path:
     """EU/POWER direction agreement matrix heatmap."""
     direction = table[table["table"] == "direction_matrix"]
     if direction.empty:
-        return directory / "direction_agreement.png"
+        return _placeholder(directory, "direction_agreement.png", "No causal EU/POWER divergence overlap")
     pivot = direction.pivot_table(
         index="divergence_eu_direction",
         columns="divergence_power_direction",
@@ -174,19 +189,21 @@ def agreement_figure(table: pd.DataFrame, directory: Path) -> Path:
 
 
 def drift_figure(table: pd.DataFrame, directory: Path) -> Path:
-    """Chronological drift: cells and Q_BJ calibrated availability per year."""
+    """Chronological causal coverage for every probability source."""
     if table.empty:
-        return directory / "drift.png"
+        return _placeholder(directory, "drift.png", "No drift rows")
     fig, axis = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
-    year = table["year"].astype(str)
-    axis.bar(year, table["cells"], alpha=0.5, label="cells")
-    axis2 = axis.twinx()
-    axis2.plot(year, table["qbj_available_fraction"], "o-", color="tab:red", label="Q_BJ calibrated fraction")
-    axis2.set_ylim(0, 1.1)
+    for representation, group in table.groupby("representation"):
+        by_year = group.groupby("year", as_index=False)["causal_coverage_fraction"].mean()
+        axis.plot(
+            by_year["year"].astype(str), by_year["causal_coverage_fraction"],
+            "o-", label=representation,
+        )
+    axis.set_ylim(0, 1.05)
     axis.set_xlabel("year")
-    axis.set_ylabel("cells")
-    axis2.set_ylabel("Q_BJ calibrated fraction")
-    axis.set_title("Chronological drift: cells and calibrated availability by year")
+    axis.set_ylabel("causal coverage fraction")
+    axis.set_title("Chronological causal availability by probability source")
+    axis.legend(fontsize=7)
     fig.tight_layout()
     return _save(fig, directory, "drift.png")
 
@@ -194,7 +211,7 @@ def drift_figure(table: pd.DataFrame, directory: Path) -> Path:
 def exclusion_figure(table: pd.DataFrame, directory: Path) -> Path:
     """Exclusion summary horizontal bar chart."""
     if table.empty or "reason_code" not in table.columns:
-        return directory / "exclusion_summary.png"
+        return _placeholder(directory, "exclusion_summary.png", "No exclusions")
     order = table.sort_values("count", ascending=False)
     fig, axis = plt.subplots(figsize=(10, max(4, 0.4 * len(order))))
     axis.barh(order["reason_code"], order["count"])
@@ -212,14 +229,14 @@ def simplex_figure(frame: pd.DataFrame, representation: str, directory: Path) ->
     """
     columns = _vector_columns(frame, representation)
     if columns.empty:
-        return directory / f"simplex_{representation}.png"
+        return _placeholder(directory, f"simplex_{representation}.png", "No raw probability vectors")
     a = pd.to_numeric(columns[f"{representation}_3"], errors="coerce").to_numpy()
     b = pd.to_numeric(columns[f"{representation}_1"], errors="coerce").to_numpy()
     c = pd.to_numeric(columns[f"{representation}_0"], errors="coerce").to_numpy()
     valid = np.isfinite(a) & np.isfinite(b) & np.isfinite(c)
     a, b, c = a[valid], b[valid], c[valid]
     if len(a) == 0:
-        return directory / f"simplex_{representation}.png"
+        return _placeholder(directory, f"simplex_{representation}.png", "No finite probability vectors")
     x = 0.5 * (2 * b + c) / (a + b + c + 1e-12)
     y = (np.sqrt(3) / 2) * c / (a + b + c + 1e-12)
     fig, axis = plt.subplots(figsize=(6, 6))
@@ -242,16 +259,46 @@ def simplex_figure(frame: pd.DataFrame, representation: str, directory: Path) ->
 def calibration_figure(table: pd.DataFrame, directory: Path) -> Path:
     """Development-only reliability/calibration plot (from committed table)."""
     if table.empty:
-        return directory / "development_only_calibration.png"
+        return _placeholder(directory, "development_only_calibration.png", "No causal development-label overlap")
+    available = table[table["status"] == "AVAILABLE"].dropna(
+        subset=["mean_prob", "observed_freq"]
+    )
+    if available.empty:
+        return _placeholder(directory, "development_only_calibration.png", "No causal development-label overlap")
     fig, axis = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
-    axis.plot(table["mean_prob"], table["observed_freq"], "o-", label="observed")
+    for (representation, outcome), group in available.groupby(["representation", "outcome"]):
+        axis.plot(
+            group["mean_prob"], group["observed_freq"], "o-",
+            label=f"{representation}:{outcome}", linewidth=0.8, markersize=3,
+        )
     axis.plot([0, 1], [0, 1], "k--", linewidth=0.8, label="perfect")
     axis.set_xlabel("mean predicted probability (Q_BJ_CALIBRATED, dev <=2023)")
     axis.set_ylabel("observed outcome frequency")
-    axis.set_title("Development-only reliability: Q_BJ_CALIBRATED")
-    axis.legend()
+    axis.set_title("Development-only reliability by probability source/outcome")
+    axis.legend(fontsize=6, ncol=2)
     fig.tight_layout()
     return _save(fig, directory, "development_only_calibration.png")
+
+
+def statistic_figure(
+    table: pd.DataFrame, directory: Path, name: str, title: str
+) -> Path:
+    if table.empty:
+        return _placeholder(directory, name, "Unavailable: no causal support")
+    value_column = "value" if "value" in table else None
+    label_column = "stat" if "stat" in table else "quantile" if "quantile" in table else None
+    if value_column is None or label_column is None:
+        return _placeholder(directory, name, "Machine-readable receipt has no plottable values")
+    values = pd.to_numeric(table[value_column], errors="coerce")
+    valid = values.notna()
+    if not valid.any():
+        return _placeholder(directory, name, "Unavailable: no finite metric values")
+    figure, axis = plt.subplots(figsize=(FIG_WIDTH, FIG_HEIGHT))
+    axis.bar(table.loc[valid, label_column].astype(str), values.loc[valid])
+    axis.tick_params(axis="x", rotation=30)
+    axis.set_title(title)
+    figure.tight_layout()
+    return _save(figure, directory, name)
 
 
 def write_all_figures(
@@ -269,15 +316,16 @@ def write_all_figures(
         written.append(missingness_figure(tables["missingness_matrix"], directory))
     if "intersection_coverage" in tables:
         written.append(intersection_figure(tables["intersection_coverage"], directory))
-    for representation in (
-        contract.Q_BJ_CALIBRATED,
-        contract.Q_EU_BJLINE,
-        contract.P_POWER_BJLINE,
-        contract.Q_EU_RAW_1X2,
-    ):
-        key = f"probability_distribution_{representation}"
+    distribution_keys = {
+        contract.Q_BJ_CALIBRATED: "probability_distribution_qbj_calibrated",
+        contract.Q_EU_BJLINE: "probability_distribution_eu_bjline",
+        contract.P_POWER_BJLINE: "probability_distribution_power",
+        contract.Q_EU_RAW_1X2: "probability_distribution_eu_raw",
+        contract.Q_BJ_SP_DEVIG: "probability_distribution_sp_devig",
+    }
+    for representation, key in distribution_keys.items():
         table = tables.get(key)
-        if table is not None and not table.empty:
+        if table is not None:
             written.append(
                 probability_distribution_figure(table, representation, directory)
             )
@@ -294,4 +342,18 @@ def write_all_figures(
         written.append(exclusion_figure(tables["exclusion_summary"], directory))
     if "development_only_calibration" in tables:
         written.append(calibration_figure(tables["development_only_calibration"], directory))
+    if "divergence_magnitude_tail" in tables:
+        written.append(
+            statistic_figure(
+                tables["divergence_magnitude_tail"], directory,
+                "divergence_tail.png", "Causal divergence magnitude tail",
+            )
+        )
+    if "predicted_sp_vs_settlement_sp" in tables:
+        written.append(
+            statistic_figure(
+                tables["predicted_sp_vs_settlement_sp"], directory,
+                "predicted_sp_vs_settlement_sp.png", "Predicted vs settlement SP diagnostics",
+            )
+        )
     return written
