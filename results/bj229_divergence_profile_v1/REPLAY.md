@@ -20,9 +20,9 @@ fail-closed: every upstream package is SHA256-verified before use.
 
 ## Reviewed-SHA binding (REQ-D09)
 
-- reviewed_commit_sha: `27e05ee2e079d26510ece1f78b9fe0e0c9ea1a8b`
-- code_hash (src/divergence_profile): `f57ab3bf4bcd021b32206e8573c0fd95308b6598026b15b32fbd267adc891a84`
-- notebook_hash: `eca06a7ce4e1c53298c322e007a1a83602eb768b10da82d28c6184c35b93f15b`
+- reviewed_commit_sha: `7a1049eda4c08fb38a798877c8924b50dc3d0aaf`
+- code_hash (src/divergence_profile): `1d53fe6f15ab33dd70a4f12593feca6a34d9d7f17117859d711cf9d494959bd5`
+- notebook_hash: `bae655d6333c187c24c25dfc1a2278d735e2c80e773bf2ea6a1fa89b823cc99a`
 - requirements_hash: `4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78`
 
 ## Upstream source hashes (recorded at build)
@@ -154,4 +154,4 @@ fail-closed: every upstream package is SHA256-verified before use.
 }
 ```
 
-Built at 2026-08-15T04:22:21.545041+00:00.
+Built at 2026-08-15T04:40:10.802232+00:00.
