@@ -1,27 +1,28 @@
-# Issue #229 — divergence-aware M×3 data profile: R3 data-readiness report
+# Issue #229 — divergence-aware M×3 data profile: R4 PI decision report
 
 Contract: `BJ-UNIFIED-DIVERGENCE-DATA-PROFILE-001/v2`. Parent: #202.
 Predecessor of #209. This package performs data preparation/profiling, not
 model or strategy selection. `REWORK_TYPE=method`; no `method.yaml` exists, so
 REQ-M is N/A.
 
-Immutable package: `results/bj229_divergence_profile_v1/` — 72 files covered by
+Immutable package: `results/bj229_divergence_profile_v1/` — 74 files covered by
 `SHA256SUMS.json`, with manifest, replay, package-wide schema, causal ledger,
 requirement evidence, 47 physical tables, generated figures, an executed
 13/13-cell notebook, reusable code, and package-only loader/validator.
 
-Full seven-class call-site evidence is in `R3_SWEEP_EVIDENCE.md`.
+R3 implementation evidence is in `R3_SWEEP_EVIDENCE.md`; the PI root-cause
+correction is in `R4_PI_TAKEOVER.md` and evidence debt in `DEBT-LEDGER.md`.
 
 ## Disposition
 
-**`READY_WITH_EXPLICIT_LIMITATIONS`**.
+**`BLOCKED_DATA_DEFECT`**.
 
 This is causal readiness, not raw-presence readiness. `Q_BJ_CALIBRATED` has
 353,991 raw vectors but only **228 causally available cells**. Every profile,
 divergence, intersection, disposition, report, and #209 handoff path consumes
 `*_available`; raw vector presence is never substituted. REQ-D01 remains
-False because causal defects/gaps remain countable, while REQ-D10 is True
-because the disposition and limitations are honest.
+False because causal defects/gaps remain countable. REQ-D10 is True only
+because the disposition now fails closed on the actual #209 interface.
 
 ## Canonical and label census
 
@@ -51,9 +52,9 @@ No year is inferred from an issue-number prefix.
 | P_POWER_BJLINE | 4,674 | 234 |
 
 `BJ_LINE_BOUNDARY` has 228 causally available cells. There is currently no
-causal Q_BJ×EU_BJLINE or Q_BJ×POWER overlap; therefore both divergence tables
-are explicit empty/unavailable receipts and no raw-only rows enter scatter,
-support, calibration, or readiness.
+causal Q_BJ×EU_BJLINE or Q_BJ×POWER overlap, and Q_BJ×pre-event-SP support is
+also zero. Therefore both divergence tables are explicit unavailable receipts
+and the package is not a usable #209 modeling input.
 
 REQ-D01 evidence records:
 
@@ -82,42 +83,41 @@ intersection, outlier/heavy-tail, divergence and chart-source mapping tables.
 Unavailable analyses remain physical receipts and figures become explicit
 placeholders rather than disappearing.
 
-`handoff_schema.json` describes 47 package tables with paths, physical and
-logical types, probability list shape, units, nullability, domains, primary
-keys, foreign keys and cardinality. `divergence_profile.load_package` and
-`validate_package` validate the package without opening private #203/#204/#214/
-#180 maps.
+`handoff_schema.json` describes the physical package and
+`divergence_profile.load_package` / `validate_package` validate the core
+package without opening private #203/#204/#214/#180 maps. Some aggregate and
+empty tables still require normalized key/domain semantics before `finalize`;
+this is recorded as E2 rather than overstated as closed.
 
 ## Verifier, provenance, and publication
 
 The verifier recomputes causal masks, divergence, label boundaries, profiling,
-schema/FK closure, requirement outcomes, report bytes, code/notebook/dependency
-hashes and PR-HEAD binding. Remanifested mutations of divergence, availability,
-labels, schema, evidence, report and manifest are rejected.
+requirement outcomes, report bytes and content hashes. Exact PR-HEAD binding is
+provided by the independent EV `AUDITED_SHA`; replacing the remaining symbolic
+package wording is E1 evidence debt.
 
 All CSV/Parquet/JSON/PNG/notebook/replay/manifest/SHA writes use same-parent
-staging, file fsync, atomic replace, and correct parent-directory fsync. Whole
-package publication protects the previous package across `Exception`,
-`BaseException`, post-rename durability faults, stale staging/previous state,
-and immediate retry.
+staging and fsync. In-process swap/rollback is tested; a durable phase journal
+for ambiguous kill/restart states remains E3 evidence debt before `finalize`.
 
 ## Verified execution
 
-- R3 focused tests: 31 passed.
-- Full Issue #229 tests: 56 passed.
-- Remanifest/tamper subset: 7 passed.
-- Sequential clean build: 29:20 wall, peak RSS 2,673,928 KiB.
-- Notebook: 13/13 code cells executed, 0 error outputs; 29:16 wall, peak RSS
-  2,670,468 KiB.
-- Package verifier after notebook execution: 72 files match; semantic checks
+- R4 focused and full Issue #229 tests: 92 passed.
+- Ruff and `git diff --check`: PASS.
+- Sequential clean build: 29:01 wall, peak RSS 2,827,008 KiB.
+- Notebook: 13/13 code cells executed, 0 error outputs; 29:29 wall, peak RSS
+  2,852,356 KiB.
+- Package verifier after notebook execution: 74 files match; semantic checks
   PASS for causal/divergence/labels/schema/profile/provenance/report.
 
-## #209 limitations
+## #209 blocking result
 
 1. Only 228 Q_BJ cells are causally available despite 353,991 raw vectors.
-2. There is no causal translated-EU or causal POWER overlap with Q_BJ, so no
-   divergence signal from those comparisons may be consumed.
-3. Q_BJ_SP_DEVIG causal coverage is zero.
+2. There is no causal translated-EU or causal POWER overlap with Q_BJ.
+3. Q_BJ_SP_DEVIG causal coverage is zero, so no current divergence row has a
+   causal pre-event price/value leg.
 4. The 15 post-decision cells and all missing/late epochs remain excluded and
    countable; they are not imputed.
 5. 2024+ labels remain sealed and physically absent.
+6. #209 must remain blocked until a new native data-remediation predecessor
+   creates positive causal SP-backed divergence support.

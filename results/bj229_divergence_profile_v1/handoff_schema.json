@@ -294,6 +294,28 @@
           "physical_type": "str",
           "source": "derived_or_identity",
           "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "reason",
+          "nullable": false,
+          "physical_type": "str",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "row_count",
+          "nullable": false,
+          "physical_type": "int64",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
         }
       ],
       "foreign_keys": [],
@@ -491,13 +513,46 @@
           "units": "decimal odds (>1)"
         },
         {
+          "admissible_use": "inference",
+          "domain": "development|test|heldout",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "cohort",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "development-label",
+          "domain": "3|1|0",
+          "list_shape": null,
+          "logical_type": "string_or_struct",
+          "name": "outcome_code",
+          "nullable": false,
+          "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
           "admissible_use": "development-label",
           "domain": "UNSPECIFIED",
           "list_shape": null,
           "logical_type": "string_or_struct",
-          "name": "issue_instance",
+          "name": "issue",
           "nullable": false,
           "physical_type": "large_string",
+          "source": "derived_or_identity",
+          "units": "unitless / categorical"
+        },
+        {
+          "admissible_use": "inference",
+          "domain": "UNSPECIFIED",
+          "list_shape": null,
+          "logical_type": "integer",
+          "name": "match_idx",
+          "nullable": false,
+          "physical_type": "int64",
           "source": "derived_or_identity",
           "units": "unitless / categorical"
         },
@@ -517,40 +572,7 @@
           "domain": "UNSPECIFIED",
           "list_shape": null,
           "logical_type": "string_or_struct",
-          "name": "issue",
-          "nullable": false,
-          "physical_type": "large_string",
-          "source": "derived_or_identity",
-          "units": "unitless / categorical"
-        },
-        {
-          "admissible_use": "development-label",
-          "domain": "3|1|0",
-          "list_shape": null,
-          "logical_type": "string_or_struct",
-          "name": "outcome_code",
-          "nullable": false,
-          "physical_type": "large_string",
-          "source": "derived_or_identity",
-          "units": "unitless / categorical"
-        },
-        {
-          "admissible_use": "inference",
-          "domain": "UNSPECIFIED",
-          "list_shape": null,
-          "logical_type": "integer",
-          "name": "match_idx",
-          "nullable": false,
-          "physical_type": "int64",
-          "source": "derived_or_identity",
-          "units": "unitless / categorical"
-        },
-        {
-          "admissible_use": "inference",
-          "domain": "development|test|heldout",
-          "list_shape": null,
-          "logical_type": "string_or_struct",
-          "name": "cohort",
+          "name": "issue_instance",
           "nullable": false,
           "physical_type": "large_string",
           "source": "derived_or_identity",

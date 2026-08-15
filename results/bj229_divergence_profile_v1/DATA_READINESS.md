@@ -1,6 +1,6 @@
 # Issue #229 data readiness
 
-Disposition: READY_WITH_EXPLICIT_LIMITATIONS
+Disposition: BLOCKED_DATA_DEFECT
 Inference cells: 357705
 Development labels through 2023: 243462
 

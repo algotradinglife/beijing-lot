@@ -15,6 +15,8 @@ Rework (2026-08-15, class-5 sweep):
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
@@ -411,6 +413,43 @@ def intersection_coverage(cells: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def readiness_support(cells: pd.DataFrame) -> dict[str, int]:
+    """Return the causal interfaces that #209 can actually consume.
+
+    A market anchor by itself is not a divergence/value interface.  The
+    downstream learner needs both a pre-event SP leg and at least one
+    independent probability source expressed in the same BJ outcome space.
+    """
+    qbj = _causal_mask(cells, contract.Q_BJ_CALIBRATED)
+    eu = _causal_mask(cells, contract.Q_EU_BJLINE)
+    power = _causal_mask(cells, contract.P_POWER_BJLINE)
+    sp = _causal_mask(cells, contract.Q_BJ_SP_DEVIG)
+    return {
+        "qbj_anchor": int(qbj.sum()),
+        "qbj_x_eu": int((qbj & eu).sum()),
+        "qbj_x_power": int((qbj & power).sum()),
+        "qbj_x_sp": int((qbj & sp).sum()),
+        "qbj_x_eu_x_sp": int((qbj & eu & sp).sum()),
+        "qbj_x_power_x_sp": int((qbj & power & sp).sum()),
+    }
+
+
+def readiness_disposition(
+    cells: pd.DataFrame, *, has_post_decision_exclusions: bool = False
+) -> str:
+    """Apply the frozen #209 minimum-support gate."""
+    support = readiness_support(cells)
+    has_eu_interface = support["qbj_x_eu_x_sp"] > 0
+    has_power_interface = support["qbj_x_power_x_sp"] > 0
+    if not (has_eu_interface or has_power_interface):
+        return "BLOCKED_DATA_DEFECT"
+    if has_post_decision_exclusions or not (
+        has_eu_interface and has_power_interface
+    ):
+        return "READY_WITH_EXPLICIT_LIMITATIONS"
+    return "READY_FOR_209"
+
+
 def exclusion_ledger(checks: dict[str, pd.DataFrame]) -> pd.DataFrame:
     """Combine all per-row exclusion checks into one stable ledger."""
     parts = []
@@ -617,10 +656,11 @@ def outlier_heavy_tail_table(dq10: pd.DataFrame) -> pd.DataFrame:
     return dq10.copy()
 
 
-def chart_source_mapping() -> pd.DataFrame:
-    """Machine-readable lineage from each committed chart to its source table."""
-    return pd.DataFrame(
-        [
+def chart_source_mapping(
+    tables: dict[str, pd.DataFrame] | None = None,
+) -> pd.DataFrame:
+    """Machine-readable chart lineage with honest availability receipts."""
+    definitions = [
             ("prob_dist_Q_BJ_CALIBRATED.png", "tables/probability_distribution_qbj_calibrated.csv", "Q_BJ_CALIBRATED"),
             ("eu_vs_bj_scatter.png", "tables/eu_vs_bj_scatter_table.csv", "Q_EU_BJLINE & Q_BJ_CALIBRATED"),
             ("power_vs_bj_scatter.png", "tables/power_vs_bj_scatter_table.csv", "P_POWER_BJLINE & Q_BJ_CALIBRATED"),
@@ -631,6 +671,40 @@ def chart_source_mapping() -> pd.DataFrame:
             ("intersection_coverage.png", "tables/intersection_coverage.csv", "causal support intersections"),
             ("development_only_calibration.png", "tables/development_only_calibration.csv", "all sources × outcomes × cohort"),
             ("predicted_sp_vs_settlement_sp.png", "tables/predicted_sp_vs_settlement_sp.csv", "causal predicted SP × development labels"),
-        ],
-        columns=["figure", "source_table", "scope"],
-    ).assign(status="BOUND")
+    ]
+    rows: list[dict[str, object]] = []
+    for figure, source_table, scope in definitions:
+        table_name = Path(source_table).stem
+        source = None if tables is None else tables.get(table_name)
+        if source is None:
+            status = "UNASSESSED"
+            reason = "SOURCE_TABLE_NOT_PROVIDED"
+            row_count = -1
+        else:
+            row_count = len(source)
+            unavailable_statuses = (
+                source["status"].dropna().astype(str)
+                if "status" in source.columns
+                else pd.Series(dtype=str)
+            )
+            unavailable = source.empty or (
+                not unavailable_statuses.empty
+                and unavailable_statuses.str.startswith("UNAVAILABLE").all()
+            )
+            status = "UNAVAILABLE" if unavailable else "BOUND"
+            reason = (
+                "NO_CAUSAL_SUPPORT"
+                if unavailable
+                else "NOT_APPLICABLE"
+            )
+        rows.append(
+            {
+                "figure": figure,
+                "source_table": source_table,
+                "scope": scope,
+                "status": status,
+                "reason": reason,
+                "row_count": row_count,
+            }
+        )
+    return pd.DataFrame(rows)

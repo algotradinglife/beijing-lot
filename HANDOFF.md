@@ -1,27 +1,20 @@
-# Issue #229 R3 handoff
+# Issue #229 R4 PI takeover handoff
 
 [SESSION] 20260815_150526_cb81c5
 
-- Current delivery HEAD: `PR_HEAD` (resolved to the exact pushed SHA in PR #231
-  and the transactional `post_handoff.py` receipt; a commit cannot embed its own
-  SHA).
-- Rework: `REWORK_TYPE=method`, fresh R3 against EV R2 audited SHA
-  `6d198fb7f8ebd72c8904ad80d928fb045088c8ac`.
+- Current delivery HEAD is bound externally by the independent EV
+  `AUDITED_SHA`; a Git commit cannot embed its own SHA.
+- R4 is a PI-owned candidate-mode correction against R3 audited SHA
+  `6c5cdf36ea77d94be1ed69eca50f9d0f6b6accda`.
 
-## Completed
+## Conclusion correction
 
-- Closed B1 raw-presence readiness bypass: source identity, observed-at,
-  decision epoch and availability masks are published and consumed by every
-  divergence/profile/intersection/disposition/handoff path.
-- Closed B2 fake-year parsing: development/sealed namespaces join authoritative
-  #203 `cell_identity.year`; 243,462 development rows through 2023 and 60,201
-  sealed 2024+ rows are independently countable.
-- Completed the seven-class sweep in `R3_SWEEP_EVIDENCE.md`, including tests for
-  source boundaries, remanifested semantic mutation, atomic publication and
-  immediate retry.
-- Published a 72-file package with 47 schema-bound tables and a package-only
-  independent loader/validator.
-- Executed and verified the notebook and immutable package.
+- Readiness no longer accepts anchor-only support. It requires a causal
+  pre-event SP plus at least one independent EU/POWER divergence pair.
+- POWER materialization now fails closed when its source handicap line differs
+  from the target BJ line.
+- Empty chart sources are explicit unavailable receipts, not `BOUND` tables.
+- The present package therefore concludes `BLOCKED_DATA_DEFECT`.
 
 ## Key decisions and reasons
 
@@ -32,23 +25,21 @@
 3. Issue identifiers are identifiers, not years. Label year is sourced only
    from #203 identity.
 4. Empty causal intersections are committed as explicit receipts/placeholders,
-   not filled or omitted.
-5. `PR_HEAD` plus exact code/notebook/dependency hashes avoids the impossible
-   commit-self-SHA cycle while allowing the verifier and handoff to bind the
-   reviewed commit.
+   not filled, omitted or called ready.
+5. Exact review binding is external through `AUDITED_SHA`; package content
+   remains bound by code/notebook/dependency/source hashes.
 
 ## Verification
 
-- R3 tests: 31 passed.
-- Full Issue #229 tests: 56 passed.
-- Remanifest/tamper tests: 7 passed.
-- Sequential build: 29:20 wall; 2,673,928 KiB peak RSS.
-- Notebook: 13/13 cells; 0 errors; 29:16 wall; 2,670,468 KiB peak RSS.
-- Final verifier: 72 files match and semantic checks PASS.
+- R4 focused/full tests: 92 passed.
+- Ruff and `git diff --check`: PASS.
+- Sequential build: 29:01 wall; 2,827,008 KiB peak RSS.
+- Notebook: 13/13 cells; 0 errors; 29:29 wall; 2,852,356 KiB peak RSS.
+- Final verifier: 74 files match and semantic checks PASS.
 
 ## Known limitations and risks
 
-- Disposition is `READY_WITH_EXPLICIT_LIMITATIONS`, not unrestricted ready.
+- Disposition is `BLOCKED_DATA_DEFECT`.
 - Q_BJ causally available: 228 cells.
 - Q_EU_BJLINE causally available: 0; P_POWER causally available: 234, but no
   causal overlap with Q_BJ; no causal divergence rows are published.
@@ -71,12 +62,11 @@
 | D07 payout boundary | PASS; no payout/tax/0.65 construction in payloads |
 | D08 complete profiling | PASS; source×outcome×cohort plus empty receipts |
 | D09 schema/provenance | PASS; 47 tables; package-only semantic validator |
-| D10 honest readiness | PASS; `READY_WITH_EXPLICIT_LIMITATIONS` |
+| D10 honest readiness | PASS; `BLOCKED_DATA_DEFECT` because required causal intersections are zero |
 | REQ-M | N/A; no `method.yaml` in contract tree |
 
-Decision input for PI: whether #209 may proceed under the published causal
-limitations, especially only 228 causal Q_BJ cells and zero causal divergence
-overlap. No model/data coverage is fabricated.
+Decision: #209 may not proceed from this handoff. A separate native
+data-remediation predecessor must create causal SP-backed divergence support.
 
 Explicit review request: EV should independently rerun 87 tests, the seven
 remanifest mutations, package verify, notebook 13/13, authoritative label-year

@@ -216,6 +216,61 @@ def test_chart_source_mapping_is_complete() -> None:
         "intersection_coverage.png",
     }.issubset(set(mapping["figure"]))
     assert mapping["source_table"].str.len().gt(0).all()
+    assessed = profile.chart_source_mapping(
+        {
+            "probability_distribution_qbj_calibrated": pd.DataFrame(
+                {"value": [0.5]}
+            ),
+            "eu_vs_bj_scatter_table": pd.DataFrame(),
+        }
+    )
+    qbj = assessed[assessed["figure"] == "prob_dist_Q_BJ_CALIBRATED.png"].iloc[0]
+    eu = assessed[assessed["figure"] == "eu_vs_bj_scatter.png"].iloc[0]
+    assert (qbj["status"], qbj["reason"]) == ("BOUND", "NOT_APPLICABLE")
+    assert (eu["status"], eu["reason"], eu["row_count"]) == (
+        "UNAVAILABLE",
+        "NO_CAUSAL_SUPPORT",
+        0,
+    )
+
+
+def test_readiness_requires_sp_backed_independent_divergence_support() -> None:
+    cells = _cells(qbj_available=True, power_available=False)
+    assert profile.readiness_support(cells)["qbj_anchor"] == 3
+    assert profile.readiness_disposition(cells) == "BLOCKED_DATA_DEFECT"
+
+    cells[contract.available_col(contract.Q_BJ_SP_DEVIG)] = True
+    cells[contract.Q_BJ_SP_DEVIG] = [[0.5, 0.3, 0.2]] * len(cells)
+    assert profile.readiness_disposition(cells) == "READY_WITH_EXPLICIT_LIMITATIONS"
+
+    cells[contract.available_col(contract.P_POWER_BJLINE)] = True
+    assert profile.readiness_disposition(cells) == "READY_FOR_209"
+
+
+def test_power_source_line_mismatch_fails_closed() -> None:
+    cells = _cells().drop(
+        columns=[
+            contract.P_POWER_BJLINE,
+            contract.SOURCE_IDENTITY_POWER,
+            contract.available_col(contract.P_POWER_BJLINE),
+        ]
+    )
+    power = pd.DataFrame(
+        {
+            "issue": ["21001"],
+            "match_idx": [1],
+            "handicap_line_norm": [1.0],
+            "team_primary_p3": [0.5],
+            "team_primary_p1": [0.3],
+            "team_primary_p0": [0.2],
+            "feature_cutoff_ts": ["2021-01-01 00:00:00"],
+        }
+    )
+    output = prob.materialize_power_bjline(cells, power)
+    assert output[contract.P_POWER_BJLINE].isna().all()
+    assert output[
+        contract.producer_reason_col(contract.P_POWER_BJLINE)
+    ].eq(contract.REASON_SOURCE_LINE_MISMATCH).all()
 
 
 # Class 4: schema and package-only loader.
@@ -344,6 +399,7 @@ def test_bj180_empty_and_partial_keep_three_cells_with_receipts() -> None:
     partial = pd.DataFrame(
         {
             "issue": ["21001"], "match_idx": [1],
+            "handicap_line_norm": [0.0],
             "team_primary_p3": [0.5], "team_primary_p1": [0.3],
             "team_primary_p0": [np.nan], "feature_cutoff_ts": ["2021-01-01 07:00:00"],
         }
@@ -358,6 +414,7 @@ def test_bj180_empty_and_partial_keep_three_cells_with_receipts() -> None:
 def test_bj180_duplicate_source_match_fails_fast() -> None:
     row = {
         "issue": "21001", "match_idx": 1,
+        "handicap_line_norm": 0.0,
         "team_primary_p3": 0.5, "team_primary_p1": 0.3,
         "team_primary_p0": 0.2, "feature_cutoff_ts": "2021-01-01 07:00:00",
     }

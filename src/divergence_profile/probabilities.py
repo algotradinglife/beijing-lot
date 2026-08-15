@@ -741,6 +741,7 @@ def materialize_power_bjline(
         [
             "issue",
             "match_idx",
+            "handicap_line_norm",
             "team_primary_p3",
             "team_primary_p1",
             "team_primary_p0",
@@ -749,6 +750,9 @@ def materialize_power_bjline(
     ].copy()
     power["issue"] = power["issue"].astype(str)
     power["match_idx"] = power["match_idx"].astype(int)
+    power["handicap_line_norm"] = pd.to_numeric(
+        power["handicap_line_norm"], errors="coerce"
+    )
     if power.duplicated(["issue", "match_idx"], keep=False).any():
         raise UpstreamBindingError("#180 duplicate source row for POWER")
     complete = power[
@@ -788,6 +792,7 @@ def materialize_power_bjline(
                 "_v3",
                 "_v1",
                 "_v0",
+                "handicap_line_norm",
                 "feature_cutoff_ts",
             ]
         ],
@@ -796,10 +801,18 @@ def materialize_power_bjline(
         suffixes=("", "_power"),
         validate="many_to_one",
     )
+    target_line = pd.to_numeric(out[contract.BJ_LINE_BOUNDARY], errors="coerce")
+    source_line = pd.to_numeric(out["handicap_line_norm"], errors="coerce")
+    source_vector_present = out[["_v3", "_v1", "_v0"]].notna().all(axis=1)
+    same_outcome_space = pd.Series(
+        np.isclose(target_line, source_line, atol=1e-12, rtol=0.0, equal_nan=False),
+        index=out.index,
+    )
+    publishable = source_vector_present & same_outcome_space
     out[contract.P_POWER_BJLINE] = out.apply(
         lambda row: (
             [row["_v3"], row["_v1"], row["_v0"]]
-            if pd.notna(row["_v3"]) and pd.notna(row["_v1"]) and pd.notna(row["_v0"])
+            if bool(publishable.loc[row.name])
             else np.nan
         ),
         axis=1,
@@ -814,13 +827,24 @@ def materialize_power_bjline(
     ] = contract.SRC_BJ180_TEAM_MODEL
     present = out[contract.P_POWER_BJLINE].apply(_is_list_vector)
     out.loc[present, producer_reason] = None
+    out.loc[
+        source_vector_present & ~same_outcome_space,
+        producer_reason,
+    ] = contract.REASON_SOURCE_LINE_MISMATCH
     keys = list(zip(out["issue"].astype(str), out["match_idx"].astype(int)))
     out.loc[
         ~present & pd.Series([key in partial_keys for key in keys], index=out.index),
         producer_reason,
     ] = contract.REASON_PARTIAL_SOURCE_TRIPLET
     out = out.drop(
-        columns=["_v3", "_v1", "_v0", "feature_cutoff_ts"], errors="ignore"
+        columns=[
+            "_v3",
+            "_v1",
+            "_v0",
+            "handicap_line_norm",
+            "feature_cutoff_ts",
+        ],
+        errors="ignore",
     )
     return out
 

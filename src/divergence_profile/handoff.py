@@ -302,7 +302,6 @@ def _profile_problems(
         "source_coverage_strata": divergence.coverage_strata(cells),
         "development_only_calibration": profile_mod.development_only_calibration(cells, labels),
         "predicted_sp_vs_settlement_sp": profile_mod.predicted_sp_vs_settlement_sp(cells, labels),
-        "chart_source_mapping": profile_mod.chart_source_mapping(),
     }
     problems: list[str] = []
     specs = schema.get("tables", {})
@@ -355,6 +354,25 @@ def _profile_problems(
                 problems.append(f"profile: chart missing {figure.name}")
             if not source_table.exists():
                 problems.append(f"profile: chart source missing {row['source_table']}")
+                continue
+            source = _read_table(source_table)
+            row_count = int(row.get("row_count", -1))
+            if row_count != len(source):
+                problems.append(f"profile: chart row count mismatch {row['figure']}")
+            source_status = (
+                source["status"].dropna().astype(str)
+                if "status" in source.columns
+                else pd.Series(dtype=str)
+            )
+            unavailable = source.empty or (
+                not source_status.empty
+                and source_status.str.startswith("UNAVAILABLE").all()
+            )
+            expected_status = "UNAVAILABLE" if unavailable else "BOUND"
+            if row.get("status") != expected_status:
+                problems.append(f"profile: dishonest chart status {row['figure']}")
+            if unavailable and not str(row.get("reason", "")).strip():
+                problems.append(f"profile: missing unavailable reason {row['figure']}")
     return problems
 
 
@@ -383,20 +401,11 @@ def _manifest_problems(
     if payload.get("report_sha256") != sources.sha256_file(package / "DATA_READINESS.md"):
         problems.append("provenance: manifest report hash mismatch")
 
-    qbj = cells[contract.available_col(contract.Q_BJ_CALIBRATED)].fillna(False).astype(bool)
-    all_four = qbj.copy()
-    for representation in (
-        contract.Q_EU_BJLINE, contract.P_POWER_BJLINE, contract.Q_BJ_SP_DEVIG
-    ):
-        all_four &= cells[contract.available_col(representation)].fillna(False).astype(bool)
     epoch = pd.to_datetime(cells[contract.DECISION_EPOCH_COLUMN], errors="coerce", utc=True)
     kickoff = pd.to_datetime(cells[contract.KICKOFF_COLUMN], errors="coerce", utc=True)
     has_post_decision = bool(kickoff.lt(epoch).any())
-    expected_disposition = (
-        "BLOCKED_DATA_DEFECT" if not qbj.any()
-        else "READY_WITH_EXPLICIT_LIMITATIONS" if has_post_decision
-        else "READY_FOR_209" if all_four.any()
-        else "READY_WITH_EXPLICIT_LIMITATIONS"
+    expected_disposition = profile_mod.readiness_disposition(
+        cells, has_post_decision_exclusions=has_post_decision
     )
     if payload.get("disposition") != expected_disposition:
         problems.append("provenance: manifest disposition is not semantically honest")
@@ -435,7 +444,18 @@ def _expected_requirement_passes(
         "REQ-D01": not causal_problems and every_raw_representation_is_causal,
         "REQ-D02": not cells.duplicated(["issue", "match_idx", "outcome_code"]).any() and not any("FK" in p or "identity" in p for p in label_problems),
         "REQ-D03": vectors_valid,
-        "REQ-D04": not any("INVALID" in str(value) for value in cells.get("eu_bjline_reason", pd.Series(dtype=object)).dropna()),
+        "REQ-D04": (
+            not any(
+                "INVALID" in str(value)
+                for value in cells.get(
+                    "eu_bjline_reason", pd.Series(dtype=object)
+                ).dropna()
+            )
+            and not cells.get(
+                contract.producer_reason_col(contract.P_POWER_BJLINE),
+                pd.Series(dtype=object),
+            ).eq(contract.REASON_SOURCE_LINE_MISMATCH).any()
+        ),
         "REQ-D05": not divergence_problems,
         "REQ-D06": not inference_forbidden and not any("future" in p for p in label_problems),
         "REQ-D07": not any("payout" in p for p in label_problems),

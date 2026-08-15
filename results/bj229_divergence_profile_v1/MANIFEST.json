@@ -1,5 +1,6 @@
 {
-  "built_at_utc": "2026-08-15T12:40:27+08:00",
+  "audit_mode": "candidate",
+  "built_at_utc": "2026-08-15T21:19:45+08:00",
   "causally_available_cells_by_source": {
     "BJ_LINE_BOUNDARY": 228,
     "P_POWER_BJLINE": 234,
@@ -9,11 +10,11 @@
     "Q_EU_RAW_1X2": 2976
   },
   "cell_count": 357705,
-  "code_hash": "a401e463ebb528daf53133ff76b52b135a400e388f98e2ae18f33d2751f12496",
+  "code_hash": "22b941237600c99d1692f4ecdc0e7b3cc43b13ce345f8a712290e77969f3ee11",
   "commit_binding_mode": "github_pr_231_head_plus_content_hashes",
   "contract_version": "BJ-UNIFIED-DIVERGENCE-DATA-PROFILE-001/v2",
   "development_label_rows_through_2023": 243462,
-  "disposition": "READY_WITH_EXPLICIT_LIMITATIONS",
+  "disposition": "BLOCKED_DATA_DEFECT",
   "environment": {
     "matplotlib": "3.10.9",
     "numpy": "2.4.6",
@@ -27,12 +28,12 @@
   "notebook_hash": "ed456e4995a070f63d373695028504189f17811404ce9804fd902a70cb851a86",
   "notebook_hash_mode": "semantic_source_cells_v1",
   "package": "bj229_divergence_profile_v1",
-  "producer_commit_sha": "6d198fb7f8ebd72c8904ad80d928fb045088c8ac",
-  "report_sha256": "bca0c56d1b2396e3d4a84639ef17a8501336fc4da4a5397b49734780b572a2c8",
+  "producer_commit_sha": "6c5cdf36ea77d94be1ed69eca50f9d0f6b6accda",
+  "report_sha256": "f1a4ce5636a57f6345f29ef4913f4e99b0cef4eee1885cab199441ed7618fddc",
   "requirements_hash": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
   "reviewed_commit_sha": "PR_HEAD",
-  "rework": "REWORK_TYPE=method (2026-08-15 fresh R3)",
-  "schema_sha256": "5e5bce4a47a6c3ceee04f1615e28296dad3ca214fe964685d18ad538b3cd01ed",
+  "rework": "PI takeover R4 candidate-mode conclusion correction (2026-08-16)",
+  "schema_sha256": "627794d935a6d8e0da690317d8581ca39dee9d2e308631f312cc710be9c394ff",
   "sealed_label_namespaces": [
     {
       "handoff_rows": 0,

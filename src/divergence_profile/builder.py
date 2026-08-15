@@ -373,8 +373,10 @@ def build(root: Path) -> BuildReceipt:
         "outlier_heavy_tail": prof.outlier_heavy_tail_table(
             receipt.checks.get("DQ10_outlier_constant_fields", pd.DataFrame())
         ),
-        "chart_source_mapping": prof.chart_source_mapping(),
     }
+    receipt.tables["chart_source_mapping"] = prof.chart_source_mapping(
+        receipt.tables
+    )
 
     # 11. REQ-D evidence rows (computed — no hardcoded PASS).
     #     disposition must be decided BEFORE evidence so REQ-D10 can bind it.
@@ -444,14 +446,20 @@ def build_evidence(receipt: BuildReceipt) -> pd.DataFrame:
     invalid_count = _count(checks, "DQ05_invalid_probability_triplets")
     payout_count = _count(checks, "DQ12_payout_factor_boundary")
 
-    # REQ-D04: non-zero-line translations that silently round to identity are
-    # impossible now (float handicap); count INVALID_LINE / unidentifiable.
+    # REQ-D04: every translated expert must remain in the target BJ line
+    # space. A POWER source-line mismatch is unavailable, never merged.
     invalid_line = 0
     if "eu_bjline_reason" in cells.columns:
         invalid_line = int(
             (cells["eu_bjline_reason"] == contract.REASON_INVALID_LINE).sum()
         )
-    d04_pass = invalid_line == 0
+    power_line_mismatch = int(
+        cells.get(
+            contract.producer_reason_col(contract.P_POWER_BJLINE),
+            pd.Series(dtype=object),
+        ).eq(contract.REASON_SOURCE_LINE_MISMATCH).sum()
+    )
+    d04_pass = invalid_line == 0 and power_line_mismatch == 0
 
     # REQ-D05: per-cell divergence columns exist and same-source alias rows
     # are explicitly unavailable (NaN with reason), never fake numbers.
@@ -534,6 +542,7 @@ def build_evidence(receipt: BuildReceipt) -> pd.DataFrame:
         all(t in receipt.tables for t in required_tables)
         and expected_calibration.issubset(actual_calibration)
         and not chart_mapping.empty
+        and not chart_mapping["status"].eq("UNASSESSED").any()
     )
 
     # REQ-D09: notebook/code/results artifacts actually present at build time
@@ -552,12 +561,13 @@ def build_evidence(receipt: BuildReceipt) -> pd.DataFrame:
     code_present = bool(code_path is not None and code_path.is_dir())
     d09_pass = notebook_present and code_present
 
-    # REQ-D10: honest readiness
-    d10_pass = receipt.disposition in (
-        "READY_FOR_209",
-        "READY_WITH_EXPLICIT_LIMITATIONS",
-        "BLOCKED_DATA_DEFECT",
+    # REQ-D10: the disposition must match the independently recomputable
+    # minimum interface, not merely be one of three allowed strings.
+    expected_disposition = prof.readiness_disposition(
+        cells,
+        has_post_decision_exclusions=post_decision > 0,
     )
+    d10_pass = receipt.disposition == expected_disposition
 
     rows = [
         {
@@ -601,8 +611,10 @@ def build_evidence(receipt: BuildReceipt) -> pd.DataFrame:
                 "Q_EU_BJLINE built via explicit independent-Poisson score "
                 "distribution with FLOAT native lines (half-goal lines "
                 "included, no rounding); invalid-line rows: "
-                f"{invalid_line}; unidentifiable translations emit "
-                "TRANSLATION_NOT_IDENTIFIABLE."
+                f"{invalid_line}; POWER source-line mismatches: "
+                f"{power_line_mismatch}; unidentifiable translations emit "
+                "TRANSLATION_NOT_IDENTIFIABLE and mismatched POWER lines "
+                "remain unavailable."
             ),
             "pass": d04_pass,
         },
@@ -666,7 +678,9 @@ def build_evidence(receipt: BuildReceipt) -> pd.DataFrame:
             "requirement": "REQ-D10",
             "name": "Honest readiness",
             "evidence": (
-                f"disposition={receipt.disposition}; no data gap repaired by "
+                f"disposition={receipt.disposition}; expected="
+                f"{expected_disposition}; causal support="
+                f"{prof.readiness_support(cells)}; no data gap repaired by "
                 "outcome-derived imputation; exclusions keep stable reason codes."
             ),
             "pass": d10_pass,
@@ -700,22 +714,10 @@ def disposition(receipt: BuildReceipt) -> str:
 
     post_decision = _count(checks, "DQ03_started_matches")
 
-    table = receipt.tables.get("intersection_coverage", pd.DataFrame())
-    if table.empty:
-        return "BLOCKED_DATA_DEFECT"
-    all_four = table.loc[table["intersection"] == "all four", "cell_count"]
-    qbj = table.loc[
-        table["intersection"] == "Q_BJ_CALIBRATED", "cell_count"
-    ]
-    qbj_ok = len(qbj) and int(qbj.iloc[0]) > 0
-    if post_decision > 0:
-        # interface exists but contains countable post-decision exclusions
-        return "READY_WITH_EXPLICIT_LIMITATIONS" if qbj_ok else "BLOCKED_DATA_DEFECT"
-    if len(all_four) and int(all_four.iloc[0]) > 0:
-        return "READY_FOR_209"
-    if qbj_ok:
-        return "READY_WITH_EXPLICIT_LIMITATIONS"
-    return "BLOCKED_DATA_DEFECT"
+    return prof.readiness_disposition(
+        receipt.cells,
+        has_post_decision_exclusions=post_decision > 0,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -807,6 +809,13 @@ def _write_staging(receipt: BuildReceipt, target: Path) -> None:
         cells, dev_labels, sealed, manifest_payload
     )
     publication.atomic_write_text(target / "DATA_READINESS.md", report)
+    for evidence_note in ("R4_PI_TAKEOVER.md", "DEBT-LEDGER.md"):
+        source_note = receipt.root / evidence_note
+        if source_note.exists():
+            publication.atomic_write_text(
+                target / evidence_note,
+                source_note.read_text(encoding="utf-8"),
+            )
     manifest_payload["report_sha256"] = sources.sha256_file(target / "DATA_READINESS.md")
     manifest_payload["schema_sha256"] = sources.sha256_file(target / "handoff_schema.json")
     publication.atomic_write_json(target / "MANIFEST.json", manifest_payload)
@@ -841,7 +850,8 @@ def _build_manifest(receipt: BuildReceipt, cells: pd.DataFrame) -> dict:
     return {
         "package": contract.PACKAGE_NAME,
         "contract_version": "BJ-UNIFIED-DIVERGENCE-DATA-PROFILE-001/v2",
-        "rework": "REWORK_TYPE=method (2026-08-15 fresh R3)",
+        "rework": "PI takeover R4 candidate-mode conclusion correction (2026-08-16)",
+        "audit_mode": "candidate",
         "reviewed_commit_sha": "PR_HEAD",
         "producer_commit_sha": producer_commit,
         "commit_binding_mode": "github_pr_231_head_plus_content_hashes",
