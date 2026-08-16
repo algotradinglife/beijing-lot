@@ -376,6 +376,25 @@ def check_sealing(package: Path, problems: list[str]) -> None:
 # ---------------------------------------------------------------------------
 # Identity semantics (C1)
 # ---------------------------------------------------------------------------
+def check_sweep_evidence(package: Path, problems: list[str]) -> None:
+    """EV R1 mandate: the same-class complete-sweep evidence document must be
+    part of the frozen package (missing = sweep not closed)."""
+    sweep = package / "contract" / "same_class_sweep.md"
+    if not sweep.exists():
+        problems.append(
+            "contract/same_class_sweep.md missing — EV R1 same-class "
+            "complete-sweep evidence not in package"
+        )
+        return
+    text = sweep.read_text(encoding="utf-8")
+    for required in ("identity", "schema / alias / M×3", "时序 / 泄漏",
+                     "source lineage", "验证盲区 / tamper"):
+        if required not in text:
+            problems.append(
+                f"contract/same_class_sweep.md missing sweep category: {required}"
+            )
+
+
 def check_identity_semantics(package: Path, problems: list[str]) -> None:
     id_path = package / "tables" / "identity_checks.csv"
     if not id_path.exists():
@@ -414,6 +433,7 @@ def verify_package(package: Path, root: Path) -> dict:
     check_namespaces(package, problems)
     check_sealing(package, problems)
     check_identity_semantics(package, problems)
+    check_sweep_evidence(package, problems)
     return {
         "verified": not problems,
         "problems": problems,

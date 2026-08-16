@@ -108,14 +108,14 @@ beidan_live.db,snapshots,eu_a,False,bounded census (table too large),,,,
 500_bjdc.sqlite,adhoc_betting_request_ledger,immutable_status,,,0.0,2.0,READY_FOR_REVIEW,UNAVAILABLE_ADHOC_PLAN
 500_bjdc.sqlite,adhoc_betting_request_ledger,valid_until_hkt,,,0.0,3.0,,2026-07-27T01:18:00+08:00
 500_bjdc.sqlite,adhoc_betting_request_ledger,created_at_hkt,,,0.0,2.0,2026-07-26T17:05:28+08:00,2026-07-26T17:17:28+08:00
-500_bjdc.sqlite,fetch_log,fetched_at,,,0.0,66118.0,2026-06-26 12:10:03,2026-08-16T07:37:31+00:00
+500_bjdc.sqlite,fetch_log,fetched_at,,,0.0,66135.0,2026-06-26 12:10:03,2026-08-16T07:51:28+00:00
 500_bjdc.sqlite,fetch_log,kind,,,0.0,8.0,issue_html,nowscore_bjdc
-500_bjdc.sqlite,fetch_log,issue,,,4777.0,323.0,140101,26085
+500_bjdc.sqlite,fetch_log,issue,,,4778.0,323.0,140101,26085
 500_bjdc.sqlite,fetch_log,url,,,0.0,419.0,https://cp.nowscore.com/buy/DanChang.aspx?all=1&TypeID=5&issueNum=26065,https://www.500.com/static/public/bjdc/xml/sp/just_26085_51.xml
 500_bjdc.sqlite,fetch_log,status,,,2258.0,2.0,200,404
 500_bjdc.sqlite,fetch_log,ok,,,0.0,2.0,0,1
-500_bjdc.sqlite,fetch_log,elapsed_sec,,,2259.0,92001.0,0.02893233299255371,402.0160777568817
-500_bjdc.sqlite,fetch_log,bytes,,,229.0,18062.0,0,1964115
+500_bjdc.sqlite,fetch_log,elapsed_sec,,,2259.0,92024.0,0.02893233299255371,402.0160777568817
+500_bjdc.sqlite,fetch_log,bytes,,,229.0,18070.0,0,1964115
 500_bjdc.sqlite,fetch_log,rows_parsed,,,229.0,237.0,0,2142
 500_bjdc.sqlite,issues,issue,,,0.0,2142.0,070502,26085
 500_bjdc.sqlite,issues,ordinal,,,0.0,2142.0,0,2141
@@ -124,7 +124,7 @@ beidan_live.db,snapshots,eu_a,False,bounded census (table too large),,,,
 500_bjdc.sqlite,issues,is_current,,,0.0,2.0,0,1
 500_bjdc.sqlite,issues,year,,,0.0,20.0,2007,2026
 500_bjdc.sqlite,issues,first_seen_at,,,0.0,15.0,2026-06-26 12:10:03,2026-08-14T14:34:01+00:00
-500_bjdc.sqlite,issues,last_seen_at,,,0.0,1.0,2026-08-16T07:34:01+00:00,2026-08-16T07:34:01+00:00
+500_bjdc.sqlite,issues,last_seen_at,,,0.0,1.0,2026-08-16T07:49:01+00:00,2026-08-16T07:49:01+00:00
 500_bjdc.sqlite,live_market_sp_snapshots,issue,False,bounded census (table too large),,,,
 500_bjdc.sqlite,live_market_sp_snapshots,playid,False,bounded census (table too large),,,,
 500_bjdc.sqlite,live_market_sp_snapshots,market_key,False,bounded census (table too large),,,,
@@ -170,14 +170,14 @@ beidan_live.db,snapshots,eu_a,False,bounded census (table too large),,,,
 500_bjdc.sqlite,llm_decision_snapshots,generated_at,,,0.0,90.0,2026-07-02 20:34:34,2026-08-14 22:39:04
 500_bjdc.sqlite,llm_decision_snapshots,checked_at,,,0.0,137.0,2026-07-02 20:39:14,2026-08-14 22:39:04
 500_bjdc.sqlite,llm_decision_snapshots,superseded_at,,,2177.0,31.0,2026-07-12 12:59:10,2026-07-26 17:14:28
-500_bjdc.sqlite,market_sp_capture_batches,batch_id,,,0.0,5245.0,0007207c05aac992d09dd3f4f8cab51b0ef047beb5873ff544c90af42a5582b6,fffc188d2481d21582c77069b7e646ae18531a308d6cde3416fc759ea297d0ce
+500_bjdc.sqlite,market_sp_capture_batches,batch_id,,,0.0,5247.0,0007207c05aac992d09dd3f4f8cab51b0ef047beb5873ff544c90af42a5582b6,fffc188d2481d21582c77069b7e646ae18531a308d6cde3416fc759ea297d0ce
 500_bjdc.sqlite,market_sp_capture_batches,issue,,,0.0,14.0,26071,26085
 500_bjdc.sqlite,market_sp_capture_batches,playid,,,0.0,2.0,40,42
 500_bjdc.sqlite,market_sp_capture_batches,market_key,,,0.0,2.0,correct_score,total_goals
 500_bjdc.sqlite,market_sp_capture_batches,source_url,,,0.0,28.0,https://www.500.com/static/public/bjdc/xml/sp/just_26071_40.xml,https://www.500.com/static/public/bjdc/xml/sp/just_26085_42.xml
-500_bjdc.sqlite,market_sp_capture_batches,fetched_at_utc,,,0.0,4410.0,2026-07-16T13:05:41.000000+00:00,2026-08-16T07:34:04.000000+00:00
-500_bjdc.sqlite,market_sp_capture_batches,source_updated_at_hkt,,,0.0,3260.0,2026-07-03T13:24:09+08:00,2026-08-16T15:33:54+08:00
-500_bjdc.sqlite,market_sp_capture_batches,payload_sha256,,,0.0,4321.0,00008156ad7c16ad741faf067e85d80f1f3cf1dc3061c861140724ced2016c74,fff09e8fa3f8a88330d853a7b7664f88e3790dcce350e5eb8bc7d98c5cad30ce
+500_bjdc.sqlite,market_sp_capture_batches,fetched_at_utc,,,0.0,4412.0,2026-07-16T13:05:41.000000+00:00,2026-08-16T07:49:04.000000+00:00
+500_bjdc.sqlite,market_sp_capture_batches,source_updated_at_hkt,,,0.0,3262.0,2026-07-03T13:24:09+08:00,2026-08-16T15:48:51+08:00
+500_bjdc.sqlite,market_sp_capture_batches,payload_sha256,,,0.0,4323.0,00008156ad7c16ad741faf067e85d80f1f3cf1dc3061c861140724ced2016c74,fff09e8fa3f8a88330d853a7b7664f88e3790dcce350e5eb8bc7d98c5cad30ce
 500_bjdc.sqlite,market_sp_capture_batches,match_rows,,,0.0,14.0,10,339
 500_bjdc.sqlite,market_sp_capture_batches,outcome_rows,,,0.0,28.0,80,8475
 500_bjdc.sqlite,market_sp_capture_batches,complete_vector_rows,,,0.0,168.0,0,196
@@ -219,7 +219,7 @@ beidan_live.db,snapshots,eu_a,False,bounded census (table too large),,,,
 500_bjdc.sqlite,nowscore_bjdc_matches,issue,,,0.0,19.0,26065,26085
 500_bjdc.sqlite,nowscore_bjdc_matches,match_idx,,,0.0,339.0,1,339
 500_bjdc.sqlite,nowscore_bjdc_matches,provider_match_id,,,0.0,1747.0,2906706,3061589
-500_bjdc.sqlite,nowscore_bjdc_matches,fetched_at,,,0.0,19.0,2026-07-03T02:24:10Z,2026-08-16T07:38:55Z
+500_bjdc.sqlite,nowscore_bjdc_matches,fetched_at,,,0.0,19.0,2026-07-03T02:24:10Z,2026-08-16T07:54:56Z
 500_bjdc.sqlite,nowscore_bjdc_matches,schedule_date,,,0.0,68.0,2026-06-12,2026-08-18
 500_bjdc.sqlite,nowscore_bjdc_matches,kickoff_time,,,0.0,86.0,00:00,23:55
 500_bjdc.sqlite,nowscore_bjdc_matches,handicap_line,,,0.0,7.0,-4.0,2.0
@@ -233,7 +233,7 @@ beidan_live.db,snapshots,eu_a,False,bounded census (table too large),,,,
 500_bjdc.sqlite,operations_alert_lifecycle,code,,,0.0,27.0,active_decision_missing,scheduled_freeze_unavailable
 500_bjdc.sqlite,operations_alert_lifecycle,domain,,,0.0,5.0,artifacts,settlement_review
 500_bjdc.sqlite,operations_alert_lifecycle,first_seen_at,,,0.0,509.0,2026-07-28 02:47:52,2026-08-16T13:17:10+08:00
-500_bjdc.sqlite,operations_alert_lifecycle,last_seen_at,,,0.0,487.0,2026-07-31T13:40:37+08:00,2026-08-16T15:40:00+08:00
+500_bjdc.sqlite,operations_alert_lifecycle,last_seen_at,,,0.0,487.0,2026-07-31T13:40:37+08:00,2026-08-16T15:55:05+08:00
 500_bjdc.sqlite,operations_alert_lifecycle,resolved_at,,,39.0,481.0,2026-07-31T13:56:47+08:00,2026-08-16T15:40:00+08:00
 500_bjdc.sqlite,segment_decision_refresh_runs,issue,,,0.0,5.0,26074,26078
 500_bjdc.sqlite,segment_decision_refresh_runs,segment_idx,,,0.0,5.0,1,5

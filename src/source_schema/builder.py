@@ -281,6 +281,15 @@ def build_package(root: Path, target: Path, *, force: bool = False) -> Path:
         atomic_write_text(staging / "contract" / "replacement_plan.md", replacement_plan_md())
         atomic_write_text(staging / "contract" / "design_notes.md", design_notes_md(total_rows, census_hashes))
         atomic_write_text(staging / "contract" / "downstream_handoff.md", downstream_handoff_md(matrix))
+        # EV R1 mandate: same-class complete-sweep evidence is part of the
+        # frozen package.  The source of truth lives in docs/ so rebuilds
+        # reproduce it deterministically (E1: package must be reproducible).
+        sweep_src = root / "docs" / "bj234_same_class_sweep.md"
+        if sweep_src.exists():
+            atomic_write_text(
+                staging / "contract" / "same_class_sweep.md",
+                sweep_src.read_text(encoding="utf-8"),
+            )
         atomic_write_csv(registry, staging / "tables" / "source_registry.csv")
         atomic_write_csv(matrix, staging / "tables" / "feasibility_matrix.csv")
         atomic_write_csv(identity_df, staging / "tables" / "identity_checks.csv")

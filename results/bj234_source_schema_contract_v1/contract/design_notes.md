@@ -12,7 +12,7 @@
 
 ## Scale measurements (v2 census, read-only)
 
-Total rows across registered tables: **96,129,720**.
+Total rows across registered tables: **96,149,459**.
 Raw source receipts bound: 7 database hashes in MANIFEST.
 
 - `beidan_live.db` snapshots: ~1.5M rows, snapshot_ts canonical-Z (0 null).

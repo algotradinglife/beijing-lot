@@ -502,6 +502,28 @@ def test_manifest_binds_source_hashes(package: Path):
 
 
 # ---------------------------------------------------------------------------
+# EV R1 mandate: same-class complete-sweep evidence is part of the frozen
+# package (missing/deleted → verifier fails closed)
+# ---------------------------------------------------------------------------
+def test_sweep_evidence_present_and_complete(package: Path):
+    sweep = package / "contract" / "same_class_sweep.md"
+    assert sweep.exists(), "same-class sweep evidence must be in the package"
+    text = sweep.read_text(encoding="utf-8")
+    for required in ("identity", "schema / alias / M×3", "时序 / 泄漏",
+                     "source lineage", "验证盲区 / tamper"):
+        assert required in text, f"sweep evidence missing category: {required}"
+
+
+def test_e2_attack_delete_sweep_evidence(pkg_copy: Path):
+    from source_schema import verify
+    path = pkg_copy / "contract" / "same_class_sweep.md"
+    assert path.exists()
+    path.unlink()
+    verdict = verify.verify_package(pkg_copy, ROOT)
+    assert not verdict["verified"]
+
+
+# ---------------------------------------------------------------------------
 # REQ-DS02: canonical identity unique within issue x match_idx
 # ---------------------------------------------------------------------------
 def test_ddl_identity_unique(package: Path):

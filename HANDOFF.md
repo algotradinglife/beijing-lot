@@ -46,6 +46,41 @@
 - Notebook: 11/11 code cells executed, 0 errors (clean run)
 - MANIFEST source_hashes: 7 database SHA-256 receipts
 
+## Fresh-audit rework pass (2026-08-16, session 20260816_1550 — pre-EV self-audit)
+
+R2 was re-verified from a fresh auditor perspective before submission. Three
+internal inconsistencies found and fixed (same-class sweep, EV R1 "next EV
+looks outside your declared scope" rule):
+
+1. **REQ-DS05 builder/verifier drift** — `builder.py` computed REQ-DS05 by
+   full column-set intersection across inference/proxy/settlement, but join
+   keys (`fixture_id`, `issue_code`, `match_idx`, …) are shared by design, so
+   the evidence row was permanently FAIL while the semantic verifier's
+   `check_namespaces` correctly exempted join keys. Single source of truth
+   added in `ddl.namespace_semantic_overlap()` / `ddl.namespaces_disjoint()`
+   (join-key-exempt); both builder evidence and verifier consume it. REQ-DS05
+   now PASS in `req_ds_evidence.csv`.
+2. **REPLAY portability** — `replay_md` hardcoded an absolute R1 worktree
+   path (`~/beijing-lot-234/.venv/bin/python`), unreproducible from a fresh
+   checkout. Rewritten to relative `python3 scripts/...` commands with
+   `DATA_ROOT` override note.
+3. **same-class sweep evidence closure** — the EV R1 mandate document
+   (`contract/same_class_sweep.md`, six-category complete-sweep evidence)
+   existed only as a manually committed file inside the immutable package;
+   a rebuild deleted it and verify would not notice. Moved the source of
+   truth to `docs/bj234_same_class_sweep.md`; `builder` copies it into the
+   package deterministically; `verify.check_sweep_evidence` fails closed if
+   the file or any required sweep category is missing; two tests added
+   (`test_sweep_evidence_present_and_complete`,
+   `test_e2_attack_delete_sweep_evidence`).
+
+Same-class sweep performed: all presence-only/string checks in builder
+(DS01..DS08 recomputed from measured facts), all verifier semantic checks
+(byte manifest, DDL rebuild probes, registry/namespace/sealing/identity/
+sweep), and the test isolation boundary (tests build/tamper in `tmp_path`
+only — re-verified green in a clean environment after a concurrent session
+rebuilt the committed package mid-run).
+
 ## Known limitations / risks
 
 - EU feed (Odds API) stays RETROSPECTIVE_PROXY/NO_RECEIPT pending coverage
