@@ -30,25 +30,20 @@ units (funded ¥16 at K8 instead of ¥1,000) — that bug is removed.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
-import json
-from typing import Any, Iterable
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from .contract import (
     ALL_SEEDS,
-    DETERMINISTIC_LANES,
     K_GRID,
-    LANES,
     N_GRID,
     NUISANCE_CANDIDATE_SEEDS,
     OUTCOMES,
     PAYOUT_COEFFICIENT,
     RANKER_FEATURES,
-    SEED_COUNT,
     SIMPLE_ACTIVE_RISK_FRACTION,
     STOCHASTIC_LANES,
     TICKET_STAKE_YUAN,
@@ -79,6 +74,37 @@ def match_score(panel: IssuePanel) -> np.ndarray:
     )
 
 
+def _canonical_ticket_arrays(
+    panel: IssuePanel,
+    selected: np.ndarray,
+    outcomes: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return paired ticket legs ordered by immutable match identity.
+
+    A parlay is an unordered set of ``(match, outcome)`` legs.  Sorting match
+    rows and outcomes independently breaks those pairs and makes a mere leg
+    permutation look like a distinct ticket.  Keep the arrays paired and use
+    the immutable match id as the single canonical ordering key.
+    """
+    selected_array = np.asarray(selected, dtype=int)
+    outcome_array = np.asarray(outcomes, dtype=int)
+    if selected_array.ndim != 1 or outcome_array.ndim != 1:
+        raise TicketBuildError("ticket legs must be one-dimensional")
+    if len(selected_array) != len(outcome_array):
+        raise TicketBuildError("ticket match/outcome lengths differ")
+    order = np.argsort(panel.match_idx[selected_array], kind="stable")
+    return selected_array[order], outcome_array[order]
+
+
+def _identity(panel: IssuePanel, selected: np.ndarray, outcomes: np.ndarray) -> str:
+    selected, outcomes = _canonical_ticket_arrays(panel, selected, outcomes)
+    payload = "|".join(
+        f"{panel.issue}:{int(panel.match_idx[row])}:{OUTCOMES[int(outcomes[i])]}"
+        for i, row in enumerate(selected)
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def generate_candidate_pool(
     panel: IssuePanel,
     n: int,
@@ -106,7 +132,7 @@ def generate_candidate_pool(
     selected_rows: list[np.ndarray] = []
     outcome_rows: list[np.ndarray] = []
     source_rows: list[str] = []
-    seen: set[tuple[tuple[int, ...], tuple[int, ...]]] = set()
+    seen: set[str] = set()
 
     for offset in range(min(64, max(top_width, 1))):
         stride = 1 + (offset % 5)
@@ -118,10 +144,9 @@ def generate_candidate_pool(
             -panel.control_probability[selected], axis=1, kind="stable"
         )
         outcomes = outcome_order[np.arange(n), (offset // max(top_width, 1)) % 3]
-        sel_key = tuple(sorted(int(x) for x in selected))
-        out_key = tuple(int(x) for x in outcomes)
-        if (sel_key, out_key) not in seen:
-            seen.add((sel_key, out_key))
+        identity = _identity(panel, selected, outcomes)
+        if identity not in seen:
+            seen.add(identity)
             selected_rows.append(selected)
             outcome_rows.append(outcomes)
             source_rows.append("TOP_MASS_SYSTEMATIC")
@@ -139,10 +164,9 @@ def generate_candidate_pool(
                 ],
                 dtype=int,
             )
-            sel_key = tuple(sorted(int(x) for x in selected))
-            out_key = tuple(int(x) for x in outcomes)
-            if (sel_key, out_key) not in seen:
-                seen.add((sel_key, out_key))
+            identity = _identity(panel, selected, outcomes)
+            if identity not in seen:
+                seen.add(identity)
                 selected_rows.append(selected)
                 outcome_rows.append(outcomes)
                 source_rows.append("MARKET_WEIGHTED_WOR")
@@ -164,9 +188,12 @@ def _rows_to_frame(
     count = len(selected_rows)
     if count == 0:
         return pd.DataFrame()
-    selected_matrix = np.stack(selected_rows)  # T x n
-    outcome_matrix = np.stack(outcome_rows)  # T x n
-    row_index = np.arange(count)[:, None]
+    canonical_rows = [
+        _canonical_ticket_arrays(panel, selected, outcomes)
+        for selected, outcomes in zip(selected_rows, outcome_rows, strict=True)
+    ]
+    selected_matrix = np.stack([row[0] for row in canonical_rows])  # T x n
+    outcome_matrix = np.stack([row[1] for row in canonical_rows])  # T x n
     chosen_p = panel.control_probability[selected_matrix, outcome_matrix]
     chosen_sp = panel.predicted_sp[selected_matrix, outcome_matrix]
     chosen_official_sp = panel.official_sp[selected_matrix, outcome_matrix]
@@ -202,7 +229,8 @@ def _rows_to_frame(
             "year": panel.year,
             "n": ticket_n,
             "match_indices": [
-                "|".join(str(int(x)) for x in row) for row in selected_matrix
+                "|".join(str(int(x)) for x in panel.match_idx[row])
+                for row in selected_matrix
             ],
             "outcomes": [
                 "|".join(OUTCOMES[int(x)] for x in row) for row in outcome_matrix
@@ -232,6 +260,7 @@ def _ticket_row(
     outcomes: np.ndarray,
     source: str,
 ) -> dict[str, Any]:
+    selected, outcomes = _canonical_ticket_arrays(panel, selected, outcomes)
     chosen_p = panel.control_probability[selected, outcomes]
     chosen_sp = panel.predicted_sp[selected, outcomes]
     chosen_official_sp = panel.official_sp[selected, outcomes]
@@ -261,7 +290,9 @@ def _ticket_row(
         "split": panel.split,
         "year": panel.year,
         "n": len(selected),
-        "match_indices": "|".join(str(int(x)) for x in selected),
+        "match_indices": "|".join(
+            str(int(x)) for x in panel.match_idx[selected]
+        ),
         "outcomes": "|".join(OUTCOMES[int(x)] for x in outcomes),
         "ticket_identity": _identity(panel, selected, outcomes),
         "candidate_source": source,
@@ -277,14 +308,6 @@ def _ticket_row(
         "realized_hit": hit,
         "pre_tax_gross_multiple": pre_tax_multiple,
     }
-
-
-def _identity(panel: IssuePanel, selected: np.ndarray, outcomes: np.ndarray) -> str:
-    payload = "|".join(
-        f"{panel.issue}:{int(panel.match_idx[row])}:{OUTCOMES[int(outcomes[i])]}"
-        for i, row in enumerate(selected)
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _lane_rng(lane: str, issue: str, k: int, seed: int) -> np.random.Generator:
@@ -317,6 +340,31 @@ def select_tickets(
             f"stochastic lane {lane} requires a preregistered seed; got {seed}"
         )
     frame = pool.copy()
+    if "ticket_identity" not in frame.columns:
+        raise TicketBuildError("candidate pool lacks ticket_identity")
+    if frame["ticket_identity"].duplicated().any():
+        raise TicketBuildError("candidate pool contains semantic duplicate tickets")
+    required_leg_columns = {"match_indices", "outcomes"}
+    if not required_leg_columns.issubset(frame.columns):
+        raise TicketBuildError("candidate pool lacks paired-leg columns")
+    semantic_keys = frame.apply(
+        lambda row: tuple(
+            sorted(
+                zip(
+                    str(row["match_indices"]).split("|"),
+                    str(row["outcomes"]).split("|"),
+                    strict=True,
+                )
+            )
+        ),
+        axis=1,
+    )
+    if semantic_keys.duplicated().any():
+        raise TicketBuildError("candidate pool contains semantic duplicate tickets")
+    if lane != "MARKET_WR" and len(frame) < k:
+        raise TicketBuildError(
+            f"lane {lane} requested K={k} from only {len(frame)} unique tickets"
+        )
     if lane == "MARKET_WR":
         rng = _lane_rng(lane, frame.issue.iloc[0], k, seed)
         probability = _softmax(frame.log_joint_probability.to_numpy(), 1.0)
@@ -336,6 +384,8 @@ def select_tickets(
     else:
         raise TicketBuildError(f"unknown lane {lane}")
     selected = frame.iloc[np.asarray(index, dtype=int)].copy()
+    if lane != "MARKET_WR" and selected["ticket_identity"].duplicated().any():
+        raise TicketBuildError(f"lane {lane} selected semantic duplicate tickets")
     selected["ticket_order"] = np.arange(1, len(selected) + 1)
     selected["lane"] = lane
     selected["k"] = k

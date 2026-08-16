@@ -1440,7 +1440,8 @@ def verify_nk_semantics(ticket_rows: pd.DataFrame, k: int | None = None) -> list
     elif k is not None:
         if len(ticket_rows) != k:
             failures.append(f"ticket table has {len(ticket_rows)} rows but K={k}")
-    for _, row in ticket_rows.iterrows():
+    semantic_keys: dict[int, tuple[tuple[int, str], ...]] = {}
+    for row_index, row in ticket_rows.iterrows():
         n = int(row["n"])
         matches = [int(x) for x in str(row["match_indices"]).split("|")]
         outcomes = str(row["outcomes"]).split("|")
@@ -1456,6 +1457,36 @@ def verify_nk_semantics(ticket_rows: pd.DataFrame, k: int | None = None) -> list
         if not set(outcomes).issubset({"3", "1", "0"}):
             failures.append(f"ticket {row['ticket_identity']} has invalid outcome code")
             break
+        paired_legs = tuple(sorted(zip(matches, outcomes, strict=True)))
+        semantic_keys[row_index] = paired_legs
+        if "issue" in ticket_rows.columns:
+            payload = "|".join(
+                f"{row['issue']}:{match_idx}:{outcome}"
+                for match_idx, outcome in paired_legs
+            )
+            expected_identity = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+            if str(row["ticket_identity"]) != expected_identity:
+                failures.append(
+                    f"ticket {row['ticket_identity']} is not canonical for paired legs"
+                )
+                break
+    if failures:
+        return failures
+
+    # Only the explicit with-replacement lane may repeat a semantic ticket.
+    # WOR and deterministic top-K lanes operate over unique unordered parlays,
+    # so a leg-order alias is a contract failure even if its stored hash differs.
+    if group_cols and "lane" in ticket_rows.columns:
+        for group_key, group in ticket_rows.groupby(group_cols, sort=False):
+            lane = str(group["lane"].iloc[0])
+            if lane == "MARKET_WR":
+                continue
+            keys = [semantic_keys[index] for index in group.index]
+            if len(set(keys)) != len(keys):
+                failures.append(
+                    f"bundle {group_key} contains semantic duplicate tickets in {lane}"
+                )
+                break
     return failures
 
 
@@ -1592,12 +1623,24 @@ def _official_sp_for_ticket(
     panel = panels.get((str(split), str(issue)))
     if panel is None:
         raise VerifyError(f"payout-economics panel missing: {split}/{issue}")
-    idx = [int(x) for x in str(match_indices).split("|")]
+    immutable_match_ids = [int(x) for x in str(match_indices).split("|")]
     out_rank = {"3": 0, "1": 1, "0": 2}
     oidx = [out_rank[o] for o in str(outcomes).split("|")]
-    if len(idx) != len(oidx):
+    if len(immutable_match_ids) != len(oidx):
         raise VerifyError("ticket leg count mismatch in payout-economics")
-    sp = panel.official_sp[np.asarray(idx, dtype=int), np.asarray(oidx, dtype=int)]
+    row_by_match_id = {
+        int(match_idx): row_index
+        for row_index, match_idx in enumerate(panel.match_idx)
+    }
+    try:
+        row_indices = [row_by_match_id[match_idx] for match_idx in immutable_match_ids]
+    except KeyError as exc:
+        raise VerifyError(
+            f"payout-economics unknown immutable match id: {exc.args[0]}"
+        ) from exc
+    sp = panel.official_sp[
+        np.asarray(row_indices, dtype=int), np.asarray(oidx, dtype=int)
+    ]
     return float(np.prod(sp))
 
 
@@ -1902,6 +1945,39 @@ def tamper_drop_bundle_ticket(path: Path) -> None:
     frame.to_parquet(path, index=False)
 
 
+def tamper_semantic_ticket_alias(path: Path) -> None:
+    """Replace one WOR/top-K row with an order-only alias of another row."""
+    frame = pd.read_parquet(path)
+    keys = ["split", "issue", "n", "k", "lane", "seed"]
+    candidates = frame[~frame["lane"].eq("MARKET_WR")]
+    target_indices: list[int] | None = None
+    for _, group in candidates.groupby(keys, sort=False):
+        if len(group) >= 2:
+            target_indices = list(group.index[:2])
+            break
+    if target_indices is None:
+        raise VerifyError("ticket alias tamper needs a non-WR bundle")
+    source_index, target_index = target_indices
+    source = frame.loc[source_index]
+    matches = str(source["match_indices"]).split("|")
+    outcomes = str(source["outcomes"]).split("|")
+    reversed_pairs = list(reversed(list(zip(matches, outcomes, strict=True))))
+    frame.loc[target_index, "match_indices"] = "|".join(
+        match_idx for match_idx, _ in reversed_pairs
+    )
+    frame.loc[target_index, "outcomes"] = "|".join(
+        outcome for _, outcome in reversed_pairs
+    )
+    noncanonical_payload = "|".join(
+        f"{source['issue']}:{match_idx}:{outcome}"
+        for match_idx, outcome in reversed_pairs
+    )
+    frame.loc[target_index, "ticket_identity"] = hashlib.sha256(
+        noncanonical_payload.encode("utf-8")
+    ).hexdigest()
+    frame.to_parquet(path, index=False)
+
+
 def tamper_req_evidence(path: Path) -> None:
     value = json.loads(path.read_text(encoding="utf-8"))
     value["req_evidence"] = value.get("req_evidence", [])[1:]
@@ -2159,6 +2235,12 @@ def run_tamper_suite(package: Path, verify_package_fn: Any) -> list[dict[str, An
         ),
     )
     _run_attack(
+        "semantic_ticket_order_alias",
+        lambda target: tamper_semantic_ticket_alias(
+            target / "ticket_economics.parquet"
+        ),
+    )
+    _run_attack(
         "remove_req_evidence",
         lambda target: tamper_req_evidence(target / "decision.json"),
     )
@@ -2235,6 +2317,7 @@ __all__ = [
     "tamper_omit_payout_coefficient", "tamper_divide_out_payout",
     "tamper_compound_coefficient", "tamper_handoff_staging_path",
     "tamper_completion_status", "tamper_drop_bundle_ticket",
+    "tamper_semantic_ticket_alias",
     "tamper_dynamic_control_semantics", "tamper_empty_schema",
     "tamper_holdout_state_shift", "tamper_req_evidence",
     "verify_2024_mutation_invariance", "verify_capital_accounting",

@@ -141,12 +141,14 @@ def _fsync_tree(root: Path) -> None:
     for path in sorted(root.rglob("*")):
         if path.is_file():
             _fsync_file(path)
-    if root.exists():
-        dir_fd = os.open(root, os.O_RDONLY)
-        try:
-            os.fsync(dir_fd)
-        finally:
-            os.close(dir_fd)
+    # File fsync does not make nested directory entries durable.  Flush every
+    # directory bottom-up so model and diagnostic filenames are committed
+    # before the package root is atomically installed.
+    directories = [root, *(path for path in root.rglob("*") if path.is_dir())]
+    for directory in sorted(
+        directories, key=lambda path: len(path.parts), reverse=True
+    ):
+        _fsync_directory(directory)
 
 
 def _fsync_directory(path: Path) -> None:
@@ -304,8 +306,14 @@ def run(output: Path) -> dict[str, object]:
             raise VerifyError(
                 "post-publication verification failed: " + "; ".join(post_failures)
             )
-        _commit_publish(output, backup)
+        # The verified new package is now the visible last-good package.
+        # Transfer ownership of the obsolete backup to cleanup *before* that
+        # cleanup starts: if backup deletion succeeds and its parent fsync
+        # fails, the outer exception path must never remove the verified new
+        # package while trying to restore a backup that no longer exists.
+        commit_backup = backup
         backup = None
+        _commit_publish(output, commit_backup)
     except BaseException:
         if backup is not None:
             _rollback_publish(output, backup)

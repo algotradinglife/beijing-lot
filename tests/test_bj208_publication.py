@@ -125,6 +125,67 @@ def test_backup_cleanup_transient_fault_retries_without_rollback(
     assert not list(tmp_path.glob(".issue-208.backup-*"))
 
 
+def test_cleanup_parent_fsync_failure_preserves_verified_new_and_retry(
+    tmp_path, monkeypatch
+):
+    """A cleanup durability error must not delete both old and new packages."""
+    output = tmp_path / "issue-208"
+    _payload(output, "old")
+
+    def build(staging, *, published_output):
+        _payload(staging, "new")
+
+    monkeypatch.setattr(runner, "_run_stages", build)
+    monkeypatch.setattr(runner, "_write_metadata", lambda *args, **kwargs: None)
+    monkeypatch.setattr(runner, "_write_manifest", lambda *args, **kwargs: None)
+    monkeypatch.setattr(runner, "verify_package", lambda *args, **kwargs: [])
+    monkeypatch.setattr(runner, "run_tamper_suite", lambda *args, **kwargs: [])
+    real_fsync = runner._fsync_directory
+    injected = False
+
+    def fail_after_backup_cleanup(path):
+        nonlocal injected
+        backup_exists = bool(list(tmp_path.glob(".issue-208.backup-*")))
+        new_visible = (
+            output.exists()
+            and (output / "payload.txt").read_text(encoding="utf-8") == "new"
+        )
+        if not injected and new_visible and not backup_exists:
+            injected = True
+            raise OSError("injected cleanup parent fsync failure")
+        return real_fsync(path)
+
+    monkeypatch.setattr(runner, "_fsync_directory", fail_after_backup_cleanup)
+    with pytest.raises(OSError, match="cleanup parent fsync"):
+        runner.run(output)
+
+    assert injected
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+
+    # The verified package remains the last-good input to an immediate retry.
+    monkeypatch.setattr(runner, "_fsync_directory", real_fsync)
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+
+
+def test_fsync_tree_flushes_nested_directories_bottom_up(tmp_path, monkeypatch):
+    root = tmp_path / "package"
+    nested = root / "models" / "folds"
+    _payload(nested, "model")
+    seen: list[Path] = []
+
+    monkeypatch.setattr(runner, "_fsync_file", lambda path: None)
+    monkeypatch.setattr(runner, "_fsync_directory", lambda path: seen.append(path))
+    runner._fsync_tree(root)
+
+    assert seen[-1] == root
+    assert set(seen) == {root, root / "models", nested}
+    assert seen.index(nested) < seen.index(root / "models") < seen.index(root)
+
+
 def test_post_publish_failure_rolls_back(tmp_path):
     output = tmp_path / "issue-208"
     staging = tmp_path / "staging"
