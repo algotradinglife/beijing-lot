@@ -1,0 +1,31 @@
+{
+  "waterfall_stages": 14,
+  "n_raw": 195269,
+  "n_target_not_started": 102240,
+  "ppower_reconstruction": {
+    "gate_cells_total": 357705,
+    "gate_issues_total": 419,
+    "g2_vector_cells": 4674,
+    "g2_vector_issues": 189,
+    "g3_causal_epoch_cells": 234,
+    "g3_causal_epoch_issues": 9,
+    "g4_freeze_row_cells": 234,
+    "g4_freeze_row_issues": 9,
+    "g6_line_matched_cells": 234,
+    "g6_line_matched_issues": 9,
+    "published_cells": 234,
+    "published_issues": 9,
+    "published_issues_list": [
+      "20062",
+      "21064",
+      "21071",
+      "22064",
+      "23024",
+      "23092",
+      "24031",
+      "24083",
+      "24105"
+    ],
+    "gate_method": "primitives only: vector present + observed_at <= feature_cutoff_ts_utc + freeze triplet complete + exact non-null line equality; P_POWER_BJLINE_available flag NOT used"
+  }
+}

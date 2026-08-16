@@ -35,6 +35,8 @@ results/*
 !results/bj229_divergence_profile_v1/**/*.parquet
 !results/bj234_source_schema_contract_v1/
 !results/bj234_source_schema_contract_v1/**
+!results/bj237_power_feature_support_v2/
+!results/bj237_power_feature_support_v2/**
 runs/
 .cache/
 tmp/
@@ -52,6 +54,8 @@ temp/
 !results/bj229_divergence_profile_v1/**/*.parquet
 !results/bj234_source_schema_contract_v1/**/*.csv
 !results/bj234_source_schema_contract_v1/**/*.parquet
+!results/bj237_power_feature_support_v2/**/*.csv
+!results/bj237_power_feature_support_v2/**/*.parquet
 *.feather
 *.h5
 *.hdf5
