@@ -136,19 +136,24 @@ def test_registry_0_65_absent_from_tables(package: Path):
     for column in frame.columns:
         assert "0.65" not in str(frame[column].tolist())
     ddl_text = (package / "sql" / "schema.sql").read_text()
-    assert "0.65" not in ddl_text
+    # strip comments: the DDL header states the 0.65 boundary rule as a note;
+    # a literal 0.65 in any executable statement is the violation.
+    ddl_no_comments = "\n".join(
+        line.split("--", 1)[0] for line in ddl_text.splitlines()
+    )
+    assert "0.65" not in ddl_no_comments
 
 
 # ---------------------------------------------------------------------------
 # C3: DDL executes with real constraints (semantic, not string-presence)
 # ---------------------------------------------------------------------------
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def ddl_conn() -> sqlite3.Connection:
-    sql = (ROOT / "src" / "source_schema" / "ddl.py")
     from source_schema import ddl as ddl_mod
     conn = sqlite3.connect(":memory:")
     conn.executescript(ddl_mod.sql_ddl())
-    return conn
+    yield conn
+    conn.close()
 
 
 def _seed(conn: sqlite3.Connection) -> None:
@@ -284,11 +289,14 @@ def test_sealing_guard_blocks_sealed_column():
 def test_sealing_evidence_published(package: Path):
     sealed = pd.read_csv(package / "tables" / "sealed_columns.csv")
     assert not sealed.empty
-    # census value stats never contain sealed columns
+    # census value stats never contain sealed columns (keyed by db+table+col)
     cols = pd.read_csv(package / "tables" / "columns.csv")
-    sealed_combos = set(zip(sealed["table"], sealed.get("column", "").fillna("")))
+    sealed_combos = set(zip(sealed["database_key"], sealed["table"],
+                           sealed.get("column", "").fillna("")))
     for _, row in cols.iterrows():
-        assert (row["table"], str(row.get("column", ""))) not in sealed_combos
+        key = (str(row.get("database_key", "")), str(row["table"]),
+               str(row.get("column", "")))
+        assert key not in sealed_combos
 
 
 def test_sealing_settlement_table_metadata_only(package: Path):

@@ -1,0 +1,21 @@
+{
+  "code_hash": "d5ed7cbc20cd2dbaad6fcacd67eb4a16ef8a1185f54cd567cf26e5fccd8d07a8",
+  "contract_version": "BJ-UNIFIED-DATA-SOURCE-SCHEMA-001",
+  "data_root": "/home/drwho1985/workspace/soccer/beijing-lot/data",
+  "ddl_sha256": "56cf8fca901a3d3efa6a25878343088f58706a35f1805905b430e559f8804b67",
+  "ddl_version": "BJ-UNIFIED-DATA-SOURCE-SCHEMA-001-ddl-v2",
+  "generated_at_utc": "2026-08-16T07:40:48+00:00",
+  "git_head": "6c4192260b18fe0124d5798c0c00d45feb0d8774",
+  "mode": "candidate",
+  "notebook_hash": "cc724081d7536d45038760c6d66e710523011b9272d5f9b46daed555cf9e3238",
+  "requirements_hash": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
+  "source_hashes": {
+    "500_bjdc.sqlite": "4f03aca4aadbc1d370959209cf445edd5251dc060b2f502d0533e33809c6eadd",
+    "beidan_features.db": "48d73b868235a78d73ea2587d5a2cd9094a861b605bfcd6447604bb90a650bf7",
+    "beidan_history.db": "867e11452306c29e7b64b97af82f730ab0d96f7519d9950dc33ef1cd64f9ceaa",
+    "beidan_live.db": "74518d3b8a1567e6f1d18d1e25e1e352efe23bd1a0a34248ee6506b865241216",
+    "beidan_modeling_plus_2026.sqlite": "c35a42800a7998ede97c5105371cd78a293a151a9c004a6fef54081e7646fdc7",
+    "beidan_nowscore_2026.sqlite": "3948176d42e7799a986e406a75266fe840eadf977c21d8331146eabf31b86927",
+    "beidan_xlsm.sqlite": "7f62079b18b3c028884da92aa8393f5b198246c9d7c32cd0b401562a055c5d6f"
+  }
+}

@@ -447,6 +447,42 @@ def parquet_schema_contract() -> dict[str, object]:
     }
 
 
+# Join keys are shared across namespaces by design (REQ-DS02 identity);
+# REQ-DS05 disjointness applies to SEMANTIC columns only.  Both the builder
+# (REQ-DS05 evidence) and the semantic verifier (check_namespaces) must use
+# this same definition so they can never drift apart (EV R1 E2 lesson).
+NAMESPACE_JOIN_KEYS = {
+    "fixture_id", "issue_code", "match_idx", "source_id",
+    "handicap_line", "outcome_code",
+}
+
+
+def namespace_semantic_overlap() -> set[str]:
+    """Semantic columns shared between any two namespaces (empty = REQ-DS05 OK)."""
+    namespaces = PARQUET_SCHEMAS
+    semantic = {
+        name: set(cols.keys()) - NAMESPACE_JOIN_KEYS
+        for name, cols in namespaces.items()
+    }
+    overlap: set[str] = set()
+    pairs = [("inference", "settlement"), ("proxy", "settlement"),
+             ("inference", "proxy")]
+    for left, right in pairs:
+        if left in semantic and right in semantic:
+            overlap |= semantic[left] & semantic[right]
+    return overlap
+
+
+def namespaces_disjoint() -> bool:
+    """REQ-DS05: no semantic column is shared across any two namespaces."""
+    return (
+        contract.INFERENCE_NAMESPACE in PARQUET_SCHEMAS
+        and contract.PROXY_NAMESPACE in PARQUET_SCHEMAS
+        and contract.SETTLEMENT_NAMESPACE in PARQUET_SCHEMAS
+        and not namespace_semantic_overlap()
+    )
+
+
 def parquet_schema_json() -> str:
     return json.dumps(parquet_schema_contract(), indent=2, sort_keys=True) + "\n"
 

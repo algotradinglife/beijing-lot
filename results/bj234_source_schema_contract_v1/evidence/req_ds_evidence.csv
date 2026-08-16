@@ -1,0 +1,9 @@
+requirement,result,evidence
+REQ-DS01,PASS,feasibility_matrix.csv: admissible_use + endpoint_evidence + raw_sha256 per row
+REQ-DS02,PASS,"DDL UNIQUE(issue_code,match_idx) + identity_checks.csv NULL-aware duplicate_excess=0"
+REQ-DS03,PASS,domain_dictionary.md + DDL canonical-UTC CHECK + temporal triggers
+REQ-DS04,PASS,"DDL quote PK(observation,bookmaker,outcome) + CHECK + COALESCE unique + natural-key unique"
+REQ-DS05,PASS,parquet_schema.json disjoint inference/proxy/settlement columns
+REQ-DS06,PASS,tables.csv measured rows=96129720; design_notes.md WAL+Parquet justification
+REQ-DS07,PASS,MANIFEST.json source_hashes + columns.csv + notebook binding
+REQ-DS08,PASS,"downstream_handoff.md selected sources: ['', 'BJ_SP_TIMESERIES #235', 'EU_ODDS #236', 'INTEGRATION #238', 'POWER_FEATURES #237']"

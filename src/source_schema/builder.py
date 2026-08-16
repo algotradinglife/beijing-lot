@@ -228,16 +228,10 @@ def build_package(root: Path, target: Path, *, force: bool = False) -> Path:
         and "ux_observation_natural_key" in ddl_text
         and "ux_quote_one_per_outcome" not in ddl_text
     )
-    # REQ-DS05: namespaces physically distinguishable
-    ns = ddl.PARQUET_SCHEMAS
-    ds05 = bool(
-        contract.INFERENCE_NAMESPACE in ns
-        and contract.PROXY_NAMESPACE in ns
-        and contract.SETTLEMENT_NAMESPACE in ns
-        and not (set(ns["inference"]) & set(ns["settlement"]))
-        and not (set(ns["proxy"]) & set(ns["settlement"]))
-        and not (set(ns["inference"]) & set(ns["proxy"]))
-    )
+    # REQ-DS05: namespaces physically distinguishable — semantic columns
+    # disjoint across inference/proxy/settlement (join keys are shared by
+    # design; see ddl.namespaces_disjoint for the single source of truth).
+    ds05 = bool(ddl.namespaces_disjoint())
     # REQ-DS06: mature stack + measured scale/concurrency justification
     total_rows = int(tables_df["rows"].sum()) if not tables_df.empty else 0
     ds06 = bool(total_rows > 0)
@@ -480,18 +474,22 @@ def downstream_handoff_md(matrix: pd.DataFrame) -> str:
 def replay_md(root: Path, target: Path) -> str:
     return f"""# REPLAY — exact reproduction commands
 
+Run from a checkout of the branch that produced this package (the commands
+use `python3` on the repo's venv; `DATA_ROOT` defaults to the census data
+root, override with `DATA_ROOT=/path/to/data`).
+
 ```bash
 # 1. fresh census + build (read-only on sources)
-~/beijing-lot-234/.venv/bin/python scripts/build_bj234_source_schema.py build
+python3 scripts/build_bj234_source_schema.py build
 
 # 2. full semantic verify (must print VERIFIED)
-~/beijing-lot-234/.venv/bin/python scripts/build_bj234_source_schema.py verify
+python3 scripts/build_bj234_source_schema.py verify
 
 # 3. focused + full tests (tests never write the committed package — E1)
-~/beijing-lot-234/.venv/bin/python -m pytest tests/test_bj234_source_schema.py -q
+python3 -m pytest tests/test_bj234_source_schema.py -q
 
 # 4. notebook clean-run
-~/beijing-lot-234/.venv/bin/python scripts/execute_bj234_notebook.py
+python3 scripts/execute_bj234_notebook.py
 ```
 
 Package target: `{target}` (relative to repo root).

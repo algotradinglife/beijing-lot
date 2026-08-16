@@ -314,24 +314,25 @@ def check_namespaces(package: Path, problems: list[str]) -> None:
     for ns in ("inference", "proxy", "settlement"):
         if ns not in schemas:
             problems.append(f"namespace: {ns} missing from parquet_schema.json")
-    inference = set(schemas.get("inference", {}).keys())
-    proxy = set(schemas.get("proxy", {}).keys())
-    settlement = set(schemas.get("settlement", {}).keys())
-    # join keys are shared by design (REQ-DS02 identity); semantic columns
-    # must never leak across namespaces (REQ-DS05).
-    join_keys = {"fixture_id", "issue_code", "match_idx", "source_id",
-                 "handicap_line", "outcome_code"}
-    semantic_overlaps = (
-        (inference - join_keys) & (settlement - join_keys)
-    ) | (
-        (proxy - join_keys) & (settlement - join_keys)
-    ) | (
-        (inference - join_keys) & (proxy - join_keys)
-    )
-    if semantic_overlaps:
+    # semantic columns must never leak across namespaces (REQ-DS05); join
+    # keys are shared by design (REQ-DS02 identity).  Same rule as the
+    # builder's evidence computation (ddl.NAMESPACE_JOIN_KEYS).
+    # recompute over the *committed* parquet_schema.json (attack target),
+    # not the in-repo PARQUET_SCHEMAS constant
+    join_keys = ddl_mod.NAMESPACE_JOIN_KEYS
+    semantic = {
+        name: set(cols.keys()) - join_keys
+        for name, cols in schemas.items()
+    }
+    committed_overlap: set[str] = set()
+    for left, right in (("inference", "settlement"), ("proxy", "settlement"),
+                        ("inference", "proxy")):
+        if left in semantic and right in semantic:
+            committed_overlap |= semantic[left] & semantic[right]
+    if committed_overlap:
         problems.append(
             f"namespace: semantic columns shared across namespaces: "
-            f"{sorted(semantic_overlaps)}"
+            f"{sorted(committed_overlap)}"
         )
 
 

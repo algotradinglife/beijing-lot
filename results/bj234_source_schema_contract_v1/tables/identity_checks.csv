@@ -1,0 +1,14 @@
+total_rows,null_key_rows,non_null_rows,distinct_non_null_keys,duplicate_excess,duplicate_groups,uniqueness_verdict,database_key,table,primitive_key
+195269,2560,192709,192709,0,0,NULL_KEY_DEFECT,beidan_xlsm.sqlite,match_features,issue|match_idx
+195269,2560,192709,192709,0,0,NULL_KEY_DEFECT,beidan_xlsm.sqlite,matches,issue|match_idx
+585807,7680,578127,578127,0,0,NULL_KEY_DEFECT,beidan_xlsm.sqlite,outcome_features,issue|match_idx|outcome_code
+190746,0,190746,190743,3,3,DUPLICATE_DEFECT,beidan_features.db,matches,match_id
+38463,0,38463,38463,0,0,UNIQUE,beidan_history.db,historical_matches,issue|match_idx
+5155,0,5155,5155,0,0,UNIQUE,beidan_live.db,matches,issue|match_idx
+76043,0,76043,76043,0,0,UNIQUE,500_bjdc.sqlite,matches,issue|match_idx
+201270,2560,198710,198710,0,0,NULL_KEY_DEFECT,beidan_modeling_plus_2026.sqlite,match_features,issue|match_idx
+201270,2560,198710,198710,0,0,NULL_KEY_DEFECT,beidan_modeling_plus_2026.sqlite,matches,issue|match_idx
+603810,7680,596130,596130,0,0,NULL_KEY_DEFECT,beidan_modeling_plus_2026.sqlite,outcome_features,issue|match_idx|outcome_code
+6001,0,6001,6001,0,0,UNIQUE,beidan_nowscore_2026.sqlite,match_features,issue|match_idx
+6001,0,6001,6001,0,0,UNIQUE,beidan_nowscore_2026.sqlite,matches,issue|match_idx
+18003,0,18003,18003,0,0,UNIQUE,beidan_nowscore_2026.sqlite,outcome_features,issue|match_idx|outcome_code

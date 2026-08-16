@@ -38,9 +38,36 @@
 
 ## Verification (from this run)
 
-- build + verify green (to be confirmed in final run)
-- pytest suite (to be confirmed)
-- notebook 13 cells clean-run (to be confirmed)
+- build + verify green: `VERIFIED` (manifest binds git_head 6c41922)
+- pytest suite: **44 passed in 153.55s** (42 original + C3-5 live-kind + invalid-kind tests)
+- notebook clean-run: 11 code cells executed, 0 errors
+- tamper self-tests (REQ-E06): 12 remanifest attacks + 5 tamper attacks all FAIL closed
+
+## Fresh-audit rework pass (2026-08-16, session 20260816_1550 — pre-EV self-audit)
+
+R2 was re-verified from a fresh auditor perspective before submission. Two
+internal inconsistencies found and fixed (same-class sweep, EV R1 "next EV
+looks outside your declared scope" rule):
+
+1. **REQ-DS05 builder/verifier drift** — `builder.py` computed REQ-DS05 by
+   full column-set intersection across inference/proxy/settlement, but join
+   keys (`fixture_id`, `issue_code`, `match_idx`, …) are shared by design, so
+   the evidence row was permanently FAIL while the semantic verifier's
+   `check_namespaces` correctly exempted join keys. Single source of truth
+   added in `ddl.namespace_semantic_overlap()` / `ddl.namespaces_disjoint()`
+   (join-key-exempt); both builder evidence and verifier consume it. REQ-DS05
+   now PASS in `req_ds_evidence.csv`.
+2. **REPLAY portability** — `replay_md` hardcoded an absolute R1 worktree
+   path (`~/beijing-lot-234/.venv/bin/python`), unreproducible from a fresh
+   checkout. Rewritten to relative `python3 scripts/...` commands with
+   `DATA_ROOT` override note.
+
+Same-class sweep performed: all presence-only/string checks in builder
+(DS01..DS08 recomputed from measured facts), all verifier semantic checks
+(byte manifest, DDL rebuild probes, registry/namespace/sealing/identity),
+and the test isolation boundary (tests build/tamper in `tmp_path` only —
+re-verified green in a clean environment after a concurrent session had
+rebuilt the committed package mid-run).
 
 ## Known limitations / risks
 
@@ -49,6 +76,9 @@
 - 500_bjdc.sqlite 17GB makes each census ~2-4 min (hashing + scans).
 - First-party Beijing interface not yet acquired — #235 wires the 500.com
   collector; official interface remains UNUSABLE until acquisition.
+- Concurrency note: multiple engineer sessions can wake on #234; commit/PR
+  operations were re-checked against the live GitHub state immediately
+  before submission.
 
 ## Next steps
 

@@ -1,0 +1,20 @@
+{
+  "MANIFEST.json": "d2e2f87f59b9b863a533026abf745f606206e0d460e32843a5c8fb7f91ac2e72",
+  "REPLAY.md": "8c7038c3e5a17f9841ecacbd51e7319b4f21eaa1ae637be10960738491ff2eda",
+  "contract/design_notes.md": "917fa99718f1d63a910aa08e58c3b6e1d33df89ae74b326158f9e4e758e7d103",
+  "contract/domain_dictionary.md": "0278167cd688b3ecd153ea330aec785a718d7dc96c55952adadf5451a314ba01",
+  "contract/downstream_handoff.md": "8161c25557c47a9dde5327c503440aa19e680341e69a842f4eeead57d1ded74c",
+  "contract/identity_crosswalk.md": "ec694007022b52e48dab5f2d96113120cd40cd5caff760e2ffbe401dd8265bb5",
+  "contract/replacement_plan.md": "0ccf3735b24d145c68a6b833cec09b3cb4c8e72d9b0ec776f13b6c5767b40485",
+  "evidence/req_ds_evidence.csv": "c800ca5e392dc0df3497eb9355a2dbb73c1d03e72d519bb174d12b1e76e07fdc",
+  "schemas/parquet_schema.json": "94e90913da95f1779f760e5201427357591282801dfbf98873a4e429772f1fc7",
+  "sql/schema.sql": "56cf8fca901a3d3efa6a25878343088f58706a35f1805905b430e559f8804b67",
+  "tables/columns.csv": "788c3b6435fa73fc876406da5e0a72b22c0cce7dc01089d224ac44d89c416af1",
+  "tables/databases.csv": "f8a792dd2ee54b79034f4643e31af5a02c9c709e8b4411ba49c5c76fcf7a3d8c",
+  "tables/feasibility_matrix.csv": "f1287abfac2223f291bfebc31efc1881c9a3e877b26ae74a769e99e4474deed2",
+  "tables/identity_checks.csv": "fcbb396011d7457f2852fffb671bf893d90af6d3487438656903716f6206c725",
+  "tables/sealed_columns.csv": "dc8ce9415abfff23bf7861a3d4cb1d1dc543518bb7908b7f873c6a99a9780c31",
+  "tables/source_registry.csv": "3033e966c50b4d78681af61679d7ec16d692a7692a8a6d9d0074571165483afa",
+  "tables/tables.csv": "70e28f6371ef0d603d06de7ff6dd1f21fdafd5a47b4d6239c79b4e56d539f5f2",
+  "tables/timestamps.csv": "9bb3d6208f4ba2a40062da4a5e8aadc5be4deddf61fc138670f5a76027b93afc"
+}

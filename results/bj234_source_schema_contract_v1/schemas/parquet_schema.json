@@ -1,0 +1,43 @@
+{
+  "ddl_version": "BJ-UNIFIED-DATA-SOURCE-SCHEMA-001-ddl-v2",
+  "namespace_rule": "semantic columns are disjoint across inference/proxy/settlement namespaces (REQ-DS05)",
+  "namespaces": {
+    "inference": {
+      "decision_epoch_id": "int64",
+      "estimator_id": "string",
+      "fixture_id": "int64",
+      "handicap_line": "double",
+      "issue_code": "string",
+      "match_idx": "int32",
+      "observed_at_utc": "timestamp[ns, tz=UTC]",
+      "outcome_code": "string",
+      "probability": "double",
+      "provenance_hash": "string",
+      "target_market": "string",
+      "uncertainty": "double"
+    },
+    "proxy": {
+      "fixture_id": "int64",
+      "handicap_line": "double",
+      "issue_code": "string",
+      "market_type": "string",
+      "match_idx": "int32",
+      "outcome_code": "string",
+      "proxy_grade": "string",
+      "snapshot_kind": "string",
+      "source_id": "string",
+      "value": "double"
+    },
+    "settlement": {
+      "fixture_id": "int64",
+      "issue_code": "string",
+      "match_idx": "int32",
+      "result_code": "string",
+      "settled_at_utc": "timestamp[ns, tz=UTC]",
+      "source_id": "string",
+      "winning_sp": "double"
+    }
+  },
+  "partitioning": "immutable, partitioned by issue_code/year",
+  "reader": "pandas / PyArrow"
+}
