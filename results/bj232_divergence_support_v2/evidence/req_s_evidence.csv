@@ -1,0 +1,11 @@
+requirement,name,pass,detail
+REQ-S01,Source identity and causal observed-at proof,True,decision-epoch SP triplets carry source_identity + observed_at_utc; zero recovered triplets remain an explicit empty receipt
+REQ-S02,Identity reconciliation without silent drops,True,every source row is counted through IDENTITY_JOIN; non-matching rows = 5332 with explicit reason
+REQ-S03,Probability triplet validity,True,"recovered triplets finite, bounded, normalized within tolerance"
+REQ-S04,Common native handicap outcome space,True,"all comparisons published on native 3/1/0 space; POWER line reconciliation enforced on identical (issue, match_idx, line); EU translation only on legal zero line, non-zero reported TRANSLATION_NOT_IDENTIFIABLE; power_cells=0 eu_cells=0"
+REQ-S05,Decision-epoch SP separate from probability,True,SP_3/1/0 price-input columns and Q_BJ_SP_DEVIG de-vig columns are distinct; normalize(1/SP) proven per row
+REQ-S06,Support waterfall reconstructs losses,True,per-source ledger: RAW == sum(DROPs) + final PASS; EXPAND == rows*factor; stages include LINE_RECONCILIATION for every source
+REQ-S07,Label boundary sealed,True,no settlement/result table opened; official 3SP fail-closed LABEL_ONLY; 2024+ outcomes untouched
+REQ-S08,Modelability by issue/cohort,True,interface_summary reports fit/tune/calibration/later issue and match counts per interface; N-feasibility table included
+REQ-S09,#229 evidence debt E1-E4 closed,True,all_closed=True; E1=True E2=True E3=True E4=True
+REQ-S10,Exact reviewed HEAD binding,True,AUDITED_SHA.json carries the externally reviewed 40-hex HEAD; manifest binds code/notebook/dependency hashes

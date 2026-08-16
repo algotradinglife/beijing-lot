@@ -1,0 +1,17 @@
+issue,year,triplet_count,devig_matches,all_bounded,all_causal
+26051,2026,23,True,True,True
+26053,2026,23,True,True,True
+26054,2026,10,True,True,True
+26055,2026,30,True,True,True
+26056,2026,20,True,True,True
+26057,2026,38,True,True,True
+26058,2026,11,True,True,True
+26061,2026,25,True,True,True
+26062,2026,11,True,True,True
+26063,2026,22,True,True,True
+26064,2026,4,True,True,True
+26065,2026,31,True,True,True
+26066,2026,20,True,True,True
+26067,2026,56,True,True,True
+26068,2026,8,True,True,True
+26069,2026,44,True,True,True

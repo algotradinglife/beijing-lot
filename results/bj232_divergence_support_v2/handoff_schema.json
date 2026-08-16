@@ -1,0 +1,369 @@
+{
+  "census": {
+    "columns": [
+      "source_key",
+      "committed",
+      "grade",
+      "asset_present",
+      "rows",
+      "issues",
+      "min_ts",
+      "max_ts",
+      "whitelist_enforced",
+      "field_whitelist",
+      "note"
+    ],
+    "dtype_map": {
+      "asset_present": "bool",
+      "committed": "bool",
+      "field_whitelist": "str",
+      "grade": "str",
+      "issues": "float64",
+      "max_ts": "str",
+      "min_ts": "str",
+      "note": "str",
+      "rows": "float64",
+      "source_key": "str",
+      "whitelist_enforced": "bool"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "source_key"
+    ],
+    "rows": 8
+  },
+  "decision_epoch_sp_triplets": {
+    "columns": [
+      "issue",
+      "match_idx",
+      "year",
+      "SP_3",
+      "SP_1",
+      "SP_0",
+      "Q_BJ_SP_DEVIG_3",
+      "Q_BJ_SP_DEVIG_1",
+      "Q_BJ_SP_DEVIG_0",
+      "observed_at_utc",
+      "decision_epoch_utc",
+      "kickoff_ts_utc",
+      "source_identity",
+      "causal",
+      "gate_observed_le_epoch",
+      "gate_epoch_le_kickoff",
+      "devig_matches_normalized_inverse",
+      "triplet_sum",
+      "triplet_bounded"
+    ],
+    "dtype_map": {
+      "Q_BJ_SP_DEVIG_0": "float64",
+      "Q_BJ_SP_DEVIG_1": "float64",
+      "Q_BJ_SP_DEVIG_3": "float64",
+      "SP_0": "float64",
+      "SP_1": "float64",
+      "SP_3": "float64",
+      "causal": "bool",
+      "decision_epoch_utc": "datetime64[us, UTC]",
+      "devig_matches_normalized_inverse": "bool",
+      "gate_epoch_le_kickoff": "bool",
+      "gate_observed_le_epoch": "bool",
+      "issue": "str",
+      "kickoff_ts_utc": "datetime64[us, UTC]",
+      "match_idx": "int64",
+      "observed_at_utc": "datetime64[us, UTC]",
+      "source_identity": "str",
+      "triplet_bounded": "bool",
+      "triplet_sum": "float64",
+      "year": "int64"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "issue",
+      "match_idx",
+      "SP_3",
+      "SP_1",
+      "SP_0",
+      "observed_at_utc"
+    ],
+    "rows": 376
+  },
+  "devig": {
+    "columns": [
+      "issue",
+      "match_idx",
+      "year",
+      "Q_BJ_SP_DEVIG_3",
+      "Q_BJ_SP_DEVIG_1",
+      "Q_BJ_SP_DEVIG_0",
+      "observed_at_utc",
+      "decision_epoch_utc",
+      "source_identity",
+      "representation"
+    ],
+    "dtype_map": {
+      "Q_BJ_SP_DEVIG_0": "float64",
+      "Q_BJ_SP_DEVIG_1": "float64",
+      "Q_BJ_SP_DEVIG_3": "float64",
+      "decision_epoch_utc": "datetime64[us, UTC]",
+      "issue": "str",
+      "match_idx": "int64",
+      "observed_at_utc": "datetime64[us, UTC]",
+      "representation": "str",
+      "source_identity": "str",
+      "year": "int64"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "issue",
+      "match_idx"
+    ],
+    "rows": 376
+  },
+  "diagnosis": {
+    "columns": [
+      "interface",
+      "root_class",
+      "evidence",
+      "anchor_issue_count",
+      "anchor_cell_count",
+      "sp_raw_rows",
+      "sp_identity_drops",
+      "sp_timestamp_drops",
+      "sp_triplet_drops",
+      "eu_raw_rows",
+      "eu_line_drops",
+      "eu_timestamp_drops",
+      "power_raw_rows",
+      "power_line_drops",
+      "power_timestamp_drops",
+      "official_3sp_raw_drops",
+      "official_3sp_reason"
+    ],
+    "dtype_map": {
+      "anchor_cell_count": "int64",
+      "anchor_issue_count": "int64",
+      "eu_line_drops": "int64",
+      "eu_raw_rows": "int64",
+      "eu_timestamp_drops": "int64",
+      "evidence": "str",
+      "interface": "str",
+      "official_3sp_raw_drops": "int64",
+      "official_3sp_reason": "str",
+      "power_line_drops": "int64",
+      "power_raw_rows": "int64",
+      "power_timestamp_drops": "int64",
+      "root_class": "str",
+      "sp_identity_drops": "int64",
+      "sp_raw_rows": "int64",
+      "sp_timestamp_drops": "int64",
+      "sp_triplet_drops": "int64"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "interface"
+    ],
+    "rows": 1
+  },
+  "modelability_interface_summary": {
+    "columns": [
+      "interface",
+      "fit_issues",
+      "fit_matches",
+      "tune_issues",
+      "tune_matches",
+      "calibration_issues",
+      "calibration_matches",
+      "2024_plus_issues",
+      "2024_plus_matches"
+    ],
+    "dtype_map": {
+      "2024_plus_issues": "int64",
+      "2024_plus_matches": "int64",
+      "calibration_issues": "int64",
+      "calibration_matches": "int64",
+      "fit_issues": "int64",
+      "fit_matches": "int64",
+      "interface": "str",
+      "tune_issues": "int64",
+      "tune_matches": "int64"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "interface"
+    ],
+    "rows": 3
+  },
+  "modelability_issue_registry": {
+    "columns": [
+      "issue",
+      "year",
+      "cohort",
+      "sp_causal_matches",
+      "sp_causal_cells",
+      "eu_causal_matches",
+      "eu_causal_cells",
+      "power_causal_matches",
+      "power_causal_cells"
+    ],
+    "dtype_map": {
+      "cohort": "str",
+      "eu_causal_cells": "int64",
+      "eu_causal_matches": "int64",
+      "issue": "str",
+      "power_causal_cells": "int64",
+      "power_causal_matches": "int64",
+      "sp_causal_cells": "int64",
+      "sp_causal_matches": "int64",
+      "year": "str"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "issue"
+    ],
+    "rows": 394
+  },
+  "modelability_n_support_qbj_sp": {
+    "columns": [
+      "n",
+      "issues_with_ge_n",
+      "fraction_of_issues"
+    ],
+    "dtype_map": {
+      "fraction_of_issues": "float64",
+      "issues_with_ge_n": "int64",
+      "n": "int64"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "n"
+    ],
+    "rows": 1
+  },
+  "modelability_qbj_eu_sp_complete_matches": {
+    "row_identity": "EMPTY_TABLE_RECEIPT",
+    "rows": 0
+  },
+  "modelability_qbj_power_sp_complete_matches": {
+    "row_identity": "EMPTY_TABLE_RECEIPT",
+    "rows": 0
+  },
+  "modelability_qbj_sp_complete_matches": {
+    "row_identity": "EMPTY_TABLE_RECEIPT",
+    "rows": 0
+  },
+  "reconcile_eu": {
+    "row_identity": "EMPTY_TABLE_RECEIPT",
+    "rows": 0
+  },
+  "reconcile_power": {
+    "row_identity": "EMPTY_TABLE_RECEIPT",
+    "rows": 0
+  },
+  "reconcile_receipts": {
+    "columns": [
+      "interface",
+      "reconciled_cells",
+      "reconciled_issues",
+      "line_reconciled",
+      "translation_available"
+    ],
+    "dtype_map": {
+      "interface": "str",
+      "line_reconciled": "float64",
+      "reconciled_cells": "int64",
+      "reconciled_issues": "int64",
+      "translation_available": "float64"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "interface"
+    ],
+    "rows": 2
+  },
+  "recovery_receipts": {
+    "columns": [
+      "interface",
+      "recovered_triplet_cells",
+      "recovered_issue_count",
+      "reason"
+    ],
+    "dtype_map": {
+      "interface": "str",
+      "reason": "str",
+      "recovered_issue_count": "int64",
+      "recovered_triplet_cells": "int64"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "interface"
+    ],
+    "rows": 1
+  },
+  "relationship": {
+    "columns": [
+      "issue",
+      "year",
+      "triplet_count",
+      "devig_matches",
+      "all_bounded",
+      "all_causal"
+    ],
+    "dtype_map": {
+      "all_bounded": "bool",
+      "all_causal": "bool",
+      "devig_matches": "bool",
+      "issue": "str",
+      "triplet_count": "int64",
+      "year": "int64"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "issue",
+      "year"
+    ],
+    "rows": 16
+  },
+  "waterfall": {
+    "columns": [
+      "source",
+      "source_key",
+      "stage",
+      "count",
+      "kind",
+      "unit",
+      "reason"
+    ],
+    "dtype_map": {
+      "count": "int64",
+      "kind": "str",
+      "reason": "str",
+      "source": "str",
+      "source_key": "str",
+      "stage": "str",
+      "unit": "str"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "source",
+      "source_key",
+      "stage",
+      "kind",
+      "reason"
+    ],
+    "rows": 34
+  },
+  "waterfall_reasons": {
+    "columns": [
+      "reason",
+      "count"
+    ],
+    "dtype_map": {
+      "count": "int64",
+      "reason": "str"
+    },
+    "duplicate_natural_key_rows": 0,
+    "row_identity": [
+      "reason"
+    ],
+    "rows": 8
+  }
+}

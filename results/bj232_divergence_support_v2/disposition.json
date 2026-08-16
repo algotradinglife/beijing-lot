@@ -1,0 +1,13 @@
+{
+  "disposition": "UNRECOVERABLE_WITH_CURRENT_SOURCES",
+  "support": {
+    "cohort_issue_support": {
+      "calibration": 0,
+      "fit": 0,
+      "tune": 0
+    },
+    "qbj_eu_sp_complete_matches": 0,
+    "qbj_power_sp_complete_matches": 0,
+    "qbj_sp_complete_matches": 0
+  }
+}

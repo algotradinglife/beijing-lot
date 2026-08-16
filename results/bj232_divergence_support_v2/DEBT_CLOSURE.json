@@ -1,0 +1,8 @@
+{
+  "E1_exact_reviewed_sha_binding": true,
+  "E2_physical_schema_domains": true,
+  "E3_crash_restart_journal": true,
+  "E4_append_only_protocol_log": true,
+  "all_closed": true,
+  "problems": []
+}

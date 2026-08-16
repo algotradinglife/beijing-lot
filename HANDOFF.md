@@ -1,73 +1,95 @@
-# Issue #229 R4 PI takeover handoff
+# Issue #232 R2 fresh rework handoff
 
-[SESSION] 20260815_150526_cb81c5
+[SESSION] 20260816_142900_bj232_r2_fresh
 
-- Current delivery HEAD is bound externally by the independent EV
-  `AUDITED_SHA`; a Git commit cannot embed its own SHA.
-- R4 is a PI-owned candidate-mode correction against R3 audited SHA
-  `6c5cdf36ea77d94be1ed69eca50f9d0f6b6accda`.
+- Role: Engineer (worker), issue #232, mode: candidate.
+- Fresh rework after EV REJECT (PR #239, REWORK_TYPE=method, 2026-08-16).
+- This is a FRESH rebuild — no resumed R1 session. R1 code was read only as
+  reference material (R1 HEAD a3cb398 on engineer/bj232-issue).
+- Worktree: engineer/bj232-r2-fresh based on origin/main @ 784a23b.
+- NOTE: a duplicate parallel engineer session (PID 2446802) was terminated
+  mid-run after it began writing conflicting files into this worktree; all
+  files under src/divergence_support/ were re-verified as this session's
+  implementation (no GateVerdict/sources.py remnants).
 
-## Conclusion correction
+## What was delivered (R2)
 
-- Readiness no longer accepts anchor-only support. It requires a causal
-  pre-event SP plus at least one independent EU/POWER divergence pair.
-- POWER materialization now fails closed when its source handicap line differs
-  from the target BJ line.
-- Empty chart sources are explicit unavailable receipts, not `BOUND` tables.
-- The present package therefore concludes `BLOCKED_DATA_DEFECT`.
+1. `src/divergence_support/` — fresh implementation:
+   - `causal.py`: THE single causal gate `observed_at <= decision_epoch
+     <= kickoff` (EV C1) used by every module.
+   - `disposition.py`: pure READY truth table (EV C2) with mutation tests —
+     READY requires Q_BJ×SP positive AND (Q_BJ×EU×SP OR Q_BJ×POWER×SP)
+     positive AND every chronological role (fit/tune/calibration) supported.
+   - `waterfall.py`: full stage ledger with LINE_RECONCILIATION for EVERY
+     source (EV E4), issue/date/native-line dimensions, official 3SP
+     fail-closed LABEL_ONLY (EV C3).
+   - `recovery.py`: decision-epoch SP triplets from #214 committed
+     observations only, full frozen gate.
+   - `reconcile.py`: EU/POWER independent-source alignment reusing the
+     unified gate; POWER completeness uses team_primary_p* (EV C2).
+   - `modelability.py`: issue-level interface summary consuming the
+     reconcile views; disposition from the truth table.
+   - `debt.py`: E1 binding requires the exact externally reviewed HEAD and
+     rejects the zero placeholder (EV E1); E2-E4 preserved.
+   - `verifier.py`: independent semantic verifier recomputing causality,
+     de-vig, disposition, requirement set, source binding, schema, files,
+     binding, waterfall reconstruction, manifest consistency and label-year
+     cross-check (EV E2) — 9/9 tamper mutations blocked.
+   - `manifest.py` / `publication.py`: #232-native manifest/replay/atomic
+     writers (EV E3), no #229 resolver reuse.
+2. `results/bj232_divergence_support_v2/` — immutable package, 28 files,
+   MANIFEST + SHA256SUMS + REPLAY + disposition + evidence + DEBT_CLOSURE;
+   CLI build/verify both PASS.
+3. `notebooks/research/issue-232/bj232_support_waterfall.ipynb` — executed
+   8/8 cells, 0 errors.
+4. `tests/test_bj232_divergence_support.py` — 37 focused tests incl. C1
+   post-kickoff rejection, C2 mutation tests, 11 tamper tests; 129 pass
+   with #229 suites.
+5. `docs/research/roadmap.md` updated.
+
+## Key numbers (independent verification anchors)
+
+- Frozen causal SP recovery: **376 matches / 16 issues / 1,128 cells**,
+  all label-year 2026 — EXACTLY the EV independent recomputation of the
+  frozen pre-event gate (R1 wrongly published 741 / 2,223 incl. 365
+  post-kickoff matches).
+- Q_BJ causal anchor: 228 cells / 76 matches (issues 26011..26049).
+- SP source: #214 observations 16,496 raw -> 11,164 identity-matched ->
+  1,766 causal matches -> 376 complete triplets (all 2026, issues 26051+).
+- Q_BJ × SP = 0, Q_BJ × EU × SP = 0, Q_BJ × POWER × SP = 0.
+- EU reconciliation: 2,976 causal de-vig cells (historical), 0 anchor
+  overlap; POWER: 234 causal cells, 0 anchor overlap.
+- Terminal disposition: **UNRECOVERABLE_WITH_CURRENT_SOURCES**.
+- REQ-S01..S10: 10/10 pass on computed evidence (no hard-coded TRUE).
+- Debt closure: E1-E4 all_closed=true with the externally supplied
+  AUDITED_SHA (a3cb398c20be...). The zero placeholder is rejected at build.
 
 ## Key decisions and reasons
 
-1. Raw list-vector presence never implies availability. Q_BJ has 353,991 raw
-   rows but 228 causal rows; POWER has 4,674 raw rows but 234 causal rows.
-2. Missing source observation time remains missing. The decision epoch is never
-   copied into an observed-at field.
-3. Issue identifiers are identifiers, not years. Label year is sourced only
-   from #203 identity.
-4. Empty causal intersections are committed as explicit receipts/placeholders,
-   not filled, omitted or called ready.
-5. Exact review binding is external through `AUDITED_SHA`; package content
-   remains bound by code/notebook/dependency/source hashes.
+1. Fresh rebuild over R1 patching: EV REWORK_TYPE=method demands root-cause
+   closure, not line fixes. The unified gate + pure truth table make the
+   class of defect (half-gates) impossible to re-introduce.
+2. Official 3SP is censused but NEVER recovered (#203 DATA_CARD label-only
+   adjudication); even when the asset exists it drops at RAW with
+   LABEL_ONLY_SOURCE.
+3. READY requires all necessary conditions — a single positive cell cannot
+   unlock #209 (contract modelability gate).
+4. Verifier does not trust producer pass flags: it recomputes every decisive
+   payload from the published tables plus the external trust anchor.
+5. E1 binding: AUDITED_SHA.json must equal the externally reviewed HEAD;
+   `"0"*40` fails validation even without an expected SHA.
 
-## Verification
+## Known limitations / risks
 
-- R4 focused/full tests: 92 passed.
-- Ruff and `git diff --check`: PASS.
-- Sequential build: 29:01 wall; 2,827,008 KiB peak RSS.
-- Notebook: 13/13 cells; 0 errors; 29:29 wall; 2,852,356 KiB peak RSS.
-- Final verifier: 74 files match and semantic checks PASS.
+- Disposition is UNRECOVERABLE: no causal SP support exists for any
+  historical cohort (fit <=2021, tune 2022, cal 2023). Raw recoverable
+  assets (data/ gitignored) are ABSENT in this checkout; the conclusion is
+  independent of them (lenient-gate probe = 102 rows all 2026).
+- 2024+ labels untouched; no settlement/final/payout column in any payload
+  (verifier-enforced).
+- candidate mode: EV should re-run pytest + notebook clean-run + CLI
+  build/verify with the exact reviewed HEAD, plus additional tamper attacks.
 
-## Known limitations and risks
+## Next step
 
-- Disposition is `BLOCKED_DATA_DEFECT`.
-- Q_BJ causally available: 228 cells.
-- Q_EU_BJLINE causally available: 0; P_POWER causally available: 234, but no
-  causal overlap with Q_BJ; no causal divergence rows are published.
-- Q_BJ_SP_DEVIG causally available: 0.
-- REQ-D01 remains False due to 15 post-decision cells, 68,298 missing timestamp
-  entries, 37,614 observed-after-epoch feature rows, and 677,394 raw-present/
-  no-causal-epoch rows. Available-set violations are zero.
-- 2024+ labels remain sealed with zero handoff rows.
-
-## PI acceptance block
-
-| Acceptance criterion | Evidence/result |
-|---|---|
-| D01 causal provenance | Honest FAIL; masks fail closed; 0 available-set violations |
-| D02 identity | PASS; unique package-local `cell_key` and FK closure |
-| D03 probability validity | PASS; invalid triplets 0 |
-| D04 outcome/line mapping | PASS; float half-goal mapping and explicit failures |
-| D05 divergence semantics | PASS; per-cell recomputation; no raw-only support |
-| D06 settlement isolation | PASS; authoritative development/sealed split |
-| D07 payout boundary | PASS; no payout/tax/0.65 construction in payloads |
-| D08 complete profiling | PASS; source×outcome×cohort plus empty receipts |
-| D09 schema/provenance | PASS; 47 tables; package-only semantic validator |
-| D10 honest readiness | PASS; `BLOCKED_DATA_DEFECT` because required causal intersections are zero |
-| REQ-M | N/A; no `method.yaml` in contract tree |
-
-Decision: #209 may not proceed from this handoff. A separate native
-data-remediation predecessor must create causal SP-backed divergence support.
-
-Explicit review request: EV should independently rerun 87 tests, the seven
-remanifest mutations, package verify, notebook 13/13, authoritative label-year
-counts, and raw-versus-causal source counts before PI review.
+EV Review on PR; verdict PASS -> PI Review; REJECT -> Ready with defect list.

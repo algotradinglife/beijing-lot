@@ -1,0 +1,2 @@
+interface,root_class,evidence,anchor_issue_count,anchor_cell_count,sp_raw_rows,sp_identity_drops,sp_timestamp_drops,sp_triplet_drops,eu_raw_rows,eu_line_drops,eu_timestamp_drops,power_raw_rows,power_line_drops,power_timestamp_drops,official_3sp_raw_drops,official_3sp_reason
+Q_BJ_x_SP,ISSUE_CALENDAR_MISMATCH,SP rows fail the identity join against the #203 issue calendar; drops=5332,33,228,16496,5332,9398,236,332718,139923,190953,1558,0,1480,1,RAW_ASSET_ABSENT

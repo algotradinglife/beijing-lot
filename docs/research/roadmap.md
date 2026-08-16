@@ -98,7 +98,7 @@ PI interpretation and does not replace those edges or Project states.
 #229 divergence causal-data profile (Done; BLOCKED_DATA_DEFECT)
              |
              v
-#232 restore causal SP-backed divergence support (Ready)
+#232 restore causal SP-backed divergence support (EV Review; R2 UNRECOVERABLE receipt)
              |
              v
 #209 full-cycle historical ablation and baseline ladder (Blocked)
@@ -119,7 +119,7 @@ PI interpretation and does not replace those edges or Project states.
 | 5 | [#207] active bankroll + separate NO_BET safety lane | Closed / Done | M3 | #206 closed | Engine valid after R7 EV and PI adversarial review; no positive active-overlay evidence; deployable policy remains false |
 | 6 | [#208] dynamic N×K frontier | Open / EV Review | M3 | No native blocker; independent line | Learn N, K, generator lane and safe capital control without assuming fixed N7 is Edge; optional diagnostic only for #209 |
 | 7 | [#229] divergence data profile | Closed / Done | M1 | No predecessor | Accepted negative readiness result: all causal SP-backed independent divergence intersections are zero; `BLOCKED_DATA_DEFECT` |
-| 8 | [#232] divergence-support remediation | Open / Ready | M1 | No native blocker | Recover provenance-valid SP-backed BJ×EU/POWER support, close #229 evidence debt and prove issue-level chronological modelability |
+| 8 | [#232] divergence-support remediation | Open / EV Review | M1 | No native blocker | R2 (EV REJECT method) rebuilt: full causal gate `observed_at <= decision_epoch <= kickoff`; READY truth table; official 3SP fail-closed; independent semantic verifier; #229 E1-E4 closed. Terminal disposition `UNRECOVERABLE_WITH_CURRENT_SOURCES` (376 causal SP triplets / 16 issues / 1,128 cells, all 2026; zero Q_BJ×SP intersection) |
 | 9 | [#209] full-cycle historical evaluation | Open / Blocked | M3 | Blocked by #232; #229 closed | Chronological ablations and accepted baseline ladder; activation requires PI modelability review, not merely one positive cell |
 | 10 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
 | 11 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |

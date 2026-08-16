@@ -1,0 +1,17 @@
+{
+  "built_utc": "2026-08-16T06:59:04.951903+00:00",
+  "contract": "BJ-UNIFIED-DIVERGENCE-SUPPORT-001",
+  "disposition": "UNRECOVERABLE_WITH_CURRENT_SOURCES",
+  "mode": "candidate",
+  "package": "bj232_divergence_support_v2",
+  "producer_commit_sha": "784a23badf38d51bb2aee6d7687479e425d1af80",
+  "reviewed_commit_sha": "a3cb398c20bef944065a8a60fc33d36e2d8cd38e",
+  "upstream_packages": {
+    "bj180": "results/bj180_gate_a_preoutcome_v2",
+    "bj203": "results/bj203_causal_tensor_v2",
+    "bj204": "results/bj204_gate_a_preoutcome_v5",
+    "bj214": "results/bj214_decision_epoch_tensor_v1",
+    "bj229": "results/bj229_divergence_profile_v1"
+  },
+  "version": "v2"
+}
