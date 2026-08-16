@@ -342,13 +342,13 @@ def test_run_post_verify_failure_rollback_parent_fsync_fault_preserves_last_good
     assert not list(tmp_path.glob(".issue-208.failed-*"))
 
 
-def test_run_post_verify_failure_rollback_new_to_failed_rename_fault_keeps_backup(
+def test_run_post_verify_failure_rollback_new_to_failed_rename_fault_restores_last_good(
     tmp_path, monkeypatch
 ):
-    """Nested-fault matrix (EV §4.2): the rollback's new→failed rename
-    fails.  The old last-good must remain recoverable in the backup and the
-    unverified new package must remain visible (fail-closed: never delete
-    the only visible copy)."""
+    """EV E1 exact production probe (v10): the rollback's new→failed rename
+    fails.  The semantic-invalid new must NOT keep the canonical path: the
+    old last-good is restored by atomic overwrite, the backup handle is
+    consumed, and a real production retry converges with no orphan."""
     output, state = _run_probe_harness(
         tmp_path, monkeypatch, post_verify_failures=["boom"]
     )
@@ -369,31 +369,36 @@ def test_run_post_verify_failure_rollback_new_to_failed_rename_fault_keeps_backu
         return real_replace(source, target)
 
     monkeypatch.setattr(runner.os, "replace", fail_new_to_failed)
-    with pytest.raises(OSError, match="new→failed rename"):
+    with pytest.raises(runner.VerifyError, match="post-publication verification"):
         runner.run(output)
 
-    # new→failed rename failed: output still holds the unverified new
-    # package and the old last-good is still intact in the backup.  Nothing
-    # was deleted; retry can restore the old package.
+    # Contract: the unverified new package must never occupy canonical
+    # output after the rollback fault.  The old last-good is restored by
+    # atomic overwrite and the backup is consumed — no stale backup, no
+    # failed copy, no unverified canonical.
     assert injected["n"] == 1
-    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
-    backups = list(tmp_path.glob(".issue-208.backup-*"))
-    assert len(backups) == 1
-    assert (backups[0] / "payload.txt").read_text(encoding="utf-8") == "old"
-
-    # A retry with the same backup handle restores the old package.
-    runner._rollback_publish(output, backups[0])
     assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
     assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+
+    # Real production retry (no private-helper calls): converges with the
+    # new package visible and zero transaction artifacts.
+    monkeypatch.setattr(runner.os, "replace", real_replace)
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.staging-*"))
 
 
-def test_run_post_verify_failure_rollback_backup_to_output_rename_fault_restores(
+def test_run_post_verify_failure_rollback_backup_to_output_rename_fault_converges(
     tmp_path, monkeypatch
 ):
     """Nested-fault matrix (EV §4.2): the rollback's backup→output rename
-    fails after new→failed succeeded.  The old package must be restored to
-    the canonical path (visibility is the commit point) or remain intact in
-    the backup; the new package must remain recoverable in .failed-*."""
+    fails after new→failed succeeded.  Canonical output is absent
+    (fail-closed: no reader can consume an unverified package), the old
+    last-good stays intact in the backup, and a real production retry
+    restores last-good and converges with no orphan."""
     output, state = _run_probe_harness(
         tmp_path, monkeypatch, post_verify_failures=["boom"]
     )
@@ -416,18 +421,93 @@ def test_run_post_verify_failure_rollback_backup_to_output_rename_fault_restores
     with pytest.raises(OSError, match="backup→output rename"):
         runner.run(output)
 
-    # Either the recovery inside _rollback_publish restored the old package
-    # (best case) or it remained intact in the backup; in both cases the old
-    # last-good is never deleted.
+    # The unverified new was moved to .failed-*; canonical output is absent.
+    # The old last-good is intact in the backup — never deleted.
     assert injected["n"] == 1
+    assert not output.exists()
     backups = list(tmp_path.glob(".issue-208.backup-*"))
-    if (output / "payload.txt").read_text(encoding="utf-8") == "old":
-        assert not backups
-    else:
-        assert len(backups) == 1
-        assert (backups[0] / "payload.txt").read_text(encoding="utf-8") == "old"
-    # The unverified new package is either cleaned or explicit in .failed-*.
-    assert not list(tmp_path.glob(".issue-208.failed-*")) or True
+    assert len(backups) == 1
+    assert (backups[0] / "payload.txt").read_text(encoding="utf-8") == "old"
+    failed = list(tmp_path.glob(".issue-208.failed-*"))
+    assert len(failed) == 1
+    assert (failed[0] / "payload.txt").read_text(encoding="utf-8") == "new"
+
+    # Real production retry: the run()-start recovery pass restores the old
+    # last-good from the backup, then the retry publishes the new package
+    # and commits it — zero orphan artifacts remain.
+    monkeypatch.setattr(runner.os, "replace", real_replace)
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.staging-*"))
+
+
+def test_run_post_verify_failure_rollback_cannot_clear_canonical_fail_closed_and_retry(
+    tmp_path, monkeypatch
+):
+    """EV E1 same-category sweep (v10): the rollback cannot move the
+    unverified new aside (new→failed rename fault) AND cannot delete it
+    (rmtree fault).  The visible tree is fail-closed with a
+    .PUBLICATION_INVALID marker, the old last-good stays intact in the
+    backup, and a real production retry (filesystem healed) restores and
+    converges with zero orphan artifacts."""
+    output, state = _run_probe_harness(
+        tmp_path, monkeypatch, post_verify_failures=["boom"]
+    )
+    real_replace = runner.os.replace
+    real_rmtree = runner.shutil.rmtree
+    injected = {"renames": 0, "rmtrees": 0}
+
+    def fail_new_to_failed(source, target):
+        source_path = Path(source)
+        if (
+            state["post_verify_failed"]
+            and injected["renames"] == 0
+            and ".issue-208.failed-" in str(target)
+            and source_path == output
+        ):
+            injected["renames"] += 1
+            raise OSError("injected rollback new→failed rename failure")
+        return real_replace(source, target)
+
+    def fail_rmtree_output(path, *args, **kwargs):
+        if (
+            state["post_verify_failed"]
+            and injected["rmtrees"] == 0
+            and Path(path) == output
+        ):
+            injected["rmtrees"] += 1
+            raise OSError("injected rollback output removal failure")
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(runner.os, "replace", fail_new_to_failed)
+    monkeypatch.setattr(runner.shutil, "rmtree", fail_rmtree_output)
+    with pytest.raises(OSError, match="output removal"):
+        runner.run(output)
+
+    # Fail-closed: the canonical path holds a tree explicitly marked
+    # .PUBLICATION_INVALID (readers/verifiers must reject it), and the true
+    # last-good remains intact in the backup for recovery.
+    assert injected["renames"] == 1
+    assert injected["rmtrees"] == 1
+    assert output.exists()
+    assert (output / runner.PUBLICATION_INVALID_MARKER).exists()
+    backups = list(tmp_path.glob(".issue-208.backup-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "payload.txt").read_text(encoding="utf-8") == "old"
+
+    # Real production retry with the filesystem healed: recovery restores
+    # the last-good from the backup, publishes the new package, commits it,
+    # and converges with zero transaction artifacts.
+    monkeypatch.setattr(runner.os, "replace", real_replace)
+    monkeypatch.setattr(runner.shutil, "rmtree", real_rmtree)
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not (output / runner.PUBLICATION_INVALID_MARKER).exists()
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.staging-*"))
 
 
 def test_run_post_verify_failure_rollback_failed_tree_cleanup_keeps_last_good(
@@ -653,3 +733,56 @@ def test_run_first_publish_post_verify_failure_removes_unverified_new(
     assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
     assert not list(tmp_path.glob(".issue-208.backup-*"))
     assert not list(tmp_path.glob(".issue-208.failed-*"))
+
+
+def test_run_commit_cleanup_failure_retry_keeps_verified_new_and_drops_stale_backup(
+    tmp_path, monkeypatch
+):
+    """v10 recovery-verify path: a prior run committed the verified new
+    package but failed while deleting the obsolete backup.  A real
+    production retry verifies the visible tree as the last-good, drops the
+    stale backup, and converges with zero orphans."""
+    output = tmp_path / "issue-208"
+    _payload(output, "old")
+
+    def build(staging, *, published_output):
+        _payload(staging, "new")
+
+    monkeypatch.setattr(runner, "_run_stages", build)
+    monkeypatch.setattr(runner, "_write_metadata", lambda *a, **k: None)
+    monkeypatch.setattr(runner, "_write_manifest", lambda *a, **k: None)
+    monkeypatch.setattr(runner, "verify_package", lambda *a, **k: [])
+    monkeypatch.setattr(runner, "run_tamper_suite", lambda *a, **k: [])
+    real_rmtree = runner.shutil.rmtree
+    calls = {"n": 0}
+
+    def fail_commit_cleanup(path, *args, **kwargs):
+        nonlocal calls
+        # _commit_publish retries once; both attempts must fail so the
+        # obsolete backup survives into the retry.
+        if ".issue-208.backup-" in str(path) and calls["n"] < 2:
+            calls["n"] += 1
+            raise OSError("injected commit backup cleanup failure")
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(runner.shutil, "rmtree", fail_commit_cleanup)
+    with pytest.raises(OSError, match="commit backup cleanup"):
+        runner.run(output)
+
+    # The verified new package stays visible; the obsolete backup survived
+    # the failed cleanup.
+    assert calls["n"] == 2
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    backups = list(tmp_path.glob(".issue-208.backup-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "payload.txt").read_text(encoding="utf-8") == "old"
+
+    # Real production retry: recovery verifies the visible tree (a complete
+    # package) as last-good, drops the stale backup, then republishes and
+    # commits — zero transaction artifacts remain.
+    monkeypatch.setattr(runner.shutil, "rmtree", real_rmtree)
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.staging-*"))

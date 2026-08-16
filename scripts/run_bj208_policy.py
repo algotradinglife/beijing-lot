@@ -210,6 +210,27 @@ def _atomic_publish(staging: Path, output: Path) -> Path | None:
     return backup
 
 
+PUBLICATION_INVALID_MARKER = ".PUBLICATION_INVALID"
+
+
+def _mark_publication_invalid(output: Path) -> None:
+    """Fail-closed marker written when a rollback cannot move an unverified
+    package off the canonical path.
+
+    The marker makes the production verifier (unlisted-file check) and any
+    reader fail closed instead of consuming a package the transaction could
+    not certify.  Best-effort: if even the marker cannot be written the
+    original fault still propagates and the backup (if any) keeps the true
+    last-good for the run()-start recovery pass.
+    """
+    try:
+        (output / PUBLICATION_INVALID_MARKER).write_text(
+            f"PUBLICATION_INVALID at {time.time()}\n", encoding="utf-8"
+        )
+    except OSError:
+        pass
+
+
 def _rollback_publish(output: Path, backup: Path | None) -> None:
     """Restore the package state that existed before publication.
 
@@ -225,52 +246,83 @@ def _rollback_publish(output: Path, backup: Path | None) -> None:
     backup is renamed to output the old last-good is visible; a parent-fsync
     fault or failed-copy cleanup fault at that point is a durability
     warning, never a reason to touch the visible package again.
+
+    EV E1 (v9 -> v10): the rollback's new→failed rename fault must not leave
+    the semantic-invalid new package occupying the canonical final path.
+    When that rename fails, the backup is atomically overwritten over the
+    invalid tree (os.replace replaces the target), restoring last-good
+    visibility and consuming the backup so an immediate retry leaves no
+    stale .backup-* orphan.  If even that overwrite fails, the tree is
+    marked .PUBLICATION_INVALID (fail-closed) and the backup stays intact
+    for the run()-start recovery pass.
     """
     if backup is None:
         # First-ever publication: roll back to the pre-publication state by
         # removing the unverified new package.  Idempotent: if the output is
         # already absent, nothing remains to do.
+        if not output.exists():
+            return
         failed = output.parent / f".{output.name}.failed-{uuid.uuid4().hex}"
-        if output.exists():
-            try:
-                os.replace(output, failed)
-            except OSError:
-                # Could not move the unverified package aside; keep the
-                # current visible state and report the rollback failure.
-                raise
-            try:
-                _fsync_directory(output.parent)
-            except OSError:
-                pass
-            try:
-                shutil.rmtree(failed)
-            except OSError:
-                pass
-            try:
-                _fsync_directory(output.parent)
-            except OSError:
-                pass
+        try:
+            os.replace(output, failed)
+        except OSError:
+            # Cannot even set the unverified new aside.  There is no
+            # last-good to restore; fail closed so no reader consumes it.
+            _mark_publication_invalid(output)
+            raise
+        try:
+            _fsync_directory(output.parent)
+        except OSError:
+            pass
+        try:
+            shutil.rmtree(failed)
+        except OSError:
+            pass
+        try:
+            _fsync_directory(output.parent)
+        except OSError:
+            pass
         return
     if not backup.exists():
         # The backup was already consumed by a previous rollback (or is
         # otherwise absent).  Fail closed: never touch the visible package.
         return
     failed = output.parent / f".{output.name}.failed-{uuid.uuid4().hex}"
-    try:
-        if output.exists():
+    if output.exists():
+        try:
             os.replace(output, failed)
-        os.replace(backup, output)
-    except BaseException:
-        # Partial rollback: the new package may be at .failed-* or still at
-        # output, and the backup is untouched.  Restore visibility of the
-        # previous package if we moved it, then re-raise; a retry is safe
-        # because backup still exists and output is either absent or the
-        # new package.
-        if backup.exists() and not output.exists():
+        except OSError:
+            # new→failed rename fault: the unverified new is still at the
+            # canonical path.  A POSIX rename cannot replace a non-empty
+            # directory target, so remove the invalid tree and then restore
+            # last-good from the backup.  An absent output is fail-closed
+            # for any reader.  The .failed-* diagnostic copy is sacrificed
+            # for visibility.
+            try:
+                shutil.rmtree(output)
+            except OSError:
+                # Even removal failed: keep the backup as the true last-good
+                # and fail closed on the visible tree so readers cannot
+                # consume it.  The next run()'s recovery pass restores the
+                # backup once the filesystem heals.
+                _mark_publication_invalid(output)
+                raise
             try:
                 os.replace(backup, output)
             except OSError:
+                _mark_publication_invalid(output)
+                raise
+            try:
+                _fsync_directory(output.parent)
+            except OSError:
                 pass
+            return
+    try:
+        os.replace(backup, output)
+    except BaseException:
+        # backup→output rename fault: output stays absent and the backup
+        # stays intact.  The run()-start recovery pass restores the
+        # last-good on the next attempt; re-raise without touching state.
         raise
     try:
         _fsync_directory(output.parent)
@@ -289,6 +341,49 @@ def _rollback_publish(output: Path, backup: Path | None) -> None:
             _fsync_directory(output.parent)
         except OSError:
             pass
+
+
+def _recover_stale_transaction(output: Path) -> None:
+    """Converge leftover publication artifacts from a failed prior run.
+
+    Invariant: whenever a .backup-* directory exists it holds the
+    pre-transaction last-good package; the canonical output is at most an
+    unverified or invalid candidate.  Called at the start of run() so an
+    immediate retry after any publication fault converges to a single
+    visible package with no stale backup/failed/staging orphan.
+
+    - If the visible tree is NOT marked .PUBLICATION_INVALID and verifies as
+      a complete package, it IS the last-good (e.g. a prior run committed
+      the new package and then failed while cleaning up the obsolete
+      backup): drop the stale backup, keep the tree.
+    - Otherwise restore the backup through _rollback_publish (persistent
+      faults keep the tree marked invalid and the backup intact for a later
+      attempt).
+    """
+    for backup in sorted(output.parent.glob(f".{output.name}.backup-*")):
+        invalid = (
+            output.exists()
+            and (output / PUBLICATION_INVALID_MARKER).exists()
+        )
+        if output.exists() and not invalid:
+            try:
+                failures = verify_package(output)
+            except BaseException:
+                failures = ["recovery verification raised"]
+            if not failures:
+                # Complete verified package is the last-good; the backup is
+                # an obsolete duplicate that must not survive the retry.
+                shutil.rmtree(backup, ignore_errors=True)
+                continue
+        _rollback_publish(output, backup)
+    for stale in output.parent.glob(f".{output.name}.failed-*"):
+        shutil.rmtree(stale, ignore_errors=True)
+    for stale in output.parent.glob(f".{output.name}.staging-*"):
+        shutil.rmtree(stale, ignore_errors=True)
+    try:
+        _fsync_directory(output.parent)
+    except OSError:
+        pass
 
 
 def _commit_publish(output: Path, backup: Path | None) -> None:
@@ -314,6 +409,11 @@ def run(output: Path) -> dict[str, object]:
     started = time.time()
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
+    # REWORK v10 (EV E1): an immediate retry after any publication fault
+    # must converge to a single visible package with no stale
+    # backup/failed/staging orphan.  Restore or drop leftover transaction
+    # artifacts from a failed prior run BEFORE building the next package.
+    _recover_stale_transaction(output)
     staging = Path(
         tempfile.mkdtemp(prefix=f".{output.name}.staging-", dir=output.parent)
     )

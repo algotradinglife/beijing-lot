@@ -491,3 +491,39 @@ selection rule, chronology and 0.65 ticket payout semantics.
 - Final disposition remains `eligible=false` with frozen
   N7/K8/MARKET_WOR/native-¥2 incumbent; the unchanged terminal decision does
   not erase the material intermediate action-surface corrections.
+
+---
+
+## 21. v10 minor-rework closure rows (2026-08-16, finalize REJECT eeabd30)
+
+The finalize audit at exact PR #230 HEAD
+`eeabd3036375f6a2e7d224c77bae292249ff2207` reproduced the null result and
+all v9 closures but found one residual publication-rollback fault under
+`finalize` mode.  The correction is purely transactional-publication
+evidence closure: model families, the 168-cell action catalog, 16-seed
+aggregation, 0.65 payout economics, selection rule, chronology and all
+scientific outputs are unchanged (replay must be byte-identical except
+execution metadata).
+
+| Row | Action | Scope | Supersedes | Rationale |
+|---|---|---|---|---|
+| #208-39 | supersede | the rollback path never leaves a semantic-invalid new package on the canonical final path: (1) when the rollback's `new→failed` rename faults, the unverified tree is removed and the old last-good is restored from the backup (a POSIX rename cannot replace a non-empty directory target, so the invalid tree is deleted first; an absent output is fail-closed for any reader); (2) if removal also fails, the visible tree is explicitly marked `.PUBLICATION_INVALID` so readers/verifiers fail closed, and the backup stays intact; (3) `run()` starts with `_recover_stale_transaction()` which restores any leftover backup (or drops it when the visible tree verifies as a complete last-good) and removes stale `.failed-*`/`.staging-*`, so an immediate production retry converges with zero orphan artifacts | #208-38 rollback path (on `new→failed` rename fault it left the unverified new visible at canonical output and the old last-good orphaned in `.backup-*`; a production retry then left the stale backup) | Finalize E1 at `eeabd30`: independent production probe injected a `new→failed` rename fault during post-verify rollback and observed `visible_value=new-unverified`, `backup_values=[old-last-good]`, `last_good_visible=false`; a subsequent production `run()` succeeded but left the old `.backup-*` orphan. Worker v9 tests encoded the wrong contract (`assert unverified new visible`) and one test used a tautological `assert ... or True`. Scientific numbers unaffected. |
+
+### v10 minor-rework executable evidence (E1 rollback rename-fault closure)
+
+- Producer worktree: `analyst/bj208-rework-r11` (fresh at audited HEAD
+  `eeabd30…`), session `20260816_145531_b32d04`.
+- `_rollback_publish` restructured for the `new→failed` rename fault;
+  `_mark_publication_invalid` + `_recover_stale_transaction` added;
+  `run()` calls recovery before building the next package.
+- Tests: the v9 wrong-contract test was rewritten to assert the restored
+  last-good at canonical output plus a real production retry (no private
+  helper calls); the tautological `assert ... or True` removed; new
+  production-entry tests for the backup→output rename fault, the
+  cannot-clear-canonical fail-closed marker path, and the commit-cleanup
+  stale-backup recovery-verify path.  Focused suite: `99 passed`
+  (97 retained + 4 new/replaced).
+- Same-category sweep declaration:
+  `docs/research/issue_208_rework_v10_rollback_sweep_evidence.md`.
+- Full deterministic replay regenerated the package; replay comparison and
+  production verifier/tamper results in the delivery.
