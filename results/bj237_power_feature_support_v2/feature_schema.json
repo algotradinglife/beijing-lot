@@ -1,0 +1,656 @@
+{
+  "contract": "BJ-UNIFIED-POWER-FEATURE-SUPPORT-001",
+  "version": "bj237-power-feature-support-v2",
+  "decision_epoch": "issue-level feature_cutoff_ts_utc from bj203 issue_offsets",
+  "completion_embargo_minutes": 180,
+  "feature_engine": "scripts/bj180_team_matchup_core.py (accepted #180 core, TEAM_PRIMARY configuration)",
+  "outcome_domain": "3/1/0 (BJ native handicap result)",
+  "line_semantics": "native_handicap_line is the fixture's BJ handicap normalized line, FAIL-CLOSED: publishable rows carry a non-null finite grid member; missing/NaN lines are line_ok=False and never publishable",
+  "identity_contract": "BJ-UNIFIED-DATA-SOURCE-SCHEMA-001 (#234): fixture_id = fix_{issue}_{match_idx}_{sha256(issue:match)[:16]}, unique within (issue, match_idx)",
+  "tables": {
+    "power_features": {
+      "description": "long-form per (issue, match_idx, outcome_code)",
+      "key": [
+        "issue",
+        "match_idx",
+        "outcome_code"
+      ],
+      "fks": [
+        {
+          "columns": [
+            "issue",
+            "match_idx"
+          ],
+          "references": "fixture (issue_code, match_idx) #234"
+        }
+      ],
+      "columns": [
+        {
+          "name": "issue",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": false,
+          "domain": "BJ issue code",
+          "note": null
+        },
+        {
+          "name": "fixture_id",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": false,
+          "domain": "canonical #234 fixture_id",
+          "note": null
+        },
+        {
+          "name": "identity_status",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": false,
+          "domain": "{CANONICAL,ALIAS,AMBIGUOUS,UNIDENTIFIED}",
+          "note": null
+        },
+        {
+          "name": "match_idx",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": ">= 1",
+          "note": null
+        },
+        {
+          "name": "match_id",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": "xlsm source key",
+          "note": null
+        },
+        {
+          "name": "kickoff_ts_utc",
+          "physical_type": "timestamp[us, tz=UTC]",
+          "logical_type": "datetime",
+          "nullable": false,
+          "domain": "Asia/Shanghai -> UTC",
+          "note": null
+        },
+        {
+          "name": "decision_epoch_utc",
+          "physical_type": "timestamp[us, tz=UTC]",
+          "logical_type": "datetime",
+          "nullable": false,
+          "domain": "#203 feature_cutoff_ts_utc",
+          "note": null
+        },
+        {
+          "name": "year",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": "2019..2026",
+          "note": null
+        },
+        {
+          "name": "league",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": true,
+          "domain": "canonical league",
+          "note": null
+        },
+        {
+          "name": "home_team_id",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": true,
+          "domain": "canonical team id",
+          "note": null
+        },
+        {
+          "name": "away_team_id",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": true,
+          "domain": "canonical team id",
+          "note": null
+        },
+        {
+          "name": "native_handicap_line",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": true,
+          "domain": "native BJ grid {-3..3 step 0.5}; NULL when line_ok=False",
+          "note": null
+        },
+        {
+          "name": "line_ok",
+          "physical_type": "bool",
+          "logical_type": "bool",
+          "nullable": false,
+          "domain": "fail-closed line gate",
+          "note": null
+        },
+        {
+          "name": "unseen_mask",
+          "physical_type": "bool",
+          "logical_type": "bool",
+          "nullable": false,
+          "domain": "min_history_n == 0 or blank team id",
+          "note": null
+        },
+        {
+          "name": "min_history_n",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": ">= 0",
+          "note": null
+        },
+        {
+          "name": "home_history_n",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": ">= 0",
+          "note": null
+        },
+        {
+          "name": "away_history_n",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": ">= 0",
+          "note": null
+        },
+        {
+          "name": "triplet_ok",
+          "physical_type": "bool",
+          "logical_type": "bool",
+          "nullable": false,
+          "domain": "line_ok AND normalized finite triplet",
+          "note": null
+        },
+        {
+          "name": "uncertainty",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": false,
+          "domain": "[0, 0.35]",
+          "note": null
+        },
+        {
+          "name": "outcome_code",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": false,
+          "domain": "{3,1,0}",
+          "note": null
+        },
+        {
+          "name": "power_probability",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": true,
+          "domain": "[0,1] or NULL when triplet_ok=False",
+          "note": null
+        }
+      ]
+    },
+    "power_feature_diagnostics": {
+      "description": "per-match diagnostics + masks",
+      "key": [
+        "issue",
+        "match_idx"
+      ],
+      "fks": [
+        {
+          "columns": [
+            "issue",
+            "match_idx"
+          ],
+          "references": "fixture (issue_code, match_idx) #234"
+        }
+      ],
+      "columns": [
+        {
+          "name": "issue",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "fixture_id",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "identity_status",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "match_idx",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "match_id",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "kickoff_ts_utc",
+          "physical_type": "timestamp[us, tz=UTC]",
+          "logical_type": "datetime",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "decision_epoch_utc",
+          "physical_type": "timestamp[us, tz=UTC]",
+          "logical_type": "datetime",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "year",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "league",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "home_team_id",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "away_team_id",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "native_handicap_line",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "line_ok",
+          "physical_type": "bool",
+          "logical_type": "bool",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "unseen_mask",
+          "physical_type": "bool",
+          "logical_type": "bool",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "min_history_n",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "home_history_n",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "away_history_n",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "triplet_ok",
+          "physical_type": "bool",
+          "logical_type": "bool",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "uncertainty",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_home_elo",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_away_elo",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_elo_diff",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_home_form_points",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_away_form_points",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_home_rest_hours",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_away_rest_hours",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_home_matches_7d",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_away_matches_7d",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_home_matches_21d",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_away_matches_21d",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_home_league_changes",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_away_league_changes",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_h2h_prior_n",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "diag_new_team_fallback",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "history_event_sha256",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": false,
+          "domain": "chained per-issue state digest (64 hex)",
+          "note": null
+        }
+      ]
+    },
+    "support_summary": {
+      "description": "causal publishable support by issue/year/league/line",
+      "key": [
+        "issue",
+        "year",
+        "league",
+        "native_handicap_line"
+      ],
+      "fks": [
+        {
+          "columns": [
+            "issue"
+          ],
+          "references": "decision_epoch (issue_code) #234"
+        }
+      ],
+      "columns": [
+        {
+          "name": "issue",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "year",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "league",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "native_handicap_line",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "rows",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": "outcome cells",
+          "note": null
+        },
+        {
+          "name": "issues",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": "=1 per group",
+          "note": null
+        },
+        {
+          "name": "matches",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": "per-issue match_idx nunique",
+          "note": null
+        }
+      ]
+    },
+    "calibration_through_2023": {
+      "description": "calibration by issue/year/league/line/outcome (<=2023)",
+      "key": [
+        "issue",
+        "year",
+        "league",
+        "native_handicap_line",
+        "outcome_code"
+      ],
+      "fks": [
+        {
+          "columns": [
+            "issue"
+          ],
+          "references": "decision_epoch (issue_code) #234"
+        }
+      ],
+      "columns": [
+        {
+          "name": "issue",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "year",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": "<= 2023",
+          "note": null
+        },
+        {
+          "name": "league",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": true,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "native_handicap_line",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": false,
+          "domain": null,
+          "note": null
+        },
+        {
+          "name": "outcome_code",
+          "physical_type": "string",
+          "logical_type": "string",
+          "nullable": false,
+          "domain": "{3,1,0}",
+          "note": null
+        },
+        {
+          "name": "n",
+          "physical_type": "int64",
+          "logical_type": "int64",
+          "nullable": false,
+          "domain": "> 0",
+          "note": null
+        },
+        {
+          "name": "mean_pred",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": false,
+          "domain": "[0,1]",
+          "note": null
+        },
+        {
+          "name": "mean_actual",
+          "physical_type": "double",
+          "logical_type": "float",
+          "nullable": false,
+          "domain": "[0,1]",
+          "note": null
+        }
+      ]
+    }
+  }
+}
