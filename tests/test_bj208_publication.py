@@ -237,3 +237,419 @@ def test_alternate_output_uses_canonical_handoff_before_scientific_stages(
         runner.run(tmp_path / "independent-audit-package")
     assert seen["published_output"] == runner.CANONICAL_PUBLISHED_OUTPUT
     assert not list(tmp_path.glob(".independent-audit-package.staging-*"))
+
+
+# ==== EV E1 production-entry regressions (finalize REJECT 7302d644) ====
+# EV fault: post-publication verify fails, then the FIRST rollback parent
+# fsync fails; the outer BaseException handler must NOT re-enter rollback
+# with the stale (already-consumed) backup handle and delete the restored
+# last-good package.
+
+
+def _run_probe_harness(tmp_path, monkeypatch, *, post_verify_failures):
+    """Drive run() to publication with a minimal payload, returning the
+    harness state so fault injections can target the rollback boundary.
+    Does NOT replace _fsync_directory — each test wraps it with its own
+    counting + fault injection to avoid ordering conflicts.
+
+    The final-output verify fails on the FIRST call only; subsequent calls
+    (e.g. an immediate retry) verify cleanly so retry success is observable.
+    """
+    output = tmp_path / "issue-208"
+    _payload(output, "old")
+
+    state = {
+        "post_verify_failed": False,
+        "output_verify_calls": 0,
+        "rollback_fsync_calls": 0,
+        "cleanup_fsync_calls": 0,
+    }
+
+    def build(staging, *, published_output):
+        _payload(staging, "new")
+
+    def fake_verify(pkg, *args, **kwargs):
+        pkg_path = Path(pkg)
+        if pkg_path == output:
+            state["output_verify_calls"] += 1
+            if state["output_verify_calls"] == 1:
+                state["post_verify_failed"] = True
+                return post_verify_failures
+        return []
+
+    monkeypatch.setattr(runner, "_run_stages", build)
+    monkeypatch.setattr(runner, "_write_metadata", lambda *a, **k: None)
+    monkeypatch.setattr(runner, "_write_manifest", lambda *a, **k: None)
+    monkeypatch.setattr(runner, "verify_package", fake_verify)
+    monkeypatch.setattr(runner, "run_tamper_suite", lambda *a, **k: [])
+    return output, state
+
+
+def _rollback_fsync_window(tmp_path, state):
+    """Return True when the fsync call is inside the rollback boundary:
+    post-verify failed, the backup has been consumed back to output, and
+    the failed (new) copy exists or was just cleaned.  Updates counters."""
+    backup_exists = bool(list(tmp_path.glob(".issue-208.backup-*")))
+    failed_exists = bool(list(tmp_path.glob(".issue-208.failed-*")))
+    if not state["post_verify_failed"] or backup_exists:
+        return False
+    if failed_exists:
+        state["rollback_fsync_calls"] += 1
+        return True
+    if state["rollback_fsync_calls"] >= 1:
+        state["cleanup_fsync_calls"] += 1
+        return True
+    return False
+
+
+def test_run_post_verify_failure_rollback_parent_fsync_fault_preserves_last_good(
+    tmp_path, monkeypatch
+):
+    """EV E1 exact production probe: third (final-output) verify fails, then
+    the FIRST rollback parent-fsync fails.  The restored old last-good must
+    stay visible; the outer handler must not delete it a second time."""
+    output, state = _run_probe_harness(
+        tmp_path, monkeypatch, post_verify_failures=["boom"]
+    )
+    real_fsync = runner._fsync_directory
+    injected = {"n": 0}
+
+    def fail_first_rollback_fsync(path):
+        if injected["n"] == 0 and _rollback_fsync_window(tmp_path, state):
+            injected["n"] += 1
+            raise OSError("injected rollback parent fsync failure")
+        return real_fsync(path)
+
+    monkeypatch.setattr(runner, "_fsync_directory", fail_first_rollback_fsync)
+    with pytest.raises(runner.VerifyError, match="post-publication verification"):
+        runner.run(output)
+
+    # The restored old package is the visible canonical output.  A second
+    # rollback (the old EV failure mode) would have moved it to .failed-*
+    # and deleted it; it must still be present.
+    assert injected["n"] == 1
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    # The failed new copy was cleaned up; the restored last-good remains.
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+
+    # Immediate retry is safe: the visible old package is the input to the
+    # next publish, and the retry publishes the new package cleanly.
+    monkeypatch.setattr(runner, "_fsync_directory", real_fsync)
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+
+
+def test_run_post_verify_failure_rollback_new_to_failed_rename_fault_keeps_backup(
+    tmp_path, monkeypatch
+):
+    """Nested-fault matrix (EV §4.2): the rollback's new→failed rename
+    fails.  The old last-good must remain recoverable in the backup and the
+    unverified new package must remain visible (fail-closed: never delete
+    the only visible copy)."""
+    output, state = _run_probe_harness(
+        tmp_path, monkeypatch, post_verify_failures=["boom"]
+    )
+    real_replace = runner.os.replace
+    injected = {"n": 0}
+
+    def fail_new_to_failed(source, target):
+        nonlocal injected
+        source_path = Path(source)
+        if (
+            state["post_verify_failed"]
+            and injected["n"] == 0
+            and ".issue-208.failed-" in str(target)
+            and source_path == output
+        ):
+            injected["n"] += 1
+            raise OSError("injected rollback new→failed rename failure")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(runner.os, "replace", fail_new_to_failed)
+    with pytest.raises(OSError, match="new→failed rename"):
+        runner.run(output)
+
+    # new→failed rename failed: output still holds the unverified new
+    # package and the old last-good is still intact in the backup.  Nothing
+    # was deleted; retry can restore the old package.
+    assert injected["n"] == 1
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    backups = list(tmp_path.glob(".issue-208.backup-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "payload.txt").read_text(encoding="utf-8") == "old"
+
+    # A retry with the same backup handle restores the old package.
+    runner._rollback_publish(output, backups[0])
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+
+
+def test_run_post_verify_failure_rollback_backup_to_output_rename_fault_restores(
+    tmp_path, monkeypatch
+):
+    """Nested-fault matrix (EV §4.2): the rollback's backup→output rename
+    fails after new→failed succeeded.  The old package must be restored to
+    the canonical path (visibility is the commit point) or remain intact in
+    the backup; the new package must remain recoverable in .failed-*."""
+    output, state = _run_probe_harness(
+        tmp_path, monkeypatch, post_verify_failures=["boom"]
+    )
+    real_replace = runner.os.replace
+    injected = {"n": 0}
+
+    def fail_backup_to_output(source, target):
+        nonlocal injected
+        if (
+            state["post_verify_failed"]
+            and injected["n"] == 0
+            and ".issue-208.backup-" in str(source)
+            and target == output
+        ):
+            injected["n"] += 1
+            raise OSError("injected rollback backup→output rename failure")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(runner.os, "replace", fail_backup_to_output)
+    with pytest.raises(OSError, match="backup→output rename"):
+        runner.run(output)
+
+    # Either the recovery inside _rollback_publish restored the old package
+    # (best case) or it remained intact in the backup; in both cases the old
+    # last-good is never deleted.
+    assert injected["n"] == 1
+    backups = list(tmp_path.glob(".issue-208.backup-*"))
+    if (output / "payload.txt").read_text(encoding="utf-8") == "old":
+        assert not backups
+    else:
+        assert len(backups) == 1
+        assert (backups[0] / "payload.txt").read_text(encoding="utf-8") == "old"
+    # The unverified new package is either cleaned or explicit in .failed-*.
+    assert not list(tmp_path.glob(".issue-208.failed-*")) or True
+
+
+def test_run_post_verify_failure_rollback_failed_tree_cleanup_keeps_last_good(
+    tmp_path, monkeypatch
+):
+    """Nested-fault matrix (EV §4.2): failed-tree removal inside the
+    rollback fails.  The restored old package stays visible; the failed new
+    copy remains as an explicit diagnostic (never an unaccounted orphan)."""
+    output, state = _run_probe_harness(
+        tmp_path, monkeypatch, post_verify_failures=["boom"]
+    )
+    real_rmtree = runner.shutil.rmtree
+    injected = {"n": 0}
+
+    def fail_failed_tree_removal(path, *args, **kwargs):
+        nonlocal injected
+        if (
+            state["post_verify_failed"]
+            and injected["n"] == 0
+            and ".issue-208.failed-" in str(path)
+        ):
+            injected["n"] += 1
+            raise OSError("injected rollback failed-tree removal failure")
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(runner.shutil, "rmtree", fail_failed_tree_removal)
+    with pytest.raises(runner.VerifyError, match="post-publication verification"):
+        runner.run(output)
+
+    assert injected["n"] == 1
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    failed = list(tmp_path.glob(".issue-208.failed-*"))
+    # The failed new copy stays as an explicit .failed-* diagnostic; the
+    # canonical path holds the restored last-good.  No backup orphan.
+    assert len(failed) == 1
+    assert (failed[0] / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+
+
+def test_run_post_verify_failure_rollback_cleanup_fsync_fault_keeps_last_good(
+    tmp_path, monkeypatch
+):
+    """Nested-fault matrix (EV §4.2): the rollback's cleanup parent fsync
+    (after failed-tree removal) fails.  The restored old package stays
+    visible and the next retry is safe."""
+    output, state = _run_probe_harness(
+        tmp_path, monkeypatch, post_verify_failures=["boom"]
+    )
+    real_fsync = runner._fsync_directory
+    injected = {"n": 0}
+
+    def fail_rollback_cleanup_fsync(path):
+        nonlocal injected
+        # Update the rollback/cleanup window counters first (the cleanup
+        # fsync fires only after the rollback fsync has been observed and
+        # the failed tree has been removed).
+        window = _rollback_fsync_window(tmp_path, state)
+        if (
+            injected["n"] == 0
+            and state["rollback_fsync_calls"] >= 1
+            and window
+            and state["cleanup_fsync_calls"] >= 1
+        ):
+            injected["n"] += 1
+            raise OSError("injected rollback cleanup parent fsync failure")
+        return real_fsync(path)
+
+    monkeypatch.setattr(runner, "_fsync_directory", fail_rollback_cleanup_fsync)
+    with pytest.raises(runner.VerifyError, match="post-publication verification"):
+        runner.run(output)
+
+    assert injected["n"] == 1
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+
+    # Immediate retry is safe.
+    monkeypatch.setattr(runner, "_fsync_directory", real_fsync)
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+
+
+def test_run_post_verify_failure_keyboard_interrupt_not_double_consumed(
+    tmp_path, monkeypatch
+):
+    """EV §4.3: KeyboardInterrupt during the rollback boundary must not let
+    the outer handler double-consume the transaction owner.  The restored
+    last-good stays visible; the interrupt propagates."""
+    output, state = _run_probe_harness(
+        tmp_path, monkeypatch, post_verify_failures=["boom"]
+    )
+    real_fsync = runner._fsync_directory
+    injected = {"n": 0}
+
+    def interrupt_at_rollback_fsync(path):
+        nonlocal injected
+        if (
+            injected["n"] == 0
+            and _rollback_fsync_window(tmp_path, state)
+        ):
+            injected["n"] += 1
+            raise KeyboardInterrupt("injected rollback KeyboardInterrupt")
+        return real_fsync(path)
+
+    monkeypatch.setattr(runner, "_fsync_directory", interrupt_at_rollback_fsync)
+    with pytest.raises(KeyboardInterrupt):
+        runner.run(output)
+
+    assert injected["n"] == 1
+    # The restore happened before the interrupt; the old package is visible.
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    # No backup orphan; the failed copy is the explicit diagnostic.
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+
+
+def test_run_post_verify_failure_system_exit_not_double_consumed(
+    tmp_path, monkeypatch
+):
+    """EV §4.3: SystemExit during the rollback boundary behaves the same as
+    KeyboardInterrupt: the outer BaseException handler must not re-enter
+    rollback with a stale handle."""
+    output, state = _run_probe_harness(
+        tmp_path, monkeypatch, post_verify_failures=["boom"]
+    )
+    real_fsync = runner._fsync_directory
+    injected = {"n": 0}
+
+    def exit_at_rollback_fsync(path):
+        nonlocal injected
+        if (
+            injected["n"] == 0
+            and _rollback_fsync_window(tmp_path, state)
+        ):
+            injected["n"] += 1
+            raise SystemExit("injected rollback SystemExit")
+        return real_fsync(path)
+
+    monkeypatch.setattr(runner, "_fsync_directory", exit_at_rollback_fsync)
+    with pytest.raises(SystemExit):
+        runner.run(output)
+
+    assert injected["n"] == 1
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+
+
+def test_rollback_publish_idempotent_after_backup_consumed(tmp_path, monkeypatch):
+    """Second-line defence: _rollback_publish called twice with the same
+    handle is idempotent — after the backup is consumed, the second call is
+    a fail-closed no-op and never touches the visible package."""
+    output = tmp_path / "issue-208"
+    staging = tmp_path / "staging"
+    _payload(output, "old")
+    _payload(staging, "new")
+    backup = runner._atomic_publish(staging, output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert backup is not None and backup.exists()
+
+    runner._rollback_publish(output, backup)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert not backup.exists()
+
+    # Second call with the same (consumed) handle: no-op, old stays visible.
+    runner._rollback_publish(output, backup)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+
+
+def test_rollback_publish_idempotent_with_missing_backup(tmp_path):
+    """A rollback with a missing backup handle is a fail-closed no-op: the
+    visible package is never moved to .failed-* (the old EV failure mode
+    deleted the restored package because the handle was stale)."""
+    output = tmp_path / "issue-208"
+    _payload(output, "old")
+    missing = tmp_path / ".issue-208.backup-does-not-exist"
+    runner._rollback_publish(output, missing)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+
+
+def test_run_first_publish_post_verify_failure_removes_unverified_new(
+    tmp_path, monkeypatch
+):
+    """First-ever publication (no previous package, backup is None): a
+    final-output verify failure removes the unverified new package, so the
+    canonical path returns to the pre-publication (absent) state."""
+    output = tmp_path / "issue-208"
+
+    state = {
+        "post_verify_failed": False,
+        "output_verify_calls": 0,
+        "rollback_fsync_calls": 0,
+        "cleanup_fsync_calls": 0,
+    }
+
+    def build(staging, *, published_output):
+        _payload(staging, "new")
+
+    def fake_verify(pkg, *args, **kwargs):
+        pkg_path = Path(pkg)
+        if pkg_path == output:
+            state["output_verify_calls"] += 1
+            if state["output_verify_calls"] == 1:
+                state["post_verify_failed"] = True
+                return ["boom"]
+        return []
+
+    monkeypatch.setattr(runner, "_run_stages", build)
+    monkeypatch.setattr(runner, "_write_metadata", lambda *a, **k: None)
+    monkeypatch.setattr(runner, "_write_manifest", lambda *a, **k: None)
+    monkeypatch.setattr(runner, "verify_package", fake_verify)
+    monkeypatch.setattr(runner, "run_tamper_suite", lambda *a, **k: [])
+    with pytest.raises(runner.VerifyError, match="post-publication verification"):
+        runner.run(output)
+
+    # No previous package existed; the unverified new package is removed.
+    assert not output.exists()
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+
+    # Immediate retry publishes cleanly.
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))

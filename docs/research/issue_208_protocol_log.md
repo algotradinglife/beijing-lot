@@ -456,19 +456,38 @@ selection rule, chronology and 0.65 ticket payout semantics.
 | #208-35 | supersede | ticket identity is the canonical unordered set of paired `(immutable match id, outcome code)` legs; paired arrays are sorted together before serialization/hash, candidate pools deduplicate that identity, every WOR/top-K selector rejects semantic aliases, and the production verifier independently reconstructs the canonical hash and bundle uniqueness | v7 separately sorted match key plus generation-order outcome/hash | Finalize C1: 1,738 non-WR semantic duplicate rows entered bundles; 36/9,744 action-label rows changed after correction, with maximum absolute matched-lift delta ¥54,170.80. |
 | #208-36 | supersede | after final-package verification, ownership of the obsolete backup is removed from the outer rollback before cleanup; cleanup parent-fsync failure preserves the verified new package and immediate retry remains safe; every nested directory is fsynced bottom-up | v7 backup cleanup followed by parent fsync while outer rollback still held the backup path | Finalize E1: if backup deletion succeeded and parent fsync failed, generic rollback deleted the verified output and could not restore the missing backup. |
 | #208-37 | add | exact before/after C1 evidence is reproduced from superseded commit `d51bd3e…` by `scripts/analyze_bj208_c1_correction.py` and committed under `docs/research/evidence/issue-208-r8/`; the production runner contains no compatibility layer for the superseded artifact | — | Preserve auditable correction attribution without imposing a backward-compatibility tax on the current model runtime. |
+| #208-38 | supersede | the rollback path is idempotent and fault-bounded: `run()` transfers ownership of the backup handle to a local before any rollback call (the outer BaseException handler then cannot re-enter with a consumed handle), `_rollback_publish` restores last-good then treats a later call with the same (consumed) handle as a fail-closed no-op, the restore parent-fsync and failed-copy cleanup fsync are durability warnings (never a second rollback trigger), failed-copy removal failure keeps an explicit `.failed-*` diagnostic, and a first-ever publication rollback removes the unverified new package to return to the absent state | #208-36 rollback path (`_rollback_publish` itself was not idempotent; a parent-fsync fault in the first rollback made the outer handler delete the restored last-good with the same stale handle) | Finalize E1 at `7302d644`: post-publication verify failure + first rollback parent-fsync fault produced `output_exists=false` — the restored old package was moved to `.failed-*` and deleted by the second rollback. Scientific numbers were unaffected; this is transactional-publication evidence closure. |
 
-### v8 executable evidence
+### v9 minor-rework executable evidence (E1 rollback idempotence)
+
+- Producer worktree: `analyst/bj208-rework-r11` (fresh checkout at audited
+  HEAD `7302d644…`).
+- `_rollback_publish` rewritten (idempotent, fault-bound); `run()` transfers
+  backup ownership before rollback.
+- 8 new tests in `tests/test_bj208_publication.py` covering the EV exact
+  production probe (third verify fails + first rollback parent-fsync fails),
+  the nested-fault matrix (new->failed rename, backup->output rename,
+  failed-copy removal, cleanup fsync), first-ever publication rollback,
+  idempotence-after-consumed and KeyboardInterrupt/SystemExit at the
+  rollback boundary.  Focused suite: `97 passed` (87 retained + 10 new).
+- Same-category sweep declaration:
+  `docs/research/issue_208_rework_v9_e1_sweep_evidence.md`.
+- Full deterministic replay regenerated the package; replay comparison and
+  production verifier/tamper results in the delivery.
+
+### v8 historical executable evidence (superseded by #208-38)
 
 - Producer code commit:
   `d2e1f9c4f74c61b8e174a09f6d54c7dc79625be5`.
 - `tests/test_bj208_canonical_identity.py` covers permutation invariance,
   semantic pool uniqueness, selector rejection and verifier rejection.
-- `tests/test_bj208_publication.py` covers cleanup parent-fsync failure,
+- `tests/test_bj208_publication.py` covered cleanup parent-fsync failure,
   verified-new visibility, immediate retry and nested-directory fsync order.
 - Production tamper suite adds `semantic_ticket_order_alias`; 26/26 attacks
   are detected.
 - Full replay: 1,154 seconds; 87 focused tests; package verifier PASS; all 78
   non-manifest payloads bound.
+
 - Final disposition remains `eligible=false` with frozen
   N7/K8/MARKET_WOR/native-¥2 incumbent; the unchanged terminal decision does
   not erase the material intermediate action-surface corrections.

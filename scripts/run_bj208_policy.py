@@ -211,16 +211,84 @@ def _atomic_publish(staging: Path, output: Path) -> Path | None:
 
 
 def _rollback_publish(output: Path, backup: Path | None) -> None:
-    """Restore the package state that existed before publication."""
+    """Restore the package state that existed before publication.
+
+    Idempotent and fault-bounded: the caller may invoke this more than once
+    with the same handle (run() post-verify branch and the outer
+    BaseException handler).  Once the backup has been consumed (renamed back
+    to output), a later call must be a no-op — it must never move the
+    restored last-good to .failed-* and delete it (EV E1: a parent-fsync
+    fault in the first rollback made the outer handler delete the restored
+    package with the same stale handle).
+
+    Fault policy: visibility restoration is the commit point.  After the
+    backup is renamed to output the old last-good is visible; a parent-fsync
+    fault or failed-copy cleanup fault at that point is a durability
+    warning, never a reason to touch the visible package again.
+    """
+    if backup is None:
+        # First-ever publication: roll back to the pre-publication state by
+        # removing the unverified new package.  Idempotent: if the output is
+        # already absent, nothing remains to do.
+        failed = output.parent / f".{output.name}.failed-{uuid.uuid4().hex}"
+        if output.exists():
+            try:
+                os.replace(output, failed)
+            except OSError:
+                # Could not move the unverified package aside; keep the
+                # current visible state and report the rollback failure.
+                raise
+            try:
+                _fsync_directory(output.parent)
+            except OSError:
+                pass
+            try:
+                shutil.rmtree(failed)
+            except OSError:
+                pass
+            try:
+                _fsync_directory(output.parent)
+            except OSError:
+                pass
+        return
+    if not backup.exists():
+        # The backup was already consumed by a previous rollback (or is
+        # otherwise absent).  Fail closed: never touch the visible package.
+        return
     failed = output.parent / f".{output.name}.failed-{uuid.uuid4().hex}"
-    if output.exists():
-        os.replace(output, failed)
-    if backup is not None and backup.exists():
+    try:
+        if output.exists():
+            os.replace(output, failed)
         os.replace(backup, output)
-    _fsync_directory(output.parent)
-    if failed.exists():
-        shutil.rmtree(failed)
+    except BaseException:
+        # Partial rollback: the new package may be at .failed-* or still at
+        # output, and the backup is untouched.  Restore visibility of the
+        # previous package if we moved it, then re-raise; a retry is safe
+        # because backup still exists and output is either absent or the
+        # new package.
+        if backup.exists() and not output.exists():
+            try:
+                os.replace(backup, output)
+            except OSError:
+                pass
+        raise
+    try:
         _fsync_directory(output.parent)
+    except OSError:
+        # Visibility already restored; a durability fault must not escalate
+        # into a second rollback that deletes the restored last-good.
+        pass
+    if failed.exists():
+        try:
+            shutil.rmtree(failed)
+        except OSError:
+            # Keep the failed copy as an explicit diagnostic; never let a
+            # cleanup fault hide the restored package.
+            pass
+        try:
+            _fsync_directory(output.parent)
+        except OSError:
+            pass
 
 
 def _commit_publish(output: Path, backup: Path | None) -> None:
@@ -301,8 +369,17 @@ def run(output: Path) -> dict[str, object]:
         # canonical post-publication location (never .staging).
         post_failures = verify_package(output)
         if post_failures:
-            _rollback_publish(output, backup)
+            # Ownership transfer BEFORE any rollback fault (EV E1): the
+            # rollback restores last-good from the backup and then flushes the
+            # parent directory; if that flush raises, the outer BaseException
+            # handler below must NOT re-enter rollback with the same handle
+            # (the backup is already consumed) and delete the restored
+            # package.  Clearing the handle first makes the outer path a
+            # no-op.  _rollback_publish itself is also idempotent (a consumed
+            # backup is a fail-closed no-op) as a second line of defence.
+            rollback_backup = backup
             backup = None
+            _rollback_publish(output, rollback_backup)
             raise VerifyError(
                 "post-publication verification failed: " + "; ".join(post_failures)
             )
