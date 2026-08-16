@@ -1,5 +1,18 @@
 # Issue #208 REWORK v10 — E1 rollback rename-fault closure sweep evidence
 
+> **SUPERSEDED in part by v11 (2026-08-16).** The v10 claim in §3.7 that
+> KeyboardInterrupt/SystemExit rollback coverage is complete is FALSE: it
+> only covered KI/SE at the restore parent-fsync boundary.  EV finalize
+> REJECT `819ef799` (2026-08-16T09:34Z) proved the rollback's
+> `output→failed` rename — the boundary that decides canonical ownership —
+> only caught `OSError`, so a KI/SE there exposed an unmarked
+> semantic-invalid canonical with the last-good hidden in `.backup-*`.
+> The v11 rework (session `20260816_173919_ce1447`) makes that boundary
+> `BaseException`-bounded with convergence-before-propagation; see
+> `issue_208_rework_v11_baseexception_sweep_evidence.md` and PROTOCOL-LOG
+> row #208-40.  The OSError-path content below remains accurate; the §3.7
+> "EVERY rename / KI/SE complete coverage" wording is superseded.
+
 - SESSION: 20260816_145531_b32d04 (minor rework, RESUME lineage from v9)
 - Audited base: `eeabd3036375f6a2e7d224c77bae292249ff2207` (PR #230 v9)
 - Controlling verdict: EV independent finalize REJECT (2026-08-16T06:48Z),

@@ -391,6 +391,147 @@ def test_run_post_verify_failure_rollback_new_to_failed_rename_fault_restores_la
     assert not list(tmp_path.glob(".issue-208.staging-*"))
 
 
+def test_atomic_publish_output_to_backup_rename_keyboard_interrupt_keeps_old(
+    tmp_path, monkeypatch
+):
+    """v11 sweep: KeyboardInterrupt at _atomic_publish's output→backup
+    rename.  The old last-good stays visible at canonical, staging is
+    untouched, no backup orphan is created, and the interrupt propagates."""
+    output = tmp_path / "issue-208"
+    staging = tmp_path / "staging"
+    _payload(output, "old")
+    _payload(staging, "new")
+    real_replace = runner.os.replace
+    injected = {"n": 0}
+
+    def interrupt_first(source, target):
+        nonlocal injected
+        injected["n"] += 1
+        if injected["n"] == 1:
+            raise KeyboardInterrupt("injected output→backup KeyboardInterrupt")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(runner.os, "replace", interrupt_first)
+    with pytest.raises(KeyboardInterrupt):
+        runner._atomic_publish(staging, output)
+    assert injected["n"] == 1
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert (staging / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+
+
+def test_atomic_publish_restore_backup_to_output_keyboard_interrupt_leaves_canonical_absent(
+    tmp_path, monkeypatch
+):
+    """v11 sweep: staging→output succeeds, the second parent fsync faults,
+    and the inner recovery's backup→output restore then raises
+    KeyboardInterrupt.  Canonical output is absent (fail-closed — no reader
+    consumes an uncommitted package), the old last-good stays intact in the
+    backup, and a healed retry publishes cleanly."""
+    output = tmp_path / "issue-208"
+    staging = tmp_path / "staging"
+    _payload(output, "old")
+    _payload(staging, "new")
+    real_replace = runner.os.replace
+    real_fsync = runner._fsync_directory
+    replace_calls = {"n": 0}
+    fsync_calls = {"n": 0}
+
+    def replace_sequence(source, target):
+        replace_calls["n"] += 1
+        # 1: output→backup, 2: staging→output, 3: output→staging (recovery),
+        # 4: backup→output (recovery) ← KeyboardInterrupt
+        if replace_calls["n"] == 4:
+            raise KeyboardInterrupt("injected backup→output KeyboardInterrupt")
+        return real_replace(source, target)
+
+    def fail_second_fsync(path):
+        fsync_calls["n"] += 1
+        # Call 1 = _fsync_tree(staging); call 2 = after output→backup;
+        # call 3 = after staging→output (the SECOND parent fsync we target).
+        if fsync_calls["n"] == 3:
+            raise OSError("injected second parent fsync failure")
+        return real_fsync(path)
+
+    monkeypatch.setattr(runner.os, "replace", replace_sequence)
+    monkeypatch.setattr(runner, "_fsync_directory", fail_second_fsync)
+    with pytest.raises(KeyboardInterrupt):
+        runner._atomic_publish(staging, output)
+    assert replace_calls["n"] == 4
+    assert not output.exists()
+    backups = list(tmp_path.glob(".issue-208.backup-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "payload.txt").read_text(encoding="utf-8") == "old"
+
+    # Healed retry: run()-start recovery converges the stale backup, then a
+    # fresh staging tree publishes and commits cleanly (mirrors run()).
+    monkeypatch.setattr(runner.os, "replace", real_replace)
+    monkeypatch.setattr(runner, "_fsync_directory", real_fsync)
+    runner._recover_stale_transaction(output)
+    _payload(staging, "new")
+    backup = runner._atomic_publish(staging, output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    runner._commit_publish(output, backup)
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+
+
+def test_atomic_publish_move_back_to_staging_keyboard_interrupt_keeps_verified_new(
+    tmp_path, monkeypatch
+):
+    """v11 sweep: staging→output succeeds, the second parent fsync faults,
+    and the inner recovery's output→staging rename then raises
+    KeyboardInterrupt.  The (verified) new package remains visible at
+    canonical, the old last-good stays intact in the backup; a real
+    run()-start recovery pass verifies the visible tree as last-good, drops
+    the stale backup and converges with zero orphans."""
+    output = tmp_path / "issue-208"
+    staging = tmp_path / "staging"
+    _payload(output, "old")
+    _payload(staging, "new")
+    real_replace = runner.os.replace
+    real_fsync = runner._fsync_directory
+    replace_calls = {"n": 0}
+    fsync_calls = {"n": 0}
+
+    def replace_sequence(source, target):
+        replace_calls["n"] += 1
+        # 1: output→backup, 2: staging→output, 3: output→staging (recovery)
+        # ← KeyboardInterrupt
+        if replace_calls["n"] == 3:
+            raise KeyboardInterrupt("injected output→staging KeyboardInterrupt")
+        return real_replace(source, target)
+
+    def fail_second_fsync(path):
+        fsync_calls["n"] += 1
+        # Call 1 = _fsync_tree(staging); call 2 = after output→backup;
+        # call 3 = after staging→output (the SECOND parent fsync we target).
+        if fsync_calls["n"] == 3:
+            raise OSError("injected second parent fsync failure")
+        return real_fsync(path)
+
+    monkeypatch.setattr(runner.os, "replace", replace_sequence)
+    monkeypatch.setattr(runner, "_fsync_directory", fail_second_fsync)
+    with pytest.raises(KeyboardInterrupt):
+        runner._atomic_publish(staging, output)
+    assert replace_calls["n"] == 3
+    # The verified new package stays visible; the old last-good is intact in
+    # the backup (a stale duplicate for the recovery pass to drop).
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    backups = list(tmp_path.glob(".issue-208.backup-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "payload.txt").read_text(encoding="utf-8") == "old"
+
+    # Real recovery: verify_package accepts the visible tree as last-good,
+    # drops the stale backup, converges with zero orphans.
+    monkeypatch.setattr(runner.os, "replace", real_replace)
+    monkeypatch.setattr(runner, "_fsync_directory", real_fsync)
+    monkeypatch.setattr(runner, "verify_package", lambda *a, **k: [])
+    runner._recover_stale_transaction(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+
+
 def test_run_post_verify_failure_rollback_backup_to_output_rename_fault_converges(
     tmp_path, monkeypatch
 ):
@@ -438,6 +579,257 @@ def test_run_post_verify_failure_rollback_backup_to_output_rename_fault_converge
     monkeypatch.setattr(runner.os, "replace", real_replace)
     runner.run(output)
     assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.staging-*"))
+
+
+# ==== EV finalize REJECT 819ef79 — BaseException boundary (REWORK v11) ====
+# EV exact production probes: the rollback's output→failed rename raises
+# KeyboardInterrupt / SystemExit (not just OSError).  The unverified new
+# must never stay unmarked at canonical output: every recovery step is
+# BaseException-bounded so a control interrupt still converges to a safe
+# state before propagating its intent.
+
+
+def _run_probe_harness_v11(tmp_path, monkeypatch, *, post_verify_failures):
+    """Reuse the v10 harness; v11 probes are distinguished only by the
+    exception type injected at the rollback's output→failed rename."""
+    return _run_probe_harness(
+        tmp_path, monkeypatch, post_verify_failures=post_verify_failures
+    )
+
+
+def test_run_post_verify_failure_rollback_new_to_failed_rename_keyboard_interrupt_converges(
+    tmp_path, monkeypatch
+):
+    """EV exact probe 1 (finalize REJECT 819ef79): final canonical verify
+    fails, then the rollback's output→failed rename raises
+    KeyboardInterrupt.  The invalid tree is removed and the old last-good is
+    restored BEFORE the interrupt propagates; a healed real run() retry
+    converges with zero orphans and no unmarked invalid canonical."""
+    output, state = _run_probe_harness_v11(
+        tmp_path, monkeypatch, post_verify_failures=["boom"]
+    )
+    real_replace = runner.os.replace
+    injected = {"n": 0}
+
+    def interrupt_new_to_failed(source, target):
+        nonlocal injected
+        source_path = Path(source)
+        if (
+            state["post_verify_failed"]
+            and injected["n"] == 0
+            and ".issue-208.failed-" in str(target)
+            and source_path == output
+        ):
+            injected["n"] += 1
+            raise KeyboardInterrupt("injected rollback KeyboardInterrupt")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(runner.os, "replace", interrupt_new_to_failed)
+    with pytest.raises(KeyboardInterrupt):
+        runner.run(output)
+
+    # Safe state before propagation: old last-good visible at canonical, no
+    # backup orphan, no failed copy, no unmarked invalid new, no staging.
+    assert injected["n"] == 1
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert not (output / runner.PUBLICATION_INVALID_MARKER).exists()
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.staging-*"))
+
+    # Healed real production retry (no private-helper calls): publishes the
+    # new package and converges with zero orphan artifacts.
+    monkeypatch.setattr(runner.os, "replace", real_replace)
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.staging-*"))
+
+
+def test_run_post_verify_failure_rollback_new_to_failed_rename_system_exit_converges(
+    tmp_path, monkeypatch
+):
+    """EV exact probe 2 (finalize REJECT 819ef79): the rollback's
+    output→failed rename raises SystemExit.  Same convergence contract as
+    the KeyboardInterrupt probe: last-good restored before the exit intent
+    propagates; healed retry converges with zero orphans."""
+    output, state = _run_probe_harness_v11(
+        tmp_path, monkeypatch, post_verify_failures=["boom"]
+    )
+    real_replace = runner.os.replace
+    injected = {"n": 0}
+
+    def exit_new_to_failed(source, target):
+        nonlocal injected
+        source_path = Path(source)
+        if (
+            state["post_verify_failed"]
+            and injected["n"] == 0
+            and ".issue-208.failed-" in str(target)
+            and source_path == output
+        ):
+            injected["n"] += 1
+            raise SystemExit("injected rollback SystemExit")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(runner.os, "replace", exit_new_to_failed)
+    with pytest.raises(SystemExit):
+        runner.run(output)
+
+    assert injected["n"] == 1
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "old"
+    assert not (output / runner.PUBLICATION_INVALID_MARKER).exists()
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.staging-*"))
+
+    monkeypatch.setattr(runner.os, "replace", real_replace)
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.staging-*"))
+
+
+def test_run_post_verify_failure_rollback_new_to_failed_rename_ki_then_rmtree_fault_marks_invalid(
+    tmp_path, monkeypatch
+):
+    """Same-category double fault (EV §4.1 sweep): output→failed rename
+    raises KeyboardInterrupt AND the invalid-tree removal then faults.  The
+    visible tree is fail-closed with a .PUBLICATION_INVALID marker, the
+    backup stays intact, and a healed real run() retry restores and
+    converges."""
+    output, state = _run_probe_harness_v11(
+        tmp_path, monkeypatch, post_verify_failures=["boom"]
+    )
+    real_replace = runner.os.replace
+    real_rmtree = runner.shutil.rmtree
+    injected = {"renames": 0, "rmtrees": 0}
+
+    def interrupt_new_to_failed(source, target):
+        source_path = Path(source)
+        if (
+            state["post_verify_failed"]
+            and injected["renames"] == 0
+            and ".issue-208.failed-" in str(target)
+            and source_path == output
+        ):
+            injected["renames"] += 1
+            raise KeyboardInterrupt("injected rollback KeyboardInterrupt")
+        return real_replace(source, target)
+
+    def fail_rmtree_output(path, *args, **kwargs):
+        if (
+            state["post_verify_failed"]
+            and injected["renames"] >= 1
+            and injected["rmtrees"] == 0
+            and Path(path) == output
+        ):
+            injected["rmtrees"] += 1
+            raise OSError("injected rollback output removal failure")
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(runner.os, "replace", interrupt_new_to_failed)
+    monkeypatch.setattr(runner.shutil, "rmtree", fail_rmtree_output)
+    with pytest.raises(OSError, match="output removal"):
+        runner.run(output)
+
+    # Fail-closed: the canonical path holds a tree explicitly marked
+    # .PUBLICATION_INVALID and the true last-good stays intact in the backup
+    # for the run()-start recovery pass.
+    assert injected["renames"] == 1
+    assert injected["rmtrees"] == 1
+    assert output.exists()
+    assert (output / runner.PUBLICATION_INVALID_MARKER).exists()
+    backups = list(tmp_path.glob(".issue-208.backup-*"))
+    assert len(backups) == 1
+    assert (backups[0] / "payload.txt").read_text(encoding="utf-8") == "old"
+
+    # Healed real production retry: recovery restores last-good, publishes
+    # the new package, commits it, and converges with zero orphans.
+    monkeypatch.setattr(runner.os, "replace", real_replace)
+    monkeypatch.setattr(runner.shutil, "rmtree", real_rmtree)
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not (output / runner.PUBLICATION_INVALID_MARKER).exists()
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.staging-*"))
+
+
+def test_run_first_publish_post_verify_failure_new_to_failed_rename_keyboard_interrupt_marks_invalid(
+    tmp_path, monkeypatch
+):
+    """First-ever publication (no last-good, backup is None): the rollback's
+    output→failed rename raises KeyboardInterrupt.  The unverified new
+    cannot be set aside and there is no backup to restore; the visible tree
+    is marked .PUBLICATION_INVALID (fail-closed) before the interrupt
+    propagates.  A healed real run() retry converges with zero orphans."""
+    output = tmp_path / "issue-208"
+
+    state = {
+        "post_verify_failed": False,
+        "output_verify_calls": 0,
+        "rollback_fsync_calls": 0,
+        "cleanup_fsync_calls": 0,
+    }
+
+    def build(staging, *, published_output):
+        _payload(staging, "new")
+
+    def fake_verify(pkg, *args, **kwargs):
+        pkg_path = Path(pkg)
+        if pkg_path == output:
+            state["output_verify_calls"] += 1
+            if state["output_verify_calls"] == 1:
+                state["post_verify_failed"] = True
+                return ["boom"]
+        return []
+
+    monkeypatch.setattr(runner, "_run_stages", build)
+    monkeypatch.setattr(runner, "_write_metadata", lambda *a, **k: None)
+    monkeypatch.setattr(runner, "_write_manifest", lambda *a, **k: None)
+    monkeypatch.setattr(runner, "verify_package", fake_verify)
+    monkeypatch.setattr(runner, "run_tamper_suite", lambda *a, **k: [])
+    real_replace = runner.os.replace
+    injected = {"n": 0}
+
+    def interrupt_new_to_failed(source, target):
+        nonlocal injected
+        source_path = Path(source)
+        if (
+            state["post_verify_failed"]
+            and injected["n"] == 0
+            and ".issue-208.failed-" in str(target)
+            and source_path == output
+        ):
+            injected["n"] += 1
+            raise KeyboardInterrupt("injected first-publish KeyboardInterrupt")
+        return real_replace(source, target)
+
+    monkeypatch.setattr(runner.os, "replace", interrupt_new_to_failed)
+    with pytest.raises(KeyboardInterrupt):
+        runner.run(output)
+
+    # Fail-closed: the unverified new is still at canonical but explicitly
+    # marked; no backup exists (first publish) and no failed/staging orphan.
+    assert injected["n"] == 1
+    assert output.exists()
+    assert (output / runner.PUBLICATION_INVALID_MARKER).exists()
+    assert not list(tmp_path.glob(".issue-208.backup-*"))
+    assert not list(tmp_path.glob(".issue-208.failed-*"))
+    assert not list(tmp_path.glob(".issue-208.staging-*"))
+
+    # Healed real production retry: recovery replaces the marked invalid
+    # tree, publishes the new package and converges with zero orphans.
+    monkeypatch.setattr(runner.os, "replace", real_replace)
+    runner.run(output)
+    assert (output / "payload.txt").read_text(encoding="utf-8") == "new"
+    assert not (output / runner.PUBLICATION_INVALID_MARKER).exists()
     assert not list(tmp_path.glob(".issue-208.backup-*"))
     assert not list(tmp_path.glob(".issue-208.failed-*"))
     assert not list(tmp_path.glob(".issue-208.staging-*"))

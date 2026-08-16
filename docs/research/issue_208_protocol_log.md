@@ -508,6 +508,7 @@ execution metadata).
 | Row | Action | Scope | Supersedes | Rationale |
 |---|---|---|---|---|
 | #208-39 | supersede | the rollback path never leaves a semantic-invalid new package on the canonical final path: (1) when the rollback's `new→failed` rename faults, the unverified tree is removed and the old last-good is restored from the backup (a POSIX rename cannot replace a non-empty directory target, so the invalid tree is deleted first; an absent output is fail-closed for any reader); (2) if removal also fails, the visible tree is explicitly marked `.PUBLICATION_INVALID` so readers/verifiers fail closed, and the backup stays intact; (3) `run()` starts with `_recover_stale_transaction()` which restores any leftover backup (or drops it when the visible tree verifies as a complete last-good) and removes stale `.failed-*`/`.staging-*`, so an immediate production retry converges with zero orphan artifacts | #208-38 rollback path (on `new→failed` rename fault it left the unverified new visible at canonical output and the old last-good orphaned in `.backup-*`; a production retry then left the stale backup) | Finalize E1 at `eeabd30`: independent production probe injected a `new→failed` rename fault during post-verify rollback and observed `visible_value=new-unverified`, `backup_values=[old-last-good]`, `last_good_visible=false`; a subsequent production `run()` succeeded but left the old `.backup-*` orphan. Worker v9 tests encoded the wrong contract (`assert unverified new visible`) and one test used a tautological `assert ... or True`. Scientific numbers unaffected. |
+| #208-40 | supersede | the rollback's `output→failed` rename is `BaseException`-bounded, not just `OSError`-bounded. When the rename itself raises `KeyboardInterrupt` or `SystemExit` (a single control interruption — not a crash-window speculation), the recovery still converges BEFORE the interrupt intent propagates: the invalid tree is removed, the old last-good is restored from the backup, the parent directory is fsynced, and only then is the control interrupt re-raised. Every recovery step (invalid-tree removal, `backup→output` restore) is itself `BaseException`-bounded: if a second fault interrupts recovery, the visible tree is marked `.PUBLICATION_INVALID` and the backup stays intact for the run()-start recovery pass. The first-publish (`backup is None`) branch has the same `BaseException` boundary: if the unverified new cannot be set aside, it is marked `.PUBLICATION_INVALID` before the interrupt propagates. The fail-closed marker writer also swallows any `BaseException` so a control interrupt during marker writing never masks the caller's own boundary fault | #208-39 rollback path (the `output→failed` rename caught only `OSError`; a `KeyboardInterrupt`/`SystemExit` there skipped the remove-invalid-tree/restore-backup path AND skipped the `.PUBLICATION_INVALID` marker, while `run()` had already transferred backup ownership — so the canonical path could hold an unmarked semantic-invalid new package with the true last-good hidden in `.backup-*`) | Finalize E1 at `819ef79` (2026-08-16T09:34Z, `REWORK_TYPE=minor`): independent production `run()` probe injected final-verify semantic rejection then a `KeyboardInterrupt`/`SystemExit` at the rollback `output→failed` rename; both probes observed `canonical_value=new-semantic-invalid`, `invalid_marker=false`, `backup_values=[old-last-good]`, `failed_values=[]`, `last_good_visible=false`, `semantic_invalid_new_exposed_unmarked=true`. The v10 sweep evidence only covered KI/SE at restore parent-fsync, not the rename boundary that decides canonical ownership. Scientific numbers unaffected — this is transactional-publication evidence closure only. |
 
 ### v10 minor-rework executable evidence (E1 rollback rename-fault closure)
 
@@ -527,3 +528,33 @@ execution metadata).
   `docs/research/issue_208_rework_v10_rollback_sweep_evidence.md`.
 - Full deterministic replay regenerated the package; replay comparison and
   production verifier/tamper results in the delivery.
+
+### v11 minor-rework executable evidence (E1 BaseException boundary closure)
+
+- Producer worktree: `analyst/bj208-rework-r11` (fresh at audited HEAD
+  `819ef79…`), session `20260816_173919_ce1447`, `REWORK_TYPE=minor`
+  (RESUME lineage per EV §5).
+- EV exact probes (finalize REJECT `819ef79`, 2026-08-16T09:34Z): the
+  rollback's `output→failed` rename raises `KeyboardInterrupt` / `SystemExit`
+  after final canonical verification rejects the new package.  v10 only
+  caught `OSError` there, so a control interrupt exposed an unmarked
+  semantic-invalid canonical with the true last-good hidden in `.backup-*`.
+- Fix: `_rollback_publish` `output→failed` rename and the first-publish
+  branch are `BaseException`-bounded; every recovery step (invalid-tree
+  removal, `backup→output` restore) is `BaseException`-bounded; recovery
+  converges to a safe state (last-good visible | canonical absent | fail-closed
+  marker + intact backup) BEFORE a control interrupt re-propagates;
+  `_mark_publication_invalid` swallows `BaseException` so a marker-write
+  interrupt never masks the caller's boundary fault.
+- Tests: 7 new production-entry tests (EV exact probes KI/SE at
+  `output→failed` rename with healed real `run()` retry convergence,
+  KI+rmtree double-fault marker path, first-publish KI marker path, and
+  `_atomic_publish` inner-recovery KI boundaries: output→backup rename,
+  backup→output restore, output→staging move-back).
+  Focused suite: `106 passed` (99 retained + 7 new).
+- Same-category full sweep + supersede declarations:
+  `docs/research/issue_208_rework_v11_baseexception_sweep_evidence.md`;
+  row #208-40 supersedes #208-39.
+- Deterministic replay regenerated the package; production verifier/tamper
+  and notebook results in the delivery.  No scientific/model/grid/seed/
+  selection change — E1 is purely transactional-publication evidence closure.

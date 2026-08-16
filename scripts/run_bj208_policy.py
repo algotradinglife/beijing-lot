@@ -221,13 +221,16 @@ def _mark_publication_invalid(output: Path) -> None:
     reader fail closed instead of consuming a package the transaction could
     not certify.  Best-effort: if even the marker cannot be written the
     original fault still propagates and the backup (if any) keeps the true
-    last-good for the run()-start recovery pass.
+    last-good for the run()-start recovery pass.  A control interrupt during
+    the marker write must not mask the caller's own fault, so every marker
+    write failure (including KeyboardInterrupt/SystemExit) is swallowed
+    here — the caller re-raises its own boundary fault.
     """
     try:
         (output / PUBLICATION_INVALID_MARKER).write_text(
             f"PUBLICATION_INVALID at {time.time()}\n", encoding="utf-8"
         )
-    except OSError:
+    except BaseException:
         pass
 
 
@@ -255,6 +258,18 @@ def _rollback_publish(output: Path, backup: Path | None) -> None:
     stale .backup-* orphan.  If even that overwrite fails, the tree is
     marked .PUBLICATION_INVALID (fail-closed) and the backup stays intact
     for the run()-start recovery pass.
+
+    EV E1 (v10 -> v11, finalize REJECT 819ef79): the new→failed rename is
+    BaseException-bounded, not just OSError-bounded.  A KeyboardInterrupt or
+    SystemExit raised AT that rename (the boundary that decides canonical
+    ownership) previously escaped without recovery and without the fail-closed
+    marker while run() had already transferred backup ownership — exposing an
+    unmarked semantic-invalid canonical.  Now every recovery step (invalid-tree
+    removal, backup→output restore) is itself BaseException-bounded and
+    converges to a safe state (last-good visible | canonical absent |
+    fail-closed marker + intact backup) BEFORE the control interrupt intent
+    propagates.  The first-publish (backup is None) branch has the same
+    BaseException boundary.
     """
     if backup is None:
         # First-ever publication: roll back to the pre-publication state by
@@ -265,9 +280,11 @@ def _rollback_publish(output: Path, backup: Path | None) -> None:
         failed = output.parent / f".{output.name}.failed-{uuid.uuid4().hex}"
         try:
             os.replace(output, failed)
-        except OSError:
-            # Cannot even set the unverified new aside.  There is no
-            # last-good to restore; fail closed so no reader consumes it.
+        except BaseException:
+            # Cannot even set the unverified new aside (OSError,
+            # KeyboardInterrupt or SystemExit).  There is no last-good to
+            # restore; fail closed so no reader consumes it.  A control
+            # interrupt intent still propagates after the marker is written.
             _mark_publication_invalid(output)
             raise
         try:
@@ -291,16 +308,24 @@ def _rollback_publish(output: Path, backup: Path | None) -> None:
     if output.exists():
         try:
             os.replace(output, failed)
-        except OSError:
-            # new→failed rename fault: the unverified new is still at the
-            # canonical path.  A POSIX rename cannot replace a non-empty
-            # directory target, so remove the invalid tree and then restore
-            # last-good from the backup.  An absent output is fail-closed
-            # for any reader.  The .failed-* diagnostic copy is sacrificed
-            # for visibility.
+        except BaseException as fault:
+            # new→failed rename fault (OSError, KeyboardInterrupt or
+            # SystemExit): the unverified new is still at the canonical
+            # path.  A POSIX rename cannot replace a non-empty directory
+            # target, so remove the invalid tree and then restore last-good
+            # from the backup.  An absent output is fail-closed for any
+            # reader.  The .failed-* diagnostic copy is sacrificed for
+            # visibility.
+            #
+            # Every recovery step is BaseException-bounded (REWORK v11,
+            # EV finalize REJECT 819ef79): a control interrupt or second
+            # fault during recovery must still converge to a safe state —
+            # last-good visible at canonical, canonical absent, or a
+            # verifiable .PUBLICATION_INVALID marker with the backup intact.
+            # Never expose an unmarked semantic-invalid canonical package.
             try:
                 shutil.rmtree(output)
-            except OSError:
+            except BaseException:
                 # Even removal failed: keep the backup as the true last-good
                 # and fail closed on the visible tree so readers cannot
                 # consume it.  The next run()'s recovery pass restores the
@@ -309,14 +334,24 @@ def _rollback_publish(output: Path, backup: Path | None) -> None:
                 raise
             try:
                 os.replace(backup, output)
-            except OSError:
+            except BaseException:
+                # Restore failed after the invalid tree was removed:
+                # canonical is absent (fail-closed) and the backup stays
+                # intact for the run()-start recovery pass.
                 _mark_publication_invalid(output)
                 raise
             try:
                 _fsync_directory(output.parent)
             except OSError:
                 pass
-            return
+            if isinstance(fault, OSError):
+                # Ordinary rollback fault: recovery succeeded, so the caller
+                # continues with its own VerifyError (v10 contract).
+                return
+            # KeyboardInterrupt / SystemExit (or another BaseException):
+            # recovery converged to a safe state first, then the control
+            # interrupt intent propagates to the caller.
+            raise
     try:
         os.replace(backup, output)
     except BaseException:
