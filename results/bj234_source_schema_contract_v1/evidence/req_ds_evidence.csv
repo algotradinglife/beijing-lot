@@ -1,0 +1,9 @@
+req,criterion,pass,evidence
+REQ-DS01,every source classified by causal admissibility with evidence,True,tables/feasibility_matrix.csv (clock_semantics + admissible_use + rationale)
+REQ-DS02,canonical fixture identity unique within issue x match_idx,True,"sql/schema.sql UNIQUE(issue_code, match_idx) + tables/identity_checks.csv"
+REQ-DS03,observed/received/decision/kickoff semantics non-interchangeable,True,contract/domain_dictionary.md + sql/schema.sql
+REQ-DS04,normalized tables reject duplicate/invalid Mx3 cells,True,sql/schema.sql CHECK constraints + unique indexes
+REQ-DS05,inference/proxy/settlement namespaces physically distinguishable,True,schemas/parquet_schema.json namespaces
+REQ-DS06,reuses pandas/PyArrow/SQLite with measured scale/concurrency justification,True,tables/databases.csv (sizes/rows) + contract/design_notes.md
+REQ-DS07,notebook tables bind machine-readable outputs and source hashes,True,MANIFEST.json source_hashes + notebook semantic hash
+REQ-DS08,"handoff names exact inputs/interfaces for Beijing, European, power, integration",True,tables/feasibility_matrix.csv selected_for_branch
