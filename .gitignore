@@ -31,6 +31,8 @@ results/*
 !results/issue-206/**
 !results/bj229_divergence_profile_v1/
 !results/bj229_divergence_profile_v1/**
+!results/bj234_source_schema_contract_v1/
+!results/bj234_source_schema_contract_v1/**
 runs/
 .cache/
 tmp/
@@ -46,6 +48,11 @@ temp/
 !results/issue-206/*.parquet
 !results/bj229_divergence_profile_v1/**/*.csv
 !results/bj229_divergence_profile_v1/**/*.parquet
+!results/bj234_source_schema_contract_v1/**/*.csv
+!results/bj234_source_schema_contract_v1/**/*.parquet
+!results/bj234_source_schema_contract_v1/**/*.json
+!results/bj234_source_schema_contract_v1/**/*.md
+!results/bj234_source_schema_contract_v1/**/*.sql
 *.feather
 *.h5
 *.hdf5

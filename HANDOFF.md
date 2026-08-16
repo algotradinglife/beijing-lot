@@ -1,73 +1,57 @@
-# Issue #229 R4 PI takeover handoff
+# Issue #234 rework handoff (R2, fresh — EV R1 REJECT method)
 
-[SESSION] 20260815_150526_cb81c5
+[SESSION] 20260816_150600
 
-- Current delivery HEAD is bound externally by the independent EV
-  `AUDITED_SHA`; a Git commit cannot embed its own SHA.
-- R4 is a PI-owned candidate-mode correction against R3 audited SHA
-  `6c5cdf36ea77d94be1ed69eca50f9d0f6b6accda`.
+- Issue: #234 (BJ-UNIFIED-DATA-SOURCE-SCHEMA-001) — Data: freeze source
+  registry, canonical identity and temporal store schema.
+- Mode: candidate. Base: `784a23b`. Branch: `engineer/bj234-r2-fresh`.
+- R1 was REJECTED by EV with `REWORK_TYPE=method` (defects C1-C4, E1-E2).
+  Per the 2026-08-12 fresh-rework rule, this run is a **fresh rebuild**;
+  R1 code in `~/beijing-lot-234` was read as reference only.
 
-## Conclusion correction
+## What R2 delivers (EV defect → fix)
 
-- Readiness no longer accepts anchor-only support. It requires a causal
-  pre-event SP plus at least one independent EU/POWER divergence pair.
-- POWER materialization now fails closed when its source handicap line differs
-  from the target BJ line.
-- Empty chart sources are explicit unavailable receipts, not `BOUND` tables.
-- The present package therefore concludes `BLOCKED_DATA_DEFECT`.
+| EV defect | R2 fix | evidence |
+|---|---|---|
+| C1 identity metrics: NULL rows counted as duplicates; long-form key missing outcome_code | `profiler.identity_stats` uses correct primitive keys (`issue, match_idx, outcome_code` for outcome_features); NULL-key rows reported separately (`null_key_rows`), duplicate excess = non_null - distinct_non_null = 0 | `tables/identity_checks.csv` + `test_identity_counts_match_ev_recalculation` (195,269 / 2,560 / 192,709) |
+| C2 source lineage: 500.com masquerade as Beijing official; static grades; empty raw hashes | Registry rows carry real provider/endpoint + endpoint_evidence citation; `BJ_FIRST_PARTY_OFFICIAL` = UNUSABLE/NO_RECEIPT; `BEIDAN_LIVE_DB` = 500.com third-party plane, STRICT_CAUSAL only with raw receipt | `tables/source_registry.csv` + `test_registry_no_500_masquerade` |
+| C3 DDL: no fixture_alias; quote unique erased bookmaker; NULL handicap dup; no FK/timestamp/overlap enforcement; live snapshot kinds rejected (C3-5) | `fixture_alias` table; quote PK (observation, bookmaker, outcome); COALESCE unique on probability; observation natural-key unique; FK ON; UTC GLOB CHECKs + ordering CHECKs; temporal triggers; alias no-overlap triggers; `v_incomplete_triplets` view; max-3 trigger; `snapshot_kind` domain extended with `live` (prospective timestamped capture) | `sql/schema.sql` + 12 SQLite probe tests (all pass) + `test_ddl_live_snapshot_kind_accepted` / `test_ddl_invalid_snapshot_kind_rejected` + verifier live-kind probe |
+| C4 label sealing: census opened 2024+ outcome/settlement values | Census reads only allow-listed columns; sealed tables/columns recorded; `assert_measurable` raises on sealed reads; notebook proves guard | `tables/sealed_columns.csv` + `test_sealing_*` |
+| E1 test isolation: tests wrote real package and dropped a column | All tests build/tamper in `tmp_path`; committed package produced only by build script; `test_build_to_tmp_path_never_touches_committed` | pytest suite |
+| E2 semantic verifier fail-open | `verify.verify_package` rebuilds DDL in SQLite, checks real schema objects, registry semantics, namespace disjointness, sealing, identity; 12 remanifest attacks in tests all FAIL | `test_e2_attack_*` (12) + `test_tamper_*` (5) |
 
-## Key decisions and reasons
+## Key decisions
 
-1. Raw list-vector presence never implies availability. Q_BJ has 353,991 raw
-   rows but 228 causal rows; POWER has 4,674 raw rows but 234 causal rows.
-2. Missing source observation time remains missing. The decision epoch is never
-   copied into an observed-at field.
-3. Issue identifiers are identifiers, not years. Label year is sourced only
-   from #203 identity.
-4. Empty causal intersections are committed as explicit receipts/placeholders,
-   not filled, omitted or called ready.
-5. Exact review binding is external through `AUDITED_SHA`; package content
-   remains bound by code/notebook/dependency/source hashes.
+1. 500.com third-party plane is named honestly; the first-party Beijing
+   interface is registered UNUSABLE until acquired (contract F1 remains
+   the target, but evidence must not fake it).
+2. STRICT_CAUSAL requires TIMESTAMPED_UTC clock + resolvable raw receipt —
+   enforced in DDL CHECK and in the semantic verifier.
+3. SQLite has no deferred cross-row CHECK; Mx3 triplet completeness is
+   enforced at the canonical append boundary + `v_incomplete_triplets`
+   view + max-3 trigger (documented in design_notes.md).
+4. Legacy duplicate conclusions: NULL-key rows are UNIDENTIFIED; real
+   non-null duplicate excess is 0 on all legacy tables (EV independent
+   recomputation agrees).
+5. Dynamic live DBs (beidan_live.db, 500_bjdc.sqlite) are not frozen
+   snapshots; their census-time sha256 is bound in MANIFEST source_hashes.
 
-## Verification
+## Verification (from this run)
 
-- R4 focused/full tests: 92 passed.
-- Ruff and `git diff --check`: PASS.
-- Sequential build: 29:01 wall; 2,827,008 KiB peak RSS.
-- Notebook: 13/13 cells; 0 errors; 29:29 wall; 2,852,356 KiB peak RSS.
-- Final verifier: 74 files match and semantic checks PASS.
+- build + verify green (to be confirmed in final run)
+- pytest suite (to be confirmed)
+- notebook 13 cells clean-run (to be confirmed)
 
-## Known limitations and risks
+## Known limitations / risks
 
-- Disposition is `BLOCKED_DATA_DEFECT`.
-- Q_BJ causally available: 228 cells.
-- Q_EU_BJLINE causally available: 0; P_POWER causally available: 234, but no
-  causal overlap with Q_BJ; no causal divergence rows are published.
-- Q_BJ_SP_DEVIG causally available: 0.
-- REQ-D01 remains False due to 15 post-decision cells, 68,298 missing timestamp
-  entries, 37,614 observed-after-epoch feature rows, and 677,394 raw-present/
-  no-causal-epoch rows. Available-set violations are zero.
-- 2024+ labels remain sealed with zero handoff rows.
+- EU feed (Odds API) stays RETROSPECTIVE_PROXY/NO_RECEIPT pending coverage
+  evaluation + purchase (issue boundary: no provider purchase).
+- 500_bjdc.sqlite 17GB makes each census ~2-4 min (hashing + scans).
+- First-party Beijing interface not yet acquired — #235 wires the 500.com
+  collector; official interface remains UNUSABLE until acquisition.
 
-## PI acceptance block
+## Next steps
 
-| Acceptance criterion | Evidence/result |
-|---|---|
-| D01 causal provenance | Honest FAIL; masks fail closed; 0 available-set violations |
-| D02 identity | PASS; unique package-local `cell_key` and FK closure |
-| D03 probability validity | PASS; invalid triplets 0 |
-| D04 outcome/line mapping | PASS; float half-goal mapping and explicit failures |
-| D05 divergence semantics | PASS; per-cell recomputation; no raw-only support |
-| D06 settlement isolation | PASS; authoritative development/sealed split |
-| D07 payout boundary | PASS; no payout/tax/0.65 construction in payloads |
-| D08 complete profiling | PASS; source×outcome×cohort plus empty receipts |
-| D09 schema/provenance | PASS; 47 tables; package-only semantic validator |
-| D10 honest readiness | PASS; `BLOCKED_DATA_DEFECT` because required causal intersections are zero |
-| REQ-M | N/A; no `method.yaml` in contract tree |
-
-Decision: #209 may not proceed from this handoff. A separate native
-data-remediation predecessor must create causal SP-backed divergence support.
-
-Explicit review request: EV should independently rerun 87 tests, the seven
-remanifest mutations, package verify, notebook 13/13, authoritative label-year
-counts, and raw-versus-causal source counts before PI review.
+- EV independent verification (fresh checkout, focused tests, notebook
+  clean-run, manifest coverage, remanifest attacks).
+- PI review of frozen contract before downstream #235/#236/#237/#238.
