@@ -1,0 +1,5 @@
+check,reason_code,count
+DQ02_timestamp_checks,MISSING_TIMESTAMP,68298
+DQ03_started_matches,POST_DECISION_OBSERVATION,15
+DQ04_invalid_handicap_result_mapping,MISSING_NATIVE_LINE,3648
+DQ10_outlier_constant_fields,OUTLIER_REFERENCE,6

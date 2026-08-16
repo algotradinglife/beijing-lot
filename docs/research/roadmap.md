@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-16 HKT (#208 independent-line C1/E1 closure in progress; native graph corrected)**
+Updated: **2026-08-16 11:43 HKT (#229 negative readiness accepted; #232 data remediation activated)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -92,17 +92,16 @@ PI interpretation and does not replace those edges or Project states.
              |
              v
 #207 ¥100k active bankroll + separate NO_BET safety lane (Done; no overlay Edge)
-             |
-             v
-#208 dynamic N×K risk-conditioned frontier (independent research line; In Progress)
 
-#203 + #204 + #214 + #180
+#208 dynamic N×K risk-conditioned frontier (independent line; EV Review)
+
+#229 divergence causal-data profile (Done; BLOCKED_DATA_DEFECT)
              |
              v
-#229 divergence data profiling/readiness (Blocked by its own data defect)
+#232 restore causal SP-backed divergence support (Ready)
              |
              v
-#209 full-cycle historical ablation and baseline ladder (Blocked by #229 only)
+#209 full-cycle historical ablation and baseline ladder (Blocked)
              |
              v
 #210 held-out/prospective validation  <--- #218 causal support accumulation
@@ -118,11 +117,28 @@ PI interpretation and does not replace those edges or Project states.
 | 3 | [#205] M×3 value matrix and joint N7 calibration | Closed / Done | M2 | #204 closed | `MARKET_INDEPENDENCE` plus frozen pre-event SP is the safe #206 interface |
 | 4 | [#206] fixed-N7 ticket generator | Closed / Done | M3 | #205 closed | Learned challenger rejected; no comparable accepted ticket baseline is bound, so all locked issues route to `NO_BET` |
 | 5 | [#207] active bankroll + separate NO_BET safety lane | Closed / Done | M3 | #206 closed | Engine valid after R7 EV and PI adversarial review; no positive active-overlay evidence; deployable policy remains false |
-| 6 | [#208] dynamic N×K frontier | Open / In Progress | M3 | No native blocker; independent line | Learn N (legs per ticket), K (tickets per issue), generator lane and safe capital control without assuming fixed N7 is Edge; not a prerequisite for #229/#209 |
-| 7 | [#229] divergence data profiling/readiness | Open / Blocked | M1 | No native predecessor; blocked by its own zero-intersection data defect | Prepare the causal BJ/EU/POWER/SP divergence interface required by #209 |
-| 8 | [#209] full-cycle historical evaluation | Open / Blocked | M3 | Blocked by #229 only | Chronological ablations and accepted baseline ladder; #208 is optional diagnostic context, not a prerequisite |
-| 9 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
-| 10 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 6 | [#208] dynamic N×K frontier | Open / EV Review | M3 | No native blocker; independent line | Learn N, K, generator lane and safe capital control without assuming fixed N7 is Edge; optional diagnostic only for #209 |
+| 7 | [#229] divergence data profile | Closed / Done | M1 | No predecessor | Accepted negative readiness result: all causal SP-backed independent divergence intersections are zero; `BLOCKED_DATA_DEFECT` |
+| 8 | [#232] divergence-support remediation | Open / Ready | M1 | No native blocker | Recover provenance-valid SP-backed BJ×EU/POWER support, close #229 evidence debt and prove issue-level chronological modelability |
+| 9 | [#209] full-cycle historical evaluation | Open / Blocked | M3 | Blocked by #232; #229 closed | Chronological ablations and accepted baseline ladder; activation requires PI modelability review, not merely one positive cell |
+| 10 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
+| 11 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+
+### #229 terminal data-readiness decision and #232 handoff
+
+- Independent candidate EV and PI adversarial review accepted #229 at exact PR
+  #231 HEAD `c2d43cb7f63fdb88c15fdccea8a0cad2ac327a83` as a complete
+  **negative readiness** result.
+- Causal support is zero for `Q_BJ × SP`, `Q_BJ × EU × SP` and
+  `Q_BJ × POWER × SP`. Raw Q_BJ presence therefore cannot be promoted to a
+  divergence-model input, and #209 remains fail-closed.
+- #232 replaces #229 as the open native blocker for #209. It must diagnose the
+  raw-to-causal support waterfall, recover only timestamp-valid common-line
+  observations, close candidate evidence debt E1-E4, and report support by
+  issue and chronological role.
+- Any future support greater than zero is necessary but not sufficient. PI must
+  review issue-level sample adequacy and supported N/action scope before #209
+  may enter `Ready`.
 
 ### #205 terminal decision and downstream contract
 
@@ -211,6 +227,7 @@ retrospective feature.
 [#211]: https://github.com/algotradinglife/beijing-lot/issues/211
 [#218]: https://github.com/algotradinglife/beijing-lot/issues/218
 [#229]: https://github.com/algotradinglife/beijing-lot/issues/229
+[#232]: https://github.com/algotradinglife/beijing-lot/issues/232
 
 ---
 
