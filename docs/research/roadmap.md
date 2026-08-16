@@ -70,7 +70,7 @@ for the initial live mapping.
 
 ## Current unified-model roadmap
 
-Updated: **2026-08-13 23:43 HKT (Issue #207 terminal review and #208 activation)**
+Updated: **2026-08-16 HKT (#208 independent-line C1/E1 closure in progress; native graph corrected)**
 
 The active program is [#202], which turns each issue's match × outcome tensor
 into a four-stage decision path: probability/value representation, constrained
@@ -94,10 +94,15 @@ PI interpretation and does not replace those edges or Project states.
 #207 ¥100k active bankroll + separate NO_BET safety lane (Done; no overlay Edge)
              |
              v
-#208 dynamic N×K risk-conditioned frontier (Ready)
+#208 dynamic N×K risk-conditioned frontier (independent research line; In Progress)
+
+#203 + #204 + #214 + #180
              |
              v
-#209 full-cycle historical ablation and baseline ladder
+#229 divergence data profiling/readiness (Blocked by its own data defect)
+             |
+             v
+#209 full-cycle historical ablation and baseline ladder (Blocked by #229 only)
              |
              v
 #210 held-out/prospective validation  <--- #218 causal support accumulation
@@ -113,10 +118,11 @@ PI interpretation and does not replace those edges or Project states.
 | 3 | [#205] M×3 value matrix and joint N7 calibration | Closed / Done | M2 | #204 closed | `MARKET_INDEPENDENCE` plus frozen pre-event SP is the safe #206 interface |
 | 4 | [#206] fixed-N7 ticket generator | Closed / Done | M3 | #205 closed | Learned challenger rejected; no comparable accepted ticket baseline is bound, so all locked issues route to `NO_BET` |
 | 5 | [#207] active bankroll + separate NO_BET safety lane | Closed / Done | M3 | #206 closed | Engine valid after R7 EV and PI adversarial review; no positive active-overlay evidence; deployable policy remains false |
-| 6 | [#208] dynamic N×K frontier | Open / Ready | M3 | #207 closed | Learn N (legs per ticket), K (tickets per issue), generator lane and safe capital control without assuming fixed N7 is Edge |
-| 7 | [#209] full-cycle historical evaluation | Open | M3 | Blocked by #208 | Chronological ablations and accepted baseline ladder |
-| 8 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
-| 9 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
+| 6 | [#208] dynamic N×K frontier | Open / In Progress | M3 | No native blocker; independent line | Learn N (legs per ticket), K (tickets per issue), generator lane and safe capital control without assuming fixed N7 is Edge; not a prerequisite for #229/#209 |
+| 7 | [#229] divergence data profiling/readiness | Open / Blocked | M1 | No native predecessor; blocked by its own zero-intersection data defect | Prepare the causal BJ/EU/POWER/SP divergence interface required by #209 |
+| 8 | [#209] full-cycle historical evaluation | Open / Blocked | M3 | Blocked by #229 only | Chronological ablations and accepted baseline ladder; #208 is optional diagnostic context, not a prerequisite |
+| 9 | [#210] held-out/forward validation | Open | M4 | Blocked by #209 and #218 | Model-unseen audit plus frozen prospective evidence |
+| 10 | [#211] message overlay | Open | M4 | Blocked by #210 and #182 | Incremental timestamped message evidence on the frozen policy |
 
 ### #205 terminal decision and downstream contract
 
@@ -204,6 +210,7 @@ retrospective feature.
 [#210]: https://github.com/algotradinglife/beijing-lot/issues/210
 [#211]: https://github.com/algotradinglife/beijing-lot/issues/211
 [#218]: https://github.com/algotradinglife/beijing-lot/issues/218
+[#229]: https://github.com/algotradinglife/beijing-lot/issues/229
 
 ---
 

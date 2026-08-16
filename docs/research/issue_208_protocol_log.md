@@ -440,3 +440,35 @@ lag-state correction only.
 - Tamper suite adds false terminal promotion and nested manifest-name escape.
 - Golden tests span lag warm-up counts 1/4/5/9/10 and first/second parent-fsync
   failure plus transient backup-cleanup failure.
+
+---
+
+## 20. PI takeover v8 C1/E1 closure rows (2026-08-16, finalize REJECT d51bd3e)
+
+The finalize audit at exact PR #230 HEAD
+`d51bd3e07b84039cc7172c8d3fef776d99aca95d` reproduced the null result but
+found one conclusion-input defect (C1) and one finalize evidence defect (E1).
+These corrections preserve the frozen action catalog, model families, seeds,
+selection rule, chronology and 0.65 ticket payout semantics.
+
+| Row | Action | Scope | Supersedes | Rationale |
+|---|---|---|---|---|
+| #208-35 | supersede | ticket identity is the canonical unordered set of paired `(immutable match id, outcome code)` legs; paired arrays are sorted together before serialization/hash, candidate pools deduplicate that identity, every WOR/top-K selector rejects semantic aliases, and the production verifier independently reconstructs the canonical hash and bundle uniqueness | v7 separately sorted match key plus generation-order outcome/hash | Finalize C1: 1,738 non-WR semantic duplicate rows entered bundles; 36/9,744 action-label rows changed after correction, with maximum absolute matched-lift delta ¥54,170.80. |
+| #208-36 | supersede | after final-package verification, ownership of the obsolete backup is removed from the outer rollback before cleanup; cleanup parent-fsync failure preserves the verified new package and immediate retry remains safe; every nested directory is fsynced bottom-up | v7 backup cleanup followed by parent fsync while outer rollback still held the backup path | Finalize E1: if backup deletion succeeded and parent fsync failed, generic rollback deleted the verified output and could not restore the missing backup. |
+| #208-37 | add | exact before/after C1 evidence is reproduced from superseded commit `d51bd3e…` by `scripts/analyze_bj208_c1_correction.py` and committed under `docs/research/evidence/issue-208-r8/`; the production runner contains no compatibility layer for the superseded artifact | — | Preserve auditable correction attribution without imposing a backward-compatibility tax on the current model runtime. |
+
+### v8 executable evidence
+
+- Producer code commit:
+  `d2e1f9c4f74c61b8e174a09f6d54c7dc79625be5`.
+- `tests/test_bj208_canonical_identity.py` covers permutation invariance,
+  semantic pool uniqueness, selector rejection and verifier rejection.
+- `tests/test_bj208_publication.py` covers cleanup parent-fsync failure,
+  verified-new visibility, immediate retry and nested-directory fsync order.
+- Production tamper suite adds `semantic_ticket_order_alias`; 26/26 attacks
+  are detected.
+- Full replay: 1,154 seconds; 87 focused tests; package verifier PASS; all 78
+  non-manifest payloads bound.
+- Final disposition remains `eligible=false` with frozen
+  N7/K8/MARKET_WOR/native-¥2 incumbent; the unchanged terminal decision does
+  not erase the material intermediate action-surface corrections.

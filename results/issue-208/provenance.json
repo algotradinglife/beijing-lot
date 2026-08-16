@@ -2,7 +2,7 @@
   "code_bindings": {
     "method.yaml": "d2a8c5345d67ecf40c23820744b9032f1a52198f092f7fda9ae01f1f292bb97e",
     "requirements.txt": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
-    "scripts/run_bj208_policy.py": "432cde3c5ae334d301b9880dd4fe74fdec74266518e35fa8c706b511bc0aeec5",
+    "scripts/run_bj208_policy.py": "6f5817ed33a513f33c8049aba1da801dc3edddb244ce3fe8a7030b8a1f17c30d",
     "src/parlay_policy/__init__.py": "dfa9d9829f46c405485807396b8a420bb847149400970a027be697625a938c4d",
     "src/parlay_policy/census.py": "fd16ef854ae66485cc2156e8433ea4c90f454bb4cda5dfcff7c53173e038f4b5",
     "src/parlay_policy/contract.py": "d69acda57d19e3f9a897948f43661bba14d675e8bb1b4c7ef60beded8a9d1b4b",
@@ -11,8 +11,8 @@
     "src/parlay_policy/incumbent.py": "4c36dbc37162465681442577afab861811808599957e80475abc125e3f76b2ac",
     "src/parlay_policy/policy.py": "5bd0b589e221128ad826ccc5ab04ec69a8c356cac1c1d7c3ce7d88c927d34f24",
     "src/parlay_policy/replay.py": "d01f805ae91e2238c40245498f4feac75288ae46daf4256b3aa099face151eba",
-    "src/parlay_policy/tickets.py": "718a4a33165f36dc94cb6c1a6675fb0fd9866a2ada8aab02a8ff9804bad1e130",
-    "src/parlay_policy/verify.py": "a003ab679392361b51c57512b2adbace781c7ff410eb7be406395c7f792345d0"
+    "src/parlay_policy/tickets.py": "3f6017cc63e8a25a4ad38d26c54fc8ecad6d00f4bea59a6f70792c07f1ee948c",
+    "src/parlay_policy/verify.py": "625344992354aa7033878ce08e39f7285acdeff4a73cf18d5cf2d54ad7109825"
   },
   "environment": {
     "numpy": "2.4.6",
@@ -24,7 +24,7 @@
   },
   "environment_lock_sha256": "e1cef58d570fc754d620beae42bc898a382e59c6293fdd515c4929cefba7eab6",
   "label_boundary": "CV_2021 fit; CV_2022/CV_2023 development; 2024/2025/2026 embargoed",
-  "producer_code_commit": "7ff62c6b01fc6d24716608e3b45527a578722b26",
+  "producer_code_commit": "d2e1f9c4f74c61b8e174a09f6d54c7dc79625be5",
   "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208",
   "source_issue_207": "results/issue-207",
   "source_issue_207_manifest_sha256": "48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6",

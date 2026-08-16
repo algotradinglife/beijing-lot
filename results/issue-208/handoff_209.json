@@ -213,11 +213,11 @@
     ],
     "fixed_action_key": null,
     "loss_curve_tail": [
-      832417.2547784647,
-      832388.509282241,
-      832379.1018152937,
-      832349.4606700485,
-      832349.8262330651
+      834464.2220297654,
+      834439.9441191014,
+      834429.6172836722,
+      834409.4588077246,
+      834402.4714713487
     ],
     "model_file": "fold2_mlp.joblib",
     "model_kind": "MLP",
@@ -251,7 +251,7 @@
     },
     "model_serialized": true,
     "model_type": "Pipeline",
-    "residual_rmse": 1290.1409955051247,
+    "residual_rmse": 1291.7315933271116,
     "scaler_mean": [
       315.6530612244898,
       0.49643029176147574,
@@ -330,7 +330,7 @@
       "prior_consecutive_losses"
     ],
     "validation_issue_count": 18,
-    "validation_rmse": 1012.4129118228267
+    "validation_rmse": 1012.6110770299373
   },
   "model_file": "results/issue-208/models/fold2_mlp.joblib",
   "package_manifest": "results/issue-208/SHA256SUMS.json",

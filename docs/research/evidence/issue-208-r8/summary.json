@@ -1,0 +1,29 @@
+{
+  "after_producer_commit": "d2e1f9c4f74c61b8e174a09f6d54c7dc79625be5",
+  "after_unexpected_semantic_duplicate_rows": 0,
+  "before_commit": "d51bd3e07b84039cc7172c8d3fef776d99aca95d",
+  "before_unexpected_semantic_duplicate_rows": 1738,
+  "capital_endpoints_changed": 5,
+  "final_disposition_changed": false,
+  "frozen_candidate_after": {
+    "capital": "NATIVE_2_YUAN",
+    "k": 8,
+    "lane": "MARKET_WOR",
+    "n": 7,
+    "policy": "FROZEN_N7_INCUMBENT"
+  },
+  "frozen_candidate_before": {
+    "capital": "NATIVE_2_YUAN",
+    "k": 8,
+    "lane": "MARKET_WOR",
+    "n": 7,
+    "policy": "FROZEN_N7_INCUMBENT"
+  },
+  "label_surface_rows_changed": 36,
+  "label_surface_rows_total": 9744,
+  "max_abs_capital_endpoint_delta_yuan": 366.0687406383222,
+  "max_abs_matched_lift_mean_delta_yuan": 54170.79986655136,
+  "payout_groups_changed": 46,
+  "selection_eligible_after": false,
+  "selection_eligible_before": false
+}

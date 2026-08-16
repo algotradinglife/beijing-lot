@@ -21,10 +21,10 @@
     "detected": true,
     "failures": [
       "hash mismatch chronology_blocks.parquet: d82ba9a17d46deb2e44dde5f22ad011d13b1fd4403054ce767cc1fbf6966dea8 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_fold1.parquet: a99c9df6e57f5423b80d493a83a5a682b15adb23954866128e2399c51cd827d8 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_fold2.parquet: e97acf561173d7ab5f85f41081b85f35a45fff02bd97b4da65314551dd7de29e != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_rows_all.parquet: 9f80c37523cef9277ffbe0cc22c9382eb7a11cc048e9c5e2f5e4d120ef580959 != 0000000000000000000000000000000000000000000000000000000000000000",
-      "hash mismatch decision_ticket_identities.parquet: 6640fa3220c0e94df4fefb9b87228850acbca3cbb37432eed1b6c1784d7fb81e != 0000000000000000000000000000000000000000000000000000000000000000"
+      "hash mismatch decision_fold1.parquet: 30886d094229b2e59260d59ebf150545fdab5b27182b94264cf6d1ce242b4cef != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_fold2.parquet: 9ee35054ec3db88678422b6384ea6a2b17f99e3ba4e3444e1823c222982a9613 != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_rows_all.parquet: 06b06a5aaacae0e8124fc1610679b3981bb4f6816b1b0cd87a29f4244a41987d != 0000000000000000000000000000000000000000000000000000000000000000",
+      "hash mismatch decision_ticket_identities.parquet: 270224e5e885b5e1e2e07bd7539533d7ac766943975e955c04772c1475c6a37f != 0000000000000000000000000000000000000000000000000000000000000000"
     ]
   },
   {
@@ -39,7 +39,7 @@
     "attack": "omit_payout_coefficient",
     "detected": true,
     "failures": [
-      "payout coefficient violation ticket 1ac98764003b781d765d5f9e533aa7162e0e335578b31541f81d4fa011aa9f41 CV_2023/23011: multiple=27.382471 expected 0.65*prod(SP)=17.798606 (prod(SP)=27.382471)"
+      "payout coefficient violation ticket 12be01152b041464dbfc2862edbb9fb28091d4f702c7c1f521d01bbf3c04330c CV_2023/23011: multiple=27.382471 expected 0.65*prod(SP)=17.798606 (prod(SP)=27.382471)"
     ]
   },
   {
@@ -54,7 +54,7 @@
     "attack": "compound_coefficient_0_65_n",
     "detected": true,
     "failures": [
-      "payout coefficient violation ticket 1ac98764003b781d765d5f9e533aa7162e0e335578b31541f81d4fa011aa9f41 CV_2023/23011: multiple=4.887942 expected 0.65*prod(SP)=17.798606 (prod(SP)=27.382471)"
+      "payout coefficient violation ticket 12be01152b041464dbfc2862edbb9fb28091d4f702c7c1f521d01bbf3c04330c CV_2023/23011: multiple=4.887942 expected 0.65*prod(SP)=17.798606 (prod(SP)=27.382471)"
     ]
   },
   {
@@ -83,6 +83,13 @@
     "detected": true,
     "failures": [
       "bundle has 7 tickets but K=8"
+    ]
+  },
+  {
+    "attack": "semantic_ticket_order_alias",
+    "detected": true,
+    "failures": [
+      "ticket 808bf9b40e25f0dfe0d12784e044d7abef4de50c7279d864e1d324e976779a67 is not canonical for paired legs"
     ]
   },
   {

@@ -6,6 +6,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PROVENANCE = json.loads(
+    (ROOT / "results" / "issue-208" / "provenance.json").read_text(
+        encoding="utf-8"
+    )
+)
+PRODUCER_COMMIT = PROVENANCE["producer_code_commit"]
 
 cells = []
 def md(text):
@@ -13,7 +19,7 @@ def md(text):
 def code(src):
     cells.append({"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [], "source": src})
 
-md("# Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier\n\nContract BJ-UNIFIED-DYNAMIC-N-001 / v7 (PI takeover of concurrent R7 EV REJECTs), generated from producer-code commit `7ff62c6b01fc6d24716608e3b45527a578722b26`. Primary candidate: per-issue learned action-value policy Q_theta(x,a) (MLPRegressor) on the bounded N×K×lane×capital catalog; controls = Ridge + best fixed action + state-conditioned restricted N/K/N×K policies; 16 preregistered hash seeds aggregated. Payout economics: pre-tax gross multiple = hit × 0.65 × product(official SP), coefficient applied exactly once per winning ticket. Every policy lane scores from its own strictly-prior live history. Exact lag-5/lag-10 use time-zero ¥100,000 until the lag exists in both fit and inference. All terminal fitted objects, selection authority, root-manifest boundary and publication transaction are production-bound. 2024/LOCKED_TEST outcomes remain embargoed. This executed notebook reads only the committed immutable package under `results/issue-208/`.")
+md(f"# Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier\n\nContract BJ-UNIFIED-DYNAMIC-N-001 / v8 C1/E1 closure, generated from producer-code commit `{PRODUCER_COMMIT}`. Primary candidate: per-issue learned action-value policy Q_theta(x,a) (MLPRegressor) on the bounded N×K×lane×capital catalog; controls = Ridge + best fixed action + state-conditioned restricted N/K/N×K policies; 16 preregistered hash seeds aggregated. Payout economics: pre-tax gross multiple = hit × 0.65 × product(official SP), coefficient applied exactly once per winning ticket. Every policy lane scores from its own strictly-prior live history. Exact lag-5/lag-10 use time-zero ¥100,000 until the lag exists in both fit and inference. Ticket identity is the canonical unordered set of paired `(immutable match, outcome)` legs. All terminal fitted objects, selection authority, root-manifest boundary and publication transaction are production-bound. 2024/LOCKED_TEST outcomes remain embargoed. This executed notebook reads only the committed immutable package under `results/issue-208/`.")
 
 code("""from pathlib import Path
 import json
@@ -40,6 +46,17 @@ md("## 1. Data census\n\n171 development issues (CV_2021 58 / CV_2022 58 / CV_20
 
 code("""census = pd.read_csv(PACKAGE / "census.csv")
 census.groupby("split").agg(issues=("issue", "nunique"), mean_M=("M", "mean")).round(1)""")
+
+md("## 1A. C1 paired-leg identity correction\n\nThe superseded package treated leg-order permutations as distinct ticket identities. The correction sorts paired `(immutable match, outcome)` legs together before pool deduplication, serialization and hashing. The before/after evidence is reproduced from exact Git commit `d51bd3e…`; non-WR semantic duplicate rows fall from 1,738 to zero. The correction changes 36/9,744 action-label rows and five control-path endpoints, but the frozen candidate and terminal no-promotion disposition remain unchanged.")
+
+code("""correction = ROOT / "docs" / "research" / "evidence" / "issue-208-r8"
+summary = json.loads((correction / "summary.json").read_text())
+summary""")
+
+code("""duplicate_census = pd.read_csv(correction / "semantic_duplicate_census.csv")
+duplicate_census.groupby(["version", "repeat_semantics"], as_index=False)[
+    "unexpected_semantic_duplicate_rows"
+].sum()""")
 
 md("## 2. Action frontier (counterfactual label surface)\n\nCV_2021 fit fold surface: per-issue × 168 actions, seed-aggregated matched pre-tax capital lift vs frozen N7/K8 incumbent.")
 
@@ -137,7 +154,7 @@ print("handoff model_serialized:", handoff["model"].get("model_serialized"))
 print("handoff scaler_mean present:", handoff["model"].get("scaler_mean") is not None)
 print("handoff model_file:", handoff["model_file"])""")
 
-md("## 10. Package verification + tamper self-tests\n\nThe production verifier checks manifest/receipt/provenance/code binding, the complete 55-frame schema inventory, chronology, issue-level path metrics, dynamic argmax decisions, all fitted objects, selection/handoff authority, capital, N/K bundles and payout economics. All 25 attacks must be detected, including false promotion and nested manifest-name escape.")
+md("## 10. Package verification + tamper self-tests\n\nThe production verifier checks manifest/receipt/provenance/code binding, the complete 55-frame schema inventory, chronology, issue-level path metrics, dynamic argmax decisions, all fitted objects, selection/handoff authority, paired-leg ticket identity, capital, N/K bundles and payout economics. All 26 attacks must be detected, including semantic ticket-order alias, false promotion and nested manifest-name escape.")
 
 code("""from scripts.run_bj208_policy import verify_package
 

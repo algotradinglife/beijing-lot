@@ -1,6 +1,6 @@
 {
   "contract_version": "bj208-dynamic-nk-policy-v7",
-  "elapsed_seconds": 355.8,
+  "elapsed_seconds": 439.9,
   "exact_reviewed_sha_binding": "external producer handoff and independent EV verdict",
   "incumbent": {
     "capital": "NATIVE_2_YUAN",
@@ -14,7 +14,7 @@
     "pre_tax_gross_multiple": "hit * 0.65 * product(official_final_sp_i)",
     "superseded": "product(SP) as pre-tax gross; division by 0.65; 0.65^N"
   },
-  "producer_code_commit": "7ff62c6b01fc6d24716608e3b45527a578722b26",
+  "producer_code_commit": "d2e1f9c4f74c61b8e174a09f6d54c7dc79625be5",
   "req_evidence": [
     {
       "evidence": [

@@ -1,7 +1,8 @@
 # Issue #208 — dynamic N×K and risk-conditioned parlay policy frontier
 
-PI takeover v7 (concurrent EV REJECTs at `feed021a`), generated from producer-code commit
-`7ff62c6b01fc6d24716608e3b45527a578722b26`. Contract BJ-UNIFIED-DYNAMIC-N-001 / v7.
+PI takeover v8 C1/E1 closure, generated from producer-code commit
+`d2e1f9c4f74c61b8e174a09f6d54c7dc79625be5`. Contract BJ-UNIFIED-DYNAMIC-N-001 / v7
+with the append-only C1/E1 correction recorded below.
 Research and paper settlement only. No betting, release, or frontend authority
 follows from this result.
 
@@ -97,6 +98,44 @@ CV_2022 incumbent path, for example, ends underwater and now reports
 `max_recovery_issues=0 / open_underwater_issues=58` (previously the open
 episode was mislabeled as a completed 58-issue recovery).
 
+## Paired-leg ticket identity and publication closure (v8 C1/E1)
+
+The finalize audit at superseded HEAD `d51bd3e…` found that candidate-pool
+deduplication sorted matches without synchronously reordering outcomes. A
+parlay is an unordered set of paired `(immutable match, outcome)` legs; the
+old implementation could therefore treat an order-only permutation as a new
+ticket. The corrected implementation sorts the paired legs together before
+serialization and hashing, deduplicates candidate pools by that canonical
+identity, and independently rejects order aliases in every WOR/top-K selector
+and the production verifier. `match_indices` now carries immutable match ids
+rather than transient panel row positions.
+
+Exact before/after evidence is committed under
+`docs/research/evidence/issue-208-r8/` and is reproducible with
+`scripts/analyze_bj208_c1_correction.py`:
+
+- unexpected semantic duplicate rows in non-WR bundles: **1,738 → 0**;
+- action-label rows changed: **36 / 9,744**, across 7 issues and 30 actions;
+- maximum absolute per-issue `matched_lift_mean` correction: **¥54,170.80**;
+- payout aggregates changed in **46** `(split,N,K,lane,seed)` groups;
+- five control-path ending capitals changed, maximum absolute delta
+  **¥366.07**;
+- the learned decision action, safety-gate result, frozen candidate and final
+  disposition did **not** change.
+
+The scientific interpretation is deliberately two-part. The terminal
+no-promotion conclusion survives, but the large local label corrections show
+that the superseded action surface was not trustworthy merely because the
+terminal fallback happened to be unchanged. This is evidence against
+overinterpreting isolated positive grid cells, not evidence for the null.
+
+The E1 correction transfers ownership of the obsolete backup out of the outer
+rollback path before cleanup starts. If backup deletion succeeds and its
+parent-directory fsync then fails, the verified new package remains visible;
+the generic rollback cannot delete it while attempting to restore a missing
+backup. `_fsync_tree` also flushes every nested directory bottom-up. Fault
+tests cover this cleanup-fsync boundary and immediate retry.
+
 ## Terminal decisions (PI takeover v7)
 
 - `ELIGIBLE_CANDIDATE=false`: the safety-gated learned policy passes the
@@ -124,14 +163,14 @@ episode was mislabeled as a completed 58-issue recovery).
 
 | Control | Ending capital ¥ | Note |
 |---|---|---|
-| static_n8k8 | 100,218.21 | static N=8 K8 native ¥2 |
+| static_n8k8 | 100,584.27 | static N=8 K8 native ¥2 |
 | cash_no_bet | 100,000.00 | safety reference (funded=0) |
 | fixed_n7_dynamic_k | 99,798.87 | per-issue scorer selects K8 on all 55 issues |
 | static_n5k8 | 99,710.20 | |
 | static_n4k8 | 99,609.10 | |
-| dynamic_n_fixed_k8_lane | 99,609.10 | scorer varies, selected action collapses to N4 |
+| dynamic_n_fixed_k8_lane | 99,593.80 | scorer varies, selected action collapses mostly to N4 |
 | best_fixed_policy | 99,569.54 | best train-fold fixed cell: N4/K8/MARKET_WR/native |
-| dynamic_nk_fixed_generator | 99,491.24 | state-conditioned; N varies, K remains 8 (v7 lag semantics) |
+| dynamic_nk_fixed_generator | 99,535.41 | state-conditioned; N varies, K remains 8 |
 | static_n9k8 | 99,403.42 | |
 | static_n6k8 | 99,387.50 | |
 | generator_change_n7k8 | 99,338.59 | MARKET_WR lane at N7/K8 |
@@ -142,16 +181,17 @@ episode was mislabeled as a completed 58-issue recovery).
 | n7k16_sensitivity | 99,106.12 | K16 native ¥2 |
 | capital_change_identical | 62,178.64 | EQUAL_1PCT on identical tickets, corrected multiples |
 
-Note: v7 changes the dynamic N×K control from v6 ¥99,487.45 to ¥99,491.24 by
-making fit-time lag warm-up identical to live inference. This is a causal-state
-correction, not evidence of Edge; the terminal conclusion is unchanged.
+Note: the v8 paired-leg correction changes static N8 from ¥100,218.21 to
+¥100,584.27 and dynamic N×K from ¥99,491.24 to ¥99,535.41 on CV_2023. These
+are corrected diagnostics, not promotion: static N8 still ends only ¥99,072
+on CV_2022 and the learned candidate remains safety-gated to the incumbent.
 
 Key attribution findings (REQ-208-05):
 
-- **N**: the frontier is not monotone or stable. Static N=8 reaches ¥100,218
+- **N**: the frontier is not monotone or stable. Static N=8 reaches ¥100,584
   on CV_2023 but ends ¥99,072 on CV_2022. The state-conditioned N-only scorer
   chooses N4 on 112 issues and N10 on 1 CV_2023 issue; joint N×K varies N across
-  3 values on CV_2022 and 6 values on CV_2023, but ends ¥99,509 / ¥99,491 and does not beat the
+  3 values on CV_2022 and 6 values on CV_2023, but ends ¥99,497 / ¥99,535 and does not beat the
   strongest fixed control. The one-fold N8 gain is therefore a diagnostic
   sweet spot, not a promotion.
 - **K**: the state-conditioned K-only scorer chooses K8 in every issue, and
@@ -190,6 +230,12 @@ verifier), `dynamic_control_decisions.parquet` (per-issue scores/actions),
 `fitted_object_inventory.json`, `holdout_mutation_receipt.json`,
 `selection.json`, `handoff_209.json`.
 
+The C1 correction evidence is separately committed as
+`semantic_duplicate_census.csv`, `corrected_result_delta.csv`,
+`label_surface_delta.csv`, `capital_endpoint_delta.csv` and `summary.json`
+under `docs/research/evidence/issue-208-r8/` so the scientific runner does not
+carry one-off compatibility logic for a superseded package.
+
 ## REWORK-E09 same-category sweep evidence (REWORK v3 payout-economics)
 
 For the PI payout-economics defect class, the FULL payout/expected-value call
@@ -227,7 +273,23 @@ surface was swept (not just the four reported instances):
    frozen (manifest `48c11d97…`); the supersession is recorded in
    PROTOCOL-LOG #208-7/#208-8 and #208 never consumes that field.
 
-## PI takeover v7 closure evidence (concurrent EV REJECTs at feed021a)
+## PI takeover v8 closure evidence (finalize C1/E1 correction)
+
+Producer commit `d2e1f9c4f74c61b8e174a09f6d54c7dc79625be5` closes both finalize blockers:
+
+1. canonical paired-leg identity is enforced at candidate generation,
+   selector entry and production verification; a dedicated
+   `semantic_ticket_order_alias` attack is detected;
+2. cleanup-fsync failure cannot remove the verified new package, nested
+   directory metadata is fsynced bottom-up, and immediate retry succeeds.
+
+The bound replay completed in 1,154 seconds; 87 focused tests passed; Ruff and
+`git diff --check` passed; production verification reports **26/26 attacks
+detected**. The package has 79 files: all 78 non-manifest files are bound.
+The final no-promotion result is unchanged, while the corrected intermediate
+surface is explicitly reported rather than hidden by the unchanged fallback.
+
+## PI takeover v7 historical closure evidence (concurrent EV REJECTs at feed021a)
 
 The v7 rework merges both exact-HEAD audits and closes five categories without
 changing the action grid, model families, seeds, selection rule or payout:
@@ -245,9 +307,10 @@ changing the action grid, model families, seeds, selection rule or payout:
 5. Atomic publication restores visible last-good on first/second fsync and
    rename faults; post-verify rollback and cleanup remain independently tested.
 
-Full replay completed in 1,112 seconds; 81 focused tests passed; production
+The superseded v7 replay completed in 1,112 seconds; 81 focused tests passed; production
 verification reports 25/25 attacks detected. The package has 79 files: all 78
-non-manifest files are bound. The scientific no-promotion result is unchanged.
+non-manifest files were bound. The later C1/E1 audit showed that reproducibility
+did not prove the ticket-label surface correct; v8 supersedes this closure claim.
 
 ## REWORK v4/v6 historical closure evidence (EV REJECT ea1fc51)
 
@@ -343,6 +406,10 @@ the exact remaining categories from the two EV REJECTs at `42b6e386`:
 - Dynamic score variation does not guarantee useful decision variation: N-only
   changes on only one issue and K-only remains fixed. Any next model must improve the
   state representation/target, not merely rerun a denser fixed grid.
+- The C1 correction changed only 36/9,744 action-label rows but moved one row by
+  ¥54,170.80. Sparse implementation errors can therefore dominate apparent
+  tail Edge; future positive cells require paired-leg identity verification and
+  cross-period replication before interpretation.
 
 ## Replay
 
@@ -350,4 +417,6 @@ the exact remaining categories from the two EV REJECTs at `42b6e386`:
 PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208
 PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py verify --output results/issue-208
 PYTHONPATH=src .venv/bin/python -m pytest tests/test_bj208_*.py
+PYTHONPATH=src .venv/bin/python scripts/analyze_bj208_c1_correction.py
+PYTHONPATH=src .venv/bin/python scripts/build_bj208_notebook.py
 ```
