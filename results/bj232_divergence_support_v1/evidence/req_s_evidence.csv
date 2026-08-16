@@ -1,0 +1,11 @@
+requirement,name,pass,detail
+REQ-S01,Source identity and causal observed-at proof,True,decision-epoch SP triplets carry source_identity + observed_at_utc; zero recovered triplets remain an explicit empty receipt
+REQ-S02,Identity reconciliation without silent drops,True,every source row is counted through IDENTITY_JOIN; non-matching rows = 350772 with explicit reason
+REQ-S03,Probability triplet validity,True,"recovered triplets finite, bounded, normalized within tolerance"
+REQ-S04,Common native handicap outcome space,True,"all comparisons published on native 3/1/0 space; POWER line reconciliation enforced on identical (issue, match_idx, line); EU translation only on legal zero line, non-zero reported TRANSLATION_NOT_IDENTIFIABLE"
+REQ-S05,SP separate from probability,True,raw SP prices (SP_3/1/0) and normalized inverse (Q_BJ_SP_DEVIG) are distinct columns
+REQ-S06,Support waterfall reconstruction,True,waterfall table covers RAW..CAUSAL_INTERSECTION per source with reason codes
+REQ-S07,Label boundary sealed,True,this package opens no settlement/result table; cohort assignment uses #203 identity year only; 2024+ remain sealed
+REQ-S08,Issue-level modelability,True,interface summary reports fit/tune/calibration/later issues and matches
+REQ-S09,#229 debt E1-E4 closure,True,"{""all_closed"": true, ""e1_binding"": {""audited_sha"": ""0000000000000000000000000000000000000000"", ""binding_mode"": ""external_ev_review"", ""status"": ""BOUND""}, ""e2_schema_problems"": [], ""e3_crash_restart_probe"": true, ""e3_journal_consistent"": true, ""e4_protocol_problems"": []}"
+REQ-S10,Reviewed-HEAD binding,True,AUDITED_SHA.json binds the externally reviewed 40-hex HEAD

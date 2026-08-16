@@ -1,0 +1,12 @@
+{
+  "all_closed": true,
+  "e1_binding": {
+    "audited_sha": "0000000000000000000000000000000000000000",
+    "binding_mode": "external_ev_review",
+    "status": "BOUND"
+  },
+  "e2_schema_problems": [],
+  "e3_crash_restart_probe": true,
+  "e3_journal_consistent": true,
+  "e4_protocol_problems": []
+}

@@ -1,73 +1,79 @@
-# Issue #229 R4 PI takeover handoff
+# Issue #232 — causal SP-backed divergence support handoff
 
-[SESSION] 20260815_150526_cb81c5
+[SESSION] 20260816_035949_fe1511f8
 
-- Current delivery HEAD is bound externally by the independent EV
-  `AUDITED_SHA`; a Git commit cannot embed its own SHA.
-- R4 is a PI-owned candidate-mode correction against R3 audited SHA
-  `6c5cdf36ea77d94be1ed69eca50f9d0f6b6accda`.
+## Current HEAD
 
-## Conclusion correction
+Worktree branch `engineer/bj232-issue` based on origin/main @ 8c597e3
+(accepted #229 PR #231 HEAD c2d43cb).
 
-- Readiness no longer accepts anchor-only support. It requires a causal
-  pre-event SP plus at least one independent EU/POWER divergence pair.
-- POWER materialization now fails closed when its source handicap line differs
-  from the target BJ line.
-- Empty chart sources are explicit unavailable receipts, not `BOUND` tables.
-- The present package therefore concludes `BLOCKED_DATA_DEFECT`.
+## What was done
+
+Built a new reusable package `src/divergence_support/` and published the
+immutable evidence package `results/bj232_divergence_support_v1/` answering
+the #232 controlling question: do existing or recoverable pre-event sources
+produce issue-level causal SP support for #209?
+
+Deliverables:
+- `src/divergence_support/` — contract, census, waterfall (REQ-S06),
+  diagnosis, recovery (decision-epoch SP triplets separate from de-vig,
+  REQ-S05), reconciliation, modelability (REQ-S08), debt E1-E4 (REQ-S09),
+  builder.
+- `scripts/build_bj232_divergence_support.py` (build/verify/manifest),
+  `scripts/execute_bj232_notebook.py`.
+- `notebooks/research/issue-232/bj232_support_waterfall.ipynb` (executed,
+  23 cells, 0 errors).
+- `results/bj232_divergence_support_v1/` — census, waterfall, diagnosis,
+  triplets, devig, relationship, reconciliation, modelability tables,
+  REQ-S evidence, schema, DEBT_CLOSURE, MANIFEST, SHA256SUMS, REPLAY.
+- `tests/test_bj232_divergence_support.py` — 16 focused + tamper tests.
+- Roadmap update in `docs/research/roadmap.md`.
 
 ## Key decisions and reasons
 
-1. Raw list-vector presence never implies availability. Q_BJ has 353,991 raw
-   rows but 228 causal rows; POWER has 4,674 raw rows but 234 causal rows.
-2. Missing source observation time remains missing. The decision epoch is never
-   copied into an observed-at field.
-3. Issue identifiers are identifiers, not years. Label year is sourced only
-   from #203 identity.
-4. Empty causal intersections are committed as explicit receipts/placeholders,
-   not filled, omitted or called ready.
-5. Exact review binding is external through `AUDITED_SHA`; package content
-   remains bound by code/notebook/dependency/source hashes.
+1. Terminal disposition is `UNRECOVERABLE_WITH_CURRENT_SOURCES`. The
+   waterfall proves: #214 SP observations (16,496 rows, issues 26051-26083,
+   captured from 2026-05-02) begin exactly where the Q_BJ anchor causal axis
+   ends (26049). No timestamped pre-event SP exists for any historical
+   cohort in any committed or recoverable asset; #203's DATA_CARD
+   adjudicates historical official 3SP as label-only.
+2. Decision-epoch SP triplets ARE recoverable — 741 matches / 17 issues /
+   2,223 cells (all 2026) — but they never intersect the Q_BJ anchor
+   (2026-only, issues 26011-26049).  Raw SP prices and normalized de-vig are
+   separate columns; the normalize(1/SP) relationship is proven per row.
+3. EU de-vig has 2,976 causal cells on historical issues; POWER has 234
+   causal cells (78 matches) on historical issues; neither overlaps the
+   Q_BJ anchor (2026-only), so all three modelability interfaces are zero.
+4. #229 evidence debt E1-E4 is closed in this package: external 40-hex
+   `AUDITED_SHA` receipt, physical row identity/domain schema, crash-restart
+   journal with kill/restart probe, append-only hash-chained protocol log.
 
 ## Verification
 
-- R4 focused/full tests: 92 passed.
+- Focused + tamper tests: 108 passed (16 new #232 + #229 suites).
 - Ruff and `git diff --check`: PASS.
-- Sequential build: 29:01 wall; 2,827,008 KiB peak RSS.
-- Notebook: 13/13 cells; 0 errors; 29:29 wall; 2,852,356 KiB peak RSS.
-- Final verifier: 74 files match and semantic checks PASS.
+- Build via CLI: disposition `UNRECOVERABLE_WITH_CURRENT_SOURCES`;
+  debt closure all_closed=True; 10/10 REQ-S evidence rows pass.
+- Verify via CLI: 27 files match SHA256SUMS.json; semantic checks PASS
+  (evidence/schema/debt/waterfall replay/binding).
+- Notebook: 23/23 cells, 0 errors; notebook hash bound in MANIFEST.
+- Waterfall ledger replays exactly: RAW - DROPs == rows; EXPAND == rows*3
+  (or *1 for cell-level EU); EXPAND - cell DROPs == final cells.
 
-## Known limitations and risks
+## Known limitations / risks
 
-- Disposition is `BLOCKED_DATA_DEFECT`.
-- Q_BJ causally available: 228 cells.
-- Q_EU_BJLINE causally available: 0; P_POWER causally available: 234, but no
-  causal overlap with Q_BJ; no causal divergence rows are published.
-- Q_BJ_SP_DEVIG causally available: 0.
-- REQ-D01 remains False due to 15 post-decision cells, 68,298 missing timestamp
-  entries, 37,614 observed-after-epoch feature rows, and 677,394 raw-present/
-  no-causal-epoch rows. Available-set violations are zero.
-- 2024+ labels remain sealed with zero handoff rows.
+- The E1 `AUDITED_SHA.json` currently carries the placeholder 40-hex; EV
+  review must replace it with the exact reviewed PR HEAD before finalize
+  (`--audited-sha <40hex>` on the build CLI).
+- Raw recoverable assets (official 3SP export, live collector snapshots,
+  sp-drift panel, 500.bjdc captures) are gitignored on the producer machine;
+  this checkout records them ABSENT. The conclusion does not depend on them:
+  even the lenient official-3SP timestamp gate yields only 102 candidate
+  rows, all 2026 and identity-only in #203.
+- No model fitting, no 0.65 at cell level, no 2024+ outcome opened.
 
-## PI acceptance block
+## Next step
 
-| Acceptance criterion | Evidence/result |
-|---|---|
-| D01 causal provenance | Honest FAIL; masks fail closed; 0 available-set violations |
-| D02 identity | PASS; unique package-local `cell_key` and FK closure |
-| D03 probability validity | PASS; invalid triplets 0 |
-| D04 outcome/line mapping | PASS; float half-goal mapping and explicit failures |
-| D05 divergence semantics | PASS; per-cell recomputation; no raw-only support |
-| D06 settlement isolation | PASS; authoritative development/sealed split |
-| D07 payout boundary | PASS; no payout/tax/0.65 construction in payloads |
-| D08 complete profiling | PASS; source×outcome×cohort plus empty receipts |
-| D09 schema/provenance | PASS; 47 tables; package-only semantic validator |
-| D10 honest readiness | PASS; `BLOCKED_DATA_DEFECT` because required causal intersections are zero |
-| REQ-M | N/A; no `method.yaml` in contract tree |
-
-Decision: #209 may not proceed from this handoff. A separate native
-data-remediation predecessor must create causal SP-backed divergence support.
-
-Explicit review request: EV should independently rerun 87 tests, the seven
-remanifest mutations, package verify, notebook 13/13, authoritative label-year
-counts, and raw-versus-causal source counts before PI review.
+EV audit (fresh checkout, re-run tests/notebook/verify, tamper checks),
+then PI review of the `UNRECOVERABLE_WITH_CURRENT_SOURCES` receipt and the
+#209 data-capability decision.

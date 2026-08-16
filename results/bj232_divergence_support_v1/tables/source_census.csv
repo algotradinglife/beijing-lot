@@ -1,0 +1,9 @@
+key,committed,grade,present,hash_receipt,rows,issue_min,issue_max,timestamp_min,timestamp_max,clock,note
+bj214_selected_market_observations,True,accepted_decision_epoch_tensor,True,74acd40670d7efc4,16496,26051,26083,2026-05-02T01:02:41+00:00,2026-08-07T09:51:29+00:00,snapshot_ts_utc,#214 selected decision-epoch BJ SP observations.
+full_3sp_official,False,official_3sp_settlement_page,False,,0,,,,,last_update_ts,Official 500.com 3SP export; #203 DATA_CARD adjudicates historical official 3SP as label-only (no trustworthy observation timestamp). [ASSET ABSENT]
+beidan_live_snapshots,False,live_collector_timestamped,False,,0,,,,,snapshot_ts,Live collector snapshots; observed 2026-05+ only. [ASSET ABSENT]
+sp_drift_panel,False,derived_timestamped_panel,False,,0,,,,,snapshot_ts,SP drift research panel; observed 2026-05+ only. [ASSET ABSENT]
+500_bjdc_live_sp_snapshots,False,live_collector_timestamped,False,,0,,,,,fetched_at,500.bjdc live SP captures; observed 2026-06+ only. [ASSET ABSENT]
+bj203_devig_euro_probability,True,accepted_causal_tensor,True,e95f23734e76cfb9,332718,190101,26069,,,euro_1h_available_ts_utc,#203 per-cell de-vig EURO probability with observed-at.
+bj204_avg_eu,True,accepted_market_anchor,True,f22489a67227b9df,357705,190101,26049,,,euro_1h_available_ts_utc,#204 avg-EU market cells (same value as Q_BJ on avg-EU cells).
+bj180_match_probability_freeze,True,accepted_unpromoted_expert,True,222d1ad3d862eba4,1558,20012,25042,2020-01-11T03:00:00+00:00,2025-04-10T00:00:00+00:00,feature_cutoff_ts,#180 team/matchup probability freeze with per-match cutoff.

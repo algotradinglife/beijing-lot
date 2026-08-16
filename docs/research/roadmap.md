@@ -191,6 +191,29 @@ retrospective feature.
   closed and #208 was explicitly activated as the dynamic N×K research step.
 - Evidence: [`issue_207_fixed_n7_bankroll.md`](issue_207_fixed_n7_bankroll.md).
 
+### #229/#232 causal divergence data readiness (M1)
+
+- #229 delivered the M×3 divergence profile and concluded
+  `BLOCKED_DATA_DEFECT`: Q_BJ_CALIBRATED 228 causal cells (all 2026),
+  P_POWER_BJLINE 234 causal cells (historical, no Q_BJ overlap), Q_EU_RAW_1X2
+  2,976 causal cells (historical), Q_BJ_SP_DEVIG 0, and zero causal
+  `Q_BJ × SP` / `Q_BJ × EU × SP` / `Q_BJ × POWER × SP` intersection.
+- #232 ran the mandated loss-of-support remediation and published the exact
+  unrecoverable-data receipt: disposition `UNRECOVERABLE_WITH_CURRENT_SOURCES`.
+  Waterfall: #214 SP observations (16,496 rows) begin 2026-05-02 (issues
+  26051+) exactly where the Q_BJ anchor causal axis ends (26049); no
+  timestamped pre-event SP exists for any historical cohort in any committed
+  or recoverable asset. Decision-epoch SP triplets ARE recoverable for 17
+  2026 issues (741 matches / 2,223 cells) but never intersect the anchor.
+  Historical EU (2,976 cells) and POWER (234 cells) causal cells never overlap
+  the 2026-only anchor. #229 debt E1-E4 is closed in the #232 package.
+- Evidence: [`results/bj232_divergence_support_v1/`](../../results/bj232_divergence_support_v1/)
+  and executed notebook
+  [`notebooks/research/issue-232/bj232_support_waterfall.ipynb`](../../notebooks/research/issue-232/bj232_support_waterfall.ipynb).
+- #209 remains blocked by data availability: chronological divergence
+  learning is impossible with current sources until a PI-owned data capability
+  delivers timestamped historical pre-event SP.
+
 [#182]: https://github.com/algotradinglife/beijing-lot/issues/182
 [#192]: https://github.com/algotradinglife/beijing-lot/issues/192
 [#202]: https://github.com/algotradinglife/beijing-lot/issues/202
