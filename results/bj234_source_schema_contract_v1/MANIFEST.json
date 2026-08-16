@@ -9,6 +9,7 @@
   "mode": "candidate",
   "notebook_hash": "cc724081d7536d45038760c6d66e710523011b9272d5f9b46daed555cf9e3238",
   "requirements_hash": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
+  "same_class_sweep": "contract/same_class_sweep.md",
   "source_hashes": {
     "500_bjdc.sqlite": "4f03aca4aadbc1d370959209cf445edd5251dc060b2f502d0533e33809c6eadd",
     "beidan_features.db": "48d73b868235a78d73ea2587d5a2cd9094a861b605bfcd6447604bb90a650bf7",
