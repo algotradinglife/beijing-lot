@@ -2,7 +2,7 @@
   "code_bindings": {
     "method.yaml": "d2a8c5345d67ecf40c23820744b9032f1a52198f092f7fda9ae01f1f292bb97e",
     "requirements.txt": "4c2368d0fe36fdd257dd707c4e6d0e6b68ab232e7b6541e9df1e2c2cce292c78",
-    "scripts/run_bj208_policy.py": "6f5817ed33a513f33c8049aba1da801dc3edddb244ce3fe8a7030b8a1f17c30d",
+    "scripts/run_bj208_policy.py": "0492260dedd77baab40e6e5fa3b0f4bed9bad2c582f9a6d4ae50d7fddc246104",
     "src/parlay_policy/__init__.py": "dfa9d9829f46c405485807396b8a420bb847149400970a027be697625a938c4d",
     "src/parlay_policy/census.py": "fd16ef854ae66485cc2156e8433ea4c90f454bb4cda5dfcff7c53173e038f4b5",
     "src/parlay_policy/contract.py": "d69acda57d19e3f9a897948f43661bba14d675e8bb1b4c7ef60beded8a9d1b4b",
@@ -24,7 +24,7 @@
   },
   "environment_lock_sha256": "e1cef58d570fc754d620beae42bc898a382e59c6293fdd515c4929cefba7eab6",
   "label_boundary": "CV_2021 fit; CV_2022/CV_2023 development; 2024/2025/2026 embargoed",
-  "producer_code_commit": "d2e1f9c4f74c61b8e174a09f6d54c7dc79625be5",
+  "producer_code_commit": "badd44386aeb06c04aef457465940a82b6575e74",
   "replay": "PYTHONPATH=src .venv/bin/python scripts/run_bj208_policy.py run --output results/issue-208",
   "source_issue_207": "results/issue-207",
   "source_issue_207_manifest_sha256": "48c11d971c20cb2239cd342ade4084bea484686bd106253c77a320ba7ae78ab6",
