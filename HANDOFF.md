@@ -63,16 +63,19 @@ Fix — three lines of defence:
 
 ## Replay results (completed 2026-08-16)
 
-- `run --output results/issue-208`: EXIT=0, COMPLETED.
+- `run --output results/issue-208`: EXIT=0, elapsed 1060.6s, COMPLETED.
 - Production verifier: `verify ok; tamper detected=26` (26/26 attacks).
 - Selection: `eligible=false`, median matched lift 0.0, positive folds 0,
   candidate=frozen `N7/K8/MARKET_WOR/NATIVE_2_YUAN` (unchanged vs v9).
 - Handoff: candidate=fallback=FROZEN_N7_INCUMBENT; `2024_opened=false`.
 - Science frames byte-identical to v9: only COMPLETED.json, SHA256SUMS.json,
-  decision.json, provenance.json changed (execution metadata — the expected
-  delta set).
+  decision.json, provenance.json changed (elapsed / execution metadata —
+  the expected delta set; producer_code_commit now `0e7e27b` which contains
+  the v10 runner code). All 55 CSV/Parquet frames, 9 joblib models and the
+  remaining JSON artifacts are unchanged.
 - Fold endings reproduce EV exactly: CV_2022 99072.00/99072.00,
   CV_2023 99245.37814957523/99245.37814957523.
+- Notebook rebuilt + executed: 20/20 code cells, 0 errors.
 - `method_preflight.py --worktree <r11>`: PASS.
 
 ## Known issues
